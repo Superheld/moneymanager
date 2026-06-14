@@ -2,6 +2,7 @@
 // Adapter (z. B. SQLite) implementieren sie; der Kern kennt sie nicht.
 
 import type {
+  Budget,
   Kategorie,
   Person,
   Vertrag,
@@ -36,5 +37,11 @@ export interface KategorieRepository {
 export interface VertragRepository {
   alle(): Promise<Vertrag[]>;
   speichern(vertrag: Vertrag): Promise<void>;
+  loeschen(id: string): Promise<void>;
+}
+
+export interface BudgetRepository {
+  alle(): Promise<Budget[]>;
+  speichern(budget: Budget): Promise<void>;
   loeschen(id: string): Promise<void>;
 }

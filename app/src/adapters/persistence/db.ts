@@ -68,6 +68,17 @@ const MIGRATIONS: Migration[] = [
       `ALTER TABLE zahlungsregel ADD COLUMN vertrag_id TEXT`,
     ],
   },
+  {
+    version: 4, // P2.2 — Budgets
+    sql: [
+      `CREATE TABLE IF NOT EXISTS budget (
+        id           TEXT PRIMARY KEY,
+        kategorie_id TEXT    NOT NULL,
+        rahmen       INTEGER NOT NULL,
+        periode      TEXT    NOT NULL
+      )`,
+    ],
+  },
 ];
 
 async function migrate(db: Database): Promise<void> {
