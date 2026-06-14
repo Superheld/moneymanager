@@ -64,4 +64,4 @@ Deutsch, Anrede „du", keine Emoji.
 
 ## Lizenz
 
-Privat / unveröffentlicht (Stand v0.1).
+[MIT](LICENSE) — frei nutzbar, veränderbar und weiterverteilbar. Beiträge willkommen.
