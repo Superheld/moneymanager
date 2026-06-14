@@ -8,3 +8,4 @@ export * from "./person";
 export * from "./konto";
 export * from "./kategorie";
 export * from "./vertrag";
+export * from "./budget";
