@@ -204,6 +204,38 @@ body {
   display: flex;
   justify-content: flex-end;
 }
+
+/* --- Kategorie-Baum (Hauptgruppe → Unterkategorien) --- */
+.katgroup {
+  margin-bottom: var(--sp-2);
+}
+.katrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.katrow .nm {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.katmain .nm {
+  font-weight: var(--fw-bold);
+}
+.katchild {
+  padding-left: var(--sp-6);
+}
+.katchild .nm {
+  color: var(--ink-2);
+  font-size: var(--fs-sm);
+}
+.katchild .nm::before {
+  content: "└ ";
+  color: var(--ink-3);
+}
 .linkbtn {
   background: none;
   border: none;

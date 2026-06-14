@@ -37,14 +37,13 @@ export function StammdatenScreen() {
   }, []);
 
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
-  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
 
   return (
     <div className="screen">
       <PageHead title="Stammdaten" subtitle="Haushalt — der eine Datenbestand · Personen · Konten · Kategorien" />
       <PersonenCard personen={personen} onChange={laden} />
       <KontenCard konten={konten} personen={personen} personName={personName} onChange={laden} />
-      <KategorienCard kategorien={kategorien} kategorieName={kategorieName} onChange={laden} />
+      <KategorienCard kategorien={kategorien} onChange={laden} />
     </div>
   );
 }
@@ -187,12 +186,28 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
   );
 }
 
-function KategorienCard({ kategorien, kategorieName, onChange }: { kategorien: Kategorie[]; kategorieName: Map<string, string>; onChange: () => void }) {
+function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onChange: () => void }) {
   const [offen, setOffen] = useState(false);
   const [name, setName] = useState("");
   const [elternId, setElternId] = useState("");
   const [defaultCharakter, setDefaultCharakter] = useState<Charakter>("Aufwand");
   const [fehler, setFehler] = useState<string | null>(null);
+
+  // Baum aufbauen: Wurzeln (Hauptgruppen) + ihre direkten Kinder.
+  const ids = new Set(kategorien.map((k) => k.id));
+  const wurzeln = kategorien.filter((k) => !k.elternId || !ids.has(k.elternId));
+  const kinderVon = (id: string) => kategorien.filter((k) => k.elternId === id);
+
+  function zeile(k: Kategorie, haupt: boolean) {
+    return (
+      <div key={k.id} className={`katrow ${haupt ? "katmain" : "katchild"}`}>
+        <span className="nm">
+          {k.name} <Pill variant={CHARAKTER_PILL[k.defaultCharakter]}>{k.defaultCharakter}</Pill>
+        </span>
+        <button className="linkbtn" onClick={() => kategorieRepo.loeschen(k.id).then(onChange)}>löschen</button>
+      </div>
+    );
+  }
 
   async function anlegen() {
     setFehler(null);
@@ -221,15 +236,14 @@ function KategorienCard({ kategorien, kategorieName, onChange }: { kategorien: K
       {kategorien.length === 0 ? (
         <div className="muted">Noch keine Kategorien. „Standard laden" legt einen sinnvollen Default-Baum an.</div>
       ) : (
-        <DataTable
-          columns={[
-            { key: "name", label: "Name" },
-            { key: "eltern", label: "Eltern", render: (k) => (k.elternId ? kategorieName.get(k.elternId) ?? "?" : "—") },
-            { key: "charakter", label: "Default-Charakter", render: (k) => <Pill variant={CHARAKTER_PILL[k.defaultCharakter as Charakter]}>{k.defaultCharakter}</Pill> },
-            { key: "_x", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => kategorieRepo.loeschen(k.id).then(onChange)}>löschen</button> },
-          ]}
-          rows={kategorien}
-        />
+        <div>
+          {wurzeln.map((w) => (
+            <div key={w.id} className="katgroup">
+              {zeile(w, true)}
+              {kinderVon(w.id).map((c) => zeile(c, false))}
+            </div>
+          ))}
+        </div>
       )}
       {offen && (
         <Modal
