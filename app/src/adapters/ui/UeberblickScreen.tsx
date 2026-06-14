@@ -7,11 +7,17 @@ import {
   formatBetrag,
   projiziereVerlauf,
   type Charakter,
+  type Kategorie,
   type Rhythmus,
+  type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
 import { zahlungsregelAnlegen } from "../../application/zahlungsregelAnlegen";
 import { sqliteZahlungsregelRepository as repo } from "../persistence/sqliteZahlungsregelRepository";
+import {
+  sqliteKategorieRepository as kategorieRepo,
+  sqliteZahlungskontoRepository as kontoRepo,
+} from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
 
 const MONATE = 12;
@@ -45,6 +51,8 @@ const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
 export function UeberblickScreen() {
   const ab = useMemo(aktuellerMonatAb, []);
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
+  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
+  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [startsaldoEuro, setStartsaldoEuro] = useState(2000);
 
   const [bezeichnung, setBezeichnung] = useState("");
@@ -52,10 +60,21 @@ export function UeberblickScreen() {
   const [rhythmus, setRhythmus] = useState<Rhythmus>("monatlich");
   const [charakter, setCharakter] = useState<Charakter>("Aufwand");
   const [startdatum, setStartdatum] = useState(ab);
+  const [kontoId, setKontoId] = useState("");
+  const [kategorieId, setKategorieId] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
 
   async function laden() {
     setRegeln(await repo.alle());
+    setKonten(await kontoRepo.alle());
+    setKategorien(await kategorieRepo.alle());
+  }
+
+  // Kategorie wählen → Default-Charakter übernehmen (Glossar-Logik sichtbar machen).
+  function kategorieWaehlen(id: string) {
+    setKategorieId(id);
+    const k = kategorien.find((x) => x.id === id);
+    if (k) setCharakter(k.defaultCharakter);
   }
 
   useEffect(() => {
@@ -71,6 +90,9 @@ export function UeberblickScreen() {
   const summeZu = verlauf.reduce((s, m) => s + m.zufluss, 0);
   const summeAb = verlauf.reduce((s, m) => s + m.abfluss, 0);
 
+  const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
+  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
+
   async function anlegen() {
     setFehler(null);
     try {
@@ -80,9 +102,13 @@ export function UeberblickScreen() {
         rhythmus,
         startdatum,
         charakter,
+        kontoId: kontoId || undefined,
+        kategorieId: kategorieId || undefined,
       });
       setBezeichnung("");
       setBetragEuro("");
+      setKontoId("");
+      setKategorieId("");
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -144,11 +170,31 @@ export function UeberblickScreen() {
               ))}
             </select>
           </FormField>
+          <FormField label="Kategorie" hint="setzt den Charakter vor">
+            <select className="field" value={kategorieId} onChange={(e) => kategorieWaehlen(e.target.value)}>
+              <option value="">— keine —</option>
+              {kategorien.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </select>
+          </FormField>
           <FormField label="Charakter">
             <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
               {CHARAKTERE.map((c) => (
                 <option key={c.wert} value={c.wert}>
                   {c.label}
+                </option>
+              ))}
+            </select>
+          </FormField>
+          <FormField label="Konto" hint="optional">
+            <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
+              <option value="">— keins —</option>
+              {konten.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.bezeichnung}
                 </option>
               ))}
             </select>
@@ -186,6 +232,8 @@ export function UeberblickScreen() {
                 render: (r) => <Pill variant={CHARAKTER_PILL[r.charakter as Charakter]}>{r.charakter}</Pill>,
               },
               { key: "rhythmus", label: "Rhythmus" },
+              { key: "kategorie", label: "Kategorie", render: (r) => (r.kategorieId ? kategorieName.get(r.kategorieId) ?? "?" : "—") },
+              { key: "konto", label: "Konto", render: (r) => (r.kontoId ? kontoName.get(r.kontoId) ?? "?" : "—") },
               { key: "startdatum", label: "ab" },
               {
                 key: "betrag",
