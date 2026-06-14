@@ -1,19 +1,23 @@
-// Übersicht (P0) — der eine Durchstich: Zahlungsregel anlegen → SQLite → Projektion
-// (pure, im Core) → Verlauf als Tabelle. Liest/schreibt über Use-Cases + Port.
+// Übersicht — Fokus-Screen: eine große Zahl (verfügbares Geld) + Plan-Projektion über
+// alle Quellen (Verträge/Regeln, Budgets, Töpfe) und das Anlegen einer Zahlungsregel.
 
 import { useEffect, useMemo, useState } from "react";
 import {
   euroZuCent,
   formatBetrag,
-  projiziereVerlauf,
+  projiziereLiquiditaet,
+  type Budget,
   type Charakter,
   type Kategorie,
   type Rhythmus,
+  type Topf,
   type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
 import { zahlungsregelAnlegen } from "../../application/zahlungsregelAnlegen";
 import { sqliteZahlungsregelRepository as repo } from "../persistence/sqliteZahlungsregelRepository";
+import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
+import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
 import {
   sqliteKategorieRepository as kategorieRepo,
   sqliteZahlungskontoRepository as kontoRepo,
@@ -53,6 +57,8 @@ export function UeberblickScreen() {
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [toepfe, setToepfe] = useState<Topf[]>([]);
   const [startsaldoEuro, setStartsaldoEuro] = useState(2000);
 
   const [bezeichnung, setBezeichnung] = useState("");
@@ -68,6 +74,8 @@ export function UeberblickScreen() {
     setRegeln(await repo.alle());
     setKonten(await kontoRepo.alle());
     setKategorien(await kategorieRepo.alle());
+    setBudgets(await budgetRepo.alle());
+    setToepfe(await topfRepo.alle());
   }
 
   // Kategorie wählen → Default-Charakter übernehmen (Glossar-Logik sichtbar machen).
@@ -82,13 +90,14 @@ export function UeberblickScreen() {
   }, []);
 
   const verlauf = useMemo(
-    () => projiziereVerlauf(regeln, ab, MONATE, euroZuCent(startsaldoEuro)),
-    [regeln, ab, startsaldoEuro],
+    () => projiziereLiquiditaet(regeln, budgets, toepfe, ab, MONATE, euroZuCent(startsaldoEuro)),
+    [regeln, budgets, toepfe, ab, startsaldoEuro],
   );
 
-  const endsaldo = verlauf.length ? verlauf[verlauf.length - 1].saldo : euroZuCent(startsaldoEuro);
+  const verfuegbar = verlauf.length ? verlauf[0].freieLiquiditaet : euroZuCent(startsaldoEuro);
+  const endFrei = verlauf.length ? verlauf[verlauf.length - 1].freieLiquiditaet : euroZuCent(startsaldoEuro);
   const summeZu = verlauf.reduce((s, m) => s + m.zufluss, 0);
-  const summeAb = verlauf.reduce((s, m) => s + m.abfluss, 0);
+  const summeAb = verlauf.reduce((s, m) => s + m.abfluss + m.budgetAbfluss, 0);
 
   const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
@@ -132,12 +141,12 @@ export function UeberblickScreen() {
       <div className="kpis">
         <KPIStat
           size="hero"
-          label="Projizierter Saldo · in 12 Monaten"
-          value={formatBetrag(endsaldo)}
+          label="Verfügbares Geld · frei"
+          value={formatBetrag(verfuegbar)}
           unit="€"
-          tone={endsaldo < 0 ? "warn" : "plan"}
+          tone={verfuegbar < 0 ? "warn" : "plan"}
         />
-        <KPIStat size="chip" label="Startsaldo heute" value={formatBetrag(euroZuCent(startsaldoEuro))} unit="€" />
+        <KPIStat size="chip" label="Frei in 12 Monaten" value={formatBetrag(endFrei)} unit="€" tone={endFrei < 0 ? "warn" : "default"} />
         <KPIStat size="chip" label="Σ Zuflüsse (Plan)" value={formatBetrag(summeZu)} unit="€" tone="ok" />
         <KPIStat size="chip" label="Σ Abflüsse (Plan)" value={formatBetrag(summeAb)} unit="€" />
       </div>
@@ -257,20 +266,24 @@ export function UeberblickScreen() {
         )}
       </Card>
 
-      <Card title="Projizierter Verlauf" subtitle="Plan-Zahlungen je Monat + laufender Saldo">
+      <Card title="Projizierter Verlauf" subtitle="Kontosaldo (echte Flüsse) und freie Liquidität (− Töpfe)">
         <DataTable
           columns={[
             { key: "label", label: "Monat" },
-            { key: "zufluss", label: "Zufluss €", align: "right", render: (m) => (m.zufluss ? formatBetrag(m.zufluss) : "—") },
-            { key: "abfluss", label: "Abfluss €", align: "right", render: (m) => (m.abfluss ? formatBetrag(m.abfluss) : "—") },
             { key: "netto", label: "Netto €", align: "right", render: (m) => formatBetrag(m.netto, true) },
             {
-              key: "saldo",
-              label: "Saldo €",
+              key: "kontosaldo",
+              label: "Kontosaldo €",
+              align: "right",
+              render: (m) => formatBetrag(m.kontosaldo),
+            },
+            {
+              key: "frei",
+              label: "Freie Liquidität €",
               align: "right",
               render: (m) => (
-                <span style={{ color: m.saldo < 0 ? "var(--warn-deep)" : "var(--ink)", fontWeight: "var(--fw-bold)" }}>
-                  {formatBetrag(m.saldo)}
+                <span style={{ color: m.freieLiquiditaet < 0 ? "var(--warn-deep)" : "var(--ink)", fontWeight: "var(--fw-bold)" }}>
+                  {formatBetrag(m.freieLiquiditaet)}
                 </span>
               ),
             },

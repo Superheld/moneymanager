@@ -6,6 +6,8 @@
 import type { Cent } from "./geld";
 import { RHYTHMUS_MONATE, type Charakter, type Zahlungsregel } from "./zahlungsregel";
 import { addMonate, monatsIndex, ord, parseIso, toIso } from "./datum";
+import { geglaetteterMonatsabfluss, type Budget } from "./budget";
+import { sollstand, zielwert, type Topf } from "./topf";
 
 const MONATSNAMEN = [
   "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
@@ -120,4 +122,70 @@ export function projiziereVerlauf(
     (k as { saldo: Cent }).saldo = saldo;
   }
   return koerbe;
+}
+
+/** Ein Monat im Liquiditätsplan mit beiden Kurven. */
+export interface LiquiditaetsMonat {
+  readonly jahr: number;
+  readonly monat: number;
+  readonly label: string;
+  /** Echte Flüsse aus Zahlungsregeln/Verträgen. */
+  readonly zufluss: Cent;
+  readonly abfluss: Cent;
+  /** Geglättete Budget-Abflüsse (negativ). */
+  readonly budgetAbfluss: Cent;
+  readonly netto: Cent; // zufluss + abfluss + budgetAbfluss
+  /** Kontosaldo am Monatsende (echte Flüsse, OHNE Topf-Zuführungen). */
+  readonly kontosaldo: Cent;
+  /** Summe der Topf-Sollstände am Monatsende (nur Töpfe mit Zielwert). */
+  readonly sollSumme: Cent;
+  /** Freie Liquidität = Kontosaldo − Σ Topf-Sollstände. Darf ins Minus (Überplanung). */
+  readonly freieLiquiditaet: Cent;
+}
+
+/**
+ * Vollständiger Liquiditätsplan über alle Plan-Quellen (BAUPLAN P2.4): zwei Kurven.
+ *  • Kontosaldo: Startsaldo + echte Flüsse (Verträge/Regeln, Budget-Verbrauch).
+ *    Topf-Zuführungen bewegen kontolose Töpfe NICHT — das Geld bleibt auf dem Konto.
+ *  • Freie Liquidität: Kontosaldo − Σ Topf-Sollstände. Reicht das Geld nicht für alle
+ *    Töpfe, geht sie ins Minus (Überplanung sichtbar; keine Allokation, keine Warnung).
+ * Topf-Sollstände werden zum MonatsENDE bewertet (erster Tag des Folgemonats).
+ */
+export function projiziereLiquiditaet(
+  regeln: Zahlungsregel[],
+  budgets: Budget[],
+  toepfe: Topf[],
+  ab: string,
+  monate: number,
+  startsaldo: Cent,
+): LiquiditaetsMonat[] {
+  const start = parseIso(ab);
+  const regelVerlauf = projiziereVerlauf(regeln, ab, monate, startsaldo);
+  const budgetProMonat = budgets.reduce((s, b) => s + geglaetteterMonatsabfluss(b), 0);
+  const sollToepfe = toepfe.filter((t) => zielwert(t) != null);
+
+  const ergebnis: LiquiditaetsMonat[] = [];
+  let kontosaldo = startsaldo;
+  for (let i = 0; i < monate; i++) {
+    const rv = regelVerlauf[i];
+    const netto = rv.netto + budgetProMonat;
+    kontosaldo += netto;
+
+    const monatsende = toIso(addMonate(start, i + 1));
+    const sollSumme = sollToepfe.reduce((s, t) => s + (sollstand(t, monatsende) ?? 0), 0);
+
+    ergebnis.push({
+      jahr: rv.jahr,
+      monat: rv.monat,
+      label: rv.label,
+      zufluss: rv.zufluss,
+      abfluss: rv.abfluss,
+      budgetAbfluss: budgetProMonat,
+      netto,
+      kontosaldo,
+      sollSumme,
+      freieLiquiditaet: kontosaldo - sollSumme,
+    });
+  }
+  return ergebnis;
 }
