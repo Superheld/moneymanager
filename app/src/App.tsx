@@ -6,6 +6,7 @@ import { VertraegeScreen } from "./adapters/ui/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/BudgetsScreen";
 import { ToepfeScreen } from "./adapters/ui/ToepfeScreen";
 import { LiquiditaetScreen } from "./adapters/ui/LiquiditaetScreen";
+import { DeckungScreen } from "./adapters/ui/DeckungScreen";
 
 export default function App() {
   const [screen, setScreen] = useState<ScreenId>("uebersicht");
@@ -16,6 +17,7 @@ export default function App() {
       {screen === "toepfe" && <ToepfeScreen />}
       {screen === "budgets" && <BudgetsScreen />}
       {screen === "vertraege" && <VertraegeScreen />}
+      {screen === "deckung" && <DeckungScreen />}
       {screen === "stammdaten" && <StammdatenScreen />}
     </AppShell>
   );

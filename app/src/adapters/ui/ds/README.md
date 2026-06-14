@@ -15,6 +15,7 @@ Diese `.jsx`/`.d.ts`-Dateien sind **verbatim kopiert** aus dem Repo-Verzeichnis
 | `DataTable` | `components/data/DataTable` |
 | `Button` | `components/controls/Button` |
 | `FormField` (+ `Input`) | `components/forms/FormField` |
+| `Dialog` | `components/forms/Dialog` |
 
 `Input` aus dem DS ist **nur Anzeige** (kein `onChange`) — gedacht für berechnete/
 abgeleitete Felder. Editierbare Eingaben bauen wir mit echten `<input>`/`<select>`

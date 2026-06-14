@@ -10,6 +10,7 @@ export type ScreenId =
   | "toepfe"
   | "budgets"
   | "vertraege"
+  | "deckung"
   | "stammdaten";
 
 interface NavEntry {
@@ -32,8 +33,7 @@ const GRUPPEN: NavGroup[] = [
       { id: "toepfe", label: "Töpfe" },
       { id: "budgets", label: "Budgets" },
       { id: "vertraege", label: "Verträge" },
-      { label: "Deckung", badge: "Ist" },
-      { label: "Analysen" },
+      { id: "deckung", label: "Deckung" },
     ],
   },
   {
