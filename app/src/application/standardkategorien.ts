@@ -1,59 +1,65 @@
-// Standardkategorien — ein sinnvoller deutscher Default-Baum, angelehnt an gängige
-// Haushaltsbuch-Apps (Wohnen, Mobilität, Lebenshaltung, Gesundheit, Versicherungen,
-// Freizeit, Einnahmen, Sparen & Anlegen). Jede trägt einen Default-Charakter:
-// Einnahmen = Ertrag, Sparen/Anlegen = Umschichtung, sonst Aufwand.
+// Standardkategorien — deutscher Default-Baum: Hauptgruppen → Unterkategorien.
+// Jede Gruppe hat einen Default-Charakter; einzelne Kinder können ihn überschreiben
+// (z. B. „Sparen & Anlegen" = Umschichtung in der ansonsten Aufwand-Gruppe Finanzen).
+// Einnahmen = Ertrag, Vorsorge/Sparen = Umschichtung, sonst Aufwand.
 
 import type { Charakter, Kategorie } from "../core";
 import type { KategorieRepository } from "./ports";
 
+interface Kind {
+  name: string;
+  charakter?: Charakter; // überschreibt den Gruppen-Charakter
+}
 interface Gruppe {
   name: string;
   charakter: Charakter;
-  kinder: string[];
+  kinder: (string | Kind)[];
 }
 
 export const STANDARDKATEGORIEN: Gruppe[] = [
-  { name: "Einnahmen", charakter: "Ertrag", kinder: ["Gehalt", "Kindergeld", "Sonstige Einnahmen"] },
-  { name: "Wohnen", charakter: "Aufwand", kinder: ["Miete / Rate", "Nebenkosten", "Strom", "Internet & Telefon", "Rundfunkbeitrag"] },
+  { name: "Einnahmen", charakter: "Ertrag", kinder: ["Gehalt", "Nebeneinkünfte", "Kindergeld", "Erstattungen", "Sonstige Einnahmen"] },
+  { name: "Wohnen", charakter: "Aufwand", kinder: ["Miete / Rate", "Nebenkosten", "Strom & Gas", "Internet & Telefon", "Rundfunkbeitrag", "Instandhaltung"] },
   { name: "Lebenshaltung", charakter: "Aufwand", kinder: ["Lebensmittel", "Drogerie & Haushalt", "Auswärts essen"] },
-  { name: "Mobilität", charakter: "Aufwand", kinder: ["ÖPNV & Tickets", "Sprit", "Kfz (Steuer & Wartung)"] },
-  { name: "Gesundheit", charakter: "Aufwand", kinder: ["Arzt & Apotheke", "Krankenversicherung"] },
-  { name: "Versicherungen", charakter: "Aufwand", kinder: ["Haftpflicht", "Hausrat", "Weitere Versicherungen"] },
-  { name: "Freizeit", charakter: "Aufwand", kinder: ["Hobby", "Reisen", "Abos & Streaming"] },
-  { name: "Kleidung", charakter: "Aufwand", kinder: [] },
-  { name: "Bildung", charakter: "Aufwand", kinder: [] },
-  { name: "Kinder", charakter: "Aufwand", kinder: [] },
-  { name: "Sparen & Anlegen", charakter: "Umschichtung", kinder: ["Sparplan / ETF", "Rücklagen", "Altersvorsorge"] },
+  { name: "Mobilität", charakter: "Aufwand", kinder: ["ÖPNV & Tickets", "Sprit & Laden", "Kfz (Steuer & Wartung)", "Fahrrad"] },
+  { name: "Gesundheit", charakter: "Aufwand", kinder: ["Arzt & Apotheke", "Krankenversicherung", "Therapie & Wellness"] },
+  { name: "Lifestyle", charakter: "Aufwand", kinder: ["Freizeit & Hobby", "Reisen & Urlaub", "Abos & Streaming", "Kleidung & Mode", "Ausgehen", "Bildung"] },
+  { name: "Familie & Kinder", charakter: "Aufwand", kinder: ["Kinderbetreuung", "Schule & Lernen", "Taschengeld", "Haustier"] },
+  { name: "Versicherungen", charakter: "Aufwand", kinder: ["Haftpflicht", "Hausrat", "Berufsunfähigkeit", "Weitere Versicherungen"] },
+  { name: "Vorsorge", charakter: "Umschichtung", kinder: ["Altersvorsorge", "Private Rente"] },
+  {
+    name: "Finanzen",
+    charakter: "Aufwand",
+    kinder: [{ name: "Sparen & Anlegen", charakter: "Umschichtung" }, "Kredite & Zinsen", "Bankgebühren", "Steuern", "Spenden"],
+  },
   { name: "Sonstiges", charakter: "Aufwand", kinder: [] },
 ];
 
 /**
  * Legt die Standardkategorien an. Idempotent: bereits vorhandene Namen werden
- * übersprungen, sodass der Aufruf gefahrlos wiederholbar ist. Liefert die Anzahl
- * neu angelegter Kategorien.
+ * übersprungen. Liefert die Anzahl neu angelegter Kategorien.
  */
 export async function standardkategorienAnlegen(repo: KategorieRepository): Promise<number> {
   const vorhanden = new Set((await repo.alle()).map((k) => k.name.toLowerCase()));
   let angelegt = 0;
 
-  for (const g of STANDARDKATEGORIEN) {
-    let elternId: string | undefined;
-    if (!vorhanden.has(g.name.toLowerCase())) {
-      const eltern: Kategorie = { id: crypto.randomUUID(), name: g.name, defaultCharakter: g.charakter };
-      await repo.speichern(eltern);
-      vorhanden.add(g.name.toLowerCase());
-      angelegt++;
-      elternId = eltern.id;
-    } else {
-      elternId = (await repo.alle()).find((k) => k.name.toLowerCase() === g.name.toLowerCase())?.id;
-    }
+  const sichern = async (k: Kategorie) => {
+    if (vorhanden.has(k.name.toLowerCase())) return false;
+    await repo.speichern(k);
+    vorhanden.add(k.name.toLowerCase());
+    angelegt++;
+    return true;
+  };
 
-    for (const kindName of g.kinder) {
-      if (vorhanden.has(kindName.toLowerCase())) continue;
-      const kind: Kategorie = { id: crypto.randomUUID(), name: kindName, elternId, defaultCharakter: g.charakter };
-      await repo.speichern(kind);
-      vorhanden.add(kindName.toLowerCase());
-      angelegt++;
+  for (const g of STANDARDKATEGORIEN) {
+    const elternId = crypto.randomUUID();
+    const neu = await sichern({ id: elternId, name: g.name, defaultCharakter: g.charakter });
+    // Eltern-ID für Kinder bestimmen (auch wenn die Gruppe schon existierte).
+    const elter = neu ? elternId : (await repo.alle()).find((k) => k.name.toLowerCase() === g.name.toLowerCase())?.id;
+
+    for (const kind of g.kinder) {
+      const name = typeof kind === "string" ? kind : kind.name;
+      const charakter = typeof kind === "string" ? g.charakter : kind.charakter ?? g.charakter;
+      await sichern({ id: crypto.randomUUID(), name, elternId: elter, defaultCharakter: charakter });
     }
   }
   return angelegt;
