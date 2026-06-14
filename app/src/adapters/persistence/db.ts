@@ -111,6 +111,24 @@ const MIGRATIONS: Migration[] = [
       `ALTER TABLE topf ADD COLUMN inventar_id TEXT`,
     ],
   },
+  {
+    version: 7, // P2.6 — Szenario (What-if), getrennt vom Plan
+    sql: [
+      `CREATE TABLE IF NOT EXISTS szenario (
+        id   TEXT PRIMARY KEY,
+        name TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS szenario_posten (
+        id          TEXT PRIMARY KEY,
+        szenario_id TEXT    NOT NULL,
+        bezeichnung TEXT    NOT NULL,
+        betrag      INTEGER NOT NULL,
+        rhythmus    TEXT    NOT NULL,
+        startdatum  TEXT    NOT NULL,
+        charakter   TEXT    NOT NULL
+      )`,
+    ],
+  },
 ];
 
 async function migrate(db: Database): Promise<void> {
