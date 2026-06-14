@@ -79,6 +79,24 @@ const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 5, // P2.3 — Töpfe
+    sql: [
+      `CREATE TABLE IF NOT EXISTS topf (
+        id                   TEXT PRIMARY KEY,
+        typ                  TEXT NOT NULL,
+        bezeichnung          TEXT NOT NULL,
+        start                TEXT NOT NULL,
+        kategorie_id         TEXT,
+        wiederbeschaffung    INTEGER,
+        nutzungsdauer_monate INTEGER,
+        schaetzbetrag        INTEGER,
+        frist_monate         INTEGER,
+        zufuehrung_pro_monat INTEGER,
+        sparziel             INTEGER
+      )`,
+    ],
+  },
 ];
 
 async function migrate(db: Database): Promise<void> {

@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 
-export type ScreenId = "uebersicht" | "budgets" | "vertraege" | "stammdaten";
+export type ScreenId = "uebersicht" | "toepfe" | "budgets" | "vertraege" | "stammdaten";
 
 interface NavEntry {
   id?: ScreenId;
@@ -23,7 +23,7 @@ const GRUPPEN: NavGroup[] = [
     eintraege: [
       { id: "uebersicht", label: "Übersicht" },
       { label: "Liquidität", badge: "Plan" },
-      { label: "Töpfe" },
+      { id: "toepfe", label: "Töpfe" },
       { id: "budgets", label: "Budgets" },
       { id: "vertraege", label: "Verträge" },
       { label: "Deckung", badge: "Ist" },
