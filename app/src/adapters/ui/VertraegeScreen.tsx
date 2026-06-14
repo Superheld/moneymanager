@@ -1,6 +1,5 @@
-// Verträge (P2.1) — wiederkehrende Zahlungen mit Konditionen & Fristen. Eine Maske
-// erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung). Zeigt den
-// nächsten Kündigungstermin und warnt, wenn er naht.
+// Verträge (P2.1) — Übersicht mit Kündigungsterminen; Anlegen im Modal. Eine Maske
+// erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung).
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -25,6 +24,8 @@ import {
   sqliteZahlungskontoRepository as kontoRepo,
 } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { PageHead } from "./PageHead";
+import { Modal } from "./Modal";
 
 const RHYTHMEN: { wert: Rhythmus; label: string }[] = [
   { wert: "monatlich", label: "monatlich" },
@@ -52,6 +53,7 @@ export function VertraegeScreen() {
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
 
+  const [offen, setOffen] = useState(false);
   const [anbieter, setAnbieter] = useState("");
   const [inhaberId, setInhaberId] = useState("");
   const [beginn, setBeginn] = useState(heute);
@@ -109,6 +111,7 @@ export function VertraegeScreen() {
       });
       setAnbieter("");
       setBetragEuro("");
+      setOffen(false);
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -117,95 +120,17 @@ export function VertraegeScreen() {
 
   return (
     <div className="screen">
-      <div className="phead">
-        <h1>Verträge</h1>
-        <div className="psub">Wiederkehrende Zahlungen inkl. Einnahmen · Fristen & Kündigungstermine</div>
-      </div>
-
-      <Card title="Vertrag anlegen" subtitle="Erzeugt zugleich die Plan-Zahlung (abgeleitete Zahlungsregel)">
-        <div className="form-grid">
-          <FormField label="Anbieter" required>
-            <input className="field" value={anbieter} onChange={(e) => setAnbieter(e.target.value)} placeholder="z. B. Stadtwerke, Arbeitgeber" />
-          </FormField>
-          <FormField label="Inhaber">
-            <select className="field" value={inhaberId} onChange={(e) => setInhaberId(e.target.value)}>
-              <option value="">—</option>
-              {personen.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Beginn">
-            <input className="field" type="date" value={beginn} onChange={(e) => setBeginn(e.target.value)} />
-          </FormField>
-          <FormField label="Mindestlaufzeit (Monate)" hint="optional">
-            <input className="field" inputMode="numeric" value={mindestlaufzeit} onChange={(e) => setMindestlaufzeit(e.target.value)} placeholder="z. B. 24" />
-          </FormField>
-          <FormField label="Verlängerung">
-            <select className="field" value={verlaengerung} onChange={(e) => setVerlaengerung(e.target.value as Verlaengerungsart)}>
-              <option value="automatisch">automatisch</option>
-              <option value="keine">keine</option>
-            </select>
-          </FormField>
-          <FormField label="Verlängerung um (Monate)" hint="bei automatisch">
-            <input className="field" inputMode="numeric" value={verlaengerungMonate} onChange={(e) => setVerlaengerungMonate(e.target.value)} placeholder="z. B. 12" />
-          </FormField>
-          <FormField label="Kündigungsfrist (Monate)" hint="optional">
-            <input className="field" inputMode="numeric" value={kuendigungsfrist} onChange={(e) => setKuendigungsfrist(e.target.value)} placeholder="z. B. 3" />
-          </FormField>
-          <FormField label="Betrag je Zahlung" required hint="positiv — Richtung aus Charakter">
-            <input className="field" inputMode="decimal" value={betragEuro} onChange={(e) => setBetragEuro(e.target.value)} placeholder="0,00" />
-          </FormField>
-          <FormField label="Rhythmus">
-            <select className="field" value={rhythmus} onChange={(e) => setRhythmus(e.target.value as Rhythmus)}>
-              {RHYTHMEN.map((r) => (
-                <option key={r.wert} value={r.wert}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Kategorie" hint="setzt den Charakter vor">
-            <select className="field" value={kategorieId} onChange={(e) => kategorieWaehlen(e.target.value)}>
-              <option value="">—</option>
-              {kategorien.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Charakter">
-            <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-              {CHARAKTERE.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Konto" hint="optional">
-            <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
-              <option value="">—</option>
-              {konten.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.bezeichnung}
-                </option>
-              ))}
-            </select>
-          </FormField>
-        </div>
-        <div className="form-actions">
-          <Button variant="primary" plus onClick={anlegen}>
+      <PageHead
+        title="Verträge"
+        subtitle="Wiederkehrende Zahlungen inkl. Einnahmen · Fristen & Kündigungstermine"
+        action={
+          <Button variant="primary" plus onClick={() => setOffen(true)}>
             Vertrag anlegen
           </Button>
-          {fehler && <span className="err">{fehler}</span>}
-        </div>
-      </Card>
+        }
+      />
 
-      <Card title="Verträge" subtitle={`${vertraege.length} Stück`}>
+      <Card>
         {vertraege.length === 0 ? (
           <div className="muted">Noch keine Verträge.</div>
         ) : (
@@ -260,6 +185,100 @@ export function VertraegeScreen() {
           />
         )}
       </Card>
+
+      {offen && (
+        <Modal
+          title="Vertrag anlegen"
+          subtitle="Erzeugt zugleich die Plan-Zahlung (abgeleitete Zahlungsregel)"
+          onClose={() => setOffen(false)}
+          footer={
+            <>
+              <Button variant="primary" onClick={anlegen}>
+                Speichern
+              </Button>
+              <button className="linkbtn" onClick={() => setOffen(false)}>
+                Abbrechen
+              </button>
+              {fehler && <span className="err">{fehler}</span>}
+            </>
+          }
+        >
+          <div className="form-grid">
+            <FormField label="Anbieter" required>
+              <input className="field" value={anbieter} onChange={(e) => setAnbieter(e.target.value)} placeholder="z. B. Stadtwerke, Arbeitgeber" />
+            </FormField>
+            <FormField label="Inhaber">
+              <select className="field" value={inhaberId} onChange={(e) => setInhaberId(e.target.value)}>
+                <option value="">—</option>
+                {personen.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Beginn">
+              <input className="field" type="date" value={beginn} onChange={(e) => setBeginn(e.target.value)} />
+            </FormField>
+            <FormField label="Mindestlaufzeit (Monate)" hint="optional">
+              <input className="field" inputMode="numeric" value={mindestlaufzeit} onChange={(e) => setMindestlaufzeit(e.target.value)} placeholder="z. B. 24" />
+            </FormField>
+            <FormField label="Verlängerung">
+              <select className="field" value={verlaengerung} onChange={(e) => setVerlaengerung(e.target.value as Verlaengerungsart)}>
+                <option value="automatisch">automatisch</option>
+                <option value="keine">keine</option>
+              </select>
+            </FormField>
+            <FormField label="Verlängerung um (Monate)" hint="bei automatisch">
+              <input className="field" inputMode="numeric" value={verlaengerungMonate} onChange={(e) => setVerlaengerungMonate(e.target.value)} placeholder="z. B. 12" />
+            </FormField>
+            <FormField label="Kündigungsfrist (Monate)" hint="optional">
+              <input className="field" inputMode="numeric" value={kuendigungsfrist} onChange={(e) => setKuendigungsfrist(e.target.value)} placeholder="z. B. 3" />
+            </FormField>
+            <FormField label="Betrag je Zahlung" required hint="positiv — Richtung aus Charakter">
+              <input className="field" inputMode="decimal" value={betragEuro} onChange={(e) => setBetragEuro(e.target.value)} placeholder="0,00" />
+            </FormField>
+            <FormField label="Rhythmus">
+              <select className="field" value={rhythmus} onChange={(e) => setRhythmus(e.target.value as Rhythmus)}>
+                {RHYTHMEN.map((r) => (
+                  <option key={r.wert} value={r.wert}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Kategorie" hint="setzt den Charakter vor">
+              <select className="field" value={kategorieId} onChange={(e) => kategorieWaehlen(e.target.value)}>
+                <option value="">—</option>
+                {kategorien.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.name}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Charakter">
+              <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
+                {CHARAKTERE.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+            <FormField label="Konto" hint="optional">
+              <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
+                <option value="">—</option>
+                {konten.map((k) => (
+                  <option key={k.id} value={k.id}>
+                    {k.bezeichnung}
+                  </option>
+                ))}
+              </select>
+            </FormField>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

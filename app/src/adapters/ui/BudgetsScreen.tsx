@@ -1,6 +1,5 @@
-// Budgets (P2.2) — Rahmen für variable Ausgaben je Kategorie/Periode. Zeigt den
-// geglätteten Monatsabfluss (linear). Plan-only; Reset zum Periodenende (kein Übertrag).
-// Die Wirkung in der Liquiditätsprojektion kommt in P2.4 (zwei Kurven).
+// Budgets (P2.2) — Übersicht der Rahmen je Kategorie; Anlegen im Modal.
+// Plan-only; Reset zum Periodenende (kein Übertrag). Ist-Wirkung ab P3.
 
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -14,6 +13,8 @@ import { budgetAnlegen } from "../../application/budgetAnlegen";
 import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, FormField } from "./ds";
+import { PageHead } from "./PageHead";
+import { Modal } from "./Modal";
 
 const PERIODEN: { wert: BudgetPeriode; label: string }[] = [
   { wert: "monatlich", label: "monatlich" },
@@ -23,6 +24,7 @@ const PERIODEN: { wert: BudgetPeriode; label: string }[] = [
 export function BudgetsScreen() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
+  const [offen, setOffen] = useState(false);
   const [kategorieId, setKategorieId] = useState("");
   const [rahmenEuro, setRahmenEuro] = useState("");
   const [periode, setPeriode] = useState<BudgetPeriode>("monatlich");
@@ -43,6 +45,8 @@ export function BudgetsScreen() {
     try {
       await budgetAnlegen(budgetRepo, { kategorieId, rahmenEuro: Number(rahmenEuro.replace(",", ".")), periode });
       setRahmenEuro("");
+      setKategorieId("");
+      setOffen(false);
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -51,13 +55,59 @@ export function BudgetsScreen() {
 
   return (
     <div className="screen">
-      <div className="phead">
-        <h1>Budgets</h1>
-        <div className="psub">Rahmen für variable Ausgaben — geglättet, Reset zum Periodenende (kein Übertrag)</div>
-      </div>
+      <PageHead
+        title="Budgets"
+        subtitle="Rahmen für variable Ausgaben — geglättet, Reset zum Periodenende"
+        action={
+          <Button variant="primary" plus onClick={() => setOffen(true)}>
+            Budget anlegen
+          </Button>
+        }
+      />
 
-      <Card title="Budget anlegen" subtitle="Ein Budget je Kategorie und Periode">
-        <div className="form-grid">
+      <Card>
+        {budgets.length === 0 ? (
+          <div className="muted">Noch keine Budgets. Lege Kategorien an, dann Budgets darauf.</div>
+        ) : (
+          <DataTable
+            columns={[
+              { key: "kategorie", label: "Kategorie", render: (b) => kategorieName.get(b.kategorieId) ?? "?" },
+              { key: "periode", label: "Periode" },
+              { key: "rahmen", label: "Rahmen €", align: "right", render: (b) => formatBetrag(b.rahmen) },
+              { key: "geglaettet", label: "≈ /Monat €", align: "right", render: (b) => formatBetrag(geglaetteterMonatsabfluss(b)) },
+              {
+                key: "_x",
+                label: "",
+                align: "right",
+                render: (b) => (
+                  <button className="linkbtn" onClick={() => budgetRepo.loeschen(b.id).then(laden)}>
+                    löschen
+                  </button>
+                ),
+              },
+            ]}
+            rows={budgets}
+          />
+        )}
+      </Card>
+
+      {offen && (
+        <Modal
+          title="Budget anlegen"
+          subtitle="Ein Budget je Kategorie und Periode"
+          onClose={() => setOffen(false)}
+          footer={
+            <>
+              <Button variant="primary" onClick={anlegen}>
+                Speichern
+              </Button>
+              <button className="linkbtn" onClick={() => setOffen(false)}>
+                Abbrechen
+              </button>
+              {fehler && <span className="err">{fehler}</span>}
+            </>
+          }
+        >
           <FormField label="Kategorie" required>
             <select className="field" value={kategorieId} onChange={(e) => setKategorieId(e.target.value)}>
               <option value="">— wählen —</option>
@@ -80,45 +130,8 @@ export function BudgetsScreen() {
               ))}
             </select>
           </FormField>
-        </div>
-        <div className="form-actions">
-          <Button variant="primary" plus onClick={anlegen}>
-            Budget anlegen
-          </Button>
-          {fehler && <span className="err">{fehler}</span>}
-        </div>
-      </Card>
-
-      <Card title="Budgets" subtitle={`${budgets.length} Stück`}>
-        {budgets.length === 0 ? (
-          <div className="muted">Noch keine Budgets. Lege Kategorien an, dann Budgets darauf.</div>
-        ) : (
-          <DataTable
-            columns={[
-              { key: "kategorie", label: "Kategorie", render: (b) => kategorieName.get(b.kategorieId) ?? "?" },
-              { key: "periode", label: "Periode" },
-              { key: "rahmen", label: "Rahmen €", align: "right", render: (b) => formatBetrag(b.rahmen) },
-              {
-                key: "geglaettet",
-                label: "≈ /Monat €",
-                align: "right",
-                render: (b) => formatBetrag(geglaetteterMonatsabfluss(b)),
-              },
-              {
-                key: "_x",
-                label: "",
-                align: "right",
-                render: (b) => (
-                  <button className="linkbtn" onClick={() => budgetRepo.loeschen(b.id).then(laden)}>
-                    löschen
-                  </button>
-                ),
-              },
-            ]}
-            rows={budgets}
-          />
-        )}
-      </Card>
+        </Modal>
+      )}
     </div>
   );
 }

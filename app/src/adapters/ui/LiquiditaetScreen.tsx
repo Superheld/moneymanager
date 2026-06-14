@@ -23,6 +23,7 @@ import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepos
 import { sqliteSzenarioRepository as szenarioRepo } from "../persistence/sqliteSzenarioRepository";
 import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { ZweiKurvenChart } from "./ZweiKurvenChart";
+import { Modal } from "./Modal";
 
 const MONATE = 12;
 
@@ -190,6 +191,8 @@ function SzenarioCard({
   onSzenarienChanged: () => void;
   onPostenChanged: () => void;
 }) {
+  const [neuOffen, setNeuOffen] = useState(false);
+  const [postenOffen, setPostenOffen] = useState(false);
   const [name, setName] = useState("");
   const [pBez, setPBez] = useState("");
   const [pBetrag, setPBetrag] = useState("");
@@ -203,6 +206,7 @@ function SzenarioCard({
     try {
       const s = await szenarioAnlegen(szenarioRepo, name);
       setName("");
+      setNeuOffen(false);
       onSzenarienChanged();
       onSelect(s.id);
     } catch (e) {
@@ -222,6 +226,7 @@ function SzenarioCard({
       });
       setPBez("");
       setPBetrag("");
+      setPostenOffen(false);
       onPostenChanged();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -235,24 +240,60 @@ function SzenarioCard({
   }
 
   return (
-    <Card title="Szenario (What-if)" subtitle="Verwerfbare Delta-Schicht — berührt den Plan nie">
-      <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-end", flexWrap: "wrap" }}>
-        <FormField label="Neues Szenario" style={{ minWidth: 220 }}>
-          <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Miete +200, Gehalt höher" />
-        </FormField>
-        <Button variant="primary" plus onClick={neuesSzenario}>
-          anlegen
-        </Button>
-        {aktivId && (
-          <button className="linkbtn" onClick={szenarioLoeschen}>
-            aktives Szenario verwerfen
-          </button>
-        )}
-      </div>
-
+    <Card
+      title="Szenario (What-if)"
+      subtitle="Verwerfbare Delta-Schicht — berührt den Plan nie"
+      action={
+        <span style={{ display: "flex", gap: "var(--sp-2)" }}>
+          {aktivId && <Button plus onClick={() => setPostenOffen(true)}>Posten</Button>}
+          <Button variant="primary" plus onClick={() => setNeuOffen(true)}>Szenario</Button>
+        </span>
+      }
+    >
       {aktivId ? (
-        <div style={{ marginTop: "var(--sp-5)" }}>
-          <div className="nlbl" style={{ marginBottom: "var(--sp-2)" }}>Zusatzposten</div>
+        posten.length > 0 ? (
+          <DataTable
+            columns={[
+              { key: "bezeichnung", label: "Posten" },
+              { key: "charakter", label: "Charakter", render: (p) => <Pill variant="neutral">{p.charakter}</Pill> },
+              { key: "rhythmus", label: "Rhythmus" },
+              { key: "betrag", label: "Betrag €", align: "right", render: (p) => formatBetrag(p.betrag, true) },
+              { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => szenarioRepo.postenLoeschen(p.id).then(onPostenChanged)}>löschen</button> },
+            ]}
+            rows={posten}
+          />
+        ) : (
+          <div className="muted">Noch keine Zusatzposten — füge welche hinzu, um das Szenario wirken zu lassen.</div>
+        )
+      ) : (
+        <div className="muted">{szenarien.length ? "Wähle oben rechts ein Szenario, um Zusatzposten zu pflegen." : "Noch kein Szenario."}</div>
+      )}
+      {aktivId && (
+        <div style={{ marginTop: "var(--sp-4)" }}>
+          <button className="linkbtn" onClick={szenarioLoeschen}>aktives Szenario verwerfen</button>
+        </div>
+      )}
+
+      {neuOffen && (
+        <Modal
+          title="Szenario anlegen"
+          subtitle="What-if — z. B. Mieterhöhung, höheres Gehalt"
+          onClose={() => setNeuOffen(false)}
+          footer={<><Button variant="primary" onClick={neuesSzenario}>Speichern</Button><button className="linkbtn" onClick={() => setNeuOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+        >
+          <FormField label="Name" required>
+            <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Miete +200, Gehalt höher" />
+          </FormField>
+        </Modal>
+      )}
+
+      {postenOffen && (
+        <Modal
+          title="Zusatzposten hinzufügen"
+          subtitle="kommt nur in der Szenario-Projektion zur Basis hinzu"
+          onClose={() => setPostenOffen(false)}
+          footer={<><Button variant="primary" onClick={postenHinzufuegen}>Speichern</Button><button className="linkbtn" onClick={() => setPostenOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+        >
           <div className="form-grid">
             <FormField label="Bezeichnung">
               <input className="field" value={pBez} onChange={(e) => setPBez(e.target.value)} placeholder="z. B. Mieterhöhung" />
@@ -262,61 +303,19 @@ function SzenarioCard({
             </FormField>
             <FormField label="Rhythmus">
               <select className="field" value={pRhythmus} onChange={(e) => setPRhythmus(e.target.value as Rhythmus)}>
-                {RHYTHMEN.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
+                {RHYTHMEN.map((r) => (<option key={r} value={r}>{r}</option>))}
               </select>
             </FormField>
             <FormField label="Charakter">
               <select className="field" value={pCharakter} onChange={(e) => setPCharakter(e.target.value as Charakter)}>
-                {CHARAKTERE.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
+                {CHARAKTERE.map((c) => (<option key={c} value={c}>{c}</option>))}
               </select>
             </FormField>
             <FormField label="Erste Fälligkeit">
               <input className="field" type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} />
             </FormField>
           </div>
-          <div className="form-actions">
-            <Button plus onClick={postenHinzufuegen}>
-              Posten hinzufügen
-            </Button>
-            {fehler && <span className="err">{fehler}</span>}
-          </div>
-
-          {posten.length > 0 && (
-            <div style={{ marginTop: "var(--sp-4)" }}>
-              <DataTable
-                columns={[
-                  { key: "bezeichnung", label: "Posten" },
-                  { key: "charakter", label: "Charakter", render: (p) => <Pill variant="neutral">{p.charakter}</Pill> },
-                  { key: "rhythmus", label: "Rhythmus" },
-                  { key: "betrag", label: "Betrag €", align: "right", render: (p) => formatBetrag(p.betrag, true) },
-                  {
-                    key: "_x",
-                    label: "",
-                    align: "right",
-                    render: (p) => (
-                      <button className="linkbtn" onClick={() => szenarioRepo.postenLoeschen(p.id).then(onPostenChanged)}>
-                        löschen
-                      </button>
-                    ),
-                  },
-                ]}
-                rows={posten}
-              />
-            </div>
-          )}
-        </div>
-      ) : (
-        <div className="muted" style={{ marginTop: "var(--sp-3)" }}>
-          {szenarien.length ? "Wähle oben rechts ein Szenario, um Zusatzposten zu pflegen." : "Noch kein Szenario."}
-        </div>
+        </Modal>
       )}
     </Card>
   );
