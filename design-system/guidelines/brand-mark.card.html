@@ -1,0 +1,25 @@
+<!-- @dsCard group="Brand" viewport="700x180" name="Marke & Chart-Sprache" subtitle="Ist = solide Ink · Plan = gestrichelt Teal" -->
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+body{margin:0;background:var(--surface);font-family:var(--font-ui);padding:20px;color:var(--ink);display:flex;gap:30px;align-items:center}
+.mk{width:48px;height:48px;border-radius:15px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800;font-size:26px}
+.nm{font-weight:800;font-size:17px;letter-spacing:-.01em}
+.sub{font-size:12px;color:var(--ink-3);margin-top:-2px}
+.legend{display:flex;gap:18px;font-size:12.5px;font-weight:600;color:var(--ink-2);align-items:center}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend i{width:22px;height:0;display:inline-block}
+.li{border-top:2.6px solid var(--ink)}
+.lp{border-top:2.6px dashed var(--accent)}
+.lw{width:10px!important;height:10px!important;border-radius:50%;background:var(--warn)}
+</style></head><body>
+<div style="display:flex;align-items:center;gap:12px">
+  <div class="mk">M</div>
+  <div><div class="nm">Moneymanager</div><div class="sub">deine private Bilanz</div></div>
+</div>
+<div class="legend">
+  <span><i class="li"></i>Ist (gebucht)</span>
+  <span><i class="lp"></i>Plan (projiziert)</span>
+  <span style="color:var(--warn-deep)"><i class="lw"></i>Engpass / heute</span>
+</div>
+</body></html>

@@ -1,0 +1,13 @@
+/* ============================================================
+   SHADOW — used sparingly. Flat by default (B direction).
+   Soft, warm-tinted elevation only for floating surfaces.
+   ============================================================ */
+:root{
+  --shadow-none: none;
+  --shadow-sm:   0 1px 2px oklch(0.5 0.03 60 / .05);
+  --shadow-card: 0 2px 6px oklch(0.5 0.03 60 / .06), 0 22px 46px -22px oklch(0.5 0.05 60 / .40);
+  --shadow-pop:  0 8px 20px -6px oklch(0.45 0.04 60 / .22);
+
+  /* most cards are flat with a hairline border, not a shadow */
+  --elevation-flat: var(--shadow-none);
+}

@@ -1,0 +1,8 @@
+/* Moneymanager Design System — global entry.
+   Consumers link THIS file. Only @import lines belong here. */
+@import "./tokens/colors.css";
+@import "./tokens/typography.css";
+@import "./tokens/spacing.css";
+@import "./tokens/radius.css";
+@import "./tokens/shadow.css";
+@import "./tokens/fonts.css";

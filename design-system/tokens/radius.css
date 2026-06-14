@@ -1,0 +1,11 @@
+/* ============================================================
+   RADIUS — friendly, rounded. Pills are fully round.
+   ============================================================ */
+:root{
+  --r-sm:    7px;   /* inputs, small controls */
+  --r-md:    11px;  /* nav items, chips       */
+  --r-lg:    15px;  /* chips/stat tiles       */
+  --r-xl:    18px;  /* cards / panels         */
+  --r-2xl:   24px;  /* large containers       */
+  --r-pill:  999px; /* pills, avatars, tracks */
+}

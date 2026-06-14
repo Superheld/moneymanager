@@ -1,0 +1,66 @@
+<!-- @dsCard group="Components" viewport="700x440" name="Core" subtitle="Pill · KPIStat · CoverageTrack · NavItem · Card" -->
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<link rel="stylesheet" href="../../styles.css" />
+<style>
+  body{margin:0;background:var(--cream);font-family:var(--font-ui);color:var(--ink);padding:22px}
+  .grp{margin-bottom:20px}
+  .lbl{font-size:var(--fs-eyebrow);font-weight:var(--fw-bold);letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--ink-3);margin-bottom:10px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end}
+</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../_load.js"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+(async function(){
+  const { Pill, Card, KPIStat, CoverageTrack, NavItem } = await window.loadDS(
+    ['Pill.jsx','Card.jsx','KPIStat.jsx','CoverageTrack.jsx','NavItem.jsx']);
+  function Demo(){
+    return (
+      <div>
+        <div className="grp"><div className="lbl">Pill — Charakter &amp; Status</div>
+          <div className="row">
+            <Pill variant="um">Umschichtung</Pill><Pill variant="ertrag">Einnahme</Pill>
+            <Pill variant="aufwand">Aufwand</Pill><Pill variant="plan">Plan</Pill>
+            <Pill variant="ist">Ist</Pill><Pill variant="warn">Engpass</Pill><Pill variant="ok">gedeckt</Pill>
+          </div>
+        </div>
+        <div className="grp"><div className="lbl">KPIStat</div>
+          <div className="row" style={{gap:24}}>
+            <KPIStat size="hero" label="Verfügbar heute" value="4.180" unit="€" meta="über 3 Konten" />
+            <KPIStat label="Tiefpunkt (Plan)" value="1.500" unit="€" tone="warn" meta="31. Juli" />
+            <KPIStat label="Töpfe-Deckung" value="86" unit="%" tone="plan" meta="gut finanziert" />
+          </div>
+        </div>
+        <div className="grp"><div className="lbl">CoverageTrack</div>
+          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'12px 28px',maxWidth:560}}>
+            <CoverageTrack label="Lebensmittel" right="520 / 600 €" value={520} max={600} />
+            <CoverageTrack label="Auswärts" right="240 / 180 €" value={240} max={180} />
+          </div>
+        </div>
+        <div className="grp" style={{display:'flex',gap:28,alignItems:'flex-start'}}>
+          <div><div className="lbl">NavItem</div>
+            <div style={{width:190,background:'var(--surface)',border:'1px solid var(--line)',borderRadius:'var(--r-md)',padding:6}}>
+              <NavItem label="Übersicht" active /><NavItem label="Liquidität" /><NavItem label="Töpfe" />
+            </div>
+          </div>
+          <div style={{flex:1}}><div className="lbl">Card</div>
+            <Card title="Verfügbares Geld" subtitle="alle Konten zusammen">
+              <div style={{fontSize:13,color:'var(--ink-2)'}}>Flache Fläche, Haarlinie, kein Schatten.</div>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+})();
+</script>
+</body>
+</html>

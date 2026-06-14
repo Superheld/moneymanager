@@ -1,0 +1,40 @@
+/* ============================================================
+   TYPOGRAPHY — one family: Hanken Grotesk (400–800).
+   Numbers use tabular figures where alignment matters.
+   ============================================================ */
+:root{
+  --font-ui: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  --font-num: 'Hanken Grotesk', system-ui, sans-serif; /* tnum via .num */
+
+  /* type scale (px) */
+  --fs-display: 64px;  /* the one hero number  */
+  --fs-h1:      30px;
+  --fs-h2:      20px;
+  --fs-h3:      17px;
+  --fs-title:   14.5px; /* card titles */
+  --fs-body:    15px;
+  --fs-sm:      13.5px;
+  --fs-xs:      12px;
+  --fs-2xs:     11px;
+  --fs-eyebrow: 10.5px; /* uppercase labels */
+
+  /* weights */
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semi:    600;
+  --fw-bold:    700;
+  --fw-black:   800;
+
+  /* line-heights */
+  --lh-tight: 1.05;
+  --lh-snug:  1.3;
+  --lh-body:  1.55;
+
+  /* letter-spacing */
+  --ls-tight:   -0.03em; /* display numbers */
+  --ls-h:       -0.015em;
+  --ls-eyebrow:  0.05em;
+}
+
+/* tabular figures helper for any aligned number */
+.num{ font-variant-numeric: tabular-nums; font-feature-settings:"tnum"; }

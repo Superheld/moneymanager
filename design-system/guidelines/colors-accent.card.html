@@ -1,0 +1,19 @@
+<!-- @dsCard group="Colors" viewport="700x190" name="Akzent & Semantik" subtitle="Teal=Plan · Amber=Engpass · Grün=Ertrag/gedeckt" -->
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+body{margin:0;background:var(--cream);font-family:var(--font-ui);padding:18px;color:var(--ink)}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.sw{width:128px}
+.chip{height:46px;border-radius:var(--r-md);display:flex;gap:4px;overflow:hidden}
+.chip i{flex:1}
+.nm{font-size:12px;font-weight:700;margin-top:7px}
+.vr{font-size:10.5px;color:var(--ink-3);font-family:var(--font-num)}
+</style></head><body>
+<div class="row">
+  <div class="sw"><div class="chip"><i style="background:var(--accent)"></i><i style="background:var(--accent-deep)"></i><i style="background:var(--accent-wash)"></i></div><div class="nm" style="color:var(--accent-deep)">Akzent · PLAN</div><div class="vr">--accent / -deep / -wash</div></div>
+  <div class="sw"><div class="chip"><i style="background:var(--warn)"></i><i style="background:var(--warn-deep)"></i><i style="background:var(--warn-wash)"></i></div><div class="nm" style="color:var(--warn-deep)">Warn · Engpass</div><div class="vr">--warn / -deep / -wash</div></div>
+  <div class="sw"><div class="chip"><i style="background:var(--ok)"></i><i style="background:var(--ok-deep)"></i><i style="background:var(--ok-wash)"></i></div><div class="nm" style="color:var(--ok-deep)">OK · Ertrag/gedeckt</div><div class="vr">--ok / -deep / -wash</div></div>
+  <div class="sw"><div class="chip"><i style="background:var(--ink)"></i></div><div class="nm">Ist (gebucht)</div><div class="vr">--ist → --ink</div></div>
+</div>
+</body></html>

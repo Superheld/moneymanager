@@ -1,0 +1,22 @@
+<!-- @dsCard group="Screens" viewport="1280x820" name="Verträge" subtitle="voller App-Screen im finalen Design" -->
+<!-- @startingPoint section="Screens" subtitle="Verträge — App-Screen" viewport="1280x900" -->
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Moneymanager — Verträge</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="../../styles.css"/>
+<link rel="stylesheet" href="../../app/app.css"/>
+</head><body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><div class="mk">M</div><div><div class="nm">Moneymanager</div><div class="sub">deine private Bilanz</div></div></div>
+<span class="nlbl">Überblick</span><nav class="nav"><a><span class="ic"></span>Übersicht</a><a><span class="ic"></span>Liquidität<span class="bdg">Plan</span></a><a><span class="ic"></span>Töpfe</a><a><span class="ic"></span>Budgets</a><a class="on"><span class="ic"></span>Verträge</a><a><span class="ic"></span>Deckung<span class="bdg">Ist</span></a><a><span class="ic"></span>Analysen</a></nav><span class="nlbl">Ausbaustufe 2</span><nav class="nav"><a><span class="ic"></span>Anlagen</a><a><span class="ic"></span>Vorsorge</a></nav><span class="nlbl">Verwaltung</span><nav class="nav"><a><span class="ic"></span>Stammdaten</a></nav>
+    <div class="foot"><div class="person"><span class="av"></span><span class="av b"></span><span style="margin-left:5px">Anna &amp; Ben · 2 Personen</span></div><div style="opacity:.85">Lokal · keine Cloud</div></div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<script src="../../app/h.js"></script>
+<script src="../../app/s_vertraege.js"></script>
+<script>document.getElementById("main").innerHTML=window.MM.screens["vertraege"].render();</script>
+</body></html>
