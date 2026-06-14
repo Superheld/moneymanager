@@ -15,6 +15,7 @@ import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqlit
 import { Button, Card, DataTable, FormField } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
+import { CategoryPicker } from "./CategoryPicker";
 
 const PERIODEN: { wert: BudgetPeriode; label: string }[] = [
   { wert: "monatlich", label: "monatlich" },
@@ -109,14 +110,7 @@ export function BudgetsScreen() {
           }
         >
           <FormField label="Kategorie" required>
-            <select className="field" value={kategorieId} onChange={(e) => setKategorieId(e.target.value)}>
-              <option value="">— wählen —</option>
-              {kategorien.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.name}
-                </option>
-              ))}
-            </select>
+            <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
           </FormField>
           <FormField label="Rahmen" required hint="Betrag je Periode">
             <input className="field" inputMode="decimal" value={rahmenEuro} onChange={(e) => setRahmenEuro(e.target.value)} placeholder="0,00" />

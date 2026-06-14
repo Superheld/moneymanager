@@ -247,6 +247,20 @@ select.field {
   content: "└ ";
   color: var(--ink-3);
 }
+
+/* Klickbare Zeile im Kategorie-Picker (Button-Reset) */
+.pickrow {
+  background: none;
+  border: none;
+  border-bottom: 1px solid var(--line-soft);
+  font-family: var(--font-ui);
+  font-size: var(--fs-body);
+  text-align: left;
+  cursor: pointer;
+}
+.pickrow:hover {
+  background: var(--accent-wash);
+}
 .linkbtn {
   background: none;
   border: none;
