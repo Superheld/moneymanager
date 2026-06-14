@@ -39,4 +39,6 @@ export interface Zahlungsregel {
   readonly kontoId?: string;
   /** Referenz auf eine Kategorie (Stammdaten), ab P1. Optional. */
   readonly kategorieId?: string;
+  /** Herkunft: aus diesem Vertrag abgeleitet (P2). Optional. */
+  readonly vertragId?: string;
 }

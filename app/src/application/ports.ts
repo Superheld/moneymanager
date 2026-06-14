@@ -1,7 +1,13 @@
 // Ports — Schnittstellen zwischen Anwendungsschicht und Außenwelt (hexagonal).
 // Adapter (z. B. SQLite) implementieren sie; der Kern kennt sie nicht.
 
-import type { Kategorie, Person, Zahlungskonto, Zahlungsregel } from "../core";
+import type {
+  Kategorie,
+  Person,
+  Vertrag,
+  Zahlungskonto,
+  Zahlungsregel,
+} from "../core";
 
 export interface ZahlungsregelRepository {
   alle(): Promise<Zahlungsregel[]>;
@@ -24,5 +30,11 @@ export interface ZahlungskontoRepository {
 export interface KategorieRepository {
   alle(): Promise<Kategorie[]>;
   speichern(kategorie: Kategorie): Promise<void>;
+  loeschen(id: string): Promise<void>;
+}
+
+export interface VertragRepository {
+  alle(): Promise<Vertrag[]>;
+  speichern(vertrag: Vertrag): Promise<void>;
   loeschen(id: string): Promise<void>;
 }

@@ -21,7 +21,7 @@ export interface ZahlungsregelEingabe {
 }
 
 /** Ertrag fließt zu (+), Aufwand und Umschichtung fließen ab (−). */
-function vorzeichenbehaftet(betragEuro: number, charakter: Charakter): number {
+export function vorzeichenbehaftet(betragEuro: number, charakter: Charakter): number {
   const cent = euroZuCent(Math.abs(betragEuro));
   return charakter === "Ertrag" ? cent : -cent;
 }

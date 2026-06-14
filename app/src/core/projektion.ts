@@ -5,46 +5,12 @@
 
 import type { Cent } from "./geld";
 import { RHYTHMUS_MONATE, type Charakter, type Zahlungsregel } from "./zahlungsregel";
+import { addMonate, monatsIndex, ord, parseIso, toIso } from "./datum";
 
 const MONATSNAMEN = [
   "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
   "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
 ];
-
-interface Ymd {
-  y: number;
-  m: number; // 1–12
-  d: number; // 1–31
-}
-
-function parseIso(iso: string): Ymd {
-  const [y, m, d] = iso.split("-").map(Number);
-  return { y, m, d };
-}
-
-function tageImMonat(y: number, m: number): number {
-  return new Date(Date.UTC(y, m, 0)).getUTCDate();
-}
-
-/** Addiert n Monate; klemmt den Tag auf den letzten gültigen Tag des Zielmonats. */
-function addMonate(ymd: Ymd, n: number): Ymd {
-  const gesamt = (ymd.y * 12 + (ymd.m - 1)) + n;
-  const y = Math.floor(gesamt / 12);
-  const m = (gesamt % 12) + 1;
-  const d = Math.min(ymd.d, tageImMonat(y, m));
-  return { y, m, d };
-}
-
-/** Vergleichbarer Schlüssel YYYYMMDD für Datumsordnung. */
-function ord(ymd: Ymd): number {
-  return ymd.y * 10000 + ymd.m * 100 + ymd.d;
-}
-
-function toIso(ymd: Ymd): string {
-  const mm = String(ymd.m).padStart(2, "0");
-  const dd = String(ymd.d).padStart(2, "0");
-  return `${ymd.y}-${mm}-${dd}`;
-}
 
 /** Eine berechnete Plan-Zahlung (nicht persistiert). */
 export interface Planbuchung {
@@ -133,13 +99,10 @@ export function projiziereVerlauf(
     });
   }
 
-  const index = (jahr: number, monat: number) =>
-    (jahr * 12 + (monat - 1)) - (start.y * 12 + (start.m - 1));
-
   for (const regel of regeln) {
     for (const b of projiziereRegel(regel, ab, monate)) {
       const ymd = parseIso(b.datum);
-      const k = koerbe[index(ymd.y, ymd.m)];
+      const k = koerbe[monatsIndex(start, ymd.y, ymd.m)];
       if (!k) continue;
       k.buchungen.push(b);
       if (b.betrag >= 0) {
