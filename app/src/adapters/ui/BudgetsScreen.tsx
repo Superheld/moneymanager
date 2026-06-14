@@ -58,13 +58,17 @@ export function BudgetsScreen() {
     <div className="screen">
       <PageHead
         title="Budgets"
-        subtitle="Rahmen für variable Ausgaben — geglättet, Reset zum Periodenende"
+        subtitle="Limit pro Periode für laufende Ausgaben — Reset zum Periodenende"
         action={
           <Button variant="primary" plus onClick={() => setOffen(true)}>
             Budget anlegen
           </Button>
         }
       />
+
+      <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
+        Ein Budget ist ein <b style={{ color: "var(--ink)" }}>Limit pro Monat</b> für laufende Ausgaben (Lebensmittel, Auswärts essen). Der Rest <b style={{ color: "var(--ink)" }}>verfällt</b> — es wird nicht angespart. Was sich <b style={{ color: "var(--ink)" }}>ansammeln</b> soll (Urlaub, Ersatz), gehört in einen <b style={{ color: "var(--ink)" }}>Topf</b>.
+      </p>
 
       <Card>
         {budgets.length === 0 ? (

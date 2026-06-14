@@ -46,7 +46,15 @@ export function ToepfeScreen() {
 
   return (
     <div className="screen">
-      <PageHead title="Töpfe" subtitle="Zweckbindung — nicht kontogebunden, durch Kontostände gedeckt" />
+      <PageHead title="Töpfe" subtitle="Wie Budgets — aber zum Ansparen statt Verbrauchen" />
+
+      <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
+        Ein Topf <b style={{ color: "var(--ink)" }}>spart an (kein Reset)</b> und du <b style={{ color: "var(--ink)" }}>entnimmst, wenn du's brauchst</b>. Drei Sorten:{" "}
+        <b style={{ color: "var(--ink)" }}>Ersatz</b> für Dinge, die du ersetzt (Waschmaschine, Auto) ·{" "}
+        <b style={{ color: "var(--ink)" }}>Puffer</b> für Ungewisses (Steuer, Reparatur) ·{" "}
+        <b style={{ color: "var(--ink)" }}>Spartopf</b> für Wünsche (Klamotten, Urlaub). Anders als ein{" "}
+        <b style={{ color: "var(--ink)" }}>Budget</b>, das ein Monats-Limit ist und zum Periodenende verfällt.
+      </p>
 
       <InventarCard items={items} onChange={laden} />
       <ToepfeListe toepfe={toepfe} heute={heute} onChange={laden} />
