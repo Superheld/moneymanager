@@ -140,6 +140,13 @@ body {
   gap: var(--gap-card);
 }
 
+.ctxbar {
+  font-size: var(--fs-sm);
+  color: var(--ink-3);
+  font-weight: var(--fw-semi);
+  margin-bottom: var(--sp-4);
+}
+
 .phead h1 {
   font-size: var(--fs-h1);
   font-weight: var(--fw-black);
