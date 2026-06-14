@@ -48,3 +48,31 @@ export async function ersatztopfAusInventar(
   await topfRepo.speichern(topf);
   return topf;
 }
+
+/**
+ * Inventar-Eintrag in einem Schritt: legt den Gegenstand (Stammdaten) UND seinen
+ * Ersatz-Topf (Planung) an — wie Vertrag → Zahlungsregel. Ein Gegenstand, für den
+ * du sparst, ist die Einheit, die der Nutzer sieht.
+ */
+export async function inventarMitTopfAnlegen(
+  inventarRepo: InventarRepository,
+  topfRepo: TopfRepository,
+  e: InventarEingabe,
+): Promise<{ gegenstand: Inventargegenstand; topf: Ersatztopf }> {
+  const gegenstand = await inventarAnlegen(inventarRepo, e);
+  const topf = await ersatztopfAusInventar(topfRepo, gegenstand);
+  return { gegenstand, topf };
+}
+
+/** Löscht einen Inventargegenstand samt seinem Ersatz-Topf. */
+export async function inventarLoeschen(
+  inventarRepo: InventarRepository,
+  topfRepo: TopfRepository,
+  gegenstandId: string,
+): Promise<void> {
+  const toepfe = await topfRepo.alle();
+  for (const t of toepfe) {
+    if (t.typ === "ersatz" && t.inventarId === gegenstandId) await topfRepo.loeschen(t.id);
+  }
+  await inventarRepo.loeschen(gegenstandId);
+}
