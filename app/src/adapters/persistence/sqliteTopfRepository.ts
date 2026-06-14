@@ -17,6 +17,7 @@ interface Zeile {
   frist_monate: number | null;
   zufuehrung_pro_monat: number | null;
   sparziel: number | null;
+  inventar_id: string | null;
 }
 
 function zuTopf(z: Zeile): Topf {
@@ -28,7 +29,7 @@ function zuTopf(z: Zeile): Topf {
   };
   switch (z.typ as TopfTyp) {
     case "ersatz":
-      return { ...basis, typ: "ersatz", wiederbeschaffung: z.wiederbeschaffung ?? 0, nutzungsdauerMonate: z.nutzungsdauer_monate ?? 1 };
+      return { ...basis, typ: "ersatz", wiederbeschaffung: z.wiederbeschaffung ?? 0, nutzungsdauerMonate: z.nutzungsdauer_monate ?? 1, inventarId: z.inventar_id ?? undefined };
     case "puffer":
       return { ...basis, typ: "puffer", schaetzbetrag: z.schaetzbetrag ?? 0, fristMonate: z.frist_monate ?? 1 };
     case "spartopf":
@@ -41,7 +42,7 @@ export const sqliteTopfRepository: TopfRepository = {
     const db = await getDb();
     const zeilen = await db.select<Zeile[]>(
       `SELECT id, typ, bezeichnung, start, kategorie_id, wiederbeschaffung, nutzungsdauer_monate,
-              schaetzbetrag, frist_monate, zufuehrung_pro_monat, sparziel
+              schaetzbetrag, frist_monate, zufuehrung_pro_monat, sparziel, inventar_id
        FROM topf ORDER BY bezeichnung`,
     );
     return zeilen.map(zuTopf);
@@ -51,20 +52,22 @@ export const sqliteTopfRepository: TopfRepository = {
     const db = await getDb();
     const w = t.typ === "ersatz" ? t.wiederbeschaffung : null;
     const nd = t.typ === "ersatz" ? t.nutzungsdauerMonate : null;
+    const inv = t.typ === "ersatz" ? t.inventarId ?? null : null;
     const sb = t.typ === "puffer" ? t.schaetzbetrag : null;
     const fr = t.typ === "puffer" ? t.fristMonate : null;
     const zu = t.typ === "spartopf" ? t.zufuehrungProMonat : null;
     const sz = t.typ === "spartopf" ? t.sparziel ?? null : null;
     await db.execute(
       `INSERT INTO topf (id, typ, bezeichnung, start, kategorie_id, wiederbeschaffung,
-         nutzungsdauer_monate, schaetzbetrag, frist_monate, zufuehrung_pro_monat, sparziel)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+         nutzungsdauer_monate, schaetzbetrag, frist_monate, zufuehrung_pro_monat, sparziel, inventar_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT(id) DO UPDATE SET typ = excluded.typ, bezeichnung = excluded.bezeichnung,
          start = excluded.start, kategorie_id = excluded.kategorie_id,
          wiederbeschaffung = excluded.wiederbeschaffung, nutzungsdauer_monate = excluded.nutzungsdauer_monate,
          schaetzbetrag = excluded.schaetzbetrag, frist_monate = excluded.frist_monate,
-         zufuehrung_pro_monat = excluded.zufuehrung_pro_monat, sparziel = excluded.sparziel`,
-      [t.id, t.typ, t.bezeichnung, t.start, t.kategorieId ?? null, w, nd, sb, fr, zu, sz],
+         zufuehrung_pro_monat = excluded.zufuehrung_pro_monat, sparziel = excluded.sparziel,
+         inventar_id = excluded.inventar_id`,
+      [t.id, t.typ, t.bezeichnung, t.start, t.kategorieId ?? null, w, nd, sb, fr, zu, sz, inv],
     );
   },
 

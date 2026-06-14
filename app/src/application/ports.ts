@@ -3,6 +3,7 @@
 
 import type {
   Budget,
+  Inventargegenstand,
   Kategorie,
   Person,
   Topf,
@@ -50,5 +51,11 @@ export interface BudgetRepository {
 export interface TopfRepository {
   alle(): Promise<Topf[]>;
   speichern(topf: Topf): Promise<void>;
+  loeschen(id: string): Promise<void>;
+}
+
+export interface InventarRepository {
+  alle(): Promise<Inventargegenstand[]>;
+  speichern(gegenstand: Inventargegenstand): Promise<void>;
   loeschen(id: string): Promise<void>;
 }
