@@ -1,93 +1,68 @@
-// Übersicht — Fokus-Screen: eine große Zahl (verfügbares Geld) + Plan-Projektion über
-// alle Quellen (Verträge/Regeln, Budgets, Töpfe) und das Anlegen einer Zahlungsregel.
+// Übersicht — Fokus-Dashboard (Design „Variante C, flach"): die eine Zahl
+// (verfügbares Geld), ein Klartext-Satz zur Lage, der Jahresverlauf und darunter
+// Nächste Zahlungen · Budgets · Im Blick. Zieht echte Daten aus allen Bereichen;
+// kein Daten-Eingabe-Formular mehr (das lebt in den Fachscreens).
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  centZuEuro,
   euroZuCent,
   formatBetrag,
+  geglaetteterMonatsabfluss,
+  kuendigungsterminNaht,
+  naechsterKuendigungstermin,
   projiziereLiquiditaet,
+  projiziereRegel,
   type Budget,
-  type Charakter,
   type Kategorie,
-  type Rhythmus,
   type Topf,
-  type Zahlungskonto,
+  type Vertrag,
   type Zahlungsregel,
 } from "../../core";
-import { zahlungsregelAnlegen } from "../../application/zahlungsregelAnlegen";
-import { sqliteZahlungsregelRepository as repo } from "../persistence/sqliteZahlungsregelRepository";
+import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
-import {
-  sqliteKategorieRepository as kategorieRepo,
-  sqliteZahlungskontoRepository as kontoRepo,
-} from "../persistence/sqliteStammdatenRepositories";
-import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
+import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
+import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
+import { Card, CoverageTrack, FormField, KPIStat, Pill } from "./ds";
+import { ZweiKurvenChart } from "./ZweiKurvenChart";
 
 const MONATE = 12;
 
-/** Erster Tag des aktuellen Monats als ISO — der unreine „Jetzt"-Punkt lebt in der UI. */
 function aktuellerMonatAb(): string {
-  const now = new Date();
-  const mm = String(now.getMonth() + 1).padStart(2, "0");
-  return `${now.getFullYear()}-${mm}-01`;
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-01`;
 }
-
-const RHYTHMEN: { wert: Rhythmus; label: string }[] = [
-  { wert: "monatlich", label: "monatlich" },
-  { wert: "quartalsweise", label: "quartalsweise" },
-  { wert: "halbjaehrlich", label: "halbjährlich" },
-  { wert: "jaehrlich", label: "jährlich" },
-];
-
-const CHARAKTERE: { wert: Charakter; label: string }[] = [
-  { wert: "Aufwand", label: "Aufwand (Ausgabe)" },
-  { wert: "Ertrag", label: "Ertrag (Einnahme)" },
-  { wert: "Umschichtung", label: "Umschichtung (Sparen/Anlegen)" },
-];
-
-const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
-  Aufwand: "aufwand",
-  Ertrag: "ertrag",
-  Umschichtung: "um",
-};
+function heuteIso(): string {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+function ddmm(iso: string): string {
+  const [, m, d] = iso.split("-");
+  return `${d}.${m}.`;
+}
 
 export function UeberblickScreen() {
   const ab = useMemo(aktuellerMonatAb, []);
+  const heute = useMemo(heuteIso, []);
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
-  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
-  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [toepfe, setToepfe] = useState<Topf[]>([]);
+  const [vertraege, setVertraege] = useState<Vertrag[]>([]);
+  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [startsaldoEuro, setStartsaldoEuro] = useState(2000);
 
-  const [bezeichnung, setBezeichnung] = useState("");
-  const [betragEuro, setBetragEuro] = useState("");
-  const [rhythmus, setRhythmus] = useState<Rhythmus>("monatlich");
-  const [charakter, setCharakter] = useState<Charakter>("Aufwand");
-  const [startdatum, setStartdatum] = useState(ab);
-  const [kontoId, setKontoId] = useState("");
-  const [kategorieId, setKategorieId] = useState("");
-  const [fehler, setFehler] = useState<string | null>(null);
-
-  async function laden() {
-    setRegeln(await repo.alle());
-    setKonten(await kontoRepo.alle());
-    setKategorien(await kategorieRepo.alle());
-    setBudgets(await budgetRepo.alle());
-    setToepfe(await topfRepo.alle());
-  }
-
-  // Kategorie wählen → Default-Charakter übernehmen (Glossar-Logik sichtbar machen).
-  function kategorieWaehlen(id: string) {
-    setKategorieId(id);
-    const k = kategorien.find((x) => x.id === id);
-    if (k) setCharakter(k.defaultCharakter);
-  }
-
   useEffect(() => {
-    laden().catch((e) => setFehler(String(e)));
+    (async () => {
+      setRegeln(await regelRepo.alle());
+      setBudgets(await budgetRepo.alle());
+      setToepfe(await topfRepo.alle());
+      setVertraege(await vertragRepo.alle());
+      setKategorien(await kategorieRepo.alle());
+    })();
   }, []);
+
+  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
 
   const verlauf = useMemo(
     () => projiziereLiquiditaet(regeln, budgets, toepfe, ab, MONATE, euroZuCent(startsaldoEuro)),
@@ -95,202 +70,127 @@ export function UeberblickScreen() {
   );
 
   const verfuegbar = verlauf.length ? verlauf[0].freieLiquiditaet : euroZuCent(startsaldoEuro);
-  const endFrei = verlauf.length ? verlauf[verlauf.length - 1].freieLiquiditaet : euroZuCent(startsaldoEuro);
-  const summeZu = verlauf.reduce((s, m) => s + m.zufluss, 0);
-  const summeAb = verlauf.reduce((s, m) => s + m.abfluss + m.budgetAbfluss, 0);
+  const endKonto = verlauf.length ? verlauf[verlauf.length - 1].kontosaldo : euroZuCent(startsaldoEuro);
+  const jahresEffekt = endKonto - euroZuCent(startsaldoEuro);
+  const tiefpunkt = verlauf.reduce(
+    (min, m) => (m.freieLiquiditaet < min.freieLiquiditaet ? m : min),
+    verlauf[0] ?? { freieLiquiditaet: 0, label: "—" },
+  );
+  const deckung = verlauf.length
+    ? verlauf[0].sollSumme > 0
+      ? Math.max(0, Math.min(100, Math.round((verlauf[0].kontosaldo / verlauf[0].sollSumme) * 100)))
+      : 100
+    : 100;
 
-  const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
-  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
+  // Nächste Zahlungen: alle Regel-Fälligkeiten ab heute (2 Monate), sortiert.
+  const naechste = useMemo(() => {
+    const alle = regeln.flatMap((r) => projiziereRegel(r, heute, 2));
+    return alle.sort((a, b) => a.datum.localeCompare(b.datum)).slice(0, 6);
+  }, [regeln, heute]);
 
-  async function anlegen() {
-    setFehler(null);
-    try {
-      await zahlungsregelAnlegen(repo, {
-        bezeichnung,
-        betragEuro: Number(betragEuro.replace(",", ".")),
-        rhythmus,
-        startdatum,
-        charakter,
-        kontoId: kontoId || undefined,
-        kategorieId: kategorieId || undefined,
-      });
-      setBezeichnung("");
-      setBetragEuro("");
-      setKontoId("");
-      setKategorieId("");
-      await laden();
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+  // Im Blick: Engpass + nahende Kündigungen.
+  const hinweise: { text: string; warn: boolean }[] = [];
+  if (tiefpunkt.freieLiquiditaet < 0)
+    hinweise.push({ text: `Überplanung: am Tiefpunkt (${tiefpunkt.label}) fehlen ${formatBetrag(tiefpunkt.freieLiquiditaet)} €`, warn: true });
+  for (const v of vertraege) {
+    if (kuendigungsterminNaht(v, heute)) {
+      const t = naechsterKuendigungstermin(v, heute);
+      hinweise.push({ text: `${v.anbieter}: Kündigung bis ${t?.kuendigenBis} möglich`, warn: true });
     }
   }
+  if (hinweise.length === 0) hinweise.push({ text: "Keine offenen Hinweise — dein Plan trägt.", warn: false });
 
-  async function loeschen(id: string) {
-    await repo.loeschen(id);
-    await laden();
-  }
+  const datumLang = new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="screen">
-      <div className="phead">
-        <h1>Übersicht</h1>
-        <div className="psub">
-          Plan-Projektion über {MONATE} Monate ab {ab.slice(0, 7)} · Plan-only, alles berechnet
-        </div>
+      <div className="ctxbar">{datumLang} · Szenario: Basis</div>
+
+      <div style={{ fontSize: "var(--fs-body)", fontWeight: "var(--fw-semi)", color: "var(--ink-2)" }}>Verfügbar heute</div>
+      <div className="num" style={{ fontSize: "var(--fs-display)", fontWeight: "var(--fw-black)", letterSpacing: "var(--ls-tight)", lineHeight: 1, marginTop: 6 }}>
+        {formatBetrag(verfuegbar)} <small style={{ fontSize: 28, fontWeight: "var(--fw-bold)", color: "var(--ink-2)" }}>€</small>
       </div>
-
-      <div className="kpis">
-        <KPIStat
-          size="hero"
-          label="Verfügbares Geld · frei"
-          value={formatBetrag(verfuegbar)}
-          unit="€"
-          tone={verfuegbar < 0 ? "warn" : "plan"}
-        />
-        <KPIStat size="chip" label="Frei in 12 Monaten" value={formatBetrag(endFrei)} unit="€" tone={endFrei < 0 ? "warn" : "default"} />
-        <KPIStat size="chip" label="Σ Zuflüsse (Plan)" value={formatBetrag(summeZu)} unit="€" tone="ok" />
-        <KPIStat size="chip" label="Σ Abflüsse (Plan)" value={formatBetrag(summeAb)} unit="€" />
-      </div>
-
-      <Card title="Zahlungsregel anlegen" subtitle="Wiederkehrende Plan-Zahlung — die Quelle der Projektion">
-        <div className="form-grid">
-          <FormField label="Bezeichnung" required>
-            <input
-              className="field"
-              value={bezeichnung}
-              placeholder="z. B. Miete, Gehalt, ETF-Sparplan"
-              onChange={(e) => setBezeichnung(e.target.value)}
-            />
-          </FormField>
-          <FormField label="Betrag" required hint="positiver Betrag — Richtung ergibt sich aus dem Charakter">
-            <input
-              className="field"
-              inputMode="decimal"
-              value={betragEuro}
-              placeholder="0,00"
-              onChange={(e) => setBetragEuro(e.target.value)}
-            />
-          </FormField>
-          <FormField label="Rhythmus">
-            <select className="field" value={rhythmus} onChange={(e) => setRhythmus(e.target.value as Rhythmus)}>
-              {RHYTHMEN.map((r) => (
-                <option key={r.wert} value={r.wert}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Kategorie" hint="setzt den Charakter vor">
-            <select className="field" value={kategorieId} onChange={(e) => kategorieWaehlen(e.target.value)}>
-              <option value="">— keine —</option>
-              {kategorien.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.name}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Charakter">
-            <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-              {CHARAKTERE.map((c) => (
-                <option key={c.wert} value={c.wert}>
-                  {c.label}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Konto" hint="optional">
-            <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
-              <option value="">— keins —</option>
-              {konten.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.bezeichnung}
-                </option>
-              ))}
-            </select>
-          </FormField>
-          <FormField label="Erste Fälligkeit">
-            <input className="field" type="date" value={startdatum} onChange={(e) => setStartdatum(e.target.value)} />
-          </FormField>
-          <FormField label="Startsaldo (für die Projektion)" hint="nur Anzeige, in P0 nicht gespeichert">
-            <input
-              className="field"
-              inputMode="decimal"
-              value={String(startsaldoEuro)}
-              onChange={(e) => setStartsaldoEuro(Number(e.target.value.replace(",", ".")) || 0)}
-            />
-          </FormField>
-        </div>
-        <div className="form-actions">
-          <Button variant="primary" plus onClick={anlegen}>
-            Regel anlegen
-          </Button>
-          {fehler && <span className="err">{fehler}</span>}
-        </div>
-      </Card>
-
-      <Card title="Angelegte Regeln" subtitle={`${regeln.length} Stück`}>
-        {regeln.length === 0 ? (
-          <div className="muted">Noch keine Regeln. Leg oben deine erste an.</div>
+      <p style={{ fontSize: 16, lineHeight: 1.55, color: "var(--ink-2)", margin: "16px 0 0", maxWidth: 620 }}>
+        Über das Jahr trägt dein Plan auf{" "}
+        <b style={{ color: jahresEffekt < 0 ? "var(--warn-deep)" : "var(--accent-deep)", fontWeight: 700 }}>{formatBetrag(jahresEffekt, true)} €</b>
+        {tiefpunkt.freieLiquiditaet < 0 ? (
+          <>
+            {" "}— am Tiefpunkt (<b style={{ color: "var(--ink)" }}>{tiefpunkt.label}</b>) wird es mit{" "}
+            <b style={{ color: "var(--warn-deep)", fontWeight: 700 }}>{formatBetrag(tiefpunkt.freieLiquiditaet)} €</b> eng.
+          </>
         ) : (
-          <DataTable
-            columns={[
-              { key: "bezeichnung", label: "Bezeichnung" },
-              {
-                key: "charakter",
-                label: "Charakter",
-                render: (r) => <Pill variant={CHARAKTER_PILL[r.charakter as Charakter]}>{r.charakter}</Pill>,
-              },
-              { key: "rhythmus", label: "Rhythmus" },
-              { key: "kategorie", label: "Kategorie", render: (r) => (r.kategorieId ? kategorieName.get(r.kategorieId) ?? "?" : "—") },
-              { key: "konto", label: "Konto", render: (r) => (r.kontoId ? kontoName.get(r.kontoId) ?? "?" : "—") },
-              { key: "startdatum", label: "ab" },
-              {
-                key: "betrag",
-                label: "Betrag €",
-                align: "right",
-                render: (r) => formatBetrag(r.betrag, true),
-              },
-              {
-                key: "_x",
-                label: "",
-                align: "right",
-                render: (r) => (
-                  <button className="linkbtn" onClick={() => loeschen(r.id)}>
-                    löschen
-                  </button>
-                ),
-              },
-            ]}
-            rows={regeln}
+          <> und die freie Liquidität bleibt durchgehend im Plus.</>
+        )}{" "}
+        Deine Töpfe sind zu <b style={{ color: "var(--ink)", fontWeight: 700 }}>{deckung} %</b> gedeckt.
+      </p>
+
+      <div className="kpis" style={{ marginTop: 22 }}>
+        <KPIStat size="chip" label={`Tiefpunkt frei (${tiefpunkt.label})`} value={formatBetrag(tiefpunkt.freieLiquiditaet)} unit="€" tone={tiefpunkt.freieLiquiditaet < 0 ? "warn" : "default"} />
+        <KPIStat size="chip" label="Töpfe-Deckung" value={String(deckung)} unit="%" tone="plan" />
+        <KPIStat size="chip" label="Plan-Effekt Jahr" value={formatBetrag(jahresEffekt, true)} unit="€" tone={jahresEffekt < 0 ? "warn" : "ok"} />
+      </div>
+
+      <Card title="Verfügbares Geld · Jahresverlauf" subtitle="alle Konten zusammen" style={{ marginTop: 24 }}>
+        {verlauf.length > 0 && (
+          <ZweiKurvenChart
+            labels={verlauf.map((m) => m.label)}
+            kontosaldo={verlauf.map((m) => centZuEuro(m.kontosaldo))}
+            freieLiquiditaet={verlauf.map((m) => centZuEuro(m.freieLiquiditaet))}
           />
         )}
+        <div style={{ marginTop: "var(--sp-4)", maxWidth: 260 }}>
+          <FormField label="Startsaldo (Annahme)" hint="in P3 aus echten Kontoständen">
+            <input className="field" inputMode="decimal" value={String(startsaldoEuro)} onChange={(e) => setStartsaldoEuro(Number(e.target.value.replace(",", ".")) || 0)} />
+          </FormField>
+        </div>
       </Card>
 
-      <Card title="Projizierter Verlauf" subtitle="Kontosaldo (echte Flüsse) und freie Liquidität (− Töpfe)">
-        <DataTable
-          columns={[
-            { key: "label", label: "Monat" },
-            { key: "netto", label: "Netto €", align: "right", render: (m) => formatBetrag(m.netto, true) },
-            {
-              key: "kontosaldo",
-              label: "Kontosaldo €",
-              align: "right",
-              render: (m) => formatBetrag(m.kontosaldo),
-            },
-            {
-              key: "frei",
-              label: "Freie Liquidität €",
-              align: "right",
-              render: (m) => (
-                <span style={{ color: m.freieLiquiditaet < 0 ? "var(--warn-deep)" : "var(--ink)", fontWeight: "var(--fw-bold)" }}>
-                  {formatBetrag(m.freieLiquiditaet)}
+      <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr 1fr", gap: "var(--gap-card)", marginTop: "var(--gap-card)", alignItems: "start" }}>
+        <Card title="Nächste Zahlungen" subtitle="kommende 2 Monate">
+          {naechste.length === 0 ? (
+            <div className="muted">Keine geplanten Zahlungen.</div>
+          ) : (
+            naechste.map((p, i) => (
+              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "11px 0", borderBottom: "1px solid var(--line-soft)" }}>
+                <span style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(p.datum)}</span>
+                  {p.bezeichnung}
+                  {p.charakter === "Umschichtung" && <Pill variant="um">Umschichtung</Pill>}
                 </span>
-              ),
-            },
-          ]}
-          rows={verlauf}
-        />
-      </Card>
+                <span className="num" style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", color: p.charakter === "Ertrag" ? "var(--ok-deep)" : p.charakter === "Umschichtung" ? "var(--accent-deep)" : "var(--ink)" }}>
+                  {formatBetrag(p.betrag, true)} €
+                </span>
+              </div>
+            ))
+          )}
+        </Card>
+
+        <Card title="Budgets diesen Monat" subtitle="Rahmen (Plan)">
+          {budgets.length === 0 ? (
+            <div className="muted">Keine Budgets.</div>
+          ) : (
+            budgets.map((b) => (
+              <div key={b.id} style={{ padding: "11px 0", borderBottom: "1px solid var(--line-soft)" }}>
+                <CoverageTrack
+                  value={0}
+                  max={Math.abs(centZuEuro(geglaetteterMonatsabfluss(b)))}
+                  label={kategorieName.get(b.kategorieId) ?? "?"}
+                  right={`${formatBetrag(Math.abs(geglaetteterMonatsabfluss(b)))} €/Mt`}
+                />
+              </div>
+            ))
+          )}
+        </Card>
+
+        <Card title="Im Blick" subtitle="Hinweise">
+          {hinweise.map((h, i) => (
+            <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.42, padding: "9px 0", borderBottom: "1px solid var(--line-soft)" }}>
+              <span style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flex: "0 0 auto", background: h.warn ? "var(--warn)" : "var(--ink-3)" }} />
+              {h.text}
+            </div>
+          ))}
+        </Card>
+      </div>
     </div>
   );
 }
