@@ -9,3 +9,4 @@ export * from "./konto";
 export * from "./kategorie";
 export * from "./vertrag";
 export * from "./budget";
+export * from "./topf";

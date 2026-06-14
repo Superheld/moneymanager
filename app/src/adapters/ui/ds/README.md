@@ -11,6 +11,7 @@ Diese `.jsx`/`.d.ts`-Dateien sind **verbatim kopiert** aus dem Repo-Verzeichnis
 | `Card` | `components/core/Card` |
 | `KPIStat` | `components/core/KPIStat` |
 | `Pill` | `components/core/Pill` |
+| `CoverageTrack` | `components/core/CoverageTrack` |
 | `DataTable` | `components/data/DataTable` |
 | `Button` | `components/controls/Button` |
 | `FormField` (+ `Input`) | `components/forms/FormField` |

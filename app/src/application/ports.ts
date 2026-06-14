@@ -5,6 +5,7 @@ import type {
   Budget,
   Kategorie,
   Person,
+  Topf,
   Vertrag,
   Zahlungskonto,
   Zahlungsregel,
@@ -43,5 +44,11 @@ export interface VertragRepository {
 export interface BudgetRepository {
   alle(): Promise<Budget[]>;
   speichern(budget: Budget): Promise<void>;
+  loeschen(id: string): Promise<void>;
+}
+
+export interface TopfRepository {
+  alle(): Promise<Topf[]>;
+  speichern(topf: Topf): Promise<void>;
   loeschen(id: string): Promise<void>;
 }

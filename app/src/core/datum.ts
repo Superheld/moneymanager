@@ -41,6 +41,13 @@ export function monatsIndex(start: Ymd, jahr: number, monat: number): number {
   return jahr * 12 + (monat - 1) - (start.y * 12 + (start.m - 1));
 }
 
+/** Volle Monate von `vonIso` bis `bisIso` (kann negativ sein). */
+export function monateZwischen(vonIso: string, bisIso: string): number {
+  const a = parseIso(vonIso);
+  const b = parseIso(bisIso);
+  return b.y * 12 + (b.m - 1) - (a.y * 12 + (a.m - 1));
+}
+
 /** Tage von `vonIso` bis `bisIso` (positiv, wenn bis in der Zukunft liegt). */
 export function tageBis(vonIso: string, bisIso: string): number {
   const a = parseIso(vonIso);
