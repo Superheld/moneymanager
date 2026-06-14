@@ -3,6 +3,7 @@
 // klickbar; spätere Bereiche (BAUPLAN P2+) sind als deaktiviert sichtbar.
 
 import type { ReactNode } from "react";
+import { APP_VERSION } from "../../version";
 
 export type ScreenId =
   | "uebersicht"
@@ -85,7 +86,7 @@ export function AppShell({
         ))}
 
         <div className="foot">
-          <div>P2 · Planungs-Core</div>
+          <div>Moneymanager {APP_VERSION}</div>
           <div>Lokal · keine Cloud</div>
         </div>
       </aside>
