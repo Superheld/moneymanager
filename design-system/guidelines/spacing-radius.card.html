@@ -1,0 +1,22 @@
+<!-- @dsCard group="Spacing" viewport="700x180" name="Radius & Flächen" subtitle="Haarlinie statt Schatten" -->
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+body{margin:0;background:var(--cream);font-family:var(--font-ui);padding:20px;color:var(--ink)}
+.row{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.b{background:var(--surface);border:1px solid var(--line);width:96px;height:64px;display:grid;place-items:center;
+  font-size:10.5px;color:var(--ink-3);font-family:var(--font-num)}
+.flat{box-shadow:var(--shadow-none)}
+.float{box-shadow:var(--shadow-card)}
+.nm{font-size:11px;color:var(--ink-3);text-align:center;margin-top:6px}
+</style></head><body>
+<div class="row">
+  <div><div class="b" style="border-radius:var(--r-sm)">7</div><div class="nm">--r-sm</div></div>
+  <div><div class="b" style="border-radius:var(--r-md)">11</div><div class="nm">--r-md</div></div>
+  <div><div class="b" style="border-radius:var(--r-lg)">15</div><div class="nm">--r-lg</div></div>
+  <div><div class="b" style="border-radius:var(--r-xl)">18</div><div class="nm">--r-xl</div></div>
+  <div><div class="b" style="border-radius:var(--r-2xl)">24</div><div class="nm">--r-2xl</div></div>
+  <div><div class="b flat" style="border-radius:var(--r-xl)">flat</div><div class="nm">default</div></div>
+  <div><div class="b float" style="border-radius:var(--r-xl);border-color:transparent">float</div><div class="nm">--shadow-card</div></div>
+</div>
+</body></html>

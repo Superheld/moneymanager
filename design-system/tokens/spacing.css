@@ -1,0 +1,21 @@
+/* ============================================================
+   SPACING — 4px base grid. Use for padding, gaps, stacks.
+   ============================================================ */
+:root{
+  --sp-1:  4px;
+  --sp-2:  8px;
+  --sp-3:  12px;
+  --sp-4:  16px;
+  --sp-5:  20px;
+  --sp-6:  24px;
+  --sp-7:  32px;
+  --sp-8:  40px;
+  --sp-9:  48px;
+
+  /* semantic */
+  --gap-card:    var(--sp-4);  /* between cards in a grid */
+  --pad-card:    var(--sp-6);  /* inside a card          */
+  --pad-screen:  var(--sp-8);  /* screen gutters         */
+  --stack-tight: var(--sp-2);
+  --stack:       var(--sp-4);
+}

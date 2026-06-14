@@ -1,0 +1,50 @@
+/* ============================================================
+   COLORS — warm-neutral base, single teal accent, semantic
+   Plan = accent (teal), Ist = ink, Warn = amber, OK = green.
+   Saturation kept low; warm whites (hue ~80), cool-ish accent.
+   ============================================================ */
+:root{
+  /* --- warm neutral surfaces --- */
+  --cream:        oklch(0.97 0.013 85);   /* app background */
+  --surface:      oklch(0.995 0.006 85);  /* cards / panels  */
+  --surface-2:    oklch(0.955 0.012 82);  /* subtle fill     */
+
+  /* --- ink (text) --- */
+  --ink:          oklch(0.30 0.022 62);   /* primary text */
+  --ink-2:        oklch(0.47 0.020 62);   /* secondary    */
+  --ink-3:        oklch(0.64 0.018 62);   /* tertiary / meta */
+
+  /* --- lines --- */
+  --line:         oklch(0.91 0.013 78);
+  --line-soft:    oklch(0.945 0.010 80);
+
+  /* --- accent (teal) = PLAN / brand --- */
+  --accent:       oklch(0.55 0.10 175);
+  --accent-deep:  oklch(0.45 0.085 178);  /* text on light */
+  --accent-wash:  oklch(0.96 0.022 175);  /* tinted bg      */
+
+  /* --- semantic --- */
+  --warn:         oklch(0.62 0.13 46);    /* Engpass / über Budget */
+  --warn-deep:    oklch(0.50 0.12 44);
+  --warn-wash:    oklch(0.95 0.035 60);
+  --ok:           oklch(0.56 0.10 165);   /* Ertrag / gedeckt */
+  --ok-deep:      oklch(0.46 0.09 167);
+  --ok-wash:      oklch(0.95 0.03 165);
+
+  /* --- semantic aliases (use these in product code) --- */
+  --bg-app:       var(--cream);
+  --bg-card:      var(--surface);
+  --text-strong:  var(--ink);
+  --text-body:    var(--ink-2);
+  --text-muted:   var(--ink-3);
+  --border:       var(--line);
+  --border-soft:  var(--line-soft);
+
+  /* domain semantics (Glossar) */
+  --plan:         var(--accent);      /* projizierte Zahlungen */
+  --plan-text:    var(--accent-deep);
+  --ist:          var(--ink);         /* gebuchte Fakten */
+  --umschichtung: var(--accent-deep); /* Sparen/Anlegen, kein Verbrauch */
+  --ertrag:       var(--ok);
+  --aufwand:      var(--ink-3);
+}

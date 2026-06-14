@@ -1,0 +1,30 @@
+<!-- @dsCard group="Components" viewport="700x320" name="Daten" subtitle="DataTable · Vessel" -->
+<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"/>
+<link rel="stylesheet" href="../../styles.css"/>
+<style>body{margin:0;background:var(--cream);font-family:var(--font-ui);color:var(--ink);padding:20px}
+.lbl{font-size:var(--fs-eyebrow);font-weight:700;letter-spacing:var(--ls-eyebrow);text-transform:uppercase;color:var(--ink-3);margin:0 0 8px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-xl);padding:16px}</style>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="../_load.js"></script>
+</head><body><div id="root"></div>
+<script type="text/babel" data-presets="react">
+(async function(){
+  const {DataTable,Vessel,Pill}=await window.loadDS(['DataTable.jsx','Vessel.jsx','../core/Pill.jsx']);
+function Demo(){
+  const cols=[{key:'nm',label:'Vertrag'},{key:'ch',label:'Charakter'},{key:'amt',label:'Betrag',align:'right',
+    render:r=> <span style={{fontWeight:700,color:r.c==='ert'?'var(--ok-deep)':(r.c==='um'?'var(--accent-deep)':'var(--ink)')}}>{r.amt}</span>}];
+  const rows=[{nm:'Gehalt Anna',ch:<Pill variant="ertrag">Ertrag</Pill>,amt:'+2.900 €',c:'ert'},
+    {nm:'Miete',ch:<Pill>Aufwand</Pill>,amt:'−1.250 €'},
+    {nm:'ETF-Sparplan',ch:<Pill variant="um">Umschichtung</Pill>,amt:'−300 €',c:'um'}];
+  return <div style={{display:'flex',gap:16,alignItems:'flex-start'}}>
+    <div style={{flex:1.4}}><div className="lbl">DataTable</div><div className="card" style={{padding:'4px 12px'}}><DataTable columns={cols} rows={rows}/></div></div>
+    <div style={{flex:1}}><div className="lbl">Vessel — Topf-Füllstand</div><div className="card" style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+      <Vessel label="Auto-Ersatz" art="Spartopf" value={8640} target={12000}/>
+      <Vessel label="Steuer" art="Puffer" value={270} target={900}/></div></div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById('root')).render(<Demo/>);
+})();
+</script></body></html>

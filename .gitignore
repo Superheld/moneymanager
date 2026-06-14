@@ -1,0 +1,16 @@
+# OS
+.DS_Store
+
+# Node
+node_modules/
+app/node_modules/
+
+# Build-Artefakte
+app/dist/
+app/src-tauri/target/
+app/src-tauri/gen/
+
+# Logs / env
+*.log
+.env
+.env.local
