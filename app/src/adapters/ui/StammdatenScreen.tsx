@@ -16,6 +16,7 @@ import {
   kontoAnlegen,
   personAnlegen,
 } from "../../application/stammdatenAnlegen";
+import { standardkategorienAnlegen } from "../../application/standardkategorien";
 import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
@@ -281,6 +282,9 @@ function KategorienCard({
       <div className="form-actions">
         <Button variant="primary" plus onClick={anlegen}>
           Kategorie anlegen
+        </Button>
+        <Button onClick={() => standardkategorienAnlegen(kategorieRepo).then(onChange)}>
+          Standardkategorien laden
         </Button>
         {fehler && <span className="err">{fehler}</span>}
       </div>
