@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 
-export type ScreenId = "uebersicht" | "stammdaten";
+export type ScreenId = "uebersicht" | "vertraege" | "stammdaten";
 
 interface NavEntry {
   id?: ScreenId;
@@ -25,7 +25,7 @@ const GRUPPEN: NavGroup[] = [
       { label: "Liquidität", badge: "Plan" },
       { label: "Töpfe" },
       { label: "Budgets" },
-      { label: "Verträge" },
+      { id: "vertraege", label: "Verträge" },
       { label: "Deckung", badge: "Ist" },
       { label: "Analysen" },
     ],
@@ -81,7 +81,7 @@ export function AppShell({
         ))}
 
         <div className="foot">
-          <div>P1 · Stammdaten</div>
+          <div>P2 · Planungs-Core</div>
           <div>Lokal · keine Cloud</div>
         </div>
       </aside>

@@ -14,6 +14,7 @@ interface Zeile {
   charakter: string;
   konto_id: string | null;
   kategorie_id: string | null;
+  vertrag_id: string | null;
 }
 
 function zuRegel(z: Zeile): Zahlungsregel {
@@ -26,6 +27,7 @@ function zuRegel(z: Zeile): Zahlungsregel {
     charakter: z.charakter as Charakter,
     kontoId: z.konto_id ?? undefined,
     kategorieId: z.kategorie_id ?? undefined,
+    vertragId: z.vertrag_id ?? undefined,
   };
 }
 
@@ -33,7 +35,7 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<Zeile[]>(
-      `SELECT id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id
+      `SELECT id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id, vertrag_id
        FROM zahlungsregel ORDER BY startdatum`,
     );
     return zeilen.map(zuRegel);
@@ -42,8 +44,8 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
   async speichern(regel) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id, vertrag_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        ON CONFLICT(id) DO UPDATE SET
          bezeichnung  = excluded.bezeichnung,
          betrag       = excluded.betrag,
@@ -51,7 +53,8 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
          startdatum   = excluded.startdatum,
          charakter    = excluded.charakter,
          konto_id     = excluded.konto_id,
-         kategorie_id = excluded.kategorie_id`,
+         kategorie_id = excluded.kategorie_id,
+         vertrag_id   = excluded.vertrag_id`,
       [
         regel.id,
         regel.bezeichnung,
@@ -61,6 +64,7 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
         regel.charakter,
         regel.kontoId ?? null,
         regel.kategorieId ?? null,
+        regel.vertragId ?? null,
       ],
     );
   },
