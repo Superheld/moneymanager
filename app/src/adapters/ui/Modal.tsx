@@ -11,12 +11,15 @@ export function Modal({
   onClose,
   footer,
   children,
+  z = 50,
 }: {
   title: ReactNode;
   subtitle?: ReactNode;
   onClose: () => void;
   footer?: ReactNode;
   children: ReactNode;
+  /** z-Index des Overlays; höher für verschachtelte Modale (z. B. Picker). */
+  z?: number;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -27,7 +30,7 @@ export function Modal({
   }, [onClose]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 50 }}>
+    <div style={{ position: "fixed", inset: 0, zIndex: z }}>
       <Dialog title={title} subtitle={subtitle} onClose={onClose} footer={footer}>
         {children}
       </Dialog>

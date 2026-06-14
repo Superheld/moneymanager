@@ -26,6 +26,7 @@ import {
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
+import { CategoryPicker } from "./CategoryPicker";
 
 const RHYTHMEN: { wert: Rhythmus; label: string }[] = [
   { wert: "monatlich", label: "monatlich" },
@@ -248,14 +249,7 @@ export function VertraegeScreen() {
               </select>
             </FormField>
             <FormField label="Kategorie" hint="setzt den Charakter vor">
-              <select className="field" value={kategorieId} onChange={(e) => kategorieWaehlen(e.target.value)}>
-                <option value="">—</option>
-                {kategorien.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.name}
-                  </option>
-                ))}
-              </select>
+              <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieWaehlen} />
             </FormField>
             <FormField label="Charakter">
               <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
