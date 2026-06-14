@@ -30,9 +30,9 @@ const GRUPPEN: NavGroup[] = [
     titel: "Überblick",
     eintraege: [
       { id: "uebersicht", label: "Übersicht", badge: "Plan" },
+      { id: "budgets", label: "Budgets" },
       { id: "toepfe", label: "Töpfe" },
       { id: "inventar", label: "Inventar" },
-      { id: "budgets", label: "Budgets" },
       { id: "vertraege", label: "Verträge" },
       { id: "deckung", label: "Deckung" },
     ],
