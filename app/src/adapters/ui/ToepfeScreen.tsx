@@ -9,12 +9,15 @@ import {
   formatBetrag,
   sollstand,
   zielwert,
+  type Inventargegenstand,
   type Topf,
   type TopfTyp,
 } from "../../core";
 import { topfAnlegen } from "../../application/topfAnlegen";
+import { ersatztopfAusInventar, inventarAnlegen } from "../../application/inventarAnlegen";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
-import { Button, Card, CoverageTrack, FormField, Pill } from "./ds";
+import { sqliteInventarRepository as inventarRepo } from "../persistence/sqliteInventarRepository";
+import { Button, Card, CoverageTrack, DataTable, FormField, Pill } from "./ds";
 
 const TYP_LABEL: Record<TopfTyp, string> = {
   ersatz: "Ersatz (Rücklage)",
@@ -84,6 +87,8 @@ export function ToepfeScreen() {
         <h1>Töpfe</h1>
         <div className="psub">Zweckbindung — nicht kontogebunden, durch Kontostände gedeckt</div>
       </div>
+
+      <InventarCard onTopfErzeugt={laden} />
 
       <Card title="Topf anlegen" subtitle="Ersatz spart für Wiederbeschaffung · Puffer für Ungewisses · Spartopf frei">
         <div className="form-grid">
@@ -179,5 +184,102 @@ export function ToepfeScreen() {
         )}
       </Card>
     </div>
+  );
+}
+
+function InventarCard({ onTopfErzeugt }: { onTopfErzeugt: () => void }) {
+  const [items, setItems] = useState<Inventargegenstand[]>([]);
+  const [bezeichnung, setBezeichnung] = useState("");
+  const [wiederbeschaffung, setWiederbeschaffung] = useState("");
+  const [nutzungsdauerMonate, setNutzungsdauerMonate] = useState("");
+  const [anschaffung, setAnschaffung] = useState(heuteIso());
+  const [fehler, setFehler] = useState<string | null>(null);
+
+  async function laden() {
+    setItems(await inventarRepo.alle());
+  }
+  useEffect(() => {
+    laden();
+  }, []);
+
+  async function anlegen() {
+    setFehler(null);
+    try {
+      await inventarAnlegen(inventarRepo, {
+        bezeichnung,
+        wiederbeschaffungEuro: Number(wiederbeschaffung.replace(",", ".")) || 0,
+        nutzungsdauerMonate: Number(nutzungsdauerMonate) || 0,
+        anschaffung,
+      });
+      setBezeichnung("");
+      setWiederbeschaffung("");
+      setNutzungsdauerMonate("");
+      await laden();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  async function ersatzTopfErzeugen(g: Inventargegenstand) {
+    await ersatztopfAusInventar(topfRepo, g);
+    onTopfErzeugt();
+  }
+
+  return (
+    <Card title="Inventar" subtitle="Dinge, die du besitzt und ersetzen musst — Quelle für Ersatz-Töpfe">
+      <div className="form-grid">
+        <FormField label="Gegenstand" required>
+          <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder="z. B. Auto, Laptop" />
+        </FormField>
+        <FormField label="Wiederbeschaffungswert" required>
+          <input className="field" inputMode="decimal" value={wiederbeschaffung} onChange={(e) => setWiederbeschaffung(e.target.value)} placeholder="z. B. 14400" />
+        </FormField>
+        <FormField label="Nutzungsdauer (Monate)" required hint="z. B. 96 = 8 Jahre">
+          <input className="field" inputMode="numeric" value={nutzungsdauerMonate} onChange={(e) => setNutzungsdauerMonate(e.target.value)} placeholder="96" />
+        </FormField>
+        <FormField label="Anschaffung">
+          <input className="field" type="date" value={anschaffung} onChange={(e) => setAnschaffung(e.target.value)} />
+        </FormField>
+      </div>
+      <div className="form-actions">
+        <Button variant="primary" plus onClick={anlegen}>
+          Gegenstand aufnehmen
+        </Button>
+        {fehler && <span className="err">{fehler}</span>}
+      </div>
+
+      {items.length > 0 && (
+        <div style={{ marginTop: "var(--sp-5)" }}>
+          <DataTable
+            columns={[
+              { key: "bezeichnung", label: "Gegenstand" },
+              { key: "wiederbeschaffung", label: "Wiederbeschaffung €", align: "right", render: (g) => formatBetrag(g.wiederbeschaffung) },
+              { key: "nutzungsdauer", label: "Nutzungsdauer (Mt)", align: "right", render: (g) => String(g.nutzungsdauerMonate) },
+              {
+                key: "_t",
+                label: "",
+                align: "right",
+                render: (g) => (
+                  <button className="linkbtn" onClick={() => ersatzTopfErzeugen(g)} style={{ color: "var(--accent-deep)" }}>
+                    → Ersatz-Topf anlegen
+                  </button>
+                ),
+              },
+              {
+                key: "_x",
+                label: "",
+                align: "right",
+                render: (g) => (
+                  <button className="linkbtn" onClick={() => inventarRepo.loeschen(g.id).then(laden)}>
+                    löschen
+                  </button>
+                ),
+              },
+            ]}
+            rows={items}
+          />
+        </div>
+      )}
+    </Card>
   );
 }

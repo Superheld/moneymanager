@@ -97,6 +97,20 @@ const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 6, // P2.5 — Inventar
+    sql: [
+      `CREATE TABLE IF NOT EXISTS inventargegenstand (
+        id                   TEXT PRIMARY KEY,
+        bezeichnung          TEXT    NOT NULL,
+        wiederbeschaffung    INTEGER NOT NULL,
+        nutzungsdauer_monate INTEGER NOT NULL,
+        anschaffung          TEXT    NOT NULL,
+        kategorie_id         TEXT
+      )`,
+      `ALTER TABLE topf ADD COLUMN inventar_id TEXT`,
+    ],
+  },
 ];
 
 async function migrate(db: Database): Promise<void> {

@@ -21,6 +21,8 @@ export interface Ersatztopf extends TopfBasis {
   readonly typ: "ersatz";
   readonly wiederbeschaffung: Cent; // Zielwert
   readonly nutzungsdauerMonate: number; // > 0
+  /** Herkunft: aus diesem Inventargegenstand abgeleitet (P2.5). Optional. */
+  readonly inventarId?: string;
 }
 
 export interface Puffertopf extends TopfBasis {
