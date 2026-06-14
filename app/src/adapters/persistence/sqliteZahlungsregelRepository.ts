@@ -12,6 +12,8 @@ interface Zeile {
   rhythmus: string;
   startdatum: string;
   charakter: string;
+  konto_id: string | null;
+  kategorie_id: string | null;
 }
 
 function zuRegel(z: Zeile): Zahlungsregel {
@@ -22,6 +24,8 @@ function zuRegel(z: Zeile): Zahlungsregel {
     rhythmus: z.rhythmus as Rhythmus,
     startdatum: z.startdatum,
     charakter: z.charakter as Charakter,
+    kontoId: z.konto_id ?? undefined,
+    kategorieId: z.kategorie_id ?? undefined,
   };
 }
 
@@ -29,7 +33,8 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<Zeile[]>(
-      "SELECT id, bezeichnung, betrag, rhythmus, startdatum, charakter FROM zahlungsregel ORDER BY startdatum",
+      `SELECT id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id
+       FROM zahlungsregel ORDER BY startdatum`,
     );
     return zeilen.map(zuRegel);
   },
@@ -37,15 +42,26 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
   async speichern(regel) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        ON CONFLICT(id) DO UPDATE SET
-         bezeichnung = excluded.bezeichnung,
-         betrag      = excluded.betrag,
-         rhythmus    = excluded.rhythmus,
-         startdatum  = excluded.startdatum,
-         charakter   = excluded.charakter`,
-      [regel.id, regel.bezeichnung, regel.betrag, regel.rhythmus, regel.startdatum, regel.charakter],
+         bezeichnung  = excluded.bezeichnung,
+         betrag       = excluded.betrag,
+         rhythmus     = excluded.rhythmus,
+         startdatum   = excluded.startdatum,
+         charakter    = excluded.charakter,
+         konto_id     = excluded.konto_id,
+         kategorie_id = excluded.kategorie_id`,
+      [
+        regel.id,
+        regel.bezeichnung,
+        regel.betrag,
+        regel.rhythmus,
+        regel.startdatum,
+        regel.charakter,
+        regel.kontoId ?? null,
+        regel.kategorieId ?? null,
+      ],
     );
   },
 

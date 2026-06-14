@@ -3,3 +3,6 @@
 export * from "./geld";
 export * from "./zahlungsregel";
 export * from "./projektion";
+export * from "./person";
+export * from "./konto";
+export * from "./kategorie";

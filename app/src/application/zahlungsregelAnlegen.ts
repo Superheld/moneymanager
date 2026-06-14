@@ -16,6 +16,8 @@ export interface ZahlungsregelEingabe {
   rhythmus: Rhythmus;
   startdatum: string; // ISO „YYYY-MM-DD"
   charakter: Charakter;
+  kontoId?: string;
+  kategorieId?: string;
 }
 
 /** Ertrag fließt zu (+), Aufwand und Umschichtung fließen ab (−). */
@@ -42,6 +44,8 @@ export async function zahlungsregelAnlegen(
     rhythmus: eingabe.rhythmus,
     startdatum: eingabe.startdatum,
     charakter: eingabe.charakter,
+    kontoId: eingabe.kontoId || undefined,
+    kategorieId: eingabe.kategorieId || undefined,
   };
   await repo.speichern(regel);
   return regel;

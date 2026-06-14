@@ -35,4 +35,8 @@ export interface Zahlungsregel {
   /** Erste Fälligkeit, ISO-Datum „YYYY-MM-DD". */
   readonly startdatum: string;
   readonly charakter: Charakter;
+  /** Referenz auf ein Zahlungskonto (Stammdaten), ab P1. Optional. */
+  readonly kontoId?: string;
+  /** Referenz auf eine Kategorie (Stammdaten), ab P1. Optional. */
+  readonly kategorieId?: string;
 }

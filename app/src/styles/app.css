@@ -110,6 +110,16 @@ body {
   opacity: 0.45;
   cursor: default;
 }
+.nav a .bdg {
+  margin-left: auto;
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  color: var(--accent-deep);
+  border: 1px solid var(--accent);
+  border-radius: var(--r-pill);
+  padding: 0 7px;
+  line-height: 1.5;
+}
 
 .side .foot {
   margin-top: auto;

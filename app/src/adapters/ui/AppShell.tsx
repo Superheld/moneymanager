@@ -1,12 +1,50 @@
-// App-Shell — Sidebar + Inhaltsfläche im Design-System-Stil. In P0 ist nur
-// „Übersicht" aktiv; die übrigen Punkte deuten die spätere Navigation an (BAUPLAN
-// P1+), sind aber bewusst deaktiviert. Kein Router nötig, solange es einen Screen gibt.
+// App-Shell — Sidebar + Inhaltsfläche im Design-System-Stil. Minimale Navigation
+// per State (kein Router-Dep, solange es wenige Screens sind). Aktive Screens sind
+// klickbar; spätere Bereiche (BAUPLAN P2+) sind als deaktiviert sichtbar.
 
 import type { ReactNode } from "react";
 
-const UEBERBLICK = ["Liquidität", "Töpfe", "Budgets", "Verträge", "Deckung", "Analysen"];
+export type ScreenId = "uebersicht" | "stammdaten";
 
-export function AppShell({ children }: { children: ReactNode }) {
+interface NavEntry {
+  id?: ScreenId;
+  label: string;
+  badge?: string;
+}
+
+interface NavGroup {
+  titel: string;
+  eintraege: NavEntry[];
+}
+
+const GRUPPEN: NavGroup[] = [
+  {
+    titel: "Überblick",
+    eintraege: [
+      { id: "uebersicht", label: "Übersicht" },
+      { label: "Liquidität", badge: "Plan" },
+      { label: "Töpfe" },
+      { label: "Budgets" },
+      { label: "Verträge" },
+      { label: "Deckung", badge: "Ist" },
+      { label: "Analysen" },
+    ],
+  },
+  {
+    titel: "Verwaltung",
+    eintraege: [{ id: "stammdaten", label: "Stammdaten" }],
+  },
+];
+
+export function AppShell({
+  current,
+  onNavigate,
+  children,
+}: {
+  current: ScreenId;
+  onNavigate: (id: ScreenId) => void;
+  children: ReactNode;
+}) {
   return (
     <div className="app">
       <aside className="side">
@@ -18,24 +56,32 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </div>
 
-        <div>
-          <span className="nlbl">Überblick</span>
-          <nav className="nav">
-            <a className="on">
-              <span className="dot" />
-              Übersicht
-            </a>
-            {UEBERBLICK.map((label) => (
-              <a key={label} className="disabled" title="kommt in einer späteren Phase">
-                <span className="dot" />
-                {label}
-              </a>
-            ))}
-          </nav>
-        </div>
+        {GRUPPEN.map((g) => (
+          <div key={g.titel}>
+            <span className="nlbl">{g.titel}</span>
+            <nav className="nav">
+              {g.eintraege.map((e) => {
+                const aktiv = e.id === current;
+                const klickbar = !!e.id;
+                return (
+                  <a
+                    key={e.label}
+                    className={[aktiv ? "on" : "", klickbar ? "" : "disabled"].join(" ").trim()}
+                    title={klickbar ? undefined : "kommt in einer späteren Phase"}
+                    onClick={klickbar ? () => onNavigate(e.id!) : undefined}
+                  >
+                    <span className="dot" />
+                    {e.label}
+                    {e.badge && <span className="bdg">{e.badge}</span>}
+                  </a>
+                );
+              })}
+            </nav>
+          </div>
+        ))}
 
         <div className="foot">
-          <div>P0 · Walking Skeleton</div>
+          <div>P1 · Stammdaten</div>
           <div>Lokal · keine Cloud</div>
         </div>
       </aside>
