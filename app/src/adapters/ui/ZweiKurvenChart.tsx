@@ -59,7 +59,7 @@ export function ZweiKurvenChart({ labels, kontosaldo, freieLiquiditaet, width = 
       <div style={{ display: "flex", gap: "var(--sp-5)", marginTop: "var(--sp-2)", fontSize: "var(--fs-sm)", color: "var(--ink-2)" }}>
         <span>
           <span style={{ display: "inline-block", width: 18, height: 0, borderTop: "2.4px solid var(--ink)", verticalAlign: "middle", marginRight: 6 }} />
-          Kontosaldo
+          Plan-Saldo
         </span>
         <span>
           <span style={{ display: "inline-block", width: 18, height: 0, borderTop: "2.4px solid var(--accent)", verticalAlign: "middle", marginRight: 6 }} />
