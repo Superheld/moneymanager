@@ -6,6 +6,7 @@ import type {
   Inventargegenstand,
   Kategorie,
   Person,
+  Szenario,
   Topf,
   Vertrag,
   Zahlungskonto,
@@ -58,4 +59,14 @@ export interface InventarRepository {
   alle(): Promise<Inventargegenstand[]>;
   speichern(gegenstand: Inventargegenstand): Promise<void>;
   loeschen(id: string): Promise<void>;
+}
+
+export interface SzenarioRepository {
+  alle(): Promise<Szenario[]>;
+  speichern(szenario: Szenario): Promise<void>;
+  loeschen(id: string): Promise<void>;
+  /** Zusatzposten (Zahlungsregeln) eines Szenarios — physisch getrennt vom Plan. */
+  posten(szenarioId: string): Promise<Zahlungsregel[]>;
+  postenSpeichern(szenarioId: string, posten: Zahlungsregel): Promise<void>;
+  postenLoeschen(postenId: string): Promise<void>;
 }
