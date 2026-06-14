@@ -6,7 +6,6 @@ import type { ReactNode } from "react";
 
 export type ScreenId =
   | "uebersicht"
-  | "liquiditaet"
   | "toepfe"
   | "budgets"
   | "vertraege"
@@ -28,8 +27,7 @@ const GRUPPEN: NavGroup[] = [
   {
     titel: "Überblick",
     eintraege: [
-      { id: "uebersicht", label: "Übersicht" },
-      { id: "liquiditaet", label: "Liquidität", badge: "Plan" },
+      { id: "uebersicht", label: "Übersicht", badge: "Plan" },
       { id: "toepfe", label: "Töpfe" },
       { id: "budgets", label: "Budgets" },
       { id: "vertraege", label: "Verträge" },
