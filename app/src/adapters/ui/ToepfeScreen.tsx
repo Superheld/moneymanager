@@ -9,13 +9,16 @@ import {
   formatBetrag,
   sollstand,
   zielwert,
+  type Kategorie,
   type Topf,
 } from "../../core";
 import { topfAnlegen } from "../../application/topfAnlegen";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
+import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
+import { CategoryPicker } from "./CategoryPicker";
 
 type TopfArt = "puffer" | "spartopf";
 const ART_LABEL: Record<TopfArt, string> = { puffer: "Puffer", spartopf: "Spartopf" };
@@ -28,11 +31,14 @@ function heuteIso(): string {
 export function ToepfeScreen() {
   const heute = useMemo(heuteIso, []);
   const [toepfe, setToepfe] = useState<Topf[]>([]);
+  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
 
   const [offen, setOffen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [typ, setTyp] = useState<TopfArt>("puffer");
   const [bezeichnung, setBezeichnung] = useState("");
   const [start, setStart] = useState(heute);
+  const [kategorieId, setKategorieId] = useState("");
   const [schaetzbetrag, setSchaetzbetrag] = useState("");
   const [fristMonate, setFristMonate] = useState("");
   const [zufuehrung, setZufuehrung] = useState("");
@@ -41,6 +47,7 @@ export function ToepfeScreen() {
 
   async function laden() {
     setToepfe(await topfRepo.alle());
+    setKategorien(await kategorieRepo.alle());
   }
   useEffect(() => {
     laden();
@@ -50,23 +57,53 @@ export function ToepfeScreen() {
   const sichtbar = toepfe.filter((t) => t.typ !== "ersatz");
   const num = (s: string) => Number(s.replace(",", ".")) || 0;
 
-  async function anlegen() {
+  function neu() {
+    setEditId(null);
+    setTyp("puffer");
+    setBezeichnung("");
+    setStart(heute);
+    setKategorieId("");
+    setSchaetzbetrag("");
+    setFristMonate("");
+    setZufuehrung("");
+    setSparziel("");
+    setFehler(null);
+    setOffen(true);
+  }
+  function bearbeiten(t: Topf) {
+    setEditId(t.id);
+    setBezeichnung(t.bezeichnung);
+    setStart(t.start);
+    setKategorieId(t.kategorieId ?? "");
+    setFehler(null);
+    if (t.typ === "puffer") {
+      setTyp("puffer");
+      setSchaetzbetrag(String(t.schaetzbetrag / 100));
+      setFristMonate(String(t.fristMonate));
+    } else if (t.typ === "spartopf") {
+      setTyp("spartopf");
+      setZufuehrung(String(t.zufuehrungProMonat / 100));
+      setSparziel(t.sparziel != null ? String(t.sparziel / 100) : "");
+    }
+    setOffen(true);
+  }
+  async function speichern() {
     setFehler(null);
     try {
-      await topfAnlegen(topfRepo, {
-        typ,
-        bezeichnung,
-        start,
-        schaetzbetragEuro: num(schaetzbetrag),
-        fristMonate: num(fristMonate),
-        zufuehrungProMonatEuro: num(zufuehrung),
-        sparzielEuro: num(sparziel),
-      });
-      setBezeichnung("");
-      setSchaetzbetrag("");
-      setFristMonate("");
-      setZufuehrung("");
-      setSparziel("");
+      await topfAnlegen(
+        topfRepo,
+        {
+          typ,
+          bezeichnung,
+          start,
+          kategorieId: kategorieId || undefined,
+          schaetzbetragEuro: num(schaetzbetrag),
+          fristMonate: num(fristMonate),
+          zufuehrungProMonatEuro: num(zufuehrung),
+          sparzielEuro: num(sparziel),
+        },
+        editId ?? undefined,
+      );
       setOffen(false);
       await laden();
     } catch (e) {
@@ -79,7 +116,7 @@ export function ToepfeScreen() {
       <PageHead
         title="Töpfe"
         subtitle="Wie Budgets — aber zum Ansparen statt Verbrauchen"
-        action={<Button variant="primary" plus onClick={() => setOffen(true)}>Topf anlegen</Button>}
+        action={<Button variant="primary" plus onClick={neu}>Topf anlegen</Button>}
       />
 
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
@@ -105,6 +142,7 @@ export function ToepfeScreen() {
                     </span>
                     <span className="muted">
                       Ansparrate {formatBetrag(ansparrate(t))} €/Mt{"  ·  "}
+                      <button className="linkbtn" onClick={() => bearbeiten(t)}>bearbeiten</button>{"  ·  "}
                       <button className="linkbtn" onClick={() => topfRepo.loeschen(t.id).then(laden)}>löschen</button>
                     </span>
                   </div>
@@ -122,14 +160,14 @@ export function ToepfeScreen() {
 
       {offen && (
         <Modal
-          title="Topf anlegen"
+          title={editId ? "Topf bearbeiten" : "Topf anlegen"}
           subtitle="Puffer für Ungewisses · Spartopf für Wünsche"
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={anlegen}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <div className="form-grid">
             <FormField label="Art">
-              <select className="field" value={typ} onChange={(e) => setTyp(e.target.value as TopfArt)}>
+              <select className="field" value={typ} disabled={editId !== null} onChange={(e) => setTyp(e.target.value as TopfArt)}>
                 <option value="puffer">Puffer — für Ungewisses</option>
                 <option value="spartopf">Spartopf — für Wünsche</option>
               </select>
@@ -139,6 +177,9 @@ export function ToepfeScreen() {
             </FormField>
             <FormField label="Start">
               <input className="field" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            </FormField>
+            <FormField label="Kategorie" hint="optional — für Auswertungen">
+              <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
             </FormField>
             {typ === "puffer" && (
               <>

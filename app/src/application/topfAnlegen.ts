@@ -20,12 +20,12 @@ export interface TopfEingabe {
   sparzielEuro?: number;
 }
 
-export async function topfAnlegen(repo: TopfRepository, e: TopfEingabe): Promise<Topf> {
+export async function topfAnlegen(repo: TopfRepository, e: TopfEingabe, id?: string): Promise<Topf> {
   const bezeichnung = e.bezeichnung.trim();
   if (!bezeichnung) throw new Error("Bitte eine Bezeichnung angeben.");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.start)) throw new Error("Bitte ein gültiges Startdatum angeben.");
 
-  const basis = { id: crypto.randomUUID(), bezeichnung, start: e.start, kategorieId: e.kategorieId || undefined };
+  const basis = { id: id ?? crypto.randomUUID(), bezeichnung, start: e.start, kategorieId: e.kategorieId || undefined };
 
   let topf: Topf;
   switch (e.typ) {

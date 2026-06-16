@@ -1,9 +1,10 @@
-// Stammdaten (P1) — Personen · Konten · Kategorien als Übersichtslisten; Anlegen je
-// im Modal. Reload-fest über die SQLite-Repos.
+// Stammdaten (P1) — Personen · Konten · Kategorien als Übersichtslisten; Anlegen UND
+// Bearbeiten je im Modal (gleiche Maske, vorbefüllt). Reload-fest über die SQLite-Repos.
 
 import { useEffect, useMemo, useState } from "react";
 import {
   KONTOTYPEN,
+  formatBetrag,
   type Charakter,
   type Kategorie,
   type Kontotyp,
@@ -50,18 +51,32 @@ export function StammdatenScreen() {
 
 function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: () => void }) {
   const [offen, setOffen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [rolle, setRolle] = useState("");
   const [geburtsdatum, setGeburtsdatum] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
 
-  async function anlegen() {
+  function neu() {
+    setEditId(null);
+    setName("");
+    setRolle("");
+    setGeburtsdatum("");
+    setFehler(null);
+    setOffen(true);
+  }
+  function bearbeiten(p: Person) {
+    setEditId(p.id);
+    setName(p.name);
+    setRolle(p.rolle ?? "");
+    setGeburtsdatum(p.geburtsdatum ?? "");
+    setFehler(null);
+    setOffen(true);
+  }
+  async function speichern() {
     setFehler(null);
     try {
-      await personAnlegen(personRepo, { name, rolle, geburtsdatum });
-      setName("");
-      setRolle("");
-      setGeburtsdatum("");
+      await personAnlegen(personRepo, { name, rolle, geburtsdatum }, editId ?? undefined);
       setOffen(false);
       onChange();
     } catch (e) {
@@ -70,7 +85,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
   }
 
   return (
-    <Card title="Personen" subtitle="Mitglieder des Haushalts — Dimension, kein eigener Mandant" action={<Button plus onClick={() => setOffen(true)}>Person</Button>}>
+    <Card title="Personen" subtitle="Mitglieder des Haushalts — Dimension, kein eigener Mandant" action={<Button plus onClick={neu}>Person</Button>}>
       {personen.length === 0 ? (
         <div className="muted">Noch keine Personen.</div>
       ) : (
@@ -79,6 +94,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
             { key: "name", label: "Name" },
             { key: "rolle", label: "Rolle", render: (p) => p.rolle ?? "—" },
             { key: "geburtsdatum", label: "Geburtsdatum", render: (p) => p.geburtsdatum ?? "—" },
+            { key: "_e", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => bearbeiten(p)}>bearbeiten</button> },
             { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => personRepo.loeschen(p.id).then(onChange)}>löschen</button> },
           ]}
           rows={personen}
@@ -86,9 +102,9 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
       )}
       {offen && (
         <Modal
-          title="Person anlegen"
+          title={editId ? "Person bearbeiten" : "Person anlegen"}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={anlegen}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <FormField label="Name" required>
             <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Anna" />
@@ -107,23 +123,41 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
 
 function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlungskonto[]; personen: Person[]; personName: Map<string, string>; onChange: () => void }) {
   const [offen, setOffen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [bezeichnung, setBezeichnung] = useState("");
   const [typ, setTyp] = useState<Kontotyp>("Giro");
   const [iban, setIban] = useState("");
   const [inhaberIds, setInhaberIds] = useState<string[]>([]);
+  const [saldoEuro, setSaldoEuro] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
 
   function toggleInhaber(id: string) {
     setInhaberIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
-
-  async function anlegen() {
+  function neu() {
+    setEditId(null);
+    setBezeichnung("");
+    setTyp("Giro");
+    setIban("");
+    setInhaberIds([]);
+    setSaldoEuro("");
+    setFehler(null);
+    setOffen(true);
+  }
+  function bearbeiten(k: Zahlungskonto) {
+    setEditId(k.id);
+    setBezeichnung(k.bezeichnung);
+    setTyp(k.typ);
+    setIban(k.iban ?? "");
+    setInhaberIds([...k.inhaberIds]);
+    setSaldoEuro(String(k.saldo / 100));
+    setFehler(null);
+    setOffen(true);
+  }
+  async function speichern() {
     setFehler(null);
     try {
-      await kontoAnlegen(kontoRepo, { bezeichnung, typ, iban, inhaberIds });
-      setBezeichnung("");
-      setIban("");
-      setInhaberIds([]);
+      await kontoAnlegen(kontoRepo, { bezeichnung, typ, iban, inhaberIds, saldoEuro: Number(saldoEuro.replace(",", ".")) || 0 }, editId ?? undefined);
       setOffen(false);
       onChange();
     } catch (e) {
@@ -132,7 +166,7 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
   }
 
   return (
-    <Card title="Konten" subtitle="Liquide Geldkonten — der Kontostand ist nur eine Zahl" action={<Button plus onClick={() => setOffen(true)}>Konto</Button>}>
+    <Card title="Konten" subtitle="Liquide Geldkonten — der Kontostand ist nur eine Zahl" action={<Button plus onClick={neu}>Konto</Button>}>
       {konten.length === 0 ? (
         <div className="muted">Noch keine Konten.</div>
       ) : (
@@ -142,6 +176,8 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
             { key: "typ", label: "Typ" },
             { key: "iban", label: "IBAN", render: (k) => k.iban ?? "—" },
             { key: "inhaber", label: "Inhaber", render: (k) => (k.inhaberIds.length ? k.inhaberIds.map((id: string) => personName.get(id) ?? "?").join(", ") : "—") },
+            { key: "saldo", label: "Kontostand €", align: "right", render: (k) => formatBetrag(k.saldo) },
+            { key: "_e", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => bearbeiten(k)}>bearbeiten</button> },
             { key: "_x", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => kontoRepo.loeschen(k.id).then(onChange)}>löschen</button> },
           ]}
           rows={konten}
@@ -149,9 +185,9 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
       )}
       {offen && (
         <Modal
-          title="Konto anlegen"
+          title={editId ? "Konto bearbeiten" : "Konto anlegen"}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={anlegen}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <div className="form-grid">
             <FormField label="Bezeichnung" required>
@@ -164,6 +200,9 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
             </FormField>
             <FormField label="IBAN" hint="optional, wird geprüft">
               <input className="field" value={iban} onChange={(e) => setIban(e.target.value)} placeholder="DE…" />
+            </FormField>
+            <FormField label="Kontostand" hint="aktueller Saldo (manuell)">
+              <input className="field" inputMode="decimal" value={saldoEuro} onChange={(e) => setSaldoEuro(e.target.value)} placeholder="0,00" />
             </FormField>
             <FormField label="Inhaber">
               {personen.length === 0 ? (
@@ -188,15 +227,42 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
 
 function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onChange: () => void }) {
   const [offen, setOffen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [elternId, setElternId] = useState("");
   const [defaultCharakter, setDefaultCharakter] = useState<Charakter>("Aufwand");
   const [fehler, setFehler] = useState<string | null>(null);
 
-  // Baum aufbauen: Wurzeln (Hauptgruppen) + ihre direkten Kinder.
   const ids = new Set(kategorien.map((k) => k.id));
   const wurzeln = kategorien.filter((k) => !k.elternId || !ids.has(k.elternId));
   const kinderVon = (id: string) => kategorien.filter((k) => k.elternId === id);
+
+  function neu() {
+    setEditId(null);
+    setName("");
+    setElternId("");
+    setDefaultCharakter("Aufwand");
+    setFehler(null);
+    setOffen(true);
+  }
+  function bearbeiten(k: Kategorie) {
+    setEditId(k.id);
+    setName(k.name);
+    setElternId(k.elternId ?? "");
+    setDefaultCharakter(k.defaultCharakter);
+    setFehler(null);
+    setOffen(true);
+  }
+  async function speichern() {
+    setFehler(null);
+    try {
+      await kategorieAnlegen(kategorieRepo, { name, elternId: elternId || undefined, defaultCharakter }, editId ?? undefined);
+      setOffen(false);
+      onChange();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   function zeile(k: Kategorie, haupt: boolean) {
     return (
@@ -204,22 +270,12 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
         <span className="nm">
           {k.name} <Pill variant={CHARAKTER_PILL[k.defaultCharakter]}>{k.defaultCharakter}</Pill>
         </span>
-        <button className="linkbtn" onClick={() => kategorieRepo.loeschen(k.id).then(onChange)}>löschen</button>
+        <span style={{ display: "flex", gap: "var(--sp-3)" }}>
+          <button className="linkbtn" onClick={() => bearbeiten(k)}>bearbeiten</button>
+          <button className="linkbtn" onClick={() => kategorieRepo.loeschen(k.id).then(onChange)}>löschen</button>
+        </span>
       </div>
     );
-  }
-
-  async function anlegen() {
-    setFehler(null);
-    try {
-      await kategorieAnlegen(kategorieRepo, { name, elternId: elternId || undefined, defaultCharakter });
-      setName("");
-      setElternId("");
-      setOffen(false);
-      onChange();
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
-    }
   }
 
   return (
@@ -229,7 +285,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
       action={
         <span style={{ display: "flex", gap: "var(--sp-2)" }}>
           <Button onClick={() => standardkategorienAnlegen(kategorieRepo).then(onChange)}>Standard laden</Button>
-          <Button variant="primary" plus onClick={() => setOffen(true)}>Kategorie</Button>
+          <Button variant="primary" plus onClick={neu}>Kategorie</Button>
         </span>
       }
     >
@@ -247,9 +303,9 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
       )}
       {offen && (
         <Modal
-          title="Kategorie anlegen"
+          title={editId ? "Kategorie bearbeiten" : "Kategorie anlegen"}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={anlegen}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <div className="form-grid">
             <FormField label="Name" required>
@@ -258,7 +314,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
             <FormField label="Elternkategorie" hint="optional">
               <select className="field" value={elternId} onChange={(e) => setElternId(e.target.value)}>
                 <option value="">— (Wurzel)</option>
-                {kategorien.map((k) => (<option key={k.id} value={k.id}>{k.name}</option>))}
+                {kategorien.filter((k) => k.id !== editId).map((k) => (<option key={k.id} value={k.id}>{k.name}</option>))}
               </select>
             </FormField>
             <FormField label="Default-Charakter">
