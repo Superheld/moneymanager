@@ -64,6 +64,38 @@ export async function inventarMitTopfAnlegen(
   return { gegenstand, topf };
 }
 
+/**
+ * Aktualisiert einen Inventargegenstand und seinen Ersatz-Topf (IDs erhalten).
+ * Findet den Topf über inventarId; existiert keiner, wird einer angelegt.
+ */
+export async function inventarAktualisieren(
+  inventarRepo: InventarRepository,
+  topfRepo: TopfRepository,
+  gegenstandId: string,
+  e: InventarEingabe,
+): Promise<Inventargegenstand> {
+  const bezeichnung = e.bezeichnung.trim();
+  if (!bezeichnung) throw new Error("Bitte eine Bezeichnung angeben.");
+  if (!(e.wiederbeschaffungEuro > 0)) throw new Error("Wiederbeschaffungswert muss größer als 0 sein.");
+  if (!(e.nutzungsdauerMonate > 0)) throw new Error("Nutzungsdauer (Monate) muss größer als 0 sein.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.anschaffung)) throw new Error("Bitte ein gültiges Anschaffungsdatum angeben.");
+
+  const gegenstand: Inventargegenstand = {
+    id: gegenstandId,
+    bezeichnung,
+    wiederbeschaffung: euroZuCent(e.wiederbeschaffungEuro),
+    nutzungsdauerMonate: Math.round(e.nutzungsdauerMonate),
+    anschaffung: e.anschaffung,
+    kategorieId: e.kategorieId || undefined,
+  };
+  await inventarRepo.speichern(gegenstand);
+
+  const topfId = (await topfRepo.alle()).find((t) => t.typ === "ersatz" && t.inventarId === gegenstandId)?.id ?? crypto.randomUUID();
+  const topf: Ersatztopf = { id: topfId, ...ersatztopfFelder(gegenstand) };
+  await topfRepo.speichern(topf);
+  return gegenstand;
+}
+
 /** Löscht einen Inventargegenstand samt seinem Ersatz-Topf. */
 export async function inventarLoeschen(
   inventarRepo: InventarRepository,

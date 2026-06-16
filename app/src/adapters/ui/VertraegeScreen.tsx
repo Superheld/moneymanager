@@ -15,7 +15,7 @@ import {
   type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
-import { vertragAnlegen, vertragLoeschen } from "../../application/vertragAnlegen";
+import { vertragAktualisieren, vertragAnlegen, vertragLoeschen } from "../../application/vertragAnlegen";
 import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import {
@@ -55,6 +55,7 @@ export function VertraegeScreen() {
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
 
   const [offen, setOffen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [anbieter, setAnbieter] = useState("");
   const [inhaberId, setInhaberId] = useState("");
   const [beginn, setBeginn] = useState(heute);
@@ -93,25 +94,60 @@ export function VertraegeScreen() {
     if (k) setCharakter(k.defaultCharakter);
   }
 
-  async function anlegen() {
+  function neu() {
+    setEditId(null);
+    setAnbieter("");
+    setInhaberId("");
+    setBeginn(heute);
+    setMindestlaufzeit("");
+    setVerlaengerung("automatisch");
+    setVerlaengerungMonate("12");
+    setKuendigungsfrist("");
+    setBetragEuro("");
+    setRhythmus("monatlich");
+    setCharakter("Aufwand");
+    setKategorieId("");
+    setKontoId("");
     setFehler(null);
+    setOffen(true);
+  }
+  function bearbeiten(v: Vertrag) {
+    const r = regelZuVertrag.get(v.id);
+    setEditId(v.id);
+    setAnbieter(v.anbieter);
+    setInhaberId(v.inhaberId ?? "");
+    setBeginn(v.beginn);
+    setMindestlaufzeit(v.mindestlaufzeitMonate != null ? String(v.mindestlaufzeitMonate) : "");
+    setVerlaengerung(v.verlaengerung);
+    setVerlaengerungMonate(v.verlaengerungMonate != null ? String(v.verlaengerungMonate) : "12");
+    setKuendigungsfrist(v.kuendigungsfristMonate != null ? String(v.kuendigungsfristMonate) : "");
+    setBetragEuro(r ? String(Math.abs(r.betrag) / 100) : "");
+    setRhythmus(r?.rhythmus ?? "monatlich");
+    setCharakter(r?.charakter ?? "Aufwand");
+    setKategorieId(r?.kategorieId ?? "");
+    setKontoId(r?.kontoId ?? "");
+    setFehler(null);
+    setOffen(true);
+  }
+  async function speichern() {
+    setFehler(null);
+    const eingabe = {
+      anbieter,
+      inhaberId: inhaberId || undefined,
+      beginn,
+      mindestlaufzeitMonate: mindestlaufzeit ? Number(mindestlaufzeit) : undefined,
+      verlaengerung,
+      verlaengerungMonate: verlaengerungMonate ? Number(verlaengerungMonate) : undefined,
+      kuendigungsfristMonate: kuendigungsfrist ? Number(kuendigungsfrist) : undefined,
+      betragEuro: Number(betragEuro.replace(",", ".")),
+      rhythmus,
+      charakter,
+      kategorieId: kategorieId || undefined,
+      kontoId: kontoId || undefined,
+    };
     try {
-      await vertragAnlegen(vertragRepo, regelRepo, {
-        anbieter,
-        inhaberId: inhaberId || undefined,
-        beginn,
-        mindestlaufzeitMonate: mindestlaufzeit ? Number(mindestlaufzeit) : undefined,
-        verlaengerung,
-        verlaengerungMonate: verlaengerungMonate ? Number(verlaengerungMonate) : undefined,
-        kuendigungsfristMonate: kuendigungsfrist ? Number(kuendigungsfrist) : undefined,
-        betragEuro: Number(betragEuro.replace(",", ".")),
-        rhythmus,
-        charakter,
-        kategorieId: kategorieId || undefined,
-        kontoId: kontoId || undefined,
-      });
-      setAnbieter("");
-      setBetragEuro("");
+      if (editId) await vertragAktualisieren(vertragRepo, regelRepo, editId, eingabe);
+      else await vertragAnlegen(vertragRepo, regelRepo, eingabe);
       setOffen(false);
       await laden();
     } catch (e) {
@@ -125,7 +161,7 @@ export function VertraegeScreen() {
         title="Verträge"
         subtitle="Wiederkehrende Zahlungen inkl. Einnahmen · Fristen & Kündigungstermine"
         action={
-          <Button variant="primary" plus onClick={() => setOffen(true)}>
+          <Button variant="primary" plus onClick={neu}>
             Vertrag anlegen
           </Button>
         }
@@ -171,6 +207,7 @@ export function VertraegeScreen() {
                   return r ? formatBetrag(r.betrag, true) : "—";
                 },
               },
+              { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>bearbeiten</button> },
               {
                 key: "_x",
                 label: "",
@@ -189,12 +226,12 @@ export function VertraegeScreen() {
 
       {offen && (
         <Modal
-          title="Vertrag anlegen"
-          subtitle="Erzeugt zugleich die Plan-Zahlung (abgeleitete Zahlungsregel)"
+          title={editId ? "Vertrag bearbeiten" : "Vertrag anlegen"}
+          subtitle="Erzeugt/aktualisiert zugleich die Plan-Zahlung (abgeleitete Zahlungsregel)"
           onClose={() => setOffen(false)}
           footer={
             <>
-              <Button variant="primary" onClick={anlegen}>
+              <Button variant="primary" onClick={speichern}>
                 Speichern
               </Button>
               <button className="linkbtn" onClick={() => setOffen(false)}>

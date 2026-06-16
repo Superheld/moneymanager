@@ -25,11 +25,12 @@ export interface PersonEingabe {
 export async function personAnlegen(
   repo: PersonRepository,
   eingabe: PersonEingabe,
+  id?: string,
 ): Promise<Person> {
   const name = eingabe.name.trim();
   if (!name) throw new Error("Bitte einen Namen angeben.");
   const person: Person = {
-    id: crypto.randomUUID(),
+    id: id ?? crypto.randomUUID(),
     name,
     geburtsdatum: eingabe.geburtsdatum?.trim() || undefined,
     rolle: eingabe.rolle?.trim() || undefined,
@@ -48,13 +49,14 @@ export interface KontoEingabe {
 export async function kontoAnlegen(
   repo: ZahlungskontoRepository,
   eingabe: KontoEingabe,
+  id?: string,
 ): Promise<Zahlungskonto> {
   const bezeichnung = eingabe.bezeichnung.trim();
   if (!bezeichnung) throw new Error("Bitte eine Bezeichnung angeben.");
   const iban = eingabe.iban?.trim();
   if (iban && !ibanGueltig(iban)) throw new Error("Die IBAN ist ungültig.");
   const konto: Zahlungskonto = {
-    id: crypto.randomUUID(),
+    id: id ?? crypto.randomUUID(),
     bezeichnung,
     typ: eingabe.typ,
     iban: iban || undefined,
@@ -73,22 +75,25 @@ export interface KategorieEingabe {
 export async function kategorieAnlegen(
   repo: KategorieRepository,
   eingabe: KategorieEingabe,
+  id?: string,
 ): Promise<Kategorie> {
   const name = eingabe.name.trim();
   if (!name) throw new Error("Bitte einen Namen angeben.");
 
-  const id = crypto.randomUUID();
+  const kid = id ?? crypto.randomUUID();
   if (eingabe.elternId) {
     const bestehende = await repo.alle();
-    // Die neue Kategorie ist noch nicht in der Liste — für die Prüfung ergänzen.
-    const mitNeu = [...bestehende, { id, name, defaultCharakter: eingabe.defaultCharakter }];
-    if (wuerdeZyklusErzeugen(mitNeu, id, eingabe.elternId)) {
+    // Beim Bearbeiten existiert der Knoten schon; sonst für die Prüfung ergänzen.
+    const mitNeu = bestehende.some((k) => k.id === kid)
+      ? bestehende
+      : [...bestehende, { id: kid, name, defaultCharakter: eingabe.defaultCharakter }];
+    if (wuerdeZyklusErzeugen(mitNeu, kid, eingabe.elternId)) {
       throw new Error("Diese Elternkategorie würde einen Zyklus erzeugen.");
     }
   }
 
   const kategorie: Kategorie = {
-    id,
+    id: kid,
     name,
     elternId: eingabe.elternId || undefined,
     defaultCharakter: eingabe.defaultCharakter,

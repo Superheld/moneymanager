@@ -26,6 +26,7 @@ export function BudgetsScreen() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [offen, setOffen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [kategorieId, setKategorieId] = useState("");
   const [rahmenEuro, setRahmenEuro] = useState("");
   const [periode, setPeriode] = useState<BudgetPeriode>("monatlich");
@@ -41,12 +42,26 @@ export function BudgetsScreen() {
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
 
-  async function anlegen() {
+  function neu() {
+    setEditId(null);
+    setKategorieId("");
+    setRahmenEuro("");
+    setPeriode("monatlich");
+    setFehler(null);
+    setOffen(true);
+  }
+  function bearbeiten(b: Budget) {
+    setEditId(b.id);
+    setKategorieId(b.kategorieId);
+    setRahmenEuro(String(b.rahmen / 100));
+    setPeriode(b.periode);
+    setFehler(null);
+    setOffen(true);
+  }
+  async function speichern() {
     setFehler(null);
     try {
-      await budgetAnlegen(budgetRepo, { kategorieId, rahmenEuro: Number(rahmenEuro.replace(",", ".")), periode });
-      setRahmenEuro("");
-      setKategorieId("");
+      await budgetAnlegen(budgetRepo, { kategorieId, rahmenEuro: Number(rahmenEuro.replace(",", ".")), periode }, editId ?? undefined);
       setOffen(false);
       await laden();
     } catch (e) {
@@ -60,7 +75,7 @@ export function BudgetsScreen() {
         title="Budgets"
         subtitle="Limit pro Periode für laufende Ausgaben — Reset zum Periodenende"
         action={
-          <Button variant="primary" plus onClick={() => setOffen(true)}>
+          <Button variant="primary" plus onClick={neu}>
             Budget anlegen
           </Button>
         }
@@ -80,6 +95,7 @@ export function BudgetsScreen() {
               { key: "periode", label: "Periode" },
               { key: "rahmen", label: "Rahmen €", align: "right", render: (b) => formatBetrag(b.rahmen) },
               { key: "geglaettet", label: "≈ /Monat €", align: "right", render: (b) => formatBetrag(geglaetteterMonatsabfluss(b)) },
+              { key: "_e", label: "", align: "right", render: (b) => <button className="linkbtn" onClick={() => bearbeiten(b)}>bearbeiten</button> },
               {
                 key: "_x",
                 label: "",
@@ -98,12 +114,12 @@ export function BudgetsScreen() {
 
       {offen && (
         <Modal
-          title="Budget anlegen"
+          title={editId ? "Budget bearbeiten" : "Budget anlegen"}
           subtitle="Ein Budget je Kategorie und Periode"
           onClose={() => setOffen(false)}
           footer={
             <>
-              <Button variant="primary" onClick={anlegen}>
+              <Button variant="primary" onClick={speichern}>
                 Speichern
               </Button>
               <button className="linkbtn" onClick={() => setOffen(false)}>
