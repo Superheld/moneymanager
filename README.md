@@ -12,7 +12,7 @@ plus Finanzplan*. Sie unterscheidet konsequent:
 **Lokal first:** Alle Daten bleiben auf dem Gerät, keine Cloud-Pflicht. Funktioniert ohne KI —
 der Kern (Projektion, Töpfe, Liquidität) ist reine Arithmetik.
 
-## Status — v0.3.0 (Plan-only)
+## Status — v0.4.0 (Plan-only)
 
 Die komplette **Planungsseite** ist gebaut und unit-getestet:
 
