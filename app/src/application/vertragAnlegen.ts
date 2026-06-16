@@ -81,6 +81,54 @@ export async function vertragAnlegen(
   return { vertrag, regel };
 }
 
+/**
+ * Aktualisiert einen bestehenden Vertrag und seine abgeleitete Zahlungsregel
+ * (IDs bleiben erhalten). Findet die verknüpfte Regel über vertragId.
+ */
+export async function vertragAktualisieren(
+  vertragRepo: VertragRepository,
+  regelRepo: ZahlungsregelRepository,
+  vertragId: string,
+  eingabe: VertragEingabe,
+): Promise<VertragErgebnis> {
+  const anbieter = eingabe.anbieter.trim();
+  if (!anbieter) throw new Error("Bitte einen Anbieter angeben.");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.beginn)) throw new Error("Bitte ein gültiges Beginn-Datum angeben.");
+  if (!(eingabe.betragEuro > 0)) throw new Error("Der Betrag muss größer als 0 sein.");
+
+  const bestehend = (await vertragRepo.alle()).find((v) => v.id === vertragId);
+  const vertrag: Vertrag = {
+    id: vertragId,
+    anbieter,
+    vertragsnummer: eingabe.vertragsnummer?.trim() || undefined,
+    inhaberId: eingabe.inhaberId || undefined,
+    beginn: eingabe.beginn,
+    mindestlaufzeitMonate: eingabe.mindestlaufzeitMonate,
+    verlaengerung: eingabe.verlaengerung,
+    verlaengerungMonate: eingabe.verlaengerung === "automatisch" ? eingabe.verlaengerungMonate : undefined,
+    kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
+    status: bestehend?.status ?? "aktiv",
+    notizen: eingabe.notizen?.trim() || undefined,
+  };
+
+  const regelId = (await regelRepo.alle()).find((r) => r.vertragId === vertragId)?.id ?? crypto.randomUUID();
+  const regel: Zahlungsregel = {
+    id: regelId,
+    bezeichnung: anbieter,
+    betrag: vorzeichenbehaftet(eingabe.betragEuro, eingabe.charakter),
+    rhythmus: eingabe.rhythmus,
+    startdatum: eingabe.ersteZahlung || eingabe.beginn,
+    charakter: eingabe.charakter,
+    kontoId: eingabe.kontoId || undefined,
+    kategorieId: eingabe.kategorieId || undefined,
+    vertragId,
+  };
+
+  await vertragRepo.speichern(vertrag);
+  await regelRepo.speichern(regel);
+  return { vertrag, regel };
+}
+
 /** Löscht einen Vertrag samt seiner abgeleiteten Zahlungsregel(n). */
 export async function vertragLoeschen(
   vertragRepo: VertragRepository,
