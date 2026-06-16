@@ -19,6 +19,7 @@ README.md                              ← du bist hier (Einstieg)
    TAKTIK-IMPORT.md                    Generic/Supporting
 30-entscheidungen/                     ADR-Serie
    ADR-0001-plattform.md               lokale App, React/TS, Tauri, hexagonal
+   ADR-0002-ist-schritt-light.md       Ist via „bezahlt markieren" über Ledger-Port (entblockt P3)
 40-referenz/                           Grundlagen & Verträge
    RECHNUNGSWESEN-BEZUG.md             Begründung (HGB/KLR)
    BUCHUNGSPACKAGE-ANFORDERUNGEN.md    Upstream-Contract zum Ledger-Package
