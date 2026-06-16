@@ -47,23 +47,24 @@ export const sqliteZahlungskontoRepository: ZahlungskontoRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<
-      { id: string; bezeichnung: string; typ: string; iban: string | null; inhaber_ids: string }[]
-    >("SELECT id, bezeichnung, typ, iban, inhaber_ids FROM zahlungskonto ORDER BY bezeichnung");
+      { id: string; bezeichnung: string; typ: string; iban: string | null; inhaber_ids: string; kontostand: number }[]
+    >("SELECT id, bezeichnung, typ, iban, inhaber_ids, kontostand FROM zahlungskonto ORDER BY bezeichnung");
     return zeilen.map((z) => ({
       id: z.id,
       bezeichnung: z.bezeichnung,
       typ: z.typ as Kontotyp,
       iban: z.iban ?? undefined,
       inhaberIds: parseIds(z.inhaber_ids),
+      saldo: z.kontostand ?? 0,
     }));
   },
   async speichern(k: Zahlungskonto) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO zahlungskonto (id, bezeichnung, typ, iban, inhaber_ids) VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO zahlungskonto (id, bezeichnung, typ, iban, inhaber_ids, kontostand) VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT(id) DO UPDATE SET bezeichnung = excluded.bezeichnung, typ = excluded.typ,
-         iban = excluded.iban, inhaber_ids = excluded.inhaber_ids`,
-      [k.id, k.bezeichnung, k.typ, k.iban ?? null, JSON.stringify(k.inhaberIds)],
+         iban = excluded.iban, inhaber_ids = excluded.inhaber_ids, kontostand = excluded.kontostand`,
+      [k.id, k.bezeichnung, k.typ, k.iban ?? null, JSON.stringify(k.inhaberIds), k.saldo],
     );
   },
   async loeschen(id) {

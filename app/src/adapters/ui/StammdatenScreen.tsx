@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   KONTOTYPEN,
+  formatBetrag,
   type Charakter,
   type Kategorie,
   type Kontotyp,
@@ -127,6 +128,7 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
   const [typ, setTyp] = useState<Kontotyp>("Giro");
   const [iban, setIban] = useState("");
   const [inhaberIds, setInhaberIds] = useState<string[]>([]);
+  const [saldoEuro, setSaldoEuro] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
 
   function toggleInhaber(id: string) {
@@ -138,6 +140,7 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
     setTyp("Giro");
     setIban("");
     setInhaberIds([]);
+    setSaldoEuro("");
     setFehler(null);
     setOffen(true);
   }
@@ -147,13 +150,14 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
     setTyp(k.typ);
     setIban(k.iban ?? "");
     setInhaberIds([...k.inhaberIds]);
+    setSaldoEuro(String(k.saldo / 100));
     setFehler(null);
     setOffen(true);
   }
   async function speichern() {
     setFehler(null);
     try {
-      await kontoAnlegen(kontoRepo, { bezeichnung, typ, iban, inhaberIds }, editId ?? undefined);
+      await kontoAnlegen(kontoRepo, { bezeichnung, typ, iban, inhaberIds, saldoEuro: Number(saldoEuro.replace(",", ".")) || 0 }, editId ?? undefined);
       setOffen(false);
       onChange();
     } catch (e) {
@@ -172,6 +176,7 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
             { key: "typ", label: "Typ" },
             { key: "iban", label: "IBAN", render: (k) => k.iban ?? "—" },
             { key: "inhaber", label: "Inhaber", render: (k) => (k.inhaberIds.length ? k.inhaberIds.map((id: string) => personName.get(id) ?? "?").join(", ") : "—") },
+            { key: "saldo", label: "Kontostand €", align: "right", render: (k) => formatBetrag(k.saldo) },
             { key: "_e", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => bearbeiten(k)}>bearbeiten</button> },
             { key: "_x", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => kontoRepo.loeschen(k.id).then(onChange)}>löschen</button> },
           ]}
@@ -195,6 +200,9 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
             </FormField>
             <FormField label="IBAN" hint="optional, wird geprüft">
               <input className="field" value={iban} onChange={(e) => setIban(e.target.value)} placeholder="DE…" />
+            </FormField>
+            <FormField label="Kontostand" hint="aktueller Saldo (manuell)">
+              <input className="field" inputMode="decimal" value={saldoEuro} onChange={(e) => setSaldoEuro(e.target.value)} placeholder="0,00" />
             </FormField>
             <FormField label="Inhaber">
               {personen.length === 0 ? (
