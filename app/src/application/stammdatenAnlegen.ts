@@ -2,6 +2,7 @@
 // einfach). ID-Erzeugung lebt hier (nicht im Core, der pure bleibt).
 
 import {
+  euroZuCent,
   ibanGueltig,
   wuerdeZyklusErzeugen,
   type Charakter,
@@ -44,6 +45,7 @@ export interface KontoEingabe {
   typ: Kontotyp;
   iban?: string;
   inhaberIds?: string[];
+  saldoEuro?: number;
 }
 
 export async function kontoAnlegen(
@@ -61,6 +63,7 @@ export async function kontoAnlegen(
     typ: eingabe.typ,
     iban: iban || undefined,
     inhaberIds: eingabe.inhaberIds ?? [],
+    saldo: euroZuCent(eingabe.saldoEuro ?? 0),
   };
   await repo.speichern(konto);
   return konto;

@@ -129,6 +129,10 @@ const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 8, // Konten: manueller Kontostand
+    sql: [`ALTER TABLE zahlungskonto ADD COLUMN kontostand INTEGER NOT NULL DEFAULT 0`],
+  },
 ];
 
 async function migrate(db: Database): Promise<void> {

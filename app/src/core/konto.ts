@@ -2,6 +2,8 @@
 // Kontostand ist „nur eine Zahl" (Töpfe sind nicht kontogebunden). Jedes Konto hat
 // genau ein internes Sachkonto-Mapping — in P1 nur Platzhalter, UI-unsichtbar.
 
+import type { Cent } from "./geld";
+
 export type Kontotyp = "Giro" | "Tagesgeld" | "Bargeld";
 
 export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld"];
@@ -14,6 +16,13 @@ export interface Zahlungskonto {
   readonly iban?: string;
   /** Inhaber-Personen (n:m als Liste von Person-IDs). */
   readonly inhaberIds: string[];
+  /** Aktueller Kontostand in Cent (manuell gepflegt; später aus Import). */
+  readonly saldo: Cent;
+}
+
+/** Summe der Kontostände — die liquiden Mittel (Startpunkt der Liquiditätsprojektion). */
+export function liquideMittel(konten: Zahlungskonto[]): Cent {
+  return konten.reduce((s, k) => s + k.saldo, 0);
 }
 
 /** Normalisiert eine IBAN: Leerzeichen weg, Großbuchstaben. */

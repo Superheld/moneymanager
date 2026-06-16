@@ -7,17 +7,20 @@ import { useEffect, useMemo, useState } from "react";
 import {
   centZuEuro,
   formatBetrag,
+  liquideMittel,
   projiziereLiquiditaet,
   sollstand,
   zielwert,
   type Budget,
   type Topf,
   type TopfTyp,
+  type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
+import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Card, CoverageTrack, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 
@@ -38,18 +41,21 @@ export function DeckungScreen() {
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [toepfe, setToepfe] = useState<Topf[]>([]);
+  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
 
   useEffect(() => {
     (async () => {
       setRegeln(await regelRepo.alle());
       setBudgets(await budgetRepo.alle());
       setToepfe(await topfRepo.alle());
+      setKonten(await kontoRepo.alle());
     })();
   }, []);
 
-  // Reine Planung: Start bei 0, kein angenommener Ist-Saldo.
-  const jetzt = useMemo(() => projiziereLiquiditaet(regeln, budgets, toepfe, ab, 1, 0)[0], [regeln, budgets, toepfe, ab]);
-  const planSaldo = jetzt?.kontosaldo ?? 0;
+  // Liquide Mittel = Summe der Kontostände (manuell gepflegt).
+  const mittel = useMemo(() => liquideMittel(konten), [konten]);
+  const jetzt = useMemo(() => projiziereLiquiditaet(regeln, budgets, toepfe, ab, 1, mittel)[0], [regeln, budgets, toepfe, ab, mittel]);
+  const planSaldo = jetzt?.kontosaldo ?? mittel;
   const sollSumme = jetzt?.sollSumme ?? 0;
   const frei = jetzt?.freieLiquiditaet ?? planSaldo;
   const deckung = sollSumme > 0 ? Math.max(0, Math.min(100, Math.round((planSaldo / sollSumme) * 100))) : 100;
@@ -57,28 +63,30 @@ export function DeckungScreen() {
 
   return (
     <div className="screen">
-      <PageHead title="Deckung" subtitle="Sind deine Töpfe finanziert? Reine Planung — Ist-Sicht kommt mit P3" />
+      <PageHead title="Deckung" subtitle="Sind deine Töpfe finanziert? Liquide Mittel = Summe der Kontostände" />
 
       <div className="kpis">
-        <KPIStat size="hero" label="Freie Liquidität (Plan)" value={formatBetrag(frei, true)} unit="€" tone={frei < 0 ? "warn" : "plan"} />
-        <KPIStat size="chip" label="Plan-Saldo (1. Monat)" value={formatBetrag(planSaldo, true)} unit="€" />
+        <KPIStat size="hero" label="Freie Liquidität" value={formatBetrag(frei, true)} unit="€" tone={frei < 0 ? "warn" : "plan"} />
+        <KPIStat size="chip" label="Liquide Mittel" value={formatBetrag(mittel)} unit="€" />
         <KPIStat size="chip" label="Σ Topf-Sollstände" value={formatBetrag(sollSumme)} unit="€" />
         <KPIStat size="chip" label="Deckungsgrad" value={String(deckung)} unit="%" tone={frei < 0 ? "warn" : "plan"} />
       </div>
 
-      <Card title="Globale Deckung" subtitle="Plan-Saldo gegen die Summe aller Topf-Sollstände">
+      <Card title="Globale Deckung" subtitle="liquide Mittel gegen die Summe aller Topf-Sollstände">
         <CoverageTrack
-          value={centZuEuro(planSaldo)}
+          value={centZuEuro(mittel)}
           max={Math.max(1, centZuEuro(sollSumme))}
           over={frei < 0}
           label={frei < 0 ? "Überplanung — zu viel verplant" : "gedeckt"}
-          right={`${formatBetrag(planSaldo, true)} / ${formatBetrag(sollSumme)} €`}
+          right={`${formatBetrag(mittel)} / ${formatBetrag(sollSumme)} €`}
         />
         <p className="muted" style={{ marginTop: "var(--sp-4)" }}>
-          {frei < 0
-            ? `Die freie Liquidität ist negativ (${formatBetrag(frei)} €) — die geplanten Töpfe übersteigen den Plan-Saldo. Kein Konto wird gekürzt; die Überplanung erscheint als globale Zahl.`
-            : `Nach Abzug aller Topf-Sollstände bleiben rechnerisch ${formatBetrag(frei, true)} € frei.`}
-          {" "}Die konten-zentrische Sicht mit echten Salden kommt mit dem Ist-Schritt (P3).
+          {konten.length === 0
+            ? "Noch keine Kontostände — leg in Stammdaten → Konten deine Konten mit Saldo an."
+            : frei < 0
+            ? `Die freie Liquidität ist negativ (${formatBetrag(frei)} €) — die geplanten Töpfe übersteigen die liquiden Mittel. Kein Konto wird gekürzt; die Überplanung erscheint als globale Zahl.`
+            : `Nach Abzug aller Topf-Sollstände bleiben ${formatBetrag(frei, true)} € frei.`}
+          {" "}Die konten-zentrische Sicht (je Konto) kommt mit dem Ist-Schritt.
         </p>
       </Card>
 
