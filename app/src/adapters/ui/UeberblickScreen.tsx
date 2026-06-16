@@ -29,6 +29,7 @@ import { sqliteSzenarioRepository as szenarioRepo } from "../persistence/sqliteS
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { ZweiKurvenChart } from "./ZweiKurvenChart";
+import { MonatsFlussChart } from "./MonatsFlussChart";
 import { Modal } from "./Modal";
 
 const MONATE = 12;
@@ -164,6 +165,21 @@ export function UeberblickScreen() {
             labels={verlauf.map((m) => m.label)}
             kontosaldo={verlauf.map((m) => centZuEuro(m.kontosaldo))}
             freieLiquiditaet={verlauf.map((m) => centZuEuro(m.freieLiquiditaet))}
+          />
+        )}
+      </Card>
+
+      <Card
+        title="Ein- und Ausgaben pro Monat"
+        subtitle="macht die Abflüsse sichtbar (Quartals-/Jahreszahlungen + Budgets)"
+        style={{ marginTop: "var(--gap-card)" }}
+        action={<span className="muted">Ø Ausgaben {formatBetrag(Math.round(summeAb / (verlauf.length || 1)))} €/Mt</span>}
+      >
+        {verlauf.length > 0 && (
+          <MonatsFlussChart
+            labels={verlauf.map((m) => m.label)}
+            einnahmen={verlauf.map((m) => centZuEuro(m.zufluss))}
+            ausgaben={verlauf.map((m) => centZuEuro(-(m.abfluss + m.budgetAbfluss)))}
           />
         )}
       </Card>

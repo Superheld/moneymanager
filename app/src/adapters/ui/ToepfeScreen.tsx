@@ -9,13 +9,16 @@ import {
   formatBetrag,
   sollstand,
   zielwert,
+  type Kategorie,
   type Topf,
 } from "../../core";
 import { topfAnlegen } from "../../application/topfAnlegen";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
+import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
+import { CategoryPicker } from "./CategoryPicker";
 
 type TopfArt = "puffer" | "spartopf";
 const ART_LABEL: Record<TopfArt, string> = { puffer: "Puffer", spartopf: "Spartopf" };
@@ -28,12 +31,14 @@ function heuteIso(): string {
 export function ToepfeScreen() {
   const heute = useMemo(heuteIso, []);
   const [toepfe, setToepfe] = useState<Topf[]>([]);
+  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
 
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [typ, setTyp] = useState<TopfArt>("puffer");
   const [bezeichnung, setBezeichnung] = useState("");
   const [start, setStart] = useState(heute);
+  const [kategorieId, setKategorieId] = useState("");
   const [schaetzbetrag, setSchaetzbetrag] = useState("");
   const [fristMonate, setFristMonate] = useState("");
   const [zufuehrung, setZufuehrung] = useState("");
@@ -42,6 +47,7 @@ export function ToepfeScreen() {
 
   async function laden() {
     setToepfe(await topfRepo.alle());
+    setKategorien(await kategorieRepo.alle());
   }
   useEffect(() => {
     laden();
@@ -56,6 +62,7 @@ export function ToepfeScreen() {
     setTyp("puffer");
     setBezeichnung("");
     setStart(heute);
+    setKategorieId("");
     setSchaetzbetrag("");
     setFristMonate("");
     setZufuehrung("");
@@ -67,6 +74,7 @@ export function ToepfeScreen() {
     setEditId(t.id);
     setBezeichnung(t.bezeichnung);
     setStart(t.start);
+    setKategorieId(t.kategorieId ?? "");
     setFehler(null);
     if (t.typ === "puffer") {
       setTyp("puffer");
@@ -88,6 +96,7 @@ export function ToepfeScreen() {
           typ,
           bezeichnung,
           start,
+          kategorieId: kategorieId || undefined,
           schaetzbetragEuro: num(schaetzbetrag),
           fristMonate: num(fristMonate),
           zufuehrungProMonatEuro: num(zufuehrung),
@@ -168,6 +177,9 @@ export function ToepfeScreen() {
             </FormField>
             <FormField label="Start">
               <input className="field" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+            </FormField>
+            <FormField label="Kategorie" hint="optional — für Auswertungen">
+              <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
             </FormField>
             {typ === "puffer" && (
               <>
