@@ -14,7 +14,7 @@ import {
   type Inventargegenstand,
   type Topf,
 } from "../../core";
-import { inventarLoeschen, inventarMitTopfAnlegen } from "../../application/inventarAnlegen";
+import { inventarAktualisieren, inventarLoeschen, inventarMitTopfAnlegen } from "../../application/inventarAnlegen";
 import { sqliteInventarRepository as inventarRepo } from "../persistence/sqliteInventarRepository";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
 import { Button, Card, CoverageTrack, FormField } from "./ds";
@@ -32,6 +32,7 @@ export function InventarScreen() {
   const [toepfe, setToepfe] = useState<Topf[]>([]);
 
   const [offen, setOffen] = useState(false);
+  const [editId, setEditId] = useState<string | null>(null);
   const [bezeichnung, setBezeichnung] = useState("");
   const [wiederbeschaffung, setWiederbeschaffung] = useState("");
   const [nutzungsdauerMonate, setNutzungsdauerMonate] = useState("");
@@ -53,18 +54,35 @@ export function InventarScreen() {
     return m;
   }, [toepfe]);
 
-  async function anlegen() {
+  function neu() {
+    setEditId(null);
+    setBezeichnung("");
+    setWiederbeschaffung("");
+    setNutzungsdauerMonate("");
+    setAnschaffung(heute);
     setFehler(null);
+    setOffen(true);
+  }
+  function bearbeiten(g: Inventargegenstand) {
+    setEditId(g.id);
+    setBezeichnung(g.bezeichnung);
+    setWiederbeschaffung(String(g.wiederbeschaffung / 100));
+    setNutzungsdauerMonate(String(g.nutzungsdauerMonate));
+    setAnschaffung(g.anschaffung);
+    setFehler(null);
+    setOffen(true);
+  }
+  async function speichern() {
+    setFehler(null);
+    const eingabe = {
+      bezeichnung,
+      wiederbeschaffungEuro: Number(wiederbeschaffung.replace(",", ".")) || 0,
+      nutzungsdauerMonate: Number(nutzungsdauerMonate) || 0,
+      anschaffung,
+    };
     try {
-      await inventarMitTopfAnlegen(inventarRepo, topfRepo, {
-        bezeichnung,
-        wiederbeschaffungEuro: Number(wiederbeschaffung.replace(",", ".")) || 0,
-        nutzungsdauerMonate: Number(nutzungsdauerMonate) || 0,
-        anschaffung,
-      });
-      setBezeichnung("");
-      setWiederbeschaffung("");
-      setNutzungsdauerMonate("");
+      if (editId) await inventarAktualisieren(inventarRepo, topfRepo, editId, eingabe);
+      else await inventarMitTopfAnlegen(inventarRepo, topfRepo, eingabe);
       setOffen(false);
       await laden();
     } catch (e) {
@@ -77,7 +95,7 @@ export function InventarScreen() {
       <PageHead
         title="Inventar"
         subtitle="Dinge, die du besitzt und ersetzen musst — du sparst automatisch den Ersatz an"
-        action={<Button variant="primary" plus onClick={() => setOffen(true)}>Gegenstand</Button>}
+        action={<Button variant="primary" plus onClick={neu}>Gegenstand</Button>}
       />
 
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
@@ -102,6 +120,7 @@ export function InventarScreen() {
                     <span className="muted">
                       {t ? `Ansparrate ${formatBetrag(ansparrate(t))} €/Mt` : "kein Ersatz-Topf"}
                       {"  ·  "}
+                      <button className="linkbtn" onClick={() => bearbeiten(g)}>bearbeiten</button>{"  ·  "}
                       <button className="linkbtn" onClick={() => inventarLoeschen(inventarRepo, topfRepo, g.id).then(laden)}>löschen</button>
                     </span>
                   </div>
@@ -119,10 +138,10 @@ export function InventarScreen() {
 
       {offen && (
         <Modal
-          title="Gegenstand aufnehmen"
-          subtitle="Wiederbeschaffung ÷ Nutzungsdauer → Ansparrate (legt den Ersatz-Topf mit an)"
+          title={editId ? "Gegenstand bearbeiten" : "Gegenstand aufnehmen"}
+          subtitle="Wiederbeschaffung ÷ Nutzungsdauer → Ansparrate (Ersatz-Topf wird mitgeführt)"
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={anlegen}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <div className="form-grid">
             <FormField label="Gegenstand" required>

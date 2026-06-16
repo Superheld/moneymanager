@@ -8,6 +8,7 @@ import {
   formatBetrag,
   geglaetteterMonatsabfluss,
   kuendigungsterminNaht,
+  liquideMittel,
   naechsterKuendigungstermin,
   projiziereLiquiditaet,
   projiziereRegel,
@@ -18,6 +19,7 @@ import {
   type Szenario,
   type Topf,
   type Vertrag,
+  type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
 import { szenarioAnlegen, szenarioPostenAnlegen } from "../../application/szenarioAnlegen";
@@ -27,8 +29,10 @@ import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepos
 import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
 import { sqliteSzenarioRepository as szenarioRepo } from "../persistence/sqliteSzenarioRepository";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
+import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { ZweiKurvenChart } from "./ZweiKurvenChart";
+import { MonatsFlussChart } from "./MonatsFlussChart";
 import { Modal } from "./Modal";
 
 const MONATE = 12;
@@ -54,6 +58,7 @@ export function UeberblickScreen() {
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [toepfe, setToepfe] = useState<Topf[]>([]);
+  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [szenarien, setSzenarien] = useState<Szenario[]>([]);
@@ -64,6 +69,7 @@ export function UeberblickScreen() {
     setRegeln(await regelRepo.alle());
     setBudgets(await budgetRepo.alle());
     setToepfe(await topfRepo.alle());
+    setKonten(await kontoRepo.alle());
     setVertraege(await vertragRepo.alle());
     setKategorien(await kategorieRepo.alle());
     setSzenarien(await szenarioRepo.alle());
@@ -81,13 +87,15 @@ export function UeberblickScreen() {
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
 
-  const basis = useMemo(() => projiziereLiquiditaet(regeln, budgets, toepfe, ab, MONATE, 0), [regeln, budgets, toepfe, ab]);
+  const start = useMemo(() => liquideMittel(konten), [konten]);
+  const basis = useMemo(() => projiziereLiquiditaet(regeln, budgets, toepfe, ab, MONATE, start), [regeln, budgets, toepfe, ab, start]);
   const verlauf = useMemo(
-    () => (szenarioId ? projiziereLiquiditaet([...regeln, ...posten], budgets, toepfe, ab, MONATE, 0) : basis),
-    [szenarioId, regeln, posten, budgets, toepfe, ab, basis],
+    () => (szenarioId ? projiziereLiquiditaet([...regeln, ...posten], budgets, toepfe, ab, MONATE, start) : basis),
+    [szenarioId, regeln, posten, budgets, toepfe, ab, start, basis],
   );
 
-  const planSaldo = verlauf.length ? verlauf[verlauf.length - 1].kontosaldo : 0;
+  const verfuegbar = verlauf.length ? verlauf[0].freieLiquiditaet : start;
+  const planSaldo = verlauf.length ? verlauf[verlauf.length - 1].kontosaldo : start;
   const tiefpunkt = verlauf.reduce(
     (min, m) => (m.freieLiquiditaet < min.freieLiquiditaet ? m : min),
     verlauf[0] ?? { freieLiquiditaet: 0, label: "—" },
@@ -121,22 +129,25 @@ export function UeberblickScreen() {
     <div className="screen">
       <div className="ctxbar">{datumLang} · {szenarioId ? `Szenario: ${szenarien.find((s) => s.id === szenarioId)?.name ?? "?"}` : "Szenario: Basis"}</div>
 
-      <div style={{ fontSize: "var(--fs-body)", fontWeight: "var(--fw-semi)", color: "var(--ink-2)" }}>Plan-Saldo · in 12 Monaten</div>
+      <div style={{ fontSize: "var(--fs-body)", fontWeight: "var(--fw-semi)", color: "var(--ink-2)" }}>Verfügbares Geld · frei</div>
       <div className="num" style={{ fontSize: "var(--fs-display)", fontWeight: "var(--fw-black)", letterSpacing: "var(--ls-tight)", lineHeight: 1, marginTop: 6 }}>
-        {formatBetrag(planSaldo, true)} <small style={{ fontSize: 28, fontWeight: "var(--fw-bold)", color: "var(--ink-2)" }}>€</small>
+        {formatBetrag(verfuegbar)} <small style={{ fontSize: 28, fontWeight: "var(--fw-bold)", color: "var(--ink-2)" }}>€</small>
       </div>
       <p style={{ fontSize: 16, lineHeight: 1.55, color: "var(--ink-2)", margin: "16px 0 0", maxWidth: 620 }}>
-        Über die nächsten 12 Monate trägt dein Plan auf{" "}
-        <b style={{ color: planSaldo < 0 ? "var(--warn-deep)" : "var(--accent-deep)", fontWeight: 700 }}>{formatBetrag(planSaldo, true)} €</b>
-        {tiefpunkt.freieLiquiditaet < 0 ? (
-          <>
-            {" "}— am Tiefpunkt (<b style={{ color: "var(--ink)" }}>{tiefpunkt.label}</b>) wird die freie Liquidität mit{" "}
-            <b style={{ color: "var(--warn-deep)", fontWeight: 700 }}>{formatBetrag(tiefpunkt.freieLiquiditaet)} €</b> knapp.
-          </>
+        {konten.length === 0 ? (
+          <>Noch keine Kontostände — leg in <b style={{ color: "var(--ink)" }}>Stammdaten → Konten</b> deine Konten mit Saldo an, dann rechnet die Liquidität ab dem echten Stand.</>
         ) : (
-          <> und die freie Liquidität (nach Töpfen) bleibt durchgehend im Plus.</>
-        )}{" "}
-        Reine Planung — echte Stände kommen mit dem Ist-Schritt.
+          <>
+            Auf deinen Konten liegen <b style={{ color: "var(--ink)" }}>{formatBetrag(start)} €</b>; nach Abzug der Töpfe sind{" "}
+            <b style={{ color: verfuegbar < 0 ? "var(--warn-deep)" : "var(--accent-deep)", fontWeight: 700 }}>{formatBetrag(verfuegbar)} €</b> frei. In 12 Monaten stehen
+            voraussichtlich <b style={{ color: "var(--ink)" }}>{formatBetrag(planSaldo)} €</b> auf den Konten
+            {tiefpunkt.freieLiquiditaet < 0 ? (
+              <> — am Tiefpunkt (<b style={{ color: "var(--ink)" }}>{tiefpunkt.label}</b>) wird's mit <b style={{ color: "var(--warn-deep)", fontWeight: 700 }}>{formatBetrag(tiefpunkt.freieLiquiditaet)} €</b> frei knapp.</>
+            ) : (
+              <>, die freie Liquidität bleibt durchgehend im Plus.</>
+            )}
+          </>
+        )}
       </p>
 
       <div className="kpis" style={{ marginTop: 22 }}>
@@ -164,6 +175,21 @@ export function UeberblickScreen() {
             labels={verlauf.map((m) => m.label)}
             kontosaldo={verlauf.map((m) => centZuEuro(m.kontosaldo))}
             freieLiquiditaet={verlauf.map((m) => centZuEuro(m.freieLiquiditaet))}
+          />
+        )}
+      </Card>
+
+      <Card
+        title="Ein- und Ausgaben pro Monat"
+        subtitle="macht die Abflüsse sichtbar (Quartals-/Jahreszahlungen + Budgets)"
+        style={{ marginTop: "var(--gap-card)" }}
+        action={<span className="muted">Ø Ausgaben {formatBetrag(Math.round(summeAb / (verlauf.length || 1)))} €/Mt</span>}
+      >
+        {verlauf.length > 0 && (
+          <MonatsFlussChart
+            labels={verlauf.map((m) => m.label)}
+            einnahmen={verlauf.map((m) => centZuEuro(m.zufluss))}
+            ausgaben={verlauf.map((m) => centZuEuro(-(m.abfluss + m.budgetAbfluss)))}
           />
         )}
       </Card>

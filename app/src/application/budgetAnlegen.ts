@@ -13,17 +13,18 @@ export interface BudgetEingabe {
 export async function budgetAnlegen(
   repo: BudgetRepository,
   eingabe: BudgetEingabe,
+  id?: string,
 ): Promise<Budget> {
   if (!eingabe.kategorieId) throw new Error("Bitte eine Kategorie wählen.");
   if (!(eingabe.rahmenEuro > 0)) throw new Error("Der Rahmen muss größer als 0 sein.");
 
   const bestehende = await repo.alle();
-  if (bestehende.some((b) => b.kategorieId === eingabe.kategorieId && b.periode === eingabe.periode)) {
+  if (bestehende.some((b) => b.id !== id && b.kategorieId === eingabe.kategorieId && b.periode === eingabe.periode)) {
     throw new Error("Für diese Kategorie und Periode gibt es schon ein Budget.");
   }
 
   const budget: Budget = {
-    id: crypto.randomUUID(),
+    id: id ?? crypto.randomUUID(),
     kategorieId: eingabe.kategorieId,
     rahmen: euroZuCent(eingabe.rahmenEuro),
     periode: eingabe.periode,
