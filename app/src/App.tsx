@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppShell, type ScreenId } from "./adapters/ui/AppShell";
 import { UeberblickScreen } from "./adapters/ui/UeberblickScreen";
+import { KontenScreen } from "./adapters/ui/KontenScreen";
 import { StammdatenScreen } from "./adapters/ui/StammdatenScreen";
 import { VertraegeScreen } from "./adapters/ui/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/BudgetsScreen";
@@ -23,6 +24,7 @@ export default function App() {
   return (
     <AppShell current={screen} onNavigate={setScreen}>
       {screen === "uebersicht" && <UeberblickScreen />}
+      {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
       {screen === "toepfe" && <ToepfeScreen />}
       {screen === "inventar" && <InventarScreen />}
       {screen === "budgets" && <BudgetsScreen />}

@@ -30,6 +30,13 @@ export function ord(ymd: Ymd): number {
   return ymd.y * 10000 + ymd.m * 100 + ymd.d;
 }
 
+/** Addiert n Kalendertage (echte Tagesarithmetik, kein Klemmen). */
+export function addTage(ymd: Ymd, n: number): Ymd {
+  const ms = Date.UTC(ymd.y, ymd.m - 1, ymd.d) + n * 86_400_000;
+  const dt = new Date(ms);
+  return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
+}
+
 export function toIso(ymd: Ymd): string {
   const mm = String(ymd.m).padStart(2, "0");
   const dd = String(ymd.d).padStart(2, "0");

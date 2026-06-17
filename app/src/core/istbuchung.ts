@@ -7,8 +7,14 @@ import type { Cent } from "./geld";
 import type { Charakter } from "./zahlungsregel";
 import type { Zahlungskonto } from "./konto";
 
-/** Herkunft einer Ist-Buchung. „bezahlt-markiert" = aus einem Plan-Posten bestätigt. */
-export type IstQuelle = "bezahlt-markiert" | "import";
+/**
+ * Herkunft einer Ist-Buchung:
+ *  • „bezahlt-markiert" — aus einem Plan-Posten 1:1 bestätigt (trägt planRef).
+ *  • „manuell"         — frei erfasst. Bei Bar die Dauerquelle (kein Import möglich);
+ *                        bei Bankkonten vorläufig, bis der Import sie abgleicht (ADR-0002).
+ *  • „import"          — aus einem Bankimport (später).
+ */
+export type IstQuelle = "bezahlt-markiert" | "manuell" | "import";
 
 /**
  * Verweis auf den geplanten Posten, aus dem die Ist-Buchung entstand (1:1-Matching).
@@ -30,6 +36,8 @@ export interface IstBuchung {
   readonly kategorieId?: string;
   readonly charakter: Charakter;
   readonly quelle: IstQuelle;
+  /** Freitext-Beschreibung (v. a. bei manuellen Buchungen). */
+  readonly notiz?: string;
   /** Gesetzt bei „bezahlt-markiert"; ermöglicht 1:1-Abgleich mit dem Plan. */
   readonly planRef?: PlanRef;
   /** Roh-Hash der Importzeile (Dedup gegen Bankimport, später). */

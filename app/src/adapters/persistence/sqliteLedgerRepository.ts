@@ -14,6 +14,7 @@ interface Zeile {
   kategorie_id: string | null;
   charakter: string;
   quelle: string;
+  notiz: string | null;
   plan_quelle_id: string | null;
   plan_faelligkeit: string | null;
   roh_hash: string | null;
@@ -23,7 +24,7 @@ export const sqliteLedgerRepository: LedgerPort = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<Zeile[]>(
-      `SELECT id, datum, betrag, konto_id, kategorie_id, charakter, quelle,
+      `SELECT id, datum, betrag, konto_id, kategorie_id, charakter, quelle, notiz,
               plan_quelle_id, plan_faelligkeit, roh_hash
          FROM ist_buchung ORDER BY datum`,
     );
@@ -36,6 +37,7 @@ export const sqliteLedgerRepository: LedgerPort = {
         kategorieId: z.kategorie_id ?? undefined,
         charakter: z.charakter as Charakter,
         quelle: z.quelle as IstQuelle,
+        notiz: z.notiz ?? undefined,
         planRef:
           z.plan_quelle_id && z.plan_faelligkeit
             ? { quelleId: z.plan_quelle_id, faelligkeit: z.plan_faelligkeit }
@@ -48,11 +50,11 @@ export const sqliteLedgerRepository: LedgerPort = {
     const db = await getDb();
     await db.execute(
       `INSERT INTO ist_buchung
-         (id, datum, betrag, konto_id, kategorie_id, charakter, quelle, plan_quelle_id, plan_faelligkeit, roh_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+         (id, datum, betrag, konto_id, kategorie_id, charakter, quelle, notiz, plan_quelle_id, plan_faelligkeit, roh_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT(id) DO UPDATE SET datum = excluded.datum, betrag = excluded.betrag,
          konto_id = excluded.konto_id, kategorie_id = excluded.kategorie_id,
-         charakter = excluded.charakter, quelle = excluded.quelle,
+         charakter = excluded.charakter, quelle = excluded.quelle, notiz = excluded.notiz,
          plan_quelle_id = excluded.plan_quelle_id, plan_faelligkeit = excluded.plan_faelligkeit,
          roh_hash = excluded.roh_hash`,
       [
@@ -63,6 +65,7 @@ export const sqliteLedgerRepository: LedgerPort = {
         b.kategorieId ?? null,
         b.charakter,
         b.quelle,
+        b.notiz ?? null,
         b.planRef?.quelleId ?? null,
         b.planRef?.faelligkeit ?? null,
         b.rohHash ?? null,
