@@ -1,0 +1,37 @@
+name: CI
+
+# Erzwingt Grün bei jedem Push auf main und für Pull Requests: Typecheck, Tests,
+# Frontend-Build. Der schwere Tauri-/Rust-Bundle-Schritt läuft hier bewusst NICHT
+# (braucht System-Libs, langsam) — dafür kommt später ein eigener Release-Workflow.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  app:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - name: Build (Frontend)
+        run: npx vite build

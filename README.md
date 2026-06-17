@@ -1,5 +1,7 @@
 # Moneymanager
 
+[![CI](https://github.com/Superheld/moneymanager/actions/workflows/ci.yml/badge.svg)](https://github.com/Superheld/moneymanager/actions/workflows/ci.yml)
+
 Eine **lokale** Finanzverwaltungs-App, die das Denken des betrieblichen Rechnungswesens
 (Liquiditätsrechnung, Rücklagen, Abschreibungen, Bilanz) auf Privathaushalte überträgt —
 in einer Sprache, die normale Menschen verstehen. Die App ist *heimlich eine private Bilanz
@@ -56,10 +58,22 @@ Voraussetzungen: Node, Rust-Toolchain (Tauri-Build), npm.
 cd app
 npm install
 npm run tauri dev     # Desktop-App starten
-npm test              # Unit-Tests (Core)
+npm test              # Unit-Tests
+npm run coverage      # Tests + Coverage-Report
 npm run typecheck     # TypeScript prüfen
 npm run tauri build   # Produktion bauen
 ```
+
+## Qualität
+
+Getestet wird **von innen nach außen** (hexagonal): der Domänenkern und die Use-Cases
+sind unit-getestet, die SQLite-**Migrationskette** läuft gegen ein In-Memory-SQLite
+(sql.js, ohne Tauri-Runtime) — inklusive der Dedup-Garantie des Ist-Journals. **CI**
+(GitHub Actions) erzwingt bei jedem Push/PR Typecheck, Tests und Frontend-Build.
+
+Noch offen (bewusst): Komponenten-Tests (React/Testing-Library) und E2E. Die SQLite-
+*Adapter* (CRUD-SQL) sind über die getestete Migrationskette abgesichert, aber nicht
+einzeln verprobt.
 
 ## Sprache
 
