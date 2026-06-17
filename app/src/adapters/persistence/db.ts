@@ -154,6 +154,10 @@ const MIGRATIONS: Migration[] = [
         WHERE plan_quelle_id IS NOT NULL`,
     ],
   },
+  {
+    version: 10, // Konto-Register: Freitext-Notiz für manuelle Buchungen
+    sql: [`ALTER TABLE ist_buchung ADD COLUMN notiz TEXT`],
+  },
 ];
 
 async function migrate(db: Database): Promise<void> {
