@@ -12,3 +12,4 @@ export * from "./budget";
 export * from "./topf";
 export * from "./inventar";
 export * from "./szenario";
+export * from "./istbuchung";

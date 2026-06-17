@@ -12,20 +12,24 @@ plus Finanzplan*. Sie unterscheidet konsequent:
 **Lokal first:** Alle Daten bleiben auf dem Gerät, keine Cloud-Pflicht. Funktioniert ohne KI —
 der Kern (Projektion, Töpfe, Liquidität) ist reine Arithmetik.
 
-## Status — v0.4.0 (Plan-only)
+## Status — v0.5.0 (Plan + Ist light)
 
-Die komplette **Planungsseite** ist gebaut und unit-getestet:
+Die komplette **Planungsseite** ist gebaut und unit-getestet; dazu der **Ist-Schritt „light"**
+(ADR-0002): geplante Posten als bezahlt abhaken, realer Kontostand, Plan/Ist je Posten.
 
 | Phase | Inhalt | Status |
 |---|---|---|
 | P0 | Walking Skeleton (Regel → Projektion → SQLite) | ✓ |
 | P1 | Stammdaten (Personen, Konten, Kategorien) | ✓ |
 | P2 | Verträge · Budgets · Inventar/Töpfe · Liquiditätsplaner · Szenario | ✓ |
-| P3 | Ist-Schritt (Import, Verbuchung, Plan/Ist) — braucht das Buchungspackage | offen |
+| P3 | Ist light — „bezahlt markieren", Ledger-Port, Reconciliation light (ADR-0002) | ✓ |
+| P3.5 | Bankimport (zweite Quelle hinter dem Ledger-Port) + Auto-Matching | offen |
 | P4 | Analysen + KI-Vorbereitung | offen |
 
 Nutzbar: Verträge/Budgets/Töpfe fließen in eine 12-Monats-Projektion mit zwei Kurven
-(Kontosaldo + freie Liquidität); Überplanung wird sichtbar; What-if per Szenario.
+(Kontosaldo + freie Liquidität); Überplanung wird sichtbar; What-if per Szenario. Geplante
+Zahlungen lassen sich als bezahlt abhaken — sie fallen aus der Vorschau und bewegen den
+realen Kontostand (Anfangsbestand + Σ Ist).
 
 ## Architektur
 
