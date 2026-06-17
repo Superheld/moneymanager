@@ -1,7 +1,7 @@
 {
   "name": "moneymanager",
   "private": true,
-  "version": "0.7.0",
+  "version": "0.7.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri"
   },
@@ -23,7 +24,10 @@
     "@tauri-apps/cli": "^2",
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.1.6",
+    "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "^4.6.0",
+    "@vitest/coverage-v8": "^2.1.9",
+    "sql.js": "^1.14.1",
     "typescript": "~5.8.3",
     "vite": "^7.0.4",
     "vitest": "^2.1.9"

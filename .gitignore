@@ -10,6 +10,9 @@ app/dist/
 app/src-tauri/target/
 app/src-tauri/gen/
 
+# Test-Coverage
+app/coverage/
+
 # Logs / env
 *.log
 .env
