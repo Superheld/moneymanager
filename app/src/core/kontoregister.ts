@@ -23,6 +23,9 @@ export interface RegisterZeile {
   // nur bei art === "ist":
   readonly istId?: string;
   readonly quelle?: IstBuchung["quelle"];
+  /** Bei Umbuchung: die beiden Beine verknüpfende ID bzw. das Gegenkonto. */
+  readonly transferId?: string;
+  readonly gegenkontoId?: string;
   // bei art === "geplant" (zum Abhaken) bzw. bei aus Plan bestätigtem Ist:
   readonly planRef?: PlanRef;
 }
@@ -57,16 +60,19 @@ export function kontoRegister(
   let saldo = konto.saldo;
   const gebucht: RegisterZeile[] = eigeneIst.map((b) => {
     saldo += b.betrag;
+    const standardBez = b.gegenkontoId ? "Umbuchung" : b.planRef ? regelBez.get(b.planRef.quelleId) ?? "Zahlung" : "Buchung";
     return {
       art: "ist",
       datum: b.datum,
-      bezeichnung: b.notiz ?? (b.planRef ? regelBez.get(b.planRef.quelleId) ?? "Zahlung" : "Buchung"),
+      bezeichnung: b.notiz ?? standardBez,
       betrag: b.betrag,
       charakter: b.charakter,
       kategorieId: b.kategorieId,
       saldo,
       istId: b.id,
       quelle: b.quelle,
+      transferId: b.transferId,
+      gegenkontoId: b.gegenkontoId,
       planRef: b.planRef,
     };
   });
