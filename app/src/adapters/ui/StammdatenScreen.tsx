@@ -5,7 +5,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   KONTOTYPEN,
   formatBetrag,
+  istSummeKonto,
+  realerKontostand,
   type Charakter,
+  type IstBuchung,
   type Kategorie,
   type Kontotyp,
   type Person,
@@ -16,6 +19,7 @@ import { standardkategorienAnlegen } from "../../application/standardkategorien"
 import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
+import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
@@ -27,11 +31,13 @@ export function StammdatenScreen() {
   const [personen, setPersonen] = useState<Person[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
+  const [ist, setIst] = useState<IstBuchung[]>([]);
 
   async function laden() {
     setPersonen(await personRepo.alle());
     setKonten(await kontoRepo.alle());
     setKategorien(await kategorieRepo.alle());
+    setIst(await ledgerRepo.alle());
   }
   useEffect(() => {
     laden();
@@ -43,7 +49,7 @@ export function StammdatenScreen() {
     <div className="screen">
       <PageHead title="Stammdaten" subtitle="Haushalt — der eine Datenbestand · Personen · Konten · Kategorien" />
       <PersonenCard personen={personen} onChange={laden} />
-      <KontenCard konten={konten} personen={personen} personName={personName} onChange={laden} />
+      <KontenCard konten={konten} personen={personen} personName={personName} ist={ist} onChange={laden} />
       <KategorienCard kategorien={kategorien} onChange={laden} />
     </div>
   );
@@ -121,7 +127,8 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
   );
 }
 
-function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlungskonto[]; personen: Person[]; personName: Map<string, string>; onChange: () => void }) {
+function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Zahlungskonto[]; personen: Person[]; personName: Map<string, string>; ist: IstBuchung[]; onChange: () => void }) {
+  const hatIst = ist.some((b) => b.planRef || b.quelle === "import");
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [bezeichnung, setBezeichnung] = useState("");
@@ -166,7 +173,7 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
   }
 
   return (
-    <Card title="Konten" subtitle="Liquide Geldkonten — der Kontostand ist nur eine Zahl" action={<Button plus onClick={neu}>Konto</Button>}>
+    <Card title="Konten" subtitle={hatIst ? "Anfangsbestand + bestätigte Ist-Buchungen = realer Stand" : "Liquide Geldkonten — der Kontostand ist nur eine Zahl"} action={<Button plus onClick={neu}>Konto</Button>}>
       {konten.length === 0 ? (
         <div className="muted">Noch keine Konten.</div>
       ) : (
@@ -176,7 +183,13 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
             { key: "typ", label: "Typ" },
             { key: "iban", label: "IBAN", render: (k) => k.iban ?? "—" },
             { key: "inhaber", label: "Inhaber", render: (k) => (k.inhaberIds.length ? k.inhaberIds.map((id: string) => personName.get(id) ?? "?").join(", ") : "—") },
-            { key: "saldo", label: "Kontostand €", align: "right", render: (k) => formatBetrag(k.saldo) },
+            { key: "saldo", label: hatIst ? "Anfangsbestand €" : "Kontostand €", align: "right", render: (k) => formatBetrag(k.saldo) },
+            ...(hatIst
+              ? [
+                  { key: "ist", label: "Σ Ist €", align: "right" as const, render: (k: Zahlungskonto) => (istSummeKonto(ist, k.id) ? formatBetrag(istSummeKonto(ist, k.id), true) : "—") },
+                  { key: "real", label: "realer Stand €", align: "right" as const, render: (k: Zahlungskonto) => <span style={{ fontWeight: "var(--fw-bold)" }}>{formatBetrag(realerKontostand(k, ist))}</span> },
+                ]
+              : []),
             { key: "_e", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => bearbeiten(k)}>bearbeiten</button> },
             { key: "_x", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => kontoRepo.loeschen(k.id).then(onChange)}>löschen</button> },
           ]}
@@ -201,7 +214,7 @@ function KontenCard({ konten, personen, personName, onChange }: { konten: Zahlun
             <FormField label="IBAN" hint="optional, wird geprüft">
               <input className="field" value={iban} onChange={(e) => setIban(e.target.value)} placeholder="DE…" />
             </FormField>
-            <FormField label="Kontostand" hint="aktueller Saldo (manuell)">
+            <FormField label="Kontostand" hint="Anfangsbestand — bezahlte Posten bewegen ihn">
               <input className="field" inputMode="decimal" value={saldoEuro} onChange={(e) => setSaldoEuro(e.target.value)} placeholder="0,00" />
             </FormField>
             <FormField label="Inhaber">

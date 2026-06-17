@@ -75,11 +75,11 @@ echte Buch bleibt dem Package vorbehalten.
 
 ## Folgeentscheidungen / Bauplan (konkretisiert BAUPLAN P3)
 
-1. **`LedgerPort` + app-seitiger Mock** (SQLite-Tabelle `ist_buchung`), Schema = Minimalformat (Migration).
-2. **Use-Case `postenBezahltMarkieren(planRef, datum, kontoId)`** → schreibt Ist-Buchung; Konto-Saldo-Effekt.
-3. **Reconciliation light** in Konten/Übersicht/Deckung: realer Kontostand aus Startsaldo − Ist.
-4. **Plan/Ist je Posten** sichtbar (bezahlt? offen?); Übersicht „Nächste Zahlungen" → abhakbar.
-5. **Topf-Verbrauch real** (Ausgabe in Topf-Kategorie entnimmt) — sobald Ist-Buchungen Kategorien tragen.
+1. ✅ **`LedgerPort` + app-seitiger Mock** (SQLite-Tabelle `ist_buchung`, Migration v9, UNIQUE-Index auf planRef), Schema = Minimalformat (`core/istbuchung.ts`).
+2. ✅ **Use-Case `postenBezahltMarkieren` / `bezahltZuruecknehmen`** → schreibt/entfernt Ist-Buchung mit `planRef`; idempotent (Dedup über die Quelle).
+3. ✅ **Reconciliation light** in Übersicht/Deckung/Stammdaten: realer Kontostand = Anfangsbestand + Σ Ist (`realerKontostand`/`liquideMittelReal`).
+4. ✅ **Plan/Ist je Posten** sichtbar; Übersicht „Nächste Zahlungen" → abhakbar; bezahlte Posten fallen aus der Projektion (kein Doppelzählen).
+5. **Topf-Verbrauch real** (Ausgabe in Topf-Kategorie entnimmt) — sobald Ist-Buchungen Kategorien tragen. *(offen)*
 6. *Später:* Bankimport als zweite Quelle hinter demselben Port + Dedup/Matching + (dann) echtes Package.
 
 Offen für eine spätere Sitzung: genaue **Dedup-Heuristik** Manuell↔Import; ob Töpfe je ein

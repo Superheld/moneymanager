@@ -5,13 +5,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  bezahlteSchluessel,
   centZuEuro,
   formatBetrag,
-  liquideMittel,
+  liquideMittelReal,
   projiziereLiquiditaet,
   sollstand,
   zielwert,
   type Budget,
+  type IstBuchung,
   type Topf,
   type TopfTyp,
   type Zahlungskonto,
@@ -21,6 +23,7 @@ import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqlit
 import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
+import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { Card, CoverageTrack, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 
@@ -42,6 +45,7 @@ export function DeckungScreen() {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [toepfe, setToepfe] = useState<Topf[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
+  const [ist, setIst] = useState<IstBuchung[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -49,12 +53,14 @@ export function DeckungScreen() {
       setBudgets(await budgetRepo.alle());
       setToepfe(await topfRepo.alle());
       setKonten(await kontoRepo.alle());
+      setIst(await ledgerRepo.alle());
     })();
   }, []);
 
-  // Liquide Mittel = Summe der Kontostände (manuell gepflegt).
-  const mittel = useMemo(() => liquideMittel(konten), [konten]);
-  const jetzt = useMemo(() => projiziereLiquiditaet(regeln, budgets, toepfe, ab, 1, mittel)[0], [regeln, budgets, toepfe, ab, mittel]);
+  // Liquide Mittel = realer Stand (Anfangsbestand + Σ Ist); bezahlte Posten ausgeschlossen.
+  const bezahlt = useMemo(() => bezahlteSchluessel(ist), [ist]);
+  const mittel = useMemo(() => liquideMittelReal(konten, ist), [konten, ist]);
+  const jetzt = useMemo(() => projiziereLiquiditaet(regeln, budgets, toepfe, ab, 1, mittel, bezahlt)[0], [regeln, budgets, toepfe, ab, mittel, bezahlt]);
   const planSaldo = jetzt?.kontosaldo ?? mittel;
   const sollSumme = jetzt?.sollSumme ?? 0;
   const frei = jetzt?.freieLiquiditaet ?? planSaldo;
