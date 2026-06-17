@@ -12,11 +12,12 @@ plus Finanzplan*. Sie unterscheidet konsequent:
 **Lokal first:** Alle Daten bleiben auf dem Gerät, keine Cloud-Pflicht. Funktioniert ohne KI —
 der Kern (Projektion, Töpfe, Liquidität) ist reine Arithmetik.
 
-## Status — v0.6.0 (Plan + Ist light + Konto-Register)
+## Status — v0.7.0 (Plan + Ist light + Konto-Register + Umbuchen)
 
 Die komplette **Planungsseite** ist gebaut und unit-getestet; dazu der **Ist-Schritt „light"**
-(ADR-0002): geplante Posten als bezahlt abhaken, realer Kontostand, Plan/Ist je Posten, sowie
-ein **Konto-Register** (gebuchte + voraussichtliche Buchungen je Konto, manuelle Buchungen).
+(ADR-0002): geplante Posten als bezahlt abhaken, realer Kontostand, Plan/Ist je Posten, ein
+**Konto-Register** (gebuchte + voraussichtliche Buchungen je Konto, manuelle Buchungen) und
+**Umbuchen** zwischen Konten (verknüpfte Doppelbuchung, Charakter Umschichtung).
 
 | Phase | Inhalt | Status |
 |---|---|---|

@@ -158,6 +158,13 @@ const MIGRATIONS: Migration[] = [
     version: 10, // Konto-Register: Freitext-Notiz für manuelle Buchungen
     sql: [`ALTER TABLE ist_buchung ADD COLUMN notiz TEXT`],
   },
+  {
+    version: 11, // Umbuchen: zwei verknüpfte Beine (transferId) + Gegenkonto
+    sql: [
+      `ALTER TABLE ist_buchung ADD COLUMN transfer_id TEXT`,
+      `ALTER TABLE ist_buchung ADD COLUMN gegenkonto_id TEXT`,
+    ],
+  },
 ];
 
 async function migrate(db: Database): Promise<void> {

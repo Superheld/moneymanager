@@ -18,6 +18,7 @@ import {
   type Zahlungsregel,
 } from "../../core";
 import { buchungErfassen, buchungLoeschen } from "../../application/buchungErfassen";
+import { umbuchungErfassen, umbuchungLoeschen } from "../../application/umbuchungErfassen";
 import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../../application/bezahltMarkieren";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
@@ -54,6 +55,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [aktivId, setAktivId] = useState("");
   const [tage, setTage] = useState(30);
   const [buchenOffen, setBuchenOffen] = useState(false);
+  const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
   async function laden() {
@@ -69,6 +71,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   }, []);
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
+  const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
   const aktiv = konten.find((k) => k.id === aktivId);
   const register = useMemo(
     () => (aktiv ? kontoRegister(aktiv, ist, regeln, heute, tage) : null),
@@ -91,8 +94,9 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     }
   }
 
-  async function buchungEntfernen(id: string) {
-    await buchungLoeschen(ledgerRepo, id);
+  async function zeileEntfernen(z: RegisterZeile) {
+    if (z.transferId) await umbuchungLoeschen(ledgerRepo, z.transferId);
+    else if (z.istId) await buchungLoeschen(ledgerRepo, z.istId);
     setIst(await ledgerRepo.alle());
   }
 
@@ -132,6 +136,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               <select className="field" style={{ width: "auto" }} value={tage} onChange={(e) => setTage(Number(e.target.value))}>
                 {TAGE_OPTIONEN.map((t) => (<option key={t} value={t}>kommende {t} Tage</option>))}
               </select>
+              {konten.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>Umbuchen</Button>}
               <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>Buchung</Button>
             </span>
           }
@@ -147,11 +152,10 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 <>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(z.datum)}</span>
                   {z.bezeichnung}
+                  {z.gegenkontoId && <span className="muted" style={{ fontSize: 12 }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
                   {z.kategorieId && <span className="muted" style={{ fontSize: 12 }}>· {kategorieName.get(z.kategorieId) ?? "?"}</span>}
-                  {z.quelle === "manuell" && <Pill variant="neutral">manuell</Pill>}
-                  {z.quelle === "bezahlt-markiert" && <Pill variant="neutral">bezahlt</Pill>}
-                  {z.charakter === "Umschichtung" && <Pill variant="um">Umschichtung</Pill>}
-                  {z.quelle === "manuell" && <button className="linkbtn" style={{ marginLeft: 4 }} onClick={() => z.istId && buchungEntfernen(z.istId)}>löschen</button>}
+                  {z.gegenkontoId ? <Pill variant="um">Umbuchung</Pill> : z.quelle === "manuell" ? <Pill variant="neutral">manuell</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">bezahlt</Pill> : null}
+                  {z.quelle === "manuell" && <button className="linkbtn" style={{ marginLeft: 4 }} onClick={() => zeileEntfernen(z)}>löschen</button>}
                 </>
               }
               betrag={z.betrag}
@@ -209,6 +213,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           onSaved={async () => { setBuchenOffen(false); setIst(await ledgerRepo.alle()); }}
         />
       )}
+
+      {umbuchenOffen && aktiv && (
+        <UmbuchungModal
+          konten={konten}
+          vonId={aktivId}
+          heute={heute}
+          onClose={() => setUmbuchenOffen(false)}
+          onSaved={async () => { setUmbuchenOffen(false); setIst(await ledgerRepo.alle()); }}
+        />
+      )}
     </div>
   );
 }
@@ -225,6 +239,56 @@ function Zeile({ links, betrag, charakter, saldo, faint }: { links: ReactNode; b
         <span className="num" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-2)", minWidth: 92, textAlign: "right" }}>{formatBetrag(saldo)} €</span>
       </span>
     </div>
+  );
+}
+
+function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Zahlungskonto[]; vonId: string; heute: string; onClose: () => void; onSaved: () => void }) {
+  const [von, setVon] = useState(vonId);
+  const [nach, setNach] = useState(konten.find((k) => k.id !== vonId)?.id ?? "");
+  const [datum, setDatum] = useState(heute);
+  const [betrag, setBetrag] = useState("");
+  const [notiz, setNotiz] = useState("");
+  const [fehler, setFehler] = useState<string | null>(null);
+
+  async function speichern() {
+    setFehler(null);
+    try {
+      await umbuchungErfassen(ledgerRepo, { vonKontoId: von, nachKontoId: nach, datum, betragEuro: Number(betrag.replace(",", ".")), notiz });
+      onSaved();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  return (
+    <Modal
+      title="Umbuchen"
+      subtitle="Übertrag zwischen zwei Konten — Vermögensumschichtung, keine Ausgabe"
+      onClose={onClose}
+      footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={onClose}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+    >
+      <div className="form-grid">
+        <FormField label="Von Konto" required>
+          <select className="field" value={von} onChange={(e) => setVon(e.target.value)}>
+            {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
+          </select>
+        </FormField>
+        <FormField label="Nach Konto" required>
+          <select className="field" value={nach} onChange={(e) => setNach(e.target.value)}>
+            {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
+          </select>
+        </FormField>
+        <FormField label="Datum" required>
+          <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
+        </FormField>
+        <FormField label="Betrag" required>
+          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
+        </FormField>
+        <FormField label="Notiz" hint="optional">
+          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Sparrate, Rücklage" />
+        </FormField>
+      </div>
+    </Modal>
   );
 }
 

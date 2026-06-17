@@ -38,6 +38,10 @@ export interface IstBuchung {
   readonly quelle: IstQuelle;
   /** Freitext-Beschreibung (v. a. bei manuellen Buchungen). */
   readonly notiz?: string;
+  /** Verknüpft die beiden Beine einer Umbuchung (− auf Quelle, + auf Ziel). */
+  readonly transferId?: string;
+  /** Das andere Konto bei einer Umbuchung (zur Anzeige der Richtung). */
+  readonly gegenkontoId?: string;
   /** Gesetzt bei „bezahlt-markiert"; ermöglicht 1:1-Abgleich mit dem Plan. */
   readonly planRef?: PlanRef;
   /** Roh-Hash der Importzeile (Dedup gegen Bankimport, später). */
