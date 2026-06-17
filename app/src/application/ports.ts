@@ -4,6 +4,7 @@
 import type {
   Budget,
   Inventargegenstand,
+  IstBuchung,
   Kategorie,
   Person,
   Szenario,
@@ -58,6 +59,16 @@ export interface TopfRepository {
 export interface InventarRepository {
   alle(): Promise<Inventargegenstand[]>;
   speichern(gegenstand: Inventargegenstand): Promise<void>;
+  loeschen(id: string): Promise<void>;
+}
+
+/**
+ * Ledger-Port (ADR-0002) — Zugang zum app-seitigen Ist-Journal. Hinter DIESEM Port
+ * docken später das echte Buchungspackage und der Bankimport an (austauschbar).
+ */
+export interface LedgerPort {
+  alle(): Promise<IstBuchung[]>;
+  speichern(buchung: IstBuchung): Promise<void>;
   loeschen(id: string): Promise<void>;
 }
 

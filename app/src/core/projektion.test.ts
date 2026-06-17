@@ -49,6 +49,14 @@ describe("projiziereRegel", () => {
     ]);
   });
 
+  it("lässt bereits bezahlte Fälligkeiten aus der Vorschau weg", () => {
+    const bezahlt = new Set(["r1@2026-02-15"]);
+    const b = projiziereRegel(regel(), "2026-01-01", 12, bezahlt);
+    expect(b).toHaveLength(11);
+    expect(b.some((x) => x.datum === "2026-02-15")).toBe(false);
+    expect(b[0].datum).toBe("2026-01-15");
+  });
+
   it("klemmt den Tag auf den letzten Monatstag (31. → Feb)", () => {
     const b = projiziereRegel(
       regel({ rhythmus: "monatlich", startdatum: "2026-01-31" }),

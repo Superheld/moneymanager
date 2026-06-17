@@ -133,6 +133,27 @@ const MIGRATIONS: Migration[] = [
     version: 8, // Konten: manueller Kontostand
     sql: [`ALTER TABLE zahlungskonto ADD COLUMN kontostand INTEGER NOT NULL DEFAULT 0`],
   },
+  {
+    version: 9, // P3 — Ist light (ADR-0002): app-seitiges Ist-Journal hinter dem Ledger-Port
+    sql: [
+      `CREATE TABLE IF NOT EXISTS ist_buchung (
+        id               TEXT PRIMARY KEY,
+        datum            TEXT    NOT NULL,
+        betrag           INTEGER NOT NULL,
+        konto_id         TEXT    NOT NULL,
+        kategorie_id     TEXT,
+        charakter        TEXT    NOT NULL,
+        quelle           TEXT    NOT NULL,
+        plan_quelle_id   TEXT,
+        plan_faelligkeit TEXT,
+        roh_hash         TEXT
+      )`,
+      // 1:1-Matching/Dedup: pro (Plan-Quelle, Fälligkeit) höchstens eine Ist-Buchung.
+      `CREATE UNIQUE INDEX IF NOT EXISTS ux_ist_planref
+        ON ist_buchung (plan_quelle_id, plan_faelligkeit)
+        WHERE plan_quelle_id IS NOT NULL`,
+    ],
+  },
 ];
 
 async function migrate(db: Database): Promise<void> {
