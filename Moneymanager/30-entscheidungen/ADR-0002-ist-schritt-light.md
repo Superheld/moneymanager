@@ -35,6 +35,8 @@
 
 4. **Budgets/variable Ausgaben bleiben Plan/Limit bis zum Import** — **kein** freier
    Ausgaben-Logger. Echte Ist-Werte pro Kategorie liefert erst der Bankimport.
+   → **Revidiert 2026-06-17** (siehe Nachtrag unten): manuelle Einzelbuchungen sind erlaubt,
+   bei Bar dauerhaft, bei Bankkonten vorläufig.
 
 5. **Ein Ist-Journal als einzige Wahrheit, Dedup über die Quelle.** Jede Buchung trägt `quelle`.
    Der spätere Import **matcht und dedupliziert** gegen bereits erfasste (manuelle) Buchungen
@@ -84,3 +86,20 @@ echte Buch bleibt dem Package vorbehalten.
 
 Offen für eine spätere Sitzung: genaue **Dedup-Heuristik** Manuell↔Import; ob Töpfe je ein
 eigenes (Unter-)Konto bekommen (KONZEPT §8, weiterhin optional).
+
+## Nachtrag 2026-06-17 — manuelle Buchungen & Konto-Register
+
+§4 wird präzisiert: das **Verbot eines manuellen Haushaltsbuchs galt der Doppelung mit dem
+Bankimport** — nicht der manuellen Erfassung an sich. Zwei Fälle lösen die Spannung sauber:
+
+- **Bargeld** hat *nie* einen Import → manuelle Erfassung ist die **einzige** Quelle, dauerhaft
+  korrekt, keine Doppelung möglich.
+- **Giro/Tagesgeld**: manuelle Buchungen nur als **Übergang bis zum Import**; sie tragen
+  `quelle: 'manuell'` (vorläufig) und werden von der Import-Dedup abgeglichen — derselbe
+  Mechanismus wie bei mark-as-paid.
+
+Umgesetzt: `IstQuelle` um `'manuell'` erweitert (+ Freitext `notiz`), Use-Case `buchungErfassen`,
+reine Funktion `kontoRegister` (gebuchtes Ist mit laufendem Saldo + geplante Vorschau der
+kommenden X Tage), eigener **Konten-Screen** mit Register je Konto und „Buchung hinzufügen".
+Budgets bleiben unverändert Plan/Limit — der Verzicht auf einen *kategoriebezogenen* freien
+Ausgaben-Logger steht weiter; manuelle Einzelbuchungen sind davon unberührt.

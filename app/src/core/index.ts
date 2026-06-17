@@ -13,3 +13,4 @@ export * from "./topf";
 export * from "./inventar";
 export * from "./szenario";
 export * from "./istbuchung";
+export * from "./kontoregister";
