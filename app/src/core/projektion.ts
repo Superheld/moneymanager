@@ -8,6 +8,7 @@ import { RHYTHMUS_MONATE, type Charakter, type Zahlungsregel } from "./zahlungsr
 import { addMonate, monatsIndex, ord, parseIso, toIso } from "./datum";
 import { geglaetteterMonatsabfluss, type Budget } from "./budget";
 import { sollstand, zielwert, type Topf } from "./topf";
+import { planRefKey } from "./istbuchung";
 
 const MONATSNAMEN = [
   "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
@@ -27,11 +28,16 @@ export interface Planbuchung {
  * Projiziert die Fälligkeiten EINER Regel in das Fenster [ab, ab+monate).
  * Beginnt beim Startdatum und schreitet im Rhythmus voran; Fälligkeiten vor
  * dem Fensterstart werden übersprungen (die Regel kann älter sein als das Fenster).
+ *
+ * `bezahlt` (optional): Schlüssel bereits per Ist bestätigter Posten (planRefKey).
+ * Solche Fälligkeiten sind Fakt, kein Plan mehr → sie werden aus der Vorschau
+ * entfernt, damit sie nicht doppelt zählen (der reale Saldo trägt sie schon).
  */
 export function projiziereRegel(
   regel: Zahlungsregel,
   ab: string,
   monate: number,
+  bezahlt?: ReadonlySet<string>,
 ): Planbuchung[] {
   const schritt = RHYTHMUS_MONATE[regel.rhythmus];
   const fensterStart = parseIso(ab);
@@ -48,10 +54,12 @@ export function projiziereRegel(
     const faellig = addMonate(start, k * schritt);
     if (ord(faellig) >= endeOrd) break;
     if (ord(faellig) >= startOrd) {
+      const datum = toIso(faellig);
+      if (bezahlt?.has(planRefKey(regel.id, datum))) continue;
       buchungen.push({
         regelId: regel.id,
         bezeichnung: regel.bezeichnung,
-        datum: toIso(faellig),
+        datum,
         betrag: regel.betrag,
         charakter: regel.charakter,
       });
@@ -82,6 +90,7 @@ export function projiziereVerlauf(
   ab: string,
   monate: number,
   startsaldo: Cent,
+  bezahlt?: ReadonlySet<string>,
 ): MonatsVerlauf[] {
   const start = parseIso(ab);
 
@@ -102,7 +111,7 @@ export function projiziereVerlauf(
   }
 
   for (const regel of regeln) {
-    for (const b of projiziereRegel(regel, ab, monate)) {
+    for (const b of projiziereRegel(regel, ab, monate, bezahlt)) {
       const ymd = parseIso(b.datum);
       const k = koerbe[monatsIndex(start, ymd.y, ymd.m)];
       if (!k) continue;
@@ -158,9 +167,10 @@ export function projiziereLiquiditaet(
   ab: string,
   monate: number,
   startsaldo: Cent,
+  bezahlt?: ReadonlySet<string>,
 ): LiquiditaetsMonat[] {
   const start = parseIso(ab);
-  const regelVerlauf = projiziereVerlauf(regeln, ab, monate, startsaldo);
+  const regelVerlauf = projiziereVerlauf(regeln, ab, monate, startsaldo, bezahlt);
   const budgetProMonat = budgets.reduce((s, b) => s + geglaetteterMonatsabfluss(b), 0);
   const sollToepfe = toepfe.filter((t) => zielwert(t) != null);
 

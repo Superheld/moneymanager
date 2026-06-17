@@ -4,17 +4,21 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
+  bezahlteSchluessel,
   centZuEuro,
   formatBetrag,
   geglaetteterMonatsabfluss,
   kuendigungsterminNaht,
-  liquideMittel,
+  liquideMittelReal,
   naechsterKuendigungstermin,
+  planRefKey,
   projiziereLiquiditaet,
   projiziereRegel,
   type Budget,
   type Charakter,
+  type IstBuchung,
   type Kategorie,
+  type Planbuchung,
   type Rhythmus,
   type Szenario,
   type Topf,
@@ -23,11 +27,13 @@ import {
   type Zahlungsregel,
 } from "../../core";
 import { szenarioAnlegen, szenarioPostenAnlegen } from "../../application/szenarioAnlegen";
+import { bezahltZuruecknehmen, postenBezahltMarkieren } from "../../application/bezahltMarkieren";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
 import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
 import { sqliteSzenarioRepository as szenarioRepo } from "../persistence/sqliteSzenarioRepository";
+import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "./ds";
@@ -64,6 +70,7 @@ export function UeberblickScreen() {
   const [szenarien, setSzenarien] = useState<Szenario[]>([]);
   const [szenarioId, setSzenarioId] = useState("");
   const [posten, setPosten] = useState<Zahlungsregel[]>([]);
+  const [ist, setIst] = useState<IstBuchung[]>([]);
 
   async function basisLaden() {
     setRegeln(await regelRepo.alle());
@@ -73,6 +80,7 @@ export function UeberblickScreen() {
     setVertraege(await vertragRepo.alle());
     setKategorien(await kategorieRepo.alle());
     setSzenarien(await szenarioRepo.alle());
+    setIst(await ledgerRepo.alle());
   }
   useEffect(() => {
     basisLaden();
@@ -87,11 +95,14 @@ export function UeberblickScreen() {
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
 
-  const start = useMemo(() => liquideMittel(konten), [konten]);
-  const basis = useMemo(() => projiziereLiquiditaet(regeln, budgets, toepfe, ab, MONATE, start), [regeln, budgets, toepfe, ab, start]);
+  // Reconciliation light: Start = realer Stand (Anfangsbestand + Σ Ist); bezahlte
+  // Plan-Posten sind Fakt → aus der Vorschau ausgeschlossen, damit nichts doppelt zählt.
+  const bezahlt = useMemo(() => bezahlteSchluessel(ist), [ist]);
+  const start = useMemo(() => liquideMittelReal(konten, ist), [konten, ist]);
+  const basis = useMemo(() => projiziereLiquiditaet(regeln, budgets, toepfe, ab, MONATE, start, bezahlt), [regeln, budgets, toepfe, ab, start, bezahlt]);
   const verlauf = useMemo(
-    () => (szenarioId ? projiziereLiquiditaet([...regeln, ...posten], budgets, toepfe, ab, MONATE, start) : basis),
-    [szenarioId, regeln, posten, budgets, toepfe, ab, start, basis],
+    () => (szenarioId ? projiziereLiquiditaet([...regeln, ...posten], budgets, toepfe, ab, MONATE, start, bezahlt) : basis),
+    [szenarioId, regeln, posten, budgets, toepfe, ab, start, bezahlt, basis],
   );
 
   const verfuegbar = verlauf.length ? verlauf[0].freieLiquiditaet : start;
@@ -107,10 +118,36 @@ export function UeberblickScreen() {
       ? verlauf[verlauf.length - 1].freieLiquiditaet - basis[basis.length - 1].freieLiquiditaet
       : null;
 
+  const regelById = useMemo(() => new Map(regeln.map((r) => [r.id, r])), [regeln]);
+  const [markFehler, setMarkFehler] = useState<string | null>(null);
+
+  // Nächste Zahlungen: bewusst OHNE Ausschluss projizieren, damit bereits bezahlte
+  // Posten mit Häkchen sichtbar bleiben (Plan/Ist je Posten, ADR-0002 §4).
   const naechste = useMemo(() => {
     const alle = regeln.flatMap((r) => projiziereRegel(r, heute, 2));
     return alle.sort((a, b) => a.datum.localeCompare(b.datum)).slice(0, 6);
   }, [regeln, heute]);
+
+  /** Konto, über das ein Posten gebucht würde — von der Regel, sonst das einzige Konto. */
+  function loeseKonto(p: Planbuchung): string | undefined {
+    return regelById.get(p.regelId)?.kontoId ?? (konten.length === 1 ? konten[0].id : undefined);
+  }
+
+  async function toggleBezahlt(p: Planbuchung, schonBezahlt: boolean) {
+    setMarkFehler(null);
+    const regel = regelById.get(p.regelId);
+    if (!regel) return;
+    try {
+      if (schonBezahlt) {
+        await bezahltZuruecknehmen(ledgerRepo, p.regelId, p.datum);
+      } else {
+        await postenBezahltMarkieren(ledgerRepo, { regel, faelligkeit: p.datum, kontoId: loeseKonto(p) });
+      }
+      setIst(await ledgerRepo.alle());
+    } catch (e) {
+      setMarkFehler(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   const hinweise: { text: string; warn: boolean }[] = [];
   if (tiefpunkt.freieLiquiditaet < 0)
@@ -204,23 +241,37 @@ export function UeberblickScreen() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr 1fr", gap: "var(--gap-card)", marginTop: "var(--gap-card)", alignItems: "start" }}>
-        <Card title="Nächste Zahlungen" subtitle="kommende 2 Monate">
+        <Card title="Nächste Zahlungen" subtitle="kommende 2 Monate · abhaken = bezahlt">
           {naechste.length === 0 ? (
             <div className="muted">Keine geplanten Zahlungen.</div>
           ) : (
-            naechste.map((p, i) => (
-              <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "11px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                <span style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(p.datum)}</span>
-                  {p.bezeichnung}
-                  {p.charakter === "Umschichtung" && <Pill variant="um">Umschichtung</Pill>}
-                </span>
-                <span className="num" style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", color: p.charakter === "Ertrag" ? "var(--ok-deep)" : p.charakter === "Umschichtung" ? "var(--accent-deep)" : "var(--ink)" }}>
-                  {formatBetrag(p.betrag, true)} €
-                </span>
-              </div>
-            ))
+            naechste.map((p, i) => {
+              const paid = bezahlt.has(planRefKey(p.regelId, p.datum));
+              const kannMarkieren = paid || !!loeseKonto(p);
+              return (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "11px 0", borderBottom: "1px solid var(--line-soft)", opacity: paid ? 0.6 : 1 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 9, minWidth: 0 }}>
+                    <input
+                      type="checkbox"
+                      checked={paid}
+                      disabled={!kannMarkieren}
+                      onChange={() => toggleBezahlt(p, paid)}
+                      title={kannMarkieren ? (paid ? "als bezahlt markiert — Häkchen entfernen" : "als bezahlt markieren") : "Kein Konto hinterlegt — der Zahlung/Regel ein Konto zuordnen"}
+                      style={{ cursor: kannMarkieren ? "pointer" : "not-allowed", accentColor: "var(--accent-deep)" }}
+                    />
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(p.datum)}</span>
+                    <span style={{ textDecoration: paid ? "line-through" : "none" }}>{p.bezeichnung}</span>
+                    {paid && <Pill variant="neutral">bezahlt</Pill>}
+                    {p.charakter === "Umschichtung" && <Pill variant="um">Umschichtung</Pill>}
+                  </span>
+                  <span className="num" style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", color: paid ? "var(--ink-3)" : p.charakter === "Ertrag" ? "var(--ok-deep)" : p.charakter === "Umschichtung" ? "var(--accent-deep)" : "var(--ink)" }}>
+                    {formatBetrag(p.betrag, true)} €
+                  </span>
+                </div>
+              );
+            })
           )}
+          {markFehler && <div className="err" style={{ marginTop: 10 }}>{markFehler}</div>}
         </Card>
 
         <Card title="Budgets diesen Monat" subtitle="Rahmen (Plan)">
