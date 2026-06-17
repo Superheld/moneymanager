@@ -101,5 +101,7 @@ Bankimport** — nicht der manuellen Erfassung an sich. Zwei Fälle lösen die S
 Umgesetzt: `IstQuelle` um `'manuell'` erweitert (+ Freitext `notiz`), Use-Case `buchungErfassen`,
 reine Funktion `kontoRegister` (gebuchtes Ist mit laufendem Saldo + geplante Vorschau der
 kommenden X Tage), eigener **Konten-Screen** mit Register je Konto und „Buchung hinzufügen".
+**Umbuchen** zwischen Konten als verknüpfte Doppelbuchung (`transferId`, `gegenkontoId`,
+Charakter Umschichtung) — Use-Case `umbuchungErfassen`; netto-neutral über alle Konten.
 Budgets bleiben unverändert Plan/Limit — der Verzicht auf einen *kategoriebezogenen* freien
 Ausgaben-Logger steht weiter; manuelle Einzelbuchungen sind davon unberührt.
