@@ -74,7 +74,7 @@ describe("postenBezahltMarkieren", () => {
     const ledger = memLedger();
     await expect(
       postenBezahltMarkieren(ledger, { regel: regel({ kontoId: undefined }), faelligkeit: "2026-07-01" }),
-    ).rejects.toThrow(/Konto/);
+    ).rejects.toThrow("bezahlt.keinKonto");
   });
 });
 

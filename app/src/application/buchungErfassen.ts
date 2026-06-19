@@ -2,15 +2,15 @@
 // Plan-Bezug. Für Bar die Dauerquelle (kein Import möglich); für Bankkonten vorläufig,
 // bis der Import sie abgleicht. quelle = 'manuell', kein planRef.
 
-import { type Charakter, type IstBuchung } from "../core";
+import { FachlicherFehler, type Cent, type Charakter, type IstBuchung } from "../core";
 import type { LedgerPort } from "./ports";
 import { vorzeichenbehaftet } from "./zahlungsregelAnlegen";
 
 export interface BuchungEingabe {
   kontoId: string;
   datum: string; // ISO
-  /** Positiver Euro-Betrag; das Vorzeichen ergibt sich aus dem Charakter. */
-  betragEuro: number;
+  /** Positiver Betrag in Minor Units; das Vorzeichen ergibt sich aus dem Charakter. */
+  betrag: Cent;
   charakter: Charakter;
   kategorieId?: string;
   notiz?: string;
@@ -21,14 +21,14 @@ export async function buchungErfassen(
   e: BuchungEingabe,
   id?: string,
 ): Promise<IstBuchung> {
-  if (!e.kontoId) throw new Error("Bitte ein Konto wählen.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new Error("Bitte ein gültiges Datum angeben.");
-  if (!(e.betragEuro > 0)) throw new Error("Der Betrag muss größer als 0 sein.");
+  if (!e.kontoId) throw new FachlicherFehler("konto.waehlen");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
+  if (!(e.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
 
   const buchung: IstBuchung = {
     id: id ?? crypto.randomUUID(),
     datum: e.datum,
-    betrag: vorzeichenbehaftet(e.betragEuro, e.charakter),
+    betrag: vorzeichenbehaftet(e.betrag, e.charakter),
     kontoId: e.kontoId,
     kategorieId: e.kategorieId || undefined,
     charakter: e.charakter,

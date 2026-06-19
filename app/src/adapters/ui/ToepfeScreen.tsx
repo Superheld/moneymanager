@@ -1,12 +1,16 @@
 // Töpfe (P2.3) — Ansparen für Ungewisses (Puffer) und Wünsche (Spartopf). Kein Reset,
 // du entnimmst, wenn du's brauchst. Der Ersatz-Fall (Gegenstände) lebt eigenständig im
 // Bereich „Inventar". Plan-only.
+//
+// i18n + Mehrwährung nach ADR-0004 (Muster: BudgetsScreen): sichtbare Strings über t(),
+// Geld über useGeld() (parse bei Eingabe, format + Symbol bei Anzeige).
 
 import { useEffect, useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import {
   ansparrate,
   centZuEuro,
-  formatBetrag,
+  minorZuMajor,
   sollstand,
   zielwert,
   type Kategorie,
@@ -19,9 +23,9 @@ import { Button, Card, CoverageTrack, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
+import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
 
 type TopfArt = "puffer" | "spartopf";
-const ART_LABEL: Record<TopfArt, string> = { puffer: "Puffer", spartopf: "Spartopf" };
 
 function heuteIso(): string {
   const n = new Date();
@@ -29,6 +33,8 @@ function heuteIso(): string {
 }
 
 export function ToepfeScreen() {
+  const { t } = useTranslation();
+  const geld = useGeld();
   const heute = useMemo(heuteIso, []);
   const [toepfe, setToepfe] = useState<Topf[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
@@ -70,20 +76,20 @@ export function ToepfeScreen() {
     setFehler(null);
     setOffen(true);
   }
-  function bearbeiten(t: Topf) {
-    setEditId(t.id);
-    setBezeichnung(t.bezeichnung);
-    setStart(t.start);
-    setKategorieId(t.kategorieId ?? "");
+  function bearbeiten(tp: Topf) {
+    setEditId(tp.id);
+    setBezeichnung(tp.bezeichnung);
+    setStart(tp.start);
+    setKategorieId(tp.kategorieId ?? "");
     setFehler(null);
-    if (t.typ === "puffer") {
+    if (tp.typ === "puffer") {
       setTyp("puffer");
-      setSchaetzbetrag(String(t.schaetzbetrag / 100));
-      setFristMonate(String(t.fristMonate));
-    } else if (t.typ === "spartopf") {
+      setSchaetzbetrag(String(minorZuMajor(tp.schaetzbetrag, geld.waehrung)));
+      setFristMonate(String(tp.fristMonate));
+    } else if (tp.typ === "spartopf") {
       setTyp("spartopf");
-      setZufuehrung(String(t.zufuehrungProMonat / 100));
-      setSparziel(t.sparziel != null ? String(t.sparziel / 100) : "");
+      setZufuehrung(String(minorZuMajor(tp.zufuehrungProMonat, geld.waehrung)));
+      setSparziel(tp.sparziel != null ? String(minorZuMajor(tp.sparziel, geld.waehrung)) : "");
     }
     setOffen(true);
   }
@@ -97,59 +103,56 @@ export function ToepfeScreen() {
           bezeichnung,
           start,
           kategorieId: kategorieId || undefined,
-          schaetzbetragEuro: num(schaetzbetrag),
+          schaetzbetrag: geld.parse(schaetzbetrag) ?? 0,
           fristMonate: num(fristMonate),
-          zufuehrungProMonatEuro: num(zufuehrung),
-          sparzielEuro: num(sparziel),
+          zufuehrungProMonat: geld.parse(zufuehrung) ?? 0,
+          sparziel: geld.parse(sparziel) ?? 0,
         },
         editId ?? undefined,
       );
       setOffen(false);
       await laden();
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
   return (
     <div className="screen">
       <PageHead
-        title="Töpfe"
-        subtitle="Wie Budgets — aber zum Ansparen statt Verbrauchen"
-        action={<Button variant="primary" plus onClick={neu}>Topf anlegen</Button>}
+        title={t("toepfe.titel")}
+        subtitle={t("toepfe.untertitel")}
+        action={<Button variant="primary" plus onClick={neu}>{t("toepfe.anlegen")}</Button>}
       />
 
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
-        Ein Topf <b style={{ color: "var(--ink)" }}>spart an (kein Reset)</b> und du <b style={{ color: "var(--ink)" }}>entnimmst, wenn du's brauchst</b>. Zwei Sorten:{" "}
-        <b style={{ color: "var(--ink)" }}>Puffer</b> für Ungewisses (Steuernachzahlung, Reparatur) ·{" "}
-        <b style={{ color: "var(--ink)" }}>Spartopf</b> für Wünsche (Klamotten, Urlaub). Für Dinge, die du
-        besitzt und ersetzen musst, gibt es den eigenen Bereich <b style={{ color: "var(--ink)" }}>Inventar</b>.
+        <Trans i18nKey="toepfe.erklaerung" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
       </p>
 
-      <Card title="Töpfe" subtitle={`${sichtbar.length} Stück`}>
+      <Card title={t("toepfe.kartenTitel")} subtitle={t("toepfe.kartenAnzahl", { count: sichtbar.length })}>
         {sichtbar.length === 0 ? (
-          <div className="muted">Noch keine Töpfe.</div>
+          <div className="muted">{t("toepfe.leer")}</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
-            {sichtbar.map((t) => {
-              const ziel = zielwert(t);
-              const soll = sollstand(t, heute);
+            {sichtbar.map((tp) => {
+              const ziel = zielwert(tp);
+              const soll = sollstand(tp, heute);
               return (
-                <div key={t.id}>
+                <div key={tp.id}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <span style={{ fontWeight: "var(--fw-bold)" }}>
-                      {t.bezeichnung} <Pill variant="neutral">{ART_LABEL[t.typ as TopfArt] ?? t.typ}</Pill>
+                      {tp.bezeichnung} <Pill variant="neutral">{t(`toepfe.art.${tp.typ}`)}</Pill>
                     </span>
                     <span className="muted">
-                      Ansparrate {formatBetrag(ansparrate(t))} €/Mt{"  ·  "}
-                      <button className="linkbtn" onClick={() => bearbeiten(t)}>bearbeiten</button>{"  ·  "}
-                      <button className="linkbtn" onClick={() => topfRepo.loeschen(t.id).then(laden)}>löschen</button>
+                      {t("toepfe.ansparrate")} {geld.format(ansparrate(tp))} {geld.symbol}{t("toepfe.proMonatKurz")}{"  ·  "}
+                      <button className="linkbtn" onClick={() => bearbeiten(tp)}>{t("toepfe.bearbeiten")}</button>{"  ·  "}
+                      <button className="linkbtn" onClick={() => topfRepo.loeschen(tp.id).then(laden)}>{t("toepfe.loeschen")}</button>
                     </span>
                   </div>
                   {ziel != null && soll != null ? (
-                    <CoverageTrack value={centZuEuro(soll)} max={centZuEuro(ziel)} label="Sollstand heute / Ziel" right={`${formatBetrag(soll)} / ${formatBetrag(ziel)} €`} />
+                    <CoverageTrack value={centZuEuro(soll)} max={centZuEuro(ziel)} label={t("toepfe.sollstandHeuteZiel")} right={`${geld.format(soll)} / ${geld.format(ziel)} ${geld.symbol}`} />
                   ) : (
-                    <div className="muted">Kein Sparziel — nur laufender Stand (real ab P3).</div>
+                    <div className="muted">{t("toepfe.keinSparziel")}</div>
                   )}
                 </div>
               );
@@ -160,44 +163,44 @@ export function ToepfeScreen() {
 
       {offen && (
         <Modal
-          title={editId ? "Topf bearbeiten" : "Topf anlegen"}
-          subtitle="Puffer für Ungewisses · Spartopf für Wünsche"
+          title={editId ? t("toepfe.modalBearbeiten") : t("toepfe.anlegen")}
+          subtitle={t("toepfe.modalUntertitel")}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>{t("toepfe.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("toepfe.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <div className="form-grid">
-            <FormField label="Art">
+            <FormField label={t("toepfe.feldArt")}>
               <select className="field" value={typ} disabled={editId !== null} onChange={(e) => setTyp(e.target.value as TopfArt)}>
-                <option value="puffer">Puffer — für Ungewisses</option>
-                <option value="spartopf">Spartopf — für Wünsche</option>
+                <option value="puffer">{t("toepfe.optionPuffer")}</option>
+                <option value="spartopf">{t("toepfe.optionSpartopf")}</option>
               </select>
             </FormField>
-            <FormField label="Bezeichnung" required>
-              <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder={typ === "puffer" ? "z. B. Steuernachzahlung" : "z. B. Urlaub"} />
+            <FormField label={t("toepfe.feldBezeichnung")} required>
+              <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder={typ === "puffer" ? t("toepfe.platzhalterBezeichnungPuffer") : t("toepfe.platzhalterBezeichnungSpartopf")} />
             </FormField>
-            <FormField label="Start">
+            <FormField label={t("toepfe.feldStart")}>
               <input className="field" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
             </FormField>
-            <FormField label="Kategorie" hint="optional — für Auswertungen">
+            <FormField label={t("toepfe.feldKategorie")} hint={t("toepfe.feldKategorieHinweis")}>
               <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
             </FormField>
             {typ === "puffer" && (
               <>
-                <FormField label="Schätzbetrag" required>
-                  <input className="field" inputMode="decimal" value={schaetzbetrag} onChange={(e) => setSchaetzbetrag(e.target.value)} placeholder="z. B. 1200" />
+                <FormField label={`${t("toepfe.feldSchaetzbetrag")} ${geld.symbol}`} required>
+                  <input className="field" inputMode="decimal" value={schaetzbetrag} onChange={(e) => setSchaetzbetrag(e.target.value)} placeholder={t("toepfe.platzhalterSchaetzbetrag")} />
                 </FormField>
-                <FormField label="Zeitfenster (Monate)" required>
+                <FormField label={t("toepfe.feldZeitfenster")} required>
                   <input className="field" inputMode="numeric" value={fristMonate} onChange={(e) => setFristMonate(e.target.value)} placeholder="12" />
                 </FormField>
               </>
             )}
             {typ === "spartopf" && (
               <>
-                <FormField label="Zuführung pro Monat" required>
-                  <input className="field" inputMode="decimal" value={zufuehrung} onChange={(e) => setZufuehrung(e.target.value)} placeholder="z. B. 50" />
+                <FormField label={`${t("toepfe.feldZufuehrung")} ${geld.symbol}`} required>
+                  <input className="field" inputMode="decimal" value={zufuehrung} onChange={(e) => setZufuehrung(e.target.value)} placeholder={t("toepfe.platzhalterZufuehrung")} />
                 </FormField>
-                <FormField label="Sparziel" hint="optional — ohne Ziel kein Sollstand">
-                  <input className="field" inputMode="decimal" value={sparziel} onChange={(e) => setSparziel(e.target.value)} placeholder="z. B. 500" />
+                <FormField label={`${t("toepfe.feldSparziel")} ${geld.symbol}`} hint={t("toepfe.feldSparzielHinweis")}>
+                  <input className="field" inputMode="decimal" value={sparziel} onChange={(e) => setSparziel(e.target.value)} placeholder={t("toepfe.platzhalterSparziel")} />
                 </FormField>
               </>
             )}

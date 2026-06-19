@@ -2,7 +2,9 @@
 // (Stammdaten) und eine daraus abgeleitete Zahlungsregel (Planung), verknüpft über
 // vertragId. Bewusst kein gemeinsames Aggregat; die Anwendungsschicht orchestriert.
 
+import { FachlicherFehler } from "../core";
 import type {
+  Cent,
   Charakter,
   Rhythmus,
   Vertrag,
@@ -24,7 +26,7 @@ export interface VertragEingabe {
   kuendigungsfristMonate?: number;
   notizen?: string;
   // --- Zahlungsseite (→ abgeleitete Zahlungsregel) ---
-  betragEuro: number;
+  betrag: Cent;
   rhythmus: Rhythmus;
   charakter: Charakter;
   kategorieId?: string;
@@ -44,9 +46,9 @@ export async function vertragAnlegen(
   eingabe: VertragEingabe,
 ): Promise<VertragErgebnis> {
   const anbieter = eingabe.anbieter.trim();
-  if (!anbieter) throw new Error("Bitte einen Anbieter angeben.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.beginn)) throw new Error("Bitte ein gültiges Beginn-Datum angeben.");
-  if (!(eingabe.betragEuro > 0)) throw new Error("Der Betrag muss größer als 0 sein.");
+  if (!anbieter) throw new FachlicherFehler("anbieter.fehlt");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.beginn)) throw new FachlicherFehler("beginn.ungueltig");
+  if (!(eingabe.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
 
   const status: Vertragsstatus = "aktiv";
   const vertrag: Vertrag = {
@@ -66,7 +68,7 @@ export async function vertragAnlegen(
   const regel: Zahlungsregel = {
     id: crypto.randomUUID(),
     bezeichnung: anbieter,
-    betrag: vorzeichenbehaftet(eingabe.betragEuro, eingabe.charakter),
+    betrag: vorzeichenbehaftet(eingabe.betrag, eingabe.charakter),
     rhythmus: eingabe.rhythmus,
     startdatum: eingabe.ersteZahlung || eingabe.beginn,
     charakter: eingabe.charakter,
@@ -92,9 +94,9 @@ export async function vertragAktualisieren(
   eingabe: VertragEingabe,
 ): Promise<VertragErgebnis> {
   const anbieter = eingabe.anbieter.trim();
-  if (!anbieter) throw new Error("Bitte einen Anbieter angeben.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.beginn)) throw new Error("Bitte ein gültiges Beginn-Datum angeben.");
-  if (!(eingabe.betragEuro > 0)) throw new Error("Der Betrag muss größer als 0 sein.");
+  if (!anbieter) throw new FachlicherFehler("anbieter.fehlt");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.beginn)) throw new FachlicherFehler("beginn.ungueltig");
+  if (!(eingabe.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
 
   const bestehend = (await vertragRepo.alle()).find((v) => v.id === vertragId);
   const vertrag: Vertrag = {
@@ -115,7 +117,7 @@ export async function vertragAktualisieren(
   const regel: Zahlungsregel = {
     id: regelId,
     bezeichnung: anbieter,
-    betrag: vorzeichenbehaftet(eingabe.betragEuro, eingabe.charakter),
+    betrag: vorzeichenbehaftet(eingabe.betrag, eingabe.charakter),
     rhythmus: eingabe.rhythmus,
     startdatum: eingabe.ersteZahlung || eingabe.beginn,
     charakter: eingabe.charakter,

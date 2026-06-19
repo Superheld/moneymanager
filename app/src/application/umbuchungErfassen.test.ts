@@ -29,7 +29,7 @@ function konto(id: string, saldoEuro: number): Zahlungskonto {
 describe("umbuchungErfassen", () => {
   it("erzeugt zwei verknüpfte Beine mit gespiegeltem Vorzeichen, Charakter Umschichtung", async () => {
     const ledger = memLedger();
-    const { ab, zu } = await umbuchungErfassen(ledger, { vonKontoId: "giro", nachKontoId: "tagesgeld", datum: "2026-06-17", betragEuro: 500 });
+    const { ab, zu } = await umbuchungErfassen(ledger, { vonKontoId: "giro", nachKontoId: "tagesgeld", datum: "2026-06-17", betrag: euroZuCent(500) });
     expect(ab.betrag).toBe(euroZuCent(-500));
     expect(zu.betrag).toBe(euroZuCent(500));
     expect(ab.charakter).toBe("Umschichtung");
@@ -43,7 +43,7 @@ describe("umbuchungErfassen", () => {
   it("lässt die liquiden Mittel über alle Konten unverändert (netto 0)", async () => {
     const ledger = memLedger();
     const konten = [konto("giro", 1000), konto("tagesgeld", 0)];
-    await umbuchungErfassen(ledger, { vonKontoId: "giro", nachKontoId: "tagesgeld", datum: "2026-06-17", betragEuro: 500 });
+    await umbuchungErfassen(ledger, { vonKontoId: "giro", nachKontoId: "tagesgeld", datum: "2026-06-17", betrag: euroZuCent(500) });
     const ist = await ledger.alle();
     expect(realerKontostand(konten[0], ist)).toBe(euroZuCent(500));
     expect(realerKontostand(konten[1], ist)).toBe(euroZuCent(500));
@@ -52,14 +52,14 @@ describe("umbuchungErfassen", () => {
 
   it("validiert: Konten verschieden, Datum, Betrag > 0", async () => {
     const ledger = memLedger();
-    await expect(umbuchungErfassen(ledger, { vonKontoId: "a", nachKontoId: "a", datum: "2026-06-17", betragEuro: 5 })).rejects.toThrow(/verschieden/);
-    await expect(umbuchungErfassen(ledger, { vonKontoId: "a", nachKontoId: "b", datum: "x", betragEuro: 5 })).rejects.toThrow(/Datum/);
-    await expect(umbuchungErfassen(ledger, { vonKontoId: "a", nachKontoId: "b", datum: "2026-06-17", betragEuro: 0 })).rejects.toThrow(/größer als 0/);
+    await expect(umbuchungErfassen(ledger, { vonKontoId: "a", nachKontoId: "a", datum: "2026-06-17", betrag: euroZuCent(5) })).rejects.toThrow("konten.verschieden");
+    await expect(umbuchungErfassen(ledger, { vonKontoId: "a", nachKontoId: "b", datum: "x", betrag: euroZuCent(5) })).rejects.toThrow("datum.ungueltig");
+    await expect(umbuchungErfassen(ledger, { vonKontoId: "a", nachKontoId: "b", datum: "2026-06-17", betrag: euroZuCent(0) })).rejects.toThrow("betrag.groesserNull");
   });
 
   it("umbuchungLoeschen entfernt beide Beine", async () => {
     const ledger = memLedger();
-    const { ab } = await umbuchungErfassen(ledger, { vonKontoId: "giro", nachKontoId: "tagesgeld", datum: "2026-06-17", betragEuro: 500 });
+    const { ab } = await umbuchungErfassen(ledger, { vonKontoId: "giro", nachKontoId: "tagesgeld", datum: "2026-06-17", betrag: euroZuCent(500) });
     await umbuchungLoeschen(ledger, ab.transferId!);
     expect(ledger.daten).toHaveLength(0);
   });

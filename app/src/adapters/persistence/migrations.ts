@@ -163,4 +163,13 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE ist_buchung ADD COLUMN gegenkonto_id TEXT`,
     ],
   },
+  {
+    version: 12, // ADR-0004 — Haushalts-Einstellungen (Währung, Locale, Sprache) als Key/Value
+    sql: [
+      `CREATE TABLE IF NOT EXISTS einstellung (
+        schluessel TEXT PRIMARY KEY,
+        wert       TEXT NOT NULL
+      )`,
+    ],
+  },
 ];

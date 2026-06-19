@@ -6,6 +6,7 @@
 // Bankimport (kein freies Haushaltsbuch, ADR-0002 §4).
 
 import {
+  FachlicherFehler,
   findeIstZuPlan,
   type IstBuchung,
   type Zahlungsregel,
@@ -33,7 +34,7 @@ export async function postenBezahltMarkieren(
 ): Promise<IstBuchung> {
   const kontoId = e.kontoId ?? e.regel.kontoId;
   if (!kontoId) {
-    throw new Error("Kein Konto hinterlegt — bitte der Zahlung/Regel ein Konto zuordnen.");
+    throw new FachlicherFehler("bezahlt.keinKonto");
   }
 
   const bestehende = await ledger.alle();

@@ -2,7 +2,8 @@
 // Übersetzt eine Formulareingabe in das Aggregat und speichert über den Port.
 
 import {
-  euroZuCent,
+  FachlicherFehler,
+  type Cent,
   type Charakter,
   type Rhythmus,
   type Zahlungsregel,
@@ -11,8 +12,8 @@ import type { ZahlungsregelRepository } from "./ports";
 
 export interface ZahlungsregelEingabe {
   bezeichnung: string;
-  /** Positiver Euro-Betrag; das Vorzeichen ergibt sich aus dem Charakter. */
-  betragEuro: number;
+  /** Positiver Betrag in Minor Units; das Vorzeichen ergibt sich aus dem Charakter. */
+  betrag: Cent;
   rhythmus: Rhythmus;
   startdatum: string; // ISO „YYYY-MM-DD"
   charakter: Charakter;
@@ -21,8 +22,8 @@ export interface ZahlungsregelEingabe {
 }
 
 /** Ertrag fließt zu (+), Aufwand und Umschichtung fließen ab (−). */
-export function vorzeichenbehaftet(betragEuro: number, charakter: Charakter): number {
-  const cent = euroZuCent(Math.abs(betragEuro));
+export function vorzeichenbehaftet(betrag: Cent, charakter: Charakter): number {
+  const cent = Math.abs(betrag);
   return charakter === "Ertrag" ? cent : -cent;
 }
 
@@ -31,16 +32,16 @@ export async function zahlungsregelAnlegen(
   eingabe: ZahlungsregelEingabe,
 ): Promise<Zahlungsregel> {
   const bezeichnung = eingabe.bezeichnung.trim();
-  if (!bezeichnung) throw new Error("Bitte eine Bezeichnung angeben.");
-  if (!(eingabe.betragEuro > 0)) throw new Error("Der Betrag muss größer als 0 sein.");
+  if (!bezeichnung) throw new FachlicherFehler("bezeichnung.fehlt");
+  if (!(eingabe.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.startdatum)) {
-    throw new Error("Bitte ein gültiges Startdatum angeben.");
+    throw new FachlicherFehler("startdatum.ungueltig");
   }
 
   const regel: Zahlungsregel = {
     id: crypto.randomUUID(),
     bezeichnung,
-    betrag: vorzeichenbehaftet(eingabe.betragEuro, eingabe.charakter),
+    betrag: vorzeichenbehaftet(eingabe.betrag, eingabe.charakter),
     rhythmus: eingabe.rhythmus,
     startdatum: eingabe.startdatum,
     charakter: eingabe.charakter,
