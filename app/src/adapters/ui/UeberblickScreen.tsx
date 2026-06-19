@@ -3,10 +3,10 @@
 // Jahresverlauf (zwei Kurven) + optionales Szenario + Monatstabelle + Info-Karten.
 
 import { useEffect, useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import {
   bezahlteSchluessel,
   centZuEuro,
-  formatBetrag,
   geglaetteterMonatsabfluss,
   kuendigungsterminNaht,
   liquideMittelReal,
@@ -40,6 +40,7 @@ import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from
 import { ZweiKurvenChart } from "./ZweiKurvenChart";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { Modal } from "./Modal";
+import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
 
 const MONATE = 12;
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
@@ -59,6 +60,8 @@ function ddmm(iso: string): string {
 }
 
 export function UeberblickScreen() {
+  const { t } = useTranslation();
+  const geld = useGeld();
   const ab = useMemo(aktuellerMonatAb, []);
   const heute = useMemo(heuteIso, []);
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
@@ -145,64 +148,73 @@ export function UeberblickScreen() {
       }
       setIst(await ledgerRepo.alle());
     } catch (e) {
-      setMarkFehler(e instanceof Error ? e.message : String(e));
+      setMarkFehler(fehlerNachricht(t, e));
     }
   }
 
   const hinweise: { text: string; warn: boolean }[] = [];
   if (tiefpunkt.freieLiquiditaet < 0)
-    hinweise.push({ text: `Überplanung: am Tiefpunkt (${tiefpunkt.label}) fehlen ${formatBetrag(tiefpunkt.freieLiquiditaet)} €`, warn: true });
+    hinweise.push({ text: t("ueberblick.hinweisUeberplanung", { label: tiefpunkt.label, betrag: geld.formatMitSymbol(tiefpunkt.freieLiquiditaet) }), warn: true });
   for (const v of vertraege) {
     if (kuendigungsterminNaht(v, heute)) {
-      const t = naechsterKuendigungstermin(v, heute);
-      hinweise.push({ text: `${v.anbieter}: Kündigung bis ${t?.kuendigenBis} möglich`, warn: true });
+      const termin = naechsterKuendigungstermin(v, heute);
+      hinweise.push({ text: t("ueberblick.hinweisKuendigung", { anbieter: v.anbieter, datum: termin?.kuendigenBis }), warn: true });
     }
   }
-  if (hinweise.length === 0) hinweise.push({ text: "Keine offenen Hinweise — dein Plan trägt.", warn: false });
+  if (hinweise.length === 0) hinweise.push({ text: t("ueberblick.hinweisKeine"), warn: false });
 
-  const datumLang = new Date().toLocaleDateString("de-DE", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const datumLang = new Date().toLocaleDateString(geld.locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="screen">
-      <div className="ctxbar">{datumLang} · {szenarioId ? `Szenario: ${szenarien.find((s) => s.id === szenarioId)?.name ?? "?"}` : "Szenario: Basis"}</div>
+      <div className="ctxbar">{datumLang} · {szenarioId ? t("ueberblick.ctxSzenario", { name: szenarien.find((s) => s.id === szenarioId)?.name ?? "?" }) : t("ueberblick.ctxBasis")}</div>
 
-      <div style={{ fontSize: "var(--fs-body)", fontWeight: "var(--fw-semi)", color: "var(--ink-2)" }}>Verfügbares Geld · frei</div>
+      <div style={{ fontSize: "var(--fs-body)", fontWeight: "var(--fw-semi)", color: "var(--ink-2)" }}>{t("ueberblick.fokusLabel")}</div>
       <div className="num" style={{ fontSize: "var(--fs-display)", fontWeight: "var(--fw-black)", letterSpacing: "var(--ls-tight)", lineHeight: 1, marginTop: 6 }}>
-        {formatBetrag(verfuegbar)} <small style={{ fontSize: 28, fontWeight: "var(--fw-bold)", color: "var(--ink-2)" }}>€</small>
+        {geld.format(verfuegbar)} <small style={{ fontSize: 28, fontWeight: "var(--fw-bold)", color: "var(--ink-2)" }}>{geld.symbol}</small>
       </div>
       <p style={{ fontSize: 16, lineHeight: 1.55, color: "var(--ink-2)", margin: "16px 0 0", maxWidth: 620 }}>
         {konten.length === 0 ? (
-          <>Noch keine Kontostände — leg in <b style={{ color: "var(--ink)" }}>Stammdaten → Konten</b> deine Konten mit Saldo an, dann rechnet die Liquidität ab dem echten Stand.</>
+          <Trans i18nKey="ueberblick.einleitungLeer" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
         ) : (
           <>
-            Auf deinen Konten liegen <b style={{ color: "var(--ink)" }}>{formatBetrag(start)} €</b>; nach Abzug der Töpfe sind{" "}
-            <b style={{ color: verfuegbar < 0 ? "var(--warn-deep)" : "var(--accent-deep)", fontWeight: 700 }}>{formatBetrag(verfuegbar)} €</b> frei. In 12 Monaten stehen
-            voraussichtlich <b style={{ color: "var(--ink)" }}>{formatBetrag(planSaldo)} €</b> auf den Konten
+            <Trans
+              i18nKey="ueberblick.einleitungStart"
+              values={{ start: geld.formatMitSymbol(start), frei: geld.formatMitSymbol(verfuegbar), plan: geld.formatMitSymbol(planSaldo) }}
+              components={{
+                b: <b style={{ color: "var(--ink)" }} />,
+                frei: <b style={{ color: verfuegbar < 0 ? "var(--warn-deep)" : "var(--accent-deep)", fontWeight: 700 }} />,
+              }}
+            />
             {tiefpunkt.freieLiquiditaet < 0 ? (
-              <> — am Tiefpunkt (<b style={{ color: "var(--ink)" }}>{tiefpunkt.label}</b>) wird's mit <b style={{ color: "var(--warn-deep)", fontWeight: 700 }}>{formatBetrag(tiefpunkt.freieLiquiditaet)} €</b> frei knapp.</>
+              <Trans
+                i18nKey="ueberblick.einleitungTiefpunkt"
+                values={{ label: tiefpunkt.label, betrag: geld.formatMitSymbol(tiefpunkt.freieLiquiditaet) }}
+                components={{ b: <b style={{ color: "var(--ink)" }} />, warn: <b style={{ color: "var(--warn-deep)", fontWeight: 700 }} /> }}
+              />
             ) : (
-              <>, die freie Liquidität bleibt durchgehend im Plus.</>
+              <>{t("ueberblick.einleitungPlus")}</>
             )}
           </>
         )}
       </p>
 
       <div className="kpis" style={{ marginTop: 22 }}>
-        <KPIStat size="chip" label={`Tiefpunkt frei (${tiefpunkt.label})`} value={formatBetrag(tiefpunkt.freieLiquiditaet)} unit="€" tone={tiefpunkt.freieLiquiditaet < 0 ? "warn" : "default"} />
-        <KPIStat size="chip" label="Σ Zuflüsse (Plan)" value={formatBetrag(summeZu)} unit="€" tone="ok" />
-        <KPIStat size="chip" label="Σ Abflüsse (Plan)" value={formatBetrag(summeAb)} unit="€" />
-        {deltaFrei != null && <KPIStat size="chip" label="Δ frei vs. Basis" value={formatBetrag(deltaFrei, true)} unit="€" tone={deltaFrei < 0 ? "warn" : "ok"} />}
+        <KPIStat size="chip" label={t("ueberblick.kpiTiefpunkt", { label: tiefpunkt.label })} value={geld.format(tiefpunkt.freieLiquiditaet)} unit={geld.symbol} tone={tiefpunkt.freieLiquiditaet < 0 ? "warn" : "default"} />
+        <KPIStat size="chip" label={t("ueberblick.kpiZufluesse")} value={geld.format(summeZu)} unit={geld.symbol} tone="ok" />
+        <KPIStat size="chip" label={t("ueberblick.kpiAbfluesse")} value={geld.format(summeAb)} unit={geld.symbol} />
+        {deltaFrei != null && <KPIStat size="chip" label={t("ueberblick.kpiDelta")} value={geld.format(deltaFrei, { mitVorzeichen: true })} unit={geld.symbol} tone={deltaFrei < 0 ? "warn" : "ok"} />}
       </div>
 
       <Card
-        title="Plan-Saldo · Jahresverlauf"
-        subtitle="ab heute, reine Planung (kein Ist)"
+        title={t("ueberblick.planSaldoTitel")}
+        subtitle={t("ueberblick.planSaldoUntertitel")}
         style={{ marginTop: 24 }}
         action={
           <select className="field" style={{ width: "auto" }} value={szenarioId} onChange={(e) => setSzenarioId(e.target.value)}>
-            <option value="">Basis (Plan)</option>
+            <option value="">{t("ueberblick.basisPlan")}</option>
             {szenarien.map((s) => (
-              <option key={s.id} value={s.id}>Szenario: {s.name}</option>
+              <option key={s.id} value={s.id}>{t("ueberblick.szenarioOption", { name: s.name })}</option>
             ))}
           </select>
         }
@@ -210,23 +222,23 @@ export function UeberblickScreen() {
         {verlauf.length > 0 && (
           <ZweiKurvenChart
             labels={verlauf.map((m) => m.label)}
-            kontosaldo={verlauf.map((m) => centZuEuro(m.kontosaldo))}
-            freieLiquiditaet={verlauf.map((m) => centZuEuro(m.freieLiquiditaet))}
+            kontosaldo={verlauf.map((m) => m.kontosaldo)}
+            freieLiquiditaet={verlauf.map((m) => m.freieLiquiditaet)}
           />
         )}
       </Card>
 
       <Card
-        title="Ein- und Ausgaben pro Monat"
-        subtitle="macht die Abflüsse sichtbar (Quartals-/Jahreszahlungen + Budgets)"
+        title={t("ueberblick.flussTitel")}
+        subtitle={t("ueberblick.flussUntertitel")}
         style={{ marginTop: "var(--gap-card)" }}
-        action={<span className="muted">Ø Ausgaben {formatBetrag(Math.round(summeAb / (verlauf.length || 1)))} €/Mt</span>}
+        action={<span className="muted">{t("ueberblick.flussDurchschnitt", { betrag: geld.formatMitSymbol(Math.round(summeAb / (verlauf.length || 1))) })}</span>}
       >
         {verlauf.length > 0 && (
           <MonatsFlussChart
             labels={verlauf.map((m) => m.label)}
-            einnahmen={verlauf.map((m) => centZuEuro(m.zufluss))}
-            ausgaben={verlauf.map((m) => centZuEuro(-(m.abfluss + m.budgetAbfluss)))}
+            einnahmen={verlauf.map((m) => m.zufluss)}
+            ausgaben={verlauf.map((m) => -(m.abfluss + m.budgetAbfluss))}
           />
         )}
       </Card>
@@ -241,9 +253,9 @@ export function UeberblickScreen() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr 1fr", gap: "var(--gap-card)", marginTop: "var(--gap-card)", alignItems: "start" }}>
-        <Card title="Nächste Zahlungen" subtitle="kommende 2 Monate · abhaken = bezahlt">
+        <Card title={t("ueberblick.naechsteTitel")} subtitle={t("ueberblick.naechsteUntertitel")}>
           {naechste.length === 0 ? (
-            <div className="muted">Keine geplanten Zahlungen.</div>
+            <div className="muted">{t("ueberblick.naechsteLeer")}</div>
           ) : (
             naechste.map((p, i) => {
               const paid = bezahlt.has(planRefKey(p.regelId, p.datum));
@@ -256,16 +268,16 @@ export function UeberblickScreen() {
                       checked={paid}
                       disabled={!kannMarkieren}
                       onChange={() => toggleBezahlt(p, paid)}
-                      title={kannMarkieren ? (paid ? "als bezahlt markiert — Häkchen entfernen" : "als bezahlt markieren") : "Kein Konto hinterlegt — der Zahlung/Regel ein Konto zuordnen"}
+                      title={kannMarkieren ? (paid ? t("ueberblick.titelHaekchenEntfernen") : t("ueberblick.titelAlsBezahlt")) : t("ueberblick.titelKeinKonto")}
                       style={{ cursor: kannMarkieren ? "pointer" : "not-allowed", accentColor: "var(--accent-deep)" }}
                     />
                     <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(p.datum)}</span>
                     <span style={{ textDecoration: paid ? "line-through" : "none" }}>{p.bezeichnung}</span>
-                    {paid && <Pill variant="neutral">bezahlt</Pill>}
-                    {p.charakter === "Umschichtung" && <Pill variant="um">Umschichtung</Pill>}
+                    {paid && <Pill variant="neutral">{t("ueberblick.pillBezahlt")}</Pill>}
+                    {p.charakter === "Umschichtung" && <Pill variant="um">{t("charakter.Umschichtung")}</Pill>}
                   </span>
                   <span className="num" style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", color: paid ? "var(--ink-3)" : p.charakter === "Ertrag" ? "var(--ok-deep)" : p.charakter === "Umschichtung" ? "var(--accent-deep)" : "var(--ink)" }}>
-                    {formatBetrag(p.betrag, true)} €
+                    {geld.formatMitSymbol(p.betrag, { mitVorzeichen: true })}
                   </span>
                 </div>
               );
@@ -274,19 +286,19 @@ export function UeberblickScreen() {
           {markFehler && <div className="err" style={{ marginTop: 10 }}>{markFehler}</div>}
         </Card>
 
-        <Card title="Budgets diesen Monat" subtitle="Rahmen (Plan)">
+        <Card title={t("ueberblick.budgetsTitel")} subtitle={t("ueberblick.budgetsUntertitel")}>
           {budgets.length === 0 ? (
-            <div className="muted">Keine Budgets.</div>
+            <div className="muted">{t("ueberblick.budgetsLeer")}</div>
           ) : (
             budgets.map((b) => (
               <div key={b.id} style={{ padding: "11px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                <CoverageTrack value={0} max={Math.abs(centZuEuro(geglaetteterMonatsabfluss(b)))} label={kategorieName.get(b.kategorieId) ?? "?"} right={`${formatBetrag(Math.abs(geglaetteterMonatsabfluss(b)))} €/Mt`} />
+                <CoverageTrack value={0} max={Math.abs(centZuEuro(geglaetteterMonatsabfluss(b)))} label={kategorieName.get(b.kategorieId) ?? "?"} right={t("ueberblick.proMonat", { betrag: geld.formatMitSymbol(Math.abs(geglaetteterMonatsabfluss(b))) })} />
               </div>
             ))
           )}
         </Card>
 
-        <Card title="Im Blick" subtitle="Hinweise">
+        <Card title={t("ueberblick.imBlickTitel")} subtitle={t("ueberblick.imBlickUntertitel")}>
           {hinweise.map((h, i) => (
             <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.42, padding: "9px 0", borderBottom: "1px solid var(--line-soft)" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flex: "0 0 auto", background: h.warn ? "var(--warn)" : "var(--ink-3)" }} />
@@ -296,20 +308,20 @@ export function UeberblickScreen() {
         </Card>
       </div>
 
-      <Card title="Monatsverlauf" subtitle="Netto, Budget-Anteil, Topf-Sollstände, beide Salden" style={{ marginTop: "var(--gap-card)" }}>
+      <Card title={t("ueberblick.monatsverlaufTitel")} subtitle={t("ueberblick.monatsverlaufUntertitel")} style={{ marginTop: "var(--gap-card)" }}>
         <DataTable
           columns={[
-            { key: "label", label: "Monat" },
-            { key: "netto", label: "Netto €", align: "right", render: (m) => formatBetrag(m.netto, true) },
-            { key: "budget", label: "davon Budget €", align: "right", render: (m) => (m.budgetAbfluss ? formatBetrag(m.budgetAbfluss) : "—") },
-            { key: "soll", label: "Σ Töpfe €", align: "right", render: (m) => (m.sollSumme ? formatBetrag(m.sollSumme) : "—") },
-            { key: "konto", label: "Plan-Saldo €", align: "right", render: (m) => formatBetrag(m.kontosaldo, true) },
+            { key: "label", label: t("ueberblick.spalteMonat") },
+            { key: "netto", label: `${t("ueberblick.spalteNetto")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.netto, { mitVorzeichen: true }) },
+            { key: "budget", label: `${t("ueberblick.spalteBudget")} ${geld.symbol}`, align: "right", render: (m) => (m.budgetAbfluss ? geld.format(m.budgetAbfluss) : "—") },
+            { key: "soll", label: `${t("ueberblick.spalteToepfe")} ${geld.symbol}`, align: "right", render: (m) => (m.sollSumme ? geld.format(m.sollSumme) : "—") },
+            { key: "konto", label: `${t("ueberblick.spaltePlanSaldo")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.kontosaldo, { mitVorzeichen: true }) },
             {
               key: "frei",
-              label: "Freie Liquidität €",
+              label: `${t("ueberblick.spalteFrei")} ${geld.symbol}`,
               align: "right",
               render: (m) => (
-                <span style={{ color: m.freieLiquiditaet < 0 ? "var(--warn-deep)" : "var(--ink)", fontWeight: "var(--fw-bold)" }}>{formatBetrag(m.freieLiquiditaet, true)}</span>
+                <span style={{ color: m.freieLiquiditaet < 0 ? "var(--warn-deep)" : "var(--ink)", fontWeight: "var(--fw-bold)" }}>{geld.format(m.freieLiquiditaet, { mitVorzeichen: true })}</span>
               ),
             },
           ]}
@@ -335,6 +347,8 @@ function SzenarioCard({
   onSzenarienChanged: () => void;
   onPostenChanged: () => void;
 }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
   const [neuOffen, setNeuOffen] = useState(false);
   const [postenOffen, setPostenOffen] = useState(false);
   const [name, setName] = useState("");
@@ -354,20 +368,20 @@ function SzenarioCard({
       onSzenarienChanged();
       onSelect(s.id);
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
   async function postenHinzufuegen() {
     setFehler(null);
     try {
-      await szenarioPostenAnlegen(szenarioRepo, aktivId, { bezeichnung: pBez, betragEuro: Number(pBetrag.replace(",", ".")), rhythmus: pRhythmus, charakter: pCharakter, startdatum: pStart });
+      await szenarioPostenAnlegen(szenarioRepo, aktivId, { bezeichnung: pBez, betrag: geld.parse(pBetrag) ?? 0, rhythmus: pRhythmus, charakter: pCharakter, startdatum: pStart });
       setPBez("");
       setPBetrag("");
       setPostenOffen(false);
       onPostenChanged();
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
@@ -379,13 +393,13 @@ function SzenarioCard({
 
   return (
     <Card
-      title="Szenario (What-if)"
-      subtitle="Verwerfbare Delta-Schicht — berührt den Plan nie"
+      title={t("ueberblick.szenarioTitel")}
+      subtitle={t("ueberblick.szenarioUntertitel")}
       style={{ marginTop: "var(--gap-card)" }}
       action={
         <span style={{ display: "flex", gap: "var(--sp-2)" }}>
-          {aktivId && <Button plus onClick={() => setPostenOffen(true)}>Posten</Button>}
-          <Button variant="primary" plus onClick={() => setNeuOffen(true)}>Szenario</Button>
+          {aktivId && <Button plus onClick={() => setPostenOffen(true)}>{t("ueberblick.btnPosten")}</Button>}
+          <Button variant="primary" plus onClick={() => setNeuOffen(true)}>{t("ueberblick.btnSzenario")}</Button>
         </span>
       }
     >
@@ -393,54 +407,54 @@ function SzenarioCard({
         posten.length > 0 ? (
           <DataTable
             columns={[
-              { key: "bezeichnung", label: "Posten" },
-              { key: "charakter", label: "Charakter", render: (p) => <Pill variant="neutral">{p.charakter}</Pill> },
-              { key: "rhythmus", label: "Rhythmus" },
-              { key: "betrag", label: "Betrag €", align: "right", render: (p) => formatBetrag(p.betrag, true) },
-              { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => szenarioRepo.postenLoeschen(p.id).then(onPostenChanged)}>löschen</button> },
+              { key: "bezeichnung", label: t("ueberblick.spaltePosten") },
+              { key: "charakter", label: t("ueberblick.spalteCharakter"), render: (p) => <Pill variant="neutral">{t(`charakter.${p.charakter}`)}</Pill> },
+              { key: "rhythmus", label: t("ueberblick.spalteRhythmus"), render: (p) => t(`ueberblick.rhythmus.${p.rhythmus}`) },
+              { key: "betrag", label: `${t("ueberblick.spalteBetrag")} ${geld.symbol}`, align: "right", render: (p) => geld.format(p.betrag, { mitVorzeichen: true }) },
+              { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => szenarioRepo.postenLoeschen(p.id).then(onPostenChanged)}>{t("ueberblick.loeschen")}</button> },
             ]}
             rows={posten}
           />
         ) : (
-          <div className="muted">Noch keine Zusatzposten — füge welche hinzu, um das Szenario wirken zu lassen.</div>
+          <div className="muted">{t("ueberblick.postenLeer")}</div>
         )
       ) : (
-        <div className="muted">{szenarien.length ? "Wähle oben am Chart ein Szenario, um Zusatzposten zu pflegen." : "Noch kein Szenario."}</div>
+        <div className="muted">{szenarien.length ? t("ueberblick.szenarioWaehlen") : t("ueberblick.keinSzenario")}</div>
       )}
       {aktivId && (
         <div style={{ marginTop: "var(--sp-4)" }}>
-          <button className="linkbtn" onClick={szenarioLoeschen}>aktives Szenario verwerfen</button>
+          <button className="linkbtn" onClick={szenarioLoeschen}>{t("ueberblick.szenarioVerwerfen")}</button>
         </div>
       )}
 
       {neuOffen && (
-        <Modal title="Szenario anlegen" subtitle="What-if — z. B. Mieterhöhung, höheres Gehalt" onClose={() => setNeuOffen(false)} footer={<><Button variant="primary" onClick={neuesSzenario}>Speichern</Button><button className="linkbtn" onClick={() => setNeuOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}>
-          <FormField label="Name" required>
-            <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Miete +200, Gehalt höher" />
+        <Modal title={t("ueberblick.modalSzenarioTitel")} subtitle={t("ueberblick.modalSzenarioUntertitel")} onClose={() => setNeuOffen(false)} footer={<><Button variant="primary" onClick={neuesSzenario}>{t("ueberblick.speichern")}</Button><button className="linkbtn" onClick={() => setNeuOffen(false)}>{t("ueberblick.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}>
+          <FormField label={t("ueberblick.feldName")} required>
+            <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("ueberblick.feldNamePlaceholder")} />
           </FormField>
         </Modal>
       )}
 
       {postenOffen && (
-        <Modal title="Zusatzposten hinzufügen" subtitle="kommt nur in der Szenario-Projektion zur Basis hinzu" onClose={() => setPostenOffen(false)} footer={<><Button variant="primary" onClick={postenHinzufuegen}>Speichern</Button><button className="linkbtn" onClick={() => setPostenOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}>
+        <Modal title={t("ueberblick.modalPostenTitel")} subtitle={t("ueberblick.modalPostenUntertitel")} onClose={() => setPostenOffen(false)} footer={<><Button variant="primary" onClick={postenHinzufuegen}>{t("ueberblick.speichern")}</Button><button className="linkbtn" onClick={() => setPostenOffen(false)}>{t("ueberblick.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}>
           <div className="form-grid">
-            <FormField label="Bezeichnung">
-              <input className="field" value={pBez} onChange={(e) => setPBez(e.target.value)} placeholder="z. B. Mieterhöhung" />
+            <FormField label={t("ueberblick.feldBezeichnung")}>
+              <input className="field" value={pBez} onChange={(e) => setPBez(e.target.value)} placeholder={t("ueberblick.feldBezeichnungPlaceholder")} />
             </FormField>
-            <FormField label="Betrag" hint="positiv — Richtung aus Charakter">
+            <FormField label={t("ueberblick.feldBetrag")} hint={t("ueberblick.feldBetragHinweis")}>
               <input className="field" inputMode="decimal" value={pBetrag} onChange={(e) => setPBetrag(e.target.value)} placeholder="0,00" />
             </FormField>
-            <FormField label="Rhythmus">
+            <FormField label={t("ueberblick.feldRhythmus")}>
               <select className="field" value={pRhythmus} onChange={(e) => setPRhythmus(e.target.value as Rhythmus)}>
-                {RHYTHMEN.map((r) => (<option key={r} value={r}>{r}</option>))}
+                {RHYTHMEN.map((r) => (<option key={r} value={r}>{t(`ueberblick.rhythmus.${r}`)}</option>))}
               </select>
             </FormField>
-            <FormField label="Charakter">
+            <FormField label={t("ueberblick.feldCharakter")}>
               <select className="field" value={pCharakter} onChange={(e) => setPCharakter(e.target.value as Charakter)}>
-                {CHARAKTERE.map((c) => (<option key={c} value={c}>{c}</option>))}
+                {CHARAKTERE.map((c) => (<option key={c} value={c}>{t(`charakter.${c}`)}</option>))}
               </select>
             </FormField>
-            <FormField label="Erste Fälligkeit">
+            <FormField label={t("ueberblick.feldFaelligkeit")}>
               <input className="field" type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} />
             </FormField>
           </div>

@@ -2,10 +2,13 @@
 // das Register eines gewählten Kontos: Anfangsbestand → gebuchte Ist-Buchungen (laufender
 // Saldo) → „heute" → geplante Buchungen der kommenden X Tage (abhakbar). Plus manuelle
 // Buchung erfassen (ADR-0002 rev.: Bar dauerhaft, Bankkonten vorläufig bis Import).
+//
+// i18n + Mehrwährung (ADR-0004): alle sichtbaren Strings über t()/<Trans>, alles Geld über
+// useGeld() (Parse bei Eingabe, Format + Symbol bei Anzeige).
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  formatBetrag,
   istSummeKonto,
   kontoRegister,
   realerKontostand,
@@ -29,6 +32,7 @@ import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
+import { useGeld, useCharakterLabel, fehlerNachricht } from "./EinstellungenProvider";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const TAGE_OPTIONEN = [14, 30, 60, 90];
@@ -47,6 +51,9 @@ function betragFarbe(z: { betrag: number; charakter: Charakter }): string {
 }
 
 export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => void }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
+  const charakterLabel = useCharakterLabel();
   const heute = useMemo(heuteIso, []);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [ist, setIst] = useState<IstBuchung[]>([]);
@@ -90,7 +97,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       }
       setIst(await ledgerRepo.alle());
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
@@ -102,24 +109,24 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
   return (
     <div className="screen">
-      <PageHead title="Konten" subtitle="Kontostände, gebuchte und voraussichtliche Buchungen je Konto" />
+      <PageHead title={t("konten.titel")} subtitle={t("konten.untertitel")} />
 
       <Card
-        title="Deine Konten"
-        subtitle="Anfangsbestand + bestätigte Ist-Buchungen = realer Stand"
-        action={<Button plus onClick={() => onNavigate("stammdaten")}>Konto anlegen</Button>}
+        title={t("konten.deineKonten")}
+        subtitle={t("konten.deineKontenUntertitel")}
+        action={<Button plus onClick={() => onNavigate("einstellungen")}>{t("konten.kontoAnlegen")}</Button>}
       >
         {konten.length === 0 ? (
-          <div className="muted">Noch keine Konten — leg in Stammdaten → Konten eines an.</div>
+          <div className="muted">{t("konten.keineKonten")}</div>
         ) : (
           <DataTable
             columns={[
-              { key: "bezeichnung", label: "Bezeichnung", render: (k) => (<span style={{ fontWeight: k.id === aktivId ? "var(--fw-bold)" : "var(--fw-semi)" }}>{k.bezeichnung}</span>) },
-              { key: "typ", label: "Typ", render: (k) => <Pill variant="neutral">{k.typ}</Pill> },
-              { key: "anfang", label: "Anfangsbestand €", align: "right", render: (k) => formatBetrag(k.saldo) },
-              { key: "ist", label: "Σ Ist €", align: "right", render: (k) => (istSummeKonto(ist, k.id) ? formatBetrag(istSummeKonto(ist, k.id), true) : "—") },
-              { key: "real", label: "realer Stand €", align: "right", render: (k) => <span style={{ fontWeight: "var(--fw-bold)" }}>{formatBetrag(realerKontostand(k, ist))}</span> },
-              { key: "_v", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => setAktivId(k.id)}>{k.id === aktivId ? "ausgewählt" : "ansehen"}</button> },
+              { key: "bezeichnung", label: t("konten.spalteBezeichnung"), render: (k) => (<span style={{ fontWeight: k.id === aktivId ? "var(--fw-bold)" : "var(--fw-semi)" }}>{k.bezeichnung}</span>) },
+              { key: "typ", label: t("konten.spalteTyp"), render: (k) => <Pill variant="neutral">{t(`konten.typ.${k.typ}`)}</Pill> },
+              { key: "anfang", label: `${t("konten.spalteAnfangsbestand")} ${geld.symbol}`, align: "right", render: (k) => geld.format(k.saldo) },
+              { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", render: (k) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
+              { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", render: (k) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
+              { key: "_v", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => setAktivId(k.id)}>{k.id === aktivId ? t("konten.ausgewaehlt") : t("konten.ansehen")}</button> },
             ]}
             rows={konten}
           />
@@ -128,21 +135,21 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
       {aktiv && register && (
         <Card
-          title={`Register · ${aktiv.bezeichnung}`}
-          subtitle={`realer Stand ${formatBetrag(register.standHeute)} € · Vorschau bis ${ddmm(fensterEnde(heute, tage))}`}
+          title={t("konten.registerTitel", { konto: aktiv.bezeichnung })}
+          subtitle={t("konten.registerUntertitel", { stand: geld.format(register.standHeute), symbol: geld.symbol, datum: ddmm(fensterEnde(heute, tage)) })}
           style={{ marginTop: "var(--gap-card)" }}
           action={
             <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
               <select className="field" style={{ width: "auto" }} value={tage} onChange={(e) => setTage(Number(e.target.value))}>
-                {TAGE_OPTIONEN.map((t) => (<option key={t} value={t}>kommende {t} Tage</option>))}
+                {TAGE_OPTIONEN.map((d) => (<option key={d} value={d}>{t("konten.kommendeTage", { tage: d })}</option>))}
               </select>
-              {konten.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>Umbuchen</Button>}
-              <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>Buchung</Button>
+              {konten.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>}
+              <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>{t("konten.btnBuchung")}</Button>
             </span>
           }
         >
           {/* Anfangsbestand */}
-          <Zeile links={<span style={{ color: "var(--ink-3)", fontWeight: 600 }}>Anfangsbestand</span>} saldo={aktiv.saldo} />
+          <Zeile links={<span style={{ color: "var(--ink-3)", fontWeight: 600 }}>{t("konten.anfangsbestand")}</span>} saldo={aktiv.saldo} />
 
           {/* Gebuchtes Ist */}
           {register.gebucht.map((z) => (
@@ -154,8 +161,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   {z.bezeichnung}
                   {z.gegenkontoId && <span className="muted" style={{ fontSize: 12 }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
                   {z.kategorieId && <span className="muted" style={{ fontSize: 12 }}>· {kategorieName.get(z.kategorieId) ?? "?"}</span>}
-                  {z.gegenkontoId ? <Pill variant="um">Umbuchung</Pill> : z.quelle === "manuell" ? <Pill variant="neutral">manuell</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">bezahlt</Pill> : null}
-                  {z.quelle === "manuell" && <button className="linkbtn" style={{ marginLeft: 4 }} onClick={() => zeileEntfernen(z)}>löschen</button>}
+                  {z.gegenkontoId ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill> : z.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null}
+                  {z.quelle === "manuell" && <button className="linkbtn" style={{ marginLeft: 4 }} onClick={() => zeileEntfernen(z)}>{t("konten.loeschen")}</button>}
                 </>
               }
               betrag={z.betrag}
@@ -167,13 +174,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           {/* Trenner heute */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 8px", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-wide, .04em)" }}>
             <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-            heute · realer Stand {formatBetrag(register.standHeute)} €
+            {t("konten.heuteRealerStand", { stand: geld.format(register.standHeute), symbol: geld.symbol })}
             <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
 
           {/* Geplante Vorschau */}
           {register.geplant.length === 0 ? (
-            <div className="muted" style={{ paddingTop: 4 }}>Keine geplanten Buchungen in den nächsten {tage} Tagen für dieses Konto.</div>
+            <div className="muted" style={{ paddingTop: 4 }}>{t("konten.keineGeplanten", { tage })}</div>
           ) : (
             register.geplant.map((z, i) => (
               <Zeile
@@ -185,12 +192,12 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                       type="checkbox"
                       checked={false}
                       onChange={() => abhaken(z, false)}
-                      title="als bezahlt markieren"
+                      title={t("konten.alsBezahltMarkieren")}
                       style={{ cursor: "pointer", accentColor: "var(--accent-deep)" }}
                     />
                     <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(z.datum)}</span>
                     {z.bezeichnung}
-                    {z.charakter === "Umschichtung" && <Pill variant="um">Umschichtung</Pill>}
+                    {z.charakter === "Umschichtung" && <Pill variant="um">{charakterLabel("Umschichtung")}</Pill>}
                   </>
                 }
                 betrag={z.betrag}
@@ -229,20 +236,23 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
 /** Eine Registerzeile: linke Beschreibung, Betrag, laufender Saldo rechts. */
 function Zeile({ links, betrag, charakter, saldo, faint }: { links: ReactNode; betrag?: number; charakter?: Charakter; saldo: number; faint?: boolean }) {
+  const geld = useGeld();
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "10px 0", borderBottom: "1px solid var(--line-soft)", opacity: faint ? 0.62 : 1 }}>
       <span style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flexWrap: "wrap" }}>{links}</span>
       <span style={{ display: "flex", gap: 18, whiteSpace: "nowrap" }}>
         {betrag != null && charakter != null && (
-          <span className="num" style={{ fontSize: 13.5, fontWeight: 700, color: betragFarbe({ betrag, charakter }), minWidth: 92, textAlign: "right" }}>{formatBetrag(betrag, true)} €</span>
+          <span className="num" style={{ fontSize: 13.5, fontWeight: 700, color: betragFarbe({ betrag, charakter }), minWidth: 92, textAlign: "right" }}>{geld.formatMitSymbol(betrag, { mitVorzeichen: true })}</span>
         )}
-        <span className="num" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-2)", minWidth: 92, textAlign: "right" }}>{formatBetrag(saldo)} €</span>
+        <span className="num" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-2)", minWidth: 92, textAlign: "right" }}>{geld.formatMitSymbol(saldo)}</span>
       </span>
     </div>
   );
 }
 
 function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Zahlungskonto[]; vonId: string; heute: string; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
   const [von, setVon] = useState(vonId);
   const [nach, setNach] = useState(konten.find((k) => k.id !== vonId)?.id ?? "");
   const [datum, setDatum] = useState(heute);
@@ -253,39 +263,39 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
   async function speichern() {
     setFehler(null);
     try {
-      await umbuchungErfassen(ledgerRepo, { vonKontoId: von, nachKontoId: nach, datum, betragEuro: Number(betrag.replace(",", ".")), notiz });
+      await umbuchungErfassen(ledgerRepo, { vonKontoId: von, nachKontoId: nach, datum, betrag: geld.parse(betrag) ?? 0, notiz });
       onSaved();
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
   return (
     <Modal
-      title="Umbuchen"
-      subtitle="Übertrag zwischen zwei Konten — Vermögensumschichtung, keine Ausgabe"
+      title={t("konten.umbuchung.titel")}
+      subtitle={t("konten.umbuchung.untertitel")}
       onClose={onClose}
-      footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={onClose}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+      footer={<><Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button><button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
     >
       <div className="form-grid">
-        <FormField label="Von Konto" required>
+        <FormField label={t("konten.umbuchung.vonKonto")} required>
           <select className="field" value={von} onChange={(e) => setVon(e.target.value)}>
             {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
           </select>
         </FormField>
-        <FormField label="Nach Konto" required>
+        <FormField label={t("konten.umbuchung.nachKonto")} required>
           <select className="field" value={nach} onChange={(e) => setNach(e.target.value)}>
             {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
           </select>
         </FormField>
-        <FormField label="Datum" required>
+        <FormField label={t("konten.feldDatum")} required>
           <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
-        <FormField label="Betrag" required>
+        <FormField label={t("konten.feldBetrag")} required>
           <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
         </FormField>
-        <FormField label="Notiz" hint="optional">
-          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Sparrate, Rücklage" />
+        <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
+          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
         </FormField>
       </div>
     </Modal>
@@ -293,6 +303,9 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
 }
 
 function BuchungModal({ konto, kategorien, heute, onClose, onSaved }: { konto: Zahlungskonto; kategorien: Kategorie[]; heute: string; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
+  const charakterLabel = useCharakterLabel();
   const [datum, setDatum] = useState(heute);
   const [betrag, setBetrag] = useState("");
   const [charakter, setCharakter] = useState<Charakter>("Aufwand");
@@ -307,41 +320,41 @@ function BuchungModal({ konto, kategorien, heute, onClose, onSaved }: { konto: Z
       await buchungErfassen(ledgerRepo, {
         kontoId: konto.id,
         datum,
-        betragEuro: Number(betrag.replace(",", ".")),
+        betrag: geld.parse(betrag) ?? 0,
         charakter,
         kategorieId: kategorieId || undefined,
         notiz,
       });
       onSaved();
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
   return (
     <Modal
-      title={`Buchung erfassen · ${konto.bezeichnung}`}
-      subtitle={vorlaeufig ? "vorläufig — der spätere Bankimport gleicht sie ab" : "Bargeld — manuelle Erfassung ist hier die Dauerquelle"}
+      title={t("konten.buchung.titel", { konto: konto.bezeichnung })}
+      subtitle={vorlaeufig ? t("konten.buchung.untertitelVorlaeufig") : t("konten.buchung.untertitelBargeld")}
       onClose={onClose}
-      footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={onClose}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+      footer={<><Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button><button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
     >
       <div className="form-grid">
-        <FormField label="Datum" required>
+        <FormField label={t("konten.feldDatum")} required>
           <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
-        <FormField label="Betrag" hint="positiv — Richtung aus Charakter" required>
+        <FormField label={t("konten.feldBetrag")} hint={t("konten.buchung.betragHinweis")} required>
           <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
         </FormField>
-        <FormField label="Charakter">
+        <FormField label={t("konten.feldCharakter")}>
           <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-            {CHARAKTERE.map((c) => (<option key={c} value={c}>{c}</option>))}
+            {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
           </select>
         </FormField>
-        <FormField label="Kategorie" hint="optional">
+        <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
           <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
         </FormField>
-        <FormField label="Notiz" hint="optional">
-          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder="z. B. Bäcker, Tankstelle" />
+        <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
+          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.buchung.notizPlatzhalter")} />
         </FormField>
       </div>
     </Modal>

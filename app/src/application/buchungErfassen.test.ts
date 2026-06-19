@@ -25,7 +25,7 @@ function memLedger(): LedgerPort & { daten: IstBuchung[] } {
 describe("buchungErfassen", () => {
   it("legt eine manuelle Ausgabe an (Aufwand → negativ), ohne planRef", async () => {
     const ledger = memLedger();
-    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betragEuro: 12.5, charakter: "Aufwand", notiz: "Bäcker" });
+    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(12.5), charakter: "Aufwand", notiz: "Bäcker" });
     expect(b.betrag).toBe(euroZuCent(-12.5));
     expect(b.quelle).toBe("manuell");
     expect(b.planRef).toBeUndefined();
@@ -35,20 +35,20 @@ describe("buchungErfassen", () => {
 
   it("Ertrag wird positiv gebucht", async () => {
     const ledger = memLedger();
-    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betragEuro: 100, charakter: "Ertrag" });
+    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(100), charakter: "Ertrag" });
     expect(b.betrag).toBe(euroZuCent(100));
   });
 
   it("validiert Konto, Datum und Betrag", async () => {
     const ledger = memLedger();
-    await expect(buchungErfassen(ledger, { kontoId: "", datum: "2026-06-17", betragEuro: 5, charakter: "Aufwand" })).rejects.toThrow(/Konto/);
-    await expect(buchungErfassen(ledger, { kontoId: "bar", datum: "17.06.2026", betragEuro: 5, charakter: "Aufwand" })).rejects.toThrow(/Datum/);
-    await expect(buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betragEuro: 0, charakter: "Aufwand" })).rejects.toThrow(/größer als 0/);
+    await expect(buchungErfassen(ledger, { kontoId: "", datum: "2026-06-17", betrag: euroZuCent(5), charakter: "Aufwand" })).rejects.toThrow("konto.waehlen");
+    await expect(buchungErfassen(ledger, { kontoId: "bar", datum: "17.06.2026", betrag: euroZuCent(5), charakter: "Aufwand" })).rejects.toThrow("datum.ungueltig");
+    await expect(buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(0), charakter: "Aufwand" })).rejects.toThrow("betrag.groesserNull");
   });
 
   it("buchungLoeschen entfernt die Buchung", async () => {
     const ledger = memLedger();
-    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betragEuro: 5, charakter: "Aufwand" });
+    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(5), charakter: "Aufwand" });
     await buchungLoeschen(ledger, b.id);
     expect(ledger.daten).toHaveLength(0);
   });

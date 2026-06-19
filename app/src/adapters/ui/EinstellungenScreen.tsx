@@ -2,11 +2,15 @@
 // Bearbeiten je im Modal (gleiche Maske, vorbefüllt). Reload-fest über die SQLite-Repos.
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   KONTOTYPEN,
-  formatBetrag,
   istSummeKonto,
+  minorZuMajor,
   realerKontostand,
+  REGIONEN,
+  waehrungNachCode,
+  waehrungssymbol,
   type Charakter,
   type IstBuchung,
   type Kategorie,
@@ -23,11 +27,13 @@ import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedge
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
+import { useGeld, fehlerNachricht, useRegionUmschalter } from "./EinstellungenProvider";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };
 
-export function StammdatenScreen() {
+export function EinstellungenScreen() {
+  const { t } = useTranslation();
   const [personen, setPersonen] = useState<Person[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
@@ -47,7 +53,8 @@ export function StammdatenScreen() {
 
   return (
     <div className="screen">
-      <PageHead title="Stammdaten" subtitle="Haushalt — der eine Datenbestand · Personen · Konten · Kategorien" />
+      <PageHead title={t("einstellungen.titel")} subtitle={t("einstellungen.untertitel")} />
+      <RegionCard />
       <PersonenCard personen={personen} onChange={laden} />
       <KontenCard konten={konten} personen={personen} personName={personName} ist={ist} onChange={laden} />
       <KategorienCard kategorien={kategorien} onChange={laden} />
@@ -55,7 +62,27 @@ export function StammdatenScreen() {
   );
 }
 
+/** Sprache & Währung des Haushalts (ADR-0004) — eine Region bestimmt alles drei. */
+function RegionCard() {
+  const { t } = useTranslation();
+  const { aktuelleLocale, regionSetzen } = useRegionUmschalter();
+  return (
+    <Card title={t("einstellungen.region.titel")} subtitle={t("einstellungen.region.untertitel")}>
+      <FormField label={t("einstellungen.region.feld")} hint={t("einstellungen.region.hinweis")}>
+        <select className="field" value={aktuelleLocale} onChange={(e) => regionSetzen(e.target.value)}>
+          {REGIONEN.map((r) => (
+            <option key={r.locale} value={r.locale}>
+              {r.label} · {waehrungssymbol(waehrungNachCode(r.waehrungCode), r.locale)}
+            </option>
+          ))}
+        </select>
+      </FormField>
+    </Card>
+  );
+}
+
 function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: () => void }) {
+  const { t } = useTranslation();
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -86,39 +113,39 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
       setOffen(false);
       onChange();
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
   return (
-    <Card title="Personen" subtitle="Mitglieder des Haushalts — Dimension, kein eigener Mandant" action={<Button plus onClick={neu}>Person</Button>}>
+    <Card title={t("einstellungen.person.titel")} subtitle={t("einstellungen.person.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.person.anlegen")}</Button>}>
       {personen.length === 0 ? (
-        <div className="muted">Noch keine Personen.</div>
+        <div className="muted">{t("einstellungen.person.leer")}</div>
       ) : (
         <DataTable
           columns={[
-            { key: "name", label: "Name" },
-            { key: "rolle", label: "Rolle", render: (p) => p.rolle ?? "—" },
-            { key: "geburtsdatum", label: "Geburtsdatum", render: (p) => p.geburtsdatum ?? "—" },
-            { key: "_e", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => bearbeiten(p)}>bearbeiten</button> },
-            { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => personRepo.loeschen(p.id).then(onChange)}>löschen</button> },
+            { key: "name", label: t("einstellungen.person.spalteName") },
+            { key: "rolle", label: t("einstellungen.person.spalteRolle"), render: (p) => p.rolle ?? "—" },
+            { key: "geburtsdatum", label: t("einstellungen.person.spalteGeburtsdatum"), render: (p) => p.geburtsdatum ?? "—" },
+            { key: "_e", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => bearbeiten(p)}>{t("einstellungen.bearbeiten")}</button> },
+            { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => personRepo.loeschen(p.id).then(onChange)}>{t("einstellungen.loeschen")}</button> },
           ]}
           rows={personen}
         />
       )}
       {offen && (
         <Modal
-          title={editId ? "Person bearbeiten" : "Person anlegen"}
+          title={editId ? t("einstellungen.person.modalBearbeiten") : t("einstellungen.person.modalAnlegen")}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
-          <FormField label="Name" required>
-            <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Anna" />
+          <FormField label={t("einstellungen.person.feldName")} required>
+            <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("einstellungen.person.feldNamePlaceholder")} />
           </FormField>
-          <FormField label="Rolle im Haushalt">
-            <input className="field" value={rolle} onChange={(e) => setRolle(e.target.value)} placeholder="z. B. Inhaberin · Vollzeit" />
+          <FormField label={t("einstellungen.person.feldRolle")}>
+            <input className="field" value={rolle} onChange={(e) => setRolle(e.target.value)} placeholder={t("einstellungen.person.feldRollePlaceholder")} />
           </FormField>
-          <FormField label="Geburtsdatum" hint="optional, für Vorsorge (Stufe 2)">
+          <FormField label={t("einstellungen.person.feldGeburtsdatum")} hint={t("einstellungen.person.feldGeburtsdatumHinweis")}>
             <input className="field" type="date" value={geburtsdatum} onChange={(e) => setGeburtsdatum(e.target.value)} />
           </FormField>
         </Modal>
@@ -128,6 +155,8 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
 }
 
 function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Zahlungskonto[]; personen: Person[]; personName: Map<string, string>; ist: IstBuchung[]; onChange: () => void }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
   const hatIst = ist.some((b) => b.planRef || b.quelle === "import");
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -135,7 +164,7 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
   const [typ, setTyp] = useState<Kontotyp>("Giro");
   const [iban, setIban] = useState("");
   const [inhaberIds, setInhaberIds] = useState<string[]>([]);
-  const [saldoEuro, setSaldoEuro] = useState("");
+  const [saldoText, setSaldoText] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
 
   function toggleInhaber(id: string) {
@@ -147,7 +176,7 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
     setTyp("Giro");
     setIban("");
     setInhaberIds([]);
-    setSaldoEuro("");
+    setSaldoText("");
     setFehler(null);
     setOffen(true);
   }
@@ -157,69 +186,69 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
     setTyp(k.typ);
     setIban(k.iban ?? "");
     setInhaberIds([...k.inhaberIds]);
-    setSaldoEuro(String(k.saldo / 100));
+    setSaldoText(String(minorZuMajor(k.saldo, geld.waehrung)));
     setFehler(null);
     setOffen(true);
   }
   async function speichern() {
     setFehler(null);
     try {
-      await kontoAnlegen(kontoRepo, { bezeichnung, typ, iban, inhaberIds, saldoEuro: Number(saldoEuro.replace(",", ".")) || 0 }, editId ?? undefined);
+      await kontoAnlegen(kontoRepo, { bezeichnung, typ, iban, inhaberIds, saldo: geld.parse(saldoText) ?? 0 }, editId ?? undefined);
       setOffen(false);
       onChange();
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
   return (
-    <Card title="Konten" subtitle={hatIst ? "Anfangsbestand + bestätigte Ist-Buchungen = realer Stand" : "Liquide Geldkonten — der Kontostand ist nur eine Zahl"} action={<Button plus onClick={neu}>Konto</Button>}>
+    <Card title={t("einstellungen.konto.titel")} subtitle={hatIst ? t("einstellungen.konto.untertitelIst") : t("einstellungen.konto.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.konto.anlegen")}</Button>}>
       {konten.length === 0 ? (
-        <div className="muted">Noch keine Konten.</div>
+        <div className="muted">{t("einstellungen.konto.leer")}</div>
       ) : (
         <DataTable
           columns={[
-            { key: "bezeichnung", label: "Bezeichnung" },
-            { key: "typ", label: "Typ" },
-            { key: "iban", label: "IBAN", render: (k) => k.iban ?? "—" },
-            { key: "inhaber", label: "Inhaber", render: (k) => (k.inhaberIds.length ? k.inhaberIds.map((id: string) => personName.get(id) ?? "?").join(", ") : "—") },
-            { key: "saldo", label: hatIst ? "Anfangsbestand €" : "Kontostand €", align: "right", render: (k) => formatBetrag(k.saldo) },
+            { key: "bezeichnung", label: t("einstellungen.konto.spalteBezeichnung") },
+            { key: "typ", label: t("einstellungen.konto.spalteTyp"), render: (k) => t(`einstellungen.konto.typ.${k.typ}`) },
+            { key: "iban", label: t("einstellungen.konto.spalteIban"), render: (k) => k.iban ?? "—" },
+            { key: "inhaber", label: t("einstellungen.konto.spalteInhaber"), render: (k) => (k.inhaberIds.length ? k.inhaberIds.map((id: string) => personName.get(id) ?? "?").join(", ") : "—") },
+            { key: "saldo", label: `${hatIst ? t("einstellungen.konto.spalteAnfangsbestand") : t("einstellungen.konto.spalteKontostand")} ${geld.symbol}`, align: "right", render: (k) => geld.format(k.saldo) },
             ...(hatIst
               ? [
-                  { key: "ist", label: "Σ Ist €", align: "right" as const, render: (k: Zahlungskonto) => (istSummeKonto(ist, k.id) ? formatBetrag(istSummeKonto(ist, k.id), true) : "—") },
-                  { key: "real", label: "realer Stand €", align: "right" as const, render: (k: Zahlungskonto) => <span style={{ fontWeight: "var(--fw-bold)" }}>{formatBetrag(realerKontostand(k, ist))}</span> },
+                  { key: "ist", label: `${t("einstellungen.konto.spalteIst")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
+                  { key: "real", label: `${t("einstellungen.konto.spalteRealerStand")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
                 ]
               : []),
-            { key: "_e", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => bearbeiten(k)}>bearbeiten</button> },
-            { key: "_x", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => kontoRepo.loeschen(k.id).then(onChange)}>löschen</button> },
+            { key: "_e", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => bearbeiten(k)}>{t("einstellungen.bearbeiten")}</button> },
+            { key: "_x", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => kontoRepo.loeschen(k.id).then(onChange)}>{t("einstellungen.loeschen")}</button> },
           ]}
           rows={konten}
         />
       )}
       {offen && (
         <Modal
-          title={editId ? "Konto bearbeiten" : "Konto anlegen"}
+          title={editId ? t("einstellungen.konto.modalBearbeiten") : t("einstellungen.konto.modalAnlegen")}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <div className="form-grid">
-            <FormField label="Bezeichnung" required>
-              <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder="z. B. Girokonto" />
+            <FormField label={t("einstellungen.konto.feldBezeichnung")} required>
+              <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder={t("einstellungen.konto.feldBezeichnungPlaceholder")} />
             </FormField>
-            <FormField label="Typ">
+            <FormField label={t("einstellungen.konto.feldTyp")}>
               <select className="field" value={typ} onChange={(e) => setTyp(e.target.value as Kontotyp)}>
-                {KONTOTYPEN.map((t) => (<option key={t} value={t}>{t}</option>))}
+                {KONTOTYPEN.map((kt) => (<option key={kt} value={kt}>{t(`einstellungen.konto.typ.${kt}`)}</option>))}
               </select>
             </FormField>
-            <FormField label="IBAN" hint="optional, wird geprüft">
+            <FormField label={t("einstellungen.konto.feldIban")} hint={t("einstellungen.konto.feldIbanHinweis")}>
               <input className="field" value={iban} onChange={(e) => setIban(e.target.value)} placeholder="DE…" />
             </FormField>
-            <FormField label="Kontostand" hint="Anfangsbestand — bezahlte Posten bewegen ihn">
-              <input className="field" inputMode="decimal" value={saldoEuro} onChange={(e) => setSaldoEuro(e.target.value)} placeholder="0,00" />
+            <FormField label={t("einstellungen.konto.feldKontostand")} hint={t("einstellungen.konto.feldKontostandHinweis")}>
+              <input className="field" inputMode="decimal" value={saldoText} onChange={(e) => setSaldoText(e.target.value)} placeholder="0,00" />
             </FormField>
-            <FormField label="Inhaber">
+            <FormField label={t("einstellungen.konto.feldInhaber")}>
               {personen.length === 0 ? (
-                <span className="muted">erst Personen anlegen</span>
+                <span className="muted">{t("einstellungen.konto.feldInhaberLeer")}</span>
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-3)", paddingTop: 4 }}>
                   {personen.map((p) => (
@@ -239,6 +268,7 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
 }
 
 function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onChange: () => void }) {
+  const { t } = useTranslation();
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -273,7 +303,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
       setOffen(false);
       onChange();
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
@@ -281,11 +311,11 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
     return (
       <div key={k.id} className={`katrow ${haupt ? "katmain" : "katchild"}`}>
         <span className="nm">
-          {k.name} <Pill variant={CHARAKTER_PILL[k.defaultCharakter]}>{k.defaultCharakter}</Pill>
+          {k.name} <Pill variant={CHARAKTER_PILL[k.defaultCharakter]}>{t(`charakter.${k.defaultCharakter}`)}</Pill>
         </span>
         <span style={{ display: "flex", gap: "var(--sp-3)" }}>
-          <button className="linkbtn" onClick={() => bearbeiten(k)}>bearbeiten</button>
-          <button className="linkbtn" onClick={() => kategorieRepo.loeschen(k.id).then(onChange)}>löschen</button>
+          <button className="linkbtn" onClick={() => bearbeiten(k)}>{t("einstellungen.bearbeiten")}</button>
+          <button className="linkbtn" onClick={() => kategorieRepo.loeschen(k.id).then(onChange)}>{t("einstellungen.loeschen")}</button>
         </span>
       </div>
     );
@@ -293,17 +323,17 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
 
   return (
     <Card
-      title="Kategorien"
-      subtitle="Querschnitt über alle Ströme — Basis der Analysen (als Baum)"
+      title={t("einstellungen.kategorie.titel")}
+      subtitle={t("einstellungen.kategorie.untertitel")}
       action={
         <span style={{ display: "flex", gap: "var(--sp-2)" }}>
-          <Button onClick={() => standardkategorienAnlegen(kategorieRepo).then(onChange)}>Standard laden</Button>
-          <Button variant="primary" plus onClick={neu}>Kategorie</Button>
+          <Button onClick={() => standardkategorienAnlegen(kategorieRepo).then(onChange)}>{t("einstellungen.kategorie.standardLaden")}</Button>
+          <Button variant="primary" plus onClick={neu}>{t("einstellungen.kategorie.anlegen")}</Button>
         </span>
       }
     >
       {kategorien.length === 0 ? (
-        <div className="muted">Noch keine Kategorien. „Standard laden" legt einen sinnvollen Default-Baum an.</div>
+        <div className="muted">{t("einstellungen.kategorie.leer")}</div>
       ) : (
         <div>
           {wurzeln.map((w) => (
@@ -316,23 +346,23 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
       )}
       {offen && (
         <Modal
-          title={editId ? "Kategorie bearbeiten" : "Kategorie anlegen"}
+          title={editId ? t("einstellungen.kategorie.modalBearbeiten") : t("einstellungen.kategorie.modalAnlegen")}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>Speichern</Button><button className="linkbtn" onClick={() => setOffen(false)}>Abbrechen</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <div className="form-grid">
-            <FormField label="Name" required>
-              <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder="z. B. Lebensmittel" />
+            <FormField label={t("einstellungen.kategorie.feldName")} required>
+              <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("einstellungen.kategorie.feldNamePlaceholder")} />
             </FormField>
-            <FormField label="Elternkategorie" hint="optional">
+            <FormField label={t("einstellungen.kategorie.feldEltern")} hint={t("einstellungen.kategorie.feldElternHinweis")}>
               <select className="field" value={elternId} onChange={(e) => setElternId(e.target.value)}>
-                <option value="">— (Wurzel)</option>
+                <option value="">{t("einstellungen.kategorie.wurzel")}</option>
                 {kategorien.filter((k) => k.id !== editId).map((k) => (<option key={k.id} value={k.id}>{k.name}</option>))}
               </select>
             </FormField>
-            <FormField label="Default-Charakter">
+            <FormField label={t("einstellungen.kategorie.feldCharakter")}>
               <select className="field" value={defaultCharakter} onChange={(e) => setDefaultCharakter(e.target.value as Charakter)}>
-                {CHARAKTERE.map((c) => (<option key={c} value={c}>{c}</option>))}
+                {CHARAKTERE.map((c) => (<option key={c} value={c}>{t(`charakter.${c}`)}</option>))}
               </select>
             </FormField>
           </div>

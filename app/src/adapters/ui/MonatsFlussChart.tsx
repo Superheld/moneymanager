@@ -2,15 +2,20 @@
 // Ausgaben nach unten (Ink). Macht die monatlichen Abflüsse sichtbar (inkl.
 // Quartals-Ausschläge und Budget-Anteil), die die kumulierte Saldo-Kurve verschluckt.
 
+import { useTranslation } from "react-i18next";
+import { useGeld } from "./EinstellungenProvider";
+
 interface Props {
   labels: string[];
-  einnahmen: number[]; // Euro, positiv
-  ausgaben: number[]; // Euro, positiver Betrag
+  einnahmen: number[]; // Minor Units (Cent), positiv
+  ausgaben: number[]; // Minor Units (Cent), positiver Betrag
   width?: number;
   height?: number;
 }
 
 export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, height = 240 }: Props) {
+  const { t } = useTranslation();
+  const geld = useGeld();
   const padL = 52;
   const padR = 16;
   const padT = 14;
@@ -26,7 +31,8 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
   const h = (v: number) => (v / max) * (innerH / 2);
 
   const gitter = [max, max / 2, 0, -max / 2, -max].map((v) => ({ v, y: mid - h(v) }));
-  const fmtK = (v: number) => (Math.round(Math.abs(v) / 100) / 10).toLocaleString("de-DE") + "k";
+  // Achsenbeträge sind Minor Units (Cent) → direkt über geld.format lokalisieren.
+  const fmtAchse = (v: number) => geld.format(Math.round(Math.abs(v)));
 
   return (
     <div>
@@ -34,7 +40,7 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
         {gitter.map((g, i) => (
           <g key={i}>
             <line x1={padL} y1={g.y} x2={width - padR} y2={g.y} stroke={g.v === 0 ? "var(--ink-3)" : "var(--line)"} strokeWidth={g.v === 0 ? 1.2 : 1} />
-            <text x={padL - 8} y={g.y + 4} textAnchor="end" fontSize="10.5" fill="var(--ink-3)" fontFamily="var(--font-ui)">{fmtK(g.v)}</text>
+            <text x={padL - 8} y={g.y + 4} textAnchor="end" fontSize="10.5" fill="var(--ink-3)" fontFamily="var(--font-ui)">{fmtAchse(g.v)}</text>
           </g>
         ))}
         {labels.map((m, i) => {
@@ -53,8 +59,8 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
         })}
       </svg>
       <div style={{ display: "flex", gap: "var(--sp-5)", marginTop: "var(--sp-2)", fontSize: "var(--fs-sm)", color: "var(--ink-2)" }}>
-        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ok)", verticalAlign: "middle", marginRight: 6 }} />Einnahmen</span>
-        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.78, verticalAlign: "middle", marginRight: 6 }} />Ausgaben (inkl. Budgets)</span>
+        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ok)", verticalAlign: "middle", marginRight: 6 }} />{t("charts.einnahmen")}</span>
+        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.78, verticalAlign: "middle", marginRight: 6 }} />{t("charts.ausgabenInklBudgets")}</span>
       </div>
     </div>
   );
