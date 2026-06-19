@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { euroZuCent, type Budget } from "../core";
+import type { Budget } from "../core";
 import type { BudgetRepository } from "./ports";
 import { budgetAnlegen } from "./budgetAnlegen";
 
@@ -14,31 +14,31 @@ function memRepo(): BudgetRepository & { daten: Budget[] } {
 }
 
 describe("budgetAnlegen", () => {
-  it("legt ein Budget an und rechnet Euro in Cent", async () => {
+  it("legt ein Budget an und übernimmt die Minor Units unverändert", async () => {
     const repo = memRepo();
-    const b = await budgetAnlegen(repo, { kategorieId: "kat1", rahmenEuro: 350, periode: "monatlich" });
-    expect(b.rahmen).toBe(euroZuCent(350));
+    const b = await budgetAnlegen(repo, { kategorieId: "kat1", rahmen: 35000, periode: "monatlich" });
+    expect(b.rahmen).toBe(35000);
     expect(repo.daten).toHaveLength(1);
   });
 
   it("validiert Kategorie und Rahmen", async () => {
     const repo = memRepo();
-    await expect(budgetAnlegen(repo, { kategorieId: "", rahmenEuro: 100, periode: "monatlich" })).rejects.toThrow(/Kategorie/);
-    await expect(budgetAnlegen(repo, { kategorieId: "k", rahmenEuro: 0, periode: "monatlich" })).rejects.toThrow(/größer als 0/);
+    await expect(budgetAnlegen(repo, { kategorieId: "", rahmen: 10000, periode: "monatlich" })).rejects.toThrow("kategorie.waehlen");
+    await expect(budgetAnlegen(repo, { kategorieId: "k", rahmen: 0, periode: "monatlich" })).rejects.toThrow("rahmen.groesserNull");
   });
 
   it("verbietet ein zweites Budget für gleiche Kategorie + Periode", async () => {
     const repo = memRepo();
-    await budgetAnlegen(repo, { kategorieId: "kat1", rahmenEuro: 100, periode: "monatlich" });
-    await expect(budgetAnlegen(repo, { kategorieId: "kat1", rahmenEuro: 200, periode: "monatlich" })).rejects.toThrow(/schon ein Budget/);
+    await budgetAnlegen(repo, { kategorieId: "kat1", rahmen: 10000, periode: "monatlich" });
+    await expect(budgetAnlegen(repo, { kategorieId: "kat1", rahmen: 20000, periode: "monatlich" })).rejects.toThrow("budget.existiert");
     // andere Periode ist erlaubt
-    await expect(budgetAnlegen(repo, { kategorieId: "kat1", rahmenEuro: 200, periode: "jaehrlich" })).resolves.toBeTruthy();
+    await expect(budgetAnlegen(repo, { kategorieId: "kat1", rahmen: 20000, periode: "jaehrlich" })).resolves.toBeTruthy();
   });
 
   it("erlaubt das Bearbeiten desselben Budgets (gleiche id)", async () => {
     const repo = memRepo();
-    const b = await budgetAnlegen(repo, { kategorieId: "kat1", rahmenEuro: 100, periode: "monatlich" });
-    await expect(budgetAnlegen(repo, { kategorieId: "kat1", rahmenEuro: 150, periode: "monatlich" }, b.id)).resolves.toBeTruthy();
+    const b = await budgetAnlegen(repo, { kategorieId: "kat1", rahmen: 10000, periode: "monatlich" });
+    await expect(budgetAnlegen(repo, { kategorieId: "kat1", rahmen: 15000, periode: "monatlich" }, b.id)).resolves.toBeTruthy();
     expect(repo.daten).toHaveLength(1);
   });
 });

@@ -2,9 +2,10 @@
 // erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung).
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
-  formatBetrag,
   kuendigungsterminNaht,
+  minorZuMajor,
   naechsterKuendigungstermin,
   type Charakter,
   type Kategorie,
@@ -27,13 +28,9 @@ import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
+import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
 
-const RHYTHMEN: { wert: Rhythmus; label: string }[] = [
-  { wert: "monatlich", label: "monatlich" },
-  { wert: "quartalsweise", label: "quartalsweise" },
-  { wert: "halbjaehrlich", label: "halbjährlich" },
-  { wert: "jaehrlich", label: "jährlich" },
-];
+const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
   Aufwand: "aufwand",
@@ -47,6 +44,8 @@ function heuteIso(): string {
 }
 
 export function VertraegeScreen() {
+  const { t } = useTranslation();
+  const geld = useGeld();
   const heute = useMemo(heuteIso, []);
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
@@ -63,7 +62,7 @@ export function VertraegeScreen() {
   const [verlaengerung, setVerlaengerung] = useState<Verlaengerungsart>("automatisch");
   const [verlaengerungMonate, setVerlaengerungMonate] = useState("12");
   const [kuendigungsfrist, setKuendigungsfrist] = useState("");
-  const [betragEuro, setBetragEuro] = useState("");
+  const [betragText, setBetragText] = useState("");
   const [rhythmus, setRhythmus] = useState<Rhythmus>("monatlich");
   const [charakter, setCharakter] = useState<Charakter>("Aufwand");
   const [kategorieId, setKategorieId] = useState("");
@@ -103,7 +102,7 @@ export function VertraegeScreen() {
     setVerlaengerung("automatisch");
     setVerlaengerungMonate("12");
     setKuendigungsfrist("");
-    setBetragEuro("");
+    setBetragText("");
     setRhythmus("monatlich");
     setCharakter("Aufwand");
     setKategorieId("");
@@ -121,7 +120,7 @@ export function VertraegeScreen() {
     setVerlaengerung(v.verlaengerung);
     setVerlaengerungMonate(v.verlaengerungMonate != null ? String(v.verlaengerungMonate) : "12");
     setKuendigungsfrist(v.kuendigungsfristMonate != null ? String(v.kuendigungsfristMonate) : "");
-    setBetragEuro(r ? String(Math.abs(r.betrag) / 100) : "");
+    setBetragText(r ? String(minorZuMajor(Math.abs(r.betrag), geld.waehrung)) : "");
     setRhythmus(r?.rhythmus ?? "monatlich");
     setCharakter(r?.charakter ?? "Aufwand");
     setKategorieId(r?.kategorieId ?? "");
@@ -139,7 +138,7 @@ export function VertraegeScreen() {
       verlaengerung,
       verlaengerungMonate: verlaengerungMonate ? Number(verlaengerungMonate) : undefined,
       kuendigungsfristMonate: kuendigungsfrist ? Number(kuendigungsfrist) : undefined,
-      betragEuro: Number(betragEuro.replace(",", ".")),
+      betrag: geld.parse(betragText) ?? 0,
       rhythmus,
       charakter,
       kategorieId: kategorieId || undefined,
@@ -151,70 +150,77 @@ export function VertraegeScreen() {
       setOffen(false);
       await laden();
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
   return (
     <div className="screen">
       <PageHead
-        title="Verträge"
-        subtitle="Wiederkehrende Zahlungen inkl. Einnahmen · Fristen & Kündigungstermine"
+        title={t("vertraege.titel")}
+        subtitle={t("vertraege.untertitel")}
         action={
           <Button variant="primary" plus onClick={neu}>
-            Vertrag anlegen
+            {t("vertraege.anlegen")}
           </Button>
         }
       />
 
       <Card>
         {vertraege.length === 0 ? (
-          <div className="muted">Noch keine Verträge.</div>
+          <div className="muted">{t("vertraege.leer")}</div>
         ) : (
           <DataTable
             columns={[
-              { key: "anbieter", label: "Anbieter" },
-              { key: "inhaber", label: "Inhaber", render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
+              { key: "anbieter", label: t("vertraege.spalteAnbieter") },
+              { key: "inhaber", label: t("vertraege.spalteInhaber"), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
               {
                 key: "charakter",
-                label: "Charakter",
+                label: t("vertraege.spalteCharakter"),
                 render: (v) => {
                   const r = regelZuVertrag.get(v.id);
-                  return r ? <Pill variant={CHARAKTER_PILL[r.charakter]}>{r.charakter}</Pill> : "—";
+                  return r ? <Pill variant={CHARAKTER_PILL[r.charakter]}>{t(`charakter.${r.charakter}`)}</Pill> : "—";
                 },
               },
-              { key: "rhythmus", label: "Rhythmus", render: (v) => regelZuVertrag.get(v.id)?.rhythmus ?? "—" },
+              {
+                key: "rhythmus",
+                label: t("vertraege.spalteRhythmus"),
+                render: (v) => {
+                  const r = regelZuVertrag.get(v.id);
+                  return r ? t(`vertraege.rhythmus.${r.rhythmus}`) : "—";
+                },
+              },
               {
                 key: "kuendigung",
-                label: "Kündigen bis",
+                label: t("vertraege.spalteKuendigenBis"),
                 render: (v) => {
-                  const t = naechsterKuendigungstermin(v, heute);
-                  if (!t) return <span className="muted">—</span>;
+                  const termin = naechsterKuendigungstermin(v, heute);
+                  if (!termin) return <span className="muted">—</span>;
                   const naht = kuendigungsterminNaht(v, heute);
                   return (
                     <span>
-                      {t.kuendigenBis} {naht && <Pill variant="warn">bald</Pill>}
+                      {termin.kuendigenBis} {naht && <Pill variant="warn">{t("vertraege.bald")}</Pill>}
                     </span>
                   );
                 },
               },
               {
                 key: "betrag",
-                label: "Betrag €",
+                label: `${t("vertraege.spalteBetrag")} ${geld.symbol}`,
                 align: "right",
                 render: (v) => {
                   const r = regelZuVertrag.get(v.id);
-                  return r ? formatBetrag(r.betrag, true) : "—";
+                  return r ? geld.format(r.betrag) : "—";
                 },
               },
-              { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>bearbeiten</button> },
+              { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
               {
                 key: "_x",
                 label: "",
                 align: "right",
                 render: (v) => (
                   <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id).then(laden)}>
-                    löschen
+                    {t("vertraege.loeschen")}
                   </button>
                 ),
               },
@@ -226,26 +232,26 @@ export function VertraegeScreen() {
 
       {offen && (
         <Modal
-          title={editId ? "Vertrag bearbeiten" : "Vertrag anlegen"}
-          subtitle="Erzeugt/aktualisiert zugleich die Plan-Zahlung (abgeleitete Zahlungsregel)"
+          title={editId ? t("vertraege.modalBearbeiten") : t("vertraege.anlegen")}
+          subtitle={t("vertraege.modalUntertitel")}
           onClose={() => setOffen(false)}
           footer={
             <>
               <Button variant="primary" onClick={speichern}>
-                Speichern
+                {t("vertraege.speichern")}
               </Button>
               <button className="linkbtn" onClick={() => setOffen(false)}>
-                Abbrechen
+                {t("vertraege.abbrechen")}
               </button>
               {fehler && <span className="err">{fehler}</span>}
             </>
           }
         >
           <div className="form-grid">
-            <FormField label="Anbieter" required>
-              <input className="field" value={anbieter} onChange={(e) => setAnbieter(e.target.value)} placeholder="z. B. Stadtwerke, Arbeitgeber" />
+            <FormField label={t("vertraege.feldAnbieter")} required>
+              <input className="field" value={anbieter} onChange={(e) => setAnbieter(e.target.value)} placeholder={t("vertraege.feldAnbieterPlatzhalter")} />
             </FormField>
-            <FormField label="Inhaber">
+            <FormField label={t("vertraege.feldInhaber")}>
               <select className="field" value={inhaberId} onChange={(e) => setInhaberId(e.target.value)}>
                 <option value="">—</option>
                 {personen.map((p) => (
@@ -255,49 +261,49 @@ export function VertraegeScreen() {
                 ))}
               </select>
             </FormField>
-            <FormField label="Beginn">
+            <FormField label={t("vertraege.feldBeginn")}>
               <input className="field" type="date" value={beginn} onChange={(e) => setBeginn(e.target.value)} />
             </FormField>
-            <FormField label="Mindestlaufzeit (Monate)" hint="optional">
-              <input className="field" inputMode="numeric" value={mindestlaufzeit} onChange={(e) => setMindestlaufzeit(e.target.value)} placeholder="z. B. 24" />
+            <FormField label={t("vertraege.feldMindestlaufzeit")} hint={t("vertraege.optional")}>
+              <input className="field" inputMode="numeric" value={mindestlaufzeit} onChange={(e) => setMindestlaufzeit(e.target.value)} placeholder={t("vertraege.feldMindestlaufzeitPlatzhalter")} />
             </FormField>
-            <FormField label="Verlängerung">
+            <FormField label={t("vertraege.feldVerlaengerung")}>
               <select className="field" value={verlaengerung} onChange={(e) => setVerlaengerung(e.target.value as Verlaengerungsart)}>
-                <option value="automatisch">automatisch</option>
-                <option value="keine">keine</option>
+                <option value="automatisch">{t("vertraege.verlaengerung.automatisch")}</option>
+                <option value="keine">{t("vertraege.verlaengerung.keine")}</option>
               </select>
             </FormField>
-            <FormField label="Verlängerung um (Monate)" hint="bei automatisch">
-              <input className="field" inputMode="numeric" value={verlaengerungMonate} onChange={(e) => setVerlaengerungMonate(e.target.value)} placeholder="z. B. 12" />
+            <FormField label={t("vertraege.feldVerlaengerungMonate")} hint={t("vertraege.feldVerlaengerungMonateHinweis")}>
+              <input className="field" inputMode="numeric" value={verlaengerungMonate} onChange={(e) => setVerlaengerungMonate(e.target.value)} placeholder={t("vertraege.feldVerlaengerungMonatePlatzhalter")} />
             </FormField>
-            <FormField label="Kündigungsfrist (Monate)" hint="optional">
-              <input className="field" inputMode="numeric" value={kuendigungsfrist} onChange={(e) => setKuendigungsfrist(e.target.value)} placeholder="z. B. 3" />
+            <FormField label={t("vertraege.feldKuendigungsfrist")} hint={t("vertraege.optional")}>
+              <input className="field" inputMode="numeric" value={kuendigungsfrist} onChange={(e) => setKuendigungsfrist(e.target.value)} placeholder={t("vertraege.feldKuendigungsfristPlatzhalter")} />
             </FormField>
-            <FormField label="Betrag je Zahlung" required hint="positiv — Richtung aus Charakter">
-              <input className="field" inputMode="decimal" value={betragEuro} onChange={(e) => setBetragEuro(e.target.value)} placeholder="0,00" />
+            <FormField label={`${t("vertraege.feldBetrag")} ${geld.symbol}`} required hint={t("vertraege.feldBetragHinweis")}>
+              <input className="field" inputMode="decimal" value={betragText} onChange={(e) => setBetragText(e.target.value)} placeholder="0,00" />
             </FormField>
-            <FormField label="Rhythmus">
+            <FormField label={t("vertraege.feldRhythmus")}>
               <select className="field" value={rhythmus} onChange={(e) => setRhythmus(e.target.value as Rhythmus)}>
                 {RHYTHMEN.map((r) => (
-                  <option key={r.wert} value={r.wert}>
-                    {r.label}
+                  <option key={r} value={r}>
+                    {t(`vertraege.rhythmus.${r}`)}
                   </option>
                 ))}
               </select>
             </FormField>
-            <FormField label="Kategorie" hint="setzt den Charakter vor">
+            <FormField label={t("vertraege.feldKategorie")} hint={t("vertraege.feldKategorieHinweis")}>
               <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieWaehlen} />
             </FormField>
-            <FormField label="Charakter">
+            <FormField label={t("vertraege.feldCharakter")}>
               <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
                 {CHARAKTERE.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {t(`charakter.${c}`)}
                   </option>
                 ))}
               </select>
             </FormField>
-            <FormField label="Konto" hint="optional">
+            <FormField label={t("vertraege.feldKonto")} hint={t("vertraege.optional")}>
               <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
                 <option value="">—</option>
                 {konten.map((k) => (

@@ -72,6 +72,16 @@ export interface LedgerPort {
   loeschen(id: string): Promise<void>;
 }
 
+/**
+ * Haushalts-Einstellungen (ADR-0004) — Key/Value, eine Zeile je Schlüssel. Bewusst
+ * generisch (Währung, Locale, Sprache und künftige Schalter ohne neue Migration).
+ */
+export interface EinstellungenRepository {
+  /** Alle Schlüssel→Wert; fehlende Schlüssel bedeuten „noch nicht gesetzt". */
+  lesen(): Promise<Record<string, string>>;
+  schreiben(schluessel: string, wert: string): Promise<void>;
+}
+
 export interface SzenarioRepository {
   alle(): Promise<Szenario[]>;
   speichern(szenario: Szenario): Promise<void>;

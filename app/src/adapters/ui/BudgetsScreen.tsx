@@ -1,10 +1,16 @@
 // Budgets (P2.2) — Übersicht der Rahmen je Kategorie; Anlegen im Modal.
 // Plan-only; Reset zum Periodenende (kein Übertrag). Ist-Wirkung ab P3.
+//
+// PILOT für ADR-0004: alle sichtbaren Strings laufen über t()/<Trans>, alles Geld über
+// useGeld() (Parse bei Eingabe, Format + Symbol bei Anzeige). Dieser Screen ist das
+// Muster, an dem die übrigen Screens nachgezogen werden — bis dahin nutzen sie weiter
+// die EUR-festen Back-compat-Helfer.
 
 import { useEffect, useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import {
-  formatBetrag,
   geglaetteterMonatsabfluss,
+  minorZuMajor,
   type Budget,
   type BudgetPeriode,
   type Kategorie,
@@ -16,19 +22,19 @@ import { Button, Card, DataTable, FormField } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
+import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
 
-const PERIODEN: { wert: BudgetPeriode; label: string }[] = [
-  { wert: "monatlich", label: "monatlich" },
-  { wert: "jaehrlich", label: "jährlich" },
-];
+const PERIODEN: BudgetPeriode[] = ["monatlich", "jaehrlich"];
 
 export function BudgetsScreen() {
+  const { t } = useTranslation();
+  const geld = useGeld();
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [kategorieId, setKategorieId] = useState("");
-  const [rahmenEuro, setRahmenEuro] = useState("");
+  const [rahmenText, setRahmenText] = useState("");
   const [periode, setPeriode] = useState<BudgetPeriode>("monatlich");
   const [fehler, setFehler] = useState<string | null>(null);
 
@@ -45,7 +51,7 @@ export function BudgetsScreen() {
   function neu() {
     setEditId(null);
     setKategorieId("");
-    setRahmenEuro("");
+    setRahmenText("");
     setPeriode("monatlich");
     setFehler(null);
     setOffen(true);
@@ -53,7 +59,7 @@ export function BudgetsScreen() {
   function bearbeiten(b: Budget) {
     setEditId(b.id);
     setKategorieId(b.kategorieId);
-    setRahmenEuro(String(b.rahmen / 100));
+    setRahmenText(String(minorZuMajor(b.rahmen, geld.waehrung)));
     setPeriode(b.periode);
     setFehler(null);
     setOffen(true);
@@ -61,48 +67,52 @@ export function BudgetsScreen() {
   async function speichern() {
     setFehler(null);
     try {
-      await budgetAnlegen(budgetRepo, { kategorieId, rahmenEuro: Number(rahmenEuro.replace(",", ".")), periode }, editId ?? undefined);
+      await budgetAnlegen(
+        budgetRepo,
+        { kategorieId, rahmen: geld.parse(rahmenText) ?? 0, periode },
+        editId ?? undefined,
+      );
       setOffen(false);
       await laden();
     } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
+      setFehler(fehlerNachricht(t, e));
     }
   }
 
   return (
     <div className="screen">
       <PageHead
-        title="Budgets"
-        subtitle="Limit pro Periode für laufende Ausgaben — Reset zum Periodenende"
+        title={t("budgets.titel")}
+        subtitle={t("budgets.untertitel")}
         action={
           <Button variant="primary" plus onClick={neu}>
-            Budget anlegen
+            {t("budgets.anlegen")}
           </Button>
         }
       />
 
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
-        Ein Budget ist ein <b style={{ color: "var(--ink)" }}>Limit pro Monat</b> für laufende Ausgaben (Lebensmittel, Auswärts essen). Der Rest <b style={{ color: "var(--ink)" }}>verfällt</b> — es wird nicht angespart. Was sich <b style={{ color: "var(--ink)" }}>ansammeln</b> soll (Urlaub, Ersatz), gehört in einen <b style={{ color: "var(--ink)" }}>Topf</b>.
+        <Trans i18nKey="budgets.erklaerung" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
       </p>
 
       <Card>
         {budgets.length === 0 ? (
-          <div className="muted">Noch keine Budgets. Lege Kategorien an, dann Budgets darauf.</div>
+          <div className="muted">{t("budgets.leer")}</div>
         ) : (
           <DataTable
             columns={[
-              { key: "kategorie", label: "Kategorie", render: (b) => kategorieName.get(b.kategorieId) ?? "?" },
-              { key: "periode", label: "Periode" },
-              { key: "rahmen", label: "Rahmen €", align: "right", render: (b) => formatBetrag(b.rahmen) },
-              { key: "geglaettet", label: "≈ /Monat €", align: "right", render: (b) => formatBetrag(geglaetteterMonatsabfluss(b)) },
-              { key: "_e", label: "", align: "right", render: (b) => <button className="linkbtn" onClick={() => bearbeiten(b)}>bearbeiten</button> },
+              { key: "kategorie", label: t("budgets.spalteKategorie"), render: (b) => kategorieName.get(b.kategorieId) ?? "?" },
+              { key: "periode", label: t("budgets.spaltePeriode"), render: (b) => t(`budgets.periode.${b.periode}`) },
+              { key: "rahmen", label: `${t("budgets.spalteRahmen")} ${geld.symbol}`, align: "right", render: (b) => geld.format(b.rahmen) },
+              { key: "geglaettet", label: `${t("budgets.spalteProMonat")} ${geld.symbol}`, align: "right", render: (b) => geld.format(geglaetteterMonatsabfluss(b)) },
+              { key: "_e", label: "", align: "right", render: (b) => <button className="linkbtn" onClick={() => bearbeiten(b)}>{t("budgets.bearbeiten")}</button> },
               {
                 key: "_x",
                 label: "",
                 align: "right",
                 render: (b) => (
                   <button className="linkbtn" onClick={() => budgetRepo.loeschen(b.id).then(laden)}>
-                    löschen
+                    {t("budgets.loeschen")}
                   </button>
                 ),
               },
@@ -114,32 +124,32 @@ export function BudgetsScreen() {
 
       {offen && (
         <Modal
-          title={editId ? "Budget bearbeiten" : "Budget anlegen"}
-          subtitle="Ein Budget je Kategorie und Periode"
+          title={editId ? t("budgets.modalBearbeiten") : t("budgets.anlegen")}
+          subtitle={t("budgets.modalUntertitel")}
           onClose={() => setOffen(false)}
           footer={
             <>
               <Button variant="primary" onClick={speichern}>
-                Speichern
+                {t("budgets.speichern")}
               </Button>
               <button className="linkbtn" onClick={() => setOffen(false)}>
-                Abbrechen
+                {t("budgets.abbrechen")}
               </button>
               {fehler && <span className="err">{fehler}</span>}
             </>
           }
         >
-          <FormField label="Kategorie" required>
+          <FormField label={t("budgets.feldKategorie")} required>
             <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
           </FormField>
-          <FormField label="Rahmen" required hint="Betrag je Periode">
-            <input className="field" inputMode="decimal" value={rahmenEuro} onChange={(e) => setRahmenEuro(e.target.value)} placeholder="0,00" />
+          <FormField label={t("budgets.feldRahmen")} required hint={t("budgets.feldRahmenHinweis")}>
+            <input className="field" inputMode="decimal" value={rahmenText} onChange={(e) => setRahmenText(e.target.value)} placeholder="0,00" />
           </FormField>
-          <FormField label="Periode">
+          <FormField label={t("budgets.feldPeriode")}>
             <select className="field" value={periode} onChange={(e) => setPeriode(e.target.value as BudgetPeriode)}>
               {PERIODEN.map((p) => (
-                <option key={p.wert} value={p.wert}>
-                  {p.label}
+                <option key={p} value={p}>
+                  {t(`budgets.periode.${p}`)}
                 </option>
               ))}
             </select>

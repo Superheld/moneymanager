@@ -3,7 +3,8 @@
 
 import {
   ersatztopfFelder,
-  euroZuCent,
+  FachlicherFehler,
+  type Cent,
   type Ersatztopf,
   type Inventargegenstand,
 } from "../core";
@@ -11,7 +12,7 @@ import type { InventarRepository, TopfRepository } from "./ports";
 
 export interface InventarEingabe {
   bezeichnung: string;
-  wiederbeschaffungEuro: number;
+  wiederbeschaffung: Cent; // Minor Units (die UI parst währungsgerecht)
   nutzungsdauerMonate: number;
   anschaffung: string; // ISO
   kategorieId?: string;
@@ -22,15 +23,15 @@ export async function inventarAnlegen(
   e: InventarEingabe,
 ): Promise<Inventargegenstand> {
   const bezeichnung = e.bezeichnung.trim();
-  if (!bezeichnung) throw new Error("Bitte eine Bezeichnung angeben.");
-  if (!(e.wiederbeschaffungEuro > 0)) throw new Error("Wiederbeschaffungswert muss größer als 0 sein.");
-  if (!(e.nutzungsdauerMonate > 0)) throw new Error("Nutzungsdauer (Monate) muss größer als 0 sein.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.anschaffung)) throw new Error("Bitte ein gültiges Anschaffungsdatum angeben.");
+  if (!bezeichnung) throw new FachlicherFehler("bezeichnung.fehlt");
+  if (!(e.wiederbeschaffung > 0)) throw new FachlicherFehler("wiederbeschaffung.groesserNull");
+  if (!(e.nutzungsdauerMonate > 0)) throw new FachlicherFehler("nutzungsdauer.groesserNull");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.anschaffung)) throw new FachlicherFehler("anschaffung.ungueltig");
 
   const gegenstand: Inventargegenstand = {
     id: crypto.randomUUID(),
     bezeichnung,
-    wiederbeschaffung: euroZuCent(e.wiederbeschaffungEuro),
+    wiederbeschaffung: e.wiederbeschaffung,
     nutzungsdauerMonate: Math.round(e.nutzungsdauerMonate),
     anschaffung: e.anschaffung,
     kategorieId: e.kategorieId || undefined,
@@ -75,15 +76,15 @@ export async function inventarAktualisieren(
   e: InventarEingabe,
 ): Promise<Inventargegenstand> {
   const bezeichnung = e.bezeichnung.trim();
-  if (!bezeichnung) throw new Error("Bitte eine Bezeichnung angeben.");
-  if (!(e.wiederbeschaffungEuro > 0)) throw new Error("Wiederbeschaffungswert muss größer als 0 sein.");
-  if (!(e.nutzungsdauerMonate > 0)) throw new Error("Nutzungsdauer (Monate) muss größer als 0 sein.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.anschaffung)) throw new Error("Bitte ein gültiges Anschaffungsdatum angeben.");
+  if (!bezeichnung) throw new FachlicherFehler("bezeichnung.fehlt");
+  if (!(e.wiederbeschaffung > 0)) throw new FachlicherFehler("wiederbeschaffung.groesserNull");
+  if (!(e.nutzungsdauerMonate > 0)) throw new FachlicherFehler("nutzungsdauer.groesserNull");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.anschaffung)) throw new FachlicherFehler("anschaffung.ungueltig");
 
   const gegenstand: Inventargegenstand = {
     id: gegenstandId,
     bezeichnung,
-    wiederbeschaffung: euroZuCent(e.wiederbeschaffungEuro),
+    wiederbeschaffung: e.wiederbeschaffung,
     nutzungsdauerMonate: Math.round(e.nutzungsdauerMonate),
     anschaffung: e.anschaffung,
     kategorieId: e.kategorieId || undefined,

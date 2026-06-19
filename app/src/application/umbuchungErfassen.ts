@@ -3,14 +3,14 @@
 // (Vermögensumschichtung, nicht erfolgswirksam). Beide Beine teilen eine transferId;
 // die liquiden Mittel über alle Konten bleiben unverändert (netto 0).
 
-import { euroZuCent, type IstBuchung } from "../core";
+import { FachlicherFehler, type Cent, type IstBuchung } from "../core";
 import type { LedgerPort } from "./ports";
 
 export interface UmbuchungEingabe {
   vonKontoId: string;
   nachKontoId: string;
   datum: string; // ISO
-  betragEuro: number; // positiv
+  betrag: Cent; // positiv, Minor Units
   notiz?: string;
 }
 
@@ -23,12 +23,12 @@ export async function umbuchungErfassen(
   ledger: LedgerPort,
   e: UmbuchungEingabe,
 ): Promise<UmbuchungErgebnis> {
-  if (!e.vonKontoId || !e.nachKontoId) throw new Error("Bitte Quell- und Zielkonto wählen.");
-  if (e.vonKontoId === e.nachKontoId) throw new Error("Quell- und Zielkonto müssen verschieden sein.");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new Error("Bitte ein gültiges Datum angeben.");
-  if (!(e.betragEuro > 0)) throw new Error("Der Betrag muss größer als 0 sein.");
+  if (!e.vonKontoId || !e.nachKontoId) throw new FachlicherFehler("konten.quelleZiel");
+  if (e.vonKontoId === e.nachKontoId) throw new FachlicherFehler("konten.verschieden");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
+  if (!(e.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
 
-  const cent = euroZuCent(e.betragEuro);
+  const cent = e.betrag;
   const transferId = crypto.randomUUID();
   const notiz = e.notiz?.trim() || undefined;
 

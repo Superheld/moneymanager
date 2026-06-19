@@ -2,15 +2,20 @@
 // und freie Liquidität (Teal). Nulllinie betont, weil die freie Liquidität ins Minus
 // gehen darf. Dünne Linien, Grid in --line, Labels in --ink-3 (Chart-Guidance).
 
+import { useTranslation } from "react-i18next";
+import { useGeld } from "./EinstellungenProvider";
+
 interface Props {
   labels: string[];
-  kontosaldo: number[]; // Euro
-  freieLiquiditaet: number[]; // Euro
+  kontosaldo: number[]; // Minor Units (Cent)
+  freieLiquiditaet: number[]; // Minor Units (Cent)
   width?: number;
   height?: number;
 }
 
 export function ZweiKurvenChart({ labels, kontosaldo, freieLiquiditaet, width = 1000, height = 300 }: Props) {
+  const { t } = useTranslation();
+  const geld = useGeld();
   const padL = 56;
   const padR = 16;
   const padT = 18;
@@ -29,7 +34,8 @@ export function ZweiKurvenChart({ labels, kontosaldo, freieLiquiditaet, width = 
 
   const gridWerte: number[] = [];
   for (let g = 0; g <= 3; g++) gridWerte.push(min + (spanne * g) / 3);
-  const fmtK = (v: number) => (Math.round(v / 100) / 10).toLocaleString("de-DE") + "k";
+  // Achsenbeträge sind Minor Units (Cent) → direkt über geld.format lokalisieren.
+  const fmtAchse = (v: number) => geld.format(Math.round(v));
 
   return (
     <div>
@@ -38,7 +44,7 @@ export function ZweiKurvenChart({ labels, kontosaldo, freieLiquiditaet, width = 
           <g key={i}>
             <line x1={padL} y1={y(v)} x2={width - padR} y2={y(v)} stroke="var(--line)" strokeWidth="1" />
             <text x={padL - 9} y={y(v) + 4} textAnchor="end" fontSize="11" fill="var(--ink-3)" fontFamily="var(--font-ui)">
-              {fmtK(v)}
+              {fmtAchse(v)}
             </text>
           </g>
         ))}
@@ -59,11 +65,11 @@ export function ZweiKurvenChart({ labels, kontosaldo, freieLiquiditaet, width = 
       <div style={{ display: "flex", gap: "var(--sp-5)", marginTop: "var(--sp-2)", fontSize: "var(--fs-sm)", color: "var(--ink-2)" }}>
         <span>
           <span style={{ display: "inline-block", width: 18, height: 0, borderTop: "2.4px solid var(--ink)", verticalAlign: "middle", marginRight: 6 }} />
-          Plan-Saldo
+          {t("charts.planSaldo")}
         </span>
         <span>
           <span style={{ display: "inline-block", width: 18, height: 0, borderTop: "2.4px solid var(--accent)", verticalAlign: "middle", marginRight: 6 }} />
-          Freie Liquidität (− Töpfe)
+          {t("charts.freieLiquiditaetMinusToepfe")}
         </span>
       </div>
     </div>

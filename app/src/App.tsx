@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { AppShell, type ScreenId } from "./adapters/ui/AppShell";
 import { UeberblickScreen } from "./adapters/ui/UeberblickScreen";
 import { KontenScreen } from "./adapters/ui/KontenScreen";
-import { StammdatenScreen } from "./adapters/ui/StammdatenScreen";
+import { EinstellungenScreen } from "./adapters/ui/EinstellungenScreen";
 import { VertraegeScreen } from "./adapters/ui/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/BudgetsScreen";
 import { ToepfeScreen } from "./adapters/ui/ToepfeScreen";
@@ -10,6 +10,7 @@ import { InventarScreen } from "./adapters/ui/InventarScreen";
 import { DeckungScreen } from "./adapters/ui/DeckungScreen";
 import { appBootstrap } from "./application/bootstrap";
 import { sqliteKategorieRepository } from "./adapters/persistence/sqliteStammdatenRepositories";
+import { EinstellungenProvider } from "./adapters/ui/EinstellungenProvider";
 
 export default function App() {
   const [screen, setScreen] = useState<ScreenId>("uebersicht");
@@ -22,15 +23,17 @@ export default function App() {
   if (!bereit) return null;
 
   return (
-    <AppShell current={screen} onNavigate={setScreen}>
-      {screen === "uebersicht" && <UeberblickScreen />}
-      {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
-      {screen === "toepfe" && <ToepfeScreen />}
-      {screen === "inventar" && <InventarScreen />}
-      {screen === "budgets" && <BudgetsScreen />}
-      {screen === "vertraege" && <VertraegeScreen />}
-      {screen === "deckung" && <DeckungScreen />}
-      {screen === "stammdaten" && <StammdatenScreen />}
-    </AppShell>
+    <EinstellungenProvider>
+      <AppShell current={screen} onNavigate={setScreen}>
+        {screen === "uebersicht" && <UeberblickScreen />}
+        {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
+        {screen === "toepfe" && <ToepfeScreen />}
+        {screen === "inventar" && <InventarScreen />}
+        {screen === "budgets" && <BudgetsScreen />}
+        {screen === "vertraege" && <VertraegeScreen />}
+        {screen === "deckung" && <DeckungScreen />}
+        {screen === "einstellungen" && <EinstellungenScreen />}
+      </AppShell>
+    </EinstellungenProvider>
   );
 }
