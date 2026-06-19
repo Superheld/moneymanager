@@ -2,9 +2,10 @@
 // einfach). ID-Erzeugung lebt hier (nicht im Core, der pure bleibt).
 
 import {
-  euroZuCent,
+  FachlicherFehler,
   ibanGueltig,
   wuerdeZyklusErzeugen,
+  type Cent,
   type Charakter,
   type Kategorie,
   type Kontotyp,
@@ -29,7 +30,7 @@ export async function personAnlegen(
   id?: string,
 ): Promise<Person> {
   const name = eingabe.name.trim();
-  if (!name) throw new Error("Bitte einen Namen angeben.");
+  if (!name) throw new FachlicherFehler("name.fehlt");
   const person: Person = {
     id: id ?? crypto.randomUUID(),
     name,
@@ -45,7 +46,7 @@ export interface KontoEingabe {
   typ: Kontotyp;
   iban?: string;
   inhaberIds?: string[];
-  saldoEuro?: number;
+  saldo?: Cent; // Minor Units (die UI parst währungsgerecht)
 }
 
 export async function kontoAnlegen(
@@ -54,16 +55,16 @@ export async function kontoAnlegen(
   id?: string,
 ): Promise<Zahlungskonto> {
   const bezeichnung = eingabe.bezeichnung.trim();
-  if (!bezeichnung) throw new Error("Bitte eine Bezeichnung angeben.");
+  if (!bezeichnung) throw new FachlicherFehler("bezeichnung.fehlt");
   const iban = eingabe.iban?.trim();
-  if (iban && !ibanGueltig(iban)) throw new Error("Die IBAN ist ungültig.");
+  if (iban && !ibanGueltig(iban)) throw new FachlicherFehler("iban.ungueltig");
   const konto: Zahlungskonto = {
     id: id ?? crypto.randomUUID(),
     bezeichnung,
     typ: eingabe.typ,
     iban: iban || undefined,
     inhaberIds: eingabe.inhaberIds ?? [],
-    saldo: euroZuCent(eingabe.saldoEuro ?? 0),
+    saldo: eingabe.saldo ?? 0,
   };
   await repo.speichern(konto);
   return konto;
@@ -81,7 +82,7 @@ export async function kategorieAnlegen(
   id?: string,
 ): Promise<Kategorie> {
   const name = eingabe.name.trim();
-  if (!name) throw new Error("Bitte einen Namen angeben.");
+  if (!name) throw new FachlicherFehler("name.fehlt");
 
   const kid = id ?? crypto.randomUUID();
   if (eingabe.elternId) {
@@ -91,7 +92,7 @@ export async function kategorieAnlegen(
       ? bestehende
       : [...bestehende, { id: kid, name, defaultCharakter: eingabe.defaultCharakter }];
     if (wuerdeZyklusErzeugen(mitNeu, kid, eingabe.elternId)) {
-      throw new Error("Diese Elternkategorie würde einen Zyklus erzeugen.");
+      throw new FachlicherFehler("kategorie.zyklus");
     }
   }
 

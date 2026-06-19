@@ -18,7 +18,7 @@ function memKategorie(): KategorieRepository & { daten: Kategorie[] } {
 
 describe("personAnlegen", () => {
   it("verlangt einen Namen", async () => {
-    await expect(personAnlegen(memPerson(), { name: "  " })).rejects.toThrow(/Namen/);
+    await expect(personAnlegen(memPerson(), { name: "  " })).rejects.toThrow("name.fehlt");
   });
   it("legt eine Person an", async () => {
     const repo = memPerson();
@@ -31,7 +31,7 @@ describe("personAnlegen", () => {
 describe("kontoAnlegen", () => {
   it("rechnet den Anfangsbestand in Cent", async () => {
     const repo = memKonto();
-    const k = await kontoAnlegen(repo, { bezeichnung: "Giro", typ: "Giro", saldoEuro: 1000 });
+    const k = await kontoAnlegen(repo, { bezeichnung: "Giro", typ: "Giro", saldo: euroZuCent(1000) });
     expect(k.saldo).toBe(euroZuCent(1000));
   });
   it("ohne Saldo → 0", async () => {
@@ -39,13 +39,13 @@ describe("kontoAnlegen", () => {
     expect(k.saldo).toBe(0);
   });
   it("weist eine ungültige IBAN ab", async () => {
-    await expect(kontoAnlegen(memKonto(), { bezeichnung: "Giro", typ: "Giro", iban: "DE00 0000" })).rejects.toThrow(/IBAN/);
+    await expect(kontoAnlegen(memKonto(), { bezeichnung: "Giro", typ: "Giro", iban: "DE00 0000" })).rejects.toThrow("iban.ungueltig");
   });
 });
 
 describe("kategorieAnlegen", () => {
   it("verlangt einen Namen", async () => {
-    await expect(kategorieAnlegen(memKategorie(), { name: "", defaultCharakter: "Aufwand" })).rejects.toThrow(/Namen/);
+    await expect(kategorieAnlegen(memKategorie(), { name: "", defaultCharakter: "Aufwand" })).rejects.toThrow("name.fehlt");
   });
   it("legt eine Unterkategorie unter eine Elternkategorie", async () => {
     const repo = memKategorie();
@@ -58,6 +58,6 @@ describe("kategorieAnlegen", () => {
     const a = await kategorieAnlegen(repo, { name: "A", defaultCharakter: "Aufwand" });
     const b = await kategorieAnlegen(repo, { name: "B", elternId: a.id, defaultCharakter: "Aufwand" });
     // A unter B hängen → Zyklus
-    await expect(kategorieAnlegen(repo, { name: "A", elternId: b.id, defaultCharakter: "Aufwand" }, a.id)).rejects.toThrow(/Zyklus/);
+    await expect(kategorieAnlegen(repo, { name: "A", elternId: b.id, defaultCharakter: "Aufwand" }, a.id)).rejects.toThrow("kategorie.zyklus");
   });
 });

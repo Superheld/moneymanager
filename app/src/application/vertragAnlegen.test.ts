@@ -28,7 +28,7 @@ function eingabe(over: Partial<VertragEingabe> = {}): VertragEingabe {
     beginn: "2026-01-01",
     verlaengerung: "automatisch",
     verlaengerungMonate: 12,
-    betragEuro: 60,
+    betrag: euroZuCent(60),
     rhythmus: "monatlich",
     charakter: "Aufwand",
     ...over,
@@ -61,9 +61,9 @@ describe("vertragAnlegen", () => {
 
   it("validiert Anbieter, Beginn-Datum und Betrag", async () => {
     const vr = memVertrag(), rr = memRegel();
-    await expect(vertragAnlegen(vr, rr, eingabe({ anbieter: " " }))).rejects.toThrow(/Anbieter/);
-    await expect(vertragAnlegen(vr, rr, eingabe({ beginn: "2026" }))).rejects.toThrow(/Beginn/);
-    await expect(vertragAnlegen(vr, rr, eingabe({ betragEuro: 0 }))).rejects.toThrow(/größer als 0/);
+    await expect(vertragAnlegen(vr, rr, eingabe({ anbieter: " " }))).rejects.toThrow("anbieter.fehlt");
+    await expect(vertragAnlegen(vr, rr, eingabe({ beginn: "2026" }))).rejects.toThrow("beginn.ungueltig");
+    await expect(vertragAnlegen(vr, rr, eingabe({ betrag: euroZuCent(0) }))).rejects.toThrow("betrag.groesserNull");
   });
 });
 
@@ -71,7 +71,7 @@ describe("vertragAktualisieren / vertragLoeschen", () => {
   it("behält die IDs und aktualisiert die verknüpfte Regel", async () => {
     const vr = memVertrag(), rr = memRegel();
     const { vertrag, regel } = await vertragAnlegen(vr, rr, eingabe());
-    const { vertrag: v2, regel: r2 } = await vertragAktualisieren(vr, rr, vertrag.id, eingabe({ betragEuro: 75 }));
+    const { vertrag: v2, regel: r2 } = await vertragAktualisieren(vr, rr, vertrag.id, eingabe({ betrag: euroZuCent(75) }));
     expect(v2.id).toBe(vertrag.id);
     expect(r2.id).toBe(regel.id);
     expect(r2.betrag).toBe(euroZuCent(-75));

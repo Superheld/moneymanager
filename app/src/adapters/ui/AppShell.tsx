@@ -3,6 +3,7 @@
 // klickbar; spätere Bereiche (BAUPLAN P2+) sind als deaktiviert sichtbar.
 
 import type { ReactNode } from "react";
+import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "../../version";
 
 export type ScreenId =
@@ -13,35 +14,35 @@ export type ScreenId =
   | "budgets"
   | "vertraege"
   | "deckung"
-  | "stammdaten";
+  | "einstellungen";
 
 interface NavEntry {
   id?: ScreenId;
-  label: string;
-  badge?: string;
+  labelKey: string;
+  badgeKey?: string;
 }
 
 interface NavGroup {
-  titel: string;
+  titelKey: string;
   eintraege: NavEntry[];
 }
 
 const GRUPPEN: NavGroup[] = [
   {
-    titel: "Überblick",
+    titelKey: "shell.gruppeUeberblick",
     eintraege: [
-      { id: "uebersicht", label: "Übersicht", badge: "Plan" },
-      { id: "konten", label: "Konten" },
-      { id: "budgets", label: "Budgets" },
-      { id: "toepfe", label: "Töpfe" },
-      { id: "inventar", label: "Inventar" },
-      { id: "vertraege", label: "Verträge" },
-      { id: "deckung", label: "Deckung" },
+      { id: "uebersicht", labelKey: "shell.navUebersicht", badgeKey: "shell.badgePlan" },
+      { id: "konten", labelKey: "shell.navKonten" },
+      { id: "budgets", labelKey: "shell.navBudgets" },
+      { id: "toepfe", labelKey: "shell.navToepfe" },
+      { id: "inventar", labelKey: "shell.navInventar" },
+      { id: "vertraege", labelKey: "shell.navVertraege" },
+      { id: "deckung", labelKey: "shell.navDeckung" },
     ],
   },
   {
-    titel: "Verwaltung",
-    eintraege: [{ id: "stammdaten", label: "Stammdaten" }],
+    titelKey: "shell.gruppeVerwaltung",
+    eintraege: [{ id: "einstellungen", labelKey: "shell.navEinstellungen" }],
   },
 ];
 
@@ -54,6 +55,7 @@ export function AppShell({
   onNavigate: (id: ScreenId) => void;
   children: ReactNode;
 }) {
+  const { t } = useTranslation();
   return (
     <div className="app">
       <aside className="side">
@@ -61,27 +63,27 @@ export function AppShell({
           <div className="mk">M</div>
           <div>
             <div className="nm">Moneymanager</div>
-            <div className="sub">deine private Bilanz</div>
+            <div className="sub">{t("shell.brandSub")}</div>
           </div>
         </div>
 
         {GRUPPEN.map((g) => (
-          <div key={g.titel}>
-            <span className="nlbl">{g.titel}</span>
+          <div key={g.titelKey}>
+            <span className="nlbl">{t(g.titelKey)}</span>
             <nav className="nav">
               {g.eintraege.map((e) => {
                 const aktiv = e.id === current;
                 const klickbar = !!e.id;
                 return (
                   <a
-                    key={e.label}
+                    key={e.labelKey}
                     className={[aktiv ? "on" : "", klickbar ? "" : "disabled"].join(" ").trim()}
-                    title={klickbar ? undefined : "kommt in einer späteren Phase"}
+                    title={klickbar ? undefined : t("shell.spaeterePhase")}
                     onClick={klickbar ? () => onNavigate(e.id!) : undefined}
                   >
                     <span className="dot" />
-                    {e.label}
-                    {e.badge && <span className="bdg">{e.badge}</span>}
+                    {t(e.labelKey)}
+                    {e.badgeKey && <span className="bdg">{t(e.badgeKey)}</span>}
                   </a>
                 );
               })}
@@ -91,7 +93,7 @@ export function AppShell({
 
         <div className="foot">
           <div>Moneymanager {APP_VERSION}</div>
-          <div>Lokal · keine Cloud</div>
+          <div>{t("shell.footLokal")}</div>
         </div>
       </aside>
 

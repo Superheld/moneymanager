@@ -2,12 +2,15 @@
 // freie Liquidität (liquide Mittel − Σ Topf-Sollstände); darf ins Minus (Überplanung).
 // Plus je Topf der Sollstand-Fortschritt. Die konten-zentrische Ist-Sicht (echte
 // Salden) kommt mit dem Ist-Schritt (P3) — ein Konto ist „nur eine Zahl".
+//
+// i18n + Mehrwährung nach ADR-0004: sichtbare Strings über t()/<Trans>, Geld-Anzeige
+// über useGeld() (Format + Symbol). Reiner Anzeige-Screen — keine Geld-Eingabe.
 
 import { useEffect, useMemo, useState } from "react";
+import { Trans, useTranslation } from "react-i18next";
 import {
   bezahlteSchluessel,
   centZuEuro,
-  formatBetrag,
   liquideMittelReal,
   projiziereLiquiditaet,
   sollstand,
@@ -26,8 +29,7 @@ import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqlit
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { Card, CoverageTrack, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
-
-const TYP_LABEL: Record<TopfTyp, string> = { ersatz: "Ersatz", puffer: "Puffer", spartopf: "Spartopf" };
+import { useGeld } from "./EinstellungenProvider";
 
 function aktuellerMonatAb(): string {
   const n = new Date();
@@ -39,6 +41,13 @@ function heuteIso(): string {
 }
 
 export function DeckungScreen() {
+  const { t } = useTranslation();
+  const geld = useGeld();
+  const TYP_LABEL: Record<TopfTyp, string> = {
+    ersatz: t("deckung.typErsatz"),
+    puffer: t("deckung.typPuffer"),
+    spartopf: t("deckung.typSpartopf"),
+  };
   const ab = useMemo(aktuellerMonatAb, []);
   const heute = useMemo(heuteIso, []);
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
@@ -69,36 +78,47 @@ export function DeckungScreen() {
 
   return (
     <div className="screen">
-      <PageHead title="Deckung" subtitle="Sind deine Töpfe finanziert? Liquide Mittel = Summe der Kontostände" />
+      <PageHead title={t("deckung.titel")} subtitle={t("deckung.untertitel")} />
 
       <div className="kpis">
-        <KPIStat size="hero" label="Freie Liquidität" value={formatBetrag(frei, true)} unit="€" tone={frei < 0 ? "warn" : "plan"} />
-        <KPIStat size="chip" label="Liquide Mittel" value={formatBetrag(mittel)} unit="€" />
-        <KPIStat size="chip" label="Σ Topf-Sollstände" value={formatBetrag(sollSumme)} unit="€" />
-        <KPIStat size="chip" label="Deckungsgrad" value={String(deckung)} unit="%" tone={frei < 0 ? "warn" : "plan"} />
+        <KPIStat size="hero" label={t("deckung.kpiFreieLiquiditaet")} value={geld.format(frei, { mitVorzeichen: true })} unit={geld.symbol} tone={frei < 0 ? "warn" : "plan"} />
+        <KPIStat size="chip" label={t("deckung.kpiLiquideMittel")} value={geld.format(mittel)} unit={geld.symbol} />
+        <KPIStat size="chip" label={t("deckung.kpiSollSumme")} value={geld.format(sollSumme)} unit={geld.symbol} />
+        <KPIStat size="chip" label={t("deckung.kpiDeckungsgrad")} value={String(deckung)} unit="%" tone={frei < 0 ? "warn" : "plan"} />
       </div>
 
-      <Card title="Globale Deckung" subtitle="liquide Mittel gegen die Summe aller Topf-Sollstände">
+      <Card title={t("deckung.globalTitel")} subtitle={t("deckung.globalUntertitel")}>
         <CoverageTrack
           value={centZuEuro(mittel)}
           max={Math.max(1, centZuEuro(sollSumme))}
           over={frei < 0}
-          label={frei < 0 ? "Überplanung — zu viel verplant" : "gedeckt"}
-          right={`${formatBetrag(mittel)} / ${formatBetrag(sollSumme)} €`}
+          label={frei < 0 ? t("deckung.ueberplanung") : t("deckung.gedeckt")}
+          right={`${geld.format(mittel)} / ${geld.format(sollSumme)} ${geld.symbol}`}
         />
         <p className="muted" style={{ marginTop: "var(--sp-4)" }}>
-          {konten.length === 0
-            ? "Noch keine Kontostände — leg in Stammdaten → Konten deine Konten mit Saldo an."
-            : frei < 0
-            ? `Die freie Liquidität ist negativ (${formatBetrag(frei)} €) — die geplanten Töpfe übersteigen die liquiden Mittel. Kein Konto wird gekürzt; die Überplanung erscheint als globale Zahl.`
-            : `Nach Abzug aller Topf-Sollstände bleiben ${formatBetrag(frei, true)} € frei.`}
-          {" "}Die konten-zentrische Sicht (je Konto) kommt mit dem Ist-Schritt.
+          {konten.length === 0 ? (
+            t("deckung.hinweisKeineKonten")
+          ) : frei < 0 ? (
+            <Trans
+              i18nKey="deckung.hinweisUeberplanung"
+              values={{ betrag: `${geld.format(frei)} ${geld.symbol}` }}
+              components={{ b: <b style={{ color: "var(--ink)" }} /> }}
+            />
+          ) : (
+            <Trans
+              i18nKey="deckung.hinweisGedeckt"
+              values={{ betrag: `${geld.format(frei, { mitVorzeichen: true })} ${geld.symbol}` }}
+              components={{ b: <b style={{ color: "var(--ink)" }} /> }}
+            />
+          )}
+          {" "}
+          {t("deckung.hinweisKontensicht")}
         </p>
       </Card>
 
-      <Card title="Töpfe im Detail" subtitle="Plan-Sollstand heute gegen Zielwert">
+      <Card title={t("deckung.detailTitel")} subtitle={t("deckung.detailUntertitel")}>
         {sollToepfe.length === 0 ? (
-          <div className="muted">Keine Töpfe mit Zielwert. Lege Töpfe an, dann erscheint hier ihre Deckung.</div>
+          <div className="muted">{t("deckung.detailLeer")}</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
             {sollToepfe.map((t) => {
@@ -111,7 +131,7 @@ export function DeckungScreen() {
                       {t.bezeichnung} <Pill variant="neutral">{TYP_LABEL[t.typ]}</Pill>
                     </span>
                   </div>
-                  <CoverageTrack value={centZuEuro(soll)} max={centZuEuro(ziel)} right={`${formatBetrag(soll)} / ${formatBetrag(ziel)} €`} />
+                  <CoverageTrack value={centZuEuro(soll)} max={centZuEuro(ziel)} right={`${geld.format(soll)} / ${geld.format(ziel)} ${geld.symbol}`} />
                 </div>
               );
             })}

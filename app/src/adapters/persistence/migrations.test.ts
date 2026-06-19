@@ -43,7 +43,7 @@ function indexExistiert(db: Database, name: string): boolean {
 }
 
 const ERWARTETE_TABELLEN = [
-  "budget", "inventargegenstand", "ist_buchung", "kategorie", "person",
+  "budget", "einstellung", "inventargegenstand", "ist_buchung", "kategorie", "person",
   "szenario", "szenario_posten", "topf", "vertrag", "zahlungskonto", "zahlungsregel",
 ];
 
@@ -77,6 +77,13 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     const db = new SQL.Database();
     apply(db);
     expect(indexExistiert(db, "ux_ist_planref")).toBe(true);
+    db.close();
+  });
+
+  it("legt die Einstellungs-Tabelle an (v12, Key/Value)", () => {
+    const db = new SQL.Database();
+    apply(db);
+    expect(spalten(db, "einstellung")).toEqual(["schluessel", "wert"]);
     db.close();
   });
 });
