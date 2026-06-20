@@ -25,6 +25,19 @@ export interface PlanRef {
   readonly faelligkeit: string; // ISO
 }
 
+/**
+ * Verwendung — das explizit benannte Gegenkonto/Buchungsziel einer Ist-Buchung
+ * jenseits der Kostenart (ADR-0003). Macht die Zuordnung eindeutig statt aus der
+ * Kategorie geraten: derselbe Kategorienbaum kann Budget, Vertrag und Topf tragen,
+ * erst das Gegenkonto trennt sie. Der Charakter folgt aus dem Gegenkonto-Typ.
+ *
+ * Aktuell nur `topf` (Passivkonto, Rücklage/Rückstellung): aus der Kostenart nicht
+ * ableitbar, daher explizit. „Budget/Kostenart" bleibt implizit über `kategorieId`
+ * × Periode; die Plan-Posten-Verknüpfung (Vertrag/Regel) läuft weiter über `planRef`.
+ * Das n:m-/Teilbetrags-Zielbild (Zuordnung-Aggregat) kommt mit dem Bankimport.
+ */
+export type Verwendung = { readonly art: "topf"; readonly topfId: string };
+
 export interface IstBuchung {
   readonly id: string;
   /** Tatsächliches Buchungsdatum (ISO). */
@@ -44,8 +57,15 @@ export interface IstBuchung {
   readonly gegenkontoId?: string;
   /** Gesetzt bei „bezahlt-markiert"; ermöglicht 1:1-Abgleich mit dem Plan. */
   readonly planRef?: PlanRef;
+  /** Explizit benanntes Gegenkonto/Buchungsziel (ADR-0003), z. B. eine Topf-Entnahme. */
+  readonly verwendung?: Verwendung;
   /** Roh-Hash der Importzeile (Dedup gegen Bankimport, später). */
   readonly rohHash?: string;
+}
+
+/** Alle Ist-Buchungen, die auf einen bestimmten Topf gebucht sind (Entnahmen). */
+export function topfBuchungen(buchungen: IstBuchung[], topfId: string): IstBuchung[] {
+  return buchungen.filter((b) => b.verwendung?.art === "topf" && b.verwendung.topfId === topfId);
 }
 
 /** Stabiler Schlüssel eines Plan-Postens (Quelle + Fälligkeit) für 1:1-Matching. */

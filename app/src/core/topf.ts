@@ -7,6 +7,8 @@
 
 import { monateZwischen } from "./datum";
 import type { Cent } from "./geld";
+import type { IstBuchung } from "./istbuchung";
+import type { Charakter } from "./zahlungsregel";
 
 export type TopfTyp = "ersatz" | "puffer" | "spartopf";
 
@@ -73,4 +75,39 @@ export function sollstand(topf: Topf, am: string): Cent | null {
   if (ziel == null) return null;
   const monate = Math.max(0, monateZwischen(topf.start, am));
   return Math.min(ansparrate(topf) * monate, ziel);
+}
+
+/**
+ * Charakter einer Topf-Entnahme nach Topf-Typ (ADR-0003 §5). Aus dem Gegenkonto-Typ
+ * abgeleitet, nicht frei gewählt:
+ *  • Ersatz/Puffer (Rücklage/Rückstellung): Entnahme = **Umschichtung** — die
+ *    Vorsorge wird aufgelöst, der Aufwand wurde über die Nutzungsdauer schon getragen.
+ *  • Spartopf (Konsumsparen): Entnahme = **Aufwand** — jetzt erst entsteht der Konsum.
+ */
+export function entnahmeCharakter(typ: TopfTyp): Charakter {
+  return typ === "spartopf" ? "Aufwand" : "Umschichtung";
+}
+
+/**
+ * Realer Topf-Stand am Datum `am`: kalkulatorischer Aufbau (lineare Zuführung ab
+ * `start`, bei vorhandenem Ziel gedeckelt) **minus** die realen Entnahmen (Ist-Buchungen
+ * mit Verwendung = dieser Topf, ADR-0003 §6). `entnahmen` sind die Buchungen DIESES
+ * Topfes; ihre Beträge sind negativ (Abfluss) und senken den Stand.
+ *
+ * Bei **Ersatz** zählen nur Entnahmen NACH dem aktuellen Zyklus-Start: die „ersetzt"-
+ * Aktion setzt `start` auf den Anschaffungstag und schließt damit den alten Zyklus ab;
+ * die auslösende Entnahme liegt auf dem Start und gehört nicht mehr in den neuen Aufbau.
+ *
+ * Ein negativer Stand = Überziehung (mehr entnommen als angespart) — der einzige echte
+ * GuV-Effekt einer Unterdeckung; die UI weist ihn aus.
+ */
+export function topfStand(topf: Topf, am: string, entnahmen: IstBuchung[]): Cent {
+  const monate = Math.max(0, monateZwischen(topf.start, am));
+  const ziel = zielwert(topf);
+  const roh = ansparrate(topf) * monate;
+  const aufbau = ziel == null ? roh : Math.min(roh, ziel);
+  const relevant =
+    topf.typ === "ersatz" ? entnahmen.filter((b) => b.datum > topf.start) : entnahmen;
+  const summeEntnahmen = relevant.reduce((s, b) => s + b.betrag, 0);
+  return aufbau + summeEntnahmen;
 }

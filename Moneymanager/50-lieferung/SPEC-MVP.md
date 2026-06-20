@@ -261,6 +261,19 @@ direkt gegen Ist; Töpfe laufen mit, ihre Zuführung ist (kontolos) kalkulatoris
 nur in der „freien Liquidität", ihr Verbrauch ist real und macht Überziehung pro Topf sichtbar;
 Deckung ist eine globale Leseschicht (freie Liquidität; sie darf ins Minus = Überplanung).
 
+> **Nachtrag (ADR-0003, 2026-06-18) — zwei Punkte abgelöst, gebaut 2026-06-20:**
+> 1. **Zuordnung über das Gegenkonto, nicht die Kategorie.** Ein Topf-Verbrauch wird nicht
+>    mehr „über die Topf-Kategorie" erschlossen (Schritt 4 oben), sondern die Ist-Buchung
+>    benennt den Topf **explizit** als Verwendung (`verwendung = {art:"topf"}`). Die Kategorie
+>    bleibt reine KLR-Analyseachse; das Budget-Matching (Schritt 3) läuft weiter automatisch
+>    über Kategorie × Periode.
+> 2. **Charakter folgt aus dem Topf-Typ.** Gedeckte Entnahme aus **Ersatz/Puffer** ist
+>    **Umschichtung** (Rücklage/Rückstellung auflösen), nicht Aufwand — sie ist für die freie
+>    Liquidität neutral, der Aufwand wurde über die Nutzungsdauer schon getragen. Nur die
+>    **Spartopf**-Entnahme ist Aufwand (Konsum) — das H&M-Beispiel (Schritt 4) bleibt also
+>    korrekt, weil „Klamotten" ein Spartopf ist. Über-/Unterdeckung am Zyklus-Ende ist der
+>    einzige echte GuV-Effekt. Bei **Ersatz** startet „ersetzt" den Abschreibungszyklus neu.
+
 ## 5. Datenmodell-Skizze (konsolidiert)
 
 Leitsatz: **Planbuchungen werden berechnet, nicht gespeichert** (TAKTIK-PLANUNG §0).
