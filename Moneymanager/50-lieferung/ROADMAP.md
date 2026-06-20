@@ -1,8 +1,8 @@
 # Moneymanager — Roadmap
 
-> **DDD-Ebene:** Lieferung — Roadmap (Now/Next/Later) · **Status:** aktiv · **Stand:** 2026-06-13 · **Bezüge:** KONZEPT, SPEC-MVP, BAUPLAN-MVP
+> **DDD-Ebene:** Lieferung — Roadmap (Now/Next/Later) · **Status:** aktiv · **Stand:** 2026-06-20 · **Bezüge:** KONZEPT, SPEC-MVP, BAUPLAN-MVP
 
-> Stand: 2026-06-07 · Format: Now / Next / Later · Team: Bruce + Claude
+> Stand: 2026-06-20 (zuletzt geradegezogen) · Format: Now / Next / Later · Team: Bruce + Claude
 > Grundlage: KONZEPT.md (§ 7 Feature-Schnitt), KI-KONZEPT.md, DDD-Vorgehen
 
 ## Leitplanken
@@ -13,6 +13,25 @@
 - **Buchungspackage erst zum Ist-Schritt.** Es wird erst zur echten Abhängigkeit, wenn echte
   Ist-Buchungen entstehen (Import → Ist-Journal). Die Basis (Stammdaten, Verträge, Inventar,
   Budgets, Plan-only-Projektion) ist app-seitig ohne das Package baubar.
+
+---
+
+## Gebaut — Stand v0.9.0 (2026-06-20)
+
+Die App ist über die reine Plan-Projektion hinaus; der Ist-Schritt läuft app-seitig
+(Ledger-Port), das Buchungspackage ist dafür noch **nicht** gebunden.
+
+| Phase | Inhalt | Stand |
+|---|---|---|
+| P0 | Walking Skeleton (Regel → Projektion → SQLite) | ✓ |
+| P1 | Stammdaten (Personen, Konten, Kategorien) | ✓ |
+| P2 | Verträge · Budgets · Inventar/Töpfe · Liquiditätsplaner · Szenario | ✓ |
+| P3 | Ist „light" (ADR-0002): bezahlt-markieren, Ledger-Port, Reconciliation light, Konto-Register, Umbuchen | ✓ |
+| P3.1 | Topf-Entnahme als Buchungssatz, realer Topf-Stand, Budget Plan/Ist (ADR-0003) | ✓ |
+| — | Internationalisierung: Sprache + Mehrwährung, strikt locale-gekoppelt (ADR-0004) | ✓ (v0.8.0) |
+
+Damit haben **alle drei Plan-Flächen** (Verträge, Budgets, Töpfe/Inventar) einen Ist-Abgleich.
+Die Zuordnung läuft über das benannte Gegenkonto, nicht über die Kategorie (ADR-0003).
 
 ---
 
@@ -48,14 +67,41 @@ Ziel: Entwicklerfreundliche Spec, dann Baustart.
    - Dazu die KI-Vorbereitungen ohne KI (KI-KONZEPT § 4): Vorschlags-Status,
      Review-Inbox, Engine als Funktionskatalog, Dokumentenablage
 
-**Abhängigkeit (normalisiert):** Die Basis des MVP — Stammdaten, Verträge, Inventar inkl.
-Abschreibung/Ansparrate, Budgets/Töpfe und die Plan-only-Projektion — braucht das Package
-*nicht*; sie rechnet rein app-seitig (Planbuchungen werden berechnet, nicht gespeichert).
-Das Buchungspackage (Ist-Journal, Stichtagssalden, KLR-Dimensionen, Rechenwerk) wird erst
-nötig, sobald echte Ist-Buchungen ins Spiel kommen: Import → Ist-Journal, Plan/Ist-Abgleich
-und der Ist-Anteil im Liquiditätsverlauf. Need-by: vor diesem Ist-Schritt, nicht vor der
-Plan-Projektion. Früh fix stehen muss nur **A5 (Buchungsformat-Schema)**. Contingency: gegen
-ein Interface/Mock des Rechenwerks starten.
+**Abhängigkeit (Stand 2026-06-20):** Die Basis des MVP rechnet app-seitig, ohne Package —
+das ist gebaut. Der Ist-Schritt „light" läuft ebenfalls app-seitig hinter dem `LedgerPort`
+(ADR-0002/0003). Das echte Buchungspackage **summae** wird erst zur Abhängigkeit, wenn der
+**Bankimport** kommt (Import → Ist-Journal, Stichtagssalden, KLR, Plan/Ist auf echter Masse).
+
+**summae-Prüfung (2026-06-20):** Der Doppik-/KLR-Kern ist reif und deckt **A1–A8** ab
+(A5-Datenformat versioniert als JSON-Schema v0.4; pure-function-Rechenwerk, Stichtagssalden,
+Dimensionen, stabile UUID-v7-IDs, Storno bidirektional, konfigurierbarer Kontenrahmen).
+summae existiert in PHP (Referenz) und **TypeScript/Node** (byte-identisch über eine gemeinsame
+Testsuite) — **noch nicht in Rust**. Offen buchungsseitig nur **A4** (kalkulatorische Buchungen
+über Dimensionen gelöst, nicht als eigene Buchungsart markiert) — heute irrelevant, weil wir die
+kalkulatorische Abschreibung app-seitig als Plan rechnen.
+
+**Anbindung (entschieden 2026-06-20): TS-Kern in die Webview bündeln.** Der TS-Kern hängt nur
+von `big.js` ab; die einzige Node-Bindung sind zwei `node:crypto`-Aufrufe (`randomBytes` in
+`Uuid.v7`, `createHash` im Export). Lösung: schlanker Web-Crypto-Shim (`getRandomValues` /
+`subtle.digest`) + Vite-Alias, dann bündelt Vite den reifen TS-Kern direkt mit. Der GoBD-Engine
+läuft damit im Webview (JS, byte-identisch getestet). **Rust-summae bleibt das spätere Ziel**
+(Produktwert über Moneymanager hinaus, saubere `src-tauri`-Grenze) — weil Moneymanager summae
+nur über den `LedgerPort` anspricht, ist der spätere Umstieg ein Port-Tausch, kein Umbau.
+Verworfen: auf den Rust-Rewrite warten (würde den Import unnötig lange blockieren).
+
+### Nächster Schritt — Bankimport (P3.5), entblockt
+
+A5 steht (summae v0.4), Anbindung entschieden (TS-Bundle, oben). Reihenfolge:
+
+1. **summae-core einbinden** — Web-Crypto-Shim (`randomBytes`→`getRandomValues`,
+   `createHash`→`subtle.digest`/pure-js sha256) + Vite-Alias auf `node:crypto`, Dependency
+   ziehen, Smoke-Test: Konto anlegen → buchen → Stichtagssaldo im laufenden Tauri-Fenster.
+2. **CSV/CAMT-Import** als zweite Quelle hinter dem `LedgerPort` (TAKTIK-IMPORT).
+3. **Auto-Matching + Dedup** (Manuell ↔ Import; n:m/Teilbeträge = das `Zuordnung`-Aggregat,
+   das ADR-0003 §7 bewusst auf diesen Schritt vertagt hat).
+4. Danach: echtes summae hinter dem `LedgerPort` (provisorisches Ist-Format → A5 per ACL).
+
+Contingency entfällt weitgehend: kein Mock nötig, da summae fachlich nutzbar ist.
 
 ## LATER — Ausbaustufen (Richtung, bewusst grob)
 
@@ -85,4 +131,5 @@ ein Interface/Mock des Rechenwerks starten.
 |---|---|
 | ~~Schnitt Stammdaten ↔ Planung~~ ✓ getrennte Kontexte, gemeinsame UI | entschieden 2026-06-07 |
 | ~~Plattform (Desktop vs. lokaler Server)~~ ✓ lokale Desktop-App, React+TS, Tauri (ADR-0001) | entschieden 2026-06-13 |
+| ~~summae-Anbindung~~ ✓ **TS-Kern in die Webview bündeln + `node:crypto`-Shim** — reversibel über den `LedgerPort`, Rust-summae bleibt späteres Ziel (Umstieg = Port-Tausch). Kehrt die Annahme vom 2026-06-19 um. | entschieden 2026-06-20 |
 | Runtime-Strategie KI (Ollama extern vs. llama.cpp embedded) | LATER, vor KI-Stufe 1 |
