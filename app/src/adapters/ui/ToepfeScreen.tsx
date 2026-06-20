@@ -1,6 +1,10 @@
 // Töpfe (P2.3) — Ansparen für Ungewisses (Puffer) und Wünsche (Spartopf). Kein Reset,
 // du entnimmst, wenn du's brauchst. Der Ersatz-Fall (Gegenstände) lebt eigenständig im
-// Bereich „Inventar". Plan-only.
+// Bereich „Inventar".
+//
+// Realer Stand seit ADR-0003: kalkulatorischer Aufbau − reale Entnahmen (Ist-Buchungen
+// mit Verwendung = Topf). „Entnehmen" bucht einen Abfluss vom Konto; der Charakter folgt
+// aus dem Topf-Typ (Puffer → Umschichtung, Spartopf → Aufwand).
 //
 // i18n + Mehrwährung nach ADR-0004 (Muster: BudgetsScreen): sichtbare Strings über t(),
 // Geld über useGeld() (parse bei Eingabe, format + Symbol bei Anzeige).
@@ -11,14 +15,22 @@ import {
   ansparrate,
   centZuEuro,
   minorZuMajor,
-  sollstand,
+  topfBuchungen,
+  topfStand,
   zielwert,
+  type IstBuchung,
   type Kategorie,
   type Topf,
+  type Zahlungskonto,
 } from "../../core";
 import { topfAnlegen } from "../../application/topfAnlegen";
+import { topfEntnahme } from "../../application/topfEntnahme";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
-import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
+import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
+import {
+  sqliteKategorieRepository as kategorieRepo,
+  sqliteZahlungskontoRepository as kontoRepo,
+} from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
@@ -38,6 +50,16 @@ export function ToepfeScreen() {
   const heute = useMemo(heuteIso, []);
   const [toepfe, setToepfe] = useState<Topf[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
+  const [ist, setIst] = useState<IstBuchung[]>([]);
+  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
+
+  // Entnahme-Modal
+  const [entTopf, setEntTopf] = useState<Topf | null>(null);
+  const [entKonto, setEntKonto] = useState("");
+  const [entDatum, setEntDatum] = useState(heute);
+  const [entBetrag, setEntBetrag] = useState("");
+  const [entNotiz, setEntNotiz] = useState("");
+  const [entFehler, setEntFehler] = useState<string | null>(null);
 
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -54,10 +76,38 @@ export function ToepfeScreen() {
   async function laden() {
     setToepfe(await topfRepo.alle());
     setKategorien(await kategorieRepo.alle());
+    setIst(await ledgerRepo.alle());
+    setKonten(await kontoRepo.alle());
   }
   useEffect(() => {
     laden();
   }, []);
+
+  function entnehmenOeffnen(tp: Topf) {
+    setEntTopf(tp);
+    setEntKonto(konten[0]?.id ?? "");
+    setEntDatum(heute);
+    setEntBetrag("");
+    setEntNotiz("");
+    setEntFehler(null);
+  }
+  async function entnehmenSpeichern() {
+    if (!entTopf) return;
+    setEntFehler(null);
+    try {
+      await topfEntnahme(ledgerRepo, {
+        topf: entTopf,
+        kontoId: entKonto,
+        datum: entDatum,
+        betrag: geld.parse(entBetrag) ?? 0,
+        notiz: entNotiz,
+      });
+      setEntTopf(null);
+      await laden();
+    } catch (e) {
+      setEntFehler(fehlerNachricht(t, e));
+    }
+  }
 
   // Nur Puffer + Spartopf hier; Ersatz-Töpfe gehören zum Inventar.
   const sichtbar = toepfe.filter((t) => t.typ !== "ersatz");
@@ -136,23 +186,26 @@ export function ToepfeScreen() {
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
             {sichtbar.map((tp) => {
               const ziel = zielwert(tp);
-              const soll = sollstand(tp, heute);
+              const stand = topfStand(tp, heute, topfBuchungen(ist, tp.id));
+              const ueberzogen = stand < 0;
               return (
                 <div key={tp.id}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <span style={{ fontWeight: "var(--fw-bold)" }}>
                       {tp.bezeichnung} <Pill variant="neutral">{t(`toepfe.art.${tp.typ}`)}</Pill>
+                      {ueberzogen && <> <Pill variant="warn">{t("toepfe.ueberzogen")}</Pill></>}
                     </span>
                     <span className="muted">
                       {t("toepfe.ansparrate")} {geld.format(ansparrate(tp))} {geld.symbol}{t("toepfe.proMonatKurz")}{"  ·  "}
+                      <button className="linkbtn" onClick={() => entnehmenOeffnen(tp)}>{t("toepfe.entnehmen")}</button>{"  ·  "}
                       <button className="linkbtn" onClick={() => bearbeiten(tp)}>{t("toepfe.bearbeiten")}</button>{"  ·  "}
                       <button className="linkbtn" onClick={() => topfRepo.loeschen(tp.id).then(laden)}>{t("toepfe.loeschen")}</button>
                     </span>
                   </div>
-                  {ziel != null && soll != null ? (
-                    <CoverageTrack value={centZuEuro(soll)} max={centZuEuro(ziel)} label={t("toepfe.sollstandHeuteZiel")} right={`${geld.format(soll)} / ${geld.format(ziel)} ${geld.symbol}`} />
+                  {ziel != null ? (
+                    <CoverageTrack value={centZuEuro(Math.max(0, stand))} max={centZuEuro(ziel)} label={t("toepfe.standHeuteZiel")} right={`${geld.format(stand)} / ${geld.format(ziel)} ${geld.symbol}`} />
                   ) : (
-                    <div className="muted">{t("toepfe.keinSparziel")}</div>
+                    <div className="muted">{t("toepfe.keinSparziel")} · {geld.format(stand)} {geld.symbol}</div>
                   )}
                 </div>
               );
@@ -205,6 +258,38 @@ export function ToepfeScreen() {
               </>
             )}
           </div>
+        </Modal>
+      )}
+
+      {entTopf && (
+        <Modal
+          title={t("toepfe.modalEntnehmen")}
+          subtitle={`${entTopf.bezeichnung} · ${t("toepfe.entnahmeUntertitel")}`}
+          onClose={() => setEntTopf(null)}
+          footer={<><Button variant="primary" onClick={entnehmenSpeichern}>{t("toepfe.speichern")}</Button><button className="linkbtn" onClick={() => setEntTopf(null)}>{t("toepfe.abbrechen")}</button>{entFehler && <span className="err">{entFehler}</span>}</>}
+        >
+          {konten.length === 0 ? (
+            <div className="muted">{t("toepfe.keinKonto")}</div>
+          ) : (
+            <div className="form-grid">
+              <FormField label={t("toepfe.feldKonto")} required>
+                <select className="field" value={entKonto} onChange={(e) => setEntKonto(e.target.value)}>
+                  {konten.map((k) => (
+                    <option key={k.id} value={k.id}>{k.bezeichnung}</option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label={t("toepfe.feldDatum")}>
+                <input className="field" type="date" value={entDatum} onChange={(e) => setEntDatum(e.target.value)} />
+              </FormField>
+              <FormField label={`${t("toepfe.feldBetrag")} ${geld.symbol}`} required>
+                <input className="field" inputMode="decimal" value={entBetrag} onChange={(e) => setEntBetrag(e.target.value)} placeholder="0,00" />
+              </FormField>
+              <FormField label={t("toepfe.feldNotiz")}>
+                <input className="field" value={entNotiz} onChange={(e) => setEntNotiz(e.target.value)} placeholder={t("toepfe.notizPlatzhalter")} />
+              </FormField>
+            </div>
+          )}
         </Modal>
       )}
     </div>

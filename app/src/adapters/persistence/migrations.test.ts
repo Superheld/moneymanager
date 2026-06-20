@@ -1,5 +1,5 @@
 // Migrations-Tests gegen ein echtes In-Memory-SQLite (sql.js, WASM — kein nativer Build,
-// CI-tauglich). Validiert die Kette v1–v11 ohne Tauri-Runtime: Schema entsteht sauber,
+// CI-tauglich). Validiert die Kette v1–v13 ohne Tauri-Runtime: Schema entsteht sauber,
 // alle ALTERs greifen, der Dedup-Index erzwingt die 1:1-Garantie, und die Migration läuft
 // auch inkrementell (von einer älteren DB vorwärts). Das ist die Schicht, die reine
 // Core-Tests prinzipiell nicht erreichen.
@@ -66,9 +66,9 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     );
     // v6
     expect(spalten(db, "topf")).toContain("inventar_id");
-    // v9/v10/v11
+    // v9/v10/v11/v13
     expect(spalten(db, "ist_buchung")).toEqual(
-      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "roh_hash"]),
+      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "verwendung_topf_id", "roh_hash"]),
     );
     db.close();
   });

@@ -172,4 +172,8 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 13, // ADR-0003 — Verwendung: explizit benanntes Gegenkonto (Topf) an der Ist-Buchung
+    sql: [`ALTER TABLE ist_buchung ADD COLUMN verwendung_topf_id TEXT`],
+  },
 ];
