@@ -1,22 +1,27 @@
 // Budgets (P2.2) — Übersicht der Rahmen je Kategorie; Anlegen im Modal.
-// Plan-only; Reset zum Periodenende (kein Übertrag). Ist-Wirkung ab P3.
+// Reset zum Periodenende (kein Übertrag). Plan/Ist seit ADR-0003: „verbraucht" =
+// bestätigte Aufwands-Ist-Buchungen der Kategorie in der laufenden Periode (Matching
+// automatisch über Kategorie × Periode); gedeckte Topf-Entnahmen (Umschichtung) zählen
+// nicht doppelt.
 //
 // PILOT für ADR-0004: alle sichtbaren Strings laufen über t()/<Trans>, alles Geld über
-// useGeld() (Parse bei Eingabe, Format + Symbol bei Anzeige). Dieser Screen ist das
-// Muster, an dem die übrigen Screens nachgezogen werden — bis dahin nutzen sie weiter
-// die EUR-festen Back-compat-Helfer.
+// useGeld() (Parse bei Eingabe, Format + Symbol bei Anzeige).
 
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
+  budgetVerbrauch,
   geglaetteterMonatsabfluss,
   minorZuMajor,
+  periodeFenster,
   type Budget,
   type BudgetPeriode,
+  type IstBuchung,
   type Kategorie,
 } from "../../core";
 import { budgetAnlegen } from "../../application/budgetAnlegen";
 import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
+import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, FormField } from "./ds";
 import { PageHead } from "./PageHead";
@@ -26,11 +31,18 @@ import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
 
 const PERIODEN: BudgetPeriode[] = ["monatlich", "jaehrlich"];
 
+function heuteIso(): string {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+}
+
 export function BudgetsScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
+  const heute = useMemo(heuteIso, []);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
+  const [ist, setIst] = useState<IstBuchung[]>([]);
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [kategorieId, setKategorieId] = useState("");
@@ -41,6 +53,12 @@ export function BudgetsScreen() {
   async function laden() {
     setBudgets(await budgetRepo.alle());
     setKategorien(await kategorieRepo.alle());
+    setIst(await ledgerRepo.alle());
+  }
+
+  function verbrauch(b: Budget): number {
+    const { von, bis } = periodeFenster(b.periode, heute);
+    return budgetVerbrauch(ist, b.kategorieId, von, bis);
   }
   useEffect(() => {
     laden();
@@ -94,6 +112,9 @@ export function BudgetsScreen() {
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
         <Trans i18nKey="budgets.erklaerung" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
       </p>
+      <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
+        {t("budgets.verbrauchHinweis")}
+      </p>
 
       <Card>
         {budgets.length === 0 ? (
@@ -105,6 +126,8 @@ export function BudgetsScreen() {
               { key: "periode", label: t("budgets.spaltePeriode"), render: (b) => t(`budgets.periode.${b.periode}`) },
               { key: "rahmen", label: `${t("budgets.spalteRahmen")} ${geld.symbol}`, align: "right", render: (b) => geld.format(b.rahmen) },
               { key: "geglaettet", label: `${t("budgets.spalteProMonat")} ${geld.symbol}`, align: "right", render: (b) => geld.format(geglaetteterMonatsabfluss(b)) },
+              { key: "verbraucht", label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`, align: "right", render: (b) => geld.format(verbrauch(b)) },
+              { key: "rest", label: `${t("budgets.spalteRest")} ${geld.symbol}`, align: "right", render: (b) => geld.format(b.rahmen - verbrauch(b)) },
               { key: "_e", label: "", align: "right", render: (b) => <button className="linkbtn" onClick={() => bearbeiten(b)}>{t("budgets.bearbeiten")}</button> },
               {
                 key: "_x",

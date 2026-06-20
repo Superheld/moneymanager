@@ -14,12 +14,15 @@ plus Finanzplan*. Sie unterscheidet konsequent:
 **Lokal first:** Alle Daten bleiben auf dem Gerät, keine Cloud-Pflicht. Funktioniert ohne KI —
 der Kern (Projektion, Töpfe, Liquidität) ist reine Arithmetik.
 
-## Status — v0.8.0 (Internationalisierung: Sprache + Mehrwährung)
+## Status — v0.9.0 (Topf-Entnahme als Buchungssatz + Plan/Ist)
 
 Die komplette **Planungsseite** ist gebaut und unit-getestet; dazu der **Ist-Schritt „light"**
 (ADR-0002): geplante Posten als bezahlt abhaken, realer Kontostand, Plan/Ist je Posten, ein
 **Konto-Register** (gebuchte + voraussichtliche Buchungen je Konto, manuelle Buchungen) und
-**Umbuchen** zwischen Konten (verknüpfte Doppelbuchung, Charakter Umschichtung).
+**Umbuchen** zwischen Konten (verknüpfte Doppelbuchung, Charakter Umschichtung). Neu (ADR-0003):
+**Töpfe und Inventar** zeigen den **realen Stand** und erlauben echte **Entnahmen** (Charakter
+aus dem Topf-Typ abgeleitet, Ersatz-Zyklus startet bei „ersetzt" neu); **Budgets** zeigen
+Plan/Ist (verbraucht/Rest) — Zuordnung über das benannte Gegenkonto, nicht über die Kategorie.
 
 | Phase | Inhalt | Status |
 |---|---|---|
@@ -27,8 +30,9 @@ Die komplette **Planungsseite** ist gebaut und unit-getestet; dazu der **Ist-Sch
 | P1 | Stammdaten (Personen, Konten, Kategorien) | ✓ |
 | P2 | Verträge · Budgets · Inventar/Töpfe · Liquiditätsplaner · Szenario | ✓ |
 | P3 | Ist light — „bezahlt markieren", Ledger-Port, Reconciliation light, Konto-Register (ADR-0002) | ✓ |
+| P3.1 | Topf-Entnahme als Buchungssatz, realer Topf-Stand, Budget Plan/Ist (ADR-0003) | ✓ |
 | P3.5 | Bankimport (zweite Quelle hinter dem Ledger-Port) + Auto-Matching | offen |
-| P4 | Analysen + KI-Vorbereitung | offen |
+| P4 | Weitere Analysen + KI-Vorbereitung | offen |
 
 Nutzbar: Verträge/Budgets/Töpfe fließen in eine 12-Monats-Projektion mit zwei Kurven
 (Kontosaldo + freie Liquidität); Überplanung wird sichtbar; What-if per Szenario. Geplante
