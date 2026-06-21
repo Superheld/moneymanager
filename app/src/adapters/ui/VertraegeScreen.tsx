@@ -7,6 +7,7 @@ import {
   kuendigungsterminNaht,
   minorZuMajor,
   naechsterKuendigungstermin,
+  RHYTHMUS_MONATE,
   type Charakter,
   type Kategorie,
   type Person,
@@ -24,7 +25,7 @@ import {
   sqlitePersonRepository as personRepo,
   sqliteZahlungskontoRepository as kontoRepo,
 } from "../persistence/sqliteStammdatenRepositories";
-import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
@@ -86,6 +87,17 @@ export function VertraegeScreen() {
     return m;
   }, [regeln]);
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
+
+  const summe = useMemo(() => {
+    let proMonat = 0;
+    let baldKuendbar = 0;
+    for (const v of vertraege) {
+      const r = regelZuVertrag.get(v.id);
+      if (r) proMonat += r.betrag / RHYTHMUS_MONATE[r.rhythmus];
+      if (kuendigungsterminNaht(v, heute)) baldKuendbar++;
+    }
+    return { proMonat: Math.round(proMonat), proJahr: Math.round(proMonat * 12), baldKuendbar };
+  }, [vertraege, regelZuVertrag, heute]);
 
   function kategorieWaehlen(id: string) {
     setKategorieId(id);
@@ -166,17 +178,29 @@ export function VertraegeScreen() {
         }
       />
 
+      {vertraege.length > 0 && (
+        <div className="kpis">
+          <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(vertraege.length)} />
+          <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} />
+          {summe.baldKuendbar > 0 && <KPIStat size="chip" label={t("vertraege.kpiBald")} value={String(summe.baldKuendbar)} tone="warn" />}
+        </div>
+      )}
+
       <Card>
         {vertraege.length === 0 ? (
           <div className="muted">{t("vertraege.leer")}</div>
         ) : (
           <DataTable
+            sortable
+            pageSize={25}
             columns={[
               { key: "anbieter", label: t("vertraege.spalteAnbieter") },
-              { key: "inhaber", label: t("vertraege.spalteInhaber"), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
+              { key: "inhaber", label: t("vertraege.spalteInhaber"), sortValue: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "" : ""), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
               {
                 key: "charakter",
                 label: t("vertraege.spalteCharakter"),
+                sortValue: (v) => regelZuVertrag.get(v.id)?.charakter ?? "",
                 render: (v) => {
                   const r = regelZuVertrag.get(v.id);
                   return r ? <Pill variant={CHARAKTER_PILL[r.charakter]}>{t(`charakter.${r.charakter}`)}</Pill> : "—";
@@ -185,6 +209,7 @@ export function VertraegeScreen() {
               {
                 key: "rhythmus",
                 label: t("vertraege.spalteRhythmus"),
+                sortValue: (v) => regelZuVertrag.get(v.id)?.rhythmus ?? "",
                 render: (v) => {
                   const r = regelZuVertrag.get(v.id);
                   return r ? t(`vertraege.rhythmus.${r.rhythmus}`) : "—";
@@ -193,6 +218,7 @@ export function VertraegeScreen() {
               {
                 key: "kuendigung",
                 label: t("vertraege.spalteKuendigenBis"),
+                sortable: false,
                 render: (v) => {
                   const termin = naechsterKuendigungstermin(v, heute);
                   if (!termin) return <span className="muted">—</span>;
@@ -208,16 +234,18 @@ export function VertraegeScreen() {
                 key: "betrag",
                 label: `${t("vertraege.spalteBetrag")} ${geld.symbol}`,
                 align: "right",
+                sortValue: (v) => regelZuVertrag.get(v.id)?.betrag ?? 0,
                 render: (v) => {
                   const r = regelZuVertrag.get(v.id);
                   return r ? geld.format(r.betrag) : "—";
                 },
               },
-              { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
+              { key: "_e", label: "", align: "right", sortable: false, render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
               {
                 key: "_x",
                 label: "",
                 align: "right",
+                sortable: false,
                 render: (v) => (
                   <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id).then(laden)}>
                     {t("vertraege.loeschen")}
