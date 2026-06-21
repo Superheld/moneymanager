@@ -61,6 +61,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [aktivId, setAktivId] = useState("");
   const [tage, setTage] = useState(30);
+  const [regLimit, setRegLimit] = useState(50);
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -76,6 +77,10 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   useEffect(() => {
     laden();
   }, []);
+  // Beim Kontowechsel die Register-Historie wieder einklappen.
+  useEffect(() => {
+    setRegLimit(50);
+  }, [aktivId]);
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
@@ -151,8 +156,15 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           {/* Anfangsbestand */}
           <Zeile links={<span style={{ color: "var(--ink-3)", fontWeight: 600 }}>{t("konten.anfangsbestand")}</span>} saldo={aktiv.saldo} />
 
-          {/* Gebuchtes Ist */}
-          {register.gebucht.map((z) => (
+          {/* Gebuchtes Ist (nur die jüngsten regLimit; ältere auf Wunsch) */}
+          {register.gebucht.length > regLimit && (
+            <div style={{ padding: "8px 0", textAlign: "center" }}>
+              <button className="linkbtn" onClick={() => setRegLimit((l) => l + 200)}>
+                {t("konten.aeltereAnzeigen", { n: register.gebucht.length - regLimit })}
+              </button>
+            </div>
+          )}
+          {register.gebucht.slice(Math.max(0, register.gebucht.length - regLimit)).map((z) => (
             <Zeile
               key={z.istId}
               links={
