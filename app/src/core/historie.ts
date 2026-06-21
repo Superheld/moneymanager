@@ -4,7 +4,9 @@
 
 import { addMonate, parseIso } from "./datum";
 import type { Cent } from "./geld";
+import type { Charakter } from "./zahlungsregel";
 import type { IstBuchung } from "./istbuchung";
+import type { Kategorie } from "./kategorie";
 import { liquideMittel, type Zahlungskonto } from "./konto";
 
 export interface MonatsIst {
@@ -76,6 +78,62 @@ export function istMonatsverlauf(
     cursor = addMonate(cursor, 1);
   }
   return reihe;
+}
+
+export interface KategorieSumme {
+  /** undefined = unkategorisiert. */
+  readonly kategorieId?: string;
+  readonly name: string;
+  /** Name der Hauptgruppe (Elternkategorie), falls vorhanden. */
+  readonly elternName?: string;
+  readonly charakter: Charakter;
+  /** Vorzeichenbehaftete Summe (Ausgaben negativ). */
+  readonly summe: Cent;
+  readonly anzahl: number;
+}
+
+const OHNE = "__ohne__";
+
+/**
+ * Summiert die Ist-Buchungen im Fenster [vonIso, bisIso] (monatsgenau, inklusive) je
+ * Kategorie. Sortiert nach Betrag (Magnitude) absteigend — das Größte oben. Charakter und
+ * Namen werden über den Kategorie-Katalog aufgelöst; ohne Kategorie zählt separat.
+ */
+export function kategorieAggregat(
+  buchungen: readonly IstBuchung[],
+  vonIso: string,
+  bisIso: string,
+  kategorien: readonly Kategorie[],
+): KategorieSumme[] {
+  const byId = new Map(kategorien.map((k) => [k.id, k]));
+  const vonLabel = vonIso.slice(0, 7);
+  const bisLabel = bisIso.slice(0, 7);
+
+  const map = new Map<string, { summe: Cent; anzahl: number; charakter: Charakter }>();
+  for (const b of buchungen) {
+    const key = monatVon(b.datum);
+    if (key < vonLabel || key > bisLabel) continue;
+    const id = b.kategorieId ?? OHNE;
+    const e = map.get(id) ?? { summe: 0, anzahl: 0, charakter: b.charakter };
+    e.summe += b.betrag;
+    e.anzahl++;
+    map.set(id, e);
+  }
+
+  return [...map.entries()]
+    .map(([id, e]): KategorieSumme => {
+      const kat = id === OHNE ? undefined : byId.get(id);
+      const eltern = kat?.elternId ? byId.get(kat.elternId) : undefined;
+      return {
+        kategorieId: kat?.id,
+        name: kat?.name ?? "—",
+        elternName: eltern?.name,
+        charakter: kat?.defaultCharakter ?? e.charakter,
+        summe: e.summe,
+        anzahl: e.anzahl,
+      };
+    })
+    .sort((a, b) => Math.abs(b.summe) - Math.abs(a.summe));
 }
 
 /** Frühester Buchungsmonat als „YYYY-MM-01", oder undefined bei leerer Liste. */

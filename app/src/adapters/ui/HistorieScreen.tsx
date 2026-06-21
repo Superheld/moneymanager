@@ -4,16 +4,41 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { addMonate, fruehesterMonat, istMonatsverlauf, toIso, type IstBuchung, type Zahlungskonto } from "../../core";
+import { addMonate, fruehesterMonat, istMonatsverlauf, kategorieAggregat, toIso, type IstBuchung, type Kategorie, type Zahlungskonto } from "../../core";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
-import { Card, DataTable, KPIStat } from "./ds";
+import { sqliteZahlungskontoRepository as kontoRepo, sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
+import { Button, Card, CoverageTrack, DataTable, KPIStat } from "./ds";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { PageHead } from "./PageHead";
 import { useGeld } from "./EinstellungenProvider";
 
+import type { KategorieSumme } from "../../core";
+
 type Zeitraum = "12" | "24" | "jahr" | "alles";
+
+function KategorieSektion({ titel, items }: { titel: string; items: KategorieSumme[] }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
+  if (items.length === 0) return null;
+  const maxAbs = Math.max(1, ...items.map((i) => Math.abs(i.summe)));
+  return (
+    <div style={{ marginBottom: "var(--sp-4)" }}>
+      <div style={{ fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", marginBottom: "var(--sp-2)" }}>{titel}</div>
+      {items.map((i) => (
+        <div key={i.kategorieId ?? "__ohne"} style={{ padding: "7px 0" }}>
+          <CoverageTrack
+            value={Math.abs(i.summe)}
+            max={maxAbs}
+            over={false}
+            label={`${i.kategorieId ? i.name : t("historie.ohneKategorie")} · ${i.anzahl}`}
+            right={geld.formatMitSymbol(i.summe, { mitVorzeichen: true })}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
 
 function aktuellerMonat(): { y: number; m: number; d: number } {
   const n = new Date();
@@ -25,7 +50,9 @@ export function HistorieScreen() {
   const geld = useGeld();
   const [ist, setIst] = useState<IstBuchung[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
+  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("12");
+  const [aktivMonat, setAktivMonat] = useState<number | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
   useEffect(() => {
@@ -33,6 +60,7 @@ export function HistorieScreen() {
       try {
         setIst(await ledgerRepo.alle());
         setKonten(await kontoRepo.alle());
+        setKategorien(await kategorieRepo.alle());
         setFehler(null);
       } catch (e) {
         setFehler(e instanceof Error ? e.message : String(e));
@@ -50,6 +78,14 @@ export function HistorieScreen() {
   }, [zeitraum, ist]);
 
   const verlauf = useMemo(() => istMonatsverlauf(konten, ist, von, bis), [konten, ist, von, bis]);
+
+  const aufschluesselung = useMemo(() => {
+    if (verlauf.length === 0) return null;
+    const idx = aktivMonat != null && aktivMonat < verlauf.length ? aktivMonat : null;
+    const bvon = idx != null ? `${verlauf[idx].label}-01` : von;
+    const bbis = idx != null ? `${verlauf[idx].label}-01` : bis;
+    return { label: idx != null ? verlauf[idx].label : null, items: kategorieAggregat(ist, bvon, bbis, kategorien) };
+  }, [aktivMonat, verlauf, ist, kategorien, von, bis]);
 
   const summeEin = verlauf.reduce((s, m) => s + m.einnahmen, 0);
   const summeAus = verlauf.reduce((s, m) => s + m.ausgaben, 0);
@@ -78,7 +114,7 @@ export function HistorieScreen() {
             title={t("historie.flussTitel")}
             subtitle={t("historie.flussUntertitel")}
             action={
-              <select className="field" style={{ width: "auto" }} value={zeitraum} onChange={(e) => setZeitraum(e.target.value as Zeitraum)}>
+              <select className="field" style={{ width: "auto" }} value={zeitraum} onChange={(e) => { setZeitraum(e.target.value as Zeitraum); setAktivMonat(null); }}>
                 <option value="12">{t("historie.zr12")}</option>
                 <option value="24">{t("historie.zr24")}</option>
                 <option value="jahr">{t("historie.zrJahr")}</option>
@@ -87,10 +123,30 @@ export function HistorieScreen() {
             }
           >
             {verlauf.length > 0 && (
-              <MonatsFlussChart labels={verlauf.map((m) => m.label)} einnahmen={verlauf.map((m) => m.einnahmen)} ausgaben={verlauf.map((m) => m.ausgaben)} />
+              <MonatsFlussChart
+                labels={verlauf.map((m) => m.label)}
+                einnahmen={verlauf.map((m) => m.einnahmen)}
+                ausgaben={verlauf.map((m) => -m.ausgaben)}
+                onMonatClick={(i) => setAktivMonat((cur) => (cur === i ? null : i))}
+                aktivIndex={aktivMonat}
+              />
             )}
-            <div className="muted" style={{ marginTop: "var(--sp-2)", fontSize: "var(--fs-xs)" }}>{t("historie.flussDurchschnitt", { betrag: geld.formatMitSymbol(oeAus) })}</div>
+            <div className="muted" style={{ marginTop: "var(--sp-2)", fontSize: "var(--fs-xs)" }}>{t("historie.flussHinweis", { betrag: geld.formatMitSymbol(oeAus) })}</div>
           </Card>
+
+          {aufschluesselung && (
+            <Card
+              title={t("historie.katTitel")}
+              subtitle={aufschluesselung.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
+              action={aufschluesselung.label ? <Button variant="ghost" onClick={() => setAktivMonat(null)}>{t("historie.alleMonate")}</Button> : undefined}
+              style={{ marginTop: "var(--gap-card)" }}
+            >
+              <KategorieSektion titel={t("historie.sektionAusgaben")} items={aufschluesselung.items.filter((i) => i.charakter === "Aufwand")} />
+              <KategorieSektion titel={t("historie.sektionEinnahmen")} items={aufschluesselung.items.filter((i) => i.charakter === "Ertrag")} />
+              <KategorieSektion titel={t("historie.sektionUmschichtung")} items={aufschluesselung.items.filter((i) => i.charakter === "Umschichtung")} />
+              {aufschluesselung.items.length === 0 && <div className="muted">{t("historie.katLeer")}</div>}
+            </Card>
+          )}
 
           <Card title={t("historie.saldoTitel")} subtitle={t("historie.saldoUntertitel")} style={{ marginTop: "var(--gap-card)" }}>
             {verlauf.length > 0 && (
