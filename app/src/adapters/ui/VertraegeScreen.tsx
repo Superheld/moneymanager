@@ -7,6 +7,7 @@ import {
   kuendigungsterminNaht,
   minorZuMajor,
   naechsterKuendigungstermin,
+  RHYTHMUS_MONATE,
   type Charakter,
   type Kategorie,
   type Person,
@@ -24,7 +25,7 @@ import {
   sqlitePersonRepository as personRepo,
   sqliteZahlungskontoRepository as kontoRepo,
 } from "../persistence/sqliteStammdatenRepositories";
-import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
@@ -86,6 +87,17 @@ export function VertraegeScreen() {
     return m;
   }, [regeln]);
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
+
+  const summe = useMemo(() => {
+    let proMonat = 0;
+    let baldKuendbar = 0;
+    for (const v of vertraege) {
+      const r = regelZuVertrag.get(v.id);
+      if (r) proMonat += r.betrag / RHYTHMUS_MONATE[r.rhythmus];
+      if (kuendigungsterminNaht(v, heute)) baldKuendbar++;
+    }
+    return { proMonat: Math.round(proMonat), proJahr: Math.round(proMonat * 12), baldKuendbar };
+  }, [vertraege, regelZuVertrag, heute]);
 
   function kategorieWaehlen(id: string) {
     setKategorieId(id);
@@ -165,6 +177,15 @@ export function VertraegeScreen() {
           </Button>
         }
       />
+
+      {vertraege.length > 0 && (
+        <div className="kpis">
+          <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(vertraege.length)} />
+          <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} />
+          {summe.baldKuendbar > 0 && <KPIStat size="chip" label={t("vertraege.kpiBald")} value={String(summe.baldKuendbar)} tone="warn" />}
+        </div>
+      )}
 
       <Card>
         {vertraege.length === 0 ? (
