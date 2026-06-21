@@ -59,6 +59,7 @@ describe("finanzguruAdapter.lies", () => {
       gegenparteiIban: undefined,
       verwendungszweck: "Kartenzahlung",
       kontoIban: "[entfernt]",
+      kontoName: "Girokonto",
       glaeubigerId: undefined,
       quelle: "finanzguru",
       nativeId: "2da83348289587cbe750f887563fd417135d354e",
