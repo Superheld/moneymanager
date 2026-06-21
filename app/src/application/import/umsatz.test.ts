@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FachlicherFehler } from "../../core";
-import { alsDuplikat, kategorisieren, verbuchen, verwerfen, type Umsatz } from "./umsatz";
+import { alsDuplikat, kategorisieren, verbuchen, verwerfen, zuruecksetzen, type Umsatz } from "./umsatz";
 
 function basis(over: Partial<Umsatz> = {}): Umsatz {
   return {
@@ -50,5 +50,14 @@ describe("Umsatz — Statusmaschine", () => {
   it("ein verbuchter Umsatz lässt sich nicht erneut verbuchen", () => {
     const u = verbuchen(basis(), "ist-1");
     expect(() => verbuchen(u, "ist-2")).toThrow(FachlicherFehler);
+  });
+
+  it("zuruecksetzen führt verbucht → neu zurück (Umkehrung von verbuchen)", () => {
+    const verbucht = verbuchen(basis(), "ist-7");
+    const zurueck = zuruecksetzen(verbucht);
+    expect(zurueck.status).toBe("neu");
+    expect(zurueck.istbuchungId).toBeUndefined();
+    // nur aus verbucht erlaubt:
+    expect(() => zuruecksetzen(basis())).toThrow(FachlicherFehler);
   });
 });
