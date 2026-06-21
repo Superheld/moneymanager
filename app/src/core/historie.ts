@@ -146,6 +146,23 @@ export function istInterneUmbuchung(b: IstBuchung): boolean {
   return b.transferId != null || (b.charakter === "Umschichtung" && !b.kategorieId);
 }
 
+/**
+ * Einzelne Ist-Buchungen einer Kategorie im Fenster [vonIso, bisIso] (monatsgenau,
+ * inklusive), neueste zuerst. Für die Detail-Ansicht beim Klick auf eine Kategorie.
+ */
+export function buchungenDerKategorie(
+  buchungen: readonly IstBuchung[],
+  kategorieId: string,
+  vonIso: string,
+  bisIso: string,
+): IstBuchung[] {
+  const vonL = vonIso.slice(0, 7);
+  const bisL = bisIso.slice(0, 7);
+  return buchungen
+    .filter((b) => b.kategorieId === kategorieId && monatVon(b.datum) >= vonL && monatVon(b.datum) <= bisL)
+    .sort((a, b) => b.datum.localeCompare(a.datum));
+}
+
 /** Frühester Buchungsmonat als „YYYY-MM-01", oder undefined bei leerer Liste. */
 export function fruehesterMonat(buchungen: readonly IstBuchung[]): string | undefined {
   if (buchungen.length === 0) return undefined;

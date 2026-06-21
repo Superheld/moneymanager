@@ -38,6 +38,7 @@ function fakes() {
   const umsatzRepo: UmsatzRepository = {
     speichern: async (u) => { umsaetze.push(u); },
     speichernViele: async (us) => { umsaetze.push(...us); },
+    alle: async () => umsaetze,
     nachLauf: async (laufId) => umsaetze.filter((u) => u.laufId === laufId),
     offene: async () => umsaetze.filter((u) => u.status === "neu"),
     loeschen: async () => {},

@@ -24,6 +24,7 @@ function fakes() {
   const umsatzRepo = {
     speichern: async (u: Umsatz) => { gespeichert.push(u); },
     speichernViele: async () => {},
+    alle: async () => gespeichert,
     nachLauf: async () => [],
     offene: async () => [],
     loeschen: async () => {},
