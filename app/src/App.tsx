@@ -8,6 +8,8 @@ import { BudgetsScreen } from "./adapters/ui/BudgetsScreen";
 import { ToepfeScreen } from "./adapters/ui/ToepfeScreen";
 import { InventarScreen } from "./adapters/ui/InventarScreen";
 import { DeckungScreen } from "./adapters/ui/DeckungScreen";
+import { ImportScreen } from "./adapters/ui/ImportScreen";
+import { ReviewScreen } from "./adapters/ui/ReviewScreen";
 import { appBootstrap } from "./application/bootstrap";
 import { sqliteKategorieRepository } from "./adapters/persistence/sqliteStammdatenRepositories";
 import { EinstellungenProvider } from "./adapters/ui/EinstellungenProvider";
@@ -32,6 +34,8 @@ export default function App() {
         {screen === "budgets" && <BudgetsScreen />}
         {screen === "vertraege" && <VertraegeScreen />}
         {screen === "deckung" && <DeckungScreen />}
+        {screen === "import" && <ImportScreen />}
+        {screen === "review" && <ReviewScreen />}
         {screen === "einstellungen" && <EinstellungenScreen />}
       </AppShell>
     </EinstellungenProvider>
