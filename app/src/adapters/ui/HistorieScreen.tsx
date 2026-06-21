@@ -4,7 +4,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { addMonate, fruehesterMonat, istMonatsverlauf, kategorieAggregat, toIso, type IstBuchung, type Kategorie, type Zahlungskonto } from "../../core";
+import { addMonate, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, toIso, type IstBuchung, type Kategorie, type Zahlungskonto } from "../../core";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteZahlungskontoRepository as kontoRepo, sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, DataTable, KPIStat } from "./ds";
@@ -88,7 +88,9 @@ export function HistorieScreen() {
     const idx = aktivMonat != null && aktivMonat < verlauf.length ? aktivMonat : null;
     const bvon = idx != null ? `${verlauf[idx].label}-01` : von;
     const bbis = idx != null ? `${verlauf[idx].label}-01` : bis;
-    return { label: idx != null ? verlauf[idx].label : null, items: kategorieAggregat(ist, bvon, bbis, kategorien) };
+    // Interne Umbuchungen raus — sie verschieben nur Geld zwischen eigenen Konten.
+    const relevant = ist.filter((b) => !istInterneUmbuchung(b));
+    return { label: idx != null ? verlauf[idx].label : null, items: kategorieAggregat(relevant, bvon, bbis, kategorien) };
   }, [aktivMonat, verlauf, ist, kategorien, von, bis]);
 
   const summeEin = verlauf.reduce((s, m) => s + m.einnahmen, 0);

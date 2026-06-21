@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fruehesterMonat, istMonatsverlauf, kategorieAggregat } from "./historie";
+import { fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat } from "./historie";
 import type { IstBuchung } from "./istbuchung";
 import type { Kategorie } from "./kategorie";
 import type { Zahlungskonto } from "./konto";
@@ -88,6 +88,20 @@ describe("kategorieAggregat", () => {
     const r = kategorieAggregat([bk("2022-01-05", -1000, "Aufwand")], "2022-01-01", "2022-01-01", kategorien);
     expect(r).toHaveLength(1);
     expect(r[0]).toMatchObject({ kategorieId: undefined, name: "—", summe: -1000 });
+  });
+});
+
+describe("istInterneUmbuchung", () => {
+  const mk = (over: Partial<IstBuchung>): IstBuchung => ({ id: "x", datum: "2022-01-01", betrag: -1, kontoId: "k1", charakter: "Aufwand", quelle: "import", ...over });
+  it("erkennt importierte Umbuchungen (Umschichtung ohne Kategorie)", () => {
+    expect(istInterneUmbuchung(mk({ charakter: "Umschichtung" }))).toBe(true);
+  });
+  it("erkennt manuelle Umbuchungen (transferId gesetzt)", () => {
+    expect(istInterneUmbuchung(mk({ charakter: "Umschichtung", transferId: "t1" }))).toBe(true);
+  });
+  it("lässt Sparen (Umschichtung MIT Kategorie) und normale Buchungen durch", () => {
+    expect(istInterneUmbuchung(mk({ charakter: "Umschichtung", kategorieId: "sp" }))).toBe(false);
+    expect(istInterneUmbuchung(mk({ charakter: "Aufwand", kategorieId: "le" }))).toBe(false);
   });
 });
 
