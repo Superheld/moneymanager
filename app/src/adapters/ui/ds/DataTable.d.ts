@@ -20,6 +20,8 @@ export interface DataTableProps {
   istAktiv?: (row: any) => boolean;
   /** Spaltenkopf-Klick sortiert (auf → ab → original). Pro Spalte via sortable abschaltbar. */
   sortable?: boolean;
+  /** Wenn gesetzt, paginiert die Tabelle mit dieser Seitengröße (Steuerung unten). */
+  pageSize?: number;
 }
 
 /**

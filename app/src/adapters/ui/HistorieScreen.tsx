@@ -155,7 +155,7 @@ export function HistorieScreen() {
             </tr>
           </thead>
           <tbody>
-            {bs.map((b) => {
+            {bs.slice(0, 50).map((b) => {
               const u = umsatzByIst.get(b.id);
               const zweck = u?.verwendungszweck ?? "";
               return (
@@ -170,6 +170,7 @@ export function HistorieScreen() {
             })}
           </tbody>
         </table>
+        {bs.length > 50 && <div className="muted" style={{ padding: "6px 8px", fontSize: "var(--fs-2xs)" }}>{t("historie.detailMehr", { n: bs.length - 50 })}</div>}
       </div>
     );
   }
@@ -238,6 +239,7 @@ export function HistorieScreen() {
           <Card title={t("historie.tabelleTitel")} subtitle={t("historie.tabelleHinweis")}>
             <DataTable
               sortable
+              pageSize={24}
               onRowClick={(m) => setAktivMonat((cur) => { const i = verlauf.findIndex((v) => v.label === m.label); return cur === i ? null : i; })}
               istAktiv={(m) => aktivMonat != null && verlauf[aktivMonat]?.label === m.label}
               columns={[
