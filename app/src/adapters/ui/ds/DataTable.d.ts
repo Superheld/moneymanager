@@ -10,6 +10,10 @@ export interface DataColumn {
 export interface DataTableProps {
   columns: DataColumn[];
   rows: any[];
+  /** Optional: macht Zeilen anklickbar; erhält das Zeilen-Objekt. */
+  onRowClick?: (row: any) => void;
+  /** Optional: markiert die aktive Zeile (Hervorhebung). */
+  istAktiv?: (row: any) => boolean;
 }
 
 /**
