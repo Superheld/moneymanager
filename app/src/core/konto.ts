@@ -4,9 +4,9 @@
 
 import type { Cent } from "./geld";
 
-export type Kontotyp = "Giro" | "Tagesgeld" | "Bargeld";
+export type Kontotyp = "Giro" | "Tagesgeld" | "Bargeld" | "Kreditkarte";
 
-export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld"];
+export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld", "Kreditkarte"];
 
 export interface Zahlungskonto {
   readonly id: string;
