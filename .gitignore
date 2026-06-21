@@ -17,3 +17,6 @@ app/coverage/
 *.log
 .env
 .env.local
+
+# Lokale, echte Finanzdaten — NIE committen
+transaction-classifier/data/
