@@ -17,21 +17,25 @@ import type { KategorieSumme } from "../../core";
 
 type Zeitraum = "12" | "24" | "jahr" | "alles";
 
-function KategorieSektion({ titel, items }: { titel: string; items: KategorieSumme[] }) {
+function KategorieSektion({ titel, items, ohneLabel }: { titel: string; items: KategorieSumme[]; ohneLabel?: string }) {
   const { t } = useTranslation();
   const geld = useGeld();
   if (items.length === 0) return null;
   const maxAbs = Math.max(1, ...items.map((i) => Math.abs(i.summe)));
+  const summe = items.reduce((s, i) => s + i.summe, 0);
   return (
     <div style={{ marginBottom: "var(--sp-4)" }}>
-      <div style={{ fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", marginBottom: "var(--sp-2)" }}>{titel}</div>
+      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", marginBottom: "var(--sp-2)" }}>
+        <span>{titel}</span>
+        <span className="num">{geld.formatMitSymbol(summe, { mitVorzeichen: true })}</span>
+      </div>
       {items.map((i) => (
         <div key={i.kategorieId ?? "__ohne"} style={{ padding: "7px 0" }}>
           <CoverageTrack
             value={Math.abs(i.summe)}
             max={maxAbs}
             over={false}
-            label={`${i.kategorieId ? i.name : t("historie.ohneKategorie")} · ${i.anzahl}`}
+            label={`${i.kategorieId ? i.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${i.anzahl}`}
             right={geld.formatMitSymbol(i.summe, { mitVorzeichen: true })}
           />
         </div>
@@ -143,7 +147,7 @@ export function HistorieScreen() {
             >
               <KategorieSektion titel={t("historie.sektionAusgaben")} items={aufschluesselung.items.filter((i) => i.charakter === "Aufwand")} />
               <KategorieSektion titel={t("historie.sektionEinnahmen")} items={aufschluesselung.items.filter((i) => i.charakter === "Ertrag")} />
-              <KategorieSektion titel={t("historie.sektionUmschichtung")} items={aufschluesselung.items.filter((i) => i.charakter === "Umschichtung")} />
+              <KategorieSektion titel={t("historie.sektionUmschichtung")} items={aufschluesselung.items.filter((i) => i.charakter === "Umschichtung")} ohneLabel={t("historie.umbuchungen")} />
               {aufschluesselung.items.length === 0 && <div className="muted">{t("historie.katLeer")}</div>}
             </Card>
           )}
@@ -154,8 +158,10 @@ export function HistorieScreen() {
             )}
           </Card>
 
-          <Card title={t("historie.tabelleTitel")} style={{ marginTop: "var(--gap-card)" }}>
+          <Card title={t("historie.tabelleTitel")} subtitle={t("historie.tabelleHinweis")} style={{ marginTop: "var(--gap-card)" }}>
             <DataTable
+              onRowClick={(m) => setAktivMonat((cur) => { const i = verlauf.findIndex((v) => v.label === m.label); return cur === i ? null : i; })}
+              istAktiv={(m) => aktivMonat != null && verlauf[aktivMonat]?.label === m.label}
               columns={[
                 { key: "label", label: t("historie.spalteMonat") },
                 { key: "einnahmen", label: `${t("historie.spalteEinnahmen")} ${geld.symbol}`, align: "right", render: (m) => (m.einnahmen ? geld.format(m.einnahmen) : "—") },
