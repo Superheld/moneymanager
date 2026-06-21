@@ -141,6 +141,7 @@ export function BudgetsScreen() {
         ) : (
           <DataTable
             sortable
+            pageSize={25}
             columns={[
               { key: "kategorie", label: t("budgets.spalteKategorie"), sortValue: (b) => kategorieName.get(b.kategorieId) ?? "", render: (b) => kategorieName.get(b.kategorieId) ?? "?" },
               { key: "periode", label: t("budgets.spaltePeriode"), render: (b) => t(`budgets.periode.${b.periode}`) },

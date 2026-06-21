@@ -193,6 +193,7 @@ export function VertraegeScreen() {
         ) : (
           <DataTable
             sortable
+            pageSize={25}
             columns={[
               { key: "anbieter", label: t("vertraege.spalteAnbieter") },
               { key: "inhaber", label: t("vertraege.spalteInhaber"), sortValue: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "" : ""), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
