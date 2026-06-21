@@ -59,15 +59,22 @@ export function HistorieScreen() {
   const [aktivMonat, setAktivMonat] = useState<number | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
+  const [geladen, setGeladen] = useState(false);
+
   useEffect(() => {
     (async () => {
       try {
-        setIst(await ledgerRepo.alle());
-        setKonten(await kontoRepo.alle());
-        setKategorien(await kategorieRepo.alle());
+        // Gemeinsam laden und in EINEM Schritt setzen — kein Render-Fenster, in dem die
+        // Aufschlüsselung gegen eine noch leere Kategorie-Liste rechnet (sonst „ohne Kategorie").
+        const [i, k, kat] = await Promise.all([ledgerRepo.alle(), kontoRepo.alle(), kategorieRepo.alle()]);
+        setIst(i);
+        setKonten(k);
+        setKategorien(kat);
         setFehler(null);
       } catch (e) {
         setFehler(e instanceof Error ? e.message : String(e));
+      } finally {
+        setGeladen(true);
       }
     })();
   }, []);
@@ -105,7 +112,7 @@ export function HistorieScreen() {
 
       {fehler && <Card style={{ marginBottom: "var(--sp-4)", borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
 
-      {ist.length === 0 && !fehler ? (
+      {!geladen ? null : ist.length === 0 && !fehler ? (
         <Card>{t("historie.leer")}</Card>
       ) : (
         <>
@@ -140,7 +147,7 @@ export function HistorieScreen() {
             <div className="muted" style={{ marginTop: "var(--sp-2)", fontSize: "var(--fs-xs)" }}>{t("historie.flussHinweis", { betrag: geld.formatMitSymbol(oeAus) })}</div>
           </Card>
 
-          {aufschluesselung && (
+          {aufschluesselung && kategorien.length > 0 && (
             <Card
               title={t("historie.katTitel")}
               subtitle={aufschluesselung.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
