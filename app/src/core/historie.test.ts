@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { fruehesterMonat, istMonatsverlauf } from "./historie";
+import { fruehesterMonat, istMonatsverlauf, kategorieAggregat } from "./historie";
 import type { IstBuchung } from "./istbuchung";
+import type { Kategorie } from "./kategorie";
 import type { Zahlungskonto } from "./konto";
 
 function konto(saldo: number): Zahlungskonto {
@@ -53,6 +54,40 @@ describe("istMonatsverlauf", () => {
     );
     expect(r[0].ausgaben).toBe(-2000); // Dez nicht im Fluss
     expect(r[0].saldo).toBe(-12000); // aber im Saldo
+  });
+});
+
+describe("kategorieAggregat", () => {
+  const kategorien: Kategorie[] = [
+    { id: "le", name: "Lebensmittel", elternId: "lh", defaultCharakter: "Aufwand" },
+    { id: "lh", name: "Lebenshaltung", defaultCharakter: "Aufwand" },
+    { id: "ge", name: "Gehalt", defaultCharakter: "Ertrag" },
+  ];
+  function bk(datum: string, betrag: number, charakter: IstBuchung["charakter"], kategorieId?: string): IstBuchung {
+    return { id: datum + betrag, datum, betrag, kontoId: "k1", charakter, quelle: "import", kategorieId };
+  }
+
+  it("summiert je Kategorie im Fenster, sortiert nach Magnitude, mit Elternname", () => {
+    const r = kategorieAggregat(
+      [
+        bk("2022-01-05", -3000, "Aufwand", "le"),
+        bk("2022-01-09", -2000, "Aufwand", "le"),
+        bk("2022-01-10", 250000, "Ertrag", "ge"),
+        bk("2022-02-01", -9999, "Aufwand", "le"), // außerhalb des Fensters
+      ],
+      "2022-01-01",
+      "2022-01-01",
+      kategorien,
+    );
+    expect(r.map((x) => x.name)).toEqual(["Gehalt", "Lebensmittel"]); // Magnitude: 250000 > 5000
+    const le = r.find((x) => x.kategorieId === "le")!;
+    expect(le).toMatchObject({ summe: -5000, anzahl: 2, elternName: "Lebenshaltung", charakter: "Aufwand" });
+  });
+
+  it("fasst Buchungen ohne Kategorie separat zusammen", () => {
+    const r = kategorieAggregat([bk("2022-01-05", -1000, "Aufwand")], "2022-01-01", "2022-01-01", kategorien);
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ kategorieId: undefined, name: "—", summe: -1000 });
   });
 });
 
