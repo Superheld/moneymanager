@@ -76,3 +76,13 @@ export function verwerfen(u: Umsatz): Umsatz {
   nurNeu(u, "verwerfen");
   return { ...u, status: "verworfen" };
 }
+
+/**
+ * Setzt einen verbuchten Umsatz zurück in die Inbox (verbucht → neu) — die Umkehrung von
+ * verbuchen, z. B. wenn die erzeugte Ist-Buchung im Konto gelöscht wurde. Die Ist-Buchungs-
+ * Referenz fällt weg; der Kategorie-Vorschlag bleibt erhalten.
+ */
+export function zuruecksetzen(u: Umsatz): Umsatz {
+  if (u.status !== "verbucht") throw new FachlicherFehler("import.umsatz.nichtVerbucht", { status: u.status });
+  return { ...u, status: "neu", istbuchungId: undefined };
+}

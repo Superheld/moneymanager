@@ -39,7 +39,33 @@ export async function buchungErfassen(
   return buchung;
 }
 
-/** Löscht eine Ist-Buchung (UI bietet das nur für manuelle Buchungen an). */
+/**
+ * Bearbeitet eine bestehende Ist-Buchung. Anders als buchungErfassen bleiben Identität und
+ * Herkunft erhalten (id, quelle, rohHash, planRef, transfer/Gegenkonto) — nur Datum, Betrag,
+ * Charakter, Kategorie und Notiz ändern sich. So lassen sich auch importierte Buchungen
+ * korrigieren, ohne ihre Import-Spur zu verlieren.
+ */
+export async function buchungBearbeiten(
+  ledger: LedgerPort,
+  original: IstBuchung,
+  e: { datum: string; betrag: Cent; charakter: Charakter; kategorieId?: string; notiz?: string },
+): Promise<IstBuchung> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
+  if (!(e.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
+
+  const aktualisiert: IstBuchung = {
+    ...original,
+    datum: e.datum,
+    betrag: vorzeichenbehaftet(e.betrag, e.charakter),
+    charakter: e.charakter,
+    kategorieId: e.kategorieId || undefined,
+    notiz: e.notiz?.trim() || undefined,
+  };
+  await ledger.speichern(aktualisiert);
+  return aktualisiert;
+}
+
+/** Löscht eine Ist-Buchung. */
 export async function buchungLoeschen(ledger: LedgerPort, id: string): Promise<void> {
   await ledger.loeschen(id);
 }
