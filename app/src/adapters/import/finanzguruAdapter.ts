@@ -22,6 +22,7 @@ const ID = "finanzguru";
 const SP = {
   buchungstag: "Buchungstag",
   referenzkonto: "Referenzkonto",
+  kontoName: "Name Referenzkonto",
   betrag: "Betrag",
   waehrung: "Waehrung",
   gegenpartei: "Beguenstigter/Auftraggeber",
@@ -72,6 +73,7 @@ function reiheZuRohUmsatz(r: Reihe): RohUmsatz | string {
     gegenparteiIban: leerZuUndefined(r[SP.gegenparteiIban]),
     verwendungszweck: (r[SP.zweck] ?? "").trim(),
     kontoIban: leerZuUndefined(r[SP.referenzkonto]),
+    kontoName: leerZuUndefined(r[SP.kontoName]),
     glaeubigerId: leerZuUndefined(r[SP.glaeubigerId]),
     quelle: ID,
     nativeId: leerZuUndefined(r[SP.buchungsId]),
