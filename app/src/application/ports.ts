@@ -96,6 +96,8 @@ export interface ImportLaufRepository {
 export interface UmsatzRepository {
   speichern(umsatz: Umsatz): Promise<void>;
   speichernViele(umsaetze: readonly Umsatz[]): Promise<void>;
+  /** Alle Umsätze (inkl. verbuchte) — z. B. für Detail-Join über istbuchungId. */
+  alle(): Promise<Umsatz[]>;
   /** Umsätze eines Laufs. */
   nachLauf(laufId: string): Promise<Umsatz[]>;
   /** Noch nicht verbuchte/verworfene Umsätze — die Review-Inbox. */
