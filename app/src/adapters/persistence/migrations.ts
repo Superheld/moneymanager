@@ -176,4 +176,39 @@ export const MIGRATIONS: Migration[] = [
     version: 13, // ADR-0003 — Verwendung: explizit benanntes Gegenkonto (Topf) an der Ist-Buchung
     sql: [`ALTER TABLE ist_buchung ADD COLUMN verwendung_topf_id TEXT`],
   },
+  {
+    version: 14, // Import (TAKTIK-IMPORT): Import-Lauf + Umsatz-Entwurfsstapel mit Dedup
+    sql: [
+      `CREATE TABLE IF NOT EXISTS import_lauf (
+        id         TEXT PRIMARY KEY,
+        quelle     TEXT    NOT NULL,
+        zeitpunkt  TEXT    NOT NULL,
+        dateiname  TEXT,
+        eingelesen INTEGER NOT NULL DEFAULT 0,
+        neu        INTEGER NOT NULL DEFAULT 0,
+        duplikate  INTEGER NOT NULL DEFAULT 0
+      )`,
+      `CREATE TABLE IF NOT EXISTS umsatz (
+        id                     TEXT    PRIMARY KEY,
+        lauf_id                TEXT    NOT NULL,
+        zahlungskonto_id       TEXT    NOT NULL,
+        buchungstag            TEXT    NOT NULL,
+        valuta                 TEXT,
+        betrag                 INTEGER NOT NULL,
+        waehrung               TEXT    NOT NULL,
+        gegenpartei            TEXT    NOT NULL,
+        verwendungszweck       TEXT    NOT NULL,
+        roh_hash               TEXT    NOT NULL,
+        native_id              TEXT,
+        status                 TEXT    NOT NULL,
+        vorschlag_kategorie_id TEXT,
+        vorschlag_charakter    TEXT,
+        vorschlag_quelle       TEXT,
+        istbuchung_id          TEXT
+      )`,
+      // Schnelle Duplikaterkennung über beide gewählten Schlüssel.
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_hash ON umsatz (roh_hash)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_native_id ON umsatz (native_id) WHERE native_id IS NOT NULL`,
+    ],
+  },
 ];

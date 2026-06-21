@@ -13,6 +13,7 @@ import type {
   Zahlungskonto,
   Zahlungsregel,
 } from "../core";
+import type { ImportLauf, Umsatz } from "./import";
 
 export interface ZahlungsregelRepository {
   alle(): Promise<Zahlungsregel[]>;
@@ -80,6 +81,28 @@ export interface EinstellungenRepository {
   /** Alle Schlüssel→Wert; fehlende Schlüssel bedeuten „noch nicht gesetzt". */
   lesen(): Promise<Record<string, string>>;
   schreiben(schluessel: string, wert: string): Promise<void>;
+}
+
+/**
+ * Import-Repositories (TAKTIK-IMPORT §5). Der Entwurfs-Stapel: Umsätze überleben den
+ * Lauf, werden in der Review-Inbox bearbeitet und erst beim Verbuchen zu Ist-Buchungen.
+ */
+export interface ImportLaufRepository {
+  alle(): Promise<ImportLauf[]>;
+  speichern(lauf: ImportLauf): Promise<void>;
+  loeschen(id: string): Promise<void>;
+}
+
+export interface UmsatzRepository {
+  speichern(umsatz: Umsatz): Promise<void>;
+  speichernViele(umsaetze: readonly Umsatz[]): Promise<void>;
+  /** Umsätze eines Laufs. */
+  nachLauf(laufId: string): Promise<Umsatz[]>;
+  /** Noch nicht verbuchte/verworfene Umsätze — die Review-Inbox. */
+  offene(): Promise<Umsatz[]>;
+  loeschen(id: string): Promise<void>;
+  /** Vorhandene Dedup-Schlüssel (für die Duplikaterkennung beim nächsten Import). */
+  bestandsSchluessel(): Promise<{ hashes: string[]; nativeIds: string[] }>;
 }
 
 export interface SzenarioRepository {
