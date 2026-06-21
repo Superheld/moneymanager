@@ -2,7 +2,7 @@
 // Ausgaben pro Monat aus den verbuchten Ist-Buchungen + realer Saldo-Verlauf über die Zeit.
 // Zeitraum wählbar (12/24 Monate, dieses Jahr, alles). Alles Geld über useGeld().
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { addMonate, buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, toIso, type IstBuchung, type Kategorie, type Zahlungskonto } from "../../core";
 import type { Umsatz } from "../../application/import";
@@ -19,7 +19,7 @@ import type { KategorieSumme } from "../../core";
 
 type Zeitraum = "12" | "24" | "jahr" | "alles";
 
-function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId }: { titel: string; items: KategorieSumme[]; ohneLabel?: string; onSelect?: (id: string, name: string) => void; aktivId?: string }) {
+function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId, renderDetail }: { titel: string; items: KategorieSumme[]; ohneLabel?: string; onSelect?: (id: string, name: string) => void; aktivId?: string; renderDetail?: (id: string) => ReactNode }) {
   const { t } = useTranslation();
   const geld = useGeld();
   if (items.length === 0) return null;
@@ -44,9 +44,10 @@ function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId }: { tite
               value={Math.abs(i.summe)}
               max={maxAbs}
               over={false}
-              label={`${i.kategorieId ? i.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${i.anzahl}`}
+              label={`${aktiv ? "▾ " : "▸ "}${i.kategorieId ? i.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${i.anzahl}`}
               right={geld.formatMitSymbol(i.summe, { mitVorzeichen: true })}
             />
+            {aktiv && renderDetail && i.kategorieId && renderDetail(i.kategorieId)}
           </div>
         );
       })}
@@ -68,7 +69,7 @@ export function HistorieScreen() {
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("12");
   const [aktivMonat, setAktivMonat] = useState<number | null>(null);
-  const [selectedKat, setSelectedKat] = useState<{ id: string; name: string } | null>(null);
+  const [offeneKat, setOffeneKat] = useState<string | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
   const [geladen, setGeladen] = useState(false);
@@ -121,13 +122,13 @@ export function HistorieScreen() {
 
   const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
 
-  const detail = useMemo(() => {
-    if (!selectedKat) return null;
+  const detailFenster = useMemo(() => {
     const idx = aktivMonat != null && aktivMonat < verlauf.length ? aktivMonat : null;
-    const bvon = idx != null ? `${verlauf[idx].label}-01` : von;
-    const bbis = idx != null ? `${verlauf[idx].label}-01` : bis;
-    return buchungenDerKategorie(ist, selectedKat.id, bvon, bbis);
-  }, [selectedKat, aktivMonat, verlauf, ist, von, bis]);
+    return {
+      bvon: idx != null ? `${verlauf[idx].label}-01` : von,
+      bbis: idx != null ? `${verlauf[idx].label}-01` : bis,
+    };
+  }, [aktivMonat, verlauf, von, bis]);
 
   const summeEin = verlauf.reduce((s, m) => s + m.einnahmen, 0);
   const summeAus = verlauf.reduce((s, m) => s + m.ausgaben, 0);
@@ -137,6 +138,41 @@ export function HistorieScreen() {
 
   const detailTh = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" } as const;
   const detailTd = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
+
+  function detailTabelle(kategorieId: string) {
+    const bs = buchungenDerKategorie(ist, kategorieId, detailFenster.bvon, detailFenster.bbis);
+    if (bs.length === 0) return <div className="muted" style={{ padding: "8px" }}>{t("historie.detailLeer")}</div>;
+    return (
+      <div style={{ background: "var(--surface-2, rgba(0,0,0,.015))", borderRadius: "var(--r-md)", padding: "4px 8px", margin: "4px 0 10px" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
+          <thead>
+            <tr>
+              <th style={detailTh}>{t("historie.spalteDatum")}</th>
+              <th style={detailTh}>{t("historie.spalteEmpf")}</th>
+              <th style={detailTh}>{t("historie.spalteZweck")}</th>
+              <th style={detailTh}>{t("historie.spalteKonto")}</th>
+              <th style={{ ...detailTh, textAlign: "right" }}>{t("historie.spalteBetrag")} {geld.symbol}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {bs.map((b) => {
+              const u = umsatzByIst.get(b.id);
+              const zweck = u?.verwendungszweck ?? "";
+              return (
+                <tr key={b.id}>
+                  <td style={detailTd}>{b.datum.split("-").reverse().join(".")}</td>
+                  <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>{u?.gegenpartei ?? b.notiz ?? "—"}</td>
+                  <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 45 ? zweck.slice(0, 45) + "…" : zweck}</td>
+                  <td style={{ ...detailTd, color: "var(--ink-3)" }}>{kontoName.get(b.kontoId) ?? "—"}</td>
+                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{geld.format(b.betrag, { mitVorzeichen: true })}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+  }
 
   return (
     <div className="screen">
@@ -159,7 +195,7 @@ export function HistorieScreen() {
             title={t("historie.flussTitel")}
             subtitle={t("historie.flussUntertitel")}
             action={
-              <select className="field" style={{ width: "auto" }} value={zeitraum} onChange={(e) => { setZeitraum(e.target.value as Zeitraum); setAktivMonat(null); setSelectedKat(null); }}>
+              <select className="field" style={{ width: "auto" }} value={zeitraum} onChange={(e) => { setZeitraum(e.target.value as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}>
                 <option value="12">{t("historie.zr12")}</option>
                 <option value="24">{t("historie.zr24")}</option>
                 <option value="jahr">{t("historie.zrJahr")}</option>
@@ -185,60 +221,21 @@ export function HistorieScreen() {
               subtitle={aufschluesselung.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
               action={aufschluesselung.label ? <Button variant="ghost" onClick={() => setAktivMonat(null)}>{t("historie.alleMonate")}</Button> : undefined}
                          >
-              <KategorieSektion titel={t("historie.sektionAusgaben")} items={aufschluesselung.items.filter((i) => i.charakter === "Aufwand")} onSelect={(id, name) => setSelectedKat((cur) => (cur?.id === id ? null : { id, name }))} aktivId={selectedKat?.id} />
-              <KategorieSektion titel={t("historie.sektionEinnahmen")} items={aufschluesselung.items.filter((i) => i.charakter === "Ertrag")} onSelect={(id, name) => setSelectedKat((cur) => (cur?.id === id ? null : { id, name }))} aktivId={selectedKat?.id} />
-              <KategorieSektion titel={t("historie.sektionUmschichtung")} items={aufschluesselung.items.filter((i) => i.charakter === "Umschichtung")} ohneLabel={t("historie.umbuchungen")} onSelect={(id, name) => setSelectedKat((cur) => (cur?.id === id ? null : { id, name }))} aktivId={selectedKat?.id} />
+              <KategorieSektion titel={t("historie.sektionAusgaben")} items={aufschluesselung.items.filter((i) => i.charakter === "Aufwand")} onSelect={(id) => setOffeneKat((cur) => (cur === id ? null : id))} aktivId={offeneKat ?? undefined} renderDetail={detailTabelle} />
+              <KategorieSektion titel={t("historie.sektionEinnahmen")} items={aufschluesselung.items.filter((i) => i.charakter === "Ertrag")} onSelect={(id) => setOffeneKat((cur) => (cur === id ? null : id))} aktivId={offeneKat ?? undefined} renderDetail={detailTabelle} />
+              <KategorieSektion titel={t("historie.sektionUmschichtung")} items={aufschluesselung.items.filter((i) => i.charakter === "Umschichtung")} ohneLabel={t("historie.umbuchungen")} onSelect={(id) => setOffeneKat((cur) => (cur === id ? null : id))} aktivId={offeneKat ?? undefined} renderDetail={detailTabelle} />
               {aufschluesselung.items.length === 0 && <div className="muted">{t("historie.katLeer")}</div>}
               <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)", marginTop: "var(--sp-2)" }}>{t("historie.katKlickHinweis")}</div>
             </Card>
           )}
 
-          {selectedKat && (
-            <Card
-              title={t("historie.detailTitel", { kategorie: selectedKat.name })}
-              subtitle={aufschluesselung?.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
-              action={<Button variant="ghost" onClick={() => setSelectedKat(null)}>{t("historie.schliessen")}</Button>}
-            >
-              {detail && detail.length > 0 ? (
-                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                  <thead>
-                    <tr>
-                      <th style={detailTh}>{t("historie.spalteDatum")}</th>
-                      <th style={detailTh}>{t("historie.spalteEmpf")}</th>
-                      <th style={detailTh}>{t("historie.spalteZweck")}</th>
-                      <th style={detailTh}>{t("historie.spalteKonto")}</th>
-                      <th style={{ ...detailTh, textAlign: "right" }}>{t("historie.spalteBetrag")} {geld.symbol}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {detail.map((b) => {
-                      const u = umsatzByIst.get(b.id);
-                      const zweck = u?.verwendungszweck ?? "";
-                      return (
-                        <tr key={b.id}>
-                          <td style={detailTd}>{b.datum.split("-").reverse().join(".")}</td>
-                          <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>{u?.gegenpartei ?? b.notiz ?? "—"}</td>
-                          <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 50 ? zweck.slice(0, 50) + "…" : zweck}</td>
-                          <td style={{ ...detailTd, color: "var(--ink-3)" }}>{kontoName.get(b.kontoId) ?? "—"}</td>
-                          <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{geld.format(b.betrag, { mitVorzeichen: true })}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              ) : (
-                <div className="muted">{t("historie.detailLeer")}</div>
-              )}
-            </Card>
-          )}
-
-          <Card title={t("historie.saldoTitel")} subtitle={t("historie.saldoUntertitel")} style={{ marginTop: "var(--gap-card)" }}>
+          <Card title={t("historie.saldoTitel")} subtitle={t("historie.saldoUntertitel")}>
             {verlauf.length > 0 && (
               <SaldoVerlaufChart labels={verlauf.map((m) => m.label)} werte={verlauf.map((m) => m.saldo)} legende={t("historie.saldoLegende")} />
             )}
           </Card>
 
-          <Card title={t("historie.tabelleTitel")} subtitle={t("historie.tabelleHinweis")} style={{ marginTop: "var(--gap-card)" }}>
+          <Card title={t("historie.tabelleTitel")} subtitle={t("historie.tabelleHinweis")}>
             <DataTable
               onRowClick={(m) => setAktivMonat((cur) => { const i = verlauf.findIndex((v) => v.label === m.label); return cur === i ? null : i; })}
               istAktiv={(m) => aktivMonat != null && verlauf[aktivMonat]?.label === m.label}
