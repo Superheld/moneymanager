@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat } from "./historie";
+import { buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat } from "./historie";
 import type { IstBuchung } from "./istbuchung";
 import type { Kategorie } from "./kategorie";
 import type { Zahlungskonto } from "./konto";
@@ -88,6 +88,19 @@ describe("kategorieAggregat", () => {
     const r = kategorieAggregat([bk("2022-01-05", -1000, "Aufwand")], "2022-01-01", "2022-01-01", kategorien);
     expect(r).toHaveLength(1);
     expect(r[0]).toMatchObject({ kategorieId: undefined, name: "—", summe: -1000 });
+  });
+});
+
+describe("buchungenDerKategorie", () => {
+  const bk = (datum: string, betrag: number, kategorieId?: string): IstBuchung => ({ id: datum + betrag, datum, betrag, kontoId: "k1", charakter: "Aufwand", quelle: "import", kategorieId });
+  it("liefert nur die Buchungen der Kategorie im Fenster, neueste zuerst", () => {
+    const r = buchungenDerKategorie(
+      [bk("2022-01-05", -10, "le"), bk("2022-01-20", -30, "le"), bk("2022-01-10", -20, "ge"), bk("2022-02-01", -99, "le")],
+      "le",
+      "2022-01-01",
+      "2022-01-01",
+    );
+    expect(r.map((b) => b.betrag)).toEqual([-30, -10]); // 20. vor 5., Feb + andere Kategorie raus
   });
 });
 
