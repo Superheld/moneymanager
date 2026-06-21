@@ -237,6 +237,7 @@ export function HistorieScreen() {
 
           <Card title={t("historie.tabelleTitel")} subtitle={t("historie.tabelleHinweis")}>
             <DataTable
+              sortable
               onRowClick={(m) => setAktivMonat((cur) => { const i = verlauf.findIndex((v) => v.label === m.label); return cur === i ? null : i; })}
               istAktiv={(m) => aktivMonat != null && verlauf[aktivMonat]?.label === m.label}
               columns={[
