@@ -23,7 +23,7 @@ import { budgetAnlegen } from "../../application/budgetAnlegen";
 import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
-import { Button, Card, DataTable, FormField } from "./ds";
+import { Button, Card, DataTable, FormField, KPIStat } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
@@ -65,6 +65,16 @@ export function BudgetsScreen() {
   }, []);
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
+
+  const summe = useMemo(() => {
+    let proMonat = 0, rahmenPeriode = 0, verbraucht = 0;
+    for (const b of budgets) {
+      proMonat += Math.abs(geglaetteterMonatsabfluss(b));
+      rahmenPeriode += b.rahmen;
+      verbraucht += verbrauch(b);
+    }
+    return { proMonat, verbraucht, auslastung: rahmenPeriode > 0 ? Math.round((verbraucht / rahmenPeriode) * 100) : 0 };
+  }, [budgets, ist, heute]);
 
   function neu() {
     setEditId(null);
@@ -112,6 +122,15 @@ export function BudgetsScreen() {
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
         <Trans i18nKey="budgets.erklaerung" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
       </p>
+
+      {budgets.length > 0 && (
+        <div className="kpis">
+          <KPIStat size="chip" label={t("budgets.kpiAnzahl")} value={String(budgets.length)} />
+          <KPIStat size="chip" label={t("budgets.kpiProMonat")} value={geld.format(summe.proMonat)} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("budgets.kpiVerbraucht")} value={geld.format(summe.verbraucht)} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("budgets.kpiAuslastung")} value={String(summe.auslastung)} unit="%" tone={summe.auslastung > 100 ? "warn" : "default"} />
+        </div>
+      )}
       <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
         {t("budgets.verbrauchHinweis")}
       </p>
@@ -121,18 +140,21 @@ export function BudgetsScreen() {
           <div className="muted">{t("budgets.leer")}</div>
         ) : (
           <DataTable
+            sortable
+            pageSize={25}
             columns={[
-              { key: "kategorie", label: t("budgets.spalteKategorie"), render: (b) => kategorieName.get(b.kategorieId) ?? "?" },
+              { key: "kategorie", label: t("budgets.spalteKategorie"), sortValue: (b) => kategorieName.get(b.kategorieId) ?? "", render: (b) => kategorieName.get(b.kategorieId) ?? "?" },
               { key: "periode", label: t("budgets.spaltePeriode"), render: (b) => t(`budgets.periode.${b.periode}`) },
               { key: "rahmen", label: `${t("budgets.spalteRahmen")} ${geld.symbol}`, align: "right", render: (b) => geld.format(b.rahmen) },
-              { key: "geglaettet", label: `${t("budgets.spalteProMonat")} ${geld.symbol}`, align: "right", render: (b) => geld.format(geglaetteterMonatsabfluss(b)) },
-              { key: "verbraucht", label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`, align: "right", render: (b) => geld.format(verbrauch(b)) },
-              { key: "rest", label: `${t("budgets.spalteRest")} ${geld.symbol}`, align: "right", render: (b) => geld.format(b.rahmen - verbrauch(b)) },
-              { key: "_e", label: "", align: "right", render: (b) => <button className="linkbtn" onClick={() => bearbeiten(b)}>{t("budgets.bearbeiten")}</button> },
+              { key: "geglaettet", label: `${t("budgets.spalteProMonat")} ${geld.symbol}`, align: "right", sortValue: (b) => geglaetteterMonatsabfluss(b), render: (b) => geld.format(geglaetteterMonatsabfluss(b)) },
+              { key: "verbraucht", label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`, align: "right", sortValue: (b) => verbrauch(b), render: (b) => geld.format(verbrauch(b)) },
+              { key: "rest", label: `${t("budgets.spalteRest")} ${geld.symbol}`, align: "right", sortValue: (b) => b.rahmen - verbrauch(b), render: (b) => geld.format(b.rahmen - verbrauch(b)) },
+              { key: "_e", label: "", align: "right", sortable: false, render: (b) => <button className="linkbtn" onClick={() => bearbeiten(b)}>{t("budgets.bearbeiten")}</button> },
               {
                 key: "_x",
                 label: "",
                 align: "right",
+                sortable: false,
                 render: (b) => (
                   <button className="linkbtn" onClick={() => budgetRepo.loeschen(b.id).then(laden)}>
                     {t("budgets.loeschen")}
