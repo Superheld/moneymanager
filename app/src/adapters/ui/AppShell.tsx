@@ -14,6 +14,7 @@ export type ScreenId =
   | "budgets"
   | "vertraege"
   | "deckung"
+  | "import"
   | "einstellungen";
 
 interface NavEntry {
@@ -42,7 +43,10 @@ const GRUPPEN: NavGroup[] = [
   },
   {
     titelKey: "shell.gruppeVerwaltung",
-    eintraege: [{ id: "einstellungen", labelKey: "shell.navEinstellungen" }],
+    eintraege: [
+      { id: "import", labelKey: "shell.navImport" },
+      { id: "einstellungen", labelKey: "shell.navEinstellungen" },
+    ],
   },
 ];
 
