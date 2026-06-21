@@ -6,6 +6,10 @@ export interface DataColumn {
   align?: 'left' | 'right';
   /** Optional custom cell renderer receiving the row object. */
   render?: (row: any) => React.ReactNode;
+  /** Bei aktivierter Tabellen-Sortierung: Sortierwert (sonst row[key]). */
+  sortValue?: (row: any) => string | number;
+  /** Diese Spalte von der Sortierung ausnehmen. */
+  sortable?: boolean;
 }
 export interface DataTableProps {
   columns: DataColumn[];
@@ -14,6 +18,8 @@ export interface DataTableProps {
   onRowClick?: (row: any) => void;
   /** Optional: markiert die aktive Zeile (Hervorhebung). */
   istAktiv?: (row: any) => boolean;
+  /** Spaltenkopf-Klick sortiert (auf → ab → original). Pro Spalte via sortable abschaltbar. */
+  sortable?: boolean;
 }
 
 /**

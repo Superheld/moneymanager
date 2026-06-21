@@ -121,18 +121,20 @@ export function BudgetsScreen() {
           <div className="muted">{t("budgets.leer")}</div>
         ) : (
           <DataTable
+            sortable
             columns={[
-              { key: "kategorie", label: t("budgets.spalteKategorie"), render: (b) => kategorieName.get(b.kategorieId) ?? "?" },
+              { key: "kategorie", label: t("budgets.spalteKategorie"), sortValue: (b) => kategorieName.get(b.kategorieId) ?? "", render: (b) => kategorieName.get(b.kategorieId) ?? "?" },
               { key: "periode", label: t("budgets.spaltePeriode"), render: (b) => t(`budgets.periode.${b.periode}`) },
               { key: "rahmen", label: `${t("budgets.spalteRahmen")} ${geld.symbol}`, align: "right", render: (b) => geld.format(b.rahmen) },
-              { key: "geglaettet", label: `${t("budgets.spalteProMonat")} ${geld.symbol}`, align: "right", render: (b) => geld.format(geglaetteterMonatsabfluss(b)) },
-              { key: "verbraucht", label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`, align: "right", render: (b) => geld.format(verbrauch(b)) },
-              { key: "rest", label: `${t("budgets.spalteRest")} ${geld.symbol}`, align: "right", render: (b) => geld.format(b.rahmen - verbrauch(b)) },
-              { key: "_e", label: "", align: "right", render: (b) => <button className="linkbtn" onClick={() => bearbeiten(b)}>{t("budgets.bearbeiten")}</button> },
+              { key: "geglaettet", label: `${t("budgets.spalteProMonat")} ${geld.symbol}`, align: "right", sortValue: (b) => geglaetteterMonatsabfluss(b), render: (b) => geld.format(geglaetteterMonatsabfluss(b)) },
+              { key: "verbraucht", label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`, align: "right", sortValue: (b) => verbrauch(b), render: (b) => geld.format(verbrauch(b)) },
+              { key: "rest", label: `${t("budgets.spalteRest")} ${geld.symbol}`, align: "right", sortValue: (b) => b.rahmen - verbrauch(b), render: (b) => geld.format(b.rahmen - verbrauch(b)) },
+              { key: "_e", label: "", align: "right", sortable: false, render: (b) => <button className="linkbtn" onClick={() => bearbeiten(b)}>{t("budgets.bearbeiten")}</button> },
               {
                 key: "_x",
                 label: "",
                 align: "right",
+                sortable: false,
                 render: (b) => (
                   <button className="linkbtn" onClick={() => budgetRepo.loeschen(b.id).then(laden)}>
                     {t("budgets.loeschen")}

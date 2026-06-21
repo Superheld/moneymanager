@@ -171,12 +171,14 @@ export function VertraegeScreen() {
           <div className="muted">{t("vertraege.leer")}</div>
         ) : (
           <DataTable
+            sortable
             columns={[
               { key: "anbieter", label: t("vertraege.spalteAnbieter") },
-              { key: "inhaber", label: t("vertraege.spalteInhaber"), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
+              { key: "inhaber", label: t("vertraege.spalteInhaber"), sortValue: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "" : ""), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
               {
                 key: "charakter",
                 label: t("vertraege.spalteCharakter"),
+                sortValue: (v) => regelZuVertrag.get(v.id)?.charakter ?? "",
                 render: (v) => {
                   const r = regelZuVertrag.get(v.id);
                   return r ? <Pill variant={CHARAKTER_PILL[r.charakter]}>{t(`charakter.${r.charakter}`)}</Pill> : "—";
@@ -185,6 +187,7 @@ export function VertraegeScreen() {
               {
                 key: "rhythmus",
                 label: t("vertraege.spalteRhythmus"),
+                sortValue: (v) => regelZuVertrag.get(v.id)?.rhythmus ?? "",
                 render: (v) => {
                   const r = regelZuVertrag.get(v.id);
                   return r ? t(`vertraege.rhythmus.${r.rhythmus}`) : "—";
@@ -193,6 +196,7 @@ export function VertraegeScreen() {
               {
                 key: "kuendigung",
                 label: t("vertraege.spalteKuendigenBis"),
+                sortable: false,
                 render: (v) => {
                   const termin = naechsterKuendigungstermin(v, heute);
                   if (!termin) return <span className="muted">—</span>;
@@ -208,16 +212,18 @@ export function VertraegeScreen() {
                 key: "betrag",
                 label: `${t("vertraege.spalteBetrag")} ${geld.symbol}`,
                 align: "right",
+                sortValue: (v) => regelZuVertrag.get(v.id)?.betrag ?? 0,
                 render: (v) => {
                   const r = regelZuVertrag.get(v.id);
                   return r ? geld.format(r.betrag) : "—";
                 },
               },
-              { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
+              { key: "_e", label: "", align: "right", sortable: false, render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
               {
                 key: "_x",
                 label: "",
                 align: "right",
+                sortable: false,
                 render: (v) => (
                   <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id).then(laden)}>
                     {t("vertraege.loeschen")}
