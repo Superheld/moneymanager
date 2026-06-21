@@ -29,6 +29,8 @@ export interface RohUmsatz {
   readonly kontoName?: string;
   /** SEPA-Gläubiger-ID (nur bei Lastschriften gesetzt) — später Anker der Regel-Schicht. */
   readonly glaeubigerId?: string;
+  /** Interne Umbuchung zwischen eigenen Konten (von der Quelle markiert) → Umschichtung. */
+  readonly istUmbuchung: boolean;
 
   // ── Quellen-native Zusatzinfos (keine Domäne, aber wertvoll) ──────────────────
   /** ID des Quellen-Adapters, der diese Zeile erzeugt hat, z. B. „finanzguru". */
