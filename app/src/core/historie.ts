@@ -136,6 +136,16 @@ export function kategorieAggregat(
     .sort((a, b) => Math.abs(b.summe) - Math.abs(a.summe));
 }
 
+/**
+ * Interne Umbuchung (Geld zwischen eigenen Konten) — gehört NICHT in eine Ausgaben-/
+ * Einnahmen-Auswertung. Erkennung: verknüpftes Transfer-Bein (transferId) ODER
+ * Umschichtung ohne Kategorie (so importieren wir Umbuchungen). Gesparte „Umschichtung MIT
+ * Kategorie" (z. B. Sparen & Anlegen) bleibt erhalten.
+ */
+export function istInterneUmbuchung(b: IstBuchung): boolean {
+  return b.transferId != null || (b.charakter === "Umschichtung" && !b.kategorieId);
+}
+
 /** Frühester Buchungsmonat als „YYYY-MM-01", oder undefined bei leerer Liste. */
 export function fruehesterMonat(buchungen: readonly IstBuchung[]): string | undefined {
   if (buchungen.length === 0) return undefined;
