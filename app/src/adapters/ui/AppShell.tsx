@@ -8,6 +8,7 @@ import { APP_VERSION } from "../../version";
 
 export type ScreenId =
   | "uebersicht"
+  | "historie"
   | "konten"
   | "toepfe"
   | "inventar"
@@ -34,6 +35,7 @@ const GRUPPEN: NavGroup[] = [
     titelKey: "shell.gruppeUeberblick",
     eintraege: [
       { id: "uebersicht", labelKey: "shell.navUebersicht", badgeKey: "shell.badgePlan" },
+      { id: "historie", labelKey: "shell.navHistorie" },
       { id: "konten", labelKey: "shell.navKonten" },
       { id: "budgets", labelKey: "shell.navBudgets" },
       { id: "toepfe", labelKey: "shell.navToepfe" },
