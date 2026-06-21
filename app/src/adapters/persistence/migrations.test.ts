@@ -43,8 +43,9 @@ function indexExistiert(db: Database, name: string): boolean {
 }
 
 const ERWARTETE_TABELLEN = [
-  "budget", "einstellung", "inventargegenstand", "ist_buchung", "kategorie", "person",
-  "szenario", "szenario_posten", "topf", "vertrag", "zahlungskonto", "zahlungsregel",
+  "budget", "einstellung", "import_lauf", "inventargegenstand", "ist_buchung", "kategorie",
+  "person", "szenario", "szenario_posten", "topf", "umsatz", "vertrag", "zahlungskonto",
+  "zahlungsregel",
 ];
 
 describe("Migrationen — frische Anwendung der ganzen Kette", () => {
@@ -84,6 +85,23 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     const db = new SQL.Database();
     apply(db);
     expect(spalten(db, "einstellung")).toEqual(["schluessel", "wert"]);
+    db.close();
+  });
+
+  it("legt Import-Lauf und Umsatz mit Dedup-Indizes an (v14)", () => {
+    const db = new SQL.Database();
+    apply(db);
+    expect(spalten(db, "import_lauf")).toEqual(
+      expect.arrayContaining(["quelle", "zeitpunkt", "dateiname", "eingelesen", "neu", "duplikate"]),
+    );
+    expect(spalten(db, "umsatz")).toEqual(
+      expect.arrayContaining([
+        "lauf_id", "zahlungskonto_id", "buchungstag", "betrag", "roh_hash", "native_id",
+        "status", "vorschlag_kategorie_id", "vorschlag_charakter", "vorschlag_quelle", "istbuchung_id",
+      ]),
+    );
+    expect(indexExistiert(db, "ix_umsatz_roh_hash")).toBe(true);
+    expect(indexExistiert(db, "ix_umsatz_native_id")).toBe(true);
     db.close();
   });
 });
