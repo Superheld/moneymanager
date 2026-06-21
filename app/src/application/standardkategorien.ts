@@ -17,14 +17,16 @@ interface Gruppe {
 }
 
 export const STANDARDKATEGORIEN: Gruppe[] = [
-  { name: "Einnahmen", charakter: "Ertrag", kinder: ["Gehalt", "Nebeneinkünfte", "Kindergeld", "Erstattungen", "Sonstige Einnahmen"] },
-  { name: "Wohnen", charakter: "Aufwand", kinder: ["Miete / Rate", "Nebenkosten", "Strom & Gas", "Internet & Telefon", "Rundfunkbeitrag", "Instandhaltung"] },
-  { name: "Lebenshaltung", charakter: "Aufwand", kinder: ["Lebensmittel", "Drogerie & Haushalt", "Auswärts essen"] },
+  { name: "Einnahmen", charakter: "Ertrag", kinder: ["Gehalt", "Nebeneinkünfte", "Kapitalerträge", "Kindergeld", "Erstattungen", "Sonstige Einnahmen"] },
+  { name: "Wohnen", charakter: "Aufwand", kinder: ["Miete / Rate", "Nebenkosten", "Strom & Gas", "Internet & Telefon", "Rundfunkbeitrag", "Instandhaltung", "Einrichtung & Geräte"] },
+  { name: "Lebenshaltung", charakter: "Aufwand", kinder: ["Lebensmittel", "Auswärts essen", "Lieferservice", "Drogerie", "Haushalt", "Genussmittel"] },
   { name: "Mobilität", charakter: "Aufwand", kinder: ["ÖPNV & Tickets", "Sprit & Laden", "Kfz (Steuer & Wartung)", "Fahrrad"] },
-  { name: "Gesundheit", charakter: "Aufwand", kinder: ["Arzt & Apotheke", "Krankenversicherung", "Therapie & Wellness"] },
-  { name: "Lifestyle", charakter: "Aufwand", kinder: ["Freizeit & Hobby", "Reisen & Urlaub", "Abos & Streaming", "Kleidung & Mode", "Ausgehen", "Bildung"] },
+  { name: "Gesundheit", charakter: "Aufwand", kinder: ["Arzt & Apotheke", "Krankenversicherung", "Therapie"] },
+  // Lifestyle aufgeteilt (Erlebnisse vs. Konsum) — sonst zu groß; FG-Feinheiten übernommen.
+  { name: "Freizeit & Kultur", charakter: "Aufwand", kinder: ["Freizeit & Hobby", "Sport", "Gaming", "Veranstaltungen", "Ausgehen", "Reisen & Urlaub", "Mitgliedschaften", "Bildung"] },
+  { name: "Konsum & Lifestyle", charakter: "Aufwand", kinder: ["Elektronik", "Kleidung & Mode", "Geschenke", "Abos & Streaming", "Körperpflege & Wellness"] },
   { name: "Familie & Kinder", charakter: "Aufwand", kinder: ["Kinderbetreuung", "Schule & Lernen", "Taschengeld", "Haustier"] },
-  { name: "Versicherungen", charakter: "Aufwand", kinder: ["Haftpflicht", "Hausrat", "Berufsunfähigkeit", "Weitere Versicherungen"] },
+  { name: "Versicherungen", charakter: "Aufwand", kinder: ["Haftpflicht", "Hausrat", "KFZ-Versicherung", "Krankenzusatz", "Rechtsschutz", "Berufsunfähigkeit", "Weitere Versicherungen"] },
   { name: "Vorsorge", charakter: "Umschichtung", kinder: ["Altersvorsorge", "Private Rente"] },
   {
     name: "Finanzen",
