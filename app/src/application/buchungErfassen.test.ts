@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { euroZuCent, type IstBuchung } from "../core";
 import type { LedgerPort } from "./ports";
-import { buchungErfassen, buchungLoeschen } from "./buchungErfassen";
+import { buchungBearbeiten, buchungErfassen, buchungLoeschen } from "./buchungErfassen";
 
 function memLedger(): LedgerPort & { daten: IstBuchung[] } {
   const daten: IstBuchung[] = [];
@@ -44,6 +44,26 @@ describe("buchungErfassen", () => {
     await expect(buchungErfassen(ledger, { kontoId: "", datum: "2026-06-17", betrag: euroZuCent(5), charakter: "Aufwand" })).rejects.toThrow("konto.waehlen");
     await expect(buchungErfassen(ledger, { kontoId: "bar", datum: "17.06.2026", betrag: euroZuCent(5), charakter: "Aufwand" })).rejects.toThrow("datum.ungueltig");
     await expect(buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(0), charakter: "Aufwand" })).rejects.toThrow("betrag.groesserNull");
+  });
+
+  it("buchungBearbeiten erhält Herkunft (quelle, rohHash) und aktualisiert die Felder", async () => {
+    const ledger = memLedger();
+    const original: IstBuchung = { id: "x1", datum: "2026-06-01", betrag: euroZuCent(-10), kontoId: "giro", charakter: "Aufwand", quelle: "import", rohHash: "h1" };
+    ledger.daten.push(original);
+    const u = await buchungBearbeiten(ledger, original, { datum: "2026-06-05", betrag: euroZuCent(25), charakter: "Aufwand", kategorieId: "k1", notiz: "korrigiert" });
+    expect(u.id).toBe("x1");
+    expect(u.quelle).toBe("import");
+    expect(u.rohHash).toBe("h1");
+    expect(u.betrag).toBe(euroZuCent(-25));
+    expect(u.kategorieId).toBe("k1");
+    expect(ledger.daten).toHaveLength(1);
+  });
+
+  it("buchungBearbeiten validiert Datum und Betrag", async () => {
+    const ledger = memLedger();
+    const o: IstBuchung = { id: "x", datum: "2026-06-01", betrag: -100, kontoId: "g", charakter: "Aufwand", quelle: "manuell" };
+    await expect(buchungBearbeiten(ledger, o, { datum: "x", betrag: 100, charakter: "Aufwand" })).rejects.toThrow("datum.ungueltig");
+    await expect(buchungBearbeiten(ledger, o, { datum: "2026-06-01", betrag: 0, charakter: "Aufwand" })).rejects.toThrow("betrag.groesserNull");
   });
 
   it("buchungLoeschen entfernt die Buchung", async () => {
