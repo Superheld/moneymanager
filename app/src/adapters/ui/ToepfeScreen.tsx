@@ -31,7 +31,7 @@ import {
   sqliteKategorieRepository as kategorieRepo,
   sqliteZahlungskontoRepository as kontoRepo,
 } from "../persistence/sqliteStammdatenRepositories";
-import { Button, Card, CoverageTrack, FormField, Pill } from "./ds";
+import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
@@ -113,6 +113,17 @@ export function ToepfeScreen() {
   const sichtbar = toepfe.filter((t) => t.typ !== "ersatz");
   const num = (s: string) => Number(s.replace(",", ".")) || 0;
 
+  const summe = useMemo(() => {
+    let angespart = 0, ziel = 0;
+    for (const tp of toepfe) {
+      if (tp.typ === "ersatz") continue;
+      angespart += Math.max(0, topfStand(tp, heute, topfBuchungen(ist, tp.id)));
+      const z = zielwert(tp);
+      if (z != null) ziel += z;
+    }
+    return { angespart, ziel, deckung: ziel > 0 ? Math.round((angespart / ziel) * 100) : 0 };
+  }, [toepfe, ist, heute]);
+
   function neu() {
     setEditId(null);
     setTyp("puffer");
@@ -178,6 +189,15 @@ export function ToepfeScreen() {
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
         <Trans i18nKey="toepfe.erklaerung" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
       </p>
+
+      {sichtbar.length > 0 && (
+        <div className="kpis">
+          <KPIStat size="chip" label={t("toepfe.kpiAnzahl")} value={String(sichtbar.length)} />
+          <KPIStat size="chip" label={t("toepfe.kpiAngespart")} value={geld.format(summe.angespart)} unit={geld.symbol} tone="ok" />
+          <KPIStat size="chip" label={t("toepfe.kpiZiel")} value={geld.format(summe.ziel)} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("toepfe.kpiDeckung")} value={String(summe.deckung)} unit="%" tone={summe.deckung < 50 ? "warn" : "default"} />
+        </div>
+      )}
 
       <Card title={t("toepfe.kartenTitel")} subtitle={t("toepfe.kartenAnzahl", { count: sichtbar.length })}>
         {sichtbar.length === 0 ? (
