@@ -14,15 +14,21 @@ plus Finanzplan*. Sie unterscheidet konsequent:
 **Lokal first:** Alle Daten bleiben auf dem Gerät, keine Cloud-Pflicht. Funktioniert ohne KI —
 der Kern (Projektion, Töpfe, Liquidität) ist reine Arithmetik.
 
-## Status — v0.9.0 (Topf-Entnahme als Buchungssatz + Plan/Ist)
+## Status — v0.10.0 (Import, Historie & Auswertungen)
 
-Die komplette **Planungsseite** ist gebaut und unit-getestet; dazu der **Ist-Schritt „light"**
-(ADR-0002): geplante Posten als bezahlt abhaken, realer Kontostand, Plan/Ist je Posten, ein
-**Konto-Register** (gebuchte + voraussichtliche Buchungen je Konto, manuelle Buchungen) und
-**Umbuchen** zwischen Konten (verknüpfte Doppelbuchung, Charakter Umschichtung). Neu (ADR-0003):
-**Töpfe und Inventar** zeigen den **realen Stand** und erlauben echte **Entnahmen** (Charakter
-aus dem Topf-Typ abgeleitet, Ersatz-Zyklus startet bei „ersetzt" neu); **Budgets** zeigen
-Plan/Ist (verbraucht/Rest) — Zuordnung über das benannte Gegenkonto, nicht über die Kategorie.
+Auf der kompletten **Planungsseite** und dem **Ist-Schritt „light"** (ADR-0002/0003)
+aufbauend, kamen drei große Bausteine dazu — Details im [CHANGELOG](CHANGELOG.md):
+
+- **Import (Finanzguru-CSV).** Modulare Quellen-Naht (weitere Formate/Apps andockbar),
+  Konto-Zuordnung mit Auto-Anlegen, Dedup (native ID + Roh-Hash), Kategorie-Vorschläge per
+  Remapping, Umbuchungs-Erkennung. Reversibler **Entwurfs-Stapel** → **Review-Inbox**
+  (prüfen, kategorisieren, Volltextsuche) → **Verbuchen** ins Ledger.
+- **Historie (Rückblick).** Echte Monatsflüsse + realer Saldo-Verlauf über die Zeit; Klick
+  auf einen Monat → Kategorie-Aufschlüsselung; Klick auf eine Kategorie → Einzelbuchungen.
+- **Konten.** Ist-Buchungen **bearbeiten & entfernen** (auch importierte; Löschen setzt den
+  Umsatz zurück in die Inbox).
+- **Listen & Tabellen.** Spalten-Sortierung, Pagination und **Übersichtszahlen (KPIs)** auf
+  Inventar, Verträgen, Budgets und Töpfen.
 
 | Phase | Inhalt | Status |
 |---|---|---|
@@ -31,13 +37,14 @@ Plan/Ist (verbraucht/Rest) — Zuordnung über das benannte Gegenkonto, nicht ü
 | P2 | Verträge · Budgets · Inventar/Töpfe · Liquiditätsplaner · Szenario | ✓ |
 | P3 | Ist light — „bezahlt markieren", Ledger-Port, Reconciliation light, Konto-Register (ADR-0002) | ✓ |
 | P3.1 | Topf-Entnahme als Buchungssatz, realer Topf-Stand, Budget Plan/Ist (ADR-0003) | ✓ |
-| P3.5 | Bankimport (zweite Quelle hinter dem Ledger-Port) + Auto-Matching | offen |
-| P4 | Weitere Analysen + KI-Vorbereitung | offen |
+| P3.5 | Bankimport (Finanzguru-CSV, modulare Quellen-Naht) → Inbox → Verbuchen | ✓ |
+| P3.6 | Historie/Auswertungen, Buchungen bearbeiten, Tabellen-Komfort | ✓ |
+| P4 | Plan/Ist-Auto-Matching · weitere Quellen (CAMT/FinTS) · KI-Vorbereitung | offen |
 
 Nutzbar: Verträge/Budgets/Töpfe fließen in eine 12-Monats-Projektion mit zwei Kurven
 (Kontosaldo + freie Liquidität); Überplanung wird sichtbar; What-if per Szenario. Geplante
-Zahlungen lassen sich als bezahlt abhaken — sie fallen aus der Vorschau und bewegen den
-realen Kontostand (Anfangsbestand + Σ Ist).
+Zahlungen lassen sich als bezahlt abhaken; Kontoauszüge importieren, prüfen und verbuchen;
+die Historie zeigt, wie es tatsächlich lief.
 
 ## Architektur
 
