@@ -14,13 +14,13 @@ const KOPF =
 function reihe(opts: {
   tag?: string; konto?: string; betrag?: string; waehrung?: string;
   gegenpartei?: string; gegenIban?: string; zweck?: string; glaeubiger?: string;
-  unterkat?: string; buchungsId?: string; splitTyp?: string;
+  unterkat?: string; umbuchung?: string; buchungsId?: string; splitTyp?: string;
 }): string {
   const f = (s = "") => s;
   return [
     f(opts.tag), f(opts.konto), "Girokonto", f(opts.betrag), "63,09", f(opts.waehrung ?? "EUR"),
     f(opts.gegenpartei), f(opts.gegenIban), f(opts.zweck), "", "", f(opts.glaeubiger),
-    "Essen & Trinken", f(opts.unterkat), "nein", "", "", "nein", "nein", "Kartenzahlung",
+    "Essen & Trinken", f(opts.unterkat), "nein", "", "", f(opts.umbuchung ?? "nein"), "nein", "Kartenzahlung",
     "Ausgaben", "2021-45", "2021-11", "2021-Q4", "2021", f(opts.buchungsId), "", f(opts.splitTyp),
   ].join(";");
 }
@@ -61,6 +61,7 @@ describe("finanzguruAdapter.lies", () => {
       kontoIban: "DE61200411440690602800",
       kontoName: "Girokonto",
       glaeubigerId: undefined,
+      istUmbuchung: false,
       quelle: "finanzguru",
       nativeId: "2da83348289587cbe750f887563fd417135d354e",
       kategorieHinweis: "Lebensmittel",
@@ -96,6 +97,17 @@ describe("finanzguruAdapter.lies", () => {
     expect(umsaetze[0].gegenpartei).toBe("Gut");
     expect(warnungen.some((w) => w.includes("Betrag"))).toBe(true);
     expect(warnungen.some((w) => w.includes("Datum"))).toBe(true);
+  });
+
+  it("erkennt interne Umbuchungen (Analyse-Umbuchung = ja)", () => {
+    const { umsaetze } = finanzguruAdapter.lies(
+      csv(
+        reihe({ tag: "01.05.2022", betrag: "-500,00", gegenpartei: "Eigenes Tagesgeld", umbuchung: "ja" }),
+        reihe({ tag: "01.05.2022", betrag: "-6,55", gegenpartei: "Trinkgut" }),
+      ),
+    );
+    expect(umsaetze[0].istUmbuchung).toBe(true);
+    expect(umsaetze[1].istUmbuchung).toBe(false);
   });
 
   it("warnt vor Split-Buchungen, parst sie aber (Mehrfachzählung folgt in Slice 2)", () => {

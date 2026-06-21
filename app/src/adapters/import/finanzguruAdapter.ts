@@ -30,6 +30,7 @@ const SP = {
   zweck: "Verwendungszweck",
   glaeubigerId: "Glaeubiger-ID",
   unterkategorie: "Analyse-Unterkategorie",
+  umbuchung: "Analyse-Umbuchung",
   buchungsId: "Buchungs-ID",
   splitTyp: "Split-Typ",
 } as const;
@@ -75,6 +76,7 @@ function reiheZuRohUmsatz(r: Reihe): RohUmsatz | string {
     kontoIban: leerZuUndefined(r[SP.referenzkonto]),
     kontoName: leerZuUndefined(r[SP.kontoName]),
     glaeubigerId: leerZuUndefined(r[SP.glaeubigerId]),
+    istUmbuchung: (r[SP.umbuchung] ?? "").trim().toLowerCase() === "ja",
     quelle: ID,
     nativeId: leerZuUndefined(r[SP.buchungsId]),
     kategorieHinweis: leerZuUndefined(r[SP.unterkategorie]),
