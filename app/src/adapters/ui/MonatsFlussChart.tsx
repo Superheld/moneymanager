@@ -11,9 +11,13 @@ interface Props {
   ausgaben: number[]; // Minor Units (Cent), positiver Betrag
   width?: number;
   height?: number;
+  /** Optional: Klick auf einen Monat (Index). Macht die Balken/Slots anklickbar. */
+  onMonatClick?: (index: number) => void;
+  /** Optional: hervorgehobener Monat (Index). */
+  aktivIndex?: number | null;
 }
 
-export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, height = 240 }: Props) {
+export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, height = 240, onMonatClick, aktivIndex }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
   const padL = 52;
@@ -47,10 +51,16 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
           const cx = padL + slot * i + slot / 2;
           const ein = h(einnahmen[i] ?? 0);
           const aus = h(ausgaben[i] ?? 0);
+          const klickbar = !!onMonatClick;
           return (
-            <g key={i}>
+            <g key={i} onClick={klickbar ? () => onMonatClick!(i) : undefined} style={klickbar ? { cursor: "pointer" } : undefined}>
+              {aktivIndex === i && (
+                <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="var(--accent)" opacity="0.1" />
+              )}
               <rect x={cx - bw - 1} y={mid - ein} width={bw} height={ein} rx="2" fill="var(--ok)" />
               <rect x={cx + 1} y={mid} width={bw} height={aus} rx="2" fill="var(--ink)" opacity="0.78" />
+              {/* transparenter, voll-hoher Slot für leichtes Klicken */}
+              {klickbar && <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="transparent" />}
               {i % Math.ceil(n / 12) === 0 && (
                 <text x={cx} y={height - 8} textAnchor="middle" fontSize="10.5" fill="var(--ink-3)" fontFamily="var(--font-ui)">{m}</text>
               )}
