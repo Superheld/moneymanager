@@ -107,16 +107,16 @@ export function HistorieScreen() {
   const saldoJetzt = verlauf.length ? verlauf[verlauf.length - 1].saldo : 0;
 
   return (
-    <>
+    <div className="screen">
       <PageHead title={t("historie.titel")} subtitle={t("historie.untertitel")} />
 
-      {fehler && <Card style={{ marginBottom: "var(--sp-4)", borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
+      {fehler && <Card style={{ borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
 
       {!geladen ? null : ist.length === 0 && !fehler ? (
         <Card>{t("historie.leer")}</Card>
       ) : (
         <>
-          <div className="kpis" style={{ marginBottom: "var(--gap-card)" }}>
+          <div className="kpis">
             <KPIStat size="chip" label={t("historie.kpiEinnahmen")} value={geld.format(summeEin)} unit={geld.symbol} tone="ok" />
             <KPIStat size="chip" label={t("historie.kpiAusgaben")} value={geld.format(summeAus)} unit={geld.symbol} />
             <KPIStat size="chip" label={t("historie.kpiNetto")} value={geld.format(netto, { mitVorzeichen: true })} unit={geld.symbol} tone={netto < 0 ? "warn" : "ok"} />
@@ -152,8 +152,7 @@ export function HistorieScreen() {
               title={t("historie.katTitel")}
               subtitle={aufschluesselung.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
               action={aufschluesselung.label ? <Button variant="ghost" onClick={() => setAktivMonat(null)}>{t("historie.alleMonate")}</Button> : undefined}
-              style={{ marginTop: "var(--gap-card)" }}
-            >
+                         >
               <KategorieSektion titel={t("historie.sektionAusgaben")} items={aufschluesselung.items.filter((i) => i.charakter === "Aufwand")} />
               <KategorieSektion titel={t("historie.sektionEinnahmen")} items={aufschluesselung.items.filter((i) => i.charakter === "Ertrag")} />
               <KategorieSektion titel={t("historie.sektionUmschichtung")} items={aufschluesselung.items.filter((i) => i.charakter === "Umschichtung")} ohneLabel={t("historie.umbuchungen")} />
@@ -184,6 +183,6 @@ export function HistorieScreen() {
           </Card>
         </>
       )}
-    </>
+    </div>
   );
 }
