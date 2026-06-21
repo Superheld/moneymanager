@@ -131,6 +131,11 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
     const db = await getDb();
     for (const u of umsaetze) await einfuegen(db, u);
   },
+  async alle() {
+    const db = await getDb();
+    const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} ORDER BY buchungstag`);
+    return zeilen.map(zuUmsatz);
+  },
   async nachLauf(laufId: string) {
     const db = await getDb();
     const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} WHERE lauf_id = $1 ORDER BY buchungstag`, [laufId]);
