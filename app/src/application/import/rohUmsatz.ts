@@ -23,8 +23,10 @@ export interface RohUmsatz {
   readonly gegenparteiIban?: string;
   /** Verwendungszweck (Freitext). */
   readonly verwendungszweck: string;
-  /** IBAN des eigenen Kontos (Referenzkonto) — Basis fürs spätere Konto-Mapping. */
+  /** IBAN des eigenen Kontos (Referenzkonto) — Basis fürs Konto-Mapping. */
   readonly kontoIban?: string;
+  /** Anzeigename des eigenen Kontos aus der Quelle (z. B. „Girokonto") — Vorschlag beim Anlegen. */
+  readonly kontoName?: string;
   /** SEPA-Gläubiger-ID (nur bei Lastschriften gesetzt) — später Anker der Regel-Schicht. */
   readonly glaeubigerId?: string;
 
