@@ -34,6 +34,7 @@ export function ReviewScreen() {
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [kontoFilter, setKontoFilter] = useState<string>("alle");
   const [statusFilter, setStatusFilter] = useState<"alle" | "offen" | "fertig">("alle");
+  const [suche, setSuche] = useState("");
   const [seite, setSeite] = useState(0);
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -62,16 +63,16 @@ export function ReviewScreen() {
   const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
   const katById = useMemo(() => new Map(kategorien.map((k) => [k.id, k])), [kategorien]);
 
-  const gefiltert = useMemo(
-    () =>
-      umsaetze.filter((u) => {
-        if (kontoFilter !== "alle" && u.zahlungskontoId !== kontoFilter) return false;
-        if (statusFilter === "offen" && u.vorschlag) return false;
-        if (statusFilter === "fertig" && !u.vorschlag) return false;
-        return true;
-      }),
-    [umsaetze, kontoFilter, statusFilter],
-  );
+  const gefiltert = useMemo(() => {
+    const q = suche.trim().toLowerCase();
+    return umsaetze.filter((u) => {
+      if (kontoFilter !== "alle" && u.zahlungskontoId !== kontoFilter) return false;
+      if (statusFilter === "offen" && u.vorschlag) return false;
+      if (statusFilter === "fertig" && !u.vorschlag) return false;
+      if (q && !(`${u.gegenpartei} ${u.verwendungszweck}`.toLowerCase().includes(q))) return false;
+      return true;
+    });
+  }, [umsaetze, kontoFilter, statusFilter, suche]);
 
   const seitenAnzahl = Math.max(1, Math.ceil(gefiltert.length / SEITE_GROESSE));
   const aktuelleSeite = Math.min(seite, seitenAnzahl - 1);
@@ -148,6 +149,13 @@ export function ReviewScreen() {
               <option value="offen">{t("review.statusOffen")}</option>
               <option value="fertig">{t("review.statusFertig")}</option>
             </select>
+            <input
+              value={suche}
+              onChange={(e) => { setSuche(e.target.value); setSeite(0); }}
+              placeholder={t("review.suche")}
+              style={{ ...select, flex: "1 1 200px", minWidth: 160 }}
+            />
+            <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
           </div>
 
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>

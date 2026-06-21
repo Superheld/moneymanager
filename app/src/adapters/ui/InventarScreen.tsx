@@ -28,7 +28,7 @@ import { sqliteInventarRepository as inventarRepo } from "../persistence/sqliteI
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
-import { Button, Card, CoverageTrack, FormField, Pill } from "./ds";
+import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
@@ -106,6 +106,21 @@ export function InventarScreen() {
     return m;
   }, [toepfe]);
 
+  // Übersichtszahlen über alle Gegenstände.
+  const summe = useMemo(() => {
+    let ersatzwert = 0, angespart = 0, ziel = 0;
+    for (const g of items) {
+      ersatzwert += g.wiederbeschaffung;
+      const topf = topfZuItem.get(g.id);
+      if (topf) {
+        const z = zielwert(topf);
+        if (z != null) ziel += z;
+        angespart += Math.max(0, topfStand(topf, heute, topfBuchungen(ist, topf.id)));
+      }
+    }
+    return { ersatzwert, angespart, ziel, deckung: ziel > 0 ? Math.round((angespart / ziel) * 100) : 0 };
+  }, [items, topfZuItem, ist, heute]);
+
   function neu() {
     setEditId(null);
     setBezeichnung("");
@@ -153,6 +168,15 @@ export function InventarScreen() {
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
         <Trans i18nKey="inventar.erklaerung" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
       </p>
+
+      {items.length > 0 && (
+        <div className="kpis">
+          <KPIStat size="chip" label={t("inventar.kpiAnzahl")} value={String(items.length)} />
+          <KPIStat size="chip" label={t("inventar.kpiErsatzwert")} value={geld.format(summe.ersatzwert)} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("inventar.kpiAngespart")} value={geld.format(summe.angespart)} unit={geld.symbol} tone="ok" />
+          <KPIStat size="chip" label={t("inventar.kpiDeckung")} value={String(summe.deckung)} unit="%" tone={summe.deckung < 50 ? "warn" : "default"} />
+        </div>
+      )}
 
       <Card>
         {items.length === 0 ? (
