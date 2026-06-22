@@ -55,11 +55,20 @@ Details: [`ARCHITEKTUR.md`](ARCHITEKTUR.md).
 Moneymanager/    DDD-Dokumentation (Strategie → Lieferung) — Fachwahrheit
 design-system/   Design-System (Tokens, Komponenten, Glossar)
 app/             die Anwendung (Tauri + React + TS)
-  src/core/         reine Domäne (Projektion, Töpfe, Kündigung …), unit-getestet
+  src/core/         reine Domäne (Projektion, Töpfe, Kündigung, Historie …), unit-getestet
   src/application/  Use-Cases + Ports
-  src/adapters/     SQLite-Persistenz + React-UI (Design-System)
+    import/           Import-Kontext: Quellen-Port, Umsatz-Aggregat, Dedup, Remapping
+  src/adapters/     Außenwelt hinter den Ports
+    persistence/      SQLite (tauri-plugin-sql) + versionierte Migrationskette
+    import/           Quellen-Adapter (Finanzguru-CSV; weitere andockbar)
+    ui/               React-UI (Design-System)
   src-tauri/        dünne Rust-Hülle
 ```
+
+Der **Import** sitzt hinter einem Quellen-Port (`Quellenadapter`): ein neues Format/eine
+neue App ist ein eigenes Adapter-Objekt, das sich registriert — ohne Bestandscode zu ändern.
+Importierte Umsätze leben als reversibler Entwurfs-Stapel, bis sie über den Ledger-Port
+verbucht werden.
 
 ## Entwicklung
 
