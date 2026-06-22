@@ -18,5 +18,5 @@ app/coverage/
 .env
 .env.local
 
-# Lokale, echte Finanzdaten — NIE committen
-transaction-classifier/data/
+# Lern-Spike (NN-Klassifizierer), lokal — enthält echte Finanzdaten in data/
+transaction-classifier/
