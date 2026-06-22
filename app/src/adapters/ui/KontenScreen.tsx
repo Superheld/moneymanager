@@ -64,7 +64,9 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [aktivId, setAktivId] = useState("");
   const [tage, setTage] = useState(30);
-  const [regLimit, setRegLimit] = useState(50);
+  const REG_PRO_SEITE = 25;
+  const [katFilter, setKatFilter] = useState("alle");
+  const [regSeite, setRegSeite] = useState(Number.MAX_SAFE_INTEGER); // Start = letzte (jüngste) Seite
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
@@ -83,10 +85,10 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   useEffect(() => {
     laden();
   }, []);
-  // Beim Kontowechsel die Register-Historie wieder einklappen.
+  // Beim Kontowechsel / Filterwechsel wieder zur jüngsten Seite springen.
   useEffect(() => {
-    setRegLimit(50);
-  }, [aktivId]);
+    setRegSeite(Number.MAX_SAFE_INTEGER);
+  }, [aktivId, katFilter]);
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
@@ -95,6 +97,38 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     () => (aktiv ? kontoRegister(aktiv, ist, regeln, heute, tage) : null),
     [aktiv, ist, regeln, heute, tage],
   );
+
+  // Importierte Buchungen tragen ihren Empfänger am Umsatz (nicht an der IstBuchung).
+  const umsatzByIst = useMemo(() => {
+    const m = new Map<string, Umsatz>();
+    for (const u of umsaetze) if (u.istbuchungId) m.set(u.istbuchungId, u);
+    return m;
+  }, [umsaetze]);
+
+  // Kategorien, die im gebuchten Register wirklich vorkommen (für das Filter-Dropdown).
+  const kategorienImRegister = useMemo(() => {
+    const ids = new Set<string>();
+    for (const z of register?.gebucht ?? []) if (z.kategorieId) ids.add(z.kategorieId);
+    return [...ids].map((id) => ({ id, name: kategorieName.get(id) ?? "?" })).sort((a, b) => a.name.localeCompare(b.name));
+  }, [register, kategorieName]);
+
+  const gebuchtGefiltert = useMemo(() => {
+    const alle = register?.gebucht ?? [];
+    if (katFilter === "alle") return alle;
+    if (katFilter === "__ohne") return alle.filter((z) => !z.kategorieId);
+    return alle.filter((z) => z.kategorieId === katFilter);
+  }, [register, katFilter]);
+
+  const regSeiten = Math.max(1, Math.ceil(gebuchtGefiltert.length / REG_PRO_SEITE));
+  const regSeiteAktuell = Math.min(regSeite, regSeiten - 1);
+  const gebuchtSeite = gebuchtGefiltert.slice(regSeiteAktuell * REG_PRO_SEITE, (regSeiteAktuell + 1) * REG_PRO_SEITE);
+
+  /** Anzeigename einer Registerzeile: Empfänger (Import) > Notiz/Regel-Bezeichnung; „Buchung" ist Füllwort. */
+  function zeilenLabel(z: RegisterZeile): string {
+    const u = z.istId ? umsatzByIst.get(z.istId) : undefined;
+    if (u?.gegenpartei) return u.gegenpartei;
+    return z.bezeichnung && z.bezeichnung !== "Buchung" ? z.bezeichnung : "";
+  }
 
   async function abhaken(z: RegisterZeile, schonBezahlt: boolean) {
     if (!z.planRef) return;
@@ -178,37 +212,56 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             </span>
           }
         >
-          {/* Anfangsbestand */}
-          <Zeile links={<span style={{ color: "var(--ink-3)", fontWeight: 600 }}>{t("konten.anfangsbestand")}</span>} saldo={aktiv.saldo} />
-
-          {/* Gebuchtes Ist (nur die jüngsten regLimit; ältere auf Wunsch) */}
-          {register.gebucht.length > regLimit && (
-            <div style={{ padding: "8px 0", textAlign: "center" }}>
-              <button className="linkbtn" onClick={() => setRegLimit((l) => l + 200)}>
-                {t("konten.aeltereAnzeigen", { n: register.gebucht.length - regLimit })}
-              </button>
+          {/* Filter nach Kategorie + Pagination der Historie */}
+          {(register.gebucht.length > 0) && (
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", padding: "4px 0 8px" }}>
+              <select className="field" style={{ width: "auto" }} value={katFilter} onChange={(e) => setKatFilter(e.target.value)}>
+                <option value="alle">{t("konten.alleKategorien")}</option>
+                {kategorienImRegister.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+                <option value="__ohne">{t("konten.ohneKategorie")}</option>
+              </select>
+              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
+              {regSeiten > 1 && (
+                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--sp-2)", fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>
+                  <button className="linkbtn" disabled={regSeiteAktuell === 0} onClick={() => setRegSeite(regSeiteAktuell - 1)}>‹</button>
+                  {t("konten.registerBereich", { von: regSeiteAktuell * REG_PRO_SEITE + 1, bis: Math.min(gebuchtGefiltert.length, (regSeiteAktuell + 1) * REG_PRO_SEITE), gesamt: gebuchtGefiltert.length })}
+                  <button className="linkbtn" disabled={regSeiteAktuell >= regSeiten - 1} onClick={() => setRegSeite(regSeiteAktuell + 1)}>›</button>
+                </span>
+              )}
             </div>
           )}
-          {register.gebucht.slice(Math.max(0, register.gebucht.length - regLimit)).map((z) => (
+
+          {/* Anfangsbestand nur auf der ersten (ältesten) Seite ohne Filter */}
+          {katFilter === "alle" && regSeiteAktuell === 0 && (
+            <Zeile links={<span style={{ color: "var(--ink-3)", fontWeight: 600 }}>{t("konten.anfangsbestand")}</span>} saldo={aktiv.saldo} />
+          )}
+
+          {/* Gebuchtes Ist (gefiltert + paginiert) */}
+          {gebuchtSeite.map((z) => (
             <Zeile
               key={z.istId}
               links={
                 <>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(z.datum)}</span>
-                  {z.bezeichnung}
+                  {zeilenLabel(z)}
                   {z.gegenkontoId && <span className="muted" style={{ fontSize: 12 }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
                   {z.kategorieId && <span className="muted" style={{ fontSize: 12 }}>· {kategorieName.get(z.kategorieId) ?? "?"}</span>}
                   {z.gegenkontoId ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill> : z.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null}
-                  {z.gegenkontoId
-                    ? <button className="linkbtn" style={{ marginLeft: 4 }} onClick={() => zeileEntfernen(z)}>{t("konten.loeschen")}</button>
-                    : <button className="linkbtn" style={{ marginLeft: 4 }} onClick={() => bearbeitenOeffnen(z)}>{t("konten.bearbeiten")}</button>}
                 </>
               }
               betrag={z.betrag}
               charakter={z.charakter}
               saldo={z.saldo}
+              aktion={
+                z.gegenkontoId
+                  ? <button className="linkbtn" onClick={() => zeileEntfernen(z)}>{t("konten.loeschen")}</button>
+                  : <button className="linkbtn" onClick={() => bearbeitenOeffnen(z)}>{t("konten.bearbeiten")}</button>
+              }
             />
           ))}
+
+          {/* „Heute" + geplante Vorschau nur auf der jüngsten Seite, ungefiltert (dort sitzt „jetzt") */}
+          {katFilter === "alle" && regSeiteAktuell === regSeiten - 1 && <>
 
           {/* Trenner heute */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 8px", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-wide, .04em)" }}>
@@ -245,6 +298,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               />
             ))
           )}
+
+          </>}
 
           {fehler && <div className="err" style={{ marginTop: 10 }}>{fehler}</div>}
         </Card>
@@ -283,17 +338,18 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   );
 }
 
-/** Eine Registerzeile: linke Beschreibung, Betrag, laufender Saldo rechts. */
-function Zeile({ links, betrag, charakter, saldo, faint }: { links: ReactNode; betrag?: number; charakter?: Charakter; saldo: number; faint?: boolean }) {
+/** Eine Registerzeile: linke Beschreibung, Betrag, laufender Saldo, optionale Aktion rechts. */
+function Zeile({ links, betrag, charakter, saldo, faint, aktion }: { links: ReactNode; betrag?: number; charakter?: Charakter; saldo: number; faint?: boolean; aktion?: ReactNode }) {
   const geld = useGeld();
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "10px 0", borderBottom: "1px solid var(--line-soft)", opacity: faint ? 0.62 : 1 }}>
       <span style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flexWrap: "wrap" }}>{links}</span>
-      <span style={{ display: "flex", gap: 18, whiteSpace: "nowrap" }}>
+      <span style={{ display: "flex", gap: 18, whiteSpace: "nowrap", alignItems: "center" }}>
         {betrag != null && charakter != null && (
           <span className="num" style={{ fontSize: 13.5, fontWeight: 700, color: betragFarbe({ betrag, charakter }), minWidth: 92, textAlign: "right" }}>{geld.formatMitSymbol(betrag, { mitVorzeichen: true })}</span>
         )}
         <span className="num" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-2)", minWidth: 92, textAlign: "right" }}>{geld.formatMitSymbol(saldo)}</span>
+        {aktion != null && <span style={{ minWidth: 64, textAlign: "right" }}>{aktion}</span>}
       </span>
     </div>
   );
