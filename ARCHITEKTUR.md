@@ -23,6 +23,14 @@ sich wandelnde Domäne → native Typteilung mit der React-UI wiegt schwerer als
 Die Verpackung ist identisch — alles kompiliert in **ein** Binary, keine Zusatzinstallation
 beim Nutzer. Ein späterer Wechsel zu Rust-Kern bliebe ein bewusster ADR-Schritt.
 
+> **Logische vs. physische Trennung — wichtig, um Erwartungen geradezurücken:** Die
+> Hexagonal-Architektur trennt Backend und Frontend **im Code** (`core`/`application` ohne
+> IO, über Ports angesprochen), **nicht im Betrieb**. Es gibt **keinen eigenen
+> Backend-Prozess und keine API** — `core`, `application`, `adapters/persistence` (SQLite)
+> und die React-UI laufen alle im **selben Webview-Prozess**. „Kern" meint die Code-Mitte,
+> kein separat laufendes Backend. Wer echte Prozess-/Service-Trennung will, braucht einen
+> neuen ADR (TS-Kern hinter einen lokalen Service ziehen).
+
 ## Hexagonales Mapping (im `app/`)
 
 Der BAUPLAN nennt die Schichten `core / app / adapters / shell`. So liegen sie konkret:
