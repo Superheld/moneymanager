@@ -124,7 +124,7 @@ const de = {
     umbuchung: "↔ Umbuchung (Umschichtung)",
     verbuchen: "Verbuchen ({{n}})",
     verbuchenBusy: "Verbuche …",
-    verbuchtErgebnis: "{{verbucht}} verbucht · {{uebersprungen}} übersprungen",
+    verbuchtErgebnis: "{{verbucht}} verbucht ({{umbuchungen}} Umbuchungen) · {{uebersprungen}} übersprungen",
     seite: "Seite {{seite}} / {{gesamt}}",
   },
   historie: {
@@ -705,7 +705,7 @@ const en: typeof de = {
     umbuchung: "↔ Transfer (reallocation)",
     verbuchen: "Post ({{n}})",
     verbuchenBusy: "Posting …",
-    verbuchtErgebnis: "{{verbucht}} posted · {{uebersprungen}} skipped",
+    verbuchtErgebnis: "{{verbucht}} posted ({{umbuchungen}} transfers) · {{uebersprungen}} skipped",
     seite: "Page {{seite}} / {{gesamt}}",
   },
   historie: {
