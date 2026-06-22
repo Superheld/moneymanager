@@ -64,9 +64,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [aktivId, setAktivId] = useState("");
   const [tage, setTage] = useState(30);
-  const REG_PRO_SEITE = 25;
   const [katFilter, setKatFilter] = useState("alle");
-  const [regSeite, setRegSeite] = useState(Number.MAX_SAFE_INTEGER); // Start = letzte (jüngste) Seite
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
@@ -85,10 +83,10 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   useEffect(() => {
     laden();
   }, []);
-  // Beim Kontowechsel / Filterwechsel wieder zur jüngsten Seite springen.
+  // Beim Kontowechsel den Kategorie-Filter zurücksetzen.
   useEffect(() => {
-    setRegSeite(Number.MAX_SAFE_INTEGER);
-  }, [aktivId, katFilter]);
+    setKatFilter("alle");
+  }, [aktivId]);
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
@@ -119,9 +117,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     return alle.filter((z) => z.kategorieId === katFilter);
   }, [register, katFilter]);
 
-  const regSeiten = Math.max(1, Math.ceil(gebuchtGefiltert.length / REG_PRO_SEITE));
-  const regSeiteAktuell = Math.min(regSeite, regSeiten - 1);
-  const gebuchtSeite = gebuchtGefiltert.slice(regSeiteAktuell * REG_PRO_SEITE, (regSeiteAktuell + 1) * REG_PRO_SEITE);
+  // Standardansicht: neueste zuerst (Tabelle sortiert/paginiert intern weiter).
+  const gebuchtFuerTabelle = useMemo(() => [...gebuchtGefiltert].reverse(), [gebuchtGefiltert]);
 
   /** Anzeigename einer Registerzeile: Empfänger (Import) > Notiz/Regel-Bezeichnung; „Buchung" ist Füllwort. */
   function zeilenLabel(z: RegisterZeile): string {
@@ -184,13 +181,15 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           <div className="muted">{t("konten.keineKonten")}</div>
         ) : (
           <DataTable
+            sortable
+            onRowClick={(k) => setAktivId(k.id)}
+            istAktiv={(k) => k.id === aktivId}
             columns={[
               { key: "bezeichnung", label: t("konten.spalteBezeichnung"), render: (k) => (<span style={{ fontWeight: k.id === aktivId ? "var(--fw-bold)" : "var(--fw-semi)" }}>{k.bezeichnung}</span>) },
-              { key: "typ", label: t("konten.spalteTyp"), render: (k) => <Pill variant="neutral">{t(`konten.typ.${k.typ}`)}</Pill> },
-              { key: "anfang", label: `${t("konten.spalteAnfangsbestand")} ${geld.symbol}`, align: "right", render: (k) => geld.format(k.saldo) },
-              { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", render: (k) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
-              { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", render: (k) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
-              { key: "_v", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => setAktivId(k.id)}>{k.id === aktivId ? t("konten.ausgewaehlt") : t("konten.ansehen")}</button> },
+              { key: "typ", label: t("konten.spalteTyp"), sortValue: (k) => k.typ, render: (k) => <Pill variant="neutral">{t(`konten.typ.${k.typ}`)}</Pill> },
+              { key: "anfang", label: `${t("konten.spalteAnfangsbestand")} ${geld.symbol}`, align: "right", sortValue: (k) => k.saldo, render: (k) => geld.format(k.saldo) },
+              { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", sortValue: (k) => istSummeKonto(ist, k.id), render: (k) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
+              { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", sortValue: (k) => realerKontostand(k, ist), render: (k) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
             ]}
             rows={konten}
           />
@@ -212,56 +211,48 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             </span>
           }
         >
-          {/* Filter nach Kategorie + Pagination der Historie */}
-          {(register.gebucht.length > 0) && (
-            <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", padding: "4px 0 8px" }}>
-              <select className="field" style={{ width: "auto" }} value={katFilter} onChange={(e) => setKatFilter(e.target.value)}>
-                <option value="alle">{t("konten.alleKategorien")}</option>
-                {kategorienImRegister.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-                <option value="__ohne">{t("konten.ohneKategorie")}</option>
-              </select>
-              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
-              {regSeiten > 1 && (
-                <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "var(--sp-2)", fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>
-                  <button className="linkbtn" disabled={regSeiteAktuell === 0} onClick={() => setRegSeite(regSeiteAktuell - 1)}>‹</button>
-                  {t("konten.registerBereich", { von: regSeiteAktuell * REG_PRO_SEITE + 1, bis: Math.min(gebuchtGefiltert.length, (regSeiteAktuell + 1) * REG_PRO_SEITE), gesamt: gebuchtGefiltert.length })}
-                  <button className="linkbtn" disabled={regSeiteAktuell >= regSeiten - 1} onClick={() => setRegSeite(regSeiteAktuell + 1)}>›</button>
-                </span>
-              )}
-            </div>
-          )}
+          {/* Gebuchte Historie als sortierbare, paginierte Tabelle; Kategorie-Filter darüber */}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", padding: "4px 0 8px" }}>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.anfangsbestand")}: {geld.formatMitSymbol(aktiv.saldo)}</span>
+            <select className="field" style={{ width: "auto", marginLeft: "auto" }} value={katFilter} onChange={(e) => setKatFilter(e.target.value)}>
+              <option value="alle">{t("konten.alleKategorien")}</option>
+              {kategorienImRegister.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
+              <option value="__ohne">{t("konten.ohneKategorie")}</option>
+            </select>
+          </div>
 
-          {/* Anfangsbestand nur auf der ersten (ältesten) Seite ohne Filter */}
-          {katFilter === "alle" && regSeiteAktuell === 0 && (
-            <Zeile links={<span style={{ color: "var(--ink-3)", fontWeight: 600 }}>{t("konten.anfangsbestand")}</span>} saldo={aktiv.saldo} />
-          )}
-
-          {/* Gebuchtes Ist (gefiltert + paginiert) */}
-          {gebuchtSeite.map((z) => (
-            <Zeile
-              key={z.istId}
-              links={
-                <>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(z.datum)}</span>
-                  {zeilenLabel(z)}
-                  {z.gegenkontoId && <span className="muted" style={{ fontSize: 12 }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
-                  {z.kategorieId && <span className="muted" style={{ fontSize: 12 }}>· {kategorieName.get(z.kategorieId) ?? "?"}</span>}
-                  {z.gegenkontoId ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill> : z.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null}
-                </>
-              }
-              betrag={z.betrag}
-              charakter={z.charakter}
-              saldo={z.saldo}
-              aktion={
-                z.gegenkontoId
-                  ? <button className="linkbtn" onClick={() => zeileEntfernen(z)}>{t("konten.loeschen")}</button>
-                  : <button className="linkbtn" onClick={() => bearbeitenOeffnen(z)}>{t("konten.bearbeiten")}</button>
-              }
+          {gebuchtGefiltert.length === 0 ? (
+            <div className="muted">{t("konten.keineGebucht")}</div>
+          ) : (
+            <DataTable
+              key={`${aktivId}-${katFilter}`}
+              sortable
+              pageSize={25}
+              columns={[
+                { key: "datum", label: t("konten.spalteDatum"), sortValue: (z) => z.datum, render: (z) => ddmm(z.datum) },
+                {
+                  key: "bez", label: t("konten.spalteBeschreibung"), sortValue: (z) => zeilenLabel(z),
+                  render: (z) => (
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
+                      {zeilenLabel(z)}
+                      {z.gegenkontoId && <span className="muted" style={{ fontSize: 12 }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
+                      {z.gegenkontoId ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill> : z.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null}
+                    </span>
+                  ),
+                },
+                { key: "kat", label: t("konten.spalteKategorie"), sortValue: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""), render: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "?" : "—") },
+                { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (z) => z.betrag, render: (z) => <span className="num" style={{ fontWeight: 700, color: betragFarbe(z) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span> },
+                { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (z) => z.saldo, render: (z) => geld.format(z.saldo) },
+                {
+                  key: "_a", label: "", align: "right", sortable: false,
+                  render: (z) => z.gegenkontoId
+                    ? <button className="linkbtn" onClick={() => zeileEntfernen(z)}>{t("konten.loeschen")}</button>
+                    : <button className="linkbtn" onClick={() => bearbeitenOeffnen(z)}>{t("konten.bearbeiten")}</button>,
+                },
+              ]}
+              rows={gebuchtFuerTabelle}
             />
-          ))}
-
-          {/* „Heute" + geplante Vorschau nur auf der jüngsten Seite, ungefiltert (dort sitzt „jetzt") */}
-          {katFilter === "alle" && regSeiteAktuell === regSeiten - 1 && <>
+          )}
 
           {/* Trenner heute */}
           <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 8px", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-wide, .04em)" }}>
@@ -298,8 +289,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               />
             ))
           )}
-
-          </>}
 
           {fehler && <div className="err" style={{ marginTop: 10 }}>{fehler}</div>}
         </Card>
