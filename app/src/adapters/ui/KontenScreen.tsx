@@ -13,7 +13,6 @@ import {
   kontoRegister,
   minorZuMajor,
   realerKontostand,
-  fensterEnde,
   type Charakter,
   type IstBuchung,
   type Kategorie,
@@ -39,6 +38,12 @@ import { useGeld, useCharakterLabel, fehlerNachricht } from "./EinstellungenProv
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const TAGE_OPTIONEN = [14, 30, 60, 90];
+const ART_OPTS = [
+  { v: "alle", k: "konten.artAlle" },
+  { v: "einnahmen", k: "konten.artEinnahmen" },
+  { v: "ausgaben", k: "konten.artAusgaben" },
+  { v: "umbuchung", k: "konten.artUmbuchung" },
+] as const;
 
 function heuteIso(): string {
   const n = new Date();
@@ -211,10 +216,27 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
       {aktiv && register && (
         <Card
-          title={t("konten.registerTitel", { konto: aktiv.bezeichnung })}
-          subtitle={t("konten.registerUntertitel", { stand: geld.format(register.standHeute), symbol: geld.symbol, datum: ddmm(fensterEnde(heute, tage)) })}
           style={{ marginTop: "var(--gap-card)" }}
-          action={
+          pad
+        >
+          {/* Statement-Masthead: wessen Auszug, welcher reale Stand */}
+          <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--sp-4)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+                <span style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{aktiv.bezeichnung}</span>
+                <Pill variant="neutral">{t(`konten.typ.${aktiv.typ}`)}</Pill>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: "var(--sp-3)", marginTop: 8 }}>
+                <span className="num" style={{ fontSize: "var(--fs-h1)", fontWeight: "var(--fw-black)", letterSpacing: "var(--ls-tight)", lineHeight: 1, color: register.standHeute < 0 ? "var(--warn-deep)" : "var(--ink)" }}>
+                  {geld.formatMitSymbol(register.standHeute)}
+                </span>
+                <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>{t("konten.realerStandLabel")}</span>
+              </div>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+                {t("konten.anfangsbestand")} {geld.formatMitSymbol(aktiv.saldo)}
+                {istSummeKonto(ist, aktiv.id) !== 0 && <> · Σ Ist {geld.formatMitSymbol(istSummeKonto(ist, aktiv.id), { mitVorzeichen: true })}</>}
+              </div>
+            </div>
             <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
               <select className="field" style={{ width: "auto" }} value={tage} onChange={(e) => setTage(Number(e.target.value))}>
                 {TAGE_OPTIONEN.map((d) => (<option key={d} value={d}>{t("konten.kommendeTage", { tage: d })}</option>))}
@@ -222,18 +244,24 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               {konten.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>}
               <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>{t("konten.btnBuchung")}</Button>
             </span>
-          }
-        >
-          {/* Gebuchte Historie als paginierte Tabelle; Filter darüber (Suche, Art, Kategorie) */}
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap", padding: "4px 0 8px" }}>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)", marginRight: "var(--sp-2)" }}>{t("konten.anfangsbestand")}: {geld.formatMitSymbol(aktiv.saldo)}</span>
-            <input className="field" style={{ width: "auto", flex: "1 1 160px", minWidth: 140 }} value={regSuche} onChange={(e) => setRegSuche(e.target.value)} placeholder={t("konten.suche")} />
-            <select className="field" style={{ width: "auto" }} value={artFilter} onChange={(e) => setArtFilter(e.target.value as typeof artFilter)}>
-              <option value="alle">{t("konten.artAlle")}</option>
-              <option value="einnahmen">{t("konten.artEinnahmen")}</option>
-              <option value="ausgaben">{t("konten.artAusgaben")}</option>
-              <option value="umbuchung">{t("konten.artUmbuchung")}</option>
-            </select>
+          </div>
+
+          {/* Filterleiste: Suche · Art (segmented) · Kategorie · Treffer */}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
+            <span style={{ position: "relative", flex: "1 1 200px", minWidth: 160, display: "inline-flex", alignItems: "center" }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2.2" style={{ position: "absolute", left: 10, pointerEvents: "none" }}><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
+              <input className="field" style={{ width: "100%", paddingLeft: 30 }} value={regSuche} onChange={(e) => setRegSuche(e.target.value)} placeholder={t("konten.suche")} />
+            </span>
+            <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
+              {ART_OPTS.map((opt, i) => {
+                const an = artFilter === opt.v;
+                return (
+                  <button key={opt.v} type="button" aria-pressed={an} onClick={() => setArtFilter(opt.v)} style={{ padding: "6px 11px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
+                    {t(opt.k)}
+                  </button>
+                );
+              })}
+            </div>
             <select className="field" style={{ width: "auto" }} value={katFilter} onChange={(e) => setKatFilter(e.target.value)}>
               <option value="alle">{t("konten.alleKategorien")}</option>
               {kategorienImRegister.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
