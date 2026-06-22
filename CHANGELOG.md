@@ -3,6 +3,33 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.11.0] — 2026-06-22
+
+Konto als Auszug, Tabellen-Komfort überall, und zwei Verhaltensänderungen am Import.
+
+### Hinzugefügt
+- **Konto-Auszug.** Statement-Ansicht je Konto mit prominentem realem Stand (Masthead);
+  gebuchte Historie als Tabelle mit Pagination, Volltextsuche (Empfänger/Zweck) und
+  Filtern nach **Art** (Einnahmen/Ausgaben/Umbuchungen, Segmented Control) und Kategorie.
+  Importierte Zeilen zeigen den Empfänger statt des Füllworts „Buchung".
+- **Konto per Klick wechseln** in der Konten-Übersicht (Tabelle, sortierbar).
+- **Tabellen-Komfort generisch** in `DataTable`: opt-in Spalten-Sortierung und Pagination;
+  genutzt in Historie, Verträgen, Budgets, Konten.
+- **Historie-Detail als Inline-Akkordeon** (Einzelbuchungen klappen unter der Kategorie auf).
+
+### Geändert
+- **Umbuchungen werden beim Import gepaart** → verknüpfte Doppelbuchung (transferId +
+  Gegenkonto), statt zweier einseitiger Umschichtungen wie in 0.10.0. Heuristik: Gegenbetrag
+  + zwei eigene Konten + Buchungstag ≤ 3 Tage versetzt; ohne Partner Fallback auf einseitig.
+- **Standardkategorien-Backfill:** fehlende Standardkategorien werden bei jedem Start
+  ergänzt (idempotent), nicht mehr nur bei komplett leerer DB — so ziehen Taxonomie-
+  Erweiterungen auf bestehenden DBs nach.
+- Konto-Register: Sortierung entfernt (der laufende Saldo ist chronologisch); dafür mehr Filter.
+
+### Behoben
+- Historie-Lade-Race (Kategorien zu spät gesetzt → fälschlich „ohne Kategorie").
+- Historie-Breite an die anderen Seiten angeglichen (`.screen`-Container).
+
 ## [0.10.0] — 2026-06-22
 
 Großes Funktions-Release: Bankimport, Rückblick/Auswertungen, Buchungs-Bearbeitung,
