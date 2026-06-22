@@ -65,6 +65,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [aktivId, setAktivId] = useState("");
   const [tage, setTage] = useState(30);
   const [katFilter, setKatFilter] = useState("alle");
+  const [artFilter, setArtFilter] = useState<"alle" | "einnahmen" | "ausgaben" | "umbuchung">("alle");
+  const [regSuche, setRegSuche] = useState("");
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
@@ -83,9 +85,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   useEffect(() => {
     laden();
   }, []);
-  // Beim Kontowechsel den Kategorie-Filter zurücksetzen.
+  // Beim Kontowechsel die Filter zurücksetzen.
   useEffect(() => {
     setKatFilter("alle");
+    setArtFilter("alle");
+    setRegSuche("");
   }, [aktivId]);
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
@@ -111,11 +115,20 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   }, [register, kategorieName]);
 
   const gebuchtGefiltert = useMemo(() => {
-    const alle = register?.gebucht ?? [];
-    if (katFilter === "alle") return alle;
-    if (katFilter === "__ohne") return alle.filter((z) => !z.kategorieId);
-    return alle.filter((z) => z.kategorieId === katFilter);
-  }, [register, katFilter]);
+    const q = regSuche.trim().toLowerCase();
+    return (register?.gebucht ?? []).filter((z) => {
+      if (katFilter === "__ohne" ? !!z.kategorieId : katFilter !== "alle" && z.kategorieId !== katFilter) return false;
+      if (artFilter === "umbuchung" && !z.gegenkontoId) return false;
+      if (artFilter === "einnahmen" && !(z.betrag > 0 && !z.gegenkontoId)) return false;
+      if (artFilter === "ausgaben" && !(z.betrag < 0 && !z.gegenkontoId)) return false;
+      if (q) {
+        const u = z.istId ? umsatzByIst.get(z.istId) : undefined;
+        const heu = `${zeilenLabel(z)} ${u?.verwendungszweck ?? ""} ${z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""}`.toLowerCase();
+        if (!heu.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [register, katFilter, artFilter, regSuche, umsatzByIst, kategorieName]);
 
   // Standardansicht: neueste zuerst (Tabelle sortiert/paginiert intern weiter).
   const gebuchtFuerTabelle = useMemo(() => [...gebuchtGefiltert].reverse(), [gebuchtGefiltert]);
@@ -211,27 +224,34 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             </span>
           }
         >
-          {/* Gebuchte Historie als sortierbare, paginierte Tabelle; Kategorie-Filter darüber */}
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", padding: "4px 0 8px" }}>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.anfangsbestand")}: {geld.formatMitSymbol(aktiv.saldo)}</span>
-            <select className="field" style={{ width: "auto", marginLeft: "auto" }} value={katFilter} onChange={(e) => setKatFilter(e.target.value)}>
+          {/* Gebuchte Historie als paginierte Tabelle; Filter darüber (Suche, Art, Kategorie) */}
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", flexWrap: "wrap", padding: "4px 0 8px" }}>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)", marginRight: "var(--sp-2)" }}>{t("konten.anfangsbestand")}: {geld.formatMitSymbol(aktiv.saldo)}</span>
+            <input className="field" style={{ width: "auto", flex: "1 1 160px", minWidth: 140 }} value={regSuche} onChange={(e) => setRegSuche(e.target.value)} placeholder={t("konten.suche")} />
+            <select className="field" style={{ width: "auto" }} value={artFilter} onChange={(e) => setArtFilter(e.target.value as typeof artFilter)}>
+              <option value="alle">{t("konten.artAlle")}</option>
+              <option value="einnahmen">{t("konten.artEinnahmen")}</option>
+              <option value="ausgaben">{t("konten.artAusgaben")}</option>
+              <option value="umbuchung">{t("konten.artUmbuchung")}</option>
+            </select>
+            <select className="field" style={{ width: "auto" }} value={katFilter} onChange={(e) => setKatFilter(e.target.value)}>
               <option value="alle">{t("konten.alleKategorien")}</option>
               {kategorienImRegister.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
               <option value="__ohne">{t("konten.ohneKategorie")}</option>
             </select>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
           </div>
 
           {gebuchtGefiltert.length === 0 ? (
             <div className="muted">{t("konten.keineGebucht")}</div>
           ) : (
             <DataTable
-              key={`${aktivId}-${katFilter}`}
-              sortable
+              key={`${aktivId}-${katFilter}-${artFilter}-${regSuche}`}
               pageSize={25}
               columns={[
-                { key: "datum", label: t("konten.spalteDatum"), sortValue: (z) => z.datum, render: (z) => ddmm(z.datum) },
+                { key: "datum", label: t("konten.spalteDatum"), render: (z) => ddmm(z.datum) },
                 {
-                  key: "bez", label: t("konten.spalteBeschreibung"), sortValue: (z) => zeilenLabel(z),
+                  key: "bez", label: t("konten.spalteBeschreibung"),
                   render: (z) => (
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
                       {zeilenLabel(z)}
