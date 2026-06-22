@@ -14,19 +14,21 @@ plus Finanzplan*. Sie unterscheidet konsequent:
 **Lokal first:** Alle Daten bleiben auf dem Gerät, keine Cloud-Pflicht. Funktioniert ohne KI —
 der Kern (Projektion, Töpfe, Liquidität) ist reine Arithmetik.
 
-## Status — v0.10.0 (Import, Historie & Auswertungen)
+## Status — v0.11.0 (Import, Historie & Konto-Auszug)
 
 Auf der kompletten **Planungsseite** und dem **Ist-Schritt „light"** (ADR-0002/0003)
-aufbauend, kamen drei große Bausteine dazu — Details im [CHANGELOG](CHANGELOG.md):
+aufbauend — Details im [CHANGELOG](CHANGELOG.md):
 
 - **Import (Finanzguru-CSV).** Modulare Quellen-Naht (weitere Formate/Apps andockbar),
   Konto-Zuordnung mit Auto-Anlegen, Dedup (native ID + Roh-Hash), Kategorie-Vorschläge per
-  Remapping, Umbuchungs-Erkennung. Reversibler **Entwurfs-Stapel** → **Review-Inbox**
-  (prüfen, kategorisieren, Volltextsuche) → **Verbuchen** ins Ledger.
+  Remapping. Reversibler **Entwurfs-Stapel** → **Review-Inbox** (prüfen, kategorisieren,
+  Volltextsuche) → **Verbuchen** ins Ledger. Interne **Umbuchungen werden gepaart** zu
+  verknüpften Doppelbuchungen (heuristisch über Gegenbetrag + Konto + Datumsfenster).
 - **Historie (Rückblick).** Echte Monatsflüsse + realer Saldo-Verlauf über die Zeit; Klick
   auf einen Monat → Kategorie-Aufschlüsselung; Klick auf eine Kategorie → Einzelbuchungen.
-- **Konten.** Ist-Buchungen **bearbeiten & entfernen** (auch importierte; Löschen setzt den
-  Umsatz zurück in die Inbox).
+- **Konten als Auszug.** Statement-Ansicht je Konto (realer Stand prominent); gebuchte
+  Historie als Tabelle mit Volltextsuche, Art-/Kategorie-Filter und Pagination; Konto per
+  Klick wechseln; Ist-Buchungen **bearbeiten & entfernen** (auch importierte).
 - **Listen & Tabellen.** Spalten-Sortierung, Pagination und **Übersichtszahlen (KPIs)** auf
   Inventar, Verträgen, Budgets und Töpfen.
 
@@ -37,8 +39,8 @@ aufbauend, kamen drei große Bausteine dazu — Details im [CHANGELOG](CHANGELOG
 | P2 | Verträge · Budgets · Inventar/Töpfe · Liquiditätsplaner · Szenario | ✓ |
 | P3 | Ist light — „bezahlt markieren", Ledger-Port, Reconciliation light, Konto-Register (ADR-0002) | ✓ |
 | P3.1 | Topf-Entnahme als Buchungssatz, realer Topf-Stand, Budget Plan/Ist (ADR-0003) | ✓ |
-| P3.5 | Bankimport (Finanzguru-CSV, modulare Quellen-Naht) → Inbox → Verbuchen | ✓ |
-| P3.6 | Historie/Auswertungen, Buchungen bearbeiten, Tabellen-Komfort | ✓ |
+| P3.5 | Bankimport (Finanzguru-CSV) → Inbox → Verbuchen; Umbuchungs-Paarung | ✓ |
+| P3.6 | Historie/Auswertungen, Konto-Auszug, Buchungen bearbeiten, Tabellen-Komfort | ✓ |
 | P4 | Plan/Ist-Auto-Matching · weitere Quellen (CAMT/FinTS) · KI-Vorbereitung | offen |
 
 Nutzbar: Verträge/Budgets/Töpfe fließen in eine 12-Monats-Projektion mit zwei Kurven
