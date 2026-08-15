@@ -3,20 +3,30 @@
 
 # Node
 node_modules/
-app/node_modules/
 
 # Build-Artefakte
-app/dist/
-app/src-tauri/target/
-app/src-tauri/gen/
+dist/
+src-tauri/target/
+src-tauri/gen/
 
 # Test-Coverage
-app/coverage/
+coverage/
 
 # Logs / env
 *.log
 .env
 .env.local
 
+# Editor
+.vscode/*
+!.vscode/extensions.json
+.idea
+
 # Lern-Spike (NN-Klassifizierer), lokal — enthält echte Finanzdaten in data/
 transaction-classifier/
+
+# Fachliche Doku und Design-System: bleiben LOKAL, nicht im öffentlichen Repo.
+# Die Dateien liegen weiter im Arbeitsverzeichnis — sie sind nur nicht mehr versioniert.
+Moneymanager/
+ARCHITEKTUR.md
+design-system/
