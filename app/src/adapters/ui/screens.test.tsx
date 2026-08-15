@@ -1,0 +1,253 @@
+/** @vitest-environment jsdom */
+// Screen-Tests — Integration von der Oberfläche bis ins Schema.
+//
+// Jeder Screen wird zweimal geprüft: im Leerzustand (frische Datenbank) und mit Daten,
+// die über die echten Repositories geschrieben wurden. Dazwischen liegt nichts Gefaktes —
+// dieselben Use-Cases, derselbe Kern, dieselbe SQL-Engine wie in der App.
+//
+// Bewusst NICHT auf Layout oder Formulierungen geprüft: die Tests suchen nach Daten, die
+// der Test selbst angelegt hat (Bezeichnungen, Beträge). So bleiben sie beim nächsten
+// Wording- oder Design-Durchgang stehen, statt reihenweise rot zu werden.
+
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { Database } from "sql.js";
+
+const halter = vi.hoisted(() => {
+  let aktuell: unknown = null;
+  return { setzen: (d: unknown) => (aktuell = d), lesen: () => aktuell };
+});
+vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
+
+import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
+import { BudgetsScreen } from "./BudgetsScreen";
+import { DeckungScreen } from "./DeckungScreen";
+import { EinstellungenScreen } from "./EinstellungenScreen";
+import { HistorieScreen } from "./HistorieScreen";
+import { ImportScreen } from "./ImportScreen";
+import { InventarScreen } from "./InventarScreen";
+import { KontenScreen } from "./KontenScreen";
+import { ReviewScreen } from "./ReviewScreen";
+import { UeberblickScreen } from "./UeberblickScreen";
+import { VertraegeScreen } from "./VertraegeScreen";
+import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
+import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
+import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
+import { sqliteTopfRepository } from "../persistence/sqliteTopfRepository";
+import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
+import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
+import {
+  sqliteKategorieRepository,
+  sqlitePersonRepository,
+  sqliteZahlungskontoRepository,
+} from "../persistence/sqliteStammdatenRepositories";
+import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
+
+let db: Database;
+
+beforeAll(sqlLaden);
+beforeEach(() => {
+  db?.close();
+  db = frischeDb();
+  halter.setzen(pluginApi(db));
+});
+
+/** Häufig gebrauchtes Grundgerüst: ein Konto und eine Kategorie. */
+async function grunddaten() {
+  await sqliteZahlungskontoRepository.speichern({
+    id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 250000,
+  });
+  await sqliteKategorieRepository.speichern({
+    id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand",
+  });
+}
+
+describe("KontenScreen", () => {
+  it("rendert im Leerzustand ohne zu scheitern", async () => {
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("zeigt ein Konto mit seiner Bezeichnung", async () => {
+    await grunddaten();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    // Steht mehrfach (Kontoliste und Auszugs-Kopf) — beides gewollt.
+    expect((await screen.findAllByText(/Girokonto/)).length).toBeGreaterThan(0);
+  });
+
+  it("zeigt gebuchte Umsätze des Kontos im Auszug", async () => {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -4250, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Wocheneinkauf",
+    });
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/42,50|Wocheneinkauf/));
+  });
+
+  it("öffnet den Buchungsdialog", async () => {
+    await grunddaten();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    const knoepfe = await screen.findAllByRole("button", { name: /buchung|buchen/i });
+    await nutzer.click(knoepfe[0]);
+    await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(1));
+  });
+});
+
+describe("UeberblickScreen", () => {
+  it("rendert im Leerzustand", async () => {
+    rendere(<UeberblickScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("bezieht Konten und Regeln in die Übersicht ein", async () => {
+    await grunddaten();
+    await sqliteZahlungsregelRepository.speichern({
+      id: "z1", bezeichnung: "Miete", betrag: -90000, rhythmus: "monatlich",
+      startdatum: "2026-01-01", charakter: "Aufwand",
+    });
+    rendere(<UeberblickScreen />);
+    // 250000 Minor Units Kontostand → „2.500,00" muss irgendwo auftauchen.
+    await waitFor(() => expect(document.body.textContent).toMatch(/2\.500,00/));
+  });
+});
+
+describe("BudgetsScreen", () => {
+  it("rendert im Leerzustand", async () => {
+    rendere(<BudgetsScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("zeigt ein Budget mit Kategorie und Rahmen", async () => {
+    await grunddaten();
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "kat1", rahmen: 40000, periode: "monatlich",
+    });
+    rendere(<BudgetsScreen />);
+    expect(await screen.findByText(/Lebensmittel/)).toBeInTheDocument();
+    await waitFor(() => expect(document.body.textContent).toMatch(/400,00/));
+  });
+
+  it("rechnet gebuchte Aufwände als Verbrauch gegen das Budget", async () => {
+    await grunddaten();
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "kat1", rahmen: 40000, periode: "monatlich",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: new Date().toISOString().slice(0, 10), betrag: -15000,
+      kontoId: "k1", charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    rendere(<BudgetsScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/150,00/));
+  });
+});
+
+describe("VertraegeScreen", () => {
+  it("rendert im Leerzustand", async () => {
+    rendere(<VertraegeScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("zeigt einen Vertrag mit Anbieter", async () => {
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Stadtwerke Musterstadt", beginn: "2026-01-01",
+      status: "aktiv", verlaengerung: "automatisch", verlaengerungMonate: 12,
+      mindestlaufzeitMonate: 12, kuendigungsfristMonate: 3,
+    });
+    rendere(<VertraegeScreen />);
+    expect(await screen.findByText(/Stadtwerke Musterstadt/)).toBeInTheDocument();
+  });
+});
+
+describe("InventarScreen", () => {
+  it("rendert im Leerzustand", async () => {
+    rendere(<InventarScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("zeigt einen Gegenstand mit Bezeichnung", async () => {
+    await sqliteInventarRepository.speichern({
+      id: "g1", bezeichnung: "Waschmaschine", anschaffung: "2024-01-01",
+      wiederbeschaffung: 60000, nutzungsdauerMonate: 120,
+    });
+    rendere(<InventarScreen />);
+    expect(await screen.findByText(/Waschmaschine/)).toBeInTheDocument();
+  });
+});
+
+describe("HistorieScreen", () => {
+  it("rendert im Leerzustand", async () => {
+    rendere(<HistorieScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("zeigt gebuchte Beträge in der Historie", async () => {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    rendere(<HistorieScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
+  });
+});
+
+describe("DeckungScreen", () => {
+  it("rendert im Leerzustand", async () => {
+    rendere(<DeckungScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("stellt Töpfe der Kontodeckung gegenüber", async () => {
+    await grunddaten();
+    await sqliteTopfRepository.speichern({
+      id: "t1", typ: "puffer", bezeichnung: "Reparaturen", start: "2020-01-01",
+      schaetzbetrag: 50000, fristMonate: 12,
+    });
+    rendere(<DeckungScreen />);
+    expect(await screen.findByText(/Reparaturen/)).toBeInTheDocument();
+  });
+});
+
+describe("ReviewScreen", () => {
+  it("rendert im Leerzustand", async () => {
+    rendere(<ReviewScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("listet offene Umsätze aus dem Import", async () => {
+    await grunddaten();
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
+      betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
+      verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
+    });
+    rendere(<ReviewScreen />);
+    await waitFor(() =>
+      expect(document.body.textContent).toMatch(/Buchhandlung Beispiel|Fachbuch|25,99/),
+    );
+  });
+});
+
+describe("ImportScreen", () => {
+  it("rendert die Dateiauswahl", async () => {
+    rendere(<ImportScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+});
+
+describe("EinstellungenScreen", () => {
+  it("rendert die Einstellungen", async () => {
+    rendere(<EinstellungenScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("zeigt angelegte Stammdaten", async () => {
+    await grunddaten();
+    await sqlitePersonRepository.speichern({ id: "p1", name: "Bruce", rolle: "hauptperson" });
+    rendere(<EinstellungenScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Bruce|Girokonto|Lebensmittel/));
+  });
+});
