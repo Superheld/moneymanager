@@ -28,6 +28,20 @@ export function typAusName(name: string | undefined): Kontotyp {
   return "Giro";
 }
 
+/**
+ * Schlüssel, unter dem die Umsätze einer Quelle einem Konto zugeordnet werden.
+ *
+ * MUSS überall identisch gebildet werden — hier bei der Gruppierung und beim Nachschlagen
+ * in umsaetzeUebernehmen. Vorher wurde nach der rohen IBAN gruppiert und erst beim
+ * Nachschlagen normalisiert: dieselbe IBAN in drei Schreibweisen („DE89 3704…", „de893704…",
+ * „DE893704…") ergab drei Gruppen, drei Anlege-Vorschläge und am Ende drei Zahlungskonten
+ * mit identischer IBAN — Saldo und Umsätze auf drei Konten verteilt, nicht per Nachimport
+ * heilbar.
+ */
+export function quelleKeyFuer(kontoIban: string | undefined): string {
+  return kontoIban ? normalisiereIban(kontoIban) : "";
+}
+
 export function kontoMatchVorschlag(
   rohUmsaetze: readonly RohUmsatz[],
   bestehende: readonly Zahlungskonto[],
@@ -37,7 +51,7 @@ export function kontoMatchVorschlag(
 
   const gruppen = new Map<string, { name?: string; anzahl: number }>();
   for (const u of rohUmsaetze) {
-    const key = u.kontoIban ?? "";
+    const key = quelleKeyFuer(u.kontoIban);
     const g = gruppen.get(key) ?? { name: u.kontoName, anzahl: 0 };
     g.anzahl++;
     if (!g.name && u.kontoName) g.name = u.kontoName;
