@@ -23,12 +23,16 @@ export const STANDARD_WAEHRUNG: Waehrung = { code: "EUR", skala: 2 };
  * häufigsten Fall — zurück, damit nie etwas crasht.
  */
 export function waehrungNachCode(code: string): Waehrung {
-  let skala = 2;
   try {
-    skala = new Intl.NumberFormat("en", { style: "currency", currency: code })
-      .resolvedOptions().maximumFractionDigits ?? 2;
+    const skala =
+      new Intl.NumberFormat("en", { style: "currency", currency: code })
+        .resolvedOptions().maximumFractionDigits ?? 2;
+    return { code, skala };
   } catch {
-    skala = 2;
+    // Auch der CODE muss zurückfallen, nicht nur die Skala: er wandert weiter in
+    // geldFormatierenMitSymbol und damit erneut in Intl — dort warf derselbe ungültige
+    // Code dann doch noch (RangeError: Invalid currency code). Die Zusage "crasht nie"
+    // war nur halb eingelöst.
+    return STANDARD_WAEHRUNG;
   }
-  return { code, skala };
 }

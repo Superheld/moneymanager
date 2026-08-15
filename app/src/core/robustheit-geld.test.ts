@@ -299,22 +299,22 @@ describe("Topf — Nutzungsdauer/Frist: Validierung vor Rundung", () => {
   //   `Math.round(0.4)` → 0. Gespeichert wird ein Ersatztopf mit nutzungsdauerMonate = 0.
   // Warum falsch: Reihenfolge-Fehler. Das Aggregat ist ab jetzt dauerhaft kaputt und
   //   liegt in der DB — siehe die beiden Folgetests.
-  it("[ROT] nutzungsdauerMonate 0.4 wird nicht zu 0 gerundet", async () => {
+  // GRÜN seit dem Fix: topfAnlegen rundet jetzt VOR der Prüfung und lehnt 0.4 ab —
+  // die im Kommentar oben genannte erste Variante ("wird abgelehnt").
+  it("nutzungsdauerMonate 0.4 wird abgelehnt statt zu 0 gerundet", async () => {
     const repo = memToepfe();
-    const t = await topfAnlegen(repo, {
+    await expect(topfAnlegen(repo, {
       typ: "ersatz", bezeichnung: "Kaputt", start: "2026-06-01",
       wiederbeschaffung: 120000, nutzungsdauerMonate: 0.4,
-    });
-    expect(t.typ === "ersatz" && t.nutzungsdauerMonate).not.toBe(0);
+    })).rejects.toThrow("nutzungsdauer.groesserNull");
   });
 
-  it("[ROT] fristMonate 0.4 wird nicht zu 0 gerundet", async () => {
+  it("fristMonate 0.4 wird abgelehnt statt zu 0 gerundet", async () => {
     const repo = memToepfe();
-    const t = await topfAnlegen(repo, {
+    await expect(topfAnlegen(repo, {
       typ: "puffer", bezeichnung: "Kaputt", start: "2026-06-01",
       schaetzbetrag: 50000, fristMonate: 0.4,
-    });
-    expect(t.typ === "puffer" && t.fristMonate).not.toBe(0);
+    })).rejects.toThrow("zeitfenster.groesserNull");
   });
 
   // [ROT] Fund 6b — Folge: ansparrate wird Infinity, sollstand/topfStand werden NaN.
@@ -328,7 +328,8 @@ describe("Topf — Nutzungsdauer/Frist: Validierung vor Rundung", () => {
       id: "t", typ: "ersatz", bezeichnung: "Kaputt", start: "2026-06-01",
       wiederbeschaffung: 120000, nutzungsdauerMonate: 0,
     };
-    expect(ansparrate(topf)).toBe(Infinity); // Ist-Zustand, hier bewusst festgehalten
+    // Nach dem Fix: kein Infinity mehr — ohne gültigen Zeitraum gibt es keinen Aufbau.
+    expect(ansparrate(topf)).toBe(0);
     expect(Number.isFinite(sollstand(topf, "2026-06-01") ?? 0)).toBe(true);
   });
 
@@ -360,7 +361,10 @@ describe("Topf — Nutzungsdauer/Frist: Validierung vor Rundung", () => {
     };
     const plan = projiziereLiquiditaet([], [], [kaputt, gesund], "2026-06-01", 3, 500000);
     expect(plan.every((m) => Number.isFinite(m.freieLiquiditaet))).toBe(true);
-    expect(plan[0].sollSumme).toBe(120000 + 10000); // kaputter Topf sofort auf Ziel
+    // Nach dem Fix trägt der kaputte Topf gar nichts mehr bei (Rate 0), statt ab dem
+    // ersten Monat als voll angespart zu gelten und die freie Liquidität sofort um den
+    // vollen Zielwert zu drücken. Übrig bleibt nur der gesunde Puffer.
+    expect(plan[0].sollSumme).toBe(10000);
   });
 
   // [GRÜN] mit gültiger Nutzungsdauer rechnet der Topf sauber.

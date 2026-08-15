@@ -16,7 +16,6 @@ function faktor(w: Waehrung): number {
   return 10 ** w.skala;
 }
 
-/** Major (z. B. 120.5) → Minor Units. Rundet kaufmännisch auf die kleinste Einheit. */
 /**
  * Ist der Wert ein verwendbarer Geldbetrag in Minor Units?
  *
@@ -31,6 +30,7 @@ export function istCent(wert: unknown): wert is Cent {
   return typeof wert === "number" && Number.isSafeInteger(wert);
 }
 
+/** Major (z. B. 120.5) → Minor Units. Rundet kaufmännisch auf die kleinste Einheit. */
 export function majorZuMinor(value: number, w: Waehrung = STANDARD_WAEHRUNG): Cent {
   return Math.round(value * faktor(w));
 }
@@ -58,6 +58,27 @@ export interface FormatOptionen {
   mitVorzeichen?: boolean;
 }
 
+/** Anzeige für einen Betrag, der kein darstellbarer Geldwert ist (NaN, ±Infinity). */
+export const KEIN_WERT = "—";
+
+/**
+ * Zerlegt Minor Units ohne Gleitkomma-Division in Ganzteil und Rest und setzt sie
+ * locale-gerecht zusammen. `Math.abs(cent) / 100` verlor bei sehr grossen Beträgen
+ * Präzision (MAX_SAFE_INTEGER wurde um einen Cent falsch angezeigt); mit reiner
+ * Integer-Arithmetik bleibt jeder sichere Integer exakt.
+ */
+function minorFormatieren(cent: Cent, w: Waehrung, locale: string): string {
+  const abs = Math.abs(cent);
+  const f = faktor(w);
+  const ganz = Math.floor(abs / f);
+  const rest = abs % f;
+  const ganzText = ganz.toLocaleString(locale, { maximumFractionDigits: 0 });
+  if (w.skala === 0) return ganzText;
+  // Dezimaltrenner des Locales abfragen, statt ihn zu raten.
+  const trenner = (1.1).toLocaleString(locale).replace(/\d/g, "");
+  return ganzText + trenner + String(rest).padStart(w.skala, "0");
+}
+
 /**
  * Formatiert Minor Units als reinen Betrag (Gruppierung, „−" U+2212 statt Bindestrich),
  * OHNE Währungssymbol — das setzt die UI separat (formatBetragMitSymbol oder eigenes €).
@@ -66,12 +87,12 @@ export interface FormatOptionen {
 export function geldFormatieren(cent: Cent, opt: FormatOptionen = {}): string {
   const w = opt.waehrung ?? STANDARD_WAEHRUNG;
   const locale = opt.locale ?? "de-DE";
+  // NaN und ±Infinity entstehen nur aus kaputten Daten. Sie als „NaN"/„∞" in die
+  // Oberfläche zu schreiben, ist keine Information — der Platzhalter sagt dasselbe,
+  // ohne wie ein Betrag auszusehen.
+  if (!Number.isFinite(cent)) return KEIN_WERT;
   const negativ = cent < 0;
-  const betrag = Math.abs(cent) / faktor(w);
-  const s = betrag.toLocaleString(locale, {
-    minimumFractionDigits: w.skala,
-    maximumFractionDigits: w.skala,
-  });
+  const s = minorFormatieren(cent, w, locale);
   if (negativ) return "−" + s;
   return opt.mitVorzeichen ? "+" + s : s;
 }
@@ -83,13 +104,22 @@ export function geldFormatieren(cent: Cent, opt: FormatOptionen = {}): string {
 export function geldFormatierenMitSymbol(cent: Cent, opt: FormatOptionen = {}): string {
   const w = opt.waehrung ?? STANDARD_WAEHRUNG;
   const locale = opt.locale ?? "de-DE";
+  if (!Number.isFinite(cent)) return KEIN_WERT;
   const betrag = Math.abs(cent) / faktor(w);
-  const s = betrag.toLocaleString(locale, {
-    style: "currency",
-    currency: w.code,
-    minimumFractionDigits: w.skala,
-    maximumFractionDigits: w.skala,
-  });
+  let s: string;
+  try {
+    s = betrag.toLocaleString(locale, {
+      style: "currency",
+      currency: w.code,
+      minimumFractionDigits: w.skala,
+      maximumFractionDigits: w.skala,
+    });
+  } catch {
+    // Intl wirft bei ungültigem Währungscode (RangeError). Die Zusage in waehrung.ts
+    // lautet "crasht nie" — also hier dasselbe Verhalten wie waehrungssymbol: den Code
+    // als Symbol verwenden statt die Formatierung scheitern zu lassen.
+    s = (minorFormatieren(cent, w, locale) + " " + w.code).trim();
+  }
   if (cent < 0) return "−" + s;
   return opt.mitVorzeichen ? "+" + s : s;
 }
