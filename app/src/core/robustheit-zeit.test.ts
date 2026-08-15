@@ -229,16 +229,21 @@ describe("ROT 5 — Formvalidierung lässt nicht existierende Daten durch, Tag 0
   // Warum falsch: dieses Datum wird angezeigt, geht in planRefKey und beim Abhaken als
   //   IstBuchung.datum in die DB. Ein Tag 00 existiert nicht; alle Datumsfenster
   //   (Budget-Periode, Kontoauszug) rechnen ihn falsch ein.
-  it("Tag 00 wird durch die gesamte Projektion durchgereicht", () => {
-    const b = projiziereRegel(regel({ startdatum: "2026-01-00" }), "2026-01-01", 3);
-    expect(b.map((x) => x.datum)).not.toContain("2026-02-00");
+  // GRÜN seit dem Fix: parseIso prüft jetzt die EXISTENZ des Datums, nicht nur die Form.
+  // Ein Tag 00 kommt gar nicht mehr in die Rechenkette, statt bis in Planbuchung und DB
+  // durchgereicht zu werden.
+  it("Tag 00 erreicht die Projektion nicht mehr", () => {
+    expect(() => projiziereRegel(regel({ startdatum: "2026-01-00" }), "2026-01-01", 3)).toThrow(
+      "datum.ungueltig",
+    );
   });
 
-  it("Monat 00 wird still in den Dezember des Vorjahres umgedeutet", () => {
-    // Erwartet: Abweisung. Tatsächlich: 12 Fälligkeiten ab 2026-01-15 — die Regel
-    // startet faktisch am 2025-12-15, ohne dass das jemand sieht.
-    const b = projiziereRegel(regel({ startdatum: "2026-00-15" }), "2025-01-01", 24);
-    expect(b[0]?.datum).not.toBe("2025-12-15");
+  it("Monat 00 wird nicht mehr in den Dezember des Vorjahres umgedeutet", () => {
+    // GRÜN seit dem Fix: statt die Regel faktisch am 2025-12-15 starten zu lassen, ohne
+    // dass das jemand sieht, wird der unmögliche Monat jetzt abgewiesen.
+    expect(() => projiziereRegel(regel({ startdatum: "2026-00-15" }), "2025-01-01", 24)).toThrow(
+      "datum.ungueltig",
+    );
   });
 });
 
@@ -249,13 +254,20 @@ describe("ROT 6 — ungültiges Fensterdatum erzeugt „undefined aN“ statt ei
   //   MONATSNAMEN[NaN-1] ins Leere), sämtliche Buchungen werden still verworfen.
   // Warum falsch: der Kern hat keinerlei Eingangsschutz; ein kaputter Wert wird bis in
   //   die Diagrammbeschriftung gerendert statt früh zu scheitern.
-  it("projiziereVerlauf mit unparsbarem ab-Datum", () => {
-    const v = projiziereVerlauf([regel()], "heute", 3, 0);
-    expect(v.map((m) => m.label)).not.toEqual(["undefined aN", "undefined aN", "undefined aN"]);
+  // GRÜN seit dem Fix: statt drei Monatskörben mit der Beschriftung „undefined aN" gibt
+  // es jetzt einen klaren Fehler — der Aufrufer kann ihn zeigen, statt Unsinn zu rendern.
+  it("projiziereVerlauf mit unparsbarem ab-Datum wirft", () => {
+    expect(() => projiziereVerlauf([regel()], "heute", 3, 0)).toThrow("datum.ungueltig");
   });
 
-  it("leeres Startdatum lässt die Regel wortlos verschwinden", () => {
-    expect(projiziereRegel(regel({ startdatum: "" }), "2026-01-01", 12)).toHaveLength(12);
+  // GRÜN seit dem Fix: die Regel verschwindet nicht mehr wortlos aus der Projektion,
+  // sondern der ungültige Datensatz meldet sich. (Zwölf Fälligkeiten aus einem LEEREN
+  // Startdatum zu erfinden wäre die falsche Antwort gewesen — es gibt kein Datum, aus
+  // dem sich eine Fälligkeit ableiten liesse.)
+  it("leeres Startdatum verschwindet nicht wortlos, sondern meldet sich", () => {
+    expect(() => projiziereRegel(regel({ startdatum: "" }), "2026-01-01", 12)).toThrow(
+      "datum.ungueltig",
+    );
   }, 5000);
 });
 
@@ -337,12 +349,20 @@ describe("ROT 10 — addMonate erzeugt bei extremen Werten unbrauchbare Daten", 
   // Warum falsch (Erreichbarkeit): naechsterKuendigungstermin rechnet
   //   addMonate(ende, -frist) mit einer ungeprüften Nutzereingabe aus dem Freitextfeld
   //   für die Kündigungsfrist — dieselbe Stelle wie ROT 2.
-  it("stark negativer Monatsoffset", () => {
-    expect(toIso(addMonate({ y: 2026, m: 1, d: 15 }, -30000))).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  // GRÜN seit dem Fix: toIso erzeugt für ein Jahr ausserhalb 0001..9999 keinen String
+  // mehr, den die (durchgehend stringbasierte) Datumsordnung falsch einsortieren würde,
+  // sondern meldet den unmöglichen Wert.
+  it("stark negativer Monatsoffset liefert keinen unbrauchbaren ISO-String", () => {
+    expect(() => toIso(addMonate({ y: 2026, m: 1, d: 15 }, -30000))).toThrow("datum.ungueltig");
   });
 
-  it("ord bleibt bei negativem Jahr nicht ordnungserhaltend zum ISO-String", () => {
+  // ord() selbst bleibt eine reine Rechenfunktion und darf auch negative Jahre abbilden —
+  // die Ordnung kippt erst beim Übergang in den ISO-String, und genau dort wird der Wert
+  // jetzt abgefangen (Test darüber). Festgehalten bleibt: beides zusammen ist konsistent,
+  // weil ein solcher Ymd-Wert nie mehr zu einem Datumsstring wird.
+  it("ord und toIso bleiben zusammen konsistent", () => {
     const x = addMonate({ y: 2026, m: 1, d: 15 }, -30000);
-    expect(ord(x)).toBeGreaterThan(0);
+    expect(x.y).toBeLessThan(1);
+    expect(() => toIso(x)).toThrow("datum.ungueltig");
   });
 });

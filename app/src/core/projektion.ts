@@ -41,7 +41,7 @@ export function projiziereRegel(
 ): Planbuchung[] {
   const schritt = RHYTHMUS_MONATE[regel.rhythmus];
   const fensterStart = parseIso(ab);
-  const fensterEnde = addMonate(fensterStart, monate); // exklusiv
+  const fensterEnde = addMonate(fensterStart, Math.max(0, Math.floor(monate))); // exklusiv
   const startOrd = ord(fensterStart);
   const endeOrd = ord(fensterEnde);
 
@@ -50,7 +50,17 @@ export function projiziereRegel(
   // (z. B. 31. → Feb 28. → würde 28. bleiben statt im März wieder 31. zu sein).
   const start = parseIso(regel.startdatum);
   const buchungen: Planbuchung[] = [];
-  for (let k = 0; k < 10000; k++) {
+
+  // Beim ersten Zyklus IM Fenster einsteigen, statt vom Regelstart hochzuzählen: eine
+  // Regel mit sehr altem Startdatum verschwand sonst kommentarlos aus der Projektion,
+  // weil der Schleifendeckel (10000 Schritte) bei monatlichem Rhythmus nur rund
+  // 833 Jahre weit reicht. Der Posten stand in der Vertragsliste, tauchte im
+  // Liquiditätsplan aber nie auf — der projizierte Saldo war zu hoch.
+  const monateBisFenster =
+    (fensterStart.y - start.y) * 12 + (fensterStart.m - start.m);
+  const kStart = Math.max(0, Math.floor(monateBisFenster / schritt));
+
+  for (let k = kStart; k < kStart + 10000; k++) {
     const faellig = addMonate(start, k * schritt);
     if (ord(faellig) >= endeOrd) break;
     if (ord(faellig) >= startOrd) {
@@ -94,9 +104,12 @@ export function projiziereVerlauf(
 ): MonatsVerlauf[] {
   const start = parseIso(ab);
 
-  // Leere Monatskörbe vorbereiten.
+  // Leere Monatskörbe vorbereiten. Ganzzahlig: bei 12.5 entstanden 13 Körbe, während
+  // das Fensterende über addMonate(start, 12.5) woanders lag — Korbanzahl und Fenster
+  // liefen auseinander.
   const koerbe: MonatsVerlauf[] = [];
-  for (let i = 0; i < monate; i++) {
+  const anzahlMonate = Math.max(0, Math.floor(monate));
+  for (let i = 0; i < anzahlMonate; i++) {
     const ym = addMonate(start, i);
     koerbe.push({
       jahr: ym.y,
@@ -111,7 +124,7 @@ export function projiziereVerlauf(
   }
 
   for (const regel of regeln) {
-    for (const b of projiziereRegel(regel, ab, monate, bezahlt)) {
+    for (const b of projiziereRegel(regel, ab, anzahlMonate, bezahlt)) {
       const ymd = parseIso(b.datum);
       const k = koerbe[monatsIndex(start, ymd.y, ymd.m)];
       if (!k) continue;
@@ -170,13 +183,17 @@ export function projiziereLiquiditaet(
   bezahlt?: ReadonlySet<string>,
 ): LiquiditaetsMonat[] {
   const start = parseIso(ab);
-  const regelVerlauf = projiziereVerlauf(regeln, ab, monate, startsaldo, bezahlt);
+  // Dieselbe ganzzahlige Monatszahl wie im Verlauf verwenden, sonst laufen die beiden
+  // Reihen auseinander (bei 12.5 hatte der Verlauf 13 Körbe, diese Schleife 13 Runden
+  // und griff auf einen nicht existierenden zu).
+  const anzahlMonate = Math.max(0, Math.floor(monate));
+  const regelVerlauf = projiziereVerlauf(regeln, ab, anzahlMonate, startsaldo, bezahlt);
   const budgetProMonat = budgets.reduce((s, b) => s + geglaetteterMonatsabfluss(b), 0);
   const sollToepfe = toepfe.filter((t) => zielwert(t) != null);
 
   const ergebnis: LiquiditaetsMonat[] = [];
   let kontosaldo = startsaldo;
-  for (let i = 0; i < monate; i++) {
+  for (let i = 0; i < anzahlMonate; i++) {
     const rv = regelVerlauf[i];
     const netto = rv.netto + budgetProMonat;
     kontosaldo += netto;
