@@ -4,6 +4,7 @@
 // KEINE Salden — das passiert erst beim Verbuchen (Slice 4). Duplikate werden NICHT
 // gespeichert, nur gezählt. Seiteneffekte laufen über injizierte Repos + id().
 
+import { normalisiereIban } from "../../core";
 import type { Zahlungskonto } from "../../core";
 import type {
   ImportLaufRepository,
@@ -12,6 +13,7 @@ import type {
   ZahlungskontoRepository,
 } from "../ports";
 import { katalogNachName, vorschlagFuer } from "./vorschlag";
+import { quelleKeyFuer } from "./kontoMatch";
 import { klassifiziere, rohHash } from "./rohHash";
 import type { RohUmsatz } from "./rohUmsatz";
 import type { Umsatz } from "./umsatz";
@@ -48,19 +50,57 @@ export interface UebernahmeDeps {
   readonly id: () => string;
 }
 
+/**
+ * Serialisiert Übernahmen. Zwischen "Bestand lesen" und "Umsätze schreiben" liegt ein
+ * Zeitfenster; zwei gleichzeitige Läufe lasen beide denselben (leeren) Bestand und legten
+ * dieselbe Buchung doppelt an. Die DB stützt die Invariante nicht ab — die Indizes auf
+ * roh_hash und native_id sind bewusst nicht eindeutig.
+ *
+ * Die App läuft in einem einzigen Prozess, deshalb genügt hier eine Promise-Kette. Ein
+ * eindeutiger Index wäre der härtere Schutz, verlangt aber vorher eine Bereinigung
+ * etwaiger Alt-Duplikate — das gehört zur Datenmigration vor der nächsten Quelle.
+ */
+let uebernahmeKette: Promise<unknown> = Promise.resolve();
+
 export async function umsaetzeUebernehmen(
+  eingabe: UebernahmeEingabe,
+  deps: UebernahmeDeps,
+): Promise<UebernahmeErgebnis> {
+  const vorgaenger = uebernahmeKette;
+  let freigeben: () => void = () => {};
+  uebernahmeKette = new Promise<void>((r) => (freigeben = r));
+  await vorgaenger.catch(() => undefined);
+  try {
+    return await uebernahmeIntern(eingabe, deps);
+  } finally {
+    freigeben();
+  }
+}
+
+async function uebernahmeIntern(
   eingabe: UebernahmeEingabe,
   deps: UebernahmeDeps,
 ): Promise<UebernahmeErgebnis> {
   const { kontoRepo, kategorieRepo, umsatzRepo, laufRepo, id } = deps;
 
   // 1. Konten auflösen / fehlende anlegen → Quell-Schlüssel → kontoId.
+  //
+  // Dieselbe IBAN darf nur EIN Konto erzeugen, auch wenn sie in zwei Schreibweisen
+  // hereinkommt: ein doppelt angelegtes Bankkonto verteilt Saldo und Umsätze auf zwei
+  // Einträge und ist per Nachimport nicht mehr zu heilen.
   const kontoVon = new Map<string, string>();
+  const angelegtPerIban = new Map<string, string>();
   let angelegteKonten = 0;
   for (const k of eingabe.konten) {
     if (k.kontoId) {
       kontoVon.set(k.quelleKey, k.kontoId);
     } else if (k.neu) {
+      const ibanKey = k.neu.iban ? normalisiereIban(k.neu.iban) : "";
+      const schonAngelegt = ibanKey ? angelegtPerIban.get(ibanKey) : undefined;
+      if (schonAngelegt) {
+        kontoVon.set(k.quelleKey, schonAngelegt);
+        continue;
+      }
       const neuesKonto: Zahlungskonto = {
         id: id(),
         bezeichnung: k.neu.bezeichnung,
@@ -71,6 +111,7 @@ export async function umsaetzeUebernehmen(
       };
       await kontoRepo.speichern(neuesKonto);
       kontoVon.set(k.quelleKey, neuesKonto.id);
+      if (ibanKey) angelegtPerIban.set(ibanKey, neuesKonto.id);
       angelegteKonten++;
     }
   }
@@ -90,7 +131,7 @@ export async function umsaetzeUebernehmen(
   const kandidaten: Kandidat[] = [];
   let ohneKonto = 0;
   for (const roh of eingabe.rohUmsaetze) {
-    const zahlungskontoId = kontoVon.get(roh.kontoIban ?? "");
+    const zahlungskontoId = kontoVon.get(quelleKeyFuer(roh.kontoIban));
     if (!zahlungskontoId) {
       ohneKonto++;
       continue;

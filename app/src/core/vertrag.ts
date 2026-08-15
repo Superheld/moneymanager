@@ -39,21 +39,44 @@ export interface Kuendigungstermin {
 export function naechsterKuendigungstermin(v: Vertrag, heute: string): Kuendigungstermin | null {
   if (v.status !== "aktiv") return null;
   const beginn = parseIso(v.beginn);
-  const heuteO = ord(parseIso(heute));
-  const frist = v.kuendigungsfristMonate ?? 0;
-  const min = v.mindestlaufzeitMonate ?? 0;
-  const verl = v.verlaengerung === "automatisch" ? v.verlaengerungMonate ?? 0 : 0;
+  const heuteDatum = parseIso(heute);
+  const heuteO = ord(heuteDatum);
+  // Monatsangaben stammen aus Freitextfeldern der UI; nicht-ganzzahlige Werte erzeugten
+  // sonst Datumsstrings wie „2026-2.5-15", NaN-Werte liessen den Termin still verschwinden.
+  const frist = ganzeMonate(v.kuendigungsfristMonate);
+  const min = ganzeMonate(v.mindestlaufzeitMonate);
+  const verl = v.verlaengerung === "automatisch" ? ganzeMonate(v.verlaengerungMonate) : 0;
 
-  let ende = addMonate(beginn, min);
   for (let k = 0; k < 1200; k++) {
+    // Jeden Termin aus dem ORIGINALDATUM rechnen, nicht aus dem vorigen Ergebnis.
+    // Iteratives addMonate(ende, verl) driftete dauerhaft weg: ein Vertrag ab dem 31.
+    // wurde im Februar auf den 28. geklemmt und blieb danach am 28. kleben, statt zum
+    // 31./30. zurückzukehren. projektion.ts rechnet aus demselben Grund k·Schritt.
+    const ende = addMonate(beginn, min + k * verl);
     const kuendigenBis = addMonate(ende, -frist);
     if (ord(kuendigenBis) >= heuteO) {
       return { endeDatum: toIso(ende), kuendigenBis: toIso(kuendigenBis) };
     }
-    if (verl <= 0) return null; // keine Verlängerung → kein weiterer Termin
-    ende = addMonate(ende, verl);
+    if (verl <= 0) {
+      // OHNE Mindestlaufzeit und ohne automatische Verlängerung ist der Vertrag jederzeit
+      // kündbar — der häufigste Typ überhaupt (monatliches Abo). Vorher bekam genau der
+      // NIE einen Termin und wurde von der Kündigungswarnung nie erfasst. Frühestmöglich
+      // ist dann: heute kündigen, Ende nach Ablauf der Frist.
+      if (min === 0) {
+        return { endeDatum: toIso(addMonate(heuteDatum, frist)), kuendigenBis: toIso(heuteDatum) };
+      }
+      // MIT Mindestlaufzeit, aber verpasster Frist: der Vertrag läuft bis zum Mindestende
+      // und endet dort — es gibt keinen weiteren Kündigungstermin.
+      return null;
+    }
   }
   return null;
+}
+
+/** Monatsangabe aus einem Freitextfeld → ganze, nicht-negative Monate. */
+function ganzeMonate(wert: number | undefined): number {
+  const n = Math.round(Number(wert));
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 /** Naht der nächste Kündigungstermin (kuendigenBis innerhalb `warnTage` ab heute)? */

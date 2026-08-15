@@ -16,6 +16,20 @@ function faktor(w: Waehrung): number {
   return 10 ** w.skala;
 }
 
+/**
+ * Ist der Wert ein verwendbarer Geldbetrag in Minor Units?
+ *
+ * Die Invariante „Geld = Integer Cent, nie Float" (CLAUDE.md) hatte an der Anwendungs-
+ * grenze keinen Wächter: die Use-Cases prüften nur `> 0`, womit sowohl 10.5 als auch
+ * Infinity durchkamen. Ein Float im Ledger bricht danach jede Summe (10.1 + 20.2 =
+ * 30.299999999999997), und Infinity vergiftet jeden Saldo, in den er eingeht.
+ *
+ * Deshalb hier zentral: endlich, ganzzahlig, innerhalb des sicheren Integer-Bereichs.
+ */
+export function istCent(wert: unknown): wert is Cent {
+  return typeof wert === "number" && Number.isSafeInteger(wert);
+}
+
 /** Major (z. B. 120.5) → Minor Units. Rundet kaufmännisch auf die kleinste Einheit. */
 export function majorZuMinor(value: number, w: Waehrung = STANDARD_WAEHRUNG): Cent {
   return Math.round(value * faktor(w));
@@ -44,6 +58,27 @@ export interface FormatOptionen {
   mitVorzeichen?: boolean;
 }
 
+/** Anzeige für einen Betrag, der kein darstellbarer Geldwert ist (NaN, ±Infinity). */
+export const KEIN_WERT = "—";
+
+/**
+ * Zerlegt Minor Units ohne Gleitkomma-Division in Ganzteil und Rest und setzt sie
+ * locale-gerecht zusammen. `Math.abs(cent) / 100` verlor bei sehr grossen Beträgen
+ * Präzision (MAX_SAFE_INTEGER wurde um einen Cent falsch angezeigt); mit reiner
+ * Integer-Arithmetik bleibt jeder sichere Integer exakt.
+ */
+function minorFormatieren(cent: Cent, w: Waehrung, locale: string): string {
+  const abs = Math.abs(cent);
+  const f = faktor(w);
+  const ganz = Math.floor(abs / f);
+  const rest = abs % f;
+  const ganzText = ganz.toLocaleString(locale, { maximumFractionDigits: 0 });
+  if (w.skala === 0) return ganzText;
+  // Dezimaltrenner des Locales abfragen, statt ihn zu raten.
+  const trenner = (1.1).toLocaleString(locale).replace(/\d/g, "");
+  return ganzText + trenner + String(rest).padStart(w.skala, "0");
+}
+
 /**
  * Formatiert Minor Units als reinen Betrag (Gruppierung, „−" U+2212 statt Bindestrich),
  * OHNE Währungssymbol — das setzt die UI separat (formatBetragMitSymbol oder eigenes €).
@@ -52,12 +87,12 @@ export interface FormatOptionen {
 export function geldFormatieren(cent: Cent, opt: FormatOptionen = {}): string {
   const w = opt.waehrung ?? STANDARD_WAEHRUNG;
   const locale = opt.locale ?? "de-DE";
+  // NaN und ±Infinity entstehen nur aus kaputten Daten. Sie als „NaN"/„∞" in die
+  // Oberfläche zu schreiben, ist keine Information — der Platzhalter sagt dasselbe,
+  // ohne wie ein Betrag auszusehen.
+  if (!Number.isFinite(cent)) return KEIN_WERT;
   const negativ = cent < 0;
-  const betrag = Math.abs(cent) / faktor(w);
-  const s = betrag.toLocaleString(locale, {
-    minimumFractionDigits: w.skala,
-    maximumFractionDigits: w.skala,
-  });
+  const s = minorFormatieren(cent, w, locale);
   if (negativ) return "−" + s;
   return opt.mitVorzeichen ? "+" + s : s;
 }
@@ -69,41 +104,101 @@ export function geldFormatieren(cent: Cent, opt: FormatOptionen = {}): string {
 export function geldFormatierenMitSymbol(cent: Cent, opt: FormatOptionen = {}): string {
   const w = opt.waehrung ?? STANDARD_WAEHRUNG;
   const locale = opt.locale ?? "de-DE";
+  if (!Number.isFinite(cent)) return KEIN_WERT;
   const betrag = Math.abs(cent) / faktor(w);
-  const s = betrag.toLocaleString(locale, {
-    style: "currency",
-    currency: w.code,
-    minimumFractionDigits: w.skala,
-    maximumFractionDigits: w.skala,
-  });
+  let s: string;
+  try {
+    s = betrag.toLocaleString(locale, {
+      style: "currency",
+      currency: w.code,
+      minimumFractionDigits: w.skala,
+      maximumFractionDigits: w.skala,
+    });
+  } catch {
+    // Intl wirft bei ungültigem Währungscode (RangeError). Die Zusage in waehrung.ts
+    // lautet "crasht nie" — also hier dasselbe Verhalten wie waehrungssymbol: den Code
+    // als Symbol verwenden statt die Formatierung scheitern zu lassen.
+    s = (minorFormatieren(cent, w, locale) + " " + w.code).trim();
+  }
   if (cent < 0) return "−" + s;
   return opt.mitVorzeichen ? "+" + s : s;
 }
 
 /**
- * Parst eingetippten Text → Minor Units. Locale-unabhängig und nachsichtig: der
- * RECHTESTE Trenner („." oder „,") gilt als Dezimaltrenner, alles davor ist
- * Gruppierung und fliegt raus. So funktionieren „1.234,56" und „1,234.56" und „12,5"
- * und „12.5" gleichermaßen. Gibt null bei leerer/unparsebarer Eingabe.
+ * Parst eingetippten Text → Minor Units. Locale-unabhängig: der RECHTESTE Trenner
+ * („." oder „,") gilt als Dezimaltrenner, alles davor ist Gruppierung. So funktionieren
+ * „1.234,56", „1,234.56", „12,5" und „12.5" gleichermaßen.
+ *
+ * Erkannte Vorzeichen — alle vor dem Filtern ausgewertet, damit keines verloren geht:
+ * führendes und NACHGESTELLTES Minus (Standard in Bank-, DATEV- und Excel-Exporten),
+ * ASCII „-" wie typografisches „−" (U+2212, das Zeichen, das geldFormatieren selbst
+ * ausgibt), sowie die buchhalterische Klammer-Notation „(1.234,56)".
+ *
+ * Bewusst STRENG statt nachsichtig: unplausible Zifferngruppen („12,34,56", „1.2.3"),
+ * eingebettete Vorzeichen („1-2"), Exponentialschreibweise („1e3") und Ergebnisse
+ * jenseits des sicheren Integer-Bereichs liefern null. Der Vertrag ist „null bei
+ * unparsebarer Eingabe", und der Import wertet null als sichtbar übersprungene Zeile —
+ * ein still danebenliegender Betrag ist schlimmer als eine gemeldete Lücke.
+ *
+ * Nicht angetastet: „1.234" bleibt 1,234 (= 123 Minor Units). Der rechteste Trenner
+ * gewinnt auch dann; das ist der hier bewusst gewählte Tradeoff, kein Versehen.
  */
 export function parseBetrag(text: string, w: Waehrung = STANDARD_WAEHRUNG): Cent | null {
-  const bereinigt = text.trim().replace(/[^0-9.,-]/g, "");
-  if (!bereinigt) return null;
-  const negativ = bereinigt.startsWith("-");
-  const ziffern = bereinigt.replace(/-/g, "");
-  const trenner = Math.max(ziffern.lastIndexOf(","), ziffern.lastIndexOf("."));
-  let normalisiert: string;
-  if (trenner === -1) {
-    normalisiert = ziffern;
-  } else {
-    const vor = ziffern.slice(0, trenner).replace(/[.,]/g, "");
-    const nach = ziffern.slice(trenner + 1);
-    normalisiert = vor + "." + nach;
+  let rest = text.trim();
+  if (!rest) return null;
+
+  let negativ = false;
+
+  // 1. Klammer-Notation: (1.234,56) === −1.234,56
+  const klammer = /^\((.*)\)$/.exec(rest);
+  if (klammer) {
+    negativ = true;
+    rest = klammer[1].trim();
   }
-  if (normalisiert === "" || normalisiert === ".") return null;
+
+  // 2. Vorzeichen vorne ODER hinten, ASCII-Minus wie U+2212.
+  const vorne = /^([-−+])\s*/.exec(rest);
+  if (vorne) {
+    negativ = negativ !== (vorne[1] !== "+");
+    rest = rest.slice(vorne[0].length);
+  }
+  const hinten = /\s*([-−+])$/.exec(rest);
+  if (hinten) {
+    negativ = negativ !== (hinten[1] !== "+");
+    rest = rest.slice(0, hinten.index);
+  }
+
+  // 3. Reine Darstellungszeichen entfernen: Leerraum, geschütztes Leerzeichen,
+  //    Apostroph-Gruppierung (1'234'567), Währungssymbole.
+  rest = rest.replace(/[\s '’]/g, "").replace(/[€$£¥]/g, "");
+  if (!rest) return null;
+
+  // 4. Ab hier sind nur noch Ziffern und Trenner zulässig — alles andere ist Müll
+  //    und wird gemeldet statt weggefiltert (fängt „1-2", „1e3", „12,-").
+  if (!/^\d+([.,]\d+)*$/.test(rest)) return null;
+
+  // 5. Zifferngruppen prüfen: bei drei oder mehr Teilen muss jede mittlere Gruppe
+  //    genau drei Ziffern haben, sonst ist es keine Gruppierung, sondern Müll
+  //    („12,34,56", „1.2.3"). Bei genau zwei Teilen gilt der Tradeoff aus dem
+  //    Funktionskopf: der rechte Teil ist die Nachkommastelle.
+  const teile = rest.split(/[.,]/);
+  if (teile.length > 2) {
+    for (const gruppe of teile.slice(1, -1)) {
+      if (gruppe.length !== 3) return null;
+    }
+  }
+
+  const normalisiert =
+    teile.length === 1 ? teile[0] : teile.slice(0, -1).join("") + "." + teile[teile.length - 1];
+
   const zahl = Number(normalisiert);
   if (!Number.isFinite(zahl)) return null;
-  return majorZuMinor(negativ ? -zahl : zahl, w);
+
+  const minor = majorZuMinor(negativ ? -zahl : zahl, w);
+  // 6. Jenseits des sicheren Integer-Bereichs ist jede spätere Summe unbrauchbar —
+  //    lieber gar kein Wert als ein lautlos gerundeter.
+  if (!Number.isSafeInteger(minor)) return null;
+  return minor;
 }
 
 // ── EUR-Back-compat (deprecated) ───────────────────────────────────────────────
