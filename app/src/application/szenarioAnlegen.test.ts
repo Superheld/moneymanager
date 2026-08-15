@@ -12,11 +12,11 @@ function memSzenarien() {
   const posten: { szenarioId: string; regel: Zahlungsregel }[] = [];
   const repo: SzenarioRepository = {
     alle: async () => szenarien,
-    speichern: async (s) => {
+    speichern: async (s: Szenario) => {
       szenarien.push(s);
     },
-    loeschen: async (id) => {
-      const i = szenarien.findIndex((s) => s.id === id);
+    loeschen: async (id: string) => {
+      const i = szenarien.findIndex((x) => x.id === id);
       if (i >= 0) szenarien.splice(i, 1);
     },
     postenSpeichern: async (szenarioId: string, regel: Zahlungsregel) => {
