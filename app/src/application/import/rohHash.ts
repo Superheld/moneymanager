@@ -6,6 +6,15 @@
 //
 // Gewählte Strategie (Bruce): native ID UND Roh-Hash. Die native Buchungs-ID fängt exakte
 // Re-Imports derselben Quelle ab; der Roh-Hash fängt dieselbe Buchung aus anderer Quelle.
+//
+// OFFEN — Altbestand (Stand 2026-08-15): Die Formel wurde um die Gegenpartei erweitert.
+// Bereits gespeicherte Umsätze tragen weiter den alten Schlüssel in `umsatz.roh_hash`.
+// Solange jede Quelle native IDs liefert (heute: Finanzguru, alle 5198 Bestandszeilen),
+// ist das folgenlos — die Dedup entscheidet dort über die ID, nicht über den Hash.
+// VOR der ersten ID-losen Quelle (Bank-CSV, FinTS) müssen die Bestands-Hashes einmalig
+// neu berechnet werden, sonst deduppt der erste Abruf nicht gegen den Bestand und legt
+// alles doppelt an. Der Backfill braucht die Konto-IBAN, die nicht am Umsatz, sondern am
+// Zahlungskonto liegt (Join über zahlungskonto_id).
 
 import { normalisiereIban } from "../../core";
 import type { RohUmsatz } from "./rohUmsatz";
@@ -15,15 +24,35 @@ function normZweck(s: string): string {
 }
 
 export function rohHash(
-  u: Pick<RohUmsatz, "kontoIban" | "buchungstag" | "betrag" | "verwendungszweck">,
+  u: Pick<RohUmsatz, "kontoIban" | "buchungstag" | "betrag" | "verwendungszweck" | "gegenpartei">,
 ): string {
   const konto = u.kontoIban ? normalisiereIban(u.kontoIban) : "";
-  return [konto, u.buchungstag, u.betrag, normZweck(u.verwendungszweck)].join("|");
+  // Die Gegenpartei gehört in den Schlüssel: bei Kartenzahlungen ist der Verwendungszweck
+  // regelmäßig leer, dann unterscheiden Konto+Tag+Betrag zwei verschiedene Händler nicht
+  // mehr — und die zweite Buchung würde als Dublette verworfen. Im Bestand vom 2026-08-15
+  // trafen 7 Hash-Gruppen genau diesen Fall.
+  //
+  // JSON statt "|"-Verkettung, damit die Feldgrenzen eindeutig bleiben: ein "|" im
+  // Referenzkonto konnte vorher einen Schlüssel nachbauen, der zu einer anderen Buchung
+  // gehört.
+  return JSON.stringify([
+    konto,
+    u.buchungstag,
+    u.betrag,
+    normZweck(u.gegenpartei),
+    normZweck(u.verwendungszweck),
+  ]);
 }
 
 export interface Bestand {
   readonly hashes: Iterable<string>;
   readonly nativeIds: Iterable<string>;
+  /**
+   * Roh-Hashes der Bestandszeilen OHNE native ID. Nur gegen diese darf ein Kandidat MIT
+   * native ID über den Hash geprüft werden — sonst würden zwei echte Buchungen derselben
+   * Quelle (zweimal derselbe Kaffee, verschiedene IDs) fälschlich zusammenfallen.
+   */
+  readonly hashesOhneId?: Iterable<string>;
 }
 
 export interface DublettenBefund<T> {
@@ -50,10 +79,20 @@ export function klassifiziere<T extends { rohHash: string; nativeId?: string }>(
 ): DublettenBefund<T> {
   const hashes = new Set(bestand.hashes);
   const nativeIds = new Set(bestand.nativeIds);
+  // Fehlt die Angabe, wird konservativ angenommen, dass der Bestand keine IDs trägt:
+  // lieber eine Dublette zu viel erkennen als dieselbe Buchung doppelt anlegen.
+  const hashesOhneId = new Set(bestand.hashesOhneId ?? bestand.hashes);
   const neu: T[] = [];
   const duplikate: T[] = [];
   for (const k of kandidaten) {
-    const dup = k.nativeId !== undefined ? nativeIds.has(k.nativeId) : hashes.has(k.rohHash);
+    // MIT native ID: die ID entscheidet — ZUSÄTZLICH aber der Hash gegen ID-lose
+    // Bestandszeilen. Sonst wirkte die quellenübergreifende Dedup nur in eine Richtung:
+    // lag dieselbe Buchung schon ID-los aus einer Bank-CSV im Bestand, kam sie über
+    // Finanzguru ein zweites Mal herein. rohHash.ts sagt genau das Gegenteil zu.
+    const dup =
+      k.nativeId !== undefined
+        ? nativeIds.has(k.nativeId) || hashesOhneId.has(k.rohHash)
+        : hashes.has(k.rohHash);
     if (dup) {
       duplikate.push(k);
       continue;
@@ -61,6 +100,7 @@ export function klassifiziere<T extends { rohHash: string; nativeId?: string }>(
     neu.push(k);
     hashes.add(k.rohHash);
     if (k.nativeId !== undefined) nativeIds.add(k.nativeId);
+    else hashesOhneId.add(k.rohHash);
   }
   return { neu, duplikate };
 }

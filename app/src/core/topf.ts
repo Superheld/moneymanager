@@ -53,13 +53,23 @@ export function zielwert(topf: Topf): Cent | null {
   }
 }
 
-/** Monatliche Ansparrate (kalkulatorischer Zufluss). */
+/**
+ * Monatliche Ansparrate (kalkulatorischer Zufluss).
+ *
+ * Rückfalllinie gegen einen Zeitraum von 0: die Division ergäbe Infinity, und über
+ * `Infinity * 0` wird daraus in sollstand/topfStand NaN — ein Wert, der weder `>` noch
+ * `<` erfüllt, jede Warnlogik still auf false fallen lässt und in der UI als „NaN"
+ * erscheint. Der eigentliche Schutz sitzt an der Grenze (topfAnlegen prüft > 0); dies
+ * hier fängt Aggregate ab, die vor diesem Schutz in die DB gelangt sind.
+ */
 export function ansparrate(topf: Topf): Cent {
   switch (topf.typ) {
     case "ersatz":
-      return Math.round(topf.wiederbeschaffung / topf.nutzungsdauerMonate);
+      return topf.nutzungsdauerMonate > 0
+        ? Math.round(topf.wiederbeschaffung / topf.nutzungsdauerMonate)
+        : 0;
     case "puffer":
-      return Math.round(topf.schaetzbetrag / topf.fristMonate);
+      return topf.fristMonate > 0 ? Math.round(topf.schaetzbetrag / topf.fristMonate) : 0;
     case "spartopf":
       return topf.zufuehrungProMonat;
   }
@@ -74,6 +84,24 @@ export function sollstand(topf: Topf, am: string): Cent | null {
   const ziel = zielwert(topf);
   if (ziel == null) return null;
   const monate = Math.max(0, monateZwischen(topf.start, am));
+  return anteiligerAufbau(topf, monate, ziel);
+}
+
+/**
+ * Aufbau nach `monate` Monaten, gedeckelt am Ziel.
+ *
+ * Anteilig AUS DEM ZIEL gerechnet, nicht als (gerundete Rate × Monate): sonst fehlte am
+ * Ende der Nutzungsdauer ein Rest, weil die Rate einmal gerundet und dann vervielfacht
+ * wurde (1000 Cent auf 3 Monate → Rate 333 → nach 3 Monaten 999). Die fachliche Zusage
+ * lautet, dass am Ende der Nutzungsdauer die Wiederbeschaffung angespart ist — die hält
+ * nur diese Rechnung ein. Der Rundungsrest verteilt sich so über die Laufzeit, statt
+ * hinten liegen zu bleiben.
+ */
+function anteiligerAufbau(topf: Topf, monate: number, ziel: Cent): Cent {
+  const dauer =
+    topf.typ === "ersatz" ? topf.nutzungsdauerMonate : topf.typ === "puffer" ? topf.fristMonate : 0;
+  if (dauer > 0) return Math.min(Math.round((ziel * monate) / dauer), ziel);
+  // Spartopf: kein Enddatum, der Aufbau folgt der gesetzten Zuführung.
   return Math.min(ansparrate(topf) * monate, ziel);
 }
 
@@ -104,8 +132,8 @@ export function entnahmeCharakter(typ: TopfTyp): Charakter {
 export function topfStand(topf: Topf, am: string, entnahmen: IstBuchung[]): Cent {
   const monate = Math.max(0, monateZwischen(topf.start, am));
   const ziel = zielwert(topf);
-  const roh = ansparrate(topf) * monate;
-  const aufbau = ziel == null ? roh : Math.min(roh, ziel);
+  const aufbau =
+    ziel == null ? ansparrate(topf) * monate : anteiligerAufbau(topf, monate, ziel);
   const relevant =
     topf.typ === "ersatz" ? entnahmen.filter((b) => b.datum > topf.start) : entnahmen;
   const summeEntnahmen = relevant.reduce((s, b) => s + b.betrag, 0);

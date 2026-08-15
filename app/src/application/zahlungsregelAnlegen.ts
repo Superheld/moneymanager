@@ -1,8 +1,8 @@
 // Use-Case „Zahlungsregel anlegen" — orchestriert, ohne Geschäftslogik.
 // Übersetzt eine Formulareingabe in das Aggregat und speichert über den Port.
 
-import {
-  FachlicherFehler,
+import { FachlicherFehler, istCent,
+  
   type Cent,
   type Charakter,
   type Rhythmus,
@@ -33,7 +33,7 @@ export async function zahlungsregelAnlegen(
 ): Promise<Zahlungsregel> {
   const bezeichnung = eingabe.bezeichnung.trim();
   if (!bezeichnung) throw new FachlicherFehler("bezeichnung.fehlt");
-  if (!(eingabe.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
+  if (!istCent(eingabe.betrag) || eingabe.betrag <= 0) throw new FachlicherFehler("betrag.groesserNull");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(eingabe.startdatum)) {
     throw new FachlicherFehler("startdatum.ungueltig");
   }

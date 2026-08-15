@@ -3,7 +3,7 @@
 // (Vermögensumschichtung, nicht erfolgswirksam). Beide Beine teilen eine transferId;
 // die liquiden Mittel über alle Konten bleiben unverändert (netto 0).
 
-import { FachlicherFehler, type Cent, type IstBuchung } from "../core";
+import { FachlicherFehler, istCent, type Cent, type IstBuchung } from "../core";
 import type { LedgerPort } from "./ports";
 
 export interface UmbuchungEingabe {
@@ -26,7 +26,7 @@ export async function umbuchungErfassen(
   if (!e.vonKontoId || !e.nachKontoId) throw new FachlicherFehler("konten.quelleZiel");
   if (e.vonKontoId === e.nachKontoId) throw new FachlicherFehler("konten.verschieden");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
-  if (!(e.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
+  if (!istCent(e.betrag) || e.betrag <= 0) throw new FachlicherFehler("betrag.groesserNull");
 
   const cent = e.betrag;
   const transferId = crypto.randomUUID();
