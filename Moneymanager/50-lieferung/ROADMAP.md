@@ -1,135 +1,161 @@
 # Moneymanager — Roadmap
 
-> **DDD-Ebene:** Lieferung — Roadmap (Now/Next/Later) · **Status:** aktiv · **Stand:** 2026-06-20 · **Bezüge:** KONZEPT, SPEC-MVP, BAUPLAN-MVP
+> **DDD-Ebene:** Lieferung — Roadmap (Now/Next/Later) · **Status:** lebend · **Stand:** 2026-08-15 · **Bezüge:** DOMAENE, ADR-0001, ADR-0004
 
-> Stand: 2026-06-20 (zuletzt geradegezogen) · Format: Now / Next / Later · Team: Bruce + Claude
-> Grundlage: KONZEPT.md (§ 7 Feature-Schnitt), KI-KONZEPT.md, DDD-Vorgehen
+> Format: Now / Next / Later · Team: Bruce + Claude
+> Grundlage: `10-strategie/DOMAENE.md` (Redesign 2026-07-19). Die Vorgänger-Roadmap
+> (Stand 2026-06-20, Modell v1) liegt unter `90-archiv/2026-06-modell-v1/ROADMAP.md`
+> und ist überholt — sie baute auf Ledger-Port und Buchungspackage auf, beides gestrichen.
 
 ## Leitplanken
 
-- **Reihenfolge schlägt Datum.** Solo-Projekt → keine Quartalsversprechen, nur verlässliche Sequenz.
-- **Design vor Code.** Strategisches DDD wird abgeschlossen, bevor taktisches Design und
-  Implementierung beginnen — Core Domain verdient die Denkarbeit.
-- **Buchungspackage erst zum Ist-Schritt.** Es wird erst zur echten Abhängigkeit, wenn echte
-  Ist-Buchungen entstehen (Import → Ist-Journal). Die Basis (Stammdaten, Verträge, Inventar,
-  Budgets, Plan-only-Projektion) ist app-seitig ohne das Package baubar.
+- **Reihenfolge schlägt Datum.** Solo-Projekt, keine Quartalsversprechen — nur eine
+  verlässliche Sequenz.
+- **Jede Scheibe ist lauffähig.** Kein Slice, der die App in einem halben Zustand lässt.
+- **Der Kern wächst von der Autonomie her.** Was die KI entscheidet, wird dokumentiert,
+  nicht freigegeben (DOMAENE §2, „Dokumentation statt Verifikation").
+- **Modellwechsel wird nicht als Big Bang nachgezogen.** Der Code trägt noch Namen aus
+  Modell v1 (`IstBuchung`); Umbenennung passiert als Nebenprodukt dort, wo Dateien
+  ohnehin angefasst werden — kein eigener Refactor-Slice.
 
 ---
 
-## Gebaut — Stand v0.9.0 (2026-06-20)
+## Gebaut — Stand v0.11.0 (2026-06-22)
 
-Die App ist über die reine Plan-Projektion hinaus; der Ist-Schritt läuft app-seitig
-(Ledger-Port), das Buchungspackage ist dafür noch **nicht** gebunden.
-
-| Phase | Inhalt | Stand |
-|---|---|---|
-| P0 | Walking Skeleton (Regel → Projektion → SQLite) | ✓ |
-| P1 | Stammdaten (Personen, Konten, Kategorien) | ✓ |
-| P2 | Verträge · Budgets · Inventar/Töpfe · Liquiditätsplaner · Szenario | ✓ |
-| P3 | Ist „light" (ADR-0002): bezahlt-markieren, Ledger-Port, Reconciliation light, Konto-Register, Umbuchen | ✓ |
-| P3.1 | Topf-Entnahme als Buchungssatz, realer Topf-Stand, Budget Plan/Ist (ADR-0003) | ✓ |
-| — | Internationalisierung: Sprache + Mehrwährung, strikt locale-gekoppelt (ADR-0004) | ✓ (v0.8.0) |
-
-Damit haben **alle drei Plan-Flächen** (Verträge, Budgets, Töpfe/Inventar) einen Ist-Abgleich.
-Die Zuordnung läuft über das benannte Gegenkonto, nicht über die Kategorie (ADR-0003).
-
----
-
-## NOW — Strategisches Design abschließen ✓ (2026-06-07)
-
-Ergebnis in **DOMAENENDESIGN.md** und **BUCHUNGSPACKAGE-ANFORDERUNGEN.md**.
-
-1. ✓ Bounded Contexts: Ledger · Planung · Stammdaten · Import · Vorsorge
-   (Stammdaten ↔ Planung: getrennte Kontexte, gemeinsame UI)
-2. ✓ Ubiquitous Language je Kontext, Mehrdeutigkeiten aufgelöst (Vertrag, Konto, Buchung)
-3. ✓ Context Map (Ledger als Open-host Service / Published Language)
-4. ✓ Anforderungen ans Buchungspackage dokumentiert (A1–A8) — **an Package-Projekt übergeben!**
-
-## NEXT — Taktisches Design + MVP-Spec
-
-Ziel: Entwicklerfreundliche Spec, dann Baustart.
-
-1. **Taktisches Design je Kontext** — Aggregates, Entities, Value Objects, Domain Events
-   - ✓ Planung (TAKTIK-PLANUNG.md) · ✓ Stammdaten (TAKTIK-STAMMDATEN.md) ·
-     ✓ Import (TAKTIK-IMPORT.md) — alle 2026-06-07; Vorsorge folgt in LATER
-2. ✓ **MVP-Spec** (SPEC-MVP.md, 2026-06-13) — User Stories, Akzeptanzkriterien, Datenmodell-Skizze
-3. ✓ **Plattform-Entscheidung** (ADR-0001-plattform.md, 2026-06-13): lokale Desktop-App,
-   React + TypeScript, **Tauri**; portabler TS-Domänenkern (hexagonal) hält Server/Browser-
-   und Mobile-Pfad offen.
-4. **MVP bauen** (KONZEPT § 7, Stufe 1):
-   - Stammdaten: Personen, Konten, Kategorien
-   - Vertragsverwaltung inkl. Einnahmen + Kündigungsfristen-Erinnerung
-   - Rücklagen (Inventar → Ansparrate) + Rückstellungen
-   - Budgetplaner
-   - Liquiditätsplaner (Jahresprojektion, Plan-only)
-   - CSV/CAMT-Import + regelbasierte Kategorisierung  *(ab hier Buchungspackage nötig)*
-   - Plan/Ist-Abgleich, Basis-Analysen
-   - Dazu die KI-Vorbereitungen ohne KI (KI-KONZEPT § 4): Vorschlags-Status,
-     Review-Inbox, Engine als Funktionskatalog, Dokumentenablage
-
-**Abhängigkeit (Stand 2026-06-20):** Die Basis des MVP rechnet app-seitig, ohne Package —
-das ist gebaut. Der Ist-Schritt „light" läuft ebenfalls app-seitig hinter dem `LedgerPort`
-(ADR-0002/0003). Das echte Buchungspackage **summae** wird erst zur Abhängigkeit, wenn der
-**Bankimport** kommt (Import → Ist-Journal, Stichtagssalden, KLR, Plan/Ist auf echter Masse).
-
-**summae-Prüfung (2026-06-20):** Der Doppik-/KLR-Kern ist reif und deckt **A1–A8** ab
-(A5-Datenformat versioniert als JSON-Schema v0.4; pure-function-Rechenwerk, Stichtagssalden,
-Dimensionen, stabile UUID-v7-IDs, Storno bidirektional, konfigurierbarer Kontenrahmen).
-summae existiert in PHP (Referenz) und **TypeScript/Node** (byte-identisch über eine gemeinsame
-Testsuite) — **noch nicht in Rust**. Offen buchungsseitig nur **A4** (kalkulatorische Buchungen
-über Dimensionen gelöst, nicht als eigene Buchungsart markiert) — heute irrelevant, weil wir die
-kalkulatorische Abschreibung app-seitig als Plan rechnen.
-
-**Anbindung (entschieden 2026-06-20): TS-Kern in die Webview bündeln.** Der TS-Kern hängt nur
-von `big.js` ab; die einzige Node-Bindung sind zwei `node:crypto`-Aufrufe (`randomBytes` in
-`Uuid.v7`, `createHash` im Export). Lösung: schlanker Web-Crypto-Shim (`getRandomValues` /
-`subtle.digest`) + Vite-Alias, dann bündelt Vite den reifen TS-Kern direkt mit. Der GoBD-Engine
-läuft damit im Webview (JS, byte-identisch getestet). **Rust-summae bleibt das spätere Ziel**
-(Produktwert über Moneymanager hinaus, saubere `src-tauri`-Grenze) — weil Moneymanager summae
-nur über den `LedgerPort` anspricht, ist der spätere Umstieg ein Port-Tausch, kein Umbau.
-Verworfen: auf den Rust-Rewrite warten (würde den Import unnötig lange blockieren).
-
-### Nächster Schritt — Bankimport (P3.5), entblockt
-
-A5 steht (summae v0.4), Anbindung entschieden (TS-Bundle, oben). Reihenfolge:
-
-1. **summae-core einbinden** — Web-Crypto-Shim (`randomBytes`→`getRandomValues`,
-   `createHash`→`subtle.digest`/pure-js sha256) + Vite-Alias auf `node:crypto`, Dependency
-   ziehen, Smoke-Test: Konto anlegen → buchen → Stichtagssaldo im laufenden Tauri-Fenster.
-2. **CSV/CAMT-Import** als zweite Quelle hinter dem `LedgerPort` (TAKTIK-IMPORT).
-3. **Auto-Matching + Dedup** (Manuell ↔ Import; n:m/Teilbeträge = das `Zuordnung`-Aggregat,
-   das ADR-0003 §7 bewusst auf diesen Schritt vertagt hat).
-4. Danach: echtes summae hinter dem `LedgerPort` (provisorisches Ist-Format → A5 per ACL).
-
-Contingency entfällt weitgehend: kein Mock nötig, da summae fachlich nutzbar ist.
-
-## LATER — Ausbaustufen (Richtung, bewusst grob)
-
-**Stufe 2 — Vermögen & Vorsorge**
-- Anlagen (manuelle Wertstände) + Umschichtungs-Semantik in den Analysen
-- Vorsorge-Cockpit: Person × Risiko × Deckung, Lücken, Rentenlücke
-  (vorher: taktisches Design Vorsorge-Kontext)
-- Vertragserkennung aus Umsätzen (deterministische Periodizitätserkennung)
-- Erweiterte Analysen, What-if-Simulation als Engine-Feature
-
-**Stufe 3 — Anbindung & Komfort**
-- FinTS/HBCI direkt (inkl. DK-Produktregistrierung)
-- KI-Schicht nach KI-KONZEPT § 5: Embeddings-Kategorisierung → Dokument-Extraktion →
-  Befragung/Briefings → agentische Szenarien
-- Mehrere Zugänge / Haushalts-Sync (lokaler Server), Mobile-Frage
-
-## WON'T (bewusst nicht / noch nicht)
-
-- Cloud-Pflicht oder Cloud-only-Features — verletzt Leitprinzip "lokal first"
-- Kredite/Verbindlichkeiten — modellierbar, aber kein MVP-Bedarf
-- Trading/Depotanbindung mit Orderausführung — Tracking ja, Handeln nie
-- PSD2-/Drittanbieter-APIs — unvereinbar mit lokal (FinTS deckt den Bedarf)
-
-## Offene Entscheidungen (mit Fälligkeit)
-
-| Entscheidung | Fällig |
+| Bereich | Inhalt |
 |---|---|
-| ~~Schnitt Stammdaten ↔ Planung~~ ✓ getrennte Kontexte, gemeinsame UI | entschieden 2026-06-07 |
-| ~~Plattform (Desktop vs. lokaler Server)~~ ✓ lokale Desktop-App, React+TS, Tauri (ADR-0001) | entschieden 2026-06-13 |
-| ~~summae-Anbindung~~ ✓ **TS-Kern in die Webview bündeln + `node:crypto`-Shim** — reversibel über den `LedgerPort`, Rust-summae bleibt späteres Ziel (Umstieg = Port-Tausch). Kehrt die Annahme vom 2026-06-19 um. | entschieden 2026-06-20 |
-| Runtime-Strategie KI (Ollama extern vs. llama.cpp embedded) | LATER, vor KI-Stufe 1 |
+| Stammdaten | Personen, Konten (Giro/Tagesgeld/Bargeld/Kreditkarte), Kategorien |
+| Planung | Verträge, Budgets, Zahlungsregeln, Liquiditätsplaner, Szenario/Projektion |
+| Vorsorge | Inventar, Töpfe (Puffer/Spartopf), Topf-Entnahme, Deckung |
+| Ist | Buchung erfassen, bezahlt-markieren, Umbuchen, Konto-Auszug, Historie |
+| Import | Finanzguru CSV/Excel, Konto-Match, Dedup via rohHash, Review-Inbox, Umbuchungs-Paarung |
+| Quer | i18n (Sprache + Mehrwährung, locale-gekoppelt, ADR-0004) |
+
+**Wichtige Lücke im Bestand:** `application/import/vorschlag.ts` klassifiziert nicht selbst —
+es übernimmt Finanzguru's Kategorie-Hinweis und mappt ihn um. Eigenes Urteil über eine
+Buchung fällt die App bisher nirgends.
+
+---
+
+## NOW — Buchungen zu Fachobjekten machen
+
+Beides setzt an derselben UI-Naht an: der Konto-Auszug hat pro Zeile bereits eine
+Aktion (`EditBuchungModal` in `KontenScreen.tsx`). Dort kommen die neuen Wege dazu.
+
+### S-1 — Umbuchung aus einer bestehenden Buchung
+
+*Als Nutzer möchte ich aus einer Buchung (z. B. Bargeldabhebung im Giro) eine Umbuchung
+auf ein anderes eigenes Konto machen können.*
+
+Zwei Fälle, die auseinandergehalten gehören:
+
+- **S-1a — Gegenbein fehlt.** Auf dem Zielkonto (typisch: Bargeld, wird nicht importiert)
+  existiert keine Buchung. Die bestehende Buchung wird zum Abgangs-Bein, das Zugangs-Bein
+  wird erzeugt, beide teilen eine `transferId`, Charakter `Umschichtung`.
+- **S-1b — beide Beine existieren.** Zwei importierte Buchungen werden nachträglich von
+  Hand als Umbuchung gepaart. Automatisch passiert das beim Import bereits (v0.11.0);
+  manuell gibt es den Weg noch nicht.
+
+Bestand: `application/umbuchungErfassen.ts` erzeugt heute **zwei neue** Buchungen. S-1
+braucht den Fall „eine existiert bereits" — also einen eigenen Use-Case, nicht nur einen
+neuen Knopf. Die Netto-Null-Invariante über alle Konten gilt unverändert.
+
+### S-2 — Vertrag aus einer bestehenden Buchung
+
+*Als Nutzer möchte ich aus einer Buchung einen Vertrag erstellen, sodass künftig gleiche
+Buchungen als Vertragsbuchung erkannt werden.*
+
+Bestand: `application/vertragAnlegen.ts` schreibt Vertrag (Stammdaten) + abgeleitete
+Zahlungsregel (Planung). Neu sind zwei Dinge:
+
+1. **Einstieg aus der Buchung** — Anbieter, Betrag, Rhythmus aus der Buchung vorbelegen.
+   Der Rhythmus lässt sich aus der Historie desselben Empfängers vorschlagen.
+2. **Rückwirkung** — künftige Buchungen, die zum Vertrag passen, werden ihm zugeordnet.
+
+Punkt 2 ist der eigentliche Gehalt: Das ist eine **Regel-/Lookup-Schicht** über
+Gläubiger-ID bzw. Empfänger + Betrag + Periodizität. Genau die Schicht hat sich im
+Classifier-Spike als der zuverlässigste Teil erwiesen (~100 %, deterministisch, weit über
+dem, was ein Netz auf diesen Fällen schafft). S-2 baut damit die erste Etage von S-4 —
+deshalb steht es davor.
+
+---
+
+## NEXT — Die App urteilt selbst
+
+### S-3 — Entscheidungsjournal
+
+*Jede Entscheidung, die die App selbst trifft, wird mit Begründung und Zeitpunkt
+festgehalten; jede Nutzerkorrektur wird als Override daran gehängt.*
+
+Append-only, eigene Tabelle, neue Migration — kein bestehendes Aggregat wird angefasst.
+Erste Schreiber sind die Entscheidungen, die es heute schon gibt (Umbuchungs-Paarung beim
+Import, Remapping-Vorschlag, Standardkategorien-Backfill), danach der Classifier.
+
+Das Journal ist Voraussetzung für S-4, nicht Beiwerk: ohne es ist eine Nutzerkorrektur
+nur eine überschriebene Kategorie und kein Trainingssignal (DOMAENE §2).
+
+### S-4 — Kategorien-Classifier
+
+*Die App ordnet Buchungen selbst einer Kategorie zu, statt fremdes Urteil zu übernehmen.*
+
+Entschieden (2026-08-15, auf Basis des Spikes in `transaction-classifier/`):
+
+- **Modellklasse: linear.** Empirisch belegt — MLP und tiefere Netze bringen nichts,
+  der Deckel ist daten- und mehrdeutigkeitslimitiert, nicht modelllimitiert.
+- **Merkmale: Hashing-BoW zuerst** (~85 %, zero-dep, portabel direkt in `core`, kein
+  Modell-Download). Embeddings (~88 %, besser bei unbekannten Händlern) bleiben als
+  späterer Austausch hinter derselben Schnittstelle offen.
+- **Autonomie: Die KI legt sich immer fest.** Keine Konfidenzschwelle, die Arbeit an den
+  Nutzer zurückgibt — Konfidenz und Begründung gehen ins Journal, der Nutzer korrigiert
+  nach. Das ist die scharfe Lesart des Autonomie-Beschlusses (DOMAENE §8).
+
+Schichtung aus dem Spike, in dieser Reihenfolge abgefragt:
+Regel/Lookup (aus S-2) → Netz (Inhalt) → Kontextabhängiges bleibt Nutzerarbeit.
+
+### S-5 — Korrekturschleife
+
+Nutzerkorrekturen aus dem Journal fließen ins Training zurück. Offen: wann trainiert wird
+(bei Import, nach N Korrekturen, on demand) und wo das Modell liegt. Wird mit S-4
+konkretisiert, nicht davor.
+
+---
+
+## LATER
+
+### S-6 — FinTS-Abruf Girokonto
+
+*Als Nutzer möchte ich mein Girokonto direkt abrufen (FinTS-Zugang liegt vor).*
+
+**Abhängigkeit, die die Story teuer macht, wenn man sie übersieht:** FinTS liefert keinen
+Kategorie-Hinweis. Heute lebt die gesamte Kategorisierung von genau diesem Feld aus dem
+Finanzguru-Export. Ohne S-4 landet nach dem Umstieg jeder abgerufene Umsatz unkategorisiert
+in der Review-Inbox — die App würde durch den Direktabruf fachlich *schlechter*. Deshalb
+steht S-6 hinter dem Classifier, obwohl der Zugang schon da ist.
+
+Technisch ein weiterer Quellen-Adapter (`application/import/quellenAdapter.ts`); Dedup über
+`rohHash` und der Konto-Match gelten unverändert. Zu klären: FinTS-Bibliothek und wo der
+Abruf läuft — berührt die Deployment-Frage aus DOMAENE §8 und damit ADR-0001.
+
+### Weiter offen (aus DOMAENE §8/§9, ohne Slice)
+
+- Bounded Contexts schneiden + Context Map. **Nicht bei null:** Modell v1 hatte
+  Ledger · Planung · Stammdaten · Import · Vorsorge geschnitten. Ledger fällt weg,
+  „Autonome Haushaltsführung" kommt als Core dazu — der Rest dürfte weitgehend tragen.
+- Deployment präzisieren („lokal" = Desktop? Heimserver? Mobilzugriff) — löst auch die
+  Frage, wie Handy-Belegfotos zur Desktop-App kommen. Prüft ADR-0001 (Tauri).
+- Kontextstrategie fürs Sprachmodell bei endlichen Kontextfenstern.
+- Chat als zweiter Bediener (DOMAENE §2, Rolle 1) — ruft dieselben Use-Cases wie die UI.
+
+---
+
+## Reihenfolge auf einen Blick
+
+```
+S-1 Umbuchung aus Buchung ─┐
+                           ├─→ S-3 Journal ─→ S-4 Classifier ─→ S-5 Korrekturschleife ─→ S-6 FinTS
+S-2 Vertrag aus Buchung ───┘        (liefert Regel-Schicht für S-4)
+```
+
+S-1 und S-2 sind unabhängig voneinander und könnten in beliebiger Reihenfolge laufen.
+S-6 hängt fachlich an S-4, nicht technisch — der Zugang funktioniert vorher, das Ergebnis
+wäre nur unbrauchbar.
