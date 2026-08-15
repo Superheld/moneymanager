@@ -2,7 +2,7 @@
 // Plan-Bezug. Für Bar die Dauerquelle (kein Import möglich); für Bankkonten vorläufig,
 // bis der Import sie abgleicht. quelle = 'manuell', kein planRef.
 
-import { FachlicherFehler, type Cent, type Charakter, type IstBuchung } from "../core";
+import { FachlicherFehler, istCent, type Cent, type Charakter, type IstBuchung } from "../core";
 import type { LedgerPort } from "./ports";
 import { vorzeichenbehaftet } from "./zahlungsregelAnlegen";
 
@@ -23,7 +23,7 @@ export async function buchungErfassen(
 ): Promise<IstBuchung> {
   if (!e.kontoId) throw new FachlicherFehler("konto.waehlen");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
-  if (!(e.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
+  if (!istCent(e.betrag) || e.betrag <= 0) throw new FachlicherFehler("betrag.groesserNull");
 
   const buchung: IstBuchung = {
     id: id ?? crypto.randomUUID(),
@@ -51,7 +51,7 @@ export async function buchungBearbeiten(
   e: { datum: string; betrag: Cent; charakter: Charakter; kategorieId?: string; notiz?: string },
 ): Promise<IstBuchung> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
-  if (!(e.betrag > 0)) throw new FachlicherFehler("betrag.groesserNull");
+  if (!istCent(e.betrag) || e.betrag <= 0) throw new FachlicherFehler("betrag.groesserNull");
 
   const aktualisiert: IstBuchung = {
     ...original,

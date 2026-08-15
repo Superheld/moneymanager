@@ -17,6 +17,20 @@ function faktor(w: Waehrung): number {
 }
 
 /** Major (z. B. 120.5) → Minor Units. Rundet kaufmännisch auf die kleinste Einheit. */
+/**
+ * Ist der Wert ein verwendbarer Geldbetrag in Minor Units?
+ *
+ * Die Invariante „Geld = Integer Cent, nie Float" (CLAUDE.md) hatte an der Anwendungs-
+ * grenze keinen Wächter: die Use-Cases prüften nur `> 0`, womit sowohl 10.5 als auch
+ * Infinity durchkamen. Ein Float im Ledger bricht danach jede Summe (10.1 + 20.2 =
+ * 30.299999999999997), und Infinity vergiftet jeden Saldo, in den er eingeht.
+ *
+ * Deshalb hier zentral: endlich, ganzzahlig, innerhalb des sicheren Integer-Bereichs.
+ */
+export function istCent(wert: unknown): wert is Cent {
+  return typeof wert === "number" && Number.isSafeInteger(wert);
+}
+
 export function majorZuMinor(value: number, w: Waehrung = STANDARD_WAEHRUNG): Cent {
   return Math.round(value * faktor(w));
 }
