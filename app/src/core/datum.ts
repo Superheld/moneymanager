@@ -1,15 +1,30 @@
 // Datum-Helfer — Monatsarithmetik auf ISO-Datumsstrings „YYYY-MM-DD", ohne
 // Zeitzonen-Fallen. Reine Funktionen; geteilt von Projektion und Kündigungslogik.
 
+import { FachlicherFehler } from "./fehler";
+
 export interface Ymd {
   y: number;
   m: number; // 1–12
   d: number; // 1–31
 }
 
+/**
+ * „YYYY-MM-DD" → Ymd. Wirft bei allem, was kein existierendes Kalenderdatum ist.
+ *
+ * Vorher wurde blind zerlegt: aus "" wurde {y:NaN,…} und daraus in der Projektion die
+ * Beschriftung „undefined aN"; "2026-01-00" überlebte als Tag 0 bis in die Planbuchung
+ * und die DB; "2026-00-15" wurde still zum Dezember des Vorjahres umgedeutet. Die
+ * Formprüfungen der Use-Cases (/^\d{4}-\d{2}-\d{2}$/) prüfen die FORM, nicht die
+ * Existenz — deshalb muss der Kern hier selbst hart sein.
+ */
 export function parseIso(iso: string): Ymd {
-  const [y, m, d] = iso.split("-").map(Number);
-  return { y, m, d };
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso ?? "");
+  if (!m) throw new FachlicherFehler("datum.ungueltig");
+  const ymd = { y: Number(m[1]), m: Number(m[2]), d: Number(m[3]) };
+  if (ymd.m < 1 || ymd.m > 12) throw new FachlicherFehler("datum.ungueltig");
+  if (ymd.d < 1 || ymd.d > tageImMonat(ymd.y, ymd.m)) throw new FachlicherFehler("datum.ungueltig");
+  return ymd;
 }
 
 export function tageImMonat(y: number, m: number): number {
@@ -37,10 +52,25 @@ export function addTage(ymd: Ymd, n: number): Ymd {
   return { y: dt.getUTCFullYear(), m: dt.getUTCMonth() + 1, d: dt.getUTCDate() };
 }
 
+/**
+ * Ymd → „YYYY-MM-DD". Das Jahr wird auf vier Stellen gepolstert.
+ *
+ * Ohne Polsterung wurde aus dem Jahr 26 der String „26-01-15" — und weil die ganze
+ * Codebase Daten als STRINGS vergleicht (Budget-Fenster, Kontoauszug, Sortierungen),
+ * kippte damit die Ordnung: „0026-01-15" < „2026-01-01" ist wahr, „26-01-15" < „2026-01-01"
+ * ist falsch. Dasselbe Datum sortierte nach einer Konvertierung in die Zukunft.
+ *
+ * Ausserhalb von 0001..9999 gibt es keine gültige ISO-Darstellung — dann lieber werfen
+ * als einen String erzeugen, den keine Vergleichslogik mehr richtig einordnet.
+ */
 export function toIso(ymd: Ymd): string {
+  if (!Number.isInteger(ymd.y) || ymd.y < 1 || ymd.y > 9999) {
+    throw new FachlicherFehler("datum.ungueltig");
+  }
+  const yyyy = String(ymd.y).padStart(4, "0");
   const mm = String(ymd.m).padStart(2, "0");
   const dd = String(ymd.d).padStart(2, "0");
-  return `${ymd.y}-${mm}-${dd}`;
+  return `${yyyy}-${mm}-${dd}`;
 }
 
 /** Monatsindex relativ zu einem Startdatum (0 = Startmonat). */
