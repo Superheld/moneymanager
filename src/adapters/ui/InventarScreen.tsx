@@ -30,6 +30,7 @@ import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedge
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
+import { betont } from "./betonung";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
 
@@ -166,7 +167,7 @@ export function InventarScreen() {
       />
 
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
-        <Trans i18nKey="inventar.erklaerung" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
+        <Trans i18nKey="inventar.erklaerung" components={betont} />
       </p>
 
       {items.length > 0 && (

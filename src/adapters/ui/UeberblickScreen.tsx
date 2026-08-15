@@ -40,6 +40,7 @@ import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from
 import { ZweiKurvenChart } from "./ZweiKurvenChart";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { Modal } from "./Modal";
+import { betont } from "./betonung";
 import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
 
 const MONATE = 12;
@@ -175,22 +176,22 @@ export function UeberblickScreen() {
       </div>
       <p style={{ fontSize: 16, lineHeight: 1.55, color: "var(--ink-2)", margin: "16px 0 0", maxWidth: 620 }}>
         {konten.length === 0 ? (
-          <Trans i18nKey="ueberblick.einleitungLeer" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
+          <Trans i18nKey="ueberblick.einleitungLeer" components={betont} />
         ) : (
           <>
             <Trans
               i18nKey="ueberblick.einleitungStart"
               values={{ start: geld.formatMitSymbol(start), frei: geld.formatMitSymbol(verfuegbar), plan: geld.formatMitSymbol(planSaldo) }}
               components={{
-                b: <b style={{ color: "var(--ink)" }} />,
-                frei: <b style={{ color: verfuegbar < 0 ? "var(--warn-deep)" : "var(--accent-deep)", fontWeight: 700 }} />,
+                ...betont,
+                frei: <b key="frei" style={{ color: verfuegbar < 0 ? "var(--warn-deep)" : "var(--accent-deep)", fontWeight: 700 }} />,
               }}
             />
             {tiefpunkt.freieLiquiditaet < 0 ? (
               <Trans
                 i18nKey="ueberblick.einleitungTiefpunkt"
                 values={{ label: tiefpunkt.label, betrag: geld.formatMitSymbol(tiefpunkt.freieLiquiditaet) }}
-                components={{ b: <b style={{ color: "var(--ink)" }} />, warn: <b style={{ color: "var(--warn-deep)", fontWeight: 700 }} /> }}
+                components={{ ...betont, warn: <b key="warn" style={{ color: "var(--warn-deep)", fontWeight: 700 }} /> }}
               />
             ) : (
               <>{t("ueberblick.einleitungPlus")}</>
