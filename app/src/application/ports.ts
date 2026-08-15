@@ -103,8 +103,17 @@ export interface UmsatzRepository {
   /** Noch nicht verbuchte/verworfene Umsätze — die Review-Inbox. */
   offene(): Promise<Umsatz[]>;
   loeschen(id: string): Promise<void>;
-  /** Vorhandene Dedup-Schlüssel (für die Duplikaterkennung beim nächsten Import). */
-  bestandsSchluessel(): Promise<{ hashes: string[]; nativeIds: string[] }>;
+  /**
+   * Vorhandene Dedup-Schlüssel (für die Duplikaterkennung beim nächsten Import).
+   * `hashesOhneId` enthält nur die Hashes der Bestandszeilen OHNE native ID — gegen sie
+   * darf auch ein Kandidat MIT ID über den Hash geprüft werden, ohne dass zwei echte
+   * Buchungen derselben Quelle fälschlich zusammenfallen (siehe rohHash.ts).
+   */
+  bestandsSchluessel(): Promise<{
+    hashes: string[];
+    nativeIds: string[];
+    hashesOhneId?: string[];
+  }>;
 }
 
 export interface SzenarioRepository {
