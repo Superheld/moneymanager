@@ -29,6 +29,7 @@ import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqlit
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { Card, CoverageTrack, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
+import { betont } from "./betonung";
 import { useGeld } from "./EinstellungenProvider";
 
 function aktuellerMonatAb(): string {
@@ -102,13 +103,13 @@ export function DeckungScreen() {
             <Trans
               i18nKey="deckung.hinweisUeberplanung"
               values={{ betrag: `${geld.format(frei)} ${geld.symbol}` }}
-              components={{ b: <b style={{ color: "var(--ink)" }} /> }}
+              components={betont}
             />
           ) : (
             <Trans
               i18nKey="deckung.hinweisGedeckt"
               values={{ betrag: `${geld.format(frei, { mitVorzeichen: true })} ${geld.symbol}` }}
-              components={{ b: <b style={{ color: "var(--ink)" }} /> }}
+              components={betont}
             />
           )}
           {" "}
