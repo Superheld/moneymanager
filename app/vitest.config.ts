@@ -9,12 +9,14 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       all: true,
-      include: [
-        "src/core/**/*.ts",
-        "src/application/**/*.ts",
-        "src/adapters/persistence/migrations.ts",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: [
+        "**/*.test.ts",
+        "src/core/index.ts",
+        "src/**/*.d.ts",
+        "src/main.tsx",
+        "src/vite-env.d.ts",
       ],
-      exclude: ["**/*.test.ts", "src/core/index.ts"],
       reporter: ["text", "html"],
     },
   },
