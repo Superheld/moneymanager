@@ -8,7 +8,7 @@
 //  - reich an Zusatzspalten: Buchungs-ID (stabil), Analyse-Unterkategorie, Gläubiger-ID
 
 import Papa from "papaparse";
-import { parseBetrag, toIso, type Cent } from "../../core";
+import { parseBetrag, toIso, waehrungNachCode, type Cent } from "../../core";
 import {
   adapterRegistrieren,
   type ImportErgebnis,
@@ -63,13 +63,16 @@ function reiheZuRohUmsatz(r: Reihe): RohUmsatz | string {
   const buchungstag = parseFgDatum(r[SP.buchungstag] ?? "");
   if (!buchungstag) return `Zeile übersprungen: ungültiges Datum „${r[SP.buchungstag] ?? ""}"`;
 
-  const betrag = parseBetrag(r[SP.betrag] ?? "") as Cent | null;
+  // Mit der Währung DER ZEILE parsen, nicht mit der EUR-Vorgabe: bei einer Skala-0-
+  // Währung (JPY, KWD) läse die Vorgabe "1200" als 120000 Minor Units.
+  const waehrung = leerZuUndefined(r[SP.waehrung]) ?? "EUR";
+  const betrag = parseBetrag(r[SP.betrag] ?? "", waehrungNachCode(waehrung)) as Cent | null;
   if (betrag === null) return `Zeile übersprungen: ungültiger Betrag „${r[SP.betrag] ?? ""}"`;
 
   return {
     buchungstag,
     betrag,
-    waehrung: leerZuUndefined(r[SP.waehrung]) ?? "EUR",
+    waehrung,
     gegenpartei: (r[SP.gegenpartei] ?? "").trim(),
     gegenparteiIban: leerZuUndefined(r[SP.gegenparteiIban]),
     verwendungszweck: (r[SP.zweck] ?? "").trim(),
