@@ -363,6 +363,7 @@ describe("ROT 10 — addMonate erzeugt bei extremen Werten unbrauchbare Daten", 
   it("ord und toIso bleiben zusammen konsistent", () => {
     const x = addMonate({ y: 2026, m: 1, d: 15 }, -30000);
     expect(x.y).toBeLessThan(1);
+    expect(ord(x)).toBeLessThan(0); // ord bildet den Wert weiterhin ab, ohne zu werten
     expect(() => toIso(x)).toThrow("datum.ungueltig");
   });
 });
