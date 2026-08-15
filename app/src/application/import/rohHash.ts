@@ -47,6 +47,12 @@ export function rohHash(
 export interface Bestand {
   readonly hashes: Iterable<string>;
   readonly nativeIds: Iterable<string>;
+  /**
+   * Roh-Hashes der Bestandszeilen OHNE native ID. Nur gegen diese darf ein Kandidat MIT
+   * native ID über den Hash geprüft werden — sonst würden zwei echte Buchungen derselben
+   * Quelle (zweimal derselbe Kaffee, verschiedene IDs) fälschlich zusammenfallen.
+   */
+  readonly hashesOhneId?: Iterable<string>;
 }
 
 export interface DublettenBefund<T> {
@@ -73,10 +79,20 @@ export function klassifiziere<T extends { rohHash: string; nativeId?: string }>(
 ): DublettenBefund<T> {
   const hashes = new Set(bestand.hashes);
   const nativeIds = new Set(bestand.nativeIds);
+  // Fehlt die Angabe, wird konservativ angenommen, dass der Bestand keine IDs trägt:
+  // lieber eine Dublette zu viel erkennen als dieselbe Buchung doppelt anlegen.
+  const hashesOhneId = new Set(bestand.hashesOhneId ?? bestand.hashes);
   const neu: T[] = [];
   const duplikate: T[] = [];
   for (const k of kandidaten) {
-    const dup = k.nativeId !== undefined ? nativeIds.has(k.nativeId) : hashes.has(k.rohHash);
+    // MIT native ID: die ID entscheidet — ZUSÄTZLICH aber der Hash gegen ID-lose
+    // Bestandszeilen. Sonst wirkte die quellenübergreifende Dedup nur in eine Richtung:
+    // lag dieselbe Buchung schon ID-los aus einer Bank-CSV im Bestand, kam sie über
+    // Finanzguru ein zweites Mal herein. rohHash.ts sagt genau das Gegenteil zu.
+    const dup =
+      k.nativeId !== undefined
+        ? nativeIds.has(k.nativeId) || hashesOhneId.has(k.rohHash)
+        : hashes.has(k.rohHash);
     if (dup) {
       duplikate.push(k);
       continue;
@@ -84,6 +100,7 @@ export function klassifiziere<T extends { rohHash: string; nativeId?: string }>(
     neu.push(k);
     hashes.add(k.rohHash);
     if (k.nativeId !== undefined) nativeIds.add(k.nativeId);
+    else hashesOhneId.add(k.rohHash);
   }
   return { neu, duplikate };
 }

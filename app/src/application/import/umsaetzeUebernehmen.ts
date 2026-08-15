@@ -50,7 +50,34 @@ export interface UebernahmeDeps {
   readonly id: () => string;
 }
 
+/**
+ * Serialisiert Übernahmen. Zwischen "Bestand lesen" und "Umsätze schreiben" liegt ein
+ * Zeitfenster; zwei gleichzeitige Läufe lasen beide denselben (leeren) Bestand und legten
+ * dieselbe Buchung doppelt an. Die DB stützt die Invariante nicht ab — die Indizes auf
+ * roh_hash und native_id sind bewusst nicht eindeutig.
+ *
+ * Die App läuft in einem einzigen Prozess, deshalb genügt hier eine Promise-Kette. Ein
+ * eindeutiger Index wäre der härtere Schutz, verlangt aber vorher eine Bereinigung
+ * etwaiger Alt-Duplikate — das gehört zur Datenmigration vor der nächsten Quelle.
+ */
+let uebernahmeKette: Promise<unknown> = Promise.resolve();
+
 export async function umsaetzeUebernehmen(
+  eingabe: UebernahmeEingabe,
+  deps: UebernahmeDeps,
+): Promise<UebernahmeErgebnis> {
+  const vorgaenger = uebernahmeKette;
+  let freigeben: () => void = () => {};
+  uebernahmeKette = new Promise<void>((r) => (freigeben = r));
+  await vorgaenger.catch(() => undefined);
+  try {
+    return await uebernahmeIntern(eingabe, deps);
+  } finally {
+    freigeben();
+  }
+}
+
+async function uebernahmeIntern(
   eingabe: UebernahmeEingabe,
   deps: UebernahmeDeps,
 ): Promise<UebernahmeErgebnis> {

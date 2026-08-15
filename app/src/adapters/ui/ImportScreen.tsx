@@ -16,6 +16,7 @@ import {
   type UebernahmeKonto,
 } from "../../application/import";
 // Selbst-Registrierung des Finanzguru-Adapters auslösen.
+import { textAusDatei } from "../import/dateiText";
 import "../import/finanzguruAdapter";
 import {
   sqliteKategorieRepository,
@@ -64,7 +65,7 @@ export function ImportScreen() {
     setDateiname(datei.name);
     setUErgebnis(null);
     setFehler(null);
-    const inhalt = await datei.text();
+    const inhalt = await textAusDatei(datei);
     const adapter = waehleAdapter(inhalt);
     if (!adapter) {
       setErgebnis(null);

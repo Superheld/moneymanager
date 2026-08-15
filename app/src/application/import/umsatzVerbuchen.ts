@@ -54,25 +54,56 @@ export function paareUmbuchungen(
 
   const verwendet = new Set<string>();
   const paare: [Umsatz, Umsatz][] = [];
+
+  /** Alle noch freien Gegenbeine zu `a`: Gegenbetrag, anderes Konto, Abstand ≤ MAX. */
+  const partnerVon = (a: Umsatz): Umsatz[] =>
+    kandidaten.filter(
+      (b) =>
+        b.id !== a.id &&
+        !verwendet.has(b.id) &&
+        b.betrag === -a.betrag &&
+        b.zahlungskontoId !== a.zahlungskontoId &&
+        Math.abs(tageBis(a.buchungstag, b.buchungstag)) <= MAX_PAAR_TAGE,
+    );
+
+  const paaren = (a: Umsatz, b: Umsatz) => {
+    verwendet.add(a.id);
+    verwendet.add(b.id);
+    paare.push(a.betrag < 0 ? [a, b] : [b, a]); // Abgang (−) zuerst
+  };
+
+  // Runde 1 — ZWANGSPAARE zuerst: Beine mit genau einem möglichen Partner.
+  //
+  // Reine Gier griff hier daneben: laufen am selben Tag A→C und C→B über denselben Betrag,
+  // nahm der erste Kandidat irgendein passendes Gegenbein und erzeugte das Paar A↔B — einen
+  // Übertrag, den es nie gab, plus zwei verwaiste Beine. Wer nur eine Möglichkeit hat, muss
+  // sie bekommen, bevor jemand mit mehreren Auswahl trifft.
+  let fortschritt = true;
+  while (fortschritt) {
+    fortschritt = false;
+    for (const a of kandidaten) {
+      if (verwendet.has(a.id)) continue;
+      const moeglich = partnerVon(a);
+      if (moeglich.length === 1) {
+        paaren(a, moeglich[0]);
+        fortschritt = true;
+      }
+    }
+  }
+
+  // Runde 2 — der Rest: nächstliegendes Gegenbein.
   for (const a of kandidaten) {
     if (verwendet.has(a.id)) continue;
-    // bestes Gegenbein: Gegenbetrag, anderes Konto, Tagesabstand ≤ MAX, kleinster Abstand zuerst.
     let best: Umsatz | undefined;
     let bestAbstand = Infinity;
-    for (const b of kandidaten) {
-      if (b.id === a.id || verwendet.has(b.id)) continue;
-      if (b.betrag !== -a.betrag || b.zahlungskontoId === a.zahlungskontoId) continue;
+    for (const b of partnerVon(a)) {
       const abstand = Math.abs(tageBis(a.buchungstag, b.buchungstag));
-      if (abstand <= MAX_PAAR_TAGE && abstand < bestAbstand) {
+      if (abstand < bestAbstand) {
         best = b;
         bestAbstand = abstand;
       }
     }
-    if (best) {
-      verwendet.add(a.id);
-      verwendet.add(best.id);
-      paare.push(a.betrag < 0 ? [a, best] : [best, a]); // Abgang (−) zuerst
-    }
+    if (best) paaren(a, best);
   }
 
   const einzeln = umsaetze.filter((u) => !verwendet.has(u.id));

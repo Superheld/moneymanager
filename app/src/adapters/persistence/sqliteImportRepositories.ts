@@ -152,8 +152,23 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
   },
   async bestandsSchluessel() {
     const db = await getDb();
-    const h = await db.select<{ roh_hash: string }[]>("SELECT roh_hash FROM umsatz");
+    // Auch die Roh-Hashes verbuchter Ist-Buchungen: umsatzVerbuchen schreibt sie mit,
+    // "damit ein späterer Bankimport gegen die verbuchte Zeile deduppen kann" — gelesen
+    // wurden sie bisher nie. Solange die Umsatz-Zeile existiert, deckt sie den Fall ab;
+    // sobald Umsätze aufgeräumt werden (der Port kann löschen), fiele die Grundlage weg.
+    const h = await db.select<{ roh_hash: string }[]>(
+      `SELECT roh_hash FROM umsatz
+       UNION
+       SELECT roh_hash FROM ist_buchung WHERE roh_hash IS NOT NULL`,
+    );
     const n = await db.select<{ native_id: string }[]>("SELECT native_id FROM umsatz WHERE native_id IS NOT NULL");
-    return { hashes: h.map((r) => r.roh_hash), nativeIds: n.map((r) => r.native_id) };
+    const o = await db.select<{ roh_hash: string }[]>(
+      "SELECT roh_hash FROM umsatz WHERE native_id IS NULL",
+    );
+    return {
+      hashes: h.map((r) => r.roh_hash),
+      nativeIds: n.map((r) => r.native_id),
+      hashesOhneId: o.map((r) => r.roh_hash),
+    };
   },
 };

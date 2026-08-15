@@ -8,7 +8,7 @@
 //  - reich an Zusatzspalten: Buchungs-ID (stabil), Analyse-Unterkategorie, Gläubiger-ID
 
 import Papa from "papaparse";
-import { parseBetrag, toIso, waehrungNachCode, type Cent } from "../../core";
+import { parseBetrag, tageImMonat, toIso, waehrungNachCode, type Cent } from "../../core";
 import {
   adapterRegistrieren,
   type ImportErgebnis,
@@ -42,7 +42,11 @@ function parseFgDatum(text: string): string | null {
   const m = text?.trim().match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
   if (!m) return null;
   const d = Number(m[1]), mo = Number(m[2]), y = Number(m[3]);
-  if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+  // Monatslänge prüfen, nicht nur 1..31: „31.02.2026" ergab sonst den Buchungstag
+  // „2026-02-31". In der Tagesarithmetik ist das der 3. März, in Sortierung und
+  // Monatsgruppierung bleibt es Februar — dieselbe Buchung lag je nach Auswertung
+  // in zwei verschiedenen Monaten.
+  if (mo < 1 || mo > 12 || d < 1 || d > tageImMonat(y, mo)) return null;
   return toIso({ y, m: mo, d });
 }
 
@@ -55,7 +59,13 @@ function leerZuUndefined(s: string | undefined): string | undefined {
 function abKopfzeile(inhalt: string): string {
   const ohneBom = inhalt.replace(/^﻿/, "");
   const zeilen = ohneBom.split(/\r?\n/);
-  const start = zeilen.findIndex((z) => z.startsWith(SP.buchungstag + ";"));
+  // Nach den Spaltennamen suchen, nicht nach der Position: `startsWith("Buchungstag;")`
+  // verlangte den Buchungstag als ERSTE Spalte, obwohl sonst überall nach Namen gemappt
+  // wird. Bei umsortierten Spalten meldete erkennt() weiterhin "ja", lies() lieferte dann
+  // null Umsätze und n × "ungültiges Datum" — eine Meldung, die auf die falsche Ursache zeigt.
+  const start = zeilen.findIndex(
+    (z) => z.includes(SP.buchungstag) && z.includes(SP.betrag) && z.includes(";"),
+  );
   return start <= 0 ? ohneBom : zeilen.slice(start).join("\n");
 }
 
