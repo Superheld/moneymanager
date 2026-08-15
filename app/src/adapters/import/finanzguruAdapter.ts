@@ -83,6 +83,47 @@ function reiheZuRohUmsatz(r: Reihe): RohUmsatz | string {
   };
 }
 
+/**
+ * Übersetzt strukturelle Parser-Schäden in Warnungen für den Nutzer.
+ *
+ * Wichtigster Fall: ein nicht geschlossenes Anführungszeichen („MissingQuotes"). Papaparse
+ * liest den gesamten Rest der Datei dann als EIN Feld — ohne diese Auswertung meldet der
+ * Import „1 Umsatz, 0 Warnungen", während der Rest der Datei verschwunden ist.
+ *
+ * Bewusst wird NICHT versucht, die Datei zu retten (etwa durch erneutes Parsen ohne
+ * Quoting): Dateien mit legitim gequoteten Feldern — ein Semikolon im Verwendungszweck
+ * genügt — würden dabei zerrissen, und aus einem sichtbaren Schaden würde ein stiller.
+ * Lieber laut scheitern und den Nutzer die Datei reparieren lassen.
+ */
+function parserWarnungen(nutzteil: string, parsed: Papa.ParseResult<Reihe>): string[] {
+  const warnungen: string[] = [];
+  const gemeldet = new Set<string>();
+
+  for (const f of parsed.errors) {
+    if (gemeldet.has(f.code)) continue;
+    gemeldet.add(f.code);
+    warnungen.push(
+      f.type === "Quotes"
+        ? "Datei beschädigt: ein Anführungszeichen wird nicht geschlossen — alles danach konnte nicht gelesen werden."
+        : `Datei-Warnung: ${f.message}`,
+    );
+  }
+
+  // Zweiter, unabhängiger Wächter: Datenzeilen zählen. Fängt auch Verluste ab, die
+  // papaparse nicht als Fehler meldet.
+  const datenzeilen = nutzteil
+    .split(/\r?\n/)
+    .slice(1)
+    .filter((z) => z.trim() !== "").length;
+  if (datenzeilen > parsed.data.length) {
+    warnungen.push(
+      `${datenzeilen - parsed.data.length} von ${datenzeilen} Datenzeilen konnten nicht gelesen werden.`,
+    );
+  }
+
+  return warnungen;
+}
+
 export const finanzguruAdapter: Quellenadapter = {
   id: ID,
   name: "Finanzguru-Export (CSV)",
@@ -93,17 +134,31 @@ export const finanzguruAdapter: Quellenadapter = {
   },
 
   lies(inhalt: string): ImportErgebnis {
-    const parsed = Papa.parse<Reihe>(abKopfzeile(inhalt), {
+    const nutzteil = abKopfzeile(inhalt);
+    const parsed = Papa.parse<Reihe>(nutzteil, {
       header: true,
       delimiter: ";",
       skipEmptyLines: true,
     });
 
     const umsaetze: RohUmsatz[] = [];
-    const warnungen: string[] = [];
+    const warnungen: string[] = [...parserWarnungen(nutzteil, parsed)];
     let splits = 0;
 
+    // Nur strukturell zerstörte Zeilen werden übersprungen — das sind die Quoting-Fehler:
+    // dort trägt die Zeile den verschluckten Rest der Datei im Feldinhalt und würde den
+    // rohHash vergiften. Ein FieldMismatch (z. B. ein Semikolon im Verwendungszweck)
+    // ist dagegen lesbar und wird nur gemeldet, nicht verworfen.
+    //
+    // Erkannt wird die betroffene Zeile am eingeschluckten Zeilenumbruch, nicht über
+    // `error.row`: papaparse zählt dort Quellzeilen, nicht den Index in `data` — die
+    // beiden laufen auseinander, sobald eine Zeile mehrere verschluckt.
+    const quotingKaputt = parsed.errors.some((f) => f.type === "Quotes");
+
     for (const r of parsed.data) {
+      if (quotingKaputt && Object.values(r).some((w) => typeof w === "string" && w.includes("\n"))) {
+        continue;
+      }
       if (leerZuUndefined(r[SP.splitTyp])) splits++;
       const ergebnis = reiheZuRohUmsatz(r);
       if (typeof ergebnis === "string") warnungen.push(ergebnis);

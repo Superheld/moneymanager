@@ -142,8 +142,20 @@ describe("Finanzguru-Adapter — kaputte CSV-Struktur", () => {
     expect(erg.warnungen.length).toBeGreaterThan(0);
   });
 
-  /** ROT — dieselbe Ursache, hier der belegte Datenverlust (2 von 3 Zeilen weg). */
-  it("verliert keine Zeilen an ein unterminiertes Anführungszeichen", () => {
+  /**
+   * GRÜN seit dem Fix — mit bewusst geänderter Erwartung gegenüber dem Fundzustand.
+   *
+   * Ursprünglich forderte dieser Test, dass alle 3 Zeilen ankommen. Das wäre nur durch
+   * erneutes Parsen ohne Quoting erreichbar und würde Dateien mit legitim gequoteten
+   * Feldern zerreißen — ein Semikolon im Verwendungszweck genügt. Aus einem sichtbaren
+   * Schaden würde damit ein stiller, also das Gegenteil des Fixes.
+   *
+   * Richtig ist: der Verlust wird beziffert gemeldet, und die beschädigte Zeile wird
+   * verworfen statt mit dem verschluckten Rest der Datei im Verwendungszweck importiert
+   * zu werden (dieser Text ginge sonst in den rohHash und machte den Dedup-Schlüssel
+   * unbrauchbar). Die Datei repariert der Nutzer.
+   */
+  it("importiert keine Zeile mit dem verschluckten Rest der Datei im Zweck", () => {
     const erg = finanzguruAdapter.lies(
       csv(
         reihe({ tag: "01.11.2021", betrag: "-1,00", gegenpartei: "A", zweck: '"offen' }),
@@ -151,10 +163,8 @@ describe("Finanzguru-Adapter — kaputte CSV-Struktur", () => {
         reihe({ tag: "03.11.2021", betrag: "-3,00", gegenpartei: "C" }),
       ),
     );
-    // Zusatzbeleg: die verschluckten Zeilen landen im Verwendungszweck der ersten Buchung
-    // und damit im rohHash — der Dedup-Schlüssel wird dadurch unbrauchbar.
-    expect(erg.umsaetze[0]?.verwendungszweck).not.toContain("02.11.2021");
-    expect(erg.umsaetze).toHaveLength(3);
+    for (const u of erg.umsaetze) expect(u.verwendungszweck).not.toContain("02.11.2021");
+    expect(erg.warnungen.join(" ")).toMatch(/Anführungszeichen|Datenzeilen/);
   });
 });
 
