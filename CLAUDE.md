@@ -7,6 +7,13 @@ Fachliche Doku (DDD-Modell, ADRs, Design-System) wird **außerhalb dieses Repos*
 Im Repo steht der lauffähige Code; die UI-Begriffe folgen dem Glossar
 (Rücklage → *Spartopf*, Rückstellung → *Puffer*, Liquidität → *Verfügbares Geld*).
 
+## Branches
+Jede Änderung — Feature, Bug, Doku — bekommt einen eigenen Branch und wird von dort
+per `--no-ff` nach **`develop`** gemerged. `develop` ist der Sammelpunkt: dort parkt
+alles, bis wir bewusst nach `main` durchreichen und pushen. Auf `main` wird nicht
+direkt gearbeitet; `main` bleibt der Stand, der veröffentlicht ist.
+Vor jedem Merge nach `develop`: `npm run typecheck` und `npm test` grün.
+
 ## Befehle
 ```bash
 npm run tauri dev   # Desktop-Fenster
