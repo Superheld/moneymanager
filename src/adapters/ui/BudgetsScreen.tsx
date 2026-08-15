@@ -24,6 +24,7 @@ import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudge
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, FormField, KPIStat } from "./ds";
+import { betont } from "./betonung";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
@@ -120,7 +121,7 @@ export function BudgetsScreen() {
       />
 
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-2)" }}>
-        <Trans i18nKey="budgets.erklaerung" components={{ b: <b style={{ color: "var(--ink)" }} /> }} />
+        <Trans i18nKey="budgets.erklaerung" components={betont} />
       </p>
 
       {budgets.length > 0 && (
