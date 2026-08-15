@@ -2,24 +2,20 @@
 
 Lokale Haushalts-Finanz-App (Tauri 2 + React + TS, hexagonaler portabler TS-Kern, SQLite lokal).
 
-## Wo die Wahrheit liegt — vor dem Ändern lesen
-- **Architektur & Schichten:** `ARCHITEKTUR.md` (Dependency Rule, Repo-Layout, Stolpersteine).
-- **Fachwahrheit (DDD-Doku, ADRs):** `Moneymanager/` — Entscheidungen in `30-entscheidungen/`.
-- **UI-Wording & Komponenten:** `design-system/` — Begriffe immer aus dem Glossar
-  (Rücklage → *Spartopf*, Rückstellung → *Puffer*, Liquidität → *Verfügbares Geld*).
+## Wo die Wahrheit liegt
+Fachliche Doku (DDD-Modell, ADRs, Design-System) wird **außerhalb dieses Repos** geführt.
+Im Repo steht der lauffähige Code; die UI-Begriffe folgen dem Glossar
+(Rücklage → *Spartopf*, Rückstellung → *Puffer*, Liquidität → *Verfügbares Geld*).
 
-## Befehle — immer aus `app/`
+## Befehle
 ```bash
-cd app
 npm run tauri dev   # Desktop-Fenster
 npm run dev         # nur Frontend (Webview ohne SQLite-Plugin)
 npm test            # Vitest (Kern, Use-Cases, Repositories, UI — alles via sql.js/jsdom)
 npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 % global)
 npm run typecheck
 ```
-⚠️ **Tooling NUR aus `app/`** ausführen (dort liegt `node_modules`). `npx`/`tsc`/`vitest`
-aus dem Repo-Root ziehen falsche globale Versionen. Im Zweifel `app/node_modules/.bin/<tool>`.
-Die Shell-cwd driftet zwischen Calls — Pfade absolut halten oder mit `cd app &&` beginnen.
+Die Shell-cwd driftet zwischen Calls — Pfade absolut halten.
 `tsc --noEmit | tail` verschluckt den Exit-Code; lieber `tsc --noEmit; echo $?`.
 
 ## Dev-Fallen
@@ -34,7 +30,7 @@ Die Shell-cwd driftet zwischen Calls — Pfade absolut halten oder mit `cd app &
   setzen; gestaffelte `setState` lassen abgeleitete Werte kurz gegen leere Listen rechnen
   (z. B. Kategorie-Lookup → fälschlich „ohne Kategorie").
 
-## Schichten (Details in ARCHITEKTUR.md)
+## Schichten
 `core` (reine Domäne, kein IO) ← `application` (Use-Cases + Ports) ← `adapters`
 (`persistence/` SQLite via tauri-plugin-sql, `ui/` React). `core` importiert nichts nach
 außen. Tests als `*.test.ts` neben dem Code.

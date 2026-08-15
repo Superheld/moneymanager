@@ -51,20 +51,17 @@ die Historie zeigt, wie es tatsächlich lief.
 ## Architektur
 
 Tauri 2 + React + TypeScript, **hexagonaler, portabler TS-Domänenkern**, SQLite lokal.
-Details: [`ARCHITEKTUR.md`](ARCHITEKTUR.md).
 
 ```
-Moneymanager/    DDD-Dokumentation (Strategie → Lieferung) — Fachwahrheit
-design-system/   Design-System (Tokens, Komponenten, Glossar)
-app/             die Anwendung (Tauri + React + TS)
-  src/core/         reine Domäne (Projektion, Töpfe, Kündigung, Historie …), unit-getestet
-  src/application/  Use-Cases + Ports
-    import/           Import-Kontext: Quellen-Port, Umsatz-Aggregat, Dedup, Remapping
-  src/adapters/     Außenwelt hinter den Ports
-    persistence/      SQLite (tauri-plugin-sql) + versionierte Migrationskette
-    import/           Quellen-Adapter (Finanzguru-CSV; weitere andockbar)
-    ui/               React-UI (Design-System)
-  src-tauri/        dünne Rust-Hülle
+src/core/         reine Domäne (Projektion, Töpfe, Kündigung, Historie …), unit-getestet
+src/application/  Use-Cases + Ports
+  import/           Import-Kontext: Quellen-Port, Umsatz-Aggregat, Dedup, Remapping
+src/adapters/     Außenwelt hinter den Ports
+  persistence/      SQLite (tauri-plugin-sql) + versionierte Migrationskette
+  import/           Quellen-Adapter (Finanzguru-CSV; weitere andockbar)
+  ui/               React-UI
+src/test/         Test-Harness (In-Memory-SQLite, Render-Helfer)
+src-tauri/        dünne Rust-Hülle
 ```
 
 Der **Import** sitzt hinter einem Quellen-Port (`Quellenadapter`): ein neues Format/eine
@@ -77,7 +74,6 @@ verbucht werden.
 Voraussetzungen: Node, Rust-Toolchain (Tauri-Build), npm.
 
 ```bash
-cd app
 npm install
 npm run tauri dev     # Desktop-App starten
 npm test              # Unit-Tests
@@ -88,14 +84,14 @@ npm run tauri build   # Produktion bauen
 
 ## Qualität
 
-Getestet wird **von innen nach außen** (hexagonal): der Domänenkern und die Use-Cases
-sind unit-getestet, die SQLite-**Migrationskette** läuft gegen ein In-Memory-SQLite
-(sql.js, ohne Tauri-Runtime) — inklusive der Dedup-Garantie des Ist-Journals. **CI**
-(GitHub Actions) erzwingt bei jedem Push/PR Typecheck, Tests und Frontend-Build.
+Getestet wird **von innen nach außen** (hexagonal): Domänenkern und Use-Cases als reine
+Unit-Tests, Repositories und UI als Integration gegen ein In-Memory-SQLite (sql.js, ohne
+Tauri-Runtime) — dieselbe SQL-Engine wie in der App, nur ohne Attrappen dazwischen. Ein
+falsches Spalten-Mapping fällt damit genauso auf wie eine kaputte Anzeige.
+**Abdeckung: rund 90 %** über das gesamte Projekt. **CI** (GitHub Actions) erzwingt bei
+jedem Push/PR Typecheck, Tests und Frontend-Build.
 
-Noch offen (bewusst): Komponenten-Tests (React/Testing-Library) und E2E. Die SQLite-
-*Adapter* (CRUD-SQL) sind über die getestete Migrationskette abgesichert, aber nicht
-einzeln verprobt.
+Noch offen (bewusst): End-to-End-Tests gegen die gebaute Desktop-App.
 
 ## Sprache
 
