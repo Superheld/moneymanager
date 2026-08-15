@@ -1,5 +1,7 @@
 # ADR-0003 — Ist-Buchung als Buchungssatz: Zuordnung über das Gegenkonto, Topf-Entnahme
 
+> **SUPERSEDED (2026-07-19):** Durch das Redesign (10-strategie/DOMAENE.md) überholt — Doppik/summae sind bewusst nicht mehr Teil des Modells; "Buchung" ist ein Kontoumsatz, kein Buchungssatz. Bleibt als Entscheidungshistorie stehen.
+
 > **DDD-Ebene:** Entscheidung — ADR-Serie · **Status:** Akzeptiert · **Stand:** 2026-06-18 · **Bezüge:** RECHNUNGSWESEN-BEZUG, SPEC-MVP §4, TAKTIK-PLANUNG (Zuordnung), KONZEPT §3, BUCHUNGSPACKAGE-ANFORDERUNGEN, ADR-0001, ADR-0002
 
 > Status: **Akzeptiert** · 2026-06-18 · Entscheider: Bruce + Claude
