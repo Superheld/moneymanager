@@ -52,6 +52,15 @@ export function periodeFenster(periode: BudgetPeriode, am: string): { von: strin
  * [von, bis), als positiver Betrag. Umschichtungen (z. B. gedeckte Topf-Entnahmen aus
  * Ersatz/Puffer) zählen NICHT — kein Doppelzählen. Spartopf-Entnahmen sind Aufwand und
  * zählen, wenn sie dieselbe Kategorie tragen.
+ *
+ * Vorzeichenrichtig: Aufwände sind negativ und erhöhen den Verbrauch, ein positiver
+ * Aufwand ist eine Erstattung und senkt ihn. Ein früheres `Math.abs` liess Retouren den
+ * Verbrauch ERHÖHEN — Fehler in Höhe des doppelten Erstattungsbetrags, und die Historie
+ * (die vorzeichenrichtig rechnet) zeigte für dieselben Daten andere Zahlen.
+ *
+ * Nicht behandelt: eine Erstattung, die als `Ertrag` gebucht ist, bleibt draussen — sie
+ * entlastet das Budget also nicht. Das ist eine fachliche Frage (zählt jeder Zufluss auf
+ * einer Aufwandskategorie als Budget-Entlastung?) und keine hier zu treffende Entscheidung.
  */
 export function budgetVerbrauch(
   buchungen: IstBuchung[],
@@ -63,6 +72,6 @@ export function budgetVerbrauch(
     if (b.kategorieId !== kategorieId) return s;
     if (b.charakter !== "Aufwand") return s;
     if (b.datum < von || b.datum >= bis) return s;
-    return s + Math.abs(b.betrag);
+    return s - b.betrag;
   }, 0);
 }
