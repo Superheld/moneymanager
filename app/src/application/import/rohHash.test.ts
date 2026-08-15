@@ -5,21 +5,36 @@ const leererBestand = { hashes: [], nativeIds: [] };
 
 describe("rohHash", () => {
   it("ist deterministisch für gleiche fachliche Daten", () => {
-    const a = { kontoIban: "DE12 3456", buchungstag: "2022-01-01", betrag: -655, verwendungszweck: "[anonymisiert]" };
-    const b = { kontoIban: "de123456", buchungstag: "2022-01-01", betrag: -655, verwendungszweck: "trinkgut" };
-    // IBAN-Normalisierung (Spaces/Case) und Zweck-Normalisierung greifen → gleicher Schlüssel.
+    const a = { kontoIban: "DE12 3456", buchungstag: "2022-01-01", betrag: -655, gegenpartei: "[anonymisiert]", verwendungszweck: "Kasse 1" };
+    const b = { kontoIban: "de123456", buchungstag: "2022-01-01", betrag: -655, gegenpartei: "trinkgut", verwendungszweck: "kasse 1" };
+    // IBAN-Normalisierung (Spaces/Case) sowie Zweck- und Gegenpartei-Normalisierung
+    // greifen → gleicher Schlüssel.
     expect(rohHash(a)).toBe(rohHash(b));
   });
 
   it("normalisiert Whitespace im Verwendungszweck", () => {
-    const a = rohHash({ buchungstag: "2022-01-01", betrag: -1, verwendungszweck: "Foo   Bar" });
-    const b = rohHash({ buchungstag: "2022-01-01", betrag: -1, verwendungszweck: "foo bar" });
+    const a = rohHash({ buchungstag: "2022-01-01", betrag: -1, gegenpartei: "x", verwendungszweck: "Foo   Bar" });
+    const b = rohHash({ buchungstag: "2022-01-01", betrag: -1, gegenpartei: "x", verwendungszweck: "foo bar" });
     expect(a).toBe(b);
   });
 
   it("unterscheidet bei abweichendem Betrag", () => {
-    const a = rohHash({ buchungstag: "2022-01-01", betrag: -655, verwendungszweck: "x" });
-    const b = rohHash({ buchungstag: "2022-01-01", betrag: -656, verwendungszweck: "x" });
+    const a = rohHash({ buchungstag: "2022-01-01", betrag: -655, gegenpartei: "x", verwendungszweck: "x" });
+    const b = rohHash({ buchungstag: "2022-01-01", betrag: -656, gegenpartei: "x", verwendungszweck: "x" });
+    expect(a).not.toBe(b);
+  });
+
+  it("unterscheidet zwei Händler bei leerem Verwendungszweck", () => {
+    // Kartenzahlung: der Zweck ist regelmäßig leer, nur die Gegenpartei trennt.
+    const a = rohHash({ kontoIban: "DE1", buchungstag: "2022-01-01", betrag: -2000, gegenpartei: "Rewe", verwendungszweck: "" });
+    const b = rohHash({ kontoIban: "DE1", buchungstag: "2022-01-01", betrag: -2000, gegenpartei: "Aldi", verwendungszweck: "" });
+    expect(a).not.toBe(b);
+  });
+
+  it("lässt sich nicht durch verschobene Feldgrenzen nachbauen", () => {
+    // Ein Trennzeichen im Referenzkonto darf keinen fremden Schlüssel erzeugen.
+    const a = rohHash({ kontoIban: 'K","2020-01-01', buchungstag: "x", betrag: -5, gegenpartei: "", verwendungszweck: "" });
+    const b = rohHash({ kontoIban: "K", buchungstag: "2020-01-01", betrag: -5, gegenpartei: "", verwendungszweck: "" });
     expect(a).not.toBe(b);
   });
 });
