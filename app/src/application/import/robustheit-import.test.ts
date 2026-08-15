@@ -12,6 +12,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { finanzguruAdapter } from "../../adapters/import/finanzguruAdapter";
+import { migrate, type MigrationsDb } from "../../adapters/persistence/db";
 import { MIGRATIONS } from "../../adapters/persistence/migrations";
 import type { Kategorie, Zahlungskonto } from "../../core";
 import { tageBis } from "../../core";
@@ -116,6 +117,33 @@ function frischeDb(): Database {
   const db = new SQL.Database();
   for (const m of MIGRATIONS) for (const sql of m.sql) db.run(sql);
   return db;
+}
+
+/**
+ * Adapter sql.js → MigrationsDb, damit `migrate` aus db.ts unter Test läuft (in der App
+ * hängt dort tauri-plugin-sql). `sabotage` lässt ein bestimmtes Statement scheitern und
+ * simuliert so einen Abbruch mitten in einer Migration.
+ */
+function migrationsDb(db: Database, sabotage?: (sql: string) => boolean): MigrationsDb {
+  return {
+    async execute(sql: string, werte?: unknown[]) {
+      if (sabotage?.(sql)) throw new Error("simulierter Abbruch");
+      db.run(sql, werte as never);
+    },
+    async select<T>(sql: string): Promise<T> {
+      const [res] = db.exec(sql);
+      if (!res) return [] as unknown as T;
+      return res.values.map((zeile) =>
+        Object.fromEntries(res.columns.map((c, i) => [c, zeile[i]])),
+      ) as unknown as T;
+    },
+  };
+}
+
+/** Aktueller Schemastand laut _migration. */
+function version(db: Database): number {
+  const [res] = db.exec("SELECT COALESCE(MAX(version), 0) AS v FROM _migration");
+  return Number(res?.values[0]?.[0] ?? 0);
 }
 
 // ══ 1. CSV-Parsing: stiller Datenverlust ═══════════════════════════════════════════
@@ -466,16 +494,24 @@ describe("Migrationskette", () => {
    *   nicht selbst; ohne manuellen SQL-Eingriff in die Nutzer-DB ist der Zustand endgültig.
    *   Betrifft alle Mehr-Statement-Migrationen (v2, v3, v6, v9, v11, v14).
    */
-  it("übersteht eine mittendrin abgebrochene Mehr-Statement-Migration", () => {
-    const db = new SQL.Database();
-    for (const m of MIGRATIONS) if (m.version <= 10) for (const sql of m.sql) db.run(sql);
+  it("übersteht eine mittendrin abgebrochene Mehr-Statement-Migration", async () => {
     const v11 = MIGRATIONS.find((m) => m.version === 11)!;
     expect(v11.sql.length).toBeGreaterThan(1);
-    db.run(v11.sql[0]); // Abbruch nach dem ersten Statement, Version bleibt bei 10
+
+    const db = new SQL.Database();
     try {
-      expect(() => {
-        for (const sql of v11.sql) db.run(sql); // Neustart: db.ts wiederholt v11 komplett
-      }).not.toThrow();
+      // Erster Start: v11 bricht nach dem ersten Statement ab (Absturz, Fenster zu, …).
+      const abbruch = migrationsDb(db, (sql) => sql === v11.sql[1]);
+      await expect(migrate(abbruch)).rejects.toThrow();
+
+      // Die Transaktion muss den Teilzustand zurückgenommen haben: weder die Spalte aus
+      // Statement 1 noch der Versionseintrag dürfen stehen geblieben sein.
+      expect(version(db)).toBe(10);
+
+      // Zweiter Start, diesmal ohne Abbruch: zieht v11 sauber nach, statt an
+      // „duplicate column name" zu scheitern.
+      await migrate(migrationsDb(db));
+      expect(version(db)).toBe(MIGRATIONS[MIGRATIONS.length - 1].version);
     } finally {
       db.close();
     }
