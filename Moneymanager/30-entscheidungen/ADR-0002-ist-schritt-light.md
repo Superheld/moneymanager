@@ -1,5 +1,7 @@
 # ADR-0002 — Ist-Schritt „light" über einen Ledger-Port
 
+> **SUPERSEDED (2026-07-19):** Durch das Redesign (10-strategie/DOMAENE.md) überholt — Doppik/summae sind bewusst nicht mehr Teil des Modells; "Buchung" ist ein Kontoumsatz, kein Buchungssatz. Bleibt als Entscheidungshistorie stehen.
+
 > **DDD-Ebene:** Entscheidung — ADR-Serie · **Status:** Akzeptiert · **Stand:** 2026-06-16 · **Bezüge:** KONZEPT §5, DOMAENENDESIGN, BUCHUNGSPACKAGE-ANFORDERUNGEN, SPEC-MVP §F/§G, BAUPLAN-MVP P3, ADR-0001
 
 > Status: **Akzeptiert** · 2026-06-16 · Entscheider: Bruce + Claude
