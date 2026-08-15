@@ -1,7 +1,7 @@
 // Use-Case „Budget anlegen". Eindeutigkeit „ein Budget je Kategorie + Periode" wird
 // hier per Repository geprüft (SPEC US-D1: bewusst nicht synchron erzwungen).
 
-import { FachlicherFehler, type Budget, type BudgetPeriode, type Cent } from "../core";
+import { FachlicherFehler, istCent,  type Budget, type BudgetPeriode, type Cent } from "../core";
 import type { BudgetRepository } from "./ports";
 
 export interface BudgetEingabe {
@@ -17,7 +17,7 @@ export async function budgetAnlegen(
   id?: string,
 ): Promise<Budget> {
   if (!eingabe.kategorieId) throw new FachlicherFehler("kategorie.waehlen");
-  if (!(eingabe.rahmen > 0)) throw new FachlicherFehler("rahmen.groesserNull");
+  if (!istCent(eingabe.rahmen) || eingabe.rahmen <= 0) throw new FachlicherFehler("rahmen.groesserNull");
 
   const bestehende = await repo.alle();
   if (bestehende.some((b) => b.id !== id && b.kategorieId === eingabe.kategorieId && b.periode === eingabe.periode)) {
