@@ -59,7 +59,11 @@ export function kontoRegister(
 
   let saldo = konto.saldo;
   const gebucht: RegisterZeile[] = eigeneIst.map((b) => {
-    saldo += b.betrag;
+    // Rückfalllinie gegen Float-Kontamination aus Altbeständen: der eigentliche
+    // Schutz sitzt an der Anwendungsgrenze (istCent). Bei sauberen Minor Units
+    // ist das Runden wirkungslos, bei kaputten hält es die Summe wenigstens
+    // in Cent statt in Binär-Gleitkomma abzudriften.
+    saldo = Math.round(saldo + b.betrag);
     const standardBez = b.gegenkontoId ? "Umbuchung" : b.planRef ? regelBez.get(b.planRef.quelleId) ?? "Zahlung" : "Buchung";
     return {
       art: "ist",

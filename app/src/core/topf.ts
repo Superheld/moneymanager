@@ -53,13 +53,23 @@ export function zielwert(topf: Topf): Cent | null {
   }
 }
 
-/** Monatliche Ansparrate (kalkulatorischer Zufluss). */
+/**
+ * Monatliche Ansparrate (kalkulatorischer Zufluss).
+ *
+ * Rückfalllinie gegen einen Zeitraum von 0: die Division ergäbe Infinity, und über
+ * `Infinity * 0` wird daraus in sollstand/topfStand NaN — ein Wert, der weder `>` noch
+ * `<` erfüllt, jede Warnlogik still auf false fallen lässt und in der UI als „NaN"
+ * erscheint. Der eigentliche Schutz sitzt an der Grenze (topfAnlegen prüft > 0); dies
+ * hier fängt Aggregate ab, die vor diesem Schutz in die DB gelangt sind.
+ */
 export function ansparrate(topf: Topf): Cent {
   switch (topf.typ) {
     case "ersatz":
-      return Math.round(topf.wiederbeschaffung / topf.nutzungsdauerMonate);
+      return topf.nutzungsdauerMonate > 0
+        ? Math.round(topf.wiederbeschaffung / topf.nutzungsdauerMonate)
+        : 0;
     case "puffer":
-      return Math.round(topf.schaetzbetrag / topf.fristMonate);
+      return topf.fristMonate > 0 ? Math.round(topf.schaetzbetrag / topf.fristMonate) : 0;
     case "spartopf":
       return topf.zufuehrungProMonat;
   }
