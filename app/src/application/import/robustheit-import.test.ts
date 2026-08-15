@@ -294,8 +294,8 @@ describe("rohHash — Schlüsselstärke", () => {
    *   dieselbe wie bei Fund 5: eine echte Buchung wird als Dublette verworfen.
    */
   it("kollidiert nicht durch verschobene Feldgrenzen", () => {
-    const a = { kontoIban: "K|2020-01-01|-5", buchungstag: "2026-01-05", betrag: -500, verwendungszweck: "kaffee" };
-    const b = { kontoIban: "K", buchungstag: "2020-01-01", betrag: -5, verwendungszweck: "2026-01-05|-500|kaffee" };
+    const a = { kontoIban: "K|2020-01-01|-5", buchungstag: "2026-01-05", betrag: -500, gegenpartei: "", verwendungszweck: "kaffee" };
+    const b = { kontoIban: "K", buchungstag: "2020-01-01", betrag: -5, gegenpartei: "", verwendungszweck: "2026-01-05|-500|kaffee" };
     expect(rohHash(a)).not.toBe(rohHash(b));
   });
 });
