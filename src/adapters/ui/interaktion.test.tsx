@@ -30,6 +30,12 @@ import {
   sqliteUmsatzRepository,
 } from "../persistence/sqliteImportRepositories";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
+import {
+  sqliteVertragserkennungRepository,
+  sqliteVertragszuordnungRepository,
+  vertragsAbgleichDeps,
+} from "../persistence/sqliteVertragZuordnungRepositories";
+import { erkennungSicherstellen, zuordnungenAbgleichen } from "../../application/vertragszuordnung";
 import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import {
@@ -710,22 +716,66 @@ describe("Vertrag aus einer Buchung", () => {
     expect(regel?.startdatum).toBe(heute);
   });
 
-  it("kennzeichnet eine Buchung, deren Empfänger schon als Vertrag erfasst ist", async () => {
+  /**
+   * Die ganze Kette in einem Test: Erkennungsregel → Abgleich → Kennzeichnung im Dialog.
+   * Der Anbietername im Vertrag ist bewusst anders geschrieben als im Umsatz — gematcht
+   * wird über den normalisierten Namen, sonst hinge die Zuordnung daran, wie die Bank
+   * den Empfänger schreibt.
+   */
+  it("kennzeichnet eine Buchung, die der Abgleich einem Vertrag zugeordnet hat", async () => {
     await zahlungAnlegen();
-    // Andere Schreibweise als im Umsatz — zugeordnet wird über den normalisierten
-    // Namen, sonst hinge die Kennzeichnung daran, wie die Bank den Empfänger schreibt.
     await sqliteVertragRepository.speichern({
       id: "v1", anbieter: "Telefonica Germany", beginn: "2025-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
+    await erkennungSicherstellen(sqliteVertragserkennungRepository, "v1", "Telefonica Germany", 2999);
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+
     const nutzer = userEvent.setup();
     rendere(<KontenScreen onNavigate={() => {}} />);
 
     await detailOeffnen(nutzer);
-    await screen.findByText("Telefonica Germany");
+    // Zweimal: als Kennzeichnung und als gewählter Eintrag in der Zuordnungs-Auswahl.
+    expect(await screen.findAllByText("Telefonica Germany")).not.toHaveLength(0);
     // Der Anlege-Weg ist weg — sonst legte man beim zweiten Blick denselben Vertrag
     // ein zweites Mal an.
     expect(screen.queryByRole("button", { name: /vertrag daraus machen/i })).toBeNull();
+  });
+
+  /**
+   * Der Rückweg, ohne den „automatisch" eine Zumutung wäre: die Automatik greift daneben,
+   * der Mensch überstimmt sie — und die Korrektur muss den nächsten Abgleich überleben.
+   * Geprüft wird an der gespeicherten Zuordnung, nicht an der Anzeige: nur dort steht,
+   * ob die Entscheidung wirklich festgehalten wurde.
+   */
+  it("lässt eine automatische Zuordnung von Hand aufheben — dauerhaft", async () => {
+    await zahlungAnlegen();
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Telefonica Germany", beginn: "2025-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await erkennungSicherstellen(sqliteVertragserkennungRepository, "v1", "Telefonica Germany", 2999);
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+    expect((await sqliteVertragszuordnungRepository.alle())[0].vertragId).toBe("v1");
+
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await detailOeffnen(nutzer);
+
+    const auswahl = await screen.findByRole("combobox", { name: /vertrag zuordnen/i });
+    await nutzer.selectOptions(auswahl, "__keiner");
+
+    await waitFor(async () => {
+      const z = (await sqliteVertragszuordnungRepository.alle())[0];
+      expect(z.vertragId).toBeNull();
+      expect(z.herkunft).toBe("manuell");
+    });
+
+    // Und der nächste Abgleich rechnet sie NICHT zurück.
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+    const danach = (await sqliteVertragszuordnungRepository.alle())[0];
+    expect(danach.vertragId).toBeNull();
+    expect(danach.herkunft).toBe("manuell");
   });
 
   it("bietet den Weg bei einem Umbuchungs-Bein nicht an", async () => {

@@ -461,9 +461,17 @@ const de = {
     zuVertrag: {
       aktion: "Vertrag daraus machen",
       untertitel: "Kommt diese Zahlung regelmäßig wieder? Dann gehört sie in die Planung.",
-      gehoertZu: "Vertrag erfasst",
+      gehoertZu: "Vertrag",
       gehoertZuHinweis:
-        "Der Empfänger ist als Vertrag angelegt — die Zahlung steht damit in der Planung. Zugeordnet über den Anbieternamen, nicht über eine feste Verknüpfung.",
+        "Diese Zahlung ist dem Vertrag zugeordnet und steht damit in der Planung. Die Zuordnung stammt aus der Erkennungsregel des Vertrags — sie wird bei jedem Abgleich neu gerechnet.",
+      keiner: "kein Vertrag",
+      offen: "— nicht festgelegt —",
+      waehlen: "Vertrag zuordnen",
+      automatisch: "automatisch erkannt",
+      vonHand: "von Hand",
+      vonHandHinweis:
+        "Diese Zuordnung hast du selbst gesetzt — sie bleibt, auch wenn die Erkennung etwas anderes rechnen würde. Zurücksetzen gibt die Entscheidung wieder an die Automatik.",
+      zuruecksetzen: "Automatik entscheiden lassen",
       hinweis: "Empfänger, Betrag, Kategorie und Konto stammen aus dieser Buchung. Den Rhythmus kennt sie nicht — der gehört geprüft.",
     },
     paarung: {
@@ -630,6 +638,8 @@ const de = {
     },
     spalteNaechste: "nächste Zahlung",
     spalteRuecklage: "zurücklegen/Mt",
+    spalteZugeordnet: "Zahlungen",
+    keineZuordnung: "keine erkannt",
     gruppeOhneRegel: "ohne hinterlegte Zahlung",
     gruppeMeta: "{{count}} Verträge · {{betrag}} pro Monat",
     gruppeMetaTurnus: "{{count}} Verträge · {{summe}} je Fälligkeit · {{proMonat}} pro Monat",
@@ -681,6 +691,28 @@ const de = {
     zusammenMindestlaufzeit: "Mindestlaufzeit {{monate}} Monate",
     zusammenKuendigungsfrist: "Frist {{monate}} Monate",
     zusammenKeineVerlaengerung: "keine Verlängerung",
+    regel: {
+      aktion: "Erkennung",
+      titel: "Woran wird dieser Vertrag erkannt?",
+      hinweis:
+        "Nach diesen Regeln ordnet die App gebuchte Zahlungen diesem Vertrag zu — auch die, die erst noch kommen. Was du hier änderst, wirkt sofort auf den ganzen Bestand. Von Hand gesetzte Zuordnungen bleiben davon unberührt.",
+      schluessel: "Erkennungsmerkmale",
+      schluesselHinweis:
+        "Ein Merkmal je Zeile: SEPA-Gläubiger-ID oder Anbietername in Kleinbuchstaben, ohne Rechtsform. Ein Treffer genügt.",
+      nameHinzufuegen: "„{{name}}“ als Merkmal aufnehmen",
+      betragVon: "Betrag ab",
+      betragBis: "Betrag bis",
+      gueltigAb: "erst ab",
+      gueltigBis: "nur bis",
+      zeitraumHinweis: "Leer = kein Stichtag. Nützlich, wenn ein Vorgänger denselben Namen trug.",
+      konto: "Konto",
+      alleKonten: "alle Konten",
+      treffer: "{{count}} Zahlungen",
+      trefferHinweis: "trifft die Regel im aktuellen Zustand — noch nicht gespeichert",
+      weitere: "… und {{count}} weitere",
+      turnusHinweis:
+        "Takt und Betrag der PLANUNG stehen nicht hier, sondern in den Vertragsdaten — hier geht es nur darum, welche Buchungen zu diesem Vertrag gezählt werden.",
+    },
     erkennung: {
       aktion: "woran erkannt?",
       titel: "Woran erkannt",
@@ -1155,9 +1187,17 @@ const en: typeof de = {
     zuVertrag: {
       aktion: "Turn into a contract",
       untertitel: "Does this payment come back regularly? Then it belongs in the plan.",
-      gehoertZu: "Contract on file",
+      gehoertZu: "Contract",
       gehoertZuHinweis:
-        "The payee is on file as a contract, so this payment is part of the plan. Matched by provider name, not by a stored link.",
+        "This payment is linked to the contract and therefore part of the plan. The link comes from the contract's matching rule and is recalculated on every sync.",
+      keiner: "no contract",
+      offen: "— not set —",
+      waehlen: "Assign contract",
+      automatisch: "matched automatically",
+      vonHand: "set by hand",
+      vonHandHinweis:
+        "You set this link yourself — it stays even if matching would compute something else. Resetting hands the decision back to automatic matching.",
+      zuruecksetzen: "Let matching decide",
       hinweis: "Payee, amount, category and account come from this transaction. Its cycle is unknown — check it.",
     },
     paarung: {
@@ -1324,6 +1364,8 @@ const en: typeof de = {
     },
     spalteNaechste: "next payment",
     spalteRuecklage: "set aside/mo",
+    spalteZugeordnet: "payments",
+    keineZuordnung: "none matched",
     gruppeOhneRegel: "no payment on file",
     gruppeMeta: "{{count}} contracts · {{betrag}} per month",
     gruppeMetaTurnus: "{{count}} contracts · {{summe}} per due date · {{proMonat}} per month",
@@ -1375,6 +1417,28 @@ const en: typeof de = {
     zusammenMindestlaufzeit: "minimum term {{monate}} months",
     zusammenKuendigungsfrist: "notice {{monate}} months",
     zusammenKeineVerlaengerung: "no renewal",
+    regel: {
+      aktion: "Matching",
+      titel: "How is this contract matched?",
+      hinweis:
+        "These rules decide which posted payments are linked to this contract — including future ones. Changes take effect immediately across the whole ledger. Links you set by hand are left alone.",
+      schluessel: "Matching keys",
+      schluesselHinweis:
+        "One key per line: SEPA creditor ID or provider name in lower case, without legal form. One match is enough.",
+      nameHinzufuegen: "Add \"{{name}}\" as a key",
+      betragVon: "Amount from",
+      betragBis: "Amount to",
+      gueltigAb: "only from",
+      gueltigBis: "only until",
+      zeitraumHinweis: "Empty = no cut-off. Useful when a predecessor used the same name.",
+      konto: "Account",
+      alleKonten: "all accounts",
+      treffer: "{{count}} payments",
+      trefferHinweis: "match the rule as it stands — not saved yet",
+      weitere: "… and {{count}} more",
+      turnusHinweis:
+        "The PLAN's cycle and amount are not set here but in the contract details — this is only about which transactions count towards this contract.",
+    },
     erkennung: {
       aktion: "why this?",
       titel: "How this was detected",
