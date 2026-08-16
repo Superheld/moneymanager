@@ -7,7 +7,7 @@
 // lassen, sondern still nichts finden — deshalb geht dieser Test durch die echte DB.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -75,6 +75,43 @@ async function konto() {
     id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 250000,
   });
 }
+
+/**
+ * Die Maske trennt Vertragsbeginn und erste Fälligkeit. Solange ein Feld beides war,
+ * verschob das Nachtragen des echten Vertragsbeginns (2015 statt „heute") sämtliche
+ * geplanten Zahlungen — bei einem Jahresvertrag um bis zu elf Monate.
+ */
+describe("VertraegeScreen — Beginn und Fälligkeit", () => {
+  it("lässt den Zahlungstakt stehen, wenn der Vertragsbeginn nachgetragen wird", async () => {
+    await konto();
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Sportverein", beginn: "2015-03-01",
+      verlaengerung: "automatisch", verlaengerungMonate: 12, status: "aktiv",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r1", bezeichnung: "Sportverein", betrag: -18000, rhythmus: "jaehrlich",
+      startdatum: "2026-04-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await nutzer.click(await screen.findByRole("button", { name: /bearbeiten/i }));
+
+    // Die erste Fälligkeit kommt aus der Regel, nicht aus dem Vertragsbeginn.
+    const faelligkeit = await screen.findByDisplayValue("2026-04-01");
+    const vertragsbeginn = screen.getByDisplayValue("2015-03-01");
+    fireEvent.change(vertragsbeginn, { target: { value: "2014-01-15" } });
+    expect((faelligkeit as HTMLInputElement).value).toBe("2026-04-01");
+
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      expect((await sqliteVertragRepository.alle())[0].beginn).toBe("2014-01-15");
+    });
+    expect((await sqliteZahlungsregelRepository.alle())[0].startdatum).toBe("2026-04-01");
+  });
+});
 
 describe("VertraegeScreen — Vorschläge", () => {
   it("zeigt ohne Buchungen keine Vorschlagskarte", async () => {
