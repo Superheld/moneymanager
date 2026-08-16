@@ -26,6 +26,10 @@ import { ToepfeScreen } from "./ToepfeScreen";
 import { VertraegeScreen } from "./VertraegeScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
+import {
+  sqliteImportLaufRepository,
+  sqliteUmsatzRepository,
+} from "../persistence/sqliteImportRepositories";
 import { sqliteTopfRepository } from "../persistence/sqliteTopfRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
@@ -441,6 +445,104 @@ describe("Umbuchung aus einer bestehenden Buchung", () => {
 
     await waitFor(async () => {
       expect(await sqliteLedgerRepository.alle()).toHaveLength(0);
+    });
+  });
+});
+
+// S-1c — die Detailansicht. Was die IstBuchung nicht trägt (Empfänger, Zweck), steht am
+// Umsatz und muss über den Join sichtbar werden; bei einer Umbuchung führt ein Klick ins
+// andere Bein.
+describe("Buchungsdetails", () => {
+  const heute = "2026-08-12";
+
+  async function zweiKonten() {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", inhaberIds: [], saldo: 0,
+    });
+  }
+
+  async function detailOeffnen(nutzer: ReturnType<typeof userEvent.setup>, kontoName: string) {
+    await nutzer.click(await screen.findByText(kontoName));
+    const bearbeiten = await screen.findAllByRole("button", { name: "bearbeiten" });
+    await nutzer.click(bearbeiten[0]);
+  }
+
+  it("zeigt Empfänger und Verwendungszweck aus dem verknüpften Umsatz", async () => {
+    await zweiKonten();
+    await sqliteImportLaufRepository.speichern({
+      id: "l1", quelle: "finanzguru", zeitpunkt: "2026-08-12T09:00:00.000Z",
+      dateiname: "umsaetze.csv", eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -949, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1",
+    });
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
+      waehrung: "EUR", gegenpartei: "[anonymisiert] Paschmann", verwendungszweck: "EDK*[anonymisiert] Muelheim",
+      rohHash: "hash-abc", nativeId: "fg-12345", status: "verbucht", istbuchungId: "i1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+
+    // Nach den DATEN suchen, die der Test angelegt hat — nicht nach Beschriftungen.
+    await waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("[anonymisiert] Paschmann");
+      expect(text).toContain("EDK*[anonymisiert] Muelheim");
+      expect(text).toContain("fg-12345");
+      expect(text).toContain("hash-abc");
+      expect(text).toContain("umsaetze.csv");
+    });
+  });
+
+  it("sagt es, wenn eine Buchung gar keinen Import-Kontext hat", async () => {
+    await zweiKonten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -500, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", notiz: "Bäcker",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+
+    await waitFor(() => expect(document.body.textContent).toMatch(/kein Import-Kontext/i));
+  });
+
+  it("springt per Klick auf die Gegenbuchung in deren Details", async () => {
+    await zweiKonten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -20000, kontoId: "k1",
+      charakter: "Umschichtung", quelle: "import", transferId: "t1", gegenkontoId: "k2",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: "2026-08-14", betrag: 20000, kontoId: "k2",
+      charakter: "Umschichtung", quelle: "manuell", transferId: "t1", gegenkontoId: "k1",
+      notiz: "Bargeld-Bein",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    /** Der Wert IM FORMULAR, nicht im Kopf: der kommt aus dem State der Komponente. */
+    const datumsfeld = () =>
+      (document.querySelector('input[type="date"]') as HTMLInputElement | null)?.value;
+
+    await detailOeffnen(nutzer, "Girokonto");
+    await waitFor(() => expect(datumsfeld()).toBe("2026-08-12"));
+
+    await nutzer.click(await screen.findByTitle(/Gegenbuchung/i));
+
+    // Jetzt trägt derselbe Dialog das Bargeld-Bein. Geprüft wird das FORMULAR, weil nur
+    // das den Fehler zeigt: useState-Initialwerte laufen einmal beim Mount, also bliebe
+    // ohne key={buchung.id} das alte Datum stehen, während der Kopf (aus props) längst
+    // die neue Buchung anzeigt.
+    await waitFor(() => {
+      expect(datumsfeld()).toBe("2026-08-14");
+      expect(document.body.textContent).toContain("Bargeld-Bein");
     });
   });
 });
