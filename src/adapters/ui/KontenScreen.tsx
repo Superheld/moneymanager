@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  istGeteilt,
   istSummeKonto,
   kontoRegister,
   minorZuMajor,
@@ -23,6 +24,7 @@ import {
 import { buchungBearbeiten, buchungErfassen, buchungLoeschen } from "../../application/buchungErfassen";
 import { zuruecksetzen, type ImportLauf, type Umsatz } from "../../application/import";
 import { umbuchungErfassen, umbuchungLoeschen } from "../../application/umbuchungErfassen";
+import { buchungSplitten, offenerRest, splitAufheben } from "../../application/buchungSplitten";
 import {
   buchungenPaaren,
   gegenbeinErzeugen,
@@ -87,6 +89,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
   const [umbuchenAus, setUmbuchenAus] = useState<IstBuchung | null>(null);
+  const [splitten, setSplitten] = useState<IstBuchung | null>(null);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [importLaeufe, setImportLaeufe] = useState<ImportLauf[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -397,6 +400,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           buchung={editBuchung}
           kategorien={kategorien}
           kontoName={kontoName}
+          kategorieName={kategorieName}
           umsatz={umsatzByIst.get(editBuchung.id)}
           importLauf={importLaufZuBuchung(editBuchung)}
           regel={editBuchung.planRef ? regeln.find((r) => r.id === editBuchung.planRef!.quelleId) : undefined}
@@ -407,6 +411,17 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           onZurUmbuchung={() => { setUmbuchenAus(editBuchung); setEditBuchung(null); }}
           onLoesen={async () => { await paarungLoesen(ledgerRepo, editBuchung.transferId!); setEditBuchung(null); await laden(); }}
           onGegenbuchung={setEditBuchung}
+          onSplitten={() => { setSplitten(editBuchung); setEditBuchung(null); }}
+          onSplitAufheben={async () => { await splitAufheben(ledgerRepo, editBuchung); setEditBuchung(null); await laden(); }}
+        />
+      )}
+
+      {splitten && (
+        <SplitModal
+          buchung={splitten}
+          kategorien={kategorien}
+          onClose={() => setSplitten(null)}
+          onSaved={async () => { setSplitten(null); await laden(); }}
         />
       )}
 
@@ -535,7 +550,7 @@ function Infozeile({ label, children, mono }: { label: string; children: ReactNo
  *    −500 kippen und die Netto-Null der Umbuchung brechen. Datum und Notiz sind
  *    unkritisch (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function EditBuchungModal({ buchung, kategorien, kontoName, umsatz, importLauf, regel, gegenbuchung, onClose, onSaved, onDelete, onZurUmbuchung, onLoesen, onGegenbuchung }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void }) {
+function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, onClose, onSaved, onDelete, onZurUmbuchung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const charakterLabel = useCharakterLabel();
@@ -546,6 +561,7 @@ function EditBuchungModal({ buchung, kategorien, kontoName, umsatz, importLauf, 
   const [notiz, setNotiz] = useState(buchung.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
   const gepaart = !!buchung.transferId;
+  const geteilt = istGeteilt(buchung);
 
   async function speichern() {
     setFehler(null);
@@ -660,6 +676,40 @@ function EditBuchungModal({ buchung, kategorien, kontoName, umsatz, importLauf, 
         )}
       </div>
 
+      {/* Aufteilung (S-7) — bei Umbuchungs-Beinen gar nicht erst anbieten. */}
+      {!gepaart && (
+        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+          {geteilt ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
+                <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>
+                  {t("konten.split.abschnitt")}
+                </span>
+                <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={onSplitten}>{t("konten.split.bearbeiten")}</button>
+                <button className="linkbtn" onClick={() => onSplitAufheben()}>{t("konten.split.aufheben")}</button>
+              </div>
+              {(buchung.aufteilungen ?? []).map((a, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", padding: "5px 0", borderBottom: "1px solid var(--line-soft)" }}>
+                  <span style={{ fontSize: 13, minWidth: 0 }}>
+                    {kategorieName.get(a.kategorieId) ?? "?"}
+                    {a.notiz && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{a.notiz}</span>}
+                  </span>
+                  <span className="num" style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
+                    {geld.formatMitSymbol(a.betrag, { mitVorzeichen: true })}
+                  </span>
+                </div>
+              ))}
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.split.aufhebenHinweis")}</div>
+            </>
+          ) : (
+            <>
+              <Button onClick={onSplitten}>{t("konten.split.aktion")}</Button>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.split.untertitel")}</div>
+            </>
+          )}
+        </div>
+      )}
+
       {/* Herkunft — alles, was bekannt ist, aber hier nicht geändert wird. */}
       <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
         <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
@@ -696,6 +746,121 @@ function EditBuchungModal({ buchung, kategorien, kontoName, umsatz, importLauf, 
             })}
           </Infozeile>
         )}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * S-7 — Buchung auf mehrere Kategorien aufteilen. Der Betrag der Buchung bleibt, was er
+ * ist; verteilt wird nur die Kategorie-Zuordnung. Der Dialog lässt sich nicht speichern,
+ * solange der Rest nicht null ist — die Invariante steht im Use-Case, hier wird sie nur
+ * früh genug sichtbar gemacht.
+ *
+ * Beträge werden POSITIV eingegeben; das Vorzeichen kommt von der Buchung.
+ */
+function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung: IstBuchung; kategorien: Kategorie[]; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
+
+  /** Vorbelegung: eine bestehende Aufteilung weiterbearbeiten, sonst zwei leere Zeilen. */
+  const [zeilen, setZeilen] = useState<{ kategorieId: string; betrag: string; notiz: string }[]>(() =>
+    buchung.aufteilungen?.length
+      ? buchung.aufteilungen.map((a) => ({
+          kategorieId: a.kategorieId,
+          betrag: String(minorZuMajor(Math.abs(a.betrag), geld.waehrung)),
+          notiz: a.notiz ?? "",
+        }))
+      : [
+          { kategorieId: buchung.kategorieId ?? "", betrag: String(minorZuMajor(Math.abs(buchung.betrag), geld.waehrung)), notiz: "" },
+          { kategorieId: "", betrag: "", notiz: "" },
+        ],
+  );
+  const [fehler, setFehler] = useState<string | null>(null);
+
+  const eingaben = zeilen.map((z) => ({ kategorieId: z.kategorieId, betrag: geld.parse(z.betrag) ?? 0, notiz: z.notiz }));
+  const rest = offenerRest(buchung, eingaben);
+  const verteilt = Math.abs(buchung.betrag) - rest;
+
+  function aendere(i: number, feld: "kategorieId" | "betrag" | "notiz", wert: string) {
+    setZeilen((zs) => zs.map((z, j) => (j === i ? { ...z, [feld]: wert } : z)));
+  }
+
+  /** Den offenen Rest in eine Zeile übernehmen — spart das Kopfrechnen bei drei Teilen. */
+  function restEinsetzen(i: number) {
+    const schon = geld.parse(zeilen[i].betrag) ?? 0;
+    setZeilen((zs) => zs.map((z, j) => (j === i ? { ...z, betrag: String(minorZuMajor(schon + rest, geld.waehrung)) } : z)));
+  }
+
+  async function speichern() {
+    setFehler(null);
+    try {
+      await buchungSplitten(ledgerRepo, buchung, eingaben);
+      onSaved();
+    } catch (e) {
+      setFehler(fehlerNachricht(t, e));
+    }
+  }
+
+  return (
+    <Modal
+      title={t("konten.split.titel")}
+      subtitle={t("konten.split.untertitel")}
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button>
+          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+          {fehler && <span className="err">{fehler}</span>}
+        </>
+      }
+    >
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
+        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.split.gesamt")}</span>
+        <span className="num" style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-black)", color: betragFarbe(buchung) }}>
+          {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
+        </span>
+      </div>
+
+      {zeilen.map((z, i) => (
+        <div key={i} style={{ display: "flex", gap: "var(--sp-2)", alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid var(--line-soft)", flexWrap: "wrap" }}>
+          <span style={{ flex: "2 1 180px", minWidth: 150 }}>
+            <CategoryPicker kategorien={kategorien} value={z.kategorieId} onChange={(v) => aendere(i, "kategorieId", v)} />
+          </span>
+          <input
+            className="field"
+            inputMode="decimal"
+            style={{ flex: "0 1 110px", minWidth: 90 }}
+            value={z.betrag}
+            onChange={(e) => aendere(i, "betrag", e.target.value)}
+            placeholder="0,00"
+            aria-label={`${t("konten.split.spalteBetrag")} ${i + 1}`}
+          />
+          {rest !== 0 && (
+            <button className="linkbtn" title={t("konten.split.restVerteilen")} onClick={() => restEinsetzen(i)} style={{ padding: "6px 4px" }}>+</button>
+          )}
+          {zeilen.length > 2 && (
+            <button className="linkbtn" onClick={() => setZeilen((zs) => zs.filter((_, j) => j !== i))}>
+              {t("konten.split.zeileEntfernen")}
+            </button>
+          )}
+        </div>
+      ))}
+
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginTop: "var(--sp-3)" }}>
+        <Button plus onClick={() => setZeilen((zs) => [...zs, { kategorieId: "", betrag: "", notiz: "" }])}>
+          {t("konten.split.zeileHinzufuegen")}
+        </Button>
+        <span style={{ fontSize: 13, fontWeight: "var(--fw-bold)", color: rest === 0 ? "var(--ok-deep)" : "var(--warn-deep)" }}>
+          {rest === 0
+            ? t("konten.split.restPasst")
+            : rest > 0
+              ? t("konten.split.restOffen", { betrag: geld.formatMitSymbol(rest) })
+              : t("konten.split.restZuviel", { betrag: geld.formatMitSymbol(-rest) })}
+        </span>
+      </div>
+      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+        {t("konten.split.hinweisPositiv")} · {t("konten.split.verteilt")}: {geld.formatMitSymbol(verteilt)}
       </div>
     </Modal>
   );
