@@ -16,11 +16,13 @@ import {
   type IstBuchung,
   type Kategorie,
   type Kontotyp,
+  type Bewertung,
   type Person,
   type Verwurfsgrund,
   type Zahlungskonto,
 } from "../../core";
 import { trainingsmaterial, type Ausschlussgrund, type Materialbefund } from "../../application/trainingsmaterial";
+import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../../application/klassifikatorTraining";
 import { kategorieAnlegen, kontoAnlegen, personAnlegen } from "../../application/stammdatenAnlegen";
 import { standardkategorienAnlegen } from "../../application/standardkategorien";
 import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStammdatenRepositories";
@@ -28,6 +30,7 @@ import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqlit
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
+import { sqliteKlassifikatorRepository as klassifikatorRepo } from "../persistence/sqliteKlassifikatorRepository";
 import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
@@ -78,14 +81,48 @@ export function EinstellungenScreen() {
  */
 function LernmaterialCard({ kategorien }: { kategorien: Kategorie[] }) {
   const { t } = useTranslation();
+  const { locale } = useGeld();
   const [befund, setBefund] = useState<Materialbefund | null>(null);
+  const [zustand, setZustand] = useState<Modellzustand | null>(null);
+  const [bewertung, setBewertung] = useState<Bewertung | null>(null);
+  const [laeuft, setLaeuft] = useState(false);
+  const [fehler, setFehler] = useState<string | null>(null);
 
+  const trainingsDeps = { ledger: ledgerRepo, umsatzRepo, klassifikatorRepo };
+
+  // Material und Modellzustand zusammen laden und zusammen setzen: gestaffelte
+  // setState-Aufrufe ließen die Karte kurz gegen einen leeren Befund rechnen.
+  async function laden() {
+    const [m, z] = await Promise.all([
+      trainingsmaterial(ledgerRepo, umsatzRepo),
+      modellzustand(trainingsDeps),
+    ]);
+    setBefund(m);
+    setZustand(z);
+  }
   useEffect(() => {
-    trainingsmaterial(ledgerRepo, umsatzRepo).then(setBefund).catch(() => setBefund(null));
+    laden().catch(() => setBefund(null));
   }, []);
 
+  async function trainingStarten() {
+    // Der Knopf kennt kein `disabled` — den Doppelklick fängt der Ablauf selbst ab.
+    if (laeuft) return;
+    setLaeuft(true);
+    setFehler(null);
+    try {
+      const r = await klassifikatorTrainieren({ ...trainingsDeps, jetzt: () => new Date().toISOString() });
+      setBewertung(r.bewertung ?? null);
+      await laden();
+    } catch (e) {
+      setFehler(fehlerNachricht(t, e));
+    } finally {
+      setLaeuft(false);
+    }
+  }
+
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
-  const zahl = (n: number) => n.toLocaleString();
+  const zahl = (n: number) => n.toLocaleString(locale);
+  const prozent = (x: number) => `${(x * 100).toLocaleString(locale, { maximumFractionDigits: 1 })} %`;
 
   if (!befund) return null;
 
@@ -97,13 +134,103 @@ function LernmaterialCard({ kategorien }: { kategorien: Kategorie[] }) {
     .filter(([, n]) => n > 0)
     .sort((a, b) => b[1] - a[1]);
 
+  const stand = zustand?.stand ?? null;
+  const schwach = (bewertung?.jeKategorie ?? [])
+    .filter((k) => k.richtig < k.gesamt)
+    .slice(0, 10)
+    .map((k) => ({ ...k }));
+
   return (
-    <Card title={t("einstellungen.lernmaterial.titel")} subtitle={t("einstellungen.lernmaterial.untertitel")}>
+    <Card
+      title={t("einstellungen.lernmaterial.titel")}
+      subtitle={t("einstellungen.lernmaterial.untertitel")}
+      action={
+        befund.beispiele.length > 0 ? (
+          <Button variant="primary" onClick={trainingStarten}>
+            {laeuft ? t("einstellungen.lernmaterial.trainiertGerade") : t("einstellungen.lernmaterial.trainieren")}
+          </Button>
+        ) : undefined
+      }
+    >
       {befund.gesamt === 0 ? (
         <div className="muted">{t("einstellungen.lernmaterial.leer")}</div>
       ) : (
         <>
-          <div style={{ display: "flex", gap: "var(--sp-6)", flexWrap: "wrap", marginBottom: "var(--sp-5)" }}>
+          {fehler && <div className="err" style={{ marginBottom: "var(--sp-4)" }}>{fehler}</div>}
+
+          <Abschnitt titel={t("einstellungen.lernmaterial.modellTitel")}>
+            {!stand ? (
+              <div className="muted">{t("einstellungen.lernmaterial.nieTrainiert")}</div>
+            ) : (
+              <>
+                <KPIStat
+                  size="tile"
+                  label={t("einstellungen.lernmaterial.genauigkeit")}
+                  value={
+                    stand.genauigkeit === undefined
+                      ? t("einstellungen.lernmaterial.genauigkeitUnbekannt")
+                      : prozent(stand.genauigkeit)
+                  }
+                  meta={
+                    stand.genauigkeit === undefined
+                      ? t("einstellungen.lernmaterial.genauigkeitUnbekanntMeta")
+                      : bewertung
+                        ? t("einstellungen.lernmaterial.genauigkeitMeta", { gesamt: zahl(bewertung.gesamt) })
+                        : undefined
+                  }
+                  tone={stand.genauigkeit !== undefined && stand.genauigkeit >= 0.85 ? "ok" : "default"}
+                />
+                <div className="muted" style={{ marginTop: "var(--sp-3)" }}>
+                  {t("einstellungen.lernmaterial.trainiertAm", {
+                    datum: new Date(stand.trainiertAm).toLocaleString(locale),
+                    beispiele: zahl(stand.modell.beispiele),
+                  })}
+                  {zustand!.zuwachs !== 0 && (
+                    <>
+                      {" "}
+                      {zustandsText(t, zustand!.zuwachs, zahl)}
+                      {zustand!.veraltet && ` ${t("einstellungen.lernmaterial.veraltet")}`}
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </Abschnitt>
+
+          {/* Nur Kategorien, die tatsächlich Fehler hatten. Ohne den Filter stünden
+              unter „wo die Erkennung sich schwertut" zehn fehlerfreie Kategorien —
+              die Überschrift behauptete dann etwas, was die Zahlen widerlegen. */}
+          {schwach.length > 0 && (
+            <Abschnitt titel={t("einstellungen.lernmaterial.schwachTitel")}>
+              <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+                {t("einstellungen.lernmaterial.schwachHinweis")}
+              </div>
+              <DataTable
+                columns={[
+                  {
+                    key: "kategorieId",
+                    label: t("einstellungen.lernmaterial.spalteKategorie"),
+                    render: (r) => kategorieName.get(r.kategorieId) ?? r.kategorieId,
+                  },
+                  {
+                    key: "quote",
+                    label: t("einstellungen.lernmaterial.spalteTrefferquote"),
+                    align: "right",
+                    render: (r) => prozent(r.richtig / r.gesamt),
+                  },
+                  {
+                    key: "gesamt",
+                    label: t("einstellungen.lernmaterial.spaltePruefungen"),
+                    align: "right",
+                    render: (r) => zahl(r.gesamt),
+                  },
+                ]}
+                rows={schwach}
+              />
+            </Abschnitt>
+          )}
+
+          <div style={{ display: "flex", gap: "var(--sp-6)", flexWrap: "wrap", margin: "var(--sp-5) 0" }}>
             <KPIStat
               size="tile"
               label={t("einstellungen.lernmaterial.brauchbar")}
@@ -224,6 +351,22 @@ function LernmaterialCard({ kategorien }: { kategorien: Kategorie[] }) {
 }
 
 const ZEILE: CSSProperties = { display: "flex", gap: "var(--sp-3)", alignItems: "baseline" };
+
+/**
+ * „Seitdem sind n Beispiele dazugekommen/weggefallen." Singular und Plural als eigene
+ * Schlüssel statt über die Plural-Mechanik von i18next: die legt den Basis-Schlüssel
+ * nicht an, und der Vollständigkeits-Test über alle verwendeten Schlüssel würde ihn
+ * dauerhaft als fehlend melden.
+ */
+function zustandsText(
+  t: (key: string, options?: Record<string, unknown>) => string,
+  zuwachs: number,
+  zahl: (n: number) => string,
+): string {
+  const n = Math.abs(zuwachs);
+  const stamm = `einstellungen.lernmaterial.${zuwachs > 0 ? "zuwachs" : "schwund"}`;
+  return n === 1 ? t(`${stamm}Eins`) : t(`${stamm}Viele`, { anzahl: zahl(n) });
+}
 
 /** Überschrift plus Inhalt — hält die Lernmaterial-Karte ohne eigene CSS-Klassen lesbar. */
 function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) {
