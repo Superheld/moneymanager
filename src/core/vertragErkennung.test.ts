@@ -37,6 +37,11 @@ function reihe(opts: {
   return spuren;
 }
 
+/** Dieselbe Reihe als Zufluss: positiver Betrag, Charakter Ertrag. */
+function zufluesse(opts: Parameters<typeof reihe>[0]): Zahlungsspur[] {
+  return reihe(opts).map((s) => ({ ...s, betrag: -s.betrag, charakter: "Ertrag" as const }));
+}
+
 describe("anbieterSchluessel", () => {
   it("fasst dieselbe Firma trotz Rechtsform und Schreibweise zusammen", () => {
     expect(anbieterSchluessel("[anonymisiert] GmbH")).toBe(anbieterSchluessel("netcup"));
@@ -107,11 +112,58 @@ describe("vertragskandidaten", () => {
     expect(vertragskandidaten(spuren, HEUTE)).toHaveLength(0);
   });
 
-  it("ignoriert Zuflüsse — ein Gehalt ist kein kündbarer Vertrag", () => {
-    const spuren = reihe({ name: "Arbeitgeber", betrag: 250000, n: 12, tage: 30 }).map((s) => ({
-      ...s, betrag: -s.betrag, charakter: "Ertrag" as const,
+  /**
+   * Einnahmen sind der zweite Regelfall: kündbar ist ein Gehalt nicht, aber es ist der
+   * größte Posten der Planung — von Hand abtippen wäre die teuerste Stelle.
+   */
+  it("erkennt eine regelmäßige Einnahme als Kandidat mit Charakter Ertrag", () => {
+    const k = vertragskandidaten(zufluesse({ name: "Arbeitgeber", betrag: 250000, n: 12, tage: 30 }), HEUTE);
+    expect(k).toHaveLength(1);
+    expect(k[0].charakter).toBe("Ertrag");
+    expect(k[0].betrag).toBe(250000);
+    expect(k[0].rhythmus).toBe("monatlich");
+  });
+
+  /**
+   * Derselbe Name in beiden Richtungen (Arbeitgeber, der auch Rechnungen stellt) darf
+   * nicht in EINER Gruppe landen: die Abstände beider Reihen vermischt ergäben einen
+   * Rhythmus, den es nie gab, und einen Betrag zwischen Gehalt und Rechnung.
+   */
+  it("trennt Ein- und Ausgaben desselben Anbieters", () => {
+    const k = vertragskandidaten(
+      [
+        ...zufluesse({ name: "Arbeitgeber", betrag: 250000, n: 12, tage: 30 }),
+        ...reihe({ name: "Arbeitgeber", betrag: 4500, n: 12, tage: 30 }),
+      ],
+      HEUTE,
+    );
+    expect(k).toHaveLength(2);
+    expect(k.map((x) => x.charakter).sort()).toEqual(["Aufwand", "Ertrag"]);
+    expect(new Set(k.map((x) => x.schluessel)).size).toBe(2);
+    expect(k.find((x) => x.charakter === "Ertrag")!.betrag).toBe(250000);
+    expect(k.find((x) => x.charakter === "Aufwand")!.betrag).toBe(4500);
+  });
+
+  /** Eine Rückerstattung auf einer Aufwandskategorie ist ein Zufluss, keine Ausgabe. */
+  it("nimmt Zuflüsse mit Aufwands-Charakter nicht in die Ausgabenreihe", () => {
+    const spuren = reihe({ name: "Versicherung", betrag: 3000, n: 12, tage: 30 }).map((s, i) =>
+      i % 2 === 0 ? { ...s, betrag: -s.betrag } : s,
+    );
+    const k = vertragskandidaten(spuren, HEUTE, { auchBeendete: true });
+    // Nur die sechs echten Abflüsse bleiben — und die liegen 60 Tage auseinander,
+    // passen also zu keinem Rhythmus mehr.
+    expect(k).toHaveLength(0);
+  });
+
+  it("merkt sich Konto und Kategorie der Zahlungen für die Vorbelegung", () => {
+    const spuren = reihe({ name: "[anonymisiert]", betrag: 1650, n: 12, tage: 30 }).map((s, i) => ({
+      ...s,
+      kontoId: i === 0 ? "giro-zweit" : "giro", // ein Ausreißer kippt die Vorbelegung nicht
+      kategorieId: "kat-it",
     }));
-    expect(vertragskandidaten(spuren, HEUTE)).toHaveLength(0);
+    const k = vertragskandidaten(spuren, HEUTE);
+    expect(k[0].kontoId).toBe("giro");
+    expect(k[0].kategorieId).toBe("kat-it");
   });
 
   it("gruppiert über die Gläubiger-ID, auch wenn der Name im Auszug wechselt", () => {
