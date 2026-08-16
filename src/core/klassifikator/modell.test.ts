@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aufteilen, bewerten, klassifizieren, trainieren, type Beispiel } from "./modell";
+import { aufteilen, bewerten, klassifizieren, trainieren, verwechslungsmatrix, type Beispiel } from "./modell";
 
 /** Ein kleines, klar trennbares Problem — die Aussagen sollen am Verhalten hängen. */
 function daten(): Beispiel[] {
@@ -161,5 +161,111 @@ describe("Aufteilen", () => {
     ];
     const { pruefung } = aufteilen(sortiert, 0.2);
     expect(new Set(pruefung.map((p) => p.kategorieId)).size).toBe(2);
+  });
+});
+
+describe("Verwechslungen", () => {
+  /** Ein Modell, das „b" nie gesehen hat und Beispiele davon zwangsläufig verwechselt. */
+  function schiefesModell() {
+    return trainieren([
+      { merkmale: ["x"], kategorieId: "a" },
+      { merkmale: ["y"], kategorieId: "c" },
+    ]);
+  }
+
+  it("nennt, was wofür gehalten wurde", () => {
+    const m = schiefesModell();
+    const b = bewerten(m, [{ merkmale: ["x"], kategorieId: "b" }]);
+    expect(b.verwechslungen).toEqual([{ tatsaechlich: "b", vorhergesagt: "a", anzahl: 1 }]);
+  });
+
+  it("zählt gleiche Paare zusammen und sortiert absteigend", () => {
+    const m = schiefesModell();
+    const b = bewerten(m, [
+      { merkmale: ["x"], kategorieId: "b" },
+      { merkmale: ["x"], kategorieId: "b" },
+      { merkmale: ["y"], kategorieId: "d" },
+    ]);
+    expect(b.verwechslungen[0]).toEqual({ tatsaechlich: "b", vorhergesagt: "a", anzahl: 2 });
+    expect(b.verwechslungen[1]).toEqual({ tatsaechlich: "d", vorhergesagt: "c", anzahl: 1 });
+  });
+
+  it("führt richtige Zuordnungen NICHT als Verwechslung", () => {
+    const m = trainieren(daten());
+    expect(bewerten(m, daten()).verwechslungen).toEqual([]);
+  });
+
+  it("ein leeres Modell erzeugt keine Verwechslungen, aber zählt den Fehlschlag", () => {
+    // Ohne Vorhersage gibt es keine Zelle, in die man sie eintragen könnte.
+    const b = bewerten(trainieren([]), [{ merkmale: ["x"], kategorieId: "a" }]);
+    expect(b.verwechslungen).toEqual([]);
+    expect(b.genauigkeit).toBe(0);
+    expect(b.jeKategorie[0]).toEqual({ kategorieId: "a", richtig: 0, gesamt: 1 });
+  });
+});
+
+describe("Verwechslungsmatrix", () => {
+  it("nimmt nur Kategorien auf, die an einem Fehler beteiligt sind", () => {
+    const m = trainieren([
+      { merkmale: ["x"], kategorieId: "a" },
+      { merkmale: ["y"], kategorieId: "c" },
+    ]);
+    // „c" wird richtig erkannt und ist an keinem Fehler beteiligt; „b" und „a" schon.
+    const b = bewerten(m, [
+      { merkmale: ["x"], kategorieId: "b" },
+      { merkmale: ["y"], kategorieId: "c" },
+    ]);
+    expect(verwechslungsmatrix(b).kategorien).toEqual(["a", "b"]);
+  });
+
+  it("trägt Diagonale und Fehlerzellen in dieselbe Zeile", () => {
+    const m = trainieren([
+      { merkmale: ["x"], kategorieId: "a" },
+      { merkmale: ["y"], kategorieId: "b" },
+    ]);
+    const b = bewerten(m, [
+      { merkmale: ["x"], kategorieId: "a" }, // richtig → Diagonale
+      { merkmale: ["y"], kategorieId: "a" }, // falsch → a wurde als b gelesen
+    ]);
+    const zeile = verwechslungsmatrix(b).zeilen.find((z) => z.kategorieId === "a")!;
+    expect(zeile.gesamt).toBe(2);
+    expect(zeile.richtig).toBe(1);
+    expect(zeile.zellen.get("a")).toBe(1);
+    expect(zeile.zellen.get("b")).toBe(1);
+  });
+
+  it("eine Kategorie, die nur als falsche Vorhersage auftaucht, hat eine leere Zeile", () => {
+    // Sie kam in der Prüfmenge nie vor — sie hat keine Zeilensumme, steht aber als
+    // Spalte da, sonst fehlte das Ziel der Verwechslung.
+    const m = trainieren([{ merkmale: ["x"], kategorieId: "a" }]);
+    const b = bewerten(m, [{ merkmale: ["x"], kategorieId: "b" }]);
+    const zeile = verwechslungsmatrix(b).zeilen.find((z) => z.kategorieId === "a")!;
+    expect(zeile.gesamt).toBe(0);
+    expect(zeile.zellen.size).toBe(0);
+  });
+
+  it("bleibt bei fehlerfreier Erkennung leer", () => {
+    const b = bewerten(trainieren(daten()), daten());
+    expect(verwechslungsmatrix(b).kategorien).toEqual([]);
+    expect(verwechslungsmatrix(b).zeilen).toEqual([]);
+  });
+
+  it("Zeilensumme stimmt mit der Bewertung überein", () => {
+    // Die Matrix darf keine Zahlen erfinden: was in einer Zeile steht, muss zusammen
+    // die Beispielzahl dieser Kategorie ergeben.
+    const m = trainieren([
+      { merkmale: ["x"], kategorieId: "a" },
+      { merkmale: ["y"], kategorieId: "b" },
+    ]);
+    const b = bewerten(m, [
+      { merkmale: ["x"], kategorieId: "a" },
+      { merkmale: ["y"], kategorieId: "a" },
+      { merkmale: ["x"], kategorieId: "b" },
+    ]);
+    for (const z of verwechslungsmatrix(b).zeilen) {
+      if (z.gesamt === 0) continue;
+      const summe = [...z.zellen.values()].reduce((s, n) => s + n, 0);
+      expect(summe).toBe(z.gesamt);
+    }
   });
 });
