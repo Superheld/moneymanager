@@ -217,6 +217,29 @@ describe("VertraegeScreen — Vorschläge", () => {
     expect(screen.queryByText("Edeka")).not.toBeInTheDocument();
   });
 
+  /**
+   * „Woran erkannt?" — die Begründung hinter dem Vorschlag. Geprüft wird, dass die
+   * angezeigten Belege aus dem Befund kommen und nicht aus einem festen Text: der Takt
+   * und die Zahl der Termine müssen zu den Buchungen passen, die der Test angelegt hat.
+   */
+  it("legt die Erkennungsregeln zu einem Vorschlag offen", async () => {
+    await konto();
+    await monatsreihe("a", "Netcup GmbH", 1650);
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Netcup GmbH");
+
+    await nutzer.click(screen.getByRole("button", { name: /woran erkannt/i }));
+
+    // Der Schlüssel: ohne Gläubiger-ID gruppiert der normalisierte Name — die
+    // Rechtsform „GmbH" fällt dabei weg.
+    await waitFor(() => expect(document.body.textContent).toMatch(/netcup/));
+    expect(document.body.textContent).not.toMatch(/netcup gmbh/);
+    // Der gemessene Takt und das Fenster, gegen das er geprüft wurde.
+    expect(document.body.textContent).toMatch(/30 Tage/);
+    expect(document.body.textContent).toMatch(/25 bis 38 Tagen/);
+  });
+
   it("füllt beim Übernehmen die Anlege-Maske vor und legt den Vertrag an", async () => {
     await konto();
     await monatsreihe("a", "Netcup GmbH", 1650);

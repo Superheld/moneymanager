@@ -45,6 +45,39 @@ export interface Zahlungsspur {
   readonly charakter: "Aufwand" | "Ertrag" | "Umschichtung";
 }
 
+/**
+ * Was die Erkennung an EINER Gruppe gemessen hat — die Belege hinter dem Vorschlag.
+ *
+ * Warum das mitläuft: ein Vorschlag ohne Begründung ist entweder blind zu glauben oder
+ * blind zu verwerfen. Wer sieht, dass 68 Zahlungen im 30-Tage-Takt an dieselbe
+ * Gläubiger-ID gingen, entscheidet anders als bei drei Zahlungen mit schwankendem
+ * Abstand. Gemessene Werte UND die Schwelle, gegen die sie geprüft wurden — der Wert
+ * allein sagt nicht, ob er knapp war.
+ */
+export interface Erkennungsbefund {
+  /** Woran gruppiert wurde: die Gläubiger-ID (präzise) oder der normalisierte Name. */
+  readonly schluesselArt: "glaeubigerId" | "name";
+  /** Der Wert, der die Gruppe zusammenhält (ID bzw. normalisierter Name). */
+  readonly schluesselWert: string;
+  /** Zahl der TERMINE (Zahlungen am selben Tag zählen als einer) und die Mindestzahl. */
+  readonly termine: number;
+  readonly minTermine: number;
+  /** Median-Abstand zwischen den Terminen, in Tagen, und das Fenster des Rhythmus. */
+  readonly medianAbstandTage: number;
+  readonly rhythmusFenster: readonly [number, number];
+  /** Wie viele Abstände nah am Median lagen (von wie vielen) und der geforderte Anteil. */
+  readonly abstaendeNah: number;
+  readonly abstaendeGesamt: number;
+  readonly minAnteilNah: number;
+  /** Toleranz, innerhalb derer ein Betrag als „derselbe" gilt, und wie viele es waren. */
+  readonly betragsToleranz: Cent;
+  readonly betraegeNah: number;
+  readonly betraegeGesamt: number;
+  /** Tage seit der letzten Zahlung und die Grenze, ab der der Vertrag als beendet gilt. */
+  readonly letzteVorTagen: number;
+  readonly beendetAbTagen: number;
+}
+
 export interface Vertragskandidat {
   /**
    * Gruppierungsschlüssel (Gläubiger-ID oder normalisierter Name) — stabil über Läufe,
@@ -82,6 +115,8 @@ export interface Vertragskandidat {
   /** Konto, über das die Gruppe überwiegend lief — Vorbelegung der Maske. */
   readonly kontoId?: string;
   readonly buchungIds: readonly string[];
+  /** Womit dieser Kandidat durch die Prüfungen kam — für die Anzeige „woran erkannt?". */
+  readonly befund: Erkennungsbefund;
 }
 
 export interface ErkennungsOptionen {
@@ -130,12 +165,27 @@ function median(werte: number[]): number {
   return sortiert[Math.floor((sortiert.length - 1) / 2)];
 }
 
+/**
+ * Tagesfenster je Rhythmus: in dieser Spanne muss der Median-Abstand liegen, damit die
+ * Gruppe als dieser Takt durchgeht. Bewusst weit — Abbuchungen wandern über Wochenenden
+ * und Monatslängen, ein starres „30 Tage" fände nichts.
+ */
+export const RHYTHMUS_FENSTER: Record<Rhythmus, readonly [number, number]> = {
+  monatlich: [25, 38],
+  quartalsweise: [80, 105],
+  halbjaehrlich: [160, 200],
+  jaehrlich: [330, 400],
+};
+
+/** Anteil der Abstände, der nah am Median liegen muss, damit es ein Takt ist. */
+export const MIN_ANTEIL_NAH = 0.6;
+
 /** Tagesabstand → Rhythmus, oder null, wenn er zu keinem passt. */
 function rhythmusAus(tage: number): Rhythmus | null {
-  if (tage >= 25 && tage <= 38) return "monatlich";
-  if (tage >= 80 && tage <= 105) return "quartalsweise";
-  if (tage >= 160 && tage <= 200) return "halbjaehrlich";
-  if (tage >= 330 && tage <= 400) return "jaehrlich";
+  for (const r of Object.keys(RHYTHMUS_FENSTER) as Rhythmus[]) {
+    const [von, bis] = RHYTHMUS_FENSTER[r];
+    if (tage >= von && tage <= bis) return r;
+  }
   return null;
 }
 
@@ -224,7 +274,7 @@ function auswerten(
   const nahAmMedian = abstaende.filter(
     (a) => Math.abs(a - medianAbstand) <= medianAbstand * opt.maxAbstandsAbweichung,
   ).length;
-  if (nahAmMedian / abstaende.length < 0.6) return null;
+  if (nahAmMedian / abstaende.length < MIN_ANTEIL_NAH) return null;
 
   const betraege = sortiert.map((s) => Math.abs(s.betrag));
   const medianBetrag = median(betraege);
@@ -241,7 +291,15 @@ function auswerten(
   // keinen Tageszähler — „ord(heute) − 70" ergäbe ein Datum, das es nicht gibt, und
   // damit ein zufälliges Ergebnis. Auf echten Daten fielen dadurch laufende Verträge
   // (Targobank, letzte Zahlung vor einem Monat) in die Rubrik „beendet".
-  const laeuft = tageBis(letzte, heute) <= medianAbstand * 2 + 10;
+  // Woran die Gruppe hängt: das „+" markiert nur die Richtung (Einnahmen) und gehört
+  // nicht zum Wert. Trägt eine Spur genau diesen Wert als Gläubiger-ID, hat die ID
+  // gruppiert — sonst war es der normalisierte Name.
+  const basisWert = schluessel.replace(/^\+/, "");
+  const schluesselArt = sortiert.some((s) => s.glaeubigerId?.trim() === basisWert) ? "glaeubigerId" : "name";
+
+  const beendetAbTagen = medianAbstand * 2 + 10;
+  const letzteVorTagen = tageBis(letzte, heute);
+  const laeuft = letzteVorTagen <= beendetAbTagen;
 
   return {
     schluessel,
@@ -259,6 +317,22 @@ function auswerten(
     kategorieId: haeufigster(sortiert, (s) => s.kategorieId),
     kontoId: haeufigster(sortiert, (s) => s.kontoId),
     buchungIds: sortiert.map((s) => s.id),
+    befund: {
+      schluesselArt,
+      schluesselWert: basisWert,
+      termine: termine.length,
+      minTermine: opt.minZahlungen,
+      medianAbstandTage: medianAbstand,
+      rhythmusFenster: RHYTHMUS_FENSTER[rhythmus],
+      abstaendeNah: nahAmMedian,
+      abstaendeGesamt: abstaende.length,
+      minAnteilNah: MIN_ANTEIL_NAH,
+      betragsToleranz: toleranz,
+      betraegeNah: stabil,
+      betraegeGesamt: betraege.length,
+      letzteVorTagen,
+      beendetAbTagen,
+    },
   };
 }
 
