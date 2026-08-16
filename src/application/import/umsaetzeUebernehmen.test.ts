@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Kategorie, Zahlungskonto } from "../../core";
+import { trainieren, type Kategorie, type Zahlungskonto } from "../../core";
 import type {
   ImportLaufRepository,
   KategorieRepository,
@@ -10,6 +10,8 @@ import type { ImportLauf } from "./importLauf";
 import type { RohUmsatz } from "./rohUmsatz";
 import type { Umsatz } from "./umsatz";
 import { umsaetzeUebernehmen, type UebernahmeDeps } from "./umsaetzeUebernehmen";
+import { quelleKeyFuer } from "./kontoMatch";
+import type { Vorschlagskontext } from "./vorschlag";
 
 function roh(over: Partial<RohUmsatz>): RohUmsatz {
   return {
@@ -113,5 +115,64 @@ describe("umsaetzeUebernehmen", () => {
     );
     expect(r).toMatchObject({ neu: 0, ohneKonto: 1 });
     expect(umsaetze).toHaveLength(0);
+  });
+});
+
+describe("Kategorisierungs-Kette beim Import", () => {
+  /** Ein Modell, das REWE kennt — ohne dass die Datei eine Kategorie mitliefert. */
+  function mitModell(): Vorschlagskontext {
+    return {
+      katalogNachName: new Map(),
+      kategorieNachId: new Map([["k-le", { id: "k-le", name: "Lebensmittel", defaultCharakter: "Aufwand" as const }]]),
+      modell: trainieren([
+        { merkmale: ["emp=rewe markt", "vwz:einkauf", "vz:-"], kategorieId: "k-le" },
+        { merkmale: ["emp=shell station", "vwz:tanken", "vz:-"], kategorieId: "k-sprit" },
+      ]),
+    };
+  }
+
+  it("kategorisiert eine Zeile OHNE mitgelieferte Kategorie", async () => {
+    // Der Fall, für den die Kette gebaut wurde: ein Bankimport liefert keinen Hinweis.
+    const { deps, umsaetze } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "bank", zeitpunkt: "2026-08-17T10:00:00.000Z",
+        rohUmsaetze: [roh({ gegenpartei: "REWE Markt", verwendungszweck: "Einkauf", kontoIban: "DE1" })],
+        konten: [{ quelleKey: quelleKeyFuer("DE1"), neu: { bezeichnung: "Giro", typ: "Giro" } }],
+      },
+      { ...deps, kategorisierung: mitModell() },
+    );
+
+    expect(umsaetze[0].vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "ki" });
+  });
+
+  it("ohne Kontext bleibt es beim alten Verhalten", async () => {
+    const { deps, umsaetze } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "bank", zeitpunkt: "2026-08-17T10:00:00.000Z",
+        rohUmsaetze: [roh({ gegenpartei: "REWE Markt", kategorieHinweis: "Lebensmittel", kontoIban: "DE1" })],
+        konten: [{ quelleKey: quelleKeyFuer("DE1"), neu: { bezeichnung: "Giro", typ: "Giro" } }],
+      },
+      deps,
+    );
+
+    expect(umsaetze[0].vorschlag?.quelle).toBe("remapping");
+  });
+
+  it("der Katalog kommt IMMER frisch aus dem Repository", async () => {
+    // Ein mitgereichter Kontext könnte einen älteren Kategorie-Stand tragen; das
+    // Remapping muss trotzdem gegen den aktuellen Katalog auflösen.
+    const { deps, umsaetze } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "bank", zeitpunkt: "2026-08-17T10:00:00.000Z",
+        rohUmsaetze: [roh({ gegenpartei: "Irgendwer", kategorieHinweis: "Lebensmittel", kontoIban: "DE1" })],
+        konten: [{ quelleKey: quelleKeyFuer("DE1"), neu: { bezeichnung: "Giro", typ: "Giro" } }],
+      },
+      { ...deps, kategorisierung: { katalogNachName: new Map(), kategorieNachId: new Map() } },
+    );
+
+    expect(umsaetze[0].vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "remapping" });
   });
 });

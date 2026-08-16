@@ -28,6 +28,8 @@ import { ImportScreen } from "./ImportScreen";
 import { InventarScreen } from "./InventarScreen";
 import { KontenScreen } from "./KontenScreen";
 import { ReviewScreen } from "./ReviewScreen";
+import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
+import { trainieren } from "../../core";
 import { VertraegeScreen } from "./VertraegeScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
@@ -275,6 +277,46 @@ describe("ReviewScreen", () => {
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Buchhandlung Beispiel|Fachbuch|25,99/),
     );
+  });
+
+  it("zeigt bei jedem Vorschlag, woher er kommt", async () => {
+    await grunddaten();
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
+      betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
+      verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
+      vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" },
+    });
+
+    rendere(<ReviewScreen />);
+
+    // Ohne die Herkunft ist einem Vorschlag nicht anzusehen, ob ihn ein Vertrag, ein
+    // Modell oder die Importdatei gesetzt hat — und damit nicht, wie sehr man ihm traut.
+    await waitFor(() => expect(screen.getAllByText("Import").length).toBeGreaterThan(0));
+  });
+
+  it("begründet einen Vorschlag des Modells mit seinen Belegen", async () => {
+    await grunddaten();
+    await sqliteKlassifikatorRepository.speichern({
+      modell: trainieren([
+        { merkmale: ["emp=buchhandlung beispiel", "vwz:fachbuch", "vz:-"], kategorieId: "kat1" },
+        { merkmale: ["emp=ganz anderer"], kategorieId: "kat2" },
+      ]),
+      trainiertAm: "2026-08-17T10:00:00.000Z",
+    });
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
+      betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
+      verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
+      vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" },
+    });
+
+    rendere(<ReviewScreen />);
+
+    await waitFor(() => expect(screen.getAllByText("Erkennung").length).toBeGreaterThan(0));
+    // Die Belege werden beim Anzeigen neu gerechnet — sie hängen am aktuellen Modell.
+    expect(document.body.textContent).toMatch(/emp=buchhandlung beispiel/);
+    expect(document.body.textContent).toMatch(/sicher/);
   });
 });
 

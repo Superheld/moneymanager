@@ -111,6 +111,21 @@ const de = {
     vorschauTitel: "Vorschau",
   },
   review: {
+    herkunft: {
+      umbuchung: "Umbuchung",
+      regel: "Vertrag",
+      ki: "Erkennung",
+      remapping: "Import",
+      manuell: "von Hand",
+    },
+    herkunftTitel: {
+      umbuchung: "Die Quelle hat die Zahlung als Umbuchung markiert.",
+      regel: "Die Zahlung passt auf die Erkennungsregel eines Vertrags — sie erbt dessen Kategorie.",
+      ki: "Das trainierte Modell hat entschieden.",
+      remapping: "Die Kategorie kam mit der Importdatei und wurde auf unseren Baum übersetzt.",
+      manuell: "Hier hat jemand von Hand entschieden.",
+    },
+    begruendungSicher: "{{wert}} sicher",
     titel: "Import-Inbox",
     untertitel: "Importierte Buchungen prüfen, kategorisieren und verbuchen",
     leer: "Keine offenen importierten Buchungen. Erst etwas im Import übernehmen.",
@@ -988,6 +1003,21 @@ const en: typeof de = {
     vorschauTitel: "Preview",
   },
   review: {
+    herkunft: {
+      umbuchung: "Transfer",
+      regel: "Contract",
+      ki: "Recognition",
+      remapping: "Import",
+      manuell: "by hand",
+    },
+    herkunftTitel: {
+      umbuchung: "The source marked this payment as a transfer.",
+      regel: "The payment matches a contract's recognition rule — it inherits that category.",
+      ki: "The trained model decided.",
+      remapping: "The category came with the import file and was mapped onto our tree.",
+      manuell: "Someone decided this by hand.",
+    },
+    begruendungSicher: "{{wert}} confident",
     titel: "Import inbox",
     untertitel: "Review, categorise and post imported transactions",
     leer: "No open imported transactions. Import some first.",
