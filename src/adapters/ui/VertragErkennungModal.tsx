@@ -17,6 +17,8 @@ import {
   anbieterSchluessel,
   minorZuMajor,
   passtZu,
+  type Erkennungsmerkmal,
+  type Merkmalsart,
   type Waehrung,
   type Vertrag,
   type Vertragserkennung,
@@ -44,8 +46,10 @@ const VORSCHAU_ZEILEN = 8;
  * ein legitimer Zwischenstand, den kein Cent-Integer abbilden kann.
  */
 interface RegelFormular {
-  /** Ein Schlüssel je Zeile — Gläubiger-IDs und normalisierte Namen gemischt. */
-  schluesselText: string;
+  /** Ein Empfänger-Muster je Zeile. */
+  empfaengerText: string;
+  /** Eine Gläubiger-ID je Zeile. */
+  glaeubigerText: string;
   betragVonText: string;
   betragBisText: string;
   gueltigAb: string;
@@ -53,10 +57,25 @@ interface RegelFormular {
   kontoId: string;
 }
 
+/** Die Muster einer Art, eines je Zeile. */
+function zeilen(e: Vertragserkennung | undefined, art: Merkmalsart): string {
+  return (e?.merkmale ?? []).filter((m) => m.art === art).map((m) => m.muster).join("\n");
+}
+
+/** Textblock → Merkmale einer Art; leere Zeilen fallen weg. */
+function ausZeilen(text: string, art: Merkmalsart): Erkennungsmerkmal[] {
+  return text
+    .split("\n")
+    .map((z) => z.trim())
+    .filter(Boolean)
+    .map((muster) => ({ art, muster }));
+}
+
 function ausRegel(e: Vertragserkennung | undefined, waehrung: Waehrung): RegelFormular {
   const zahl = (c?: number) => (c === undefined ? "" : String(minorZuMajor(c, waehrung)));
   return {
-    schluesselText: (e?.schluessel ?? []).join("\n"),
+    empfaengerText: zeilen(e, "empfaenger"),
+    glaeubigerText: zeilen(e, "glaeubigerId"),
     betragVonText: zahl(e?.betragVon),
     betragBisText: zahl(e?.betragBis),
     gueltigAb: e?.gueltigAb ?? "",
@@ -101,13 +120,12 @@ export function VertragErkennungModal({
   /** Formular → Regel. Leere Felder werden zu `undefined`, also „keine Einschränkung". */
   const regel: Vertragserkennung | null = useMemo(() => {
     if (!f) return null;
-    const schluessel = f.schluesselText
-      .split("\n")
-      .map((z) => z.trim())
-      .filter(Boolean);
     return {
       vertragId: vertrag.id,
-      schluessel,
+      merkmale: [
+        ...ausZeilen(f.glaeubigerText, "glaeubigerId"),
+        ...ausZeilen(f.empfaengerText, "empfaenger"),
+      ],
       betragVon: geld.parse(f.betragVonText) ?? undefined,
       betragBis: geld.parse(f.betragBisText) ?? undefined,
       gueltigAb: f.gueltigAb || undefined,
@@ -121,7 +139,7 @@ export function VertragErkennungModal({
    * beim Nachsteuern interessiert der jüngste Stand, nicht der Anfang der Reihe.
    */
   const treffer = useMemo(() => {
-    if (!regel || regel.schluessel.length === 0) return [];
+    if (!regel || regel.merkmale.length === 0) return [];
     return spuren
       .filter((s) => passtZu(regel, s))
       .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0));
@@ -141,9 +159,10 @@ export function VertragErkennungModal({
     }
   }
 
-  /** Den normalisierten Anbieternamen als Schlüssel anbieten, wenn er fehlt. */
+  /** Den normalisierten Anbieternamen als Empfänger-Muster anbieten, wenn er fehlt. */
   const nameSchluessel = anbieterSchluessel(vertrag.anbieter);
-  const nameFehlt = !!f && !!nameSchluessel && !regel?.schluessel.includes(nameSchluessel);
+  const nameFehlt =
+    !!f && !!nameSchluessel && !regel?.merkmale.some((m) => m.muster === nameSchluessel);
 
   return (
     <Modal
@@ -165,27 +184,41 @@ export function VertragErkennungModal({
 
       {f && (
         <>
-          <FormField label={t("vertraege.regel.schluessel")} hint={t("vertraege.regel.schluesselHinweis")}>
+          {/* Empfänger und Gläubiger-ID getrennt: einem Eintrag in einer gemischten Liste
+              war nicht anzusehen, als was er gemeint war — und die Vorrangregel bei
+              mehreren Treffern hing damit an einer Vermutung statt an einer Angabe. */}
+          <FormField label={t("vertraege.regel.empfaenger")} hint={t("vertraege.regel.empfaengerHinweis")}>
             <textarea
               className="field"
-              aria-label={t("vertraege.regel.schluessel")}
-              rows={Math.max(2, regel?.schluessel.length ?? 1)}
+              aria-label={t("vertraege.regel.empfaenger")}
+              rows={Math.max(2, f.empfaengerText.split("\n").length)}
               style={{ width: "100%", fontFamily: "var(--font-mono, monospace)", fontSize: 13 }}
-              value={f.schluesselText}
-              onChange={(e) => setze("schluesselText", e.target.value)}
+              value={f.empfaengerText}
+              onChange={(e) => setze("empfaengerText", e.target.value)}
             />
           </FormField>
           {nameFehlt && (
             <button
               className="linkbtn"
               style={{ marginBottom: "var(--sp-3)" }}
-              onClick={() => setze("schluesselText", `${f.schluesselText}\n${nameSchluessel}`.trim())}
+              onClick={() => setze("empfaengerText", `${f.empfaengerText}\n${nameSchluessel}`.trim())}
             >
               {t("vertraege.regel.nameHinzufuegen", { name: nameSchluessel })}
             </button>
           )}
 
-          <div className="form-grid">
+          <FormField label={t("vertraege.regel.glaeubiger")} hint={t("vertraege.regel.glaeubigerHinweis")} style={{ marginTop: "var(--sp-3)" }}>
+            <textarea
+              className="field"
+              aria-label={t("vertraege.regel.glaeubiger")}
+              rows={Math.max(1, f.glaeubigerText.split("\n").length)}
+              style={{ width: "100%", fontFamily: "var(--font-mono, monospace)", fontSize: 13 }}
+              value={f.glaeubigerText}
+              onChange={(e) => setze("glaeubigerText", e.target.value)}
+            />
+          </FormField>
+
+          <div className="form-grid" style={{ marginTop: "var(--sp-3)" }}>
             <FormField label={`${t("vertraege.regel.betragVon")} ${geld.symbol}`}>
               <input className="field" inputMode="decimal" aria-label={t("vertraege.regel.betragVon")}
                 value={f.betragVonText} onChange={(e) => setze("betragVonText", e.target.value)} />
