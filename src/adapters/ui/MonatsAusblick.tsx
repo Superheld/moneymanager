@@ -56,14 +56,7 @@ export function MonatsAusblick({
 
   return (
     <div>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fit, minmax(290px, 1fr))",
-          gap: "var(--gap-card)",
-          alignItems: "start",
-        }}
-      >
+      <div className="ausblick-karten">
         {ausblicke.map((a) => (
           <AusblickKarte key={a.label} ausblick={a} kategorieName={kategorieName} />
         ))}
@@ -102,12 +95,13 @@ function AusblickKarte({
         ausblick.laufend ? <Pill variant="ist">{t("ausblick.pillLaufend")}</Pill> : <Pill variant="plan">{t("ausblick.pillVorschau")}</Pill>
       }
     >
-      {/* Spaltenköpfe nur dort, wo es zwei Spalten gibt — sonst ist die Zahl selbsterklärend. */}
+      {/* Spaltenköpfe nur dort, wo es zwei Spalten gibt — sonst ist die Zahl
+          selbsterklärend. Gebucht steht vor Geplant: das Tatsächliche zuerst. */}
       {zweiSpalten && (
         <div style={{ ...zeileGrid(true), ...kopfStil }}>
           <span />
-          <span style={{ textAlign: "right" }}>{t("ausblick.spaltePlan")}</span>
           <span style={{ textAlign: "right" }}>{t("ausblick.spalteIst")}</span>
+          <span style={{ textAlign: "right" }}>{t("ausblick.spaltePlan")}</span>
         </div>
       )}
 
@@ -202,14 +196,14 @@ function ZeileMitPosten({
           {aufklappbar && <span style={{ color: "var(--ink-3)", marginRight: 6 }}>{offen ? "▾" : "▸"}</span>}
           {t(`ausblick.zeile.${zeile.id}`)}
         </span>
-        <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)" }}>
-          {geld.format(zeile.plan, { mitVorzeichen: true })}
-        </span>
         {zweiSpalten && (
           <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)" }}>
             {geld.format(zeile.ist ?? 0, { mitVorzeichen: true })}
           </span>
         )}
+        <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)" }}>
+          {geld.format(zeile.plan, { mitVorzeichen: true })}
+        </span>
       </div>
 
       {offen && (
@@ -261,14 +255,14 @@ function PlanPosten({
         <span style={{ opacity: erledigt ? 0.72 : 1, ...gekappt }}>{name}</span>
         {posten.status === "bezahlt" && <Pill variant="ok" style={{ marginLeft: 0 }}>{t("ausblick.statusBezahlt")}</Pill>}
       </span>
-      <span className="num" style={{ textAlign: "right", color: "var(--ink-3)" }}>
-        {posten.plan === 0 ? "—" : geld.format(posten.plan, { mitVorzeichen: true })}
-      </span>
       {zweiSpalten && (
         <span className="num" style={{ textAlign: "right", color: erledigt ? "var(--ink)" : "var(--ink-3)" }}>
           {posten.ist == null ? t("ausblick.statusOffen") : geld.format(posten.ist, { mitVorzeichen: true })}
         </span>
       )}
+      <span className="num" style={{ textAlign: "right", color: "var(--ink-3)" }}>
+        {posten.plan === 0 ? "—" : geld.format(posten.plan, { mitVorzeichen: true })}
+      </span>
     </div>
   );
 }
