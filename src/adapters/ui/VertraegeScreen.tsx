@@ -17,6 +17,7 @@ import {
   type Rhythmus,
   type Vertrag,
   type Vertragskandidat,
+  type Vertragszuordnung,
   type Zahlungsregel,
 } from "../../core";
 import { vertragLoeschen } from "../../application/vertragAnlegen";
@@ -30,6 +31,15 @@ import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqlit
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
 import { sqliteEinstellungenRepository as einstellungenRepo } from "../persistence/sqliteEinstellungenRepository";
+import {
+  sqliteVertragserkennungRepository,
+  sqliteVertragszuordnungRepository,
+  vertragsAbgleichDeps,
+} from "../persistence/sqliteVertragZuordnungRepositories";
+import {
+  erkennungenNachziehen,
+  zuordnungenAbgleichen,
+} from "../../application/vertragszuordnung";
 import {
   sqliteKategorieRepository as kategorieRepo,
   sqlitePersonRepository as personRepo,
@@ -45,7 +55,17 @@ import {
   VertragModal,
   type VertragFormular,
 } from "./VertragModal";
+import { VertragErkennungModal } from "./VertragErkennungModal";
 import { useGeld } from "./einstellungenKontext";
+
+/**
+ * Erkennungsregel und Zuordnungen gehören zum Vertrag: beim Löschen müssen sie mit,
+ * sonst zeigte eine Zuordnung auf einen Vertrag, den es nicht mehr gibt.
+ */
+const zuordnungsDeps = {
+  erkennungRepo: sqliteVertragserkennungRepository,
+  zuordnungRepo: sqliteVertragszuordnungRepository,
+};
 
 /** Die Turnus-Ansicht zeigt je Rhythmus eine Gruppe — in dieser Reihenfolge. */
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
@@ -163,6 +183,7 @@ export function VertraegeScreen() {
   const [personen, setPersonen] = useState<Person[]>([]);
   // Nur für die Kategorie-Ansicht: die Regel trägt die kategorieId, den Namen nicht.
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
+  const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
   const [vorschlaege, setVorschlaege] = useState<Vertragskandidat[]>([]);
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
 
@@ -174,21 +195,32 @@ export function VertraegeScreen() {
   const [maske, setMaske] = useState<{ editId: string | null; start: VertragFormular } | null>(null);
   /** Der Vorschlag, dessen Erkennung gerade aufgeschlagen ist. */
   const [befund, setBefund] = useState<Vertragskandidat | null>(null);
+  /** Der Vertrag, dessen Erkennungsregel gerade bearbeitet wird. */
+  const [regelVon, setRegelVon] = useState<Vertrag | null>(null);
 
   // Verwandte Repos in EINEM Effekt und zusammen setzen — gestaffelte setState lassen
   // abgeleitete Werte kurz gegen leere Listen rechnen.
   async function laden() {
-    const [v, r, p, k, ignoriert] = await Promise.all([
+    // Erst die Zuordnungsseite auf Stand bringen, dann anzeigen. Beides ist billig, wenn
+    // nichts zu tun ist (Nachziehen fasst Vorhandenes nicht an, der Abgleich schreibt nur
+    // Deltas) — und die Alternative wäre, dass der Bestand blind bleibt, bis jemand einen
+    // Vertrag anfasst.
+    await erkennungenNachziehen(vertragRepo, regelRepo, sqliteVertragserkennungRepository);
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+
+    const [v, r, p, k, z, ignoriert] = await Promise.all([
       vertragRepo.alle(),
       regelRepo.alle(),
       personRepo.alle(),
       kategorieRepo.alle(),
+      sqliteVertragszuordnungRepository.alle(),
       ignorierteSchluessel(einstellungenRepo),
     ]);
     setVertraege(v);
     setRegeln(r);
     setPersonen(p);
     setKategorien(k);
+    setZuordnungen(z);
     // Die Vorschläge lesen den gesamten Buchungsbestand — bewusst NACH den Stammdaten,
     // damit die Liste sofort steht und die Karte nachrückt.
     setVorschlaege(await vertragsvorschlaege(ledgerRepo, umsatzRepo, vertragRepo, heute, { ignoriert }));
@@ -213,6 +245,22 @@ export function VertraegeScreen() {
     return m;
   }, [regeln]);
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
+
+  /**
+   * Wie viele gebuchte Zahlungen der Abgleich diesem Vertrag zugeordnet hat.
+   *
+   * Steht als Spalte in der Tabelle, weil die Automatik sonst unsichtbar bliebe: eine
+   * Null sagt „die Regel greift nicht" — falscher Anbietername, zu enge Betragsspanne,
+   * oder es gibt schlicht noch keine Zahlung. Ohne diese Zahl merkt man den Fehlgriff
+   * erst, wenn irgendwo eine Auswertung nicht stimmt.
+   */
+  const zahlungenJeVertrag = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const z of zuordnungen) {
+      if (z.vertragId) m.set(z.vertragId, (m.get(z.vertragId) ?? 0) + 1);
+    }
+    return m;
+  }, [zuordnungen]);
 
   const summe = useMemo(() => {
     let proMonat = 0;
@@ -298,6 +346,16 @@ export function VertraegeScreen() {
           return r ? geld.format(r.betrag) : "—";
         },
       },
+      {
+        // Greift die Erkennung? Eine Null heißt: die Regel findet nichts.
+        key: "zahlungen",
+        label: t("vertraege.spalteZugeordnet"),
+        align: "right",
+        render: (v) => {
+          const n = zahlungenJeVertrag.get(v.id) ?? 0;
+          return n > 0 ? String(n) : <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>;
+        },
+      },
     ];
     if (mitRuecklage) {
       s.push({
@@ -312,13 +370,22 @@ export function VertraegeScreen() {
       });
     }
     s.push(
+      {
+        // Woran wird dieser Vertrag in den Buchungen erkannt — und wie steuert man nach?
+        key: "_r",
+        label: "",
+        align: "right",
+        render: (v) => (
+          <button className="linkbtn" onClick={() => setRegelVon(v)}>{t("vertraege.regel.aktion")}</button>
+        ),
+      },
       { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
       {
         key: "_x",
         label: "",
         align: "right",
         render: (v) => (
-          <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id).then(laden)}>
+          <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id, zuordnungsDeps).then(laden)}>
             {t("vertraege.loeschen")}
           </button>
         ),
@@ -638,6 +705,14 @@ export function VertraegeScreen() {
       )}
 
       {befund && <ErkennungsDialog kandidat={befund} onClose={() => setBefund(null)} />}
+
+      {regelVon && (
+        <VertragErkennungModal
+          vertrag={regelVon}
+          onClose={() => setRegelVon(null)}
+          onSaved={async () => { setRegelVon(null); await laden(); }}
+        />
+      )}
 
       {maske && (
         <VertragModal

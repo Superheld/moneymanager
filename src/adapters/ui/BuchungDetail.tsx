@@ -16,9 +16,9 @@ import {
   minorZuMajor,
   type Charakter,
   type IstBuchung,
-  vertragZuGegenpartei,
   type Kategorie,
   type Vertrag,
+  type Vertragszuordnung,
   type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
@@ -38,6 +38,15 @@ import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqlit
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
+import {
+  sqliteVertragszuordnungRepository as zuordnungRepo,
+  vertragsAbgleichDeps as abgleichDeps,
+} from "../persistence/sqliteVertragZuordnungRepositories";
+import {
+  zuordnungenAbgleichen,
+  zuordnungVonHand,
+  zuordnungZuruecksetzen,
+} from "../../application/vertragszuordnung";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import {
   sqliteUmsatzRepository as umsatzRepo,
@@ -73,6 +82,94 @@ function Infozeile({ label, children, mono }: { label: string; children: ReactNo
 }
 
 /**
+ * Alles, was diese Buchung mit einem Vertrag verbindet — und die Wege, das zu ändern.
+ * Als eigenes Objekt gebündelt, weil es sonst fünf weitere Einzel-Props an einem Modal
+ * wären, das schon reichlich davon trägt.
+ */
+interface VertragsBindung {
+  /** Der zugeordnete Vertrag, falls es einen gibt. */
+  readonly vertrag?: Vertrag;
+  /** Die gespeicherte Zuordnung — ihre Herkunft entscheidet, was angeboten wird. */
+  readonly zuordnung?: Vertragszuordnung;
+  /** Alle Verträge, zur Auswahl von Hand. */
+  readonly alle: readonly Vertrag[];
+  /** Von Hand setzen; `null` heißt „gehört ausdrücklich zu keinem Vertrag". */
+  readonly zuordnen: (vertragId: string | null) => void | Promise<void>;
+  /** Handentscheidung zurücknehmen — ab dann entscheidet wieder die Automatik. */
+  readonly zuruecksetzen: () => void | Promise<void>;
+  /** Aus dieser Buchung einen neuen Vertrag machen. */
+  readonly neuAnlegen: () => void;
+}
+
+/**
+ * Der Vertragsblock im Buchungsdialog. Drei Zustände an EINER Stelle, weil es dieselbe
+ * Frage ist: gehört diese Zahlung zu einem Vertrag, zu keinem, oder soll sie einer werden?
+ *
+ * Sichtbar ist immer auch die HERKUNFT der Antwort. Das ist kein Beiwerk: „automatisch
+ * erkannt" darf man überstimmen und der nächste Abgleich rechnet es neu, „von Hand"
+ * bleibt stehen, bis man es zurücknimmt. Wer den Unterschied nicht sieht, weiß nicht,
+ * ob seine Korrektur hält.
+ */
+function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
+  const { t } = useTranslation();
+  const { vertrag, zuordnung, alle } = bindung;
+  const vonHand = zuordnung?.herkunft === "manuell";
+  // Ausdrücklich zu keinem Vertrag: eine Aussage, kein fehlender Wert.
+  const ausgeschlossen = vonHand && zuordnung?.vertragId === null;
+
+  return (
+    <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
+        {vertrag ? (
+          <>
+            <Pill variant="ok">{t("konten.zuVertrag.gehoertZu")}</Pill>
+            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{vertrag.anbieter}</span>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              {t(vonHand ? "konten.zuVertrag.vonHand" : "konten.zuVertrag.automatisch")}
+            </span>
+          </>
+        ) : ausgeschlossen ? (
+          <>
+            <Pill variant="neutral">{t("konten.zuVertrag.keiner")}</Pill>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.zuVertrag.vonHand")}</span>
+          </>
+        ) : (
+          <Button onClick={bindung.neuAnlegen}>{t("konten.zuVertrag.aktion")}</Button>
+        )}
+      </div>
+
+      {/* Zuordnen von Hand — auch der Weg zurück: „kein Vertrag" ist eine gültige Wahl. */}
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+        <select
+          className="field"
+          style={{ width: "auto", maxWidth: "100%" }}
+          aria-label={t("konten.zuVertrag.waehlen")}
+          value={vertrag?.id ?? (ausgeschlossen ? "__keiner" : "")}
+          onChange={(e) =>
+            bindung.zuordnen(e.target.value === "__keiner" || e.target.value === "" ? null : e.target.value)
+          }
+        >
+          <option value="">{t("konten.zuVertrag.offen")}</option>
+          <option value="__keiner">{t("konten.zuVertrag.keiner")}</option>
+          {alle.map((v) => (
+            <option key={v.id} value={v.id}>{v.anbieter}</option>
+          ))}
+        </select>
+        {vonHand && (
+          <button className="linkbtn" onClick={() => bindung.zuruecksetzen()}>
+            {t("konten.zuVertrag.zuruecksetzen")}
+          </button>
+        )}
+      </div>
+
+      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+        {t(vonHand ? "konten.zuVertrag.vonHandHinweis" : vertrag ? "konten.zuVertrag.gehoertZuHinweis" : "konten.zuVertrag.untertitel")}
+      </div>
+    </div>
+  );
+}
+
+/**
  * Detailansicht einer gebuchten Ist-Buchung (S-1c). Vier Teile:
  *
  *  1. Was man ändern darf — das Formular.
@@ -92,7 +189,7 @@ function Infozeile({ label, children, mono }: { label: string; children: ReactNo
  *    −500 kippen und die Netto-Null der Umbuchung brechen. Datum und Notiz sind
  *    unkritisch (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, onClose, onSaved, onDelete, onZurUmbuchung, onZuVertrag, vertrag, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onZuVertrag: () => void; vertrag?: Vertrag; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, onClose, onSaved, onDelete, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; vertragsBindung: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const charakterLabel = useCharakterLabel();
@@ -258,35 +355,10 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
         )}
       </div>
 
-      {/* Vertrag — an derselben Stelle zwei Zustände, weil es dieselbe Frage ist:
-          gehört diese Zahlung schon zu einem Vertrag, oder soll sie einer werden?
-          Wer hier nur „Vertrag daraus machen" liest, legt beim zweiten Blick auf
-          dieselbe Miete einen zweiten Mietvertrag an.
-
-          Nicht bei Umbuchungs-Beinen: eine Umbuchung aufs eigene Sparkonto ist perfekt
-          regelmäßig und trotzdem kein Vertrag (dieselbe Grenze zieht die Erkennung). */}
-      {!gepaart && (
-        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-          {vertrag ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
-                <Pill variant="ok">{t("konten.zuVertrag.gehoertZu")}</Pill>
-                <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{vertrag.anbieter}</span>
-              </div>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-                {t("konten.zuVertrag.gehoertZuHinweis")}
-              </div>
-            </>
-          ) : (
-            <>
-              <Button onClick={onZuVertrag}>{t("konten.zuVertrag.aktion")}</Button>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-                {t("konten.zuVertrag.untertitel")}
-              </div>
-            </>
-          )}
-        </div>
-      )}
+      {/* Vertrag — nicht bei Umbuchungs-Beinen: eine Umbuchung aufs eigene Sparkonto ist
+          perfekt regelmäßig und trotzdem kein Vertrag (dieselbe Grenze zieht die
+          Erkennung, siehe core/vertragZuordnung#passtZu). */}
+      {!gepaart && <VertragsBlock bindung={vertragsBindung} />}
 
       {/* Herkunft — alles, was bekannt ist, aber hier nicht geändert wird. */}
       <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
@@ -568,14 +640,16 @@ export function BuchungDetail({ buchung, onClose, onGeaendert }: {
   const [laeufe, setLaeufe] = useState<ImportLauf[]>([]);
   const [alle, setAlle] = useState<IstBuchung[]>([]);
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
+  const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
 
   async function laden() {
-    const [ks, kats, rs, us, ls, bs, vs] = await Promise.all([
+    const [ks, kats, rs, us, ls, bs, vs, zs] = await Promise.all([
       kontoRepo.alle(), kategorieRepo.alle(), regelRepo.alle(),
       umsatzRepo.alle(), importLaufRepo.alle(), ledgerRepo.alle(), vertragRepo.alle(),
+      zuordnungRepo.alle(),
     ]);
     setKonten(ks); setKategorien(kats); setRegeln(rs);
-    setUmsaetze(us); setLaeufe(ls); setAlle(bs); setVertraege(vs);
+    setUmsaetze(us); setLaeufe(ls); setAlle(bs); setVertraege(vs); setZuordnungen(zs);
     // Die gezeigte Buchung aus dem frischen Stand nachziehen (nach dem Speichern).
     setAktuelle((b) => bs.find((x) => x.id === b.id) ?? b);
   }
@@ -591,14 +665,17 @@ export function BuchungDetail({ buchung, onClose, onGeaendert }: {
 
   const umsatz = umsatzByIst.get(aktuelle.id);
   /**
-   * Gehört die Zahlung zu einem erfassten Vertrag? Abgeleitet aus dem Empfängernamen,
-   * nicht aus einer Verknüpfung — es gibt keine (siehe `vertragZuGegenpartei`). Ohne
-   * Empfänger (Handbuchung) hilft die Notiz: sie ist an dieser Stelle das, woran man
-   * die Zahlung wiedererkennt, und genau der Text, aus dem der Anbieter vorbelegt wird.
+   * Gehört die Zahlung zu einem Vertrag? Jetzt aus der gespeicherten ZUORDNUNG, nicht
+   * mehr aus dem Empfängernamen abgeleitet: der Name konnte zwei Verträge beim selben
+   * Anbieter nicht unterscheiden, und eine Korrektur von Hand hatte nirgends Platz.
    */
+  const zuordnung = useMemo(
+    () => zuordnungen.find((z) => z.istbuchungId === aktuelle.id),
+    [zuordnungen, aktuelle.id],
+  );
   const vertrag = useMemo(
-    () => vertragZuGegenpartei(vertraege, umsatz?.gegenpartei || aktuelle.notiz || ""),
-    [vertraege, umsatz, aktuelle.notiz],
+    () => (zuordnung?.vertragId ? vertraege.find((v) => v.id === zuordnung.vertragId) : undefined),
+    [vertraege, zuordnung],
   );
   const gegenbuchung = aktuelle.transferId
     ? alle.find((x) => x.transferId === aktuelle.transferId && x.id !== aktuelle.id)
@@ -688,8 +765,25 @@ export function BuchungDetail({ buchung, onClose, onGeaendert }: {
       onSaved={async () => { await nachAenderung(); onClose(); }}
       onDelete={entfernen}
       onZurUmbuchung={() => setUmbuchenAus(aktuelle)}
-      onZuVertrag={() => setVertragAus(aktuelle)}
-      vertrag={vertrag}
+      vertragsBindung={{
+        vertrag,
+        zuordnung,
+        alle: vertraege,
+        // Von Hand gesetzte Zuordnungen überleben jeden Abgleich — deshalb reicht hier
+        // das Neuladen, es muss nichts nachgerechnet werden.
+        zuordnen: async (vertragId) => {
+          await zuordnungVonHand(zuordnungRepo, aktuelle.id, vertragId);
+          await nachAenderung();
+        },
+        zuruecksetzen: async () => {
+          await zuordnungZuruecksetzen(zuordnungRepo, aktuelle.id);
+          // Jetzt entscheidet wieder die Regel — also einmal rechnen lassen, sonst bliebe
+          // die Buchung bis zum nächsten Anlass unzugeordnet stehen.
+          await zuordnungenAbgleichen(abgleichDeps);
+          await nachAenderung();
+        },
+        neuAnlegen: () => setVertragAus(aktuelle),
+      }}
       onLoesen={async () => { await paarungLoesen(ledgerRepo, aktuelle.transferId!); await nachAenderung(); onClose(); }}
       onGegenbuchung={setAktuelle}
       onSplitten={() => setSplitten(aktuelle)}

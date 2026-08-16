@@ -278,4 +278,36 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE topf DROP COLUMN inventar_id`,
     ],
   },
+  {
+    version: 19, // Vertrag ↔ Ist-Buchung: Erkennungsregel je Vertrag, Zuordnung je Buchung
+    sql: [
+      // Bis hierher zeigte der Vertrag auf KEINE Buchung; die Zugehörigkeit wurde jedes
+      // Mal aus dem Empfängernamen abgeleitet (core/vertragErkennung#vertragZuGegenpartei).
+      // Zwei Tabellen statt Spalten am Vertrag, weil es zwei verschiedene Dinge sind:
+      // die REGEL (wie erkenne ich die Zahlungen dieses Vertrags — änderbar, einsehbar)
+      // und das ERGEBNIS je Buchung (samt Herkunft, damit Handarbeit den Abgleich
+      // überlebt). Dasselbe Muster wie Vertrag ↔ Zahlungsregel: getrennte Kontexte,
+      // verknüpft über vertragId.
+      //
+      // Reines Anlegen, kein Datenumbau — wiederholbar.
+      `CREATE TABLE IF NOT EXISTS vertrag_erkennung (
+        vertrag_id  TEXT    PRIMARY KEY,
+        schluessel  TEXT    NOT NULL,
+        betrag_von  INTEGER,
+        betrag_bis  INTEGER,
+        gueltig_ab  TEXT,
+        gueltig_bis TEXT,
+        konto_id    TEXT
+      )`,
+      // `vertrag_id` NULL ist hier eine AUSSAGE („gehört ausdrücklich zu keinem Vertrag"),
+      // kein fehlender Wert — nur so überlebt eine Korrektur den nächsten Abgleich.
+      // Deshalb auch kein NOT NULL. herkunft: 'automatisch' | 'manuell'.
+      `CREATE TABLE IF NOT EXISTS vertrag_zuordnung (
+        istbuchung_id TEXT PRIMARY KEY,
+        vertrag_id    TEXT,
+        herkunft      TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS ix_vertrag_zuordnung_vertrag ON vertrag_zuordnung (vertrag_id)`,
+    ],
+  },
 ];

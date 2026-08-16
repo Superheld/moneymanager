@@ -7,13 +7,14 @@
 // Und ob es zu einem Kandidaten längst einen Vertrag gibt, weiß erst das Repository.
 
 import { anbieterSchluessel, vertragskandidaten } from "../core";
-import type { Vertragskandidat, Zahlungsspur } from "../core";
+import type { Vertragskandidat } from "../core";
 import type {
   EinstellungenRepository,
   LedgerPort,
   UmsatzRepository,
   VertragRepository,
 } from "./ports";
+import { zahlungsspuren } from "./zahlungsspuren";
 
 export interface VorschlagsOptionen {
   /** Auch Kandidaten zeigen, deren letzte Zahlung lange her ist. */
@@ -71,32 +72,10 @@ export async function vertragsvorschlaege(
   heute: string,
   optionen: VorschlagsOptionen = {},
 ): Promise<Vertragskandidat[]> {
-  const [buchungen, umsaetze, vertraege] = await Promise.all([
-    ledger.alle(),
-    umsatzRepo.alle(),
+  const [spuren, vertraege] = await Promise.all([
+    zahlungsspuren(ledger, umsatzRepo),
     vertragRepo.alle(),
   ]);
-
-  // Ein Umsatz je Buchung; bei mehreren gewinnt der erste — Empfänger und Gläubiger-ID
-  // sind bei allen dieselben, sie stammen aus derselben Quellzeile.
-  const umsatzZuBuchung = new Map<string, (typeof umsaetze)[number]>();
-  for (const u of umsaetze) {
-    if (u.istbuchungId && !umsatzZuBuchung.has(u.istbuchungId)) umsatzZuBuchung.set(u.istbuchungId, u);
-  }
-
-  const spuren: Zahlungsspur[] = buchungen.map((b) => {
-    const u = umsatzZuBuchung.get(b.id);
-    return {
-      id: b.id,
-      datum: b.datum,
-      betrag: b.betrag,
-      gegenpartei: u?.gegenpartei ?? "",
-      glaeubigerId: u?.glaeubigerId,
-      kategorieId: b.kategorieId,
-      kontoId: b.kontoId,
-      charakter: b.charakter,
-    };
-  });
 
   const erfasst = new Set(vertraege.map((v) => anbieterSchluessel(v.anbieter)));
   const ignoriert = optionen.ignoriert ?? new Set<string>();
