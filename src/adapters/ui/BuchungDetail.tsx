@@ -16,7 +16,9 @@ import {
   minorZuMajor,
   type Charakter,
   type IstBuchung,
+  vertragZuGegenpartei,
   type Kategorie,
+  type Vertrag,
   type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
@@ -35,6 +37,7 @@ import {
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
+import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import {
   sqliteUmsatzRepository as umsatzRepo,
@@ -89,7 +92,7 @@ function Infozeile({ label, children, mono }: { label: string; children: ReactNo
  *    −500 kippen und die Netto-Null der Umbuchung brechen. Datum und Notiz sind
  *    unkritisch (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, onClose, onSaved, onDelete, onZurUmbuchung, onZuVertrag, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onZuVertrag: () => void; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, onClose, onSaved, onDelete, onZurUmbuchung, onZuVertrag, vertrag, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onZuVertrag: () => void; vertrag?: Vertrag; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const charakterLabel = useCharakterLabel();
@@ -255,15 +258,33 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
         )}
       </div>
 
-      {/* Aus der Buchung einen Vertrag machen — der dritte Weg, der von hier ausgeht.
+      {/* Vertrag — an derselben Stelle zwei Zustände, weil es dieselbe Frage ist:
+          gehört diese Zahlung schon zu einem Vertrag, oder soll sie einer werden?
+          Wer hier nur „Vertrag daraus machen" liest, legt beim zweiten Blick auf
+          dieselbe Miete einen zweiten Mietvertrag an.
+
           Nicht bei Umbuchungs-Beinen: eine Umbuchung aufs eigene Sparkonto ist perfekt
           regelmäßig und trotzdem kein Vertrag (dieselbe Grenze zieht die Erkennung). */}
       {!gepaart && (
         <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-          <Button onClick={onZuVertrag}>{t("konten.zuVertrag.aktion")}</Button>
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-            {t("konten.zuVertrag.untertitel")}
-          </div>
+          {vertrag ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+                <Pill variant="ok">{t("konten.zuVertrag.gehoertZu")}</Pill>
+                <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{vertrag.anbieter}</span>
+              </div>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+                {t("konten.zuVertrag.gehoertZuHinweis")}
+              </div>
+            </>
+          ) : (
+            <>
+              <Button onClick={onZuVertrag}>{t("konten.zuVertrag.aktion")}</Button>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+                {t("konten.zuVertrag.untertitel")}
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -546,14 +567,15 @@ export function BuchungDetail({ buchung, onClose, onGeaendert }: {
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [laeufe, setLaeufe] = useState<ImportLauf[]>([]);
   const [alle, setAlle] = useState<IstBuchung[]>([]);
+  const [vertraege, setVertraege] = useState<Vertrag[]>([]);
 
   async function laden() {
-    const [ks, kats, rs, us, ls, bs] = await Promise.all([
+    const [ks, kats, rs, us, ls, bs, vs] = await Promise.all([
       kontoRepo.alle(), kategorieRepo.alle(), regelRepo.alle(),
-      umsatzRepo.alle(), importLaufRepo.alle(), ledgerRepo.alle(),
+      umsatzRepo.alle(), importLaufRepo.alle(), ledgerRepo.alle(), vertragRepo.alle(),
     ]);
     setKonten(ks); setKategorien(kats); setRegeln(rs);
-    setUmsaetze(us); setLaeufe(ls); setAlle(bs);
+    setUmsaetze(us); setLaeufe(ls); setAlle(bs); setVertraege(vs);
     // Die gezeigte Buchung aus dem frischen Stand nachziehen (nach dem Speichern).
     setAktuelle((b) => bs.find((x) => x.id === b.id) ?? b);
   }
@@ -568,6 +590,16 @@ export function BuchungDetail({ buchung, onClose, onGeaendert }: {
   }, [umsaetze]);
 
   const umsatz = umsatzByIst.get(aktuelle.id);
+  /**
+   * Gehört die Zahlung zu einem erfassten Vertrag? Abgeleitet aus dem Empfängernamen,
+   * nicht aus einer Verknüpfung — es gibt keine (siehe `vertragZuGegenpartei`). Ohne
+   * Empfänger (Handbuchung) hilft die Notiz: sie ist an dieser Stelle das, woran man
+   * die Zahlung wiedererkennt, und genau der Text, aus dem der Anbieter vorbelegt wird.
+   */
+  const vertrag = useMemo(
+    () => vertragZuGegenpartei(vertraege, umsatz?.gegenpartei || aktuelle.notiz || ""),
+    [vertraege, umsatz, aktuelle.notiz],
+  );
   const gegenbuchung = aktuelle.transferId
     ? alle.find((x) => x.transferId === aktuelle.transferId && x.id !== aktuelle.id)
     : undefined;
@@ -657,6 +689,7 @@ export function BuchungDetail({ buchung, onClose, onGeaendert }: {
       onDelete={entfernen}
       onZurUmbuchung={() => setUmbuchenAus(aktuelle)}
       onZuVertrag={() => setVertragAus(aktuelle)}
+      vertrag={vertrag}
       onLoesen={async () => { await paarungLoesen(ledgerRepo, aktuelle.transferId!); await nachAenderung(); onClose(); }}
       onGegenbuchung={setAktuelle}
       onSplitten={() => setSplitten(aktuelle)}

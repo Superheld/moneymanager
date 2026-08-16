@@ -461,6 +461,9 @@ const de = {
     zuVertrag: {
       aktion: "Vertrag daraus machen",
       untertitel: "Kommt diese Zahlung regelmäßig wieder? Dann gehört sie in die Planung.",
+      gehoertZu: "Vertrag erfasst",
+      gehoertZuHinweis:
+        "Der Empfänger ist als Vertrag angelegt — die Zahlung steht damit in der Planung. Zugeordnet über den Anbieternamen, nicht über eine feste Verknüpfung.",
       hinweis: "Empfänger, Betrag, Kategorie und Konto stammen aus dieser Buchung. Den Rhythmus kennt sie nicht — der gehört geprüft.",
     },
     paarung: {
@@ -1140,6 +1143,9 @@ const en: typeof de = {
     zuVertrag: {
       aktion: "Turn into a contract",
       untertitel: "Does this payment come back regularly? Then it belongs in the plan.",
+      gehoertZu: "Contract on file",
+      gehoertZuHinweis:
+        "The payee is on file as a contract, so this payment is part of the plan. Matched by provider name, not by a stored link.",
       hinweis: "Payee, amount, category and account come from this transaction. Its cycle is unknown — check it.",
     },
     paarung: {
