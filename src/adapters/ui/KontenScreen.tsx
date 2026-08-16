@@ -23,6 +23,14 @@ import {
 import { buchungBearbeiten, buchungErfassen, buchungLoeschen } from "../../application/buchungErfassen";
 import { zuruecksetzen, type Umsatz } from "../../application/import";
 import { umbuchungErfassen, umbuchungLoeschen } from "../../application/umbuchungErfassen";
+import {
+  buchungenPaaren,
+  gegenbeinErzeugen,
+  paarungLoesen,
+  paarungsKandidaten,
+  umbuchungsBeinBearbeiten,
+  MAX_VORSCHLAG_TAGE,
+} from "../../application/umbuchungAusBuchung";
 import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../../application/bezahltMarkieren";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
@@ -75,6 +83,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
+  const [umbuchenAus, setUmbuchenAus] = useState<IstBuchung | null>(null);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
 
@@ -161,27 +170,29 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     }
   }
 
-  async function zeileEntfernen(z: RegisterZeile) {
-    if (z.transferId) {
-      await umbuchungLoeschen(ledgerRepo, z.transferId);
-    } else if (z.istId) {
-      await buchungLoeschen(ledgerRepo, z.istId);
-      // Importierte Buchung? Den verknüpften Umsatz zurück in die Inbox setzen.
-      const umsatz = umsaetze.find((u) => u.istbuchungId === z.istId);
-      if (umsatz) await umsatzRepo.speichern(zuruecksetzen(umsatz));
-    }
-    await laden();
-  }
-
   function bearbeitenOeffnen(z: RegisterZeile) {
     const b = ist.find((x) => x.id === z.istId);
     if (b) setEditBuchung(b);
   }
 
+  /** Importierte Buchungen tragen einen Umsatz — der muss zurück in die Inbox, sonst verwaist er. */
+  async function umsaetzeZuruecksetzen(istIds: string[]) {
+    for (const id of istIds) {
+      const umsatz = umsaetze.find((u) => u.istbuchungId === id);
+      if (umsatz) await umsatzRepo.speichern(zuruecksetzen(umsatz));
+    }
+  }
+
+  /** Löscht eine Buchung — bei einer Umbuchung BEIDE Beine, sonst bliebe eines verwaist. */
   async function buchungEntfernen(b: IstBuchung) {
-    await buchungLoeschen(ledgerRepo, b.id);
-    const umsatz = umsaetze.find((u) => u.istbuchungId === b.id);
-    if (umsatz) await umsatzRepo.speichern(zuruecksetzen(umsatz));
+    if (b.transferId) {
+      const beine = ist.filter((x) => x.transferId === b.transferId);
+      await umbuchungLoeschen(ledgerRepo, b.transferId);
+      await umsaetzeZuruecksetzen(beine.map((x) => x.id));
+    } else {
+      await buchungLoeschen(ledgerRepo, b.id);
+      await umsaetzeZuruecksetzen([b.id]);
+    }
     setEditBuchung(null);
     await laden();
   }
@@ -293,9 +304,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (z) => z.saldo, render: (z) => geld.format(z.saldo) },
                 {
                   key: "_a", label: "", align: "right", sortable: false,
-                  render: (z) => z.gegenkontoId
-                    ? <button className="linkbtn" onClick={() => zeileEntfernen(z)}>{t("konten.loeschen")}</button>
-                    : <button className="linkbtn" onClick={() => bearbeitenOeffnen(z)}>{t("konten.bearbeiten")}</button>,
+                  render: (z) => <button className="linkbtn" onClick={() => bearbeitenOeffnen(z)}>{t("konten.bearbeiten")}</button>,
                 },
               ]}
               rows={gebuchtFuerTabelle}
@@ -356,9 +365,24 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         <EditBuchungModal
           buchung={editBuchung}
           kategorien={kategorien}
+          kontoName={kontoName}
           onClose={() => setEditBuchung(null)}
           onSaved={async () => { setEditBuchung(null); await laden(); }}
           onDelete={async () => { await buchungEntfernen(editBuchung); }}
+          onZurUmbuchung={() => { setUmbuchenAus(editBuchung); setEditBuchung(null); }}
+          onLoesen={async () => { await paarungLoesen(ledgerRepo, editBuchung.transferId!); setEditBuchung(null); await laden(); }}
+        />
+      )}
+
+      {umbuchenAus && (
+        <ZurUmbuchungModal
+          buchung={umbuchenAus}
+          konten={konten}
+          alleBuchungen={ist}
+          kontoName={kontoName}
+          umsatzByIst={umsatzByIst}
+          onClose={() => setUmbuchenAus(null)}
+          onSaved={async () => { setUmbuchenAus(null); await laden(); }}
         />
       )}
 
@@ -444,7 +468,17 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
   );
 }
 
-function EditBuchungModal({ buchung, kategorien, onClose, onSaved, onDelete }: { buchung: IstBuchung; kategorien: Kategorie[]; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void> }) {
+/**
+ * Detailansicht einer gebuchten Ist-Buchung. Zwei Gesichter:
+ *
+ *  • frei — alle Felder editierbar, plus der Einstieg „Zur Umbuchung machen" (S-1).
+ *  • Bein einer Umbuchung — Betrag, Charakter und Kategorie sind FEST. `buchungBearbeiten`
+ *    leitet das Vorzeichen über `vorzeichenbehaftet()` aus dem Charakter ab, und das macht
+ *    eine Umschichtung immer negativ: das Zugangs-Bein (+500) würde beim Speichern auf
+ *    −500 kippen und die Netto-Null der Umbuchung brechen. Datum und Notiz sind
+ *    unkritisch (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
+ */
+function EditBuchungModal({ buchung, kategorien, kontoName, onClose, onSaved, onDelete, onZurUmbuchung, onLoesen }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onLoesen: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const charakterLabel = useCharakterLabel();
@@ -454,11 +488,16 @@ function EditBuchungModal({ buchung, kategorien, onClose, onSaved, onDelete }: {
   const [kategorieId, setKategorieId] = useState(buchung.kategorieId ?? "");
   const [notiz, setNotiz] = useState(buchung.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
+  const gepaart = !!buchung.transferId;
 
   async function speichern() {
     setFehler(null);
     try {
-      await buchungBearbeiten(ledgerRepo, buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
+      if (gepaart) {
+        await umbuchungsBeinBearbeiten(ledgerRepo, buchung, { datum, notiz });
+      } else {
+        await buchungBearbeiten(ledgerRepo, buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
+      }
       onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
@@ -484,20 +523,146 @@ function EditBuchungModal({ buchung, kategorien, onClose, onSaved, onDelete }: {
           <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
         <FormField label={t("konten.feldBetrag")} required>
-          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
+          <input className="field" inputMode="decimal" value={betrag} disabled={gepaart} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
         </FormField>
-        <FormField label={t("konten.feldCharakter")}>
-          <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-            {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
-          </select>
-        </FormField>
-        <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
-          <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
-        </FormField>
+        {!gepaart && (
+          <>
+            <FormField label={t("konten.feldCharakter")}>
+              <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
+                {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
+              </select>
+            </FormField>
+            <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
+              <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
+            </FormField>
+          </>
+        )}
         <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
           <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.buchung.notizPlatzhalter")} />
         </FormField>
       </div>
+
+      {/* Umbuchungs-Abschnitt: Einstieg (S-1) bzw. Paarung lösen */}
+      <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+        {gepaart ? (
+          <>
+            <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
+              <Pill variant="um">{t("konten.paarung.titel")}</Pill>
+              <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
+                {t("konten.paarung.gegenkonto")}: {kontoName.get(buchung.gegenkontoId ?? "") ?? "?"}
+              </span>
+              <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={() => onLoesen()}>{t("konten.paarung.loesen")}</button>
+            </div>
+            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+              {t("konten.paarung.loesenHinweis")} {t("konten.paarung.loeschtBeide")}
+            </div>
+          </>
+        ) : (
+          <>
+            <Button onClick={onZurUmbuchung}>{t("konten.zurUmbuchung.aktion")}</Button>
+            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+              {t("konten.zurUmbuchung.untertitel")}
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+/**
+ * S-1 — macht aus einer bestehenden Buchung eine Umbuchung. EIN Dialog für beide Fälle:
+ * oben die passenden Gegenbuchungen (S-1b, nachträgliche Paarung), darunter der Ausweg
+ * „Gegenbein neu erzeugen" (S-1a, Zielkonto wird nicht importiert). Der Nutzer soll nicht
+ * vorher wissen müssen, welcher Fall vorliegt — die Liste beantwortet das.
+ */
+function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzByIst, onClose, onSaved }: { buchung: IstBuchung; konten: Zahlungskonto[]; alleBuchungen: IstBuchung[]; kontoName: Map<string, string>; umsatzByIst: Map<string, Umsatz>; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
+  const kandidaten = useMemo(() => paarungsKandidaten(alleBuchungen, buchung), [alleBuchungen, buchung]);
+  const andereKonten = konten.filter((k) => k.id !== buchung.kontoId);
+  // Vorauswahl: der beste Kandidat, sonst der Weg über ein neu erzeugtes Gegenbein.
+  const [wahl, setWahl] = useState<string>(kandidaten[0]?.id ?? "__neu");
+  const [neuKontoId, setNeuKontoId] = useState(andereKonten[0]?.id ?? "");
+  const [fehler, setFehler] = useState<string | null>(null);
+
+  /** Beschriftung einer Gegenbuchung: Empfänger aus dem Import, sonst Notiz. */
+  function kandidatLabel(k: IstBuchung): string {
+    return umsatzByIst.get(k.id)?.gegenpartei || k.notiz || "";
+  }
+
+  async function speichern() {
+    setFehler(null);
+    try {
+      if (wahl === "__neu") {
+        await gegenbeinErzeugen(ledgerRepo, buchung, neuKontoId);
+      } else {
+        const gegen = alleBuchungen.find((b) => b.id === wahl);
+        if (!gegen) return;
+        await buchungenPaaren(ledgerRepo, buchung, gegen);
+      }
+      onSaved();
+    } catch (e) {
+      setFehler(fehlerNachricht(t, e));
+    }
+  }
+
+  return (
+    <Modal
+      title={t("konten.zurUmbuchung.titel")}
+      subtitle={t("konten.zurUmbuchung.untertitel")}
+      onClose={onClose}
+      footer={<><Button variant="primary" onClick={speichern}>{t("konten.zurUmbuchung.bestaetigen")}</Button><button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
+    >
+      {/* Die Buchung, um die es geht */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", marginBottom: "var(--sp-4)" }}>
+        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
+          {ddmm(buchung.datum)} · {kandidatLabel(buchung) || kontoName.get(buchung.kontoId) || ""}
+        </span>
+        <span className="num" style={{ fontWeight: 700, color: betragFarbe(buchung) }}>
+          {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
+        </span>
+      </div>
+
+      <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
+        {t("konten.zurUmbuchung.kandidatenTitel")}
+      </div>
+      {kandidaten.length === 0 ? (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.zurUmbuchung.keineKandidaten", { tage: MAX_VORSCHLAG_TAGE })}</div>
+      ) : (
+        kandidaten.map((k) => (
+          <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
+            <input type="radio" name="gegenbein" value={k.id} checked={wahl === k.id} onChange={() => setWahl(k.id)} style={{ accentColor: "var(--accent-deep)" }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(k.datum)}</span>
+            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
+              {kontoName.get(k.kontoId) ?? "?"}
+              {kandidatLabel(k) && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{kandidatLabel(k)}</span>}
+            </span>
+            <span className="num" style={{ fontWeight: 700, color: betragFarbe(k) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
+          </label>
+        ))
+      )}
+
+      {/* Ausweg: kein Gegenbein vorhanden (S-1a) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "var(--sp-4) 0 var(--sp-3)", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)" }}>
+        <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+        {t("konten.zurUmbuchung.oder")}
+        <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+      </div>
+      <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+        <input type="radio" name="gegenbein" value="__neu" checked={wahl === "__neu"} onChange={() => setWahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
+        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
+        <select className="field" style={{ width: "auto" }} value={neuKontoId} onChange={(e) => { setNeuKontoId(e.target.value); setWahl("__neu"); }}>
+          {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
+        </select>
+      </label>
+      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
+
+      {buchung.kategorieId && (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)" }}>
+          {t("konten.zurUmbuchung.kategorieHinweis")}
+        </div>
+      )}
     </Modal>
   );
 }
