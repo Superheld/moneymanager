@@ -9,8 +9,14 @@ import React from 'react';
  * Originalreihenfolge. Sortierwert ist `column.sortValue(row)` oder sonst `row[column.key]`
  * (Zahlen numerisch, sonst locale-/numerisch-tolerant). Einzelne Spalten lassen sich mit
  * `column.sortable === false` ausnehmen.
+ *
+ * Zeilenhöhe: Zellen brechen NICHT um. Eine zweizeilige Zeile verschiebt alles darunter —
+ * bei paginierten Tabellen wandert dadurch der Seitenschalter je nach Inhalt der aktuellen
+ * Seite nach oben oder unten, und man klickt daneben. Langer Inhalt wird stattdessen
+ * abgeschnitten (`column.maxWidth` begrenzt die Spalte).
  */
-export function DataTable({ columns, rows, onRowClick, istAktiv, sortable = false, pageSize }) {
+export function DataTable({ columns, rows, onRowClick, istAktiv, sortable = false, pageSize,
+  labelSeite, labelErste, labelLetzte, labelZurueck, labelVor }) {
   const [sort, setSort] = React.useState(null); // { idx, dir: 'asc' | 'desc' }
   const [page, setPage] = React.useState(0);
 
@@ -66,15 +72,28 @@ export function DataTable({ columns, rows, onRowClick, istAktiv, sortable = fals
           var v=c.render?c.render(row):row[c.key];
           return <td key={ci} style={{ padding:'10px', borderBottom:'1px solid var(--line-soft)',
             textAlign:c.align==='right'?'right':'left', fontVariantNumeric:c.align==='right'?'tabular-nums':'normal',
-            fontWeight:ci===0?'var(--fw-bold)':'var(--fw-regular)', color:'var(--ink)' }}>{v}</td>;
+            fontWeight:ci===0?'var(--fw-bold)':'var(--fw-regular)', color:'var(--ink)',
+            whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis',
+            maxWidth:c.maxWidth || undefined }}>{v}</td>;
         })}</tr>;
       })}</tbody>
     </table>
     {pageSize && seiten > 1 && (
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'12px', marginTop:'10px', fontSize:'var(--fs-xs)', color:'var(--ink-3)' }}>
-        <button style={{ ...btn, opacity: seite===0?0.4:1 }} disabled={seite===0} onClick={function(){ setPage(seite-1); }}>‹</button>
-        <span>{(seite*pageSize)+1}–{Math.min(gesamt,(seite+1)*pageSize)} / {gesamt}</span>
-        <button style={{ ...btn, opacity: seite>=seiten-1?0.4:1 }} disabled={seite>=seiten-1} onClick={function(){ setPage(seite+1); }}>›</button>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:'8px', marginTop:'10px', fontSize:'var(--fs-xs)', color:'var(--ink-3)' }}>
+        <button style={{ ...btn, opacity: seite===0?0.4:1 }} disabled={seite===0} onClick={function(){ setPage(0); }} title={labelErste}>|‹</button>
+        <button style={{ ...btn, opacity: seite===0?0.4:1 }} disabled={seite===0} onClick={function(){ setPage(seite-1); }} title={labelZurueck}>‹</button>
+        {/* Freie Seitenwahl: bei tausenden Zeilen ist „ans Ende blättern" sonst Klickarbeit. */}
+        <input type="number" min="1" max={seiten} value={seite+1} aria-label={labelSeite}
+          onChange={function(e){
+            var n = parseInt(e.target.value, 10);
+            if (!isNaN(n)) setPage(Math.min(Math.max(n,1), seiten) - 1);
+          }}
+          style={{ width:'5.5ch', padding:'2px 4px', textAlign:'center', fontSize:'var(--fs-xs)',
+            border:'1px solid var(--line)', borderRadius:'var(--r-sm, 4px)', background:'var(--surface)',
+            color:'var(--ink-2)', fontFamily:'inherit' }} />
+        <span style={{ whiteSpace:'nowrap' }}>/ {seiten} · {(seite*pageSize)+1}–{Math.min(gesamt,(seite+1)*pageSize)} / {gesamt}</span>
+        <button style={{ ...btn, opacity: seite>=seiten-1?0.4:1 }} disabled={seite>=seiten-1} onClick={function(){ setPage(seite+1); }} title={labelVor}>›</button>
+        <button style={{ ...btn, opacity: seite>=seiten-1?0.4:1 }} disabled={seite>=seiten-1} onClick={function(){ setPage(seiten-1); }} title={labelLetzte}>›|</button>
       </div>
     )}
     </>

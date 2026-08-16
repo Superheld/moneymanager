@@ -10,6 +10,8 @@ export interface DataColumn {
   sortValue?: (row: any) => string | number;
   /** Diese Spalte von der Sortierung ausnehmen. */
   sortable?: boolean;
+  /** Begrenzt die Spaltenbreite; längerer Inhalt wird abgeschnitten statt umzubrechen. */
+  maxWidth?: number | string;
 }
 export interface DataTableProps {
   columns: DataColumn[];
@@ -22,6 +24,15 @@ export interface DataTableProps {
   sortable?: boolean;
   /** Wenn gesetzt, paginiert die Tabelle mit dieser Seitengröße (Steuerung unten). */
   pageSize?: number;
+  /**
+   * Beschriftungen der Seitensteuerung. Optional, damit die Komponente selbst sprachfrei
+   * bleibt — die App reicht übersetzte Texte durch.
+   */
+  labelSeite?: string;
+  labelErste?: string;
+  labelLetzte?: string;
+  labelZurueck?: string;
+  labelVor?: string;
 }
 
 /**
