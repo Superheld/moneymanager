@@ -3,7 +3,8 @@
 // Ansparen gehört in einen Topf, nicht ins Budget). MVP: lineare Glättung.
 
 import type { Cent } from "./geld";
-import type { IstBuchung } from "./istbuchung";
+import { kategorieAnteile, type IstBuchung } from "./istbuchung";
+import { kategorieUnterbaum, type Kategorie } from "./kategorie";
 
 export type BudgetPeriode = "monatlich" | "jaehrlich";
 
@@ -61,17 +62,30 @@ export function periodeFenster(periode: BudgetPeriode, am: string): { von: strin
  * Nicht behandelt: eine Erstattung, die als `Ertrag` gebucht ist, bleibt draussen — sie
  * entlastet das Budget also nicht. Das ist eine fachliche Frage (zählt jeder Zufluss auf
  * einer Aufwandskategorie als Budget-Entlastung?) und keine hier zu treffende Entscheidung.
+ *
+ * Der Kategorienbaum zählt MIT: ein Budget auf „Lebenshaltung" wird von Buchungen auf
+ * „Lebensmittel" belastet. Vorher prüfte die Funktion nur die eine ID — auf echten Daten
+ * traf keine einzige Buchung ihre Budget-Kategorie direkt (Budgets hängen an den
+ * Hauptkategorien, gebucht wird auf Kindern), also stand jeder Verbrauch auf 0. Deshalb
+ * ist `kategorien` ein Pflichtparameter: vergessen kann man ihn nicht, und ohne den Baum
+ * ist die Zahl schlicht falsch.
  */
 export function budgetVerbrauch(
   buchungen: IstBuchung[],
+  kategorien: readonly Kategorie[],
   kategorieId: string,
   von: string,
   bis: string,
 ): Cent {
+  const relevant = kategorieUnterbaum(kategorien, kategorieId);
   return buchungen.reduce((s, b) => {
-    if (b.kategorieId !== kategorieId) return s;
     if (b.charakter !== "Aufwand") return s;
     if (b.datum < von || b.datum >= bis) return s;
-    return s - b.betrag;
+    // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung (S-7) belastet
+    // dieses Budget nur mit IHREM Teil, nicht mit dem vollen Betrag — und nicht gar nicht.
+    return kategorieAnteile(b).reduce(
+      (t, a) => (a.kategorieId && relevant.has(a.kategorieId) ? t - a.betrag : t),
+      s,
+    );
   }, 0);
 }

@@ -5,7 +5,7 @@
 import { addMonate, parseIso } from "./datum";
 import type { Cent } from "./geld";
 import type { Charakter } from "./zahlungsregel";
-import type { IstBuchung } from "./istbuchung";
+import { kategorieAnteile, type IstBuchung } from "./istbuchung";
 import type { Kategorie } from "./kategorie";
 import { liquideMittel, type Zahlungskonto } from "./konto";
 
@@ -113,11 +113,16 @@ export function kategorieAggregat(
   for (const b of buchungen) {
     const key = monatVon(b.datum);
     if (key < vonLabel || key > bisLabel) continue;
-    const id = b.kategorieId ?? OHNE;
-    const e = map.get(id) ?? { summe: 0, anzahl: 0, charakter: b.charakter };
-    e.summe += b.betrag;
-    e.anzahl++;
-    map.set(id, e);
+    // Eine geteilte Buchung (S-7) erscheint in jeder ihrer Kategorien mit ihrem Teil.
+    // `anzahl` zählt sie dabei in jeder mit — sie IST dort ein Posten; die Summe über
+    // alle Zeilen bleibt trotzdem der Buchungsbetrag.
+    for (const a of kategorieAnteile(b)) {
+      const id = a.kategorieId ?? OHNE;
+      const e = map.get(id) ?? { summe: 0, anzahl: 0, charakter: b.charakter };
+      e.summe += a.betrag;
+      e.anzahl++;
+      map.set(id, e);
+    }
   }
 
   return [...map.entries()]
@@ -133,6 +138,70 @@ export function kategorieAggregat(
         anzahl: e.anzahl,
       };
     })
+    .sort((a, b) => Math.abs(b.summe) - Math.abs(a.summe));
+}
+
+/** Eine Hauptgruppe mit ihren Unterkategorien. */
+export interface GruppenSumme {
+  /** undefined = die Sammelzeile „ohne Kategorie". */
+  readonly kategorieId?: string;
+  readonly name: string;
+  readonly charakter: Charakter;
+  /** Summe der Gruppe inklusive aller Kinder. */
+  readonly summe: Cent;
+  readonly anzahl: number;
+  readonly kinder: readonly KategorieSumme[];
+}
+
+/**
+ * Fasst ein Kategorie-Aggregat zu Hauptgruppen zusammen.
+ *
+ * Eine Kategorie ohne Elternteil IST ihre eigene Hauptgruppe — sie erscheint als Gruppe
+ * ohne Kinder, nicht als Kind von irgendetwas. Buchungen, die direkt auf einer
+ * Hauptgruppe liegen (statt auf einer ihrer Unterkategorien), gehen in deren Summe ein
+ * und erscheinen zusätzlich als eigenes Kind; sonst zeigte die aufgeklappte Gruppe
+ * weniger an, als ihre Zeile behauptet.
+ *
+ * Sortiert nach Betrag (größter zuerst), Kinder ebenso — wie das flache Aggregat.
+ */
+export function nachHauptgruppe(
+  items: readonly KategorieSumme[],
+  kategorien: readonly Kategorie[],
+): GruppenSumme[] {
+  const byId = new Map(kategorien.map((k) => [k.id, k]));
+  const gruppen = new Map<string, { name: string; charakter: Charakter; summe: Cent; anzahl: number; kinder: KategorieSumme[]; id?: string }>();
+
+  for (const item of items) {
+    const kat = item.kategorieId ? byId.get(item.kategorieId) : undefined;
+    const eltern = kat?.elternId ? byId.get(kat.elternId) : undefined;
+    const gruppeId = eltern?.id ?? item.kategorieId ?? OHNE;
+    const gruppeName = eltern?.name ?? item.name;
+
+    const e = gruppen.get(gruppeId) ?? {
+      id: gruppeId === OHNE ? undefined : gruppeId,
+      name: gruppeName,
+      charakter: eltern?.defaultCharakter ?? item.charakter,
+      summe: 0,
+      anzahl: 0,
+      kinder: [],
+    };
+    e.summe += item.summe;
+    e.anzahl += item.anzahl;
+    // Auch die Gruppe selbst erscheint als Kind, wenn direkt auf sie gebucht wurde —
+    // sonst summieren die sichtbaren Kinder auf weniger als die Gruppenzeile.
+    e.kinder.push(item);
+    gruppen.set(gruppeId, e);
+  }
+
+  return [...gruppen.values()]
+    .map((g): GruppenSumme => ({
+      kategorieId: g.id,
+      name: g.name,
+      charakter: g.charakter,
+      summe: g.summe,
+      anzahl: g.anzahl,
+      kinder: [...g.kinder].sort((a, b) => Math.abs(b.summe) - Math.abs(a.summe)),
+    }))
     .sort((a, b) => Math.abs(b.summe) - Math.abs(a.summe));
 }
 
@@ -159,8 +228,22 @@ export function buchungenDerKategorie(
   const vonL = vonIso.slice(0, 7);
   const bisL = bisIso.slice(0, 7);
   return buchungen
-    .filter((b) => b.kategorieId === kategorieId && monatVon(b.datum) >= vonL && monatVon(b.datum) <= bisL)
+    .filter(
+      (b) =>
+        monatVon(b.datum) >= vonL &&
+        monatVon(b.datum) <= bisL &&
+        kategorieAnteile(b).some((a) => a.kategorieId === kategorieId),
+    )
     .sort((a, b) => b.datum.localeCompare(a.datum));
+}
+
+/**
+ * Der Betrag, mit dem eine Buchung auf EINE Kategorie wirkt — bei einer geteilten Buchung
+ * ihr Teil, sonst der volle Betrag. Für Detaillisten, die sonst den Gesamtbetrag zeigten
+ * und damit mehr, als in dieser Kategorie steckt.
+ */
+export function betragInKategorie(b: IstBuchung, kategorieId: string): Cent {
+  return kategorieAnteile(b).reduce((s, a) => (a.kategorieId === kategorieId ? s + a.betrag : s), 0);
 }
 
 /** Frühester Buchungsmonat als „YYYY-MM-01", oder undefined bei leerer Liste. */

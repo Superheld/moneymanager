@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat } from "./historie";
+import { buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, nachHauptgruppe, type KategorieSumme } from "./historie";
 import type { IstBuchung } from "./istbuchung";
 import type { Kategorie } from "./kategorie";
 import type { Zahlungskonto } from "./konto";
@@ -124,5 +124,71 @@ describe("fruehesterMonat", () => {
   });
   it("liefert undefined bei leerer Liste", () => {
     expect(fruehesterMonat([])).toBeUndefined();
+  });
+});
+
+describe("nachHauptgruppe", () => {
+  const kategorien: Kategorie[] = [
+    { id: "lebenshaltung", name: "Lebenshaltung", defaultCharakter: "Aufwand" },
+    { id: "essen", name: "Lebensmittel", defaultCharakter: "Aufwand", elternId: "lebenshaltung" },
+    { id: "drogerie", name: "Drogerie", defaultCharakter: "Aufwand", elternId: "lebenshaltung" },
+    { id: "wohnen", name: "Wohnen", defaultCharakter: "Aufwand" },
+    { id: "miete", name: "Miete", defaultCharakter: "Aufwand", elternId: "wohnen" },
+  ];
+
+  const flach: KategorieSumme[] = [
+    { kategorieId: "essen", name: "Lebensmittel", charakter: "Aufwand", summe: -40000, anzahl: 20 },
+    { kategorieId: "drogerie", name: "Drogerie", charakter: "Aufwand", summe: -10000, anzahl: 5 },
+    { kategorieId: "miete", name: "Miete", charakter: "Aufwand", summe: -90000, anzahl: 3 },
+  ];
+
+  it("bündelt Unterkategorien unter ihrer Hauptgruppe", () => {
+    const gruppen = nachHauptgruppe(flach, kategorien);
+    expect(gruppen.map((g) => g.name)).toEqual(["Wohnen", "Lebenshaltung"]); // nach Betrag
+    const lebenshaltung = gruppen.find((g) => g.kategorieId === "lebenshaltung")!;
+    expect(lebenshaltung.summe).toBe(-50000);
+    expect(lebenshaltung.anzahl).toBe(25);
+    expect(lebenshaltung.kinder.map((k) => k.name)).toEqual(["Lebensmittel", "Drogerie"]);
+  });
+
+  it("führt eine Kategorie ohne Elternteil als eigene Gruppe", () => {
+    const gruppen = nachHauptgruppe(
+      [{ kategorieId: "wohnen", name: "Wohnen", charakter: "Aufwand", summe: -5000, anzahl: 1 }],
+      kategorien,
+    );
+    expect(gruppen).toHaveLength(1);
+    expect(gruppen[0].kategorieId).toBe("wohnen");
+    expect(gruppen[0].summe).toBe(-5000);
+  });
+
+  /**
+   * Wird direkt auf eine Hauptgruppe gebucht UND auf ihre Unterkategorien, muss die
+   * Gruppenzeile beides tragen — und aufgeklappt beides zeigen. Sonst summieren die
+   * sichtbaren Kinder auf weniger, als die Zeile darüber behauptet.
+   */
+  it("zählt Buchungen direkt auf der Hauptgruppe mit und zeigt sie als Kind", () => {
+    const gruppen = nachHauptgruppe(
+      [
+        { kategorieId: "lebenshaltung", name: "Lebenshaltung", charakter: "Aufwand", summe: -1000, anzahl: 1 },
+        { kategorieId: "essen", name: "Lebensmittel", charakter: "Aufwand", summe: -4000, anzahl: 2 },
+      ],
+      kategorien,
+    );
+    expect(gruppen).toHaveLength(1);
+    expect(gruppen[0].summe).toBe(-5000);
+    expect(gruppen[0].kinder.reduce((s, k) => s + k.summe, 0)).toBe(gruppen[0].summe);
+  });
+
+  it("behält die Sammelzeile ohne Kategorie", () => {
+    const gruppen = nachHauptgruppe(
+      [{ name: "—", charakter: "Aufwand", summe: -700, anzahl: 2 }],
+      kategorien,
+    );
+    expect(gruppen).toHaveLength(1);
+    expect(gruppen[0].kategorieId).toBeUndefined();
+  });
+
+  it("kommt mit einer leeren Liste zurecht", () => {
+    expect(nachHauptgruppe([], kategorien)).toEqual([]);
   });
 });

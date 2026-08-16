@@ -17,13 +17,13 @@ import {
   liquideMittel,
   minorZuMajor,
   parseBetrag,
+  sollRuecklage,
   sollstand,
   topfStand,
   ansparrate,
-  projiziereLiquiditaet,
   type Budget,
   type Cent,
-  type Ersatztopf,
+  type Inventargegenstand,
   type IstBuchung,
   type Puffertopf,
   type Zahlungskonto,
@@ -33,6 +33,7 @@ import { geldFormatierenMitSymbol } from "./geld";
 import { buchungErfassen } from "../application/buchungErfassen";
 import { umbuchungErfassen } from "../application/umbuchungErfassen";
 import { budgetAnlegen } from "../application/budgetAnlegen";
+import { inventarAnlegen } from "../application/inventarAnlegen";
 import { topfAnlegen } from "../application/topfAnlegen";
 import type { BudgetRepository, LedgerPort, TopfRepository } from "../application/ports";
 import type { Topf } from "./topf";
@@ -296,17 +297,24 @@ describe("Topf — Nutzungsdauer/Frist: Validierung vor Rundung", () => {
   // Erwartet: nutzungsdauerMonate 0.4 wird abgelehnt („nutzungsdauer.groesserNull") —
   //   oder mindestens auf 1 geklemmt. Ein Topf mit Nutzungsdauer 0 ist fachlich unmöglich.
   // Tatsächlich: topfAnlegen.ts:35 prüft `Number(0.4) > 0` → true, Zeile 40 macht
-  //   `Math.round(0.4)` → 0. Gespeichert wird ein Ersatztopf mit nutzungsdauerMonate = 0.
+  //   `Math.round(0.4)` → 0. Gespeichert wird ein Aggregat mit Zeitraum = 0.
   // Warum falsch: Reihenfolge-Fehler. Das Aggregat ist ab jetzt dauerhaft kaputt und
   //   liegt in der DB — siehe die beiden Folgetests.
   // GRÜN seit dem Fix: topfAnlegen rundet jetzt VOR der Prüfung und lehnt 0.4 ab —
   // die im Kommentar oben genannte erste Variante ("wird abgelehnt").
   it("nutzungsdauerMonate 0.4 wird abgelehnt statt zu 0 gerundet", async () => {
-    const repo = memToepfe();
-    await expect(topfAnlegen(repo, {
-      typ: "ersatz", bezeichnung: "Kaputt", start: "2026-06-01",
-      wiederbeschaffung: 120000, nutzungsdauerMonate: 0.4,
+    // Seit dem Wegfall des Ersatz-Topfes sitzt dieselbe Reihenfolge am Inventar.
+    const gespeichert: Inventargegenstand[] = [];
+    const repo = {
+      alle: async () => gespeichert,
+      speichern: async (g: Inventargegenstand) => { gespeichert.push(g); },
+      loeschen: async () => {},
+    };
+    await expect(inventarAnlegen(repo, {
+      bezeichnung: "Kaputt", wiederbeschaffung: 120000,
+      nutzungsdauerMonate: 0.4, anschaffung: "2026-06-01",
     })).rejects.toThrow("nutzungsdauer.groesserNull");
+    expect(gespeichert).toHaveLength(0);
   });
 
   it("fristMonate 0.4 wird abgelehnt statt zu 0 gerundet", async () => {
@@ -319,59 +327,33 @@ describe("Topf — Nutzungsdauer/Frist: Validierung vor Rundung", () => {
 
   // [ROT] Fund 6b — Folge: ansparrate wird Infinity, sollstand/topfStand werden NaN.
   // Erwartet: ein endlicher Cent-Wert. Tatsächlich: topf.ts:60 rechnet
-  //   Math.round(120000 / 0) = Infinity; topf.ts:77 rechnet Math.min(Infinity * 0, ziel)
+  //   Math.round(120000 / 0) = Infinity; der Aufbau rechnet Math.min(Infinity * 0, ziel)
   //   — Infinity * 0 ist NaN, Math.min(NaN, …) ist NaN.
   // Warum falsch: NaN ist „klebrig". Es ist weder > noch < irgendetwas, jede Warnlogik
   //   („freie Liquidität < 0?") fällt still auf false zurück, und in der UI steht „NaN".
-  it("[ROT] sollstand eines Topfes mit Nutzungsdauer 0 ist endlich", () => {
-    const topf: Ersatztopf = {
-      id: "t", typ: "ersatz", bezeichnung: "Kaputt", start: "2026-06-01",
-      wiederbeschaffung: 120000, nutzungsdauerMonate: 0,
+  it("[ROT] sollstand eines Topfes mit Zeitfenster 0 ist endlich", () => {
+    const topf: Puffertopf = {
+      id: "t", typ: "puffer", bezeichnung: "Kaputt", start: "2026-06-01",
+      schaetzbetrag: 120000, fristMonate: 0,
     };
     // Nach dem Fix: kein Infinity mehr — ohne gültigen Zeitraum gibt es keinen Aufbau.
     expect(ansparrate(topf)).toBe(0);
     expect(Number.isFinite(sollstand(topf, "2026-06-01") ?? 0)).toBe(true);
   });
 
-  it("[ROT] topfStand eines Topfes mit Nutzungsdauer 0 ist endlich", () => {
-    const topf: Ersatztopf = {
-      id: "t", typ: "ersatz", bezeichnung: "Kaputt", start: "2026-06-01",
-      wiederbeschaffung: 120000, nutzungsdauerMonate: 0,
+  it("[ROT] topfStand eines Topfes mit Zeitfenster 0 ist endlich", () => {
+    const topf: Puffertopf = {
+      id: "t", typ: "puffer", bezeichnung: "Kaputt", start: "2026-06-01",
+      schaetzbetrag: 120000, fristMonate: 0,
     };
     expect(Number.isFinite(topfStand(topf, "2026-06-01", []))).toBe(true);
   });
 
-  // [GRÜN] Fund 6c — Reichweite des NaN, hier bewusst eingegrenzt.
-  // Hypothese war: der NaN vergiftet die ganze Liquiditätsprojektion. Das stimmt NICHT
-  //   und ist hier festgenagelt: projektion.ts:184 bewertet Töpfe immer zum MonatsENDE,
-  //   also mit monate ≥ 1. Dann ist Infinity × 1 = Infinity und Math.min(Infinity, ziel)
-  //   = ziel — endlich. Der NaN entsteht nur bei monate === 0, also bei einer Bewertung
-  //   auf dem Starttag (topfStand/sollstand aus den Töpfe-/Inventar-Screens).
-  // Der Nebenbefund bleibt trotzdem falsch: der kaputte Topf gilt ab dem ERSTEN Monat
-  //   als voll angespart (120000) statt linear aufzubauen — die freie Liquidität wird
-  //   sofort um den vollen Zielwert gedrückt.
-  it("[GRÜN] Liquiditätsprojektion bleibt endlich, wertet den kaputten Topf aber sofort voll", () => {
-    const kaputt: Ersatztopf = {
-      id: "t", typ: "ersatz", bezeichnung: "Kaputt", start: "2026-06-01",
-      wiederbeschaffung: 120000, nutzungsdauerMonate: 0,
-    };
-    const gesund: Puffertopf = {
-      id: "p", typ: "puffer", bezeichnung: "Puffer", start: "2026-06-01",
-      schaetzbetrag: 60000, fristMonate: 6,
-    };
-    const plan = projiziereLiquiditaet([], [], [kaputt, gesund], "2026-06-01", 3, 500000);
-    expect(plan.every((m) => Number.isFinite(m.freieLiquiditaet))).toBe(true);
-    // Nach dem Fix trägt der kaputte Topf gar nichts mehr bei (Rate 0), statt ab dem
-    // ersten Monat als voll angespart zu gelten und die freie Liquidität sofort um den
-    // vollen Zielwert zu drücken. Übrig bleibt nur der gesunde Puffer.
-    expect(plan[0].sollSumme).toBe(10000);
-  });
-
-  // [GRÜN] mit gültiger Nutzungsdauer rechnet der Topf sauber.
-  it("[GRÜN] regulärer Ersatztopf: Sollstand baut linear auf und deckelt am Ziel", () => {
-    const topf: Ersatztopf = {
-      id: "t", typ: "ersatz", bezeichnung: "Waschmaschine", start: "2026-01-01",
-      wiederbeschaffung: 60000, nutzungsdauerMonate: 60,
+  // [GRÜN] mit gültigem Zeitfenster rechnet der Topf sauber.
+  it("[GRÜN] regulärer Puffertopf: Sollstand baut linear auf und deckelt am Ziel", () => {
+    const topf: Puffertopf = {
+      id: "t", typ: "puffer", bezeichnung: "Waschmaschine", start: "2026-01-01",
+      schaetzbetrag: 60000, fristMonate: 60,
     };
     expect(ansparrate(topf)).toBe(1000);
     expect(sollstand(topf, "2026-07-01")).toBe(6000);
@@ -386,20 +368,20 @@ describe("Topf — Nutzungsdauer/Frist: Validierung vor Rundung", () => {
 describe("Rundungsverlust bei Anteilsrechnung", () => {
   // [ROT] Fund 7 — die Ansparrate erreicht das Ziel am Ende der Nutzungsdauer nicht.
   // Erwartet: nach genau `nutzungsdauerMonate` Monaten ist der Sollstand == Zielwert.
-  //   Das ist die fachliche Zusage des Ersatztopfs: am Ende der Nutzungsdauer ist die
-  //   Wiederbeschaffung angespart.
+  //   Das ist die fachliche Zusage der Inventar-Rücklage: am Ende der Nutzungsdauer ist
+  //   die Wiederbeschaffung beisammen.
   // Tatsächlich: 1000 Cent / 3 Monate → Math.round(333,33) = 333 → nach 3 Monaten 999.
   //   Es fehlt 1 Cent, dauerhaft (Math.min deckelt nur nach oben, gleicht nichts aus).
   // Warum falsch: topf.ts:60 rundet die Rate einmal und multipliziert; der Restbetrag
   //   wird nirgends verteilt. Die Abweichung wächst mit der Zahl der Perioden
   //   (bis zu (nutzungsdauer/2) Cent) und trifft jeden Topf, dessen Ziel nicht glatt
   //   durch die Monate teilbar ist — also die Mehrheit.
-  it("[ROT] Ersatztopf erreicht das Ziel am Ende der Nutzungsdauer exakt", () => {
-    const topf: Ersatztopf = {
-      id: "t", typ: "ersatz", bezeichnung: "Krumm", start: "2026-01-01",
-      wiederbeschaffung: 1000, nutzungsdauerMonate: 3,
+  it("[ROT] Inventar-Rücklage erreicht das Ziel am Ende der Nutzungsdauer exakt", () => {
+    const g: Inventargegenstand = {
+      id: "g", bezeichnung: "Krumm", wiederbeschaffung: 1000,
+      nutzungsdauerMonate: 3, anschaffung: "2026-01-01",
     };
-    expect(sollstand(topf, "2026-04-01")).toBe(1000);
+    expect(sollRuecklage(g, "2026-04-01")).toBe(1000);
   });
 
   // [ROT] Fund 8 — 12 geglättete Monatsabflüsse ergeben nicht den Jahresrahmen.
@@ -451,7 +433,7 @@ describe("budgetVerbrauch — Erstattungen", () => {
       ist({ betrag: -5000, datum: "2026-06-05", kategorieId: "lebensmittel", charakter: "Aufwand" }),
       ist({ betrag: 2000, datum: "2026-06-12", kategorieId: "lebensmittel", charakter: "Aufwand" }),
     ];
-    expect(budgetVerbrauch(buchungen, "lebensmittel", "2026-06-01", "2026-07-01")).toBe(3000);
+    expect(budgetVerbrauch(buchungen, [], "lebensmittel", "2026-06-01", "2026-07-01")).toBe(3000);
   });
 
   // [GRÜN] reine Abflüsse werden korrekt aufsummiert und gefenstert.
@@ -462,7 +444,7 @@ describe("budgetVerbrauch — Erstattungen", () => {
       ist({ betrag: -2000, datum: "2026-06-07", kategorieId: "andere", charakter: "Aufwand" }),
       ist({ betrag: -3000, datum: "2026-06-08", kategorieId: "lebensmittel", charakter: "Umschichtung" }),
     ];
-    expect(budgetVerbrauch(buchungen, "lebensmittel", "2026-06-01", "2026-07-01")).toBe(5000);
+    expect(budgetVerbrauch(buchungen, [], "lebensmittel", "2026-06-01", "2026-07-01")).toBe(5000);
   });
 });
 
@@ -470,40 +452,29 @@ describe("budgetVerbrauch — Erstattungen", () => {
 // 7. topfStand — Entnahme am Zyklus-Starttag
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("topfStand — Ersatztopf-Fensterung", () => {
-  // [ROT] Fund 10 — eine Entnahme AM Starttag verschwindet spurlos.
-  // Erwartet: Ein Ersatztopf, der am 2026-01-01 startet und am selben Tag eine
-  //   Entnahme von 100 € trägt, steht bei −10.000 Cent (Überziehung).
-  // Tatsächlich: 0 — topf.ts:110 filtert `b.datum > topf.start` (strikt), die Buchung
-  //   auf dem Starttag fällt heraus.
-  // Warum falsch: Der Filter existiert für „ersetzt" (die auslösende Entnahme gehört zum
-  //   alten Zyklus). Er trifft aber auch jede unabhängige Entnahme am Starttag — etwa
-  //   wenn der Nutzer den Topf am selben Tag anlegt, an dem er entnimmt, oder wenn
-  //   nach „ersetzt" am Anschaffungstag noch eine zweite Zahlung folgt. Diese Buchung
-  //   senkt zwar den Kontostand, aber nie den Topfstand: die Deckungsrechnung ist
-  //   dauerhaft zu optimistisch.
-  // BEWUSST NICHT GEFIXT — der naheliegende Fix (>= statt >) würde eine dokumentierte
-  // Semantik brechen: die „ersetzt"-Aktion setzt `start` auf den Anschaffungstag, und die
-  // auslösende Entnahme liegt genau dort. Mit >= zöge sie den frisch begonnenen Zyklus
-  // sofort ins Minus — schlimmer als der Fund.
+describe("topfStand — Entnahme am Starttag", () => {
+  // Fund 10 war: eine Entnahme AM Starttag verschwand spurlos, weil topfStand für
+  // Ersatz-Töpfe `b.datum > topf.start` filterte (die „ersetzt"-Aktion setzte den Start
+  // auf den Anschaffungstag, und die auslösende Entnahme lag genau dort). Der Filter war
+  // bewusst nicht gefixt, weil >= den frisch begonnenen Zyklus sofort ins Minus gezogen
+  // hätte.
   //
-  // Sauber wäre, die auslösende Entnahme explizit zu markieren, statt sie am Datum zu
-  // erraten; das ist eine Datenmodell-Frage (ein Feld an der Buchung oder an der
-  // Verwendung) und keine Zeile in dieser Funktion. Der Test hält den Ist-Zustand fest.
-  it("Entnahme am Zyklus-Starttag zählt (noch) nicht gegen den Topfstand", () => {
-    const topf: Ersatztopf = {
-      id: "t", typ: "ersatz", bezeichnung: "Laptop", start: "2026-01-01",
-      wiederbeschaffung: 120000, nutzungsdauerMonate: 48,
+  // ERLEDIGT seit 2026-08-16: Der Ersatz-Topf ist entfallen — das Inventar rechnet ohne
+  // Entnahme-Buchungen. Damit gibt es keine Sonderfensterung mehr, und jede Entnahme
+  // zählt, egal an welchem Tag sie liegt.
+  it("Entnahme am Starttag senkt den Stand", () => {
+    const topf: Puffertopf = {
+      id: "t", typ: "puffer", bezeichnung: "Laptop", start: "2026-01-01",
+      schaetzbetrag: 120000, fristMonate: 48,
     };
     const entnahme = ist({ betrag: -10000, datum: "2026-01-01", charakter: "Umschichtung" });
-    expect(topfStand(topf, "2026-01-01", [entnahme])).toBe(0);
+    expect(topfStand(topf, "2026-01-01", [entnahme])).toBe(-10000);
   });
 
-  // [GRÜN] einen Tag später zählt sie korrekt.
   it("[GRÜN] Entnahme nach dem Starttag senkt den Stand", () => {
-    const topf: Ersatztopf = {
-      id: "t", typ: "ersatz", bezeichnung: "Laptop", start: "2026-01-01",
-      wiederbeschaffung: 120000, nutzungsdauerMonate: 48,
+    const topf: Puffertopf = {
+      id: "t", typ: "puffer", bezeichnung: "Laptop", start: "2026-01-01",
+      schaetzbetrag: 120000, fristMonate: 48,
     };
     const entnahme = ist({ betrag: -10000, datum: "2026-01-02", charakter: "Umschichtung" });
     expect(topfStand(topf, "2026-01-01", [entnahme])).toBe(-10000);

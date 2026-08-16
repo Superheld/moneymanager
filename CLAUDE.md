@@ -2,10 +2,31 @@
 
 Lokale Haushalts-Finanz-App (Tauri 2 + React + TS, hexagonaler portabler TS-Kern, SQLite lokal).
 
+## Stadium: Alpha
+Die App ist **nicht veröffentlicht**. Es gibt genau einen Datenbestand — den lokalen —,
+und der lässt sich per Import wiederherstellen. Sichtbar gemacht wird das in der
+Seitenleiste (`APP_STADIUM` in `src/version.ts`); im Versionsstring steht es bewusst
+nicht, weil der in die Tauri-Bundle-Metadaten durchschlägt.
+
+Was daraus folgt: **Migrationen dürfen auch wegnehmen.** Tabellen und Spalten, die kein
+Code mehr kennt, werden abgeräumt statt als Altlast mitgeschleppt (so geschehen mit v18:
+Szenario-Tabellen, Ersatz-Topf-Spalten). Die Regeln darunter gelten unverändert weiter —
+append-only, forward-only, jedes Statement wiederholbar (siehe *Invarianten*). Vor einem
+Abräumen wird geprüft, dass die Ziele leer sind; ist Inhalt drin, gehört er benannt und
+gesichert, nicht stillschweigend gelöscht. Mit dem ersten veröffentlichten Stand endet
+diese Freiheit.
+
 ## Wo die Wahrheit liegt
 Fachliche Doku (DDD-Modell, ADRs, Design-System) wird **außerhalb dieses Repos** geführt.
 Im Repo steht der lauffähige Code; die UI-Begriffe folgen dem Glossar
 (Rücklage → *Spartopf*, Rückstellung → *Puffer*, Liquidität → *Verfügbares Geld*).
+
+## Branches
+Jede Änderung — Feature, Bug, Doku — bekommt einen eigenen Branch und wird von dort
+per `--no-ff` nach **`develop`** gemerged. `develop` ist der Sammelpunkt: dort parkt
+alles, bis wir bewusst nach `main` durchreichen und pushen. Auf `main` wird nicht
+direkt gearbeitet; `main` bleibt der Stand, der veröffentlicht ist.
+Vor jedem Merge nach `develop`: `npm run typecheck` und `npm test` grün.
 
 ## Befehle
 ```bash
@@ -17,6 +38,11 @@ npm run typecheck
 ```
 Die Shell-cwd driftet zwischen Calls — Pfade absolut halten.
 `tsc --noEmit | tail` verschluckt den Exit-Code; lieber `tsc --noEmit; echo $?`.
+
+**Node kommt über mise** (`mise.toml`: node 26). In einer nicht-interaktiven Shell ist
+`mise` keine Funktion — dann `eval "$(/opt/homebrew/bin/mise env -s bash)"` voranstellen,
+sonst greift das ältere Node aus dem PATH. Die CI pinnt dieselbe Hauptversion getrennt
+in `.github/workflows/ci.yml`, weil Actions die mise.toml nicht liest.
 
 ## Dev-Fallen
 - **WebView-Cache (Tauri dev):** Erscheinen Frontend-Änderungen NICHT im Fenster trotz
@@ -60,24 +86,47 @@ außen. Tests als `*.test.ts` neben dem Code.
 - **Charakter = `Aufwand | Ertrag | Umschichtung`** (erfolgs- vs. liquiditätswirksam;
   Umschichtung = Aktivtausch, keine Ausgabe).
 - **Migrationen** in `adapters/persistence/migrations.ts`: versioniert, **forward-only,
-  append-only** — bestehende Versionen nie editieren, neue Version anhängen.
-  `migrate()` klammert jede Migration mit ihrem Versionseintrag in eine Transaktion.
-  ⚠️ Ob `BEGIN`/`COMMIT` über tauri-plugin-sql auf derselben Connection landen, ist NICHT
-  verifiziert (der Test läuft gegen sql.js) — vor dem nächsten Schema-Schritt an der
-  echten DB prüfen.
+  append-only** — bestehende Versionen nie editieren, neue Version anhängen. Eine neue
+  Version darf in der Alpha auch abräumen (`DROP TABLE IF EXISTS`, `DROP COLUMN`), siehe
+  *Stadium*; `migrate()` überspringt einen `DROP COLUMN`, dessen Spalte schon fehlt.
+  **Keine Transaktionen — jedes Statement muss WIEDERHOLBAR sein.** Geprüft 2026-08-16:
+  tauri-plugin-sql führt jedes `execute` über `pool.execute()` aus, und `Executor for
+  &Pool` holt pro Aufruf eine Verbindung aus einem Pool der sqlx-Standardgröße 10.
+  Ein `BEGIN` öffnet die Transaktion also auf einer Verbindung, die danach mit offener
+  Transaktion in den Pool zurückgeht — die Statements laufen auf anderen und committen
+  einzeln. `migrate()` klammert deshalb nichts mehr, sondern überspringt bereits
+  vorhandene Spalten per `PRAGMA table_info` (`CREATE …` trägt ohnehin `IF NOT EXISTS`).
+  Neue Migrationen müssen sich in diese Regel fügen; ein Datenumbau (UPDATE/DELETE)
+  braucht eine eigene Lösung, keine Scheintransaktion.
 - **`IstBuchung` trägt KEINEN Empfänger/Verwendungszweck** — die stehen am `Umsatz`
   (Import-Kontext); Join über `Umsatz.istbuchungId` für Detail-/Reporting-Ansichten.
 - **Tauri = nur Hülle:** Domänen-/Backend-Logik läuft als TS in der Webview, nicht in Rust
   (`src-tauri/` ist bewusst dünn). Logische Trennung (hexagonal), kein eigener Backend-Prozess.
 
-## Offene Schuld vor der nächsten Import-Quelle
-Der `rohHash` (Dedup-Schlüssel) enthält seit 2026-08-15 die Gegenpartei. Bestehende
-Umsätze tragen weiter den ALTEN Schlüssel. Solange jede Quelle native IDs liefert
-(Finanzguru), ist das folgenlos — die Dedup entscheidet dort über die ID. Vor der ersten
-ID-losen Quelle (Bank-CSV, FinTS) müssen die Bestands-Hashes einmalig neu berechnet
-werden, sonst deduppt der erste Abruf nicht gegen den Bestand und legt alles doppelt an.
-Der Backfill braucht die Konto-IBAN, die nicht am Umsatz, sondern am Zahlungskonto liegt.
-Details in `application/import/rohHash.ts`.
+## Datenstand
+Die lokale DB wurde am **2026-08-16 zurückgesetzt** (Datei gelöscht, Schema frisch bis
+v15 aufgebaut, Standardkategorien über den Bootstrap). Zahlungskonten müssen von Hand neu
+angelegt werden, alles andere kommt über den Import.
+
+Damit ist die frühere Schuld am `rohHash` **erledigt**: der Dedup-Schlüssel enthält seit
+2026-08-15 die Gegenpartei, und Bestandsdaten mit dem alten Schlüssel gibt es nicht mehr.
+Ein Backfill vor der ersten ID-losen Quelle (Bank-CSV, FinTS) ist nicht mehr nötig.
+Sicherungen des alten Stands liegen als `moneymanager.db.vor-reset-*` neben der DB.
+
+Der Bestand (5279 Umsätze, 5206 verbucht) stammt aus **einem** Import derselben xlsx.
+Die Gläubiger-ID (Migration 16) wurde am 2026-08-16 über die `Buchungs-ID` nachgetragen
+statt neu zu importieren — 418 Zeilen, ohne die 4426 kategorisierten Ist-Buchungen zu
+verlieren. Sicherung: `moneymanager.db.vor-glaeubiger-backfill-*`.
+
+## Kein E2E — und was stattdessen trägt
+`tauri-driver` gibt es für Linux und Windows, **nicht für macOS** (WKWebView bietet
+keinen WebDriver). Playwright gegen `npm run dev` bringt nichts: die Webview allein hat
+kein SQLite-Plugin und damit keine Daten.
+Ersatz, der wirklich trägt: die jsdom-Tests laufen von der Oberfläche bis ins Schema
+(echte In-Memory-SQLite), und gegen den **echten** Bestand lassen sich App-Code-Pfade
+headless fahren — `cp` der DB nach `/tmp`, dann `npx vite-node <skript.ts>` mit Import
+aus `src/`. So wurden Vertrags- und Budgeterkennung kalibriert. Bei `sqlite3 -json` über
+viele Zeilen `maxBuffer` hochsetzen, sonst `ENOBUFS`.
 
 ## Sprache
 Deutsch, Anrede „du", keine Emoji. Fachlich streng innen, alltagstauglich außen (Glossar).

@@ -1,19 +1,16 @@
-// Projektion — die Core Domain. Aus Zahlungsregeln entstehen Plan-Zahlungen auf
-// einer Zeitachse; daraus wird der Monatsverlauf (netto + laufender Saldo) aggregiert.
+// Projektion — aus Zahlungsregeln entstehen Plan-Zahlungen auf einer Zeitachse.
 // Strikt seiteneffektfrei: kein IO, keine Uhr, kein Zufall → trivial unit-testbar.
 // Planbuchungen werden BERECHNET, nicht gespeichert (TAKTIK-PLANUNG §0).
+//
+// Die Monatsverlaufs- und Liquiditätsaggregation stand hier einmal daneben; sie ist mit
+// den Bereichen Planung und Deckung entfallen (2026-08-16). Wer heute einen Monat
+// aufrechnet, tut das über `monatsAusblick` gegen Ist-Buchungen, nicht gegen eine Kurve.
 
 import type { Cent } from "./geld";
 import { RHYTHMUS_MONATE, type Charakter, type Zahlungsregel } from "./zahlungsregel";
-import { addMonate, monatsIndex, ord, parseIso, toIso } from "./datum";
-import { geglaetteterMonatsabfluss, type Budget } from "./budget";
-import { sollstand, zielwert, type Topf } from "./topf";
+import { addMonate, ord, parseIso, toIso } from "./datum";
 import { planRefKey } from "./istbuchung";
 
-const MONATSNAMEN = [
-  "Jan", "Feb", "Mär", "Apr", "Mai", "Jun",
-  "Jul", "Aug", "Sep", "Okt", "Nov", "Dez",
-];
 
 /** Eine berechnete Plan-Zahlung (nicht persistiert). */
 export interface Planbuchung {
@@ -78,141 +75,31 @@ export function projiziereRegel(
   return buchungen;
 }
 
-/** Ein Monat im projizierten Verlauf. */
-export interface MonatsVerlauf {
-  readonly jahr: number;
-  readonly monat: number; // 1–12
-  readonly label: string; // z. B. „Jun 26"
-  readonly zufluss: Cent;
-  readonly abfluss: Cent; // negativ oder 0
-  readonly netto: Cent;
-  readonly saldo: Cent; // laufender Kontosaldo am Monatsende
-  readonly buchungen: Planbuchung[];
-}
-
 /**
- * Aggregiert alle Regeln zu einem Monatsverlauf über `monate` ab `ab`.
- * Liefert je Monat Zu-/Abfluss, Netto und den laufenden Saldo (Startsaldo +
- * kumuliertes Netto). Das ist der „projizierte 12-Monats-Verlauf" der DoD.
+ * Nächste Fälligkeit einer Regel ab `heute` (einschließlich heute), oder null, wenn
+ * keine mehr kommt. Eigene Funktion statt `projiziereRegel(...)[0]`: die Projektion
+ * baut ein ganzes Fenster auf, und wer nur den nächsten Termin braucht (Vertragsliste),
+ * müsste raten, wie weit das Fenster reichen muss — bei einem Jahresvertrag zwölf
+ * Monate, bei einem monatlichen einer.
+ *
+ * Rechnet wie die Projektion aus dem ORIGINAL-Startdatum + k·Schritt, damit der
+ * Monatstag nicht driftet (ein Vertrag ab dem 31. bliebe sonst nach dem Februar
+ * dauerhaft am 28. kleben).
  */
-export function projiziereVerlauf(
-  regeln: Zahlungsregel[],
-  ab: string,
-  monate: number,
-  startsaldo: Cent,
-  bezahlt?: ReadonlySet<string>,
-): MonatsVerlauf[] {
-  const start = parseIso(ab);
+export function naechsteFaelligkeit(regel: Zahlungsregel, heute: string): string | null {
+  const schritt = RHYTHMUS_MONATE[regel.rhythmus];
+  const start = parseIso(regel.startdatum);
+  const jetzt = parseIso(heute);
+  const heuteOrd = ord(jetzt);
 
-  // Leere Monatskörbe vorbereiten. Ganzzahlig: bei 12.5 entstanden 13 Körbe, während
-  // das Fensterende über addMonate(start, 12.5) woanders lag — Korbanzahl und Fenster
-  // liefen auseinander.
-  const koerbe: MonatsVerlauf[] = [];
-  const anzahlMonate = Math.max(0, Math.floor(monate));
-  for (let i = 0; i < anzahlMonate; i++) {
-    const ym = addMonate(start, i);
-    koerbe.push({
-      jahr: ym.y,
-      monat: ym.m,
-      label: `${MONATSNAMEN[ym.m - 1]} ${String(ym.y).slice(-2)}`,
-      zufluss: 0,
-      abfluss: 0,
-      netto: 0,
-      saldo: 0,
-      buchungen: [],
-    });
+  // Direkt in die Nähe springen statt vom Startdatum hochzuzählen — Regeln mit sehr
+  // altem Start (Miete seit 2009) sind der Normalfall, nicht die Ausnahme.
+  const monateBisHeute = (jetzt.y - start.y) * 12 + (jetzt.m - start.m);
+  let k = Math.max(0, Math.floor(monateBisHeute / schritt));
+  // Der Sprung landet höchstens einen Zyklus daneben; drei Schritte sind reichlich.
+  for (let i = 0; i < 3; i++, k++) {
+    const faellig = addMonate(start, k * schritt);
+    if (ord(faellig) >= heuteOrd) return toIso(faellig);
   }
-
-  for (const regel of regeln) {
-    for (const b of projiziereRegel(regel, ab, anzahlMonate, bezahlt)) {
-      const ymd = parseIso(b.datum);
-      const k = koerbe[monatsIndex(start, ymd.y, ymd.m)];
-      if (!k) continue;
-      k.buchungen.push(b);
-      if (b.betrag >= 0) {
-        (k as { zufluss: Cent }).zufluss += b.betrag;
-      } else {
-        (k as { abfluss: Cent }).abfluss += b.betrag;
-      }
-    }
-  }
-
-  let saldo = startsaldo;
-  for (const k of koerbe) {
-    (k as { netto: Cent }).netto = k.zufluss + k.abfluss;
-    saldo += k.netto;
-    (k as { saldo: Cent }).saldo = saldo;
-  }
-  return koerbe;
-}
-
-/** Ein Monat im Liquiditätsplan mit beiden Kurven. */
-export interface LiquiditaetsMonat {
-  readonly jahr: number;
-  readonly monat: number;
-  readonly label: string;
-  /** Echte Flüsse aus Zahlungsregeln/Verträgen. */
-  readonly zufluss: Cent;
-  readonly abfluss: Cent;
-  /** Geglättete Budget-Abflüsse (negativ). */
-  readonly budgetAbfluss: Cent;
-  readonly netto: Cent; // zufluss + abfluss + budgetAbfluss
-  /** Kontosaldo am Monatsende (echte Flüsse, OHNE Topf-Zuführungen). */
-  readonly kontosaldo: Cent;
-  /** Summe der Topf-Sollstände am Monatsende (nur Töpfe mit Zielwert). */
-  readonly sollSumme: Cent;
-  /** Freie Liquidität = Kontosaldo − Σ Topf-Sollstände. Darf ins Minus (Überplanung). */
-  readonly freieLiquiditaet: Cent;
-}
-
-/**
- * Vollständiger Liquiditätsplan über alle Plan-Quellen (BAUPLAN P2.4): zwei Kurven.
- *  • Kontosaldo: Startsaldo + echte Flüsse (Verträge/Regeln, Budget-Verbrauch).
- *    Topf-Zuführungen bewegen kontolose Töpfe NICHT — das Geld bleibt auf dem Konto.
- *  • Freie Liquidität: Kontosaldo − Σ Topf-Sollstände. Reicht das Geld nicht für alle
- *    Töpfe, geht sie ins Minus (Überplanung sichtbar; keine Allokation, keine Warnung).
- * Topf-Sollstände werden zum MonatsENDE bewertet (erster Tag des Folgemonats).
- */
-export function projiziereLiquiditaet(
-  regeln: Zahlungsregel[],
-  budgets: Budget[],
-  toepfe: Topf[],
-  ab: string,
-  monate: number,
-  startsaldo: Cent,
-  bezahlt?: ReadonlySet<string>,
-): LiquiditaetsMonat[] {
-  const start = parseIso(ab);
-  // Dieselbe ganzzahlige Monatszahl wie im Verlauf verwenden, sonst laufen die beiden
-  // Reihen auseinander (bei 12.5 hatte der Verlauf 13 Körbe, diese Schleife 13 Runden
-  // und griff auf einen nicht existierenden zu).
-  const anzahlMonate = Math.max(0, Math.floor(monate));
-  const regelVerlauf = projiziereVerlauf(regeln, ab, anzahlMonate, startsaldo, bezahlt);
-  const budgetProMonat = budgets.reduce((s, b) => s + geglaetteterMonatsabfluss(b), 0);
-  const sollToepfe = toepfe.filter((t) => zielwert(t) != null);
-
-  const ergebnis: LiquiditaetsMonat[] = [];
-  let kontosaldo = startsaldo;
-  for (let i = 0; i < anzahlMonate; i++) {
-    const rv = regelVerlauf[i];
-    const netto = rv.netto + budgetProMonat;
-    kontosaldo += netto;
-
-    const monatsende = toIso(addMonate(start, i + 1));
-    const sollSumme = sollToepfe.reduce((s, t) => s + (sollstand(t, monatsende) ?? 0), 0);
-
-    ergebnis.push({
-      jahr: rv.jahr,
-      monat: rv.monat,
-      label: rv.label,
-      zufluss: rv.zufluss,
-      abfluss: rv.abfluss,
-      budgetAbfluss: budgetProMonat,
-      netto,
-      kontosaldo,
-      sollSumme,
-      freieLiquiditaet: kontosaldo - sollSumme,
-    });
-  }
-  return ergebnis;
+  return null;
 }

@@ -7,58 +7,72 @@ Eine **lokale** Finanzverwaltungs-App, die das Denken des betrieblichen Rechnung
 in einer Sprache, die normale Menschen verstehen. Die App ist *heimlich eine private Bilanz
 plus Finanzplan*. Sie unterscheidet konsequent:
 
-- **Plan vs. Ist** — wie verhält sich mein Jahr voraussichtlich, nicht nur die Rückschau.
+- **Plan vs. Ist** — was der Plan sagt und was tatsächlich gebucht wurde, nebeneinander.
 - **Ausgabe vs. Vermögensumschichtung** — ein ETF-Sparplan ist keine „Ausgabe".
 - **Zweckbindung vs. Liquidität** — eine Rücklage „liegt" nicht auf einem Konto, sie ist davon *gedeckt*.
 
 **Lokal first:** Alle Daten bleiben auf dem Gerät, keine Cloud-Pflicht. Funktioniert ohne KI —
-der Kern (Projektion, Töpfe, Liquidität) ist reine Arithmetik.
+der Kern (Aufrechnung, Töpfe, Rücklagen) ist reine Arithmetik.
 
-## Status — v0.11.0 (Import, Historie & Konto-Auszug)
+> **Alpha.** Die App ist nicht veröffentlicht und wird an einem einzigen Datenbestand
+> entwickelt. Das Schema darf sich noch ohne Rücksicht ändern — Migrationen dürfen auch
+> wegnehmen. Wer sie ausprobiert, sollte damit rechnen.
 
-Auf der kompletten **Planungsseite** und dem **Ist-Schritt „light"** (ADR-0002/0003)
-aufbauend — Details im [CHANGELOG](CHANGELOG.md):
+## Status — v0.12.0 (Monatsausblick, Vorschläge, Aufräumen)
 
-- **Import (Finanzguru-CSV).** Modulare Quellen-Naht (weitere Formate/Apps andockbar),
-  Konto-Zuordnung mit Auto-Anlegen, Dedup (native ID + Roh-Hash), Kategorie-Vorschläge per
-  Remapping. Reversibler **Entwurfs-Stapel** → **Review-Inbox** (prüfen, kategorisieren,
-  Volltextsuche) → **Verbuchen** ins Ledger. Interne **Umbuchungen werden gepaart** zu
-  verknüpften Doppelbuchungen (heuristisch über Gegenbetrag + Konto + Datumsfenster).
-- **Historie (Rückblick).** Echte Monatsflüsse + realer Saldo-Verlauf über die Zeit; Klick
-  auf einen Monat → Kategorie-Aufschlüsselung; Klick auf eine Kategorie → Einzelbuchungen.
-- **Konten als Auszug.** Statement-Ansicht je Konto (realer Stand prominent); gebuchte
-  Historie als Tabelle mit Volltextsuche, Art-/Kategorie-Filter und Pagination; Konto per
-  Klick wechseln; Ist-Buchungen **bearbeiten & entfernen** (auch importierte).
-- **Listen & Tabellen.** Spalten-Sortierung, Pagination und **Übersichtszahlen (KPIs)** auf
-  Inventar, Verträgen, Budgets und Töpfen.
+Details im [CHANGELOG](CHANGELOG.md):
+
+- **Monatsausblick.** Drei Karten oben in der Übersicht — laufender Monat und die beiden
+  folgenden —, jede als Aufrechnung: Einnahmen − Verträge − Budgets − Rücklagen = bleibt.
+  Der laufende Monat zeigt gebucht und geplant nebeneinander; jede Zeile klappt zu ihren
+  Posten auf. Einnahmen kommen aus Verträgen, nicht aus einer Hochrechnung.
+- **Verträge und Budgets schlagen sich selbst vor.** Wiederkehrende Zahlungen werden aus
+  den Buchungen erkannt (beide Richtungen, mit Konto und Rhythmus); Budgetrahmen ergeben
+  sich aus dem Median der Monatssummen **abzüglich** des vertraglich gebundenen Teils —
+  was automatisch abgeht, steuert kein Budget.
+- **Import (Finanzguru-xlsx).** Modulare Quellen-Naht (weitere Formate andockbar),
+  Konto-Zuordnung mit Auto-Anlegen, Dedup (native ID + Roh-Hash), Kategorie-Vorschläge.
+  Reversibler **Entwurfs-Stapel** → **Review-Inbox** → **Verbuchen** ins Ledger. Interne
+  Umbuchungen werden zu verknüpften Doppelbuchungen gepaart.
+- **Übersicht (Rückblick).** Monatsflüsse, realer Saldo-Verlauf, Kategorie-Aufschlüsselung
+  wahlweise einzeln oder nach Hauptgruppen, bis hinunter zur Einzelbuchung — die sich von
+  dort auch gleich korrigieren lässt.
+- **Konten als Auszug.** Statement-Ansicht je Konto, Volltextsuche, Art-/Kategorie-Filter,
+  Pagination; Buchungen bearbeiten, aufteilen und zu Umbuchungen paaren.
+- **Inventar.** Wiederbeschaffung ÷ Nutzungsdauer ergibt die monatliche Rücklage; nennt man
+  das Konto, auf dem das Geld liegt, wird die Rechnung gegen den echten Stand abgeglichen.
 
 | Phase | Inhalt | Status |
 |---|---|---|
 | P0 | Walking Skeleton (Regel → Projektion → SQLite) | ✓ |
 | P1 | Stammdaten (Personen, Konten, Kategorien) | ✓ |
-| P2 | Verträge · Budgets · Inventar/Töpfe · Liquiditätsplaner · Szenario | ✓ |
-| P3 | Ist light — „bezahlt markieren", Ledger-Port, Reconciliation light, Konto-Register (ADR-0002) | ✓ |
+| P2 | Verträge · Budgets · Inventar/Töpfe | ✓ |
+| P3 | Ist light — „bezahlt markieren", Ledger-Port, Konto-Register (ADR-0002) | ✓ |
 | P3.1 | Topf-Entnahme als Buchungssatz, realer Topf-Stand, Budget Plan/Ist (ADR-0003) | ✓ |
-| P3.5 | Bankimport (Finanzguru-CSV) → Inbox → Verbuchen; Umbuchungs-Paarung | ✓ |
+| P3.5 | Bankimport (Finanzguru-xlsx) → Inbox → Verbuchen; Umbuchungs-Paarung | ✓ |
 | P3.6 | Historie/Auswertungen, Konto-Auszug, Buchungen bearbeiten, Tabellen-Komfort | ✓ |
-| P4 | Plan/Ist-Auto-Matching · weitere Quellen (CAMT/FinTS) · KI-Vorbereitung | offen |
+| P3.7 | Monatsausblick, Vertrags- und Budgetvorschläge aus den Buchungen | ✓ |
+| P4 | Vorausschau neu gedacht · weitere Quellen (CAMT/FinTS) · KI-Vorbereitung | offen |
 
-Nutzbar: Verträge/Budgets/Töpfe fließen in eine 12-Monats-Projektion mit zwei Kurven
-(Kontosaldo + freie Liquidität); Überplanung wird sichtbar; What-if per Szenario. Geplante
-Zahlungen lassen sich als bezahlt abhaken; Kontoauszüge importieren, prüfen und verbuchen;
-die Historie zeigt, wie es tatsächlich lief.
+Nutzbar: Kontoauszüge importieren, prüfen und verbuchen; sehen, wie es tatsächlich lief;
+Verträge und Budgets aus den eigenen Daten aufbauen; und Monat für Monat aufrechnen, was
+nach allen Verpflichtungen übrig bleibt.
+
+**Zurückgestellt:** Die frühere Planungsseite (12-Monats-Liquiditätskurve, Szenarien,
+Deckungsgrad) ist in 0.12.0 entfallen. Sie versprach eine Genauigkeit, die das Modell nicht
+hielt; die Vorausschau kommt wieder, dann anders geschnitten.
 
 ## Architektur
 
 Tauri 2 + React + TypeScript, **hexagonaler, portabler TS-Domänenkern**, SQLite lokal.
 
 ```
-src/core/         reine Domäne (Projektion, Töpfe, Kündigung, Historie …), unit-getestet
+src/core/         reine Domäne (Aufrechnung, Töpfe, Kündigung, Historie …), unit-getestet
 src/application/  Use-Cases + Ports
   import/           Import-Kontext: Quellen-Port, Umsatz-Aggregat, Dedup, Remapping
 src/adapters/     Außenwelt hinter den Ports
   persistence/      SQLite (tauri-plugin-sql) + versionierte Migrationskette
-  import/           Quellen-Adapter (Finanzguru-CSV; weitere andockbar)
+  import/           Quellen-Adapter (Finanzguru-xlsx; weitere andockbar)
   ui/               React-UI
 src/test/         Test-Harness (In-Memory-SQLite, Render-Helfer)
 src-tauri/        dünne Rust-Hülle
@@ -71,7 +85,8 @@ verbucht werden.
 
 ## Entwicklung
 
-Voraussetzungen: Node, Rust-Toolchain (Tauri-Build), npm.
+Voraussetzungen: Node 26 (steht in der `mise.toml` — `mise install` genügt), npm,
+Rust-Toolchain für den Tauri-Build.
 
 ```bash
 npm install
@@ -88,10 +103,13 @@ Getestet wird **von innen nach außen** (hexagonal): Domänenkern und Use-Cases 
 Unit-Tests, Repositories und UI als Integration gegen ein In-Memory-SQLite (sql.js, ohne
 Tauri-Runtime) — dieselbe SQL-Engine wie in der App, nur ohne Attrappen dazwischen. Ein
 falsches Spalten-Mapping fällt damit genauso auf wie eine kaputte Anzeige.
-**Abdeckung: rund 90 %** über das gesamte Projekt. **CI** (GitHub Actions) erzwingt bei
-jedem Push/PR Typecheck, Tests und Frontend-Build.
+**Abdeckung: rund 86 % Statements / 87 % Zeilen** über das gesamte Projekt (Ziel: 90 %).
+**CI** (GitHub Actions) erzwingt bei jedem Push auf `main`/`develop` und für Pull Requests
+Typecheck, Tests und Frontend-Build.
 
-Noch offen (bewusst): End-to-End-Tests gegen die gebaute Desktop-App.
+Noch offen (bewusst): End-to-End-Tests gegen die gebaute Desktop-App — `tauri-driver` gibt
+es für macOS nicht. Ersatzweise lassen sich App-Code-Pfade headless gegen eine Lesekopie der
+echten Datenbank fahren.
 
 ## Sprache
 
