@@ -1,30 +1,26 @@
-// Topf — Zweckbindung auf der Passiva-Seite (KONZEPT §3.2). Drei Spielarten EINES
+// Topf — Zweckbindung auf der Passiva-Seite (KONZEPT §3.2). Zwei Spielarten EINES
 // Konzepts: laufender Saldo mit optionalem, getyptem Zielwert.
-//   • Ersatz   (Rücklage):    Wiederbeschaffung + Nutzungsdauer → Ansparrate (Abschreibung)
 //   • Puffer   (Rückstellung): Schätzbetrag + Zeitfenster
 //   • Spartopf (Freitopf):    Zuführung/Monat, OPTIONALES Sparziel (sonst kein Sollstand)
-// Töpfe sind NICHT kontogebunden; sie werden durch Kontostände gedeckt (Deckung = Linse).
+// Töpfe sind NICHT kontogebunden.
+//
+// Den Ersatz-Topf gab es hier einmal als dritte Spielart (Rücklage für Inventar). Er ist
+// 2026-08-16 entfallen: das Inventar rechnet seine Rücklage selbst (rein kalkulatorisch,
+// siehe inventar.ts) und gleicht sie gegen einen echten Kontostand ab, statt ein eigenes
+// Sparvehikel zu führen.
 
 import { monateZwischen } from "./datum";
 import type { Cent } from "./geld";
 import type { IstBuchung } from "./istbuchung";
 import type { Charakter } from "./zahlungsregel";
 
-export type TopfTyp = "ersatz" | "puffer" | "spartopf";
+export type TopfTyp = "puffer" | "spartopf";
 
 interface TopfBasis {
   readonly id: string;
   readonly bezeichnung: string;
   readonly start: string; // ISO „YYYY-MM-DD"
   readonly kategorieId?: string;
-}
-
-export interface Ersatztopf extends TopfBasis {
-  readonly typ: "ersatz";
-  readonly wiederbeschaffung: Cent; // Zielwert
-  readonly nutzungsdauerMonate: number; // > 0
-  /** Herkunft: aus diesem Inventargegenstand abgeleitet (P2.5). Optional. */
-  readonly inventarId?: string;
 }
 
 export interface Puffertopf extends TopfBasis {
@@ -39,13 +35,11 @@ export interface Spartopf extends TopfBasis {
   readonly sparziel?: Cent; // optionaler Zielwert
 }
 
-export type Topf = Ersatztopf | Puffertopf | Spartopf;
+export type Topf = Puffertopf | Spartopf;
 
 /** Zielwert des Topfes, oder null (Spartopf ohne Sparziel). */
 export function zielwert(topf: Topf): Cent | null {
   switch (topf.typ) {
-    case "ersatz":
-      return topf.wiederbeschaffung;
     case "puffer":
       return topf.schaetzbetrag;
     case "spartopf":
@@ -64,10 +58,6 @@ export function zielwert(topf: Topf): Cent | null {
  */
 export function ansparrate(topf: Topf): Cent {
   switch (topf.typ) {
-    case "ersatz":
-      return topf.nutzungsdauerMonate > 0
-        ? Math.round(topf.wiederbeschaffung / topf.nutzungsdauerMonate)
-        : 0;
     case "puffer":
       return topf.fristMonate > 0 ? Math.round(topf.schaetzbetrag / topf.fristMonate) : 0;
     case "spartopf":
@@ -78,7 +68,7 @@ export function ansparrate(topf: Topf): Cent {
 /**
  * Plan-Sollstand am Datum `am`: linear angespart ab `start`, gedeckelt auf den
  * Zielwert. null, wenn kein Zielwert existiert (Spartopf ohne Sparziel) — dann gibt
- * es nur einen laufenden Stand (real, ab P3), keinen Soll.
+ * es nur einen laufenden Stand, keinen Soll.
  */
 export function sollstand(topf: Topf, am: string): Cent | null {
   const ziel = zielwert(topf);
@@ -91,15 +81,14 @@ export function sollstand(topf: Topf, am: string): Cent | null {
  * Aufbau nach `monate` Monaten, gedeckelt am Ziel.
  *
  * Anteilig AUS DEM ZIEL gerechnet, nicht als (gerundete Rate × Monate): sonst fehlte am
- * Ende der Nutzungsdauer ein Rest, weil die Rate einmal gerundet und dann vervielfacht
- * wurde (1000 Cent auf 3 Monate → Rate 333 → nach 3 Monaten 999). Die fachliche Zusage
- * lautet, dass am Ende der Nutzungsdauer die Wiederbeschaffung angespart ist — die hält
- * nur diese Rechnung ein. Der Rundungsrest verteilt sich so über die Laufzeit, statt
- * hinten liegen zu bleiben.
+ * Ende der Frist ein Rest, weil die Rate einmal gerundet und dann vervielfacht wurde
+ * (1000 Cent auf 3 Monate → Rate 333 → nach 3 Monaten 999). Die fachliche Zusage lautet,
+ * dass am Ende des Zeitfensters der Schätzbetrag beisammen ist — die hält nur diese
+ * Rechnung ein. Der Rundungsrest verteilt sich so über die Laufzeit, statt hinten
+ * liegen zu bleiben.
  */
 function anteiligerAufbau(topf: Topf, monate: number, ziel: Cent): Cent {
-  const dauer =
-    topf.typ === "ersatz" ? topf.nutzungsdauerMonate : topf.typ === "puffer" ? topf.fristMonate : 0;
+  const dauer = topf.typ === "puffer" ? topf.fristMonate : 0;
   if (dauer > 0) return Math.min(Math.round((ziel * monate) / dauer), ziel);
   // Spartopf: kein Enddatum, der Aufbau folgt der gesetzten Zuführung.
   return Math.min(ansparrate(topf) * monate, ziel);
@@ -108,8 +97,8 @@ function anteiligerAufbau(topf: Topf, monate: number, ziel: Cent): Cent {
 /**
  * Charakter einer Topf-Entnahme nach Topf-Typ (ADR-0003 §5). Aus dem Gegenkonto-Typ
  * abgeleitet, nicht frei gewählt:
- *  • Ersatz/Puffer (Rücklage/Rückstellung): Entnahme = **Umschichtung** — die
- *    Vorsorge wird aufgelöst, der Aufwand wurde über die Nutzungsdauer schon getragen.
+ *  • Puffer (Rückstellung): Entnahme = **Umschichtung** — die Vorsorge wird aufgelöst,
+ *    der Aufwand wurde über das Zeitfenster schon getragen.
  *  • Spartopf (Konsumsparen): Entnahme = **Aufwand** — jetzt erst entsteht der Konsum.
  */
 export function entnahmeCharakter(typ: TopfTyp): Charakter {
@@ -122,10 +111,6 @@ export function entnahmeCharakter(typ: TopfTyp): Charakter {
  * mit Verwendung = dieser Topf, ADR-0003 §6). `entnahmen` sind die Buchungen DIESES
  * Topfes; ihre Beträge sind negativ (Abfluss) und senken den Stand.
  *
- * Bei **Ersatz** zählen nur Entnahmen NACH dem aktuellen Zyklus-Start: die „ersetzt"-
- * Aktion setzt `start` auf den Anschaffungstag und schließt damit den alten Zyklus ab;
- * die auslösende Entnahme liegt auf dem Start und gehört nicht mehr in den neuen Aufbau.
- *
  * Ein negativer Stand = Überziehung (mehr entnommen als angespart) — der einzige echte
  * GuV-Effekt einer Unterdeckung; die UI weist ihn aus.
  */
@@ -134,8 +119,6 @@ export function topfStand(topf: Topf, am: string, entnahmen: IstBuchung[]): Cent
   const ziel = zielwert(topf);
   const aufbau =
     ziel == null ? ansparrate(topf) * monate : anteiligerAufbau(topf, monate, ziel);
-  const relevant =
-    topf.typ === "ersatz" ? entnahmen.filter((b) => b.datum > topf.start) : entnahmen;
-  const summeEntnahmen = relevant.reduce((s, b) => s + b.betrag, 0);
+  const summeEntnahmen = entnahmen.reduce((s, b) => s + b.betrag, 0);
   return aufbau + summeEntnahmen;
 }

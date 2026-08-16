@@ -27,7 +27,8 @@ import {
   sqliteKategorieRepository,
   sqliteZahlungskontoRepository,
 } from "../persistence/sqliteStammdatenRepositories";
-import type { Budget, IstBuchung, Kategorie, Zahlungsregel } from "../../core";
+import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
+import type { Budget, Inventargegenstand, IstBuchung, Kategorie, Zahlungsregel } from "../../core";
 
 let db: Database;
 beforeAll(sqlLaden);
@@ -57,7 +58,12 @@ const IST: IstBuchung[] = [
   { id: "i2", datum: "2026-08-11", betrag: -6250, kontoId: "giro", kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "import" },
 ];
 
-const props = { regeln: REGELN, budgets: BUDGETS, ist: IST, kategorien: KATEGORIEN, heute: "2026-08-16" };
+// Rücklage: 12.000,00 auf 100 Monate → 120,00 im Monat. Kalkulatorisch, nie gebucht.
+const INVENTAR: Inventargegenstand[] = [
+  { id: "g-auto", bezeichnung: "Auto", wiederbeschaffung: 1200000, nutzungsdauerMonate: 100, anschaffung: "2024-01-01" },
+];
+
+const props = { regeln: REGELN, budgets: BUDGETS, inventar: [], ist: IST, kategorien: KATEGORIEN, heute: "2026-08-16" };
 
 /**
  * Die Karte eines Monats. Der EinstellungenProvider rendert erst nach dem Laden, deshalb
@@ -141,10 +147,42 @@ describe("MonatsAusblick", () => {
     expect(await screen.findByText(/Einnahmen kommen aus Verträgen/)).toBeInTheDocument();
   });
 
-  it("zeigt ohne Verträge und Budgets einen Hinweis statt drei leerer Karten", async () => {
+  it("zeigt ohne Verträge, Budgets und Inventar einen Hinweis statt drei leerer Karten", async () => {
     rendere(<MonatsAusblick {...props} regeln={[]} budgets={[]} />);
     expect(await screen.findByText(/Für den Ausblick fehlen die Plan-Daten/)).toBeInTheDocument();
     expect(screen.queryByText("August 2026")).not.toBeInTheDocument();
+  });
+
+  // Die Rücklage ist reine Rechnung: sie steht in beiden Spalten mit demselben Betrag und
+  // senkt „Bleibt" auch im laufenden Monat, obwohl nichts gebucht wurde.
+  it("zieht die Inventar-Rücklage als eigene Zeile ab", async () => {
+    rendere(<MonatsAusblick {...props} inventar={INVENTAR} />);
+    const september = await karte("September 2026");
+    expect(within(september).getByText("Rücklagen")).toBeInTheDocument();
+    expect(within(september).getByText("−120,00")).toBeInTheDocument();
+    // Ohne Rücklage blieben +1.573,95 — mit ihr 120,00 weniger.
+    expect(within(september).getByText("+1.453,95 €")).toBeInTheDocument();
+  });
+
+  it("senkt auch das Gebuchte des laufenden Monats um die Rücklage", async () => {
+    rendere(<MonatsAusblick {...props} inventar={INVENTAR} />);
+    const august = await karte("August 2026");
+    // −521,75 gebucht − 120,00 Rücklage.
+    expect(within(august).getByText("−641,75 €")).toBeInTheDocument();
+  });
+
+  it("lässt die Zeile weg, wenn es kein Inventar gibt", async () => {
+    rendere(<MonatsAusblick {...props} />);
+    await screen.findByText("August 2026");
+    expect(screen.queryByText("Rücklagen")).not.toBeInTheDocument();
+  });
+
+  // Einzeilig: die Aufschlüsselung nach Gegenstand steht im Inventar, nicht hier.
+  it("ist nicht aufklappbar", async () => {
+    rendere(<MonatsAusblick {...props} inventar={INVENTAR} />);
+    const august = await karte("August 2026");
+    const zeile = within(august).getByText("Rücklagen").closest("[role]");
+    expect(zeile).toBeNull();
   });
 
   it("schweigt über fehlende Einnahmen, sobald ein Ertrags-Vertrag existiert", async () => {
@@ -160,6 +198,7 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     for (const r of REGELN) await sqliteZahlungsregelRepository.speichern(r);
     for (const b of BUDGETS) await sqliteBudgetRepository.speichern(b);
     await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo: 100000 });
+    for (const g of INVENTAR) await sqliteInventarRepository.speichern(g);
     // Eine Buchung im laufenden Monat — welcher das ist, entscheidet hier die echte Uhr.
     const jetzt = new Date();
     const monatsErster = `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, "0")}-01`;
@@ -176,5 +215,7 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     const nutzer = userEvent.setup();
     await nutzer.click(screen.getAllByText(/Verträge/)[0]);
     expect(screen.getAllByText("Vermieter").length).toBeGreaterThan(0);
+    // Das Inventar kommt über sein eigenes Repository — die Zeile steht in allen drei Karten.
+    expect(screen.getAllByText("Rücklagen")).toHaveLength(3);
   });
 });
