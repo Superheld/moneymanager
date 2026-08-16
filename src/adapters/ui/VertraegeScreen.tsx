@@ -46,10 +46,15 @@ import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 /**
- * Drei Blicke auf dieselben Verträge. „liste" ist die freie Tabelle (Spaltenköpfe
- * sortieren), „faelligkeit" stellt vor, was als Nächstes abgeht, „turnus" gruppiert
- * nach Takt — dort steht auch, was die nicht-monatlichen Verträge im Monat kosten,
- * obwohl sie nicht abgehen.
+ * Drei Blicke auf dieselben Verträge. „liste" zeigt alle nach Betrag, „faelligkeit"
+ * stellt vor, was als Nächstes abgeht, „turnus" gruppiert nach Takt — dort steht auch,
+ * was die nicht-monatlichen Verträge im Monat kosten, obwohl sie nicht abgehen.
+ *
+ * Die Tabellen sind bewusst NICHT sortierbar: eine angeklickte Spalte überschreibt genau
+ * die Ordnung, die die gewählte Ansicht ausmacht — wer in „faelligkeit" nach Anbieter
+ * sortiert, sieht dieselbe Tabelle wie in „liste" und hat den Umschalter entwertet.
+ * Innerhalb einer Ansicht steht die Reihenfolge fest: nach Betrag, groß nach klein
+ * (in „faelligkeit" nach Termin — das IST dort die Aussage).
  */
 type Ansicht = "liste" | "faelligkeit" | "turnus";
 const ANSICHTEN: Ansicht[] = ["liste", "faelligkeit", "turnus"];
@@ -208,11 +213,10 @@ export function VertraegeScreen() {
   function spalten(mitRuecklage: boolean): DataColumn[] {
     const s: DataColumn[] = [
       { key: "anbieter", label: t("vertraege.spalteAnbieter") },
-      { key: "inhaber", label: t("vertraege.spalteInhaber"), sortValue: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "" : ""), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
+      { key: "inhaber", label: t("vertraege.spalteInhaber"), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
       {
         key: "charakter",
         label: t("vertraege.spalteCharakter"),
-        sortValue: (v) => regelZuVertrag.get(v.id)?.charakter ?? "",
         render: (v) => {
           const r = regelZuVertrag.get(v.id);
           return r ? <Pill variant={CHARAKTER_PILL[r.charakter]}>{t(`charakter.${r.charakter}`)}</Pill> : "—";
@@ -221,12 +225,6 @@ export function VertraegeScreen() {
       {
         key: "rhythmus",
         label: t("vertraege.spalteRhythmus"),
-        // Nach Zykluslänge sortieren, nicht alphabetisch — sonst stünde „halbjährlich"
-        // vor „monatlich" und die Reihenfolge sagte nichts über den Takt.
-        sortValue: (v) => {
-          const r = regelZuVertrag.get(v.id);
-          return r ? RHYTHMUS_MONATE[r.rhythmus] : 0;
-        },
         render: (v) => {
           const r = regelZuVertrag.get(v.id);
           return r ? t(`vertraege.rhythmus.${r.rhythmus}`) : "—";
@@ -235,14 +233,11 @@ export function VertraegeScreen() {
       {
         key: "naechste",
         label: t("vertraege.spalteNaechste"),
-        // Ohne Termin ans Ende, nicht an den Anfang: „kein Termin" ist keine baldige Zahlung.
-        sortValue: (v) => naechsteZahlung.get(v.id) ?? "9999-12-31",
         render: (v) => naechsteZahlung.get(v.id) ?? <span className="muted">—</span>,
       },
       {
         key: "kuendigung",
         label: t("vertraege.spalteKuendigenBis"),
-        sortable: false,
         render: (v) => {
           const termin = naechsterKuendigungstermin(v, heute);
           if (!termin) return <span className="muted">—</span>;
@@ -258,7 +253,6 @@ export function VertraegeScreen() {
         key: "betrag",
         label: `${t("vertraege.spalteBetrag")} ${geld.symbol}`,
         align: "right",
-        sortValue: (v) => regelZuVertrag.get(v.id)?.betrag ?? 0,
         render: (v) => {
           const r = regelZuVertrag.get(v.id);
           return r ? geld.format(r.betrag) : "—";
@@ -270,10 +264,6 @@ export function VertraegeScreen() {
         key: "ruecklage",
         label: `${t("vertraege.spalteRuecklage")} ${geld.symbol}`,
         align: "right",
-        sortValue: (v) => {
-          const r = regelZuVertrag.get(v.id);
-          return r ? ruecklageProMonat(r) : 0;
-        },
         render: (v) => {
           const r = regelZuVertrag.get(v.id);
           const wert = r ? ruecklageProMonat(r) : 0;
@@ -282,12 +272,11 @@ export function VertraegeScreen() {
       });
     }
     s.push(
-      { key: "_e", label: "", align: "right", sortable: false, render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
+      { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
       {
         key: "_x",
         label: "",
         align: "right",
-        sortable: false,
         render: (v) => (
           <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id).then(laden)}>
             {t("vertraege.loeschen")}
@@ -297,6 +286,21 @@ export function VertraegeScreen() {
     );
     return s;
   }
+
+  /**
+   * Die Grundordnung: großer Betrag zuerst. Verglichen wird der BETRAG, nicht sein
+   * Vorzeichen — sonst stünden alle Einnahmen vor allen Ausgaben, und die Frage „was
+   * kostet am meisten?" wäre nur noch am Ende der Liste zu beantworten. Verträge ohne
+   * Regel tragen keinen Betrag und fallen ans Ende.
+   */
+  function betragsRang(v: Vertrag): number {
+    const r = regelZuVertrag.get(v.id);
+    return r ? Math.abs(r.betrag) : -1;
+  }
+  const nachBetrag = useMemo(
+    () => [...vertraege].sort((a, b) => betragsRang(b) - betragsRang(a)),
+    [vertraege, regelZuVertrag],
+  );
 
   /** Nach nächster Fälligkeit aufsteigend; Verträge ohne Termin ans Ende. */
   const nachFaelligkeit = useMemo(
@@ -313,7 +317,11 @@ export function VertraegeScreen() {
       key: r as string,
       titel: t(`vertraege.rhythmus.${r}`),
       mitRuecklage: RHYTHMUS_MONATE[r] > 1,
-      vertraege: vertraege.filter((v) => regelZuVertrag.get(v.id)?.rhythmus === r),
+      // Auch hier Betrag groß nach klein — innerhalb einer Turnus-Gruppe ist das die
+      // einzige Ordnung, die etwas aussagt: der Takt ist ja schon gleich.
+      vertraege: vertraege
+        .filter((v) => regelZuVertrag.get(v.id)?.rhythmus === r)
+        .sort((a, b) => betragsRang(b) - betragsRang(a)),
     }));
     const ohne = vertraege.filter((v) => !regelZuVertrag.get(v.id));
     if (ohne.length) gruppen.push({ key: "ohne", titel: t("vertraege.gruppeOhneRegel"), mitRuecklage: false, vertraege: ohne });
@@ -523,19 +531,18 @@ export function VertraegeScreen() {
           {ansicht === "turnus" ? (
             turnusGruppen.map((g) => (
               <Card key={g.key} title={g.titel} subtitle={gruppenUntertitel(g)}>
-                <DataTable sortable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
+                <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
               </Card>
             ))
           ) : (
             <Card>
               <DataTable
-                // Ohne key behielte die Tabelle beim Ansichtswechsel ihre angeklickte
-                // Sortierung — die neue Reihenfolge wäre dann unsichtbar.
+                // Ohne key bliebe beim Ansichtswechsel die aufgeschlagene Seite stehen —
+                // Seite 3 von „liste" ist in „faelligkeit" ein anderer Ausschnitt.
                 key={ansicht}
-                sortable
                 pageSize={25}
                 columns={spalten(false)}
-                rows={ansicht === "faelligkeit" ? nachFaelligkeit : vertraege}
+                rows={ansicht === "faelligkeit" ? nachFaelligkeit : nachBetrag}
               />
             </Card>
           )}
