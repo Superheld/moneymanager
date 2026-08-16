@@ -2,6 +2,20 @@
 
 Lokale Haushalts-Finanz-App (Tauri 2 + React + TS, hexagonaler portabler TS-Kern, SQLite lokal).
 
+## Stadium: Alpha
+Die App ist **nicht veröffentlicht**. Es gibt genau einen Datenbestand — den lokalen —,
+und der lässt sich per Import wiederherstellen. Sichtbar gemacht wird das in der
+Seitenleiste (`APP_STADIUM` in `src/version.ts`); im Versionsstring steht es bewusst
+nicht, weil der in die Tauri-Bundle-Metadaten durchschlägt.
+
+Was daraus folgt: **Migrationen dürfen auch wegnehmen.** Tabellen und Spalten, die kein
+Code mehr kennt, werden abgeräumt statt als Altlast mitgeschleppt (so geschehen mit v18:
+Szenario-Tabellen, Ersatz-Topf-Spalten). Die Regeln darunter gelten unverändert weiter —
+append-only, forward-only, jedes Statement wiederholbar (siehe *Invarianten*). Vor einem
+Abräumen wird geprüft, dass die Ziele leer sind; ist Inhalt drin, gehört er benannt und
+gesichert, nicht stillschweigend gelöscht. Mit dem ersten veröffentlichten Stand endet
+diese Freiheit.
+
 ## Wo die Wahrheit liegt
 Fachliche Doku (DDD-Modell, ADRs, Design-System) wird **außerhalb dieses Repos** geführt.
 Im Repo steht der lauffähige Code; die UI-Begriffe folgen dem Glossar
@@ -67,7 +81,9 @@ außen. Tests als `*.test.ts` neben dem Code.
 - **Charakter = `Aufwand | Ertrag | Umschichtung`** (erfolgs- vs. liquiditätswirksam;
   Umschichtung = Aktivtausch, keine Ausgabe).
 - **Migrationen** in `adapters/persistence/migrations.ts`: versioniert, **forward-only,
-  append-only** — bestehende Versionen nie editieren, neue Version anhängen.
+  append-only** — bestehende Versionen nie editieren, neue Version anhängen. Eine neue
+  Version darf in der Alpha auch abräumen (`DROP TABLE IF EXISTS`, `DROP COLUMN`), siehe
+  *Stadium*; `migrate()` überspringt einen `DROP COLUMN`, dessen Spalte schon fehlt.
   **Keine Transaktionen — jedes Statement muss WIEDERHOLBAR sein.** Geprüft 2026-08-16:
   tauri-plugin-sql führt jedes `execute` über `pool.execute()` aus, und `Executor for
   &Pool` holt pro Aufruf eine Verbindung aus einem Pool der sqlx-Standardgröße 10.
