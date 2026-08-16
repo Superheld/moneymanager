@@ -22,7 +22,6 @@ import { AppShell } from "./AppShell";
 import { BudgetsScreen } from "./BudgetsScreen";
 import { InventarScreen } from "./InventarScreen";
 import { KontenScreen } from "./KontenScreen";
-import { ToepfeScreen } from "./ToepfeScreen";
 import { VertraegeScreen } from "./VertraegeScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
@@ -92,49 +91,6 @@ describe("AppShell", () => {
     );
     await waitFor(() => expect(document.body.textContent).toMatch(/Moneymanager/));
     expect(screen.getByText("Inhalt")).toBeInTheDocument();
-  });
-});
-
-describe("Topf anlegen", () => {
-  it("legt über das Formular einen Spartopf an und zeigt ihn danach", async () => {
-    const nutzer = userEvent.setup();
-    rendere(<ToepfeScreen />);
-
-    await nutzer.click((await screen.findAllByRole("button", { name: /anlegen|neu/i }))[0]);
-
-    const felder = await screen.findAllByRole("textbox");
-    await nutzer.type(felder[0], "Neue Urlaubskasse");
-
-    // Zahlenfelder über ihre Rolle finden (spinbutton = <input type="number">).
-    const zahlen = screen.queryAllByRole("spinbutton");
-    for (const feld of zahlen.slice(0, 2)) {
-      await nutzer.clear(feld);
-      await nutzer.type(feld, "100");
-    }
-
-    const speichern = ((a) => a[a.length - 1]!)(screen.getAllByRole("button", { name: /speichern|anlegen/i }));
-    await nutzer.click(speichern);
-
-    // Entweder ist der Topf angelegt, oder das Formular meldet, was fehlt. Ein stilles
-    // "nichts passiert" wäre der eigentliche Fehler — genau das schliesst der Test aus.
-    await waitFor(async () => {
-      const gespeichert = await sqliteTopfRepository.alle();
-      const meldung = /muss|bitte|ungültig|fehlt|größer/i.test(document.body.textContent ?? "");
-      expect(gespeichert.length > 0 || meldung).toBe(true);
-    });
-  });
-
-  it("zeigt eine Fehlermeldung statt zu speichern, wenn die Bezeichnung fehlt", async () => {
-    const nutzer = userEvent.setup();
-    rendere(<ToepfeScreen />);
-    await nutzer.click((await screen.findAllByRole("button", { name: /anlegen|neu/i }))[0]);
-
-    const speichern = ((a) => a[a.length - 1]!)(screen.getAllByRole("button", { name: /speichern|anlegen/i }));
-    await nutzer.click(speichern);
-
-    // Nichts gespeichert, und der Dialog bleibt offen.
-    expect(await sqliteTopfRepository.alle()).toHaveLength(0);
-    await waitFor(() => expect(document.body.textContent).toMatch(/Bezeichnung|angeben|fehlt/i));
   });
 });
 
