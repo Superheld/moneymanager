@@ -6,7 +6,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Kategorie, Zahlungskonto } from "../../core";
-import { kategorisieren, umsaetzeVerbuchen, type Umsatz, type VerbuchenErgebnis } from "../../application/import";
+import {
+  kategorisieren,
+  umsaetzeVerbuchen,
+  vorschlagsbefundFuer,
+  type Umsatz,
+  type VerbuchenErgebnis,
+  type Vorschlagskontext,
+} from "../../application/import";
+import { kategorisierungsquellen } from "../../application/kategorisierungsquellen";
 import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
 import { vertragsAbgleichDeps } from "../persistence/sqliteVertragZuordnungRepositories";
 import {
@@ -15,12 +23,53 @@ import {
 } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
-import { Button, Card } from "./ds";
+import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
+import { sqliteVertragserkennungRepository } from "../persistence/sqliteVertragZuordnungRepositories";
+import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
+import { sqliteMerkmalskonfigurationRepository } from "../persistence/sqliteMerkmalskonfigurationRepository";
+import { Button, Card, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { PageHead } from "./PageHead";
 import { useGeld } from "./einstellungenKontext";
 
 const SEITE_GROESSE = 100;
+
+/**
+ * Woher der Vorschlag dieser Zeile kommt — und beim Modell, woran es lag.
+ *
+ * Die Belege werden hier neu gerechnet: sie hängen am aktuellen Modell und an der
+ * aktuellen Merkmalskonfiguration. Nur wenn die Neurechnung dieselbe Kategorie liefert
+ * wie der gespeicherte Vorschlag, wird sie gezeigt — sonst erklärte sie etwas anderes,
+ * als in der Zeile steht.
+ */
+function Herkunft({ umsatz, kontext }: { umsatz: Umsatz; kontext: Vorschlagskontext | null }) {
+  const { t } = useTranslation();
+  const quelle = umsatz.vorschlag?.quelle;
+  if (!quelle) return null;
+
+  const befund =
+    kontext && quelle === "ki" ? vorschlagsbefundFuer(umsatz, kontext, umsatz.zahlungskontoId) : null;
+  const passt = befund?.vorschlag?.kategorieId === umsatz.vorschlag?.kategorieId;
+  const belege = passt ? befund?.beitraege ?? [] : [];
+
+  return (
+    <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+      <Pill variant={quelle === "manuell" ? "plan" : quelle === "ki" ? "neutral" : "ok"}>
+        {t(`review.herkunft.${quelle}`)}
+      </Pill>
+      {passt && befund?.sicherheit !== undefined && (
+        <span
+          className="muted"
+          style={{ fontSize: "var(--fs-2xs)" }}
+          title={belege.map((b) => `${b.gewicht >= 0 ? "+" : "−"}${Math.abs(b.gewicht).toFixed(2)} ${b.merkmal}`).join("  ")}
+        >
+          {t("review.begruendungSicher", { wert: `${Math.round(befund.sicherheit * 100)} %` })}
+          {belege.length > 0 && ` · ${belege.slice(0, 3).map((b) => b.merkmal).join(", ")}`}
+        </span>
+      )}
+    </div>
+  );
+}
 
 function ddmmyyyy(iso: string): string {
   const [y, m, d] = iso.split("-");
@@ -41,6 +90,11 @@ export function ReviewScreen() {
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [verb, setVerb] = useState<VerbuchenErgebnis | null>(null);
+  // Für die Frage „warum diese Kategorie?": dieselben Quellen, aus denen der Vorschlag
+  // beim Import entstand. Die Begründung wird beim Anzeigen neu gerechnet statt beim
+  // Import gespeichert — sie hängt am aktuellen Modell, und ein gespeicherter Satz von
+  // vorgestern erklärte einen Vorschlag, den es so nicht mehr gäbe.
+  const [kontext, setKontext] = useState<Vorschlagskontext | null>(null);
 
   async function laden() {
     try {
@@ -52,6 +106,15 @@ export function ReviewScreen() {
       setUmsaetze(u);
       setKonten(k);
       setKategorien(kat);
+      setKontext(
+        await kategorisierungsquellen({
+          kategorieRepo: sqliteKategorieRepository,
+          vertragRepo: sqliteVertragRepository,
+          erkennungRepo: sqliteVertragserkennungRepository,
+          klassifikatorRepo: sqliteKlassifikatorRepository,
+          merkmalRepo: sqliteMerkmalskonfigurationRepository,
+        }),
+      );
       setFehler(null);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -191,6 +254,7 @@ export function ReviewScreen() {
                     ) : (
                       <CategoryPicker kategorien={kategorien} value={u.vorschlag?.kategorieId ?? ""} onChange={(id) => kategorieGesetzt(u, id)} />
                     )}
+                    {u.vorschlag && <Herkunft umsatz={u} kontext={kontext} />}
                   </td>
                 </tr>
               ))}

@@ -375,4 +375,32 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 23, // Der Vertrag trägt eine Kategorie — Kopf der Kategorisierungs-Kette
+    sql: [
+      // Bisher hing die Kategorie nur an der abgeleiteten Zahlungsregel. Für die
+      // automatische Kategorisierung ist das die falsche Stelle: was eine Buchung trifft,
+      // ist die Vertragszuordnung (Migration 19), und die zeigt auf den VERTRAG. Über die
+      // Zahlungsregel zu gehen hieße, sich auf eine Ableitung zu verlassen, die es nicht
+      // für jeden Vertrag gibt.
+      //
+      // Die Zahlungsregel behält ihre eigene Kategorie: sie kann auch ohne Vertrag
+      // existieren (freie Planung). Beim Ableiten wird sie aus dem Vertrag vorbelegt.
+      `ALTER TABLE vertrag ADD COLUMN kategorie_id TEXT`,
+      // Bestandsverträge holen ihre Kategorie aus der abgeleiteten Zahlungsregel nach.
+      // Ohne das trüge kein einziger vorhandener Vertrag eine Kategorie, und die
+      // Kategorisierungs-Kette begänne erst beim nächsten neu erfassten zu wirken.
+      //
+      // WIEDERHOLBAR trotz UPDATE (siehe Invarianten): `WHERE kategorie_id IS NULL`
+      // greift nach dem ersten Lauf nur noch dort, wo auch die Regel nichts hatte — und
+      // schreibt dann wieder NULL. Ein zweiter Durchgang ändert also nichts. Bewusst
+      // setzt es NUR leere Felder: eine am Vertrag gepflegte Kategorie darf eine
+      // wiederholte Migration nicht überschreiben.
+      `UPDATE vertrag SET kategorie_id = (
+         SELECT r.kategorie_id FROM zahlungsregel r
+          WHERE r.vertrag_id = vertrag.id AND r.kategorie_id IS NOT NULL
+          LIMIT 1
+       ) WHERE kategorie_id IS NULL`,
+    ],
+  },
 ];

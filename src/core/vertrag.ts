@@ -21,6 +21,15 @@ export interface Vertrag {
   readonly verlaengerungMonate?: number;
   readonly kuendigungsfristMonate?: number;
   readonly status: Vertragsstatus;
+  /**
+   * Kategorie der Zahlungen dieses Vertrags.
+   *
+   * Sie sitzt hier und nicht (nur) an der Zahlungsregel, weil die Vertragszuordnung auf
+   * den VERTRAG zeigt: eine Buchung, die zu diesem Vertrag gehört, erbt genau diese
+   * Kategorie. Der Weg über die Zahlungsregel wäre eine Ableitung, die es nicht für jeden
+   * Vertrag gibt — und damit eine Lücke in der Kategorisierung.
+   */
+  readonly kategorieId?: string;
   readonly notizen?: string;
 }
 
