@@ -2,9 +2,17 @@
 // planRef wird auf zwei Spalten abgebildet (plan_quelle_id, plan_faelligkeit); ein
 // UNIQUE-Index darauf erzwingt 1:1-Matching. Später dockt hier der Bankimport an.
 
-import type { Charakter, IstBuchung, IstQuelle } from "../../core";
+import type { Aufteilung, Charakter, IstBuchung, IstQuelle } from "../../core";
 import type { LedgerPort } from "../../application/ports";
 import { getDb } from "./db";
+
+interface AufteilungZeile {
+  id: string;
+  istbuchung_id: string;
+  kategorie_id: string;
+  betrag: number;
+  notiz: string | null;
+}
 
 interface Zeile {
   id: string;
@@ -26,14 +34,31 @@ interface Zeile {
 export const sqliteLedgerRepository: LedgerPort = {
   async alle() {
     const db = await getDb();
-    const zeilen = await db.select<Zeile[]>(
-      `SELECT id, datum, betrag, konto_id, kategorie_id, charakter, quelle, notiz,
-              transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit,
-              verwendung_topf_id, roh_hash
-         FROM ist_buchung ORDER BY datum`,
-    );
+    // Aufteilungen in EINER Abfrage mitziehen statt je Buchung nachzuladen — bei 5000+
+    // Buchungen wäre das sonst ein N+1 über die gesamte Ledger-Ladung.
+    const [zeilen, teile] = await Promise.all([
+      db.select<Zeile[]>(
+        `SELECT id, datum, betrag, konto_id, kategorie_id, charakter, quelle, notiz,
+                transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit,
+                verwendung_topf_id, roh_hash
+           FROM ist_buchung ORDER BY datum`,
+      ),
+      db.select<AufteilungZeile[]>(
+        `SELECT id, istbuchung_id, kategorie_id, betrag, notiz
+           FROM ist_buchung_aufteilung ORDER BY rowid`,
+      ),
+    ]);
+
+    const teileJeBuchung = new Map<string, Aufteilung[]>();
+    for (const t of teile) {
+      const liste = teileJeBuchung.get(t.istbuchung_id) ?? [];
+      liste.push({ kategorieId: t.kategorie_id, betrag: t.betrag, notiz: t.notiz ?? undefined });
+      teileJeBuchung.set(t.istbuchung_id, liste);
+    }
+
     return zeilen.map(
       (z): IstBuchung => ({
+        aufteilungen: teileJeBuchung.get(z.id),
         id: z.id,
         datum: z.datum,
         betrag: z.betrag,
@@ -84,9 +109,22 @@ export const sqliteLedgerRepository: LedgerPort = {
         b.rohHash ?? null,
       ],
     );
+
+    // Aufteilungen: ersetzen statt abgleichen. Sie sind Value Objects ohne eigene
+    // Identität — welche Zeile „dieselbe" ist, ist keine sinnvolle Frage, und ein
+    // Abgleich würde nur Ordnung und Ids ohne Nutzen bewahren.
+    await db.execute("DELETE FROM ist_buchung_aufteilung WHERE istbuchung_id = $1", [b.id]);
+    for (const a of b.aufteilungen ?? []) {
+      await db.execute(
+        `INSERT INTO ist_buchung_aufteilung (id, istbuchung_id, kategorie_id, betrag, notiz)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [crypto.randomUUID(), b.id, a.kategorieId, a.betrag, a.notiz ?? null],
+      );
+    }
   },
   async loeschen(id: string) {
     const db = await getDb();
+    await db.execute("DELETE FROM ist_buchung_aufteilung WHERE istbuchung_id = $1", [id]);
     await db.execute("DELETE FROM ist_buchung WHERE id = $1", [id]);
   },
 };
