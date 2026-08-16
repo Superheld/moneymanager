@@ -696,10 +696,13 @@ const de = {
       titel: "Woran wird dieser Vertrag erkannt?",
       hinweis:
         "Nach diesen Regeln ordnet die App gebuchte Zahlungen diesem Vertrag zu — auch die, die erst noch kommen. Was du hier änderst, wirkt sofort auf den ganzen Bestand. Von Hand gesetzte Zuordnungen bleiben davon unberührt.",
-      schluessel: "Erkennungsmerkmale",
-      schluesselHinweis:
-        "Ein Merkmal je Zeile: SEPA-Gläubiger-ID oder Anbietername in Kleinbuchstaben, ohne Rechtsform. Ein Treffer genügt.",
-      nameHinzufuegen: "„{{name}}“ als Merkmal aufnehmen",
+      empfaenger: "Empfänger",
+      empfaengerHinweis:
+        "Ein Muster je Zeile. Groß-/Kleinschreibung egal; verglichen wird mit dem Namen aus dem Auszug UND seiner vereinfachten Form (ohne Rechtsform und Satzzeichen). * steht für beliebigen Text — „stadtwerke*“ trifft auch „Stadtwerke Bonn Rg. 4711“.",
+      glaeubiger: "SEPA-Gläubiger-ID",
+      glaeubigerHinweis:
+        "Eine ID je Zeile. Nur bei Lastschrift vorhanden, dafür eindeutig — sie schlägt bei mehreren Treffern den Empfängernamen. * ist auch hier erlaubt.",
+      nameHinzufuegen: "„{{name}}“ als Empfänger aufnehmen",
       betragVon: "Betrag ab",
       betragBis: "Betrag bis",
       gueltigAb: "erst ab",
@@ -1422,10 +1425,13 @@ const en: typeof de = {
       titel: "How is this contract matched?",
       hinweis:
         "These rules decide which posted payments are linked to this contract — including future ones. Changes take effect immediately across the whole ledger. Links you set by hand are left alone.",
-      schluessel: "Matching keys",
-      schluesselHinweis:
-        "One key per line: SEPA creditor ID or provider name in lower case, without legal form. One match is enough.",
-      nameHinzufuegen: "Add \"{{name}}\" as a key",
+      empfaenger: "Payee",
+      empfaengerHinweis:
+        "One pattern per line. Case-insensitive; matched against the name as it appears on the statement AND its simplified form (no legal form or punctuation). * stands for any text — \"stadtwerke*\" also matches \"Stadtwerke Bonn inv. 4711\".",
+      glaeubiger: "SEPA creditor ID",
+      glaeubigerHinweis:
+        "One ID per line. Only present on direct debits, but unambiguous — it beats the payee name when several rules match. * works here too.",
+      nameHinzufuegen: "Add \"{{name}}\" as a payee",
       betragVon: "Amount from",
       betragBis: "Amount to",
       gueltigAb: "only from",
