@@ -3,7 +3,6 @@ import {
   anbieterSchluessel,
   jahresbetrag,
   vertragskandidaten,
-  vertragZuGegenpartei,
   type Zahlungsspur,
 } from "./vertragErkennung";
 
@@ -307,20 +306,3 @@ describe("Erkennungsbefund", () => {
 // Funktion. Sie muss dieselbe Regel anwenden, mit der die Vorschlagsliste bereits
 // erfasste Verträge ausblendet — sonst gälte eine Buchung als vertragsgebunden und
 // derselbe Anbieter stünde weiter als Vorschlag daneben.
-describe("vertragZuGegenpartei", () => {
-  const vertraege = [{ anbieter: "Telefonica Germany GmbH" }, { anbieter: "[anonymisiert] Bonn" }];
-
-  it("findet den Vertrag trotz abweichender Schreibweise und Rechtsform", () => {
-    expect(vertragZuGegenpartei(vertraege, "TELEFONICA GERMANY")?.anbieter).toBe("Telefonica Germany GmbH");
-    expect(vertragZuGegenpartei(vertraege, "Telefonica Germany GmbH & Co. OHG")?.anbieter).toBe("Telefonica Germany GmbH");
-  });
-
-  it("verwechselt Anbieter mit gleichem Anfang nicht", () => {
-    expect(vertragZuGegenpartei(vertraege, "[anonymisiert] Bremen")).toBeUndefined();
-  });
-
-  it("liefert nichts bei leerer Gegenpartei", () => {
-    expect(vertragZuGegenpartei(vertraege, "")).toBeUndefined();
-    expect(vertragZuGegenpartei(vertraege, "   ")).toBeUndefined();
-  });
-});

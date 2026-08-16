@@ -29,7 +29,10 @@ function spur(teil: Partial<Zahlungsspur> = {}): Zahlungsspur {
   };
 }
 
-const netcup: Vertragserkennung = { vertragId: "v1", schluessel: ["netcup"] };
+const netcup: Vertragserkennung = {
+  vertragId: "v1",
+  merkmale: [{ art: "empfaenger", muster: "netcup" }],
+};
 
 describe("passtZu", () => {
   it("trifft über den normalisierten Namen, Rechtsform und Schreibweise egal", () => {
@@ -38,7 +41,10 @@ describe("passtZu", () => {
   });
 
   it("trifft über die Gläubiger-ID, auch wenn der Name anders lautet", () => {
-    const e: Vertragserkennung = { vertragId: "v1", schluessel: ["DE98ZZZ09999999999"] };
+    const e: Vertragserkennung = {
+      vertragId: "v1",
+      merkmale: [{ art: "glaeubigerId", muster: "DE98ZZZ09999999999" }],
+    };
     expect(passtZu(e, spur({ gegenpartei: "Irgendein Rechenzentrum", glaeubigerId: "DE98ZZZ09999999999" }))).toBe(true);
   });
 
@@ -46,6 +52,62 @@ describe("passtZu", () => {
     // Eine monatliche Umbuchung aufs eigene Tagesgeldkonto ist perfekt regelmäßig und
     // trotzdem keine Vertragszahlung.
     expect(passtZu(netcup, spur({ charakter: "Umschichtung" }))).toBe(false);
+  });
+
+  /**
+   * Merkmale sind typisiert und NICHT austauschbar: eine Gläubiger-ID darf nicht über den
+   * Empfängernamen greifen und umgekehrt. In einer gemischten Liste war das nicht zu
+   * trennen — dort hätte ein Empfängername, der zufällig wie eine ID aussieht, auf beiden
+   * Feldern gezogen.
+   */
+  it("prüft ein Merkmal nur gegen das Feld seiner Art", () => {
+    const alsId: Vertragserkennung = {
+      vertragId: "v1",
+      merkmale: [{ art: "glaeubigerId", muster: "netcup" }],
+    };
+    // Derselbe Text, aber als Gläubiger-ID gemeint — der Empfängername zählt nicht.
+    expect(passtZu(alsId, spur({ gegenpartei: "[anonymisiert] GmbH" }))).toBe(false);
+    expect(passtZu(alsId, spur({ gegenpartei: "X", glaeubigerId: "netcup" }))).toBe(true);
+  });
+
+  /**
+   * Wildcards. Der Fall dahinter: Abbuchungen tragen Vertrags-, Rechnungs- oder
+   * Ortsangaben im Empfängerfeld, und ohne Platzhalter bräuchte jede Schreibweise eine
+   * eigene Zeile.
+   */
+  it("versteht * als beliebigen Text", () => {
+    const e: Vertragserkennung = {
+      vertragId: "v1",
+      merkmale: [{ art: "empfaenger", muster: "stadtwerke*" }],
+    };
+    expect(passtZu(e, spur({ gegenpartei: "[anonymisiert] Bonn" }))).toBe(true);
+    expect(passtZu(e, spur({ gegenpartei: "STADTWERKE MUENCHEN GMBH" }))).toBe(true);
+    expect(passtZu(e, spur({ gegenpartei: "Kreiswerke Bonn" }))).toBe(false);
+  });
+
+  it("nimmt alles außer dem Stern wörtlich", () => {
+    // Der Punkt ist ein Punkt, kein „beliebiges Zeichen" — sonst träfe „a.b" auch „axb".
+    const e: Vertragserkennung = {
+      vertragId: "v1",
+      merkmale: [{ art: "empfaenger", muster: "e.on*" }],
+    };
+    expect(passtZu(e, spur({ gegenpartei: "[anonymisiert]" }))).toBe(true);
+    expect(passtZu(e, spur({ gegenpartei: "exon Energie" }))).toBe(false);
+  });
+
+  /**
+   * Der Empfänger wird gegen ZWEI Formen geprüft: den Namen aus dem Auszug und seine
+   * normalisierte Form. Beide begegnen einem an verschiedenen Stellen der Oberfläche —
+   * wer eine davon abtippt, soll einen Treffer bekommen und nicht raten müssen.
+   */
+  it("trifft sowohl den Namen aus dem Auszug als auch seine normalisierte Form", () => {
+    const roh: Vertragserkennung = {
+      vertragId: "v1",
+      merkmale: [{ art: "empfaenger", muster: "[anonymisiert] GmbH" }],
+    };
+    expect(passtZu(roh, spur({ gegenpartei: "[anonymisiert] GmbH" }))).toBe(true);
+    // „netcup" ist die normalisierte Form desselben Namens.
+    expect(passtZu(netcup, spur({ gegenpartei: "[anonymisiert] GmbH" }))).toBe(true);
   });
 
   it("grenzt über die Betragsspanne ab", () => {
@@ -93,8 +155,8 @@ describe("standardErkennung", () => {
 
   it("nimmt die Gläubiger-ID als zweiten Schlüssel auf", () => {
     const e = standardErkennung("v1", "[anonymisiert] GmbH", 1650, "DE98ZZZ09999999999");
-    expect(e.schluessel).toContain("netcup");
-    expect(e.schluessel).toContain("DE98ZZZ09999999999");
+    expect(e.merkmale).toContainEqual({ art: "empfaenger", muster: "netcup" });
+    expect(e.merkmale).toContainEqual({ art: "glaeubigerId", muster: "DE98ZZZ09999999999" });
   });
 
   it("setzt ohne Betrag keine Spanne", () => {
@@ -106,8 +168,14 @@ describe("standardErkennung", () => {
 
 describe("vertragFuer", () => {
   it("lässt den Gläubiger-ID-Treffer vor dem Namenstreffer gewinnen", () => {
-    const ueberName: Vertragserkennung = { vertragId: "v-name", schluessel: ["telefonica"] };
-    const ueberId: Vertragserkennung = { vertragId: "v-id", schluessel: ["DE11ZZZ00000000001"] };
+    const ueberName: Vertragserkennung = {
+      vertragId: "v-name",
+      merkmale: [{ art: "empfaenger", muster: "telefonica" }],
+    };
+    const ueberId: Vertragserkennung = {
+      vertragId: "v-id",
+      merkmale: [{ art: "glaeubigerId", muster: "DE11ZZZ00000000001" }],
+    };
     const s = spur({ gegenpartei: "Telefonica Germany GmbH", glaeubigerId: "DE11ZZZ00000000001" });
     // Reihenfolge der Regeln darf das Ergebnis nicht bestimmen.
     expect(vertragFuer([ueberName, ueberId], s)).toBe("v-id");
@@ -115,8 +183,9 @@ describe("vertragFuer", () => {
   });
 
   it("lässt bei zwei Namenstreffern die engere Betragsspanne gewinnen", () => {
-    const weit: Vertragserkennung = { vertragId: "v-weit", schluessel: ["o2"], betragVon: 100, betragBis: 9000 };
-    const eng: Vertragserkennung = { vertragId: "v-eng", schluessel: ["o2"], betragVon: 1900, betragBis: 2100 };
+    const muster = [{ art: "empfaenger", muster: "o2" }] as const;
+    const weit: Vertragserkennung = { vertragId: "v-weit", merkmale: muster, betragVon: 100, betragBis: 9000 };
+    const eng: Vertragserkennung = { vertragId: "v-eng", merkmale: muster, betragVon: 1900, betragBis: 2100 };
     const s = spur({ gegenpartei: "O2", betrag: -2000 });
     expect(vertragFuer([weit, eng], s)).toBe("v-eng");
     expect(vertragFuer([eng, weit], s)).toBe("v-eng");

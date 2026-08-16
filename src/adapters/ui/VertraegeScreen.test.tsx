@@ -503,6 +503,45 @@ describe("VertraegeScreen — Vorschläge", () => {
   });
 
   /**
+   * Wildcards durch die Maske. Der Fall: derselbe Anbieter taucht im Auszug mit
+   * angehängter Rechnungs- oder Vertragsangabe auf — ohne Platzhalter bräuchte jede
+   * Schreibweise eine eigene Zeile. Zugleich der Beweis, dass das Empfänger-Feld auch
+   * wirklich als Empfänger-Merkmal ankommt und nicht als Gläubiger-ID.
+   */
+  it("nimmt über ein Muster mit * auch abweichende Schreibweisen auf", async () => {
+    await konto();
+    await monatsreihe("a", "[anonymisiert] Bonn", 5000, 4);
+    await monatsreihe("b", "[anonymisiert] Bonn Rg 4711", 5000, 3);
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "[anonymisiert] Bonn", beginn: "2024-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "[anonymisiert] Bonn", 5000));
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+    // Nur die exakt geschriebenen vier — die drei mit Zusatz fallen durch.
+    expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(4);
+
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("[anonymisiert] Bonn");
+    await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
+
+    const empfaenger = await screen.findByRole("textbox", { name: /^empfänger$/i });
+    await nutzer.clear(empfaenger);
+    await nutzer.type(empfaenger, "stadtwerke bonn*");
+
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(7);
+    });
+    // Und das Merkmal steht als Empfänger in der Regel, nicht als Gläubiger-ID.
+    const [regel] = await sqliteVertragserkennungRepository.alle();
+    expect(regel.merkmale).toEqual([{ art: "empfaenger", muster: "stadtwerke bonn*" }]);
+  });
+
+  /**
    * Einnahmen laufen durch dieselbe Naht wie Ausgaben, nur mit umgekehrtem Vorzeichen.
    * Der Test geht bis in die Regel, weil erst dort sichtbar wird, ob der Charakter das
    * Vorzeichen richtig dreht: ein Gehalt mit negativem Betrag verschöbe die gesamte
