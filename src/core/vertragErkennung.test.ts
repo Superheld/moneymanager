@@ -242,3 +242,67 @@ describe("vertragskandidaten", () => {
     expect(vertragskandidaten(ohneNamen, HEUTE)).toEqual([]);
   });
 });
+
+// Der Befund ist die Begründung, die in der Oberfläche steht. Er muss zum Ergebnis
+// passen — ein Vorschlag, dessen angezeigte Belege nicht das sagen, was die Erkennung
+// tatsächlich geprüft hat, wäre schlimmer als gar keine Begründung.
+describe("Erkennungsbefund", () => {
+  it("nennt Schlüssel, Termine, Takt und Betragstoleranz einer monatlichen Reihe", () => {
+    const [k] = vertragskandidaten(reihe({ name: "Telefonica GmbH", betrag: 2999, n: 12, tage: 30 }), HEUTE);
+    const b = k.befund;
+
+    expect(b.schluesselArt).toBe("name");
+    expect(b.schluesselWert).toBe(anbieterSchluessel("Telefonica GmbH"));
+    // 12 Zahlungen ergeben 12 Termine und 11 Abstände.
+    expect(b.termine).toBe(12);
+    expect(b.minTermine).toBe(3);
+    expect(b.medianAbstandTage).toBe(30);
+    expect(b.abstaendeNah).toBe(11);
+    expect(b.abstaendeGesamt).toBe(11);
+    // Das Fenster ist das, gegen das der Median geprüft wurde — der Median liegt drin.
+    expect(b.medianAbstandTage).toBeGreaterThanOrEqual(b.rhythmusFenster[0]);
+    expect(b.medianAbstandTage).toBeLessThanOrEqual(b.rhythmusFenster[1]);
+    // 5 % von 29,99 € = 1,50 € — über dem Mindestwert von 1 €, also gilt der Prozentwert.
+    expect(b.betragsToleranz).toBe(150);
+    expect(b.betraegeNah).toBe(12);
+    expect(b.betraegeGesamt).toBe(12);
+    expect(b.letzteVorTagen).toBe(0);
+    expect(b.beendetAbTagen).toBe(70);
+  });
+
+  it("weist die Gläubiger-ID als Schlüssel aus, wenn sie gruppiert hat", () => {
+    const [k] = vertragskandidaten(
+      reihe({ name: "O2", betrag: 2999, n: 6, tage: 30, glaeubigerId: "DE98ZZZ09999999999" }),
+      HEUTE,
+    );
+    expect(k.befund.schluesselArt).toBe("glaeubigerId");
+    expect(k.befund.schluesselWert).toBe("DE98ZZZ09999999999");
+  });
+
+  it("zählt bei schwankenden Beträgen nur die, die in der Toleranz liegen", () => {
+    // 40 € Basis, jede zweite Zahlung 10 € daneben. Die Toleranz sind 5 % = 2 €,
+    // die Ausreißer liegen weit darüber und fallen raus.
+    const [k] = vertragskandidaten(
+      reihe({ name: "Stadtwerke", betrag: 4000, n: 12, tage: 30, streuung: [0, 1000] }),
+      HEUTE,
+    );
+    expect(k.befund.betraegeGesamt).toBe(12);
+    expect(k.befund.betraegeNah).toBe(6);
+    expect(k.betragStabilitaet).toBeCloseTo(0.5);
+  });
+
+  it("meldet bei einer beendeten Reihe, wie weit die letzte Zahlung zurückliegt", () => {
+    const [k] = vertragskandidaten(
+      reihe({ name: "Altvertrag", betrag: 1000, n: 6, tage: 30, bis: "2024-08-16" }),
+      HEUTE,
+      { auchBeendete: true },
+    );
+    expect(k.laeuft).toBe(false);
+    expect(k.befund.letzteVorTagen).toBeGreaterThan(k.befund.beendetAbTagen);
+  });
+});
+
+// Die Kennzeichnung „gehört zu einem Vertrag" im Buchungsdialog hängt an dieser
+// Funktion. Sie muss dieselbe Regel anwenden, mit der die Vorschlagsliste bereits
+// erfasste Verträge ausblendet — sonst gälte eine Buchung als vertragsgebunden und
+// derselbe Anbieter stünde weiter als Vorschlag daneben.

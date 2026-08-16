@@ -6,9 +6,15 @@ import type {
   Inventargegenstand,
   IstBuchung,
   Kategorie,
+  Kategoriefestlegung,
+  Merkmalsausschluss,
+  Merkmalsherkunft,
+  Modell,
   Person,
   Topf,
   Vertrag,
+  Vertragserkennung,
+  Vertragszuordnung,
   Zahlungskonto,
   Zahlungsregel,
 } from "../core";
@@ -42,6 +48,39 @@ export interface VertragRepository {
   alle(): Promise<Vertrag[]>;
   speichern(vertrag: Vertrag): Promise<void>;
   loeschen(id: string): Promise<void>;
+}
+
+/**
+ * Die Erkennungsregeln der Verträge — woran ihre Zahlungen zu erkennen sind.
+ * Getrennt vom Vertrag wie die Zahlungsregel: der Vertrag beschreibt Konditionen,
+ * die Erkennung beschreibt Zuordnungspolitik (siehe core/vertragZuordnung).
+ */
+export interface VertragserkennungRepository {
+  alle(): Promise<Vertragserkennung[]>;
+  speichern(erkennung: Vertragserkennung): Promise<void>;
+  loeschen(vertragId: string): Promise<void>;
+}
+
+/**
+ * Welche Buchung zu welchem Vertrag gehört — samt Herkunft, damit ein Abgleich die
+ * Handarbeit nicht überschreibt. `loeschen` gibt eine Buchung wieder an die Automatik
+ * zurück; das ist der Rückweg aus einer manuellen Entscheidung.
+ */
+export interface VertragszuordnungRepository {
+  alle(): Promise<Vertragszuordnung[]>;
+  speichern(zuordnung: Vertragszuordnung): Promise<void>;
+  loeschen(istbuchungId: string): Promise<void>;
+}
+
+/**
+ * Die Kategorie-Festlegungen — „immer bei diesem Empfänger". Der Schlüssel ist das
+ * Muster: ein zweites Festlegen auf denselben Text ersetzt die alte Aussage, statt eine
+ * zweite danebenzustellen.
+ */
+export interface KategoriefestlegungRepository {
+  alle(): Promise<Kategoriefestlegung[]>;
+  speichern(festlegung: Kategoriefestlegung): Promise<void>;
+  loeschen(muster: string): Promise<void>;
 }
 
 export interface BudgetRepository {
@@ -80,6 +119,54 @@ export interface EinstellungenRepository {
   /** Alle Schlüssel→Wert; fehlende Schlüssel bedeuten „noch nicht gesetzt". */
   lesen(): Promise<Record<string, string>>;
   schreiben(schluessel: string, wert: string): Promise<void>;
+}
+
+/**
+ * Das gespeicherte Modell samt der Angaben, die es einordnen — wann es entstand, aus wie
+ * vielen Beispielen, und wie gut es an ungesehenen Zeilen abschnitt. Ohne diese drei ist
+ * eine Genauigkeit eine Zahl ohne Grundlage.
+ */
+export interface Modellstand {
+  readonly modell: Modell;
+  /** ISO-Zeitpunkt des Trainings. */
+  readonly trainiertAm: string;
+  /** Genauigkeit an der Prüfmenge (0…1); fehlt, wenn zu wenig Material für einen Split war. */
+  readonly genauigkeit?: number;
+}
+
+/**
+ * Der Klassifikator der automatischen Kategorisierung. Genau EIN aktuelles Modell —
+ * `speichern` ersetzt es. Eine Historie gäbe es nur, um alte Stände aufzuheben, die aus
+ * dem Bestand in Millisekunden neu entstehen.
+ */
+export interface KlassifikatorRepository {
+  /** Der gespeicherte Stand, oder null, wenn noch nie trainiert wurde. */
+  laden(): Promise<Modellstand | null>;
+  speichern(stand: Modellstand): Promise<void>;
+}
+
+/**
+ * Ein Ausschluss samt seiner Herkunft im Sinne von „wer hat ihn gesetzt".
+ * `standard` kam mit der App, `manuell` hat jemand entschieden — nur so lässt sich die
+ * eigene Pflege von der Grundausstattung trennen.
+ */
+export interface GespeicherterAusschluss extends Merkmalsausschluss {
+  readonly quelle: "standard" | "manuell";
+}
+
+/**
+ * Was ins Training geht: die aktiven Merkmalsherkünfte und die Ausschlussliste.
+ *
+ * Getrennte Operationen für Schalter und Liste, weil sie sich verschieden verhalten —
+ * die fünf Schalter entscheidet man einmal, die Liste wächst über Jahre am Einzelfall.
+ */
+export interface MerkmalskonfigurationRepository {
+  /** Aktive Herkünfte; null, solange nie etwas gesetzt wurde (dann gilt der Standard). */
+  herkuenfteLesen(): Promise<Merkmalsherkunft[] | null>;
+  herkuenfteSetzen(herkuenfte: readonly Merkmalsherkunft[]): Promise<void>;
+  ausschluesseLesen(): Promise<GespeicherterAusschluss[]>;
+  ausschlussSetzen(a: GespeicherterAusschluss): Promise<void>;
+  ausschlussEntfernen(wort: string): Promise<void>;
 }
 
 /**

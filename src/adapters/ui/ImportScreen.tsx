@@ -22,6 +22,12 @@ import {
   sqliteZahlungskontoRepository,
 } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteImportLaufRepository, sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
+import { kategorisierungsquellen } from "../../application/kategorisierungsquellen";
+import { sqliteKategoriefestlegungRepository } from "../persistence/sqliteKategoriefestlegungRepository";
+import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
+import { sqliteVertragserkennungRepository } from "../persistence/sqliteVertragZuordnungRepositories";
+import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
+import { sqliteMerkmalskonfigurationRepository } from "../persistence/sqliteMerkmalskonfigurationRepository";
 import { Button, Card, DataTable } from "./ds";
 import { PageHead } from "./PageHead";
 import { useGeld } from "./einstellungenKontext";
@@ -123,6 +129,17 @@ export function ImportScreen() {
           ? { quelleKey: m.quelleKey, kontoId: z.kontoId }
           : { quelleKey: m.quelleKey, neu: { bezeichnung: z.bezeichnung, typ: z.typ, iban: z.iban } };
       });
+      // Die Kategorisierungs-Kette braucht Verträge, Modell und Merkmalskonfiguration.
+      // Einmal vor dem Lauf geladen, nicht je Zeile: der Bestand ändert sich währenddessen
+      // nicht, und ein Import über tausende Zeilen soll nicht tausendmal dasselbe holen.
+      const kategorisierung = await kategorisierungsquellen({
+        kategorieRepo: sqliteKategorieRepository,
+        festlegungRepo: sqliteKategoriefestlegungRepository,
+        vertragRepo: sqliteVertragRepository,
+        erkennungRepo: sqliteVertragserkennungRepository,
+        klassifikatorRepo: sqliteKlassifikatorRepository,
+        merkmalRepo: sqliteMerkmalskonfigurationRepository,
+      });
       const r = await umsaetzeUebernehmen(
         {
           quelle: ergebnis.quelle,
@@ -137,6 +154,7 @@ export function ImportScreen() {
           umsatzRepo: sqliteUmsatzRepository,
           laufRepo: sqliteImportLaufRepository,
           id: () => crypto.randomUUID(),
+          kategorisierung,
         },
       );
       setUErgebnis(r);

@@ -278,4 +278,171 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE topf DROP COLUMN inventar_id`,
     ],
   },
+  {
+    version: 19, // Vertrag ↔ Ist-Buchung: Erkennungsregel je Vertrag, Zuordnung je Buchung
+    sql: [
+      // Bis hierher zeigte der Vertrag auf KEINE Buchung; die Zugehörigkeit wurde jedes
+      // Mal aus dem Empfängernamen abgeleitet (core/vertragErkennung#anbieterSchluessel).
+      // Zwei Tabellen statt Spalten am Vertrag, weil es zwei verschiedene Dinge sind:
+      // die REGEL (wie erkenne ich die Zahlungen dieses Vertrags — änderbar, einsehbar)
+      // und das ERGEBNIS je Buchung (samt Herkunft, damit Handarbeit den Abgleich
+      // überlebt). Dasselbe Muster wie Vertrag ↔ Zahlungsregel: getrennte Kontexte,
+      // verknüpft über vertragId.
+      //
+      // Reines Anlegen, kein Datenumbau — wiederholbar.
+      `CREATE TABLE IF NOT EXISTS vertrag_erkennung (
+        vertrag_id  TEXT    PRIMARY KEY,
+        schluessel  TEXT    NOT NULL,
+        betrag_von  INTEGER,
+        betrag_bis  INTEGER,
+        gueltig_ab  TEXT,
+        gueltig_bis TEXT,
+        konto_id    TEXT
+      )`,
+      // `vertrag_id` NULL ist hier eine AUSSAGE („gehört ausdrücklich zu keinem Vertrag"),
+      // kein fehlender Wert — nur so überlebt eine Korrektur den nächsten Abgleich.
+      // Deshalb auch kein NOT NULL. herkunft: 'automatisch' | 'manuell'.
+      `CREATE TABLE IF NOT EXISTS vertrag_zuordnung (
+        istbuchung_id TEXT PRIMARY KEY,
+        vertrag_id    TEXT,
+        herkunft      TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS ix_vertrag_zuordnung_vertrag ON vertrag_zuordnung (vertrag_id)`,
+    ],
+  },
+  {
+    version: 20, // Herkunft der KATEGORIE an der Ist-Buchung (Fundament der Auto-Kategorisierung)
+    sql: [
+      // `quelle` sagt, woher die BUCHUNG kommt (import/manuell/bezahlt-markiert) — nicht,
+      // woher ihre KATEGORIE kommt. Solange das fehlt, kann ein automatischer Lauf nicht
+      // unterscheiden, ob er einen eigenen früheren Treffer korrigiert oder eine
+      // Handentscheidung plattmacht. Dasselbe Problem war bei Vertrag ↔ Buchung schon
+      // gelöst (vertrag_zuordnung.herkunft, Migration 19); hier fehlte es.
+      //
+      // DEFAULT 'automatisch' ist für den Bestand fachlich richtig: er stammt aus einem
+      // Import und wurde über das Finanzguru-Remapping kategorisiert, nicht von Hand.
+      // Damit greift ein späterer Abgleich auf allem, was nie jemand angefasst hat —
+      // und lässt genau das in Ruhe, was jemand angefasst hat.
+      //
+      // Reines Anlegen mit Default, kein Datenumbau — wiederholbar (`migrate()`
+      // überspringt einen Zugang, dessen Spalte schon existiert).
+      `ALTER TABLE ist_buchung ADD COLUMN kategorie_herkunft TEXT NOT NULL DEFAULT 'automatisch'`,
+    ],
+  },
+  {
+    version: 21, // Klassifikator: das trainierte Modell der automatischen Kategorisierung
+    sql: [
+      // EINE Zeile, feste Id — es gibt genau ein aktuelles Modell, und ein Training
+      // ersetzt es vollständig. Keine Historie: ein altes Modell ist nicht „auch eine
+      // Meinung", sondern ein überholter Stand, und aus dem Bestand jederzeit in
+      // Millisekunden neu herstellbar (137 ms über 3689 Beispiele).
+      //
+      // Vokabular und Kategorien als Textliste, die Gewichte als base64-kodierte
+      // Float32-Matrix. Kein eigenes Zahlenformat, keine Zeile je Gewicht: bei ~2000
+      // Merkmalen × ~50 Kategorien wären das 100.000 Zeilen für einen Wert, den ohnehin
+      // niemand einzeln liest.
+      `CREATE TABLE IF NOT EXISTS klassifikator_modell (
+        id             TEXT    PRIMARY KEY,
+        kategorien     TEXT    NOT NULL,
+        vokabular      TEXT    NOT NULL,
+        gewichte       TEXT    NOT NULL,
+        bias           TEXT    NOT NULL,
+        beispiele      INTEGER NOT NULL,
+        trainiert_am   TEXT    NOT NULL,
+        genauigkeit    REAL
+      )`,
+    ],
+  },
+  {
+    version: 22, // Merkmale steuerbar: welche Wörter nicht ins Training gehen
+    sql: [
+      // Eine Zeile je ausgeschlossenem Wort. `herkuenfte` NULL heißt „überall", sonst
+      // kommagetrennte Herkünfte (empGanz, empWort, vwz, gid, vz) — dasselbe Wort kann
+      // im Empfängerfeld brauchbar und im Verwendungszweck Rauschen sein.
+      //
+      // Die aktiven Herkünfte selbst stehen NICHT hier, sondern in `einstellung`: das
+      // sind fünf Schalter, genau der Fall, für den die Key/Value-Tabelle da ist. Eine
+      // eigene Tabelle für fünf Zeilen mit festen Schlüsseln wäre Schema ohne Gegenwert.
+      //
+      // `quelle` hält fest, ob ein Eintrag mitgeliefert wurde oder von Hand kam. Ohne das
+      // ließe sich die eigene Pflege nicht von der Grundausstattung trennen — und ein
+      // späteres Nachliefern neuer Standardwörter könnte eigene Entscheidungen
+      // überschreiben, ohne dass es auffiele.
+      `CREATE TABLE IF NOT EXISTS merkmal_ausschluss (
+        wort       TEXT PRIMARY KEY,
+        herkuenfte TEXT,
+        quelle     TEXT NOT NULL DEFAULT 'standard'
+      )`,
+    ],
+  },
+  {
+    version: 23, // Der Vertrag trägt eine Kategorie — Kopf der Kategorisierungs-Kette
+    sql: [
+      // Bisher hing die Kategorie nur an der abgeleiteten Zahlungsregel. Für die
+      // automatische Kategorisierung ist das die falsche Stelle: was eine Buchung trifft,
+      // ist die Vertragszuordnung (Migration 19), und die zeigt auf den VERTRAG. Über die
+      // Zahlungsregel zu gehen hieße, sich auf eine Ableitung zu verlassen, die es nicht
+      // für jeden Vertrag gibt.
+      //
+      // Die Zahlungsregel behält ihre eigene Kategorie: sie kann auch ohne Vertrag
+      // existieren (freie Planung). Beim Ableiten wird sie aus dem Vertrag vorbelegt.
+      `ALTER TABLE vertrag ADD COLUMN kategorie_id TEXT`,
+      // Bestandsverträge holen ihre Kategorie aus der abgeleiteten Zahlungsregel nach.
+      // Ohne das trüge kein einziger vorhandener Vertrag eine Kategorie, und die
+      // Kategorisierungs-Kette begänne erst beim nächsten neu erfassten zu wirken.
+      //
+      // WIEDERHOLBAR trotz UPDATE (siehe Invarianten): `WHERE kategorie_id IS NULL`
+      // greift nach dem ersten Lauf nur noch dort, wo auch die Regel nichts hatte — und
+      // schreibt dann wieder NULL. Ein zweiter Durchgang ändert also nichts. Bewusst
+      // setzt es NUR leere Felder: eine am Vertrag gepflegte Kategorie darf eine
+      // wiederholte Migration nicht überschreiben.
+      `UPDATE vertrag SET kategorie_id = (
+         SELECT r.kategorie_id FROM zahlungsregel r
+          WHERE r.vertrag_id = vertrag.id AND r.kategorie_id IS NOT NULL
+          LIMIT 1
+       ) WHERE kategorie_id IS NULL`,
+    ],
+  },
+  {
+    version: 24, // Kategorie-Festlegungen: das dünne Overlay über der Erkennung
+    sql: [
+      // Empfängermuster → Kategorie, sonst nichts. Bewusst KEINE Betragsspanne und kein
+      // Zeitraum wie bei der Vertragserkennung: die trifft Identität und muss eng sein,
+      // eine Kategorie ist eine Klasse (Lebensmittel kosten mal 8 € und mal 190 €).
+      //
+      // Das Muster ist der Primärschlüssel. Zwei Festlegungen auf denselben Text wären
+      // keine zwei Aussagen, sondern eine geänderte — und ein zweites Festlegen soll die
+      // erste ersetzen, nicht danebenliegen.
+      `CREATE TABLE IF NOT EXISTS kategorie_festlegung (
+        muster       TEXT PRIMARY KEY,
+        kategorie_id TEXT NOT NULL,
+        angelegt_am  TEXT NOT NULL
+      )`,
+    ],
+  },
+  {
+    version: 25, // Vertrags-Kategorie NOCHMAL nachtragen — v23 hat es nicht überall getan
+    sql: [
+      // Auf der echten Datenbank stand nach v23 bei allen 16 Verträgen `kategorie_id`
+      // auf NULL, obwohl jeder eine Zahlungsregel MIT Kategorie hatte. Die Erklärung ist
+      // der Entwicklungsbetrieb: die laufende App hat Version 23 verbucht, als die
+      // Migration erst aus dem `ALTER TABLE` bestand — der Nachtrag kam Minuten später
+      // dazu und wurde nie ausgeführt, weil die Version schon stand.
+      //
+      // Die Regel „append-only, bestehende Versionen nie editieren" ist deshalb keine
+      // Förmlichkeit: sie ist der Grund, warum die Reparatur hier steht und nicht in v23.
+      //
+      // Folge ohne diesen Nachtrag: die Vertragsstufe der Kategorisierungs-Kette wäre auf
+      // dem echten Bestand tot — 93 von 738 geprüften Zahlungen fielen durch auf das
+      // Modell, obwohl für sie eine getroffene Zuordnung existiert.
+      //
+      // Wiederholbar wie in v23: `WHERE kategorie_id IS NULL` greift nach dem ersten Lauf
+      // nur noch dort, wo auch die Regel nichts hat, und schreibt wieder NULL.
+      `UPDATE vertrag SET kategorie_id = (
+         SELECT r.kategorie_id FROM zahlungsregel r
+          WHERE r.vertrag_id = vertrag.id AND r.kategorie_id IS NOT NULL
+          LIMIT 1
+       ) WHERE kategorie_id IS NULL`,
+    ],
+  },
 ];

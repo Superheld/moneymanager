@@ -30,6 +30,13 @@ import {
   sqliteUmsatzRepository,
 } from "../persistence/sqliteImportRepositories";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
+import {
+  sqliteVertragserkennungRepository,
+  sqliteVertragszuordnungRepository,
+  vertragsAbgleichDeps,
+} from "../persistence/sqliteVertragZuordnungRepositories";
+import { erkennungSicherstellen, zuordnungenAbgleichen } from "../../application/vertragszuordnung";
+import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import {
   sqliteKategorieRepository,
@@ -633,5 +640,162 @@ describe("Buchung splitten", () => {
     });
     const [b] = await sqliteLedgerRepository.alle();
     expect(b.aufteilungen).toBeUndefined();
+  });
+});
+
+// Aus einer gebuchten Zahlung einen Vertrag machen. Der Weg ist die Umkehrung der
+// Vertragserkennung: die kennt viele Zahlungen und rät den Takt, hier kennt man EINE
+// Zahlung und trägt den Takt selbst nach. Geprüft wird beides — dass die Vorbelegung
+// aus der Buchung kommt, und dass Vertrag UND Zahlungsregel danach in SQLite stehen.
+describe("Vertrag aus einer Buchung", () => {
+  const heute = "2026-08-12";
+
+  async function zahlungAnlegen() {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -2999, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1",
+    });
+    await sqliteImportLaufRepository.speichern({
+      id: "l1", quelle: "finanzguru", dateiname: "a.xlsx", zeitpunkt: "2026-08-12T10:00:00Z",
+      eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: heute, betrag: -2999,
+      waehrung: "EUR", gegenpartei: "Telefonica Germany GmbH", verwendungszweck: "Mobilfunk",
+      rohHash: "h1", status: "verbucht", istbuchungId: "i1",
+    });
+  }
+
+  async function detailOeffnen(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+  }
+
+  it("übernimmt Empfänger, Betrag, Konto und Kategorie in die Vertragsmaske", async () => {
+    await zahlungAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer);
+    await nutzer.click(await screen.findByRole("button", { name: /vertrag daraus machen/i }));
+
+    // Nach Daten suchen, die der Test selbst angelegt hat — nicht nach Formulierungen.
+    expect((await screen.findByDisplayValue("Telefonica Germany GmbH")).tagName).toBe("INPUT");
+    // Die Maske trägt den Betrag POSITIV — die Richtung steckt im Charakter.
+    await screen.findByDisplayValue("29.99");
+    // Sichtbar ist die erste Fälligkeit; der Vertragsbeginn liegt im zugeklappten
+    // Konditionen-Block und trägt dasselbe Datum.
+    expect(await screen.findAllByDisplayValue(heute)).toHaveLength(1);
+    await nutzer.click(screen.getByRole("button", { name: /Vertragsdaten/i }));
+    expect(await screen.findAllByDisplayValue(heute)).toHaveLength(2);
+  });
+
+  it("legt Vertrag und Zahlungsregel an", async () => {
+    await zahlungAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer);
+    await nutzer.click(await screen.findByRole("button", { name: /vertrag daraus machen/i }));
+    await nutzer.click(((a) => a[a.length - 1]!)(screen.getAllByRole("button", { name: /speichern/i })));
+
+    await waitFor(async () => {
+      const [v] = await sqliteVertragRepository.alle();
+      expect(v?.anbieter).toBe("Telefonica Germany GmbH");
+      expect(v?.beginn).toBe(heute);
+    });
+    const [v] = await sqliteVertragRepository.alle();
+    const regeln = await sqliteZahlungsregelRepository.alle();
+    const regel = regeln.find((r) => r.vertragId === v.id);
+    // Der Betrag kommt positiv in die Maske; das Vorzeichen setzt der Use-Case aus dem
+    // Charakter — eine Aufwands-Regel muss abfliessen, nicht zufliessen.
+    expect(regel?.betrag).toBe(-2999);
+    expect(regel?.kontoId).toBe("k1");
+    expect(regel?.kategorieId).toBe("kat1");
+    expect(regel?.startdatum).toBe(heute);
+  });
+
+  /**
+   * Die ganze Kette in einem Test: Erkennungsregel → Abgleich → Kennzeichnung im Dialog.
+   * Der Anbietername im Vertrag ist bewusst anders geschrieben als im Umsatz — gematcht
+   * wird über den normalisierten Namen, sonst hinge die Zuordnung daran, wie die Bank
+   * den Empfänger schreibt.
+   */
+  it("kennzeichnet eine Buchung, die der Abgleich einem Vertrag zugeordnet hat", async () => {
+    await zahlungAnlegen();
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Telefonica Germany", beginn: "2025-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await erkennungSicherstellen(sqliteVertragserkennungRepository, "v1", "Telefonica Germany", 2999);
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer);
+    // Zweimal: als Kennzeichnung und als gewählter Eintrag in der Zuordnungs-Auswahl.
+    expect(await screen.findAllByText("Telefonica Germany")).not.toHaveLength(0);
+    // Der Anlege-Weg ist weg — sonst legte man beim zweiten Blick denselben Vertrag
+    // ein zweites Mal an.
+    expect(screen.queryByRole("button", { name: /vertrag daraus machen/i })).toBeNull();
+  });
+
+  /**
+   * Der Rückweg, ohne den „automatisch" eine Zumutung wäre: die Automatik greift daneben,
+   * der Mensch überstimmt sie — und die Korrektur muss den nächsten Abgleich überleben.
+   * Geprüft wird an der gespeicherten Zuordnung, nicht an der Anzeige: nur dort steht,
+   * ob die Entscheidung wirklich festgehalten wurde.
+   */
+  it("lässt eine automatische Zuordnung von Hand aufheben — dauerhaft", async () => {
+    await zahlungAnlegen();
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Telefonica Germany", beginn: "2025-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await erkennungSicherstellen(sqliteVertragserkennungRepository, "v1", "Telefonica Germany", 2999);
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+    expect((await sqliteVertragszuordnungRepository.alle())[0].vertragId).toBe("v1");
+
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await detailOeffnen(nutzer);
+
+    const auswahl = await screen.findByRole("combobox", { name: /vertrag zuordnen/i });
+    await nutzer.selectOptions(auswahl, "__keiner");
+
+    await waitFor(async () => {
+      const z = (await sqliteVertragszuordnungRepository.alle())[0];
+      expect(z.vertragId).toBeNull();
+      expect(z.herkunft).toBe("manuell");
+    });
+
+    // Und der nächste Abgleich rechnet sie NICHT zurück.
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+    const danach = (await sqliteVertragszuordnungRepository.alle())[0];
+    expect(danach.vertragId).toBeNull();
+    expect(danach.herkunft).toBe("manuell");
+  });
+
+  it("bietet den Weg bei einem Umbuchungs-Bein nicht an", async () => {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", inhaberIds: [], saldo: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -50000, kontoId: "k1", gegenkontoId: "k2",
+      transferId: "t1", charakter: "Umschichtung", quelle: "manuell",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: 50000, kontoId: "k2", gegenkontoId: "k1",
+      transferId: "t1", charakter: "Umschichtung", quelle: "manuell",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer);
+    await screen.findByText(/Gegenkonto/i);
+    expect(screen.queryByRole("button", { name: /vertrag daraus machen/i })).toBeNull();
   });
 });
