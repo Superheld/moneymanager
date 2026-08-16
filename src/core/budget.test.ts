@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { euroZuCent } from "./geld";
 import { budgetVerbrauch, geglaetteterMonatsabfluss, periodeFenster, type Budget } from "./budget";
 import type { IstBuchung } from "./istbuchung";
+import type { Kategorie } from "./kategorie";
 
 function budget(over: Partial<Budget> = {}): Budget {
   return { id: "b", kategorieId: "k", rahmen: euroZuCent(400), periode: "monatlich", ...over };
@@ -39,7 +40,7 @@ describe("budgetVerbrauch", () => {
 
   it("summiert Aufwands-Abflüsse der Kategorie im Fenster (als positiver Betrag)", () => {
     const ist = [b({ id: "1", betrag: euroZuCent(-50) }), b({ id: "2", betrag: euroZuCent(-30) })];
-    expect(budgetVerbrauch(ist, "k", von, bis)).toBe(euroZuCent(80));
+    expect(budgetVerbrauch(ist, [], "k", von, bis)).toBe(euroZuCent(80));
   });
   it("ignoriert andere Kategorien, andere Perioden und Nicht-Aufwand", () => {
     const ist = [
@@ -49,6 +50,23 @@ describe("budgetVerbrauch", () => {
       b({ id: "4", charakter: "Umschichtung" }), // gedeckte Topf-Entnahme zählt nicht
       b({ id: "5", charakter: "Ertrag" }),
     ];
-    expect(budgetVerbrauch(ist, "k", von, bis)).toBe(0);
+    expect(budgetVerbrauch(ist, [], "k", von, bis)).toBe(0);
+  });
+
+  // Der Fall, an dem der Verbrauch in der echten App auf 0 stand: Budgets hängen an den
+  // Hauptkategorien, gebucht wird ausschließlich auf deren Kindern.
+  it("zählt Buchungen auf Unterkategorien der Budget-Kategorie mit", () => {
+    const kategorien: Kategorie[] = [
+      { id: "k", name: "Lebenshaltung", defaultCharakter: "Aufwand" },
+      { id: "lebensmittel", name: "Lebensmittel", elternId: "k", defaultCharakter: "Aufwand" },
+      { id: "drogerie", name: "Drogerie", elternId: "lebensmittel", defaultCharakter: "Aufwand" },
+      { id: "fremd", name: "Mobilität", defaultCharakter: "Aufwand" },
+    ];
+    const ist = [
+      b({ id: "1", kategorieId: "lebensmittel", betrag: euroZuCent(-50) }),
+      b({ id: "2", kategorieId: "drogerie", betrag: euroZuCent(-12) }), // Enkel zählt auch
+      b({ id: "3", kategorieId: "fremd", betrag: euroZuCent(-99) }),
+    ];
+    expect(budgetVerbrauch(ist, kategorien, "k", von, bis)).toBe(euroZuCent(62));
   });
 });
