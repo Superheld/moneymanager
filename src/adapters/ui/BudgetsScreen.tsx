@@ -189,7 +189,7 @@ export function BudgetsScreen() {
             <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
           </FormField>
           <FormField label={t("budgets.feldRahmen")} required hint={t("budgets.feldRahmenHinweis")}>
-            <input className="field" inputMode="decimal" value={rahmenText} onChange={(e) => setRahmenText(e.target.value)} placeholder="0,00" />
+            <input className="field" inputMode="decimal" value={rahmenText} onChange={(e) => setRahmenText(e.target.value)} placeholder={geld.format(0)} />
           </FormField>
           <FormField label={t("budgets.feldPeriode")}>
             <select className="field" value={periode} onChange={(e) => setPeriode(e.target.value as BudgetPeriode)}>

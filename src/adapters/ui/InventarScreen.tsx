@@ -228,7 +228,7 @@ export function InventarScreen() {
               <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder={t("inventar.feldGegenstandPlatzhalter")} />
             </FormField>
             <FormField label={t("inventar.feldWiederbeschaffung")} required>
-              <input className="field" inputMode="decimal" value={wiederbeschaffung} onChange={(e) => setWiederbeschaffung(e.target.value)} placeholder="z. B. 14400" />
+              <input className="field" inputMode="decimal" value={wiederbeschaffung} onChange={(e) => setWiederbeschaffung(e.target.value)} placeholder={t("inventar.feldWiederbeschaffungPlatzhalter")} />
             </FormField>
             <FormField label={t("inventar.feldNutzungsdauer")} required hint={t("inventar.feldNutzungsdauerHinweis")}>
               <input className="field" inputMode="numeric" value={nutzungsdauerMonate} onChange={(e) => setNutzungsdauerMonate(e.target.value)} placeholder="96" />
@@ -262,7 +262,7 @@ export function InventarScreen() {
                 <input className="field" type="date" value={ersDatum} onChange={(e) => setErsDatum(e.target.value)} />
               </FormField>
               <FormField label={`${t("inventar.feldBetrag")} ${geld.symbol}`} required hint={t("inventar.feldBetragHinweis")}>
-                <input className="field" inputMode="decimal" value={ersBetrag} onChange={(e) => setErsBetrag(e.target.value)} placeholder="0,00" />
+                <input className="field" inputMode="decimal" value={ersBetrag} onChange={(e) => setErsBetrag(e.target.value)} placeholder={geld.format(0)} />
               </FormField>
               <FormField label={t("inventar.feldNotiz")}>
                 <input className="field" value={ersNotiz} onChange={(e) => setErsNotiz(e.target.value)} placeholder={t("inventar.notizPlatzhalter")} />
