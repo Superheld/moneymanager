@@ -1,4 +1,4 @@
-// Use-Case „Topf anlegen" — eine Eingabe, drei Spielarten. Übersetzt Euro/Monate in
+// Use-Case „Topf anlegen" — eine Eingabe, zwei Spielarten. Übersetzt Euro/Monate in
 // das passende Topf-Aggregat und validiert je Typ.
 
 import { FachlicherFehler, istCent,  type Cent, type Topf, type TopfTyp } from "../core";
@@ -10,9 +10,6 @@ export interface TopfEingabe {
   start: string; // ISO
   kategorieId?: string;
   // Geldfelder in Minor Units (die UI parst währungsgerecht)
-  // ersatz
-  wiederbeschaffung?: Cent;
-  nutzungsdauerMonate?: number;
   // puffer
   schaetzbetrag?: Cent;
   fristMonate?: number;
@@ -30,20 +27,6 @@ export async function topfAnlegen(repo: TopfRepository, e: TopfEingabe, id?: str
 
   let topf: Topf;
   switch (e.typ) {
-    case "ersatz":
-      // Runden VOR dem Prüfen: sonst besteht 0.4 die Schwelle und wird danach zu 0 —
-      // die Ansparrate teilt dann durch null (Infinity), Soll- und Topfstand werden NaN.
-      if (!istCent(e.wiederbeschaffung) || e.wiederbeschaffung <= 0)
-        throw new FachlicherFehler("wiederbeschaffung.groesserNull");
-      const nutzungsdauerMonate = Math.round(Number(e.nutzungsdauerMonate));
-      if (!(nutzungsdauerMonate > 0)) throw new FachlicherFehler("nutzungsdauer.groesserNull");
-      topf = {
-        ...basis,
-        typ: "ersatz",
-        wiederbeschaffung: e.wiederbeschaffung,
-        nutzungsdauerMonate,
-      };
-      break;
     case "puffer":
       if (!istCent(e.schaetzbetrag) || e.schaetzbetrag <= 0)
         throw new FachlicherFehler("schaetzbetrag.groesserNull");

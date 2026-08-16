@@ -22,21 +22,17 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { BudgetsScreen } from "./BudgetsScreen";
-import { DeckungScreen } from "./DeckungScreen";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { HistorieScreen } from "./HistorieScreen";
 import { ImportScreen } from "./ImportScreen";
 import { InventarScreen } from "./InventarScreen";
 import { KontenScreen } from "./KontenScreen";
 import { ReviewScreen } from "./ReviewScreen";
-import { PlanungScreen } from "./PlanungScreen";
 import { VertraegeScreen } from "./VertraegeScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
-import { sqliteTopfRepository } from "../persistence/sqliteTopfRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
-import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import {
   sqliteKategorieRepository,
   sqlitePersonRepository,
@@ -93,24 +89,6 @@ describe("KontenScreen", () => {
     const knoepfe = await screen.findAllByRole("button", { name: /buchung|buchen/i });
     await nutzer.click(knoepfe[0]);
     await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(1));
-  });
-});
-
-describe("PlanungScreen", () => {
-  it("rendert im Leerzustand", async () => {
-    rendere(<PlanungScreen />);
-    await waitFor(() => expect(document.body.textContent).toBeTruthy());
-  });
-
-  it("bezieht Konten und Regeln in die Übersicht ein", async () => {
-    await grunddaten();
-    await sqliteZahlungsregelRepository.speichern({
-      id: "z1", bezeichnung: "Miete", betrag: -90000, rhythmus: "monatlich",
-      startdatum: "2026-01-01", charakter: "Aufwand",
-    });
-    rendere(<PlanungScreen />);
-    // 250000 Minor Units Kontostand → „2.500,00" muss irgendwo auftauchen.
-    await waitFor(() => expect(document.body.textContent).toMatch(/2\.500,00/));
   });
 });
 
@@ -277,23 +255,6 @@ describe("HistorieScreen", () => {
 
     await nutzer.click(screen.getByText(/Lebenshaltung/));
     await waitFor(() => expect(screen.getByText(/Lebensmittel/)).toBeInTheDocument());
-  });
-});
-
-describe("DeckungScreen", () => {
-  it("rendert im Leerzustand", async () => {
-    rendere(<DeckungScreen />);
-    await waitFor(() => expect(document.body.textContent).toBeTruthy());
-  });
-
-  it("stellt Töpfe der Kontodeckung gegenüber", async () => {
-    await grunddaten();
-    await sqliteTopfRepository.speichern({
-      id: "t1", typ: "puffer", bezeichnung: "Reparaturen", start: "2020-01-01",
-      schaetzbetrag: 50000, fristMonate: 12,
-    });
-    rendere(<DeckungScreen />);
-    expect(await screen.findByText(/Reparaturen/)).toBeInTheDocument();
   });
 });
 

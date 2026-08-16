@@ -1,6 +1,5 @@
-// Saldo-Verlauf — eine Linie (realer Gesamt-Saldo über die Zeit), im Stil von
-// ZweiKurvenChart, aber generisch mit eigener Legende. Nulllinie betont, falls der
-// Saldo ins Minus läuft.
+// Saldo-Verlauf — eine Linie (realer Gesamt-Saldo über die Zeit) mit eigener Legende.
+// Nulllinie betont, falls der Saldo ins Minus läuft.
 
 import { useGeld } from "./einstellungenKontext";
 

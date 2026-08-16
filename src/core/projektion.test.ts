@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { euroZuCent } from "./geld";
 import type { Zahlungsregel } from "./zahlungsregel";
-import { naechsteFaelligkeit, projiziereRegel, projiziereVerlauf } from "./projektion";
+import { naechsteFaelligkeit, projiziereRegel } from "./projektion";
 
 function regel(over: Partial<Zahlungsregel> = {}): Zahlungsregel {
   return {
@@ -68,49 +68,6 @@ describe("projiziereRegel", () => {
       "2026-02-28",
       "2026-03-31",
     ]);
-  });
-});
-
-describe("projiziereVerlauf", () => {
-  it("kumuliert den Saldo aus Startsaldo + Netto je Monat", () => {
-    const einnahme = regel({
-      id: "e",
-      bezeichnung: "Gehalt",
-      betrag: euroZuCent(3000),
-      charakter: "Ertrag",
-      startdatum: "2026-01-01",
-    });
-    const miete = regel({
-      id: "m",
-      bezeichnung: "Miete",
-      betrag: euroZuCent(-1200),
-      charakter: "Aufwand",
-      startdatum: "2026-01-01",
-    });
-    const v = projiziereVerlauf([einnahme, miete], "2026-01-01", 12, euroZuCent(2000));
-
-    expect(v).toHaveLength(12);
-    expect(v[0].zufluss).toBe(euroZuCent(3000));
-    expect(v[0].abfluss).toBe(euroZuCent(-1200));
-    expect(v[0].netto).toBe(euroZuCent(1800));
-    // Startsaldo 2000 + 1800 nach Monat 1.
-    expect(v[0].saldo).toBe(euroZuCent(3800));
-    // Nach 12 Monaten: 2000 + 12*1800.
-    expect(v[11].saldo).toBe(euroZuCent(2000 + 12 * 1800));
-  });
-
-  it("ordnet eine jährliche Zahlung dem richtigen Monat zu", () => {
-    const hausrat = regel({
-      id: "h",
-      bezeichnung: "Hausrat",
-      betrag: euroZuCent(-120),
-      rhythmus: "jaehrlich",
-      startdatum: "2026-03-01",
-    });
-    const v = projiziereVerlauf([hausrat], "2026-01-01", 12, 0);
-    expect(v[0].netto).toBe(0); // Jan
-    expect(v[2].netto).toBe(euroZuCent(-120)); // Mär
-    expect(v[2].buchungen).toHaveLength(1);
   });
 });
 

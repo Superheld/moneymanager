@@ -21,24 +21,6 @@ describe("topfAnlegen — gemeinsame Validierung", () => {
   });
 });
 
-describe("topfAnlegen — Ersatz", () => {
-  it("legt einen Ersatztopf an und konvertiert den Wiederbeschaffungswert", async () => {
-    const repo = memRepo();
-    const t = await topfAnlegen(repo, { typ: "ersatz", bezeichnung: "Laptop", start: "2026-06-01", wiederbeschaffung: euroZuCent(1200), nutzungsdauerMonate: 48 });
-    expect(t.typ).toBe("ersatz");
-    if (t.typ === "ersatz") {
-      expect(t.wiederbeschaffung).toBe(euroZuCent(1200));
-      expect(t.nutzungsdauerMonate).toBe(48);
-    }
-  });
-
-  it("validiert Wiederbeschaffung und Nutzungsdauer", async () => {
-    const repo = memRepo();
-    await expect(topfAnlegen(repo, { typ: "ersatz", bezeichnung: "X", start: "2026-06-01", wiederbeschaffung: euroZuCent(0), nutzungsdauerMonate: 12 })).rejects.toThrow("wiederbeschaffung.groesserNull");
-    await expect(topfAnlegen(repo, { typ: "ersatz", bezeichnung: "X", start: "2026-06-01", wiederbeschaffung: euroZuCent(100), nutzungsdauerMonate: 0 })).rejects.toThrow("nutzungsdauer.groesserNull");
-  });
-});
-
 describe("topfAnlegen — Puffer", () => {
   it("legt einen Puffertopf an", async () => {
     const repo = memRepo();

@@ -1,31 +1,31 @@
-// Inventar — deine Gegenstände, für deren Ersatz du automatisch ansparst (Ersatz-Fall).
-// Eigener Bereich, getrennt von den Töpfen (die nur Puffer + Spartopf sind). Ein
-// Gegenstand legt beim Anlegen direkt seinen Ersatz-Topf mit an; die Liste zeigt den
-// Ansparfortschritt.
+// Inventar — deine Gegenstände und die Rücklage, die sie jeden Monat kosten.
 //
-// Realer Stand seit ADR-0003: kalkulatorischer Aufbau − reale Entnahmen. „ersetzt" bucht
-// die Entnahme (Umschichtung, gedeckte Auflösung der Rücklage) UND startet die
-// Abschreibung neu (Topf.start + Inventar.anschaffung wandern auf den Anschaffungstag).
+// REIN KALKULATORISCH (2026-08-16): Der frühere Ersatz-Topf ist entfallen. Der Gegenstand
+// rechnet selbst (Wiederbeschaffung ÷ Nutzungsdauer), und was davon TATSÄCHLICH da ist,
+// kommt nicht aus Buchungen, sondern aus dem realen Stand des Kontos, das der Gegenstand
+// benennt: liegen dort 60 % der rechnerischen Summe, ist jeder Gegenstand darauf zu 60 %
+// gedeckt (anteilig, ohne Rangfolge). „Ersetzt" bucht nichts mehr — es startet nur den
+// Zyklus neu; der Kauf selbst ist eine normale Ausgabe und senkt den Kontostand ohnehin.
 
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
-  ansparrate,
   centZuEuro,
   minorZuMajor,
-  topfBuchungen,
-  topfStand,
-  zielwert,
-  type Ersatztopf,
+  monatsRuecklage,
+  realerKontostand,
+  ruecklagenDeckung,
   type Inventargegenstand,
   type IstBuchung,
-  type Topf,
   type Zahlungskonto,
 } from "../../core";
-import { inventarAktualisieren, inventarLoeschen, inventarMitTopfAnlegen } from "../../application/inventarAnlegen";
-import { ersatzErsetzt } from "../../application/topfEntnahme";
+import {
+  inventarAktualisieren,
+  inventarAnlegen,
+  inventarErsetzt,
+  inventarLoeschen,
+} from "../../application/inventarAnlegen";
 import { sqliteInventarRepository as inventarRepo } from "../persistence/sqliteInventarRepository";
-import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "./ds";
@@ -44,83 +44,48 @@ export function InventarScreen() {
   const geld = useGeld();
   const heute = useMemo(heuteIso, []);
   const [items, setItems] = useState<Inventargegenstand[]>([]);
-  const [toepfe, setToepfe] = useState<Topf[]>([]);
   const [ist, setIst] = useState<IstBuchung[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
 
-  // Ersetzt-Modal
-  const [ersTopf, setErsTopf] = useState<Ersatztopf | null>(null);
-  const [ersKonto, setErsKonto] = useState("");
-  const [ersDatum, setErsDatum] = useState(heute);
-  const [ersBetrag, setErsBetrag] = useState("");
-  const [ersNotiz, setErsNotiz] = useState("");
-  const [ersFehler, setErsFehler] = useState<string | null>(null);
-
+  // Anlegen/Bearbeiten
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [bezeichnung, setBezeichnung] = useState("");
   const [wiederbeschaffung, setWiederbeschaffung] = useState("");
   const [nutzungsdauerMonate, setNutzungsdauerMonate] = useState("");
   const [anschaffung, setAnschaffung] = useState(heute);
+  const [kontoId, setKontoId] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
 
+  // Ersetzt-Dialog
+  const [ersItem, setErsItem] = useState<Inventargegenstand | null>(null);
+  const [ersDatum, setErsDatum] = useState(heute);
+  const [ersWert, setErsWert] = useState("");
+  const [ersFehler, setErsFehler] = useState<string | null>(null);
+
+  // Verwandte Repos in EINEM Zug laden und zusammen setzen: gestaffelte setState lassen
+  // die Deckung kurz gegen eine leere Kontenliste rechnen (jeder Stand wäre dann 0).
   async function laden() {
-    setItems(await inventarRepo.alle());
-    setToepfe(await topfRepo.alle());
-    setIst(await ledgerRepo.alle());
-    setKonten(await kontoRepo.alle());
+    const [i, b, k] = await Promise.all([inventarRepo.alle(), ledgerRepo.alle(), kontoRepo.alle()]);
+    setItems(i);
+    setIst(b);
+    setKonten(k);
   }
   useEffect(() => {
     laden();
   }, []);
 
-  function ersetztOeffnen(topf: Ersatztopf) {
-    setErsTopf(topf);
-    setErsKonto(konten[0]?.id ?? "");
-    setErsDatum(heute);
-    setErsBetrag(String(minorZuMajor(topf.wiederbeschaffung, geld.waehrung)));
-    setErsNotiz("");
-    setErsFehler(null);
-  }
-  async function ersetztSpeichern() {
-    if (!ersTopf) return;
-    setErsFehler(null);
-    try {
-      await ersatzErsetzt(ledgerRepo, topfRepo, inventarRepo, {
-        topf: ersTopf,
-        kontoId: ersKonto,
-        datum: ersDatum,
-        betrag: geld.parse(ersBetrag) ?? 0,
-        notiz: ersNotiz,
-      });
-      setErsTopf(null);
-      await laden();
-    } catch (e) {
-      setErsFehler(fehlerNachricht(t, e));
-    }
-  }
-
-  // Ersatz-Topf je Gegenstand (für den Ansparfortschritt).
-  const topfZuItem = useMemo(() => {
-    const m = new Map<string, Ersatztopf>();
-    for (const t of toepfe) if (t.typ === "ersatz" && t.inventarId) m.set(t.inventarId, t);
-    return m;
-  }, [toepfe]);
-
-  // Übersichtszahlen über alle Gegenstände.
-  const summe = useMemo(() => {
-    let ersatzwert = 0, angespart = 0, ziel = 0;
-    for (const g of items) {
-      ersatzwert += g.wiederbeschaffung;
-      const topf = topfZuItem.get(g.id);
-      if (topf) {
-        const z = zielwert(topf);
-        if (z != null) ziel += z;
-        angespart += Math.max(0, topfStand(topf, heute, topfBuchungen(ist, topf.id)));
-      }
-    }
-    return { ersatzwert, angespart, ziel, deckung: ziel > 0 ? Math.round((angespart / ziel) * 100) : 0 };
-  }, [items, topfZuItem, ist, heute]);
+  const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
+  const kontostaende = useMemo(
+    () => new Map(konten.map((k) => [k.id, realerKontostand(k, ist)])),
+    [konten, ist],
+  );
+  const deckung = useMemo(
+    () => ruecklagenDeckung(items, heute, kontostaende),
+    [items, heute, kontostaende],
+  );
+  const proMonat = useMemo(() => items.reduce((s, g) => s + monatsRuecklage(g), 0), [items]);
+  const ersatzwert = useMemo(() => items.reduce((s, g) => s + g.wiederbeschaffung, 0), [items]);
 
   function neu() {
     setEditId(null);
@@ -128,6 +93,7 @@ export function InventarScreen() {
     setWiederbeschaffung("");
     setNutzungsdauerMonate("");
     setAnschaffung(heute);
+    setKontoId("");
     setFehler(null);
     setOffen(true);
   }
@@ -137,6 +103,7 @@ export function InventarScreen() {
     setWiederbeschaffung(String(minorZuMajor(g.wiederbeschaffung, geld.waehrung)));
     setNutzungsdauerMonate(String(g.nutzungsdauerMonate));
     setAnschaffung(g.anschaffung);
+    setKontoId(g.kontoId ?? "");
     setFehler(null);
     setOffen(true);
   }
@@ -147,14 +114,33 @@ export function InventarScreen() {
       wiederbeschaffung: geld.parse(wiederbeschaffung) ?? 0,
       nutzungsdauerMonate: Number(nutzungsdauerMonate) || 0,
       anschaffung,
+      kontoId: kontoId || undefined,
     };
     try {
-      if (editId) await inventarAktualisieren(inventarRepo, topfRepo, editId, eingabe);
-      else await inventarMitTopfAnlegen(inventarRepo, topfRepo, eingabe);
+      if (editId) await inventarAktualisieren(inventarRepo, editId, eingabe);
+      else await inventarAnlegen(inventarRepo, eingabe);
       setOffen(false);
       await laden();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
+    }
+  }
+
+  function ersetztOeffnen(g: Inventargegenstand) {
+    setErsItem(g);
+    setErsDatum(heute);
+    setErsWert(String(minorZuMajor(g.wiederbeschaffung, geld.waehrung)));
+    setErsFehler(null);
+  }
+  async function ersetztSpeichern() {
+    if (!ersItem) return;
+    setErsFehler(null);
+    try {
+      await inventarErsetzt(inventarRepo, ersItem, ersDatum, geld.parse(ersWert) ?? undefined);
+      setErsItem(null);
+      await laden();
+    } catch (e) {
+      setErsFehler(fehlerNachricht(t, e));
     }
   }
 
@@ -173,9 +159,19 @@ export function InventarScreen() {
       {items.length > 0 && (
         <div className="kpis">
           <KPIStat size="chip" label={t("inventar.kpiAnzahl")} value={String(items.length)} />
-          <KPIStat size="chip" label={t("inventar.kpiErsatzwert")} value={geld.format(summe.ersatzwert)} unit={geld.symbol} />
-          <KPIStat size="chip" label={t("inventar.kpiAngespart")} value={geld.format(summe.angespart)} unit={geld.symbol} tone="ok" />
-          <KPIStat size="chip" label={t("inventar.kpiDeckung")} value={String(summe.deckung)} unit="%" tone={summe.deckung < 50 ? "warn" : "default"} />
+          <KPIStat size="chip" label={t("inventar.kpiErsatzwert")} value={geld.format(ersatzwert)} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("inventar.kpiProMonat")} value={geld.format(proMonat)} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("inventar.kpiSoll")} value={geld.format(deckung.soll)} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("inventar.kpiTatsaechlich")} value={geld.format(deckung.tatsaechlich)} unit={geld.symbol} tone="ok" />
+          <KPIStat size="chip" label={t("inventar.kpiDeckung")} value={String(deckung.grad)} unit="%" tone={deckung.grad < 50 ? "warn" : "default"} />
+        </div>
+      )}
+
+      {items.length > 0 && deckung.sollMitKonto === 0 && (
+        // Ohne Kontozuordnung gibt es nur die Rechnung. Das einmal sagen, statt überall
+        // ein „—" zu zeigen, hinter dem man einen Fehler vermutet.
+        <div className="muted" style={{ fontSize: "var(--fs-small)", margin: "0 0 var(--sp-3)" }}>
+          {t("inventar.hinweisOhneKonto")}
         </div>
       )}
 
@@ -184,30 +180,42 @@ export function InventarScreen() {
           <div className="muted">{t("inventar.leer")}</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
-            {items.map((g) => {
-              const topf = topfZuItem.get(g.id);
-              const ziel = topf ? zielwert(topf) : null;
-              const stand = topf ? topfStand(topf, heute, topfBuchungen(ist, topf.id)) : null;
-              const ueberzogen = stand != null && stand < 0;
+            {deckung.posten.map((p) => {
+              const g = p.gegenstand;
               return (
                 <div key={g.id}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: "var(--sp-3)", flexWrap: "wrap" }}>
                     <span style={{ fontWeight: "var(--fw-bold)" }}>
                       {g.bezeichnung}
-                      {ueberzogen && <> <Pill variant="warn">{t("inventar.ueberzogen")}</Pill></>}
+                      {!g.kontoId && <> <Pill variant="neutral">{t("inventar.pillNurRechnung")}</Pill></>}
                     </span>
                     <span className="muted">
-                      {topf ? `${t("inventar.ansparrate")} ${geld.format(ansparrate(topf))} ${geld.symbol}${t("inventar.proMonatSuffix")}` : t("inventar.keinErsatzTopf")}
-                      {topf && <>{"  ·  "}<button className="linkbtn" onClick={() => ersetztOeffnen(topf)}>{t("inventar.ersetzt")}</button></>}
-                      {"  ·  "}
-                      <button className="linkbtn" onClick={() => bearbeiten(g)}>{t("inventar.bearbeiten")}</button>{"  ·  "}
-                      <button className="linkbtn" onClick={() => inventarLoeschen(inventarRepo, topfRepo, g.id).then(laden)}>{t("inventar.loeschen")}</button>
+                      {t("inventar.ruecklage")} {geld.format(monatsRuecklage(g))} {geld.symbol}{t("inventar.proMonatSuffix")}
+                      {"  ·  "}<button className="linkbtn" onClick={() => ersetztOeffnen(g)}>{t("inventar.ersetzt")}</button>
+                      {"  ·  "}<button className="linkbtn" onClick={() => bearbeiten(g)}>{t("inventar.bearbeiten")}</button>
+                      {"  ·  "}<button className="linkbtn" onClick={() => inventarLoeschen(inventarRepo, g.id).then(laden)}>{t("inventar.loeschen")}</button>
                     </span>
                   </div>
-                  {ziel != null && stand != null ? (
-                    <CoverageTrack value={centZuEuro(Math.max(0, stand))} max={centZuEuro(ziel)} label={t("inventar.fortschrittLabel")} right={`${geld.format(stand)} / ${geld.format(ziel)} ${geld.symbol}`} />
-                  ) : (
-                    <div className="muted">{t("inventar.nutzungsdauer")} {g.nutzungsdauerMonate} {t("inventar.monate")} · {t("inventar.wiederbeschaffung")} {geld.format(g.wiederbeschaffung)} {geld.symbol}</div>
+
+                  {/* Die Rechnung: wie weit die Abschreibung fortgeschritten ist. */}
+                  <CoverageTrack
+                    value={centZuEuro(p.soll)}
+                    max={centZuEuro(g.wiederbeschaffung)}
+                    label={t("inventar.fortschrittLabel")}
+                    right={`${geld.format(p.soll)} / ${geld.format(g.wiederbeschaffung)} ${geld.symbol}`}
+                  />
+
+                  {/* Die Wirklichkeit: nur, wenn ein Konto benannt ist. */}
+                  {p.tatsaechlich != null && (
+                    <div style={{ marginTop: 6 }}>
+                      <CoverageTrack
+                        value={centZuEuro(p.tatsaechlich)}
+                        max={centZuEuro(Math.max(1, p.soll))}
+                        over={p.tatsaechlich < p.soll}
+                        label={t("inventar.gedecktDurch", { konto: kontoName.get(g.kontoId!) ?? "?" })}
+                        right={`${geld.format(p.tatsaechlich)} / ${geld.format(p.soll)} ${geld.symbol}`}
+                      />
+                    </div>
                   )}
                 </div>
               );
@@ -236,39 +244,31 @@ export function InventarScreen() {
             <FormField label={t("inventar.feldAnschaffung")}>
               <input className="field" type="date" value={anschaffung} onChange={(e) => setAnschaffung(e.target.value)} />
             </FormField>
+            <FormField label={t("inventar.feldKonto")} hint={t("inventar.feldKontoHinweis")}>
+              <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
+                <option value="">{t("inventar.kontoKeins")}</option>
+                {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
+              </select>
+            </FormField>
           </div>
         </Modal>
       )}
 
-      {ersTopf && (
+      {ersItem && (
         <Modal
           title={t("inventar.modalErsetzt")}
-          subtitle={`${ersTopf.bezeichnung} · ${t("inventar.ersetztUntertitel")}`}
-          onClose={() => setErsTopf(null)}
-          footer={<><Button variant="primary" onClick={ersetztSpeichern}>{t("inventar.speichern")}</Button><button className="linkbtn" onClick={() => setErsTopf(null)}>{t("inventar.abbrechen")}</button>{ersFehler && <span className="err">{ersFehler}</span>}</>}
+          subtitle={`${ersItem.bezeichnung} · ${t("inventar.ersetztUntertitel")}`}
+          onClose={() => setErsItem(null)}
+          footer={<><Button variant="primary" onClick={ersetztSpeichern}>{t("inventar.speichern")}</Button><button className="linkbtn" onClick={() => setErsItem(null)}>{t("inventar.abbrechen")}</button>{ersFehler && <span className="err">{ersFehler}</span>}</>}
         >
-          {konten.length === 0 ? (
-            <div className="muted">{t("inventar.keinKonto")}</div>
-          ) : (
-            <div className="form-grid">
-              <FormField label={t("inventar.feldKonto")} required>
-                <select className="field" value={ersKonto} onChange={(e) => setErsKonto(e.target.value)}>
-                  {konten.map((k) => (
-                    <option key={k.id} value={k.id}>{k.bezeichnung}</option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label={t("inventar.feldDatum")}>
-                <input className="field" type="date" value={ersDatum} onChange={(e) => setErsDatum(e.target.value)} />
-              </FormField>
-              <FormField label={`${t("inventar.feldBetrag")} ${geld.symbol}`} required hint={t("inventar.feldBetragHinweis")}>
-                <input className="field" inputMode="decimal" value={ersBetrag} onChange={(e) => setErsBetrag(e.target.value)} placeholder={geld.format(0)} />
-              </FormField>
-              <FormField label={t("inventar.feldNotiz")}>
-                <input className="field" value={ersNotiz} onChange={(e) => setErsNotiz(e.target.value)} placeholder={t("inventar.notizPlatzhalter")} />
-              </FormField>
-            </div>
-          )}
+          <div className="form-grid">
+            <FormField label={t("inventar.feldAnschaffung")} required>
+              <input className="field" type="date" value={ersDatum} onChange={(e) => setErsDatum(e.target.value)} />
+            </FormField>
+            <FormField label={`${t("inventar.feldWiederbeschaffung")} ${geld.symbol}`} required hint={t("inventar.feldNeuwertHinweis")}>
+              <input className="field" inputMode="decimal" value={ersWert} onChange={(e) => setErsWert(e.target.value)} placeholder={geld.format(0)} />
+            </FormField>
+          </div>
         </Modal>
       )}
     </div>
