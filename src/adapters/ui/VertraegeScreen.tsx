@@ -13,13 +13,22 @@ import {
   type Person,
   type Rhythmus,
   type Vertrag,
+  type Vertragskandidat,
   type Verlaengerungsart,
   type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
 import { vertragAktualisieren, vertragAnlegen, vertragLoeschen } from "../../application/vertragAnlegen";
+import {
+  ignorierteSchluessel,
+  vertragsvorschlaege,
+  vorschlagIgnorieren,
+} from "../../application/vertragsvorschlaege";
 import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
+import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
+import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
+import { sqliteEinstellungenRepository as einstellungenRepo } from "../persistence/sqliteEinstellungenRepository";
 import {
   sqliteKategorieRepository as kategorieRepo,
   sqlitePersonRepository as personRepo,
@@ -53,6 +62,7 @@ export function VertraegeScreen() {
   const [personen, setPersonen] = useState<Person[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
+  const [vorschlaege, setVorschlaege] = useState<Vertragskandidat[]>([]);
 
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -70,16 +80,45 @@ export function VertraegeScreen() {
   const [kontoId, setKontoId] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
 
+  // Verwandte Repos in EINEM Effekt und zusammen setzen — gestaffelte setState lassen
+  // abgeleitete Werte kurz gegen leere Listen rechnen.
   async function laden() {
-    setVertraege(await vertragRepo.alle());
-    setRegeln(await regelRepo.alle());
-    setPersonen(await personRepo.alle());
-    setKategorien(await kategorieRepo.alle());
-    setKonten(await kontoRepo.alle());
+    const [v, r, p, k, ko, ignoriert] = await Promise.all([
+      vertragRepo.alle(),
+      regelRepo.alle(),
+      personRepo.alle(),
+      kategorieRepo.alle(),
+      kontoRepo.alle(),
+      ignorierteSchluessel(einstellungenRepo),
+    ]);
+    setVertraege(v);
+    setRegeln(r);
+    setPersonen(p);
+    setKategorien(k);
+    setKonten(ko);
+    // Die Vorschläge lesen den gesamten Buchungsbestand — bewusst NACH den Stammdaten,
+    // damit die Liste sofort steht und die Karte nachrückt.
+    setVorschlaege(await vertragsvorschlaege(ledgerRepo, umsatzRepo, vertragRepo, heute, { ignoriert }));
   }
   useEffect(() => {
     laden();
   }, []);
+
+  /** Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort. */
+  function vorschlagUebernehmen(k: Vertragskandidat) {
+    neu();
+    setAnbieter(k.anbieter);
+    setBeginn(k.ersteZahlung);
+    setBetragText(String(minorZuMajor(k.betrag, geld.waehrung)));
+    setRhythmus(k.rhythmus);
+    setCharakter("Aufwand");
+    if (k.kategorieId) setKategorieId(k.kategorieId);
+  }
+
+  async function vorschlagVerwerfen(k: Vertragskandidat) {
+    await vorschlagIgnorieren(einstellungenRepo, k.schluessel);
+    setVorschlaege((bisher) => bisher.filter((x) => x.schluessel !== k.schluessel));
+  }
 
   const regelZuVertrag = useMemo(() => {
     const m = new Map<string, Zahlungsregel>();
@@ -185,6 +224,71 @@ export function VertraegeScreen() {
           <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} />
           {summe.baldKuendbar > 0 && <KPIStat size="chip" label={t("vertraege.kpiBald")} value={String(summe.baldKuendbar)} tone="warn" />}
         </div>
+      )}
+
+      {vorschlaege.length > 0 && (
+        <Card
+          title={t("vertraege.vorschlaegeTitel")}
+          subtitle={t("vertraege.vorschlaegeUntertitel", { count: vorschlaege.length })}
+        >
+          <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
+            {t("vertraege.vorschlaegeHinweis")}
+          </p>
+          <DataTable
+            sortable
+            pageSize={10}
+            columns={[
+              { key: "anbieter", label: t("vertraege.spalteAnbieter"), render: (k: Vertragskandidat) => k.anbieter },
+              { key: "rhythmus", label: t("vertraege.spalteRhythmus"), render: (k: Vertragskandidat) => t(`vertraege.rhythmus.${k.rhythmus}`) },
+              {
+                key: "betrag",
+                label: `${t("vertraege.spalteBetrag")} ${geld.symbol}`,
+                align: "right",
+                sortValue: (k: Vertragskandidat) => k.betrag,
+                render: (k: Vertragskandidat) => geld.format(k.betrag),
+              },
+              {
+                // Die Stabilität sagt, wie ernst der vorgeschlagene Betrag zu nehmen ist:
+                // 100 % = immer derselbe (Miete), 30 % = Mittelwert (Strom, Mobilfunk).
+                key: "stabil",
+                label: t("vertraege.spalteStabil"),
+                align: "right",
+                sortValue: (k: Vertragskandidat) => k.betragStabilitaet,
+                render: (k: Vertragskandidat) =>
+                  k.betragStabilitaet >= 0.8 ? (
+                    <Pill variant="ok">{t("vertraege.betragFest")}</Pill>
+                  ) : (
+                    <Pill variant="neutral">{t("vertraege.betragSchwankt")}</Pill>
+                  ),
+              },
+              { key: "anzahl", label: t("vertraege.spalteZahlungen"), align: "right", render: (k: Vertragskandidat) => String(k.anzahl) },
+              { key: "letzte", label: t("vertraege.spalteLetzte"), render: (k: Vertragskandidat) => k.letzteZahlung },
+              {
+                key: "_u",
+                label: "",
+                align: "right",
+                sortable: false,
+                render: (k: Vertragskandidat) => (
+                  <button className="linkbtn" onClick={() => vorschlagUebernehmen(k)}>
+                    {t("vertraege.vorschlagUebernehmen")}
+                  </button>
+                ),
+              },
+              {
+                key: "_v",
+                label: "",
+                align: "right",
+                sortable: false,
+                render: (k: Vertragskandidat) => (
+                  <button className="linkbtn" onClick={() => vorschlagVerwerfen(k)}>
+                    {t("vertraege.vorschlagVerwerfen")}
+                  </button>
+                ),
+              },
+            ]}
+            rows={vorschlaege}
+          />
+        </Card>
       )}
 
       <Card>
