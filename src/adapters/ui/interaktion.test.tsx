@@ -314,3 +314,131 @@ describe("Budget anlegen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/(^|[^\d.])30,00/));
   });
 });
+
+// S-1 — aus einer bestehenden Buchung eine Umbuchung machen. Ein Dialog trägt beide
+// Fälle: bestehende Gegenbuchung wählen (S-1b) oder das Gegenbein erzeugen lassen (S-1a).
+describe("Umbuchung aus einer bestehenden Buchung", () => {
+  const heute = "2026-08-12";
+
+  async function zweiKonten() {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", inhaberIds: [], saldo: 0,
+    });
+  }
+
+  /**
+   * Wählt ein Konto und öffnet die Detailansicht seiner ersten Registerzeile.
+   * Das Konto wird bewusst angeklickt statt auf die Vorauswahl zu vertrauen — welches
+   * Konto zuerst kommt, entscheidet die Sortierung des Repositories.
+   */
+  async function detailOeffnen(nutzer: ReturnType<typeof userEvent.setup>, kontoName: string) {
+    await nutzer.click(await screen.findByText(kontoName));
+    const bearbeiten = await screen.findAllByRole("button", { name: /bearbeiten/i });
+    await nutzer.click(bearbeiten[0]);
+  }
+
+  it("erzeugt das fehlende Gegenbein auf dem Bargeldkonto (S-1a)", async () => {
+    await zweiKonten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -20000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Abhebung",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+    await nutzer.click(await screen.findByRole("button", { name: /zur umbuchung/i }));
+    await nutzer.click(await screen.findByRole("button", { name: /umbuchung anlegen/i }));
+
+    await waitFor(async () => {
+      const alle = await sqliteLedgerRepository.alle();
+      expect(alle).toHaveLength(2);
+      // Netto 0 über beide Beine — Geld verschoben, nicht ausgegeben.
+      expect(alle.reduce((s, b) => s + b.betrag, 0)).toBe(0);
+      const bar = alle.find((b) => b.kontoId === "k2")!;
+      expect(bar.betrag).toBe(20000);
+      expect(bar.transferId).toBe(alle.find((b) => b.id === "i1")!.transferId);
+      // Die Kategorie muss weg, sonst zählt die Umschichtung weiter ins Budget.
+      expect(alle.find((b) => b.id === "i1")!.kategorieId).toBeUndefined();
+    });
+  });
+
+  it("paart zwei bestehende Buchungen nachträglich (S-1b)", async () => {
+    await zweiKonten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -20000, kontoId: "k1", charakter: "Aufwand", quelle: "import",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: 20000, kontoId: "k2", charakter: "Ertrag", quelle: "import",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+    await nutzer.click(await screen.findByRole("button", { name: /zur umbuchung/i }));
+    // Der Kandidat ist vorausgewählt — der Dialog bietet ihn als erste Option an.
+    await nutzer.click(await screen.findByRole("button", { name: /umbuchung anlegen/i }));
+
+    await waitFor(async () => {
+      const alle = await sqliteLedgerRepository.alle();
+      expect(alle).toHaveLength(2); // nichts Neues angelegt, nur verknüpft
+      const [a, b] = [alle.find((x) => x.id === "i1")!, alle.find((x) => x.id === "i2")!];
+      expect(a.transferId).toBeTruthy();
+      expect(a.transferId).toBe(b.transferId);
+      expect(a.gegenkontoId).toBe("k2");
+      expect(b.gegenkontoId).toBe("k1");
+      expect(a.charakter).toBe("Umschichtung");
+      expect(b.charakter).toBe("Umschichtung");
+      expect(a.quelle).toBe("import"); // Import-Spur bleibt
+    });
+  });
+
+  it("löst eine Paarung wieder, ohne eine Buchung zu löschen", async () => {
+    await zweiKonten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -20000, kontoId: "k1",
+      charakter: "Umschichtung", quelle: "import", transferId: "t1", gegenkontoId: "k2",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: 20000, kontoId: "k2",
+      charakter: "Umschichtung", quelle: "import", transferId: "t1", gegenkontoId: "k1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+    await nutzer.click(await screen.findByRole("button", { name: /paarung lösen/i }));
+
+    await waitFor(async () => {
+      const alle = await sqliteLedgerRepository.alle();
+      expect(alle).toHaveLength(2);
+      for (const b of alle) {
+        expect(b.transferId).toBeUndefined();
+        expect(b.gegenkontoId).toBeUndefined();
+      }
+    });
+  });
+
+  it("löscht beide Beine, wenn ein Bein gelöscht wird", async () => {
+    await zweiKonten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -20000, kontoId: "k1",
+      charakter: "Umschichtung", quelle: "import", transferId: "t1", gegenkontoId: "k2",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: 20000, kontoId: "k2",
+      charakter: "Umschichtung", quelle: "import", transferId: "t1", gegenkontoId: "k1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+    const loeschen = screen.getAllByRole("button", { name: /^löschen$/i });
+    await nutzer.click(loeschen[loeschen.length - 1]);
+
+    await waitFor(async () => {
+      expect(await sqliteLedgerRepository.alle()).toHaveLength(0);
+    });
+  });
+});
