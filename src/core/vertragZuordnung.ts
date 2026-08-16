@@ -2,7 +2,7 @@
 //
 // Bis hierher gab es diese Verbindung NICHT. Wer wissen wollte, ob eine Buchung zu einem
 // Vertrag gehört, leitete es jedes Mal neu aus dem Empfängernamen ab
-// (`vertragZuGegenpartei`). Das reicht, um eine Pille an die Buchung zu hängen, und es
+// (über `anbieterSchluessel`). Das reicht, um eine Pille an die Buchung zu hängen, und es
 // reicht für nichts, was rechnet: zwei Verträge beim selben Anbieter sind nicht
 // unterscheidbar, „Amazon Prime" und eine Amazon-Bestellung sehen gleich aus, und eine
 // Korrektur von Hand hat nirgends Platz.
@@ -27,21 +27,42 @@ import { anbieterSchluessel, type Zahlungsspur } from "./vertragErkennung";
 import type { Cent } from "./geld";
 
 /**
+ * Woran EIN Merkmal ansetzt. Die beiden Arten sind nicht austauschbar und sollen es auch
+ * nicht sein: die Gläubiger-ID identifiziert den Einzieher eindeutig, der Empfängername
+ * ist Text mit Unschärfe. In einer gemeinsamen Liste war einem Eintrag nicht anzusehen,
+ * als was er gemeint war — und die Vorrangregel bei mehreren Treffern hing damit an einer
+ * Vermutung statt an einer Angabe.
+ */
+export type Merkmalsart = "glaeubigerId" | "empfaenger";
+
+/**
+ * Ein Erkennungsmerkmal: Art plus Muster.
+ *
+ * `muster` darf `*` enthalten — beliebig viel Text an dieser Stelle. Das ist der
+ * Unterschied zwischen „ich muss den Namen exakt treffen" und „alles von diesem
+ * Anbieter": Abbuchungen tragen Vertragsnummern, Rechnungsnummern und Ortsangaben im
+ * Empfängerfeld, und ohne Platzhalter bräuchte jede Schreibweise eine eigene Zeile.
+ */
+export interface Erkennungsmerkmal {
+  readonly art: Merkmalsart;
+  readonly muster: string;
+}
+
+/**
  * Woran die Zahlungen EINES Vertrags zu erkennen sind.
  *
- * Alle Felder außer `schluessel` sind Einschränkungen: nicht gesetzt heißt „egal".
- * Der Schlüssel allein ist bewusst NICHT genug — deshalb belegt `standardErkennung`
+ * Alle Felder außer `merkmale` sind Einschränkungen: nicht gesetzt heißt „egal".
+ * Die Merkmale allein sind bewusst NICHT genug — deshalb belegt `standardErkennung`
  * eine Betragsspanne vor. Ohne sie zöge ein Vertrag „Amazon Prime" jede Amazon-Bestellung
  * mit sich, und der Fehler fiele erst auf, wenn ein Budget nicht mehr stimmt.
  */
 export interface Vertragserkennung {
   readonly vertragId: string;
   /**
-   * Gläubiger-IDs und/oder normalisierte Anbieternamen (`anbieterSchluessel`).
    * ODER-verknüpft: ein Treffer genügt. Mehrere, weil ein Anbieter über die Zeit
    * verschiedene Namen im Auszug trägt und die Gläubiger-ID nur bei Lastschrift dabei ist.
    */
-  readonly schluessel: readonly string[];
+  readonly merkmale: readonly Erkennungsmerkmal[];
   /** Betragshöhe (positiv, ohne Vorzeichen), Untergrenze einschließlich. */
   readonly betragVon?: Cent;
   /** Betragshöhe (positiv, ohne Vorzeichen), Obergrenze einschließlich. */
@@ -85,18 +106,65 @@ export function standardErkennung(
   betrag: Cent,
   glaeubigerId?: string,
 ): Vertragserkennung {
-  const schluessel = new Set<string>();
+  const merkmale: Erkennungsmerkmal[] = [];
   const name = anbieterSchluessel(anbieter.trim());
-  if (name) schluessel.add(name);
+  if (name) merkmale.push({ art: "empfaenger", muster: name });
   const id = glaeubigerId?.trim();
-  if (id) schluessel.add(id);
+  if (id) merkmale.push({ art: "glaeubigerId", muster: id });
   const hoehe = Math.abs(betrag);
   return {
     vertragId,
-    schluessel: [...schluessel],
+    merkmale,
     betragVon: hoehe > 0 ? Math.round(hoehe * 0.6) : undefined,
     betragBis: hoehe > 0 ? Math.round(hoehe * 1.8) : undefined,
   };
+}
+
+/**
+ * Ein Muster mit `*` als kompilierter Ausdruck. Alles außer dem Stern wird wörtlich
+ * genommen — ein Punkt im Anbieternamen ist ein Punkt, kein „beliebiges Zeichen".
+ *
+ * Gecacht, weil `passtZu` im Abgleich über den GANZEN Bestand läuft: bei ein paar tausend
+ * Buchungen mal einem Dutzend Verträge wäre das sonst fünfstellig viele Regex-Bauten pro
+ * Lauf. Die Zahl verschiedener Muster ist dagegen winzig — es sind die Zeilen, die jemand
+ * von Hand eingetippt hat.
+ */
+const musterCache = new Map<string, RegExp>();
+function alsRegex(muster: string): RegExp {
+  const fertig = musterCache.get(muster);
+  if (fertig) return fertig;
+  // Erst ALLES escapen (der Stern wird zu `\*`), dann gezielt den Stern freigeben.
+  const quelle = muster.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*");
+  const regex = new RegExp(`^${quelle}$`, "i");
+  musterCache.set(muster, regex);
+  return regex;
+}
+
+/**
+ * Trifft ein Muster diesen Text? Ohne Stern ein schlichter Vergleich ohne Groß-/
+ * Kleinschreibung — der Normalfall, und der billigste.
+ */
+function musterTrifft(muster: string, text: string): boolean {
+  if (!text) return false;
+  if (!muster.includes("*")) return muster.toLowerCase() === text.toLowerCase();
+  return alsRegex(muster).test(text);
+}
+
+/**
+ * Trifft ein Merkmal auf diese Zahlung zu?
+ *
+ * Der Empfänger wird gegen ZWEI Formen geprüft: den Namen, wie er im Auszug steht, und
+ * seine normalisierte Form (klein, ohne Rechtsform und Satzzeichen). Grund: beide Texte
+ * begegnen einem an verschiedenen Stellen — im Kontoauszug steht „Netcup GmbH", in der
+ * Vorschlagsbegründung „netcup". Wer eine der beiden Formen abtippt, soll einen Treffer
+ * bekommen und nicht raten müssen, welche gemeint war.
+ */
+function merkmalTrifft(m: Erkennungsmerkmal, s: Zahlungsspur): boolean {
+  const muster = m.muster.trim();
+  if (!muster) return false;
+  if (m.art === "glaeubigerId") return musterTrifft(muster, s.glaeubigerId?.trim() ?? "");
+  const roh = s.gegenpartei.trim();
+  return musterTrifft(muster, roh) || musterTrifft(muster, anbieterSchluessel(roh));
 }
 
 /** Trifft die Erkennungsregel auf diese Zahlung zu? */
@@ -104,10 +172,7 @@ export function passtZu(e: Vertragserkennung, s: Zahlungsspur): boolean {
   // Eine Umschichtung ist nie eine Vertragszahlung — sie wechselt nur das eigene Konto.
   if (s.charakter === "Umschichtung") return false;
 
-  const id = s.glaeubigerId?.trim();
-  const name = anbieterSchluessel(s.gegenpartei.trim());
-  const trifft = e.schluessel.some((k) => (id && k === id) || (name && k === name));
-  if (!trifft) return false;
+  if (!e.merkmale.some((m) => merkmalTrifft(m, s))) return false;
 
   const hoehe = Math.abs(s.betrag);
   if (e.betragVon !== undefined && hoehe < e.betragVon) return false;
@@ -128,13 +193,13 @@ export function passtZu(e: Vertragserkennung, s: Zahlungsspur): boolean {
  * liefert und nicht bei jedem Lauf Zuordnungen umspringen:
  *
  *   1. Treffer über die Gläubiger-ID schlägt Treffer über den Namen — die ID
- *      identifiziert den Einzieher, der Name ist eine Normalisierung mit Unschärfe.
+ *      identifiziert den Einzieher, der Name ist Text mit Unschärfe.
  *   2. Danach die engere Betragsspanne — wer sich festgelegt hat, meint es genauer.
  *   3. Zuletzt die Vertrags-Id, rein damit das Ergebnis stabil ist.
  */
 function besser(a: Vertragserkennung, b: Vertragserkennung, s: Zahlungsspur): boolean {
-  const id = s.glaeubigerId?.trim();
-  const ueberId = (e: Vertragserkennung) => !!id && e.schluessel.includes(id);
+  const ueberId = (e: Vertragserkennung) =>
+    e.merkmale.some((m) => m.art === "glaeubigerId" && merkmalTrifft(m, s));
   if (ueberId(a) !== ueberId(b)) return ueberId(a);
 
   const breite = (e: Vertragserkennung) =>
