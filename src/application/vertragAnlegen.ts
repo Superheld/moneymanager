@@ -87,6 +87,9 @@ export async function vertragAnlegen(
     verlaengerungMonate: eingabe.verlaengerung === "automatisch" ? eingabe.verlaengerungMonate : undefined,
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
     status,
+    // Auch am VERTRAG, nicht nur an der abgeleiteten Zahlungsregel: die
+    // Kategorisierungs-Kette fragt den Vertrag, weil die Vertragszuordnung auf ihn zeigt.
+    kategorieId: eingabe.kategorieId,
     notizen: eingabe.notizen?.trim() || undefined,
   };
 
@@ -145,6 +148,7 @@ export async function vertragAktualisieren(
     verlaengerungMonate: eingabe.verlaengerung === "automatisch" ? eingabe.verlaengerungMonate : undefined,
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
     status: bestehend?.status ?? "aktiv",
+    kategorieId: eingabe.kategorieId,
     notizen: eingabe.notizen?.trim() || undefined,
   };
 
