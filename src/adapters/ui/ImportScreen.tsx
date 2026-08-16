@@ -16,7 +16,6 @@ import {
   type UebernahmeKonto,
 } from "../../application/import";
 // Selbst-Registrierung des Finanzguru-Adapters auslösen.
-import { textAusDatei } from "../import/dateiText";
 import "../import/finanzguruAdapter";
 import {
   sqliteKategorieRepository,
@@ -65,7 +64,8 @@ export function ImportScreen() {
     setDateiname(datei.name);
     setUErgebnis(null);
     setFehler(null);
-    const inhalt = await textAusDatei(datei);
+    // Rohe Bytes: der Quellen-Port entscheidet selbst, wie er sie liest (xlsx = ZIP).
+    const inhalt = new Uint8Array(await datei.arrayBuffer());
     const adapter = waehleAdapter(inhalt);
     if (!adapter) {
       setErgebnis(null);
@@ -157,7 +157,7 @@ export function ImportScreen() {
 
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
-          <input ref={inputRef} type="file" accept=".csv,text/csv" onChange={dateiGewaehlt} style={{ display: "none" }} />
+          <input ref={inputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={dateiGewaehlt} style={{ display: "none" }} />
           <Button variant="primary" onClick={() => inputRef.current?.click()}>{t("import.dateiWaehlen")}</Button>
           {dateiname && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>{dateiname}</span>}
         </div>
