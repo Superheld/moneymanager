@@ -691,6 +691,28 @@ const de = {
     zusammenMindestlaufzeit: "Mindestlaufzeit {{monate}} Monate",
     zusammenKuendigungsfrist: "Frist {{monate}} Monate",
     zusammenKeineVerlaengerung: "keine Verlängerung",
+    regel: {
+      aktion: "Erkennung",
+      titel: "Woran wird dieser Vertrag erkannt?",
+      hinweis:
+        "Nach diesen Regeln ordnet die App gebuchte Zahlungen diesem Vertrag zu — auch die, die erst noch kommen. Was du hier änderst, wirkt sofort auf den ganzen Bestand. Von Hand gesetzte Zuordnungen bleiben davon unberührt.",
+      schluessel: "Erkennungsmerkmale",
+      schluesselHinweis:
+        "Ein Merkmal je Zeile: SEPA-Gläubiger-ID oder Anbietername in Kleinbuchstaben, ohne Rechtsform. Ein Treffer genügt.",
+      nameHinzufuegen: "„{{name}}“ als Merkmal aufnehmen",
+      betragVon: "Betrag ab",
+      betragBis: "Betrag bis",
+      gueltigAb: "erst ab",
+      gueltigBis: "nur bis",
+      zeitraumHinweis: "Leer = kein Stichtag. Nützlich, wenn ein Vorgänger denselben Namen trug.",
+      konto: "Konto",
+      alleKonten: "alle Konten",
+      treffer: "{{count}} Zahlungen",
+      trefferHinweis: "trifft die Regel im aktuellen Zustand — noch nicht gespeichert",
+      weitere: "… und {{count}} weitere",
+      turnusHinweis:
+        "Takt und Betrag der PLANUNG stehen nicht hier, sondern in den Vertragsdaten — hier geht es nur darum, welche Buchungen zu diesem Vertrag gezählt werden.",
+    },
     erkennung: {
       aktion: "woran erkannt?",
       titel: "Woran erkannt",
@@ -1395,6 +1417,28 @@ const en: typeof de = {
     zusammenMindestlaufzeit: "minimum term {{monate}} months",
     zusammenKuendigungsfrist: "notice {{monate}} months",
     zusammenKeineVerlaengerung: "no renewal",
+    regel: {
+      aktion: "Matching",
+      titel: "How is this contract matched?",
+      hinweis:
+        "These rules decide which posted payments are linked to this contract — including future ones. Changes take effect immediately across the whole ledger. Links you set by hand are left alone.",
+      schluessel: "Matching keys",
+      schluesselHinweis:
+        "One key per line: SEPA creditor ID or provider name in lower case, without legal form. One match is enough.",
+      nameHinzufuegen: "Add \"{{name}}\" as a key",
+      betragVon: "Amount from",
+      betragBis: "Amount to",
+      gueltigAb: "only from",
+      gueltigBis: "only until",
+      zeitraumHinweis: "Empty = no cut-off. Useful when a predecessor used the same name.",
+      konto: "Account",
+      alleKonten: "all accounts",
+      treffer: "{{count}} payments",
+      trefferHinweis: "match the rule as it stands — not saved yet",
+      weitere: "… and {{count}} more",
+      turnusHinweis:
+        "The PLAN's cycle and amount are not set here but in the contract details — this is only about which transactions count towards this contract.",
+    },
     erkennung: {
       aktion: "why this?",
       titel: "How this was detected",
