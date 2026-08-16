@@ -669,6 +669,9 @@ const de = {
     feldCharakter: "Charakter",
     feldKonto: "Konto",
     verlaengerung: { automatisch: "automatisch", keine: "keine" },
+    zusammenMindestlaufzeit: "Mindestlaufzeit {{monate}} Monate",
+    zusammenKuendigungsfrist: "Frist {{monate}} Monate",
+    zusammenKeineVerlaengerung: "keine Verlängerung",
     erkennung: {
       aktion: "woran erkannt?",
       titel: "Woran erkannt",
@@ -1351,6 +1354,9 @@ const en: typeof de = {
     feldCharakter: "Character",
     feldKonto: "Account",
     verlaengerung: { automatisch: "automatic", keine: "none" },
+    zusammenMindestlaufzeit: "minimum term {{monate}} months",
+    zusammenKuendigungsfrist: "notice {{monate}} months",
+    zusammenKeineVerlaengerung: "no renewal",
     erkennung: {
       aktion: "why this?",
       titel: "How this was detected",

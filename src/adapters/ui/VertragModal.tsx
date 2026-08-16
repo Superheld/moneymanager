@@ -152,17 +152,54 @@ export function formularAusBuchung(
  * Gruppen, die verschieden viel wiegen: was in die Planung rechnet (Betrag, Rhythmus,
  * Fälligkeit, Konto) und was nur die Konditionen beschreibt (Laufzeit, Fristen). Als
  * eine durchgehende Wand aus Eingabefeldern sah beides gleich wichtig aus.
+ *
+ * `einklappbar` geht noch einen Schritt weiter: die Konditionen sind beim Anlegen fast
+ * immer leer und werden selten angefasst — ausgeklappt kosten sie die halbe Maske für
+ * Felder, die niemand ausfüllt. Zugeklappt bleiben sie EINE Zeile, die sagt, dass es
+ * sie gibt. Aufgeklappt wird bewusst, nicht beim Scrollen.
+ *
+ * Auch beim Bearbeiten bleibt der Block zu: was drinsteht, sagt der `hinweis` in der
+ * zugeklappten Zeile. Aufklappen muss nur, wer ÄNDERN will.
+ *
+ * Bewusst kein `<details>`: dessen Marker und Bündigkeit lassen sich über Browser
+ * hinweg nicht verlässlich an die übrigen Abschnittsköpfe angleichen.
  */
-function Abschnitt({ titel, hinweis, children }: { titel: string; hinweis?: string; children: ReactNode }) {
+function Abschnitt({ titel, hinweis, einklappbar, children }: {
+  titel: string;
+  hinweis?: string;
+  einklappbar?: boolean;
+  children: ReactNode;
+}) {
+  const [offen, setOffen] = useState(!einklappbar);
+  const zugeklappt = einklappbar && !offen;
+
+  const kopf = (
+    <>
+      <h4 style={{ margin: 0, fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-black)", textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-2)" }}>
+        {einklappbar && <span aria-hidden style={{ marginRight: 6, color: "var(--ink-3)" }}>{offen ? "▾" : "▸"}</span>}
+        {titel}
+      </h4>
+      {hinweis && <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>{hinweis}</span>}
+    </>
+  );
+
+  const kopfStil = { display: "flex", alignItems: "baseline", gap: 8, borderTop: "1px solid var(--line)", paddingTop: "var(--sp-3)" } as const;
+
   return (
-    <section style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, borderTop: "1px solid var(--line)", paddingTop: "var(--sp-3)" }}>
-        <h4 style={{ margin: 0, fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-black)", textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-2)" }}>
-          {titel}
-        </h4>
-        {hinweis && <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>{hinweis}</span>}
-      </div>
-      {children}
+    <section style={{ display: "flex", flexDirection: "column", gap: zugeklappt ? 0 : "var(--sp-3)" }}>
+      {einklappbar ? (
+        <button
+          type="button"
+          aria-expanded={offen}
+          onClick={() => setOffen((o) => !o)}
+          style={{ ...kopfStil, width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", textAlign: "left", cursor: "pointer", fontFamily: "var(--font-ui)", paddingLeft: 0, paddingRight: 0, paddingBottom: zugeklappt ? "var(--sp-3)" : 0 }}
+        >
+          {kopf}
+        </button>
+      ) : (
+        <div style={kopfStil}>{kopf}</div>
+      )}
+      {!zugeklappt && children}
     </section>
   );
 }
@@ -199,6 +236,19 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
       setKonten(ko);
     })();
   }, []);
+
+  /**
+   * Was in den Konditionen steht, in einer Zeile — die Beschriftung des zugeklappten
+   * Abschnitts. Leer, wenn nichts drinsteht; dann greift der Standard-Hinweis.
+   */
+  const konditionen = [
+    f.mindestlaufzeit && t("vertraege.zusammenMindestlaufzeit", { monate: f.mindestlaufzeit }),
+    f.kuendigungsfrist && t("vertraege.zusammenKuendigungsfrist", { monate: f.kuendigungsfrist }),
+    f.verlaengerung === "keine" ? t("vertraege.zusammenKeineVerlaengerung") : null,
+    f.inhaberId ? personen.find((p) => p.id === f.inhaberId)?.name : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   function setze<K extends keyof VertragFormular>(feld: K, wert: VertragFormular[K]) {
     setF((v) => ({ ...v, [feld]: wert }));
@@ -305,7 +355,15 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
         </div>
       </Abschnitt>
 
-      <Abschnitt titel={t("vertraege.abschnittVertrag")} hinweis={t("vertraege.abschnittVertragHinweis")}>
+      {/* Konditionen zugeklappt: beim Anlegen sind sie fast immer leer, beim Bearbeiten
+          geht es meist um Betrag oder Kategorie. Damit nichts unsichtbar wird, was
+          drinsteht, trägt die zugeklappte Zeile eine Zusammenfassung — sonst müsste man
+          aufklappen, nur um zu sehen, ob es etwas zu sehen gibt. */}
+      <Abschnitt
+        titel={t("vertraege.abschnittVertrag")}
+        hinweis={konditionen || t("vertraege.abschnittVertragHinweis")}
+        einklappbar
+      >
         <div className="form-grid">
           <FormField label={t("vertraege.feldBeginn")} hint={t("vertraege.feldBeginnHinweis")}>
             <input className="field" type="date" value={f.beginn} onChange={(e) => setze("beginn", e.target.value)} />
