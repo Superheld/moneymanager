@@ -1,7 +1,7 @@
 // Verträge (P2.1) — Übersicht mit Kündigungsterminen; Anlegen im Modal. Eine Maske
 // erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   kuendigungsterminNaht,
@@ -48,6 +48,26 @@ const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
   Umschichtung: "um",
 };
 
+/**
+ * Ein abgesetzter Block in der Maske. Die Felder eines Vertrags zerfallen in zwei
+ * Gruppen, die verschieden viel wiegen: was in die Planung rechnet (Betrag, Rhythmus,
+ * Fälligkeit, Konto) und was nur die Konditionen beschreibt (Laufzeit, Fristen). Als
+ * eine durchgehende Wand aus Eingabefeldern sah beides gleich wichtig aus.
+ */
+function Abschnitt({ titel, hinweis, children }: { titel: string; hinweis?: string; children: ReactNode }) {
+  return (
+    <section style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 8, borderTop: "1px solid var(--line)", paddingTop: "var(--sp-3)" }}>
+        <h4 style={{ margin: 0, fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-black)", textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-2)" }}>
+          {titel}
+        </h4>
+        {hinweis && <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>{hinweis}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
 function heuteIso(): string {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
@@ -69,6 +89,11 @@ export function VertraegeScreen() {
   const [anbieter, setAnbieter] = useState("");
   const [inhaberId, setInhaberId] = useState("");
   const [beginn, setBeginn] = useState(heute);
+  // Getrennt vom Beginn: der Beginn trägt die Fristen (Mindestlaufzeit, Kündigung), die
+  // erste Fälligkeit den Takt der Planung. Bei einem 2015 geschlossenen Jahresvertrag
+  // sind das zwei verschiedene Daten — solange ein Feld beides war, verschob das
+  // Nachtragen des echten Vertragsbeginns die geplanten Zahlungen.
+  const [ersteZahlung, setErsteZahlung] = useState(heute);
   const [mindestlaufzeit, setMindestlaufzeit] = useState("");
   const [verlaengerung, setVerlaengerung] = useState<Verlaengerungsart>("automatisch");
   const [verlaengerungMonate, setVerlaengerungMonate] = useState("12");
@@ -109,6 +134,7 @@ export function VertraegeScreen() {
     neu();
     setAnbieter(k.anbieter);
     setBeginn(k.ersteZahlung);
+    setErsteZahlung(k.ersteZahlung);
     setBetragText(String(minorZuMajor(k.betrag, geld.waehrung)));
     setRhythmus(k.rhythmus);
     setCharakter(k.charakter);
@@ -152,6 +178,7 @@ export function VertraegeScreen() {
     setAnbieter("");
     setInhaberId("");
     setBeginn(heute);
+    setErsteZahlung(heute);
     setMindestlaufzeit("");
     setVerlaengerung("automatisch");
     setVerlaengerungMonate("12");
@@ -170,6 +197,7 @@ export function VertraegeScreen() {
     setAnbieter(v.anbieter);
     setInhaberId(v.inhaberId ?? "");
     setBeginn(v.beginn);
+    setErsteZahlung(r?.startdatum ?? v.beginn);
     setMindestlaufzeit(v.mindestlaufzeitMonate != null ? String(v.mindestlaufzeitMonate) : "");
     setVerlaengerung(v.verlaengerung);
     setVerlaengerungMonate(v.verlaengerungMonate != null ? String(v.verlaengerungMonate) : "12");
@@ -188,6 +216,7 @@ export function VertraegeScreen() {
       anbieter,
       inhaberId: inhaberId || undefined,
       beginn,
+      ersteZahlung: ersteZahlung || undefined,
       mindestlaufzeitMonate: mindestlaufzeit ? Number(mindestlaufzeit) : undefined,
       verlaengerung,
       verlaengerungMonate: verlaengerungMonate ? Number(verlaengerungMonate) : undefined,
@@ -390,73 +419,88 @@ export function VertraegeScreen() {
             </>
           }
         >
-          <div className="form-grid">
-            <FormField label={t("vertraege.feldAnbieter")} required>
-              <input className="field" value={anbieter} onChange={(e) => setAnbieter(e.target.value)} placeholder={t("vertraege.feldAnbieterPlatzhalter")} />
-            </FormField>
-            <FormField label={t("vertraege.feldInhaber")}>
-              <select className="field" value={inhaberId} onChange={(e) => setInhaberId(e.target.value)}>
-                <option value="">—</option>
-                {personen.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-            <FormField label={t("vertraege.feldBeginn")}>
-              <input className="field" type="date" value={beginn} onChange={(e) => setBeginn(e.target.value)} />
-            </FormField>
-            <FormField label={t("vertraege.feldMindestlaufzeit")} hint={t("vertraege.optional")}>
-              <input className="field" inputMode="numeric" value={mindestlaufzeit} onChange={(e) => setMindestlaufzeit(e.target.value)} placeholder={t("vertraege.feldMindestlaufzeitPlatzhalter")} />
-            </FormField>
-            <FormField label={t("vertraege.feldVerlaengerung")}>
-              <select className="field" value={verlaengerung} onChange={(e) => setVerlaengerung(e.target.value as Verlaengerungsart)}>
-                <option value="automatisch">{t("vertraege.verlaengerung.automatisch")}</option>
-                <option value="keine">{t("vertraege.verlaengerung.keine")}</option>
-              </select>
-            </FormField>
-            <FormField label={t("vertraege.feldVerlaengerungMonate")} hint={t("vertraege.feldVerlaengerungMonateHinweis")}>
-              <input className="field" inputMode="numeric" value={verlaengerungMonate} onChange={(e) => setVerlaengerungMonate(e.target.value)} placeholder={t("vertraege.feldVerlaengerungMonatePlatzhalter")} />
-            </FormField>
-            <FormField label={t("vertraege.feldKuendigungsfrist")} hint={t("vertraege.optional")}>
-              <input className="field" inputMode="numeric" value={kuendigungsfrist} onChange={(e) => setKuendigungsfrist(e.target.value)} placeholder={t("vertraege.feldKuendigungsfristPlatzhalter")} />
-            </FormField>
-            <FormField label={`${t("vertraege.feldBetrag")} ${geld.symbol}`} required hint={t("vertraege.feldBetragHinweis")}>
-              <input className="field" inputMode="decimal" value={betragText} onChange={(e) => setBetragText(e.target.value)} placeholder={geld.format(0)} />
-            </FormField>
-            <FormField label={t("vertraege.feldRhythmus")}>
-              <select className="field" value={rhythmus} onChange={(e) => setRhythmus(e.target.value as Rhythmus)}>
-                {RHYTHMEN.map((r) => (
-                  <option key={r} value={r}>
-                    {t(`vertraege.rhythmus.${r}`)}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-            <FormField label={t("vertraege.feldKategorie")} hint={t("vertraege.feldKategorieHinweis")}>
-              <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieWaehlen} />
-            </FormField>
-            <FormField label={t("vertraege.feldCharakter")}>
-              <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-                {CHARAKTERE.map((c) => (
-                  <option key={c} value={c}>
-                    {t(`charakter.${c}`)}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-            <FormField label={t("vertraege.feldKonto")} hint={t("vertraege.optional")}>
-              <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
-                <option value="">—</option>
-                {konten.map((k) => (
-                  <option key={k.id} value={k.id}>
-                    {k.bezeichnung}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-          </div>
+          <FormField label={t("vertraege.feldAnbieter")} required>
+            <input className="field" value={anbieter} onChange={(e) => setAnbieter(e.target.value)} placeholder={t("vertraege.feldAnbieterPlatzhalter")} />
+          </FormField>
+
+          <Abschnitt titel={t("vertraege.abschnittZahlung")} hinweis={t("vertraege.abschnittZahlungHinweis")}>
+            <div className="form-grid">
+              <FormField label={`${t("vertraege.feldBetrag")} ${geld.symbol}`} required hint={t("vertraege.feldBetragHinweis")}>
+                <input className="field" inputMode="decimal" value={betragText} onChange={(e) => setBetragText(e.target.value)} placeholder={geld.format(0)} />
+              </FormField>
+              <FormField label={t("vertraege.feldRhythmus")}>
+                <select className="field" value={rhythmus} onChange={(e) => setRhythmus(e.target.value as Rhythmus)}>
+                  {RHYTHMEN.map((r) => (
+                    <option key={r} value={r}>
+                      {t(`vertraege.rhythmus.${r}`)}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label={t("vertraege.feldErsteZahlung")} hint={t("vertraege.feldErsteZahlungHinweis")}>
+                <input className="field" type="date" value={ersteZahlung} onChange={(e) => setErsteZahlung(e.target.value)} />
+              </FormField>
+              <FormField label={t("vertraege.feldKonto")} hint={t("vertraege.optional")}>
+                <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
+                  <option value="">—</option>
+                  {konten.map((k) => (
+                    <option key={k.id} value={k.id}>
+                      {k.bezeichnung}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label={t("vertraege.feldKategorie")} hint={t("vertraege.feldKategorieHinweis")}>
+                <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieWaehlen} />
+              </FormField>
+              <FormField label={t("vertraege.feldCharakter")}>
+                <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
+                  {CHARAKTERE.map((c) => (
+                    <option key={c} value={c}>
+                      {t(`charakter.${c}`)}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+            </div>
+          </Abschnitt>
+
+          <Abschnitt titel={t("vertraege.abschnittVertrag")} hinweis={t("vertraege.abschnittVertragHinweis")}>
+            <div className="form-grid">
+              <FormField label={t("vertraege.feldBeginn")} hint={t("vertraege.feldBeginnHinweis")}>
+                <input className="field" type="date" value={beginn} onChange={(e) => setBeginn(e.target.value)} />
+              </FormField>
+              <FormField label={t("vertraege.feldInhaber")} hint={t("vertraege.optional")}>
+                <select className="field" value={inhaberId} onChange={(e) => setInhaberId(e.target.value)}>
+                  <option value="">—</option>
+                  {personen.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </select>
+              </FormField>
+              <FormField label={t("vertraege.feldMindestlaufzeit")} hint={t("vertraege.optional")}>
+                <input className="field" inputMode="numeric" value={mindestlaufzeit} onChange={(e) => setMindestlaufzeit(e.target.value)} placeholder={t("vertraege.feldMindestlaufzeitPlatzhalter")} />
+              </FormField>
+              <FormField label={t("vertraege.feldKuendigungsfrist")} hint={t("vertraege.optional")}>
+                <input className="field" inputMode="numeric" value={kuendigungsfrist} onChange={(e) => setKuendigungsfrist(e.target.value)} placeholder={t("vertraege.feldKuendigungsfristPlatzhalter")} />
+              </FormField>
+              <FormField label={t("vertraege.feldVerlaengerung")}>
+                <select className="field" value={verlaengerung} onChange={(e) => setVerlaengerung(e.target.value as Verlaengerungsart)}>
+                  <option value="automatisch">{t("vertraege.verlaengerung.automatisch")}</option>
+                  <option value="keine">{t("vertraege.verlaengerung.keine")}</option>
+                </select>
+              </FormField>
+              {/* Ohne automatische Verlängerung hat der Schritt keine Bedeutung — ein Feld,
+                  das nichts tut, kostet in jeder Maske Aufmerksamkeit. */}
+              {verlaengerung === "automatisch" && (
+                <FormField label={t("vertraege.feldVerlaengerungMonate")} hint={t("vertraege.feldVerlaengerungMonateHinweis")}>
+                  <input className="field" inputMode="numeric" value={verlaengerungMonate} onChange={(e) => setVerlaengerungMonate(e.target.value)} placeholder={t("vertraege.feldVerlaengerungMonatePlatzhalter")} />
+                </FormField>
+              )}
+            </div>
+          </Abschnitt>
         </Modal>
       )}
     </div>
