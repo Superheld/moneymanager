@@ -17,6 +17,21 @@ import type { Zahlungskonto } from "./konto";
 export type IstQuelle = "bezahlt-markiert" | "manuell" | "import";
 
 /**
+ * Wer die KATEGORIE dieser Buchung gesetzt hat — und damit, wer sie ändern darf.
+ *
+ * Nicht zu verwechseln mit `IstQuelle`: die sagt, woher die BUCHUNG stammt. Eine
+ * importierte Buchung, deren Kategorie jemand von Hand korrigiert hat, ist
+ * `quelle: "import"` UND `kategorieHerkunft: "manuell"` — beides zugleich, und genau
+ * diese Kombination ist der Fall, für den das Feld existiert.
+ *
+ * Dieselbe Bauweise wie `Zuordnungsherkunft` bei Vertrag ↔ Buchung: `automatisch`
+ * schreibt die Automatik und darf sie jederzeit überschreiben, `manuell` rührt sie nie
+ * an. Ohne diese Unterscheidung könnte ein rückwirkender Lauf eine Handentscheidung
+ * nicht von seinem eigenen früheren Treffer unterscheiden.
+ */
+export type Kategorieherkunft = "automatisch" | "manuell";
+
+/**
  * Verweis auf den geplanten Posten, aus dem die Ist-Buchung entstand (1:1-Matching).
  * `quelleId` = Zahlungsregel-ID, `faelligkeit` = die projizierte Fälligkeit (ISO).
  */
@@ -83,6 +98,26 @@ export function istGeteilt(b: IstBuchung): boolean {
   return (b.aufteilungen?.length ?? 0) > 0;
 }
 
+/**
+ * Ist die Kategoriezuordnung dieser Buchung eine Handentscheidung — also für jede
+ * Automatik tabu?
+ *
+ * Zwei Fälle, und der zweite ist der Grund, warum das eine Funktion ist und kein
+ * Feldvergleich:
+ *
+ *   1. `kategorieHerkunft === "manuell"` — jemand hat die Kategorie gesetzt oder
+ *      korrigiert. Fehlendes Feld zählt als `automatisch`; so bleiben Bestandsdaten und
+ *      neu gebaute Objekte ohne das Feld für die Automatik offen.
+ *   2. Die Buchung ist AUFGETEILT. Ein Split entsteht nur von Hand, trägt mehrere
+ *      Kategorien und hat gar kein Feld, in das ein Vorschlag passen würde. Was eine
+ *      Automatik damit tun sollte, ist nicht definiert — also fasst sie ihn nicht an.
+ *
+ * Beides an einer Stelle, damit nicht jeder Aufrufer die zweite Hälfte vergisst.
+ */
+export function kategorieIstHandverlesen(b: IstBuchung): boolean {
+  return b.kategorieHerkunft === "manuell" || istGeteilt(b);
+}
+
 export interface IstBuchung {
   readonly id: string;
   /** Tatsächliches Buchungsdatum (ISO). */
@@ -92,6 +127,11 @@ export interface IstBuchung {
   /** Konto, über das tatsächlich geflossen ist. */
   readonly kontoId: string;
   readonly kategorieId?: string;
+  /**
+   * Wer die Kategorie gesetzt hat. Fehlend zählt als `automatisch` — prüfen deshalb
+   * immer über `kategorieIstHandverlesen`, nie direkt auf den Wert.
+   */
+  readonly kategorieHerkunft?: Kategorieherkunft;
   readonly charakter: Charakter;
   readonly quelle: IstQuelle;
   /** Freitext-Beschreibung (v. a. bei manuellen Buchungen). */

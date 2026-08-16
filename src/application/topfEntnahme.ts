@@ -37,6 +37,9 @@ function baueEntnahme(e: TopfEntnahmeEingabe, id?: string): IstBuchung {
     betrag: vorzeichenbehaftet(e.betrag, charakter),
     kontoId: e.kontoId,
     kategorieId: e.topf.kategorieId,
+    // Die Kategorie kommt aus den Topf-Stammdaten, und die Buchung trägt zusätzlich den
+    // Topf als explizites Buchungsziel (ADR-0003). Beides ist benannt, nicht geraten.
+    kategorieHerkunft: e.topf.kategorieId ? "manuell" : undefined,
     charakter,
     quelle: "manuell",
     notiz: e.notiz?.trim() || undefined,

@@ -5,6 +5,7 @@ import {
   bezahlteSchluessel,
   findeIstZuPlan,
   istSummeKonto,
+  kategorieIstHandverlesen,
   liquideMittelReal,
   planRefKey,
   realerKontostand,
@@ -68,5 +69,31 @@ describe("Reconciliation light", () => {
     const konten = [konto({ id: "k1", saldo: euroZuCent(1000) }), konto({ id: "k2", saldo: euroZuCent(500) })];
     const buchungen = [ist({ kontoId: "k1", betrag: euroZuCent(-200) }), ist({ id: "i2", kontoId: "k2", betrag: euroZuCent(-100) })];
     expect(liquideMittelReal(konten, buchungen)).toBe(euroZuCent(1200));
+  });
+});
+
+describe("kategorieIstHandverlesen — was eine Automatik nicht anfassen darf", () => {
+  it("fehlende Herkunft zählt als automatisch (Bestandsdaten bleiben offen)", () => {
+    expect(kategorieIstHandverlesen(ist({ kategorieId: "kat-1" }))).toBe(false);
+  });
+
+  it("„automatisch“ ist offen, „manuell“ ist gesperrt", () => {
+    expect(kategorieIstHandverlesen(ist({ kategorieId: "kat-1", kategorieHerkunft: "automatisch" }))).toBe(false);
+    expect(kategorieIstHandverlesen(ist({ kategorieId: "kat-1", kategorieHerkunft: "manuell" }))).toBe(true);
+  });
+
+  it("eine aufgeteilte Buchung ist gesperrt, auch ohne „manuell“", () => {
+    const geteilt = ist({
+      kategorieId: undefined,
+      betrag: euroZuCent(-52),
+      aufteilungen: [
+        { kategorieId: "kat-lebensmittel", betrag: euroZuCent(-40) },
+        { kategorieId: "kat-drogerie", betrag: euroZuCent(-12) },
+      ],
+    });
+    // Ein Split entsteht nur von Hand und trägt mehrere Kategorien — es gibt kein Feld,
+    // in das ein Vorschlag passen würde.
+    expect(geteilt.kategorieHerkunft).toBeUndefined();
+    expect(kategorieIstHandverlesen(geteilt)).toBe(true);
   });
 });
