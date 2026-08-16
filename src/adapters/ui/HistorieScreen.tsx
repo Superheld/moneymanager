@@ -4,13 +4,16 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { addMonate, buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, nachHauptgruppe, toIso, type GruppenSumme, type IstBuchung, type Kategorie, type Zahlungskonto } from "../../core";
+import { addMonate, buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, nachHauptgruppe, toIso, type Budget, type GruppenSumme, type IstBuchung, type Kategorie, type Zahlungskonto, type Zahlungsregel } from "../../core";
 import type { Umsatz } from "../../application/import";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository as kontoRepo, sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
+import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
+import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
 import { Button, Card, CoverageTrack, DataTable, KPIStat } from "./ds";
 import { BuchungDetail } from "./BuchungDetail";
+import { MonatsAusblick } from "./MonatsAusblick";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { PageHead } from "./PageHead";
@@ -155,6 +158,11 @@ function aktuellerMonat(): { y: number; m: number; d: number } {
   return { y: n.getFullYear(), m: n.getMonth() + 1, d: 1 };
 }
 
+function heuteIso(): string {
+  const n = new Date();
+  return toIso({ y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() });
+}
+
 export function HistorieScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -162,6 +170,9 @@ export function HistorieScreen() {
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
+  const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
+  const [budgets, setBudgets] = useState<Budget[]>([]);
+  const heute = useMemo(heuteIso, []);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("12");
   const [aktivMonat, setAktivMonat] = useState<number | null>(null);
   const [offeneKat, setOffeneKat] = useState<string | null>(null);
@@ -183,11 +194,15 @@ export function HistorieScreen() {
   // Aufschlüsselung gegen eine noch leere Kategorie-Liste rechnet (sonst „ohne Kategorie").
   async function laden() {
     try {
-      const [i, k, kat, u] = await Promise.all([ledgerRepo.alle(), kontoRepo.alle(), kategorieRepo.alle(), umsatzRepo.alle()]);
+      const [i, k, kat, u, r, b] = await Promise.all([
+        ledgerRepo.alle(), kontoRepo.alle(), kategorieRepo.alle(), umsatzRepo.alle(), regelRepo.alle(), budgetRepo.alle(),
+      ]);
       setIst(i);
       setKonten(k);
       setKategorien(kat);
       setUmsaetze(u);
+      setRegeln(r);
+      setBudgets(b);
       setFehler(null);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -316,6 +331,12 @@ export function HistorieScreen() {
       <PageHead title={t("historie.titel")} subtitle={t("historie.untertitel")} />
 
       {fehler && <Card style={{ borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
+
+      {/* Der Ausblick steht vor dem Rückblick: die Frage „was bleibt diesen Monat?" ist
+          beim Öffnen die dringendere. Er lebt vom Plan und braucht keine Ist-Buchungen. */}
+      {geladen && !fehler && (
+        <MonatsAusblick regeln={regeln} budgets={budgets} ist={ist} kategorien={kategorien} heute={heute} />
+      )}
 
       {!geladen ? null : ist.length === 0 && !fehler ? (
         <Card>{t("historie.leer")}</Card>
