@@ -678,7 +678,10 @@ describe("Vertrag aus einer Buchung", () => {
     expect((await screen.findByDisplayValue("Telefonica Germany GmbH")).tagName).toBe("INPUT");
     // Die Maske trägt den Betrag POSITIV — die Richtung steckt im Charakter.
     await screen.findByDisplayValue("29.99");
-    // Zweimal dasselbe Datum: Beginn UND erste Fälligkeit hängen an der Buchung.
+    // Sichtbar ist die erste Fälligkeit; der Vertragsbeginn liegt im zugeklappten
+    // Konditionen-Block und trägt dasselbe Datum.
+    expect(await screen.findAllByDisplayValue(heute)).toHaveLength(1);
+    await nutzer.click(screen.getByRole("button", { name: /Vertragsdaten/i }));
     expect(await screen.findAllByDisplayValue(heute)).toHaveLength(2);
   });
 

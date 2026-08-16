@@ -147,6 +147,30 @@ describe("VertraegeScreen — Ansichten", () => {
 });
 
 describe("VertraegeScreen — Beginn und Fälligkeit", () => {
+  it("hält die Konditionen zugeklappt und fasst zusammen, was drinsteht", async () => {
+    await konto();
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Sportverein", beginn: "2015-03-01", mindestlaufzeitMonate: 24,
+      kuendigungsfristMonate: 3, verlaengerung: "automatisch", verlaengerungMonate: 12, status: "aktiv",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await nutzer.click(await screen.findByRole("button", { name: /bearbeiten/i }));
+
+    // Zugeklappt: die Felder sind weg, ihr Inhalt steht trotzdem in der Kopfzeile —
+    // sonst müsste man aufklappen, nur um zu sehen, ob es etwas zu sehen gibt.
+    const kopf = await screen.findByRole("button", { name: /Vertragsdaten/i });
+    expect(kopf).toHaveAttribute("aria-expanded", "false");
+    expect(kopf.textContent).toMatch(/24/);
+    expect(kopf.textContent).toMatch(/3/);
+    // Die Mindestlaufzeit liegt eindeutig im zugeklappten Block (der Vertragsbeginn
+    // teilt sein Datum mit der ersten Fälligkeit und taugt nicht als Prüfstein).
+    expect(screen.queryByDisplayValue("24")).toBeNull();
+
+    await nutzer.click(kopf);
+    expect(await screen.findByDisplayValue("24")).toBeInTheDocument();
+  });
+
   it("lässt den Zahlungstakt stehen, wenn der Vertragsbeginn nachgetragen wird", async () => {
     await konto();
     await sqliteVertragRepository.speichern({
@@ -161,6 +185,9 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
     await nutzer.click(await screen.findByRole("button", { name: /bearbeiten/i }));
+
+    // Die Konditionen liegen zugeklappt — der Vertragsbeginn gehört dazu.
+    await nutzer.click(await screen.findByRole("button", { name: /Vertragsdaten/i }));
 
     // Die erste Fälligkeit kommt aus der Regel, nicht aus dem Vertragsbeginn.
     const faelligkeit = await screen.findByDisplayValue("2026-04-01");
