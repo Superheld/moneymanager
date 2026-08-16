@@ -66,6 +66,13 @@ export function useGeld() {
   );
 }
 
+/**
+ * Was `useGeld` liefert. Als Typ exportiert, damit Helfer ausserhalb einer Komponente
+ * (Formular-Umrechnungen, Aufbereitung) das Geld-Werkzeug annehmen können, ohne Währung
+ * und Locale einzeln durchzureichen.
+ */
+export type Geld = ReturnType<typeof useGeld>;
+
 /** Enum-Label-Schicht: Charakter (gespeicherter Code) → übersetztes Anzeige-Label. */
 export function useCharakterLabel(): (c: Charakter) => string {
   const { t } = useTranslation();

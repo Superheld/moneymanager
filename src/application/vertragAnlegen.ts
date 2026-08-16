@@ -12,8 +12,25 @@ import type {
   Vertragsstatus,
   Zahlungsregel,
 } from "../core";
-import type { VertragRepository, ZahlungsregelRepository } from "./ports";
+import type {
+  VertragRepository,
+  VertragserkennungRepository,
+  VertragszuordnungRepository,
+  ZahlungsregelRepository,
+} from "./ports";
 import { vorzeichenbehaftet } from "./zahlungsregelAnlegen";
+import { erkennungSicherstellen, vertragszuordnungenAbraeumen } from "./vertragszuordnung";
+
+/**
+ * Die Zuordnungsseite eines Vertrags — seine Erkennungsregel und die Zuordnungen, die
+ * auf ihn zeigen (siehe `core/vertragZuordnung`). Optional, weil der Vertrag auch ohne
+ * sie vollständig ist: dann wird er eben nicht automatisch an Buchungen erkannt. Wer sie
+ * mitgibt, bekommt die Regel angelegt bzw. beim Löschen abgeräumt.
+ */
+export interface VertragZuordnungsDeps {
+  readonly erkennungRepo: VertragserkennungRepository;
+  readonly zuordnungRepo: VertragszuordnungRepository;
+}
 
 export interface VertragEingabe {
   anbieter: string;
@@ -33,6 +50,13 @@ export interface VertragEingabe {
   kontoId?: string;
   /** Erste Fälligkeit der Zahlung; Standard = Vertragsbeginn. */
   ersteZahlung?: string;
+  /**
+   * SEPA-Gläubiger-ID, sofern bekannt (kommt aus einem übernommenen Vorschlag). Landet
+   * nicht am Vertrag, sondern in seiner Erkennungsregel: dort ist sie der präziseste
+   * Schlüssel, den es gibt — sie identifiziert den Einzieher, während der Name eine
+   * Normalisierung mit Unschärfe bleibt.
+   */
+  glaeubigerId?: string;
 }
 
 export interface VertragErgebnis {
@@ -44,6 +68,7 @@ export async function vertragAnlegen(
   vertragRepo: VertragRepository,
   regelRepo: ZahlungsregelRepository,
   eingabe: VertragEingabe,
+  zuordnung?: VertragZuordnungsDeps,
 ): Promise<VertragErgebnis> {
   const anbieter = eingabe.anbieter.trim();
   if (!anbieter) throw new FachlicherFehler("anbieter.fehlt");
@@ -62,6 +87,9 @@ export async function vertragAnlegen(
     verlaengerungMonate: eingabe.verlaengerung === "automatisch" ? eingabe.verlaengerungMonate : undefined,
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
     status,
+    // Auch am VERTRAG, nicht nur an der abgeleiteten Zahlungsregel: die
+    // Kategorisierungs-Kette fragt den Vertrag, weil die Vertragszuordnung auf ihn zeigt.
+    kategorieId: eingabe.kategorieId,
     notizen: eingabe.notizen?.trim() || undefined,
   };
 
@@ -80,6 +108,15 @@ export async function vertragAnlegen(
   // Eventual consistent: erst Stammdaten, dann die abgeleitete Planungsregel.
   await vertragRepo.speichern(vertrag);
   await regelRepo.speichern(regel);
+  if (zuordnung) {
+    await erkennungSicherstellen(
+      zuordnung.erkennungRepo,
+      vertrag.id,
+      anbieter,
+      eingabe.betrag,
+      eingabe.glaeubigerId,
+    );
+  }
   return { vertrag, regel };
 }
 
@@ -92,6 +129,7 @@ export async function vertragAktualisieren(
   regelRepo: ZahlungsregelRepository,
   vertragId: string,
   eingabe: VertragEingabe,
+  zuordnung?: VertragZuordnungsDeps,
 ): Promise<VertragErgebnis> {
   const anbieter = eingabe.anbieter.trim();
   if (!anbieter) throw new FachlicherFehler("anbieter.fehlt");
@@ -110,6 +148,7 @@ export async function vertragAktualisieren(
     verlaengerungMonate: eingabe.verlaengerung === "automatisch" ? eingabe.verlaengerungMonate : undefined,
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
     status: bestehend?.status ?? "aktiv",
+    kategorieId: eingabe.kategorieId,
     notizen: eingabe.notizen?.trim() || undefined,
   };
 
@@ -128,18 +167,33 @@ export async function vertragAktualisieren(
 
   await vertragRepo.speichern(vertrag);
   await regelRepo.speichern(regel);
+  // Nur anlegen, wenn noch keine Regel da ist — eine nachgesteuerte darf ein
+  // Namenswechsel im Vertrag nicht wegwischen (siehe `erkennungSicherstellen`).
+  if (zuordnung) {
+    await erkennungSicherstellen(
+      zuordnung.erkennungRepo,
+      vertragId,
+      anbieter,
+      eingabe.betrag,
+      eingabe.glaeubigerId,
+    );
+  }
   return { vertrag, regel };
 }
 
-/** Löscht einen Vertrag samt seiner abgeleiteten Zahlungsregel(n). */
+/** Löscht einen Vertrag samt seiner abgeleiteten Zahlungsregel(n) und seiner Zuordnungen. */
 export async function vertragLoeschen(
   vertragRepo: VertragRepository,
   regelRepo: ZahlungsregelRepository,
   vertragId: string,
+  zuordnung?: VertragZuordnungsDeps,
 ): Promise<void> {
   const regeln = await regelRepo.alle();
   for (const r of regeln) {
     if (r.vertragId === vertragId) await regelRepo.loeschen(r.id);
+  }
+  if (zuordnung) {
+    await vertragszuordnungenAbraeumen(zuordnung.erkennungRepo, zuordnung.zuordnungRepo, vertragId);
   }
   await vertragRepo.loeschen(vertragId);
 }
