@@ -599,7 +599,7 @@ const de = {
     vorschlaegeTitel: "Aus deinen Buchungen erkannt",
     vorschlaegeUntertitel: "{{count}} mögliche Verträge",
     vorschlaegeHinweis:
-      "Regelmäßige Abbuchungen, zu denen noch kein Vertrag erfasst ist. Beim Übernehmen füllt sich die Anlege-Maske vor — Laufzeit und Kündigungsfrist kennt nur der Vertrag selbst, die trägst du nach.",
+      "Regelmäßige Zahlungen, zu denen noch kein Vertrag erfasst ist — Abbuchungen wie Eingänge (Gehalt, Miete). Beim Übernehmen füllt sich die Anlege-Maske vor, samt Konto, über das gezahlt wurde. Laufzeit und Kündigungsfrist kennt nur der Vertrag selbst, die trägst du nach.",
     vorschlagUebernehmen: "übernehmen",
     vorschlagVerwerfen: "kein Vertrag",
     spalteStabil: "Betrag",
@@ -1339,7 +1339,7 @@ const en: typeof de = {
     vorschlaegeTitel: "Detected in your bookings",
     vorschlaegeUntertitel: "{{count}} possible contracts",
     vorschlaegeHinweis:
-      "Recurring debits with no contract on file yet. Accepting one pre-fills the form — term and notice period are known only to the contract itself, so add those yourself.",
+      "Recurring payments with no contract on file yet — debits as well as incoming ones (salary, rent). Accepting one pre-fills the form, including the account the money moved through. Term and notice period are known only to the contract itself, so add those yourself.",
     vorschlagUebernehmen: "accept",
     vorschlagVerwerfen: "not a contract",
     spalteStabil: "Amount",
