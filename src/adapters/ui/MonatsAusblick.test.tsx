@@ -82,10 +82,13 @@ describe("MonatsAusblick", () => {
   it("rechnet im laufenden Monat Plan und Gebuchtes nebeneinander auf", async () => {
     rendere(<MonatsAusblick {...props} />);
     const august = await karte("August 2026");
-    // Plan: 2475,36 − 471,41 − 430,00 = 1573,95 · Ist: die Einnahme fehlt noch → −521,75
-    expect(within(august).getByText("+1.573,95 €")).toBeInTheDocument();
+    // Unter dem Strich steht im laufenden Monat das Gebuchte: −459,25 − 62,50 = −521,75.
+    // Geplant wären 2475,36 − 471,41 − 430,00 = +1573,95 — die Differenz steht darunter.
     expect(within(august).getByText("−521,75 €")).toBeInTheDocument();
+    expect(within(august).getByText("−2.095,70 € gegenüber Plan")).toBeInTheDocument();
+    // Die Zeilen selbst tragen weiterhin beide Spalten.
     expect(within(august).getByText("gebucht")).toBeInTheDocument();
+    expect(within(august).getByText("−471,41")).toBeInTheDocument();
   });
 
   it("zeigt für kommende Monate nur die Plan-Spalte", async () => {
@@ -93,6 +96,8 @@ describe("MonatsAusblick", () => {
     const september = await karte("September 2026");
     expect(within(september).queryByText("gebucht")).not.toBeInTheDocument();
     expect(within(september).getByText("+1.573,95 €")).toBeInTheDocument();
+    // Ohne Ist gibt es auch nichts zu vergleichen.
+    expect(within(september).queryByText(/gegenüber Plan/)).not.toBeInTheDocument();
   });
 
   it("klappt die Verträge auf und zeigt, was schon gebucht ist", async () => {
@@ -105,6 +110,8 @@ describe("MonatsAusblick", () => {
 
     expect(within(august).getByText("Vermieter")).toBeInTheDocument();
     expect(within(august).getByText("04.")).toBeInTheDocument();
+    // Lange Anbieternamen werden per CSS gekappt — der volle Name bleibt im title.
+    expect(within(august).getByTitle("Vermieter")).toBeInTheDocument();
     // Der TATSÄCHLICH gebuchte Betrag steht am Posten, nicht der geplante — einmal in
     // der Zeilensumme, einmal am aufgeklappten Posten.
     expect(within(august).getAllByText("−459,25")).toHaveLength(2);
