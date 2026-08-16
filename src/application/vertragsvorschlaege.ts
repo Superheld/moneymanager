@@ -93,6 +93,7 @@ export async function vertragsvorschlaege(
       gegenpartei: u?.gegenpartei ?? "",
       glaeubigerId: u?.glaeubigerId,
       kategorieId: b.kategorieId,
+      kontoId: b.kontoId,
       charakter: b.charakter,
     };
   });
