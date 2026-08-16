@@ -20,6 +20,12 @@ function spaltenZugang(sql: string): { tabelle: string; spalte: string } | null 
   return m ? { tabelle: m[1], spalte: m[2] } : null;
 }
 
+/** `ALTER TABLE x DROP COLUMN y` → Tabelle und Spalte; sonst null. */
+function spaltenAbgang(sql: string): { tabelle: string; spalte: string } | null {
+  const m = sql.match(/^\s*ALTER\s+TABLE\s+(\w+)\s+DROP\s+COLUMN\s+(\w+)/i);
+  return m ? { tabelle: m[1], spalte: m[2] } : null;
+}
+
 async function spalteExistiert(db: MigrationsDb, tabelle: string, spalte: string): Promise<boolean> {
   const zeilen = await db.select<{ name: string }[]>(`PRAGMA table_info(${tabelle})`);
   return zeilen.some((z) => z.name === spalte);
@@ -44,8 +50,12 @@ async function spalteExistiert(db: MigrationsDb, tabelle: string, spalte: string
  * dauerhaft nicht mehr starten zu lassen.
  *
  *  • `CREATE TABLE/INDEX` tragen `IF NOT EXISTS` (alle Migrationen halten das ein).
+ *  • `DROP TABLE/INDEX` tragen `IF EXISTS`.
  *  • `ALTER TABLE … ADD COLUMN` kennt kein `IF NOT EXISTS` in SQLite — deshalb wird die
  *    Spalte vorher per `PRAGMA table_info` geprüft und der Zugang übersprungen.
+ *  • `ALTER TABLE … DROP COLUMN` genauso, nur andersherum: fehlt die Spalte schon, ist
+ *    nichts zu tun. Ohne diese Prüfung scheiterte der zweite Lauf an „no such column"
+ *    und die App käme nicht mehr hoch.
  *
  * Der Versionseintrag kommt zuletzt: lieber eine Migration zweimal laufen lassen (sie ist
  * wiederholbar) als sie fälschlich für erledigt halten.
@@ -65,6 +75,8 @@ export async function migrate(db: MigrationsDb): Promise<void> {
     for (const stmt of m.sql) {
       const zugang = spaltenZugang(stmt);
       if (zugang && (await spalteExistiert(db, zugang.tabelle, zugang.spalte))) continue;
+      const abgang = spaltenAbgang(stmt);
+      if (abgang && !(await spalteExistiert(db, abgang.tabelle, abgang.spalte))) continue;
       await db.execute(stmt);
     }
     await db.execute(`INSERT INTO _migration (version) VALUES ($1)`, [m.version]);
