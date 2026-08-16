@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { AppShell, type ScreenId } from "./adapters/ui/AppShell";
-import { UeberblickScreen } from "./adapters/ui/UeberblickScreen";
+import { PlanungScreen } from "./adapters/ui/PlanungScreen";
 import { HistorieScreen } from "./adapters/ui/HistorieScreen";
 import { KontenScreen } from "./adapters/ui/KontenScreen";
 import { EinstellungenScreen } from "./adapters/ui/EinstellungenScreen";
@@ -16,7 +16,7 @@ import { sqliteKategorieRepository } from "./adapters/persistence/sqliteStammdat
 import { EinstellungenProvider } from "./adapters/ui/EinstellungenProvider";
 
 export default function App() {
-  const [screen, setScreen] = useState<ScreenId>("uebersicht");
+  const [screen, setScreen] = useState<ScreenId>("historie");
   const [bereit, setBereit] = useState(false);
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function App() {
   return (
     <EinstellungenProvider>
       <AppShell current={screen} onNavigate={setScreen}>
-        {screen === "uebersicht" && <UeberblickScreen />}
+        {screen === "planung" && <PlanungScreen />}
         {screen === "historie" && <HistorieScreen />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
         {screen === "toepfe" && <ToepfeScreen />}

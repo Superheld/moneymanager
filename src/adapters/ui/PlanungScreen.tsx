@@ -60,7 +60,7 @@ function ddmm(iso: string): string {
   return `${d}.${m}.`;
 }
 
-export function UeberblickScreen() {
+export function PlanungScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
   const ab = useMemo(aktuellerMonatAb, []);
@@ -155,32 +155,32 @@ export function UeberblickScreen() {
 
   const hinweise: { text: string; warn: boolean }[] = [];
   if (tiefpunkt.freieLiquiditaet < 0)
-    hinweise.push({ text: t("ueberblick.hinweisUeberplanung", { label: tiefpunkt.label, betrag: geld.formatMitSymbol(tiefpunkt.freieLiquiditaet) }), warn: true });
+    hinweise.push({ text: t("planung.hinweisUeberplanung", { label: tiefpunkt.label, betrag: geld.formatMitSymbol(tiefpunkt.freieLiquiditaet) }), warn: true });
   for (const v of vertraege) {
     if (kuendigungsterminNaht(v, heute)) {
       const termin = naechsterKuendigungstermin(v, heute);
-      hinweise.push({ text: t("ueberblick.hinweisKuendigung", { anbieter: v.anbieter, datum: termin?.kuendigenBis }), warn: true });
+      hinweise.push({ text: t("planung.hinweisKuendigung", { anbieter: v.anbieter, datum: termin?.kuendigenBis }), warn: true });
     }
   }
-  if (hinweise.length === 0) hinweise.push({ text: t("ueberblick.hinweisKeine"), warn: false });
+  if (hinweise.length === 0) hinweise.push({ text: t("planung.hinweisKeine"), warn: false });
 
   const datumLang = new Date().toLocaleDateString(geld.locale, { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="screen">
-      <div className="ctxbar">{datumLang} · {szenarioId ? t("ueberblick.ctxSzenario", { name: szenarien.find((s) => s.id === szenarioId)?.name ?? "?" }) : t("ueberblick.ctxBasis")}</div>
+      <div className="ctxbar">{datumLang} · {szenarioId ? t("planung.ctxSzenario", { name: szenarien.find((s) => s.id === szenarioId)?.name ?? "?" }) : t("planung.ctxBasis")}</div>
 
-      <div style={{ fontSize: "var(--fs-body)", fontWeight: "var(--fw-semi)", color: "var(--ink-2)" }}>{t("ueberblick.fokusLabel")}</div>
+      <div style={{ fontSize: "var(--fs-body)", fontWeight: "var(--fw-semi)", color: "var(--ink-2)" }}>{t("planung.fokusLabel")}</div>
       <div className="num" style={{ fontSize: "var(--fs-display)", fontWeight: "var(--fw-black)", letterSpacing: "var(--ls-tight)", lineHeight: 1, marginTop: 6 }}>
         {geld.format(verfuegbar)} <small style={{ fontSize: 28, fontWeight: "var(--fw-bold)", color: "var(--ink-2)" }}>{geld.symbol}</small>
       </div>
       <p style={{ fontSize: 16, lineHeight: 1.55, color: "var(--ink-2)", margin: "16px 0 0", maxWidth: 620 }}>
         {konten.length === 0 ? (
-          <Trans i18nKey="ueberblick.einleitungLeer" components={betont} />
+          <Trans i18nKey="planung.einleitungLeer" components={betont} />
         ) : (
           <>
             <Trans
-              i18nKey="ueberblick.einleitungStart"
+              i18nKey="planung.einleitungStart"
               values={{ start: geld.formatMitSymbol(start), frei: geld.formatMitSymbol(verfuegbar), plan: geld.formatMitSymbol(planSaldo) }}
               components={{
                 ...betont,
@@ -189,33 +189,33 @@ export function UeberblickScreen() {
             />
             {tiefpunkt.freieLiquiditaet < 0 ? (
               <Trans
-                i18nKey="ueberblick.einleitungTiefpunkt"
+                i18nKey="planung.einleitungTiefpunkt"
                 values={{ label: tiefpunkt.label, betrag: geld.formatMitSymbol(tiefpunkt.freieLiquiditaet) }}
                 components={{ ...betont, warn: <b key="warn" style={{ color: "var(--warn-deep)", fontWeight: 700 }} /> }}
               />
             ) : (
-              <>{t("ueberblick.einleitungPlus")}</>
+              <>{t("planung.einleitungPlus")}</>
             )}
           </>
         )}
       </p>
 
       <div className="kpis" style={{ marginTop: 22 }}>
-        <KPIStat size="chip" label={t("ueberblick.kpiTiefpunkt", { label: tiefpunkt.label })} value={geld.format(tiefpunkt.freieLiquiditaet)} unit={geld.symbol} tone={tiefpunkt.freieLiquiditaet < 0 ? "warn" : "default"} />
-        <KPIStat size="chip" label={t("ueberblick.kpiZufluesse")} value={geld.format(summeZu)} unit={geld.symbol} tone="ok" />
-        <KPIStat size="chip" label={t("ueberblick.kpiAbfluesse")} value={geld.format(summeAb)} unit={geld.symbol} />
-        {deltaFrei != null && <KPIStat size="chip" label={t("ueberblick.kpiDelta")} value={geld.format(deltaFrei, { mitVorzeichen: true })} unit={geld.symbol} tone={deltaFrei < 0 ? "warn" : "ok"} />}
+        <KPIStat size="chip" label={t("planung.kpiTiefpunkt", { label: tiefpunkt.label })} value={geld.format(tiefpunkt.freieLiquiditaet)} unit={geld.symbol} tone={tiefpunkt.freieLiquiditaet < 0 ? "warn" : "default"} />
+        <KPIStat size="chip" label={t("planung.kpiZufluesse")} value={geld.format(summeZu)} unit={geld.symbol} tone="ok" />
+        <KPIStat size="chip" label={t("planung.kpiAbfluesse")} value={geld.format(summeAb)} unit={geld.symbol} />
+        {deltaFrei != null && <KPIStat size="chip" label={t("planung.kpiDelta")} value={geld.format(deltaFrei, { mitVorzeichen: true })} unit={geld.symbol} tone={deltaFrei < 0 ? "warn" : "ok"} />}
       </div>
 
       <Card
-        title={t("ueberblick.planSaldoTitel")}
-        subtitle={t("ueberblick.planSaldoUntertitel")}
+        title={t("planung.planSaldoTitel")}
+        subtitle={t("planung.planSaldoUntertitel")}
         style={{ marginTop: 24 }}
         action={
           <select className="field" style={{ width: "auto" }} value={szenarioId} onChange={(e) => setSzenarioId(e.target.value)}>
-            <option value="">{t("ueberblick.basisPlan")}</option>
+            <option value="">{t("planung.basisPlan")}</option>
             {szenarien.map((s) => (
-              <option key={s.id} value={s.id}>{t("ueberblick.szenarioOption", { name: s.name })}</option>
+              <option key={s.id} value={s.id}>{t("planung.szenarioOption", { name: s.name })}</option>
             ))}
           </select>
         }
@@ -230,10 +230,10 @@ export function UeberblickScreen() {
       </Card>
 
       <Card
-        title={t("ueberblick.flussTitel")}
-        subtitle={t("ueberblick.flussUntertitel")}
+        title={t("planung.flussTitel")}
+        subtitle={t("planung.flussUntertitel")}
         style={{ marginTop: "var(--gap-card)" }}
-        action={<span className="muted">{t("ueberblick.flussDurchschnitt", { betrag: geld.formatMitSymbol(Math.round(summeAb / (verlauf.length || 1))) })}</span>}
+        action={<span className="muted">{t("planung.flussDurchschnitt", { betrag: geld.formatMitSymbol(Math.round(summeAb / (verlauf.length || 1))) })}</span>}
       >
         {verlauf.length > 0 && (
           <MonatsFlussChart
@@ -254,9 +254,9 @@ export function UeberblickScreen() {
       />
 
       <div style={{ display: "grid", gridTemplateColumns: "1.15fr 1fr 1fr", gap: "var(--gap-card)", marginTop: "var(--gap-card)", alignItems: "start" }}>
-        <Card title={t("ueberblick.naechsteTitel")} subtitle={t("ueberblick.naechsteUntertitel")}>
+        <Card title={t("planung.naechsteTitel")} subtitle={t("planung.naechsteUntertitel")}>
           {naechste.length === 0 ? (
-            <div className="muted">{t("ueberblick.naechsteLeer")}</div>
+            <div className="muted">{t("planung.naechsteLeer")}</div>
           ) : (
             naechste.map((p, i) => {
               const paid = bezahlt.has(planRefKey(p.regelId, p.datum));
@@ -269,12 +269,12 @@ export function UeberblickScreen() {
                       checked={paid}
                       disabled={!kannMarkieren}
                       onChange={() => toggleBezahlt(p, paid)}
-                      title={kannMarkieren ? (paid ? t("ueberblick.titelHaekchenEntfernen") : t("ueberblick.titelAlsBezahlt")) : t("ueberblick.titelKeinKonto")}
+                      title={kannMarkieren ? (paid ? t("planung.titelHaekchenEntfernen") : t("planung.titelAlsBezahlt")) : t("planung.titelKeinKonto")}
                       style={{ cursor: kannMarkieren ? "pointer" : "not-allowed", accentColor: "var(--accent-deep)" }}
                     />
                     <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(p.datum)}</span>
                     <span style={{ textDecoration: paid ? "line-through" : "none" }}>{p.bezeichnung}</span>
-                    {paid && <Pill variant="neutral">{t("ueberblick.pillBezahlt")}</Pill>}
+                    {paid && <Pill variant="neutral">{t("planung.pillBezahlt")}</Pill>}
                     {p.charakter === "Umschichtung" && <Pill variant="um">{t("charakter.Umschichtung")}</Pill>}
                   </span>
                   <span className="num" style={{ fontSize: 13.5, fontWeight: 700, whiteSpace: "nowrap", color: paid ? "var(--ink-3)" : p.charakter === "Ertrag" ? "var(--ok-deep)" : p.charakter === "Umschichtung" ? "var(--accent-deep)" : "var(--ink)" }}>
@@ -287,19 +287,19 @@ export function UeberblickScreen() {
           {markFehler && <div className="err" style={{ marginTop: 10 }}>{markFehler}</div>}
         </Card>
 
-        <Card title={t("ueberblick.budgetsTitel")} subtitle={t("ueberblick.budgetsUntertitel")}>
+        <Card title={t("planung.budgetsTitel")} subtitle={t("planung.budgetsUntertitel")}>
           {budgets.length === 0 ? (
-            <div className="muted">{t("ueberblick.budgetsLeer")}</div>
+            <div className="muted">{t("planung.budgetsLeer")}</div>
           ) : (
             budgets.map((b) => (
               <div key={b.id} style={{ padding: "11px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                <CoverageTrack value={0} max={Math.abs(centZuEuro(geglaetteterMonatsabfluss(b)))} label={kategorieName.get(b.kategorieId) ?? "?"} right={t("ueberblick.proMonat", { betrag: geld.formatMitSymbol(Math.abs(geglaetteterMonatsabfluss(b))) })} />
+                <CoverageTrack value={0} max={Math.abs(centZuEuro(geglaetteterMonatsabfluss(b)))} label={kategorieName.get(b.kategorieId) ?? "?"} right={t("planung.proMonat", { betrag: geld.formatMitSymbol(Math.abs(geglaetteterMonatsabfluss(b))) })} />
               </div>
             ))
           )}
         </Card>
 
-        <Card title={t("ueberblick.imBlickTitel")} subtitle={t("ueberblick.imBlickUntertitel")}>
+        <Card title={t("planung.imBlickTitel")} subtitle={t("planung.imBlickUntertitel")}>
           {hinweise.map((h, i) => (
             <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 13, color: "var(--ink-2)", lineHeight: 1.42, padding: "9px 0", borderBottom: "1px solid var(--line-soft)" }}>
               <span style={{ width: 8, height: 8, borderRadius: "50%", marginTop: 5, flex: "0 0 auto", background: h.warn ? "var(--warn)" : "var(--ink-3)" }} />
@@ -309,17 +309,17 @@ export function UeberblickScreen() {
         </Card>
       </div>
 
-      <Card title={t("ueberblick.monatsverlaufTitel")} subtitle={t("ueberblick.monatsverlaufUntertitel")} style={{ marginTop: "var(--gap-card)" }}>
+      <Card title={t("planung.monatsverlaufTitel")} subtitle={t("planung.monatsverlaufUntertitel")} style={{ marginTop: "var(--gap-card)" }}>
         <DataTable
           columns={[
-            { key: "label", label: t("ueberblick.spalteMonat") },
-            { key: "netto", label: `${t("ueberblick.spalteNetto")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.netto, { mitVorzeichen: true }) },
-            { key: "budget", label: `${t("ueberblick.spalteBudget")} ${geld.symbol}`, align: "right", render: (m) => (m.budgetAbfluss ? geld.format(m.budgetAbfluss) : "—") },
-            { key: "soll", label: `${t("ueberblick.spalteToepfe")} ${geld.symbol}`, align: "right", render: (m) => (m.sollSumme ? geld.format(m.sollSumme) : "—") },
-            { key: "konto", label: `${t("ueberblick.spaltePlanSaldo")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.kontosaldo, { mitVorzeichen: true }) },
+            { key: "label", label: t("planung.spalteMonat") },
+            { key: "netto", label: `${t("planung.spalteNetto")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.netto, { mitVorzeichen: true }) },
+            { key: "budget", label: `${t("planung.spalteBudget")} ${geld.symbol}`, align: "right", render: (m) => (m.budgetAbfluss ? geld.format(m.budgetAbfluss) : "—") },
+            { key: "soll", label: `${t("planung.spalteToepfe")} ${geld.symbol}`, align: "right", render: (m) => (m.sollSumme ? geld.format(m.sollSumme) : "—") },
+            { key: "konto", label: `${t("planung.spaltePlanSaldo")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.kontosaldo, { mitVorzeichen: true }) },
             {
               key: "frei",
-              label: `${t("ueberblick.spalteFrei")} ${geld.symbol}`,
+              label: `${t("planung.spalteFrei")} ${geld.symbol}`,
               align: "right",
               render: (m) => (
                 <span style={{ color: m.freieLiquiditaet < 0 ? "var(--warn-deep)" : "var(--ink)", fontWeight: "var(--fw-bold)" }}>{geld.format(m.freieLiquiditaet, { mitVorzeichen: true })}</span>
@@ -394,13 +394,13 @@ function SzenarioCard({
 
   return (
     <Card
-      title={t("ueberblick.szenarioTitel")}
-      subtitle={t("ueberblick.szenarioUntertitel")}
+      title={t("planung.szenarioTitel")}
+      subtitle={t("planung.szenarioUntertitel")}
       style={{ marginTop: "var(--gap-card)" }}
       action={
         <span style={{ display: "flex", gap: "var(--sp-2)" }}>
-          {aktivId && <Button plus onClick={() => setPostenOffen(true)}>{t("ueberblick.btnPosten")}</Button>}
-          <Button variant="primary" plus onClick={() => setNeuOffen(true)}>{t("ueberblick.btnSzenario")}</Button>
+          {aktivId && <Button plus onClick={() => setPostenOffen(true)}>{t("planung.btnPosten")}</Button>}
+          <Button variant="primary" plus onClick={() => setNeuOffen(true)}>{t("planung.btnSzenario")}</Button>
         </span>
       }
     >
@@ -408,54 +408,54 @@ function SzenarioCard({
         posten.length > 0 ? (
           <DataTable
             columns={[
-              { key: "bezeichnung", label: t("ueberblick.spaltePosten") },
-              { key: "charakter", label: t("ueberblick.spalteCharakter"), render: (p) => <Pill variant="neutral">{t(`charakter.${p.charakter}`)}</Pill> },
-              { key: "rhythmus", label: t("ueberblick.spalteRhythmus"), render: (p) => t(`ueberblick.rhythmus.${p.rhythmus}`) },
-              { key: "betrag", label: `${t("ueberblick.spalteBetrag")} ${geld.symbol}`, align: "right", render: (p) => geld.format(p.betrag, { mitVorzeichen: true }) },
-              { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => szenarioRepo.postenLoeschen(p.id).then(onPostenChanged)}>{t("ueberblick.loeschen")}</button> },
+              { key: "bezeichnung", label: t("planung.spaltePosten") },
+              { key: "charakter", label: t("planung.spalteCharakter"), render: (p) => <Pill variant="neutral">{t(`charakter.${p.charakter}`)}</Pill> },
+              { key: "rhythmus", label: t("planung.spalteRhythmus"), render: (p) => t(`planung.rhythmus.${p.rhythmus}`) },
+              { key: "betrag", label: `${t("planung.spalteBetrag")} ${geld.symbol}`, align: "right", render: (p) => geld.format(p.betrag, { mitVorzeichen: true }) },
+              { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => szenarioRepo.postenLoeschen(p.id).then(onPostenChanged)}>{t("planung.loeschen")}</button> },
             ]}
             rows={posten}
           />
         ) : (
-          <div className="muted">{t("ueberblick.postenLeer")}</div>
+          <div className="muted">{t("planung.postenLeer")}</div>
         )
       ) : (
-        <div className="muted">{szenarien.length ? t("ueberblick.szenarioWaehlen") : t("ueberblick.keinSzenario")}</div>
+        <div className="muted">{szenarien.length ? t("planung.szenarioWaehlen") : t("planung.keinSzenario")}</div>
       )}
       {aktivId && (
         <div style={{ marginTop: "var(--sp-4)" }}>
-          <button className="linkbtn" onClick={szenarioLoeschen}>{t("ueberblick.szenarioVerwerfen")}</button>
+          <button className="linkbtn" onClick={szenarioLoeschen}>{t("planung.szenarioVerwerfen")}</button>
         </div>
       )}
 
       {neuOffen && (
-        <Modal title={t("ueberblick.modalSzenarioTitel")} subtitle={t("ueberblick.modalSzenarioUntertitel")} onClose={() => setNeuOffen(false)} footer={<><Button variant="primary" onClick={neuesSzenario}>{t("ueberblick.speichern")}</Button><button className="linkbtn" onClick={() => setNeuOffen(false)}>{t("ueberblick.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}>
-          <FormField label={t("ueberblick.feldName")} required>
-            <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("ueberblick.feldNamePlaceholder")} />
+        <Modal title={t("planung.modalSzenarioTitel")} subtitle={t("planung.modalSzenarioUntertitel")} onClose={() => setNeuOffen(false)} footer={<><Button variant="primary" onClick={neuesSzenario}>{t("planung.speichern")}</Button><button className="linkbtn" onClick={() => setNeuOffen(false)}>{t("planung.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}>
+          <FormField label={t("planung.feldName")} required>
+            <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("planung.feldNamePlaceholder")} />
           </FormField>
         </Modal>
       )}
 
       {postenOffen && (
-        <Modal title={t("ueberblick.modalPostenTitel")} subtitle={t("ueberblick.modalPostenUntertitel")} onClose={() => setPostenOffen(false)} footer={<><Button variant="primary" onClick={postenHinzufuegen}>{t("ueberblick.speichern")}</Button><button className="linkbtn" onClick={() => setPostenOffen(false)}>{t("ueberblick.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}>
+        <Modal title={t("planung.modalPostenTitel")} subtitle={t("planung.modalPostenUntertitel")} onClose={() => setPostenOffen(false)} footer={<><Button variant="primary" onClick={postenHinzufuegen}>{t("planung.speichern")}</Button><button className="linkbtn" onClick={() => setPostenOffen(false)}>{t("planung.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}>
           <div className="form-grid">
-            <FormField label={t("ueberblick.feldBezeichnung")}>
-              <input className="field" value={pBez} onChange={(e) => setPBez(e.target.value)} placeholder={t("ueberblick.feldBezeichnungPlaceholder")} />
+            <FormField label={t("planung.feldBezeichnung")}>
+              <input className="field" value={pBez} onChange={(e) => setPBez(e.target.value)} placeholder={t("planung.feldBezeichnungPlaceholder")} />
             </FormField>
-            <FormField label={t("ueberblick.feldBetrag")} hint={t("ueberblick.feldBetragHinweis")}>
+            <FormField label={t("planung.feldBetrag")} hint={t("planung.feldBetragHinweis")}>
               <input className="field" inputMode="decimal" value={pBetrag} onChange={(e) => setPBetrag(e.target.value)} placeholder={geld.format(0)} />
             </FormField>
-            <FormField label={t("ueberblick.feldRhythmus")}>
+            <FormField label={t("planung.feldRhythmus")}>
               <select className="field" value={pRhythmus} onChange={(e) => setPRhythmus(e.target.value as Rhythmus)}>
-                {RHYTHMEN.map((r) => (<option key={r} value={r}>{t(`ueberblick.rhythmus.${r}`)}</option>))}
+                {RHYTHMEN.map((r) => (<option key={r} value={r}>{t(`planung.rhythmus.${r}`)}</option>))}
               </select>
             </FormField>
-            <FormField label={t("ueberblick.feldCharakter")}>
+            <FormField label={t("planung.feldCharakter")}>
               <select className="field" value={pCharakter} onChange={(e) => setPCharakter(e.target.value as Charakter)}>
                 {CHARAKTERE.map((c) => (<option key={c} value={c}>{t(`charakter.${c}`)}</option>))}
               </select>
             </FormField>
-            <FormField label={t("ueberblick.feldFaelligkeit")}>
+            <FormField label={t("planung.feldFaelligkeit")}>
               <input className="field" type="date" value={pStart} onChange={(e) => setPStart(e.target.value)} />
             </FormField>
           </div>

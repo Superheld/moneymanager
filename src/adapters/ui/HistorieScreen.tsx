@@ -130,11 +130,37 @@ export function HistorieScreen() {
     };
   }, [aktivMonat, verlauf, von, bis]);
 
-  const summeEin = verlauf.reduce((s, m) => s + m.einnahmen, 0);
-  const summeAus = verlauf.reduce((s, m) => s + m.ausgaben, 0);
+  /**
+   * Kennzahlen — entweder über den ganzen Zeitraum oder über den gewählten Monat.
+   *
+   * Der Durchschnitt bleibt IMMER der des Zeitraums: er ist der Maßstab, gegen den ein
+   * einzelner Monat etwas aussagt. Ein „Durchschnitt eines Monats" wäre der Monat selbst.
+   */
+  const monat = aktivMonat != null && aktivMonat < verlauf.length ? verlauf[aktivMonat] : null;
+
+  const oeEin = verlauf.length ? Math.round(verlauf.reduce((s, m) => s + m.einnahmen, 0) / verlauf.length) : 0;
+  const oeAus = verlauf.length ? Math.round(verlauf.reduce((s, m) => s + m.ausgaben, 0) / verlauf.length) : 0;
+
+  const summeEin = monat ? monat.einnahmen : verlauf.reduce((s, m) => s + m.einnahmen, 0);
+  const summeAus = monat ? monat.ausgaben : verlauf.reduce((s, m) => s + m.ausgaben, 0);
   const netto = summeEin + summeAus;
-  const oeAus = verlauf.length ? Math.round(summeAus / verlauf.length) : 0;
   const saldoJetzt = verlauf.length ? verlauf[verlauf.length - 1].saldo : 0;
+
+  /**
+   * Abweichung eines Monatswerts vom Zeitraum-Durchschnitt, in Prozent.
+   * `null`, wenn es keinen Vergleich gibt (kein Monat gewählt, oder Ø ist 0).
+   */
+  function abweichung(wert: number, schnitt: number): number | null {
+    if (!monat || schnitt === 0) return null;
+    return Math.round(((wert - schnitt) / Math.abs(schnitt)) * 100);
+  }
+
+  /** „+12 %" / „−8 %" als Zusatz an einer Kennzahl; U+2212 wie überall beim Geld. */
+  function vergleich(wert: number, schnitt: number): string | undefined {
+    const a = abweichung(wert, schnitt);
+    if (a == null || a === 0) return undefined;
+    return t("historie.vsDurchschnitt", { prozent: (a > 0 ? "+" : "\u2212") + Math.abs(a) });
+  }
 
   const detailTh = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" } as const;
   const detailTd = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
@@ -186,9 +212,14 @@ export function HistorieScreen() {
       ) : (
         <>
           <div className="kpis">
-            <KPIStat size="chip" label={t("historie.kpiEinnahmen")} value={geld.format(summeEin)} unit={geld.symbol} tone="ok" />
-            <KPIStat size="chip" label={t("historie.kpiAusgaben")} value={geld.format(summeAus)} unit={geld.symbol} />
+            <KPIStat size="chip" label={monat ? t("historie.kpiEinnahmenMonat", { monat: monat.label }) : t("historie.kpiEinnahmen")}
+              value={geld.format(summeEin)} unit={geld.symbol} tone="ok" meta={vergleich(summeEin, oeEin)} />
+            <KPIStat size="chip" label={monat ? t("historie.kpiAusgabenMonat", { monat: monat.label }) : t("historie.kpiAusgaben")}
+              value={geld.format(summeAus)} unit={geld.symbol} meta={vergleich(summeAus, oeAus)} />
             <KPIStat size="chip" label={t("historie.kpiNetto")} value={geld.format(netto, { mitVorzeichen: true })} unit={geld.symbol} tone={netto < 0 ? "warn" : "ok"} />
+            {/* Der Maßstab: was ein Monat im Schnitt kostet. Bleibt beim Zeitraum-Ø,
+                auch wenn ein einzelner Monat gewählt ist — sonst gäbe es nichts zu vergleichen. */}
+            <KPIStat size="chip" label={t("historie.kpiOeAusgaben")} value={geld.format(oeAus)} unit={geld.symbol} />
             <KPIStat size="chip" label={t("historie.kpiSaldo")} value={geld.format(saldoJetzt)} unit={geld.symbol} tone={saldoJetzt < 0 ? "warn" : "default"} />
           </div>
 
@@ -196,12 +227,26 @@ export function HistorieScreen() {
             title={t("historie.flussTitel")}
             subtitle={t("historie.flussUntertitel")}
             action={
-              <select className="field" style={{ width: "auto" }} value={zeitraum} onChange={(e) => { setZeitraum(e.target.value as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}>
-                <option value="12">{t("historie.zr12")}</option>
-                <option value="24">{t("historie.zr24")}</option>
-                <option value="jahr">{t("historie.zrJahr")}</option>
-                <option value="alles">{t("historie.zrAlles")}</option>
-              </select>
+              <span style={{ display: "inline-flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+                {/* Monat direkt wählbar — der Klick auf den Chart macht dasselbe, ist bei
+                    vielen Monaten aber Zielübung. Beide schreiben denselben Zustand. */}
+                <select
+                  className="field"
+                  style={{ width: "auto" }}
+                  aria-label={t("historie.monatWaehlen")}
+                  value={aktivMonat ?? ""}
+                  onChange={(e) => { setAktivMonat(e.target.value === "" ? null : Number(e.target.value)); setOffeneKat(null); }}
+                >
+                  <option value="">{t("historie.alleMonate")}</option>
+                  {verlauf.map((m, i) => (<option key={m.label} value={i}>{m.label}</option>))}
+                </select>
+                <select className="field" style={{ width: "auto" }} value={zeitraum} onChange={(e) => { setZeitraum(e.target.value as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}>
+                  <option value="12">{t("historie.zr12")}</option>
+                  <option value="24">{t("historie.zr24")}</option>
+                  <option value="jahr">{t("historie.zrJahr")}</option>
+                  <option value="alles">{t("historie.zrAlles")}</option>
+                </select>
+              </span>
             }
           >
             {verlauf.length > 0 && (
