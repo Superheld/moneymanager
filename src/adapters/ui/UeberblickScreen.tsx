@@ -41,7 +41,7 @@ import { ZweiKurvenChart } from "./ZweiKurvenChart";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { Modal } from "./Modal";
 import { betont } from "./betonung";
-import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
+import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 
 const MONATE = 12;
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];

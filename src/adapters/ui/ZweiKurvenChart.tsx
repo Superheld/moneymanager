@@ -3,7 +3,7 @@
 // gehen darf. Dünne Linien, Grid in --line, Labels in --ink-3 (Chart-Guidance).
 
 import { useTranslation } from "react-i18next";
-import { useGeld } from "./EinstellungenProvider";
+import { useGeld } from "./einstellungenKontext";
 
 interface Props {
   labels: string[];

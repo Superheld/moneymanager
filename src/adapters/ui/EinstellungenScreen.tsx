@@ -27,7 +27,7 @@ import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedge
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
-import { useGeld, fehlerNachricht, useRegionUmschalter } from "./EinstellungenProvider";
+import { useGeld, fehlerNachricht, useRegionUmschalter } from "./einstellungenKontext";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };

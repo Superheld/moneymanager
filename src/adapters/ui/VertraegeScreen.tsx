@@ -29,7 +29,7 @@ import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
-import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
+import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];

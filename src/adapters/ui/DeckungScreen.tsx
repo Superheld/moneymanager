@@ -30,7 +30,7 @@ import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedge
 import { Card, CoverageTrack, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { betont } from "./betonung";
-import { useGeld } from "./EinstellungenProvider";
+import { useGeld } from "./einstellungenKontext";
 
 function aktuellerMonatAb(): string {
   const n = new Date();
