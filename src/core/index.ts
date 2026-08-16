@@ -13,6 +13,7 @@ export * from "./kategorie";
 export * from "./vertrag";
 export * from "./vertragErkennung";
 export * from "./budget";
+export * from "./budgetVorschlag";
 export * from "./topf";
 export * from "./inventar";
 export * from "./szenario";
