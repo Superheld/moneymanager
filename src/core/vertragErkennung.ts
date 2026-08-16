@@ -42,6 +42,13 @@ export interface Zahlungsspur {
   readonly glaeubigerId?: string;
   readonly kategorieId?: string;
   /**
+   * Wer die Kategorie gesetzt hat. Wie `kategorieId` und `geteilt` steht das hier für die
+   * Kategorisierung, nicht für die Vertragserkennung: der rückwirkende Abgleich muss eine
+   * Handentscheidung erkennen können, ohne sich die Ist-Buchung dazu nochmal zu holen.
+   * Fehlend zählt als `automatisch`.
+   */
+  readonly kategorieHerkunft?: "automatisch" | "manuell";
+  /**
    * Trägt die Buchung eine Aufteilung? Dann hat sie mehrere Kategorien und taugt weder
    * als Trainingsbeispiel noch als Ziel eines automatischen Laufs.
    */
