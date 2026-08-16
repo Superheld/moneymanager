@@ -8,6 +8,7 @@ import { beforeAll, describe, it, expect } from "vitest";
 import { createRequire } from "node:module";
 import initSqlJs, { type SqlJsStatic, type Database } from "sql.js";
 import { MIGRATIONS } from "./migrations";
+import { migrate, type MigrationsDb } from "./db";
 
 const require = createRequire(import.meta.url);
 let SQL: SqlJsStatic;
@@ -151,5 +152,74 @@ describe("Versionsschema", () => {
     const versionen = MIGRATIONS.map((m) => m.version);
     expect(versionen).toEqual([...versionen].sort((a, b) => a - b));
     expect(new Set(versionen).size).toBe(versionen.length);
+  });
+});
+
+/**
+ * Tests für `migrate()` selbst — die Funktion, die in der App läuft. Die Tests darüber
+ * bilden das Anwenden nach; hier geht es um das, was NUR migrate() macht: Versionsstand
+ * führen und einen Abbruch überstehen.
+ */
+describe("migrate() gegen echtes SQLite", () => {
+  /** Minimaler MigrationsDb-Adapter auf sql.js — dasselbe, was tauri-plugin-sql liefert. */
+  function adapter(db: Database): MigrationsDb {
+    return {
+      async execute(sql: string, werte: unknown[] = []) {
+        db.run(sql, Object.fromEntries(werte.map((w, i) => [`$${i + 1}`, w as never])));
+      },
+      async select<T>(sql: string): Promise<T> {
+        const r = db.exec(sql);
+        if (!r.length) return [] as unknown as T;
+        return r[0].values.map((row) =>
+          Object.fromEntries(r[0].columns.map((c, i) => [c, row[i]])),
+        ) as unknown as T;
+      },
+    };
+  }
+
+  const version = (db: Database) =>
+    Number(db.exec("SELECT COALESCE(MAX(version), 0) FROM _migration")[0].values[0][0]);
+
+  it("zieht eine frische Datenbank auf den letzten Stand", async () => {
+    const db = new SQL.Database();
+    await migrate(adapter(db));
+    // migrate() führt zusätzlich seine eigene Versionstabelle — apply() oben tut das nicht.
+    expect(tabellen(db)).toEqual(["_migration", ...ERWARTETE_TABELLEN]);
+    expect(version(db)).toBe(MIGRATIONS[MIGRATIONS.length - 1].version);
+    db.close();
+  });
+
+  it("läuft ein zweites Mal folgenlos durch", async () => {
+    const db = new SQL.Database();
+    await migrate(adapter(db));
+    await migrate(adapter(db)); // darf nicht werfen
+    expect(tabellen(db)).toEqual(["_migration", ...ERWARTETE_TABELLEN]);
+    db.close();
+  });
+
+  /**
+   * Der Fall, für den früher eine Scheintransaktion hier stand: v11 fügt ZWEI Spalten
+   * hinzu. Bricht es nach der ersten ab, steht die Version nicht — und der nächste Start
+   * lief in „duplicate column name" und ließ die App dauerhaft nicht mehr hochkommen.
+   * Eine echte Transaktion ist über tauri-plugin-sql nicht zu haben (Pool, siehe db.ts),
+   * also muss das Wiederholen selbst folgenlos sein.
+   */
+  it("übersteht eine mittendrin abgebrochene Migration", async () => {
+    const db = new SQL.Database();
+    apply(db, 0, 10);
+    db.run("CREATE TABLE IF NOT EXISTS _migration (version INTEGER PRIMARY KEY)");
+    for (const m of MIGRATIONS) {
+      if (m.version <= 10) db.run(`INSERT INTO _migration (version) VALUES (${m.version})`);
+    }
+    // v11 halb ausgeführt: erste Spalte da, Versionseintrag fehlt.
+    db.run("ALTER TABLE ist_buchung ADD COLUMN transfer_id TEXT");
+
+    await migrate(adapter(db));
+
+    expect(spalten(db, "ist_buchung")).toEqual(
+      expect.arrayContaining(["transfer_id", "gegenkonto_id"]),
+    );
+    expect(version(db)).toBe(MIGRATIONS[MIGRATIONS.length - 1].version);
+    db.close();
   });
 });
