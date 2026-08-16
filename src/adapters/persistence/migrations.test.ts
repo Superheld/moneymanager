@@ -45,7 +45,7 @@ function indexExistiert(db: Database, name: string): boolean {
 
 const ERWARTETE_TABELLEN = [
   "budget", "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
-  "ist_buchung_aufteilung", "kategorie", "person", "szenario", "szenario_posten", "topf",
+  "ist_buchung_aufteilung", "kategorie", "person", "topf",
   "umsatz", "vertrag", "zahlungskonto", "zahlungsregel",
 ];
 
@@ -66,8 +66,6 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     expect(spalten(db, "zahlungsregel")).toEqual(
       expect.arrayContaining(["konto_id", "kategorie_id", "vertrag_id"]),
     );
-    // v6 — vom entfallenen Ersatz-Topf; die Spalte bleibt (forward-only), ungenutzt.
-    expect(spalten(db, "topf")).toContain("inventar_id");
     // v17
     expect(spalten(db, "inventargegenstand")).toContain("konto_id");
     // v9/v10/v11/v13
@@ -150,6 +148,32 @@ describe("Inkrementelle Migration von einer älteren DB", () => {
   });
 });
 
+describe("Alpha-Aufräumen (v18)", () => {
+  it("räumt Szenario-Tabellen und Ersatz-Topf-Spalten ab, wenn es sie gab", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 17); // Stand vor dem Aufräumen
+    expect(tabellen(db)).toEqual(expect.arrayContaining(["szenario", "szenario_posten"]));
+    expect(spalten(db, "topf")).toEqual(
+      expect.arrayContaining(["wiederbeschaffung", "nutzungsdauer_monate", "inventar_id"]),
+    );
+
+    apply(db, 17);
+
+    expect(tabellen(db)).not.toContain("szenario");
+    expect(tabellen(db)).not.toContain("szenario_posten");
+    expect(spalten(db, "topf")).toEqual(["id", "typ", "bezeichnung", "start", "kategorie_id", "schaetzbetrag", "frist_monate", "zufuehrung_pro_monat", "sparziel"]);
+    db.close();
+  });
+
+  // Was bleiben MUSS: die Entnahme-Verwendung trägt Puffer und Spartopf.
+  it("lässt verwendung_topf_id an der Ist-Buchung stehen", () => {
+    const db = new SQL.Database();
+    apply(db);
+    expect(spalten(db, "ist_buchung")).toContain("verwendung_topf_id");
+    db.close();
+  });
+});
+
 describe("Versionsschema", () => {
   it("hat streng aufsteigende, eindeutige Versionen", () => {
     const versionen = MIGRATIONS.map((m) => m.version);
@@ -207,6 +231,31 @@ describe("migrate() gegen echtes SQLite", () => {
    * Eine echte Transaktion ist über tauri-plugin-sql nicht zu haben (Pool, siehe db.ts),
    * also muss das Wiederholen selbst folgenlos sein.
    */
+  /**
+   * v18 nimmt weg statt hinzuzufügen — dieselbe Wiederholbarkeit muss auch dann halten.
+   * `DROP TABLE` trägt `IF EXISTS`, für `DROP COLUMN` hat SQLite kein Gegenstück; das
+   * fängt migrate() über PRAGMA table_info ab. Ohne diese Prüfung stünde nach einem
+   * Abbruch dauerhaft „no such column" zwischen der App und ihren Daten.
+   */
+  it("übersteht ein mittendrin abgebrochenes Aufräumen", async () => {
+    const db = new SQL.Database();
+    apply(db, 0, 17);
+    db.run("CREATE TABLE IF NOT EXISTS _migration (version INTEGER PRIMARY KEY)");
+    for (const m of MIGRATIONS) {
+      if (m.version <= 17) db.run(`INSERT INTO _migration (version) VALUES (${m.version})`);
+    }
+    // v18 halb ausgeführt: eine Tabelle und eine Spalte schon weg, Versionseintrag fehlt.
+    db.run("DROP TABLE szenario_posten");
+    db.run("ALTER TABLE topf DROP COLUMN wiederbeschaffung");
+
+    await migrate(adapter(db));
+
+    expect(tabellen(db)).not.toContain("szenario");
+    expect(spalten(db, "topf")).not.toContain("inventar_id");
+    expect(version(db)).toBe(MIGRATIONS[MIGRATIONS.length - 1].version);
+    db.close();
+  });
+
   it("übersteht eine mittendrin abgebrochene Migration", async () => {
     const db = new SQL.Database();
     apply(db, 0, 10);
