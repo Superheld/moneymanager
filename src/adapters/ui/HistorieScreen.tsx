@@ -29,6 +29,12 @@ type Zeitraum = "12" | "24" | "jahr" | "alles";
 function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId, renderDetail, monate = 1 }: { titel: string; items: KategorieSumme[]; ohneLabel?: string; onSelect?: (id: string, name: string) => void; aktivId?: string; renderDetail?: (id: string) => ReactNode; monate?: number }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  /** „450,00 € · Ø 37,50" — der Schnitt steht bei der Zahl, mit der er sich vergleicht. */
+  const mitSchnitt = (summe: number) =>
+    monate > 1
+      ? `${geld.formatMitSymbol(summe, { mitVorzeichen: true })} · Ø ${geld.format(Math.round(summe / monate))}`
+      : geld.formatMitSymbol(summe, { mitVorzeichen: true });
+
   if (items.length === 0) return null;
   const maxAbs = Math.max(1, ...items.map((i) => Math.abs(i.summe)));
   const summe = items.reduce((s, i) => s + i.summe, 0);
@@ -51,8 +57,8 @@ function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId, renderDe
               value={Math.abs(i.summe)}
               max={maxAbs}
               over={false}
-              label={`${aktiv ? "▾ " : "▸ "}${i.kategorieId ? i.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${i.anzahl}${monate > 1 ? ` · Ø ${geld.format(Math.round(i.summe / monate))}` : ""}`}
-              right={geld.formatMitSymbol(i.summe, { mitVorzeichen: true })}
+              label={`${aktiv ? "▾ " : "▸ "}${i.kategorieId ? i.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${i.anzahl}`}
+              right={mitSchnitt(i.summe)}
             />
             {aktiv && renderDetail && i.kategorieId && renderDetail(i.kategorieId)}
           </div>
@@ -80,6 +86,12 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  /** „450,00 € · Ø 37,50" — der Schnitt steht bei der Zahl, mit der er sich vergleicht. */
+  const mitSchnitt = (summe: number) =>
+    monate > 1
+      ? `${geld.formatMitSymbol(summe, { mitVorzeichen: true })} · Ø ${geld.format(Math.round(summe / monate))}`
+      : geld.formatMitSymbol(summe, { mitVorzeichen: true });
+
   if (gruppen.length === 0) return null;
   const maxAbs = Math.max(1, ...gruppen.map((g) => Math.abs(g.summe)));
   const summe = gruppen.reduce((s, g) => s + g.summe, 0);
@@ -103,8 +115,8 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
                 value={Math.abs(g.summe)}
                 max={maxAbs}
                 over={false}
-                label={`${offen ? "▾ " : "▸ "}${g.kategorieId ? g.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${g.anzahl}${monate > 1 ? ` · Ø ${geld.format(Math.round(g.summe / monate))}` : ""}`}
-                right={geld.formatMitSymbol(g.summe, { mitVorzeichen: true })}
+                label={`${offen ? "▾ " : "▸ "}${g.kategorieId ? g.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${g.anzahl}`}
+                right={mitSchnitt(g.summe)}
               />
             </div>
             {offen && (
@@ -121,8 +133,8 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
                           value={Math.abs(k.summe)}
                           max={Math.max(1, ...g.kinder.map((x) => Math.abs(x.summe)))}
                           over={false}
-                          label={`${katOffen ? "▾ " : "▸ "}${k.kategorieId ? k.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${k.anzahl}${monate > 1 ? ` · Ø ${geld.format(Math.round(k.summe / monate))}` : ""}`}
-                          right={geld.formatMitSymbol(k.summe, { mitVorzeichen: true })}
+                          label={`${katOffen ? "▾ " : "▸ "}${k.kategorieId ? k.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${k.anzahl}`}
+                          right={mitSchnitt(k.summe)}
                         />
                       </div>
                       {katOffen && k.kategorieId && renderDetail(k.kategorieId)}
