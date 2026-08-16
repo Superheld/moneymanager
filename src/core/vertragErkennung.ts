@@ -34,21 +34,32 @@ export interface Zahlungsspur {
   readonly gegenpartei: string;
   readonly glaeubigerId?: string;
   readonly kategorieId?: string;
+  /** Konto, über das die Zahlung lief — der Vorschlag reicht es an die Maske durch. */
+  readonly kontoId?: string;
   /**
-   * Nur `Aufwand` kann ein Vertrag sein. Ohne diese Prüfung stand auf echten Daten das
-   * eigene „Tagesgeldkonto" als Vertragsvorschlag in der Liste: eine monatliche
-   * Umbuchung aufs Sparkonto ist perfekt regelmäßig — und trotzdem keine Ausgabe,
-   * sondern eigenes Geld, das nur den Platz wechselt.
+   * `Aufwand` und `Ertrag` können ein Vertrag sein, `Umschichtung` nicht. Ohne diese
+   * Prüfung stand auf echten Daten das eigene „Tagesgeldkonto" als Vertragsvorschlag
+   * in der Liste: eine monatliche Umbuchung aufs Sparkonto ist perfekt regelmäßig —
+   * und trotzdem keine Zahlung an jemanden, sondern eigenes Geld, das den Platz wechselt.
    */
   readonly charakter: "Aufwand" | "Ertrag" | "Umschichtung";
 }
 
 export interface Vertragskandidat {
-  /** Gruppierungsschlüssel (Gläubiger-ID oder normalisierter Name) — stabil über Läufe. */
+  /**
+   * Gruppierungsschlüssel (Gläubiger-ID oder normalisierter Name) — stabil über Läufe,
+   * denn er trägt den Merkzettel der weggeklickten Vorschläge. Einnahmen bekommen das
+   * Präfix `+`: derselbe Name kann in beide Richtungen zahlen (Arbeitgeber, der auch
+   * Rechnungen stellt), und zwei Richtungen in einer Gruppe ergäben Unsinn. Nur die
+   * Einnahmen tragen das Präfix, damit die bereits weggeklickten Ausgaben-Vorschläge
+   * nicht alle zurückkommen.
+   */
   readonly schluessel: string;
   /** Anzeigename: der längste tatsächlich vorkommende Empfängername der Gruppe. */
   readonly anbieter: string;
   readonly glaeubigerId?: string;
+  /** `Aufwand` (Abfluss) oder `Ertrag` (Zufluss) — belegt in der Maske den Charakter vor. */
+  readonly charakter: "Aufwand" | "Ertrag";
   readonly rhythmus: Rhythmus;
   /** Median der Beträge, positiv (Betragshöhe, nicht Richtung). */
   readonly betrag: Cent;
@@ -68,6 +79,8 @@ export interface Vertragskandidat {
   readonly laeuft: boolean;
   /** Häufigste Kategorie der Gruppe, sofern eine gesetzt ist. */
   readonly kategorieId?: string;
+  /** Konto, über das die Gruppe überwiegend lief — Vorbelegung der Maske. */
+  readonly kontoId?: string;
   readonly buchungIds: readonly string[];
 }
 
@@ -130,8 +143,13 @@ function rhythmusAus(tage: number): Rhythmus | null {
  * Findet Vertragskandidaten in `spuren`. `heute` entscheidet nur darüber, was noch als
  * laufend gilt — die Erkennung selbst ist zeitunabhängig.
  *
- * Nur Abflüsse: eine Gehaltszahlung ist zwar regelmäßig, aber kein Vertrag, den man
- * kündigt. Einnahmen-Verträge legt man weiter von Hand an.
+ * Beide Richtungen: Abflüsse (Aufwand) sind der Regelfall, Zuflüsse (Ertrag) der zweite
+ * — Gehalt, Miete aus Vermietung, Kindergeld. Kündbar ist so eine Einnahme meist nicht,
+ * aber der Vertrag ist trotzdem die Stelle, an der sie in die Planung kommt; sonst
+ * müsste man genau die größten Posten von Hand abtippen.
+ *
+ * Nur `Umschichtung` bleibt draußen: eine Umbuchung aufs eigene Tagesgeldkonto ist
+ * perfekt regelmäßig und trotzdem kein Vertrag.
  */
 export function vertragskandidaten(
   spuren: readonly Zahlungsspur[],
@@ -142,11 +160,19 @@ export function vertragskandidaten(
 
   const gruppen = new Map<string, Zahlungsspur[]>();
   for (const s of spuren) {
-    if (s.betrag >= 0 || s.charakter !== "Aufwand") continue;
+    // Richtung und Charakter müssen zusammenpassen: eine Rückerstattung auf einer
+    // Aufwands-Kategorie ist ein Zufluss und gehört nicht in die Ausgaben-Reihe.
+    const richtung = s.charakter === "Aufwand" && s.betrag < 0
+      ? "Aufwand"
+      : s.charakter === "Ertrag" && s.betrag > 0
+        ? "Ertrag"
+        : null;
+    if (!richtung) continue;
     const name = s.gegenpartei.trim();
     if (!name && !s.glaeubigerId) continue;
-    const schluessel = s.glaeubigerId?.trim() || anbieterSchluessel(name);
-    if (!schluessel) continue;
+    const basis = s.glaeubigerId?.trim() || anbieterSchluessel(name);
+    if (!basis) continue;
+    const schluessel = richtung === "Ertrag" ? `+${basis}` : basis;
     const liste = gruppen.get(schluessel);
     if (liste) liste.push(s);
     else gruppen.set(schluessel, [s]);
@@ -221,6 +247,8 @@ function auswerten(
     schluessel,
     anbieter: anzeigename(sortiert),
     glaeubigerId: sortiert.find((s) => s.glaeubigerId)?.glaeubigerId,
+    // Die Gruppe ist richtungsrein (siehe Gruppierung) — die erste Spur entscheidet.
+    charakter: sortiert[0].charakter === "Ertrag" ? "Ertrag" : "Aufwand",
     rhythmus,
     betrag: medianBetrag,
     betragStabilitaet: stabil / betraege.length,
@@ -228,7 +256,8 @@ function auswerten(
     ersteZahlung: termine[0],
     letzteZahlung: letzte,
     laeuft,
-    kategorieId: haeufigsteKategorie(sortiert),
+    kategorieId: haeufigster(sortiert, (s) => s.kategorieId),
+    kontoId: haeufigster(sortiert, (s) => s.kontoId),
     buchungIds: sortiert.map((s) => s.id),
   };
 }
@@ -255,10 +284,19 @@ function anzeigename(gruppe: Zahlungsspur[]): string {
   return bester;
 }
 
-function haeufigsteKategorie(gruppe: Zahlungsspur[]): string | undefined {
+/**
+ * Häufigster Wert eines Merkmals in der Gruppe (Kategorie, Konto). Ein Vertrag läuft in
+ * aller Regel über EIN Konto und EINE Kategorie; ein Ausreißer (einmal von Hand vom
+ * anderen Konto gezahlt) soll die Vorbelegung nicht kippen.
+ */
+function haeufigster(
+  gruppe: Zahlungsspur[],
+  merkmal: (s: Zahlungsspur) => string | undefined,
+): string | undefined {
   const zaehler = new Map<string, number>();
   for (const s of gruppe) {
-    if (s.kategorieId) zaehler.set(s.kategorieId, (zaehler.get(s.kategorieId) ?? 0) + 1);
+    const wert = merkmal(s);
+    if (wert) zaehler.set(wert, (zaehler.get(wert) ?? 0) + 1);
   }
   let bester: string | undefined;
   let besteZahl = 0;

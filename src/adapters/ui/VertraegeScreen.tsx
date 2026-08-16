@@ -111,8 +111,11 @@ export function VertraegeScreen() {
     setBeginn(k.ersteZahlung);
     setBetragText(String(minorZuMajor(k.betrag, geld.waehrung)));
     setRhythmus(k.rhythmus);
-    setCharakter("Aufwand");
+    setCharakter(k.charakter);
     if (k.kategorieId) setKategorieId(k.kategorieId);
+    // Das Konto, über das die erkannten Zahlungen tatsächlich liefen — steht in den
+    // Buchungen und muss nicht noch einmal gesucht werden.
+    if (k.kontoId) setKontoId(k.kontoId);
   }
 
   async function vorschlagVerwerfen(k: Vertragskandidat) {
@@ -239,6 +242,14 @@ export function VertraegeScreen() {
             pageSize={10}
             columns={[
               { key: "anbieter", label: t("vertraege.spalteAnbieter"), render: (k: Vertragskandidat) => k.anbieter },
+              {
+                key: "charakter",
+                label: t("vertraege.spalteCharakter"),
+                sortValue: (k: Vertragskandidat) => k.charakter,
+                render: (k: Vertragskandidat) => (
+                  <Pill variant={CHARAKTER_PILL[k.charakter]}>{t(`charakter.${k.charakter}`)}</Pill>
+                ),
+              },
               { key: "rhythmus", label: t("vertraege.spalteRhythmus"), render: (k: Vertragskandidat) => t(`vertraege.rhythmus.${k.rhythmus}`) },
               {
                 key: "betrag",

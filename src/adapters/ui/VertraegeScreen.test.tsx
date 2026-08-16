@@ -54,6 +54,22 @@ async function monatsreihe(praefix: string, gegenpartei: string, betrag: number,
   }
 }
 
+/** Dieselbe Reihe als Eingang: positiver Betrag, Charakter Ertrag (Gehalt). */
+async function einnahmereihe(praefix: string, gegenpartei: string, betrag: number, n = 12) {
+  for (let i = 0; i < n; i++) {
+    const id = `${praefix}-${i}`;
+    const datum = tagVor(i * 30);
+    await sqliteLedgerRepository.speichern({
+      id, datum, betrag, kontoId: "k1", charakter: "Ertrag", quelle: "import",
+    });
+    await sqliteUmsatzRepository.speichern({
+      id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
+      betrag, waehrung: "EUR", gegenpartei, verwendungszweck: "",
+      rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
+    });
+  }
+}
+
 async function konto() {
   await sqliteZahlungskontoRepository.speichern({
     id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 250000,
@@ -124,6 +140,35 @@ describe("VertraegeScreen — Vorschläge", () => {
     expect(regeln).toHaveLength(1);
     expect(regeln[0].betrag).toBe(-1650);
     expect(regeln[0].rhythmus).toBe("monatlich");
+  });
+
+  /**
+   * Einnahmen laufen durch dieselbe Naht wie Ausgaben, nur mit umgekehrtem Vorzeichen.
+   * Der Test geht bis in die Regel, weil erst dort sichtbar wird, ob der Charakter das
+   * Vorzeichen richtig dreht: ein Gehalt mit negativem Betrag verschöbe die gesamte
+   * Liquiditätsplanung.
+   */
+  it("erkennt ein Gehalt und legt es als Ertrag mit erkanntem Konto an", async () => {
+    await konto();
+    await einnahmereihe("g", "Musterfirma AG", 250000);
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Musterfirma AG");
+
+    await nutzer.click(screen.getByRole("button", { name: /übernehmen/i }));
+    await waitFor(() => expect(screen.getByDisplayValue("Musterfirma AG")).toBeInTheDocument());
+    // Konto und Charakter stehen vorbelegt; geprüft wird das unten an der gespeicherten
+    // Regel — die Maske könnte sie sonst anzeigen, ohne sie zu übernehmen.
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      expect(await sqliteVertragRepository.alle()).toHaveLength(1);
+    });
+    const regeln = await sqliteZahlungsregelRepository.alle();
+    expect(regeln[0].betrag).toBe(250000);
+    expect(regeln[0].charakter).toBe("Ertrag");
+    expect(regeln[0].kontoId).toBe("k1");
   });
 
   /** Ein erfasster Vertrag darf nicht weiter als Vorschlag erscheinen. */
