@@ -1,0 +1,8 @@
+# Werkzeugstände dieses Projekts. mise aktiviert sie beim Betreten des Verzeichnisses;
+# ~/Projekte steht in den trusted_config_paths, es braucht kein zusätzliches `mise trust`.
+#
+# Node 26: Die CI läuft auf derselben Hauptversion (.github/workflows/ci.yml) — die
+# Version steht an zwei Stellen, weil GitHub Actions keine mise.toml liest. Wer sie hier
+# hebt, hebt sie dort mit.
+[tools]
+node = "26"
