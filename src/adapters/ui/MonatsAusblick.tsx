@@ -91,6 +91,8 @@ function AusblickKarte({
   const [offen, setOffen] = useState<string | null>(null);
   const zweiSpalten = !ausblick.zukunft;
   const monatName = t(`${MONATSNAMEN_KEY}.${ausblick.monat}`);
+  /** Die eine Zahl unter dem Strich. */
+  const bleibt = ausblick.zukunft ? ausblick.restPlan : (ausblick.restIst ?? 0);
 
   return (
     <Card
@@ -109,37 +111,51 @@ function AusblickKarte({
         </div>
       )}
 
-      {ausblick.zeilen.map((z) => (
+      {ausblick.zeilen.map((z, i) => (
         <ZeileMitPosten
           key={z.id}
           zeile={z}
           zweiSpalten={zweiSpalten}
+          letzte={i === ausblick.zeilen.length - 1}
           offen={offen === z.id}
           onToggle={() => setOffen((cur) => (cur === z.id ? null : z.id))}
           kategorieName={kategorieName}
         />
       ))}
 
-      {/* Der Strich unter der Rechnung. */}
+      {/* Unter dem Strich EINE Zahl: im laufenden Monat das Gebuchte (die Realität),
+          in der Vorschau der Plan. Die jeweils andere Sicht steht klein darunter als
+          Abstand zum Plan — zwei fette Zahlen nebeneinander lasen sich unruhig.
+          Der Strich ist die Trennlinie der letzten Zeile; ein eigener kam als zweite
+          Linie direkt darüber zu liegen. */}
       <div
         style={{
           ...zeileGrid(zweiSpalten),
-          borderTop: "2px solid var(--line)",
-          marginTop: "var(--sp-2)",
-          paddingTop: "var(--sp-3)",
+          marginTop: "var(--sp-3)",
           fontWeight: "var(--fw-black)",
           fontSize: "var(--fs-body)",
+          alignItems: "start",
         }}
       >
         <span>{t("ausblick.bleibt")}</span>
-        <span className="num" style={{ textAlign: "right", color: farbe(ausblick.restPlan) }}>
-          {geld.formatMitSymbol(ausblick.restPlan, { mitVorzeichen: true })}
-        </span>
-        {zweiSpalten && (
-          <span className="num" style={{ textAlign: "right", color: farbe(ausblick.restIst ?? 0) }}>
-            {geld.formatMitSymbol(ausblick.restIst ?? 0, { mitVorzeichen: true })}
+        <span style={{ gridColumn: zweiSpalten ? "2 / span 2" : "2", textAlign: "right" }}>
+          <span className="num" style={{ color: farbe(bleibt) }}>
+            {geld.formatMitSymbol(bleibt, { mitVorzeichen: true })}
           </span>
-        )}
+          {zweiSpalten && (
+            <span
+              style={{
+                display: "block",
+                fontSize: "var(--fs-2xs)",
+                fontWeight: "var(--fw-semi)",
+                color: "var(--ink-3)",
+                marginTop: 2,
+              }}
+            >
+              {t("ausblick.vsPlan", { betrag: geld.formatMitSymbol(bleibt - ausblick.restPlan, { mitVorzeichen: true }) })}
+            </span>
+          )}
+        </span>
       </div>
     </Card>
   );
@@ -148,12 +164,15 @@ function AusblickKarte({
 function ZeileMitPosten({
   zeile,
   zweiSpalten,
+  letzte,
   offen,
   onToggle,
   kategorieName,
 }: {
   zeile: AusblickZeile;
   zweiSpalten: boolean;
+  /** Die unterste Zeile trägt den Strich, gegen den „Bleibt" gerechnet wird. */
+  letzte: boolean;
   offen: boolean;
   onToggle: () => void;
   kategorieName: Map<string, string>;
@@ -173,12 +192,13 @@ function ZeileMitPosten({
         style={{
           ...zeileGrid(zweiSpalten),
           padding: "9px 0",
-          borderBottom: "1px solid var(--line-soft)",
+          borderBottom: `1px solid ${letzte ? "var(--line)" : "var(--line-soft)"}`,
           cursor: aufklappbar ? "pointer" : "default",
           fontSize: "13.5px",
+          background: offen ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent",
         }}
       >
-        <span style={{ fontWeight: "var(--fw-semi)", color: "var(--ink-2)" }}>
+        <span style={{ fontWeight: "var(--fw-semi)", color: "var(--ink-2)", ...gekappt }}>
           {aufklappbar && <span style={{ color: "var(--ink-3)", marginRight: 6 }}>{offen ? "▾" : "▸"}</span>}
           {t(`ausblick.zeile.${zeile.id}`)}
         </span>
@@ -193,7 +213,16 @@ function ZeileMitPosten({
       </div>
 
       {offen && (
-        <div style={{ padding: "6px 0 10px 14px", borderLeft: "2px solid var(--line-soft)", marginLeft: 4 }}>
+        // Dieselbe Fläche wie beim Aufklappen in der Historie. Der negative Rand hebt das
+        // Innenpolster wieder auf, damit die Beträge mit denen der Zeile darüber fluchten.
+        <div
+          style={{
+            background: "var(--surface-2, rgba(0,0,0,.015))",
+            borderRadius: "var(--r-md)",
+            padding: "4px 8px",
+            margin: "4px -8px 10px",
+          }}
+        >
           {zeile.id === "budgets"
             ? zeile.posten.map((p) => (
                 <BudgetPosten key={p.schluessel} posten={p} name={kategorieName.get(p.bezeichnung) ?? p.bezeichnung} zeigeIst={zweiSpalten} />
@@ -224,10 +253,13 @@ function PlanPosten({
 
   return (
     <div style={{ ...zeileGrid(zweiSpalten), padding: "5px 0", fontSize: "12.5px", alignItems: "baseline" }}>
-      <span style={{ minWidth: 0, color: "var(--ink-2)" }}>
-        {posten.datum && <span style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", marginRight: 6 }}>{tagVon(posten.datum)}</span>}
-        <span style={{ opacity: erledigt ? 0.72 : 1 }}>{name}</span>
-        {posten.status === "bezahlt" && <Pill variant="ok" style={{ marginLeft: 6 }}>{t("ausblick.statusBezahlt")}</Pill>}
+      {/* Anbieternamen aus dem Import sind lang („SWB - Service - Wohnungsvermietungs-
+          und -baugesellschaft mbH"). Eine Zeile, abgeschnitten; der volle Name steht im
+          title — umbrechend zerlegte er die Karte. */}
+      <span style={{ color: "var(--ink-2)", display: "flex", alignItems: "baseline", gap: 6, ...gekappt }} title={name}>
+        {posten.datum && <span style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>{tagVon(posten.datum)}</span>}
+        <span style={{ opacity: erledigt ? 0.72 : 1, ...gekappt }}>{name}</span>
+        {posten.status === "bezahlt" && <Pill variant="ok" style={{ marginLeft: 0 }}>{t("ausblick.statusBezahlt")}</Pill>}
       </span>
       <span className="num" style={{ textAlign: "right", color: "var(--ink-3)" }}>
         {posten.plan === 0 ? "—" : geld.format(posten.plan, { mitVorzeichen: true })}
@@ -264,13 +296,26 @@ function BudgetPosten({ posten, name, zeigeIst }: { posten: AusblickPosten; name
   );
 }
 
-/** Drei Spalten im laufenden Monat (Label · Plan · Ist), sonst zwei. */
+/**
+ * Drei Spalten im laufenden Monat (Label · Plan · Ist), sonst zwei. Die Zahlenspalten
+ * haben eine FESTE Breite: mit `auto` bemaß sich jede Karte an ihrem eigenen längsten
+ * Betrag, und die drei Karten standen sichtbar gegeneinander versetzt. 88px trägt
+ * „−9.999,99" bei tabellarischen Ziffern.
+ */
 const zeileGrid = (zweiSpalten: boolean) => ({
   display: "grid",
-  gridTemplateColumns: zweiSpalten ? "1fr auto auto" : "1fr auto",
+  gridTemplateColumns: zweiSpalten ? "1fr 88px 88px" : "1fr 88px",
   columnGap: "var(--sp-3)",
   alignItems: "center",
 } as const);
+
+/** Einzeilig, überlanger Text mit „…" — braucht in einem Grid das `minWidth: 0`. */
+const gekappt = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+} as const;
 
 const kopfStil = {
   fontSize: "var(--fs-2xs)",
