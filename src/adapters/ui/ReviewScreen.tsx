@@ -16,7 +16,7 @@ import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { Button, Card } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { PageHead } from "./PageHead";
-import { useGeld } from "./EinstellungenProvider";
+import { useGeld } from "./einstellungenKontext";
 
 const SEITE_GROESSE = 100;
 

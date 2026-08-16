@@ -174,3 +174,25 @@ describe("Sichtbare Texte in Komponenten", () => {
     expect(funde).toEqual([]);
   });
 });
+
+/**
+ * Fast Refresh bleibt heil, solange Dateien mit Komponenten NUR Komponenten exportieren.
+ *
+ * Sonst tauscht Vite die Datei nicht partiell aus, sondern lädt die ganze Seite neu —
+ * bei `EinstellungenProvider.tsx` hing daran der halbe UI-Baum, weil fast jeder Screen
+ * daraus importierte. Der Test hält die Trennung fest, damit ein bequemer Export dort
+ * nicht unbemerkt zurückkommt.
+ *
+ * Geprüft wird die Provider-Datei stellvertretend: sie ist die einzige, bei der Hooks und
+ * Komponente historisch zusammenlagen, und die einzige mit dieser Reichweite.
+ */
+describe("Fast Refresh", () => {
+  it("lässt den EinstellungenProvider nur seine Komponente exportieren", () => {
+    const datei = new URL("../adapters/ui/EinstellungenProvider.tsx", import.meta.url).pathname;
+    const exporte = [...readFileSync(datei, "utf8").matchAll(/^export\s+(?:async\s+)?(?:function|const)\s+(\w+)/gm)]
+      .map((m) => m[1]);
+    const keineKomponente = exporte.filter((n) => !/^[A-Z]/.test(n));
+    expect(keineKomponente).toEqual([]);
+    expect(exporte).toContain("EinstellungenProvider");
+  });
+});

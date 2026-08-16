@@ -25,7 +25,7 @@ import {
 import { sqliteImportLaufRepository, sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
 import { Button, Card, DataTable } from "./ds";
 import { PageHead } from "./PageHead";
-import { useGeld } from "./EinstellungenProvider";
+import { useGeld } from "./einstellungenKontext";
 
 const VORSCHAU_MAX = 500;
 type RU = ImportErgebnis["umsaetze"][number];

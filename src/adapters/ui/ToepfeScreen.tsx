@@ -36,7 +36,7 @@ import { PageHead } from "./PageHead";
 import { betont } from "./betonung";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
-import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
+import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 
 type TopfArt = "puffer" | "spartopf";
 
