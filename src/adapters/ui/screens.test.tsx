@@ -232,6 +232,52 @@ describe("HistorieScreen", () => {
       expect(text).toMatch(/vs\./); // Abweichung wird ausgewiesen
     });
   });
+
+  /** Der Weg, der vorher nur über den Konto-Auszug ging: Kategorie → Buchung → Details. */
+  it("öffnet die Buchungsdetails aus einer aufgeklappten Kategorie", async () => {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Sondermüll",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<HistorieScreen />);
+
+    // Kategorie aufklappen …
+    await nutzer.click(await screen.findByText(/Lebensmittel/));
+    // … dann die Buchung darin.
+    await waitFor(() => expect(screen.getAllByTitle(/Buchungsdetails/).length).toBeGreaterThan(0));
+    await nutzer.click(screen.getAllByTitle(/Buchungsdetails/)[0]);
+
+    // Der Detaildialog trägt die Notiz der Buchung.
+    await waitFor(() => expect(document.body.textContent).toMatch(/Sondermüll/));
+  });
+
+  it("bündelt die Auswertung auf Wunsch zu Hauptgruppen", async () => {
+    await grunddaten();
+    await sqliteKategorieRepository.speichern({
+      id: "gruppe1", name: "Lebenshaltung", defaultCharakter: "Aufwand",
+    });
+    await sqliteKategorieRepository.speichern({
+      id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand", elternId: "gruppe1",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<HistorieScreen />);
+
+    await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
+    await nutzer.selectOptions(await screen.findByLabelText("Gliederung"), "gruppe");
+
+    // Jetzt steht die Hauptgruppe da; die Unterkategorie erst nach dem Aufklappen.
+    await waitFor(() => expect(screen.getByText(/Lebenshaltung/)).toBeInTheDocument());
+    expect(screen.queryByText(/Lebensmittel/)).not.toBeInTheDocument();
+
+    await nutzer.click(screen.getByText(/Lebenshaltung/));
+    await waitFor(() => expect(screen.getByText(/Lebensmittel/)).toBeInTheDocument());
+  });
 });
 
 describe("DeckungScreen", () => {
