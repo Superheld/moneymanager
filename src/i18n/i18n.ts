@@ -670,6 +670,36 @@ const de = {
       kategorieWeg: "Kategorie gelöscht",
       aufheben: "aufheben",
     },
+    abgleich: {
+      titel: "5 · Bestand abgleichen",
+      untertitel: "Vorhandene Buchungen mit dem aktuellen Stand der Erkennung durchrechnen",
+      hinweis:
+        "Alles Bisherige wirkt nur nach vorn: ein frisch trainiertes Modell, eine neue Festlegung, eine Kategorie am Vertrag lassen die schon gebuchten Zahlungen unberührt. Der Abgleich rechnet sie neu — und zeigt zuerst, was er ändern würde. Geschrieben wird erst auf Bestätigung.",
+      vorschau: "Vorschau rechnen",
+      rechnet: "rechne …",
+      nichtsZuTun: "Nichts zu ändern — bei {{unveraendert}} Buchungen liefert die Erkennung genau das, was schon dasteht.",
+      aenderungen: "Würden sich ändern",
+      aenderungenMeta: "in {{gruppen}} verschiedenen Übergängen",
+      unveraendert: "Bleiben, wie sie sind",
+      unveraendertMeta: "Erkennung und Bestand stimmen überein",
+      uebergaengeTitel: "Was sich verschieben würde",
+      uebergaengeHinweis:
+        "Nach Übergang zusammengefasst, größter Block zuerst. Die Namen darunter sind Beispiele aus der Gruppe — an ihnen lässt sich beurteilen, ob der Übergang stimmt.",
+      ohneKategorie: "ohne Kategorie",
+      ohneEmpfaenger: "ohne Empfänger",
+      charakterTitel: "Ändern auch ihren Charakter",
+      charakterHinweis:
+        "Bei {{anzahl}} Buchungen ändert sich nicht nur die Sortierung, sondern ob sie erfolgs- oder liquiditätswirksam sind — der Charakter folgt der Zielkategorie. Meist sind das Rückerstattungen, die in eine Ausgabenkategorie wandern und sie dort mindern. Das ist der Teil, der Auswertungen wirklich bewegt.",
+      uebersprungenTitel: "Nicht angefasst",
+      uebersprungen: {
+        handverlesen: "von Hand gesetzt oder aufgeteilt — eine getroffene Entscheidung bleibt stehen",
+        umschichtung: "Umschichtung — eigenes Geld, das das Konto wechselt",
+        ohneVorschlag: "die Erkennung hatte nichts anzubieten",
+      },
+      uebernehmen: "{{anzahl}} Buchungen ändern",
+      schreibt: "schreibe …",
+      fertig: "{{anzahl}} Buchungen geändert.",
+    },
     lernmaterial: {
       titel: "Automatische Kategorisierung",
       untertitel: "Woraus die Erkennung lernt — und was dabei aussortiert wird",
@@ -1585,6 +1615,36 @@ const en: typeof de = {
       spalteAngelegt: "since",
       kategorieWeg: "category deleted",
       aufheben: "remove",
+    },
+    abgleich: {
+      titel: "5 · Reconcile existing bookings",
+      untertitel: "Re-run existing bookings against the current state of the recognition",
+      hinweis:
+        "Everything so far only works going forward: a freshly trained model, a new pin, a category on a contract leave already-booked payments untouched. The reconciliation recomputes them — and shows what it would change first. Nothing is written until you confirm.",
+      vorschau: "Compute preview",
+      rechnet: "computing …",
+      nichtsZuTun: "Nothing to change — for {{unveraendert}} bookings the recognition returns exactly what is already there.",
+      aenderungen: "Would change",
+      aenderungenMeta: "across {{gruppen}} distinct transitions",
+      unveraendert: "Stay as they are",
+      unveraendertMeta: "recognition and stock agree",
+      uebergaengeTitel: "What would move",
+      uebergaengeHinweis:
+        "Grouped by transition, biggest block first. The names below are examples from the group — use them to judge whether the transition is right.",
+      ohneKategorie: "no category",
+      ohneEmpfaenger: "no payee",
+      charakterTitel: "Also change their character",
+      charakterHinweis:
+        "For {{anzahl}} bookings it is not only the sorting that changes but whether they affect profit or liquidity — the character follows the target category. Usually these are refunds moving into an expense category, reducing it. This is the part that actually moves your reports.",
+      uebersprungenTitel: "Left untouched",
+      uebersprungen: {
+        handverlesen: "set by hand or split — a decision that was made stays",
+        umschichtung: "transfer — your own money changing accounts",
+        ohneVorschlag: "the recognition had nothing to offer",
+      },
+      uebernehmen: "Change {{anzahl}} bookings",
+      schreibt: "writing …",
+      fertig: "{{anzahl}} bookings changed.",
     },
     lernmaterial: {
       titel: "Automatic categorisation",

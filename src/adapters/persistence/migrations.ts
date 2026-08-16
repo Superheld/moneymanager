@@ -420,4 +420,29 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 25, // Vertrags-Kategorie NOCHMAL nachtragen — v23 hat es nicht überall getan
+    sql: [
+      // Auf der echten Datenbank stand nach v23 bei allen 16 Verträgen `kategorie_id`
+      // auf NULL, obwohl jeder eine Zahlungsregel MIT Kategorie hatte. Die Erklärung ist
+      // der Entwicklungsbetrieb: die laufende App hat Version 23 verbucht, als die
+      // Migration erst aus dem `ALTER TABLE` bestand — der Nachtrag kam Minuten später
+      // dazu und wurde nie ausgeführt, weil die Version schon stand.
+      //
+      // Die Regel „append-only, bestehende Versionen nie editieren" ist deshalb keine
+      // Förmlichkeit: sie ist der Grund, warum die Reparatur hier steht und nicht in v23.
+      //
+      // Folge ohne diesen Nachtrag: die Vertragsstufe der Kategorisierungs-Kette wäre auf
+      // dem echten Bestand tot — 93 von 738 geprüften Zahlungen fielen durch auf das
+      // Modell, obwohl für sie eine getroffene Zuordnung existiert.
+      //
+      // Wiederholbar wie in v23: `WHERE kategorie_id IS NULL` greift nach dem ersten Lauf
+      // nur noch dort, wo auch die Regel nichts hat, und schreibt wieder NULL.
+      `UPDATE vertrag SET kategorie_id = (
+         SELECT r.kategorie_id FROM zahlungsregel r
+          WHERE r.vertrag_id = vertrag.id AND r.kategorie_id IS NOT NULL
+          LIMIT 1
+       ) WHERE kategorie_id IS NULL`,
+    ],
+  },
 ];
