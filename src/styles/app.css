@@ -110,8 +110,8 @@ body {
   opacity: 0.45;
   cursor: default;
 }
-.nav a .bdg {
-  margin-left: auto;
+/* Kleines Kennzeichen in der Seitenleiste — Navigationseintrag oder Fußzeile. */
+.side .bdg {
   font-size: var(--fs-2xs);
   font-weight: var(--fw-bold);
   color: var(--accent-deep);
@@ -119,6 +119,9 @@ body {
   border-radius: var(--r-pill);
   padding: 0 7px;
   line-height: 1.5;
+}
+.nav a .bdg {
+  margin-left: auto;
 }
 
 .side .foot {
@@ -138,13 +141,6 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--gap-card);
-}
-
-.ctxbar {
-  font-size: var(--fs-sm);
-  color: var(--ink-3);
-  font-weight: var(--fw-semi);
-  margin-bottom: var(--sp-4);
 }
 
 .phead h1 {
@@ -271,4 +267,22 @@ select.field {
 }
 .linkbtn:hover {
   color: var(--warn-deep);
+}
+
+/* --- Monatsausblick: drei Karten im goldenen Schnitt ---
+   Der laufende Monat trägt eine Zahlenspalte mehr und bekommt die breite Seite
+   (38,2 %); die beiden Vorschauen teilen sich den Rest. Eine hälftige Aufteilung
+   liesse den Vorschauen bei 1040 px Screen-Breite nur rund 110 px für die
+   Beschriftung — dort steht dann alles als Ellipse.
+   Unter 900 px stapeln die Karten; nebeneinander wären sie nicht mehr lesbar. */
+.ausblick-karten {
+  display: grid;
+  grid-template-columns: 1.236fr 1fr 1fr;
+  gap: var(--gap-card);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .ausblick-karten {
+    grid-template-columns: 1fr;
+  }
 }

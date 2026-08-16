@@ -1,14 +1,20 @@
-// Finanzguru-CSV-Adapter — die EINZIGE Stelle mit Wissen über das Finanzguru-Format.
+// Finanzguru-Adapter — die EINZIGE Stelle mit Wissen über das Finanzguru-Format.
 // Übersetzt den Export („Alle Buchungen") in kanonische RohUmsätze. Reines Parsen,
-// null Domänenlogik (TAKTIK-IMPORT §6). CSV-Robustheit kommt von papaparse.
+// null Domänenlogik (TAKTIK-IMPORT §6).
 //
-// Eigenheiten der Datei:
-//  - erste Zeile ist Müll („Tabelle 1"), die echte Kopfzeile kommt danach
-//  - Trenner „;", deutsche Beträge („-6,55"), Datum „TT.MM.JJJJ"
-//  - reich an Zusatzspalten: Buchungs-ID (stabil), Analyse-Unterkategorie, Gläubiger-ID
+// **Seit 2026-08-16 xlsx statt CSV** — Finanzguru bietet nichts anderes mehr an. Die
+// Spaltennamen sind dabei unverändert geblieben, die WERTE nicht:
+//  - Datum als Excel-Seriennummer („46251"), nicht mehr „TT.MM.JJJJ"
+//  - Beträge in englischer Notation („-5.3" = −5,30), nicht mehr „-5,30"
+//  - keine Vorspannzeile mehr; Zeile 1 IST die Kopfzeile
+// `parseFgDatum` bleibt als Rückfall für Textdaten stehen — Excel-Zellen können
+// formatiert oder als Text abgelegt sein, und beides kostet hier nichts.
+//
+// Unverändert: reich an Zusatzspalten — Buchungs-ID (stabil), Analyse-Unterkategorie,
+// Gläubiger-ID.
 
-import Papa from "papaparse";
 import { parseBetrag, tageImMonat, toIso, waehrungNachCode, type Cent } from "../../core";
+import { serienDatum, xlsxLesen } from "./xlsx";
 import {
   adapterRegistrieren,
   type ImportErgebnis,
@@ -33,7 +39,11 @@ const SP = {
   umbuchung: "Analyse-Umbuchung",
   buchungsId: "Buchungs-ID",
   splitTyp: "Split-Typ",
+  originalId: "Referenz-Original-ID",
 } as const;
+
+/** Split-Typen, die TEILE einer anderen Buchung sind — nicht die Buchung selbst. */
+const TEIL_TYPEN = new Set(["Teilbuchung", "Restbetrag"]);
 
 type Reihe = Record<string, string>;
 
@@ -55,23 +65,10 @@ function leerZuUndefined(s: string | undefined): string | undefined {
   return t ? t : undefined;
 }
 
-/** Entfernt führende Nicht-Kopf-Zeilen (z. B. „Tabelle 1"), startet bei der echten Kopfzeile. */
-function abKopfzeile(inhalt: string): string {
-  const ohneBom = inhalt.replace(/^﻿/, "");
-  const zeilen = ohneBom.split(/\r?\n/);
-  // Nach den Spaltennamen suchen, nicht nach der Position: `startsWith("Buchungstag;")`
-  // verlangte den Buchungstag als ERSTE Spalte, obwohl sonst überall nach Namen gemappt
-  // wird. Bei umsortierten Spalten meldete erkennt() weiterhin "ja", lies() lieferte dann
-  // null Umsätze und n × "ungültiges Datum" — eine Meldung, die auf die falsche Ursache zeigt.
-  const start = zeilen.findIndex(
-    (z) => z.includes(SP.buchungstag) && z.includes(SP.betrag) && z.includes(";"),
-  );
-  return start <= 0 ? ohneBom : zeilen.slice(start).join("\n");
-}
-
 function reiheZuRohUmsatz(r: Reihe): RohUmsatz | string {
-  const buchungstag = parseFgDatum(r[SP.buchungstag] ?? "");
-  if (!buchungstag) return `Zeile übersprungen: ungültiges Datum „${r[SP.buchungstag] ?? ""}"`;
+  const roh = r[SP.buchungstag] ?? "";
+  const buchungstag = serienDatum(roh) ?? parseFgDatum(roh);
+  if (!buchungstag) return `Zeile übersprungen: ungültiges Datum „${roh}"`;
 
   // Mit der Währung DER ZEILE parsen, nicht mit der EUR-Vorgabe: bei einer Skala-0-
   // Währung (JPY, KWD) läse die Vorgabe "1200" als 120000 Minor Units.
@@ -97,89 +94,95 @@ function reiheZuRohUmsatz(r: Reihe): RohUmsatz | string {
 }
 
 /**
- * Übersetzt strukturelle Parser-Schäden in Warnungen für den Nutzer.
+ * Sucht die Kopfzeile und macht aus den Datenzeilen benannte Reihen.
  *
- * Wichtigster Fall: ein nicht geschlossenes Anführungszeichen („MissingQuotes"). Papaparse
- * liest den gesamten Rest der Datei dann als EIN Feld — ohne diese Auswertung meldet der
- * Import „1 Umsatz, 0 Warnungen", während der Rest der Datei verschwunden ist.
- *
- * Bewusst wird NICHT versucht, die Datei zu retten (etwa durch erneutes Parsen ohne
- * Quoting): Dateien mit legitim gequoteten Feldern — ein Semikolon im Verwendungszweck
- * genügt — würden dabei zerrissen, und aus einem sichtbaren Schaden würde ein stiller.
- * Lieber laut scheitern und den Nutzer die Datei reparieren lassen.
+ * Gesucht wird nach den SPALTENNAMEN, nicht nach Position: die Kopfzeile ist zwar
+ * inzwischen Zeile 1, aber der Adapter mappt überall nach Namen, und eine Datei mit
+ * Vorspann soll daran nicht scheitern. Liefert `null`, wenn keine Kopfzeile zu finden ist.
  */
-function parserWarnungen(nutzteil: string, parsed: Papa.ParseResult<Reihe>): string[] {
-  const warnungen: string[] = [];
-  const gemeldet = new Set<string>();
+function reihen(zeilen: string[][]): Reihe[] | null {
+  const kopfIndex = zeilen.findIndex(
+    (z) => z.includes(SP.buchungstag) && z.includes(SP.betrag),
+  );
+  if (kopfIndex < 0) return null;
 
-  for (const f of parsed.errors) {
-    if (gemeldet.has(f.code)) continue;
-    gemeldet.add(f.code);
-    warnungen.push(
-      f.type === "Quotes"
-        ? "Datei beschädigt: ein Anführungszeichen wird nicht geschlossen — alles danach konnte nicht gelesen werden."
-        : `Datei-Warnung: ${f.message}`,
-    );
-  }
-
-  // Zweiter, unabhängiger Wächter: Datenzeilen zählen. Fängt auch Verluste ab, die
-  // papaparse nicht als Fehler meldet.
-  const datenzeilen = nutzteil
-    .split(/\r?\n/)
-    .slice(1)
-    .filter((z) => z.trim() !== "").length;
-  if (datenzeilen > parsed.data.length) {
-    warnungen.push(
-      `${datenzeilen - parsed.data.length} von ${datenzeilen} Datenzeilen konnten nicht gelesen werden.`,
-    );
-  }
-
-  return warnungen;
+  const kopf = zeilen[kopfIndex];
+  return zeilen
+    .slice(kopfIndex + 1)
+    .filter((z) => z.some((w) => w.trim() !== "")) // Leerzeilen am Blattende
+    .map((z) => Object.fromEntries(kopf.map((name, i) => [name, z[i] ?? ""])));
 }
 
 export const finanzguruAdapter: Quellenadapter = {
   id: ID,
-  name: "Finanzguru-Export (CSV)",
+  name: "Finanzguru-Export (Excel)",
 
-  erkennt(inhalt: string): boolean {
-    const kopf = inhalt.slice(0, 4000).toLowerCase();
-    return kopf.includes("buchungstag;") && kopf.includes("analyse-hauptkategorie");
+  erkennt(datei: Uint8Array): boolean {
+    const zeilen = xlsxLesen(datei);
+    if (!zeilen) return false;
+    // Fingerabdruck über die Kopfzeile, wie zuvor bei CSV — nur ohne Trennzeichen.
+    const kopf = zeilen.slice(0, 20).flat().join("|").toLowerCase();
+    return kopf.includes("buchungstag") && kopf.includes("analyse-hauptkategorie");
   },
 
-  lies(inhalt: string): ImportErgebnis {
-    const nutzteil = abKopfzeile(inhalt);
-    const parsed = Papa.parse<Reihe>(nutzteil, {
-      header: true,
-      delimiter: ";",
-      skipEmptyLines: true,
-    });
+  lies(datei: Uint8Array): ImportErgebnis {
+    const zeilen = xlsxLesen(datei);
+    if (!zeilen) {
+      return { quelle: ID, umsaetze: [], warnungen: ["Die Datei ist keine lesbare Excel-Datei."] };
+    }
+    const daten = reihen(zeilen);
+    if (!daten) {
+      return {
+        quelle: ID,
+        umsaetze: [],
+        warnungen: [`Keine Kopfzeile gefunden — „${SP.buchungstag}" und „${SP.betrag}" fehlen.`],
+      };
+    }
 
     const umsaetze: RohUmsatz[] = [];
-    const warnungen: string[] = [...parserWarnungen(nutzteil, parsed)];
-    let splits = 0;
+    const warnungen: string[] = [];
 
-    // Nur strukturell zerstörte Zeilen werden übersprungen — das sind die Quoting-Fehler:
-    // dort trägt die Zeile den verschluckten Rest der Datei im Feldinhalt und würde den
-    // rohHash vergiften. Ein FieldMismatch (z. B. ein Semikolon im Verwendungszweck)
-    // ist dagegen lesbar und wird nur gemeldet, nicht verworfen.
+    // Split-Buchungen stehen DOPPELT in der Datei: die Originalbuchung mit dem vollen
+    // Betrag UND ihre Teile („Teilbuchung", „Restbetrag"), die zusammen denselben Betrag
+    // ergeben. Wer beides importiert, zählt jeden gesplitteten Umsatz zweimal.
     //
-    // Erkannt wird die betroffene Zeile am eingeschluckten Zeilenumbruch, nicht über
-    // `error.row`: papaparse zählt dort Quellzeilen, nicht den Index in `data` — die
-    // beiden laufen auseinander, sobald eine Zeile mehrere verschluckt.
-    const quotingKaputt = parsed.errors.some((f) => f.type === "Quotes");
+    // Verworfen werden die TEILE, nicht das Original: das Original trägt den Betrag, der
+    // tatsächlich vom Konto ging, und ist der Anker für Saldo und Dedup. Verworfen wird
+    // aber nur, wenn das Original wirklich in dieser Datei steht — bei einem Export mit
+    // Zeitraumfilter kann es fehlen, und dann wäre ein stiller Verlust schlimmer als eine
+    // doppelte Zeile.
+    //
+    // Die Kategorien der Teile gehen dabei verloren. Das Datenmodell trägt sie inzwischen
+    // (S-7, `IstBuchung.aufteilungen`); sie durch die Import-Pipeline zu reichen, ist ein
+    // eigener Schritt.
+    const vorhandeneIds = new Set(daten.map((r) => r[SP.buchungsId]).filter(Boolean));
+    let verworfen = 0;
+    let ohneOriginal = 0;
 
-    for (const r of parsed.data) {
-      if (quotingKaputt && Object.values(r).some((w) => typeof w === "string" && w.includes("\n"))) {
-        continue;
+    for (const r of daten) {
+      const typ = leerZuUndefined(r[SP.splitTyp]);
+      if (typ && TEIL_TYPEN.has(typ)) {
+        const original = leerZuUndefined(r[SP.originalId]);
+        if (original && vorhandeneIds.has(original)) {
+          verworfen++;
+          continue;
+        }
+        ohneOriginal++;
       }
-      if (leerZuUndefined(r[SP.splitTyp])) splits++;
       const ergebnis = reiheZuRohUmsatz(r);
       if (typeof ergebnis === "string") warnungen.push(ergebnis);
       else umsaetze.push(ergebnis);
     }
 
-    if (splits > 0) {
-      warnungen.push(`${splits} Split-Buchung(en) erkannt — Mehrfachzählung wird in Slice 2 behandelt.`);
+    if (verworfen > 0) {
+      warnungen.push(
+        `${verworfen} Teilbuchung(en) übersprungen — sie sind Aufteilungen bereits enthaltener Buchungen und würden doppelt zählen.`,
+      );
+    }
+    if (ohneOriginal > 0) {
+      warnungen.push(
+        `${ohneOriginal} Teilbuchung(en) ohne zugehörige Originalbuchung übernommen — bitte prüfen.`,
+      );
     }
 
     return { quelle: ID, umsaetze, warnungen };

@@ -12,7 +12,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { finanzguruAdapter } from "../../adapters/import/finanzguruAdapter";
-import { textAusPuffer } from "../../adapters/import/dateiText";
+import { xlsxAusZeilen } from "../../test/xlsxBauen";
 import { migrate, type MigrationsDb } from "../../adapters/persistence/db";
 import { MIGRATIONS } from "../../adapters/persistence/migrations";
 import type { Kategorie, Zahlungskonto } from "../../core";
@@ -28,29 +28,34 @@ import { paareUmbuchungen } from "./umsatzVerbuchen";
 // ── Testdaten-Werkzeug ────────────────────────────────────────────────────────────
 
 /** Echte Kopfzeile des Finanzguru-Exports (Spaltenzahl/-reihenfolge wie in der Datei). */
-const KOPF =
-  "Buchungstag;Referenzkonto;Name Referenzkonto;Betrag;Kontostand;Waehrung;" +
-  "Beguenstigter/Auftraggeber;IBAN Beguenstigter/Auftraggeber;Verwendungszweck;E-Ref;" +
-  "Mandatsreferenz;Glaeubiger-ID;Analyse-Hauptkategorie;Analyse-Unterkategorie;" +
-  "Analyse-Vertrag;Analyse-Vertragsturnus;Analyse-Vertrags-ID;Analyse-Umbuchung;" +
-  "Analyse-Vom frei verfuegbaren Einkommen ausgeschlossen;Analyse-Umsatzart;Analyse-Betrag;" +
-  "Analyse-Woche;Analyse-Monat;Analyse-Quartal;Analyse-Jahr;Buchungs-ID;Referenz-Original-ID;Split-Typ";
+const KOPF = [
+  "Buchungstag", "Referenzkonto", "Name Referenzkonto", "Betrag", "Kontostand", "Waehrung",
+  "Beguenstigter/Auftraggeber", "IBAN Beguenstigter/Auftraggeber", "Verwendungszweck", "E-Ref",
+  "Mandatsreferenz", "Glaeubiger-ID", "Analyse-Hauptkategorie", "Analyse-Unterkategorie",
+  "Analyse-Vertrag", "Analyse-Vertragsturnus", "Analyse-Vertrags-ID", "Analyse-Umbuchung",
+  "Analyse-Vom frei verfuegbaren Einkommen ausgeschlossen", "Analyse-Umsatzart", "Analyse-Betrag",
+  "Analyse-Woche", "Analyse-Monat", "Analyse-Quartal", "Analyse-Jahr", "Buchungs-ID",
+  "Referenz-Original-ID", "Split-Typ",
+];
+
+/** Excel-Seriennummer des 01.11.2021 — der Tag, an dem die Testdaten hängen. */
+const T_2021_11_01 = "44501";
 
 function reihe(o: {
   tag?: string; konto?: string; betrag?: string; gegenpartei?: string; zweck?: string;
   unterkat?: string; umbuchung?: string; buchungsId?: string;
-}): string {
+}): string[] {
   const f = (s = "") => s;
   return [
-    f(o.tag), f(o.konto), "Girokonto", f(o.betrag), "63,09", "EUR",
+    f(o.tag), f(o.konto), "Girokonto", f(o.betrag), "63.09", "EUR",
     f(o.gegenpartei), "", f(o.zweck), "", "", "",
     "Essen & Trinken", f(o.unterkat), "nein", "", "", f(o.umbuchung ?? "nein"), "nein", "Kartenzahlung",
     "Ausgaben", "2021-45", "2021-11", "2021-Q4", "2021", f(o.buchungsId), "", "",
-  ].join(";");
+  ];
 }
 
-function csv(...reihen: string[]): string {
-  return ["Tabelle 1", KOPF, ...reihen].join("\n");
+function csv(...reihen: string[][]): Uint8Array {
+  return xlsxAusZeilen([KOPF, ...reihen]);
 }
 
 function roh(over: Partial<RohUmsatz> = {}): RohUmsatz {
@@ -147,53 +152,34 @@ function version(db: Database): number {
   return Number(res?.values[0]?.[0] ?? 0);
 }
 
-// ══ 1. CSV-Parsing: stiller Datenverlust ═══════════════════════════════════════════
+// ══ 1. Datei-Struktur: stiller Datenverlust ════════════════════════════════════════
 
-describe("Finanzguru-Adapter — kaputte CSV-Struktur", () => {
+describe("Finanzguru-Adapter — beschädigte Datei", () => {
   /**
-   * ROT — FUND 1 (hoch): unterminiertes Anführungszeichen frisst den Rest der Datei.
-   * ERWARTET: 3 Buchungen; wenn der Parser nicht alle lesen kann, mindestens eine Warnung.
-   * TATSÄCHLICH: 1 Buchung, `warnungen` ist LEER. Papaparse meldet den Fehler sauber in
-   *   `parsed.errors` ({type:"Quotes", code:"MissingQuotes"}) — finanzguruAdapter.ts:96-111
-   *   liest `parsed.errors` nie aus.
-   * WARUM FALSCH: Der Nutzer sieht „1 Umsatz eingelesen, 0 Warnungen" und hat keine Chance
-   *   zu merken, dass 2 von 3 Buchungen fehlen. Genau das Gegenteil der Zusage in
-   *   rohUmsatz.ts:45-48 („sammelt schlechte Zeilen, damit der Nutzer das Gesamtbild sieht").
+   * Erbe der beiden CSV-Quoting-Tests, die hier standen (FUND 1: ein unterminiertes
+   * Anführungszeichen fraß den Rest der Datei, ohne dass eine Warnung entstand).
+   *
+   * Mit dem Wechsel auf xlsx (2026-08-16) gibt es kein Quoting mehr — die Fundstelle ist
+   * verschwunden, die GEFAHR nicht: eine strukturell kaputte Datei darf nicht als „0
+   * Umsätze, 0 Warnungen" durchgehen. Genau das prüft dieser Test an der neuen Struktur.
    */
-  it("meldet ein unterminiertes Anführungszeichen als Warnung", () => {
-    const erg = finanzguruAdapter.lies(
-      csv(
-        reihe({ tag: "01.11.2021", betrag: "-1,00", gegenpartei: "A", zweck: '"offen' }),
-        reihe({ tag: "02.11.2021", betrag: "-2,00", gegenpartei: "B" }),
-        reihe({ tag: "03.11.2021", betrag: "-3,00", gegenpartei: "C" }),
-      ),
-    );
+  it("meldet eine unlesbare Datei, statt still nichts zu liefern", () => {
+    const abgeschnitten = csv(reihe({ tag: T_2021_11_01, betrag: "-1.00", gegenpartei: "A" })).slice(0, 40);
+    const erg = finanzguruAdapter.lies(abgeschnitten);
+    expect(erg.umsaetze).toHaveLength(0);
     expect(erg.warnungen.length).toBeGreaterThan(0);
   });
 
-  /**
-   * GRÜN seit dem Fix — mit bewusst geänderter Erwartung gegenüber dem Fundzustand.
-   *
-   * Ursprünglich forderte dieser Test, dass alle 3 Zeilen ankommen. Das wäre nur durch
-   * erneutes Parsen ohne Quoting erreichbar und würde Dateien mit legitim gequoteten
-   * Feldern zerreißen — ein Semikolon im Verwendungszweck genügt. Aus einem sichtbaren
-   * Schaden würde damit ein stiller, also das Gegenteil des Fixes.
-   *
-   * Richtig ist: der Verlust wird beziffert gemeldet, und die beschädigte Zeile wird
-   * verworfen statt mit dem verschluckten Rest der Datei im Verwendungszweck importiert
-   * zu werden (dieser Text ginge sonst in den rohHash und machte den Dedup-Schlüssel
-   * unbrauchbar). Die Datei repariert der Nutzer.
-   */
-  it("importiert keine Zeile mit dem verschluckten Rest der Datei im Zweck", () => {
+  it("liest eine intakte Datei vollständig", () => {
     const erg = finanzguruAdapter.lies(
       csv(
-        reihe({ tag: "01.11.2021", betrag: "-1,00", gegenpartei: "A", zweck: '"offen' }),
-        reihe({ tag: "02.11.2021", betrag: "-2,00", gegenpartei: "B" }),
-        reihe({ tag: "03.11.2021", betrag: "-3,00", gegenpartei: "C" }),
+        reihe({ tag: T_2021_11_01, betrag: "-1.00", gegenpartei: "A" }),
+        reihe({ tag: T_2021_11_01, betrag: "-2.00", gegenpartei: "B" }),
+        reihe({ tag: T_2021_11_01, betrag: "-3.00", gegenpartei: "C" }),
       ),
     );
-    for (const u of erg.umsaetze) expect(u.verwendungszweck).not.toContain("02.11.2021");
-    expect(erg.warnungen.join(" ")).toMatch(/Anführungszeichen|Datenzeilen/);
+    expect(erg.umsaetze).toHaveLength(3);
+    expect(erg.warnungen).toHaveLength(0);
   });
 });
 
@@ -212,11 +198,10 @@ describe("Finanzguru-Adapter — Kopfzeilen-Suche", () => {
    *   aus (FG liefert Buchungstag zuerst), bricht aber bei der nächsten Formatänderung.
    */
   it("liest eine Datei mit umsortierten Spalten", () => {
-    const vertauscht = [
-      "Tabelle 1",
-      "Betrag;Buchungstag;Analyse-Hauptkategorie;Analyse-Unterkategorie",
-      "-6,55;01.11.2021;Essen;Lebensmittel",
-    ].join("\n");
+    const vertauscht = xlsxAusZeilen([
+      ["Betrag", "Buchungstag", "Analyse-Hauptkategorie", "Analyse-Unterkategorie"],
+      ["-6.55", T_2021_11_01, "Essen", "Lebensmittel"],
+    ]);
     expect(finanzguruAdapter.erkennt(vertauscht)).toBe(true);
     expect(finanzguruAdapter.lies(vertauscht).umsaetze).toHaveLength(1);
   });
@@ -266,34 +251,21 @@ describe("Betragsparser am Import-Eingang", () => {
   });
 });
 
-describe("Encoding", () => {
+describe("Umlaute", () => {
   /**
-   * ROT — FUND 4 (niedrig): Latin-1-Dateien werden stillschweigend verstümmelt.
-   * ERWARTET: „Müller" bleibt „Müller" — oder es gibt eine Warnung.
-   * TATSÄCHLICH: ImportScreen.tsx:67 liest die Datei mit `datei.text()` (immer UTF-8, ohne
-   *   Fehler). Latin-1-Umlaute werden zu U+FFFD; Adapter und Pipeline merken nichts.
-   * WARUM FALSCH: Gegenpartei/Verwendungszweck sind Suchfelder (ReviewScreen.tsx:72) und
-   *   gehen in den rohHash ein — nach einer Encoding-Korrektur dedupliziert nichts mehr
-   *   gegen die alten Zeilen. Fix gehört in den Datei-Lesepfad, nicht in den Adapter.
+   * Erbe von FUND 4 (Latin-1 wurde beim Lesen stillschweigend verstümmelt). Der Fund
+   * betraf den TEXT-Lesepfad; seit dem Wechsel auf xlsx gibt es ihn hier nicht mehr —
+   * XML ist immer UTF-8. Geprüft wird trotzdem, dass Umlaute die neue Strecke heil
+   * überstehen (ZIP → XML → Entities → Zelle).
+   *
+   * Der Lesepfad selbst hat seinen eigenen Test: `adapters/import/dateiText.test.ts`.
    */
-  // GRÜN seit dem Fix — auf der richtigen Ebene geprüft. Der Adapter kann verstümmelten
-  // Text nicht mehr heilen (die Bytes sind beim Dekodieren bereits verloren); der Fix
-  // gehört in den LESEPFAD. textAusPuffer versucht UTF-8 strikt und fällt sonst auf
-  // Windows-1252 zurück, ImportScreen benutzt ihn.
-  it("verstümmelt Latin-1-Umlaute nicht", () => {
-    const latin1 = Buffer.from(
-      csv(reihe({ tag: "01.11.2021", betrag: "-1,00", gegenpartei: "Müller" })),
-      "latin1",
+  it("liest Umlaute und kaufmännisches Und unverändert", () => {
+    const erg = finanzguruAdapter.lies(
+      csv(reihe({ tag: T_2021_11_01, betrag: "-1.00", gegenpartei: "Müller & Söhne", zweck: "Straße 5" })),
     );
-    const text = textAusPuffer(latin1.buffer.slice(latin1.byteOffset, latin1.byteOffset + latin1.byteLength));
-    const erg = finanzguruAdapter.lies(text);
-    expect(erg.umsaetze[0].gegenpartei).toBe("Müller");
-  });
-
-  it("liest eine saubere UTF-8-Datei unverändert", () => {
-    const utf8 = Buffer.from(csv(reihe({ tag: "01.11.2021", betrag: "-1,00", gegenpartei: "Müller" })), "utf8");
-    const text = textAusPuffer(utf8.buffer.slice(utf8.byteOffset, utf8.byteOffset + utf8.byteLength));
-    expect(finanzguruAdapter.lies(text).umsaetze[0].gegenpartei).toBe("Müller");
+    expect(erg.umsaetze[0].gegenpartei).toBe("Müller & Söhne");
+    expect(erg.umsaetze[0].verwendungszweck).toBe("Straße 5");
   });
 });
 
@@ -583,33 +555,37 @@ describe("Migrationskette", () => {
 
 describe("Standgehalten — kein Fund", () => {
   it("verkraftet leere Datei, reine Kopfzeile und unbekanntes Format ohne Wurf", () => {
-    expect(finanzguruAdapter.lies("").umsaetze).toHaveLength(0);
-    expect(finanzguruAdapter.lies(csv()).umsaetze).toHaveLength(0);
-    expect(finanzguruAdapter.erkennt("")).toBe(false);
-    expect(finanzguruAdapter.erkennt("irgendein;text;ohne;header")).toBe(false);
+    const leer = new Uint8Array(0);
+    expect(finanzguruAdapter.lies(leer).umsaetze).toHaveLength(0);
+    expect(finanzguruAdapter.lies(csv()).umsaetze).toHaveLength(0); // nur Kopfzeile
+    expect(finanzguruAdapter.erkennt(leer)).toBe(false);
+    expect(finanzguruAdapter.erkennt(new TextEncoder().encode("irgendein;text;ohne;header"))).toBe(false);
   });
 
-  it("warnt bei fehlender Betragsspalte pro Zeile, statt sie mit 0 zu verbuchen", () => {
-    const ohneBetragsspalte = ["Tabelle 1", KOPF.replace("Betrag;", "Betrg;"), reihe({ tag: "01.11.2021", betrag: "-1,00" })].join("\n");
-    const erg = finanzguruAdapter.lies(ohneBetragsspalte);
+  it("meldet eine fehlende Betragsspalte, statt Zeilen mit 0 zu verbuchen", () => {
+    // „Betrag" verschrieben → die Kopfzeilen-Suche greift nicht mehr.
+    const verdreht = KOPF.map((n) => (n === "Betrag" ? "Betrg" : n));
+    const erg = finanzguruAdapter.lies(
+      xlsxAusZeilen([verdreht, reihe({ tag: T_2021_11_01, betrag: "-1.00" })]),
+    );
     expect(erg.umsaetze).toHaveLength(0);
-    expect(erg.warnungen.some((w) => w.includes("Betrag"))).toBe(true);
+    expect(erg.warnungen.some((w) => w.includes("Kopfzeile") || w.includes("Betrag"))).toBe(true);
   });
 
-  it("verkraftet BOM und CRLF", () => {
-    const mitBom = "﻿" + csv(reihe({ tag: "01.11.2021", betrag: "-1,00", gegenpartei: "A" }));
-    expect(finanzguruAdapter.erkennt(mitBom)).toBe(true);
-    expect(finanzguruAdapter.lies(mitBom).umsaetze).toHaveLength(1);
-
-    const crlf = csv(reihe({ tag: "01.11.2021", betrag: "-1,00", gegenpartei: "A" })).replace(/\n/g, "\r\n");
-    const erg = finanzguruAdapter.lies(crlf);
+  // BOM und CRLF waren Textdatei-Themen und sind mit dem Wechsel auf xlsx entfallen —
+  // in einem ZIP mit XML gibt es weder das eine noch das andere. An ihre Stelle tritt
+  // die Frage, die bei einem Tabellenblatt wirklich beißt: fehlende Zellen.
+  it("verkraftet Zeilen mit ausgelassenen Zellen", () => {
+    const kurz = reihe({ tag: T_2021_11_01, betrag: "-1.00", gegenpartei: "A" }).slice(0, 10);
+    const erg = finanzguruAdapter.lies(xlsxAusZeilen([KOPF, kurz]));
     expect(erg.umsaetze).toHaveLength(1);
     expect(erg.umsaetze[0].gegenpartei).toBe("A");
+    expect(erg.umsaetze[0].nativeId).toBeUndefined();
   });
 
   it("übersteht sehr lange Zwecke und Sonderzeichen ohne Verlust", () => {
     const zweck = "Ä".repeat(5000) + " '; DROP TABLE umsatz; -- \\   <b>";
-    const erg = finanzguruAdapter.lies(csv(reihe({ tag: "01.11.2021", betrag: "-1,00", gegenpartei: "A", zweck })));
+    const erg = finanzguruAdapter.lies(csv(reihe({ tag: T_2021_11_01, betrag: "-1.00", gegenpartei: "A", zweck })));
     expect(erg.umsaetze[0].verwendungszweck.length).toBeGreaterThan(5000);
     // Der Hash bleibt stabil und trennt weiterhin (Normalisierung nur Case/Whitespace).
     expect(rohHash(roh({ verwendungszweck: zweck }))).not.toBe(rohHash(roh({ verwendungszweck: zweck + "x" })));

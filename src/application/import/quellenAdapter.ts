@@ -1,6 +1,11 @@
 // Quellen-Port (Hexagonal, TAKTIK-IMPORT §6) + eine kleine Registry.
 // Das ist die modulare Naht: ein neuer Importer = ein neues Objekt, das `Quellenadapter`
 // erfüllt und sich registriert. Alles andere im System bleibt unberührt.
+//
+// Der Port reicht ROHE BYTES durch, keinen Text. Binärformate (xlsx = ZIP mit XML) lassen
+// sich nicht sinnvoll als String durchreichen, und die Encoding-Frage gehört ohnehin zum
+// Format: eine CSV-Quelle entscheidet selbst über UTF-8 oder Latin-1 (`dateiText.ts`),
+// eine xlsx-Quelle hat die Frage gar nicht.
 
 import type { ImportErgebnis } from "./rohUmsatz";
 
@@ -10,12 +15,12 @@ export interface Quellenadapter {
   /** Anzeigename für die UI, z. B. „Finanzguru-Export (CSV)". */
   readonly name: string;
   /**
-   * Heuristik: Sieht dieser Inhalt nach meinem Format aus? Für Auto-Erkennung beim
+   * Heuristik: Sieht diese Datei nach meinem Format aus? Für Auto-Erkennung beim
    * Datei-Drop. Soll billig und tolerant sein (Header-Fingerabdruck), nicht voll parsen.
    */
-  erkennt(inhalt: string): boolean;
-  /** Liest den Datei-Inhalt und liefert kanonische RohUmsätze + Warnungen. */
-  lies(inhalt: string): ImportErgebnis;
+  erkennt(datei: Uint8Array): boolean;
+  /** Liest die Datei und liefert kanonische RohUmsätze + Warnungen. */
+  lies(datei: Uint8Array): ImportErgebnis;
 }
 
 const registry = new Map<string, Quellenadapter>();
@@ -36,9 +41,9 @@ export function adapterNach(id: string): Quellenadapter | undefined {
 }
 
 /**
- * Wählt automatisch den passenden Adapter für einen Datei-Inhalt (erster, dessen
- * `erkennt` greift). undefined, wenn keiner passt → UI fragt den Nutzer.
+ * Wählt automatisch den passenden Adapter für eine Datei (erster, dessen `erkennt`
+ * greift). undefined, wenn keiner passt → UI fragt den Nutzer.
  */
-export function waehleAdapter(inhalt: string): Quellenadapter | undefined {
-  return alleAdapter().find((a) => a.erkennt(inhalt));
+export function waehleAdapter(datei: Uint8Array): Quellenadapter | undefined {
+  return alleAdapter().find((a) => a.erkennt(datei));
 }

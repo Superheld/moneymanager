@@ -19,11 +19,9 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { InventarScreen } from "./InventarScreen";
-import { ToepfeScreen } from "./ToepfeScreen";
-import { UeberblickScreen } from "./UeberblickScreen";
+import { BudgetsScreen } from "./BudgetsScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteTopfRepository } from "../persistence/sqliteTopfRepository";
-import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import {
   sqliteKategorieRepository,
   sqliteZahlungskontoRepository,
@@ -62,15 +60,29 @@ async function klicke(nutzer: ReturnType<typeof userEvent.setup>, muster: RegExp
   return letzter;
 }
 
-describe("Töpfe — Formularpfade", () => {
+/** Der aufbauende Teil der Budgets (früher der eigene Töpfe-Screen). */
+describe("Aufbauende Budgets — Formularpfade", () => {
+  /** Wählt im Anlege-Dialog die Art; der Dialog trägt seit der Zusammenlegung beide Fälle. */
+  async function artWaehlen(nutzer: ReturnType<typeof userEvent.setup>, wert: string) {
+    const feld = screen
+      .getAllByRole("combobox")
+      .find((s) => (s.textContent ?? "").includes("Spartopf"));
+    if (feld) await nutzer.selectOptions(feld, wert);
+  }
+
   it("bricht das Anlegen ab, ohne etwas zu speichern", async () => {
     const nutzer = userEvent.setup();
-    rendere(<ToepfeScreen />);
-    await klicke(nutzer, /anlegen|neu/i);
+    rendere(<BudgetsScreen />);
+    // Erst warten, bis der Screen steht: `klicke` sucht synchron, und auf einem noch
+    // leeren Body fände es nichts — der Test liefe dann durch, ohne etwas zu tun.
+    await nutzer.click(await screen.findByRole("button", { name: /anlegen/i }));
+    await artWaehlen(nutzer, "spartopf");
     await formularFuellen(nutzer, "Verworfen", "50");
     await klicke(nutzer, /abbrechen|schließen/i);
 
     expect(await sqliteTopfRepository.alle()).toHaveLength(0);
+    // Der Dialog ist zu — sonst hätte „abbrechen" nur nichts getroffen.
+    await waitFor(() => expect(screen.queryByText("Verworfen")).not.toBeInTheDocument());
   });
 
   it("entnimmt aus einem bestehenden Topf", async () => {
@@ -82,7 +94,7 @@ describe("Töpfe — Formularpfade", () => {
       zufuehrungProMonat: 10000, sparziel: 500000,
     });
     const nutzer = userEvent.setup();
-    rendere(<ToepfeScreen />);
+    rendere(<BudgetsScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Urlaub/));
 
     const entnehmen = await klicke(nutzer, /entnehmen|entnahme/i);
@@ -163,27 +175,3 @@ describe("Einstellungen — Formularpfade", () => {
   });
 });
 
-describe("Übersicht — mit Plandaten", () => {
-  it("stellt Plan und Bestand gegenüber", async () => {
-    await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 300000,
-    });
-    await sqliteZahlungsregelRepository.speichern({
-      id: "z1", bezeichnung: "Gehalt", betrag: 250000, rhythmus: "monatlich",
-      startdatum: "2026-01-01", charakter: "Ertrag",
-    });
-    await sqliteZahlungsregelRepository.speichern({
-      id: "z2", bezeichnung: "Miete", betrag: -90000, rhythmus: "monatlich",
-      startdatum: "2026-01-01", charakter: "Aufwand",
-    });
-    await sqliteTopfRepository.speichern({
-      id: "t1", typ: "puffer", bezeichnung: "Reparaturen", start: "2020-01-01",
-      schaetzbetrag: 50000, fristMonate: 12,
-    });
-
-    rendere(<UeberblickScreen />);
-    await waitFor(() => expect(document.body.textContent).toMatch(/3\.000,00/));
-    // Die Töpfe mindern die frei verfügbare Liquidität — der Wert muss auftauchen.
-    expect(document.body.textContent).toMatch(/500,00|2\.500,00/);
-  });
-});
