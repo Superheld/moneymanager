@@ -29,6 +29,7 @@ import { sqliteInventarRepository as inventarRepository } from "./sqliteInventar
 import { sqliteLedgerRepository as ledgerRepository } from "./sqliteLedgerRepository";
 import { sqliteKlassifikatorRepository as klassifikatorRepository } from "./sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository as merkmalRepository } from "./sqliteMerkmalskonfigurationRepository";
+import { sqliteKategoriefestlegungRepository as festlegungRepository } from "./sqliteKategoriefestlegungRepository";
 import { klassifizieren, trainieren } from "../../core";
 import { sqliteTopfRepository as topfRepository } from "./sqliteTopfRepository";
 import { sqliteVertragRepository as vertragRepository } from "./sqliteVertragRepository";
@@ -593,6 +594,37 @@ describe("Merkmalskonfiguration — Persistenz", () => {
     expect(alle).toHaveLength(1);
     expect(alle[0].quelle).toBe("manuell");
     expect(alle[0].herkuenfte).toEqual(["vwz"]);
+  });
+});
+
+describe("Kategorie-Festlegungen — Persistenz", () => {
+  it("trägt Muster, Kategorie und Zeitpunkt durch das Schema", async () => {
+    await festlegungRepository.speichern({
+      muster: "netflix international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z",
+    });
+
+    expect(await festlegungRepository.alle()).toEqual([
+      { muster: "netflix international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" },
+    ]);
+  });
+
+  it("normalisiert das Muster beim Speichern und Löschen", async () => {
+    // „Netflix" und „netflix" wirken gleich — als zwei Zeilen ließe sich die eine
+    // löschen, ohne dass sich etwas ändert.
+    await festlegungRepository.speichern({ muster: "  NETFLIX  ", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" });
+    expect((await festlegungRepository.alle())[0].muster).toBe("netflix");
+
+    await festlegungRepository.loeschen("NETFLIX");
+    expect(await festlegungRepository.alle()).toHaveLength(0);
+  });
+
+  it("ersetzt eine vorhandene Festlegung statt eine zweite anzulegen", async () => {
+    await festlegungRepository.speichern({ muster: "rewe", kategorieId: "k-le", angelegtAm: "2026-08-01T00:00:00.000Z" });
+    await festlegungRepository.speichern({ muster: "rewe", kategorieId: "k-abo", angelegtAm: "2026-08-17T00:00:00.000Z" });
+
+    const alle = await festlegungRepository.alle();
+    expect(alle).toHaveLength(1);
+    expect(alle[0].kategorieId).toBe("k-abo");
   });
 });
 

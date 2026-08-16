@@ -113,6 +113,7 @@ const de = {
   review: {
     herkunft: {
       umbuchung: "Umbuchung",
+      festlegung: "Festgelegt",
       regel: "Vertrag",
       ki: "Erkennung",
       remapping: "Import",
@@ -120,10 +121,18 @@ const de = {
     },
     herkunftTitel: {
       umbuchung: "Die Quelle hat die Zahlung als Umbuchung markiert.",
+      festlegung: "Für diesen Empfänger wurde ausdrücklich festgelegt, welche Kategorie gilt.",
       regel: "Die Zahlung passt auf die Erkennungsregel eines Vertrags — sie erbt dessen Kategorie.",
       ki: "Das trainierte Modell hat entschieden.",
       remapping: "Die Kategorie kam mit der Importdatei und wurde auf unseren Baum übersetzt.",
       manuell: "Hier hat jemand von Hand entschieden.",
+    },
+    festlegung: {
+      frage: "Immer bei „{{muster}}“?",
+      ja: "immer so",
+      nein: "nur hier",
+      gesetzt: "Festgelegt: „{{muster}}“",
+      gesetztWeitere: "Festgelegt: „{{muster}}“ — {{anzahl}} weitere offene Zeilen angepasst",
     },
     begruendungSicher: "{{wert}} sicher",
     titel: "Import-Inbox",
@@ -396,6 +405,10 @@ const de = {
     keine: "— keine —",
   },
   konten: {
+    festlegung: {
+      immer: "Immer bei „{{muster}}“ diese Kategorie",
+      hinweis: "Gilt ab jetzt für neue Zahlungen an diesen Empfänger. Aufheben lässt sich das in den Einstellungen.",
+    },
     merkmale: {
       titel: "Was die Erkennung hier sieht",
       aufklappen: "Merkmale dieser Buchung anzeigen",
@@ -643,6 +656,19 @@ const de = {
       feldEltern: "Elternkategorie",
       feldElternHinweis: "optional",
       feldCharakter: "Default-Charakter",
+    },
+    festlegung: {
+      titel: "Festlegungen",
+      untertitel: "Empfänger, deren Kategorie ausdrücklich festgelegt ist",
+      laedt: "lädt …",
+      leer: "Noch nichts festgelegt. Festlegungen entstehen beim Korrigieren einer Kategorie — in der Import-Inbox oder im Buchungsdialog.",
+      hinweis:
+        "Diese Empfänger bekommen ihre Kategorie ohne Umweg über das Modell. Sie stehen ganz vorn in der Kette — vor dem Vertrag und vor der Erkennung. Ein „*“ im Muster steht für beliebigen Text.",
+      spalteMuster: "Empfänger",
+      spalteKategorie: "Kategorie",
+      spalteAngelegt: "seit",
+      kategorieWeg: "Kategorie gelöscht",
+      aufheben: "aufheben",
     },
     lernmaterial: {
       titel: "Automatische Kategorisierung",
@@ -1005,6 +1031,7 @@ const en: typeof de = {
   review: {
     herkunft: {
       umbuchung: "Transfer",
+      festlegung: "Pinned",
       regel: "Contract",
       ki: "Recognition",
       remapping: "Import",
@@ -1012,10 +1039,18 @@ const en: typeof de = {
     },
     herkunftTitel: {
       umbuchung: "The source marked this payment as a transfer.",
+      festlegung: "Someone pinned a category for this payee.",
       regel: "The payment matches a contract's recognition rule — it inherits that category.",
       ki: "The trained model decided.",
       remapping: "The category came with the import file and was mapped onto our tree.",
       manuell: "Someone decided this by hand.",
+    },
+    festlegung: {
+      frage: "Always for “{{muster}}”?",
+      ja: "always",
+      nein: "just here",
+      gesetzt: "Pinned: “{{muster}}”",
+      gesetztWeitere: "Pinned: “{{muster}}” — {{anzahl}} more open rows updated",
     },
     begruendungSicher: "{{wert}} confident",
     titel: "Import inbox",
@@ -1286,6 +1321,10 @@ const en: typeof de = {
     keine: "— none —",
   },
   konten: {
+    festlegung: {
+      immer: "Always use this category for “{{muster}}”",
+      hinweis: "Applies to new payments to this payee from now on. You can remove it in the settings.",
+    },
     merkmale: {
       titel: "What the recognition sees here",
       aufklappen: "Show this payment's features",
@@ -1533,6 +1572,19 @@ const en: typeof de = {
       feldEltern: "Parent category",
       feldElternHinweis: "optional",
       feldCharakter: "Default character",
+    },
+    festlegung: {
+      titel: "Pinned categories",
+      untertitel: "Payees whose category is fixed explicitly",
+      laedt: "loading …",
+      leer: "Nothing pinned yet. Pins are created when you correct a category — in the import inbox or the booking dialog.",
+      hinweis:
+        "These payees get their category without going through the model. They sit at the front of the chain — ahead of contracts and of the recognition. A “*” in the pattern stands for any text.",
+      spalteMuster: "Payee",
+      spalteKategorie: "Category",
+      spalteAngelegt: "since",
+      kategorieWeg: "category deleted",
+      aufheben: "remove",
     },
     lernmaterial: {
       titel: "Automatic categorisation",
