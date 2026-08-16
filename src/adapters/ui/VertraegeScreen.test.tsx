@@ -23,7 +23,10 @@ import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository"
 import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
-import { sqliteZahlungskontoRepository } from "../persistence/sqliteStammdatenRepositories";
+import {
+  sqliteKategorieRepository,
+  sqliteZahlungskontoRepository,
+} from "../persistence/sqliteStammdatenRepositories";
 
 let db: Database;
 
@@ -147,6 +150,39 @@ describe("VertraegeScreen — Ansichten", () => {
 });
 
 describe("VertraegeScreen — Beginn und Fälligkeit", () => {
+  it("gruppiert die Verträge nach Kategorie, teuerste Gruppe zuerst", async () => {
+    await konto();
+    await sqliteKategorieRepository.speichern({ id: "wohnen", name: "Wohnen", defaultCharakter: "Aufwand" });
+    await sqliteKategorieRepository.speichern({ id: "medien", name: "Medien", defaultCharakter: "Aufwand" });
+    const vertraege: [string, string, number, string | undefined][] = [
+      ["v1", "Vermieter", -90000, "wohnen"],
+      ["v2", "Stadtwerke", -12000, "wohnen"],
+      ["v3", "Streamingdienst", -1799, "medien"],
+      ["v4", "Ohne Zuordnung", -500, undefined],
+    ];
+    for (const [id, anbieter, betrag, kategorieId] of vertraege) {
+      await sqliteVertragRepository.speichern({
+        id, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch", status: "aktiv",
+      });
+      await sqliteZahlungsregelRepository.speichern({
+        id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: "monatlich",
+        startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: id, kategorieId,
+      });
+    }
+
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Vermieter");
+    await nutzer.click(screen.getByRole("button", { name: "Kategorie" }));
+
+    // Reihenfolge der Gruppen: Monatskosten groß nach klein, „ohne Kategorie" zuletzt.
+    // getAllByText liefert in Dokumentreihenfolge — genau das ist hier die Aussage.
+    const koepfe = await screen.findAllByText(/^(Wohnen|Medien|Ohne Kategorie)$/);
+    expect(koepfe.map((e) => e.textContent)).toEqual(["Wohnen", "Medien", "Ohne Kategorie"]);
+    // Die Gruppe trägt ihre Summe: 900 + 120 = 1.020 € pro Monat.
+    expect(document.body.textContent).toMatch(/1\.020,00/);
+  });
+
   it("hält die Konditionen zugeklappt und fasst zusammen, was drinsteht", async () => {
     await konto();
     await sqliteVertragRepository.speichern({

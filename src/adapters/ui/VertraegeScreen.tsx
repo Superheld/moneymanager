@@ -11,6 +11,7 @@ import {
   ruecklagenbedarf,
   ruecklageProMonat,
   type Charakter,
+  type Kategorie,
   type Person,
   type Rhythmus,
   type Vertrag,
@@ -28,7 +29,10 @@ import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqlit
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
 import { sqliteEinstellungenRepository as einstellungenRepo } from "../persistence/sqliteEinstellungenRepository";
-import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStammdatenRepositories";
+import {
+  sqliteKategorieRepository as kategorieRepo,
+  sqlitePersonRepository as personRepo,
+} from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, KPIStat, Pill } from "./ds";
 import { Modal } from "./Modal";
 import type { DataColumn } from "./ds/DataTable";
@@ -45,9 +49,10 @@ import { useGeld } from "./einstellungenKontext";
 /** Die Turnus-Ansicht zeigt je Rhythmus eine Gruppe — in dieser Reihenfolge. */
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 /**
- * Drei Blicke auf dieselben Verträge. „liste" zeigt alle nach Betrag, „faelligkeit"
+ * Vier Blicke auf dieselben Verträge. „liste" zeigt alle nach Betrag, „faelligkeit"
  * stellt vor, was als Nächstes abgeht, „turnus" gruppiert nach Takt — dort steht auch,
- * was die nicht-monatlichen Verträge im Monat kosten, obwohl sie nicht abgehen.
+ * was die nicht-monatlichen Verträge im Monat kosten, obwohl sie nicht abgehen —, und
+ * „kategorie" beantwortet, WOFÜR die festen Kosten draufgehen.
  *
  * Die Tabellen sind bewusst NICHT sortierbar: eine angeklickte Spalte überschreibt genau
  * die Ordnung, die die gewählte Ansicht ausmacht — wer in „faelligkeit" nach Anbieter
@@ -55,8 +60,8 @@ const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "ja
  * Innerhalb einer Ansicht steht die Reihenfolge fest: nach Betrag, groß nach klein
  * (in „faelligkeit" nach Termin — das IST dort die Aussage).
  */
-type Ansicht = "liste" | "faelligkeit" | "turnus";
-const ANSICHTEN: Ansicht[] = ["liste", "faelligkeit", "turnus"];
+type Ansicht = "liste" | "faelligkeit" | "turnus" | "kategorie";
+const ANSICHTEN: Ansicht[] = ["liste", "faelligkeit", "turnus", "kategorie"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
   Aufwand: "aufwand",
   Ertrag: "ertrag",
@@ -155,6 +160,8 @@ export function VertraegeScreen() {
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
   const [personen, setPersonen] = useState<Person[]>([]);
+  // Nur für die Kategorie-Ansicht: die Regel trägt die kategorieId, den Namen nicht.
+  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [vorschlaege, setVorschlaege] = useState<Vertragskandidat[]>([]);
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
 
@@ -170,15 +177,17 @@ export function VertraegeScreen() {
   // Verwandte Repos in EINEM Effekt und zusammen setzen — gestaffelte setState lassen
   // abgeleitete Werte kurz gegen leere Listen rechnen.
   async function laden() {
-    const [v, r, p, ignoriert] = await Promise.all([
+    const [v, r, p, k, ignoriert] = await Promise.all([
       vertragRepo.alle(),
       regelRepo.alle(),
       personRepo.alle(),
+      kategorieRepo.alle(),
       ignorierteSchluessel(einstellungenRepo),
     ]);
     setVertraege(v);
     setRegeln(r);
     setPersonen(p);
+    setKategorien(k);
     // Die Vorschläge lesen den gesamten Buchungsbestand — bewusst NACH den Stammdaten,
     // damit die Liste sofort steht und die Karte nachrückt.
     setVorschlaege(await vertragsvorschlaege(ledgerRepo, umsatzRepo, vertragRepo, heute, { ignoriert }));
@@ -358,6 +367,51 @@ export function VertraegeScreen() {
     return gruppen.filter((g) => g.vertraege.length > 0);
   }, [vertraege, regelZuVertrag, t]);
 
+  /**
+   * Gruppen der Kategorie-Ansicht. Beantwortet die Frage, die weder Liste noch Turnus
+   * beantworten: WOFÜR gehen die festen Kosten drauf? Ein Blick auf „Wohnen 1.240 €,
+   * Versicherungen 210 €" sagt mehr über den Haushalt als dieselben Verträge nach
+   * Abbuchungstakt sortiert.
+   *
+   * Gruppiert wird über die Kategorie der REGEL, nicht des Vertrags — der Vertrag trägt
+   * keine; die Kategorie ist eine Eigenschaft der Zahlung. Die Rücklagen-Spalte hängt
+   * hier daran, ob überhaupt ein nicht-monatlicher Vertrag in der Gruppe steckt: anders
+   * als beim Turnus ist der Takt innerhalb einer Kategorie gemischt.
+   */
+  const kategorieGruppen = useMemo(() => {
+    const name = new Map(kategorien.map((k) => [k.id, k.name]));
+    const nachId = new Map<string, Vertrag[]>();
+    for (const v of vertraege) {
+      const id = regelZuVertrag.get(v.id)?.kategorieId ?? "__ohne";
+      const liste = nachId.get(id);
+      if (liste) liste.push(v);
+      else nachId.set(id, [v]);
+    }
+    /** Was die Gruppe im Monat kostet — danach ordnen sich die Gruppen. */
+    const proMonat = (vs: Vertrag[]) =>
+      Math.abs(
+        vs.reduce((sum, v) => {
+          const r = regelZuVertrag.get(v.id);
+          return r ? sum + r.betrag / RHYTHMUS_MONATE[r.rhythmus] : sum;
+        }, 0),
+      );
+
+    return [...nachId.entries()]
+      .map(([id, vs]) => ({
+        key: id,
+        titel: id === "__ohne" ? t("vertraege.gruppeOhneKategorie") : name.get(id) ?? t("vertraege.gruppeOhneKategorie"),
+        mitRuecklage: vs.some((v) => {
+          const r = regelZuVertrag.get(v.id);
+          return !!r && RHYTHMUS_MONATE[r.rhythmus] > 1;
+        }),
+        vertraege: [...vs].sort((a, b) => betragsRang(b) - betragsRang(a)),
+        gewicht: proMonat(vs),
+        // „ohne Kategorie" ganz nach hinten: es ist keine Kategorie, sondern ihr Fehlen.
+        ohne: id === "__ohne",
+      }))
+      .sort((a, b) => (a.ohne !== b.ohne ? (a.ohne ? 1 : -1) : b.gewicht - a.gewicht));
+  }, [vertraege, regelZuVertrag, kategorien, t]);
+
   /** Kopfzeile einer Turnus-Gruppe: Anzahl, Monatsanteil und — falls nötig — die Rücklage. */
   function gruppenUntertitel(g: { vertraege: Vertrag[]; mitRuecklage: boolean }): string {
     const regeln = g.vertraege.map((v) => regelZuVertrag.get(v.id)).filter((r): r is Zahlungsregel => !!r);
@@ -506,8 +560,8 @@ export function VertraegeScreen() {
             })}
           </div>
 
-          {ansicht === "turnus" ? (
-            turnusGruppen.map((g) => (
+          {ansicht === "turnus" || ansicht === "kategorie" ? (
+            (ansicht === "turnus" ? turnusGruppen : kategorieGruppen).map((g) => (
               <Card key={g.key} title={g.titel} subtitle={gruppenUntertitel(g)}>
                 <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
               </Card>
