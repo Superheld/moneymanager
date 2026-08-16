@@ -10,8 +10,8 @@
 // weiterhin treffen — es würde sie nur verstecken. Also: ein Screen, ein Anlege-Dialog,
 // dahinter unverändert `budgetAnlegen` bzw. `topfAnlegen`.
 //
-// Ersatz-Töpfe erscheinen hier NICHT; die hängen an einem Gegenstand und leben im
-// Bereich „Inventar".
+// Rücklagen für Gegenstände erscheinen hier NICHT: die rechnet der Bereich „Inventar"
+// selbst, ohne eigenes Sparvehikel.
 //
 // PILOT für ADR-0004: alle sichtbaren Strings über t()/<Trans>, alles Geld über useGeld().
 
@@ -145,8 +145,7 @@ export function BudgetsScreen() {
   }
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
-  /** Ersatz-Töpfe hängen am Inventar und werden dort geführt. */
-  const aufbauend = useMemo(() => toepfe.filter((tp) => tp.typ !== "ersatz"), [toepfe]);
+  const aufbauend = toepfe;
 
   function verbrauch(b: Budget): number {
     const { von, bis } = periodeFenster(b.periode, heute);

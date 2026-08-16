@@ -5,8 +5,9 @@
 
 import { describe, it, expect } from "vitest";
 import { addMonate, addTage, ord, parseIso, tageBis, toIso } from "./datum";
-import { projiziereRegel, projiziereVerlauf, projiziereLiquiditaet } from "./projektion";
+import { projiziereRegel } from "./projektion";
 import { ansparrate, sollstand, topfStand, type Topf } from "./topf";
+import { monatsRuecklage, sollRuecklage, type Inventargegenstand } from "./inventar";
 import { kuendigungsterminNaht, naechsterKuendigungstermin, type Vertrag } from "./vertrag";
 import type { Zahlungsregel } from "./zahlungsregel";
 
@@ -74,19 +75,19 @@ describe("hält: entartete Projektionsfenster hängen nicht", () => {
   it("Laufzeit 0 und negative Laufzeit liefern ein leeres Fenster statt einer Endlosschleife", () => {
     expect(projiziereRegel(regel(), "2026-01-01", 0)).toEqual([]);
     expect(projiziereRegel(regel(), "2026-01-01", -12)).toEqual([]);
-    expect(projiziereVerlauf([regel()], "2026-01-01", 0, 0)).toEqual([]);
-    expect(projiziereVerlauf([regel()], "2026-01-01", -5, 0)).toEqual([]);
   }, 5000);
 
   it("Regelstart weit nach dem Fensterende liefert leer, ohne zu hängen", () => {
     expect(projiziereRegel(regel({ startdatum: "2999-01-01" }), "2026-01-01", 12)).toEqual([]);
   }, 5000);
 
-  it("Fensterstart mitten im Monat: keine Doppelzählung, korrekte Monatskörbe", () => {
-    const v = projiziereVerlauf([regel({ startdatum: "2026-01-15" })], "2026-01-31", 12, 0);
-    expect(v).toHaveLength(12);
-    expect(v.flatMap((m) => m.buchungen)).toHaveLength(11); // 15.01. liegt vor dem Fensterstart
-    expect(v.every((m) => m.buchungen.length <= 1)).toBe(true);
+  it("Fensterstart mitten im Monat: keine Fälligkeit vor dem Fenster, keine doppelt", () => {
+    // Fenster [2026-01-31, 2027-01-31): der 15.01.2026 liegt davor und fällt raus, der
+    // 15.01.2027 liegt drin. Zwölf Termine, jeder genau einmal.
+    const b = projiziereRegel(regel({ startdatum: "2026-01-15" }), "2026-01-31", 12);
+    expect(b).toHaveLength(12);
+    expect(b[0].datum).toBe("2026-02-15");
+    expect(new Set(b.map((p) => p.datum)).size).toBe(12);
   });
 });
 
@@ -256,8 +257,8 @@ describe("ROT 6 — ungültiges Fensterdatum erzeugt „undefined aN“ statt ei
   //   die Diagrammbeschriftung gerendert statt früh zu scheitern.
   // GRÜN seit dem Fix: statt drei Monatskörben mit der Beschriftung „undefined aN" gibt
   // es jetzt einen klaren Fehler — der Aufrufer kann ihn zeigen, statt Unsinn zu rendern.
-  it("projiziereVerlauf mit unparsbarem ab-Datum wirft", () => {
-    expect(() => projiziereVerlauf([regel()], "heute", 3, 0)).toThrow("datum.ungueltig");
+  it("projiziereRegel mit unparsbarem ab-Datum wirft", () => {
+    expect(() => projiziereRegel(regel(), "heute", 3)).toThrow("datum.ungueltig");
   });
 
   // GRÜN seit dem Fix: die Regel verschwindet nicht mehr wortlos aus der Projektion,
@@ -271,33 +272,51 @@ describe("ROT 6 — ungültiges Fensterdatum erzeugt „undefined aN“ statt ei
   }, 5000);
 });
 
-describe("ROT 7 — Nutzungsdauer 0 erzeugt Infinity/NaN statt eines Fehlers", () => {
-  // Erreichbarkeit: topfAnlegen.ts:34 und inventarAnlegen.ts validieren > 0, und
-  //   sqliteTopfRepository.ts:32 fängt mit `?? 1` nur NULL ab — eine 0 in der Spalte
-  //   passiert. Der Kern selbst ist nicht defensiv.
-  // Erwartet: Fehler oder 0. Tatsächlich: ansparrate = Infinity, und Infinity * 0
-  //   Monate = NaN → sollstand und topfStand am Starttag sind NaN.
-  // Warum falsch: NaN wandert ungebremst in Topf-Liste und Deckungsrechnung; die UI
-  //   zeigt „NaN“ und jede Weiterrechnung ist ab da vergiftet.
+describe("ROT 7 — Zeitraum 0 erzeugt Infinity/NaN statt eines Fehlers", () => {
+  // Erreichbarkeit: topfAnlegen.ts und inventarAnlegen.ts validieren > 0, aber die
+  //   Repositories fangen mit `?? 1` nur NULL ab — eine 0 in der Spalte passiert. Der
+  //   Kern selbst ist nicht defensiv.
+  // Erwartet: Fehler oder 0. Tatsächlich (vor dem Fix): rate = Infinity, und
+  //   Infinity * 0 Monate = NaN → jeder Stand am Starttag ist NaN.
+  // Warum falsch: NaN wandert ungebremst in Liste und Deckungsrechnung; die UI zeigt
+  //   „NaN" und jede Weiterrechnung ist ab da vergiftet.
   const t: Topf = {
     id: "t1",
-    typ: "ersatz",
+    typ: "puffer",
     bezeichnung: "Kaputt",
     start: "2026-01-01",
-    wiederbeschaffung: 120000,
-    nutzungsdauerMonate: 0,
+    schaetzbetrag: 120000,
+    fristMonate: 0,
   };
 
-  it("ansparrate wird Infinity", () => {
+  it("ansparrate bleibt endlich", () => {
     expect(Number.isFinite(ansparrate(t))).toBe(true);
   });
 
-  it("sollstand am Starttag wird NaN", () => {
+  it("sollstand am Starttag ist 0, nicht NaN", () => {
     expect(sollstand(t, "2026-01-01")).toBe(0);
   });
 
-  it("topfStand am Starttag wird NaN", () => {
+  it("topfStand am Starttag ist 0, nicht NaN", () => {
     expect(topfStand(t, "2026-01-01", [])).toBe(0);
+  });
+
+  // Dieselbe Falle am Inventargegenstand, der seine Rücklage seit 2026-08-16 selbst
+  // rechnet (kein Ersatz-Topf mehr).
+  const g: Inventargegenstand = {
+    id: "g1",
+    bezeichnung: "Kaputt",
+    wiederbeschaffung: 120000,
+    nutzungsdauerMonate: 0,
+    anschaffung: "2026-01-01",
+  };
+
+  it("monatsRuecklage bleibt endlich", () => {
+    expect(monatsRuecklage(g)).toBe(0);
+  });
+
+  it("sollRuecklage ist 0, nicht NaN", () => {
+    expect(sollRuecklage(g, "2027-01-01")).toBe(0);
   });
 });
 
@@ -308,12 +327,9 @@ describe("ROT 8 — nicht-ganzzahlige Laufzeit erzeugt einen Monatskorb zu viel"
   //   über addMonate(start, 12.5) mit einem Nicht-Integer-Monat gebildet wird.
   // Warum falsch: Anzahl der Körbe und Fensterende driften auseinander; die Kurve zeigt
   //   einen Monat, der laut Parameter nicht im Fenster liegt.
-  it("projiziereVerlauf mit monate = 12.5", () => {
-    expect(projiziereVerlauf([regel()], "2026-01-01", 12.5, 0)).toHaveLength(12);
-  });
-
-  it("projiziereLiquiditaet erbt dieselbe Länge", () => {
-    expect(projiziereLiquiditaet([regel()], [], [], "2026-01-01", 12.5, 0)).toHaveLength(12);
+  it("projiziereRegel mit monate = 12.5 bleibt im ganzzahligen Fenster", () => {
+    // 12.5 wird auf 12 abgerundet — sonst driften Fensterende und Korbanzahl auseinander.
+    expect(projiziereRegel(regel(), "2026-01-01", 12.5)).toHaveLength(12);
   });
 });
 

@@ -7,7 +7,6 @@ import type {
   IstBuchung,
   Kategorie,
   Person,
-  Szenario,
   Topf,
   Vertrag,
   Zahlungskonto,
@@ -114,14 +113,4 @@ export interface UmsatzRepository {
     nativeIds: string[];
     hashesOhneId?: string[];
   }>;
-}
-
-export interface SzenarioRepository {
-  alle(): Promise<Szenario[]>;
-  speichern(szenario: Szenario): Promise<void>;
-  loeschen(id: string): Promise<void>;
-  /** Zusatzposten (Zahlungsregeln) eines Szenarios — physisch getrennt vom Plan. */
-  posten(szenarioId: string): Promise<Zahlungsregel[]>;
-  postenSpeichern(szenarioId: string, posten: Zahlungsregel): Promise<void>;
-  postenLoeschen(postenId: string): Promise<void>;
 }

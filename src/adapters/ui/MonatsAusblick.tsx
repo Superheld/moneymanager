@@ -16,6 +16,7 @@ import {
   type AusblickPosten,
   type AusblickZeile,
   type Budget,
+  type Inventargegenstand,
   type IstBuchung,
   type Kategorie,
   type MonatsAusblick as Ausblick,
@@ -29,12 +30,14 @@ const MONATSNAMEN_KEY = "ausblick.monat";
 export function MonatsAusblick({
   regeln,
   budgets,
+  inventar,
   ist,
   kategorien,
   heute,
 }: {
   regeln: Zahlungsregel[];
   budgets: Budget[];
+  inventar: Inventargegenstand[];
   ist: IstBuchung[];
   kategorien: Kategorie[];
   /** Von außen hereingereicht, damit die Komponente testbar bleibt (keine Uhr im Render). */
@@ -42,15 +45,15 @@ export function MonatsAusblick({
 }) {
   const { t } = useTranslation();
   const ausblicke = useMemo(
-    () => monatsAusblicke({ regeln, budgets, ist, kategorien, heute }),
-    [regeln, budgets, ist, kategorien, heute],
+    () => monatsAusblicke({ regeln, budgets, inventar, ist, kategorien, heute }),
+    [regeln, budgets, inventar, ist, kategorien, heute],
   );
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   const ohneEinnahmeplan = ausblicke.every((a) => a.zeilen.find((z) => z.id === "einnahmen")!.plan === 0);
 
   // Ohne Verträge und Budgets gäbe es drei Karten voller Nullen — das liest sich wie ein
   // Datenfehler, nicht wie ein leerer Plan. Lieber einmal sagen, woher die Zahlen kommen.
-  if (regeln.length === 0 && budgets.length === 0) {
+  if (regeln.length === 0 && budgets.length === 0 && inventar.length === 0) {
     return <Card subtitle={t("ausblick.leerUntertitel")}>{t("ausblick.leer")}</Card>;
   }
 
