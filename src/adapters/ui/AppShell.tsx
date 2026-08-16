@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { APP_VERSION } from "../../version";
+import { APP_STADIUM, APP_VERSION } from "../../version";
 
 export type ScreenId =
   | "historie"
@@ -19,7 +19,6 @@ export type ScreenId =
 interface NavEntry {
   id?: ScreenId;
   labelKey: string;
-  badgeKey?: string;
 }
 
 interface NavGroup {
@@ -88,7 +87,6 @@ export function AppShell({
                   >
                     <span className="dot" />
                     {t(e.labelKey)}
-                    {e.badgeKey && <span className="bdg">{t(e.badgeKey)}</span>}
                   </a>
                 );
               })}
@@ -97,7 +95,11 @@ export function AppShell({
         ))}
 
         <div className="foot">
-          <div>Moneymanager {APP_VERSION}</div>
+          {/* Das Stadium steht neben der Version, nicht darin: wer hier hinsieht, soll
+              wissen, dass Schema und Daten noch nicht festgeschrieben sind. */}
+          <div>
+            Moneymanager {APP_VERSION} <span className="bdg">{APP_STADIUM}</span>
+          </div>
           <div>{t("shell.footLokal")}</div>
         </div>
       </aside>

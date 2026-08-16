@@ -249,9 +249,33 @@ export const MIGRATIONS: Migration[] = [
       // Reines Anlegen einer Spalte, kein Datenumbau — wiederholbar (migrate() überspringt
       // vorhandene Spalten per PRAGMA table_info).
       `ALTER TABLE inventargegenstand ADD COLUMN konto_id TEXT`,
-      // Die Tabelle `topf` behält ihre ersatz-Zeilen: forward-only heißt auch, dass
-      // Altbestand liegen bleiben darf. Gelesen werden sie nicht mehr — die Repositories
-      // liefern nur noch puffer und spartopf.
+    ],
+  },
+  {
+    version: 18, // Alpha-Aufräumen: leere Hüllen von Szenario und Ersatz-Topf abräumen
+    sql: [
+      // ALPHA (siehe CLAUDE.md): Die App ist nicht veröffentlicht, es gibt keine fremden
+      // Datenbestände zu schonen. Deshalb wird hier ausnahmsweise WEGGENOMMEN statt nur
+      // angehängt — sonst schleppte das Schema auf Dauer Tabellen mit, die kein Code mehr
+      // kennt, und der nächste Blick ins Schema fragte sich, wofür sie stehen.
+      //
+      // Der Rest der Regel gilt unverändert: append-only (Migration 18 ist neu, 1–17
+      // bleiben unberührt), forward-only, und jedes Statement WIEDERHOLBAR — `IF EXISTS`
+      // bei den Tabellen, und `DROP COLUMN` überspringt migrate(), wenn die Spalte fehlt.
+      //
+      // Kein Datenumbau: alle drei Ziele waren beim Umbau am 2026-08-16 nachweislich leer
+      // (szenario 0 Zeilen, szenario_posten 0, topf 0). Es geht nichts verloren.
+
+      // Szenarien — der What-if-Layer ist mit dem Bereich Planung entfallen.
+      `DROP TABLE IF EXISTS szenario_posten`,
+      `DROP TABLE IF EXISTS szenario`,
+
+      // Ersatz-Topf — das Inventar rechnet seine Rücklage selbst (core/inventar.ts).
+      // Damit sind diese drei Spalten an `topf` ohne Bedeutung; TopfTyp kennt nur noch
+      // puffer und spartopf.
+      `ALTER TABLE topf DROP COLUMN wiederbeschaffung`,
+      `ALTER TABLE topf DROP COLUMN nutzungsdauer_monate`,
+      `ALTER TABLE topf DROP COLUMN inventar_id`,
     ],
   },
 ];
