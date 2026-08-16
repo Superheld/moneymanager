@@ -11,7 +11,14 @@
 // Ausgelöst wird es von Hand (Knopf in den Einstellungen). Ein Modell, das sich
 // unbemerkt ändert, ist eines, dessen Verhalten sich niemand erklären kann.
 
-import { aufteilen, bewerten, trainieren, type Beispiel, type Bewertung } from "../core";
+import {
+  aufteilen,
+  bewerten,
+  trainieren,
+  type Beispiel,
+  type Bewertung,
+  type Merkmalskonfiguration,
+} from "../core";
 import type { KlassifikatorRepository, LedgerPort, Modellstand, UmsatzRepository } from "./ports";
 import { trainingsmaterial, type Materialbefund } from "./trainingsmaterial";
 
@@ -37,6 +44,13 @@ export interface TrainingsDeps {
   readonly ledger: LedgerPort;
   readonly umsatzRepo: UmsatzRepository;
   readonly klassifikatorRepo: KlassifikatorRepository;
+  /**
+   * Was ins Training geht. Hereingereicht statt hier geladen: sonst hinge dieser
+   * Use-Case an `merkmalskonfiguration`, das seinerseits die Messschwelle von hier
+   * bezieht — ein Zyklus für einen Wert, den die Oberfläche ohnehin schon hat.
+   * Fehlt sie, gilt die Grundausstattung.
+   */
+  readonly konfiguration?: Merkmalskonfiguration;
   /** Zeitquelle — hereingereicht, damit der Ablauf testbar bleibt. */
   readonly jetzt: () => string;
 }
@@ -51,7 +65,7 @@ export interface TrainingsDeps {
  * Genauigkeit, sondern eine Selbstbestätigung.
  */
 export async function klassifikatorTrainieren(deps: TrainingsDeps): Promise<TrainingsErgebnis> {
-  const material = await trainingsmaterial(deps.ledger, deps.umsatzRepo);
+  const material = await trainingsmaterial(deps.ledger, deps.umsatzRepo, deps.konfiguration);
   const beispiele: Beispiel[] = material.beispiele.map((b) => ({
     merkmale: b.merkmale,
     kategorieId: b.kategorieId,
@@ -100,10 +114,11 @@ export async function modellzustand(deps: {
   ledger: LedgerPort;
   umsatzRepo: UmsatzRepository;
   klassifikatorRepo: KlassifikatorRepository;
+  konfiguration?: Merkmalskonfiguration;
 }): Promise<Modellzustand> {
   const [stand, material] = await Promise.all([
     deps.klassifikatorRepo.laden(),
-    trainingsmaterial(deps.ledger, deps.umsatzRepo),
+    trainingsmaterial(deps.ledger, deps.umsatzRepo, deps.konfiguration),
   ]);
 
   const beispieleJetzt = material.beispiele.length;

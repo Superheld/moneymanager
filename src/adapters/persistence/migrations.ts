@@ -353,4 +353,26 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 22, // Merkmale steuerbar: welche Wörter nicht ins Training gehen
+    sql: [
+      // Eine Zeile je ausgeschlossenem Wort. `herkuenfte` NULL heißt „überall", sonst
+      // kommagetrennte Herkünfte (empGanz, empWort, vwz, gid, vz) — dasselbe Wort kann
+      // im Empfängerfeld brauchbar und im Verwendungszweck Rauschen sein.
+      //
+      // Die aktiven Herkünfte selbst stehen NICHT hier, sondern in `einstellung`: das
+      // sind fünf Schalter, genau der Fall, für den die Key/Value-Tabelle da ist. Eine
+      // eigene Tabelle für fünf Zeilen mit festen Schlüsseln wäre Schema ohne Gegenwert.
+      //
+      // `quelle` hält fest, ob ein Eintrag mitgeliefert wurde oder von Hand kam. Ohne das
+      // ließe sich die eigene Pflege nicht von der Grundausstattung trennen — und ein
+      // späteres Nachliefern neuer Standardwörter könnte eigene Entscheidungen
+      // überschreiben, ohne dass es auffiele.
+      `CREATE TABLE IF NOT EXISTS merkmal_ausschluss (
+        wort       TEXT PRIMARY KEY,
+        herkuenfte TEXT,
+        quelle     TEXT NOT NULL DEFAULT 'standard'
+      )`,
+    ],
+  },
 ];
