@@ -55,6 +55,13 @@ in `.github/workflows/ci.yml`, weil Actions die mise.toml nicht liest.
 - **Daten-Lade-Race:** Verwandte Repos in EINEM Effekt per `Promise.all` laden und zusammen
   setzen; gestaffelte `setState` lassen abgeleitete Werte kurz gegen leere Listen rechnen
   (z. B. Kategorie-Lookup → fälschlich „ohne Kategorie").
+- **Halbfertige Migration im laufenden `tauri dev`:** Läuft die App, während eine neue
+  Migration entsteht, kann sie deren Version verbuchen, bevor alle Statements drinstehen —
+  der Rest läuft dann NIE. Real passiert bei v23: die App hatte 23 gesetzt, als die
+  Migration erst aus dem `ALTER TABLE` bestand; der Kategorie-Nachtrag kam Minuten später
+  dazu und blieb liegen, alle 16 Verträge ohne Kategorie. Deshalb nach jeder Migration
+  am echten Bestand nachsehen, ob sie gewirkt hat — und die Reparatur in eine NEUE Version
+  legen (v25), niemals in die alte. Sicherer: die App während Schema-Arbeiten schließen.
 
 ## Schichten
 `core` (reine Domäne, kein IO) ← `application` (Use-Cases + Ports) ← `adapters`
