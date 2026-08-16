@@ -92,5 +92,20 @@ Damit ist die frühere Schuld am `rohHash` **erledigt**: der Dedup-Schlüssel en
 Ein Backfill vor der ersten ID-losen Quelle (Bank-CSV, FinTS) ist nicht mehr nötig.
 Sicherungen des alten Stands liegen als `moneymanager.db.vor-reset-*` neben der DB.
 
+Der Bestand (5279 Umsätze, 5206 verbucht) stammt aus **einem** Import derselben xlsx.
+Die Gläubiger-ID (Migration 16) wurde am 2026-08-16 über die `Buchungs-ID` nachgetragen
+statt neu zu importieren — 418 Zeilen, ohne die 4426 kategorisierten Ist-Buchungen zu
+verlieren. Sicherung: `moneymanager.db.vor-glaeubiger-backfill-*`.
+
+## Kein E2E — und was stattdessen trägt
+`tauri-driver` gibt es für Linux und Windows, **nicht für macOS** (WKWebView bietet
+keinen WebDriver). Playwright gegen `npm run dev` bringt nichts: die Webview allein hat
+kein SQLite-Plugin und damit keine Daten.
+Ersatz, der wirklich trägt: die jsdom-Tests laufen von der Oberfläche bis ins Schema
+(echte In-Memory-SQLite), und gegen den **echten** Bestand lassen sich App-Code-Pfade
+headless fahren — `cp` der DB nach `/tmp`, dann `npx vite-node <skript.ts>` mit Import
+aus `src/`. So wurden Vertrags- und Budgeterkennung kalibriert. Bei `sqlite3 -json` über
+viele Zeilen `maxBuffer` hochsetzen, sonst `ENOBUFS`.
+
 ## Sprache
 Deutsch, Anrede „du", keine Emoji. Fachlich streng innen, alltagstauglich außen (Glossar).
