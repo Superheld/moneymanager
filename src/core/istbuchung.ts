@@ -1,5 +1,5 @@
 // Ist-Buchung — die provisorische „Published Language" des Ist-Schritts (ADR-0002).
-// Hält FAKTEN (was tatsächlich geflossen ist), getrennt von der Plan-/Szenario-Schicht.
+// Hält FAKTEN (was tatsächlich geflossen ist), getrennt von der Plan-Schicht.
 // Bewusst NICHT das volle A5-Buchungsformat: minimal, vorläufig, später per ACL auf
 // das echte Buchungspackage gemappt. Betrag vorzeichenbehaftet (negativ = Abfluss).
 

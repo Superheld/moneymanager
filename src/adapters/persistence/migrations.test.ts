@@ -66,8 +66,10 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     expect(spalten(db, "zahlungsregel")).toEqual(
       expect.arrayContaining(["konto_id", "kategorie_id", "vertrag_id"]),
     );
-    // v6
+    // v6 — vom entfallenen Ersatz-Topf; die Spalte bleibt (forward-only), ungenutzt.
     expect(spalten(db, "topf")).toContain("inventar_id");
+    // v17
+    expect(spalten(db, "inventargegenstand")).toContain("konto_id");
     // v9/v10/v11/v13
     expect(spalten(db, "umsatz")).toContain("glaeubiger_id"); // v16
     expect(spalten(db, "ist_buchung")).toEqual(

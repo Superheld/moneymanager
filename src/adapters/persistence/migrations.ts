@@ -241,4 +241,17 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_umsatz_glaeubiger ON umsatz (glaeubiger_id) WHERE glaeubiger_id IS NOT NULL`,
     ],
   },
+  {
+    version: 17, // Inventar rein kalkulatorisch: Konto, auf dem die Rücklage tatsächlich liegt
+    sql: [
+      // Der Ersatz-Topf ist entfallen; was zurückgelegt ist, wird nicht mehr gebucht,
+      // sondern gegen den realen Stand DIESES Kontos abgeglichen (siehe core/inventar.ts).
+      // Reines Anlegen einer Spalte, kein Datenumbau — wiederholbar (migrate() überspringt
+      // vorhandene Spalten per PRAGMA table_info).
+      `ALTER TABLE inventargegenstand ADD COLUMN konto_id TEXT`,
+      // Die Tabelle `topf` behält ihre ersatz-Zeilen: forward-only heißt auch, dass
+      // Altbestand liegen bleiben darf. Gelesen werden sie nicht mehr — die Repositories
+      // liefern nur noch puffer und spartopf.
+    ],
+  },
 ];

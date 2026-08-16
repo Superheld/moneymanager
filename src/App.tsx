@@ -1,13 +1,11 @@
 import { useEffect, useState } from "react";
 import { AppShell, type ScreenId } from "./adapters/ui/AppShell";
-import { PlanungScreen } from "./adapters/ui/PlanungScreen";
 import { HistorieScreen } from "./adapters/ui/HistorieScreen";
 import { KontenScreen } from "./adapters/ui/KontenScreen";
 import { EinstellungenScreen } from "./adapters/ui/EinstellungenScreen";
 import { VertraegeScreen } from "./adapters/ui/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/BudgetsScreen";
 import { InventarScreen } from "./adapters/ui/InventarScreen";
-import { DeckungScreen } from "./adapters/ui/DeckungScreen";
 import { ImportScreen } from "./adapters/ui/ImportScreen";
 import { ReviewScreen } from "./adapters/ui/ReviewScreen";
 import { appBootstrap } from "./application/bootstrap";
@@ -27,13 +25,11 @@ export default function App() {
   return (
     <EinstellungenProvider>
       <AppShell current={screen} onNavigate={setScreen}>
-        {screen === "planung" && <PlanungScreen />}
         {screen === "historie" && <HistorieScreen />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
         {screen === "inventar" && <InventarScreen />}
         {screen === "budgets" && <BudgetsScreen />}
         {screen === "vertraege" && <VertraegeScreen />}
-        {screen === "deckung" && <DeckungScreen />}
         {screen === "import" && <ImportScreen />}
         {screen === "review" && <ReviewScreen />}
         {screen === "einstellungen" && <EinstellungenScreen />}
