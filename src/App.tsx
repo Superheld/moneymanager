@@ -6,7 +6,6 @@ import { KontenScreen } from "./adapters/ui/KontenScreen";
 import { EinstellungenScreen } from "./adapters/ui/EinstellungenScreen";
 import { VertraegeScreen } from "./adapters/ui/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/BudgetsScreen";
-import { ToepfeScreen } from "./adapters/ui/ToepfeScreen";
 import { InventarScreen } from "./adapters/ui/InventarScreen";
 import { DeckungScreen } from "./adapters/ui/DeckungScreen";
 import { ImportScreen } from "./adapters/ui/ImportScreen";
@@ -31,7 +30,6 @@ export default function App() {
         {screen === "planung" && <PlanungScreen />}
         {screen === "historie" && <HistorieScreen />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
-        {screen === "toepfe" && <ToepfeScreen />}
         {screen === "inventar" && <InventarScreen />}
         {screen === "budgets" && <BudgetsScreen />}
         {screen === "vertraege" && <VertraegeScreen />}
