@@ -32,8 +32,20 @@ export interface Zahlungsspur {
   /** Vorzeichenbehaftet; negativ = Abfluss. */
   readonly betrag: Cent;
   readonly gegenpartei: string;
+  /**
+   * Verwendungszweck der Quellzeile. Die Vertragserkennung nutzt ihn NICHT — ein Vertrag
+   * hängt am Empfänger, nicht am Text. Er steht hier, weil die Kategorisierung ihn
+   * braucht und aus demselben Join stammt (`application/zahlungsspuren`); ein zweiter
+   * Lader für dieselbe Verbindung wären zwei Antworten auf dieselbe Frage.
+   */
+  readonly verwendungszweck?: string;
   readonly glaeubigerId?: string;
   readonly kategorieId?: string;
+  /**
+   * Trägt die Buchung eine Aufteilung? Dann hat sie mehrere Kategorien und taugt weder
+   * als Trainingsbeispiel noch als Ziel eines automatischen Laufs.
+   */
+  readonly geteilt?: boolean;
   /** Konto, über das die Zahlung lief — der Vorschlag reicht es an die Maske durch. */
   readonly kontoId?: string;
   /**
