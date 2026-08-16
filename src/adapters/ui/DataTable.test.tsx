@@ -71,7 +71,7 @@ describe("DataTable — Seitensteuerung", () => {
   });
 });
 
-describe("DataTable — Zeilenhöhe", () => {
+describe("DataTable — Zeilenhöhe und Breite", () => {
   it("lässt Zellen nicht umbrechen", () => {
     const { container } = tabelle();
     const zelle = container.querySelector("tbody td") as HTMLElement;
@@ -79,11 +79,53 @@ describe("DataTable — Zeilenhöhe", () => {
     expect(zelle.style.textOverflow).toBe("ellipsis");
   });
 
-  it("begrenzt die Spaltenbreite, wenn maxWidth gesetzt ist", () => {
+  /**
+   * Der Kern der Breitenkappung: sie sitzt am inneren Block, NICHT an der Zelle. Die
+   * Wirkung von max-width auf Tabellenzellen ist in CSS 2.1 undefiniert und wird bei
+   * `table-layout: auto` ignoriert — genau deshalb hatte `column.maxWidth` an den
+   * Konten-Spalten nichts bewirkt und lange Namen schoben die Tabelle aus dem Bild.
+   */
+  it("kappt den Zellinhalt in einem Block, nicht an der Zelle selbst", () => {
+    const { container } = tabelle();
+    const inhalt = container.querySelector("tbody td > div") as HTMLElement;
+    expect(inhalt).toBeTruthy();
+    expect(inhalt.style.maxWidth).toBeTruthy();
+    expect(inhalt.style.overflow).toBe("hidden");
+    expect(inhalt.style.textOverflow).toBe("ellipsis");
+  });
+
+  it("begrenzt jede Spalte auch ohne eigene Angabe", () => {
+    const lang = [{ name: "SWB - Service-, Wohnungsvermietungs- und Verwaltungsgesellschaft mbH" }];
+    const { container } = render(<DataTable columns={[{ key: "name", label: "Name" }]} rows={lang} />);
+    const inhalt = container.querySelector("tbody td > div") as HTMLElement;
+    expect(inhalt.style.maxWidth).toBe("32ch");
+    // Abgeschnitten wird nur die Anzeige — der volle Text bleibt als Tooltip erreichbar.
+    expect(inhalt.title).toBe(lang[0].name);
+  });
+
+  it("lässt eine Spalte ihre eigene Kappung setzen", () => {
     const { container } = render(
       <DataTable columns={[{ key: "name", label: "Name", maxWidth: 320 }]} rows={zeilen.slice(0, 3)} />,
     );
-    const zelle = container.querySelector("tbody td") as HTMLElement;
-    expect(zelle.style.maxWidth).toBe("320px");
+    const inhalt = container.querySelector("tbody td > div") as HTMLElement;
+    expect(inhalt.style.maxWidth).toBe("320px");
+  });
+
+  /** Rechtsbündige Zahlen müssen am rechten Zellenrand bleiben, nicht am Ende des Blocks. */
+  it("schiebt rechtsbündige Spalten an den rechten Rand", () => {
+    const { container } = render(
+      <DataTable columns={[{ key: "name", label: "Name" }, { key: "n", label: "Betrag", align: "right" }]} rows={[{ name: "A", n: "12,00" }]} />,
+    );
+    const bloecke = container.querySelectorAll("tbody td > div");
+    expect((bloecke[0] as HTMLElement).style.marginLeft).toBe("");
+    expect((bloecke[1] as HTMLElement).style.marginLeft).toBe("auto");
+  });
+
+  /** Fangnetz: passt die Tabelle trotzdem nicht, scrollt SIE — nicht die ganze Seite. */
+  it("liegt in einem waagerecht scrollbaren Rahmen", () => {
+    const { container } = tabelle();
+    const rahmen = container.querySelector("table")!.parentElement as HTMLElement;
+    expect(rahmen.style.overflowX).toBe("auto");
+    expect(rahmen.style.maxWidth).toBe("100%");
   });
 });
