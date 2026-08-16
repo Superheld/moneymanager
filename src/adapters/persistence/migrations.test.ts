@@ -69,6 +69,7 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     // v6
     expect(spalten(db, "topf")).toContain("inventar_id");
     // v9/v10/v11/v13
+    expect(spalten(db, "umsatz")).toContain("glaeubiger_id"); // v16
     expect(spalten(db, "ist_buchung")).toEqual(
       expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "verwendung_topf_id", "roh_hash"]),
     );
