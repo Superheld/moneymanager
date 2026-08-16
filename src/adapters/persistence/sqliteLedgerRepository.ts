@@ -2,7 +2,7 @@
 // planRef wird auf zwei Spalten abgebildet (plan_quelle_id, plan_faelligkeit); ein
 // UNIQUE-Index darauf erzwingt 1:1-Matching. Später dockt hier der Bankimport an.
 
-import type { Aufteilung, Charakter, IstBuchung, IstQuelle } from "../../core";
+import type { Aufteilung, Charakter, IstBuchung, IstQuelle, Kategorieherkunft } from "../../core";
 import type { LedgerPort } from "../../application/ports";
 import { getDb } from "./db";
 
@@ -20,6 +20,7 @@ interface Zeile {
   betrag: number;
   konto_id: string;
   kategorie_id: string | null;
+  kategorie_herkunft: string | null;
   charakter: string;
   quelle: string;
   notiz: string | null;
@@ -38,8 +39,8 @@ export const sqliteLedgerRepository: LedgerPort = {
     // Buchungen wäre das sonst ein N+1 über die gesamte Ledger-Ladung.
     const [zeilen, teile] = await Promise.all([
       db.select<Zeile[]>(
-        `SELECT id, datum, betrag, konto_id, kategorie_id, charakter, quelle, notiz,
-                transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit,
+        `SELECT id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter,
+                quelle, notiz, transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit,
                 verwendung_topf_id, roh_hash
            FROM ist_buchung ORDER BY datum`,
       ),
@@ -64,6 +65,7 @@ export const sqliteLedgerRepository: LedgerPort = {
         betrag: z.betrag,
         kontoId: z.konto_id,
         kategorieId: z.kategorie_id ?? undefined,
+        kategorieHerkunft: (z.kategorie_herkunft as Kategorieherkunft | null) ?? undefined,
         charakter: z.charakter as Charakter,
         quelle: z.quelle as IstQuelle,
         notiz: z.notiz ?? undefined,
@@ -84,10 +86,11 @@ export const sqliteLedgerRepository: LedgerPort = {
     const db = await getDb();
     await db.execute(
       `INSERT INTO ist_buchung
-         (id, datum, betrag, konto_id, kategorie_id, charakter, quelle, notiz, transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit, verwendung_topf_id, roh_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+         (id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter, quelle, notiz, transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit, verwendung_topf_id, roh_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        ON CONFLICT(id) DO UPDATE SET datum = excluded.datum, betrag = excluded.betrag,
          konto_id = excluded.konto_id, kategorie_id = excluded.kategorie_id,
+         kategorie_herkunft = excluded.kategorie_herkunft,
          charakter = excluded.charakter, quelle = excluded.quelle, notiz = excluded.notiz,
          transfer_id = excluded.transfer_id, gegenkonto_id = excluded.gegenkonto_id,
          plan_quelle_id = excluded.plan_quelle_id, plan_faelligkeit = excluded.plan_faelligkeit,
@@ -98,6 +101,9 @@ export const sqliteLedgerRepository: LedgerPort = {
         b.betrag,
         b.kontoId,
         b.kategorieId ?? null,
+        // Die Spalte ist NOT NULL: ein fehlendes Feld heißt „automatisch" (siehe
+        // core/istbuchung#Kategorieherkunft) und wird hier explizit dazu gemacht.
+        b.kategorieHerkunft ?? "automatisch",
         b.charakter,
         b.quelle,
         b.notiz ?? null,

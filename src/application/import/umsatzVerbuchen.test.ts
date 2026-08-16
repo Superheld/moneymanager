@@ -110,3 +110,25 @@ describe("umsaetzeVerbuchen", () => {
     expect(ledger).toHaveLength(0);
   });
 });
+
+describe("Herkunft der Kategorie beim Verbuchen", () => {
+  it("Remapping-Vorschlag wird als automatisch verbucht (bleibt korrigierbar)", async () => {
+    const { deps, ledger } = fakes();
+    await umsaetzeVerbuchen(
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      deps,
+    );
+    expect(ledger[0].kategorieHerkunft).toBe("automatisch");
+  });
+
+  it("in der Inbox von Hand kategorisiert bleibt manuell", async () => {
+    const { deps, ledger } = fakes();
+    await umsaetzeVerbuchen(
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "manuell" } })],
+      deps,
+    );
+    // Das ist die Zusage, an der die Reversibilität hängt: wer in der Review-Inbox
+    // entscheidet, soll das nicht beim nächsten Abgleich zurückbekommen.
+    expect(ledger[0].kategorieHerkunft).toBe("manuell");
+  });
+});

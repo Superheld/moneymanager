@@ -73,7 +73,15 @@ export async function buchungSplitten(
  * ändert sich nicht.
  */
 export async function splitAufheben(ledger: LedgerPort, buchung: IstBuchung): Promise<IstBuchung> {
-  const ungeteilt: IstBuchung = { ...buchung, aufteilungen: undefined, kategorieId: undefined };
+  // Auch die Herkunft zurücksetzen: die Buchung steht jetzt ohne Kategorie da, und ein
+  // stehengebliebenes „manuell" würde sie dauerhaft von jeder Automatik ausschließen —
+  // ausgerechnet in dem Zustand, in dem sie einen Vorschlag am nötigsten hat.
+  const ungeteilt: IstBuchung = {
+    ...buchung,
+    aufteilungen: undefined,
+    kategorieId: undefined,
+    kategorieHerkunft: undefined,
+  };
   await ledger.speichern(ungeteilt);
   return ungeteilt;
 }
