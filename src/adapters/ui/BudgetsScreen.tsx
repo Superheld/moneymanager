@@ -150,7 +150,7 @@ export function BudgetsScreen() {
 
   function verbrauch(b: Budget): number {
     const { von, bis } = periodeFenster(b.periode, heute);
-    return budgetVerbrauch(ist, b.kategorieId, von, bis);
+    return budgetVerbrauch(ist, kategorien, b.kategorieId, von, bis);
   }
 
   const summeMonatlich = useMemo(() => {
