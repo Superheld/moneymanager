@@ -5,7 +5,7 @@
 import { addMonate, parseIso } from "./datum";
 import type { Cent } from "./geld";
 import type { Charakter } from "./zahlungsregel";
-import type { IstBuchung } from "./istbuchung";
+import { kategorieAnteile, type IstBuchung } from "./istbuchung";
 import type { Kategorie } from "./kategorie";
 import { liquideMittel, type Zahlungskonto } from "./konto";
 
@@ -113,11 +113,16 @@ export function kategorieAggregat(
   for (const b of buchungen) {
     const key = monatVon(b.datum);
     if (key < vonLabel || key > bisLabel) continue;
-    const id = b.kategorieId ?? OHNE;
-    const e = map.get(id) ?? { summe: 0, anzahl: 0, charakter: b.charakter };
-    e.summe += b.betrag;
-    e.anzahl++;
-    map.set(id, e);
+    // Eine geteilte Buchung (S-7) erscheint in jeder ihrer Kategorien mit ihrem Teil.
+    // `anzahl` zählt sie dabei in jeder mit — sie IST dort ein Posten; die Summe über
+    // alle Zeilen bleibt trotzdem der Buchungsbetrag.
+    for (const a of kategorieAnteile(b)) {
+      const id = a.kategorieId ?? OHNE;
+      const e = map.get(id) ?? { summe: 0, anzahl: 0, charakter: b.charakter };
+      e.summe += a.betrag;
+      e.anzahl++;
+      map.set(id, e);
+    }
   }
 
   return [...map.entries()]
@@ -159,8 +164,22 @@ export function buchungenDerKategorie(
   const vonL = vonIso.slice(0, 7);
   const bisL = bisIso.slice(0, 7);
   return buchungen
-    .filter((b) => b.kategorieId === kategorieId && monatVon(b.datum) >= vonL && monatVon(b.datum) <= bisL)
+    .filter(
+      (b) =>
+        monatVon(b.datum) >= vonL &&
+        monatVon(b.datum) <= bisL &&
+        kategorieAnteile(b).some((a) => a.kategorieId === kategorieId),
+    )
     .sort((a, b) => b.datum.localeCompare(a.datum));
+}
+
+/**
+ * Der Betrag, mit dem eine Buchung auf EINE Kategorie wirkt — bei einer geteilten Buchung
+ * ihr Teil, sonst der volle Betrag. Für Detaillisten, die sonst den Gesamtbetrag zeigten
+ * und damit mehr, als in dieser Kategorie steckt.
+ */
+export function betragInKategorie(b: IstBuchung, kategorieId: string): Cent {
+  return kategorieAnteile(b).reduce((s, a) => (a.kategorieId === kategorieId ? s + a.betrag : s), 0);
 }
 
 /** Frühester Buchungsmonat als „YYYY-MM-01", oder undefined bei leerer Liste. */

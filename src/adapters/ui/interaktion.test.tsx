@@ -546,3 +546,125 @@ describe("Buchungsdetails", () => {
     });
   });
 });
+
+// S-7 — Buchung splitten. Der Weg vom Dialog bis in die Datenbank UND zurück: die
+// Aufteilung muss die Rundreise durch echtes SQLite überstehen, sonst nützt sie nichts.
+describe("Buchung splitten", () => {
+  const heute = "2026-08-12";
+
+  async function einkaufAnlegen() {
+    await grunddaten();
+    await sqliteKategorieRepository.speichern({
+      id: "kat2", name: "Drogerie", defaultCharakter: "Aufwand",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -5200, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Wocheneinkauf",
+    });
+  }
+
+  // Der Kontoname steht zweimal da, sobald das Konto aktiv ist (Tabelle + Kopfzeile) —
+  // deshalb der erste Treffer statt findByText, das bei Mehrdeutigkeit wirft.
+  async function detailOeffnen(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+  }
+
+  it("speichert die Aufteilung und liest sie aus SQLite zurück", async () => {
+    await einkaufAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer);
+    await nutzer.click(await screen.findByRole("button", { name: /auf Kategorien aufteilen/i }));
+
+    // Zeile 1 ist mit dem vollen Betrag vorbelegt — auf 40 korrigieren, Rest auf Zeile 2.
+    const betrag1 = await screen.findByLabelText(/Betrag 1/i);
+    await nutzer.clear(betrag1);
+    await nutzer.type(betrag1, "40");
+    await nutzer.type(await screen.findByLabelText(/Betrag 2/i), "12");
+
+    // Kategorie der zweiten Zeile setzen (die erste trägt schon kat1). Der
+    // CategoryPicker ist ein Button mit Such-Modal, kein natives <select>.
+    await nutzer.click(await screen.findByRole("button", { name: /wählen/i }));
+    await nutzer.click(await screen.findByText("Drogerie"));
+
+    await nutzer.click(((a) => a[a.length - 1]!)(screen.getAllByRole("button", { name: /speichern/i })));
+
+    await waitFor(async () => {
+      const [b] = await sqliteLedgerRepository.alle();
+      expect(b.betrag).toBe(-5200); // Ledger-Betrag unberührt
+      expect(b.kategorieId).toBeUndefined();
+      expect(b.aufteilungen).toEqual([
+        { kategorieId: "kat1", betrag: -4000, notiz: undefined },
+        { kategorieId: "kat2", betrag: -1200, notiz: undefined },
+      ]);
+    });
+  });
+
+  it("speichert nicht, solange die Teile den Betrag nicht treffen", async () => {
+    await einkaufAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer);
+    await nutzer.click(await screen.findByRole("button", { name: /auf Kategorien aufteilen/i }));
+
+    const betrag1 = await screen.findByLabelText(/Betrag 1/i);
+    await nutzer.clear(betrag1);
+    await nutzer.type(betrag1, "40"); // 12 € bleiben offen
+    await nutzer.click(await screen.findByRole("button", { name: /wählen/i }));
+    await nutzer.click(await screen.findByText("Drogerie"));
+
+    await nutzer.click(((a) => a[a.length - 1]!)(screen.getAllByRole("button", { name: /speichern/i })));
+
+    // Nichts gespeichert, und der Dialog sagt warum.
+    await waitFor(() => expect(document.body.textContent).toMatch(/genau treffen|zu verteilen/i));
+    const [b] = await sqliteLedgerRepository.alle();
+    expect(b.aufteilungen).toBeUndefined();
+  });
+
+  it("hebt eine bestehende Aufteilung wieder auf", async () => {
+    await einkaufAnlegen();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -5200, kontoId: "k1", charakter: "Aufwand",
+      quelle: "manuell", notiz: "Wocheneinkauf",
+      aufteilungen: [
+        { kategorieId: "kat1", betrag: -4000 },
+        { kategorieId: "kat2", betrag: -1200 },
+      ],
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer);
+    await nutzer.click(await screen.findByRole("button", { name: /aufteilung aufheben/i }));
+
+    await waitFor(async () => {
+      const [b] = await sqliteLedgerRepository.alle();
+      expect(b.aufteilungen).toBeUndefined();
+      expect(b.betrag).toBe(-5200);
+    });
+  });
+
+  it("räumt die Teile mit weg, wenn die Buchung gelöscht wird", async () => {
+    await einkaufAnlegen();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -5200, kontoId: "k1", charakter: "Aufwand",
+      quelle: "manuell",
+      aufteilungen: [
+        { kategorieId: "kat1", betrag: -4000 },
+        { kategorieId: "kat2", betrag: -1200 },
+      ],
+    });
+
+    await sqliteLedgerRepository.loeschen("i1");
+
+    // Verwaiste Teile würden bei einer neuen Buchung mit derselben Id wieder auftauchen.
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -100, kontoId: "k1", charakter: "Aufwand", quelle: "manuell",
+    });
+    const [b] = await sqliteLedgerRepository.alle();
+    expect(b.aufteilungen).toBeUndefined();
+  });
+});
