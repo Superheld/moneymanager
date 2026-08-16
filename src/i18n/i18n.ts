@@ -24,7 +24,7 @@ const de = {
   charakter: {
     Aufwand: "Aufwand",
     Ertrag: "Ertrag",
-    Umschichtung: "Umschichtung",
+    Umschichtung: "Sparen & Vorsorge",
   },
   // Fehler-Codes (FachlicherFehler.code) → Text. Verschachtelt, weil i18next Punkte als
   // Pfadtrenner liest: code "betrag.groesserNull" → fehler.betrag.groesserNull.
@@ -131,7 +131,7 @@ const de = {
     spalteGegenpartei: "Empfänger / Sender",
     spalteBetrag: "Betrag",
     spalteKategorie: "Kategorie",
-    umbuchung: "↔ Umbuchung (Umschichtung)",
+    umbuchung: "↔ Umbuchung (keine Ausgabe)",
     verbuchen: "Verbuchen ({{n}})",
     verbuchenBusy: "Verbuche …",
     verbuchtErgebnis: "{{verbucht}} verbucht ({{umbuchungen}} Umbuchungen) · {{uebersprungen}} übersprungen",
@@ -168,7 +168,7 @@ const de = {
     alleMonate: "Alle Monate",
     sektionAusgaben: "Ausgaben",
     sektionEinnahmen: "Einnahmen",
-    sektionUmschichtung: "Umschichtungen",
+    sektionUmschichtung: "Sparen & Vorsorge",
     umbuchungen: "Umbuchungen (zwischen Konten)",
     katLeer: "Keine Buchungen in diesem Zeitraum.",
     ohneKategorie: "(ohne Kategorie)",
@@ -199,7 +199,7 @@ const de = {
     spalteEinnahmen: "Einnahmen",
     spalteAusgaben: "Ausgaben",
     spalteNetto: "Netto",
-    spalteUmschichtung: "Umschichtung",
+    spalteUmschichtung: "Zurückgelegt",
     spalteSaldo: "Saldo",
   },
   budgets: {
@@ -411,7 +411,7 @@ const de = {
       neu: "Gegenbein neu erzeugen auf",
       neuHinweis: "Für Konten, die nicht importiert werden — typisch Bargeld.",
       bestaetigen: "Umbuchung anlegen",
-      kategorieHinweis: "Die Kategorie entfällt: eine Umschichtung zählt nicht ins Budget.",
+      kategorieHinweis: "Die Kategorie entfällt: verschobenes Geld zählt nicht ins Budget.",
     },
     paarung: {
       titel: "Umbuchung",
@@ -711,7 +711,7 @@ const en: typeof de = {
   charakter: {
     Aufwand: "Expense",
     Ertrag: "Income",
-    Umschichtung: "Transfer",
+    Umschichtung: "Savings & provision",
   },
   fehler: {
     kategorie: {
@@ -816,7 +816,7 @@ const en: typeof de = {
     spalteGegenpartei: "Payee / Payer",
     spalteBetrag: "Amount",
     spalteKategorie: "Category",
-    umbuchung: "↔ Transfer (reallocation)",
+    umbuchung: "↔ Transfer (not an expense)",
     verbuchen: "Post ({{n}})",
     verbuchenBusy: "Posting …",
     verbuchtErgebnis: "{{verbucht}} posted ({{umbuchungen}} transfers) · {{uebersprungen}} skipped",
@@ -853,7 +853,7 @@ const en: typeof de = {
     alleMonate: "All months",
     sektionAusgaben: "Expenses",
     sektionEinnahmen: "Income",
-    sektionUmschichtung: "Reallocations",
+    sektionUmschichtung: "Savings & provision",
     umbuchungen: "Transfers (between accounts)",
     katLeer: "No transactions in this period.",
     ohneKategorie: "(uncategorised)",
@@ -884,7 +884,7 @@ const en: typeof de = {
     spalteEinnahmen: "Income",
     spalteAusgaben: "Expenses",
     spalteNetto: "Net",
-    spalteUmschichtung: "Reallocation",
+    spalteUmschichtung: "Set aside",
     spalteSaldo: "Balance",
   },
   budgets: {
@@ -1096,7 +1096,7 @@ const en: typeof de = {
       neu: "Create the counter entry on",
       neuHinweis: "For accounts that are never imported — typically cash.",
       bestaetigen: "Create transfer",
-      kategorieHinweis: "The category is dropped: a transfer does not count against a budget.",
+      kategorieHinweis: "The category is dropped: moved money does not count against a budget.",
     },
     paarung: {
       titel: "Transfer",
