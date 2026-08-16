@@ -20,10 +20,8 @@ import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { InventarScreen } from "./InventarScreen";
 import { BudgetsScreen } from "./BudgetsScreen";
-import { PlanungScreen } from "./PlanungScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteTopfRepository } from "../persistence/sqliteTopfRepository";
-import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import {
   sqliteKategorieRepository,
   sqliteZahlungskontoRepository,
@@ -177,27 +175,3 @@ describe("Einstellungen — Formularpfade", () => {
   });
 });
 
-describe("Übersicht — mit Plandaten", () => {
-  it("stellt Plan und Bestand gegenüber", async () => {
-    await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 300000,
-    });
-    await sqliteZahlungsregelRepository.speichern({
-      id: "z1", bezeichnung: "Gehalt", betrag: 250000, rhythmus: "monatlich",
-      startdatum: "2026-01-01", charakter: "Ertrag",
-    });
-    await sqliteZahlungsregelRepository.speichern({
-      id: "z2", bezeichnung: "Miete", betrag: -90000, rhythmus: "monatlich",
-      startdatum: "2026-01-01", charakter: "Aufwand",
-    });
-    await sqliteTopfRepository.speichern({
-      id: "t1", typ: "puffer", bezeichnung: "Reparaturen", start: "2020-01-01",
-      schaetzbetrag: 50000, fristMonate: 12,
-    });
-
-    rendere(<PlanungScreen />);
-    await waitFor(() => expect(document.body.textContent).toMatch(/3\.000,00/));
-    // Die Töpfe mindern die frei verfügbare Liquidität — der Wert muss auftauchen.
-    expect(document.body.textContent).toMatch(/500,00|2\.500,00/);
-  });
-});

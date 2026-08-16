@@ -29,7 +29,6 @@ import {
   sqliteImportLaufRepository,
   sqliteUmsatzRepository,
 } from "../persistence/sqliteImportRepositories";
-import { sqliteTopfRepository } from "../persistence/sqliteTopfRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import {
@@ -60,7 +59,7 @@ describe("AppShell", () => {
     const nutzer = userEvent.setup();
     const gewechseltZu: string[] = [];
     rendere(
-      <AppShell current="planung" onNavigate={(id) => gewechseltZu.push(id)}>
+      <AppShell current="historie" onNavigate={(id) => gewechseltZu.push(id)}>
         <div>Inhalt</div>
       </AppShell>,
     );
@@ -171,7 +170,7 @@ describe("Vertrag anlegen", () => {
 });
 
 describe("Inventar anlegen", () => {
-  it("legt einen Gegenstand an und erzeugt dabei den Ersatz-Topf", async () => {
+  it("legt einen Gegenstand an", async () => {
     const nutzer = userEvent.setup();
     rendere(<InventarScreen />);
 
@@ -197,19 +196,31 @@ describe("Inventar anlegen", () => {
     });
   });
 
-  it("zeigt Gegenstand und abgeleiteten Topf zusammen", async () => {
+  it("zeigt Gegenstand, Monatsrücklage und Wiederbeschaffung", async () => {
     await sqliteInventarRepository.speichern({
       id: "g1", bezeichnung: "Trockner", anschaffung: "2024-01-01",
       wiederbeschaffung: 50000, nutzungsdauerMonate: 100,
     });
-    await sqliteTopfRepository.speichern({
-      id: "t1", typ: "ersatz", bezeichnung: "Trockner", start: "2024-01-01",
-      wiederbeschaffung: 50000, nutzungsdauerMonate: 100, inventarId: "g1",
-    });
     rendere(<InventarScreen />);
     expect((await screen.findAllByText(/Trockner/)).length).toBeGreaterThan(0);
-    // 500,00 Zielwert bzw. 5,00 Monatsrate müssen auftauchen.
+    // 500,00 Wiederbeschaffung bzw. 5,00 Monatsrücklage müssen auftauchen.
     await waitFor(() => expect(document.body.textContent).toMatch(/500,00|5,00/));
+  });
+
+  // Ohne Konto gibt es nur die Rechnung; mit Konto wird sie anteilig gegen den realen
+  // Stand abgeglichen. Der Test sucht nach den DATEN, die er selbst angelegt hat.
+  it("gleicht die Rücklage gegen den realen Stand des zugeordneten Kontos ab", async () => {
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k-rueck", bezeichnung: "Rücklagenkonto", typ: "Giro", saldo: 12500, inhaberIds: [],
+    });
+    await sqliteInventarRepository.speichern({
+      id: "g1", bezeichnung: "Trockner", anschaffung: "2024-01-01",
+      wiederbeschaffung: 50000, nutzungsdauerMonate: 100, kontoId: "k-rueck",
+    });
+    rendere(<InventarScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Rücklagenkonto/));
+    // Auf dem Konto liegen 125,00 — die müssen als tatsächlich gedeckter Teil auftauchen.
+    await waitFor(() => expect(document.body.textContent).toMatch(/125,00/));
   });
 });
 
