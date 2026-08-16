@@ -272,3 +272,21 @@ select.field {
 .linkbtn:hover {
   color: var(--warn-deep);
 }
+
+/* --- Monatsausblick: drei Karten im goldenen Schnitt ---
+   Der laufende Monat trägt eine Zahlenspalte mehr und bekommt die breite Seite
+   (38,2 %); die beiden Vorschauen teilen sich den Rest. Eine hälftige Aufteilung
+   liesse den Vorschauen bei 1040 px Screen-Breite nur rund 110 px für die
+   Beschriftung — dort steht dann alles als Ellipse.
+   Unter 900 px stapeln die Karten; nebeneinander wären sie nicht mehr lesbar. */
+.ausblick-karten {
+  display: grid;
+  grid-template-columns: 1.236fr 1fr 1fr;
+  gap: var(--gap-card);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .ausblick-karten {
+    grid-template-columns: 1fr;
+  }
+}

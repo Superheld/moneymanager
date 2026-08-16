@@ -138,7 +138,7 @@ const de = {
   },
   // Monatsausblick — die drei Karten oben in der Übersicht.
   ausblick: {
-    untertitelLaufend: "geplant und bereits gebucht",
+    untertitelLaufend: "gebucht und geplant",
     untertitelVorschau: "was der Plan sagt",
     pillLaufend: "läuft",
     pillVorschau: "Vorschau",
@@ -879,7 +879,7 @@ const en: typeof de = {
     seite: "Page {{seite}} / {{gesamt}}",
   },
   ausblick: {
-    untertitelLaufend: "planned and already posted",
+    untertitelLaufend: "posted and planned",
     untertitelVorschau: "what the plan says",
     pillLaufend: "current",
     pillVorschau: "preview",
