@@ -10,6 +10,9 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "resolveJsonModule": true,
+    /* TypeScript 7 zieht @types/* nicht mehr von selbst herein — was global gelten soll,
+       steht hier. Alles andere (React, sql.js …) kommt ohnehin über die Importe. */
+    "types": ["node"],
     "isolatedModules": true,
     "noEmit": true,
     "jsx": "react-jsx",

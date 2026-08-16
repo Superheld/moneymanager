@@ -58,7 +58,10 @@ function csv(...zeilen: string[][]) {
 
 /** Legt eine Datei in das Dateifeld des Screens. */
 async function dateiWaehlen(nutzer: ReturnType<typeof userEvent.setup>, inhalt: Uint8Array) {
-  const datei = new File([inhalt], "export.xlsx", {
+  // `Uint8Array` ist seit TS 5.7 generisch über den Puffertyp; `BlobPart` verlangt einen
+  // echten ArrayBuffer, ein SharedArrayBuffer wäre nicht zulässig. Die Kopie erzwingt den
+  // engeren Typ, statt ihn per `as` zu behaupten — und kostet in einem Test nichts.
+  const datei = new File([new Uint8Array(inhalt)], "export.xlsx", {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   });
   const eingabe = document.querySelector('input[type="file"]') as HTMLInputElement;
