@@ -7,6 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Kategorie, Zahlungskonto } from "../../core";
 import { kategorisieren, umsaetzeVerbuchen, type Umsatz, type VerbuchenErgebnis } from "../../application/import";
+import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
+import { vertragsAbgleichDeps } from "../persistence/sqliteVertragZuordnungRepositories";
 import {
   sqliteKategorieRepository,
   sqliteZahlungskontoRepository,
@@ -107,6 +109,11 @@ export function ReviewScreen() {
         id: () => crypto.randomUUID(),
       });
       setVerb(ergebnis);
+      // Frisch verbuchte Zahlungen sofort den Verträgen zuordnen — das ist der Weg, über
+      // den neue Buchungen ihre Kennzeichnung bekommen, ohne dass jemand etwas anklickt.
+      // Bewusst HIER und nicht in `umsaetzeVerbuchen`: der Use-Case schreibt Fakten ins
+      // Ledger, die Zuordnung ist eine Interpretation darüber.
+      await zuordnungenAbgleichen(vertragsAbgleichDeps);
       await laden(); // verbuchte fallen aus „offene" raus
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));

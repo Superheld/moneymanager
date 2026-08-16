@@ -46,7 +46,8 @@ function indexExistiert(db: Database, name: string): boolean {
 const ERWARTETE_TABELLEN = [
   "budget", "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
   "ist_buchung_aufteilung", "kategorie", "person", "topf",
-  "umsatz", "vertrag", "zahlungskonto", "zahlungsregel",
+  "umsatz", "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
+  "zahlungskonto", "zahlungsregel",
 ];
 
 describe("Migrationen — frische Anwendung der ganzen Kette", () => {

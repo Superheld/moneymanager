@@ -23,6 +23,13 @@ import {
   type Zahlungsregel,
 } from "../../core";
 import { vertragAktualisieren, vertragAnlegen } from "../../application/vertragAnlegen";
+import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
+import {
+  sqliteVertragserkennungRepository,
+  sqliteVertragszuordnungRepository,
+  vertragsAbgleichDeps,
+} from "../persistence/sqliteVertragZuordnungRepositories";
+
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
 import {
@@ -34,6 +41,12 @@ import { Button, FormField } from "./ds";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
 import { useGeld, fehlerNachricht, type Geld } from "./einstellungenKontext";
+
+/** Die Zuordnungsseite, die `vertragAnlegen`/`vertragAktualisieren` mitpflegen. */
+const zuordnungsDeps = {
+  erkennungRepo: sqliteVertragserkennungRepository,
+  zuordnungRepo: sqliteVertragszuordnungRepository,
+};
 
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
@@ -57,6 +70,12 @@ export interface VertragFormular {
   charakter: Charakter;
   kategorieId: string;
   kontoId: string;
+  /**
+   * SEPA-Gläubiger-ID aus einem übernommenen Vorschlag. Kein Eingabefeld — sie wird
+   * durchgereicht, nicht getippt. Sie landet in der Erkennungsregel des Vertrags, wo sie
+   * der präziseste Schlüssel ist, den es gibt (siehe core/vertragZuordnung).
+   */
+  glaeubigerId: string;
 }
 
 /** Leere Maske; `heute` belegt Beginn und erste Zahlung vor. */
@@ -75,6 +94,7 @@ export function leeresFormular(heute: string): VertragFormular {
     charakter: "Aufwand",
     kategorieId: "",
     kontoId: "",
+    glaeubigerId: "",
   };
 }
 
@@ -99,6 +119,9 @@ export function formularAusVertrag(v: Vertrag, r: Zahlungsregel | undefined, gel
     charakter: r?.charakter ?? "Aufwand",
     kategorieId: r?.kategorieId ?? "",
     kontoId: r?.kontoId ?? "",
+    // Beim Bearbeiten steht die Erkennungsregel nicht zur Debatte — sie hat ihre eigene
+    // Maske und darf hier nicht überschrieben werden.
+    glaeubigerId: "",
   };
 }
 
@@ -116,6 +139,7 @@ export function formularAusKandidat(k: Vertragskandidat, heute: string, geld: Ge
     // Das Konto, über das die erkannten Zahlungen tatsächlich liefen — steht in den
     // Buchungen und muss nicht noch einmal gesucht werden.
     kontoId: k.kontoId ?? "",
+    glaeubigerId: k.glaeubigerId ?? "",
   };
 }
 
@@ -276,10 +300,15 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
       charakter: f.charakter,
       kategorieId: f.kategorieId || undefined,
       kontoId: f.kontoId || undefined,
+      glaeubigerId: f.glaeubigerId || undefined,
     };
     try {
-      if (editId) await vertragAktualisieren(vertragRepo, regelRepo, editId, eingabe);
-      else await vertragAnlegen(vertragRepo, regelRepo, eingabe);
+      if (editId) await vertragAktualisieren(vertragRepo, regelRepo, editId, eingabe, zuordnungsDeps);
+      else await vertragAnlegen(vertragRepo, regelRepo, eingabe, zuordnungsDeps);
+      // Der frisch erfasste Vertrag muss RÜCKWIRKEND greifen: seine Zahlungen liegen
+      // längst im Bestand. Ohne diesen Lauf trüge nur, was danach gebucht wird, seine
+      // Zuordnung — und der Vertrag stünde in der Liste, ohne je eine Buchung zu kennen.
+      await zuordnungenAbgleichen(vertragsAbgleichDeps);
       await onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
