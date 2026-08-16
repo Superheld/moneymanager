@@ -707,6 +707,24 @@ describe("Vertrag aus einer Buchung", () => {
     expect(regel?.startdatum).toBe(heute);
   });
 
+  it("kennzeichnet eine Buchung, deren Empfänger schon als Vertrag erfasst ist", async () => {
+    await zahlungAnlegen();
+    // Andere Schreibweise als im Umsatz — zugeordnet wird über den normalisierten
+    // Namen, sonst hinge die Kennzeichnung daran, wie die Bank den Empfänger schreibt.
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Telefonica Germany", beginn: "2025-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer);
+    await screen.findByText("Telefonica Germany");
+    // Der Anlege-Weg ist weg — sonst legte man beim zweiten Blick denselben Vertrag
+    // ein zweites Mal an.
+    expect(screen.queryByRole("button", { name: /vertrag daraus machen/i })).toBeNull();
+  });
+
   it("bietet den Weg bei einem Umbuchungs-Bein nicht an", async () => {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
