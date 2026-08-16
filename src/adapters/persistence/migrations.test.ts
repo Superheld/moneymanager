@@ -72,8 +72,29 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     // v9/v10/v11/v13
     expect(spalten(db, "umsatz")).toContain("glaeubiger_id"); // v16
     expect(spalten(db, "ist_buchung")).toEqual(
-      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "verwendung_topf_id", "roh_hash"]),
+      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "verwendung_topf_id", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
     );
+    db.close();
+  });
+
+  /**
+   * v20 fügt die Spalte MIT Default hinzu — und der Default ist die eigentliche Aussage
+   * der Migration: der Bestand kam über den Import und das FG-Remapping herein, also
+   * automatisch. Ohne ihn stünde dort NULL, und der erste rückwirkende Lauf müsste raten,
+   * ob er 5279 Zeilen anfassen darf.
+   */
+  it("gibt bestehenden Ist-Buchungen die Kategorie-Herkunft „automatisch“ (v20)", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 19); // Stand VOR der neuen Spalte
+    db.run(
+      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle)
+       VALUES ('alt', '2026-01-15', -1234, 'k1', 'kat-lebensmittel', 'Aufwand', 'import')`,
+    );
+
+    apply(db, 19, 20);
+
+    const r = db.exec("SELECT kategorie_herkunft FROM ist_buchung WHERE id = 'alt'");
+    expect(String(r[0].values[0][0])).toBe("automatisch");
     db.close();
   });
 

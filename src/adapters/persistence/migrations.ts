@@ -310,4 +310,23 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_vertrag_zuordnung_vertrag ON vertrag_zuordnung (vertrag_id)`,
     ],
   },
+  {
+    version: 20, // Herkunft der KATEGORIE an der Ist-Buchung (Fundament der Auto-Kategorisierung)
+    sql: [
+      // `quelle` sagt, woher die BUCHUNG kommt (import/manuell/bezahlt-markiert) — nicht,
+      // woher ihre KATEGORIE kommt. Solange das fehlt, kann ein automatischer Lauf nicht
+      // unterscheiden, ob er einen eigenen früheren Treffer korrigiert oder eine
+      // Handentscheidung plattmacht. Dasselbe Problem war bei Vertrag ↔ Buchung schon
+      // gelöst (vertrag_zuordnung.herkunft, Migration 19); hier fehlte es.
+      //
+      // DEFAULT 'automatisch' ist für den Bestand fachlich richtig: er stammt aus einem
+      // Import und wurde über das Finanzguru-Remapping kategorisiert, nicht von Hand.
+      // Damit greift ein späterer Abgleich auf allem, was nie jemand angefasst hat —
+      // und lässt genau das in Ruhe, was jemand angefasst hat.
+      //
+      // Reines Anlegen mit Default, kein Datenumbau — wiederholbar (`migrate()`
+      // überspringt einen Zugang, dessen Spalte schon existiert).
+      `ALTER TABLE ist_buchung ADD COLUMN kategorie_herkunft TEXT NOT NULL DEFAULT 'automatisch'`,
+    ],
+  },
 ];
