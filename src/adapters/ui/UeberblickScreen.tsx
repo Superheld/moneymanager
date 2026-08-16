@@ -443,7 +443,7 @@ function SzenarioCard({
               <input className="field" value={pBez} onChange={(e) => setPBez(e.target.value)} placeholder={t("ueberblick.feldBezeichnungPlaceholder")} />
             </FormField>
             <FormField label={t("ueberblick.feldBetrag")} hint={t("ueberblick.feldBetragHinweis")}>
-              <input className="field" inputMode="decimal" value={pBetrag} onChange={(e) => setPBetrag(e.target.value)} placeholder="0,00" />
+              <input className="field" inputMode="decimal" value={pBetrag} onChange={(e) => setPBetrag(e.target.value)} placeholder={geld.format(0)} />
             </FormField>
             <FormField label={t("ueberblick.feldRhythmus")}>
               <select className="field" value={pRhythmus} onChange={(e) => setPRhythmus(e.target.value as Rhythmus)}>
