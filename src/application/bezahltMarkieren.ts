@@ -47,6 +47,10 @@ export async function postenBezahltMarkieren(
     betrag: e.regel.betrag,
     kontoId,
     kategorieId: e.regel.kategorieId,
+    // Die Kategorie stammt aus der Zahlungsregel — die hat jemand von Hand angelegt und
+    // dabei genau diese Kategorie gewählt. Kein Ratespiel, das eine Automatik korrigieren
+    // dürfte.
+    kategorieHerkunft: e.regel.kategorieId ? "manuell" : undefined,
     charakter: e.regel.charakter,
     quelle: "bezahlt-markiert",
     planRef: { quelleId: e.regel.id, faelligkeit: e.faelligkeit },
