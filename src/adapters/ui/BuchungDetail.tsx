@@ -55,6 +55,7 @@ import {
 import { Button, FormField, Pill } from "./ds";
 import { formularAusBuchung, VertragModal } from "./VertragModal";
 import { CategoryPicker } from "./CategoryPicker";
+import { MerkmaleBlock } from "./MerkmaleBlock";
 import { Modal } from "./Modal";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
 
@@ -309,6 +310,10 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
           )}
         </div>
       )}
+
+      {/* Was die automatische Erkennung aus dieser Buchung macht — und die Stelle, an
+          der sich ihre Wortlisten am konkreten Fall pflegen lassen. */}
+      <MerkmaleBlock buchung={buchung} umsatz={umsatz} />
 
       {/* Umbuchungs-Abschnitt: Einstieg (S-1) bzw. Gegenbuchung und Paarung lösen */}
       <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
