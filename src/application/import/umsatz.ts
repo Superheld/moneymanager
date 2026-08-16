@@ -15,7 +15,13 @@ import { FachlicherFehler, type Cent, type Charakter } from "../../core";
 export type UmsatzStatus = "neu" | "verbucht" | "duplikat" | "verworfen";
 
 /** Woher der Kategorie-Vorschlag stammt — Transparenz und Basis des späteren Lern-Loops. */
-export type VorschlagQuelle = "remapping" | "umbuchung" | "manuell" | "regel" | "ki";
+export type VorschlagQuelle =
+  | "remapping"
+  | "umbuchung"
+  | "manuell"
+  | "festlegung"
+  | "regel"
+  | "ki";
 
 export interface Kategorisierungsvorschlag {
   /** Ziel-Kategorie; optional, weil Umbuchungen/unklare (noch) keine konkrete Kategorie haben. */
