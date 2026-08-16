@@ -451,7 +451,7 @@ describe("budgetVerbrauch — Erstattungen", () => {
       ist({ betrag: -5000, datum: "2026-06-05", kategorieId: "lebensmittel", charakter: "Aufwand" }),
       ist({ betrag: 2000, datum: "2026-06-12", kategorieId: "lebensmittel", charakter: "Aufwand" }),
     ];
-    expect(budgetVerbrauch(buchungen, "lebensmittel", "2026-06-01", "2026-07-01")).toBe(3000);
+    expect(budgetVerbrauch(buchungen, [], "lebensmittel", "2026-06-01", "2026-07-01")).toBe(3000);
   });
 
   // [GRÜN] reine Abflüsse werden korrekt aufsummiert und gefenstert.
@@ -462,7 +462,7 @@ describe("budgetVerbrauch — Erstattungen", () => {
       ist({ betrag: -2000, datum: "2026-06-07", kategorieId: "andere", charakter: "Aufwand" }),
       ist({ betrag: -3000, datum: "2026-06-08", kategorieId: "lebensmittel", charakter: "Umschichtung" }),
     ];
-    expect(budgetVerbrauch(buchungen, "lebensmittel", "2026-06-01", "2026-07-01")).toBe(5000);
+    expect(budgetVerbrauch(buchungen, [], "lebensmittel", "2026-06-01", "2026-07-01")).toBe(5000);
   });
 });
 

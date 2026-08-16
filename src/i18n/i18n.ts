@@ -136,6 +136,41 @@ const de = {
     verbuchtErgebnis: "{{verbucht}} verbucht ({{umbuchungen}} Umbuchungen) · {{uebersprungen}} übersprungen",
     seite: "Seite {{seite}} / {{gesamt}}",
   },
+  // Monatsausblick — die drei Karten oben in der Übersicht.
+  ausblick: {
+    untertitelLaufend: "geplant und bereits gebucht",
+    untertitelVorschau: "was der Plan sagt",
+    pillLaufend: "läuft",
+    pillVorschau: "Vorschau",
+    spaltePlan: "geplant",
+    spalteIst: "gebucht",
+    bleibt: "Bleibt",
+    statusBezahlt: "abgehakt",
+    statusOffen: "offen",
+    zeile: {
+      einnahmen: "Einnahmen",
+      vertraege: "Verträge",
+      budgets: "Budgets",
+      umschichtung: "Sparen & Vorsorge",
+      sonstiges: "Sonstiges",
+    },
+    // Sammelposten: gebucht, aber ohne geplanten Posten dahinter.
+    sammel: {
+      einnahmen: "weitere Einnahmen",
+      vertraege: "weitere Zahlungen",
+      umschichtung: "weitere Umbuchungen",
+      sonstiges: "ohne Budget und Vertrag",
+      budgets: "ohne Budget",
+    },
+    monat: {
+      1: "Januar", 2: "Februar", 3: "März", 4: "April", 5: "Mai", 6: "Juni",
+      7: "Juli", 8: "August", 9: "September", 10: "Oktober", 11: "November", 12: "Dezember",
+    },
+    hinweisKeineEinnahmen:
+      "Für keinen der drei Monate sind Einnahmen geplant. Einnahmen kommen aus Verträgen — leg unter Verträge einen mit Charakter „Ertrag“ an, dann rechnet der Ausblick sie mit.",
+    leer: "Für den Ausblick fehlen die Plan-Daten: Er rechnet Einnahmen und Verträge (beides Zahlungsregeln) gegen die Budgets auf. Beides wird unter Verträge und Budgets gepflegt — aus den Ist-Buchungen allein wird hier nichts geschätzt.",
+    leerUntertitel: "Die nächsten drei Monate",
+  },
   historie: {
     titel: "Übersicht",
     untertitel: "Was tatsächlich geflossen ist — Monat für Monat",
@@ -841,6 +876,39 @@ const en: typeof de = {
     verbuchenBusy: "Posting …",
     verbuchtErgebnis: "{{verbucht}} posted ({{umbuchungen}} transfers) · {{uebersprungen}} skipped",
     seite: "Page {{seite}} / {{gesamt}}",
+  },
+  ausblick: {
+    untertitelLaufend: "planned and already posted",
+    untertitelVorschau: "what the plan says",
+    pillLaufend: "current",
+    pillVorschau: "preview",
+    spaltePlan: "planned",
+    spalteIst: "posted",
+    bleibt: "Left over",
+    statusBezahlt: "ticked off",
+    statusOffen: "open",
+    zeile: {
+      einnahmen: "Income",
+      vertraege: "Contracts",
+      budgets: "Budgets",
+      umschichtung: "Saving & provisions",
+      sonstiges: "Other",
+    },
+    sammel: {
+      einnahmen: "other income",
+      vertraege: "other payments",
+      umschichtung: "other transfers",
+      sonstiges: "outside budget and contract",
+      budgets: "no budget",
+    },
+    monat: {
+      1: "January", 2: "February", 3: "March", 4: "April", 5: "May", 6: "June",
+      7: "July", 8: "August", 9: "September", 10: "October", 11: "November", 12: "December",
+    },
+    hinweisKeineEinnahmen:
+      "No income is planned for any of the three months. Income comes from contracts — add one with character “Ertrag” under Contracts and the outlook will include it.",
+    leer: "The outlook needs plan data: it offsets income and contracts (both payment rules) against the budgets. Both live under Contracts and Budgets — nothing here is estimated from posted transactions.",
+    leerUntertitel: "The next three months",
   },
   historie: {
     titel: "Overview",
