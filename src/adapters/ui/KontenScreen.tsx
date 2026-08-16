@@ -21,7 +21,7 @@ import {
   type Zahlungsregel,
 } from "../../core";
 import { buchungBearbeiten, buchungErfassen, buchungLoeschen } from "../../application/buchungErfassen";
-import { zuruecksetzen, type Umsatz } from "../../application/import";
+import { zuruecksetzen, type ImportLauf, type Umsatz } from "../../application/import";
 import { umbuchungErfassen, umbuchungLoeschen } from "../../application/umbuchungErfassen";
 import {
   buchungenPaaren,
@@ -36,7 +36,10 @@ import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqlit
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
+import {
+  sqliteUmsatzRepository as umsatzRepo,
+  sqliteImportLaufRepository as importLaufRepo,
+} from "../persistence/sqliteImportRepositories";
 import type { ScreenId } from "./AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
@@ -85,15 +88,28 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
   const [umbuchenAus, setUmbuchenAus] = useState<IstBuchung | null>(null);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
+  const [importLaeufe, setImportLaeufe] = useState<ImportLauf[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
 
+  // Alles in EINEM Zug laden und zusammen setzen. Gestaffelte await/setState-Paare
+  // lassen abgeleitete Werte kurz gegen leere Listen rechnen — der Empfänger einer
+  // importierten Buchung käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte
+  // für einen Render „Buchung" statt „[anonymisiert]".
   async function laden() {
-    const ks = await kontoRepo.alle();
+    const [ks, bs, rs, kats, us, laeufe] = await Promise.all([
+      kontoRepo.alle(),
+      ledgerRepo.alle(),
+      regelRepo.alle(),
+      kategorieRepo.alle(),
+      umsatzRepo.alle(),
+      importLaufRepo.alle(),
+    ]);
     setKonten(ks);
-    setIst(await ledgerRepo.alle());
-    setRegeln(await regelRepo.alle());
-    setKategorien(await kategorieRepo.alle());
-    setUmsaetze(await umsatzRepo.alle());
+    setIst(bs);
+    setRegeln(rs);
+    setKategorien(kats);
+    setUmsaetze(us);
+    setImportLaeufe(laeufe);
     setAktivId((id) => id || ks[0]?.id || "");
   }
   useEffect(() => {
@@ -173,6 +189,18 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   function bearbeitenOeffnen(z: RegisterZeile) {
     const b = ist.find((x) => x.id === z.istId);
     if (b) setEditBuchung(b);
+  }
+
+  /** Das andere Bein einer Umbuchung — gleiche transferId, andere id. */
+  function gegenbuchungZu(b: IstBuchung): IstBuchung | undefined {
+    if (!b.transferId) return undefined;
+    return ist.find((x) => x.transferId === b.transferId && x.id !== b.id);
+  }
+
+  /** Der Import-Lauf, aus dem die Buchung stammt (über ihren Umsatz). */
+  function importLaufZuBuchung(b: IstBuchung): ImportLauf | undefined {
+    const laufId = umsatzByIst.get(b.id)?.laufId;
+    return laufId ? importLaeufe.find((l) => l.id === laufId) : undefined;
   }
 
   /** Importierte Buchungen tragen einen Umsatz — der muss zurück in die Inbox, sonst verwaist er. */
@@ -363,14 +391,22 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
       {editBuchung && (
         <EditBuchungModal
+          // Ohne key bliebe beim Sprung zur Gegenbuchung der Formularstate der ALTEN
+          // Buchung stehen — useState-Initialwerte laufen nur beim Mount.
+          key={editBuchung.id}
           buchung={editBuchung}
           kategorien={kategorien}
           kontoName={kontoName}
+          umsatz={umsatzByIst.get(editBuchung.id)}
+          importLauf={importLaufZuBuchung(editBuchung)}
+          regel={editBuchung.planRef ? regeln.find((r) => r.id === editBuchung.planRef!.quelleId) : undefined}
+          gegenbuchung={gegenbuchungZu(editBuchung)}
           onClose={() => setEditBuchung(null)}
           onSaved={async () => { setEditBuchung(null); await laden(); }}
           onDelete={async () => { await buchungEntfernen(editBuchung); }}
           onZurUmbuchung={() => { setUmbuchenAus(editBuchung); setEditBuchung(null); }}
           onLoesen={async () => { await paarungLoesen(ledgerRepo, editBuchung.transferId!); setEditBuchung(null); await laden(); }}
+          onGegenbuchung={setEditBuchung}
         />
       )}
 
@@ -468,9 +504,30 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
   );
 }
 
+/** Ein Label/Wert-Paar im Herkunfts-Abschnitt. Lange Werte (Hash, Zweck) dürfen umbrechen. */
+function Infozeile({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
+  return (
+    <div style={{ display: "flex", gap: "var(--sp-3)", padding: "5px 0", alignItems: "baseline" }}>
+      <span style={{ flex: "0 0 34%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>{label}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 13, wordBreak: "break-word", fontFamily: mono ? "var(--font-mono, monospace)" : undefined, color: mono ? "var(--ink-2)" : "var(--ink)" }}>
+        {children}
+      </span>
+    </div>
+  );
+}
+
 /**
- * Detailansicht einer gebuchten Ist-Buchung. Zwei Gesichter:
+ * Detailansicht einer gebuchten Ist-Buchung (S-1c). Drei Teile:
  *
+ *  1. Was man ändern darf — das Formular.
+ *  2. Umbuchung — Einstieg (S-1) bzw. Gegenbuchung und Paarung lösen.
+ *  3. Herkunft — was über die Buchung bekannt ist, aber nirgends änderbar.
+ *
+ * Zu 3: Empfänger und Verwendungszweck hängen NICHT an der `IstBuchung`, sondern am
+ * `Umsatz` (Import-Kontext, siehe ADR-0002) — hereingereicht statt hier nachgeladen,
+ * der Screen hat die Zuordnung ohnehin schon.
+ *
+ * Zwei Gesichter beim Bearbeiten:
  *  • frei — alle Felder editierbar, plus der Einstieg „Zur Umbuchung machen" (S-1).
  *  • Bein einer Umbuchung — Betrag, Charakter und Kategorie sind FEST. `buchungBearbeiten`
  *    leitet das Vorzeichen über `vorzeichenbehaftet()` aus dem Charakter ab, und das macht
@@ -478,7 +535,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
  *    −500 kippen und die Netto-Null der Umbuchung brechen. Datum und Notiz sind
  *    unkritisch (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function EditBuchungModal({ buchung, kategorien, kontoName, onClose, onSaved, onDelete, onZurUmbuchung, onLoesen }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onLoesen: () => void | Promise<void> }) {
+function EditBuchungModal({ buchung, kategorien, kontoName, umsatz, importLauf, regel, gegenbuchung, onClose, onSaved, onDelete, onZurUmbuchung, onLoesen, onGegenbuchung }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const charakterLabel = useCharakterLabel();
@@ -506,7 +563,7 @@ function EditBuchungModal({ buchung, kategorien, kontoName, onClose, onSaved, on
 
   return (
     <Modal
-      title={t("konten.editTitel")}
+      title={t("konten.detail.titel")}
       subtitle={buchung.quelle === "import" ? t("konten.editUntertitelImport") : undefined}
       onClose={onClose}
       footer={
@@ -518,6 +575,22 @@ function EditBuchungModal({ buchung, kategorien, kontoName, onClose, onSaved, on
         </>
       }
     >
+      {/* Kopf: worum es geht — Empfänger und Betrag, die beiden Dinge, an denen man
+          eine Buchung wiedererkennt. Der Empfänger kommt aus dem Umsatz. */}
+      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
+        <span style={{ minWidth: 0 }}>
+          <span style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>
+            {umsatz?.gegenpartei || buchung.notiz || kontoName.get(buchung.kontoId) || ""}
+          </span>
+          <span className="muted" style={{ display: "block", fontSize: "var(--fs-xs)", marginTop: 4 }}>
+            {ddmm(buchung.datum)} · {kontoName.get(buchung.kontoId) ?? "?"}
+          </span>
+        </span>
+        <span className="num" style={{ fontSize: "var(--fs-h2, var(--fs-h3))", fontWeight: "var(--fw-black)", color: betragFarbe(buchung) }}>
+          {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
+        </span>
+      </div>
+
       <div className="form-grid">
         <FormField label={t("konten.feldDatum")} required>
           <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
@@ -542,7 +615,7 @@ function EditBuchungModal({ buchung, kategorien, kontoName, onClose, onSaved, on
         </FormField>
       </div>
 
-      {/* Umbuchungs-Abschnitt: Einstieg (S-1) bzw. Paarung lösen */}
+      {/* Umbuchungs-Abschnitt: Einstieg (S-1) bzw. Gegenbuchung und Paarung lösen */}
       <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
         {gepaart ? (
           <>
@@ -553,6 +626,26 @@ function EditBuchungModal({ buchung, kategorien, kontoName, onClose, onSaved, on
               </span>
               <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={() => onLoesen()}>{t("konten.paarung.loesen")}</button>
             </div>
+
+            {/* Sprung ins andere Bein — derselbe Dialog, andere Buchung. */}
+            {gegenbuchung && (
+              <button
+                className="linkbtn"
+                title={t("konten.paarung.gegenbuchungOeffnen")}
+                onClick={() => onGegenbuchung(gegenbuchung)}
+                style={{ display: "flex", width: "100%", alignItems: "center", gap: 10, marginTop: 8, padding: "8px 10px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", textAlign: "left" }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(gegenbuchung.datum)}</span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
+                  {t("konten.paarung.gegenbuchung")} · {kontoName.get(gegenbuchung.kontoId) ?? "?"}
+                </span>
+                <span className="num" style={{ fontWeight: 700, color: betragFarbe(gegenbuchung) }}>
+                  {geld.formatMitSymbol(gegenbuchung.betrag, { mitVorzeichen: true })}
+                </span>
+                <span aria-hidden style={{ color: "var(--ink-3)" }}>›</span>
+              </button>
+            )}
+
             <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
               {t("konten.paarung.loesenHinweis")} {t("konten.paarung.loeschtBeide")}
             </div>
@@ -564,6 +657,44 @@ function EditBuchungModal({ buchung, kategorien, kontoName, onClose, onSaved, on
               {t("konten.zurUmbuchung.untertitel")}
             </div>
           </>
+        )}
+      </div>
+
+      {/* Herkunft — alles, was bekannt ist, aber hier nicht geändert wird. */}
+      <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+        <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
+          {t("konten.detail.herkunft")}
+        </div>
+
+        <Infozeile label={t("konten.detail.erfasstUeber")}>{t(`konten.quelleName.${buchung.quelle}`)}</Infozeile>
+        <Infozeile label={t("konten.detail.konto")}>{kontoName.get(buchung.kontoId) ?? "?"}</Infozeile>
+
+        {umsatz ? (
+          <>
+            <Infozeile label={t("konten.detail.empfaenger")}>{umsatz.gegenpartei || "—"}</Infozeile>
+            <Infozeile label={t("konten.detail.zweck")}>{umsatz.verwendungszweck || "—"}</Infozeile>
+            {importLauf && (
+              <Infozeile label={t("konten.detail.importlauf")}>
+                {t("konten.detail.importlaufWert", {
+                  quelle: importLauf.dateiname || importLauf.quelle,
+                  zeitpunkt: importLauf.zeitpunkt.slice(0, 10),
+                })}
+              </Infozeile>
+            )}
+            {umsatz.nativeId && <Infozeile label={t("konten.detail.nativeId")} mono>{umsatz.nativeId}</Infozeile>}
+            <Infozeile label={t("konten.detail.rohHash")} mono>{umsatz.rohHash}</Infozeile>
+          </>
+        ) : (
+          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.detail.ohneImport")}</div>
+        )}
+
+        {buchung.planRef && (
+          <Infozeile label={t("konten.detail.planbezug")}>
+            {t("konten.detail.planbezugWert", {
+              regel: regel?.bezeichnung ?? buchung.planRef.quelleId,
+              faelligkeit: ddmm(buchung.planRef.faelligkeit),
+            })}
+          </Infozeile>
         )}
       </div>
     </Modal>
