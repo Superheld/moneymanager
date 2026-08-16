@@ -63,9 +63,16 @@ function kategorie(id: string, name: string) {
   );
 }
 
-/** Wartet, bis die Karte gerendert ist (sie erscheint erst mit geladenem Befund). */
-async function karteGeladen() {
-  await screen.findByText("Automatische Kategorisierung");
+/**
+ * Klappt die Karte auf und wartet, bis ihr Inhalt geladen ist.
+ *
+ * Die Karten der Einstellungen starten zugeklappt, und der Inhalt wird erst dann
+ * gerendert — der Ladeeffekt läuft also auch erst dann. Das ist der Punkt der Sache:
+ * wer eine Person umbenennen will, soll nicht den ganzen Ledger laden.
+ */
+async function karteGeladen(nutzer: ReturnType<typeof userEvent.setup>) {
+  await nutzer.click(await screen.findByRole("button", { name: /Automatische Kategorisierung/ }));
+  await screen.findByText(/Brauchbare Beispiele|Noch keine gebuchten Zahlungen/);
 }
 
 /**
@@ -84,8 +91,9 @@ describe("Lernmaterial-Karte", () => {
     buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm" });
     buchung({ id: "b2", betrag: -2345, kategorieId: "kat-lm" });
 
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
 
     expect(screen.getByText("Brauchbare Beispiele")).toBeTruthy();
     expect(screen.getByText("von 2 gebuchten Zahlungen")).toBeTruthy();
@@ -97,8 +105,9 @@ describe("Lernmaterial-Karte", () => {
     buchung({ id: "b2", betrag: -500, charakter: "Umschichtung" });
     buchung({ id: "b3", betrag: 500, charakter: "Umschichtung" });
 
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
 
     expect(screen.getByText(/Umschichtung — eigenes Geld/)).toBeTruthy();
     // Zwei Umschichtungen, eine brauchbare Zahlung von dreien.
@@ -111,8 +120,9 @@ describe("Lernmaterial-Karte", () => {
     buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm" });
     buchung({ id: "b2", betrag: -999, kategorieId: "kat-selten", gegenpartei: "Kuriosum" });
 
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
 
     // Der Name, nicht die Id — sonst ist die Warnung nicht verwertbar.
     expect(textVorhanden(/Seltene Sache · 1/)).toBe(true);
@@ -123,8 +133,9 @@ describe("Lernmaterial-Karte", () => {
     buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm", zweck: "SEPA Lastschrift RE2026004711" });
     buchung({ id: "b2", betrag: -2345, kategorieId: "kat-lm", zweck: "SEPA Lastschrift RE2026004712" });
 
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
 
     expect(screen.getByText("Aussortierte Wörter")).toBeTruthy();
     // Das Originalwort steht da, nicht der gekürzte Kern — sonst zeigte die Liste
@@ -139,15 +150,17 @@ describe("Lernmaterial-Karte", () => {
     kategorie("kat-lm", "Lebensmittel");
     buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm" });
 
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
 
     expect(textVorhanden(/Feste Stoppwortliste \(\d+\)/)).toBe(true);
   });
 
   it("sagt es, wenn es gar nichts zu lernen gibt", async () => {
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
     expect(screen.getByText(/Noch keine gebuchten Zahlungen/)).toBeTruthy();
   });
 });
@@ -165,8 +178,9 @@ describe("Training über die Oberfläche", () => {
 
   it("sagt vor dem ersten Training, dass noch nichts gelernt ist", async () => {
     material();
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
     expect(screen.getByText(/Noch nicht trainiert/)).toBeTruthy();
   });
 
@@ -174,7 +188,7 @@ describe("Training über die Oberfläche", () => {
     material();
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
 
     await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
 
@@ -190,14 +204,14 @@ describe("Training über die Oberfläche", () => {
     material();
     const nutzer = userEvent.setup();
     const ersteAnsicht = rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
     await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
     await waitFor(() => expect(screen.getByText(/Zuletzt trainiert am/)).toBeTruthy());
 
     // Es liegt in der Datenbank, nicht im Zustand der Komponente.
     ersteAnsicht.unmount();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
     await waitFor(() => expect(screen.getByText(/aus 80 Beispielen/)).toBeTruthy());
   });
 
@@ -206,7 +220,7 @@ describe("Training über die Oberfläche", () => {
     buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm" });
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
 
     await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
 
@@ -216,8 +230,100 @@ describe("Training über die Oberfläche", () => {
   });
 
   it("bietet kein Training an, solange es kein Material gibt", async () => {
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await karteGeladen();
+    await karteGeladen(nutzer);
     expect(screen.queryByRole("button", { name: "Training starten" })).toBeNull();
+  });
+});
+
+describe("Karten klappen", () => {
+  it("startet eingeklappt und lädt den Inhalt erst beim Aufklappen", async () => {
+    kategorie("kat-lm", "Lebensmittel");
+    buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm" });
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+
+    const titel = await screen.findByRole("button", { name: /Automatische Kategorisierung/ });
+    expect(titel.getAttribute("aria-expanded")).toBe("false");
+    // Der Inhalt hängt nicht im Baum — damit läuft auch sein Ladeeffekt nicht.
+    expect(screen.queryByText("Brauchbare Beispiele")).toBeNull();
+
+    await nutzer.click(titel);
+
+    expect(titel.getAttribute("aria-expanded")).toBe("true");
+    expect(await screen.findByText("Brauchbare Beispiele")).toBeTruthy();
+  });
+
+  it("klappt auf Klick wieder zu", async () => {
+    kategorie("kat-lm", "Lebensmittel");
+    buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm" });
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    const titel = await screen.findByRole("button", { name: /Automatische Kategorisierung/ });
+
+    await nutzer.click(titel);
+    await screen.findByText("Brauchbare Beispiele");
+    await nutzer.click(titel);
+
+    expect(screen.queryByText("Brauchbare Beispiele")).toBeNull();
+  });
+
+  it("alle Karten der Einstellungen starten eingeklappt", async () => {
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await screen.findByRole("button", { name: /Automatische Kategorisierung/ });
+
+    const schalter = screen.getAllByRole("button").filter((b) => b.hasAttribute("aria-expanded"));
+    expect(schalter.length).toBeGreaterThanOrEqual(5);
+    for (const s of schalter) expect(s.getAttribute("aria-expanded")).toBe("false");
+    // Die Titel bleiben lesbar — genau das ist der Sinn der Sache.
+    expect(document.body.textContent).toMatch(/Personen/);
+    expect(document.body.textContent).toMatch(/Kategorien/);
+    expect(nutzer).toBeTruthy();
+  });
+});
+
+describe("Verwechslungsmatrix in der Anzeige", () => {
+  /** Zwei Empfänger, die dasselbe Wort teilen — das erzwingt echte Verwechslungen. */
+  function verwechselbar() {
+    kategorie("kat-a", "Alpha");
+    kategorie("kat-b", "Beta");
+    for (let i = 0; i < 30; i++) {
+      buchung({ id: `a${i}`, betrag: -1000, kategorieId: "kat-a", gegenpartei: "Markt Nord", zweck: "Kauf" });
+      buchung({ id: `b${i}`, betrag: -1000, kategorieId: "kat-b", gegenpartei: "Markt Nord", zweck: "Kauf" });
+    }
+  }
+
+  it("zeigt nach dem Training eine Matrix mit den Kategorienamen", async () => {
+    verwechselbar();
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await karteGeladen(nutzer);
+
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+    await waitFor(() => expect(screen.getByText("Verwechslungen")).toBeTruthy());
+
+    // Identische Merkmale bei zwei Kategorien — eine davon muss die andere schlucken.
+    expect(screen.getByText(/tatsächlich ↓ \/ erkannt →/)).toBeTruthy();
+    expect(screen.getAllByText(/Alpha|Beta/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Häufigste Verwechslungen")).toBeTruthy();
+  });
+
+  it("meldet Fehlerfreiheit, statt eine leere Matrix zu zeigen", async () => {
+    kategorie("kat-lm", "Lebensmittel");
+    kategorie("kat-sprit", "Sprit & Laden");
+    for (let i = 0; i < 40; i++) {
+      buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "REWE Markt", zweck: "Einkauf" });
+      buchung({ id: `s${i}`, betrag: -6000, kategorieId: "kat-sprit", gegenpartei: "Shell Station", zweck: "Tanken" });
+    }
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await karteGeladen(nutzer);
+
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+
+    await waitFor(() => expect(screen.getByText(/Kein einziger Fehler in der Prüfung/)).toBeTruthy());
+    expect(screen.queryByText(/tatsächlich ↓/)).toBeNull();
   });
 });

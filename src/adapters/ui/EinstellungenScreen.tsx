@@ -16,7 +16,9 @@ import {
   type IstBuchung,
   type Kategorie,
   type Kontotyp,
+  verwechslungsmatrix,
   type Bewertung,
+  type Matrixzeile,
   type Person,
   type Verwurfsgrund,
   type Zahlungskonto,
@@ -38,6 +40,57 @@ import { useGeld, fehlerNachricht, useRegionUmschalter } from "./einstellungenKo
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };
+
+/**
+ * Eine Karte, die eingeklappt startet. Der Einstellungs-Screen ist eine Sammlung von
+ * Bereichen, von denen man fast immer genau einen will — ausgeklappt scrollt man an vier
+ * Listen vorbei, um an die fünfte zu kommen.
+ *
+ * Der Inhalt wird erst gerendert, wenn jemand aufklappt. Das ist mehr als eine Anzeige-
+ * frage: die Kinder laden ihre Daten in eigenen Effekten, und die laufen damit erst bei
+ * Bedarf. Die Lernmaterial-Karte zieht den gesamten Ledger (5280 Zahlungen) und rechnet
+ * die Merkmale darüber — das beim Öffnen der Einstellungen zu tun, obwohl jemand nur
+ * eine Person umbenennen will, ist Arbeit für nichts.
+ *
+ * `action` erscheint nur im offenen Zustand: ein „+"-Knopf über einer eingeklappten
+ * Liste lädt zum versehentlichen Klick ein.
+ */
+function KlappCard({
+  titel,
+  untertitel,
+  action,
+  children,
+}: {
+  titel: string;
+  untertitel?: ReactNode;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  const [offen, setOffen] = useState(false);
+  return (
+    <Card
+      title={
+        <button
+          type="button"
+          onClick={() => setOffen((o) => !o)}
+          aria-expanded={offen}
+          style={{
+            background: "none", border: "none", padding: 0, margin: 0, cursor: "pointer",
+            font: "inherit", color: "inherit", display: "flex", alignItems: "center",
+            gap: "var(--sp-2)", textAlign: "left",
+          }}
+        >
+          <span aria-hidden="true" style={{ fontSize: "0.8em", opacity: 0.6 }}>{offen ? "▾" : "▸"}</span>
+          {titel}
+        </button>
+      }
+      subtitle={untertitel}
+      action={offen ? action : undefined}
+    >
+      {offen && children}
+    </Card>
+  );
+}
 
 export function EinstellungenScreen() {
   const { t } = useTranslation();
@@ -80,6 +133,23 @@ export function EinstellungenScreen() {
  * niemand mehr auf ihre Grundlage zurückführt.
  */
 function LernmaterialCard({ kategorien }: { kategorien: Kategorie[] }) {
+  const { t } = useTranslation();
+  return (
+    <KlappCard
+      titel={t("einstellungen.lernmaterial.titel")}
+      untertitel={t("einstellungen.lernmaterial.untertitel")}
+    >
+      <LernmaterialInhalt kategorien={kategorien} />
+    </KlappCard>
+  );
+}
+
+/**
+ * Der Inhalt als eigene Komponente, damit sein Ladeeffekt erst beim Aufklappen läuft.
+ * Er zieht den gesamten Ledger und rechnet die Merkmale darüber — in der Hülle stehend
+ * täte er das bei jedem Öffnen der Einstellungen.
+ */
+function LernmaterialInhalt({ kategorien }: { kategorien: Kategorie[] }) {
   const { t } = useTranslation();
   const { locale } = useGeld();
   const [befund, setBefund] = useState<Materialbefund | null>(null);
@@ -135,30 +205,28 @@ function LernmaterialCard({ kategorien }: { kategorien: Kategorie[] }) {
     .sort((a, b) => b[1] - a[1]);
 
   const stand = zustand?.stand ?? null;
-  const schwach = (bewertung?.jeKategorie ?? [])
-    .filter((k) => k.richtig < k.gesamt)
-    .slice(0, 10)
-    .map((k) => ({ ...k }));
+  const matrix = bewertung
+    ? verwechslungsmatrix(bewertung)
+    : { kategorien: [] as string[], zeilen: [] as Matrixzeile[] };
 
   return (
-    <Card
-      title={t("einstellungen.lernmaterial.titel")}
-      subtitle={t("einstellungen.lernmaterial.untertitel")}
-      action={
-        befund.beispiele.length > 0 ? (
-          <Button variant="primary" onClick={trainingStarten}>
-            {laeuft ? t("einstellungen.lernmaterial.trainiertGerade") : t("einstellungen.lernmaterial.trainieren")}
-          </Button>
-        ) : undefined
-      }
-    >
+    <>
       {befund.gesamt === 0 ? (
         <div className="muted">{t("einstellungen.lernmaterial.leer")}</div>
       ) : (
         <>
           {fehler && <div className="err" style={{ marginBottom: "var(--sp-4)" }}>{fehler}</div>}
 
-          <Abschnitt titel={t("einstellungen.lernmaterial.modellTitel")}>
+          <Abschnitt
+            titel={t("einstellungen.lernmaterial.modellTitel")}
+            neben={
+              befund.beispiele.length > 0 ? (
+                <Button variant="primary" onClick={trainingStarten}>
+                  {laeuft ? t("einstellungen.lernmaterial.trainiertGerade") : t("einstellungen.lernmaterial.trainieren")}
+                </Button>
+              ) : undefined
+            }
+          >
             {!stand ? (
               <div className="muted">{t("einstellungen.lernmaterial.nieTrainiert")}</div>
             ) : (
@@ -200,33 +268,51 @@ function LernmaterialCard({ kategorien }: { kategorien: Kategorie[] }) {
           {/* Nur Kategorien, die tatsächlich Fehler hatten. Ohne den Filter stünden
               unter „wo die Erkennung sich schwertut" zehn fehlerfreie Kategorien —
               die Überschrift behauptete dann etwas, was die Zahlen widerlegen. */}
-          {schwach.length > 0 && (
-            <Abschnitt titel={t("einstellungen.lernmaterial.schwachTitel")}>
+          {bewertung && (
+            <Abschnitt titel={t("einstellungen.lernmaterial.matrixTitel")}>
               <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
-                {t("einstellungen.lernmaterial.schwachHinweis")}
+                {matrix.kategorien.length === 0
+                  ? t("einstellungen.lernmaterial.matrixFehlerfrei")
+                  : t("einstellungen.lernmaterial.matrixHinweis")}
               </div>
-              <DataTable
-                columns={[
-                  {
-                    key: "kategorieId",
-                    label: t("einstellungen.lernmaterial.spalteKategorie"),
-                    render: (r) => kategorieName.get(r.kategorieId) ?? r.kategorieId,
-                  },
-                  {
-                    key: "quote",
-                    label: t("einstellungen.lernmaterial.spalteTrefferquote"),
-                    align: "right",
-                    render: (r) => prozent(r.richtig / r.gesamt),
-                  },
-                  {
-                    key: "gesamt",
-                    label: t("einstellungen.lernmaterial.spaltePruefungen"),
-                    align: "right",
-                    render: (r) => zahl(r.gesamt),
-                  },
-                ]}
-                rows={schwach}
-              />
+              {matrix.kategorien.length > 0 && (
+                <>
+                  <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+                    {t("einstellungen.lernmaterial.matrixLegende", {
+                      fehler: zahl(bewertung.gesamt - bewertung.richtig),
+                      zellen: zahl(bewertung.verwechslungen.length),
+                      kategorien: zahl(matrix.kategorien.length),
+                    })}
+                  </div>
+                  <Matrix
+                    matrix={matrix}
+                    beschriftung={(id) => kategorieName.get(id) ?? id}
+                    kopf={t("einstellungen.lernmaterial.matrixSpalteIst")}
+                  />
+                  <Abschnitt titel={t("einstellungen.lernmaterial.paareTitel")}>
+                    <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+                      {t("einstellungen.lernmaterial.paareHinweis")}
+                    </div>
+                    <DataTable
+                      columns={[
+                        {
+                          key: "tatsaechlich",
+                          label: t("einstellungen.lernmaterial.spaltePaar"),
+                          render: (r) =>
+                            `${kategorieName.get(r.tatsaechlich) ?? r.tatsaechlich} → ${kategorieName.get(r.vorhergesagt) ?? r.vorhergesagt}`,
+                        },
+                        {
+                          key: "anzahl",
+                          label: t("einstellungen.lernmaterial.spalteAnzahl"),
+                          align: "right",
+                          render: (r) => zahl(r.anzahl),
+                        },
+                      ]}
+                      rows={bewertung.verwechslungen.slice(0, 15).map((v) => ({ ...v }))}
+                    />
+                  </Abschnitt>
+                </>
+              )}
             </Abschnitt>
           )}
 
@@ -346,11 +432,103 @@ function LernmaterialCard({ kategorien }: { kategorien: Kategorie[] }) {
           </Abschnitt>
         </>
       )}
-    </Card>
+    </>
   );
 }
 
 const ZEILE: CSSProperties = { display: "flex", gap: "var(--sp-3)", alignItems: "baseline" };
+
+/**
+ * Die Verwechslungsmatrix als Tabelle: Zeile = tatsächliche Kategorie, Spalte = was die
+ * Erkennung daraus gemacht hat.
+ *
+ * Eine eigene Tabelle statt `DataTable`, weil hier die Spalten aus den Daten entstehen
+ * und die Diagonale eine eigene Bedeutung hat. Sie scrollt in ihrem eigenen Kasten —
+ * bei fünfundzwanzig beteiligten Kategorien ist sie breiter als jedes Fenster, und die
+ * Seite selbst darf davon nicht seitwärts wandern.
+ *
+ * Leere Zellen bleiben leer statt eine Null zu zeigen: bei rund neunzig Prozent Nullen
+ * wäre das ein Feld aus Ziffern, in dem die wenigen echten Zahlen untergehen.
+ */
+function Matrix({
+  matrix,
+  beschriftung,
+  kopf,
+}: {
+  matrix: { kategorien: string[]; zeilen: Matrixzeile[] };
+  beschriftung: (id: string) => string;
+  kopf: string;
+}) {
+  const zelle: CSSProperties = {
+    padding: "var(--sp-1) var(--sp-2)",
+    textAlign: "right",
+    fontVariantNumeric: "tabular-nums",
+    borderBottom: "1px solid var(--line)",
+  };
+  return (
+    <div style={{ overflowX: "auto", maxWidth: "100%" }}>
+      <table style={{ borderCollapse: "collapse", fontSize: "var(--fs-sm)" }}>
+        <thead>
+          <tr>
+            <th style={{ ...zelle, textAlign: "left", position: "sticky", left: 0, background: "var(--surface)" }}>
+              {kopf}
+            </th>
+            {matrix.kategorien.map((id) => (
+              // Schräg gestellt: waagerecht bräuchte jede Spalte die Breite eines
+              // Kategorienamens, und die Matrix wäre um ein Vielfaches breiter als hoch.
+              <th key={id} style={{ ...zelle, height: 120, verticalAlign: "bottom", padding: 0 }}>
+                <div
+                  style={{
+                    writingMode: "vertical-rl",
+                    transform: "rotate(180deg)",
+                    whiteSpace: "nowrap",
+                    padding: "var(--sp-2) var(--sp-1)",
+                    fontWeight: "var(--fw-bold)",
+                  }}
+                >
+                  {beschriftung(id)}
+                </div>
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {matrix.zeilen.map((z) => (
+            <tr key={z.kategorieId}>
+              <th
+                style={{
+                  ...zelle, textAlign: "left", whiteSpace: "nowrap",
+                  position: "sticky", left: 0, background: "var(--surface)",
+                  fontWeight: "var(--fw-bold)",
+                }}
+              >
+                {beschriftung(z.kategorieId)}
+              </th>
+              {matrix.kategorien.map((spalte) => {
+                const n = z.zellen.get(spalte);
+                const diagonale = spalte === z.kategorieId;
+                return (
+                  <td
+                    key={spalte}
+                    style={{
+                      ...zelle,
+                      color: n ? (diagonale ? "var(--ok-deep)" : "var(--warn-deep)") : "var(--ink-3)",
+                      fontWeight: n && !diagonale ? "var(--fw-bold)" : "var(--fw-regular)",
+                      background: diagonale ? "var(--surface-2)" : undefined,
+                    }}
+                    title={`${beschriftung(z.kategorieId)} → ${beschriftung(spalte)}`}
+                  >
+                    {n ?? ""}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 /**
  * „Seitdem sind n Beispiele dazugekommen/weggefallen." Singular und Plural als eigene
@@ -369,10 +547,13 @@ function zustandsText(
 }
 
 /** Überschrift plus Inhalt — hält die Lernmaterial-Karte ohne eigene CSS-Klassen lesbar. */
-function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) {
+function Abschnitt({ titel, neben, children }: { titel: string; neben?: ReactNode; children: ReactNode }) {
   return (
     <div style={{ marginTop: "var(--sp-5)" }}>
-      <div style={{ fontWeight: "var(--fw-bold)", marginBottom: "var(--sp-2)" }}>{titel}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", marginBottom: "var(--sp-2)" }}>
+        <div style={{ fontWeight: "var(--fw-bold)" }}>{titel}</div>
+        {neben}
+      </div>
       {children}
     </div>
   );
@@ -383,7 +564,7 @@ function RegionCard() {
   const { t } = useTranslation();
   const { aktuelleLocale, regionSetzen } = useRegionUmschalter();
   return (
-    <Card title={t("einstellungen.region.titel")} subtitle={t("einstellungen.region.untertitel")}>
+    <KlappCard titel={t("einstellungen.region.titel")} untertitel={t("einstellungen.region.untertitel")}>
       <FormField label={t("einstellungen.region.feld")} hint={t("einstellungen.region.hinweis")}>
         <select className="field" value={aktuelleLocale} onChange={(e) => regionSetzen(e.target.value)}>
           {REGIONEN.map((r) => (
@@ -393,7 +574,7 @@ function RegionCard() {
           ))}
         </select>
       </FormField>
-    </Card>
+    </KlappCard>
   );
 }
 
@@ -434,7 +615,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
   }
 
   return (
-    <Card title={t("einstellungen.person.titel")} subtitle={t("einstellungen.person.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.person.anlegen")}</Button>}>
+    <KlappCard titel={t("einstellungen.person.titel")} untertitel={t("einstellungen.person.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.person.anlegen")}</Button>}>
       {personen.length === 0 ? (
         <div className="muted">{t("einstellungen.person.leer")}</div>
       ) : (
@@ -466,7 +647,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
           </FormField>
         </Modal>
       )}
-    </Card>
+    </KlappCard>
   );
 }
 
@@ -518,7 +699,7 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
   }
 
   return (
-    <Card title={t("einstellungen.konto.titel")} subtitle={hatIst ? t("einstellungen.konto.untertitelIst") : t("einstellungen.konto.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.konto.anlegen")}</Button>}>
+    <KlappCard titel={t("einstellungen.konto.titel")} untertitel={hatIst ? t("einstellungen.konto.untertitelIst") : t("einstellungen.konto.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.konto.anlegen")}</Button>}>
       {konten.length === 0 ? (
         <div className="muted">{t("einstellungen.konto.leer")}</div>
       ) : (
@@ -579,7 +760,7 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
           </div>
         </Modal>
       )}
-    </Card>
+    </KlappCard>
   );
 }
 
@@ -638,9 +819,9 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
   }
 
   return (
-    <Card
-      title={t("einstellungen.kategorie.titel")}
-      subtitle={t("einstellungen.kategorie.untertitel")}
+    <KlappCard
+      titel={t("einstellungen.kategorie.titel")}
+      untertitel={t("einstellungen.kategorie.untertitel")}
       action={
         <span style={{ display: "flex", gap: "var(--sp-2)" }}>
           <Button onClick={() => standardkategorienAnlegen(kategorieRepo).then(onChange)}>{t("einstellungen.kategorie.standardLaden")}</Button>
@@ -684,6 +865,6 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
           </div>
         </Modal>
       )}
-    </Card>
+    </KlappCard>
   );
 }

@@ -14,7 +14,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
+import { frischeDb, kartenAufklappen, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { KontenScreen } from "./KontenScreen";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
@@ -33,9 +33,13 @@ beforeEach(() => {
   halter.setzen(pluginApi(db));
 });
 
-/** Klickt den ersten Knopf, dessen Beschriftung passt. */
+/**
+ * Klickt einen Aktions-Knopf. Karten-Titel sind selbst Knöpfe (sie klappen die Karte
+ * auf und zu) und tragen `aria-expanded` — sie werden übersprungen, sonst fängt der
+ * Titel „Personen" den Klick ab, der dem „+ Person" gilt.
+ */
 async function klicke(nutzer: ReturnType<typeof userEvent.setup>, muster: RegExp) {
-  const knoepfe = await screen.findAllByRole("button");
+  const knoepfe = (await screen.findAllByRole("button")).filter((b) => !b.hasAttribute("aria-expanded"));
   const treffer = knoepfe.find((b) => muster.test(b.textContent ?? ""));
   if (treffer) await nutzer.click(treffer);
   return treffer;
@@ -51,7 +55,9 @@ describe("EinstellungenScreen — Stammdaten", () => {
       id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand",
     });
 
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
+    await kartenAufklappen(nutzer);
     await waitFor(() => expect(document.body.textContent).toMatch(/Bruce/));
     expect(document.body.textContent).toMatch(/Girokonto/);
     expect(document.body.textContent).toMatch(/Lebensmittel/);
@@ -60,7 +66,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
   it("legt eine Person über das Formular an", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+    await kartenAufklappen(nutzer);
 
     await klicke(nutzer, /person|hinzufügen|anlegen|neu/i);
     const felder = screen.queryAllByRole("textbox");
@@ -75,8 +81,9 @@ describe("EinstellungenScreen — Stammdaten", () => {
   });
 
   it("bietet die Sprach-/Regionsumschaltung an", async () => {
+    const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+    await kartenAufklappen(nutzer);
     // Die Region steuert Sprache UND Währung (ADR-0004) — die Auswahl muss existieren.
     const auswahl = screen.queryAllByRole("combobox");
     expect(auswahl.length).toBeGreaterThanOrEqual(0);
