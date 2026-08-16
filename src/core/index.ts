@@ -20,3 +20,4 @@ export * from "./szenario";
 export * from "./istbuchung";
 export * from "./kontoregister";
 export * from "./historie";
+export * from "./monatsausblick";

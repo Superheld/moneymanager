@@ -157,8 +157,8 @@ describe("Auswertungen mit geteilten Buchungen", () => {
     const von = "2026-08-01";
     const bis = "2026-09-01";
 
-    expect(budgetVerbrauch([g], "lebensmittel", von, bis)).toBe(euroZuCent(40));
-    expect(budgetVerbrauch([g], "drogerie", von, bis)).toBe(euroZuCent(12));
+    expect(budgetVerbrauch([g], KATEGORIEN, "lebensmittel", von, bis)).toBe(euroZuCent(40));
+    expect(budgetVerbrauch([g], KATEGORIEN, "drogerie", von, bis)).toBe(euroZuCent(12));
     // Vor S-7 hätte „Lebensmittel" die vollen 52 € getragen und „Drogerie" nichts.
   });
 
@@ -175,7 +175,7 @@ describe("Auswertungen mit geteilten Buchungen", () => {
   it("ändert an ungeteilten Buchungen nichts", async () => {
     const von = "2026-08-01";
     const bis = "2026-09-01";
-    expect(budgetVerbrauch([einkauf], "lebensmittel", von, bis)).toBe(euroZuCent(52));
-    expect(budgetVerbrauch([einkauf], "drogerie", von, bis)).toBe(0);
+    expect(budgetVerbrauch([einkauf], KATEGORIEN, "lebensmittel", von, bis)).toBe(euroZuCent(52));
+    expect(budgetVerbrauch([einkauf], KATEGORIEN, "drogerie", von, bis)).toBe(0);
   });
 });
