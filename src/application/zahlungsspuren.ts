@@ -7,7 +7,7 @@
 // Vorschläge und der Zuordnungs-Abgleich), und es zweimal zu schreiben hieße, zwei
 // Antworten auf dieselbe Frage zu haben.
 
-import type { Zahlungsspur } from "../core";
+import { istGeteilt, type Zahlungsspur } from "../core";
 import type { LedgerPort, UmsatzRepository } from "./ports";
 
 export async function zahlungsspuren(
@@ -30,8 +30,10 @@ export async function zahlungsspuren(
       datum: b.datum,
       betrag: b.betrag,
       gegenpartei: u?.gegenpartei ?? "",
+      verwendungszweck: u?.verwendungszweck ?? "",
       glaeubigerId: u?.glaeubigerId,
       kategorieId: b.kategorieId,
+      geteilt: istGeteilt(b),
       kontoId: b.kontoId,
       charakter: b.charakter,
     };
