@@ -1,11 +1,11 @@
 // Verträge (P2.1) — Übersicht mit Kündigungsterminen; Anlegen im Modal. Eine Maske
 // erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung).
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  hauptkategorie,
   kuendigungsterminNaht,
-  minorZuMajor,
   naechsteFaelligkeit,
   naechsterKuendigungstermin,
   RHYTHMUS_MONATE,
@@ -17,11 +17,10 @@ import {
   type Rhythmus,
   type Vertrag,
   type Vertragskandidat,
-  type Verlaengerungsart,
-  type Zahlungskonto,
+  type Vertragszuordnung,
   type Zahlungsregel,
 } from "../../core";
-import { vertragAktualisieren, vertragAnlegen, vertragLoeschen } from "../../application/vertragAnlegen";
+import { vertragLoeschen } from "../../application/vertragAnlegen";
 import {
   ignorierteSchluessel,
   vertragsvorschlaege,
@@ -33,27 +32,57 @@ import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedge
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
 import { sqliteEinstellungenRepository as einstellungenRepo } from "../persistence/sqliteEinstellungenRepository";
 import {
+  sqliteVertragserkennungRepository,
+  sqliteVertragszuordnungRepository,
+  vertragsAbgleichDeps,
+} from "../persistence/sqliteVertragZuordnungRepositories";
+import {
+  erkennungenNachziehen,
+  zuordnungenAbgleichen,
+} from "../../application/vertragszuordnung";
+import {
   sqliteKategorieRepository as kategorieRepo,
   sqlitePersonRepository as personRepo,
-  sqliteZahlungskontoRepository as kontoRepo,
 } from "../persistence/sqliteStammdatenRepositories";
-import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
+import { Button, Card, DataTable, KPIStat, Pill } from "./ds";
+import { Modal } from "./Modal";
 import type { DataColumn } from "./ds/DataTable";
 import { PageHead } from "./PageHead";
-import { Modal } from "./Modal";
-import { CategoryPicker } from "./CategoryPicker";
-import { useGeld, fehlerNachricht } from "./einstellungenKontext";
+import {
+  formularAusKandidat,
+  formularAusVertrag,
+  leeresFormular,
+  VertragModal,
+  type VertragFormular,
+} from "./VertragModal";
+import { VertragErkennungModal } from "./VertragErkennungModal";
+import { useGeld } from "./einstellungenKontext";
 
+/**
+ * Erkennungsregel und Zuordnungen gehören zum Vertrag: beim Löschen müssen sie mit,
+ * sonst zeigte eine Zuordnung auf einen Vertrag, den es nicht mehr gibt.
+ */
+const zuordnungsDeps = {
+  erkennungRepo: sqliteVertragserkennungRepository,
+  zuordnungRepo: sqliteVertragszuordnungRepository,
+};
+
+/** Die Turnus-Ansicht zeigt je Rhythmus eine Gruppe — in dieser Reihenfolge. */
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 /**
- * Drei Blicke auf dieselben Verträge. „liste" ist die freie Tabelle (Spaltenköpfe
- * sortieren), „faelligkeit" stellt vor, was als Nächstes abgeht, „turnus" gruppiert
- * nach Takt — dort steht auch, was die nicht-monatlichen Verträge im Monat kosten,
- * obwohl sie nicht abgehen.
+ * Vier Blicke auf dieselben Verträge. „liste" zeigt alle nach Betrag, „faelligkeit"
+ * stellt vor, was als Nächstes abgeht, „turnus" gruppiert nach Takt — dort steht auch,
+ * was die nicht-monatlichen Verträge im Monat kosten, obwohl sie nicht abgehen —, und
+ * „kategorie" beantwortet, WOFÜR die festen Kosten draufgehen.
+ *
+ * Die Tabellen sind bewusst NICHT sortierbar: eine angeklickte Spalte überschreibt genau
+ * die Ordnung, die die gewählte Ansicht ausmacht — wer in „faelligkeit" nach Anbieter
+ * sortiert, sieht dieselbe Tabelle wie in „liste" und hat den Umschalter entwertet.
+ * Innerhalb einer Ansicht steht die Reihenfolge fest: nach Betrag, groß nach klein
+ * (in „faelligkeit" nach Termin — das IST dort die Aussage).
  */
-type Ansicht = "liste" | "faelligkeit" | "turnus";
-const ANSICHTEN: Ansicht[] = ["liste", "faelligkeit", "turnus"];
-const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
+type Ansicht = "liste" | "faelligkeit" | "turnus" | "kategorie";
+const ANSICHTEN: Ansicht[] = ["liste", "faelligkeit", "turnus", "kategorie"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
   Aufwand: "aufwand",
   Ertrag: "ertrag",
@@ -61,22 +90,82 @@ const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
 };
 
 /**
- * Ein abgesetzter Block in der Maske. Die Felder eines Vertrags zerfallen in zwei
- * Gruppen, die verschieden viel wiegen: was in die Planung rechnet (Betrag, Rhythmus,
- * Fälligkeit, Konto) und was nur die Konditionen beschreibt (Laufzeit, Fristen). Als
- * eine durchgehende Wand aus Eingabefeldern sah beides gleich wichtig aus.
+ * „Woran erkannt?" — die Prüfungen, die bei diesem Kandidaten angeschlagen haben, je
+ * mit dem gemessenen Wert UND der Schwelle.
+ *
+ * Warum das sichtbar gehört: ein Vorschlag ohne Begründung lässt nur zwei Reaktionen zu
+ * — blind übernehmen oder blind wegklicken. Wer sieht, dass 68 Zahlungen im 30-Tage-Takt
+ * an dieselbe Gläubiger-ID gingen, entscheidet anders als bei drei Zahlungen mit
+ * schwankendem Abstand. Und wenn die Erkennung danebenliegt, ist hier zu sehen, warum.
  */
-function Abschnitt({ titel, hinweis, children }: { titel: string; hinweis?: string; children: ReactNode }) {
-  return (
-    <section style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, borderTop: "1px solid var(--line)", paddingTop: "var(--sp-3)" }}>
-        <h4 style={{ margin: 0, fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-black)", textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-2)" }}>
-          {titel}
-        </h4>
-        {hinweis && <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>{hinweis}</span>}
+function ErkennungsDialog({ kandidat, onClose }: { kandidat: Vertragskandidat; onClose: () => void }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
+  const b = kandidat.befund;
+
+  function Zeile({ label, wert }: { label: string; wert: string }) {
+    return (
+      <div style={{ display: "flex", gap: "var(--sp-3)", padding: "7px 0", alignItems: "baseline", borderBottom: "1px solid var(--line-soft)" }}>
+        <span style={{ flex: "0 0 32%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>{label}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 13, wordBreak: "break-word" }}>{wert}</span>
       </div>
-      {children}
-    </section>
+    );
+  }
+
+  return (
+    <Modal
+      title={t("vertraege.erkennung.titel")}
+      subtitle={kandidat.anbieter}
+      onClose={onClose}
+      footer={<Button variant="primary" onClick={onClose}>{t("vertraege.erkennung.schliessen")}</Button>}
+    >
+      <p className="muted" style={{ fontSize: "var(--fs-small)", margin: "0 0 var(--sp-3)", maxWidth: 620 }}>
+        {t("vertraege.erkennung.hinweis")}
+      </p>
+
+      <Zeile
+        label={t("vertraege.erkennung.schluessel")}
+        wert={
+          b.schluesselArt === "glaeubigerId"
+            ? t("vertraege.erkennung.schluesselGlaeubiger", { wert: b.schluesselWert })
+            : t("vertraege.erkennung.schluesselName", { wert: b.schluesselWert })
+        }
+      />
+      <Zeile
+        label={t("vertraege.erkennung.termine")}
+        wert={t("vertraege.erkennung.termineWert", { termine: b.termine, min: b.minTermine, von: kandidat.ersteZahlung, bis: kandidat.letzteZahlung })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.takt")}
+        wert={t("vertraege.erkennung.taktWert", {
+          tage: b.medianAbstandTage,
+          rhythmus: t(`vertraege.rhythmus.${kandidat.rhythmus}`),
+          von: b.rhythmusFenster[0],
+          bis: b.rhythmusFenster[1],
+        })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.regelmaessig")}
+        wert={t("vertraege.erkennung.regelmaessigWert", { nah: b.abstaendeNah, gesamt: b.abstaendeGesamt, prozent: Math.round(b.minAnteilNah * 100) })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.betrag")}
+        wert={t("vertraege.erkennung.betragWert", {
+          median: `${geld.format(kandidat.betrag)} ${geld.symbol}`,
+          nah: b.betraegeNah,
+          gesamt: b.betraegeGesamt,
+          toleranz: `${geld.format(b.betragsToleranz)} ${geld.symbol}`,
+        })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.richtung")}
+        wert={t("vertraege.erkennung.richtungWert", { charakter: t(`charakter.${kandidat.charakter}`) })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.laufend")}
+        wert={t("vertraege.erkennung.laufendWert", { tage: b.letzteVorTagen, grenze: b.beendetAbTagen })}
+      />
+    </Modal>
   );
 }
 
@@ -92,48 +181,46 @@ export function VertraegeScreen() {
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
   const [personen, setPersonen] = useState<Person[]>([]);
+  // Nur für die Kategorie-Ansicht: die Regel trägt die kategorieId, den Namen nicht.
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
-  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
+  const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
   const [vorschlaege, setVorschlaege] = useState<Vertragskandidat[]>([]);
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
 
-  const [offen, setOffen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [anbieter, setAnbieter] = useState("");
-  const [inhaberId, setInhaberId] = useState("");
-  const [beginn, setBeginn] = useState(heute);
-  // Getrennt vom Beginn: der Beginn trägt die Fristen (Mindestlaufzeit, Kündigung), die
-  // erste Fälligkeit den Takt der Planung. Bei einem 2015 geschlossenen Jahresvertrag
-  // sind das zwei verschiedene Daten — solange ein Feld beides war, verschob das
-  // Nachtragen des echten Vertragsbeginns die geplanten Zahlungen.
-  const [ersteZahlung, setErsteZahlung] = useState(heute);
-  const [mindestlaufzeit, setMindestlaufzeit] = useState("");
-  const [verlaengerung, setVerlaengerung] = useState<Verlaengerungsart>("automatisch");
-  const [verlaengerungMonate, setVerlaengerungMonate] = useState("12");
-  const [kuendigungsfrist, setKuendigungsfrist] = useState("");
-  const [betragText, setBetragText] = useState("");
-  const [rhythmus, setRhythmus] = useState<Rhythmus>("monatlich");
-  const [charakter, setCharakter] = useState<Charakter>("Aufwand");
-  const [kategorieId, setKategorieId] = useState("");
-  const [kontoId, setKontoId] = useState("");
-  const [fehler, setFehler] = useState<string | null>(null);
+  /**
+   * Die offene Maske: `start` ist ihr Anfangszustand, `editId` unterscheidet Ändern von
+   * Anlegen. Der Formularzustand selbst liegt in `VertragModal` — der Screen gibt nur
+   * die Vorbelegung hinein und erfährt, wenn gespeichert wurde.
+   */
+  const [maske, setMaske] = useState<{ editId: string | null; start: VertragFormular } | null>(null);
+  /** Der Vorschlag, dessen Erkennung gerade aufgeschlagen ist. */
+  const [befund, setBefund] = useState<Vertragskandidat | null>(null);
+  /** Der Vertrag, dessen Erkennungsregel gerade bearbeitet wird. */
+  const [regelVon, setRegelVon] = useState<Vertrag | null>(null);
 
   // Verwandte Repos in EINEM Effekt und zusammen setzen — gestaffelte setState lassen
   // abgeleitete Werte kurz gegen leere Listen rechnen.
   async function laden() {
-    const [v, r, p, k, ko, ignoriert] = await Promise.all([
+    // Erst die Zuordnungsseite auf Stand bringen, dann anzeigen. Beides ist billig, wenn
+    // nichts zu tun ist (Nachziehen fasst Vorhandenes nicht an, der Abgleich schreibt nur
+    // Deltas) — und die Alternative wäre, dass der Bestand blind bleibt, bis jemand einen
+    // Vertrag anfasst.
+    await erkennungenNachziehen(vertragRepo, regelRepo, sqliteVertragserkennungRepository);
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+
+    const [v, r, p, k, z, ignoriert] = await Promise.all([
       vertragRepo.alle(),
       regelRepo.alle(),
       personRepo.alle(),
       kategorieRepo.alle(),
-      kontoRepo.alle(),
+      sqliteVertragszuordnungRepository.alle(),
       ignorierteSchluessel(einstellungenRepo),
     ]);
     setVertraege(v);
     setRegeln(r);
     setPersonen(p);
     setKategorien(k);
-    setKonten(ko);
+    setZuordnungen(z);
     // Die Vorschläge lesen den gesamten Buchungsbestand — bewusst NACH den Stammdaten,
     // damit die Liste sofort steht und die Karte nachrückt.
     setVorschlaege(await vertragsvorschlaege(ledgerRepo, umsatzRepo, vertragRepo, heute, { ignoriert }));
@@ -144,17 +231,7 @@ export function VertraegeScreen() {
 
   /** Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort. */
   function vorschlagUebernehmen(k: Vertragskandidat) {
-    neu();
-    setAnbieter(k.anbieter);
-    setBeginn(k.ersteZahlung);
-    setErsteZahlung(k.ersteZahlung);
-    setBetragText(String(minorZuMajor(k.betrag, geld.waehrung)));
-    setRhythmus(k.rhythmus);
-    setCharakter(k.charakter);
-    if (k.kategorieId) setKategorieId(k.kategorieId);
-    // Das Konto, über das die erkannten Zahlungen tatsächlich liefen — steht in den
-    // Buchungen und muss nicht noch einmal gesucht werden.
-    if (k.kontoId) setKontoId(k.kontoId);
+    setMaske({ editId: null, start: formularAusKandidat(k, heute, geld) });
   }
 
   async function vorschlagVerwerfen(k: Vertragskandidat) {
@@ -168,6 +245,22 @@ export function VertraegeScreen() {
     return m;
   }, [regeln]);
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
+
+  /**
+   * Wie viele gebuchte Zahlungen der Abgleich diesem Vertrag zugeordnet hat.
+   *
+   * Steht als Spalte in der Tabelle, weil die Automatik sonst unsichtbar bliebe: eine
+   * Null sagt „die Regel greift nicht" — falscher Anbietername, zu enge Betragsspanne,
+   * oder es gibt schlicht noch keine Zahlung. Ohne diese Zahl merkt man den Fehlgriff
+   * erst, wenn irgendwo eine Auswertung nicht stimmt.
+   */
+  const zahlungenJeVertrag = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const z of zuordnungen) {
+      if (z.vertragId) m.set(z.vertragId, (m.get(z.vertragId) ?? 0) + 1);
+    }
+    return m;
+  }, [zuordnungen]);
 
   const summe = useMemo(() => {
     let proMonat = 0;
@@ -208,11 +301,10 @@ export function VertraegeScreen() {
   function spalten(mitRuecklage: boolean): DataColumn[] {
     const s: DataColumn[] = [
       { key: "anbieter", label: t("vertraege.spalteAnbieter") },
-      { key: "inhaber", label: t("vertraege.spalteInhaber"), sortValue: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "" : ""), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
+      { key: "inhaber", label: t("vertraege.spalteInhaber"), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
       {
         key: "charakter",
         label: t("vertraege.spalteCharakter"),
-        sortValue: (v) => regelZuVertrag.get(v.id)?.charakter ?? "",
         render: (v) => {
           const r = regelZuVertrag.get(v.id);
           return r ? <Pill variant={CHARAKTER_PILL[r.charakter]}>{t(`charakter.${r.charakter}`)}</Pill> : "—";
@@ -221,12 +313,6 @@ export function VertraegeScreen() {
       {
         key: "rhythmus",
         label: t("vertraege.spalteRhythmus"),
-        // Nach Zykluslänge sortieren, nicht alphabetisch — sonst stünde „halbjährlich"
-        // vor „monatlich" und die Reihenfolge sagte nichts über den Takt.
-        sortValue: (v) => {
-          const r = regelZuVertrag.get(v.id);
-          return r ? RHYTHMUS_MONATE[r.rhythmus] : 0;
-        },
         render: (v) => {
           const r = regelZuVertrag.get(v.id);
           return r ? t(`vertraege.rhythmus.${r.rhythmus}`) : "—";
@@ -235,14 +321,11 @@ export function VertraegeScreen() {
       {
         key: "naechste",
         label: t("vertraege.spalteNaechste"),
-        // Ohne Termin ans Ende, nicht an den Anfang: „kein Termin" ist keine baldige Zahlung.
-        sortValue: (v) => naechsteZahlung.get(v.id) ?? "9999-12-31",
         render: (v) => naechsteZahlung.get(v.id) ?? <span className="muted">—</span>,
       },
       {
         key: "kuendigung",
         label: t("vertraege.spalteKuendigenBis"),
-        sortable: false,
         render: (v) => {
           const termin = naechsterKuendigungstermin(v, heute);
           if (!termin) return <span className="muted">—</span>;
@@ -258,10 +341,19 @@ export function VertraegeScreen() {
         key: "betrag",
         label: `${t("vertraege.spalteBetrag")} ${geld.symbol}`,
         align: "right",
-        sortValue: (v) => regelZuVertrag.get(v.id)?.betrag ?? 0,
         render: (v) => {
           const r = regelZuVertrag.get(v.id);
           return r ? geld.format(r.betrag) : "—";
+        },
+      },
+      {
+        // Greift die Erkennung? Eine Null heißt: die Regel findet nichts.
+        key: "zahlungen",
+        label: t("vertraege.spalteZugeordnet"),
+        align: "right",
+        render: (v) => {
+          const n = zahlungenJeVertrag.get(v.id) ?? 0;
+          return n > 0 ? String(n) : <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>;
         },
       },
     ];
@@ -270,10 +362,6 @@ export function VertraegeScreen() {
         key: "ruecklage",
         label: `${t("vertraege.spalteRuecklage")} ${geld.symbol}`,
         align: "right",
-        sortValue: (v) => {
-          const r = regelZuVertrag.get(v.id);
-          return r ? ruecklageProMonat(r) : 0;
-        },
         render: (v) => {
           const r = regelZuVertrag.get(v.id);
           const wert = r ? ruecklageProMonat(r) : 0;
@@ -282,14 +370,22 @@ export function VertraegeScreen() {
       });
     }
     s.push(
-      { key: "_e", label: "", align: "right", sortable: false, render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
+      {
+        // Woran wird dieser Vertrag in den Buchungen erkannt — und wie steuert man nach?
+        key: "_r",
+        label: "",
+        align: "right",
+        render: (v) => (
+          <button className="linkbtn" onClick={() => setRegelVon(v)}>{t("vertraege.regel.aktion")}</button>
+        ),
+      },
+      { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
       {
         key: "_x",
         label: "",
         align: "right",
-        sortable: false,
         render: (v) => (
-          <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id).then(laden)}>
+          <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id, zuordnungsDeps).then(laden)}>
             {t("vertraege.loeschen")}
           </button>
         ),
@@ -297,6 +393,21 @@ export function VertraegeScreen() {
     );
     return s;
   }
+
+  /**
+   * Die Grundordnung: großer Betrag zuerst. Verglichen wird der BETRAG, nicht sein
+   * Vorzeichen — sonst stünden alle Einnahmen vor allen Ausgaben, und die Frage „was
+   * kostet am meisten?" wäre nur noch am Ende der Liste zu beantworten. Verträge ohne
+   * Regel tragen keinen Betrag und fallen ans Ende.
+   */
+  function betragsRang(v: Vertrag): number {
+    const r = regelZuVertrag.get(v.id);
+    return r ? Math.abs(r.betrag) : -1;
+  }
+  const nachBetrag = useMemo(
+    () => [...vertraege].sort((a, b) => betragsRang(b) - betragsRang(a)),
+    [vertraege, regelZuVertrag],
+  );
 
   /** Nach nächster Fälligkeit aufsteigend; Verträge ohne Termin ans Ende. */
   const nachFaelligkeit = useMemo(
@@ -307,101 +418,122 @@ export function VertraegeScreen() {
     [vertraege, naechsteZahlung],
   );
 
-  /** Gruppen der Turnus-Ansicht: je Rhythmus eine, zuletzt die Verträge ohne Zahlung. */
+  /** Betrag mit Vorzeichen und Währungssymbol — die Schreibweise der Gruppenköpfe. */
+  function betragText(cent: number): string {
+    return `${geld.format(Math.round(cent), { mitVorzeichen: true })} ${geld.symbol}`;
+  }
+  /** Die Regeln der Verträge einer Gruppe (Verträge ohne Regel fallen raus). */
+  function regelnVon(vs: Vertrag[]): Zahlungsregel[] {
+    return vs.map((v) => regelZuVertrag.get(v.id)).filter((r): r is Zahlungsregel => !!r);
+  }
+
+  /**
+   * Gruppen der Turnus-Ansicht: je Rhythmus eine, zuletzt die Verträge ohne Zahlung.
+   *
+   * Der Kopf nennt zwei VERSCHIEDENE Zahlen: was in der Gruppe je Fälligkeit abgeht
+   * (die Summe — bei „jährlich" der Jahresbetrag) und was das im Monat ausmacht. Vorher
+   * standen dort der Monatsanteil und der Rücklagenbedarf, und die sind bei einer reinen
+   * Abflussgruppe derselbe Wert: zweimal „pro Monat" mit identischem Betrag. Der
+   * Rücklagenbedarf steht weiterhin in der Tabellenspalte und in der KPI oben.
+   * Bei monatlichem Takt sind Summe und Monatsanteil ohnehin dasselbe — dort nur eine Zahl.
+   */
   const turnusGruppen = useMemo(() => {
-    const gruppen = RHYTHMEN.map((r) => ({
-      key: r as string,
-      titel: t(`vertraege.rhythmus.${r}`),
-      mitRuecklage: RHYTHMUS_MONATE[r] > 1,
-      vertraege: vertraege.filter((v) => regelZuVertrag.get(v.id)?.rhythmus === r),
-    }));
-    const ohne = vertraege.filter((v) => !regelZuVertrag.get(v.id));
-    if (ohne.length) gruppen.push({ key: "ohne", titel: t("vertraege.gruppeOhneRegel"), mitRuecklage: false, vertraege: ohne });
-    return gruppen.filter((g) => g.vertraege.length > 0);
-  }, [vertraege, regelZuVertrag, t]);
-
-  /** Kopfzeile einer Turnus-Gruppe: Anzahl, Monatsanteil und — falls nötig — die Rücklage. */
-  function gruppenUntertitel(g: { vertraege: Vertrag[]; mitRuecklage: boolean }): string {
-    const regeln = g.vertraege.map((v) => regelZuVertrag.get(v.id)).filter((r): r is Zahlungsregel => !!r);
-    const proMonat = Math.round(regeln.reduce((sum, r) => sum + r.betrag / RHYTHMUS_MONATE[r.rhythmus], 0));
-    const basis = t("vertraege.gruppeMeta", {
-      count: g.vertraege.length,
-      betrag: `${geld.format(proMonat, { mitVorzeichen: true })} ${geld.symbol}`,
+    const gruppen = RHYTHMEN.map((r) => {
+      // Auch hier Betrag groß nach klein — innerhalb einer Turnus-Gruppe ist das die
+      // einzige Ordnung, die etwas aussagt: der Takt ist ja schon gleich.
+      const drin = vertraege
+        .filter((v) => regelZuVertrag.get(v.id)?.rhythmus === r)
+        .sort((a, b) => betragsRang(b) - betragsRang(a));
+      const monate = RHYTHMUS_MONATE[r];
+      const summe = regelnVon(drin).reduce((s, x) => s + x.betrag, 0);
+      return {
+        key: r as string,
+        titel: t(`vertraege.rhythmus.${r}`),
+        mitRuecklage: monate > 1,
+        vertraege: drin,
+        meta:
+          monate > 1
+            ? t("vertraege.gruppeMetaTurnus", {
+                count: drin.length,
+                summe: betragText(summe),
+                proMonat: betragText(summe / monate),
+              })
+            : t("vertraege.gruppeMeta", { count: drin.length, betrag: betragText(summe) }),
+      };
     });
-    if (!g.mitRuecklage) return basis;
-    const rueck = ruecklagenbedarf(regeln);
-    if (rueck <= 0) return basis;
-    return `${basis} · ${t("vertraege.gruppeRuecklage", { betrag: `${geld.format(rueck)} ${geld.symbol}` })}`;
-  }
+    const ohne = vertraege.filter((v) => !regelZuVertrag.get(v.id));
+    if (ohne.length) {
+      gruppen.push({
+        key: "ohne",
+        titel: t("vertraege.gruppeOhneRegel"),
+        mitRuecklage: false,
+        vertraege: ohne,
+        meta: t("vertraege.gruppeMetaOhne", { count: ohne.length }),
+      });
+    }
+    return gruppen.filter((g) => g.vertraege.length > 0);
+  }, [vertraege, regelZuVertrag, geld, t]);
 
-  function kategorieWaehlen(id: string) {
-    setKategorieId(id);
-    const k = kategorien.find((x) => x.id === id);
-    if (k) setCharakter(k.defaultCharakter);
-  }
+  /**
+   * Gruppen der Kategorie-Ansicht. Beantwortet die Frage, die weder Liste noch Turnus
+   * beantworten: WOFÜR gehen die festen Kosten drauf? Ein Blick auf „Wohnen 1.240 €,
+   * Versicherungen 210 €" sagt mehr über den Haushalt als dieselben Verträge nach
+   * Abbuchungstakt sortiert.
+   *
+   * Gruppiert wird über die Kategorie der REGEL, nicht des Vertrags — der Vertrag trägt
+   * keine; die Kategorie ist eine Eigenschaft der Zahlung. Und über deren HAUPTkategorie,
+   * nicht über die gebuchte Unterkategorie: gebucht wird auf „Strom", „Gas", „Wasser",
+   * und drei Gruppen mit je einem Vertrag beantworten die Frage „wofür geht das Geld?"
+   * schlechter als eine Gruppe „Wohnen". Dieselbe Rollup-Regel, nach der auch Budgets
+   * und Budgetvorschläge rechnen.
+   *
+   * Die Rücklagen-Spalte hängt hier daran, ob überhaupt ein nicht-monatlicher Vertrag in
+   * der Gruppe steckt: anders als beim Turnus ist der Takt innerhalb einer Kategorie
+   * gemischt. Aus demselben Grund nennt der Kopf Monats- UND Jahressumme statt einer
+   * Summe „je Fälligkeit" — die gäbe es hier gar nicht, die Fälligkeiten sind gemischt.
+   */
+  const kategorieGruppen = useMemo(() => {
+    const nachId = new Map<string, Vertrag[]>();
+    const titelVon = new Map<string, string>();
+    for (const v of vertraege) {
+      const kategorieId = regelZuVertrag.get(v.id)?.kategorieId;
+      const haupt = kategorieId ? hauptkategorie(kategorien, kategorieId) : undefined;
+      const id = haupt?.id ?? "__ohne";
+      if (haupt) titelVon.set(id, haupt.name);
+      const liste = nachId.get(id);
+      if (liste) liste.push(v);
+      else nachId.set(id, [v]);
+    }
+    /** Was die Gruppe im Monat kostet — danach ordnen sich die Gruppen. */
+    const proMonat = (vs: Vertrag[]) =>
+      regelnVon(vs).reduce((sum, r) => sum + r.betrag / RHYTHMUS_MONATE[r.rhythmus], 0);
+
+    return [...nachId.entries()]
+      .map(([id, vs]) => {
+        const monat = proMonat(vs);
+        return {
+          key: id,
+          titel: titelVon.get(id) ?? t("vertraege.gruppeOhneKategorie"),
+          mitRuecklage: regelnVon(vs).some((r) => RHYTHMUS_MONATE[r.rhythmus] > 1),
+          vertraege: [...vs].sort((a, b) => betragsRang(b) - betragsRang(a)),
+          meta: t("vertraege.gruppeMetaKategorie", {
+            count: vs.length,
+            proMonat: betragText(monat),
+            proJahr: betragText(monat * 12),
+          }),
+          gewicht: Math.abs(monat),
+          // „ohne Kategorie" ganz nach hinten: es ist keine Kategorie, sondern ihr Fehlen.
+          ohne: id === "__ohne",
+        };
+      })
+      .sort((a, b) => (a.ohne !== b.ohne ? (a.ohne ? 1 : -1) : b.gewicht - a.gewicht));
+  }, [vertraege, regelZuVertrag, kategorien, geld, t]);
 
   function neu() {
-    setEditId(null);
-    setAnbieter("");
-    setInhaberId("");
-    setBeginn(heute);
-    setErsteZahlung(heute);
-    setMindestlaufzeit("");
-    setVerlaengerung("automatisch");
-    setVerlaengerungMonate("12");
-    setKuendigungsfrist("");
-    setBetragText("");
-    setRhythmus("monatlich");
-    setCharakter("Aufwand");
-    setKategorieId("");
-    setKontoId("");
-    setFehler(null);
-    setOffen(true);
+    setMaske({ editId: null, start: leeresFormular(heute) });
   }
   function bearbeiten(v: Vertrag) {
-    const r = regelZuVertrag.get(v.id);
-    setEditId(v.id);
-    setAnbieter(v.anbieter);
-    setInhaberId(v.inhaberId ?? "");
-    setBeginn(v.beginn);
-    setErsteZahlung(r?.startdatum ?? v.beginn);
-    setMindestlaufzeit(v.mindestlaufzeitMonate != null ? String(v.mindestlaufzeitMonate) : "");
-    setVerlaengerung(v.verlaengerung);
-    setVerlaengerungMonate(v.verlaengerungMonate != null ? String(v.verlaengerungMonate) : "12");
-    setKuendigungsfrist(v.kuendigungsfristMonate != null ? String(v.kuendigungsfristMonate) : "");
-    setBetragText(r ? String(minorZuMajor(Math.abs(r.betrag), geld.waehrung)) : "");
-    setRhythmus(r?.rhythmus ?? "monatlich");
-    setCharakter(r?.charakter ?? "Aufwand");
-    setKategorieId(r?.kategorieId ?? "");
-    setKontoId(r?.kontoId ?? "");
-    setFehler(null);
-    setOffen(true);
-  }
-  async function speichern() {
-    setFehler(null);
-    const eingabe = {
-      anbieter,
-      inhaberId: inhaberId || undefined,
-      beginn,
-      ersteZahlung: ersteZahlung || undefined,
-      mindestlaufzeitMonate: mindestlaufzeit ? Number(mindestlaufzeit) : undefined,
-      verlaengerung,
-      verlaengerungMonate: verlaengerungMonate ? Number(verlaengerungMonate) : undefined,
-      kuendigungsfristMonate: kuendigungsfrist ? Number(kuendigungsfrist) : undefined,
-      betrag: geld.parse(betragText) ?? 0,
-      rhythmus,
-      charakter,
-      kategorieId: kategorieId || undefined,
-      kontoId: kontoId || undefined,
-    };
-    try {
-      if (editId) await vertragAktualisieren(vertragRepo, regelRepo, editId, eingabe);
-      else await vertragAnlegen(vertragRepo, regelRepo, eingabe);
-      setOffen(false);
-      await laden();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
+    setMaske({ editId: v.id, start: formularAusVertrag(v, regelZuVertrag.get(v.id), geld) });
   }
 
   return (
@@ -474,6 +606,17 @@ export function VertraegeScreen() {
               { key: "anzahl", label: t("vertraege.spalteZahlungen"), align: "right", render: (k: Vertragskandidat) => String(k.anzahl) },
               { key: "letzte", label: t("vertraege.spalteLetzte"), render: (k: Vertragskandidat) => k.letzteZahlung },
               {
+                key: "_r",
+                label: "",
+                align: "right",
+                sortable: false,
+                render: (k: Vertragskandidat) => (
+                  <button className="linkbtn" onClick={() => setBefund(k)}>
+                    {t("vertraege.erkennung.aktion")}
+                  </button>
+                ),
+              },
+              {
                 key: "_u",
                 label: "",
                 align: "right",
@@ -506,142 +649,78 @@ export function VertraegeScreen() {
           <div className="muted">{t("vertraege.leer")}</div>
         </Card>
       ) : (
-        <>
-          {/* Umschalter: eine Fläche, drei Blicke auf dieselben Verträge. */}
-          <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
-            {ANSICHTEN.map((a, i) => {
-              const an = ansicht === a;
-              return (
-                <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
-                  style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                  {t(`vertraege.ansicht.${a}`)}
-                </button>
-              );
-            })}
+        /*
+         * EINE Card für alle vier Ansichten. Der Umschalter sitzt darin wie eine
+         * Filterleiste (dieselbe Bauform wie im Kontenregister) — vorher stand er
+         * außerhalb und die gruppierenden Ansichten sprengten die Fläche in eine Card je
+         * Gruppe. Damit sah derselbe Bestand je nach Umschalterstellung aus wie ein
+         * anderer Screen; die Gruppen sind aber eine Gliederung INNERHALB der Liste,
+         * keine eigenständigen Bereiche.
+         */
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
+            <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
+              {ANSICHTEN.map((a, i) => {
+                const an = ansicht === a;
+                return (
+                  <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
+                    style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
+                    {t(`vertraege.ansicht.${a}`)}
+                  </button>
+                );
+              })}
+            </div>
+            {/*
+              Die Ordnung steht fest und ist nicht klickbar (siehe Ansicht-Doku oben) —
+              also gehört sie hingeschrieben. Sonst sucht man die Sortierpfeile in den
+              Spaltenköpfen und hält ihr Fehlen für einen Fehler.
+            */}
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t(`vertraege.ordnung.${ansicht}`)}</span>
           </div>
 
-          {ansicht === "turnus" ? (
-            turnusGruppen.map((g) => (
-              <Card key={g.key} title={g.titel} subtitle={gruppenUntertitel(g)}>
-                <DataTable sortable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
-              </Card>
+          {ansicht === "turnus" || ansicht === "kategorie" ? (
+            (ansicht === "turnus" ? turnusGruppen : kategorieGruppen).map((g, i) => (
+              <div
+                key={g.key}
+                // Trennlinie statt Rahmen: die Gruppen liegen jetzt in EINER Fläche und
+                // brauchen nur eine Naht, keine eigene Kante.
+                style={i > 0 ? { borderTop: "1px solid var(--line)", marginTop: "var(--sp-5)", paddingTop: "var(--sp-5)" } : undefined}
+              >
+                <div style={{ fontSize: "var(--fs-title)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{g.titel}</div>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", margin: "3px 0 var(--sp-3)" }}>{g.meta}</div>
+                <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
+              </div>
             ))
           ) : (
-            <Card>
-              <DataTable
-                // Ohne key behielte die Tabelle beim Ansichtswechsel ihre angeklickte
-                // Sortierung — die neue Reihenfolge wäre dann unsichtbar.
-                key={ansicht}
-                sortable
-                pageSize={25}
-                columns={spalten(false)}
-                rows={ansicht === "faelligkeit" ? nachFaelligkeit : vertraege}
-              />
-            </Card>
+            <DataTable
+              // Ohne key bliebe beim Ansichtswechsel die aufgeschlagene Seite stehen —
+              // Seite 3 von „liste" ist in „faelligkeit" ein anderer Ausschnitt.
+              key={ansicht}
+              pageSize={25}
+              columns={spalten(false)}
+              rows={ansicht === "faelligkeit" ? nachFaelligkeit : nachBetrag}
+            />
           )}
-        </>
+        </Card>
       )}
 
-      {offen && (
-        <Modal
-          title={editId ? t("vertraege.modalBearbeiten") : t("vertraege.anlegen")}
-          subtitle={t("vertraege.modalUntertitel")}
-          onClose={() => setOffen(false)}
-          footer={
-            <>
-              <Button variant="primary" onClick={speichern}>
-                {t("vertraege.speichern")}
-              </Button>
-              <button className="linkbtn" onClick={() => setOffen(false)}>
-                {t("vertraege.abbrechen")}
-              </button>
-              {fehler && <span className="err">{fehler}</span>}
-            </>
-          }
-        >
-          <FormField label={t("vertraege.feldAnbieter")} required>
-            <input className="field" value={anbieter} onChange={(e) => setAnbieter(e.target.value)} placeholder={t("vertraege.feldAnbieterPlatzhalter")} />
-          </FormField>
+      {befund && <ErkennungsDialog kandidat={befund} onClose={() => setBefund(null)} />}
 
-          <Abschnitt titel={t("vertraege.abschnittZahlung")} hinweis={t("vertraege.abschnittZahlungHinweis")}>
-            <div className="form-grid">
-              <FormField label={`${t("vertraege.feldBetrag")} ${geld.symbol}`} required hint={t("vertraege.feldBetragHinweis")}>
-                <input className="field" inputMode="decimal" value={betragText} onChange={(e) => setBetragText(e.target.value)} placeholder={geld.format(0)} />
-              </FormField>
-              <FormField label={t("vertraege.feldRhythmus")}>
-                <select className="field" value={rhythmus} onChange={(e) => setRhythmus(e.target.value as Rhythmus)}>
-                  {RHYTHMEN.map((r) => (
-                    <option key={r} value={r}>
-                      {t(`vertraege.rhythmus.${r}`)}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label={t("vertraege.feldErsteZahlung")} hint={t("vertraege.feldErsteZahlungHinweis")}>
-                <input className="field" type="date" value={ersteZahlung} onChange={(e) => setErsteZahlung(e.target.value)} />
-              </FormField>
-              <FormField label={t("vertraege.feldKonto")} hint={t("vertraege.optional")}>
-                <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
-                  <option value="">—</option>
-                  {konten.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.bezeichnung}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label={t("vertraege.feldKategorie")} hint={t("vertraege.feldKategorieHinweis")}>
-                <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieWaehlen} />
-              </FormField>
-              <FormField label={t("vertraege.feldCharakter")}>
-                <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-                  {CHARAKTERE.map((c) => (
-                    <option key={c} value={c}>
-                      {t(`charakter.${c}`)}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-            </div>
-          </Abschnitt>
+      {regelVon && (
+        <VertragErkennungModal
+          vertrag={regelVon}
+          onClose={() => setRegelVon(null)}
+          onSaved={async () => { setRegelVon(null); await laden(); }}
+        />
+      )}
 
-          <Abschnitt titel={t("vertraege.abschnittVertrag")} hinweis={t("vertraege.abschnittVertragHinweis")}>
-            <div className="form-grid">
-              <FormField label={t("vertraege.feldBeginn")} hint={t("vertraege.feldBeginnHinweis")}>
-                <input className="field" type="date" value={beginn} onChange={(e) => setBeginn(e.target.value)} />
-              </FormField>
-              <FormField label={t("vertraege.feldInhaber")} hint={t("vertraege.optional")}>
-                <select className="field" value={inhaberId} onChange={(e) => setInhaberId(e.target.value)}>
-                  <option value="">—</option>
-                  {personen.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label={t("vertraege.feldMindestlaufzeit")} hint={t("vertraege.optional")}>
-                <input className="field" inputMode="numeric" value={mindestlaufzeit} onChange={(e) => setMindestlaufzeit(e.target.value)} placeholder={t("vertraege.feldMindestlaufzeitPlatzhalter")} />
-              </FormField>
-              <FormField label={t("vertraege.feldKuendigungsfrist")} hint={t("vertraege.optional")}>
-                <input className="field" inputMode="numeric" value={kuendigungsfrist} onChange={(e) => setKuendigungsfrist(e.target.value)} placeholder={t("vertraege.feldKuendigungsfristPlatzhalter")} />
-              </FormField>
-              <FormField label={t("vertraege.feldVerlaengerung")}>
-                <select className="field" value={verlaengerung} onChange={(e) => setVerlaengerung(e.target.value as Verlaengerungsart)}>
-                  <option value="automatisch">{t("vertraege.verlaengerung.automatisch")}</option>
-                  <option value="keine">{t("vertraege.verlaengerung.keine")}</option>
-                </select>
-              </FormField>
-              {/* Ohne automatische Verlängerung hat der Schritt keine Bedeutung — ein Feld,
-                  das nichts tut, kostet in jeder Maske Aufmerksamkeit. */}
-              {verlaengerung === "automatisch" && (
-                <FormField label={t("vertraege.feldVerlaengerungMonate")} hint={t("vertraege.feldVerlaengerungMonateHinweis")}>
-                  <input className="field" inputMode="numeric" value={verlaengerungMonate} onChange={(e) => setVerlaengerungMonate(e.target.value)} placeholder={t("vertraege.feldVerlaengerungMonatePlatzhalter")} />
-                </FormField>
-              )}
-            </div>
-          </Abschnitt>
-        </Modal>
+      {maske && (
+        <VertragModal
+          editId={maske.editId}
+          start={maske.start}
+          onClose={() => setMaske(null)}
+          onSaved={async () => { setMaske(null); await laden(); }}
+        />
       )}
     </div>
   );

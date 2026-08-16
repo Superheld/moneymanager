@@ -24,7 +24,10 @@ import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStamm
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { Button, DataTable, FormField, Pill } from "./ds";
+import { KlappCard } from "./KlappCard";
+import { KategorisierungCards } from "./KategorisierungCards";
+import { FestlegungenCard } from "./FestlegungenCard";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht, useRegionUmschalter } from "./einstellungenKontext";
@@ -58,6 +61,8 @@ export function EinstellungenScreen() {
       <PersonenCard personen={personen} onChange={laden} />
       <KontenCard konten={konten} personen={personen} personName={personName} ist={ist} onChange={laden} />
       <KategorienCard kategorien={kategorien} onChange={laden} />
+      <FestlegungenCard kategorien={kategorien} />
+      <KategorisierungCards kategorien={kategorien} />
     </div>
   );
 }
@@ -67,7 +72,7 @@ function RegionCard() {
   const { t } = useTranslation();
   const { aktuelleLocale, regionSetzen } = useRegionUmschalter();
   return (
-    <Card title={t("einstellungen.region.titel")} subtitle={t("einstellungen.region.untertitel")}>
+    <KlappCard titel={t("einstellungen.region.titel")} untertitel={t("einstellungen.region.untertitel")}>
       <FormField label={t("einstellungen.region.feld")} hint={t("einstellungen.region.hinweis")}>
         <select className="field" value={aktuelleLocale} onChange={(e) => regionSetzen(e.target.value)}>
           {REGIONEN.map((r) => (
@@ -77,7 +82,7 @@ function RegionCard() {
           ))}
         </select>
       </FormField>
-    </Card>
+    </KlappCard>
   );
 }
 
@@ -118,7 +123,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
   }
 
   return (
-    <Card title={t("einstellungen.person.titel")} subtitle={t("einstellungen.person.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.person.anlegen")}</Button>}>
+    <KlappCard titel={t("einstellungen.person.titel")} untertitel={t("einstellungen.person.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.person.anlegen")}</Button>}>
       {personen.length === 0 ? (
         <div className="muted">{t("einstellungen.person.leer")}</div>
       ) : (
@@ -150,7 +155,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
           </FormField>
         </Modal>
       )}
-    </Card>
+    </KlappCard>
   );
 }
 
@@ -202,7 +207,7 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
   }
 
   return (
-    <Card title={t("einstellungen.konto.titel")} subtitle={hatIst ? t("einstellungen.konto.untertitelIst") : t("einstellungen.konto.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.konto.anlegen")}</Button>}>
+    <KlappCard titel={t("einstellungen.konto.titel")} untertitel={hatIst ? t("einstellungen.konto.untertitelIst") : t("einstellungen.konto.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.konto.anlegen")}</Button>}>
       {konten.length === 0 ? (
         <div className="muted">{t("einstellungen.konto.leer")}</div>
       ) : (
@@ -263,7 +268,7 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
           </div>
         </Modal>
       )}
-    </Card>
+    </KlappCard>
   );
 }
 
@@ -322,9 +327,9 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
   }
 
   return (
-    <Card
-      title={t("einstellungen.kategorie.titel")}
-      subtitle={t("einstellungen.kategorie.untertitel")}
+    <KlappCard
+      titel={t("einstellungen.kategorie.titel")}
+      untertitel={t("einstellungen.kategorie.untertitel")}
       action={
         <span style={{ display: "flex", gap: "var(--sp-2)" }}>
           <Button onClick={() => standardkategorienAnlegen(kategorieRepo).then(onChange)}>{t("einstellungen.kategorie.standardLaden")}</Button>
@@ -368,6 +373,6 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
           </div>
         </Modal>
       )}
-    </Card>
+    </KlappCard>
   );
 }

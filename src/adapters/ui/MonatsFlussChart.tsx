@@ -1,6 +1,11 @@
-// MonatsFlussChart — divergierende Balken je Monat: Einnahmen nach oben (grün),
-// Ausgaben nach unten (Ink). Macht die monatlichen Abflüsse sichtbar (inkl.
-// Quartals-Ausschläge und Budget-Anteil), die die kumulierte Saldo-Kurve verschluckt.
+// MonatsFlussChart — je Monat zwei Balken nebeneinander: Einnahmen (grün) und Ausgaben
+// (Ink). Macht die monatlichen Abflüsse sichtbar (inkl. Quartals-Ausschläge und
+// Budget-Anteil), die die kumulierte Saldo-Kurve verschluckt.
+//
+// BEIDE Balken stehen auf derselben Grundlinie und wachsen nach oben, obwohl Ausgaben
+// fachlich negativ sind. Divergierende Balken (Einnahmen hoch, Ausgaben runter) zwingen
+// beim Vergleichen zum Spiegeln im Kopf; nebeneinander liest man direkt ab, welcher
+// Balken höher ist. Das Vorzeichen trägt die Farbe und die Legende, nicht die Richtung.
 
 import { useTranslation } from "react-i18next";
 import { useGeld } from "./einstellungenKontext";
@@ -29,12 +34,13 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
 
   const innerW = width - padL - padR;
   const innerH = height - padT - padB;
-  const mid = padT + innerH / 2;
+  /** Grundlinie: unten, gemeinsam für Einnahmen und Ausgaben. */
+  const basis = padT + innerH;
   const slot = n > 0 ? innerW / n : innerW;
   const bw = Math.min(18, slot * 0.36);
-  const h = (v: number) => (v / max) * (innerH / 2);
+  const h = (v: number) => (v / max) * innerH;
 
-  const gitter = [max, max / 2, 0, -max / 2, -max].map((v) => ({ v, y: mid - h(v) }));
+  const gitter = [max, (max * 3) / 4, max / 2, max / 4, 0].map((v) => ({ v, y: basis - h(v) }));
   // Achsenbeträge sind Minor Units (Cent) → direkt über geld.format lokalisieren.
   const fmtAchse = (v: number) => geld.format(Math.round(Math.abs(v)));
 
@@ -57,8 +63,8 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
               {aktivIndex === i && (
                 <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="var(--accent)" opacity="0.1" />
               )}
-              <rect x={cx - bw - 1} y={mid - ein} width={bw} height={ein} rx="2" fill="var(--ok)" />
-              <rect x={cx + 1} y={mid} width={bw} height={aus} rx="2" fill="var(--ink)" opacity="0.78" />
+              <rect x={cx - bw - 1} y={basis - ein} width={bw} height={ein} rx="2" fill="var(--ok)" />
+              <rect x={cx + 1} y={basis - aus} width={bw} height={aus} rx="2" fill="var(--ink)" opacity="0.78" />
               {/* transparenter, voll-hoher Slot für leichtes Klicken */}
               {klickbar && <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="transparent" />}
               {i % Math.ceil(n / 12) === 0 && (

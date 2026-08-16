@@ -3,6 +3,140 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.13.0] — 2026-08-17
+
+Zwei Themen, die dasselbe Ziel haben: die App soll die Arbeit erkennen, statt sie
+abzufragen. Verträge zeigen jetzt auf echte Buchungen statt auf einen Namen, und
+Buchungen bekommen ihre Kategorie selbst — aus einem Modell, das auf den eigenen
+Korrekturen trainiert ist und jede Entscheidung begründet.
+
+### Hinzugefügt
+
+**Automatische Kategorisierung.** Eine importierte Zahlung ohne mitgelieferte Kategorie
+kam bisher unkategorisiert in der Inbox an — der Normalfall für jeden Bankimport (CSV,
+FinTS). Jetzt entscheidet eine Kette, von „festgelegt" zu „geraten":
+
+  Umbuchung → Festlegung → Vertrag → Modell → Import-Kategorie
+
+- **Klassifikator** (`core/klassifikator`): multinomiale logistische Regression über
+  Bag-of-Words, rein, zero-dep. Linear ist Absicht — der Lern-Spike zeigte MLP und
+  tief+breit gleichauf, der Deckel ist daten- und nicht modelllimitiert. Bei einem
+  linearen Modell IST die Begründung das Modell: jede Entscheidung zerfällt ohne
+  Näherung in „woran lag es" (EDEKA → Lebensmittel: `emp=edeka` +2.30, `vwz:edeka`
+  +2.19). Am echten Bestand **89,1 % im Mittel über fünf Splits** (bester Einzelsplit
+  90,5 % — bewusst nicht als Kalibrierziel genommen), 137 ms über 3689 Beispiele.
+  Determinismus über einen gesetzten Generator statt `Math.random`: zweimal „Training
+  starten" muss dasselbe Modell ergeben.
+- **Merkmalsextraktion** mit getrennten Namensräumen (`emp=` ganzer Empfänger, `emp:`
+  seine Einzelwörter, `vwz:`, `gid:`, `vz:`), am echten Bestand kalibriert: angeklebte
+  Nummern werden abgeschnitten statt das Wort wegzuwerfen (ohne das fielen `debitkarte`
+  mit 1057 und `comdirect` mit 366 Belegen komplett aus dem Vokabular), Grenze bei drei
+  Stellen, damit `o2` heil bleibt; maskierte Kartennummern (`xxxx`, 1060×) fliegen raus.
+- **Vier Karten in den Einstellungen** entlang des tatsächlichen Trainingsablaufs:
+  Trainingsdaten → Merkmale → Ausschlüsse → Erkennungsmodell. Merkmalsquellen sind
+  einzeln abschaltbar, die Ausschlussliste ist pflegbar, und **„Wirkung messen"** sagt,
+  was das Weglassen einer Quelle kosten würde (sechs Varianten über fünf Splits).
+- **Verwechslungsmatrix** statt Schwächenliste: nicht nur wie oft eine Kategorie
+  danebengeht, sondern wohin. Dünn gespeichert — bei 49 Kategorien wären es 2401 Zellen,
+  von denen auf echten Daten 50 belegt sind.
+- **„Was die Erkennung hier sieht"** im Buchungsdialog: die Merkmale DIESER Zahlung, je
+  mit ihrer Trennschärfe über den ganzen Bestand, dazu der Modellvorschlag samt
+  Beitragszerlegung. Ausschlüsse lassen sich dort pflegen, wo der Beleg liegt.
+- **Festlegungen** („immer bei diesem Empfänger"): das dünne Overlay über der Erkennung,
+  für Aussagen, die halten sollen. Empfängermuster → Kategorie, sonst nichts — keine
+  Betragsspanne, kein Zeitraum. Sie entsteht nur auf ausdrückliche Zustimmung nach einer
+  Korrektur; beim Annehmen ziehen die übrigen offenen Zeilen desselben Empfängers mit.
+- **Rückwirkender Abgleich mit Vorschau.** Ohne ihn wirkte alles nur nach vorn: ein
+  frisch trainiertes Modell ließe die 5280 vorhandenen Zahlungen unberührt. Rechnen und
+  Schreiben sind getrennt — die Vorschau zeigt Übergänge statt Zeilen („52 × Sonstiges →
+  Kinderbetreuung" mit Beispiel-Empfängern), einen eigenen Abschnitt für die Wechsel, die
+  auch den Charakter ändern, und was warum übersprungen wurde. Geschrieben wird erst auf
+  Bestätigung.
+- **Kategorie-Herkunft an der Ist-Buchung** (Migration 20): `quelle` sagt, woher die
+  BUCHUNG stammt, nicht woher ihre KATEGORIE stammt. Ohne diese Trennung kann kein
+  automatischer Lauf unterscheiden, ob er seinen eigenen Treffer korrigiert oder eine
+  Handentscheidung plattmacht.
+
+**Vertrag ↔ Buchung, echt verknüpft** (Migration 19). Bis hierher zeigte ein Vertrag auf
+KEINE Buchung; die Zugehörigkeit wurde jedes Mal neu aus dem Empfängernamen abgeleitet.
+Das reicht für eine Pille und für nichts, was rechnet.
+
+- **Erkennungsregel** je Vertrag (Merkmale, Betragsspanne, Zeitraum, Konto) — getrennt vom
+  Vertrag wie die Zahlungsregel: der Vertrag beschreibt Konditionen, die Erkennung
+  beschreibt Zuordnungspolitik. Die Standardspanne ist bewusst weit und unsymmetrisch
+  (60 %…180 %): sie soll fremde Zahlungen an denselben Empfänger draußen halten, nicht die
+  eigenen aussortieren.
+- **Zuordnung mit Herkunft:** `automatisch` darf der Abgleich überschreiben, `manuell` nie.
+  `vertrag_id NULL` ist keine fehlende Angabe, sondern die Aussage „gehört ausdrücklich zu
+  keinem Vertrag" — ohne sie käme ein Fehlgriff bei jedem Lauf zurück.
+- **Regel einsehen und nachsteuern**, mit **Live-Vorschau**: bei jeder Änderung steht
+  darunter, welche Buchungen die Regel gerade trifft. Ohne sie wäre jede Anpassung ein
+  Blindflug.
+- **Typisierte Merkmale und Wildcards.** Jedes Merkmal trägt seine Art (`glaeubigerId` |
+  `empfaenger`) und wird nur gegen das Feld seiner Art geprüft — vorher hing die
+  Vorrangregel „ID schlägt Namen" an einer Vermutung. `*` steht für beliebigen Text; alles
+  andere wörtlich (ein Punkt in „E.ON" ist ein Punkt).
+- **Vertrag aus einer Buchung anlegen**, mit Vorbelegung. Und umgekehrt: eine Buchung
+  zeigt, wenn ihr Empfänger schon ein Vertrag ist — wer dort nur „Vertrag daraus machen"
+  liest, legt beim zweiten Blick auf dieselbe Miete einen zweiten Mietvertrag an.
+- **Vertragsvorschläge begründen sich.** Je Prüfung der gemessene Wert UND die Schwelle,
+  gegen die geprüft wurde — der Wert allein sagt nicht, ob er knapp war. Wer sieht, dass
+  68 Zahlungen im 30-Tage-Takt an dieselbe Gläubiger-ID gingen, entscheidet anders als bei
+  drei Zahlungen mit schwankendem Abstand.
+- **Vierte Vertrags-Ansicht: nach Kategorie.** Beantwortet, was weder Liste noch Turnus
+  beantworten — wofür gehen die festen Kosten drauf. Gruppiert nach HAUPTkategorie:
+  „Strom", „Gas", „Wasser" als drei Gruppen mit je einem Vertrag sagen weniger als eine
+  Gruppe „Wohnen". Dafür neu im Kern: `hauptkategorie()`, bis zur Wurzel.
+
+### Geändert
+- **Die Einstellungs-Karten starten eingeklappt.** Der Inhalt hängt erst beim Aufklappen
+  im Baum — damit läuft auch sein Ladeeffekt erst dann. Die Kategorisierungs-Karten ziehen
+  den gesamten Ledger; das zu tun, obwohl jemand nur eine Person umbenennen will, war
+  Arbeit für nichts.
+- **Verträge auf einer Fläche.** Der Ansichts-Umschalter sitzt in der Card wie eine
+  Filterleiste; die gruppierenden Ansichten sprengten den Screen vorher in eine Card je
+  Gruppe, derselbe Bestand sah je nach Umschalterstellung aus wie ein anderer Screen.
+  Tabellen dort sind bewusst nicht mehr sortierbar — eine angeklickte Spalte überschrieb
+  genau die Ordnung, die die gewählte Ansicht ausmacht; daneben steht jetzt, wonach sie
+  ordnet.
+- **Vertragsmaske:** Konditionen (Laufzeit, Fristen) zugeklappt, mit Zusammenfassung in der
+  Kopfzeile — sonst müsste man aufklappen, nur um zu sehen, ob es etwas zu sehen gibt.
+- **Der Vertrag trägt eine Kategorie** (Migration 23), nicht nur seine abgeleitete
+  Zahlungsregel. Was eine Buchung trifft, ist die Vertragszuordnung, und die zeigt auf den
+  Vertrag.
+- **Stoppwörter liegen in der Datenbank** (Migration 22), nicht mehr im Code. Blieben sie
+  dort, bräuchte es zusätzlich eine Liste der Ausnahmen von der Liste. Damit revidiert:
+  die frühere Entscheidung „fest im Code, nur einsehbar". Sie war unter der Annahme
+  richtig, dass sich nicht messen lässt, welches Merkmal taugt — es lässt sich messen, und
+  die Messung gehört in die App.
+- **Monatsverlauf:** Einnahmen und Ausgaben auf gemeinsamer Grundlinie, beide nach oben.
+  Divergierende Balken zwangen zum Spiegeln im Kopf.
+- **Buchungsmaske:** Kategorie und Aufteilung sind EIN Block, weil nur eines von beiden
+  gilt.
+
+### Behoben
+- **Die Vertrags-Kategorie war auf dem echten Bestand nie angekommen.** Nach Migration 23
+  stand sie bei allen 16 Verträgen auf NULL, obwohl jeder eine Zahlungsregel mit Kategorie
+  hatte: die laufende App hatte Version 23 verbucht, als die Migration erst aus dem
+  `ALTER TABLE` bestand — der Nachtrag kam Minuten später und war damit für immer erledigt,
+  ohne je gelaufen zu sein. Die Vertragsstufe der Kategorisierungs-Kette war dort tot.
+  **Migration 25** trägt es nach, in einer neuen Version statt in der alten; die Falle
+  steht jetzt in CLAUDE.md.
+- **Übersicht/Kategorien:** die Detailtabelle liegt neben der Zeile statt darin — vorher
+  schloss jeder Klick in die Tabelle die Kategorie wieder (Bubbling), und die Einfärbung
+  der offenen Zeile legte sich als Rahmen um die Tabelle.
+- **Inventar:** „davon da" misst gegen die Wiederbeschaffung statt gegen das rechnerische
+  Soll, damit beide Balken eines Gegenstands denselben Maßstab haben; dazu eine Trennlinie
+  zwischen den Gegenständen — zwei Balken je Posten sahen sonst aus wie vier Balken eines
+  Postens.
+- Einer geteilten Buchung ließ sich wieder eine Kategorie geben — genau der Zustand, den
+  `buchungSplitten` ausschließt.
+
+### Schema
+Migrationen 19–25: Vertragserkennung und -zuordnung (19), Kategorie-Herkunft an der
+Ist-Buchung (20), Klassifikator-Modell (21), Merkmalsausschlüsse (22), Kategorie am Vertrag
+(23) samt Nachtrag (25), Kategorie-Festlegungen (24).
+
 ## [0.12.0] — 2026-08-16
 
 Der Monatsausblick wird zum Einstieg, Verträge und Budgets schlagen sich selbst vor —

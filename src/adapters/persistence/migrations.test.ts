@@ -45,8 +45,11 @@ function indexExistiert(db: Database, name: string): boolean {
 
 const ERWARTETE_TABELLEN = [
   "budget", "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
-  "ist_buchung_aufteilung", "kategorie", "person", "topf",
-  "umsatz", "vertrag", "zahlungskonto", "zahlungsregel",
+  "ist_buchung_aufteilung", "kategorie", "kategorie_festlegung", "klassifikator_modell",
+  "merkmal_ausschluss",
+  "person", "topf",
+  "umsatz", "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
+  "zahlungskonto", "zahlungsregel",
 ];
 
 describe("Migrationen — frische Anwendung der ganzen Kette", () => {
@@ -68,11 +71,34 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     );
     // v17
     expect(spalten(db, "inventargegenstand")).toContain("konto_id");
+    // v23 — der Vertrag trägt die Kategorie, an der die Kategorisierungs-Kette hängt
+    expect(spalten(db, "vertrag")).toContain("kategorie_id");
     // v9/v10/v11/v13
     expect(spalten(db, "umsatz")).toContain("glaeubiger_id"); // v16
     expect(spalten(db, "ist_buchung")).toEqual(
-      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "verwendung_topf_id", "roh_hash"]),
+      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "verwendung_topf_id", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
     );
+    db.close();
+  });
+
+  /**
+   * v20 fügt die Spalte MIT Default hinzu — und der Default ist die eigentliche Aussage
+   * der Migration: der Bestand kam über den Import und das FG-Remapping herein, also
+   * automatisch. Ohne ihn stünde dort NULL, und der erste rückwirkende Lauf müsste raten,
+   * ob er 5279 Zeilen anfassen darf.
+   */
+  it("gibt bestehenden Ist-Buchungen die Kategorie-Herkunft „automatisch“ (v20)", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 19); // Stand VOR der neuen Spalte
+    db.run(
+      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle)
+       VALUES ('alt', '2026-01-15', -1234, 'k1', 'kat-lebensmittel', 'Aufwand', 'import')`,
+    );
+
+    apply(db, 19, 20);
+
+    const r = db.exec("SELECT kategorie_herkunft FROM ist_buchung WHERE id = 'alt'");
+    expect(String(r[0].values[0][0])).toBe("automatisch");
     db.close();
   });
 
@@ -272,6 +298,109 @@ describe("migrate() gegen echtes SQLite", () => {
       expect.arrayContaining(["transfer_id", "gegenkonto_id"]),
     );
     expect(version(db)).toBe(MIGRATIONS[MIGRATIONS.length - 1].version);
+    db.close();
+  });
+});
+
+describe("Vertrags-Kategorie nachtragen (v23)", () => {
+  /** Ein Vertrag mit abgeleiteter Zahlungsregel, auf dem Stand VOR der neuen Spalte. */
+  function bestand(db: Database) {
+    apply(db, 0, 22);
+    db.run(
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status)
+       VALUES ('v1', 'O2', '2024-01-01', 'automatisch', 'aktiv')`,
+    );
+    db.run(
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, vertrag_id, kategorie_id)
+       VALUES ('r1', 'O2', -2999, 'monatlich', '2024-01-01', 'Aufwand', 'v1', 'kat-telefon')`,
+    );
+  }
+
+  const kategorieVon = (db: Database, id: string) => {
+    const r = db.exec(`SELECT kategorie_id FROM vertrag WHERE id = '${id}'`);
+    return r[0].values[0][0];
+  };
+
+  it("holt die Kategorie aus der Zahlungsregel", () => {
+    const db = new SQL.Database();
+    bestand(db);
+
+    apply(db, 22, 23);
+
+    // Ohne das trüge kein Bestandsvertrag eine Kategorie, und die Kette begänne erst
+    // beim nächsten neu erfassten zu wirken.
+    expect(kategorieVon(db, "v1")).toBe("kat-telefon");
+    db.close();
+  });
+
+  it("ein zweiter Durchgang ändert nichts", () => {
+    const db = new SQL.Database();
+    bestand(db);
+    apply(db, 22, 23);
+    // Von Hand nachgesteuert — das darf eine Wiederholung nicht wegwischen.
+    db.run("UPDATE vertrag SET kategorie_id = 'kat-vonhand' WHERE id = 'v1'");
+
+    // Nur das UPDATE erneut: das ADD COLUMN fängt `migrate()` über PRAGMA table_info ab
+    // (siehe db.ts), der einfache apply()-Helfer hier kennt diese Prüfung nicht.
+    const nachtrag = MIGRATIONS.find((m) => m.version === 23)!.sql.find((q) => q.startsWith("UPDATE"))!;
+    db.run(nachtrag);
+
+    expect(kategorieVon(db, "v1")).toBe("kat-vonhand");
+    db.close();
+  });
+
+  it("ein Vertrag ohne Regel-Kategorie bleibt leer", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 22);
+    db.run(
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status)
+       VALUES ('v2', 'Ohne Regel', '2024-01-01', 'keine', 'aktiv')`,
+    );
+
+    apply(db, 22, 23);
+
+    expect(kategorieVon(db, "v2")).toBeNull();
+    db.close();
+  });
+});
+
+describe("Vertrags-Kategorie erneut nachtragen (v25)", () => {
+  it("holt nach, was v23 im laufenden Betrieb verpasst hat", () => {
+    // Der reale Fall: die App hatte Version 23 verbucht, als die Migration erst aus dem
+    // ALTER bestand. Der Bestand steht also auf 24, hat die Spalte — und sie ist leer.
+    const db = new SQL.Database();
+    apply(db, 0, 24);
+    db.run(
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status)
+       VALUES ('v1', 'O2', '2024-01-01', 'automatisch', 'aktiv')`,
+    );
+    db.run(
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, vertrag_id, kategorie_id)
+       VALUES ('r1', 'O2', -2999, 'monatlich', '2024-01-01', 'Aufwand', 'v1', 'kat-telefon')`,
+    );
+
+    apply(db, 24, 25);
+
+    expect(db.exec("SELECT kategorie_id FROM vertrag WHERE id = 'v1'")[0].values[0][0]).toBe("kat-telefon");
+    db.close();
+  });
+
+  it("überschreibt nichts von Hand Gepflegtes", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 24);
+    db.run(
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, kategorie_id)
+       VALUES ('v1', 'O2', '2024-01-01', 'automatisch', 'aktiv', 'kat-vonhand')`,
+    );
+    db.run(
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, vertrag_id, kategorie_id)
+       VALUES ('r1', 'O2', -2999, 'monatlich', '2024-01-01', 'Aufwand', 'v1', 'kat-telefon')`,
+    );
+
+    apply(db, 24, 25);
+    apply(db, 24, 25); // und ein zweites Mal
+
+    expect(db.exec("SELECT kategorie_id FROM vertrag WHERE id = 'v1'")[0].values[0][0]).toBe("kat-vonhand");
     db.close();
   });
 });
