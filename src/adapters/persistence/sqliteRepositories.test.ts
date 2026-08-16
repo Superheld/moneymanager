@@ -595,3 +595,28 @@ describe("Merkmalskonfiguration — Persistenz", () => {
     expect(alle[0].herkuenfte).toEqual(["vwz"]);
   });
 });
+
+describe("Vertrag — Kategorie am Aggregat", () => {
+  it("trägt die Kategorie durch das Schema", async () => {
+    await vertragRepository.speichern({
+      id: "v1", anbieter: "[anonymisiert]", beginn: "2026-01-01",
+      verlaengerung: "automatisch", status: "aktiv", kategorieId: "kat-abo",
+    });
+    expect((await vertragRepository.alle())[0].kategorieId).toBe("kat-abo");
+  });
+
+  it("ein Vertrag ohne Kategorie bleibt ohne", async () => {
+    await vertragRepository.speichern({
+      id: "v1", anbieter: "[anonymisiert]", beginn: "2026-01-01",
+      verlaengerung: "keine", status: "aktiv",
+    });
+    expect((await vertragRepository.alle())[0].kategorieId).toBeUndefined();
+  });
+
+  it("überschreibt die Kategorie beim Aktualisieren", async () => {
+    const basis = { id: "v1", anbieter: "[anonymisiert]", beginn: "2026-01-01", verlaengerung: "keine" as const, status: "aktiv" as const };
+    await vertragRepository.speichern({ ...basis, kategorieId: "kat-alt" });
+    await vertragRepository.speichern({ ...basis, kategorieId: "kat-neu" });
+    expect((await vertragRepository.alle())[0].kategorieId).toBe("kat-neu");
+  });
+});
