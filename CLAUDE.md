@@ -39,6 +39,11 @@ npm run typecheck
 Die Shell-cwd driftet zwischen Calls — Pfade absolut halten.
 `tsc --noEmit | tail` verschluckt den Exit-Code; lieber `tsc --noEmit; echo $?`.
 
+**Node kommt über mise** (`mise.toml`: node 26). In einer nicht-interaktiven Shell ist
+`mise` keine Funktion — dann `eval "$(/opt/homebrew/bin/mise env -s bash)"` voranstellen,
+sonst greift das ältere Node aus dem PATH. Die CI pinnt dieselbe Hauptversion getrennt
+in `.github/workflows/ci.yml`, weil Actions die mise.toml nicht liest.
+
 ## Dev-Fallen
 - **WebView-Cache (Tauri dev):** Erscheinen Frontend-Änderungen NICHT im Fenster trotz
   korrektem Code? Erst prüfen, ob Vite ausliefert (`curl -s localhost:1420/src/.../X.tsx`),
