@@ -4,7 +4,8 @@ Diese `.jsx`/`.d.ts`-Dateien stammen aus dem Repo-Verzeichnis
 `../../../../../design-system/components/` und werden von dort übernommen.
 
 **Ausnahme `DataTable`:** die App-Fassung ist dem Design-System vorausgelaufen und trägt
-Sortierung, Pagination, Zeilenklick, Spaltenbreiten und feste Zeilenhöhe. Sie ist hier die
+Sortierung, Pagination, Zeilenklick, Spaltenbreiten, feste Zeilenhöhe und die Breitenkappung
+(innerer Block mit `max-width` je Zelle, Fangnetz-Scrollrahmen). Sie ist hier die
 Quelle der Wahrheit; wer das Design-System aktualisiert, darf sie nicht blind überschreiben.
 Alle übrigen Dateien sind verbatim kopiert und werden hier nicht verändert.
 
