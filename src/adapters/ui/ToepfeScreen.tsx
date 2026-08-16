@@ -304,7 +304,7 @@ export function ToepfeScreen() {
                 <input className="field" type="date" value={entDatum} onChange={(e) => setEntDatum(e.target.value)} />
               </FormField>
               <FormField label={`${t("toepfe.feldBetrag")} ${geld.symbol}`} required>
-                <input className="field" inputMode="decimal" value={entBetrag} onChange={(e) => setEntBetrag(e.target.value)} placeholder="0,00" />
+                <input className="field" inputMode="decimal" value={entBetrag} onChange={(e) => setEntBetrag(e.target.value)} placeholder={geld.format(0)} />
               </FormField>
               <FormField label={t("toepfe.feldNotiz")}>
                 <input className="field" value={entNotiz} onChange={(e) => setEntNotiz(e.target.value)} placeholder={t("toepfe.notizPlatzhalter")} />

@@ -509,7 +509,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
           <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
         <FormField label={t("konten.feldBetrag")} required>
-          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
+          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
         <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
           <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
@@ -612,7 +612,7 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
           <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
         <FormField label={t("konten.feldBetrag")} required>
-          <input className="field" inputMode="decimal" value={betrag} disabled={gepaart} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
+          <input className="field" inputMode="decimal" value={betrag} disabled={gepaart} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
         {!gepaart && (
           <>
@@ -833,7 +833,7 @@ function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung: IstBuc
             style={{ flex: "0 1 110px", minWidth: 90 }}
             value={z.betrag}
             onChange={(e) => aendere(i, "betrag", e.target.value)}
-            placeholder="0,00"
+            placeholder={geld.format(0)}
             aria-label={`${t("konten.split.spalteBetrag")} ${i + 1}`}
           />
           {rest !== 0 && (
@@ -1004,7 +1004,7 @@ function BuchungModal({ konto, kategorien, heute, onClose, onSaved }: { konto: Z
           <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
         <FormField label={t("konten.feldBetrag")} hint={t("konten.buchung.betragHinweis")} required>
-          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
+          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
         <FormField label={t("konten.feldCharakter")}>
           <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
