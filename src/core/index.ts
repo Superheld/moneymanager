@@ -21,3 +21,4 @@ export * from "./istbuchung";
 export * from "./kontoregister";
 export * from "./historie";
 export * from "./monatsausblick";
+export * from "./klassifikator/merkmale";
