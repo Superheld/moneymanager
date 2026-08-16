@@ -28,7 +28,7 @@ import { betont } from "./betonung";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
-import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
+import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 
 const PERIODEN: BudgetPeriode[] = ["monatlich", "jaehrlich"];
 

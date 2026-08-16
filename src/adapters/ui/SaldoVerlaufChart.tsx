@@ -2,7 +2,7 @@
 // ZweiKurvenChart, aber generisch mit eigener Legende. Nulllinie betont, falls der
 // Saldo ins Minus läuft.
 
-import { useGeld } from "./EinstellungenProvider";
+import { useGeld } from "./einstellungenKontext";
 
 interface Props {
   labels: string[];
