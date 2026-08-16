@@ -7,7 +7,8 @@
 // Ausschlussliste tatsächlich mit Belegen aus DIESEN Daten dasteht.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
 const halter = vi.hoisted(() => {
@@ -148,5 +149,75 @@ describe("Lernmaterial-Karte", () => {
     rendere(<EinstellungenScreen />);
     await karteGeladen();
     expect(screen.getByText(/Noch keine gebuchten Zahlungen/)).toBeTruthy();
+  });
+});
+
+describe("Training über die Oberfläche", () => {
+  /** Genug klar trennbares Material, damit eine Messung überhaupt stattfindet. */
+  function material() {
+    kategorie("kat-lm", "Lebensmittel");
+    kategorie("kat-sprit", "Sprit & Laden");
+    for (let i = 0; i < 40; i++) {
+      buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "REWE Markt", zweck: "Einkauf" });
+      buchung({ id: `s${i}`, betrag: -6000, kategorieId: "kat-sprit", gegenpartei: "Shell Station", zweck: "Tanken" });
+    }
+  }
+
+  it("sagt vor dem ersten Training, dass noch nichts gelernt ist", async () => {
+    material();
+    rendere(<EinstellungenScreen />);
+    await karteGeladen();
+    expect(screen.getByText(/Noch nicht trainiert/)).toBeTruthy();
+  });
+
+  it("trainiert auf Knopfdruck und zeigt danach eine gemessene Trefferquote", async () => {
+    material();
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await karteGeladen();
+
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+
+    // Die Aufgabe ist trennbar — das Modell muss sie treffen.
+    await waitFor(() => expect(screen.getByText("100 %")).toBeTruthy());
+    expect(screen.getByText(/Zuletzt trainiert am .*, aus 80 Beispielen/)).toBeTruthy();
+    expect(screen.queryByText(/Noch nicht trainiert/)).toBeNull();
+    // Bei fehlerfreier Erkennung darf keine Liste „wo es schwerfällt" erscheinen.
+    expect(screen.queryByText("Wo die Erkennung sich schwertut")).toBeNull();
+  });
+
+  it("das Modell überlebt einen Neuaufbau des Screens", async () => {
+    material();
+    const nutzer = userEvent.setup();
+    const ersteAnsicht = rendere(<EinstellungenScreen />);
+    await karteGeladen();
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+    await waitFor(() => expect(screen.getByText(/Zuletzt trainiert am/)).toBeTruthy());
+
+    // Es liegt in der Datenbank, nicht im Zustand der Komponente.
+    ersteAnsicht.unmount();
+    rendere(<EinstellungenScreen />);
+    await karteGeladen();
+    await waitFor(() => expect(screen.getByText(/aus 80 Beispielen/)).toBeTruthy());
+  });
+
+  it("misst nicht, wenn zu wenige Beispiele da sind", async () => {
+    kategorie("kat-lm", "Lebensmittel");
+    buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm" });
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await karteGeladen();
+
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+
+    // Lieber keine Angabe als eine, die nur den Zufall des Splits wiedergibt.
+    await waitFor(() => expect(screen.getByText("nicht gemessen")).toBeTruthy());
+    expect(screen.getByText(/aus 1 Beispielen/)).toBeTruthy();
+  });
+
+  it("bietet kein Training an, solange es kein Material gibt", async () => {
+    rendere(<EinstellungenScreen />);
+    await karteGeladen();
+    expect(screen.queryByRole("button", { name: "Training starten" })).toBeNull();
   });
 });

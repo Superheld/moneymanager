@@ -27,6 +27,8 @@ import { sqliteBudgetRepository as budgetRepository } from "./sqliteBudgetReposi
 import { sqliteEinstellungenRepository as einstellungenRepository } from "./sqliteEinstellungenRepository";
 import { sqliteInventarRepository as inventarRepository } from "./sqliteInventarRepository";
 import { sqliteLedgerRepository as ledgerRepository } from "./sqliteLedgerRepository";
+import { sqliteKlassifikatorRepository as klassifikatorRepository } from "./sqliteKlassifikatorRepository";
+import { klassifizieren, trainieren } from "../../core";
 import { sqliteTopfRepository as topfRepository } from "./sqliteTopfRepository";
 import { sqliteVertragRepository as vertragRepository } from "./sqliteVertragRepository";
 import {
@@ -471,5 +473,67 @@ describe("Vertragszuordnung — Persistenz", () => {
     const alle = await zuordnungRepository.alle();
     expect(alle).toHaveLength(1);
     expect(alle[0].vertragId).toBe("v2");
+  });
+});
+
+describe("Klassifikator-Repository", () => {
+  it("trägt ein Modell verlustfrei durch das Schema", async () => {
+    const modell = trainieren([
+      { merkmale: ["emp=rewe", "vz:-"], kategorieId: "kat-lm" },
+      { merkmale: ["emp=shell", "vz:-"], kategorieId: "kat-sprit" },
+    ]);
+    await klassifikatorRepository.speichern({
+      modell, trainiertAm: "2026-08-16T12:00:00.000Z", genauigkeit: 0.891,
+    });
+
+    const zurueck = await klassifikatorRepository.laden();
+    expect(zurueck?.trainiertAm).toBe("2026-08-16T12:00:00.000Z");
+    expect(zurueck?.genauigkeit).toBeCloseTo(0.891, 5);
+    expect([...zurueck!.modell.kategorien]).toEqual([...modell.kategorien]);
+    expect([...zurueck!.modell.vokabular]).toEqual([...modell.vokabular]);
+    // Bit für Bit: die Gewichte gehen als Float32 durch base64, nicht über Textzahlen.
+    expect([...zurueck!.modell.gewichte]).toEqual([...modell.gewichte]);
+    expect([...zurueck!.modell.bias]).toEqual([...modell.bias]);
+  });
+
+  it("liefert das geladene Modell mit identischen Entscheidungen", async () => {
+    const beispiele = [
+      { merkmale: ["emp=rewe", "vwz:einkauf"], kategorieId: "kat-lm" },
+      { merkmale: ["emp=shell", "vwz:tanken"], kategorieId: "kat-sprit" },
+    ];
+    const modell = trainieren(beispiele);
+    await klassifikatorRepository.speichern({ modell, trainiertAm: "2026-08-16T12:00:00.000Z" });
+
+    const zurueck = (await klassifikatorRepository.laden())!.modell;
+    for (const b of beispiele) {
+      expect(klassifizieren(zurueck, b.merkmale)?.kategorieId).toBe(
+        klassifizieren(modell, b.merkmale)?.kategorieId,
+      );
+    }
+  });
+
+  it("liefert null, solange nie trainiert wurde", async () => {
+    expect(await klassifikatorRepository.laden()).toBeNull();
+  });
+
+  it("ersetzt das Modell statt ein zweites anzulegen", async () => {
+    const a = trainieren([{ merkmale: ["emp=alt"], kategorieId: "kat-a" }]);
+    const b = trainieren([{ merkmale: ["emp=neu"], kategorieId: "kat-b" }]);
+    await klassifikatorRepository.speichern({ modell: a, trainiertAm: "2026-08-01T00:00:00.000Z" });
+    await klassifikatorRepository.speichern({ modell: b, trainiertAm: "2026-08-16T00:00:00.000Z" });
+
+    const zurueck = await klassifikatorRepository.laden();
+    expect([...zurueck!.modell.kategorien]).toEqual(["kat-b"]);
+    expect(zurueck!.trainiertAm).toBe("2026-08-16T00:00:00.000Z");
+  });
+
+  it("übersteht ein leeres Modell (nichts zu lernen gewesen)", async () => {
+    await klassifikatorRepository.speichern({
+      modell: trainieren([]), trainiertAm: "2026-08-16T00:00:00.000Z",
+    });
+    const zurueck = await klassifikatorRepository.laden();
+    expect(zurueck!.modell.kategorien).toHaveLength(0);
+    expect(zurueck!.modell.vokabular).toHaveLength(0);
+    expect(zurueck!.genauigkeit).toBeUndefined();
   });
 });
