@@ -118,6 +118,61 @@ describe("Vertrag", () => {
   });
 });
 
+describe("Festlegung", () => {
+  /** „Zahlungen an [anonymisiert] sind immer Abos & Streaming." */
+  function mitFestlegung(): Vorschlagskontext {
+    return {
+      ...nurKatalog,
+      festlegungen: [{ muster: "netflix international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" }],
+    };
+  }
+
+  it("setzt die festgelegte Kategorie", () => {
+    const v = vorschlagFuer(roh({ gegenpartei: "NETFLIX INTERNATIONAL BV", betrag: -4200 }), mitFestlegung());
+    expect(v).toEqual({ kategorieId: "k-abo", charakter: "Aufwand", quelle: "festlegung" });
+  });
+
+  it("nennt das Muster im Befund", () => {
+    const b = vorschlagsbefundFuer(roh({ gegenpartei: "NETFLIX INTERNATIONAL BV" }), mitFestlegung());
+    expect(b.festlegung).toBe("netflix international");
+  });
+
+  it("kennt keine Betragsspanne — eine Kategorie ist eine Klasse, kein Vertrag", () => {
+    // Genau der Unterschied zur Vertragserkennung: dort hielte die Spanne diese Zahlung
+    // draußen. Lebensmittel kosten mal 8 € und mal 190 €.
+    const v = vorschlagFuer(roh({ gegenpartei: "[anonymisiert] International BV", betrag: -190_00 }), mitFestlegung());
+    expect(v?.kategorieId).toBe("k-abo");
+  });
+
+  it("schlägt den Vertrag", () => {
+    const kontext: Vorschlagskontext = {
+      ...mitFestlegung(),
+      erkennungen: [standardErkennung("v1", "[anonymisiert] International", 999)],
+      vertragsKategorie: new Map([["v1", "k-le"]]),
+    };
+    expect(vorschlagFuer(roh({ gegenpartei: "[anonymisiert] International BV", betrag: -999 }), kontext)?.kategorieId).toBe("k-abo");
+  });
+
+  it("die Umbuchung schlägt auch die Festlegung", () => {
+    // Eigenes Geld, das das Konto wechselt, gehört in keine Ausgabenkategorie — auch
+    // dann nicht, wenn für den Empfänger etwas festgelegt ist.
+    const v = vorschlagFuer(roh({ gegenpartei: "[anonymisiert] International BV", istUmbuchung: true }), mitFestlegung());
+    expect(v).toEqual({ charakter: "Umschichtung", quelle: "umbuchung" });
+  });
+
+  it("greift nicht bei einem anderen Empfänger", () => {
+    expect(vorschlagFuer(roh({ gegenpartei: "REWE Markt" }), mitFestlegung())).toBeUndefined();
+  });
+
+  it("eine Festlegung auf eine gelöschte Kategorie fällt durch", () => {
+    const kontext: Vorschlagskontext = {
+      ...nurKatalog,
+      festlegungen: [{ muster: "rewe", kategorieId: "geloescht", angelegtAm: "2026-08-17T10:00:00.000Z" }],
+    };
+    expect(vorschlagFuer(roh({ gegenpartei: "REWE Markt", kategorieHinweis: "Lebensmittel" }), kontext)?.quelle).toBe("remapping");
+  });
+});
+
 describe("Modell", () => {
   function mitModell(): Vorschlagskontext {
     return {
