@@ -318,19 +318,28 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             <DataTable
               key={`${aktivId}-${katFilter}-${artFilter}-${regSuche}`}
               pageSize={25}
+              labelSeite={t("konten.seite")}
+              labelErste={t("konten.seiteErste")}
+              labelLetzte={t("konten.seiteLetzte")}
+              labelZurueck={t("konten.seiteZurueck")}
+              labelVor={t("konten.seiteVor")}
               columns={[
                 { key: "datum", label: t("konten.spalteDatum"), render: (z) => ddmm(z.datum) },
                 {
-                  key: "bez", label: t("konten.spalteBeschreibung"),
+                  // Nicht umbrechen (flexWrap): eine zweizeilige Zeile schiebt den
+                  // Seitenschalter darunter je nach Seiteninhalt nach oben oder unten,
+                  // und beim Durchblättern klickt man daneben. Der volle Text steht im
+                  // title, für die Fälle, in denen abgeschnitten wird.
+                  key: "bez", label: t("konten.spalteBeschreibung"), maxWidth: 320,
                   render: (z) => (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-                      {zeilenLabel(z)}
-                      {z.gegenkontoId && <span className="muted" style={{ fontSize: 12 }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
+                    <span title={zeilenLabel(z)} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{zeilenLabel(z)}</span>
+                      {z.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
                       {z.gegenkontoId ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill> : z.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null}
                     </span>
                   ),
                 },
-                { key: "kat", label: t("konten.spalteKategorie"), sortValue: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""), render: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "?" : "—") },
+                { key: "kat", label: t("konten.spalteKategorie"), maxWidth: 180, sortValue: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""), render: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "?" : "—") },
                 { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (z) => z.betrag, render: (z) => <span className="num" style={{ fontWeight: 700, color: betragFarbe(z) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span> },
                 { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (z) => z.saldo, render: (z) => geld.format(z.saldo) },
                 {
