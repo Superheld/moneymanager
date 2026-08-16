@@ -1,27 +1,23 @@
 // Verträge (P2.1) — Übersicht mit Kündigungsterminen; Anlegen im Modal. Eine Maske
 // erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung).
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   kuendigungsterminNaht,
-  minorZuMajor,
   naechsteFaelligkeit,
   naechsterKuendigungstermin,
   RHYTHMUS_MONATE,
   ruecklagenbedarf,
   ruecklageProMonat,
   type Charakter,
-  type Kategorie,
   type Person,
   type Rhythmus,
   type Vertrag,
   type Vertragskandidat,
-  type Verlaengerungsart,
-  type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
-import { vertragAktualisieren, vertragAnlegen, vertragLoeschen } from "../../application/vertragAnlegen";
+import { vertragLoeschen } from "../../application/vertragAnlegen";
 import {
   ignorierteSchluessel,
   vertragsvorschlaege,
@@ -32,18 +28,20 @@ import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqlit
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
 import { sqliteEinstellungenRepository as einstellungenRepo } from "../persistence/sqliteEinstellungenRepository";
-import {
-  sqliteKategorieRepository as kategorieRepo,
-  sqlitePersonRepository as personRepo,
-  sqliteZahlungskontoRepository as kontoRepo,
-} from "../persistence/sqliteStammdatenRepositories";
-import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
+import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStammdatenRepositories";
+import { Button, Card, DataTable, KPIStat, Pill } from "./ds";
 import type { DataColumn } from "./ds/DataTable";
 import { PageHead } from "./PageHead";
-import { Modal } from "./Modal";
-import { CategoryPicker } from "./CategoryPicker";
-import { useGeld, fehlerNachricht } from "./einstellungenKontext";
+import {
+  formularAusKandidat,
+  formularAusVertrag,
+  leeresFormular,
+  VertragModal,
+  type VertragFormular,
+} from "./VertragModal";
+import { useGeld } from "./einstellungenKontext";
 
+/** Die Turnus-Ansicht zeigt je Rhythmus eine Gruppe — in dieser Reihenfolge. */
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 /**
  * Drei Blicke auf dieselben Verträge. „liste" zeigt alle nach Betrag, „faelligkeit"
@@ -58,32 +56,11 @@ const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "ja
  */
 type Ansicht = "liste" | "faelligkeit" | "turnus";
 const ANSICHTEN: Ansicht[] = ["liste", "faelligkeit", "turnus"];
-const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
   Aufwand: "aufwand",
   Ertrag: "ertrag",
   Umschichtung: "um",
 };
-
-/**
- * Ein abgesetzter Block in der Maske. Die Felder eines Vertrags zerfallen in zwei
- * Gruppen, die verschieden viel wiegen: was in die Planung rechnet (Betrag, Rhythmus,
- * Fälligkeit, Konto) und was nur die Konditionen beschreibt (Laufzeit, Fristen). Als
- * eine durchgehende Wand aus Eingabefeldern sah beides gleich wichtig aus.
- */
-function Abschnitt({ titel, hinweis, children }: { titel: string; hinweis?: string; children: ReactNode }) {
-  return (
-    <section style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8, borderTop: "1px solid var(--line)", paddingTop: "var(--sp-3)" }}>
-        <h4 style={{ margin: 0, fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-black)", textTransform: "uppercase", letterSpacing: ".06em", color: "var(--ink-2)" }}>
-          {titel}
-        </h4>
-        {hinweis && <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>{hinweis}</span>}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function heuteIso(): string {
   const n = new Date();
@@ -97,48 +74,28 @@ export function VertraegeScreen() {
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
   const [personen, setPersonen] = useState<Person[]>([]);
-  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
-  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [vorschlaege, setVorschlaege] = useState<Vertragskandidat[]>([]);
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
 
-  const [offen, setOffen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [anbieter, setAnbieter] = useState("");
-  const [inhaberId, setInhaberId] = useState("");
-  const [beginn, setBeginn] = useState(heute);
-  // Getrennt vom Beginn: der Beginn trägt die Fristen (Mindestlaufzeit, Kündigung), die
-  // erste Fälligkeit den Takt der Planung. Bei einem 2015 geschlossenen Jahresvertrag
-  // sind das zwei verschiedene Daten — solange ein Feld beides war, verschob das
-  // Nachtragen des echten Vertragsbeginns die geplanten Zahlungen.
-  const [ersteZahlung, setErsteZahlung] = useState(heute);
-  const [mindestlaufzeit, setMindestlaufzeit] = useState("");
-  const [verlaengerung, setVerlaengerung] = useState<Verlaengerungsart>("automatisch");
-  const [verlaengerungMonate, setVerlaengerungMonate] = useState("12");
-  const [kuendigungsfrist, setKuendigungsfrist] = useState("");
-  const [betragText, setBetragText] = useState("");
-  const [rhythmus, setRhythmus] = useState<Rhythmus>("monatlich");
-  const [charakter, setCharakter] = useState<Charakter>("Aufwand");
-  const [kategorieId, setKategorieId] = useState("");
-  const [kontoId, setKontoId] = useState("");
-  const [fehler, setFehler] = useState<string | null>(null);
+  /**
+   * Die offene Maske: `start` ist ihr Anfangszustand, `editId` unterscheidet Ändern von
+   * Anlegen. Der Formularzustand selbst liegt in `VertragModal` — der Screen gibt nur
+   * die Vorbelegung hinein und erfährt, wenn gespeichert wurde.
+   */
+  const [maske, setMaske] = useState<{ editId: string | null; start: VertragFormular } | null>(null);
 
   // Verwandte Repos in EINEM Effekt und zusammen setzen — gestaffelte setState lassen
   // abgeleitete Werte kurz gegen leere Listen rechnen.
   async function laden() {
-    const [v, r, p, k, ko, ignoriert] = await Promise.all([
+    const [v, r, p, ignoriert] = await Promise.all([
       vertragRepo.alle(),
       regelRepo.alle(),
       personRepo.alle(),
-      kategorieRepo.alle(),
-      kontoRepo.alle(),
       ignorierteSchluessel(einstellungenRepo),
     ]);
     setVertraege(v);
     setRegeln(r);
     setPersonen(p);
-    setKategorien(k);
-    setKonten(ko);
     // Die Vorschläge lesen den gesamten Buchungsbestand — bewusst NACH den Stammdaten,
     // damit die Liste sofort steht und die Karte nachrückt.
     setVorschlaege(await vertragsvorschlaege(ledgerRepo, umsatzRepo, vertragRepo, heute, { ignoriert }));
@@ -149,17 +106,7 @@ export function VertraegeScreen() {
 
   /** Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort. */
   function vorschlagUebernehmen(k: Vertragskandidat) {
-    neu();
-    setAnbieter(k.anbieter);
-    setBeginn(k.ersteZahlung);
-    setErsteZahlung(k.ersteZahlung);
-    setBetragText(String(minorZuMajor(k.betrag, geld.waehrung)));
-    setRhythmus(k.rhythmus);
-    setCharakter(k.charakter);
-    if (k.kategorieId) setKategorieId(k.kategorieId);
-    // Das Konto, über das die erkannten Zahlungen tatsächlich liefen — steht in den
-    // Buchungen und muss nicht noch einmal gesucht werden.
-    if (k.kontoId) setKontoId(k.kontoId);
+    setMaske({ editId: null, start: formularAusKandidat(k, heute, geld) });
   }
 
   async function vorschlagVerwerfen(k: Vertragskandidat) {
@@ -342,74 +289,11 @@ export function VertraegeScreen() {
     return `${basis} · ${t("vertraege.gruppeRuecklage", { betrag: `${geld.format(rueck)} ${geld.symbol}` })}`;
   }
 
-  function kategorieWaehlen(id: string) {
-    setKategorieId(id);
-    const k = kategorien.find((x) => x.id === id);
-    if (k) setCharakter(k.defaultCharakter);
-  }
-
   function neu() {
-    setEditId(null);
-    setAnbieter("");
-    setInhaberId("");
-    setBeginn(heute);
-    setErsteZahlung(heute);
-    setMindestlaufzeit("");
-    setVerlaengerung("automatisch");
-    setVerlaengerungMonate("12");
-    setKuendigungsfrist("");
-    setBetragText("");
-    setRhythmus("monatlich");
-    setCharakter("Aufwand");
-    setKategorieId("");
-    setKontoId("");
-    setFehler(null);
-    setOffen(true);
+    setMaske({ editId: null, start: leeresFormular(heute) });
   }
   function bearbeiten(v: Vertrag) {
-    const r = regelZuVertrag.get(v.id);
-    setEditId(v.id);
-    setAnbieter(v.anbieter);
-    setInhaberId(v.inhaberId ?? "");
-    setBeginn(v.beginn);
-    setErsteZahlung(r?.startdatum ?? v.beginn);
-    setMindestlaufzeit(v.mindestlaufzeitMonate != null ? String(v.mindestlaufzeitMonate) : "");
-    setVerlaengerung(v.verlaengerung);
-    setVerlaengerungMonate(v.verlaengerungMonate != null ? String(v.verlaengerungMonate) : "12");
-    setKuendigungsfrist(v.kuendigungsfristMonate != null ? String(v.kuendigungsfristMonate) : "");
-    setBetragText(r ? String(minorZuMajor(Math.abs(r.betrag), geld.waehrung)) : "");
-    setRhythmus(r?.rhythmus ?? "monatlich");
-    setCharakter(r?.charakter ?? "Aufwand");
-    setKategorieId(r?.kategorieId ?? "");
-    setKontoId(r?.kontoId ?? "");
-    setFehler(null);
-    setOffen(true);
-  }
-  async function speichern() {
-    setFehler(null);
-    const eingabe = {
-      anbieter,
-      inhaberId: inhaberId || undefined,
-      beginn,
-      ersteZahlung: ersteZahlung || undefined,
-      mindestlaufzeitMonate: mindestlaufzeit ? Number(mindestlaufzeit) : undefined,
-      verlaengerung,
-      verlaengerungMonate: verlaengerungMonate ? Number(verlaengerungMonate) : undefined,
-      kuendigungsfristMonate: kuendigungsfrist ? Number(kuendigungsfrist) : undefined,
-      betrag: geld.parse(betragText) ?? 0,
-      rhythmus,
-      charakter,
-      kategorieId: kategorieId || undefined,
-      kontoId: kontoId || undefined,
-    };
-    try {
-      if (editId) await vertragAktualisieren(vertragRepo, regelRepo, editId, eingabe);
-      else await vertragAnlegen(vertragRepo, regelRepo, eingabe);
-      setOffen(false);
-      await laden();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
+    setMaske({ editId: v.id, start: formularAusVertrag(v, regelZuVertrag.get(v.id), geld) });
   }
 
   return (
@@ -549,106 +433,13 @@ export function VertraegeScreen() {
         </>
       )}
 
-      {offen && (
-        <Modal
-          title={editId ? t("vertraege.modalBearbeiten") : t("vertraege.anlegen")}
-          subtitle={t("vertraege.modalUntertitel")}
-          onClose={() => setOffen(false)}
-          footer={
-            <>
-              <Button variant="primary" onClick={speichern}>
-                {t("vertraege.speichern")}
-              </Button>
-              <button className="linkbtn" onClick={() => setOffen(false)}>
-                {t("vertraege.abbrechen")}
-              </button>
-              {fehler && <span className="err">{fehler}</span>}
-            </>
-          }
-        >
-          <FormField label={t("vertraege.feldAnbieter")} required>
-            <input className="field" value={anbieter} onChange={(e) => setAnbieter(e.target.value)} placeholder={t("vertraege.feldAnbieterPlatzhalter")} />
-          </FormField>
-
-          <Abschnitt titel={t("vertraege.abschnittZahlung")} hinweis={t("vertraege.abschnittZahlungHinweis")}>
-            <div className="form-grid">
-              <FormField label={`${t("vertraege.feldBetrag")} ${geld.symbol}`} required hint={t("vertraege.feldBetragHinweis")}>
-                <input className="field" inputMode="decimal" value={betragText} onChange={(e) => setBetragText(e.target.value)} placeholder={geld.format(0)} />
-              </FormField>
-              <FormField label={t("vertraege.feldRhythmus")}>
-                <select className="field" value={rhythmus} onChange={(e) => setRhythmus(e.target.value as Rhythmus)}>
-                  {RHYTHMEN.map((r) => (
-                    <option key={r} value={r}>
-                      {t(`vertraege.rhythmus.${r}`)}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label={t("vertraege.feldErsteZahlung")} hint={t("vertraege.feldErsteZahlungHinweis")}>
-                <input className="field" type="date" value={ersteZahlung} onChange={(e) => setErsteZahlung(e.target.value)} />
-              </FormField>
-              <FormField label={t("vertraege.feldKonto")} hint={t("vertraege.optional")}>
-                <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
-                  <option value="">—</option>
-                  {konten.map((k) => (
-                    <option key={k.id} value={k.id}>
-                      {k.bezeichnung}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label={t("vertraege.feldKategorie")} hint={t("vertraege.feldKategorieHinweis")}>
-                <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieWaehlen} />
-              </FormField>
-              <FormField label={t("vertraege.feldCharakter")}>
-                <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-                  {CHARAKTERE.map((c) => (
-                    <option key={c} value={c}>
-                      {t(`charakter.${c}`)}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-            </div>
-          </Abschnitt>
-
-          <Abschnitt titel={t("vertraege.abschnittVertrag")} hinweis={t("vertraege.abschnittVertragHinweis")}>
-            <div className="form-grid">
-              <FormField label={t("vertraege.feldBeginn")} hint={t("vertraege.feldBeginnHinweis")}>
-                <input className="field" type="date" value={beginn} onChange={(e) => setBeginn(e.target.value)} />
-              </FormField>
-              <FormField label={t("vertraege.feldInhaber")} hint={t("vertraege.optional")}>
-                <select className="field" value={inhaberId} onChange={(e) => setInhaberId(e.target.value)}>
-                  <option value="">—</option>
-                  {personen.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                </select>
-              </FormField>
-              <FormField label={t("vertraege.feldMindestlaufzeit")} hint={t("vertraege.optional")}>
-                <input className="field" inputMode="numeric" value={mindestlaufzeit} onChange={(e) => setMindestlaufzeit(e.target.value)} placeholder={t("vertraege.feldMindestlaufzeitPlatzhalter")} />
-              </FormField>
-              <FormField label={t("vertraege.feldKuendigungsfrist")} hint={t("vertraege.optional")}>
-                <input className="field" inputMode="numeric" value={kuendigungsfrist} onChange={(e) => setKuendigungsfrist(e.target.value)} placeholder={t("vertraege.feldKuendigungsfristPlatzhalter")} />
-              </FormField>
-              <FormField label={t("vertraege.feldVerlaengerung")}>
-                <select className="field" value={verlaengerung} onChange={(e) => setVerlaengerung(e.target.value as Verlaengerungsart)}>
-                  <option value="automatisch">{t("vertraege.verlaengerung.automatisch")}</option>
-                  <option value="keine">{t("vertraege.verlaengerung.keine")}</option>
-                </select>
-              </FormField>
-              {/* Ohne automatische Verlängerung hat der Schritt keine Bedeutung — ein Feld,
-                  das nichts tut, kostet in jeder Maske Aufmerksamkeit. */}
-              {verlaengerung === "automatisch" && (
-                <FormField label={t("vertraege.feldVerlaengerungMonate")} hint={t("vertraege.feldVerlaengerungMonateHinweis")}>
-                  <input className="field" inputMode="numeric" value={verlaengerungMonate} onChange={(e) => setVerlaengerungMonate(e.target.value)} placeholder={t("vertraege.feldVerlaengerungMonatePlatzhalter")} />
-                </FormField>
-              )}
-            </div>
-          </Abschnitt>
-        </Modal>
+      {maske && (
+        <VertragModal
+          editId={maske.editId}
+          start={maske.start}
+          onClose={() => setMaske(null)}
+          onSaved={async () => { setMaske(null); await laden(); }}
+        />
       )}
     </div>
   );

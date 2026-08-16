@@ -458,6 +458,11 @@ const de = {
       bestaetigen: "Umbuchung anlegen",
       kategorieHinweis: "Die Kategorie entfällt: verschobenes Geld zählt nicht ins Budget.",
     },
+    zuVertrag: {
+      aktion: "Vertrag daraus machen",
+      untertitel: "Kommt diese Zahlung regelmäßig wieder? Dann gehört sie in die Planung.",
+      hinweis: "Empfänger, Betrag, Kategorie und Konto stammen aus dieser Buchung. Den Rhythmus kennt sie nicht — der gehört geprüft.",
+    },
     paarung: {
       titel: "Umbuchung",
       gegenkonto: "Gegenkonto",
@@ -1109,6 +1114,11 @@ const en: typeof de = {
       neuHinweis: "For accounts that are never imported — typically cash.",
       bestaetigen: "Create transfer",
       kategorieHinweis: "The category is dropped: moved money does not count against a budget.",
+    },
+    zuVertrag: {
+      aktion: "Turn into a contract",
+      untertitel: "Does this payment come back regularly? Then it belongs in the plan.",
+      hinweis: "Payee, amount, category and account come from this transaction. Its cycle is unknown — check it.",
     },
     paarung: {
       titel: "Transfer",
