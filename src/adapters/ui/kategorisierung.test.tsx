@@ -76,6 +76,7 @@ const KARTEN = {
   merkmale: /2 · Merkmale/,
   ausschluesse: /3 · Ausschlüsse/,
   modell: /4 · Erkennungsmodell/,
+  abgleich: /5 · Bestand abgleichen/,
 } as const;
 
 /**
@@ -386,5 +387,85 @@ describe("Karten klappen", () => {
     await nutzer.click(screen.getByRole("button", { name: KARTEN.daten }));
 
     expect(screen.queryByText("Brauchbare Beispiele")).toBeNull();
+  });
+});
+
+describe("5 · Bestand abgleichen", () => {
+  /** Bestand plus eine Festlegung, die etwas anderes sagt als die gebuchte Kategorie. */
+  function schieflage() {
+    kategorie("kat-lm", "Lebensmittel");
+    kategorie("kat-dro", "Drogerie");
+    for (let i = 0; i < 3; i++) {
+      buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "[anonymisiert]", zweck: "Einkauf" });
+    }
+    db.run(
+      `INSERT INTO kategorie_festlegung (muster, kategorie_id, angelegt_am)
+       VALUES ('rossmann', 'kat-dro', '2026-08-17T10:00:00.000Z')`,
+    );
+  }
+
+  it("rechnet erst auf Knopfdruck — und schreibt dabei nichts", async () => {
+    // Rechnen und Schreiben sind getrennt: der Lauf ändert die Zahl, die in jedem
+    // Budget steht.
+    schieflage();
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await oeffne(nutzer, KARTEN.abgleich);
+
+    await nutzer.click(screen.getByRole("button", { name: /Vorschau rechnen/ }));
+
+    await waitFor(() => expect(screen.getByText(/3 ×/)).toBeTruthy());
+    expect(within(karteninhalt(KARTEN.abgleich)).getByText("Drogerie")).toBeTruthy();
+    // Noch unverändert in der Datenbank.
+    const [zeile] = db.exec("SELECT kategorie_id FROM ist_buchung WHERE id = 'r0'")[0].values;
+    expect(zeile[0]).toBe("kat-lm");
+  });
+
+  it("schreibt erst auf Bestätigung — und dann alle drei", async () => {
+    schieflage();
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await oeffne(nutzer, KARTEN.abgleich);
+    await nutzer.click(screen.getByRole("button", { name: /Vorschau rechnen/ }));
+    await waitFor(() => expect(screen.getByText(/3 ×/)).toBeTruthy());
+
+    await nutzer.click(screen.getByRole("button", { name: /3 Buchungen ändern/ }));
+
+    await waitFor(() => {
+      const treffer = db.exec("SELECT COUNT(*) FROM ist_buchung WHERE kategorie_id = 'kat-dro'");
+      expect(treffer[0].values[0][0]).toBe(3);
+    });
+    // Geschriebenes bleibt für die Automatik offen — sonst wäre der erste Abgleich
+    // zugleich der letzte.
+    const herkunft = db.exec("SELECT DISTINCT kategorie_herkunft FROM ist_buchung")[0].values;
+    expect(herkunft).toEqual([["automatisch"]]);
+  });
+
+  it("läuft ein zweites Mal ins Leere", async () => {
+    schieflage();
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await oeffne(nutzer, KARTEN.abgleich);
+    await nutzer.click(screen.getByRole("button", { name: /Vorschau rechnen/ }));
+    await waitFor(() => expect(screen.getByText(/3 ×/)).toBeTruthy());
+    await nutzer.click(screen.getByRole("button", { name: /3 Buchungen ändern/ }));
+    await waitFor(() => expect(screen.getByText(/3 Buchungen geändert/)).toBeTruthy());
+
+    await nutzer.click(screen.getByRole("button", { name: /Vorschau rechnen/ }));
+
+    await waitFor(() => expect(screen.getByText(/Nichts zu ändern/)).toBeTruthy());
+  });
+
+  it("lässt eine von Hand gesetzte Kategorie stehen und sagt es", async () => {
+    schieflage();
+    db.run("UPDATE ist_buchung SET kategorie_herkunft = 'manuell' WHERE id = 'r0'");
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await oeffne(nutzer, KARTEN.abgleich);
+
+    await nutzer.click(screen.getByRole("button", { name: /Vorschau rechnen/ }));
+
+    await waitFor(() => expect(screen.getByText(/2 ×/)).toBeTruthy());
+    expect(screen.getByText(/eine getroffene Entscheidung bleibt stehen/)).toBeTruthy();
   });
 });
