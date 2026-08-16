@@ -68,23 +68,29 @@ außen. Tests als `*.test.ts` neben dem Code.
   Umschichtung = Aktivtausch, keine Ausgabe).
 - **Migrationen** in `adapters/persistence/migrations.ts`: versioniert, **forward-only,
   append-only** — bestehende Versionen nie editieren, neue Version anhängen.
-  `migrate()` klammert jede Migration mit ihrem Versionseintrag in eine Transaktion.
-  ⚠️ Ob `BEGIN`/`COMMIT` über tauri-plugin-sql auf derselben Connection landen, ist NICHT
-  verifiziert (der Test läuft gegen sql.js) — vor dem nächsten Schema-Schritt an der
-  echten DB prüfen.
+  **Keine Transaktionen — jedes Statement muss WIEDERHOLBAR sein.** Geprüft 2026-08-16:
+  tauri-plugin-sql führt jedes `execute` über `pool.execute()` aus, und `Executor for
+  &Pool` holt pro Aufruf eine Verbindung aus einem Pool der sqlx-Standardgröße 10.
+  Ein `BEGIN` öffnet die Transaktion also auf einer Verbindung, die danach mit offener
+  Transaktion in den Pool zurückgeht — die Statements laufen auf anderen und committen
+  einzeln. `migrate()` klammert deshalb nichts mehr, sondern überspringt bereits
+  vorhandene Spalten per `PRAGMA table_info` (`CREATE …` trägt ohnehin `IF NOT EXISTS`).
+  Neue Migrationen müssen sich in diese Regel fügen; ein Datenumbau (UPDATE/DELETE)
+  braucht eine eigene Lösung, keine Scheintransaktion.
 - **`IstBuchung` trägt KEINEN Empfänger/Verwendungszweck** — die stehen am `Umsatz`
   (Import-Kontext); Join über `Umsatz.istbuchungId` für Detail-/Reporting-Ansichten.
 - **Tauri = nur Hülle:** Domänen-/Backend-Logik läuft als TS in der Webview, nicht in Rust
   (`src-tauri/` ist bewusst dünn). Logische Trennung (hexagonal), kein eigener Backend-Prozess.
 
-## Offene Schuld vor der nächsten Import-Quelle
-Der `rohHash` (Dedup-Schlüssel) enthält seit 2026-08-15 die Gegenpartei. Bestehende
-Umsätze tragen weiter den ALTEN Schlüssel. Solange jede Quelle native IDs liefert
-(Finanzguru), ist das folgenlos — die Dedup entscheidet dort über die ID. Vor der ersten
-ID-losen Quelle (Bank-CSV, FinTS) müssen die Bestands-Hashes einmalig neu berechnet
-werden, sonst deduppt der erste Abruf nicht gegen den Bestand und legt alles doppelt an.
-Der Backfill braucht die Konto-IBAN, die nicht am Umsatz, sondern am Zahlungskonto liegt.
-Details in `application/import/rohHash.ts`.
+## Datenstand
+Die lokale DB wurde am **2026-08-16 zurückgesetzt** (Datei gelöscht, Schema frisch bis
+v15 aufgebaut, Standardkategorien über den Bootstrap). Zahlungskonten müssen von Hand neu
+angelegt werden, alles andere kommt über den Import.
+
+Damit ist die frühere Schuld am `rohHash` **erledigt**: der Dedup-Schlüssel enthält seit
+2026-08-15 die Gegenpartei, und Bestandsdaten mit dem alten Schlüssel gibt es nicht mehr.
+Ein Backfill vor der ersten ID-losen Quelle (Bank-CSV, FinTS) ist nicht mehr nötig.
+Sicherungen des alten Stands liegen als `moneymanager.db.vor-reset-*` neben der DB.
 
 ## Sprache
 Deutsch, Anrede „du", keine Emoji. Fachlich streng innen, alltagstauglich außen (Glossar).
