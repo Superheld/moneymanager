@@ -29,6 +29,10 @@ import { sqliteInventarRepository as inventarRepository } from "./sqliteInventar
 import { sqliteLedgerRepository as ledgerRepository } from "./sqliteLedgerRepository";
 import { sqliteTopfRepository as topfRepository } from "./sqliteTopfRepository";
 import { sqliteVertragRepository as vertragRepository } from "./sqliteVertragRepository";
+import {
+  sqliteVertragserkennungRepository as erkennungRepository,
+  sqliteVertragszuordnungRepository as zuordnungRepository,
+} from "./sqliteVertragZuordnungRepositories";
 import { sqliteZahlungsregelRepository as zahlungsregelRepository } from "./sqliteZahlungsregelRepository";
 import {
   sqliteKategorieRepository as kategorieRepository,
@@ -360,5 +364,79 @@ describe("Import-Repositories", () => {
     expect(u.vorschlag?.kategorieId).toBe("kat1");
     expect(u.vorschlag?.quelle).toBe("remapping");
     expect(u.istbuchungId).toBe("i1");
+  });
+});
+
+/**
+ * Erkennungsregel und Zuordnung (Migration 19). Beides geht durch eine JSON-Textspalte
+ * bzw. eine NULL-tragende Spalte, deren Bedeutung leicht verloren geht — genau die zwei
+ * Stellen, an denen ein Mapping-Fehler nicht knallt, sondern still das Falsche tut.
+ */
+describe("Vertragszuordnung — Persistenz", () => {
+  it("hält typisierte Merkmale und alle Grenzen über die Rundreise", async () => {
+    await erkennungRepository.speichern({
+      vertragId: "v1",
+      merkmale: [
+        { art: "glaeubigerId", muster: "DE98ZZZ09999999999" },
+        { art: "empfaenger", muster: "stadtwerke*" },
+      ],
+      betragVon: 1000,
+      betragBis: 2000,
+      gueltigAb: "2025-01-01",
+      gueltigBis: "2026-12-31",
+      kontoId: "k1",
+    });
+    const [e] = await erkennungRepository.alle();
+    expect(e.merkmale).toEqual([
+      { art: "glaeubigerId", muster: "DE98ZZZ09999999999" },
+      { art: "empfaenger", muster: "stadtwerke*" },
+    ]);
+    expect(e.betragVon).toBe(1000);
+    expect(e.gueltigBis).toBe("2026-12-31");
+    expect(e.kontoId).toBe("k1");
+  });
+
+  /**
+   * Das Format der ersten Fassung: eine flache Liste von Schlüsseln ohne Art. So stehen
+   * die Regeln in Datenbanken, die vor der Typisierung angelegt wurden — der Leser muss
+   * sie noch verstehen und die Art an der Form des Werts erraten.
+   */
+  it("liest die flache Schlüsselliste der ersten Fassung", async () => {
+    db.run(
+      `INSERT INTO vertrag_erkennung (vertrag_id, schluessel, betrag_von, betrag_bis)
+       VALUES ('alt', '["netcup","DE98ZZZ09999999999"]', 990, 2970)`,
+    );
+    const [e] = await erkennungRepository.alle();
+    expect(e.merkmale).toEqual([
+      { art: "empfaenger", muster: "netcup" },
+      { art: "glaeubigerId", muster: "DE98ZZZ09999999999" },
+    ]);
+    expect(e.betragVon).toBe(990);
+  });
+
+  it("überlebt eine kaputte JSON-Spalte, ohne die Liste ausfallen zu lassen", async () => {
+    db.run(`INSERT INTO vertrag_erkennung (vertrag_id, schluessel) VALUES ('kaputt', '{nicht')`);
+    const [e] = await erkennungRepository.alle();
+    expect(e.merkmale).toEqual([]);
+  });
+
+  /**
+   * `vertragId: null` ist die Aussage „gehört ausdrücklich zu keinem Vertrag" und darf
+   * beim Laden NICHT zu `undefined` werden — sonst wäre die Korrektur von Hand nicht mehr
+   * von „noch nicht entschieden" zu unterscheiden.
+   */
+  it("hält das ausdrückliche „kein Vertrag“ über die Rundreise", async () => {
+    await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: null, herkunft: "manuell" });
+    const [z] = await zuordnungRepository.alle();
+    expect(z.vertragId).toBeNull();
+    expect(z.herkunft).toBe("manuell");
+  });
+
+  it("überschreibt eine bestehende Zuordnung statt zu doppeln", async () => {
+    await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: "v1", herkunft: "automatisch" });
+    await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: "v2", herkunft: "manuell" });
+    const alle = await zuordnungRepository.alle();
+    expect(alle).toHaveLength(1);
+    expect(alle[0].vertragId).toBe("v2");
   });
 });
