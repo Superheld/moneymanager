@@ -224,6 +224,39 @@ describe("Ledger-Repository", () => {
     await ledgerRepository.loeschen("i1");
     expect(await ledgerRepository.alle()).toHaveLength(0);
   });
+
+  it("trägt die Kategorie-Herkunft durch Schema und zurück", async () => {
+    await ledgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -1500, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1", kategorieHerkunft: "manuell",
+    });
+    // Ohne Angabe: die Spalte ist NOT NULL, das Feld optional — der Adapter muss den
+    // Default setzen, sonst schlägt das INSERT fehl statt still „automatisch" zu meinen.
+    await ledgerRepository.speichern({
+      id: "i2", datum: "2026-06-02", betrag: -200, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat2",
+    });
+
+    const nachId = new Map((await ledgerRepository.alle()).map((b) => [b.id, b]));
+    expect(nachId.get("i1")?.kategorieHerkunft).toBe("manuell");
+    expect(nachId.get("i2")?.kategorieHerkunft).toBe("automatisch");
+  });
+
+  it("überschreibt die Herkunft beim Aktualisieren derselben Buchung", async () => {
+    const basis = {
+      id: "i1", datum: "2026-06-01", betrag: -1500, kontoId: "k1",
+      charakter: "Aufwand" as const, quelle: "import" as const, kategorieId: "kat1",
+    };
+    await ledgerRepository.speichern({ ...basis, kategorieHerkunft: "automatisch" });
+    await ledgerRepository.speichern({ ...basis, kategorieId: "kat2", kategorieHerkunft: "manuell" });
+
+    const alle = await ledgerRepository.alle();
+    expect(alle).toHaveLength(1);
+    // Fehlte die Spalte im ON-CONFLICT-Zweig, bliebe hier „automatisch" stehen — und die
+    // Korrektur wäre beim nächsten Abgleich wieder weg.
+    expect(alle[0].kategorieHerkunft).toBe("manuell");
+    expect(alle[0].kategorieId).toBe("kat2");
+  });
 });
 
 describe("Vertrag- und Zahlungsregel-Repository", () => {

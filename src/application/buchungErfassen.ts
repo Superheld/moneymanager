@@ -31,6 +31,10 @@ export async function buchungErfassen(
     betrag: vorzeichenbehaftet(e.betrag, e.charakter),
     kontoId: e.kontoId,
     kategorieId: e.kategorieId || undefined,
+    // Wer die Buchung von Hand erfasst UND dabei eine Kategorie wählt, hat entschieden —
+    // das überlebt jeden späteren automatischen Lauf. Ohne Kategorie bleibt die Zeile
+    // bewusst offen: dann soll die Automatik sie später gerade füllen dürfen.
+    kategorieHerkunft: e.kategorieId ? "manuell" : undefined,
     charakter: e.charakter,
     quelle: "manuell",
     notiz: e.notiz?.trim() || undefined,
@@ -53,12 +57,24 @@ export async function buchungBearbeiten(
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
   if (!istCent(e.betrag) || e.betrag <= 0) throw new FachlicherFehler("betrag.groesserNull");
 
+  // Die Herkunft beschreibt die KATEGORIE, nicht die Buchung: sie springt nur um, wenn
+  // sich die Kategorie tatsächlich ändert. Wer nur die Notiz korrigiert, macht damit
+  // keine Kategorie-Entscheidung — und eine Buchung, die nur durchs Speichern der Maske
+  // läuft, soll der Automatik nicht stillschweigend entzogen werden.
+  //
+  // Die Kategorie zu LEEREN ist dabei ebenfalls eine Entscheidung („die gehört in keine
+  // Kategorie") und wird genauso festgehalten; sonst käme beim nächsten Lauf zurück,
+  // was jemand gerade weggenommen hat.
+  const neueKategorie = e.kategorieId || undefined;
+  const kategorieGeaendert = neueKategorie !== original.kategorieId;
+
   const aktualisiert: IstBuchung = {
     ...original,
     datum: e.datum,
     betrag: vorzeichenbehaftet(e.betrag, e.charakter),
     charakter: e.charakter,
-    kategorieId: e.kategorieId || undefined,
+    kategorieId: neueKategorie,
+    kategorieHerkunft: kategorieGeaendert ? "manuell" : original.kategorieHerkunft,
     notiz: e.notiz?.trim() || undefined,
   };
   await ledger.speichern(aktualisiert);

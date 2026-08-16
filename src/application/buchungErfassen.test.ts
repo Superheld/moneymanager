@@ -73,3 +73,45 @@ describe("buchungErfassen", () => {
     expect(ledger.daten).toHaveLength(0);
   });
 });
+
+describe("Herkunft der Kategorie", () => {
+  it("erfassen MIT Kategorie ist eine Handentscheidung", async () => {
+    const ledger = memLedger();
+    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(9), charakter: "Aufwand", kategorieId: "kat-lebensmittel" });
+    expect(b.kategorieHerkunft).toBe("manuell");
+  });
+
+  it("erfassen OHNE Kategorie bleibt für die Automatik offen", async () => {
+    const ledger = memLedger();
+    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(9), charakter: "Aufwand" });
+    expect(b.kategorieHerkunft).toBeUndefined();
+  });
+
+  it("nur die Notiz zu ändern lässt die Herkunft in Ruhe", async () => {
+    const ledger = memLedger();
+    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(9), charakter: "Aufwand" });
+    const nachher = await buchungBearbeiten(ledger, b, { datum: b.datum, betrag: euroZuCent(9), charakter: "Aufwand", notiz: "Bäcker" });
+    // Sonst würde jedes Speichern der Maske die Buchung stillschweigend der Automatik entziehen.
+    expect(nachher.kategorieHerkunft).toBeUndefined();
+    expect(nachher.notiz).toBe("Bäcker");
+  });
+
+  it("die Kategorie zu ändern macht sie zur Handentscheidung", async () => {
+    const ledger = memLedger();
+    const importiert: IstBuchung = { id: "i1", datum: "2026-06-17", betrag: euroZuCent(-9), kontoId: "giro", kategorieId: "kat-falsch", kategorieHerkunft: "automatisch", charakter: "Aufwand", quelle: "import" };
+    await ledger.speichern(importiert);
+    const nachher = await buchungBearbeiten(ledger, importiert, { datum: "2026-06-17", betrag: euroZuCent(9), charakter: "Aufwand", kategorieId: "kat-richtig" });
+    expect(nachher.kategorieHerkunft).toBe("manuell");
+    // Die Import-Spur reißt dabei nicht: quelle beschreibt die Buchung, nicht die Kategorie.
+    expect(nachher.quelle).toBe("import");
+  });
+
+  it("die Kategorie zu LEEREN ist ebenfalls eine Entscheidung", async () => {
+    const ledger = memLedger();
+    const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(9), charakter: "Aufwand", kategorieId: "kat-lebensmittel" });
+    const nachher = await buchungBearbeiten(ledger, b, { datum: b.datum, betrag: euroZuCent(9), charakter: "Aufwand" });
+    // Ohne das käme beim nächsten Lauf zurück, was jemand gerade weggenommen hat.
+    expect(nachher.kategorieId).toBeUndefined();
+    expect(nachher.kategorieHerkunft).toBe("manuell");
+  });
+});

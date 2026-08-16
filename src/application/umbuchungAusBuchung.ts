@@ -70,6 +70,10 @@ function alsBein(b: IstBuchung, transferId: string, gegenkontoId: string): IstBu
     ...b,
     charakter: "Umschichtung",
     kategorieId: undefined,
+    // Mit der Kategorie fällt auch die Aussage darüber weg, wer sie gesetzt hat. Bliebe
+    // ein „manuell" stehen, wäre die Buchung gegen jeden künftigen Lauf gesperrt — für
+    // eine Kategorie, die es gar nicht mehr gibt.
+    kategorieHerkunft: undefined,
     transferId,
     gegenkontoId,
   };
