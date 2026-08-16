@@ -259,6 +259,13 @@ export interface Kategoriewert {
   readonly gesamt: number;
 }
 
+/** Eine Zelle der Verwechslungsmatrix abseits der Diagonale: was wurde wofür gehalten. */
+export interface Verwechslung {
+  readonly tatsaechlich: string;
+  readonly vorhergesagt: string;
+  readonly anzahl: number;
+}
+
 export interface Bewertung {
   /** Anteil richtig zugeordneter Beispiele (0…1). */
   readonly genauigkeit: number;
@@ -266,11 +273,24 @@ export interface Bewertung {
   readonly gesamt: number;
   /** Je Kategorie, schwächste zuerst — dort lohnt das Nachschauen. */
   readonly jeKategorie: readonly Kategoriewert[];
+  /**
+   * Die Verwechslungsmatrix, ohne ihre Nullen.
+   *
+   * `jeKategorie` trägt Diagonale und Zeilensumme (richtig von gesamt), `verwechslungen`
+   * alle übrigen belegten Zellen — zusammen ist das die vollständige Matrix. Sie als
+   * dichtes Feld zu führen hieße bei 49 Kategorien 2401 Zellen, von denen rund 98 %
+   * null sind; und die Frage, die man an so eine Matrix stellt, ist ohnehin „was wird
+   * womit verwechselt", nicht „wie viele Nullen gibt es".
+   *
+   * Absteigend nach Häufigkeit, bei Gleichstand alphabetisch — stabil zwischen Läufen.
+   */
+  readonly verwechslungen: readonly Verwechslung[];
 }
 
 /** Misst das Modell an Beispielen, die es nicht gesehen hat. */
 export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewertung {
   const je = new Map<string, { richtig: number; gesamt: number }>();
+  const paare = new Map<string, Verwechslung>();
   let richtig = 0;
 
   for (const b of beispiele) {
@@ -281,6 +301,18 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
     e.gesamt++;
     if (treffer) e.richtig++;
     je.set(b.kategorieId, e);
+
+    // Ein leeres Modell liefert null — dann gibt es keine Vorhersage, die man als
+    // Verwechslung führen könnte; die Zeile zählt trotzdem als Fehlschlag.
+    if (!treffer && k) {
+      const schluessel = `${b.kategorieId} ${k.kategorieId}`;
+      const vorhanden = paare.get(schluessel);
+      paare.set(schluessel, {
+        tatsaechlich: b.kategorieId,
+        vorhergesagt: k.kategorieId,
+        anzahl: (vorhanden?.anzahl ?? 0) + 1,
+      });
+    }
   }
 
   return {
@@ -290,7 +322,65 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
     jeKategorie: [...je]
       .map(([kategorieId, e]) => ({ kategorieId, ...e }))
       .sort((a, b) => a.richtig / a.gesamt - b.richtig / b.gesamt || b.gesamt - a.gesamt),
+    verwechslungen: [...paare.values()].sort(
+      (a, b) =>
+        b.anzahl - a.anzahl ||
+        a.tatsaechlich.localeCompare(b.tatsaechlich) ||
+        a.vorhergesagt.localeCompare(b.vorhergesagt),
+    ),
   };
+}
+
+/** Eine Zeile der Verwechslungsmatrix: eine tatsächliche Kategorie und wohin sie ging. */
+export interface Matrixzeile {
+  readonly kategorieId: string;
+  /** Beispiele dieser Kategorie in der Prüfmenge. */
+  readonly gesamt: number;
+  /** Davon richtig erkannt (die Diagonale). */
+  readonly richtig: number;
+  /** Vorhergesagte Kategorie → Anzahl. Nur belegte Zellen, Diagonale eingeschlossen. */
+  readonly zellen: ReadonlyMap<string, number>;
+}
+
+/**
+ * Baut aus einer Bewertung die Verwechslungsmatrix — beschränkt auf die Kategorien, die
+ * an mindestens einem Fehler beteiligt sind (als tatsächliche oder als vorhergesagte).
+ *
+ * Warum beschränkt: Auf echten Daten standen 43 Kategorien in der Prüfmenge, aber nur 25
+ * kamen in einem Fehler vor. Die vollen 43×43 wären 1849 Zellen, von denen 50 belegt
+ * sind — die restlichen Zeilen bestünden aus ihrer Diagonale und sonst nichts. Sie
+ * fügen der Frage „was wird womit verwechselt" nichts hinzu und machen die Matrix so
+ * breit, dass man sie nicht mehr überblickt.
+ *
+ * Die weggelassenen Kategorien sind nicht verschwiegen: sie stehen in `jeKategorie` mit
+ * ihrer Trefferquote von 100 %.
+ */
+export function verwechslungsmatrix(b: Bewertung): {
+  kategorien: string[];
+  zeilen: Matrixzeile[];
+} {
+  const beteiligt = new Set<string>();
+  for (const v of b.verwechslungen) {
+    beteiligt.add(v.tatsaechlich);
+    beteiligt.add(v.vorhergesagt);
+  }
+
+  const wert = new Map(b.jeKategorie.map((k) => [k.kategorieId, k]));
+  const kategorien = [...beteiligt].sort();
+
+  const zeilen = kategorien.map((kategorieId): Matrixzeile => {
+    const k = wert.get(kategorieId);
+    const zellen = new Map<string, number>();
+    // Die Diagonale kommt aus `jeKategorie`; eine Kategorie, die nur als FALSCHE
+    // Vorhersage auftaucht, hat dort keinen Eintrag und damit auch keine Zeilensumme.
+    if (k?.richtig) zellen.set(kategorieId, k.richtig);
+    for (const v of b.verwechslungen) {
+      if (v.tatsaechlich === kategorieId) zellen.set(v.vorhergesagt, v.anzahl);
+    }
+    return { kategorieId, gesamt: k?.gesamt ?? 0, richtig: k?.richtig ?? 0, zellen };
+  });
+
+  return { kategorien, zeilen };
 }
 
 /**

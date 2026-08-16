@@ -637,9 +637,16 @@ const de = {
       schwundEins: "Seitdem ist 1 Beispiel weggefallen.",
       schwundViele: "Seitdem sind {{anzahl}} Beispiele weggefallen.",
       veraltet: "Ein neues Training würde den aktuellen Stand berücksichtigen.",
-      schwachTitel: "Wo die Erkennung sich schwertut",
-      schwachHinweis:
-        "Diese Kategorien wurden in der Prüfung am seltensten getroffen. Manche sind aus dem Text schlicht nicht ableitbar — ob eine Zahlung zu einer Reise gehört, steht nicht im Verwendungszweck.",
+      matrixTitel: "Verwechslungen",
+      matrixHinweis:
+        "Zeile = tatsächliche Kategorie, Spalte = was die Erkennung daraus gemacht hat. Die Diagonale sind die Treffer. Gezeigt werden nur Kategorien, die an mindestens einem Fehler beteiligt waren — alle übrigen wurden vollständig richtig erkannt.",
+      matrixLegende: "{{fehler}} Fehler auf {{zellen}} Feldern · {{kategorien}} beteiligte Kategorien",
+      matrixSpalteIst: "tatsächlich ↓ / erkannt →",
+      spaltePaar: "gehört zu → erkannt als",
+      matrixFehlerfrei: "Kein einziger Fehler in der Prüfung — es gibt nichts zu verwechseln.",
+      paareTitel: "Häufigste Verwechslungen",
+      paareHinweis:
+        "Manche Kategorien sind aus dem Text schlicht nicht ableitbar — ob eine Zahlung zu einer Reise gehört, steht nicht im Verwendungszweck.",
       spalteKategorie: "Kategorie",
       spalteTrefferquote: "Trefferquote",
       spaltePruefungen: "Geprüft",
@@ -1431,9 +1438,16 @@ const en: typeof de = {
       schwundEins: "1 example has been removed since.",
       schwundViele: "{{anzahl}} examples have been removed since.",
       veraltet: "A new training run would take the current state into account.",
-      schwachTitel: "Where the recognition struggles",
-      schwachHinweis:
-        "These categories were hit least often during evaluation. Some simply cannot be derived from the text — whether a payment belongs to a trip is not stated in the reference.",
+      matrixTitel: "Confusions",
+      matrixHinweis:
+        "Row = actual category, column = what the recognition made of it. The diagonal holds the hits. Only categories involved in at least one error are shown — all others were recognised correctly throughout.",
+      matrixLegende: "{{fehler}} errors across {{zellen}} cells · {{kategorien}} categories involved",
+      matrixSpalteIst: "actual ↓ / predicted →",
+      spaltePaar: "belongs to → recognised as",
+      matrixFehlerfrei: "Not a single error in the evaluation — nothing to confuse.",
+      paareTitel: "Most frequent confusions",
+      paareHinweis:
+        "Some categories simply cannot be derived from the text — whether a payment belongs to a trip is not stated in the reference.",
       spalteKategorie: "Category",
       spalteTrefferquote: "Hit rate",
       spaltePruefungen: "Evaluated",
