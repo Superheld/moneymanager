@@ -63,6 +63,7 @@ interface UmsatzZeile {
   waehrung: string;
   gegenpartei: string;
   verwendungszweck: string;
+  glaeubiger_id: string | null;
   roh_hash: string;
   native_id: string | null;
   status: string;
@@ -83,6 +84,7 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
     waehrung: z.waehrung,
     gegenpartei: z.gegenpartei,
     verwendungszweck: z.verwendungszweck,
+    glaeubigerId: z.glaeubiger_id ?? undefined,
     rohHash: z.roh_hash,
     nativeId: z.native_id ?? undefined,
     status: z.status as UmsatzStatus,
@@ -98,7 +100,7 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
 }
 
 const SELECT = `SELECT id, lauf_id, zahlungskonto_id, buchungstag, valuta, betrag, waehrung,
-       gegenpartei, verwendungszweck, roh_hash, native_id, status,
+       gegenpartei, verwendungszweck, glaeubiger_id, roh_hash, native_id, status,
        vorschlag_kategorie_id, vorschlag_charakter, vorschlag_quelle, istbuchung_id
   FROM umsatz`;
 
@@ -106,16 +108,16 @@ async function einfuegen(db: Awaited<ReturnType<typeof getDb>>, u: Umsatz): Prom
   await db.execute(
     `INSERT INTO umsatz
        (id, lauf_id, zahlungskonto_id, buchungstag, valuta, betrag, waehrung, gegenpartei,
-        verwendungszweck, roh_hash, native_id, status,
+        verwendungszweck, glaeubiger_id, roh_hash, native_id, status,
         vorschlag_kategorie_id, vorschlag_charakter, vorschlag_quelle, istbuchung_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
      ON CONFLICT(id) DO UPDATE SET zahlungskonto_id = excluded.zahlungskonto_id,
        status = excluded.status, vorschlag_kategorie_id = excluded.vorschlag_kategorie_id,
        vorschlag_charakter = excluded.vorschlag_charakter, vorschlag_quelle = excluded.vorschlag_quelle,
        istbuchung_id = excluded.istbuchung_id`,
     [
       u.id, u.laufId, u.zahlungskontoId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
-      u.gegenpartei, u.verwendungszweck, u.rohHash, u.nativeId ?? null, u.status,
+      u.gegenpartei, u.verwendungszweck, u.glaeubigerId ?? null, u.rohHash, u.nativeId ?? null, u.status,
       u.vorschlag?.kategorieId ?? null, u.vorschlag?.charakter ?? null, u.vorschlag?.quelle ?? null,
       u.istbuchungId ?? null,
     ],
