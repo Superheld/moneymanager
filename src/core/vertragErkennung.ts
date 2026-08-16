@@ -159,6 +159,30 @@ export function anbieterSchluessel(name: string): string {
   return woerter.join(" ") || roh;
 }
 
+/**
+ * Der erfasste Vertrag, unter dessen Anbieternamen diese Gegenpartei fällt — sonst
+ * `undefined`.
+ *
+ * Bewusst DIESELBE Regel, mit der `vertragsvorschlaege` bereits erfasste Verträge aus
+ * der Vorschlagsliste nimmt: über den normalisierten Namen. Sonst gäbe es zwei
+ * Wahrheiten darüber, was „schon erfasst" heißt — eine Buchung könnte als
+ * vertragsgebunden gelten und trotzdem weiter als Vorschlag auftauchen.
+ *
+ * Was das NICHT ist: eine Zuordnung. Der Vertrag zeigt auf keine Buchung (siehe
+ * `application/budgetvorschlaege`), es gibt kein `vertragId` am Ledger. Diese Funktion
+ * leitet die Zugehörigkeit jedes Mal neu aus dem Namen ab. Zwei Verträge beim selben
+ * Anbieter (zwei Handyverträge bei O2) sind darüber NICHT unterscheidbar — dann
+ * gewinnt der erste. Für eine Kennzeichnung reicht das; für alles, was rechnet, nicht.
+ */
+export function vertragZuGegenpartei<T extends { anbieter: string }>(
+  vertraege: readonly T[],
+  gegenpartei: string,
+): T | undefined {
+  const gesucht = anbieterSchluessel(gegenpartei.trim());
+  if (!gesucht) return undefined;
+  return vertraege.find((v) => anbieterSchluessel(v.anbieter) === gesucht);
+}
+
 /** Median einer nicht-leeren Zahlenreihe (bei gerader Länge der untere der beiden mittleren). */
 function median(werte: number[]): number {
   const sortiert = [...werte].sort((a, b) => a - b);
