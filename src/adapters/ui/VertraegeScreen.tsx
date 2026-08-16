@@ -6,8 +6,11 @@ import { useTranslation } from "react-i18next";
 import {
   kuendigungsterminNaht,
   minorZuMajor,
+  naechsteFaelligkeit,
   naechsterKuendigungstermin,
   RHYTHMUS_MONATE,
+  ruecklagenbedarf,
+  ruecklageProMonat,
   type Charakter,
   type Kategorie,
   type Person,
@@ -35,12 +38,21 @@ import {
   sqliteZahlungskontoRepository as kontoRepo,
 } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
+import type { DataColumn } from "./ds/DataTable";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
+/**
+ * Drei Blicke auf dieselben Verträge. „liste" ist die freie Tabelle (Spaltenköpfe
+ * sortieren), „faelligkeit" stellt vor, was als Nächstes abgeht, „turnus" gruppiert
+ * nach Takt — dort steht auch, was die nicht-monatlichen Verträge im Monat kosten,
+ * obwohl sie nicht abgehen.
+ */
+type Ansicht = "liste" | "faelligkeit" | "turnus";
+const ANSICHTEN: Ansicht[] = ["liste", "faelligkeit", "turnus"];
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
   Aufwand: "aufwand",
@@ -83,6 +95,7 @@ export function VertraegeScreen() {
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [vorschlaege, setVorschlaege] = useState<Vertragskandidat[]>([]);
+  const [ansicht, setAnsicht] = useState<Ansicht>("liste");
 
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -159,13 +172,167 @@ export function VertraegeScreen() {
   const summe = useMemo(() => {
     let proMonat = 0;
     let baldKuendbar = 0;
+    const eigeneRegeln: Zahlungsregel[] = [];
     for (const v of vertraege) {
       const r = regelZuVertrag.get(v.id);
-      if (r) proMonat += r.betrag / RHYTHMUS_MONATE[r.rhythmus];
+      if (r) {
+        proMonat += r.betrag / RHYTHMUS_MONATE[r.rhythmus];
+        eigeneRegeln.push(r);
+      }
       if (kuendigungsterminNaht(v, heute)) baldKuendbar++;
     }
-    return { proMonat: Math.round(proMonat), proJahr: Math.round(proMonat * 12), baldKuendbar };
+    return {
+      proMonat: Math.round(proMonat),
+      proJahr: Math.round(proMonat * 12),
+      baldKuendbar,
+      // Was die nicht-monatlichen Abflüsse im Monat kosten, obwohl sie nicht abgehen.
+      ruecklage: ruecklagenbedarf(eigeneRegeln),
+    };
   }, [vertraege, regelZuVertrag, heute]);
+
+  /** Nächste Fälligkeit je Vertrag — aus der abgeleiteten Regel, nicht aus dem Beginn. */
+  const naechsteZahlung = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const v of vertraege) {
+      const r = regelZuVertrag.get(v.id);
+      m.set(v.id, r ? naechsteFaelligkeit(r, heute) : null);
+    }
+    return m;
+  }, [vertraege, regelZuVertrag, heute]);
+
+  /**
+   * Die Spalten der Vertragstabelle. Als Funktion, weil die Turnus-Ansicht je Gruppe
+   * eine eigene Tabelle zeigt und nur dort die Rücklagen-Spalte trägt — innerhalb einer
+   * Gruppe steht der Rhythmus fest, also ist die Spalte dort auch vergleichbar.
+   */
+  function spalten(mitRuecklage: boolean): DataColumn[] {
+    const s: DataColumn[] = [
+      { key: "anbieter", label: t("vertraege.spalteAnbieter") },
+      { key: "inhaber", label: t("vertraege.spalteInhaber"), sortValue: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "" : ""), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
+      {
+        key: "charakter",
+        label: t("vertraege.spalteCharakter"),
+        sortValue: (v) => regelZuVertrag.get(v.id)?.charakter ?? "",
+        render: (v) => {
+          const r = regelZuVertrag.get(v.id);
+          return r ? <Pill variant={CHARAKTER_PILL[r.charakter]}>{t(`charakter.${r.charakter}`)}</Pill> : "—";
+        },
+      },
+      {
+        key: "rhythmus",
+        label: t("vertraege.spalteRhythmus"),
+        // Nach Zykluslänge sortieren, nicht alphabetisch — sonst stünde „halbjährlich"
+        // vor „monatlich" und die Reihenfolge sagte nichts über den Takt.
+        sortValue: (v) => {
+          const r = regelZuVertrag.get(v.id);
+          return r ? RHYTHMUS_MONATE[r.rhythmus] : 0;
+        },
+        render: (v) => {
+          const r = regelZuVertrag.get(v.id);
+          return r ? t(`vertraege.rhythmus.${r.rhythmus}`) : "—";
+        },
+      },
+      {
+        key: "naechste",
+        label: t("vertraege.spalteNaechste"),
+        // Ohne Termin ans Ende, nicht an den Anfang: „kein Termin" ist keine baldige Zahlung.
+        sortValue: (v) => naechsteZahlung.get(v.id) ?? "9999-12-31",
+        render: (v) => naechsteZahlung.get(v.id) ?? <span className="muted">—</span>,
+      },
+      {
+        key: "kuendigung",
+        label: t("vertraege.spalteKuendigenBis"),
+        sortable: false,
+        render: (v) => {
+          const termin = naechsterKuendigungstermin(v, heute);
+          if (!termin) return <span className="muted">—</span>;
+          const naht = kuendigungsterminNaht(v, heute);
+          return (
+            <span>
+              {termin.kuendigenBis} {naht && <Pill variant="warn">{t("vertraege.bald")}</Pill>}
+            </span>
+          );
+        },
+      },
+      {
+        key: "betrag",
+        label: `${t("vertraege.spalteBetrag")} ${geld.symbol}`,
+        align: "right",
+        sortValue: (v) => regelZuVertrag.get(v.id)?.betrag ?? 0,
+        render: (v) => {
+          const r = regelZuVertrag.get(v.id);
+          return r ? geld.format(r.betrag) : "—";
+        },
+      },
+    ];
+    if (mitRuecklage) {
+      s.push({
+        key: "ruecklage",
+        label: `${t("vertraege.spalteRuecklage")} ${geld.symbol}`,
+        align: "right",
+        sortValue: (v) => {
+          const r = regelZuVertrag.get(v.id);
+          return r ? ruecklageProMonat(r) : 0;
+        },
+        render: (v) => {
+          const r = regelZuVertrag.get(v.id);
+          const wert = r ? ruecklageProMonat(r) : 0;
+          return wert > 0 ? geld.format(wert) : <span className="muted">—</span>;
+        },
+      });
+    }
+    s.push(
+      { key: "_e", label: "", align: "right", sortable: false, render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
+      {
+        key: "_x",
+        label: "",
+        align: "right",
+        sortable: false,
+        render: (v) => (
+          <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id).then(laden)}>
+            {t("vertraege.loeschen")}
+          </button>
+        ),
+      },
+    );
+    return s;
+  }
+
+  /** Nach nächster Fälligkeit aufsteigend; Verträge ohne Termin ans Ende. */
+  const nachFaelligkeit = useMemo(
+    () =>
+      [...vertraege].sort((a, b) =>
+        (naechsteZahlung.get(a.id) ?? "9999-12-31").localeCompare(naechsteZahlung.get(b.id) ?? "9999-12-31"),
+      ),
+    [vertraege, naechsteZahlung],
+  );
+
+  /** Gruppen der Turnus-Ansicht: je Rhythmus eine, zuletzt die Verträge ohne Zahlung. */
+  const turnusGruppen = useMemo(() => {
+    const gruppen = RHYTHMEN.map((r) => ({
+      key: r as string,
+      titel: t(`vertraege.rhythmus.${r}`),
+      mitRuecklage: RHYTHMUS_MONATE[r] > 1,
+      vertraege: vertraege.filter((v) => regelZuVertrag.get(v.id)?.rhythmus === r),
+    }));
+    const ohne = vertraege.filter((v) => !regelZuVertrag.get(v.id));
+    if (ohne.length) gruppen.push({ key: "ohne", titel: t("vertraege.gruppeOhneRegel"), mitRuecklage: false, vertraege: ohne });
+    return gruppen.filter((g) => g.vertraege.length > 0);
+  }, [vertraege, regelZuVertrag, t]);
+
+  /** Kopfzeile einer Turnus-Gruppe: Anzahl, Monatsanteil und — falls nötig — die Rücklage. */
+  function gruppenUntertitel(g: { vertraege: Vertrag[]; mitRuecklage: boolean }): string {
+    const regeln = g.vertraege.map((v) => regelZuVertrag.get(v.id)).filter((r): r is Zahlungsregel => !!r);
+    const proMonat = Math.round(regeln.reduce((sum, r) => sum + r.betrag / RHYTHMUS_MONATE[r.rhythmus], 0));
+    const basis = t("vertraege.gruppeMeta", {
+      count: g.vertraege.length,
+      betrag: `${geld.format(proMonat, { mitVorzeichen: true })} ${geld.symbol}`,
+    });
+    if (!g.mitRuecklage) return basis;
+    const rueck = ruecklagenbedarf(regeln);
+    if (rueck <= 0) return basis;
+    return `${basis} · ${t("vertraege.gruppeRuecklage", { betrag: `${geld.format(rueck)} ${geld.symbol}` })}`;
+  }
 
   function kategorieWaehlen(id: string) {
     setKategorieId(id);
@@ -254,6 +421,9 @@ export function VertraegeScreen() {
           <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(vertraege.length)} />
           <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} />
           <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} />
+          {summe.ruecklage > 0 && (
+            <KPIStat size="chip" label={t("vertraege.kpiRuecklage")} value={geld.format(summe.ruecklage)} unit={geld.symbol} meta={t("vertraege.kpiRuecklageMeta")} />
+          )}
           {summe.baldKuendbar > 0 && <KPIStat size="chip" label={t("vertraege.kpiBald")} value={String(summe.baldKuendbar)} tone="warn" />}
         </div>
       )}
@@ -331,76 +501,46 @@ export function VertraegeScreen() {
         </Card>
       )}
 
-      <Card>
-        {vertraege.length === 0 ? (
+      {vertraege.length === 0 ? (
+        <Card>
           <div className="muted">{t("vertraege.leer")}</div>
-        ) : (
-          <DataTable
-            sortable
-            pageSize={25}
-            columns={[
-              { key: "anbieter", label: t("vertraege.spalteAnbieter") },
-              { key: "inhaber", label: t("vertraege.spalteInhaber"), sortValue: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "" : ""), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
-              {
-                key: "charakter",
-                label: t("vertraege.spalteCharakter"),
-                sortValue: (v) => regelZuVertrag.get(v.id)?.charakter ?? "",
-                render: (v) => {
-                  const r = regelZuVertrag.get(v.id);
-                  return r ? <Pill variant={CHARAKTER_PILL[r.charakter]}>{t(`charakter.${r.charakter}`)}</Pill> : "—";
-                },
-              },
-              {
-                key: "rhythmus",
-                label: t("vertraege.spalteRhythmus"),
-                sortValue: (v) => regelZuVertrag.get(v.id)?.rhythmus ?? "",
-                render: (v) => {
-                  const r = regelZuVertrag.get(v.id);
-                  return r ? t(`vertraege.rhythmus.${r.rhythmus}`) : "—";
-                },
-              },
-              {
-                key: "kuendigung",
-                label: t("vertraege.spalteKuendigenBis"),
-                sortable: false,
-                render: (v) => {
-                  const termin = naechsterKuendigungstermin(v, heute);
-                  if (!termin) return <span className="muted">—</span>;
-                  const naht = kuendigungsterminNaht(v, heute);
-                  return (
-                    <span>
-                      {termin.kuendigenBis} {naht && <Pill variant="warn">{t("vertraege.bald")}</Pill>}
-                    </span>
-                  );
-                },
-              },
-              {
-                key: "betrag",
-                label: `${t("vertraege.spalteBetrag")} ${geld.symbol}`,
-                align: "right",
-                sortValue: (v) => regelZuVertrag.get(v.id)?.betrag ?? 0,
-                render: (v) => {
-                  const r = regelZuVertrag.get(v.id);
-                  return r ? geld.format(r.betrag) : "—";
-                },
-              },
-              { key: "_e", label: "", align: "right", sortable: false, render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
-              {
-                key: "_x",
-                label: "",
-                align: "right",
-                sortable: false,
-                render: (v) => (
-                  <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id).then(laden)}>
-                    {t("vertraege.loeschen")}
-                  </button>
-                ),
-              },
-            ]}
-            rows={vertraege}
-          />
-        )}
-      </Card>
+        </Card>
+      ) : (
+        <>
+          {/* Umschalter: eine Fläche, drei Blicke auf dieselben Verträge. */}
+          <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
+            {ANSICHTEN.map((a, i) => {
+              const an = ansicht === a;
+              return (
+                <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
+                  style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
+                  {t(`vertraege.ansicht.${a}`)}
+                </button>
+              );
+            })}
+          </div>
+
+          {ansicht === "turnus" ? (
+            turnusGruppen.map((g) => (
+              <Card key={g.key} title={g.titel} subtitle={gruppenUntertitel(g)}>
+                <DataTable sortable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
+              </Card>
+            ))
+          ) : (
+            <Card>
+              <DataTable
+                // Ohne key behielte die Tabelle beim Ansichtswechsel ihre angeklickte
+                // Sortierung — die neue Reihenfolge wäre dann unsichtbar.
+                key={ansicht}
+                sortable
+                pageSize={25}
+                columns={spalten(false)}
+                rows={ansicht === "faelligkeit" ? nachFaelligkeit : vertraege}
+              />
+            </Card>
+          )}
+        </>
+      )}
 
       {offen && (
         <Modal
