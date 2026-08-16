@@ -9,6 +9,8 @@ import type {
   Person,
   Topf,
   Vertrag,
+  Vertragserkennung,
+  Vertragszuordnung,
   Zahlungskonto,
   Zahlungsregel,
 } from "../core";
@@ -42,6 +44,28 @@ export interface VertragRepository {
   alle(): Promise<Vertrag[]>;
   speichern(vertrag: Vertrag): Promise<void>;
   loeschen(id: string): Promise<void>;
+}
+
+/**
+ * Die Erkennungsregeln der Verträge — woran ihre Zahlungen zu erkennen sind.
+ * Getrennt vom Vertrag wie die Zahlungsregel: der Vertrag beschreibt Konditionen,
+ * die Erkennung beschreibt Zuordnungspolitik (siehe core/vertragZuordnung).
+ */
+export interface VertragserkennungRepository {
+  alle(): Promise<Vertragserkennung[]>;
+  speichern(erkennung: Vertragserkennung): Promise<void>;
+  loeschen(vertragId: string): Promise<void>;
+}
+
+/**
+ * Welche Buchung zu welchem Vertrag gehört — samt Herkunft, damit ein Abgleich die
+ * Handarbeit nicht überschreibt. `loeschen` gibt eine Buchung wieder an die Automatik
+ * zurück; das ist der Rückweg aus einer manuellen Entscheidung.
+ */
+export interface VertragszuordnungRepository {
+  alle(): Promise<Vertragszuordnung[]>;
+  speichern(zuordnung: Vertragszuordnung): Promise<void>;
+  loeschen(istbuchungId: string): Promise<void>;
 }
 
 export interface BudgetRepository {

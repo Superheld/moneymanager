@@ -461,9 +461,17 @@ const de = {
     zuVertrag: {
       aktion: "Vertrag daraus machen",
       untertitel: "Kommt diese Zahlung regelmäßig wieder? Dann gehört sie in die Planung.",
-      gehoertZu: "Vertrag erfasst",
+      gehoertZu: "Vertrag",
       gehoertZuHinweis:
-        "Der Empfänger ist als Vertrag angelegt — die Zahlung steht damit in der Planung. Zugeordnet über den Anbieternamen, nicht über eine feste Verknüpfung.",
+        "Diese Zahlung ist dem Vertrag zugeordnet und steht damit in der Planung. Die Zuordnung stammt aus der Erkennungsregel des Vertrags — sie wird bei jedem Abgleich neu gerechnet.",
+      keiner: "kein Vertrag",
+      offen: "— nicht festgelegt —",
+      waehlen: "Vertrag zuordnen",
+      automatisch: "automatisch erkannt",
+      vonHand: "von Hand",
+      vonHandHinweis:
+        "Diese Zuordnung hast du selbst gesetzt — sie bleibt, auch wenn die Erkennung etwas anderes rechnen würde. Zurücksetzen gibt die Entscheidung wieder an die Automatik.",
+      zuruecksetzen: "Automatik entscheiden lassen",
       hinweis: "Empfänger, Betrag, Kategorie und Konto stammen aus dieser Buchung. Den Rhythmus kennt sie nicht — der gehört geprüft.",
     },
     paarung: {
@@ -630,6 +638,8 @@ const de = {
     },
     spalteNaechste: "nächste Zahlung",
     spalteRuecklage: "zurücklegen/Mt",
+    spalteZugeordnet: "Zahlungen",
+    keineZuordnung: "keine erkannt",
     gruppeOhneRegel: "ohne hinterlegte Zahlung",
     gruppeMeta: "{{count}} Verträge · {{betrag}} pro Monat",
     gruppeMetaTurnus: "{{count}} Verträge · {{summe}} je Fälligkeit · {{proMonat}} pro Monat",
@@ -1155,9 +1165,17 @@ const en: typeof de = {
     zuVertrag: {
       aktion: "Turn into a contract",
       untertitel: "Does this payment come back regularly? Then it belongs in the plan.",
-      gehoertZu: "Contract on file",
+      gehoertZu: "Contract",
       gehoertZuHinweis:
-        "The payee is on file as a contract, so this payment is part of the plan. Matched by provider name, not by a stored link.",
+        "This payment is linked to the contract and therefore part of the plan. The link comes from the contract's matching rule and is recalculated on every sync.",
+      keiner: "no contract",
+      offen: "— not set —",
+      waehlen: "Assign contract",
+      automatisch: "matched automatically",
+      vonHand: "set by hand",
+      vonHandHinweis:
+        "You set this link yourself — it stays even if matching would compute something else. Resetting hands the decision back to automatic matching.",
+      zuruecksetzen: "Let matching decide",
       hinweis: "Payee, amount, category and account come from this transaction. Its cycle is unknown — check it.",
     },
     paarung: {
@@ -1324,6 +1342,8 @@ const en: typeof de = {
     },
     spalteNaechste: "next payment",
     spalteRuecklage: "set aside/mo",
+    spalteZugeordnet: "payments",
+    keineZuordnung: "none matched",
     gruppeOhneRegel: "no payment on file",
     gruppeMeta: "{{count}} contracts · {{betrag}} per month",
     gruppeMetaTurnus: "{{count}} contracts · {{summe}} per due date · {{proMonat}} per month",
