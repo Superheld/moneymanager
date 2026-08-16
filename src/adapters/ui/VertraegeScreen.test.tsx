@@ -37,6 +37,7 @@ beforeEach(() => {
 const heute = new Date();
 const tagVor = (n: number) =>
   new Date(heute.getTime() - n * 86_400_000).toISOString().slice(0, 10);
+const tagNach = (n: number) => tagVor(-n);
 
 /** Legt `n` monatliche Abbuchungen samt zugehöriger Umsätze an. */
 async function monatsreihe(praefix: string, gegenpartei: string, betrag: number, n = 12) {
@@ -81,6 +82,70 @@ async function konto() {
  * verschob das Nachtragen des echten Vertragsbeginns (2015 statt „heute") sämtliche
  * geplanten Zahlungen — bei einem Jahresvertrag um bis zu elf Monate.
  */
+/**
+ * Drei Blicke auf denselben Bestand. Geprüft wird an den Zahlen, die der Test selbst
+ * anlegt — Reihenfolge und Rücklagenbetrag —, nicht an Beschriftungen.
+ */
+describe("VertraegeScreen — Ansichten", () => {
+  /** Ein Vertrag samt Regel; künftiger Start ⇒ die nächste Fälligkeit IST der Start. */
+  async function vertragMitRegel(id: string, anbieter: string, betrag: number, rhythmus: string, start: string) {
+    await sqliteVertragRepository.speichern({
+      id, anbieter, beginn: start, verlaengerung: "keine", status: "aktiv",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: rhythmus as "monatlich",
+      startdatum: start, charakter: "Aufwand", kontoId: "k1", vertragId: id,
+    });
+  }
+
+  async function bestand() {
+    await konto();
+    await vertragMitRegel("a", "Alpha", -12000, "jaehrlich", tagNach(40));
+    await vertragMitRegel("b", "Beta", -5508, "quartalsweise", tagNach(10));
+    await vertragMitRegel("c", "Gamma", -4500, "monatlich", tagNach(100));
+  }
+
+  /** Anbieternamen in der Reihenfolge, in der sie in den Tabellen stehen. */
+  function zeilenfolge(): string[] {
+    return [...document.querySelectorAll("tbody tr")]
+      .map((tr) => tr.querySelector("td")?.textContent?.trim() ?? "")
+      .filter((x) => ["Alpha", "Beta", "Gamma"].includes(x));
+  }
+
+  /** 120 €/Jahr → 10,00 pro Monat; 55,08 €/Quartal → 18,36; monatlich zählt nicht mit. */
+  it("nennt den monatlichen Rücklagenbedarf der nicht-monatlichen Verträge", async () => {
+    await bestand();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Alpha");
+    await waitFor(() => expect(document.body.textContent).toMatch(/28,36/));
+  });
+
+  it("sortiert die Fälligkeits-Ansicht nach der nächsten Zahlung", async () => {
+    await bestand();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Alpha");
+
+    await nutzer.click(screen.getByRole("button", { name: /fälligkeit/i }));
+    // Beta zahlt in 10 Tagen, Alpha in 40, Gamma in 100.
+    await waitFor(() => expect(zeilenfolge()).toEqual(["Beta", "Alpha", "Gamma"]));
+  });
+
+  it("gruppiert die Turnus-Ansicht nach Takt und zeigt die Rücklage je Vertrag", async () => {
+    await bestand();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Alpha");
+
+    await nutzer.click(screen.getByRole("button", { name: /turnus/i }));
+    // Vom kürzesten zum längsten Takt: monatlich, quartalsweise, jährlich.
+    await waitFor(() => expect(zeilenfolge()).toEqual(["Gamma", "Beta", "Alpha"]));
+    // Die Rücklagen-Spalte steht nur in den nicht-monatlichen Gruppen.
+    expect(document.body.textContent).toMatch(/18,36/);
+    expect(document.body.textContent).toMatch(/10,00/);
+  });
+});
+
 describe("VertraegeScreen — Beginn und Fälligkeit", () => {
   it("lässt den Zahlungstakt stehen, wenn der Vertragsbeginn nachgetragen wird", async () => {
     await konto();

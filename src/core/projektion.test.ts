@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { euroZuCent } from "./geld";
 import type { Zahlungsregel } from "./zahlungsregel";
-import { projiziereRegel, projiziereVerlauf } from "./projektion";
+import { naechsteFaelligkeit, projiziereRegel, projiziereVerlauf } from "./projektion";
 
 function regel(over: Partial<Zahlungsregel> = {}): Zahlungsregel {
   return {
@@ -111,5 +111,42 @@ describe("projiziereVerlauf", () => {
     expect(v[0].netto).toBe(0); // Jan
     expect(v[2].netto).toBe(euroZuCent(-120)); // Mär
     expect(v[2].buchungen).toHaveLength(1);
+  });
+});
+
+describe("naechsteFaelligkeit", () => {
+  it("liefert den heutigen Termin, wenn heute Zahltag ist", () => {
+    expect(naechsteFaelligkeit(regel(), "2026-01-15")).toBe("2026-01-15");
+  });
+
+  it("springt beim monatlichen Rhythmus in den Folgemonat, sobald der Tag vorbei ist", () => {
+    expect(naechsteFaelligkeit(regel(), "2026-01-16")).toBe("2026-02-15");
+  });
+
+  /** Der Normalfall im Bestand: die Regel läuft seit Jahren, gefragt ist der nächste Termin. */
+  it("findet den Termin auch bei sehr altem Startdatum", () => {
+    const miete = regel({ startdatum: "2009-03-01" });
+    expect(naechsteFaelligkeit(miete, "2026-08-16")).toBe("2026-09-01");
+  });
+
+  it("rechnet den Jahres-Rhythmus auf den nächsten Jahrestag", () => {
+    const hausrat = regel({ rhythmus: "jaehrlich", startdatum: "2019-03-10" });
+    expect(naechsteFaelligkeit(hausrat, "2026-08-16")).toBe("2027-03-10");
+    expect(naechsteFaelligkeit(hausrat, "2026-02-01")).toBe("2026-03-10");
+  });
+
+  it("liefert bei künftigem Start den Start selbst", () => {
+    expect(naechsteFaelligkeit(regel({ startdatum: "2027-05-01" }), "2026-08-16")).toBe("2027-05-01");
+  });
+
+  /**
+   * Regression aus der Projektion: iteratives Weiterzählen klemmte einen Termin vom 31.
+   * im Februar auf den 28. und ließ ihn dort kleben. Aus dem Original gerechnet kehrt er
+   * im März zurück.
+   */
+  it("hält den Monatstag, statt nach dem Februar zu driften", () => {
+    const r = regel({ startdatum: "2026-01-31" });
+    expect(naechsteFaelligkeit(r, "2026-02-01")).toBe("2026-02-28");
+    expect(naechsteFaelligkeit(r, "2026-03-01")).toBe("2026-03-31");
   });
 });
