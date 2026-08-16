@@ -7,6 +7,8 @@
 // Oberfläche sieht aus wie ein Wortproblem, nicht wie eine Lücke.
 
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import i18n, { SPRACHEN } from "./i18n";
 
 type Baum = Record<string, unknown>;
@@ -85,5 +87,55 @@ describe("Übersetzungs-Bundles", () => {
         expect(label, `${wert} in ${s.code}`).not.toBe(`charakter.${wert}`);
       }
     }
+  });
+});
+
+/**
+ * Jeder Schlüssel, den der Code anfordert, muss im Bundle stehen.
+ *
+ * Fehlt er, wirft i18next nicht — es rendert den PFAD. In der Oberfläche steht dann
+ * wörtlich „konten.bearbeiten" statt „bearbeiten", und das sieht aus wie eine fehlende
+ * Übersetzung, nicht wie ein Tippfehler. Der Paritätstest oben findet das nicht: er
+ * vergleicht die Bundles nur untereinander, und ein Schlüssel, den es in KEINER Sprache
+ * gibt, ist zwischen ihnen konsistent.
+ *
+ * Erfasst werden nur statisch lesbare Aufrufe — t("a.b") und <Trans i18nKey="a.b">.
+ * Zusammengesetzte Schlüssel (Template-Literale wie `konten.typ.${typ}`) bleiben außen
+ * vor; die sind aus dem Quelltext nicht auflösbar.
+ */
+describe("Schlüssel im Code", () => {
+  const WURZEL = new URL("..", import.meta.url).pathname;
+
+  function quelldateien(verzeichnis: string): string[] {
+    return readdirSync(verzeichnis, { withFileTypes: true }).flatMap((e) => {
+      const pfad = join(verzeichnis, e.name);
+      if (e.isDirectory()) return quelldateien(pfad);
+      return /\.tsx?$/.test(e.name) && !/\.test\./.test(e.name) ? [pfad] : [];
+    });
+  }
+
+  it("fordert keinen Schlüssel an, den es nicht gibt", () => {
+    const fundstellen = new Map<string, string[]>();
+    for (const datei of quelldateien(WURZEL)) {
+      readFileSync(datei, "utf8").split("\n").forEach((zeile, i) => {
+        const treffer = [
+          ...zeile.matchAll(/\bt\(\s*"([^"${}]+)"/g),
+          ...zeile.matchAll(/i18nKey=\{?"([^"${}]+)"/g),
+        ];
+        for (const m of treffer) {
+          const ort = `${datei.slice(WURZEL.length)}:${i + 1}`;
+          fundstellen.set(m[1], [...(fundstellen.get(m[1]) ?? []), ort]);
+        }
+      });
+    }
+
+    // Sicherung gegen einen still leerlaufenden Test: wenn das Sammeln kaputtgeht,
+    // wäre die Liste leer und der Test grün, ohne irgendetwas geprüft zu haben.
+    expect(fundstellen.size).toBeGreaterThan(100);
+
+    const fehlend = [...fundstellen.entries()]
+      .filter(([schluessel]) => !i18n.exists(schluessel))
+      .map(([schluessel, orte]) => `${schluessel} (${orte.join(", ")})`);
+    expect(fehlend).toEqual([]);
   });
 });
