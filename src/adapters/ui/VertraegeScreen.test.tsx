@@ -23,7 +23,10 @@ import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository"
 import {
   sqliteVertragserkennungRepository,
   sqliteVertragszuordnungRepository,
+  vertragsAbgleichDeps,
 } from "../persistence/sqliteVertragZuordnungRepositories";
+import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
+import { standardErkennung } from "../../core";
 import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
@@ -448,6 +451,54 @@ describe("VertraegeScreen — Vorschläge", () => {
     await waitFor(async () => {
       expect(await sqliteVertragserkennungRepository.alle()).toHaveLength(1);
       expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(12);
+    });
+  });
+
+  /**
+   * Der Fall, für den die Regel überhaupt bearbeitbar ist: der Preis ist gestiegen, die
+   * neuen Zahlungen fallen aus der Betragsspanne und werden nicht mehr zugeordnet. Der
+   * Weg zurück führt über das Nachsteuern der Obergrenze — geprüft am Bestand vorher und
+   * nachher, nicht an der Anzeige.
+   */
+  it("nimmt nach dem Weiten der Betragsspanne die teureren Zahlungen mit auf", async () => {
+    await konto();
+    await monatsreihe("a", "[anonymisiert] GmbH", 1650, 12);
+    // Drei spätere Zahlungen zum erhöhten Preis — außerhalb der Standardspanne
+    // (60…180 % von 16,50 € = 9,90…29,70 €).
+    for (let i = 0; i < 3; i++) {
+      const id = `teuer-${i}`;
+      const datum = tagVor(400 + i * 30);
+      await sqliteLedgerRepository.speichern({
+        id, datum, betrag: -4000, kontoId: "k1", charakter: "Aufwand", quelle: "import",
+      });
+      await sqliteUmsatzRepository.speichern({
+        id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
+        betrag: -4000, waehrung: "EUR", gegenpartei: "[anonymisiert] GmbH", verwendungszweck: "",
+        rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
+      });
+    }
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "[anonymisiert] GmbH", beginn: "2024-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "[anonymisiert] GmbH", 1650));
+    await zuordnungenAbgleichen(vertragsAbgleichDeps);
+    expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(12);
+
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("[anonymisiert] GmbH");
+    await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
+
+    const obergrenze = await screen.findByRole("textbox", { name: /betrag bis/i });
+    await nutzer.clear(obergrenze);
+    await nutzer.type(obergrenze, "50");
+
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(15);
     });
   });
 
