@@ -12,6 +12,7 @@ export * from "./konto";
 export * from "./kategorie";
 export * from "./vertrag";
 export * from "./vertragErkennung";
+export * from "./vertragZuordnung";
 export * from "./budget";
 export * from "./budgetVorschlag";
 export * from "./topf";

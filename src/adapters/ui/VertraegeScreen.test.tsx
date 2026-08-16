@@ -20,6 +20,10 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { VertraegeScreen } from "./VertraegeScreen";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
+import {
+  sqliteVertragserkennungRepository,
+  sqliteVertragszuordnungRepository,
+} from "../persistence/sqliteVertragZuordnungRepositories";
 import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
@@ -390,6 +394,61 @@ describe("VertraegeScreen — Vorschläge", () => {
     expect(regeln).toHaveLength(1);
     expect(regeln[0].betrag).toBe(-1650);
     expect(regeln[0].rhythmus).toBe("monatlich");
+  });
+
+  /**
+   * Der Punkt, an dem aus einem Vorschlag eine echte Verknüpfung wird: der neu erfasste
+   * Vertrag muss RÜCKWIRKEND greifen. Seine Zahlungen liegen längst im Bestand — würde
+   * die Zuordnung erst ab dem Anlegen wirken, stünde der Vertrag in der Liste, ohne je
+   * eine Buchung zu kennen. Geprüft an der gespeicherten Zuordnung, nicht an der Anzeige.
+   */
+  it("ordnet dem übernommenen Vertrag seine bisherigen Zahlungen zu", async () => {
+    await konto();
+    await monatsreihe("a", "Netcup GmbH", 1650); // 12 Abbuchungen
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Netcup GmbH");
+
+    await nutzer.click(screen.getByRole("button", { name: /übernehmen/i }));
+    await waitFor(() => expect(screen.getByDisplayValue("Netcup GmbH")).toBeInTheDocument());
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const zuordnungen = await sqliteVertragszuordnungRepository.alle();
+      expect(zuordnungen).toHaveLength(12);
+    });
+    const vertragId = (await sqliteVertragRepository.alle())[0].id;
+    const zuordnungen = await sqliteVertragszuordnungRepository.alle();
+    expect(zuordnungen.every((z) => z.vertragId === vertragId)).toBe(true);
+    expect(zuordnungen.every((z) => z.herkunft === "automatisch")).toBe(true);
+  });
+
+  /**
+   * Verträge sind älter als die Zuordnung. Ohne das Nachziehen trüge der gesamte Bestand
+   * keine Erkennungsregel und damit keine einzige Zuordnung — die Automatik begänne erst
+   * beim nächsten neu erfassten Vertrag zu wirken.
+   */
+  it("zieht die Erkennungsregel für einen Vertrag ohne Regel nach", async () => {
+    await konto();
+    await monatsreihe("a", "Netcup GmbH", 1650);
+    // Direkt ins Repository geschrieben — wie ein Vertrag aus der Zeit vor Migration 19.
+    await sqliteVertragRepository.speichern({
+      id: "alt", anbieter: "Netcup GmbH", beginn: "2025-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-alt", bezeichnung: "Netcup GmbH", betrag: -1650, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "alt",
+    });
+
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Netcup GmbH");
+
+    await waitFor(async () => {
+      expect(await sqliteVertragserkennungRepository.alle()).toHaveLength(1);
+      expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(12);
+    });
   });
 
   /**
