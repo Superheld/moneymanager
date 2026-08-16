@@ -139,3 +139,38 @@ describe("Schlüssel im Code", () => {
     expect(fehlend).toEqual([]);
   });
 });
+
+/**
+ * Sichtbare Texte kommen aus dem Bundle, nicht aus dem Quelltext.
+ *
+ * Das Gegenstück zum Test darüber: der prüft, dass angeforderte Schlüssel existieren —
+ * dieser, dass überhaupt einer angefordert wird. Ein hartkodiertes `placeholder="suchen…"`
+ * fällt sonst nirgends auf, es sieht in der deutschen Oberfläche ja richtig aus. Erst in
+ * der englischen steht ein deutsches Wort mitten im Formular.
+ *
+ * Geprüft werden die Attribute, die der Nutzer LIEST. Reine Zahlen sind erlaubt (ein
+ * Platzhalter „96" für Monate ist sprachfrei) — Beträge dagegen nicht: die gehören über
+ * `geld.format(0)` formatiert, weil das Dezimaltrennzeichen an der Locale hängt.
+ */
+describe("Sichtbare Texte in Komponenten", () => {
+  const UI = new URL("../adapters/ui", import.meta.url).pathname;
+  const SICHTBAR = /\b(placeholder|title|aria-label|alt)\s*=\s*"([^"]*)"/g;
+  /** Sprachfrei und deshalb erlaubt: reine Ganzzahlen. */
+  const SPRACHFREI = /^\d+$/;
+
+  it("hält keine sichtbaren Texte als Literal im Quelltext", () => {
+    const funde: string[] = [];
+    for (const name of readdirSync(UI)) {
+      if (!name.endsWith(".tsx") || name.includes(".test.")) continue;
+      readFileSync(join(UI, name), "utf8")
+        .split("\n")
+        .forEach((zeile, i) => {
+          for (const m of zeile.matchAll(SICHTBAR)) {
+            if (SPRACHFREI.test(m[2])) continue;
+            funde.push(`${name}:${i + 1} ${m[1]}="${m[2]}"`);
+          }
+        });
+    }
+    expect(funde).toEqual([]);
+  });
+});
