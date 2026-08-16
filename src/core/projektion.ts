@@ -78,6 +78,35 @@ export function projiziereRegel(
   return buchungen;
 }
 
+/**
+ * Nächste Fälligkeit einer Regel ab `heute` (einschließlich heute), oder null, wenn
+ * keine mehr kommt. Eigene Funktion statt `projiziereRegel(...)[0]`: die Projektion
+ * baut ein ganzes Fenster auf, und wer nur den nächsten Termin braucht (Vertragsliste),
+ * müsste raten, wie weit das Fenster reichen muss — bei einem Jahresvertrag zwölf
+ * Monate, bei einem monatlichen einer.
+ *
+ * Rechnet wie die Projektion aus dem ORIGINAL-Startdatum + k·Schritt, damit der
+ * Monatstag nicht driftet (ein Vertrag ab dem 31. bliebe sonst nach dem Februar
+ * dauerhaft am 28. kleben).
+ */
+export function naechsteFaelligkeit(regel: Zahlungsregel, heute: string): string | null {
+  const schritt = RHYTHMUS_MONATE[regel.rhythmus];
+  const start = parseIso(regel.startdatum);
+  const jetzt = parseIso(heute);
+  const heuteOrd = ord(jetzt);
+
+  // Direkt in die Nähe springen statt vom Startdatum hochzuzählen — Regeln mit sehr
+  // altem Start (Miete seit 2009) sind der Normalfall, nicht die Ausnahme.
+  const monateBisHeute = (jetzt.y - start.y) * 12 + (jetzt.m - start.m);
+  let k = Math.max(0, Math.floor(monateBisHeute / schritt));
+  // Der Sprung landet höchstens einen Zyklus daneben; drei Schritte sind reichlich.
+  for (let i = 0; i < 3; i++, k++) {
+    const faellig = addMonate(start, k * schritt);
+    if (ord(faellig) >= heuteOrd) return toIso(faellig);
+  }
+  return null;
+}
+
 /** Ein Monat im projizierten Verlauf. */
 export interface MonatsVerlauf {
   readonly jahr: number;

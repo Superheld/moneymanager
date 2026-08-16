@@ -4,6 +4,7 @@
 // Umfasst auch Einnahmen (Charakter Ertrag der Regel) und Versicherungen.
 
 import { addMonate, ord, parseIso, tageBis, toIso } from "./datum";
+import { RHYTHMUS_MONATE, type Zahlungsregel } from "./zahlungsregel";
 
 export type Verlaengerungsart = "keine" | "automatisch";
 export type Vertragsstatus = "aktiv" | "gekuendigt" | "beendet";
@@ -77,6 +78,31 @@ export function naechsterKuendigungstermin(v: Vertrag, heute: string): Kuendigun
 function ganzeMonate(wert: number | undefined): number {
   const n = Math.round(Number(wert));
   return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Was eine Zahlung im Monat kostet, obwohl sie nicht monatlich abgeht — der Betrag,
+ * den man zurücklegen muss, um bei Fälligkeit nicht ins Minus zu rutschen.
+ *
+ * Fachlich eine Rückstellung (Oberfläche: „Puffer"): eine bekannte künftige Zahlung,
+ * die schon feststeht, aber erst später abfließt. Nur Abflüsse zählen — eine jährliche
+ * Einnahme braucht keine Rücklage — und monatliche Zahlungen ebenfalls nicht: die
+ * kommen aus dem laufenden Monat.
+ *
+ * Bewusst der schlichte Anteil (Betrag ÷ Monate im Rhythmus), nicht „Restbetrag bis
+ * zur nächsten Fälligkeit": das wäre nur richtig, wenn der Topf bei null anfängt, und
+ * schwankte jeden Monat. Gefragt ist die Dauerrate.
+ */
+export function ruecklageProMonat(regel: Zahlungsregel): number {
+  if (regel.betrag >= 0) return 0;
+  const monate = RHYTHMUS_MONATE[regel.rhythmus];
+  if (monate <= 1) return 0;
+  return Math.round(Math.abs(regel.betrag) / monate);
+}
+
+/** Summe der monatlichen Rücklagen über mehrere Zahlungsregeln. */
+export function ruecklagenbedarf(regeln: readonly Zahlungsregel[]): number {
+  return regeln.reduce((s, r) => s + ruecklageProMonat(r), 0);
 }
 
 /** Naht der nächste Kündigungstermin (kuendigenBis innerhalb `warnTage` ab heute)? */
