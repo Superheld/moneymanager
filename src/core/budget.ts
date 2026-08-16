@@ -3,7 +3,7 @@
 // Ansparen gehört in einen Topf, nicht ins Budget). MVP: lineare Glättung.
 
 import type { Cent } from "./geld";
-import type { IstBuchung } from "./istbuchung";
+import { kategorieAnteile, type IstBuchung } from "./istbuchung";
 
 export type BudgetPeriode = "monatlich" | "jaehrlich";
 
@@ -69,9 +69,13 @@ export function budgetVerbrauch(
   bis: string,
 ): Cent {
   return buchungen.reduce((s, b) => {
-    if (b.kategorieId !== kategorieId) return s;
     if (b.charakter !== "Aufwand") return s;
     if (b.datum < von || b.datum >= bis) return s;
-    return s - b.betrag;
+    // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung (S-7) belastet
+    // dieses Budget nur mit IHREM Teil, nicht mit dem vollen Betrag — und nicht gar nicht.
+    return kategorieAnteile(b).reduce(
+      (t, a) => (a.kategorieId === kategorieId ? t - a.betrag : t),
+      s,
+    );
   }, 0);
 }
