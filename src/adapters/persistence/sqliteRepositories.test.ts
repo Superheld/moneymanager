@@ -28,6 +28,7 @@ import { sqliteEinstellungenRepository as einstellungenRepository } from "./sqli
 import { sqliteInventarRepository as inventarRepository } from "./sqliteInventarRepository";
 import { sqliteLedgerRepository as ledgerRepository } from "./sqliteLedgerRepository";
 import { sqliteKlassifikatorRepository as klassifikatorRepository } from "./sqliteKlassifikatorRepository";
+import { sqliteMerkmalskonfigurationRepository as merkmalRepository } from "./sqliteMerkmalskonfigurationRepository";
 import { klassifizieren, trainieren } from "../../core";
 import { sqliteTopfRepository as topfRepository } from "./sqliteTopfRepository";
 import { sqliteVertragRepository as vertragRepository } from "./sqliteVertragRepository";
@@ -535,5 +536,62 @@ describe("Klassifikator-Repository", () => {
     expect(zurueck!.modell.kategorien).toHaveLength(0);
     expect(zurueck!.modell.vokabular).toHaveLength(0);
     expect(zurueck!.genauigkeit).toBeUndefined();
+  });
+});
+
+describe("Merkmalskonfiguration — Persistenz", () => {
+  it("unterscheidet „nie gesetzt“ von „alles abgeschaltet“", async () => {
+    expect(await merkmalRepository.herkuenfteLesen()).toBeNull();
+
+    await merkmalRepository.herkuenfteSetzen([]);
+
+    // Ein leerer Eintrag ist eine Entscheidung; würde er als „nie gesetzt" gelesen,
+    // käme beim nächsten Start der Standard zurück.
+    expect(await merkmalRepository.herkuenfteLesen()).toEqual([]);
+  });
+
+  it("trägt die aktiven Herkünfte durch das Schema", async () => {
+    await merkmalRepository.herkuenfteSetzen(["empGanz", "vwz"]);
+    expect(await merkmalRepository.herkuenfteLesen()).toEqual(["empGanz", "vwz"]);
+  });
+
+  it("überschreibt die Herkünfte statt sie zu ergänzen", async () => {
+    await merkmalRepository.herkuenfteSetzen(["empGanz", "vwz"]);
+    await merkmalRepository.herkuenfteSetzen(["gid"]);
+    expect(await merkmalRepository.herkuenfteLesen()).toEqual(["gid"]);
+  });
+
+  it("speichert einen globalen Ausschluss ohne Herkunftsliste", async () => {
+    await merkmalRepository.ausschlussSetzen({ wort: "kdn", quelle: "manuell" });
+
+    const [a] = await merkmalRepository.ausschluesseLesen();
+    expect(a.wort).toBe("kdn");
+    // NULL in der Spalte muss als „fehlend" zurückkommen, nicht als leere Liste — im
+    // Kern bedeutet die leere Liste etwas anderes.
+    expect(a.herkuenfte).toBeUndefined();
+    expect(a.quelle).toBe("manuell");
+  });
+
+  it("speichert einen auf Herkünfte eingeschränkten Ausschluss", async () => {
+    await merkmalRepository.ausschlussSetzen({ wort: "bank", herkuenfte: ["vwz", "empWort"], quelle: "manuell" });
+    expect((await merkmalRepository.ausschluesseLesen())[0].herkuenfte).toEqual(["vwz", "empWort"]);
+  });
+
+  it("normalisiert das Wort beim Speichern und Löschen", async () => {
+    await merkmalRepository.ausschlussSetzen({ wort: "  KDN  ", quelle: "manuell" });
+    expect((await merkmalRepository.ausschluesseLesen())[0].wort).toBe("kdn");
+
+    await merkmalRepository.ausschlussEntfernen("KDN");
+    expect(await merkmalRepository.ausschluesseLesen()).toHaveLength(0);
+  });
+
+  it("ändert einen vorhandenen Eintrag statt einen zweiten anzulegen", async () => {
+    await merkmalRepository.ausschlussSetzen({ wort: "bank", quelle: "standard" });
+    await merkmalRepository.ausschlussSetzen({ wort: "bank", herkuenfte: ["vwz"], quelle: "manuell" });
+
+    const alle = await merkmalRepository.ausschluesseLesen();
+    expect(alle).toHaveLength(1);
+    expect(alle[0].quelle).toBe("manuell");
+    expect(alle[0].herkuenfte).toEqual(["vwz"]);
   });
 });

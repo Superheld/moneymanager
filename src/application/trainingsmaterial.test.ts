@@ -85,9 +85,9 @@ describe("Was der Befund über die Daten sagt", () => {
     const b = materialBefund([spur({ id: "a" }), spur({ id: "b" }), spur({ id: "c", gegenpartei: "Anderer Laden" })]);
     // „vwz:einkauf" und „vz:-" kommen beide 3× vor; der Gleichstand entscheidet sich
     // alphabetisch, damit die Anzeige zwischen zwei Läufen nicht springt.
-    expect(b.vokabular.haeufigste.slice(0, 2)).toEqual([
-      { merkmal: "vwz:einkauf", anzahl: 3 },
-      { merkmal: "vz:-", anzahl: 3 },
+    expect(b.vokabular.haeufigste.slice(0, 2).map((m) => [m.merkmal, m.belege])).toEqual([
+      ["vwz:einkauf", 3],
+      ["vz:-", 3],
     ]);
   });
 
@@ -101,9 +101,11 @@ describe("Was der Befund über die Daten sagt", () => {
       spur({ id: "a", verwendungszweck: "SEPA Lastschrift RE2026004711" }),
       spur({ id: "b", verwendungszweck: "SEPA Lastschrift RE2026004712" }),
     ]);
-    expect(b.vokabular.verworfen.stoppwort).toBe(4); // 2× sepa, 2× lastschrift
+    expect(b.vokabular.verworfen.ausgeschlossen).toBe(4); // 2× sepa, 2× lastschrift
     expect(b.vokabular.verworfen.ziffern).toBe(2);
-    expect(b.vokabular.haeufigsteVerworfen[0]).toEqual({ wort: "lastschrift", grund: "stoppwort", anzahl: 2 });
+    expect(b.vokabular.haeufigsteVerworfen[0]).toEqual({
+      wort: "lastschrift", grund: "ausgeschlossen", herkunft: "vwz", anzahl: 2,
+    });
   });
 
   it("zählt Verworfenes über dieselbe Grundmenge wie das Vokabular", () => {
@@ -111,7 +113,7 @@ describe("Was der Befund über die Daten sagt", () => {
     // ließen sich Vokabulargröße und Verwurfszahl nicht mehr gegeneinander lesen.
     const b = materialBefund([spur({ kategorieId: undefined, verwendungszweck: "SEPA Zahlung" })]);
     expect(b.beispiele).toHaveLength(0);
-    expect(b.vokabular.verworfen.stoppwort).toBe(0);
+    expect(b.vokabular.verworfen.ausgeschlossen).toBe(0);
   });
 
   it("ein leerer Bestand liefert einen leeren, aber gültigen Befund", () => {
