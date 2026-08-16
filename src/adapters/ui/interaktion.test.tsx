@@ -334,7 +334,9 @@ describe("Umbuchung aus einer bestehenden Buchung", () => {
    */
   async function detailOeffnen(nutzer: ReturnType<typeof userEvent.setup>, kontoName: string) {
     await nutzer.click(await screen.findByText(kontoName));
-    const bearbeiten = await screen.findAllByRole("button", { name: /bearbeiten/i });
+    // Exakt, nicht /bearbeiten/i: ein fehlender Übersetzungsschlüssel rendert als Pfad
+    // („konten.bearbeiten"), und ein toleranter Ausdruck hätte genau das durchgelassen.
+    const bearbeiten = await screen.findAllByRole("button", { name: "bearbeiten" });
     await nutzer.click(bearbeiten[0]);
   }
 
