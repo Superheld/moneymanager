@@ -1,12 +1,22 @@
 // SQLite-Implementierungen der beiden Zuordnungs-Ports (Migration 19):
 // die Erkennungsregel je Vertrag und die Zuordnung je Ist-Buchung.
 //
-// Die Schlüsselliste liegt als JSON-Textspalte — dasselbe Muster wie `inhaber_ids` beim
+// Die Merkmale liegen als JSON-Textspalte — dasselbe Muster wie `inhaber_ids` beim
 // Zahlungskonto. Eine eigene Zeilen-Tabelle wäre sauberer normalisiert und hier reine
 // Zeremonie: die Liste hat zwei bis drei Einträge, wird immer vollständig gelesen und
 // vollständig geschrieben.
+//
+// Die Spalte heißt noch `schluessel`, obwohl sie inzwischen typisierte Merkmale trägt.
+// Bewusst so gelassen: ein RENAME COLUMN wäre beim zweiten Lauf ein Fehler, und
+// Migrationen müssen hier wiederholbar sein (siehe CLAUDE.md). Der Name der Spalte kostet
+// nichts, ein nicht wiederholbares Statement schon.
 
-import type { Vertragserkennung, Vertragszuordnung, Zuordnungsherkunft } from "../../core";
+import type {
+  Erkennungsmerkmal,
+  Vertragserkennung,
+  Vertragszuordnung,
+  Zuordnungsherkunft,
+} from "../../core";
 import type {
   VertragserkennungRepository,
   VertragszuordnungRepository,
@@ -26,14 +36,49 @@ interface ErkennungZeile {
   konto_id: string | null;
 }
 
-/** Defensiv: ein kaputter JSON-Eintrag darf die Vertragsliste nicht ausfallen lassen. */
-function parseSchluessel(json: string): string[] {
+/**
+ * Sieht dieser Text nach einer SEPA-Gläubiger-ID aus? Zwei Buchstaben Land, zwei
+ * Prüfziffern, „ZZZ" als Geschäftsbereich, dann die Kennung — z. B. „DE98ZZZ09999999999".
+ * Nur für den Altformat-Leser unten gebraucht; im laufenden Betrieb sagt die Art, was ein
+ * Merkmal ist, statt dass jemand es errät.
+ */
+const SIEHT_AUS_WIE_GLAEUBIGER_ID = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{3}[A-Z0-9]{1,28}$/;
+
+/**
+ * JSON-Spalte → Merkmale. Liest ZWEI Formate:
+ *
+ *  • aktuell: `[{"art":"empfaenger","muster":"netcup"}, …]`
+ *  • Altbestand: `["netcup", "DE98ZZZ…"]` — eine flache Schlüsselliste ohne Art. Die
+ *    Regeln aus Migration 19 stehen so in der Datenbank; ihre Art wird an der Form des
+ *    Werts erraten. Das ist die einzige Stelle, an der geraten wird, und sie verschwindet,
+ *    sobald die betroffenen Regeln einmal gespeichert wurden. Eine Migration hätte dafür
+ *    ein JSON-Array in SQL umbauen müssen — nicht wiederholbar zu bekommen, und die Regel
+ *    für Migrationen lautet: jedes Statement muss wiederholbar sein.
+ *
+ * Defensiv im Übrigen: ein kaputter Eintrag darf die Vertragsliste nicht ausfallen lassen.
+ */
+function parseMerkmale(json: string): Erkennungsmerkmal[] {
+  let gelesen: unknown;
   try {
-    const v: unknown = JSON.parse(json);
-    return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+    gelesen = JSON.parse(json);
   } catch {
     return [];
   }
+  if (!Array.isArray(gelesen)) return [];
+  return gelesen.flatMap((eintrag): Erkennungsmerkmal[] => {
+    if (typeof eintrag === "string") {
+      const wert = eintrag.trim();
+      if (!wert) return [];
+      return [{ art: SIEHT_AUS_WIE_GLAEUBIGER_ID.test(wert) ? "glaeubigerId" : "empfaenger", muster: wert }];
+    }
+    if (eintrag && typeof eintrag === "object") {
+      const { art, muster } = eintrag as { art?: unknown; muster?: unknown };
+      if (typeof muster === "string" && (art === "glaeubigerId" || art === "empfaenger")) {
+        return [{ art, muster }];
+      }
+    }
+    return [];
+  });
 }
 
 export const sqliteVertragserkennungRepository: VertragserkennungRepository = {
@@ -45,7 +90,7 @@ export const sqliteVertragserkennungRepository: VertragserkennungRepository = {
     );
     return zeilen.map((z): Vertragserkennung => ({
       vertragId: z.vertrag_id,
-      schluessel: parseSchluessel(z.schluessel),
+      merkmale: parseMerkmale(z.schluessel),
       betragVon: z.betrag_von ?? undefined,
       betragBis: z.betrag_bis ?? undefined,
       gueltigAb: z.gueltig_ab ?? undefined,
@@ -65,7 +110,7 @@ export const sqliteVertragserkennungRepository: VertragserkennungRepository = {
          gueltig_bis = excluded.gueltig_bis, konto_id = excluded.konto_id`,
       [
         e.vertragId,
-        JSON.stringify(e.schluessel),
+        JSON.stringify(e.merkmale),
         e.betragVon ?? null,
         e.betragBis ?? null,
         e.gueltigAb ?? null,

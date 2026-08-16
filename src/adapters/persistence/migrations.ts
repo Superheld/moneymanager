@@ -282,7 +282,7 @@ export const MIGRATIONS: Migration[] = [
     version: 19, // Vertrag ↔ Ist-Buchung: Erkennungsregel je Vertrag, Zuordnung je Buchung
     sql: [
       // Bis hierher zeigte der Vertrag auf KEINE Buchung; die Zugehörigkeit wurde jedes
-      // Mal aus dem Empfängernamen abgeleitet (core/vertragErkennung#vertragZuGegenpartei).
+      // Mal aus dem Empfängernamen abgeleitet (core/vertragErkennung#anbieterSchluessel).
       // Zwei Tabellen statt Spalten am Vertrag, weil es zwei verschiedene Dinge sind:
       // die REGEL (wie erkenne ich die Zahlungen dieses Vertrags — änderbar, einsehbar)
       // und das ERGEBNIS je Buchung (samt Herkunft, damit Handarbeit den Abgleich
