@@ -29,7 +29,7 @@ import { ImportScreen } from "./ImportScreen";
 import { InventarScreen } from "./InventarScreen";
 import { KontenScreen } from "./KontenScreen";
 import { ReviewScreen } from "./ReviewScreen";
-import { UeberblickScreen } from "./UeberblickScreen";
+import { PlanungScreen } from "./PlanungScreen";
 import { VertraegeScreen } from "./VertraegeScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
@@ -96,9 +96,9 @@ describe("KontenScreen", () => {
   });
 });
 
-describe("UeberblickScreen", () => {
+describe("PlanungScreen", () => {
   it("rendert im Leerzustand", async () => {
-    rendere(<UeberblickScreen />);
+    rendere(<PlanungScreen />);
     await waitFor(() => expect(document.body.textContent).toBeTruthy());
   });
 
@@ -108,7 +108,7 @@ describe("UeberblickScreen", () => {
       id: "z1", bezeichnung: "Miete", betrag: -90000, rhythmus: "monatlich",
       startdatum: "2026-01-01", charakter: "Aufwand",
     });
-    rendere(<UeberblickScreen />);
+    rendere(<PlanungScreen />);
     // 250000 Minor Units Kontostand → „2.500,00" muss irgendwo auftauchen.
     await waitFor(() => expect(document.body.textContent).toMatch(/2\.500,00/));
   });
@@ -191,6 +191,46 @@ describe("HistorieScreen", () => {
     });
     rendere(<HistorieScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
+  });
+
+  /**
+   * Der Durchschnitt ist der Maßstab, gegen den ein einzelner Monat etwas aussagt.
+   * Zwei Monate mit 100 € und 300 € → Ø 200 €; er darf sich nicht mitverschieben,
+   * wenn ein Monat gewählt wird, sonst verglichen man den Monat mit sich selbst.
+   */
+  it("zeigt den Durchschnitt pro Monat und vergleicht einen gewählten Monat damit", async () => {
+    await grunddaten();
+    const heute = new Date();
+    const monat = (rueck: number) => {
+      const d = new Date(heute.getFullYear(), heute.getMonth() - rueck, 15);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-15`;
+    };
+    await sqliteLedgerRepository.speichern({
+      id: "a", datum: monat(1), betrag: -10000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "b", datum: monat(0), betrag: -30000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<HistorieScreen />);
+
+    // Ø über die 12 Monate des Zeitraums: 400 € / 12 = 33,33 €.
+    await waitFor(() => expect(document.body.textContent).toMatch(/33,33/));
+
+    // Einen Monat wählen — die Kennzahlen zeigen dann diesen Monat.
+    const auswahl = await screen.findByLabelText("Monat");
+    const laufend = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}`;
+    await nutzer.selectOptions(auswahl, screen.getByRole("option", { name: laufend }));
+
+    await waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toMatch(/300,00/); // Ausgaben des gewählten Monats
+      expect(text).toMatch(/33,33/); // Ø bleibt der des Zeitraums
+      expect(text).toMatch(/vs\./); // Abweichung wird ausgewiesen
+    });
   });
 });
 

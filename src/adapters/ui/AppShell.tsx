@@ -7,7 +7,7 @@ import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "../../version";
 
 export type ScreenId =
-  | "uebersicht"
+  | "planung"
   | "historie"
   | "konten"
   | "toepfe"
@@ -34,8 +34,10 @@ const GRUPPEN: NavGroup[] = [
   {
     titelKey: "shell.gruppeUeberblick",
     eintraege: [
-      { id: "uebersicht", labelKey: "shell.navUebersicht", badgeKey: "shell.badgePlan" },
-      { id: "historie", labelKey: "shell.navHistorie" },
+      // „Übersicht" ist die Historie: was tatsächlich war, ist der Einstieg. Die
+      // Vorausschau steht daneben und heißt, was sie ist — Planung.
+      { id: "historie", labelKey: "shell.navUebersicht" },
+      { id: "planung", labelKey: "shell.navPlanung", badgeKey: "shell.badgePlan" },
       { id: "konten", labelKey: "shell.navKonten" },
       { id: "budgets", labelKey: "shell.navBudgets" },
       { id: "toepfe", labelKey: "shell.navToepfe" },

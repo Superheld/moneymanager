@@ -20,7 +20,7 @@ import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { InventarScreen } from "./InventarScreen";
 import { ToepfeScreen } from "./ToepfeScreen";
-import { UeberblickScreen } from "./UeberblickScreen";
+import { PlanungScreen } from "./PlanungScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteTopfRepository } from "../persistence/sqliteTopfRepository";
 import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
@@ -181,7 +181,7 @@ describe("Übersicht — mit Plandaten", () => {
       schaetzbetrag: 50000, fristMonate: 12,
     });
 
-    rendere(<UeberblickScreen />);
+    rendere(<PlanungScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/3\.000,00/));
     // Die Töpfe mindern die frei verfügbare Liquidität — der Wert muss auftauchen.
     expect(document.body.textContent).toMatch(/500,00|2\.500,00/);
