@@ -91,6 +91,15 @@ describe("MonatsAusblick", () => {
     expect(within(august).getByText("−471,41")).toBeInTheDocument();
   });
 
+  it("stellt das Gebuchte vor das Geplante", async () => {
+    rendere(<MonatsAusblick {...props} />);
+    const august = await karte("August 2026");
+    const gebucht = within(august).getByText("gebucht");
+    const geplant = within(august).getByText("geplant");
+    // Das Tatsächliche steht links — beim nächsten Umbau soll das nicht still zurückdrehen.
+    expect(gebucht.compareDocumentPosition(geplant) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("zeigt für kommende Monate nur die Plan-Spalte", async () => {
     rendere(<MonatsAusblick {...props} />);
     const september = await karte("September 2026");
