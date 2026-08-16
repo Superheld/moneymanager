@@ -27,6 +27,7 @@ import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedge
 import { Button, DataTable, FormField, Pill } from "./ds";
 import { KlappCard } from "./KlappCard";
 import { KategorisierungCards } from "./KategorisierungCards";
+import { FestlegungenCard } from "./FestlegungenCard";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht, useRegionUmschalter } from "./einstellungenKontext";
@@ -60,6 +61,7 @@ export function EinstellungenScreen() {
       <PersonenCard personen={personen} onChange={laden} />
       <KontenCard konten={konten} personen={personen} personName={personName} ist={ist} onChange={laden} />
       <KategorienCard kategorien={kategorien} onChange={laden} />
+      <FestlegungenCard kategorien={kategorien} />
       <KategorisierungCards kategorien={kategorien} />
     </div>
   );

@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import {
   istGeteilt,
   minorZuMajor,
+  musterVorschlag,
   type Charakter,
   type IstBuchung,
   type Kategorie,
@@ -56,6 +57,8 @@ import { Button, FormField, Pill } from "./ds";
 import { formularAusBuchung, VertragModal } from "./VertragModal";
 import { CategoryPicker } from "./CategoryPicker";
 import { MerkmaleBlock } from "./MerkmaleBlock";
+import { festlegungSetzen } from "../../application/kategoriefestlegungen";
+import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persistence/sqliteKategoriefestlegungRepository";
 import { Modal } from "./Modal";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
 
@@ -200,8 +203,14 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
   const [kategorieId, setKategorieId] = useState(buchung.kategorieId ?? "");
   const [notiz, setNotiz] = useState(buchung.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
+  // „Immer bei diesem Empfänger" — nur angeboten, wenn die Kategorie hier gerade
+  // GEÄNDERT wird. Ein dauerhaft sichtbarer Haken wäre eine Einladung, beim Durchsehen
+  // nebenbei Regeln anzulegen; die Festlegung soll aus einer Korrektur entstehen.
+  const [immer, setImmer] = useState(false);
   const gepaart = !!buchung.transferId;
   const geteilt = istGeteilt(buchung);
+  const musterAngebot = musterVorschlag(umsatz?.gegenpartei ?? "");
+  const kategorieGeaendert = kategorieId !== (buchung.kategorieId ?? "");
 
   async function speichern() {
     setFehler(null);
@@ -210,6 +219,11 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
         await umbuchungsBeinBearbeiten(ledgerRepo, buchung, { datum, notiz });
       } else {
         await buchungBearbeiten(ledgerRepo, buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
+        // Die Festlegung entsteht NACH der Buchung: schlüge das Speichern fehl, stünde
+        // sonst eine Regel für eine Änderung, die es nicht gibt.
+        if (immer && kategorieId && musterAngebot) {
+          await festlegungSetzen(festlegungRepo, musterAngebot, kategorieId);
+        }
       }
       onSaved();
     } catch (e) {
@@ -301,6 +315,15 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
               <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
                 <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
               </FormField>
+              {kategorieGeaendert && kategorieId && musterAngebot && (
+                <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", marginTop: 6, fontSize: "var(--fs-xs)" }}>
+                  <input type="checkbox" checked={immer} onChange={(e) => setImmer(e.target.checked)} />
+                  <span>
+                    {t("konten.festlegung.immer", { muster: musterAngebot })}
+                    <span className="muted" style={{ display: "block" }}>{t("konten.festlegung.hinweis")}</span>
+                  </span>
+                </label>
+              )}
               <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
                 <button className="linkbtn" onClick={onSplitten}>{t("konten.split.aktion")}</button>
                 {" · "}

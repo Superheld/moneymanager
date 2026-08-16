@@ -403,4 +403,21 @@ export const MIGRATIONS: Migration[] = [
        ) WHERE kategorie_id IS NULL`,
     ],
   },
+  {
+    version: 24, // Kategorie-Festlegungen: das dünne Overlay über der Erkennung
+    sql: [
+      // Empfängermuster → Kategorie, sonst nichts. Bewusst KEINE Betragsspanne und kein
+      // Zeitraum wie bei der Vertragserkennung: die trifft Identität und muss eng sein,
+      // eine Kategorie ist eine Klasse (Lebensmittel kosten mal 8 € und mal 190 €).
+      //
+      // Das Muster ist der Primärschlüssel. Zwei Festlegungen auf denselben Text wären
+      // keine zwei Aussagen, sondern eine geänderte — und ein zweites Festlegen soll die
+      // erste ersetzen, nicht danebenliegen.
+      `CREATE TABLE IF NOT EXISTS kategorie_festlegung (
+        muster       TEXT PRIMARY KEY,
+        kategorie_id TEXT NOT NULL,
+        angelegt_am  TEXT NOT NULL
+      )`,
+    ],
+  },
 ];
