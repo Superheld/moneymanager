@@ -47,7 +47,7 @@ import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
-import { useGeld, useCharakterLabel, fehlerNachricht } from "./EinstellungenProvider";
+import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const TAGE_OPTIONEN = [14, 30, 60, 90];
