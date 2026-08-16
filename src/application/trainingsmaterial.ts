@@ -9,7 +9,16 @@
 // Reine Anwendungsschicht: lädt über die Ports, rechnet mit dem Kern
 // (`core/klassifikator/merkmale`), entscheidet nichts über Modelle.
 
-import { merkmalsbefund, namensraum, type Verwurfsgrund, type Zahlungsspur } from "../core";
+import {
+  herkunftVon,
+  merkmalsbefund,
+  namensraum,
+  STANDARD_KONFIGURATION,
+  type Merkmalsherkunft,
+  type Merkmalskonfiguration,
+  type Verwurfsgrund,
+  type Zahlungsspur,
+} from "../core";
 import type { LedgerPort, UmsatzRepository } from "./ports";
 import { zahlungsspuren } from "./zahlungsspuren";
 
@@ -54,8 +63,8 @@ export interface Vokabularbefund {
   readonly groesse: number;
   /** Tokens je Namensraum (`emp`, `vwz`, `gid`, `vz`). */
   readonly jeNamensraum: Readonly<Record<string, number>>;
-  /** Die häufigsten Tokens mit ihrer Belegzahl — was das Modell am stärksten sieht. */
-  readonly haeufigste: readonly { readonly merkmal: string; readonly anzahl: number }[];
+  /** Die häufigsten Tokens, mit dem Maß dafür, ob sie überhaupt etwas trennen. */
+  readonly haeufigste: readonly Merkmalswert[];
   /**
    * Tokens, die genau EINMAL vorkommen. Sie können nichts generalisieren und sind das
    * beste Maß dafür, ob die Filter zu lasch sind: steigt der Anteil, rutscht wieder
@@ -65,7 +74,37 @@ export interface Vokabularbefund {
   /** Wie viele Wörter die Filter verworfen haben, nach Grund. */
   readonly verworfen: Readonly<Record<Verwurfsgrund, number>>;
   /** Die häufigsten verworfenen Wörter — die Probe aufs Exempel für die Ausschlussliste. */
-  readonly haeufigsteVerworfen: readonly { readonly wort: string; readonly grund: Verwurfsgrund; readonly anzahl: number }[];
+  readonly haeufigsteVerworfen: readonly VerworfenesWortWert[];
+}
+
+/**
+ * Ein Merkmal mit dem, was es taugt.
+ *
+ * `konzentration` ist der Anteil der häufigsten Kategorie an allen Belegen und damit das
+ * Maß, das beim Ausschließen zählt — nicht die Häufigkeit. Ein Wort, das 451-mal
+ * vorkommt und dabei zu 100 % in einer Kategorie liegt, ist das schärfste Merkmal
+ * überhaupt; eines mit 83 Belegen über 17 Kategorien ist Rauschen, egal wie vertraut es
+ * aussieht. Ohne diese Zahl neben dem Wort wäre die Pflege der Ausschlussliste ein
+ * Ratespiel, das das Modell verschlechtert.
+ */
+export interface Merkmalswert {
+  readonly merkmal: string;
+  readonly herkunft: Merkmalsherkunft | null;
+  /** Zeilen, in denen das Merkmal vorkommt. */
+  readonly belege: number;
+  /** Über wie viele verschiedene Kategorien sich diese Belege verteilen. */
+  readonly kategorien: number;
+  /** Anteil der häufigsten Kategorie (0…1). 1 = immer dieselbe. */
+  readonly konzentration: number;
+  /** Die häufigste Kategorie — wofür das Merkmal spricht. */
+  readonly haeufigsteKategorieId: string;
+}
+
+export interface VerworfenesWortWert {
+  readonly wort: string;
+  readonly grund: Verwurfsgrund;
+  readonly herkunft: Merkmalsherkunft;
+  readonly anzahl: number;
 }
 
 /** Ab wie wenigen Beispielen eine Kategorie als dünn gilt. */
@@ -78,15 +117,22 @@ const TOP_N = 25;
  * Wertet den gebuchten Bestand als Trainingsmaterial aus. Reine Funktion über bereits
  * geladene Spuren — die Ladung steckt in `trainingsmaterial()`.
  */
-export function materialBefund(spuren: readonly Zahlungsspur[]): Materialbefund {
+export function materialBefund(
+  spuren: readonly Zahlungsspur[],
+  konfiguration: Merkmalskonfiguration = STANDARD_KONFIGURATION,
+): Materialbefund {
   const beispiele: Lernbeispiel[] = [];
   const ausgeschlossen: Record<Ausschlussgrund, number> = {
     ohneKategorie: 0, geteilt: 0, umschichtung: 0, ohneText: 0,
   };
   const jeKategorie = new Map<string, number>();
   const tokenZaehler = new Map<string, number>();
-  const verworfen: Record<Verwurfsgrund, number> = { zuKurz: 0, ziffern: 0, stoppwort: 0, platzhalter: 0 };
-  const verworfenZaehler = new Map<string, { grund: Verwurfsgrund; anzahl: number }>();
+  // Je Merkmal die Kategorien seiner Belege — daraus entsteht die Trennschärfe.
+  const tokenKategorien = new Map<string, Map<string, number>>();
+  const verworfen: Record<Verwurfsgrund, number> = {
+    zuKurz: 0, ziffern: 0, platzhalter: 0, ausgeschlossen: 0,
+  };
+  const verworfenZaehler = new Map<string, VerworfenesWortWert>();
 
   for (const s of spuren) {
     // Reihenfolge der Prüfungen = Reihenfolge der Aussagekraft. Eine geteilte Buchung
@@ -105,12 +151,15 @@ export function materialBefund(spuren: readonly Zahlungsspur[]): Materialbefund 
       continue;
     }
 
-    const befund = merkmalsbefund({
-      gegenpartei: s.gegenpartei,
-      verwendungszweck: s.verwendungszweck ?? "",
-      glaeubigerId: s.glaeubigerId,
-      betrag: s.betrag,
-    });
+    const befund = merkmalsbefund(
+      {
+        gegenpartei: s.gegenpartei,
+        verwendungszweck: s.verwendungszweck ?? "",
+        glaeubigerId: s.glaeubigerId,
+        betrag: s.betrag,
+      },
+      konfiguration,
+    );
 
     // Ein Vektor, in dem nur das Vorzeichen steht, ist kein Beispiel — er behauptet,
     // „Abfluss" allein bestimme die Kategorie, und zieht das Modell zur häufigsten Klasse.
@@ -127,14 +176,26 @@ export function materialBefund(spuren: readonly Zahlungsspur[]): Materialbefund 
     // und ließen sich nicht mehr gegeneinander lesen. Genau dafür stehen die Zahlen da.
     for (const v of befund.verworfen) {
       verworfen[v.grund]++;
-      const eintrag = verworfenZaehler.get(v.wort);
-      if (eintrag) eintrag.anzahl++;
-      else verworfenZaehler.set(v.wort, { grund: v.grund, anzahl: 1 });
+      // Nach Wort UND Herkunft: dasselbe Wort kann im Empfängerfeld ausgeschlossen und
+      // im Verwendungszweck erlaubt sein — als ein Eintrag wäre nicht zu sehen, welcher
+      // Fall gemeint ist.
+      const schluessel = `${v.herkunft} ${v.wort}`;
+      const eintrag = verworfenZaehler.get(schluessel);
+      if (eintrag) verworfenZaehler.set(schluessel, { ...eintrag, anzahl: eintrag.anzahl + 1 });
+      else verworfenZaehler.set(schluessel, { wort: v.wort, grund: v.grund, herkunft: v.herkunft, anzahl: 1 });
     }
 
     beispiele.push({ istbuchungId: s.id, merkmale: befund.merkmale, kategorieId: s.kategorieId });
     jeKategorie.set(s.kategorieId, (jeKategorie.get(s.kategorieId) ?? 0) + 1);
-    for (const m of befund.merkmale) tokenZaehler.set(m, (tokenZaehler.get(m) ?? 0) + 1);
+    for (const m of befund.merkmale) {
+      tokenZaehler.set(m, (tokenZaehler.get(m) ?? 0) + 1);
+      let verteilung = tokenKategorien.get(m);
+      if (!verteilung) {
+        verteilung = new Map();
+        tokenKategorien.set(m, verteilung);
+      }
+      verteilung.set(s.kategorieId, (verteilung.get(s.kategorieId) ?? 0) + 1);
+    }
   }
 
   const jeNamensraum: Record<string, number> = {};
@@ -157,14 +218,38 @@ export function materialBefund(spuren: readonly Zahlungsspur[]): Materialbefund 
     vokabular: {
       groesse: tokenZaehler.size,
       jeNamensraum,
-      haeufigste: bestenliste(tokenZaehler, TOP_N).map(([merkmal, anzahl]) => ({ merkmal, anzahl })),
+      haeufigste: bestenliste(tokenZaehler, TOP_N).map(([merkmal]) =>
+        merkmalswert(merkmal, tokenKategorien.get(merkmal)!),
+      ),
       einmalige,
       verworfen,
       haeufigsteVerworfen: [...verworfenZaehler]
         .sort((a, b) => b[1].anzahl - a[1].anzahl || a[0].localeCompare(b[0]))
         .slice(0, TOP_N)
-        .map(([wort, e]) => ({ wort, grund: e.grund, anzahl: e.anzahl })),
+        .map(([, e]) => e),
     },
+  };
+}
+
+/** Trennschärfe eines Merkmals aus der Verteilung seiner Belege über die Kategorien. */
+function merkmalswert(merkmal: string, verteilung: ReadonlyMap<string, number>): Merkmalswert {
+  let belege = 0;
+  let groesste = 0;
+  let haeufigsteKategorieId = "";
+  for (const [kategorieId, n] of verteilung) {
+    belege += n;
+    if (n > groesste || (n === groesste && kategorieId < haeufigsteKategorieId)) {
+      groesste = n;
+      haeufigsteKategorieId = kategorieId;
+    }
+  }
+  return {
+    merkmal,
+    herkunft: herkunftVon(merkmal),
+    belege,
+    kategorien: verteilung.size,
+    konzentration: belege ? groesste / belege : 0,
+    haeufigsteKategorieId,
   };
 }
 
@@ -177,6 +262,7 @@ function bestenliste(zaehler: ReadonlyMap<string, number>, n: number): [string, 
 export async function trainingsmaterial(
   ledger: LedgerPort,
   umsatzRepo: UmsatzRepository,
+  konfiguration?: Merkmalskonfiguration,
 ): Promise<Materialbefund> {
-  return materialBefund(await zahlungsspuren(ledger, umsatzRepo));
+  return materialBefund(await zahlungsspuren(ledger, umsatzRepo), konfiguration);
 }

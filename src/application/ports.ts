@@ -6,6 +6,8 @@ import type {
   Inventargegenstand,
   IstBuchung,
   Kategorie,
+  Merkmalsausschluss,
+  Merkmalsherkunft,
   Modell,
   Person,
   Topf,
@@ -129,6 +131,30 @@ export interface KlassifikatorRepository {
   /** Der gespeicherte Stand, oder null, wenn noch nie trainiert wurde. */
   laden(): Promise<Modellstand | null>;
   speichern(stand: Modellstand): Promise<void>;
+}
+
+/**
+ * Ein Ausschluss samt seiner Herkunft im Sinne von „wer hat ihn gesetzt".
+ * `standard` kam mit der App, `manuell` hat jemand entschieden — nur so lässt sich die
+ * eigene Pflege von der Grundausstattung trennen.
+ */
+export interface GespeicherterAusschluss extends Merkmalsausschluss {
+  readonly quelle: "standard" | "manuell";
+}
+
+/**
+ * Was ins Training geht: die aktiven Merkmalsherkünfte und die Ausschlussliste.
+ *
+ * Getrennte Operationen für Schalter und Liste, weil sie sich verschieden verhalten —
+ * die fünf Schalter entscheidet man einmal, die Liste wächst über Jahre am Einzelfall.
+ */
+export interface MerkmalskonfigurationRepository {
+  /** Aktive Herkünfte; null, solange nie etwas gesetzt wurde (dann gilt der Standard). */
+  herkuenfteLesen(): Promise<Merkmalsherkunft[] | null>;
+  herkuenfteSetzen(herkuenfte: readonly Merkmalsherkunft[]): Promise<void>;
+  ausschluesseLesen(): Promise<GespeicherterAusschluss[]>;
+  ausschlussSetzen(a: GespeicherterAusschluss): Promise<void>;
+  ausschlussEntfernen(wort: string): Promise<void>;
 }
 
 /**
