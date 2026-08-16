@@ -33,6 +33,7 @@ export async function zahlungsspuren(
       verwendungszweck: u?.verwendungszweck ?? "",
       glaeubigerId: u?.glaeubigerId,
       kategorieId: b.kategorieId,
+      kategorieHerkunft: b.kategorieHerkunft,
       geteilt: istGeteilt(b),
       kontoId: b.kontoId,
       charakter: b.charakter,

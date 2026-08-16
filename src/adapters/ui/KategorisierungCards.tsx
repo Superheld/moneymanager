@@ -33,6 +33,13 @@ import {
   type Modellzustand,
 } from "../../application/klassifikatorTraining";
 import {
+  abgleichVorschau,
+  charakterWechsel,
+  planAnwenden,
+  uebergaenge,
+  type Abgleichsplan,
+} from "../../application/kategorieAbgleich";
+import {
   herkunftSchalten,
   konfigurationLaden,
   wirkungMessen,
@@ -45,6 +52,10 @@ import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedge
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
 import { sqliteKlassifikatorRepository as klassifikatorRepo } from "../persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository as merkmalRepo } from "../persistence/sqliteMerkmalskonfigurationRepository";
+import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persistence/sqliteKategoriefestlegungRepository";
+import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
+import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
+import { sqliteVertragserkennungRepository as erkennungRepo } from "../persistence/sqliteVertragZuordnungRepositories";
 import { Button, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { KlappCard } from "./KlappCard";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
@@ -62,7 +73,11 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
   const { locale } = useGeld();
   const [daten, setDaten] = useState<Daten | null>(null);
   const [angefordert, setAngefordert] = useState(false);
-  const [laeuft, setLaeuft] = useState<"training" | "wirkung" | null>(null);
+  const [laeuft, setLaeuft] = useState<"training" | "wirkung" | "abgleich" | "anwenden" | null>(null);
+  // Der gerechnete, noch NICHT geschriebene Abgleich. Rechnen und Schreiben sind hier
+  // getrennt: der Lauf ändert die Zahl, die in jedem Budget steht.
+  const [plan, setPlan] = useState<Abgleichsplan | null>(null);
+  const [angewendet, setAngewendet] = useState<number | null>(null);
   const [bewertung, setBewertung] = useState<Bewertung | null>(null);
   const [wirkung, setWirkung] = useState<{ basis: number; wirkungen: Wirkung[] } | null>(null);
   const [listenGeaendert, setListenGeaendert] = useState(false);
@@ -147,6 +162,42 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
     }
   }
 
+  /** Alle Quellen der Kategorisierungs-Kette — dieselben wie beim Import. */
+  const quellen = {
+    kategorieRepo, festlegungRepo, vertragRepo, erkennungRepo, klassifikatorRepo, merkmalRepo,
+  };
+
+  async function vorschauRechnen() {
+    if (laeuft) return;
+    setLaeuft("abgleich");
+    setFehler(null);
+    setAngewendet(null);
+    try {
+      setPlan(await abgleichVorschau(ledgerRepo, umsatzRepo, quellen));
+    } catch (e) {
+      setFehler(fehlerNachricht(t, e));
+    } finally {
+      setLaeuft(null);
+    }
+  }
+
+  async function planUebernehmen() {
+    if (laeuft || !plan) return;
+    setLaeuft("anwenden");
+    setFehler(null);
+    try {
+      setAngewendet(await planAnwenden(ledgerRepo, plan));
+      // Der Plan ist verbraucht: stehen zu lassen hieße, einen Knopf anzubieten, der
+      // dieselbe Arbeit ein zweites Mal verspricht.
+      setPlan(null);
+      await laden();
+    } catch (e) {
+      setFehler(fehlerNachricht(t, e));
+    } finally {
+      setLaeuft(null);
+    }
+  }
+
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   const hilfe = {
     t,
@@ -212,6 +263,150 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
           aufTraining={trainingStarten}
         />
       </KlappCard>
+
+      <KlappCard
+        titel={t("einstellungen.abgleich.titel")}
+        untertitel={t("einstellungen.abgleich.untertitel")}
+      >
+        <AbgleichInhalt
+          {...hilfe}
+          plan={plan}
+          angewendet={angewendet}
+          rechnet={laeuft === "abgleich"}
+          schreibt={laeuft === "anwenden"}
+          aufVorschau={vorschauRechnen}
+          aufUebernehmen={planUebernehmen}
+        />
+      </KlappCard>
+    </>
+  );
+}
+
+// ------------------------------------------------------------ 5 · Bestand abgleichen
+
+/**
+ * Der rückwirkende Abgleich: erst rechnen, zeigen, dann auf Bestätigung schreiben.
+ *
+ * Bewusst OHNE `beiOeffnen`-Nachladen: die anderen vier Karten zeigen Zustand, diese
+ * verändert ihn. Ein Lauf über den ganzen Bestand soll starten, weil jemand ihn startet —
+ * nicht, weil jemand eine Karte aufgeklappt hat.
+ */
+function AbgleichInhalt({
+  t, kategorieName, zahl, plan, angewendet, rechnet, schreibt, aufVorschau, aufUebernehmen,
+}: Hilfe & {
+  plan: Abgleichsplan | null;
+  angewendet: number | null;
+  rechnet: boolean;
+  schreibt: boolean;
+  aufVorschau: () => void;
+  aufUebernehmen: () => void;
+}) {
+  const name = (id?: string) => (id ? kategorieName.get(id) ?? id : t("einstellungen.abgleich.ohneKategorie"));
+  const gruppen = plan ? uebergaenge(plan) : [];
+  const charakter = plan ? charakterWechsel(plan) : [];
+
+  return (
+    <>
+      <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+        {t("einstellungen.abgleich.hinweis")}
+      </div>
+
+      <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center", flexWrap: "wrap" }}>
+        <Button onClick={rechnet ? undefined : aufVorschau}>
+          {rechnet ? t("einstellungen.abgleich.rechnet") : t("einstellungen.abgleich.vorschau")}
+        </Button>
+        {angewendet !== null && (
+          <span className="muted">{t("einstellungen.abgleich.fertig", { anzahl: zahl(angewendet) })}</span>
+        )}
+      </div>
+
+      {plan && plan.setzen.length === 0 && (
+        <div className="muted" style={{ marginTop: "var(--sp-4)" }}>
+          {t("einstellungen.abgleich.nichtsZuTun", { unveraendert: zahl(plan.unveraendert) })}
+        </div>
+      )}
+
+      {plan && plan.setzen.length > 0 && (
+        <>
+          <div style={{ display: "flex", gap: "var(--sp-6)", flexWrap: "wrap", marginTop: "var(--sp-4)" }}>
+            <KPIStat
+              size="tile"
+              tone="warn"
+              label={t("einstellungen.abgleich.aenderungen")}
+              value={zahl(plan.setzen.length)}
+              meta={t("einstellungen.abgleich.aenderungenMeta", { gruppen: gruppen.length })}
+            />
+            <KPIStat
+              size="tile"
+              label={t("einstellungen.abgleich.unveraendert")}
+              value={zahl(plan.unveraendert)}
+              meta={t("einstellungen.abgleich.unveraendertMeta")}
+            />
+          </div>
+
+          <Abschnitt titel={t("einstellungen.abgleich.uebergaengeTitel")}>
+            <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+              {t("einstellungen.abgleich.uebergaengeHinweis")}
+            </div>
+            {gruppen.map((g) => (
+              <div key={`${g.vonKategorieId ?? ""}-${g.nachKategorieId}`} style={{ marginBottom: "var(--sp-3)" }}>
+                <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
+                  <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: "var(--fw-bold)", minWidth: "5ch", textAlign: "right" }}>
+                    {zahl(g.anzahl)} ×
+                  </span>
+                  <span>{name(g.vonKategorieId)}</span>
+                  <span className="muted">→</span>
+                  <span style={{ fontWeight: "var(--fw-semi)" }}>{name(g.nachKategorieId)}</span>
+                </div>
+                <div className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "6ch" }}>
+                  {g.beispiele.map((b) => b.gegenpartei || t("einstellungen.abgleich.ohneEmpfaenger")).join(" · ")}
+                  {g.anzahl > g.beispiele.length && " …"}
+                </div>
+              </div>
+            ))}
+          </Abschnitt>
+
+          {charakter.length > 0 && (
+            <Abschnitt titel={t("einstellungen.abgleich.charakterTitel")}>
+              <div className="muted" style={{ marginBottom: "var(--sp-2)" }}>
+                {t("einstellungen.abgleich.charakterHinweis", { anzahl: zahl(charakter.length) })}
+              </div>
+              <div style={{ display: "grid", gap: 4 }}>
+                {charakter.slice(0, 10).map((w) => (
+                  <div key={w.istbuchungId} style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
+                    <span>{w.gegenpartei || t("einstellungen.abgleich.ohneEmpfaenger")}</span>
+                    <Pill>{t(`charakter.${w.vonCharakter}`)}</Pill>
+                    <span className="muted">→</span>
+                    <Pill variant="warn">{t(`charakter.${w.charakter}`)}</Pill>
+                    <span className="muted">{name(w.nachKategorieId)}</span>
+                  </div>
+                ))}
+              </div>
+            </Abschnitt>
+          )}
+
+          <Abschnitt titel={t("einstellungen.abgleich.uebersprungenTitel")}>
+            <div style={{ display: "grid", gap: 4 }}>
+              {(["handverlesen", "umschichtung", "ohneVorschlag"] as const).map((grund) => (
+                <div key={grund} style={{ display: "flex", gap: "var(--sp-3)", alignItems: "baseline" }}>
+                  <span style={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
+                    {zahl(plan.uebersprungen[grund])}
+                  </span>
+                  <span className="muted">{t(`einstellungen.abgleich.uebersprungen.${grund}`)}</span>
+                </div>
+              ))}
+            </div>
+          </Abschnitt>
+
+          <div style={{ marginTop: "var(--sp-4)" }}>
+            <Button variant="primary" onClick={schreibt ? undefined : aufUebernehmen}>
+              {schreibt
+                ? t("einstellungen.abgleich.schreibt")
+                : t("einstellungen.abgleich.uebernehmen", { anzahl: zahl(plan.setzen.length) })}
+            </Button>
+          </div>
+        </>
+      )}
     </>
   );
 }

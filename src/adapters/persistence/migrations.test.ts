@@ -363,3 +363,44 @@ describe("Vertrags-Kategorie nachtragen (v23)", () => {
     db.close();
   });
 });
+
+describe("Vertrags-Kategorie erneut nachtragen (v25)", () => {
+  it("holt nach, was v23 im laufenden Betrieb verpasst hat", () => {
+    // Der reale Fall: die App hatte Version 23 verbucht, als die Migration erst aus dem
+    // ALTER bestand. Der Bestand steht also auf 24, hat die Spalte — und sie ist leer.
+    const db = new SQL.Database();
+    apply(db, 0, 24);
+    db.run(
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status)
+       VALUES ('v1', 'O2', '2024-01-01', 'automatisch', 'aktiv')`,
+    );
+    db.run(
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, vertrag_id, kategorie_id)
+       VALUES ('r1', 'O2', -2999, 'monatlich', '2024-01-01', 'Aufwand', 'v1', 'kat-telefon')`,
+    );
+
+    apply(db, 24, 25);
+
+    expect(db.exec("SELECT kategorie_id FROM vertrag WHERE id = 'v1'")[0].values[0][0]).toBe("kat-telefon");
+    db.close();
+  });
+
+  it("überschreibt nichts von Hand Gepflegtes", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 24);
+    db.run(
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, kategorie_id)
+       VALUES ('v1', 'O2', '2024-01-01', 'automatisch', 'aktiv', 'kat-vonhand')`,
+    );
+    db.run(
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, vertrag_id, kategorie_id)
+       VALUES ('r1', 'O2', -2999, 'monatlich', '2024-01-01', 'Aufwand', 'v1', 'kat-telefon')`,
+    );
+
+    apply(db, 24, 25);
+    apply(db, 24, 25); // und ein zweites Mal
+
+    expect(db.exec("SELECT kategorie_id FROM vertrag WHERE id = 'v1'")[0].values[0][0]).toBe("kat-vonhand");
+    db.close();
+  });
+});
