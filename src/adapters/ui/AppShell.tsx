@@ -10,7 +10,6 @@ export type ScreenId =
   | "planung"
   | "historie"
   | "konten"
-  | "toepfe"
   | "inventar"
   | "budgets"
   | "vertraege"
@@ -40,7 +39,6 @@ const GRUPPEN: NavGroup[] = [
       { id: "planung", labelKey: "shell.navPlanung", badgeKey: "shell.badgePlan" },
       { id: "konten", labelKey: "shell.navKonten" },
       { id: "budgets", labelKey: "shell.navBudgets" },
-      { id: "toepfe", labelKey: "shell.navToepfe" },
       { id: "inventar", labelKey: "shell.navInventar" },
       { id: "vertraege", labelKey: "shell.navVertraege" },
       { id: "deckung", labelKey: "shell.navDeckung" },
