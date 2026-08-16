@@ -211,4 +211,24 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_umsatz_native_id ON umsatz (native_id) WHERE native_id IS NOT NULL`,
     ],
   },
+  {
+    version: 15, // S-7 — Buchung splitten: Teilbeträge je Kategorie an der Ist-Buchung
+    sql: [
+      // Value Objects im Aggregat IstBuchung: keine eigene fachliche Identität, Lebenszeit
+      // an die Buchung gekoppelt. Die Zeilen-Id trägt nur die Persistenz.
+      //
+      // Kein Datenumbau — reines Anlegen. Das ist hier wichtig, weil nicht verifiziert
+      // ist, ob BEGIN/COMMIT über tauri-plugin-sql auf derselben Connection landen: bei
+      // einem Teilabbruch bleibt höchstens die Tabelle ohne Versionseintrag stehen, und
+      // der nächste Lauf legt sie per IF NOT EXISTS folgenlos erneut an.
+      `CREATE TABLE IF NOT EXISTS ist_buchung_aufteilung (
+        id            TEXT    PRIMARY KEY,
+        istbuchung_id TEXT    NOT NULL,
+        kategorie_id  TEXT    NOT NULL,
+        betrag        INTEGER NOT NULL,
+        notiz         TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS ix_aufteilung_buchung ON ist_buchung_aufteilung (istbuchung_id)`,
+    ],
+  },
 ];
