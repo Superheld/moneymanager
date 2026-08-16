@@ -1,5 +1,6 @@
 // Buchungsdetails (S-1c) — die Ansicht einer einzelnen Ist-Buchung, samt der Wege, die
-// von dort ausgehen: aufteilen (S-7), zur Umbuchung machen (S-1), Paarung lösen, löschen.
+// von dort ausgehen: aufteilen (S-7), zur Umbuchung machen (S-1), Vertrag daraus machen,
+// Paarung lösen, löschen.
 //
 // Eigene Datei, weil sie an mehreren Stellen gebraucht wird: im Konto-Auszug UND in der
 // Übersicht, wo man beim Durchsehen einer Kategorie auf eine Buchung stößt, die korrigiert
@@ -40,6 +41,7 @@ import {
   sqliteImportLaufRepository as importLaufRepo,
 } from "../persistence/sqliteImportRepositories";
 import { Button, FormField, Pill } from "./ds";
+import { formularAusBuchung, VertragModal } from "./VertragModal";
 import { CategoryPicker } from "./CategoryPicker";
 import { Modal } from "./Modal";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
@@ -87,7 +89,7 @@ function Infozeile({ label, children, mono }: { label: string; children: ReactNo
  *    −500 kippen und die Netto-Null der Umbuchung brechen. Datum und Notiz sind
  *    unkritisch (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, onClose, onSaved, onDelete, onZurUmbuchung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, onClose, onSaved, onDelete, onZurUmbuchung, onZuVertrag, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung: IstBuchung; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; onZuVertrag: () => void; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const charakterLabel = useCharakterLabel();
@@ -252,6 +254,18 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
           </>
         )}
       </div>
+
+      {/* Aus der Buchung einen Vertrag machen — der dritte Weg, der von hier ausgeht.
+          Nicht bei Umbuchungs-Beinen: eine Umbuchung aufs eigene Sparkonto ist perfekt
+          regelmäßig und trotzdem kein Vertrag (dieselbe Grenze zieht die Erkennung). */}
+      {!gepaart && (
+        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+          <Button onClick={onZuVertrag}>{t("konten.zuVertrag.aktion")}</Button>
+          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+            {t("konten.zuVertrag.untertitel")}
+          </div>
+        </div>
+      )}
 
       {/* Herkunft — alles, was bekannt ist, aber hier nicht geändert wird. */}
       <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
@@ -517,11 +531,14 @@ export function BuchungDetail({ buchung, onClose, onGeaendert }: {
   onClose: () => void;
   onGeaendert: () => void | Promise<void>;
 }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
   // Welche Buchung gerade gezeigt wird — der Sprung zur Gegenbuchung ändert das, ohne
   // dass der aufrufende Screen etwas davon wissen muss.
   const [aktuelle, setAktuelle] = useState(buchung);
   const [splitten, setSplitten] = useState<IstBuchung | null>(null);
   const [umbuchenAus, setUmbuchenAus] = useState<IstBuchung | null>(null);
+  const [vertragAus, setVertragAus] = useState<IstBuchung | null>(null);
 
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
@@ -593,6 +610,21 @@ export function BuchungDetail({ buchung, onClose, onGeaendert }: {
     );
   }
 
+  if (vertragAus) {
+    // Der Anbieter ist das, woran man die Zahlung wiedererkennt: der Empfänger aus dem
+    // Import, sonst die Notiz. Leer lassen wäre schlechter als ein Vorschlag, den man
+    // überschreibt — Pflichtfeld ist er ohnehin.
+    const anbieter = umsatzByIst.get(vertragAus.id)?.gegenpartei || vertragAus.notiz || "";
+    return (
+      <VertragModal
+        start={formularAusBuchung(vertragAus, anbieter, geld)}
+        hinweis={t("konten.zuVertrag.hinweis")}
+        onClose={() => setVertragAus(null)}
+        onSaved={async () => { setVertragAus(null); await nachAenderung(); }}
+      />
+    );
+  }
+
   if (umbuchenAus) {
     return (
       <ZurUmbuchungModal
@@ -624,6 +656,7 @@ export function BuchungDetail({ buchung, onClose, onGeaendert }: {
       onSaved={async () => { await nachAenderung(); onClose(); }}
       onDelete={entfernen}
       onZurUmbuchung={() => setUmbuchenAus(aktuelle)}
+      onZuVertrag={() => setVertragAus(aktuelle)}
       onLoesen={async () => { await paarungLoesen(ledgerRepo, aktuelle.transferId!); await nachAenderung(); onClose(); }}
       onGegenbuchung={setAktuelle}
       onSplitten={() => setSplitten(aktuelle)}
