@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Kategorie, Zahlungskonto } from "../../core";
+import { festlegungTrifft, type Kategorie, type Zahlungskonto } from "../../core";
 import {
   kategorisieren,
   umsaetzeVerbuchen,
@@ -15,6 +15,8 @@ import {
   type Vorschlagskontext,
 } from "../../application/import";
 import { kategorisierungsquellen } from "../../application/kategorisierungsquellen";
+import { festlegungAngebot, festlegungSetzen } from "../../application/kategoriefestlegungen";
+import { sqliteKategoriefestlegungRepository } from "../persistence/sqliteKategoriefestlegungRepository";
 import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
 import { vertragsAbgleichDeps } from "../persistence/sqliteVertragZuordnungRepositories";
 import {
@@ -54,9 +56,11 @@ function Herkunft({ umsatz, kontext }: { umsatz: Umsatz; kontext: Vorschlagskont
 
   return (
     <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
-      <Pill variant={quelle === "manuell" ? "plan" : quelle === "ki" ? "neutral" : "ok"}>
-        {t(`review.herkunft.${quelle}`)}
-      </Pill>
+      <span title={t(`review.herkunftTitel.${quelle}`)}>
+        <Pill variant={quelle === "manuell" || quelle === "festlegung" ? "plan" : quelle === "ki" ? "neutral" : "ok"}>
+          {t(`review.herkunft.${quelle}`)}
+        </Pill>
+      </span>
       {passt && befund?.sicherheit !== undefined && (
         <span
           className="muted"
@@ -95,6 +99,11 @@ export function ReviewScreen() {
   // Import gespeichert — sie hängt am aktuellen Modell, und ein gespeicherter Satz von
   // vorgestern erklärte einen Vorschlag, den es so nicht mehr gäbe.
   const [kontext, setKontext] = useState<Vorschlagskontext | null>(null);
+  // Das Angebot „immer bei diesem Empfänger" — es steht an GENAU EINER Zeile, nämlich der
+  // zuletzt korrigierten. Eine Festlegung soll aus einer bewussten Handlung entstehen;
+  // ein Knopf an jeder Zeile wäre eine Einladung, die Liste zuzumüllen.
+  const [angebot, setAngebot] = useState<{ umsatzId: string; muster: string; kategorieId: string } | null>(null);
+  const [festgelegt, setFestgelegt] = useState<{ muster: string; weitere: number } | null>(null);
 
   async function laden() {
     try {
@@ -109,6 +118,7 @@ export function ReviewScreen() {
       setKontext(
         await kategorisierungsquellen({
           kategorieRepo: sqliteKategorieRepository,
+          festlegungRepo: sqliteKategoriefestlegungRepository,
           vertragRepo: sqliteVertragRepository,
           erkennungRepo: sqliteVertragserkennungRepository,
           klassifikatorRepo: sqliteKlassifikatorRepository,
@@ -157,6 +167,47 @@ export function ReviewScreen() {
     try {
       await sqliteUmsatzRepository.speichern(final);
       setUmsaetze((prev) => prev.map((x) => (x.id === u.id ? final : x)));
+      setFestgelegt(null);
+      const muster = kategorieId ? festlegungAngebot(kontext?.festlegungen ?? [], u.gegenpartei, kategorieId) : null;
+      setAngebot(muster ? { umsatzId: u.id, muster, kategorieId } : null);
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Das Angebot annehmen: die Festlegung entsteht — und die übrigen OFFENEN Zeilen
+   * desselben Empfängers ziehen mit.
+   *
+   * Das Mitziehen ist der Punkt. Wer bei einer von dreizehn Zahlungen an denselben
+   * Empfänger „immer so" sagt und danach zwölf falsche Zeilen stehen sieht, hat die Zusage
+   * nicht eingelöst bekommen. Verbuchte Zahlungen bleiben unberührt — die holt der
+   * rückwirkende Abgleich, mit Vorschau.
+   *
+   * Unangetastet bleiben Zeilen, an denen jemand von Hand entschieden hat, und
+   * Umbuchungen: beides sind Aussagen, die eine Festlegung nicht überstimmen darf.
+   */
+  async function angebotAnnehmen() {
+    if (!angebot) return;
+    const kat = katById.get(angebot.kategorieId);
+    if (!kat) return;
+    try {
+      const f = await festlegungSetzen(sqliteKategoriefestlegungRepository, angebot.muster, angebot.kategorieId);
+      if (!f) return;
+      let weitere = 0;
+      for (const x of umsaetze) {
+        if (x.id === angebot.umsatzId) continue;
+        if (x.vorschlag?.quelle === "manuell" || x.vorschlag?.quelle === "umbuchung") continue;
+        if (x.vorschlag?.kategorieId === kat.id) continue;
+        if (!festlegungTrifft(f, x.gegenpartei)) continue;
+        await sqliteUmsatzRepository.speichern(
+          kategorisieren(x, { kategorieId: kat.id, charakter: kat.defaultCharakter, quelle: "festlegung" }),
+        );
+        weitere++;
+      }
+      setAngebot(null);
+      setFestgelegt({ muster: angebot.muster, weitere });
+      await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
     }
@@ -202,6 +253,13 @@ export function ReviewScreen() {
           title={t("review.offenInfo", { offen, fertig })}
           action={
             <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center", flexWrap: "wrap" }}>
+              {festgelegt && (
+                <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)" }}>
+                  {festgelegt.weitere > 0
+                    ? t("review.festlegung.gesetztWeitere", { muster: festgelegt.muster, anzahl: festgelegt.weitere })
+                    : t("review.festlegung.gesetzt", { muster: festgelegt.muster })}
+                </span>
+              )}
               {verb && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)" }}>{t("review.verbuchtErgebnis", { verbucht: verb.verbucht, umbuchungen: verb.umbuchungen, uebersprungen: verb.uebersprungen })}</span>}
               <Button variant="primary" onClick={busy || fertig === 0 ? undefined : verbuchen} style={busy || fertig === 0 ? { opacity: 0.5, cursor: busy ? "wait" : "not-allowed" } : undefined}>
                 {busy ? t("review.verbuchenBusy") : t("review.verbuchen", { n: fertig })}
@@ -255,6 +313,13 @@ export function ReviewScreen() {
                       <CategoryPicker kategorien={kategorien} value={u.vorschlag?.kategorieId ?? ""} onChange={(id) => kategorieGesetzt(u, id)} />
                     )}
                     {u.vorschlag && <Herkunft umsatz={u} kontext={kontext} />}
+                    {angebot?.umsatzId === u.id && (
+                      <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap", fontSize: "var(--fs-2xs)" }}>
+                        <span className="muted">{t("review.festlegung.frage", { muster: angebot.muster })}</span>
+                        <button className="linkbtn" onClick={angebotAnnehmen}>{t("review.festlegung.ja")}</button>
+                        <button className="linkbtn" onClick={() => setAngebot(null)}>{t("review.festlegung.nein")}</button>
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}

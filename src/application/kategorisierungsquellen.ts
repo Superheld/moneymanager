@@ -13,6 +13,7 @@ import { STANDARD_KONFIGURATION, type Kategorie } from "../core";
 import { katalogNachId, katalogNachName, type Vorschlagskontext } from "./import/vorschlag";
 import { konfigurationLaden } from "./merkmalskonfiguration";
 import type {
+  KategoriefestlegungRepository,
   KategorieRepository,
   KlassifikatorRepository,
   MerkmalskonfigurationRepository,
@@ -22,6 +23,7 @@ import type {
 
 export interface QuellenDeps {
   readonly kategorieRepo: KategorieRepository;
+  readonly festlegungRepo?: KategoriefestlegungRepository;
   readonly vertragRepo?: VertragRepository;
   readonly erkennungRepo?: VertragserkennungRepository;
   readonly klassifikatorRepo?: KlassifikatorRepository;
@@ -36,8 +38,9 @@ export interface QuellenDeps {
  * über den ganzen Regelsatz für ein Ergebnis laufen zu lassen, das feststeht.
  */
 export async function kategorisierungsquellen(deps: QuellenDeps): Promise<Vorschlagskontext> {
-  const [kategorien, vertraege, erkennungen, modellstand, konfiguration] = await Promise.all([
+  const [kategorien, festlegungen, vertraege, erkennungen, modellstand, konfiguration] = await Promise.all([
     deps.kategorieRepo.alle(),
+    deps.festlegungRepo?.alle() ?? Promise.resolve([]),
     deps.vertragRepo?.alle() ?? Promise.resolve([]),
     deps.erkennungRepo?.alle() ?? Promise.resolve([]),
     deps.klassifikatorRepo?.laden() ?? Promise.resolve(null),
@@ -54,6 +57,7 @@ export async function kategorisierungsquellen(deps: QuellenDeps): Promise<Vorsch
   return {
     katalogNachName: katalogNachName(kategorien as Kategorie[]),
     kategorieNachId: katalogNachId(kategorien as Kategorie[]),
+    festlegungen: festlegungen.length > 0 ? festlegungen : undefined,
     erkennungen: vertragsKategorie.size > 0 ? erkennungen : undefined,
     vertragsKategorie: vertragsKategorie.size > 0 ? vertragsKategorie : undefined,
     // Ein leeres Modell (nie trainiert oder ohne Material) würde nichts liefern und die
