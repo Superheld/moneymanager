@@ -1,7 +1,7 @@
 // Stammdaten (P1) — Personen · Konten · Kategorien als Übersichtslisten; Anlegen UND
 // Bearbeiten je im Modal (gleiche Maske, vorbefüllt). Reload-fest über die SQLite-Repos.
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   KONTOTYPEN,
@@ -9,6 +9,7 @@ import {
   minorZuMajor,
   realerKontostand,
   REGIONEN,
+  STOPPWOERTER,
   waehrungNachCode,
   waehrungssymbol,
   type Charakter,
@@ -16,15 +17,18 @@ import {
   type Kategorie,
   type Kontotyp,
   type Person,
+  type Verwurfsgrund,
   type Zahlungskonto,
 } from "../../core";
+import { trainingsmaterial, type Ausschlussgrund, type Materialbefund } from "../../application/trainingsmaterial";
 import { kategorieAnlegen, kontoAnlegen, personAnlegen } from "../../application/stammdatenAnlegen";
 import { standardkategorienAnlegen } from "../../application/standardkategorien";
 import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
+import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht, useRegionUmschalter } from "./einstellungenKontext";
@@ -58,6 +62,175 @@ export function EinstellungenScreen() {
       <PersonenCard personen={personen} onChange={laden} />
       <KontenCard konten={konten} personen={personen} personName={personName} ist={ist} onChange={laden} />
       <KategorienCard kategorien={kategorien} onChange={laden} />
+      <LernmaterialCard kategorien={kategorien} />
+    </div>
+  );
+}
+
+/**
+ * Woraus die automatische Kategorisierung lernt — und was dabei aussortiert wird.
+ *
+ * Die Karte steht bewusst VOR dem ersten Modell: ein Klassifikator, der auf Zeilen
+ * trainiert, von denen ein Teil gar keine Kategorie trägt oder deren Text nur aus
+ * Referenznummern besteht, lernt stillschweigend etwas anderes, als man annimmt. Wer das
+ * hier sieht, kann die Extraktion beurteilen, bevor Zahlen aus einem Modell fallen, die
+ * niemand mehr auf ihre Grundlage zurückführt.
+ */
+function LernmaterialCard({ kategorien }: { kategorien: Kategorie[] }) {
+  const { t } = useTranslation();
+  const [befund, setBefund] = useState<Materialbefund | null>(null);
+
+  useEffect(() => {
+    trainingsmaterial(ledgerRepo, umsatzRepo).then(setBefund).catch(() => setBefund(null));
+  }, []);
+
+  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
+  const zahl = (n: number) => n.toLocaleString();
+
+  if (!befund) return null;
+
+  const { vokabular: v } = befund;
+  const ausgeschlossen = (Object.entries(befund.ausgeschlossen) as [Ausschlussgrund, number][])
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1]);
+  const verwurf = (Object.entries(v.verworfen) as [Verwurfsgrund, number][])
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1]);
+
+  return (
+    <Card title={t("einstellungen.lernmaterial.titel")} subtitle={t("einstellungen.lernmaterial.untertitel")}>
+      {befund.gesamt === 0 ? (
+        <div className="muted">{t("einstellungen.lernmaterial.leer")}</div>
+      ) : (
+        <>
+          <div style={{ display: "flex", gap: "var(--sp-6)", flexWrap: "wrap", marginBottom: "var(--sp-5)" }}>
+            <KPIStat
+              size="tile"
+              label={t("einstellungen.lernmaterial.brauchbar")}
+              value={zahl(befund.beispiele.length)}
+              meta={t("einstellungen.lernmaterial.brauchbarMeta", { gesamt: zahl(befund.gesamt) })}
+            />
+            <KPIStat
+              size="tile"
+              label={t("einstellungen.lernmaterial.kategorien")}
+              value={zahl(befund.kategorien)}
+              meta={t("einstellungen.lernmaterial.kategorienMeta", { duenn: befund.duenneKategorien.length })}
+              tone={befund.duenneKategorien.length > 0 ? "warn" : "default"}
+            />
+            <KPIStat
+              size="tile"
+              label={t("einstellungen.lernmaterial.vokabular")}
+              value={zahl(v.groesse)}
+              meta={t("einstellungen.lernmaterial.vokabularMeta", { einmalige: zahl(v.einmalige) })}
+            />
+          </div>
+
+          {befund.beispiele.length === 0 && (
+            <div className="muted" style={{ marginBottom: "var(--sp-5)" }}>
+              {t("einstellungen.lernmaterial.keineBeispiele")}
+            </div>
+          )}
+
+          {ausgeschlossen.length > 0 && (
+            <Abschnitt titel={t("einstellungen.lernmaterial.ausgeschlossenTitel")}>
+              {ausgeschlossen.map(([grund, n]) => (
+                <div key={grund} style={ZEILE}>
+                  <span style={{ fontVariantNumeric: "tabular-nums", minWidth: "4ch", textAlign: "right" }}>{zahl(n)}</span>
+                  <span className="muted">{t(`einstellungen.lernmaterial.grund.${grund}`)}</span>
+                </div>
+              ))}
+            </Abschnitt>
+          )}
+
+          {/* Eigener Abschnitt, NICHT beim Ausschluss: dünne Kategorien haben mit
+              aussortierten Zeilen nichts zu tun. Zusammengelegt verschwand die Warnung
+              ausgerechnet dann, wenn alle Buchungen brauchbar sind — also bei sauberen
+              Daten, wo sie genauso gilt. */}
+          {befund.duenneKategorien.length > 0 && (
+            <Abschnitt titel={t("einstellungen.lernmaterial.duenneTitel")}>
+              <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+                {t("einstellungen.lernmaterial.duenneHinweis")}
+              </div>
+              <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+                {befund.duenneKategorien.map((d) => (
+                  <Pill key={d.kategorieId} variant="warn">
+                    {kategorieName.get(d.kategorieId) ?? d.kategorieId} · {d.anzahl}
+                  </Pill>
+                ))}
+              </div>
+            </Abschnitt>
+          )}
+
+          <Abschnitt titel={t("einstellungen.lernmaterial.namensraumTitel")}>
+            <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+              {Object.entries(v.jeNamensraum)
+                .sort((a, b) => b[1] - a[1])
+                .map(([raum, n]) => (
+                  <Pill key={raum}>
+                    {t(`einstellungen.lernmaterial.namensraum.${raum}`, { defaultValue: raum })} · {zahl(n)}
+                  </Pill>
+                ))}
+            </div>
+          </Abschnitt>
+
+          {v.haeufigste.length > 0 && (
+            <Abschnitt titel={t("einstellungen.lernmaterial.merkmaleTitel")}>
+              <DataTable
+                columns={[
+                  { key: "merkmal", label: t("einstellungen.lernmaterial.spalteMerkmal") },
+                  { key: "anzahl", label: t("einstellungen.lernmaterial.spalteAnzahl"), align: "right", render: (r) => zahl(r.anzahl) },
+                ]}
+                rows={[...v.haeufigste]}
+              />
+            </Abschnitt>
+          )}
+
+          <Abschnitt titel={t("einstellungen.lernmaterial.verworfenTitel")}>
+            <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+              {t("einstellungen.lernmaterial.verworfenHinweis")}
+            </div>
+            <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
+              {verwurf.map(([grund, n]) => (
+                <Pill key={grund}>
+                  {t(`einstellungen.lernmaterial.verwurf.${grund}`)} · {zahl(n)}
+                </Pill>
+              ))}
+            </div>
+            {v.haeufigsteVerworfen.length > 0 && (
+              <DataTable
+                columns={[
+                  { key: "wort", label: t("einstellungen.lernmaterial.spalteWort") },
+                  { key: "grund", label: t("einstellungen.lernmaterial.spalteGrund"), render: (r) => t(`einstellungen.lernmaterial.verwurf.${r.grund}`) },
+                  { key: "anzahl", label: t("einstellungen.lernmaterial.spalteAnzahl"), align: "right", render: (r) => zahl(r.anzahl) },
+                ]}
+                rows={[...v.haeufigsteVerworfen]}
+              />
+            )}
+            <details style={{ marginTop: "var(--sp-4)" }}>
+              <summary className="muted" style={{ cursor: "pointer" }}>
+                {t("einstellungen.lernmaterial.stoppwoerterTitel", { anzahl: STOPPWOERTER.size })}
+              </summary>
+              <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", marginTop: "var(--sp-3)" }}>
+                {[...STOPPWOERTER].sort().map((w) => (
+                  <Pill key={w}>{w}</Pill>
+                ))}
+              </div>
+            </details>
+          </Abschnitt>
+        </>
+      )}
+    </Card>
+  );
+}
+
+const ZEILE: CSSProperties = { display: "flex", gap: "var(--sp-3)", alignItems: "baseline" };
+
+/** Überschrift plus Inhalt — hält die Lernmaterial-Karte ohne eigene CSS-Klassen lesbar. */
+function Abschnitt({ titel, children }: { titel: string; children: ReactNode }) {
+  return (
+    <div style={{ marginTop: "var(--sp-5)" }}>
+      <div style={{ fontWeight: "var(--fw-bold)", marginBottom: "var(--sp-2)" }}>{titel}</div>
+      {children}
     </div>
   );
 }
