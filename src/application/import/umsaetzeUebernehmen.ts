@@ -152,6 +152,7 @@ async function uebernahmeIntern(
     betrag: k.roh.betrag,
     waehrung: k.roh.waehrung,
     gegenpartei: k.roh.gegenpartei,
+    glaeubigerId: k.roh.glaeubigerId,
     verwendungszweck: k.roh.verwendungszweck,
     rohHash: k.rohHash,
     nativeId: k.nativeId,

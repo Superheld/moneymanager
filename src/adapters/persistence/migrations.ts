@@ -211,4 +211,71 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_umsatz_native_id ON umsatz (native_id) WHERE native_id IS NOT NULL`,
     ],
   },
+  {
+    version: 15, // S-7 — Buchung splitten: Teilbeträge je Kategorie an der Ist-Buchung
+    sql: [
+      // Value Objects im Aggregat IstBuchung: keine eigene fachliche Identität, Lebenszeit
+      // an die Buchung gekoppelt. Die Zeilen-Id trägt nur die Persistenz.
+      //
+      // Kein Datenumbau — reines Anlegen. Das ist hier wichtig, weil nicht verifiziert
+      // ist, ob BEGIN/COMMIT über tauri-plugin-sql auf derselben Connection landen: bei
+      // einem Teilabbruch bleibt höchstens die Tabelle ohne Versionseintrag stehen, und
+      // der nächste Lauf legt sie per IF NOT EXISTS folgenlos erneut an.
+      `CREATE TABLE IF NOT EXISTS ist_buchung_aufteilung (
+        id            TEXT    PRIMARY KEY,
+        istbuchung_id TEXT    NOT NULL,
+        kategorie_id  TEXT    NOT NULL,
+        betrag        INTEGER NOT NULL,
+        notiz         TEXT
+      )`,
+      `CREATE INDEX IF NOT EXISTS ix_aufteilung_buchung ON ist_buchung_aufteilung (istbuchung_id)`,
+    ],
+  },
+  {
+    version: 16, // Gläubiger-ID am Umsatz — Schlüssel für Vertragserkennung und Regel-Schicht
+    sql: [
+      // Finanzguru liefert sie („Glaeubiger-ID"), RohUmsatz trug sie, der Umsatz nicht:
+      // beim Übernehmen ging sie verloren. Eine SEPA-Mandatsreferenz identifiziert einen
+      // Zahlungsempfänger eindeutig — anders als ein abgeschnittener, normalisierter Name.
+      `ALTER TABLE umsatz ADD COLUMN glaeubiger_id TEXT`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_glaeubiger ON umsatz (glaeubiger_id) WHERE glaeubiger_id IS NOT NULL`,
+    ],
+  },
+  {
+    version: 17, // Inventar rein kalkulatorisch: Konto, auf dem die Rücklage tatsächlich liegt
+    sql: [
+      // Der Ersatz-Topf ist entfallen; was zurückgelegt ist, wird nicht mehr gebucht,
+      // sondern gegen den realen Stand DIESES Kontos abgeglichen (siehe core/inventar.ts).
+      // Reines Anlegen einer Spalte, kein Datenumbau — wiederholbar (migrate() überspringt
+      // vorhandene Spalten per PRAGMA table_info).
+      `ALTER TABLE inventargegenstand ADD COLUMN konto_id TEXT`,
+    ],
+  },
+  {
+    version: 18, // Alpha-Aufräumen: leere Hüllen von Szenario und Ersatz-Topf abräumen
+    sql: [
+      // ALPHA (siehe CLAUDE.md): Die App ist nicht veröffentlicht, es gibt keine fremden
+      // Datenbestände zu schonen. Deshalb wird hier ausnahmsweise WEGGENOMMEN statt nur
+      // angehängt — sonst schleppte das Schema auf Dauer Tabellen mit, die kein Code mehr
+      // kennt, und der nächste Blick ins Schema fragte sich, wofür sie stehen.
+      //
+      // Der Rest der Regel gilt unverändert: append-only (Migration 18 ist neu, 1–17
+      // bleiben unberührt), forward-only, und jedes Statement WIEDERHOLBAR — `IF EXISTS`
+      // bei den Tabellen, und `DROP COLUMN` überspringt migrate(), wenn die Spalte fehlt.
+      //
+      // Kein Datenumbau: alle drei Ziele waren beim Umbau am 2026-08-16 nachweislich leer
+      // (szenario 0 Zeilen, szenario_posten 0, topf 0). Es geht nichts verloren.
+
+      // Szenarien — der What-if-Layer ist mit dem Bereich Planung entfallen.
+      `DROP TABLE IF EXISTS szenario_posten`,
+      `DROP TABLE IF EXISTS szenario`,
+
+      // Ersatz-Topf — das Inventar rechnet seine Rücklage selbst (core/inventar.ts).
+      // Damit sind diese drei Spalten an `topf` ohne Bedeutung; TopfTyp kennt nur noch
+      // puffer und spartopf.
+      `ALTER TABLE topf DROP COLUMN wiederbeschaffung`,
+      `ALTER TABLE topf DROP COLUMN nutzungsdauer_monate`,
+      `ALTER TABLE topf DROP COLUMN inventar_id`,
+    ],
+  },
 ];

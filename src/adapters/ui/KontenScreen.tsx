@@ -11,7 +11,6 @@ import { useTranslation } from "react-i18next";
 import {
   istSummeKonto,
   kontoRegister,
-  minorZuMajor,
   realerKontostand,
   type Charakter,
   type IstBuchung,
@@ -20,9 +19,9 @@ import {
   type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
-import { buchungBearbeiten, buchungErfassen, buchungLoeschen } from "../../application/buchungErfassen";
-import { zuruecksetzen, type Umsatz } from "../../application/import";
-import { umbuchungErfassen, umbuchungLoeschen } from "../../application/umbuchungErfassen";
+import { buchungErfassen } from "../../application/buchungErfassen";
+import { type Umsatz } from "../../application/import";
+import { umbuchungErfassen } from "../../application/umbuchungErfassen";
 import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../../application/bezahltMarkieren";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
@@ -32,9 +31,10 @@ import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImpor
 import type { ScreenId } from "./AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
+import { BuchungDetail } from "./BuchungDetail";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
-import { useGeld, useCharakterLabel, fehlerNachricht } from "./EinstellungenProvider";
+import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const TAGE_OPTIONEN = [14, 30, 60, 90];
@@ -78,13 +78,23 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
 
+  // Alles in EINEM Zug laden und zusammen setzen. Gestaffelte await/setState-Paare
+  // lassen abgeleitete Werte kurz gegen leere Listen rechnen — der Empfänger einer
+  // importierten Buchung käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte
+  // für einen Render „Buchung" statt „[anonymisiert]".
   async function laden() {
-    const ks = await kontoRepo.alle();
+    const [ks, bs, rs, kats, us] = await Promise.all([
+      kontoRepo.alle(),
+      ledgerRepo.alle(),
+      regelRepo.alle(),
+      kategorieRepo.alle(),
+      umsatzRepo.alle(),
+    ]);
     setKonten(ks);
-    setIst(await ledgerRepo.alle());
-    setRegeln(await regelRepo.alle());
-    setKategorien(await kategorieRepo.alle());
-    setUmsaetze(await umsatzRepo.alle());
+    setIst(bs);
+    setRegeln(rs);
+    setKategorien(kats);
+    setUmsaetze(us);
     setAktivId((id) => id || ks[0]?.id || "");
   }
   useEffect(() => {
@@ -161,30 +171,14 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     }
   }
 
-  async function zeileEntfernen(z: RegisterZeile) {
-    if (z.transferId) {
-      await umbuchungLoeschen(ledgerRepo, z.transferId);
-    } else if (z.istId) {
-      await buchungLoeschen(ledgerRepo, z.istId);
-      // Importierte Buchung? Den verknüpften Umsatz zurück in die Inbox setzen.
-      const umsatz = umsaetze.find((u) => u.istbuchungId === z.istId);
-      if (umsatz) await umsatzRepo.speichern(zuruecksetzen(umsatz));
-    }
-    await laden();
-  }
-
   function bearbeitenOeffnen(z: RegisterZeile) {
     const b = ist.find((x) => x.id === z.istId);
     if (b) setEditBuchung(b);
   }
 
-  async function buchungEntfernen(b: IstBuchung) {
-    await buchungLoeschen(ledgerRepo, b.id);
-    const umsatz = umsaetze.find((u) => u.istbuchungId === b.id);
-    if (umsatz) await umsatzRepo.speichern(zuruecksetzen(umsatz));
-    setEditBuchung(null);
-    await laden();
-  }
+
+
+
 
   return (
     <div className="screen">
@@ -276,26 +270,33 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             <DataTable
               key={`${aktivId}-${katFilter}-${artFilter}-${regSuche}`}
               pageSize={25}
+              labelSeite={t("konten.seite")}
+              labelErste={t("konten.seiteErste")}
+              labelLetzte={t("konten.seiteLetzte")}
+              labelZurueck={t("konten.seiteZurueck")}
+              labelVor={t("konten.seiteVor")}
               columns={[
                 { key: "datum", label: t("konten.spalteDatum"), render: (z) => ddmm(z.datum) },
                 {
-                  key: "bez", label: t("konten.spalteBeschreibung"),
+                  // Nicht umbrechen (flexWrap): eine zweizeilige Zeile schiebt den
+                  // Seitenschalter darunter je nach Seiteninhalt nach oben oder unten,
+                  // und beim Durchblättern klickt man daneben. Der volle Text steht im
+                  // title, für die Fälle, in denen abgeschnitten wird.
+                  key: "bez", label: t("konten.spalteBeschreibung"), maxWidth: 320,
                   render: (z) => (
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "wrap" }}>
-                      {zeilenLabel(z)}
-                      {z.gegenkontoId && <span className="muted" style={{ fontSize: 12 }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
+                    <span title={zeilenLabel(z)} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{zeilenLabel(z)}</span>
+                      {z.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
                       {z.gegenkontoId ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill> : z.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null}
                     </span>
                   ),
                 },
-                { key: "kat", label: t("konten.spalteKategorie"), sortValue: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""), render: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "?" : "—") },
+                { key: "kat", label: t("konten.spalteKategorie"), maxWidth: 180, sortValue: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""), render: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "?" : "—") },
                 { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (z) => z.betrag, render: (z) => <span className="num" style={{ fontWeight: 700, color: betragFarbe(z) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span> },
                 { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (z) => z.saldo, render: (z) => geld.format(z.saldo) },
                 {
                   key: "_a", label: "", align: "right", sortable: false,
-                  render: (z) => z.gegenkontoId
-                    ? <button className="linkbtn" onClick={() => zeileEntfernen(z)}>{t("konten.loeschen")}</button>
-                    : <button className="linkbtn" onClick={() => bearbeitenOeffnen(z)}>{t("konten.bearbeiten")}</button>,
+                  render: (z) => <button className="linkbtn" onClick={() => bearbeitenOeffnen(z)}>{t("konten.bearbeiten")}</button>,
                 },
               ]}
               rows={gebuchtFuerTabelle}
@@ -353,12 +354,10 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       )}
 
       {editBuchung && (
-        <EditBuchungModal
+        <BuchungDetail
           buchung={editBuchung}
-          kategorien={kategorien}
           onClose={() => setEditBuchung(null)}
-          onSaved={async () => { setEditBuchung(null); await laden(); }}
-          onDelete={async () => { await buchungEntfernen(editBuchung); }}
+          onGeaendert={laden}
         />
       )}
 
@@ -434,68 +433,10 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
           <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
         <FormField label={t("konten.feldBetrag")} required>
-          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
+          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
         <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
           <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
-        </FormField>
-      </div>
-    </Modal>
-  );
-}
-
-function EditBuchungModal({ buchung, kategorien, onClose, onSaved, onDelete }: { buchung: IstBuchung; kategorien: Kategorie[]; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void> }) {
-  const { t } = useTranslation();
-  const geld = useGeld();
-  const charakterLabel = useCharakterLabel();
-  const [datum, setDatum] = useState(buchung.datum);
-  const [betrag, setBetrag] = useState(String(minorZuMajor(Math.abs(buchung.betrag), geld.waehrung)));
-  const [charakter, setCharakter] = useState<Charakter>(buchung.charakter);
-  const [kategorieId, setKategorieId] = useState(buchung.kategorieId ?? "");
-  const [notiz, setNotiz] = useState(buchung.notiz ?? "");
-  const [fehler, setFehler] = useState<string | null>(null);
-
-  async function speichern() {
-    setFehler(null);
-    try {
-      await buchungBearbeiten(ledgerRepo, buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
-      onSaved();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
-  }
-
-  return (
-    <Modal
-      title={t("konten.editTitel")}
-      subtitle={buchung.quelle === "import" ? t("konten.editUntertitelImport") : undefined}
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button>
-          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
-          <button className="linkbtn" style={{ marginLeft: "auto", color: "var(--danger, #c0392b)" }} onClick={() => onDelete()}>{t("konten.loeschen")}</button>
-          {fehler && <span className="err">{fehler}</span>}
-        </>
-      }
-    >
-      <div className="form-grid">
-        <FormField label={t("konten.feldDatum")} required>
-          <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
-        </FormField>
-        <FormField label={t("konten.feldBetrag")} required>
-          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
-        </FormField>
-        <FormField label={t("konten.feldCharakter")}>
-          <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-            {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
-          </select>
-        </FormField>
-        <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
-          <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
-        </FormField>
-        <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
-          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.buchung.notizPlatzhalter")} />
         </FormField>
       </div>
     </Modal>
@@ -543,7 +484,7 @@ function BuchungModal({ konto, kategorien, heute, onClose, onSaved }: { konto: Z
           <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
         <FormField label={t("konten.feldBetrag")} hint={t("konten.buchung.betragHinweis")} required>
-          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder="0,00" />
+          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
         <FormField label={t("konten.feldCharakter")}>
           <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>

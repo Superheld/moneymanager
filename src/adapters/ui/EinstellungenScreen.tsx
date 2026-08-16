@@ -27,7 +27,7 @@ import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedge
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
-import { useGeld, fehlerNachricht, useRegionUmschalter } from "./EinstellungenProvider";
+import { useGeld, fehlerNachricht, useRegionUmschalter } from "./einstellungenKontext";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };
@@ -241,10 +241,10 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
               </select>
             </FormField>
             <FormField label={t("einstellungen.konto.feldIban")} hint={t("einstellungen.konto.feldIbanHinweis")}>
-              <input className="field" value={iban} onChange={(e) => setIban(e.target.value)} placeholder="DE…" />
+              <input className="field" value={iban} onChange={(e) => setIban(e.target.value)} placeholder={t("einstellungen.konto.ibanPlatzhalter")} />
             </FormField>
             <FormField label={t("einstellungen.konto.feldKontostand")} hint={t("einstellungen.konto.feldKontostandHinweis")}>
-              <input className="field" inputMode="decimal" value={saldoText} onChange={(e) => setSaldoText(e.target.value)} placeholder="0,00" />
+              <input className="field" inputMode="decimal" value={saldoText} onChange={(e) => setSaldoText(e.target.value)} placeholder={geld.format(0)} />
             </FormField>
             <FormField label={t("einstellungen.konto.feldInhaber")}>
               {personen.length === 0 ? (

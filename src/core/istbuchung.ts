@@ -1,5 +1,5 @@
 // Ist-Buchung — die provisorische „Published Language" des Ist-Schritts (ADR-0002).
-// Hält FAKTEN (was tatsächlich geflossen ist), getrennt von der Plan-/Szenario-Schicht.
+// Hält FAKTEN (was tatsächlich geflossen ist), getrennt von der Plan-Schicht.
 // Bewusst NICHT das volle A5-Buchungsformat: minimal, vorläufig, später per ACL auf
 // das echte Buchungspackage gemappt. Betrag vorzeichenbehaftet (negativ = Abfluss).
 
@@ -38,6 +38,51 @@ export interface PlanRef {
  */
 export type Verwendung = { readonly art: "topf"; readonly topfId: string };
 
+/**
+ * Ein Teil einer aufgeteilten Buchung (S-7): der Wocheneinkauf, der zu 40 € Lebensmittel
+ * und 12 € Drogerie gehört.
+ *
+ * Value Object IM Aggregat IstBuchung, kein eigenes Aggregat: eine Aufteilung hat keine
+ * Existenz ohne ihre Buchung, und die Invariante „Σ Teile = Betrag" ist genau die Art
+ * Konsistenzregel, für die es Aggregatgrenzen gibt. Deshalb hängen die Teile an der
+ * Buchung und werden mit ihr geladen — nicht als zweite Liste durch die Auswertungen
+ * gereicht.
+ *
+ * Betrag vorzeichenbehaftet wie die Buchung selbst (Aufwand negativ).
+ */
+export interface Aufteilung {
+  /** Pflicht — ein Teil ohne Kategorie hätte keinen Zweck; dafür bleibt die Buchung ungeteilt. */
+  readonly kategorieId: string;
+  readonly betrag: Cent;
+  readonly notiz?: string;
+}
+
+/** Kategorie-Zuordnung mit Betrag — für Auswertungen die einzige Sicht, die zählt. */
+export interface KategorieAnteil {
+  readonly kategorieId?: string;
+  readonly betrag: Cent;
+}
+
+/**
+ * Wie eine Buchung auf Kategorien wirkt — EIN Anteil bei einer normalen Buchung, sonst
+ * ihre Teile. Jede kategorie-basierte Auswertung (Budget, Historie) läuft hierüber statt
+ * direkt über `b.kategorieId`; sonst zählt ein Split entweder gar nicht oder mit vollem
+ * Betrag mehrfach.
+ */
+export function kategorieAnteile(b: IstBuchung): KategorieAnteil[] {
+  return b.aufteilungen?.length ? [...b.aufteilungen] : [{ kategorieId: b.kategorieId, betrag: b.betrag }];
+}
+
+/** Summe der Teilbeträge — muss den Betrag der Buchung exakt treffen. */
+export function aufteilungsSumme(teile: readonly Aufteilung[]): Cent {
+  return teile.reduce((s, a) => s + a.betrag, 0);
+}
+
+/** Trägt die Buchung eine Aufteilung? */
+export function istGeteilt(b: IstBuchung): boolean {
+  return (b.aufteilungen?.length ?? 0) > 0;
+}
+
 export interface IstBuchung {
   readonly id: string;
   /** Tatsächliches Buchungsdatum (ISO). */
@@ -59,6 +104,12 @@ export interface IstBuchung {
   readonly planRef?: PlanRef;
   /** Explizit benanntes Gegenkonto/Buchungsziel (ADR-0003), z. B. eine Topf-Entnahme. */
   readonly verwendung?: Verwendung;
+  /**
+   * Aufteilung auf mehrere Kategorien (S-7). Gesetzt ⇒ `kategorieId` ist leer und die
+   * Teile sind die Wahrheit; Σ Teile = `betrag`. Der Ledger-Betrag bleibt unberührt —
+   * Saldo, Register und Netto-Null rechnen weiter mit der EINEN Zeile.
+   */
+  readonly aufteilungen?: readonly Aufteilung[];
   /** Roh-Hash der Importzeile (Dedup gegen Bankimport, später). */
   readonly rohHash?: string;
 }

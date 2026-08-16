@@ -3,6 +3,7 @@
 // Suchfeld (tippen filtert) und dem gruppierten Baum (Hauptgruppen → Unterkategorien).
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import type { Charakter, Kategorie } from "../../core";
 import { Pill } from "./ds";
 import { Modal } from "./Modal";
@@ -13,13 +14,15 @@ export function CategoryPicker({
   kategorien,
   value,
   onChange,
-  placeholder = "— wählen —",
+  placeholder,
 }: {
   kategorien: Kategorie[];
   value: string;
   onChange: (id: string) => void;
+  /** Text, solange nichts gewählt ist. Ohne Angabe der übersetzte Standard. */
   placeholder?: string;
 }) {
+  const { t } = useTranslation();
   const [offen, setOffen] = useState(false);
   const [suche, setSuche] = useState("");
 
@@ -42,16 +45,16 @@ export function CategoryPicker({
   return (
     <>
       <button type="button" className="field" style={{ cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }} onClick={() => setOffen(true)}>
-        <span style={{ color: gewaehlt ? "var(--ink)" : "var(--ink-3)" }}>{gewaehlt ? gewaehlt.name : placeholder}</span>
+        <span style={{ color: gewaehlt ? "var(--ink)" : "var(--ink-3)" }}>{gewaehlt ? gewaehlt.name : placeholder ?? t("kategoriePicker.leer")}</span>
         <span style={{ color: "var(--ink-3)" }}>▾</span>
       </button>
 
       {offen && (
-        <Modal title="Kategorie wählen" onClose={() => setOffen(false)} z={60}>
-          <input className="field" autoFocus placeholder="suchen…" value={suche} onChange={(e) => setSuche(e.target.value)} />
+        <Modal title={t("kategoriePicker.titel")} onClose={() => setOffen(false)} z={60}>
+          <input className="field" autoFocus placeholder={t("kategoriePicker.suche")} value={suche} onChange={(e) => setSuche(e.target.value)} />
           <div style={{ maxHeight: 360, overflow: "auto", marginTop: "var(--sp-2)" }}>
             <button type="button" className="katrow katmain pickrow" onClick={() => waehle("")} style={{ width: "100%" }}>
-              <span className="nm" style={{ color: "var(--ink-3)" }}>— keine —</span>
+              <span className="nm" style={{ color: "var(--ink-3)" }}>{t("kategoriePicker.keine")}</span>
             </button>
             {wurzeln.map((w) => {
               const kinder = kinderVon(w.id);

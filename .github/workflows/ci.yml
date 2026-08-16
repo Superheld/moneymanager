@@ -6,7 +6,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
 
 jobs:
@@ -17,7 +17,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          # Muss zur mise.toml im Repo passen — GitHub Actions liest die nicht selbst.
+          node-version: "26"
           cache: npm
           cache-dependency-path: package-lock.json
 

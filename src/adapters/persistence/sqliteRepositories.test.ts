@@ -30,7 +30,6 @@ import { sqliteLedgerRepository as ledgerRepository } from "./sqliteLedgerReposi
 import { sqliteTopfRepository as topfRepository } from "./sqliteTopfRepository";
 import { sqliteVertragRepository as vertragRepository } from "./sqliteVertragRepository";
 import { sqliteZahlungsregelRepository as zahlungsregelRepository } from "./sqliteZahlungsregelRepository";
-import { sqliteSzenarioRepository as szenarioRepository } from "./sqliteSzenarioRepository";
 import {
   sqliteKategorieRepository as kategorieRepository,
   sqlitePersonRepository as personRepository,
@@ -136,11 +135,7 @@ describe("Stammdaten-Repositories", () => {
 });
 
 describe("Topf-Repository", () => {
-  it("macht die Rundreise für alle drei Topf-Spielarten", async () => {
-    await topfRepository.speichern({
-      id: "t1", typ: "ersatz", bezeichnung: "Laptop", start: "2026-01-01",
-      wiederbeschaffung: 120000, nutzungsdauerMonate: 48,
-    });
+  it("macht die Rundreise für beide Topf-Spielarten", async () => {
     await topfRepository.speichern({
       id: "t2", typ: "puffer", bezeichnung: "Reparatur", start: "2026-01-01",
       schaetzbetrag: 50000, fristMonate: 12,
@@ -151,11 +146,7 @@ describe("Topf-Repository", () => {
     });
 
     const alle = await topfRepository.alle();
-    expect(alle).toHaveLength(3);
-
-    const ersatz = alle.find((t) => t.id === "t1");
-    expect(ersatz?.typ === "ersatz" && ersatz.wiederbeschaffung).toBe(120000);
-    expect(ersatz?.typ === "ersatz" && ersatz.nutzungsdauerMonate).toBe(48);
+    expect(alle).toHaveLength(2);
 
     const puffer = alle.find((t) => t.id === "t2");
     expect(puffer?.typ === "puffer" && puffer.schaetzbetrag).toBe(50000);
@@ -271,35 +262,36 @@ describe("Vertrag- und Zahlungsregel-Repository", () => {
   });
 });
 
-describe("Inventar- und Szenario-Repository", () => {
-  it("speichert einen Inventargegenstand", async () => {
+describe("Inventar-Repository", () => {
+  it("speichert einen Inventargegenstand samt Rücklagenkonto", async () => {
     await inventarRepository.speichern({
       id: "g1", bezeichnung: "Waschmaschine", anschaffung: "2024-01-01",
-      wiederbeschaffung: 60000, nutzungsdauerMonate: 120,
+      wiederbeschaffung: 60000, nutzungsdauerMonate: 120, kontoId: "k-tagesgeld",
     });
     const [g] = await inventarRepository.alle();
     expect(g.bezeichnung).toBe("Waschmaschine");
     expect(g.wiederbeschaffung).toBe(60000);
     expect(g.nutzungsdauerMonate).toBe(120);
     expect(g.anschaffung).toBe("2024-01-01");
+    expect(g.kontoId).toBe("k-tagesgeld");
   });
 
-  it("speichert ein Szenario", async () => {
-    await szenarioRepository.speichern({ id: "s1", name: "Gehaltserhöhung" });
-    const [s] = await szenarioRepository.alle();
-    expect(s.name).toBe("Gehaltserhöhung");
+  it("liefert ohne Zuordnung undefined statt eines leeren Strings", async () => {
+    await inventarRepository.speichern({
+      id: "g1", bezeichnung: "Ohne Konto", anschaffung: "2024-01-01",
+      wiederbeschaffung: 100, nutzungsdauerMonate: 12,
+    });
+    const [g] = await inventarRepository.alle();
+    expect(g.kontoId).toBeUndefined();
   });
 
-  it("löscht Inventar und Szenario", async () => {
+  it("löscht einen Gegenstand", async () => {
     await inventarRepository.speichern({
       id: "g1", bezeichnung: "X", anschaffung: "2024-01-01",
       wiederbeschaffung: 100, nutzungsdauerMonate: 12,
     });
-    await szenarioRepository.speichern({ id: "s1", name: "X" });
     await inventarRepository.loeschen("g1");
-    await szenarioRepository.loeschen("s1");
     expect(await inventarRepository.alle()).toHaveLength(0);
-    expect(await szenarioRepository.alle()).toHaveLength(0);
   });
 });
 

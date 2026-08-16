@@ -22,21 +22,17 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { BudgetsScreen } from "./BudgetsScreen";
-import { DeckungScreen } from "./DeckungScreen";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { HistorieScreen } from "./HistorieScreen";
 import { ImportScreen } from "./ImportScreen";
 import { InventarScreen } from "./InventarScreen";
 import { KontenScreen } from "./KontenScreen";
 import { ReviewScreen } from "./ReviewScreen";
-import { UeberblickScreen } from "./UeberblickScreen";
 import { VertraegeScreen } from "./VertraegeScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
-import { sqliteTopfRepository } from "../persistence/sqliteTopfRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
-import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import {
   sqliteKategorieRepository,
   sqlitePersonRepository,
@@ -93,24 +89,6 @@ describe("KontenScreen", () => {
     const knoepfe = await screen.findAllByRole("button", { name: /buchung|buchen/i });
     await nutzer.click(knoepfe[0]);
     await waitFor(() => expect(screen.getAllByRole("button").length).toBeGreaterThan(1));
-  });
-});
-
-describe("UeberblickScreen", () => {
-  it("rendert im Leerzustand", async () => {
-    rendere(<UeberblickScreen />);
-    await waitFor(() => expect(document.body.textContent).toBeTruthy());
-  });
-
-  it("bezieht Konten und Regeln in die Übersicht ein", async () => {
-    await grunddaten();
-    await sqliteZahlungsregelRepository.speichern({
-      id: "z1", bezeichnung: "Miete", betrag: -90000, rhythmus: "monatlich",
-      startdatum: "2026-01-01", charakter: "Aufwand",
-    });
-    rendere(<UeberblickScreen />);
-    // 250000 Minor Units Kontostand → „2.500,00" muss irgendwo auftauchen.
-    await waitFor(() => expect(document.body.textContent).toMatch(/2\.500,00/));
   });
 });
 
@@ -192,22 +170,91 @@ describe("HistorieScreen", () => {
     rendere(<HistorieScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
   });
-});
 
-describe("DeckungScreen", () => {
-  it("rendert im Leerzustand", async () => {
-    rendere(<DeckungScreen />);
-    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  /**
+   * Der Durchschnitt ist der Maßstab, gegen den ein einzelner Monat etwas aussagt.
+   * Zwei Monate mit 100 € und 300 € → Ø 200 €; er darf sich nicht mitverschieben,
+   * wenn ein Monat gewählt wird, sonst verglichen man den Monat mit sich selbst.
+   */
+  it("zeigt den Durchschnitt pro Monat und vergleicht einen gewählten Monat damit", async () => {
+    await grunddaten();
+    const heute = new Date();
+    const monat = (rueck: number) => {
+      const d = new Date(heute.getFullYear(), heute.getMonth() - rueck, 15);
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-15`;
+    };
+    await sqliteLedgerRepository.speichern({
+      id: "a", datum: monat(1), betrag: -10000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "b", datum: monat(0), betrag: -30000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<HistorieScreen />);
+
+    // Ø über die 12 Monate des Zeitraums: 400 € / 12 = 33,33 €.
+    await waitFor(() => expect(document.body.textContent).toMatch(/33,33/));
+
+    // Einen Monat wählen — die Kennzahlen zeigen dann diesen Monat.
+    const auswahl = await screen.findByLabelText("Monat");
+    const laufend = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}`;
+    await nutzer.selectOptions(auswahl, screen.getByRole("option", { name: laufend }));
+
+    await waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toMatch(/300,00/); // Ausgaben des gewählten Monats
+      expect(text).toMatch(/33,33/); // Ø bleibt der des Zeitraums
+      expect(text).toMatch(/vs\./); // Abweichung wird ausgewiesen
+    });
   });
 
-  it("stellt Töpfe der Kontodeckung gegenüber", async () => {
+  /** Der Weg, der vorher nur über den Konto-Auszug ging: Kategorie → Buchung → Details. */
+  it("öffnet die Buchungsdetails aus einer aufgeklappten Kategorie", async () => {
     await grunddaten();
-    await sqliteTopfRepository.speichern({
-      id: "t1", typ: "puffer", bezeichnung: "Reparaturen", start: "2020-01-01",
-      schaetzbetrag: 50000, fristMonate: 12,
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Sondermüll",
     });
-    rendere(<DeckungScreen />);
-    expect(await screen.findByText(/Reparaturen/)).toBeInTheDocument();
+    const nutzer = userEvent.setup();
+    rendere(<HistorieScreen />);
+
+    // Kategorie aufklappen …
+    await nutzer.click(await screen.findByText(/Lebensmittel/));
+    // … dann die Buchung darin.
+    await waitFor(() => expect(screen.getAllByTitle(/Buchungsdetails/).length).toBeGreaterThan(0));
+    await nutzer.click(screen.getAllByTitle(/Buchungsdetails/)[0]);
+
+    // Der Detaildialog trägt die Notiz der Buchung.
+    await waitFor(() => expect(document.body.textContent).toMatch(/Sondermüll/));
+  });
+
+  it("bündelt die Auswertung auf Wunsch zu Hauptgruppen", async () => {
+    await grunddaten();
+    await sqliteKategorieRepository.speichern({
+      id: "gruppe1", name: "Lebenshaltung", defaultCharakter: "Aufwand",
+    });
+    await sqliteKategorieRepository.speichern({
+      id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand", elternId: "gruppe1",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<HistorieScreen />);
+
+    await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
+    await nutzer.selectOptions(await screen.findByLabelText("Gliederung"), "gruppe");
+
+    // Jetzt steht die Hauptgruppe da; die Unterkategorie erst nach dem Aufklappen.
+    await waitFor(() => expect(screen.getByText(/Lebenshaltung/)).toBeInTheDocument());
+    expect(screen.queryByText(/Lebensmittel/)).not.toBeInTheDocument();
+
+    await nutzer.click(screen.getByText(/Lebenshaltung/));
+    await waitFor(() => expect(screen.getByText(/Lebensmittel/)).toBeInTheDocument());
   });
 });
 

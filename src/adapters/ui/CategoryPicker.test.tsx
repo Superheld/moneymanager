@@ -8,6 +8,10 @@ import { describe, expect, it } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Kategorie } from "../../core";
+// Seiteneffekt-Import: initialisiert i18next. Ohne ihn rendert t() den Schlüsselpfad
+// statt des Textes — die Komponente wird hier bewusst ohne den EinstellungenProvider
+// gerendert (sie braucht keine Datenbank), also muss die Übersetzung von Hand her.
+import "../../i18n/i18n";
 import { CategoryPicker } from "./CategoryPicker";
 
 const kategorien: Kategorie[] = [

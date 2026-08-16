@@ -4,17 +4,14 @@
 
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { APP_VERSION } from "../../version";
+import { APP_STADIUM, APP_VERSION } from "../../version";
 
 export type ScreenId =
-  | "uebersicht"
   | "historie"
   | "konten"
-  | "toepfe"
   | "inventar"
   | "budgets"
   | "vertraege"
-  | "deckung"
   | "import"
   | "review"
   | "einstellungen";
@@ -22,7 +19,6 @@ export type ScreenId =
 interface NavEntry {
   id?: ScreenId;
   labelKey: string;
-  badgeKey?: string;
 }
 
 interface NavGroup {
@@ -34,14 +30,14 @@ const GRUPPEN: NavGroup[] = [
   {
     titelKey: "shell.gruppeUeberblick",
     eintraege: [
-      { id: "uebersicht", labelKey: "shell.navUebersicht", badgeKey: "shell.badgePlan" },
-      { id: "historie", labelKey: "shell.navHistorie" },
+      // „Übersicht" ist die Historie: was tatsächlich war, plus der Monatsausblick.
+      // Der frühere Bereich „Planung" (Jahresprojektion, Szenarien) und „Deckung" sind
+      // 2026-08-16 entfallen — sie kommen wieder, dann aber anders geschnitten.
+      { id: "historie", labelKey: "shell.navUebersicht" },
       { id: "konten", labelKey: "shell.navKonten" },
       { id: "budgets", labelKey: "shell.navBudgets" },
-      { id: "toepfe", labelKey: "shell.navToepfe" },
       { id: "inventar", labelKey: "shell.navInventar" },
       { id: "vertraege", labelKey: "shell.navVertraege" },
-      { id: "deckung", labelKey: "shell.navDeckung" },
     ],
   },
   {
@@ -91,7 +87,6 @@ export function AppShell({
                   >
                     <span className="dot" />
                     {t(e.labelKey)}
-                    {e.badgeKey && <span className="bdg">{t(e.badgeKey)}</span>}
                   </a>
                 );
               })}
@@ -100,7 +95,11 @@ export function AppShell({
         ))}
 
         <div className="foot">
-          <div>Moneymanager {APP_VERSION}</div>
+          {/* Das Stadium steht neben der Version, nicht darin: wer hier hinsieht, soll
+              wissen, dass Schema und Daten noch nicht festgeschrieben sind. */}
+          <div>
+            Moneymanager {APP_VERSION} <span className="bdg">{APP_STADIUM}</span>
+          </div>
           <div>{t("shell.footLokal")}</div>
         </div>
       </aside>
