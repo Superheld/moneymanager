@@ -45,7 +45,8 @@ function indexExistiert(db: Database, name: string): boolean {
 
 const ERWARTETE_TABELLEN = [
   "budget", "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
-  "ist_buchung_aufteilung", "kategorie", "klassifikator_modell", "person", "topf",
+  "ist_buchung_aufteilung", "kategorie", "klassifikator_modell", "merkmal_ausschluss",
+  "person", "topf",
   "umsatz", "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
   "zahlungskonto", "zahlungsregel",
 ];
