@@ -23,6 +23,7 @@ import {
 } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteImportLaufRepository, sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
 import { kategorisierungsquellen } from "../../application/kategorisierungsquellen";
+import { sqliteKategoriefestlegungRepository } from "../persistence/sqliteKategoriefestlegungRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import { sqliteVertragserkennungRepository } from "../persistence/sqliteVertragZuordnungRepositories";
 import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
@@ -133,6 +134,7 @@ export function ImportScreen() {
       // nicht, und ein Import über tausende Zeilen soll nicht tausendmal dasselbe holen.
       const kategorisierung = await kategorisierungsquellen({
         kategorieRepo: sqliteKategorieRepository,
+        festlegungRepo: sqliteKategoriefestlegungRepository,
         vertragRepo: sqliteVertragRepository,
         erkennungRepo: sqliteVertragserkennungRepository,
         klassifikatorRepo: sqliteKlassifikatorRepository,

@@ -24,6 +24,7 @@
 // Anwendungsschicht (`application/vertragszuordnung`).
 
 import { anbieterSchluessel, type Zahlungsspur } from "./vertragErkennung";
+import { musterTrifft } from "./muster";
 import type { Cent } from "./geld";
 
 /**
@@ -118,36 +119,6 @@ export function standardErkennung(
     betragVon: hoehe > 0 ? Math.round(hoehe * 0.6) : undefined,
     betragBis: hoehe > 0 ? Math.round(hoehe * 1.8) : undefined,
   };
-}
-
-/**
- * Ein Muster mit `*` als kompilierter Ausdruck. Alles außer dem Stern wird wörtlich
- * genommen — ein Punkt im Anbieternamen ist ein Punkt, kein „beliebiges Zeichen".
- *
- * Gecacht, weil `passtZu` im Abgleich über den GANZEN Bestand läuft: bei ein paar tausend
- * Buchungen mal einem Dutzend Verträge wäre das sonst fünfstellig viele Regex-Bauten pro
- * Lauf. Die Zahl verschiedener Muster ist dagegen winzig — es sind die Zeilen, die jemand
- * von Hand eingetippt hat.
- */
-const musterCache = new Map<string, RegExp>();
-function alsRegex(muster: string): RegExp {
-  const fertig = musterCache.get(muster);
-  if (fertig) return fertig;
-  // Erst ALLES escapen (der Stern wird zu `\*`), dann gezielt den Stern freigeben.
-  const quelle = muster.replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\\\*/g, ".*");
-  const regex = new RegExp(`^${quelle}$`, "i");
-  musterCache.set(muster, regex);
-  return regex;
-}
-
-/**
- * Trifft ein Muster diesen Text? Ohne Stern ein schlichter Vergleich ohne Groß-/
- * Kleinschreibung — der Normalfall, und der billigste.
- */
-function musterTrifft(muster: string, text: string): boolean {
-  if (!text) return false;
-  if (!muster.includes("*")) return muster.toLowerCase() === text.toLowerCase();
-  return alsRegex(muster).test(text);
 }
 
 /**

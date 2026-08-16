@@ -5,12 +5,16 @@
 //
 //   1. **Umbuchung** — die Quelle hat es markiert. Umschichtung, OHNE konkrete Kategorie:
 //      eigenes Geld, das das Konto wechselt, gehört in keine Ausgabenkategorie.
-//   2. **Vertrag** — die Zahlung passt auf die Erkennungsregel eines Vertrags, und der
+//   2. **Festlegung** — jemand hat ausdrücklich gesagt „immer bei diesem Empfänger".
+//      Steht VOR dem Vertrag, weil sie das Jüngere und Speziellere ist: wer sie eintippt,
+//      hat den konkreten Fall vor Augen; die Kategorie am Vertrag ist eine Angabe von
+//      damals, oft nur beim Anlegen mitgelaufen.
+//   3. **Vertrag** — die Zahlung passt auf die Erkennungsregel eines Vertrags, und der
 //      trägt eine Kategorie. Das ist keine Schätzung, sondern eine Zuordnung, die jemand
 //      beim Erfassen des Vertrags getroffen hat.
-//   3. **Modell** — der trainierte Klassifikator. Er legt sich immer fest; auf echten
+//   4. **Modell** — der trainierte Klassifikator. Er legt sich immer fest; auf echten
 //      Daten trifft er in rund 89 % der Fälle.
-//   4. **Remapping** — die Kategorie, die Finanzguru mitgeliefert hat, auf unseren Baum
+//   5. **Remapping** — die Kategorie, die Finanzguru mitgeliefert hat, auf unseren Baum
 //      übersetzt. Steht bewusst HINTER dem Modell: eine Fremdklassifikation nach fremdem
 //      Kategoriebaum ist schwächer als ein Modell, das auf den eigenen Korrekturen
 //      trainiert wurde. Sie trägt den Kaltstart, solange nichts trainiert ist.
@@ -21,12 +25,14 @@
 // `application/kategorisierungsquellen`.
 
 import {
+  festlegungFuer,
   herkunftVon,
   klassifizieren,
   merkmalsbefund,
   vertragFuer,
   type Beitrag,
   type Kategorie,
+  type Kategoriefestlegung,
   type Merkmalskonfiguration,
   type Modell,
   type Vertragserkennung,
@@ -59,6 +65,8 @@ export interface Vorschlagskontext {
   readonly katalogNachName: ReadonlyMap<string, Kategorie>;
   /** Kategorien nach Id — liefert den Charakter zur gewählten Kategorie. */
   readonly kategorieNachId: ReadonlyMap<string, Kategorie>;
+  /** Ausdrückliche Festlegungen „immer bei diesem Empfänger". */
+  readonly festlegungen?: readonly Kategoriefestlegung[];
   /** Erkennungsregeln aller Verträge. */
   readonly erkennungen?: readonly Vertragserkennung[];
   /** Vertrag → Kategorie. Verträge ohne Kategorie fehlen hier und greifen nicht. */
@@ -77,6 +85,8 @@ export interface Vorschlagsbefund {
   readonly beitraege?: readonly Beitrag[];
   /** Name des Vertrags, wenn er den Vorschlag getragen hat. */
   readonly vertragId?: string;
+  /** Das Muster der Festlegung, wenn sie den Vorschlag getragen hat. */
+  readonly festlegung?: string;
   /** Sicherheit des Modells (0…1), sofern es entschieden hat. */
   readonly sicherheit?: number;
 }
@@ -125,7 +135,16 @@ export function vorschlagsbefundFuer(
     return { vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" } };
   }
 
-  // 1. Vertrag — eine getroffene Zuordnung schlägt jede Schätzung.
+  // 1. Festlegung — die ausdrücklichste Aussage, die es hier gibt.
+  if (kontext.festlegungen?.length) {
+    const f = festlegungFuer(kontext.festlegungen, roh.gegenpartei);
+    if (f) {
+      const vorschlag = auf(f.kategorieId, "festlegung", kontext);
+      if (vorschlag) return { vorschlag, festlegung: f.muster };
+    }
+  }
+
+  // 2. Vertrag — eine getroffene Zuordnung schlägt jede Schätzung.
   if (kontext.erkennungen?.length && kontext.vertragsKategorie?.size) {
     const vertragId = vertragFuer(kontext.erkennungen, alsSpur(roh, zahlungskontoId));
     const kategorieId = vertragId ? kontext.vertragsKategorie.get(vertragId) : undefined;
@@ -135,7 +154,7 @@ export function vorschlagsbefundFuer(
     }
   }
 
-  // 2. Modell.
+  // 3. Modell.
   if (kontext.modell) {
     const befund = merkmalsbefund(
       {
@@ -158,7 +177,7 @@ export function vorschlagsbefundFuer(
     }
   }
 
-  // 3. Remapping der mitgelieferten Kategorie.
+  // 4. Remapping der mitgelieferten Kategorie.
   const name = unsereKategorieFuer(roh.kategorieHinweis);
   const kat = name ? kontext.katalogNachName.get(name.toLowerCase()) : undefined;
   if (kat) {
