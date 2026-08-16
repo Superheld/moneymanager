@@ -55,6 +55,7 @@ import {
   VertragModal,
   type VertragFormular,
 } from "./VertragModal";
+import { VertragErkennungModal } from "./VertragErkennungModal";
 import { useGeld } from "./einstellungenKontext";
 
 /**
@@ -194,6 +195,8 @@ export function VertraegeScreen() {
   const [maske, setMaske] = useState<{ editId: string | null; start: VertragFormular } | null>(null);
   /** Der Vorschlag, dessen Erkennung gerade aufgeschlagen ist. */
   const [befund, setBefund] = useState<Vertragskandidat | null>(null);
+  /** Der Vertrag, dessen Erkennungsregel gerade bearbeitet wird. */
+  const [regelVon, setRegelVon] = useState<Vertrag | null>(null);
 
   // Verwandte Repos in EINEM Effekt und zusammen setzen — gestaffelte setState lassen
   // abgeleitete Werte kurz gegen leere Listen rechnen.
@@ -367,6 +370,15 @@ export function VertraegeScreen() {
       });
     }
     s.push(
+      {
+        // Woran wird dieser Vertrag in den Buchungen erkannt — und wie steuert man nach?
+        key: "_r",
+        label: "",
+        align: "right",
+        render: (v) => (
+          <button className="linkbtn" onClick={() => setRegelVon(v)}>{t("vertraege.regel.aktion")}</button>
+        ),
+      },
       { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
       {
         key: "_x",
@@ -693,6 +705,14 @@ export function VertraegeScreen() {
       )}
 
       {befund && <ErkennungsDialog kandidat={befund} onClose={() => setBefund(null)} />}
+
+      {regelVon && (
+        <VertragErkennungModal
+          vertrag={regelVon}
+          onClose={() => setRegelVon(null)}
+          onSaved={async () => { setRegelVon(null); await laden(); }}
+        />
+      )}
 
       {maske && (
         <VertragModal
