@@ -68,11 +68,12 @@ function Infozeile({ label, children, mono }: { label: string; children: ReactNo
 }
 
 /**
- * Detailansicht einer gebuchten Ist-Buchung (S-1c). Drei Teile:
+ * Detailansicht einer gebuchten Ist-Buchung (S-1c). Vier Teile:
  *
  *  1. Was man ändern darf — das Formular.
- *  2. Umbuchung — Einstieg (S-1) bzw. Gegenbuchung und Paarung lösen.
- *  3. Herkunft — was über die Buchung bekannt ist, aber nirgends änderbar.
+ *  2. Kategorie ODER Aufteilung (S-7) — eine Entscheidung, ein Block.
+ *  3. Umbuchung — Einstieg (S-1) bzw. Gegenbuchung und Paarung lösen.
+ *  4. Herkunft — was über die Buchung bekannt ist, aber nirgends änderbar.
  *
  * Zu 3: Empfänger und Verwendungszweck hängen NICHT an der `IstBuchung`, sondern am
  * `Umsatz` (Import-Kontext, siehe ADR-0002) — hereingereicht statt hier nachgeladen,
@@ -151,21 +152,61 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
           <input className="field" inputMode="decimal" value={betrag} disabled={gepaart} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
         {!gepaart && (
-          <>
-            <FormField label={t("konten.feldCharakter")}>
-              <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-                {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
-              </select>
-            </FormField>
-            <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
-              <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
-            </FormField>
-          </>
+          <FormField label={t("konten.feldCharakter")}>
+            <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
+              {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
+            </select>
+          </FormField>
         )}
         <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
           <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.buchung.notizPlatzhalter")} />
         </FormField>
       </div>
+
+      {/* Kategorie ODER Aufteilung — nie beides. `buchungSplitten` löscht die Kategorie,
+          wenn Teile entstehen; die Aufteilung ist ab dann die Wahrheit. Solange beides
+          getrennt im Dialog stand (Kategorie oben, Aufteilung unter der Umbuchung), sah es
+          aus wie zwei unabhängige Angaben — und man konnte einer geteilten Buchung wieder
+          eine Kategorie geben, also genau den Zustand herstellen, den das Modell ausschließt.
+          Jetzt EIN Block, der zeigt, welcher der beiden Fälle gerade gilt. */}
+      {!gepaart && (
+        <div style={{ marginTop: "var(--sp-4)" }}>
+          {geteilt ? (
+            <>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
+                <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>
+                  {t("konten.split.abschnitt")}
+                </span>
+                <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={onSplitten}>{t("konten.split.bearbeiten")}</button>
+                <button className="linkbtn" onClick={() => onSplitAufheben()}>{t("konten.split.aufheben")}</button>
+              </div>
+              {(buchung.aufteilungen ?? []).map((a, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", padding: "5px 0", borderBottom: "1px solid var(--line-soft)" }}>
+                  <span style={{ fontSize: 13, minWidth: 0 }}>
+                    {kategorieName.get(a.kategorieId) ?? "?"}
+                    {a.notiz && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{a.notiz}</span>}
+                  </span>
+                  <span className="num" style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
+                    {geld.formatMitSymbol(a.betrag, { mitVorzeichen: true })}
+                  </span>
+                </div>
+              ))}
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.split.stattKategorie")} {t("konten.split.aufhebenHinweis")}</div>
+            </>
+          ) : (
+            <>
+              <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
+                <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
+              </FormField>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+                <button className="linkbtn" onClick={onSplitten}>{t("konten.split.aktion")}</button>
+                {" · "}
+                {t("konten.split.untertitel")}
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Umbuchungs-Abschnitt: Einstieg (S-1) bzw. Gegenbuchung und Paarung lösen */}
       <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
@@ -211,40 +252,6 @@ function EditBuchungModal({ buchung, kategorien, kontoName, kategorieName, umsat
           </>
         )}
       </div>
-
-      {/* Aufteilung (S-7) — bei Umbuchungs-Beinen gar nicht erst anbieten. */}
-      {!gepaart && (
-        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-          {geteilt ? (
-            <>
-              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
-                <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>
-                  {t("konten.split.abschnitt")}
-                </span>
-                <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={onSplitten}>{t("konten.split.bearbeiten")}</button>
-                <button className="linkbtn" onClick={() => onSplitAufheben()}>{t("konten.split.aufheben")}</button>
-              </div>
-              {(buchung.aufteilungen ?? []).map((a, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", padding: "5px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                  <span style={{ fontSize: 13, minWidth: 0 }}>
-                    {kategorieName.get(a.kategorieId) ?? "?"}
-                    {a.notiz && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{a.notiz}</span>}
-                  </span>
-                  <span className="num" style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
-                    {geld.formatMitSymbol(a.betrag, { mitVorzeichen: true })}
-                  </span>
-                </div>
-              ))}
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.split.aufhebenHinweis")}</div>
-            </>
-          ) : (
-            <>
-              <Button onClick={onSplitten}>{t("konten.split.aktion")}</Button>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.split.untertitel")}</div>
-            </>
-          )}
-        </div>
-      )}
 
       {/* Herkunft — alles, was bekannt ist, aber hier nicht geändert wird. */}
       <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>

@@ -52,18 +52,23 @@ function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId, renderDe
         const klickbar = !!onSelect && !!i.kategorieId;
         const aktiv = !!aktivId && i.kategorieId === aktivId;
         return (
-          <div
-            key={i.kategorieId ?? "__ohne"}
-            onClick={klickbar ? () => onSelect!(i.kategorieId!, i.name) : undefined}
-            style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: klickbar ? "pointer" : "default", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent" }}
-          >
-            <CoverageTrack
-              value={Math.abs(i.summe)}
-              max={maxAbs}
-              over={false}
-              label={`${aktiv ? "▾ " : "▸ "}${i.kategorieId ? i.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${i.anzahl}`}
-              right={mitSchnitt(i.summe)}
-            />
+          // Zeile und Detail sind GESCHWISTER, nicht ineinander — wie in der
+          // Gruppen-Ansicht. Lag das Detail im klickbaren Div, schloss jeder Klick in
+          // die Tabelle die Kategorie wieder (der Klick blubberte zur Zeile hoch), und
+          // die Einfärbung der offenen Zeile legte sich als Rahmen um die Tabelle.
+          <div key={i.kategorieId ?? "__ohne"}>
+            <div
+              onClick={klickbar ? () => onSelect!(i.kategorieId!, i.name) : undefined}
+              style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: klickbar ? "pointer" : "default", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent" }}
+            >
+              <CoverageTrack
+                value={Math.abs(i.summe)}
+                max={maxAbs}
+                over={false}
+                label={`${aktiv ? "▾ " : "▸ "}${i.kategorieId ? i.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${i.anzahl}`}
+                right={mitSchnitt(i.summe)}
+              />
+            </div>
             {aktiv && renderDetail && i.kategorieId && renderDetail(i.kategorieId)}
           </div>
         );

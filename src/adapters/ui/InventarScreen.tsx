@@ -180,10 +180,15 @@ export function InventarScreen() {
           <div className="muted">{t("inventar.leer")}</div>
         ) : (
           <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
-            {deckung.posten.map((p) => {
+            {deckung.posten.map((p, idx) => {
               const g = p.gegenstand;
               return (
-                <div key={g.id}>
+                // Trennlinie ab dem zweiten Gegenstand: zwei Balken je Posten sehen sonst
+                // aus wie vier Balken eines Postens — der Abstand allein trennt zu schwach.
+                <div
+                  key={g.id}
+                  style={idx > 0 ? { borderTop: "1px solid var(--line)", paddingTop: "var(--sp-5)" } : undefined}
+                >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6, gap: "var(--sp-3)", flexWrap: "wrap" }}>
                     <span style={{ fontWeight: "var(--fw-bold)" }}>
                       {g.bezeichnung}
@@ -205,15 +210,20 @@ export function InventarScreen() {
                     right={`${geld.format(p.soll)} / ${geld.format(g.wiederbeschaffung)} ${geld.symbol}`}
                   />
 
-                  {/* Die Wirklichkeit: nur, wenn ein Konto benannt ist. */}
+                  {/* Die Wirklichkeit: nur, wenn ein Konto benannt ist.
+                      Bezugsgröße ist die WIEDERBESCHAFFUNG, nicht das rechnerische Soll —
+                      derselbe Maßstab wie beim Balken darüber. Gegen das Soll gemessen
+                      sagte „davon da" nur, wie weit man dem eigenen Sparplan folgt; gegen
+                      die Wiederbeschaffung sagt es, wie weit das Geld für den Ersatz da
+                      ist. Die Warnfarbe bleibt am Soll: darunter liegt man zurück. */}
                   {p.tatsaechlich != null && (
                     <div style={{ marginTop: 6 }}>
                       <CoverageTrack
                         value={centZuEuro(p.tatsaechlich)}
-                        max={centZuEuro(Math.max(1, p.soll))}
+                        max={centZuEuro(Math.max(1, g.wiederbeschaffung))}
                         over={p.tatsaechlich < p.soll}
                         label={t("inventar.gedecktDurch", { konto: kontoName.get(g.kontoId!) ?? "?" })}
-                        right={`${geld.format(p.tatsaechlich)} / ${geld.format(p.soll)} ${geld.symbol}`}
+                        right={`${geld.format(p.tatsaechlich)} / ${geld.format(g.wiederbeschaffung)} ${geld.symbol}`}
                       />
                     </div>
                   )}
