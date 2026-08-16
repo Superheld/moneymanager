@@ -7,13 +7,11 @@ import { useTranslation } from "react-i18next";
 import { APP_VERSION } from "../../version";
 
 export type ScreenId =
-  | "planung"
   | "historie"
   | "konten"
   | "inventar"
   | "budgets"
   | "vertraege"
-  | "deckung"
   | "import"
   | "review"
   | "einstellungen";
@@ -33,15 +31,14 @@ const GRUPPEN: NavGroup[] = [
   {
     titelKey: "shell.gruppeUeberblick",
     eintraege: [
-      // „Übersicht" ist die Historie: was tatsächlich war, ist der Einstieg. Die
-      // Vorausschau steht daneben und heißt, was sie ist — Planung.
+      // „Übersicht" ist die Historie: was tatsächlich war, plus der Monatsausblick.
+      // Der frühere Bereich „Planung" (Jahresprojektion, Szenarien) und „Deckung" sind
+      // 2026-08-16 entfallen — sie kommen wieder, dann aber anders geschnitten.
       { id: "historie", labelKey: "shell.navUebersicht" },
-      { id: "planung", labelKey: "shell.navPlanung", badgeKey: "shell.badgePlan" },
       { id: "konten", labelKey: "shell.navKonten" },
       { id: "budgets", labelKey: "shell.navBudgets" },
       { id: "inventar", labelKey: "shell.navInventar" },
       { id: "vertraege", labelKey: "shell.navVertraege" },
-      { id: "deckung", labelKey: "shell.navDeckung" },
     ],
   },
   {

@@ -18,18 +18,32 @@
 // Ohne diese Ordnung zählte eine Vertragszahlung, deren Kategorie unter einer
 // Budget-Kategorie hängt (auf echten Daten: Sport → Freizeit & Kultur), doppelt — und
 // die Aufrechnung ginge nicht mehr gegen den Kontostand auf.
+//
+// DIE RÜCKLAGEN-ZEILE IST DIE EINE AUSNAHME von „Ist = was tatsächlich floss": die
+// monatliche Rücklage für das Inventar wird nirgends gebucht, sie ist reine Rechnung.
+// Sie steht deshalb in BEIDEN Spalten mit demselben Betrag. Das ist Absicht — die Frage
+// unter dem Strich lautet „was kann ich noch ausgeben?", und eine Rücklage kann man
+// nicht ausgeben, ob sie nun geflossen ist oder nicht. Wer die Ist-Spalte gegen den
+// Kontoauszug prüft, muss diese Zeile herausrechnen.
 
 import { addMonate, parseIso, toIso } from "./datum";
 import type { Cent } from "./geld";
 import { geglaetteterMonatsabfluss, budgetVerbrauch, type Budget } from "./budget";
 import { istInterneUmbuchung } from "./historie";
+import { monatsRuecklageGesamt, type Inventargegenstand } from "./inventar";
 import { kategorieUnterbaum, type Kategorie } from "./kategorie";
 import { findeIstZuPlan, kategorieAnteile, type IstBuchung } from "./istbuchung";
 import { projiziereRegel, type Planbuchung } from "./projektion";
 import type { Zahlungsregel } from "./zahlungsregel";
 
 /** Die Zeilen der Aufrechnung, in Anzeigereihenfolge. */
-export type AusblickZeileId = "einnahmen" | "vertraege" | "budgets" | "umschichtung" | "sonstiges";
+export type AusblickZeileId =
+  | "einnahmen"
+  | "vertraege"
+  | "budgets"
+  | "ruecklagen"
+  | "umschichtung"
+  | "sonstiges";
 
 /**
  * Wie belegt ein Posten ist:
@@ -93,6 +107,8 @@ const BETRAGS_TOLERANZ = 0.15;
 export interface MonatsAusblickEingabe {
   readonly regeln: readonly Zahlungsregel[];
   readonly budgets: readonly Budget[];
+  /** Inventar — Quelle der monatlichen Rücklage (kalkulatorisch, nie gebucht). */
+  readonly inventar?: readonly Inventargegenstand[];
   readonly ist: readonly IstBuchung[];
   readonly kategorien: readonly Kategorie[];
   /** Erster Tag des Monats, „YYYY-MM-01". */
@@ -154,6 +170,8 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
     vertraege,
     budgetZeile,
   ];
+  const ruecklagen = ruecklagenZeile(e.inventar ?? [], zukunft);
+  if (ruecklagen) zeilen.push(ruecklagen);
   if (umschichtung.plan !== 0 || weitereUmschichtung !== 0) {
     zeilen.push(mitSammelposten(umschichtung, weitereUmschichtung, "umschichtung.weitere", zukunft));
   }
@@ -304,6 +322,23 @@ function budgetsZeile(
     ist: zukunft ? null : summe(posten.map((p) => p.ist ?? 0)),
     posten,
   };
+}
+
+/**
+ * Die monatliche Inventar-Rücklage als EINE Zeile, ohne Posten: die Aufschlüsselung nach
+ * Gegenstand steht im Inventar, und drei aufklappbare Karten nebeneinander vertragen
+ * keine vierte Ebene. Ohne Inventar entfällt die Zeile ganz, statt eine Null zu zeigen.
+ *
+ * Plan und Ist tragen denselben Betrag — die Rücklage wird nicht gebucht (siehe Kopf).
+ */
+function ruecklagenZeile(
+  inventar: readonly Inventargegenstand[],
+  zukunft: boolean,
+): AusblickZeile | null {
+  const rate = monatsRuecklageGesamt(inventar);
+  if (rate === 0) return null;
+  const plan = -rate; // Abfluss aus Sicht des verfügbaren Geldes
+  return { id: "ruecklagen", plan, ist: zukunft ? null : plan, posten: [] };
 }
 
 /** Hängt einen Sammelposten für nicht geplantes Ist an eine Zeile, falls es welches gibt. */

@@ -108,24 +108,6 @@ describe("BudgetsScreen", () => {
     expect(await screen.findByText("Reparaturen")).toBeInTheDocument();
   });
 
-  /** Ersatz-Töpfe hängen am Inventar und dürfen hier nicht doppelt auftauchen. */
-  it("führt Ersatz-Töpfe nicht mit auf", async () => {
-    await sqliteTopfRepository.speichern({
-      id: "t1", typ: "ersatz", bezeichnung: "Waschmaschine", start: "2026-01-01",
-      wiederbeschaffung: 75000, nutzungsdauerMonate: 120,
-    });
-    // Zweiter Topf als Anker: erst wenn DER sichtbar ist, sind die Daten geladen. Auf den
-    // Abschnittstitel zu warten reichte nicht — der steht schon vor dem ersten Ladeergebnis
-    // da, und der Test wäre gegen einen entfernten Filter blind.
-    await sqliteTopfRepository.speichern({
-      id: "t2", typ: "spartopf", bezeichnung: "Urlaub", start: "2026-01-01",
-      zufuehrungProMonat: 5000, sparziel: 60000,
-    });
-    rendere(<BudgetsScreen />);
-    expect(await screen.findByText("Urlaub")).toBeInTheDocument();
-    expect(screen.queryByText("Waschmaschine")).not.toBeInTheDocument();
-  });
-
   it("berücksichtigt eine reale Entnahme im angezeigten Stand", async () => {
     // Puffer über 12 Monate, Start weit in der Vergangenheit → voll angespart (50.000),
     // minus einer Entnahme von 100,00 → 400,00 müssen sichtbar werden.

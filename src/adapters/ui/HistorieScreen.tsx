@@ -4,13 +4,14 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { addMonate, buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, nachHauptgruppe, toIso, type Budget, type GruppenSumme, type IstBuchung, type Kategorie, type Zahlungskonto, type Zahlungsregel } from "../../core";
+import { addMonate, buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, nachHauptgruppe, toIso, type Budget, type GruppenSumme, type Inventargegenstand, type IstBuchung, type Kategorie, type Zahlungskonto, type Zahlungsregel } from "../../core";
 import type { Umsatz } from "../../application/import";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository as kontoRepo, sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
+import { sqliteInventarRepository as inventarRepo } from "../persistence/sqliteInventarRepository";
 import { Button, Card, CoverageTrack, DataTable, KPIStat } from "./ds";
 import { BuchungDetail } from "./BuchungDetail";
 import { MonatsAusblick } from "./MonatsAusblick";
@@ -172,6 +173,7 @@ export function HistorieScreen() {
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
   const [budgets, setBudgets] = useState<Budget[]>([]);
+  const [inventar, setInventar] = useState<Inventargegenstand[]>([]);
   const heute = useMemo(heuteIso, []);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("12");
   const [aktivMonat, setAktivMonat] = useState<number | null>(null);
@@ -194,8 +196,9 @@ export function HistorieScreen() {
   // Aufschlüsselung gegen eine noch leere Kategorie-Liste rechnet (sonst „ohne Kategorie").
   async function laden() {
     try {
-      const [i, k, kat, u, r, b] = await Promise.all([
+      const [i, k, kat, u, r, b, inv] = await Promise.all([
         ledgerRepo.alle(), kontoRepo.alle(), kategorieRepo.alle(), umsatzRepo.alle(), regelRepo.alle(), budgetRepo.alle(),
+        inventarRepo.alle(),
       ]);
       setIst(i);
       setKonten(k);
@@ -203,6 +206,7 @@ export function HistorieScreen() {
       setUmsaetze(u);
       setRegeln(r);
       setBudgets(b);
+      setInventar(inv);
       setFehler(null);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -335,7 +339,7 @@ export function HistorieScreen() {
       {/* Der Ausblick steht vor dem Rückblick: die Frage „was bleibt diesen Monat?" ist
           beim Öffnen die dringendere. Er lebt vom Plan und braucht keine Ist-Buchungen. */}
       {geladen && !fehler && (
-        <MonatsAusblick regeln={regeln} budgets={budgets} ist={ist} kategorien={kategorien} heute={heute} />
+        <MonatsAusblick regeln={regeln} budgets={budgets} inventar={inventar} ist={ist} kategorien={kategorien} heute={heute} />
       )}
 
       {!geladen ? null : ist.length === 0 && !fehler ? (
