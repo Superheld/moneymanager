@@ -30,6 +30,7 @@ import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImpor
 import { sqliteEinstellungenRepository as einstellungenRepo } from "../persistence/sqliteEinstellungenRepository";
 import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, KPIStat, Pill } from "./ds";
+import { Modal } from "./Modal";
 import type { DataColumn } from "./ds/DataTable";
 import { PageHead } from "./PageHead";
 import {
@@ -62,6 +63,86 @@ const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
   Umschichtung: "um",
 };
 
+/**
+ * „Woran erkannt?" — die Prüfungen, die bei diesem Kandidaten angeschlagen haben, je
+ * mit dem gemessenen Wert UND der Schwelle.
+ *
+ * Warum das sichtbar gehört: ein Vorschlag ohne Begründung lässt nur zwei Reaktionen zu
+ * — blind übernehmen oder blind wegklicken. Wer sieht, dass 68 Zahlungen im 30-Tage-Takt
+ * an dieselbe Gläubiger-ID gingen, entscheidet anders als bei drei Zahlungen mit
+ * schwankendem Abstand. Und wenn die Erkennung danebenliegt, ist hier zu sehen, warum.
+ */
+function ErkennungsDialog({ kandidat, onClose }: { kandidat: Vertragskandidat; onClose: () => void }) {
+  const { t } = useTranslation();
+  const geld = useGeld();
+  const b = kandidat.befund;
+
+  function Zeile({ label, wert }: { label: string; wert: string }) {
+    return (
+      <div style={{ display: "flex", gap: "var(--sp-3)", padding: "7px 0", alignItems: "baseline", borderBottom: "1px solid var(--line-soft)" }}>
+        <span style={{ flex: "0 0 32%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>{label}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: 13, wordBreak: "break-word" }}>{wert}</span>
+      </div>
+    );
+  }
+
+  return (
+    <Modal
+      title={t("vertraege.erkennung.titel")}
+      subtitle={kandidat.anbieter}
+      onClose={onClose}
+      footer={<Button variant="primary" onClick={onClose}>{t("vertraege.erkennung.schliessen")}</Button>}
+    >
+      <p className="muted" style={{ fontSize: "var(--fs-small)", margin: "0 0 var(--sp-3)", maxWidth: 620 }}>
+        {t("vertraege.erkennung.hinweis")}
+      </p>
+
+      <Zeile
+        label={t("vertraege.erkennung.schluessel")}
+        wert={
+          b.schluesselArt === "glaeubigerId"
+            ? t("vertraege.erkennung.schluesselGlaeubiger", { wert: b.schluesselWert })
+            : t("vertraege.erkennung.schluesselName", { wert: b.schluesselWert })
+        }
+      />
+      <Zeile
+        label={t("vertraege.erkennung.termine")}
+        wert={t("vertraege.erkennung.termineWert", { termine: b.termine, min: b.minTermine, von: kandidat.ersteZahlung, bis: kandidat.letzteZahlung })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.takt")}
+        wert={t("vertraege.erkennung.taktWert", {
+          tage: b.medianAbstandTage,
+          rhythmus: t(`vertraege.rhythmus.${kandidat.rhythmus}`),
+          von: b.rhythmusFenster[0],
+          bis: b.rhythmusFenster[1],
+        })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.regelmaessig")}
+        wert={t("vertraege.erkennung.regelmaessigWert", { nah: b.abstaendeNah, gesamt: b.abstaendeGesamt, prozent: Math.round(b.minAnteilNah * 100) })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.betrag")}
+        wert={t("vertraege.erkennung.betragWert", {
+          median: `${geld.format(kandidat.betrag)} ${geld.symbol}`,
+          nah: b.betraegeNah,
+          gesamt: b.betraegeGesamt,
+          toleranz: `${geld.format(b.betragsToleranz)} ${geld.symbol}`,
+        })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.richtung")}
+        wert={t("vertraege.erkennung.richtungWert", { charakter: t(`charakter.${kandidat.charakter}`) })}
+      />
+      <Zeile
+        label={t("vertraege.erkennung.laufend")}
+        wert={t("vertraege.erkennung.laufendWert", { tage: b.letzteVorTagen, grenze: b.beendetAbTagen })}
+      />
+    </Modal>
+  );
+}
+
 function heuteIso(): string {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
@@ -83,6 +164,8 @@ export function VertraegeScreen() {
    * die Vorbelegung hinein und erfährt, wenn gespeichert wurde.
    */
   const [maske, setMaske] = useState<{ editId: string | null; start: VertragFormular } | null>(null);
+  /** Der Vorschlag, dessen Erkennung gerade aufgeschlagen ist. */
+  const [befund, setBefund] = useState<Vertragskandidat | null>(null);
 
   // Verwandte Repos in EINEM Effekt und zusammen setzen — gestaffelte setState lassen
   // abgeleitete Werte kurz gegen leere Listen rechnen.
@@ -366,6 +449,17 @@ export function VertraegeScreen() {
               { key: "anzahl", label: t("vertraege.spalteZahlungen"), align: "right", render: (k: Vertragskandidat) => String(k.anzahl) },
               { key: "letzte", label: t("vertraege.spalteLetzte"), render: (k: Vertragskandidat) => k.letzteZahlung },
               {
+                key: "_r",
+                label: "",
+                align: "right",
+                sortable: false,
+                render: (k: Vertragskandidat) => (
+                  <button className="linkbtn" onClick={() => setBefund(k)}>
+                    {t("vertraege.erkennung.aktion")}
+                  </button>
+                ),
+              },
+              {
                 key: "_u",
                 label: "",
                 align: "right",
@@ -432,6 +526,8 @@ export function VertraegeScreen() {
           )}
         </>
       )}
+
+      {befund && <ErkennungsDialog kandidat={befund} onClose={() => setBefund(null)} />}
 
       {maske && (
         <VertragModal
