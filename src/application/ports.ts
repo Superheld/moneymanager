@@ -6,6 +6,7 @@ import type {
   Inventargegenstand,
   IstBuchung,
   Kategorie,
+  Modell,
   Person,
   Topf,
   Vertrag,
@@ -104,6 +105,30 @@ export interface EinstellungenRepository {
   /** Alle Schlüssel→Wert; fehlende Schlüssel bedeuten „noch nicht gesetzt". */
   lesen(): Promise<Record<string, string>>;
   schreiben(schluessel: string, wert: string): Promise<void>;
+}
+
+/**
+ * Das gespeicherte Modell samt der Angaben, die es einordnen — wann es entstand, aus wie
+ * vielen Beispielen, und wie gut es an ungesehenen Zeilen abschnitt. Ohne diese drei ist
+ * eine Genauigkeit eine Zahl ohne Grundlage.
+ */
+export interface Modellstand {
+  readonly modell: Modell;
+  /** ISO-Zeitpunkt des Trainings. */
+  readonly trainiertAm: string;
+  /** Genauigkeit an der Prüfmenge (0…1); fehlt, wenn zu wenig Material für einen Split war. */
+  readonly genauigkeit?: number;
+}
+
+/**
+ * Der Klassifikator der automatischen Kategorisierung. Genau EIN aktuelles Modell —
+ * `speichern` ersetzt es. Eine Historie gäbe es nur, um alte Stände aufzuheben, die aus
+ * dem Bestand in Millisekunden neu entstehen.
+ */
+export interface KlassifikatorRepository {
+  /** Der gespeicherte Stand, oder null, wenn noch nie trainiert wurde. */
+  laden(): Promise<Modellstand | null>;
+  speichern(stand: Modellstand): Promise<void>;
 }
 
 /**

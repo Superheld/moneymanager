@@ -22,3 +22,4 @@ export * from "./kontoregister";
 export * from "./historie";
 export * from "./monatsausblick";
 export * from "./klassifikator/merkmale";
+export * from "./klassifikator/modell";

@@ -329,4 +329,28 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE ist_buchung ADD COLUMN kategorie_herkunft TEXT NOT NULL DEFAULT 'automatisch'`,
     ],
   },
+  {
+    version: 21, // Klassifikator: das trainierte Modell der automatischen Kategorisierung
+    sql: [
+      // EINE Zeile, feste Id — es gibt genau ein aktuelles Modell, und ein Training
+      // ersetzt es vollständig. Keine Historie: ein altes Modell ist nicht „auch eine
+      // Meinung", sondern ein überholter Stand, und aus dem Bestand jederzeit in
+      // Millisekunden neu herstellbar (137 ms über 3689 Beispiele).
+      //
+      // Vokabular und Kategorien als Textliste, die Gewichte als base64-kodierte
+      // Float32-Matrix. Kein eigenes Zahlenformat, keine Zeile je Gewicht: bei ~2000
+      // Merkmalen × ~50 Kategorien wären das 100.000 Zeilen für einen Wert, den ohnehin
+      // niemand einzeln liest.
+      `CREATE TABLE IF NOT EXISTS klassifikator_modell (
+        id             TEXT    PRIMARY KEY,
+        kategorien     TEXT    NOT NULL,
+        vokabular      TEXT    NOT NULL,
+        gewichte       TEXT    NOT NULL,
+        bias           TEXT    NOT NULL,
+        beispiele      INTEGER NOT NULL,
+        trainiert_am   TEXT    NOT NULL,
+        genauigkeit    REAL
+      )`,
+    ],
+  },
 ];
