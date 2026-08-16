@@ -3,7 +3,7 @@
 // Quartals-Ausschläge und Budget-Anteil), die die kumulierte Saldo-Kurve verschluckt.
 
 import { useTranslation } from "react-i18next";
-import { useGeld } from "./EinstellungenProvider";
+import { useGeld } from "./einstellungenKontext";
 
 interface Props {
   labels: string[];

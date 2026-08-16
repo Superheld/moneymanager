@@ -13,7 +13,7 @@ import { Button, Card, CoverageTrack, DataTable, KPIStat } from "./ds";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { PageHead } from "./PageHead";
-import { useGeld } from "./EinstellungenProvider";
+import { useGeld } from "./einstellungenKontext";
 
 import type { KategorieSumme } from "../../core";
 

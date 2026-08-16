@@ -32,7 +32,7 @@ import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { betont } from "./betonung";
 import { Modal } from "./Modal";
-import { useGeld, fehlerNachricht } from "./EinstellungenProvider";
+import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 
 function heuteIso(): string {
   const n = new Date();

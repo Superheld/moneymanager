@@ -26,7 +26,12 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      //
+      // `coverage/` ebenso: `npm run coverage` schreibt dort eine HTML-Datei je Quelldatei,
+      // und der Dev-Server schob danach für jede einzelne einen Page-Reload nach — Hunderte
+      // Zeilen Log und ein Fenster, das minutenlang neu lädt, ohne dass sich Code geändert
+      // hätte. `dist/` aus demselben Grund.
+      ignored: ["**/src-tauri/**", "**/coverage/**", "**/dist/**"],
     },
   },
 }));
