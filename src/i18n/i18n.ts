@@ -145,6 +145,7 @@ const de = {
     spaltePlan: "geplant",
     spalteIst: "gebucht",
     bleibt: "Bleibt",
+    vsPlan: "{{betrag}} gegenüber Plan",
     statusBezahlt: "abgehakt",
     statusOffen: "offen",
     zeile: {
@@ -885,6 +886,7 @@ const en: typeof de = {
     spaltePlan: "planned",
     spalteIst: "posted",
     bleibt: "Left over",
+    vsPlan: "{{betrag}} vs. plan",
     statusBezahlt: "ticked off",
     statusOffen: "open",
     zeile: {
