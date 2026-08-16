@@ -2,8 +2,11 @@ import { describe, it, expect } from "vitest";
 import {
   kuendigungsterminNaht,
   naechsterKuendigungstermin,
+  ruecklagenbedarf,
+  ruecklageProMonat,
   type Vertrag,
 } from "./vertrag";
+import type { Zahlungsregel } from "./zahlungsregel";
 
 function vertrag(over: Partial<Vertrag> = {}): Vertrag {
   return {
@@ -49,5 +52,43 @@ describe("kuendigungsterminNaht", () => {
 
   it("false, wenn der Termin noch weit weg ist", () => {
     expect(kuendigungsterminNaht(vertrag(), "2026-06-01", 45)).toBe(false);
+  });
+});
+
+describe("ruecklageProMonat", () => {
+  function regel(over: Partial<Zahlungsregel> = {}): Zahlungsregel {
+    return {
+      id: "r1", bezeichnung: "Test", betrag: -12000, rhythmus: "jaehrlich",
+      startdatum: "2026-03-01", charakter: "Aufwand", ...over,
+    };
+  }
+
+  it("verteilt eine Jahreszahlung auf zwölf Monate", () => {
+    expect(ruecklageProMonat(regel())).toBe(1000);
+  });
+
+  it("verteilt Quartal und Halbjahr auf ihre Monate", () => {
+    expect(ruecklageProMonat(regel({ betrag: -5508, rhythmus: "quartalsweise" }))).toBe(1836);
+    expect(ruecklageProMonat(regel({ betrag: -2199, rhythmus: "halbjaehrlich" }))).toBe(367);
+  });
+
+  /** Eine monatliche Zahlung kommt aus dem laufenden Monat — dafür legt niemand zurück. */
+  it("verlangt für monatliche Zahlungen nichts", () => {
+    expect(ruecklageProMonat(regel({ betrag: -4500, rhythmus: "monatlich" }))).toBe(0);
+  });
+
+  /** Eine jährliche Einnahme (Steuererstattung) braucht keine Rücklage. */
+  it("verlangt für Zuflüsse nichts", () => {
+    expect(ruecklageProMonat(regel({ betrag: 97172 }))).toBe(0);
+  });
+
+  it("summiert über mehrere Regeln", () => {
+    expect(
+      ruecklagenbedarf([
+        regel(),
+        regel({ id: "r2", betrag: -5508, rhythmus: "quartalsweise" }),
+        regel({ id: "r3", betrag: -4500, rhythmus: "monatlich" }),
+      ]),
+    ).toBe(1000 + 1836);
   });
 });
