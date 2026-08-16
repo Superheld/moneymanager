@@ -12,7 +12,7 @@ import type {
   UmsatzRepository,
   ZahlungskontoRepository,
 } from "../ports";
-import { katalogNachName, vorschlagFuer } from "./vorschlag";
+import { katalogNachId, katalogNachName, vorschlagFuer, type Vorschlagskontext } from "./vorschlag";
 import { quelleKeyFuer } from "./kontoMatch";
 import { klassifiziere, rohHash } from "./rohHash";
 import type { RohUmsatz } from "./rohUmsatz";
@@ -48,6 +48,15 @@ export interface UebernahmeDeps {
   readonly umsatzRepo: UmsatzRepository;
   readonly laufRepo: ImportLaufRepository;
   readonly id: () => string;
+  /**
+   * Die weiteren Quellen der Kategorisierungs-Kette (Verträge, Modell,
+   * Merkmalskonfiguration) — geladen über `kategorisierungsquellen`.
+   *
+   * Optional, damit dieser Use-Case nicht von vier Repositories abhängt, die er selbst
+   * nie befragt. Fehlt der Kontext, bleiben Umbuchungs-Erkennung und Remapping übrig —
+   * genau das Verhalten von vor der Kette.
+   */
+  readonly kategorisierung?: Vorschlagskontext;
 }
 
 /**
@@ -116,8 +125,14 @@ async function uebernahmeIntern(
     }
   }
 
-  // 2. Katalog + Bestand laden.
-  const katalog = katalogNachName(await kategorieRepo.alle());
+  // 2. Katalog + Bestand laden. Der Kategorie-Katalog wird auch dann gebraucht, wenn ein
+  // Kontext mitkam — dessen Indizes könnten aus einem älteren Stand stammen.
+  const kategorien = await kategorieRepo.alle();
+  const kontext: Vorschlagskontext = {
+    ...deps.kategorisierung,
+    katalogNachName: katalogNachName(kategorien),
+    kategorieNachId: katalogNachId(kategorien),
+  };
   const bestand = await umsatzRepo.bestandsSchluessel();
   const laufId = id();
 
@@ -157,7 +172,7 @@ async function uebernahmeIntern(
     rohHash: k.rohHash,
     nativeId: k.nativeId,
     status: "neu",
-    vorschlag: vorschlagFuer(k.roh, katalog),
+    vorschlag: vorschlagFuer(k.roh, kontext, k.zahlungskontoId),
   }));
 
   // 6. Persistieren: Umsätze + Lauf-Protokoll.
