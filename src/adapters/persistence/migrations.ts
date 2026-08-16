@@ -231,4 +231,14 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_aufteilung_buchung ON ist_buchung_aufteilung (istbuchung_id)`,
     ],
   },
+  {
+    version: 16, // Gläubiger-ID am Umsatz — Schlüssel für Vertragserkennung und Regel-Schicht
+    sql: [
+      // Finanzguru liefert sie („Glaeubiger-ID"), RohUmsatz trug sie, der Umsatz nicht:
+      // beim Übernehmen ging sie verloren. Eine SEPA-Mandatsreferenz identifiziert einen
+      // Zahlungsempfänger eindeutig — anders als ein abgeschnittener, normalisierter Name.
+      `ALTER TABLE umsatz ADD COLUMN glaeubiger_id TEXT`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_glaeubiger ON umsatz (glaeubiger_id) WHERE glaeubiger_id IS NOT NULL`,
+    ],
+  },
 ];

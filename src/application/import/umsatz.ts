@@ -36,6 +36,9 @@ export interface Umsatz {
   readonly waehrung: string;
   readonly gegenpartei: string;
   readonly verwendungszweck: string;
+  /** SEPA-Gläubiger-ID der Gegenpartei, falls die Quelle sie liefert. Schlüssel für die
+   *  Vertragserkennung: eindeutiger als ein Empfängername. */
+  readonly glaeubigerId?: string;
   /** Quellen-agnostischer Dedup-Schlüssel (siehe rohHash). */
   readonly rohHash: string;
   /** Stabile native ID der Quelle (Finanzguru Buchungs-ID) — exakte Re-Import-Dedup. */
