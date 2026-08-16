@@ -29,17 +29,25 @@ import {
   zielwert,
   type Budget,
   type BudgetPeriode,
+  type Budgetvorschlag,
   type IstBuchung,
   type Kategorie,
   type Topf,
   type Zahlungskonto,
 } from "../../core";
 import { budgetAnlegen } from "../../application/budgetAnlegen";
+import {
+  budgetvorschlaegeLaden,
+  budgetvorschlagIgnorieren,
+  ignorierteBudgetvorschlaege,
+} from "../../application/budgetvorschlaege";
 import { topfAnlegen } from "../../application/topfAnlegen";
 import { topfEntnahme } from "../../application/topfEntnahme";
 import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
 import { sqliteTopfRepository as topfRepo } from "../persistence/sqliteTopfRepository";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
+import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
+import { sqliteEinstellungenRepository as einstellungenRepo } from "../persistence/sqliteEinstellungenRepository";
 import {
   sqliteKategorieRepository as kategorieRepo,
   sqliteZahlungskontoRepository as kontoRepo,
@@ -71,6 +79,7 @@ export function BudgetsScreen() {
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [ist, setIst] = useState<IstBuchung[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
+  const [vorschlaege, setVorschlaege] = useState<Budgetvorschlag[]>([]);
 
   // Anlege-/Bearbeiten-Dialog (trägt beide Arten)
   const [offen, setOffen] = useState(false);
@@ -98,22 +107,42 @@ export function BudgetsScreen() {
   // Verwandte Repos in EINEM Effekt und zusammen setzen: gestaffelte setState lassen die
   // abgeleiteten Werte kurz gegen leere Listen rechnen (Kategorie-Lookup → „ohne Kategorie").
   async function laden() {
-    const [b, tp, k, i, ko] = await Promise.all([
+    const [b, tp, k, i, ko, ignoriert] = await Promise.all([
       budgetRepo.alle(),
       topfRepo.alle(),
       kategorieRepo.alle(),
       ledgerRepo.alle(),
       kontoRepo.alle(),
+      ignorierteBudgetvorschlaege(einstellungenRepo),
     ]);
     setBudgets(b);
     setToepfe(tp);
     setKategorien(k);
     setIst(i);
     setKonten(ko);
+    setVorschlaege(
+      await budgetvorschlaegeLaden(
+        ledgerRepo, umsatzRepo, kategorieRepo, budgetRepo, heute.slice(0, 7), heute, ignoriert,
+      ),
+    );
   }
   useEffect(() => {
     laden();
   }, []);
+
+  /** Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort. */
+  function vorschlagUebernehmen(v: Budgetvorschlag) {
+    neu();
+    setArt("monatlich");
+    setKategorieId(v.kategorieId);
+    setRahmenText(String(minorZuMajor(v.vorschlag, geld.waehrung)));
+    setPeriode("monatlich");
+  }
+
+  async function vorschlagVerwerfen(v: Budgetvorschlag) {
+    await budgetvorschlagIgnorieren(einstellungenRepo, v.kategorieId);
+    setVorschlaege((bisher) => bisher.filter((x) => x.kategorieId !== v.kategorieId));
+  }
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   /** Ersatz-Töpfe hängen am Inventar und werden dort geführt. */
@@ -265,6 +294,85 @@ export function BudgetsScreen() {
       <p style={{ color: "var(--ink-2)", fontSize: "var(--fs-body)", lineHeight: 1.55, maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
         <Trans i18nKey="budgets.erklaerung" components={betont} />
       </p>
+
+      {vorschlaege.length > 0 && (
+        <Card
+          title={t("budgets.vorschlaegeTitel")}
+          subtitle={t("budgets.vorschlaegeUntertitel", { count: vorschlaege.length })}
+        >
+          <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
+            {t("budgets.vorschlaegeHinweis")}
+          </p>
+          <DataTable
+            sortable
+            pageSize={10}
+            columns={[
+              { key: "kategorie", label: t("budgets.spalteKategorie"), render: (v: Budgetvorschlag) => v.name },
+              {
+                key: "median",
+                label: `${t("budgets.spalteBisher")} ${geld.symbol}`,
+                align: "right",
+                sortValue: (v: Budgetvorschlag) => v.medianProMonat,
+                render: (v: Budgetvorschlag) => geld.format(v.medianProMonat),
+              },
+              {
+                // Was der Vertrag abbucht, steuert kein Budget — deshalb steht der Abzug
+                // in der Tabelle und nicht nur im Ergebnis.
+                key: "vertrag",
+                label: `${t("budgets.spalteVertraglich")} ${geld.symbol}`,
+                align: "right",
+                sortValue: (v: Budgetvorschlag) => v.vertragsanteil,
+                render: (v: Budgetvorschlag) => (v.vertragsanteil > 0 ? geld.format(-v.vertragsanteil) : "—"),
+              },
+              {
+                key: "vorschlag",
+                label: `${t("budgets.spalteVorschlag")} ${geld.symbol}`,
+                align: "right",
+                sortValue: (v: Budgetvorschlag) => v.vorschlag,
+                render: (v: Budgetvorschlag) => <b>{geld.format(v.vorschlag)}</b>,
+              },
+              {
+                // Sagt, wie oft der Rahmen reißen wird: ×1 = jeden Monat gleich,
+                // ×23 = ein einzelner Monat war das Dreiundzwanzigfache.
+                key: "schwankung",
+                label: t("budgets.spalteSchwankung"),
+                align: "right",
+                sortValue: (v: Budgetvorschlag) => v.schwankung,
+                render: (v: Budgetvorschlag) =>
+                  v.schwankung <= 2 ? (
+                    <Pill variant="ok">{t("budgets.stabil")}</Pill>
+                  ) : (
+                    <Pill variant="warn">{t("budgets.schwankend", { faktor: v.schwankung })}</Pill>
+                  ),
+              },
+              { key: "monate", label: t("budgets.spalteMonate"), align: "right", render: (v: Budgetvorschlag) => String(v.monate) },
+              {
+                key: "_u",
+                label: "",
+                align: "right",
+                sortable: false,
+                render: (v: Budgetvorschlag) => (
+                  <button className="linkbtn" onClick={() => vorschlagUebernehmen(v)}>
+                    {t("budgets.vorschlagUebernehmen")}
+                  </button>
+                ),
+              },
+              {
+                key: "_v",
+                label: "",
+                align: "right",
+                sortable: false,
+                render: (v: Budgetvorschlag) => (
+                  <button className="linkbtn" onClick={() => vorschlagVerwerfen(v)}>
+                    {t("budgets.vorschlagVerwerfen")}
+                  </button>
+                ),
+              },
+            ]}
+            rows={vorschlaege}
+          />
+        </Card>
+      )}
 
       <Card title={t("budgets.abschnittMonatlich")} subtitle={t("budgets.abschnittMonatlichHinweis")}>
         {budgets.length === 0 ? (
