@@ -48,6 +48,32 @@ export function kategorieUnterbaum(
 }
 
 /**
+ * Die Hauptkategorie zu einer Kategorie: der oberste Knoten über ihr, sonst sie selbst.
+ *
+ * Warum bis zur Wurzel und nicht nur eine Ebene hoch: Auswertungen, die „nach
+ * Hauptkategorie" gruppieren, sollen bei einem dreistufigen Baum nicht plötzlich auf der
+ * mittleren Ebene stehen bleiben und dieselbe Hauptkategorie zweimal zeigen. In der Praxis
+ * ist der Baum zweistufig — dann ist das Ergebnis dasselbe wie beim einfachen Elternblick.
+ *
+ * Unbekannte `id` liefert `undefined`; Zyklen fängt der Schutzzähler ab
+ * (fachlich ausgeschlossen über `wuerdeZyklusErzeugen`).
+ */
+export function hauptkategorie(
+  kategorien: readonly Kategorie[],
+  id: string,
+): Kategorie | undefined {
+  const byId = new Map(kategorien.map((k) => [k.id, k]));
+  let aktuell = byId.get(id);
+  let schutz = 0;
+  while (aktuell?.elternId && schutz++ < 10000) {
+    const eltern = byId.get(aktuell.elternId);
+    if (!eltern) break;
+    aktuell = eltern;
+  }
+  return aktuell;
+}
+
+/**
  * Würde das Setzen von `elternId` für `id` einen Zyklus erzeugen? Reine Funktion
  * über die bestehende Kategorienliste. Zyklus, wenn der neue Elternknoten der
  * Knoten selbst oder ein Nachfahre von ihm ist (d. h. `id` ein Vorfahr von `elternId`).

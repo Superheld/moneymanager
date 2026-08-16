@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  hauptkategorie,
   kuendigungsterminNaht,
   naechsteFaelligkeit,
   naechsterKuendigungstermin,
@@ -350,22 +351,61 @@ export function VertraegeScreen() {
     [vertraege, naechsteZahlung],
   );
 
-  /** Gruppen der Turnus-Ansicht: je Rhythmus eine, zuletzt die Verträge ohne Zahlung. */
+  /** Betrag mit Vorzeichen und Währungssymbol — die Schreibweise der Gruppenköpfe. */
+  function betragText(cent: number): string {
+    return `${geld.format(Math.round(cent), { mitVorzeichen: true })} ${geld.symbol}`;
+  }
+  /** Die Regeln der Verträge einer Gruppe (Verträge ohne Regel fallen raus). */
+  function regelnVon(vs: Vertrag[]): Zahlungsregel[] {
+    return vs.map((v) => regelZuVertrag.get(v.id)).filter((r): r is Zahlungsregel => !!r);
+  }
+
+  /**
+   * Gruppen der Turnus-Ansicht: je Rhythmus eine, zuletzt die Verträge ohne Zahlung.
+   *
+   * Der Kopf nennt zwei VERSCHIEDENE Zahlen: was in der Gruppe je Fälligkeit abgeht
+   * (die Summe — bei „jährlich" der Jahresbetrag) und was das im Monat ausmacht. Vorher
+   * standen dort der Monatsanteil und der Rücklagenbedarf, und die sind bei einer reinen
+   * Abflussgruppe derselbe Wert: zweimal „pro Monat" mit identischem Betrag. Der
+   * Rücklagenbedarf steht weiterhin in der Tabellenspalte und in der KPI oben.
+   * Bei monatlichem Takt sind Summe und Monatsanteil ohnehin dasselbe — dort nur eine Zahl.
+   */
   const turnusGruppen = useMemo(() => {
-    const gruppen = RHYTHMEN.map((r) => ({
-      key: r as string,
-      titel: t(`vertraege.rhythmus.${r}`),
-      mitRuecklage: RHYTHMUS_MONATE[r] > 1,
+    const gruppen = RHYTHMEN.map((r) => {
       // Auch hier Betrag groß nach klein — innerhalb einer Turnus-Gruppe ist das die
       // einzige Ordnung, die etwas aussagt: der Takt ist ja schon gleich.
-      vertraege: vertraege
+      const drin = vertraege
         .filter((v) => regelZuVertrag.get(v.id)?.rhythmus === r)
-        .sort((a, b) => betragsRang(b) - betragsRang(a)),
-    }));
+        .sort((a, b) => betragsRang(b) - betragsRang(a));
+      const monate = RHYTHMUS_MONATE[r];
+      const summe = regelnVon(drin).reduce((s, x) => s + x.betrag, 0);
+      return {
+        key: r as string,
+        titel: t(`vertraege.rhythmus.${r}`),
+        mitRuecklage: monate > 1,
+        vertraege: drin,
+        meta:
+          monate > 1
+            ? t("vertraege.gruppeMetaTurnus", {
+                count: drin.length,
+                summe: betragText(summe),
+                proMonat: betragText(summe / monate),
+              })
+            : t("vertraege.gruppeMeta", { count: drin.length, betrag: betragText(summe) }),
+      };
+    });
     const ohne = vertraege.filter((v) => !regelZuVertrag.get(v.id));
-    if (ohne.length) gruppen.push({ key: "ohne", titel: t("vertraege.gruppeOhneRegel"), mitRuecklage: false, vertraege: ohne });
+    if (ohne.length) {
+      gruppen.push({
+        key: "ohne",
+        titel: t("vertraege.gruppeOhneRegel"),
+        mitRuecklage: false,
+        vertraege: ohne,
+        meta: t("vertraege.gruppeMetaOhne", { count: ohne.length }),
+      });
+    }
     return gruppen.filter((g) => g.vertraege.length > 0);
-  }, [vertraege, regelZuVertrag, t]);
+  }, [vertraege, regelZuVertrag, geld, t]);
 
   /**
    * Gruppen der Kategorie-Ansicht. Beantwortet die Frage, die weder Liste noch Turnus
@@ -374,57 +414,53 @@ export function VertraegeScreen() {
    * Abbuchungstakt sortiert.
    *
    * Gruppiert wird über die Kategorie der REGEL, nicht des Vertrags — der Vertrag trägt
-   * keine; die Kategorie ist eine Eigenschaft der Zahlung. Die Rücklagen-Spalte hängt
-   * hier daran, ob überhaupt ein nicht-monatlicher Vertrag in der Gruppe steckt: anders
-   * als beim Turnus ist der Takt innerhalb einer Kategorie gemischt.
+   * keine; die Kategorie ist eine Eigenschaft der Zahlung. Und über deren HAUPTkategorie,
+   * nicht über die gebuchte Unterkategorie: gebucht wird auf „Strom", „Gas", „Wasser",
+   * und drei Gruppen mit je einem Vertrag beantworten die Frage „wofür geht das Geld?"
+   * schlechter als eine Gruppe „Wohnen". Dieselbe Rollup-Regel, nach der auch Budgets
+   * und Budgetvorschläge rechnen.
+   *
+   * Die Rücklagen-Spalte hängt hier daran, ob überhaupt ein nicht-monatlicher Vertrag in
+   * der Gruppe steckt: anders als beim Turnus ist der Takt innerhalb einer Kategorie
+   * gemischt. Aus demselben Grund nennt der Kopf Monats- UND Jahressumme statt einer
+   * Summe „je Fälligkeit" — die gäbe es hier gar nicht, die Fälligkeiten sind gemischt.
    */
   const kategorieGruppen = useMemo(() => {
-    const name = new Map(kategorien.map((k) => [k.id, k.name]));
     const nachId = new Map<string, Vertrag[]>();
+    const titelVon = new Map<string, string>();
     for (const v of vertraege) {
-      const id = regelZuVertrag.get(v.id)?.kategorieId ?? "__ohne";
+      const kategorieId = regelZuVertrag.get(v.id)?.kategorieId;
+      const haupt = kategorieId ? hauptkategorie(kategorien, kategorieId) : undefined;
+      const id = haupt?.id ?? "__ohne";
+      if (haupt) titelVon.set(id, haupt.name);
       const liste = nachId.get(id);
       if (liste) liste.push(v);
       else nachId.set(id, [v]);
     }
     /** Was die Gruppe im Monat kostet — danach ordnen sich die Gruppen. */
     const proMonat = (vs: Vertrag[]) =>
-      Math.abs(
-        vs.reduce((sum, v) => {
-          const r = regelZuVertrag.get(v.id);
-          return r ? sum + r.betrag / RHYTHMUS_MONATE[r.rhythmus] : sum;
-        }, 0),
-      );
+      regelnVon(vs).reduce((sum, r) => sum + r.betrag / RHYTHMUS_MONATE[r.rhythmus], 0);
 
     return [...nachId.entries()]
-      .map(([id, vs]) => ({
-        key: id,
-        titel: id === "__ohne" ? t("vertraege.gruppeOhneKategorie") : name.get(id) ?? t("vertraege.gruppeOhneKategorie"),
-        mitRuecklage: vs.some((v) => {
-          const r = regelZuVertrag.get(v.id);
-          return !!r && RHYTHMUS_MONATE[r.rhythmus] > 1;
-        }),
-        vertraege: [...vs].sort((a, b) => betragsRang(b) - betragsRang(a)),
-        gewicht: proMonat(vs),
-        // „ohne Kategorie" ganz nach hinten: es ist keine Kategorie, sondern ihr Fehlen.
-        ohne: id === "__ohne",
-      }))
+      .map(([id, vs]) => {
+        const monat = proMonat(vs);
+        return {
+          key: id,
+          titel: titelVon.get(id) ?? t("vertraege.gruppeOhneKategorie"),
+          mitRuecklage: regelnVon(vs).some((r) => RHYTHMUS_MONATE[r.rhythmus] > 1),
+          vertraege: [...vs].sort((a, b) => betragsRang(b) - betragsRang(a)),
+          meta: t("vertraege.gruppeMetaKategorie", {
+            count: vs.length,
+            proMonat: betragText(monat),
+            proJahr: betragText(monat * 12),
+          }),
+          gewicht: Math.abs(monat),
+          // „ohne Kategorie" ganz nach hinten: es ist keine Kategorie, sondern ihr Fehlen.
+          ohne: id === "__ohne",
+        };
+      })
       .sort((a, b) => (a.ohne !== b.ohne ? (a.ohne ? 1 : -1) : b.gewicht - a.gewicht));
-  }, [vertraege, regelZuVertrag, kategorien, t]);
-
-  /** Kopfzeile einer Turnus-Gruppe: Anzahl, Monatsanteil und — falls nötig — die Rücklage. */
-  function gruppenUntertitel(g: { vertraege: Vertrag[]; mitRuecklage: boolean }): string {
-    const regeln = g.vertraege.map((v) => regelZuVertrag.get(v.id)).filter((r): r is Zahlungsregel => !!r);
-    const proMonat = Math.round(regeln.reduce((sum, r) => sum + r.betrag / RHYTHMUS_MONATE[r.rhythmus], 0));
-    const basis = t("vertraege.gruppeMeta", {
-      count: g.vertraege.length,
-      betrag: `${geld.format(proMonat, { mitVorzeichen: true })} ${geld.symbol}`,
-    });
-    if (!g.mitRuecklage) return basis;
-    const rueck = ruecklagenbedarf(regeln);
-    if (rueck <= 0) return basis;
-    return `${basis} · ${t("vertraege.gruppeRuecklage", { betrag: `${geld.format(rueck)} ${geld.symbol}` })}`;
-  }
+  }, [vertraege, regelZuVertrag, kategorien, geld, t]);
 
   function neu() {
     setMaske({ editId: null, start: leeresFormular(heute) });
@@ -546,39 +582,59 @@ export function VertraegeScreen() {
           <div className="muted">{t("vertraege.leer")}</div>
         </Card>
       ) : (
-        <>
-          {/* Umschalter: eine Fläche, drei Blicke auf dieselben Verträge. */}
-          <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
-            {ANSICHTEN.map((a, i) => {
-              const an = ansicht === a;
-              return (
-                <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
-                  style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                  {t(`vertraege.ansicht.${a}`)}
-                </button>
-              );
-            })}
+        /*
+         * EINE Card für alle vier Ansichten. Der Umschalter sitzt darin wie eine
+         * Filterleiste (dieselbe Bauform wie im Kontenregister) — vorher stand er
+         * außerhalb und die gruppierenden Ansichten sprengten die Fläche in eine Card je
+         * Gruppe. Damit sah derselbe Bestand je nach Umschalterstellung aus wie ein
+         * anderer Screen; die Gruppen sind aber eine Gliederung INNERHALB der Liste,
+         * keine eigenständigen Bereiche.
+         */
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
+            <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
+              {ANSICHTEN.map((a, i) => {
+                const an = ansicht === a;
+                return (
+                  <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
+                    style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
+                    {t(`vertraege.ansicht.${a}`)}
+                  </button>
+                );
+              })}
+            </div>
+            {/*
+              Die Ordnung steht fest und ist nicht klickbar (siehe Ansicht-Doku oben) —
+              also gehört sie hingeschrieben. Sonst sucht man die Sortierpfeile in den
+              Spaltenköpfen und hält ihr Fehlen für einen Fehler.
+            */}
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t(`vertraege.ordnung.${ansicht}`)}</span>
           </div>
 
           {ansicht === "turnus" || ansicht === "kategorie" ? (
-            (ansicht === "turnus" ? turnusGruppen : kategorieGruppen).map((g) => (
-              <Card key={g.key} title={g.titel} subtitle={gruppenUntertitel(g)}>
+            (ansicht === "turnus" ? turnusGruppen : kategorieGruppen).map((g, i) => (
+              <div
+                key={g.key}
+                // Trennlinie statt Rahmen: die Gruppen liegen jetzt in EINER Fläche und
+                // brauchen nur eine Naht, keine eigene Kante.
+                style={i > 0 ? { borderTop: "1px solid var(--line)", marginTop: "var(--sp-5)", paddingTop: "var(--sp-5)" } : undefined}
+              >
+                <div style={{ fontSize: "var(--fs-title)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{g.titel}</div>
+                <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", margin: "3px 0 var(--sp-3)" }}>{g.meta}</div>
                 <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
-              </Card>
+              </div>
             ))
           ) : (
-            <Card>
-              <DataTable
-                // Ohne key bliebe beim Ansichtswechsel die aufgeschlagene Seite stehen —
-                // Seite 3 von „liste" ist in „faelligkeit" ein anderer Ausschnitt.
-                key={ansicht}
-                pageSize={25}
-                columns={spalten(false)}
-                rows={ansicht === "faelligkeit" ? nachFaelligkeit : nachBetrag}
-              />
-            </Card>
+            <DataTable
+              // Ohne key bliebe beim Ansichtswechsel die aufgeschlagene Seite stehen —
+              // Seite 3 von „liste" ist in „faelligkeit" ein anderer Ausschnitt.
+              key={ansicht}
+              pageSize={25}
+              columns={spalten(false)}
+              rows={ansicht === "faelligkeit" ? nachFaelligkeit : nachBetrag}
+            />
           )}
-        </>
+        </Card>
       )}
 
       {befund && <ErkennungsDialog kandidat={befund} onClose={() => setBefund(null)} />}

@@ -147,6 +147,31 @@ describe("VertraegeScreen — Ansichten", () => {
     expect(document.body.textContent).toMatch(/18,36/);
     expect(document.body.textContent).toMatch(/10,00/);
   });
+
+  /**
+   * Der Kopf einer nicht-monatlichen Turnus-Gruppe nennt ZWEI verschiedene Zahlen: was
+   * je Fälligkeit abgeht und was das im Monat ausmacht. Vorher standen dort Monatsanteil
+   * und Rücklagenbedarf — bei einer reinen Abflussgruppe derselbe Wert, also zweimal
+   * dieselbe Aussage. Geprüft an einem BLATTknoten: nur wenn beide Zahlen in einem
+   * Element ohne Kinder stehen, ist es wirklich die Kopfzeile und nicht ihr Container.
+   */
+  it("nennt im Turnus-Kopf Summe je Fälligkeit und Monatsanteil", async () => {
+    await bestand();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Alpha");
+    await nutzer.click(screen.getByRole("button", { name: /turnus/i }));
+
+    // Alpha: 120,00 € im Jahr ⇒ 10,00 € pro Monat. Beides im selben Kopf.
+    const kopf = await screen.findAllByText(
+      (_, el) =>
+        !!el &&
+        el.children.length === 0 &&
+        /120,00/.test(el.textContent ?? "") &&
+        /10,00/.test(el.textContent ?? ""),
+    );
+    expect(kopf.length).toBeGreaterThan(0);
+  });
 });
 
 describe("VertraegeScreen — Beginn und Fälligkeit", () => {
@@ -181,6 +206,43 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
     expect(koepfe.map((e) => e.textContent)).toEqual(["Wohnen", "Medien", "Ohne Kategorie"]);
     // Die Gruppe trägt ihre Summe: 900 + 120 = 1.020 € pro Monat.
     expect(document.body.textContent).toMatch(/1\.020,00/);
+  });
+
+  /**
+   * Gebucht wird auf Unterkategorien („Strom", „Gas"), gefragt ist aber die
+   * Hauptkategorie: drei Gruppen mit je einem Vertrag beantworten „wofür geht das Geld?"
+   * schlechter als eine Gruppe „Wohnen". Geprüft an den Namen, die der Test selbst
+   * angelegt hat — die Unterkategorien dürfen NICHT als Gruppenkopf auftauchen.
+   */
+  it("rollt die Kategorie-Ansicht auf die Hauptkategorie hoch", async () => {
+    await konto();
+    await sqliteKategorieRepository.speichern({ id: "wohnen", name: "Wohnen", defaultCharakter: "Aufwand" });
+    await sqliteKategorieRepository.speichern({ id: "strom", name: "Strom", elternId: "wohnen", defaultCharakter: "Aufwand" });
+    await sqliteKategorieRepository.speichern({ id: "gas", name: "Gas", elternId: "wohnen", defaultCharakter: "Aufwand" });
+    const vertraege: [string, string, number, string][] = [
+      ["v1", "[anonymisiert] Strom", -8000, "strom"],
+      ["v2", "[anonymisiert] Gas", -6000, "gas"],
+    ];
+    for (const [id, anbieter, betrag, kategorieId] of vertraege) {
+      await sqliteVertragRepository.speichern({
+        id, anbieter, beginn: "2025-01-01", verlaengerung: "automatisch", status: "aktiv",
+      });
+      await sqliteZahlungsregelRepository.speichern({
+        id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: "monatlich",
+        startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: id, kategorieId,
+      });
+    }
+
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("[anonymisiert] Strom");
+    await nutzer.click(screen.getByRole("button", { name: "Kategorie" }));
+
+    // Eine Gruppe „Wohnen" mit beiden Verträgen — 80 + 60 = 140 € pro Monat.
+    expect(await screen.findByText("Wohnen")).toBeInTheDocument();
+    expect(screen.queryByText("Strom")).toBeNull();
+    expect(screen.queryByText("Gas")).toBeNull();
+    expect(document.body.textContent).toMatch(/140,00/);
   });
 
   it("hält die Konditionen zugeklappt und fasst zusammen, was drinsteht", async () => {
