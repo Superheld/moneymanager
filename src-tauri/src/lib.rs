@@ -7,6 +7,11 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::new().build())
+        // Reiner Transport für FinTS: der Bank-Endpunkt sendet kein
+        // Access-Control-Allow-Origin, aus der Webview stirbt der POST an CORS.
+        // Dieser fetch läuft durch Rust und kennt kein CORS. Keine Domänenlogik —
+        // welche URLs erlaubt sind, steht in capabilities/default.json.
+        .plugin(tauri_plugin_http::init())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
