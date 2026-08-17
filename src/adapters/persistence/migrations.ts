@@ -445,4 +445,46 @@ export const MIGRATIONS: Migration[] = [
        ) WHERE kategorie_id IS NULL`,
     ],
   },
+  {
+    version: 26, // Bankzugang für den FinTS-Direktabruf
+    sql: [
+      // Ein hinterlegter Zugang — OHNE PIN. Die PIN lebt nur in der Sitzung und wird
+      // weder hier noch sonstwo gespeichert; sie steht bei jeder Anmeldung neu im
+      // Eingabefeld. Käme sie eines Tages doch in eine Aufbewahrung, dann in den
+      // System-Schlüsselbund und nicht in diese Datei.
+      //
+      // `bankparameter` ist das serialisierte BankingInformation-Objekt der Bibliothek
+      // (systemId + BPD + UPD). Es MUSS aufbewahrt werden: ohne es synchronisiert jede
+      // Anmeldung von vorn — zwei zusätzliche Dialogrunden, und der Erstlauf zieht dabei
+      // eher eine TAN. Es enthält Kontonummern und Inhabernamen, also nichts, was nicht
+      // ohnehin in dieser Datenbank steht.
+      `CREATE TABLE IF NOT EXISTS bankzugang (
+        id               TEXT PRIMARY KEY,
+        bezeichnung      TEXT NOT NULL,
+        url              TEXT NOT NULL,
+        blz              TEXT NOT NULL,
+        benutzer         TEXT NOT NULL,
+        kunden_id        TEXT,
+        bankparameter    TEXT,
+        tan_verfahren_id INTEGER,
+        tan_medium       TEXT,
+        angelegt_am      TEXT NOT NULL
+      )`,
+      // Welches Bankkonto auf welches Zahlungskonto der App zeigt.
+      //
+      // Der Schlüssel ist `kontonummer|unterkontomerkmal`, NIE die Kontonummer allein:
+      // comdirect meldet Girokonto und Depot unter derselben Nummer und trennt sie über
+      // das Unterkontomerkmal, in dem der Produktname steht.
+      //
+      // `letzter_abruf_bis` trägt den fortlaufenden Abruf (S-6d): ab wo beim nächsten Mal
+      // gelesen wird, statt jedes Mal alles zu holen.
+      `CREATE TABLE IF NOT EXISTS bankkonto_zuordnung (
+        zugang_id         TEXT NOT NULL,
+        schluessel        TEXT NOT NULL,
+        zahlungskonto_id  TEXT NOT NULL,
+        letzter_abruf_bis TEXT,
+        PRIMARY KEY (zugang_id, schluessel)
+      )`,
+    ],
+  },
 ];

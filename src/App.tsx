@@ -7,6 +7,7 @@ import { VertraegeScreen } from "./adapters/ui/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/BudgetsScreen";
 import { InventarScreen } from "./adapters/ui/InventarScreen";
 import { ImportScreen } from "./adapters/ui/ImportScreen";
+import { BankabrufScreen } from "./adapters/ui/BankabrufScreen";
 import { ReviewScreen } from "./adapters/ui/ReviewScreen";
 import { appBootstrap } from "./application/bootstrap";
 import { sqliteKategorieRepository } from "./adapters/persistence/sqliteStammdatenRepositories";
@@ -31,6 +32,7 @@ export default function App() {
         {screen === "budgets" && <BudgetsScreen />}
         {screen === "vertraege" && <VertraegeScreen />}
         {screen === "import" && <ImportScreen />}
+        {screen === "bankabruf" && <BankabrufScreen />}
         {screen === "review" && <ReviewScreen />}
         {screen === "einstellungen" && <EinstellungenScreen />}
       </AppShell>
