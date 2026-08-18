@@ -44,7 +44,7 @@ export function NeueBuchungen({
   bestand: readonly Umsatz[];
   kategorien: readonly Kategorie[];
   /** Öffnet die verbuchte Buchung zum vollen Bearbeiten. */
-  onOeffnen: (istbuchungId: string) => void;
+  onOeffnen: (istbuchungId: string) => void | Promise<void>;
   onGeaendert: () => void;
 }) {
   const { t } = useTranslation();
@@ -108,7 +108,7 @@ export function NeueBuchungen({
   async function bestaetigenUndOeffnen(u: Umsatz) {
     await bestaetigen([u]);
     const frisch = (await sqliteUmsatzRepository.alle()).find((x) => x.id === u.id);
-    if (frisch?.istbuchungId) onOeffnen(frisch.istbuchungId);
+    if (frisch?.istbuchungId) await onOeffnen(frisch.istbuchungId);
   }
 
   /** Markiert die Zeile als Umbuchung — dann paart das Verbuchen die zwei Beine. */
