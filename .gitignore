@@ -31,8 +31,12 @@ Moneymanager/
 ARCHITEKTUR.md
 design-system/
 
-# DK-Bankenliste: von der Deutschen Kreditwirtschaft an registrierte Hersteller
-# verteilt, nicht öffentlich — weder die Quelle noch das daraus Erzeugte gehören in ein
-# öffentliches Repo. Beides entsteht lokal über scripts/bankenliste-erzeugen.mjs.
-public/bankenliste.json
-src-tauri/capabilities/fints-banken.json
+# Die DK-Bankenliste als CSV liegt im lokalen Doku-Ordner und ist über `Moneymanager/`
+# schon ausgeschlossen. Die daraus ERZEUGTEN Dateien (public/bankenliste.json,
+# src-tauri/capabilities/fints-banken.json) liegen dagegen im Repo: darin stehen
+# Bankleitzahl, Institut, Ort und der öffentliche FinTS-Endpunkt — nichts
+# Nutzerbezogenes. Neu erzeugen: `npm run bankenliste`.
+#
+# NICHT ins Repo gehört die DK-Produktregistrierungsnummer. Sie steht in der .env
+# (oben ausgeschlossen); dass sie in keiner versionierten Datei landet, prüft
+# src/adapters/fints/produktId.test.ts bei jedem Testlauf.
