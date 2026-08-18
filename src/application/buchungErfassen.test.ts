@@ -66,6 +66,35 @@ describe("buchungErfassen", () => {
     await expect(buchungBearbeiten(ledger, o, { datum: "2026-06-01", betrag: 0, charakter: "Aufwand" })).rejects.toThrow("betrag.groesserNull");
   });
 
+  it("buchungBearbeiten verschiebt die Buchung auf ein anderes Konto", async () => {
+    // Der Konto-Match des Imports ist eine Vermutung — wer die Buchung vor sich hat,
+    // korrigiert sie hier.
+    const ledger = memLedger();
+    const original: IstBuchung = { id: "x1", datum: "2026-06-01", betrag: euroZuCent(-10), kontoId: "giro", charakter: "Aufwand", quelle: "import" };
+    ledger.daten.push(original);
+    const u = await buchungBearbeiten(ledger, original, { datum: "2026-06-01", betrag: euroZuCent(10), charakter: "Aufwand", kontoId: "bar" });
+    expect(u.kontoId).toBe("bar");
+  });
+
+  it("buchungBearbeiten lässt das Konto stehen, wenn keines mitgegeben wird", async () => {
+    const ledger = memLedger();
+    const original: IstBuchung = { id: "x1", datum: "2026-06-01", betrag: euroZuCent(-10), kontoId: "giro", charakter: "Aufwand", quelle: "import" };
+    ledger.daten.push(original);
+    const u = await buchungBearbeiten(ledger, original, { datum: "2026-06-01", betrag: euroZuCent(10), charakter: "Aufwand" });
+    expect(u.kontoId).toBe("giro");
+  });
+
+  it("buchungBearbeiten verweigert den Kontowechsel bei einem Umbuchungs-Bein", async () => {
+    // Das Gegenkonto steht am ANDEREN Bein; ein einseitiger Wechsel zöge die Paarung auf
+    // zwei verschiedene Aussagen auseinander.
+    const ledger = memLedger();
+    const bein: IstBuchung = { id: "t1", datum: "2026-06-01", betrag: euroZuCent(-10), kontoId: "giro", charakter: "Umschichtung", quelle: "manuell", transferId: "tr1", gegenkontoId: "spar" };
+    ledger.daten.push(bein);
+    await expect(
+      buchungBearbeiten(ledger, bein, { datum: "2026-06-01", betrag: euroZuCent(10), charakter: "Umschichtung", kontoId: "bar" }),
+    ).rejects.toThrow("konten.kontoWechselGepaart");
+  });
+
   it("buchungLoeschen entfernt die Buchung", async () => {
     const ledger = memLedger();
     const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(5), charakter: "Aufwand" });

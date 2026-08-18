@@ -19,7 +19,6 @@ import {
   type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
-import { buchungErfassen } from "../../application/buchungErfassen";
 import { type Umsatz } from "../../application/import";
 import { umbuchungErfassen } from "../../application/umbuchungErfassen";
 import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../../application/bezahltMarkieren";
@@ -31,7 +30,6 @@ import { sqliteImportLaufRepository as laufRepo, sqliteUmsatzRepository as umsat
 import { sqliteKontozuordnungRepository as zuordnungRepo } from "../persistence/sqliteBankzugangRepositories";
 import type { ScreenId } from "./AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
-import { CategoryPicker } from "./CategoryPicker";
 import { BuchungDetail } from "./BuchungDetail";
 import { AbrufDialog } from "./AbrufDialog";
 import { ABRUF_QUELLEN, NeueBuchungen } from "./NeueBuchungen";
@@ -39,7 +37,6 @@ import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
 
-const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const TAGE_OPTIONEN = [14, 30, 60, 90];
 const ART_OPTS = [
   { v: "alle", k: "konten.artAlle" },
@@ -78,6 +75,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
+  /** Die abgerufene Zeile, die gerade im Dialog liegt — noch nichts davon ist gebucht. */
+  const [entwurf, setEntwurf] = useState<Umsatz | null>(null);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [abruf, setAbruf] = useState(false);
   /** Konten, die an einer Bankverbindung hängen — daran hängt auch der Abruf-Knopf. */
@@ -277,13 +276,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           alleNeuen={neueAbrufe}
           konten={konten}
           kategorien={kategorien}
-          onOeffnen={async (istbuchungId) => {
-            // FRISCH aus dem Ledger holen, nicht aus `ist`: die Buchung ist gerade erst
-            // entstanden, und der State dieser Render-Runde kennt sie noch nicht. Genau
-            // daran öffnete sich der Dialog nicht — bestätigt wurde, mehr nicht.
-            const b = (await ledgerRepo.alle()).find((x) => x.id === istbuchungId);
-            if (b) setEditBuchung(b);
-          }}
+          onOeffnen={setEntwurf}
           onGeaendert={() => void laden()}
         />
       )}
@@ -423,13 +416,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         </Card>
       )}
 
+      {/* Anlegen und Bearbeiten sind derselbe Dialog: ohne `buchung` legt er eine neue an,
+          vorbelegt mit dem Konto, dessen Register gerade offen ist. */}
       {buchenOffen && aktiv && (
-        <BuchungModal
-          konto={aktiv}
-          kategorien={kategorien}
-          heute={heute}
+        <BuchungDetail
+          vorgabe={{ kontoId: aktiv.id, datum: heute }}
           onClose={() => setBuchenOffen(false)}
-          onSaved={async () => { setBuchenOffen(false); setIst(await ledgerRepo.alle()); }}
+          onGeaendert={laden}
         />
       )}
 
@@ -437,6 +430,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         <BuchungDetail
           buchung={editBuchung}
           onClose={() => setEditBuchung(null)}
+          onGeaendert={laden}
+        />
+      )}
+
+      {/* Derselbe Dialog für die Bankzeile — er schreibt erst beim Übernehmen oder
+          Verwerfen. Wegklicken lässt den Entwurf unangetastet stehen. */}
+      {entwurf && (
+        <BuchungDetail
+          entwurf={entwurf}
+          onClose={() => setEntwurf(null)}
           onGeaendert={laden}
         />
       )}
@@ -517,65 +520,6 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
         </FormField>
         <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
           <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
-        </FormField>
-      </div>
-    </Modal>
-  );
-}
-
-function BuchungModal({ konto, kategorien, heute, onClose, onSaved }: { konto: Zahlungskonto; kategorien: Kategorie[]; heute: string; onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation();
-  const geld = useGeld();
-  const charakterLabel = useCharakterLabel();
-  const [datum, setDatum] = useState(heute);
-  const [betrag, setBetrag] = useState("");
-  const [charakter, setCharakter] = useState<Charakter>("Aufwand");
-  const [kategorieId, setKategorieId] = useState("");
-  const [notiz, setNotiz] = useState("");
-  const [fehler, setFehler] = useState<string | null>(null);
-  const vorlaeufig = konto.typ !== "Bargeld";
-
-  async function speichern() {
-    setFehler(null);
-    try {
-      await buchungErfassen(ledgerRepo, {
-        kontoId: konto.id,
-        datum,
-        betrag: geld.parse(betrag) ?? 0,
-        charakter,
-        kategorieId: kategorieId || undefined,
-        notiz,
-      });
-      onSaved();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
-  }
-
-  return (
-    <Modal
-      title={t("konten.buchung.titel", { konto: konto.bezeichnung })}
-      subtitle={vorlaeufig ? t("konten.buchung.untertitelVorlaeufig") : t("konten.buchung.untertitelBargeld")}
-      onClose={onClose}
-      footer={<><Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button><button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
-    >
-      <div className="form-grid">
-        <FormField label={t("konten.feldDatum")} required>
-          <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
-        </FormField>
-        <FormField label={t("konten.feldBetrag")} hint={t("konten.buchung.betragHinweis")} required>
-          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
-        </FormField>
-        <FormField label={t("konten.feldCharakter")}>
-          <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-            {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
-          </select>
-        </FormField>
-        <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
-          <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
-        </FormField>
-        <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
-          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.buchung.notizPlatzhalter")} />
         </FormField>
       </div>
     </Modal>
