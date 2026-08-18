@@ -16,18 +16,13 @@
 // Bestätigen heißt verbuchen: erst dann wird aus dem Abruf eine Ist-Buchung, die im
 // Saldo steht. Bis dahin ist nichts passiert, was sich nicht folgenlos verwerfen ließe.
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Kategorie } from "../../core";
-import {
-  umsaetzeVerbuchen,
-  verwerfen,
-  type ImportLauf,
-  type Umsatz,
-} from "../../application/import";
+import { umsaetzeVerbuchen, verwerfen, type Umsatz } from "../../application/import";
 import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
 import { vertragsAbgleichDeps } from "../persistence/sqliteVertragZuordnungRepositories";
-import { sqliteImportLaufRepository, sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
+import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { CategoryPicker } from "./CategoryPicker";
 import { Button, Card, Pill } from "./ds";
@@ -37,37 +32,25 @@ import { useGeld } from "./einstellungenKontext";
 export const ABRUF_QUELLEN = new Set(["fints"]);
 
 export function NeueBuchungen({
-  kontoId,
+  zeilen,
+  alleOffenen,
   kategorien,
   onGeaendert,
 }: {
-  kontoId: string;
+  /** Die offenen Abruf-Buchungen DIESES Kontos. */
+  zeilen: readonly Umsatz[];
+  /** Alle offenen — zum Auflösen des vermuteten Zwillings, der woanders liegen kann. */
+  alleOffenen: readonly Umsatz[];
   kategorien: readonly Kategorie[];
   onGeaendert: () => void;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const [offene, setOffene] = useState<Umsatz[]>([]);
-  const [laeufe, setLaeufe] = useState<ImportLauf[]>([]);
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   /** Zeile, deren Kategorie gerade geändert wird. */
   const [aendertId, setAendertId] = useState<string | null>(null);
 
-  async function laden() {
-    const [us, ls] = await Promise.all([sqliteUmsatzRepository.offene(), sqliteImportLaufRepository.alle()]);
-    setLaeufe(ls);
-    setOffene(us);
-  }
-
-  useEffect(() => {
-    laden().catch(() => setOffene([]));
-  }, [kontoId]);
-
-  const quelleVon = new Map(laeufe.map((l) => [l.id, l.quelle]));
-  const zeilen = offene.filter(
-    (u) => u.zahlungskontoId === kontoId && ABRUF_QUELLEN.has(quelleVon.get(u.laufId) ?? ""),
-  );
   const kategorieName = new Map(kategorien.map((k) => [k.id, k.name]));
 
   async function bestaetigen(auswahl: readonly Umsatz[]) {
@@ -84,7 +67,6 @@ export function NeueBuchungen({
       // Inbox. Er gehört nicht in den Verbuchen-Use-Case: der schreibt Fakten, die
       // Zuordnung ist eine Interpretation darüber.
       await zuordnungenAbgleichen(vertragsAbgleichDeps);
-      await laden();
       onGeaendert();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -95,7 +77,6 @@ export function NeueBuchungen({
 
   async function verwerfenEiner(u: Umsatz) {
     await sqliteUmsatzRepository.speichern(verwerfen(u));
-    await laden();
     onGeaendert();
   }
 
@@ -112,7 +93,7 @@ export function NeueBuchungen({
       },
     });
     setAendertId(null);
-    await laden();
+    onGeaendert();
   }
 
   if (zeilen.length === 0) return null;
@@ -135,7 +116,7 @@ export function NeueBuchungen({
       {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
 
       {zeilen.map((u) => {
-        const zwilling = u.verdachtAufId ? offene.find((x) => x.id === u.verdachtAufId) : undefined;
+        const zwilling = u.verdachtAufId ? alleOffenen.find((x) => x.id === u.verdachtAufId) : undefined;
         return (
           <div key={u.id} style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-3) 0" }}>
             <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "baseline", flexWrap: "wrap" }}>

@@ -27,14 +27,14 @@ import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqlit
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
+import { sqliteImportLaufRepository as laufRepo, sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
 import { sqliteKontozuordnungRepository as zuordnungRepo } from "../persistence/sqliteBankzugangRepositories";
 import type { ScreenId } from "./AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { BuchungDetail } from "./BuchungDetail";
 import { AbrufDialog } from "./AbrufDialog";
-import { NeueBuchungen } from "./NeueBuchungen";
+import { ABRUF_QUELLEN, NeueBuchungen } from "./NeueBuchungen";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
@@ -82,6 +82,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [abruf, setAbruf] = useState(false);
   /** Konten, die an einer Bankverbindung hängen — daran hängt auch der Abruf-Knopf. */
   const [onlineKonten, setOnlineKonten] = useState<Set<string>>(new Set());
+  /** Abgerufene, noch nicht bestätigte Buchungen — je Konto. */
+  const [neueAbrufe, setNeueAbrufe] = useState<Umsatz[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
 
   // Alles in EINEM Zug laden und zusammen setzen. Gestaffelte await/setState-Paare
@@ -89,21 +91,30 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   // importierten Buchung käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte
   // für einen Render „Buchung" statt „[anonymisiert]".
   async function laden() {
-    const [ks, bs, rs, kats, us, zuordnungen] = await Promise.all([
+    const [ks, bs, rs, kats, us, zuordnungen, offene, laeufe] = await Promise.all([
       kontoRepo.alle(),
       ledgerRepo.alle(),
       regelRepo.alle(),
       kategorieRepo.alle(),
       umsatzRepo.alle(),
       zuordnungRepo.alle(),
+      umsatzRepo.offene(),
+      laufRepo.alle(),
     ]);
+    const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
+    const neu = offene.filter((u) => abrufLaeufe.has(u.laufId));
+    setNeueAbrufe(neu);
     setOnlineKonten(new Set(zuordnungen.map((z) => z.zahlungskontoId)));
     setKonten(ks);
     setIst(bs);
     setRegeln(rs);
     setKategorien(kats);
     setUmsaetze(us);
-    setAktivId((id) => id || ks[0]?.id || "");
+    // Vorauswahl: das Konto, auf das etwas wartet. Sonst steht die Übersicht auf dem
+    // ersten Konto nach Alphabet („Bargeld"), und die abgerufenen Buchungen des
+    // Girokontos sieht man erst, wenn man zufällig die richtige Zeile anklickt.
+    const wartet = ks.find((k) => neu.some((u) => u.zahlungskontoId === k.id));
+    setAktivId((id) => id || wartet?.id || ks[0]?.id || "");
   }
   useEffect(() => {
     laden();
@@ -217,6 +228,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               { key: "bezeichnung", label: t("konten.spalteBezeichnung"), render: (k) => (<span style={{ fontWeight: k.id === aktivId ? "var(--fw-bold)" : "var(--fw-semi)" }}>{k.bezeichnung}</span>) },
               { key: "typ", label: t("konten.spalteTyp"), sortValue: (k) => k.typ, render: (k) => <Pill variant="neutral">{t(`konten.typ.${k.typ}`)}</Pill> },
               {
+                key: "wartet",
+                label: t("konten.spalteWartet"),
+                align: "right" as const,
+                sortValue: (k) => neueAbrufe.filter((u) => u.zahlungskontoId === k.id).length,
+                render: (k) => {
+                  const n = neueAbrufe.filter((u) => u.zahlungskontoId === k.id).length;
+                  return n > 0 ? <Pill variant="plan">{t("konten.wartet", { n })}</Pill> : "—";
+                },
+              },
+              {
                 key: "verbindung",
                 label: t("konten.spalteVerbindung"),
                 sortValue: (k) => (onlineKonten.has(k.id) ? "0" : "1"),
@@ -246,7 +267,12 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {/* Was die Bank gebracht hat, steht VOR dem Register: es ist noch nicht Teil des
           Saldos und wartet auf eine Entscheidung. */}
       {aktivId && (
-        <NeueBuchungen kontoId={aktivId} kategorien={kategorien} onGeaendert={() => void laden()} />
+        <NeueBuchungen
+          zeilen={neueAbrufe.filter((u) => u.zahlungskontoId === aktivId)}
+          alleOffenen={neueAbrufe}
+          kategorien={kategorien}
+          onGeaendert={() => void laden()}
+        />
       )}
 
       {aktiv && register && (
