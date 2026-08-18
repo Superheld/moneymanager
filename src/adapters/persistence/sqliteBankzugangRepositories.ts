@@ -88,6 +88,19 @@ export const sqliteBankzugangRepository: BankzugangRepository = {
 };
 
 export const sqliteKontozuordnungRepository: KontozuordnungRepository = {
+  async alle() {
+    const db = await getDb();
+    const zeilen = await db.select<ZuordnungZeile[]>(
+      `SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis FROM bankkonto_zuordnung`,
+    );
+    return zeilen.map((z) => ({
+      zugangId: z.zugang_id,
+      schluessel: z.schluessel,
+      zahlungskontoId: z.zahlungskonto_id,
+      letzterAbrufBis: z.letzter_abruf_bis ?? undefined,
+    }));
+  },
+
   async nachZugang(zugangId: string) {
     const db = await getDb();
     const zeilen = await db.select<ZuordnungZeile[]>(

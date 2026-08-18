@@ -52,7 +52,9 @@ describe("App", () => {
     render(<App />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Moneymanager/));
 
-    await nutzer.click(await screen.findByText(/^Konten$/));
+    // „Konten" steht zweimal in der Seitenleiste: die Übersicht unter Überblick und die
+    // Verwaltung unter Verwaltung. Hier ist die erste gemeint.
+    await nutzer.click((await screen.findAllByText(/^Konten$/))[0]);
     // Nach dem Wechsel muss der Konten-Bereich sichtbar sein.
     await waitFor(() => expect(document.body.textContent).toMatch(/Konto|Konten/));
   });

@@ -24,6 +24,8 @@ export interface Kontozuordnung {
 }
 
 export interface KontozuordnungRepository {
+  /** Alle Zuordnungen — Grundlage der Frage „ist dieses Konto online?". */
+  alle(): Promise<Kontozuordnung[]>;
   nachZugang(zugangId: string): Promise<Kontozuordnung[]>;
   speichern(zuordnung: Kontozuordnung): Promise<void>;
   loeschen(zugangId: string, schluessel: string): Promise<void>;
