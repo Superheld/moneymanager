@@ -22,7 +22,7 @@ import {
 } from "../../core";
 import { kontoAnlegen } from "../../application/stammdatenAnlegen";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
-import { Button, Card, DataTable, FormField } from "./ds";
+import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { KontoAnlegenModal } from "./KontoAnlegenModal";
 import { Modal } from "./Modal";
 import { fehlerNachricht, useGeld } from "./einstellungenKontext";
@@ -32,12 +32,15 @@ export function KontenVerwaltung({
   personen,
   personName,
   ist,
+  onlineKonten,
   onChange,
 }: {
   konten: Zahlungskonto[];
   personen: Person[];
   personName: Map<string, string>;
   ist: IstBuchung[];
+  /** Konten, die an einer Bankverbindung hängen. */
+  onlineKonten: ReadonlySet<string>;
   onChange: () => void;
 }) {
   const { t } = useTranslation();
@@ -91,6 +94,16 @@ export function KontenVerwaltung({
           columns={[
             { key: "bezeichnung", label: t("einstellungen.konto.spalteBezeichnung") },
             { key: "typ", label: t("einstellungen.konto.spalteTyp"), render: (k) => t(`einstellungen.konto.typ.${k.typ}`) },
+            {
+              key: "verbindung",
+              label: t("konten.spalteVerbindung"),
+              render: (k) =>
+                onlineKonten.has(k.id) ? (
+                  <Pill variant="ok">{t("konten.online")}</Pill>
+                ) : (
+                  <Pill variant="neutral">{t("konten.offline")}</Pill>
+                ),
+            },
             { key: "iban", label: t("einstellungen.konto.spalteIban"), render: (k) => k.iban ?? "—" },
             { key: "inhaber", label: t("einstellungen.konto.spalteInhaber"), render: (k) => (k.inhaberIds.length ? k.inhaberIds.map((id: string) => personName.get(id) ?? "?").join(", ") : "—") },
             { key: "saldo", label: `${hatIst ? t("einstellungen.konto.spalteAnfangsbestand") : t("einstellungen.konto.spalteKontostand")} ${geld.symbol}`, align: "right", render: (k) => geld.format(k.saldo) },

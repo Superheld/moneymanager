@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { IstBuchung, Person, Zahlungskonto } from "../../core";
+import { sqliteKontozuordnungRepository as zuordnungRepo } from "../persistence/sqliteBankzugangRepositories";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import {
   sqlitePersonRepository as personRepo,
@@ -24,14 +25,21 @@ export function KontenVerwaltungScreen() {
   const [personen, setPersonen] = useState<Person[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [ist, setIst] = useState<IstBuchung[]>([]);
+  const [onlineKonten, setOnlineKonten] = useState<Set<string>>(new Set());
 
   // Zusammen laden und zusammen setzen: gestaffelte setState lassen die abgeleiteten
   // Werte (realer Stand, Inhaber-Namen) kurz gegen leere Listen rechnen.
   async function laden() {
-    const [p, k, i] = await Promise.all([personRepo.alle(), kontoRepo.alle(), ledgerRepo.alle()]);
+    const [p, k, i, zuordnungen] = await Promise.all([
+      personRepo.alle(),
+      kontoRepo.alle(),
+      ledgerRepo.alle(),
+      zuordnungRepo.alle(),
+    ]);
     setPersonen(p);
     setKonten(k);
     setIst(i);
+    setOnlineKonten(new Set(zuordnungen.map((z) => z.zahlungskontoId)));
   }
 
   useEffect(() => {
@@ -50,6 +58,7 @@ export function KontenVerwaltungScreen() {
         personen={personen}
         personName={personName}
         ist={ist}
+        onlineKonten={onlineKonten}
         onChange={() => void laden()}
       />
     </div>

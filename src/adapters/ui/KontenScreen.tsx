@@ -28,10 +28,12 @@ import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqlit
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
+import { sqliteKontozuordnungRepository as zuordnungRepo } from "../persistence/sqliteBankzugangRepositories";
 import type { ScreenId } from "./AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { BuchungDetail } from "./BuchungDetail";
+import { AbrufDialog } from "./AbrufDialog";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
@@ -76,6 +78,9 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
+  const [abruf, setAbruf] = useState(false);
+  /** Konten, die an einer Bankverbindung hängen — daran hängt auch der Abruf-Knopf. */
+  const [onlineKonten, setOnlineKonten] = useState<Set<string>>(new Set());
   const [fehler, setFehler] = useState<string | null>(null);
 
   // Alles in EINEM Zug laden und zusammen setzen. Gestaffelte await/setState-Paare
@@ -83,13 +88,15 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   // importierten Buchung käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte
   // für einen Render „Buchung" statt „Edeka".
   async function laden() {
-    const [ks, bs, rs, kats, us] = await Promise.all([
+    const [ks, bs, rs, kats, us, zuordnungen] = await Promise.all([
       kontoRepo.alle(),
       ledgerRepo.alle(),
       regelRepo.alle(),
       kategorieRepo.alle(),
       umsatzRepo.alle(),
+      zuordnungRepo.alle(),
     ]);
+    setOnlineKonten(new Set(zuordnungen.map((z) => z.zahlungskontoId)));
     setKonten(ks);
     setIst(bs);
     setRegeln(rs);
@@ -187,7 +194,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       <Card
         title={t("konten.deineKonten")}
         subtitle={t("konten.deineKontenUntertitel")}
-        action={<Button plus onClick={() => onNavigate("einstellungen")}>{t("konten.kontoAnlegen")}</Button>}
+        action={
+          <span style={{ display: "flex", gap: "var(--sp-2)" }}>
+            {/* Nur zeigen, wenn es überhaupt etwas abzurufen gibt — ein Knopf, der
+                nichts tun kann, ist eine Frage an den Nutzer statt einer Antwort. */}
+            {onlineKonten.size > 0 && (
+              <Button variant="primary" onClick={() => setAbruf(true)}>{t("konten.abrufen")}</Button>
+            )}
+            <Button plus onClick={() => onNavigate("kontenverwaltung")}>{t("konten.kontoAnlegen")}</Button>
+          </span>
+        }
       >
         {konten.length === 0 ? (
           <div className="muted">{t("konten.keineKonten")}</div>
@@ -199,6 +215,17 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             columns={[
               { key: "bezeichnung", label: t("konten.spalteBezeichnung"), render: (k) => (<span style={{ fontWeight: k.id === aktivId ? "var(--fw-bold)" : "var(--fw-semi)" }}>{k.bezeichnung}</span>) },
               { key: "typ", label: t("konten.spalteTyp"), sortValue: (k) => k.typ, render: (k) => <Pill variant="neutral">{t(`konten.typ.${k.typ}`)}</Pill> },
+              {
+                key: "verbindung",
+                label: t("konten.spalteVerbindung"),
+                sortValue: (k) => (onlineKonten.has(k.id) ? "0" : "1"),
+                render: (k) =>
+                  onlineKonten.has(k.id) ? (
+                    <Pill variant="ok">{t("konten.online")}</Pill>
+                  ) : (
+                    <Pill variant="neutral">{t("konten.offline")}</Pill>
+                  ),
+              },
               { key: "anfang", label: `${t("konten.spalteAnfangsbestand")} ${geld.symbol}`, align: "right", sortValue: (k) => k.saldo, render: (k) => geld.format(k.saldo) },
               { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", sortValue: (k) => istSummeKonto(ist, k.id), render: (k) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
               { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", sortValue: (k) => realerKontostand(k, ist), render: (k) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
@@ -207,6 +234,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           />
         )}
       </Card>
+
+      {abruf && (
+        <AbrufDialog
+          onClose={() => setAbruf(false)}
+          onFertig={() => void laden()}
+        />
+      )}
 
       {aktiv && register && (
         <Card
