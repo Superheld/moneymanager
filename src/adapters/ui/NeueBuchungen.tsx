@@ -16,14 +16,16 @@
 // Bestätigen heißt verbuchen: erst dann wird aus dem Abruf eine Ist-Buchung, die im
 // Saldo steht. Bis dahin ist nichts passiert, was sich nicht folgenlos verwerfen ließe.
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { Kategorie, Zahlungskonto } from "../../core";
 import {
+  alsDuplikat,
   gegenbeinFuer,
   ordneZu,
   umsaetzeVerbuchen,
   verwerfen,
+  zurueckholen,
   type Bewertung,
   type Umsatz,
 } from "../../application/import";
@@ -40,6 +42,7 @@ export const ABRUF_QUELLEN = new Set(["fints"]);
 
 export function NeueBuchungen({
   zeilen,
+  weggelegte,
   bestand,
   alleNeuen,
   konten,
@@ -49,6 +52,14 @@ export function NeueBuchungen({
 }: {
   /** Die offenen Abruf-Buchungen DIESES Kontos. */
   zeilen: readonly Umsatz[];
+  /**
+   * Die weggelegten Abruf-Zeilen dieses Kontos (verworfen oder als Dublette markiert).
+   *
+   * Sie standen bisher nirgends. Das ist die Sorte Lücke, die erst auffällt, wenn sie
+   * zuschlägt: eine versehentlich verworfene Bankzeile nahm den Betrag aus dem Kontostand
+   * mit, und weder war zu sehen, dass sie existiert, noch gab es einen Weg zurück.
+   */
+  weggelegte: readonly Umsatz[];
   /** Alle übrigen Umsätze des Kontos — Grundlage der Dublettenprüfung in der Anzeige. */
   bestand: readonly Umsatz[];
   /**
@@ -72,6 +83,8 @@ export function NeueBuchungen({
   const [fehler, setFehler] = useState<string | null>(null);
   /** Zeile, deren Kategorie gerade geändert wird. */
   const [aendertId, setAendertId] = useState<string | null>(null);
+  /** Der Weggelegt-Bereich ist zugeklappt — er ist der Rückweg, nicht der Alltag. */
+  const [zeigeWeggelegt, setZeigeWeggelegt] = useState(false);
 
   const kategorieName = new Map(kategorien.map((k) => [k.id, k.name]));
   const kontoName = new Map(konten.map((k) => [k.id, k.bezeichnung]));
@@ -91,6 +104,21 @@ export function NeueBuchungen({
   ordneZu(neuSortiert, bestand).forEach((t, i) => {
     if (t.bewertung.urteil !== "verschieden") {
       geprueft.set(neuSortiert[i].id, { bewertung: t.bewertung, zwilling: t.bestand });
+    }
+  });
+
+  // Dieselbe Prüfung für die weggelegten Zeilen — sie ist dort sogar die WICHTIGERE
+  // Auskunft: ob eine Zeile zu Recht weggelegt wurde, entscheidet sich daran, ob es ihr
+  // Gegenstück im Bestand wirklich gibt. Fehlt es, fehlt der Betrag im Kontostand.
+  // Verglichen wird gegen den Bestand OHNE die weggelegten selbst; sonst erklärten zwei
+  // weggelegte Zeilen einander für vorhanden, und beide fehlten trotzdem.
+  const weggelegteIds = new Set(weggelegte.map((u) => u.id));
+  const bestandOhneWeggelegte = bestand.filter((u) => !weggelegteIds.has(u.id));
+  const geprueftWeggelegt = new Map<string, { bewertung: Bewertung; zwilling?: Umsatz }>();
+  const weggelegtSortiert = [...weggelegte].sort((a, b) => b.buchungstag.localeCompare(a.buchungstag));
+  ordneZu(weggelegtSortiert, bestandOhneWeggelegte).forEach((t, i) => {
+    if (t.bewertung.urteil !== "verschieden") {
+      geprueftWeggelegt.set(weggelegtSortiert[i].id, { bewertung: t.bewertung, zwilling: t.bestand });
     }
   });
 
@@ -159,8 +187,21 @@ export function NeueBuchungen({
     onGeaendert();
   }
 
-  async function verwerfenEiner(u: Umsatz) {
-    await sqliteUmsatzRepository.speichern(verwerfen(u));
+  /**
+   * Weglegen — mit dem Unterschied, der für den Kontostand zählt.
+   *
+   * „ist schon gebucht" (Status `duplikat`) heißt: der Betrag steht bereits im Ledger,
+   * über eine andere Zeile. Der Kontostand bleibt richtig.
+   * „verwerfen" heißt: der Betrag kommt NICHT ins Ledger, obwohl die Bank ihn meldet —
+   * danach weicht der Kontostand ab. Deshalb sind es zwei Wörter und nicht eines.
+   */
+  async function weglegen(u: Umsatz, alsDublette: boolean) {
+    await sqliteUmsatzRepository.speichern(alsDublette ? alsDuplikat(u) : verwerfen(u));
+    onGeaendert();
+  }
+
+  async function zurueck(u: Umsatz) {
+    await sqliteUmsatzRepository.speichern(zurueckholen(u));
     onGeaendert();
   }
 
@@ -180,7 +221,7 @@ export function NeueBuchungen({
     onGeaendert();
   }
 
-  if (zeilen.length === 0) return null;
+  if (zeilen.length === 0 && weggelegte.length === 0) return null;
 
   const ohneVerdacht = neuSortiert.filter((u) => !geprueft.has(u.id));
 
@@ -199,41 +240,26 @@ export function NeueBuchungen({
     >
       {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
 
-      {neuSortiert.map((u) => {
-        const verdacht = geprueft.get(u.id);
-        return (
-          <div key={u.id} style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-3) 0" }}>
-            <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "baseline", flexWrap: "wrap" }}>
-              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{u.buchungstag}</span>
-              <strong>{u.gegenpartei || t("konten.neue.ohneGegenpartei")}</strong>
-              <span style={{ marginLeft: "auto", fontWeight: "var(--fw-bold)" }}>{geld.format(u.betrag)}</span>
-            </div>
-
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-1) 0" }}>
-              {u.verwendungszweck}
-            </div>
-
-            <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
-              {/* Die Kategorie MIT Absender: eine automatische Zuordnung ohne sichtbaren
-                  Grund ist eine Behauptung, die man nicht prüfen kann. */}
-              <Pill variant={u.vorschlag?.kategorieId ? "ok" : "warn"}>
-                {u.vorschlag?.kategorieId
-                  ? (kategorieName.get(u.vorschlag.kategorieId) ?? "?")
-                  : t("konten.neue.ohneKategorie")}
-              </Pill>
-              {u.vorschlag && (
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-                  {t(`konten.neue.quelle.${u.vorschlag.quelle}`)}
-                </span>
-              )}
+      {neuSortiert.map((u) => (
+        <Zeile
+          key={u.id}
+          u={u}
+          verdacht={geprueft.get(u.id)}
+          kategorieName={kategorieName}
+          kontoName={kontoName}
+          gegenbein={
+            u.vorschlag?.quelle === "umbuchung"
+              ? gegenbeinFuer(u, alleNeuen.filter((x) => x.id !== u.id))
+              : undefined
+          }
+          aktionen={
+            <>
               <button className="linkbtn" onClick={() => setAendertId(aendertId === u.id ? null : u.id)}>
                 {t("konten.neue.kategorieAendern")}
               </button>
-
               <button className="linkbtn" onClick={() => void alsUmbuchung(u)}>
                 {t("konten.neue.alsUmbuchung")}
               </button>
-
               <span style={{ marginLeft: "auto", display: "flex", gap: "var(--sp-3)" }}>
                 <button className="linkbtn" onClick={() => void bestaetigen([u])}>
                   {t("konten.neue.bestaetigen")}
@@ -241,13 +267,14 @@ export function NeueBuchungen({
                 <button className="linkbtn" onClick={() => onOeffnen(u)}>
                   {t("konten.neue.bearbeiten")}
                 </button>
-                <button className="linkbtn" onClick={() => void verwerfenEiner(u)}>
-                  {t("konten.neue.verwerfen")}
+                <button className="linkbtn" onClick={() => void weglegen(u, !!geprueft.get(u.id))}>
+                  {t(geprueft.get(u.id) ? "konten.neue.schonGebucht" : "konten.neue.verwerfen")}
                 </button>
               </span>
-            </div>
-
-            {aendertId === u.id && (
+            </>
+          }
+          nachtrag={
+            aendertId === u.id ? (
               <div style={{ marginTop: "var(--sp-2)", maxWidth: 320 }}>
                 <CategoryPicker
                   kategorien={[...kategorien]}
@@ -255,55 +282,161 @@ export function NeueBuchungen({
                   onChange={(id) => void kategorieSetzen(u, id)}
                 />
               </div>
-            )}
+            ) : undefined
+          }
+        />
+      ))}
 
-            {u.vorschlag?.quelle === "umbuchung" && (
-              <div style={{ marginTop: "var(--sp-2)" }}>
-                {(() => {
-                  const gegen = gegenbeinFuer(u, alleNeuen.filter((x) => x.id !== u.id));
-                  return gegen ? (
-                    <>
-                      <Pill variant="um">{t("konten.neue.umbuchung")}</Pill>{" "}
-                      <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-                        {t("konten.neue.gegenbein", {
-                          konto: kontoName.get(gegen.zahlungskontoId) ?? "?",
-                          datum: gegen.buchungstag,
-                          betrag: geld.format(gegen.betrag),
-                        })}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Pill variant="warn">{t("konten.neue.umbuchung")}</Pill>{" "}
-                      <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-                        {t("konten.neue.ohneGegenbein")}
-                      </span>
-                    </>
-                  );
-                })()}
+      {/* Ein Satz zur Folge, dauerhaft sichtbar statt einer Warnung pro Zeile: was
+          verworfen wird, fehlt danach im Kontostand. */}
+      {zeilen.length > 0 && (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+          {t("konten.neue.verwerfenHinweis")}
+        </div>
+      )}
+
+      {/* Der Rückweg. Zugeklappt, weil er kein Alltagsweg ist — aber vorhanden, sichtbar
+          und mit Anzahl, damit man weiß, dass dort etwas liegt.
+          Aufgeklappt steht dort DIESELBE Zeile wie oben, mit derselben Dublettenprüfung.
+          Das ist der Punkt: ob eine weggelegte Zeile zurück soll, entscheidet sich genau
+          daran, ob es ihr Gegenstück im Bestand wirklich gibt. Eine Zeile ohne Zwilling
+          fehlt im Kontostand — und ohne die Prüfung sähe man ihr das nicht an. */}
+      {weggelegte.length > 0 && (
+        <div style={{ marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+          <button className="linkbtn" onClick={() => setZeigeWeggelegt((x) => !x)}>
+            {t("konten.neue.weggelegt", { n: weggelegte.length })}
+          </button>
+          {zeigeWeggelegt && (
+            <>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-2) 0" }}>
+                {t("konten.neue.weggelegtHinweis")}
               </div>
-            )}
-
-            {verdacht && (
-              <div style={{ marginTop: "var(--sp-2)" }}>
-                <Pill variant="warn">
-                  {verdacht.bewertung.urteil === "identisch"
-                    ? t("konten.neue.dubletteSicher")
-                    : t("konten.neue.dublette")}
-                </Pill>{" "}
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-                  {t("konten.neue.dubletteHinweis", { gruende: verdacht.bewertung.gruende.join(", ") })}
-                  {verdacht.zwilling &&
-                    ` — ${verdacht.zwilling.buchungstag} ${verdacht.zwilling.gegenpartei} (${t(
-                      `konten.neue.status.${verdacht.zwilling.status}`,
-                    )})`}
-                </span>
-              </div>
-            )}
-          </div>
-        );
-      })}
-
+              {weggelegtSortiert.map((u) => (
+                <Zeile
+                  key={u.id}
+                  u={u}
+                  verdacht={geprueftWeggelegt.get(u.id)}
+                  kategorieName={kategorieName}
+                  kontoName={kontoName}
+                  status={t(`konten.neue.weggelegtStatus.${u.status}`)}
+                  aktionen={
+                    <span style={{ marginLeft: "auto" }}>
+                      <button className="linkbtn" onClick={() => void zurueck(u)}>
+                        {t("konten.neue.zurueckholen")}
+                      </button>
+                    </span>
+                  }
+                  hinweis={
+                    geprueftWeggelegt.has(u.id)
+                      ? t("konten.neue.weggelegtMitZwilling")
+                      : t("konten.neue.weggelegtOhneZwilling", { betrag: geld.format(u.betrag) })
+                  }
+                />
+              ))}
+            </>
+          )}
+        </div>
+      )}
     </Card>
+  );
+}
+
+/**
+ * Eine Zeile — für wartende UND weggelegte dieselbe.
+ *
+ * Bewusst eine Komponente und nicht zwei: die Frage, die man an eine weggelegte Zeile
+ * hat, ist dieselbe wie an eine wartende — was steht drin, welche Kategorie hat sie
+ * bekommen und woher, und gibt es das schon einmal? Zwei Darstellungen würden genau an
+ * der Stelle auseinanderlaufen, an der man vergleicht.
+ *
+ * Unterschiedlich sind nur die Knöpfe (`aktionen`) und was darunter noch kommt.
+ */
+function Zeile({ u, verdacht, kategorieName, kontoName, gegenbein, status, aktionen, nachtrag, hinweis }: {
+  u: Umsatz;
+  verdacht?: { bewertung: Bewertung; zwilling?: Umsatz };
+  kategorieName: Map<string, string>;
+  kontoName: Map<string, string>;
+  /** Das gefundene Gegenbein, wenn die Zeile als Umbuchung markiert ist. */
+  gegenbein?: Umsatz;
+  /** Eigener Status als Text — nur bei weggelegten, wo er die Auskunft ist. */
+  status?: string;
+  aktionen: ReactNode;
+  nachtrag?: ReactNode;
+  hinweis?: ReactNode;
+}) {
+  const { t } = useTranslation();
+  const geld = useGeld();
+
+  return (
+    <div style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-3) 0" }}>
+      <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "baseline", flexWrap: "wrap" }}>
+        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{u.buchungstag}</span>
+        <strong>{u.gegenpartei || t("konten.neue.ohneGegenpartei")}</strong>
+        {status && <Pill variant="neutral">{status}</Pill>}
+        <span style={{ marginLeft: "auto", fontWeight: "var(--fw-bold)" }}>{geld.format(u.betrag)}</span>
+      </div>
+
+      <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-1) 0" }}>
+        {u.verwendungszweck}
+      </div>
+
+      <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+        {/* Die Kategorie MIT Absender: eine automatische Zuordnung ohne sichtbaren
+            Grund ist eine Behauptung, die man nicht prüfen kann. */}
+        <Pill variant={u.vorschlag?.kategorieId ? "ok" : "warn"}>
+          {u.vorschlag?.kategorieId
+            ? (kategorieName.get(u.vorschlag.kategorieId) ?? "?")
+            : t("konten.neue.ohneKategorie")}
+        </Pill>
+        {u.vorschlag && (
+          <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            {t(`konten.neue.quelle.${u.vorschlag.quelle}`)}
+          </span>
+        )}
+        {aktionen}
+      </div>
+
+      {nachtrag}
+
+      {u.vorschlag?.quelle === "umbuchung" && (
+        <div style={{ marginTop: "var(--sp-2)" }}>
+          {gegenbein ? (
+            <>
+              <Pill variant="um">{t("konten.neue.umbuchung")}</Pill>{" "}
+              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                {t("konten.neue.gegenbein", {
+                  konto: kontoName.get(gegenbein.zahlungskontoId) ?? "?",
+                  datum: gegenbein.buchungstag,
+                  betrag: geld.format(gegenbein.betrag),
+                })}
+              </span>
+            </>
+          ) : (
+            <Pill variant="um">{t("konten.neue.umbuchung")}</Pill>
+          )}
+        </div>
+      )}
+
+      {verdacht && (
+        <div style={{ marginTop: "var(--sp-2)" }}>
+          <Pill variant="warn">
+            {verdacht.bewertung.urteil === "identisch"
+              ? t("konten.neue.dubletteSicher")
+              : t("konten.neue.dublette")}
+          </Pill>{" "}
+          <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            {t("konten.neue.dubletteHinweis", { gruende: verdacht.bewertung.gruende.join(", ") })}
+            {verdacht.zwilling &&
+              ` — ${verdacht.zwilling.buchungstag} ${verdacht.zwilling.gegenpartei} (${t(
+                `konten.neue.status.${verdacht.zwilling.status}`,
+              )})`}
+          </span>
+        </div>
+      )}
+
+      {hinweis && (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>{hinweis}</div>
+      )}
+    </div>
   );
 }

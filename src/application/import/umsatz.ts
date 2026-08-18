@@ -143,6 +143,25 @@ export function verwerfen(u: Umsatz): Umsatz {
 }
 
 /**
+ * Holt eine weggelegte Zeile zurück in den Entwurfs-Stapel (verworfen/duplikat → neu).
+ *
+ * Der Rückweg fehlte, und das war ein Loch mit Folgen: „verworfen" heißt bei einer
+ * BANKZEILE nicht „gab es nicht", sondern „ich buche sie nicht". Wer sich dabei vertut,
+ * verliert nicht nur die Zeile, sondern den Betrag im Kontostand — und weil verworfene
+ * Zeilen nirgends angezeigt wurden, gab es weder Hinweis noch Weg zurück. Die Daten waren
+ * die ganze Zeit da; erreichbar waren sie nicht.
+ *
+ * Verbuchte bleiben außen vor: die haben mit `zuruecksetzen` einen eigenen Rückweg, der
+ * zusätzlich die Ist-Buchung berücksichtigen muss.
+ */
+export function zurueckholen(u: Umsatz): Umsatz {
+  if (u.status !== "verworfen" && u.status !== "duplikat") {
+    throw new FachlicherFehler("import.umsatz.nichtWeggelegt", { status: u.status });
+  }
+  return { ...u, status: "neu" };
+}
+
+/**
  * Setzt einen verbuchten Umsatz zurück in die Inbox (verbucht → neu) — die Umkehrung von
  * verbuchen, z. B. wenn die erzeugte Ist-Buchung im Konto gelöscht wurde. Die Ist-Buchungs-
  * Referenz fällt weg; der Kategorie-Vorschlag bleibt erhalten.

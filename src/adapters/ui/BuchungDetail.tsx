@@ -41,6 +41,7 @@ import {
 } from "../../core";
 import { buchungBearbeiten, buchungErfassen, buchungLoeschen } from "../../application/buchungErfassen";
 import {
+  alsDuplikat,
   passtAlsGegenbein,
   ordneZu,
   umsaetzeVerbuchen,
@@ -453,13 +454,19 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
     }
   }
 
-  /** Verworfen ist verworfen: die Zeile bleibt gespeichert, aber markiert und übersprungen. */
+  /**
+   * Weglegen — die Zeile bleibt gespeichert, markiert und wird übersprungen.
+   *
+   * Zwei Wörter, weil der Unterschied im Kontostand landet: „ist schon gebucht" heißt,
+   * der Betrag steht bereits über eine andere Zeile im Ledger; „verwerfen" heißt, er
+   * kommt nicht hinein, obwohl die Bank ihn meldet — danach weicht der Stand ab.
+   */
   async function verwerfenEntwurf() {
     if (!entwurf) return;
     setFehler(null);
     setBusy(true);
     try {
-      await umsatzRepo.speichern(verwerfen(entwurf));
+      await umsatzRepo.speichern(dublette ? alsDuplikat(entwurf) : verwerfen(entwurf));
       onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
@@ -499,7 +506,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
           <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
           {istEntwurf && (
             <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={() => verwerfenEntwurf()}>
-              {t("konten.entwurf.verwerfen")}
+              {t(dublette ? "konten.neue.schonGebucht" : "konten.entwurf.verwerfen")}
             </button>
           )}
           {buchung && (
@@ -836,6 +843,14 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
       {istEntwurf && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
           {t("konten.entwurf.spaeterHinweis")}
+        </div>
+      )}
+
+      {/* Die Folge des Verwerfens beziffert, nicht nur behauptet: ohne Gegenstück im
+          Bestand fehlt danach genau dieser Betrag gegenüber dem, was die Bank sagt. */}
+      {istEntwurf && !dublette && (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
+          {t("konten.entwurf.verwerfenFolge", { betrag: geld.formatMitSymbol(entwurf!.betrag, { mitVorzeichen: true }) })}
         </div>
       )}
 
