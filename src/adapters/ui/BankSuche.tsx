@@ -18,6 +18,7 @@ export function BankSuche({ onWaehlen }: { onWaehlen: (b: Bankeintrag) => void }
   const [alle, setAlle] = useState<Bankeintrag[]>([]);
   const [eingabe, setEingabe] = useState("");
   const [offen, setOffen] = useState(false);
+  const [aktiv, setAktiv] = useState(0);
   const huelle = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -54,41 +55,68 @@ export function BankSuche({ onWaehlen }: { onWaehlen: (b: Bankeintrag) => void }
           placeholder={t("bankabruf.feldBankSuchePlatzhalter")}
           onChange={(e) => {
             setEingabe(e.target.value);
+            setAktiv(0);
             setOffen(true);
           }}
           onFocus={() => setOffen(true)}
+          onKeyDown={(e) => {
+            // Eine Vorschlagsliste, die man nur mit der Maus bedienen kann, unterbricht
+            // das Ausfüllen eines Formulars — hoch/runter/Enter/Esc gehören dazu.
+            if (e.key === "ArrowDown") {
+              e.preventDefault();
+              setOffen(true);
+              setAktiv((i) => Math.min(i + 1, treffer.length - 1));
+            } else if (e.key === "ArrowUp") {
+              e.preventDefault();
+              setAktiv((i) => Math.max(i - 1, 0));
+            } else if (e.key === "Enter" && offen && treffer[aktiv]) {
+              e.preventDefault();
+              waehle(treffer[aktiv]);
+            } else if (e.key === "Escape") {
+              setOffen(false);
+            }
+          }}
         />
       </FormField>
 
       {offen && treffer.length > 0 && (
+        // Eigene Fläche statt der DS-Card: die setzt ihre Flächenfarbe inline, eine
+        // Klasse „card" gibt es im Stylesheet nicht — die Liste stand deshalb ohne
+        // Hintergrund über dem Formular und war unlesbar. Hier dieselben Tokens von
+        // Hand, plus die Schatten-Stufe für schwebende Flächen.
         <ul
-          className="card"
           style={{
             position: "absolute",
             zIndex: 20,
             left: 0,
             right: 0,
+            marginTop: 4,
             maxHeight: 260,
             overflowY: "auto",
-            margin: 0,
-            padding: 0,
+            padding: "var(--sp-1) 0",
             listStyle: "none",
+            background: "var(--surface)",
+            border: "1px solid var(--line)",
+            borderRadius: "var(--r-lg)",
+            boxShadow: "var(--shadow-card)",
           }}
         >
-          {treffer.map((b) => (
+          {treffer.map((b, i) => (
             <li key={b.blz}>
               <button
                 type="button"
-                className="row-btn"
                 style={{
                   display: "block",
                   width: "100%",
                   textAlign: "left",
                   padding: "var(--sp-2) var(--sp-3)",
-                  background: "none",
+                  background: i === aktiv ? "var(--surface-2)" : "transparent",
+                  color: "var(--ink)",
                   border: 0,
                   cursor: "pointer",
+                  font: "inherit",
                 }}
+                onMouseEnter={() => setAktiv(i)}
                 onClick={() => waehle(b)}
               >
                 <div>{b.name}</div>
