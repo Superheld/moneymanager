@@ -485,6 +485,30 @@ const de = {
     },
     titel: "Konten",
     untertitel: "Kontostände, gebuchte und voraussichtliche Buchungen je Konto",
+    registerUebersicht: "Übersicht",
+    registerVerwaltung: "Verwalten",
+    anlegen: {
+      titel: "Konto anlegen",
+      untertitel: "Mit der Bank verbunden oder von Hand geführt",
+      feldArt: "Art des Kontos",
+      feldArtHinweis: "Online heißt: die Bank wird angebunden, der Abruf läuft später auf Knopfdruck.",
+      artOffline: "Offline — von Hand geführt",
+      artOnline: "Online — mit der Bank verbunden",
+      verbinden: "Mit der Bank verbinden",
+      verbindet: "verbindet …",
+      uebernehmen: "Übernehmen",
+      zuordnenHinweis:
+        "Die Bank meldet diese Konten. Zu jedem entscheidest du, ob daraus ein neues Konto entsteht, " +
+        "ob es zu einem vorhandenen gehört oder ob es außen vor bleibt.",
+      zielIgnorieren: "nicht übernehmen",
+      zielNeu: "neu anlegen",
+      zielVorhanden: "mit vorhandenem verknüpfen",
+      standBank: "Stand bei der Bank: {{betrag}}",
+      saldoHinweis:
+        "Der Anfangsbestand ist der Stand VOR der ersten importierten Buchung — nicht der heutige. " +
+        "Der reale Stand ergibt sich daraus plus allem, was gebucht ist; der heutige Stand würde die " +
+        "importierten Wochen doppelt zählen.",
+    },
     deineKonten: "Deine Konten",
     deineKontenUntertitel: "Anfangsbestand + bestätigte Ist-Buchungen = realer Stand",
     kontoAnlegen: "Konto anlegen",
@@ -1483,6 +1507,30 @@ const en: typeof de = {
     },
     titel: "Accounts",
     untertitel: "Balances, booked and expected entries per account",
+    registerUebersicht: "Overview",
+    registerVerwaltung: "Manage",
+    anlegen: {
+      titel: "Add account",
+      untertitel: "Connected to the bank, or kept by hand",
+      feldArt: "Kind of account",
+      feldArtHinweis: "Online means the bank is connected and retrieval later runs at the push of a button.",
+      artOffline: "Offline — kept by hand",
+      artOnline: "Online — connected to the bank",
+      verbinden: "Connect to the bank",
+      verbindet: "connecting …",
+      uebernehmen: "Apply",
+      zuordnenHinweis:
+        "These are the accounts the bank reports. For each one, decide whether it becomes a new account, " +
+        "belongs to an existing one, or stays out.",
+      zielIgnorieren: "do not add",
+      zielNeu: "create new",
+      zielVorhanden: "link to existing",
+      standBank: "Balance at the bank: {{betrag}}",
+      saldoHinweis:
+        "The opening balance is the balance BEFORE the first imported transaction — not today's. " +
+        "The real balance follows from it plus everything booked; today's figure would count the " +
+        "imported weeks twice.",
+    },
     deineKonten: "Your accounts",
     deineKontenUntertitel: "Opening balance + confirmed actual entries = real balance",
     kontoAnlegen: "Add account",

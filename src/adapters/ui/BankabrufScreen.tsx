@@ -15,18 +15,12 @@ import { fintsAbruf, fintsEinsatzbereit } from "../fints";
 import { sqliteBankzugangRepository } from "../persistence/sqliteBankzugangRepositories";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { BankSuche } from "./BankSuche";
-import { Modal } from "./Modal";
+import { TanDialog, type TanFrage } from "./TanDialog";
 import { useGeld } from "./einstellungenKontext";
 
 interface KontoZeile extends Bankkonto {
   saldo?: number;
   saldoDatum?: string;
-}
-
-/** Offene TAN-Rückfrage: die Herausforderung plus der Weg, die Antwort zurückzugeben. */
-interface TanDialog {
-  herausforderung: TanHerausforderung;
-  antworten: (tan: string | undefined) => void;
 }
 
 function leererZugang(): Bankzugang {
@@ -44,8 +38,7 @@ export function BankabrufScreen() {
   const [fehler, setFehler] = useState<string | null>(null);
   const [sitzung, setSitzung] = useState<Abrufsitzung | null>(null);
   const [konten, setKonten] = useState<KontoZeile[]>([]);
-  const [tanDialog, setTanDialog] = useState<TanDialog | null>(null);
-  const [tanEingabe, setTanEingabe] = useState("");
+  const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
 
   useEffect(() => {
     sqliteBankzugangRepository
@@ -67,16 +60,7 @@ export function BankabrufScreen() {
    * Zeitraum über 90 Tage zurückreicht.
    */
   function frageTan(h: TanHerausforderung): Promise<string | undefined> {
-    return new Promise((resolve) => {
-      setTanEingabe("");
-      setTanDialog({
-        herausforderung: h,
-        antworten: (tan) => {
-          setTanDialog(null);
-          resolve(tan);
-        },
-      });
-    });
+    return new Promise((antworten) => setTanFrage({ herausforderung: h, antworten }));
   }
 
   async function anmelden() {
@@ -258,40 +242,7 @@ export function BankabrufScreen() {
         </Card>
       )}
 
-      {tanDialog && (
-        <Modal
-          title={t("bankabruf.tanTitel")}
-          subtitle={tanDialog.herausforderung.decoupled ? t("bankabruf.tanDecoupled") : undefined}
-          onClose={() => tanDialog.antworten(undefined)}
-          footer={
-            !tanDialog.herausforderung.decoupled && (
-              <Button variant="primary" onClick={() => tanDialog.antworten(tanEingabe)}>
-                {t("bankabruf.tanBestaetigen")}
-              </Button>
-            )
-          }
-        >
-          {tanDialog.herausforderung.text && <p>{tanDialog.herausforderung.text}</p>}
-          {/* photoTAN: das Bild kommt inline in der Herausforderung mit. Ohne Anzeige
-              gibt es nichts abzuscannen — bei comdirect ist es das einzige Verfahren. */}
-          {tanDialog.herausforderung.bild && (
-            <img
-              alt={t("bankabruf.tanBild")}
-              style={{ maxWidth: "100%", imageRendering: "pixelated" }}
-              src={URL.createObjectURL(
-                new Blob([tanDialog.herausforderung.bild.daten as BlobPart], {
-                  type: tanDialog.herausforderung.bild.mimeType,
-                }),
-              )}
-            />
-          )}
-          {!tanDialog.herausforderung.decoupled && (
-            <FormField label={t("bankabruf.tanFeld")} required>
-              <input className="field" value={tanEingabe} onChange={(e) => setTanEingabe(e.target.value)} autoFocus />
-            </FormField>
-          )}
-        </Modal>
-      )}
+      {tanFrage && <TanDialog frage={tanFrage} onFertig={() => setTanFrage(null)} />}
     </>
   );
 }

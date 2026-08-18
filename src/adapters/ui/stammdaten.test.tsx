@@ -16,6 +16,7 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
+import { KontenBereich } from "./KontenBereich";
 import { KontenScreen } from "./KontenScreen";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import {
@@ -61,15 +62,24 @@ describe("EinstellungenScreen — Stammdaten", () => {
     rendere(<EinstellungenScreen />);
 
     // Ein Register nach dem anderen: es ist immer genau eines offen, und das ist der
-    // Punkt der Umstellung — vorher standen alle Listen untereinander.
+    // Punkt der Umstellung — vorher standen alle Listen untereinander. Die Konten sind
+    // seit 2026-08-18 gar nicht mehr hier, sondern haben einen eigenen Punkt.
     await registerWaehlen(nutzer, /^Personen$/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Bruce/));
 
-    await registerWaehlen(nutzer, /^Konten$/);
-    await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
-
     await registerWaehlen(nutzer, /^Kategorien$/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Lebensmittel/));
+  });
+
+  it("zeigt die Konten an ihrem eigenen Punkt, nicht mehr in den Einstellungen", async () => {
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 100000,
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<KontenBereich onNavigate={() => {}} />);
+    await registerWaehlen(nutzer, /^Verwalten$/);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
   });
 
   it("legt eine Person über das Formular an", async () => {

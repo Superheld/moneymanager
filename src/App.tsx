@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AppShell, type ScreenId } from "./adapters/ui/AppShell";
 import { HistorieScreen } from "./adapters/ui/HistorieScreen";
-import { KontenScreen } from "./adapters/ui/KontenScreen";
+import { KontenBereich } from "./adapters/ui/KontenBereich";
 import { EinstellungenScreen } from "./adapters/ui/EinstellungenScreen";
 import { VertraegeScreen } from "./adapters/ui/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/BudgetsScreen";
@@ -26,7 +26,7 @@ export default function App() {
     <EinstellungenProvider>
       <AppShell current={screen} onNavigate={setScreen}>
         {screen === "historie" && <HistorieScreen />}
-        {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
+        {screen === "konten" && <KontenBereich onNavigate={setScreen} />}
         {screen === "inventar" && <InventarScreen />}
         {screen === "budgets" && <BudgetsScreen />}
         {screen === "vertraege" && <VertraegeScreen />}

@@ -33,7 +33,6 @@ import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { BuchungDetail } from "./BuchungDetail";
 import { Modal } from "./Modal";
-import { PageHead } from "./PageHead";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
@@ -182,7 +181,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
   return (
     <div className="screen">
-      <PageHead title={t("konten.titel")} subtitle={t("konten.untertitel")} />
 
       <Card
         title={t("konten.deineKonten")}
