@@ -513,6 +513,22 @@ const de = {
       ohneGegenpartei: "ohne Empfänger",
       dublette: "könnte Dublette sein",
       dubletteSicher: "schon vorhanden",
+      schonGebucht: "ist schon gebucht",
+      verwerfenHinweis:
+        "Verwerfen heißt: nicht buchen. Eine Zeile ohne Gegenstück fehlt danach im Kontostand — zurückholen geht unten.",
+      weggelegt: "Weggelegt ({{n}}) anzeigen",
+      zurueckholen: "zurückholen",
+      weggelegtHinweis:
+        "Geprüft wie oben: hat die Zeile ein Gegenstück im Bestand, war das Weglegen richtig. Hat sie keines, fehlt ihr Betrag im Kontostand.",
+      weggelegtMitZwilling: "Gegenstück vorhanden — der Betrag steht bereits im Konto.",
+      weggelegtOhneZwilling:
+        "Kein Gegenstück gefunden. Solange die Zeile hier liegt, fehlen {{betrag}} gegenüber dem, was die Bank meldet.",
+      weggelegtStatus: {
+        verworfen: "verworfen",
+        duplikat: "als Dublette markiert",
+        neu: "wartet",
+        verbucht: "gebucht",
+      },
       dubletteHinweis: "Gründe: {{gruende}}",
       bearbeiten: "ansehen & bearbeiten",
       alsUmbuchung: "ist eine Umbuchung",
@@ -717,6 +733,8 @@ const de = {
       einseitig: "einseitig lassen — kein Gegenstück",
       vertragVorgemerkt: "Wird beim Übernehmen gesetzt und überstimmt die automatische Erkennung.",
       vertragOffen: "Ohne Angabe entscheidet die automatische Erkennung.",
+      verwerfenFolge:
+        "Verwerfen: zu dieser Zeile gibt es kein Gegenstück im Bestand. Der Kontostand weicht danach um {{betrag}} von dem ab, was die Bank meldet.",
     },
     dublette: {
       oeffnen: "Gegenstück öffnen",
@@ -1632,6 +1650,22 @@ const en: typeof de = {
       ohneGegenpartei: "no payee",
       dublette: "might be a duplicate",
       dubletteSicher: "already present",
+      schonGebucht: "already booked",
+      verwerfenHinweis:
+        "Discarding means: not booking it. A row without a counterpart will be missing from the balance — you can bring it back below.",
+      weggelegt: "Show set aside ({{n}})",
+      zurueckholen: "bring back",
+      weggelegtHinweis:
+        "Checked as above: if the row has a counterpart, setting it aside was right. If it has none, its amount is missing from the balance.",
+      weggelegtMitZwilling: "Counterpart present — the amount is already in the account.",
+      weggelegtOhneZwilling:
+        "No counterpart found. While this row stays here, {{betrag}} is missing from what the bank reports.",
+      weggelegtStatus: {
+        verworfen: "discarded",
+        duplikat: "marked as duplicate",
+        neu: "waiting",
+        verbucht: "booked",
+      },
       dubletteHinweis: "Reasons: {{gruende}}",
       bearbeiten: "review & edit",
       alsUmbuchung: "is a transfer",
@@ -1836,6 +1870,8 @@ const en: typeof de = {
       einseitig: "leave one-sided — no counterpart",
       vertragVorgemerkt: "Applied on accept; overrides the automatic detection.",
       vertragOffen: "Left blank, the automatic detection decides.",
+      verwerfenFolge:
+        "Discard: there is no counterpart for this row. The balance will then differ by {{betrag}} from what the bank reports.",
     },
     dublette: {
       oeffnen: "Open the counterpart",
