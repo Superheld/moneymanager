@@ -44,6 +44,8 @@ const de = {
     konten: {
       quelleZiel: "Bitte Quell- und Zielkonto wählen.",
       verschieden: "Quell- und Zielkonto müssen verschieden sein.",
+      kontoWechselGepaart:
+        "Ein Bein einer Umbuchung kann das Konto nicht wechseln. Erst die Paarung lösen.",
     },
     split: {
       umbuchung: "Ein Umbuchungs-Bein lässt sich nicht aufteilen — es trägt keine Kategorie.",
@@ -512,7 +514,7 @@ const de = {
       dublette: "könnte Dublette sein",
       dubletteSicher: "schon vorhanden",
       dubletteHinweis: "Gründe: {{gruende}}",
-      bearbeiten: "bestätigen & bearbeiten",
+      bearbeiten: "ansehen & bearbeiten",
       alsUmbuchung: "ist eine Umbuchung",
       umbuchung: "Umbuchung",
       gegenbein: "Gegenbuchung: {{konto}}, {{datum}}, {{betrag}} — wird zusammen bestätigt",
@@ -698,6 +700,24 @@ const de = {
       planbezugWert: "{{regel}} · fällig {{faelligkeit}}",
       ohneImport: "In der App erfasst — kein Import-Kontext vorhanden.",
       bearbeitbar: "Änderbar",
+      kontoGepaart: "fest — erst die Paarung lösen",
+      loeschenHinweis:
+        "Löschen entfernt die Buchung aus dem Konto. Die Zeile der Bank bleibt erhalten und steht danach wieder unter „Neu von der Bank“ — dort lässt sie sich verwerfen.",
+    },
+    entwurf: {
+      titel: "Neu von der Bank",
+      untertitel: "Noch nicht gebucht — erst „Übernehmen“ schreibt sie ins Konto",
+      uebernehmen: "Übernehmen",
+      verwerfen: "Verwerfen",
+      laeuft: "übernimmt …",
+      vonDerBank: "von der Bank — nicht änderbar",
+      spaeterHinweis:
+        "Aufteilen, Vertrag und Paarung gibt es nach dem Übernehmen. Verwerfen löscht nichts: die Zeile bleibt gespeichert und wird künftig übersprungen.",
+    },
+    dublette: {
+      oeffnen: "Gegenstück öffnen",
+      hinweis:
+        "Geprüft wird gegen alles auf diesem Konto — auch gegen Verworfenes. Beide Zeilen bleiben stehen, bis du eine davon löschst.",
     },
     quelleName: {
       import: "Bankimport",
@@ -1141,6 +1161,7 @@ const en: typeof de = {
     datum: { ungueltig: "Please enter a valid date." },
     konten: {
       quelleZiel: "Please select source and target accounts.",
+      kontoWechselGepaart: "A transfer leg cannot change accounts. Unpair it first.",
       verschieden: "Source and target accounts must differ.",
     },
     split: {
@@ -1608,7 +1629,7 @@ const en: typeof de = {
       dublette: "might be a duplicate",
       dubletteSicher: "already present",
       dubletteHinweis: "Reasons: {{gruende}}",
-      bearbeiten: "confirm & edit",
+      bearbeiten: "review & edit",
       alsUmbuchung: "is a transfer",
       umbuchung: "Transfer",
       gegenbein: "Counter entry: {{konto}}, {{datum}}, {{betrag}} — confirmed together",
@@ -1794,6 +1815,24 @@ const en: typeof de = {
       planbezugWert: "{{regel}} · due {{faelligkeit}}",
       ohneImport: "Captured in the app — no import context available.",
       bearbeitbar: "Editable",
+      kontoGepaart: "fixed — unpair the transfer first",
+      loeschenHinweis:
+        "Deleting removes the entry from the account. The bank row itself remains and reappears under “New from the bank”, where it can be discarded.",
+    },
+    entwurf: {
+      titel: "New from the bank",
+      untertitel: "Not booked yet — only “Accept” writes it to the account",
+      uebernehmen: "Accept",
+      verwerfen: "Discard",
+      laeuft: "accepting …",
+      vonDerBank: "from the bank — not editable",
+      spaeterHinweis:
+        "Splitting, contracts and pairing become available after accepting. Discarding deletes nothing: the row stays stored and is skipped from now on.",
+    },
+    dublette: {
+      oeffnen: "Open the counterpart",
+      hinweis:
+        "Checked against everything on this account, discarded rows included. Both entries stay until you delete one of them.",
     },
     quelleName: {
       import: "bank import",

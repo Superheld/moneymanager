@@ -59,8 +59,11 @@ export function NeueBuchungen({
   alleNeuen: readonly Umsatz[];
   konten: readonly Zahlungskonto[];
   kategorien: readonly Kategorie[];
-  /** Öffnet die verbuchte Buchung zum vollen Bearbeiten. */
-  onOeffnen: (istbuchungId: string) => void | Promise<void>;
+  /**
+   * Öffnet den Entwurf im Buchungsdialog — OHNE ihn vorher zu verbuchen. Übernommen wird
+   * dort, oder gar nicht.
+   */
+  onOeffnen: (entwurf: Umsatz) => void;
   onGeaendert: () => void;
 }) {
   const { t } = useTranslation();
@@ -136,21 +139,6 @@ export function NeueBuchungen({
     } finally {
       setBusy(false);
     }
-  }
-
-  /**
-   * Bestätigt EINE Zeile und öffnet die daraus entstandene Buchung sofort zum
-   * Bearbeiten — Konto ändern, splitten, umbuchen, einem Vertrag zuordnen.
-   *
-   * Der Umweg über das Verbuchen ist Absicht statt Bequemlichkeit: die volle
-   * Bearbeitung hängt an einer Ist-Buchung (Aufteilungen, Gegenkonto, Vertragsspur), und
-   * die entsteht erst dabei. Ein zweiter Bearbeitungspfad für den Entwurf wäre dieselbe
-   * Oberfläche ein zweites Mal — mit der Aussicht, dass beide auseinanderlaufen.
-   */
-  async function bestaetigenUndOeffnen(u: Umsatz) {
-    await bestaetigen([u]);
-    const frisch = (await sqliteUmsatzRepository.alle()).find((x) => x.id === u.id);
-    if (frisch?.istbuchungId) await onOeffnen(frisch.istbuchungId);
   }
 
   /**
@@ -250,7 +238,7 @@ export function NeueBuchungen({
                 <button className="linkbtn" onClick={() => void bestaetigen([u])}>
                   {t("konten.neue.bestaetigen")}
                 </button>
-                <button className="linkbtn" onClick={() => void bestaetigenUndOeffnen(u)}>
+                <button className="linkbtn" onClick={() => onOeffnen(u)}>
                   {t("konten.neue.bearbeiten")}
                 </button>
                 <button className="linkbtn" onClick={() => void verwerfenEiner(u)}>
