@@ -526,4 +526,26 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE umsatz ADD COLUMN verdacht_gruende TEXT`,
     ],
   },
+  {
+    version: 29, // Der Kontostand, den die BANK meldet
+    sql: [
+      // Bis hierher rechnet die App ihren Kontostand allein aus dem, was sie kennt:
+      // Anfangsbestand plus die Buchungen, die es hereingeschafft haben. Fehlt eine,
+      // stimmt die Zahl trotzdem — sie ist ja in sich schluessig. Genau das ist das
+      // Problem: es gab keine zweite, unabhaengige Aussage, gegen die sich das pruefen
+      // liesse. Eine verworfene Bankzeile fiel deshalb erst Wochen spaeter auf.
+      //
+      // FinTS liefert den echten Saldo (HKSAL), und der Adapter kann ihn laengst — er
+      // wurde bisher nur beim Anlegen eines Kontos benutzt. Ab jetzt wird er bei jedem
+      // Abruf mitgeholt und hier abgelegt, mit dem Stichtag der Bank. Die Differenz
+      // daraus ist die Garantie: null heisst beweisbar synchron, alles andere ist eine
+      // Ansage, dass etwas fehlt oder doppelt ist.
+      //
+      // An der Zuordnung und nicht am Zahlungskonto: es ist die Aussage der BANK ueber
+      // ein verknuepftes Konto, kein Stammdatum der App. Offline-Konten haben so etwas
+      // schlicht nicht.
+      `ALTER TABLE bankkonto_zuordnung ADD COLUMN bank_saldo INTEGER`,
+      `ALTER TABLE bankkonto_zuordnung ADD COLUMN bank_saldo_datum TEXT`,
+    ],
+  },
 ];

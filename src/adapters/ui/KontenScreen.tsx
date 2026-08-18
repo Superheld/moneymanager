@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  bankAbweichung,
   istSummeKonto,
   kontoRegister,
   realerKontostand,
@@ -81,6 +82,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [abruf, setAbruf] = useState(false);
   /** Konten, die an einer Bankverbindung hängen — daran hängt auch der Abruf-Knopf. */
   const [onlineKonten, setOnlineKonten] = useState<Set<string>>(new Set());
+  /** Der zuletzt von der Bank gemeldete Stand je Konto — Grundlage des Abgleichs. */
+  const [bankStand, setBankStand] = useState<Map<string, { betrag: number; datum?: string }>>(new Map());
   /** Abgerufene, noch nicht bestätigte Buchungen — je Konto. */
   const [neueAbrufe, setNeueAbrufe] = useState<Umsatz[]>([]);
   /** Welche Import-Läufe aus einem Bankabruf stammen — Filter für den Konto-Block. */
@@ -107,6 +110,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     setAbrufLaufIds(abrufLaeufe);
     setNeueAbrufe(neu);
     setOnlineKonten(new Set(zuordnungen.map((z) => z.zahlungskontoId)));
+    setBankStand(
+      new Map(
+        zuordnungen
+          .filter((z) => z.bankSaldo != null)
+          .map((z) => [z.zahlungskontoId, { betrag: z.bankSaldo!, datum: z.bankSaldoDatum }]),
+      ),
+    );
     setKonten(ks);
     setIst(bs);
     setRegeln(rs);
@@ -253,6 +263,27 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               { key: "anfang", label: `${t("konten.spalteAnfangsbestand")} ${geld.symbol}`, align: "right", sortValue: (k) => k.saldo, render: (k) => geld.format(k.saldo) },
               { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", sortValue: (k) => istSummeKonto(ist, k.id), render: (k) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
               { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", sortValue: (k) => realerKontostand(k, ist), render: (k) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
+              // Der Abgleich in der Übersicht, nicht nur im geöffneten Konto: eine
+              // Differenz will man sehen, ohne sie zu suchen.
+              {
+                key: "abgleich",
+                label: t("konten.abgleich.spalte"),
+                align: "right",
+                sortValue: (k) => {
+                  const stand = bankStand.get(k.id);
+                  return stand ? Math.abs(bankAbweichung(k, ist, stand.betrag)) : -1;
+                },
+                render: (k) => {
+                  const stand = bankStand.get(k.id);
+                  if (!stand) return <span className="muted">{onlineKonten.has(k.id) ? t("konten.abgleich.nieAbgeglichen") : "—"}</span>;
+                  const diff = bankAbweichung(k, ist, stand.betrag);
+                  return (
+                    <Pill variant={diff === 0 ? "ok" : "warn"}>
+                      {diff === 0 ? t("konten.abgleich.stimmt") : geld.format(diff, { mitVorzeichen: true })}
+                    </Pill>
+                  );
+                },
+              },
             ]}
             rows={konten}
           />
@@ -313,6 +344,39 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 {t("konten.anfangsbestand")} {geld.formatMitSymbol(aktiv.saldo)}
                 {istSummeKonto(ist, aktiv.id) !== 0 && <> · Σ Ist {geld.formatMitSymbol(istSummeKonto(ist, aktiv.id), { mitVorzeichen: true })}</>}
               </div>
+
+              {/* Der Abgleich gegen die Bank. Ohne ihn ist der Stand oben nur in sich
+                  schlüssig — er kann vollständig aussehen und trotzdem eine Buchung
+                  vermissen. Die Differenz macht daraus eine Aussage: null heißt
+                  beweisbar vollständig, alles andere benennt, wieviel fehlt.
+                  Vorzeichen mit Bedeutung: die Bank hat mehr (+) → es fehlt eine
+                  Einnahme; die App hat mehr (−) → eine Ausgabe fehlt oder etwas ist
+                  doppelt drin. */}
+              {(() => {
+                const stand = bankStand.get(aktiv.id);
+                if (!stand) return null;
+                const diff = bankAbweichung(aktiv, ist, stand.betrag);
+                return (
+                  <div style={{ fontSize: "var(--fs-xs)", marginTop: 6, display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
+                    <Pill variant={diff === 0 ? "ok" : "warn"}>
+                      {diff === 0
+                        ? t("konten.abgleich.stimmt")
+                        : t("konten.abgleich.differenz", { betrag: geld.formatMitSymbol(diff, { mitVorzeichen: true }) })}
+                    </Pill>
+                    <span className="muted">
+                      {t("konten.abgleich.bankSagt", {
+                        betrag: geld.formatMitSymbol(stand.betrag),
+                        datum: stand.datum ?? "?",
+                      })}
+                    </span>
+                    {diff !== 0 && (
+                      <span className="muted">
+                        {t(diff > 0 ? "konten.abgleich.bankMehr" : "konten.abgleich.appMehr")}
+                      </span>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
             <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
               <select className="field" style={{ width: "auto" }} value={tage} onChange={(e) => setTage(Number(e.target.value))}>
