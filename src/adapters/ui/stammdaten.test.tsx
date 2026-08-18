@@ -16,7 +16,7 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
-import { KontenBereich } from "./KontenBereich";
+import { KontenVerwaltungScreen } from "./KontenVerwaltungScreen";
 import { KontenScreen } from "./KontenScreen";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import {
@@ -76,9 +76,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
       id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 100000,
     });
 
-    const nutzer = userEvent.setup();
-    rendere(<KontenBereich onNavigate={() => {}} />);
-    await registerWaehlen(nutzer, /^Verwalten$/);
+    rendere(<KontenVerwaltungScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
   });
 

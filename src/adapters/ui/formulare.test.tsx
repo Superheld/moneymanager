@@ -18,7 +18,7 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
-import { KontenBereich } from "./KontenBereich";
+import { KontenVerwaltungScreen } from "./KontenVerwaltungScreen";
 import { InventarScreen } from "./InventarScreen";
 import { BudgetsScreen } from "./BudgetsScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
@@ -147,8 +147,7 @@ describe("Einstellungen — Formularpfade", () => {
     // Der Dialog fragt zuerst nach der Art des Kontos und steht auf „offline" —
     // ein Konto ohne Bankverbindung soll ohne Umweg anzulegen sein.
     const nutzer = userEvent.setup();
-    rendere(<KontenBereich onNavigate={() => {}} />);
-    await registerWaehlen(nutzer, /^Verwalten$/);
+    rendere(<KontenVerwaltungScreen />);
 
     // Der Knopf heißt schlicht „+ Konto" (die Karte darüber sagt, worum es geht).
     await waitFor(() => expect(screen.queryAllByRole("button").length).toBeGreaterThan(0));
