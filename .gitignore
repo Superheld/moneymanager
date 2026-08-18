@@ -30,3 +30,9 @@ transaction-classifier/
 Moneymanager/
 ARCHITEKTUR.md
 design-system/
+
+# DK-Bankenliste: von der Deutschen Kreditwirtschaft an registrierte Hersteller
+# verteilt, nicht öffentlich — weder die Quelle noch das daraus Erzeugte gehören in ein
+# öffentliches Repo. Beides entsteht lokal über scripts/bankenliste-erzeugen.mjs.
+public/bankenliste.json
+src-tauri/capabilities/fints-banken.json

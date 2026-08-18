@@ -14,6 +14,7 @@ import type { Bankkonto, Bankzugang, Abrufsitzung, TanHerausforderung } from "..
 import { fintsAbruf, fintsEinsatzbereit } from "../fints";
 import { sqliteBankzugangRepository } from "../persistence/sqliteBankzugangRepositories";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { BankSuche } from "./BankSuche";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
 import { useGeld } from "./einstellungenKontext";
@@ -174,6 +175,14 @@ export function BankabrufScreen() {
             </select>
           </FormField>
         )}
+
+        {/* Bank wählen füllt BLZ, Adresse und (falls noch leer) die Bezeichnung. Beides
+            bleibt danach von Hand änderbar — die Liste ist eine Abkürzung, keine Fessel. */}
+        <BankSuche
+          onWaehlen={(b) =>
+            setForm((f) => ({ ...f, blz: b.blz, url: b.url, bezeichnung: f.bezeichnung || b.name }))
+          }
+        />
 
         <div className="form-grid">
           <FormField label={t("bankabruf.feldBezeichnung")} required>
