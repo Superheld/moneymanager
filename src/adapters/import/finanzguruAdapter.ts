@@ -35,6 +35,8 @@ const SP = {
   gegenparteiIban: "IBAN Beguenstigter/Auftraggeber",
   zweck: "Verwendungszweck",
   glaeubigerId: "Glaeubiger-ID",
+  mandatsreferenz: "Mandatsreferenz",
+  umsatzart: "Analyse-Umsatzart",
   unterkategorie: "Analyse-Unterkategorie",
   umbuchung: "Analyse-Umbuchung",
   buchungsId: "Buchungs-ID",
@@ -86,6 +88,19 @@ function reiheZuRohUmsatz(r: Reihe): RohUmsatz | string {
     kontoIban: leerZuUndefined(r[SP.referenzkonto]),
     kontoName: leerZuUndefined(r[SP.kontoName]),
     glaeubigerId: leerZuUndefined(r[SP.glaeubigerId]),
+    // Zwei Spalten, die der Export von Anfang an mitbrachte und die wir bis 2026-08-18
+    // weggeworfen haben. Die Mandatsreferenz ist der Grund für die Nachlese: zusammen
+    // mit der Gläubiger-ID ist sie der einzige von der BANK vergebene Schlüssel, den
+    // beide Quellen tragen — damit erkennt der Dublettenfinder dieselbe Lastschrift
+    // ohne jede Textähnlichkeit. Die Umsatzart („Kartenzahlung") ist Anzeigewert;
+    // sie wird bewusst NICHT zum Abgleich benutzt, weil die Bank ein anderes Vokabular
+    // verwendet („KARTENVERFÜGUNG").
+    //
+    // Was der Export sonst noch führt, bleibt draußen: `E-Ref` ist in allen 5279 Zeilen
+    // leer, `Kontostand` gehört an das Konto und nicht an die Buchung, und die
+    // `Analyse-*`-Spalten sind Finanzgurus eigene Auswertung — die machen wir selbst.
+    mandatsreferenz: leerZuUndefined(r[SP.mandatsreferenz]),
+    umsatzart: leerZuUndefined(r[SP.umsatzart]),
     istUmbuchung: (r[SP.umbuchung] ?? "").trim().toLowerCase() === "ja",
     quelle: ID,
     nativeId: leerZuUndefined(r[SP.buchungsId]),

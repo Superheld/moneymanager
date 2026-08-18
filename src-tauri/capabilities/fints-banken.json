@@ -1,0 +1,270 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "fints-banken",
+  "description": "HTTP-Transport für den FinTS-Abruf. Erzeugt aus der DK-Bankenliste (scripts/bankenliste-erzeugen.mjs) — nicht von Hand pflegen.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://banking-bb6.s-fints-pt-bb.de/*"
+        },
+        {
+          "url": "https://banking-be3.s-fints-pt-be.de/*"
+        },
+        {
+          "url": "https://banking-bw1.s-fints-pt-bw.de/*"
+        },
+        {
+          "url": "https://banking-bw2.s-fints-pt-bw.de/*"
+        },
+        {
+          "url": "https://banking-bw3.s-fints-pt-bw.de/*"
+        },
+        {
+          "url": "https://banking-bw4.s-fints-pt-bw.de/*"
+        },
+        {
+          "url": "https://banking-bw5.s-fints-pt-bw.de/*"
+        },
+        {
+          "url": "https://banking-bw6.s-fints-pt-bw.de/*"
+        },
+        {
+          "url": "https://banking-by1.s-fints-pt-by.de/*"
+        },
+        {
+          "url": "https://banking-by2.s-fints-pt-by.de/*"
+        },
+        {
+          "url": "https://banking-by3.s-fints-pt-by.de/*"
+        },
+        {
+          "url": "https://banking-by4.s-fints-pt-by.de/*"
+        },
+        {
+          "url": "https://banking-by5.s-fints-pt-by.de/*"
+        },
+        {
+          "url": "https://banking-by6.s-fints-pt-by.de/*"
+        },
+        {
+          "url": "https://banking-by7.s-fints-pt-by.de/*"
+        },
+        {
+          "url": "https://banking-hb6.s-fints-pt-hb.de/*"
+        },
+        {
+          "url": "https://banking-hh7.s-fints-pt-hh.de/*"
+        },
+        {
+          "url": "https://banking-hs1.s-fints-pt-hs.de/*"
+        },
+        {
+          "url": "https://banking-hs2.s-fints-pt-hs.de/*"
+        },
+        {
+          "url": "https://banking-hs3.s-fints-pt-hs.de/*"
+        },
+        {
+          "url": "https://banking-hs4.s-fints-pt-hs.de/*"
+        },
+        {
+          "url": "https://banking-hs6.s-fints-pt-hs.de/*"
+        },
+        {
+          "url": "https://banking-hs7.s-fints-pt-hs.de/*"
+        },
+        {
+          "url": "https://banking-li1.s-fints-pt-li.de/*"
+        },
+        {
+          "url": "https://banking-li2.s-fints-pt-li.de/*"
+        },
+        {
+          "url": "https://banking-li4.s-fints-pt-li.de/*"
+        },
+        {
+          "url": "https://banking-mv6.s-fints-pt-mv.de/*"
+        },
+        {
+          "url": "https://banking-ni1.s-fints-pt-ni.de/*"
+        },
+        {
+          "url": "https://banking-ni2.s-fints-pt-ni.de/*"
+        },
+        {
+          "url": "https://banking-ni3.s-fints-pt-ni.de/*"
+        },
+        {
+          "url": "https://banking-ni4.s-fints-pt-ni.de/*"
+        },
+        {
+          "url": "https://banking-rl1.s-fints-pt-rl.de/*"
+        },
+        {
+          "url": "https://banking-rl2.s-fints-pt-rl.de/*"
+        },
+        {
+          "url": "https://banking-rl3.s-fints-pt-rl.de/*"
+        },
+        {
+          "url": "https://banking-rl4.s-fints-pt-rl.de/*"
+        },
+        {
+          "url": "https://banking-rl5.s-fints-pt-rl.de/*"
+        },
+        {
+          "url": "https://banking-rl6.s-fints-pt-rl.de/*"
+        },
+        {
+          "url": "https://banking-rl7.s-fints-pt-rl.de/*"
+        },
+        {
+          "url": "https://banking-rp1.s-fints-pt-rp.de/*"
+        },
+        {
+          "url": "https://banking-rp3.s-fints-pt-rp.de/*"
+        },
+        {
+          "url": "https://banking-rp4.s-fints-pt-rp.de/*"
+        },
+        {
+          "url": "https://banking-sh1.s-fints-pt-sh.de/*"
+        },
+        {
+          "url": "https://banking-sh2.s-fints-pt-sh.de/*"
+        },
+        {
+          "url": "https://banking-sl2.s-fints-pt-sl.de/*"
+        },
+        {
+          "url": "https://banking-sn4.s-fints-pt-sn.de/*"
+        },
+        {
+          "url": "https://banking-sn5.s-fints-pt-sn.de/*"
+        },
+        {
+          "url": "https://banking-st5.s-fints-pt-st.de/*"
+        },
+        {
+          "url": "https://banking-th5.s-fints-pt-th.de/*"
+        },
+        {
+          "url": "https://banking-wl1.s-fints-pt-wl.de/*"
+        },
+        {
+          "url": "https://banking-wl2.s-fints-pt-wl.de/*"
+        },
+        {
+          "url": "https://banking-wl3.s-fints-pt-wl.de/*"
+        },
+        {
+          "url": "https://banking-wl4.s-fints-pt-wl.de/*"
+        },
+        {
+          "url": "https://banking-wl5.s-fints-pt-wl.de/*"
+        },
+        {
+          "url": "https://banking-wl6.s-fints-pt-wl.de/*"
+        },
+        {
+          "url": "https://banking-wl7.s-fints-pt-wl.de/*"
+        },
+        {
+          "url": "https://banking.aab.de/*"
+        },
+        {
+          "url": "https://banking.ikb.de/*"
+        },
+        {
+          "url": "https://banking.netbank.de/*"
+        },
+        {
+          "url": "https://banking.seeligerbank.de/*"
+        },
+        {
+          "url": "https://brokerage-hbci.consorsbank.de/*"
+        },
+        {
+          "url": "https://fints.1822direkt.com/*"
+        },
+        {
+          "url": "https://fints.apobank.de/*"
+        },
+        {
+          "url": "https://fints.baaderbank.de/*"
+        },
+        {
+          "url": "https://fints.comdirect.de/*"
+        },
+        {
+          "url": "https://fints.commerzbank.de/*"
+        },
+        {
+          "url": "https://fints.degussa-bank.de/*"
+        },
+        {
+          "url": "https://fints.deutsche-bank.de/*"
+        },
+        {
+          "url": "https://fints.dkb.de/*"
+        },
+        {
+          "url": "https://fints.ing.de/*"
+        },
+        {
+          "url": "https://fints.miles-and-more-kreditkarte.com/*"
+        },
+        {
+          "url": "https://fints.norisbank.de/*"
+        },
+        {
+          "url": "https://fints.paycenter.de/*"
+        },
+        {
+          "url": "https://fints.targobank.de/*"
+        },
+        {
+          "url": "https://fints1.atruvia.de/*"
+        },
+        {
+          "url": "https://fints2.atruvia.de/*"
+        },
+        {
+          "url": "https://hbci-01.hypovereinsbank.de/*"
+        },
+        {
+          "url": "https://hbci.akf24.de/*"
+        },
+        {
+          "url": "https://hbci.neelmeyer.de/*"
+        },
+        {
+          "url": "https://hbci.olb.de/*"
+        },
+        {
+          "url": "https://hbci.postbank.de/*"
+        },
+        {
+          "url": "https://hbciplus.sperrer.de/*"
+        },
+        {
+          "url": "https://homebanking.hsh-nordbank-banking.de/*"
+        },
+        {
+          "url": "https://konto.biw-bank.de/*"
+        },
+        {
+          "url": "https://www.bv-activebanking.de/*"
+        },
+        {
+          "url": "https://www.warburg-bank.de/*"
+        }
+      ]
+    }
+  ]
+}

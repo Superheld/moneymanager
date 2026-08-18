@@ -30,7 +30,10 @@ export function Modal({
   }, [onClose]);
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: z }}>
+    // role/aria-modal am Layer: das DS-Dialog liefert nur das Aussehen. Ohne die Rolle
+    // ist ein Modal für Screenreader ein beliebiger Kasten in der Seite — und für Tests
+    // nicht als eigener Bereich adressierbar.
+    <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, zIndex: z }}>
       <Dialog title={title} subtitle={subtitle} onClose={onClose} footer={footer}>
         {children}
       </Dialog>

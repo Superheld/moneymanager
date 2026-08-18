@@ -84,7 +84,8 @@ describe("AppShell", () => {
     // sind per Tastatur nicht fokussierbar und für Screenreader nicht als bedienbar
     // erkennbar. Das ist ein Barrierefreiheits-Mangel im Markup, nicht im Test; hier
     // festgehalten, damit er nicht in Vergessenheit gerät.
-    const ziel = await screen.findByText(/^Konten$/);
+    // Zweimal vorhanden: Übersicht (Überblick) und Verwaltung. Die erste genügt.
+    const ziel = (await screen.findAllByText(/^Konten$/))[0];
     await nutzer.click(ziel);
     expect(gewechseltZu.length).toBeGreaterThan(0);
   });

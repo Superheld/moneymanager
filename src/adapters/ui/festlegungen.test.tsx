@@ -17,7 +17,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, kartenAufklappen, pluginApi, rendere, sqlLaden } from "../../test/harness";
+import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { KontenScreen } from "./KontenScreen";
 import { ReviewScreen } from "./ReviewScreen";
@@ -249,7 +249,7 @@ describe("Festlegungen in den Einstellungen", () => {
     await festlegungRepo.speichern({ muster: "jana stoka", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await kartenAufklappen(nutzer);
+    await registerWaehlen(nutzer, /^Festlegungen$/);
 
     await waitFor(() => expect(screen.getByText("jana stoka")).toBeInTheDocument());
     expect(screen.getAllByText("Kinderbetreuung").length).toBeGreaterThan(0);
@@ -261,7 +261,7 @@ describe("Festlegungen in den Einstellungen", () => {
     await festlegungRepo.speichern({ muster: "jana stoka", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await kartenAufklappen(nutzer);
+    await registerWaehlen(nutzer, /^Festlegungen$/);
     await waitFor(() => expect(screen.getByText("jana stoka")).toBeInTheDocument());
 
     await nutzer.click(screen.getByRole("button", { name: /aufheben/i }));
@@ -276,7 +276,7 @@ describe("Festlegungen in den Einstellungen", () => {
     await festlegungRepo.speichern({ muster: "irgendwer", kategorieId: "gibt-es-nicht", angelegtAm: "2026-08-17T10:00:00.000Z" });
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await kartenAufklappen(nutzer);
+    await registerWaehlen(nutzer, /^Festlegungen$/);
 
     await waitFor(() => expect(screen.getByText("irgendwer")).toBeInTheDocument());
     expect(document.body.textContent).toMatch(/gelöscht/i);
