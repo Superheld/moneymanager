@@ -14,6 +14,9 @@
 //     Dubletten, und die fängt die Dedup ab; das ist der billigere Fehler.
 //  2. **Der Stand wird nur bei Erfolg fortgeschrieben.** Bricht ein Konto ab, bleibt
 //     sein `letzterAbrufBis` stehen, und der nächste Lauf holt den Zeitraum erneut.
+//  3. **Der Saldo der Bank wird immer mitgeholt**, in einem eigenen try: er ist die
+//     zweite, unabhängige Aussage über das Konto und die einzige Möglichkeit zu merken,
+//     dass eine Buchung fehlt. Scheitert er, laufen die Umsätze trotzdem — und umgekehrt.
 
 import type { ImportLaufRepository, KategorieRepository, UmsatzRepository, ZahlungskontoRepository } from "../ports";
 import type { Vorschlagskontext } from "../import/vorschlag";
@@ -36,6 +39,9 @@ export interface AbrufBefund {
   readonly bis: string;
   readonly format?: string;
   readonly ergebnis?: UebernahmeErgebnis;
+  /** Der von der Bank gemeldete Kontostand, falls sie ihn herausgibt. */
+  readonly bankSaldo?: number;
+  readonly bankSaldoDatum?: string;
   /** Gesetzt, wenn dieses Konto nicht abgerufen werden konnte — der Rest läuft weiter. */
   readonly fehler?: string;
 }
@@ -52,6 +58,16 @@ export interface AbrufDeps {
   readonly kategorisierung?: Vorschlagskontext;
   /** Heute als ISO-Datum — von außen, damit der Ablauf prüfbar bleibt. */
   readonly heute: string;
+  /**
+   * Wie viele Tage zurück geholt werden soll — überschreibt den fortlaufenden Stand.
+   *
+   * Der Normalfall ist der Rückgriff auf `letzterAbrufBis`; er hält den Abruf klein. Wer
+   * dagegen einen Altbestand aus einer Datei durch die Zeilen der Bank ersetzen will,
+   * braucht den Zeitraum, den die Datei abdeckt — und das sind Monate, nicht Tage. Wie
+   * weit die Bank überhaupt zurückreicht, sagt sie selbst (`speicherzeitraumTage`); was
+   * darüber hinaus verlangt wird, liefert sie einfach nicht.
+   */
+  readonly rueckgriffTage?: number;
 }
 
 function tageVor(iso: string, tage: number): string {
@@ -60,8 +76,14 @@ function tageVor(iso: string, tage: number): string {
   return d.toISOString().slice(0, 10);
 }
 
-/** Ab wann für dieses Konto geholt wird. */
-export function abrufStart(zuordnung: Kontozuordnung, heute: string): string {
+/**
+ * Ab wann für dieses Konto geholt wird.
+ *
+ * Ein ausdrücklich gewünschter Zeitraum gewinnt — auch gegen einen jüngeren Stand: wer
+ * 180 Tage anfordert, will 180 Tage, nicht „ab letztem Abruf, aber höchstens 180".
+ */
+export function abrufStart(zuordnung: Kontozuordnung, heute: string, rueckgriffTage?: number): string {
+  if (rueckgriffTage != null) return tageVor(heute, rueckgriffTage);
   return zuordnung.letzterAbrufBis
     ? tageVor(zuordnung.letzterAbrufBis, RUECKGRIFF_TAGE)
     : tageVor(heute, ERSTABRUF_TAGE);
@@ -96,7 +118,7 @@ export async function abrufAusfuehren(
     const bankkonto = sitzung.konten.find((k) => k.schluessel === z.schluessel);
     const zahlungskonto = konten.find((k) => k.id === z.zahlungskontoId);
     const bezeichnung = zahlungskonto?.bezeichnung ?? bankkonto?.bezeichnung ?? z.schluessel;
-    const von = abrufStart(z, deps.heute);
+    const von = abrufStart(z, deps.heute, deps.rueckgriffTage);
 
     if (!bankkonto) {
       befunde.push({
@@ -117,6 +139,16 @@ export async function abrufAusfuehren(
         fehler: "Das verknüpfte Konto der App gibt es nicht mehr.",
       });
       continue;
+    }
+
+    // Der Saldo in EIGENEM try: er ist die Kontrollzahl und darf weder an einem
+    // Umsatzfehler scheitern noch einen verursachen. Banken, die HKSAL nicht anbieten,
+    // liefern schlicht null — dann bleibt der letzte bekannte Stand stehen.
+    let saldo: Awaited<ReturnType<typeof sitzung.saldo>> = null;
+    try {
+      saldo = await sitzung.saldo(bankkonto);
+    } catch {
+      saldo = null;
     }
 
     try {
@@ -142,7 +174,12 @@ export async function abrufAusfuehren(
         },
       );
 
-      await deps.zuordnungRepo.speichern({ ...z, letzterAbrufBis: deps.heute });
+      await deps.zuordnungRepo.speichern({
+        ...z,
+        letzterAbrufBis: deps.heute,
+        bankSaldo: saldo?.betrag ?? z.bankSaldo,
+        bankSaldoDatum: saldo?.datum ?? z.bankSaldoDatum,
+      });
       befunde.push({
         zahlungskontoId: z.zahlungskontoId,
         bezeichnung,
@@ -150,13 +187,23 @@ export async function abrufAusfuehren(
         bis: deps.heute,
         format: abruf.format,
         ergebnis,
+        bankSaldo: saldo?.betrag,
+        bankSaldoDatum: saldo?.datum,
       });
     } catch (e) {
+      // Auch im Fehlerfall wird ein geholter Saldo festgehalten: er sagt bereits, ob
+      // etwas fehlt, selbst wenn die Umsätze nicht kamen. `letzterAbrufBis` bleibt
+      // dagegen stehen — der Zeitraum wurde ja nicht geholt.
+      if (saldo) {
+        await deps.zuordnungRepo.speichern({ ...z, bankSaldo: saldo.betrag, bankSaldoDatum: saldo.datum });
+      }
       befunde.push({
         zahlungskontoId: z.zahlungskontoId,
         bezeichnung,
         von,
         bis: deps.heute,
+        bankSaldo: saldo?.betrag,
+        bankSaldoDatum: saldo?.datum,
         fehler: e instanceof Error ? e.message : String(e),
       });
     }

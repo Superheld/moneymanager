@@ -43,7 +43,7 @@ const konto: Zahlungskonto = {
 };
 
 /** Merkt sich, mit welchem Zeitraum gefragt wurde, und liefert eine feste Buchung. */
-function fakeAdapter(opt: { konten: Bankkonto[]; wirft?: boolean }) {
+function fakeAdapter(opt: { konten: Bankkonto[]; wirft?: boolean; saldo?: number; saldoWirft?: boolean }) {
   const anfragen: { schluessel: string; von: string; bis: string }[] = [];
   const sitzung: Abrufsitzung = {
     konten: opt.konten,
@@ -51,7 +51,8 @@ function fakeAdapter(opt: { konten: Bankkonto[]; wirft?: boolean }) {
     hinweise: [],
     bankNachrichten: [],
     async saldo() {
-      return null;
+      if (opt.saldoWirft) throw new Error("9000 Auftrag abgelehnt");
+      return opt.saldo == null ? null : { betrag: opt.saldo, datum: "2026-08-18", waehrung: "EUR" };
     },
     async umsaetze(k, von, bis) {
       anfragen.push({ schluessel: k.schluessel, von, bis });
@@ -146,6 +147,14 @@ describe("abrufStart", () => {
     expect(RUECKGRIFF_TAGE).toBe(7);
   });
 
+  it("ein ausdrücklich gewünschter Zeitraum gewinnt gegen den letzten Stand", () => {
+    // Wer 180 Tage anfordert, will 180 Tage — sonst liesse sich ein alter Dateibestand
+    // nie durch die Zeilen der Bank ersetzen.
+    const z = { zugangId: "z1", schluessel: "s", zahlungskontoId: "k1", letzterAbrufBis: "2026-08-15" };
+    expect(abrufStart(z, HEUTE, 90)).toBe("2026-05-20");
+    expect(abrufStart(z, HEUTE, 0)).toBe(HEUTE);
+  });
+
   it("nimmt beim Erstabruf ein festes Fenster", () => {
     const start = abrufStart({ zugangId: "z1", schluessel: "s", zahlungskontoId: "k1" }, HEUTE);
     expect(start).toBe("2026-07-19");
@@ -208,6 +217,49 @@ describe("abrufAusfuehren", () => {
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
     expect(f.zugaenge[f.zugaenge.length - 1]?.bankparameter).toBe('{"systemId":"S"}');
+  });
+
+  it("holt den Kontostand der Bank mit und schreibt ihn fort", async () => {
+    // Ohne ihn ist der Stand der App nur in sich schlüssig; er ist die zweite,
+    // unabhängige Aussage und damit die einzige Chance, eine fehlende Buchung zu merken.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()], saldo: 250000 });
+    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
+    const befunde = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(befunde[0].bankSaldo).toBe(250000);
+    expect(f.gespeicherteZuordnungen[0].bankSaldo).toBe(250000);
+    expect(f.gespeicherteZuordnungen[0].bankSaldoDatum).toBe("2026-08-18");
+  });
+
+  it("hält den Saldo auch fest, wenn die Umsätze scheitern", async () => {
+    // Er sagt bereits, dass etwas fehlt — auch ohne die Zeilen dazu. Der Abrufstand
+    // bleibt dagegen stehen, der Zeitraum wurde ja nicht geholt.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()], wirft: true, saldo: 250000 });
+    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1", letzterAbrufBis: "2026-08-10" }]);
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(f.gespeicherteZuordnungen[0].bankSaldo).toBe(250000);
+    expect(f.gespeicherteZuordnungen[0].letzterAbrufBis).toBe("2026-08-10");
+  });
+
+  it("lässt einen scheiternden Saldo den Abruf nicht kippen", async () => {
+    // Nicht jede Bank gibt HKSAL heraus. Dann fehlt die Kontrollzahl — die Umsätze
+    // kommen trotzdem.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()], saldoWirft: true });
+    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
+    const befunde = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(befunde[0].fehler).toBeUndefined();
+    expect(befunde[0].bankSaldo).toBeUndefined();
+    expect(f.gespeicherteZuordnungen[0].letzterAbrufBis).toBe(HEUTE);
+  });
+
+  it("holt den gewünschten Zeitraum statt des fortlaufenden", async () => {
+    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1", letzterAbrufBis: "2026-08-15" }]);
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps, rueckgriffTage: 90 });
+
+    expect(anfragen[0].von).toBe("2026-05-20");
   });
 
   it("tut nichts, wenn dem Zugang kein Konto zugeordnet ist", async () => {

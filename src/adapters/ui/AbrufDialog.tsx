@@ -42,6 +42,15 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
   const [zugaenge, setZugaenge] = useState<Bankzugang[]>([]);
   const [zugangId, setZugangId] = useState("");
   const [pin, setPin] = useState("");
+  /**
+   * Wie weit zurück geholt wird. Leer = fortlaufend ab dem letzten Stand, der Normalfall.
+   *
+   * Die Wahl gibt es, weil ein Altbestand aus einer Datei nur dann durch die Zeilen der
+   * Bank ersetzt werden kann, wenn die Bank denselben Zeitraum liefert — und das sind
+   * Monate. Was über den Speicherzeitraum der Bank hinausgeht, kommt einfach nicht;
+   * ein Fehler ist es nicht.
+   */
+  const [rueckgriff, setRueckgriff] = useState("");
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [befunde, setBefunde] = useState<AbrufBefund[] | null>(null);
@@ -86,6 +95,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
           merkmalRepo: sqliteMerkmalskonfigurationRepository,
         }),
         heute: heuteIso(),
+        rueckgriffTage: rueckgriff ? Number(rueckgriff) : undefined,
       });
       setBefunde(ergebnis);
       setPin("");
@@ -139,6 +149,14 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
             <FormField label={t("bankabruf.feldPin")} required hint={t("bankabruf.feldPinHinweis")}>
               <input className="field" type="password" value={pin} onChange={(e) => setPin(e.target.value)} autoComplete="off" autoFocus />
             </FormField>
+            <FormField label={t("konten.abruf.feldZeitraum")} hint={t("konten.abruf.zeitraumHinweis")}>
+              <select className="field" aria-label={t("konten.abruf.feldZeitraum")} value={rueckgriff} onChange={(e) => setRueckgriff(e.target.value)}>
+                <option value="">{t("konten.abruf.zeitraumFortlaufend")}</option>
+                {[30, 90, 180, 360].map((n) => (
+                  <option key={n} value={n}>{t("konten.abruf.zeitraumTage", { n })}</option>
+                ))}
+              </select>
+            </FormField>
           </>
         )}
 
@@ -162,6 +180,11 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
                     })
                   )}
                 </div>
+                {b.bankSaldo != null && (
+                  <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                    {t("konten.abgleich.gemeldet", { datum: b.bankSaldoDatum ?? b.bis })}
+                  </div>
+                )}
               </li>
             ))}
             {befunde.length === 0 && <li className="muted">{t("konten.abruf.keineZuordnung")}</li>}

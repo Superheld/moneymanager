@@ -198,6 +198,22 @@ export function realerKontostand(konto: Zahlungskonto, buchungen: IstBuchung[]):
   return konto.saldo + istSummeKonto(buchungen, konto.id);
 }
 
+/**
+ * Was die Bank meldet, minus was die App rechnet — die einzige Zahl, die beweist, dass
+ * ein Konto vollständig ist.
+ *
+ * Positiv heißt: die Bank hat mehr, der App fehlt eine Einnahme oder eine Ausgabe steht
+ * zu viel darin. Negativ heißt umgekehrt: die App hat mehr, also fehlt eine Ausgabe oder
+ * eine Buchung ist doppelt drin. Null heißt vollständig — und das ist keine Meinung,
+ * sondern eine Aussage gegen eine unabhängige Quelle.
+ *
+ * Bewusst OHNE Toleranz: „fast null" gibt es beim Geld nicht. Ein Cent Abweichung ist
+ * eine fehlende Buchung, kein Rundungsfehler — gerechnet wird durchgehend in Minor Units.
+ */
+export function bankAbweichung(konto: Zahlungskonto, buchungen: IstBuchung[], bankSaldo: Cent): Cent {
+  return bankSaldo - realerKontostand(konto, buchungen);
+}
+
 /** Liquide Mittel real über alle Konten — Startpunkt der Projektion mit Ist. */
 export function liquideMittelReal(konten: Zahlungskonto[], buchungen: IstBuchung[]): Cent {
   return konten.reduce((s, k) => s + realerKontostand(k, buchungen), 0);
