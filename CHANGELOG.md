@@ -3,6 +3,86 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.14.0] — 2026-08-19
+
+Die App holt sich die Buchungen jetzt selbst bei der Bank — und, was mehr Arbeit war:
+sie kann sagen, ob sie damit vollständig ist. Dazwischen liegt alles, was eine
+abgerufene Zeile durchläuft, bis sie im Konto steht.
+
+### Hinzugefügt
+
+**FinTS-Abruf (S-6).** PIN/TAN über `lib-fints`, Transport über `tauri-plugin-http`
+(Bankserver senden keine CORS-Header, die Webview allein käme nicht durch). Die Bank
+wird aus der Liste der Deutschen Kreditwirtschaft gewählt — 1735 Institute mit BLZ, Ort
+und FinTS-Endpunkt liegen im Repo, die Registrierungsnummer ausdrücklich nicht: sie steht
+in der `.env`, und ein Test scheitert, sobald sie in einer versionierten Datei auftaucht.
+Zugänge und Kontozuordnungen sind dauerhaft, Abruf auf Knopfdruck.
+
+**Dublettenfinder** (`application/import/dublette.ts`) — deterministisch und
+quellenagnostisch, er vergleicht Bankzeile gegen Dateizeile, ohne zu wissen, welche
+welche ist. Kein Modell: die Frage ist Identität, nicht Ähnlichkeit, und bei einer
+Fehlentscheidung muss der Grund lesbar sein. Betrag und Konto sind harte Vorbedingungen,
+darüber ein Punktesystem aus Datum (Buchungstag ODER Valuta), Gläubiger-ID plus
+Mandatsreferenz, Zweck-Präfix und Gegenpartei. Am echten Bestand gemessen: 50 identisch,
+3 zur Bestätigung vorgelegt, 7 wirklich neu; ein Reimport derselben Datei erkennt
+5279 von 5279 wieder, in 2 ms. Wird eine Zeile wiedererkannt, entsteht keine zweite —
+die vorhandene bekommt die Felder, die ihr fehlen.
+
+**Bankabgleich.** Bei jedem Abruf wird der Kontostand geholt, den die BANK meldet, und
+gegen den gerechneten gestellt. Das ist der Unterschied zwischen „in sich schlüssig" und
+„nachweislich vollständig": ohne eine zweite, unabhängige Quelle sieht ein Konto mit einer
+fehlenden Buchung genauso richtig aus wie eines ohne. Die Differenz steht im Kontokopf und
+als Spalte in der Übersicht, mit Vorzeichen und Deutung — Bank hat mehr heißt fehlende
+Einnahme, App hat mehr heißt fehlende Ausgabe oder Dublette. Ohne Toleranz: ein Cent ist
+eine fehlende Buchung, kein Rundungsfehler.
+
+**Ein Buchungsdialog für drei Rollen** — anlegen, Entwurf prüfen, bearbeiten. Vorher
+waren es zwei Masken mit denselben fünf Feldern; jede Erweiterung war doppelt zu bauen
+oder blieb auf einer Seite liegen (so fehlte im Anlegen das Konto). Der Entwurfs-Modus
+schreibt nichts, bis man drückt: Übernehmen bucht, Verwerfen legt weg, Wegklicken lässt
+alles stehen. Tag und Betrag sind dort fest — das ist die Aussage der Bank, keine
+Eingabe. Umbuchung und Vertragszuordnung lassen sich schon am Entwurf entscheiden.
+
+**Konten als eigener Bereich**, online wie offline in einem Anlege-Dialog, mit
+sichtbarer Verbindung und wartenden Buchungen je Konto. Die Verwaltung läuft jetzt über
+Register statt Klappkarten.
+
+### Geändert
+
+- **Abgerufene Buchungen stehen beim Konto, nicht in der Import-Inbox.** Die Inbox ist
+  der Ort für den gelegentlichen Dateiimport; ein Bankabruf ist Alltag und gehört dorthin,
+  wo man auf das Konto schaut.
+- **Der Abrufzeitraum ist wählbar** (fortlaufend / 30 / 90 / 180 / 360 Tage). Ein
+  ausdrücklicher Wunsch gewinnt gegen den letzten Stand.
+- **Das Konto einer Buchung ist änderbar.** Der Konto-Match des Imports ist eine
+  Vermutung; wer die Buchung vor sich hat, korrigiert sie. Bei einem Umbuchungs-Bein
+  verweigert der Use-Case den Wechsel — das Gegenkonto steht am anderen Bein.
+- **„Löschen" sagt jetzt, was es tut:** bei importierten Buchungen bleibt die Bankzeile
+  erhalten und steht danach wieder unter den Entwürfen.
+
+### Behoben
+
+- **Verworfene Bankzeilen waren unerreichbar.** Verwerfen war ein Endzustand, die Zeile
+  stand in keiner Oberfläche, und einen Rückweg gab es im Code nicht — eine
+  versehentlich verworfene Zeile nahm ihren Betrag aus dem Kontostand mit, ohne Spur.
+  Jetzt sichtbar unter „Weggelegt", mit derselben Dublettenprüfung wie oben (steht das
+  Gegenstück wirklich im Bestand?) und mit Rückweg.
+- **Eine Umbuchung zwischen zwei unbestätigten Entwürfen** ließ sich nicht als solche
+  bestätigen: die Paarung entsteht beim gemeinsamen Verbuchen, und das Gegenbein liegt
+  per Definition auf einem anderen Konto. Es wird jetzt mitgenommen.
+- **„Bestätigen & bearbeiten" bestätigte nur** — der Callback hielt einen veralteten
+  Zustand fest, in dem die eben erzeugte Buchung nicht sein konnte.
+
+### Sicherheit
+
+- **Eine echte Kontoverbindung stand in zwei Tests.** Unter einem erfundenen
+  Institutsnamen eine echte Bankleitzahl samt echter Kontonummer, zusammengesetzt zu
+  einer gültigen IBAN. Der erfundene Name macht die Zahlen nicht anonym. Ersetzt durch
+  frei erfundene Werte und aus der noch nicht veröffentlichten Historie entfernt.
+- **Ein Empfängername in einem Test** las sich wie ein echter Personenname und stand
+  zusammen mit Betrag und Verwendungszweck da. Ersetzt. Er steht allerdings bereits in
+  der veröffentlichten Historie (8d2f5b4).
+
 ## [0.13.0] — 2026-08-17
 
 Zwei Themen, die dasselbe Ziel haben: die App soll die Arbeit erkennen, statt sie

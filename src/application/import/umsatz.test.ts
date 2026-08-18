@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { FachlicherFehler } from "../../core";
-import { alsDuplikat, kategorisieren, verbuchen, verwerfen, zuruecksetzen, type Umsatz } from "./umsatz";
+import { alsDuplikat, kategorisieren, verbuchen, verwerfen, zurueckholen, zuruecksetzen, type Umsatz } from "./umsatz";
 
 function basis(over: Partial<Umsatz> = {}): Umsatz {
   return {
@@ -50,6 +50,19 @@ describe("Umsatz — Statusmaschine", () => {
   it("ein verbuchter Umsatz lässt sich nicht erneut verbuchen", () => {
     const u = verbuchen(basis(), "ist-1");
     expect(() => verbuchen(u, "ist-2")).toThrow(FachlicherFehler);
+  });
+
+  it("zurueckholen holt eine weggelegte Zeile zurück in den Stapel", () => {
+    // Ohne den Rückweg nahm ein versehentliches Verwerfen den Betrag aus dem Kontostand
+    // mit — und die Zeile war nirgends mehr zu sehen.
+    expect(zurueckholen(verwerfen(basis())).status).toBe("neu");
+    expect(zurueckholen(alsDuplikat(basis())).status).toBe("neu");
+  });
+
+  it("zurueckholen gilt nicht für offene oder verbuchte Zeilen", () => {
+    // Für verbuchte gibt es zuruecksetzen — das muss zusätzlich die Ist-Buchung bedenken.
+    expect(() => zurueckholen(basis())).toThrow(FachlicherFehler);
+    expect(() => zurueckholen(verbuchen(basis(), "ist-1"))).toThrow(FachlicherFehler);
   });
 
   it("zuruecksetzen führt verbucht → neu zurück (Umkehrung von verbuchen)", () => {

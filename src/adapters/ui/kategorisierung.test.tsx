@@ -18,7 +18,7 @@ const halter = vi.hoisted(() => {
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
-import { EinstellungenScreen } from "./EinstellungenScreen";
+import { TrainingBereich } from "./TrainingBereich";
 import { sqliteMerkmalskonfigurationRepository as merkmalRepo } from "../persistence/sqliteMerkmalskonfigurationRepository";
 
 let db: Database;
@@ -80,29 +80,31 @@ const KARTEN = {
 } as const;
 
 /**
- * Klappt eine der vier Karten auf und wartet, bis der gemeinsame Ladevorgang durch ist.
- * Er läuft erst beim ersten Aufklappen — vorher hängt der Inhalt nicht im Baum.
+ * Wählt eines der fünf Register und wartet, bis der gemeinsame Ladevorgang durch ist.
+ * Der läuft beim Betreten des Bereichs; die Register selbst hängen nur den jeweiligen
+ * Inhalt in den Baum.
  */
 async function oeffne(nutzer: ReturnType<typeof userEvent.setup>, karte: RegExp) {
-  await nutzer.click(await screen.findByRole("button", { name: karte }));
+  await nutzer.click(await screen.findByRole("tab", { name: karte }));
   await waitFor(() => expect(screen.queryAllByText("…")).toHaveLength(0));
 }
 
 /**
- * Der Kasten EINER Karte. Am Hintergrund-Token erkannt, das die Card-Komponente setzt —
- * die Zahl der Zwischenebenen ist ein Detail des Design-Systems und würde jeden Test
- * beim nächsten Umbau dort brechen.
+ * Der Inhalt des offenen Registers. Seit der Umstellung auf Register ist immer genau
+ * eines im Baum — die Einschränkung auf „diese eine Karte" ist damit das Panel selbst.
+ * Das Argument bleibt in der Signatur, damit an den Aufrufstellen lesbar steht, welcher
+ * Bereich gemeint ist.
  */
-function karteninhalt(karte: RegExp): HTMLElement {
-  const titel = screen.getByRole("button", { name: karte });
-  return titel.closest('div[style*="var(--surface)"]') as HTMLElement;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function karteninhalt(_karte: RegExp): HTMLElement {
+  return screen.getByRole("tabpanel") as HTMLElement;
 }
 
 describe("1 · Trainingsdaten", () => {
   it("zählt brauchbare Beispiele und belegte Kategorien", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.daten);
 
     expect(screen.getByText("Brauchbare Beispiele")).toBeTruthy();
@@ -114,7 +116,7 @@ describe("1 · Trainingsdaten", () => {
     buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm" });
     buchung({ id: "b2", betrag: -500, charakter: "Umschichtung" });
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.daten);
 
     expect(screen.getByText(/Umschichtung — eigenes Geld/)).toBeTruthy();
@@ -126,7 +128,7 @@ describe("1 · Trainingsdaten", () => {
     buchung({ id: "b1", betrag: -1234, kategorieId: "kat-lm" });
     buchung({ id: "b2", betrag: -999, kategorieId: "kat-selten", gegenpartei: "Kuriosum" });
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.daten);
 
     expect(
@@ -136,7 +138,7 @@ describe("1 · Trainingsdaten", () => {
 
   it("sagt es, wenn es gar nichts zu lernen gibt", async () => {
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.daten);
     expect(screen.getByText(/Noch keine gebuchten Zahlungen/)).toBeTruthy();
   });
@@ -146,7 +148,7 @@ describe("2 · Merkmale", () => {
   it("führt die fünf Quellen mit Klartext-Namen", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.merkmale);
 
     // `emp=` und `emp:` sind aus dem Präfix nicht zu erraten — sie brauchen Namen.
@@ -158,7 +160,7 @@ describe("2 · Merkmale", () => {
   it("schaltet eine Quelle ab und schreibt das in die Datenbank", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.merkmale);
 
     const schalter = within(karteninhalt(KARTEN.merkmale)).getAllByRole("checkbox");
@@ -172,7 +174,7 @@ describe("2 · Merkmale", () => {
   it("eine abgeschaltete Quelle verschwindet aus dem Vokabular", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.merkmale);
     expect(screen.getByText("vz:-")).toBeTruthy();
 
@@ -186,7 +188,7 @@ describe("2 · Merkmale", () => {
   it("zeigt die Trennschärfe je Merkmal", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.merkmale);
 
     // Ohne diese Zahl neben dem Wort wäre das Ausschließen ein Ratespiel.
@@ -197,7 +199,7 @@ describe("2 · Merkmale", () => {
   it("schließt ein Merkmal aus der Tabelle heraus aus — in seiner Quelle", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.merkmale);
 
     const zeile = screen.getByText("vwz:einkauf").closest("tr")!;
@@ -214,7 +216,7 @@ describe("2 · Merkmale", () => {
   it("misst auf Anforderung, was jede Quelle beiträgt", async () => {
     material();
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.merkmale);
 
     await nutzer.click(within(karteninhalt(KARTEN.merkmale)).getByRole("button", { name: "Wirkung messen" }));
@@ -227,7 +229,7 @@ describe("3 · Ausschlüsse", () => {
   it("legt beim ersten Öffnen die mitgelieferte Liste an", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.ausschluesse);
 
     // Die Stoppwörter liegen ab jetzt in der Datenbank — nur so ist eines löschbar.
@@ -239,7 +241,7 @@ describe("3 · Ausschlüsse", () => {
   it("nimmt ein Wort über das Formular auf", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.ausschluesse);
 
     const inhalt = karteninhalt(KARTEN.ausschluesse);
@@ -256,7 +258,7 @@ describe("3 · Ausschlüsse", () => {
   it("nimmt ein Wort wieder ins Training auf", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.ausschluesse);
 
     // Ein eigenes Wort statt eines mitgelieferten: die Liste ist alphabetisch sortiert
@@ -278,7 +280,7 @@ describe("3 · Ausschlüsse", () => {
   it("unterscheidet mitgelieferte von selbst gesetzten Einträgen", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.ausschluesse);
 
     const inhalt = karteninhalt(KARTEN.ausschluesse);
@@ -294,7 +296,7 @@ describe("4 · Erkennungsmodell", () => {
   it("sagt vor dem ersten Training, dass noch nichts gelernt ist", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.modell);
     expect(screen.getByText(/Noch nicht trainiert/)).toBeTruthy();
   });
@@ -302,7 +304,7 @@ describe("4 · Erkennungsmodell", () => {
   it("trainiert auf Knopfdruck und zeigt eine gemessene Trefferquote", async () => {
     material();
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.modell);
 
     await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
@@ -314,7 +316,7 @@ describe("4 · Erkennungsmodell", () => {
   it("misst nicht, wenn zu wenige Beispiele da sind", async () => {
     material(1);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.modell);
 
     await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
@@ -324,7 +326,7 @@ describe("4 · Erkennungsmodell", () => {
 
   it("bietet kein Training an, solange es kein Material gibt", async () => {
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.modell);
     expect(screen.queryByRole("button", { name: "Training starten" })).toBeNull();
   });
@@ -332,7 +334,7 @@ describe("4 · Erkennungsmodell", () => {
   it("meldet Fehlerfreiheit, statt eine leere Matrix zu zeigen", async () => {
     material();
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.modell);
 
     await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
@@ -343,50 +345,56 @@ describe("4 · Erkennungsmodell", () => {
   it("das Modell überlebt einen Neuaufbau des Screens", async () => {
     material();
     const nutzer = userEvent.setup();
-    const erste = rendere(<EinstellungenScreen />);
+    const erste = rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.modell);
     await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
     await waitFor(() => expect(screen.getByText(/Zuletzt trainiert am/)).toBeTruthy());
 
     erste.unmount();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.modell);
 
     await waitFor(() => expect(screen.getByText(/aus 80 Beispielen/)).toBeTruthy());
   });
 });
 
-describe("Karten klappen", () => {
-  it("alle Karten starten eingeklappt und laden nichts", async () => {
+describe("Register", () => {
+  it("öffnet mit dem ersten Register und hängt nur dieses in den Baum", async () => {
+    // Der Unterschied zu den früheren Klappkarten: es ist immer GENAU EINES offen. Was
+    // nicht gewählt ist, wird nicht gerendert — und lädt damit auch nichts nach.
     material(2);
-    rendere(<EinstellungenScreen />);
-    await screen.findByRole("button", { name: KARTEN.daten });
+    rendere(<TrainingBereich />);
+    await screen.findByRole("tab", { name: KARTEN.daten });
 
-    const schalter = screen.getAllByRole("button").filter((b) => b.hasAttribute("aria-expanded"));
-    expect(schalter.length).toBeGreaterThanOrEqual(8); // 4 Stammdaten + 4 Kategorisierung
-    for (const s of schalter) expect(s.getAttribute("aria-expanded")).toBe("false");
-    expect(screen.queryByText("Brauchbare Beispiele")).toBeNull();
+    const reiter = screen.getAllByRole("tab");
+    expect(reiter).toHaveLength(5);
+    expect(reiter[0].getAttribute("aria-selected")).toBe("true");
+    expect(reiter.slice(1).every((r) => r.getAttribute("aria-selected") === "false")).toBe(true);
+    // Inhalt eines anderen Registers steht nicht da.
+    expect(screen.queryByText("Empfänger, ganz")).toBeNull();
   });
 
-  it("die vier Karten teilen sich einen Ladevorgang", async () => {
+  it("die Register teilen sich einen Ladevorgang", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.daten);
 
-    // Die zweite Karte ist sofort gefüllt — sie lädt nicht noch einmal.
-    await nutzer.click(screen.getByRole("button", { name: KARTEN.merkmale }));
+    // Das zweite Register ist sofort gefüllt — geladen wird beim Betreten des Bereichs,
+    // nicht je Register.
+    await nutzer.click(screen.getByRole("tab", { name: KARTEN.merkmale }));
     expect(screen.getByText("Empfänger, ganz")).toBeTruthy();
   });
 
-  it("klappt auf Klick wieder zu", async () => {
+  it("wechselt zurück, ohne neu zu laden", async () => {
     material(2);
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
-    await oeffne(nutzer, KARTEN.daten);
-    await nutzer.click(screen.getByRole("button", { name: KARTEN.daten }));
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.merkmale);
+    await nutzer.click(screen.getByRole("tab", { name: KARTEN.daten }));
 
-    expect(screen.queryByText("Brauchbare Beispiele")).toBeNull();
+    expect(screen.getByText("Brauchbare Beispiele")).toBeTruthy();
+    expect(screen.queryByText("Empfänger, ganz")).toBeNull();
   });
 });
 
@@ -409,7 +417,7 @@ describe("5 · Bestand abgleichen", () => {
     // Budget steht.
     schieflage();
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.abgleich);
 
     await nutzer.click(screen.getByRole("button", { name: /Vorschau rechnen/ }));
@@ -424,7 +432,7 @@ describe("5 · Bestand abgleichen", () => {
   it("schreibt erst auf Bestätigung — und dann alle drei", async () => {
     schieflage();
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.abgleich);
     await nutzer.click(screen.getByRole("button", { name: /Vorschau rechnen/ }));
     await waitFor(() => expect(screen.getByText(/3 ×/)).toBeTruthy());
@@ -444,7 +452,7 @@ describe("5 · Bestand abgleichen", () => {
   it("läuft ein zweites Mal ins Leere", async () => {
     schieflage();
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.abgleich);
     await nutzer.click(screen.getByRole("button", { name: /Vorschau rechnen/ }));
     await waitFor(() => expect(screen.getByText(/3 ×/)).toBeTruthy());
@@ -460,7 +468,7 @@ describe("5 · Bestand abgleichen", () => {
     schieflage();
     db.run("UPDATE ist_buchung SET kategorie_herkunft = 'manuell' WHERE id = 'r0'");
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
+    rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.abgleich);
 
     await nutzer.click(screen.getByRole("button", { name: /Vorschau rechnen/ }));
