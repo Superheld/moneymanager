@@ -487,4 +487,43 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 27, // Was die Quellen mehr wissen, als bisher ankam
+    sql: [
+      // Von der BANK wird alles weggespeichert, was strukturiert ankommt — es kostet
+      // nichts und fehlt sonst genau dann, wenn man es braucht. Bei der Datei wird
+      // gewählt: `Mandatsreferenz` und `Analyse-Umsatzart` tragen, der Rest ist
+      // Finanzgurus eigene Auswertung und gehört nicht in unseren Bestand.
+      //
+      // Der Anlass ist der Dublettenfinder: Gläubiger-ID PLUS Mandatsreferenz ist der
+      // einzige von der Bank vergebene Schlüssel, den beide Quellen tragen — und die
+      // Mandatsreferenz haben wir bisher weggeworfen, obwohl sie in der Datei steht
+      // (422 von 5279 Zeilen).
+      `ALTER TABLE umsatz ADD COLUMN gegenpartei_iban TEXT`,
+      `ALTER TABLE umsatz ADD COLUMN mandatsreferenz TEXT`,
+      `ALTER TABLE umsatz ADD COLUMN e2e_referenz TEXT`,
+      `ALTER TABLE umsatz ADD COLUMN umsatzart TEXT`,
+      `ALTER TABLE umsatz ADD COLUMN buchungsschluessel TEXT`,
+      // Institutseigene Referenz aus dem Freitext (comdirect: `Ref. …`). Ausdrücklich
+      // KEIN Schlüssel — im Spike waren von 64 nur 59 verschieden. Gespeichert wird sie,
+      // damit sich am Bestand prüfen lässt, ob sie über mehrere Abrufe stabil bleibt.
+      `ALTER TABLE umsatz ADD COLUMN bank_referenz TEXT`,
+    ],
+  },
+  {
+    version: 28, // Dublettenverdacht an der Buchung
+    sql: [
+      // Der Dublettenfinder kennt drei Urteile. „identisch" legt nichts an, sondern
+      // ergänzt die vorhandene Zeile; „verschieden" legt an. Dazwischen liegt der
+      // Verdacht: die Zeile wird angelegt UND zeigt auf den vermuteten Zwilling, damit
+      // die Durchsicht entscheidet statt der Automatik.
+      //
+      // Warum als eigene Version und nicht in v27 hineingeschrieben, die aus derselben
+      // Stunde stammt: die App lief währenddessen. Eine laufende App kann eine Version
+      // verbuchen, bevor alle Statements drinstehen — dann liefe der Nachtrag NIE
+      // (passiert bei v23, siehe v25). Append-only ist deshalb keine Förmlichkeit.
+      `ALTER TABLE umsatz ADD COLUMN verdacht_auf_id TEXT`,
+      `ALTER TABLE umsatz ADD COLUMN verdacht_gruende TEXT`,
+    ],
+  },
 ];

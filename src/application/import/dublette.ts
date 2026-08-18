@@ -40,7 +40,6 @@ export interface Vergleichbar {
   readonly glaeubigerId?: string;
   readonly mandatsreferenz?: string;
   readonly nativeId?: string;
-  readonly quelle: string;
 }
 
 export type Urteil = "identisch" | "verdacht" | "verschieden";

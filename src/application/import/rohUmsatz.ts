@@ -29,6 +29,36 @@ export interface RohUmsatz {
   readonly kontoName?: string;
   /** SEPA-Gläubiger-ID (nur bei Lastschriften gesetzt) — später Anker der Regel-Schicht. */
   readonly glaeubigerId?: string;
+  /**
+   * SEPA-Mandatsreferenz. Zusammen mit der Gläubiger-ID der einzige von der BANK
+   * vergebene Schlüssel, den beide Quellen tragen — der Dublettenfinder erklärt damit
+   * zwei Lastschriften ohne jede Textähnlichkeit für dieselbe.
+   */
+  readonly mandatsreferenz?: string;
+  /**
+   * SEPA-End-to-End-Referenz. Wäre der saubere Schlüssel für alles; Finanzguru liefert
+   * die Spalte `E-Ref` aber in 0 von 5279 Zeilen gefüllt. Von der Bank nehmen wir sie
+   * trotzdem mit: sobald zwei Bankquellen aufeinandertreffen, trägt sie.
+   */
+  readonly e2eReferenz?: string;
+  /**
+   * Art der Buchung in der Sprache der QUELLE — „KARTENVERFÜGUNG" bei comdirect,
+   * „Kartenzahlung" bei Finanzguru. Bewusst nicht vereinheitlicht und bewusst NICHT
+   * für den Abgleich benutzt: die Vokabulare sind verschieden, und ein hier erfundenes
+   * drittes wäre eine Behauptung über Daten, die wir nicht haben.
+   */
+  readonly umsatzart?: string;
+  /** Geschäftsvorfallcode der Bank (MT940 `:61:`, z. B. 005, 700, 820). */
+  readonly buchungsschluessel?: string;
+  /**
+   * Institutseigene Referenz aus dem Freitext (comdirect: `Ref. …`).
+   *
+   * ABSICHTLICH KEIN Dedup-Schlüssel: im Spike trugen 64 von 65 Buchungen eine, davon
+   * aber nur 59 verschiedene — und ob sie über mehrere Abrufe stabil bleibt, ist
+   * ungeprüft. Gespeichert wird sie, damit genau diese Frage am Bestand beantwortbar
+   * wird, statt sie zu raten.
+   */
+  readonly bankreferenz?: string;
   /** Interne Umbuchung zwischen eigenen Konten (von der Quelle markiert) → Umschichtung. */
   readonly istUmbuchung: boolean;
 
