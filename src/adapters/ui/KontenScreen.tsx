@@ -34,6 +34,7 @@ import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { BuchungDetail } from "./BuchungDetail";
 import { AbrufDialog } from "./AbrufDialog";
+import { NeueBuchungen } from "./NeueBuchungen";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
@@ -240,6 +241,12 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           onClose={() => setAbruf(false)}
           onFertig={() => void laden()}
         />
+      )}
+
+      {/* Was die Bank gebracht hat, steht VOR dem Register: es ist noch nicht Teil des
+          Saldos und wartet auf eine Entscheidung. */}
+      {aktivId && (
+        <NeueBuchungen kontoId={aktivId} kategorien={kategorien} onGeaendert={() => void laden()} />
       )}
 
       {aktiv && register && (

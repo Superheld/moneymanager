@@ -23,13 +23,14 @@ import {
   sqliteKategorieRepository,
   sqliteZahlungskontoRepository,
 } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
+import { sqliteImportLaufRepository, sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import { sqliteVertragserkennungRepository } from "../persistence/sqliteVertragZuordnungRepositories";
 import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "../persistence/sqliteMerkmalskonfigurationRepository";
 import { Button, Card, Pill } from "./ds";
+import { ABRUF_QUELLEN } from "./NeueBuchungen";
 import { CategoryPicker } from "./CategoryPicker";
 import { useGeld } from "./einstellungenKontext";
 
@@ -106,12 +107,19 @@ export function ReviewScreen() {
 
   async function laden() {
     try {
-      const [u, k, kat] = await Promise.all([
+      const [u, k, kat, laeufe] = await Promise.all([
         sqliteUmsatzRepository.offene(),
         sqliteZahlungskontoRepository.alle(),
         sqliteKategorieRepository.alle(),
+        sqliteImportLaufRepository.alle(),
       ]);
-      setUmsaetze(u);
+      // Die Inbox ist der Ort für den gelegentlichen DATEI-Import: ein Stapel, den man am
+      // Stück durchsieht. Was per Bankabruf hereinkommt, steht seit 2026-08-18 beim
+      // Konto selbst — dort schaut man ohnehin hin, und es ist der Alltag, kein Vorgang.
+      const abruf = new Set(
+        laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id),
+      );
+      setUmsaetze(u.filter((x) => !abruf.has(x.laufId)));
       setKonten(k);
       setKategorien(kat);
       setKontext(
