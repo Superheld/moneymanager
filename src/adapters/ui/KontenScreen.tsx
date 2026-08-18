@@ -275,8 +275,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             (u) => u.zahlungskontoId === aktivId && !neueAbrufe.some((n) => n.id === u.id),
           )}
           kategorien={kategorien}
-          onOeffnen={(istbuchungId) => {
-            const b = ist.find((x) => x.id === istbuchungId);
+          onOeffnen={async (istbuchungId) => {
+            // FRISCH aus dem Ledger holen, nicht aus `ist`: die Buchung ist gerade erst
+            // entstanden, und der State dieser Render-Runde kennt sie noch nicht. Genau
+            // daran öffnete sich der Dialog nicht — bestätigt wurde, mehr nicht.
+            const b = (await ledgerRepo.alle()).find((x) => x.id === istbuchungId);
             if (b) setEditBuchung(b);
           }}
           onGeaendert={() => void laden()}
