@@ -20,10 +20,12 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Kategorie, Zahlungskonto } from "../../core";
 import {
+  alsDuplikat,
   gegenbeinFuer,
   ordneZu,
   umsaetzeVerbuchen,
   verwerfen,
+  zurueckholen,
   type Bewertung,
   type Umsatz,
 } from "../../application/import";
@@ -40,6 +42,7 @@ export const ABRUF_QUELLEN = new Set(["fints"]);
 
 export function NeueBuchungen({
   zeilen,
+  weggelegte,
   bestand,
   alleNeuen,
   konten,
@@ -49,6 +52,14 @@ export function NeueBuchungen({
 }: {
   /** Die offenen Abruf-Buchungen DIESES Kontos. */
   zeilen: readonly Umsatz[];
+  /**
+   * Die weggelegten Abruf-Zeilen dieses Kontos (verworfen oder als Dublette markiert).
+   *
+   * Sie standen bisher nirgends. Das ist die Sorte Lücke, die erst auffällt, wenn sie
+   * zuschlägt: eine versehentlich verworfene Bankzeile nahm den Betrag aus dem Kontostand
+   * mit, und weder war zu sehen, dass sie existiert, noch gab es einen Weg zurück.
+   */
+  weggelegte: readonly Umsatz[];
   /** Alle übrigen Umsätze des Kontos — Grundlage der Dublettenprüfung in der Anzeige. */
   bestand: readonly Umsatz[];
   /**
@@ -72,6 +83,8 @@ export function NeueBuchungen({
   const [fehler, setFehler] = useState<string | null>(null);
   /** Zeile, deren Kategorie gerade geändert wird. */
   const [aendertId, setAendertId] = useState<string | null>(null);
+  /** Der Weggelegt-Bereich ist zugeklappt — er ist der Rückweg, nicht der Alltag. */
+  const [zeigeWeggelegt, setZeigeWeggelegt] = useState(false);
 
   const kategorieName = new Map(kategorien.map((k) => [k.id, k.name]));
   const kontoName = new Map(konten.map((k) => [k.id, k.bezeichnung]));
@@ -159,8 +172,21 @@ export function NeueBuchungen({
     onGeaendert();
   }
 
-  async function verwerfenEiner(u: Umsatz) {
-    await sqliteUmsatzRepository.speichern(verwerfen(u));
+  /**
+   * Weglegen — mit dem Unterschied, der für den Kontostand zählt.
+   *
+   * „ist schon gebucht" (Status `duplikat`) heißt: der Betrag steht bereits im Ledger,
+   * über eine andere Zeile. Der Kontostand bleibt richtig.
+   * „verwerfen" heißt: der Betrag kommt NICHT ins Ledger, obwohl die Bank ihn meldet —
+   * danach weicht der Kontostand ab. Deshalb sind es zwei Wörter und nicht eines.
+   */
+  async function weglegen(u: Umsatz, alsDublette: boolean) {
+    await sqliteUmsatzRepository.speichern(alsDublette ? alsDuplikat(u) : verwerfen(u));
+    onGeaendert();
+  }
+
+  async function zurueck(u: Umsatz) {
+    await sqliteUmsatzRepository.speichern(zurueckholen(u));
     onGeaendert();
   }
 
@@ -180,7 +206,7 @@ export function NeueBuchungen({
     onGeaendert();
   }
 
-  if (zeilen.length === 0) return null;
+  if (zeilen.length === 0 && weggelegte.length === 0) return null;
 
   const ohneVerdacht = neuSortiert.filter((u) => !geprueft.has(u.id));
 
@@ -241,8 +267,8 @@ export function NeueBuchungen({
                 <button className="linkbtn" onClick={() => onOeffnen(u)}>
                   {t("konten.neue.bearbeiten")}
                 </button>
-                <button className="linkbtn" onClick={() => void verwerfenEiner(u)}>
-                  {t("konten.neue.verwerfen")}
+                <button className="linkbtn" onClick={() => void weglegen(u, !!verdacht)}>
+                  {t(verdacht ? "konten.neue.schonGebucht" : "konten.neue.verwerfen")}
                 </button>
               </span>
             </div>
@@ -304,6 +330,39 @@ export function NeueBuchungen({
         );
       })}
 
+      {/* Ein Satz zur Folge, dauerhaft sichtbar statt einer Warnung pro Zeile: was
+          verworfen wird, fehlt danach im Kontostand. */}
+      {zeilen.length > 0 && (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+          {t("konten.neue.verwerfenHinweis")}
+        </div>
+      )}
+
+      {/* Der Rückweg. Zugeklappt, weil er kein Alltagsweg ist — aber vorhanden, sichtbar
+          und mit Anzahl, damit man weiß, dass dort etwas liegt. */}
+      {weggelegte.length > 0 && (
+        <div style={{ marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+          <button className="linkbtn" onClick={() => setZeigeWeggelegt((x) => !x)}>
+            {t("konten.neue.weggelegt", { n: weggelegte.length })}
+          </button>
+          {zeigeWeggelegt &&
+            [...weggelegte]
+              .sort((a, b) => b.buchungstag.localeCompare(a.buchungstag))
+              .map((u) => (
+                <div key={u.id} style={{ display: "flex", gap: "var(--sp-3)", alignItems: "baseline", flexWrap: "wrap", padding: "var(--sp-2) 0", borderBottom: "1px solid var(--line-soft)" }}>
+                  <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{u.buchungstag}</span>
+                  <span style={{ fontWeight: "var(--fw-semi)" }}>{u.gegenpartei || t("konten.neue.ohneGegenpartei")}</span>
+                  <Pill variant="neutral">{t(`konten.neue.status.${u.status}`)}</Pill>
+                  <span style={{ marginLeft: "auto", display: "flex", gap: "var(--sp-3)", alignItems: "baseline" }}>
+                    <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(u.betrag)}</span>
+                    <button className="linkbtn" onClick={() => void zurueck(u)}>
+                      {t("konten.neue.zurueckholen")}
+                    </button>
+                  </span>
+                </div>
+              ))}
+        </div>
+      )}
     </Card>
   );
 }

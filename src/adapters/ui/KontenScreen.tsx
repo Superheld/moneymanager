@@ -83,6 +83,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [onlineKonten, setOnlineKonten] = useState<Set<string>>(new Set());
   /** Abgerufene, noch nicht bestätigte Buchungen — je Konto. */
   const [neueAbrufe, setNeueAbrufe] = useState<Umsatz[]>([]);
+  /** Welche Import-Läufe aus einem Bankabruf stammen — Filter für den Konto-Block. */
+  const [abrufLaufIds, setAbrufLaufIds] = useState<Set<string>>(new Set());
   const [fehler, setFehler] = useState<string | null>(null);
 
   // Alles in EINEM Zug laden und zusammen setzen. Gestaffelte await/setState-Paare
@@ -102,6 +104,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     ]);
     const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
     const neu = offene.filter((u) => abrufLaeufe.has(u.laufId));
+    setAbrufLaufIds(abrufLaeufe);
     setNeueAbrufe(neu);
     setOnlineKonten(new Set(zuordnungen.map((z) => z.zahlungskontoId)));
     setKonten(ks);
@@ -272,6 +275,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           // offen ODER verworfen, nur nicht gegen die neuen Zeilen selbst.
           bestand={umsaetze.filter(
             (u) => u.zahlungskontoId === aktivId && !neueAbrufe.some((n) => n.id === u.id),
+          )}
+          // Weggelegte Zeilen desselben Kontos aus einem Abruf — der Rückweg.
+          weggelegte={umsaetze.filter(
+            (u) =>
+              u.zahlungskontoId === aktivId &&
+              (u.status === "verworfen" || u.status === "duplikat") &&
+              abrufLaufIds.has(u.laufId),
           )}
           alleNeuen={neueAbrufe}
           konten={konten}

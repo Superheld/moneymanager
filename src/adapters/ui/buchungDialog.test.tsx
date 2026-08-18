@@ -162,6 +162,54 @@ describe("Entwurf prüfen", () => {
   });
 });
 
+describe("Weglegen und zurueckholen", () => {
+  it("legt eine verworfene Zeile sichtbar ab und holt sie zurück", async () => {
+    // Der gemeldete Verlust: verworfen war terminal, unsichtbar und ohne Rückweg — der
+    // Betrag fehlte danach im Kontostand, ohne dass irgendwo stand, warum.
+    await grunddaten();
+    await entwurf();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await screen.findByText("Testhaendler Nord");
+    await nutzer.click(screen.getByRole("button", { name: /^verwerfen$/i }));
+
+    await waitFor(async () =>
+      expect((await umsatzRepo.alle()).find((u) => u.id === "e1")?.status).toBe("verworfen"),
+    );
+
+    // Sie ist nicht verschwunden: der Rückweg steht da, mit Anzahl.
+    await nutzer.click(await screen.findByRole("button", { name: /weggelegt \(1\)/i }));
+    await nutzer.click(await screen.findByRole("button", { name: /zurückholen/i }));
+
+    await waitFor(async () =>
+      expect((await umsatzRepo.alle()).find((u) => u.id === "e1")?.status).toBe("neu"),
+    );
+  });
+
+  it("nennt eine erkannte Dublette beim Namen statt sie zu verwerfen", async () => {
+    // „ist schon gebucht" und „verwerfen" sind nicht dasselbe: beim einen bleibt der
+    // Kontostand richtig, beim anderen nicht.
+    await grunddaten();
+    await entwurf();
+    await umsatzRepo.speichern({
+      id: "alt", laufId: "l-fints", zahlungskontoId: "k1", buchungstag: "2026-08-17",
+      betrag: -4990, waehrung: "EUR", gegenpartei: "Testhaendler Nord",
+      verwendungszweck: "Einkauf", rohHash: "h-alt", status: "verbucht", istbuchungId: "b-alt",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await screen.findByText("Testhaendler Nord");
+    expect(screen.queryByRole("button", { name: /^verwerfen$/i })).toBeNull();
+    await nutzer.click(screen.getByRole("button", { name: /ist schon gebucht/i }));
+
+    await waitFor(async () =>
+      expect((await umsatzRepo.alle()).find((u) => u.id === "e1")?.status).toBe("duplikat"),
+    );
+  });
+});
+
 describe("Umbuchung und Vertrag am Entwurf", () => {
   it("paart beim Übernehmen mit einer schon gebuchten Gegenbuchung", async () => {
     // Der Alltagsfall: das andere Bein kam mit einem früheren Abruf und ist längst
