@@ -27,6 +27,7 @@ import {
   sqliteBankzugangRepository,
   sqliteKontozuordnungRepository,
 } from "../persistence/sqliteBankzugangRepositories";
+import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { BankSuche } from "./BankSuche";
 import { TanDialog, type TanFrage } from "./TanDialog";
@@ -159,6 +160,7 @@ export function KontoAnlegenModal({
     setBusy(true);
     setFehler(null);
     try {
+      const bekannteBuchungen = await sqliteUmsatzRepository.alle().catch(() => []);
       for (const k of bankkonten ?? []) {
         const wahl = wahlen[k.schluessel];
         if (!wahl || wahl.ziel === "ignorieren") continue;
@@ -177,10 +179,27 @@ export function KontoAnlegenModal({
                 })
               ).id;
 
+        // Wo der Abruf ANFÄNGT, entscheidet sich hier — und das ist die wirksamste
+        // Maßnahme gegen Dubletten: Wird ein Konto verknüpft, das schon Buchungen aus
+        // einer Datei trägt, beginnt der erste Abruf am letzten bekannten Buchungstag
+        // statt 30 Tage davor. Ohne das holt er einen Monat, der längst im Bestand
+        // liegt — am echten Bestand waren das 51 von 60 Zeilen.
+        //
+        // Der Rückgriff des Abrufs (sieben Tage) läuft trotzdem darüber: die Bank trägt
+        // nach und verschiebt Buchungstage, und was dabei doppelt hereinkommt, fängt der
+        // Dublettenfinder ab. Lieber ein paar erkannte Wiedergänger als eine verlorene
+        // Nachzügler-Buchung.
+        const letzterTag = bekannteBuchungen
+          .filter((u) => u.zahlungskontoId === kontoId)
+          .map((u) => u.buchungstag)
+          .sort()
+          .pop();
+
         await sqliteKontozuordnungRepository.speichern({
           zugangId: zugang.id,
           schluessel: k.schluessel,
           zahlungskontoId: kontoId,
+          letzterAbrufBis: letzterTag,
         });
       }
       onGespeichert();
