@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "bankenliste": "node scripts/bankenliste-erzeugen.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",

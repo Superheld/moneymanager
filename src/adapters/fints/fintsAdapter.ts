@@ -95,12 +95,19 @@ function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Ba
   const proNummer = new Map<string, number>();
   for (const k of roh) proNummer.set(k.accountNumber, (proNummer.get(k.accountNumber) ?? 0) + 1);
 
-  return roh.map((k) => {
-    // Die gesamte API von lib-fints adressiert Konten ALLEIN über die Nummer. Kommt eine
-    // Nummer mehrfach vor (comdirect: Girokonto und Depot teilen sie sich und trennen über
-    // das Unterkontomerkmal), trifft jeder Abruf still das erste passende Konto. Solche
-    // Konten werden benannt statt abgerufen.
-    const mehrdeutig = (proNummer.get(k.accountNumber) ?? 0) > 1;
+  return roh.map((k, i) => {
+    // Die gesamte API von lib-fints adressiert Konten ALLEIN über die Nummer, und
+    // `FinTSConfig.getBankAccount` nimmt per `find` das ERSTE Konto mit dieser Nummer
+    // (config.js:188). Kommt eine Nummer mehrfach vor — comdirect meldet Girokonto und
+    // Depot unter derselben und trennt über das Unterkontomerkmal —, dann ist das erste
+    // Konto sehr wohl erreichbar: jeder Abruf landet genau dort. Unerreichbar sind die
+    // WEITEREN; im Spike sichtbar am „Depot-Saldo", der der Girokonto-Saldo war.
+    //
+    // Deshalb nicht pauschal alle Konten einer geteilten Nummer sperren: das nähme dem
+    // Nutzer sein Girokonto, also genau das Konto, um das es geht.
+    const ersteMitNummer = roh.findIndex((a) => a.accountNumber === k.accountNumber);
+    const geteilt = (proNummer.get(k.accountNumber) ?? 0) > 1;
+    const mehrdeutig = geteilt && i !== ersteMitNummer;
     let kannSaldo = false;
     let kannUmsaetze = false;
     try {
@@ -123,10 +130,14 @@ function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Ba
       kannUmsaetze: kannUmsaetze && !mehrdeutig,
       adressierbar: !mehrdeutig,
       hinweis: mehrdeutig
-        ? `Die Bank meldet die Kontonummer ${k.accountNumber} mehrfach (Unterkonto „${k.subAccountId ?? "—"}"). ` +
-          `Die Bibliothek kann Konten nur über die Nummer ansprechen und träfe möglicherweise das falsche — ` +
-          `dieses Konto wird deshalb nicht abgerufen.`
-        : undefined,
+        ? `Die Bank meldet die Kontonummer ${k.accountNumber} mehrfach und unterscheidet nur über das ` +
+          `Unterkontomerkmal („${k.subAccountId ?? "—"}"). Die Bibliothek spricht Konten allein über die Nummer an ` +
+          `und träfe damit „${roh[ersteMitNummer].product ?? roh[ersteMitNummer].accountNumber}" — dieses Konto ` +
+          `ist deshalb nicht abrufbar.`
+        : geteilt
+          ? `Teilt sich die Kontonummer ${k.accountNumber} mit einem weiteren Konto der Bank. Abgerufen wird ` +
+            `dieses hier, weil die Bibliothek das erste Konto mit dieser Nummer nimmt.`
+          : undefined,
     };
   });
 }
