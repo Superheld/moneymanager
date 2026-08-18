@@ -518,6 +518,17 @@ const de = {
         "Verwerfen heißt: nicht buchen. Eine Zeile ohne Gegenstück fehlt danach im Kontostand — zurückholen geht unten.",
       weggelegt: "Weggelegt ({{n}}) anzeigen",
       zurueckholen: "zurückholen",
+      weggelegtHinweis:
+        "Geprüft wie oben: hat die Zeile ein Gegenstück im Bestand, war das Weglegen richtig. Hat sie keines, fehlt ihr Betrag im Kontostand.",
+      weggelegtMitZwilling: "Gegenstück vorhanden — der Betrag steht bereits im Konto.",
+      weggelegtOhneZwilling:
+        "Kein Gegenstück gefunden. Solange die Zeile hier liegt, fehlen {{betrag}} gegenüber dem, was die Bank meldet.",
+      weggelegtStatus: {
+        verworfen: "verworfen",
+        duplikat: "als Dublette markiert",
+        neu: "wartet",
+        verbucht: "gebucht",
+      },
       dubletteHinweis: "Gründe: {{gruende}}",
       bearbeiten: "ansehen & bearbeiten",
       alsUmbuchung: "ist eine Umbuchung",
@@ -1644,6 +1655,17 @@ const en: typeof de = {
         "Discarding means: not booking it. A row without a counterpart will be missing from the balance — you can bring it back below.",
       weggelegt: "Show set aside ({{n}})",
       zurueckholen: "bring back",
+      weggelegtHinweis:
+        "Checked as above: if the row has a counterpart, setting it aside was right. If it has none, its amount is missing from the balance.",
+      weggelegtMitZwilling: "Counterpart present — the amount is already in the account.",
+      weggelegtOhneZwilling:
+        "No counterpart found. While this row stays here, {{betrag}} is missing from what the bank reports.",
+      weggelegtStatus: {
+        verworfen: "discarded",
+        duplikat: "marked as duplicate",
+        neu: "waiting",
+        verbucht: "booked",
+      },
       dubletteHinweis: "Reasons: {{gruende}}",
       bearbeiten: "review & edit",
       alsUmbuchung: "is a transfer",
