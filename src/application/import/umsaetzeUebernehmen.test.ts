@@ -38,7 +38,13 @@ function fakes() {
     loeschen: async () => {},
   };
   const umsatzRepo: UmsatzRepository = {
-    speichern: async (u) => { umsaetze.push(u); },
+    speichern: async (u) => {
+      // Wie das echte Repository: ON CONFLICT(id) DO UPDATE. Ohne das sähe der
+      // Ergänzen-Fall im Test wie ein zweiter Datensatz aus.
+      const i = umsaetze.findIndex((x) => x.id === u.id);
+      if (i >= 0) umsaetze[i] = u;
+      else umsaetze.push(u);
+    },
     speichernViele: async (us) => { umsaetze.push(...us); },
     alle: async () => umsaetze,
     nachLauf: async (laufId) => umsaetze.filter((u) => u.laufId === laufId),
@@ -174,5 +180,144 @@ describe("Kategorisierungs-Kette beim Import", () => {
     );
 
     expect(umsaetze[0].vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "remapping" });
+  });
+});
+
+describe("Dublettenfinder beim Übernehmen", () => {
+  /** Ein Bestand, wie ihn der Dateiimport hinterlässt: geputzte Gegenpartei, kein Valuta. */
+  async function bestandAusDatei() {
+    const f = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "finanzguru",
+        zeitpunkt: "2026-08-16T10:00:00.000Z",
+        rohUmsaetze: [
+          roh({
+            buchungstag: "2026-08-04",
+            betrag: -4990,
+            gegenpartei: "[anonymisiert]",
+            verwendungszweck: "EDK*[anonymisiert] [anonymisiert], MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
+            kontoIban: "[entfernt]",
+            nativeId: "fg-1",
+          }),
+        ],
+        konten: [{ quelleKey: "[entfernt]", neu: { bezeichnung: "Giro", typ: "Giro" } }],
+      },
+      f.deps,
+    );
+    return f;
+  }
+
+  /** Dieselbe Buchung, wie die Bank sie liefert: roher Empfänger, Buchungstext vorn. */
+  const vonDerBank = (over: Partial<RohUmsatz> = {}) =>
+    roh({
+      quelle: "fints",
+      buchungstag: "2026-08-04",
+      valuta: "2026-08-04",
+      betrag: -4990,
+      gegenpartei: "EDK*[anonymisiert] [anonymisiert]",
+      verwendungszweck: "KARTENVERFÜGUNGEDK*[anonymisiert] [anonymisiert], MUSTERSTADT  DE",
+      kontoIban: "[entfernt]",
+      mandatsreferenz: "M-4711",
+      nativeId: undefined,
+      ...over,
+    });
+
+  it("legt eine wiedererkannte Buchung nicht nochmal an, sondern ergänzt sie", async () => {
+    // Der Fall, der am echten Bestand 51 von 60 Zeilen betraf: der Roh-Hash trifft nicht,
+    // weil Finanzguru die Gegenpartei putzt und die Bank sie roh liefert.
+    const f = await bestandAusDatei();
+    const vorher = f.umsaetze.length;
+
+    const ergebnis = await umsaetzeUebernehmen(
+      {
+        quelle: "fints",
+        zeitpunkt: "2026-08-18T10:00:00.000Z",
+        rohUmsaetze: [vonDerBank()],
+        konten: [{ quelleKey: "[entfernt]", kontoId: f.konten[0].id }],
+      },
+      f.deps,
+    );
+
+    expect(ergebnis.neu).toBe(0);
+    expect(ergebnis.duplikate).toBe(1);
+    expect(ergebnis.ergaenzt).toBe(1);
+    expect(f.umsaetze).toHaveLength(vorher);
+
+    // Ergänzt wurde, was die Bank mehr weiß …
+    expect(f.umsaetze[0].mandatsreferenz).toBe("M-4711");
+    expect(f.umsaetze[0].valuta).toBe("2026-08-04");
+    // … und die native ID der ersten Quelle bleibt unangetastet.
+    expect(f.umsaetze[0].nativeId).toBe("fg-1");
+    expect(f.umsaetze[0].gegenpartei).toBe("[anonymisiert]");
+  });
+
+  it("legt bei abweichendem Datum an, schreibt aber den Verdacht dazu", async () => {
+    const f = await bestandAusDatei();
+
+    const ergebnis = await umsaetzeUebernehmen(
+      {
+        quelle: "fints",
+        zeitpunkt: "2026-08-18T10:00:00.000Z",
+        rohUmsaetze: [vonDerBank({ buchungstag: "2026-08-05", valuta: "2026-08-05" })],
+        konten: [{ quelleKey: "[entfernt]", kontoId: f.konten[0].id }],
+      },
+      f.deps,
+    );
+
+    expect(ergebnis.neu).toBe(1);
+    expect(ergebnis.verdacht).toBe(1);
+    const angelegt = f.umsaetze[f.umsaetze.length - 1];
+    expect(angelegt.verdachtAufId).toBe(f.umsaetze[0].id);
+    expect(angelegt.verdachtGruende?.length).toBeGreaterThan(0);
+  });
+
+  it("lässt eine echt neue Buchung neu sein", async () => {
+    const f = await bestandAusDatei();
+
+    const ergebnis = await umsaetzeUebernehmen(
+      {
+        quelle: "fints",
+        zeitpunkt: "2026-08-18T10:00:00.000Z",
+        rohUmsaetze: [vonDerBank({ betrag: -1234, gegenpartei: "TANKSTELLE NORD", verwendungszweck: "TANKSTELLE NORD, MUSTERSTADT" })],
+        konten: [{ quelleKey: "[entfernt]", kontoId: f.konten[0].id }],
+      },
+      f.deps,
+    );
+
+    expect(ergebnis.neu).toBe(1);
+    expect(ergebnis.verdacht).toBe(0);
+    expect(f.umsaetze[f.umsaetze.length - 1].verdachtAufId).toBeUndefined();
+  });
+
+  it("erkennt den Reimport derselben Datei über die Buchungs-ID", async () => {
+    // Bruce' Fall: Tabelle erweitern, Datei nochmal einlesen — es soll ergänzt statt
+    // neu aufgebaut werden.
+    const f = await bestandAusDatei();
+    const vorher = f.umsaetze.length;
+
+    const ergebnis = await umsaetzeUebernehmen(
+      {
+        quelle: "finanzguru",
+        zeitpunkt: "2026-08-18T11:00:00.000Z",
+        rohUmsaetze: [
+          roh({
+            buchungstag: "2026-08-04",
+            betrag: -4990,
+            gegenpartei: "[anonymisiert]",
+            verwendungszweck: "EDK*[anonymisiert] [anonymisiert], MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
+            kontoIban: "[entfernt]",
+            nativeId: "fg-1",
+            mandatsreferenz: "M-4711",
+          }),
+        ],
+        konten: [{ quelleKey: "[entfernt]", kontoId: f.konten[0].id }],
+      },
+      f.deps,
+    );
+
+    expect(ergebnis.neu).toBe(0);
+    expect(f.umsaetze).toHaveLength(vorher);
+    expect(f.umsaetze[0].mandatsreferenz).toBe("M-4711");
   });
 });

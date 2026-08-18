@@ -175,9 +175,12 @@ export interface FintsBuchung {
   readonly remoteName?: string;
   readonly remoteAccountNumber?: string;
   readonly remoteBankId?: string;
+  /** Geschäftsvorfallcode (MT940 `:61:`), z. B. 005, 700, 820. */
+  readonly transactionCode?: string;
   /** Typisiert, aber von lib-fints nie befüllt — trotzdem gelesen, falls es sich ändert. */
   readonly remoteIdentifier?: string;
   readonly mandateReference?: string;
+  readonly e2eReference?: string;
   readonly bookingText?: string;
 }
 
@@ -218,6 +221,14 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
     kontoIban: konto.iban,
     kontoName: konto.name,
     glaeubigerId: b.remoteIdentifier?.trim() || a.glaeubigerId,
+    // Von der Bank wird alles weggespeichert, was strukturiert ankommt. Die typisierten
+    // Felder haben Vorrang vor dem Geparsten — heute füllt lib-fints sie nie, aber wenn
+    // sich das ändert, ist die Angabe der Bibliothek die verlässlichere.
+    mandatsreferenz: b.mandateReference?.trim() || a.mandatsreferenz,
+    e2eReferenz: b.e2eReference?.trim() || a.e2eReferenz,
+    umsatzart: b.bookingText?.trim() || a.buchungstext,
+    buchungsschluessel: b.transactionCode?.trim() || undefined,
+    bankreferenz: a.bankreferenz,
     istUmbuchung: false,
     quelle: FINTS_QUELLE,
   };

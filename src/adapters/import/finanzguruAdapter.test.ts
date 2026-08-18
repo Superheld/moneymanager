@@ -27,12 +27,12 @@ function reihe(opts: {
   tag?: string; konto?: string; betrag?: string; waehrung?: string;
   gegenpartei?: string; gegenIban?: string; zweck?: string; glaeubiger?: string;
   unterkat?: string; umbuchung?: string; buchungsId?: string; splitTyp?: string;
-  originalId?: string;
+  originalId?: string; mandatsreferenz?: string;
 }): string[] {
   const f = (s = "") => s;
   return [
     f(opts.tag), f(opts.konto), "Girokonto", f(opts.betrag), "63.09", f(opts.waehrung ?? "EUR"),
-    f(opts.gegenpartei), f(opts.gegenIban), f(opts.zweck), "", "", f(opts.glaeubiger),
+    f(opts.gegenpartei), f(opts.gegenIban), f(opts.zweck), "", f(opts.mandatsreferenz), f(opts.glaeubiger),
     "Essen & Trinken", f(opts.unterkat), "nein", "", "", f(opts.umbuchung ?? "nein"), "nein", "Kartenzahlung",
     "Ausgaben", "2021-45", "2021-11", "2021-Q4", "2021", f(opts.buchungsId), f(opts.originalId), f(opts.splitTyp),
   ];
@@ -76,11 +76,23 @@ describe("finanzguruAdapter.lies", () => {
       kontoIban: "[entfernt]",
       kontoName: "Girokonto",
       glaeubigerId: undefined,
+      mandatsreferenz: undefined,
+      umsatzart: "Kartenzahlung",
       istUmbuchung: false,
       quelle: "finanzguru",
       nativeId: "2da83348289587cbe750f887563fd417135d354e",
       kategorieHinweis: "Lebensmittel",
     });
+  });
+
+  it("liest die Mandatsreferenz — der einzige Bankschlüssel, den beide Quellen tragen", () => {
+    // Zusammen mit der Gläubiger-ID erkennt der Dublettenfinder damit dieselbe
+    // Lastschrift ohne jede Textähnlichkeit. Die Spalte war von Anfang an im Export;
+    // gelesen wird sie erst seit 2026-08-18.
+    const { umsaetze } = finanzguruAdapter.lies(
+      datei(reihe({ tag: TAG["2021-11-01"], betrag: "-6.55", mandatsreferenz: "M-4711" })),
+    );
+    expect(umsaetze[0].mandatsreferenz).toBe("M-4711");
   });
 
   /**
