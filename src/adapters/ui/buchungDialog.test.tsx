@@ -31,6 +31,8 @@ import {
   sqliteKategorieRepository as kategorieRepo,
   sqliteZahlungskontoRepository as kontoRepo,
 } from "../persistence/sqliteStammdatenRepositories";
+import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
+import { sqliteVertragszuordnungRepository as zuordnungRepo } from "../persistence/sqliteVertragZuordnungRepositories";
 
 let db: Database;
 
@@ -157,6 +159,78 @@ describe("Entwurf prüfen", () => {
     const dialog = await entwurfOeffnen(nutzer);
 
     expect(dialog.getByText(/schon vorhanden|Dublette/)).toBeInTheDocument();
+  });
+});
+
+describe("Umbuchung und Vertrag am Entwurf", () => {
+  it("paart beim Übernehmen mit einer schon gebuchten Gegenbuchung", async () => {
+    // Der Alltagsfall: das andere Bein kam mit einem früheren Abruf und ist längst
+    // gebucht. Ohne diesen Weg entstünde eine einseitige Umschichtung.
+    await grunddaten();
+    await entwurf();
+    await ledgerRepo.speichern({
+      id: "b-gegen", datum: "2026-08-17", betrag: 4990, kontoId: "k2",
+      charakter: "Ertrag", quelle: "manuell",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    const dialog = await entwurfOeffnen(nutzer);
+
+    await nutzer.click(dialog.getByRole("button", { name: /zur umbuchung machen/i }));
+    await nutzer.click(await dialog.findByRole("radio", { name: /bereits gebucht/ }));
+    await nutzer.click(dialog.getByRole("button", { name: /übernehmen/i }));
+
+    await waitFor(async () => expect(await ledgerRepo.alle()).toHaveLength(2));
+    const alle = await ledgerRepo.alle();
+    const gegen = alle.find((b) => b.id === "b-gegen")!;
+    const neue = alle.find((b) => b.id !== "b-gegen")!;
+    expect(neue.transferId).toBeTruthy();
+    expect(gegen.transferId).toBe(neue.transferId);
+    expect(neue.charakter).toBe("Umschichtung");
+  });
+
+  it("erzeugt das fehlende Gegenbein auf dem gewählten Konto", async () => {
+    // Für Konten, die nicht importiert werden — typisch Bargeld.
+    await grunddaten();
+    await entwurf();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    const dialog = await entwurfOeffnen(nutzer);
+
+    await nutzer.click(dialog.getByRole("button", { name: /zur umbuchung machen/i }));
+    await nutzer.click(await dialog.findByRole("radio", { name: /neu erzeugen/i }));
+    await nutzer.click(dialog.getByRole("button", { name: /übernehmen/i }));
+
+    await waitFor(async () => expect(await ledgerRepo.alle()).toHaveLength(2));
+    const alle = await ledgerRepo.alle();
+    expect(alle.every((b) => b.charakter === "Umschichtung")).toBe(true);
+    expect(alle.map((b) => b.kontoId).sort()).toEqual(["k1", "k2"]);
+    expect(alle[0].transferId).toBe(alle[1].transferId);
+    // Netto null über beide Konten.
+    expect(alle.reduce((s, b) => s + b.betrag, 0)).toBe(0);
+  });
+
+  it("setzt eine vorgemerkte Vertragszuordnung nach dem Übernehmen", async () => {
+    await grunddaten();
+    await entwurf();
+    await vertragRepo.speichern({
+      id: "v1", anbieter: "Testanbieter", beginn: "2026-01-01", status: "aktiv",
+      verlaengerung: "automatisch", verlaengerungMonate: 1,
+      mindestlaufzeitMonate: 1, kuendigungsfristMonate: 1,
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    const dialog = await entwurfOeffnen(nutzer);
+
+    await nutzer.selectOptions(await dialog.findByRole("combobox", { name: /vertrag zuordnen/i }), "v1");
+    await nutzer.click(dialog.getByRole("button", { name: /übernehmen/i }));
+
+    await waitFor(async () => expect(await ledgerRepo.alle()).toHaveLength(1));
+    const gebucht = (await ledgerRepo.alle())[0];
+    await waitFor(async () => {
+      const zuordnungen = await zuordnungRepo.alle();
+      expect(zuordnungen).toContainEqual({ istbuchungId: gebucht.id, vertragId: "v1", herkunft: "manuell" });
+    });
   });
 });
 

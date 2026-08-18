@@ -712,7 +712,11 @@ const de = {
       laeuft: "übernimmt …",
       vonDerBank: "von der Bank — nicht änderbar",
       spaeterHinweis:
-        "Aufteilen, Vertrag und Paarung gibt es nach dem Übernehmen. Verwerfen löscht nichts: die Zeile bleibt gespeichert und wird künftig übersprungen.",
+        "Aufteilen und das Anlegen eines neuen Vertrags gibt es nach dem Übernehmen. Verwerfen löscht nichts: die Zeile bleibt gespeichert und wird künftig übersprungen.",
+      dochKeineUmbuchung: "doch keine Umbuchung",
+      einseitig: "einseitig lassen — kein Gegenstück",
+      vertragVorgemerkt: "Wird beim Übernehmen gesetzt und überstimmt die automatische Erkennung.",
+      vertragOffen: "Ohne Angabe entscheidet die automatische Erkennung.",
     },
     dublette: {
       oeffnen: "Gegenstück öffnen",
@@ -1827,7 +1831,11 @@ const en: typeof de = {
       laeuft: "accepting …",
       vonDerBank: "from the bank — not editable",
       spaeterHinweis:
-        "Splitting, contracts and pairing become available after accepting. Discarding deletes nothing: the row stays stored and is skipped from now on.",
+        "Splitting and creating a new contract become available after accepting. Discarding deletes nothing: the row stays stored and is skipped from now on.",
+      dochKeineUmbuchung: "not a transfer after all",
+      einseitig: "leave one-sided — no counterpart",
+      vertragVorgemerkt: "Applied on accept; overrides the automatic detection.",
+      vertragOffen: "Left blank, the automatic detection decides.",
     },
     dublette: {
       oeffnen: "Open the counterpart",
