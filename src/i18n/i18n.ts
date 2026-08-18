@@ -101,7 +101,7 @@ const de = {
     feldUrl: "FinTS-Adresse",
     feldBankSuche: "Bank suchen",
     feldBankSucheHinweis: "Name, Bankleitzahl oder IBAN — die Auswahl füllt Bankleitzahl und Adresse.",
-    feldBankSuchePlatzhalter: "z. B. comdirect, 20000004 oder eine IBAN",
+    feldBankSuchePlatzhalter: "z. B. Sparkasse, die Bankleitzahl oder eine IBAN",
     bankenlisteFehlt:
       "Keine Bankenliste vorhanden. Sie wird lokal mit `npm run bankenliste` aus der CSV der " +
       "Deutschen Kreditwirtschaft erzeugt; ohne sie werden Bankleitzahl und Adresse von Hand eingetragen.",
@@ -1255,7 +1255,7 @@ const en: typeof de = {
     feldUrl: "FinTS endpoint",
     feldBankSuche: "Find your bank",
     feldBankSucheHinweis: "Name, bank code or IBAN — picking one fills in the bank code and endpoint.",
-    feldBankSuchePlatzhalter: "e.g. comdirect, 20000004 or an IBAN",
+    feldBankSuchePlatzhalter: "e.g. Sparkasse, the bank code or an IBAN",
     bankenlisteFehlt:
       "No bank list available. It is generated locally with `npm run bankenliste` from the German " +
       "Banking Industry Committee CSV; without it, bank code and endpoint are typed by hand.",

@@ -24,7 +24,7 @@ function bankkonto(over: Partial<Bankkonto> = {}): Bankkonto {
     nummer: "9876543210",
     unterkonto: "Girokonto",
     schluessel: "9876543210|Girokonto",
-    iban: "DE02120300000000202051",
+    iban: "DE15200000049876543210",
     bezeichnung: "Girokonto",
     waehrung: "EUR",
     kannSaldo: true,

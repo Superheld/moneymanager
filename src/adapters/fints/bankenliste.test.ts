@@ -1,5 +1,10 @@
-// Suche in der Bankenliste. Alle Einträge hier sind ERFUNDEN — die echte Liste ist
-// gitignoriert und darf in keinem Test auftauchen.
+// Suche in der Bankenliste.
+//
+// Alle Einträge hier sind ERFUNDEN, und zwar vollständig: Bankleitzahl, Ort und die
+// Beispiel-IBAN. Das ist keine Förmlichkeit — hier stand eine Weile eine echte BLZ samt
+// echter Kontonummer in einer gültigen IBAN, unter einem erfundenen Institutsnamen. Der
+// Name allein macht die Zahl nicht anonym: BLZ plus Kontonummer IST die Kontoverbindung.
+// Prüfziffer der Beispiel-IBAN ist gerechnet, damit die Zerlegung echt geprüft wird.
 
 import { describe, expect, it } from "vitest";
 import { bankenSuchen, type Bankeintrag } from "./bankenliste";
@@ -25,7 +30,7 @@ describe("bankenSuchen", () => {
   });
 
   it("liest reine Ziffern als BLZ-Präfix", () => {
-    expect(bankenSuchen(LISTE, "2000").map((x) => x.blz)).toEqual(["20000002", "20000003"]);
+    expect(bankenSuchen(LISTE, "2000").map((x) => x.blz)).toEqual(["20000002", "20000003", "20000004"]);
   });
 
   it("zerlegt eine IBAN selbst — die BLZ steht an Stelle 5 bis 12", () => {
