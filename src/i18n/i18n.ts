@@ -514,6 +514,9 @@ const de = {
       dubletteHinweis: "Gründe: {{gruende}}",
       bearbeiten: "bestätigen & bearbeiten",
       alsUmbuchung: "ist eine Umbuchung",
+      umbuchung: "Umbuchung",
+      gegenbein: "Gegenbuchung: {{konto}}, {{datum}}, {{betrag}} — wird zusammen bestätigt",
+      ohneGegenbein: "Kein Gegenstück gefunden. Beim Bestätigen entsteht eine einseitige Umschichtung.",
       status: {
         neu: "wartet ebenfalls",
         verbucht: "bereits gebucht",
@@ -1607,6 +1610,9 @@ const en: typeof de = {
       dubletteHinweis: "Reasons: {{gruende}}",
       bearbeiten: "confirm & edit",
       alsUmbuchung: "is a transfer",
+      umbuchung: "Transfer",
+      gegenbein: "Counter entry: {{konto}}, {{datum}}, {{betrag}} — confirmed together",
+      ohneGegenbein: "No counterpart found. Confirming creates a one-sided reallocation.",
       status: {
         neu: "also waiting",
         verbucht: "already booked",
