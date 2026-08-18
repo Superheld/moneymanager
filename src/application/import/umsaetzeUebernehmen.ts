@@ -15,8 +15,9 @@ import type {
 import { katalogNachId, katalogNachName, vorschlagFuer, type Vorschlagskontext } from "./vorschlag";
 import { quelleKeyFuer } from "./kontoMatch";
 import { klassifiziere, rohHash } from "./rohHash";
+import { ordneZu } from "./dublette";
 import type { RohUmsatz } from "./rohUmsatz";
-import type { Umsatz } from "./umsatz";
+import { ergaenze, type Umsatz } from "./umsatz";
 
 /** Auflösung eines Quell-Kontos: entweder bestehendes wählen ODER neues anlegen. */
 export interface UebernahmeKonto {
@@ -38,6 +39,10 @@ export interface UebernahmeErgebnis {
   readonly eingelesen: number;
   readonly neu: number;
   readonly duplikate: number;
+  /** Bekannte Zeilen, auf denen Felder nachgetragen wurden. */
+  readonly ergaenzt: number;
+  /** Angelegt, aber mit Verdacht auf eine vorhandene Buchung angeschrieben. */
+  readonly verdacht: number;
   readonly ohneKonto: number;
   readonly angelegteKonten: number;
 }
@@ -154,11 +159,65 @@ async function uebernahmeIntern(
     kandidaten.push({ roh, rohHash: rohHash(roh), nativeId: roh.nativeId, zahlungskontoId });
   }
 
-  // 4. Dedup.
-  const { neu, duplikate } = klassifiziere(kandidaten, bestand);
+  // 4. Der Dublettenfinder gegen den vorhandenen Umsatzbestand — VOR der Schlüsselprüfung.
+  //
+  //    Die Reihenfolge ist keine Kosmetik: liefe die exakte Prüfung zuerst, fiele der
+  //    Reimport derselben Datei sofort als Dublette heraus, und genau dann könnte nichts
+  //    mehr ergänzt werden. Der Finder kennt die Buchungs-ID als oberste Stufe selbst,
+  //    liefert aber zusätzlich die ZEILE, auf die sie zeigt — und die braucht es zum
+  //    Nachtragen.
+  //
+  //    Verglichen wird nur innerhalb desselben Zahlungskontos: die Kontogrenze ist hart
+  //    und spart zugleich den Großteil der Vergleiche.
+  const vorhandeneProKonto = new Map<string, Umsatz[]>();
+  for (const u of await umsatzRepo.alle()) {
+    const liste = vorhandeneProKonto.get(u.zahlungskontoId);
+    if (liste) liste.push(u);
+    else vorhandeneProKonto.set(u.zahlungskontoId, [u]);
+  }
 
-  // 5. Umsätze (Status neu) bauen.
-  const umsaetze: Umsatz[] = neu.map((k) => ({
+  const gefunden: Kandidat[] = [];
+  const verdacht = new Map<Kandidat, { auf: Umsatz; gruende: readonly string[] }>();
+  const zuErgaenzen: Umsatz[] = [];
+
+  const proKonto = new Map<string, Kandidat[]>();
+  for (const k of kandidaten) {
+    const liste = proKonto.get(k.zahlungskontoId);
+    if (liste) liste.push(k);
+    else proKonto.set(k.zahlungskontoId, [k]);
+  }
+
+  for (const [kontoId, gruppe] of proKonto) {
+    const treffer = ordneZu(
+      gruppe.map((k) => k.roh),
+      vorhandeneProKonto.get(kontoId) ?? [],
+    );
+    treffer.forEach((t, i) => {
+      const k = gruppe[i];
+      if (t.bewertung.urteil === "identisch" && t.bestand) {
+        // Nicht anlegen, sondern die vorhandene Zeile um das ergänzen, was diese Quelle
+        // mehr weiß. Ist nichts zu ergänzen, passiert gar nichts.
+        const ergaenzt = ergaenze(t.bestand, k.roh);
+        if (ergaenzt) zuErgaenzen.push(ergaenzt);
+        return;
+      }
+      if (t.bewertung.urteil === "verdacht" && t.bestand) {
+        verdacht.set(k, { auf: t.bestand, gruende: t.bewertung.gruende });
+      }
+      gefunden.push(k);
+    });
+  }
+
+  // 5. Was der Finder durchgelassen hat, geht noch durch die exakte Schlüsselprüfung.
+  //
+  //    Sie fängt zwei Fälle, die der Finder nicht sehen kann: Roh-Hashes VERBUCHTER
+  //    Ist-Buchungen, zu denen kein offener Umsatz mehr gehört, und Wiederholungen
+  //    INNERHALB derselben Datei — dort wächst der Bestand während des Laufs mit.
+  const { neu: anzulegen, duplikate } = klassifiziere(gefunden, bestand);
+
+  // 6. Umsätze (Status neu) bauen. Ein Verdacht wird angelegt UND angeschrieben: er ist
+  //    keine Sperre, sondern ein Hinweis für die Durchsicht.
+  const umsaetze: Umsatz[] = anzulegen.map((k) => ({
     id: id(),
     laufId,
     zahlungskontoId: k.zahlungskontoId,
@@ -168,14 +227,23 @@ async function uebernahmeIntern(
     waehrung: k.roh.waehrung,
     gegenpartei: k.roh.gegenpartei,
     glaeubigerId: k.roh.glaeubigerId,
+    gegenparteiIban: k.roh.gegenparteiIban,
+    mandatsreferenz: k.roh.mandatsreferenz,
+    e2eReferenz: k.roh.e2eReferenz,
+    umsatzart: k.roh.umsatzart,
+    buchungsschluessel: k.roh.buchungsschluessel,
+    bankreferenz: k.roh.bankreferenz,
     verwendungszweck: k.roh.verwendungszweck,
     rohHash: k.rohHash,
     nativeId: k.nativeId,
     status: "neu",
     vorschlag: vorschlagFuer(k.roh, kontext, k.zahlungskontoId),
+    verdachtAufId: verdacht.get(k)?.auf.id,
+    verdachtGruende: verdacht.get(k)?.gruende,
   }));
 
-  // 6. Persistieren: Umsätze + Lauf-Protokoll.
+  // 7. Persistieren: Ergänzungen, neue Umsätze, Lauf-Protokoll.
+  for (const u of zuErgaenzen) await umsatzRepo.speichern(u);
   await umsatzRepo.speichernViele(umsaetze);
   await laufRepo.speichern({
     id: laufId,
@@ -184,14 +252,17 @@ async function uebernahmeIntern(
     dateiname: eingabe.dateiname,
     eingelesen: eingabe.rohUmsaetze.length,
     neu: umsaetze.length,
-    duplikate: duplikate.length,
+    // Als Dublette zählt beides: der exakte Schlüsseltreffer und der Fund des Finders.
+    duplikate: duplikate.length + (kandidaten.length - gefunden.length),
   });
 
   return {
     laufId,
     eingelesen: eingabe.rohUmsaetze.length,
     neu: umsaetze.length,
-    duplikate: duplikate.length,
+    duplikate: duplikate.length + (kandidaten.length - gefunden.length),
+    ergaenzt: zuErgaenzen.length,
+    verdacht: verdacht.size,
     ohneKonto,
     angelegteKonten,
   };

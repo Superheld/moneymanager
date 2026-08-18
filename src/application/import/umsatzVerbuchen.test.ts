@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { IstBuchung } from "../../core";
 import type { LedgerPort, UmsatzRepository } from "../ports";
 import type { Umsatz } from "./umsatz";
-import { paareUmbuchungen, umsaetzeVerbuchen } from "./umsatzVerbuchen";
+import { gegenbeinFuer, paareUmbuchungen, umsaetzeVerbuchen } from "./umsatzVerbuchen";
 
 function umsatz(over: Partial<Umsatz>): Umsatz {
   return {
@@ -130,5 +130,39 @@ describe("Herkunft der Kategorie beim Verbuchen", () => {
     // Das ist die Zusage, an der die Reversibilität hängt: wer in der Review-Inbox
     // entscheidet, soll das nicht beim nächsten Abgleich zurückbekommen.
     expect(ledger[0].kategorieHerkunft).toBe("manuell");
+  });
+});
+
+describe("gegenbeinFuer", () => {
+  const um = (over: Partial<Umsatz>) =>
+    umsatz({ vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" }, ...over });
+
+  it("findet das Gegenstück auf dem anderen Konto", () => {
+    // Der Fall, der in der Oberfläche fehlte: BEIDE Beine sind noch Entwürfe, im Ledger
+    // steht nichts, dem man etwas zuweisen könnte. Die Zuordnung muss deshalb schon
+    // zwischen den Entwürfen möglich sein.
+    const ab = um({ id: "a", zahlungskontoId: "giro", betrag: -15000, buchungstag: "2026-08-17" });
+    const zu = um({ id: "b", zahlungskontoId: "tagesgeld", betrag: 15000, buchungstag: "2026-08-17" });
+    expect(gegenbeinFuer(ab, [zu])?.id).toBe("b");
+  });
+
+  it("nimmt das nächstliegende Datum, wenn mehrere passen", () => {
+    const ab = um({ id: "a", zahlungskontoId: "giro", betrag: -15000, buchungstag: "2026-08-17" });
+    const fern = um({ id: "fern", zahlungskontoId: "tagesgeld", betrag: 15000, buchungstag: "2026-08-19" });
+    const nah = um({ id: "nah", zahlungskontoId: "tagesgeld", betrag: 15000, buchungstag: "2026-08-18" });
+    expect(gegenbeinFuer(ab, [fern, nah])?.id).toBe("nah");
+  });
+
+  it("nimmt nichts vom selben Konto und nichts mit gleichem Vorzeichen", () => {
+    const ab = um({ id: "a", zahlungskontoId: "giro", betrag: -15000, buchungstag: "2026-08-17" });
+    const selbesKonto = um({ id: "s", zahlungskontoId: "giro", betrag: 15000, buchungstag: "2026-08-17" });
+    const gleichesVorzeichen = um({ id: "v", zahlungskontoId: "tagesgeld", betrag: -15000, buchungstag: "2026-08-17" });
+    expect(gegenbeinFuer(ab, [selbesKonto, gleichesVorzeichen])).toBeUndefined();
+  });
+
+  it("nimmt nichts, was zu weit auseinanderliegt", () => {
+    const ab = um({ id: "a", zahlungskontoId: "giro", betrag: -15000, buchungstag: "2026-08-17" });
+    const spaet = um({ id: "b", zahlungskontoId: "tagesgeld", betrag: 15000, buchungstag: "2026-08-25" });
+    expect(gegenbeinFuer(ab, [spaet])).toBeUndefined();
   });
 });

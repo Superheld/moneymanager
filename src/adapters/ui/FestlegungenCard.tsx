@@ -10,13 +10,13 @@
 // zu raten, statt es an einer echten Zahlung abzulesen — und genau daraus entstünde die
 // Regelliste, die der ganze Ansatz vermeiden soll.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Kategorie, Kategoriefestlegung } from "../../core";
 import { festlegungAufheben } from "../../application/kategoriefestlegungen";
 import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persistence/sqliteKategoriefestlegungRepository";
-import { DataTable } from "./ds";
-import { KlappCard } from "./KlappCard";
+import { Card, DataTable } from "./ds";
+
 import { fehlerNachricht, useGeld } from "./einstellungenKontext";
 
 export function FestlegungenCard({ kategorien }: { kategorien: Kategorie[] }) {
@@ -24,6 +24,13 @@ export function FestlegungenCard({ kategorien }: { kategorien: Kategorie[] }) {
   const { locale } = useGeld();
   const [festlegungen, setFestlegungen] = useState<Kategoriefestlegung[] | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
+
+  // Geladen wird beim Betreten des Registers — die Komponente entsteht ohnehin erst
+  // dann. Vorher hing das am ersten Aufklappen der Karte.
+  useEffect(() => {
+    void laden();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function laden() {
     setFehler(null);
@@ -54,11 +61,7 @@ export function FestlegungenCard({ kategorien }: { kategorien: Kategorie[] }) {
   }));
 
   return (
-    <KlappCard
-      titel={t("einstellungen.festlegung.titel")}
-      untertitel={t("einstellungen.festlegung.untertitel")}
-      beiOeffnen={() => void laden()}
-    >
+    <Card>
       {fehler && <div className="err">{fehler}</div>}
       {festlegungen === null ? (
         <div className="muted">{t("einstellungen.festlegung.laedt")}</div>
@@ -92,6 +95,6 @@ export function FestlegungenCard({ kategorien }: { kategorien: Kategorie[] }) {
           />
         </>
       )}
-    </KlappCard>
+    </Card>
   );
 }
