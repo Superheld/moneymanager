@@ -457,6 +457,18 @@ const de = {
     leer: "— wählen —",
     keine: "— keine —",
   },
+  bankzugaenge: {
+    titel: "Hinterlegte Bankzugänge",
+    untertitel: "Was verbunden ist, und was die Bank dazu freigibt",
+    leer: "Kein Bankzugang hinterlegt. Er entsteht beim Anlegen eines Online-Kontos.",
+    spalteBank: "Bank",
+    spalteKonten: "Konten",
+    spalteLetzterAbruf: "Abgerufen bis",
+    pruefen: "Prüfen",
+    pruefenTitel: "{{bank}} prüfen",
+    pruefenUntertitel: "Meldet sich an und zeigt, welche Konten die Bank kennt. Es werden keine Umsätze geholt.",
+    verknuepft: "verknüpft",
+  },
   konten: {
     festlegung: {
       immer: "Immer bei „{{muster}}“ diese Kategorie",
@@ -487,6 +499,17 @@ const de = {
     titel: "Konten",
     untertitel: "Kontostände, gebuchte und voraussichtliche Buchungen je Konto",
     verwaltungTitel: "Konten verwalten",
+    registerKonten: "Konten",
+    registerZugaenge: "Bankzugänge",
+    verbindung: {
+      titel: "Bankverbindung",
+      abgerufenBis: "abgerufen bis {{datum}}",
+      nieAbgerufen: "noch nichts abgerufen",
+      trennen: "Verbindung lösen",
+      hinweisOffline:
+        "Dieses Konto wird von Hand geführt. Verbinden lässt es sich über `+ Konto` → online: " +
+        "dort das gemeldete Bankkonto auf `mit vorhandenem verknüpfen` stellen.",
+    },
     spalteVerbindung: "Verbindung",
     online: "Online",
     offline: "Offline",
@@ -1495,6 +1518,18 @@ const en: typeof de = {
     leer: "— choose —",
     keine: "— none —",
   },
+  bankzugaenge: {
+    titel: "Stored bank access",
+    untertitel: "What is connected, and what the bank allows for it",
+    leer: "No bank access stored. It is created when you add an online account.",
+    spalteBank: "Bank",
+    spalteKonten: "Accounts",
+    spalteLetzterAbruf: "Retrieved through",
+    pruefen: "Check",
+    pruefenTitel: "Check {{bank}}",
+    pruefenUntertitel: "Logs in and shows which accounts the bank knows. No transactions are fetched.",
+    verknuepft: "linked",
+  },
   konten: {
     festlegung: {
       immer: "Always use this category for “{{muster}}”",
@@ -1525,6 +1560,17 @@ const en: typeof de = {
     titel: "Accounts",
     untertitel: "Balances, booked and expected entries per account",
     verwaltungTitel: "Manage accounts",
+    registerKonten: "Accounts",
+    registerZugaenge: "Bank access",
+    verbindung: {
+      titel: "Bank connection",
+      abgerufenBis: "retrieved through {{datum}}",
+      nieAbgerufen: "nothing retrieved yet",
+      trennen: "Disconnect",
+      hinweisOffline:
+        "This account is kept by hand. To connect it, use “+ account” → online and set the reported " +
+        "bank account to “link to existing”.",
+    },
     spalteVerbindung: "Connection",
     online: "Online",
     offline: "Offline",

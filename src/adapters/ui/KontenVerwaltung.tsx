@@ -27,20 +27,31 @@ import { KontoAnlegenModal } from "./KontoAnlegenModal";
 import { Modal } from "./Modal";
 import { fehlerNachricht, useGeld } from "./einstellungenKontext";
 
+/** Woran ein Konto hängt: welcher Zugang, welches Bankkonto, bis wann geholt. */
+export interface KontoVerbindung {
+  readonly zugangId: string;
+  readonly zugangName: string;
+  readonly schluessel: string;
+  readonly letzterAbrufBis?: string;
+}
+
 export function KontenVerwaltung({
   konten,
   personen,
   personName,
   ist,
-  onlineKonten,
+  verbindungen,
+  onTrennen,
   onChange,
 }: {
   konten: Zahlungskonto[];
   personen: Person[];
   personName: Map<string, string>;
   ist: IstBuchung[];
-  /** Konten, die an einer Bankverbindung hängen. */
-  onlineKonten: ReadonlySet<string>;
+  /** Bankverbindung je Zahlungskonto — fehlt sie, ist das Konto offline. */
+  verbindungen: ReadonlyMap<string, KontoVerbindung>;
+  /** Löst die Verbindung eines Kontos (der Zugang selbst bleibt bestehen). */
+  onTrennen: (v: KontoVerbindung) => Promise<void>;
   onChange: () => void;
 }) {
   const { t } = useTranslation();
@@ -59,6 +70,14 @@ export function KontenVerwaltung({
   function toggleInhaber(id: string) {
     setInhaberIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
   }
+  const verbindung = editId ? verbindungen.get(editId) : undefined;
+
+  async function trennen() {
+    if (!verbindung) return;
+    await onTrennen(verbindung);
+    setOffen(false);
+  }
+
   function bearbeiten(k: Zahlungskonto) {
     setEditId(k.id);
     setBezeichnung(k.bezeichnung);
@@ -98,7 +117,7 @@ export function KontenVerwaltung({
               key: "verbindung",
               label: t("konten.spalteVerbindung"),
               render: (k) =>
-                onlineKonten.has(k.id) ? (
+                verbindungen.has(k.id) ? (
                   <Pill variant="ok">{t("konten.online")}</Pill>
                 ) : (
                   <Pill variant="neutral">{t("konten.offline")}</Pill>
@@ -125,6 +144,34 @@ export function KontenVerwaltung({
           onClose={() => setOffen(false)}
           footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
         >
+          {/* Die Verbindung gehört an den Anfang: sie entscheidet, wie viel an diesem
+              Konto überhaupt von Hand gilt. IBAN und Bezeichnung kommen bei einem
+              Online-Konto von der Bank, und der Stand füllt sich über den Abruf. */}
+          <FormField label={t("konten.verbindung.titel")}>
+            {verbindung ? (
+              <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+                <Pill variant="ok">{t("konten.online")}</Pill>
+                <span>{verbindung.zugangName}</span>
+                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {verbindung.schluessel.replace("|", " · ")}
+                  {verbindung.letzterAbrufBis
+                    ? ` · ${t("konten.verbindung.abgerufenBis", { datum: verbindung.letzterAbrufBis })}`
+                    : ` · ${t("konten.verbindung.nieAbgerufen")}`}
+                </span>
+                <button className="linkbtn" onClick={() => void trennen()}>
+                  {t("konten.verbindung.trennen")}
+                </button>
+              </span>
+            ) : (
+              <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+                <Pill variant="neutral">{t("konten.offline")}</Pill>
+                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {t("konten.verbindung.hinweisOffline")}
+                </span>
+              </span>
+            )}
+          </FormField>
+
           <div className="form-grid">
             <FormField label={t("einstellungen.konto.feldBezeichnung")} required>
               <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder={t("einstellungen.konto.feldBezeichnungPlaceholder")} />
