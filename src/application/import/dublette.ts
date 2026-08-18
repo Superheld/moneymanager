@@ -26,7 +26,6 @@
 
 import type { Cent } from "../../core";
 import { normalisiereIban } from "../../core";
-import type { RohUmsatz } from "./rohUmsatz";
 
 /** Was der Finder von einer Buchung braucht — der gemeinsame Nenner beider Quellen. */
 export interface Vergleichbar {
@@ -299,8 +298,8 @@ export function vergleiche(a: Vergleichbar, b: Vergleichbar): Bewertung {
 
 // ── Zuordnung über ganze Listen ───────────────────────────────────────────────────────
 
-export interface Treffer<T> {
-  readonly neu: RohUmsatz;
+export interface Treffer<N, T> {
+  readonly neu: N;
   /** Der Bestandssatz, auf den er zeigt — bei „verschieden" keiner. */
   readonly bestand?: T;
   readonly bewertung: Bewertung;
@@ -316,10 +315,10 @@ export interface Treffer<T> {
  * ist beliebig, aber deterministisch, und beide Kandidaten sind dann ohnehin
  * gleichwertig.
  */
-export function ordneZu<T extends Vergleichbar>(
-  neue: readonly RohUmsatz[],
+export function ordneZu<N extends Vergleichbar, T extends Vergleichbar>(
+  neue: readonly N[],
   bestand: readonly T[],
-): Treffer<T>[] {
+): Treffer<N, T>[] {
   // Vorsortierung nach Betrag: der muss exakt stimmen, das spart den Rest der Vergleiche.
   const nachBetrag = new Map<Cent, T[]>();
   for (const b of bestand) {

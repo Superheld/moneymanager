@@ -269,8 +269,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {aktivId && (
         <NeueBuchungen
           zeilen={neueAbrufe.filter((u) => u.zahlungskontoId === aktivId)}
-          alleOffenen={neueAbrufe}
+          // Verglichen wird gegen alles, was auf diesem Konto schon liegt — verbucht,
+          // offen ODER verworfen, nur nicht gegen die neuen Zeilen selbst.
+          bestand={umsaetze.filter(
+            (u) => u.zahlungskontoId === aktivId && !neueAbrufe.some((n) => n.id === u.id),
+          )}
           kategorien={kategorien}
+          onOeffnen={(istbuchungId) => {
+            const b = ist.find((x) => x.id === istbuchungId);
+            if (b) setEditBuchung(b);
+          }}
           onGeaendert={() => void laden()}
         />
       )}

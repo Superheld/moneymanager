@@ -510,7 +510,16 @@ const de = {
       ohneKategorie: "keine Kategorie",
       ohneGegenpartei: "ohne Empfänger",
       dublette: "könnte Dublette sein",
+      dubletteSicher: "schon vorhanden",
       dubletteHinweis: "Gründe: {{gruende}}",
+      bearbeiten: "bestätigen & bearbeiten",
+      alsUmbuchung: "ist eine Umbuchung",
+      status: {
+        neu: "wartet ebenfalls",
+        verbucht: "bereits gebucht",
+        verworfen: "schon einmal verworfen",
+        duplikat: "als Dublette markiert",
+      },
       quelle: {
         ki: "vom Modell erkannt",
         regel: "über einen Vertrag zugeordnet",
@@ -1594,7 +1603,16 @@ const en: typeof de = {
       ohneKategorie: "no category",
       ohneGegenpartei: "no payee",
       dublette: "might be a duplicate",
+      dubletteSicher: "already present",
       dubletteHinweis: "Reasons: {{gruende}}",
+      bearbeiten: "confirm & edit",
+      alsUmbuchung: "is a transfer",
+      status: {
+        neu: "also waiting",
+        verbucht: "already booked",
+        verworfen: "discarded before",
+        duplikat: "marked as duplicate",
+      },
       quelle: {
         ki: "recognised by the model",
         regel: "assigned via a contract",

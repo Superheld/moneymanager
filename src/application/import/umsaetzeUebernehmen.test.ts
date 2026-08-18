@@ -8,7 +8,7 @@ import type {
 } from "../ports";
 import type { ImportLauf } from "./importLauf";
 import type { RohUmsatz } from "./rohUmsatz";
-import type { Umsatz } from "./umsatz";
+import { verwerfen, type Umsatz } from "./umsatz";
 import { umsaetzeUebernehmen, type UebernahmeDeps } from "./umsaetzeUebernehmen";
 import { quelleKeyFuer } from "./kontoMatch";
 import type { Vorschlagskontext } from "./vorschlag";
@@ -288,6 +288,28 @@ describe("Dublettenfinder beim Übernehmen", () => {
     expect(ergebnis.neu).toBe(1);
     expect(ergebnis.verdacht).toBe(0);
     expect(f.umsaetze[f.umsaetze.length - 1].verdachtAufId).toBeUndefined();
+  });
+
+  it("holt eine verworfene Buchung nicht zurück", async () => {
+    // Verworfen ist verworfen: die Zeile BLEIBT im Bestand, nur eben mit diesem Status —
+    // und genau deshalb erkennt der Finder sie beim nächsten Abruf wieder und legt sie
+    // nicht erneut an. Ohne die Zeile käme dieselbe Buchung bei jedem Abruf zurück.
+    const f = await bestandAusDatei();
+    f.umsaetze[0] = verwerfen(f.umsaetze[0]);
+
+    const ergebnis = await umsaetzeUebernehmen(
+      {
+        quelle: "fints",
+        zeitpunkt: "2026-08-18T10:00:00.000Z",
+        rohUmsaetze: [vonDerBank()],
+        konten: [{ quelleKey: "[entfernt]", kontoId: f.konten[0].id }],
+      },
+      f.deps,
+    );
+
+    expect(ergebnis.neu).toBe(0);
+    expect(f.umsaetze).toHaveLength(1);
+    expect(f.umsaetze[0].status).toBe("verworfen");
   });
 
   it("erkennt den Reimport derselben Datei über die Buchungs-ID", async () => {

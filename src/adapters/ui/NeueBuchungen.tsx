@@ -19,7 +19,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Kategorie } from "../../core";
-import { umsaetzeVerbuchen, verwerfen, type Umsatz } from "../../application/import";
+import { ordneZu, umsaetzeVerbuchen, verwerfen, type Bewertung, type Umsatz } from "../../application/import";
 import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
 import { vertragsAbgleichDeps } from "../persistence/sqliteVertragZuordnungRepositories";
 import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
@@ -33,15 +33,18 @@ export const ABRUF_QUELLEN = new Set(["fints"]);
 
 export function NeueBuchungen({
   zeilen,
-  alleOffenen,
+  bestand,
   kategorien,
+  onOeffnen,
   onGeaendert,
 }: {
   /** Die offenen Abruf-Buchungen DIESES Kontos. */
   zeilen: readonly Umsatz[];
-  /** Alle offenen — zum Auflösen des vermuteten Zwillings, der woanders liegen kann. */
-  alleOffenen: readonly Umsatz[];
+  /** Alle übrigen Umsätze des Kontos — Grundlage der Dublettenprüfung in der Anzeige. */
+  bestand: readonly Umsatz[];
   kategorien: readonly Kategorie[];
+  /** Öffnet die verbuchte Buchung zum vollen Bearbeiten. */
+  onOeffnen: (istbuchungId: string) => void;
   onGeaendert: () => void;
 }) {
   const { t } = useTranslation();
@@ -52,6 +55,24 @@ export function NeueBuchungen({
   const [aendertId, setAendertId] = useState<string | null>(null);
 
   const kategorieName = new Map(kategorien.map((k) => [k.id, k.name]));
+
+  // Die Dublettenprüfung läuft HIER in der Anzeige und nicht nur beim Import.
+  //
+  // Der Grund ist praktisch: der Verdacht, den der Import an die Zeile schreibt, gilt für
+  // den Stand von damals. Zeilen, die vor dem Finder hereinkamen, tragen gar keinen — und
+  // eine Buchung, die inzwischen aus anderer Quelle dazukam, würde nie nachträglich
+  // angeschrieben. Der Vergleich kostet nichts (gemessen: 60 gegen 5279 Zeilen in 2 ms),
+  // also wird er beim Hinsehen gerechnet statt einmalig konserviert.
+  //
+  // Verworfene Zeilen bleiben im Bestand und zählen mit: „das habe ich schon einmal
+  // weggeworfen" ist genau die Auskunft, die man hier braucht.
+  const geprueft = new Map<string, { bewertung: Bewertung; zwilling?: Umsatz }>();
+  const neuSortiert = [...zeilen].sort((a, b) => b.buchungstag.localeCompare(a.buchungstag));
+  ordneZu(neuSortiert, bestand).forEach((t, i) => {
+    if (t.bewertung.urteil !== "verschieden") {
+      geprueft.set(neuSortiert[i].id, { bewertung: t.bewertung, zwilling: t.bestand });
+    }
+  });
 
   async function bestaetigen(auswahl: readonly Umsatz[]) {
     if (auswahl.length === 0) return;
@@ -73,6 +94,30 @@ export function NeueBuchungen({
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Bestätigt EINE Zeile und öffnet die daraus entstandene Buchung sofort zum
+   * Bearbeiten — Konto ändern, splitten, umbuchen, einem Vertrag zuordnen.
+   *
+   * Der Umweg über das Verbuchen ist Absicht statt Bequemlichkeit: die volle
+   * Bearbeitung hängt an einer Ist-Buchung (Aufteilungen, Gegenkonto, Vertragsspur), und
+   * die entsteht erst dabei. Ein zweiter Bearbeitungspfad für den Entwurf wäre dieselbe
+   * Oberfläche ein zweites Mal — mit der Aussicht, dass beide auseinanderlaufen.
+   */
+  async function bestaetigenUndOeffnen(u: Umsatz) {
+    await bestaetigen([u]);
+    const frisch = (await sqliteUmsatzRepository.alle()).find((x) => x.id === u.id);
+    if (frisch?.istbuchungId) onOeffnen(frisch.istbuchungId);
+  }
+
+  /** Markiert die Zeile als Umbuchung — dann paart das Verbuchen die zwei Beine. */
+  async function alsUmbuchung(u: Umsatz) {
+    await sqliteUmsatzRepository.speichern({
+      ...u,
+      vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" },
+    });
+    onGeaendert();
   }
 
   async function verwerfenEiner(u: Umsatz) {
@@ -98,7 +143,7 @@ export function NeueBuchungen({
 
   if (zeilen.length === 0) return null;
 
-  const ohneVerdacht = zeilen.filter((u) => !u.verdachtAufId);
+  const ohneVerdacht = neuSortiert.filter((u) => !geprueft.has(u.id));
 
   return (
     <Card
@@ -115,8 +160,8 @@ export function NeueBuchungen({
     >
       {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
 
-      {zeilen.map((u) => {
-        const zwilling = u.verdachtAufId ? alleOffenen.find((x) => x.id === u.verdachtAufId) : undefined;
+      {neuSortiert.map((u) => {
+        const verdacht = geprueft.get(u.id);
         return (
           <div key={u.id} style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-3) 0" }}>
             <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "baseline", flexWrap: "wrap" }}>
@@ -146,9 +191,16 @@ export function NeueBuchungen({
                 {t("konten.neue.kategorieAendern")}
               </button>
 
+              <button className="linkbtn" onClick={() => void alsUmbuchung(u)}>
+                {t("konten.neue.alsUmbuchung")}
+              </button>
+
               <span style={{ marginLeft: "auto", display: "flex", gap: "var(--sp-3)" }}>
                 <button className="linkbtn" onClick={() => void bestaetigen([u])}>
                   {t("konten.neue.bestaetigen")}
+                </button>
+                <button className="linkbtn" onClick={() => void bestaetigenUndOeffnen(u)}>
+                  {t("konten.neue.bearbeiten")}
                 </button>
                 <button className="linkbtn" onClick={() => void verwerfenEiner(u)}>
                   {t("konten.neue.verwerfen")}
@@ -166,12 +218,19 @@ export function NeueBuchungen({
               </div>
             )}
 
-            {u.verdachtAufId && (
+            {verdacht && (
               <div style={{ marginTop: "var(--sp-2)" }}>
-                <Pill variant="warn">{t("konten.neue.dublette")}</Pill>{" "}
+                <Pill variant="warn">
+                  {verdacht.bewertung.urteil === "identisch"
+                    ? t("konten.neue.dubletteSicher")
+                    : t("konten.neue.dublette")}
+                </Pill>{" "}
                 <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-                  {t("konten.neue.dubletteHinweis", { gruende: (u.verdachtGruende ?? []).join(", ") })}
-                  {zwilling && ` — ${zwilling.buchungstag} ${zwilling.gegenpartei}`}
+                  {t("konten.neue.dubletteHinweis", { gruende: verdacht.bewertung.gruende.join(", ") })}
+                  {verdacht.zwilling &&
+                    ` — ${verdacht.zwilling.buchungstag} ${verdacht.zwilling.gegenpartei} (${t(
+                      `konten.neue.status.${verdacht.zwilling.status}`,
+                    )})`}
                 </span>
               </div>
             )}
