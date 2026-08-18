@@ -14,7 +14,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, kartenAufklappen, pluginApi, rendere, sqlLaden } from "../../test/harness";
+import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { KontenScreen } from "./KontenScreen";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
@@ -34,12 +34,14 @@ beforeEach(() => {
 });
 
 /**
- * Klickt einen Aktions-Knopf. Karten-Titel sind selbst Knöpfe (sie klappen die Karte
- * auf und zu) und tragen `aria-expanded` — sie werden übersprungen, sonst fängt der
- * Titel „Personen" den Klick ab, der dem „+ Person" gilt.
+ * Klickt einen Aktions-Knopf. Register-Reiter sind ebenfalls Knöpfe und tragen dieselben
+ * Namen wie die Bereiche — sie werden übersprungen, sonst fängt der Reiter „Personen"
+ * den Klick ab, der dem „+ Person" gilt.
  */
 async function klicke(nutzer: ReturnType<typeof userEvent.setup>, muster: RegExp) {
-  const knoepfe = (await screen.findAllByRole("button")).filter((b) => !b.hasAttribute("aria-expanded"));
+  const knoepfe = (await screen.findAllByRole("button")).filter(
+    (b) => !b.hasAttribute("aria-expanded") && b.getAttribute("role") !== "tab",
+  );
   const treffer = knoepfe.find((b) => muster.test(b.textContent ?? ""));
   if (treffer) await nutzer.click(treffer);
   return treffer;
@@ -57,16 +59,23 @@ describe("EinstellungenScreen — Stammdaten", () => {
 
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await kartenAufklappen(nutzer);
+
+    // Ein Register nach dem anderen: es ist immer genau eines offen, und das ist der
+    // Punkt der Umstellung — vorher standen alle Listen untereinander.
+    await registerWaehlen(nutzer, /^Personen$/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Bruce/));
-    expect(document.body.textContent).toMatch(/Girokonto/);
-    expect(document.body.textContent).toMatch(/Lebensmittel/);
+
+    await registerWaehlen(nutzer, /^Konten$/);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
+
+    await registerWaehlen(nutzer, /^Kategorien$/);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Lebensmittel/));
   });
 
   it("legt eine Person über das Formular an", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await kartenAufklappen(nutzer);
+    await registerWaehlen(nutzer, /^Personen$/);
 
     await klicke(nutzer, /person|hinzufügen|anlegen|neu/i);
     const felder = screen.queryAllByRole("textbox");
@@ -83,7 +92,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
   it("bietet die Sprach-/Regionsumschaltung an", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await kartenAufklappen(nutzer);
+    await registerWaehlen(nutzer, /Sprache & Währung/);
     // Die Region steuert Sprache UND Währung (ADR-0004) — die Auswahl muss existieren.
     const auswahl = screen.queryAllByRole("combobox");
     expect(auswahl.length).toBeGreaterThanOrEqual(0);

@@ -29,7 +29,6 @@ import { sqliteVertragserkennungRepository } from "../persistence/sqliteVertragZ
 import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "../persistence/sqliteMerkmalskonfigurationRepository";
 import { Button, Card, DataTable } from "./ds";
-import { PageHead } from "./PageHead";
 import { useGeld } from "./einstellungenKontext";
 
 const VORSCHAU_MAX = 500;
@@ -171,7 +170,6 @@ export function ImportScreen() {
 
   return (
     <>
-      <PageHead title={t("import.titel")} subtitle={t("import.untertitel")} />
 
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>

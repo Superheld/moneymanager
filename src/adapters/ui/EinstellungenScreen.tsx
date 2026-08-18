@@ -24,11 +24,9 @@ import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStamm
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { Button, DataTable, FormField, Pill } from "./ds";
-import { KlappCard } from "./KlappCard";
-import { KategorisierungCards } from "./KategorisierungCards";
+import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { Bereich } from "./Bereich";
 import { FestlegungenCard } from "./FestlegungenCard";
-import { PageHead } from "./PageHead";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht, useRegionUmschalter } from "./einstellungenKontext";
 
@@ -54,16 +52,46 @@ export function EinstellungenScreen() {
 
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
 
+  // Was hier NICHT mehr steht: die fünf Karten der Kategorie-Erkennung. Die sind nach
+  // „Training" umgezogen — Einstellungen sind Stammdaten, Training ist Arbeit am Modell.
   return (
-    <div className="screen">
-      <PageHead title={t("einstellungen.titel")} subtitle={t("einstellungen.untertitel")} />
-      <RegionCard />
-      <PersonenCard personen={personen} onChange={laden} />
-      <KontenCard konten={konten} personen={personen} personName={personName} ist={ist} onChange={laden} />
-      <KategorienCard kategorien={kategorien} onChange={laden} />
-      <FestlegungenCard kategorien={kategorien} />
-      <KategorisierungCards kategorien={kategorien} />
-    </div>
+    <Bereich
+      titel={t("einstellungen.titel")}
+      register={[
+        {
+          id: "region",
+          label: t("einstellungen.region.titel"),
+          untertitel: t("einstellungen.region.untertitel"),
+          inhalt: () => <RegionCard />,
+        },
+        {
+          id: "personen",
+          label: t("einstellungen.person.titel"),
+          untertitel: t("einstellungen.person.untertitel"),
+          inhalt: () => <PersonenCard personen={personen} onChange={laden} />,
+        },
+        {
+          id: "konten",
+          label: t("einstellungen.konto.titel"),
+          untertitel: t("einstellungen.konto.untertitel"),
+          inhalt: () => (
+            <KontenCard konten={konten} personen={personen} personName={personName} ist={ist} onChange={laden} />
+          ),
+        },
+        {
+          id: "kategorien",
+          label: t("einstellungen.kategorie.titel"),
+          untertitel: t("einstellungen.kategorie.untertitel"),
+          inhalt: () => <KategorienCard kategorien={kategorien} onChange={laden} />,
+        },
+        {
+          id: "festlegungen",
+          label: t("einstellungen.festlegung.titel"),
+          untertitel: t("einstellungen.festlegung.untertitel"),
+          inhalt: () => <FestlegungenCard kategorien={kategorien} />,
+        },
+      ]}
+    />
   );
 }
 
@@ -72,7 +100,7 @@ function RegionCard() {
   const { t } = useTranslation();
   const { aktuelleLocale, regionSetzen } = useRegionUmschalter();
   return (
-    <KlappCard titel={t("einstellungen.region.titel")} untertitel={t("einstellungen.region.untertitel")}>
+    <Card>
       <FormField label={t("einstellungen.region.feld")} hint={t("einstellungen.region.hinweis")}>
         <select className="field" value={aktuelleLocale} onChange={(e) => regionSetzen(e.target.value)}>
           {REGIONEN.map((r) => (
@@ -82,7 +110,7 @@ function RegionCard() {
           ))}
         </select>
       </FormField>
-    </KlappCard>
+    </Card>
   );
 }
 
@@ -123,7 +151,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
   }
 
   return (
-    <KlappCard titel={t("einstellungen.person.titel")} untertitel={t("einstellungen.person.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.person.anlegen")}</Button>}>
+    <Card action={<Button plus onClick={neu}>{t("einstellungen.person.anlegen")}</Button>}>
       {personen.length === 0 ? (
         <div className="muted">{t("einstellungen.person.leer")}</div>
       ) : (
@@ -155,7 +183,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
           </FormField>
         </Modal>
       )}
-    </KlappCard>
+    </Card>
   );
 }
 
@@ -207,7 +235,12 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
   }
 
   return (
-    <KlappCard titel={t("einstellungen.konto.titel")} untertitel={hatIst ? t("einstellungen.konto.untertitelIst") : t("einstellungen.konto.untertitel")} action={<Button plus onClick={neu}>{t("einstellungen.konto.anlegen")}</Button>}>
+    <Card action={<Button plus onClick={neu}>{t("einstellungen.konto.anlegen")}</Button>}>
+      {hatIst && (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
+          {t("einstellungen.konto.untertitelIst")}
+        </div>
+      )}
       {konten.length === 0 ? (
         <div className="muted">{t("einstellungen.konto.leer")}</div>
       ) : (
@@ -268,7 +301,7 @@ function KontenCard({ konten, personen, personName, ist, onChange }: { konten: Z
           </div>
         </Modal>
       )}
-    </KlappCard>
+    </Card>
   );
 }
 
@@ -327,9 +360,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
   }
 
   return (
-    <KlappCard
-      titel={t("einstellungen.kategorie.titel")}
-      untertitel={t("einstellungen.kategorie.untertitel")}
+    <Card
       action={
         <span style={{ display: "flex", gap: "var(--sp-2)" }}>
           <Button onClick={() => standardkategorienAnlegen(kategorieRepo).then(onChange)}>{t("einstellungen.kategorie.standardLaden")}</Button>
@@ -373,6 +404,6 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
           </div>
         </Modal>
       )}
-    </KlappCard>
+    </Card>
   );
 }

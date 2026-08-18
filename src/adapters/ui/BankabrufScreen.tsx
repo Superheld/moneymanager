@@ -16,7 +16,6 @@ import { sqliteBankzugangRepository } from "../persistence/sqliteBankzugangRepos
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { BankSuche } from "./BankSuche";
 import { Modal } from "./Modal";
-import { PageHead } from "./PageHead";
 import { useGeld } from "./einstellungenKontext";
 
 interface KontoZeile extends Bankkonto {
@@ -151,7 +150,6 @@ export function BankabrufScreen() {
 
   return (
     <>
-      <PageHead title={t("bankabruf.titel")} subtitle={t("bankabruf.untertitel")} />
 
       {!fintsEinsatzbereit && (
         <Card>

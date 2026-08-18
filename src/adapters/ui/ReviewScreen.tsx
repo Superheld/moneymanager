@@ -31,7 +31,6 @@ import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikato
 import { sqliteMerkmalskonfigurationRepository } from "../persistence/sqliteMerkmalskonfigurationRepository";
 import { Button, Card, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
-import { PageHead } from "./PageHead";
 import { useGeld } from "./einstellungenKontext";
 
 const SEITE_GROESSE = 100;
@@ -242,7 +241,6 @@ export function ReviewScreen() {
 
   return (
     <>
-      <PageHead title={t("review.titel")} subtitle={t("review.untertitel")} />
 
       {fehler && <Card style={{ marginBottom: "var(--sp-4)", borderColor: "var(--danger, #c0392b)" }}>{t("review.fehlerDb")} ({fehler})</Card>}
 
