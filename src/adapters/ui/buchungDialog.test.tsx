@@ -180,6 +180,11 @@ describe("Weglegen und zurueckholen", () => {
 
     // Sie ist nicht verschwunden: der Rückweg steht da, mit Anzahl.
     await nutzer.click(await screen.findByRole("button", { name: /weggelegt \(1\)/i }));
+    // Und aufgeklappt steht dieselbe Auskunft wie oben — hier die entscheidende:
+    // zu dieser Zeile gibt es kein Gegenstück, ihr Betrag fehlt also im Kontostand.
+    expect(await screen.findByText(/Kein Gegenstück gefunden/)).toBeInTheDocument();
+    expect(screen.getByText("Einkauf")).toBeInTheDocument();
+
     await nutzer.click(await screen.findByRole("button", { name: /zurückholen/i }));
 
     await waitFor(async () =>
@@ -207,6 +212,10 @@ describe("Weglegen und zurueckholen", () => {
     await waitFor(async () =>
       expect((await umsatzRepo.alle()).find((u) => u.id === "e1")?.status).toBe("duplikat"),
     );
+
+    // Weggelegt und belegt: das Gegenstück steht daneben, also war es richtig so.
+    await nutzer.click(await screen.findByRole("button", { name: /weggelegt \(1\)/i }));
+    expect(await screen.findByText(/Gegenstück vorhanden/)).toBeInTheDocument();
   });
 });
 
