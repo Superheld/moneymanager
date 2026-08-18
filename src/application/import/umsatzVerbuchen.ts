@@ -40,6 +40,42 @@ function verbuchbar(u: Umsatz): boolean {
  * als Umbuchung vorgeschlagen. Deterministisch (stabil sortiert, greedy, nächstes Datum
  * bevorzugt). Liefert die Paare (Abgang zuerst) und alle übrigen Umsätze einzeln.
  */
+/**
+ * Kann `b` das Gegenbein von `a` sein? Gegenbetrag, ANDERES eigenes Konto, Buchungstag
+ * höchstens `MAX_PAAR_TAGE` auseinander — Beine werden oft versetzt gebucht.
+ *
+ * Öffentlich, weil die Oberfläche dieselbe Frage stellen muss, bevor irgendetwas gebucht
+ * ist: wer eine Umbuchung von A nach B bestätigen will, während beide Beine noch
+ * Entwürfe sind, braucht die Regel schon dort. Zwei Formulierungen derselben Regel wären
+ * die Sorte Doppelung, die irgendwann auseinanderläuft.
+ */
+export function passtAlsGegenbein(a: Umsatz, b: Umsatz): boolean {
+  return (
+    b.id !== a.id &&
+    b.betrag === -a.betrag &&
+    b.zahlungskontoId !== a.zahlungskontoId &&
+    Math.abs(tageBis(a.buchungstag, b.buchungstag)) <= MAX_PAAR_TAGE
+  );
+}
+
+/**
+ * Das wahrscheinlichste Gegenbein aus einer Menge von Entwürfen — das mit dem nächsten
+ * Buchungstag. `undefined`, wenn keines passt.
+ */
+export function gegenbeinFuer(a: Umsatz, kandidaten: readonly Umsatz[]): Umsatz | undefined {
+  let best: Umsatz | undefined;
+  let bestAbstand = Infinity;
+  for (const b of kandidaten) {
+    if (!passtAlsGegenbein(a, b)) continue;
+    const abstand = Math.abs(tageBis(a.buchungstag, b.buchungstag));
+    if (abstand < bestAbstand) {
+      best = b;
+      bestAbstand = abstand;
+    }
+  }
+  return best;
+}
+
 export function paareUmbuchungen(
   umsaetze: readonly Umsatz[],
 ): { paare: [Umsatz, Umsatz][]; einzeln: Umsatz[] } {
@@ -57,14 +93,7 @@ export function paareUmbuchungen(
 
   /** Alle noch freien Gegenbeine zu `a`: Gegenbetrag, anderes Konto, Abstand ≤ MAX. */
   const partnerVon = (a: Umsatz): Umsatz[] =>
-    kandidaten.filter(
-      (b) =>
-        b.id !== a.id &&
-        !verwendet.has(b.id) &&
-        b.betrag === -a.betrag &&
-        b.zahlungskontoId !== a.zahlungskontoId &&
-        Math.abs(tageBis(a.buchungstag, b.buchungstag)) <= MAX_PAAR_TAGE,
-    );
+    kandidaten.filter((b) => passtAlsGegenbein(a, b) && !verwendet.has(b.id));
 
   const paaren = (a: Umsatz, b: Umsatz) => {
     verwendet.add(a.id);

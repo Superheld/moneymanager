@@ -18,8 +18,15 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Kategorie } from "../../core";
-import { ordneZu, umsaetzeVerbuchen, verwerfen, type Bewertung, type Umsatz } from "../../application/import";
+import type { Kategorie, Zahlungskonto } from "../../core";
+import {
+  gegenbeinFuer,
+  ordneZu,
+  umsaetzeVerbuchen,
+  verwerfen,
+  type Bewertung,
+  type Umsatz,
+} from "../../application/import";
 import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
 import { vertragsAbgleichDeps } from "../persistence/sqliteVertragZuordnungRepositories";
 import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
@@ -34,6 +41,8 @@ export const ABRUF_QUELLEN = new Set(["fints"]);
 export function NeueBuchungen({
   zeilen,
   bestand,
+  alleNeuen,
+  konten,
   kategorien,
   onOeffnen,
   onGeaendert,
@@ -42,6 +51,13 @@ export function NeueBuchungen({
   zeilen: readonly Umsatz[];
   /** Alle übrigen Umsätze des Kontos — Grundlage der Dublettenprüfung in der Anzeige. */
   bestand: readonly Umsatz[];
+  /**
+   * ALLE offenen Abrufbuchungen, auch die anderer Konten. Ohne sie wäre eine Umbuchung
+   * nicht als solche zu bestätigen: ihr Gegenbein liegt per Definition auf dem anderen
+   * Konto und damit in einem anderen Block.
+   */
+  alleNeuen: readonly Umsatz[];
+  konten: readonly Zahlungskonto[];
   kategorien: readonly Kategorie[];
   /** Öffnet die verbuchte Buchung zum vollen Bearbeiten. */
   onOeffnen: (istbuchungId: string) => void | Promise<void>;
@@ -55,6 +71,7 @@ export function NeueBuchungen({
   const [aendertId, setAendertId] = useState<string | null>(null);
 
   const kategorieName = new Map(kategorien.map((k) => [k.id, k.name]));
+  const kontoName = new Map(konten.map((k) => [k.id, k.bezeichnung]));
 
   // Die Dublettenprüfung läuft HIER in der Anzeige und nicht nur beim Import.
   //
@@ -74,7 +91,32 @@ export function NeueBuchungen({
     }
   });
 
-  async function bestaetigen(auswahl: readonly Umsatz[]) {
+  /**
+   * Zu jeder als Umbuchung markierten Zeile das Gegenbein dazunehmen — auch wenn es auf
+   * einem anderen Konto liegt und hier gar nicht angezeigt wird.
+   *
+   * Das ist die Antwort auf ein Loch, das sich beim Benutzen zeigte: `paareUmbuchungen`
+   * verknüpft die zwei Beine, indem es sie im SELBEN Verbuchungslauf sieht. Wer nur eine
+   * Seite bestätigt, bekommt eine einseitige Umschichtung, und die zweite Seite später
+   * noch eine — zwei Halbe statt eines Übertrags. Im Ledger ließe sich das nachträglich
+   * paaren, aber nur, wenn beide Beine dort schon liegen; solange beide Entwürfe sind,
+   * gibt es dort nichts zu verknüpfen.
+   */
+  function mitGegenbeinen(auswahl: readonly Umsatz[]): Umsatz[] {
+    const gewaehlt = new Map(auswahl.map((u) => [u.id, u]));
+    for (const u of auswahl) {
+      if (u.vorschlag?.quelle !== "umbuchung") continue;
+      const gegen = gegenbeinFuer(
+        u,
+        alleNeuen.filter((x) => !gewaehlt.has(x.id) && x.vorschlag?.quelle === "umbuchung"),
+      );
+      if (gegen) gewaehlt.set(gegen.id, gegen);
+    }
+    return [...gewaehlt.values()];
+  }
+
+  async function bestaetigen(roheAuswahl: readonly Umsatz[]) {
+    const auswahl = mitGegenbeinen(roheAuswahl);
     if (auswahl.length === 0) return;
     setBusy(true);
     setFehler(null);
@@ -111,12 +153,21 @@ export function NeueBuchungen({
     if (frisch?.istbuchungId) await onOeffnen(frisch.istbuchungId);
   }
 
-  /** Markiert die Zeile als Umbuchung — dann paart das Verbuchen die zwei Beine. */
+  /**
+   * Markiert die Zeile als Umbuchung — und gleich das passende Gegenbein mit.
+   *
+   * Beides zusammen zu markieren ist kein Automatismus über den Kopf des Nutzers hinweg,
+   * sondern die einzige Form, in der die Aussage überhaupt Sinn ergibt: eine Umbuchung
+   * hat zwei Seiten. Was hier nicht passt, findet auch `paareUmbuchungen` nicht.
+   */
   async function alsUmbuchung(u: Umsatz) {
-    await sqliteUmsatzRepository.speichern({
-      ...u,
+    const alsUm = (x: Umsatz): Umsatz => ({
+      ...x,
       vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" },
     });
+    await sqliteUmsatzRepository.speichern(alsUm(u));
+    const gegen = gegenbeinFuer(u, alleNeuen.filter((x) => x.id !== u.id));
+    if (gegen) await sqliteUmsatzRepository.speichern(alsUm(gegen));
     onGeaendert();
   }
 
@@ -215,6 +266,33 @@ export function NeueBuchungen({
                   value={u.vorschlag?.kategorieId ?? ""}
                   onChange={(id) => void kategorieSetzen(u, id)}
                 />
+              </div>
+            )}
+
+            {u.vorschlag?.quelle === "umbuchung" && (
+              <div style={{ marginTop: "var(--sp-2)" }}>
+                {(() => {
+                  const gegen = gegenbeinFuer(u, alleNeuen.filter((x) => x.id !== u.id));
+                  return gegen ? (
+                    <>
+                      <Pill variant="um">{t("konten.neue.umbuchung")}</Pill>{" "}
+                      <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                        {t("konten.neue.gegenbein", {
+                          konto: kontoName.get(gegen.zahlungskontoId) ?? "?",
+                          datum: gegen.buchungstag,
+                          betrag: geld.format(gegen.betrag),
+                        })}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Pill variant="warn">{t("konten.neue.umbuchung")}</Pill>{" "}
+                      <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                        {t("konten.neue.ohneGegenbein")}
+                      </span>
+                    </>
+                  );
+                })()}
               </div>
             )}
 
