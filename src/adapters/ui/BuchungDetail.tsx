@@ -41,7 +41,7 @@ import {
 } from "../../core";
 import { buchungBearbeiten, buchungErfassen, buchungLoeschen } from "../../application/buchungErfassen";
 import {
-  gegenbeinFuer,
+  passtAlsGegenbein,
   ordneZu,
   umsaetzeVerbuchen,
   verwerfen,
@@ -278,7 +278,7 @@ function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund
  *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
  *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function BuchungFormular({ buchung, entwurf, andereEntwuerfe, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onClose, onSaved, onDelete, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onClose, onSaved, onDelete, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const charakterLabel = useCharakterLabel();
@@ -302,13 +302,58 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, vorgabe, konten, k
   const musterAngebot = musterVorschlag(umsatz?.gegenpartei ?? "");
   const kategorieGeaendert = kategorieId !== (buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
   const konto = konten.find((k) => k.id === kontoId);
-  // Eine Umschichtung ist eine Umbuchung: sie hat zwei Seiten, und die zweite liegt auf
-  // einem anderen Konto. Im Entwurf wird sie schon HIER gesucht, damit sichtbar ist, was
-  // beim Übernehmen mitkommt (oder eben fehlt).
-  const gegenEntwurf =
-    istEntwurf && charakter === "Umschichtung"
-      ? gegenbeinFuer({ ...entwurf!, zahlungskontoId: kontoId }, andereEntwuerfe)
-      : undefined;
+  const istUmschichtung = charakter === "Umschichtung";
+  const andereKonten = konten.filter((k) => k.id !== kontoId);
+
+  // ── Gegenbein-Suche im Entwurf ──────────────────────────────────────────────────────
+  //
+  // Eine Umschichtung hat zwei Seiten, und die zweite liegt auf einem anderen Konto. Wo
+  // sie steckt, ist offen: sie kann als zweiter Entwurf danebenliegen, längst gebucht
+  // sein (das andere Bein kam mit einem früheren Abruf), gar nicht existieren (Bargeld
+  // wird nicht importiert) — oder es ist wirklich nur eine Seite.
+  //
+  // ZWEI Zeitfenster, und das ist kein Versehen: Entwürfe werden beim Übernehmen von
+  // `paareUmbuchungen` verknüpft, und die Regel dort erlaubt 3 Tage. Ein weiter entfernter
+  // Entwurf ließe sich hier auswählen, würde beim Verbuchen aber nicht gepaart — zwei
+  // halbe Umschichtungen. Bei gebuchten Zeilen paart `buchungenPaaren` auf Zuruf, ohne
+  // Fenster; da gilt das großzügigere Vorschlags-Fenster wie im Umbuchungs-Dialog.
+  const entwurfKandidaten = useMemo(
+    () =>
+      istEntwurf && istUmschichtung
+        ? andereEntwuerfe.filter((x) => passtAlsGegenbein({ ...entwurf!, zahlungskontoId: kontoId }, x))
+        : [],
+    [istEntwurf, istUmschichtung, andereEntwuerfe, entwurf, kontoId],
+  );
+  const buchungKandidaten = useMemo(
+    () =>
+      istEntwurf && istUmschichtung
+        ? paarungsKandidaten(alleBuchungen, {
+            id: "", datum: entwurf!.buchungstag, betrag: entwurf!.betrag,
+            kontoId, charakter: "Umschichtung", quelle: "import",
+          })
+        : [],
+    [istEntwurf, istUmschichtung, alleBuchungen, entwurf, kontoId],
+  );
+
+  /** Auswahlwerte: `e:<id>` Entwurf, `b:<id>` gebucht, `__neu` erzeugen, `__einseitig`. */
+  const gegenOptionen = [
+    ...entwurfKandidaten.map((x) => `e:${x.id}`),
+    ...buchungKandidaten.map((x) => `b:${x.id}`),
+    ...(andereKonten.length > 0 ? ["__neu"] : []),
+    "__einseitig",
+  ];
+  const [gegenwahl, setGegenwahl] = useState<string>("");
+  // Leer starten und beim Lesen auffüllen: die Kontenliste wird asynchron nachgeladen,
+  // ein useState-Initialwert liefe gegen die noch leere Liste und bliebe dann leer.
+  const [neuKontoId, setNeuKontoId] = useState("");
+  const neuKontoGewaehlt = andereKonten.some((k) => k.id === neuKontoId) ? neuKontoId : (andereKonten[0]?.id ?? "");
+  // Das Konto zu wechseln ändert die Kandidatenliste. Statt die Wahl per Effekt
+  // nachzuziehen (und dabei einen Render mit ungültigem Wert zu riskieren) wird sie beim
+  // Lesen geprüft: was nicht mehr angeboten wird, fällt auf die beste Vorgabe zurück.
+  const gegenGewaehlt = gegenOptionen.includes(gegenwahl) ? gegenwahl : (gegenOptionen[0] ?? "__einseitig");
+
+  /** Vorgemerkte Vertragszuordnung — gesetzt wird sie erst nach dem Übernehmen. */
+  const [vertragWahl, setVertragWahl] = useState<string>("");
 
   /**
    * Der Umsatz mit dem, was hier entschieden wurde — Konto und Vorschlag.
@@ -339,21 +384,47 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, vorgabe, konten, k
     setBusy(true);
     try {
       if (entwurf) {
-        // Das Gegenbein kommt in DENSELBEN Lauf: `paareUmbuchungen` verknüpft die beiden
-        // Seiten, indem es sie zusammen sieht. Einzeln übernommen entstünden zwei halbe
-        // Umschichtungen statt eines Übertrags.
-        const auswahl = gegenEntwurf
-          ? [entwurfMitEntscheidung(entwurf), { ...gegenEntwurf, vorschlag: { charakter: "Umschichtung" as const, quelle: "umbuchung" as const } }]
+        // Ein Entwurfs-Gegenbein kommt in DENSELBEN Lauf: `paareUmbuchungen` verknüpft die
+        // beiden Seiten, indem es sie zusammen sieht. Einzeln übernommen entstünden zwei
+        // halbe Umschichtungen statt eines Übertrags.
+        const partnerEntwurf = gegenGewaehlt.startsWith("e:")
+          ? andereEntwuerfe.find((x) => x.id === gegenGewaehlt.slice(2))
+          : undefined;
+        const auswahl = partnerEntwurf
+          ? [entwurfMitEntscheidung(entwurf), { ...partnerEntwurf, vorschlag: { charakter: "Umschichtung" as const, quelle: "umbuchung" as const } }]
           : [entwurfMitEntscheidung(entwurf)];
         await umsaetzeVerbuchen(auswahl, {
           ledgerRepo,
           umsatzRepo,
           id: () => crypto.randomUUID(),
         });
+
+        // Alles Weitere hängt an der Ist-Buchung, die es vorher nicht gab: Paarung mit
+        // einer schon gebuchten Zeile, ein erzeugtes Gegenbein, die Vertragszuordnung.
+        // Deshalb wird die frisch entstandene Buchung hier nachgeschlagen — im Dialog
+        // entschieden, nach dem Verbuchen angewandt.
+        const frisch = (await umsatzRepo.alle()).find((x) => x.id === entwurf.id);
+        const neueBuchung = frisch?.istbuchungId
+          ? (await ledgerRepo.alle()).find((b) => b.id === frisch.istbuchungId)
+          : undefined;
+
+        if (neueBuchung && istUmschichtung) {
+          if (gegenGewaehlt.startsWith("b:")) {
+            const gegen = alleBuchungen.find((b) => b.id === gegenGewaehlt.slice(2));
+            if (gegen) await buchungenPaaren(ledgerRepo, neueBuchung, gegen);
+          } else if (gegenGewaehlt === "__neu" && neuKontoGewaehlt) {
+            await gegenbeinErzeugen(ledgerRepo, neueBuchung, neuKontoGewaehlt);
+          }
+        }
+
         // Frisch verbuchte Zahlungen den Verträgen zuordnen — derselbe Schritt wie in der
         // Inbox. Er gehört nicht in den Verbuchen-Use-Case: der schreibt Fakten, die
         // Zuordnung ist eine Interpretation darüber.
         await zuordnungenAbgleichen(abgleichDeps);
+        // ZULETZT die Handentscheidung: sie überstimmt, was der Abgleich gerechnet hat.
+        if (neueBuchung && vertragWahl && !istUmschichtung) {
+          await zuordnungVonHand(zuordnungRepo, neueBuchung.id, vertragWahl === "__keiner" ? null : vertragWahl);
+        }
       } else if (!buchung) {
         await buchungErfassen(ledgerRepo, { kontoId, datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
       } else if (gepaart) {
@@ -502,26 +573,74 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, vorgabe, konten, k
         )}
       </div>
 
-      {/* Umbuchung im Entwurf: keine Paarung im Ledger, sondern die Ansage, dass zwei
-          Zeilen zusammen übernommen werden. Ob das Gegenstück gefunden wurde, muss VOR
+      {/* Umbuchung im Entwurf (S-1 vor dem Verbuchen). Derselbe Zuschnitt wie im
+          Umbuchungs-Dialog der gebuchten Zeile: die Liste beantwortet die Frage, welcher
+          Fall vorliegt, statt sie vorher zu verlangen. Welche Seite gewählt ist, muss VOR
           dem Drücken dastehen — sonst entsteht lautlos eine einseitige Umschichtung. */}
-      {istEntwurf && charakter === "Umschichtung" && (
-        <div style={{ marginTop: "var(--sp-3)" }}>
-          {gegenEntwurf ? (
+      {istEntwurf && (
+        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+          {!istUmschichtung ? (
             <>
-              <Pill variant="um">{t("konten.neue.umbuchung")}</Pill>{" "}
-              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-                {t("konten.neue.gegenbein", {
-                  konto: kontoName.get(gegenEntwurf.zahlungskontoId) ?? "?",
-                  datum: gegenEntwurf.buchungstag,
-                  betrag: geld.format(gegenEntwurf.betrag),
-                })}
-              </span>
+              <Button onClick={() => setCharakter("Umschichtung")}>{t("konten.zurUmbuchung.aktion")}</Button>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+                {t("konten.zurUmbuchung.untertitel")}
+              </div>
             </>
           ) : (
             <>
-              <Pill variant="warn">{t("konten.neue.umbuchung")}</Pill>{" "}
-              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.neue.ohneGegenbein")}</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
+                <Pill variant="um">{t("konten.paarung.titel")}</Pill>
+                <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>
+                  {t("konten.zurUmbuchung.kandidatenTitel")}
+                </span>
+                <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={() => setCharakter("Aufwand")}>
+                  {t("konten.entwurf.dochKeineUmbuchung")}
+                </button>
+              </div>
+
+              {entwurfKandidaten.map((k) => (
+                <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
+                  <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === `e:${k.id}`} onChange={() => setGegenwahl(`e:${k.id}`)} style={{ accentColor: "var(--accent-deep)" }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(k.buchungstag)}</span>
+                  <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
+                    {kontoName.get(k.zahlungskontoId) ?? "?"}
+                    <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.neu")}</span>
+                  </span>
+                  <span className="num" style={{ fontWeight: 700 }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
+                </label>
+              ))}
+
+              {buchungKandidaten.map((k) => (
+                <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
+                  <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === `b:${k.id}`} onChange={() => setGegenwahl(`b:${k.id}`)} style={{ accentColor: "var(--accent-deep)" }} />
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(k.datum)}</span>
+                  <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
+                    {kontoName.get(k.kontoId) ?? "?"}
+                    <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.verbucht")}</span>
+                  </span>
+                  <span className="num" style={{ fontWeight: 700, color: betragFarbe(k) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
+                </label>
+              ))}
+
+              {/* Ausweg: kein Gegenbein vorhanden (S-1a) — typisch Bargeld. */}
+              {andereKonten.length > 0 && (
+                <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer", flexWrap: "wrap" }}>
+                  <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === "__neu"} onChange={() => setGegenwahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
+                  <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
+                  <select className="field" style={{ width: "auto" }} aria-label={t("konten.zurUmbuchung.neu")} value={neuKontoGewaehlt} onChange={(e) => { setNeuKontoId(e.target.value); setGegenwahl("__neu"); }}>
+                    {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
+                  </select>
+                </label>
+              )}
+
+              <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer" }}>
+                <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === "__einseitig"} onChange={() => setGegenwahl("__einseitig")} style={{ accentColor: "var(--accent-deep)" }} />
+                <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.entwurf.einseitig")}</span>
+              </label>
+
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+                {gegenGewaehlt === "__einseitig" ? t("konten.neue.ohneGegenbein") : t("konten.zurUmbuchung.neuHinweis")}
+              </div>
             </>
           )}
         </div>
@@ -644,6 +763,35 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, vorgabe, konten, k
           perfekt regelmäßig und trotzdem kein Vertrag (dieselbe Grenze zieht die
           Erkennung, siehe core/vertragZuordnung#passtZu). */}
       {!gepaart && vertragsBindung && <VertragsBlock bindung={vertragsBindung} />}
+
+      {/* Vertrag im Entwurf: eine VORMERKUNG. Die Zuordnung hängt an der Ist-Buchung
+          (`Vertragszuordnung.istbuchungId`), die es hier noch nicht gibt — also wird die
+          Wahl gemerkt und direkt nach dem Übernehmen gesetzt, nach dem automatischen
+          Abgleich, damit die Handentscheidung das letzte Wort behält.
+          Kein „Vertrag daraus machen": das öffnet einen zweiten Dialog, und der Entwurf
+          verlöre dabei alles hier Eingestellte, weil noch nichts gespeichert ist. Aus
+          einer übernommenen Buchung geht es weiterhin. */}
+      {istEntwurf && !istUmschichtung && (
+        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+          <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
+            {t("konten.zuVertrag.gehoertZu")}
+          </div>
+          <select
+            className="field"
+            style={{ width: "auto", maxWidth: "100%" }}
+            aria-label={t("konten.zuVertrag.waehlen")}
+            value={vertragWahl}
+            onChange={(e) => setVertragWahl(e.target.value)}
+          >
+            <option value="">{t("konten.zuVertrag.offen")}</option>
+            <option value="__keiner">{t("konten.zuVertrag.keiner")}</option>
+            {vertraege.map((v) => (<option key={v.id} value={v.id}>{v.anbieter}</option>))}
+          </select>
+          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+            {vertragWahl ? t("konten.entwurf.vertragVorgemerkt") : t("konten.entwurf.vertragOffen")}
+          </div>
+        </div>
+      )}
 
       {/* Herkunft — alles, was bekannt ist, aber hier nicht geändert wird. */}
       {(buchung || entwurf) && (
@@ -1115,6 +1263,8 @@ export function BuchungDetail(props: {
       buchung={aktuelle}
       entwurf={aktuellerEntwurf}
       andereEntwuerfe={andereEntwuerfe}
+      alleBuchungen={alle}
+      vertraege={vertraege}
       vorgabe={vorgabe ?? { kontoId: aktuelle?.kontoId ?? "", datum: aktuelle?.datum ?? "" }}
       konten={konten}
       kategorien={kategorien}
