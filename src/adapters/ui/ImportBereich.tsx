@@ -1,13 +1,11 @@
 // Import — ein Navigationspunkt für alles, was Buchungen ins Haus bringt.
 //
-// Vorher standen drei Einträge nebeneinander (Import, Bankabruf, Import-Inbox), die
-// dieselbe Sache in drei Schritten sind: woher die Daten kommen (Datei oder Bank) und was
-// danach mit ihnen passiert (Inbox). Als Register bleibt der Weg sichtbar, ohne die
-// Seitenleiste zu füllen.
+// Hier liegt, was aus einer DATEI kommt, und die Inbox, in der alles Eingelesene auf die
+// Durchsicht wartet. Der Bankabruf ist bewusst NICHT hier: er hängt an einem Konto und
+// steht deshalb unter Konten — beim Konto der Knopf, unter „Bankzugänge" die Verbindung.
 
 import { useTranslation } from "react-i18next";
 import { Bereich } from "./Bereich";
-import { BankabrufScreen } from "./BankabrufScreen";
 import { ImportScreen } from "./ImportScreen";
 import { ReviewScreen } from "./ReviewScreen";
 
@@ -22,12 +20,6 @@ export function ImportBereich() {
           label: t("import.registerDatei"),
           untertitel: t("import.untertitel"),
           inhalt: () => <ImportScreen />,
-        },
-        {
-          id: "bank",
-          label: t("import.registerBank"),
-          untertitel: t("bankabruf.untertitel"),
-          inhalt: () => <BankabrufScreen />,
         },
         {
           id: "inbox",
