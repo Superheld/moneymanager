@@ -19,7 +19,6 @@ import {
   type Zahlungskonto,
   type Zahlungsregel,
 } from "../../core";
-import { buchungErfassen } from "../../application/buchungErfassen";
 import { type Umsatz } from "../../application/import";
 import { umbuchungErfassen } from "../../application/umbuchungErfassen";
 import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../../application/bezahltMarkieren";
@@ -27,16 +26,17 @@ import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqlit
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
+import { sqliteImportLaufRepository as laufRepo, sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
+import { sqliteKontozuordnungRepository as zuordnungRepo } from "../persistence/sqliteBankzugangRepositories";
 import type { ScreenId } from "./AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
-import { CategoryPicker } from "./CategoryPicker";
 import { BuchungDetail } from "./BuchungDetail";
+import { AbrufDialog } from "./AbrufDialog";
+import { ABRUF_QUELLEN, NeueBuchungen } from "./NeueBuchungen";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
 
-const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const TAGE_OPTIONEN = [14, 30, 60, 90];
 const ART_OPTS = [
   { v: "alle", k: "konten.artAlle" },
@@ -75,7 +75,14 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
+  /** Die abgerufene Zeile, die gerade im Dialog liegt — noch nichts davon ist gebucht. */
+  const [entwurf, setEntwurf] = useState<Umsatz | null>(null);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
+  const [abruf, setAbruf] = useState(false);
+  /** Konten, die an einer Bankverbindung hängen — daran hängt auch der Abruf-Knopf. */
+  const [onlineKonten, setOnlineKonten] = useState<Set<string>>(new Set());
+  /** Abgerufene, noch nicht bestätigte Buchungen — je Konto. */
+  const [neueAbrufe, setNeueAbrufe] = useState<Umsatz[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
 
   // Alles in EINEM Zug laden und zusammen setzen. Gestaffelte await/setState-Paare
@@ -83,19 +90,30 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   // importierten Buchung käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte
   // für einen Render „Buchung" statt „Edeka".
   async function laden() {
-    const [ks, bs, rs, kats, us] = await Promise.all([
+    const [ks, bs, rs, kats, us, zuordnungen, offene, laeufe] = await Promise.all([
       kontoRepo.alle(),
       ledgerRepo.alle(),
       regelRepo.alle(),
       kategorieRepo.alle(),
       umsatzRepo.alle(),
+      zuordnungRepo.alle(),
+      umsatzRepo.offene(),
+      laufRepo.alle(),
     ]);
+    const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
+    const neu = offene.filter((u) => abrufLaeufe.has(u.laufId));
+    setNeueAbrufe(neu);
+    setOnlineKonten(new Set(zuordnungen.map((z) => z.zahlungskontoId)));
     setKonten(ks);
     setIst(bs);
     setRegeln(rs);
     setKategorien(kats);
     setUmsaetze(us);
-    setAktivId((id) => id || ks[0]?.id || "");
+    // Vorauswahl: das Konto, auf das etwas wartet. Sonst steht die Übersicht auf dem
+    // ersten Konto nach Alphabet („Bargeld"), und die abgerufenen Buchungen des
+    // Girokontos sieht man erst, wenn man zufällig die richtige Zeile anklickt.
+    const wartet = ks.find((k) => neu.some((u) => u.zahlungskontoId === k.id));
+    setAktivId((id) => id || wartet?.id || ks[0]?.id || "");
   }
   useEffect(() => {
     laden();
@@ -187,7 +205,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       <Card
         title={t("konten.deineKonten")}
         subtitle={t("konten.deineKontenUntertitel")}
-        action={<Button plus onClick={() => onNavigate("einstellungen")}>{t("konten.kontoAnlegen")}</Button>}
+        action={
+          <span style={{ display: "flex", gap: "var(--sp-2)" }}>
+            {/* Nur zeigen, wenn es überhaupt etwas abzurufen gibt — ein Knopf, der
+                nichts tun kann, ist eine Frage an den Nutzer statt einer Antwort. */}
+            {onlineKonten.size > 0 && (
+              <Button variant="primary" onClick={() => setAbruf(true)}>{t("konten.abrufen")}</Button>
+            )}
+            <Button plus onClick={() => onNavigate("kontenverwaltung")}>{t("konten.kontoAnlegen")}</Button>
+          </span>
+        }
       >
         {konten.length === 0 ? (
           <div className="muted">{t("konten.keineKonten")}</div>
@@ -199,6 +226,27 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             columns={[
               { key: "bezeichnung", label: t("konten.spalteBezeichnung"), render: (k) => (<span style={{ fontWeight: k.id === aktivId ? "var(--fw-bold)" : "var(--fw-semi)" }}>{k.bezeichnung}</span>) },
               { key: "typ", label: t("konten.spalteTyp"), sortValue: (k) => k.typ, render: (k) => <Pill variant="neutral">{t(`konten.typ.${k.typ}`)}</Pill> },
+              {
+                key: "wartet",
+                label: t("konten.spalteWartet"),
+                align: "right" as const,
+                sortValue: (k) => neueAbrufe.filter((u) => u.zahlungskontoId === k.id).length,
+                render: (k) => {
+                  const n = neueAbrufe.filter((u) => u.zahlungskontoId === k.id).length;
+                  return n > 0 ? <Pill variant="plan">{t("konten.wartet", { n })}</Pill> : "—";
+                },
+              },
+              {
+                key: "verbindung",
+                label: t("konten.spalteVerbindung"),
+                sortValue: (k) => (onlineKonten.has(k.id) ? "0" : "1"),
+                render: (k) =>
+                  onlineKonten.has(k.id) ? (
+                    <Pill variant="ok">{t("konten.online")}</Pill>
+                  ) : (
+                    <Pill variant="neutral">{t("konten.offline")}</Pill>
+                  ),
+              },
               { key: "anfang", label: `${t("konten.spalteAnfangsbestand")} ${geld.symbol}`, align: "right", sortValue: (k) => k.saldo, render: (k) => geld.format(k.saldo) },
               { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", sortValue: (k) => istSummeKonto(ist, k.id), render: (k) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
               { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", sortValue: (k) => realerKontostand(k, ist), render: (k) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
@@ -207,6 +255,31 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           />
         )}
       </Card>
+
+      {abruf && (
+        <AbrufDialog
+          onClose={() => setAbruf(false)}
+          onFertig={() => void laden()}
+        />
+      )}
+
+      {/* Was die Bank gebracht hat, steht VOR dem Register: es ist noch nicht Teil des
+          Saldos und wartet auf eine Entscheidung. */}
+      {aktivId && (
+        <NeueBuchungen
+          zeilen={neueAbrufe.filter((u) => u.zahlungskontoId === aktivId)}
+          // Verglichen wird gegen alles, was auf diesem Konto schon liegt — verbucht,
+          // offen ODER verworfen, nur nicht gegen die neuen Zeilen selbst.
+          bestand={umsaetze.filter(
+            (u) => u.zahlungskontoId === aktivId && !neueAbrufe.some((n) => n.id === u.id),
+          )}
+          alleNeuen={neueAbrufe}
+          konten={konten}
+          kategorien={kategorien}
+          onOeffnen={setEntwurf}
+          onGeaendert={() => void laden()}
+        />
+      )}
 
       {aktiv && register && (
         <Card
@@ -343,13 +416,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         </Card>
       )}
 
+      {/* Anlegen und Bearbeiten sind derselbe Dialog: ohne `buchung` legt er eine neue an,
+          vorbelegt mit dem Konto, dessen Register gerade offen ist. */}
       {buchenOffen && aktiv && (
-        <BuchungModal
-          konto={aktiv}
-          kategorien={kategorien}
-          heute={heute}
+        <BuchungDetail
+          vorgabe={{ kontoId: aktiv.id, datum: heute }}
           onClose={() => setBuchenOffen(false)}
-          onSaved={async () => { setBuchenOffen(false); setIst(await ledgerRepo.alle()); }}
+          onGeaendert={laden}
         />
       )}
 
@@ -357,6 +430,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         <BuchungDetail
           buchung={editBuchung}
           onClose={() => setEditBuchung(null)}
+          onGeaendert={laden}
+        />
+      )}
+
+      {/* Derselbe Dialog für die Bankzeile — er schreibt erst beim Übernehmen oder
+          Verwerfen. Wegklicken lässt den Entwurf unangetastet stehen. */}
+      {entwurf && (
+        <BuchungDetail
+          entwurf={entwurf}
+          onClose={() => setEntwurf(null)}
           onGeaendert={laden}
         />
       )}
@@ -437,65 +520,6 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
         </FormField>
         <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
           <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
-        </FormField>
-      </div>
-    </Modal>
-  );
-}
-
-function BuchungModal({ konto, kategorien, heute, onClose, onSaved }: { konto: Zahlungskonto; kategorien: Kategorie[]; heute: string; onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation();
-  const geld = useGeld();
-  const charakterLabel = useCharakterLabel();
-  const [datum, setDatum] = useState(heute);
-  const [betrag, setBetrag] = useState("");
-  const [charakter, setCharakter] = useState<Charakter>("Aufwand");
-  const [kategorieId, setKategorieId] = useState("");
-  const [notiz, setNotiz] = useState("");
-  const [fehler, setFehler] = useState<string | null>(null);
-  const vorlaeufig = konto.typ !== "Bargeld";
-
-  async function speichern() {
-    setFehler(null);
-    try {
-      await buchungErfassen(ledgerRepo, {
-        kontoId: konto.id,
-        datum,
-        betrag: geld.parse(betrag) ?? 0,
-        charakter,
-        kategorieId: kategorieId || undefined,
-        notiz,
-      });
-      onSaved();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
-  }
-
-  return (
-    <Modal
-      title={t("konten.buchung.titel", { konto: konto.bezeichnung })}
-      subtitle={vorlaeufig ? t("konten.buchung.untertitelVorlaeufig") : t("konten.buchung.untertitelBargeld")}
-      onClose={onClose}
-      footer={<><Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button><button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
-    >
-      <div className="form-grid">
-        <FormField label={t("konten.feldDatum")} required>
-          <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
-        </FormField>
-        <FormField label={t("konten.feldBetrag")} hint={t("konten.buchung.betragHinweis")} required>
-          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
-        </FormField>
-        <FormField label={t("konten.feldCharakter")}>
-          <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-            {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
-          </select>
-        </FormField>
-        <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
-          <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
-        </FormField>
-        <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
-          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.buchung.notizPlatzhalter")} />
         </FormField>
       </div>
     </Modal>

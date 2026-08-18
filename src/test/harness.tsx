@@ -8,7 +8,7 @@
 //
 // Diese Datei ist Test-Werkzeug und aus der Coverage ausgenommen.
 
-import { render, waitFor, type RenderResult } from "@testing-library/react";
+import { render, screen, waitFor, type RenderResult } from "@testing-library/react";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import type { ReactElement } from "react";
@@ -61,19 +61,15 @@ export function rendere(element: ReactElement): RenderResult {
 }
 
 /**
- * Klappt alle eingeklappten Karten auf (Einstellungs-Screen).
- *
- * Die Karten dort starten zugeklappt, damit man nicht an vier Listen vorbeiscrollt, um an
- * die fünfte zu kommen — und ihr Inhalt wird erst beim Aufklappen gerendert. Tests, die
- * den Inhalt prüfen, müssen ihn also zuerst sichtbar machen.
- *
- * Erkannt am `aria-expanded="false"`, nicht an der Beschriftung: so bleibt der Helfer
- * gültig, wenn eine Karte umbenannt wird oder eine neue dazukommt. In Schleife, weil eine
- * frisch aufgeklappte Karte selbst wieder klappbare Bereiche enthalten kann.
+ * Wählt ein Register (Tab) im Bereichs-Kopf und wartet vorher darauf, dass überhaupt
+ * gerendert ist. Löst `kartenAufklappen` ab: die Einstellungen sind keine Sammlung
+ * aufklappbarer Karten mehr, sondern ein Bereich mit Registern — und weil immer genau
+ * eines offen ist, muss ein Test sagen, welches er meint.
  */
-export async function kartenAufklappen(nutzer: {
-  click: (el: Element) => Promise<void>;
-}): Promise<void> {
+export async function registerWaehlen(
+  nutzer: { click: (el: Element) => Promise<void> },
+  name: RegExp | string,
+): Promise<void> {
   // Erst abwarten, dass überhaupt etwas dasteht: der EinstellungenProvider lädt Locale
   // und Währung aus der Datenbank und rendert seine Kinder bis dahin nicht. Ohne dieses
   // Warten liefe der Helfer über ein leeres Dokument und täte stillschweigend nichts.
@@ -81,9 +77,5 @@ export async function kartenAufklappen(nutzer: {
     if (!document.body.textContent) throw new Error("noch nichts gerendert");
   });
 
-  for (let runde = 0; runde < 5; runde++) {
-    const zu = [...document.querySelectorAll('[aria-expanded="false"]')];
-    if (zu.length === 0) return;
-    for (const knopf of zu) await nutzer.click(knopf);
-  }
+  await nutzer.click(await screen.findByRole("tab", { name }));
 }

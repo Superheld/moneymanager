@@ -20,7 +20,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, kartenAufklappen, rendere, sqlLaden } from "../../test/harness";
+import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
 import { BudgetsScreen } from "./BudgetsScreen";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { HistorieScreen } from "./HistorieScreen";
@@ -338,7 +338,7 @@ describe("EinstellungenScreen", () => {
     await sqlitePersonRepository.speichern({ id: "p1", name: "Bruce", rolle: "hauptperson" });
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await kartenAufklappen(nutzer);
+    await registerWaehlen(nutzer, /^Personen$/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Bruce|Girokonto|Lebensmittel/));
   });
 });

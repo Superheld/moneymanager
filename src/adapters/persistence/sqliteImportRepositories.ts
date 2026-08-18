@@ -64,6 +64,12 @@ interface UmsatzZeile {
   gegenpartei: string;
   verwendungszweck: string;
   glaeubiger_id: string | null;
+  gegenpartei_iban: string | null;
+  mandatsreferenz: string | null;
+  e2e_referenz: string | null;
+  umsatzart: string | null;
+  buchungsschluessel: string | null;
+  bank_referenz: string | null;
   roh_hash: string;
   native_id: string | null;
   status: string;
@@ -71,6 +77,8 @@ interface UmsatzZeile {
   vorschlag_charakter: string | null;
   vorschlag_quelle: string | null;
   istbuchung_id: string | null;
+  verdacht_auf_id: string | null;
+  verdacht_gruende: string | null;
 }
 
 function zuUmsatz(z: UmsatzZeile): Umsatz {
@@ -85,6 +93,12 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
     gegenpartei: z.gegenpartei,
     verwendungszweck: z.verwendungszweck,
     glaeubigerId: z.glaeubiger_id ?? undefined,
+    gegenparteiIban: z.gegenpartei_iban ?? undefined,
+    mandatsreferenz: z.mandatsreferenz ?? undefined,
+    e2eReferenz: z.e2e_referenz ?? undefined,
+    umsatzart: z.umsatzart ?? undefined,
+    buchungsschluessel: z.buchungsschluessel ?? undefined,
+    bankreferenz: z.bank_referenz ?? undefined,
     rohHash: z.roh_hash,
     nativeId: z.native_id ?? undefined,
     status: z.status as UmsatzStatus,
@@ -96,30 +110,53 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
         }
       : undefined,
     istbuchungId: z.istbuchung_id ?? undefined,
+    verdachtAufId: z.verdacht_auf_id ?? undefined,
+    verdachtGruende: z.verdacht_gruende ? (JSON.parse(z.verdacht_gruende) as string[]) : undefined,
   };
 }
 
 const SELECT = `SELECT id, lauf_id, zahlungskonto_id, buchungstag, valuta, betrag, waehrung,
-       gegenpartei, verwendungszweck, glaeubiger_id, roh_hash, native_id, status,
-       vorschlag_kategorie_id, vorschlag_charakter, vorschlag_quelle, istbuchung_id
+       gegenpartei, verwendungszweck, glaeubiger_id, gegenpartei_iban, mandatsreferenz,
+       e2e_referenz, umsatzart, buchungsschluessel, bank_referenz,
+       roh_hash, native_id, status,
+       vorschlag_kategorie_id, vorschlag_charakter, vorschlag_quelle, istbuchung_id,
+       verdacht_auf_id, verdacht_gruende
   FROM umsatz`;
 
 async function einfuegen(db: Awaited<ReturnType<typeof getDb>>, u: Umsatz): Promise<void> {
   await db.execute(
+    // Beim Aktualisieren werden auch die Quellenfelder nachgezogen: das ist der
+    // Ergänzen-Fall des Dublettenfinders — eine bekannte Zeile bekommt, was die neue
+    // Quelle mehr weiß (Mandatsreferenz, Valuta, Umsatzart …), ohne dass eine zweite
+    // Zeile entsteht. Der Aufrufer entscheidet, was er übergibt; leer überschreibt nicht,
+    // weil er den Bestand vorher hineinmischt.
     `INSERT INTO umsatz
        (id, lauf_id, zahlungskonto_id, buchungstag, valuta, betrag, waehrung, gegenpartei,
-        verwendungszweck, glaeubiger_id, roh_hash, native_id, status,
-        vorschlag_kategorie_id, vorschlag_charakter, vorschlag_quelle, istbuchung_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        verwendungszweck, glaeubiger_id, gegenpartei_iban, mandatsreferenz, e2e_referenz,
+        umsatzart, buchungsschluessel, bank_referenz, roh_hash, native_id, status,
+        vorschlag_kategorie_id, vorschlag_charakter, vorschlag_quelle, istbuchung_id,
+        verdacht_auf_id, verdacht_gruende)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
      ON CONFLICT(id) DO UPDATE SET zahlungskonto_id = excluded.zahlungskonto_id,
+       valuta = excluded.valuta, glaeubiger_id = excluded.glaeubiger_id,
+       gegenpartei_iban = excluded.gegenpartei_iban, mandatsreferenz = excluded.mandatsreferenz,
+       e2e_referenz = excluded.e2e_referenz, umsatzart = excluded.umsatzart,
+       buchungsschluessel = excluded.buchungsschluessel, bank_referenz = excluded.bank_referenz,
+       native_id = excluded.native_id,
        status = excluded.status, vorschlag_kategorie_id = excluded.vorschlag_kategorie_id,
        vorschlag_charakter = excluded.vorschlag_charakter, vorschlag_quelle = excluded.vorschlag_quelle,
-       istbuchung_id = excluded.istbuchung_id`,
+       istbuchung_id = excluded.istbuchung_id,
+       verdacht_auf_id = excluded.verdacht_auf_id, verdacht_gruende = excluded.verdacht_gruende`,
     [
       u.id, u.laufId, u.zahlungskontoId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
-      u.gegenpartei, u.verwendungszweck, u.glaeubigerId ?? null, u.rohHash, u.nativeId ?? null, u.status,
+      u.gegenpartei, u.verwendungszweck, u.glaeubigerId ?? null, u.gegenparteiIban ?? null,
+      u.mandatsreferenz ?? null, u.e2eReferenz ?? null, u.umsatzart ?? null,
+      u.buchungsschluessel ?? null, u.bankreferenz ?? null,
+      u.rohHash, u.nativeId ?? null, u.status,
       u.vorschlag?.kategorieId ?? null, u.vorschlag?.charakter ?? null, u.vorschlag?.quelle ?? null,
       u.istbuchungId ?? null,
+      u.verdachtAufId ?? null,
+      u.verdachtGruende ? JSON.stringify(u.verdachtGruende) : null,
     ],
   );
 }

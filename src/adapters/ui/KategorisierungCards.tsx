@@ -10,7 +10,7 @@
 // zieht den gesamten Ledger und rechnet die Merkmale darüber. Viermal getrennt zu laden
 // wäre dieselbe Arbeit vierfach.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   MERKMALSHERKUENFTE,
@@ -56,8 +56,8 @@ import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persis
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
 import { sqliteVertragserkennungRepository as erkennungRepo } from "../persistence/sqliteVertragZuordnungRepositories";
-import { Button, DataTable, FormField, KPIStat, Pill } from "./ds";
-import { KlappCard } from "./KlappCard";
+import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
+import { Bereich } from "./Bereich";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 
 /** Alles, was die vier Karten gemeinsam brauchen. */
@@ -103,11 +103,16 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
     });
   }
 
-  function beiOeffnen() {
+  // Geladen wird beim Betreten des Bereichs, nicht beim Aufklappen einer Karte: die
+  // Komponente entsteht erst, wenn jemand „Training" wählt. Die Trainingsdaten ziehen den
+  // gesamten Ledger und rechnen die Merkmale darüber — dass das nicht nebenbei beim
+  // Öffnen der Einstellungen passiert, war schon der Grund für das verzögerte Aufklappen.
+  useEffect(() => {
     if (angefordert) return;
     setAngefordert(true);
     laden().catch((e) => setFehler(fehlerNachricht(t, e)));
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /** Nach jeder Listenänderung: neu rechnen und merken, dass das Modell hinterherhinkt. */
   async function nachAenderung(aktion: Promise<unknown>) {
@@ -208,77 +213,95 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
   };
 
   return (
-    <>
-      {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
-
-      <KlappCard
-        titel={t("einstellungen.lernmaterial.datenTitel")}
-        untertitel={t("einstellungen.lernmaterial.datenUntertitel")}
-        beiOeffnen={beiOeffnen}
-      >
-        <DatenInhalt {...hilfe} />
-      </KlappCard>
-
-      <KlappCard
-        titel={t("einstellungen.lernmaterial.merkmaleTitel")}
-        untertitel={t("einstellungen.lernmaterial.merkmaleUntertitel")}
-        beiOeffnen={beiOeffnen}
-      >
-        <MerkmaleInhalt
-          {...hilfe}
-          wirkung={wirkung}
-          misst={laeuft === "wirkung"}
-          aufWirkung={wirkungStarten}
-          aufSchalten={(h, aktiv) => nachAenderung(herkunftSchalten(merkmalRepo, h, aktiv))}
-          aufAusschliessen={(wort, herkuenfte) =>
-            nachAenderung(wortAusschliessen(merkmalRepo, wort, herkuenfte))
-          }
-        />
-      </KlappCard>
-
-      <KlappCard
-        titel={t("einstellungen.lernmaterial.ausschluesseTitel")}
-        untertitel={t("einstellungen.lernmaterial.ausschluesseUntertitel")}
-        beiOeffnen={beiOeffnen}
-      >
-        <AusschluesseInhalt
-          {...hilfe}
-          aufAusschliessen={(wort, herkuenfte) =>
-            nachAenderung(wortAusschliessen(merkmalRepo, wort, herkuenfte))
-          }
-          aufZulassen={(wort) => nachAenderung(wortZulassen(merkmalRepo, wort))}
-        />
-      </KlappCard>
-
-      <KlappCard
-        titel={t("einstellungen.lernmaterial.modellKarteTitel")}
-        untertitel={t("einstellungen.lernmaterial.modellKarteUntertitel")}
-        beiOeffnen={beiOeffnen}
-      >
-        <ModellInhalt
-          {...hilfe}
-          bewertung={bewertung}
-          trainiert={laeuft === "training"}
-          listenGeaendert={listenGeaendert}
-          aufTraining={trainingStarten}
-        />
-      </KlappCard>
-
-      <KlappCard
-        titel={t("einstellungen.abgleich.titel")}
-        untertitel={t("einstellungen.abgleich.untertitel")}
-      >
-        <AbgleichInhalt
-          {...hilfe}
-          plan={plan}
-          angewendet={angewendet}
-          rechnet={laeuft === "abgleich"}
-          schreibt={laeuft === "anwenden"}
-          aufVorschau={vorschauRechnen}
-          aufUebernehmen={planUebernehmen}
-        />
-      </KlappCard>
-    </>
+    <Bereich
+      titel={t("shell.navTraining")}
+      register={[
+        {
+          id: "daten",
+          label: t("einstellungen.lernmaterial.datenTitel"),
+          untertitel: t("einstellungen.lernmaterial.datenUntertitel"),
+          inhalt: () => (
+            <Card>
+              {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
+              <DatenInhalt {...hilfe} />
+            </Card>
+          ),
+        },
+        {
+          id: "merkmale",
+          label: t("einstellungen.lernmaterial.merkmaleTitel"),
+          untertitel: t("einstellungen.lernmaterial.merkmaleUntertitel"),
+          inhalt: () => (
+            <Card>
+              {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
+              <MerkmaleInhalt
+                {...hilfe}
+                wirkung={wirkung}
+                misst={laeuft === "wirkung"}
+                aufWirkung={wirkungStarten}
+                aufSchalten={(h, aktiv) => nachAenderung(herkunftSchalten(merkmalRepo, h, aktiv))}
+                aufAusschliessen={(wort, herkuenfte) =>
+                  nachAenderung(wortAusschliessen(merkmalRepo, wort, herkuenfte))
+                }
+              />
+            </Card>
+          ),
+        },
+        {
+          id: "ausschluesse",
+          label: t("einstellungen.lernmaterial.ausschluesseTitel"),
+          untertitel: t("einstellungen.lernmaterial.ausschluesseUntertitel"),
+          inhalt: () => (
+            <Card>
+              {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
+              <AusschluesseInhalt
+                {...hilfe}
+                aufAusschliessen={(wort, herkuenfte) =>
+                  nachAenderung(wortAusschliessen(merkmalRepo, wort, herkuenfte))
+                }
+                aufZulassen={(wort) => nachAenderung(wortZulassen(merkmalRepo, wort))}
+              />
+            </Card>
+          ),
+        },
+        {
+          id: "modell",
+          label: t("einstellungen.lernmaterial.modellKarteTitel"),
+          untertitel: t("einstellungen.lernmaterial.modellKarteUntertitel"),
+          inhalt: () => (
+            <Card>
+              {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
+              <ModellInhalt
+                {...hilfe}
+                bewertung={bewertung}
+                trainiert={laeuft === "training"}
+                listenGeaendert={listenGeaendert}
+                aufTraining={trainingStarten}
+              />
+            </Card>
+          ),
+        },
+        {
+          id: "abgleich",
+          label: t("einstellungen.abgleich.titel"),
+          untertitel: t("einstellungen.abgleich.untertitel"),
+          inhalt: () => (
+            <Card>
+              {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
+              <AbgleichInhalt
+                {...hilfe}
+                plan={plan}
+                angewendet={angewendet}
+                rechnet={laeuft === "abgleich"}
+                schreibt={laeuft === "anwenden"}
+                aufVorschau={vorschauRechnen}
+                aufUebernehmen={planUebernehmen}
+              />
+            </Card>
+          ),
+        },
+      ]}
+    />
   );
 }
 

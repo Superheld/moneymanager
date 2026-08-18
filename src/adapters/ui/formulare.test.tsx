@@ -16,8 +16,9 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, kartenAufklappen, rendere, sqlLaden } from "../../test/harness";
+import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
+import { KontenVerwaltungScreen } from "./KontenVerwaltungScreen";
 import { InventarScreen } from "./InventarScreen";
 import { BudgetsScreen } from "./BudgetsScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
@@ -53,12 +54,14 @@ async function formularFuellen(
 }
 
 /**
- * Klickt einen Aktions-Knopf. Karten-Titel sind selbst Knöpfe (sie klappen die Karte
- * auf und zu) und tragen `aria-expanded` — sie werden übersprungen, sonst fängt der
- * Titel „Personen" den Klick ab, der dem „+ Person" gilt.
+ * Klickt einen Aktions-Knopf. Register-Reiter sind ebenfalls Knöpfe und tragen dieselben
+ * Namen wie die Bereiche („Konten", „Kategorien") — sie werden übersprungen, sonst fängt
+ * der Reiter den Klick ab, der dem „+ Konto" gilt.
  */
 async function klicke(nutzer: ReturnType<typeof userEvent.setup>, muster: RegExp) {
-  const knoepfe = screen.queryAllByRole("button").filter((b) => !b.hasAttribute("aria-expanded"));
+  const knoepfe = screen
+    .queryAllByRole("button")
+    .filter((b) => !b.hasAttribute("aria-expanded") && b.getAttribute("role") !== "tab");
   const treffer = knoepfe.filter((b) => muster.test(b.textContent ?? ""));
   const letzter = treffer[treffer.length - 1];
   if (letzter) await nutzer.click(letzter);
@@ -140,26 +143,29 @@ describe("Inventar — Formularpfade", () => {
 });
 
 describe("Einstellungen — Formularpfade", () => {
-  it("legt ein Konto über das Formular an", async () => {
+  it("legt ein Offline-Konto über den Anlege-Dialog an", async () => {
+    // Der Dialog fragt zuerst nach der Art des Kontos und steht auf „offline" —
+    // ein Konto ohne Bankverbindung soll ohne Umweg anzulegen sein.
     const nutzer = userEvent.setup();
-    rendere(<EinstellungenScreen />);
-    await kartenAufklappen(nutzer);
+    rendere(<KontenVerwaltungScreen />);
 
-    await klicke(nutzer, /konto/i);
-    await formularFuellen(nutzer, "Zweitkonto", "0");
-    await klicke(nutzer, /speichern|anlegen|hinzufügen/i);
+    // Der Knopf heißt schlicht „+ Konto" (die Karte darüber sagt, worum es geht).
+    await waitFor(() => expect(screen.queryAllByRole("button").length).toBeGreaterThan(0));
+    await klicke(nutzer, /^\+?\s*Konto$/i);
+    const bezeichnung = (await screen.findAllByRole("textbox"))[0];
+    await nutzer.type(bezeichnung, "Zweitkonto");
+    await klicke(nutzer, /^speichern$/i);
 
     await waitFor(async () => {
       const konten = await sqliteZahlungskontoRepository.alle();
-      const meldung = /muss|bitte|fehlt|ungültig/i.test(document.body.textContent ?? "");
-      expect(konten.length > 0 || meldung).toBe(true);
+      expect(konten.map((k) => k.bezeichnung)).toContain("Zweitkonto");
     });
   });
 
   it("legt eine Kategorie über das Formular an", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await kartenAufklappen(nutzer);
+    await registerWaehlen(nutzer, /^Kategorien$/);
 
     await klicke(nutzer, /kategorie/i);
     await formularFuellen(nutzer, "Testkategorie", "0");
@@ -174,7 +180,7 @@ describe("Einstellungen — Formularpfade", () => {
 
   it("führt die Bereiche Sprache/Währung, Personen, Konten und Kategorien", async () => {
     rendere(<EinstellungenScreen />);
-    // Die Titel stehen auch eingeklappt da — genau dafür sind sie gedacht.
+    // Die Namen stehen in der Registerleiste, unabhängig davon, welches Register offen ist.
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Sprache|Währung|Person|Konten|Kategorien/i),
     );

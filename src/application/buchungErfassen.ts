@@ -45,17 +45,24 @@ export async function buchungErfassen(
 
 /**
  * Bearbeitet eine bestehende Ist-Buchung. Anders als buchungErfassen bleiben Identität und
- * Herkunft erhalten (id, quelle, rohHash, planRef, transfer/Gegenkonto) — nur Datum, Betrag,
- * Charakter, Kategorie und Notiz ändern sich. So lassen sich auch importierte Buchungen
- * korrigieren, ohne ihre Import-Spur zu verlieren.
+ * Herkunft erhalten (id, quelle, rohHash, planRef, transfer/Gegenkonto) — nur Konto, Datum,
+ * Betrag, Charakter, Kategorie und Notiz ändern sich. So lassen sich auch importierte
+ * Buchungen korrigieren, ohne ihre Import-Spur zu verlieren.
  */
 export async function buchungBearbeiten(
   ledger: LedgerPort,
   original: IstBuchung,
-  e: { datum: string; betrag: Cent; charakter: Charakter; kategorieId?: string; notiz?: string },
+  e: { datum: string; betrag: Cent; charakter: Charakter; kategorieId?: string; notiz?: string; kontoId?: string },
 ): Promise<IstBuchung> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
   if (!istCent(e.betrag) || e.betrag <= 0) throw new FachlicherFehler("betrag.groesserNull");
+  // Das Konto darf sich ändern — der Konto-Match des Imports ist eine Vermutung, und wer
+  // die Buchung vor sich hat, weiß es besser. NICHT bei einem Umbuchungs-Bein: dort hängt
+  // das Gegenkonto der anderen Seite daran, und ein einseitiger Wechsel würde die Paarung
+  // auf zwei verschiedene Aussagen auseinanderziehen.
+  if (e.kontoId && e.kontoId !== original.kontoId && original.transferId) {
+    throw new FachlicherFehler("konten.kontoWechselGepaart");
+  }
 
   // Die Herkunft beschreibt die KATEGORIE, nicht die Buchung: sie springt nur um, wenn
   // sich die Kategorie tatsächlich ändert. Wer nur die Notiz korrigiert, macht damit
@@ -70,6 +77,7 @@ export async function buchungBearbeiten(
 
   const aktualisiert: IstBuchung = {
     ...original,
+    kontoId: e.kontoId || original.kontoId,
     datum: e.datum,
     betrag: vorzeichenbehaftet(e.betrag, e.charakter),
     charakter: e.charakter,
