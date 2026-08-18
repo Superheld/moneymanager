@@ -48,7 +48,7 @@ async function grunddaten() {
 async function offeneZeile(id: string, over: { quelle?: "ki" | "manuell"; kategorieId?: string } = {}) {
   await umsatzRepo.speichern({
     id, laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-03-01",
-    betrag: -37500, waehrung: "EUR", gegenpartei: "[entfernt]",
+    betrag: -37500, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
     verwendungszweck: "Betreuung", rohHash: `h-${id}`, status: "neu",
     vorschlag: { kategorieId: over.kategorieId ?? "kat-so", charakter: "Aufwand", quelle: over.quelle ?? "ki" },
   });
@@ -74,12 +74,12 @@ describe("Festlegung aus der Import-Inbox", () => {
     await offeneZeile("u1");
     const nutzer = userEvent.setup();
     rendere(<ReviewScreen />);
-    await waitFor(() => expect(screen.getByText("[entfernt]")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Britta Musterfrau")).toBeInTheDocument());
 
     await korrigiere(nutzer, 0, "Kinderbetreuung");
 
     // Das Muster ist die normalisierte Form des Empfängers.
-    await waitFor(() => expect(document.body.textContent).toMatch(/jana stoka/));
+    await waitFor(() => expect(document.body.textContent).toMatch(/britta musterfrau/));
   });
 
   it("legt ohne Zustimmung NICHTS an", async () => {
@@ -88,10 +88,10 @@ describe("Festlegung aus der Import-Inbox", () => {
     await offeneZeile("u1");
     const nutzer = userEvent.setup();
     rendere(<ReviewScreen />);
-    await waitFor(() => expect(screen.getByText("[entfernt]")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Britta Musterfrau")).toBeInTheDocument());
 
     await korrigiere(nutzer, 0, "Kinderbetreuung");
-    await waitFor(() => expect(document.body.textContent).toMatch(/jana stoka/));
+    await waitFor(() => expect(document.body.textContent).toMatch(/britta musterfrau/));
 
     expect(await festlegungRepo.alle()).toHaveLength(0);
   });
@@ -101,16 +101,16 @@ describe("Festlegung aus der Import-Inbox", () => {
     await offeneZeile("u1");
     const nutzer = userEvent.setup();
     rendere(<ReviewScreen />);
-    await waitFor(() => expect(screen.getByText("[entfernt]")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("Britta Musterfrau")).toBeInTheDocument());
 
     await korrigiere(nutzer, 0, "Kinderbetreuung");
-    await waitFor(() => expect(document.body.textContent).toMatch(/jana stoka/));
+    await waitFor(() => expect(document.body.textContent).toMatch(/britta musterfrau/));
     await nutzer.click(screen.getByRole("button", { name: /immer so/i }));
 
     await waitFor(async () => {
       const alle = await festlegungRepo.alle();
       expect(alle).toHaveLength(1);
-      expect(alle[0]).toMatchObject({ muster: "jana stoka", kategorieId: "kat-kb" });
+      expect(alle[0]).toMatchObject({ muster: "britta musterfrau", kategorieId: "kat-kb" });
     });
   });
 
@@ -123,10 +123,10 @@ describe("Festlegung aus der Import-Inbox", () => {
     await offeneZeile("u3");
     const nutzer = userEvent.setup();
     rendere(<ReviewScreen />);
-    await waitFor(() => expect(screen.getAllByText("[entfernt]")).toHaveLength(3));
+    await waitFor(() => expect(screen.getAllByText("Britta Musterfrau")).toHaveLength(3));
 
     await korrigiere(nutzer, 0, "Kinderbetreuung");
-    await waitFor(() => expect(document.body.textContent).toMatch(/jana stoka/));
+    await waitFor(() => expect(document.body.textContent).toMatch(/britta musterfrau/));
     await nutzer.click(screen.getByRole("button", { name: /immer so/i }));
 
     await waitFor(async () => {
@@ -143,10 +143,10 @@ describe("Festlegung aus der Import-Inbox", () => {
     await offeneZeile("u2", { quelle: "manuell", kategorieId: "kat-so" });
     const nutzer = userEvent.setup();
     rendere(<ReviewScreen />);
-    await waitFor(() => expect(screen.getAllByText("[entfernt]")).toHaveLength(2));
+    await waitFor(() => expect(screen.getAllByText("Britta Musterfrau")).toHaveLength(2));
 
     await korrigiere(nutzer, 0, "Kinderbetreuung");
-    await waitFor(() => expect(document.body.textContent).toMatch(/jana stoka/));
+    await waitFor(() => expect(document.body.textContent).toMatch(/britta musterfrau/));
     await nutzer.click(screen.getByRole("button", { name: /immer so/i }));
 
     await waitFor(async () => expect(await festlegungRepo.alle()).toHaveLength(1));
@@ -156,10 +156,10 @@ describe("Festlegung aus der Import-Inbox", () => {
 
   it("setzt die Kategorie bei einer neuen Zeile ohne Umweg über das Modell", async () => {
     await grunddaten();
-    await festlegungRepo.speichern({ muster: "jana stoka", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
+    await festlegungRepo.speichern({ muster: "britta musterfrau", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
     await umsatzRepo.speichern({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-03-01",
-      betrag: -37500, waehrung: "EUR", gegenpartei: "[entfernt]",
+      betrag: -37500, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
       verwendungszweck: "Betreuung", rohHash: "h1", status: "neu",
       vorschlag: { kategorieId: "kat-kb", charakter: "Aufwand", quelle: "festlegung" },
     });
@@ -180,7 +180,7 @@ describe("Festlegung aus dem Buchungsdialog", () => {
     });
     await umsatzRepo.speichern({
       id: "u-b1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-03-01",
-      betrag: -37500, waehrung: "EUR", gegenpartei: "[entfernt]",
+      betrag: -37500, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
       verwendungszweck: "Betreuung", rohHash: "h-b1", status: "verbucht", istbuchungId: "b1",
     });
   }
@@ -220,7 +220,7 @@ describe("Festlegung aus dem Buchungsdialog", () => {
     await waitFor(async () => {
       const alle = await festlegungRepo.alle();
       expect(alle).toHaveLength(1);
-      expect(alle[0]).toMatchObject({ muster: "jana stoka", kategorieId: "kat-kb" });
+      expect(alle[0]).toMatchObject({ muster: "britta musterfrau", kategorieId: "kat-kb" });
     });
     // Die Buchung selbst trägt die neue Kategorie — beides gehört zusammen.
     expect((await ledgerRepo.alle()).find((b) => b.id === "b1")?.kategorieId).toBe("kat-kb");
@@ -246,23 +246,23 @@ describe("Festlegung aus dem Buchungsdialog", () => {
 describe("Festlegungen in den Einstellungen", () => {
   it("listet die Festlegung mit ihrer Kategorie", async () => {
     await grunddaten();
-    await festlegungRepo.speichern({ muster: "jana stoka", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
+    await festlegungRepo.speichern({ muster: "britta musterfrau", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
     await registerWaehlen(nutzer, /^Festlegungen$/);
 
-    await waitFor(() => expect(screen.getByText("jana stoka")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("britta musterfrau")).toBeInTheDocument());
     expect(screen.getAllByText("Kinderbetreuung").length).toBeGreaterThan(0);
   });
 
   it("hebt eine Festlegung wieder auf", async () => {
     // Ohne den Rückweg wäre sie eine Einbahnstraße, die auf jeden künftigen Import wirkt.
     await grunddaten();
-    await festlegungRepo.speichern({ muster: "jana stoka", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
+    await festlegungRepo.speichern({ muster: "britta musterfrau", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
     await registerWaehlen(nutzer, /^Festlegungen$/);
-    await waitFor(() => expect(screen.getByText("jana stoka")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("britta musterfrau")).toBeInTheDocument());
 
     await nutzer.click(screen.getByRole("button", { name: /aufheben/i }));
 
