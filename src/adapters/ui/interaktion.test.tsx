@@ -474,6 +474,57 @@ describe("Buchungsdetails", () => {
     });
   });
 
+  // Gesperrt ist die HERKUNFT, nicht das Konto. Vorher hing die Sperre am Konto: alles
+  // auf einem Konto mit Bankverbindung war tabu, also auch die Zeilen, die per Datei
+  // dorthin kamen — die kennt die Bank aber gar nicht, und ohne Löschweg blieb eine
+  // falsch importierte Zeile für immer im Saldo stehen.
+  it("sperrt das Löschen für Zeilen aus dem Bankabruf", async () => {
+    await zweiKonten();
+    await sqliteImportLaufRepository.speichern({
+      id: "l-bank", quelle: "fints", zeitpunkt: "2026-08-12T09:00:00.000Z",
+      eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -949, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Von der Bank",
+    });
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l-bank", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
+      waehrung: "EUR", gegenpartei: "Bank AG", verwendungszweck: "Abbuchung",
+      rohHash: "h-bank", nativeId: "fints-1", status: "verbucht", istbuchungId: "i1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+    expect(await screen.findByText(/Von der Bank geliefert/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^löschen$/i })).not.toBeInTheDocument();
+  });
+
+  it("lässt eine Zeile aus einem Dateiimport löschen, auch auf einem Bankkonto", async () => {
+    await zweiKonten();
+    await sqliteImportLaufRepository.speichern({
+      id: "l-datei", quelle: "finanzguru", zeitpunkt: "2026-08-12T09:00:00.000Z",
+      dateiname: "umsaetze.csv", eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -949, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Aus der Datei",
+    });
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l-datei", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
+      waehrung: "EUR", gegenpartei: "[anonymisiert]", verwendungszweck: "Einkauf",
+      rohHash: "h-datei", nativeId: "fg-1", status: "verbucht", istbuchungId: "i1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+    const loeschen = await screen.findAllByRole("button", { name: /^löschen$/i });
+    await nutzer.click(loeschen[loeschen.length - 1]);
+    await waitFor(async () => expect(await sqliteLedgerRepository.alle()).toHaveLength(0));
+  });
+
   it("sagt es, wenn eine Buchung gar keinen Import-Kontext hat", async () => {
     await zweiKonten();
     await sqliteLedgerRepository.speichern({

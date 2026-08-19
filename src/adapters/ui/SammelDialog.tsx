@@ -21,14 +21,15 @@ import { fehlerNachricht, useGeld } from "./einstellungenKontext";
 export function SammelDialog({
   buchungen,
   kategorien,
-  gesperrteKonten,
+  gesperrteIds,
   onClose,
   onGeaendert,
 }: {
   buchungen: IstBuchung[];
   kategorien: Kategorie[];
   /** Konten an einer Bankverbindung — dort wird nicht von Hand gelöscht. */
-  gesperrteKonten: ReadonlySet<string>;
+  /** IDs der Buchungen, die aus einem Bankabruf stammen — die werden nicht gelöscht. */
+  gesperrteIds: ReadonlySet<string>;
   onClose: () => void;
   onGeaendert: () => void | Promise<void>;
 }) {
@@ -43,7 +44,7 @@ export function SammelDialog({
   const [busy, setBusy] = useState(false);
 
   const summe = buchungen.reduce((s, b) => s + b.betrag, 0);
-  const gesperrt = buchungen.filter((b) => gesperrteKonten.has(b.kontoId)).length;
+  const gesperrt = buchungen.filter((b) => gesperrteIds.has(b.id)).length;
   const umbuchungen = buchungen.filter((b) => b.transferId).length;
 
   async function speichern() {
@@ -72,7 +73,7 @@ export function SammelDialog({
     setFehler(null);
     setBusy(true);
     try {
-      await buchungenLoeschen(ledgerRepo, buchungen, gesperrteKonten);
+      await buchungenLoeschen(ledgerRepo, buchungen, gesperrteIds);
       await onGeaendert();
       onClose();
     } catch (e) {
