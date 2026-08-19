@@ -233,6 +233,47 @@ describe("Budget-Umbau (v30/v31)", () => {
   });
 });
 
+describe("Verwaiste Umsätze (v33)", () => {
+  function umsatz(db: InstanceType<typeof SQL.Database>, id: string, istId: string | null) {
+    db.run(
+      `INSERT INTO umsatz (id, lauf_id, zahlungskonto_id, buchungstag, betrag, waehrung,
+         gegenpartei, verwendungszweck, roh_hash, status, istbuchung_id)
+       VALUES (?, 'l1', 'giro', '2026-08-11', -5700, 'EUR', 'Laden', 'Zweck', ?, 'verbucht', ?)`,
+      [id, `h-${id}`, istId],
+    );
+  }
+
+  it("legt weg, was auf eine gelöschte Buchung zeigt — und lässt den Rest in Ruhe", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 32);
+    db.run("INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle) VALUES ('b-da','2026-08-11',-5700,'giro','Aufwand','import')");
+    umsatz(db, "u-heil", "b-da");
+    umsatz(db, "u-verwaist", "b-weg");
+    umsatz(db, "u-ohne", null);
+
+    apply(db, 32, 33);
+
+    const zeilen = db.exec("SELECT id, status, istbuchung_id FROM umsatz ORDER BY id")[0].values;
+    expect(zeilen).toEqual([
+      ["u-heil", "verbucht", "b-da"],
+      ["u-ohne", "verworfen", null],
+      ["u-verwaist", "verworfen", null],
+    ]);
+    db.close();
+  });
+
+  it("ein zweiter Durchgang ändert nichts", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 32);
+    umsatz(db, "u-verwaist", "b-weg");
+    apply(db, 32, 33);
+    const vorher = db.exec("SELECT id, status FROM umsatz")[0].values;
+    apply(db, 32, 33);
+    expect(db.exec("SELECT id, status FROM umsatz")[0].values).toEqual(vorher);
+    db.close();
+  });
+});
+
 describe("Versionsschema", () => {
   it("hat streng aufsteigende, eindeutige Versionen", () => {
     const versionen = MIGRATIONS.map((m) => m.version);

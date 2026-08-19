@@ -94,6 +94,16 @@ describe("Dublettenmarkierung im Ledger", () => {
     expect(sicht.dublettenverdacht.size).toBe(0);
   });
 
+  it("schweigt, wenn die zweite Buchung gelöscht wurde", async () => {
+    // Der gemeldete Fall: das Duplikat war aus dem Ledger entfernt, der Umsatz stand aber
+    // weiter auf „verbucht" und zeigte auf eine Buchung, die es nicht mehr gibt. Im
+    // Ledger war nichts mehr doppelt — angemahnt wurde es trotzdem.
+    const sicht = await kontenLaden(
+      deps([buchung({ id: "b-datei" })], [AUS_DATEI, AUS_BANK]), // „b-bank" fehlt im Ledger
+    );
+    expect(sicht.dublettenverdacht.size).toBe(0);
+  });
+
   it("hängt den Befund an die Registerzeile", async () => {
     const sicht = await kontenLaden(
       deps([buchung({ id: "b-datei" }), buchung({ id: "b-bank" })], [AUS_DATEI, AUS_BANK]),
