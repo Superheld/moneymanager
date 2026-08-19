@@ -7,7 +7,7 @@
 // Code-Konstanten und werden NIE übersetzt/umgespeichert. Übersetzt wird nur ihr
 // Anzeige-Label über den `charakter`-Namespace — das ist die Enum-Label-Schicht.
 //
-// Das Glossar (Spartopf/Puffer/Deckung …) ist je Sprache redaktionelle Arbeit: die
+// Das Glossar ist je Sprache redaktionelle Arbeit: die
 // englischen Strings hier sind erste Entwürfe nach einer festen Begriffsliste — das
 // endgültige EN-Vokabular entscheidet das Produkt (offen in ADR-0004), nicht diese Datei.
 
@@ -1193,7 +1193,6 @@ const de = {
     einnahmen: "Einnahmen",
     ausgabenInklBudgets: "Ausgaben (inkl. Budgets)",
     planSaldo: "Plan-Saldo",
-    freieLiquiditaetMinusToepfe: "Freie Liquidität (− Aufbauend)",
   },
 };
 
@@ -2364,7 +2363,6 @@ const en: typeof de = {
     einnahmen: "Income",
     ausgabenInklBudgets: "Expenses (incl. budgets)",
     planSaldo: "Plan balance",
-    freieLiquiditaetMinusToepfe: "Available money (− building up)",
   },
 };
 
