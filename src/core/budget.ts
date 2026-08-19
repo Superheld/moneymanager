@@ -208,17 +208,48 @@ export function budgetVerbrauch(
   von: string,
   bis: string,
 ): Cent {
+  return budgetBuchungen(buchungen, kategorien, budget, alle, von, bis)
+    .reduce((s, p) => s + p.betrag, 0);
+}
+
+/** Ein Verbrauchsposten: welche Buchung mit welchem Teilbetrag auf das Budget zählt. */
+export interface Verbrauchsposten {
+  readonly buchung: IstBuchung;
+  /** Die Kategorie DES ANTEILS — bei geteilten Buchungen nicht die der Buchung. */
+  readonly kategorieId?: string;
+  /** Beitrag zum Verbrauch, POSITIV (eine Erstattung ist entsprechend negativ). */
+  readonly betrag: Cent;
+}
+
+/**
+ * Die einzelnen Buchungen (genauer: Anteile) hinter `budgetVerbrauch`.
+ *
+ * Es gibt sie, damit die Oberfläche „woraus besteht dieser Verbrauch?" beantworten kann,
+ * ohne die Auswahlregeln nachzubauen — `budgetVerbrauch` ist nur noch ihre Summe. Zwei
+ * Stellen mit derselben Regel wären zwei Stellen, an denen sie auseinanderlaufen kann.
+ */
+export function budgetBuchungen(
+  buchungen: readonly IstBuchung[],
+  kategorien: readonly Kategorie[],
+  budget: Budget,
+  alle: readonly Budget[],
+  von: string,
+  bis: string,
+): Verbrauchsposten[] {
   const relevant = budgetKategorien(budget, alle, kategorien);
-  return buchungen.reduce((s, b) => {
-    if (b.charakter !== "Aufwand") return s;
-    if (b.datum < von || b.datum >= bis) return s;
+  const raus: Verbrauchsposten[] = [];
+  for (const b of buchungen) {
+    if (b.charakter !== "Aufwand") continue;
+    if (b.datum < von || b.datum >= bis) continue;
     // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung (S-7) belastet
     // dieses Budget nur mit IHREM Teil, nicht mit dem vollen Betrag — und nicht gar nicht.
-    return kategorieAnteile(b).reduce(
-      (t, a) => (a.kategorieId && relevant.has(a.kategorieId) ? t - a.betrag : t),
-      s,
-    );
-  }, 0);
+    for (const a of kategorieAnteile(b)) {
+      if (a.kategorieId && relevant.has(a.kategorieId)) {
+        raus.push({ buchung: b, kategorieId: a.kategorieId, betrag: -a.betrag });
+      }
+    }
+  }
+  return raus.sort((x, y) => x.buchung.datum.localeCompare(y.buchung.datum));
 }
 
 /** Rahmen minus Verbrauch zum Monat von `am` — was noch da ist. Negativ = überzogen. */

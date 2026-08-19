@@ -88,10 +88,10 @@ describe("MonatsAusblick", () => {
   it("rechnet im laufenden Monat Plan und Gebuchtes nebeneinander auf", async () => {
     rendere(<MonatsAusblick {...props} />);
     const august = await karte("August 2026");
-    // Unter dem Strich steht im laufenden Monat das Gebuchte: −459,25 − 62,50 = −521,75.
-    // Geplant wären 2475,36 − 471,41 − 430,00 = +1573,95 — die Differenz steht darunter.
+    // Unter dem Strich steht BEIDES nebeneinander, jede Zahl in ihrer Spalte:
+    // gebucht −459,25 − 62,50 = −521,75, geplant 2475,36 − 471,41 − 430,00 = +1573,95.
     expect(within(august).getByText("−521,75 €")).toBeInTheDocument();
-    expect(within(august).getByText("−[Betrag] € gegenüber Plan")).toBeInTheDocument();
+    expect(within(august).getByText("+1.573,95 €")).toBeInTheDocument();
     // Die Zeilen selbst tragen weiterhin beide Spalten.
     expect(within(august).getByText("gebucht")).toBeInTheDocument();
     expect(within(august).getByText("−471,41")).toBeInTheDocument();
@@ -121,7 +121,8 @@ describe("MonatsAusblick", () => {
     const august = await karte("August 2026");
 
     expect(within(august).queryByText("Vermieter")).not.toBeInTheDocument();
-    await nutzer.click(within(august).getByText(/Verträge/));
+    // Exakt, nicht per Regex: die Fusszeile erklärt „Bleibt übrig" mit denselben Wörtern.
+    await nutzer.click(within(august).getByText("Verträge"));
 
     expect(within(august).getByText("Vermieter")).toBeInTheDocument();
     expect(within(august).getByText("04.")).toBeInTheDocument();
@@ -211,12 +212,35 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     rendere(<UebersichtScreen />);
 
     // Drei Karten, und die Miete steht als Vertragsposten drin (Regel korrekt gemappt).
-    await waitFor(() => expect(screen.getAllByText("Bleibt")).toHaveLength(3));
+    await waitFor(() => expect(screen.getAllByText("Bleibt übrig")).toHaveLength(3));
     expect(screen.getAllByText(/geplant/).length).toBeGreaterThan(0);
     const nutzer = userEvent.setup();
-    await nutzer.click(screen.getAllByText(/Verträge/)[0]);
+    await nutzer.click(screen.getAllByText("Verträge")[0]);
     expect(screen.getAllByText("Vermieter").length).toBeGreaterThan(0);
     // Das Inventar kommt über sein eigenes Repository — die Zeile steht in allen drei Karten.
     expect(screen.getAllByText("Rücklagen")).toHaveLength(3);
+  });
+
+  it("klappt ein Budget der Liste auf und zeigt seine Buchungen", async () => {
+    for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
+    for (const b of BUDGETS) await sqliteBudgetRepository.speichern(b);
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo: 0 });
+    const jetzt = new Date();
+    const monatsErster = `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, "0")}-01`;
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: monatsErster, betrag: -6250, kontoId: "giro",
+      kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "manuell", notiz: "Wocheneinkauf",
+    });
+
+    rendere(<UebersichtScreen />);
+    const nutzer = userEvent.setup();
+    // Die Budget-Liste unten trägt denselben Kategorienamen wie die aufgeklappte
+    // Budgets-Zeile der Karte — deshalb über das aria-label der Kopfzeile greifen.
+    const kopf = await screen.findByLabelText(/Lebenshaltung/);
+    expect(screen.queryByText("Wocheneinkauf")).not.toBeInTheDocument();
+
+    await nutzer.click(kopf);
+    expect(await screen.findByText("Wocheneinkauf")).toBeInTheDocument();
+    expect(screen.getByText("Verbraucht")).toBeInTheDocument();
   });
 });
