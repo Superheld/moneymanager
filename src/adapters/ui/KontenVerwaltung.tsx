@@ -23,9 +23,11 @@ import {
 import { kontoAnlegen } from "../../application/stammdatenAnlegen";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { IconButton } from "./IconButton";
 import { KontoAnlegenModal } from "./KontoAnlegenModal";
 import { Modal } from "./Modal";
 import { fehlerNachricht, useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
 /** Woran ein Konto hängt: welcher Zugang, welches Bankkonto, bis wann geholt. */
 export interface KontoVerbindung {
@@ -128,12 +130,12 @@ export function KontenVerwaltung({
             { key: "saldo", label: `${hatIst ? t("einstellungen.konto.spalteAnfangsbestand") : t("einstellungen.konto.spalteKontostand")} ${geld.symbol}`, align: "right", render: (k) => geld.format(k.saldo) },
             ...(hatIst
               ? [
-                  { key: "ist", label: `${t("einstellungen.konto.spalteIst")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
+                  { key: "ist", label: `${t("einstellungen.konto.spalteIst")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => (istSummeKonto(ist, k.id) ? <span style={{ color: geldFarbe(istSummeKonto(ist, k.id)) }}>{geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true })}</span> : "—") },
                   { key: "real", label: `${t("einstellungen.konto.spalteRealerStand")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
                 ]
               : []),
-            { key: "_e", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => bearbeiten(k)}>{t("einstellungen.bearbeiten")}</button> },
-            { key: "_x", label: "", align: "right", render: (k) => <button className="linkbtn" onClick={() => kontoRepo.loeschen(k.id).then(onChange)}>{t("einstellungen.loeschen")}</button> },
+            { key: "_e", label: "", align: "right", render: (k) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} /> },
+            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void kontoRepo.loeschen(k.id).then(onChange)} /> },
           ]}
           rows={konten}
         />

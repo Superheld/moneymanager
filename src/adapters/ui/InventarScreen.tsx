@@ -30,6 +30,7 @@ import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedge
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
+import { IconButton, IconLeiste } from "./IconButton";
 import { betont } from "./betonung";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
@@ -194,11 +195,13 @@ export function InventarScreen() {
                       {g.bezeichnung}
                       {!g.kontoId && <> <Pill variant="neutral">{t("inventar.pillNurRechnung")}</Pill></>}
                     </span>
-                    <span className="muted">
+                    <span className="muted" style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)" }}>
                       {t("inventar.ruecklage")} {geld.format(monatsRuecklage(g))} {geld.symbol}{t("inventar.proMonatSuffix")}
-                      {"  ·  "}<button className="linkbtn" onClick={() => ersetztOeffnen(g)}>{t("inventar.ersetzt")}</button>
-                      {"  ·  "}<button className="linkbtn" onClick={() => bearbeiten(g)}>{t("inventar.bearbeiten")}</button>
-                      {"  ·  "}<button className="linkbtn" onClick={() => inventarLoeschen(inventarRepo, g.id).then(laden)}>{t("inventar.loeschen")}</button>
+                      <IconLeiste>
+                        <IconButton icon="uebernehmen" label={t("inventar.ersetzt")} onClick={() => ersetztOeffnen(g)} />
+                        <IconButton icon="bearbeiten" label={t("inventar.bearbeiten")} onClick={() => bearbeiten(g)} />
+                        <IconButton icon="loeschen" ton="gefahr" label={t("inventar.loeschen")} onClick={() => void inventarLoeschen(inventarRepo, g.id).then(laden)} />
+                      </IconLeiste>
                     </span>
                   </div>
 

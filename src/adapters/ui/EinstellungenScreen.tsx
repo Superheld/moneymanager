@@ -20,6 +20,7 @@ import { standardkategorienAnlegen } from "../../application/standardkategorien"
 import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { IconButton } from "./IconButton";
 import { Bereich } from "./Bereich";
 import { FestlegungenCard } from "./FestlegungenCard";
 import { Modal } from "./Modal";
@@ -139,8 +140,8 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
             { key: "name", label: t("einstellungen.person.spalteName") },
             { key: "rolle", label: t("einstellungen.person.spalteRolle"), render: (p) => p.rolle ?? "—" },
             { key: "geburtsdatum", label: t("einstellungen.person.spalteGeburtsdatum"), render: (p) => p.geburtsdatum ?? "—" },
-            { key: "_e", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => bearbeiten(p)}>{t("einstellungen.bearbeiten")}</button> },
-            { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => personRepo.loeschen(p.id).then(onChange)}>{t("einstellungen.loeschen")}</button> },
+            { key: "_e", label: "", align: "right", render: (p) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(p)} /> },
+            { key: "_x", label: "", align: "right", render: (p) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void personRepo.loeschen(p.id).then(onChange)} /> },
           ]}
           rows={personen}
         />
@@ -213,8 +214,8 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
           {k.name} <Pill variant={CHARAKTER_PILL[k.defaultCharakter]}>{t(`charakter.${k.defaultCharakter}`)}</Pill>
         </span>
         <span style={{ display: "flex", gap: "var(--sp-3)" }}>
-          <button className="linkbtn" onClick={() => bearbeiten(k)}>{t("einstellungen.bearbeiten")}</button>
-          <button className="linkbtn" onClick={() => kategorieRepo.loeschen(k.id).then(onChange)}>{t("einstellungen.loeschen")}</button>
+          <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} />
+          <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void kategorieRepo.loeschen(k.id).then(onChange)} />
         </span>
       </div>
     );

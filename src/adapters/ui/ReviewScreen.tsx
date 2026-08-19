@@ -33,6 +33,7 @@ import { Button, Card, Pill } from "./ds";
 import { ABRUF_QUELLEN } from "./NeueBuchungen";
 import { CategoryPicker } from "./CategoryPicker";
 import { useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
 const SEITE_GROESSE = 100;
 
@@ -311,7 +312,7 @@ export function ReviewScreen() {
                     <div style={{ fontWeight: "var(--fw-bold)" }}>{u.gegenpartei}</div>
                     <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)" }}>{u.verwendungszweck.length > 50 ? u.verwendungszweck.slice(0, 50) + "…" : u.verwendungszweck}</div>
                   </td>
-                  <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{geld.format(u.betrag, { mitVorzeichen: true })}</td>
+                  <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(u.betrag) }}>{geld.format(u.betrag, { mitVorzeichen: true })}</td>
                   <td style={td}>
                     {u.vorschlag?.quelle === "umbuchung" ? (
                       <span style={{ color: "var(--ink-2)" }}>{t("review.umbuchung")}</span>

@@ -48,6 +48,7 @@ import { Button, Card, DataTable, KPIStat, Pill } from "./ds";
 import { Modal } from "./Modal";
 import type { DataColumn } from "./ds/DataTable";
 import { PageHead } from "./PageHead";
+import { IconButton } from "./IconButton";
 import {
   formularAusKandidat,
   formularAusVertrag,
@@ -376,18 +377,21 @@ export function VertraegeScreen() {
         label: "",
         align: "right",
         render: (v) => (
-          <button className="linkbtn" onClick={() => setRegelVon(v)}>{t("vertraege.regel.aktion")}</button>
+          <IconButton icon="regel" label={t("vertraege.regel.aktion")} onClick={() => setRegelVon(v)} />
         ),
       },
-      { key: "_e", label: "", align: "right", render: (v) => <button className="linkbtn" onClick={() => bearbeiten(v)}>{t("vertraege.bearbeiten")}</button> },
+      { key: "_e", label: "", align: "right", render: (v) => <IconButton icon="bearbeiten" label={t("vertraege.bearbeiten")} onClick={() => bearbeiten(v)} /> },
       {
         key: "_x",
         label: "",
         align: "right",
         render: (v) => (
-          <button className="linkbtn" onClick={() => vertragLoeschen(vertragRepo, regelRepo, v.id, zuordnungsDeps).then(laden)}>
-            {t("vertraege.loeschen")}
-          </button>
+          <IconButton
+            icon="loeschen"
+            ton="gefahr"
+            label={t("vertraege.loeschen")}
+            onClick={() => void vertragLoeschen(vertragRepo, regelRepo, v.id, zuordnungsDeps).then(laden)}
+          />
         ),
       },
     );
@@ -551,8 +555,8 @@ export function VertraegeScreen() {
       {vertraege.length > 0 && (
         <div className="kpis">
           <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(vertraege.length)} />
-          <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} />
-          <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} />
+          <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proMonat < 0 ? "warn" : "ok"} />
+          <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proJahr < 0 ? "warn" : "ok"} />
           {summe.ruecklage > 0 && (
             <KPIStat size="chip" label={t("vertraege.kpiRuecklage")} value={geld.format(summe.ruecklage)} unit={geld.symbol} meta={t("vertraege.kpiRuecklageMeta")} />
           )}
@@ -611,9 +615,7 @@ export function VertraegeScreen() {
                 align: "right",
                 sortable: false,
                 render: (k: Vertragskandidat) => (
-                  <button className="linkbtn" onClick={() => setBefund(k)}>
-                    {t("vertraege.erkennung.aktion")}
-                  </button>
+                  <IconButton icon="details" label={t("vertraege.erkennung.aktion")} onClick={() => setBefund(k)} />
                 ),
               },
               {
@@ -622,9 +624,7 @@ export function VertraegeScreen() {
                 align: "right",
                 sortable: false,
                 render: (k: Vertragskandidat) => (
-                  <button className="linkbtn" onClick={() => vorschlagUebernehmen(k)}>
-                    {t("vertraege.vorschlagUebernehmen")}
-                  </button>
+                  <IconButton icon="uebernehmen" label={t("vertraege.vorschlagUebernehmen")} onClick={() => vorschlagUebernehmen(k)} />
                 ),
               },
               {
@@ -633,9 +633,7 @@ export function VertraegeScreen() {
                 align: "right",
                 sortable: false,
                 render: (k: Vertragskandidat) => (
-                  <button className="linkbtn" onClick={() => vorschlagVerwerfen(k)}>
-                    {t("vertraege.vorschlagVerwerfen")}
-                  </button>
+                  <IconButton icon="verwerfen" label={t("vertraege.vorschlagVerwerfen")} onClick={() => vorschlagVerwerfen(k)} />
                 ),
               },
             ]}
