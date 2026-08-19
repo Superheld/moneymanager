@@ -3,7 +3,7 @@
 //
 // Zwei Ebenen: die Karten selbst gegen übergebene Daten (dort ist `heute` festgenagelt,
 // damit die Tests nicht mit der Uhr wandern), und einmal der ganze Weg über den
-// HistorieScreen gegen eine echte In-Memory-SQLite — der prüft die Verdrahtung
+// UebersichtScreen gegen eine echte In-Memory-SQLite — der prüft die Verdrahtung
 // (Repositories, Spalten-Mapping), nicht die Rechnung.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,7 +19,7 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { MonatsAusblick } from "./MonatsAusblick";
-import { HistorieScreen } from "./HistorieScreen";
+import { UebersichtScreen } from "./UebersichtScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
@@ -207,7 +207,8 @@ describe("Übersicht — Ausblick am echten Schema", () => {
       kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "manuell",
     });
 
-    rendere(<HistorieScreen />);
+    // Der Ausblick sitzt seit 2026-08-19 auf der Übersicht, nicht mehr im Rückblick.
+    rendere(<UebersichtScreen />);
 
     // Drei Karten, und die Miete steht als Vertragsposten drin (Regel korrekt gemappt).
     await waitFor(() => expect(screen.getAllByText("Bleibt")).toHaveLength(3));

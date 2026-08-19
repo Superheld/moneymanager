@@ -7,7 +7,8 @@ import { useTranslation } from "react-i18next";
 import { APP_STADIUM, APP_VERSION } from "../../version";
 
 export type ScreenId =
-  | "historie"
+  | "uebersicht"
+  | "analyse"
   | "konten"
   | "inventar"
   | "budgets"
@@ -31,12 +32,15 @@ const GRUPPEN: NavGroup[] = [
   {
     titelKey: "shell.gruppeUeberblick",
     eintraege: [
-      // „Übersicht" ist die Historie: was tatsächlich war, plus der Monatsausblick.
+      // Getrennt seit 2026-08-19: „Übersicht" zeigt, was JETZT gilt (drei Monatskarten
+      // plus die Budgets des laufenden Monats), „Analyse" wertet Zeiträume aus. Vorher
+      // war beides ein Screen, und die Kategorien standen ganz unten.
       // Der frühere Bereich „Planung" (Jahresprojektion, Szenarien) und „Deckung" sind
       // 2026-08-16 entfallen — sie kommen wieder, dann aber anders geschnitten.
-      { id: "historie", labelKey: "shell.navUebersicht" },
+      { id: "uebersicht", labelKey: "shell.navUebersicht" },
       { id: "konten", labelKey: "shell.navKonten" },
       { id: "budgets", labelKey: "shell.navBudgets" },
+      { id: "analyse", labelKey: "shell.navAnalyse" },
       { id: "inventar", labelKey: "shell.navInventar" },
       { id: "vertraege", labelKey: "shell.navVertraege" },
     ],

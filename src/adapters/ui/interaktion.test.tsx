@@ -66,7 +66,7 @@ describe("AppShell", () => {
     const nutzer = userEvent.setup();
     const gewechseltZu: string[] = [];
     rendere(
-      <AppShell current="historie" onNavigate={(id) => gewechseltZu.push(id)}>
+      <AppShell current="uebersicht" onNavigate={(id) => gewechseltZu.push(id)}>
         <div>Inhalt</div>
       </AppShell>,
     );
