@@ -29,6 +29,10 @@ const de = {
   // Fehler-Codes (FachlicherFehler.code) → Text. Verschachtelt, weil i18next Punkte als
   // Pfadtrenner liest: code "betrag.groesserNull" → fehler.betrag.groesserNull.
   fehler: {
+    dublette: {
+      unvollstaendig: "Zum Festhalten braucht es beide Zeilen.",
+      selbst: "Eine Zeile kann nicht ihr eigener Zwilling sein.",
+    },
     kategorie: {
       waehlen: "Bitte eine Kategorie wählen.",
       zyklus: "Diese Elternkategorie würde einen Zyklus erzeugen.",
@@ -776,6 +780,11 @@ const de = {
       oeffnen: "Gegenstück öffnen",
       hinweis:
         "Geprüft wird gegen alles auf diesem Konto — auch gegen Verworfenes. Beide Zeilen bleiben stehen, bis du eine davon löschst.",
+      hinweisLedger:
+        "Beide Zeilen stehen im Saldo. Sie bleiben, bis du eine davon löschst — oder hier festhältst, dass es zwei verschiedene Zahlungen sind.",
+      keinDuplikat: "Kein Duplikat — nicht mehr melden",
+      freigegeben: "Als „kein Duplikat“ festgehalten.",
+      freigabeAufheben: "wieder prüfen",
     },
     quelleName: {
       import: "Bankimport",
@@ -1216,6 +1225,10 @@ const en: typeof de = {
     Umschichtung: "Savings & provision",
   },
   fehler: {
+    dublette: {
+      unvollstaendig: "Both entries are needed to record this.",
+      selbst: "An entry cannot be its own twin.",
+    },
     kategorie: {
       waehlen: "Please select a category.",
       zyklus: "This parent category would create a cycle.",
@@ -1960,6 +1973,11 @@ const en: typeof de = {
       oeffnen: "Open the counterpart",
       hinweis:
         "Checked against everything on this account, discarded rows included. Both entries stay until you delete one of them.",
+      hinweisLedger:
+        "Both entries count towards the balance. They stay until you delete one of them \u2014 or record here that these are two different payments.",
+      keinDuplikat: "Not a duplicate \u2014 stop flagging",
+      freigegeben: "Recorded as \u201cnot a duplicate\u201d.",
+      freigabeAufheben: "check again",
     },
     quelleName: {
       import: "bank import",

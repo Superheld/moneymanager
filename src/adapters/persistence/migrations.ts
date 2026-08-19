@@ -638,4 +638,26 @@ export const MIGRATIONS: Migration[] = [
                OR istbuchung_id NOT IN (SELECT id FROM ist_buchung))`,
     ],
   },
+  {
+    version: 34, // „Kein Duplikat" — die Entscheidung von Hand braucht einen Platz
+    sql: [
+      // Die Dublettenprüfung läuft bei JEDEM Hinsehen neu. Ohne diese Tabelle käme
+      // dieselbe Fehleinschätzung nach jedem Neuladen wieder, und die einzige Abhilfe
+      // wäre, eine der beiden richtigen Buchungen zu löschen.
+      //
+      // Gespeichert wird das PAAR, nicht die Buchung: dass A nicht dasselbe ist wie B,
+      // sagt nichts darüber, ob A dasselbe ist wie C. Die beiden Spalten sind aufsteigend
+      // sortiert, damit der Primärschlüssel in beide Richtungen greift — sortiert wird im
+      // Use-Case, die Datenbank kann das nicht erzwingen.
+      //
+      // Kein FOREIGN KEY: verschwindet ein Umsatz, steht hier eine Zeile ohne Wirkung,
+      // und die ist harmloser als ein Löschweg, der an einer Freigabe scheitert.
+      `CREATE TABLE IF NOT EXISTS dubletten_freigabe (
+         umsatz_a TEXT NOT NULL,
+         umsatz_b TEXT NOT NULL,
+         angelegt TEXT NOT NULL,
+         PRIMARY KEY (umsatz_a, umsatz_b)
+       )`,
+    ],
+  },
 ];

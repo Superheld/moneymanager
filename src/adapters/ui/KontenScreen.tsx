@@ -39,6 +39,7 @@ import { geldFarbe } from "./geldFarbe";
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
 const LEERE_IDS: ReadonlySet<string> = new Set();
+const LEERE_PAARE: ReadonlySet<string> = new Set();
 
 const TAGE_OPTIONEN = [14, 30, 60, 90];
 const ART_OPTS = [
@@ -176,6 +177,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     [register],
   );
 
+  // Ist der letzte Verdacht erledigt, verschwindet der Filterknopf — der Filter selbst
+  // blieb bisher an und liess eine leere Tabelle zurück, ohne dass noch etwas dastand,
+  // womit man ihn wieder ausschaltet. Der Erfolg sah aus wie ein Datenverlust.
+  useEffect(() => {
+    if (dublettenAnzahl === 0) setNurDubletten(false);
+  }, [dublettenAnzahl]);
+
   // Standardansicht: neueste zuerst (Tabelle sortiert/paginiert intern weiter).
   const gebuchtFuerTabelle = useMemo(() => [...gebuchtGefiltert].reverse(), [gebuchtGefiltert]);
 
@@ -291,6 +299,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {aktivId && (
         <NeueBuchungen
           zeilen={neueAbrufe.filter((u) => u.zahlungskontoId === aktivId)}
+          freigegeben={sicht?.freigegeben ?? LEERE_PAARE}
           // Verglichen wird gegen alles, was auf diesem Konto schon liegt — verbucht,
           // offen ODER verworfen, nur nicht gegen die neuen Zeilen selbst.
           bestand={umsaetze.filter(

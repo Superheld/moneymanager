@@ -45,7 +45,8 @@ function indexExistiert(db: Database, name: string): boolean {
 
 const ERWARTETE_TABELLEN = [
   "bankkonto_zuordnung", "bankzugang", // v26 — Bankzugang für den FinTS-Direktabruf
-  "budget", "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
+  "budget", "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
+  "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
   "ist_buchung_aufteilung", "kategorie", "kategorie_festlegung", "klassifikator_modell",
   "merkmal_ausschluss",
   "person",

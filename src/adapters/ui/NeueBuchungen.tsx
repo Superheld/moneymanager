@@ -25,15 +25,13 @@
 
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { Kategorie, Zahlungskonto } from "../../application";
+import { stapelVerdacht, type Dublettenverdacht, type Kategorie, type Zahlungskonto } from "../../application";
 import { umsaetzeBuchen, umsatzSpeichern } from "../dienste";
 import {
   alsDuplikat,
   gegenbeinFuer,
-  ordneZu,
   verwerfen,
   zurueckholen,
-  type Bewertung,
   type Umsatz,
 } from "../../application/import";
 import { CategoryPicker } from "./CategoryPicker";
@@ -44,6 +42,7 @@ export function NeueBuchungen({
   zeilen,
   weggelegte,
   bestand,
+  freigegeben,
   alleNeuen,
   konten,
   kategorien,
@@ -62,6 +61,8 @@ export function NeueBuchungen({
   weggelegte: readonly Umsatz[];
   /** Alle übrigen Umsätze des Kontos — Grundlage der Dublettenprüfung in der Anzeige. */
   bestand: readonly Umsatz[];
+  /** Die von Hand freigegebenen Paare — was hier steht, wird nicht mehr angemahnt. */
+  freigegeben: ReadonlySet<string>;
   /**
    * ALLE offenen Abrufbuchungen, auch die anderer Konten. Ohne sie wäre eine Umbuchung
    * nicht als solche zu bestätigen: ihr Gegenbein liegt per Definition auf dem anderen
@@ -98,13 +99,11 @@ export function NeueBuchungen({
   //
   // Verworfene Zeilen bleiben im Bestand und zählen mit: „das habe ich schon einmal
   // weggeworfen" ist genau die Auskunft, die man hier braucht.
-  const geprueft = new Map<string, { bewertung: Bewertung; zwilling?: Umsatz }>();
+  //
+  // Gerechnet wird in `stapelVerdacht` — dieselbe Regel wie im Dialog, nur über den
+  // ganzen Stapel statt über eine Zeile.
   const neuSortiert = [...zeilen].sort((a, b) => b.buchungstag.localeCompare(a.buchungstag));
-  ordneZu(neuSortiert, bestand).forEach((t, i) => {
-    if (t.bewertung.urteil !== "verschieden") {
-      geprueft.set(neuSortiert[i].id, { bewertung: t.bewertung, zwilling: t.bestand });
-    }
-  });
+  const geprueft = stapelVerdacht(neuSortiert, bestand, freigegeben);
 
   // Dieselbe Prüfung für die weggelegten Zeilen — sie ist dort sogar die WICHTIGERE
   // Auskunft: ob eine Zeile zu Recht weggelegt wurde, entscheidet sich daran, ob es ihr
@@ -113,13 +112,12 @@ export function NeueBuchungen({
   // weggelegte Zeilen einander für vorhanden, und beide fehlten trotzdem.
   const weggelegteIds = new Set(weggelegte.map((u) => u.id));
   const bestandOhneWeggelegte = bestand.filter((u) => !weggelegteIds.has(u.id));
-  const geprueftWeggelegt = new Map<string, { bewertung: Bewertung; zwilling?: Umsatz }>();
   const weggelegtSortiert = [...weggelegte].sort((a, b) => b.buchungstag.localeCompare(a.buchungstag));
-  ordneZu(weggelegtSortiert, bestandOhneWeggelegte).forEach((t, i) => {
-    if (t.bewertung.urteil !== "verschieden") {
-      geprueftWeggelegt.set(weggelegtSortiert[i].id, { bewertung: t.bewertung, zwilling: t.bestand });
-    }
-  });
+  const geprueftWeggelegt = stapelVerdacht(weggelegtSortiert, bestandOhneWeggelegte, freigegeben);
+
+  /** Was die Zeile anzeigt: der Befund und die Zeile, die er meint (nur die ID steht drin). */
+  const befund = (v?: Dublettenverdacht) =>
+    v ? { befund: v, zwilling: bestand.find((u) => u.id === v.zwillingUmsatzId) } : undefined;
 
   /**
    * Zu jeder als Umbuchung markierten Zeile das Gegenbein dazunehmen — auch wenn es auf
@@ -234,7 +232,7 @@ export function NeueBuchungen({
         <Zeile
           key={u.id}
           u={u}
-          verdacht={geprueft.get(u.id)}
+          verdacht={befund(geprueft.get(u.id))}
           kategorieName={kategorieName}
           kontoName={kontoName}
           gegenbein={
@@ -305,7 +303,7 @@ export function NeueBuchungen({
                 <Zeile
                   key={u.id}
                   u={u}
-                  verdacht={geprueftWeggelegt.get(u.id)}
+                  verdacht={befund(geprueftWeggelegt.get(u.id))}
                   kategorieName={kategorieName}
                   kontoName={kontoName}
                   status={t(`konten.neue.weggelegtStatus.${u.status}`)}
@@ -343,7 +341,7 @@ export function NeueBuchungen({
  */
 function Zeile({ u, verdacht, kategorieName, kontoName, gegenbein, status, aktionen, nachtrag, hinweis }: {
   u: Umsatz;
-  verdacht?: { bewertung: Bewertung; zwilling?: Umsatz };
+  verdacht?: { befund: Dublettenverdacht; zwilling?: Umsatz };
   kategorieName: Map<string, string>;
   kontoName: Map<string, string>;
   /** Das gefundene Gegenbein, wenn die Zeile als Umbuchung markiert ist. */
@@ -410,12 +408,12 @@ function Zeile({ u, verdacht, kategorieName, kontoName, gegenbein, status, aktio
       {verdacht && (
         <div style={{ marginTop: "var(--sp-2)" }}>
           <Pill variant="warn">
-            {verdacht.bewertung.urteil === "identisch"
+            {verdacht.befund.urteil === "identisch"
               ? t("konten.neue.dubletteSicher")
               : t("konten.neue.dublette")}
           </Pill>{" "}
           <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-            {t("konten.neue.dubletteHinweis", { gruende: verdacht.bewertung.gruende.join(", ") })}
+            {t("konten.neue.dubletteHinweis", { gruende: verdacht.befund.gruende.join(", ") })}
             {verdacht.zwilling &&
               ` — ${verdacht.zwilling.buchungstag} ${verdacht.zwilling.gegenpartei} (${t(
                 `konten.neue.status.${verdacht.zwilling.status}`,

@@ -43,13 +43,16 @@ import {
 import {
   alsDuplikat,
   passtAlsGegenbein,
-  ordneZu,
   verwerfen,
   zuruecksetzen,
-  type Bewertung,
   type ImportLauf,
   type Umsatz,
 } from "../../application/import";
+import {
+  entwurfVerdacht,
+  type Dublettenfreigabe,
+  type Dublettenverdacht,
+} from "../../application";
 import { offenerRest } from "../../application/buchungSplitten";
 import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../application/umbuchungAusBuchung";
 import {
@@ -59,6 +62,8 @@ import {
   buchungenPaaren,
   buchungSplitten,
   buchungsdetail,
+  dublettenFreigabeAufheben,
+  dublettenFreigeben,
   festlegungSpeichern,
   gegenbeinErzeugen,
   paarungLoesen,
@@ -185,9 +190,13 @@ function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
   );
 }
 
+/** Stabile Leerwerte — als Literal im useState-Aufruf wäre jeder Render ein neues Objekt. */
+const LEERE_KARTE: ReadonlyMap<string, Dublettenverdacht> = new Map();
+const LEERE_MENGE: ReadonlySet<string> = new Set();
+
 /** Was die Dublettenprüfung zu dieser Buchung sagt — samt der Zeile, die sie meint. */
 export interface Dublettenbefund {
-  readonly bewertung: Bewertung;
+  readonly verdacht: Dublettenverdacht;
   readonly zwilling: Umsatz;
 }
 
@@ -200,14 +209,27 @@ export interface Dublettenbefund {
  * später aus einer anderen Quelle dazukam, würde nie nachträglich angeschrieben.
  *
  * Er entscheidet nichts. Die Gründe stehen im Klartext da, das Gegenstück ist einen Klick
- * entfernt — beides zusammen ist die Auskunft, die man braucht, um selbst zu entscheiden,
- * welche der beiden Zeilen bleibt.
+ * entfernt, und „ist kein Duplikat" ist die dritte Antwort neben „eine davon löschen" und
+ * „stehen lassen": der Finder rechnet mit Punkten und liegt manchmal daneben. Ohne diesen
+ * Knopf stünde die Mahnung nach jedem Neuladen wieder da, denn geprüft wird bei jedem
+ * Hinsehen neu.
  */
-function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund; onZwillingOeffnen?: () => void }) {
+function DublettenBlock({
+  befund,
+  imLedger,
+  onZwillingOeffnen,
+  onKeinDuplikat,
+}: {
+  befund: Dublettenbefund;
+  /** Gebuchte Zeile (beide stehen im Saldo) oder noch ein Entwurf? Der Hinweis unterscheidet sich. */
+  imLedger: boolean;
+  onZwillingOeffnen?: () => void;
+  onKeinDuplikat?: () => void | Promise<void>;
+}) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const { bewertung, zwilling } = befund;
-  const sicher = bewertung.urteil === "identisch";
+  const { verdacht, zwilling } = befund;
+  const sicher = verdacht.urteil === "identisch";
 
   return (
     <div style={{ marginBottom: "var(--sp-4)", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--warn-wash, var(--surface-2))", border: "1px solid var(--warn, var(--line))" }}>
@@ -225,9 +247,39 @@ function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund
         )}
       </div>
       <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-        {t("konten.neue.dubletteHinweis", { gruende: bewertung.gruende.join(", ") })}
+        {t("konten.neue.dubletteHinweis", { gruende: verdacht.gruende.join(", ") })}
       </div>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>{t("konten.dublette.hinweis")}</div>
+      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+        {t(imLedger ? "konten.dublette.hinweisLedger" : "konten.dublette.hinweis")}
+      </div>
+      {onKeinDuplikat && (
+        <button
+          className="linkbtn"
+          style={{ marginTop: 6, padding: 0 }}
+          onClick={() => void onKeinDuplikat()}
+        >
+          {t("konten.dublette.keinDuplikat")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Die Gegenprobe: hier wurde einmal entschieden, dass es KEIN Duplikat ist.
+ *
+ * Ohne diese Zeile wäre die Entscheidung unsichtbar und unumkehrbar — die Markierung
+ * bliebe weg, und niemand wüsste warum. Wer sich vertan hat, hätte zwei Zeilen im Saldo
+ * und nichts, was darauf zeigt.
+ */
+function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void> }) {
+  const { t } = useTranslation();
+  return (
+    <div className="muted" style={{ marginBottom: "var(--sp-4)", fontSize: "var(--fs-xs)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <span>{t("konten.dublette.freigegeben")}</span>
+      <button className="linkbtn" style={{ padding: 0 }} onClick={() => void onAufheben()}>
+        {t("konten.dublette.freigabeAufheben")}
+      </button>
     </div>
   );
 }
@@ -263,7 +315,7 @@ function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund
  *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
  *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onClose, onSaved, onDelete, loeschenGesperrt, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; loeschenGesperrt?: boolean; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, loeschenGesperrt, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; loeschenGesperrt?: boolean; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const istEntwurf = !!entwurf;
@@ -538,7 +590,16 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
       {/* Ganz oben, noch vor den Feldern: die Frage, ob es diese Buchung schon gibt. Sie
           geht allem voraus — an einer Zeile, die gar nicht bleiben soll, lohnt sich keine
           Korrektur. */}
-      {dublette && <DublettenBlock befund={dublette} onZwillingOeffnen={onZwillingOeffnen} />}
+      {dublette ? (
+        <DublettenBlock
+          befund={dublette}
+          imLedger={!entwurf}
+          onZwillingOeffnen={onZwillingOeffnen}
+          onKeinDuplikat={onKeinDuplikat}
+        />
+      ) : (
+        onFreigabeAufheben && <FreigabeHinweis onAufheben={onFreigabeAufheben} />
+      )}
 
       <div className="form-grid">
         {/* Das Konto ist änderbar (außer bei einer Paarung): bei importierten Buchungen ist
@@ -1129,12 +1190,16 @@ export function BuchungDetail(props: {
   const [alle, setAlle] = useState<IstBuchung[]>([]);
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
+  const [dublettenverdacht, setDublettenverdacht] = useState<ReadonlyMap<string, Dublettenverdacht>>(LEERE_KARTE);
+  const [freigegeben, setFreigegeben] = useState<ReadonlySet<string>>(LEERE_MENGE);
+  const [freigaben, setFreigaben] = useState<readonly Dublettenfreigabe[]>([]);
 
   async function laden() {
     const d = await buchungsdetail();
     setKonten([...d.konten]); setKategorien([...d.kategorien]); setRegeln([...d.regeln]);
     setUmsaetze([...d.umsaetze]); setLaeufe([...d.laeufe]); setAlle([...d.buchungen]);
     setVertraege([...d.vertraege]); setZuordnungen([...d.zuordnungen]);
+    setDublettenverdacht(d.dublettenverdacht); setFreigegeben(d.freigegeben); setFreigaben(d.freigaben);
     // Die gezeigte Buchung aus dem frischen Stand nachziehen (nach dem Speichern).
     setAktuelle((b) => (b ? d.buchungen.find((x) => x.id === b.id) ?? b : undefined));
   }
@@ -1160,22 +1225,42 @@ export function BuchungDetail(props: {
   /**
    * Ist das hier womöglich schon einmal gebucht worden?
    *
-   * Verglichen wird gegen alles, was auf DEMSELBEN Konto liegt — verbucht, offen oder
-   * verworfen. Der Finder kostet praktisch nichts (gemessen: 60 gegen 5279 Zeilen in
-   * 2 ms), hier ist es eine Zeile gegen den Kontobestand.
+   * Die Antwort kommt aus der Anwendungsschicht und ist DIESELBE wie im Kontoauszug —
+   * bis 2026-08-20 rechnete der Dialog sie sich hier selbst, gegen einen anderen Bestand,
+   * und mahnte deshalb Zwillinge an, die längst gelöscht waren.
    *
-   * Nur für importierte Buchungen: eine von Hand erfasste hat weder Empfänger noch
-   * Verwendungszweck, und ohne die bliebe vom Vergleich nur „gleicher Betrag am gleichen
-   * Tag" übrig — zu wenig für eine Aussage, aber genug für ständigen Fehlalarm.
+   * Zwei Fragen, zwei Wege (beide in `dublettensicht`): eine gebuchte Zeile fragt „steht
+   * das zweimal im Saldo?" — das ist die fertige Karte aus `buchungsdetail()`. Ein
+   * Entwurf fragt „ist das schon bekannt?" und zählt auch Verworfenes mit; das hängt an
+   * genau dieser Zeile und wird deshalb hier gerechnet.
    */
-  const dublette = useMemo(() => {
-    const geprueft = aktuellerEntwurf ?? umsatz;
-    if (!geprueft) return undefined;
-    const bestand = umsaetze.filter((u) => u.id !== geprueft.id && u.zahlungskontoId === geprueft.zahlungskontoId);
-    const [treffer] = ordneZu([geprueft], bestand);
-    if (!treffer?.bestand || treffer.bewertung.urteil === "verschieden") return undefined;
-    return { bewertung: treffer.bewertung, zwilling: treffer.bestand };
-  }, [aktuellerEntwurf, umsatz, umsaetze]);
+  const dublette = useMemo((): Dublettenbefund | undefined => {
+    if (aktuellerEntwurf) {
+      const verdacht = entwurfVerdacht(aktuellerEntwurf, umsaetze, freigegeben);
+      const zwilling = verdacht && umsaetze.find((u) => u.id === verdacht.zwillingUmsatzId);
+      return verdacht && zwilling ? { verdacht, zwilling } : undefined;
+    }
+    if (!aktuelle) return undefined;
+    const verdacht = dublettenverdacht.get(aktuelle.id);
+    const zwilling = verdacht && umsaetze.find((u) => u.id === verdacht.zwillingUmsatzId);
+    return verdacht && zwilling ? { verdacht, zwilling } : undefined;
+  }, [aktuellerEntwurf, aktuelle, umsaetze, dublettenverdacht, freigegeben]);
+
+  /**
+   * Der eigene Umsatz — die Freigabe wird zwischen zwei Umsätzen festgehalten, nicht
+   * zwischen zwei Buchungen: geprüft wird über die Umsätze, und ein Entwurf hat noch gar
+   * keine Buchung.
+   */
+  const eigenerUmsatz = aktuellerEntwurf ?? umsatz;
+
+  /** Eine bestehende Freigabe zu DIESER Zeile — sichtbar, damit sie umkehrbar bleibt. */
+  const freigabeHier = useMemo(
+    () =>
+      eigenerUmsatz
+        ? freigaben.find((f) => f.umsatzA === eigenerUmsatz.id || f.umsatzB === eigenerUmsatz.id)
+        : undefined,
+    [freigaben, eigenerUmsatz],
+  );
 
   /**
    * Gehört die Zahlung zu einem Vertrag? Jetzt aus der gespeicherten ZUORDNUNG, nicht
@@ -1288,6 +1373,25 @@ export function BuchungDetail(props: {
       gegenbuchung={gegenbuchung}
       dublette={dublette}
       onZwillingOeffnen={zwillingBuchung ? () => setAktuelle(zwillingBuchung) : undefined}
+      onKeinDuplikat={
+        dublette && eigenerUmsatz
+          ? async () => {
+              await dublettenFreigeben(eigenerUmsatz.id, dublette.zwilling.id);
+              // Nicht nur der Dialog: die Markierung steht auch im Auszug, und der Filter
+              // „könnten doppelt sein" zählt sie. Wer hier entscheidet, schliesst danach
+              // oft mit Abbrechen — ohne diesen Weg bliebe die Markierung dort stehen.
+              await nachAenderung();
+            }
+          : undefined
+      }
+      onFreigabeAufheben={
+        freigabeHier
+          ? async () => {
+              await dublettenFreigabeAufheben(freigabeHier.umsatzA, freigabeHier.umsatzB);
+              await nachAenderung();
+            }
+          : undefined
+      }
       onClose={onClose}
       onSaved={async () => { await nachAenderung(); onClose(); }}
       onDelete={entfernen}

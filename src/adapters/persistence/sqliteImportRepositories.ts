@@ -3,7 +3,12 @@
 // flach abgelegten Kategorie-Vorschlag.
 
 import type { Charakter } from "../../core";
-import type { ImportLaufRepository, UmsatzRepository } from "../../application/ports";
+import type {
+  DublettenfreigabeRepository,
+  ImportLaufRepository,
+  UmsatzRepository,
+} from "../../application/ports";
+import type { Dublettenfreigabe } from "../../application/dublettensicht";
 import type { ImportLauf, Umsatz, UmsatzStatus, VorschlagQuelle } from "../../application/import";
 import { getDb } from "./db";
 
@@ -209,5 +214,39 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
       nativeIds: n.map((r) => r.native_id),
       hashesOhneId: o.map((r) => r.roh_hash),
     };
+  },
+};
+
+/**
+ * Die von Hand gesetzten „ist kein Duplikat"-Entscheidungen.
+ *
+ * Sortiert wird im Use-Case (`freigabeAus`), nicht hier — die Tabelle kann die Ordnung
+ * nicht erzwingen, und ein zweites Sortieren an dieser Stelle täuschte eine Sicherheit
+ * vor, die es nicht gibt. Gelöscht wird dafür in BEIDE Richtungen: ein Aufrufer, der die
+ * IDs andersherum hält, soll nicht ins Leere greifen.
+ */
+export const sqliteDublettenfreigabeRepository: DublettenfreigabeRepository = {
+  async alle() {
+    const db = await getDb();
+    const zeilen = await db.select<{ umsatz_a: string; umsatz_b: string; angelegt: string }[]>(
+      "SELECT umsatz_a, umsatz_b, angelegt FROM dubletten_freigabe",
+    );
+    return zeilen.map((z) => ({ umsatzA: z.umsatz_a, umsatzB: z.umsatz_b, angelegt: z.angelegt }));
+  },
+  async speichern(f: Dublettenfreigabe) {
+    const db = await getDb();
+    await db.execute(
+      `INSERT INTO dubletten_freigabe (umsatz_a, umsatz_b, angelegt) VALUES ($1, $2, $3)
+       ON CONFLICT(umsatz_a, umsatz_b) DO UPDATE SET angelegt = excluded.angelegt`,
+      [f.umsatzA, f.umsatzB, f.angelegt],
+    );
+  },
+  async entfernen(umsatzA: string, umsatzB: string) {
+    const db = await getDb();
+    await db.execute(
+      `DELETE FROM dubletten_freigabe
+        WHERE (umsatz_a = $1 AND umsatz_b = $2) OR (umsatz_a = $2 AND umsatz_b = $1)`,
+      [umsatzA, umsatzB],
+    );
   },
 };
