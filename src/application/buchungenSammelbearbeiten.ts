@@ -86,20 +86,24 @@ export async function buchungenSammelbearbeiten(
 }
 
 /**
- * Löscht mehrere Buchungen. `gesperrteKonten` sind Konten, die an einer Bankverbindung
- * hängen: was die Bank geliefert hat, wird nicht von Hand entfernt — beim nächsten Abruf
+ * Löscht mehrere Buchungen. `gesperrteIds` sind die Buchungen, die aus einem BANKABRUF
+ * stammen: was die Bank geliefert hat, wird nicht von Hand entfernt — beim nächsten Abruf
  * käme es ohnehin zurück, und bis dahin stimmte der Saldo nicht mehr mit ihr überein.
  * Wer eine solche Zeile loswerden will, verwirft sie im Abruf.
+ *
+ * Gesperrt ist die HERKUNFT, nicht das Konto: eine Zeile aus einem Dateiimport oder von
+ * Hand ist auch auf einem Bankkonto löschbar — die Bank kennt sie nicht und holt sie
+ * nicht zurück.
  */
 export async function buchungenLoeschen(
   ledger: LedgerPort,
   buchungen: readonly IstBuchung[],
-  gesperrteKonten: ReadonlySet<string>,
+  gesperrteIds: ReadonlySet<string>,
 ): Promise<{ geloescht: number; gesperrt: number }> {
   let geloescht = 0;
   let gesperrt = 0;
   for (const b of buchungen) {
-    if (gesperrteKonten.has(b.kontoId)) {
+    if (gesperrteIds.has(b.id)) {
       gesperrt++;
       continue;
     }

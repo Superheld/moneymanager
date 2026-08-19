@@ -232,8 +232,16 @@ export function NeueBuchungen({
     // Dublettenschutz aushebelt.
     <Card
       style={{ marginTop: "var(--gap-card)" }}
-      title={t("konten.neue.titel", { n: zeilen.length })}
-      subtitle={t("konten.neue.untertitel")}
+      // Ohne wartende Zeile ist das hier keine Aufgabe mehr, sondern nur noch das
+      // Archiv der weggelegten. Ein Kopf „Zu prüfen (0)" über 42 alten Zeilen las sich
+      // wie offene Arbeit, wo keine ist — seit der Abruf direkt verbucht, ist das der
+      // Normalzustand.
+      title={
+        zeilen.length > 0
+          ? t("konten.neue.titel", { n: zeilen.length })
+          : t("konten.neue.nurWeggelegtTitel")
+      }
+      subtitle={zeilen.length > 0 ? t("konten.neue.untertitel") : t("konten.neue.nurWeggelegtUntertitel")}
     >
       {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
 

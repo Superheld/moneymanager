@@ -98,12 +98,14 @@ describe("buchungenLoeschen", () => {
     expect(ledger.daten).toHaveLength(0);
   });
 
-  it("lässt Buchungen auf Bankkonten stehen", async () => {
+  it("lässt stehen, was aus einem Bankabruf kam — und nur das", async () => {
     // Was die Bank geliefert hat, käme beim nächsten Abruf ohnehin zurück — und bis
-    // dahin stimmte der Saldo nicht mehr mit ihr überein.
-    const ledger = memLedger([b({ id: "1", kontoId: "giro" }), b({ id: "2", kontoId: "bar" })]);
-    const erg = await buchungenLoeschen(ledger, [...ledger.daten], new Set(["giro"]));
+    // dahin stimmte der Saldo nicht mehr mit ihr überein. Gesperrt ist die HERKUNFT der
+    // Buchung, nicht ihr Konto: „2" liegt auf demselben Bankkonto, kam aber aus einer
+    // Datei und ist deshalb löschbar.
+    const ledger = memLedger([b({ id: "1", kontoId: "giro" }), b({ id: "2", kontoId: "giro" })]);
+    const erg = await buchungenLoeschen(ledger, [...ledger.daten], new Set(["2"]));
     expect(erg).toEqual({ geloescht: 1, gesperrt: 1 });
-    expect(ledger.daten.map((x) => x.id)).toEqual(["1"]);
+    expect(ledger.daten.map((x) => x.id)).toEqual(["2"]);
   });
 });

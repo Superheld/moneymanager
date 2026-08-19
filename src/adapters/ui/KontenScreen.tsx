@@ -53,9 +53,14 @@ function heuteIso(): string {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 }
-function ddmm(iso: string): string {
-  const [, m, d] = iso.split("-");
-  return `${d}.${m}.`;
+/**
+ * Datum einer Registerzeile — MIT Jahr. Ohne es liest sich eine Liste, die über den
+ * Jahreswechsel reicht, als wäre alles aus demselben Jahr; im Register stehen aber alle
+ * Buchungen eines Kontos, nicht nur die des laufenden Jahres.
+ */
+function datumKurz(iso: string): string {
+  const [j, m, d] = iso.split("-");
+  return `${d}.${m}.${j}`;
 }
 
 export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => void }) {
@@ -233,6 +238,20 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     if (b) setEditBuchung(b);
   }
 
+  /**
+   * Buchungen, die aus einem BANKABRUF stammen — nur die werden nicht von Hand gelöscht.
+   *
+   * Vorher hing die Sperre am Konto: alles auf einem Konto mit Bankverbindung war tabu,
+   * also auch die Zeilen, die per Dateiimport oder von Hand dorthin kamen. Die Bank
+   * kennt die aber gar nicht, sie holt sie beim nächsten Abruf nicht zurück, und ohne
+   * Löschweg blieb eine falsch importierte Zeile für immer im Saldo stehen.
+   */
+  const ausBankabruf = useMemo(() => {
+    const ids = new Set<string>();
+    for (const u of umsaetze) if (u.istbuchungId && abrufLaufIds.has(u.laufId)) ids.add(u.istbuchungId);
+    return ids;
+  }, [umsaetze, abrufLaufIds]);
+
   /** Die markierten Zeilen als echte Buchungen — nur die, die es noch gibt. */
   const gewaehlteBuchungen = useMemo(
     () => ist.filter((b) => auswahl.has(b.id)),
@@ -370,9 +389,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 </span>
                 <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>{t("konten.realerStandLabel")}</span>
               </div>
+              {/* Woraus die grosse Zahl darüber besteht — ausgeschrieben statt als
+                  „Anfangsbestand [Betrag] € · Σ Ist +[Betrag] €". Die alte Fassung nannte
+                  zwei Zahlen und verschwieg, dass sie zusammen genau den Stand darüber
+                  ergeben; „Σ Ist" hiess dabei nichts, was ausserhalb des Codes jemand
+                  wissen konnte. */}
               <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-                {t("konten.anfangsbestand")} {geld.formatMitSymbol(aktiv.saldo)}
-                {istSummeKonto(ist, aktiv.id) !== 0 && <> · Σ Ist {geld.formatMitSymbol(istSummeKonto(ist, aktiv.id), { mitVorzeichen: true })}</>}
+                {t("konten.standHerkunft", {
+                  anfang: geld.formatMitSymbol(aktiv.saldo),
+                  bewegung: geld.formatMitSymbol(istSummeKonto(ist, aktiv.id), { mitVorzeichen: true }),
+                })}
               </div>
 
               {/* Der Abgleich gegen die Bank. Ohne ihn ist der Stand oben nur in sich
@@ -501,7 +527,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                         ) : null,
                     }]
                   : []),
-                { key: "datum", label: t("konten.spalteDatum"), render: (z) => ddmm(z.datum) },
+                { key: "datum", label: t("konten.spalteDatum"), render: (z) => datumKurz(z.datum) },
                 {
                   // Nicht umbrechen (flexWrap): eine zweizeilige Zeile schiebt den
                   // Seitenschalter darunter je nach Seiteninhalt nach oben oder unten,
@@ -564,7 +590,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                       title={t("konten.alsBezahltMarkieren")}
                       style={{ cursor: "pointer", accentColor: "var(--accent-deep)" }}
                     />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(z.datum)}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 66 }}>{datumKurz(z.datum)}</span>
                     {z.bezeichnung}
                     {z.charakter === "Umschichtung" && <Pill variant="um">{charakterLabel("Umschichtung")}</Pill>}
                   </>
@@ -593,10 +619,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {editBuchung && (
         <BuchungDetail
           buchung={editBuchung}
-          // Was die Bank geliefert hat, wird nicht von Hand gelöscht — beim nächsten
+          // Was die BANK geliefert hat, wird nicht von Hand gelöscht — beim nächsten
           // Abruf käme es zurück, und bis dahin stimmte der Saldo nicht mehr mit ihr
-          // überein. Der Weg für so eine Zeile ist das Verwerfen im Abruf.
-          loeschenGesperrt={onlineKonten.has(editBuchung.kontoId)}
+          // überein. Der Weg für so eine Zeile ist das Verwerfen im Abruf. Was aus einer
+          // Datei kam, hat diese Bindung nicht und ist löschbar.
+          loeschenGesperrt={ausBankabruf.has(editBuchung.id)}
           onClose={() => setEditBuchung(null)}
           onGeaendert={laden}
         />
@@ -606,7 +633,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         <SammelDialog
           buchungen={gewaehlteBuchungen}
           kategorien={kategorien}
-          gesperrteKonten={onlineKonten}
+          gesperrteIds={ausBankabruf}
           onClose={() => setSammelOffen(false)}
           onGeaendert={async () => { setAuswahl(new Set()); await laden(); }}
         />
