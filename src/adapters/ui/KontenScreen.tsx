@@ -160,6 +160,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
   const gebuchtGefiltert = useMemo(() => {
     const q = regSuche.trim().toLowerCase();
+    // „12,50" soll die Zeile über 12,50 € finden, egal ob sie ein Zu- oder Abfluss ist.
+    // Zwei Wege nebeneinander, weil beide gebraucht werden: der geparste Betrag trifft
+    // exakt (auch „12" → 12,00), der formatierte Text erlaubt das Suchen nach Anfängen
+    // („1.2" findet 1.234,56). Nur der Text allein hätte „12" nie auf 12,00 gebracht.
+    const qBetrag = regSuche.trim() ? geld.parse(regSuche.trim()) : null;
     return (register?.gebucht ?? []).filter((z) => {
       if (katFilter === "__ohne" ? !!z.kategorieId : katFilter !== "alle" && z.kategorieId !== katFilter) return false;
       if (artFilter === "umbuchung" && !z.gegenkontoId) return false;
@@ -167,12 +172,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       if (artFilter === "ausgaben" && !(z.betrag < 0 && !z.gegenkontoId)) return false;
       if (q) {
         const u = z.istId ? umsatzByIst.get(z.istId) : undefined;
-        const heu = `${zeilenLabel(z)} ${u?.verwendungszweck ?? ""} ${z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""}`.toLowerCase();
-        if (!heu.includes(q)) return false;
+        const heu = `${zeilenLabel(z)} ${u?.verwendungszweck ?? ""} ${z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""} ${geld.format(Math.abs(z.betrag))}`.toLowerCase();
+        const trifftBetrag = qBetrag != null && Math.abs(z.betrag) === Math.abs(qBetrag);
+        if (!heu.includes(q) && !trifftBetrag) return false;
       }
       return true;
     });
-  }, [register, katFilter, artFilter, regSuche, umsatzByIst, kategorieName]);
+  }, [register, katFilter, artFilter, regSuche, umsatzByIst, kategorieName, geld]);
 
   // Standardansicht: neueste zuerst (Tabelle sortiert/paginiert intern weiter).
   const gebuchtFuerTabelle = useMemo(() => [...gebuchtGefiltert].reverse(), [gebuchtGefiltert]);
@@ -258,30 +264,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                     <Pill variant="neutral">{t("konten.offline")}</Pill>
                   ),
               },
-              { key: "anfang", label: `${t("konten.spalteAnfangsbestand")} ${geld.symbol}`, align: "right", sortValue: (k) => k.saldo, render: (k) => geld.format(k.saldo) },
               { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", sortValue: (k) => istSummeKonto(ist, k.id), render: (k) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
               { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", sortValue: (k) => realerKontostand(k, ist), render: (k) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
-              // Der Abgleich in der Übersicht, nicht nur im geöffneten Konto: eine
-              // Differenz will man sehen, ohne sie zu suchen.
-              {
-                key: "abgleich",
-                label: t("konten.abgleich.spalte"),
-                align: "right",
-                sortValue: (k) => {
-                  const stand = bankStand.get(k.id);
-                  return stand ? Math.abs(bankAbweichung(k, ist, stand.betrag)) : -1;
-                },
-                render: (k) => {
-                  const stand = bankStand.get(k.id);
-                  if (!stand) return <span className="muted">{onlineKonten.has(k.id) ? t("konten.abgleich.nieAbgeglichen") : "—"}</span>;
-                  const diff = bankAbweichung(k, ist, stand.betrag);
-                  return (
-                    <Pill variant={diff === 0 ? "ok" : "warn"}>
-                      {diff === 0 ? t("konten.abgleich.stimmt") : geld.format(diff, { mitVorzeichen: true })}
-                    </Pill>
-                  );
-                },
-              },
             ]}
             rows={konten}
           />
@@ -432,11 +416,23 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                     <span title={zeilenLabel(z)} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{zeilenLabel(z)}</span>
                       {z.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
-                      {z.gegenkontoId ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill> : z.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null}
+                      {!z.gegenkontoId && (z.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
                     </span>
                   ),
                 },
-                { key: "kat", label: t("konten.spalteKategorie"), maxWidth: 180, sortValue: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""), render: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "?" : "—") },
+                {
+                  // Die Umbuchungs-Pille steht HIER, nicht bei der Beschreibung: eine
+                  // Umbuchung trägt keine Kategorie (sie verschiebt nur eigenes Geld),
+                  // die Pille sagt also genau das, was in dieser Spalte fehlt. Vorher
+                  // stand sie rechts neben dem Empfänger und die Kategorie-Spalte zeigte
+                  // daneben einen Strich — zwei Zeichen für dieselbe Aussage.
+                  key: "kat", label: t("konten.spalteKategorie"), maxWidth: 180,
+                  sortValue: (z) => (z.gegenkontoId ? "" : z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""),
+                  render: (z) =>
+                    z.gegenkontoId
+                      ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill>
+                      : z.kategorieId ? kategorieName.get(z.kategorieId) ?? "?" : "—",
+                },
                 { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (z) => z.betrag, render: (z) => <span className="num" style={{ fontWeight: 700, color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span> },
                 { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (z) => z.saldo, render: (z) => geld.format(z.saldo) },
                 {
