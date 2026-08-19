@@ -29,6 +29,12 @@ import {
 } from "../application/fints/abrufAusfuehren";
 import type { TanHerausforderung } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
+import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/merkmalskonfiguration";
+import { trainingsmaterial, type Materialbefund } from "../application/trainingsmaterial";
+import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/klassifikatorTraining";
+import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../application/kategorieAbgleich";
+import { festlegungAufheben, festlegungSetzen } from "../application/kategoriefestlegungen";
+import type { Merkmalskonfiguration, Merkmalsherkunft } from "../core";
 import { zuordnungenAbgleichen } from "../application/vertragszuordnung";
 import { zahlungsspuren } from "../application/zahlungsspuren";
 import { kategorisierungsquellen } from "../application/kategorisierungsquellen";
@@ -442,4 +448,104 @@ export async function bankAbrufen(
     heute,
     rueckgriffTage,
   });
+}
+
+
+// --- Training und Kategorisierungs-Kette -----------------------------------
+//
+// Hier stehen keine neuen Regeln, nur die Verdrahtung: die Use-Cases gab es schon, der
+// Bereich „Training" hat sie sich bisher nur selbst zusammengesteckt (acht Repositories
+// in einer Datei).
+
+/** Alle Quellen der Kategorisierungs-Kette — dieselben wie beim Import. */
+const KETTE = {
+  kategorieRepo: sqliteKategorieRepository,
+  festlegungRepo: sqliteKategoriefestlegungRepository,
+  vertragRepo: sqliteVertragRepository,
+  erkennungRepo: sqliteVertragserkennungRepository,
+  klassifikatorRepo: sqliteKlassifikatorRepository,
+  merkmalRepo: sqliteMerkmalskonfigurationRepository,
+};
+
+const MODELL_DEPS = {
+  ledger: sqliteLedgerRepository,
+  umsatzRepo: sqliteUmsatzRepository,
+  klassifikatorRepo: sqliteKlassifikatorRepository,
+};
+
+export function merkmalskonfiguration() {
+  return konfigurationLaden(sqliteMerkmalskonfigurationRepository);
+}
+
+export function trainingsdaten(konfiguration: Merkmalskonfiguration): Promise<Materialbefund> {
+  return trainingsmaterial(sqliteLedgerRepository, sqliteUmsatzRepository, konfiguration);
+}
+
+export function modellStand(konfiguration: Merkmalskonfiguration): Promise<Modellzustand> {
+  return modellzustand({ ...MODELL_DEPS, konfiguration });
+}
+
+export function modellTrainieren(konfiguration: Merkmalskonfiguration) {
+  return klassifikatorTrainieren({
+    ...MODELL_DEPS,
+    konfiguration,
+    jetzt: () => new Date().toISOString(),
+  });
+}
+
+export function merkmalswirkung(konfiguration: Merkmalskonfiguration) {
+  return wirkungMessen({
+    ledger: sqliteLedgerRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    konfiguration,
+  });
+}
+
+export function herkunftUmschalten(h: Merkmalsherkunft, aktiv: boolean) {
+  return herkunftSchalten(sqliteMerkmalskonfigurationRepository, h, aktiv);
+}
+
+export function wortSperren(wort: string, herkuenfte?: readonly Merkmalsherkunft[]) {
+  return wortAusschliessen(sqliteMerkmalskonfigurationRepository, wort, herkuenfte);
+}
+
+export function wortFreigeben(wort: string) {
+  return wortZulassen(sqliteMerkmalskonfigurationRepository, wort);
+}
+
+export function kategorieAbgleichVorschau(): Promise<Abgleichsplan> {
+  return abgleichVorschau(sqliteLedgerRepository, sqliteUmsatzRepository, KETTE);
+}
+
+export function kategorieAbgleichAnwenden(plan: Abgleichsplan) {
+  return planAnwenden(sqliteLedgerRepository, plan);
+}
+
+// --- Kategorie-Festlegungen ------------------------------------------------
+
+export function festlegungen() {
+  return sqliteKategoriefestlegungRepository.alle();
+}
+
+export function festlegungSpeichern(muster: string, kategorieId: string) {
+  return festlegungSetzen(sqliteKategoriefestlegungRepository, muster, kategorieId);
+}
+
+export function festlegungEntfernen(muster: string) {
+  return festlegungAufheben(sqliteKategoriefestlegungRepository, muster);
+}
+
+/** Was das Modell an EINER Buchung sieht — die Antwort auf „warum diese Kategorie?". */
+export function merkmaleZuBuchung(
+  quelle: { gegenpartei: string; verwendungszweck: string; glaeubigerId?: string; betrag: number },
+): Promise<Merkmalsansicht> {
+  return merkmalsansicht(
+    {
+      ledger: sqliteLedgerRepository,
+      umsatzRepo: sqliteUmsatzRepository,
+      klassifikatorRepo: sqliteKlassifikatorRepository,
+      merkmalRepo: sqliteMerkmalskonfigurationRepository,
+    },
+    quelle,
+  );
 }

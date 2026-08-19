@@ -12,9 +12,8 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Kategorie, Kategoriefestlegung } from "../../core";
-import { festlegungAufheben } from "../../application/kategoriefestlegungen";
-import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persistence/sqliteKategoriefestlegungRepository";
+import type { Kategorie, Kategoriefestlegung } from "../../application";
+import { festlegungEntfernen, festlegungen as festlegungenLaden } from "../dienste";
 import { Card, DataTable } from "./ds";
 
 import { fehlerNachricht, useGeld } from "./einstellungenKontext";
@@ -35,7 +34,7 @@ export function FestlegungenCard({ kategorien }: { kategorien: Kategorie[] }) {
   async function laden() {
     setFehler(null);
     try {
-      setFestlegungen(await festlegungRepo.alle());
+      setFestlegungen(await festlegungenLaden());
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
     }
@@ -43,7 +42,7 @@ export function FestlegungenCard({ kategorien }: { kategorien: Kategorie[] }) {
 
   async function aufheben(muster: string) {
     try {
-      await festlegungAufheben(festlegungRepo, muster);
+      await festlegungEntfernen(muster);
       await laden();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));

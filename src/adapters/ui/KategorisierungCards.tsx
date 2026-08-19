@@ -20,42 +20,34 @@ import {
   type Matrixzeile,
   type Merkmalsherkunft,
   type Verwurfsgrund,
-} from "../../core";
+} from "../../application";
 import {
-  trainingsmaterial,
   type Ausschlussgrund,
   type Materialbefund,
   type Merkmalswert,
 } from "../../application/trainingsmaterial";
 import {
-  klassifikatorTrainieren,
-  modellzustand,
   type Modellzustand,
 } from "../../application/klassifikatorTraining";
 import {
-  abgleichVorschau,
   charakterWechsel,
-  planAnwenden,
   uebergaenge,
   type Abgleichsplan,
 } from "../../application/kategorieAbgleich";
+import type { Wirkung } from "../../application/merkmalskonfiguration";
 import {
-  herkunftSchalten,
-  konfigurationLaden,
-  wirkungMessen,
-  wortAusschliessen,
-  wortZulassen,
-  type Wirkung,
-} from "../../application/merkmalskonfiguration";
+  herkunftUmschalten,
+  kategorieAbgleichAnwenden,
+  kategorieAbgleichVorschau,
+  merkmalskonfiguration,
+  merkmalswirkung,
+  modellStand,
+  modellTrainieren,
+  trainingsdaten,
+  wortFreigeben,
+  wortSperren,
+} from "../dienste";
 import type { GespeicherterAusschluss } from "../../application/ports";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
-import { sqliteKlassifikatorRepository as klassifikatorRepo } from "../persistence/sqliteKlassifikatorRepository";
-import { sqliteMerkmalskonfigurationRepository as merkmalRepo } from "../persistence/sqliteMerkmalskonfigurationRepository";
-import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persistence/sqliteKategoriefestlegungRepository";
-import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
-import { sqliteVertragserkennungRepository as erkennungRepo } from "../persistence/sqliteVertragZuordnungRepositories";
 import { Button, Card, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { Bereich } from "./Bereich";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
@@ -90,10 +82,10 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
    * gefüllten Stand rechnen.
    */
   async function laden() {
-    const stand = await konfigurationLaden(merkmalRepo);
+    const stand = await merkmalskonfiguration();
     const [material, zustand] = await Promise.all([
-      trainingsmaterial(ledgerRepo, umsatzRepo, stand.konfiguration),
-      modellzustand({ ledger: ledgerRepo, umsatzRepo, klassifikatorRepo, konfiguration: stand.konfiguration }),
+      trainingsdaten(stand.konfiguration),
+      modellStand(stand.konfiguration),
     ]);
     setDaten({
       material,
@@ -134,11 +126,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
     setLaeuft("training");
     setFehler(null);
     try {
-      const r = await klassifikatorTrainieren({
-        ledger: ledgerRepo, umsatzRepo, klassifikatorRepo,
-        konfiguration: { herkuenfte: daten.herkuenfte, ausschluesse: daten.ausschluesse },
-        jetzt: () => new Date().toISOString(),
-      });
+      const r = await modellTrainieren({ herkuenfte: daten.herkuenfte, ausschluesse: daten.ausschluesse });
       setBewertung(r.bewertung ?? null);
       setListenGeaendert(false);
       await laden();
@@ -154,12 +142,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
     setLaeuft("wirkung");
     setFehler(null);
     try {
-      setWirkung(
-        await wirkungMessen({
-          ledger: ledgerRepo, umsatzRepo,
-          konfiguration: { herkuenfte: daten.herkuenfte, ausschluesse: daten.ausschluesse },
-        }),
-      );
+      setWirkung(await merkmalswirkung({ herkuenfte: daten.herkuenfte, ausschluesse: daten.ausschluesse }));
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
     } finally {
@@ -167,18 +150,13 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
     }
   }
 
-  /** Alle Quellen der Kategorisierungs-Kette — dieselben wie beim Import. */
-  const quellen = {
-    kategorieRepo, festlegungRepo, vertragRepo, erkennungRepo, klassifikatorRepo, merkmalRepo,
-  };
-
   async function vorschauRechnen() {
     if (laeuft) return;
     setLaeuft("abgleich");
     setFehler(null);
     setAngewendet(null);
     try {
-      setPlan(await abgleichVorschau(ledgerRepo, umsatzRepo, quellen));
+      setPlan(await kategorieAbgleichVorschau());
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
     } finally {
@@ -191,7 +169,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
     setLaeuft("anwenden");
     setFehler(null);
     try {
-      setAngewendet(await planAnwenden(ledgerRepo, plan));
+      setAngewendet(await kategorieAbgleichAnwenden(plan));
       // Der Plan ist verbraucht: stehen zu lassen hieße, einen Knopf anzubieten, der
       // dieselbe Arbeit ein zweites Mal verspricht.
       setPlan(null);
@@ -239,9 +217,9 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
                 wirkung={wirkung}
                 misst={laeuft === "wirkung"}
                 aufWirkung={wirkungStarten}
-                aufSchalten={(h, aktiv) => nachAenderung(herkunftSchalten(merkmalRepo, h, aktiv))}
+                aufSchalten={(h, aktiv) => nachAenderung(herkunftUmschalten(h, aktiv))}
                 aufAusschliessen={(wort, herkuenfte) =>
-                  nachAenderung(wortAusschliessen(merkmalRepo, wort, herkuenfte))
+                  nachAenderung(wortSperren(wort, herkuenfte))
                 }
               />
             </Card>
@@ -257,9 +235,9 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
               <AusschluesseInhalt
                 {...hilfe}
                 aufAusschliessen={(wort, herkuenfte) =>
-                  nachAenderung(wortAusschliessen(merkmalRepo, wort, herkuenfte))
+                  nachAenderung(wortSperren(wort, herkuenfte))
                 }
-                aufZulassen={(wort) => nachAenderung(wortZulassen(merkmalRepo, wort))}
+                aufZulassen={(wort) => nachAenderung(wortFreigeben(wort))}
               />
             </Card>
           ),
