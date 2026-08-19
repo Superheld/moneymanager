@@ -65,6 +65,13 @@ export interface AusblickPosten {
   /** Tatsächlich gebucht/verbraucht, vorzeichenbehaftet. `null` = im Plan-Blick ohne Ist. */
   readonly ist: Cent | null;
   readonly status: PostenStatus;
+  /**
+   * Die Ist-Buchung hinter diesem Posten, falls es genau eine gibt. Der Kern kennt
+   * weder Empfänger noch Kategoriename — die Oberfläche löst beides über diese ID auf.
+   */
+  readonly istId?: string;
+  /** Kategorie des Postens (bei geteilten Buchungen die des jeweiligen Anteils). */
+  readonly kategorieId?: string;
 }
 
 export interface AusblickZeile {
@@ -149,40 +156,41 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
     e.budgets.flatMap((b) => [...kategorieUnterbaum(e.kategorien, b.kategorieId)]),
   );
 
-  // Sammelposten: gebucht, aber von keiner Plan-Zeile erfasst. Ohne sie summierte die
-  // Ist-Spalte nicht auf das, was tatsächlich vom Konto ging.
-  const weitereEinnahmen = summe(
-    offenesIst.filter((b) => b.charakter === "Ertrag").map((b) => b.betrag),
-  );
-  const sonstigeAusgaben = summe(
-    offenesIst
-      .filter((b) => b.charakter === "Aufwand")
-      .flatMap((b) => kategorieAnteile(b))
-      .filter((a) => !a.kategorieId || !budgetKategorien.has(a.kategorieId))
-      .map((a) => a.betrag),
-  );
-  const weitereUmschichtung = summe(
-    offenesIst.filter((b) => b.charakter === "Umschichtung").map((b) => b.betrag),
-  );
+  // Was gebucht, aber von keiner Plan-Zeile erfasst ist, kommt EINZELN dazu — je Buchung
+  // ein Posten. Früher stand hier eine Summe pro Zeile („weitere Einnahmen: 342,10"),
+  // und damit war die Zeile zwar richtig, aber unbeantwortbar: welche Buchungen das
+  // waren, stand nirgends, und genau danach fragt man beim Aufklappen.
+  const weitereEinnahmen = offenesIst.filter((b) => b.charakter === "Ertrag").map(buchungsPosten);
+  const weitereUmschichtung = offenesIst
+    .filter((b) => b.charakter === "Umschichtung")
+    .map(buchungsPosten);
+  // Bei den Ausgaben zählt der ANTEIL, nicht die Buchung: eine geteilte Buchung kann
+  // zur Hälfte auf ein Budget laufen und zur anderen hier landen.
+  const sonstigeAusgaben = offenesIst
+    .filter((b) => b.charakter === "Aufwand")
+    .flatMap((b) =>
+      kategorieAnteile(b)
+        .map((a, i) => ({ b, a, i }))
+        .filter(({ a }) => !a.kategorieId || !budgetKategorien.has(a.kategorieId)),
+    )
+    .map(({ b, a, i }) => anteilsPosten(b, a, i));
 
   const zeilen: AusblickZeile[] = [
-    mitSammelposten(einnahmen, weitereEinnahmen, "einnahmen.weitere", zukunft),
+    mitEinzelposten(einnahmen, weitereEinnahmen),
     vertraege,
     budgetZeile,
   ];
   const ruecklagen = ruecklagenZeile(e.inventar ?? [], zukunft);
   if (ruecklagen) zeilen.push(ruecklagen);
-  if (umschichtung.plan !== 0 || weitereUmschichtung !== 0) {
-    zeilen.push(mitSammelposten(umschichtung, weitereUmschichtung, "umschichtung.weitere", zukunft));
+  if (umschichtung.plan !== 0 || weitereUmschichtung.length > 0) {
+    zeilen.push(mitEinzelposten(umschichtung, weitereUmschichtung));
   }
-  if (sonstigeAusgaben !== 0) {
+  if (sonstigeAusgaben.length > 0) {
     zeilen.push({
       id: "sonstiges",
       plan: 0,
-      ist: sonstigeAusgaben,
-      posten: [
-        { schluessel: "sonstiges.summe", bezeichnung: "sonstiges", plan: 0, ist: sonstigeAusgaben, status: "ohnePlan" },
-      ],
+      ist: summe(sonstigeAusgaben.map((p) => p.ist ?? 0)),
+      posten: nachDatum(sonstigeAusgaben),
     });
   }
 
@@ -341,23 +349,44 @@ function ruecklagenZeile(
   return { id: "ruecklagen", plan, ist: zukunft ? null : plan, posten: [] };
 }
 
-/** Hängt einen Sammelposten für nicht geplantes Ist an eine Zeile, falls es welches gibt. */
-function mitSammelposten(
-  zeile: AusblickZeile,
-  betrag: Cent,
-  schluessel: string,
-  zukunft: boolean,
-): AusblickZeile {
-  if (zukunft || betrag === 0) return zeile;
+/** Hängt die ungeplanten Buchungen einer Zeile als eigene Posten an. */
+function mitEinzelposten(zeile: AusblickZeile, weitere: readonly AusblickPosten[]): AusblickZeile {
+  if (weitere.length === 0) return zeile;
   return {
     ...zeile,
-    ist: (zeile.ist ?? 0) + betrag,
-    posten: [
-      ...zeile.posten,
-      { schluessel, bezeichnung: schluessel, plan: 0, ist: betrag, status: "ohnePlan" },
-    ],
+    ist: (zeile.ist ?? 0) + summe(weitere.map((p) => p.ist ?? 0)),
+    posten: nachDatum([...zeile.posten, ...weitere]),
   };
 }
+
+/** Eine ungeplante Buchung als Posten — die Oberfläche beschriftet sie über `istId`. */
+function buchungsPosten(b: IstBuchung): AusblickPosten {
+  return {
+    schluessel: b.id,
+    bezeichnung: b.notiz ?? "",
+    datum: b.datum,
+    plan: 0,
+    ist: b.betrag,
+    status: "ohnePlan",
+    istId: b.id,
+    kategorieId: b.kategorieId,
+  };
+}
+
+/** Ein Anteil einer (womöglich geteilten) Buchung als Posten. */
+function anteilsPosten(b: IstBuchung, anteil: { kategorieId?: string; betrag: Cent }, i: number): AusblickPosten {
+  return {
+    ...buchungsPosten(b),
+    // Der Index hält den Schlüssel eindeutig, wenn eine Buchung mehrere Anteile
+    // ausserhalb der Budgets hat.
+    schluessel: `${b.id}#${i}`,
+    ist: anteil.betrag,
+    kategorieId: anteil.kategorieId,
+  };
+}
+
+const nachDatum = (posten: readonly AusblickPosten[]): AusblickPosten[] =>
+  [...posten].sort((a, b) => (a.datum ?? "").localeCompare(b.datum ?? ""));
 
 const summe = (werte: readonly Cent[]): Cent => werte.reduce((s, w) => s + w, 0);
 

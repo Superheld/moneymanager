@@ -224,8 +224,8 @@ const de = {
     pillVorschau: "Vorschau",
     spaltePlan: "geplant",
     spalteIst: "gebucht",
-    bleibt: "Bleibt",
-    vsPlan: "{{betrag}} gegenüber Plan",
+    bleibt: "Bleibt übrig",
+    bleibtErklaerung: "Einnahmen minus Verträge, Budgets und Rücklagen",
     statusBezahlt: "abgehakt",
     statusOffen: "offen",
     zeile: {
@@ -264,6 +264,10 @@ const de = {
     monatWaehlen: "Monat",
     monatDieser: "{{monat}} (dieser Monat)",
     vonRahmen: "von {{rahmen}}",
+    budgetAufklappen: "{{name}} — Buchungen zeigen",
+    budgetOhneBuchungen: "In diesem Zeitraum ist auf dieses Budget nichts gebucht.",
+    budgetBuchung: "Buchung",
+    budgetSumme: "Verbraucht",
   },
   analyse: {
     titel: "Analyse",
@@ -1397,7 +1401,7 @@ const en: typeof de = {
     spaltePlan: "planned",
     spalteIst: "posted",
     bleibt: "Left over",
-    vsPlan: "{{betrag}} vs. plan",
+    bleibtErklaerung: "Income minus contracts, budgets and reserves",
     statusBezahlt: "ticked off",
     statusOffen: "open",
     zeile: {
@@ -1435,6 +1439,10 @@ const en: typeof de = {
     monatWaehlen: "Month",
     monatDieser: "{{monat}} (this month)",
     vonRahmen: "of {{rahmen}}",
+    budgetAufklappen: "{{name}} — show entries",
+    budgetOhneBuchungen: "Nothing was posted to this budget in this period.",
+    budgetBuchung: "Entry",
+    budgetSumme: "Spent",
   },
   analyse: {
     titel: "Analysis",

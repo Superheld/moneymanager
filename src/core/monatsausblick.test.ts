@@ -222,6 +222,64 @@ describe("monatsAusblick — Ist-Spalte des laufenden Monats", () => {
     expect(e.posten[e.posten.length - 1].status).toBe("ohnePlan");
   });
 
+  it("führt Sonstiges als einzelne Buchungen auf, nicht als eine Summe", () => {
+    // Aufgeklappt soll dort stehen, WAS das war — eine Zeile „ohne Budget und Vertrag:
+    // −72,40" beantwortet die Frage nicht, wegen der man aufklappt.
+    const a = monatsAusblick({
+      ...basis,
+      ist: [
+        ist({ id: "s1", datum: "2026-08-11", betrag: euroZuCent(-20), kategorieId: "wohnen", notiz: "Schlüsseldienst" }),
+        ist({ id: "s2", datum: "2026-08-03", betrag: euroZuCent(-52.4), kategorieId: undefined }),
+      ],
+      monatAb: "2026-08-01",
+    });
+    const s = zeile(a, "sonstiges")!;
+    expect(s.ist).toBe(euroZuCent(-72.4));
+    // Chronologisch, mit Datum und Herkunft an jedem Posten.
+    expect(s.posten.map((p) => [p.datum, p.ist, p.istId])).toEqual([
+      ["2026-08-03", euroZuCent(-52.4), "s2"],
+      ["2026-08-11", euroZuCent(-20), "s1"],
+    ]);
+    expect(s.posten[1].bezeichnung).toBe("Schlüsseldienst");
+    expect(s.posten[1].kategorieId).toBe("wohnen");
+  });
+
+  it("teilt eine geteilte Buchung zwischen Budget und Sonstigem auf", () => {
+    const a = monatsAusblick({
+      ...basis,
+      budgets: [budget()],
+      ist: [
+        ist({
+          id: "geteilt", datum: "2026-08-07", betrag: euroZuCent(-100), kategorieId: undefined,
+          aufteilungen: [
+            { kategorieId: "lebensmittel", betrag: euroZuCent(-60) },
+            { kategorieId: "wohnen", betrag: euroZuCent(-40) },
+          ],
+        }),
+      ],
+      monatAb: "2026-08-01",
+    });
+    expect(zeile(a, "budgets")!.ist).toBe(euroZuCent(-60));
+    const s = zeile(a, "sonstiges")!;
+    expect(s.ist).toBe(euroZuCent(-40));
+    expect(s.posten).toHaveLength(1);
+    expect(s.posten[0].kategorieId).toBe("wohnen");
+  });
+
+  it("führt auch die ungeplanten Umschichtungen einzeln auf", () => {
+    const a = monatsAusblick({
+      ...basis,
+      ist: [
+        ist({ id: "u1", datum: "2026-08-09", betrag: euroZuCent(-250), charakter: "Umschichtung", notiz: "Depot" }),
+        ist({ id: "u2", datum: "2026-08-20", betrag: euroZuCent(-100), charakter: "Umschichtung" }),
+      ],
+      monatAb: "2026-08-01",
+    });
+    const u = zeile(a, "umschichtung")!;
+    expect(u.ist).toBe(euroZuCent(-350));
+    expect(u.posten.map((p) => p.istId)).toEqual(["u1", "u2"]);
+  });
+
   it("die Ist-Spalte summiert auf alles Gebuchte des Monats", () => {
     const buchungen = [
       ist({ id: "1", betrag: euroZuCent(-459.25), kategorieId: "miete" }),

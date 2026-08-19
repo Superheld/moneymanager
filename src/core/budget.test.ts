@@ -4,6 +4,7 @@ import {
   budgetKategorien,
   budgetRahmen,
   budgetStand,
+  budgetBuchungen,
   budgetVerbrauch,
   effektiverMonatsbetrag,
   elternBudget,
@@ -149,6 +150,39 @@ describe("budgetVerbrauch", () => {
       b({ id: "5", charakter: "Ertrag" }),
     ];
     expect(budgetVerbrauch(ist, BAUM, dach, [dach], von, bis)).toBe(0);
+  });
+
+  it("legt dieselbe Auswahl als Einzelposten offen — Summe = Verbrauch", () => {
+    // Die Oberfläche zeigt beim Aufklappen genau diese Liste. Weil `budgetVerbrauch`
+    // nur noch ihre Summe ist, können Balken und Liste nicht auseinanderlaufen.
+    const ist = [
+      b({ id: "1", datum: "2026-06-12", kategorieId: "kino", betrag: euroZuCent(-50) }),
+      b({ id: "2", datum: "2026-06-03", kategorieId: "fernreise", betrag: euroZuCent(-12) }),
+      b({ id: "3", kategorieId: "fremd", betrag: euroZuCent(-99) }),
+    ];
+    const posten = budgetBuchungen(ist, BAUM, dach, [dach], von, bis);
+    expect(posten.map((p) => [p.buchung.id, p.betrag])).toEqual([
+      ["2", euroZuCent(12)],
+      ["1", euroZuCent(50)],
+    ]);
+    expect(posten.reduce((s, p) => s + p.betrag, 0)).toBe(
+      budgetVerbrauch(ist, BAUM, dach, [dach], von, bis),
+    );
+  });
+
+  it("führt jeden Anteil einer geteilten Buchung als eigenen Posten", () => {
+    const ist = [
+      b({
+        id: "geteilt", kategorieId: undefined,
+        aufteilungen: [
+          { kategorieId: "kino", betrag: euroZuCent(-30) },
+          { kategorieId: "fremd", betrag: euroZuCent(-20) },
+        ],
+      }),
+    ];
+    const posten = budgetBuchungen(ist, BAUM, dach, [dach], von, bis);
+    expect(posten).toHaveLength(1);
+    expect(posten[0]).toMatchObject({ kategorieId: "kino", betrag: euroZuCent(30) });
   });
 
   it("senkt den Verbrauch bei einer Erstattung, statt ihn zu erhöhen", () => {
