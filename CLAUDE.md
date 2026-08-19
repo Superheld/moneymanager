@@ -51,7 +51,9 @@ in `.github/workflows/ci.yml`, weil Actions die mise.toml nicht liest.
   `~/Library/WebKit/moneymanager` + `~/Library/Caches/moneymanager` löschen, neu starten.
   DB bleibt unberührt. Nicht stundenlang den Code verdächtigen — erst das prüfen.
 - **Echte DB für Diagnose:** `~/Library/Application Support/de.netmechanics.moneymanager/moneymanager.db`
-  read-only via `sqlite3` inspizieren, statt Datenbugs zu raten.
+  read-only via `sqlite3` inspizieren, statt Datenbugs zu raten. Neue Migrations-SQL vorher
+  auf einer `cp`-Kopie durchspielen und das Ergebnis ansehen — Vorbelegungen greifen sonst
+  plausibel daneben, und kein Test merkt es.
 - **Daten-Lade-Race:** Verwandte Repos in EINEM Effekt per `Promise.all` laden und zusammen
   setzen; gestaffelte `setState` lassen abgeleitete Werte kurz gegen leere Listen rechnen
   (z. B. Kategorie-Lookup → fälschlich „ohne Kategorie").
@@ -67,6 +69,9 @@ in `.github/workflows/ci.yml`, weil Actions die mise.toml nicht liest.
 `core` (reine Domäne, kein IO) ← `application` (Use-Cases + Ports) ← `adapters`
 (`persistence/` SQLite via tauri-plugin-sql, `ui/` React). `core` importiert nichts nach
 außen. Tests als `*.test.ts` neben dem Code.
+Querschnitt in `ui/`: `geldFarbe.ts` ist die EINE Farbregel für Beträge (Plus grün, Minus
+`--warn-deep`, Null neutral), `IconButton.tsx` die Zeilen-Aktionen als Icon (Text wandert
+in `title`/`aria-label`). `ds/` ist aus dem Design-System kopiert — dort nichts erfinden.
 
 ## Tests schreiben
 - **Kern/Use-Cases:** reine Funktionen, In-Memory-Fakes für Ports. Node-Umgebung, schnell.
@@ -79,6 +84,9 @@ außen. Tests als `*.test.ts` neben dem Code.
   auch die Kern-Tests unnötig in jsdom.
 - Nach **Daten** suchen, die der Test selbst angelegt hat, nicht nach Formulierungen —
   sonst wird die Suite beim nächsten Wording-Durchgang reihenweise rot.
+- **Elemente über `aria-label` greifen, nicht über die Rolle allein:** `getByRole("checkbox")`
+  bricht, sobald irgendwo ein zweites Kästchen dazukommt. Im `KontenScreen` steht der
+  Kontoname doppelt (Liste + Masthead) — dort `findAllByText`.
 
 ## Invarianten, die beißen
 - **Geld = Integer Cent**, nie Float. Formatierung über `formatBetrag` (U+2212-Minus).
@@ -91,7 +99,10 @@ außen. Tests als `*.test.ts` neben dem Code.
   der Kern. `toIso` polstert das Jahr vierstellig, weil die gesamte Datumsordnung über
   String-Vergleiche läuft.
 - **Charakter = `Aufwand | Ertrag | Umschichtung`** (erfolgs- vs. liquiditätswirksam;
-  Umschichtung = Aktivtausch, keine Ausgabe).
+  Umschichtung = Aktivtausch, keine Ausgabe). Seit 2026-08-19 gibt es KEIN Eingabefeld
+  mehr — er folgt `kategorie.defaultCharakter`, bei Umbuchungen dem Transfer. Das Konzept
+  bleibt tragend: `budgetVerbrauch` (nur Aufwand), die Sektionen der Analyse, die
+  Vertragserkennung (Umschichtung ist nie ein Vertrag), die Färbung im Register.
 - **Migrationen** in `adapters/persistence/migrations.ts`: versioniert, **forward-only,
   append-only** — bestehende Versionen nie editieren, neue Version anhängen. Eine neue
   Version darf in der Alpha auch abräumen (`DROP TABLE IF EXISTS`, `DROP COLUMN`), siehe
@@ -105,6 +116,10 @@ außen. Tests als `*.test.ts` neben dem Code.
   vorhandene Spalten per `PRAGMA table_info` (`CREATE …` trägt ohnehin `IF NOT EXISTS`).
   Neue Migrationen müssen sich in diese Regel fügen; ein Datenumbau (UPDATE/DELETE)
   braucht eine eigene Lösung, keine Scheintransaktion.
+  **Lesen und Abräumen gehören in GETRENNTE Versionen:** eine Version, die eine Spalte
+  liest, und eine, die sie droppt, dürfen nicht dieselbe sein — bricht der Lauf dazwischen
+  ab, läuft die Lesende beim nächsten Start gegen die fehlende Spalte, und die App kommt
+  nicht mehr hoch (SQLite prüft Spaltennamen beim Parsen). Deshalb v30/v31 getrennt.
 - **`IstBuchung` trägt KEINEN Empfänger/Verwendungszweck** — die stehen am `Umsatz`
   (Import-Kontext); Join über `Umsatz.istbuchungId` für Detail-/Reporting-Ansichten.
 - **Tauri = nur Hülle:** Domänen-/Backend-Logik läuft als TS in der Webview, nicht in Rust
@@ -137,3 +152,7 @@ viele Zeilen `maxBuffer` hochsetzen, sonst `ENOBUFS`.
 
 ## Sprache
 Deutsch, Anrede „du", keine Emoji. Fachlich streng innen, alltagstauglich außen (Glossar).
+`i18n.ts` hält de und en als zwei Blöcke, und Schlüsselnamen wiederholen sich über die
+Namensräume (`titel` 26×, `suche` 6×) — beim Ändern am NAMENSRAUM ankern, nie am blossen
+Schlüsseltext, sonst trifft es den falschen Bereich. `npm test` prüft de/en-Parität,
+Platzhalter und dass kein `t("…")` im Code ins Leere zeigt — nicht aber die Einordnung.
