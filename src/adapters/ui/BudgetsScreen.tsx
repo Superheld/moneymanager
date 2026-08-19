@@ -16,31 +16,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
-  budgetStand,
-  effektiverMonatsbetrag,
-  elternBudget,
   minorZuMajor,
   type Budget,
   type Budgetart,
+  type Budgetbereich,
+  type Budgetstand,
   type Budgetvorschlag,
-  type IstBuchung,
-  type Kategorie,
-  type Zahlungskonto,
-} from "../../core";
-import { budgetAnlegen } from "../../application/budgetAnlegen";
-import {
-  budgetvorschlaegeLaden,
-  budgetvorschlagIgnorieren,
-  ignorierteBudgetvorschlaege,
-} from "../../application/budgetvorschlaege";
-import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
-import { sqliteEinstellungenRepository as einstellungenRepo } from "../persistence/sqliteEinstellungenRepository";
-import {
-  sqliteKategorieRepository as kategorieRepo,
-  sqliteZahlungskontoRepository as kontoRepo,
-} from "../persistence/sqliteStammdatenRepositories";
+} from "../../application";
+import { budgetAnlegen as budgetSpeichern, budgetbereich, budgetLoeschen, vorschlagIgnorieren } from "../dienste";
 import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "./ds";
 import { IconButton, IconLeiste } from "./IconButton";
 import { betont } from "./betonung";
@@ -52,19 +35,12 @@ import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 
 const ARTEN: Budgetart[] = ["monatlich", "aufbauend"];
 
+/** Stabile leere Karte — eine frisch erzeugte Map liesse jedes Memo neu rechnen. */
+const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
+
 function heuteIso(): string {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-}
-
-/** Eine Zeile der Liste: das Budget, seine Zahlen und wie tief es eingebettet ist. */
-interface Zeile {
-  budget: Budget;
-  tiefe: number;
-  proMonat: number;
-  rahmen: number;
-  verbraucht: number;
-  rest: number;
 }
 
 export function BudgetsScreen() {
@@ -72,11 +48,7 @@ export function BudgetsScreen() {
   const geld = useGeld();
   const heute = useMemo(heuteIso, []);
 
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
-  const [ist, setIst] = useState<IstBuchung[]>([]);
-  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
-  const [vorschlaege, setVorschlaege] = useState<Budgetvorschlag[]>([]);
+  const [bereich, setBereich] = useState<Budgetbereich | null>(null);
 
   // Anlege-/Bearbeiten-Dialog
   const [offen, setOffen] = useState(false);
@@ -88,67 +60,27 @@ export function BudgetsScreen() {
   const [start, setStart] = useState(heute);
   const [fehler, setFehler] = useState<string | null>(null);
 
-  // Verwandte Repos in EINEM Effekt und zusammen setzen: gestaffelte setState lassen die
-  // abgeleiteten Werte kurz gegen leere Listen rechnen (Kategorie-Lookup → „ohne Kategorie").
+  // EIN Ladevorgang, EIN setState: gestaffelte await/setState-Paare lassen abgeleitete
+  // Werte kurz gegen leere Listen rechnen (ein Kategorie-Lookup meldet dann für einen
+  // Render „ohne Kategorie").
   async function laden() {
-    const [b, k, i, ko, ignoriert] = await Promise.all([
-      budgetRepo.alle(),
-      kategorieRepo.alle(),
-      ledgerRepo.alle(),
-      kontoRepo.alle(),
-      ignorierteBudgetvorschlaege(einstellungenRepo),
-    ]);
-    setBudgets(b);
-    setKategorien(k);
-    setIst(i);
-    setKonten(ko);
-    setVorschlaege(
-      await budgetvorschlaegeLaden(
-        ledgerRepo, umsatzRepo, kategorieRepo, budgetRepo, heute.slice(0, 7), heute, ignoriert,
-      ),
-    );
+    setBereich(await budgetbereich(heute));
   }
   useEffect(() => {
     laden();
   }, []);
 
-  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
-  const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
-
   /**
    * Die Liste in Baumordnung: ein Budget steht unter dem, in dem es liegt. Nur so ist
    * die Verrechnung ablesbar — sonst stünde beim Dach ein gekürzter Monatsbetrag und
-   * nirgends, wohin der Rest gegangen ist.
+   * nirgends, wohin der Rest gegangen ist. Geordnet und gerechnet wird das in
+   * `budgetstaende` (Anwendungsschicht), nicht hier.
    */
-  const zeilen = useMemo<Zeile[]>(() => {
-    const kinder = new Map<string | null, Budget[]>();
-    for (const b of budgets) {
-      const eltern = elternBudget(b, budgets, kategorien)?.id ?? null;
-      const liste = kinder.get(eltern);
-      if (liste) liste.push(b);
-      else kinder.set(eltern, [b]);
-    }
-    const sortiere = (bs: Budget[]) =>
-      [...bs].sort((a, b) =>
-        (kategorieName.get(a.kategorieId) ?? "").localeCompare(kategorieName.get(b.kategorieId) ?? ""),
-      );
-
-    const raus: Zeile[] = [];
-    const gehe = (elternId: string | null, tiefe: number) => {
-      for (const b of sortiere(kinder.get(elternId) ?? [])) {
-        const stand = budgetStand(ist, kategorien, b, budgets, heute);
-        raus.push({
-          budget: b,
-          tiefe,
-          proMonat: effektiverMonatsbetrag(b, budgets, kategorien),
-          ...stand,
-        });
-        gehe(b.id, tiefe + 1);
-      }
-    };
-    gehe(null, 0);
-    return raus;
-  }, [budgets, kategorien, ist, heute, kategorieName]);
+  const zeilen: readonly Budgetstand[] = bereich?.staende ?? [];
+  const kategorien = bereich?.kategorien ?? [];
+  const konten = bereich?.konten ?? [];
+  const vorschlaege = bereich?.vorschlaege ?? [];
+  const kontoName = bereich?.kontoNamen ?? LEERE_NAMEN;
 
   /**
    * Die Kennzahlen zählen nur die EFFEKTIVEN Beträge — sonst stünde ein eingebettetes
@@ -199,15 +131,14 @@ export function BudgetsScreen() {
   }
 
   async function vorschlagVerwerfen(v: Budgetvorschlag) {
-    await budgetvorschlagIgnorieren(einstellungenRepo, v.kategorieId);
-    setVorschlaege((bisher) => bisher.filter((x) => x.kategorieId !== v.kategorieId));
+    await vorschlagIgnorieren(v.kategorieId);
+    await laden();
   }
 
   async function speichern() {
     setFehler(null);
     try {
-      await budgetAnlegen(
-        budgetRepo,
+      await budgetSpeichern(
         { kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, art, start },
         editId ?? undefined,
       );
@@ -236,9 +167,9 @@ export function BudgetsScreen() {
 
       {/* Kennzahlen als eigene Reihe, nicht in der Karte — dieselbe Ordnung wie auf der
           Übersicht: erst die Zahlen, dann das, worüber sie sprechen. */}
-      {budgets.length > 0 && (
+      {zeilen.length > 0 && (
         <div className="kpis">
-          <KPIStat size="chip" label={t("budgets.kpiAnzahl")} value={String(budgets.length)} />
+          <KPIStat size="chip" label={t("budgets.kpiAnzahl")} value={String(zeilen.length)} />
           <KPIStat size="chip" label={t("budgets.kpiProMonat")} value={geld.format(summe.proMonat)} unit={geld.symbol} />
           <KPIStat size="chip" label={t("budgets.kpiVerbraucht")} value={geld.format(summe.verbraucht)} unit={geld.symbol} />
           <KPIStat size="chip" label={t("budgets.kpiAuslastung")} value={String(summe.auslastung)} unit="%" tone={summe.auslastung > 100 ? "warn" : "default"} />
@@ -312,13 +243,13 @@ export function BudgetsScreen() {
                 ),
               },
             ]}
-            rows={vorschlaege}
+            rows={[...vorschlaege]}
           />
         </Card>
       )}
 
       <Card title={t("budgets.abschnittListe")} subtitle={t("budgets.abschnittListeHinweis")}>
-        {budgets.length === 0 ? (
+        {zeilen.length === 0 ? (
           <div className="muted">{t("budgets.leer")}</div>
         ) : (
           <>
@@ -331,13 +262,13 @@ export function BudgetsScreen() {
                 {
                   key: "kategorie",
                   label: t("budgets.spalteKategorie"),
-                  render: (z: Zeile) => (
+                  render: (z: Budgetstand) => (
                     // Einrückung statt eigener Spalte: die Verschachtelung ist eine
                     // Eigenschaft der Kategorie, keine zweite Information daneben.
                     <span style={{ paddingLeft: z.tiefe * 18, display: "inline-flex", alignItems: "center", gap: 6 }}>
                       {z.tiefe > 0 && <span style={{ color: "var(--ink-3)" }}>└</span>}
                       <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)" }}>
-                        {kategorieName.get(z.budget.kategorieId) ?? "?"}
+                        {z.kategorieName}
                       </span>
                     </span>
                   ),
@@ -345,20 +276,20 @@ export function BudgetsScreen() {
                 {
                   key: "art",
                   label: t("budgets.spalteArt"),
-                  render: (z: Zeile) => (
+                  render: (z: Budgetstand) => (
                     <Pill variant={z.budget.art === "aufbauend" ? "um" : "neutral"}>{t(`budgets.art.${z.budget.art}`)}</Pill>
                   ),
                 },
                 {
                   key: "konto",
                   label: t("budgets.spalteKonto"),
-                  render: (z: Zeile) => kontoName.get(z.budget.kontoId) ?? <span className="muted">{t("budgets.kontoFehlt")}</span>,
+                  render: (z: Budgetstand) => kontoName.get(z.budget.kontoId) ?? <span className="muted">{t("budgets.kontoFehlt")}</span>,
                 },
                 {
                   key: "proMonat",
                   label: `${t("budgets.spalteProMonat")} ${geld.symbol}`,
                   align: "right",
-                  render: (z: Zeile) => (
+                  render: (z: Budgetstand) => (
                     <span title={z.proMonat !== z.budget.betragProMonat ? t("budgets.abzugHinweis", { voll: geld.format(z.budget.betragProMonat) }) : undefined}>
                       {geld.format(z.proMonat)}
                       {z.proMonat !== z.budget.betragProMonat && <span className="muted"> *</span>}
@@ -372,19 +303,19 @@ export function BudgetsScreen() {
                   key: "rahmen",
                   label: `${t("budgets.spalteRahmen")} ${geld.symbol}`,
                   align: "right",
-                  render: (z: Zeile) => geld.format(z.rahmen),
+                  render: (z: Budgetstand) => geld.format(z.rahmen),
                 },
                 {
                   key: "verbraucht",
                   label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`,
                   align: "right",
-                  render: (z: Zeile) => geld.format(z.verbraucht),
+                  render: (z: Budgetstand) => geld.format(z.verbraucht),
                 },
                 {
                   key: "rest",
                   label: `${t("budgets.spalteRest")} ${geld.symbol}`,
                   align: "right",
-                  render: (z: Zeile) => (
+                  render: (z: Budgetstand) => (
                     <span style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}>{geld.format(z.rest)}</span>
                   ),
                 },
@@ -392,7 +323,7 @@ export function BudgetsScreen() {
                   key: "balken",
                   label: "",
                   sortable: false,
-                  render: (z: Zeile) => (
+                  render: (z: Budgetstand) => (
                     <span style={{ display: "block", minWidth: 90 }}>
                       <CoverageTrack value={Math.max(0, z.verbraucht)} max={Math.max(1, z.rahmen)} over={z.rest < 0} label="" right="" />
                     </span>
@@ -403,15 +334,15 @@ export function BudgetsScreen() {
                   label: "",
                   align: "right",
                   sortable: false,
-                  render: (z: Zeile) => (
+                  render: (z: Budgetstand) => (
                     <IconLeiste>
                       <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z.budget)} />
-                      <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => void budgetRepo.loeschen(z.budget.id).then(laden)} />
+                      <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => void budgetLoeschen(z.budget.id).then(laden)} />
                     </IconLeiste>
                   ),
                 },
               ]}
-              rows={zeilen}
+              rows={[...zeilen]}
             />
             {zeilen.some((z) => z.proMonat !== z.budget.betragProMonat) && (
               <div className="muted" style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-2)" }}>
@@ -451,7 +382,7 @@ export function BudgetsScreen() {
             </FormField>
 
             <FormField label={t("budgets.feldKategorie")} required hint={t("budgets.feldKategorieHinweis")}>
-              <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
+              <CategoryPicker kategorien={[...kategorien]} value={kategorieId} onChange={setKategorieId} />
             </FormField>
 
             <FormField label={t("budgets.feldKonto")} required hint={t("budgets.feldKontoHinweis")}>

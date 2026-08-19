@@ -16,6 +16,20 @@
 // Tabellen für dieselbe Frage „was lege ich monatlich für X zurück?". Zusammengelegt
 // 2026-08-19; die Töpfe waren zu dem Zeitpunkt leer (0 Zeilen, 0 Buchungen darauf).
 //
+// **Verträge zählen NICHT.** Ein Budget steuert Verhalten — „diesen Monat noch 120 € für
+// Auswärtsessen". Eine Vertragsrate kann man nicht steuern; sie ist anderswo geplant und
+// steht im Monatsausblick in ihrer eigenen Zeile. Zählte sie zusätzlich gegen das Budget,
+// stünde dieselbe Zahlung zweimal in der Aufrechnung, und ein Rahmen, der (wie der
+// Budgetvorschlag ihn errechnet) den Vertragsanteil schon abgezogen hat, würde gegen
+// einen Verbrauch mitsamt Verträgen gemessen. Auf echten Daten: „Familie & Kinder",
+// Rahmen 110 €, zeigte 425 € Verbrauch — die Kinderbetreuung, ein erfasster Vertrag.
+//
+// Welche Buchungen das sind, entscheidet der Kern NICHT selbst: die Verknüpfung
+// Buchung↔Vertrag entsteht in `vertragszuordnung` (Anwendungsschicht) aus den
+// Erkennungsmustern. Sie kommt deshalb als Pflichtfeld in der `BudgetSicht` herein —
+// pflichtig, weil eine optionale Angabe genau an einer Aufrufstelle vergessen wird und
+// dort still eine falsche Zahl erzeugt. Genau so ist dieser Fehler entstanden.
+//
 // **Verschachtelung.** Budgets dürfen ineinander liegen: „Freizeit" monatlich, darin
 // „Urlaub" aufbauend. Dann gehört der Urlaub NICHT mehr zu Freizeit — weder sein Betrag
 // noch sein Verbrauch. Sonst zählte dieselbe Ausgabe zweimal, und der Monatsbetrag der
@@ -200,21 +214,33 @@ export function budgetRahmen(
  * Gezählt wird über `budgetKategorien`, nicht über den rohen Unterbaum: was ein
  * eingebettetes Budget beansprucht, belastet das Dach nicht noch einmal.
  */
-export function budgetVerbrauch(
-  buchungen: readonly IstBuchung[],
-  kategorien: readonly Kategorie[],
-  budget: Budget,
-  alle: readonly Budget[],
-  von: string,
-  bis: string,
-): Cent {
-  return budgetBuchungen(buchungen, kategorien, budget, alle, von, bis)
-    .reduce((s, p) => s + p.betrag, 0);
+export interface BudgetSicht {
+  readonly buchungen: readonly IstBuchung[];
+  readonly kategorien: readonly Kategorie[];
+  /** ALLE Budgets — für das Herausrechnen der ineinanderliegenden. */
+  readonly budgets: readonly Budget[];
+  /**
+   * IDs der Buchungen, die zu einem Vertrag gehören. Sie zählen NICHT gegen ein Budget
+   * (siehe Kopf). Pflichtfeld: eine leere Menge ist eine Aussage („keine Verträge
+   * bekannt") und muss hingeschrieben werden, nicht durch Weglassen entstehen.
+   */
+  readonly vertragsBuchungen: ReadonlySet<string>;
+}
+
+export function budgetVerbrauch(sicht: BudgetSicht, budget: Budget, von: string, bis: string): Cent {
+  return budgetBuchungen(sicht, budget, von, bis).reduce((s, p) => s + p.betrag, 0);
 }
 
 /** Ein Verbrauchsposten: welche Buchung mit welchem Teilbetrag auf das Budget zählt. */
 export interface Verbrauchsposten {
   readonly buchung: IstBuchung;
+  /**
+   * Index des Anteils innerhalb der Buchung. Zusammen mit `buchung.id` der Schlüssel,
+   * an dem der Monatsausblick erkennt, welche Anteile schon von einem Budget getragen
+   * werden — der Rest gehört unter „Sonstiges". Ohne ihn wäre ein Anteil, den kein
+   * Budget nimmt, unsichtbar, und die Ist-Spalte summierte nicht mehr auf.
+   */
+  readonly anteil: number;
   /** Die Kategorie DES ANTEILS — bei geteilten Buchungen nicht die der Buchung. */
   readonly kategorieId?: string;
   /** Beitrag zum Verbrauch, POSITIV (eine Erstattung ist entsprechend negativ). */
@@ -229,39 +255,38 @@ export interface Verbrauchsposten {
  * Stellen mit derselben Regel wären zwei Stellen, an denen sie auseinanderlaufen kann.
  */
 export function budgetBuchungen(
-  buchungen: readonly IstBuchung[],
-  kategorien: readonly Kategorie[],
+  sicht: BudgetSicht,
   budget: Budget,
-  alle: readonly Budget[],
   von: string,
   bis: string,
 ): Verbrauchsposten[] {
-  const relevant = budgetKategorien(budget, alle, kategorien);
+  const { buchungen, kategorien, budgets, vertragsBuchungen } = sicht;
+  const relevant = budgetKategorien(budget, budgets, kategorien);
   const raus: Verbrauchsposten[] = [];
   for (const b of buchungen) {
     if (b.charakter !== "Aufwand") continue;
     if (b.datum < von || b.datum >= bis) continue;
+    // Vertragsraten sind anderswo geplant und stehen im Ausblick in ihrer eigenen Zeile.
+    if (vertragsBuchungen.has(b.id)) continue;
     // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung (S-7) belastet
     // dieses Budget nur mit IHREM Teil, nicht mit dem vollen Betrag — und nicht gar nicht.
-    for (const a of kategorieAnteile(b)) {
+    kategorieAnteile(b).forEach((a, i) => {
       if (a.kategorieId && relevant.has(a.kategorieId)) {
-        raus.push({ buchung: b, kategorieId: a.kategorieId, betrag: -a.betrag });
+        raus.push({ buchung: b, anteil: i, kategorieId: a.kategorieId, betrag: -a.betrag });
       }
-    }
+    });
   }
   return raus.sort((x, y) => x.buchung.datum.localeCompare(y.buchung.datum));
 }
 
 /** Rahmen minus Verbrauch zum Monat von `am` — was noch da ist. Negativ = überzogen. */
 export function budgetStand(
-  buchungen: readonly IstBuchung[],
-  kategorien: readonly Kategorie[],
+  sicht: BudgetSicht,
   budget: Budget,
-  alle: readonly Budget[],
   am: string,
 ): { rahmen: Cent; verbraucht: Cent; rest: Cent } {
   const { von, bis } = verbrauchsFenster(budget, am);
-  const rahmen = budgetRahmen(budget, alle, kategorien, am);
-  const verbraucht = budgetVerbrauch(buchungen, kategorien, budget, alle, von, bis);
+  const rahmen = budgetRahmen(budget, sicht.budgets, sicht.kategorien, am);
+  const verbraucht = budgetVerbrauch(sicht, budget, von, bis);
   return { rahmen, verbraucht, rest: rahmen - verbraucht };
 }

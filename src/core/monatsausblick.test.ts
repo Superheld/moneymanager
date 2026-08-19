@@ -52,7 +52,11 @@ const budget = (over: Partial<Budget> = {}): Budget => ({
   ...over,
 });
 
-const basis = { regeln: [], budgets: [], ist: [], kategorien: KATEGORIEN, heute: "2026-08-16" };
+const basis = {
+  regeln: [], budgets: [], ist: [], kategorien: KATEGORIEN,
+  // Pflichtfeld: „keine Vertragszuordnung bekannt" ist eine Aussage und muss dastehen.
+  vertragsBuchungen: new Set<string>(), heute: "2026-08-16",
+};
 const zeile = (a: ReturnType<typeof monatsAusblick>, id: AusblickZeileId) =>
   a.zeilen.find((z) => z.id === id);
 
@@ -278,6 +282,27 @@ describe("monatsAusblick — Ist-Spalte des laufenden Monats", () => {
     const u = zeile(a, "umschichtung")!;
     expect(u.ist).toBe(euroZuCent(-350));
     expect(u.posten.map((p) => p.istId)).toEqual(["u1", "u2"]);
+  });
+
+  it("schiebt eine Vertragszahlung auf einer Budgetkategorie nach Sonstiges statt sie zu verlieren", () => {
+    // Der heikle Fall an der Vertragsregel: die Buchung hängt unter einer Budgetkategorie,
+    // wird vom Budget aber nicht getragen. Nähme „Sonstiges" (wie früher) alles, dessen
+    // KATEGORIE ausserhalb der Budgets liegt, fiele sie durch beide Zeilen — und die
+    // Ist-Spalte summierte nicht mehr auf das, was vom Konto ging.
+    const a = monatsAusblick({
+      ...basis,
+      budgets: [budget()],
+      ist: [
+        ist({ id: "rate", datum: "2026-08-02", betrag: euroZuCent(-425), kategorieId: "lebensmittel" }),
+        ist({ id: "frei", datum: "2026-08-06", betrag: euroZuCent(-30), kategorieId: "lebensmittel" }),
+      ],
+      vertragsBuchungen: new Set(["rate"]),
+      monatAb: "2026-08-01",
+    });
+    expect(zeile(a, "budgets")!.ist).toBe(euroZuCent(-30));
+    const s = zeile(a, "sonstiges")!;
+    expect(s.posten.map((p) => p.istId)).toEqual(["rate"]);
+    expect(a.restIst).toBe(euroZuCent(-455)); // beide Buchungen, jede genau einmal
   });
 
   it("die Ist-Spalte summiert auf alles Gebuchte des Monats", () => {

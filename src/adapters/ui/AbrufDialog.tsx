@@ -28,7 +28,10 @@ import {
   sqliteZahlungskontoRepository,
 } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
-import { sqliteVertragserkennungRepository } from "../persistence/sqliteVertragZuordnungRepositories";
+import {
+  sqliteVertragserkennungRepository,
+  sqliteVertragszuordnungRepository,
+} from "../persistence/sqliteVertragZuordnungRepositories";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, FormField } from "./ds";
 import { Modal } from "./Modal";
@@ -84,6 +87,11 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
         kontoRepo: sqliteZahlungskontoRepository,
         kategorieRepo: sqliteKategorieRepository,
         ledgerRepo: sqliteLedgerRepository,
+        // Der Abruf hängt die frisch gebuchten Zeilen selbst an ihre Verträge. Ohne das
+        // zählte jede abgerufene Vertragsrate gegen das Budget ihrer Kategorie, bis
+        // jemand zufällig einen Verträge-Screen öffnet.
+        erkennungRepo: sqliteVertragserkennungRepository,
+        vertragszuordnungRepo: sqliteVertragszuordnungRepository,
         umsatzRepo: sqliteUmsatzRepository,
         laufRepo: sqliteImportLaufRepository,
         id: () => crypto.randomUUID(),
