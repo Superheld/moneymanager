@@ -61,6 +61,9 @@ export {
   // Aus EINER Bewertung abgeleitet, keine Auswahl über den Bestand.
   verwechslungsmatrix,
   herkunftVon,
+  // Eigenschaften EINER Buchung bzw. EINES Empfängernamens.
+  istGeteilt,
+  musterVorschlag,
   anbieterSchluessel,
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,
@@ -111,6 +114,24 @@ export {
 export { zahlungsspuren } from "./zahlungsspuren";
 export { zuordnungenAbgleichen, zuordnungVonHand } from "./vertragszuordnung";
 export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertragsvorschlaege";
+export {
+  kontenLaden,
+  registerSicht,
+  ABRUF_QUELLEN,
+  type Kontensicht,
+  type Kontozeile,
+  type Registersicht,
+  type Registerzeile,
+  type KontenDeps,
+} from "./kontensichten";
+export { buchungErfassen, type BuchungEingabe } from "./buchungErfassen";
+export { umbuchungErfassen } from "./umbuchungErfassen";
+export { postenBezahltMarkieren, bezahltZuruecknehmen } from "./bezahltMarkieren";
+export {
+  buchungenSammelbearbeiten,
+  buchungenLoeschen,
+  type SammelAenderung,
+} from "./buchungenSammelbearbeiten";
 export {
   analyseLaden,
   analyseFenster,

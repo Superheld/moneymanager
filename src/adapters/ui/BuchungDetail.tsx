@@ -23,7 +23,8 @@
 // gehört. Sie lädt ihre Bezugsdaten (Konten, Kategorien, Umsätze, Import-Läufe, Regeln)
 // deshalb SELBST, statt sie sich von jedem Aufrufer durchreichen zu lassen — ein Dialog
 // wird selten geöffnet, und die Alternative wäre, jeden Screen mit Daten zu belasten, die
-// nur dieser Dialog braucht.
+// nur dieser Dialog braucht. „Selbst" heisst seit 2026-08-19: über `buchungsdetail()`
+// aus der Anwendungsschicht, nicht über acht Repositories von Hand.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -38,54 +39,43 @@ import {
   type Vertragszuordnung,
   type Zahlungskonto,
   type Zahlungsregel,
-} from "../../core";
-import { buchungBearbeiten, buchungErfassen, buchungLoeschen } from "../../application/buchungErfassen";
+} from "../../application";
 import {
   alsDuplikat,
   passtAlsGegenbein,
   ordneZu,
-  umsaetzeVerbuchen,
   verwerfen,
   zuruecksetzen,
   type Bewertung,
   type ImportLauf,
   type Umsatz,
 } from "../../application/import";
-import { umbuchungLoeschen } from "../../application/umbuchungErfassen";
-import { buchungSplitten, offenerRest, splitAufheben } from "../../application/buchungSplitten";
+import { offenerRest } from "../../application/buchungSplitten";
+import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../application/umbuchungAusBuchung";
 import {
+  buchungBearbeiten,
+  buchungErfassen,
+  buchungLoeschen,
   buchungenPaaren,
+  buchungSplitten,
+  buchungsdetail,
+  festlegungSpeichern,
   gegenbeinErzeugen,
   paarungLoesen,
-  paarungsKandidaten,
+  splitAufheben,
+  umbuchungLoeschen,
   umbuchungsBeinBearbeiten,
-  MAX_VORSCHLAG_TAGE,
-} from "../../application/umbuchungAusBuchung";
-import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
-import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
-import {
-  sqliteVertragszuordnungRepository as zuordnungRepo,
-  vertragsAbgleichDeps as abgleichDeps,
-} from "../persistence/sqliteVertragZuordnungRepositories";
-import {
-  zuordnungenAbgleichen,
-  zuordnungVonHand,
-  zuordnungZuruecksetzen,
-} from "../../application/vertragszuordnung";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import {
-  sqliteUmsatzRepository as umsatzRepo,
-  sqliteImportLaufRepository as importLaufRepo,
-} from "../persistence/sqliteImportRepositories";
+  umsaetzeBuchen,
+  umsatzSpeichern,
+  vertragszuordnungenAbgleichen,
+  vertragZuordnenVonHand,
+  vertragZuordnungZuruecksetzen,
+} from "../dienste";
 import { Button, FormField, Pill } from "./ds";
 import { IconButton } from "./IconButton";
 import { formularAusBuchung, VertragModal } from "./VertragModal";
 import { CategoryPicker } from "./CategoryPicker";
 import { MerkmaleBlock } from "./MerkmaleBlock";
-import { festlegungSetzen } from "../../application/kategoriefestlegungen";
-import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persistence/sqliteKategoriefestlegungRepository";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 import { geldFarbe } from "./geldFarbe";
@@ -407,56 +397,50 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         const auswahl = partnerEntwurf
           ? [entwurfMitEntscheidung(entwurf), { ...partnerEntwurf, vorschlag: { charakter: "Umschichtung" as const, quelle: "umbuchung" as const } }]
           : [entwurfMitEntscheidung(entwurf)];
-        await umsaetzeVerbuchen(auswahl, {
-          ledgerRepo,
-          umsatzRepo,
-          id: () => crypto.randomUUID(),
-        });
+        await umsaetzeBuchen(auswahl);
 
         // Alles Weitere hängt an der Ist-Buchung, die es vorher nicht gab: Paarung mit
         // einer schon gebuchten Zeile, ein erzeugtes Gegenbein, die Vertragszuordnung.
         // Deshalb wird die frisch entstandene Buchung hier nachgeschlagen — im Dialog
         // entschieden, nach dem Verbuchen angewandt.
-        const frisch = (await umsatzRepo.alle()).find((x) => x.id === entwurf.id);
+        const stand = await buchungsdetail();
+        const frisch = stand.umsaetze.find((x) => x.id === entwurf.id);
         const neueBuchung = frisch?.istbuchungId
-          ? (await ledgerRepo.alle()).find((b) => b.id === frisch.istbuchungId)
+          ? stand.buchungen.find((b) => b.id === frisch.istbuchungId)
           : undefined;
 
         if (neueBuchung && istUmschichtung) {
           if (gegenGewaehlt.startsWith("b:")) {
             const gegen = alleBuchungen.find((b) => b.id === gegenGewaehlt.slice(2));
-            if (gegen) await buchungenPaaren(ledgerRepo, neueBuchung, gegen);
+            if (gegen) await buchungenPaaren(neueBuchung, gegen);
           } else if (gegenGewaehlt === "__neu" && neuKontoGewaehlt) {
-            await gegenbeinErzeugen(ledgerRepo, neueBuchung, neuKontoGewaehlt);
+            await gegenbeinErzeugen(neueBuchung, neuKontoGewaehlt);
           }
         }
 
-        // Frisch verbuchte Zahlungen den Verträgen zuordnen — derselbe Schritt wie in der
-        // Inbox. Er gehört nicht in den Verbuchen-Use-Case: der schreibt Fakten, die
-        // Zuordnung ist eine Interpretation darüber.
-        await zuordnungenAbgleichen(abgleichDeps);
-        // ZULETZT die Handentscheidung: sie überstimmt, was der Abgleich gerechnet hat.
+        // `umsaetzeBuchen` hat die Zuordnungen schon abgeglichen. ZULETZT die
+        // Handentscheidung: sie überstimmt, was der Abgleich gerechnet hat.
         if (neueBuchung && vertragWahl && !istUmschichtung) {
-          await zuordnungVonHand(zuordnungRepo, neueBuchung.id, vertragWahl === "__keiner" ? null : vertragWahl);
+          await vertragZuordnenVonHand(neueBuchung.id, vertragWahl === "__keiner" ? null : vertragWahl);
         }
       } else if (!buchung) {
-        await buchungErfassen(ledgerRepo, { kontoId, datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
+        await buchungErfassen({ kontoId, datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
       } else if (gepaart) {
-        await umbuchungsBeinBearbeiten(ledgerRepo, buchung, { datum, notiz });
+        await umbuchungsBeinBearbeiten(buchung, { datum, notiz });
       } else {
-        await buchungBearbeiten(ledgerRepo, buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz, kontoId });
+        await buchungBearbeiten(buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz, kontoId });
         // Zieht das Konto um, zieht der Umsatz mit: sein `zahlungskontoId` ist das
         // Ergebnis des Konto-Matches beim Import, also eine Vermutung. Wer die Buchung
         // vor sich hat, korrigiert damit genau diese Vermutung — bliebe der Umsatz
         // stehen, zeigte die Herkunft weiter aufs alte Konto und die Dublettenprüfung
         // verglichen gegen den falschen Bestand.
         if (umsatz && kontoId !== umsatz.zahlungskontoId) {
-          await umsatzRepo.speichern({ ...umsatz, zahlungskontoId: kontoId });
+          await umsatzSpeichern({ ...umsatz, zahlungskontoId: kontoId });
         }
         // Die Festlegung entsteht NACH der Buchung: schlüge das Speichern fehl, stünde
         // sonst eine Regel für eine Änderung, die es nicht gibt.
         if (immer && kategorieId && musterAngebot) {
-          await festlegungSetzen(festlegungRepo, musterAngebot, kategorieId);
+          await festlegungSpeichern(musterAngebot, kategorieId);
         }
       }
       onSaved();
@@ -479,7 +463,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
     setFehler(null);
     setBusy(true);
     try {
-      await umsatzRepo.speichern(dublette ? alsDuplikat(entwurf) : verwerfen(entwurf));
+      await umsatzSpeichern(dublette ? alsDuplikat(entwurf) : verwerfen(entwurf));
       onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
@@ -919,7 +903,7 @@ function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung: IstBuc
   async function speichern() {
     setFehler(null);
     try {
-      await buchungSplitten(ledgerRepo, buchung, eingaben);
+      await buchungSplitten(buchung, eingaben);
       onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
@@ -1015,11 +999,11 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
     setFehler(null);
     try {
       if (wahl === "__neu") {
-        await gegenbeinErzeugen(ledgerRepo, buchung, neuKontoId);
+        await gegenbeinErzeugen(buchung, neuKontoId);
       } else {
         const gegen = alleBuchungen.find((b) => b.id === wahl);
         if (!gegen) return;
-        await buchungenPaaren(ledgerRepo, buchung, gegen);
+        await buchungenPaaren(buchung, gegen);
       }
       onSaved();
     } catch (e) {
@@ -1147,15 +1131,12 @@ export function BuchungDetail(props: {
   const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
 
   async function laden() {
-    const [ks, kats, rs, us, ls, bs, vs, zs] = await Promise.all([
-      kontoRepo.alle(), kategorieRepo.alle(), regelRepo.alle(),
-      umsatzRepo.alle(), importLaufRepo.alle(), ledgerRepo.alle(), vertragRepo.alle(),
-      zuordnungRepo.alle(),
-    ]);
-    setKonten(ks); setKategorien(kats); setRegeln(rs);
-    setUmsaetze(us); setLaeufe(ls); setAlle(bs); setVertraege(vs); setZuordnungen(zs);
+    const d = await buchungsdetail();
+    setKonten([...d.konten]); setKategorien([...d.kategorien]); setRegeln([...d.regeln]);
+    setUmsaetze([...d.umsaetze]); setLaeufe([...d.laeufe]); setAlle([...d.buchungen]);
+    setVertraege([...d.vertraege]); setZuordnungen([...d.zuordnungen]);
     // Die gezeigte Buchung aus dem frischen Stand nachziehen (nach dem Speichern).
-    setAktuelle((b) => (b ? bs.find((x) => x.id === b.id) ?? b : undefined));
+    setAktuelle((b) => (b ? d.buchungen.find((x) => x.id === b.id) ?? b : undefined));
   }
   useEffect(() => { laden(); }, []);
 
@@ -1217,7 +1198,7 @@ export function BuchungDetail(props: {
   async function umsaetzeZuruecksetzen(istIds: string[]) {
     for (const id of istIds) {
       const u = umsaetze.find((x) => x.istbuchungId === id);
-      if (u) await umsatzRepo.speichern(zuruecksetzen(u));
+      if (u) await umsatzSpeichern(zuruecksetzen(u));
     }
   }
 
@@ -1226,10 +1207,10 @@ export function BuchungDetail(props: {
     if (!aktuelle) return;
     if (aktuelle.transferId) {
       const beine = alle.filter((x) => x.transferId === aktuelle.transferId);
-      await umbuchungLoeschen(ledgerRepo, aktuelle.transferId);
+      await umbuchungLoeschen(aktuelle.transferId);
       await umsaetzeZuruecksetzen(beine.map((x) => x.id));
     } else {
-      await buchungLoeschen(ledgerRepo, aktuelle.id);
+      await buchungLoeschen(aktuelle.id);
       await umsaetzeZuruecksetzen([aktuelle.id]);
     }
     await onGeaendert();
@@ -1321,24 +1302,24 @@ export function BuchungDetail(props: {
               // Von Hand gesetzte Zuordnungen überleben jeden Abgleich — deshalb reicht
               // hier das Neuladen, es muss nichts nachgerechnet werden.
               zuordnen: async (vertragId) => {
-                await zuordnungVonHand(zuordnungRepo, aktuelle.id, vertragId);
+                await vertragZuordnenVonHand(aktuelle.id, vertragId);
                 await nachAenderung();
               },
               zuruecksetzen: async () => {
-                await zuordnungZuruecksetzen(zuordnungRepo, aktuelle.id);
+                await vertragZuordnungZuruecksetzen(aktuelle.id);
                 // Jetzt entscheidet wieder die Regel — also einmal rechnen lassen, sonst
                 // bliebe die Buchung bis zum nächsten Anlass unzugeordnet stehen.
-                await zuordnungenAbgleichen(abgleichDeps);
+                await vertragszuordnungenAbgleichen();
                 await nachAenderung();
               },
               neuAnlegen: () => setVertragAus(aktuelle),
             }
           : undefined
       }
-      onLoesen={async () => { if (!aktuelle?.transferId) return; await paarungLoesen(ledgerRepo, aktuelle.transferId); await nachAenderung(); onClose(); }}
+      onLoesen={async () => { if (!aktuelle?.transferId) return; await paarungLoesen(aktuelle.transferId); await nachAenderung(); onClose(); }}
       onGegenbuchung={setAktuelle}
       onSplitten={() => aktuelle && setSplitten(aktuelle)}
-      onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(ledgerRepo, aktuelle); await nachAenderung(); onClose(); }}
+      onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(aktuelle); await nachAenderung(); onClose(); }}
     />
   );
 }

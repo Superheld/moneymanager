@@ -5,7 +5,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Kategorie, Zahlungskonto } from "../../application";
+import { ABRUF_QUELLEN, type Kategorie, type Zahlungskonto } from "../../application";
 import {
   festlegungAnwenden,
   importLaeufe,
@@ -25,7 +25,6 @@ import {
 } from "../../application/import";
 import { festlegungAngebot } from "../../application/kategoriefestlegungen";
 import { Button, Card, Pill } from "./ds";
-import { ABRUF_QUELLEN } from "./NeueBuchungen";
 import { CategoryPicker } from "./CategoryPicker";
 import { useGeld } from "./einstellungenKontext";
 import { geldFarbe } from "./geldFarbe";

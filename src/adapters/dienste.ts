@@ -56,6 +56,31 @@ import { stammdatenLaden, type Stammdaten } from "../application/stammdatensicht
 import { inventarLaden, type Inventarsicht } from "../application/inventarsichten";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertragssichten";
+import { kontenLaden, type Kontensicht } from "../application/kontensichten";
+import { buchungsdetailLaden, type Buchungsdetaildaten } from "../application/buchungsdetail";
+import {
+  buchungBearbeiten as buchungBearbeitenUseCase,
+  buchungErfassen as buchungErfassenUseCase,
+  buchungLoeschen as buchungLoeschenUseCase,
+  type BuchungEingabe,
+} from "../application/buchungErfassen";
+import { umbuchungLoeschen as umbuchungLoeschenUseCase } from "../application/umbuchungErfassen";
+import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchungSplitten";
+import { paarungLoesen as paarungLoesenUseCase } from "../application/umbuchungAusBuchung";
+import {
+  buchungenPaaren as buchungenPaarenUseCase,
+  gegenbeinErzeugen as gegenbeinErzeugenUseCase,
+  umbuchungsBeinBearbeiten as umbuchungsBeinBearbeitenUseCase,
+} from "../application/umbuchungAusBuchung";
+import { zuordnungVonHand as zuordnungVonHandUseCase, zuordnungZuruecksetzen as zuordnungZuruecksetzenUseCase } from "../application/vertragszuordnung";
+import { umbuchungErfassen as umbuchungErfassenUseCase } from "../application/umbuchungErfassen";
+import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../application/bezahltMarkieren";
+import {
+  buchungenLoeschen as buchungenLoeschenUseCase,
+  buchungenSammelbearbeiten as buchungenSammelbearbeitenUseCase,
+  type SammelAenderung,
+} from "../application/buchungenSammelbearbeiten";
+import type { IstBuchung, Zahlungsregel } from "../core";
 import {
   vertragAktualisieren as vertragAktualisierenUseCase,
   vertragAnlegen as vertragAnlegenUseCase,
@@ -548,4 +573,112 @@ export function merkmaleZuBuchung(
     },
     quelle,
   );
+}
+
+
+// --- Konten ----------------------------------------------------------------
+
+/** Kontoliste und Registergrundlage — einmal geladen, danach rein gerechnet. */
+export function konten(): Promise<Kontensicht> {
+  return kontenLaden({
+    kontoRepo: sqliteZahlungskontoRepository,
+    ledger: sqliteLedgerRepository,
+    regelRepo: sqliteZahlungsregelRepository,
+    kategorieRepo: sqliteKategorieRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    laufRepo: sqliteImportLaufRepository,
+    kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
+  });
+}
+
+export function umbuchungErfassen(eingabe: Parameters<typeof umbuchungErfassenUseCase>[1]) {
+  return umbuchungErfassenUseCase(sqliteLedgerRepository, eingabe);
+}
+
+export function alsBezahltMarkieren(regel: Zahlungsregel, faelligkeit: string, kontoId: string) {
+  return postenBezahltMarkieren(sqliteLedgerRepository, { regel, faelligkeit, kontoId });
+}
+
+export function bezahltZurueck(quelleId: string, faelligkeit: string) {
+  return bezahltZuruecknehmen(sqliteLedgerRepository, quelleId, faelligkeit);
+}
+
+export function buchungenSammelbearbeiten(
+  buchungen: readonly IstBuchung[],
+  aenderung: SammelAenderung,
+  kategorien: readonly Kategorie[],
+) {
+  return buchungenSammelbearbeitenUseCase(sqliteLedgerRepository, buchungen, aenderung, kategorien);
+}
+
+export function buchungenLoeschen(
+  buchungen: readonly IstBuchung[],
+  gesperrteIds: ReadonlySet<string>,
+) {
+  return buchungenLoeschenUseCase(sqliteLedgerRepository, buchungen, gesperrteIds);
+}
+
+
+// --- Buchungsdialog --------------------------------------------------------
+
+/** Alles, was der Dialog LESEND braucht — Herkunft, Gegenbein, Vertrag, Auswahl. */
+export function buchungsdetail(): Promise<Buchungsdetaildaten> {
+  return buchungsdetailLaden({
+    kontoRepo: sqliteZahlungskontoRepository,
+    kategorieRepo: sqliteKategorieRepository,
+    regelRepo: sqliteZahlungsregelRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    laufRepo: sqliteImportLaufRepository,
+    ledger: sqliteLedgerRepository,
+    vertragRepo: sqliteVertragRepository,
+    zuordnungRepo: sqliteVertragszuordnungRepository,
+  });
+}
+
+export function buchungErfassen(eingabe: BuchungEingabe) {
+  return buchungErfassenUseCase(sqliteLedgerRepository, eingabe);
+}
+
+export function buchungBearbeiten(buchung: IstBuchung, eingabe: Parameters<typeof buchungBearbeitenUseCase>[2]) {
+  return buchungBearbeitenUseCase(sqliteLedgerRepository, buchung, eingabe);
+}
+
+export function buchungLoeschen(id: string) {
+  return buchungLoeschenUseCase(sqliteLedgerRepository, id);
+}
+
+export function umbuchungLoeschen(transferId: string) {
+  return umbuchungLoeschenUseCase(sqliteLedgerRepository, transferId);
+}
+
+export function buchungSplitten(buchung: IstBuchung, teile: Parameters<typeof buchungSplittenUseCase>[2]) {
+  return buchungSplittenUseCase(sqliteLedgerRepository, buchung, teile);
+}
+
+export function splitAufheben(buchung: IstBuchung) {
+  return splitAufhebenUseCase(sqliteLedgerRepository, buchung);
+}
+
+export function buchungenPaaren(a: IstBuchung, b: IstBuchung) {
+  return buchungenPaarenUseCase(sqliteLedgerRepository, a, b);
+}
+
+export function gegenbeinErzeugen(buchung: IstBuchung, kontoId: string) {
+  return gegenbeinErzeugenUseCase(sqliteLedgerRepository, buchung, kontoId);
+}
+
+export function umbuchungsBeinBearbeiten(buchung: IstBuchung, eingabe: Parameters<typeof umbuchungsBeinBearbeitenUseCase>[2]) {
+  return umbuchungsBeinBearbeitenUseCase(sqliteLedgerRepository, buchung, eingabe);
+}
+
+export function vertragZuordnenVonHand(istbuchungId: string, vertragId: string | null) {
+  return zuordnungVonHandUseCase(sqliteVertragszuordnungRepository, istbuchungId, vertragId);
+}
+
+export function vertragZuordnungZuruecksetzen(istbuchungId: string) {
+  return zuordnungZuruecksetzenUseCase(sqliteVertragszuordnungRepository, istbuchungId);
+}
+
+export function paarungLoesen(transferId: string) {
+  return paarungLoesenUseCase(sqliteLedgerRepository, transferId);
 }
