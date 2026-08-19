@@ -38,6 +38,7 @@ npm run dev         # nur Frontend (Webview ohne SQLite-Plugin)
 npm test            # Vitest (Kern, Use-Cases, Repositories, UI — alles via sql.js/jsdom)
 npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 % global)
 npm run typecheck
+npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
 ```
 - **Node kommt über mise** (`mise.toml`: node 26). In einer nicht-interaktiven Shell ist
   `mise` keine Funktion — dann `eval "$(/opt/homebrew/bin/mise env -s bash)"` voranstellen,
@@ -59,7 +60,8 @@ npm run typecheck
 ## Schichten
 `core` (reine Domäne, kein IO) ← `application` (Use-Cases + Ports) ← `adapters`
 (`persistence/` SQLite via tauri-plugin-sql, `ui/` React). `core` importiert nichts nach
-außen. Tests als `*.test.ts` neben dem Code.
+außen. Tests als `*.test.ts` neben dem Code. Die Grenze gilt dem PRODUKTIVcode: ein Test
+darf schichtübergreifend prüfen und in `core/` liegen, obwohl er aus `application` importiert.
 
 In `ui/`:
 - `ds/` ist aus dem Design-System kopiert — dort nichts erfinden, eigene Bausteine nach `ui/`.
@@ -71,11 +73,14 @@ In `ui/`:
   Kategorie-Lookup meldet dann für einen Render „ohne Kategorie".
 
 ## Invarianten, die beißen
-- **Geld = Integer Cent**, nie Float. Formatierung über `formatBetrag` (U+2212-Minus).
-  Durchgesetzt wird das an der Anwendungsgrenze mit `istCent()` — jeder Use-Case, der
-  Beträge annimmt, prüft damit. `parseBetrag` liefert `null` bei unplausibler Eingabe
-  (Müll, Exponent, jenseits des sicheren Integer-Bereichs), statt still eine falsche Zahl
-  zu erzeugen; es erkennt nachgestelltes Minus, U+2212 und Klammer-Notation.
+- **Geld = Integer Cent**, nie Float. Formatiert wird über `useGeld()` (UI) bzw.
+  `geldFormatieren`/`geldFormatierenMitSymbol` (Kern) — nie mit eigenem `toFixed` und nie
+  an der Währungs-/Locale-Schicht vorbei. Minus ist U+2212.
+  Die Cent-Invariante wird an der Anwendungsgrenze mit `istCent()` durchgesetzt — jeder
+  Use-Case, der Beträge annimmt, prüft damit. `parseBetrag` liefert `null` bei
+  unplausibler Eingabe (Müll, Exponent, jenseits des sicheren Integer-Bereichs), statt
+  still eine falsche Zahl zu erzeugen; es erkennt nachgestelltes Minus, U+2212 und
+  Klammer-Notation.
 - **Datumsangaben:** `parseIso` WIRFT bei nicht existierenden Daten („2026-02-31", Tag oder
   Monat `00`). Die Regex-Prüfungen der Use-Cases prüfen nur die FORM — die Existenz prüft
   der Kern. `toIso` polstert das Jahr vierstellig, weil die gesamte Datumsordnung über
