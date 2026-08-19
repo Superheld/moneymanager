@@ -334,6 +334,29 @@ describe("ReviewScreen", () => {
     );
   });
 
+  it("legt eine Zeile weg, die nie übernommen wird", async () => {
+    // Der gemeldete Fall: neun Zeilen aus einem Dateiimport standen dauerhaft in der
+    // Inbox — ohne Kategorie, ohne Weg nach vorn und ohne Weg hinaus.
+    await grunddaten();
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
+      betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
+      verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<ReviewScreen />);
+    await screen.findByText("Buchhandlung Beispiel");
+
+    await nutzer.click(screen.getByLabelText(/diese zeile weglegen/i));
+
+    await waitFor(() => expect(screen.queryByText("Buchhandlung Beispiel")).not.toBeInTheDocument());
+    // Weggelegt heisst nicht gelöscht: die Zeile bleibt und zählt bei der
+    // Dublettenprüfung weiter mit.
+    const alle = await sqliteUmsatzRepository.alle();
+    expect(alle).toHaveLength(1);
+    expect(alle[0].status).toBe("verworfen");
+  });
+
   it("zeigt bei jedem Vorschlag, woher er kommt", async () => {
     await grunddaten();
     await sqliteUmsatzRepository.speichern({

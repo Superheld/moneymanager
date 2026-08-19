@@ -9,6 +9,7 @@ import { festlegungTrifft, type Kategorie, type Zahlungskonto } from "../../core
 import {
   kategorisieren,
   umsaetzeVerbuchen,
+  verwerfen,
   vorschlagsbefundFuer,
   type Umsatz,
   type VerbuchenErgebnis,
@@ -34,6 +35,7 @@ import { ABRUF_QUELLEN } from "./NeueBuchungen";
 import { CategoryPicker } from "./CategoryPicker";
 import { useGeld } from "./einstellungenKontext";
 import { geldFarbe } from "./geldFarbe";
+import { IconButton } from "./IconButton";
 
 const SEITE_GROESSE = 100;
 
@@ -105,6 +107,8 @@ export function ReviewScreen() {
   // ein Knopf an jeder Zeile wäre eine Einladung, die Liste zuzumüllen.
   const [angebot, setAngebot] = useState<{ umsatzId: string; muster: string; kategorieId: string } | null>(null);
   const [festgelegt, setFestgelegt] = useState<{ muster: string; weitere: number } | null>(null);
+  /** Zweite Frage vor dem Sammel-Verwerfen — es betrifft alles, was gerade sichtbar ist. */
+  const [verwerfenGefragt, setVerwerfenGefragt] = useState(false);
 
   async function laden() {
     try {
@@ -221,6 +225,42 @@ export function ReviewScreen() {
     }
   }
 
+  /**
+   * Eine Zeile aus dem Stapel nehmen, ohne sie zu buchen.
+   *
+   * Bis 2026-08-19 gab es das hier nicht: was ein Dateiimport hereinbrachte und niemand
+   * kategorisierte, blieb für immer stehen. Auf dem echten Bestand waren das neun Zeilen
+   * aus einem Import vom Vortag — sichtbar, aber ohne Weg nach vorn oder zurück.
+   *
+   * Verworfen heisst NICHT gelöscht: die Zeile bleibt in der Datenbank (Status
+   * `verworfen`) und zählt bei der Dublettenprüfung weiter mit. „Das habe ich schon
+   * einmal weggeworfen" ist genau die Auskunft, die man beim nächsten Import braucht.
+   */
+  async function zeileVerwerfen(u: Umsatz) {
+    try {
+      await sqliteUmsatzRepository.speichern(verwerfen(u));
+      setUmsaetze((prev) => prev.filter((x) => x.id !== u.id));
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /** Alles, was gerade in der Liste steht und keine Kategorie hat, auf einmal weglegen. */
+  async function restVerwerfen() {
+    setBusy(true);
+    setFehler(null);
+    try {
+      const offeneZeilen = gefiltert.filter((u) => !u.vorschlag);
+      for (const u of offeneZeilen) await sqliteUmsatzRepository.speichern(verwerfen(u));
+      await laden();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+      setVerwerfenGefragt(false);
+    }
+  }
+
   async function verbuchen() {
     setBusy(true);
     setFehler(null);
@@ -271,6 +311,22 @@ export function ReviewScreen() {
               <Button variant="primary" onClick={busy || fertig === 0 ? undefined : verbuchen} style={busy || fertig === 0 ? { opacity: 0.5, cursor: busy ? "wait" : "not-allowed" } : undefined}>
                 {busy ? t("review.verbuchenBusy") : t("review.verbuchen", { n: fertig })}
               </Button>
+              {/* Der Gegenweg zum Verbuchen: was hier nie eine Kategorie bekommt, soll
+                  auch verschwinden können — sonst steht der Rest eines Imports für immer
+                  in der Inbox. */}
+              {offen > 0 && (
+                verwerfenGefragt ? (
+                  <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", fontSize: "var(--fs-xs)" }}>
+                    <span className="muted">{t("review.verwerfenFrage", { n: gefiltert.filter((u) => !u.vorschlag).length })}</span>
+                    <button className="linkbtn" style={{ color: "var(--warn-deep)" }} onClick={() => void restVerwerfen()}>{t("review.verwerfenJa")}</button>
+                    <button className="linkbtn" onClick={() => setVerwerfenGefragt(false)}>{t("review.verwerfenNein")}</button>
+                  </span>
+                ) : (
+                  <button className="linkbtn" onClick={() => setVerwerfenGefragt(true)}>
+                    {t("review.restVerwerfen")}
+                  </button>
+                )
+              )}
             </div>
           }
         >
@@ -301,6 +357,7 @@ export function ReviewScreen() {
                 <th style={th}>{t("review.spalteGegenpartei")}</th>
                 <th style={{ ...th, textAlign: "right" }}>{t("review.spalteBetrag")} {geld.symbol}</th>
                 <th style={{ ...th, minWidth: 220 }}>{t("review.spalteKategorie")}</th>
+                <th style={{ ...th, width: 40 }} />
               </tr>
             </thead>
             <tbody>
@@ -327,6 +384,14 @@ export function ReviewScreen() {
                         <button className="linkbtn" onClick={() => setAngebot(null)}>{t("review.festlegung.nein")}</button>
                       </div>
                     )}
+                  </td>
+                  <td style={{ ...td, textAlign: "right" }}>
+                    <IconButton
+                      icon="verwerfen"
+                      ton="gefahr"
+                      label={t("review.zeileVerwerfen")}
+                      onClick={() => void zeileVerwerfen(u)}
+                    />
                   </td>
                 </tr>
               ))}

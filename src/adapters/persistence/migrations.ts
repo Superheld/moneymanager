@@ -604,4 +604,16 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE ist_buchung DROP COLUMN verwendung_topf_id`,
     ],
   },
+  {
+    version: 32, // Nicht jeder Vertrag ist ein Abo
+    sql: [
+      // Arbeitsvertrag, Mietvertrag, Kindergeld: wiederkehrende Zahlungen mit Fristen,
+      // aber niemand sucht dort die nächste Gelegenheit auszusteigen. Bis hierher bekam
+      // ein Arbeitsvertrag ohne Mindestlaufzeit dieselbe Behandlung wie ein Abo
+      // („heute kündbar, bald!") und stand in der Warnung, die den kündbaren Verträgen
+      // gehört. Bestand bleibt „abo" — das war die bisherige Annahme, und sie stimmt
+      // für die Mehrheit.
+      `ALTER TABLE vertrag ADD COLUMN art TEXT NOT NULL DEFAULT 'abo'`,
+    ],
+  },
 ];

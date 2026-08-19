@@ -17,6 +17,7 @@ import {
   type Person,
   type Rhythmus,
   type Verlaengerungsart,
+  type Vertragsart,
   type Vertrag,
   type Vertragskandidat,
   type Zahlungskonto,
@@ -64,6 +65,7 @@ export interface VertragFormular {
   mindestlaufzeit: string;
   verlaengerung: Verlaengerungsart;
   verlaengerungMonate: string;
+  art: Vertragsart;
   kuendigungsfrist: string;
   betragText: string;
   rhythmus: Rhythmus;
@@ -88,6 +90,7 @@ export function leeresFormular(heute: string): VertragFormular {
     mindestlaufzeit: "",
     verlaengerung: "automatisch",
     verlaengerungMonate: "12",
+    art: "abo",
     kuendigungsfrist: "",
     betragText: "",
     rhythmus: "monatlich",
@@ -113,6 +116,7 @@ export function formularAusVertrag(v: Vertrag, r: Zahlungsregel | undefined, gel
     mindestlaufzeit: v.mindestlaufzeitMonate != null ? String(v.mindestlaufzeitMonate) : "",
     verlaengerung: v.verlaengerung,
     verlaengerungMonate: v.verlaengerungMonate != null ? String(v.verlaengerungMonate) : "12",
+    art: v.art ?? "abo",
     kuendigungsfrist: v.kuendigungsfristMonate != null ? String(v.kuendigungsfristMonate) : "",
     betragText: r ? String(minorZuMajor(Math.abs(r.betrag), geld.waehrung)) : "",
     rhythmus: r?.rhythmus ?? "monatlich",
@@ -294,6 +298,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
       mindestlaufzeitMonate: f.mindestlaufzeit ? Number(f.mindestlaufzeit) : undefined,
       verlaengerung: f.verlaengerung,
       verlaengerungMonate: f.verlaengerungMonate ? Number(f.verlaengerungMonate) : undefined,
+      art: f.art,
       kuendigungsfristMonate: f.kuendigungsfrist ? Number(f.kuendigungsfrist) : undefined,
       betrag: geld.parse(f.betragText) ?? 0,
       rhythmus: f.rhythmus,
@@ -394,6 +399,14 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
         einklappbar
       >
         <div className="form-grid">
+          {/* Die Art steht VOR den Fristen: sie entscheidet, ob die Kündigungswarnung
+              überhaupt gemeint ist. */}
+          <FormField label={t("vertraege.feldArt")} hint={t(`vertraege.artHinweis.${f.art}`)}>
+            <select className="field" aria-label={t("vertraege.feldArt")} value={f.art} onChange={(e) => setze("art", e.target.value as Vertragsart)}>
+              <option value="abo">{t("vertraege.art.abo")}</option>
+              <option value="dauervertrag">{t("vertraege.art.dauervertrag")}</option>
+            </select>
+          </FormField>
           <FormField label={t("vertraege.feldBeginn")} hint={t("vertraege.feldBeginnHinweis")}>
             <input className="field" type="date" value={f.beginn} onChange={(e) => setze("beginn", e.target.value)} />
           </FormField>

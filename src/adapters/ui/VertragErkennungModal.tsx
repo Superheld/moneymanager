@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import {
   anbieterSchluessel,
   minorZuMajor,
+  erkennungsDiagnose,
   passtZu,
   type Erkennungsmerkmal,
   type Merkmalsart,
@@ -145,6 +146,33 @@ export function VertragErkennungModal({
       .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0));
   }, [regel, spuren]);
 
+  /**
+   * Wo die Kette abreisst.
+   *
+   * Ohne diese Aufschlüsselung war die Vorschau bei null Treffern stumm: das Muster
+   * konnte passen und trotzdem verschwand alles an der Betragsspanne, die
+   * `standardErkennung` beim Anlegen mitgibt. Wer dann `*ard*` tippte und nichts sah,
+   * kam zu dem Schluss, dass Platzhalter nicht funktionieren. Sie tun es — nur ein
+   * Filter dahinter räumte auf.
+   */
+  const diagnose = useMemo(
+    () => (regel && regel.merkmale.length > 0 ? erkennungsDiagnose(regel, spuren) : null),
+    [regel, spuren],
+  );
+
+  /** Die Stufe, die am meisten weggenommen hat — nur wenn es überhaupt eine gibt. */
+  const engstelle = useMemo(() => {
+    if (!diagnose) return null;
+    const stufen = [
+      { schluessel: "merkmale", vorher: diagnose.grundmenge, nachher: diagnose.nachMerkmalen },
+      { schluessel: "betrag", vorher: diagnose.nachMerkmalen, nachher: diagnose.nachBetrag },
+      { schluessel: "zeitraum", vorher: diagnose.nachBetrag, nachher: diagnose.nachZeitraum },
+      { schluessel: "konto", vorher: diagnose.nachZeitraum, nachher: diagnose.nachKonto },
+    ].filter((x) => x.vorher > x.nachher);
+    if (stufen.length === 0) return null;
+    return stufen.reduce((a, b) => (b.vorher - b.nachher > a.vorher - a.nachher ? b : a));
+  }, [diagnose]);
+
   async function speichern() {
     if (!regel) return;
     setFehler(null);
@@ -254,6 +282,16 @@ export function VertragErkennungModal({
                 {t("vertraege.regel.trefferHinweis")}
               </span>
             </div>
+
+            {/* Wo die Kette abreisst — nur zeigen, wenn wirklich etwas verlorengeht. */}
+            {engstelle && (
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 8 }}>
+                {t(`vertraege.regel.engstelle.${engstelle.schluessel}`, {
+                  weg: engstelle.vorher - engstelle.nachher,
+                  uebrig: engstelle.nachher,
+                })}
+              </div>
+            )}
 
             {treffer.slice(0, VORSCHAU_ZEILEN).map((s) => (
               <div key={s.id} style={{ display: "flex", gap: "var(--sp-3)", padding: "4px 0", alignItems: "baseline", fontSize: 13, borderBottom: "1px solid var(--line-soft)" }}>
