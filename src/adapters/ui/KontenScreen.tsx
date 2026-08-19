@@ -17,7 +17,6 @@ import {
   type RegisterZeile,
   type Zahlungskonto,
 } from "../../application";
-import { type Umsatz } from "../../application/import";
 import {
   alsBezahltMarkieren,
   bezahltZurueck,
@@ -29,7 +28,6 @@ import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { BuchungDetail } from "./BuchungDetail";
 import { SammelDialog } from "./SammelDialog";
 import { AbrufDialog } from "./AbrufDialog";
-import { NeueBuchungen } from "./NeueBuchungen";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
 import { IconButton } from "./IconButton";
@@ -39,7 +37,6 @@ import { geldFarbe } from "./geldFarbe";
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
 const LEERE_IDS: ReadonlySet<string> = new Set();
-const LEERE_PAARE: ReadonlySet<string> = new Set();
 
 const TAGE_OPTIONEN = [14, 30, 60, 90];
 const ART_OPTS = [
@@ -91,8 +88,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [auswahlModus, setAuswahlModus] = useState(false);
   const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
   const [sammelOffen, setSammelOffen] = useState(false);
-  /** Die abgerufene Zeile, die gerade im Dialog liegt — noch nichts davon ist gebucht. */
-  const [entwurf, setEntwurf] = useState<Umsatz | null>(null);
   const [abruf, setAbruf] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
@@ -103,11 +98,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   async function laden() {
     const s = await kontenLaden();
     setSicht(s);
-    // Vorauswahl: das Konto, auf das etwas wartet. Sonst steht die Übersicht auf dem
-    // ersten Konto nach Alphabet („Bargeld"), und die abgerufenen Buchungen des
-    // Girokontos sieht man erst, wenn man zufällig die richtige Zeile anklickt.
-    const wartet = s.zeilen.find((z) => z.wartet > 0);
-    setAktivId((id) => id || wartet?.konto.id || s.zeilen[0]?.konto.id || "");
+    setAktivId((id) => id || s.zeilen[0]?.konto.id || "");
   }
   useEffect(() => {
     laden();
@@ -127,8 +118,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const kontozeilen = sicht?.zeilen ?? [];
   const kategorien = sicht?.kategorien ?? [];
   const ist = sicht?.buchungen ?? [];
-  const umsaetze = sicht?.umsaetze ?? [];
-  const neueAbrufe = sicht?.neueAbrufe ?? [];
   const kontoName = sicht?.kontoNamen ?? LEERE_NAMEN;
   const ausBankabruf = sicht?.ausBankabruf ?? LEERE_IDS;
   const aktivZeile = kontozeilen.find((z) => z.konto.id === aktivId);
@@ -262,13 +251,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               { key: "bezeichnung", label: t("konten.spalteBezeichnung"), render: (z) => (<span style={{ fontWeight: z.konto.id === aktivId ? "var(--fw-bold)" : "var(--fw-semi)" }}>{z.konto.bezeichnung}</span>) },
               { key: "typ", label: t("konten.spalteTyp"), sortValue: (z) => z.konto.typ, render: (z) => <Pill variant="neutral">{t(`konten.typ.${z.konto.typ}`)}</Pill> },
               {
-                key: "wartet",
-                label: t("konten.spalteWartet"),
-                align: "right" as const,
-                sortValue: (z) => z.wartet,
-                render: (z) => (z.wartet > 0 ? <Pill variant="plan">{t("konten.wartet", { n: z.wartet })}</Pill> : "—"),
-              },
-              {
                 key: "verbindung",
                 label: t("konten.spalteVerbindung"),
                 sortValue: (z) => (z.online ? "0" : "1"),
@@ -291,32 +273,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         <AbrufDialog
           onClose={() => setAbruf(false)}
           onFertig={() => void laden()}
-        />
-      )}
-
-      {/* Was die Bank gebracht hat, steht VOR dem Register: es ist noch nicht Teil des
-          Saldos und wartet auf eine Entscheidung. */}
-      {aktivId && (
-        <NeueBuchungen
-          zeilen={neueAbrufe.filter((u) => u.zahlungskontoId === aktivId)}
-          freigegeben={sicht?.freigegeben ?? LEERE_PAARE}
-          // Verglichen wird gegen alles, was auf diesem Konto schon liegt — verbucht,
-          // offen ODER verworfen, nur nicht gegen die neuen Zeilen selbst.
-          bestand={umsaetze.filter(
-            (u) => u.zahlungskontoId === aktivId && !neueAbrufe.some((n) => n.id === u.id),
-          )}
-          // Weggelegte Zeilen desselben Kontos aus einem Abruf — der Rückweg.
-          weggelegte={umsaetze.filter(
-            (u) =>
-              u.zahlungskontoId === aktivId &&
-              (u.status === "verworfen" || u.status === "duplikat") &&
-              (sicht?.abrufLaeufe.has(u.laufId) ?? false),
-          )}
-          alleNeuen={neueAbrufe}
-          konten={kontozeilen.map((z) => z.konto)}
-          kategorien={[...kategorien]}
-          onOeffnen={setEntwurf}
-          onGeaendert={() => void laden()}
         />
       )}
 
@@ -619,16 +575,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           gesperrteIds={ausBankabruf}
           onClose={() => setSammelOffen(false)}
           onGeaendert={async () => { setAuswahl(new Set()); await laden(); }}
-        />
-      )}
-
-      {/* Derselbe Dialog für die Bankzeile — er schreibt erst beim Übernehmen oder
-          Verwerfen. Wegklicken lässt den Entwurf unangetastet stehen. */}
-      {entwurf && (
-        <BuchungDetail
-          entwurf={entwurf}
-          onClose={() => setEntwurf(null)}
-          onGeaendert={laden}
         />
       )}
 

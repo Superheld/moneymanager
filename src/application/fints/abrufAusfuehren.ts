@@ -17,14 +17,20 @@
 //  3. **Der Saldo der Bank wird immer mitgeholt**, in einem eigenen try: er ist die
 //     zweite, unabhängige Aussage über das Konto und die einzige Möglichkeit zu merken,
 //     dass eine Buchung fehlt. Scheitert er, laufen die Umsätze trotzdem — und umgekehrt.
-//  4. **Was unverdächtig ist, wird SOFORT gebucht.** Bis hierher landete alles in einer
-//     Warteliste am Konto und musste einzeln bestätigt werden — ein Schritt, der in der
-//     Praxis nur aus Klicken bestand: was die Bank meldet, IST passiert, daran gibt es
-//     nichts zu bestätigen. Was bleibt, ist die Frage, die man wirklich beantworten
-//     muss: ob eine Zeile schon einmal da war. Deshalb wird alles ohne
-//     Dublettenverdacht direkt verbucht, und in der Warteliste steht nur noch, was die
-//     Dedup als möglichen Zwilling markiert hat. Ohne diese Trennung führte der Rückgriff
-//     (Punkt 1) jeden Abruf zu Doppelbuchungen.
+//  4. **Alles wird SOFORT gebucht — auch die Verdachtsfälle.** Bis hierher landete alles
+//     in einer Warteliste am Konto und musste einzeln bestätigt werden; ein Schritt, der
+//     in der Praxis nur aus Klicken bestand: was die Bank meldet, IST passiert, daran
+//     gibt es nichts zu bestätigen. Seit 2026-08-19 blieben immerhin die Verdachtsfälle
+//     dort stehen — die Frage „war das schon einmal da?" ist die einzige, die man
+//     wirklich beantworten muss.
+//
+//     Seit 2026-08-20 steht sie am richtigen Ort: im Kontoauszug selbst. Beide Zeilen
+//     tragen dort die Markierung, mit Gründen, mit dem Weg zum Gegenstück und mit „kein
+//     Duplikat" für den Fall, dass der Finder danebenlag. Das ist mehr Zusammenhang, als
+//     eine Warteliste vor dem Saldo je hatte — und es macht die Warteliste überflüssig.
+//     Der Preis: eine mögliche Dublette zählt kurz im Saldo mit, bis du sie ansiehst.
+//     Der Rückgriff (Punkt 1) erzeugt genau solche Zeilen, deshalb ist die Markierung
+//     kein Nebenweg, sondern der Hauptweg.
 
 import type {
   ImportLaufRepository, KategorieRepository, LedgerPort, UmsatzRepository,
@@ -203,12 +209,9 @@ export async function abrufAusfuehren(
         },
       );
 
-      // Direkt verbuchen, was keinen Dublettenverdacht trägt. Nur die Verdachtsfälle
-      // bleiben als Entwurf stehen und warten auf eine Entscheidung — sie sind der
-      // einzige Fall, in dem es überhaupt etwas zu entscheiden gibt.
-      const frisch = (await deps.umsatzRepo.offene()).filter(
-        (u) => u.laufId === ergebnis.laufId && !u.verdachtAufId,
-      );
+      // Alles aus diesem Lauf direkt verbuchen. Ein Verdacht hält nichts mehr auf: er
+      // steht am Umsatz und wird im Auszug an BEIDEN Zeilen gezeigt (siehe Kopf, 4).
+      const frisch = (await deps.umsatzRepo.offene()).filter((u) => u.laufId === ergebnis.laufId);
       if (frisch.length > 0) {
         await umsaetzeVerbuchen(frisch, {
           ledgerRepo: deps.ledgerRepo,
