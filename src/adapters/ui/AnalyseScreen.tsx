@@ -1,20 +1,21 @@
-// Historie (Rückblick) — Gegenstück zur zukunfts-reinen Übersicht: echte Einnahmen/
-// Ausgaben pro Monat aus den verbuchten Ist-Buchungen + realer Saldo-Verlauf über die Zeit.
+// Analyse (Rückblick) — echte Einnahmen und Ausgaben pro Monat aus den verbuchten
+// Ist-Buchungen, realer Saldo-Verlauf über die Zeit, Aufschlüsselung nach Kategorien.
 // Zeitraum wählbar (12/24 Monate, dieses Jahr, alles). Alles Geld über useGeld().
+//
+// Abgetrennt von der Übersicht (2026-08-19): dort steht, was JETZT gilt — die drei
+// Monatskarten und die Budgets des laufenden Monats. Alles, was einen Zeitraum
+// auswertet, hat einen eigenen Bereich bekommen. Vorher war das ein Screen, den man
+// nach unten scrollen musste, bis die Kategorien kamen.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { addMonate, buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, nachHauptgruppe, toIso, type Budget, type GruppenSumme, type Inventargegenstand, type IstBuchung, type Kategorie, type Zahlungskonto, type Zahlungsregel } from "../../core";
+import { addMonate, buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, nachHauptgruppe, toIso, type GruppenSumme, type IstBuchung, type Kategorie, type Zahlungskonto } from "../../core";
 import type { Umsatz } from "../../application/import";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository as kontoRepo, sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
-import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
-import { sqliteInventarRepository as inventarRepo } from "../persistence/sqliteInventarRepository";
 import { Button, Card, CoverageTrack, DataTable, KPIStat } from "./ds";
 import { BuchungDetail } from "./BuchungDetail";
-import { MonatsAusblick } from "./MonatsAusblick";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { PageHead } from "./PageHead";
@@ -165,22 +166,13 @@ function aktuellerMonat(): { y: number; m: number; d: number } {
   return { y: n.getFullYear(), m: n.getMonth() + 1, d: 1 };
 }
 
-function heuteIso(): string {
-  const n = new Date();
-  return toIso({ y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() });
-}
-
-export function HistorieScreen() {
+export function AnalyseScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
   const [ist, setIst] = useState<IstBuchung[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
-  const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [inventar, setInventar] = useState<Inventargegenstand[]>([]);
-  const heute = useMemo(heuteIso, []);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("12");
   const [aktivMonat, setAktivMonat] = useState<number | null>(null);
   const [offeneKat, setOffeneKat] = useState<string | null>(null);
@@ -202,17 +194,13 @@ export function HistorieScreen() {
   // Aufschlüsselung gegen eine noch leere Kategorie-Liste rechnet (sonst „ohne Kategorie").
   async function laden() {
     try {
-      const [i, k, kat, u, r, b, inv] = await Promise.all([
-        ledgerRepo.alle(), kontoRepo.alle(), kategorieRepo.alle(), umsatzRepo.alle(), regelRepo.alle(), budgetRepo.alle(),
-        inventarRepo.alle(),
+      const [i, k, kat, u] = await Promise.all([
+        ledgerRepo.alle(), kontoRepo.alle(), kategorieRepo.alle(), umsatzRepo.alle(),
       ]);
       setIst(i);
       setKonten(k);
       setKategorien(kat);
       setUmsaetze(u);
-      setRegeln(r);
-      setBudgets(b);
-      setInventar(inv);
       setFehler(null);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -338,15 +326,9 @@ export function HistorieScreen() {
 
   return (
     <div className="screen">
-      <PageHead title={t("historie.titel")} subtitle={t("historie.untertitel")} />
+      <PageHead title={t("analyse.titel")} subtitle={t("analyse.untertitel")} />
 
       {fehler && <Card style={{ borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
-
-      {/* Der Ausblick steht vor dem Rückblick: die Frage „was bleibt diesen Monat?" ist
-          beim Öffnen die dringendere. Er lebt vom Plan und braucht keine Ist-Buchungen. */}
-      {geladen && !fehler && (
-        <MonatsAusblick regeln={regeln} budgets={budgets} inventar={inventar} ist={ist} kategorien={kategorien} heute={heute} />
-      )}
 
       {!geladen ? null : ist.length === 0 && !fehler ? (
         <Card>{t("historie.leer")}</Card>
