@@ -7,7 +7,7 @@
 // Use-Case-Aufrufe und die Fehlerbehandlung der Screens abgedeckt, nicht nur ihr Markup.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -586,6 +586,79 @@ describe("Konto-Register — Suche und Spalten", () => {
     const kopfzeilen = [...document.querySelectorAll("th")].map((z) => z.textContent ?? "");
     expect(kopfzeilen.some((z) => /Anfangsbestand/i.test(z))).toBe(false);
     expect(kopfzeilen.some((z) => /Abgleich/i.test(z))).toBe(false);
+  });
+});
+
+describe("Massenbearbeitung im Register", () => {
+  const heute = "2026-08-12";
+
+  async function zweiOhneKategorie() {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -1250, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", notiz: "Baecker",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: -8900, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", notiz: "Tankstelle",
+    });
+  }
+
+  /** Schaltet den Auswahlmodus ein und markiert alle gefilterten Zeilen. */
+  async function alleMarkieren(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click(screen.getByLabelText(/mehrere bearbeiten/i));
+    await nutzer.click(await screen.findByLabelText(/alle gefilterten/i));
+  }
+
+  it("zeigt die Kästchen erst, wenn man den Modus einschaltet", async () => {
+    await zweiOhneKategorie();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findByText("Baecker");
+
+    // Eine dauerhafte Kästchenspalte macht aus einer Leseansicht ein Formular.
+    expect(screen.queryByLabelText(/diese buchung wählen/i)).toBeNull();
+    await nutzer.click(screen.getByLabelText(/mehrere bearbeiten/i));
+    expect(screen.getAllByLabelText(/diese buchung wählen/i)).toHaveLength(2);
+  });
+
+  it("setzt die Kategorie auf allen markierten Buchungen", async () => {
+    await zweiOhneKategorie();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findByText("Baecker");
+    await alleMarkieren(nutzer);
+
+    await nutzer.click(screen.getByRole("button", { name: /auswahl bearbeiten/i }));
+    const dialog = within(await screen.findByRole("dialog"));
+    // Ohne Haken passiert nichts — leer heisst hier „nicht anfassen".
+    await nutzer.click(dialog.getByLabelText(/kategorie setzen/i));
+    await nutzer.click(dialog.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel/ }));
+    await nutzer.click(dialog.getByRole("button", { name: /anwenden/i }));
+
+    await waitFor(async () => {
+      const alle = await sqliteLedgerRepository.alle();
+      expect(alle.every((b) => b.kategorieId === "kat1")).toBe(true);
+      // Die Bezeichnungen bleiben stehen: danach wurde nicht gefragt.
+      expect(alle.map((b) => b.notiz).sort()).toEqual(["Baecker", "Tankstelle"]);
+    });
+  });
+
+  it("löscht die markierten Buchungen nach Rückfrage", async () => {
+    await zweiOhneKategorie();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findByText("Baecker");
+    await alleMarkieren(nutzer);
+
+    await nutzer.click(screen.getByRole("button", { name: /auswahl bearbeiten/i }));
+    const dialog = within(await screen.findByRole("dialog"));
+    await nutzer.click(dialog.getByRole("button", { name: /^löschen$/i }));
+    // Zweite Frage, mit der Zahl darin — Löschen ist der einzige Weg ohne Rückweg.
+    await nutzer.click(await dialog.findByRole("button", { name: /2 löschen/i }));
+
+    await waitFor(async () => expect(await sqliteLedgerRepository.alle()).toHaveLength(0));
   });
 });
 

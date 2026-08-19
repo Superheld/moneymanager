@@ -32,6 +32,7 @@ import { sqliteKontozuordnungRepository as zuordnungRepo } from "../persistence/
 import type { ScreenId } from "./AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { BuchungDetail } from "./BuchungDetail";
+import { SammelDialog } from "./SammelDialog";
 import { AbrufDialog } from "./AbrufDialog";
 import { ABRUF_QUELLEN, NeueBuchungen } from "./NeueBuchungen";
 import { Modal } from "./Modal";
@@ -74,6 +75,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
+  /**
+   * Massenbearbeitung — auf Wunsch, nicht immer. Eine dauerhafte Kästchenspalte macht
+   * aus einer Leseansicht ein Formular; sie erscheint erst, wenn man sie einschaltet.
+   */
+  const [auswahlModus, setAuswahlModus] = useState(false);
+  const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
+  const [sammelOffen, setSammelOffen] = useState(false);
   /** Die abgerufene Zeile, die gerade im Dialog liegt — noch nichts davon ist gebucht. */
   const [entwurf, setEntwurf] = useState<Umsatz | null>(null);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
@@ -134,6 +142,9 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     setKatFilter("alle");
     setArtFilter("alle");
     setRegSuche("");
+    // Die Auswahl gehört zum Register des Kontos — sie über einen Wechsel mitzunehmen
+    // hiesse, Buchungen zu ändern, die man nicht mehr vor sich hat.
+    setAuswahl(new Set());
   }, [aktivId]);
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
@@ -183,8 +194,19 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   // Standardansicht: neueste zuerst (Tabelle sortiert/paginiert intern weiter).
   const gebuchtFuerTabelle = useMemo(() => [...gebuchtGefiltert].reverse(), [gebuchtGefiltert]);
 
-  /** Anzeigename einer Registerzeile: Empfänger (Import) > Notiz/Regel-Bezeichnung; „Buchung" ist Füllwort. */
+  /**
+   * Anzeigename einer Registerzeile.
+   *
+   * Die eigene Notiz gewinnt gegen den Empfänger aus dem Import — sonst wäre eine von
+   * Hand vergebene Bezeichnung („Urlaub Norwegen") in der Liste unsichtbar, und die
+   * Sammelbearbeitung schriebe ins Leere. Der Name der Bank bleibt: er steht im Detail
+   * unter „Herkunft" und wird hier nicht überschrieben, sondern nur überlagert.
+   *
+   * „Buchung" ist Füllwort aus dem Register und zählt als leer.
+   */
   function zeilenLabel(z: RegisterZeile): string {
+    const b = z.istId ? ist.find((x) => x.id === z.istId) : undefined;
+    if (b?.notiz) return b.notiz;
     const u = z.istId ? umsatzByIst.get(z.istId) : undefined;
     if (u?.gegenpartei) return u.gegenpartei;
     return z.bezeichnung && z.bezeichnung !== "Buchung" ? z.bezeichnung : "";
@@ -210,6 +232,32 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     const b = ist.find((x) => x.id === z.istId);
     if (b) setEditBuchung(b);
   }
+
+  /** Die markierten Zeilen als echte Buchungen — nur die, die es noch gibt. */
+  const gewaehlteBuchungen = useMemo(
+    () => ist.filter((b) => auswahl.has(b.id)),
+    [ist, auswahl],
+  );
+
+  function auswahlUmschalten(id: string) {
+    setAuswahl((bisher) => {
+      const neu = new Set(bisher);
+      if (neu.has(id)) neu.delete(id);
+      else neu.add(id);
+      return neu;
+    });
+  }
+
+  /**
+   * Alles-Markieren bezieht sich auf das GEFILTERTE Register, nicht auf die sichtbare
+   * Seite. Wer nach „[anonymisiert]" filtert und alles markiert, meint alle [anonymisiert]-Zeilen — nicht
+   * die ersten fünfundzwanzig davon.
+   */
+  const alleIds = useMemo(
+    () => gebuchtGefiltert.map((z) => z.istId).filter((x): x is string => !!x),
+    [gebuchtGefiltert],
+  );
+  const alleGewaehlt = alleIds.length > 0 && alleIds.every((id) => auswahl.has(id));
 
 
 
@@ -391,7 +439,28 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               <option value="__ohne">{t("konten.ohneKategorie")}</option>
             </select>
             <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-xs)", color: "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
+              <input
+                type="checkbox"
+                checked={auswahlModus}
+                onChange={(e) => { setAuswahlModus(e.target.checked); if (!e.target.checked) setAuswahl(new Set()); }}
+                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+              />
+              {t("konten.sammel.modus")}
+            </label>
           </div>
+
+          {/* Die Aktionsleiste erscheint erst, wenn etwas markiert ist — vorher gäbe es
+              nichts zu tun, und ein grauer Knopf ist eine Frage ohne Antwort. */}
+          {auswahlModus && auswahl.size > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)", padding: "8px 12px", borderRadius: "var(--r-md)", background: "var(--accent-wash)" }}>
+              <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-bold)", color: "var(--accent-deep)" }}>
+                {t("konten.sammel.gewaehlt", { n: auswahl.size })}
+              </span>
+              <Button variant="primary" onClick={() => setSammelOffen(true)}>{t("konten.sammel.bearbeiten")}</Button>
+              <button className="linkbtn" onClick={() => setAuswahl(new Set())}>{t("konten.sammel.aufheben")}</button>
+            </div>
+          )}
 
           {gebuchtGefiltert.length === 0 ? (
             <div className="muted">{t("konten.keineGebucht")}</div>
@@ -405,6 +474,33 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               labelZurueck={t("konten.seiteZurueck")}
               labelVor={t("konten.seiteVor")}
               columns={[
+                // Die Auswahlspalte gibt es nur im Auswahlmodus — sonst hätte jede Zeile
+                // dauerhaft ein Kästchen, das in neun von zehn Sitzungen niemand braucht.
+                ...(auswahlModus
+                  ? [{
+                      key: "_sel",
+                      label: (
+                        <input
+                          type="checkbox"
+                          checked={alleGewaehlt}
+                          aria-label={t("konten.sammel.alleWaehlen")}
+                          onChange={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
+                          style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                        />
+                      ),
+                      sortable: false,
+                      render: (z: RegisterZeile) =>
+                        z.istId ? (
+                          <input
+                            type="checkbox"
+                            checked={auswahl.has(z.istId)}
+                            aria-label={t("konten.sammel.zeileWaehlen")}
+                            onChange={() => auswahlUmschalten(z.istId!)}
+                            style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                          />
+                        ) : null,
+                    }]
+                  : []),
                 { key: "datum", label: t("konten.spalteDatum"), render: (z) => ddmm(z.datum) },
                 {
                   // Nicht umbrechen (flexWrap): eine zweizeilige Zeile schiebt den
@@ -497,8 +593,22 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {editBuchung && (
         <BuchungDetail
           buchung={editBuchung}
+          // Was die Bank geliefert hat, wird nicht von Hand gelöscht — beim nächsten
+          // Abruf käme es zurück, und bis dahin stimmte der Saldo nicht mehr mit ihr
+          // überein. Der Weg für so eine Zeile ist das Verwerfen im Abruf.
+          loeschenGesperrt={onlineKonten.has(editBuchung.kontoId)}
           onClose={() => setEditBuchung(null)}
           onGeaendert={laden}
+        />
+      )}
+
+      {sammelOffen && (
+        <SammelDialog
+          buchungen={gewaehlteBuchungen}
+          kategorien={kategorien}
+          gesperrteKonten={onlineKonten}
+          onClose={() => setSammelOffen(false)}
+          onGeaendert={async () => { setAuswahl(new Set()); await laden(); }}
         />
       )}
 
