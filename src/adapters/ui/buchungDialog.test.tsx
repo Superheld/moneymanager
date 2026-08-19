@@ -22,6 +22,7 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { KontenScreen } from "./KontenScreen";
+import { ReviewScreen } from "./ReviewScreen";
 import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
 import {
   sqliteImportLaufRepository as laufRepo,
@@ -48,14 +49,15 @@ async function grunddaten() {
   await kontoRepo.speichern({ id: "k2", bezeichnung: "Zweitkonto", typ: "Giro", inhaberIds: [], saldo: 0 });
   await kategorieRepo.speichern({ id: "kat-le", name: "Lebensmittel", defaultCharakter: "Aufwand" });
   await kategorieRepo.speichern({ id: "kat-so", name: "Sonstiges", defaultCharakter: "Aufwand" });
-  // Nur Umsätze aus einem Abruf-Lauf landen im Block „Neu von der Bank".
-  await laufRepo.speichern({ id: "l-fints", quelle: "fints", zeitpunkt: "2026-08-18T10:00:00Z", eingelesen: 1, neu: 1, duplikate: 0 });
+  // Der Entwurfs-Stapel gehört seit 2026-08-20 allein dem DATEI-Import: der Bankabruf
+  // bucht direkt und hat keine Warteliste mehr.
+  await laufRepo.speichern({ id: "l-datei", quelle: "finanzguru", zeitpunkt: "2026-08-18T10:00:00Z", eingelesen: 1, neu: 1, duplikate: 0 });
 }
 
 /** Eine abgerufene, noch nicht übernommene Zeile. */
 async function entwurf(over: Record<string, unknown> = {}) {
   await umsatzRepo.speichern({
-    id: "e1", laufId: "l-fints", zahlungskontoId: "k1", buchungstag: "2026-08-17",
+    id: "e1", laufId: "l-datei", zahlungskontoId: "k1", buchungstag: "2026-08-17",
     betrag: -4990, waehrung: "EUR", gegenpartei: "Testhaendler Nord",
     verwendungszweck: "Einkauf", rohHash: "h-e1", status: "neu",
     vorschlag: { kategorieId: "kat-so", charakter: "Aufwand", quelle: "ki" },
@@ -63,7 +65,7 @@ async function entwurf(over: Record<string, unknown> = {}) {
   });
 }
 
-/** Öffnet den Entwurfs-Dialog aus dem Block „Neu von der Bank" und liefert ihn zurück. */
+/** Öffnet den Entwurfs-Dialog aus der Import-Inbox und liefert ihn zurück. */
 async function entwurfOeffnen(nutzer: ReturnType<typeof userEvent.setup>) {
   await screen.findByText("Testhaendler Nord");
   await nutzer.click(await screen.findByRole("button", { name: /ansehen & bearbeiten/i }));
@@ -78,7 +80,7 @@ describe("Entwurf prüfen", () => {
     await grunddaten();
     await entwurf();
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
     await nutzer.click(dialog.getByRole("button", { name: /abbrechen/i }));
@@ -95,7 +97,7 @@ describe("Entwurf prüfen", () => {
     await grunddaten();
     await entwurf();
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
     await nutzer.selectOptions(dialog.getByRole("combobox", { name: /^Konto$/ }), "k2");
@@ -119,7 +121,7 @@ describe("Entwurf prüfen", () => {
     await grunddaten();
     await entwurf();
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
     // Beides ist die Aussage der Bank — im Entwurf steht sie nur da.
@@ -132,7 +134,7 @@ describe("Entwurf prüfen", () => {
     await grunddaten();
     await entwurf();
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
     await nutzer.click(dialog.getByRole("button", { name: /^verwerfen$/i }));
@@ -150,12 +152,12 @@ describe("Entwurf prüfen", () => {
     // Dieselbe Zahlung liegt schon auf dem Konto — gleicher Betrag, gleicher Tag,
     // gleicher Empfänger.
     await umsatzRepo.speichern({
-      id: "alt", laufId: "l-fints", zahlungskontoId: "k1", buchungstag: "2026-08-17",
+      id: "alt", laufId: "l-abruf", zahlungskontoId: "k1", buchungstag: "2026-08-17",
       betrag: -4990, waehrung: "EUR", gegenpartei: "Testhaendler Nord",
       verwendungszweck: "Einkauf", rohHash: "h-alt", status: "verbucht", istbuchungId: "b-alt",
     });
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
     expect(dialog.getByText(/schon vorhanden|Dublette/)).toBeInTheDocument();
@@ -169,10 +171,10 @@ describe("Weglegen und zurueckholen", () => {
     await grunddaten();
     await entwurf();
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
 
     await screen.findByText("Testhaendler Nord");
-    await nutzer.click(screen.getByRole("button", { name: /^verwerfen$/i }));
+    await nutzer.click(screen.getByRole("button", { name: /diese zeile weglegen/i }));
 
     await waitFor(async () =>
       expect((await umsatzRepo.alle()).find((u) => u.id === "e1")?.status).toBe("verworfen"),
@@ -180,10 +182,7 @@ describe("Weglegen und zurueckholen", () => {
 
     // Sie ist nicht verschwunden: der Rückweg steht da, mit Anzahl.
     await nutzer.click(await screen.findByRole("button", { name: /weggelegt \(1\)/i }));
-    // Und aufgeklappt steht dieselbe Auskunft wie oben — hier die entscheidende:
-    // zu dieser Zeile gibt es kein Gegenstück, ihr Betrag fehlt also im Kontostand.
-    expect(await screen.findByText(/Kein Gegenstück gefunden/)).toBeInTheDocument();
-    expect(screen.getByText("Einkauf")).toBeInTheDocument();
+    expect(await screen.findByText(/fehlen damit im Kontostand/)).toBeInTheDocument();
 
     await nutzer.click(await screen.findByRole("button", { name: /zurückholen/i }));
 
@@ -194,28 +193,26 @@ describe("Weglegen und zurueckholen", () => {
 
   it("nennt eine erkannte Dublette beim Namen statt sie zu verwerfen", async () => {
     // „ist schon gebucht" und „verwerfen" sind nicht dasselbe: beim einen bleibt der
-    // Kontostand richtig, beim anderen nicht.
+    // Kontostand richtig, beim anderen nicht. Der Unterschied steht im Dialog, denn erst
+    // dort ist zu sehen, WORAUF sich der Verdacht bezieht.
     await grunddaten();
     await entwurf();
     await umsatzRepo.speichern({
-      id: "alt", laufId: "l-fints", zahlungskontoId: "k1", buchungstag: "2026-08-17",
+      id: "alt", laufId: "l-abruf", zahlungskontoId: "k1", buchungstag: "2026-08-17",
       betrag: -4990, waehrung: "EUR", gegenpartei: "Testhaendler Nord",
       verwendungszweck: "Einkauf", rohHash: "h-alt", status: "verbucht", istbuchungId: "b-alt",
     });
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
+    const dialog = await entwurfOeffnen(nutzer);
 
-    await screen.findByText("Testhaendler Nord");
-    expect(screen.queryByRole("button", { name: /^verwerfen$/i })).toBeNull();
-    await nutzer.click(screen.getByRole("button", { name: /ist schon gebucht/i }));
+    // Bei Verdacht heisst der Knopf anders — und tut etwas anderes.
+    expect(dialog.queryByRole("button", { name: /^verwerfen$/i })).toBeNull();
+    await nutzer.click(dialog.getByRole("button", { name: /ist schon gebucht/i }));
 
     await waitFor(async () =>
       expect((await umsatzRepo.alle()).find((u) => u.id === "e1")?.status).toBe("duplikat"),
     );
-
-    // Weggelegt und belegt: das Gegenstück steht daneben, also war es richtig so.
-    await nutzer.click(await screen.findByRole("button", { name: /weggelegt \(1\)/i }));
-    expect(await screen.findByText(/Gegenstück vorhanden/)).toBeInTheDocument();
   });
 });
 
@@ -230,7 +227,7 @@ describe("Umbuchung und Vertrag am Entwurf", () => {
       charakter: "Ertrag", quelle: "manuell",
     });
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
     await nutzer.click(dialog.getByRole("button", { name: /zur umbuchung machen/i }));
@@ -251,7 +248,7 @@ describe("Umbuchung und Vertrag am Entwurf", () => {
     await grunddaten();
     await entwurf();
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
     await nutzer.click(dialog.getByRole("button", { name: /zur umbuchung machen/i }));
@@ -276,7 +273,7 @@ describe("Umbuchung und Vertrag am Entwurf", () => {
       mindestlaufzeitMonate: 1, kuendigungsfristMonate: 1,
     });
     const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
     await nutzer.selectOptions(await dialog.findByRole("combobox", { name: /vertrag zuordnen/i }), "v1");

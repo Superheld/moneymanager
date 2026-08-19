@@ -209,18 +209,38 @@ describe("abrufAusfuehren", () => {
     expect(f.umsaetze[0].istbuchungId).toBe(f.buchungen[0].id);
   });
 
-  it("lässt einen Dublettenverdacht ungebucht in der Warteliste stehen", async () => {
-    // Der Rückgriff (RUECKGRIFF_TAGE) holt jeden Abruf ein paar Tage doppelt. Würde das
-    // ungeprüft gebucht, entstünde bei jedem Lauf ein Satz Doppelbuchungen.
+  it("legt dieselbe Zeile beim zweiten Abruf nicht noch einmal an", async () => {
+    // Der Rückgriff (RUECKGRIFF_TAGE) holt jeden Abruf ein paar Tage doppelt. Der Finder
+    // erkennt die Zeile als „identisch" und legt sie gar nicht erst an — das ist die
+    // Stufe, die ohne Rückfrage entschieden wird.
     const { adapter } = fakeAdapter({ konten: [bankkonto()] });
     const f = fakes([zuordnung]);
-    // Erster Lauf: die Zeile wird gebucht.
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
     expect(f.buchungen).toHaveLength(1);
 
-    // Zweiter Lauf mit derselben Zeile — sie ist als Duplikat bekannt und wird gar nicht
-    // erst angelegt; auf jeden Fall entsteht keine zweite Buchung.
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    expect(f.buchungen).toHaveLength(1);
+  });
+
+  it("bucht auch einen VERDACHTSFALL — entschieden wird danach im Auszug", async () => {
+    // Bis 2026-08-20 blieb so eine Zeile als Entwurf am Konto liegen. Die Warteliste dort
+    // gibt es nicht mehr: beide Zeilen stehen jetzt im Auszug und tragen dort die
+    // Markierung, mit Gründen und mit dem Weg zum Gegenstück.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([zuordnung]);
+    // Ein Bestandssatz, der nur BEINAHE passt: gleicher Betrag, gleicher Empfänger,
+    // einen Tag daneben. Abweichendes Datum deckelt das Urteil auf „verdacht".
+    f.umsaetze.push({
+      id: "alt", laufId: "l-alt", zahlungskontoId: "k1", buchungstag: "2026-08-16",
+      betrag: -1234, waehrung: "EUR", gegenpartei: "Laden", verwendungszweck: "Einkauf",
+      rohHash: "h-alt", status: "verbucht", istbuchungId: "b-alt",
+    });
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    const frisch = f.umsaetze.find((u) => u.id !== "alt");
+    expect(frisch.verdachtAufId).toBe("alt"); // der Verdacht steht dran …
+    expect(frisch.status).toBe("verbucht"); // … hält aber nichts mehr auf
     expect(f.buchungen).toHaveLength(1);
   });
 

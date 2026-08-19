@@ -68,8 +68,6 @@ export interface Kontozeile {
   readonly realerStand: Cent;
   /** Hängt das Konto an einer Bankverbindung? */
   readonly online: boolean;
-  /** Wie viele abgerufene Zeilen dieses Kontos noch eine Entscheidung brauchen. */
-  readonly wartet: number;
   /** Der zuletzt von der Bank gemeldete Stand, falls es einen gibt. */
   readonly bankSaldo?: { betrag: Cent; datum?: string };
   /**
@@ -86,11 +84,6 @@ export interface Kontensicht {
   readonly kontoNamen: ReadonlyMap<string, string>;
   readonly buchungen: readonly IstBuchung[];
   readonly regeln: readonly Zahlungsregel[];
-  readonly umsaetze: readonly Umsatz[];
-  /** Offene Abruf-Zeilen aller Konten — eine Umbuchung hat ihr Gegenbein woanders. */
-  readonly neueAbrufe: readonly Umsatz[];
-  /** Läufe, die aus einem Bankabruf stammen. */
-  readonly abrufLaeufe: ReadonlySet<string>;
   /**
    * IDs der Buchungen, die aus einem Bankabruf stammen — nur die sind vor dem Löschen
    * geschützt (siehe Kopf).
@@ -101,12 +94,15 @@ export interface Kontensicht {
   /**
    * Buchungs-ID → Dublettenverdacht. Steht in der Registerliste als Markierung.
    *
-   * Seit der Abruf DIREKT ins Ledger bucht, gibt es keine Vorstufe mehr, in der man
-   * einen Zwilling abfangen könnte — außer bei echtem Dublettenverdacht der Prüfung beim
-   * Import. Was danach doppelt hereinkommt (zweiter Dateiimport, überlappendes
-   * Abruffenster, dieselbe Zahlung aus zwei Quellen), stünde sonst unbemerkt zweimal im
-   * Saldo. Deshalb wird beim LESEN geprüft, nicht einmalig beim Schreiben: ein Verdacht
-   * vom Importtag gälte für den Stand von damals.
+   * Der Abruf bucht DIREKT ins Ledger und hat seit 2026-08-20 gar keine Vorstufe mehr,
+   * in der man einen Zwilling abfangen könnte — auch die Verdachtsfälle nicht. Was
+   * doppelt hereinkommt (überlappendes Abruffenster, dieselbe Zahlung aus zwei Quellen),
+   * stünde sonst unbemerkt zweimal im Saldo. Deshalb wird beim LESEN geprüft, nicht
+   * einmalig beim Schreiben: ein Verdacht vom Importtag gälte für den Stand von damals.
+   *
+   * Der DATEI-Import behält seine Vorstufe (die Import-Inbox) und prüft dort vorher —
+   * eine Datei ist kein Kontoauszug, sie kann alt sein oder aus einer anderen App
+   * stammen. Diese Markierung hier ist der Fang danach, nicht statt dessen.
    *
    * Geprüft wird über die Umsätze, nicht über die Ist-Buchungen — Empfänger,
    * Verwendungszweck und Quellen-ID stehen dort. Eine von Hand erfasste Buchung ohne
@@ -120,7 +116,7 @@ export interface Kontensicht {
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, offene, laeufe, freigaben] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -128,13 +124,11 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.kategorieRepo.alle(),
       deps.umsatzRepo.alle(),
       deps.kontozuordnungen(),
-      deps.umsatzRepo.offene(),
       deps.laufRepo.alle(),
       deps.freigabeRepo.alle(),
     ]);
 
   const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
-  const neueAbrufe = offene.filter((u) => abrufLaeufe.has(u.laufId));
 
   const ausBankabruf = new Set<string>();
   const umsatzZuBuchung = new Map<string, Umsatz>();
@@ -157,7 +151,6 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
         bewegungen: istSummeKonto(buchungen, konto.id),
         realerStand: realerKontostand(konto, buchungen),
         online: !!z,
-        wartet: neueAbrufe.filter((u) => u.zahlungskontoId === konto.id).length,
         bankSaldo,
         abweichung: bankSaldo ? bankAbweichung(konto, buchungen, bankSaldo.betrag) : undefined,
       };
@@ -166,9 +159,6 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     buchungen,
     regeln,
-    umsaetze,
-    neueAbrufe,
-    abrufLaeufe,
     ausBankabruf,
     umsatzZuBuchung,
     dublettenverdacht,

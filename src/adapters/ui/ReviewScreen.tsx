@@ -2,28 +2,47 @@
 // „neu") prüfen, Zeile für Zeile kategorisieren und verbuchen. Filter nach Konto/Status,
 // seitenweise (skaliert auf tausende Zeilen). „Verbuchen" macht aus allen kategorisierten
 // Umsätzen Ist-Buchungen (wirkt auf Salden). Umbuchungen sind als Umschichtung fix gelabelt.
+//
+// Seit 2026-08-20 ist das die EINZIGE Inbox. Der Bankabruf bucht direkt und hat keine
+// Warteliste mehr — was er meldet, IST passiert, und ob es doppelt ist, steht im Auszug.
+// Der DATEI-Import behält die Vorstufe: eine Datei ist kein Kontoauszug, sie kann alt
+// sein, überlappen oder aus einer anderen App stammen. Sicher ist sicher.
+//
+// Daraus folgen zwei Dinge, die vorher am Konto hingen und hierher gewandert sind:
+// der Dublettenverdacht steht an der Zeile (mit Gründen), und der volle Buchungsdialog
+// lässt sich zu jedem Entwurf öffnen — Herkunft, Gegenbein, Vertrag, alles vor dem
+// Buchen. Beide Wege gab es nur im Konto-Block „Neu von der Bank", den es nicht mehr gibt.
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ABRUF_QUELLEN, type Kategorie, type Zahlungskonto } from "../../application";
+import {
+  ABRUF_QUELLEN,
+  stapelVerdacht,
+  type Dublettenverdacht,
+  type Kategorie,
+  type Zahlungskonto,
+} from "../../application";
 import {
   festlegungAnwenden,
   importLaeufe,
   kategorisierung,
   offeneUmsaetze,
   stammdaten,
+  umsaetze as alleUmsaetze,
   umsaetzeBuchen,
   umsatzSpeichern,
 } from "../dienste";
 import {
   kategorisieren,
   verwerfen,
+  zurueckholen,
   vorschlagsbefundFuer,
   type Umsatz,
   type VerbuchenErgebnis,
   type Vorschlagskontext,
 } from "../../application/import";
 import { festlegungAngebot } from "../../application/kategoriefestlegungen";
+import { BuchungDetail } from "./BuchungDetail";
 import { Button, Card, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { useGeld } from "./einstellungenKontext";
@@ -102,13 +121,27 @@ export function ReviewScreen() {
   const [festgelegt, setFestgelegt] = useState<{ muster: string; weitere: number } | null>(null);
   /** Zweite Frage vor dem Sammel-Verwerfen — es betrifft alles, was gerade sichtbar ist. */
   const [verwerfenGefragt, setVerwerfenGefragt] = useState(false);
+  /**
+   * ALLE Umsätze — Grundlage der Dublettenprüfung, nicht nur die offenen.
+   *
+   * Verbuchtes muss mit hinein (danach wird ja gesucht), Verworfenes auch: „das habe ich
+   * schon einmal weggelegt" ist beim Durchsehen genau die Auskunft, die man braucht.
+   */
+  const [bestand, setBestand] = useState<Umsatz[]>([]);
+  /** Der Entwurf, der gerade im vollen Dialog liegt — geschrieben wird dort erst auf Klick. */
+  const [imDialog, setImDialog] = useState<Umsatz | null>(null);
+  /** Läufe aus einem Bankabruf — deren Zeilen gehören nicht in diese Inbox. */
+  const [abrufLaeufe, setAbrufLaeufe] = useState<ReadonlySet<string>>(new Set());
+  /** Der Weggelegt-Bereich ist zugeklappt: er ist der Rückweg, nicht der Alltag. */
+  const [zeigeWeggelegt, setZeigeWeggelegt] = useState(false);
 
   async function laden() {
     try {
-      const [u, daten, laeufe] = await Promise.all([
+      const [u, daten, laeufe, alle] = await Promise.all([
         offeneUmsaetze(),
         stammdaten(),
         importLaeufe(),
+        alleUmsaetze(),
       ]);
       // Die Inbox ist der Ort für den gelegentlichen DATEI-Import: ein Stapel, den man am
       // Stück durchsieht. Was per Bankabruf hereinkommt, steht seit 2026-08-18 beim
@@ -117,6 +150,8 @@ export function ReviewScreen() {
         laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id),
       );
       setUmsaetze(u.filter((x) => !abruf.has(x.laufId)));
+      setBestand(alle);
+      setAbrufLaeufe(abruf);
       setKonten([...daten.konten]);
       setKategorien([...daten.kategorien]);
       setKontext(await kategorisierung());
@@ -143,6 +178,44 @@ export function ReviewScreen() {
       return true;
     });
   }, [umsaetze, kontoFilter, statusFilter, suche]);
+
+  /**
+   * Welche der offenen Zeilen könnte schon da sein — gerechnet, nicht abgelesen.
+   *
+   * Der Verdacht, den der Import an die Zeile schreibt, gilt für den Stand von damals.
+   * Was seitdem aus einer anderen Quelle dazukam (ein Bankabruf über denselben Zeitraum),
+   * würde nie nachträglich angeschrieben. Also beim Hinsehen prüfen — dieselbe Regel wie
+   * im Buchungsdialog, nur über den ganzen Stapel (`stapelVerdacht`).
+   */
+  const verdaechtig = useMemo(() => {
+    const eigene = new Set(umsaetze.map((u) => u.id));
+    return stapelVerdacht(umsaetze, bestand.filter((u) => !eigene.has(u.id)));
+  }, [umsaetze, bestand]);
+
+  const zwillingVon = (v: Dublettenverdacht) => bestand.find((u) => u.id === v.zwillingUmsatzId);
+
+  /**
+   * Der Rückweg. Weggelegt heisst nicht gelöscht — aber ohne diese Liste wäre es das
+   * praktisch doch: eine versehentlich verworfene Zeile nimmt ihren Betrag aus dem
+   * Kontostand mit, und weder wäre zu sehen, dass es sie gibt, noch käme sie zurück.
+   */
+  const weggelegte = useMemo(
+    () =>
+      bestand
+        .filter((u) => (u.status === "verworfen" || u.status === "duplikat") && !abrufLaeufe.has(u.laufId))
+        .sort((a, b) => b.buchungstag.localeCompare(a.buchungstag)),
+    [bestand, abrufLaeufe],
+  );
+
+  /** Holt eine weggelegte Zeile zurück in den Stapel. */
+  async function zurueck(u: Umsatz) {
+    try {
+      await umsatzSpeichern(zurueckholen(u));
+      await laden();
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   const seitenAnzahl = Math.max(1, Math.ceil(gefiltert.length / SEITE_GROESSE));
   const aktuelleSeite = Math.min(seite, seitenAnzahl - 1);
@@ -209,8 +282,12 @@ export function ReviewScreen() {
    */
   async function zeileVerwerfen(u: Umsatz) {
     try {
-      await umsatzSpeichern(verwerfen(u));
+      const weggelegt = verwerfen(u);
+      await umsatzSpeichern(weggelegt);
       setUmsaetze((prev) => prev.filter((x) => x.id !== u.id));
+      // Auch im Bestand nachziehen: daraus speist sich der Weggelegt-Bereich, und ohne
+      // das läge die Zeile weg, ohne dass der Rückweg sie zeigt.
+      setBestand((prev) => prev.map((x) => (x.id === u.id ? weggelegt : x)));
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
     }
@@ -320,7 +397,7 @@ export function ReviewScreen() {
                 <th style={th}>{t("review.spalteGegenpartei")}</th>
                 <th style={{ ...th, textAlign: "right" }}>{t("review.spalteBetrag")} {geld.symbol}</th>
                 <th style={{ ...th, minWidth: 220 }}>{t("review.spalteKategorie")}</th>
-                <th style={{ ...th, width: 40 }} />
+                <th style={{ ...th, width: 76 }} />
               </tr>
             </thead>
             <tbody>
@@ -331,6 +408,24 @@ export function ReviewScreen() {
                   <td style={td}>
                     <div style={{ fontWeight: "var(--fw-bold)" }}>{u.gegenpartei}</div>
                     <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)" }}>{u.verwendungszweck.length > 50 ? u.verwendungszweck.slice(0, 50) + "…" : u.verwendungszweck}</div>
+                    {/* Der Verdacht steht AN der Zeile, nicht in einem eigenen Bereich:
+                        entschieden wird hier, mit dem Empfänger daneben. */}
+                    {(() => {
+                      const v = verdaechtig.get(u.id);
+                      if (!v) return null;
+                      const zwilling = zwillingVon(v);
+                      return (
+                        <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
+                          <Pill variant="warn">
+                            {t(v.urteil === "identisch" ? "review.dublette.sicher" : "review.dublette.verdacht")}
+                          </Pill>
+                          <span className="muted" style={{ fontSize: "var(--fs-2xs)" }}>
+                            {t("review.dublette.gruende", { gruende: v.gruende.join(", ") })}
+                            {zwilling && ` — ${t(`review.dublette.status.${zwilling.status}`)}`}
+                          </span>
+                        </div>
+                      );
+                    })()}
                   </td>
                   <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(u.betrag) }}>{geld.format(u.betrag, { mitVorzeichen: true })}</td>
                   <td style={td}>
@@ -348,7 +443,12 @@ export function ReviewScreen() {
                       </div>
                     )}
                   </td>
-                  <td style={{ ...td, textAlign: "right" }}>
+                  <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
+                    <IconButton
+                      icon="bearbeiten"
+                      label={t("review.zeileOeffnen")}
+                      onClick={() => setImDialog(u)}
+                    />
                     <IconButton
                       icon="verwerfen"
                       ton="gefahr"
@@ -369,6 +469,54 @@ export function ReviewScreen() {
             </div>
           )}
         </Card>
+      )}
+
+      {/* Der Rückweg — zugeklappt, aber mit Anzahl, damit man weiß, dass dort etwas liegt. */}
+      {weggelegte.length > 0 && (
+        <Card style={{ marginTop: "var(--gap-card)" }} pad>
+          <button className="linkbtn" onClick={() => setZeigeWeggelegt((x) => !x)}>
+            {t("review.weggelegt.titel", { n: weggelegte.length })}
+          </button>
+          {zeigeWeggelegt && (
+            <>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-2) 0" }}>
+                {t("review.weggelegt.hinweis")}
+              </div>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+                <tbody>
+                  {weggelegte.map((u) => (
+                    <tr key={u.id}>
+                      <td style={td}>{ddmmyyyy(u.buchungstag)}</td>
+                      <td style={{ ...td, color: "var(--ink-3)" }}>{kontoName.get(u.zahlungskontoId) ?? "—"}</td>
+                      <td style={td}>{u.gegenpartei}</td>
+                      <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(u.betrag) }}>
+                        {geld.format(u.betrag, { mitVorzeichen: true })}
+                      </td>
+                      <td style={td}>
+                        <Pill variant="neutral">{t(`review.weggelegt.status.${u.status}`)}</Pill>
+                      </td>
+                      <td style={{ ...td, textAlign: "right" }}>
+                        <button className="linkbtn" onClick={() => void zurueck(u)}>
+                          {t("review.weggelegt.zurueckholen")}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </Card>
+      )}
+
+      {/* Der volle Dialog auf einem ENTWURF: er schreibt erst beim Übernehmen oder
+          Verwerfen. Wegklicken lässt die Zeile unangetastet stehen. */}
+      {imDialog && (
+        <BuchungDetail
+          entwurf={imDialog}
+          onClose={() => setImDialog(null)}
+          onGeaendert={laden}
+        />
       )}
     </>
   );
