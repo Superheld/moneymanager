@@ -208,6 +208,11 @@ const de = {
     umbuchung: "↔ Umbuchung (keine Ausgabe)",
     verbuchen: "Verbuchen ({{n}})",
     verbuchenBusy: "Verbuche …",
+    restVerwerfen: "Rest weglegen",
+    verwerfenFrage: "{{n}} Zeilen ohne Kategorie weglegen?",
+    verwerfenJa: "ja, weglegen",
+    verwerfenNein: "abbrechen",
+    zeileVerwerfen: "Diese Zeile weglegen",
     verbuchtErgebnis: "{{verbucht}} verbucht ({{umbuchungen}} Umbuchungen) · {{uebersprungen}} übersprungen",
     seite: "Seite {{seite}} / {{gesamt}}",
   },
@@ -1054,8 +1059,14 @@ const de = {
     kpiProMonat: "Pro Monat",
     kpiProJahr: "Pro Jahr",
     kpiBald: "Kündigung bald",
-    kpiRuecklage: "Zurücklegen",
-    kpiRuecklageMeta: "pro Monat für nicht-monatliche Verträge",
+    kpiRuecklage: "Zurücklegen / Monat",
+    feldArt: "Art",
+    art: { abo: "Abo — kündbar", dauervertrag: "Dauervertrag — Arbeit, Miete" },
+    artKurz: { dauervertrag: "Dauervertrag" },
+    artHinweis: {
+      abo: "wird auf den nächsten Kündigungstermin hin überwacht",
+      dauervertrag: "keine Kündigungswarnung — die Frist steht trotzdem in der Tabelle",
+    },
     ansicht: { liste: "Liste", faelligkeit: "Fälligkeit", turnus: "Turnus", kategorie: "Kategorie" },
     ordnung: {
       liste: "nach Betrag, groß nach klein",
@@ -1125,7 +1136,7 @@ const de = {
         "Nach diesen Regeln ordnet die App gebuchte Zahlungen diesem Vertrag zu — auch die, die erst noch kommen. Was du hier änderst, wirkt sofort auf den ganzen Bestand. Von Hand gesetzte Zuordnungen bleiben davon unberührt.",
       empfaenger: "Empfänger",
       empfaengerHinweis:
-        "Ein Muster je Zeile. Groß-/Kleinschreibung egal; verglichen wird mit dem Namen aus dem Auszug UND seiner vereinfachten Form (ohne Rechtsform und Satzzeichen). * steht für beliebigen Text — „stadtwerke*“ trifft auch „[anonymisiert] Bonn Rg. 4711“.",
+        "Ein Muster je Zeile. Groß-/Kleinschreibung egal; verglichen wird mit dem Namen aus dem Auszug UND seiner vereinfachten Form (ohne Rechtsform und Satzzeichen). Das Muster muss den GANZEN Namen abdecken — deshalb braucht ein Wort mitten im Namen Sterne auf beiden Seiten: „*ard*“ trifft „Südwestrundfunk ARD ZDF“, „ard“ allein nur einen Empfänger, der genau so heißt.",
       glaeubiger: "SEPA-Gläubiger-ID",
       glaeubigerHinweis:
         "Eine ID je Zeile. Nur bei Lastschrift vorhanden, dafür eindeutig — sie schlägt bei mehreren Treffern den Empfängernamen. * ist auch hier erlaubt.",
@@ -1139,6 +1150,12 @@ const de = {
       alleKonten: "alle Konten",
       treffer: "{{count}} Zahlungen",
       trefferHinweis: "trifft die Regel im aktuellen Zustand — noch nicht gespeichert",
+      engstelle: {
+        merkmale: "{{weg}} Zahlungen passen zu keinem Muster.",
+        betrag: "Die Betragsspanne nimmt {{weg}} Zahlungen weg, die die Muster treffen — {{uebrig}} bleiben. Spanne leeren oder weiten, wenn das nicht gewollt ist.",
+        zeitraum: "Der Zeitraum nimmt {{weg}} Zahlungen weg — {{uebrig}} bleiben.",
+        konto: "Die Kontowahl nimmt {{weg}} Zahlungen weg — {{uebrig}} bleiben.",
+      },
       weitere: "… und {{count}} weitere",
       turnusHinweis:
         "Takt und Betrag der PLANUNG stehen nicht hier, sondern in den Vertragsdaten — hier geht es nur darum, welche Buchungen zu diesem Vertrag gezählt werden.",
@@ -1365,6 +1382,11 @@ const en: typeof de = {
     umbuchung: "↔ Transfer (not an expense)",
     verbuchen: "Post ({{n}})",
     verbuchenBusy: "Posting …",
+    restVerwerfen: "Set the rest aside",
+    verwerfenFrage: "Set aside {{n}} rows without a category?",
+    verwerfenJa: "yes, set aside",
+    verwerfenNein: "cancel",
+    zeileVerwerfen: "Set this row aside",
     verbuchtErgebnis: "{{verbucht}} posted ({{umbuchungen}} transfers) · {{uebersprungen}} skipped",
     seite: "Page {{seite}} / {{gesamt}}",
   },
@@ -2208,8 +2230,14 @@ const en: typeof de = {
     kpiProMonat: "Per month",
     kpiProJahr: "Per year",
     kpiBald: "Cancel soon",
-    kpiRuecklage: "Set aside",
-    kpiRuecklageMeta: "per month for non-monthly contracts",
+    kpiRuecklage: "Set aside / month",
+    feldArt: "Kind",
+    art: { abo: "Subscription — cancellable", dauervertrag: "Standing contract — work, rent" },
+    artKurz: { dauervertrag: "Standing" },
+    artHinweis: {
+      abo: "watched for its next cancellation deadline",
+      dauervertrag: "no cancellation warning — the notice period still shows in the table",
+    },
     ansicht: { liste: "List", faelligkeit: "Due date", turnus: "Frequency", kategorie: "Category" },
     ordnung: {
       liste: "by amount, largest first",
@@ -2279,7 +2307,7 @@ const en: typeof de = {
         "These rules decide which posted payments are linked to this contract — including future ones. Changes take effect immediately across the whole ledger. Links you set by hand are left alone.",
       empfaenger: "Payee",
       empfaengerHinweis:
-        "One pattern per line. Case-insensitive; matched against the name as it appears on the statement AND its simplified form (no legal form or punctuation). * stands for any text — \"stadtwerke*\" also matches \"[anonymisiert] Bonn inv. 4711\".",
+        "One pattern per line. Case-insensitive; matched against the name as it appears on the statement AND its simplified form (no legal form or punctuation). The pattern must cover the WHOLE name — a word in the middle therefore needs stars on both sides: \"*ard*\" matches \"Suedwestrundfunk ARD ZDF\", while \"ard\" alone only matches a payee called exactly that.",
       glaeubiger: "SEPA creditor ID",
       glaeubigerHinweis:
         "One ID per line. Only present on direct debits, but unambiguous — it beats the payee name when several rules match. * works here too.",
@@ -2293,6 +2321,12 @@ const en: typeof de = {
       alleKonten: "all accounts",
       treffer: "{{count}} payments",
       trefferHinweis: "match the rule as it stands — not saved yet",
+      engstelle: {
+        merkmale: "{{weg}} payments match none of the patterns.",
+        betrag: "The amount range removes {{weg}} payments that do match the patterns — {{uebrig}} remain. Clear or widen it if that is not intended.",
+        zeitraum: "The date range removes {{weg}} payments — {{uebrig}} remain.",
+        konto: "The account choice removes {{weg}} payments — {{uebrig}} remain.",
+      },
       weitere: "… and {{count}} more",
       turnusHinweis:
         "The PLAN's cycle and amount are not set here but in the contract details — this is only about which transactions count towards this contract.",

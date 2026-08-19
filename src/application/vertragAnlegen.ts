@@ -9,6 +9,7 @@ import type {
   Rhythmus,
   Vertrag,
   Verlaengerungsart,
+  Vertragsart,
   Vertragsstatus,
   Zahlungsregel,
 } from "../core";
@@ -40,6 +41,8 @@ export interface VertragEingabe {
   mindestlaufzeitMonate?: number;
   verlaengerung: Verlaengerungsart;
   verlaengerungMonate?: number;
+  /** Abo (kündbar, wird überwacht) oder Dauervertrag (Arbeit, Miete). Fehlend = Abo. */
+  art?: Vertragsart;
   kuendigungsfristMonate?: number;
   notizen?: string;
   // --- Zahlungsseite (→ abgeleitete Zahlungsregel) ---
@@ -85,6 +88,7 @@ export async function vertragAnlegen(
     mindestlaufzeitMonate: eingabe.mindestlaufzeitMonate,
     verlaengerung: eingabe.verlaengerung,
     verlaengerungMonate: eingabe.verlaengerung === "automatisch" ? eingabe.verlaengerungMonate : undefined,
+    art: eingabe.art ?? "abo",
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
     status,
     // Auch am VERTRAG, nicht nur an der abgeleiteten Zahlungsregel: die
@@ -146,6 +150,7 @@ export async function vertragAktualisieren(
     mindestlaufzeitMonate: eingabe.mindestlaufzeitMonate,
     verlaengerung: eingabe.verlaengerung,
     verlaengerungMonate: eingabe.verlaengerung === "automatisch" ? eingabe.verlaengerungMonate : undefined,
+    art: eingabe.art ?? "abo",
     kuendigungsfristMonate: eingabe.kuendigungsfristMonate,
     status: bestehend?.status ?? "aktiv",
     kategorieId: eingabe.kategorieId,

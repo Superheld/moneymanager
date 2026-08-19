@@ -92,3 +92,31 @@ describe("ruecklageProMonat", () => {
     ).toBe(1000 + 1836);
   });
 });
+
+describe("Vertragsart", () => {
+  const basis = {
+    id: "v1", anbieter: "Arbeitgeber", beginn: "2020-01-01",
+    verlaengerung: "keine" as const, status: "aktiv" as const,
+    kuendigungsfristMonate: 3,
+  };
+
+  it("warnt bei einem Dauervertrag nicht vor dem nächsten Kündigungstermin", () => {
+    // Ohne Mindestlaufzeit gilt ein Vertrag als jederzeit kündbar — bei einem
+    // Arbeitsvertrag heisst das „heute kündbar, bald!", und er stand damit in der
+    // Warnung, die den Abos gehört.
+    const abo = { ...basis, art: "abo" as const };
+    const dauer = { ...basis, art: "dauervertrag" as const };
+    expect(kuendigungsterminNaht(abo, "2026-08-19")).toBe(true);
+    expect(kuendigungsterminNaht(dauer, "2026-08-19")).toBe(false);
+  });
+
+  it("liefert den Termin selbst weiterhin — er ist eine Auskunft, keine Aufforderung", () => {
+    const dauer = { ...basis, art: "dauervertrag" as const };
+    expect(naechsterKuendigungstermin(dauer, "2026-08-19")).not.toBeNull();
+  });
+
+  it("behandelt einen Vertrag ohne Art wie ein Abo", () => {
+    // Bestandsdaten tragen das Feld nicht — sie sollen sich verhalten wie bisher.
+    expect(kuendigungsterminNaht(basis, "2026-08-19")).toBe(true);
+  });
+});

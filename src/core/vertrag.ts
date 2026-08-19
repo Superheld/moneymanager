@@ -9,6 +9,23 @@ import { RHYTHMUS_MONATE, type Zahlungsregel } from "./zahlungsregel";
 export type Verlaengerungsart = "keine" | "automatisch";
 export type Vertragsstatus = "aktiv" | "gekuendigt" | "beendet";
 
+/**
+ * Was für ein Vertrag das ist — und ob es Sinn ergibt, ihn kündigen zu wollen.
+ *
+ *   • `abo` — der Regelfall: Handy, Streaming, Fitnessstudio, Versicherung. Läuft
+ *     weiter, bis man etwas dagegen tut, und genau deshalb warnt die App vor dem
+ *     nächsten Kündigungstermin.
+ *   • `dauervertrag` — Arbeitsvertrag, Mietvertrag, Kindergeld. Auch eine
+ *     wiederkehrende Zahlung mit Fristen, aber niemand sucht hier nach der nächsten
+ *     Gelegenheit auszusteigen. Bis 2026-08-19 bekam ein Arbeitsvertrag ohne
+ *     Mindestlaufzeit dieselbe Behandlung wie ein Abo — „heute kündbar, bald!" — und
+ *     stand damit in der Warnung, die den kündbaren Verträgen gehört.
+ *
+ * Die Frist bleibt in BEIDEN Fällen sichtbar: bei einem Mietvertrag ist sie eine
+ * nützliche Auskunft, nur eben keine Aufforderung.
+ */
+export type Vertragsart = "abo" | "dauervertrag";
+
 export interface Vertrag {
   readonly id: string;
   readonly anbieter: string;
@@ -17,6 +34,8 @@ export interface Vertrag {
   readonly beginn: string; // ISO „YYYY-MM-DD"
   readonly mindestlaufzeitMonate?: number;
   readonly verlaengerung: Verlaengerungsart;
+  /** Fehlend zählt als `abo` — Bestandsdaten und frisch gebaute Objekte bleiben so gültig. */
+  readonly art?: Vertragsart;
   /** Verlängerungsschritt in Monaten, wenn verlaengerung = „automatisch". */
   readonly verlaengerungMonate?: number;
   readonly kuendigungsfristMonate?: number;
@@ -116,6 +135,9 @@ export function ruecklagenbedarf(regeln: readonly Zahlungsregel[]): number {
 
 /** Naht der nächste Kündigungstermin (kuendigenBis innerhalb `warnTage` ab heute)? */
 export function kuendigungsterminNaht(v: Vertrag, heute: string, warnTage = 45): boolean {
+  // Ein Dauervertrag wird nicht „bald kündbar" — die Warnung gehört den Abos. Der Termin
+  // selbst bleibt abrufbar (naechsterKuendigungstermin), er ist nur keine Aufforderung.
+  if (v.art === "dauervertrag") return false;
   const t = naechsterKuendigungstermin(v, heute);
   if (!t) return false;
   const diff = tageBis(heute, t.kuendigenBis);

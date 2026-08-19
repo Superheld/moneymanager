@@ -301,7 +301,18 @@ export function VertraegeScreen() {
    */
   function spalten(mitRuecklage: boolean): DataColumn[] {
     const s: DataColumn[] = [
-      { key: "anbieter", label: t("vertraege.spalteAnbieter") },
+      {
+        key: "anbieter",
+        label: t("vertraege.spalteAnbieter"),
+        // Nur der Dauervertrag bekommt eine Pille — er ist der Sonderfall. Eine Pille an
+        // jeder Zeile („Abo") sagte nichts und kostete eine Spaltenbreite.
+        render: (v) => (
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+            {v.anbieter}
+            {v.art === "dauervertrag" && <Pill variant="neutral">{t("vertraege.artKurz.dauervertrag")}</Pill>}
+          </span>
+        ),
+      },
       { key: "inhaber", label: t("vertraege.spalteInhaber"), render: (v) => (v.inhaberId ? personName.get(v.inhaberId) ?? "?" : "—") },
       {
         key: "charakter",
@@ -558,7 +569,10 @@ export function VertraegeScreen() {
           <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proMonat < 0 ? "warn" : "ok"} />
           <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proJahr < 0 ? "warn" : "ok"} />
           {summe.ruecklage > 0 && (
-            <KPIStat size="chip" label={t("vertraege.kpiRuecklage")} value={geld.format(summe.ruecklage)} unit={geld.symbol} meta={t("vertraege.kpiRuecklageMeta")} />
+            // Ohne meta-Zeile: sie machte genau diese Karte eine Zeile höher als ihre
+            // Nachbarn, und die Reihe stand sichtbar schief. Was sie erklärte, steht
+            // jetzt im Label.
+            <KPIStat size="chip" label={t("vertraege.kpiRuecklage")} value={geld.format(summe.ruecklage)} unit={geld.symbol} />
           )}
           {summe.baldKuendbar > 0 && <KPIStat size="chip" label={t("vertraege.kpiBald")} value={String(summe.baldKuendbar)} tone="warn" />}
         </div>

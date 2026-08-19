@@ -1,6 +1,6 @@
 // SQLite-Implementierung des VertragRepository-Ports.
 
-import type { Verlaengerungsart, Vertrag, Vertragsstatus } from "../../core";
+import type { Verlaengerungsart, Vertrag, Vertragsart, Vertragsstatus } from "../../core";
 import type { VertragRepository } from "../../application/ports";
 import { getDb } from "./db";
 
@@ -15,6 +15,7 @@ interface Zeile {
   verlaengerung_monate: number | null;
   kuendigungsfrist_monate: number | null;
   status: string;
+  art: string | null;
   kategorie_id: string | null;
   notizen: string | null;
 }
@@ -31,6 +32,8 @@ function zuVertrag(z: Zeile): Vertrag {
     verlaengerungMonate: z.verlaengerung_monate ?? undefined,
     kuendigungsfristMonate: z.kuendigungsfrist_monate ?? undefined,
     status: z.status as Vertragsstatus,
+    // Fehlend heisst „abo" — so bleiben Bestandsverträge ohne Spalte gültig.
+    art: (z.art as Vertragsart) ?? "abo",
     kategorieId: z.kategorie_id ?? undefined,
     notizen: z.notizen ?? undefined,
   };
@@ -41,7 +44,7 @@ export const sqliteVertragRepository: VertragRepository = {
     const db = await getDb();
     const zeilen = await db.select<Zeile[]>(
       `SELECT id, anbieter, vertragsnummer, inhaber_id, beginn, mindestlaufzeit_monate,
-              verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status,
+              verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, art,
               kategorie_id, notizen
        FROM vertrag ORDER BY anbieter`,
     );
@@ -52,15 +55,15 @@ export const sqliteVertragRepository: VertragRepository = {
     const db = await getDb();
     await db.execute(
       `INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, mindestlaufzeit_monate,
-         verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, kategorie_id, notizen)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+         verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, art, kategorie_id, notizen)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
        ON CONFLICT(id) DO UPDATE SET
          anbieter = excluded.anbieter, vertragsnummer = excluded.vertragsnummer,
          inhaber_id = excluded.inhaber_id, beginn = excluded.beginn,
          mindestlaufzeit_monate = excluded.mindestlaufzeit_monate,
          verlaengerung = excluded.verlaengerung, verlaengerung_monate = excluded.verlaengerung_monate,
          kuendigungsfrist_monate = excluded.kuendigungsfrist_monate,
-         status = excluded.status, kategorie_id = excluded.kategorie_id,
+         status = excluded.status, art = excluded.art, kategorie_id = excluded.kategorie_id,
          notizen = excluded.notizen`,
       [
         v.id,
@@ -73,6 +76,7 @@ export const sqliteVertragRepository: VertragRepository = {
         v.verlaengerungMonate ?? null,
         v.kuendigungsfristMonate ?? null,
         v.status,
+        v.art ?? "abo",
         v.kategorieId ?? null,
         v.notizen ?? null,
       ],
