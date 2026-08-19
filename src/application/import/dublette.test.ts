@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { RohUmsatz } from "./rohUmsatz";
-import { ordneZu, vergleiche, zweckKern, type Vergleichbar } from "./dublette";
+import { ordneZu, paareImBestand, vergleiche, zweckKern, type Vergleichbar } from "./dublette";
 
 function bank(over: Partial<RohUmsatz> = {}): RohUmsatz {
   return {
@@ -153,5 +153,42 @@ describe("ordneZu", () => {
   it("kommt mit leerem Bestand klar", () => {
     expect(ordneZu([bank()], [])).toHaveLength(1);
     expect(ordneZu([], [datei()])).toEqual([]);
+  });
+});
+
+
+describe("paareImBestand", () => {
+  it("findet Paare ohne Richtung — es gibt kein Original", () => {
+    // Im Ledger liegen beide Zeilen längst; welche davon weg soll, entscheidet niemand
+    // automatisch. Deshalb ein Paar und keine Zuordnung.
+    const [paar] = paareImBestand([bank({ nativeId: "a" }), datei({ nativeId: "b" })]);
+    expect(paar.bewertung.urteil).toBe("identisch");
+    expect([paar.a.nativeId, paar.b.nativeId]).toEqual(["a", "b"]);
+  });
+
+  it("meldet bei drei gleichen Zeilen alle drei Paare, nicht nur eines", () => {
+    // Anders als `ordneZu`: dort verhindert die 1:1-Regel, dass zwei neue Zeilen auf
+    // dieselbe alte zeigen. Hier wäre genau das Verschweigen — liegt eine Zahlung
+    // dreimal da, gehören alle drei Verbindungen auf den Tisch.
+    const drei = [bank({ nativeId: "1" }), bank({ nativeId: "2" }), bank({ nativeId: "3" })];
+    expect(paareImBestand(drei)).toHaveLength(3);
+  });
+
+  it("vergleicht nur innerhalb desselben Betrags", () => {
+    expect(paareImBestand([bank(), bank({ betrag: -4991 })])).toEqual([]);
+  });
+
+  it("sortiert die sichersten Funde nach oben", () => {
+    const paare = paareImBestand([
+      bank({ nativeId: "x" }),
+      datei({ nativeId: "x" }), // gleiche Quellen-ID → 99 Punkte
+      datei({ verwendungszweck: "EDK*[anonymisiert] [anonymisiert]" }),
+    ]);
+    expect(paare[0].bewertung.punkte).toBe(99);
+    expect(paare.length).toBeGreaterThan(1);
+  });
+
+  it("liefert nichts, wenn es nur eine Zeile gibt", () => {
+    expect(paareImBestand([bank()])).toEqual([]);
   });
 });
