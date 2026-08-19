@@ -303,13 +303,13 @@ function budgetsZeile(
     .map((b): AusblickPosten => {
       // `|| 0` fängt die negative Null: `-0` formatiert sich als „−0,00" und liest sich
       // wie eine Ausgabe, die es nicht gab.
-      const roh = budgetVerbrauch([...offenesIst], kategorien, b.kategorieId, von, bis);
+      const roh = budgetVerbrauch(offenesIst, kategorien, b, budgets, von, bis);
       const verbrauch = zukunft ? null : -roh || 0;
       return {
         schluessel: b.id,
         // Der Name der Kategorie steht nicht im Budget — die Oberfläche löst ihn auf.
         bezeichnung: b.kategorieId,
-        plan: geglaetteterMonatsabfluss(b),
+        plan: geglaetteterMonatsabfluss(b, budgets, kategorien),
         ist: verbrauch,
         status: verbrauch == null || verbrauch === 0 ? "offen" : "gebucht",
       };

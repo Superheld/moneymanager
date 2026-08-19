@@ -48,7 +48,7 @@ const ERWARTETE_TABELLEN = [
   "budget", "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
   "ist_buchung_aufteilung", "kategorie", "kategorie_festlegung", "klassifikator_modell",
   "merkmal_ausschluss",
-  "person", "topf",
+  "person",
   "umsatz", "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
   "zahlungskonto", "zahlungsregel",
 ];
@@ -77,7 +77,7 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     // v9/v10/v11/v13
     expect(spalten(db, "umsatz")).toContain("glaeubiger_id"); // v16
     expect(spalten(db, "ist_buchung")).toEqual(
-      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "verwendung_topf_id", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
+      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
     );
     db.close();
   });
@@ -184,19 +184,51 @@ describe("Alpha-Aufräumen (v18)", () => {
       expect.arrayContaining(["wiederbeschaffung", "nutzungsdauer_monate", "inventar_id"]),
     );
 
-    apply(db, 17);
+    apply(db, 17, 18); // NUR v18 — v31 räumt die Tabelle später ganz ab.
 
     expect(tabellen(db)).not.toContain("szenario");
     expect(tabellen(db)).not.toContain("szenario_posten");
     expect(spalten(db, "topf")).toEqual(["id", "typ", "bezeichnung", "start", "kategorie_id", "schaetzbetrag", "frist_monate", "zufuehrung_pro_monat", "sparziel"]);
     db.close();
   });
+});
 
-  // Was bleiben MUSS: die Entnahme-Verwendung trägt Puffer und Spartopf.
-  it("lässt verwendung_topf_id an der Ist-Buchung stehen", () => {
+describe("Budget-Umbau (v30/v31)", () => {
+  it("überführt ein Bestandsbudget in die neue Form und wählt ein Konto", () => {
     const db = new SQL.Database();
-    apply(db);
-    expect(spalten(db, "ist_buchung")).toContain("verwendung_topf_id");
+    apply(db, 0, 29);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('giro','Girokonto','Giro','[]')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('bar','Bargeld','Bargeld','[]')");
+    db.run("INSERT INTO budget (id, kategorie_id, rahmen, periode) VALUES ('b1','k1',43000,'monatlich')");
+    db.run("INSERT INTO budget (id, kategorie_id, rahmen, periode) VALUES ('b2','k2',480000,'jaehrlich')");
+
+    apply(db, 29, 30);
+
+    const zeilen = db.exec("SELECT id, betrag_pro_monat, art, konto_id, start FROM budget ORDER BY id")[0].values;
+    // Das jährliche Budget wird auf seinen Monatsanteil umgerechnet, nicht abgeschnitten.
+    expect(zeilen).toEqual([
+      ["b1", 43000, "monatlich", "giro", "2026-08-01"],
+      ["b2", 40000, "monatlich", "giro", "2026-08-01"],
+    ]);
+    db.close();
+  });
+
+  it("räumt erst danach ab — und übersteht einen Abbruch dazwischen", () => {
+    // Der Grund für die Trennung in zwei Versionen: v30 LIEST periode und rahmen. Liefe
+    // das Abräumen in derselben Version und bräche der Lauf dazwischen ab, fände v30
+    // beim nächsten Start die Spalten nicht mehr — SQLite prüft Spaltennamen beim
+    // Parsen, und die App käme nicht mehr hoch.
+    const db = new SQL.Database();
+    apply(db, 0, 30);
+    expect(spalten(db, "budget")).toContain("rahmen");
+    expect(tabellen(db)).toContain("topf");
+
+    apply(db, 30, 31);
+
+    expect(spalten(db, "budget")).not.toContain("rahmen");
+    expect(spalten(db, "budget")).not.toContain("periode");
+    expect(tabellen(db)).not.toContain("topf");
+    expect(spalten(db, "ist_buchung")).not.toContain("verwendung_topf_id");
     db.close();
   });
 });

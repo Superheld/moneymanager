@@ -5,6 +5,7 @@ import {
   istGeteilt,
   kategorieAggregat,
   kategorieAnteile,
+  type Budget,
   type IstBuchung,
   type Kategorie,
 } from "../core";
@@ -29,6 +30,13 @@ function memLedger(start: IstBuchung[] = []): LedgerPort & { daten: IstBuchung[]
     },
   };
 }
+
+/** Je ein Budget auf den beiden Kategorien der Aufteilung. */
+const BUDGET_LM: Budget = {
+  id: "b-lm", kategorieId: "lebensmittel", kontoId: "giro",
+  betragProMonat: euroZuCent(400), art: "monatlich", start: "2026-01-01",
+};
+const BUDGET_DR: Budget = { ...BUDGET_LM, id: "b-dr", kategorieId: "drogerie" };
 
 /** Wocheneinkauf über 52 € — der Fall aus der Story. */
 const einkauf: IstBuchung = {
@@ -157,8 +165,8 @@ describe("Auswertungen mit geteilten Buchungen", () => {
     const von = "2026-08-01";
     const bis = "2026-09-01";
 
-    expect(budgetVerbrauch([g], KATEGORIEN, "lebensmittel", von, bis)).toBe(euroZuCent(40));
-    expect(budgetVerbrauch([g], KATEGORIEN, "drogerie", von, bis)).toBe(euroZuCent(12));
+    expect(budgetVerbrauch([g], KATEGORIEN, BUDGET_LM, [BUDGET_LM], von, bis)).toBe(euroZuCent(40));
+    expect(budgetVerbrauch([g], KATEGORIEN, BUDGET_DR, [BUDGET_DR], von, bis)).toBe(euroZuCent(12));
     // Vor S-7 hätte „Lebensmittel" die vollen 52 € getragen und „Drogerie" nichts.
   });
 
@@ -175,7 +183,7 @@ describe("Auswertungen mit geteilten Buchungen", () => {
   it("ändert an ungeteilten Buchungen nichts", async () => {
     const von = "2026-08-01";
     const bis = "2026-09-01";
-    expect(budgetVerbrauch([einkauf], KATEGORIEN, "lebensmittel", von, bis)).toBe(euroZuCent(52));
-    expect(budgetVerbrauch([einkauf], KATEGORIEN, "drogerie", von, bis)).toBe(0);
+    expect(budgetVerbrauch([einkauf], KATEGORIEN, BUDGET_LM, [BUDGET_LM], von, bis)).toBe(euroZuCent(52));
+    expect(budgetVerbrauch([einkauf], KATEGORIEN, BUDGET_DR, [BUDGET_DR], von, bis)).toBe(0);
   });
 });

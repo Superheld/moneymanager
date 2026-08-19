@@ -6,7 +6,6 @@
 import { describe, it, expect } from "vitest";
 import { addMonate, addTage, ord, parseIso, tageBis, toIso } from "./datum";
 import { projiziereRegel } from "./projektion";
-import { ansparrate, sollstand, topfStand, type Topf } from "./topf";
 import { monatsRuecklage, sollRuecklage, type Inventargegenstand } from "./inventar";
 import { kuendigungsterminNaht, naechsterKuendigungstermin, type Vertrag } from "./vertrag";
 import type { Zahlungsregel } from "./zahlungsregel";
@@ -135,7 +134,7 @@ describe("ROT 2 — Dezimale/ungültige Laufzeit-Eingaben erzeugen kaputte Datum
   // Pfad: VertraegeScreen.tsx:296 ist ein FREITEXT-Feld (inputMode="numeric" ist nur ein
   //   Tastatur-Hinweis, keine Validierung), VertraegeScreen.tsx:149 macht `Number(...)`,
   //   und vertragAnlegen.ts validiert die Monatsfelder überhaupt nicht — anders als
-  //   topfAnlegen.ts, das `Math.round` erzwingt.
+  //   inventarAnlegen.ts, das `Math.round` erzwingt.
   //
   // Erwartet: entweder ein FachlicherFehler oder ein gerundeter, gültiger Termin.
   // Tatsächlich: endeDatum = "2026-2.5-15" (kein Datum), weil addMonate mit einem
@@ -221,7 +220,7 @@ describe("ROT 4 — Regel mit sehr altem Startdatum verschwindet still aus der P
 });
 
 describe("ROT 5 — Formvalidierung lässt nicht existierende Daten durch, Tag 00 überlebt", () => {
-  // zahlungsregelAnlegen.ts:38 / vertragAnlegen.ts:56 / topfAnlegen.ts:27 prüfen nur
+  // zahlungsregelAnlegen.ts:38 / vertragAnlegen.ts:56 prüfen nur
   // /^\d{4}-\d{2}-\d{2}$/ — also die FORM, nicht die Existenz des Datums.
   //
   // Erwartet: "2026-01-00" wird abgewiesen oder auf einen realen Tag normalisiert.
@@ -273,36 +272,13 @@ describe("ROT 6 — ungültiges Fensterdatum erzeugt „undefined aN“ statt ei
 });
 
 describe("ROT 7 — Zeitraum 0 erzeugt Infinity/NaN statt eines Fehlers", () => {
-  // Erreichbarkeit: topfAnlegen.ts und inventarAnlegen.ts validieren > 0, aber die
-  //   Repositories fangen mit `?? 1` nur NULL ab — eine 0 in der Spalte passiert. Der
-  //   Kern selbst ist nicht defensiv.
+  // Erreichbarkeit: inventarAnlegen.ts validiert > 0, aber das Repository fängt mit
+  //   `?? 1` nur NULL ab — eine 0 in der Spalte passiert. Der Kern selbst ist nicht
+  //   defensiv. (Dieselbe Falle stand bis 2026-08-19 am Topf; die Töpfe sind entfallen.)
   // Erwartet: Fehler oder 0. Tatsächlich (vor dem Fix): rate = Infinity, und
   //   Infinity * 0 Monate = NaN → jeder Stand am Starttag ist NaN.
   // Warum falsch: NaN wandert ungebremst in Liste und Deckungsrechnung; die UI zeigt
   //   „NaN" und jede Weiterrechnung ist ab da vergiftet.
-  const t: Topf = {
-    id: "t1",
-    typ: "puffer",
-    bezeichnung: "Kaputt",
-    start: "2026-01-01",
-    schaetzbetrag: 120000,
-    fristMonate: 0,
-  };
-
-  it("ansparrate bleibt endlich", () => {
-    expect(Number.isFinite(ansparrate(t))).toBe(true);
-  });
-
-  it("sollstand am Starttag ist 0, nicht NaN", () => {
-    expect(sollstand(t, "2026-01-01")).toBe(0);
-  });
-
-  it("topfStand am Starttag ist 0, nicht NaN", () => {
-    expect(topfStand(t, "2026-01-01", [])).toBe(0);
-  });
-
-  // Dieselbe Falle am Inventargegenstand, der seine Rücklage seit 2026-08-16 selbst
-  // rechnet (kein Ersatz-Topf mehr).
   const g: Inventargegenstand = {
     id: "g1",
     bezeichnung: "Kaputt",
