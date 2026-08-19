@@ -313,3 +313,36 @@ describe("Buchung von Hand anlegen", () => {
     expect(gebucht.quelle).toBe("manuell");
   });
 });
+
+describe("Charakter folgt der Kategorie", () => {
+  // Bis 2026-08-19 stand im Dialog ein drittes Auswahlfeld für den Charakter. Es fragte
+  // nach etwas, das die Kategorie längst weiss, und eine abweichende Antwort hätte
+  // Auswertungen erzeugt, die sich gegenseitig widersprechen (die gruppieren nach
+  // Charakter UND nach Kategorie).
+  it("setzt beim Kategoriewechsel den Charakter der Kategorie", async () => {
+    await grunddaten();
+    await kategorieRepo.speichern({ id: "kat-lohn", name: "Gehalt", defaultCharakter: "Ertrag" });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click(await screen.findByRole("button", { name: /^\+?\s*Buchung$/i }));
+    const dialog = within(await screen.findByRole("dialog"));
+
+    // Kein Charakter-Feld mehr — es gibt nichts mehr zu wählen.
+    expect(dialog.queryByLabelText(/charakter/i)).not.toBeInTheDocument();
+
+    const betrag = dialog.getByLabelText(/betrag/i);
+    await nutzer.type(betrag, "2500");
+    await nutzer.click(dialog.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Gehalt/ }));
+    await nutzer.click(dialog.getByRole("button", { name: /^speichern$/i }));
+
+    await waitFor(async () => {
+      const alle = await ledgerRepo.alle();
+      expect(alle).toHaveLength(1);
+      // Ertrag aus der Kategorie — und damit ein ZUFLUSS, nicht ein Abfluss.
+      expect(alle[0].charakter).toBe("Ertrag");
+      expect(alle[0].betrag).toBe(250000);
+    });
+  });
+});

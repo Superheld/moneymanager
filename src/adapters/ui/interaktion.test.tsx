@@ -524,6 +524,71 @@ describe("Buchungsdetails", () => {
 
 // S-7 — Buchung splitten. Der Weg vom Dialog bis in die Datenbank UND zurück: die
 // Aufteilung muss die Rundreise durch echtes SQLite überstehen, sonst nützt sie nichts.
+describe("Konto-Register — Suche und Spalten", () => {
+  const heute = "2026-08-12";
+
+  async function dreiBuchungen() {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Sparkonto", typ: "Tagesgeld", inhaberIds: [], saldo: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -1250, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Baecker",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: -8900, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Tankstelle",
+    });
+    // Ein Umbuchungs-Bein: traegt ein Gegenkonto und keine Kategorie.
+    await sqliteLedgerRepository.speichern({
+      id: "i3", datum: heute, betrag: -50000, kontoId: "k1", gegenkontoId: "k2",
+      transferId: "t1", charakter: "Umschichtung", quelle: "manuell", notiz: "Uebertrag",
+    });
+  }
+
+  it("findet eine Buchung ueber ihren Betrag", async () => {
+    await dreiBuchungen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findAllByText("Girokonto");
+    await screen.findByText("Baecker");
+
+    // „89" allein ist kein Betrag, „89,00" schon — beide Wege muessen die Zeile finden.
+    await nutzer.type(screen.getByPlaceholderText(/Suche/i), "89,00");
+    await waitFor(() => expect(screen.queryByText("Baecker")).not.toBeInTheDocument());
+    expect(screen.getByText("Tankstelle")).toBeInTheDocument();
+  });
+
+  it("zeigt die Umbuchungs-Pille in der Kategorie-Spalte", async () => {
+    await dreiBuchungen();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findAllByText("Girokonto");
+    await screen.findByText("Uebertrag");
+
+    // Die Pille ersetzt die Kategorie: sie steht in derselben Zelle, in der bei den
+    // anderen Zeilen „Lebensmittel" steht.
+    const zeile = screen.getByText("Uebertrag").closest("tr")!;
+    const zellen = [...zeile.querySelectorAll("td")].map((z) => z.textContent ?? "");
+    const katSpalte = zellen.findIndex((z) => z.includes("Umbuchung"));
+    expect(katSpalte).toBeGreaterThan(0);
+    // Und bei einer normalen Zeile steht an derselben Stelle die Kategorie.
+    const andere = screen.getByText("Baecker").closest("tr")!;
+    expect([...andere.querySelectorAll("td")][katSpalte].textContent).toContain("Lebensmittel");
+  });
+
+  it("zeigt in der Kontenliste weder Anfangsbestand noch Abgleich", async () => {
+    await dreiBuchungen();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findAllByText("Girokonto");
+    // Beide Spalten sind 2026-08-19 aus der Liste geflogen: der Anfangsbestand steht im
+    // geoeffneten Konto, der Abgleich ebenfalls — in der Liste waren sie Ballast.
+    const kopfzeilen = [...document.querySelectorAll("th")].map((z) => z.textContent ?? "");
+    expect(kopfzeilen.some((z) => /Anfangsbestand/i.test(z))).toBe(false);
+    expect(kopfzeilen.some((z) => /Abgleich/i.test(z))).toBe(false);
+  });
+});
+
 describe("Buchung splitten", () => {
   const heute = "2026-08-12";
 

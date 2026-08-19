@@ -87,10 +87,8 @@ import { MerkmaleBlock } from "./MerkmaleBlock";
 import { festlegungSetzen } from "../../application/kategoriefestlegungen";
 import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persistence/sqliteKategoriefestlegungRepository";
 import { Modal } from "./Modal";
-import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
+import { useGeld, fehlerNachricht } from "./einstellungenKontext";
 import { geldFarbe } from "./geldFarbe";
-
-const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 
 function ddmm(iso: string): string {
   const [, m, d] = iso.split("-");
@@ -278,7 +276,6 @@ function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund
 function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onClose, onSaved, onDelete, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const charakterLabel = useCharakterLabel();
   const istEntwurf = !!entwurf;
   const istNeu = !buchung && !entwurf;
   const [kontoId, setKontoId] = useState(buchung?.kontoId ?? entwurf?.zahlungskontoId ?? vorgabe.kontoId);
@@ -287,6 +284,26 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
   const [betrag, setBetrag] = useState(startBetrag == null ? "" : String(minorZuMajor(Math.abs(startBetrag), geld.waehrung)));
   const [charakter, setCharakter] = useState<Charakter>(buchung?.charakter ?? entwurf?.vorschlag?.charakter ?? "Aufwand");
   const [kategorieId, setKategorieId] = useState(buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
+
+  /**
+   * Der Charakter wird nicht mehr GEWÄHLT, sondern folgt der Kategorie.
+   *
+   * Bis 2026-08-19 stand hier ein drittes Auswahlfeld („Aufwand / Ertrag / Sparen &
+   * Vorsorge"). Es fragte nach etwas, das die Kategorie längst weiss — jede Kategorie
+   * trägt ihren `defaultCharakter` —, und eine Antwort, die von der Kategorie abweicht,
+   * hat keinen Ort, an dem sie richtig wäre: die Auswertungen gruppieren nach Charakter
+   * UND nach Kategorie, und ein Widerspruch zwischen beiden erzeugt Zahlen, die sich
+   * gegenseitig widersprechen.
+   *
+   * `Umschichtung` bleibt ausgenommen: die kommt nicht aus der Kategorie, sondern aus
+   * der Umbuchung (zwei Beine, eigener Weg im Dialog darunter).
+   */
+  function kategorieSetzen(id: string) {
+    setKategorieId(id);
+    if (charakter === "Umschichtung") return;
+    const gewaehlt = kategorien.find((k) => k.id === id);
+    if (gewaehlt) setCharakter(gewaehlt.defaultCharakter);
+  }
   const [notiz, setNotiz] = useState(buchung?.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -560,13 +577,6 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         >
           <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
-        {!gepaart && (
-          <FormField label={t("konten.feldCharakter")}>
-            <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-              {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
-            </select>
-          </FormField>
-        )}
         {/* Die Notiz gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt den
             Verwendungszweck der Bank, und der steht unter „Herkunft". */}
         {!istEntwurf && (
@@ -685,7 +695,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
           ) : (
             <>
               <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
-                <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
+                <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieSetzen} />
               </FormField>
               {kategorieGeaendert && kategorieId && musterAngebot && !istEntwurf && (
                 <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", marginTop: 6, fontSize: "var(--fs-xs)" }}>
