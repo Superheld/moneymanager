@@ -32,15 +32,11 @@ const WURZEL = resolve(__dirname);
  * gebaut wird, wird gleich richtig gebaut.
  */
 const ALTLAST: readonly string[] = [
-  "adapters/ui/AbrufDialog.tsx",
   "adapters/ui/BuchungDetail.tsx",
   "adapters/ui/FestlegungenCard.tsx",
-  "adapters/ui/ImportScreen.tsx",
   "adapters/ui/KategorisierungCards.tsx",
   "adapters/ui/KontenScreen.tsx",
   "adapters/ui/MerkmaleBlock.tsx",
-  "adapters/ui/NeueBuchungen.tsx",
-  "adapters/ui/ReviewScreen.tsx",
   "adapters/ui/SammelDialog.tsx",
   "adapters/ui/TrainingBereich.tsx",
 ];
