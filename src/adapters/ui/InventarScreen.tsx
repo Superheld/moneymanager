@@ -13,27 +13,27 @@ import {
   centZuEuro,
   minorZuMajor,
   monatsRuecklage,
-  realerKontostand,
-  ruecklagenDeckung,
+  type Inventarsicht,
   type Inventargegenstand,
-  type IstBuchung,
-  type Zahlungskonto,
-} from "../../core";
+  type RuecklagenDeckung,
+} from "../../application";
 import {
+  inventar,
   inventarAktualisieren,
   inventarAnlegen,
   inventarErsetzt,
   inventarLoeschen,
-} from "../../application/inventarAnlegen";
-import { sqliteInventarRepository as inventarRepo } from "../persistence/sqliteInventarRepository";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
+} from "../dienste";
 import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "./ds";
 import { PageHead } from "./PageHead";
 import { IconButton, IconLeiste } from "./IconButton";
 import { betont } from "./betonung";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
+
+/** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
+const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
+const LEERE_DECKUNG: RuecklagenDeckung = { posten: [], soll: 0, sollMitKonto: 0, tatsaechlich: 0, grad: 100 };
 
 function heuteIso(): string {
   const n = new Date();
@@ -44,9 +44,7 @@ export function InventarScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
   const heute = useMemo(heuteIso, []);
-  const [items, setItems] = useState<Inventargegenstand[]>([]);
-  const [ist, setIst] = useState<IstBuchung[]>([]);
-  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
+  const [sicht, setSicht] = useState<Inventarsicht | null>(null);
 
   // Anlegen/Bearbeiten
   const [offen, setOffen] = useState(false);
@@ -67,26 +65,18 @@ export function InventarScreen() {
   // Verwandte Repos in EINEM Zug laden und zusammen setzen: gestaffelte setState lassen
   // die Deckung kurz gegen eine leere Kontenliste rechnen (jeder Stand wäre dann 0).
   async function laden() {
-    const [i, b, k] = await Promise.all([inventarRepo.alle(), ledgerRepo.alle(), kontoRepo.alle()]);
-    setItems(i);
-    setIst(b);
-    setKonten(k);
+    setSicht(await inventar(heute));
   }
   useEffect(() => {
     laden();
   }, []);
 
-  const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
-  const kontostaende = useMemo(
-    () => new Map(konten.map((k) => [k.id, realerKontostand(k, ist)])),
-    [konten, ist],
-  );
-  const deckung = useMemo(
-    () => ruecklagenDeckung(items, heute, kontostaende),
-    [items, heute, kontostaende],
-  );
-  const proMonat = useMemo(() => items.reduce((s, g) => s + monatsRuecklage(g), 0), [items]);
-  const ersatzwert = useMemo(() => items.reduce((s, g) => s + g.wiederbeschaffung, 0), [items]);
+  const items = sicht?.gegenstaende ?? [];
+  const konten = sicht?.konten ?? [];
+  const kontoName = sicht?.kontoNamen ?? LEERE_NAMEN;
+  const deckung = sicht?.deckung ?? LEERE_DECKUNG;
+  const proMonat = sicht?.proMonat ?? 0;
+  const ersatzwert = sicht?.ersatzwert ?? 0;
 
   function neu() {
     setEditId(null);
@@ -118,8 +108,8 @@ export function InventarScreen() {
       kontoId: kontoId || undefined,
     };
     try {
-      if (editId) await inventarAktualisieren(inventarRepo, editId, eingabe);
-      else await inventarAnlegen(inventarRepo, eingabe);
+      if (editId) await inventarAktualisieren(editId, eingabe);
+      else await inventarAnlegen(eingabe);
       setOffen(false);
       await laden();
     } catch (e) {
@@ -137,7 +127,7 @@ export function InventarScreen() {
     if (!ersItem) return;
     setErsFehler(null);
     try {
-      await inventarErsetzt(inventarRepo, ersItem, ersDatum, geld.parse(ersWert) ?? undefined);
+      await inventarErsetzt(ersItem, ersDatum, geld.parse(ersWert) ?? undefined);
       setErsItem(null);
       await laden();
     } catch (e) {
@@ -200,7 +190,7 @@ export function InventarScreen() {
                       <IconLeiste>
                         <IconButton icon="uebernehmen" label={t("inventar.ersetzt")} onClick={() => ersetztOeffnen(g)} />
                         <IconButton icon="bearbeiten" label={t("inventar.bearbeiten")} onClick={() => bearbeiten(g)} />
-                        <IconButton icon="loeschen" ton="gefahr" label={t("inventar.loeschen")} onClick={() => void inventarLoeschen(inventarRepo, g.id).then(laden)} />
+                        <IconButton icon="loeschen" ton="gefahr" label={t("inventar.loeschen")} onClick={() => void inventarLoeschen(g.id).then(laden)} />
                       </IconLeiste>
                     </span>
                   </div>

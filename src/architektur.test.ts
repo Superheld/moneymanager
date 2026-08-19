@@ -33,11 +33,9 @@ const WURZEL = resolve(__dirname);
  */
 const ALTLAST: readonly string[] = [
   "adapters/ui/AbrufDialog.tsx",
-  "adapters/ui/AnalyseScreen.tsx",
   "adapters/ui/BuchungDetail.tsx",
   "adapters/ui/FestlegungenCard.tsx",
   "adapters/ui/ImportScreen.tsx",
-  "adapters/ui/InventarScreen.tsx",
   "adapters/ui/KategorisierungCards.tsx",
   "adapters/ui/KontenScreen.tsx",
   "adapters/ui/MerkmaleBlock.tsx",
