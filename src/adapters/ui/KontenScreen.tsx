@@ -9,37 +9,36 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  bankAbweichung,
-  istSummeKonto,
-  kontoRegister,
-  realerKontostand,
+  registerSicht,
   type Charakter,
   type IstBuchung,
-  type Kategorie,
+  type Kontensicht,
+  type Registerzeile,
   type RegisterZeile,
   type Zahlungskonto,
-  type Zahlungsregel,
-} from "../../core";
+} from "../../application";
 import { type Umsatz } from "../../application/import";
-import { umbuchungErfassen } from "../../application/umbuchungErfassen";
-import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../../application/bezahltMarkieren";
-import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteImportLaufRepository as laufRepo, sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
-import { sqliteKontozuordnungRepository as zuordnungRepo } from "../persistence/sqliteBankzugangRepositories";
+import {
+  alsBezahltMarkieren,
+  bezahltZurueck,
+  konten as kontenLaden,
+  umbuchungErfassen,
+} from "../dienste";
 import type { ScreenId } from "./AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { BuchungDetail } from "./BuchungDetail";
 import { SammelDialog } from "./SammelDialog";
 import { AbrufDialog } from "./AbrufDialog";
-import { ABRUF_QUELLEN, NeueBuchungen } from "./NeueBuchungen";
+import { NeueBuchungen } from "./NeueBuchungen";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
 import { IconButton } from "./IconButton";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
 import { geldFarbe } from "./geldFarbe";
+
+/** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
+const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
+const LEERE_IDS: ReadonlySet<string> = new Set();
 
 const TAGE_OPTIONEN = [14, 30, 60, 90];
 const ART_OPTS = [
@@ -68,10 +67,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const geld = useGeld();
   const charakterLabel = useCharakterLabel();
   const heute = useMemo(heuteIso, []);
-  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
-  const [ist, setIst] = useState<IstBuchung[]>([]);
-  const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
-  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
+  const [sicht, setSicht] = useState<Kontensicht | null>(null);
   const [aktivId, setAktivId] = useState("");
   const [tage, setTage] = useState(30);
   const [katFilter, setKatFilter] = useState("alle");
@@ -89,59 +85,26 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [sammelOffen, setSammelOffen] = useState(false);
   /** Die abgerufene Zeile, die gerade im Dialog liegt — noch nichts davon ist gebucht. */
   const [entwurf, setEntwurf] = useState<Umsatz | null>(null);
-  const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [abruf, setAbruf] = useState(false);
-  /** Konten, die an einer Bankverbindung hängen — daran hängt auch der Abruf-Knopf. */
-  const [onlineKonten, setOnlineKonten] = useState<Set<string>>(new Set());
-  /** Der zuletzt von der Bank gemeldete Stand je Konto — Grundlage des Abgleichs. */
-  const [bankStand, setBankStand] = useState<Map<string, { betrag: number; datum?: string }>>(new Map());
-  /** Abgerufene, noch nicht bestätigte Buchungen — je Konto. */
-  const [neueAbrufe, setNeueAbrufe] = useState<Umsatz[]>([]);
-  /** Welche Import-Läufe aus einem Bankabruf stammen — Filter für den Konto-Block. */
-  const [abrufLaufIds, setAbrufLaufIds] = useState<Set<string>>(new Set());
   const [fehler, setFehler] = useState<string | null>(null);
 
-  // Alles in EINEM Zug laden und zusammen setzen. Gestaffelte await/setState-Paare
-  // lassen abgeleitete Werte kurz gegen leere Listen rechnen — der Empfänger einer
-  // importierten Buchung käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte
-  // für einen Render „Buchung" statt „[anonymisiert]".
+  // EIN Ladevorgang, EIN setState. Gestaffelte await/setState-Paare lassen abgeleitete
+  // Werte kurz gegen leere Listen rechnen — der Empfänger einer importierten Buchung
+  // käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte für einen Render
+  // „Buchung" statt „[anonymisiert]".
   async function laden() {
-    const [ks, bs, rs, kats, us, zuordnungen, offene, laeufe] = await Promise.all([
-      kontoRepo.alle(),
-      ledgerRepo.alle(),
-      regelRepo.alle(),
-      kategorieRepo.alle(),
-      umsatzRepo.alle(),
-      zuordnungRepo.alle(),
-      umsatzRepo.offene(),
-      laufRepo.alle(),
-    ]);
-    const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
-    const neu = offene.filter((u) => abrufLaeufe.has(u.laufId));
-    setAbrufLaufIds(abrufLaeufe);
-    setNeueAbrufe(neu);
-    setOnlineKonten(new Set(zuordnungen.map((z) => z.zahlungskontoId)));
-    setBankStand(
-      new Map(
-        zuordnungen
-          .filter((z) => z.bankSaldo != null)
-          .map((z) => [z.zahlungskontoId, { betrag: z.bankSaldo!, datum: z.bankSaldoDatum }]),
-      ),
-    );
-    setKonten(ks);
-    setIst(bs);
-    setRegeln(rs);
-    setKategorien(kats);
-    setUmsaetze(us);
+    const s = await kontenLaden();
+    setSicht(s);
     // Vorauswahl: das Konto, auf das etwas wartet. Sonst steht die Übersicht auf dem
     // ersten Konto nach Alphabet („Bargeld"), und die abgerufenen Buchungen des
     // Girokontos sieht man erst, wenn man zufällig die richtige Zeile anklickt.
-    const wartet = ks.find((k) => neu.some((u) => u.zahlungskontoId === k.id));
-    setAktivId((id) => id || wartet?.id || ks[0]?.id || "");
+    const wartet = s.zeilen.find((z) => z.wartet > 0);
+    setAktivId((id) => id || wartet?.konto.id || s.zeilen[0]?.konto.id || "");
   }
   useEffect(() => {
     laden();
   }, []);
+
   // Beim Kontowechsel die Filter zurücksetzen.
   useEffect(() => {
     setKatFilter("alle");
@@ -152,25 +115,27 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     setAuswahl(new Set());
   }, [aktivId]);
 
-  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
-  const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
-  const aktiv = konten.find((k) => k.id === aktivId);
+  const kontozeilen = sicht?.zeilen ?? [];
+  const kategorien = sicht?.kategorien ?? [];
+  const ist = sicht?.buchungen ?? [];
+  const umsaetze = sicht?.umsaetze ?? [];
+  const neueAbrufe = sicht?.neueAbrufe ?? [];
+  const kontoName = sicht?.kontoNamen ?? LEERE_NAMEN;
+  const ausBankabruf = sicht?.ausBankabruf ?? LEERE_IDS;
+  const aktivZeile = kontozeilen.find((z) => z.konto.id === aktivId);
+  const aktiv = aktivZeile?.konto;
+
   const register = useMemo(
-    () => (aktiv ? kontoRegister(aktiv, ist, regeln, heute, tage) : null),
-    [aktiv, ist, regeln, heute, tage],
+    () => (sicht && aktiv ? registerSicht(sicht, aktiv, heute, tage) : null),
+    [sicht, aktiv, heute, tage],
   );
 
-  // Importierte Buchungen tragen ihren Empfänger am Umsatz (nicht an der IstBuchung).
-  const umsatzByIst = useMemo(() => {
-    const m = new Map<string, Umsatz>();
-    for (const u of umsaetze) if (u.istbuchungId) m.set(u.istbuchungId, u);
-    return m;
-  }, [umsaetze]);
+  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
 
   // Kategorien, die im gebuchten Register wirklich vorkommen (für das Filter-Dropdown).
   const kategorienImRegister = useMemo(() => {
     const ids = new Set<string>();
-    for (const z of register?.gebucht ?? []) if (z.kategorieId) ids.add(z.kategorieId);
+    for (const z of register?.gebucht ?? []) if (z.zeile.kategorieId) ids.add(z.zeile.kategorieId);
     return [...ids].map((id) => ({ id, name: kategorieName.get(id) ?? "?" })).sort((a, b) => a.name.localeCompare(b.name));
   }, [register, kategorieName]);
 
@@ -181,76 +146,39 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     // exakt (auch „12" → 12,00), der formatierte Text erlaubt das Suchen nach Anfängen
     // („1.2" findet 1.234,56). Nur der Text allein hätte „12" nie auf 12,00 gebracht.
     const qBetrag = regSuche.trim() ? geld.parse(regSuche.trim()) : null;
-    return (register?.gebucht ?? []).filter((z) => {
+    return (register?.gebucht ?? []).filter((r) => {
+      const z = r.zeile;
       if (katFilter === "__ohne" ? !!z.kategorieId : katFilter !== "alle" && z.kategorieId !== katFilter) return false;
       if (artFilter === "umbuchung" && !z.gegenkontoId) return false;
       if (artFilter === "einnahmen" && !(z.betrag > 0 && !z.gegenkontoId)) return false;
       if (artFilter === "ausgaben" && !(z.betrag < 0 && !z.gegenkontoId)) return false;
       if (q) {
-        const u = z.istId ? umsatzByIst.get(z.istId) : undefined;
-        const heu = `${zeilenLabel(z)} ${u?.verwendungszweck ?? ""} ${z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""} ${geld.format(Math.abs(z.betrag))}`.toLowerCase();
+        const heu = `${r.bezeichnung} ${r.verwendungszweck} ${r.kategorieName} ${geld.format(Math.abs(z.betrag))}`.toLowerCase();
         const trifftBetrag = qBetrag != null && Math.abs(z.betrag) === Math.abs(qBetrag);
         if (!heu.includes(q) && !trifftBetrag) return false;
       }
       return true;
     });
-  }, [register, katFilter, artFilter, regSuche, umsatzByIst, kategorieName, geld]);
+  }, [register, katFilter, artFilter, regSuche, geld]);
 
   // Standardansicht: neueste zuerst (Tabelle sortiert/paginiert intern weiter).
   const gebuchtFuerTabelle = useMemo(() => [...gebuchtGefiltert].reverse(), [gebuchtGefiltert]);
-
-  /**
-   * Anzeigename einer Registerzeile.
-   *
-   * Die eigene Notiz gewinnt gegen den Empfänger aus dem Import — sonst wäre eine von
-   * Hand vergebene Bezeichnung („Urlaub Norwegen") in der Liste unsichtbar, und die
-   * Sammelbearbeitung schriebe ins Leere. Der Name der Bank bleibt: er steht im Detail
-   * unter „Herkunft" und wird hier nicht überschrieben, sondern nur überlagert.
-   *
-   * „Buchung" ist Füllwort aus dem Register und zählt als leer.
-   */
-  function zeilenLabel(z: RegisterZeile): string {
-    const b = z.istId ? ist.find((x) => x.id === z.istId) : undefined;
-    if (b?.notiz) return b.notiz;
-    const u = z.istId ? umsatzByIst.get(z.istId) : undefined;
-    if (u?.gegenpartei) return u.gegenpartei;
-    return z.bezeichnung && z.bezeichnung !== "Buchung" ? z.bezeichnung : "";
-  }
 
   async function abhaken(z: RegisterZeile, schonBezahlt: boolean) {
     if (!z.planRef) return;
     setFehler(null);
     try {
       if (schonBezahlt) {
-        await bezahltZuruecknehmen(ledgerRepo, z.planRef.quelleId, z.planRef.faelligkeit);
+        await bezahltZurueck(z.planRef.quelleId, z.planRef.faelligkeit);
       } else {
-        const regel = regeln.find((r) => r.id === z.planRef!.quelleId);
-        if (regel) await postenBezahltMarkieren(ledgerRepo, { regel, faelligkeit: z.planRef.faelligkeit, kontoId: aktivId });
+        const regel = (sicht?.regeln ?? []).find((r) => r.id === z.planRef!.quelleId);
+        if (regel) await alsBezahltMarkieren(regel, z.planRef.faelligkeit, aktivId);
       }
-      setIst(await ledgerRepo.alle());
+      await laden();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
     }
   }
-
-  function bearbeitenOeffnen(z: RegisterZeile) {
-    const b = ist.find((x) => x.id === z.istId);
-    if (b) setEditBuchung(b);
-  }
-
-  /**
-   * Buchungen, die aus einem BANKABRUF stammen — nur die werden nicht von Hand gelöscht.
-   *
-   * Vorher hing die Sperre am Konto: alles auf einem Konto mit Bankverbindung war tabu,
-   * also auch die Zeilen, die per Dateiimport oder von Hand dorthin kamen. Die Bank
-   * kennt die aber gar nicht, sie holt sie beim nächsten Abruf nicht zurück, und ohne
-   * Löschweg blieb eine falsch importierte Zeile für immer im Saldo stehen.
-   */
-  const ausBankabruf = useMemo(() => {
-    const ids = new Set<string>();
-    for (const u of umsaetze) if (u.istbuchungId && abrufLaufIds.has(u.laufId)) ids.add(u.istbuchungId);
-    return ids;
-  }, [umsaetze, abrufLaufIds]);
 
   /** Die markierten Zeilen als echte Buchungen — nur die, die es noch gibt. */
   const gewaehlteBuchungen = useMemo(
@@ -273,7 +201,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
    * die ersten fünfundzwanzig davon.
    */
   const alleIds = useMemo(
-    () => gebuchtGefiltert.map((z) => z.istId).filter((x): x is string => !!x),
+    () => gebuchtGefiltert.map((r) => r.zeile.istId).filter((x): x is string => !!x),
     [gebuchtGefiltert],
   );
   const alleGewaehlt = alleIds.length > 0 && alleIds.every((id) => auswahl.has(id));
@@ -293,48 +221,45 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           <span style={{ display: "flex", gap: "var(--sp-2)" }}>
             {/* Nur zeigen, wenn es überhaupt etwas abzurufen gibt — ein Knopf, der
                 nichts tun kann, ist eine Frage an den Nutzer statt einer Antwort. */}
-            {onlineKonten.size > 0 && (
+            {kontozeilen.some((z) => z.online) && (
               <Button variant="primary" onClick={() => setAbruf(true)}>{t("konten.abrufen")}</Button>
             )}
             <Button plus onClick={() => onNavigate("kontenverwaltung")}>{t("konten.kontoAnlegen")}</Button>
           </span>
         }
       >
-        {konten.length === 0 ? (
+        {kontozeilen.length === 0 ? (
           <div className="muted">{t("konten.keineKonten")}</div>
         ) : (
           <DataTable
             sortable
-            onRowClick={(k) => setAktivId(k.id)}
-            istAktiv={(k) => k.id === aktivId}
+            onRowClick={(z) => setAktivId(z.konto.id)}
+            istAktiv={(z) => z.konto.id === aktivId}
             columns={[
-              { key: "bezeichnung", label: t("konten.spalteBezeichnung"), render: (k) => (<span style={{ fontWeight: k.id === aktivId ? "var(--fw-bold)" : "var(--fw-semi)" }}>{k.bezeichnung}</span>) },
-              { key: "typ", label: t("konten.spalteTyp"), sortValue: (k) => k.typ, render: (k) => <Pill variant="neutral">{t(`konten.typ.${k.typ}`)}</Pill> },
+              { key: "bezeichnung", label: t("konten.spalteBezeichnung"), render: (z) => (<span style={{ fontWeight: z.konto.id === aktivId ? "var(--fw-bold)" : "var(--fw-semi)" }}>{z.konto.bezeichnung}</span>) },
+              { key: "typ", label: t("konten.spalteTyp"), sortValue: (z) => z.konto.typ, render: (z) => <Pill variant="neutral">{t(`konten.typ.${z.konto.typ}`)}</Pill> },
               {
                 key: "wartet",
                 label: t("konten.spalteWartet"),
                 align: "right" as const,
-                sortValue: (k) => neueAbrufe.filter((u) => u.zahlungskontoId === k.id).length,
-                render: (k) => {
-                  const n = neueAbrufe.filter((u) => u.zahlungskontoId === k.id).length;
-                  return n > 0 ? <Pill variant="plan">{t("konten.wartet", { n })}</Pill> : "—";
-                },
+                sortValue: (z) => z.wartet,
+                render: (z) => (z.wartet > 0 ? <Pill variant="plan">{t("konten.wartet", { n: z.wartet })}</Pill> : "—"),
               },
               {
                 key: "verbindung",
                 label: t("konten.spalteVerbindung"),
-                sortValue: (k) => (onlineKonten.has(k.id) ? "0" : "1"),
-                render: (k) =>
-                  onlineKonten.has(k.id) ? (
+                sortValue: (z) => (z.online ? "0" : "1"),
+                render: (z) =>
+                  z.online ? (
                     <Pill variant="ok">{t("konten.online")}</Pill>
                   ) : (
                     <Pill variant="neutral">{t("konten.offline")}</Pill>
                   ),
               },
-              { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", sortValue: (k) => istSummeKonto(ist, k.id), render: (k) => (istSummeKonto(ist, k.id) ? geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true }) : "—") },
-              { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", sortValue: (k) => realerKontostand(k, ist), render: (k) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
+              { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", sortValue: (z) => z.bewegungen, render: (z) => (z.bewegungen ? geld.format(z.bewegungen, { mitVorzeichen: true }) : "—") },
+              { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", sortValue: (z) => z.realerStand, render: (z) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(z.realerStand)}</span> },
             ]}
-            rows={konten}
+            rows={[...kontozeilen]}
           />
         )}
       </Card>
@@ -361,11 +286,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             (u) =>
               u.zahlungskontoId === aktivId &&
               (u.status === "verworfen" || u.status === "duplikat") &&
-              abrufLaufIds.has(u.laufId),
+              (sicht?.abrufLaeufe.has(u.laufId) ?? false),
           )}
           alleNeuen={neueAbrufe}
-          konten={konten}
-          kategorien={kategorien}
+          konten={kontozeilen.map((z) => z.konto)}
+          kategorien={[...kategorien]}
           onOeffnen={setEntwurf}
           onGeaendert={() => void laden()}
         />
@@ -397,7 +322,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
                 {t("konten.standHerkunft", {
                   anfang: geld.formatMitSymbol(aktiv.saldo),
-                  bewegung: geld.formatMitSymbol(istSummeKonto(ist, aktiv.id), { mitVorzeichen: true }),
+                  bewegung: geld.formatMitSymbol(aktivZeile?.bewegungen ?? 0, { mitVorzeichen: true }),
                 })}
               </div>
 
@@ -409,9 +334,9 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   Einnahme; die App hat mehr (−) → eine Ausgabe fehlt oder etwas ist
                   doppelt drin. */}
               {(() => {
-                const stand = bankStand.get(aktiv.id);
+                const stand = aktivZeile?.bankSaldo;
                 if (!stand) return null;
-                const diff = bankAbweichung(aktiv, ist, stand.betrag);
+                const diff = aktivZeile?.abweichung ?? 0;
                 return (
                   <div style={{ fontSize: "var(--fs-xs)", marginTop: 6, display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
                     <Pill variant={diff === 0 ? "ok" : "warn"}>
@@ -438,7 +363,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               <select className="field" style={{ width: "auto" }} value={tage} onChange={(e) => setTage(Number(e.target.value))}>
                 {TAGE_OPTIONEN.map((d) => (<option key={d} value={d}>{t("konten.kommendeTage", { tage: d })}</option>))}
               </select>
-              {konten.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>}
+              {kontozeilen.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>}
               <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>{t("konten.btnBuchung")}</Button>
             </span>
           </div>
@@ -515,30 +440,30 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                         />
                       ),
                       sortable: false,
-                      render: (z: RegisterZeile) =>
-                        z.istId ? (
+                      render: (r: Registerzeile) =>
+                        r.zeile.istId ? (
                           <input
                             type="checkbox"
-                            checked={auswahl.has(z.istId)}
+                            checked={auswahl.has(r.zeile.istId)}
                             aria-label={t("konten.sammel.zeileWaehlen")}
-                            onChange={() => auswahlUmschalten(z.istId!)}
+                            onChange={() => auswahlUmschalten(r.zeile.istId!)}
                             style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
                           />
                         ) : null,
                     }]
                   : []),
-                { key: "datum", label: t("konten.spalteDatum"), render: (z) => datumKurz(z.datum) },
+                { key: "datum", label: t("konten.spalteDatum"), render: (r) => datumKurz(r.zeile.datum) },
                 {
                   // Nicht umbrechen (flexWrap): eine zweizeilige Zeile schiebt den
                   // Seitenschalter darunter je nach Seiteninhalt nach oben oder unten,
                   // und beim Durchblättern klickt man daneben. Der volle Text steht im
                   // title, für die Fälle, in denen abgeschnitten wird.
                   key: "bez", label: t("konten.spalteBeschreibung"), maxWidth: 320,
-                  render: (z) => (
-                    <span title={zeilenLabel(z)} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{zeilenLabel(z)}</span>
-                      {z.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{z.betrag < 0 ? "→" : "←"} {kontoName.get(z.gegenkontoId) ?? "?"}</span>}
-                      {!z.gegenkontoId && (z.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : z.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
+                  render: (r) => (
+                    <span title={r.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
+                      {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
+                      {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
                     </span>
                   ),
                 },
@@ -549,17 +474,17 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   // stand sie rechts neben dem Empfänger und die Kategorie-Spalte zeigte
                   // daneben einen Strich — zwei Zeichen für dieselbe Aussage.
                   key: "kat", label: t("konten.spalteKategorie"), maxWidth: 180,
-                  sortValue: (z) => (z.gegenkontoId ? "" : z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""),
-                  render: (z) =>
-                    z.gegenkontoId
+                  sortValue: (r) => (r.zeile.gegenkontoId ? "" : r.kategorieName),
+                  render: (r) =>
+                    r.zeile.gegenkontoId
                       ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill>
-                      : z.kategorieId ? kategorieName.get(z.kategorieId) ?? "?" : "—",
+                      : r.kategorieName || "—",
                 },
-                { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (z) => z.betrag, render: (z) => <span className="num" style={{ fontWeight: 700, color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span> },
-                { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (z) => z.saldo, render: (z) => geld.format(z.saldo) },
+                { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (r) => r.zeile.betrag, render: (r) => <span className="num" style={{ fontWeight: 700, color: geldFarbe(r.zeile.betrag) }}>{geld.format(r.zeile.betrag, { mitVorzeichen: true })}</span> },
+                { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (r) => r.zeile.saldo, render: (r) => geld.format(r.zeile.saldo) },
                 {
                   key: "_a", label: "", align: "right", sortable: false,
-                  render: (z) => <IconButton icon="bearbeiten" label={t("konten.bearbeiten")} onClick={() => bearbeitenOeffnen(z)} />,
+                  render: (r) => <IconButton icon="bearbeiten" label={t("konten.bearbeiten")} onClick={() => r.buchung && setEditBuchung(r.buchung)} />,
                 },
               ]}
               rows={gebuchtFuerTabelle}
@@ -632,7 +557,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {sammelOffen && (
         <SammelDialog
           buchungen={gewaehlteBuchungen}
-          kategorien={kategorien}
+          kategorien={[...kategorien]}
           gesperrteIds={ausBankabruf}
           onClose={() => setSammelOffen(false)}
           onGeaendert={async () => { setAuswahl(new Set()); await laden(); }}
@@ -651,11 +576,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
       {umbuchenOffen && aktiv && (
         <UmbuchungModal
-          konten={konten}
+          konten={kontozeilen.map((z) => z.konto)}
           vonId={aktivId}
           heute={heute}
           onClose={() => setUmbuchenOffen(false)}
-          onSaved={async () => { setUmbuchenOffen(false); setIst(await ledgerRepo.alle()); }}
+          onSaved={async () => { setUmbuchenOffen(false); await laden(); }}
         />
       )}
     </div>
@@ -692,7 +617,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
   async function speichern() {
     setFehler(null);
     try {
-      await umbuchungErfassen(ledgerRepo, { vonKontoId: von, nachKontoId: nach, datum, betrag: geld.parse(betrag) ?? 0, notiz });
+      await umbuchungErfassen({ vonKontoId: von, nachKontoId: nach, datum, betrag: geld.parse(betrag) ?? 0, notiz });
       onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));

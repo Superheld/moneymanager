@@ -26,16 +26,16 @@ const WURZEL = resolve(__dirname);
 /**
  * UI-Dateien, die noch direkt auf `core` oder `adapters/persistence` zugreifen.
  *
- * Diese Liste ist die Migrationsschuld, sichtbar im Repo statt in einem Ticket. Sie darf
- * nur SCHRUMPFEN — ein Test unten schlägt fehl, sobald ein Eintrag nichts mehr verletzt,
- * damit sie nicht mit toten Namen verrottet. Neue Einträge gehören nicht hinein: was neu
- * gebaut wird, wird gleich richtig gebaut.
+ * **Sie ist leer.** Seit 2026-08-20 geht die gesamte Oberfläche über `application/` —
+ * 27 Screens sind in acht Schritten migriert worden, die Liste war dabei die
+ * Migrationsschuld, sichtbar im Repo statt in einem Ticket.
+ *
+ * Sie bleibt stehen, weil sie zwei Dinge kann, die ein gelöschtes Array nicht kann: sie
+ * benennt den Ausnahmefall, falls es je wieder einen gibt, und der Test darunter hält
+ * sie ehrlich — ein Eintrag, der nichts mehr verletzt, lässt ihn fehlschlagen. Neue
+ * Einträge gehören nicht hinein: was neu gebaut wird, wird gleich richtig gebaut.
  */
-const ALTLAST: readonly string[] = [
-  "adapters/ui/BuchungDetail.tsx",
-  "adapters/ui/KontenScreen.tsx",
-  "adapters/ui/SammelDialog.tsx",
-];
+const ALTLAST: readonly string[] = [];
 
 /** Alle Produktivdateien unter `src/` — Tests zählen nicht (sie dürfen schichtübergreifend prüfen). */
 function produktivDateien(verzeichnis = WURZEL): string[] {

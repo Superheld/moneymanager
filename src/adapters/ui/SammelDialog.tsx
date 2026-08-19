@@ -7,12 +7,8 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { IstBuchung, Kategorie } from "../../core";
-import {
-  buchungenLoeschen,
-  buchungenSammelbearbeiten,
-} from "../../application/buchungenSammelbearbeiten";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
+import type { IstBuchung, Kategorie } from "../../application";
+import { buchungenLoeschen, buchungenSammelbearbeiten } from "../dienste";
 import { Button, FormField, Pill } from "./ds";
 import { CategoryPicker } from "./CategoryPicker";
 import { Modal } from "./Modal";
@@ -27,7 +23,6 @@ export function SammelDialog({
 }: {
   buchungen: IstBuchung[];
   kategorien: Kategorie[];
-  /** Konten an einer Bankverbindung — dort wird nicht von Hand gelöscht. */
   /** IDs der Buchungen, die aus einem Bankabruf stammen — die werden nicht gelöscht. */
   gesperrteIds: ReadonlySet<string>;
   onClose: () => void;
@@ -52,7 +47,6 @@ export function SammelDialog({
     setBusy(true);
     try {
       await buchungenSammelbearbeiten(
-        ledgerRepo,
         buchungen,
         {
           kategorieId: kategorieAn ? (kategorieId || null) : undefined,
@@ -73,7 +67,7 @@ export function SammelDialog({
     setFehler(null);
     setBusy(true);
     try {
-      await buchungenLoeschen(ledgerRepo, buchungen, gesperrteIds);
+      await buchungenLoeschen(buchungen, gesperrteIds);
       await onGeaendert();
       onClose();
     } catch (e) {

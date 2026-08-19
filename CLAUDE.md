@@ -85,10 +85,16 @@ Budget" war an drei Stellen erfunden und an der vierten vergessen, und dieselbe 
 zeigte für dasselbe Budget 0,00 € und 425,00 €. Was die UI umgehen KANN, umgeht sie
 irgendwann.
 
-Geprüft wird das in `src/architektur.test.ts` (läuft in `npm test`, also in der CI). Er
-trägt eine Liste `ALTLAST` der noch nicht migrierten Screens — sie darf nur schrumpfen,
-und ein eigener Test schlägt fehl, sobald ein Eintrag nichts mehr verletzt. **Neu gebauter
-Code kommt nicht auf die Liste.**
+Geprüft wird das in `src/architektur.test.ts` (läuft in `npm test`, also in der CI). Seine
+Ausnahmeliste `ALTLAST` ist **leer** — alle 27 Screens sind migriert. Sie bleibt stehen
+für den Fall, dass es je wieder einen Ausnahmefall gibt; ein eigener Test schlägt fehl,
+sobald ein Eintrag darin nichts mehr verletzt. **Neuer Code kommt nicht auf die Liste.**
+
+Die Verdrahtung von Use-Cases und SQLite steht in **`adapters/dienste.ts`** — EINE Datei
+statt hundert Repository-Importen quer durch die Screens. Sie darf beide Seiten kennen,
+weil sie selbst ein Adapter ist; `application/` weiß weiterhin nichts von SQLite. Ein
+Screen importiert also aus genau zwei Richtungen: `../../application` (Vokabular und
+Use-Case-Typen) und `../dienste` (die gebundenen Aufrufe).
 
 In `ui/`:
 - `ds/` ist aus dem Design-System kopiert — dort nichts erfinden, eigene Bausteine nach `ui/`.

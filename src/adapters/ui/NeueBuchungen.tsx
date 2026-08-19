@@ -40,9 +40,6 @@ import { CategoryPicker } from "./CategoryPicker";
 import { Card, Pill } from "./ds";
 import { useGeld } from "./einstellungenKontext";
 
-/** Quellen, die als Bankabruf gelten — deren Umsätze landen hier statt in der Inbox. */
-export const ABRUF_QUELLEN = new Set(["fints"]);
-
 export function NeueBuchungen({
   zeilen,
   weggelegte,
