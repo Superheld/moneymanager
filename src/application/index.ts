@@ -51,6 +51,11 @@ export {
   addTage,
   addMonate,
   monateZwischen,
+  // Abgeleitete Eigenschaften EINES Objekts. Die Grenze läuft hier an der Frage, ob
+  // etwas über eine SAMMLUNG geht: `monatsRuecklage(gegenstand)` ist Wiederbeschaffung
+  // durch Nutzungsdauer und kann gar nichts auswählen. `ruecklagenDeckung(alle, …)`
+  // dagegen verteilt Kontostände über alle Gegenstände — das ist eine Sicht.
+  monatsRuecklage,
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,
   MERKMALSHERKUENFTE,
@@ -81,6 +86,30 @@ export {
   budgetvorschlagIgnorieren,
   ignorierteBudgetvorschlaege,
 } from "./budgetvorschlaege";
+export {
+  analyseLaden,
+  analyseFenster,
+  analyseVerlauf,
+  analyseAufschluesselung,
+  analyseGruppen,
+  analyseBuchungen,
+  type Analysebasis,
+  type Analysezeile,
+  type AnalyseDeps,
+  type Zeitraum,
+} from "./analysesichten";
+export {
+  inventarLaden,
+  type Inventarsicht,
+  type InventarDeps,
+} from "./inventarsichten";
+export {
+  inventarAnlegen,
+  inventarAktualisieren,
+  inventarErsetzt,
+  inventarLoeschen,
+  type InventarEingabe,
+} from "./inventarAnlegen";
 export {
   stammdatenLaden,
   type Stammdaten,

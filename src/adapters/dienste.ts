@@ -25,6 +25,15 @@ import { budgetAnlegen as budgetAnlegenUseCase, type BudgetEingabe } from "../ap
 import { budgetvorschlagIgnorieren } from "../application/budgetvorschlaege";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdatensichten";
+import { inventarLaden, type Inventarsicht } from "../application/inventarsichten";
+import { analyseLaden, type Analysebasis } from "../application/analysesichten";
+import {
+  inventarAktualisieren as inventarAktualisierenUseCase,
+  inventarAnlegen as inventarAnlegenUseCase,
+  inventarErsetzt as inventarErsetztUseCase,
+  inventarLoeschen as inventarLoeschenUseCase,
+  type InventarEingabe,
+} from "../application/inventarAnlegen";
 import {
   kategorieAnlegen as kategorieAnlegenUseCase,
   kontoAnlegen as kontoAnlegenUseCase,
@@ -186,4 +195,43 @@ export function kontoLoeschen(id: string): Promise<void> {
 /** Alle bekannten Umsätze — für die Dublettenprüfung beim Anlegen einer Verbindung. */
 export function umsaetze() {
   return sqliteUmsatzRepository.alle();
+}
+
+
+// --- Inventar --------------------------------------------------------------
+
+const INVENTAR_DEPS = {
+  inventarRepo: sqliteInventarRepository,
+  ledger: sqliteLedgerRepository,
+  kontoRepo: sqliteZahlungskontoRepository,
+};
+
+export function inventar(heute: string): Promise<Inventarsicht> {
+  return inventarLaden(INVENTAR_DEPS, heute);
+}
+
+export function inventarAnlegen(eingabe: InventarEingabe) {
+  return inventarAnlegenUseCase(sqliteInventarRepository, eingabe);
+}
+
+export function inventarAktualisieren(id: string, eingabe: InventarEingabe) {
+  return inventarAktualisierenUseCase(sqliteInventarRepository, id, eingabe);
+}
+
+export function inventarErsetzt(g: Parameters<typeof inventarErsetztUseCase>[1], datum: string, wert?: number) {
+  return inventarErsetztUseCase(sqliteInventarRepository, g, datum, wert);
+}
+
+export function inventarLoeschen(id: string) {
+  return inventarLoeschenUseCase(sqliteInventarRepository, id);
+}
+
+/** Die Datengrundlage des Analyse-Bereichs — einmal geladen, danach rein gerechnet. */
+export function analyse(): Promise<Analysebasis> {
+  return analyseLaden({
+    ledger: sqliteLedgerRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+    kategorieRepo: sqliteKategorieRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+  });
 }
