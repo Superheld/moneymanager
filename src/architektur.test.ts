@@ -43,9 +43,6 @@ const ALTLAST: readonly string[] = [
   "adapters/ui/ReviewScreen.tsx",
   "adapters/ui/SammelDialog.tsx",
   "adapters/ui/TrainingBereich.tsx",
-  "adapters/ui/VertraegeScreen.tsx",
-  "adapters/ui/VertragErkennungModal.tsx",
-  "adapters/ui/VertragModal.tsx",
 ];
 
 /** Alle Produktivdateien unter `src/` — Tests zählen nicht (sie dürfen schichtübergreifend prüfen). */

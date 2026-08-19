@@ -5,45 +5,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   hauptkategorie,
-  kuendigungsterminNaht,
-  naechsteFaelligkeit,
-  naechsterKuendigungstermin,
   RHYTHMUS_MONATE,
-  ruecklagenbedarf,
-  ruecklageProMonat,
   type Charakter,
-  type Kategorie,
-  type Person,
   type Rhythmus,
   type Vertrag,
   type Vertragskandidat,
-  type Vertragszuordnung,
+  type Vertragssicht,
   type Zahlungsregel,
-} from "../../core";
-import { vertragLoeschen } from "../../application/vertragAnlegen";
+} from "../../application";
 import {
-  ignorierteSchluessel,
-  vertragsvorschlaege,
-  vorschlagIgnorieren,
-} from "../../application/vertragsvorschlaege";
-import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
-import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
-import { sqliteEinstellungenRepository as einstellungenRepo } from "../persistence/sqliteEinstellungenRepository";
-import {
-  sqliteVertragserkennungRepository,
-  sqliteVertragszuordnungRepository,
-  vertragsAbgleichDeps,
-} from "../persistence/sqliteVertragZuordnungRepositories";
-import {
-  erkennungenNachziehen,
-  zuordnungenAbgleichen,
-} from "../../application/vertragszuordnung";
-import {
-  sqliteKategorieRepository as kategorieRepo,
-  sqlitePersonRepository as personRepo,
-} from "../persistence/sqliteStammdatenRepositories";
+  vertraege as vertraegeLaden,
+  vertragLoeschen,
+  vertragsvorschlagIgnorieren,
+} from "../dienste";
 import { Button, Card, DataTable, KPIStat, Pill } from "./ds";
 import { Modal } from "./Modal";
 import type { DataColumn } from "./ds/DataTable";
@@ -59,14 +33,9 @@ import {
 import { VertragErkennungModal } from "./VertragErkennungModal";
 import { useGeld } from "./einstellungenKontext";
 
-/**
- * Erkennungsregel und Zuordnungen gehören zum Vertrag: beim Löschen müssen sie mit,
- * sonst zeigte eine Zuordnung auf einen Vertrag, den es nicht mehr gibt.
- */
-const zuordnungsDeps = {
-  erkennungRepo: sqliteVertragserkennungRepository,
-  zuordnungRepo: sqliteVertragszuordnungRepository,
-};
+/** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
+const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
+const LEERE_KENNZAHLEN = { proMonat: 0, proJahr: 0, baldKuendbar: 0, ruecklage: 0 } as const;
 
 /** Die Turnus-Ansicht zeigt je Rhythmus eine Gruppe — in dieser Reihenfolge. */
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
@@ -179,13 +148,7 @@ export function VertraegeScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
   const heute = useMemo(heuteIso, []);
-  const [vertraege, setVertraege] = useState<Vertrag[]>([]);
-  const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
-  const [personen, setPersonen] = useState<Person[]>([]);
-  // Nur für die Kategorie-Ansicht: die Regel trägt die kategorieId, den Namen nicht.
-  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
-  const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
-  const [vorschlaege, setVorschlaege] = useState<Vertragskandidat[]>([]);
+  const [sicht, setSicht] = useState<Vertragssicht | null>(null);
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
 
   /**
@@ -199,36 +162,23 @@ export function VertraegeScreen() {
   /** Der Vertrag, dessen Erkennungsregel gerade bearbeitet wird. */
   const [regelVon, setRegelVon] = useState<Vertrag | null>(null);
 
-  // Verwandte Repos in EINEM Effekt und zusammen setzen — gestaffelte setState lassen
-  // abgeleitete Werte kurz gegen leere Listen rechnen.
+  // EIN Ladevorgang, EIN setState. Die Sicht bringt den Bestand vorher auf Stand
+  // (Erkennungen nachziehen, Zuordnungen abgleichen) — beides billig, wenn nichts zu tun
+  // ist, und ohne es bliebe der Bestand blind, bis jemand einen Vertrag anfasst.
   async function laden() {
-    // Erst die Zuordnungsseite auf Stand bringen, dann anzeigen. Beides ist billig, wenn
-    // nichts zu tun ist (Nachziehen fasst Vorhandenes nicht an, der Abgleich schreibt nur
-    // Deltas) — und die Alternative wäre, dass der Bestand blind bleibt, bis jemand einen
-    // Vertrag anfasst.
-    await erkennungenNachziehen(vertragRepo, regelRepo, sqliteVertragserkennungRepository);
-    await zuordnungenAbgleichen(vertragsAbgleichDeps);
-
-    const [v, r, p, k, z, ignoriert] = await Promise.all([
-      vertragRepo.alle(),
-      regelRepo.alle(),
-      personRepo.alle(),
-      kategorieRepo.alle(),
-      sqliteVertragszuordnungRepository.alle(),
-      ignorierteSchluessel(einstellungenRepo),
-    ]);
-    setVertraege(v);
-    setRegeln(r);
-    setPersonen(p);
-    setKategorien(k);
-    setZuordnungen(z);
-    // Die Vorschläge lesen den gesamten Buchungsbestand — bewusst NACH den Stammdaten,
-    // damit die Liste sofort steht und die Karte nachrückt.
-    setVorschlaege(await vertragsvorschlaege(ledgerRepo, umsatzRepo, vertragRepo, heute, { ignoriert }));
+    setSicht(await vertraegeLaden(heute));
   }
   useEffect(() => {
     laden();
   }, []);
+
+  const zeilen = sicht?.zeilen ?? [];
+  const vertraege = useMemo(() => zeilen.map((z) => z.vertrag), [zeilen]);
+  const kategorien = sicht?.kategorien ?? [];
+  const vorschlaege = sicht?.vorschlaege ?? [];
+  const personName = sicht?.personNamen ?? LEERE_NAMEN;
+  const summe = sicht?.kennzahlen ?? LEERE_KENNZAHLEN;
+  const zeileZu = useMemo(() => new Map(zeilen.map((z) => [z.vertrag.id, z])), [zeilen]);
 
   /** Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort. */
   function vorschlagUebernehmen(k: Vertragskandidat) {
@@ -236,63 +186,15 @@ export function VertraegeScreen() {
   }
 
   async function vorschlagVerwerfen(k: Vertragskandidat) {
-    await vorschlagIgnorieren(einstellungenRepo, k.schluessel);
-    setVorschlaege((bisher) => bisher.filter((x) => x.schluessel !== k.schluessel));
+    await vertragsvorschlagIgnorieren(k.schluessel);
+    await laden();
   }
 
   const regelZuVertrag = useMemo(() => {
     const m = new Map<string, Zahlungsregel>();
-    for (const r of regeln) if (r.vertragId) m.set(r.vertragId, r);
+    for (const z of zeilen) if (z.regel) m.set(z.vertrag.id, z.regel);
     return m;
-  }, [regeln]);
-  const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
-
-  /**
-   * Wie viele gebuchte Zahlungen der Abgleich diesem Vertrag zugeordnet hat.
-   *
-   * Steht als Spalte in der Tabelle, weil die Automatik sonst unsichtbar bliebe: eine
-   * Null sagt „die Regel greift nicht" — falscher Anbietername, zu enge Betragsspanne,
-   * oder es gibt schlicht noch keine Zahlung. Ohne diese Zahl merkt man den Fehlgriff
-   * erst, wenn irgendwo eine Auswertung nicht stimmt.
-   */
-  const zahlungenJeVertrag = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const z of zuordnungen) {
-      if (z.vertragId) m.set(z.vertragId, (m.get(z.vertragId) ?? 0) + 1);
-    }
-    return m;
-  }, [zuordnungen]);
-
-  const summe = useMemo(() => {
-    let proMonat = 0;
-    let baldKuendbar = 0;
-    const eigeneRegeln: Zahlungsregel[] = [];
-    for (const v of vertraege) {
-      const r = regelZuVertrag.get(v.id);
-      if (r) {
-        proMonat += r.betrag / RHYTHMUS_MONATE[r.rhythmus];
-        eigeneRegeln.push(r);
-      }
-      if (kuendigungsterminNaht(v, heute)) baldKuendbar++;
-    }
-    return {
-      proMonat: Math.round(proMonat),
-      proJahr: Math.round(proMonat * 12),
-      baldKuendbar,
-      // Was die nicht-monatlichen Abflüsse im Monat kosten, obwohl sie nicht abgehen.
-      ruecklage: ruecklagenbedarf(eigeneRegeln),
-    };
-  }, [vertraege, regelZuVertrag, heute]);
-
-  /** Nächste Fälligkeit je Vertrag — aus der abgeleiteten Regel, nicht aus dem Beginn. */
-  const naechsteZahlung = useMemo(() => {
-    const m = new Map<string, string | null>();
-    for (const v of vertraege) {
-      const r = regelZuVertrag.get(v.id);
-      m.set(v.id, r ? naechsteFaelligkeit(r, heute) : null);
-    }
-    return m;
-  }, [vertraege, regelZuVertrag, heute]);
+  }, [zeilen]);
 
   /**
    * Die Spalten der Vertragstabelle. Als Funktion, weil die Turnus-Ansicht je Gruppe
@@ -333,15 +235,15 @@ export function VertraegeScreen() {
       {
         key: "naechste",
         label: t("vertraege.spalteNaechste"),
-        render: (v) => naechsteZahlung.get(v.id) ?? <span className="muted">—</span>,
+        render: (v) => zeileZu.get(v.id)?.naechsteZahlung ?? <span className="muted">—</span>,
       },
       {
         key: "kuendigung",
         label: t("vertraege.spalteKuendigenBis"),
         render: (v) => {
-          const termin = naechsterKuendigungstermin(v, heute);
+          const termin = zeileZu.get(v.id)?.kuendigungstermin ?? null;
           if (!termin) return <span className="muted">—</span>;
-          const naht = kuendigungsterminNaht(v, heute);
+          const naht = zeileZu.get(v.id)?.kuendigungNaht ?? false;
           return (
             <span>
               {termin.kuendigenBis} {naht && <Pill variant="warn">{t("vertraege.bald")}</Pill>}
@@ -364,7 +266,7 @@ export function VertraegeScreen() {
         label: t("vertraege.spalteZugeordnet"),
         align: "right",
         render: (v) => {
-          const n = zahlungenJeVertrag.get(v.id) ?? 0;
+          const n = zeileZu.get(v.id)?.zahlungen ?? 0;
           return n > 0 ? String(n) : <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>;
         },
       },
@@ -375,8 +277,7 @@ export function VertraegeScreen() {
         label: `${t("vertraege.spalteRuecklage")} ${geld.symbol}`,
         align: "right",
         render: (v) => {
-          const r = regelZuVertrag.get(v.id);
-          const wert = r ? ruecklageProMonat(r) : 0;
+          const wert = zeileZu.get(v.id)?.ruecklage ?? 0;
           return wert > 0 ? geld.format(wert) : <span className="muted">—</span>;
         },
       });
@@ -401,7 +302,7 @@ export function VertraegeScreen() {
             icon="loeschen"
             ton="gefahr"
             label={t("vertraege.loeschen")}
-            onClick={() => void vertragLoeschen(vertragRepo, regelRepo, v.id, zuordnungsDeps).then(laden)}
+            onClick={() => void vertragLoeschen(v.id).then(laden)}
           />
         ),
       },
@@ -428,9 +329,11 @@ export function VertraegeScreen() {
   const nachFaelligkeit = useMemo(
     () =>
       [...vertraege].sort((a, b) =>
-        (naechsteZahlung.get(a.id) ?? "9999-12-31").localeCompare(naechsteZahlung.get(b.id) ?? "9999-12-31"),
+        (zeileZu.get(a.id)?.naechsteZahlung ?? "9999-12-31").localeCompare(
+          zeileZu.get(b.id)?.naechsteZahlung ?? "9999-12-31",
+        ),
       ),
-    [vertraege, naechsteZahlung],
+    [vertraege, zeileZu],
   );
 
   /** Betrag mit Vorzeichen und Währungssymbol — die Schreibweise der Gruppenköpfe. */
@@ -651,7 +554,7 @@ export function VertraegeScreen() {
                 ),
               },
             ]}
-            rows={vorschlaege}
+            rows={[...vorschlaege]}
           />
         </Card>
       )}
