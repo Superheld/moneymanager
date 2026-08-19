@@ -19,6 +19,7 @@ import {
   sqliteKontozuordnungRepository,
 } from "../persistence/sqliteBankzugangRepositories";
 import { sqliteImportLaufRepository, sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
+import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteKategoriefestlegungRepository } from "../persistence/sqliteKategoriefestlegungRepository";
 import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "../persistence/sqliteMerkmalskonfigurationRepository";
@@ -82,6 +83,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
         zuordnungRepo: sqliteKontozuordnungRepository,
         kontoRepo: sqliteZahlungskontoRepository,
         kategorieRepo: sqliteKategorieRepository,
+        ledgerRepo: sqliteLedgerRepository,
         umsatzRepo: sqliteUmsatzRepository,
         laufRepo: sqliteImportLaufRepository,
         id: () => crypto.randomUUID(),

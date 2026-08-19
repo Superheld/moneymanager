@@ -19,6 +19,17 @@ export interface VerbuchenDeps {
   readonly ledgerRepo: LedgerPort;
   readonly umsatzRepo: UmsatzRepository;
   readonly id: () => string;
+  /**
+   * Auch Zeilen ohne Kategorievorschlag buchen.
+   *
+   * Der Bankabruf braucht das (seit 2026-08-19 bucht er direkt): was die Bank meldet,
+   * IST geflossen — ob die Kategorisierung dafür schon einen Vorschlag hat, ändert daran
+   * nichts, und eine Buchung ohne Kategorie ist überall im System ein normaler Zustand.
+   *
+   * Die Review-Inbox lässt es AUS: dort heisst „verbuchen" ausdrücklich „das, was ich
+   * durchgesehen habe", und ungeprüfte Zeilen sollen dort liegen bleiben.
+   */
+  readonly auchOhneKategorie?: boolean;
 }
 
 export interface VerbuchenErgebnis {
@@ -28,9 +39,9 @@ export interface VerbuchenErgebnis {
   readonly umbuchungen: number;
 }
 
-/** Verbuchbar = im Status „neu" mit Vorschlag. */
-function verbuchbar(u: Umsatz): boolean {
-  return u.status === "neu" && !!u.vorschlag;
+/** Verbuchbar = im Status „neu"; ein Vorschlag ist nur nötig, wenn er verlangt wird. */
+function verbuchbar(u: Umsatz, auchOhneKategorie = false): boolean {
+  return u.status === "neu" && (auchOhneKategorie || !!u.vorschlag);
 }
 
 /**
@@ -170,7 +181,7 @@ export async function umsaetzeVerbuchen(
 
   // 2. Rest einzeln (inkl. ungepaarter Umbuchungen → einseitige Umschichtung als Fallback).
   for (const u of einzeln) {
-    if (!verbuchbar(u)) {
+    if (!verbuchbar(u, deps.auchOhneKategorie)) {
       uebersprungen++;
       continue;
     }
@@ -179,13 +190,16 @@ export async function umsaetzeVerbuchen(
       datum: u.buchungstag,
       betrag: u.betrag,
       kontoId: u.zahlungskontoId,
-      kategorieId: u.vorschlag!.kategorieId,
+      kategorieId: u.vorschlag?.kategorieId,
       // Hat jemand in der Review-Inbox von Hand kategorisiert, ist das eine Entscheidung
       // und überlebt jeden späteren automatischen Lauf. Alles andere (Remapping, Regel,
       // Modell) bleibt automatisch — und damit korrigierbar, ohne dass jemand die Zeile
       // zuerst freigeben muss.
-      kategorieHerkunft: u.vorschlag!.quelle === "manuell" ? "manuell" : "automatisch",
-      charakter: u.vorschlag!.charakter,
+      kategorieHerkunft: u.vorschlag?.quelle === "manuell" ? "manuell" : "automatisch",
+      // Ohne Vorschlag entscheidet die Richtung: was abfliesst, ist Aufwand, was
+      // zufliesst, Ertrag. Eine Umschichtung kann daraus nicht werden — die braucht ein
+      // zweites Bein, und das steht in der Paarung oben.
+      charakter: u.vorschlag?.charakter ?? (u.betrag < 0 ? "Aufwand" : "Ertrag"),
       quelle: "import",
       rohHash: u.rohHash,
     };

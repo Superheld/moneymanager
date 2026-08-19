@@ -17,11 +17,20 @@
 //  3. **Der Saldo der Bank wird immer mitgeholt**, in einem eigenen try: er ist die
 //     zweite, unabhängige Aussage über das Konto und die einzige Möglichkeit zu merken,
 //     dass eine Buchung fehlt. Scheitert er, laufen die Umsätze trotzdem — und umgekehrt.
+//  4. **Was unverdächtig ist, wird SOFORT gebucht.** Bis hierher landete alles in einer
+//     Warteliste am Konto und musste einzeln bestätigt werden — ein Schritt, der in der
+//     Praxis nur aus Klicken bestand: was die Bank meldet, IST passiert, daran gibt es
+//     nichts zu bestätigen. Was bleibt, ist die Frage, die man wirklich beantworten
+//     muss: ob eine Zeile schon einmal da war. Deshalb wird alles ohne
+//     Dublettenverdacht direkt verbucht, und in der Warteliste steht nur noch, was die
+//     Dedup als möglichen Zwilling markiert hat. Ohne diese Trennung führte der Rückgriff
+//     (Punkt 1) jeden Abruf zu Doppelbuchungen.
 
-import type { ImportLaufRepository, KategorieRepository, UmsatzRepository, ZahlungskontoRepository } from "../ports";
+import type { ImportLaufRepository, KategorieRepository, LedgerPort, UmsatzRepository, ZahlungskontoRepository } from "../ports";
 import type { Vorschlagskontext } from "../import/vorschlag";
 import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
+import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
 import type { Abrufadapter, Bankzugang, TanFrager } from "./abrufPort";
 import type { Kontozuordnung, KontozuordnungRepository } from "./bankzugangPort";
 import type { BankzugangRepository } from "./bankzugangPort";
@@ -54,6 +63,11 @@ export interface AbrufDeps {
   readonly kategorieRepo: KategorieRepository;
   readonly umsatzRepo: UmsatzRepository;
   readonly laufRepo: ImportLaufRepository;
+  /**
+   * Das Ledger — der Abruf bucht selbst. Bis 2026-08-19 legte er nur Entwürfe an, die
+   * eine Warteliste am Konto abnicken musste; siehe den Kopfkommentar unter Punkt 4.
+   */
+  readonly ledgerRepo: LedgerPort;
   readonly id: () => string;
   readonly kategorisierung?: Vorschlagskontext;
   /** Heute als ISO-Datum — von außen, damit der Ablauf prüfbar bleibt. */
@@ -173,6 +187,24 @@ export async function abrufAusfuehren(
           kategorisierung: deps.kategorisierung,
         },
       );
+
+      // Direkt verbuchen, was keinen Dublettenverdacht trägt. Nur die Verdachtsfälle
+      // bleiben als Entwurf stehen und warten auf eine Entscheidung — sie sind der
+      // einzige Fall, in dem es überhaupt etwas zu entscheiden gibt.
+      const frisch = (await deps.umsatzRepo.offene()).filter(
+        (u) => u.laufId === ergebnis.laufId && !u.verdachtAufId,
+      );
+      if (frisch.length > 0) {
+        await umsaetzeVerbuchen(frisch, {
+          ledgerRepo: deps.ledgerRepo,
+          umsatzRepo: deps.umsatzRepo,
+          id: deps.id,
+          // Auch ohne Kategorievorschlag: was die Bank meldet, ist geflossen. Die
+          // Kategorie darf danach kommen — sie fehlt sonst als Grund, eine Tatsache
+          // nicht zu buchen.
+          auchOhneKategorie: true,
+        });
+      }
 
       await deps.zuordnungRepo.speichern({
         ...z,
