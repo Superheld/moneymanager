@@ -7,13 +7,10 @@
 // (siehe Kopfkommentar dort).
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import {
-  einstellungenLaden,
-  regionWaehlen,
-  STANDARD_EINSTELLUNGEN,
-  type Haushaltseinstellungen,
-} from "../../application/einstellungen";
-import { sqliteEinstellungenRepository } from "../persistence/sqliteEinstellungenRepository";
+import { STANDARD_EINSTELLUNGEN, type Haushaltseinstellungen } from "../../application";
+// Umbenannt importiert: die Kontext-Eigenschaft heisst genauso, und `regionSetzen`
+// im Rumpf sähe dann nach einem Aufruf ihrer selbst aus.
+import { einstellungen as einstellungenHolen, regionSetzen as regionSpeichern } from "../dienste";
 import i18n from "../../i18n/i18n";
 import { EinstellungenContext, type ContextWert } from "./einstellungenKontext";
 
@@ -30,15 +27,15 @@ export function EinstellungenProvider({ children }: { children: ReactNode }) {
   }
 
   useEffect(() => {
-    einstellungenLaden(sqliteEinstellungenRepository).then(anwenden);
+    einstellungenHolen().then(anwenden);
   }, []);
 
   const wert = useMemo<ContextWert>(
     () => ({
       einstellungen: einstellungen ?? STANDARD_EINSTELLUNGEN,
       regionSetzen: async (locale: string) => {
-        await regionWaehlen(sqliteEinstellungenRepository, locale);
-        await anwenden(await einstellungenLaden(sqliteEinstellungenRepository));
+        await regionSpeichern(locale);
+        await anwenden(await einstellungenHolen());
       },
     }),
     [einstellungen],

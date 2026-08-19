@@ -12,16 +12,13 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   KONTOTYPEN,
-  istSummeKonto,
   minorZuMajor,
-  realerKontostand,
-  type IstBuchung,
+  type Kontostand,
   type Kontotyp,
   type Person,
   type Zahlungskonto,
-} from "../../core";
-import { kontoAnlegen } from "../../application/stammdatenAnlegen";
-import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
+} from "../../application";
+import { kontoAnlegen, kontoLoeschen } from "../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { IconButton } from "./IconButton";
 import { KontoAnlegenModal } from "./KontoAnlegenModal";
@@ -41,7 +38,8 @@ export function KontenVerwaltung({
   konten,
   personen,
   personName,
-  ist,
+  kontostaende,
+  hatGebuchtes,
   verbindungen,
   onTrennen,
   onChange,
@@ -49,7 +47,10 @@ export function KontenVerwaltung({
   konten: Zahlungskonto[];
   personen: Person[];
   personName: Map<string, string>;
-  ist: IstBuchung[];
+  /** Die Zahlen je Konto, fertig gerechnet aus `stammdatenLaden`. */
+  kontostaende: readonly Kontostand[];
+  /** Gibt es überhaupt gebuchte Bewegungen? Ohne sie IST der Anfangsbestand der Stand. */
+  hatGebuchtes: boolean;
   /** Bankverbindung je Zahlungskonto — fehlt sie, ist das Konto offline. */
   verbindungen: ReadonlyMap<string, KontoVerbindung>;
   /** Löst die Verbindung eines Kontos (der Zugang selbst bleibt bestehen). */
@@ -58,7 +59,7 @@ export function KontenVerwaltung({
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const hatIst = ist.some((b) => b.planRef || b.quelle === "import");
+  const stand = new Map(kontostaende.map((k) => [k.konto.id, k]));
   const [offen, setOffen] = useState(false);
   const [anlegen, setAnlegen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -93,7 +94,7 @@ export function KontenVerwaltung({
   async function speichern() {
     setFehler(null);
     try {
-      await kontoAnlegen(kontoRepo, { bezeichnung, typ, iban, inhaberIds, saldo: geld.parse(saldoText) ?? 0 }, editId ?? undefined);
+      await kontoAnlegen({ bezeichnung, typ, iban, inhaberIds, saldo: geld.parse(saldoText) ?? 0 }, editId ?? undefined);
       setOffen(false);
       onChange();
     } catch (e) {
@@ -103,7 +104,7 @@ export function KontenVerwaltung({
 
   return (
     <Card action={<Button variant="primary" plus onClick={() => setAnlegen(true)}>{t("einstellungen.konto.anlegen")}</Button>}>
-      {hatIst && (
+      {hatGebuchtes && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
           {t("einstellungen.konto.untertitelIst")}
         </div>
@@ -127,15 +128,15 @@ export function KontenVerwaltung({
             },
             { key: "iban", label: t("einstellungen.konto.spalteIban"), render: (k) => k.iban ?? "—" },
             { key: "inhaber", label: t("einstellungen.konto.spalteInhaber"), render: (k) => (k.inhaberIds.length ? k.inhaberIds.map((id: string) => personName.get(id) ?? "?").join(", ") : "—") },
-            { key: "saldo", label: `${hatIst ? t("einstellungen.konto.spalteAnfangsbestand") : t("einstellungen.konto.spalteKontostand")} ${geld.symbol}`, align: "right", render: (k) => geld.format(k.saldo) },
-            ...(hatIst
+            { key: "saldo", label: `${hatGebuchtes ? t("einstellungen.konto.spalteAnfangsbestand") : t("einstellungen.konto.spalteKontostand")} ${geld.symbol}`, align: "right", render: (k) => geld.format(k.saldo) },
+            ...(hatGebuchtes
               ? [
-                  { key: "ist", label: `${t("einstellungen.konto.spalteIst")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => (istSummeKonto(ist, k.id) ? <span style={{ color: geldFarbe(istSummeKonto(ist, k.id)) }}>{geld.format(istSummeKonto(ist, k.id), { mitVorzeichen: true })}</span> : "—") },
-                  { key: "real", label: `${t("einstellungen.konto.spalteRealerStand")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(realerKontostand(k, ist))}</span> },
+                  { key: "ist", label: `${t("einstellungen.konto.spalteIst")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => { const b = stand.get(k.id)?.bewegungen ?? 0; return b ? <span style={{ color: geldFarbe(b) }}>{geld.format(b, { mitVorzeichen: true })}</span> : "—"; } },
+                  { key: "real", label: `${t("einstellungen.konto.spalteRealerStand")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(stand.get(k.id)?.realerStand ?? k.saldo)}</span> },
                 ]
               : []),
             { key: "_e", label: "", align: "right", render: (k) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} /> },
-            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void kontoRepo.loeschen(k.id).then(onChange)} /> },
+            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void kontoLoeschen(k.id).then(onChange)} /> },
           ]}
           rows={konten}
         />
