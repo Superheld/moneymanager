@@ -23,10 +23,25 @@ import {
 import { uebersichtLaden, type Uebersichtsdaten } from "../application/uebersicht";
 import { budgetAnlegen as budgetAnlegenUseCase, type BudgetEingabe } from "../application/budgetAnlegen";
 import { budgetvorschlagIgnorieren } from "../application/budgetvorschlaege";
+import { zuordnungenAbgleichen } from "../application/vertragszuordnung";
+import { zahlungsspuren } from "../application/zahlungsspuren";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdatensichten";
 import { inventarLaden, type Inventarsicht } from "../application/inventarsichten";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
+import { vertraegeLaden, type Vertragssicht } from "../application/vertragssichten";
+import {
+  vertragAktualisieren as vertragAktualisierenUseCase,
+  vertragAnlegen as vertragAnlegenUseCase,
+  vertragLoeschen as vertragLoeschenUseCase,
+  type VertragEingabe,
+} from "../application/vertragAnlegen";
+import { vorschlagIgnorieren as vertragsvorschlagIgnorierenUseCase } from "../application/vertragsvorschlaege";
+import { sqliteVertragRepository } from "./persistence/sqliteVertragRepository";
+import {
+  sqliteVertragserkennungRepository,
+  vertragsAbgleichDeps,
+} from "./persistence/sqliteVertragZuordnungRepositories";
 import {
   inventarAktualisieren as inventarAktualisierenUseCase,
   inventarAnlegen as inventarAnlegenUseCase,
@@ -234,4 +249,69 @@ export function analyse(): Promise<Analysebasis> {
     kategorieRepo: sqliteKategorieRepository,
     umsatzRepo: sqliteUmsatzRepository,
   });
+}
+
+
+// --- Verträge --------------------------------------------------------------
+
+const VERTRAG_DEPS = {
+  vertragRepo: sqliteVertragRepository,
+  regelRepo: sqliteZahlungsregelRepository,
+  personRepo: sqlitePersonRepository,
+  kategorieRepo: sqliteKategorieRepository,
+  erkennungRepo: sqliteVertragserkennungRepository,
+  zuordnungRepo: sqliteVertragszuordnungRepository,
+  ledger: sqliteLedgerRepository,
+  umsatzRepo: sqliteUmsatzRepository,
+  einstellungenRepo: sqliteEinstellungenRepository,
+  abgleich: vertragsAbgleichDeps,
+};
+
+/** Die Verträge samt abgeleiteten Terminen, Zahlungen und Kennzahlen. */
+export function vertraege(heute: string): Promise<Vertragssicht> {
+  return vertraegeLaden(VERTRAG_DEPS, heute);
+}
+
+/** Die Zuordnungsseite, die beim Anlegen/Ändern eines Vertrags mitgezogen wird. */
+const VERTRAG_ZUORDNUNG = {
+  erkennungRepo: sqliteVertragserkennungRepository,
+  zuordnungRepo: sqliteVertragszuordnungRepository,
+};
+
+export function vertragAnlegen(eingabe: VertragEingabe) {
+  return vertragAnlegenUseCase(sqliteVertragRepository, sqliteZahlungsregelRepository, eingabe, VERTRAG_ZUORDNUNG);
+}
+
+export function vertragAktualisieren(id: string, eingabe: VertragEingabe) {
+  return vertragAktualisierenUseCase(sqliteVertragRepository, sqliteZahlungsregelRepository, id, eingabe, VERTRAG_ZUORDNUNG);
+}
+
+export function vertragLoeschen(id: string) {
+  return vertragLoeschenUseCase(sqliteVertragRepository, sqliteZahlungsregelRepository, id, VERTRAG_ZUORDNUNG);
+}
+
+export function vertragsvorschlagIgnorieren(schluessel: string) {
+  return vertragsvorschlagIgnorierenUseCase(sqliteEinstellungenRepository, schluessel);
+}
+
+/** Erkennungen und Zuordnungen neu rechnen — nach jeder Änderung an einem Vertrag. */
+export function vertragszuordnungenAbgleichen() {
+  return zuordnungenAbgleichen(vertragsAbgleichDeps);
+}
+
+/** Alle Erkennungsregeln — je Vertrag eine. */
+export function vertragserkennungen() {
+  return sqliteVertragserkennungRepository.alle();
+}
+
+export function vertragserkennungSpeichern(regel: Parameters<typeof sqliteVertragserkennungRepository.speichern>[0]) {
+  return sqliteVertragserkennungRepository.speichern(regel);
+}
+
+/**
+ * Die Zahlungsspuren des ganzen Bestands: Buchung plus das, was am Umsatz hängt
+ * (Empfänger, Gläubiger-ID). Grundlage jeder Erkennungsprobe.
+ */
+export function spuren() {
+  return zahlungsspuren(sqliteLedgerRepository, sqliteUmsatzRepository);
 }

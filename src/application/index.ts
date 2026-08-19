@@ -56,6 +56,9 @@ export {
   // durch Nutzungsdauer und kann gar nichts auswählen. `ruecklagenDeckung(alle, …)`
   // dagegen verteilt Kontostände über alle Gegenstände — das ist eine Sicht.
   monatsRuecklage,
+  // Baum-Auskünfte über die Kategorien: sie ordnen ein, sie wählen nicht aus.
+  hauptkategorie,
+  anbieterSchluessel,
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,
   MERKMALSHERKUENFTE,
@@ -86,6 +89,25 @@ export {
   budgetvorschlagIgnorieren,
   ignorierteBudgetvorschlaege,
 } from "./budgetvorschlaege";
+export {
+  vertraegeLaden,
+  type Vertragssicht,
+  type Vertragszeile,
+  type Vertragskennzahlen,
+  type VertragsichtDeps,
+  erkennungProbieren,
+  type Erkennungsprobe,
+} from "./vertragssichten";
+export {
+  vertragAnlegen,
+  vertragAktualisieren,
+  vertragLoeschen,
+  type VertragEingabe,
+  type VertragErgebnis,
+} from "./vertragAnlegen";
+export { zahlungsspuren } from "./zahlungsspuren";
+export { zuordnungenAbgleichen, zuordnungVonHand } from "./vertragszuordnung";
+export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertragsvorschlaege";
 export {
   analyseLaden,
   analyseFenster,

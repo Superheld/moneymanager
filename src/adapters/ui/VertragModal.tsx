@@ -22,32 +22,17 @@ import {
   type Vertragskandidat,
   type Zahlungskonto,
   type Zahlungsregel,
-} from "../../core";
-import { vertragAktualisieren, vertragAnlegen } from "../../application/vertragAnlegen";
-import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
+} from "../../application";
 import {
-  sqliteVertragserkennungRepository,
-  sqliteVertragszuordnungRepository,
-  vertragsAbgleichDeps,
-} from "../persistence/sqliteVertragZuordnungRepositories";
-
-import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
-import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
-import {
-  sqliteKategorieRepository as kategorieRepo,
-  sqlitePersonRepository as personRepo,
-  sqliteZahlungskontoRepository as kontoRepo,
-} from "../persistence/sqliteStammdatenRepositories";
+  stammdaten,
+  vertragAktualisieren,
+  vertragAnlegen,
+  vertragszuordnungenAbgleichen,
+} from "../dienste";
 import { Button, FormField } from "./ds";
 import { Modal } from "./Modal";
 import { CategoryPicker } from "./CategoryPicker";
 import { useGeld, fehlerNachricht, type Geld } from "./einstellungenKontext";
-
-/** Die Zuordnungsseite, die `vertragAnlegen`/`vertragAktualisieren` mitpflegen. */
-const zuordnungsDeps = {
-  erkennungRepo: sqliteVertragserkennungRepository,
-  zuordnungRepo: sqliteVertragszuordnungRepository,
-};
 
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
@@ -258,7 +243,8 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
     // Zusammen laden und zusammen setzen — gestaffelte setState lassen die Auswahllisten
     // kurz leer erscheinen und die Vorbelegung damit ins Nichts zeigen.
     (async () => {
-      const [p, k, ko] = await Promise.all([personRepo.alle(), kategorieRepo.alle(), kontoRepo.alle()]);
+      const d = await stammdaten();
+      const [p, k, ko] = [[...d.personen], [...d.kategorien], [...d.konten]];
       setPersonen(p);
       setKategorien(k);
       setKonten(ko);
@@ -308,12 +294,12 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
       glaeubigerId: f.glaeubigerId || undefined,
     };
     try {
-      if (editId) await vertragAktualisieren(vertragRepo, regelRepo, editId, eingabe, zuordnungsDeps);
-      else await vertragAnlegen(vertragRepo, regelRepo, eingabe, zuordnungsDeps);
+      if (editId) await vertragAktualisieren(editId, eingabe);
+      else await vertragAnlegen(eingabe);
       // Der frisch erfasste Vertrag muss RÜCKWIRKEND greifen: seine Zahlungen liegen
       // längst im Bestand. Ohne diesen Lauf trüge nur, was danach gebucht wird, seine
       // Zuordnung — und der Vertrag stünde in der Liste, ohne je eine Buchung zu kennen.
-      await zuordnungenAbgleichen(vertragsAbgleichDeps);
+      await vertragszuordnungenAbgleichen();
       await onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));

@@ -16,8 +16,7 @@ import { useTranslation } from "react-i18next";
 import {
   anbieterSchluessel,
   minorZuMajor,
-  erkennungsDiagnose,
-  passtZu,
+  erkennungProbieren,
   type Erkennungsmerkmal,
   type Merkmalsart,
   type Waehrung,
@@ -25,16 +24,14 @@ import {
   type Vertragserkennung,
   type Zahlungskonto,
   type Zahlungsspur,
-} from "../../core";
-import { zahlungsspuren } from "../../application/zahlungsspuren";
-import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
-import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
+} from "../../application";
 import {
-  sqliteVertragserkennungRepository as erkennungRepo,
-  vertragsAbgleichDeps,
-} from "../persistence/sqliteVertragZuordnungRepositories";
+  spuren as spurenLaden,
+  stammdaten,
+  vertragserkennungen,
+  vertragserkennungSpeichern,
+  vertragszuordnungenAbgleichen,
+} from "../dienste";
 import { Button, FormField, Pill } from "./ds";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
@@ -104,9 +101,9 @@ export function VertragErkennungModal({
   useEffect(() => {
     (async () => {
       const [alleRegeln, sp, ks] = await Promise.all([
-        erkennungRepo.alle(),
-        zahlungsspuren(ledgerRepo, umsatzRepo),
-        kontoRepo.alle(),
+        vertragserkennungen(),
+        spurenLaden(),
+        stammdaten().then((d) => [...d.konten]),
       ]);
       setF(ausRegel(alleRegeln.find((e) => e.vertragId === vertrag.id), geld.waehrung));
       setSpuren(sp);
@@ -139,12 +136,8 @@ export function VertragErkennungModal({
    * Was die Regel im aktuellen Zustand trifft — live, ohne Speichern. Neueste zuerst:
    * beim Nachsteuern interessiert der jüngste Stand, nicht der Anfang der Reihe.
    */
-  const treffer = useMemo(() => {
-    if (!regel || regel.merkmale.length === 0) return [];
-    return spuren
-      .filter((s) => passtZu(regel, s))
-      .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0));
-  }, [regel, spuren]);
+  const probe = useMemo(() => erkennungProbieren(regel, spuren), [regel, spuren]);
+  const treffer = probe.treffer;
 
   /**
    * Wo die Kette abreisst.
@@ -155,10 +148,7 @@ export function VertragErkennungModal({
    * kam zu dem Schluss, dass Platzhalter nicht funktionieren. Sie tun es — nur ein
    * Filter dahinter räumte auf.
    */
-  const diagnose = useMemo(
-    () => (regel && regel.merkmale.length > 0 ? erkennungsDiagnose(regel, spuren) : null),
-    [regel, spuren],
-  );
+  const diagnose = probe.diagnose;
 
   /** Die Stufe, die am meisten weggenommen hat — nur wenn es überhaupt eine gibt. */
   const engstelle = useMemo(() => {
@@ -177,10 +167,10 @@ export function VertragErkennungModal({
     if (!regel) return;
     setFehler(null);
     try {
-      await erkennungRepo.speichern(regel);
+      await vertragserkennungSpeichern(regel);
       // Die geänderte Regel wirkt erst, wenn neu gerechnet wird — und sie kann Zuordnungen
       // auch WEGnehmen (engere Spanne, Stichtag). Beides macht der Abgleich.
-      await zuordnungenAbgleichen(vertragsAbgleichDeps);
+      await vertragszuordnungenAbgleichen();
       await onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
