@@ -33,12 +33,8 @@ const WURZEL = resolve(__dirname);
  */
 const ALTLAST: readonly string[] = [
   "adapters/ui/BuchungDetail.tsx",
-  "adapters/ui/FestlegungenCard.tsx",
-  "adapters/ui/KategorisierungCards.tsx",
   "adapters/ui/KontenScreen.tsx",
-  "adapters/ui/MerkmaleBlock.tsx",
   "adapters/ui/SammelDialog.tsx",
-  "adapters/ui/TrainingBereich.tsx",
 ];
 
 /** Alle Produktivdateien unter `src/` — Tests zählen nicht (sie dürfen schichtübergreifend prüfen). */

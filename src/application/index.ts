@@ -58,6 +58,9 @@ export {
   monatsRuecklage,
   // Baum-Auskünfte über die Kategorien: sie ordnen ein, sie wählen nicht aus.
   hauptkategorie,
+  // Aus EINER Bewertung abgeleitet, keine Auswahl über den Bestand.
+  verwechslungsmatrix,
+  herkunftVon,
   anbieterSchluessel,
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,

@@ -17,73 +17,33 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   herkunftVon,
-  klassifizieren,
-  merkmalsbefund,
   type IstBuchung,
-  type Klassifikation,
   type Merkmalsherkunft,
-  type VerworfenesWort,
-} from "../../core";
+} from "../../application";
+import type { Merkmalsansicht } from "../../application/merkmalskonfiguration";
 import type { Umsatz } from "../../application/import";
-import {
-  konfigurationLaden,
-  wortAusschliessen,
-  wortZulassen,
-} from "../../application/merkmalskonfiguration";
-import { trainingsmaterial, type Merkmalswert } from "../../application/trainingsmaterial";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
-import { sqliteKlassifikatorRepository as klassifikatorRepo } from "../persistence/sqliteKlassifikatorRepository";
-import { sqliteMerkmalskonfigurationRepository as merkmalRepo } from "../persistence/sqliteMerkmalskonfigurationRepository";
+import { merkmaleZuBuchung, wortFreigeben, wortSperren } from "../dienste";
 import { Pill } from "./ds";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
-
-interface Stand {
-  /** Die Merkmale dieser Buchung, mit ihrer Statistik über den Bestand. */
-  readonly verwendet: readonly { merkmal: string; wert?: Merkmalswert }[];
-  readonly verworfen: readonly VerworfenesWort[];
-  /** Wörter, die auf der Ausschlussliste stehen — nur die lassen sich zurückholen. */
-  readonly ausgeschlossen: ReadonlySet<string>;
-  readonly vorschlag: Klassifikation | null;
-  readonly hatModell: boolean;
-}
 
 export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz?: Umsatz }) {
   const { t } = useTranslation();
   const { locale } = useGeld();
   const [offen, setOffen] = useState(false);
-  const [stand, setStand] = useState<Stand | null>(null);
+  const [stand, setStand] = useState<Merkmalsansicht | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
   async function laden() {
     setFehler(null);
     try {
-      const konf = await konfigurationLaden(merkmalRepo);
-      const quelle = {
-        gegenpartei: umsatz?.gegenpartei ?? "",
-        verwendungszweck: umsatz?.verwendungszweck ?? "",
-        glaeubigerId: umsatz?.glaeubigerId,
-        betrag: buchung.betrag,
-      };
-      const befund = merkmalsbefund(quelle, konf.konfiguration);
-
-      // Statistik und Modell parallel — beide lesen nur.
-      const [material, modellstand] = await Promise.all([
-        trainingsmaterial(ledgerRepo, umsatzRepo, konf.konfiguration),
-        klassifikatorRepo.laden(),
-      ]);
-
-      // Die Bestenliste deckt nur die häufigsten Merkmale ab; für ein seltenes Merkmal
-      // dieser Buchung gibt es dort keinen Eintrag — dann steht „kommt nur hier vor".
-      const statistik = new Map(material.vokabular.haeufigste.map((m) => [m.merkmal, m]));
-
-      setStand({
-        verwendet: befund.merkmale.map((merkmal) => ({ merkmal, wert: statistik.get(merkmal) })),
-        verworfen: befund.verworfen,
-        ausgeschlossen: new Set(konf.ausschluesse.map((a) => a.wort)),
-        vorschlag: modellstand ? klassifizieren(modellstand.modell, befund.merkmale) : null,
-        hatModell: !!modellstand,
-      });
+      setStand(
+        await merkmaleZuBuchung({
+          gegenpartei: umsatz?.gegenpartei ?? "",
+          verwendungszweck: umsatz?.verwendungszweck ?? "",
+          glaeubigerId: umsatz?.glaeubigerId,
+          betrag: buchung.betrag,
+        }),
+      );
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
     }
@@ -178,8 +138,7 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
                           className="linkbtn"
                           onClick={() =>
                             aendern(
-                              wortAusschliessen(
-                                merkmalRepo,
+                              wortSperren(
                                 wortVon(merkmal),
                                 herkunftVon(merkmal) ? [herkunftVon(merkmal) as Merkmalsherkunft] : undefined,
                               ),
@@ -211,7 +170,7 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
                         {/* Zurückholen geht nur bei Listeneinträgen — was der Code als
                             Nummer oder Platzhalter aussortiert, steht nirgends. */}
                         {v.grund === "ausgeschlossen" && stand.ausgeschlossen.has(v.wort) && (
-                          <button className="linkbtn" onClick={() => aendern(wortZulassen(merkmalRepo, v.wort))}>
+                          <button className="linkbtn" onClick={() => aendern(wortFreigeben(v.wort))}>
                             {t("konten.merkmale.zulassen")}
                           </button>
                         )}
