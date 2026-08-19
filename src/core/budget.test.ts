@@ -13,6 +13,7 @@ import {
   monatsFenster,
   verbrauchsFenster,
   type Budget,
+  type BudgetSicht,
 } from "./budget";
 import type { IstBuchung } from "./istbuchung";
 import type { Kategorie } from "./kategorie";
@@ -126,6 +127,19 @@ describe("Verschachtelung", () => {
   });
 });
 
+/**
+ * Eine `BudgetSicht` fürs Testen. `vertragsBuchungen` ist im Kern Pflicht — hier meist
+ * leer, weil die allermeisten Fälle nichts mit Verträgen zu tun haben; die Fälle, die es
+ * tun, setzen sie ausdrücklich.
+ */
+function sicht(
+  buchungen: readonly IstBuchung[],
+  budgets: readonly Budget[],
+  vertragsBuchungen: ReadonlySet<string> = new Set(),
+): BudgetSicht {
+  return { buchungen, kategorien: BAUM, budgets, vertragsBuchungen };
+}
+
 describe("budgetVerbrauch", () => {
   function b(over: Partial<IstBuchung>): IstBuchung {
     return {
@@ -138,7 +152,7 @@ describe("budgetVerbrauch", () => {
 
   it("summiert Aufwands-Abflüsse der Kategorie im Fenster (als positiver Betrag)", () => {
     const ist = [b({ id: "1", betrag: euroZuCent(-50) }), b({ id: "2", betrag: euroZuCent(-30) })];
-    expect(budgetVerbrauch(ist, BAUM, dach, [dach], von, bis)).toBe(euroZuCent(80));
+    expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(euroZuCent(80));
   });
 
   it("ignoriert andere Kategorien, andere Monate und Nicht-Aufwand", () => {
@@ -149,7 +163,7 @@ describe("budgetVerbrauch", () => {
       b({ id: "4", charakter: "Umschichtung" }), // nur ein Kontowechsel, keine Ausgabe
       b({ id: "5", charakter: "Ertrag" }),
     ];
-    expect(budgetVerbrauch(ist, BAUM, dach, [dach], von, bis)).toBe(0);
+    expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(0);
   });
 
   it("legt dieselbe Auswahl als Einzelposten offen — Summe = Verbrauch", () => {
@@ -160,13 +174,13 @@ describe("budgetVerbrauch", () => {
       b({ id: "2", datum: "2026-06-03", kategorieId: "fernreise", betrag: euroZuCent(-12) }),
       b({ id: "3", kategorieId: "fremd", betrag: euroZuCent(-99) }),
     ];
-    const posten = budgetBuchungen(ist, BAUM, dach, [dach], von, bis);
+    const posten = budgetBuchungen(sicht(ist, [dach]), dach, von, bis);
     expect(posten.map((p) => [p.buchung.id, p.betrag])).toEqual([
       ["2", euroZuCent(12)],
       ["1", euroZuCent(50)],
     ]);
     expect(posten.reduce((s, p) => s + p.betrag, 0)).toBe(
-      budgetVerbrauch(ist, BAUM, dach, [dach], von, bis),
+      budgetVerbrauch(sicht(ist, [dach]), dach, von, bis),
     );
   });
 
@@ -180,14 +194,29 @@ describe("budgetVerbrauch", () => {
         ],
       }),
     ];
-    const posten = budgetBuchungen(ist, BAUM, dach, [dach], von, bis);
+    const posten = budgetBuchungen(sicht(ist, [dach]), dach, von, bis);
     expect(posten).toHaveLength(1);
     expect(posten[0]).toMatchObject({ kategorieId: "kino", betrag: euroZuCent(30) });
   });
 
+  it("lässt Vertragszahlungen draußen — sie sind anderswo geplant", () => {
+    // Der Fehler, wegen dem `vertragsBuchungen` Pflichtfeld ist: auf der Übersicht stand
+    // „Familie & Kinder" mit 425,00 € Verbrauch bei 110,00 € Rahmen, obwohl die 425 € die
+    // Kinderbetreuung waren — ein erfasster Vertrag mit eigener Zeile im Ausblick.
+    const ist = [
+      b({ id: "vertrag", betrag: euroZuCent(-425) }),
+      b({ id: "frei", betrag: euroZuCent(-20) }),
+    ];
+    expect(budgetVerbrauch(sicht(ist, [dach], new Set(["vertrag"])), dach, von, bis))
+      .toBe(euroZuCent(20));
+    // Und die Liste zeigt dieselbe Auswahl — nicht nur dieselbe Summe.
+    expect(budgetBuchungen(sicht(ist, [dach], new Set(["vertrag"])), dach, von, bis)
+      .map((p) => p.buchung.id)).toEqual(["frei"]);
+  });
+
   it("senkt den Verbrauch bei einer Erstattung, statt ihn zu erhöhen", () => {
     const ist = [b({ id: "1", betrag: euroZuCent(-50) }), b({ id: "2", betrag: euroZuCent(20) })];
-    expect(budgetVerbrauch(ist, BAUM, dach, [dach], von, bis)).toBe(euroZuCent(30));
+    expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(euroZuCent(30));
   });
 
   // Der Fall, an dem der Verbrauch in der echten App auf 0 stand: Budgets hängen an den
@@ -198,7 +227,7 @@ describe("budgetVerbrauch", () => {
       b({ id: "2", kategorieId: "fernreise", betrag: euroZuCent(-12) }),
       b({ id: "3", kategorieId: "fremd", betrag: euroZuCent(-99) }),
     ];
-    expect(budgetVerbrauch(ist, BAUM, dach, [dach], von, bis)).toBe(euroZuCent(62));
+    expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(euroZuCent(62));
   });
 
   it("lässt den Verbrauch eines eingebetteten Budgets beim Dach draussen", () => {
@@ -208,8 +237,8 @@ describe("budgetVerbrauch", () => {
       b({ id: "1", kategorieId: "kino", betrag: euroZuCent(-50) }),
       b({ id: "2", kategorieId: "fernreise", betrag: euroZuCent(-12) }), // gehört dem Kind
     ];
-    expect(budgetVerbrauch(ist, BAUM, dach, alle, von, bis)).toBe(euroZuCent(50));
-    expect(budgetVerbrauch(ist, BAUM, kind, alle, von, bis)).toBe(euroZuCent(12));
+    expect(budgetVerbrauch(sicht(ist, alle), dach, von, bis)).toBe(euroZuCent(50));
+    expect(budgetVerbrauch(sicht(ist, alle), kind, von, bis)).toBe(euroZuCent(12));
   });
 
   it("belastet ein Budget bei geteilten Buchungen nur mit seinem Teil", () => {
@@ -222,7 +251,7 @@ describe("budgetVerbrauch", () => {
         ],
       }),
     ];
-    expect(budgetVerbrauch(ist, BAUM, dach, [dach], von, bis)).toBe(euroZuCent(40));
+    expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(euroZuCent(40));
   });
 });
 
@@ -234,7 +263,7 @@ describe("budgetStand", () => {
 
   it("monatlich: nur der laufende Monat zählt gegen den Monatsbetrag", () => {
     const b = budget({ kategorieId: "urlaub", betragProMonat: euroZuCent(100) });
-    expect(budgetStand(ist, BAUM, b, [b], "2026-03-15")).toEqual({
+    expect(budgetStand(sicht(ist, [b]), b, "2026-03-15")).toEqual({
       rahmen: euroZuCent(100),
       verbraucht: euroZuCent(20),
       rest: euroZuCent(80),
@@ -243,7 +272,7 @@ describe("budgetStand", () => {
 
   it("aufbauend: alles seit dem Start gegen die Summe aller Raten", () => {
     const b = budget({ kategorieId: "urlaub", art: "aufbauend", betragProMonat: euroZuCent(100), start: "2026-01-01" });
-    expect(budgetStand(ist, BAUM, b, [b], "2026-03-15")).toEqual({
+    expect(budgetStand(sicht(ist, [b]), b, "2026-03-15")).toEqual({
       rahmen: euroZuCent(300), // Januar + Februar + März
       verbraucht: euroZuCent(50), // beide Buchungen
       rest: euroZuCent(250),
@@ -252,6 +281,6 @@ describe("budgetStand", () => {
 
   it("meldet einen negativen Rest, wenn mehr ausgegeben wurde als da war", () => {
     const b = budget({ kategorieId: "urlaub", betragProMonat: euroZuCent(10) });
-    expect(budgetStand(ist, BAUM, b, [b], "2026-03-15").rest).toBe(euroZuCent(-10));
+    expect(budgetStand(sicht(ist, [b]), b, "2026-03-15").rest).toBe(euroZuCent(-10));
   });
 });

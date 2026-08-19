@@ -6,65 +6,49 @@
 // laufende Monat trägt zwei Spalten (geplant / gebucht), die kommenden nur den Plan.
 //
 // Jede Zeile lässt sich aufklappen und zeigt dann ihre Posten: welche Rate schon
-// abgebucht ist, wie weit ein Budget durch ist. Gerechnet wird nichts hier — die
-// Aufrechnung kommt fertig aus `monatsAusblick` (Kern).
+// abgebucht ist, wie weit ein Budget durch ist. Gerechnet wird hier NICHTS — die
+// Aufrechnung kommt fertig aus `uebersichtLaden` (Anwendungsschicht), die Komponente
+// bekommt sie als `ausblicke` gereicht. Bis 2026-08-19 rief sie `monatsAusblicke` selbst
+// auf und musste dafür Regeln, Budgets, Inventar und Buchungen kennen.
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  monatsAusblicke,
-  type AusblickPosten,
-  type AusblickZeile,
-  type Budget,
-  type Inventargegenstand,
-  type IstBuchung,
-  type Kategorie,
-  type MonatsAusblick as Ausblick,
-  type Zahlungsregel,
-} from "../../core";
+import type {
+  AusblickPosten,
+  AusblickZeile,
+  MonatsAusblick as Ausblick,
+} from "../../application";
 import { Card, CoverageTrack, Pill } from "./ds";
 import { useGeld } from "./einstellungenKontext";
 import { geldFarbe } from "./geldFarbe";
 
 const MONATSNAMEN_KEY = "ausblick.monat";
 
-/** Stabile leere Karte — eine frisch erzeugte Map liesse jedes Memo neu rechnen. */
-const LEER: ReadonlyMap<string, string> = new Map();
-
 export function MonatsAusblick({
-  regeln,
-  budgets,
-  inventar,
-  ist,
-  kategorien,
-  heute,
+  ausblicke,
+  hatPlandaten,
+  kategorieNamen,
   empfaenger,
 }: {
-  regeln: Zahlungsregel[];
-  budgets: Budget[];
-  inventar: Inventargegenstand[];
-  ist: IstBuchung[];
-  kategorien: Kategorie[];
-  /** Von außen hereingereicht, damit die Komponente testbar bleibt (keine Uhr im Render). */
-  heute: string;
+  /** Fertig aufgerechnet aus `uebersichtLaden` — hier wird nichts mehr gerechnet. */
+  ausblicke: readonly Ausblick[];
+  /** Gibt es überhaupt Verträge, Budgets oder Inventar? */
+  hatPlandaten: boolean;
+  /** Kategorie-ID → Name. Der Kern gibt IDs heraus, die Oberfläche zeigt Namen. */
+  kategorieNamen: ReadonlyMap<string, string>;
   /**
    * Buchungs-ID → Empfänger aus dem Import. Der Kern kennt ihn nicht (er steht am
    * Umsatz, nicht an der IstBuchung), aufgeklappt ist er aber das Einzige, woran man
    * eine ungeplante Zeile wiedererkennt.
    */
-  empfaenger?: ReadonlyMap<string, string>;
+  empfaenger: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
-  const ausblicke = useMemo(
-    () => monatsAusblicke({ regeln, budgets, inventar, ist, kategorien, heute }),
-    [regeln, budgets, inventar, ist, kategorien, heute],
-  );
-  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   const ohneEinnahmeplan = ausblicke.every((a) => a.zeilen.find((z) => z.id === "einnahmen")!.plan === 0);
 
   // Ohne Verträge und Budgets gäbe es drei Karten voller Nullen — das liest sich wie ein
   // Datenfehler, nicht wie ein leerer Plan. Lieber einmal sagen, woher die Zahlen kommen.
-  if (regeln.length === 0 && budgets.length === 0 && inventar.length === 0) {
+  if (!hatPlandaten) {
     return <Card subtitle={t("ausblick.leerUntertitel")}>{t("ausblick.leer")}</Card>;
   }
 
@@ -75,8 +59,8 @@ export function MonatsAusblick({
           <AusblickKarte
             key={a.label}
             ausblick={a}
-            kategorieName={kategorieName}
-            empfaenger={empfaenger ?? LEER}
+            kategorieName={kategorieNamen}
+            empfaenger={empfaenger}
           />
         ))}
       </div>
@@ -97,7 +81,7 @@ function AusblickKarte({
   empfaenger,
 }: {
   ausblick: Ausblick;
-  kategorieName: Map<string, string>;
+  kategorieName: ReadonlyMap<string, string>;
   empfaenger: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
@@ -197,7 +181,7 @@ function ZeileMitPosten({
   letzte: boolean;
   offen: boolean;
   onToggle: () => void;
-  kategorieName: Map<string, string>;
+  kategorieName: ReadonlyMap<string, string>;
   empfaenger: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
@@ -282,7 +266,7 @@ function PlanPosten({
   posten: AusblickPosten;
   zeile: AusblickZeile["id"];
   zweiSpalten: boolean;
-  kategorieName: Map<string, string>;
+  kategorieName: ReadonlyMap<string, string>;
   empfaenger: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();

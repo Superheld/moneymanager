@@ -26,7 +26,11 @@
 //     Dedup als möglichen Zwilling markiert hat. Ohne diese Trennung führte der Rückgriff
 //     (Punkt 1) jeden Abruf zu Doppelbuchungen.
 
-import type { ImportLaufRepository, KategorieRepository, LedgerPort, UmsatzRepository, ZahlungskontoRepository } from "../ports";
+import type {
+  ImportLaufRepository, KategorieRepository, LedgerPort, UmsatzRepository,
+  VertragserkennungRepository, VertragszuordnungRepository, ZahlungskontoRepository,
+} from "../ports";
+import { zuordnungenAbgleichen } from "../vertragszuordnung";
 import type { Vorschlagskontext } from "../import/vorschlag";
 import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
@@ -68,6 +72,17 @@ export interface AbrufDeps {
    * eine Warteliste am Konto abnicken musste; siehe den Kopfkommentar unter Punkt 4.
    */
   readonly ledgerRepo: LedgerPort;
+  /**
+   * Erkennung und Zuordnung der Verträge — der Abruf gleicht am Ende ab.
+   *
+   * Ohne das hingen die frisch gebuchten Zeilen an keinem Vertrag, bis jemand zufällig
+   * einen Verträge-Screen öffnet. Seit der Abruf direkt verbucht, ist das der Normalfall
+   * — und bis dahin zählte jede Vertragsrate gegen ihr Budget (siehe
+   * `application/budgetsichten`). Optional, damit ältere Aufrufer nicht brechen; fehlt
+   * es, wird nur nicht abgeglichen.
+   */
+  readonly erkennungRepo?: VertragserkennungRepository;
+  readonly vertragszuordnungRepo?: VertragszuordnungRepository;
   readonly id: () => string;
   readonly kategorisierung?: Vorschlagskontext;
   /** Heute als ISO-Datum — von außen, damit der Ablauf prüfbar bleibt. */
@@ -239,6 +254,22 @@ export async function abrufAusfuehren(
         fehler: e instanceof Error ? e.message : String(e),
       });
     }
+  }
+
+  // Die frisch gebuchten Zeilen an ihre Verträge hängen. EIN Lauf über den Bestand,
+  // nicht einer je Zeile: der Abgleich ist idempotent und schreibt nur Deltas.
+  //
+  // Das gehört hierher und nicht in die Oberfläche. Ohne diesen Aufruf trüge eine
+  // abgerufene Vertragsrate keine Zuordnung, bis jemand einen Verträge-Screen öffnet —
+  // und zählte bis dahin gegen das Budget ihrer Kategorie, obwohl sie im Ausblick schon
+  // als Vertrag steht.
+  if (deps.erkennungRepo && deps.vertragszuordnungRepo) {
+    await zuordnungenAbgleichen({
+      ledger: deps.ledgerRepo,
+      umsatzRepo: deps.umsatzRepo,
+      erkennungRepo: deps.erkennungRepo,
+      zuordnungRepo: deps.vertragszuordnungRepo,
+    });
   }
 
   // Zum Schluss noch einmal: die Bank hat während der Aufträge womöglich neue Parameter
