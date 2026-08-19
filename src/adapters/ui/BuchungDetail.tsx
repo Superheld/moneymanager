@@ -80,6 +80,7 @@ import {
   sqliteImportLaufRepository as importLaufRepo,
 } from "../persistence/sqliteImportRepositories";
 import { Button, FormField, Pill } from "./ds";
+import { IconButton } from "./IconButton";
 import { formularAusBuchung, VertragModal } from "./VertragModal";
 import { CategoryPicker } from "./CategoryPicker";
 import { MerkmaleBlock } from "./MerkmaleBlock";
@@ -87,16 +88,13 @@ import { festlegungSetzen } from "../../application/kategoriefestlegungen";
 import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persistence/sqliteKategoriefestlegungRepository";
 import { Modal } from "./Modal";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 
 function ddmm(iso: string): string {
   const [, m, d] = iso.split("-");
   return `${d}.${m}.`;
-}
-function betragFarbe(z: { betrag: number; charakter: Charakter }): string {
-  if (z.betrag >= 0) return "var(--ok-deep)";
-  return z.charakter === "Umschichtung" ? "var(--accent-deep)" : "var(--ink)";
 }
 
 /** Ein Label/Wert-Paar im Herkunfts-Abschnitt. Lange Werte (Hash, Zweck) dürfen umbrechen. */
@@ -230,14 +228,12 @@ function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund
         <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
           {ddmm(zwilling.buchungstag)} · {zwilling.gegenpartei || t("konten.neue.ohneGegenpartei")}
         </span>
-        <span className="num" style={{ fontWeight: 700 }}>{geld.formatMitSymbol(zwilling.betrag, { mitVorzeichen: true })}</span>
+        <span className="num" style={{ fontWeight: 700, color: geldFarbe(zwilling.betrag) }}>{geld.formatMitSymbol(zwilling.betrag, { mitVorzeichen: true })}</span>
         <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
           {t(`konten.neue.status.${zwilling.status}`)}
         </span>
         {onZwillingOeffnen && (
-          <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={onZwillingOeffnen}>
-            {t("konten.dublette.oeffnen")}
-          </button>
+          <IconButton icon="oeffnen" label={t("konten.dublette.oeffnen")} onClick={onZwillingOeffnen} style={{ marginLeft: "auto" }} />
         )}
       </div>
       <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
@@ -529,7 +525,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
               {ddmm(buchung?.datum ?? entwurf!.buchungstag)} · {kontoName.get(kontoId) ?? "?"}
             </span>
           </span>
-          <span className="num" style={{ fontSize: "var(--fs-h2, var(--fs-h3))", fontWeight: "var(--fw-black)", color: betragFarbe({ betrag: buchung?.betrag ?? entwurf!.betrag, charakter }) }}>
+          <span className="num" style={{ fontSize: "var(--fs-h2, var(--fs-h3))", fontWeight: "var(--fw-black)", color: geldFarbe(buchung?.betrag ?? entwurf!.betrag) }}>
             {geld.formatMitSymbol(buchung?.betrag ?? entwurf!.betrag, { mitVorzeichen: true })}
           </span>
         </div>
@@ -613,7 +609,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                     {kontoName.get(k.zahlungskontoId) ?? "?"}
                     <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.neu")}</span>
                   </span>
-                  <span className="num" style={{ fontWeight: 700 }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
+                  <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
                 </label>
               ))}
 
@@ -625,7 +621,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                     {kontoName.get(k.kontoId) ?? "?"}
                     <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.verbucht")}</span>
                   </span>
-                  <span className="num" style={{ fontWeight: 700, color: betragFarbe(k) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
+                  <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
                 </label>
               ))}
 
@@ -676,7 +672,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                     {kategorieName.get(a.kategorieId) ?? "?"}
                     {a.notiz && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{a.notiz}</span>}
                   </span>
-                  <span className="num" style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  <span className="num" style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", color: geldFarbe(a.betrag) }}>
                     {geld.formatMitSymbol(a.betrag, { mitVorzeichen: true })}
                   </span>
                 </div>
@@ -744,7 +740,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
                     {t("konten.paarung.gegenbuchung")} · {kontoName.get(gegenbuchung.kontoId) ?? "?"}
                   </span>
-                  <span className="num" style={{ fontWeight: 700, color: betragFarbe(gegenbuchung) }}>
+                  <span className="num" style={{ fontWeight: 700, color: geldFarbe(gegenbuchung.betrag) }}>
                     {geld.formatMitSymbol(gegenbuchung.betrag, { mitVorzeichen: true })}
                   </span>
                   <span aria-hidden style={{ color: "var(--ink-3)" }}>›</span>
@@ -932,7 +928,7 @@ function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung: IstBuc
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
         <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.split.gesamt")}</span>
-        <span className="num" style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-black)", color: betragFarbe(buchung) }}>
+        <span className="num" style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-black)", color: geldFarbe(buchung.betrag) }}>
           {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
         </span>
       </div>
@@ -1030,7 +1026,7 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
         <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
           {ddmm(buchung.datum)} · {kandidatLabel(buchung) || kontoName.get(buchung.kontoId) || ""}
         </span>
-        <span className="num" style={{ fontWeight: 700, color: betragFarbe(buchung) }}>
+        <span className="num" style={{ fontWeight: 700, color: geldFarbe(buchung.betrag) }}>
           {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
         </span>
       </div>
@@ -1049,7 +1045,7 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
               {kontoName.get(k.kontoId) ?? "?"}
               {kandidatLabel(k) && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{kandidatLabel(k)}</span>}
             </span>
-            <span className="num" style={{ fontWeight: 700, color: betragFarbe(k) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
+            <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
           </label>
         ))
       )}

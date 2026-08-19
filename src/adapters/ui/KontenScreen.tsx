@@ -36,7 +36,9 @@ import { AbrufDialog } from "./AbrufDialog";
 import { ABRUF_QUELLEN, NeueBuchungen } from "./NeueBuchungen";
 import { Modal } from "./Modal";
 import { PageHead } from "./PageHead";
+import { IconButton } from "./IconButton";
 import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
 const TAGE_OPTIONEN = [14, 30, 60, 90];
 const ART_OPTS = [
@@ -53,10 +55,6 @@ function heuteIso(): string {
 function ddmm(iso: string): string {
   const [, m, d] = iso.split("-");
   return `${d}.${m}.`;
-}
-function betragFarbe(z: { betrag: number; charakter: Charakter }): string {
-  if (z.betrag >= 0) return "var(--ok-deep)";
-  return z.charakter === "Umschichtung" ? "var(--accent-deep)" : "var(--ink)";
 }
 
 export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => void }) {
@@ -439,11 +437,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   ),
                 },
                 { key: "kat", label: t("konten.spalteKategorie"), maxWidth: 180, sortValue: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "" : ""), render: (z) => (z.kategorieId ? kategorieName.get(z.kategorieId) ?? "?" : "—") },
-                { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (z) => z.betrag, render: (z) => <span className="num" style={{ fontWeight: 700, color: betragFarbe(z) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span> },
+                { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (z) => z.betrag, render: (z) => <span className="num" style={{ fontWeight: 700, color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span> },
                 { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (z) => z.saldo, render: (z) => geld.format(z.saldo) },
                 {
                   key: "_a", label: "", align: "right", sortable: false,
-                  render: (z) => <button className="linkbtn" onClick={() => bearbeitenOeffnen(z)}>{t("konten.bearbeiten")}</button>,
+                  render: (z) => <IconButton icon="bearbeiten" label={t("konten.bearbeiten")} onClick={() => bearbeitenOeffnen(z)} />,
                 },
               ]}
               rows={gebuchtFuerTabelle}
@@ -539,7 +537,7 @@ function Zeile({ links, betrag, charakter, saldo, faint, aktion }: { links: Reac
       <span style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flexWrap: "wrap" }}>{links}</span>
       <span style={{ display: "flex", gap: 18, whiteSpace: "nowrap", alignItems: "center" }}>
         {betrag != null && charakter != null && (
-          <span className="num" style={{ fontSize: 13.5, fontWeight: 700, color: betragFarbe({ betrag, charakter }), minWidth: 92, textAlign: "right" }}>{geld.formatMitSymbol(betrag, { mitVorzeichen: true })}</span>
+          <span className="num" style={{ fontSize: 13.5, fontWeight: 700, color: geldFarbe(betrag), minWidth: 92, textAlign: "right" }}>{geld.formatMitSymbol(betrag, { mitVorzeichen: true })}</span>
         )}
         <span className="num" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-2)", minWidth: 92, textAlign: "right" }}>{geld.formatMitSymbol(saldo)}</span>
         {aktion != null && <span style={{ minWidth: 64, textAlign: "right" }}>{aktion}</span>}

@@ -24,6 +24,7 @@ import {
 } from "../../core";
 import { Card, CoverageTrack, Pill } from "./ds";
 import { useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
 const MONATSNAMEN_KEY = "ausblick.monat";
 
@@ -136,7 +137,7 @@ function AusblickKarte({
       >
         <span>{t("ausblick.bleibt")}</span>
         <span style={{ gridColumn: zweiSpalten ? "2 / span 2" : "2", textAlign: "right" }}>
-          <span className="num" style={{ color: farbe(bleibt) }}>
+          <span className="num" style={{ color: geldFarbe(bleibt) }}>
             {geld.formatMitSymbol(bleibt, { mitVorzeichen: true })}
           </span>
           {zweiSpalten && (
@@ -200,11 +201,11 @@ function ZeileMitPosten({
           {t(`ausblick.zeile.${zeile.id}`)}
         </span>
         {zweiSpalten && (
-          <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)" }}>
+          <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)", color: geldFarbe(zeile.ist ?? 0) }}>
             {geld.format(zeile.ist ?? 0, { mitVorzeichen: true })}
           </span>
         )}
-        <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)" }}>
+        <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)", color: geldFarbe(zeile.plan) }}>
           {geld.format(zeile.plan, { mitVorzeichen: true })}
         </span>
       </div>
@@ -323,5 +324,4 @@ const kopfStil = {
   paddingBottom: "var(--sp-2)",
 } as const;
 
-const farbe = (wert: number) => (wert < 0 ? "var(--warn-deep)" : "var(--ink)");
 const tagVon = (iso: string) => `${iso.slice(8)}.`;

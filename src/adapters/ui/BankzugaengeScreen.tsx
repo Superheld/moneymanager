@@ -23,6 +23,7 @@ import {
 } from "../persistence/sqliteBankzugangRepositories";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { IconButton } from "./IconButton";
 import { Modal } from "./Modal";
 import { useGeld } from "./einstellungenKontext";
 
@@ -178,9 +179,11 @@ export function BankzugaengeScreen() {
                 label: "",
                 align: "right" as const,
                 render: (z: Bankzugang) => (
-                  <button className="linkbtn" onClick={() => { setPin({ zugang: z }); setPinText(""); setFehler(null); }}>
-                    {t("bankzugaenge.pruefen")}
-                  </button>
+                  <IconButton
+                    icon="details"
+                    label={t("bankzugaenge.pruefen")}
+                    onClick={() => { setPin({ zugang: z }); setPinText(""); setFehler(null); }}
+                  />
                 ),
               },
               {
@@ -188,9 +191,7 @@ export function BankzugaengeScreen() {
                 label: "",
                 align: "right" as const,
                 render: (z: Bankzugang) => (
-                  <button className="linkbtn" onClick={() => void loeschen(z.id)}>
-                    {t("einstellungen.loeschen")}
-                  </button>
+                  <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void loeschen(z.id)} />
                 ),
               },
             ]}

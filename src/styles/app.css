@@ -286,3 +286,37 @@ select.field {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- Zeilen-Aktionen als Icon (siehe ui/IconButton.tsx) ---
+   Zurückhaltend im Ruhezustand, damit 25 Tabellenzeilen nicht wie ein Werkzeugkasten
+   aussehen; erst beim Hovern bekommt das Icon Kontrast und eine Fläche darunter.
+   Die Trefferfläche ist bewusst grösser als das 16-px-Icon — mit Maus trifft man sonst
+   zwischen zwei Aktionen. */
+.iconbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.iconbtn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--accent-deep);
+}
+.iconbtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.iconbtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.iconbtn-gefahr:hover:not(:disabled) {
+  color: var(--warn-deep);
+}

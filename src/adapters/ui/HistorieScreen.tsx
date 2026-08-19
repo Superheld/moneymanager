@@ -19,6 +19,7 @@ import { MonatsFlussChart } from "./MonatsFlussChart";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { PageHead } from "./PageHead";
 import { useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
 import type { KategorieSumme } from "../../core";
 
@@ -324,7 +325,7 @@ export function HistorieScreen() {
                   <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>{u?.gegenpartei ?? b.notiz ?? "—"}</td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 45 ? zweck.slice(0, 45) + "…" : zweck}</td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{kontoName.get(b.kontoId) ?? "—"}</td>
-                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{geld.format(b.betrag, { mitVorzeichen: true })}</td>
+                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(b.betrag) }}>{geld.format(b.betrag, { mitVorzeichen: true })}</td>
                 </tr>
               );
             })}
@@ -355,11 +356,11 @@ export function HistorieScreen() {
             <KPIStat size="chip" label={monat ? t("historie.kpiEinnahmenMonat", { monat: monat.label }) : t("historie.kpiEinnahmen")}
               value={geld.format(summeEin)} unit={geld.symbol} tone="ok" meta={vergleich(summeEin, oeEin)} />
             <KPIStat size="chip" label={monat ? t("historie.kpiAusgabenMonat", { monat: monat.label }) : t("historie.kpiAusgaben")}
-              value={geld.format(summeAus)} unit={geld.symbol} meta={vergleich(summeAus, oeAus)} />
+              value={geld.format(summeAus)} unit={geld.symbol} tone={summeAus < 0 ? "warn" : "default"} meta={vergleich(summeAus, oeAus)} />
             <KPIStat size="chip" label={t("historie.kpiNetto")} value={geld.format(netto, { mitVorzeichen: true })} unit={geld.symbol} tone={netto < 0 ? "warn" : "ok"} />
             {/* Der Maßstab: was ein Monat im Schnitt kostet. Bleibt beim Zeitraum-Ø,
                 auch wenn ein einzelner Monat gewählt ist — sonst gäbe es nichts zu vergleichen. */}
-            <KPIStat size="chip" label={t("historie.kpiOeAusgaben")} value={geld.format(oeAus)} unit={geld.symbol} />
+            <KPIStat size="chip" label={t("historie.kpiOeAusgaben")} value={geld.format(oeAus)} unit={geld.symbol} tone={oeAus < 0 ? "warn" : "default"} />
             <KPIStat size="chip" label={t("historie.kpiSaldo")} value={geld.format(saldoJetzt)} unit={geld.symbol} tone={saldoJetzt < 0 ? "warn" : "default"} />
           </div>
 
@@ -426,7 +427,7 @@ export function HistorieScreen() {
                   { key: "label", label: t("historie.spalteMonat") },
                   { key: "einnahmen", label: `${t("historie.spalteEinnahmen")} ${geld.symbol}`, align: "right", render: (m) => (m.einnahmen ? geld.format(m.einnahmen) : "—") },
                   { key: "ausgaben", label: `${t("historie.spalteAusgaben")} ${geld.symbol}`, align: "right", render: (m) => (m.ausgaben ? geld.format(m.ausgaben) : "—") },
-                  { key: "netto", label: `${t("historie.spalteNetto")} ${geld.symbol}`, align: "right", render: (m) => <span style={{ color: m.netto < 0 ? "var(--warn-deep)" : "var(--ink)", fontWeight: "var(--fw-bold)" }}>{geld.format(m.netto, { mitVorzeichen: true })}</span> },
+                  { key: "netto", label: `${t("historie.spalteNetto")} ${geld.symbol}`, align: "right", render: (m) => <span style={{ color: geldFarbe(m.netto), fontWeight: "var(--fw-bold)" }}>{geld.format(m.netto, { mitVorzeichen: true })}</span> },
                   { key: "umschichtung", label: `${t("historie.spalteUmschichtung")} ${geld.symbol}`, align: "right", render: (m) => (m.umschichtung ? geld.format(m.umschichtung, { mitVorzeichen: true }) : "—") },
                   { key: "saldo", label: `${t("historie.spalteSaldo")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.saldo, { mitVorzeichen: true }) },
                 ]}
