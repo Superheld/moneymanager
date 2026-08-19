@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { IstBuchung, Kategorie } from "../core";
-import type { LedgerPort } from "./ports";
+import type { Umsatz } from "./import";
+import type { LedgerPort, UmsatzRepository } from "./ports";
 import { buchungenLoeschen, buchungenSammelbearbeiten } from "./buchungenSammelbearbeiten";
 
 function memLedger(start: IstBuchung[] = []): LedgerPort & { daten: IstBuchung[] } {
@@ -95,6 +96,36 @@ describe("buchungenLoeschen", () => {
     const ledger = memLedger([b({ id: "1" }), b({ id: "2" })]);
     const erg = await buchungenLoeschen(ledger, [...ledger.daten], new Set());
     expect(erg).toEqual({ geloescht: 2, gesperrt: 0 });
+    expect(ledger.daten).toHaveLength(0);
+  });
+
+  it("legt den zugehörigen Umsatz mit weg", async () => {
+    // Ohne das blieb er auf „verbucht" stehen und zeigte auf eine Buchung, die es nicht
+    // mehr gibt. Sichtbare Folge: die Dublettenprüfung im Auszug mahnte Zeilen an, die
+    // längst entfernt waren.
+    const ledger = memLedger([b({ id: "1" })]);
+    const umsaetze: Umsatz[] = [{
+      id: "u1", laufId: "l1", zahlungskontoId: "giro", buchungstag: "2026-08-11",
+      betrag: -5700, waehrung: "EUR", gegenpartei: "Musterladen", verwendungszweck: "Einkauf",
+      rohHash: "h1", status: "verbucht", istbuchungId: "1",
+    }];
+    const umsatzRepo = {
+      async alle() { return umsaetze; },
+      async speichern(u: Umsatz) { umsaetze[0] = u; },
+    } as unknown as UmsatzRepository;
+
+    await buchungenLoeschen(ledger, [...ledger.daten], new Set(), umsatzRepo);
+
+    // `verworfen`, nicht `neu`: wer dreissig Zeilen markiert und wegwirft, will sie nicht
+    // danach im Stapel wiederfinden. In der Datenbank bleibt die Zeile trotzdem — der
+    // nächste Import soll wissen, dass sie schon einmal da war.
+    expect(umsaetze[0].status).toBe("verworfen");
+    expect(umsaetze[0].istbuchungId).toBeUndefined();
+  });
+
+  it("räumt ohne Umsatz-Repository nur das Ledger", async () => {
+    const ledger = memLedger([b({ id: "1" })]);
+    await buchungenLoeschen(ledger, [...ledger.daten], new Set());
     expect(ledger.daten).toHaveLength(0);
   });
 

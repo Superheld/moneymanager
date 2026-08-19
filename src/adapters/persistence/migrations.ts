@@ -616,4 +616,26 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE vertrag ADD COLUMN art TEXT NOT NULL DEFAULT 'abo'`,
     ],
   },
+  {
+    version: 33, // Verwaiste Umsätze: „verbucht", aber die Buchung gibt es nicht mehr
+    sql: [
+      // Wer eine Buchung über die Sammelbearbeitung entfernte, liess ihren Umsatz auf
+      // „verbucht" stehen — mit einer istbuchung_id, die ins Leere zeigte. Das ist ein
+      // Widerspruch in den Daten, und er wurde sichtbar, als die Dublettenprüfung in den
+      // Auszug wanderte: sie mahnte Zeilen an, die längst entfernt waren.
+      //
+      // Der Zielzustand ist derselbe, den der reparierte Use-Case ab jetzt herstellt:
+      // `verworfen` ohne Buchungsbezug. Nicht `neu` — diese Zeilen wurden bewusst
+      // weggeworfen, sie gehören nicht zurück in den Stapel. In der Datenbank bleiben
+      // sie: „das habe ich schon einmal weggeworfen" ist die Auskunft, die der nächste
+      // Import braucht (`bestandsSchluessel` liest sie unabhängig vom Status).
+      //
+      // Wiederholbar: nach dem ersten Lauf trifft die WHERE-Bedingung nichts mehr.
+      `UPDATE umsatz
+          SET status = 'verworfen', istbuchung_id = NULL
+        WHERE status = 'verbucht'
+          AND (istbuchung_id IS NULL
+               OR istbuchung_id NOT IN (SELECT id FROM ist_buchung))`,
+    ],
+  },
 ];

@@ -17,7 +17,8 @@
 // eine Buchung, deren Kategorie sich ändert, erbt ihn hier genauso.
 
 import { FachlicherFehler, type IstBuchung, type Kategorie } from "../core";
-import type { LedgerPort } from "./ports";
+import { verwerfen, zuruecksetzen } from "./import";
+import type { LedgerPort, UmsatzRepository } from "./ports";
 
 export interface SammelAenderung {
   /** Neue Kategorie; `null` leert sie ausdrücklich, `undefined` lässt sie stehen. */
@@ -94,12 +95,26 @@ export async function buchungenSammelbearbeiten(
  * Gesperrt ist die HERKUNFT, nicht das Konto: eine Zeile aus einem Dateiimport oder von
  * Hand ist auch auf einem Bankkonto löschbar — die Bank kennt sie nicht und holt sie
  * nicht zurück.
+ *
+ * **Der zugehörige Umsatz wird mit weggelegt.** Ohne das blieb er auf „verbucht" stehen
+ * und zeigte auf eine Buchung, die es nicht mehr gibt — ein Widerspruch in den Daten mit
+ * sichtbarer Folge: die Dublettenprüfung im Ledger mahnte weiter Zeilen an, die längst
+ * entfernt waren (32 solche Umsätze im echten Bestand). Er wird `verworfen`, nicht
+ * `neu`: wer dreißig Zeilen markiert und wegwirft, will sie nicht danach im Stapel
+ * wiederfinden. In der Datenbank bleibt er — „das habe ich schon einmal weggeworfen" ist
+ * genau die Auskunft, die der nächste Import braucht.
+ *
+ * Der Einzeldialog setzt stattdessen auf `neu` zurück, und das ist Absicht: dort löscht
+ * man EINE falsch erfasste Buchung und will sie meist gleich richtig erfassen.
  */
 export async function buchungenLoeschen(
   ledger: LedgerPort,
   buchungen: readonly IstBuchung[],
   gesperrteIds: ReadonlySet<string>,
+  /** Ohne ihn wird nur das Ledger geräumt — die Umsätze bleiben dann stehen. */
+  umsatzRepo?: UmsatzRepository,
 ): Promise<{ geloescht: number; gesperrt: number }> {
+  const umsaetze = umsatzRepo ? await umsatzRepo.alle() : [];
   let geloescht = 0;
   let gesperrt = 0;
   for (const b of buchungen) {
@@ -108,6 +123,8 @@ export async function buchungenLoeschen(
       continue;
     }
     await ledger.loeschen(b.id);
+    const u = umsaetze.find((x) => x.istbuchungId === b.id && x.status === "verbucht");
+    if (u && umsatzRepo) await umsatzRepo.speichern(verwerfen(zuruecksetzen(u)));
     geloescht++;
   }
   return { geloescht, gesperrt };

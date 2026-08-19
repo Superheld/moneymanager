@@ -48,9 +48,14 @@ npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
 - `tsc --noEmit | tail` verschluckt den Exit-Code; lieber `tsc --noEmit; echo $?`.
 - **Echte DB:** `~/Library/Application Support/de.netmechanics.moneymanager/moneymanager.db`
   read-only via `sqlite3` inspizieren, statt Datenbugs zu raten. Neue Migrations-SQL vorher
-  auf einer `cp`-Kopie durchspielen und das Ergebnis ansehen — Vorbelegungen greifen sonst
+  auf einer Kopie durchspielen und das Ergebnis ansehen — Vorbelegungen greifen sonst
   plausibel daneben, und kein Test merkt es. Bei `sqlite3 -json` über viele Zeilen
   `maxBuffer` hochsetzen, sonst `ENOBUFS`.
+- **Kopie NIE mit `cp`**, sondern `sqlite3 -readonly "$DB" ".backup '/pfad/probe.db'"`. Die
+  Datenbank läuft im WAL-Modus: frische Schreibvorgänge stehen in `moneymanager.db-wal`,
+  nicht in der Hauptdatei. Ein `cp` der Hauptdatei allein liefert einen ÄLTEREN Stand —
+  still und plausibel aussehend. Einmal passiert: die Kopie zeigte 5299 Buchungen, der
+  echte Bestand 5308, und der geprüfte Datenfehler war in der Kopie schlicht nicht da.
 - **Erscheinen Frontend-Änderungen nicht im Tauri-Fenster**, obwohl der Code stimmt: erst
   prüfen, ob Vite ausliefert (`curl -s localhost:1420/src/.../X.tsx`), dann Live-Banner-Test.
   Hängt der WebView-Cache (er überlebt den App-Neustart): App schließen,

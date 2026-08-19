@@ -116,6 +116,8 @@ export interface Kontensicht {
    * Geprüft wird über die Umsätze, nicht über die Ist-Buchungen — Empfänger,
    * Verwendungszweck und Quellen-ID stehen dort. Eine von Hand erfasste Buchung ohne
    * Import-Kontext kann deshalb nicht geprüft werden und trägt nie eine Markierung.
+   * Umgekehrt zählt ein Umsatz nur, wenn seine Ist-Buchung im Ledger auch wirklich
+   * (noch) steht.
    */
   readonly dublettenverdacht: ReadonlyMap<string, Dublettenverdacht>;
 }
@@ -145,7 +147,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
   }
 
   const zuordnungJeKonto = new Map(zuordnungen.map((z) => [z.zahlungskontoId, z]));
-  const dublettenverdacht = verdachtJeBuchung(umsaetze);
+  const dublettenverdacht = verdachtJeBuchung(umsaetze, new Set(buchungen.map((b) => b.id)));
 
   return {
     zeilen: konten.map((konto): Kontozeile => {
@@ -182,10 +184,18 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
  * Buchung sind — und weil es die Vergleiche kleinhält. Nur verbuchte: was noch als
  * Entwurf offen liegt, steht nicht im Saldo und hat seine eigene Prüfung.
  */
-function verdachtJeBuchung(umsaetze: readonly Umsatz[]): Map<string, Dublettenverdacht> {
+function verdachtJeBuchung(
+  umsaetze: readonly Umsatz[],
+  gebuchteIds: ReadonlySet<string>,
+): Map<string, Dublettenverdacht> {
   const jeKonto = new Map<string, Umsatz[]>();
   for (const u of umsaetze) {
     if (!u.istbuchungId || u.status !== "verbucht") continue;
+    // Und die Buchung muss es WIRKLICH noch geben. Ein Umsatz kann „verbucht" heißen und
+    // auf eine gelöschte Zeile zeigen — dann steht im Ledger nichts Doppeltes mehr, und
+    // ein Verdacht wäre schlicht falsch. Am echten Bestand traf das 32 Zeilen: genau die
+    // Dubletten, die schon von Hand entfernt worden waren, wurden weiter angemahnt.
+    if (!gebuchteIds.has(u.istbuchungId)) continue;
     const liste = jeKonto.get(u.zahlungskontoId);
     if (liste) liste.push(u);
     else jeKonto.set(u.zahlungskontoId, [u]);

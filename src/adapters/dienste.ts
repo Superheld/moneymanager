@@ -615,7 +615,9 @@ export function buchungenLoeschen(
   buchungen: readonly IstBuchung[],
   gesperrteIds: ReadonlySet<string>,
 ) {
-  return buchungenLoeschenUseCase(sqliteLedgerRepository, buchungen, gesperrteIds);
+  return buchungenLoeschenUseCase(
+    sqliteLedgerRepository, buchungen, gesperrteIds, sqliteUmsatzRepository,
+  );
 }
 
 
