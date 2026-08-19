@@ -1,4 +1,10 @@
-// Neue Buchungen eines Kontos — abgerufen, noch nicht bestätigt.
+// Abgerufene Zeilen eines Kontos, die noch eine Entscheidung brauchen.
+//
+// Seit 2026-08-19 ist das die AUSNAHME, nicht der Normalfall: der Abruf verbucht direkt
+// (siehe application/fints/abrufAusfuehren, Punkt 4). Was die Bank meldet, ist passiert
+// — daran gibt es nichts zu bestätigen, und der frühere Bestätigen-Schritt bestand in
+// der Praxis nur aus Klicken. Hier landet deshalb nur noch, was die Dublettenprüfung als
+// möglichen Zwilling markiert hat: die eine Frage, die man wirklich beantworten muss.
 //
 // Sie stehen hier und NICHT in der Import-Inbox, und das ist eine bewusste Trennung:
 // Die Inbox ist der Ort für den gelegentlichen Dateiimport, bei dem man einen ganzen
@@ -13,8 +19,9 @@
 //    Absender,
 //  • ob sie eine Dublette sein könnte, mit den Gründen des Finders im Klartext.
 //
-// Bestätigen heißt verbuchen: erst dann wird aus dem Abruf eine Ist-Buchung, die im
-// Saldo steht. Bis dahin ist nichts passiert, was sich nicht folgenlos verwerfen ließe.
+// Bestätigen heißt hier: „doch keine Dublette" — erst dann wird aus der Zeile eine
+// Ist-Buchung, die im Saldo steht. Bis dahin ist nichts passiert, was sich nicht
+// folgenlos verwerfen ließe.
 
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -34,7 +41,7 @@ import { vertragsAbgleichDeps } from "../persistence/sqliteVertragZuordnungRepos
 import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { CategoryPicker } from "./CategoryPicker";
-import { Button, Card, Pill } from "./ds";
+import { Card, Pill } from "./ds";
 import { useGeld } from "./einstellungenKontext";
 
 /** Quellen, die als Bankabruf gelten — deren Umsätze landen hier statt in der Inbox. */
@@ -79,7 +86,6 @@ export function NeueBuchungen({
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   /** Zeile, deren Kategorie gerade geändert wird. */
   const [aendertId, setAendertId] = useState<string | null>(null);
@@ -149,7 +155,6 @@ export function NeueBuchungen({
   async function bestaetigen(roheAuswahl: readonly Umsatz[]) {
     const auswahl = mitGegenbeinen(roheAuswahl);
     if (auswahl.length === 0) return;
-    setBusy(true);
     setFehler(null);
     try {
       await umsaetzeVerbuchen(auswahl, {
@@ -164,8 +169,6 @@ export function NeueBuchungen({
       onGeaendert();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
-    } finally {
-      setBusy(false);
     }
   }
 
@@ -223,20 +226,14 @@ export function NeueBuchungen({
 
   if (zeilen.length === 0 && weggelegte.length === 0) return null;
 
-  const ohneVerdacht = neuSortiert.filter((u) => !geprueft.has(u.id));
-
   return (
+    // Kein Sammel-Knopf mehr: was hier steht, ist je Zeile eine eigene Frage („ist das
+    // dieselbe Buchung?"). Ein „alle bestätigen" darüber wäre genau die Geste, die den
+    // Dublettenschutz aushebelt.
     <Card
       style={{ marginTop: "var(--gap-card)" }}
       title={t("konten.neue.titel", { n: zeilen.length })}
       subtitle={t("konten.neue.untertitel")}
-      action={
-        ohneVerdacht.length > 0 ? (
-          <Button variant="primary" onClick={() => void bestaetigen(ohneVerdacht)}>
-            {busy ? t("konten.neue.laeuft") : t("konten.neue.alleBestaetigen", { n: ohneVerdacht.length })}
-          </Button>
-        ) : undefined
-      }
     >
       {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
 

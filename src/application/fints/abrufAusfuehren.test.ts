@@ -93,11 +93,15 @@ function fakeAdapter(opt: { konten: Bankkonto[]; wirft?: boolean; saldo?: number
 function fakes(zuordnungen: Kontozuordnung[]) {
   const gespeicherteZuordnungen: Kontozuordnung[] = [...zuordnungen];
   const zugaenge: Bankzugang[] = [];
-  const umsaetze: unknown[] = [];
+  // Die Umsätze müssen sich merken lassen: der Abruf verbucht selbst und liest dafür
+  // seine eigenen frischen Zeilen über `offene()` zurück.
+  const umsaetze: any[] = [];
+  const buchungen: any[] = [];
   return {
     gespeicherteZuordnungen,
     zugaenge,
     umsaetze,
+    buchungen,
     deps: {
       zugangRepo: {
         alle: async () => [],
@@ -123,16 +127,32 @@ function fakes(zuordnungen: Kontozuordnung[]) {
       },
       kategorieRepo: { alle: async () => [], speichern: async () => {}, loeschen: async () => {} },
       umsatzRepo: {
-        speichern: async () => {},
-        speichernViele: async (u: readonly unknown[]) => void umsaetze.push(...u),
-        alle: async () => [],
-        nachLauf: async () => [],
-        offene: async () => [],
+        speichern: async (u: any) => {
+          const i = umsaetze.findIndex((x) => x.id === u.id);
+          if (i >= 0) umsaetze[i] = u; else umsaetze.push(u);
+        },
+        speichernViele: async (u: readonly any[]) => void umsaetze.push(...u),
+        alle: async () => [...umsaetze],
+        nachLauf: async (laufId: string) => umsaetze.filter((u) => u.laufId === laufId),
+        offene: async () => umsaetze.filter((u) => u.status === "neu"),
         loeschen: async () => {},
         bestandsSchluessel: async () => ({ hashes: [], nativeIds: [] }),
       },
+      ledgerRepo: {
+        alle: async () => [...buchungen],
+        speichern: async (b: any) => {
+          const i = buchungen.findIndex((x) => x.id === b.id);
+          if (i >= 0) buchungen[i] = b; else buchungen.push(b);
+        },
+        loeschen: async (id: string) => {
+          const i = buchungen.findIndex((x) => x.id === id);
+          if (i >= 0) buchungen.splice(i, 1);
+        },
+      },
       laufRepo: { alle: async () => [], speichern: async () => {}, loeschen: async () => {} },
-      id: () => "id",
+      // Eindeutige IDs: der Abruf legt Umsatz UND Ist-Buchung an; mit einer konstanten
+      // ID überschrieben die sich gegenseitig.
+      id: (() => { let n = 0; return () => `id-${++n}`; })(),
       heute: HEUTE,
     },
   };
@@ -173,6 +193,36 @@ describe("abrufAusfuehren", () => {
     schluessel: "9876543210|Girokonto",
     zahlungskontoId: "k1",
   };
+
+  it("verbucht die geholten Zeilen sofort, statt sie in eine Warteliste zu legen", async () => {
+    // Was die Bank meldet, IST passiert — daran gibt es nichts zu bestätigen. Bis
+    // 2026-08-19 lag alles als Entwurf am Konto und musste abgenickt werden.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([zuordnung]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(f.buchungen).toHaveLength(1);
+    expect(f.buchungen[0]).toMatchObject({ betrag: -1234, kontoId: "k1", quelle: "import" });
+    // Und der Umsatz zeigt auf die Buchung, statt offen zu bleiben.
+    expect(f.umsaetze[0].status).toBe("verbucht");
+    expect(f.umsaetze[0].istbuchungId).toBe(f.buchungen[0].id);
+  });
+
+  it("lässt einen Dublettenverdacht ungebucht in der Warteliste stehen", async () => {
+    // Der Rückgriff (RUECKGRIFF_TAGE) holt jeden Abruf ein paar Tage doppelt. Würde das
+    // ungeprüft gebucht, entstünde bei jedem Lauf ein Satz Doppelbuchungen.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([zuordnung]);
+    // Erster Lauf: die Zeile wird gebucht.
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    expect(f.buchungen).toHaveLength(1);
+
+    // Zweiter Lauf mit derselben Zeile — sie ist als Duplikat bekannt und wird gar nicht
+    // erst angelegt; auf jeden Fall entsteht keine zweite Buchung.
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    expect(f.buchungen).toHaveLength(1);
+  });
 
   it("holt den Zeitraum und schreibt den Stand fort", async () => {
     const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
