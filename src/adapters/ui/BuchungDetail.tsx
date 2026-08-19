@@ -273,7 +273,7 @@ function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund
  *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
  *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onClose, onSaved, onDelete, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onClose, onSaved, onDelete, loeschenGesperrt, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; loeschenGesperrt?: boolean; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const istEntwurf = !!entwurf;
@@ -522,8 +522,11 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
               {t(dublette ? "konten.neue.schonGebucht" : "konten.entwurf.verwerfen")}
             </button>
           )}
-          {buchung && (
-            <button className="linkbtn" style={{ marginLeft: "auto", color: "var(--danger, #c0392b)" }} onClick={() => onDelete()}>{t("konten.loeschen")}</button>
+          {buchung && !loeschenGesperrt && (
+            <button className="linkbtn" style={{ marginLeft: "auto", color: "var(--warn-deep)" }} onClick={() => onDelete()}>{t("konten.loeschen")}</button>
+          )}
+          {buchung && loeschenGesperrt && (
+            <span className="muted" style={{ marginLeft: "auto", fontSize: "var(--fs-xs)" }}>{t("konten.detail.loeschenOnline")}</span>
           )}
           {fehler && <span className="err">{fehler}</span>}
         </>
@@ -699,7 +702,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
               </FormField>
               {kategorieGeaendert && kategorieId && musterAngebot && !istEntwurf && (
                 <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", marginTop: 6, fontSize: "var(--fs-xs)" }}>
-                  <input type="checkbox" checked={immer} onChange={(e) => setImmer(e.target.checked)} />
+                  <input type="checkbox" aria-label={t("konten.festlegung.immerLabel")} checked={immer} onChange={(e) => setImmer(e.target.checked)} />
                   <span>
                     {t("konten.festlegung.immer", { muster: musterAngebot })}
                     <span className="muted" style={{ display: "block" }}>{t("konten.festlegung.hinweis")}</span>
@@ -1101,6 +1104,12 @@ export function BuchungDetail(props: {
   buchung: IstBuchung;
   entwurf?: undefined;
   vorgabe?: undefined;
+  /**
+   * Löschen ausblenden. Gesetzt für Buchungen auf Konten, die an einer Bankverbindung
+   * hängen: was die Bank geliefert hat, wird nicht von Hand entfernt — beim nächsten
+   * Abruf käme es zurück, und bis dahin stimmte der Saldo nicht mehr mit ihr überein.
+   */
+  loeschenGesperrt?: boolean;
   onClose: () => void;
   onGeaendert: () => void | Promise<void>;
 } | {
@@ -1117,6 +1126,7 @@ export function BuchungDetail(props: {
   onGeaendert: () => void | Promise<void>;
 }) {
   const { buchung, entwurf, vorgabe, onClose, onGeaendert } = props;
+  const loeschenGesperrt = "loeschenGesperrt" in props ? props.loeschenGesperrt : false;
   const { t } = useTranslation();
   const geld = useGeld();
   // Welche Buchung gerade gezeigt wird — der Sprung zur Gegenbuchung (und zum Zwilling
@@ -1300,6 +1310,7 @@ export function BuchungDetail(props: {
       onClose={onClose}
       onSaved={async () => { await nachAenderung(); onClose(); }}
       onDelete={entfernen}
+      loeschenGesperrt={loeschenGesperrt}
       onZurUmbuchung={() => aktuelle && setUmbuchenAus(aktuelle)}
       vertragsBindung={
         aktuelle
