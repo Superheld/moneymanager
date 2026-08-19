@@ -23,6 +23,24 @@ import {
 import { uebersichtLaden, type Uebersichtsdaten } from "../application/uebersicht";
 import { budgetAnlegen as budgetAnlegenUseCase, type BudgetEingabe } from "../application/budgetAnlegen";
 import { budgetvorschlagIgnorieren } from "../application/budgetvorschlaege";
+import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
+import { stammdatenLaden, type Stammdaten } from "../application/stammdatensichten";
+import {
+  kategorieAnlegen as kategorieAnlegenUseCase,
+  kontoAnlegen as kontoAnlegenUseCase,
+  personAnlegen as personAnlegenUseCase,
+  type KategorieEingabe,
+  type KontoEingabe,
+  type PersonEingabe,
+} from "../application/stammdatenAnlegen";
+import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/standardkategorien";
+import type { Bankzugang } from "../application/fints/abrufPort";
+import type { Kontozuordnung } from "../application/fints/bankzugangPort";
+import {
+  sqliteBankzugangRepository,
+  sqliteKontozuordnungRepository,
+} from "./persistence/sqliteBankzugangRepositories";
+import { sqlitePersonRepository } from "./persistence/sqliteStammdatenRepositories";
 import { sqliteBudgetRepository } from "./persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "./persistence/sqliteLedgerRepository";
 import { sqliteKategorieRepository } from "./persistence/sqliteStammdatenRepositories";
@@ -76,4 +94,96 @@ export function budgetAnlegen(eingabe: BudgetEingabe, id?: string) {
 
 export function vorschlagIgnorieren(kategorieId: string): Promise<void> {
   return budgetvorschlagIgnorieren(sqliteEinstellungenRepository, kategorieId);
+}
+
+/** Die Haushaltseinstellungen — Währung, Locale, Sprache. */
+export function einstellungen(): Promise<Haushaltseinstellungen> {
+  return einstellungenLaden(sqliteEinstellungenRepository);
+}
+
+export function regionSetzen(locale: string): Promise<void> {
+  return regionWaehlen(sqliteEinstellungenRepository, locale);
+}
+
+
+// --- Stammdaten ------------------------------------------------------------
+
+const STAMMDATEN_DEPS = {
+  personRepo: sqlitePersonRepository,
+  kontoRepo: sqliteZahlungskontoRepository,
+  kategorieRepo: sqliteKategorieRepository,
+  ledger: sqliteLedgerRepository,
+};
+
+/** Personen, Konten, Kategorien — samt fertig gerechneter Kontostände. */
+export function stammdaten(): Promise<Stammdaten> {
+  return stammdatenLaden(STAMMDATEN_DEPS);
+}
+
+export function personAnlegen(eingabe: PersonEingabe, id?: string) {
+  return personAnlegenUseCase(sqlitePersonRepository, eingabe, id);
+}
+
+export function kontoAnlegen(eingabe: KontoEingabe, id?: string) {
+  return kontoAnlegenUseCase(sqliteZahlungskontoRepository, eingabe, id);
+}
+
+export function kategorieAnlegen(eingabe: KategorieEingabe, id?: string) {
+  return kategorieAnlegenUseCase(sqliteKategorieRepository, eingabe, id);
+}
+
+export function standardkategorienAnlegen(): Promise<number> {
+  return standardkategorienUseCase(sqliteKategorieRepository);
+}
+
+// --- Bankzugänge -----------------------------------------------------------
+//
+// Hier gibt es (noch) keinen Use-Case dazwischen: die Screens legen Zugänge und
+// Zuordnungen unverändert ab, es ist nichts zu entscheiden. Der Weg über diese Datei
+// hält die Repositories trotzdem aus der Oberfläche heraus — kommt morgen eine Regel
+// dazu, hat sie hier bereits ihren Platz.
+
+export function bankzugaenge(): Promise<Bankzugang[]> {
+  return sqliteBankzugangRepository.alle();
+}
+
+export function bankzugangSpeichern(zugang: Bankzugang): Promise<void> {
+  return sqliteBankzugangRepository.speichern(zugang);
+}
+
+export function bankzugangLoeschen(id: string): Promise<void> {
+  return sqliteBankzugangRepository.loeschen(id);
+}
+
+export function kontozuordnungen(): Promise<Kontozuordnung[]> {
+  return sqliteKontozuordnungRepository.alle();
+}
+
+export function kontozuordnungenNachZugang(zugangId: string): Promise<Kontozuordnung[]> {
+  return sqliteKontozuordnungRepository.nachZugang(zugangId);
+}
+
+export function kontozuordnungSpeichern(z: Kontozuordnung): Promise<void> {
+  return sqliteKontozuordnungRepository.speichern(z);
+}
+
+export function kontozuordnungLoeschen(zugangId: string, schluessel: string): Promise<void> {
+  return sqliteKontozuordnungRepository.loeschen(zugangId, schluessel);
+}
+
+export function personLoeschen(id: string): Promise<void> {
+  return sqlitePersonRepository.loeschen(id);
+}
+
+export function kategorieLoeschen(id: string): Promise<void> {
+  return sqliteKategorieRepository.loeschen(id);
+}
+
+export function kontoLoeschen(id: string): Promise<void> {
+  return sqliteZahlungskontoRepository.loeschen(id);
+}
+
+/** Alle bekannten Umsätze — für die Dublettenprüfung beim Anlegen einer Verbindung. */
+export function umsaetze() {
+  return sqliteUmsatzRepository.alle();
 }

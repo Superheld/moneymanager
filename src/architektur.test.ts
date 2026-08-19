@@ -34,19 +34,12 @@ const WURZEL = resolve(__dirname);
 const ALTLAST: readonly string[] = [
   "adapters/ui/AbrufDialog.tsx",
   "adapters/ui/AnalyseScreen.tsx",
-  "adapters/ui/BankzugaengeScreen.tsx",
   "adapters/ui/BuchungDetail.tsx",
-  "adapters/ui/CategoryPicker.tsx",
-  "adapters/ui/EinstellungenProvider.tsx",
-  "adapters/ui/EinstellungenScreen.tsx",
   "adapters/ui/FestlegungenCard.tsx",
   "adapters/ui/ImportScreen.tsx",
   "adapters/ui/InventarScreen.tsx",
   "adapters/ui/KategorisierungCards.tsx",
   "adapters/ui/KontenScreen.tsx",
-  "adapters/ui/KontenVerwaltung.tsx",
-  "adapters/ui/KontenVerwaltungScreen.tsx",
-  "adapters/ui/KontoAnlegenModal.tsx",
   "adapters/ui/MerkmaleBlock.tsx",
   "adapters/ui/NeueBuchungen.tsx",
   "adapters/ui/ReviewScreen.tsx",
@@ -55,7 +48,6 @@ const ALTLAST: readonly string[] = [
   "adapters/ui/VertraegeScreen.tsx",
   "adapters/ui/VertragErkennungModal.tsx",
   "adapters/ui/VertragModal.tsx",
-  "adapters/ui/einstellungenKontext.ts",
 ];
 
 /** Alle Produktivdateien unter `src/` — Tests zählen nicht (sie dürfen schichtübergreifend prüfen). */

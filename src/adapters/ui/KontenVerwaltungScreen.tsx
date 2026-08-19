@@ -10,16 +10,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { IstBuchung, Person, Zahlungskonto } from "../../core";
+import type { Kontostand, Person, Zahlungskonto } from "../../application";
 import {
-  sqliteBankzugangRepository as zugangRepo,
-  sqliteKontozuordnungRepository as zuordnungRepo,
-} from "../persistence/sqliteBankzugangRepositories";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import {
-  sqlitePersonRepository as personRepo,
-  sqliteZahlungskontoRepository as kontoRepo,
-} from "../persistence/sqliteStammdatenRepositories";
+  bankzugaenge,
+  kontozuordnungen,
+  kontozuordnungLoeschen,
+  stammdaten,
+} from "../dienste";
 import { Bereich } from "./Bereich";
 import { BankzugaengeScreen } from "./BankzugaengeScreen";
 import { KontenVerwaltung, type KontoVerbindung } from "./KontenVerwaltung";
@@ -28,22 +25,22 @@ export function KontenVerwaltungScreen() {
   const { t } = useTranslation();
   const [personen, setPersonen] = useState<Person[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
-  const [ist, setIst] = useState<IstBuchung[]>([]);
+  const [kontostaende, setKontostaende] = useState<readonly Kontostand[]>([]);
+  const [hatGebuchtes, setHatGebuchtes] = useState(false);
   const [verbindungen, setVerbindungen] = useState<Map<string, KontoVerbindung>>(new Map());
 
   // Zusammen laden und zusammen setzen: gestaffelte setState lassen die abgeleiteten
   // Werte (realer Stand, Inhaber-Namen) kurz gegen leere Listen rechnen.
   async function laden() {
-    const [p, k, i, zuordnungen, zugaenge] = await Promise.all([
-      personRepo.alle(),
-      kontoRepo.alle(),
-      ledgerRepo.alle(),
-      zuordnungRepo.alle(),
-      zugangRepo.alle(),
+    const [daten, zuordnungen, zugaenge] = await Promise.all([
+      stammdaten(),
+      kontozuordnungen(),
+      bankzugaenge(),
     ]);
-    setPersonen(p);
-    setKonten(k);
-    setIst(i);
+    setPersonen([...daten.personen]);
+    setKonten([...daten.konten]);
+    setKontostaende(daten.kontostaende);
+    setHatGebuchtes(daten.hatGebuchtes);
     setVerbindungen(
       new Map(
         zuordnungen.map((z) => [
@@ -80,12 +77,13 @@ export function KontenVerwaltungScreen() {
               konten={konten}
               personen={personen}
               personName={personName}
-              ist={ist}
+              kontostaende={kontostaende}
+              hatGebuchtes={hatGebuchtes}
               verbindungen={verbindungen}
               onTrennen={async (v) => {
                 // Nur die Zuordnung fällt weg — der Zugang bleibt, er kann weitere
                 // Konten tragen. Was schon importiert wurde, bleibt ebenfalls stehen.
-                await zuordnungRepo.loeschen(v.zugangId, v.schluessel);
+                await kontozuordnungLoeschen(v.zugangId, v.schluessel);
                 await laden();
               }}
               onChange={() => void laden()}

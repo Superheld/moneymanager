@@ -14,13 +14,14 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Bankkonto, Bankzugang, TanHerausforderung } from "../../application/fints/abrufPort";
-import type { Kontozuordnung } from "../../application/fints/bankzugangPort";
+import type { Bankkonto, Bankzugang, Kontozuordnung, TanHerausforderung } from "../../application";
 import { fintsAbruf, fintsEinsatzbereit } from "../fints";
 import {
-  sqliteBankzugangRepository,
-  sqliteKontozuordnungRepository,
-} from "../persistence/sqliteBankzugangRepositories";
+  bankzugaenge,
+  bankzugangLoeschen,
+  bankzugangSpeichern,
+  kontozuordnungen,
+} from "../dienste";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
 import { IconButton } from "./IconButton";
@@ -55,8 +56,8 @@ export function BankzugaengeScreen() {
 
   async function laden() {
     const [z, zo] = await Promise.all([
-      sqliteBankzugangRepository.alle(),
-      sqliteKontozuordnungRepository.alle(),
+      bankzugaenge(),
+      kontozuordnungen(),
     ]);
     setZugaenge(z);
     setZuordnungen(zo);
@@ -75,7 +76,7 @@ export function BankzugaengeScreen() {
     setFehler(null);
     try {
       const sitzung = await fintsAbruf.anmelden(zugang, geheim, frageTan);
-      await sqliteBankzugangRepository.speichern({ ...zugang, bankparameter: sitzung.bankparameter() });
+      await bankzugangSpeichern({ ...zugang, bankparameter: sitzung.bankparameter() });
 
       const zeilen: KontoZeile[] = [];
       for (const k of sitzung.konten) {
@@ -107,7 +108,7 @@ export function BankzugaengeScreen() {
   }
 
   async function loeschen(id: string) {
-    await sqliteBankzugangRepository.loeschen(id);
+    await bankzugangLoeschen(id);
     if (pruefung?.zugangId === id) setPruefung(null);
     await laden();
   }
