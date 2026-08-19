@@ -17,7 +17,6 @@ export * from "./vertragZuordnung";
 export * from "./kategoriefestlegung";
 export * from "./budget";
 export * from "./budgetVorschlag";
-export * from "./topf";
 export * from "./inventar";
 export * from "./istbuchung";
 export * from "./kontoregister";

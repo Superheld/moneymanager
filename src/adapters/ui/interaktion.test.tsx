@@ -260,7 +260,7 @@ describe("Budget anlegen", () => {
     await grunddaten();
     const heute = new Date().toISOString().slice(0, 10);
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", rahmen: 20000, periode: "monatlich",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 20000, art: "monatlich", start: "2026-01-01",
     });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: heute, betrag: -5000, kontoId: "k1",
@@ -276,7 +276,7 @@ describe("Budget anlegen", () => {
     await grunddaten();
     const heute = new Date().toISOString().slice(0, 10);
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", rahmen: 100000, periode: "monatlich",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 100000, art: "monatlich", start: "2026-01-01",
     });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: heute, betrag: -5000, kontoId: "k1",

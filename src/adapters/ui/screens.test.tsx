@@ -103,7 +103,7 @@ describe("BudgetsScreen", () => {
   it("zeigt ein Budget mit Kategorie und Rahmen", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", rahmen: 40000, periode: "monatlich",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000, art: "monatlich", start: "2026-01-01",
     });
     rendere(<BudgetsScreen />);
     expect(await screen.findByText(/Lebensmittel/)).toBeInTheDocument();
@@ -113,7 +113,7 @@ describe("BudgetsScreen", () => {
   it("rechnet gebuchte Aufwände als Verbrauch gegen das Budget", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", rahmen: 40000, periode: "monatlich",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000, art: "monatlich", start: "2026-01-01",
     });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: new Date().toISOString().slice(0, 10), betrag: -15000,

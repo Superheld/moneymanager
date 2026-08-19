@@ -45,8 +45,10 @@ function ist(over: Partial<IstBuchung> = {}): IstBuchung {
 const budget = (over: Partial<Budget> = {}): Budget => ({
   id: "b1",
   kategorieId: "lebenshaltung",
-  rahmen: euroZuCent(430),
-  periode: "monatlich",
+  kontoId: "giro",
+  betragProMonat: euroZuCent(430),
+  art: "monatlich",
+  start: "2026-01-01",
   ...over,
 });
 
@@ -101,13 +103,28 @@ describe("monatsAusblick — Plan-Spalte aus den Verträgen", () => {
     expect(zeile(a, "einnahmen")!.plan).toBe(0);
   });
 
-  it("glättet ein Jahresbudget auf den Monat", () => {
+  it("rechnet ein aufbauendes Budget mit derselben Monatsrate ein wie ein monatliches", () => {
+    // Auch was sich aufbaut, kostet jeden Monat seine Rate — es gibt sie nur am
+    // Monatsende nicht zurück. Für die Aufrechnung „was bleibt" ist das dasselbe.
     const a = monatsAusblick({
       ...basis,
-      budgets: [budget({ rahmen: euroZuCent(4800), periode: "jaehrlich" })],
+      budgets: [budget({ art: "aufbauend", betragProMonat: euroZuCent(400) })],
       monatAb: "2026-09-01",
     });
     expect(zeile(a, "budgets")!.plan).toBe(euroZuCent(-400));
+  });
+
+  it("zieht ein eingebettetes Budget vom Dach ab, statt beide voll zu zählen", () => {
+    const a = monatsAusblick({
+      ...basis,
+      budgets: [
+        budget({ id: "dach", kategorieId: "freizeit", betragProMonat: euroZuCent(200) }),
+        budget({ id: "kind", kategorieId: "sport", art: "aufbauend", betragProMonat: euroZuCent(80) }),
+      ],
+      monatAb: "2026-09-01",
+    });
+    // 200 insgesamt, nicht 280 — das Kind liegt IM Dach.
+    expect(zeile(a, "budgets")!.plan).toBe(euroZuCent(-200));
   });
 
   it("nimmt eine quartalsweise Rate nur im Fälligkeitsmonat auf", () => {
@@ -185,7 +202,7 @@ describe("monatsAusblick — Ist-Spalte des laufenden Monats", () => {
     const a = monatsAusblick({
       ...basis,
       regeln: [regel({ id: "r-verein", bezeichnung: "Verein", betrag: euroZuCent(-180), kategorieId: "sport", startdatum: "2026-01-01" })],
-      budgets: [budget({ id: "b-frei", kategorieId: "freizeit", rahmen: euroZuCent(160) })],
+      budgets: [budget({ id: "b-frei", kategorieId: "freizeit", betragProMonat: euroZuCent(160) })],
       ist: [ist({ id: "v", datum: "2026-08-01", betrag: euroZuCent(-180), kategorieId: "sport" })],
       monatAb: "2026-08-01",
     });

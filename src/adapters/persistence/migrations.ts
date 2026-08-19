@@ -548,4 +548,60 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE bankkonto_zuordnung ADD COLUMN bank_saldo_datum TEXT`,
     ],
   },
+  {
+    version: 30, // Budgets: zwei Arten in EINEM Aggregat — die neuen Spalten und der Umbau
+    sql: [
+      // Bis hierher gab es drei Arten in zwei Tabellen: `budget` (Rahmen je Periode
+      // monatlich/jährlich) und `topf` (Puffer mit Schätzbetrag+Frist, Spartopf mit
+      // Zuführung+Sparziel). Alle drei beantworten dieselbe Frage — „was lege ich
+      // monatlich für X zurück?" — und unterscheiden sich nur darin, ob der Rest zum
+      // Monatsersten verfällt. Genau das bleibt übrig: `art` = monatlich | aufbauend.
+      //
+      // Neu ist die Konto-Bindung: ein aufbauendes Budget ohne Konto ist eine Zahl ohne
+      // Deckung. Bestandsbudgets bekommen unten das Konto, über das am meisten gebucht
+      // wurde — eine Vorbelegung, keine Aussage; sie ist in der Maske änderbar.
+      `ALTER TABLE budget ADD COLUMN konto_id TEXT`,
+      `ALTER TABLE budget ADD COLUMN betrag_pro_monat INTEGER`,
+      `ALTER TABLE budget ADD COLUMN art TEXT`,
+      `ALTER TABLE budget ADD COLUMN start TEXT`,
+
+      // Datenumbau, deshalb streng wiederholbar formuliert: jedes UPDATE trifft nur
+      // Zeilen, die den Wert noch NICHT tragen. Ein zweiter Lauf ändert nichts mehr.
+      // (Migrationen laufen ohne Transaktion — siehe CLAUDE.md „Invarianten".)
+      `UPDATE budget SET betrag_pro_monat = CASE periode WHEN 'jaehrlich' THEN CAST(ROUND(rahmen / 12.0) AS INTEGER) ELSE rahmen END WHERE betrag_pro_monat IS NULL`,
+      `UPDATE budget SET art = 'monatlich' WHERE art IS NULL`,
+      // Fester Stichtag statt „heute": eine Migration muss bei jedem Lauf dasselbe tun.
+      `UPDATE budget SET start = '2026-08-01' WHERE start IS NULL`,
+      // Das meistgenutzte Konto, nicht das alphabetisch erste: „Depot" stand sonst vor
+      // „Girokonto" und hätte jedem Haushaltsbudget das falsche Konto verpasst.
+      // Die ID als zweites Sortierkriterium hält das Ergebnis bei Gleichstand stabil.
+      `UPDATE budget SET konto_id = (SELECT konto_id FROM ist_buchung GROUP BY konto_id ORDER BY COUNT(*) DESC, konto_id LIMIT 1) WHERE konto_id IS NULL`,
+      // Rückfall für eine Datenbank ohne Buchungen: irgendein Girokonto, sonst irgendeins.
+      `UPDATE budget SET konto_id = (SELECT id FROM zahlungskonto WHERE typ = 'Giro' ORDER BY bezeichnung LIMIT 1) WHERE konto_id IS NULL`,
+      `UPDATE budget SET konto_id = (SELECT id FROM zahlungskonto ORDER BY bezeichnung LIMIT 1) WHERE konto_id IS NULL`,
+    ],
+  },
+  {
+    version: 31, // … und erst danach abräumen
+    sql: [
+      // Warum getrennt von v30 und nicht in einer Version: v30 LIEST `periode` und
+      // `rahmen`. Stünde das Abräumen daneben und bräche der Lauf dazwischen ab, liefe
+      // v30 beim nächsten Start erneut — dann gegen eine Tabelle, der die gelesenen
+      // Spalten fehlen. SQLite prüft die Spaltennamen beim Parsen, das `WHERE … IS NULL`
+      // rettet nichts, und die App käme nicht mehr hoch. Als eigene Version ist v30
+      // abgeschlossen, bevor v31 ihm die Grundlage entzieht.
+      `ALTER TABLE budget DROP COLUMN rahmen`,
+      `ALTER TABLE budget DROP COLUMN periode`,
+
+      // ALPHA (siehe CLAUDE.md): weggenommen wird nur, was nachweislich leer ist. Geprüft
+      // am 2026-08-19 gegen den echten Bestand: `topf` trug 8 Zeilen, alle vom Typ
+      // „ersatz" — Altbestand, den `alle()` seit v18 herausfiltert, für den Code also
+      // längst nicht mehr existent. Lebende Töpfe (puffer/spartopf): 0. Ist-Buchungen mit
+      // `verwendung_topf_id`: 0. Es geht nichts verloren.
+      `DROP TABLE IF EXISTS topf`,
+      // Die „Verwendung" (ADR-0003, explizit benanntes Gegenkonto) hatte genau einen
+      // Fall — die Topf-Entnahme. Ohne Töpfe ist die Spalte ein leeres Konzept.
+      `ALTER TABLE ist_buchung DROP COLUMN verwendung_topf_id`,
+    ],
+  },
 ];

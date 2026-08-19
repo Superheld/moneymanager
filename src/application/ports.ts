@@ -11,7 +11,6 @@ import type {
   Merkmalsherkunft,
   Modell,
   Person,
-  Topf,
   Vertrag,
   Vertragserkennung,
   Vertragszuordnung,
@@ -86,12 +85,6 @@ export interface KategoriefestlegungRepository {
 export interface BudgetRepository {
   alle(): Promise<Budget[]>;
   speichern(budget: Budget): Promise<void>;
-  loeschen(id: string): Promise<void>;
-}
-
-export interface TopfRepository {
-  alle(): Promise<Topf[]>;
-  speichern(topf: Topf): Promise<void>;
   loeschen(id: string): Promise<void>;
 }
 
