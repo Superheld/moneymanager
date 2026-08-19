@@ -73,6 +73,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [katFilter, setKatFilter] = useState("alle");
   const [artFilter, setArtFilter] = useState<"alle" | "einnahmen" | "ausgaben" | "umbuchung">("alle");
   const [regSuche, setRegSuche] = useState("");
+  /**
+   * Nur die Zeilen zeigen, die womöglich doppelt im Konto stehen.
+   *
+   * Seit der Abruf direkt bucht, gibt es keine Vorstufe mehr, in der ein Zwilling
+   * auffiele — die Frage „steht das schon drin?" gehört deshalb an den Auszug selbst.
+   */
+  const [nurDubletten, setNurDubletten] = useState(false);
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
@@ -110,6 +117,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     setKatFilter("alle");
     setArtFilter("alle");
     setRegSuche("");
+    setNurDubletten(false);
     // Die Auswahl gehört zum Register des Kontos — sie über einen Wechsel mitzunehmen
     // hiesse, Buchungen zu ändern, die man nicht mehr vor sich hat.
     setAuswahl(new Set());
@@ -148,6 +156,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     const qBetrag = regSuche.trim() ? geld.parse(regSuche.trim()) : null;
     return (register?.gebucht ?? []).filter((r) => {
       const z = r.zeile;
+      if (nurDubletten && !r.dublette) return false;
       if (katFilter === "__ohne" ? !!z.kategorieId : katFilter !== "alle" && z.kategorieId !== katFilter) return false;
       if (artFilter === "umbuchung" && !z.gegenkontoId) return false;
       if (artFilter === "einnahmen" && !(z.betrag > 0 && !z.gegenkontoId)) return false;
@@ -159,7 +168,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       }
       return true;
     });
-  }, [register, katFilter, artFilter, regSuche, geld]);
+  }, [register, katFilter, artFilter, regSuche, nurDubletten, geld]);
+
+  /** Wie viele Zeilen des Registers überhaupt einen Verdacht tragen. */
+  const dublettenAnzahl = useMemo(
+    () => (register?.gebucht ?? []).filter((r) => r.dublette).length,
+    [register],
+  );
 
   // Standardansicht: neueste zuerst (Tabelle sortiert/paginiert intern weiter).
   const gebuchtFuerTabelle = useMemo(() => [...gebuchtGefiltert].reverse(), [gebuchtGefiltert]);
@@ -390,6 +405,25 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               <option value="__ohne">{t("konten.ohneKategorie")}</option>
             </select>
             <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
+            {/* Erscheint nur, wenn es etwas zu sehen gibt. Ein Schalter, der dauerhaft
+                „0 mögliche Dubletten" anbietet, ist eine Frage ohne Antwort. */}
+            {dublettenAnzahl > 0 && (
+              <button
+                type="button"
+                aria-pressed={nurDubletten}
+                onClick={() => setNurDubletten((x) => !x)}
+                style={{
+                  padding: "5px 10px", fontSize: "12.5px", fontFamily: "var(--font-ui)",
+                  fontWeight: "var(--fw-bold)", borderRadius: "var(--r-md)", cursor: "pointer",
+                  border: "1px solid var(--warn, var(--line))",
+                  background: nurDubletten ? "var(--warn, #b8860b)" : "var(--warn-wash, transparent)",
+                  color: nurDubletten ? "var(--surface, #fff)" : "var(--warn-deep, var(--ink-2))",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {t("konten.dubletten.filter", { n: dublettenAnzahl })}
+              </button>
+            )}
             <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-xs)", color: "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
               <input
                 type="checkbox"
@@ -464,6 +498,21 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
                       {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
                       {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
+                      {/* Der Verdacht steht an BEIDEN Zeilen — es gibt kein Original.
+                          Die Gründe hängen im title, entschieden wird im Detail. */}
+                      {r.dublette && (
+                        // Der title sitzt am Wrapper, nicht an der Pille: `ds/` ist aus
+                        // dem Design-System kopiert und kennt die Eigenschaft nicht —
+                        // dort wird nichts erfunden.
+                        <span
+                          style={{ flex: "0 0 auto", display: "inline-flex" }}
+                          title={`${r.dublette.gruende.join(" · ")} · ${t("konten.dubletten.zwilling", { datum: r.dublette.zwillingDatum })}`}
+                        >
+                          <Pill variant="warn">
+                            {t(r.dublette.urteil === "identisch" ? "konten.dubletten.sicher" : "konten.dubletten.verdacht")}
+                          </Pill>
+                        </span>
+                      )}
                     </span>
                   ),
                 },

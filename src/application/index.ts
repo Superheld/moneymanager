@@ -122,6 +122,7 @@ export {
   type Kontozeile,
   type Registersicht,
   type Registerzeile,
+  type Dublettenverdacht,
   type KontenDeps,
 } from "./kontensichten";
 export { buchungErfassen, type BuchungEingabe } from "./buchungErfassen";
