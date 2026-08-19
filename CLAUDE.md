@@ -58,10 +58,37 @@ npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
   Die DB bleibt unberührt. Nicht den Code verdächtigen, bevor das geprüft ist.
 
 ## Schichten
-`core` (reine Domäne, kein IO) ← `application` (Use-Cases + Ports) ← `adapters`
-(`persistence/` SQLite via tauri-plugin-sql, `ui/` React). `core` importiert nichts nach
-außen. Tests als `*.test.ts` neben dem Code. Die Grenze gilt dem PRODUKTIVcode: ein Test
-darf schichtübergreifend prüfen und in `core/` liegen, obwohl er aus `application` importiert.
+```
+adapters ──▶ application ──▶ core
+src/adapters/     src/application/     src/core/
+persistence/ ui/  Use-Cases + Ports    reine Domäne
+import/ fints/    orchestriert, keine  kein IO, kein React,
+                  Geschäftslogik       keine Uhr
+```
+`core` importiert **nichts** nach außen. `application` kennt nur `core`. Tests als
+`*.test.ts` neben dem Code; die Grenze gilt dem PRODUKTIVcode — ein Test darf
+schichtübergreifend prüfen und in `core/` liegen, obwohl er aus `application` importiert.
+
+**Die UI importiert weder `core/` noch `adapters/persistence/`.** Alles, was ein Screen
+braucht, kommt aus `application/`:
+- **Vokabular** reicht `application/index.ts` aus dem Kern durch: Domänentypen
+  (`IstBuchung`, `Kategorie`, `Budget` …) und wertfreie Helfer (`geldFormatieren`,
+  `KONTOTYPEN`). Ein Typ trifft keine Entscheidung — ihn zu kapseln wäre Zeremonie.
+- **Entscheidungen** liegen hinter einem Use-Case: alles, was AUSWÄHLT oder RECHNET
+  (welche Buchungen zählen zu einem Budget, was steht im Register, wie sieht der Monat
+  aus) — **auch beim reinen Lesen.** Ein Screen bekommt fertige Sichten, keine Rohteile.
+
+Der Grund steht in ARCHITEKTUR.md ausführlich, kurz: die Regel galt lange nur fürs
+Schreiben (22 Schreibzugriffe über Use-Cases, aber 144 LESEzugriffe direkt ans
+Repository). Leseregeln hatten damit keine Heimat — „welche Buchung zählt gegen ein
+Budget" war an drei Stellen erfunden und an der vierten vergessen, und dieselbe Übersicht
+zeigte für dasselbe Budget 0,00 € und 425,00 €. Was die UI umgehen KANN, umgeht sie
+irgendwann.
+
+Geprüft wird das in `src/architektur.test.ts` (läuft in `npm test`, also in der CI). Er
+trägt eine Liste `ALTLAST` der noch nicht migrierten Screens — sie darf nur schrumpfen,
+und ein eigener Test schlägt fehl, sobald ein Eintrag nichts mehr verletzt. **Neu gebauter
+Code kommt nicht auf die Liste.**
 
 In `ui/`:
 - `ds/` ist aus dem Design-System kopiert — dort nichts erfinden, eigene Bausteine nach `ui/`.
