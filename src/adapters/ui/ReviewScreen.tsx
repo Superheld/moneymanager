@@ -5,31 +5,25 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { festlegungTrifft, type Kategorie, type Zahlungskonto } from "../../core";
+import type { Kategorie, Zahlungskonto } from "../../application";
+import {
+  festlegungAnwenden,
+  importLaeufe,
+  kategorisierung,
+  offeneUmsaetze,
+  stammdaten,
+  umsaetzeBuchen,
+  umsatzSpeichern,
+} from "../dienste";
 import {
   kategorisieren,
-  umsaetzeVerbuchen,
   verwerfen,
   vorschlagsbefundFuer,
   type Umsatz,
   type VerbuchenErgebnis,
   type Vorschlagskontext,
 } from "../../application/import";
-import { kategorisierungsquellen } from "../../application/kategorisierungsquellen";
-import { festlegungAngebot, festlegungSetzen } from "../../application/kategoriefestlegungen";
-import { sqliteKategoriefestlegungRepository } from "../persistence/sqliteKategoriefestlegungRepository";
-import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
-import { vertragsAbgleichDeps } from "../persistence/sqliteVertragZuordnungRepositories";
-import {
-  sqliteKategorieRepository,
-  sqliteZahlungskontoRepository,
-} from "../persistence/sqliteStammdatenRepositories";
-import { sqliteImportLaufRepository, sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
-import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
-import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
-import { sqliteVertragserkennungRepository } from "../persistence/sqliteVertragZuordnungRepositories";
-import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
-import { sqliteMerkmalskonfigurationRepository } from "../persistence/sqliteMerkmalskonfigurationRepository";
+import { festlegungAngebot } from "../../application/kategoriefestlegungen";
 import { Button, Card, Pill } from "./ds";
 import { ABRUF_QUELLEN } from "./NeueBuchungen";
 import { CategoryPicker } from "./CategoryPicker";
@@ -112,11 +106,10 @@ export function ReviewScreen() {
 
   async function laden() {
     try {
-      const [u, k, kat, laeufe] = await Promise.all([
-        sqliteUmsatzRepository.offene(),
-        sqliteZahlungskontoRepository.alle(),
-        sqliteKategorieRepository.alle(),
-        sqliteImportLaufRepository.alle(),
+      const [u, daten, laeufe] = await Promise.all([
+        offeneUmsaetze(),
+        stammdaten(),
+        importLaeufe(),
       ]);
       // Die Inbox ist der Ort für den gelegentlichen DATEI-Import: ein Stapel, den man am
       // Stück durchsieht. Was per Bankabruf hereinkommt, steht seit 2026-08-18 beim
@@ -125,18 +118,9 @@ export function ReviewScreen() {
         laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id),
       );
       setUmsaetze(u.filter((x) => !abruf.has(x.laufId)));
-      setKonten(k);
-      setKategorien(kat);
-      setKontext(
-        await kategorisierungsquellen({
-          kategorieRepo: sqliteKategorieRepository,
-          festlegungRepo: sqliteKategoriefestlegungRepository,
-          vertragRepo: sqliteVertragRepository,
-          erkennungRepo: sqliteVertragserkennungRepository,
-          klassifikatorRepo: sqliteKlassifikatorRepository,
-          merkmalRepo: sqliteMerkmalskonfigurationRepository,
-        }),
-      );
+      setKonten([...daten.konten]);
+      setKategorien([...daten.kategorien]);
+      setKontext(await kategorisierung());
       setFehler(null);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -177,7 +161,7 @@ export function ReviewScreen() {
     // „keine" gewählt → Vorschlag entfernen (zurück zu unkategorisiert).
     const final = kategorieId ? aktualisiert : { ...u, vorschlag: undefined };
     try {
-      await sqliteUmsatzRepository.speichern(final);
+      await umsatzSpeichern(final);
       setUmsaetze((prev) => prev.map((x) => (x.id === u.id ? final : x)));
       setFestgelegt(null);
       const muster = kategorieId ? festlegungAngebot(kontext?.festlegungen ?? [], u.gegenpartei, kategorieId) : null;
@@ -204,19 +188,7 @@ export function ReviewScreen() {
     const kat = katById.get(angebot.kategorieId);
     if (!kat) return;
     try {
-      const f = await festlegungSetzen(sqliteKategoriefestlegungRepository, angebot.muster, angebot.kategorieId);
-      if (!f) return;
-      let weitere = 0;
-      for (const x of umsaetze) {
-        if (x.id === angebot.umsatzId) continue;
-        if (x.vorschlag?.quelle === "manuell" || x.vorschlag?.quelle === "umbuchung") continue;
-        if (x.vorschlag?.kategorieId === kat.id) continue;
-        if (!festlegungTrifft(f, x.gegenpartei)) continue;
-        await sqliteUmsatzRepository.speichern(
-          kategorisieren(x, { kategorieId: kat.id, charakter: kat.defaultCharakter, quelle: "festlegung" }),
-        );
-        weitere++;
-      }
+      const weitere = await festlegungAnwenden(angebot.muster, kat, umsaetze, angebot.umsatzId);
       setAngebot(null);
       setFestgelegt({ muster: angebot.muster, weitere });
       await laden();
@@ -238,7 +210,7 @@ export function ReviewScreen() {
    */
   async function zeileVerwerfen(u: Umsatz) {
     try {
-      await sqliteUmsatzRepository.speichern(verwerfen(u));
+      await umsatzSpeichern(verwerfen(u));
       setUmsaetze((prev) => prev.filter((x) => x.id !== u.id));
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -251,7 +223,7 @@ export function ReviewScreen() {
     setFehler(null);
     try {
       const offeneZeilen = gefiltert.filter((u) => !u.vorschlag);
-      for (const u of offeneZeilen) await sqliteUmsatzRepository.speichern(verwerfen(u));
+      for (const u of offeneZeilen) await umsatzSpeichern(verwerfen(u));
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -265,17 +237,9 @@ export function ReviewScreen() {
     setBusy(true);
     setFehler(null);
     try {
-      const ergebnis = await umsaetzeVerbuchen(umsaetze, {
-        ledgerRepo: sqliteLedgerRepository,
-        umsatzRepo: sqliteUmsatzRepository,
-        id: () => crypto.randomUUID(),
-      });
-      setVerb(ergebnis);
-      // Frisch verbuchte Zahlungen sofort den Verträgen zuordnen — das ist der Weg, über
-      // den neue Buchungen ihre Kennzeichnung bekommen, ohne dass jemand etwas anklickt.
-      // Bewusst HIER und nicht in `umsaetzeVerbuchen`: der Use-Case schreibt Fakten ins
-      // Ledger, die Zuordnung ist eine Interpretation darüber.
-      await zuordnungenAbgleichen(vertragsAbgleichDeps);
+      // Bucht und ordnet die frischen Zahlungen gleich ihren Verträgen zu — der Weg,
+      // über den neue Buchungen ihre Kennzeichnung bekommen, ohne dass jemand klickt.
+      setVerb(await umsaetzeBuchen(umsaetze));
       await laden(); // verbuchte fallen aus „offene" raus
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));

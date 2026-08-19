@@ -25,21 +25,17 @@
 
 import { useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import type { Kategorie, Zahlungskonto } from "../../core";
+import type { Kategorie, Zahlungskonto } from "../../application";
+import { umsaetzeBuchen, umsatzSpeichern } from "../dienste";
 import {
   alsDuplikat,
   gegenbeinFuer,
   ordneZu,
-  umsaetzeVerbuchen,
   verwerfen,
   zurueckholen,
   type Bewertung,
   type Umsatz,
 } from "../../application/import";
-import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
-import { vertragsAbgleichDeps } from "../persistence/sqliteVertragZuordnungRepositories";
-import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
-import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { CategoryPicker } from "./CategoryPicker";
 import { Card, Pill } from "./ds";
 import { useGeld } from "./einstellungenKontext";
@@ -157,15 +153,7 @@ export function NeueBuchungen({
     if (auswahl.length === 0) return;
     setFehler(null);
     try {
-      await umsaetzeVerbuchen(auswahl, {
-        ledgerRepo: sqliteLedgerRepository,
-        umsatzRepo: sqliteUmsatzRepository,
-        id: () => crypto.randomUUID(),
-      });
-      // Frisch verbuchte Zahlungen den Verträgen zuordnen — derselbe Schritt wie in der
-      // Inbox. Er gehört nicht in den Verbuchen-Use-Case: der schreibt Fakten, die
-      // Zuordnung ist eine Interpretation darüber.
-      await zuordnungenAbgleichen(vertragsAbgleichDeps);
+      await umsaetzeBuchen(auswahl);
       onGeaendert();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -184,9 +172,9 @@ export function NeueBuchungen({
       ...x,
       vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" },
     });
-    await sqliteUmsatzRepository.speichern(alsUm(u));
+    await umsatzSpeichern(alsUm(u));
     const gegen = gegenbeinFuer(u, alleNeuen.filter((x) => x.id !== u.id));
-    if (gegen) await sqliteUmsatzRepository.speichern(alsUm(gegen));
+    if (gegen) await umsatzSpeichern(alsUm(gegen));
     onGeaendert();
   }
 
@@ -199,18 +187,18 @@ export function NeueBuchungen({
    * danach weicht der Kontostand ab. Deshalb sind es zwei Wörter und nicht eines.
    */
   async function weglegen(u: Umsatz, alsDublette: boolean) {
-    await sqliteUmsatzRepository.speichern(alsDublette ? alsDuplikat(u) : verwerfen(u));
+    await umsatzSpeichern(alsDublette ? alsDuplikat(u) : verwerfen(u));
     onGeaendert();
   }
 
   async function zurueck(u: Umsatz) {
-    await sqliteUmsatzRepository.speichern(zurueckholen(u));
+    await umsatzSpeichern(zurueckholen(u));
     onGeaendert();
   }
 
   async function kategorieSetzen(u: Umsatz, kategorieId: string) {
     const kategorie = kategorien.find((k) => k.id === kategorieId);
-    await sqliteUmsatzRepository.speichern({
+    await umsatzSpeichern({
       ...u,
       // Von Hand gewählt ist von Hand gewählt — die Quelle wird mitgeführt, damit später
       // sichtbar bleibt, was das Modell wusste und was der Mensch entschieden hat.

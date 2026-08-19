@@ -23,8 +23,28 @@ import {
 import { uebersichtLaden, type Uebersichtsdaten } from "../application/uebersicht";
 import { budgetAnlegen as budgetAnlegenUseCase, type BudgetEingabe } from "../application/budgetAnlegen";
 import { budgetvorschlagIgnorieren } from "../application/budgetvorschlaege";
+import {
+  abrufAusfuehren,
+  type AbrufBefund,
+} from "../application/fints/abrufAusfuehren";
+import type { TanHerausforderung } from "../application/fints/abrufPort";
+import { fintsAbruf } from "./fints";
 import { zuordnungenAbgleichen } from "../application/vertragszuordnung";
 import { zahlungsspuren } from "../application/zahlungsspuren";
+import { kategorisierungsquellen } from "../application/kategorisierungsquellen";
+import { festlegungAnwenden as festlegungAnwendenUseCase } from "../application/kategoriefestlegungen";
+import { umsaetzeVerbuchen } from "../application/import";
+import type { Kategorie } from "../core";
+import {
+  umsaetzeUebernehmen,
+  type UebernahmeEingabe,
+  type UebernahmeErgebnis,
+  type Umsatz,
+} from "../application/import";
+import { sqliteImportLaufRepository } from "./persistence/sqliteImportRepositories";
+import { sqliteKategoriefestlegungRepository } from "./persistence/sqliteKategoriefestlegungRepository";
+import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
+import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdatensichten";
 import { inventarLaden, type Inventarsicht } from "../application/inventarsichten";
@@ -314,4 +334,112 @@ export function vertragserkennungSpeichern(regel: Parameters<typeof sqliteVertra
  */
 export function spuren() {
   return zahlungsspuren(sqliteLedgerRepository, sqliteUmsatzRepository);
+}
+
+
+// --- Import ----------------------------------------------------------------
+
+/**
+ * Die Kategorisierungs-Kette: Umbuchung → Festlegung → Vertrag → Modell.
+ *
+ * Einmal vor einem Lauf geladen, nicht je Zeile — der Bestand ändert sich währenddessen
+ * nicht, und ein Import über tausende Zeilen soll nicht tausendmal dasselbe holen.
+ */
+export function kategorisierung() {
+  return kategorisierungsquellen({
+    kategorieRepo: sqliteKategorieRepository,
+    festlegungRepo: sqliteKategoriefestlegungRepository,
+    vertragRepo: sqliteVertragRepository,
+    erkennungRepo: sqliteVertragserkennungRepository,
+    klassifikatorRepo: sqliteKlassifikatorRepository,
+    merkmalRepo: sqliteMerkmalskonfigurationRepository,
+  });
+}
+
+/** Einen Dateiimport übernehmen — mit Dedup, Kategorie-Vorschlag und Review-Inbox. */
+export async function importUebernehmen(auftrag: UebernahmeEingabe): Promise<UebernahmeErgebnis> {
+  return umsaetzeUebernehmen(auftrag, {
+    kontoRepo: sqliteZahlungskontoRepository,
+    kategorieRepo: sqliteKategorieRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    laufRepo: sqliteImportLaufRepository,
+    id: () => crypto.randomUUID(),
+    kategorisierung: await kategorisierung(),
+  });
+}
+
+export function offeneUmsaetze(): Promise<Umsatz[]> {
+  return sqliteUmsatzRepository.offene();
+}
+
+export function umsatzSpeichern(u: Umsatz): Promise<void> {
+  return sqliteUmsatzRepository.speichern(u);
+}
+
+export function importLaeufe() {
+  return sqliteImportLaufRepository.alle();
+}
+
+/** „Immer bei diesem Empfänger" — setzen und sofort auf den offenen Stapel anwenden. */
+export function festlegungAnwenden(
+  muster: string,
+  kategorie: Kategorie,
+  offene: readonly Umsatz[],
+  ausserId: string,
+): Promise<number> {
+  return festlegungAnwendenUseCase(
+    { festlegungRepo: sqliteKategoriefestlegungRepository, umsatzRepo: sqliteUmsatzRepository },
+    muster, kategorie, offene, ausserId,
+  );
+}
+
+/** Offene Umsätze ins Ledger buchen und die frischen Zahlungen ihren Verträgen zuordnen. */
+export async function umsaetzeBuchen(umsaetze: readonly Umsatz[]) {
+  const ergebnis = await umsaetzeVerbuchen(umsaetze, {
+    ledgerRepo: sqliteLedgerRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    id: () => crypto.randomUUID(),
+  });
+  // Bewusst HIER und nicht in `umsaetzeVerbuchen`: der Use-Case schreibt Fakten ins
+  // Ledger, die Zuordnung ist eine Interpretation darüber.
+  await zuordnungenAbgleichen(vertragsAbgleichDeps);
+  return ergebnis;
+}
+
+
+// --- Bankabruf -------------------------------------------------------------
+
+/**
+ * Eine Banksitzung: abrufen, verbuchen, den Verträgen zuordnen.
+ *
+ * Die PIN wird durchgereicht und nirgends gespeichert — sie lebt im State des Dialogs
+ * und ist mit dem Schließen weg.
+ */
+export async function bankAbrufen(
+  zugang: Bankzugang,
+  pin: string,
+  frageTan: (h: TanHerausforderung) => Promise<string | undefined>,
+  heute: string,
+  rueckgriffTage?: number,
+): Promise<AbrufBefund[]> {
+  return abrufAusfuehren(zugang, pin, frageTan, {
+    adapter: fintsAbruf,
+    zugangRepo: sqliteBankzugangRepository,
+    zuordnungRepo: sqliteKontozuordnungRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+    kategorieRepo: sqliteKategorieRepository,
+    ledgerRepo: sqliteLedgerRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    laufRepo: sqliteImportLaufRepository,
+    // Der Abruf hängt die frisch gebuchten Zeilen selbst an ihre Verträge. Ohne das
+    // zählte jede abgerufene Vertragsrate gegen das Budget ihrer Kategorie, bis jemand
+    // zufällig einen Verträge-Screen öffnet.
+    erkennungRepo: sqliteVertragserkennungRepository,
+    vertragszuordnungRepo: sqliteVertragszuordnungRepository,
+    id: () => crypto.randomUUID(),
+    // Dieselbe Kette wie beim Dateiimport: Umbuchung → Festlegung → Vertrag → Modell.
+    kategorisierung: await kategorisierung(),
+    heute,
+    rueckgriffTage,
+  });
 }

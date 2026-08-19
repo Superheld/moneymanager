@@ -149,6 +149,7 @@ export {
 export { standardkategorienAnlegen } from "./standardkategorien";
 export type { Bankkonto, Bankzugang, TanHerausforderung, TanFrager } from "./fints/abrufPort";
 export type { Kontozuordnung } from "./fints/bankzugangPort";
+export type { AbrufBefund } from "./fints/abrufAusfuehren";
 export {
   STANDARD_EINSTELLUNGEN,
   einstellungenLaden,
