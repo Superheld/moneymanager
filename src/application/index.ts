@@ -122,9 +122,17 @@ export {
   type Kontozeile,
   type Registersicht,
   type Registerzeile,
-  type Dublettenverdacht,
   type KontenDeps,
 } from "./kontensichten";
+export {
+  entwurfVerdacht,
+  stapelVerdacht,
+  freigabeSchluessel,
+  freigegebenePaare,
+  type Dublettenfreigabe,
+  type Dublettenverdacht,
+} from "./dublettensicht";
+export { dublettenFreigeben, dublettenFreigabeAufheben } from "./dublettenFreigabe";
 export { buchungErfassen, type BuchungEingabe } from "./buchungErfassen";
 export { umbuchungErfassen } from "./umbuchungErfassen";
 export { postenBezahltMarkieren, bezahltZuruecknehmen } from "./bezahltMarkieren";

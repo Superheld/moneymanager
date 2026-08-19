@@ -47,7 +47,10 @@ import {
   type UebernahmeErgebnis,
   type Umsatz,
 } from "../application/import";
-import { sqliteImportLaufRepository } from "./persistence/sqliteImportRepositories";
+import {
+  sqliteDublettenfreigabeRepository,
+  sqliteImportLaufRepository,
+} from "./persistence/sqliteImportRepositories";
 import { sqliteKategoriefestlegungRepository } from "./persistence/sqliteKategoriefestlegungRepository";
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
@@ -58,6 +61,10 @@ import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertragssichten";
 import { kontenLaden, type Kontensicht } from "../application/kontensichten";
 import { buchungsdetailLaden, type Buchungsdetaildaten } from "../application/buchungsdetail";
+import {
+  dublettenFreigabeAufheben as dublettenFreigabeAufhebenUseCase,
+  dublettenFreigeben as dublettenFreigebenUseCase,
+} from "../application/dublettenFreigabe";
 import {
   buchungBearbeiten as buchungBearbeitenUseCase,
   buchungErfassen as buchungErfassenUseCase,
@@ -587,8 +594,18 @@ export function konten(): Promise<Kontensicht> {
     kategorieRepo: sqliteKategorieRepository,
     umsatzRepo: sqliteUmsatzRepository,
     laufRepo: sqliteImportLaufRepository,
+    freigabeRepo: sqliteDublettenfreigabeRepository,
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
   });
+}
+
+/** „Diese beiden sind NICHT dasselbe" — und der Weg zurück. */
+export function dublettenFreigeben(umsatzA: string, umsatzB: string) {
+  return dublettenFreigebenUseCase(sqliteDublettenfreigabeRepository, umsatzA, umsatzB);
+}
+
+export function dublettenFreigabeAufheben(umsatzA: string, umsatzB: string) {
+  return dublettenFreigabeAufhebenUseCase(sqliteDublettenfreigabeRepository, umsatzA, umsatzB);
 }
 
 export function umbuchungErfassen(eingabe: Parameters<typeof umbuchungErfassenUseCase>[1]) {
@@ -634,6 +651,7 @@ export function buchungsdetail(): Promise<Buchungsdetaildaten> {
     ledger: sqliteLedgerRepository,
     vertragRepo: sqliteVertragRepository,
     zuordnungRepo: sqliteVertragszuordnungRepository,
+    freigabeRepo: sqliteDublettenfreigabeRepository,
   });
 }
 

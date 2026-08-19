@@ -24,9 +24,15 @@ import {
   type Zahlungskonto,
   type Zahlungsregel,
 } from "../core";
-import { paareImBestand, type Bewertung, type Umsatz } from "./import";
+import type { Umsatz } from "./import";
+import {
+  freigegebenePaare,
+  ledgerVerdacht,
+  type Dublettenverdacht,
+} from "./dublettensicht";
 import type { Kontozuordnung } from "./fints/bankzugangPort";
 import type {
+  DublettenfreigabeRepository,
   ImportLaufRepository,
   KategorieRepository,
   LedgerPort,
@@ -35,22 +41,9 @@ import type {
   ZahlungsregelRepository,
 } from "./ports";
 
-/**
- * Was die Dublettenprüfung zu einer gebuchten Zeile sagt.
- *
- * Es gibt bewusst kein „Original" und keine „Kopie": beide Zeilen liegen im Ledger, und
- * welche davon weg soll, entscheidet niemand automatisch. Deshalb wird bei einem Fund
- * auch BEIDEN Zeilen der Verdacht angeschrieben.
- */
-export interface Dublettenverdacht {
-  readonly urteil: Bewertung["urteil"];
-  readonly punkte: number;
-  /** Warum — im Klartext, damit eine Fehleinschätzung nachvollziehbar bleibt. */
-  readonly gruende: readonly string[];
-  /** Die andere Buchung: ihre Ist-Buchungs-ID und ihr Datum. */
-  readonly zwillingIstId: string;
-  readonly zwillingDatum: string;
-}
+// Der Verdacht selbst steht in `dublettensicht` — die Regel gilt für alle Anzeigen
+// gemeinsam, nicht nur fürs Register.
+export type { Dublettenverdacht };
 
 /** Quellen, die als Bankabruf gelten — deren Zeilen sind nicht von Hand löschbar. */
 export const ABRUF_QUELLEN: ReadonlySet<string> = new Set(["fints"]);
@@ -62,6 +55,8 @@ export interface KontenDeps {
   readonly kategorieRepo: KategorieRepository;
   readonly umsatzRepo: UmsatzRepository;
   readonly laufRepo: ImportLaufRepository;
+  /** Die von Hand gesetzten „ist kein Duplikat"-Entscheidungen. */
+  readonly freigabeRepo: DublettenfreigabeRepository;
   /** Bankverbindungen — daran hängt der Abruf-Knopf und der Abgleich. */
   readonly kontozuordnungen: () => Promise<Kontozuordnung[]>;
 }
@@ -120,10 +115,12 @@ export interface Kontensicht {
    * (noch) steht.
    */
   readonly dublettenverdacht: ReadonlyMap<string, Dublettenverdacht>;
+  /** Die „ist kein Duplikat"-Entscheidungen als Paarschlüssel — auch die Inbox achtet darauf. */
+  readonly freigegeben: ReadonlySet<string>;
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, offene, laeufe] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, offene, laeufe, freigaben] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -133,6 +130,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.kontozuordnungen(),
       deps.umsatzRepo.offene(),
       deps.laufRepo.alle(),
+      deps.freigabeRepo.alle(),
     ]);
 
   const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
@@ -147,7 +145,8 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
   }
 
   const zuordnungJeKonto = new Map(zuordnungen.map((z) => [z.zahlungskontoId, z]));
-  const dublettenverdacht = verdachtJeBuchung(umsaetze, new Set(buchungen.map((b) => b.id)));
+  const freigegeben = freigegebenePaare(freigaben);
+  const dublettenverdacht = ledgerVerdacht(umsaetze, new Set(buchungen.map((b) => b.id)), freigegeben);
 
   return {
     zeilen: konten.map((konto): Kontozeile => {
@@ -173,72 +172,8 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     ausBankabruf,
     umsatzZuBuchung,
     dublettenverdacht,
+    freigegeben,
   };
-}
-
-/**
- * Sucht Dubletten unter den VERBUCHTEN Umsätzen, je Konto getrennt, und schreibt den
- * Befund beiden Seiten an.
- *
- * Je Konto getrennt, weil zwei gleiche Beträge auf verschiedenen Konten nie dieselbe
- * Buchung sind — und weil es die Vergleiche kleinhält. Nur verbuchte: was noch als
- * Entwurf offen liegt, steht nicht im Saldo und hat seine eigene Prüfung.
- */
-function verdachtJeBuchung(
-  umsaetze: readonly Umsatz[],
-  gebuchteIds: ReadonlySet<string>,
-): Map<string, Dublettenverdacht> {
-  const jeKonto = new Map<string, Umsatz[]>();
-  for (const u of umsaetze) {
-    if (!u.istbuchungId || u.status !== "verbucht") continue;
-    // Und die Buchung muss es WIRKLICH noch geben. Ein Umsatz kann „verbucht" heißen und
-    // auf eine gelöschte Zeile zeigen — dann steht im Ledger nichts Doppeltes mehr, und
-    // ein Verdacht wäre schlicht falsch. Am echten Bestand traf das 32 Zeilen: genau die
-    // Dubletten, die schon von Hand entfernt worden waren, wurden weiter angemahnt.
-    if (!gebuchteIds.has(u.istbuchungId)) continue;
-    const liste = jeKonto.get(u.zahlungskontoId);
-    if (liste) liste.push(u);
-    else jeKonto.set(u.zahlungskontoId, [u]);
-  }
-
-  const raus = new Map<string, Dublettenverdacht>();
-  for (const gruppe of jeKonto.values()) {
-    for (const paar of paareImBestand(gruppe)) {
-      // NUR über Lauf-Grenzen hinweg. Innerhalb EINES Laufs hat die Dublettenprüfung
-      // beim Import schon über genau diese Menge entschieden und beide durchgelassen —
-      // sie hier erneut anzuzweifeln hiesse, eine getroffene Entscheidung zu übergehen.
-      //
-      // Am echten Bestand ist der Unterschied nicht theoretisch: von 126 Paaren lagen 76
-      // im selben Lauf, und die waren durchweg echte Mehrfachzahlungen — dreimal 25,00 €
-      // „Uebertrag auf Girokonto" an einem Tag, zweimal 10,00 € beim selben Anbieter,
-      // oder zwei [anonymisiert]-Zahlungen, die sich erst in der Referenznummer unterscheiden
-      // (der Finder vergleicht den Zweck-ANFANG und sieht den Unterschied nicht).
-      //
-      // Was übrig bleibt, ist genau der Fall, für den die Markierung gedacht ist: dieselbe
-      // Zahlung aus zwei Quellen oder aus zwei überlappenden Abrufen.
-      if (paar.a.laufId === paar.b.laufId) continue;
-      // Der stärkste Fund je Buchung gewinnt — `paareImBestand` liefert absteigend.
-      merke(raus, paar.a.istbuchungId!, paar.b, paar.bewertung);
-      merke(raus, paar.b.istbuchungId!, paar.a, paar.bewertung);
-    }
-  }
-  return raus;
-}
-
-function merke(
-  ziel: Map<string, Dublettenverdacht>,
-  istId: string,
-  zwilling: Umsatz,
-  bewertung: Bewertung,
-): void {
-  if (ziel.has(istId)) return;
-  ziel.set(istId, {
-    urteil: bewertung.urteil,
-    punkte: bewertung.punkte,
-    gruende: bewertung.gruende,
-    zwillingIstId: zwilling.istbuchungId!,
-    zwillingDatum: zwilling.buchungstag,
-  });
 }
 
 /** Eine Registerzeile mit dem, woran man sie in der Liste wiedererkennt. */

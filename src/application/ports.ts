@@ -18,6 +18,7 @@ import type {
   Zahlungsregel,
 } from "../core";
 import type { ImportLauf, Umsatz } from "./import";
+import type { Dublettenfreigabe } from "./dublettensicht";
 
 export interface ZahlungsregelRepository {
   alle(): Promise<Zahlungsregel[]>;
@@ -170,6 +171,19 @@ export interface ImportLaufRepository {
   alle(): Promise<ImportLauf[]>;
   speichern(lauf: ImportLauf): Promise<void>;
   loeschen(id: string): Promise<void>;
+}
+
+/**
+ * Die von Hand gesetzten Entscheidungen „diese beiden sind NICHT dasselbe".
+ *
+ * Bewusst ein eigener Port und keine Spalte am Umsatz: festgehalten wird das PAAR. Dass A
+ * nicht dasselbe ist wie B, sagt nichts darüber, ob A dasselbe ist wie C.
+ */
+export interface DublettenfreigabeRepository {
+  alle(): Promise<Dublettenfreigabe[]>;
+  speichern(freigabe: Dublettenfreigabe): Promise<void>;
+  /** Nimmt eine Freigabe zurück — die Reihenfolge der beiden IDs ist egal. */
+  entfernen(umsatzA: string, umsatzB: string): Promise<void>;
 }
 
 export interface UmsatzRepository {

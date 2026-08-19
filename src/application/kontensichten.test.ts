@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import { kontenLaden, registerSicht, type KontenDeps } from "./kontensichten";
 import type { ImportLauf, Umsatz } from "./import";
 import type { IstBuchung, Zahlungskonto } from "../core";
+import { freigabeAus, type Dublettenfreigabe } from "./dublettensicht";
 
 const KONTO: Zahlungskonto = {
   id: "giro", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 0,
@@ -34,7 +35,11 @@ function umsatz(over: Partial<Umsatz> = {}): Umsatz {
   };
 }
 
-function deps(buchungen: IstBuchung[], umsaetze: Umsatz[]): KontenDeps {
+function deps(
+  buchungen: IstBuchung[],
+  umsaetze: Umsatz[],
+  freigaben: Dublettenfreigabe[] = [],
+): KontenDeps {
   return {
     kontoRepo: { async alle() { return [KONTO]; }, async speichern() {}, async loeschen() {} },
     ledger: {
@@ -48,6 +53,10 @@ function deps(buchungen: IstBuchung[], umsaetze: Umsatz[]): KontenDeps {
       async offene() { return umsaetze.filter((u) => u.status === "neu"); },
     } as unknown as KontenDeps["umsatzRepo"],
     laufRepo: { async alle() { return LAEUFE; }, async speichern() {}, async loeschen() {} },
+    freigabeRepo: {
+      async alle() { return freigaben; },
+      async speichern() {}, async entfernen() {},
+    },
     kontozuordnungen: async () => [],
   };
 }
@@ -101,6 +110,18 @@ describe("Dublettenmarkierung im Ledger", () => {
     const sicht = await kontenLaden(
       deps([buchung({ id: "b-datei" })], [AUS_DATEI, AUS_BANK]), // „b-bank" fehlt im Ledger
     );
+    expect(sicht.dublettenverdacht.size).toBe(0);
+  });
+
+  it("schweigt bei einem Paar, das von Hand freigegeben wurde", async () => {
+    const sicht = await kontenLaden(
+      deps(
+        [buchung({ id: "b-datei" }), buchung({ id: "b-bank" })],
+        [AUS_DATEI, AUS_BANK],
+        [freigabeAus(AUS_BANK.id, AUS_DATEI.id, "2026-08-20T10:00:00.000Z")],
+      ),
+    );
+    // Auch in der anderen Richtung angelegt — der Schlüssel ist richtungslos.
     expect(sicht.dublettenverdacht.size).toBe(0);
   });
 

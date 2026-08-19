@@ -43,6 +43,7 @@ import {
   sqliteZahlungskontoRepository as zahlungskontoRepository,
 } from "./sqliteStammdatenRepositories";
 import {
+  sqliteDublettenfreigabeRepository as freigabeRepository,
   sqliteImportLaufRepository as importLaufRepository,
   sqliteUmsatzRepository as umsatzRepository,
 } from "./sqliteImportRepositories";
@@ -630,5 +631,31 @@ describe("Vertrag — Kategorie am Aggregat", () => {
     await vertragRepository.speichern({ ...basis, kategorieId: "kat-alt" });
     await vertragRepository.speichern({ ...basis, kategorieId: "kat-neu" });
     expect((await vertragRepository.alle())[0].kategorieId).toBe("kat-neu");
+  });
+});
+
+
+describe("Dubletten-Freigabe — von Hand festgehalten", () => {
+  it("speichert das Paar und liest es zurück", async () => {
+    await freigabeRepository.speichern({ umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-20T10:00:00.000Z" });
+    expect(await freigabeRepository.alle()).toEqual([
+      { umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-20T10:00:00.000Z" },
+    ]);
+  });
+
+  it("legt dasselbe Paar nicht zweimal an", async () => {
+    await freigabeRepository.speichern({ umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-20T10:00:00.000Z" });
+    await freigabeRepository.speichern({ umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-21T10:00:00.000Z" });
+    const alle = await freigabeRepository.alle();
+    expect(alle).toHaveLength(1);
+    expect(alle[0].angelegt).toBe("2026-08-21T10:00:00.000Z");
+  });
+
+  it("entfernt auch, wenn die IDS andersherum kommen", async () => {
+    // Die Anzeige kennt „diese Zeile und ihr Zwilling" — welche davon in Spalte A steht,
+    // weiss sie nicht.
+    await freigabeRepository.speichern({ umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-20T10:00:00.000Z" });
+    await freigabeRepository.entfernen("u-b", "u-a");
+    expect(await freigabeRepository.alle()).toEqual([]);
   });
 });
