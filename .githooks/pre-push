@@ -95,8 +95,10 @@ while read -r lokal_ref lokal_sha remote_ref remote_sha; do
     # Zahlen an der Wortgrenze pruefen: sonst schlaegt "15000" in "150000" an, und ein
     # Waechter mit Fehlalarmen wird umgangen statt gelesen.
     case "$wert" in
-      *[!0-9.,]*) treffer=$(printf '%s' "$texte" | grep -cF -- "$wert") ;;
-      *)          treffer=$(printf '%s' "$texte" | grep -cE "(^|[^0-9])$wert([^0-9]|$)") ;;
+      # `|| true`, weil grep -c bei null Treffern mit 1 endet — unter `set -e` waere das
+      # ein stiller Abbruch des ganzen Hooks, und der saehe aus wie „alles geprueft".
+      *[!0-9.,]*) treffer=$(printf '%s' "$texte" | grep -cF -- "$wert" || true) ;;
+      *)          treffer=$(printf '%s' "$texte" | grep -cE "(^|[^0-9])$wert([^0-9]|$)" || true) ;;
     esac
     if [ "$treffer" -gt 0 ]; then
       echo "pre-push: ABGEBROCHEN — ein Wert aus dem echten Bestand steht in einem Commit-Text ($lokal_ref)."
