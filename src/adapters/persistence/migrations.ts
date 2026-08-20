@@ -701,4 +701,138 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE bankkonto_zuordnung DROP COLUMN bank_saldo_datum`,
     ],
   },
+  {
+    version: 37, // Bankfähigkeitsprofil — was die Bank kann, aufbewahrt statt weggeworfen
+    sql: [
+      // Die Bank meldet bei jedem Dialog mit, was sie kann: wie weit sie Umsätze vorhält,
+      // welche Formate sie kennt, welche TAN-Verfahren es gibt, was sie je Konto freigibt.
+      // Das steckte bisher im `bankparameter`-Blob der Bibliothek, aus dem wir genau einen
+      // Wert holten und den Rest verwarfen — und der Blob ist für die Anwendungsschicht
+      // nicht lesbar. Hier steht dasselbe in unseren eigenen Begriffen, als JSON.
+      //
+      // Als Spalte und nicht als Tabelle, weil das Profil immer als Ganzes gelesen wird
+      // und nie Gegenstand einer Abfrage ist. Wird es das, ist die Tabelle eine spätere
+      // Migration und kein verlorener Aufwand.
+      `ALTER TABLE bankzugang ADD COLUMN profil TEXT`,
+      // Welches Umsatzformat für dieses Konto zuletzt getragen hat. Wir fragen CAMT zuerst
+      // und fallen auf MT940 zurück; wo der Rückfall schon einmal nötig war, spart der
+      // Vermerk beim nächsten Mal eine ergebnislose Runde zur Bank.
+      `ALTER TABLE bankkonto_zuordnung ADD COLUMN letztes_format TEXT`,
+    ],
+  },
+  {
+    version: 38, // Depots — Beobachtungen statt Buchungen
+    sql: [
+      // Ein Depot ist ausdrücklich KEIN `zahlungskonto`. Ein Zahlungskonto hat einen
+      // Anfangsbestand und Buchungen, aus denen sich sein Stand ergibt; ändert sich der
+      // Stand, ist etwas geflossen. Ein Depot hat einen Wert, der sich täglich ändert,
+      // ohne dass etwas passiert wäre — er ist nicht liquide, belastet kein Budget und
+      // gehört in keine Liquiditätsprojektion.
+      //
+      // Der Unterschied ist nicht theoretisch: `liquideMittel()` summiert die Salden ALLER
+      // Konten ohne Typprüfung. Ein Depot dort einzureihen hiesse, es an jeder künftigen
+      // Auswertung wieder ausnehmen zu müssen — und einmal wird es vergessen.
+      `CREATE TABLE IF NOT EXISTS depot (
+         id          TEXT PRIMARY KEY,
+         zugang_id   TEXT NOT NULL,
+         schluessel  TEXT NOT NULL,
+         bezeichnung TEXT NOT NULL,
+         waehrung    TEXT,
+         UNIQUE (zugang_id, schluessel)
+       )`,
+      // Die Wertreihe. Ein Eintrag je Stichtag, nicht ein überschriebener Wert: die Frage
+      // „wie hat es sich entwickelt" ist die einzige, die ein Depot überhaupt beantworten
+      // kann, und sie braucht die Geschichte.
+      `CREATE TABLE IF NOT EXISTS depotwert (
+         depot_id    TEXT    NOT NULL,
+         stichtag    TEXT    NOT NULL,
+         gesamtwert  INTEGER NOT NULL,
+         erfasst_am  TEXT    NOT NULL,
+         PRIMARY KEY (depot_id, stichtag)
+       )`,
+      // Die Positionen zum Stichtag. `stueck`, `kurs` und `einstand_kurs` stehen bewusst
+      // als REAL da und nicht als INTEGER: das eine ist eine Menge (Fondsanteile haben
+      // Nachkommastellen), die anderen sind Notierungen der Bank mit oft vier
+      // Nachkommastellen. In Cent gepresst verlören sie still an Genauigkeit. `wert` ist
+      // dagegen Geld und damit Integer Cent wie überall sonst; gerechnet wird nur damit.
+      //
+      // `kennung` ist der Schlüssel innerhalb eines Stichtags: ISIN, sonst WKN, sonst
+      // Name, sonst die laufende Nummer. Nicht (isin, name) als zusammengesetzter
+      // Schlüssel — in SQLite gelten NULL-Werte innerhalb eines Primärschlüssels
+      // paarweise als VERSCHIEDEN, zwei Positionen ohne beides landeten also doppelt in
+      // der Tabelle, und zwar bei jedem Abruf erneut.
+      `CREATE TABLE IF NOT EXISTS depotposition (
+         depot_id       TEXT NOT NULL,
+         stichtag       TEXT NOT NULL,
+         kennung        TEXT NOT NULL,
+         isin           TEXT,
+         wkn            TEXT,
+         name           TEXT,
+         stueck         REAL,
+         kurs           REAL,
+         wert           INTEGER,
+         waehrung       TEXT,
+         einstand_datum TEXT,
+         einstand_kurs  REAL,
+         PRIMARY KEY (depot_id, stichtag, kennung)
+       )`,
+    ],
+  },
+  {
+    version: 39, // Reparatur von v38 — `depotposition` neu, mit `kennung`
+    sql: [
+      // v38 legte die Tabelle zunächst mit `PRIMARY KEY (depot_id, stichtag, isin, name)`
+      // an. Das ist falsch: in SQLite gelten NULL-Werte innerhalb eines Primärschlüssels
+      // paarweise als VERSCHIEDEN, zwei Positionen ohne ISIN und ohne Namen landeten also
+      // bei jedem Abruf erneut in der Tabelle.
+      //
+      // Der Fehler wurde in v38 SELBST korrigiert, statt eine neue Version anzuhängen —
+      // gegen die Regel oben in dieser Datei. Wo v38 zu dem Zeitpunkt schon gelaufen war,
+      // wurde sie als erledigt vermerkt und die Korrektur nie ausgeführt; der erste
+      // Depotabruf scheiterte dort mit „table depotposition has no column named kennung".
+      // Genau dafür gibt es die Regel: eine Reparatur ist eine NEUE Version.
+      //
+      // Neu anlegen statt ALTER, weil SQLite den Primärschlüssel nicht ändern kann. Der
+      // Verlust ist keiner: die Tabelle hält Beobachtungen eines Stichtags, und der
+      // nächste Abruf schreibt sie vollständig neu. Beide Ausgangslagen enden hier
+      // gleich — die mit und die ohne `kennung`.
+      `DROP TABLE IF EXISTS depotposition`,
+      `CREATE TABLE IF NOT EXISTS depotposition (
+         depot_id       TEXT NOT NULL,
+         stichtag       TEXT NOT NULL,
+         kennung        TEXT NOT NULL,
+         isin           TEXT,
+         wkn            TEXT,
+         name           TEXT,
+         stueck         REAL,
+         kurs           REAL,
+         wert           INTEGER,
+         waehrung       TEXT,
+         einstand_datum TEXT,
+         einstand_kurs  REAL,
+         PRIMARY KEY (depot_id, stichtag, kennung)
+       )`,
+    ],
+  },
+  {
+    version: 40, // Kontoklasse — wofür ein Konto da ist, und ob sein Geld verfügbar ist
+    sql: [
+      // Der Kontotyp sagt, WAS ein Konto ist (Giro, Tagesgeld). Die Klasse sagt, welche
+      // Rolle es spielt — und daraus folgt, ob sein Geld zu den liquiden Mitteln zählt.
+      // Zwei Fragen, die sich nicht decken: dasselbe Tagesgeldkonto kann Alltagsreserve
+      // oder zweckgebundene Rücklage sein, ohne dass sich sein Typ ändert.
+      //
+      // Bis hierher summierte `liquideMittel()` alle Salden ohne Unterschied, und ein
+      // Depot zählte als Bargeld.
+      `ALTER TABLE zahlungskonto ADD COLUMN klasse TEXT`,
+      // Vorbelegung aus dem Typ — nur ein Vorschlag, überschreibbar in der Oberfläche.
+      // Ein Depot ist offensichtlich nicht verfügbar; bei allem anderen ist „verfügbar"
+      // die harmlosere Annahme, weil sie den bisherigen Stand fortschreibt.
+      //
+      // `WHERE klasse IS NULL` statt einer Scheintransaktion: so ist das Statement
+      // wiederholbar, und ein zweiter Lauf überschreibt keine Wahl des Nutzers.
+      `UPDATE zahlungskonto SET klasse = 'vorsorge' WHERE klasse IS NULL AND typ = 'Depot'`,
+      `UPDATE zahlungskonto SET klasse = 'liquide'  WHERE klasse IS NULL`,
+    ],
+  },
 ];

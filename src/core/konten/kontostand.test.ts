@@ -20,7 +20,7 @@ import {
 } from "./kontostand";
 
 const KONTO: Zahlungskonto = {
-  id: "giro", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 10000,
+  id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 10000,
 };
 
 function buchung(datum: string, betrag: number, over: Partial<IstBuchung> = {}): IstBuchung {

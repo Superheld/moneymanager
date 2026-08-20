@@ -54,7 +54,7 @@ beforeEach(() => {
 
 async function grunddaten() {
   await sqliteZahlungskontoRepository.speichern({
-    id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 250000,
+    id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 250000,
   });
   await sqliteKategorieRepository.speichern({
     id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand",
@@ -219,7 +219,7 @@ describe("Inventar anlegen", () => {
   // Stand abgeglichen. Der Test sucht nach den DATEN, die er selbst angelegt hat.
   it("gleicht die Rücklage gegen den realen Stand des zugeordneten Kontos ab", async () => {
     await sqliteZahlungskontoRepository.speichern({
-      id: "k-rueck", bezeichnung: "Rücklagenkonto", typ: "Giro", saldo: 12500, inhaberIds: [],
+      id: "k-rueck", bezeichnung: "Rücklagenkonto", typ: "Giro", klasse: "liquide", saldo: 12500, inhaberIds: [],
     });
     await sqliteInventarRepository.speichern({
       id: "g1", bezeichnung: "Trockner", anschaffung: "2024-01-01",
@@ -302,7 +302,7 @@ describe("Umbuchung aus einer bestehenden Buchung", () => {
   async function zweiKonten() {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
-      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", inhaberIds: [], saldo: 0,
+      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
     });
   }
 
@@ -433,7 +433,7 @@ describe("Buchungsdetails", () => {
   async function zweiKonten() {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
-      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", inhaberIds: [], saldo: 0,
+      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
     });
   }
 
@@ -581,7 +581,7 @@ describe("Konto-Register — Suche und Spalten", () => {
   async function dreiBuchungen() {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
-      id: "k2", bezeichnung: "Sparkonto", typ: "Tagesgeld", inhaberIds: [], saldo: 0,
+      id: "k2", bezeichnung: "Sparkonto", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 0,
     });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: heute, betrag: -1250, kontoId: "k1",
@@ -971,7 +971,7 @@ describe("Vertrag aus einer Buchung", () => {
   it("bietet den Weg bei einem Umbuchungs-Bein nicht an", async () => {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
-      id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", inhaberIds: [], saldo: 0,
+      id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 0,
     });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: heute, betrag: -50000, kontoId: "k1", gegenkontoId: "k2",

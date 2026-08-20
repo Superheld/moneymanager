@@ -83,7 +83,7 @@ async function einnahmereihe(praefix: string, gegenpartei: string, betrag: numbe
 
 async function konto() {
   await sqliteZahlungskontoRepository.speichern({
-    id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 250000,
+    id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 250000,
   });
 }
 

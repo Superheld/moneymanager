@@ -45,8 +45,8 @@ beforeEach(() => {
 });
 
 async function grunddaten() {
-  await kontoRepo.speichern({ id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 0 });
-  await kontoRepo.speichern({ id: "k2", bezeichnung: "Zweitkonto", typ: "Giro", inhaberIds: [], saldo: 0 });
+  await kontoRepo.speichern({ id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
+  await kontoRepo.speichern({ id: "k2", bezeichnung: "Zweitkonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
   await kategorieRepo.speichern({ id: "kat-le", name: "Lebensmittel", defaultCharakter: "Aufwand" });
   await kategorieRepo.speichern({ id: "kat-so", name: "Sonstiges", defaultCharakter: "Aufwand" });
   // Der Entwurfs-Stapel gehört seit 2026-08-20 allein dem DATEI-Import: der Bankabruf

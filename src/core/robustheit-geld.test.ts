@@ -234,7 +234,7 @@ describe("Use-Cases — Integer-Cent-Invariante", () => {
   //   genau der, gegen den die Cent-Invariante existiert. Der Test zeigt, dass der Kern
   //   selbst keinerlei Schutz hat, sobald ein Float hereinkommt.
   it("[ROT] laufender Saldo bleibt ganzzahlig, auch bei Float-Eingaben", () => {
-    const konto: Zahlungskonto = { id: "k1", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo: 0 };
+    const konto: Zahlungskonto = { id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 };
     const buchungen = [
       ist({ betrag: 10.1, datum: "2026-06-01", charakter: "Ertrag" }),
       ist({ betrag: 20.2, datum: "2026-06-02", charakter: "Ertrag" }),
@@ -245,7 +245,7 @@ describe("Use-Cases — Integer-Cent-Invariante", () => {
 
   // [GRÜN] mit sauberen Integer-Cents hält die Summe exakt — auch über viele Buchungen.
   it("[GRÜN] 10.000 Integer-Buchungen summieren exakt", () => {
-    const konto: Zahlungskonto = { id: "k1", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo: 0 };
+    const konto: Zahlungskonto = { id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 };
     const buchungen = Array.from({ length: 10_000 }, (_, i) =>
       ist({ betrag: i % 2 === 0 ? 1 : -1, datum: "2026-06-01", charakter: "Ertrag" }),
     );
@@ -477,8 +477,8 @@ describe("liquideMittel — Überlauf", () => {
   it("summiert bis in absurde, aber sichere Grössenordnungen exakt", () => {
     const haelfte = Math.floor(Number.MAX_SAFE_INTEGER / 2);
     const konten: Zahlungskonto[] = [
-      { id: "a", bezeichnung: "A", typ: "Giro", inhaberIds: [], saldo: haelfte },
-      { id: "b", bezeichnung: "B", typ: "Giro", inhaberIds: [], saldo: haelfte },
+      { id: "a", bezeichnung: "A", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: haelfte },
+      { id: "b", bezeichnung: "B", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: haelfte },
     ];
     expect(liquideMittel(konten)).toBe(haelfte * 2);
     expect(Number.isSafeInteger(liquideMittel(konten))).toBe(true);
@@ -487,7 +487,7 @@ describe("liquideMittel — Überlauf", () => {
   // [GRÜN] realistische Größenordnungen summieren exakt.
   it("[GRÜN] realistische Kontostände summieren exakt", () => {
     const konten: Zahlungskonto[] = Array.from({ length: 50 }, (_, i) => ({
-      id: `k${i}`, bezeichnung: `K${i}`, typ: "Giro" as const, inhaberIds: [], saldo: 123_456_789,
+      id: `k${i}`, bezeichnung: `K${i}`, typ: "Giro", klasse: "liquide" as const, inhaberIds: [], saldo: 123_456_789,
     }));
     expect(liquideMittel(konten)).toBe(50 * 123_456_789);
   });

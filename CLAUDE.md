@@ -37,7 +37,9 @@ Zuordnung zur Komponente in `App.tsx`:
 | Einstellungen | `EinstellungenScreen` | Stammdaten und Voreinstellungen |
 
 Übersicht beantwortet „wie stehe ich **gerade** da", Analyse „wie war es über einen
-**Zeitraum**" — diese Grenze ist beabsichtigt und entscheidet, wo Neues hingehört.
+**Zeitraum**" — diese Grenze ist beabsichtigt und entscheidet, wo Neues hingehört. Das
+Depot ist das jüngste Beispiel: sein Stand steht in der Übersicht, sein Verlauf in der
+Analyse, aus derselben Wertreihe.
 
 ### Die Schichten
 
@@ -68,9 +70,9 @@ Die Schicht steht oben, der Fachbereich darunter — dieselben Namen über alle 
 damit ein Thema an drei Stellen gleich heißt:
 
 ```
-core/         basis buchung konten budgets vertraege kategorien inventar
+core/         basis buchung konten budgets vertraege kategorien inventar depot
               stammdaten klassifikator          + index, monatsausblick
-application/  buchung konten budgets vertraege kategorien inventar dubletten
+application/  buchung konten budgets vertraege kategorien inventar depot dubletten
               stammdaten import fints           + index, ports, bootstrap,
                                                   uebersicht, analysesichten, einstellungen
 adapters/ui/  bausteine buchung konten budgets vertraege kategorien(training)
@@ -93,22 +95,32 @@ Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (
 Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 
-Ein Name weicht ab: der UI-Ordner heißt `training/`, weil die Navigation den Bereich so
-nennt (`ScreenId`); fachlich ist es dieselbe Sache wie `kategorien/` in Kern und Anwendung.
+Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der
+Fachgliederung:
+
+- Der UI-Ordner heißt `training/`, weil die Navigation den Bereich so nennt (`ScreenId`);
+  fachlich ist es dieselbe Sache wie `kategorien/` in Kern und Anwendung.
+- **`depot/` gibt es in `ui/` gar nicht.** Ein Depot ist kein Bereich, sondern etwas, das
+  in zweien vorkommt: der Stand in der Übersicht (`ui/uebersicht/DepotKarte.tsx`), die
+  Entwicklung in der Analyse (`ui/analyse/DepotAnsicht.tsx`). Kern und Anwendung haben
+  ihren `depot/`-Ordner trotzdem — dort gliedert die Fachlichkeit, nicht das Menü.
 
 ### Das Datenmodell
 
-21 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+24 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
 - **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `umsatz` (Import-Kontext:
-  Empfänger, Verwendungszweck — steht **nicht** an der Buchung) · `zahlungskonto` ·
+  Empfänger, Verwendungszweck — steht **nicht** an der Buchung) · `zahlungskonto` (mit Typ
+  UND Klasse, siehe unten) ·
   `kontostand_anker` · `import_lauf` · `dubletten_freigabe`
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` · `vertrag` ·
   `vertrag_erkennung` · `vertrag_zuordnung` · `zahlungsregel` · `inventargegenstand`
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
-- **Bank:** `bankzugang` · `bankkonto_zuordnung`
+- **Bank:** `bankzugang` (samt Bankfähigkeitsprofil) · `bankkonto_zuordnung`
+- **Besitzen:** `depot` · `depotwert` (Reihe der Stichtagswerte) · `depotposition` —
+  Beobachtungen, keine Buchungen; siehe unten
 - **Sonstiges:** `person` · `einstellung`
 
 Gedroppt und nicht wiederzubeleben: `topf`, `szenario`, `szenario_posten` — aufgegangen in
@@ -166,6 +178,22 @@ Node kommt über **mise** (`mise.toml`: node 26); die CI pinnt dieselbe Hauptver
 in `.github/workflows/ci.yml`, weil Actions die `mise.toml` nicht liest. Wer sie hier hebt,
 hebt sie dort mit. Die Kommandozeilen für diese Maschine stehen in `CLAUDE.local.md`.
 
+## Mitgelieferte Skills
+
+`.claude/skills/` — Wissen, das zum Projekt gehört, aber in keine Quelldatei passt. Es
+lädt automatisch, sobald das Thema aufkommt.
+
+| Skill | worum es geht |
+|---|---|
+| `lib-fints` | die Bibliothek hinter dem Bankabruf: Ablauf, Datenformen, Bankparameter und die Fallen, die sonst Stunden kosten |
+
+Der `lib-fints`-Skill lag bis 2026-08-21 nur im Benutzerverzeichnis und stand damit
+niemandem sonst zur Verfügung. Er beschreibt beide Stände — den npm-Release und den Fork,
+auf den `package.json` zeigt —, weil zwei der dort beschriebenen Fallen nur im ersten
+gelten. Beim Verschieben ins öffentliche Repo wurden seine Beispielwerte anonymisiert;
+sie stammten aus einem echten Mitschnitt, und **kein Wächter hätte das gefunden** — eine
+Kontonummer aus dem Protokoll steht in dieser Form in keiner Tabelle.
+
 ## Die Regeln je Schicht
 
 Sie stehen dort, wo man sie beim Schreiben liest — diese Datei zeigt nur, was es gibt:
@@ -188,6 +216,29 @@ Vier Dinge gelten überall und stehen deshalb hier:
 - **Migrationen sind forward-only und append-only** und klammern nichts in Transaktionen;
   jedes Statement muss für sich wiederholbar sein.
 - **Kein Wert aus dem echten Bestand ins Repo** (unten ausführlich).
+- **Ein abgerufenes Depot ist kein Konto.** Ein `zahlungskonto` hat einen Anfangsbestand
+  und Buchungen, aus denen sich sein Stand ergibt; ändert sich der Stand, ist etwas
+  geflossen. Ein von der Bank gemeldetes Depot hat nur Beobachtungen zu Stichtagen — sein
+  Wert ändert sich täglich, ohne dass etwas passiert wäre. Es liegt deshalb in eigenen
+  Tabellen (`depot`, `depotwert`, `depotposition`), hat keinen Saldo und taucht in keiner
+  Kontenliste auf.
+
+- **Typ und Klasse eines Kontos beantworten verschiedene Fragen.** Der `Kontotyp` sagt, WAS
+  ein Konto ist (Giro, Tagesgeld, Depot) — ein Etikett ohne Wirkung auf die Rechnung. Die
+  `Kontoklasse` sagt, WOFÜR es da ist (`liquide`, `ruecklage`, `vorsorge`), und daran hängt
+  genau eine Rechnung: nur `liquide` zählt zu den liquiden Mitteln. Beides deckt sich nicht,
+  und deshalb sind es zwei Felder — dasselbe Tagesgeldkonto kann Alltagsreserve oder
+  zweckgebundene Rücklage sein, ohne dass sich sein Typ ändert.
+
+  Wer die Klassen erweitert (`KONTOKLASSEN` in `core/konten/konto.ts`), muss für jeden neuen
+  Wert entscheiden, ob er verfügbar ist. Bislang trennt die Klasse **nur** das; was Rücklage
+  und Vorsorge sonst unterscheiden soll, ist offen.
+
+  **Saldo und Buchungen gehören dabei zusammen.** `istMonatsverlauf` bildet seinen Sockel aus
+  `liquideMittel` und lässt Buchungen darüberlaufen. Nimmt man den Saldo eines Kontos heraus
+  und seine Buchungen nicht, zeigt der Verlauf einen Stand, den es nie gab — beide Seiten
+  filtern deshalb mit derselben Regel (`istLiquide`). Festgehalten in
+  `core/konten/konto.test.ts` und `core/buchung/historie.test.ts`.
 
 Ausführbar geprüft wird das in `src/architektur.test.ts` (Schichtgrenzen),
 `src/doku.test.ts` (Verweise) und `src/privatsphaere.test.ts` (echte Daten).

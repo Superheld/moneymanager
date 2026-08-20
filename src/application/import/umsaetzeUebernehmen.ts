@@ -4,7 +4,7 @@
 // KEINE Salden — das passiert erst beim Verbuchen (Slice 4). Duplikate werden NICHT
 // gespeichert, nur gezählt. Seiteneffekte laufen über injizierte Repos + id().
 
-import { normalisiereIban } from "../../core";
+import { klasseVorschlag, normalisiereIban } from "../../core";
 import type { Zahlungskonto } from "../../core";
 import type {
   ImportLaufRepository,
@@ -119,6 +119,9 @@ async function uebernahmeIntern(
         id: id(),
         bezeichnung: k.neu.bezeichnung,
         typ: k.neu.typ,
+        // Beim Anlegen aus einer Quelle gibt es niemanden zu fragen — der Vorschlag aus
+        // dem Typ ist das Beste, was hier zu haben ist, und in der Verwaltung änderbar.
+        klasse: klasseVorschlag(k.neu.typ),
         iban: k.neu.iban,
         inhaberIds: [],
         saldo: 0,

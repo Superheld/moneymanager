@@ -18,6 +18,7 @@ export * from "./kategorien/kategoriefestlegung";
 export * from "./budgets/budget";
 export * from "./budgets/budgetVorschlag";
 export * from "./inventar/inventar";
+export * from "./depot/depot";
 export * from "./buchung/istbuchung";
 export * from "./konten/kontoregister";
 export * from "./konten/kontostand";

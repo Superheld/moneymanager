@@ -67,6 +67,10 @@ export {
   anbieterSchluessel,
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,
+  KONTOKLASSEN,
+  // Ein Vorschlag ist keine Entscheidung: `klasseVorschlag` leitet aus dem Typ ab, was
+  // beim Anlegen sinnvoll voreingestellt ist. Ändern kann der Nutzer es immer.
+  klasseVorschlag,
   MERKMALSHERKUENFTE,
   RHYTHMUS_MONATE,
   // Fehler mit fachlichem Schlüssel — die UI übersetzt ihn
@@ -159,6 +163,14 @@ export {
   type Zeitraum,
 } from "./analysesichten";
 export {
+  depotsLaden,
+  depotEntwicklung,
+  type Depotdaten,
+  type Depotsicht,
+  type Positionszeile,
+  type DepotDeps,
+} from "./depot/depotsichten";
+export {
   inventarLaden,
   type Inventarsicht,
   type InventarDeps,
@@ -185,9 +197,28 @@ export {
   type KategorieEingabe,
 } from "./stammdaten/stammdatenAnlegen";
 export { standardkategorienAnlegen } from "./kategorien/standardkategorien";
-export type { Bankkonto, Bankzugang, TanHerausforderung, TanFrager } from "./fints/abrufPort";
+export type {
+  Bankkonto,
+  Bankprofil,
+  Bankzugang,
+  TanFrager,
+  TanHerausforderung,
+  TanVerfahren,
+  Vorfallprofil,
+} from "./fints/abrufPort";
 export type { Kontozuordnung } from "./fints/bankzugangPort";
-export type { AbrufBefund } from "./fints/abrufAusfuehren";
+export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
+// Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
+// Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen
+// Vorfall überhaupt darf, sind Entscheidungen mit genau einer richtigen Antwort.
+export {
+  alleKontenAmStueck,
+  kannVorfall,
+  kontoKannVorfall,
+  speicherzeitraumJeFormat,
+  speicherzeitraumTage,
+  vorfall,
+} from "./fints/bankprofil";
 export {
   STANDARD_EINSTELLUNGEN,
   einstellungenLaden,

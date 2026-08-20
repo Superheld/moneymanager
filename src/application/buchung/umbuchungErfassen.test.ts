@@ -23,7 +23,7 @@ function memLedger(): LedgerPort & { daten: IstBuchung[] } {
 }
 
 function konto(id: string, saldoEuro: number): Zahlungskonto {
-  return { id, bezeichnung: id, typ: "Giro", inhaberIds: [], saldo: euroZuCent(saldoEuro) };
+  return { id, bezeichnung: id, typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: euroZuCent(saldoEuro) };
 }
 
 describe("umbuchungErfassen", () => {

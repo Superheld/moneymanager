@@ -45,7 +45,9 @@ function indexExistiert(db: Database, name: string): boolean {
 
 const ERWARTETE_TABELLEN = [
   "bankkonto_zuordnung", "bankzugang", // v26 — Bankzugang für den FinTS-Direktabruf
-  "budget", "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
+  "budget",
+  "depot", "depotposition", "depotwert", // v38 — Depots: Beobachtungen statt Buchungen
+  "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
   "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
   "ist_buchung_aufteilung", "kategorie", "kategorie_festlegung", "klassifikator_modell",
   "kontostand_anker", // v35 — was an einem Stichtag wirklich auf dem Konto lag
@@ -54,6 +56,42 @@ const ERWARTETE_TABELLEN = [
   "umsatz", "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
   "zahlungskonto", "zahlungsregel",
 ];
+
+describe("Migration 40 — Kontoklasse vorbelegen", () => {
+  it("belegt jedes Konto vor und trifft beim Depot etwas anderes", () => {
+    const db = new SQL.Database();
+    apply(db);
+    db.run(
+      `INSERT INTO zahlungskonto (id, bezeichnung, typ, klasse, inhaber_ids, kontostand)
+       VALUES ('a', 'Giro', 'Giro', NULL, '[]', 0), ('b', 'Depot', 'Depot', NULL, '[]', 0)`,
+    );
+    // Die Vorbelegung noch einmal fahren — die Statements sind wiederholbar formuliert.
+    db.run("UPDATE zahlungskonto SET klasse = 'vorsorge' WHERE klasse IS NULL AND typ = 'Depot'");
+    db.run("UPDATE zahlungskonto SET klasse = 'liquide'  WHERE klasse IS NULL");
+
+    const zeilen = db.exec("SELECT id, klasse FROM zahlungskonto ORDER BY id")[0].values;
+    expect(zeilen).toEqual([
+      ["a", "liquide"],
+      ["b", "vorsorge"],
+    ]);
+    db.close();
+  });
+
+  it("überschreibt eine gesetzte Klasse nicht", () => {
+    // `WHERE klasse IS NULL` ist der Grund: ein zweiter Lauf darf die Wahl des Nutzers
+    // nicht zurücksetzen.
+    const db = new SQL.Database();
+    apply(db);
+    db.run(
+      `INSERT INTO zahlungskonto (id, bezeichnung, typ, klasse, inhaber_ids, kontostand)
+       VALUES ('a', 'Depot', 'Depot', 'liquide', '[]', 0)`,
+    );
+    db.run("UPDATE zahlungskonto SET klasse = 'vorsorge' WHERE klasse IS NULL AND typ = 'Depot'");
+
+    expect(db.exec("SELECT klasse FROM zahlungskonto")[0].values).toEqual([["liquide"]]);
+    db.close();
+  });
+});
 
 describe("Migrationen — frische Anwendung der ganzen Kette", () => {
   it("legt alle erwarteten Tabellen an", () => {
@@ -81,6 +119,14 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     expect(spalten(db, "ist_buchung")).toEqual(
       expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
     );
+    // v37 — das Bankfaehigkeitsprofil am Zugang, das getragene Format an der Zuordnung
+    expect(spalten(db, "bankzugang")).toContain("profil");
+    expect(spalten(db, "bankkonto_zuordnung")).toContain("letztes_format");
+    // v39 — die Reparatur von v38. `kennung` identifiziert eine Position innerhalb eines
+    // Stichtags; ohne sie schlaegt der erste Depotabruf fehl.
+    expect(spalten(db, "depotposition")).toContain("kennung");
+    // v40 — wofuer ein Konto da ist, und damit ob sein Saldo als verfuegbar zaehlt
+    expect(spalten(db, "zahlungskonto")).toContain("klasse");
     db.close();
   });
 

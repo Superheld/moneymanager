@@ -3,6 +3,9 @@
 
 import type {
   Budget,
+  Depot,
+  Depotposition,
+  Depotwert,
   Inventargegenstand,
   IstBuchung,
   Kategorie,
@@ -186,6 +189,33 @@ export interface KontostandsankerRepository {
   alle(): Promise<Kontostandsanker[]>;
   speichern(anker: Kontostandsanker): Promise<void>;
   entfernen(kontoId: string, datum: string, herkunft: Ankerherkunft): Promise<void>;
+}
+
+/**
+ * Depots und ihre Wertreihe.
+ *
+ * Ein Port und nicht drei, weil die drei Tabellen immer zusammen gelesen und geschrieben
+ * werden: ein Abruf liefert Depot, Stichtagswert und Positionen in einem Stück, und eine
+ * Wertreihe ohne ihr Depot ist nichts.
+ *
+ * `positionenErsetzen` heisst so, wie es sich verhält: die Positionen eines Stichtags
+ * werden vollständig ersetzt, nicht ergänzt. Ein zweiter Abruf desselben Tages liefert
+ * dieselbe Aufstellung, und eine Position, die dabei verschwindet, ist verkauft — sie
+ * stehen zu lassen ergäbe ein Depot, das nur wächst.
+ */
+export interface DepotRepository {
+  alle(): Promise<Depot[]>;
+  speichern(depot: Depot): Promise<void>;
+  loeschen(id: string): Promise<void>;
+  /** Alle Stichtagswerte, optional auf ein Depot eingegrenzt. */
+  werte(depotId?: string): Promise<Depotwert[]>;
+  wertSpeichern(wert: Depotwert, erfasstAm: string): Promise<void>;
+  positionen(depotId: string, stichtag?: string): Promise<Depotposition[]>;
+  positionenErsetzen(
+    depotId: string,
+    stichtag: string,
+    positionen: readonly Depotposition[],
+  ): Promise<void>;
 }
 
 /**

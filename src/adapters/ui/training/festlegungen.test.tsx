@@ -39,7 +39,7 @@ beforeEach(() => {
 });
 
 async function grunddaten() {
-  await kontoRepo.speichern({ id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 0 });
+  await kontoRepo.speichern({ id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
   await kategorieRepo.speichern({ id: "kat-kb", name: "Kinderbetreuung", defaultCharakter: "Aufwand" });
   await kategorieRepo.speichern({ id: "kat-so", name: "Sonstiges", defaultCharakter: "Aufwand" });
 }

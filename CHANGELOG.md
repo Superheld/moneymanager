@@ -3,6 +3,83 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.17.0] — 2026-08-21
+
+Die Runde, in der der Bankabruf erwachsen wird — und in der die App zum ersten Mal etwas
+kennt, das kein Zahlungskonto ist.
+
+### Geändert
+
+**FinTS läuft gegen einen Fork von `lib-fints`.** Die bisherige Leitentscheidung lautete
+„kein Patch, kein Fork"; sie gilt so nicht mehr. `package.json` zeigt auf
+`Superheld/lib-fints#workshop`, und die vier Änderungen dort sind upstream als Pull Request
+angeboten — es geht also nicht darum, die Bibliothek zu umgehen, sondern darum, nicht auf
+sie warten zu müssen. Sobald sie in einem npm-Stand sind, geht die Abhängigkeit zurück auf
+die Version; der Code hier muss sich dafür nicht ändern.
+
+Zwei der vier Änderungen wirken sofort:
+
+- **Konten werden über das Konto adressiert, nicht über die Kontonummer.** Die
+  Bibliothek nahm bei einer geteilten Nummer still das erste passende Konto — bei einem
+  Institut, das Girokonto und Depot unter derselben Nummer führt, beantwortete ein Abruf
+  damit die Frage für das falsche Konto. Dagegen stand hier eine Sperre, die dem zweiten
+  Konto den Abruf ganz verwehrte. Die Sperre ist ersatzlos weg.
+- **Die Kontoverbindung folgt den HISPAS-Parametern der Bank.** Damit geht CAMT bei
+  Instituten durch, die es vorher mit `3010 Kontonummer ist ungültig` ablehnten; der
+  Rückfall auf MT940 wird vom Regelfall zur Ausnahme.
+
+**Ein Depot ist kein Konto.** Was die Bank als Depot meldet, liegt in eigenen Tabellen
+(`depot`, `depotwert`, `depotposition`) und nicht im Kontenbestand. Der Grund ist keine
+Ordnungsliebe: ein Zahlungskonto hat einen Anfangsbestand und Buchungen, aus denen sich
+sein Stand ergibt — ändert er sich, ist etwas geflossen. Ein Depotwert ändert sich täglich,
+ohne dass irgendetwas passiert wäre. Er ist eine Beobachtung zu einem Stichtag, und aus
+Beobachtungen lässt sich weder eine Zahlung ableiten noch ein Budget belasten.
+
+**Konten haben jetzt eine Klasse neben ihrem Typ.** Der Typ sagt, WAS ein Konto ist (Giro,
+Tagesgeld, Depot), die Klasse, WOFÜR es da ist (verfügbar, Rücklage, Vorsorge). Daran hängt
+genau eine Rechnung: nur „verfügbar" zählt zu den liquiden Mitteln. Beides deckt sich
+nicht — dasselbe Tagesgeldkonto kann Alltagsreserve oder zweckgebundene Rücklage sein, ohne
+dass sich sein Typ ändert. Die drei Klassen sind ein Anfang, kein fertiges Modell; was
+Rücklage und Vorsorge außer dem Namen trennen soll, ist offen.
+
+### Hinzugefügt
+
+**Das Bankfähigkeitsprofil.** Jede Bank meldet in jedem Dialog mit, was sie kann: wie weit
+sie Umsätze vorhält, welche Formate sie kennt, welche Vorgänge sie je Konto freigibt, welche
+TAN-Verfahren es gibt. Davon wurde bisher ein einziger Wert gelesen und der Rest mit der
+Sitzung verworfen. Jetzt steht das Profil am Zugang und ist ohne Anmeldung einsehbar — die
+Frage „warum holt der Abruf nur 30 Tage" kostet damit nicht mehr die PIN.
+
+Drei Dinge hängen daran: der **Erstabruf** holt, was die Bank vorhält, statt fester 30 Tage;
+ein zu großer Zeitraum wird **gedeckelt und gemeldet**, statt still weniger zu liefern; und
+das **TAN-Verfahren ist wählbar**, wo eine Bank mehrere anbietet.
+
+**Depots, vollständig.** Der Abruf holt jede Depotaufstellung mit, die die Bank freigibt.
+Die Übersicht zeigt den Stand mit Stichtag und die Positionen, die Analyse den Wertverlauf
+über den gewählten Zeitraum, und im Kontobereich bekommt ein Depot den Bestand statt einer
+Auszugsliste, die dort dauerhaft leer stünde. Ausdrücklich eine reine Wertbetrachtung und
+keine Rendite: Zukäufe und Entnahmen stecken mit drin und sind aus den Beständen allein
+nicht herauszurechnen.
+
+**Ein freier Abrufzeitraum.** Die festen Stufen decken die üblichen Fälle ab, aber nicht
+den, um den es beim Ersetzen eines Dateibestands geht — dessen Zeitraum ist eine beliebige
+Zahl. Daneben steht, wie weit die gewählte Bank überhaupt zurückreicht.
+
+**Der `lib-fints`-Skill liegt im Repo** (`.claude/skills/lib-fints/`) statt nur im
+Benutzerverzeichnis. Er beschreibt beide Stände der Bibliothek, weil zwei der dort
+genannten Fallen nur für den npm-Release gelten.
+
+### Behoben
+
+**TAN mit Enter bestätigen.** Beim Abtippen liegt die Hand auf der Tastatur; zur Maus zu
+greifen war genau dort der unnötigste Weg.
+
+**Das getragene Umsatzformat wird gelesen, nicht nur gemerkt.** Wo der Rückfall auf MT940
+dauerhaft nötig ist, kostete jeder Abruf eine ergebnislose Bankrunde. Das gemerkte Format
+entscheidet jetzt die Reihenfolge der beiden Versuche — und nur die: der zweite Versuch
+bleibt in beiden Richtungen, damit ein Institut, das CAMT nachrüstet, von selbst wieder
+darauf kommt.
+
 ## [0.16.0] — 2026-08-20
 
 Eine Aufräumrunde ohne neue Funktion: das Repo ist so sortiert, dass man beim Draufschauen

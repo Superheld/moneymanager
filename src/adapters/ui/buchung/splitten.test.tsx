@@ -35,7 +35,7 @@ beforeEach(() => {
 
 /** Ein Konto, zwei Kategorien und eine gebuchte Zahlung über 90,00. */
 async function bestand() {
-  await kontoRepo.speichern({ id: "kt", bezeichnung: "Alltagskonto", typ: "Giro", inhaberIds: [], saldo: 0 });
+  await kontoRepo.speichern({ id: "kt", bezeichnung: "Alltagskonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
   await kategorieRepo.speichern({ id: "kat-a", name: "Haushalt", defaultCharakter: "Aufwand" });
   await kategorieRepo.speichern({ id: "kat-b", name: "Werkzeug", defaultCharakter: "Aufwand" });
   await ledgerRepo.speichern({

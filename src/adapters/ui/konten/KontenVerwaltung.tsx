@@ -13,6 +13,9 @@ import { useTranslation } from "react-i18next";
 import {
   KONTOTYPEN,
   minorZuMajor,
+  KONTOKLASSEN,
+  klasseVorschlag,
+  type Kontoklasse,
   type Kontostand,
   type Kontotyp,
   type Person,
@@ -65,6 +68,11 @@ export function KontenVerwaltung({
   const [editId, setEditId] = useState<string | null>(null);
   const [bezeichnung, setBezeichnung] = useState("");
   const [typ, setTyp] = useState<Kontotyp>("Giro");
+  /**
+   * Wofür das Konto da ist. Getrennt vom Typ, weil beide verschiedene Fragen beantworten
+   * — und weil nur die Klasse darüber entscheidet, ob der Saldo als verfügbar zählt.
+   */
+  const [klasse, setKlasse] = useState<Kontoklasse>("liquide");
   const [iban, setIban] = useState("");
   const [inhaberIds, setInhaberIds] = useState<string[]>([]);
   const [saldoText, setSaldoText] = useState("");
@@ -85,6 +93,7 @@ export function KontenVerwaltung({
     setEditId(k.id);
     setBezeichnung(k.bezeichnung);
     setTyp(k.typ);
+    setKlasse(k.klasse);
     setIban(k.iban ?? "");
     setInhaberIds([...k.inhaberIds]);
     setSaldoText(String(minorZuMajor(k.saldo, geld.waehrung)));
@@ -94,7 +103,10 @@ export function KontenVerwaltung({
   async function speichern() {
     setFehler(null);
     try {
-      await kontoAnlegen({ bezeichnung, typ, iban, inhaberIds, saldo: geld.parse(saldoText) ?? 0 }, editId ?? undefined);
+      await kontoAnlegen(
+        { bezeichnung, typ, klasse, iban, inhaberIds, saldo: geld.parse(saldoText) ?? 0 },
+        editId ?? undefined,
+      );
       setOffen(false);
       onChange();
     } catch (e) {
@@ -116,6 +128,11 @@ export function KontenVerwaltung({
           columns={[
             { key: "bezeichnung", label: t("einstellungen.konto.spalteBezeichnung") },
             { key: "typ", label: t("einstellungen.konto.spalteTyp"), render: (k) => t(`einstellungen.konto.typ.${k.typ}`) },
+            {
+              key: "klasse",
+              label: t("einstellungen.konto.spalteKlasse"),
+              render: (k) => t(`einstellungen.konto.klasse.${k.klasse}`),
+            },
             {
               key: "verbindung",
               label: t("konten.spalteVerbindung"),
@@ -180,8 +197,29 @@ export function KontenVerwaltung({
               <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder={t("einstellungen.konto.feldBezeichnungPlaceholder")} />
             </FormField>
             <FormField label={t("einstellungen.konto.feldTyp")}>
-              <select className="field" value={typ} onChange={(e) => setTyp(e.target.value as Kontotyp)}>
+              <select
+                className="field"
+                value={typ}
+                onChange={(e) => {
+                  const neu = e.target.value as Kontotyp;
+                  setTyp(neu);
+                  // Nur beim ANLEGEN nachziehen. Wer ein bestehendes Konto bearbeitet, hat
+                  // seine Klasse womöglich bewusst gesetzt — die wegen eines Typwechsels
+                  // zurückzusetzen, wäre eine stille Änderung an der Liquiditätsrechnung.
+                  if (!editId) setKlasse(klasseVorschlag(neu));
+                }}
+              >
                 {KONTOTYPEN.map((kt) => (<option key={kt} value={kt}>{t(`einstellungen.konto.typ.${kt}`)}</option>))}
+              </select>
+            </FormField>
+            <FormField
+              label={t("einstellungen.konto.feldKlasse")}
+              hint={t(`einstellungen.konto.klasseHinweis.${klasse}`)}
+            >
+              <select className="field" value={klasse} onChange={(e) => setKlasse(e.target.value as Kontoklasse)}>
+                {KONTOKLASSEN.map((kk) => (
+                  <option key={kk} value={kk}>{t(`einstellungen.konto.klasse.${kk}`)}</option>
+                ))}
               </select>
             </FormField>
             <FormField label={t("einstellungen.konto.feldIban")} hint={t("einstellungen.konto.feldIbanHinweis")}>

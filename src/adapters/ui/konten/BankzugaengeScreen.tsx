@@ -14,7 +14,13 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Bankkonto, Bankzugang, Kontozuordnung, TanHerausforderung } from "../../../application";
+import type {
+  Bankkonto,
+  Bankprofil,
+  Bankzugang,
+  Kontozuordnung,
+  TanHerausforderung,
+} from "../../../application";
 import { fintsAbruf, fintsEinsatzbereit } from "../../fints";
 import {
   bankzugaenge,
@@ -22,6 +28,7 @@ import {
   bankzugangSpeichern,
   kontozuordnungen,
 } from "../../dienste";
+import { Bankprofilkarte } from "./Bankprofilkarte";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
@@ -39,7 +46,7 @@ interface Pruefung {
   hinweise: readonly string[];
   bankNachrichten: readonly string[];
   tanVerfahren?: string;
-  speicherzeitraumTage?: number;
+  profil: Bankprofil;
 }
 
 export function BankzugaengeScreen() {
@@ -52,6 +59,15 @@ export function BankzugaengeScreen() {
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [pruefung, setPruefung] = useState<Pruefung | null>(null);
+  /**
+   * Welcher Zugang gerade sein gespeichertes Profil zeigt.
+   *
+   * Getrennt von `pruefung`, weil das der Punkt der Sache ist: das Profil steht auch
+   * ohne Anmeldung zur Verfügung. Wer nachsehen will, warum ein Abruf nur 30 Tage holt,
+   * soll dafür nicht seine PIN eintippen müssen.
+   */
+  const [angesehen, setAngesehen] = useState<string | null>(null);
+  const [tanGespeichert, setTanGespeichert] = useState(false);
   const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
 
   async function laden() {
@@ -76,7 +92,13 @@ export function BankzugaengeScreen() {
     setFehler(null);
     try {
       const sitzung = await fintsAbruf.anmelden(zugang, geheim, frageTan);
-      await bankzugangSpeichern({ ...zugang, bankparameter: sitzung.bankparameter() });
+      // Das Profil geht mit — es ist aus denselben Parametern abgeleitet und wäre sonst
+      // genau dann veraltet, wenn sich etwas geändert hat.
+      await bankzugangSpeichern({
+        ...zugang,
+        bankparameter: sitzung.bankparameter(),
+        profil: JSON.stringify(sitzung.profil),
+      });
 
       const zeilen: KontoZeile[] = [];
       for (const k of sitzung.konten) {
@@ -95,7 +117,7 @@ export function BankzugaengeScreen() {
         hinweise: sitzung.hinweise,
         bankNachrichten: sitzung.bankNachrichten,
         tanVerfahren: sitzung.tanVerfahren,
-        speicherzeitraumTage: sitzung.speicherzeitraumTage,
+        profil: sitzung.profil,
       });
       setPin(null);
       setPinText("");
@@ -105,6 +127,28 @@ export function BankzugaengeScreen() {
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Das gespeicherte Profil eines Zugangs.
+   *
+   * Kaputtes JSON gibt `null` statt einer Ausnahme: das Profil ist eine Bequemlichkeit,
+   * und ein Screen, der wegen einer unlesbaren Nebensache gar nichts mehr zeigt, ist
+   * schlechter als einer ohne diese Karte.
+   */
+  function profilVon(z: Bankzugang): Bankprofil | null {
+    if (!z.profil) return null;
+    try {
+      return JSON.parse(z.profil) as Bankprofil;
+    } catch {
+      return null;
+    }
+  }
+
+  async function tanVerfahrenWaehlen(z: Bankzugang, id: number) {
+    await bankzugangSpeichern({ ...z, tanVerfahrenId: id });
+    setTanGespeichert(true);
+    await laden();
   }
 
   async function loeschen(id: string) {
@@ -131,7 +175,6 @@ export function BankzugaengeScreen() {
         <span style={{ display: "flex", gap: "var(--sp-1)", flexWrap: "wrap" }}>
           {r.kannSaldo && <Pill variant="ok">{t("bankabruf.kannSaldo")}</Pill>}
           {r.kannUmsaetze && <Pill variant="ok">{t("bankabruf.kannUmsaetze")}</Pill>}
-          {!r.adressierbar && <Pill variant="warn">{t("bankabruf.nichtAdressierbar")}</Pill>}
           {zuordnungen.some((z) => z.schluessel === r.schluessel) && (
             <Pill variant="ok">{t("bankzugaenge.verknuepft")}</Pill>
           )}
@@ -176,6 +219,27 @@ export function BankzugaengeScreen() {
                 },
               },
               {
+                key: "_profil",
+                label: "",
+                align: "right" as const,
+                render: (z: Bankzugang) =>
+                  z.profil ? (
+                    <button
+                      className="linkbtn"
+                      onClick={() => {
+                        setAngesehen(angesehen === z.id ? null : z.id);
+                        setTanGespeichert(false);
+                      }}
+                    >
+                      {t("bankabruf.profilTitel")}
+                    </button>
+                  ) : (
+                    <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                      {t("bankabruf.profilNochKeins")}
+                    </span>
+                  ),
+              },
+              {
                 key: "_p",
                 label: "",
                 align: "right" as const,
@@ -206,10 +270,7 @@ export function BankzugaengeScreen() {
         <Card
           style={{ marginTop: "var(--gap-card)" }}
           title={t("bankabruf.kontenTitel")}
-          subtitle={t("bankabruf.kontenHinweis", {
-            verfahren: pruefung.tanVerfahren ?? "—",
-            tage: pruefung.speicherzeitraumTage ?? "?",
-          })}
+          subtitle={t("bankabruf.kontenHinweis", { verfahren: pruefung.tanVerfahren ?? "—" })}
         >
           <DataTable columns={kontenSpalten} rows={pruefung.konten} />
 
@@ -244,6 +305,24 @@ export function BankzugaengeScreen() {
           </details>
         </Card>
       )}
+
+      {/* Frisch geprüft: das Profil der laufenden Sitzung. Sonst das gespeicherte. */}
+      {(() => {
+        const zugangDerKarte = pruefung
+          ? zugaenge.find((z) => z.id === pruefung.zugangId)
+          : zugaenge.find((z) => z.id === angesehen);
+        if (!zugangDerKarte) return null;
+        const profil = pruefung ? pruefung.profil : profilVon(zugangDerKarte);
+        if (!profil) return null;
+        return (
+          <Bankprofilkarte
+            zugang={zugangDerKarte}
+            profil={profil}
+            gespeichert={tanGespeichert}
+            onTanVerfahren={(id) => void tanVerfahrenWaehlen(zugangDerKarte, id)}
+          />
+        );
+      })()}
 
       {pin && (
         <Modal

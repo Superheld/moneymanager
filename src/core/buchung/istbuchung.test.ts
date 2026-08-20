@@ -26,7 +26,7 @@ function ist(over: Partial<IstBuchung> = {}): IstBuchung {
 }
 
 function konto(over: Partial<Zahlungskonto> = {}): Zahlungskonto {
-  return { id: "k1", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo: euroZuCent(1000), ...over };
+  return { id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: euroZuCent(1000), ...over };
 }
 
 describe("planRefKey / bezahlteSchluessel / findeIstZuPlan", () => {

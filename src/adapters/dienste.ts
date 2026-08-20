@@ -25,7 +25,7 @@ import { budgetAnlegen as budgetAnlegenUseCase, type BudgetEingabe } from "../ap
 import { budgetvorschlagIgnorieren } from "../application/budgets/budgetvorschlaege";
 import {
   abrufAusfuehren,
-  type AbrufBefund,
+  type Abrufergebnis,
 } from "../application/fints/abrufAusfuehren";
 import type { TanHerausforderung } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
@@ -53,11 +53,13 @@ import {
 } from "./persistence/sqliteImportRepositories";
 import { sqliteKategoriefestlegungRepository } from "./persistence/sqliteKategoriefestlegungRepository";
 import { sqliteKontostandsankerRepository } from "./persistence/sqliteKontostandRepository";
+import { sqliteDepotRepository } from "./persistence/sqliteDepotRepository";
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { inventarLaden, type Inventarsicht } from "../application/inventar/inventarsichten";
+import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
 import { kontenLaden, type Kontensicht } from "../application/konten/kontensichten";
@@ -276,6 +278,15 @@ export function umsaetze() {
 }
 
 
+// --- Depots ----------------------------------------------------------------
+//
+// Ein einziger Port: Depots stehen für sich und rechnen gegen nichts anderes. Das ist der
+// sichtbare Ausdruck davon, dass ein Depotwert weder ein Kontostand noch eine Buchung ist.
+
+export function depots(): Promise<Depotdaten> {
+  return depotsLaden({ depotRepo: sqliteDepotRepository });
+}
+
 // --- Inventar --------------------------------------------------------------
 
 const INVENTAR_DEPS = {
@@ -464,7 +475,7 @@ export async function bankAbrufen(
   frageTan: (h: TanHerausforderung) => Promise<string | undefined>,
   heute: string,
   rueckgriffTage?: number,
-): Promise<AbrufBefund[]> {
+): Promise<Abrufergebnis> {
   return abrufAusfuehren(zugang, pin, frageTan, {
     adapter: fintsAbruf,
     zugangRepo: sqliteBankzugangRepository,
@@ -473,6 +484,9 @@ export async function bankAbrufen(
     kategorieRepo: sqliteKategorieRepository,
     ledgerRepo: sqliteLedgerRepository,
     ankerRepo: sqliteKontostandsankerRepository,
+    // Depots werden mitgeholt: sie hängen an keiner Kontozuordnung, weil sie keine Konten
+    // sind — jedes, das die Bank freigibt, kommt als Beobachtung in die Wertreihe.
+    depotRepo: sqliteDepotRepository,
     umsatzRepo: sqliteUmsatzRepository,
     laufRepo: sqliteImportLaufRepository,
     // Der Abruf hängt die frisch gebuchten Zeilen selbst an ihre Verträge. Ohne das
@@ -603,6 +617,8 @@ export function konten(): Promise<Kontensicht> {
     freigabeRepo: sqliteDublettenfreigabeRepository,
     ankerRepo: sqliteKontostandsankerRepository,
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
+    // Damit ein Depot-Konto seinen Bestand zeigt statt einer leeren Buchungsliste.
+    depotRepo: sqliteDepotRepository,
   });
 }
 
