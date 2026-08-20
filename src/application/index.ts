@@ -1,7 +1,7 @@
 // Die Import-Fläche der Anwendungsschicht — alles, was ein Screen sehen darf.
 //
 // `adapters/ui/` importiert weder `core/` noch `adapters/persistence/` (CLAUDE.md,
-// ARCHITEKTUR.md, geprüft in `src/architektur.test.ts`). Was ein Screen braucht, kommt
+// geprüft in `src/architektur.test.ts`). Was ein Screen braucht, kommt
 // von hier. Die Datei zieht dabei eine Linie, und die ist der ganze Punkt:
 //
 //   VOKABULAR wird durchgereicht — Domänentypen und wertfreie Helfer. Ein Typ trifft

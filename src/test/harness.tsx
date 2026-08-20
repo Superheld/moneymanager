@@ -1,10 +1,10 @@
 // Test-Harness für die UI-Screens.
 //
-// Die Screens sprechen direkt mit den SQLite-Repositories. Statt jedes Repository zu
-// ersetzen, wird nur `getDb` auf eine frische In-Memory-Datenbank (sql.js) umgebogen —
-// dieselbe SQL-Engine wie in der App. Die Tests laufen damit als echte Integration von
-// der Oberfläche bis ins Schema, nicht gegen Attrappen: ein falsches Spalten-Mapping
-// oder eine kaputte Abfrage fällt hier genauso auf wie eine kaputte Anzeige.
+// Die Screens gehen über `application/`, dahinter liegen die SQLite-Repositories. Statt
+// jede Schicht zu ersetzen, wird nur `getDb` auf eine frische In-Memory-Datenbank (sql.js)
+// umgebogen — dieselbe SQL-Engine wie in der App. Der Weg von der Oberfläche bis ins
+// Schema läuft dadurch echt und nicht gegen Attrappen: ein falsches Spalten-Mapping oder
+// eine kaputte Abfrage fällt hier genauso auf wie eine kaputte Anzeige.
 //
 // Diese Datei ist Test-Werkzeug und aus der Coverage ausgenommen.
 
