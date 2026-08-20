@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { adapterNach, adapterRegistrieren, alleAdapter, waehleAdapter, type Quellenadapter } from "./quellenAdapter";
 // Import des Adapters löst dessen Selbst-Registrierung aus.
 import "../../adapters/import/finanzguruAdapter";
-import { xlsxAusZeilen } from "../../test/xlsxBauen";
+import { xlsxAusZeilen } from "../../testwerkzeug/xlsxBauen";
 
 const fgDatei = xlsxAusZeilen([
   ["Buchungstag", "Betrag", "Analyse-Hauptkategorie"],

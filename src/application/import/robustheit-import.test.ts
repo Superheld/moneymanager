@@ -12,7 +12,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { finanzguruAdapter } from "../../adapters/import/finanzguruAdapter";
-import { xlsxAusZeilen } from "../../test/xlsxBauen";
+import { xlsxAusZeilen } from "../../testwerkzeug/xlsxBauen";
 import { migrate, type MigrationsDb } from "../../adapters/persistence/db";
 import { MIGRATIONS } from "../../adapters/persistence/migrations";
 import type { Kategorie, Zahlungskonto } from "../../core";

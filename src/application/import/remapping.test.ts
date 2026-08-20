@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { STANDARDKATEGORIEN } from "../standardkategorien";
+import { STANDARDKATEGORIEN } from "../kategorien/standardkategorien";
 import { FG_REMAPPING, unsereKategorieFuer } from "./remapping";
 
 // Alle gültigen Kategorie-Namen (Gruppen + Kinder) aus dem Standard-Baum.

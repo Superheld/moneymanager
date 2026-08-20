@@ -40,8 +40,8 @@
 // 342-mal zu 100 % Lebensmittel, `vwz:[anonymisiert]` sieht harmlos aus und streut über 17
 // Kategorien.
 
-import type { Cent } from "../geld";
-import { anbieterSchluessel } from "../vertragErkennung";
+import type { Cent } from "../basis/geld";
+import { anbieterSchluessel } from "../vertraege/vertragErkennung";
 
 /** Was von einer Zahlung in die Extraktion geht. Bewusst flach — kein Aggregat. */
 export interface Merkmalsquelle {

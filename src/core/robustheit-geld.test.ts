@@ -22,13 +22,13 @@ import {
   type Inventargegenstand,
   type IstBuchung,
   type Zahlungskonto,
-} from "./index";
-import { STANDARD_WAEHRUNG, waehrungNachCode, type Waehrung } from "./waehrung";
-import { geldFormatierenMitSymbol } from "./geld";
-import { buchungErfassen } from "../application/buchungErfassen";
-import { umbuchungErfassen } from "../application/umbuchungErfassen";
-import { budgetAnlegen } from "../application/budgetAnlegen";
-import { inventarAnlegen } from "../application/inventarAnlegen";
+} from ".";
+import { STANDARD_WAEHRUNG, waehrungNachCode, type Waehrung } from "./basis/waehrung";
+import { geldFormatierenMitSymbol } from "./basis/geld";
+import { buchungErfassen } from "../application/buchung/buchungErfassen";
+import { umbuchungErfassen } from "../application/buchung/umbuchungErfassen";
+import { budgetAnlegen } from "../application/budgets/budgetAnlegen";
+import { inventarAnlegen } from "../application/inventar/inventarAnlegen";
 import type { BudgetRepository, LedgerPort } from "../application/ports";
 
 const EUR = STANDARD_WAEHRUNG;

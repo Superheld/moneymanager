@@ -17,12 +17,12 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
-import { AppShell } from "./AppShell";
-import { BudgetsScreen } from "./BudgetsScreen";
-import { InventarScreen } from "./InventarScreen";
-import { KontenScreen } from "./KontenScreen";
-import { VertraegeScreen } from "./VertraegeScreen";
+import { frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
+import { AppShell } from "./bausteine/AppShell";
+import { BudgetsScreen } from "./budgets/BudgetsScreen";
+import { InventarScreen } from "./inventar/InventarScreen";
+import { KontenScreen } from "./konten/KontenScreen";
+import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import {
@@ -35,7 +35,7 @@ import {
   sqliteVertragszuordnungRepository,
   vertragsAbgleichDeps,
 } from "../persistence/sqliteVertragZuordnungRepositories";
-import { erkennungSicherstellen, zuordnungenAbgleichen } from "../../application/vertragszuordnung";
+import { erkennungSicherstellen, zuordnungenAbgleichen } from "../../application/vertraege/vertragszuordnung";
 import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import {

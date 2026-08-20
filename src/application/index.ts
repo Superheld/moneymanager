@@ -1,7 +1,7 @@
 // Die Import-Fläche der Anwendungsschicht — alles, was ein Screen sehen darf.
 //
 // `adapters/ui/` importiert weder `core/` noch `adapters/persistence/` (CLAUDE.md,
-// ARCHITEKTUR.md, geprüft in `src/architektur.test.ts`). Was ein Screen braucht, kommt
+// geprüft in `src/architektur.test.ts`). Was ein Screen braucht, kommt
 // von hier. Die Datei zieht dabei eine Linie, und die ist der ganze Punkt:
 //
 //   VOKABULAR wird durchgereicht — Domänentypen und wertfreie Helfer. Ein Typ trifft
@@ -88,13 +88,13 @@ export {
   budgetLoeschen,
   type Budgetbereich,
   type BudgetbereichDeps,
-} from "./budgetsichten";
-export { budgetAnlegen, type BudgetEingabe } from "./budgetAnlegen";
+} from "./budgets/budgetsichten";
+export { budgetAnlegen, type BudgetEingabe } from "./budgets/budgetAnlegen";
 export {
   budgetvorschlaegeLaden,
   budgetvorschlagIgnorieren,
   ignorierteBudgetvorschlaege,
-} from "./budgetvorschlaege";
+} from "./budgets/budgetvorschlaege";
 export {
   vertraegeLaden,
   type Vertragssicht,
@@ -103,17 +103,17 @@ export {
   type VertragsichtDeps,
   erkennungProbieren,
   type Erkennungsprobe,
-} from "./vertragssichten";
+} from "./vertraege/vertragssichten";
 export {
   vertragAnlegen,
   vertragAktualisieren,
   vertragLoeschen,
   type VertragEingabe,
   type VertragErgebnis,
-} from "./vertragAnlegen";
-export { zahlungsspuren } from "./zahlungsspuren";
-export { zuordnungenAbgleichen, zuordnungVonHand } from "./vertragszuordnung";
-export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertragsvorschlaege";
+} from "./vertraege/vertragAnlegen";
+export { zahlungsspuren } from "./buchung/zahlungsspuren";
+export { zuordnungenAbgleichen, zuordnungVonHand } from "./vertraege/vertragszuordnung";
+export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertraege/vertragsvorschlaege";
 export {
   kontenLaden,
   registerSicht,
@@ -123,7 +123,7 @@ export {
   type Registersicht,
   type Registerzeile,
   type KontenDeps,
-} from "./kontensichten";
+} from "./konten/kontensichten";
 export {
   entwurfVerdacht,
   stapelVerdacht,
@@ -131,21 +131,21 @@ export {
   freigegebenePaare,
   type Dublettenfreigabe,
   type Dublettenverdacht,
-} from "./dublettensicht";
-export { dublettenFreigeben, dublettenFreigabeAufheben } from "./dublettenFreigabe";
+} from "./dubletten/dublettensicht";
+export { dublettenFreigeben, dublettenFreigabeAufheben } from "./dubletten/dublettenFreigabe";
 export {
   anfangsbestandAbgleichen,
   kontostandFesthalten,
   type Abgleichergebnis,
-} from "./kontostandAnker";
-export { buchungErfassen, type BuchungEingabe } from "./buchungErfassen";
-export { umbuchungErfassen } from "./umbuchungErfassen";
-export { postenBezahltMarkieren, bezahltZuruecknehmen } from "./bezahltMarkieren";
+} from "./konten/kontostandAnker";
+export { buchungErfassen, type BuchungEingabe } from "./buchung/buchungErfassen";
+export { umbuchungErfassen } from "./buchung/umbuchungErfassen";
+export { postenBezahltMarkieren, bezahltZuruecknehmen } from "./buchung/bezahltMarkieren";
 export {
   buchungenSammelbearbeiten,
   buchungenLoeschen,
   type SammelAenderung,
-} from "./buchungenSammelbearbeiten";
+} from "./buchung/buchungenSammelbearbeiten";
 export {
   analyseLaden,
   analyseFenster,
@@ -162,20 +162,20 @@ export {
   inventarLaden,
   type Inventarsicht,
   type InventarDeps,
-} from "./inventarsichten";
+} from "./inventar/inventarsichten";
 export {
   inventarAnlegen,
   inventarAktualisieren,
   inventarErsetzt,
   inventarLoeschen,
   type InventarEingabe,
-} from "./inventarAnlegen";
+} from "./inventar/inventarAnlegen";
 export {
   stammdatenLaden,
   type Stammdaten,
   type StammdatenDeps,
   type Kontostand,
-} from "./stammdatensichten";
+} from "./stammdaten/stammdatensichten";
 export {
   personAnlegen,
   kontoAnlegen,
@@ -183,8 +183,8 @@ export {
   type PersonEingabe,
   type KontoEingabe,
   type KategorieEingabe,
-} from "./stammdatenAnlegen";
-export { standardkategorienAnlegen } from "./standardkategorien";
+} from "./stammdaten/stammdatenAnlegen";
+export { standardkategorienAnlegen } from "./kategorien/standardkategorien";
 export type { Bankkonto, Bankzugang, TanHerausforderung, TanFrager } from "./fints/abrufPort";
 export type { Kontozuordnung } from "./fints/bankzugangPort";
 export type { AbrufBefund } from "./fints/abrufAusfuehren";

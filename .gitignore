@@ -28,7 +28,6 @@ transaction-classifier/
 # Fachliche Doku und Design-System: bleiben LOKAL, nicht im öffentlichen Repo.
 # Die Dateien liegen weiter im Arbeitsverzeichnis — sie sind nur nicht mehr versioniert.
 Moneymanager/
-ARCHITEKTUR.md
 design-system/
 
 # Die DK-Bankenliste als CSV liegt im lokalen Doku-Ordner und ist über `Moneymanager/`
@@ -51,3 +50,8 @@ design-system/
 *.sqlite
 *.sqlite3
 *.csv
+
+# Lokale Projektanweisungen dieser Maschine (Pfade, Rezepte). Claude Code laedt
+# CLAUDE.local.md automatisch neben CLAUDE.md; .claude/CLAUDE.md waere dagegen der
+# Ort fuer TEAM-geteilte Projektanweisungen und gehoerte damit ins Repo.
+CLAUDE.local.md

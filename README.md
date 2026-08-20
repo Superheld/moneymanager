@@ -2,102 +2,95 @@
 
 [![CI](https://github.com/Superheld/moneymanager/actions/workflows/ci.yml/badge.svg)](https://github.com/Superheld/moneymanager/actions/workflows/ci.yml)
 
-Eine **lokale** Finanzverwaltungs-App, die das Denken des betrieblichen Rechnungswesens
-(Liquiditätsrechnung, Rücklagen, Abschreibungen, Bilanz) auf Privathaushalte überträgt —
-in einer Sprache, die normale Menschen verstehen. Die App ist *heimlich eine private Bilanz
-plus Finanzplan*. Sie unterscheidet konsequent:
+Eine **lokale** Finanzverwaltungs-App, die das Denken des betrieblichen Rechnungswesens auf
+einen Privathaushalt überträgt — Liquiditätsrechnung, Rücklagen, Abschreibungen, Bilanz —,
+aber in einer Sprache, die man nicht nachschlagen muss. Sie ist *heimlich eine private
+Bilanz plus Finanzplan*.
 
-- **Plan vs. Ist** — was der Plan sagt und was tatsächlich gebucht wurde, nebeneinander.
-- **Ausgabe vs. Vermögensumschichtung** — ein ETF-Sparplan ist keine „Ausgabe".
-- **Zweckbindung vs. Liquidität** — eine Rücklage „liegt" nicht auf einem Konto, sie ist davon *gedeckt*.
+Drei Unterscheidungen, die ein Haushaltsbuch üblicherweise nicht macht:
 
-**Lokal first:** Alle Daten bleiben auf dem Gerät, keine Cloud-Pflicht. Funktioniert ohne KI —
-der Kern (Aufrechnung, Töpfe, Rücklagen) ist reine Arithmetik.
+- **Plan vs. Ist** — was vorgesehen war und was tatsächlich gebucht wurde, nebeneinander
+  statt vermischt.
+- **Ausgabe vs. Vermögensumschichtung** — ein ETF-Sparplan ist keine „Ausgabe". Das Geld
+  ist noch da, es liegt nur woanders.
+- **Zweckbindung vs. Liquidität** — eine Rücklage *liegt* nicht auf einem Konto, sie ist
+  davon **gedeckt**. Dasselbe Guthaben kann für zwei Dinge vorgesehen und trotzdem nur
+  einmal vorhanden sein.
 
-> **Alpha.** Die App ist nicht veröffentlicht und wird an einem einzigen Datenbestand
-> entwickelt. Das Schema darf sich noch ohne Rücksicht ändern — Migrationen dürfen auch
-> wegnehmen. Wer sie ausprobiert, sollte damit rechnen.
+Alle Daten bleiben auf dem Gerät: keine Cloud, kein Benutzerkonto, keine Registrierung. Und
+sie funktioniert ohne KI — der rechnende Kern ist Arithmetik, die automatische
+Kategorisierung ist Komfort obendrauf.
 
-## Status — v0.13.0 (Kategorien von selbst, Verträge greifen durch)
+> **Alpha, nicht veröffentlicht.** Es gibt genau einen Datenbestand, an dem entwickelt wird.
+> Das Schema darf sich noch ohne Rücksicht ändern, Migrationen dürfen auch wegnehmen. Dieses
+> Repo ist offen, weil der Weg dorthin interessanter ist als das Ziel — es ist kein Download
+> und keine Empfehlung, deine Finanzen darin zu führen.
 
-Details im [CHANGELOG](CHANGELOG.md):
+## Was sie kann
 
-- **Buchungen kategorisieren sich selbst.** Eine Kette entscheidet, von „festgelegt" zu
-  „geraten": Umbuchung → Festlegung → Vertrag → Modell → Import-Kategorie. Das Modell ist
-  eine multinomiale logistische Regression über Bag-of-Words — linear, damit die Begründung
-  das Modell IST und jede Entscheidung ohne Näherung in „woran lag es" zerfällt. Am eigenen
-  Bestand rund **89 % Trefferquote**, gemessen über fünf Aufteilungen an zurückgehaltenen
-  Zahlungen.
-- **Nachvollziehbar und steuerbar.** Vier Karten in den Einstellungen entlang des
-  Trainingsablaufs: welche Beispiele taugen, welche Merkmalsquellen eingehen (einzeln
-  abschaltbar, mit „Wirkung messen"), welche Wörter draußen bleiben, und was das Training
-  ergab — inklusive Verwechslungsmatrix. Am einzelnen Beleg zeigt der Buchungsdialog, was
-  die Erkennung dort sieht.
-- **Festlegungen und rückwirkender Abgleich.** „Immer bei diesem Empfänger" für Aussagen,
-  die halten sollen; und ein Lauf über den Bestand, der zuerst zeigt, was er ändern würde
-  (nach Übergängen gebündelt), und erst auf Bestätigung schreibt. Handentscheidungen und
-  aufgeteilte Buchungen bleiben unangetastet.
-- **Verträge zeigen auf echte Buchungen.** Eigene Erkennungsregel je Vertrag (Merkmale mit
-  Wildcards, Betragsspanne, Zeitraum, Konto), einsehbar und änderbar mit Live-Vorschau der
-  Treffer. Die Zuordnung trägt ihre Herkunft: was die Automatik setzt, darf sie ändern; was
-  von Hand kam, nie. Vertrag aus einer Buchung anlegen geht direkt aus dem Dialog.
-- **Import (Finanzguru-xlsx).** Modulare Quellen-Naht (weitere Formate andockbar),
-  Konto-Zuordnung mit Auto-Anlegen, Dedup (native ID + Roh-Hash). Reversibler
-  **Entwurfs-Stapel** → **Review-Inbox** → **Verbuchen** ins Ledger; jede Zeile zeigt, woher
-  ihr Kategorie-Vorschlag kommt. Interne Umbuchungen werden zu verknüpften Doppelbuchungen
-  gepaart.
-- **Monatsausblick.** Drei Karten oben in der Übersicht — laufender Monat und die beiden
-  folgenden —, jede als Aufrechnung: Einnahmen − Verträge − Budgets − Rücklagen = bleibt.
-- **Übersicht (Rückblick).** Monatsflüsse, realer Saldo-Verlauf, Kategorie-Aufschlüsselung
-  wahlweise einzeln oder nach Hauptgruppen, bis hinunter zur Einzelbuchung — die sich von
-  dort auch gleich korrigieren lässt.
-- **Konten als Auszug.** Statement-Ansicht je Konto, Volltextsuche, Art-/Kategorie-Filter,
-  Pagination; Buchungen bearbeiten, aufteilen und zu Umbuchungen paaren.
-- **Inventar.** Wiederbeschaffung ÷ Nutzungsdauer ergibt die monatliche Rücklage; nennt man
-  das Konto, auf dem das Geld liegt, wird die Rechnung gegen den echten Stand abgeglichen.
+Der jeweils aktuelle Stand steht im [CHANGELOG](CHANGELOG.md); grob umrissen:
 
-| Phase | Inhalt | Status |
-|---|---|---|
-| P0 | Walking Skeleton (Regel → Projektion → SQLite) | ✓ |
-| P1 | Stammdaten (Personen, Konten, Kategorien) | ✓ |
-| P2 | Verträge · Budgets · Inventar/Töpfe | ✓ |
-| P3 | Ist light — „bezahlt markieren", Ledger-Port, Konto-Register (ADR-0002) | ✓ |
-| P3.1 | Topf-Entnahme als Buchungssatz, realer Topf-Stand, Budget Plan/Ist (ADR-0003) | ✓ |
-| P3.5 | Bankimport (Finanzguru-xlsx) → Inbox → Verbuchen; Umbuchungs-Paarung | ✓ |
-| P3.6 | Historie/Auswertungen, Konto-Auszug, Buchungen bearbeiten, Tabellen-Komfort | ✓ |
-| P3.7 | Monatsausblick, Vertrags- und Budgetvorschläge aus den Buchungen | ✓ |
-| P3.8 | Vertrag ↔ Buchung verknüpft; automatische Kategorisierung mit Begründung | ✓ |
-| P4 | Vorausschau neu gedacht · weitere Quellen (CAMT/FinTS) · Embeddings | offen |
-
-Nutzbar: Kontoauszüge importieren, prüfen und verbuchen — und die Kategorien dabei weitgehend
-der App überlassen; sehen, wie es tatsächlich lief; Verträge und Budgets aus den eigenen Daten
-aufbauen; und Monat für Monat aufrechnen, was nach allen Verpflichtungen übrig bleibt.
+- **Buchungen kommen selbst herein.** FinTS-Abruf direkt bei der Bank (PIN/TAN) oder Import
+  aus einer Datei. Wiedererkannte Zeilen erzeugen keine zweite Buchung, sondern ergänzen die
+  vorhandene.
+- **Und kategorisieren sich weitgehend selbst.** Eine Kette entscheidet von „festgelegt" zu
+  „geraten": Umbuchung → Festlegung → Vertrag → Modell → Import-Kategorie. Jede Entscheidung
+  ist am Beleg aufklappbar: woran lag es.
+- **Verträge und Budgets.** Wiederkehrendes mit eigener Erkennungsregel und Live-Vorschau;
+  Budgets in zwei Arten — monatlich (Rest verfällt) oder aufbauend (Rest bleibt liegen) —
+  und verschachtelbar.
+- **Stimmt der Kontostand?** Die App vergleicht ihren gerechneten Stand gegen das, was die
+  Bank meldet oder was jemand gezählt hat. Ohne Toleranz: ein Cent Abweichung ist eine
+  fehlende Buchung, kein Rundungsfehler. Aus mehreren solcher Beobachtungen fällt heraus, in
+  welchem *Zeitraum* etwas verlorenging.
+- **Monatsausblick.** Laufender Monat und die beiden folgenden als Aufrechnung:
+  Einnahmen − Verträge − Budgets − Rücklagen = bleibt.
+- **Rückblick.** Monatsflüsse, Saldo-Verlauf, Kategorie-Aufschlüsselung bis hinunter zur
+  Einzelbuchung, die sich von dort auch gleich korrigieren lässt.
+- **Inventar.** Wiederbeschaffungswert ÷ Nutzungsdauer ergibt die monatliche Rücklage —
+  Abschreibung, nur eben von vorn gedacht.
 
 **Zurückgestellt:** Die frühere Planungsseite (12-Monats-Liquiditätskurve, Szenarien,
-Deckungsgrad) ist in 0.12.0 entfallen. Sie versprach eine Genauigkeit, die das Modell nicht
+Deckungsgrad) ist entfallen. Sie versprach eine Genauigkeit, die das Modell dahinter nicht
 hielt; die Vorausschau kommt wieder, dann anders geschnitten.
 
-## Architektur
+## Wie sie gebaut ist
 
-Tauri 2 + React + TypeScript, **hexagonaler, portabler TS-Domänenkern**, SQLite lokal.
+Tauri 2 + React + TypeScript, hexagonaler portabler TS-Domänenkern, SQLite lokal. Die
+Schichtenregeln und ihre Begründungen stehen ausführlich in [CLAUDE.md](CLAUDE.md).
 
 ```
-src/core/         reine Domäne (Aufrechnung, Töpfe, Kündigung, Historie …), unit-getestet
-  klassifikator/    Merkmalsextraktion und lineares Modell der Kategorie-Erkennung
-src/application/  Use-Cases + Ports
-  import/           Import-Kontext: Quellen-Port, Umsatz-Aggregat, Dedup, Remapping
-src/adapters/     Außenwelt hinter den Ports
-  persistence/      SQLite (tauri-plugin-sql) + versionierte Migrationskette
-  import/           Quellen-Adapter (Finanzguru-xlsx; weitere andockbar)
-  ui/               React-UI
-src/test/         Test-Harness (In-Memory-SQLite, Render-Helfer)
-src-tauri/        dünne Rust-Hülle
+src/core/         reine Domäne — kein IO, kein React, keine Uhr
+src/application/  Use-Cases + Ports; die UI redet nur hiermit
+src/adapters/     persistence (SQLite) · import · ui (React)
+src-tauri/        dünne Rust-Hülle; die Logik läuft als TS in der Webview
 ```
 
-Der **Import** sitzt hinter einem Quellen-Port (`Quellenadapter`): ein neues Format/eine
-neue App ist ein eigenes Adapter-Objekt, das sich registriert — ohne Bestandscode zu ändern.
-Importierte Umsätze leben als reversibler Entwurfs-Stapel, bis sie über den Ledger-Port
-verbucht werden.
+Ein paar Entscheidungen, die das Ding prägen:
+
+- **Geld ist Integer Cent, nie Float** — und wird nur an einer Stelle formatiert. Ein
+  eigenes `toFixed` irgendwo im Screen ist der Anfang zweier Wahrheiten über denselben
+  Betrag.
+- **Kontostands-Anker sind Beobachtungen, keine Rechenergebnisse.** Ein Anker sagt: an
+  diesem Stichtag lag dieser Betrag auf dem Konto. Er wird nie neu berechnet, auch nicht,
+  wenn jemand später eine Buchung davor einfügt — was sich ändert, ist die Differenz, und
+  genau die will man sehen.
+- **Das Kategorie-Modell ist linear** (multinomiale logistische Regression über
+  Bag-of-Words) — nicht, weil mehr nicht ginge, sondern damit die *Begründung das Modell
+  ist*: jede Entscheidung zerfällt ohne Näherung in „woran lag es". Rund 89 % Trefferquote
+  am eigenen Bestand, gemessen über fünf Aufteilungen an zurückgehaltenen Zahlungen.
+- **Der Dublettenfinder ist bewusst kein Modell.** Die Frage ist Identität, nicht
+  Ähnlichkeit, und bei einer Fehlentscheidung muss der Grund lesbar sein. Also harte
+  Vorbedingungen plus ein Punktesystem, das im Klartext sagt, warum es zwei Zeilen für
+  dieselbe hält.
+- **Die Schichtgrenze ist ausführbar.** `src/architektur.test.ts` prüft in der CI, dass
+  `core` nichts nach außen importiert und die UI weder `core/` noch die Persistenz anfasst.
+  Die Ausnahmeliste ist leer — und ein eigener Test schlägt fehl, sobald ein Eintrag darin
+  nichts mehr verletzt, damit sie nicht verrottet.
+- **Zwei Wächter halten echte Kontodaten aus dem öffentlichen Repo.** Ein Test liest die
+  lokale Datenbank zur Laufzeit und prüft den Arbeitsbaum dagegen; ein pre-push-Hook prüft
+  dasselbe für Commit-Texte. Beide brechen ab, wenn sie nichts sehen können — ein Wächter,
+  der nichts prüft, ist schlimmer als keiner, weil er beruhigt.
 
 ## Entwicklung
 
@@ -107,7 +100,7 @@ Rust-Toolchain für den Tauri-Build.
 ```bash
 npm install
 npm run tauri dev     # Desktop-App starten
-npm test              # Unit-Tests
+npm test              # Tests
 npm run coverage      # Tests + Coverage-Report
 npm run typecheck     # TypeScript prüfen
 npm run tauri build   # Produktion bauen
@@ -115,25 +108,27 @@ npm run tauri build   # Produktion bauen
 
 ## Qualität
 
-Getestet wird **von innen nach außen** (hexagonal): Domänenkern und Use-Cases als reine
-Unit-Tests, Repositories und UI als Integration gegen ein In-Memory-SQLite (sql.js, ohne
-Tauri-Runtime) — dieselbe SQL-Engine wie in der App, nur ohne Attrappen dazwischen. Ein
-falsches Spalten-Mapping fällt damit genauso auf wie eine kaputte Anzeige.
-**Abdeckung: rund 88 % Statements / 90 % Zeilen** über das gesamte Projekt (Ziel: 90 %).
-**CI** (GitHub Actions) erzwingt bei jedem Push auf `main`/`develop` und für Pull Requests
-Typecheck, Tests und Frontend-Build.
+Getestet wird von innen nach außen: Domänenkern und Use-Cases als reine Unit-Tests,
+Repositories und UI als Integration gegen ein In-Memory-SQLite (sql.js) — dieselbe
+SQL-Engine wie in der App, nur ohne Attrappen dazwischen. Ein falsches Spalten-Mapping fällt
+damit genauso auf wie eine kaputte Anzeige. Der Domänenkern ist dabei am dichtesten
+abgedeckt — dort sitzt die Rechnung, die still danebengehen kann. Die CI erzwingt bei jedem
+Push und für Pull Requests Typecheck, Tests und Frontend-Build; `npm run coverage` zeigt den
+aktuellen Stand.
 
-Noch offen (bewusst): End-to-End-Tests gegen die gebaute Desktop-App — `tauri-driver` gibt
-es für macOS nicht. Ersatzweise lassen sich App-Code-Pfade headless gegen eine Lesekopie der
+Bewusst offen: End-to-End-Tests gegen die gebaute Desktop-App — `tauri-driver` gibt es für
+macOS nicht, WKWebView bietet keinen WebDriver. Ersatzweise laufen die jsdom-Tests von der
+Oberfläche bis ins Schema, und App-Code-Pfade lassen sich headless gegen eine Lesekopie der
 echten Datenbank fahren.
 
 ## Sprache
 
-Fachlich streng innen, alltagstauglich außen. Das Datenmodell nutzt präzise
-Rechnungswesen-Begriffe, die UI übersetzt sie über ein verbindliches Glossar
-(Rücklage → *Spartopf*, Rückstellung → *Puffer*, Liquidität → *Verfügbares Geld* …).
-Deutsch, Anrede „du", keine Emoji.
+Fachlich streng innen, alltagstauglich außen. Das Datenmodell benutzt die präzisen
+Rechnungswesen-Begriffe, die Oberfläche übersetzt sie über ein verbindliches Glossar
+(Rücklage → *Spartopf*, Rückstellung → *Puffer*, Liquidität → *Verfügbares Geld*). Die App
+spricht Deutsch und Englisch; die Codebasis und die Doku sind durchgehend deutsch.
 
 ## Lizenz
 
-[MIT](LICENSE) — frei nutzbar, veränderbar und weiterverteilbar. Beiträge willkommen.
+[MIT](LICENSE). Issues und Fragen gern — für Pull Requests ist das Projekt zu früh: es hat
+einen einzigen Datenbestand, und das Schema bewegt sich noch unter dem laufenden Betrieb.

@@ -13,7 +13,7 @@ import { defineConfig } from "vitest/config";
 // der schnellen Node-Umgebung bleiben.
 export default defineConfig({
   test: {
-    setupFiles: ["./src/test/setup.ts"],
+    setupFiles: ["./src/testwerkzeug/setup.ts"],
     coverage: {
       provider: "v8",
       all: true,
@@ -21,7 +21,7 @@ export default defineConfig({
       exclude: [
         "**/*.test.ts",
         "**/*.test.tsx",
-        "src/test/**",
+        "src/testwerkzeug/**",
         "src/core/index.ts",
         "src/**/*.d.ts",
         "src/main.tsx",

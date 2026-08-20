@@ -19,26 +19,26 @@ import {
   budgetuebersichtLaden,
   type Budgetbereich,
   type Budgetuebersicht,
-} from "../application/budgetsichten";
+} from "../application/budgets/budgetsichten";
 import { uebersichtLaden, type Uebersichtsdaten } from "../application/uebersicht";
-import { budgetAnlegen as budgetAnlegenUseCase, type BudgetEingabe } from "../application/budgetAnlegen";
-import { budgetvorschlagIgnorieren } from "../application/budgetvorschlaege";
+import { budgetAnlegen as budgetAnlegenUseCase, type BudgetEingabe } from "../application/budgets/budgetAnlegen";
+import { budgetvorschlagIgnorieren } from "../application/budgets/budgetvorschlaege";
 import {
   abrufAusfuehren,
   type AbrufBefund,
 } from "../application/fints/abrufAusfuehren";
 import type { TanHerausforderung } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
-import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/merkmalskonfiguration";
-import { trainingsmaterial, type Materialbefund } from "../application/trainingsmaterial";
-import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/klassifikatorTraining";
-import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../application/kategorieAbgleich";
-import { festlegungAufheben, festlegungSetzen } from "../application/kategoriefestlegungen";
+import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
+import { trainingsmaterial, type Materialbefund } from "../application/kategorien/trainingsmaterial";
+import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
+import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../application/kategorien/kategorieAbgleich";
+import { festlegungAufheben, festlegungSetzen } from "../application/kategorien/kategoriefestlegungen";
 import type { Merkmalskonfiguration, Merkmalsherkunft } from "../core";
-import { zuordnungenAbgleichen } from "../application/vertragszuordnung";
-import { zahlungsspuren } from "../application/zahlungsspuren";
-import { kategorisierungsquellen } from "../application/kategorisierungsquellen";
-import { festlegungAnwenden as festlegungAnwendenUseCase } from "../application/kategoriefestlegungen";
+import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnung";
+import { zahlungsspuren } from "../application/buchung/zahlungsspuren";
+import { kategorisierungsquellen } from "../application/kategorien/kategorisierungsquellen";
+import { festlegungAnwenden as festlegungAnwendenUseCase } from "../application/kategorien/kategoriefestlegungen";
 import { umsaetzeVerbuchen } from "../application/import";
 import type { Kategorie } from "../core";
 import {
@@ -56,50 +56,50 @@ import { sqliteKontostandsankerRepository } from "./persistence/sqliteKontostand
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
-import { stammdatenLaden, type Stammdaten } from "../application/stammdatensichten";
-import { inventarLaden, type Inventarsicht } from "../application/inventarsichten";
+import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
+import { inventarLaden, type Inventarsicht } from "../application/inventar/inventarsichten";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
-import { vertraegeLaden, type Vertragssicht } from "../application/vertragssichten";
-import { kontenLaden, type Kontensicht } from "../application/kontensichten";
-import { buchungsdetailLaden, type Buchungsdetaildaten } from "../application/buchungsdetail";
+import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
+import { kontenLaden, type Kontensicht } from "../application/konten/kontensichten";
+import { buchungsdetailLaden, type Buchungsdetaildaten } from "../application/buchung/buchungsdetail";
 import {
   dublettenFreigabeAufheben as dublettenFreigabeAufhebenUseCase,
   dublettenFreigeben as dublettenFreigebenUseCase,
-} from "../application/dublettenFreigabe";
+} from "../application/dubletten/dublettenFreigabe";
 import {
   anfangsbestandAbgleichen as anfangsbestandAbgleichenUseCase,
   kontostandFesthalten as kontostandFesthaltenUseCase,
-} from "../application/kontostandAnker";
+} from "../application/konten/kontostandAnker";
 import {
   buchungBearbeiten as buchungBearbeitenUseCase,
   buchungErfassen as buchungErfassenUseCase,
   buchungLoeschen as buchungLoeschenUseCase,
   type BuchungEingabe,
-} from "../application/buchungErfassen";
-import { umbuchungLoeschen as umbuchungLoeschenUseCase } from "../application/umbuchungErfassen";
-import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchungSplitten";
-import { paarungLoesen as paarungLoesenUseCase } from "../application/umbuchungAusBuchung";
+} from "../application/buchung/buchungErfassen";
+import { umbuchungLoeschen as umbuchungLoeschenUseCase } from "../application/buchung/umbuchungErfassen";
+import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchung/buchungSplitten";
+import { paarungLoesen as paarungLoesenUseCase } from "../application/buchung/umbuchungAusBuchung";
 import {
   buchungenPaaren as buchungenPaarenUseCase,
   gegenbeinErzeugen as gegenbeinErzeugenUseCase,
   umbuchungsBeinBearbeiten as umbuchungsBeinBearbeitenUseCase,
-} from "../application/umbuchungAusBuchung";
-import { zuordnungVonHand as zuordnungVonHandUseCase, zuordnungZuruecksetzen as zuordnungZuruecksetzenUseCase } from "../application/vertragszuordnung";
-import { umbuchungErfassen as umbuchungErfassenUseCase } from "../application/umbuchungErfassen";
-import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../application/bezahltMarkieren";
+} from "../application/buchung/umbuchungAusBuchung";
+import { zuordnungVonHand as zuordnungVonHandUseCase, zuordnungZuruecksetzen as zuordnungZuruecksetzenUseCase } from "../application/vertraege/vertragszuordnung";
+import { umbuchungErfassen as umbuchungErfassenUseCase } from "../application/buchung/umbuchungErfassen";
+import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../application/buchung/bezahltMarkieren";
 import {
   buchungenLoeschen as buchungenLoeschenUseCase,
   buchungenSammelbearbeiten as buchungenSammelbearbeitenUseCase,
   type SammelAenderung,
-} from "../application/buchungenSammelbearbeiten";
+} from "../application/buchung/buchungenSammelbearbeiten";
 import type { IstBuchung, Zahlungsregel } from "../core";
 import {
   vertragAktualisieren as vertragAktualisierenUseCase,
   vertragAnlegen as vertragAnlegenUseCase,
   vertragLoeschen as vertragLoeschenUseCase,
   type VertragEingabe,
-} from "../application/vertragAnlegen";
-import { vorschlagIgnorieren as vertragsvorschlagIgnorierenUseCase } from "../application/vertragsvorschlaege";
+} from "../application/vertraege/vertragAnlegen";
+import { vorschlagIgnorieren as vertragsvorschlagIgnorierenUseCase } from "../application/vertraege/vertragsvorschlaege";
 import { sqliteVertragRepository } from "./persistence/sqliteVertragRepository";
 import {
   sqliteVertragserkennungRepository,
@@ -111,7 +111,7 @@ import {
   inventarErsetzt as inventarErsetztUseCase,
   inventarLoeschen as inventarLoeschenUseCase,
   type InventarEingabe,
-} from "../application/inventarAnlegen";
+} from "../application/inventar/inventarAnlegen";
 import {
   kategorieAnlegen as kategorieAnlegenUseCase,
   kontoAnlegen as kontoAnlegenUseCase,
@@ -119,8 +119,8 @@ import {
   type KategorieEingabe,
   type KontoEingabe,
   type PersonEingabe,
-} from "../application/stammdatenAnlegen";
-import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/standardkategorien";
+} from "../application/stammdaten/stammdatenAnlegen";
+import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/kategorien/standardkategorien";
 import type { Bankzugang } from "../application/fints/abrufPort";
 import type { Kontozuordnung } from "../application/fints/bankzugangPort";
 import {
