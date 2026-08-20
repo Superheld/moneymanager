@@ -126,5 +126,20 @@ Commit-Texte. Beide finden nur den **Originalwert**. Ob ein Ersatz neutral ist u
 sich über Testfälle hinweg wiederholt, kann keiner von beiden sehen. Regel 2 und 3 sind
 Handarbeit.
 
+**Der Wächter kennt nur die Tabellen, die jemand eingetragen hat.** Er liest keine Spalten
+„mit Beträgen", sondern eine feste Liste von Abfragen — und was dort fehlt, sieht er nicht.
+Deshalb gehört zu **jeder neuen Tabelle mit Beträgen, Namen oder Kontobezügen** eine Zeile
+in dieser Liste, im selben Schritt wie die Migration. Ein Wächter, der eine Tabelle nicht
+kennt, ist an dieser Stelle keiner — und er sagt es nicht, er schweigt.
+
+Am 2026-08-21 durchgemessen, weil es passiert ist: die Depot-Tabellen kamen dazu, der
+Wächter kannte sie nicht, und ein Depotwert aus dem echten Bestand stand als Erwartung in
+einem Screen-Test. Gefunden wurde er von Hand, nicht vom Testlauf.
+
+**Eine Ergänzung, die man nicht hat scheitern sehen, ist ungeprüft.** Nach dem Eintragen
+den echten Wert kurz in den Arbeitsbaum setzen und nachsehen, ob der Wächter rot wird und
+Datei und Wert nennt — danach wieder entfernen. Das kostet eine Minute und ist der einzige
+Beleg, dass die neue Zeile trifft.
+
 Warum das Repo überhaupt so behandelt wird und was die Wächter im Einzelnen tun, steht in
 `../CLAUDE.md` unter „Nichts aus dem echten Bestand ins Repo".
