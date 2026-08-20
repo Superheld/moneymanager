@@ -59,7 +59,7 @@ describe("finanzguruAdapter.lies", () => {
   it("parst eine Zeile vollständig", () => {
     const { umsaetze, warnungen } = finanzguruAdapter.lies(
       datei(reihe({
-        tag: TAG["2021-11-01"], konto: "[entfernt]", betrag: "-6.55",
+        tag: TAG["2021-11-01"], konto: "DE31999999980000000002", betrag: "-6.55",
         gegenpartei: "[anonymisiert]", zweck: "Kartenzahlung", unterkat: "Lebensmittel",
         buchungsId: "2da83348289587cbe750f887563fd417135d354e",
       })),
@@ -73,7 +73,7 @@ describe("finanzguruAdapter.lies", () => {
       gegenpartei: "[anonymisiert]",
       gegenparteiIban: undefined,
       verwendungszweck: "Kartenzahlung",
-      kontoIban: "[entfernt]",
+      kontoIban: "DE31999999980000000002",
       kontoName: "Girokonto",
       glaeubigerId: undefined,
       mandatsreferenz: undefined,

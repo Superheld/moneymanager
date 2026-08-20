@@ -59,10 +59,10 @@ describe("Verwendungszweck", () => {
 
   it("wirft Referenznummern und Ziffernfolgen weg", () => {
     const b = merkmalsbefund(
-      quelle({ verwendungszweck: "Rechnung RE2026004711 vom 15.03.2026 IBAN [entfernt]" }),
+      quelle({ verwendungszweck: "Rechnung RE2026004711 vom 15.03.2026 IBAN DE93999999990000000001" }),
     );
     expect(b.merkmale.some((m) => m.includes("2026004711"))).toBe(false);
-    expect(b.merkmale.some((m) => m.includes("[entfernt]"))).toBe(false);
+    expect(b.merkmale.some((m) => m.includes("de93999999990000000001"))).toBe(false);
     expect(b.verworfen.map((v) => v.grund)).toContain("ziffern");
   });
 
@@ -87,7 +87,7 @@ describe("Verwendungszweck", () => {
   it("wirft weg, wenn nach dem Abschneiden nur ein Präfix übrig bleibt", () => {
     // „de" aus der IBAN und „re" aus der Rechnungsnummer sind keine Wörter, sondern die
     // Reste von Nummern — sie kämen massenhaft vor und bedeuteten nichts.
-    const b = merkmalsbefund(quelle({ verwendungszweck: "[entfernt] RE2026004711" }));
+    const b = merkmalsbefund(quelle({ verwendungszweck: "DE93999999990000000001 RE2026004711" }));
     expect(b.merkmale).not.toContain("vwz:de");
     expect(b.merkmale).not.toContain("vwz:re");
     expect(b.verworfen.every((v) => v.grund === "ziffern")).toBe(true);
