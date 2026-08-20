@@ -4,18 +4,18 @@ import { wuerdeZyklusErzeugen, type Kategorie } from "./kategorie";
 
 describe("ibanGueltig", () => {
   it("akzeptiert gültige IBANs (auch mit Leerzeichen)", () => {
-    expect(ibanGueltig("[entfernt]")).toBe(true);
+    expect(ibanGueltig("DE93 9999 9999 0000 0000 01")).toBe(true);
     expect(ibanGueltig("GB82WEST12345698765432")).toBe(true);
   });
 
   it("lehnt falsche Prüfsumme / Struktur ab", () => {
-    expect(ibanGueltig("[entfernt]")).toBe(false);
+    expect(ibanGueltig("DE00 9999 9999 0000 0000 01")).toBe(false);
     expect(ibanGueltig("XX")).toBe(false);
     expect(ibanGueltig("1234567890")).toBe(false);
   });
 
   it("normalisiert Leerzeichen und Kleinbuchstaben", () => {
-    expect(normalisiereIban("[entfernt]")).toBe("[entfernt]");
+    expect(normalisiereIban("de93 9999 9999 0000 0000 01")).toBe("DE93999999990000000001");
   });
 });
 

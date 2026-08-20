@@ -140,39 +140,40 @@ describe("Daten aus dem echten Bestand", () => {
     ).toEqual([]);
   });
 
-  it("enthält nur ausdrücklich freigegebene IBANs", () => {
-    // Die EIGENEN IBANs fängt schon die Prüfung oben ab, solange sie am Konto hinterlegt
-    // sind. Diese hier greift eine Stufe früher: jede IBAN-förmige Zeichenkette, die
-    // nicht bewusst freigegeben wurde, schlägt an — auch eine fremde, auch eine, die
-    // niemand mehr zuordnen kann.
+  it("verwendet nur Bankleitzahlen, die es nicht gibt", () => {
+    // Die schärfere Regel, und sie braucht kein Urteil: eine IBAN mit einer BLZ, die in
+    // der Liste der Deutschen Kreditwirtschaft NICHT vorkommt, kann zu keinem Konto der
+    // Welt gehören. Eine mit einer echten BLZ kann es — und ob die Kontonummer dahinter
+    // vergeben ist, weiß hier niemand.
     //
-    // Die Prüfziffer taugt NICHT zur Unterscheidung: die erfundenen Beispiele unten sind
-    // rechnerisch gültig, sonst kämen sie durch `ibanGueltig` nicht durch. „Echt oder
-    // erfunden" ist eine Entscheidung, keine Rechnung — deshalb eine Liste, die man
-    // bewusst erweitert.
-    const FREIGEGEBEN = [
-      "[entfernt]", // das Beispiel aus der IBAN-Dokumentation, überall zitiert
-      "[entfernt]", // öffentliche Testkontoverbindung
-      "[entfernt]", // öffentliche Testkontoverbindung
-      "DE15200000049876543210", // erfunden, für den Abruf-Fake
-      "DE00000000000000000000", // Nullwert für Prüfungen
-      "[entfernt]", // dasselbe Beispiel mit absichtlich falscher Prüfziffer
-    ];
-    const muster = /\bDE\d{2}[ ]?(?:\d{4}[ ]?){4}\d{2}\b/g;
+    // Vorher stand hier eine Freigabeliste aus Annahmen („das ist doch die
+    // Beispiel-IBAN"). Sie hat genau das durchgelassen, wovor sie schützen sollte: vier
+    // der sechs eingetragenen IBANs trugen die BLZ einer echten Bank — Commerzbank, DKB,
+    // ING-DiBa —, darunter die, die am 2026-08-19 schon einmal als echte Kontoverbindung
+    // aus `bankenliste.test.ts` entfernt worden war und in fünf anderen Testdateien
+    // stehen geblieben ist.
+    //
+    // Wer eine Test-IBAN braucht: BLZ aus dem 999999xx-Bereich nehmen und die Prüfziffer
+    // rechnen. Dann ist sie strukturell gültig und gehört trotzdem niemandem.
+    const banken = JSON.parse(readFileSync(join(WURZEL, "public/bankenliste.json"), "utf8"));
+    const echteBlz = new Set<string>(
+      (Object.values(banken).find(Array.isArray) as { blz: string }[]).map((b) => String(b.blz)),
+    );
 
+    const muster = /\bDE\d{2}[ ]?(?:\d{4}[ ]?){4}\d{2}\b/g;
     const funde: string[] = [];
     for (const { datei, inhalt } of textbestand()) {
       if (datei.endsWith("privatsphaere.test.ts")) continue;
       for (const treffer of inhalt.match(muster) ?? []) {
-        const iban = treffer.replace(/ /g, "");
-        if (!FREIGEGEBEN.includes(iban)) funde.push(`${datei}: ${iban}`);
+        const blz = treffer.replace(/ /g, "").slice(4, 12);
+        if (echteBlz.has(blz)) funde.push(`${datei}: BLZ ${blz}`);
       }
     }
 
     expect(
       funde,
-      `Nicht freigegebene IBANs:\n  ${funde.join("\n  ")}\n` +
-        "Ist sie erfunden, trag sie oben ein. Ist sie echt, nimm sie raus.",
+      `IBANs mit der Bankleitzahl einer ECHTEN Bank:\n  ${[...new Set(funde)].join("\n  ")}\n` +
+        "Nimm eine BLZ, die es nicht gibt (999999xx), und rechne die Prüfziffer neu.",
     ).toEqual([]);
   });
 });

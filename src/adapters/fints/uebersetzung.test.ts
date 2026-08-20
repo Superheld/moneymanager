@@ -108,7 +108,7 @@ describe("zuRohUmsatz", () => {
   });
 
   it("übersetzt die Felder, auf die die Import-Kette angewiesen ist", () => {
-    const u = zuRohUmsatz(buchung(), { iban: "[entfernt]", name: "Girokonto", waehrung: "EUR" });
+    const u = zuRohUmsatz(buchung(), { iban: "DE31999999980000000002", name: "Girokonto", waehrung: "EUR" });
 
     expect(u.buchungstag).toBe("2026-08-04"); // entryDate
     expect(u.valuta).toBe("2026-08-03"); // valueDate
@@ -117,7 +117,7 @@ describe("zuRohUmsatz", () => {
     expect(u.gegenpartei).toBe("Stromwerke Nord");
     expect(u.verwendungszweck).toBe("STROMWERKE NORDABSCHLAG 08/2026");
     expect(u.glaeubigerId).toBe("[anonymisiert]");
-    expect(u.kontoIban).toBe("[entfernt]");
+    expect(u.kontoIban).toBe("DE31999999980000000002");
     expect(u.kontoName).toBe("Girokonto");
     expect(u.quelle).toBe("fints");
   });
@@ -136,8 +136,8 @@ describe("zuRohUmsatz", () => {
   it("übernimmt die Gegenpartei-IBAN nur, wenn es wirklich eine ist", () => {
     // MT940 füllt remoteAccountNumber je nach Bank mit IBAN ODER nationaler Kontonummer.
     // Eine Kontonummer als IBAN weiterzureichen ergäbe im Konto-Match und im rohHash Müll.
-    const mitIban = zuRohUmsatz(buchung({ remoteAccountNumber: "[entfernt]" }), {});
-    expect(mitIban.gegenparteiIban).toBe("[entfernt]");
+    const mitIban = zuRohUmsatz(buchung({ remoteAccountNumber: "DE66999999970000000003" }), {});
+    expect(mitIban.gegenparteiIban).toBe("DE66999999970000000003");
 
     const mitKontonummer = zuRohUmsatz(buchung({ remoteAccountNumber: "137075030" }), {});
     expect(mitKontonummer.gegenparteiIban).toBeUndefined();

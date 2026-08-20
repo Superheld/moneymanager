@@ -24,12 +24,12 @@ describe("typAusName", () => {
 describe("kontoMatchVorschlag", () => {
   const giro: Zahlungskonto = {
     id: "k-giro", bezeichnung: "Mein Giro", typ: "Giro",
-    iban: "[entfernt]", inhaberIds: [], saldo: 0,
+    iban: "DE31 9999 9998 0000 0000 02", inhaberIds: [], saldo: 0,
   };
 
   it("verknüpft per IBAN mit bestehendem Konto (Normalisierung greift)", () => {
     const matches = kontoMatchVorschlag(
-      [roh({ kontoIban: "[entfernt]", kontoName: "Girokonto" })],
+      [roh({ kontoIban: "DE31999999980000000002", kontoName: "Girokonto" })],
       [giro],
     );
     expect(matches).toHaveLength(1);
@@ -41,15 +41,15 @@ describe("kontoMatchVorschlag", () => {
   it("schlägt fehlende Konten zum Anlegen vor — mit geratenem Typ und gültiger IBAN", () => {
     const matches = kontoMatchVorschlag(
       [
-        roh({ kontoIban: "[entfernt]", kontoName: "Tagesgeldkonto" }),
-        roh({ kontoIban: "[entfernt]", kontoName: "Tagesgeldkonto" }),
+        roh({ kontoIban: "DE93999999990000000001", kontoName: "Tagesgeldkonto" }),
+        roh({ kontoIban: "DE93999999990000000001", kontoName: "Tagesgeldkonto" }),
         roh({ kontoIban: "562dabc5b2", kontoName: "Bargeld" }),
       ],
       [],
     );
     const tagesgeld = matches.find((m) => m.quelleName === "Tagesgeldkonto")!;
     expect(tagesgeld.anzahl).toBe(2);
-    expect(tagesgeld.neu).toEqual({ bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", iban: "[entfernt]" });
+    expect(tagesgeld.neu).toEqual({ bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", iban: "DE93999999990000000001" });
 
     const bargeld = matches.find((m) => m.quelleName === "Bargeld")!;
     expect(bargeld.neu?.typ).toBe("Bargeld");

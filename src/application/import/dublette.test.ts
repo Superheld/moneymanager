@@ -16,7 +16,7 @@ function bank(over: Partial<RohUmsatz> = {}): RohUmsatz {
     waehrung: "EUR",
     gegenpartei: "EDK*[anonymisiert] [anonymisiert]",
     verwendungszweck: "KARTENVERFÜGUNGEDK*[anonymisiert] [anonymisiert], MUSTERSTADT  DE",
-    kontoIban: "[entfernt]",
+    kontoIban: "DE31999999980000000002",
     istUmbuchung: false,
     quelle: "fints",
     ...over,
@@ -30,7 +30,7 @@ function datei(over: Partial<RohUmsatz> = {}): RohUmsatz {
     waehrung: "EUR",
     gegenpartei: "[anonymisiert]",
     verwendungszweck: "EDK*[anonymisiert] [anonymisiert], MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
-    kontoIban: "[entfernt]",
+    kontoIban: "DE31999999980000000002",
     istUmbuchung: false,
     quelle: "finanzguru",
     nativeId: "fg-1",
@@ -112,7 +112,7 @@ describe("vergleiche", () => {
   });
 
   it("trennt Konten, auch wenn alles andere passt", () => {
-    const b = vergleiche(bank(), datei({ nativeId: undefined, kontoIban: "[entfernt]" }));
+    const b = vergleiche(bank(), datei({ nativeId: undefined, kontoIban: "DE66999999970000000003" }));
     expect(b.urteil).toBe("verschieden");
   });
 

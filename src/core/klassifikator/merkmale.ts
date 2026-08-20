@@ -133,7 +133,7 @@ const MIN_LAENGE = 2;
 /**
  * Ab dieser Länge gilt ein Wort mit Ziffern als Referenznummer und fliegt raus.
  *
- * Die Grenze ist der Kompromiss zwischen zwei echten Fällen: „[entfernt]"
+ * Die Grenze ist der Kompromiss zwischen zwei echten Fällen: „de93999999990000000001"
  * (IBAN), „re2026004711" (Rechnungsnummer) und „mandat0815" sollen weg — „o2", „m1" und
  * „b12" (Buslinien, Produktnamen) sollen bleiben. Reine Ziffernfolgen fliegen unabhängig
  * von der Länge raus; ein Datum oder ein Betrag im Verwendungszweck sagt über die
@@ -161,7 +161,7 @@ const ZIFFERNRAND_AB = 3;
  * Wie viel Wort nach dem Abschneiden übrig bleiben muss, damit sich das Abschneiden
  * gelohnt hat.
  *
- * Sonst wird aus `[entfernt]` ein `de` und aus `re2026004711` ein `re` — das
+ * Sonst wird aus `de93999999990000000001` ein `de` und aus `re2026004711` ein `re` — das
  * IBAN-Länderkürzel und das Rechnungspräfix, beide massenhaft in den Daten und beide
  * ohne jeden Bezug zur Kategorie. Bleibt nur so ein Stummel übrig, war das ganze Token
  * eine Nummer mit Präfix und kein Wort mit angehängter Nummer.

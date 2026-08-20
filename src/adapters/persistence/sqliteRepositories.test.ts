@@ -100,14 +100,14 @@ describe("Stammdaten-Repositories", () => {
       id: "k1",
       bezeichnung: "Giro",
       typ: "Giro",
-      iban: "[entfernt]",
+      iban: "DE93999999990000000001",
       inhaberIds: [],
       saldo: 123456,
     });
     const [k] = await zahlungskontoRepository.alle();
     expect(k.bezeichnung).toBe("Giro");
     expect(k.typ).toBe("Giro");
-    expect(k.iban).toBe("[entfernt]");
+    expect(k.iban).toBe("DE93999999990000000001");
     expect(k.saldo).toBe(123456);
   });
 
