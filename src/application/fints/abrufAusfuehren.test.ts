@@ -29,7 +29,6 @@ function bankkonto(over: Partial<Bankkonto> = {}): Bankkonto {
     waehrung: "EUR",
     kannSaldo: true,
     kannUmsaetze: true,
-    adressierbar: true,
     ...over,
   };
 }

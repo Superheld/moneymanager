@@ -1,10 +1,26 @@
 // FinTS-Abrufadapter — die einzige Stelle im Projekt, die `lib-fints` kennt.
 //
 // Leitentscheidung (ROADMAP, 2026-08-17): Wir bauen GEGEN die Bibliothek mit dem, was sie
-// kann und was sie sagt. Kein Patch, kein Fork, kein Vendoring. Was fehlt, wird gemeldet,
-// nicht umgangen — und was die Bank nicht hergibt, erscheint als Hinweis statt als leere
-// Liste. Daraus folgt der Stil hier: erst fragen (`canGet…`, `getTransactionParameters`),
-// dann abrufen; kein Format und kein Kontotyp hartkodiert.
+// kann und was sie sagt. Was fehlt, wird gemeldet, nicht umgangen — und was die Bank nicht
+// hergibt, erscheint als Hinweis statt als leere Liste. Daraus folgt der Stil hier: erst
+// fragen (`canGet…`, `getTransactionParameters`), dann abrufen; kein Format und kein
+// Kontotyp hartkodiert.
+//
+// Ergänzt 2026-08-20: der Zusatz „kein Patch, kein Fork, kein Vendoring" gilt so nicht
+// mehr. `package.json` zeigt auf `Superheld/lib-fints#workshop` statt auf den npm-Stand
+// 1.5.0. Der Grund ist kein Umgehen, sondern das Gegenteil — die vier Änderungen dort sind
+// gemeldet und als Pull Requests offen:
+//
+//   1. Konten werden über das Konto adressiert (`AccountRef`), nicht über die Kontonummer.
+//      1.5.0 nahm bei einer geteilten Nummer still das erste Konto; wir mussten die
+//      weiteren sperren.
+//   2. Die Kontoverbindung folgt `nationalAccountAllowed` aus den HISPAS-Parametern,
+//      statt IBAN, BIC und die nationalen Felder immer zugleich zu füllen.
+//   3. `HIWPDS` wird gelesen — damit ist erkennbar, welche Depot-Argumente die Bank annimmt.
+//   4. Die Interaction-Klassen sind exportiert.
+//
+// Sobald das in einem npm-Stand ist, geht `package.json` zurück auf die Version. Der Code
+// hier muss sich dafür nicht ändern.
 
 import { FinTSClient, FinTSConfig } from "lib-fints";
 import { waehrungNachCode } from "../../core";
@@ -90,31 +106,31 @@ async function mitTan<T extends ClientResponse>(
   return weiter(antwort.tanReference, tan);
 }
 
-/** Kontenliste der Bank → `Bankkonto`, inklusive Fähigkeiten und Kollisionsbefund. */
+/**
+ * Kontenliste der Bank → `Bankkonto`, inklusive der Fähigkeiten, die die Bank je Konto
+ * meldet.
+ *
+ * Bis zum Umstieg auf den Fork stand hier zusätzlich eine Kollisionsprüfung: die
+ * Bibliothek adressierte Konten allein über die Kontonummer, und `getBankAccount` nahm
+ * bei einer geteilten Nummer per `find` das erste Konto — ein Abruf für das zweite
+ * beantwortete still die Frage für das erste. Wir mussten solche Konten sperren.
+ *
+ * Der Fork adressiert über das Konto selbst (`AccountRef`), also über Nummer UND
+ * Unterkontomerkmal. Damit ist jedes gemeldete Konto erreichbar, und die Sperre ist
+ * ersatzlos entfallen.
+ */
 function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Bankkonto[] {
-  const proNummer = new Map<string, number>();
-  for (const k of roh) proNummer.set(k.accountNumber, (proNummer.get(k.accountNumber) ?? 0) + 1);
-
-  return roh.map((k, i) => {
-    // Die gesamte API von lib-fints adressiert Konten ALLEIN über die Nummer, und
-    // `FinTSConfig.getBankAccount` nimmt per `find` das ERSTE Konto mit dieser Nummer
-    // (config.js:188). Kommt eine Nummer mehrfach vor — ein Institut meldet Girokonto und
-    // Depot unter derselben und trennt über das Unterkontomerkmal —, dann ist das erste
-    // Konto sehr wohl erreichbar: jeder Abruf landet genau dort. Unerreichbar sind die
-    // WEITEREN; im Spike sichtbar am „Depot-Saldo", der der Girokonto-Saldo war.
-    //
-    // Deshalb nicht pauschal alle Konten einer geteilten Nummer sperren: das nähme dem
-    // Nutzer sein Girokonto, also genau das Konto, um das es geht.
-    const ersteMitNummer = roh.findIndex((a) => a.accountNumber === k.accountNumber);
-    const geteilt = (proNummer.get(k.accountNumber) ?? 0) > 1;
-    const mehrdeutig = geteilt && i !== ersteMitNummer;
+  return roh.map((k) => {
+    // Mit dem Konto fragen, nicht mit seiner Nummer: eine geteilte Nummer lässt
+    // `getBankAccount` jetzt werfen, statt zu raten — und die Antwort auf „kann dieses
+    // Konto Umsätze" wäre sonst die des Nachbarkontos.
     let kannSaldo = false;
     let kannUmsaetze = false;
     try {
-      kannSaldo = client.canGetAccountBalance(k.accountNumber);
-      kannUmsaetze = client.canGetAccountStatements(k.accountNumber);
+      kannSaldo = client.canGetAccountBalance(k);
+      kannUmsaetze = client.canGetAccountStatements(k);
     } catch {
-      // canGet… wirft bei unbekannter Kontonummer — dann eben „kann nicht".
+      // Kennt die Bank das Konto in der UPD nicht mehr, ist die Antwort schlicht „kann nicht".
     }
     return {
       nummer: k.accountNumber,
@@ -126,18 +142,11 @@ function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Ba
       bezeichnung: k.product?.trim() || k.iban || k.accountNumber,
       waehrung: k.currency,
       inhaber: [k.holder1, k.holder2].filter(Boolean).join(", ") || undefined,
-      kannSaldo: kannSaldo && !mehrdeutig,
-      kannUmsaetze: kannUmsaetze && !mehrdeutig,
-      adressierbar: !mehrdeutig,
-      hinweis: mehrdeutig
-        ? `Die Bank meldet die Kontonummer ${k.accountNumber} mehrfach und unterscheidet nur über das ` +
-          `Unterkontomerkmal („${k.subAccountId ?? "—"}"). Die Bibliothek spricht Konten allein über die Nummer an ` +
-          `und träfe damit „${roh[ersteMitNummer].product ?? roh[ersteMitNummer].accountNumber}" — dieses Konto ` +
-          `ist deshalb nicht abrufbar.`
-        : geteilt
-          ? `Teilt sich die Kontonummer ${k.accountNumber} mit einem weiteren Konto der Bank. Abgerufen wird ` +
-            `dieses hier, weil die Bibliothek das erste Konto mit dieser Nummer nimmt.`
-          : undefined,
+      kannSaldo,
+      kannUmsaetze,
+      hinweis: !kannUmsaetze && !kannSaldo
+        ? `Die Bank gibt für „${k.product?.trim() || k.accountNumber}" weder Saldo noch Umsätze frei.`
+        : undefined,
     };
   });
 }
@@ -153,6 +162,14 @@ class FintsSitzung implements Abrufsitzung {
   constructor(
     private readonly client: FinTSClient,
     readonly konten: readonly Bankkonto[],
+    /**
+     * Der Weg vom `Bankkonto` dieser App zurück zum `BankAccount` der Bibliothek.
+     *
+     * Nötig, weil der Port `lib-fints` nicht kennen darf — und die Bibliothek seit dem
+     * Fork das Konto selbst verlangt statt seiner Nummer. Der Schlüssel ist derselbe,
+     * den auch die Zuordnung persistiert: Nummer UND Unterkontomerkmal.
+     */
+    private readonly bankkonten: ReadonlyMap<string, BankAccount>,
     readonly hinweise: readonly string[],
     readonly bankNachrichten: readonly string[],
     readonly tanVerfahren: string | undefined,
@@ -166,6 +183,23 @@ class FintsSitzung implements Abrufsitzung {
     return JSON.stringify(this.client.config.bankingInformation);
   }
 
+  /**
+   * Das Konto, wie die Bibliothek es braucht.
+   *
+   * Wirft statt zu raten: ein Schlüssel, den die frische UPD nicht mehr kennt, bedeutet,
+   * dass die Bank das Konto nicht mehr meldet — und ein Abruf gegen ein geratenes Konto
+   * liefert eine Antwort, die zu nichts gehört.
+   */
+  private bankkonto(konto: Bankkonto): BankAccount {
+    const treffer = this.bankkonten.get(konto.schluessel);
+    if (!treffer) {
+      throw new Error(
+        `Die Bank meldet das Konto „${konto.bezeichnung}" in dieser Sitzung nicht mehr.`,
+      );
+    }
+    return treffer;
+  }
+
   private get decoupled() {
     const v = this.client.config.selectedTanMethod;
     return v?.isDecoupled ? v.decoupled : undefined;
@@ -173,7 +207,7 @@ class FintsSitzung implements Abrufsitzung {
 
   async saldo(konto: Bankkonto): Promise<Saldo | null> {
     if (!konto.kannSaldo) return null;
-    let antwort = await this.client.getAccountBalance(konto.nummer);
+    let antwort = await this.client.getAccountBalance(this.bankkonto(konto));
     antwort = await mitTan(antwort, (r, t) => this.client.getAccountBalanceWithTan(r, t), this.frageTan, this.decoupled);
     if (!antwort.balance) return null;
     return {
@@ -184,28 +218,41 @@ class FintsSitzung implements Abrufsitzung {
   }
 
   async umsaetze(konto: Bankkonto, vonIso: string, bisIso: string): Promise<AbrufErgebnis> {
-    if (!konto.adressierbar) throw new Error(konto.hinweis ?? "Dieses Konto ist nicht adressierbar.");
     if (!konto.kannUmsaetze) throw new Error("Die Bank gibt für dieses Konto keine Umsätze frei.");
 
     const von = anfrageDatum(vonIso);
     const bis = anfrageDatum(bisIso);
     const hinweise: string[] = [];
 
-    // Kein Format hartkodieren: erst CAMT anfragen, und NUR wenn die Bank ablehnt, auf
-    // MT940 zurückfallen. mindestens ein Institut lehnt CAMT mit `3010 Kontonummer ist ungültig` ab
-    // (Ursache: HKCAZ nutzt die internationale Kontoverbindung, in der lib-fints IBAN, BIC
-    // und die nationalen Felder ZUGLEICH füllt; die Spezifikation meint das eine oder das
-    // andere). Bei einer anderen Bank kann CAMT dagegen laufen — deshalb fragen wir sie,
-    // statt es zu entscheiden.
+    // Kein Format hartkodieren: erst CAMT anfragen, und nur wenn nichts kommt, auf MT940
+    // zurückfallen.
+    //
+    // Der häufigste Grund für „nichts" ist seit dem Fork weg: HKCAZ nutzt die
+    // internationale Kontoverbindung, und lib-fints füllte darin IBAN, BIC UND die
+    // nationalen Felder zugleich — was mindestens ein Institut mit `3010 Kontonummer ist
+    // ungültig` und einer leeren Liste beantwortete. Der Fork fragt stattdessen die
+    // HISPAS-Parameter der Bank (`nationalAccountAllowed`) und lässt die nationalen Felder
+    // weg, wo sie nicht erlaubt sind.
+    //
+    // Der Rückfall bleibt trotzdem, aus zwei Gründen: nicht jede Bank erklärt ihre
+    // Ablehnung über HISPAS, und `success` taugt hier nicht als Prüfung — die Bibliothek
+    // setzt es auf `höchster Rückmeldecode < 9000`, und `3010` liegt darunter. Ein leeres
+    // Ergebnis ist der einzige verlässliche Indikator, und ein legitim leerer Zeitraum
+    // kostet dadurch eine zusätzliche Runde. Das ist der billigere Fehler.
     let format = "CAMT";
-    let antwort = await this.client.getAccountStatements(konto.nummer, von, bis, true);
+    let antwort = await this.client.getAccountStatements(this.bankkonto(konto), von, bis, true);
     antwort = await mitTan(antwort, (r, t) => this.client.getAccountStatementsWithTan(r, t), this.frageTan, this.decoupled);
     hinweise.push(...hinweiseAus(antwort));
 
     if (!antwort.success || antwort.statements.length === 0) {
-      hinweise.push("CAMT lieferte nichts — Rückfall auf MT940.");
+      const abgelehnt = antwort.bankAnswers.find((a) => a.code === 3010);
+      hinweise.push(
+        abgelehnt
+          ? `CAMT wurde abgelehnt (${abgelehnt.code} ${abgelehnt.text}) — Rückfall auf MT940.`
+          : "CAMT lieferte nichts — Rückfall auf MT940.",
+      );
       format = "MT940";
-      antwort = await this.client.getAccountStatements(konto.nummer, von, bis, false);
+      antwort = await this.client.getAccountStatements(this.bankkonto(konto), von, bis, false);
       antwort = await mitTan(antwort, (r, t) => this.client.getAccountStatementsWithTan(r, t), this.frageTan, this.decoupled);
       hinweise.push(...hinweiseAus(antwort));
     }
@@ -322,7 +369,9 @@ export function fintsAdapter(opt: FintsAdapterOptionen): Abrufadapter {
       }
 
       const info = config.bankingInformation;
-      const konten = kontenAufbereiten(client, info.upd?.bankAccounts ?? []);
+      const rohkonten = info.upd?.bankAccounts ?? [];
+      const konten = kontenAufbereiten(client, rohkonten);
+      const bankkonten = new Map(rohkonten.map((k) => [schluesselVon(k), k]));
 
       // Wie weit die Bank überhaupt zurückreicht, sagt sie selbst (im Test: 540 Tage).
       // Abfragen statt annehmen — und der Aufruf wirft für Vorfälle ohne Segmentdefinition.
@@ -336,6 +385,7 @@ export function fintsAdapter(opt: FintsAdapterOptionen): Abrufadapter {
       return new FintsSitzung(
         client,
         konten,
+        bankkonten,
         hinweise,
         (info.bankMessages ?? []).map((m) => [m.subject, m.text].filter(Boolean).join(": ")),
         gewaehlt.name,
