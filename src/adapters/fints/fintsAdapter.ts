@@ -302,44 +302,59 @@ class FintsSitzung implements Abrufsitzung {
     };
   }
 
-  async umsaetze(konto: Bankkonto, vonIso: string, bisIso: string): Promise<AbrufErgebnis> {
+  async umsaetze(
+    konto: Bankkonto,
+    vonIso: string,
+    bisIso: string,
+    bevorzugtesFormat?: string,
+  ): Promise<AbrufErgebnis> {
     if (!konto.kannUmsaetze) throw new Error("Die Bank gibt für dieses Konto keine Umsätze frei.");
 
     const von = anfrageDatum(vonIso);
     const bis = anfrageDatum(bisIso);
     const hinweise: string[] = [];
 
-    // Kein Format hartkodieren: erst CAMT anfragen, und nur wenn nichts kommt, auf MT940
-    // zurückfallen.
+    // Kein Format hartkodieren: beide Wege werden probiert, die Reihenfolge entscheidet
+    // nur, welcher zuerst dran ist.
     //
-    // Der häufigste Grund für „nichts" ist seit dem Fork weg: HKCAZ nutzt die
-    // internationale Kontoverbindung, und lib-fints füllte darin IBAN, BIC UND die
-    // nationalen Felder zugleich — was mindestens ein Institut mit `3010 Kontonummer ist
-    // ungültig` und einer leeren Liste beantwortete. Der Fork fragt stattdessen die
-    // HISPAS-Parameter der Bank (`nationalAccountAllowed`) und lässt die nationalen Felder
-    // weg, wo sie nicht erlaubt sind.
+    // Vorgabe ist CAMT. Der häufigste Grund, warum das nichts lieferte, ist seit dem Fork
+    // weg: HKCAZ nutzt die internationale Kontoverbindung, und lib-fints füllte darin
+    // IBAN, BIC UND die nationalen Felder zugleich — was mindestens ein Institut mit
+    // `3010 Kontonummer ist ungültig` und einer leeren Liste beantwortete. Der Fork fragt
+    // stattdessen die HISPAS-Parameter der Bank (`nationalAccountAllowed`).
     //
-    // Der Rückfall bleibt trotzdem, aus zwei Gründen: nicht jede Bank erklärt ihre
+    // Der zweite Versuch bleibt trotzdem, aus zwei Gründen: nicht jede Bank erklärt ihre
     // Ablehnung über HISPAS, und `success` taugt hier nicht als Prüfung — die Bibliothek
     // setzt es auf `höchster Rückmeldecode < 9000`, und `3010` liegt darunter. Ein leeres
-    // Ergebnis ist der einzige verlässliche Indikator, und ein legitim leerer Zeitraum
-    // kostet dadurch eine zusätzliche Runde. Das ist der billigere Fehler.
-    let format = "CAMT";
-    let antwort = await this.client.getAccountStatements(this.bankkonto(konto), von, bis, true);
-    antwort = await mitTan(antwort, (r, t) => this.client.getAccountStatementsWithTan(r, t), this.frageTan, this.decoupled);
-    hinweise.push(...hinweiseAus(antwort));
+    // Ergebnis ist der einzige verlässliche Indikator.
+    //
+    // `bevorzugtesFormat` dreht die Reihenfolge um, wo MT940 zuletzt getragen hat. Das
+    // spart die ergebnislose erste Runde — und weil der zweite Versuch bleibt, kommt ein
+    // Institut, das CAMT nachrüstet, von selbst wieder darauf. Ein Gedächtnis, keine
+    // Festlegung.
+    const zuerstCamt = bevorzugtesFormat !== "MT940";
+
+    const holen = async (camt: boolean) => {
+      let a = await this.client.getAccountStatements(this.bankkonto(konto), von, bis, camt);
+      a = await mitTan(a, (r, t) => this.client.getAccountStatementsWithTan(r, t), this.frageTan, this.decoupled);
+      hinweise.push(...hinweiseAus(a));
+      return a;
+    };
+
+    const name = (camt: boolean) => (camt ? "CAMT" : "MT940");
+
+    let format = name(zuerstCamt);
+    let antwort = await holen(zuerstCamt);
 
     if (!antwort.success || antwort.statements.length === 0) {
       const abgelehnt = antwort.bankAnswers.find((a) => a.code === 3010);
       hinweise.push(
         abgelehnt
-          ? `CAMT wurde abgelehnt (${abgelehnt.code} ${abgelehnt.text}) — Rückfall auf MT940.`
-          : "CAMT lieferte nichts — Rückfall auf MT940.",
+          ? `${format} wurde abgelehnt (${abgelehnt.code} ${abgelehnt.text}) — zweiter Versuch mit ${name(!zuerstCamt)}.`
+          : `${format} lieferte nichts — zweiter Versuch mit ${name(!zuerstCamt)}.`,
       );
-      format = "MT940";
-      antwort = await this.client.getAccountStatements(this.bankkonto(konto), von, bis, false);
-      antwort = await mitTan(antwort, (r, t) => this.client.getAccountStatementsWithTan(r, t), this.frageTan, this.decoupled);
-      hinweise.push(...hinweiseAus(antwort));
+      format = name(!zuerstCamt);
+      antwort = await holen(!zuerstCamt);
     }
 
     if (!antwort.success) {

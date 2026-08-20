@@ -251,7 +251,21 @@ export interface Abrufsitzung {
   /** Was diese Bank kann, wie sie es selbst meldet. */
   readonly profil: Bankprofil;
   saldo(konto: Bankkonto): Promise<Saldo | null>;
-  umsaetze(konto: Bankkonto, vonIso: string, bisIso: string): Promise<AbrufErgebnis>;
+  /**
+   * Umsätze holen.
+   *
+   * `bevorzugtesFormat` ist das, was für dieses Konto zuletzt getragen hat („CAMT" oder
+   * „MT940"). Es entscheidet nur die REIHENFOLGE der beiden Versuche, nie das Ergebnis:
+   * bleibt der erste leer, läuft der zweite. Damit spart ein Konto, das nur über MT940
+   * geht, die ergebnislose CAMT-Runde — und ein Institut, das CAMT nachrüstet, kommt
+   * trotzdem wieder darauf, statt für immer auf dem alten Weg zu bleiben.
+   */
+  umsaetze(
+    konto: Bankkonto,
+    vonIso: string,
+    bisIso: string,
+    bevorzugtesFormat?: string,
+  ): Promise<AbrufErgebnis>;
   /**
    * Die Depotaufstellung, sofern die Bank sie für dieses Konto freigibt.
    *

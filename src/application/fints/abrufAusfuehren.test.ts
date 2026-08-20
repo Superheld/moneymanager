@@ -64,7 +64,7 @@ function fakeAdapter(opt: {
   saldoWirft?: boolean;
   profil?: Bankprofil;
 }) {
-  const anfragen: { schluessel: string; von: string; bis: string }[] = [];
+  const anfragen: { schluessel: string; von: string; bis: string; bevorzugt?: string }[] = [];
   const sitzung: Abrufsitzung = {
     konten: opt.konten,
     bankparameter: () => '{"systemId":"S"}',
@@ -78,8 +78,8 @@ function fakeAdapter(opt: {
     async depot() {
       return null;
     },
-    async umsaetze(k, von, bis) {
-      anfragen.push({ schluessel: k.schluessel, von, bis });
+    async umsaetze(k, von, bis, bevorzugt) {
+      anfragen.push({ schluessel: k.schluessel, von, bis, bevorzugt });
       if (opt.wirft) throw new Error("3010 Kontonummer ist ungültig");
       return {
         format: "MT940",
@@ -404,6 +404,42 @@ describe("abrufAusfuehren", () => {
     (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps, rueckgriffTage: 90 })).konten;
 
     expect(anfragen[0].von).toBe("2026-05-20");
+  });
+
+  it("gibt das zuletzt getragene Format als Reihenfolge mit", async () => {
+    // Wo MT940 zuletzt getragen hat, spart das die ergebnislose CAMT-Runde. Es ist eine
+    // Reihenfolge, keine Festlegung — der Adapter versucht den anderen Weg trotzdem,
+    // wenn der erste leer bleibt.
+    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([
+      {
+        zugangId: "z1",
+        schluessel: "9876543210|Girokonto",
+        zahlungskontoId: "k1",
+        letzterAbrufBis: "2026-08-15",
+        letztesFormat: "MT940",
+      },
+    ]);
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(anfragen[0].bevorzugt).toBe("MT940");
+  });
+
+  it("fragt ohne Gedächtnis ohne Vorgabe", async () => {
+    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(anfragen[0].bevorzugt).toBeUndefined();
+  });
+
+  it("schreibt das getragene Format fort", async () => {
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    // Der Fake antwortet mit MT940 — beim nächsten Lauf steht das als Reihenfolge bereit.
+    expect(f.gespeicherteZuordnungen[0].letztesFormat).toBe("MT940");
   });
 
   it("tut nichts, wenn dem Zugang kein Konto zugeordnet ist", async () => {
