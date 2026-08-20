@@ -47,6 +47,14 @@ export interface Bankzugang {
   readonly tanVerfahrenId?: number;
   /** Zuletzt gewähltes TAN-Medium (Name laut Bank). */
   readonly tanMedium?: string;
+  /**
+   * Das zuletzt erhobene Bankfähigkeitsprofil, serialisiert.
+   *
+   * Abgeleitet aus denselben Bankparametern wie `bankparameter` und insofern redundant —
+   * aber in einer Form, die die Anwendungsschicht lesen darf. `bankparameter` ist ein
+   * Objekt der Bibliothek und bleibt im Adapter.
+   */
+  readonly profil?: string;
 }
 
 /**
@@ -72,6 +80,79 @@ export interface Bankkonto {
   readonly kannUmsaetze: boolean;
   /** Klartext, warum ein Konto eingeschränkt ist — leer, wenn es nichts zu sagen gibt. */
   readonly hinweis?: string;
+}
+
+/**
+ * Ein TAN-Verfahren, wie die Bank es anbietet — soweit es für die Auswahl zählt.
+ *
+ * Bis hierher nahm der Abruf immer das erste gemeldete Verfahren. Das ist bei Instituten,
+ * die mehrere anbieten, eine stille Entscheidung über die Bequemlichkeit des Nutzers: ob
+ * er eine TAN abtippt oder in der Banking-App auf „freigeben" tippt, steht in dieser Liste.
+ */
+export interface TanVerfahren {
+  /** Bank-interne ID, wie sie in `Bankzugang.tanVerfahrenId` gehört. */
+  readonly id: number;
+  readonly name: string;
+  /** true = Freigabe geschieht in der Banking-App, es wird nichts eingetippt. */
+  readonly decoupled: boolean;
+  /** Ob ein Medium gewählt werden MUSS — die Bank sagt das, nicht die Länge der Liste. */
+  readonly mediumPflicht: boolean;
+  readonly medien: readonly string[];
+}
+
+/**
+ * Was die Bank zu einem Geschäftsvorfall sagt.
+ *
+ * Alle Felder sind optional, weil jeder Vorfall andere Parameter mitbringt und Banken
+ * ältere Segmentversionen senden, in denen Felder schlicht fehlen. Ein fehlendes Feld
+ * heißt „die Bank hat dazu nichts gesagt", nicht „nein" — der Unterschied entscheidet,
+ * ob man einen Abruf wagt oder ihn unterlässt.
+ */
+export interface Vorfallprofil {
+  /** FinTS-Segmentkürzel, z. B. „HKKAZ". Die Oberfläche übersetzt es. */
+  readonly segment: string;
+  /** Höchste Version, die Bank UND Bibliothek gemeinsam können. */
+  readonly version?: number;
+  /** Wie weit die Bank für diesen Vorfall zurückreicht. Kann je Format abweichen. */
+  readonly speicherzeitraumTage?: number;
+  /** Ob alle Konten in einem Auftrag abgefragt werden dürfen. */
+  readonly alleKontenAmStueck?: boolean;
+  /** Ob die Anzahl der Einträge begrenzt werden darf. */
+  readonly anzahlBegrenzbar?: boolean;
+  /** Ob eine Währung gewählt werden darf (Depot). */
+  readonly waehrungWaehlbar?: boolean;
+  /** Ob Echtzeitkurse statt verzögerter angefordert werden dürfen (Depot). */
+  readonly kursqualitaetWaehlbar?: boolean;
+  /** Unterstützte Datenformate, z. B. CAMT-Fassungen oder Auszugsformate. */
+  readonly formate?: readonly string[];
+}
+
+/**
+ * Was diese Bank kann — abgefragt statt angenommen.
+ *
+ * Das steckt alles in den Bankparametern (BPD/UPD), die wir ohnehin als `bankparameter`
+ * aufbewahren. Der Unterschied ist die Form: dort ist es ein Objekt der Bibliothek, das
+ * nur der Adapter lesen darf und niemand ansehen kann. Hier sind es Fachbegriffe, die
+ * ohne Anmeldung und ohne PIN dastehen — und damit die Antwort auf „warum holt der Abruf
+ * nur 30 Tage" hergeben, bevor jemand sich einloggt, um nachzusehen.
+ */
+export interface Bankprofil {
+  /** Wann dieses Profil erhoben wurde (ISO-Datum). */
+  readonly standAm: string;
+  readonly tanVerfahren: readonly TanVerfahren[];
+  readonly vorfaelle: readonly Vorfallprofil[];
+  /**
+   * Welche Vorfälle je Konto freigegeben sind — Schlüssel ist `Bankkonto.schluessel`.
+   * Die Bank meldet das je Konto verschieden; ein Depot kann Umsätze verweigern und
+   * Bestände liefern.
+   */
+  readonly kontoVorfaelle: Readonly<Record<string, readonly string[]>>;
+  /**
+   * Ob die Bank die nationalen Kontofelder in der internationalen Kontoverbindung
+   * erlaubt (`HISPAS.nationalAccountAllowed`). `false` ist der Grund, warum bei manchen
+   * Instituten CAMT nur ohne diese Felder durchgeht.
+   */
+  readonly nationaleFelderErlaubt?: boolean;
 }
 
 /** Rückfrage der Bank nach einer TAN. Das Bild kommt bei photoTAN inline mit. */
@@ -115,8 +196,8 @@ export interface Abrufsitzung {
   readonly bankNachrichten: readonly string[];
   /** Name des benutzten TAN-Verfahrens, für die Anzeige. */
   readonly tanVerfahren?: string;
-  /** Wie weit die Bank Umsätze überhaupt vorhält (Tage) — von ihr selbst gemeldet. */
-  readonly speicherzeitraumTage?: number;
+  /** Was diese Bank kann, wie sie es selbst meldet. */
+  readonly profil: Bankprofil;
   saldo(konto: Bankkonto): Promise<Saldo | null>;
   umsaetze(konto: Bankkonto, vonIso: string, bisIso: string): Promise<AbrufErgebnis>;
 }

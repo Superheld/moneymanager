@@ -43,7 +43,8 @@ import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
 import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
 import { bankAnker } from "../../core";
-import type { Abrufadapter, Bankzugang, TanFrager } from "./abrufPort";
+import type { Abrufadapter, Bankprofil, Bankzugang, TanFrager } from "./abrufPort";
+import { abruffenster, erstabrufTage } from "./bankprofil";
 import type { Kontozuordnung, KontozuordnungRepository } from "./bankzugangPort";
 import type { BankzugangRepository } from "./bankzugangPort";
 
@@ -63,6 +64,12 @@ export interface AbrufBefund {
   /** Der von der Bank gemeldete Kontostand, falls sie ihn herausgibt. */
   readonly bankSaldo?: number;
   readonly bankSaldoDatum?: string;
+  /**
+   * Gesetzt, wenn die Bank den gewünschten Zeitraum beschnitten hat — der Wert ist ihre
+   * Grenze in Tagen. Ohne das liest sich ein an der Grenze abgeschnittener Abruf wie ein
+   * vollständiger.
+   */
+  readonly speicherzeitraumErreicht?: number;
   /** Gesetzt, wenn dieses Konto nicht abgerufen werden konnte — der Rest läuft weiter. */
   readonly fehler?: string;
 }
@@ -115,17 +122,57 @@ function tageVor(iso: string, tage: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** Ganze Tage von `von` bis `bis`. Nie negativ — ein Stand aus der Zukunft heißt „null Tage". */
+function tageZwischen(von: string, bis: string): number {
+  const zahl = (iso: string) => {
+    const [j, m, t] = iso.split("-").map(Number);
+    return Date.UTC(j, m - 1, t);
+  };
+  return Math.max(0, Math.round((zahl(bis) - zahl(von)) / 86_400_000));
+}
+
+/** Von wann bis heute geholt wird — und ob die Bank den Wunsch beschnitten hat. */
+export interface Abrufzeitraum {
+  readonly von: string;
+  /** true, wenn der Speicherzeitraum der Bank vor dem gewünschten Start endet. */
+  readonly gedeckelt: boolean;
+  /** Die Grenze der Bank in Tagen, sofern sie eine genannt hat. */
+  readonly grenze?: number;
+}
+
 /**
  * Ab wann für dieses Konto geholt wird.
  *
- * Ein ausdrücklich gewünschter Zeitraum gewinnt — auch gegen einen jüngeren Stand: wer
- * 180 Tage anfordert, will 180 Tage, nicht „ab letztem Abruf, aber höchstens 180".
+ * Drei Fälle, in dieser Reihenfolge:
+ *
+ *  1. Ein ausdrücklich gewünschter Zeitraum gewinnt — auch gegen einen jüngeren Stand: wer
+ *     180 Tage anfordert, will 180 Tage, nicht „ab letztem Abruf, aber höchstens 180".
+ *  2. Ein Erstabruf holt, was die Bank vorhält. Bis hierher waren das feste 30 Tage, und
+ *     bei einem Institut mit langem Speicherzeitraum blieb der Rest liegen, bis jemand
+ *     ihn ausdrücklich nachholte — was niemand tut, der nicht weiß, dass er etwas
+ *     verpasst hat. Sagt die Bank nichts, bleibt es bei der Vorgabe.
+ *  3. Sonst der fortlaufende Stand mit Rückgriff.
+ *
+ * Am Ende wird in jedem Fall an dem gemessen, was die Bank überhaupt hergibt. Das ändert
+ * die geholte Menge nicht — mehr liefert sie ohnehin nicht —, aber es macht den
+ * Unterschied zwischen „in diesen Monaten war nichts" und „diese Monate hat die Bank
+ * nicht mehr" sichtbar.
  */
-export function abrufStart(zuordnung: Kontozuordnung, heute: string, rueckgriffTage?: number): string {
-  if (rueckgriffTage != null) return tageVor(heute, rueckgriffTage);
-  return zuordnung.letzterAbrufBis
-    ? tageVor(zuordnung.letzterAbrufBis, RUECKGRIFF_TAGE)
-    : tageVor(heute, ERSTABRUF_TAGE);
+export function abrufZeitraum(
+  zuordnung: Kontozuordnung,
+  heute: string,
+  rueckgriffTage?: number,
+  profil?: Bankprofil,
+): Abrufzeitraum {
+  const gewuenscht =
+    rueckgriffTage != null
+      ? rueckgriffTage
+      : zuordnung.letzterAbrufBis
+        ? tageZwischen(zuordnung.letzterAbrufBis, heute) + RUECKGRIFF_TAGE
+        : erstabrufTage(profil, ERSTABRUF_TAGE);
+
+  const fenster = abruffenster(profil, gewuenscht);
+  return { von: tageVor(heute, fenster.tage), gedeckelt: fenster.gedeckelt, grenze: fenster.grenze };
 }
 
 /**
@@ -148,7 +195,14 @@ export async function abrufAusfuehren(
 
   // Bankparameter direkt nach der Anmeldung sichern: BPD/UPD können sich bei jedem
   // Auftrag ändern, und ein späterer Abbruch soll den frischen Stand nicht verwerfen.
-  await deps.zugangRepo.speichern({ ...zugang, bankparameter: sitzung.bankparameter() });
+  // Das Profil geht mit — es ist aus denselben Parametern abgeleitet und wäre sonst
+  // genau dann veraltet, wenn sich etwas geändert hat.
+  const profil = sitzung.profil;
+  await deps.zugangRepo.speichern({
+    ...zugang,
+    bankparameter: sitzung.bankparameter(),
+    profil: JSON.stringify(profil),
+  });
 
   const konten = await deps.kontoRepo.alle();
   const befunde: AbrufBefund[] = [];
@@ -157,7 +211,8 @@ export async function abrufAusfuehren(
     const bankkonto = sitzung.konten.find((k) => k.schluessel === z.schluessel);
     const zahlungskonto = konten.find((k) => k.id === z.zahlungskontoId);
     const bezeichnung = zahlungskonto?.bezeichnung ?? bankkonto?.bezeichnung ?? z.schluessel;
-    const von = abrufStart(z, deps.heute, deps.rueckgriffTage);
+    const zeitraum = abrufZeitraum(z, deps.heute, deps.rueckgriffTage, profil);
+    const von = zeitraum.von;
 
     if (!bankkonto) {
       befunde.push({
@@ -247,7 +302,13 @@ export async function abrufAusfuehren(
       }
 
       await ankerFesthalten();
-      await deps.zuordnungRepo.speichern({ ...z, letzterAbrufBis: deps.heute });
+      // Das getragene Format mit fortschreiben: hat CAMT hier nicht getragen, ist die
+      // erste Runde beim nächsten Mal absehbar vergeblich.
+      await deps.zuordnungRepo.speichern({
+        ...z,
+        letzterAbrufBis: deps.heute,
+        letztesFormat: abruf.format,
+      });
       befunde.push({
         zahlungskontoId: z.zahlungskontoId,
         bezeichnung,
@@ -257,6 +318,7 @@ export async function abrufAusfuehren(
         ergebnis,
         bankSaldo: saldo?.betrag,
         bankSaldoDatum: saldo?.datum,
+        speicherzeitraumErreicht: zeitraum.gedeckelt ? zeitraum.grenze : undefined,
       });
     } catch (e) {
       // Auch im Fehlerfall wird ein geholter Saldo festgehalten (siehe `ankerFesthalten`).
@@ -292,6 +354,10 @@ export async function abrufAusfuehren(
 
   // Zum Schluss noch einmal: die Bank hat während der Aufträge womöglich neue Parameter
   // nachgeschoben.
-  await deps.zugangRepo.speichern({ ...zugang, bankparameter: sitzung.bankparameter() });
+  await deps.zugangRepo.speichern({
+    ...zugang,
+    bankparameter: sitzung.bankparameter(),
+    profil: JSON.stringify(sitzung.profil),
+  });
   return befunde;
 }

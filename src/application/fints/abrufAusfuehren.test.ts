@@ -7,7 +7,8 @@ import { describe, expect, it } from "vitest";
 import type { Zahlungskonto } from "../../core";
 import type { Abrufadapter, Abrufsitzung, Bankkonto, Bankzugang } from "./abrufPort";
 import type { Kontozuordnung } from "./bankzugangPort";
-import { ERSTABRUF_TAGE, RUECKGRIFF_TAGE, abrufAusfuehren, abrufStart } from "./abrufAusfuehren";
+import type { Bankprofil } from "./abrufPort";
+import { ERSTABRUF_TAGE, RUECKGRIFF_TAGE, abrufAusfuehren, abrufZeitraum } from "./abrufAusfuehren";
 
 const HEUTE = "2026-08-18";
 
@@ -41,14 +42,34 @@ const konto: Zahlungskonto = {
   saldo: 0,
 };
 
+/** Eine Bank, die nichts über sich sagt — der Normalfall in den Tests unten. */
+function leeresProfil(): Bankprofil {
+  return { standAm: HEUTE, tanVerfahren: [], vorfaelle: [], kontoVorfaelle: {} };
+}
+
+/** Eine Bank, die einen Speicherzeitraum nennt. */
+function profilMitSpeicherzeitraum(tage: number): Bankprofil {
+  return {
+    ...leeresProfil(),
+    vorfaelle: [{ segment: "HKKAZ", speicherzeitraumTage: tage }],
+  };
+}
+
 /** Merkt sich, mit welchem Zeitraum gefragt wurde, und liefert eine feste Buchung. */
-function fakeAdapter(opt: { konten: Bankkonto[]; wirft?: boolean; saldo?: number; saldoWirft?: boolean }) {
+function fakeAdapter(opt: {
+  konten: Bankkonto[];
+  wirft?: boolean;
+  saldo?: number;
+  saldoWirft?: boolean;
+  profil?: Bankprofil;
+}) {
   const anfragen: { schluessel: string; von: string; bis: string }[] = [];
   const sitzung: Abrufsitzung = {
     konten: opt.konten,
     bankparameter: () => '{"systemId":"S"}',
     hinweise: [],
     bankNachrichten: [],
+    profil: opt.profil ?? leeresProfil(),
     async saldo() {
       if (opt.saldoWirft) throw new Error("9000 Auftrag abgelehnt");
       return opt.saldo == null ? null : { betrag: opt.saldo, datum: "2026-08-18", waehrung: "EUR" };
@@ -167,32 +188,58 @@ function fakes(zuordnungen: Kontozuordnung[]) {
   };
 }
 
-describe("abrufStart", () => {
+describe("abrufZeitraum", () => {
+  const z = (over: Partial<Kontozuordnung> = {}): Kontozuordnung => ({
+    zugangId: "z1",
+    schluessel: "s",
+    zahlungskontoId: "k1",
+    ...over,
+  });
+
   it("greift beim Folgeabruf hinter den letzten Stand zurück", () => {
     // Banken tragen nach und verschieben Valuta. Exakt am letzten Tag anzusetzen
     // verliert genau diese Nachzügler — unbemerkt.
-    const start = abrufStart({ zugangId: "z1", schluessel: "s", zahlungskontoId: "k1", letzterAbrufBis: "2026-08-15" }, HEUTE);
-    expect(start).toBe("2026-08-08");
+    expect(abrufZeitraum(z({ letzterAbrufBis: "2026-08-15" }), HEUTE).von).toBe("2026-08-08");
     expect(RUECKGRIFF_TAGE).toBe(7);
   });
 
   it("ein ausdrücklich gewünschter Zeitraum gewinnt gegen den letzten Stand", () => {
     // Wer 180 Tage anfordert, will 180 Tage — sonst liesse sich ein alter Dateibestand
     // nie durch die Zeilen der Bank ersetzen.
-    const z = { zugangId: "z1", schluessel: "s", zahlungskontoId: "k1", letzterAbrufBis: "2026-08-15" };
-    expect(abrufStart(z, HEUTE, 90)).toBe("2026-05-20");
-    expect(abrufStart(z, HEUTE, 0)).toBe(HEUTE);
+    const mitStand = z({ letzterAbrufBis: "2026-08-15" });
+    expect(abrufZeitraum(mitStand, HEUTE, 90).von).toBe("2026-05-20");
+    expect(abrufZeitraum(mitStand, HEUTE, 0).von).toBe(HEUTE);
   });
 
-  it("nimmt beim Erstabruf ein festes Fenster", () => {
-    const start = abrufStart({ zugangId: "z1", schluessel: "s", zahlungskontoId: "k1" }, HEUTE);
-    expect(start).toBe("2026-07-19");
+  it("nimmt beim Erstabruf das feste Fenster, solange die Bank nichts sagt", () => {
+    expect(abrufZeitraum(z(), HEUTE).von).toBe("2026-07-19");
     expect(ERSTABRUF_TAGE).toBe(30);
   });
 
   it("rechnet über die Monatsgrenze richtig", () => {
-    const start = abrufStart({ zugangId: "z1", schluessel: "s", zahlungskontoId: "k1", letzterAbrufBis: "2026-03-03" }, HEUTE);
-    expect(start).toBe("2026-02-24");
+    expect(abrufZeitraum(z({ letzterAbrufBis: "2026-03-03" }), HEUTE).von).toBe("2026-02-24");
+  });
+
+  it("holt beim Erstabruf, was die Bank vorhält, statt der festen 30 Tage", () => {
+    // Der Kern von Punkt 2: bei einem Institut mit langem Speicherzeitraum blieb der
+    // Rest bisher liegen, bis jemand ihn ausdrücklich nachholte.
+    const fenster = abrufZeitraum(z(), HEUTE, undefined, profilMitSpeicherzeitraum(540));
+    expect(fenster.von).toBe("2025-02-24");
+    expect(fenster.gedeckelt).toBe(false);
+  });
+
+  it("meldet, wenn der Wunsch über den Speicherzeitraum der Bank hinausgeht", () => {
+    const fenster = abrufZeitraum(z(), HEUTE, 720, profilMitSpeicherzeitraum(540));
+    expect(fenster.von).toBe("2025-02-24");
+    expect(fenster.gedeckelt).toBe(true);
+    expect(fenster.grenze).toBe(540);
+  });
+
+  it("deckelt nicht, wo die Bank nichts gesagt hat", () => {
+    // Unbekannt ist nicht null: wer daraus eine Grenze macht, schaltet den Abruf ab.
+    const fenster = abrufZeitraum(z(), HEUTE, 720);
+    expect(fenster.von).toBe("2024-08-28");
+    expect(fenster.gedeckelt).toBe(false);
   });
 });
 
