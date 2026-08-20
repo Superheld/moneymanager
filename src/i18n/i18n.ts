@@ -628,6 +628,11 @@ const de = {
       feldZeitraum: "Zeitraum",
       zeitraumFortlaufend: "seit dem letzten Abruf",
       zeitraumTage: "die letzten {{n}} Tage",
+      zeitraumEigen: "eigener Zeitraum …",
+      zeitraumEigenFeld: "Zeitraum in Tagen",
+      zeitraumEigenPlatzhalter: "Tage",
+      zeitraumGrenze: "Diese Bank hält Umsätze {{tage}} Tage vor — mehr liefert sie nicht.",
+      zeitraumGedeckelt: "Mehr als {{tage}} Tage gibt es bei dieser Bank nicht; geholt wird bis dorthin.",
       zeitraumHinweis:
         "Weiter zurück, wenn ein alter Dateibestand durch die Zeilen der Bank ersetzt werden soll. Was über den Speicherzeitraum der Bank hinausgeht, liefert sie nicht — das ist kein Fehler.",
       zeile: "{{eingelesen}} geholt · {{neu}} neu · {{duplikate}} schon bekannt",
@@ -1887,6 +1892,11 @@ const en: typeof de = {
       feldZeitraum: "Period",
       zeitraumFortlaufend: "since the last retrieval",
       zeitraumTage: "the last {{n}} days",
+      zeitraumEigen: "custom period …",
+      zeitraumEigenFeld: "Period in days",
+      zeitraumEigenPlatzhalter: "days",
+      zeitraumGrenze: "This bank keeps transactions for {{tage}} days — it will not supply more.",
+      zeitraumGedeckelt: "This bank holds no more than {{tage}} days; the retrieval stops there.",
       zeitraumHinweis:
         "Reach further back when an old file-based stock is to be replaced by the bank's own rows. Anything beyond the bank's retention simply does not arrive — that is not an error.",
       zeile: "{{eingelesen}} fetched · {{neu}} new · {{duplikate}} already known",

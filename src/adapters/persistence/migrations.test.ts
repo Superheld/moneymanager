@@ -83,6 +83,12 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     expect(spalten(db, "ist_buchung")).toEqual(
       expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
     );
+    // v37 — das Bankfaehigkeitsprofil am Zugang, das getragene Format an der Zuordnung
+    expect(spalten(db, "bankzugang")).toContain("profil");
+    expect(spalten(db, "bankkonto_zuordnung")).toContain("letztes_format");
+    // v39 — die Reparatur von v38. `kennung` identifiziert eine Position innerhalb eines
+    // Stichtags; ohne sie schlaegt der erste Depotabruf fehl.
+    expect(spalten(db, "depotposition")).toContain("kennung");
     db.close();
   });
 
