@@ -35,6 +35,19 @@ Bewusst: `@typescript-eslint/parser` unterstützt das hier installierte TypeScri
 - **Tests als Wächter.** `architektur.test.ts` (Schichtgrenzen), `doku.test.ts`
   (Verweise in der Doku), `privatsphaere.test.ts` (keine echten Daten), der i18n-Test
   (de/en-Parität). Eine Regel, die zählt, wird ausführbar gemacht statt aufgeschrieben.
+- **Das LSP** (`typescript-lsp`, aktiviert in `.claude/settings.json`) liefert dieselben
+  Auskünfte während der Arbeit statt erst im Testlauf: wo ein Symbol definiert ist, **alle**
+  Verwendungen davon, welcher Typ dahintersteht. Bei „wer benutzt das" ist es `grep`
+  überlegen, weil es den Compiler fragt statt Text zu vergleichen — Erwähnungen in
+  Kommentaren zählt es nicht mit, Namensgleichheit über Modulgrenzen verwechselt es nicht.
+
+  Zwei Fallen: **Der erste Aufruf nach dem Start ist kalt** und meldet zu wenig (bei einer
+  Funktion mit acht Verwendungen kam beim ersten Mal genau eine zurück) — im Zweifel
+  wiederholen, ein „keine Referenzen" ist erst beim zweiten Mal eine Aussage. Und der
+  Sprachserver muss **global installiert** sein (`npm install -g typescript-language-server
+  typescript@5`); das Plugin bringt nur die Anbindung mit. Die Version 5 ist kein Versehen:
+  das Projekt-TypeScript 7 liefert kein `tsserver.js` mehr, der Server findet dann keine
+  brauchbare Installation und beendet sich. Dasselbe Muster wie beim fehlenden Linter.
 
 ## Tests
 
