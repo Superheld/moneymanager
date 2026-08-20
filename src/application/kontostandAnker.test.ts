@@ -4,7 +4,7 @@ import { anfangsbestandAbgleichen, kontostandFesthalten } from "./kontostandAnke
 import type { KontostandsankerRepository, LedgerPort, ZahlungskontoRepository } from "./ports";
 
 const KONTO: Zahlungskonto = {
-  id: "giro", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: [Betrag],
+  id: "giro", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 9900,
 };
 
 function fakes(konto = KONTO, buchungen: IstBuchung[] = [], anker: Kontostandsanker[] = []) {
@@ -57,27 +57,27 @@ describe("kontostandFesthalten — der Kassensturz", () => {
 
 describe("anfangsbestandAbgleichen", () => {
   const ANKER: Kontostandsanker = {
-    kontoId: "giro", datum: "2026-08-20", herkunft: "bank", betrag: [Betrag],
+    kontoId: "giro", datum: "2026-08-20", herkunft: "bank", betrag: 145678,
     erfasstAm: "2026-08-20T22:47:00.000Z",
   };
 
   it("setzt den Anfangsbestand so, dass die Rechnung den Anker trifft", async () => {
-    // Der echte Fall: die App rechnet 1.828,72 €, die Bank meldet [Betrag] € — 103,38 €
-    // Differenz, die vermutlich aus der Zeit vor dem ersten Import stammt.
-    const buchungen = [buchung("2026-01-05", [Betrag])];
+    // Der Fall, um den es geht: die App rechnet mehr als die Bank meldet, und die
+    // Differenz stammt vermutlich aus der Zeit vor dem ersten Import.
+    const buchungen = [buchung("2026-01-05", 133344)];
     const f = fakes(KONTO, buchungen, [ANKER]);
 
     const ergebnis = await anfangsbestandAbgleichen(f.deps, "giro");
 
-    expect(ergebnis.alt).toBe([Betrag]);
-    expect(ergebnis.neu).toBe(6964); // [Betrag] − [Betrag]
-    expect(ergebnis.differenz).toBe(-10338);
-    expect(f.gespeicherteKonten[0].saldo).toBe(6964);
+    expect(ergebnis.alt).toBe(9900);
+    expect(ergebnis.neu).toBe(12334); // 145678 − 133344
+    expect(ergebnis.differenz).toBe(2434);
+    expect(f.gespeicherteKonten[0].saldo).toBe(12334);
   });
 
   it("rührt nichts an, wenn schon alles stimmt", async () => {
     // Sonst schriebe ein Klick ohne Wirkung trotzdem — und ein Konto sähe geändert aus.
-    const buchungen = [buchung("2026-01-05", 155232)];
+    const buchungen = [buchung("2026-01-05", 135778)];
     const f = fakes(KONTO, buchungen, [ANKER]);
 
     const ergebnis = await anfangsbestandAbgleichen(f.deps, "giro");
@@ -89,10 +89,10 @@ describe("anfangsbestandAbgleichen", () => {
   it("zählt nur, was bis zum Stichtag gebucht ist", async () => {
     // Eine Buchung NACH dem Ankerdatum gehört nicht in den Anfangsbestand — sie ist ja
     // im gemeldeten Stand gar nicht enthalten.
-    const buchungen = [buchung("2026-01-05", [Betrag]), buchung("2026-08-25", -5000)];
+    const buchungen = [buchung("2026-01-05", 133344), buchung("2026-08-25", -5000)];
     const f = fakes(KONTO, buchungen, [ANKER]);
 
-    expect((await anfangsbestandAbgleichen(f.deps, "giro")).neu).toBe(6964);
+    expect((await anfangsbestandAbgleichen(f.deps, "giro")).neu).toBe(12334);
   });
 
   it("verweigert den Abgleich ohne Anker", async () => {
