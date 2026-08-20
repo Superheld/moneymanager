@@ -778,4 +778,40 @@ export const MIGRATIONS: Migration[] = [
        )`,
     ],
   },
+  {
+    version: 39, // Reparatur von v38 — `depotposition` neu, mit `kennung`
+    sql: [
+      // v38 legte die Tabelle zunächst mit `PRIMARY KEY (depot_id, stichtag, isin, name)`
+      // an. Das ist falsch: in SQLite gelten NULL-Werte innerhalb eines Primärschlüssels
+      // paarweise als VERSCHIEDEN, zwei Positionen ohne ISIN und ohne Namen landeten also
+      // bei jedem Abruf erneut in der Tabelle.
+      //
+      // Der Fehler wurde in v38 SELBST korrigiert, statt eine neue Version anzuhängen —
+      // gegen die Regel oben in dieser Datei. Wo v38 zu dem Zeitpunkt schon gelaufen war,
+      // wurde sie als erledigt vermerkt und die Korrektur nie ausgeführt; der erste
+      // Depotabruf scheiterte dort mit „table depotposition has no column named kennung".
+      // Genau dafür gibt es die Regel: eine Reparatur ist eine NEUE Version.
+      //
+      // Neu anlegen statt ALTER, weil SQLite den Primärschlüssel nicht ändern kann. Der
+      // Verlust ist keiner: die Tabelle hält Beobachtungen eines Stichtags, und der
+      // nächste Abruf schreibt sie vollständig neu. Beide Ausgangslagen enden hier
+      // gleich — die mit und die ohne `kennung`.
+      `DROP TABLE IF EXISTS depotposition`,
+      `CREATE TABLE IF NOT EXISTS depotposition (
+         depot_id       TEXT NOT NULL,
+         stichtag       TEXT NOT NULL,
+         kennung        TEXT NOT NULL,
+         isin           TEXT,
+         wkn            TEXT,
+         name           TEXT,
+         stueck         REAL,
+         kurs           REAL,
+         wert           INTEGER,
+         waehrung       TEXT,
+         einstand_datum TEXT,
+         einstand_kurs  REAL,
+         PRIMARY KEY (depot_id, stichtag, kennung)
+       )`,
+    ],
+  },
 ];
