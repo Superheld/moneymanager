@@ -9,7 +9,7 @@
 // Der Screen RECHNET NICHTS. Er lud vorher sechs Repositories selbst zusammen und rief
 // damit die Kernfunktionen auf — und genau dabei ging die Vertragsregel verloren: die
 // Karten oben bekamen eine gefilterte Buchungsliste, die Budgetliste darunter die
-// ungefilterte, und dasselbe Budget stand im selben Bild mit 0,00 € und mit 425,00 €.
+// ungefilterte, und dasselbe Budget stand im selben Bild mit zwei verschiedenen Werten.
 // Seit 2026-08-19 kommt alles fertig aus `uebersichtLaden` (Anwendungsschicht).
 //
 // Der Monatsumschalter geht ausdrücklich nur nach HINTEN. Ein Budget in der Zukunft hat

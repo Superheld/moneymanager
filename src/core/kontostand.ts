@@ -9,8 +9,8 @@
 // **Ein Anker ist eine BEOBACHTUNG, kein zwischengespeichertes Rechenergebnis.** Der
 // Unterschied ist tragend. Ein Cache müsste ungültig werden, sobald jemand nachträglich
 // eine Buchung vor dem Stichtag einfügt, und diese Invalidierung ist die Stelle, an der
-// solche Systeme faulen. Eine Beobachtung wird nie falsch: am 20.08. hat die Bank [Betrag]
-// gemeldet, das bleibt wahr, egal was danach nachgebucht wird. Was sich ändert, ist die
+// solche Systeme faulen. Eine Beobachtung wird nie falsch: was die Bank an einem Tag
+// gemeldet hat, bleibt wahr, egal was danach nachgebucht wird. Was sich ändert, ist die
 // DIFFERENZ — und die ist genau die Information, die man sehen will.
 //
 // **Was ein einzelner Anker nicht kann.** Er sagt „hier fehlen 600 Euro", aber nicht, wo.

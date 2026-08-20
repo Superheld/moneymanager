@@ -121,8 +121,8 @@ export interface MonatsAusblickEingabe {
   /**
    * IDs der Buchungen, die zu einem Vertrag gehören — sie zählen nicht gegen ein Budget.
    * Pflichtfeld, damit die Aufrechnung hier dieselbe Regel benutzt wie die Budgetliste;
-   * die beiden zeigten sonst für dasselbe Budget verschiedene Zahlen (0,00 € und
-   * 425,00 € auf derselben Übersicht).
+   * die beiden zeigten sonst für dasselbe Budget verschiedene Zahlen — kein Verbrauch
+   * hier, ein überschrittener Rahmen dort, auf derselben Übersicht.
    */
   readonly vertragsBuchungen: ReadonlySet<string>;
   /** Erster Tag des Monats, „YYYY-MM-01". */

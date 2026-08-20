@@ -99,7 +99,7 @@ export async function buchungenSammelbearbeiten(
  * **Der zugehörige Umsatz wird mit weggelegt.** Ohne das blieb er auf „verbucht" stehen
  * und zeigte auf eine Buchung, die es nicht mehr gibt — ein Widerspruch in den Daten mit
  * sichtbarer Folge: die Dublettenprüfung im Ledger mahnte weiter Zeilen an, die längst
- * entfernt waren (32 solche Umsätze im echten Bestand). Er wird `verworfen`, nicht
+ * entfernt waren (am echten Bestand ein paar Dutzend). Er wird `verworfen`, nicht
  * `neu`: wer dreißig Zeilen markiert und wegwirft, will sie nicht danach im Stapel
  * wiederfinden. In der Datenbank bleibt er — „das habe ich schon einmal weggeworfen" ist
  * genau die Auskunft, die der nächste Import braucht.

@@ -17,7 +17,8 @@
 // **Warum ein Punktesystem und keine feste Regel.** Keine einzelne Angabe trägt allein:
 // die Bank vergibt keine stabile Buchungs-ID (`customerReference` ist durchgehend
 // NONREF, `bankReference` ein Positionszähler über das abgefragte Fenster), Finanzguru
-// liefert die End-to-End-Referenz nicht (Spalte `E-Ref`: 0 von 5279 gefüllt), und der
+// liefert die End-to-End-Referenz nicht (Spalte `E-Ref`: am echten Bestand durchweg
+// leer), und der
 // Buchungstag verschiebt sich, wenn aus einer angekündigten eine gebuchte Zahlung wird.
 // Mehrere schwache Signale zusammen tragen; ein einzelnes nicht.
 //
@@ -370,8 +371,8 @@ export interface Dublettenpaar<T> {
  * dreimal da, sollen alle drei Paare auftauchen und nicht zwei davon stillschweigend
  * verschwinden.
  *
- * Vorsortiert nach Betrag, weil der exakt stimmen muss — auf dem echten Bestand bleiben
- * damit von 5300 Sätzen rund 26.000 Paarvergleiche übrig statt 14 Millionen.
+ * Vorsortiert nach Betrag, weil der exakt stimmen muss — das drückt die Zahl der
+ * Paarvergleiche am echten Bestand um mehr als das Fünfhundertfache.
  */
 export function paareImBestand<T extends Vergleichbar>(saetze: readonly T[]): Dublettenpaar<T>[] {
   const nachBetrag = new Map<Cent, T[]>();

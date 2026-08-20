@@ -25,7 +25,7 @@ sagen, in welchem ZEITRAUM eine Lücke entstand. `abweichungsfenster` rechnet An
 Anker und kommt dabei ohne den Anfangsbestand aus: der ist selbst nur geschätzt (er
 überbrückt die Zeit vor dem ersten Import), und ein falscher verschiebt jede Abweichung um
 denselben Betrag, ohne die Differenz zwischen zwei Ankern anzutasten. Aus „irgendwo in
-3.511 Buchungen seit 2021 fehlen 600 €" wird damit „zwischen dem 31.07. und dem 31.08.".
+Tausenden Buchungen mehrerer Jahre fehlt etwas" wird damit ein Zeitraum von wenigen Wochen.
 
 **Anfangsbestand abgleichen** — einmalig, mit Vorschau und auf Zuruf. Die Differenz
 wandert dorthin, wo sie hingehört, solange der Anfangsbestand nur die fehlende
@@ -37,8 +37,8 @@ Gründe im Klartext, ein Sprung zum Gegenstück, ein Filter „könnten doppelt 
 „kein Duplikat" für den Fall, dass der Finder danebenlag. Festgehalten wird das PAAR, denn
 dass A nicht dasselbe ist wie B, sagt nichts über A und C. Geprüft wird beim Hinsehen, nicht
 einmalig beim Import: ein Verdacht vom Importtag gälte für den Stand von damals. Gewertet
-wird nur über Lauf-Grenzen hinweg — am echten Bestand lagen 76 von 126 Paaren im selben
-Lauf und waren durchweg echte Mehrfachzahlungen.
+wird nur über Lauf-Grenzen hinweg — am echten Bestand lag die Mehrheit aller Paare im
+selben Lauf und war durchweg echte Mehrfachzahlung.
 
 **Massenbearbeitung im Register.** Kategorie oder Bezeichnung für dreißig Zeilen auf
 einmal, Löschen mit zweiter Frage. Die Kästchenspalte erscheint erst, wenn man sie
@@ -95,15 +95,14 @@ verrotten.
 
 ### Behoben
 
-- **Vertragsraten zählten gegen ihr Budget.** Auf der Übersicht stand „Familie & Kinder"
-  oben mit 0,00 € Verbrauch und darunter mit 425,00 € bei 110,00 € Rahmen — beides aus
-  denselben Daten. Die Regel steckte nicht in der Funktion, sondern in der Liste, die der
-  Aufrufer übergab. `budgetVerbrauch`/`budgetBuchungen`/`budgetStand` nehmen jetzt eine
+- **Vertragsraten zählten gegen ihr Budget.** Auf der Übersicht stand dasselbe Budget
+  oben ohne Verbrauch und darunter weit über seinem Rahmen — beides aus denselben Daten.
+  Die Regel steckte nicht in der Funktion, sondern in der Liste, die der Aufrufer übergab. `budgetVerbrauch`/`budgetBuchungen`/`budgetStand` nehmen jetzt eine
   `BudgetSicht` mit Pflichtfeld `vertragsBuchungen`; der Compiler hat alle Aufrufer
   gefunden.
 - **Verwaiste Umsätze.** Wer eine Buchung über die Sammelbearbeitung entfernte, ließ ihren
-  Umsatz auf „verbucht" stehen, mit einer Buchungs-ID, die ins Leere zeigte — 32 Zeilen im
-  echten Bestand, die dadurch weiter als Dublette angemahnt wurden. Use-Case repariert,
+  Umsatz auf „verbucht" stehen, mit einer Buchungs-ID, die ins Leere zeigte — am echten
+  Bestand ein paar Dutzend Zeilen, die dadurch weiter als Dublette angemahnt wurden. Use-Case repariert,
   Bestand über Migration 33 aufgeräumt.
 - **Der Dublettenfilter blieb hängen**, wenn der letzte Verdacht erledigt war: der Knopf
   verschwand, der Filter nicht, und die Tabelle stand leer da. Der Erfolg sah aus wie ein
