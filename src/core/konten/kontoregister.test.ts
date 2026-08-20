@@ -6,7 +6,7 @@ import type { IstBuchung } from "../buchung/istbuchung";
 import { kontoRegister } from "./kontoregister";
 
 function konto(over: Partial<Zahlungskonto> = {}): Zahlungskonto {
-  return { id: "k1", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo: euroZuCent(1000), ...over };
+  return { id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: euroZuCent(1000), ...over };
 }
 function regel(over: Partial<Zahlungsregel> = {}): Zahlungsregel {
   return {

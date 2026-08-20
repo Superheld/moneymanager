@@ -11,7 +11,7 @@ import type { IstBuchung, Zahlungskonto } from "../../core";
 import { freigabeAus, type Dublettenfreigabe } from "../dubletten/dublettensicht";
 
 const KONTO: Zahlungskonto = {
-  id: "giro", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 0,
+  id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
 };
 
 const LAEUFE: ImportLauf[] = [

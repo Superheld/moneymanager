@@ -5,7 +5,7 @@
 
 import type { Cent } from "../basis/geld";
 import type { Charakter } from "../basis/zahlungsregel";
-import type { Zahlungskonto } from "../konten/konto";
+import { istLiquide, type Zahlungskonto } from "../konten/konto";
 
 /**
  * Herkunft einer Ist-Buchung:
@@ -179,7 +179,13 @@ export function realerKontostand(konto: Zahlungskonto, buchungen: IstBuchung[]):
   return konto.saldo + istSummeKonto(buchungen, konto.id);
 }
 
-/** Liquide Mittel real über alle Konten — Startpunkt der Projektion mit Ist. */
+/**
+ * Liquide Mittel real — Startpunkt der Projektion mit Ist.
+ *
+ * Wie `liquideMittel`, nur mit den Buchungen verrechnet: nicht verfügbare Konten bleiben
+ * mit Saldo UND Bewegungen draußen. Beide Seiten zusammen, sonst entsteht ein Stand, den
+ * es nie gab.
+ */
 export function liquideMittelReal(konten: Zahlungskonto[], buchungen: IstBuchung[]): Cent {
-  return konten.reduce((s, k) => s + realerKontostand(k, buchungen), 0);
+  return konten.filter(istLiquide).reduce((s, k) => s + realerKontostand(k, buchungen), 0);
 }

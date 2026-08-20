@@ -23,7 +23,7 @@ describe("typAusName", () => {
 
 describe("kontoMatchVorschlag", () => {
   const giro: Zahlungskonto = {
-    id: "k-giro", bezeichnung: "Mein Giro", typ: "Giro",
+    id: "k-giro", bezeichnung: "Mein Giro", typ: "Giro", klasse: "liquide",
     iban: "DE31 9999 9998 0000 0000 02", inhaberIds: [], saldo: 0,
   };
 

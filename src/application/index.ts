@@ -67,6 +67,10 @@ export {
   anbieterSchluessel,
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,
+  KONTOKLASSEN,
+  // Ein Vorschlag ist keine Entscheidung: `klasseVorschlag` leitet aus dem Typ ab, was
+  // beim Anlegen sinnvoll voreingestellt ist. Ändern kann der Nutzer es immer.
+  klasseVorschlag,
   MERKMALSHERKUENFTE,
   RHYTHMUS_MONATE,
   // Fehler mit fachlichem Schlüssel — die UI übersetzt ihn

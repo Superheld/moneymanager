@@ -33,7 +33,7 @@ function buchung(p: Partial<IstBuchung> & { id: string; kontoId: string; betrag:
 }
 
 function konto(id: string, saldoEuro: number): Zahlungskonto {
-  return { id, bezeichnung: id, typ: "Giro", inhaberIds: [], saldo: euroZuCent(saldoEuro) };
+  return { id, bezeichnung: id, typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: euroZuCent(saldoEuro) };
 }
 
 describe("paarungsKandidaten", () => {

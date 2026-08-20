@@ -5,7 +5,7 @@ import type { Kategorie } from "../kategorien/kategorie";
 import type { Zahlungskonto } from "../konten/konto";
 
 function konto(saldo: number): Zahlungskonto {
-  return { id: "k1", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo };
+  return { id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo };
 }
 function b(datum: string, betrag: number, charakter: IstBuchung["charakter"]): IstBuchung {
   return { id: datum + betrag, datum, betrag, kontoId: "k1", charakter, quelle: "import" };
@@ -54,6 +54,55 @@ describe("istMonatsverlauf", () => {
     );
     expect(r[0].ausgaben).toBe(-2000); // Dez nicht im Fluss
     expect(r[0].saldo).toBe(-12000); // aber im Saldo
+  });
+
+  it("lässt nicht verfügbare Konten mit Saldo UND Buchungen draußen", () => {
+    // Der Kern der Sache: der Sockel entsteht aus den liquiden Salden, und liefe danach
+    // die Bewegung eines Rücklagenkontos darüber, zeigte die Kurve einen Saldo, den es
+    // nie gab. Beide Seiten müssen dieselbe Regel benutzen.
+    const ruecklage: Zahlungskonto = {
+      id: "k2",
+      bezeichnung: "Rücklage",
+      typ: "Tagesgeld",
+      klasse: "ruecklage",
+      inhaberIds: [],
+      saldo: 500000,
+    };
+    const aufRuecklage: IstBuchung = {
+      id: "r1",
+      datum: "2022-01-10",
+      betrag: -100000,
+      kontoId: "k2",
+      charakter: "Aufwand",
+      quelle: "import",
+    };
+
+    const r = istMonatsverlauf(
+      [konto(100000), ruecklage],
+      [b("2022-01-15", -5000, "Aufwand"), aufRuecklage],
+      "2022-01-01",
+      "2022-01-01",
+    );
+
+    // Weder die 5000er Ausgabe des Girokontos verschwindet, noch taucht die 100000er auf.
+    expect(r[0].ausgaben).toBe(-5000);
+    // Sockel 100000 (nur das Girokonto) minus 5000 — die Rücklage kommt nirgends vor.
+    expect(r[0].saldo).toBe(95000);
+  });
+
+  it("zählt eine Buchung mit, deren Konto gar nicht in der Liste steht", () => {
+    // Die Kontenliste ist hier eine Filterregel, keine Vollständigkeitszusage. Eine
+    // Buchung stillschweigend zu verlieren wäre der schlechtere Fehler.
+    const fremd: IstBuchung = {
+      id: "f1",
+      datum: "2022-01-12",
+      betrag: -2000,
+      kontoId: "unbekannt",
+      charakter: "Aufwand",
+      quelle: "import",
+    };
+    const r = istMonatsverlauf([konto(0)], [fremd], "2022-01-01", "2022-01-01");
+    expect(r[0].ausgaben).toBe(-2000);
   });
 });
 

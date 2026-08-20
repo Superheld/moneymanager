@@ -7,7 +7,7 @@ import type { Cent } from "../basis/geld";
 import type { Charakter } from "../basis/zahlungsregel";
 import { kategorieAnteile, type IstBuchung } from "./istbuchung";
 import type { Kategorie } from "../kategorien/kategorie";
-import { liquideMittel, type Zahlungskonto } from "../konten/konto";
+import { istLiquide, liquideMittel, type Zahlungskonto } from "../konten/konto";
 
 export interface MonatsIst {
   /** „YYYY-MM". */
@@ -45,8 +45,19 @@ export function istMonatsverlauf(
   const proMonat = new Map<string, { ein: Cent; aus: Cent; um: Cent }>();
   // Saldo-Sockel: Anfangsbestände + alle Ist VOR dem Fenster.
   let lauf: Cent = liquideMittel([...konten]);
+
+  // Buchungen nicht verfügbarer Konten bleiben ebenfalls draußen — und zwar mit DERSELBEN
+  // Regel, aus der der Sockel entsteht. Das ist keine Feinheit: der Sockel enthält den
+  // Anfangsbestand nur der liquiden Konten, und liefe danach die Bewegung eines
+  // Depotkontos darüber, zeigte die Kurve einen Saldo, den es nie gab.
+  //
+  // Ein Konto, das die Buchung nennt, aber in der Liste fehlt, wird MITGEZÄHLT: die
+  // Kontenliste ist hier eine Filterregel und keine Vollständigkeitszusage, und eine
+  // Buchung stillschweigend zu verlieren wäre der schlechtere Fehler.
+  const nichtLiquide = new Set(konten.filter((k) => !istLiquide(k)).map((k) => k.id));
   const vonLabel = `${von.y}-${String(von.m).padStart(2, "0")}`;
   for (const b of buchungen) {
+    if (nichtLiquide.has(b.kontoId)) continue;
     const key = monatVon(b.datum);
     if (key < vonLabel) {
       lauf += b.betrag;

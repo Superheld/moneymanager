@@ -100,7 +100,7 @@ describe("Stammdaten-Repositories", () => {
     await zahlungskontoRepository.speichern({
       id: "k1",
       bezeichnung: "Giro",
-      typ: "Giro",
+      typ: "Giro", klasse: "liquide",
       iban: "DE93999999990000000001",
       inhaberIds: [],
       saldo: 123456,
@@ -108,8 +108,39 @@ describe("Stammdaten-Repositories", () => {
     const [k] = await zahlungskontoRepository.alle();
     expect(k.bezeichnung).toBe("Giro");
     expect(k.typ).toBe("Giro");
+    expect(k.klasse).toBe("liquide");
     expect(k.iban).toBe("DE93999999990000000001");
     expect(k.saldo).toBe(123456);
+  });
+
+  it("hält Typ und Klasse getrennt", async () => {
+    // Ein Depot, das der Nutzer ausdrücklich als verfügbar führt: der Typ sagt, was es
+    // ist, die Klasse, ob es mitzählt. Ein Repository, das die Klasse aus dem Typ
+    // ableitet, nähme ihm diese Wahl.
+    await zahlungskontoRepository.speichern({
+      id: "k9",
+      bezeichnung: "Depot",
+      typ: "Depot",
+      klasse: "liquide",
+      inhaberIds: [],
+      saldo: 900,
+    });
+    const k = (await zahlungskontoRepository.alle()).find((x) => x.id === "k9")!;
+    expect(k.typ).toBe("Depot");
+    expect(k.klasse).toBe("liquide");
+  });
+
+  it("gibt einem Konto ohne gespeicherte Klasse den Vorschlag aus dem Typ", async () => {
+    // Migration 40 belegt alles vor — aber eine Zeile, die auf anderem Weg hereinkommt,
+    // soll nicht am Fehlen eines Feldes still aus den liquiden Mitteln fallen.
+    const db = halter.lesen() as { execute: (sql: string, w?: unknown[]) => Promise<unknown> };
+    await db.execute(
+      `INSERT INTO zahlungskonto (id, bezeichnung, typ, klasse, inhaber_ids, kontostand)
+       VALUES ($1, $2, $3, NULL, '[]', 0)`,
+      ["k8", "Altes Depot", "Depot"],
+    );
+    const k = (await zahlungskontoRepository.alle()).find((x) => x.id === "k8")!;
+    expect(k.klasse).toBe("vorsorge");
   });
 
   it("speichert eine Kategorie mit Elternbezug", async () => {

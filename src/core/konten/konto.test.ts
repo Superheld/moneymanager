@@ -1,15 +1,22 @@
-// Die Kontoarten und was sie bedeuten.
+// Die Kontoarten, die Kontoklassen — und die Grenze dazwischen.
 //
-// Der Test hält vor allem EINE Entscheidung fest, die man sonst für einen Fehler halten
-// würde: ein Konto vom Typ „Depot" zählt zu den liquiden Mitteln. Der Grund steht bei
-// `Kontotyp` — es ist ein selbst geführtes Konto und nicht die `depot`-Entität, die aus
-// dem Bankabruf kommt.
+// Der Typ sagt, WAS ein Konto ist. Die Klasse sagt, WOFÜR es da ist, und daraus folgt die
+// einzige Rechnung, die daran hängt: ob sein Saldo zu den liquiden Mitteln zählt. Beides
+// zu vermengen wäre naheliegend und falsch — dasselbe Tagesgeldkonto kann Alltagsreserve
+// oder zweckgebundene Rücklage sein, ohne dass sich sein Typ ändert.
 
 import { describe, expect, it } from "vitest";
-import { KONTOTYPEN, liquideMittel, type Zahlungskonto } from "./konto";
+import {
+  KONTOKLASSEN,
+  KONTOTYPEN,
+  istLiquide,
+  klasseVorschlag,
+  liquideMittel,
+  type Zahlungskonto,
+} from "./konto";
 
 function konto(over: Partial<Zahlungskonto> = {}): Zahlungskonto {
-  return { id: "k1", bezeichnung: "Konto", typ: "Giro", inhaberIds: [], saldo: 0, ...over };
+  return { id: "k1", bezeichnung: "Konto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0, ...over };
 }
 
 describe("Kontoarten", () => {
@@ -24,20 +31,48 @@ describe("Kontoarten", () => {
   });
 });
 
+describe("Kontoklassen", () => {
+  it("bietet jede Klasse genau einmal", () => {
+    expect(new Set(KONTOKLASSEN).size).toBe(KONTOKLASSEN.length);
+  });
+
+  it("hält allein die Klasse liquide für verfügbar", () => {
+    // Die einzige Wirkung, die die Klasse heute hat. Rücklage und Vorsorge trennt bislang
+    // nur der Name — was sie sonst unterscheiden soll, ist offen.
+    expect(istLiquide({ klasse: "liquide" })).toBe(true);
+    expect(istLiquide({ klasse: "ruecklage" })).toBe(false);
+    expect(istLiquide({ klasse: "vorsorge" })).toBe(false);
+  });
+
+  it("schlägt für ein Depot etwas anderes vor als für die übrigen Arten", () => {
+    // Nur ein Vorschlag: ein Tagesgeldkonto ist mal Reserve, mal zweckgebundene Rücklage,
+    // und das weiß nur der, dem es gehört.
+    expect(klasseVorschlag("Depot")).toBe("vorsorge");
+    expect(klasseVorschlag("Giro")).toBe("liquide");
+    expect(klasseVorschlag("Tagesgeld")).toBe("liquide");
+  });
+});
+
 describe("liquideMittel", () => {
-  it("summiert die Kontostände", () => {
+  it("summiert die verfügbaren Kontostände", () => {
     expect(liquideMittel([konto({ saldo: 120_00 }), konto({ id: "k2", saldo: 80_00 })])).toBe(200_00);
   });
 
-  it("nimmt ein Konto vom Typ Depot NICHT aus", () => {
-    // Sieht nach einem Fehler aus, ist keiner: `istMonatsverlauf` bildet den Sockel aus
-    // dieser Summe und lässt danach alle Buchungen darüberlaufen. Nähme man den Sockel
-    // heraus und die Buchungen nicht, ergäbe der Verlauf einen Saldo, den es nie gab.
-    //
-    // Nicht zu verwechseln mit der `depot`-Entität aus dem Bankabruf: die hat gar keinen
-    // Saldo und kommt hier nie vorbei.
-    const summe = liquideMittel([konto({ saldo: 100_00 }), konto({ id: "k2", typ: "Depot", saldo: 50_00 })]);
-    expect(summe).toBe(150_00);
+  it("lässt Rücklage und Vorsorge draußen", () => {
+    // Bis 2026-08-21 summierte diese Funktion alle Salden ohne Unterschied, und ein Depot
+    // zählte als Bargeld.
+    const summe = liquideMittel([
+      konto({ saldo: 100_00 }),
+      konto({ id: "k2", klasse: "ruecklage", saldo: 50_00 }),
+      konto({ id: "k3", typ: "Depot", klasse: "vorsorge", saldo: 900_00 }),
+    ]);
+    expect(summe).toBe(100_00);
+  });
+
+  it("richtet sich nach der Klasse, nicht nach dem Typ", () => {
+    // Ein Depot, das der Nutzer ausdrücklich als verfügbar führt, zählt mit. Der Typ ist
+    // ein Etikett; die Aussage über Verfügbarkeit trifft die Klasse.
+    expect(liquideMittel([konto({ typ: "Depot", klasse: "liquide", saldo: 42_00 })])).toBe(42_00);
   });
 
   it("ist ohne Konten null", () => {

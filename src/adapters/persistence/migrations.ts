@@ -814,4 +814,25 @@ export const MIGRATIONS: Migration[] = [
        )`,
     ],
   },
+  {
+    version: 40, // Kontoklasse — wofür ein Konto da ist, und ob sein Geld verfügbar ist
+    sql: [
+      // Der Kontotyp sagt, WAS ein Konto ist (Giro, Tagesgeld). Die Klasse sagt, welche
+      // Rolle es spielt — und daraus folgt, ob sein Geld zu den liquiden Mitteln zählt.
+      // Zwei Fragen, die sich nicht decken: dasselbe Tagesgeldkonto kann Alltagsreserve
+      // oder zweckgebundene Rücklage sein, ohne dass sich sein Typ ändert.
+      //
+      // Bis hierher summierte `liquideMittel()` alle Salden ohne Unterschied, und ein
+      // Depot zählte als Bargeld.
+      `ALTER TABLE zahlungskonto ADD COLUMN klasse TEXT`,
+      // Vorbelegung aus dem Typ — nur ein Vorschlag, überschreibbar in der Oberfläche.
+      // Ein Depot ist offensichtlich nicht verfügbar; bei allem anderen ist „verfügbar"
+      // die harmlosere Annahme, weil sie den bisherigen Stand fortschreibt.
+      //
+      // `WHERE klasse IS NULL` statt einer Scheintransaktion: so ist das Statement
+      // wiederholbar, und ein zweiter Lauf überschreibt keine Wahl des Nutzers.
+      `UPDATE zahlungskonto SET klasse = 'vorsorge' WHERE klasse IS NULL AND typ = 'Depot'`,
+      `UPDATE zahlungskonto SET klasse = 'liquide'  WHERE klasse IS NULL`,
+    ],
+  },
 ];
