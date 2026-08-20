@@ -295,7 +295,8 @@ export async function abrufAusfuehren(
     }
 
     try {
-      const abruf = await sitzung.umsaetze(bankkonto, von, deps.heute);
+      // Das zuletzt getragene Format als Reihenfolge mitgeben — nicht als Festlegung.
+      const abruf = await sitzung.umsaetze(bankkonto, von, deps.heute, z.letztesFormat);
 
       // Das Ziel steht fest — es kommt aus der Zuordnung, nicht aus einem Konto-Match
       // über die IBAN. Deshalb wird hier auch nichts angelegt.
