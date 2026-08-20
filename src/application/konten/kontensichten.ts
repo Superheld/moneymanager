@@ -36,7 +36,9 @@ import {
   type Dublettenverdacht,
 } from "../dubletten/dublettensicht";
 import type { Kontozuordnung } from "../fints/bankzugangPort";
+import { depotJeKonto, depotsLaden, type Depotsicht } from "../depot/depotsichten";
 import type {
+  DepotRepository,
   DublettenfreigabeRepository,
   ImportLaufRepository,
   KategorieRepository,
@@ -67,6 +69,11 @@ export interface KontenDeps {
   readonly ankerRepo: KontostandsankerRepository;
   /** Bankverbindungen — daran hängt der Abruf-Knopf und der Abgleich. */
   readonly kontozuordnungen: () => Promise<Kontozuordnung[]>;
+  /**
+   * Die Depots. Optional — ohne sie fehlt an einem Depot-Konto nur die Bestandsansicht,
+   * alles andere läuft unverändert.
+   */
+  readonly depotRepo?: DepotRepository;
 }
 
 /** Ein Konto in der oberen Liste. */
@@ -76,6 +83,14 @@ export interface Kontozeile {
   readonly realerStand: Cent;
   /** Hängt das Konto an einer Bankverbindung? */
   readonly online: boolean;
+  /**
+   * Das Depot hinter diesem Konto, sofern eines daran hängt.
+   *
+   * Ein Depot-Konto hat keinen eigenen Saldo und keine Buchungen — sein Stand steht in der
+   * Wertreihe der Bank. Ohne diese Verbindung zeigte die Kontenansicht dort eine leere
+   * Liste und eine Null, während der Wert eine Tabelle weiter danebenlag.
+   */
+  readonly depot?: Depotsicht;
   /**
    * Der jüngste Kontostands-Anker — was zuletzt nachweislich auf dem Konto lag.
    *
@@ -144,7 +159,7 @@ export interface Kontensicht {
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -155,6 +170,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.laufRepo.alle(),
       deps.freigabeRepo.alle(),
       deps.ankerRepo.alle(),
+      deps.depotRepo ? depotsLaden({ depotRepo: deps.depotRepo }) : Promise.resolve(null),
     ]);
 
   const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
@@ -168,6 +184,9 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
   }
 
   const zuordnungJeKonto = new Map(zuordnungen.map((z) => [z.zahlungskontoId, z]));
+  // Die Verbindung Depot → Konto steht in derselben Zuordnung; eine eigene Spalte braucht
+  // es dafür nicht.
+  const depots = depotdaten ? depotJeKonto(depotdaten.depots, zuordnungen) : new Map();
   const freigegeben = freigegebenePaare(freigaben);
   const dublettenverdacht = ledgerVerdacht(umsaetze, new Set(buchungen.map((b) => b.id)), freigegeben);
 
@@ -181,6 +200,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
         bewegungen: istSummeKonto(buchungen, konto.id),
         realerStand: realerKontostand(konto, buchungen),
         online: !!z,
+        depot: depots.get(konto.id),
         anker: juengster,
         abweichung,
         luecken: abweichungsfenster(buchungen, anker, konto.id),

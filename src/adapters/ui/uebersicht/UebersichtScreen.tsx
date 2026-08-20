@@ -98,8 +98,10 @@ export function UebersichtScreen() {
         />
       )}
 
-      {depotdaten && <DepotKarte daten={depotdaten} />}
-
+      {/* Budgets und Depots nebeneinander. Fehlt eines von beiden, nimmt das andere die
+          volle Breite — das erledigt `auto-fit` im Raster, ohne dass hier eine Bedingung
+          stünde, die man beim nächsten Element wieder anpassen müsste. */}
+      <div className="karten-paar">
       {daten && (
         <Card
           title={t("uebersicht.budgetsTitel")}
@@ -181,6 +183,9 @@ export function UebersichtScreen() {
           )}
         </Card>
       )}
+
+      {depotdaten && <DepotKarte daten={depotdaten} />}
+      </div>
     </div>
   );
 }

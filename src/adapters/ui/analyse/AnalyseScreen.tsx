@@ -466,10 +466,15 @@ export function AnalyseScreen() {
           )}
 
           {/* Depots zuletzt: sie beantworten eine eigene Frage und mischen sich in die
-              Kategorien-Auswertung darüber nicht ein. */}
-          {depotdaten?.depots.map((d) => (
-            <DepotAnsicht key={d.depot.id} sicht={d} von={von} bis={bis} />
-          ))}
+              Kategorien-Auswertung darüber nicht ein. Nebeneinander wie in der Übersicht —
+              bei einem einzelnen Depot nimmt es die volle Breite. */}
+          {depotdaten && depotdaten.depots.length > 0 && (
+            <div className="karten-paar">
+              {depotdaten.depots.map((d) => (
+                <DepotAnsicht key={d.depot.id} sicht={d} von={von} bis={bis} />
+              ))}
+            </div>
+          )}
 
         </>
       )}

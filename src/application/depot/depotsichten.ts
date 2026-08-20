@@ -84,6 +84,31 @@ export async function depotsLaden(deps: DepotDeps): Promise<Depotdaten> {
 }
 
 /**
+ * Welches Depot an welchem Zahlungskonto hängt.
+ *
+ * Ohne eigene Spalte: die Verbindung steht schon in der Kontozuordnung. Ein Depot kennt
+ * seinen Zugang und seinen Kontoschlüssel, die Zuordnung dieselben beiden plus das
+ * Zahlungskonto — mehr braucht es nicht.
+ *
+ * Der Nutzen ist die Kontenansicht: ein Konto vom Typ Depot hat keinen eigenen Saldo und
+ * keine Buchungen, sein Stand steht in der Wertreihe. Ohne diese Zuordnung zeigte es eine
+ * leere Liste und eine Null.
+ */
+export function depotJeKonto(
+  depots: readonly Depotsicht[],
+  zuordnungen: readonly { zugangId: string; schluessel: string; zahlungskontoId: string }[],
+): Map<string, Depotsicht> {
+  const raus = new Map<string, Depotsicht>();
+  for (const z of zuordnungen) {
+    const treffer = depots.find(
+      (d) => d.depot.zugangId === z.zugangId && d.depot.schluessel === z.schluessel,
+    );
+    if (treffer) raus.set(z.zahlungskontoId, treffer);
+  }
+  return raus;
+}
+
+/**
  * Die Entwicklung eines Depots über einen Zeitraum.
  *
  * Getrennt von `depotsLaden`, weil der Zeitraum von aussen kommt: die Übersicht hat

@@ -617,6 +617,8 @@ export function konten(): Promise<Kontensicht> {
     freigabeRepo: sqliteDublettenfreigabeRepository,
     ankerRepo: sqliteKontostandsankerRepository,
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
+    // Damit ein Depot-Konto seinen Bestand zeigt statt einer leeren Buchungsliste.
+    depotRepo: sqliteDepotRepository,
   });
 }
 

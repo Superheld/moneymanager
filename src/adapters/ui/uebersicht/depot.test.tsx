@@ -18,6 +18,7 @@ import type { Depotdaten, Depotsicht } from "../../../application";
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { DepotKarte } from "./DepotKarte";
 import { DepotAnsicht } from "../analyse/DepotAnsicht";
+import { DepotAuszug } from "../konten/DepotAuszug";
 
 let db: Database;
 
@@ -136,5 +137,47 @@ describe("DepotAnsicht (Analyse)", () => {
   it("verlangt für einen Verlauf mindestens zwei Stände im Zeitraum", async () => {
     await zeige(<DepotAnsicht sicht={sicht} von="2026-08-01" bis="2026-08-31" />);
     expect(screen.getByText(/mindestens zwei Stände/)).toBeInTheDocument();
+  });
+});
+
+describe("DepotAuszug (Konto)", () => {
+  const konto = {
+    id: "k-depot",
+    bezeichnung: "Depot",
+    typ: "Depot" as const,
+    klasse: "vorsorge" as const,
+    inhaberIds: [],
+    saldo: 0,
+  };
+
+  it("zeigt den Depotwert statt des Kontostands", async () => {
+    // Der eigentliche Anlass: das Konto hat Saldo 0, weil es keine Buchungen gibt — und
+    // zeigte deshalb eine Null, während der Wert eine Tabelle weiter danebenlag.
+    await zeige(<DepotAuszug konto={konto} sicht={sicht} />);
+    expect(screen.getByText(/1\.250,00|1,250\.00/)).toBeInTheDocument();
+  });
+
+  it("nennt den Stichtag zur Zahl", async () => {
+    await zeige(<DepotAuszug konto={konto} sicht={sicht} />);
+    expect(screen.getByText(/2026-08-20/)).toBeInTheDocument();
+  });
+
+  it("erklärt, warum hier keine Buchungen stehen", async () => {
+    // Eine leere Auszugsliste liest sich wie ein Fehler. Der Satz sagt, wo die Bewegungen
+    // wirklich sind.
+    await zeige(<DepotAuszug konto={konto} sicht={sicht} />);
+    expect(screen.getByText(/Verrechnungskonto/)).toBeInTheDocument();
+  });
+
+  it("listet die Positionen", async () => {
+    await zeige(<DepotAuszug konto={konto} sicht={sicht} />);
+    expect(screen.getByText("Vibora Sammelanlage")).toBeInTheDocument();
+    expect(screen.getByText("Ohlert Anteil")).toBeInTheDocument();
+  });
+
+  it("kommt mit einem nie abgerufenen Depot zurecht", async () => {
+    const leer = { depot: sicht.depot, reihe: [], positionen: [] };
+    await zeige(<DepotAuszug konto={konto} sicht={leer} />);
+    expect(screen.getByText("noch nie abgerufen")).toBeInTheDocument();
   });
 });

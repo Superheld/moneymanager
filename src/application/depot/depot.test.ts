@@ -6,7 +6,7 @@ import type { Depot, Depotposition, Depotwert } from "../../core";
 import type { DepotRepository } from "../ports";
 import type { Bankkonto, Depotbestand } from "../fints/abrufPort";
 import { depotUebernehmen } from "./depotUebernehmen";
-import { depotEntwicklung, depotsLaden } from "./depotsichten";
+import { depotEntwicklung, depotJeKonto, depotsLaden } from "./depotsichten";
 
 /** In-Memory-Fake des Ports — dieselbe Zusage, ohne SQLite. */
 function fakeRepo(): DepotRepository & { stand: { depots: Depot[]; werte: Depotwert[]; positionen: Depotposition[] } } {
@@ -217,5 +217,45 @@ describe("depotEntwicklung", () => {
   it("hält sich zurück, wo im Zeitraum überhaupt nichts liegt", async () => {
     const e = depotEntwicklung(await reihe(), "2025-01-01", "2025-12-31");
     expect(e.veraenderung).toBeUndefined();
+  });
+});
+
+describe("depotJeKonto", () => {
+  it("findet das Konto über Zugang und Kontoschlüssel", async () => {
+    // Ohne eigene Spalte: die Verbindung steht schon in der Kontozuordnung. Ein Depot
+    // kennt seinen Zugang und seinen Schlüssel, die Zuordnung dieselben plus das Konto.
+    await depotUebernehmen("z1", konto, bestand(), deps());
+    const daten = await depotsLaden({ depotRepo: repo });
+
+    const zuordnung = { zugangId: "z1", schluessel: "9876543210|Depot", zahlungskontoId: "k-depot" };
+    const treffer = depotJeKonto(daten.depots, [zuordnung]);
+
+    expect(treffer.get("k-depot")?.depot.schluessel).toBe("9876543210|Depot");
+  });
+
+  it("verwechselt Depot und Girokonto derselben Nummer nicht", async () => {
+    // Genau der Fall, für den es den zusammengesetzten Schlüssel gibt: Institute führen
+    // beide unter derselben Kontonummer.
+    await depotUebernehmen("z1", konto, bestand(), deps());
+    const daten = await depotsLaden({ depotRepo: repo });
+
+    const treffer = depotJeKonto(daten.depots, [
+      { zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k-giro" },
+      { zugangId: "z1", schluessel: "9876543210|Depot", zahlungskontoId: "k-depot" },
+    ]);
+
+    expect(treffer.has("k-giro")).toBe(false);
+    expect(treffer.has("k-depot")).toBe(true);
+  });
+
+  it("trennt Depots verschiedener Zugänge", async () => {
+    await depotUebernehmen("z1", konto, bestand(), deps());
+    const daten = await depotsLaden({ depotRepo: repo });
+
+    const treffer = depotJeKonto(daten.depots, [
+      { zugangId: "z2", schluessel: "9876543210|Depot", zahlungskontoId: "k-fremd" },
+    ]);
+
+    expect(treffer.size).toBe(0);
   });
 });
