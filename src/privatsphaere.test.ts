@@ -23,35 +23,35 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import initSqlJs from "sql.js";
-import { createRequire } from "node:module";
 
 const WURZEL = join(import.meta.dirname, "..");
-const require = createRequire(import.meta.url);
 
 /**
  * Die echte Datenbank — read-only gelesen, nie geschrieben.
  *
- * Der WAL-Stand fehlt dabei (sql.js liest nur die Hauptdatei), und das ist hier egal:
- * frisch geschriebene Zeilen können noch nicht in einem versionierten Kommentar stehen.
+ * Gelesen wird über das `sqlite3`-Kommando, NICHT über sql.js. Der Grund ist derselbe,
+ * vor dem CLAUDE.md bei Kopien warnt: die Datenbank läuft im WAL-Modus, und sql.js liest
+ * nur die Hauptdatei. Der erste Anlauf dieses Wächters tat genau das — und übersah
+ * deshalb die ganze Anker-Tabelle samt der Kontostände darin, die zur selben Stunde in
+ * zwei Testdateien standen. Ein Wächter, der die halbe Datenbank nicht sieht, ist
+ * schlimmer als keiner: er beruhigt.
  */
 const DB_PFAD = join(
   homedir(),
   "Library/Application Support/de.netmechanics.moneymanager/moneymanager.db",
 );
 
-async function merkmale(): Promise<string[]> {
+function merkmale(): string[] {
   if (!existsSync(DB_PFAD)) return [];
-  const SQL = await initSqlJs({ locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm") });
-  const db = new SQL.Database(readFileSync(DB_PFAD));
   const werte = new Set<string>();
 
-  function frage(sql: string): unknown[] {
+  function frage(sql: string): string[] {
     try {
-      const r = db.exec(sql);
-      return r.length ? r[0].values.flat() : [];
+      return execFileSync("sqlite3", ["-readonly", DB_PFAD, sql], { encoding: "utf8" })
+        .split("\n")
+        .filter(Boolean);
     } catch {
-      return []; // Tabelle oder Spalte gibt es (noch) nicht — dann eben nichts zu prüfen.
+      return []; // kein sqlite3, oder Tabelle/Spalte gibt es (noch) nicht
     }
   }
 
@@ -68,8 +68,9 @@ async function merkmale(): Promise<string[]> {
     if (!Number.isFinite(cent) || Math.abs(cent) < 1000 || cent % 1000 === 0) continue;
     const euro = Math.trunc(Math.abs(cent) / 100);
     const rest = String(Math.abs(cent) % 100).padStart(2, "0");
-    werte.add(`${euro},${rest}`); // [Betrag]
-    werte.add(`${euro.toLocaleString("de-DE")},${rest}`); // [Betrag]
+    werte.add(`${euro},${rest}`); //  1234,56
+    werte.add(`${euro.toLocaleString("de-DE")},${rest}`); //  1.234,56
+    werte.add(String(cent)); // und die Rohform in Cent, wie sie in Fixtures steht
   }
 
   // Zeichenketten: alles, was eine Person oder ein Konto benennt.
@@ -85,7 +86,6 @@ async function merkmale(): Promise<string[]> {
     if (wert.length >= 5) werte.add(wert);
   }
 
-  db.close();
   return [...werte];
 }
 
@@ -119,8 +119,8 @@ function textbestand(): { datei: string; inhalt: string }[] {
 }
 
 describe("Daten aus dem echten Bestand", () => {
-  it("stehen in keiner versionierten Datei", async () => {
-    const gesucht = await merkmale();
+  it("stehen in keiner versionierten Datei", () => {
+    const gesucht = merkmale();
     if (gesucht.length === 0) return; // keine Datenbank — nichts zu schützen
 
     const bestand = textbestand();
