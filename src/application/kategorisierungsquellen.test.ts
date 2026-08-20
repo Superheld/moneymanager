@@ -57,7 +57,7 @@ function repos(over: {
 const ZAHLUNG = {
   buchungstag: "2026-03-01",
   betrag: -999,
-  gegenpartei: "[anonymisiert] International BV",
+  gegenpartei: "Kesselmann International BV",
   verwendungszweck: "Abo",
 };
 
@@ -71,8 +71,8 @@ describe("Quellen laden", () => {
   it("nimmt Verträge mit Kategorie samt ihrer Regeln auf", async () => {
     const q = await kategorisierungsquellen(
       repos({
-        vertraege: [{ id: "v1", anbieter: "[anonymisiert]", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv", kategorieId: "k-abo" }],
-        erkennungen: [standardErkennung("v1", "[anonymisiert] International", 999)],
+        vertraege: [{ id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv", kategorieId: "k-abo" }],
+        erkennungen: [standardErkennung("v1", "Kesselmann International", 999)],
       }),
     );
     expect(q.vertragsKategorie?.get("v1")).toBe("k-abo");
@@ -83,8 +83,8 @@ describe("Quellen laden", () => {
     // Sonst liefe der Abgleich über den ganzen Regelsatz für ein Ergebnis, das feststeht.
     const q = await kategorisierungsquellen(
       repos({
-        vertraege: [{ id: "v1", anbieter: "[anonymisiert]", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv" }],
-        erkennungen: [standardErkennung("v1", "[anonymisiert] International", 999)],
+        vertraege: [{ id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv" }],
+        erkennungen: [standardErkennung("v1", "Kesselmann International", 999)],
       }),
     );
     expect(q.erkennungen).toBeUndefined();
@@ -96,7 +96,7 @@ describe("Quellen laden", () => {
       repos({
         modell: {
           modell: trainieren([
-            { merkmale: ["emp=netflix international", "vwz:abo"], kategorieId: "k-abo" },
+            { merkmale: ["emp=kesselmann international", "vwz:abo"], kategorieId: "k-abo" },
             { merkmale: ["emp=rewe markt"], kategorieId: "k-le" },
           ]),
           trainiertAm: "2026-08-17T10:00:00.000Z",
@@ -123,7 +123,7 @@ describe("Quellen laden", () => {
 
   it("nimmt die Festlegungen auf", async () => {
     const q = await kategorisierungsquellen(
-      repos({ festlegungen: [{ muster: "netflix international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" }] }),
+      repos({ festlegungen: [{ muster: "kesselmann international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" }] }),
     );
     expect(vorschlagFuer(ZAHLUNG, q)?.quelle).toBe("festlegung");
   });

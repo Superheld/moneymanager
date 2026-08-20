@@ -15,7 +15,7 @@ import type { Vorschlagskontext } from "./vorschlag";
 
 function roh(over: Partial<RohUmsatz>): RohUmsatz {
   return {
-    buchungstag: "2022-01-01", betrag: -655, waehrung: "EUR", gegenpartei: "[anonymisiert]",
+    buchungstag: "2022-01-01", betrag: -655, waehrung: "EUR", gegenpartei: "Brandeis",
     verwendungszweck: "Kartenzahlung", istUmbuchung: false, quelle: "finanzguru", ...over,
   };
 }
@@ -195,8 +195,8 @@ describe("Dublettenfinder beim Übernehmen", () => {
           roh({
             buchungstag: "2026-08-04",
             betrag: -4990,
-            gegenpartei: "[anonymisiert]",
-            verwendungszweck: "EDK*[anonymisiert] [anonymisiert], MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
+            gegenpartei: "Nordhoff",
+            verwendungszweck: "EDK*NORDHOFF NORDHOFF, MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
             kontoIban: "DE31999999980000000002",
             nativeId: "fg-1",
           }),
@@ -215,8 +215,8 @@ describe("Dublettenfinder beim Übernehmen", () => {
       buchungstag: "2026-08-04",
       valuta: "2026-08-04",
       betrag: -4990,
-      gegenpartei: "EDK*[anonymisiert] [anonymisiert]",
-      verwendungszweck: "KARTENVERFÜGUNGEDK*[anonymisiert] [anonymisiert], MUSTERSTADT  DE",
+      gegenpartei: "EDK*NORDHOFF NORDHOFF",
+      verwendungszweck: "KARTENVERFÜGUNGEDK*NORDHOFF NORDHOFF, MUSTERSTADT  DE",
       kontoIban: "DE31999999980000000002",
       mandatsreferenz: "M-4711",
       nativeId: undefined,
@@ -249,7 +249,7 @@ describe("Dublettenfinder beim Übernehmen", () => {
     expect(f.umsaetze[0].valuta).toBe("2026-08-04");
     // … und die native ID der ersten Quelle bleibt unangetastet.
     expect(f.umsaetze[0].nativeId).toBe("fg-1");
-    expect(f.umsaetze[0].gegenpartei).toBe("[anonymisiert]");
+    expect(f.umsaetze[0].gegenpartei).toBe("Nordhoff");
   });
 
   it("legt bei abweichendem Datum an, schreibt aber den Verdacht dazu", async () => {
@@ -326,8 +326,8 @@ describe("Dublettenfinder beim Übernehmen", () => {
           roh({
             buchungstag: "2026-08-04",
             betrag: -4990,
-            gegenpartei: "[anonymisiert]",
-            verwendungszweck: "EDK*[anonymisiert] [anonymisiert], MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
+            gegenpartei: "Nordhoff",
+            verwendungszweck: "EDK*NORDHOFF NORDHOFF, MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
             kontoIban: "DE31999999980000000002",
             nativeId: "fg-1",
             mandatsreferenz: "M-4711",

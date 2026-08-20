@@ -248,12 +248,12 @@ describe("Ledger-Repository", () => {
 describe("Vertrag- und Zahlungsregel-Repository", () => {
   it("speichert einen Vertrag mit Laufzeitfeldern", async () => {
     await vertragRepository.speichern({
-      id: "v1", anbieter: "[anonymisiert]", beginn: "2026-01-01", status: "aktiv",
+      id: "v1", anbieter: "Petrossen", beginn: "2026-01-01", status: "aktiv",
       verlaengerung: "automatisch", verlaengerungMonate: 12,
       mindestlaufzeitMonate: 12, kuendigungsfristMonate: 3,
     });
     const [v] = await vertragRepository.alle();
-    expect(v.anbieter).toBe("[anonymisiert]");
+    expect(v.anbieter).toBe("Petrossen");
     expect(v.mindestlaufzeitMonate).toBe(12);
     expect(v.kuendigungsfristMonate).toBe(3);
     expect(v.verlaengerung).toBe("automatisch");
@@ -397,7 +397,7 @@ describe("Vertragszuordnung — Persistenz", () => {
       vertragId: "v1",
       merkmale: [
         { art: "glaeubigerId", muster: "DE98ZZZ09999999999" },
-        { art: "empfaenger", muster: "stadtwerke*" },
+        { art: "empfaenger", muster: "petrossen*" },
       ],
       betragVon: 1000,
       betragBis: 2000,
@@ -408,7 +408,7 @@ describe("Vertragszuordnung — Persistenz", () => {
     const [e] = await erkennungRepository.alle();
     expect(e.merkmale).toEqual([
       { art: "glaeubigerId", muster: "DE98ZZZ09999999999" },
-      { art: "empfaenger", muster: "stadtwerke*" },
+      { art: "empfaenger", muster: "petrossen*" },
     ]);
     expect(e.betragVon).toBe(1000);
     expect(e.gueltigBis).toBe("2026-12-31");
@@ -423,11 +423,11 @@ describe("Vertragszuordnung — Persistenz", () => {
   it("liest die flache Schlüsselliste der ersten Fassung", async () => {
     db.run(
       `INSERT INTO vertrag_erkennung (vertrag_id, schluessel, betrag_von, betrag_bis)
-       VALUES ('alt', '["netcup","DE98ZZZ09999999999"]', 990, 2970)`,
+       VALUES ('alt', '["vibora","DE98ZZZ09999999999"]', 990, 2970)`,
     );
     const [e] = await erkennungRepository.alle();
     expect(e.merkmale).toEqual([
-      { art: "empfaenger", muster: "netcup" },
+      { art: "empfaenger", muster: "vibora" },
       { art: "glaeubigerId", muster: "DE98ZZZ09999999999" },
     ]);
     expect(e.betragVon).toBe(990);
@@ -582,21 +582,21 @@ describe("Merkmalskonfiguration — Persistenz", () => {
 describe("Kategorie-Festlegungen — Persistenz", () => {
   it("trägt Muster, Kategorie und Zeitpunkt durch das Schema", async () => {
     await festlegungRepository.speichern({
-      muster: "netflix international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z",
+      muster: "kesselmann international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z",
     });
 
     expect(await festlegungRepository.alle()).toEqual([
-      { muster: "netflix international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" },
+      { muster: "kesselmann international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" },
     ]);
   });
 
   it("normalisiert das Muster beim Speichern und Löschen", async () => {
-    // „[anonymisiert]" und „netflix" wirken gleich — als zwei Zeilen ließe sich die eine
+    // „Kesselmann" und „kesselmann" wirken gleich — als zwei Zeilen ließe sich die eine
     // löschen, ohne dass sich etwas ändert.
-    await festlegungRepository.speichern({ muster: "  NETFLIX  ", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" });
-    expect((await festlegungRepository.alle())[0].muster).toBe("netflix");
+    await festlegungRepository.speichern({ muster: "  KESSELMANN  ", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" });
+    expect((await festlegungRepository.alle())[0].muster).toBe("kesselmann");
 
-    await festlegungRepository.loeschen("NETFLIX");
+    await festlegungRepository.loeschen("KESSELMANN");
     expect(await festlegungRepository.alle()).toHaveLength(0);
   });
 
@@ -613,7 +613,7 @@ describe("Kategorie-Festlegungen — Persistenz", () => {
 describe("Vertrag — Kategorie am Aggregat", () => {
   it("trägt die Kategorie durch das Schema", async () => {
     await vertragRepository.speichern({
-      id: "v1", anbieter: "[anonymisiert]", beginn: "2026-01-01",
+      id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01",
       verlaengerung: "automatisch", status: "aktiv", kategorieId: "kat-abo",
     });
     expect((await vertragRepository.alle())[0].kategorieId).toBe("kat-abo");
@@ -621,14 +621,14 @@ describe("Vertrag — Kategorie am Aggregat", () => {
 
   it("ein Vertrag ohne Kategorie bleibt ohne", async () => {
     await vertragRepository.speichern({
-      id: "v1", anbieter: "[anonymisiert]", beginn: "2026-01-01",
+      id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01",
       verlaengerung: "keine", status: "aktiv",
     });
     expect((await vertragRepository.alle())[0].kategorieId).toBeUndefined();
   });
 
   it("überschreibt die Kategorie beim Aktualisieren", async () => {
-    const basis = { id: "v1", anbieter: "[anonymisiert]", beginn: "2026-01-01", verlaengerung: "keine" as const, status: "aktiv" as const };
+    const basis = { id: "v1", anbieter: "Kesselmann", beginn: "2026-01-01", verlaengerung: "keine" as const, status: "aktiv" as const };
     await vertragRepository.speichern({ ...basis, kategorieId: "kat-alt" });
     await vertragRepository.speichern({ ...basis, kategorieId: "kat-neu" });
     expect((await vertragRepository.alle())[0].kategorieId).toBe("kat-neu");

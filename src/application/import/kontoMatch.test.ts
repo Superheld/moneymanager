@@ -15,7 +15,7 @@ describe("typAusName", () => {
     expect(typAusName("Girokonto")).toBe("Giro");
     expect(typAusName("Tagesgeldkonto")).toBe("Tagesgeld");
     expect(typAusName("Bargeld")).toBe("Bargeld");
-    expect(typAusName("[anonymisiert]")).toBe("Kreditkarte");
+    expect(typAusName("Kreditkarte Beispiel")).toBe("Kreditkarte");
     expect(typAusName("Verrechnungskonto")).toBe("Giro");
     expect(typAusName(undefined)).toBe("Giro");
   });

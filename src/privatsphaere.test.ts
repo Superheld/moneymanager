@@ -13,6 +13,14 @@
 // (frischer Klon, CI, anderer Rechner) hat er nichts zu prüfen und ist still zufrieden.
 // Er ersetzt deshalb kein Nachdenken; er fängt das ab, woran man nicht gedacht hat.
 //
+// **Ersetzen reicht nicht — es muss ANONYMISIEREN.** Ein erfundener Name, der die Branche
+// durchscheinen lässt, verrät dasselbe wie der echte: wer einen Streamingdienst durch
+// einen Fantasienamen ersetzt, dem man den Streamingdienst ansieht, hat den Namen
+// getauscht und die Aussage behalten. Dasselbe gilt für die Kategorie daneben. Erfundene Werte sind deshalb
+// SEKTORNEUTRAL: „Kesselmann", „Vibora", „Ohlert" lassen keinen Rückschluss zu, weder für
+// sich noch in Kombination mit ihrer Kategorie. Dieser Wächter kann das nicht prüfen — er
+// findet nur den Originalwert. Die Neutralität ist Handarbeit.
+//
 // Geprüft wird ein bewusst KLEINER, dafür eindeutiger Satz von Merkmalen: Kontostände,
 // Budgetbeträge, Anker, IBANs, Personennamen und Bankzugänge. Nicht geprüft werden die
 // Beträge einzelner Buchungen — „12,50" steht in jeder zweiten Fixture, und ein Wächter,
@@ -63,6 +71,10 @@ function sqliteVorhanden(): boolean {
 function merkmale(): string[] {
   if (!existsSync(DB_PFAD) || !sqliteVorhanden()) return [];
   const werte = new Set<string>();
+  const banken = JSON.parse(readFileSync(join(WURZEL, "public/bankenliste.json"), "utf8"));
+  const bankNamen = new Set<string>(
+    (Object.values(banken).find(Array.isArray) as { name: string }[]).map((b) => b.name),
+  );
 
   function frage(sql: string, mussGehen = false): string[] {
     try {
@@ -103,6 +115,31 @@ function merkmale(): string[] {
     werte.add(`${euro},${rest}`); //  1234,56
     werte.add(`${euro.toLocaleString("de-DE")},${rest}`); //  1.234,56
     werte.add(String(cent)); // und die Rohform in Cent, wie sie in Fixtures steht
+  }
+
+  // Empfänger, Vertragsanbieter und Gläubiger-IDs — das, was verrät, WO jemand einkauft.
+  //
+  // Mit Ausnahmeliste, und die ist der Grund, warum diese Gruppe lange gefehlt hat:
+  // hunderte Empfängernamen sind Allerweltswörter („Tanken", „Friseur", „Urlaub"), die in
+  // jedem zweiten Test stehen. Ein Wächter, der darauf anschlägt, wird abgeschaltet.
+  // Deshalb hier: alles meldet sich, ausser was einmal bewusst freigegeben wurde.
+  const ALLERWELT = new Set([
+    "Abbuchung", "Action", "Baecker", "Bargeld", "Friseur", "Geschenk", "Girokonto",
+    "Gutschrift", "Retour", "Tanken", "Tankstelle", "Transact", "Urlaub", "Veranstaltung",
+    "Verrechnungskonto", "Tagesgeldkonto", "Kreditkarte",
+  ]);
+  for (const roh of [
+    ...frage("SELECT DISTINCT gegenpartei FROM umsatz WHERE length(gegenpartei) >= 6"),
+    ...frage("SELECT DISTINCT anbieter FROM vertrag WHERE length(anbieter) >= 6"),
+    ...frage("SELECT DISTINCT glaeubiger_id FROM umsatz WHERE glaeubiger_id IS NOT NULL"),
+    ...frage("SELECT DISTINCT mandatsreferenz FROM umsatz WHERE length(mandatsreferenz) >= 8"),
+  ]) {
+    const wert = String(roh ?? "").trim();
+    if (wert.length < 6 || ALLERWELT.has(wert)) continue;
+    // Namen echter Banken stehen ohnehin in der öffentlichen DK-Liste im Repo — auch als
+    // Bestandteil („Sparkasse" steckt in „Sparkasse Essen").
+    if ([...bankNamen].some((n) => n.includes(wert))) continue;
+    werte.add(wert);
   }
 
   // Zeichenketten: alles, was eine Person oder ein Konto benennt.

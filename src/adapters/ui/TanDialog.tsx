@@ -1,13 +1,13 @@
 // TAN-Rückfrage der Bank.
 //
-// Beim Lesen ist sie die Ausnahme, nicht der Normalfall: comdirect antwortet mit
+// Beim Lesen ist sie die Ausnahme, nicht der Normalfall: manche Institute antworten mit
 // `3076 Starke Kundenauthentifizierung nicht notwendig`, solange der Zeitraum in den
 // letzten 90 Tagen liegt. Ein Erstimport über Monate zieht sehr wohl eine TAN — der
 // Dialog muss also da sein, auch wenn er selten aufgeht.
 //
 // Zwei Formen, die die Bibliothek unterscheidet:
 //  • **photoTAN/chipTAN-QR** — das Bild kommt INLINE in der Herausforderung mit. Ohne
-//    Anzeige gibt es nichts abzuscannen; bei comdirect ist es das einzige Verfahren.
+//    Anzeige gibt es nichts abzuscannen; bei manchen Instituten ist es das einzige.
 //  • **decoupled** — die Freigabe geschieht in der Banking-App, es wird nichts eingetippt.
 //    Dann wartet der Adapter und fragt die Bank in ihren eigenen Abständen nach; hier
 //    steht nur, dass gewartet wird.

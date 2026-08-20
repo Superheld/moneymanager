@@ -67,13 +67,13 @@ function vertrag(anbieter: string): Vertrag {
 
 describe("vertragsvorschlaege", () => {
   it("verbindet Buchung und Umsatz über istbuchungId", async () => {
-    const { buchungen, umsaetze } = monatsreihe("a", "[anonymisiert] GmbH", 1650, { glaeubigerId: "[anonymisiert]" });
+    const { buchungen, umsaetze } = monatsreihe("a", "Vibora GmbH", 1650, { glaeubigerId: "DE98ZZZ09999999902" });
     const { ledger, umsatzRepo, vertragRepo } = fakes(buchungen, umsaetze);
 
     const k = await vertragsvorschlaege(ledger, umsatzRepo, vertragRepo, HEUTE);
     expect(k).toHaveLength(1);
-    expect(k[0].anbieter).toBe("[anonymisiert] GmbH");
-    expect(k[0].glaeubigerId).toBe("[anonymisiert]");
+    expect(k[0].anbieter).toBe("Vibora GmbH");
+    expect(k[0].glaeubigerId).toBe("DE98ZZZ09999999902");
     expect(k[0].betrag).toBe(1650);
   });
 
@@ -82,19 +82,19 @@ describe("vertragsvorschlaege", () => {
    * Empfänger steht am Umsatz, nicht an der Buchung (Import-Kontext, CLAUDE.md).
    */
   it("findet nichts, wenn zu den Buchungen keine Umsätze gehören", async () => {
-    const { buchungen } = monatsreihe("a", "[anonymisiert]", 1650);
+    const { buchungen } = monatsreihe("a", "Vibora", 1650);
     const { ledger, umsatzRepo, vertragRepo } = fakes(buchungen, []);
     expect(await vertragsvorschlaege(ledger, umsatzRepo, vertragRepo, HEUTE)).toEqual([]);
   });
 
   it("blendet aus, was schon als Vertrag erfasst ist", async () => {
-    const a = monatsreihe("a", "[anonymisiert] GmbH", 1650);
+    const a = monatsreihe("a", "Vibora GmbH", 1650);
     const b = monatsreihe("b", "Octopus Energy", 5135);
     const { ledger, umsatzRepo, vertragRepo } = fakes(
       [...a.buchungen, ...b.buchungen],
       [...a.umsaetze, ...b.umsaetze],
       // Schreibweise bewusst anders als im Auszug — der Abgleich läuft normalisiert.
-      [vertrag("netcup")],
+      [vertrag("vibora")],
     );
 
     const k = await vertragsvorschlaege(ledger, umsatzRepo, vertragRepo, HEUTE);
@@ -102,7 +102,7 @@ describe("vertragsvorschlaege", () => {
   });
 
   it("blendet weggeklickte Vorschläge aus", async () => {
-    const a = monatsreihe("a", "[anonymisiert] GmbH", 1650);
+    const a = monatsreihe("a", "Vibora GmbH", 1650);
     const b = monatsreihe("b", "Octopus Energy", 5135);
     const { ledger, umsatzRepo, vertragRepo } = fakes(
       [...a.buchungen, ...b.buchungen],
@@ -125,9 +125,9 @@ describe("vertragsvorschlaege", () => {
     };
 
     expect(await ignorierteSchluessel(repo)).toEqual(new Set());
-    await vorschlagIgnorieren(repo, "netcup");
+    await vorschlagIgnorieren(repo, "vibora");
     await vorschlagIgnorieren(repo, "o2");
-    expect(await ignorierteSchluessel(repo)).toEqual(new Set(["netcup", "o2"]));
+    expect(await ignorierteSchluessel(repo)).toEqual(new Set(["vibora", "o2"]));
 
     await ignorierteZuruecksetzen(repo);
     expect(await ignorierteSchluessel(repo)).toEqual(new Set());

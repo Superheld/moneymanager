@@ -99,7 +99,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   // EIN Ladevorgang, EIN setState. Gestaffelte await/setState-Paare lassen abgeleitete
   // Werte kurz gegen leere Listen rechnen — der Empfänger einer importierten Buchung
   // käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte für einen Render
-  // „Buchung" statt „[anonymisiert]".
+  // „Buchung" statt „Nordhoff".
   async function laden() {
     const s = await kontenLaden();
     setSicht(s);
@@ -214,7 +214,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
   /**
    * Alles-Markieren bezieht sich auf das GEFILTERTE Register, nicht auf die sichtbare
-   * Seite. Wer nach „[anonymisiert]" filtert und alles markiert, meint alle [anonymisiert]-Zeilen — nicht
+   * Seite. Wer nach „Nordhoff" filtert und alles markiert, meint alle Nordhoff-Zeilen — nicht
    * die ersten fünfundzwanzig davon.
    */
   const alleIds = useMemo(

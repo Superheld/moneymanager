@@ -22,7 +22,7 @@ function spur(teil: Partial<Zahlungsspur> = {}): Zahlungsspur {
     id: "b1",
     datum: "2026-05-10",
     betrag: -1650,
-    gegenpartei: "[anonymisiert] GmbH",
+    gegenpartei: "Vibora GmbH",
     kategorieId: "hosting",
     kontoId: "k1",
     charakter: "Aufwand",
@@ -30,15 +30,15 @@ function spur(teil: Partial<Zahlungsspur> = {}): Zahlungsspur {
   };
 }
 
-const netcup: Vertragserkennung = {
+const vibora: Vertragserkennung = {
   vertragId: "v1",
-  merkmale: [{ art: "empfaenger", muster: "netcup" }],
+  merkmale: [{ art: "empfaenger", muster: "vibora" }],
 };
 
 describe("passtZu", () => {
   it("trifft über den normalisierten Namen, Rechtsform und Schreibweise egal", () => {
-    expect(passtZu(netcup, spur({ gegenpartei: "NETCUP GmbH" }))).toBe(true);
-    expect(passtZu(netcup, spur({ gegenpartei: "netcup" }))).toBe(true);
+    expect(passtZu(vibora, spur({ gegenpartei: "VIBORA GmbH" }))).toBe(true);
+    expect(passtZu(vibora, spur({ gegenpartei: "vibora" }))).toBe(true);
   });
 
   it("trifft über die Gläubiger-ID, auch wenn der Name anders lautet", () => {
@@ -52,7 +52,7 @@ describe("passtZu", () => {
   it("lässt Umschichtungen draußen", () => {
     // Eine monatliche Umbuchung aufs eigene Tagesgeldkonto ist perfekt regelmäßig und
     // trotzdem keine Vertragszahlung.
-    expect(passtZu(netcup, spur({ charakter: "Umschichtung" }))).toBe(false);
+    expect(passtZu(vibora, spur({ charakter: "Umschichtung" }))).toBe(false);
   });
 
   /**
@@ -64,11 +64,11 @@ describe("passtZu", () => {
   it("prüft ein Merkmal nur gegen das Feld seiner Art", () => {
     const alsId: Vertragserkennung = {
       vertragId: "v1",
-      merkmale: [{ art: "glaeubigerId", muster: "netcup" }],
+      merkmale: [{ art: "glaeubigerId", muster: "vibora" }],
     };
     // Derselbe Text, aber als Gläubiger-ID gemeint — der Empfängername zählt nicht.
-    expect(passtZu(alsId, spur({ gegenpartei: "[anonymisiert] GmbH" }))).toBe(false);
-    expect(passtZu(alsId, spur({ gegenpartei: "X", glaeubigerId: "netcup" }))).toBe(true);
+    expect(passtZu(alsId, spur({ gegenpartei: "Vibora GmbH" }))).toBe(false);
+    expect(passtZu(alsId, spur({ gegenpartei: "X", glaeubigerId: "vibora" }))).toBe(true);
   });
 
   /**
@@ -79,10 +79,10 @@ describe("passtZu", () => {
   it("versteht * als beliebigen Text", () => {
     const e: Vertragserkennung = {
       vertragId: "v1",
-      merkmale: [{ art: "empfaenger", muster: "stadtwerke*" }],
+      merkmale: [{ art: "empfaenger", muster: "petrossen*" }],
     };
-    expect(passtZu(e, spur({ gegenpartei: "[anonymisiert] Bonn" }))).toBe(true);
-    expect(passtZu(e, spur({ gegenpartei: "STADTWERKE MUENCHEN GMBH" }))).toBe(true);
+    expect(passtZu(e, spur({ gegenpartei: "Petrossen Bonn" }))).toBe(true);
+    expect(passtZu(e, spur({ gegenpartei: "PETROSSEN MUENCHEN GMBH" }))).toBe(true);
     expect(passtZu(e, spur({ gegenpartei: "Kreiswerke Bonn" }))).toBe(false);
   });
 
@@ -90,10 +90,10 @@ describe("passtZu", () => {
     // Der Punkt ist ein Punkt, kein „beliebiges Zeichen" — sonst träfe „a.b" auch „axb".
     const e: Vertragserkennung = {
       vertragId: "v1",
-      merkmale: [{ art: "empfaenger", muster: "e.on*" }],
+      merkmale: [{ art: "empfaenger", muster: "s.w*" }],
     };
-    expect(passtZu(e, spur({ gegenpartei: "[anonymisiert]" }))).toBe(true);
-    expect(passtZu(e, spur({ gegenpartei: "exon Energie" }))).toBe(false);
+    expect(passtZu(e, spur({ gegenpartei: "S.W. Musterstadt" }))).toBe(true);
+    expect(passtZu(e, spur({ gegenpartei: "sxw Energie" }))).toBe(false);
   });
 
   /**
@@ -104,15 +104,15 @@ describe("passtZu", () => {
   it("trifft sowohl den Namen aus dem Auszug als auch seine normalisierte Form", () => {
     const roh: Vertragserkennung = {
       vertragId: "v1",
-      merkmale: [{ art: "empfaenger", muster: "[anonymisiert] GmbH" }],
+      merkmale: [{ art: "empfaenger", muster: "Vibora GmbH" }],
     };
-    expect(passtZu(roh, spur({ gegenpartei: "[anonymisiert] GmbH" }))).toBe(true);
-    // „netcup" ist die normalisierte Form desselben Namens.
-    expect(passtZu(netcup, spur({ gegenpartei: "[anonymisiert] GmbH" }))).toBe(true);
+    expect(passtZu(roh, spur({ gegenpartei: "Vibora GmbH" }))).toBe(true);
+    // „vibora" ist die normalisierte Form desselben Namens.
+    expect(passtZu(vibora, spur({ gegenpartei: "Vibora GmbH" }))).toBe(true);
   });
 
   it("grenzt über die Betragsspanne ab", () => {
-    const e: Vertragserkennung = { ...netcup, betragVon: 1000, betragBis: 2000 };
+    const e: Vertragserkennung = { ...vibora, betragVon: 1000, betragBis: 2000 };
     expect(passtZu(e, spur({ betrag: -1650 }))).toBe(true);
     expect(passtZu(e, spur({ betrag: -800 }))).toBe(false);
     expect(passtZu(e, spur({ betrag: -2500 }))).toBe(false);
@@ -122,14 +122,14 @@ describe("passtZu", () => {
   });
 
   it("grenzt über den Zeitraum ab", () => {
-    const e: Vertragserkennung = { ...netcup, gueltigAb: "2026-01-01", gueltigBis: "2026-12-31" };
+    const e: Vertragserkennung = { ...vibora, gueltigAb: "2026-01-01", gueltigBis: "2026-12-31" };
     expect(passtZu(e, spur({ datum: "2026-05-10" }))).toBe(true);
     expect(passtZu(e, spur({ datum: "2025-12-31" }))).toBe(false);
     expect(passtZu(e, spur({ datum: "2027-01-01" }))).toBe(false);
   });
 
   it("grenzt über das Konto ab", () => {
-    const e: Vertragserkennung = { ...netcup, kontoId: "k2" };
+    const e: Vertragserkennung = { ...vibora, kontoId: "k2" };
     expect(passtZu(e, spur({ kontoId: "k1" }))).toBe(false);
     expect(passtZu(e, spur({ kontoId: "k2" }))).toBe(true);
   });
@@ -142,9 +142,9 @@ describe("passtZu", () => {
  */
 describe("standardErkennung", () => {
   it("hält fremde Zahlungen an denselben Empfänger draußen", () => {
-    const prime = standardErkennung("v1", "[anonymisiert]", 899);
-    expect(passtZu(prime, spur({ gegenpartei: "[anonymisiert]", betrag: -899 }))).toBe(true);
-    expect(passtZu(prime, spur({ gegenpartei: "[anonymisiert]", betrag: -4790 }))).toBe(false);
+    const prime = standardErkennung("v1", "Arnholt", 899);
+    expect(passtZu(prime, spur({ gegenpartei: "Arnholt", betrag: -899 }))).toBe(true);
+    expect(passtZu(prime, spur({ gegenpartei: "Arnholt", betrag: -4790 }))).toBe(false);
   });
 
   it("lässt eine Preiserhöhung durch, ohne dass man nachsteuern muss", () => {
@@ -155,13 +155,13 @@ describe("standardErkennung", () => {
   });
 
   it("nimmt die Gläubiger-ID als zweiten Schlüssel auf", () => {
-    const e = standardErkennung("v1", "[anonymisiert] GmbH", 1650, "DE98ZZZ09999999999");
-    expect(e.merkmale).toContainEqual({ art: "empfaenger", muster: "netcup" });
+    const e = standardErkennung("v1", "Vibora GmbH", 1650, "DE98ZZZ09999999999");
+    expect(e.merkmale).toContainEqual({ art: "empfaenger", muster: "vibora" });
     expect(e.merkmale).toContainEqual({ art: "glaeubigerId", muster: "DE98ZZZ09999999999" });
   });
 
   it("setzt ohne Betrag keine Spanne", () => {
-    const e = standardErkennung("v1", "[anonymisiert]", 0);
+    const e = standardErkennung("v1", "Vibora", 0);
     expect(e.betragVon).toBeUndefined();
     expect(e.betragBis).toBeUndefined();
   });
@@ -193,7 +193,7 @@ describe("vertragFuer", () => {
   });
 
   it("liefert null, wenn keine Regel greift", () => {
-    expect(vertragFuer([netcup], spur({ gegenpartei: "[anonymisiert]" }))).toBeNull();
+    expect(vertragFuer([vibora], spur({ gegenpartei: "Nordhoff" }))).toBeNull();
   });
 });
 
@@ -203,22 +203,22 @@ describe("zuordnungAbgleich", () => {
     const bestand: Vertragszuordnung[] = [
       { istbuchungId: "b1", vertragId: "v1", herkunft: "automatisch" },
     ];
-    const { setzen, entfernen } = zuordnungAbgleich([netcup], spuren, bestand);
+    const { setzen, entfernen } = zuordnungAbgleich([vibora], spuren, bestand);
     expect(setzen).toEqual([{ istbuchungId: "b2", vertragId: "v1", herkunft: "automatisch" }]);
     expect(entfernen).toEqual([]);
   });
 
   it("ist idempotent — ein zweiter Lauf will nichts mehr", () => {
     const spuren = [spur({ id: "b1" }), spur({ id: "b2" })];
-    const erst = zuordnungAbgleich([netcup], spuren, []);
-    const zweit = zuordnungAbgleich([netcup], spuren, erst.setzen);
+    const erst = zuordnungAbgleich([vibora], spuren, []);
+    const zweit = zuordnungAbgleich([vibora], spuren, erst.setzen);
     expect(zweit.setzen).toEqual([]);
     expect(zweit.entfernen).toEqual([]);
   });
 
   it("nimmt eine automatische Zuordnung zurück, wenn die Regel nicht mehr trifft", () => {
     // Die Betragsspanne wurde von Hand verengt — die 25-€-Buchung fällt heraus.
-    const eng: Vertragserkennung = { ...netcup, betragVon: 1000, betragBis: 2000 };
+    const eng: Vertragserkennung = { ...vibora, betragVon: 1000, betragBis: 2000 };
     const bestand: Vertragszuordnung[] = [
       { istbuchungId: "b1", vertragId: "v1", herkunft: "automatisch" },
     ];
@@ -238,8 +238,8 @@ describe("zuordnungAbgleich", () => {
       { istbuchungId: "b1", vertragId: null, herkunft: "manuell" },
       { istbuchungId: "b2", vertragId: "v-fremd", herkunft: "manuell" },
     ];
-    const spuren = [spur({ id: "b1" }), spur({ id: "b2", gegenpartei: "[anonymisiert]" })];
-    const { setzen, entfernen } = zuordnungAbgleich([netcup], spuren, bestand);
+    const spuren = [spur({ id: "b1" }), spur({ id: "b2", gegenpartei: "Nordhoff" })];
+    const { setzen, entfernen } = zuordnungAbgleich([vibora], spuren, bestand);
     expect(setzen).toEqual([]);
     expect(entfernen).toEqual([]);
   });
@@ -251,7 +251,7 @@ describe("erkennungsDiagnose", () => {
   const spuren: Zahlungsspur[] = [
     { id: "1", datum: "2026-03-01", betrag: -5508, gegenpartei: "Suedwestrundfunk ARD ZDF", charakter: "Aufwand", kontoId: "giro" },
     { id: "2", datum: "2026-06-01", betrag: -5508, gegenpartei: "Suedwestrundfunk ARD ZDF", charakter: "Aufwand", kontoId: "giro" },
-    { id: "3", datum: "2026-06-05", betrag: -2000, gegenpartei: "[anonymisiert]", charakter: "Aufwand", kontoId: "giro" },
+    { id: "3", datum: "2026-06-05", betrag: -2000, gegenpartei: "Nordhoff", charakter: "Aufwand", kontoId: "giro" },
     { id: "4", datum: "2026-06-06", betrag: -9000, gegenpartei: "Tagesgeldkonto", charakter: "Umschichtung", kontoId: "giro" },
   ];
 

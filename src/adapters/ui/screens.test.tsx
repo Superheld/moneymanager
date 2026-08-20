@@ -133,12 +133,12 @@ describe("VertraegeScreen", () => {
 
   it("zeigt einen Vertrag mit Anbieter", async () => {
     await sqliteVertragRepository.speichern({
-      id: "v1", anbieter: "[anonymisiert] Musterstadt", beginn: "2026-01-01",
+      id: "v1", anbieter: "Petrossen", beginn: "2026-01-01",
       status: "aktiv", verlaengerung: "automatisch", verlaengerungMonate: 12,
       mindestlaufzeitMonate: 12, kuendigungsfristMonate: 3,
     });
     rendere(<VertraegeScreen />);
-    expect(await screen.findByText(/[anonymisiert] Musterstadt/)).toBeInTheDocument();
+    expect(await screen.findByText(/Petrossen/)).toBeInTheDocument();
   });
 });
 

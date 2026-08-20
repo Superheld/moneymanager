@@ -146,7 +146,7 @@ const ZIFFERN_AB_LAENGE = 4;
  * abgeschnitten wird.
  *
  * Gemessen am echten Bestand (2026-08-16): ohne diesen Schritt verwarf die Ziffernregel
- * `debitkarte2025` (309×), `debitkarte2024`, `debitkarte2026`, `3386comdirect` (364×) und
+ * `debitkarte2025`, `debitkarte2024`, `debitkarte2026`, `3386musterbank` und
  * `3386kdn` (326×) KOMPLETT — mitsamt dem brauchbaren Wort darin. Banken setzen zwischen
  * Bezeichnung und Nummer kein Leerzeichen; wer das ganze Token wegwirft, wirft die
  * Bezeichnung mit weg.
@@ -215,7 +215,7 @@ function zerlegen(text: string): string[] {
 
 /**
  * Schneidet angeklebte Nummern von den Wortenden ab: `debitkarte2025` → `debitkarte`,
- * `3386comdirect` → `comdirect`. Kurze Ziffern (`o2`) bleiben stehen — siehe ZIFFERNRAND_AB.
+ * `3386musterbank` → `musterbank`. Kurze Ziffern (`o2`) bleiben stehen — siehe ZIFFERNRAND_AB.
  */
 function ohneRandziffern(wort: string): string {
   const rand = new RegExp(`^\\d{${ZIFFERNRAND_AB},}|\\d{${ZIFFERNRAND_AB},}$`, "g");

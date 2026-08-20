@@ -82,7 +82,7 @@ beforeEach(() => {
 
 describe("budgetvorschlaegeLaden", () => {
   it("schlägt eine Hauptkategorie mit steuerbaren Ausgaben vor", async () => {
-    einkaufsreihe("a", "essen", 43700, "[anonymisiert]");
+    einkaufsreihe("a", "essen", 43700, "Nordhoff");
     const f = fakes();
     const v = await budgetvorschlaegeLaden(f.ledger, f.umsatzRepo, f.kategorieRepo, f.budgetRepo, BIS, HEUTE);
     expect(v).toHaveLength(1);
@@ -99,7 +99,7 @@ describe("budgetvorschlaegeLaden", () => {
    */
   it("zieht erkannte Vertragszahlungen ab und lässt reine Vertragskategorien weg", async () => {
     vertragsreihe("m", "miete", 47000, "SWB Wohnungsvermietung");
-    einkaufsreihe("e", "essen", 43700, "[anonymisiert]");
+    einkaufsreihe("e", "essen", 43700, "Nordhoff");
     const f = fakes();
 
     const v = await budgetvorschlaegeLaden(f.ledger, f.umsatzRepo, f.kategorieRepo, f.budgetRepo, BIS, HEUTE);
@@ -108,13 +108,13 @@ describe("budgetvorschlaegeLaden", () => {
 
   /** Ein Budget auf der Unterkategorie deckt die Hauptkategorie mit ab. */
   it("schlägt nichts vor, wofür schon ein Budget auf einer Unterkategorie läuft", async () => {
-    einkaufsreihe("a", "essen", 43700, "[anonymisiert]");
+    einkaufsreihe("a", "essen", 43700, "Nordhoff");
     const f = fakes([{ id: "b1", kategorieId: "essen", kontoId: "giro", betragProMonat: 40000, art: "monatlich", start: "2026-01-01" }]);
     expect(await budgetvorschlaegeLaden(f.ledger, f.umsatzRepo, f.kategorieRepo, f.budgetRepo, BIS, HEUTE)).toEqual([]);
   });
 
   it("blendet weggeklickte Kategorien aus", async () => {
-    einkaufsreihe("a", "essen", 43700, "[anonymisiert]");
+    einkaufsreihe("a", "essen", 43700, "Nordhoff");
     const f = fakes();
     const v = await budgetvorschlaegeLaden(
       f.ledger, f.umsatzRepo, f.kategorieRepo, f.budgetRepo, BIS, HEUTE, new Set(["leben"]),

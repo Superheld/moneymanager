@@ -1141,7 +1141,7 @@ const de = {
     feldErsteZahlungHinweis: "ab hier läuft der Rhythmus",
     feldBeginnHinweis: "Vertragsschluss — Basis der Fristen",
     feldAnbieter: "Anbieter",
-    feldAnbieterPlatzhalter: "z. B. [anonymisiert], Arbeitgeber",
+    feldAnbieterPlatzhalter: "z. B. Petrossen, Arbeitgeber",
     feldInhaber: "Inhaber",
     feldBeginn: "Beginn",
     feldMindestlaufzeit: "Mindestlaufzeit (Monate)",

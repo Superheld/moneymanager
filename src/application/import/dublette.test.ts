@@ -14,8 +14,8 @@ function bank(over: Partial<RohUmsatz> = {}): RohUmsatz {
     valuta: "2026-08-04",
     betrag: -4990,
     waehrung: "EUR",
-    gegenpartei: "EDK*[anonymisiert] [anonymisiert]",
-    verwendungszweck: "KARTENVERFÜGUNGEDK*[anonymisiert] [anonymisiert], MUSTERSTADT  DE",
+    gegenpartei: "EDK*NORDHOFF NORDHOFF",
+    verwendungszweck: "KARTENVERFÜGUNGEDK*NORDHOFF NORDHOFF, MUSTERSTADT  DE",
     kontoIban: "DE31999999980000000002",
     istUmbuchung: false,
     quelle: "fints",
@@ -28,8 +28,8 @@ function datei(over: Partial<RohUmsatz> = {}): RohUmsatz {
     buchungstag: "2026-08-04",
     betrag: -4990,
     waehrung: "EUR",
-    gegenpartei: "[anonymisiert]",
-    verwendungszweck: "EDK*[anonymisiert] [anonymisiert], MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
+    gegenpartei: "Nordhoff",
+    verwendungszweck: "EDK*NORDHOFF NORDHOFF, MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
     kontoIban: "DE31999999980000000002",
     istUmbuchung: false,
     quelle: "finanzguru",
@@ -41,8 +41,8 @@ function datei(over: Partial<RohUmsatz> = {}): RohUmsatz {
 describe("zweckKern", () => {
   it("schneidet den Buchungstext ab, den nur die Bank mitliefert", () => {
     // Sonst scheitert der Vergleich an genau diesem Wort: die Datei kennt es nicht.
-    expect(zweckKern("KARTENVERFÜGUNG[anonymisiert], MUSTERSTADT")).toBe("[anonymisiert]musterstadt");
-    expect(zweckKern("[anonymisiert], Musterstadt")).toBe("[anonymisiert]musterstadt");
+    expect(zweckKern("KARTENVERFÜGUNGNORDHOFF, MUSTERSTADT")).toBe("nordhoffmusterstadt");
+    expect(zweckKern("Nordhoff, Musterstadt")).toBe("nordhoffmusterstadt");
   });
 
   it("lässt einen unbekannten Anfang stehen, statt zu raten", () => {
@@ -66,8 +66,8 @@ describe("vergleiche", () => {
   });
 
   it("erkennt dieselbe Lastschrift über Gläubiger-ID und Mandatsreferenz", () => {
-    const a = bank({ glaeubigerId: "[anonymisiert]", mandatsreferenz: "M-4711", verwendungszweck: "" });
-    const b = datei({ glaeubigerId: "[anonymisiert]", mandatsreferenz: "M-4711", nativeId: undefined, verwendungszweck: "" });
+    const a = bank({ glaeubigerId: "DE98ZZZ09999999901", mandatsreferenz: "M-4711", verwendungszweck: "" });
+    const b = datei({ glaeubigerId: "DE98ZZZ09999999901", mandatsreferenz: "M-4711", nativeId: undefined, verwendungszweck: "" });
     expect(vergleiche(a, b).urteil).toBe("identisch");
   });
 
@@ -182,7 +182,7 @@ describe("paareImBestand", () => {
     const paare = paareImBestand([
       bank({ nativeId: "x" }),
       datei({ nativeId: "x" }), // gleiche Quellen-ID → 99 Punkte
-      datei({ verwendungszweck: "EDK*[anonymisiert] [anonymisiert]" }),
+      datei({ verwendungszweck: "EDK*NORDHOFF NORDHOFF" }),
     ]);
     expect(paare[0].bewertung.punkte).toBe(99);
     expect(paare.length).toBeGreaterThan(1);

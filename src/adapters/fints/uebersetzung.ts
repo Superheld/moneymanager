@@ -10,7 +10,7 @@
 //  3. Mehrere typisierte Felder (`remoteIdentifier`, `mandateReference`, `e2eReference`,
 //     `bookingText`) bleiben LEER. Der Inhalt steckt im `purpose`-Freitext, in der
 //     Schreibweise des Instituts. Das Herausparsen ist bankspezifisch und liegt deshalb
-//     hinter einer eigenen Naht (`[anonymisiert]`): greift es nicht, fehlen
+//     hinter einer eigenen Naht (`klartextAnreicherung`): greift es nicht, fehlen
 //     Zusatzfelder — die Übersetzung läuft trotzdem durch.
 
 import { ibanGueltig, istCent, majorZuMinor, waehrungNachCode, type Cent, type Waehrung } from "../../core";
@@ -48,13 +48,13 @@ export function isoDatum(d: Date): string {
   return `${j}-${m}-${t}`;
 }
 
-// ── Bankspezifische Naht: comdirects Klartext-Etiketten ───────────────────────────────
+// ── Bankspezifische Naht: Klartext-Etiketten statt SEPA-Tags ───────────────────────────────
 //
 // Kein `CRED+`/`MREF+`/`SVWZ+` wie in der SEPA-Norm, sondern deutsche Etiketten OHNE
 // Trennzeichen, direkt aneinandergeklebt:
 //
 //   LASTSCHRIFT / BELASTUNGHÄNDLER XY - EINZUG 806315
-//   END-TO-END-REF.:8063154CORE / MANDATSREF.:648026GLÄUBIGER-ID:[anonymisiert]Ref. 5D2C2…
+//   END-TO-END-REF.:8063154CORE / MANDATSREF.:648026GLÄUBIGER-ID:DE98ZZZ09999999901Ref. 5D2C2…
 //
 // Weil es keine Trennzeichen gibt, endet ein Wert dort, wo das nächste bekannte Etikett
 // beginnt. Deshalb wird nicht mit verschachtelten Regex gearbeitet, sondern die Etiketten
@@ -71,7 +71,7 @@ const ETIKETTEN = [
 ] as const;
 
 /**
- * Buchungstext-Vokabular (MT940-Feld `:86:`, Subfeld `?00`), das comdirect vorn an den
+ * Buchungstext-Vokabular (MT940-Feld `:86:`, Subfeld `?00`), das solche Banken vorn an den
  * Verwendungszweck klebt. Unvollständig und darf es sein: was nicht erkannt wird, bleibt
  * einfach Teil des Verwendungszwecks.
  */
@@ -99,7 +99,7 @@ export interface Anreicherung {
   readonly mandatsreferenz?: string;
   readonly e2eReferenz?: string;
   /**
-   * comdirects eigene 16-stellige Referenz am Zweckende (`Ref. …`).
+   * die institutseigene 16-stellige Referenz am Zweckende (`Ref. …`).
    *
    * ABSICHTLICH NICHT als `nativeId` verwendet: im Spike trugen 64 von 65 Buchungen eine,
    * davon aber nur 59 verschiedene — und ob sie über mehrere Abrufe hinweg stabil bleibt,
@@ -111,16 +111,16 @@ export interface Anreicherung {
 }
 
 function saeubern(wert: string | undefined): string | undefined {
-  // comdirect trennt Angaben mit „ / ", das am Wertende hängen bleibt.
+  // Solche Banken trennen Angaben mit „ / ", das am Wertende hängen bleibt.
   const s = (wert ?? "").replace(/[\s/]+$/, "").trim();
   return LEERWERTE.has(s.toUpperCase()) ? undefined : s || undefined;
 }
 
 /**
- * Zerlegt comdirects Zweck-Freitext. Reine Anreicherung: greift kein Muster, kommt der
+ * Zerlegt den Zweck-Freitext solcher Banken. Reine Anreicherung: greift kein Muster, kommt der
  * Zweck unverändert zurück und alle Zusatzfelder bleiben leer.
  */
-export function [anonymisiert](purpose: string | undefined): Anreicherung {
+export function klartextAnreicherung(purpose: string | undefined): Anreicherung {
   const text = (purpose ?? "").trim();
   if (!text) return { zweck: "" };
 
@@ -202,7 +202,7 @@ export interface KontoKontext {
  * Die Umbuchungs-Paarung ist Sache der bestehenden Erkennung eine Schicht höher.
  */
 export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
-  const a = [anonymisiert](b.purpose);
+  const a = klartextAnreicherung(b.purpose);
   const waehrung = waehrungNachCode(konto.waehrung ?? "EUR");
   // MT940 füllt `remoteAccountNumber` je nach Bank mit einer IBAN ODER einer nationalen
   // Kontonummer. Nur was eine gültige IBAN ist, darf als solche weitergereicht werden —

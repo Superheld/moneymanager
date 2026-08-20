@@ -31,7 +31,7 @@ import type { ImportErgebnis } from "../import";
  */
 export interface Bankzugang {
   readonly id: string;
-  /** Anzeigename, z. B. „comdirect". */
+  /** Anzeigename der Bank, wie sie sich selbst nennt. */
   readonly bezeichnung: string;
   /** FinTS-PIN/TAN-Endpunkt der Bank. */
   readonly url: string;
@@ -52,7 +52,7 @@ export interface Bankzugang {
 /**
  * Ein Konto, wie die BANK es meldet — noch kein `Zahlungskonto` der App.
  *
- * Der Schlüssel ist `nummer` + `unterkonto`, nie die Nummer allein: comdirect sendet für
+ * Der Schlüssel ist `nummer` + `unterkonto`, nie die Nummer allein: manche Institute senden für
  * Girokonto und Depot dieselbe Kontonummer und unterscheidet über das Unterkontomerkmal,
  * in dem der Produktname steht. Wer nur über die Nummer adressiert, bekommt still das
  * erste passende Konto — im Spike sichtbar an einem „Depot-Saldo", der der Girokonto-Saldo

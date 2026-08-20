@@ -221,7 +221,7 @@ describe("BudgetsScreen — Vorschläge", () => {
 
   it("schlägt eine Hauptkategorie mit ihrem üblichen Monatsbetrag vor", async () => {
     await stammdaten();
-    await einkaufsreihe("e", "essen", 43700, "[anonymisiert]");
+    await einkaufsreihe("e", "essen", 43700, "Nordhoff");
 
     rendere(<BudgetsScreen />);
     expect(await screen.findByText("Lebenshaltung")).toBeInTheDocument();
@@ -236,7 +236,7 @@ describe("BudgetsScreen — Vorschläge", () => {
    */
   it("lässt eine rein vertragliche Kategorie weg", async () => {
     await stammdaten();
-    await einkaufsreihe("e", "essen", 43700, "[anonymisiert]");
+    await einkaufsreihe("e", "essen", 43700, "Nordhoff");
     for (let i = 0; i < 12; i++) {
       await erfassen(`m-${i}`, `${monat(i)}-15`, 47000, "miete", "SWB Wohnungsvermietung");
     }
@@ -248,7 +248,7 @@ describe("BudgetsScreen — Vorschläge", () => {
 
   it("füllt beim Übernehmen die Anlege-Maske vor und legt das Budget an", async () => {
     await stammdaten();
-    await einkaufsreihe("e", "essen", 43700, "[anonymisiert]");
+    await einkaufsreihe("e", "essen", 43700, "Nordhoff");
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
     await screen.findByText("Lebenshaltung");
@@ -272,7 +272,7 @@ describe("BudgetsScreen — Vorschläge", () => {
   it("merkt sich ein weggeklicktes Verwerfen über einen Neustart", async () => {
     await stammdaten();
     await sqliteKategorieRepository.speichern({ id: "freizeit", name: "Freizeit", defaultCharakter: "Aufwand" });
-    await einkaufsreihe("e", "essen", 43700, "[anonymisiert]");
+    await einkaufsreihe("e", "essen", 43700, "Nordhoff");
     // Zweiter Vorschlag als Anker: nur wenn DER nach dem Neustart wieder dasteht, sind
     // die Vorschläge geladen. Ohne ihn prüfte der Test gegen einen Bildschirm, auf dem
     // die Karte schlicht noch nicht gerendert ist — und wäre auch grün, wenn nichts
