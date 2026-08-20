@@ -21,7 +21,7 @@ import type {
   VertragserkennungRepository,
   VertragszuordnungRepository,
 } from "../../application/ports";
-import type { AbgleichDeps } from "../../application/vertragszuordnung";
+import type { AbgleichDeps } from "../../application/vertraege/vertragszuordnung";
 import { getDb } from "./db";
 import { sqliteLedgerRepository } from "./sqliteLedgerRepository";
 import { sqliteUmsatzRepository } from "./sqliteImportRepositories";

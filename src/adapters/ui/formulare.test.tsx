@@ -16,11 +16,11 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
-import { EinstellungenScreen } from "./EinstellungenScreen";
-import { KontenVerwaltungScreen } from "./KontenVerwaltungScreen";
-import { InventarScreen } from "./InventarScreen";
-import { BudgetsScreen } from "./BudgetsScreen";
+import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../testwerkzeug/harness";
+import { EinstellungenScreen } from "./einstellungen/EinstellungenScreen";
+import { KontenVerwaltungScreen } from "./konten/KontenVerwaltungScreen";
+import { InventarScreen } from "./inventar/InventarScreen";
+import { BudgetsScreen } from "./budgets/BudgetsScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import {

@@ -109,7 +109,7 @@ verrotten.
   Datenverlust.
 - **Der Buchungsdialog rechnete Dubletten anders als der Auszug** — gegen einen anderen
   Bestand, ohne zu prüfen, ob es das Gegenstück noch gibt. Beide Rechenwege liegen jetzt
-  in `application/dublettensicht.ts`, mit der Begründung, warum es genau zwei Fragen gibt.
+  in `application/dubletten/dublettensicht.ts`, mit der Begründung, warum es genau zwei Fragen gibt.
 - **Der Abruf hängte frisch gebuchte Zeilen nicht an ihre Verträge** — bis jemand zufällig
   einen Verträge-Screen öffnete, zählte jede Vertragsrate gegen ihr Budget.
 

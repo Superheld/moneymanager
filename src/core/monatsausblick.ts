@@ -26,15 +26,15 @@
 // nicht ausgeben, ob sie nun geflossen ist oder nicht. Wer die Ist-Spalte gegen den
 // Kontoauszug prüft, muss diese Zeile herausrechnen.
 
-import { addMonate, parseIso, toIso } from "./datum";
-import type { Cent } from "./geld";
-import { geglaetteterMonatsabfluss, budgetBuchungen, type Budget, type BudgetSicht } from "./budget";
-import { istInterneUmbuchung } from "./historie";
-import { monatsRuecklageGesamt, type Inventargegenstand } from "./inventar";
-import type { Kategorie } from "./kategorie";
-import { findeIstZuPlan, kategorieAnteile, type IstBuchung } from "./istbuchung";
-import { projiziereRegel, type Planbuchung } from "./projektion";
-import type { Zahlungsregel } from "./zahlungsregel";
+import { addMonate, parseIso, toIso } from "./basis/datum";
+import type { Cent } from "./basis/geld";
+import { geglaetteterMonatsabfluss, budgetBuchungen, type Budget, type BudgetSicht } from "./budgets/budget";
+import { istInterneUmbuchung } from "./buchung/historie";
+import { monatsRuecklageGesamt, type Inventargegenstand } from "./inventar/inventar";
+import type { Kategorie } from "./kategorien/kategorie";
+import { findeIstZuPlan, kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
+import { projiziereRegel, type Planbuchung } from "./buchung/projektion";
+import type { Zahlungsregel } from "./basis/zahlungsregel";
 
 /** Die Zeilen der Aufrechnung, in Anzeigereihenfolge. */
 export type AusblickZeileId =

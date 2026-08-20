@@ -84,7 +84,7 @@ describe("Doku-Verweise", () => {
     const inhalt = readFileSync(join(WURZEL, datei), "utf8");
     const fehlend = genanntePfade(datei, inhalt).filter((pfad) => {
       if (AUSSERHALB.includes(pfad)) return false;
-      // Suffix-Vergleich: CLAUDE.md darf `ds/CLAUDE.md` kurz nennen, ohne den vollen Pfad
+      // Suffix-Vergleich: CLAUDE.md darf `bausteine/CLAUDE.md` kurz nennen, ohne den vollen Pfad
       // zu wiederholen. Der Kandidat muss dabei an einer Verzeichnisgrenze aufsetzen.
       return !versioniert.some((v) => v === pfad || v.endsWith(`/${pfad}`));
     });

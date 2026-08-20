@@ -14,7 +14,7 @@
 // inzwischen veränderten Bestand rechnen, während die Karten oben den alten zeigen.
 
 import { fruehesterMonat, monatsAusblicke, type Kategorie, type MonatsAusblick } from "../core";
-import { budgetstaende, vertragsBuchungenLaden, type Budgetstand } from "./budgetsichten";
+import { budgetstaende, vertragsBuchungenLaden, type Budgetstand } from "./budgets/budgetsichten";
 import type { BudgetSicht } from "../core";
 import type {
   BudgetRepository,

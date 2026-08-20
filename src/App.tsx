@@ -1,18 +1,18 @@
 import { useEffect, useState } from "react";
-import { AppShell, type ScreenId } from "./adapters/ui/AppShell";
-import { UebersichtScreen } from "./adapters/ui/UebersichtScreen";
-import { AnalyseScreen } from "./adapters/ui/AnalyseScreen";
-import { KontenScreen } from "./adapters/ui/KontenScreen";
-import { KontenVerwaltungScreen } from "./adapters/ui/KontenVerwaltungScreen";
-import { EinstellungenScreen } from "./adapters/ui/EinstellungenScreen";
-import { VertraegeScreen } from "./adapters/ui/VertraegeScreen";
-import { BudgetsScreen } from "./adapters/ui/BudgetsScreen";
-import { InventarScreen } from "./adapters/ui/InventarScreen";
-import { ImportBereich } from "./adapters/ui/ImportBereich";
-import { TrainingBereich } from "./adapters/ui/TrainingBereich";
+import { AppShell, type ScreenId } from "./adapters/ui/bausteine/AppShell";
+import { UebersichtScreen } from "./adapters/ui/uebersicht/UebersichtScreen";
+import { AnalyseScreen } from "./adapters/ui/analyse/AnalyseScreen";
+import { KontenScreen } from "./adapters/ui/konten/KontenScreen";
+import { KontenVerwaltungScreen } from "./adapters/ui/konten/KontenVerwaltungScreen";
+import { EinstellungenScreen } from "./adapters/ui/einstellungen/EinstellungenScreen";
+import { VertraegeScreen } from "./adapters/ui/vertraege/VertraegeScreen";
+import { BudgetsScreen } from "./adapters/ui/budgets/BudgetsScreen";
+import { InventarScreen } from "./adapters/ui/inventar/InventarScreen";
+import { ImportBereich } from "./adapters/ui/import/ImportBereich";
+import { TrainingBereich } from "./adapters/ui/training/TrainingBereich";
 import { appBootstrap } from "./application/bootstrap";
 import { sqliteKategorieRepository } from "./adapters/persistence/sqliteStammdatenRepositories";
-import { EinstellungenProvider } from "./adapters/ui/EinstellungenProvider";
+import { EinstellungenProvider } from "./adapters/ui/bausteine/EinstellungenProvider";
 
 export default function App() {
   const [screen, setScreen] = useState<ScreenId>("uebersicht");

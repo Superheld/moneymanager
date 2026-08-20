@@ -11,7 +11,7 @@
 // die gecachte Promise stellt sicher, dass der Bootstrap genau einmal läuft.
 
 import type { KategorieRepository } from "./ports";
-import { standardkategorienAnlegen } from "./standardkategorien";
+import { standardkategorienAnlegen } from "./kategorien/standardkategorien";
 
 let laeuft: Promise<void> | null = null;
 
