@@ -4,7 +4,7 @@
 // Kernfunktionen auf. Das war nicht bloß umständlich, es war die Stelle, an der die
 // Vertragsregel verloren ging: die drei Monatskarten bekamen eine gefilterte
 // Buchungsliste, die Budgetliste darunter die ungefilterte — und dasselbe Budget stand
-// im selben Bild einmal mit 0,00 € und einmal mit 425,00 € Verbrauch.
+// im selben Bild einmal ohne Verbrauch und einmal weit über seinem Rahmen.
 //
 // Jetzt entscheidet diese Datei einmal, was gilt, und der Screen zeigt es nur noch an.
 //

@@ -54,8 +54,8 @@ npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
 - **Kopie NIE mit `cp`**, sondern `sqlite3 -readonly "$DB" ".backup '/pfad/probe.db'"`. Die
   Datenbank läuft im WAL-Modus: frische Schreibvorgänge stehen in `moneymanager.db-wal`,
   nicht in der Hauptdatei. Ein `cp` der Hauptdatei allein liefert einen ÄLTEREN Stand —
-  still und plausibel aussehend. Einmal passiert: die Kopie zeigte 5299 Buchungen, der
-  echte Bestand 5308, und der geprüfte Datenfehler war in der Kopie schlicht nicht da.
+  still und plausibel aussehend. Einmal passiert: die Kopie hatte neun Buchungen weniger
+  als der echte Bestand, und der geprüfte Datenfehler war in ihr schlicht nicht da.
 - **Erscheinen Frontend-Änderungen nicht im Tauri-Fenster**, obwohl der Code stimmt: erst
   prüfen, ob Vite ausliefert (`curl -s localhost:1420/src/.../X.tsx`), dann Live-Banner-Test.
   Hängt der WebView-Cache (er überlebt den App-Neustart): App schließen,
@@ -87,7 +87,7 @@ Der Grund steht in ARCHITEKTUR.md ausführlich, kurz: die Regel galt lange nur f
 Schreiben (22 Schreibzugriffe über Use-Cases, aber 144 LESEzugriffe direkt ans
 Repository). Leseregeln hatten damit keine Heimat — „welche Buchung zählt gegen ein
 Budget" war an drei Stellen erfunden und an der vierten vergessen, und dieselbe Übersicht
-zeigte für dasselbe Budget 0,00 € und 425,00 €. Was die UI umgehen KANN, umgeht sie
+zeigte für dasselbe Budget zwei verschiedene Werte. Was die UI umgehen KANN, umgeht sie
 irgendwann.
 
 Geprüft wird das in `src/architektur.test.ts` (läuft in `npm test`, also in der CI). Seine

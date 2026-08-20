@@ -318,7 +318,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>{t("konten.realerStandLabel")}</span>
               </div>
               {/* Woraus die grosse Zahl darüber besteht — ausgeschrieben statt als
-                  „Anfangsbestand [Betrag] € · Σ Ist +[Betrag] €". Die alte Fassung nannte
+                  „Anfangsbestand X · Σ Ist Y". Die alte Fassung nannte
                   zwei Zahlen und verschwieg, dass sie zusammen genau den Stand darüber
                   ergeben; „Σ Ist" hiess dabei nichts, was ausserhalb des Codes jemand
                   wissen konnte. */}

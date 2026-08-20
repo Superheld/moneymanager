@@ -16,7 +16,7 @@
 // Warum so streng: bis 2026-08-19 galt die Regel nur fürs Schreiben. Beim Lesen holte
 // sich jeder Screen seine Rohteile selbst — und „welche Buchung zählt gegen ein Budget"
 // war dadurch an drei Stellen erfunden und an der vierten vergessen. Dieselbe Übersicht
-// zeigte für dasselbe Budget 0,00 € und 425,00 €.
+// zeigte für dasselbe Budget gleichzeitig null Verbrauch und einen überschrittenen Rahmen.
 
 // ---------------------------------------------------------------------------
 // Vokabular: sämtliche Domänentypen. `export type *` reicht ausschliesslich Typen

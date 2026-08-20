@@ -4,7 +4,7 @@
 // Repositories und rief `budgetStand` mit dem, was er gerade zur Hand hatte. Was dabei
 // niemand hinschrieb, war die Vertragsregel — Vertragsraten zählen nicht gegen ein
 // Budget. Die Folge stand auf der Übersicht: für „Familie & Kinder" zeigte die Karte
-// oben 0,00 € Verbrauch, die Liste zwanzig Zentimeter darunter 425,00 € bei 110,00 €
+// oben null Verbrauch, die Liste zwanzig Zentimeter darunter den vollen Betrag über
 // Rahmen. Beides aus denselben Daten, beides „richtig gerechnet".
 //
 // Seit 2026-08-19 gibt es die Rohteile nicht mehr einzeln: wer Budgetstände will, ruft

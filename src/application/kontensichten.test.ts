@@ -80,8 +80,8 @@ describe("Dublettenmarkierung im Ledger", () => {
 
   it("schweigt bei zwei gleichen Zahlungen AUS DEMSELBEN Lauf", async () => {
     // Der Import hat über genau diese Menge schon entschieden und beide durchgelassen.
-    // Am echten Bestand waren solche Paare durchweg echte Mehrfachzahlungen — dreimal
-    // derselbe Übertrag an einem Tag, zweimal derselbe Anbieter.
+    // Am echten Bestand waren solche Paare durchweg echte Mehrfachzahlungen: derselbe
+    // Übertrag mehrmals an einem Tag, zweimal derselbe Anbieter.
     const a = umsatz({ id: "u-a", istbuchungId: "b-a" });
     const b = umsatz({ id: "u-b", istbuchungId: "b-b", rohHash: "h2" });
     const sicht = await kontenLaden(
