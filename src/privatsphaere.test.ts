@@ -18,8 +18,11 @@
 // einen Fantasienamen ersetzt, dem man den Streamingdienst ansieht, hat den Namen
 // getauscht und die Aussage behalten. Dasselbe gilt für die Kategorie daneben. Erfundene Werte sind deshalb
 // SEKTORNEUTRAL: „Kesselmann", „Vibora", „Ohlert" lassen keinen Rückschluss zu, weder für
-// sich noch in Kombination mit ihrer Kategorie. Dieser Wächter kann das nicht prüfen — er
-// findet nur den Originalwert. Die Neutralität ist Handarbeit.
+// sich noch in Kombination mit ihrer Kategorie. Und sie gelten je TESTFALL: derselbe
+// Fantasiename in siebenundzwanzig Tests wird selbst zum Muster, das Fälle verbindet, die
+// nichts miteinander zu tun haben. Gebraucht wird Gleichheit nur innerhalb eines Falls.
+// Dieser Wächter kann beides nicht prüfen — er findet nur den Originalwert. Der Rest ist
+// Handarbeit.
 //
 // Geprüft wird ein bewusst KLEINER, dafür eindeutiger Satz von Merkmalen: Kontostände,
 // Budgetbeträge, Anker, IBANs, Personennamen und Bankzugänge. Nicht geprüft werden die

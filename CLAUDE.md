@@ -214,6 +214,12 @@ ohne den Beleg: „ein überschrittener Rahmen" statt des Betrags.
   und ihre Kategorie folgt nicht aus dem Namen. Aus einer Fixture darf sich nichts über
   den Haushalt ableiten lassen — weder aus einem Wert noch aus der Kombination. Kein
   Wächter kann das prüfen; er findet nur den Originalwert. Der Rest ist Handarbeit.
+- **Erfundene Namen gelten je TESTFALL, nicht projektweit.** Derselbe Fantasiename in
+  siebenundzwanzig Tests wird selbst zum Muster: er verbindet Fälle, die nichts
+  miteinander zu tun haben, und wenn einmal jemand herausfindet, wofür er stand, gilt das
+  rückwirkend für alle. Gebraucht wird Gleichheit nur INNERHALB eines Testfalls — dort,
+  wo zwei Zeilen denselben Empfänger meinen müssen. Neue Tests bekommen deshalb eigene
+  Namen; der Bestand wird nach und nach umgestellt, nicht in einem Zug.
 - **Test-IBANs tragen eine BLZ, die es nicht gibt** (Bereich `999999xx`, Prüfziffer
   rechnen). Eine IBAN mit echter BLZ kann zu einem echten Konto gehören; ob die
   Kontonummer vergeben ist, weiss hier niemand. Beispiel-IBANs aus dem Netz taugen nicht —
