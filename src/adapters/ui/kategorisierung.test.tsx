@@ -404,11 +404,11 @@ describe("5 · Bestand abgleichen", () => {
     kategorie("kat-lm", "Lebensmittel");
     kategorie("kat-dro", "Drogerie");
     for (let i = 0; i < 3; i++) {
-      buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "[anonymisiert]", zweck: "Einkauf" });
+      buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "Talmer", zweck: "Einkauf" });
     }
     db.run(
       `INSERT INTO kategorie_festlegung (muster, kategorie_id, angelegt_am)
-       VALUES ('rossmann', 'kat-dro', '2026-08-17T10:00:00.000Z')`,
+       VALUES ('talmer', 'kat-dro', '2026-08-17T10:00:00.000Z')`,
     );
   }
 

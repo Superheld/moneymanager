@@ -12,7 +12,7 @@ function f(muster: string, kategorieId: string): Kategoriefestlegung {
 
 describe("Muster vorschlagen", () => {
   it("nimmt die normalisierte Form des Empfängers", () => {
-    expect(musterVorschlag("NETFLIX INTERNATIONAL BV")).toBe("netflix international");
+    expect(musterVorschlag("KESSELMANN INTERNATIONAL BV")).toBe("kesselmann international");
   });
 
   it("liefert leer, wenn nach der Normalisierung nichts übrig bleibt", () => {
@@ -23,17 +23,17 @@ describe("Muster vorschlagen", () => {
 
 describe("Trifft", () => {
   it("trifft den rohen Namen", () => {
-    expect(festlegungTrifft(f("[anonymisiert] International BV", "k1"), "netflix international bv")).toBe(true);
+    expect(festlegungTrifft(f("Kesselmann International BV", "k1"), "kesselmann international bv")).toBe(true);
   });
 
   it("trifft die normalisierte Form", () => {
-    // Wer „netflix international" aus der Begründung abtippt, soll einen Treffer bekommen.
-    expect(festlegungTrifft(f("netflix international", "k1"), "NETFLIX INTERNATIONAL BV")).toBe(true);
+    // Wer „kesselmann international" aus der Begründung abtippt, soll einen Treffer bekommen.
+    expect(festlegungTrifft(f("kesselmann international", "k1"), "KESSELMANN INTERNATIONAL BV")).toBe(true);
   });
 
   it("nimmt den Stern als beliebigen Text", () => {
     expect(festlegungTrifft(f("dm*", "k1"), "dm Filiale 4711")).toBe(true);
-    expect(festlegungTrifft(f("dm*", "k1"), "[anonymisiert]")).toBe(false);
+    expect(festlegungTrifft(f("dm*", "k1"), "Talmer")).toBe(false);
   });
 
   it("nimmt alles außer dem Stern wörtlich", () => {
@@ -48,7 +48,7 @@ describe("Trifft", () => {
 
 describe("Welche Festlegung gilt", () => {
   it("liefert null, wenn keine passt", () => {
-    expect(festlegungFuer([f("rewe", "k1")], "[anonymisiert]")).toBeNull();
+    expect(festlegungFuer([f("rewe", "k1")], "Kesselmann")).toBeNull();
   });
 
   it("die schärfere schlägt die breitere", () => {

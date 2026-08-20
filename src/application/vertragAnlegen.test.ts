@@ -24,7 +24,7 @@ function memRegel(): ZahlungsregelRepository & { daten: Zahlungsregel[] } {
 
 function eingabe(over: Partial<VertragEingabe> = {}): VertragEingabe {
   return {
-    anbieter: "[anonymisiert]",
+    anbieter: "Petrossen",
     beginn: "2026-01-01",
     verlaengerung: "automatisch",
     verlaengerungMonate: 12,

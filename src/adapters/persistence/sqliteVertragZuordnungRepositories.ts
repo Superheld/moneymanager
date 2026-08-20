@@ -47,8 +47,8 @@ const SIEHT_AUS_WIE_GLAEUBIGER_ID = /^[A-Z]{2}[0-9]{2}[A-Z0-9]{3}[A-Z0-9]{1,28}$
 /**
  * JSON-Spalte → Merkmale. Liest ZWEI Formate:
  *
- *  • aktuell: `[{"art":"empfaenger","muster":"netcup"}, …]`
- *  • Altbestand: `["netcup", "DE98ZZZ…"]` — eine flache Schlüsselliste ohne Art. Die
+ *  • aktuell: `[{"art":"empfaenger","muster":"vibora"}, …]`
+ *  • Altbestand: `["vibora", "DE98ZZZ…"]` — eine flache Schlüsselliste ohne Art. Die
  *    Regeln aus Migration 19 stehen so in der Datenbank; ihre Art wird an der Form des
  *    Werts erraten. Das ist die einzige Stelle, an der geraten wird, und sie verschwindet,
  *    sobald die betroffenen Regeln einmal gespeichert wurden. Eine Migration hätte dafür

@@ -56,7 +56,7 @@ const TAN_MEDIUM_PFLICHT = 2;
 /**
  * Setzt eine Antwort fort, wenn die Bank eine Freigabe verlangt.
  *
- * Beim LESEN ist das die Ausnahme, nicht der Normalfall: comdirect antwortet mit
+ * Beim LESEN ist das die Ausnahme, nicht der Normalfall: manche Institute antworten mit
  * `3076 Starke Kundenauthentifizierung nicht notwendig` (PSD2-Ausnahme für
  * Kontoinformation). Die Ausnahme deckt aber nur 90 Tage und verfällt — ein Erstimport
  * über Monate zieht sehr wohl eine TAN. Der Pfad muss also da sein, auch wenn er selten
@@ -98,7 +98,7 @@ function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Ba
   return roh.map((k, i) => {
     // Die gesamte API von lib-fints adressiert Konten ALLEIN über die Nummer, und
     // `FinTSConfig.getBankAccount` nimmt per `find` das ERSTE Konto mit dieser Nummer
-    // (config.js:188). Kommt eine Nummer mehrfach vor — comdirect meldet Girokonto und
+    // (config.js:188). Kommt eine Nummer mehrfach vor — ein Institut meldet Girokonto und
     // Depot unter derselben und trennt über das Unterkontomerkmal —, dann ist das erste
     // Konto sehr wohl erreichbar: jeder Abruf landet genau dort. Unerreichbar sind die
     // WEITEREN; im Spike sichtbar am „Depot-Saldo", der der Girokonto-Saldo war.
@@ -192,7 +192,7 @@ class FintsSitzung implements Abrufsitzung {
     const hinweise: string[] = [];
 
     // Kein Format hartkodieren: erst CAMT anfragen, und NUR wenn die Bank ablehnt, auf
-    // MT940 zurückfallen. comdirect lehnt CAMT mit `3010 Kontonummer ist ungültig` ab
+    // MT940 zurückfallen. mindestens ein Institut lehnt CAMT mit `3010 Kontonummer ist ungültig` ab
     // (Ursache: HKCAZ nutzt die internationale Kontoverbindung, in der lib-fints IBAN, BIC
     // und die nationalen Felder ZUGLEICH füllt; die Spezifikation meint das eine oder das
     // andere). Bei einer anderen Bank kann CAMT dagegen laufen — deshalb fragen wir sie,
@@ -324,7 +324,7 @@ export function fintsAdapter(opt: FintsAdapterOptionen): Abrufadapter {
       const info = config.bankingInformation;
       const konten = kontenAufbereiten(client, info.upd?.bankAccounts ?? []);
 
-      // Wie weit die Bank überhaupt zurückreicht, sagt sie selbst (comdirect: 540 Tage).
+      // Wie weit die Bank überhaupt zurückreicht, sagt sie selbst (im Test: 540 Tage).
       // Abfragen statt annehmen — und der Aufruf wirft für Vorfälle ohne Segmentdefinition.
       let speicherzeitraumTage: number | undefined;
       try {

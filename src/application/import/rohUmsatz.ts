@@ -42,7 +42,7 @@ export interface RohUmsatz {
    */
   readonly e2eReferenz?: string;
   /**
-   * Art der Buchung in der Sprache der QUELLE — „KARTENVERFÜGUNG" bei comdirect,
+   * Art der Buchung in der Sprache der QUELLE — „KARTENVERFÜGUNG" bei der einen Bank,
    * „Kartenzahlung" bei Finanzguru. Bewusst nicht vereinheitlicht und bewusst NICHT
    * für den Abgleich benutzt: die Vokabulare sind verschieden, und ein hier erfundenes
    * drittes wäre eine Behauptung über Daten, die wir nicht haben.
@@ -51,7 +51,7 @@ export interface RohUmsatz {
   /** Geschäftsvorfallcode der Bank (MT940 `:61:`, z. B. 005, 700, 820). */
   readonly buchungsschluessel?: string;
   /**
-   * Institutseigene Referenz aus dem Freitext (comdirect: `Ref. …`).
+   * Institutseigene Referenz aus dem Freitext (etwa `Ref. …`).
    *
    * ABSICHTLICH KEIN Dedup-Schlüssel: im Spike trugen 64 von 65 Buchungen eine, davon
    * aber nur 59 verschiedene — und ob sie über mehrere Abrufe stabil bleibt, ist

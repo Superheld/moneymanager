@@ -38,7 +38,7 @@ describe("textAusPuffer", () => {
 
   /** Reines ASCII ist in beiden Kodierungen byte-gleich — darf sich nie unterscheiden. */
   it("behandelt ASCII in beiden Kodierungen gleich", () => {
-    expect(textAusPuffer(puffer("[anonymisiert];-6,55", "latin1"))).toBe("[anonymisiert];-6,55");
-    expect(textAusPuffer(puffer("[anonymisiert];-6,55", "utf8"))).toBe("[anonymisiert];-6,55");
+    expect(textAusPuffer(puffer("Brandeis;-6,55", "latin1"))).toBe("Brandeis;-6,55");
+    expect(textAusPuffer(puffer("Brandeis;-6,55", "utf8"))).toBe("Brandeis;-6,55");
   });
 });

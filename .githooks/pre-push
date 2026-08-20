@@ -16,6 +16,12 @@
 # oder ohne sqlite3 entfaellt Schritt 2; laesst sie sich nicht oeffnen, bricht der Hook ab
 # statt stillschweigend durchzuwinken.
 #
+# ERSETZEN REICHT NICHT — es muss anonymisieren. Ein erfundener Name, der die Branche
+# durchscheinen laesst, verraet dasselbe wie der echte: ein Fantasiename, dem man den
+# Streamingdienst ansieht, sagt immer noch, dass es so ein Abo gibt - und die Kategorie
+# daneben bestaetigt es.
+# Erfundene Werte sind sektorneutral. Das prueft hier nichts nach - es ist Handarbeit.
+#
 # Aktiv wird der Hook durch:  git config core.hooksPath .githooks
 # Umgehen im Notfall:         git push --no-verify
 

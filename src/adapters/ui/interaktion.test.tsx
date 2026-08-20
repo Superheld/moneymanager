@@ -455,7 +455,7 @@ describe("Buchungsdetails", () => {
     });
     await sqliteUmsatzRepository.speichern({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
-      waehrung: "EUR", gegenpartei: "[anonymisiert] Paschmann", verwendungszweck: "EDK*[anonymisiert] Muelheim",
+      waehrung: "EUR", gegenpartei: "Nordhoff Paschmann", verwendungszweck: "EDK*NORDHOFF Muelheim",
       rohHash: "hash-abc", nativeId: "fg-12345", status: "verbucht", istbuchungId: "i1",
     });
     const nutzer = userEvent.setup();
@@ -466,8 +466,8 @@ describe("Buchungsdetails", () => {
     // Nach den DATEN suchen, die der Test angelegt hat — nicht nach Beschriftungen.
     await waitFor(() => {
       const text = document.body.textContent ?? "";
-      expect(text).toContain("[anonymisiert] Paschmann");
-      expect(text).toContain("EDK*[anonymisiert] Muelheim");
+      expect(text).toContain("Nordhoff Paschmann");
+      expect(text).toContain("EDK*NORDHOFF Muelheim");
       expect(text).toContain("fg-12345");
       expect(text).toContain("hash-abc");
       expect(text).toContain("umsaetze.csv");
@@ -513,7 +513,7 @@ describe("Buchungsdetails", () => {
     });
     await sqliteUmsatzRepository.speichern({
       id: "u1", laufId: "l-datei", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
-      waehrung: "EUR", gegenpartei: "[anonymisiert]", verwendungszweck: "Einkauf",
+      waehrung: "EUR", gegenpartei: "Nordhoff", verwendungszweck: "Einkauf",
       rohHash: "h-datei", nativeId: "fg-1", status: "verbucht", istbuchungId: "i1",
     });
     const nutzer = userEvent.setup();

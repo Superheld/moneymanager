@@ -42,7 +42,7 @@ export interface Kategoriefestlegung {
  * Das Muster, das für diesen Empfänger vorgeschlagen wird: seine normalisierte Form.
  *
  * Nicht der rohe Name, weil der Schreibweisen mitschleppt, die nichts bedeuten
- * („NETFLIX INTERNATIONAL B.V." vs. „[anonymisiert] International BV"). Leer, wenn nach der
+ * („KESSELMANN INTERNATIONAL B.V." vs. „Kesselmann International BV"). Leer, wenn nach der
  * Normalisierung nichts übrig bleibt — dann gibt es nichts festzulegen.
  */
 export function musterVorschlag(gegenpartei: string): string {
@@ -60,7 +60,7 @@ export function festlegungTrifft(f: Kategoriefestlegung, gegenpartei: string): b
 /**
  * Welche Festlegung für diesen Empfänger gilt — oder null.
  *
- * Bei mehreren Treffern gewinnt die SCHÄRFERE: „netflix" schlägt „net*". Das ist die
+ * Bei mehreren Treffern gewinnt die SCHÄRFERE: „kesselmann" schlägt „net*". Das ist die
  * Reihenfolge, die man erwartet, wenn man eine Ausnahme von einer breiten Regel eintippt
  * — und sie ist deterministisch, damit ein rückwirkender Abgleich zweimal dasselbe
  * Ergebnis liefert statt bei jedem Lauf Kategorien umspringen zu lassen. Bei gleicher

@@ -188,7 +188,7 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
     await sqliteKategorieRepository.speichern({ id: "medien", name: "Medien", defaultCharakter: "Aufwand" });
     const vertraege: [string, string, number, string | undefined][] = [
       ["v1", "Vermieter", -90000, "wohnen"],
-      ["v2", "[anonymisiert]", -12000, "wohnen"],
+      ["v2", "Petrossen", -12000, "wohnen"],
       ["v3", "Streamingdienst", -1799, "medien"],
       ["v4", "Ohne Zuordnung", -500, undefined],
     ];
@@ -227,8 +227,8 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
     await sqliteKategorieRepository.speichern({ id: "strom", name: "Strom", elternId: "wohnen", defaultCharakter: "Aufwand" });
     await sqliteKategorieRepository.speichern({ id: "gas", name: "Gas", elternId: "wohnen", defaultCharakter: "Aufwand" });
     const vertraege: [string, string, number, string][] = [
-      ["v1", "[anonymisiert] Strom", -8000, "strom"],
-      ["v2", "[anonymisiert] Gas", -6000, "gas"],
+      ["v1", "Petrossen Strom", -8000, "strom"],
+      ["v2", "Petrossen Gas", -6000, "gas"],
     ];
     for (const [id, anbieter, betrag, kategorieId] of vertraege) {
       await sqliteVertragRepository.speichern({
@@ -242,7 +242,7 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
 
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
-    await screen.findByText("[anonymisiert] Strom");
+    await screen.findByText("Petrossen Strom");
     await nutzer.click(screen.getByRole("button", { name: "Kategorie" }));
 
     // Eine Gruppe „Wohnen" mit beiden Verträgen — 80 + 60 = 140 € pro Monat.
@@ -319,10 +319,10 @@ describe("VertraegeScreen — Vorschläge", () => {
 
   it("erkennt eine monatliche Abbuchung und schlägt sie vor", async () => {
     await konto();
-    await monatsreihe("a", "[anonymisiert] GmbH", 1650);
+    await monatsreihe("a", "Vibora GmbH", 1650);
 
     rendere(<VertraegeScreen />);
-    expect(await screen.findByText("[anonymisiert] GmbH")).toBeInTheDocument();
+    expect(await screen.findByText("Vibora GmbH")).toBeInTheDocument();
     // 1650 Minor Units → „16,50" in de-DE, dazu die Zahl der Zahlungen.
     await waitFor(() => expect(document.body.textContent).toMatch(/16,50/));
     expect(document.body.textContent).toMatch(/Aus deinen Buchungen erkannt/);
@@ -340,13 +340,13 @@ describe("VertraegeScreen — Vorschläge", () => {
       });
       await sqliteUmsatzRepository.speichern({
         id: `ue${i}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
-        betrag: -(1000 + i * 800), waehrung: "EUR", gegenpartei: "[anonymisiert]",
+        betrag: -(1000 + i * 800), waehrung: "EUR", gegenpartei: "Nordhoff",
         verwendungszweck: "", rohHash: `he${i}`, status: "verbucht", istbuchungId: `e${i}`,
       });
     }
     rendere(<VertraegeScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Verträge/));
-    expect(screen.queryByText("[anonymisiert]")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nordhoff")).not.toBeInTheDocument();
   });
 
   /**
@@ -356,17 +356,17 @@ describe("VertraegeScreen — Vorschläge", () => {
    */
   it("legt die Erkennungsregeln zu einem Vorschlag offen", async () => {
     await konto();
-    await monatsreihe("a", "[anonymisiert] GmbH", 1650);
+    await monatsreihe("a", "Vibora GmbH", 1650);
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
-    await screen.findByText("[anonymisiert] GmbH");
+    await screen.findByText("Vibora GmbH");
 
     await nutzer.click(screen.getByRole("button", { name: /woran erkannt/i }));
 
     // Der Schlüssel: ohne Gläubiger-ID gruppiert der normalisierte Name — die
     // Rechtsform „GmbH" fällt dabei weg.
-    await waitFor(() => expect(document.body.textContent).toMatch(/netcup/));
-    expect(document.body.textContent).not.toMatch(/netcup gmbh/);
+    await waitFor(() => expect(document.body.textContent).toMatch(/vibora/));
+    expect(document.body.textContent).not.toMatch(/vibora gmbh/);
     // Der gemessene Takt und das Fenster, gegen das er geprüft wurde.
     expect(document.body.textContent).toMatch(/30 Tage/);
     expect(document.body.textContent).toMatch(/25 bis 38 Tagen/);
@@ -374,14 +374,14 @@ describe("VertraegeScreen — Vorschläge", () => {
 
   it("füllt beim Übernehmen die Anlege-Maske vor und legt den Vertrag an", async () => {
     await konto();
-    await monatsreihe("a", "[anonymisiert] GmbH", 1650);
+    await monatsreihe("a", "Vibora GmbH", 1650);
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
-    await screen.findByText("[anonymisiert] GmbH");
+    await screen.findByText("Vibora GmbH");
 
     await nutzer.click(screen.getByRole("button", { name: /übernehmen/i }));
     // Anbieter und Betrag stehen vorbelegt im Formular.
-    await waitFor(() => expect(screen.getByDisplayValue("[anonymisiert] GmbH")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByDisplayValue("Vibora GmbH")).toBeInTheDocument());
     expect(screen.getByDisplayValue("16.5")).toBeInTheDocument();
 
     const speichern = screen.getAllByRole("button", { name: /speichern/i });
@@ -390,7 +390,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     await waitFor(async () => {
       const vertraege = await sqliteVertragRepository.alle();
       expect(vertraege).toHaveLength(1);
-      expect(vertraege[0].anbieter).toBe("[anonymisiert] GmbH");
+      expect(vertraege[0].anbieter).toBe("Vibora GmbH");
     });
     // Die abgeleitete Zahlungsregel trägt Betrag und Rhythmus des Vorschlags.
     const regeln = await sqliteZahlungsregelRepository.alle();
@@ -407,13 +407,13 @@ describe("VertraegeScreen — Vorschläge", () => {
    */
   it("ordnet dem übernommenen Vertrag seine bisherigen Zahlungen zu", async () => {
     await konto();
-    await monatsreihe("a", "[anonymisiert] GmbH", 1650); // 12 Abbuchungen
+    await monatsreihe("a", "Vibora GmbH", 1650); // 12 Abbuchungen
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
-    await screen.findByText("[anonymisiert] GmbH");
+    await screen.findByText("Vibora GmbH");
 
     await nutzer.click(screen.getByRole("button", { name: /übernehmen/i }));
-    await waitFor(() => expect(screen.getByDisplayValue("[anonymisiert] GmbH")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByDisplayValue("Vibora GmbH")).toBeInTheDocument());
     const speichern = screen.getAllByRole("button", { name: /speichern/i });
     await nutzer.click(speichern[speichern.length - 1]);
 
@@ -434,19 +434,19 @@ describe("VertraegeScreen — Vorschläge", () => {
    */
   it("zieht die Erkennungsregel für einen Vertrag ohne Regel nach", async () => {
     await konto();
-    await monatsreihe("a", "[anonymisiert] GmbH", 1650);
+    await monatsreihe("a", "Vibora GmbH", 1650);
     // Direkt ins Repository geschrieben — wie ein Vertrag aus der Zeit vor Migration 19.
     await sqliteVertragRepository.speichern({
-      id: "alt", anbieter: "[anonymisiert] GmbH", beginn: "2025-01-01",
+      id: "alt", anbieter: "Vibora GmbH", beginn: "2025-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
     await sqliteZahlungsregelRepository.speichern({
-      id: "r-alt", bezeichnung: "[anonymisiert] GmbH", betrag: -1650, rhythmus: "monatlich",
+      id: "r-alt", bezeichnung: "Vibora GmbH", betrag: -1650, rhythmus: "monatlich",
       startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "alt",
     });
 
     rendere(<VertraegeScreen />);
-    await screen.findByText("[anonymisiert] GmbH");
+    await screen.findByText("Vibora GmbH");
 
     await waitFor(async () => {
       expect(await sqliteVertragserkennungRepository.alle()).toHaveLength(1);
@@ -462,7 +462,7 @@ describe("VertraegeScreen — Vorschläge", () => {
    */
   it("nimmt nach dem Weiten der Betragsspanne die teureren Zahlungen mit auf", async () => {
     await konto();
-    await monatsreihe("a", "[anonymisiert] GmbH", 1650, 12);
+    await monatsreihe("a", "Vibora GmbH", 1650, 12);
     // Drei spätere Zahlungen zum erhöhten Preis — außerhalb der Standardspanne
     // (60…180 % von 16,50 € = 9,90…29,70 €).
     for (let i = 0; i < 3; i++) {
@@ -473,21 +473,21 @@ describe("VertraegeScreen — Vorschläge", () => {
       });
       await sqliteUmsatzRepository.speichern({
         id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
-        betrag: -4000, waehrung: "EUR", gegenpartei: "[anonymisiert] GmbH", verwendungszweck: "",
+        betrag: -4000, waehrung: "EUR", gegenpartei: "Vibora GmbH", verwendungszweck: "",
         rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
       });
     }
     await sqliteVertragRepository.speichern({
-      id: "v1", anbieter: "[anonymisiert] GmbH", beginn: "2024-01-01",
+      id: "v1", anbieter: "Vibora GmbH", beginn: "2024-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
-    await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "[anonymisiert] GmbH", 1650));
+    await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "Vibora GmbH", 1650));
     await zuordnungenAbgleichen(vertragsAbgleichDeps);
     expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(12);
 
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
-    await screen.findByText("[anonymisiert] GmbH");
+    await screen.findByText("Vibora GmbH");
     await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
 
     const obergrenze = await screen.findByRole("textbox", { name: /betrag bis/i });
@@ -510,25 +510,25 @@ describe("VertraegeScreen — Vorschläge", () => {
    */
   it("nimmt über ein Muster mit * auch abweichende Schreibweisen auf", async () => {
     await konto();
-    await monatsreihe("a", "[anonymisiert] Bonn", 5000, 4);
-    await monatsreihe("b", "[anonymisiert] Bonn Rg 4711", 5000, 3);
+    await monatsreihe("a", "Petrossen Bonn", 5000, 4);
+    await monatsreihe("b", "Petrossen Bonn Rg 4711", 5000, 3);
     await sqliteVertragRepository.speichern({
-      id: "v1", anbieter: "[anonymisiert] Bonn", beginn: "2024-01-01",
+      id: "v1", anbieter: "Petrossen Bonn", beginn: "2024-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
-    await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "[anonymisiert] Bonn", 5000));
+    await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "Petrossen Bonn", 5000));
     await zuordnungenAbgleichen(vertragsAbgleichDeps);
     // Nur die exakt geschriebenen vier — die drei mit Zusatz fallen durch.
     expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(4);
 
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
-    await screen.findByText("[anonymisiert] Bonn");
+    await screen.findByText("Petrossen Bonn");
     await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
 
     const empfaenger = await screen.findByRole("textbox", { name: /^empfänger$/i });
     await nutzer.clear(empfaenger);
-    await nutzer.type(empfaenger, "stadtwerke bonn*");
+    await nutzer.type(empfaenger, "petrossen bonn*");
 
     const speichern = screen.getAllByRole("button", { name: /speichern/i });
     await nutzer.click(speichern[speichern.length - 1]);
@@ -538,7 +538,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     });
     // Und das Merkmal steht als Empfänger in der Regel, nicht als Gläubiger-ID.
     const [regel] = await sqliteVertragserkennungRepository.alle();
-    expect(regel.merkmale).toEqual([{ art: "empfaenger", muster: "stadtwerke bonn*" }]);
+    expect(regel.merkmale).toEqual([{ art: "empfaenger", muster: "petrossen bonn*" }]);
   });
 
   /**
@@ -573,21 +573,21 @@ describe("VertraegeScreen — Vorschläge", () => {
   /** Ein erfasster Vertrag darf nicht weiter als Vorschlag erscheinen. */
   it("blendet den Vorschlag aus, sobald der Vertrag existiert", async () => {
     await konto();
-    await monatsreihe("a", "[anonymisiert] GmbH", 1650);
+    await monatsreihe("a", "Vibora GmbH", 1650);
     await sqliteVertragRepository.speichern({
-      id: "v1", anbieter: "netcup", beginn: "2025-01-01",
+      id: "v1", anbieter: "vibora", beginn: "2025-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
 
     rendere(<VertraegeScreen />);
     // Der Vertrag selbst steht in der Tabelle, der Vorschlag nicht mehr.
-    expect(await screen.findByText("netcup")).toBeInTheDocument();
+    expect(await screen.findByText("vibora")).toBeInTheDocument();
     await waitFor(() => expect(document.body.textContent).not.toMatch(/Aus deinen Buchungen erkannt/));
   });
 
   it("merkt sich ein weggeklicktes Verwerfen über einen Neustart", async () => {
     await konto();
-    await monatsreihe("a", "[anonymisiert] GmbH", 1650);
+    await monatsreihe("a", "Vibora GmbH", 1650);
     // Zweiter Kandidat als Anker: nur wenn DER nach dem Neustart wieder dasteht, sind
     // die Vorschläge geladen. Ohne ihn prüfte der Test gegen einen noch leeren Bildschirm
     // und wäre auch dann grün, wenn nichts gespeichert würde.
@@ -595,17 +595,17 @@ describe("VertraegeScreen — Vorschläge", () => {
 
     const nutzer = userEvent.setup();
     const ersteAnsicht = rendere(<VertraegeScreen />);
-    await screen.findByText("[anonymisiert] GmbH");
+    await screen.findByText("Vibora GmbH");
 
     const verwerfen = screen.getAllByRole("button", { name: /kein vertrag/i });
-    // [anonymisiert] steht wegen der Sortierung nach Jahreskosten hinter Octopus.
+    // Vibora steht wegen der Sortierung nach Jahreskosten hinter Octopus.
     await nutzer.click(verwerfen[verwerfen.length - 1]);
-    await waitFor(() => expect(screen.queryByText("[anonymisiert] GmbH")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByText("Vibora GmbH")).not.toBeInTheDocument());
 
     // Neu gerendert (wie nach einem App-Start) darf er nicht zurückkommen.
     ersteAnsicht.unmount();
     rendere(<VertraegeScreen />);
     expect(await screen.findByText("Octopus Energy")).toBeInTheDocument();
-    expect(screen.queryByText("[anonymisiert] GmbH")).not.toBeInTheDocument();
+    expect(screen.queryByText("Vibora GmbH")).not.toBeInTheDocument();
   });
 });
