@@ -8,7 +8,7 @@ import type {
   ImportLaufRepository,
   UmsatzRepository,
 } from "../../application/ports";
-import type { Dublettenfreigabe } from "../../application/dublettensicht";
+import type { Dublettenfreigabe } from "../../application/dubletten/dublettensicht";
 import type { ImportLauf, Umsatz, UmsatzStatus, VorschlagQuelle } from "../../application/import";
 import { getDb } from "./db";
 

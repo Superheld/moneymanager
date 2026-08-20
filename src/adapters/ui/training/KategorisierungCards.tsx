@@ -25,16 +25,16 @@ import {
   type Ausschlussgrund,
   type Materialbefund,
   type Merkmalswert,
-} from "../../../application/trainingsmaterial";
+} from "../../../application/kategorien/trainingsmaterial";
 import {
   type Modellzustand,
-} from "../../../application/klassifikatorTraining";
+} from "../../../application/kategorien/klassifikatorTraining";
 import {
   charakterWechsel,
   uebergaenge,
   type Abgleichsplan,
-} from "../../../application/kategorieAbgleich";
-import type { Wirkung } from "../../../application/merkmalskonfiguration";
+} from "../../../application/kategorien/kategorieAbgleich";
+import type { Wirkung } from "../../../application/kategorien/merkmalskonfiguration";
 import {
   herkunftUmschalten,
   kategorieAbgleichAnwenden,

@@ -62,6 +62,40 @@ im **Code**, nicht im Betrieb: es gibt keinen eigenen Backend-Prozess und keine 
 Webview-Prozess**. „Kern" meint die Code-Mitte, kein separat laufendes Backend. Wer echte
 Prozesstrennung will, braucht eine neue Entscheidung, keinen Refactor.
 
+### Wie die Schichten innen gegliedert sind
+
+Die Schicht steht oben, der Fachbereich darunter — dieselben Namen über alle drei Schichten,
+damit ein Thema an drei Stellen gleich heißt:
+
+```
+core/         basis buchung konten budgets vertraege kategorien inventar
+              stammdaten klassifikator          + index, monatsausblick
+application/  buchung konten budgets vertraege kategorien inventar dubletten
+              stammdaten import fints           + index, ports, bootstrap,
+                                                  uebersicht, analysesichten, einstellungen
+adapters/ui/  bausteine buchung konten budgets vertraege kategorien(training)
+              inventar analyse uebersicht import einstellungen
+```
+
+Drei Regeln, wohin eine neue Datei gehört:
+
+- **In den Bereichsordner**, wenn genau ein Bereich sie braucht — auch wenn sie „allgemein"
+  aussieht.
+- **Nach `ui/bausteine/`**, wenn **zwei oder mehr** Bereiche sie benutzen. Das ist gemessen,
+  nicht geschätzt: ein Baustein, den nur ein Screen benutzt, ist ein Teil dieses Screens.
+- **Nach `core/basis/`**, wenn sie ein Domänen-Primitiv ist, das quer durch alles geht —
+  Geld, Datum, Währung, Zahlungsregel, Muster, Fehler, Region. Fachliches gehört auch im
+  Kern in seinen Bereich.
+
+Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (`index.ts`,
+`ports.ts`), der Start (`bootstrap.ts`) und die bewusst querliegenden Sichten
+(`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`) — sie rechnen über mehrere
+Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
+die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
+
+Ein Name weicht ab: der UI-Ordner heißt `training/`, weil die Navigation den Bereich so
+nennt (`ScreenId`); fachlich ist es dieselbe Sache wie `kategorien/` in Kern und Anwendung.
+
 ### Das Datenmodell
 
 21 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
@@ -193,7 +227,7 @@ In `ui/`:
   Analyse gruppiert danach, die Vertragserkennung schließt Umschichtungen aus, das
   Konto-Register färbt danach. Kein totes Konzept, auch wenn keine Maske danach fragt.
 - **Kontostands-Anker sind BEOBACHTUNGEN, keine Rechenergebnisse.** Ein Anker
-  (`core/kontostand.ts`, Tabelle `kontostand_anker`) sagt: an DIESEM Stichtag lag DIESER
+  (`core/konten/kontostand.ts`, Tabelle `kontostand_anker`) sagt: an DIESEM Stichtag lag DIESER
   Betrag auf dem Konto — von der Bank gemeldet oder von Hand gezählt. Er wird deshalb nie
   ungültig und nie neu berechnet, auch nicht, wenn jemand nachträglich eine Buchung davor
   einfügt; was sich ändert, ist die Differenz, und genau die will man sehen. Anker werden

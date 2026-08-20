@@ -20,7 +20,7 @@ import {
   type IstBuchung,
   type Merkmalsherkunft,
 } from "../../../application";
-import type { Merkmalsansicht } from "../../../application/merkmalskonfiguration";
+import type { Merkmalsansicht } from "../../../application/kategorien/merkmalskonfiguration";
 import type { Umsatz } from "../../../application/import";
 import { merkmaleZuBuchung, wortFreigeben, wortSperren } from "../../dienste";
 import { Pill } from "../bausteine";

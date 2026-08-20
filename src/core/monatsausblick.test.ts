@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { euroZuCent } from "./geld";
+import { euroZuCent } from "./basis/geld";
 import { monatsAusblick, monatsAusblicke, type AusblickZeileId } from "./monatsausblick";
-import type { Budget } from "./budget";
-import type { IstBuchung } from "./istbuchung";
-import type { Kategorie } from "./kategorie";
-import type { Zahlungsregel } from "./zahlungsregel";
+import type { Budget } from "./budgets/budget";
+import type { IstBuchung } from "./buchung/istbuchung";
+import type { Kategorie } from "./kategorien/kategorie";
+import type { Zahlungsregel } from "./basis/zahlungsregel";
 
 const KATEGORIEN: Kategorie[] = [
   { id: "wohnen", name: "Wohnen", defaultCharakter: "Aufwand" },

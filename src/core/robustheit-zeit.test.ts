@@ -4,11 +4,11 @@
 // Kein Produktivcode wurde für diese Datei geändert.
 
 import { describe, it, expect } from "vitest";
-import { addMonate, addTage, ord, parseIso, tageBis, toIso } from "./datum";
-import { projiziereRegel } from "./projektion";
-import { monatsRuecklage, sollRuecklage, type Inventargegenstand } from "./inventar";
-import { kuendigungsterminNaht, naechsterKuendigungstermin, type Vertrag } from "./vertrag";
-import type { Zahlungsregel } from "./zahlungsregel";
+import { addMonate, addTage, ord, parseIso, tageBis, toIso } from "./basis/datum";
+import { projiziereRegel } from "./buchung/projektion";
+import { monatsRuecklage, sollRuecklage, type Inventargegenstand } from "./inventar/inventar";
+import { kuendigungsterminNaht, naechsterKuendigungstermin, type Vertrag } from "./vertraege/vertrag";
+import type { Zahlungsregel } from "./basis/zahlungsregel";
 
 function regel(over: Partial<Zahlungsregel> = {}): Zahlungsregel {
   return {

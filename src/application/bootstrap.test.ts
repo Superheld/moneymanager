@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Kategorie } from "../core";
 import type { KategorieRepository } from "./ports";
-import { STANDARDKATEGORIEN } from "./standardkategorien";
+import { STANDARDKATEGORIEN } from "./kategorien/standardkategorien";
 
 // Eigene Repo-Instanz pro Test, weil appBootstrap eine modulweite Singleton-Promise cacht;
 // wir testen daher die Bootstrap-Logik über standardkategorienAnlegen direkt (gleiches Verhalten).
-import { standardkategorienAnlegen } from "./standardkategorien";
+import { standardkategorienAnlegen } from "./kategorien/standardkategorien";
 
 function memRepo(initial: Kategorie[] = []): KategorieRepository {
   const daten = [...initial];

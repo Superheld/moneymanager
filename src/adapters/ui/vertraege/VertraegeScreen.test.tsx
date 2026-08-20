@@ -25,7 +25,7 @@ import {
   sqliteVertragszuordnungRepository,
   vertragsAbgleichDeps,
 } from "../../persistence/sqliteVertragZuordnungRepositories";
-import { zuordnungenAbgleichen } from "../../../application/vertragszuordnung";
+import { zuordnungenAbgleichen } from "../../../application/vertraege/vertragszuordnung";
 import { standardErkennung } from "../../../core";
 import { sqliteZahlungsregelRepository } from "../../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";

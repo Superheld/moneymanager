@@ -53,8 +53,8 @@ import {
   type Dublettenfreigabe,
   type Dublettenverdacht,
 } from "../../../application";
-import { offenerRest } from "../../../application/buchungSplitten";
-import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../../application/umbuchungAusBuchung";
+import { offenerRest } from "../../../application/buchung/buchungSplitten";
+import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../../application/buchung/umbuchungAusBuchung";
 import {
   buchungBearbeiten,
   buchungErfassen,

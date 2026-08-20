@@ -37,7 +37,7 @@ import type {
   UmsatzRepository, VertragserkennungRepository, VertragszuordnungRepository,
   ZahlungskontoRepository,
 } from "../ports";
-import { zuordnungenAbgleichen } from "../vertragszuordnung";
+import { zuordnungenAbgleichen } from "../vertraege/vertragszuordnung";
 import type { Vorschlagskontext } from "../import/vorschlag";
 import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";

@@ -20,7 +20,7 @@ import type {
   Kontostandsanker,
 } from "../core";
 import type { ImportLauf, Umsatz } from "./import";
-import type { Dublettenfreigabe } from "./dublettensicht";
+import type { Dublettenfreigabe } from "./dubletten/dublettensicht";
 
 export interface ZahlungsregelRepository {
   alle(): Promise<Zahlungsregel[]>;

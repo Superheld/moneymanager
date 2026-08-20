@@ -41,7 +41,7 @@ import {
   type VerbuchenErgebnis,
   type Vorschlagskontext,
 } from "../../../application/import";
-import { festlegungAngebot } from "../../../application/kategoriefestlegungen";
+import { festlegungAngebot } from "../../../application/kategorien/kategoriefestlegungen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { Button, Card, Pill } from "../bausteine";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
