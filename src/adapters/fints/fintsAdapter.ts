@@ -32,12 +32,21 @@ import type {
   Bankkonto,
   Bankprofil,
   Bankzugang,
+  Depotbestand,
+  Depotposition,
   Saldo,
   TanFrager,
 } from "../../application/fints/abrufPort";
 import { profilErheben } from "./bankprofil";
 import { bankEndpunktFreigeben } from "./transport";
-import { FINTS_QUELLE, bankbetragZuCent, isoDatum, zuRohUmsatz } from "./uebersetzung";
+import {
+  FINTS_QUELLE,
+  bankbetragZuCent,
+  depotStichtag,
+  isoDatum,
+  zuDepotposition,
+  zuRohUmsatz,
+} from "./uebersetzung";
 
 /**
  * Datum für eine ANFRAGE bauen.
@@ -128,9 +137,11 @@ function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Ba
     // Konto Umsätze" wäre sonst die des Nachbarkontos.
     let kannSaldo = false;
     let kannUmsaetze = false;
+    let kannDepot = false;
     try {
       kannSaldo = client.canGetAccountBalance(k);
       kannUmsaetze = client.canGetAccountStatements(k);
+      kannDepot = client.canGetPortfolio(k);
     } catch {
       // Kennt die Bank das Konto in der UPD nicht mehr, ist die Antwort schlicht „kann nicht".
     }
@@ -146,11 +157,29 @@ function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Ba
       inhaber: [k.holder1, k.holder2].filter(Boolean).join(", ") || undefined,
       kannSaldo,
       kannUmsaetze,
-      hinweis: !kannUmsaetze && !kannSaldo
-        ? `Die Bank gibt für „${k.product?.trim() || k.accountNumber}" weder Saldo noch Umsätze frei.`
+      kannDepot,
+      hinweis: !kannUmsaetze && !kannSaldo && !kannDepot
+        ? `Die Bank gibt für „${k.product?.trim() || k.accountNumber}" nichts frei — weder Saldo noch Umsätze noch Bestände.`
         : undefined,
     };
   });
+}
+
+/**
+ * Der Gesamtwert eines Depots.
+ *
+ * Die Summe der Bank gewinnt. Fehlt sie, wird sie aus den Positionen gebildet — aber nur,
+ * wenn ALLE einen Wert tragen: eine Teilsumme sähe aus wie ein Depotwert und wäre einer,
+ * der zu klein ist, ohne dass man es ihm ansieht.
+ */
+function gesamtwert(
+  gemeldet: number | undefined,
+  positionen: readonly Depotposition[],
+  waehrung: string | undefined,
+): number | undefined {
+  if (gemeldet != null) return bankbetragZuCent(gemeldet, waehrungNachCode(waehrung ?? "EUR"));
+  if (positionen.length === 0 || positionen.some((p) => p.wert == null)) return undefined;
+  return positionen.reduce((summe, p) => summe + (p.wert ?? 0), 0);
 }
 
 export interface FintsAdapterOptionen {
@@ -216,6 +245,60 @@ class FintsSitzung implements Abrufsitzung {
       betrag: bankbetragZuCent(antwort.balance.balance, waehrungNachCode(antwort.balance.currency)),
       datum: isoDatum(antwort.balance.date),
       waehrung: antwort.balance.currency,
+    };
+  }
+
+  /**
+   * Die Depotaufstellung.
+   *
+   * Was mitgeschickt werden darf, sagt die Bank in `HIWPDS` — und bis zum Umstieg auf den
+   * Fork konnte das niemand lesen: die drei optionalen Argumente von `getPortfolio` wurden
+   * auf gut Glück gesendet oder gar nicht. Jetzt wird gefragt.
+   *
+   * Die Kursqualität ist der einzige Parameter, den ein Aufrufer wählt; Währung und
+   * Anzahl bleiben ungesetzt, weil wir alles in der Währung der Bank und vollständig
+   * wollen.
+   */
+  async depot(konto: Bankkonto, echtzeitkurse = false): Promise<Depotbestand | null> {
+    if (!konto.kannDepot) return null;
+
+    const wpd = this.profil.vorfaelle.find((v) => v.segment === "HKWPD");
+    const kursqualitaet = echtzeitkurse && wpd?.kursqualitaetWaehlbar ? ("1" as const) : undefined;
+
+    let antwort = await this.client.getPortfolio(this.bankkonto(konto), undefined, kursqualitaet);
+    antwort = await mitTan(antwort, (r, t) => this.client.getPortfolioWithTan(r, t), this.frageTan, this.decoupled);
+
+    const hinweise = hinweiseAus(antwort);
+    if (!antwort.success) {
+      throw new Error(`Die Bank hat die Depotaufstellung abgelehnt: ${hinweise.join(" · ") || "ohne Begründung"}`);
+    }
+
+    const aufstellung = antwort.portfolioStatement;
+    if (!aufstellung) {
+      // Die Bibliothek hebt die Rohnachricht auf, wenn ihr MT535-Parser nicht durchkommt.
+      // Das ist ein Befund und keine leere Antwort — als leere Liste zurückgegeben wäre es
+      // ununterscheidbar von einem Depot ohne Bestände.
+      throw new Error(
+        antwort.rawMT535Data
+          ? "Die Bank hat eine Depotaufstellung geliefert, die die Bibliothek nicht lesen konnte."
+          : `Die Bank hat keine Depotaufstellung geliefert: ${hinweise.join(" · ") || "ohne Begründung"}`,
+      );
+    }
+
+    const waehrung = aufstellung.currency ?? konto.waehrung;
+    const daten: (Date | undefined)[] = [];
+    const positionen: Depotposition[] = [];
+    for (const h of aufstellung.holdings ?? []) {
+      daten.push(h.date);
+      positionen.push(zuDepotposition(h, waehrung));
+    }
+
+    return {
+      stichtag: depotStichtag(daten, isoDatum(new Date())),
+      gesamtwert: gesamtwert(aufstellung.totalValue, positionen, waehrung),
+      waehrung,
+      positionen,
+      hinweise,
     };
   }
 

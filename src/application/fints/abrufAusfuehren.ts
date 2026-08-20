@@ -33,10 +33,12 @@
 //     kein Nebenweg, sondern der Hauptweg.
 
 import type {
+  DepotRepository,
   ImportLaufRepository, KategorieRepository, KontostandsankerRepository, LedgerPort,
   UmsatzRepository, VertragserkennungRepository, VertragszuordnungRepository,
   ZahlungskontoRepository,
 } from "../ports";
+import { depotUebernehmen, type DepotUebernahme } from "../depot/depotUebernehmen";
 import { zuordnungenAbgleichen } from "../vertraege/vertragszuordnung";
 import type { Vorschlagskontext } from "../import/vorschlag";
 import { quelleKeyFuer } from "../import/kontoMatch";
@@ -74,6 +76,27 @@ export interface AbrufBefund {
   readonly fehler?: string;
 }
 
+/**
+ * Was ein Abruf insgesamt ergeben hat.
+ *
+ * Zwei Listen und nicht eine, weil es zwei verschiedene Dinge sind: ein Konto liefert
+ * Buchungen, die verbucht und abgeglichen werden; ein Depot liefert eine Beobachtung, die
+ * abgelegt wird. Sie in einer Liste zu führen hiesse, an jeder Auswertungsstelle wieder
+ * unterscheiden zu müssen, was man gerade in der Hand hat.
+ */
+export interface Abrufergebnis {
+  readonly konten: readonly AbrufBefund[];
+  readonly depots: readonly DepotBefund[];
+}
+
+/** Was ein Depotabruf ergeben hat — oder warum er nicht ging. */
+export interface DepotBefund {
+  readonly schluessel: string;
+  readonly bezeichnung: string;
+  readonly uebernahme?: DepotUebernahme;
+  readonly fehler?: string;
+}
+
 export interface AbrufDeps {
   readonly adapter: Abrufadapter;
   readonly zugangRepo: BankzugangRepository;
@@ -104,6 +127,11 @@ export interface AbrufDeps {
   readonly kategorisierung?: Vorschlagskontext;
   /** Heute als ISO-Datum — von außen, damit der Ablauf prüfbar bleibt. */
   readonly heute: string;
+  /**
+   * Die Depots. Optional — fehlt der Port, werden Depotaufstellungen nicht geholt und der
+   * Rest des Abrufs läuft unverändert.
+   */
+  readonly depotRepo?: DepotRepository;
   /**
    * Wie viele Tage zurück geholt werden soll — überschreibt den fortlaufenden Stand.
    *
@@ -187,9 +215,12 @@ export async function abrufAusfuehren(
   pin: string,
   frageTan: TanFrager,
   deps: AbrufDeps,
-): Promise<AbrufBefund[]> {
+): Promise<Abrufergebnis> {
   const zuordnungen = await deps.zuordnungRepo.nachZugang(zugang.id);
-  if (zuordnungen.length === 0) return [];
+  // Nicht mehr früh aussteigen, wenn keine Kontozuordnung besteht: ein Zugang kann
+  // ausschliesslich ein Depot führen, und das hat keine Zuordnung — es ist kein
+  // Zahlungskonto und wird mit keinem verknüpft.
+  if (zuordnungen.length === 0 && !deps.depotRepo) return { konten: [], depots: [] };
 
   const sitzung = await deps.adapter.anmelden(zugang, pin, frageTan);
 
@@ -336,6 +367,31 @@ export async function abrufAusfuehren(
     }
   }
 
+  // Die Depots — unabhängig von den Kontozuordnungen, weil ein Depot keine hat. Abgerufen
+  // wird jedes, das die Bank in dieser Sitzung freigibt; ein Fehler dabei kippt den
+  // übrigen Abruf nicht.
+  const depots: DepotBefund[] = [];
+  if (deps.depotRepo) {
+    for (const bankkonto of sitzung.konten.filter((k) => k.kannDepot)) {
+      try {
+        const bestand = await sitzung.depot(bankkonto);
+        if (!bestand) continue;
+        const uebernahme = await depotUebernehmen(zugang.id, bankkonto, bestand, {
+          depotRepo: deps.depotRepo,
+          id: deps.id,
+          jetzt: new Date().toISOString(),
+        });
+        depots.push({ schluessel: bankkonto.schluessel, bezeichnung: bankkonto.bezeichnung, uebernahme });
+      } catch (e) {
+        depots.push({
+          schluessel: bankkonto.schluessel,
+          bezeichnung: bankkonto.bezeichnung,
+          fehler: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+  }
+
   // Die frisch gebuchten Zeilen an ihre Verträge hängen. EIN Lauf über den Bestand,
   // nicht einer je Zeile: der Abgleich ist idempotent und schreibt nur Deltas.
   //
@@ -359,5 +415,5 @@ export async function abrufAusfuehren(
     bankparameter: sitzung.bankparameter(),
     profil: JSON.stringify(sitzung.profil),
   });
-  return befunde;
+  return { konten: befunde, depots };
 }

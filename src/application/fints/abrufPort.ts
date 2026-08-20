@@ -78,6 +78,8 @@ export interface Bankkonto {
   /** Fähigkeitsmatrix, wie die Bank sie je Konto meldet. */
   readonly kannSaldo: boolean;
   readonly kannUmsaetze: boolean;
+  /** Ob die Bank für dieses Konto eine Depotaufstellung hergibt. */
+  readonly kannDepot: boolean;
   /** Klartext, warum ein Konto eingeschränkt ist — leer, wenn es nichts zu sagen gibt. */
   readonly hinweis?: string;
 }
@@ -169,6 +171,56 @@ export interface TanHerausforderung {
  */
 export type TanFrager = (h: TanHerausforderung) => Promise<string | undefined>;
 
+/**
+ * Eine Position im Depot, zu einem Stichtag.
+ *
+ * Zu den Zahlen: `wert` und `einstand` sind Geld und damit Integer Cent wie überall.
+ * `stueck` und `kurs` sind es NICHT — und das ist kein Versehen:
+ *
+ *  • `stueck` ist eine Menge, keine Summe. Fondsanteile kommen mit Nachkommastellen, und
+ *    ein Bestand von 12,3456 Anteilen auf Cent zu runden ergibt keinen Sinn.
+ *  • `kurs` ist eine NOTIERUNG der Bank, oft mit vier Nachkommastellen. In Cent gepresst
+ *    verlöre er still an Genauigkeit — und weil er dann fast richtig aussähe, fiele es
+ *    niemandem auf.
+ *
+ * Deshalb die Regel dazu: gerechnet wird mit `wert` und `einstand`. `stueck` und `kurs`
+ * werden ANGEZEIGT, nie summiert. Wer aus ihnen einen Betrag bildet, hat die Cent-Regel
+ * über eine Hintertür verlassen.
+ */
+export interface Depotposition {
+  readonly isin?: string;
+  readonly wkn?: string;
+  readonly name?: string;
+  /** Stückzahl bzw. Anteile — eine Menge, kein Geld. */
+  readonly stueck?: number;
+  /** Kursnotierung der Bank — zur Anzeige, nicht zum Rechnen. */
+  readonly kurs?: number;
+  /** Der Wert der Position in Cent, wie die Bank ihn beziffert. */
+  readonly wert?: Cent;
+  readonly waehrung?: string;
+  /** Wann gekauft wurde, sofern die Bank es mitschickt (ISO-Datum). */
+  readonly einstandDatum?: string;
+  /** Einstandskurs — ebenfalls eine Notierung. */
+  readonly einstandKurs?: number;
+}
+
+/**
+ * Das Depot zu einem Stichtag, wie die Bank es aufstellt.
+ *
+ * Der Stichtag ist Teil der Aussage, nicht Beiwerk: ein Depotwert ohne Datum ist wertlos,
+ * weil er sich täglich ändert, ohne dass etwas gebucht wurde. Genau darin unterscheidet
+ * sich ein Depot von einem Zahlungskonto — es hat keine Buchungen, aus denen sich sein
+ * Stand ableiten liesse, sondern nur Beobachtungen.
+ */
+export interface Depotbestand {
+  readonly stichtag: string;
+  readonly gesamtwert?: Cent;
+  readonly waehrung?: string;
+  readonly positionen: readonly Depotposition[];
+  /** Rückmeldungen der Bank zu diesem Abruf. */
+  readonly hinweise: readonly string[];
+}
+
 export interface Saldo {
   readonly betrag: Cent;
   readonly datum: string;
@@ -200,6 +252,14 @@ export interface Abrufsitzung {
   readonly profil: Bankprofil;
   saldo(konto: Bankkonto): Promise<Saldo | null>;
   umsaetze(konto: Bankkonto, vonIso: string, bisIso: string): Promise<AbrufErgebnis>;
+  /**
+   * Die Depotaufstellung, sofern die Bank sie für dieses Konto freigibt.
+   *
+   * `null` heisst „für dieses Konto nicht vorgesehen" — kein Fehler. Ob Währung und
+   * Kursqualität mitgeschickt werden dürfen, sagt die Bank über ihre Parameter; sie
+   * ungefragt zu senden hiess bis zum Umstieg auf den Fork, es auf gut Glück zu tun.
+   */
+  depot(konto: Bankkonto, echtzeitkurse?: boolean): Promise<Depotbestand | null>;
 }
 
 export interface Abrufadapter {

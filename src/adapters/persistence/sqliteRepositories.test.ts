@@ -43,6 +43,7 @@ import {
   sqliteZahlungskontoRepository as zahlungskontoRepository,
 } from "./sqliteStammdatenRepositories";
 import { sqliteKontostandsankerRepository as ankerRepository } from "./sqliteKontostandRepository";
+import { sqliteDepotRepository as depotRepository } from "./sqliteDepotRepository";
 import {
   sqliteDublettenfreigabeRepository as freigabeRepository,
   sqliteImportLaufRepository as importLaufRepository,
@@ -695,5 +696,117 @@ describe("Kontostands-Anker", () => {
     await ankerRepository.speichern({ kontoId: "giro", datum: "2026-08-21", herkunft: "bank", betrag: 2, erfasstAm: "x" });
     await ankerRepository.entfernen("giro", "2026-08-20", "bank");
     expect((await ankerRepository.alle()).map((a) => a.datum)).toEqual(["2026-08-21"]);
+  });
+});
+
+describe("Depot — Beobachtungen statt Buchungen", () => {
+  const depot = {
+    id: "d1",
+    zugangId: "z1",
+    schluessel: "9876543210|Depot",
+    bezeichnung: "Depot",
+    waehrung: "EUR",
+  };
+
+  it("macht die Rundreise über alle drei Tabellen", async () => {
+    await depotRepository.speichern(depot);
+    await depotRepository.wertSpeichern(
+      { depotId: "d1", stichtag: "2026-08-20", gesamtwert: 1_250_00 },
+      "2026-08-20T10:00:00.000Z",
+    );
+    await depotRepository.positionenErsetzen("d1", "2026-08-20", [
+      {
+        depotId: "d1",
+        stichtag: "2026-08-20",
+        kennung: "DE000TEST001",
+        isin: "DE000TEST001",
+        wkn: "TST001",
+        name: "Vibora Sammelanlage",
+        stueck: 12.3456,
+        kurs: 87.65,
+        wert: 1_082_09,
+        waehrung: "EUR",
+        einstandDatum: "2024-03-01",
+        einstandKurs: 60.5,
+      },
+    ]);
+
+    expect(await depotRepository.alle()).toEqual([depot]);
+    expect(await depotRepository.werte("d1")).toEqual([
+      { depotId: "d1", stichtag: "2026-08-20", gesamtwert: 1_250_00 },
+    ]);
+    const positionen = await depotRepository.positionen("d1");
+    expect(positionen).toHaveLength(1);
+    // Die Stückzahl überlebt als Bruch: sie ist eine Menge, kein Geld, und würde als
+    // Integer auf 12 zusammenfallen.
+    expect(positionen[0].stueck).toBe(12.3456);
+    expect(positionen[0].kurs).toBe(87.65);
+    expect(positionen[0].wert).toBe(1_082_09);
+    expect(positionen[0].einstandKurs).toBe(60.5);
+  });
+
+  it("überschreibt einen zweiten Abruf desselben Stichtags", async () => {
+    // Zwei Werte für denselben Tag wären keine Geschichte, sondern ein Widerspruch — die
+    // spätere Aussage der Bank ist die genauere.
+    await depotRepository.speichern(depot);
+    await depotRepository.wertSpeichern({ depotId: "d1", stichtag: "2026-08-20", gesamtwert: 100 }, "a");
+    await depotRepository.wertSpeichern({ depotId: "d1", stichtag: "2026-08-20", gesamtwert: 200 }, "b");
+    expect(await depotRepository.werte("d1")).toEqual([
+      { depotId: "d1", stichtag: "2026-08-20", gesamtwert: 200 },
+    ]);
+  });
+
+  it("hält die Stichtage auseinander und liefert sie geordnet", async () => {
+    await depotRepository.speichern(depot);
+    await depotRepository.wertSpeichern({ depotId: "d1", stichtag: "2026-08-20", gesamtwert: 300 }, "x");
+    await depotRepository.wertSpeichern({ depotId: "d1", stichtag: "2026-06-30", gesamtwert: 100 }, "x");
+    await depotRepository.wertSpeichern({ depotId: "d1", stichtag: "2026-07-31", gesamtwert: 200 }, "x");
+    expect((await depotRepository.werte("d1")).map((w) => w.stichtag)).toEqual([
+      "2026-06-30",
+      "2026-07-31",
+      "2026-08-20",
+    ]);
+  });
+
+  it("ersetzt Positionen, statt sie anzuhäufen", async () => {
+    // Eine Position, die im neuen Abruf fehlt, ist verkauft. Nur einzufügen ergäbe ein
+    // Depot, das nur wachsen kann.
+    await depotRepository.speichern(depot);
+    const basis = { depotId: "d1", stichtag: "2026-08-20" };
+    await depotRepository.positionenErsetzen("d1", "2026-08-20", [
+      { ...basis, kennung: "A", name: "Ohlert Anteil", wert: 100 },
+      { ...basis, kennung: "B", name: "Kesselmann Anteil", wert: 200 },
+    ]);
+    await depotRepository.positionenErsetzen("d1", "2026-08-20", [
+      { ...basis, kennung: "A", name: "Ohlert Anteil", wert: 150 },
+    ]);
+    const positionen = await depotRepository.positionen("d1", "2026-08-20");
+    expect(positionen.map((p) => p.kennung)).toEqual(["A"]);
+    expect(positionen[0].wert).toBe(150);
+  });
+
+  it("hält zwei namenlose Positionen desselben Tages auseinander", async () => {
+    // Ohne eigene Kennung wären sie in einem zusammengesetzten Schlüssel aus NULL-Werten
+    // ununterscheidbar — SQLite betrachtet NULLs dort paarweise als verschieden, die
+    // Zeilen kämen bei jedem Abruf erneut dazu.
+    await depotRepository.speichern(depot);
+    const basis = { depotId: "d1", stichtag: "2026-08-20" };
+    await depotRepository.positionenErsetzen("d1", "2026-08-20", [
+      { ...basis, kennung: "#0", wert: 100 },
+      { ...basis, kennung: "#1", wert: 200 },
+    ]);
+    expect(await depotRepository.positionen("d1", "2026-08-20")).toHaveLength(2);
+  });
+
+  it("räumt beim Löschen die Wertreihe und die Positionen mit ab", async () => {
+    await depotRepository.speichern(depot);
+    await depotRepository.wertSpeichern({ depotId: "d1", stichtag: "2026-08-20", gesamtwert: 1 }, "x");
+    await depotRepository.positionenErsetzen("d1", "2026-08-20", [
+      { depotId: "d1", stichtag: "2026-08-20", kennung: "A", wert: 1 },
+    ]);
+    await depotRepository.loeschen("d1");
+    expect(await depotRepository.alle()).toEqual([]);
+    expect(await depotRepository.werte()).toEqual([]);
+    expect(await depotRepository.positionen("d1")).toEqual([]);
   });
 });

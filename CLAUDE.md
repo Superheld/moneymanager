@@ -37,7 +37,9 @@ Zuordnung zur Komponente in `App.tsx`:
 | Einstellungen | `EinstellungenScreen` | Stammdaten und Voreinstellungen |
 
 Übersicht beantwortet „wie stehe ich **gerade** da", Analyse „wie war es über einen
-**Zeitraum**" — diese Grenze ist beabsichtigt und entscheidet, wo Neues hingehört.
+**Zeitraum**" — diese Grenze ist beabsichtigt und entscheidet, wo Neues hingehört. Das
+Depot ist das jüngste Beispiel: sein Stand steht in der Übersicht, sein Verlauf in der
+Analyse, aus derselben Wertreihe.
 
 ### Die Schichten
 
@@ -68,9 +70,9 @@ Die Schicht steht oben, der Fachbereich darunter — dieselben Namen über alle 
 damit ein Thema an drei Stellen gleich heißt:
 
 ```
-core/         basis buchung konten budgets vertraege kategorien inventar
+core/         basis buchung konten budgets vertraege kategorien inventar depot
               stammdaten klassifikator          + index, monatsausblick
-application/  buchung konten budgets vertraege kategorien inventar dubletten
+application/  buchung konten budgets vertraege kategorien inventar depot dubletten
               stammdaten import fints           + index, ports, bootstrap,
                                                   uebersicht, analysesichten, einstellungen
 adapters/ui/  bausteine buchung konten budgets vertraege kategorien(training)
@@ -93,12 +95,19 @@ Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (
 Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 
-Ein Name weicht ab: der UI-Ordner heißt `training/`, weil die Navigation den Bereich so
-nennt (`ScreenId`); fachlich ist es dieselbe Sache wie `kategorien/` in Kern und Anwendung.
+Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der
+Fachgliederung:
+
+- Der UI-Ordner heißt `training/`, weil die Navigation den Bereich so nennt (`ScreenId`);
+  fachlich ist es dieselbe Sache wie `kategorien/` in Kern und Anwendung.
+- **`depot/` gibt es in `ui/` gar nicht.** Ein Depot ist kein Bereich, sondern etwas, das
+  in zweien vorkommt: der Stand in der Übersicht (`ui/uebersicht/DepotKarte.tsx`), die
+  Entwicklung in der Analyse (`ui/analyse/DepotAnsicht.tsx`). Kern und Anwendung haben
+  ihren `depot/`-Ordner trotzdem — dort gliedert die Fachlichkeit, nicht das Menü.
 
 ### Das Datenmodell
 
-21 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+24 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
@@ -108,7 +117,9 @@ ist sie:
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` · `vertrag` ·
   `vertrag_erkennung` · `vertrag_zuordnung` · `zahlungsregel` · `inventargegenstand`
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
-- **Bank:** `bankzugang` · `bankkonto_zuordnung`
+- **Bank:** `bankzugang` (samt Bankfähigkeitsprofil) · `bankkonto_zuordnung`
+- **Besitzen:** `depot` · `depotwert` (Reihe der Stichtagswerte) · `depotposition` —
+  Beobachtungen, keine Buchungen; siehe unten
 - **Sonstiges:** `person` · `einstellung`
 
 Gedroppt und nicht wiederzubeleben: `topf`, `szenario`, `szenario_posten` — aufgegangen in
@@ -188,6 +199,14 @@ Vier Dinge gelten überall und stehen deshalb hier:
 - **Migrationen sind forward-only und append-only** und klammern nichts in Transaktionen;
   jedes Statement muss für sich wiederholbar sein.
 - **Kein Wert aus dem echten Bestand ins Repo** (unten ausführlich).
+- **Ein Depot ist kein Konto.** Ein `zahlungskonto` hat einen Anfangsbestand und
+  Buchungen, aus denen sich sein Stand ergibt; ändert sich der Stand, ist etwas geflossen.
+  Ein Depot hat nur Beobachtungen zu Stichtagen — sein Wert ändert sich täglich, ohne dass
+  etwas passiert wäre. Er zählt deshalb **nicht** zu den liquiden Mitteln, belastet kein
+  Budget und geht in keine Liquiditätsprojektion ein. Praktisch heißt das: `liquideMittel()`
+  summiert die Salden ALLER Konten ohne Typprüfung, und genau deshalb liegt das Depot in
+  eigenen Tabellen statt als Kontotyp — sonst müsste es an jeder künftigen Auswertung
+  wieder ausgenommen werden, und einmal wird es vergessen.
 
 Ausführbar geprüft wird das in `src/architektur.test.ts` (Schichtgrenzen),
 `src/doku.test.ts` (Verweise) und `src/privatsphaere.test.ts` (echte Daten).

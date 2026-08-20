@@ -10,9 +10,10 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { AbrufBefund, Bankzugang, TanHerausforderung } from "../../../application";
+import type { Abrufergebnis, Bankzugang, TanHerausforderung } from "../../../application";
 import { bankAbrufen, bankzugaenge } from "../../dienste";
 import { TanDialog, type TanFrage } from "./TanDialog";
+import { useGeld } from "../bausteine/einstellungenKontext";
 import { Button, FormField } from "../bausteine";
 import { Modal } from "../bausteine/Modal";
 
@@ -23,6 +24,7 @@ function heuteIso(): string {
 
 export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFertig: () => void }) {
   const { t } = useTranslation();
+  const geld = useGeld();
   const [zugaenge, setZugaenge] = useState<Bankzugang[]>([]);
   const [zugangId, setZugangId] = useState("");
   const [pin, setPin] = useState("");
@@ -37,7 +39,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
   const [rueckgriff, setRueckgriff] = useState("");
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
-  const [befunde, setBefunde] = useState<AbrufBefund[] | null>(null);
+  const [befunde, setBefunde] = useState<Abrufergebnis | null>(null);
   const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
 
   useEffect(() => {
@@ -131,7 +133,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
 
         {befunde && (
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
-            {befunde.map((b) => (
+            {befunde.konten.map((b) => (
               <li key={b.zahlungskontoId + b.von} style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-2) 0" }}>
                 <strong>{b.bezeichnung}</strong>{" "}
                 <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
@@ -156,7 +158,31 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
                 )}
               </li>
             ))}
-            {befunde.length === 0 && <li className="muted">{t("konten.abruf.keineZuordnung")}</li>}
+            {/* Depots stehen getrennt: sie liefern keine Buchungen, sondern einen Stand. */}
+            {befunde.depots.map((d) => (
+              <li key={d.schluessel} style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-2) 0" }}>
+                <strong>{d.bezeichnung}</strong>{" "}
+                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {t("depot.bezeichnung")}
+                  {d.uebernahme ? ` · ${d.uebernahme.stichtag}` : ""}
+                </span>
+                <div>
+                  {d.fehler ? (
+                    <span className="err">{d.fehler}</span>
+                  ) : d.uebernahme?.ohneGesamtwert ? (
+                    t("depot.abrufOhneWert", { n: d.uebernahme.positionen })
+                  ) : (
+                    t("depot.abrufZeile", {
+                      n: d.uebernahme?.positionen ?? 0,
+                      wert: geld.formatMitSymbol(d.uebernahme?.gesamtwert ?? 0),
+                    })
+                  )}
+                </div>
+              </li>
+            ))}
+            {befunde.konten.length === 0 && befunde.depots.length === 0 && (
+              <li className="muted">{t("konten.abruf.keineZuordnung")}</li>
+            )}
             <li className="muted" style={{ fontSize: "var(--fs-xs)", paddingTop: "var(--sp-3)" }}>
               {t("konten.abruf.weiterInInbox")}
             </li>
