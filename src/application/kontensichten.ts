@@ -12,8 +12,11 @@
 // einer Stelle, die eine Tabellenspalte nicht kennen kann.
 
 import {
-  bankAbweichung,
+  abweichungsfenster,
+  anfangsbestandAusAnker,
+  ankerAbweichung,
   istSummeKonto,
+  juengsterAnker,
   kontoRegister,
   realerKontostand,
   type Cent,
@@ -22,6 +25,8 @@ import {
   type KontoRegister,
   type RegisterZeile,
   type Zahlungskonto,
+  type Abweichungsfenster,
+  type Kontostandsanker,
   type Zahlungsregel,
 } from "../core";
 import type { Umsatz } from "./import";
@@ -35,6 +40,7 @@ import type {
   DublettenfreigabeRepository,
   ImportLaufRepository,
   KategorieRepository,
+  KontostandsankerRepository,
   LedgerPort,
   UmsatzRepository,
   ZahlungskontoRepository,
@@ -57,6 +63,8 @@ export interface KontenDeps {
   readonly laufRepo: ImportLaufRepository;
   /** Die von Hand gesetzten „ist kein Duplikat"-Entscheidungen. */
   readonly freigabeRepo: DublettenfreigabeRepository;
+  /** Die Kontostands-Anker — was zu einem Stichtag nachweislich auf dem Konto lag. */
+  readonly ankerRepo: KontostandsankerRepository;
   /** Bankverbindungen — daran hängt der Abruf-Knopf und der Abgleich. */
   readonly kontozuordnungen: () => Promise<Kontozuordnung[]>;
 }
@@ -68,14 +76,34 @@ export interface Kontozeile {
   readonly realerStand: Cent;
   /** Hängt das Konto an einer Bankverbindung? */
   readonly online: boolean;
-  /** Der zuletzt von der Bank gemeldete Stand, falls es einen gibt. */
-  readonly bankSaldo?: { betrag: Cent; datum?: string };
   /**
-   * Bank minus App. 0 heisst beweisbar vollständig; `undefined`, wenn die Bank nichts
-   * gemeldet hat. Vorzeichen mit Bedeutung: + → es fehlt eine Einnahme, − → eine
-   * Ausgabe fehlt oder etwas ist doppelt drin.
+   * Der jüngste Kontostands-Anker — was zuletzt nachweislich auf dem Konto lag.
+   *
+   * Von der Bank gemeldet oder von Hand gezählt; `undefined` bei einem Konto, für das es
+   * nie eine unabhängige Aussage gab.
+   */
+  readonly anker?: Kontostandsanker;
+  /**
+   * Anker minus App, gerechnet bis zum Stichtag des Ankers. 0 heisst beweisbar
+   * vollständig; `undefined`, wenn es keinen Anker gibt. Vorzeichen mit Bedeutung:
+   * + → es fehlt eine Einnahme, − → eine Ausgabe fehlt oder etwas ist doppelt drin.
    */
   readonly abweichung?: Cent;
+  /**
+   * Die Zeiträume zwischen zwei Ankern, in denen etwas fehlt — die eigentliche Auskunft.
+   *
+   * Ein einzelner Anker sagt „hier fehlen 600 Euro", diese Liste sagt „zwischen dem
+   * 31.07. und dem 31.08.". Vom Anfangsbestand unabhängig, deshalb auch dann belastbar,
+   * wenn der nur geschätzt ist.
+   */
+  readonly luecken: readonly Abweichungsfenster[];
+  /**
+   * Was der Anfangsbestand sein müsste, damit die Rechnung den jüngsten Anker trifft.
+   *
+   * Der Vorschlag für den einmaligen Abgleich; `undefined` ohne Anker oder wenn es nichts
+   * zu ändern gibt.
+   */
+  readonly anfangsbestandVorschlag?: Cent;
 }
 
 export interface Kontensicht {
@@ -116,7 +144,7 @@ export interface Kontensicht {
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -126,6 +154,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.kontozuordnungen(),
       deps.laufRepo.alle(),
       deps.freigabeRepo.alle(),
+      deps.ankerRepo.alle(),
     ]);
 
   const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
@@ -145,14 +174,20 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
   return {
     zeilen: konten.map((konto): Kontozeile => {
       const z = zuordnungJeKonto.get(konto.id);
-      const bankSaldo = z?.bankSaldo != null ? { betrag: z.bankSaldo, datum: z.bankSaldoDatum } : undefined;
+      const juengster = juengsterAnker(anker, konto.id);
+      const abweichung = juengster ? ankerAbweichung(konto, buchungen, juengster) : undefined;
       return {
         konto,
         bewegungen: istSummeKonto(buchungen, konto.id),
         realerStand: realerKontostand(konto, buchungen),
         online: !!z,
-        bankSaldo,
-        abweichung: bankSaldo ? bankAbweichung(konto, buchungen, bankSaldo.betrag) : undefined,
+        anker: juengster,
+        abweichung,
+        luecken: abweichungsfenster(buchungen, anker, konto.id),
+        // Nur vorschlagen, wenn es etwas zu ändern gibt — sonst böte die Oberfläche eine
+        // Handlung an, die nichts tut.
+        anfangsbestandVorschlag:
+          juengster && abweichung !== 0 ? anfangsbestandAusAnker(buchungen, juengster) : undefined,
       };
     }),
     kategorien,

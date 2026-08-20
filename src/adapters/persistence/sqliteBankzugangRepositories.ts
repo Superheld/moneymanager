@@ -28,8 +28,6 @@ interface ZuordnungZeile {
   schluessel: string;
   zahlungskonto_id: string;
   letzter_abruf_bis: string | null;
-  bank_saldo: number | null;
-  bank_saldo_datum: string | null;
 }
 
 export const sqliteBankzugangRepository: BankzugangRepository = {
@@ -93,7 +91,7 @@ export const sqliteKontozuordnungRepository: KontozuordnungRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<ZuordnungZeile[]>(
-      `SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis, bank_saldo, bank_saldo_datum
+      `SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis
          FROM bankkonto_zuordnung`,
     );
     return zeilen.map((z) => ({
@@ -101,15 +99,13 @@ export const sqliteKontozuordnungRepository: KontozuordnungRepository = {
       schluessel: z.schluessel,
       zahlungskontoId: z.zahlungskonto_id,
       letzterAbrufBis: z.letzter_abruf_bis ?? undefined,
-      bankSaldo: z.bank_saldo ?? undefined,
-      bankSaldoDatum: z.bank_saldo_datum ?? undefined,
     }));
   },
 
   async nachZugang(zugangId: string) {
     const db = await getDb();
     const zeilen = await db.select<ZuordnungZeile[]>(
-      `SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis, bank_saldo, bank_saldo_datum
+      `SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis
          FROM bankkonto_zuordnung WHERE zugang_id = $1`,
       [zugangId],
     );
@@ -118,23 +114,17 @@ export const sqliteKontozuordnungRepository: KontozuordnungRepository = {
       schluessel: z.schluessel,
       zahlungskontoId: z.zahlungskonto_id,
       letzterAbrufBis: z.letzter_abruf_bis ?? undefined,
-      bankSaldo: z.bank_saldo ?? undefined,
-      bankSaldoDatum: z.bank_saldo_datum ?? undefined,
     }));
   },
 
   async speichern(z: Kontozuordnung) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis,
-                                        bank_saldo, bank_saldo_datum)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis)
+       VALUES ($1, $2, $3, $4)
        ON CONFLICT(zugang_id, schluessel) DO UPDATE SET zahlungskonto_id  = excluded.zahlungskonto_id,
-                                                       letzter_abruf_bis = excluded.letzter_abruf_bis,
-                                                       bank_saldo        = excluded.bank_saldo,
-                                                       bank_saldo_datum  = excluded.bank_saldo_datum`,
-      [z.zugangId, z.schluessel, z.zahlungskontoId, z.letzterAbrufBis ?? null,
-       z.bankSaldo ?? null, z.bankSaldoDatum ?? null],
+                                                       letzter_abruf_bis = excluded.letzter_abruf_bis`,
+      [z.zugangId, z.schluessel, z.zahlungskontoId, z.letzterAbrufBis ?? null],
     );
   },
 

@@ -97,11 +97,13 @@ function fakes(zuordnungen: Kontozuordnung[]) {
   // seine eigenen frischen Zeilen über `offene()` zurück.
   const umsaetze: any[] = [];
   const buchungen: any[] = [];
+  const anker: any[] = [];
   return {
     gespeicherteZuordnungen,
     zugaenge,
     umsaetze,
     buchungen,
+    anker,
     deps: {
       zugangRepo: {
         alle: async () => [],
@@ -150,6 +152,14 @@ function fakes(zuordnungen: Kontozuordnung[]) {
         },
       },
       laufRepo: { alle: async () => [], speichern: async () => {}, loeschen: async () => {} },
+      ankerRepo: {
+        alle: async () => [...anker],
+        speichern: async (a: any) => {
+          const i = anker.findIndex((x) => x.kontoId === a.kontoId && x.datum === a.datum && x.herkunft === a.herkunft);
+          if (i >= 0) anker[i] = a; else anker.push(a);
+        },
+        entfernen: async () => {},
+      },
       // Eindeutige IDs: der Abruf legt Umsatz UND Ist-Buchung an; mit einer konstanten
       // ID überschrieben die sich gegenseitig.
       id: (() => { let n = 0; return () => `id-${++n}`; })(),
@@ -289,16 +299,19 @@ describe("abrufAusfuehren", () => {
     expect(f.zugaenge[f.zugaenge.length - 1]?.bankparameter).toBe('{"systemId":"S"}');
   });
 
-  it("holt den Kontostand der Bank mit und schreibt ihn fort", async () => {
+  it("hält den Kontostand der Bank als ANKER fest", async () => {
     // Ohne ihn ist der Stand der App nur in sich schlüssig; er ist die zweite,
     // unabhängige Aussage und damit die einzige Chance, eine fehlende Buchung zu merken.
+    // Aufgehoben statt überschrieben: erst mehrere Anker sagen, WANN es auseinanderlief.
     const { adapter } = fakeAdapter({ konten: [bankkonto()], saldo: 250000 });
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
     const befunde = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
     expect(befunde[0].bankSaldo).toBe(250000);
-    expect(f.gespeicherteZuordnungen[0].bankSaldo).toBe(250000);
-    expect(f.gespeicherteZuordnungen[0].bankSaldoDatum).toBe("2026-08-18");
+    expect(f.anker).toHaveLength(1);
+    expect(f.anker[0]).toMatchObject({
+      kontoId: "k1", datum: "2026-08-18", herkunft: "bank", betrag: 250000,
+    });
   });
 
   it("hält den Saldo auch fest, wenn die Umsätze scheitern", async () => {
@@ -308,8 +321,19 @@ describe("abrufAusfuehren", () => {
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1", letzterAbrufBis: "2026-08-10" }]);
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    expect(f.gespeicherteZuordnungen[0].bankSaldo).toBe(250000);
+    expect(f.anker[0]?.betrag).toBe(250000);
     expect(f.gespeicherteZuordnungen[0].letzterAbrufBis).toBe("2026-08-10");
+  });
+
+  it("ersetzt den Anker desselben Tages, statt einen zweiten anzulegen", async () => {
+    // Zwei Abrufe an einem Tag sind zwei Aussagen über DENSELBEN Stichtag, nicht zwei
+    // Stichtage. Sonst stünden im Verlauf Fenster der Länge null.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()], saldo: 250000 });
+    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(f.anker).toHaveLength(1);
   });
 
   it("lässt einen scheiternden Saldo den Abruf nicht kippen", async () => {

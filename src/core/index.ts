@@ -20,6 +20,7 @@ export * from "./budgetVorschlag";
 export * from "./inventar";
 export * from "./istbuchung";
 export * from "./kontoregister";
+export * from "./kontostand";
 export * from "./historie";
 export * from "./monatsausblick";
 export * from "./klassifikator/merkmale";

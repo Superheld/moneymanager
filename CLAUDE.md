@@ -129,6 +129,18 @@ In `ui/`:
   Eingabefeld dafür. Tragend ist er trotzdem: `budgetVerbrauch` zählt nur Aufwand, die
   Analyse gruppiert danach, die Vertragserkennung schließt Umschichtungen aus, das
   Konto-Register färbt danach. Kein totes Konzept, auch wenn keine Maske danach fragt.
+- **Kontostands-Anker sind BEOBACHTUNGEN, keine Rechenergebnisse.** Ein Anker
+  (`core/kontostand.ts`, Tabelle `kontostand_anker`) sagt: an DIESEM Stichtag lag DIESER
+  Betrag auf dem Konto — von der Bank gemeldet oder von Hand gezählt. Er wird deshalb nie
+  ungültig und nie neu berechnet, auch nicht, wenn jemand nachträglich eine Buchung davor
+  einfügt; was sich ändert, ist die Differenz, und genau die will man sehen. Anker werden
+  **aufgehoben, nicht überschrieben** (ein Stichtag je Herkunft): erst mehrere sagen, in
+  welchem ZEITRAUM eine Lücke entstand — `abweichungsfenster` rechnet Anker gegen Anker
+  und kommt ohne den Anfangsbestand aus, weil der selbst nur geschätzt ist.
+  Der `saldo` am Konto ist der **Anfangsbestand** und überbrückt die Zeit vor dem ersten
+  Import. Ihn auf einen Anker auszurichten (`anfangsbestandAbgleichen`) ist ein einmaliger
+  Eingriff auf Zuruf — **niemals still beim Anzeigen**: danach ist jede neue Abweichung ein
+  echter Fehler, und wer sie weiterhin wegrechnet, macht den Detektor kaputt.
 - **`IstBuchung` trägt KEINEN Empfänger/Verwendungszweck** — die stehen am `Umsatz`
   (Import-Kontext); Join über `Umsatz.istbuchungId` für Detail-/Reporting-Ansichten.
 - **Tauri = nur Hülle:** Domänen-/Backend-Logik läuft als TS in der Webview, nicht in Rust

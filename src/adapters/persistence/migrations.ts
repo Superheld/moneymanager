@@ -660,4 +660,45 @@ export const MIGRATIONS: Migration[] = [
        )`,
     ],
   },
+  {
+    version: 35, // Kontostands-Anker: was an einem Stichtag wirklich da war
+    sql: [
+      // Bisher stand der von der Bank gemeldete Saldo an der Kontozuordnung und wurde bei
+      // JEDEM Abruf überschrieben. Damit ist die Frage „stimmt mein Konto?" mit einer Zahl
+      // zu beantworten, die Frage „seit wann nicht mehr?" mit gar nichts — und die zweite
+      // ist die nützlichere: aus 224 Buchungen über fünf Jahre werden zwei Wochen.
+      //
+      // Ein Anker ist eine BEOBACHTUNG, kein Rechenergebnis. Er wird deshalb nie ungültig
+      // und braucht keine Invalidierung, wenn jemand nachträglich eine Buchung davor
+      // einfügt — was sich ändert, ist die Differenz, und genau die will man sehen.
+      //
+      // Zwei Herkünfte: 'bank' (gemeldet) und 'hand' (Kassensturz beim Bargeld). Deshalb
+      // im Schlüssel: an einem Tag kann beides vorkommen.
+      `CREATE TABLE IF NOT EXISTS kontostand_anker (
+         konto_id   TEXT    NOT NULL,
+         datum      TEXT    NOT NULL,
+         herkunft   TEXT    NOT NULL,
+         betrag     INTEGER NOT NULL,
+         erfasst_am TEXT    NOT NULL,
+         PRIMARY KEY (konto_id, datum, herkunft)
+       )`,
+      // Der zuletzt gemeldete Stand wird zum ersten Anker — sonst begänne die Historie
+      // bei null und die erste brauchbare Aussage käme erst nach dem übernächsten Abruf.
+      // `INSERT OR IGNORE` macht das Statement wiederholbar.
+      `INSERT OR IGNORE INTO kontostand_anker (konto_id, datum, herkunft, betrag, erfasst_am)
+       SELECT zahlungskonto_id, bank_saldo_datum, 'bank', bank_saldo, bank_saldo_datum
+         FROM bankkonto_zuordnung
+        WHERE bank_saldo IS NOT NULL AND bank_saldo_datum IS NOT NULL`,
+    ],
+  },
+  {
+    version: 36, // … und erst danach die alten Spalten abräumen
+    sql: [
+      // Getrennte Version, weil v35 sie LIEST. Stünde beides zusammen und der Lauf bräche
+      // dazwischen ab, liefe v35 beim nächsten Start gegen die fehlenden Spalten — SQLite
+      // prüft Spaltennamen beim Parsen, da rettet keine WHERE-Bedingung.
+      `ALTER TABLE bankkonto_zuordnung DROP COLUMN bank_saldo`,
+      `ALTER TABLE bankkonto_zuordnung DROP COLUMN bank_saldo_datum`,
+    ],
+  },
 ];

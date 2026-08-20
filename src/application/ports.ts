@@ -16,6 +16,8 @@ import type {
   Vertragszuordnung,
   Zahlungskonto,
   Zahlungsregel,
+  Ankerherkunft,
+  Kontostandsanker,
 } from "../core";
 import type { ImportLauf, Umsatz } from "./import";
 import type { Dublettenfreigabe } from "./dublettensicht";
@@ -171,6 +173,19 @@ export interface ImportLaufRepository {
   alle(): Promise<ImportLauf[]>;
   speichern(lauf: ImportLauf): Promise<void>;
   loeschen(id: string): Promise<void>;
+}
+
+/**
+ * Kontostands-Anker: was an einem Stichtag wirklich auf dem Konto lag.
+ *
+ * Sie werden AUFGEHOBEN, nicht überschrieben — ein einzelner Anker sagt „hier fehlen 600
+ * Euro", zwei sagen „zwischen dem 31.07. und dem 31.08.". Das ist der Unterschied
+ * zwischen einer Zahl und einer brauchbaren Auskunft.
+ */
+export interface KontostandsankerRepository {
+  alle(): Promise<Kontostandsanker[]>;
+  speichern(anker: Kontostandsanker): Promise<void>;
+  entfernen(kontoId: string, datum: string, herkunft: Ankerherkunft): Promise<void>;
 }
 
 /**
