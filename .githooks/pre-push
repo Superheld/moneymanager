@@ -92,7 +92,13 @@ while read -r lokal_ref lokal_sha remote_ref remote_sha; do
   fi
   texte=$(git log --format='%B' "$bereich" 2>/dev/null) || continue
   for wert in $merkmale $kennungen; do
-    if printf '%s' "$texte" | grep -qF -- "$wert"; then
+    # Zahlen an der Wortgrenze pruefen: sonst schlaegt "15000" in "150000" an, und ein
+    # Waechter mit Fehlalarmen wird umgangen statt gelesen.
+    case "$wert" in
+      *[!0-9.,]*) treffer=$(printf '%s' "$texte" | grep -cF -- "$wert") ;;
+      *)          treffer=$(printf '%s' "$texte" | grep -cE "(^|[^0-9])$wert([^0-9]|$)") ;;
+    esac
+    if [ "$treffer" -gt 0 ]; then
       echo "pre-push: ABGEBROCHEN — ein Wert aus dem echten Bestand steht in einem Commit-Text ($lokal_ref)."
       echo "          Laenge $(printf '%s' "$wert" | wc -c | tr -d ' '), gefunden im Bereich $bereich."
       echo "          Der Wert wird hier bewusst nicht ausgegeben. Suche ihn mit:"

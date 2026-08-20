@@ -210,7 +210,12 @@ describe("Daten aus dem echten Bestand", () => {
       // Der Wächter selbst darf die Merkmale natürlich zur Laufzeit halten.
       if (datei.endsWith("privatsphaere.test.ts")) continue;
       for (const wert of gesucht) {
-        if (inhalt.includes(wert)) funde.push(`${datei}: „${wert}"`);
+        // Reine Zahlen nur an der Wortgrenze: „15000" steckt sonst in „150000", und ein
+        // Wächter mit Fehlalarmen wird umgangen statt gelesen.
+        const trifft = /^[\d.,]+$/.test(wert)
+          ? new RegExp(`(^|[^\\d])${wert.replace(/[.]/g, "\\.")}([^\\d]|$)`).test(inhalt)
+          : inhalt.includes(wert);
+        if (trifft) funde.push(`${datei}: „${wert}"`);
       }
     }
 
