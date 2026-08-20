@@ -50,10 +50,10 @@ function artFeld(): HTMLElement {
 
 async function stammdatenBasis() {
   await sqliteZahlungskontoRepository.speichern({
-    id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 250000,
+    id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 250000,
   });
   await sqliteZahlungskontoRepository.speichern({
-    id: "k2", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", inhaberIds: [], saldo: 500000,
+    id: "k2", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 500000,
   });
 }
 
@@ -205,7 +205,7 @@ describe("BudgetsScreen — Vorschläge", () => {
 
   async function stammdaten() {
     await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 250000,
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 250000,
     });
     await sqliteKategorieRepository.speichern({ id: "leben", name: "Lebenshaltung", defaultCharakter: "Aufwand" });
     await sqliteKategorieRepository.speichern({ id: "essen", name: "Lebensmittel", elternId: "leben", defaultCharakter: "Aufwand" });

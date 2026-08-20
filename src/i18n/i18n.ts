@@ -949,6 +949,14 @@ const de = {
       feldInhaber: "Inhaber",
       feldInhaberLeer: "erst Personen anlegen",
       typ: { Giro: "Giro", Tagesgeld: "Tagesgeld", Bargeld: "Bargeld", Kreditkarte: "Kreditkarte", Depot: "Depot" },
+      feldKlasse: "Wofür",
+      spalteKlasse: "Wofür",
+      klasse: { liquide: "Verfügbar", ruecklage: "Rücklage", vorsorge: "Vorsorge" },
+      klasseHinweis: {
+        liquide: "Zählt zu den liquiden Mitteln — Geld, das für den Alltag da ist.",
+        ruecklage: "Zurückgelegt für etwas Bestimmtes. Zählt nicht als verfügbar.",
+        vorsorge: "Langfristig gebunden. Zählt nicht als verfügbar.",
+      },
     },
     kategorie: {
       titel: "Kategorien",
@@ -2213,6 +2221,14 @@ const en: typeof de = {
       feldInhaber: "Owner",
       feldInhaberLeer: "add people first",
       typ: { Giro: "Checking", Tagesgeld: "Savings", Bargeld: "Cash", Kreditkarte: "Credit card", Depot: "Portfolio" },
+      feldKlasse: "Purpose",
+      spalteKlasse: "Purpose",
+      klasse: { liquide: "Available", ruecklage: "Reserve", vorsorge: "Long-term" },
+      klasseHinweis: {
+        liquide: "Counts as liquid funds — money meant for everyday use.",
+        ruecklage: "Set aside for something specific. Does not count as available.",
+        vorsorge: "Tied up long term. Does not count as available.",
+      },
     },
     kategorie: {
       titel: "Categories",

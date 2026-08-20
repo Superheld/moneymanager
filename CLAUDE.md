@@ -112,7 +112,8 @@ weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Über
 ist sie:
 
 - **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `umsatz` (Import-Kontext:
-  Empfänger, Verwendungszweck — steht **nicht** an der Buchung) · `zahlungskonto` ·
+  Empfänger, Verwendungszweck — steht **nicht** an der Buchung) · `zahlungskonto` (mit Typ
+  UND Klasse, siehe unten) ·
   `kontostand_anker` · `import_lauf` · `dubletten_freigabe`
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` · `vertrag` ·
   `vertrag_erkennung` · `vertrag_zuordnung` · `zahlungsregel` · `inventargegenstand`
@@ -219,16 +220,25 @@ Vier Dinge gelten überall und stehen deshalb hier:
   und Buchungen, aus denen sich sein Stand ergibt; ändert sich der Stand, ist etwas
   geflossen. Ein von der Bank gemeldetes Depot hat nur Beobachtungen zu Stichtagen — sein
   Wert ändert sich täglich, ohne dass etwas passiert wäre. Es liegt deshalb in eigenen
-  Tabellen (`depot`, `depotwert`, `depotposition`), hat keinen Saldo, belastet kein Budget
-  und geht in keine Liquiditätsprojektion ein.
+  Tabellen (`depot`, `depotwert`, `depotposition`), hat keinen Saldo und taucht in keiner
+  Kontenliste auf.
 
-  **Der Kontotyp `"Depot"` ist etwas anderes** und darf damit nicht verwechselt werden: er
-  ist ein Etikett für ein Konto, das der Nutzer SELBST führt und als Depot bezeichnet. Ein
-  solches Konto hat einen Saldo und Buchungen wie jedes andere — und geht deshalb sehr wohl
-  in `liquideMittel()` ein. Das ist Absicht: `istMonatsverlauf` bildet den Sockel aus dieser
-  Summe und lässt danach alle Buchungen darüberlaufen; nähme man den Sockel heraus und die
-  Buchungen nicht, ergäbe der Verlauf einen Saldo, den es nie gab. Festgehalten in
-  `core/konten/konto.test.ts`.
+- **Typ und Klasse eines Kontos beantworten verschiedene Fragen.** Der `Kontotyp` sagt, WAS
+  ein Konto ist (Giro, Tagesgeld, Depot) — ein Etikett ohne Wirkung auf die Rechnung. Die
+  `Kontoklasse` sagt, WOFÜR es da ist (`liquide`, `ruecklage`, `vorsorge`), und daran hängt
+  genau eine Rechnung: nur `liquide` zählt zu den liquiden Mitteln. Beides deckt sich nicht,
+  und deshalb sind es zwei Felder — dasselbe Tagesgeldkonto kann Alltagsreserve oder
+  zweckgebundene Rücklage sein, ohne dass sich sein Typ ändert.
+
+  Wer die Klassen erweitert (`KONTOKLASSEN` in `core/konten/konto.ts`), muss für jeden neuen
+  Wert entscheiden, ob er verfügbar ist. Bislang trennt die Klasse **nur** das; was Rücklage
+  und Vorsorge sonst unterscheiden soll, ist offen.
+
+  **Saldo und Buchungen gehören dabei zusammen.** `istMonatsverlauf` bildet seinen Sockel aus
+  `liquideMittel` und lässt Buchungen darüberlaufen. Nimmt man den Saldo eines Kontos heraus
+  und seine Buchungen nicht, zeigt der Verlauf einen Stand, den es nie gab — beide Seiten
+  filtern deshalb mit derselben Regel (`istLiquide`). Festgehalten in
+  `core/konten/konto.test.ts` und `core/buchung/historie.test.ts`.
 
 Ausführbar geprüft wird das in `src/architektur.test.ts` (Schichtgrenzen),
 `src/doku.test.ts` (Verweise) und `src/privatsphaere.test.ts` (echte Daten).

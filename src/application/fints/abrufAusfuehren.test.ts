@@ -38,7 +38,7 @@ function bankkonto(over: Partial<Bankkonto> = {}): Bankkonto {
 const konto: Zahlungskonto = {
   id: "k1",
   bezeichnung: "Giro",
-  typ: "Giro",
+  typ: "Giro", klasse: "liquide",
   inhaberIds: [],
   saldo: 0,
 };

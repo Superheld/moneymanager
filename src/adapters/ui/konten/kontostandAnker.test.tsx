@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 
 async function konto(saldo: number) {
-  await kontoRepo.speichern({ id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo });
+  await kontoRepo.speichern({ id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo });
 }
 
 async function buchung(id: string, datum: string, betrag: number) {

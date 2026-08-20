@@ -4,7 +4,7 @@ import { anfangsbestandAbgleichen, kontostandFesthalten } from "./kontostandAnke
 import type { KontostandsankerRepository, LedgerPort, ZahlungskontoRepository } from "../ports";
 
 const KONTO: Zahlungskonto = {
-  id: "giro", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 9900,
+  id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 9900,
 };
 
 function fakes(konto = KONTO, buchungen: IstBuchung[] = [], anker: Kontostandsanker[] = []) {

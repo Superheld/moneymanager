@@ -85,7 +85,7 @@ describe("Budgets — Formularpfade", () => {
 
   it("legt ein aufbauendes Budget über die Maske an", async () => {
     await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", inhaberIds: [], saldo: 100000,
+      id: "k1", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 100000,
     });
     await sqliteKategorieRepository.speichern({ id: "kat1", name: "Urlaub", defaultCharakter: "Aufwand" });
 

@@ -4,10 +4,12 @@
 import {
   FachlicherFehler,
   ibanGueltig,
+  klasseVorschlag,
   wuerdeZyklusErzeugen,
   type Cent,
   type Charakter,
   type Kategorie,
+  type Kontoklasse,
   type Kontotyp,
   type Person,
   type Zahlungskonto,
@@ -44,6 +46,8 @@ export async function personAnlegen(
 export interface KontoEingabe {
   bezeichnung: string;
   typ: Kontotyp;
+  /** Fehlt sie, wird sie aus dem Typ vorgeschlagen — änderbar bleibt sie immer. */
+  klasse?: Kontoklasse;
   iban?: string;
   inhaberIds?: string[];
   saldo?: Cent; // Minor Units (die UI parst währungsgerecht)
@@ -62,6 +66,7 @@ export async function kontoAnlegen(
     id: id ?? crypto.randomUUID(),
     bezeichnung,
     typ: eingabe.typ,
+    klasse: eingabe.klasse ?? klasseVorschlag(eingabe.typ),
     iban: iban || undefined,
     inhaberIds: eingabe.inhaberIds ?? [],
     saldo: eingabe.saldo ?? 0,

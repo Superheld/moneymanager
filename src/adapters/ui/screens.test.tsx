@@ -55,7 +55,7 @@ beforeEach(() => {
 /** Häufig gebrauchtes Grundgerüst: ein Konto und eine Kategorie. */
 async function grunddaten() {
   await sqliteZahlungskontoRepository.speichern({
-    id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 250000,
+    id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 250000,
   });
   await sqliteKategorieRepository.speichern({
     id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand",

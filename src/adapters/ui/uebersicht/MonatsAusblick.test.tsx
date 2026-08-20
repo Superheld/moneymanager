@@ -218,7 +218,7 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
     for (const r of REGELN) await sqliteZahlungsregelRepository.speichern(r);
     for (const b of BUDGETS) await sqliteBudgetRepository.speichern(b);
-    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo: 100000 });
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 100000 });
     for (const g of INVENTAR) await sqliteInventarRepository.speichern(g);
     // Eine Buchung im laufenden Monat — welcher das ist, entscheidet hier die echte Uhr.
     const jetzt = new Date();
@@ -244,7 +244,7 @@ describe("Übersicht — Ausblick am echten Schema", () => {
   it("klappt ein Budget der Liste auf und zeigt seine Buchungen", async () => {
     for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
     for (const b of BUDGETS) await sqliteBudgetRepository.speichern(b);
-    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo: 0 });
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
     const jetzt = new Date();
     const monatsErster = `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, "0")}-01`;
     await sqliteLedgerRepository.speichern({

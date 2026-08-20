@@ -52,7 +52,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
   it("zeigt Personen, Konten und Kategorien aus der Datenbank", async () => {
     await sqlitePersonRepository.speichern({ id: "p1", name: "Bruce", rolle: "hauptperson" });
     await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: ["p1"], saldo: 100000,
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: ["p1"], saldo: 100000,
     });
     await sqliteKategorieRepository.speichern({
       id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand",
@@ -73,7 +73,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
 
   it("zeigt die Konten an ihrem eigenen Punkt, nicht mehr in den Einstellungen", async () => {
     await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 100000,
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 100000,
     });
 
     rendere(<KontenVerwaltungScreen />);
@@ -111,10 +111,10 @@ describe("EinstellungenScreen — Stammdaten", () => {
 describe("KontenScreen — Auszug und Dialoge", () => {
   async function konten() {
     await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 250000,
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 250000,
     });
     await sqliteZahlungskontoRepository.speichern({
-      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", inhaberIds: [], saldo: 5000,
+      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 5000,
     });
     await sqliteKategorieRepository.speichern({
       id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand",

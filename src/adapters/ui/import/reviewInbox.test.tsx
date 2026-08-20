@@ -39,7 +39,7 @@ const GEMEINSAM = {
 };
 
 async function grunddaten() {
-  await kontoRepo.speichern({ id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 0 });
+  await kontoRepo.speichern({ id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
   await laufRepo.speichern({ id: "l-datei", quelle: "finanzguru", zeitpunkt: "2026-08-19T09:00:00Z", eingelesen: 1, neu: 1, duplikate: 0 });
   await laufRepo.speichern({ id: "l-bank", quelle: "fints", zeitpunkt: "2026-08-18T09:00:00Z", eingelesen: 1, neu: 1, duplikate: 0 });
 }

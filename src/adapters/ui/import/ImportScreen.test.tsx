@@ -125,7 +125,7 @@ describe("ImportScreen", () => {
 
   it("übernimmt die Umsätze und schreibt sie in die Datenbank", async () => {
     await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Girokonto", typ: "Giro",
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide",
       iban: "DE93999999990000000001", inhaberIds: [], saldo: 100000,
     });
 
@@ -153,7 +153,7 @@ describe("ImportScreen", () => {
 
   it("erkennt beim zweiten Einlesen derselben Datei die Dubletten", async () => {
     await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Girokonto", typ: "Giro",
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide",
       iban: "DE93999999990000000001", inhaberIds: [], saldo: 100000,
     });
     // Bestand direkt setzen, damit der zweite Durchlauf dagegen deduppen muss.
