@@ -215,14 +215,20 @@ Vier Dinge gelten überall und stehen deshalb hier:
 - **Migrationen sind forward-only und append-only** und klammern nichts in Transaktionen;
   jedes Statement muss für sich wiederholbar sein.
 - **Kein Wert aus dem echten Bestand ins Repo** (unten ausführlich).
-- **Ein Depot ist kein Konto.** Ein `zahlungskonto` hat einen Anfangsbestand und
-  Buchungen, aus denen sich sein Stand ergibt; ändert sich der Stand, ist etwas geflossen.
-  Ein Depot hat nur Beobachtungen zu Stichtagen — sein Wert ändert sich täglich, ohne dass
-  etwas passiert wäre. Er zählt deshalb **nicht** zu den liquiden Mitteln, belastet kein
-  Budget und geht in keine Liquiditätsprojektion ein. Praktisch heißt das: `liquideMittel()`
-  summiert die Salden ALLER Konten ohne Typprüfung, und genau deshalb liegt das Depot in
-  eigenen Tabellen statt als Kontotyp — sonst müsste es an jeder künftigen Auswertung
-  wieder ausgenommen werden, und einmal wird es vergessen.
+- **Ein abgerufenes Depot ist kein Konto.** Ein `zahlungskonto` hat einen Anfangsbestand
+  und Buchungen, aus denen sich sein Stand ergibt; ändert sich der Stand, ist etwas
+  geflossen. Ein von der Bank gemeldetes Depot hat nur Beobachtungen zu Stichtagen — sein
+  Wert ändert sich täglich, ohne dass etwas passiert wäre. Es liegt deshalb in eigenen
+  Tabellen (`depot`, `depotwert`, `depotposition`), hat keinen Saldo, belastet kein Budget
+  und geht in keine Liquiditätsprojektion ein.
+
+  **Der Kontotyp `"Depot"` ist etwas anderes** und darf damit nicht verwechselt werden: er
+  ist ein Etikett für ein Konto, das der Nutzer SELBST führt und als Depot bezeichnet. Ein
+  solches Konto hat einen Saldo und Buchungen wie jedes andere — und geht deshalb sehr wohl
+  in `liquideMittel()` ein. Das ist Absicht: `istMonatsverlauf` bildet den Sockel aus dieser
+  Summe und lässt danach alle Buchungen darüberlaufen; nähme man den Sockel heraus und die
+  Buchungen nicht, ergäbe der Verlauf einen Saldo, den es nie gab. Festgehalten in
+  `core/konten/konto.test.ts`.
 
 Ausführbar geprüft wird das in `src/architektur.test.ts` (Schichtgrenzen),
 `src/doku.test.ts` (Verweise) und `src/privatsphaere.test.ts` (echte Daten).

@@ -4,9 +4,28 @@
 
 import type { Cent } from "../basis/geld";
 
-export type Kontotyp = "Giro" | "Tagesgeld" | "Bargeld" | "Kreditkarte";
+/**
+ * Die Art eines Zahlungskontos — ein Etikett, keine Regel.
+ *
+ * `"Depot"` ist dabei die einzige, die Erklärung braucht, weil es daneben eine `depot`-
+ * Entität gibt (`core/depot/`). Das sind zwei verschiedene Dinge:
+ *
+ *  • **`Depot` als Entität** ist, was die BANK meldet — eine Reihe von Beobachtungen zu
+ *    Stichtagen, ohne Buchungen, ohne Saldo. Sie zählt nicht zu den liquiden Mitteln.
+ *  • **`Kontotyp: "Depot"`** ist ein Konto, das der Nutzer SELBST führt und als Depot
+ *    bezeichnet. Es hat einen Saldo und Buchungen wie jedes andere Konto und verhält sich
+ *    auch so — der Typ sagt nur, was es ist.
+ *
+ * Ein Konto vom Typ `"Depot"` geht deshalb weiterhin in `liquideMittel` ein. Das ist eine
+ * bewusste Entscheidung und keine Nachlässigkeit: `istMonatsverlauf` bildet den Sockel aus
+ * `liquideMittel` und lässt danach ALLE Buchungen darüberlaufen. Nähme man den Sockel
+ * heraus und die Buchungen nicht, ergäbe der Verlauf einen Saldo, den es nie gab. Wer den
+ * Typ aus den liquiden Mitteln nehmen will, muss beide Seiten zugleich anfassen — das ist
+ * eine eigene Entscheidung mit Folgen für jede Verlaufsrechnung.
+ */
+export type Kontotyp = "Giro" | "Tagesgeld" | "Bargeld" | "Kreditkarte" | "Depot";
 
-export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld", "Kreditkarte"];
+export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld", "Kreditkarte", "Depot"];
 
 export interface Zahlungskonto {
   readonly id: string;
