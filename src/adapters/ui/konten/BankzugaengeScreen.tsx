@@ -131,7 +131,6 @@ export function BankzugaengeScreen() {
         <span style={{ display: "flex", gap: "var(--sp-1)", flexWrap: "wrap" }}>
           {r.kannSaldo && <Pill variant="ok">{t("bankabruf.kannSaldo")}</Pill>}
           {r.kannUmsaetze && <Pill variant="ok">{t("bankabruf.kannUmsaetze")}</Pill>}
-          {!r.adressierbar && <Pill variant="warn">{t("bankabruf.nichtAdressierbar")}</Pill>}
           {zuordnungen.some((z) => z.schluessel === r.schluessel) && (
             <Pill variant="ok">{t("bankzugaenge.verknuepft")}</Pill>
           )}

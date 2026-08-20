@@ -52,11 +52,10 @@ export interface Bankzugang {
 /**
  * Ein Konto, wie die BANK es meldet — noch kein `Zahlungskonto` der App.
  *
- * Der Schlüssel ist `nummer` + `unterkonto`, nie die Nummer allein: manche Institute senden für
- * Girokonto und Depot dieselbe Kontonummer und unterscheidet über das Unterkontomerkmal,
- * in dem der Produktname steht. Wer nur über die Nummer adressiert, bekommt still das
- * erste passende Konto — im Spike sichtbar an einem „Depot-Saldo", der der Girokonto-Saldo
- * war.
+ * Der Schlüssel ist `nummer` + `unterkonto`, nie die Nummer allein: manche Institute senden
+ * für Girokonto und Depot dieselbe Kontonummer und unterscheiden nur über das
+ * Unterkontomerkmal, in dem der Produktname steht. Beides zusammen identifiziert ein Konto
+ * — so, wie FinTS es vorsieht.
  */
 export interface Bankkonto {
   readonly nummer: string;
@@ -71,13 +70,7 @@ export interface Bankkonto {
   /** Fähigkeitsmatrix, wie die Bank sie je Konto meldet. */
   readonly kannSaldo: boolean;
   readonly kannUmsaetze: boolean;
-  /**
-   * false, wenn die Kontonummer mehrfach vorkommt: die Bibliothek adressiert allein über
-   * die Nummer und träfe damit möglicherweise das falsche Konto. Solche Konten werden
-   * BENANNT, nicht stillschweigend abgerufen und nicht verschwiegen.
-   */
-  readonly adressierbar: boolean;
-  /** Klartext, warum ein Konto nicht adressierbar oder eingeschränkt ist. */
+  /** Klartext, warum ein Konto eingeschränkt ist — leer, wenn es nichts zu sagen gibt. */
   readonly hinweis?: string;
 }
 
