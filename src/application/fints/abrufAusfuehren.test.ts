@@ -30,6 +30,7 @@ function bankkonto(over: Partial<Bankkonto> = {}): Bankkonto {
     waehrung: "EUR",
     kannSaldo: true,
     kannUmsaetze: true,
+    kannDepot: false,
     ...over,
   };
 }
@@ -73,6 +74,9 @@ function fakeAdapter(opt: {
     async saldo() {
       if (opt.saldoWirft) throw new Error("9000 Auftrag abgelehnt");
       return opt.saldo == null ? null : { betrag: opt.saldo, datum: "2026-08-18", waehrung: "EUR" };
+    },
+    async depot() {
+      return null;
     },
     async umsaetze(k, von, bis) {
       anfragen.push({ schluessel: k.schluessel, von, bis });
@@ -256,7 +260,7 @@ describe("abrufAusfuehren", () => {
     const { adapter } = fakeAdapter({ konten: [bankkonto()] });
     const f = fakes([zuordnung]);
 
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     expect(f.buchungen).toHaveLength(1);
     expect(f.buchungen[0]).toMatchObject({ betrag: -1234, kontoId: "k1", quelle: "import" });
@@ -271,10 +275,10 @@ describe("abrufAusfuehren", () => {
     // Stufe, die ohne Rückfrage entschieden wird.
     const { adapter } = fakeAdapter({ konten: [bankkonto()] });
     const f = fakes([zuordnung]);
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
     expect(f.buchungen).toHaveLength(1);
 
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
     expect(f.buchungen).toHaveLength(1);
   });
 
@@ -292,7 +296,7 @@ describe("abrufAusfuehren", () => {
       rohHash: "h-alt", status: "verbucht", istbuchungId: "b-alt",
     });
 
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     const frisch = f.umsaetze.find((u) => u.id !== "alt");
     expect(frisch.verdachtAufId).toBe("alt"); // der Verdacht steht dran …
@@ -304,7 +308,7 @@ describe("abrufAusfuehren", () => {
     const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
     const f = fakes([zuordnung]);
 
-    const befunde = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    const befunde = (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     expect(anfragen).toEqual([{ schluessel: "9876543210|Girokonto", von: "2026-07-19", bis: HEUTE }]);
     expect(befunde).toHaveLength(1);
@@ -318,7 +322,7 @@ describe("abrufAusfuehren", () => {
     const { adapter } = fakeAdapter({ konten: [bankkonto()], wirft: true });
     const f = fakes([{ ...zuordnung, letzterAbrufBis: "2026-08-10" }]);
 
-    const befunde = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    const befunde = (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     expect(befunde[0].fehler).toMatch(/3010/);
     expect(befunde[0].ergebnis).toBeUndefined();
@@ -329,7 +333,7 @@ describe("abrufAusfuehren", () => {
     const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto({ schluessel: "andere|Nummer" })] });
     const f = fakes([zuordnung]);
 
-    const befunde = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    const befunde = (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     expect(anfragen).toEqual([]);
     expect(befunde[0].fehler).toMatch(/meldet das zugeordnete Konto/);
@@ -340,7 +344,7 @@ describe("abrufAusfuehren", () => {
     const { adapter } = fakeAdapter({ konten: [bankkonto()], wirft: true });
     const f = fakes([zuordnung]);
 
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     expect(f.zugaenge[f.zugaenge.length - 1]?.bankparameter).toBe('{"systemId":"S"}');
   });
@@ -351,7 +355,7 @@ describe("abrufAusfuehren", () => {
     // Aufgehoben statt überschrieben: erst mehrere Anker sagen, WANN es auseinanderlief.
     const { adapter } = fakeAdapter({ konten: [bankkonto()], saldo: 250000 });
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
-    const befunde = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    const befunde = (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     expect(befunde[0].bankSaldo).toBe(250000);
     expect(f.anker).toHaveLength(1);
@@ -365,7 +369,7 @@ describe("abrufAusfuehren", () => {
     // bleibt dagegen stehen, der Zeitraum wurde ja nicht geholt.
     const { adapter } = fakeAdapter({ konten: [bankkonto()], wirft: true, saldo: 250000 });
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1", letzterAbrufBis: "2026-08-10" }]);
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     expect(f.anker[0]?.betrag).toBe(250000);
     expect(f.gespeicherteZuordnungen[0].letzterAbrufBis).toBe("2026-08-10");
@@ -376,8 +380,8 @@ describe("abrufAusfuehren", () => {
     // Stichtage. Sonst stünden im Verlauf Fenster der Länge null.
     const { adapter } = fakeAdapter({ konten: [bankkonto()], saldo: 250000 });
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
+    (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     expect(f.anker).toHaveLength(1);
   });
@@ -387,7 +391,7 @@ describe("abrufAusfuehren", () => {
     // kommen trotzdem.
     const { adapter } = fakeAdapter({ konten: [bankkonto()], saldoWirft: true });
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
-    const befunde = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    const befunde = (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     expect(befunde[0].fehler).toBeUndefined();
     expect(befunde[0].bankSaldo).toBeUndefined();
@@ -397,7 +401,7 @@ describe("abrufAusfuehren", () => {
   it("holt den gewünschten Zeitraum statt des fortlaufenden", async () => {
     const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1", letzterAbrufBis: "2026-08-15" }]);
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps, rueckgriffTage: 90 });
+    (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps, rueckgriffTage: 90 })).konten;
 
     expect(anfragen[0].von).toBe("2026-05-20");
   });
@@ -406,7 +410,9 @@ describe("abrufAusfuehren", () => {
     const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
     const f = fakes([]);
 
-    expect(await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).toEqual([]);
+    const ergebnis = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    expect(ergebnis.konten).toEqual([]);
+    expect(ergebnis.depots).toEqual([]);
     expect(anfragen).toEqual([]);
   });
 });

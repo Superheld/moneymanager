@@ -159,6 +159,14 @@ export {
   type Zeitraum,
 } from "./analysesichten";
 export {
+  depotsLaden,
+  depotEntwicklung,
+  type Depotdaten,
+  type Depotsicht,
+  type Positionszeile,
+  type DepotDeps,
+} from "./depot/depotsichten";
+export {
   inventarLaden,
   type Inventarsicht,
   type InventarDeps,
@@ -195,7 +203,7 @@ export type {
   Vorfallprofil,
 } from "./fints/abrufPort";
 export type { Kontozuordnung } from "./fints/bankzugangPort";
-export type { AbrufBefund } from "./fints/abrufAusfuehren";
+export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
 // Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen
 // Vorfall überhaupt darf, sind Entscheidungen mit genau einer richtigen Antwort.

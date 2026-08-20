@@ -23,11 +23,13 @@ import {
   budgetPostenZu,
   budgetstaende,
   toIso,
+  type Depotdaten,
   type Uebersichtsdaten,
   type Verbrauchsposten,
 } from "../../../application";
-import { uebersicht } from "../../dienste";
+import { depots, uebersicht } from "../../dienste";
 import { Card, CoverageTrack, Pill } from "../bausteine";
+import { DepotKarte } from "./DepotKarte";
 import { MonatsAusblick } from "./MonatsAusblick";
 import { PageHead } from "../bausteine/PageHead";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -45,6 +47,14 @@ export function UebersichtScreen() {
   const dieserMonat = heute.slice(0, 7);
 
   const [daten, setDaten] = useState<Uebersichtsdaten | null>(null);
+  /**
+   * Die Depots — getrennt geladen und getrennt gehalten.
+   *
+   * Nicht Teil von `Uebersichtsdaten`, weil sie mit dem Rest nichts zu tun haben: sie
+   * gehen in keine Monatskarte ein, belasten kein Budget und zählen nicht zu den liquiden
+   * Mitteln. Ein Fehler beim Laden nimmt der Übersicht deshalb auch nicht ihren Inhalt.
+   */
+  const [depotdaten, setDepotdaten] = useState<Depotdaten | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
   /** Welcher Monat in der Budget-Liste steht — Vorgabe ist der laufende. */
   const [monat, setMonat] = useState(dieserMonat);
@@ -55,6 +65,9 @@ export function UebersichtScreen() {
     uebersicht(heute)
       .then((d) => { setDaten(d); setFehler(null); })
       .catch((e) => setFehler(e instanceof Error ? e.message : String(e)));
+    depots()
+      .then(setDepotdaten)
+      .catch(() => setDepotdaten(null));
   }, [heute]);
 
   /**
@@ -84,6 +97,8 @@ export function UebersichtScreen() {
           empfaenger={daten.empfaenger}
         />
       )}
+
+      {depotdaten && <DepotKarte daten={depotdaten} />}
 
       {daten && (
         <Card

@@ -48,6 +48,76 @@ export function isoDatum(d: Date): string {
   return `${j}-${m}-${t}`;
 }
 
+// ── Depot: MT535-Aufstellung → Bestand ────────────────────────────────────────────────────
+//
+// Anders als bei den Umsätzen gibt es hier keine Naht zu einem bestehenden Modell: ein
+// Depot hat keine Buchungen. Was ankommt, ist eine Beobachtung zu einem Stichtag, und die
+// Übersetzung besteht im Wesentlichen aus zwei Entscheidungen — welche Zahl Geld ist und
+// welche nicht, und welcher Tag gemeint ist.
+
+/**
+ * Der Stichtag einer Aufstellung.
+ *
+ * MT535 trägt das Datum an den POSITIONEN, nicht an der Aufstellung. Genommen wird das
+ * späteste — es ist der Stand, den die Bank insgesamt meldet. Fehlt es überall, gilt der
+ * Abruftag: das ist die Aussage, die die Bank gerade gemacht hat.
+ */
+export function depotStichtag(daten: readonly (Date | undefined)[], abruftag: string): string {
+  const tage = daten.filter((d): d is Date => d instanceof Date && !Number.isNaN(d.getTime()));
+  if (tage.length === 0) return abruftag;
+  const sortiert = tage.map(isoDatum).sort();
+  return sortiert[sortiert.length - 1];
+}
+
+/**
+ * Eine Position der Bank → unsere.
+ *
+ * `wert` geht durch `bankbetragZuCent` wie jeder Betrag. `stueck` und `kurs` NICHT: das
+ * eine ist eine Menge (Fondsanteile haben Nachkommastellen), das andere eine Notierung,
+ * die in Cent gepresst still an Genauigkeit verlöre. Beide werden angezeigt, nie summiert
+ * — die Summen kommen aus `wert`.
+ */
+export function zuDepotposition(
+  h: {
+    isin?: string;
+    wkn?: string;
+    name?: string;
+    amount?: number;
+    price?: number;
+    value?: number;
+    currency?: string;
+    acquisitionDate?: Date;
+    acquisitionPrice?: number;
+  },
+  standardWaehrung?: string,
+): DepotpositionRoh {
+  const waehrung = h.currency ?? standardWaehrung;
+  return {
+    isin: h.isin,
+    wkn: h.wkn,
+    name: h.name,
+    stueck: h.amount,
+    kurs: h.price,
+    wert: h.value == null ? undefined : bankbetragZuCent(h.value, waehrungNachCode(waehrung ?? "EUR")),
+    waehrung,
+    einstandDatum: h.acquisitionDate ? isoDatum(h.acquisitionDate) : undefined,
+    einstandKurs: h.acquisitionPrice,
+  };
+}
+
+/** Die Form, die `zuDepotposition` liefert — deckungsgleich mit `Depotposition` im Port. */
+interface DepotpositionRoh {
+  isin?: string;
+  wkn?: string;
+  name?: string;
+  stueck?: number;
+  kurs?: number;
+  wert?: Cent;
+  waehrung?: string;
+  einstandDatum?: string;
+  einstandKurs?: number;
+}
+
 // ── Bankspezifische Naht: Klartext-Etiketten statt SEPA-Tags ───────────────────────────────
 //
 // Kein `CRED+`/`MREF+`/`SVWZ+` wie in der SEPA-Norm, sondern deutsche Etiketten OHNE

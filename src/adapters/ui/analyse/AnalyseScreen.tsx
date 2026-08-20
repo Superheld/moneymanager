@@ -17,12 +17,14 @@ import {
   analyseVerlauf,
   type Analysebasis,
   type GruppenSumme,
+  type Depotdaten,
   type IstBuchung,
 } from "../../../application";
-import { analyse } from "../../dienste";
+import { analyse, depots } from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, KPIStat } from "../bausteine";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { MonatsFlussChart } from "./MonatsFlussChart";
+import { DepotAnsicht } from "./DepotAnsicht";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { PageHead } from "../bausteine/PageHead";
 import { useGeld } from "../bausteine/einstellungenKontext";
@@ -193,6 +195,11 @@ export function AnalyseScreen() {
   const [fehler, setFehler] = useState<string | null>(null);
 
   const [geladen, setGeladen] = useState(false);
+  /**
+   * Die Depots. Getrennt geladen, weil sie mit der übrigen Analyse nichts teilen: sie
+   * bestehen aus Beobachtungen, nicht aus Buchungen, und gehen in keine Kennzahl ein.
+   */
+  const [depotdaten, setDepotdaten] = useState<Depotdaten | null>(null);
 
   // Gemeinsam laden und in EINEM Schritt setzen — kein Render-Fenster, in dem die
   // Aufschlüsselung gegen eine noch leere Kategorie-Liste rechnet (sonst „ohne Kategorie").
@@ -208,6 +215,9 @@ export function AnalyseScreen() {
   }
   useEffect(() => {
     laden();
+    depots()
+      .then(setDepotdaten)
+      .catch(() => setDepotdaten(null));
   }, []);
 
   const heute = useMemo(() => toIsoHeute(), []);
@@ -454,6 +464,12 @@ export function AnalyseScreen() {
               <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)", marginTop: "var(--sp-2)" }}>{t("historie.katKlickHinweis")}</div>
             </Card>
           )}
+
+          {/* Depots zuletzt: sie beantworten eine eigene Frage und mischen sich in die
+              Kategorien-Auswertung darüber nicht ein. */}
+          {depotdaten?.depots.map((d) => (
+            <DepotAnsicht key={d.depot.id} sicht={d} von={von} bis={bis} />
+          ))}
 
         </>
       )}
