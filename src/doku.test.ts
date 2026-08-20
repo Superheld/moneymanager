@@ -29,6 +29,13 @@ const AUSSERHALB: readonly string[] = [
   // nicht ins öffentliche Repo und werden in CLAUDE.md ausdrücklich als lokal benannt.
   // `CLAUDE.local.md` ist der von Claude Code vorgesehene Ort für lokale Anweisungen.
   "CLAUDE.local.md",
+  // Dateien der Bibliothek `lib-fints`, nicht unsere. Der Skill unter
+  // `.claude/skills/lib-fints/` belegt seine Aussagen an deren Quelltext — das ist der
+  // Sinn eines solchen Skills, und ein Verweis darauf ist kein Fehler. Sie liegen in
+  // `node_modules` bzw. im Repo der Bibliothek.
+  "node_modules/lib-fints/README.md",
+  "codes.ts",
+  "interactions/customerInteraction.ts",
 ];
 
 /** Alle vom Repo verwalteten Dateien. Ohne git ist die Prüfung wertlos — dann soll sie brechen. */
