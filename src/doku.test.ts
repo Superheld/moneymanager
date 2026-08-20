@@ -72,9 +72,21 @@ function genanntePfade(datei: string, inhalt: string): string[] {
   return raus;
 }
 
+/**
+ * Dateien, deren Verweise NICHT geprüft werden.
+ *
+ * Nur das Changelog: es erzählt, was war, und muss dabei Dateien nennen dürfen, die es
+ * heute nicht mehr gibt („ARCHITEKTUR.md ist darin aufgegangen", „src/test/ heißt jetzt
+ * …"). Ein Verweis, der auf einen vergangenen Stand zeigt, ist dort kein Fehler, sondern
+ * der Zweck. Für jede andere Markdown-Datei gilt die Prüfung.
+ */
+const ERZAEHLENDE_DATEIEN: readonly string[] = ["CHANGELOG.md"];
+
 describe("Doku-Verweise", () => {
   const versioniert = versionierteDateien();
-  const markdown = versioniert.filter((d) => d.endsWith(".md"));
+  const markdown = versioniert
+    .filter((d) => d.endsWith(".md"))
+    .filter((d) => !ERZAEHLENDE_DATEIEN.includes(d));
 
   it("findet überhaupt versionierte Markdown-Dateien", () => {
     expect(markdown.length).toBeGreaterThan(0);

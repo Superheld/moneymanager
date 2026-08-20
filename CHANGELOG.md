@@ -3,6 +3,63 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.16.0] — 2026-08-20
+
+Eine Aufräumrunde ohne neue Funktion: das Repo ist so sortiert, dass man beim Draufschauen
+sieht, worum es geht, und die Regeln stehen dort, wo man sie beim Schreiben liest. Nach
+außen ändert sich nichts — die App kann danach genau dasselbe wie vorher.
+
+### Geändert
+
+**Alle drei Schichten nach Fachbereichen sortiert.** Vorher lagen `adapters/ui/` mit 39
+Dateien, `application/` mit 37 und `core/` mit 24 flach nebeneinander; die Zugehörigkeit
+stand nur im Dateinamen-Präfix, was ein handgemachter Ersatz für den Ordner ist, der fehlt.
+Jetzt bleibt die Schicht oben — die Architektur ist damit am Verzeichnisnamen ablesbar,
+ohne dass man dafür Dokumentation gelesen haben muss —, und darunter kommt der Bereich, mit
+denselben Namen über Kern, Anwendung und Oberfläche. Die Zuordnung ist gemessen, nicht
+geschätzt: was zwei oder mehr Bereiche benutzen, ist ein Baustein; was einer benutzt, gehört
+in dessen Ordner. `core/` bekam dabei einen anderen Schnitt als die äußeren Schichten, weil
+es nach Abstraktion geschichtet war und nicht nach Fachlichkeit — die Primitive (Geld,
+Datum, Währung, Zahlungsregel, Muster, Fehler, Region) liegen in `basis/`.
+
+**Die Regeln stehen je Schicht.** Eine `CLAUDE.md` in einem Unterverzeichnis lädt erst, wenn
+dort gearbeitet wird. Aus einer Datei mit 342 Zeilen sind sechs geworden: Kern, Anwendung,
+Persistenz, Oberfläche und geteilte Bausteine tragen ihre eigenen; oben bleibt die
+Orientierung und das, was überall gilt. Jede Regel steht an genau einer Stelle.
+
+**`ds/` ist in `bausteine/` aufgegangen.** Das Design-System ist eine Vorlage, keine Vorgabe
+— die Trennung in „kopiert, nicht anfassen" und „eigenes" kostete ein Verzeichnis und
+erzeugte eine Doktrin, die so nicht gilt. Was bleibt, sind die zwei Fallen, die man kennen
+muss: `DataTable` ist hier die App-Fassung, und der `Input` des Systems kann kein `onChange`.
+
+**`src/test/` heißt `src/testwerkzeug/`.** Dort lagen nie Tests, sondern Harness, Setup und
+Fixture-Bau; alle Testdateien liegen neben ihrem Code.
+
+**Die README richtet sich an Besucher** statt an Werkzeuge: die Idee der App, die
+Entscheidungen dahinter und was bewusst fehlt. Architektur und Arbeitsregeln stehen in den
+`CLAUDE.md`-Dateien, `ARCHITEKTUR.md` ist darin aufgegangen. Maschinenspezifische Rezepte
+(Pfade, `sqlite3`-Aufrufe, Cache-Verzeichnisse) liegen in `CLAUDE.local.md` außerhalb des
+Repos.
+
+### Hinzugefügt
+
+**Ein Wächter über die Doku-Verweise** (`src/doku.test.ts`): jeder Pfad, den eine
+versionierte Markdown-Datei nennt, muss selbst versioniert sein. Nicht „existiert im
+Arbeitsbaum" — genau das war die Täuschung, an der schon zweimal ein Verweis zerbrochen ist:
+für den, der das Verzeichnis lokal hat, stimmt der Satz, für einen frischen Klon führt er
+ins Leere.
+
+**Tests für Bedienpfade, die nie ausgeführt wurden:** dass „Gegenstand bearbeiten" keinen
+zweiten anlegt, dass „ersetzt" den Rücklagen-Zyklus neu startet, dass eine Aufteilung den
+Betrag der Buchung genau treffen muss, und dass der Saldo-Verlauf auch bei einer einzigen
+Stützstelle oder konstantem Wert etwas Sinnvolles zeichnet statt durch null zu teilen.
+
+### Behoben
+
+- **Ein veralteter Kommentar im Testharness** behauptete, die Screens sprächen direkt mit
+  den SQLite-Repositories — die Regel, die in 0.15.0 abgeschafft wurde.
+- **Drei tote Verweise in Code-Kommentaren** auf Dateien, die es nicht mehr gibt.
+
 ## [0.15.0] — 2026-08-20
 
 Eine Bankzeile geht jetzt ohne Zwischenstopp ins Konto. Damit fällt die Warteliste weg,

@@ -111,9 +111,10 @@ npm run tauri build   # Produktion bauen
 Getestet wird von innen nach außen: Domänenkern und Use-Cases als reine Unit-Tests,
 Repositories und UI als Integration gegen ein In-Memory-SQLite (sql.js) — dieselbe
 SQL-Engine wie in der App, nur ohne Attrappen dazwischen. Ein falsches Spalten-Mapping fällt
-damit genauso auf wie eine kaputte Anzeige. Abdeckung: **rund 83 % Statements / 84 %
-Zeilen** über das gesamte Projekt — Ziel sind 90 %, dort ist es noch nicht. Die CI erzwingt
-bei jedem Push und für Pull Requests Typecheck, Tests und Frontend-Build.
+damit genauso auf wie eine kaputte Anzeige. Der Domänenkern ist dabei am dichtesten
+abgedeckt — dort sitzt die Rechnung, die still danebengehen kann. Die CI erzwingt bei jedem
+Push und für Pull Requests Typecheck, Tests und Frontend-Build; `npm run coverage` zeigt den
+aktuellen Stand.
 
 Bewusst offen: End-to-End-Tests gegen die gebaute Desktop-App — `tauri-driver` gibt es für
 macOS nicht, WKWebView bietet keinen WebDriver. Ersatzweise laufen die jsdom-Tests von der
