@@ -177,6 +177,22 @@ Node kommt über **mise** (`mise.toml`: node 26); die CI pinnt dieselbe Hauptver
 in `.github/workflows/ci.yml`, weil Actions die `mise.toml` nicht liest. Wer sie hier hebt,
 hebt sie dort mit. Die Kommandozeilen für diese Maschine stehen in `CLAUDE.local.md`.
 
+## Mitgelieferte Skills
+
+`.claude/skills/` — Wissen, das zum Projekt gehört, aber in keine Quelldatei passt. Es
+lädt automatisch, sobald das Thema aufkommt.
+
+| Skill | worum es geht |
+|---|---|
+| `lib-fints` | die Bibliothek hinter dem Bankabruf: Ablauf, Datenformen, Bankparameter und die Fallen, die sonst Stunden kosten |
+
+Der `lib-fints`-Skill lag bis 2026-08-21 nur im Benutzerverzeichnis und stand damit
+niemandem sonst zur Verfügung. Er beschreibt beide Stände — den npm-Release und den Fork,
+auf den `package.json` zeigt —, weil zwei der dort beschriebenen Fallen nur im ersten
+gelten. Beim Verschieben ins öffentliche Repo wurden seine Beispielwerte anonymisiert;
+sie stammten aus einem echten Mitschnitt, und **kein Wächter hätte das gefunden** — eine
+Kontonummer aus dem Protokoll steht in dieser Form in keiner Tabelle.
+
 ## Die Regeln je Schicht
 
 Sie stehen dort, wo man sie beim Schreiben liest — diese Datei zeigt nur, was es gibt:
