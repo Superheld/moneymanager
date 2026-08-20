@@ -1,7 +1,7 @@
-// Design-System-Komponenten, die diese App nutzt — verbatim aus dem Repo-Verzeichnis
-// `design-system/` übernommen (Quelle der Wahrheit). Hier liegen nur die Bausteine,
-// die wir tatsächlich brauchen. Beim Aktualisieren des Design-Systems die genutzten
-// Dateien neu kopieren (siehe ds/README.md), nicht hier frei verändern.
+// Design-System-Komponenten, die diese App nutzt — verbatim aus dem Design-System
+// übernommen, das ausserhalb des Repos liegt. Hier liegen nur die Bausteine, die wir
+// tatsächlich brauchen. Beim Aktualisieren die genutzten Dateien neu kopieren
+// (siehe ds/CLAUDE.md — `DataTable` dabei aussparen), nicht hier frei verändern.
 
 export { Card } from "./Card";
 export { KPIStat } from "./KPIStat";

@@ -33,8 +33,8 @@ denselben Empfänger meinen müssen. Der Bestand wird nach und nach umgestellt.
 Eine Test-IBAN trägt eine **Bankleitzahl, die es nicht gibt** — Bereich `999999xx`, dann
 die Prüfziffer rechnen. Eine IBAN mit echter BLZ kann zu einem echten Konto gehören, und
 ob die Kontonummer dahinter vergeben ist, weiss hier niemand. Beispiel-IBANs aus dem Netz
-taugen nicht: von den vier, die hier als „bekanntes Beispiel" im Umlauf waren, trugen alle
-vier die BLZ einer echten Bank.
+taugen dafür nicht: was als „bekanntes Dummy-Beispiel" kursiert, trägt regelmäßig die BLZ
+einer echten Bank.
 
 ## Was die Wächter können — und was nicht
 
@@ -44,5 +44,5 @@ Commit-Texte. Beide finden nur den **Originalwert**. Ob ein Ersatz neutral ist u
 sich über Testfälle hinweg wiederholt, kann keiner von beiden sehen. Regel 2 und 3 sind
 Handarbeit.
 
-Der ausführliche Zusammenhang steht in `../CLAUDE.md` unter „Nichts aus dem echten Bestand
-ins Repo".
+Warum das Repo überhaupt so behandelt wird und was die Wächter im Einzelnen tun, steht in
+`../CLAUDE.md` unter „Nichts aus dem echten Bestand ins Repo".

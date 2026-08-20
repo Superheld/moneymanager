@@ -6,7 +6,7 @@
 // damit schon in der CI. Und er kann mehr als eine Import-Regel: die ALTLAST unten ist
 // prüfbar, sie darf nicht verrotten.
 //
-// Die Regel selbst steht in CLAUDE.md und ARCHITEKTUR.md. Hier steht sie ausführbar.
+// Die Regel selbst steht in CLAUDE.md. Hier steht sie ausführbar.
 //
 //   adapters ──▶ application ──▶ core
 //
