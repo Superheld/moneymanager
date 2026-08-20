@@ -51,6 +51,12 @@ npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
   auf einer Kopie durchspielen und das Ergebnis ansehen — Vorbelegungen greifen sonst
   plausibel daneben, und kein Test merkt es. Bei `sqlite3 -json` über viele Zeilen
   `maxBuffer` hochsetzen, sonst `ENOBUFS`.
+- **Die laufende App blockiert `sqlite3 -readonly`.** Solange `tauri dev` läuft, scheitert
+  ein read-only-Zugriff mit „unable to open database file": der WAL-Modus braucht die
+  `-shm`-Datei, und die darf ein read-only-Leser nicht anlegen. Stattdessen
+  `sqlite3 -cmd "PRAGMA query_only=ON" "$DB" "…"` — öffnet normal, verbietet jedes
+  Schreiben, sieht den WAL. Und **vor Schema-Arbeiten die App wirklich schliessen**: sie
+  wendet Migrationen beim Hot-Reload selbst an, mitten im Schreiben.
 - **Kopie NIE mit `cp`**, sondern `sqlite3 -readonly "$DB" ".backup '/pfad/probe.db'"`. Die
   Datenbank läuft im WAL-Modus: frische Schreibvorgänge stehen in `moneymanager.db-wal`,
   nicht in der Hauptdatei. Ein `cp` der Hauptdatei allein liefert einen ÄLTEREN Stand —
@@ -191,6 +197,27 @@ SQLite-Plugin und damit keine Daten. Es tragen zwei Ersatzwege: die jsdom-Tests 
 der Oberfläche bis ins Schema (echte In-Memory-SQLite), und gegen den **echten** Bestand
 lassen sich App-Code-Pfade headless fahren — `cp` der DB nach `/tmp`, dann
 `npx vite-node <skript.ts>` mit Import aus `src/`.
+
+## Nichts aus dem echten Bestand ins Repo
+Das Repo ist **öffentlich**. Kein Wert aus der echten Datenbank gehört hinein — keine
+IBAN, kein Empfänger, kein Betrag, kein Kontostand, keine Buchungszahl. Und zwar nicht nur
+in Tests: auch nicht in Kommentaren, in dieser Datei, im Changelog und **nicht in
+Commit-Texten**. „Am echten Bestand gemessen" ist die überzeugendste Begründung, und die
+Zahl dazu wirkt am überzeugendsten — genau deshalb rutscht sie mit. Die Aussage trägt auch
+ohne den Beleg: „ein überschrittener Rahmen" statt des Betrags.
+
+- **Test-IBANs tragen eine BLZ, die es nicht gibt** (Bereich `999999xx`, Prüfziffer
+  rechnen). Eine IBAN mit echter BLZ kann zu einem echten Konto gehören; ob die
+  Kontonummer vergeben ist, weiss hier niemand. Beispiel-IBANs aus dem Netz taugen nicht —
+  drei der vier, die hier als „Dummy" im Umlauf waren, trugen echte Bankleitzahlen.
+- **`src/privatsphaere.test.ts`** kennt die Daten nicht, sondern liest sie zur Laufzeit aus
+  der echten Datenbank und prüft den Arbeitsbaum dagegen. Er läuft in `npm test`.
+- **Die Commit-TEXTE sieht nur der pre-push-Hook.** Aktiv über
+  `git config core.hooksPath .githooks` — einmal je Klon, sonst greift er nicht.
+- Beide brechen ab, wenn die Datenbank da ist, sich aber nicht lesen lässt oder kein
+  Merkmal liefert. Ein Wächter, der nichts sieht, ist schlimmer als keiner: er beruhigt.
+- Ein Rewrite ist **nie vollständig** — Forks und alte Commit-SHAs bleiben bei GitHub
+  abrufbar. Es zählt nur, dass es gar nicht erst hineingerät.
 
 ## Sprache
 Deutsch, Anrede „du", keine Emoji.
