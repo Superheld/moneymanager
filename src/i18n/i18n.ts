@@ -194,6 +194,11 @@ const de = {
     spalteWert: "Wert",
     spalteErgebnis: "seit Kauf",
     anteil: "{{prozent}} %",
+    wertLabel: "Depotwert",
+    standErklaerung: "So hat die Bank es am {{datum}} aufgestellt.",
+    keinePositionen: "Die Bank hat für diesen Stichtag keine Positionen gemeldet.",
+    keineBewegungen:
+      "Ein Depot hat keine Buchungen — gekauft und verkauft wird über das Verrechnungskonto. Wie sich der Wert entwickelt hat, steht in der Analyse.",
   },
   import: {
     titel: "Import",
@@ -1468,6 +1473,11 @@ const en: typeof de = {
     spalteWert: "Value",
     spalteErgebnis: "since purchase",
     anteil: "{{prozent}} %",
+    wertLabel: "Portfolio value",
+    standErklaerung: "This is how the bank listed it on {{datum}}.",
+    keinePositionen: "The bank reported no holdings for this date.",
+    keineBewegungen:
+      "A portfolio has no bookings — buying and selling runs through the settlement account. How its value developed is in Analysis.",
   },
   import: {
     titel: "Import",

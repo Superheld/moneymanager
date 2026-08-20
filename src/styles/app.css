@@ -193,6 +193,30 @@ select.field {
   grid-template-columns: repeat(2, 1fr);
   gap: var(--sp-4);
 }
+/*
+ * Zwei Karten nebeneinander, die auch allein bestehen.
+ *
+ * `1fr 1fr` mit `auto-fit` statt fester Spalten: steht nur eine Karte darin, nimmt sie
+ * die volle Breite, ohne dass jemand die Klasse umschalten muss. Ein leerer Platzhalter
+ * daneben wäre die Alternative gewesen und hätte an jeder Stelle bedacht werden müssen,
+ * an der eine der beiden Karten fehlen kann.
+ *
+ * `minmax(320px, 1fr)` bricht die Spalten auf schmalen Fenstern untereinander — eine
+ * Positionsliste oder ein Budgetbalken in 160 Pixel Breite ist nicht mehr lesbar.
+ */
+.karten-paar {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--gap-card);
+  align-items: start;
+  margin-top: var(--gap-card);
+}
+
+/* Die Karten darin bringen ihren eigenen Abstand schon mit. */
+.karten-paar > * {
+  margin-top: 0 !important;
+}
+
 .form-actions {
   margin-top: var(--sp-4);
   display: flex;

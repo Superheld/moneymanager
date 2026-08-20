@@ -28,6 +28,7 @@ import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { SammelDialog } from "../buchung/SammelDialog";
 import { AbrufDialog } from "./AbrufDialog";
+import { DepotAuszug } from "./DepotAuszug";
 import { AbgleichModal, KassensturzModal } from "./KontostandModal";
 import { Modal } from "../bausteine/Modal";
 import { PageHead } from "../bausteine/PageHead";
@@ -267,7 +268,30 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   ),
               },
               { key: "ist", label: `${t("konten.spalteIst")} ${geld.symbol}`, align: "right", sortValue: (z) => z.bewegungen, render: (z) => (z.bewegungen ? geld.format(z.bewegungen, { mitVorzeichen: true }) : "—") },
-              { key: "real", label: `${t("konten.spalteRealerStand")} ${geld.symbol}`, align: "right", sortValue: (z) => z.realerStand, render: (z) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(z.realerStand)}</span> },
+              {
+                key: "real",
+                label: `${t("konten.spalteRealerStand")} ${geld.symbol}`,
+                align: "right",
+                // Ein Depot-Konto hat keine Buchungen; sein realer Stand waere dauerhaft
+                // null, waehrend der Wert daneben in der Wertreihe steht. Gezeigt wird
+                // deshalb der zuletzt gemeldete Depotwert - mit dem Stichtag im Titel,
+                // damit er nicht wie ein gerechneter Saldo aussieht.
+                sortValue: (z) => z.depot?.aktuell?.gesamtwert ?? z.realerStand,
+                render: (z) =>
+                  z.depot ? (
+                    <span
+                      style={{ fontWeight: "var(--fw-bold)" }}
+                      title={t("depot.standErklaerung", { datum: z.depot.aktuell?.stichtag ?? "—" })}
+                    >
+                      {z.depot.aktuell ? geld.format(z.depot.aktuell.gesamtwert) : "—"}
+                      <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-1)" }}>
+                        {t("depot.bezeichnung")}
+                      </span>
+                    </span>
+                  ) : (
+                    <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(z.realerStand)}</span>
+                  ),
+              },
             ]}
             rows={[...kontozeilen]}
           />
@@ -299,7 +323,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         />
       )}
 
-      {aktiv && register && (
+      {/* Ein Depot-Konto bekommt den Bestand statt des Auszugs: es hat keine Bewegungen,
+          und die gewohnte Liste stünde dauerhaft leer. */}
+      {aktiv && aktivZeile?.depot && <DepotAuszug konto={aktiv} sicht={aktivZeile.depot} />}
+
+      {aktiv && register && !aktivZeile?.depot && (
         <Card
           style={{ marginTop: "var(--gap-card)" }}
           pad
