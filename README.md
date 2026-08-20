@@ -56,8 +56,8 @@ hielt; die Vorausschau kommt wieder, dann anders geschnitten.
 
 ## Wie sie gebaut ist
 
-Tauri 2 + React + TypeScript, hexagonaler portabler TS-Domänenkern, SQLite lokal. Das
-Layout und die Schichtenregeln stehen in [ARCHITEKTUR.md](ARCHITEKTUR.md).
+Tauri 2 + React + TypeScript, hexagonaler portabler TS-Domänenkern, SQLite lokal. Die
+Schichtenregeln und ihre Begründungen stehen ausführlich in [CLAUDE.md](CLAUDE.md).
 
 ```
 src/core/         reine Domäne — kein IO, kein React, keine Uhr
