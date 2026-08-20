@@ -13,7 +13,7 @@ import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import type { ReactElement } from "react";
 import { MIGRATIONS } from "../adapters/persistence/migrations";
-import { EinstellungenProvider } from "../adapters/ui/EinstellungenProvider";
+import { EinstellungenProvider } from "../adapters/ui/bausteine/EinstellungenProvider";
 
 /**
  * tauri-plugin-sql-API auf sql.js: der Plugin nummeriert Platzhalter ($1, $2, …),

@@ -12,7 +12,8 @@ hierher, sondern in die Doku außerhalb des Repos. Maschinenspezifische Rezepte 
 
 ### Die App in zehn Bereichen
 
-Die Navigation steht in `adapters/ui/AppShell.tsx` (Typ `ScreenId`, zwei Gruppen), die
+Die Navigation steht in `adapters/ui/bausteine/AppShell.tsx` (Typ `ScreenId`, zwei
+Gruppen), die
 Zuordnung zur Komponente in `App.tsx`:
 
 **Überblick** — was gilt und was war:
@@ -88,7 +89,7 @@ den Budgets bzw. im Monatsausblick.
 4. `src/architektur.test.ts` — die Schichtgrenze als ausführbare Regel.
 
 `src/CLAUDE.md` gilt zusätzlich für alles unter `src/` (Testdaten). In
-`src/adapters/ui/ds/CLAUDE.md` stehen die Regeln für die kopierten Design-System-Bausteine.
+`src/adapters/ui/bausteine/CLAUDE.md` stehen die Regeln für die geteilten Bausteine.
 
 ## Stadium: Alpha
 
@@ -162,10 +163,11 @@ importiert also aus genau zwei Richtungen: `../../application` (Vokabular und Us
 und `../dienste` (die gebundenen Aufrufe).
 
 In `ui/`:
-- `ds/` ist aus dem Design-System kopiert — dort nichts erfinden, eigene Bausteine nach
-  `ui/`. Details in `ds/CLAUDE.md`.
-- `geldFarbe.ts` ist die EINE Farbregel für Beträge (Plus grün, Minus `--warn-deep`, Null
-  neutral); `IconButton.tsx` die Zeilen-Aktionen als Icon, deren Text in `title`/`aria-label`
+- `bausteine/` hält alles, was mehrere Bereiche benutzen — Shell, Modal, PageHead,
+  Farbregel, der Einstellungs-Kontext. Ein Teil davon stammt aus dem Design-System und
+  wird dort als Vorlage geführt; Details in `bausteine/CLAUDE.md`.
+- `bausteine/geldFarbe.ts` ist die EINE Farbregel für Beträge (Plus grün, Minus `--warn-deep`, Null
+  neutral); `bausteine/IconButton.tsx` die Zeilen-Aktionen als Icon, deren Text in `title`/`aria-label`
   wandert statt zu verschwinden.
 - **Verwandte Repos in EINEM Effekt per `Promise.all` laden und zusammen setzen.**
   Gestaffelte `setState` lassen abgeleitete Werte kurz gegen leere Listen rechnen — ein

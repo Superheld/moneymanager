@@ -22,7 +22,7 @@ import {
   type Inventargegenstand,
   type IstBuchung,
   type Zahlungskonto,
-} from "./index";
+} from ".";
 import { STANDARD_WAEHRUNG, waehrungNachCode, type Waehrung } from "./waehrung";
 import { geldFormatierenMitSymbol } from "./geld";
 import { buchungErfassen } from "../application/buchungErfassen";

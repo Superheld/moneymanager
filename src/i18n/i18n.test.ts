@@ -188,7 +188,7 @@ describe("Sichtbare Texte in Komponenten", () => {
  */
 describe("Fast Refresh", () => {
   it("lässt den EinstellungenProvider nur seine Komponente exportieren", () => {
-    const datei = new URL("../adapters/ui/EinstellungenProvider.tsx", import.meta.url).pathname;
+    const datei = new URL("../adapters/ui/bausteine/EinstellungenProvider.tsx", import.meta.url).pathname;
     const exporte = [...readFileSync(datei, "utf8").matchAll(/^export\s+(?:async\s+)?(?:function|const)\s+(\w+)/gm)]
       .map((m) => m[1]);
     const keineKomponente = exporte.filter((n) => !/^[A-Z]/.test(n));

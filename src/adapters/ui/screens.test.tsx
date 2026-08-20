@@ -21,17 +21,17 @@ const halter = vi.hoisted(() => {
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
-import { BudgetsScreen } from "./BudgetsScreen";
-import { EinstellungenScreen } from "./EinstellungenScreen";
-import { AnalyseScreen } from "./AnalyseScreen";
-import { UebersichtScreen } from "./UebersichtScreen";
-import { ImportScreen } from "./ImportScreen";
-import { InventarScreen } from "./InventarScreen";
-import { KontenScreen } from "./KontenScreen";
-import { ReviewScreen } from "./ReviewScreen";
+import { BudgetsScreen } from "./budgets/BudgetsScreen";
+import { EinstellungenScreen } from "./einstellungen/EinstellungenScreen";
+import { AnalyseScreen } from "./analyse/AnalyseScreen";
+import { UebersichtScreen } from "./uebersicht/UebersichtScreen";
+import { ImportScreen } from "./import/ImportScreen";
+import { InventarScreen } from "./inventar/InventarScreen";
+import { KontenScreen } from "./konten/KontenScreen";
+import { ReviewScreen } from "./import/ReviewScreen";
 import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
 import { trainieren } from "../../core";
-import { VertraegeScreen } from "./VertraegeScreen";
+import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
