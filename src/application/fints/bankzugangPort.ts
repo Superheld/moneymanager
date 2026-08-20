@@ -21,6 +21,15 @@ export interface Kontozuordnung {
   readonly zahlungskontoId: string;
   /** Bis wohin zuletzt abgerufen wurde (ISO-Datum) — Grundlage des fortlaufenden Abrufs. */
   readonly letzterAbrufBis?: string;
+  /**
+   * Welches Umsatzformat für dieses Konto zuletzt getragen hat („CAMT" oder „MT940").
+   *
+   * Wir fragen CAMT zuerst und fallen bei leerem Ergebnis auf MT940 zurück. Wo der
+   * Rückfall schon einmal nötig war, ist die erste Runde beim nächsten Mal absehbar
+   * vergeblich — der Vermerk spart sie. Er ist ein Gedächtnis, keine Festlegung: das
+   * Profil kann sich ändern, und ein Abruf darf ihn jederzeit überschreiben.
+   */
+  readonly letztesFormat?: string;
   // Der gemeldete Kontostand stand bis 2026-08-20 hier und wurde bei jedem Abruf
   // überschrieben. Er ist jetzt ein Kontostands-Anker (`core/kontostand.ts`): aufgehoben
   // statt überschrieben, damit sich eine Abweichung zeitlich einkreisen lässt.

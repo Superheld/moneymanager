@@ -30,10 +30,12 @@ import type {
   Abrufadapter,
   Abrufsitzung,
   Bankkonto,
+  Bankprofil,
   Bankzugang,
   Saldo,
   TanFrager,
 } from "../../application/fints/abrufPort";
+import { profilErheben } from "./bankprofil";
 import { bankEndpunktFreigeben } from "./transport";
 import { FINTS_QUELLE, bankbetragZuCent, isoDatum, zuRohUmsatz } from "./uebersetzung";
 
@@ -173,7 +175,7 @@ class FintsSitzung implements Abrufsitzung {
     readonly hinweise: readonly string[],
     readonly bankNachrichten: readonly string[],
     readonly tanVerfahren: string | undefined,
-    readonly speicherzeitraumTage: number | undefined,
+    readonly profil: Bankprofil,
     private readonly frageTan: TanFrager,
   ) {}
 
@@ -373,14 +375,9 @@ export function fintsAdapter(opt: FintsAdapterOptionen): Abrufadapter {
       const konten = kontenAufbereiten(client, rohkonten);
       const bankkonten = new Map(rohkonten.map((k) => [schluesselVon(k), k]));
 
-      // Wie weit die Bank überhaupt zurückreicht, sagt sie selbst (im Test: 540 Tage).
-      // Abfragen statt annehmen — und der Aufruf wirft für Vorfälle ohne Segmentdefinition.
-      let speicherzeitraumTage: number | undefined;
-      try {
-        speicherzeitraumTage = config.getTransactionParameters<{ maxDays: number }>("HKKAZ")?.maxDays;
-      } catch {
-        speicherzeitraumTage = undefined;
-      }
+      // Was die Bank kann, sagt sie selbst — abfragen statt annehmen. Bis hierher holten
+      // wir daraus genau einen Wert (den Speicherzeitraum) und warfen den Rest weg.
+      const profil = profilErheben(config, schluesselVon, isoDatum(new Date()));
 
       return new FintsSitzung(
         client,
@@ -389,7 +386,7 @@ export function fintsAdapter(opt: FintsAdapterOptionen): Abrufadapter {
         hinweise,
         (info.bankMessages ?? []).map((m) => [m.subject, m.text].filter(Boolean).join(": ")),
         gewaehlt.name,
-        speicherzeitraumTage,
+        profil,
         frageTan,
       );
     },

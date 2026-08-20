@@ -701,4 +701,23 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE bankkonto_zuordnung DROP COLUMN bank_saldo_datum`,
     ],
   },
+  {
+    version: 37, // Bankfähigkeitsprofil — was die Bank kann, aufbewahrt statt weggeworfen
+    sql: [
+      // Die Bank meldet bei jedem Dialog mit, was sie kann: wie weit sie Umsätze vorhält,
+      // welche Formate sie kennt, welche TAN-Verfahren es gibt, was sie je Konto freigibt.
+      // Das steckte bisher im `bankparameter`-Blob der Bibliothek, aus dem wir genau einen
+      // Wert holten und den Rest verwarfen — und der Blob ist für die Anwendungsschicht
+      // nicht lesbar. Hier steht dasselbe in unseren eigenen Begriffen, als JSON.
+      //
+      // Als Spalte und nicht als Tabelle, weil das Profil immer als Ganzes gelesen wird
+      // und nie Gegenstand einer Abfrage ist. Wird es das, ist die Tabelle eine spätere
+      // Migration und kein verlorener Aufwand.
+      `ALTER TABLE bankzugang ADD COLUMN profil TEXT`,
+      // Welches Umsatzformat für dieses Konto zuletzt getragen hat. Wir fragen CAMT zuerst
+      // und fallen auf MT940 zurück; wo der Rückfall schon einmal nötig war, spart der
+      // Vermerk beim nächsten Mal eine ergebnislose Runde zur Bank.
+      `ALTER TABLE bankkonto_zuordnung ADD COLUMN letztes_format TEXT`,
+    ],
+  },
 ];
