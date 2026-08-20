@@ -3,6 +3,127 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.15.0] — 2026-08-20
+
+Eine Bankzeile geht jetzt ohne Zwischenstopp ins Konto. Damit fällt die Warteliste weg,
+in der man sie vorher abnicken musste — und mit ihr die Stelle, an der eine Dublette
+hängen blieb. Die Frage „steht das schon drin?" ist deshalb dorthin gewandert, wo beide
+Zeilen nebeneinander stehen: in den Kontoauszug. Dazu kommt die Gegenfrage, die vorher
+niemand beantworten konnte: *fehlt* etwas, und seit wann.
+
+Innen liegt die größere Änderung. Die Oberfläche kennt seit dieser Runde nur noch die
+Anwendungsschicht, und ein Test hält das fest.
+
+### Hinzugefügt
+
+**Kontostands-Anker.** Was an einem Stichtag wirklich auf dem Konto lag — von der Bank
+gemeldet oder von Hand gezählt (Kassensturz, auch fürs Bargeld). Ein Anker ist eine
+**Beobachtung, kein Rechenergebnis**: er wird nie ungültig und nie neu berechnet, auch
+nicht, wenn später eine Buchung davor eingefügt wird. Was sich ändert, ist die Differenz,
+und genau die will man sehen. Anker werden aufgehoben statt überschrieben — erst mehrere
+sagen, in welchem ZEITRAUM eine Lücke entstand. `abweichungsfenster` rechnet Anker gegen
+Anker und kommt dabei ohne den Anfangsbestand aus: der ist selbst nur geschätzt (er
+überbrückt die Zeit vor dem ersten Import), und ein falscher verschiebt jede Abweichung um
+denselben Betrag, ohne die Differenz zwischen zwei Ankern anzutasten. Aus „irgendwo in
+3.511 Buchungen seit 2021 fehlen 600 €" wird damit „zwischen dem 31.07. und dem 31.08.".
+
+**Anfangsbestand abgleichen** — einmalig, mit Vorschau und auf Zuruf. Die Differenz
+wandert dorthin, wo sie hingehört, solange der Anfangsbestand nur die fehlende
+Vorgeschichte überbrückt. Ausdrücklich **nicht** still bei jeder Anzeige: danach wäre jede
+neue Abweichung unsichtbar, und das ist der Detektor, den man gerade scharfgestellt hat.
+
+**Dubletten im Kontoauszug.** Beide Zeilen tragen die Markierung — es gibt kein Original.
+Gründe im Klartext, ein Sprung zum Gegenstück, ein Filter „könnten doppelt sein", und
+„kein Duplikat" für den Fall, dass der Finder danebenlag. Festgehalten wird das PAAR, denn
+dass A nicht dasselbe ist wie B, sagt nichts über A und C. Geprüft wird beim Hinsehen, nicht
+einmalig beim Import: ein Verdacht vom Importtag gälte für den Stand von damals. Gewertet
+wird nur über Lauf-Grenzen hinweg — am echten Bestand lagen 76 von 126 Paaren im selben
+Lauf und waren durchweg echte Mehrfachzahlungen.
+
+**Massenbearbeitung im Register.** Kategorie oder Bezeichnung für dreißig Zeilen auf
+einmal, Löschen mit zweiter Frage. Die Kästchenspalte erscheint erst, wenn man sie
+einschaltet — eine dauerhafte macht aus einer Leseansicht ein Formular.
+
+**Budgets: zwei Arten statt dreier, in EINEM Aggregat.** Vorher drei Arten in zwei
+Tabellen (`budget` mit Periode, `topf` als Puffer und als Spartopf). Alle drei beantworten
+dieselbe Frage — was lege ich monatlich für X zurück? — und unterscheiden sich nur darin,
+ob der Rest zum Monatsersten verfällt. Übrig bleibt `art` = monatlich | aufbauend und
+genau eine Zahl. Neu ist die Verschachtelung (Freizeit monatlich, darin Urlaub aufbauend;
+das Enkelbudget hängt am nächsten Dach) und die Konto-Bindung für aufbauende Budgets.
+
+**Übersicht und Analyse getrennt.** Die Übersicht beantwortet „wie stehe ich gerade da?" —
+drei Monatskarten, darunter die Budgets dieses Monats mit ihrem Rest, umschaltbar auf
+vergangene Monate. Alles, was einen ZEITRAUM auswertet, steht jetzt unter Analyse. Die
+Monatskarten zeigen Einzelposten statt Summen, Budgets lassen sich aufklappen, und jede
+Spalte sagt getrennt, was geplant und was tatsächlich übrig ist.
+
+**Ein ausführbarer Architektur-Test** (`src/architektur.test.ts`, läuft in der CI): `core`
+importiert nichts nach außen, `application` kennt nur `core`, und die UI fasst weder
+`core/` noch `adapters/persistence/` an. Seine Ausnahmeliste ist leer, und ein eigener
+Test schlägt fehl, sobald ein Eintrag darin nichts mehr verletzt — damit kann sie nicht
+verrotten.
+
+### Geändert
+
+- **Die Oberfläche kennt nur noch die Anwendungsschicht.** Die Regel galt lange nur fürs
+  Schreiben: 22 Schreibzugriffe liefen über Use-Cases, aber 144 LESEzugriffe gingen direkt
+  ans Repository. Leseregeln hatten damit keine Heimat — „welche Buchung zählt gegen ein
+  Budget" war an drei Stellen erfunden und an der vierten vergessen. Alle 27 Screens sind
+  migriert; Vokabular reicht `application/index.ts` durch, alles, was AUSWÄHLT oder
+  RECHNET, liegt hinter einem Use-Case, und die Verdrahtung steht in `adapters/dienste.ts`
+  statt in hundert Repository-Importen quer durch die Screens.
+- **Der Bankabruf bucht direkt.** Was die Bank meldet, IST passiert — daran gab es nichts
+  zu bestätigen, und der Schritt bestand in der Praxis nur aus Klicken. Seit dieser Runde
+  gilt das auch für Verdachtsfälle: sie stehen im Auszug, mit allem Zusammenhang.
+- **Die Import-Inbox ist die einzige Vorstufe** und gehört dem Dateiimport. Eine Datei ist
+  kein Kontoauszug: sie kann alt sein, überlappen oder aus einer anderen App stammen. Sie
+  zeigt jetzt den Dublettenverdacht an der Zeile, lässt den vollen Buchungsdialog zu jedem
+  Entwurf öffnen und hat einen Weggelegt-Bereich mit Rückweg.
+- **Löschen hängt an der HERKUNFT, nicht am Konto.** Vorher war alles auf einem Konto mit
+  Bankverbindung tabu, auch das, was per Datei dorthin kam — die Bank kennt diese Zeilen
+  gar nicht und holt sie nicht zurück.
+- **Nicht jeder Vertrag ist ein Abo.** Arbeitsvertrag, Mietvertrag, Kindergeld:
+  wiederkehrende Zahlungen mit Fristen, aber niemand sucht dort die nächste Gelegenheit
+  auszusteigen. Neue `art` am Vertrag; die Kündigungswarnung gilt nur noch Abos.
+- **Ein Ton für Geld, Icons für Zeilenaktionen.** Plus grün, Minus `--warn-deep`, Null
+  neutral — an einer Stelle (`geldFarbe.ts`) statt in jedem Screen. Zeilenaktionen sind
+  Icons, deren Text in `title`/`aria-label` wandert, statt zu verschwinden.
+- **Die Kontotabelle ist entschlackt**, Suche greift auch über Beträge, das Jahr steht im
+  Register, und der Kontokopf sagt, woraus der Stand entsteht.
+- **CLAUDE.md hält nur noch Systemdesign** — was wir bauen, wo es liegt, nach welchen
+  Regeln. Vorfälle und Datenstände stehen außerhalb des Repos.
+
+### Behoben
+
+- **Vertragsraten zählten gegen ihr Budget.** Auf der Übersicht stand „Familie & Kinder"
+  oben mit 0,00 € Verbrauch und darunter mit 425,00 € bei 110,00 € Rahmen — beides aus
+  denselben Daten. Die Regel steckte nicht in der Funktion, sondern in der Liste, die der
+  Aufrufer übergab. `budgetVerbrauch`/`budgetBuchungen`/`budgetStand` nehmen jetzt eine
+  `BudgetSicht` mit Pflichtfeld `vertragsBuchungen`; der Compiler hat alle Aufrufer
+  gefunden.
+- **Verwaiste Umsätze.** Wer eine Buchung über die Sammelbearbeitung entfernte, ließ ihren
+  Umsatz auf „verbucht" stehen, mit einer Buchungs-ID, die ins Leere zeigte — 32 Zeilen im
+  echten Bestand, die dadurch weiter als Dublette angemahnt wurden. Use-Case repariert,
+  Bestand über Migration 33 aufgeräumt.
+- **Der Dublettenfilter blieb hängen**, wenn der letzte Verdacht erledigt war: der Knopf
+  verschwand, der Filter nicht, und die Tabelle stand leer da. Der Erfolg sah aus wie ein
+  Datenverlust.
+- **Der Buchungsdialog rechnete Dubletten anders als der Auszug** — gegen einen anderen
+  Bestand, ohne zu prüfen, ob es das Gegenstück noch gibt. Beide Rechenwege liegen jetzt
+  in `application/dublettensicht.ts`, mit der Begründung, warum es genau zwei Fragen gibt.
+- **Der Abruf hängte frisch gebuchte Zeilen nicht an ihre Verträge** — bis jemand zufällig
+  einen Verträge-Screen öffnete, zählte jede Vertragsrate gegen ihr Budget.
+
+### Entfernt
+
+- **Die Warteliste am Konto** samt Spalte „Neu" und dem Block „Neu von der Bank".
+- **`bank_saldo` an der Kontozuordnung** — der gemeldete Stand ist jetzt ein Anker
+  (Migrationen 35/36, in getrennten Versionen, weil die eine liest, was die andere abräumt).
+- **`core/bankAbweichung`** — sie verglich den gemeldeten Stand gegen ALLE Buchungen;
+  mit einer Anker-Historie wäre das ein systematischer Fehler.
+- **Töpfe, Szenarien und die Deckungsrechnung** — aufgegangen in den Budgets bzw. im
+  Monatsausblick.
+
 ## [0.14.0] — 2026-08-19
 
 Die App holt sich die Buchungen jetzt selbst bei der Bank — und, was mehr Arbeit war:
