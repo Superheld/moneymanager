@@ -42,6 +42,20 @@ export function TanDialog({ frage, onFertig }: { frage: TanFrage; onFertig: () =
     onFertig();
   }
 
+  /**
+   * Enter im TAN-Feld bestätigt.
+   *
+   * Eine TAN wird abgetippt oder aus einem Lesegerät übernommen, und dabei liegt die Hand
+   * auf der Tastatur — zur Maus zu greifen, um einen Knopf zu treffen, ist genau an dieser
+   * Stelle der unnötigste Weg. Leere Eingabe tut nichts: ein Abbruch geschieht über das
+   * Schliessen, nicht über ein leeres Enter, das wie ein Versehen aussieht.
+   */
+  function beiTaste(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (tan.trim()) beantworten(tan);
+  }
+
   return (
     <Modal
       title={t("bankabruf.tanTitel")}
@@ -61,7 +75,13 @@ export function TanDialog({ frage, onFertig }: { frage: TanFrage; onFertig: () =
       {bildUrl && <img alt={t("bankabruf.tanBild")} style={{ maxWidth: "100%", imageRendering: "pixelated" }} src={bildUrl} />}
       {!decoupled && (
         <FormField label={t("bankabruf.tanFeld")} required>
-          <input className="field" value={tan} onChange={(e) => setTan(e.target.value)} autoFocus />
+          <input
+            className="field"
+            value={tan}
+            onChange={(e) => setTan(e.target.value)}
+            onKeyDown={beiTaste}
+            autoFocus
+          />
         </FormField>
       )}
     </Modal>
