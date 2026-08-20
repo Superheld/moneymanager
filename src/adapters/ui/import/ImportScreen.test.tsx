@@ -15,8 +15,8 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../test/harness";
-import { xlsxAusZeilen } from "../../../test/xlsxBauen";
+import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { xlsxAusZeilen } from "../../../testwerkzeug/xlsxBauen";
 import { ImportScreen } from "./ImportScreen";
 import { sqliteUmsatzRepository } from "../../persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository } from "../../persistence/sqliteStammdatenRepositories";

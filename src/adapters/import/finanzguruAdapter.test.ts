@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { finanzguruAdapter } from "./finanzguruAdapter";
-import { xlsxAusZeilen } from "../../test/xlsxBauen";
+import { xlsxAusZeilen } from "../../testwerkzeug/xlsxBauen";
 
 // Echte Kopfzeile des Finanzguru-Exports (alle Spalten, Reihenfolge wie in der Datei).
 const KOPF = [

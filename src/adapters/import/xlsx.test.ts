@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { serienDatum, xlsxLesen } from "./xlsx";
-import { xlsxAusZeilen } from "../../test/xlsxBauen";
+import { xlsxAusZeilen } from "../../testwerkzeug/xlsxBauen";
 
 describe("xlsxLesen", () => {
   it("liest Kopf- und Datenzeilen eines Blatts", () => {

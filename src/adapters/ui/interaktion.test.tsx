@@ -17,7 +17,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
+import { frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
 import { AppShell } from "./bausteine/AppShell";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
 import { InventarScreen } from "./inventar/InventarScreen";
