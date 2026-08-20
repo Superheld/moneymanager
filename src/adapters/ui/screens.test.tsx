@@ -33,6 +33,7 @@ import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikato
 import { trainieren } from "../../core";
 import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
+import { sqliteDepotRepository } from "../persistence/sqliteDepotRepository";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
@@ -169,6 +170,27 @@ describe("UebersichtScreen", () => {
   it("rendert im Leerzustand", async () => {
     rendere(<UebersichtScreen />);
     await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("zeigt den Depotwert, nicht den Kontostand des Depot-Kontos", async () => {
+    // Der Fall aus der Praxis: ein Depot-Konto hat Saldo 0, weil es keine Buchungen gibt.
+    // Der Wert steht in der Wertreihe der Bank — und der gehört in die Karte.
+    await grunddaten();
+    await sqliteDepotRepository.speichern({
+      id: "d1",
+      zugangId: "z1",
+      schluessel: "1234567800|Depot",
+      bezeichnung: "Wertpapierdepot",
+      waehrung: "EUR",
+    });
+    await sqliteDepotRepository.wertSpeichern(
+      { depotId: "d1", stichtag: "2026-08-20", gesamtwert: 314159 },
+      "2026-08-20T10:00:00.000Z",
+    );
+
+    rendere(<UebersichtScreen />);
+    expect(await screen.findByText("Wertpapierdepot")).toBeInTheDocument();
+    await waitFor(() => expect(document.body.textContent).toMatch(/3\.141,59/));
   });
 
   it("zeigt die Budgets des laufenden Monats mit ihrem Rest", async () => {

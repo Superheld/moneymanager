@@ -75,6 +75,47 @@ export function DepotKarte({ daten }: { daten: Depotdaten }) {
                   </span>
                 )}
               </span>
+              {/* Was drin liegt — kompakt: Name und Wert, sonst nichts. Stück, Kurs und
+                  Ergebnis stehen im Kontobereich, wo Platz dafür ist. Hier zählt, WAS im
+                  Depot liegt; die Zahlen dazu sind einen Klick entfernt. */}
+              {s.positionen.length > 0 && (
+                <ul
+                  style={{
+                    listStyle: "none",
+                    padding: 0,
+                    margin: "var(--sp-2) 0 0",
+                    width: "100%",
+                    fontSize: "var(--fs-xs)",
+                  }}
+                >
+                  {s.positionen.map((p) => (
+                    <li
+                      key={p.kennung}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        gap: "var(--sp-3)",
+                        padding: "2px 0",
+                        color: "var(--ink-2)",
+                      }}
+                    >
+                      <span
+                        style={{
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
+                        }}
+                        title={p.isin ? `${p.name ?? p.kennung} · ${p.isin}` : (p.name ?? p.kennung)}
+                      >
+                        {p.name ?? p.kennung}
+                      </span>
+                      <span className="num" style={{ whiteSpace: "nowrap" }}>
+                        {p.wert == null ? "—" : geld.formatMitSymbol(p.wert)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </li>
           );
         })}

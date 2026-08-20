@@ -108,6 +108,12 @@ function merkmale(): string[] {
     ...frage("SELECT betrag_pro_monat FROM budget"),
     ...frage("SELECT betrag FROM kontostand_anker"),
     ...frage("SELECT sum(betrag) FROM ist_buchung GROUP BY konto_id"),
+    // Depots: der Gesamtwert und die Werte der einzelnen Positionen. Ergänzt am
+    // 2026-08-21, weil genau dieser Weg offen war — ein Depotwert aus dem echten Bestand
+    // stand als Erwartung in einem Screen-Test, und der Wächter sah ihn nicht. Ein Wert
+    // ist ein Wert, gleich in welcher Tabelle er steht.
+    ...frage("SELECT gesamtwert FROM depotwert"),
+    ...frage("SELECT wert FROM depotposition"),
   ]) {
     const cent = Number(roh);
     // Kleinbeträge und glatte Zehner sind zu unspezifisch: „0,00", „10,00" oder „100,00"

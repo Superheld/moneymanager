@@ -102,6 +102,20 @@ describe("DepotKarte (Übersicht)", () => {
     expect(screen.getByText(/seit 2026-06-30/)).toBeInTheDocument();
   });
 
+  it("listet die Positionen mit ihrem Wert", async () => {
+    // Der Gesamtwert allein beantwortet „wieviel", nicht „was drin liegt". Beides steht
+    // in derselben Karte, weil die Frage in der Übersicht meist beides zugleich ist.
+    await zeige(<DepotKarte daten={daten} />);
+    expect(screen.getByText("Vibora Sammelanlage")).toBeInTheDocument();
+    expect(screen.getByText("Ohlert Anteil")).toBeInTheDocument();
+  });
+
+  it("zeigt keine Positionsliste, wo die Bank keine gemeldet hat", async () => {
+    const ohne: Depotsicht = { ...sicht, positionen: [] };
+    await zeige(<DepotKarte daten={{ depots: [ohne], gesamtwert: 125_000, hatDepots: true }} />);
+    expect(screen.queryByText("Vibora Sammelanlage")).not.toBeInTheDocument();
+  });
+
   it("meldet ein nie abgerufenes Depot als solches, statt eine Null zu zeigen", async () => {
     const nie: Depotsicht = { depot: sicht.depot, reihe: [], positionen: [] };
     await zeige(<DepotKarte daten={{ depots: [nie], gesamtwert: 0, hatDepots: true }} />);
