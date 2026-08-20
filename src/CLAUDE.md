@@ -27,8 +27,23 @@ Fachbegriffe folgen der Domäne, nicht der Alltagssprache: im Code heißt es `R�
 
 ## Es gibt keinen Linter
 
-Bewusst: `@typescript-eslint/parser` unterstützt das hier installierte TypeScript 7 nicht
-(Peer bis 6.0). Die Rolle übernehmen zwei andere:
+Bewusst, und aus zwei Gründen. Der erste ist technisch: `@typescript-eslint/parser`
+unterstützt das hier installierte TypeScript 7 nicht (Peer bis `<6.1.0`). Der zweite wiegt
+schwerer, weil er auch für die Linter gilt, denen die TypeScript-Version egal ist (oxlint,
+Biome — beide bringen einen eigenen Parser mit): **an dieser Codebasis finden sie nichts.**
+
+Am 2026-08-20 durchgemessen. Der Standard-Regelsatz meldete zwei Kleinigkeiten, beide in
+kopierten Design-System-Dateien. `react-in-jsx-scope` ist bei `jsx: "react-jsx"` schlicht
+falsch. Und `exhaustive-deps`, die einzige Regel mit echtem Potenzial, meldete zwölf
+Stellen — durchweg Memos, deren Hilfsfunktionen über Werte schließen, die im Dep-Array
+bereits stehen. Formal fehlt die Funktion, praktisch ist die Abhängigkeit abgedeckt.
+
+Ein Linter, dessen Bestandsmeldungen man erst einzeln wegdrücken muss, erzieht dazu,
+Meldungen wegzudrücken. Wird hier je eine echte Fehlerklasse sichtbar, die der Compiler
+nicht sieht, ist die Entscheidung neu zu treffen — dann aber mit einem Fund als Anlass,
+nicht mit der Hoffnung auf einen.
+
+Die Rolle übernehmen bis dahin drei andere:
 
 - **Der Compiler.** `strict`, `noUnusedLocals`, `noUnusedParameters`,
   `noFallthroughCasesInSwitch` sind an. `npm run typecheck` muss grün sein.
