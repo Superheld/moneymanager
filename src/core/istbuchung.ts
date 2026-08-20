@@ -40,18 +40,6 @@ export interface PlanRef {
   readonly faelligkeit: string; // ISO
 }
 
-/**
- * Verwendung — das explizit benannte Gegenkonto/Buchungsziel einer Ist-Buchung
- * jenseits der Kostenart (ADR-0003). Macht die Zuordnung eindeutig statt aus der
- * Kategorie geraten: derselbe Kategorienbaum kann Budget, Vertrag und Topf tragen,
- * erst das Gegenkonto trennt sie. Der Charakter folgt aus dem Gegenkonto-Typ.
- *
- * Aktuell nur `topf` (Passivkonto, Rücklage/Rückstellung): aus der Kostenart nicht
- * ableitbar, daher explizit. „Budget/Kostenart" bleibt implizit über `kategorieId`
- * × Periode; die Plan-Posten-Verknüpfung (Vertrag/Regel) läuft weiter über `planRef`.
- * Das n:m-/Teilbetrags-Zielbild (Zuordnung-Aggregat) kommt mit dem Bankimport.
- */
-export type Verwendung = { readonly art: "topf"; readonly topfId: string };
 
 /**
  * Ein Teil einer aufgeteilten Buchung (S-7): der Wocheneinkauf, der zu 40 € Lebensmittel
@@ -142,8 +130,6 @@ export interface IstBuchung {
   readonly gegenkontoId?: string;
   /** Gesetzt bei „bezahlt-markiert"; ermöglicht 1:1-Abgleich mit dem Plan. */
   readonly planRef?: PlanRef;
-  /** Explizit benanntes Gegenkonto/Buchungsziel (ADR-0003), z. B. eine Topf-Entnahme. */
-  readonly verwendung?: Verwendung;
   /**
    * Aufteilung auf mehrere Kategorien (S-7). Gesetzt ⇒ `kategorieId` ist leer und die
    * Teile sind die Wahrheit; Σ Teile = `betrag`. Der Ledger-Betrag bleibt unberührt —
@@ -152,11 +138,6 @@ export interface IstBuchung {
   readonly aufteilungen?: readonly Aufteilung[];
   /** Roh-Hash der Importzeile (Dedup gegen Bankimport, später). */
   readonly rohHash?: string;
-}
-
-/** Alle Ist-Buchungen, die auf einen bestimmten Topf gebucht sind (Entnahmen). */
-export function topfBuchungen(buchungen: IstBuchung[], topfId: string): IstBuchung[] {
-  return buchungen.filter((b) => b.verwendung?.art === "topf" && b.verwendung.topfId === topfId);
 }
 
 /** Stabiler Schlüssel eines Plan-Postens (Quelle + Fälligkeit) für 1:1-Matching. */
@@ -196,22 +177,6 @@ export function istSummeKonto(buchungen: IstBuchung[], kontoId: string): Cent {
  */
 export function realerKontostand(konto: Zahlungskonto, buchungen: IstBuchung[]): Cent {
   return konto.saldo + istSummeKonto(buchungen, konto.id);
-}
-
-/**
- * Was die Bank meldet, minus was die App rechnet — die einzige Zahl, die beweist, dass
- * ein Konto vollständig ist.
- *
- * Positiv heißt: die Bank hat mehr, der App fehlt eine Einnahme oder eine Ausgabe steht
- * zu viel darin. Negativ heißt umgekehrt: die App hat mehr, also fehlt eine Ausgabe oder
- * eine Buchung ist doppelt drin. Null heißt vollständig — und das ist keine Meinung,
- * sondern eine Aussage gegen eine unabhängige Quelle.
- *
- * Bewusst OHNE Toleranz: „fast null" gibt es beim Geld nicht. Ein Cent Abweichung ist
- * eine fehlende Buchung, kein Rundungsfehler — gerechnet wird durchgehend in Minor Units.
- */
-export function bankAbweichung(konto: Zahlungskonto, buchungen: IstBuchung[], bankSaldo: Cent): Cent {
-  return bankSaldo - realerKontostand(konto, buchungen);
 }
 
 /** Liquide Mittel real über alle Konten — Startpunkt der Projektion mit Ist. */

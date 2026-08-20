@@ -156,6 +156,58 @@ export function passtZu(e: Vertragserkennung, s: Zahlungsspur): boolean {
 }
 
 /**
+ * Warum trifft die Regel so wenig — oder gar nichts?
+ *
+ * Der Fall aus der Praxis: jemand tippt `*ard*` als Empfänger-Muster, sieht null Treffer
+ * und schliesst daraus, dass Platzhalter nicht funktionieren. Sie tun es; was zuschlägt,
+ * ist die Betragsspanne, die `standardErkennung` beim Anlegen mitgibt (0,6× bis 1,8× vom
+ * Vertragsbetrag). Die Vorschau zeigte nur das Endergebnis und verschwieg, welcher Filter
+ * es weggenommen hat.
+ *
+ * Diese Funktion legt die Kette offen: wie viele Zahlungen jede Stufe noch übrig lässt.
+ * Sie rechnet in DERSELBEN Reihenfolge wie `passtZu`, damit die Zahlen zusammenpassen.
+ */
+export interface Erkennungsdiagnose {
+  /** Zahlungen, die überhaupt in Frage kommen (keine Umschichtungen). */
+  readonly grundmenge: number;
+  /** … davon von mindestens einem Merkmal getroffen. */
+  readonly nachMerkmalen: number;
+  /** … davon innerhalb der Betragsspanne. */
+  readonly nachBetrag: number;
+  /** … davon innerhalb des Zeitraums. */
+  readonly nachZeitraum: number;
+  /** … davon auf dem geforderten Konto. Das ist zugleich die Trefferzahl. */
+  readonly nachKonto: number;
+}
+
+export function erkennungsDiagnose(
+  e: Vertragserkennung,
+  spuren: readonly Zahlungsspur[],
+): Erkennungsdiagnose {
+  const grund = spuren.filter((s) => s.charakter !== "Umschichtung");
+  const nachMerkmalen = grund.filter((s) => e.merkmale.some((m) => merkmalTrifft(m, s)));
+  const nachBetrag = nachMerkmalen.filter((s) => {
+    const hoehe = Math.abs(s.betrag);
+    if (e.betragVon !== undefined && hoehe < e.betragVon) return false;
+    if (e.betragBis !== undefined && hoehe > e.betragBis) return false;
+    return true;
+  });
+  const nachZeitraum = nachBetrag.filter((s) => {
+    if (e.gueltigAb && s.datum < e.gueltigAb) return false;
+    if (e.gueltigBis && s.datum > e.gueltigBis) return false;
+    return true;
+  });
+  const nachKonto = nachZeitraum.filter((s) => !e.kontoId || s.kontoId === e.kontoId);
+  return {
+    grundmenge: grund.length,
+    nachMerkmalen: nachMerkmalen.length,
+    nachBetrag: nachBetrag.length,
+    nachZeitraum: nachZeitraum.length,
+    nachKonto: nachKonto.length,
+  };
+}
+
+/**
  * Welcher Vertrag gewinnt, wenn mehrere Regeln auf dieselbe Zahlung passen?
  *
  * Der Fall ist real: zwei Handyverträge beim selben Anbieter, oder eine noch weite

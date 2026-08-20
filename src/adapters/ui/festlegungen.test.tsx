@@ -198,12 +198,12 @@ describe("Festlegung aus dem Buchungsdialog", () => {
     rendere(<KontenScreen onNavigate={() => {}} />);
     await dialogOeffnen(nutzer);
 
-    expect(screen.queryByRole("checkbox")).toBeNull();
+    expect(screen.queryByLabelText(/immer bei diesem Empfänger/i)).toBeNull();
 
     await nutzer.click(await screen.findByRole("button", { name: /Sonstiges/ }));
     await nutzer.click(await screen.findByRole("button", { name: /Kinderbetreuung/ }));
 
-    await waitFor(() => expect(screen.getByRole("checkbox")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByLabelText(/immer bei diesem Empfänger/i)).toBeInTheDocument());
   });
 
   it("schreibt die Festlegung nur mit gesetztem Haken", async () => {
@@ -214,7 +214,7 @@ describe("Festlegung aus dem Buchungsdialog", () => {
 
     await nutzer.click(await screen.findByRole("button", { name: /Sonstiges/ }));
     await nutzer.click(await screen.findByRole("button", { name: /Kinderbetreuung/ }));
-    await nutzer.click(await screen.findByRole("checkbox"));
+    await nutzer.click(await screen.findByLabelText(/immer bei diesem Empfänger/i));
     await nutzer.click(screen.getByRole("button", { name: /speichern/i }));
 
     await waitFor(async () => {

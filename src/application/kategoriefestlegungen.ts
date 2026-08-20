@@ -5,8 +5,9 @@
 // es an jeder aufrufenden Stelle nochmal zu machen — und die Stellen sind bereits drei
 // (Review-Inbox, Buchungsdialog, Einstellungsliste).
 
-import { musterVorschlag, type Kategoriefestlegung } from "../core";
-import type { KategoriefestlegungRepository } from "./ports";
+import { festlegungTrifft, musterVorschlag, type Kategorie, type Kategoriefestlegung } from "../core";
+import { kategorisieren, type Umsatz } from "./import";
+import type { KategoriefestlegungRepository, UmsatzRepository } from "./ports";
 
 /**
  * „Immer bei diesem Empfänger": legt fest, dass Zahlungen auf dieses Muster diese
@@ -51,4 +52,47 @@ export function festlegungAngebot(
   if (!muster || !kategorieId) return null;
   const vorhanden = bestand.find((f) => f.muster === muster);
   return vorhanden?.kategorieId === kategorieId ? null : muster;
+}
+
+/**
+ * Eine Festlegung setzen UND sie sofort auf die offenen Zeilen anwenden.
+ *
+ * Beides zusammen, weil es fachlich ein Vorgang ist: „immer bei diesem Empfänger" meint
+ * auch die Zeilen, die gerade im Stapel liegen. Stand die Schleife in der Oberfläche,
+ * musste sie `festlegungTrifft` kennen und die Ausnahmen mitführen (Handentscheidungen
+ * und Umbuchungen bleiben unangetastet) — eine Regel an einem Ort, an dem sie niemand
+ * vermutet.
+ *
+ * Liefert, auf wie viele WEITERE Zeilen die Festlegung gegriffen hat.
+ */
+export async function festlegungAnwenden(
+  deps: {
+    readonly festlegungRepo: KategoriefestlegungRepository;
+    readonly umsatzRepo: UmsatzRepository;
+  },
+  muster: string,
+  kategorie: Kategorie,
+  offene: readonly Umsatz[],
+  /** Die Zeile, aus der das Angebot entstand — sie ist schon kategorisiert. */
+  ausserId: string,
+): Promise<number> {
+  const f = await festlegungSetzen(deps.festlegungRepo, muster, kategorie.id);
+  if (!f) return 0;
+  let weitere = 0;
+  for (const x of offene) {
+    if (x.id === ausserId) continue;
+    // Handentscheidungen und Umbuchungen sind für jede Automatik tabu.
+    if (x.vorschlag?.quelle === "manuell" || x.vorschlag?.quelle === "umbuchung") continue;
+    if (x.vorschlag?.kategorieId === kategorie.id) continue;
+    if (!festlegungTrifft(f, x.gegenpartei)) continue;
+    await deps.umsatzRepo.speichern(
+      kategorisieren(x, {
+        kategorieId: kategorie.id,
+        charakter: kategorie.defaultCharakter,
+        quelle: "festlegung",
+      }),
+    );
+    weitere++;
+  }
+  return weitere;
 }

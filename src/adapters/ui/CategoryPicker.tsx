@@ -4,7 +4,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Charakter, Kategorie } from "../../core";
+import type { Charakter, Kategorie } from "../../application";
 import { Pill } from "./ds";
 import { Modal } from "./Modal";
 

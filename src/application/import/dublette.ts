@@ -17,7 +17,8 @@
 // **Warum ein Punktesystem und keine feste Regel.** Keine einzelne Angabe trägt allein:
 // die Bank vergibt keine stabile Buchungs-ID (`customerReference` ist durchgehend
 // NONREF, `bankReference` ein Positionszähler über das abgefragte Fenster), Finanzguru
-// liefert die End-to-End-Referenz nicht (Spalte `E-Ref`: 0 von 5279 gefüllt), und der
+// liefert die End-to-End-Referenz nicht (Spalte `E-Ref`: am echten Bestand durchweg
+// leer), und der
 // Buchungstag verschiebt sich, wenn aus einer angekündigten eine gebuchte Zahlung wird.
 // Mehrere schwache Signale zusammen tragen; ein einzelnes nicht.
 //
@@ -351,4 +352,45 @@ export function ordneZu<N extends Vergleichbar, T extends Vergleichbar>(
       ? { neu: n, bestand: treffer.kandidat, bewertung: treffer.bewertung }
       : { neu: n, bewertung: { urteil: "verschieden" as const, punkte: 0, gruende: [] } };
   });
+}
+
+/** Zwei Sätze, die dieselbe Buchung sein könnten. */
+export interface Dublettenpaar<T> {
+  readonly a: T;
+  readonly b: T;
+  readonly bewertung: Bewertung;
+}
+
+/**
+ * Findet Dubletten INNERHALB eines Bestands — Paare statt Zuordnungen.
+ *
+ * Der Unterschied zu `ordneZu` ist nicht technisch, sondern fachlich: dort gibt es eine
+ * neue Zeile und einen Bestand, also ein Original und einen Zugang. Hier liegen beide
+ * längst im Ledger, und keine der beiden ist „die richtige". Deshalb ein Paar ohne
+ * Richtung, und deshalb wird auch KEINE 1:1-Regel erzwungen: liegt dieselbe Zahlung
+ * dreimal da, sollen alle drei Paare auftauchen und nicht zwei davon stillschweigend
+ * verschwinden.
+ *
+ * Vorsortiert nach Betrag, weil der exakt stimmen muss — das drückt die Zahl der
+ * Paarvergleiche am echten Bestand um mehr als das Fünfhundertfache.
+ */
+export function paareImBestand<T extends Vergleichbar>(saetze: readonly T[]): Dublettenpaar<T>[] {
+  const nachBetrag = new Map<Cent, T[]>();
+  for (const s of saetze) {
+    const liste = nachBetrag.get(s.betrag);
+    if (liste) liste.push(s);
+    else nachBetrag.set(s.betrag, [s]);
+  }
+
+  const paare: Dublettenpaar<T>[] = [];
+  for (const gruppe of nachBetrag.values()) {
+    for (let i = 0; i < gruppe.length; i++) {
+      for (let j = i + 1; j < gruppe.length; j++) {
+        const bewertung = vergleiche(gruppe[i], gruppe[j]);
+        if (bewertung.urteil !== "verschieden") paare.push({ a: gruppe[i], b: gruppe[j], bewertung });
+      }
+    }
+  }
+  // Die stärksten zuerst: wer eine Liste durchsieht, will die sicheren Fälle oben.
+  return paare.sort((x, y) => y.bewertung.punkte - x.bewertung.punkte);
 }

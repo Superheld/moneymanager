@@ -11,14 +11,16 @@ import type {
   Merkmalsherkunft,
   Modell,
   Person,
-  Topf,
   Vertrag,
   Vertragserkennung,
   Vertragszuordnung,
   Zahlungskonto,
   Zahlungsregel,
+  Ankerherkunft,
+  Kontostandsanker,
 } from "../core";
 import type { ImportLauf, Umsatz } from "./import";
+import type { Dublettenfreigabe } from "./dublettensicht";
 
 export interface ZahlungsregelRepository {
   alle(): Promise<Zahlungsregel[]>;
@@ -86,12 +88,6 @@ export interface KategoriefestlegungRepository {
 export interface BudgetRepository {
   alle(): Promise<Budget[]>;
   speichern(budget: Budget): Promise<void>;
-  loeschen(id: string): Promise<void>;
-}
-
-export interface TopfRepository {
-  alle(): Promise<Topf[]>;
-  speichern(topf: Topf): Promise<void>;
   loeschen(id: string): Promise<void>;
 }
 
@@ -177,6 +173,32 @@ export interface ImportLaufRepository {
   alle(): Promise<ImportLauf[]>;
   speichern(lauf: ImportLauf): Promise<void>;
   loeschen(id: string): Promise<void>;
+}
+
+/**
+ * Kontostands-Anker: was an einem Stichtag wirklich auf dem Konto lag.
+ *
+ * Sie werden AUFGEHOBEN, nicht überschrieben — ein einzelner Anker sagt „hier fehlen 600
+ * Euro", zwei sagen „zwischen dem 31.07. und dem 31.08.". Das ist der Unterschied
+ * zwischen einer Zahl und einer brauchbaren Auskunft.
+ */
+export interface KontostandsankerRepository {
+  alle(): Promise<Kontostandsanker[]>;
+  speichern(anker: Kontostandsanker): Promise<void>;
+  entfernen(kontoId: string, datum: string, herkunft: Ankerherkunft): Promise<void>;
+}
+
+/**
+ * Die von Hand gesetzten Entscheidungen „diese beiden sind NICHT dasselbe".
+ *
+ * Bewusst ein eigener Port und keine Spalte am Umsatz: festgehalten wird das PAAR. Dass A
+ * nicht dasselbe ist wie B, sagt nichts darüber, ob A dasselbe ist wie C.
+ */
+export interface DublettenfreigabeRepository {
+  alle(): Promise<Dublettenfreigabe[]>;
+  speichern(freigabe: Dublettenfreigabe): Promise<void>;
+  /** Nimmt eine Freigabe zurück — die Reihenfolge der beiden IDs ist egal. */
+  entfernen(umsatzA: string, umsatzB: string): Promise<void>;
 }
 
 export interface UmsatzRepository {

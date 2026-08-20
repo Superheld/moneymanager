@@ -5,10 +5,10 @@
 
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KONTOTYPEN, type Kontotyp, type Zahlungskonto } from "../../core";
+import { KONTOTYPEN, type Kontotyp, type Zahlungskonto } from "../../application";
+import { importUebernehmen, stammdaten } from "../dienste";
 import {
   kontoMatchVorschlag,
-  umsaetzeUebernehmen,
   waehleAdapter,
   type ImportErgebnis,
   type KontoMatch,
@@ -17,17 +17,6 @@ import {
 } from "../../application/import";
 // Selbst-Registrierung des Finanzguru-Adapters auslösen.
 import "../import/finanzguruAdapter";
-import {
-  sqliteKategorieRepository,
-  sqliteZahlungskontoRepository,
-} from "../persistence/sqliteStammdatenRepositories";
-import { sqliteImportLaufRepository, sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
-import { kategorisierungsquellen } from "../../application/kategorisierungsquellen";
-import { sqliteKategoriefestlegungRepository } from "../persistence/sqliteKategoriefestlegungRepository";
-import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
-import { sqliteVertragserkennungRepository } from "../persistence/sqliteVertragZuordnungRepositories";
-import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
-import { sqliteMerkmalskonfigurationRepository } from "../persistence/sqliteMerkmalskonfigurationRepository";
 import { Button, Card, DataTable } from "./ds";
 import { useGeld } from "./einstellungenKontext";
 
@@ -83,7 +72,7 @@ export function ImportScreen() {
 
     let konten: Zahlungskonto[] = [];
     try {
-      konten = await sqliteZahlungskontoRepository.alle();
+      konten = [...(await stammdaten()).konten];
     } catch {
       konten = []; // reiner Browser-Modus ohne SQLite
     }
@@ -128,34 +117,13 @@ export function ImportScreen() {
           ? { quelleKey: m.quelleKey, kontoId: z.kontoId }
           : { quelleKey: m.quelleKey, neu: { bezeichnung: z.bezeichnung, typ: z.typ, iban: z.iban } };
       });
-      // Die Kategorisierungs-Kette braucht Verträge, Modell und Merkmalskonfiguration.
-      // Einmal vor dem Lauf geladen, nicht je Zeile: der Bestand ändert sich währenddessen
-      // nicht, und ein Import über tausende Zeilen soll nicht tausendmal dasselbe holen.
-      const kategorisierung = await kategorisierungsquellen({
-        kategorieRepo: sqliteKategorieRepository,
-        festlegungRepo: sqliteKategoriefestlegungRepository,
-        vertragRepo: sqliteVertragRepository,
-        erkennungRepo: sqliteVertragserkennungRepository,
-        klassifikatorRepo: sqliteKlassifikatorRepository,
-        merkmalRepo: sqliteMerkmalskonfigurationRepository,
+      const r = await importUebernehmen({
+        quelle: ergebnis.quelle,
+        dateiname: dateiname ?? undefined,
+        zeitpunkt: new Date().toISOString(),
+        rohUmsaetze: ergebnis.umsaetze,
+        konten,
       });
-      const r = await umsaetzeUebernehmen(
-        {
-          quelle: ergebnis.quelle,
-          dateiname: dateiname ?? undefined,
-          zeitpunkt: new Date().toISOString(),
-          rohUmsaetze: ergebnis.umsaetze,
-          konten,
-        },
-        {
-          kontoRepo: sqliteZahlungskontoRepository,
-          kategorieRepo: sqliteKategorieRepository,
-          umsatzRepo: sqliteUmsatzRepository,
-          laufRepo: sqliteImportLaufRepository,
-          id: () => crypto.randomUUID(),
-          kategorisierung,
-        },
-      );
       setUErgebnis(r);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));

@@ -10,24 +10,8 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Bankzugang, TanHerausforderung } from "../../application/fints/abrufPort";
-import { abrufAusfuehren, type AbrufBefund } from "../../application/fints/abrufAusfuehren";
-import { kategorisierungsquellen } from "../../application/kategorisierungsquellen";
-import { fintsAbruf } from "../fints";
-import {
-  sqliteBankzugangRepository,
-  sqliteKontozuordnungRepository,
-} from "../persistence/sqliteBankzugangRepositories";
-import { sqliteImportLaufRepository, sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
-import { sqliteKategoriefestlegungRepository } from "../persistence/sqliteKategoriefestlegungRepository";
-import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
-import { sqliteMerkmalskonfigurationRepository } from "../persistence/sqliteMerkmalskonfigurationRepository";
-import {
-  sqliteKategorieRepository,
-  sqliteZahlungskontoRepository,
-} from "../persistence/sqliteStammdatenRepositories";
-import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
-import { sqliteVertragserkennungRepository } from "../persistence/sqliteVertragZuordnungRepositories";
+import type { AbrufBefund, Bankzugang, TanHerausforderung } from "../../application";
+import { bankAbrufen, bankzugaenge } from "../dienste";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, FormField } from "./ds";
 import { Modal } from "./Modal";
@@ -57,8 +41,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
   const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
 
   useEffect(() => {
-    sqliteBankzugangRepository
-      .alle()
+    bankzugaenge()
       .then((z) => {
         setZugaenge(z);
         setZugangId(z[0]?.id ?? "");
@@ -76,27 +59,13 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
     setBusy(true);
     setFehler(null);
     try {
-      const ergebnis = await abrufAusfuehren(zugang, pin, frageTan, {
-        adapter: fintsAbruf,
-        zugangRepo: sqliteBankzugangRepository,
-        zuordnungRepo: sqliteKontozuordnungRepository,
-        kontoRepo: sqliteZahlungskontoRepository,
-        kategorieRepo: sqliteKategorieRepository,
-        umsatzRepo: sqliteUmsatzRepository,
-        laufRepo: sqliteImportLaufRepository,
-        id: () => crypto.randomUUID(),
-        // Dieselbe Kette wie beim Dateiimport: Umbuchung → Festlegung → Vertrag → Modell.
-        kategorisierung: await kategorisierungsquellen({
-          kategorieRepo: sqliteKategorieRepository,
-          festlegungRepo: sqliteKategoriefestlegungRepository,
-          vertragRepo: sqliteVertragRepository,
-          erkennungRepo: sqliteVertragserkennungRepository,
-          klassifikatorRepo: sqliteKlassifikatorRepository,
-          merkmalRepo: sqliteMerkmalskonfigurationRepository,
-        }),
-        heute: heuteIso(),
-        rueckgriffTage: rueckgriff ? Number(rueckgriff) : undefined,
-      });
+      const ergebnis = await bankAbrufen(
+        zugang,
+        pin,
+        frageTan,
+        heuteIso(),
+        rueckgriff ? Number(rueckgriff) : undefined,
+      );
       setBefunde(ergebnis);
       setPin("");
       onFertig();

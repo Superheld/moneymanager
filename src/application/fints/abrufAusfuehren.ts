@@ -17,11 +17,32 @@
 //  3. **Der Saldo der Bank wird immer mitgeholt**, in einem eigenen try: er ist die
 //     zweite, unabhängige Aussage über das Konto und die einzige Möglichkeit zu merken,
 //     dass eine Buchung fehlt. Scheitert er, laufen die Umsätze trotzdem — und umgekehrt.
+//  4. **Alles wird SOFORT gebucht — auch die Verdachtsfälle.** Bis hierher landete alles
+//     in einer Warteliste am Konto und musste einzeln bestätigt werden; ein Schritt, der
+//     in der Praxis nur aus Klicken bestand: was die Bank meldet, IST passiert, daran
+//     gibt es nichts zu bestätigen. Seit 2026-08-19 blieben immerhin die Verdachtsfälle
+//     dort stehen — die Frage „war das schon einmal da?" ist die einzige, die man
+//     wirklich beantworten muss.
+//
+//     Seit 2026-08-20 steht sie am richtigen Ort: im Kontoauszug selbst. Beide Zeilen
+//     tragen dort die Markierung, mit Gründen, mit dem Weg zum Gegenstück und mit „kein
+//     Duplikat" für den Fall, dass der Finder danebenlag. Das ist mehr Zusammenhang, als
+//     eine Warteliste vor dem Saldo je hatte — und es macht die Warteliste überflüssig.
+//     Der Preis: eine mögliche Dublette zählt kurz im Saldo mit, bis du sie ansiehst.
+//     Der Rückgriff (Punkt 1) erzeugt genau solche Zeilen, deshalb ist die Markierung
+//     kein Nebenweg, sondern der Hauptweg.
 
-import type { ImportLaufRepository, KategorieRepository, UmsatzRepository, ZahlungskontoRepository } from "../ports";
+import type {
+  ImportLaufRepository, KategorieRepository, KontostandsankerRepository, LedgerPort,
+  UmsatzRepository, VertragserkennungRepository, VertragszuordnungRepository,
+  ZahlungskontoRepository,
+} from "../ports";
+import { zuordnungenAbgleichen } from "../vertragszuordnung";
 import type { Vorschlagskontext } from "../import/vorschlag";
 import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
+import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
+import { bankAnker } from "../../core";
 import type { Abrufadapter, Bankzugang, TanFrager } from "./abrufPort";
 import type { Kontozuordnung, KontozuordnungRepository } from "./bankzugangPort";
 import type { BankzugangRepository } from "./bankzugangPort";
@@ -54,6 +75,24 @@ export interface AbrufDeps {
   readonly kategorieRepo: KategorieRepository;
   readonly umsatzRepo: UmsatzRepository;
   readonly laufRepo: ImportLaufRepository;
+  /**
+   * Das Ledger — der Abruf bucht selbst. Bis 2026-08-19 legte er nur Entwürfe an, die
+   * eine Warteliste am Konto abnicken musste; siehe den Kopfkommentar unter Punkt 4.
+   */
+  readonly ledgerRepo: LedgerPort;
+  /** Die Kontostands-Anker — jeder Abruf legt einen dazu, sofern die Bank einen Saldo gibt. */
+  readonly ankerRepo: KontostandsankerRepository;
+  /**
+   * Erkennung und Zuordnung der Verträge — der Abruf gleicht am Ende ab.
+   *
+   * Ohne das hingen die frisch gebuchten Zeilen an keinem Vertrag, bis jemand zufällig
+   * einen Verträge-Screen öffnet. Seit der Abruf direkt verbucht, ist das der Normalfall
+   * — und bis dahin zählte jede Vertragsrate gegen ihr Budget (siehe
+   * `application/budgetsichten`). Optional, damit ältere Aufrufer nicht brechen; fehlt
+   * es, wird nur nicht abgeglichen.
+   */
+  readonly erkennungRepo?: VertragserkennungRepository;
+  readonly vertragszuordnungRepo?: VertragszuordnungRepository;
   readonly id: () => string;
   readonly kategorisierung?: Vorschlagskontext;
   /** Heute als ISO-Datum — von außen, damit der Ablauf prüfbar bleibt. */
@@ -143,12 +182,30 @@ export async function abrufAusfuehren(
 
     // Der Saldo in EIGENEM try: er ist die Kontrollzahl und darf weder an einem
     // Umsatzfehler scheitern noch einen verursachen. Banken, die HKSAL nicht anbieten,
-    // liefern schlicht null — dann bleibt der letzte bekannte Stand stehen.
+    // liefern schlicht null — dann kommt für diesen Tag eben kein Anker dazu.
     let saldo: Awaited<ReturnType<typeof sitzung.saldo>> = null;
     try {
       saldo = await sitzung.saldo(bankkonto);
     } catch {
       saldo = null;
+    }
+
+    /**
+     * Den gemeldeten Stand als ANKER festhalten — aufgehoben, nicht überschrieben.
+     *
+     * Jeder Abruf ist ein Messpunkt gegen eine unabhängige Quelle. Wer sie wegwirft, kann
+     * hinterher nur sagen „hier fehlen 600 Euro", nicht „zwischen dem 31.07. und dem
+     * 31.08." — und die zweite Auskunft ist die, mit der man etwas anfangen kann.
+     *
+     * Auch dann, wenn die Umsätze scheitern: der Saldo allein sagt bereits, ob etwas
+     * fehlt. Ohne Datum von der Bank gilt der Abruftag; das ist die Aussage, die sie
+     * gerade gemacht hat.
+     */
+    async function ankerFesthalten() {
+      if (!saldo) return;
+      await deps.ankerRepo.speichern(
+        bankAnker(z.zahlungskontoId, saldo.betrag, saldo.datum ?? deps.heute, new Date().toISOString()),
+      );
     }
 
     try {
@@ -174,12 +231,23 @@ export async function abrufAusfuehren(
         },
       );
 
-      await deps.zuordnungRepo.speichern({
-        ...z,
-        letzterAbrufBis: deps.heute,
-        bankSaldo: saldo?.betrag ?? z.bankSaldo,
-        bankSaldoDatum: saldo?.datum ?? z.bankSaldoDatum,
-      });
+      // Alles aus diesem Lauf direkt verbuchen. Ein Verdacht hält nichts mehr auf: er
+      // steht am Umsatz und wird im Auszug an BEIDEN Zeilen gezeigt (siehe Kopf, 4).
+      const frisch = (await deps.umsatzRepo.offene()).filter((u) => u.laufId === ergebnis.laufId);
+      if (frisch.length > 0) {
+        await umsaetzeVerbuchen(frisch, {
+          ledgerRepo: deps.ledgerRepo,
+          umsatzRepo: deps.umsatzRepo,
+          id: deps.id,
+          // Auch ohne Kategorievorschlag: was die Bank meldet, ist geflossen. Die
+          // Kategorie darf danach kommen — sie fehlt sonst als Grund, eine Tatsache
+          // nicht zu buchen.
+          auchOhneKategorie: true,
+        });
+      }
+
+      await ankerFesthalten();
+      await deps.zuordnungRepo.speichern({ ...z, letzterAbrufBis: deps.heute });
       befunde.push({
         zahlungskontoId: z.zahlungskontoId,
         bezeichnung,
@@ -191,12 +259,9 @@ export async function abrufAusfuehren(
         bankSaldoDatum: saldo?.datum,
       });
     } catch (e) {
-      // Auch im Fehlerfall wird ein geholter Saldo festgehalten: er sagt bereits, ob
-      // etwas fehlt, selbst wenn die Umsätze nicht kamen. `letzterAbrufBis` bleibt
-      // dagegen stehen — der Zeitraum wurde ja nicht geholt.
-      if (saldo) {
-        await deps.zuordnungRepo.speichern({ ...z, bankSaldo: saldo.betrag, bankSaldoDatum: saldo.datum });
-      }
+      // Auch im Fehlerfall wird ein geholter Saldo festgehalten (siehe `ankerFesthalten`).
+      // `letzterAbrufBis` bleibt dagegen stehen — der Zeitraum wurde ja nicht geholt.
+      await ankerFesthalten();
       befunde.push({
         zahlungskontoId: z.zahlungskontoId,
         bezeichnung,
@@ -207,6 +272,22 @@ export async function abrufAusfuehren(
         fehler: e instanceof Error ? e.message : String(e),
       });
     }
+  }
+
+  // Die frisch gebuchten Zeilen an ihre Verträge hängen. EIN Lauf über den Bestand,
+  // nicht einer je Zeile: der Abgleich ist idempotent und schreibt nur Deltas.
+  //
+  // Das gehört hierher und nicht in die Oberfläche. Ohne diesen Aufruf trüge eine
+  // abgerufene Vertragsrate keine Zuordnung, bis jemand einen Verträge-Screen öffnet —
+  // und zählte bis dahin gegen das Budget ihrer Kategorie, obwohl sie im Ausblick schon
+  // als Vertrag steht.
+  if (deps.erkennungRepo && deps.vertragszuordnungRepo) {
+    await zuordnungenAbgleichen({
+      ledger: deps.ledgerRepo,
+      umsatzRepo: deps.umsatzRepo,
+      erkennungRepo: deps.erkennungRepo,
+      zuordnungRepo: deps.vertragszuordnungRepo,
+    });
   }
 
   // Zum Schluss noch einmal: die Bank hat während der Aufträge womöglich neue Parameter

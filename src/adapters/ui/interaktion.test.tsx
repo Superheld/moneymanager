@@ -7,7 +7,7 @@
 // Use-Case-Aufrufe und die Fehlerbehandlung der Screens abgedeckt, nicht nur ihr Markup.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -66,7 +66,7 @@ describe("AppShell", () => {
     const nutzer = userEvent.setup();
     const gewechseltZu: string[] = [];
     rendere(
-      <AppShell current="historie" onNavigate={(id) => gewechseltZu.push(id)}>
+      <AppShell current="uebersicht" onNavigate={(id) => gewechseltZu.push(id)}>
         <div>Inhalt</div>
       </AppShell>,
     );
@@ -260,7 +260,7 @@ describe("Budget anlegen", () => {
     await grunddaten();
     const heute = new Date().toISOString().slice(0, 10);
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", rahmen: 20000, periode: "monatlich",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 20000, art: "monatlich", start: "2026-01-01",
     });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: heute, betrag: -5000, kontoId: "k1",
@@ -276,7 +276,7 @@ describe("Budget anlegen", () => {
     await grunddaten();
     const heute = new Date().toISOString().slice(0, 10);
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", rahmen: 100000, periode: "monatlich",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 100000, art: "monatlich", start: "2026-01-01",
     });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: heute, betrag: -5000, kontoId: "k1",
@@ -474,6 +474,57 @@ describe("Buchungsdetails", () => {
     });
   });
 
+  // Gesperrt ist die HERKUNFT, nicht das Konto. Vorher hing die Sperre am Konto: alles
+  // auf einem Konto mit Bankverbindung war tabu, also auch die Zeilen, die per Datei
+  // dorthin kamen — die kennt die Bank aber gar nicht, und ohne Löschweg blieb eine
+  // falsch importierte Zeile für immer im Saldo stehen.
+  it("sperrt das Löschen für Zeilen aus dem Bankabruf", async () => {
+    await zweiKonten();
+    await sqliteImportLaufRepository.speichern({
+      id: "l-bank", quelle: "fints", zeitpunkt: "2026-08-12T09:00:00.000Z",
+      eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -949, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Von der Bank",
+    });
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l-bank", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
+      waehrung: "EUR", gegenpartei: "Bank AG", verwendungszweck: "Abbuchung",
+      rohHash: "h-bank", nativeId: "fints-1", status: "verbucht", istbuchungId: "i1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+    expect(await screen.findByText(/Von der Bank geliefert/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^löschen$/i })).not.toBeInTheDocument();
+  });
+
+  it("lässt eine Zeile aus einem Dateiimport löschen, auch auf einem Bankkonto", async () => {
+    await zweiKonten();
+    await sqliteImportLaufRepository.speichern({
+      id: "l-datei", quelle: "finanzguru", zeitpunkt: "2026-08-12T09:00:00.000Z",
+      dateiname: "umsaetze.csv", eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -949, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Aus der Datei",
+    });
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l-datei", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
+      waehrung: "EUR", gegenpartei: "[anonymisiert]", verwendungszweck: "Einkauf",
+      rohHash: "h-datei", nativeId: "fg-1", status: "verbucht", istbuchungId: "i1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await detailOeffnen(nutzer, "Girokonto");
+    const loeschen = await screen.findAllByRole("button", { name: /^löschen$/i });
+    await nutzer.click(loeschen[loeschen.length - 1]);
+    await waitFor(async () => expect(await sqliteLedgerRepository.alle()).toHaveLength(0));
+  });
+
   it("sagt es, wenn eine Buchung gar keinen Import-Kontext hat", async () => {
     await zweiKonten();
     await sqliteLedgerRepository.speichern({
@@ -524,6 +575,144 @@ describe("Buchungsdetails", () => {
 
 // S-7 — Buchung splitten. Der Weg vom Dialog bis in die Datenbank UND zurück: die
 // Aufteilung muss die Rundreise durch echtes SQLite überstehen, sonst nützt sie nichts.
+describe("Konto-Register — Suche und Spalten", () => {
+  const heute = "2026-08-12";
+
+  async function dreiBuchungen() {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Sparkonto", typ: "Tagesgeld", inhaberIds: [], saldo: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -1250, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Baecker",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: -8900, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Tankstelle",
+    });
+    // Ein Umbuchungs-Bein: traegt ein Gegenkonto und keine Kategorie.
+    await sqliteLedgerRepository.speichern({
+      id: "i3", datum: heute, betrag: -50000, kontoId: "k1", gegenkontoId: "k2",
+      transferId: "t1", charakter: "Umschichtung", quelle: "manuell", notiz: "Uebertrag",
+    });
+  }
+
+  it("findet eine Buchung ueber ihren Betrag", async () => {
+    await dreiBuchungen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findAllByText("Girokonto");
+    await screen.findByText("Baecker");
+
+    // „89" allein ist kein Betrag, „89,00" schon — beide Wege muessen die Zeile finden.
+    await nutzer.type(screen.getByPlaceholderText(/Suche/i), "89,00");
+    await waitFor(() => expect(screen.queryByText("Baecker")).not.toBeInTheDocument());
+    expect(screen.getByText("Tankstelle")).toBeInTheDocument();
+  });
+
+  it("zeigt die Umbuchungs-Pille in der Kategorie-Spalte", async () => {
+    await dreiBuchungen();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findAllByText("Girokonto");
+    await screen.findByText("Uebertrag");
+
+    // Die Pille ersetzt die Kategorie: sie steht in derselben Zelle, in der bei den
+    // anderen Zeilen „Lebensmittel" steht.
+    const zeile = screen.getByText("Uebertrag").closest("tr")!;
+    const zellen = [...zeile.querySelectorAll("td")].map((z) => z.textContent ?? "");
+    const katSpalte = zellen.findIndex((z) => z.includes("Umbuchung"));
+    expect(katSpalte).toBeGreaterThan(0);
+    // Und bei einer normalen Zeile steht an derselben Stelle die Kategorie.
+    const andere = screen.getByText("Baecker").closest("tr")!;
+    expect([...andere.querySelectorAll("td")][katSpalte].textContent).toContain("Lebensmittel");
+  });
+
+  it("zeigt in der Kontenliste weder Anfangsbestand noch Abgleich", async () => {
+    await dreiBuchungen();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findAllByText("Girokonto");
+    // Beide Spalten sind 2026-08-19 aus der Liste geflogen: der Anfangsbestand steht im
+    // geoeffneten Konto, der Abgleich ebenfalls — in der Liste waren sie Ballast.
+    const kopfzeilen = [...document.querySelectorAll("th")].map((z) => z.textContent ?? "");
+    expect(kopfzeilen.some((z) => /Anfangsbestand/i.test(z))).toBe(false);
+    expect(kopfzeilen.some((z) => /Abgleich/i.test(z))).toBe(false);
+  });
+});
+
+describe("Massenbearbeitung im Register", () => {
+  const heute = "2026-08-12";
+
+  async function zweiOhneKategorie() {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -1250, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", notiz: "Baecker",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: -8900, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", notiz: "Tankstelle",
+    });
+  }
+
+  /** Schaltet den Auswahlmodus ein und markiert alle gefilterten Zeilen. */
+  async function alleMarkieren(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click(screen.getByLabelText(/mehrere bearbeiten/i));
+    await nutzer.click(await screen.findByLabelText(/alle gefilterten/i));
+  }
+
+  it("zeigt die Kästchen erst, wenn man den Modus einschaltet", async () => {
+    await zweiOhneKategorie();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findByText("Baecker");
+
+    // Eine dauerhafte Kästchenspalte macht aus einer Leseansicht ein Formular.
+    expect(screen.queryByLabelText(/diese buchung wählen/i)).toBeNull();
+    await nutzer.click(screen.getByLabelText(/mehrere bearbeiten/i));
+    expect(screen.getAllByLabelText(/diese buchung wählen/i)).toHaveLength(2);
+  });
+
+  it("setzt die Kategorie auf allen markierten Buchungen", async () => {
+    await zweiOhneKategorie();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findByText("Baecker");
+    await alleMarkieren(nutzer);
+
+    await nutzer.click(screen.getByRole("button", { name: /auswahl bearbeiten/i }));
+    const dialog = within(await screen.findByRole("dialog"));
+    // Ohne Haken passiert nichts — leer heisst hier „nicht anfassen".
+    await nutzer.click(dialog.getByLabelText(/kategorie setzen/i));
+    await nutzer.click(dialog.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel/ }));
+    await nutzer.click(dialog.getByRole("button", { name: /anwenden/i }));
+
+    await waitFor(async () => {
+      const alle = await sqliteLedgerRepository.alle();
+      expect(alle.every((b) => b.kategorieId === "kat1")).toBe(true);
+      // Die Bezeichnungen bleiben stehen: danach wurde nicht gefragt.
+      expect(alle.map((b) => b.notiz).sort()).toEqual(["Baecker", "Tankstelle"]);
+    });
+  });
+
+  it("löscht die markierten Buchungen nach Rückfrage", async () => {
+    await zweiOhneKategorie();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findByText("Baecker");
+    await alleMarkieren(nutzer);
+
+    await nutzer.click(screen.getByRole("button", { name: /auswahl bearbeiten/i }));
+    const dialog = within(await screen.findByRole("dialog"));
+    await nutzer.click(dialog.getByRole("button", { name: /^löschen$/i }));
+    // Zweite Frage, mit der Zahl darin — Löschen ist der einzige Weg ohne Rückweg.
+    await nutzer.click(await dialog.findByRole("button", { name: /2 löschen/i }));
+
+    await waitFor(async () => expect(await sqliteLedgerRepository.alle()).toHaveLength(0));
+  });
+});
+
 describe("Buchung splitten", () => {
   const heute = "2026-08-12";
 

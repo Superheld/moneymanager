@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import {
   anbieterSchluessel,
   minorZuMajor,
-  passtZu,
+  erkennungProbieren,
   type Erkennungsmerkmal,
   type Merkmalsart,
   type Waehrung,
@@ -24,16 +24,14 @@ import {
   type Vertragserkennung,
   type Zahlungskonto,
   type Zahlungsspur,
-} from "../../core";
-import { zahlungsspuren } from "../../application/zahlungsspuren";
-import { zuordnungenAbgleichen } from "../../application/vertragszuordnung";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
-import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
+} from "../../application";
 import {
-  sqliteVertragserkennungRepository as erkennungRepo,
-  vertragsAbgleichDeps,
-} from "../persistence/sqliteVertragZuordnungRepositories";
+  spuren as spurenLaden,
+  stammdaten,
+  vertragserkennungen,
+  vertragserkennungSpeichern,
+  vertragszuordnungenAbgleichen,
+} from "../dienste";
 import { Button, FormField, Pill } from "./ds";
 import { Modal } from "./Modal";
 import { useGeld, fehlerNachricht } from "./einstellungenKontext";
@@ -103,9 +101,9 @@ export function VertragErkennungModal({
   useEffect(() => {
     (async () => {
       const [alleRegeln, sp, ks] = await Promise.all([
-        erkennungRepo.alle(),
-        zahlungsspuren(ledgerRepo, umsatzRepo),
-        kontoRepo.alle(),
+        vertragserkennungen(),
+        spurenLaden(),
+        stammdaten().then((d) => [...d.konten]),
       ]);
       setF(ausRegel(alleRegeln.find((e) => e.vertragId === vertrag.id), geld.waehrung));
       setSpuren(sp);
@@ -138,21 +136,41 @@ export function VertragErkennungModal({
    * Was die Regel im aktuellen Zustand trifft — live, ohne Speichern. Neueste zuerst:
    * beim Nachsteuern interessiert der jüngste Stand, nicht der Anfang der Reihe.
    */
-  const treffer = useMemo(() => {
-    if (!regel || regel.merkmale.length === 0) return [];
-    return spuren
-      .filter((s) => passtZu(regel, s))
-      .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0));
-  }, [regel, spuren]);
+  const probe = useMemo(() => erkennungProbieren(regel, spuren), [regel, spuren]);
+  const treffer = probe.treffer;
+
+  /**
+   * Wo die Kette abreisst.
+   *
+   * Ohne diese Aufschlüsselung war die Vorschau bei null Treffern stumm: das Muster
+   * konnte passen und trotzdem verschwand alles an der Betragsspanne, die
+   * `standardErkennung` beim Anlegen mitgibt. Wer dann `*ard*` tippte und nichts sah,
+   * kam zu dem Schluss, dass Platzhalter nicht funktionieren. Sie tun es — nur ein
+   * Filter dahinter räumte auf.
+   */
+  const diagnose = probe.diagnose;
+
+  /** Die Stufe, die am meisten weggenommen hat — nur wenn es überhaupt eine gibt. */
+  const engstelle = useMemo(() => {
+    if (!diagnose) return null;
+    const stufen = [
+      { schluessel: "merkmale", vorher: diagnose.grundmenge, nachher: diagnose.nachMerkmalen },
+      { schluessel: "betrag", vorher: diagnose.nachMerkmalen, nachher: diagnose.nachBetrag },
+      { schluessel: "zeitraum", vorher: diagnose.nachBetrag, nachher: diagnose.nachZeitraum },
+      { schluessel: "konto", vorher: diagnose.nachZeitraum, nachher: diagnose.nachKonto },
+    ].filter((x) => x.vorher > x.nachher);
+    if (stufen.length === 0) return null;
+    return stufen.reduce((a, b) => (b.vorher - b.nachher > a.vorher - a.nachher ? b : a));
+  }, [diagnose]);
 
   async function speichern() {
     if (!regel) return;
     setFehler(null);
     try {
-      await erkennungRepo.speichern(regel);
+      await vertragserkennungSpeichern(regel);
       // Die geänderte Regel wirkt erst, wenn neu gerechnet wird — und sie kann Zuordnungen
       // auch WEGnehmen (engere Spanne, Stichtag). Beides macht der Abgleich.
-      await zuordnungenAbgleichen(vertragsAbgleichDeps);
+      await vertragszuordnungenAbgleichen();
       await onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
@@ -254,6 +272,16 @@ export function VertragErkennungModal({
                 {t("vertraege.regel.trefferHinweis")}
               </span>
             </div>
+
+            {/* Wo die Kette abreisst — nur zeigen, wenn wirklich etwas verlorengeht. */}
+            {engstelle && (
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 8 }}>
+                {t(`vertraege.regel.engstelle.${engstelle.schluessel}`, {
+                  weg: engstelle.vorher - engstelle.nachher,
+                  uebrig: engstelle.nachher,
+                })}
+              </div>
+            )}
 
             {treffer.slice(0, VORSCHAU_ZEILEN).map((s) => (
               <div key={s.id} style={{ display: "flex", gap: "var(--sp-3)", padding: "4px 0", alignItems: "baseline", fontSize: 13, borderBottom: "1px solid var(--line-soft)" }}>

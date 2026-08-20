@@ -17,19 +17,25 @@ import {
   herkunftVon,
   MERKMALSHERKUENFTE,
   STANDARD_KONFIGURATION,
+  klassifizieren,
+  merkmalsbefund,
   trainieren,
   type Beispiel,
+  type Cent,
+  type Klassifikation,
   type Merkmalsherkunft,
   type Merkmalskonfiguration,
+  type VerworfenesWort,
 } from "../core";
 import type {
   GespeicherterAusschluss,
+  KlassifikatorRepository,
   LedgerPort,
   MerkmalskonfigurationRepository,
   UmsatzRepository,
 } from "./ports";
 import { MESSBAR_AB } from "./klassifikatorTraining";
-import { materialBefund } from "./trainingsmaterial";
+import { materialBefund, trainingsmaterial, type Merkmalswert } from "./trainingsmaterial";
 import { zahlungsspuren } from "./zahlungsspuren";
 
 /** Die Konfiguration samt der Angabe, woher jeder Ausschluss stammt. */
@@ -175,4 +181,54 @@ export async function wirkungMessen(deps: {
   // Am meisten kostend zuerst: was am stärksten fehlt, ist am wichtigsten.
   wirkungen.sort((a, b) => a.abstand - b.abstand);
   return { basis, wirkungen };
+}
+
+/**
+ * Was das Modell an EINER Buchung sieht: welche Merkmale entstehen, welche Wörter
+ * verworfen wurden, was das Modell daraus vorschlagen würde.
+ *
+ * Es ist die Antwort auf „warum diese Kategorie?", und sie muss aus denselben Quellen
+ * kommen wie der Vorschlag selbst — Konfiguration, Trainingsmaterial und Modell. Stand
+ * das im Screen, hätte eine geänderte Ausschlussliste dort anders gewirkt als beim
+ * Import.
+ */
+export interface Merkmalsansicht {
+  /** Die Merkmale dieser Buchung, mit ihrer Statistik über den Bestand. */
+  readonly verwendet: readonly { merkmal: string; wert?: Merkmalswert }[];
+  readonly verworfen: readonly VerworfenesWort[];
+  /** Wörter, die auf der Ausschlussliste stehen — nur die lassen sich zurückholen. */
+  readonly ausgeschlossen: ReadonlySet<string>;
+  readonly vorschlag: Klassifikation | null;
+  readonly hatModell: boolean;
+}
+
+export async function merkmalsansicht(
+  deps: {
+    readonly ledger: LedgerPort;
+    readonly umsatzRepo: UmsatzRepository;
+    readonly klassifikatorRepo: KlassifikatorRepository;
+    readonly merkmalRepo: MerkmalskonfigurationRepository;
+  },
+  quelle: { gegenpartei: string; verwendungszweck: string; glaeubigerId?: string; betrag: Cent },
+): Promise<Merkmalsansicht> {
+  const konf = await konfigurationLaden(deps.merkmalRepo);
+  const befund = merkmalsbefund(quelle, konf.konfiguration);
+
+  // Statistik und Modell parallel — beide lesen nur.
+  const [material, modellstand] = await Promise.all([
+    trainingsmaterial(deps.ledger, deps.umsatzRepo, konf.konfiguration),
+    deps.klassifikatorRepo.laden(),
+  ]);
+
+  // Die Bestenliste deckt nur die häufigsten Merkmale ab; für ein seltenes Merkmal dieser
+  // Buchung gibt es dort keinen Eintrag — dann steht „kommt nur hier vor".
+  const statistik = new Map(material.vokabular.haeufigste.map((m) => [m.merkmal, m]));
+
+  return {
+    verwendet: befund.merkmale.map((merkmal) => ({ merkmal, wert: statistik.get(merkmal) })),
+    verworfen: befund.verworfen,
+    ausgeschlossen: new Set(konf.ausschluesse.map((a) => a.wort)),
+    vorschlag: modellstand ? klassifizieren(modellstand.modell, befund.merkmale) : null,
+    hatModell: !!modellstand,
+  };
 }

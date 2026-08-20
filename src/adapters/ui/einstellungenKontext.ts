@@ -7,13 +7,16 @@
 // komplett neu — und weil praktisch jeder Screen hier importiert, hing der ganze UI-Baum
 // mit drin. Die Trennung ist der Grund, nicht Ordnungsliebe.
 //
-// Die reine Geld-Logik bleibt im Kern (geld.ts); `useGeld` bindet sie nur an die eine
-// Haushaltswährung, damit die Screens nicht überall Währung + Locale durchreichen müssen.
+// Die reine Geld-Logik bleibt im Kern (geld.ts) und kommt über die Anwendungsschicht
+// herein — Formatieren und Parsen sind Vokabular, keine Entscheidung. `useGeld` bindet
+// sie nur an die eine Haushaltswährung, damit die Screens nicht überall Währung + Locale
+// durchreichen müssen.
 
 import { createContext, useContext, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FachlicherFehler,
+  STANDARD_EINSTELLUNGEN,
   geldFormatieren,
   geldFormatierenMitSymbol,
   parseBetrag,
@@ -21,8 +24,8 @@ import {
   type Cent,
   type Charakter,
   type FormatOptionen,
-} from "../../core";
-import { STANDARD_EINSTELLUNGEN, type Haushaltseinstellungen } from "../../application/einstellungen";
+  type Haushaltseinstellungen,
+} from "../../application";
 
 export interface ContextWert {
   einstellungen: Haushaltseinstellungen;

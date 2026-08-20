@@ -23,7 +23,8 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../test/harness";
 import { BudgetsScreen } from "./BudgetsScreen";
 import { EinstellungenScreen } from "./EinstellungenScreen";
-import { HistorieScreen } from "./HistorieScreen";
+import { AnalyseScreen } from "./AnalyseScreen";
+import { UebersichtScreen } from "./UebersichtScreen";
 import { ImportScreen } from "./ImportScreen";
 import { InventarScreen } from "./InventarScreen";
 import { KontenScreen } from "./KontenScreen";
@@ -103,7 +104,7 @@ describe("BudgetsScreen", () => {
   it("zeigt ein Budget mit Kategorie und Rahmen", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", rahmen: 40000, periode: "monatlich",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000, art: "monatlich", start: "2026-01-01",
     });
     rendere(<BudgetsScreen />);
     expect(await screen.findByText(/Lebensmittel/)).toBeInTheDocument();
@@ -113,7 +114,7 @@ describe("BudgetsScreen", () => {
   it("rechnet gebuchte Aufwände als Verbrauch gegen das Budget", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", rahmen: 40000, periode: "monatlich",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000, art: "monatlich", start: "2026-01-01",
     });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: new Date().toISOString().slice(0, 10), betrag: -15000,
@@ -157,9 +158,63 @@ describe("InventarScreen", () => {
   });
 });
 
-describe("HistorieScreen", () => {
+describe("UebersichtScreen", () => {
+  /** Der Monatsschlüssel `zurueck` Monate vor heute. */
+  function monat(zurueck: number): string {
+    const n = new Date();
+    const d = new Date(n.getFullYear(), n.getMonth() - zurueck, 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+
   it("rendert im Leerzustand", async () => {
-    rendere(<HistorieScreen />);
+    rendere(<UebersichtScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  it("zeigt die Budgets des laufenden Monats mit ihrem Rest", async () => {
+    await grunddaten();
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000,
+      art: "monatlich", start: `${monat(6)}-01`,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: `${monat(0)}-05`, betrag: -15000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+
+    rendere(<UebersichtScreen />);
+    expect(await screen.findByText(/Lebensmittel/)).toBeInTheDocument();
+    // 400,00 Rahmen − 150,00 verbraucht = 250,00 Rest.
+    await waitFor(() => expect(document.body.textContent).toMatch(/250,00/));
+  });
+
+  it("schaltet auf einen vergangenen Monat um und rechnet dessen Verbrauch", async () => {
+    await grunddaten();
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000,
+      art: "monatlich", start: `${monat(6)}-01`,
+    });
+    // Nur im VORmonat gebucht — im laufenden ist der Rahmen unangetastet.
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: `${monat(1)}-05`, betrag: -30000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<UebersichtScreen />);
+    await screen.findByText(/Lebensmittel/);
+    // Laufender Monat: nichts verbraucht, voller Rahmen.
+    await waitFor(() => expect(document.body.textContent).toMatch(/400,00/));
+
+    await nutzer.selectOptions(screen.getByLabelText("Monat"), monat(1));
+    // Vormonat: 400,00 − 300,00 = 100,00.
+    await waitFor(() => expect(document.body.textContent).toMatch(/100,00/));
+  });
+});
+
+describe("AnalyseScreen", () => {
+  it("rendert im Leerzustand", async () => {
+    rendere(<AnalyseScreen />);
     await waitFor(() => expect(document.body.textContent).toBeTruthy());
   });
 
@@ -169,7 +224,7 @@ describe("HistorieScreen", () => {
       id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
       charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
     });
-    rendere(<HistorieScreen />);
+    rendere(<AnalyseScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
   });
 
@@ -195,7 +250,7 @@ describe("HistorieScreen", () => {
     });
 
     const nutzer = userEvent.setup();
-    rendere(<HistorieScreen />);
+    rendere(<AnalyseScreen />);
 
     // Ø über die 12 Monate des Zeitraums: 400 € / 12 = 33,33 €.
     await waitFor(() => expect(document.body.textContent).toMatch(/33,33/));
@@ -221,7 +276,7 @@ describe("HistorieScreen", () => {
       charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Sondermüll",
     });
     const nutzer = userEvent.setup();
-    rendere(<HistorieScreen />);
+    rendere(<AnalyseScreen />);
 
     // Kategorie aufklappen …
     await nutzer.click(await screen.findByText(/Lebensmittel/));
@@ -246,7 +301,7 @@ describe("HistorieScreen", () => {
       charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
     });
     const nutzer = userEvent.setup();
-    rendere(<HistorieScreen />);
+    rendere(<AnalyseScreen />);
 
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
     await nutzer.selectOptions(await screen.findByLabelText("Gliederung"), "gruppe");
@@ -277,6 +332,29 @@ describe("ReviewScreen", () => {
     await waitFor(() =>
       expect(document.body.textContent).toMatch(/Buchhandlung Beispiel|Fachbuch|25,99/),
     );
+  });
+
+  it("legt eine Zeile weg, die nie übernommen wird", async () => {
+    // Der gemeldete Fall: neun Zeilen aus einem Dateiimport standen dauerhaft in der
+    // Inbox — ohne Kategorie, ohne Weg nach vorn und ohne Weg hinaus.
+    await grunddaten();
+    await sqliteUmsatzRepository.speichern({
+      id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
+      betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
+      verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<ReviewScreen />);
+    await screen.findByText("Buchhandlung Beispiel");
+
+    await nutzer.click(screen.getByLabelText(/diese zeile weglegen/i));
+
+    await waitFor(() => expect(screen.queryByText("Buchhandlung Beispiel")).not.toBeInTheDocument());
+    // Weggelegt heisst nicht gelöscht: die Zeile bleibt und zählt bei der
+    // Dublettenprüfung weiter mit.
+    const alle = await sqliteUmsatzRepository.alle();
+    expect(alle).toHaveLength(1);
+    expect(alle[0].status).toBe("verworfen");
   });
 
   it("zeigt bei jedem Vorschlag, woher er kommt", async () => {

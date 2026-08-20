@@ -37,7 +37,7 @@ export interface RohUmsatz {
   readonly mandatsreferenz?: string;
   /**
    * SEPA-End-to-End-Referenz. Wäre der saubere Schlüssel für alles; Finanzguru liefert
-   * die Spalte `E-Ref` aber in 0 von 5279 Zeilen gefüllt. Von der Bank nehmen wir sie
+   * die Spalte `E-Ref` aber am echten Bestand durchweg leer. Von der Bank nehmen wir sie
    * trotzdem mit: sobald zwei Bankquellen aufeinandertreffen, trägt sie.
    */
   readonly e2eReferenz?: string;

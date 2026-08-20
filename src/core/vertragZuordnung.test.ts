@@ -7,6 +7,7 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  erkennungsDiagnose,
   passtZu,
   standardErkennung,
   vertragFuer,
@@ -241,5 +242,49 @@ describe("zuordnungAbgleich", () => {
     const { setzen, entfernen } = zuordnungAbgleich([netcup], spuren, bestand);
     expect(setzen).toEqual([]);
     expect(entfernen).toEqual([]);
+  });
+});
+
+describe("erkennungsDiagnose", () => {
+  // Der gemeldete Fall: `*ard*` trifft, aber die Betragsspanne aus `standardErkennung`
+  // räumt alles weg — und die Vorschau zeigte nur „0 Treffer", ohne zu sagen, woran es lag.
+  const spuren: Zahlungsspur[] = [
+    { id: "1", datum: "2026-03-01", betrag: -5508, gegenpartei: "Suedwestrundfunk ARD ZDF", charakter: "Aufwand", kontoId: "giro" },
+    { id: "2", datum: "2026-06-01", betrag: -5508, gegenpartei: "Suedwestrundfunk ARD ZDF", charakter: "Aufwand", kontoId: "giro" },
+    { id: "3", datum: "2026-06-05", betrag: -2000, gegenpartei: "[anonymisiert]", charakter: "Aufwand", kontoId: "giro" },
+    { id: "4", datum: "2026-06-06", betrag: -9000, gegenpartei: "Tagesgeldkonto", charakter: "Umschichtung", kontoId: "giro" },
+  ];
+
+  it("zeigt, dass der Stern in der Mitte trifft", () => {
+    const d = erkennungsDiagnose(
+      { vertragId: "v", merkmale: [{ art: "empfaenger", muster: "*ard*" }] },
+      spuren,
+    );
+    // Die Umschichtung zählt gar nicht erst mit — sie kann nie eine Vertragszahlung sein.
+    expect(d.grundmenge).toBe(3);
+    expect(d.nachMerkmalen).toBe(2);
+    expect(d.nachKonto).toBe(2);
+  });
+
+  it("benennt die Betragsspanne als die Stufe, die alles wegnimmt", () => {
+    const d = erkennungsDiagnose(
+      {
+        vertragId: "v",
+        merkmale: [{ art: "empfaenger", muster: "*ard*" }],
+        betragVon: 10000,
+        betragBis: 20000,
+      },
+      spuren,
+    );
+    expect(d.nachMerkmalen).toBe(2);
+    expect(d.nachBetrag).toBe(0);
+  });
+
+  it("ein Muster ohne Sterne trifft nur den ganzen Namen", () => {
+    const d = erkennungsDiagnose(
+      { vertragId: "v", merkmale: [{ art: "empfaenger", muster: "ard" }] },
+      spuren,
+    );
+    expect(d.nachMerkmalen).toBe(0);
   });
 });

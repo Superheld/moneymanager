@@ -17,18 +17,16 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KONTOTYPEN, type Kontotyp, type Person, type Zahlungskonto } from "../../core";
-import { kontoAnlegen } from "../../application/stammdatenAnlegen";
+import { KONTOTYPEN, type Bankkonto, type Bankzugang, type Kontotyp, type Person, type TanHerausforderung, type Zahlungskonto } from "../../application";
 import { typAusName } from "../../application/import";
-import type { Bankkonto, Bankzugang, TanHerausforderung } from "../../application/fints/abrufPort";
 import { fintsAbruf, fintsEinsatzbereit } from "../fints";
 import type { Bankeintrag } from "../fints/bankenliste";
 import {
-  sqliteBankzugangRepository,
-  sqliteKontozuordnungRepository,
-} from "../persistence/sqliteBankzugangRepositories";
-import { sqliteUmsatzRepository } from "../persistence/sqliteImportRepositories";
-import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
+  bankzugangSpeichern,
+  kontoAnlegen,
+  kontozuordnungSpeichern,
+  umsaetze,
+} from "../dienste";
 import { BankSuche } from "./BankSuche";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, FormField, Pill } from "./ds";
@@ -93,7 +91,7 @@ export function KontoAnlegenModal({
     setBusy(true);
     setFehler(null);
     try {
-      await kontoAnlegen(kontoRepo, {
+      await kontoAnlegen({
         bezeichnung,
         typ,
         iban,
@@ -119,7 +117,7 @@ export function KontoAnlegenModal({
     try {
       const sitzung = await fintsAbruf.anmelden(zugang, pin, frageTan);
       const gespeichert = { ...zugang, bankparameter: sitzung.bankparameter() };
-      await sqliteBankzugangRepository.speichern(gespeichert);
+      await bankzugangSpeichern(gespeichert);
       setZugang(gespeichert);
 
       const stand: Record<string, number> = {};
@@ -160,7 +158,7 @@ export function KontoAnlegenModal({
     setBusy(true);
     setFehler(null);
     try {
-      const bekannteBuchungen = await sqliteUmsatzRepository.alle().catch(() => []);
+      const bekannteBuchungen = await umsaetze().catch(() => []);
       for (const k of bankkonten ?? []) {
         const wahl = wahlen[k.schluessel];
         if (!wahl || wahl.ziel === "ignorieren") continue;
@@ -169,7 +167,7 @@ export function KontoAnlegenModal({
           wahl.ziel === "vorhanden" && wahl.kontoId
             ? wahl.kontoId
             : (
-                await kontoAnlegen(kontoRepo, {
+                await kontoAnlegen({
                   bezeichnung: k.bezeichnung,
                   typ: typAusName(k.bezeichnung),
                   iban: k.iban,
@@ -195,7 +193,7 @@ export function KontoAnlegenModal({
           .sort()
           .pop();
 
-        await sqliteKontozuordnungRepository.speichern({
+        await kontozuordnungSpeichern({
           zugangId: zugang.id,
           schluessel: k.schluessel,
           zahlungskontoId: kontoId,

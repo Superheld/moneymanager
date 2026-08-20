@@ -45,12 +45,18 @@ function ist(over: Partial<IstBuchung> = {}): IstBuchung {
 const budget = (over: Partial<Budget> = {}): Budget => ({
   id: "b1",
   kategorieId: "lebenshaltung",
-  rahmen: euroZuCent(430),
-  periode: "monatlich",
+  kontoId: "giro",
+  betragProMonat: euroZuCent(430),
+  art: "monatlich",
+  start: "2026-01-01",
   ...over,
 });
 
-const basis = { regeln: [], budgets: [], ist: [], kategorien: KATEGORIEN, heute: "2026-08-16" };
+const basis = {
+  regeln: [], budgets: [], ist: [], kategorien: KATEGORIEN,
+  // Pflichtfeld: „keine Vertragszuordnung bekannt" ist eine Aussage und muss dastehen.
+  vertragsBuchungen: new Set<string>(), heute: "2026-08-16",
+};
 const zeile = (a: ReturnType<typeof monatsAusblick>, id: AusblickZeileId) =>
   a.zeilen.find((z) => z.id === id);
 
@@ -101,13 +107,28 @@ describe("monatsAusblick — Plan-Spalte aus den Verträgen", () => {
     expect(zeile(a, "einnahmen")!.plan).toBe(0);
   });
 
-  it("glättet ein Jahresbudget auf den Monat", () => {
+  it("rechnet ein aufbauendes Budget mit derselben Monatsrate ein wie ein monatliches", () => {
+    // Auch was sich aufbaut, kostet jeden Monat seine Rate — es gibt sie nur am
+    // Monatsende nicht zurück. Für die Aufrechnung „was bleibt" ist das dasselbe.
     const a = monatsAusblick({
       ...basis,
-      budgets: [budget({ rahmen: euroZuCent(4800), periode: "jaehrlich" })],
+      budgets: [budget({ art: "aufbauend", betragProMonat: euroZuCent(400) })],
       monatAb: "2026-09-01",
     });
     expect(zeile(a, "budgets")!.plan).toBe(euroZuCent(-400));
+  });
+
+  it("zieht ein eingebettetes Budget vom Dach ab, statt beide voll zu zählen", () => {
+    const a = monatsAusblick({
+      ...basis,
+      budgets: [
+        budget({ id: "dach", kategorieId: "freizeit", betragProMonat: euroZuCent(200) }),
+        budget({ id: "kind", kategorieId: "sport", art: "aufbauend", betragProMonat: euroZuCent(80) }),
+      ],
+      monatAb: "2026-09-01",
+    });
+    // 200 insgesamt, nicht 280 — das Kind liegt IM Dach.
+    expect(zeile(a, "budgets")!.plan).toBe(euroZuCent(-200));
   });
 
   it("nimmt eine quartalsweise Rate nur im Fälligkeitsmonat auf", () => {
@@ -185,7 +206,7 @@ describe("monatsAusblick — Ist-Spalte des laufenden Monats", () => {
     const a = monatsAusblick({
       ...basis,
       regeln: [regel({ id: "r-verein", bezeichnung: "Verein", betrag: euroZuCent(-180), kategorieId: "sport", startdatum: "2026-01-01" })],
-      budgets: [budget({ id: "b-frei", kategorieId: "freizeit", rahmen: euroZuCent(160) })],
+      budgets: [budget({ id: "b-frei", kategorieId: "freizeit", betragProMonat: euroZuCent(160) })],
       ist: [ist({ id: "v", datum: "2026-08-01", betrag: euroZuCent(-180), kategorieId: "sport" })],
       monatAb: "2026-08-01",
     });
@@ -203,6 +224,85 @@ describe("monatsAusblick — Ist-Spalte des laufenden Monats", () => {
     const e = zeile(a, "einnahmen")!;
     expect([e.plan, e.ist]).toEqual([0, euroZuCent(300)]);
     expect(e.posten[e.posten.length - 1].status).toBe("ohnePlan");
+  });
+
+  it("führt Sonstiges als einzelne Buchungen auf, nicht als eine Summe", () => {
+    // Aufgeklappt soll dort stehen, WAS das war — eine Zeile „ohne Budget und Vertrag:
+    // −72,40" beantwortet die Frage nicht, wegen der man aufklappt.
+    const a = monatsAusblick({
+      ...basis,
+      ist: [
+        ist({ id: "s1", datum: "2026-08-11", betrag: euroZuCent(-20), kategorieId: "wohnen", notiz: "Schlüsseldienst" }),
+        ist({ id: "s2", datum: "2026-08-03", betrag: euroZuCent(-52.4), kategorieId: undefined }),
+      ],
+      monatAb: "2026-08-01",
+    });
+    const s = zeile(a, "sonstiges")!;
+    expect(s.ist).toBe(euroZuCent(-72.4));
+    // Chronologisch, mit Datum und Herkunft an jedem Posten.
+    expect(s.posten.map((p) => [p.datum, p.ist, p.istId])).toEqual([
+      ["2026-08-03", euroZuCent(-52.4), "s2"],
+      ["2026-08-11", euroZuCent(-20), "s1"],
+    ]);
+    expect(s.posten[1].bezeichnung).toBe("Schlüsseldienst");
+    expect(s.posten[1].kategorieId).toBe("wohnen");
+  });
+
+  it("teilt eine geteilte Buchung zwischen Budget und Sonstigem auf", () => {
+    const a = monatsAusblick({
+      ...basis,
+      budgets: [budget()],
+      ist: [
+        ist({
+          id: "geteilt", datum: "2026-08-07", betrag: euroZuCent(-100), kategorieId: undefined,
+          aufteilungen: [
+            { kategorieId: "lebensmittel", betrag: euroZuCent(-60) },
+            { kategorieId: "wohnen", betrag: euroZuCent(-40) },
+          ],
+        }),
+      ],
+      monatAb: "2026-08-01",
+    });
+    expect(zeile(a, "budgets")!.ist).toBe(euroZuCent(-60));
+    const s = zeile(a, "sonstiges")!;
+    expect(s.ist).toBe(euroZuCent(-40));
+    expect(s.posten).toHaveLength(1);
+    expect(s.posten[0].kategorieId).toBe("wohnen");
+  });
+
+  it("führt auch die ungeplanten Umschichtungen einzeln auf", () => {
+    const a = monatsAusblick({
+      ...basis,
+      ist: [
+        ist({ id: "u1", datum: "2026-08-09", betrag: euroZuCent(-250), charakter: "Umschichtung", notiz: "Depot" }),
+        ist({ id: "u2", datum: "2026-08-20", betrag: euroZuCent(-100), charakter: "Umschichtung" }),
+      ],
+      monatAb: "2026-08-01",
+    });
+    const u = zeile(a, "umschichtung")!;
+    expect(u.ist).toBe(euroZuCent(-350));
+    expect(u.posten.map((p) => p.istId)).toEqual(["u1", "u2"]);
+  });
+
+  it("schiebt eine Vertragszahlung auf einer Budgetkategorie nach Sonstiges statt sie zu verlieren", () => {
+    // Der heikle Fall an der Vertragsregel: die Buchung hängt unter einer Budgetkategorie,
+    // wird vom Budget aber nicht getragen. Nähme „Sonstiges" (wie früher) alles, dessen
+    // KATEGORIE ausserhalb der Budgets liegt, fiele sie durch beide Zeilen — und die
+    // Ist-Spalte summierte nicht mehr auf das, was vom Konto ging.
+    const a = monatsAusblick({
+      ...basis,
+      budgets: [budget()],
+      ist: [
+        ist({ id: "rate", datum: "2026-08-02", betrag: euroZuCent(-425), kategorieId: "lebensmittel" }),
+        ist({ id: "frei", datum: "2026-08-06", betrag: euroZuCent(-30), kategorieId: "lebensmittel" }),
+      ],
+      vertragsBuchungen: new Set(["rate"]),
+      monatAb: "2026-08-01",
+    });
+    expect(zeile(a, "budgets")!.ist).toBe(euroZuCent(-30));
+    const s = zeile(a, "sonstiges")!;
+    expect(s.posten.map((p) => p.istId)).toEqual(["rate"]);
+    expect(a.restIst).toBe(euroZuCent(-455)); // beide Buchungen, jede genau einmal
   });
 
   it("die Ist-Spalte summiert auf alles Gebuchte des Monats", () => {

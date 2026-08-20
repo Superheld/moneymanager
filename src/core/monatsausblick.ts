@@ -28,10 +28,10 @@
 
 import { addMonate, parseIso, toIso } from "./datum";
 import type { Cent } from "./geld";
-import { geglaetteterMonatsabfluss, budgetVerbrauch, type Budget } from "./budget";
+import { geglaetteterMonatsabfluss, budgetBuchungen, type Budget, type BudgetSicht } from "./budget";
 import { istInterneUmbuchung } from "./historie";
 import { monatsRuecklageGesamt, type Inventargegenstand } from "./inventar";
-import { kategorieUnterbaum, type Kategorie } from "./kategorie";
+import type { Kategorie } from "./kategorie";
 import { findeIstZuPlan, kategorieAnteile, type IstBuchung } from "./istbuchung";
 import { projiziereRegel, type Planbuchung } from "./projektion";
 import type { Zahlungsregel } from "./zahlungsregel";
@@ -65,6 +65,13 @@ export interface AusblickPosten {
   /** Tatsächlich gebucht/verbraucht, vorzeichenbehaftet. `null` = im Plan-Blick ohne Ist. */
   readonly ist: Cent | null;
   readonly status: PostenStatus;
+  /**
+   * Die Ist-Buchung hinter diesem Posten, falls es genau eine gibt. Der Kern kennt
+   * weder Empfänger noch Kategoriename — die Oberfläche löst beides über diese ID auf.
+   */
+  readonly istId?: string;
+  /** Kategorie des Postens (bei geteilten Buchungen die des jeweiligen Anteils). */
+  readonly kategorieId?: string;
 }
 
 export interface AusblickZeile {
@@ -111,6 +118,13 @@ export interface MonatsAusblickEingabe {
   readonly inventar?: readonly Inventargegenstand[];
   readonly ist: readonly IstBuchung[];
   readonly kategorien: readonly Kategorie[];
+  /**
+   * IDs der Buchungen, die zu einem Vertrag gehören — sie zählen nicht gegen ein Budget.
+   * Pflichtfeld, damit die Aufrechnung hier dieselbe Regel benutzt wie die Budgetliste;
+   * die beiden zeigten sonst für dasselbe Budget verschiedene Zahlen — kein Verbrauch
+   * hier, ein überschrittener Rahmen dort, auf derselben Übersicht.
+   */
+  readonly vertragsBuchungen: ReadonlySet<string>;
   /** Erster Tag des Monats, „YYYY-MM-01". */
   readonly monatAb: string;
   /** Heutiges Datum (ISO) — trennt Plan-only von Plan+Ist. */
@@ -144,45 +158,52 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
   // Was noch keiner Zeile gehört — die Basis für Budgets und Sonstiges.
   const offenesIst = istImMonat.filter((b) => !verbraucht.has(b.id));
 
-  const budgetZeile = budgetsZeile(e.budgets, offenesIst, e.kategorien, von, bis, zukunft);
-  const budgetKategorien = new Set(
-    e.budgets.flatMap((b) => [...kategorieUnterbaum(e.kategorien, b.kategorieId)]),
-  );
+  const sicht: BudgetSicht = {
+    buchungen: offenesIst,
+    kategorien: e.kategorien,
+    budgets: e.budgets,
+    vertragsBuchungen: e.vertragsBuchungen,
+  };
+  const { zeile: budgetZeile, getragen } = budgetsZeile(sicht, von, bis, zukunft);
 
-  // Sammelposten: gebucht, aber von keiner Plan-Zeile erfasst. Ohne sie summierte die
-  // Ist-Spalte nicht auf das, was tatsächlich vom Konto ging.
-  const weitereEinnahmen = summe(
-    offenesIst.filter((b) => b.charakter === "Ertrag").map((b) => b.betrag),
-  );
-  const sonstigeAusgaben = summe(
-    offenesIst
-      .filter((b) => b.charakter === "Aufwand")
-      .flatMap((b) => kategorieAnteile(b))
-      .filter((a) => !a.kategorieId || !budgetKategorien.has(a.kategorieId))
-      .map((a) => a.betrag),
-  );
-  const weitereUmschichtung = summe(
-    offenesIst.filter((b) => b.charakter === "Umschichtung").map((b) => b.betrag),
-  );
+  // Was gebucht, aber von keiner Plan-Zeile erfasst ist, kommt EINZELN dazu — je Buchung
+  // ein Posten. Früher stand hier eine Summe pro Zeile („weitere Einnahmen: 342,10"),
+  // und damit war die Zeile zwar richtig, aber unbeantwortbar: welche Buchungen das
+  // waren, stand nirgends, und genau danach fragt man beim Aufklappen.
+  const weitereEinnahmen = offenesIst.filter((b) => b.charakter === "Ertrag").map(buchungsPosten);
+  const weitereUmschichtung = offenesIst
+    .filter((b) => b.charakter === "Umschichtung")
+    .map(buchungsPosten);
+  // Bei den Ausgaben zählt der ANTEIL, nicht die Buchung: eine geteilte Buchung kann
+  // zur Hälfte auf ein Budget laufen und zur anderen hier landen. Gefragt wird, was die
+  // Budgets TATSÄCHLICH getragen haben — nicht, ob die Kategorie unter einem Budget
+  // hängt. Der Unterschied ist die Vertragszahlung auf einer Budgetkategorie: sie hängt
+  // dort, wird aber nicht getragen und gehört deshalb hierher.
+  const sonstigeAusgaben = offenesIst
+    .filter((b) => b.charakter === "Aufwand")
+    .flatMap((b) =>
+      kategorieAnteile(b)
+        .map((a, i) => ({ b, a, i }))
+        .filter(({ b: buchung, i }) => !getragen.has(`${buchung.id}#${i}`)),
+    )
+    .map(({ b, a, i }) => anteilsPosten(b, a, i));
 
   const zeilen: AusblickZeile[] = [
-    mitSammelposten(einnahmen, weitereEinnahmen, "einnahmen.weitere", zukunft),
+    mitEinzelposten(einnahmen, weitereEinnahmen),
     vertraege,
     budgetZeile,
   ];
   const ruecklagen = ruecklagenZeile(e.inventar ?? [], zukunft);
   if (ruecklagen) zeilen.push(ruecklagen);
-  if (umschichtung.plan !== 0 || weitereUmschichtung !== 0) {
-    zeilen.push(mitSammelposten(umschichtung, weitereUmschichtung, "umschichtung.weitere", zukunft));
+  if (umschichtung.plan !== 0 || weitereUmschichtung.length > 0) {
+    zeilen.push(mitEinzelposten(umschichtung, weitereUmschichtung));
   }
-  if (sonstigeAusgaben !== 0) {
+  if (sonstigeAusgaben.length > 0) {
     zeilen.push({
       id: "sonstiges",
       plan: 0,
-      ist: sonstigeAusgaben,
-      posten: [
-        { schluessel: "sonstiges.summe", bezeichnung: "sonstiges", plan: 0, ist: sonstigeAusgaben, status: "ohnePlan" },
-      ],
+      ist: summe(sonstigeAusgaben.map((p) => p.ist ?? 0)),
+      posten: nachDatum(sonstigeAusgaben),
     });
   }
 
@@ -292,24 +313,30 @@ function zeileAusRegeln(
  * auch bei jährlicher Periode. Sonst stünde ein Zwölftel Plan gegen einen Jahresverbrauch.
  */
 function budgetsZeile(
-  budgets: readonly Budget[],
-  offenesIst: readonly IstBuchung[],
-  kategorien: readonly Kategorie[],
+  sicht: BudgetSicht,
   von: string,
   bis: string,
   zukunft: boolean,
-): AusblickZeile {
+): { zeile: AusblickZeile; getragen: Set<string> } {
+  const { budgets, kategorien } = sicht;
+  // Welche ANTEILE ein Budget trägt, wird hier festgehalten: „Sonstiges" nimmt genau den
+  // Rest. Ohne diese Menge verschwände eine Vertragszahlung auf einer Budgetkategorie
+  // aus beiden Zeilen — das Budget nimmt sie nicht (Vertrag), Sonstiges nimmt sie nicht
+  // (Budgetkategorie) —, und die Ist-Spalte summierte nicht mehr auf das Gebuchte.
+  const getragen = new Set<string>();
   const posten = budgets
     .map((b): AusblickPosten => {
+      const beitraege = budgetBuchungen(sicht, b, von, bis);
+      for (const p of beitraege) getragen.add(`${p.buchung.id}#${p.anteil}`);
       // `|| 0` fängt die negative Null: `-0` formatiert sich als „−0,00" und liest sich
       // wie eine Ausgabe, die es nicht gab.
-      const roh = budgetVerbrauch([...offenesIst], kategorien, b.kategorieId, von, bis);
+      const roh = beitraege.reduce((sum, p) => sum + p.betrag, 0);
       const verbrauch = zukunft ? null : -roh || 0;
       return {
         schluessel: b.id,
         // Der Name der Kategorie steht nicht im Budget — die Oberfläche löst ihn auf.
         bezeichnung: b.kategorieId,
-        plan: geglaetteterMonatsabfluss(b),
+        plan: geglaetteterMonatsabfluss(b, budgets, kategorien),
         ist: verbrauch,
         status: verbrauch == null || verbrauch === 0 ? "offen" : "gebucht",
       };
@@ -317,10 +344,13 @@ function budgetsZeile(
     .sort((a, b) => a.plan - b.plan);
 
   return {
-    id: "budgets",
-    plan: summe(posten.map((p) => p.plan)),
-    ist: zukunft ? null : summe(posten.map((p) => p.ist ?? 0)),
-    posten,
+    zeile: {
+      id: "budgets",
+      plan: summe(posten.map((p) => p.plan)),
+      ist: zukunft ? null : summe(posten.map((p) => p.ist ?? 0)),
+      posten,
+    },
+    getragen,
   };
 }
 
@@ -341,23 +371,44 @@ function ruecklagenZeile(
   return { id: "ruecklagen", plan, ist: zukunft ? null : plan, posten: [] };
 }
 
-/** Hängt einen Sammelposten für nicht geplantes Ist an eine Zeile, falls es welches gibt. */
-function mitSammelposten(
-  zeile: AusblickZeile,
-  betrag: Cent,
-  schluessel: string,
-  zukunft: boolean,
-): AusblickZeile {
-  if (zukunft || betrag === 0) return zeile;
+/** Hängt die ungeplanten Buchungen einer Zeile als eigene Posten an. */
+function mitEinzelposten(zeile: AusblickZeile, weitere: readonly AusblickPosten[]): AusblickZeile {
+  if (weitere.length === 0) return zeile;
   return {
     ...zeile,
-    ist: (zeile.ist ?? 0) + betrag,
-    posten: [
-      ...zeile.posten,
-      { schluessel, bezeichnung: schluessel, plan: 0, ist: betrag, status: "ohnePlan" },
-    ],
+    ist: (zeile.ist ?? 0) + summe(weitere.map((p) => p.ist ?? 0)),
+    posten: nachDatum([...zeile.posten, ...weitere]),
   };
 }
+
+/** Eine ungeplante Buchung als Posten — die Oberfläche beschriftet sie über `istId`. */
+function buchungsPosten(b: IstBuchung): AusblickPosten {
+  return {
+    schluessel: b.id,
+    bezeichnung: b.notiz ?? "",
+    datum: b.datum,
+    plan: 0,
+    ist: b.betrag,
+    status: "ohnePlan",
+    istId: b.id,
+    kategorieId: b.kategorieId,
+  };
+}
+
+/** Ein Anteil einer (womöglich geteilten) Buchung als Posten. */
+function anteilsPosten(b: IstBuchung, anteil: { kategorieId?: string; betrag: Cent }, i: number): AusblickPosten {
+  return {
+    ...buchungsPosten(b),
+    // Der Index hält den Schlüssel eindeutig, wenn eine Buchung mehrere Anteile
+    // ausserhalb der Budgets hat.
+    schluessel: `${b.id}#${i}`,
+    ist: anteil.betrag,
+    kategorieId: anteil.kategorieId,
+  };
+}
+
+const nachDatum = (posten: readonly AusblickPosten[]): AusblickPosten[] =>
+  [...posten].sort((a, b) => (a.datum ?? "").localeCompare(b.datum ?? ""));
 
 const summe = (werte: readonly Cent[]): Cent => werte.reduce((s, w) => s + w, 0);
 

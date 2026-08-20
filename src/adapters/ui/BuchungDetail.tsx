@@ -23,7 +23,8 @@
 // gehört. Sie lädt ihre Bezugsdaten (Konten, Kategorien, Umsätze, Import-Läufe, Regeln)
 // deshalb SELBST, statt sie sich von jedem Aufrufer durchreichen zu lassen — ein Dialog
 // wird selten geöffnet, und die Alternative wäre, jeden Screen mit Daten zu belasten, die
-// nur dieser Dialog braucht.
+// nur dieser Dialog braucht. „Selbst" heisst seit 2026-08-19: über `buchungsdetail()`
+// aus der Anwendungsschicht, nicht über acht Repositories von Hand.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -38,65 +39,55 @@ import {
   type Vertragszuordnung,
   type Zahlungskonto,
   type Zahlungsregel,
-} from "../../core";
-import { buchungBearbeiten, buchungErfassen, buchungLoeschen } from "../../application/buchungErfassen";
+} from "../../application";
 import {
   alsDuplikat,
   passtAlsGegenbein,
-  ordneZu,
-  umsaetzeVerbuchen,
   verwerfen,
   zuruecksetzen,
-  type Bewertung,
   type ImportLauf,
   type Umsatz,
 } from "../../application/import";
-import { umbuchungLoeschen } from "../../application/umbuchungErfassen";
-import { buchungSplitten, offenerRest, splitAufheben } from "../../application/buchungSplitten";
 import {
+  entwurfVerdacht,
+  type Dublettenfreigabe,
+  type Dublettenverdacht,
+} from "../../application";
+import { offenerRest } from "../../application/buchungSplitten";
+import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../application/umbuchungAusBuchung";
+import {
+  buchungBearbeiten,
+  buchungErfassen,
+  buchungLoeschen,
   buchungenPaaren,
+  buchungSplitten,
+  buchungsdetail,
+  dublettenFreigabeAufheben,
+  dublettenFreigeben,
+  festlegungSpeichern,
   gegenbeinErzeugen,
   paarungLoesen,
-  paarungsKandidaten,
+  splitAufheben,
+  umbuchungLoeschen,
   umbuchungsBeinBearbeiten,
-  MAX_VORSCHLAG_TAGE,
-} from "../../application/umbuchungAusBuchung";
-import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
-import { sqliteVertragRepository as vertragRepo } from "../persistence/sqliteVertragRepository";
-import {
-  sqliteVertragszuordnungRepository as zuordnungRepo,
-  vertragsAbgleichDeps as abgleichDeps,
-} from "../persistence/sqliteVertragZuordnungRepositories";
-import {
-  zuordnungenAbgleichen,
-  zuordnungVonHand,
-  zuordnungZuruecksetzen,
-} from "../../application/vertragszuordnung";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import {
-  sqliteUmsatzRepository as umsatzRepo,
-  sqliteImportLaufRepository as importLaufRepo,
-} from "../persistence/sqliteImportRepositories";
+  umsaetzeBuchen,
+  umsatzSpeichern,
+  vertragszuordnungenAbgleichen,
+  vertragZuordnenVonHand,
+  vertragZuordnungZuruecksetzen,
+} from "../dienste";
 import { Button, FormField, Pill } from "./ds";
+import { IconButton } from "./IconButton";
 import { formularAusBuchung, VertragModal } from "./VertragModal";
 import { CategoryPicker } from "./CategoryPicker";
 import { MerkmaleBlock } from "./MerkmaleBlock";
-import { festlegungSetzen } from "../../application/kategoriefestlegungen";
-import { sqliteKategoriefestlegungRepository as festlegungRepo } from "../persistence/sqliteKategoriefestlegungRepository";
 import { Modal } from "./Modal";
-import { useGeld, useCharakterLabel, fehlerNachricht } from "./einstellungenKontext";
-
-const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
+import { useGeld, fehlerNachricht } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
 function ddmm(iso: string): string {
   const [, m, d] = iso.split("-");
   return `${d}.${m}.`;
-}
-function betragFarbe(z: { betrag: number; charakter: Charakter }): string {
-  if (z.betrag >= 0) return "var(--ok-deep)";
-  return z.charakter === "Umschichtung" ? "var(--accent-deep)" : "var(--ink)";
 }
 
 /** Ein Label/Wert-Paar im Herkunfts-Abschnitt. Lange Werte (Hash, Zweck) dürfen umbrechen. */
@@ -199,9 +190,13 @@ function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
   );
 }
 
+/** Stabile Leerwerte — als Literal im useState-Aufruf wäre jeder Render ein neues Objekt. */
+const LEERE_KARTE: ReadonlyMap<string, Dublettenverdacht> = new Map();
+const LEERE_MENGE: ReadonlySet<string> = new Set();
+
 /** Was die Dublettenprüfung zu dieser Buchung sagt — samt der Zeile, die sie meint. */
 export interface Dublettenbefund {
-  readonly bewertung: Bewertung;
+  readonly verdacht: Dublettenverdacht;
   readonly zwilling: Umsatz;
 }
 
@@ -214,14 +209,27 @@ export interface Dublettenbefund {
  * später aus einer anderen Quelle dazukam, würde nie nachträglich angeschrieben.
  *
  * Er entscheidet nichts. Die Gründe stehen im Klartext da, das Gegenstück ist einen Klick
- * entfernt — beides zusammen ist die Auskunft, die man braucht, um selbst zu entscheiden,
- * welche der beiden Zeilen bleibt.
+ * entfernt, und „ist kein Duplikat" ist die dritte Antwort neben „eine davon löschen" und
+ * „stehen lassen": der Finder rechnet mit Punkten und liegt manchmal daneben. Ohne diesen
+ * Knopf stünde die Mahnung nach jedem Neuladen wieder da, denn geprüft wird bei jedem
+ * Hinsehen neu.
  */
-function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund; onZwillingOeffnen?: () => void }) {
+function DublettenBlock({
+  befund,
+  imLedger,
+  onZwillingOeffnen,
+  onKeinDuplikat,
+}: {
+  befund: Dublettenbefund;
+  /** Gebuchte Zeile (beide stehen im Saldo) oder noch ein Entwurf? Der Hinweis unterscheidet sich. */
+  imLedger: boolean;
+  onZwillingOeffnen?: () => void;
+  onKeinDuplikat?: () => void | Promise<void>;
+}) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const { bewertung, zwilling } = befund;
-  const sicher = bewertung.urteil === "identisch";
+  const { verdacht, zwilling } = befund;
+  const sicher = verdacht.urteil === "identisch";
 
   return (
     <div style={{ marginBottom: "var(--sp-4)", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--warn-wash, var(--surface-2))", border: "1px solid var(--warn, var(--line))" }}>
@@ -230,20 +238,48 @@ function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund
         <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
           {ddmm(zwilling.buchungstag)} · {zwilling.gegenpartei || t("konten.neue.ohneGegenpartei")}
         </span>
-        <span className="num" style={{ fontWeight: 700 }}>{geld.formatMitSymbol(zwilling.betrag, { mitVorzeichen: true })}</span>
+        <span className="num" style={{ fontWeight: 700, color: geldFarbe(zwilling.betrag) }}>{geld.formatMitSymbol(zwilling.betrag, { mitVorzeichen: true })}</span>
         <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
           {t(`konten.neue.status.${zwilling.status}`)}
         </span>
         {onZwillingOeffnen && (
-          <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={onZwillingOeffnen}>
-            {t("konten.dublette.oeffnen")}
-          </button>
+          <IconButton icon="oeffnen" label={t("konten.dublette.oeffnen")} onClick={onZwillingOeffnen} style={{ marginLeft: "auto" }} />
         )}
       </div>
       <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-        {t("konten.neue.dubletteHinweis", { gruende: bewertung.gruende.join(", ") })}
+        {t("konten.neue.dubletteHinweis", { gruende: verdacht.gruende.join(", ") })}
       </div>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>{t("konten.dublette.hinweis")}</div>
+      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+        {t(imLedger ? "konten.dublette.hinweisLedger" : "konten.dublette.hinweis")}
+      </div>
+      {onKeinDuplikat && (
+        <button
+          className="linkbtn"
+          style={{ marginTop: 6, padding: 0 }}
+          onClick={() => void onKeinDuplikat()}
+        >
+          {t("konten.dublette.keinDuplikat")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Die Gegenprobe: hier wurde einmal entschieden, dass es KEIN Duplikat ist.
+ *
+ * Ohne diese Zeile wäre die Entscheidung unsichtbar und unumkehrbar — die Markierung
+ * bliebe weg, und niemand wüsste warum. Wer sich vertan hat, hätte zwei Zeilen im Saldo
+ * und nichts, was darauf zeigt.
+ */
+function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void> }) {
+  const { t } = useTranslation();
+  return (
+    <div className="muted" style={{ marginBottom: "var(--sp-4)", fontSize: "var(--fs-xs)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+      <span>{t("konten.dublette.freigegeben")}</span>
+      <button className="linkbtn" style={{ padding: 0 }} onClick={() => void onAufheben()}>
+        {t("konten.dublette.freigabeAufheben")}
+      </button>
     </div>
   );
 }
@@ -279,10 +315,9 @@ function DublettenBlock({ befund, onZwillingOeffnen }: { befund: Dublettenbefund
  *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
  *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onClose, onSaved, onDelete, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, loeschenGesperrt, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; loeschenGesperrt?: boolean; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const charakterLabel = useCharakterLabel();
   const istEntwurf = !!entwurf;
   const istNeu = !buchung && !entwurf;
   const [kontoId, setKontoId] = useState(buchung?.kontoId ?? entwurf?.zahlungskontoId ?? vorgabe.kontoId);
@@ -291,6 +326,26 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
   const [betrag, setBetrag] = useState(startBetrag == null ? "" : String(minorZuMajor(Math.abs(startBetrag), geld.waehrung)));
   const [charakter, setCharakter] = useState<Charakter>(buchung?.charakter ?? entwurf?.vorschlag?.charakter ?? "Aufwand");
   const [kategorieId, setKategorieId] = useState(buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
+
+  /**
+   * Der Charakter wird nicht mehr GEWÄHLT, sondern folgt der Kategorie.
+   *
+   * Bis 2026-08-19 stand hier ein drittes Auswahlfeld („Aufwand / Ertrag / Sparen &
+   * Vorsorge"). Es fragte nach etwas, das die Kategorie längst weiss — jede Kategorie
+   * trägt ihren `defaultCharakter` —, und eine Antwort, die von der Kategorie abweicht,
+   * hat keinen Ort, an dem sie richtig wäre: die Auswertungen gruppieren nach Charakter
+   * UND nach Kategorie, und ein Widerspruch zwischen beiden erzeugt Zahlen, die sich
+   * gegenseitig widersprechen.
+   *
+   * `Umschichtung` bleibt ausgenommen: die kommt nicht aus der Kategorie, sondern aus
+   * der Umbuchung (zwei Beine, eigener Weg im Dialog darunter).
+   */
+  function kategorieSetzen(id: string) {
+    setKategorieId(id);
+    if (charakter === "Umschichtung") return;
+    const gewaehlt = kategorien.find((k) => k.id === id);
+    if (gewaehlt) setCharakter(gewaehlt.defaultCharakter);
+  }
   const [notiz, setNotiz] = useState(buchung?.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -394,56 +449,50 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         const auswahl = partnerEntwurf
           ? [entwurfMitEntscheidung(entwurf), { ...partnerEntwurf, vorschlag: { charakter: "Umschichtung" as const, quelle: "umbuchung" as const } }]
           : [entwurfMitEntscheidung(entwurf)];
-        await umsaetzeVerbuchen(auswahl, {
-          ledgerRepo,
-          umsatzRepo,
-          id: () => crypto.randomUUID(),
-        });
+        await umsaetzeBuchen(auswahl);
 
         // Alles Weitere hängt an der Ist-Buchung, die es vorher nicht gab: Paarung mit
         // einer schon gebuchten Zeile, ein erzeugtes Gegenbein, die Vertragszuordnung.
         // Deshalb wird die frisch entstandene Buchung hier nachgeschlagen — im Dialog
         // entschieden, nach dem Verbuchen angewandt.
-        const frisch = (await umsatzRepo.alle()).find((x) => x.id === entwurf.id);
+        const stand = await buchungsdetail();
+        const frisch = stand.umsaetze.find((x) => x.id === entwurf.id);
         const neueBuchung = frisch?.istbuchungId
-          ? (await ledgerRepo.alle()).find((b) => b.id === frisch.istbuchungId)
+          ? stand.buchungen.find((b) => b.id === frisch.istbuchungId)
           : undefined;
 
         if (neueBuchung && istUmschichtung) {
           if (gegenGewaehlt.startsWith("b:")) {
             const gegen = alleBuchungen.find((b) => b.id === gegenGewaehlt.slice(2));
-            if (gegen) await buchungenPaaren(ledgerRepo, neueBuchung, gegen);
+            if (gegen) await buchungenPaaren(neueBuchung, gegen);
           } else if (gegenGewaehlt === "__neu" && neuKontoGewaehlt) {
-            await gegenbeinErzeugen(ledgerRepo, neueBuchung, neuKontoGewaehlt);
+            await gegenbeinErzeugen(neueBuchung, neuKontoGewaehlt);
           }
         }
 
-        // Frisch verbuchte Zahlungen den Verträgen zuordnen — derselbe Schritt wie in der
-        // Inbox. Er gehört nicht in den Verbuchen-Use-Case: der schreibt Fakten, die
-        // Zuordnung ist eine Interpretation darüber.
-        await zuordnungenAbgleichen(abgleichDeps);
-        // ZULETZT die Handentscheidung: sie überstimmt, was der Abgleich gerechnet hat.
+        // `umsaetzeBuchen` hat die Zuordnungen schon abgeglichen. ZULETZT die
+        // Handentscheidung: sie überstimmt, was der Abgleich gerechnet hat.
         if (neueBuchung && vertragWahl && !istUmschichtung) {
-          await zuordnungVonHand(zuordnungRepo, neueBuchung.id, vertragWahl === "__keiner" ? null : vertragWahl);
+          await vertragZuordnenVonHand(neueBuchung.id, vertragWahl === "__keiner" ? null : vertragWahl);
         }
       } else if (!buchung) {
-        await buchungErfassen(ledgerRepo, { kontoId, datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
+        await buchungErfassen({ kontoId, datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
       } else if (gepaart) {
-        await umbuchungsBeinBearbeiten(ledgerRepo, buchung, { datum, notiz });
+        await umbuchungsBeinBearbeiten(buchung, { datum, notiz });
       } else {
-        await buchungBearbeiten(ledgerRepo, buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz, kontoId });
+        await buchungBearbeiten(buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz, kontoId });
         // Zieht das Konto um, zieht der Umsatz mit: sein `zahlungskontoId` ist das
         // Ergebnis des Konto-Matches beim Import, also eine Vermutung. Wer die Buchung
         // vor sich hat, korrigiert damit genau diese Vermutung — bliebe der Umsatz
         // stehen, zeigte die Herkunft weiter aufs alte Konto und die Dublettenprüfung
         // verglichen gegen den falschen Bestand.
         if (umsatz && kontoId !== umsatz.zahlungskontoId) {
-          await umsatzRepo.speichern({ ...umsatz, zahlungskontoId: kontoId });
+          await umsatzSpeichern({ ...umsatz, zahlungskontoId: kontoId });
         }
         // Die Festlegung entsteht NACH der Buchung: schlüge das Speichern fehl, stünde
         // sonst eine Regel für eine Änderung, die es nicht gibt.
         if (immer && kategorieId && musterAngebot) {
-          await festlegungSetzen(festlegungRepo, musterAngebot, kategorieId);
+          await festlegungSpeichern(musterAngebot, kategorieId);
         }
       }
       onSaved();
@@ -466,7 +515,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
     setFehler(null);
     setBusy(true);
     try {
-      await umsatzRepo.speichern(dublette ? alsDuplikat(entwurf) : verwerfen(entwurf));
+      await umsatzSpeichern(dublette ? alsDuplikat(entwurf) : verwerfen(entwurf));
       onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
@@ -509,8 +558,11 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
               {t(dublette ? "konten.neue.schonGebucht" : "konten.entwurf.verwerfen")}
             </button>
           )}
-          {buchung && (
-            <button className="linkbtn" style={{ marginLeft: "auto", color: "var(--danger, #c0392b)" }} onClick={() => onDelete()}>{t("konten.loeschen")}</button>
+          {buchung && !loeschenGesperrt && (
+            <button className="linkbtn" style={{ marginLeft: "auto", color: "var(--warn-deep)" }} onClick={() => onDelete()}>{t("konten.loeschen")}</button>
+          )}
+          {buchung && loeschenGesperrt && (
+            <span className="muted" style={{ marginLeft: "auto", fontSize: "var(--fs-xs)" }}>{t("konten.detail.loeschenOnline")}</span>
           )}
           {fehler && <span className="err">{fehler}</span>}
         </>
@@ -529,7 +581,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
               {ddmm(buchung?.datum ?? entwurf!.buchungstag)} · {kontoName.get(kontoId) ?? "?"}
             </span>
           </span>
-          <span className="num" style={{ fontSize: "var(--fs-h2, var(--fs-h3))", fontWeight: "var(--fw-black)", color: betragFarbe({ betrag: buchung?.betrag ?? entwurf!.betrag, charakter }) }}>
+          <span className="num" style={{ fontSize: "var(--fs-h2, var(--fs-h3))", fontWeight: "var(--fw-black)", color: geldFarbe(buchung?.betrag ?? entwurf!.betrag) }}>
             {geld.formatMitSymbol(buchung?.betrag ?? entwurf!.betrag, { mitVorzeichen: true })}
           </span>
         </div>
@@ -538,7 +590,16 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
       {/* Ganz oben, noch vor den Feldern: die Frage, ob es diese Buchung schon gibt. Sie
           geht allem voraus — an einer Zeile, die gar nicht bleiben soll, lohnt sich keine
           Korrektur. */}
-      {dublette && <DublettenBlock befund={dublette} onZwillingOeffnen={onZwillingOeffnen} />}
+      {dublette ? (
+        <DublettenBlock
+          befund={dublette}
+          imLedger={!entwurf}
+          onZwillingOeffnen={onZwillingOeffnen}
+          onKeinDuplikat={onKeinDuplikat}
+        />
+      ) : (
+        onFreigabeAufheben && <FreigabeHinweis onAufheben={onFreigabeAufheben} />
+      )}
 
       <div className="form-grid">
         {/* Das Konto ist änderbar (außer bei einer Paarung): bei importierten Buchungen ist
@@ -564,13 +625,6 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         >
           <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
-        {!gepaart && (
-          <FormField label={t("konten.feldCharakter")}>
-            <select className="field" value={charakter} onChange={(e) => setCharakter(e.target.value as Charakter)}>
-              {CHARAKTERE.map((c) => (<option key={c} value={c}>{charakterLabel(c)}</option>))}
-            </select>
-          </FormField>
-        )}
         {/* Die Notiz gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt den
             Verwendungszweck der Bank, und der steht unter „Herkunft". */}
         {!istEntwurf && (
@@ -613,7 +667,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                     {kontoName.get(k.zahlungskontoId) ?? "?"}
                     <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.neu")}</span>
                   </span>
-                  <span className="num" style={{ fontWeight: 700 }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
+                  <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
                 </label>
               ))}
 
@@ -625,7 +679,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                     {kontoName.get(k.kontoId) ?? "?"}
                     <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.verbucht")}</span>
                   </span>
-                  <span className="num" style={{ fontWeight: 700, color: betragFarbe(k) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
+                  <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
                 </label>
               ))}
 
@@ -676,7 +730,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                     {kategorieName.get(a.kategorieId) ?? "?"}
                     {a.notiz && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{a.notiz}</span>}
                   </span>
-                  <span className="num" style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap" }}>
+                  <span className="num" style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", color: geldFarbe(a.betrag) }}>
                     {geld.formatMitSymbol(a.betrag, { mitVorzeichen: true })}
                   </span>
                 </div>
@@ -689,11 +743,11 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
           ) : (
             <>
               <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
-                <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={setKategorieId} />
+                <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieSetzen} />
               </FormField>
               {kategorieGeaendert && kategorieId && musterAngebot && !istEntwurf && (
                 <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", marginTop: 6, fontSize: "var(--fs-xs)" }}>
-                  <input type="checkbox" checked={immer} onChange={(e) => setImmer(e.target.checked)} />
+                  <input type="checkbox" aria-label={t("konten.festlegung.immerLabel")} checked={immer} onChange={(e) => setImmer(e.target.checked)} />
                   <span>
                     {t("konten.festlegung.immer", { muster: musterAngebot })}
                     <span className="muted" style={{ display: "block" }}>{t("konten.festlegung.hinweis")}</span>
@@ -744,7 +798,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
                     {t("konten.paarung.gegenbuchung")} · {kontoName.get(gegenbuchung.kontoId) ?? "?"}
                   </span>
-                  <span className="num" style={{ fontWeight: 700, color: betragFarbe(gegenbuchung) }}>
+                  <span className="num" style={{ fontWeight: 700, color: geldFarbe(gegenbuchung.betrag) }}>
                     {geld.formatMitSymbol(gegenbuchung.betrag, { mitVorzeichen: true })}
                   </span>
                   <span aria-hidden style={{ color: "var(--ink-3)" }}>›</span>
@@ -910,7 +964,7 @@ function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung: IstBuc
   async function speichern() {
     setFehler(null);
     try {
-      await buchungSplitten(ledgerRepo, buchung, eingaben);
+      await buchungSplitten(buchung, eingaben);
       onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
@@ -932,7 +986,7 @@ function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung: IstBuc
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
         <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.split.gesamt")}</span>
-        <span className="num" style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-black)", color: betragFarbe(buchung) }}>
+        <span className="num" style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-black)", color: geldFarbe(buchung.betrag) }}>
           {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
         </span>
       </div>
@@ -1006,11 +1060,11 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
     setFehler(null);
     try {
       if (wahl === "__neu") {
-        await gegenbeinErzeugen(ledgerRepo, buchung, neuKontoId);
+        await gegenbeinErzeugen(buchung, neuKontoId);
       } else {
         const gegen = alleBuchungen.find((b) => b.id === wahl);
         if (!gegen) return;
-        await buchungenPaaren(ledgerRepo, buchung, gegen);
+        await buchungenPaaren(buchung, gegen);
       }
       onSaved();
     } catch (e) {
@@ -1030,7 +1084,7 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
         <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
           {ddmm(buchung.datum)} · {kandidatLabel(buchung) || kontoName.get(buchung.kontoId) || ""}
         </span>
-        <span className="num" style={{ fontWeight: 700, color: betragFarbe(buchung) }}>
+        <span className="num" style={{ fontWeight: 700, color: geldFarbe(buchung.betrag) }}>
           {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
         </span>
       </div>
@@ -1049,7 +1103,7 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
               {kontoName.get(k.kontoId) ?? "?"}
               {kandidatLabel(k) && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{kandidatLabel(k)}</span>}
             </span>
-            <span className="num" style={{ fontWeight: 700, color: betragFarbe(k) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
+            <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
           </label>
         ))
       )}
@@ -1095,6 +1149,12 @@ export function BuchungDetail(props: {
   buchung: IstBuchung;
   entwurf?: undefined;
   vorgabe?: undefined;
+  /**
+   * Löschen ausblenden. Gesetzt für Buchungen auf Konten, die an einer Bankverbindung
+   * hängen: was die Bank geliefert hat, wird nicht von Hand entfernt — beim nächsten
+   * Abruf käme es zurück, und bis dahin stimmte der Saldo nicht mehr mit ihr überein.
+   */
+  loeschenGesperrt?: boolean;
   onClose: () => void;
   onGeaendert: () => void | Promise<void>;
 } | {
@@ -1111,6 +1171,7 @@ export function BuchungDetail(props: {
   onGeaendert: () => void | Promise<void>;
 }) {
   const { buchung, entwurf, vorgabe, onClose, onGeaendert } = props;
+  const loeschenGesperrt = "loeschenGesperrt" in props ? props.loeschenGesperrt : false;
   const { t } = useTranslation();
   const geld = useGeld();
   // Welche Buchung gerade gezeigt wird — der Sprung zur Gegenbuchung (und zum Zwilling
@@ -1129,17 +1190,18 @@ export function BuchungDetail(props: {
   const [alle, setAlle] = useState<IstBuchung[]>([]);
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
+  const [dublettenverdacht, setDublettenverdacht] = useState<ReadonlyMap<string, Dublettenverdacht>>(LEERE_KARTE);
+  const [freigegeben, setFreigegeben] = useState<ReadonlySet<string>>(LEERE_MENGE);
+  const [freigaben, setFreigaben] = useState<readonly Dublettenfreigabe[]>([]);
 
   async function laden() {
-    const [ks, kats, rs, us, ls, bs, vs, zs] = await Promise.all([
-      kontoRepo.alle(), kategorieRepo.alle(), regelRepo.alle(),
-      umsatzRepo.alle(), importLaufRepo.alle(), ledgerRepo.alle(), vertragRepo.alle(),
-      zuordnungRepo.alle(),
-    ]);
-    setKonten(ks); setKategorien(kats); setRegeln(rs);
-    setUmsaetze(us); setLaeufe(ls); setAlle(bs); setVertraege(vs); setZuordnungen(zs);
+    const d = await buchungsdetail();
+    setKonten([...d.konten]); setKategorien([...d.kategorien]); setRegeln([...d.regeln]);
+    setUmsaetze([...d.umsaetze]); setLaeufe([...d.laeufe]); setAlle([...d.buchungen]);
+    setVertraege([...d.vertraege]); setZuordnungen([...d.zuordnungen]);
+    setDublettenverdacht(d.dublettenverdacht); setFreigegeben(d.freigegeben); setFreigaben(d.freigaben);
     // Die gezeigte Buchung aus dem frischen Stand nachziehen (nach dem Speichern).
-    setAktuelle((b) => (b ? bs.find((x) => x.id === b.id) ?? b : undefined));
+    setAktuelle((b) => (b ? d.buchungen.find((x) => x.id === b.id) ?? b : undefined));
   }
   useEffect(() => { laden(); }, []);
 
@@ -1163,22 +1225,42 @@ export function BuchungDetail(props: {
   /**
    * Ist das hier womöglich schon einmal gebucht worden?
    *
-   * Verglichen wird gegen alles, was auf DEMSELBEN Konto liegt — verbucht, offen oder
-   * verworfen. Der Finder kostet praktisch nichts (gemessen: 60 gegen 5279 Zeilen in
-   * 2 ms), hier ist es eine Zeile gegen den Kontobestand.
+   * Die Antwort kommt aus der Anwendungsschicht und ist DIESELBE wie im Kontoauszug —
+   * bis 2026-08-20 rechnete der Dialog sie sich hier selbst, gegen einen anderen Bestand,
+   * und mahnte deshalb Zwillinge an, die längst gelöscht waren.
    *
-   * Nur für importierte Buchungen: eine von Hand erfasste hat weder Empfänger noch
-   * Verwendungszweck, und ohne die bliebe vom Vergleich nur „gleicher Betrag am gleichen
-   * Tag" übrig — zu wenig für eine Aussage, aber genug für ständigen Fehlalarm.
+   * Zwei Fragen, zwei Wege (beide in `dublettensicht`): eine gebuchte Zeile fragt „steht
+   * das zweimal im Saldo?" — das ist die fertige Karte aus `buchungsdetail()`. Ein
+   * Entwurf fragt „ist das schon bekannt?" und zählt auch Verworfenes mit; das hängt an
+   * genau dieser Zeile und wird deshalb hier gerechnet.
    */
-  const dublette = useMemo(() => {
-    const geprueft = aktuellerEntwurf ?? umsatz;
-    if (!geprueft) return undefined;
-    const bestand = umsaetze.filter((u) => u.id !== geprueft.id && u.zahlungskontoId === geprueft.zahlungskontoId);
-    const [treffer] = ordneZu([geprueft], bestand);
-    if (!treffer?.bestand || treffer.bewertung.urteil === "verschieden") return undefined;
-    return { bewertung: treffer.bewertung, zwilling: treffer.bestand };
-  }, [aktuellerEntwurf, umsatz, umsaetze]);
+  const dublette = useMemo((): Dublettenbefund | undefined => {
+    if (aktuellerEntwurf) {
+      const verdacht = entwurfVerdacht(aktuellerEntwurf, umsaetze, freigegeben);
+      const zwilling = verdacht && umsaetze.find((u) => u.id === verdacht.zwillingUmsatzId);
+      return verdacht && zwilling ? { verdacht, zwilling } : undefined;
+    }
+    if (!aktuelle) return undefined;
+    const verdacht = dublettenverdacht.get(aktuelle.id);
+    const zwilling = verdacht && umsaetze.find((u) => u.id === verdacht.zwillingUmsatzId);
+    return verdacht && zwilling ? { verdacht, zwilling } : undefined;
+  }, [aktuellerEntwurf, aktuelle, umsaetze, dublettenverdacht, freigegeben]);
+
+  /**
+   * Der eigene Umsatz — die Freigabe wird zwischen zwei Umsätzen festgehalten, nicht
+   * zwischen zwei Buchungen: geprüft wird über die Umsätze, und ein Entwurf hat noch gar
+   * keine Buchung.
+   */
+  const eigenerUmsatz = aktuellerEntwurf ?? umsatz;
+
+  /** Eine bestehende Freigabe zu DIESER Zeile — sichtbar, damit sie umkehrbar bleibt. */
+  const freigabeHier = useMemo(
+    () =>
+      eigenerUmsatz
+        ? freigaben.find((f) => f.umsatzA === eigenerUmsatz.id || f.umsatzB === eigenerUmsatz.id)
+        : undefined,
+    [freigaben, eigenerUmsatz],
+  );
 
   /**
    * Gehört die Zahlung zu einem Vertrag? Jetzt aus der gespeicherten ZUORDNUNG, nicht
@@ -1201,7 +1283,7 @@ export function BuchungDetail(props: {
   async function umsaetzeZuruecksetzen(istIds: string[]) {
     for (const id of istIds) {
       const u = umsaetze.find((x) => x.istbuchungId === id);
-      if (u) await umsatzRepo.speichern(zuruecksetzen(u));
+      if (u) await umsatzSpeichern(zuruecksetzen(u));
     }
   }
 
@@ -1210,10 +1292,10 @@ export function BuchungDetail(props: {
     if (!aktuelle) return;
     if (aktuelle.transferId) {
       const beine = alle.filter((x) => x.transferId === aktuelle.transferId);
-      await umbuchungLoeschen(ledgerRepo, aktuelle.transferId);
+      await umbuchungLoeschen(aktuelle.transferId);
       await umsaetzeZuruecksetzen(beine.map((x) => x.id));
     } else {
-      await buchungLoeschen(ledgerRepo, aktuelle.id);
+      await buchungLoeschen(aktuelle.id);
       await umsaetzeZuruecksetzen([aktuelle.id]);
     }
     await onGeaendert();
@@ -1291,9 +1373,29 @@ export function BuchungDetail(props: {
       gegenbuchung={gegenbuchung}
       dublette={dublette}
       onZwillingOeffnen={zwillingBuchung ? () => setAktuelle(zwillingBuchung) : undefined}
+      onKeinDuplikat={
+        dublette && eigenerUmsatz
+          ? async () => {
+              await dublettenFreigeben(eigenerUmsatz.id, dublette.zwilling.id);
+              // Nicht nur der Dialog: die Markierung steht auch im Auszug, und der Filter
+              // „könnten doppelt sein" zählt sie. Wer hier entscheidet, schliesst danach
+              // oft mit Abbrechen — ohne diesen Weg bliebe die Markierung dort stehen.
+              await nachAenderung();
+            }
+          : undefined
+      }
+      onFreigabeAufheben={
+        freigabeHier
+          ? async () => {
+              await dublettenFreigabeAufheben(freigabeHier.umsatzA, freigabeHier.umsatzB);
+              await nachAenderung();
+            }
+          : undefined
+      }
       onClose={onClose}
       onSaved={async () => { await nachAenderung(); onClose(); }}
       onDelete={entfernen}
+      loeschenGesperrt={loeschenGesperrt}
       onZurUmbuchung={() => aktuelle && setUmbuchenAus(aktuelle)}
       vertragsBindung={
         aktuelle
@@ -1304,24 +1406,24 @@ export function BuchungDetail(props: {
               // Von Hand gesetzte Zuordnungen überleben jeden Abgleich — deshalb reicht
               // hier das Neuladen, es muss nichts nachgerechnet werden.
               zuordnen: async (vertragId) => {
-                await zuordnungVonHand(zuordnungRepo, aktuelle.id, vertragId);
+                await vertragZuordnenVonHand(aktuelle.id, vertragId);
                 await nachAenderung();
               },
               zuruecksetzen: async () => {
-                await zuordnungZuruecksetzen(zuordnungRepo, aktuelle.id);
+                await vertragZuordnungZuruecksetzen(aktuelle.id);
                 // Jetzt entscheidet wieder die Regel — also einmal rechnen lassen, sonst
                 // bliebe die Buchung bis zum nächsten Anlass unzugeordnet stehen.
-                await zuordnungenAbgleichen(abgleichDeps);
+                await vertragszuordnungenAbgleichen();
                 await nachAenderung();
               },
               neuAnlegen: () => setVertragAus(aktuelle),
             }
           : undefined
       }
-      onLoesen={async () => { if (!aktuelle?.transferId) return; await paarungLoesen(ledgerRepo, aktuelle.transferId); await nachAenderung(); onClose(); }}
+      onLoesen={async () => { if (!aktuelle?.transferId) return; await paarungLoesen(aktuelle.transferId); await nachAenderung(); onClose(); }}
       onGegenbuchung={setAktuelle}
       onSplitten={() => aktuelle && setSplitten(aktuelle)}
-      onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(ledgerRepo, aktuelle); await nachAenderung(); onClose(); }}
+      onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(aktuelle); await nachAenderung(); onClose(); }}
     />
   );
 }

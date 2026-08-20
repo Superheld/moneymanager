@@ -14,12 +14,17 @@ import {
   type Charakter,
   type Kategorie,
   type Person,
-} from "../../core";
-import { kategorieAnlegen, personAnlegen } from "../../application/stammdatenAnlegen";
-import { standardkategorienAnlegen } from "../../application/standardkategorien";
-import { sqlitePersonRepository as personRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
+} from "../../application";
+import {
+  kategorieAnlegen,
+  kategorieLoeschen,
+  personAnlegen,
+  personLoeschen,
+  stammdaten,
+  standardkategorienAnlegen,
+} from "../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "./ds";
+import { IconButton } from "./IconButton";
 import { Bereich } from "./Bereich";
 import { FestlegungenCard } from "./FestlegungenCard";
 import { Modal } from "./Modal";
@@ -34,8 +39,9 @@ export function EinstellungenScreen() {
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
 
   async function laden() {
-    setPersonen(await personRepo.alle());
-    setKategorien(await kategorieRepo.alle());
+    const d = await stammdaten();
+    setPersonen([...d.personen]);
+    setKategorien([...d.kategorien]);
   }
   useEffect(() => {
     laden();
@@ -121,7 +127,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
   async function speichern() {
     setFehler(null);
     try {
-      await personAnlegen(personRepo, { name, rolle, geburtsdatum }, editId ?? undefined);
+      await personAnlegen({ name, rolle, geburtsdatum }, editId ?? undefined);
       setOffen(false);
       onChange();
     } catch (e) {
@@ -139,8 +145,8 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
             { key: "name", label: t("einstellungen.person.spalteName") },
             { key: "rolle", label: t("einstellungen.person.spalteRolle"), render: (p) => p.rolle ?? "—" },
             { key: "geburtsdatum", label: t("einstellungen.person.spalteGeburtsdatum"), render: (p) => p.geburtsdatum ?? "—" },
-            { key: "_e", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => bearbeiten(p)}>{t("einstellungen.bearbeiten")}</button> },
-            { key: "_x", label: "", align: "right", render: (p) => <button className="linkbtn" onClick={() => personRepo.loeschen(p.id).then(onChange)}>{t("einstellungen.loeschen")}</button> },
+            { key: "_e", label: "", align: "right", render: (p) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(p)} /> },
+            { key: "_x", label: "", align: "right", render: (p) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void personLoeschen(p.id).then(onChange)} /> },
           ]}
           rows={personen}
         />
@@ -198,7 +204,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
   async function speichern() {
     setFehler(null);
     try {
-      await kategorieAnlegen(kategorieRepo, { name, elternId: elternId || undefined, defaultCharakter }, editId ?? undefined);
+      await kategorieAnlegen({ name, elternId: elternId || undefined, defaultCharakter }, editId ?? undefined);
       setOffen(false);
       onChange();
     } catch (e) {
@@ -213,8 +219,8 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
           {k.name} <Pill variant={CHARAKTER_PILL[k.defaultCharakter]}>{t(`charakter.${k.defaultCharakter}`)}</Pill>
         </span>
         <span style={{ display: "flex", gap: "var(--sp-3)" }}>
-          <button className="linkbtn" onClick={() => bearbeiten(k)}>{t("einstellungen.bearbeiten")}</button>
-          <button className="linkbtn" onClick={() => kategorieRepo.loeschen(k.id).then(onChange)}>{t("einstellungen.loeschen")}</button>
+          <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} />
+          <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void kategorieLoeschen(k.id).then(onChange)} />
         </span>
       </div>
     );
@@ -224,7 +230,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
     <Card
       action={
         <span style={{ display: "flex", gap: "var(--sp-2)" }}>
-          <Button onClick={() => standardkategorienAnlegen(kategorieRepo).then(onChange)}>{t("einstellungen.kategorie.standardLaden")}</Button>
+          <Button onClick={() => standardkategorienAnlegen().then(onChange)}>{t("einstellungen.kategorie.standardLaden")}</Button>
           <Button variant="primary" plus onClick={neu}>{t("einstellungen.kategorie.anlegen")}</Button>
         </span>
       }

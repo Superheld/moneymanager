@@ -31,7 +31,6 @@ import { sqliteKlassifikatorRepository as klassifikatorRepository } from "./sqli
 import { sqliteMerkmalskonfigurationRepository as merkmalRepository } from "./sqliteMerkmalskonfigurationRepository";
 import { sqliteKategoriefestlegungRepository as festlegungRepository } from "./sqliteKategoriefestlegungRepository";
 import { klassifizieren, trainieren } from "../../core";
-import { sqliteTopfRepository as topfRepository } from "./sqliteTopfRepository";
 import { sqliteVertragRepository as vertragRepository } from "./sqliteVertragRepository";
 import {
   sqliteVertragserkennungRepository as erkennungRepository,
@@ -43,7 +42,9 @@ import {
   sqlitePersonRepository as personRepository,
   sqliteZahlungskontoRepository as zahlungskontoRepository,
 } from "./sqliteStammdatenRepositories";
+import { sqliteKontostandsankerRepository as ankerRepository } from "./sqliteKontostandRepository";
 import {
+  sqliteDublettenfreigabeRepository as freigabeRepository,
   sqliteImportLaufRepository as importLaufRepository,
   sqliteUmsatzRepository as umsatzRepository,
 } from "./sqliteImportRepositories";
@@ -142,52 +143,33 @@ describe("Stammdaten-Repositories", () => {
   });
 });
 
-describe("Topf-Repository", () => {
-  it("macht die Rundreise für beide Topf-Spielarten", async () => {
-    await topfRepository.speichern({
-      id: "t2", typ: "puffer", bezeichnung: "Reparatur", start: "2026-01-01",
-      schaetzbetrag: 50000, fristMonate: 12,
+describe("Budget-Repository", () => {
+  it("macht die Rundreise für beide Arten", async () => {
+    await budgetRepository.speichern({
+      id: "b1", kategorieId: "k1", kontoId: "giro",
+      betragProMonat: 40000, art: "monatlich", start: "2026-08-01",
     });
-    await topfRepository.speichern({
-      id: "t3", typ: "spartopf", bezeichnung: "Urlaub", start: "2026-01-01",
-      zufuehrungProMonat: 10000, sparziel: 120000,
+    await budgetRepository.speichern({
+      id: "b2", kategorieId: "k2", kontoId: "tagesgeld",
+      betragProMonat: 5000, art: "aufbauend", start: "2026-01-01",
     });
-
-    const alle = await topfRepository.alle();
+    const alle = await budgetRepository.alle();
     expect(alle).toHaveLength(2);
 
-    const puffer = alle.find((t) => t.id === "t2");
-    expect(puffer?.typ === "puffer" && puffer.schaetzbetrag).toBe(50000);
-    expect(puffer?.typ === "puffer" && puffer.fristMonate).toBe(12);
+    const monatlich = alle.find((b) => b.id === "b1");
+    expect(monatlich?.betragProMonat).toBe(40000);
+    expect(monatlich?.art).toBe("monatlich");
+    expect(monatlich?.kontoId).toBe("giro");
 
-    const spar = alle.find((t) => t.id === "t3");
-    expect(spar?.typ === "spartopf" && spar.zufuehrungProMonat).toBe(10000);
-    expect(spar?.typ === "spartopf" && spar.sparziel).toBe(120000);
-  });
-
-  it("löscht einen Topf", async () => {
-    await topfRepository.speichern({
-      id: "t1", typ: "puffer", bezeichnung: "Weg", start: "2026-01-01",
-      schaetzbetrag: 1000, fristMonate: 3,
-    });
-    await topfRepository.loeschen("t1");
-    expect(await topfRepository.alle()).toHaveLength(0);
-  });
-});
-
-describe("Budget-Repository", () => {
-  it("speichert und liest ein Budget", async () => {
-    await budgetRepository.speichern({
-      id: "b1", kategorieId: "k1", rahmen: 40000, periode: "monatlich",
-    });
-    const [b] = await budgetRepository.alle();
-    expect(b.rahmen).toBe(40000);
-    expect(b.periode).toBe("monatlich");
+    const aufbauend = alle.find((b) => b.id === "b2");
+    expect(aufbauend?.art).toBe("aufbauend");
+    expect(aufbauend?.start).toBe("2026-01-01");
   });
 
   it("löscht ein Budget", async () => {
     await budgetRepository.speichern({
-      id: "b1", kategorieId: "k1", rahmen: 40000, periode: "jaehrlich",
+      id: "b1", kategorieId: "k1", kontoId: "giro",
+      betragProMonat: 40000, art: "monatlich", start: "2026-08-01",
     });
     await budgetRepository.loeschen("b1");
     expect(await budgetRepository.alle()).toHaveLength(0);
@@ -650,5 +632,68 @@ describe("Vertrag — Kategorie am Aggregat", () => {
     await vertragRepository.speichern({ ...basis, kategorieId: "kat-alt" });
     await vertragRepository.speichern({ ...basis, kategorieId: "kat-neu" });
     expect((await vertragRepository.alle())[0].kategorieId).toBe("kat-neu");
+  });
+});
+
+
+describe("Dubletten-Freigabe — von Hand festgehalten", () => {
+  it("speichert das Paar und liest es zurück", async () => {
+    await freigabeRepository.speichern({ umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-20T10:00:00.000Z" });
+    expect(await freigabeRepository.alle()).toEqual([
+      { umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-20T10:00:00.000Z" },
+    ]);
+  });
+
+  it("legt dasselbe Paar nicht zweimal an", async () => {
+    await freigabeRepository.speichern({ umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-20T10:00:00.000Z" });
+    await freigabeRepository.speichern({ umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-21T10:00:00.000Z" });
+    const alle = await freigabeRepository.alle();
+    expect(alle).toHaveLength(1);
+    expect(alle[0].angelegt).toBe("2026-08-21T10:00:00.000Z");
+  });
+
+  it("entfernt auch, wenn die IDS andersherum kommen", async () => {
+    // Die Anzeige kennt „diese Zeile und ihr Zwilling" — welche davon in Spalte A steht,
+    // weiss sie nicht.
+    await freigabeRepository.speichern({ umsatzA: "u-a", umsatzB: "u-b", angelegt: "2026-08-20T10:00:00.000Z" });
+    await freigabeRepository.entfernen("u-b", "u-a");
+    expect(await freigabeRepository.alle()).toEqual([]);
+  });
+});
+
+
+describe("Kontostands-Anker", () => {
+  it("trägt Stichtag, Herkunft und Erfassungszeitpunkt getrennt durch das Schema", async () => {
+    await ankerRepository.speichern({
+      kontoId: "giro", datum: "2026-08-20", herkunft: "bank", betrag: [Betrag],
+      erfasstAm: "2026-08-20T22:47:25.284Z",
+    });
+    expect(await ankerRepository.alle()).toEqual([
+      { kontoId: "giro", datum: "2026-08-20", herkunft: "bank", betrag: [Betrag], erfasstAm: "2026-08-20T22:47:25.284Z" },
+    ]);
+  });
+
+  it("überschreibt denselben Stichtag derselben Quelle, statt zu doppeln", async () => {
+    // Zwei Abrufe an einem Tag sind zwei Aussagen über DENSELBEN Tag.
+    const basis = { kontoId: "giro", datum: "2026-08-20", herkunft: "bank" as const };
+    await ankerRepository.speichern({ ...basis, betrag: [Betrag], erfasstAm: "2026-08-20T09:00:00.000Z" });
+    await ankerRepository.speichern({ ...basis, betrag: 170000, erfasstAm: "2026-08-20T22:00:00.000Z" });
+    const alle = await ankerRepository.alle();
+    expect(alle).toHaveLength(1);
+    expect(alle[0].betrag).toBe(170000);
+  });
+
+  it("hält Bank und Kassensturz desselben Tages auseinander", async () => {
+    // Zwei Quellen, zwei Aussagen — die dürfen sich nicht gegenseitig überschreiben.
+    await ankerRepository.speichern({ kontoId: "bar", datum: "2026-08-20", herkunft: "bank", betrag: 100, erfasstAm: "x" });
+    await ankerRepository.speichern({ kontoId: "bar", datum: "2026-08-20", herkunft: "hand", betrag: 4750, erfasstAm: "y" });
+    expect(await ankerRepository.alle()).toHaveLength(2);
+  });
+
+  it("entfernt gezielt einen Anker", async () => {
+    await ankerRepository.speichern({ kontoId: "giro", datum: "2026-08-20", herkunft: "bank", betrag: 1, erfasstAm: "x" });
+    await ankerRepository.speichern({ kontoId: "giro", datum: "2026-08-21", herkunft: "bank", betrag: 2, erfasstAm: "x" });
+    await ankerRepository.entfernen("giro", "2026-08-20", "bank");
+    expect((await ankerRepository.alle()).map((a) => a.datum)).toEqual(["2026-08-21"]);
   });
 });

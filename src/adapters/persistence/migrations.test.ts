@@ -45,10 +45,12 @@ function indexExistiert(db: Database, name: string): boolean {
 
 const ERWARTETE_TABELLEN = [
   "bankkonto_zuordnung", "bankzugang", // v26 — Bankzugang für den FinTS-Direktabruf
-  "budget", "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
+  "budget", "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
+  "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
   "ist_buchung_aufteilung", "kategorie", "kategorie_festlegung", "klassifikator_modell",
+  "kontostand_anker", // v35 — was an einem Stichtag wirklich auf dem Konto lag
   "merkmal_ausschluss",
-  "person", "topf",
+  "person",
   "umsatz", "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
   "zahlungskonto", "zahlungsregel",
 ];
@@ -77,7 +79,7 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     // v9/v10/v11/v13
     expect(spalten(db, "umsatz")).toContain("glaeubiger_id"); // v16
     expect(spalten(db, "ist_buchung")).toEqual(
-      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "verwendung_topf_id", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
+      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
     );
     db.close();
   });
@@ -184,19 +186,142 @@ describe("Alpha-Aufräumen (v18)", () => {
       expect.arrayContaining(["wiederbeschaffung", "nutzungsdauer_monate", "inventar_id"]),
     );
 
-    apply(db, 17);
+    apply(db, 17, 18); // NUR v18 — v31 räumt die Tabelle später ganz ab.
 
     expect(tabellen(db)).not.toContain("szenario");
     expect(tabellen(db)).not.toContain("szenario_posten");
     expect(spalten(db, "topf")).toEqual(["id", "typ", "bezeichnung", "start", "kategorie_id", "schaetzbetrag", "frist_monate", "zufuehrung_pro_monat", "sparziel"]);
     db.close();
   });
+});
 
-  // Was bleiben MUSS: die Entnahme-Verwendung trägt Puffer und Spartopf.
-  it("lässt verwendung_topf_id an der Ist-Buchung stehen", () => {
+describe("Budget-Umbau (v30/v31)", () => {
+  it("überführt ein Bestandsbudget in die neue Form und wählt ein Konto", () => {
     const db = new SQL.Database();
-    apply(db);
-    expect(spalten(db, "ist_buchung")).toContain("verwendung_topf_id");
+    apply(db, 0, 29);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('giro','Girokonto','Giro','[]')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('bar','Bargeld','Bargeld','[]')");
+    db.run("INSERT INTO budget (id, kategorie_id, rahmen, periode) VALUES ('b1','k1',43000,'monatlich')");
+    db.run("INSERT INTO budget (id, kategorie_id, rahmen, periode) VALUES ('b2','k2',480000,'jaehrlich')");
+
+    apply(db, 29, 30);
+
+    const zeilen = db.exec("SELECT id, betrag_pro_monat, art, konto_id, start FROM budget ORDER BY id")[0].values;
+    // Das jährliche Budget wird auf seinen Monatsanteil umgerechnet, nicht abgeschnitten.
+    expect(zeilen).toEqual([
+      ["b1", 43000, "monatlich", "giro", "2026-08-01"],
+      ["b2", 40000, "monatlich", "giro", "2026-08-01"],
+    ]);
+    db.close();
+  });
+
+  it("räumt erst danach ab — und übersteht einen Abbruch dazwischen", () => {
+    // Der Grund für die Trennung in zwei Versionen: v30 LIEST periode und rahmen. Liefe
+    // das Abräumen in derselben Version und bräche der Lauf dazwischen ab, fände v30
+    // beim nächsten Start die Spalten nicht mehr — SQLite prüft Spaltennamen beim
+    // Parsen, und die App käme nicht mehr hoch.
+    const db = new SQL.Database();
+    apply(db, 0, 30);
+    expect(spalten(db, "budget")).toContain("rahmen");
+    expect(tabellen(db)).toContain("topf");
+
+    apply(db, 30, 31);
+
+    expect(spalten(db, "budget")).not.toContain("rahmen");
+    expect(spalten(db, "budget")).not.toContain("periode");
+    expect(tabellen(db)).not.toContain("topf");
+    expect(spalten(db, "ist_buchung")).not.toContain("verwendung_topf_id");
+    db.close();
+  });
+});
+
+describe("Kontostands-Anker (v35/v36)", () => {
+  it("macht aus dem zuletzt gemeldeten Saldo den ersten Anker", () => {
+    // Sonst begänne die Historie bei null und die erste brauchbare Aussage („seit wann
+    // stimmt es nicht mehr?") käme erst nach dem übernächsten Abruf.
+    const db = new SQL.Database();
+    apply(db, 0, 34);
+    db.run(
+      `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id, bank_saldo, bank_saldo_datum)
+       VALUES ('z1', 's1', 'giro', [Betrag], '2026-08-20')`,
+    );
+    // Ein Konto ohne gemeldeten Stand darf keinen Anker erzeugen.
+    db.run(
+      `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id)
+       VALUES ('z1', 's2', 'depot')`,
+    );
+
+    apply(db, 34, 35);
+
+    expect(db.exec("SELECT konto_id, datum, herkunft, betrag FROM kontostand_anker")[0].values).toEqual([
+      ["giro", "2026-08-20", "bank", [Betrag]],
+    ]);
+    db.close();
+  });
+
+  it("läuft zweimal, ohne zu doppeln", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 34);
+    db.run(
+      `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id, bank_saldo, bank_saldo_datum)
+       VALUES ('z1', 's1', 'giro', [Betrag], '2026-08-20')`,
+    );
+    apply(db, 34, 35);
+    apply(db, 34, 35);
+    expect(db.exec("SELECT count(*) FROM kontostand_anker")[0].values).toEqual([[1]]);
+    db.close();
+  });
+
+  it("räumt die alten Spalten erst in der NÄCHSTEN Version ab", () => {
+    // Getrennte Versionen, weil v35 sie liest: bräche der Lauf dazwischen ab, liefe v35
+    // beim nächsten Start gegen fehlende Spalten und die App käme nicht mehr hoch.
+    const db = new SQL.Database();
+    apply(db, 0, 35);
+    expect(spalten(db, "bankkonto_zuordnung")).toContain("bank_saldo");
+    apply(db, 35, 36);
+    expect(spalten(db, "bankkonto_zuordnung")).not.toContain("bank_saldo");
+    expect(spalten(db, "bankkonto_zuordnung")).not.toContain("bank_saldo_datum");
+    db.close();
+  });
+});
+
+describe("Verwaiste Umsätze (v33)", () => {
+  function umsatz(db: InstanceType<typeof SQL.Database>, id: string, istId: string | null) {
+    db.run(
+      `INSERT INTO umsatz (id, lauf_id, zahlungskonto_id, buchungstag, betrag, waehrung,
+         gegenpartei, verwendungszweck, roh_hash, status, istbuchung_id)
+       VALUES (?, 'l1', 'giro', '2026-08-11', -5700, 'EUR', 'Laden', 'Zweck', ?, 'verbucht', ?)`,
+      [id, `h-${id}`, istId],
+    );
+  }
+
+  it("legt weg, was auf eine gelöschte Buchung zeigt — und lässt den Rest in Ruhe", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 32);
+    db.run("INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle) VALUES ('b-da','2026-08-11',-5700,'giro','Aufwand','import')");
+    umsatz(db, "u-heil", "b-da");
+    umsatz(db, "u-verwaist", "b-weg");
+    umsatz(db, "u-ohne", null);
+
+    apply(db, 32, 33);
+
+    const zeilen = db.exec("SELECT id, status, istbuchung_id FROM umsatz ORDER BY id")[0].values;
+    expect(zeilen).toEqual([
+      ["u-heil", "verbucht", "b-da"],
+      ["u-ohne", "verworfen", null],
+      ["u-verwaist", "verworfen", null],
+    ]);
+    db.close();
+  });
+
+  it("ein zweiter Durchgang ändert nichts", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 32);
+    umsatz(db, "u-verwaist", "b-weg");
+    apply(db, 32, 33);
+    const vorher = db.exec("SELECT id, status FROM umsatz")[0].values;
+    apply(db, 32, 33);
+    expect(db.exec("SELECT id, status FROM umsatz")[0].values).toEqual(vorher);
     db.close();
   });
 });

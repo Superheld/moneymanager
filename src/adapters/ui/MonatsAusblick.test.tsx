@@ -3,7 +3,7 @@
 //
 // Zwei Ebenen: die Karten selbst gegen übergebene Daten (dort ist `heute` festgenagelt,
 // damit die Tests nicht mit der Uhr wandern), und einmal der ganze Weg über den
-// HistorieScreen gegen eine echte In-Memory-SQLite — der prüft die Verdrahtung
+// UebersichtScreen gegen eine echte In-Memory-SQLite — der prüft die Verdrahtung
 // (Repositories, Spalten-Mapping), nicht die Rechnung.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -19,7 +19,7 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../test/harness";
 import { MonatsAusblick } from "./MonatsAusblick";
-import { HistorieScreen } from "./HistorieScreen";
+import { UebersichtScreen } from "./UebersichtScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
@@ -28,6 +28,7 @@ import {
   sqliteZahlungskontoRepository,
 } from "../persistence/sqliteStammdatenRepositories";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
+import { monatsAusblicke } from "../../core";
 import type { Budget, Inventargegenstand, IstBuchung, Kategorie, Zahlungsregel } from "../../core";
 
 let db: Database;
@@ -51,7 +52,7 @@ const REGELN: Zahlungsregel[] = [
   { id: "r-lohn", bezeichnung: "Arbeitgeber", betrag: 247536, rhythmus: "monatlich", startdatum: "2026-01-28", charakter: "Ertrag", kategorieId: "gehalt" },
 ];
 
-const BUDGETS: Budget[] = [{ id: "b1", kategorieId: "lebenshaltung", rahmen: 43000, periode: "monatlich" }];
+const BUDGETS: Budget[] = [{ id: "b1", kategorieId: "lebenshaltung", kontoId: "giro", betragProMonat: 43000, art: "monatlich", start: "2026-01-01" }];
 
 const IST: IstBuchung[] = [
   { id: "i1", datum: "2026-08-05", betrag: -45925, kontoId: "giro", kategorieId: "miete", charakter: "Aufwand", quelle: "import" },
@@ -63,7 +64,26 @@ const INVENTAR: Inventargegenstand[] = [
   { id: "g-auto", bezeichnung: "Auto", wiederbeschaffung: 1200000, nutzungsdauerMonate: 100, anschaffung: "2024-01-01" },
 ];
 
-const props = { regeln: REGELN, budgets: BUDGETS, inventar: [], ist: IST, kategorien: KATEGORIEN, heute: "2026-08-16" };
+/**
+ * Die Karten rechnen seit 2026-08-19 nicht mehr selbst — sie bekommen fertige Ausblicke
+ * aus der Anwendungsschicht. Der Test rechnet sie deshalb hier vor: dieselbe Rohdaten-
+ * Fassung wie vorher, nur einmal durch `monatsAusblicke` gedreht. Dass er dabei den Kern
+ * anfasst, ist erlaubt — die Schichtgrenze gilt dem Produktivcode.
+ */
+const ROH = {
+  regeln: REGELN, budgets: BUDGETS, inventar: [] as Inventargegenstand[],
+  ist: IST, kategorien: KATEGORIEN, vertragsBuchungen: new Set<string>(), heute: "2026-08-16",
+};
+
+function props(over: Partial<typeof ROH> = {}) {
+  const roh = { ...ROH, ...over };
+  return {
+    ausblicke: monatsAusblicke(roh),
+    hatPlandaten: roh.regeln.length > 0 || roh.budgets.length > 0 || roh.inventar.length > 0,
+    kategorieNamen: new Map(roh.kategorien.map((k) => [k.id, k.name])),
+    empfaenger: new Map<string, string>(),
+  };
+}
 
 /**
  * Die Karte eines Monats. Der EinstellungenProvider rendert erst nach dem Laden, deshalb
@@ -79,26 +99,26 @@ async function karte(titel: string): Promise<HTMLElement> {
 
 describe("MonatsAusblick", () => {
   it("zeigt den laufenden Monat und die beiden folgenden", async () => {
-    rendere(<MonatsAusblick {...props} />);
+    rendere(<MonatsAusblick {...props()} />);
     expect(await screen.findByText("August 2026")).toBeInTheDocument();
     expect(screen.getByText("September 2026")).toBeInTheDocument();
     expect(screen.getByText("Oktober 2026")).toBeInTheDocument();
   });
 
   it("rechnet im laufenden Monat Plan und Gebuchtes nebeneinander auf", async () => {
-    rendere(<MonatsAusblick {...props} />);
+    rendere(<MonatsAusblick {...props()} />);
     const august = await karte("August 2026");
-    // Unter dem Strich steht im laufenden Monat das Gebuchte: −459,25 − 62,50 = −521,75.
-    // Geplant wären 2475,36 − 471,41 − 430,00 = +1573,95 — die Differenz steht darunter.
+    // Unter dem Strich steht BEIDES nebeneinander, jede Zahl in ihrer Spalte:
+    // gebucht −459,25 − 62,50 = −521,75, geplant 2475,36 − 471,41 − 430,00 = +1573,95.
     expect(within(august).getByText("−521,75 €")).toBeInTheDocument();
-    expect(within(august).getByText("−[Betrag] € gegenüber Plan")).toBeInTheDocument();
+    expect(within(august).getByText("+1.573,95 €")).toBeInTheDocument();
     // Die Zeilen selbst tragen weiterhin beide Spalten.
     expect(within(august).getByText("gebucht")).toBeInTheDocument();
     expect(within(august).getByText("−471,41")).toBeInTheDocument();
   });
 
   it("stellt das Gebuchte vor das Geplante", async () => {
-    rendere(<MonatsAusblick {...props} />);
+    rendere(<MonatsAusblick {...props()} />);
     const august = await karte("August 2026");
     const gebucht = within(august).getByText("gebucht");
     const geplant = within(august).getByText("geplant");
@@ -107,7 +127,7 @@ describe("MonatsAusblick", () => {
   });
 
   it("zeigt für kommende Monate nur die Plan-Spalte", async () => {
-    rendere(<MonatsAusblick {...props} />);
+    rendere(<MonatsAusblick {...props()} />);
     const september = await karte("September 2026");
     expect(within(september).queryByText("gebucht")).not.toBeInTheDocument();
     expect(within(september).getByText("+1.573,95 €")).toBeInTheDocument();
@@ -117,11 +137,12 @@ describe("MonatsAusblick", () => {
 
   it("klappt die Verträge auf und zeigt, was schon gebucht ist", async () => {
     const nutzer = userEvent.setup();
-    rendere(<MonatsAusblick {...props} />);
+    rendere(<MonatsAusblick {...props()} />);
     const august = await karte("August 2026");
 
     expect(within(august).queryByText("Vermieter")).not.toBeInTheDocument();
-    await nutzer.click(within(august).getByText(/Verträge/));
+    // Exakt, nicht per Regex: die Fusszeile erklärt „Bleibt übrig" mit denselben Wörtern.
+    await nutzer.click(within(august).getByText("Verträge"));
 
     expect(within(august).getByText("Vermieter")).toBeInTheDocument();
     expect(within(august).getByText("04.")).toBeInTheDocument();
@@ -134,7 +155,7 @@ describe("MonatsAusblick", () => {
 
   it("klappt die Budgets auf und zeigt, wie weit der Rahmen durch ist", async () => {
     const nutzer = userEvent.setup();
-    rendere(<MonatsAusblick {...props} />);
+    rendere(<MonatsAusblick {...props()} />);
     const august = await karte("August 2026");
 
     await nutzer.click(within(august).getByText("Budgets"));
@@ -143,12 +164,12 @@ describe("MonatsAusblick", () => {
   });
 
   it("weist darauf hin, wenn gar keine Einnahmen geplant sind", async () => {
-    rendere(<MonatsAusblick {...props} regeln={[REGELN[0]]} />);
+    rendere(<MonatsAusblick {...props({ regeln: [REGELN[0]] })} />);
     expect(await screen.findByText(/Einnahmen kommen aus Verträgen/)).toBeInTheDocument();
   });
 
   it("zeigt ohne Verträge, Budgets und Inventar einen Hinweis statt drei leerer Karten", async () => {
-    rendere(<MonatsAusblick {...props} regeln={[]} budgets={[]} />);
+    rendere(<MonatsAusblick {...props({ regeln: [], budgets: [] })} />);
     expect(await screen.findByText(/Für den Ausblick fehlen die Plan-Daten/)).toBeInTheDocument();
     expect(screen.queryByText("August 2026")).not.toBeInTheDocument();
   });
@@ -156,7 +177,7 @@ describe("MonatsAusblick", () => {
   // Die Rücklage ist reine Rechnung: sie steht in beiden Spalten mit demselben Betrag und
   // senkt „Bleibt" auch im laufenden Monat, obwohl nichts gebucht wurde.
   it("zieht die Inventar-Rücklage als eigene Zeile ab", async () => {
-    rendere(<MonatsAusblick {...props} inventar={INVENTAR} />);
+    rendere(<MonatsAusblick {...props({ inventar: INVENTAR })} />);
     const september = await karte("September 2026");
     expect(within(september).getByText("Rücklagen")).toBeInTheDocument();
     expect(within(september).getByText("−120,00")).toBeInTheDocument();
@@ -165,28 +186,28 @@ describe("MonatsAusblick", () => {
   });
 
   it("senkt auch das Gebuchte des laufenden Monats um die Rücklage", async () => {
-    rendere(<MonatsAusblick {...props} inventar={INVENTAR} />);
+    rendere(<MonatsAusblick {...props({ inventar: INVENTAR })} />);
     const august = await karte("August 2026");
     // −521,75 gebucht − 120,00 Rücklage.
     expect(within(august).getByText("−641,75 €")).toBeInTheDocument();
   });
 
   it("lässt die Zeile weg, wenn es kein Inventar gibt", async () => {
-    rendere(<MonatsAusblick {...props} />);
+    rendere(<MonatsAusblick {...props()} />);
     await screen.findByText("August 2026");
     expect(screen.queryByText("Rücklagen")).not.toBeInTheDocument();
   });
 
   // Einzeilig: die Aufschlüsselung nach Gegenstand steht im Inventar, nicht hier.
   it("ist nicht aufklappbar", async () => {
-    rendere(<MonatsAusblick {...props} inventar={INVENTAR} />);
+    rendere(<MonatsAusblick {...props({ inventar: INVENTAR })} />);
     const august = await karte("August 2026");
     const zeile = within(august).getByText("Rücklagen").closest("[role]");
     expect(zeile).toBeNull();
   });
 
   it("schweigt über fehlende Einnahmen, sobald ein Ertrags-Vertrag existiert", async () => {
-    rendere(<MonatsAusblick {...props} />);
+    rendere(<MonatsAusblick {...props()} />);
     await screen.findByText("August 2026");
     expect(screen.queryByText(/Einnahmen kommen aus Verträgen/)).not.toBeInTheDocument();
   });
@@ -207,15 +228,39 @@ describe("Übersicht — Ausblick am echten Schema", () => {
       kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "manuell",
     });
 
-    rendere(<HistorieScreen />);
+    // Der Ausblick sitzt seit 2026-08-19 auf der Übersicht, nicht mehr im Rückblick.
+    rendere(<UebersichtScreen />);
 
     // Drei Karten, und die Miete steht als Vertragsposten drin (Regel korrekt gemappt).
-    await waitFor(() => expect(screen.getAllByText("Bleibt")).toHaveLength(3));
+    await waitFor(() => expect(screen.getAllByText("Bleibt übrig")).toHaveLength(3));
     expect(screen.getAllByText(/geplant/).length).toBeGreaterThan(0);
     const nutzer = userEvent.setup();
-    await nutzer.click(screen.getAllByText(/Verträge/)[0]);
+    await nutzer.click(screen.getAllByText("Verträge")[0]);
     expect(screen.getAllByText("Vermieter").length).toBeGreaterThan(0);
     // Das Inventar kommt über sein eigenes Repository — die Zeile steht in allen drei Karten.
     expect(screen.getAllByText("Rücklagen")).toHaveLength(3);
+  });
+
+  it("klappt ein Budget der Liste auf und zeigt seine Buchungen", async () => {
+    for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
+    for (const b of BUDGETS) await sqliteBudgetRepository.speichern(b);
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Giro", typ: "Giro", inhaberIds: [], saldo: 0 });
+    const jetzt = new Date();
+    const monatsErster = `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, "0")}-01`;
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: monatsErster, betrag: -6250, kontoId: "giro",
+      kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "manuell", notiz: "Wocheneinkauf",
+    });
+
+    rendere(<UebersichtScreen />);
+    const nutzer = userEvent.setup();
+    // Die Budget-Liste unten trägt denselben Kategorienamen wie die aufgeklappte
+    // Budgets-Zeile der Karte — deshalb über das aria-label der Kopfzeile greifen.
+    const kopf = await screen.findByLabelText(/Lebenshaltung/);
+    expect(screen.queryByText("Wocheneinkauf")).not.toBeInTheDocument();
+
+    await nutzer.click(kopf);
+    expect(await screen.findByText("Wocheneinkauf")).toBeInTheDocument();
+    expect(screen.getByText("Verbraucht")).toBeInTheDocument();
   });
 });

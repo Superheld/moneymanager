@@ -6,54 +6,49 @@
 // laufende Monat trägt zwei Spalten (geplant / gebucht), die kommenden nur den Plan.
 //
 // Jede Zeile lässt sich aufklappen und zeigt dann ihre Posten: welche Rate schon
-// abgebucht ist, wie weit ein Budget durch ist. Gerechnet wird nichts hier — die
-// Aufrechnung kommt fertig aus `monatsAusblick` (Kern).
+// abgebucht ist, wie weit ein Budget durch ist. Gerechnet wird hier NICHTS — die
+// Aufrechnung kommt fertig aus `uebersichtLaden` (Anwendungsschicht), die Komponente
+// bekommt sie als `ausblicke` gereicht. Bis 2026-08-19 rief sie `monatsAusblicke` selbst
+// auf und musste dafür Regeln, Budgets, Inventar und Buchungen kennen.
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import {
-  monatsAusblicke,
-  type AusblickPosten,
-  type AusblickZeile,
-  type Budget,
-  type Inventargegenstand,
-  type IstBuchung,
-  type Kategorie,
-  type MonatsAusblick as Ausblick,
-  type Zahlungsregel,
-} from "../../core";
+import type {
+  AusblickPosten,
+  AusblickZeile,
+  MonatsAusblick as Ausblick,
+} from "../../application";
 import { Card, CoverageTrack, Pill } from "./ds";
 import { useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
 const MONATSNAMEN_KEY = "ausblick.monat";
 
 export function MonatsAusblick({
-  regeln,
-  budgets,
-  inventar,
-  ist,
-  kategorien,
-  heute,
+  ausblicke,
+  hatPlandaten,
+  kategorieNamen,
+  empfaenger,
 }: {
-  regeln: Zahlungsregel[];
-  budgets: Budget[];
-  inventar: Inventargegenstand[];
-  ist: IstBuchung[];
-  kategorien: Kategorie[];
-  /** Von außen hereingereicht, damit die Komponente testbar bleibt (keine Uhr im Render). */
-  heute: string;
+  /** Fertig aufgerechnet aus `uebersichtLaden` — hier wird nichts mehr gerechnet. */
+  ausblicke: readonly Ausblick[];
+  /** Gibt es überhaupt Verträge, Budgets oder Inventar? */
+  hatPlandaten: boolean;
+  /** Kategorie-ID → Name. Der Kern gibt IDs heraus, die Oberfläche zeigt Namen. */
+  kategorieNamen: ReadonlyMap<string, string>;
+  /**
+   * Buchungs-ID → Empfänger aus dem Import. Der Kern kennt ihn nicht (er steht am
+   * Umsatz, nicht an der IstBuchung), aufgeklappt ist er aber das Einzige, woran man
+   * eine ungeplante Zeile wiedererkennt.
+   */
+  empfaenger: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
-  const ausblicke = useMemo(
-    () => monatsAusblicke({ regeln, budgets, inventar, ist, kategorien, heute }),
-    [regeln, budgets, inventar, ist, kategorien, heute],
-  );
-  const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   const ohneEinnahmeplan = ausblicke.every((a) => a.zeilen.find((z) => z.id === "einnahmen")!.plan === 0);
 
   // Ohne Verträge und Budgets gäbe es drei Karten voller Nullen — das liest sich wie ein
   // Datenfehler, nicht wie ein leerer Plan. Lieber einmal sagen, woher die Zahlen kommen.
-  if (regeln.length === 0 && budgets.length === 0 && inventar.length === 0) {
+  if (!hatPlandaten) {
     return <Card subtitle={t("ausblick.leerUntertitel")}>{t("ausblick.leer")}</Card>;
   }
 
@@ -61,7 +56,12 @@ export function MonatsAusblick({
     <div>
       <div className="ausblick-karten">
         {ausblicke.map((a) => (
-          <AusblickKarte key={a.label} ausblick={a} kategorieName={kategorieName} />
+          <AusblickKarte
+            key={a.label}
+            ausblick={a}
+            kategorieName={kategorieNamen}
+            empfaenger={empfaenger}
+          />
         ))}
       </div>
       {ohneEinnahmeplan && (
@@ -78,17 +78,17 @@ export function MonatsAusblick({
 function AusblickKarte({
   ausblick,
   kategorieName,
+  empfaenger,
 }: {
   ausblick: Ausblick;
-  kategorieName: Map<string, string>;
+  kategorieName: ReadonlyMap<string, string>;
+  empfaenger: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const [offen, setOffen] = useState<string | null>(null);
   const zweiSpalten = !ausblick.zukunft;
   const monatName = t(`${MONATSNAMEN_KEY}.${ausblick.monat}`);
-  /** Die eine Zahl unter dem Strich. */
-  const bleibt = ausblick.zukunft ? ausblick.restPlan : (ausblick.restIst ?? 0);
 
   return (
     <Card
@@ -117,14 +117,18 @@ function AusblickKarte({
           offen={offen === z.id}
           onToggle={() => setOffen((cur) => (cur === z.id ? null : z.id))}
           kategorieName={kategorieName}
+          empfaenger={empfaenger}
         />
       ))}
 
-      {/* Unter dem Strich EINE Zahl: im laufenden Monat das Gebuchte (die Realität),
-          in der Vorschau der Plan. Die jeweils andere Sicht steht klein darunter als
-          Abstand zum Plan — zwei fette Zahlen nebeneinander lasen sich unruhig.
-          Der Strich ist die Trennlinie der letzten Zeile; ein eigener kam als zweite
-          Linie direkt darüber zu liegen. */}
+      {/* Unter dem Strich steht die Zahl in JEDER Spalte, in der sie eine Bedeutung hat:
+          links, was bisher tatsächlich übrig ist, rechts, was übrig bliebe, wenn der
+          Monat wie geplant durchläuft. Vorher stand dort eine Zahl und darunter der
+          Abstand zum Plan („+112,30 gegenüber Plan") — man musste im Kopf addieren, um
+          auf die Planzahl zu kommen, und es war nicht zu sehen, WELCHE der beiden die
+          fette Zahl war.
+          Der Strich darüber ist die Trennlinie der letzten Zeile; ein eigener kam als
+          zweite Linie direkt darüber zu liegen. */}
       <div
         style={{
           ...zeileGrid(zweiSpalten),
@@ -134,24 +138,28 @@ function AusblickKarte({
           alignItems: "start",
         }}
       >
-        <span>{t("ausblick.bleibt")}</span>
-        <span style={{ gridColumn: zweiSpalten ? "2 / span 2" : "2", textAlign: "right" }}>
-          <span className="num" style={{ color: farbe(bleibt) }}>
-            {geld.formatMitSymbol(bleibt, { mitVorzeichen: true })}
+        <span>
+          {t("ausblick.bleibt")}
+          <span
+            style={{
+              display: "block",
+              fontSize: "var(--fs-2xs)",
+              fontWeight: "var(--fw-semi)",
+              color: "var(--ink-3)",
+              marginTop: 2,
+              whiteSpace: "normal",
+            }}
+          >
+            {t("ausblick.bleibtErklaerung")}
           </span>
-          {zweiSpalten && (
-            <span
-              style={{
-                display: "block",
-                fontSize: "var(--fs-2xs)",
-                fontWeight: "var(--fw-semi)",
-                color: "var(--ink-3)",
-                marginTop: 2,
-              }}
-            >
-              {t("ausblick.vsPlan", { betrag: geld.formatMitSymbol(bleibt - ausblick.restPlan, { mitVorzeichen: true }) })}
-            </span>
-          )}
+        </span>
+        {zweiSpalten && (
+          <span className="num" style={{ textAlign: "right", color: geldFarbe(ausblick.restIst ?? 0) }}>
+            {geld.formatMitSymbol(ausblick.restIst ?? 0, { mitVorzeichen: true })}
+          </span>
+        )}
+        <span className="num" style={{ textAlign: "right", color: geldFarbe(ausblick.restPlan) }}>
+          {geld.formatMitSymbol(ausblick.restPlan, { mitVorzeichen: true })}
         </span>
       </div>
     </Card>
@@ -165,6 +173,7 @@ function ZeileMitPosten({
   offen,
   onToggle,
   kategorieName,
+  empfaenger,
 }: {
   zeile: AusblickZeile;
   zweiSpalten: boolean;
@@ -172,7 +181,8 @@ function ZeileMitPosten({
   letzte: boolean;
   offen: boolean;
   onToggle: () => void;
-  kategorieName: Map<string, string>;
+  kategorieName: ReadonlyMap<string, string>;
+  empfaenger: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -200,11 +210,11 @@ function ZeileMitPosten({
           {t(`ausblick.zeile.${zeile.id}`)}
         </span>
         {zweiSpalten && (
-          <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)" }}>
+          <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)", color: geldFarbe(zeile.ist ?? 0) }}>
             {geld.format(zeile.ist ?? 0, { mitVorzeichen: true })}
           </span>
         )}
-        <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)" }}>
+        <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)", color: geldFarbe(zeile.plan) }}>
           {geld.format(zeile.plan, { mitVorzeichen: true })}
         </span>
       </div>
@@ -218,6 +228,11 @@ function ZeileMitPosten({
             borderRadius: "var(--r-md)",
             padding: "4px 8px",
             margin: "4px -8px 10px",
+            // „Sonstiges" ist im laufenden Monat die längste Liste — auf echten Daten
+            // dreissig bis vierzig Zeilen. Ohne Deckel schiebt eine aufgeklappte Zeile
+            // die beiden Nachbarkarten aus dem Bild.
+            maxHeight: 320,
+            overflowY: "auto",
           }}
         >
           {zeile.id === "budgets"
@@ -225,7 +240,14 @@ function ZeileMitPosten({
                 <BudgetPosten key={p.schluessel} posten={p} name={kategorieName.get(p.bezeichnung) ?? p.bezeichnung} zeigeIst={zweiSpalten} />
               ))
             : zeile.posten.map((p) => (
-                <PlanPosten key={p.schluessel} posten={p} zeile={zeile.id} zweiSpalten={zweiSpalten} />
+                <PlanPosten
+                  key={p.schluessel}
+                  posten={p}
+                  zeile={zeile.id}
+                  zweiSpalten={zweiSpalten}
+                  kategorieName={kategorieName}
+                  empfaenger={empfaenger}
+                />
               ))}
         </div>
       )}
@@ -238,15 +260,32 @@ function PlanPosten({
   posten,
   zeile,
   zweiSpalten,
+  kategorieName,
+  empfaenger,
 }: {
   posten: AusblickPosten;
   zeile: AusblickZeile["id"];
   zweiSpalten: boolean;
+  kategorieName: ReadonlyMap<string, string>;
+  empfaenger: ReadonlyMap<string, string>;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const erledigt = posten.status === "bezahlt" || posten.status === "gebucht";
-  const name = posten.status === "ohnePlan" ? t(`ausblick.sammel.${zeile}`) : posten.bezeichnung;
+  /**
+   * Ein ungeplanter Posten ist genau EINE Buchung — die trägt aber selbst keinen Namen.
+   * Dieselbe Reihenfolge wie im Konto-Register: eigene Notiz vor Empfänger aus dem
+   * Import, dann die Kategorie, und erst zuletzt das Sammelwort.
+   */
+  const name =
+    posten.status !== "ohnePlan"
+      ? posten.bezeichnung
+      : posten.bezeichnung ||
+        (posten.istId ? empfaenger.get(posten.istId) : undefined) ||
+        (posten.kategorieId ? kategorieName.get(posten.kategorieId) : undefined) ||
+        t(`ausblick.sammel.${zeile}`);
+  /** Die Kategorie als Zusatz — nur, wenn sie nicht schon der Name ist. */
+  const kategorie = posten.kategorieId ? kategorieName.get(posten.kategorieId) : undefined;
 
   return (
     <div style={{ ...zeileGrid(zweiSpalten), padding: "5px 0", fontSize: "12.5px", alignItems: "baseline" }}>
@@ -256,6 +295,9 @@ function PlanPosten({
       <span style={{ color: "var(--ink-2)", display: "flex", alignItems: "baseline", gap: 6, ...gekappt }} title={name}>
         {posten.datum && <span style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>{tagVon(posten.datum)}</span>}
         <span style={{ opacity: erledigt ? 0.72 : 1, ...gekappt }}>{name}</span>
+        {kategorie && kategorie !== name && (
+          <span style={{ color: "var(--ink-3)", fontSize: "11.5px", flex: "0 0 auto" }}>{kategorie}</span>
+        )}
         {posten.status === "bezahlt" && <Pill variant="ok" style={{ marginLeft: 0 }}>{t("ausblick.statusBezahlt")}</Pill>}
       </span>
       {zweiSpalten && (
@@ -323,5 +365,4 @@ const kopfStil = {
   paddingBottom: "var(--sp-2)",
 } as const;
 
-const farbe = (wert: number) => (wert < 0 ? "var(--warn-deep)" : "var(--ink)");
 const tagVon = (iso: string) => `${iso.slice(8)}.`;

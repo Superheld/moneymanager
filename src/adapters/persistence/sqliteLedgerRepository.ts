@@ -28,7 +28,6 @@ interface Zeile {
   gegenkonto_id: string | null;
   plan_quelle_id: string | null;
   plan_faelligkeit: string | null;
-  verwendung_topf_id: string | null;
   roh_hash: string | null;
 }
 
@@ -41,7 +40,7 @@ export const sqliteLedgerRepository: LedgerPort = {
       db.select<Zeile[]>(
         `SELECT id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter,
                 quelle, notiz, transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit,
-                verwendung_topf_id, roh_hash
+                roh_hash
            FROM ist_buchung ORDER BY datum`,
       ),
       db.select<AufteilungZeile[]>(
@@ -75,9 +74,6 @@ export const sqliteLedgerRepository: LedgerPort = {
           z.plan_quelle_id && z.plan_faelligkeit
             ? { quelleId: z.plan_quelle_id, faelligkeit: z.plan_faelligkeit }
             : undefined,
-        verwendung: z.verwendung_topf_id
-          ? { art: "topf", topfId: z.verwendung_topf_id }
-          : undefined,
         rohHash: z.roh_hash ?? undefined,
       }),
     );
@@ -86,15 +82,15 @@ export const sqliteLedgerRepository: LedgerPort = {
     const db = await getDb();
     await db.execute(
       `INSERT INTO ist_buchung
-         (id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter, quelle, notiz, transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit, verwendung_topf_id, roh_hash)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         (id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter, quelle, notiz, transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit, roh_hash)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT(id) DO UPDATE SET datum = excluded.datum, betrag = excluded.betrag,
          konto_id = excluded.konto_id, kategorie_id = excluded.kategorie_id,
          kategorie_herkunft = excluded.kategorie_herkunft,
          charakter = excluded.charakter, quelle = excluded.quelle, notiz = excluded.notiz,
          transfer_id = excluded.transfer_id, gegenkonto_id = excluded.gegenkonto_id,
          plan_quelle_id = excluded.plan_quelle_id, plan_faelligkeit = excluded.plan_faelligkeit,
-         verwendung_topf_id = excluded.verwendung_topf_id, roh_hash = excluded.roh_hash`,
+         roh_hash = excluded.roh_hash`,
       [
         b.id,
         b.datum,
@@ -111,7 +107,6 @@ export const sqliteLedgerRepository: LedgerPort = {
         b.gegenkontoId ?? null,
         b.planRef?.quelleId ?? null,
         b.planRef?.faelligkeit ?? null,
-        b.verwendung?.art === "topf" ? b.verwendung.topfId : null,
         b.rohHash ?? null,
       ],
     );

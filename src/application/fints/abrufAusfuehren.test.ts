@@ -93,11 +93,17 @@ function fakeAdapter(opt: { konten: Bankkonto[]; wirft?: boolean; saldo?: number
 function fakes(zuordnungen: Kontozuordnung[]) {
   const gespeicherteZuordnungen: Kontozuordnung[] = [...zuordnungen];
   const zugaenge: Bankzugang[] = [];
-  const umsaetze: unknown[] = [];
+  // Die Umsätze müssen sich merken lassen: der Abruf verbucht selbst und liest dafür
+  // seine eigenen frischen Zeilen über `offene()` zurück.
+  const umsaetze: any[] = [];
+  const buchungen: any[] = [];
+  const anker: any[] = [];
   return {
     gespeicherteZuordnungen,
     zugaenge,
     umsaetze,
+    buchungen,
+    anker,
     deps: {
       zugangRepo: {
         alle: async () => [],
@@ -123,16 +129,40 @@ function fakes(zuordnungen: Kontozuordnung[]) {
       },
       kategorieRepo: { alle: async () => [], speichern: async () => {}, loeschen: async () => {} },
       umsatzRepo: {
-        speichern: async () => {},
-        speichernViele: async (u: readonly unknown[]) => void umsaetze.push(...u),
-        alle: async () => [],
-        nachLauf: async () => [],
-        offene: async () => [],
+        speichern: async (u: any) => {
+          const i = umsaetze.findIndex((x) => x.id === u.id);
+          if (i >= 0) umsaetze[i] = u; else umsaetze.push(u);
+        },
+        speichernViele: async (u: readonly any[]) => void umsaetze.push(...u),
+        alle: async () => [...umsaetze],
+        nachLauf: async (laufId: string) => umsaetze.filter((u) => u.laufId === laufId),
+        offene: async () => umsaetze.filter((u) => u.status === "neu"),
         loeschen: async () => {},
         bestandsSchluessel: async () => ({ hashes: [], nativeIds: [] }),
       },
+      ledgerRepo: {
+        alle: async () => [...buchungen],
+        speichern: async (b: any) => {
+          const i = buchungen.findIndex((x) => x.id === b.id);
+          if (i >= 0) buchungen[i] = b; else buchungen.push(b);
+        },
+        loeschen: async (id: string) => {
+          const i = buchungen.findIndex((x) => x.id === id);
+          if (i >= 0) buchungen.splice(i, 1);
+        },
+      },
       laufRepo: { alle: async () => [], speichern: async () => {}, loeschen: async () => {} },
-      id: () => "id",
+      ankerRepo: {
+        alle: async () => [...anker],
+        speichern: async (a: any) => {
+          const i = anker.findIndex((x) => x.kontoId === a.kontoId && x.datum === a.datum && x.herkunft === a.herkunft);
+          if (i >= 0) anker[i] = a; else anker.push(a);
+        },
+        entfernen: async () => {},
+      },
+      // Eindeutige IDs: der Abruf legt Umsatz UND Ist-Buchung an; mit einer konstanten
+      // ID überschrieben die sich gegenseitig.
+      id: (() => { let n = 0; return () => `id-${++n}`; })(),
       heute: HEUTE,
     },
   };
@@ -173,6 +203,56 @@ describe("abrufAusfuehren", () => {
     schluessel: "9876543210|Girokonto",
     zahlungskontoId: "k1",
   };
+
+  it("verbucht die geholten Zeilen sofort, statt sie in eine Warteliste zu legen", async () => {
+    // Was die Bank meldet, IST passiert — daran gibt es nichts zu bestätigen. Bis
+    // 2026-08-19 lag alles als Entwurf am Konto und musste abgenickt werden.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([zuordnung]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(f.buchungen).toHaveLength(1);
+    expect(f.buchungen[0]).toMatchObject({ betrag: -1234, kontoId: "k1", quelle: "import" });
+    // Und der Umsatz zeigt auf die Buchung, statt offen zu bleiben.
+    expect(f.umsaetze[0].status).toBe("verbucht");
+    expect(f.umsaetze[0].istbuchungId).toBe(f.buchungen[0].id);
+  });
+
+  it("legt dieselbe Zeile beim zweiten Abruf nicht noch einmal an", async () => {
+    // Der Rückgriff (RUECKGRIFF_TAGE) holt jeden Abruf ein paar Tage doppelt. Der Finder
+    // erkennt die Zeile als „identisch" und legt sie gar nicht erst an — das ist die
+    // Stufe, die ohne Rückfrage entschieden wird.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([zuordnung]);
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    expect(f.buchungen).toHaveLength(1);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    expect(f.buchungen).toHaveLength(1);
+  });
+
+  it("bucht auch einen VERDACHTSFALL — entschieden wird danach im Auszug", async () => {
+    // Bis 2026-08-20 blieb so eine Zeile als Entwurf am Konto liegen. Die Warteliste dort
+    // gibt es nicht mehr: beide Zeilen stehen jetzt im Auszug und tragen dort die
+    // Markierung, mit Gründen und mit dem Weg zum Gegenstück.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([zuordnung]);
+    // Ein Bestandssatz, der nur BEINAHE passt: gleicher Betrag, gleicher Empfänger,
+    // einen Tag daneben. Abweichendes Datum deckelt das Urteil auf „verdacht".
+    f.umsaetze.push({
+      id: "alt", laufId: "l-alt", zahlungskontoId: "k1", buchungstag: "2026-08-16",
+      betrag: -1234, waehrung: "EUR", gegenpartei: "Laden", verwendungszweck: "Einkauf",
+      rohHash: "h-alt", status: "verbucht", istbuchungId: "b-alt",
+    });
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    const frisch = f.umsaetze.find((u) => u.id !== "alt");
+    expect(frisch.verdachtAufId).toBe("alt"); // der Verdacht steht dran …
+    expect(frisch.status).toBe("verbucht"); // … hält aber nichts mehr auf
+    expect(f.buchungen).toHaveLength(1);
+  });
 
   it("holt den Zeitraum und schreibt den Stand fort", async () => {
     const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
@@ -219,16 +299,19 @@ describe("abrufAusfuehren", () => {
     expect(f.zugaenge[f.zugaenge.length - 1]?.bankparameter).toBe('{"systemId":"S"}');
   });
 
-  it("holt den Kontostand der Bank mit und schreibt ihn fort", async () => {
+  it("hält den Kontostand der Bank als ANKER fest", async () => {
     // Ohne ihn ist der Stand der App nur in sich schlüssig; er ist die zweite,
     // unabhängige Aussage und damit die einzige Chance, eine fehlende Buchung zu merken.
+    // Aufgehoben statt überschrieben: erst mehrere Anker sagen, WANN es auseinanderlief.
     const { adapter } = fakeAdapter({ konten: [bankkonto()], saldo: 250000 });
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
     const befunde = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
     expect(befunde[0].bankSaldo).toBe(250000);
-    expect(f.gespeicherteZuordnungen[0].bankSaldo).toBe(250000);
-    expect(f.gespeicherteZuordnungen[0].bankSaldoDatum).toBe("2026-08-18");
+    expect(f.anker).toHaveLength(1);
+    expect(f.anker[0]).toMatchObject({
+      kontoId: "k1", datum: "2026-08-18", herkunft: "bank", betrag: 250000,
+    });
   });
 
   it("hält den Saldo auch fest, wenn die Umsätze scheitern", async () => {
@@ -238,8 +321,19 @@ describe("abrufAusfuehren", () => {
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1", letzterAbrufBis: "2026-08-10" }]);
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    expect(f.gespeicherteZuordnungen[0].bankSaldo).toBe(250000);
+    expect(f.anker[0]?.betrag).toBe(250000);
     expect(f.gespeicherteZuordnungen[0].letzterAbrufBis).toBe("2026-08-10");
+  });
+
+  it("ersetzt den Anker desselben Tages, statt einen zweiten anzulegen", async () => {
+    // Zwei Abrufe an einem Tag sind zwei Aussagen über DENSELBEN Stichtag, nicht zwei
+    // Stichtage. Sonst stünden im Verlauf Fenster der Länge null.
+    const { adapter } = fakeAdapter({ konten: [bankkonto()], saldo: 250000 });
+    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(f.anker).toHaveLength(1);
   });
 
   it("lässt einen scheiternden Saldo den Abruf nicht kippen", async () => {

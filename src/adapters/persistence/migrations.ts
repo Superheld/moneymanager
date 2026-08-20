@@ -548,4 +548,157 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE bankkonto_zuordnung ADD COLUMN bank_saldo_datum TEXT`,
     ],
   },
+  {
+    version: 30, // Budgets: zwei Arten in EINEM Aggregat — die neuen Spalten und der Umbau
+    sql: [
+      // Bis hierher gab es drei Arten in zwei Tabellen: `budget` (Rahmen je Periode
+      // monatlich/jährlich) und `topf` (Puffer mit Schätzbetrag+Frist, Spartopf mit
+      // Zuführung+Sparziel). Alle drei beantworten dieselbe Frage — „was lege ich
+      // monatlich für X zurück?" — und unterscheiden sich nur darin, ob der Rest zum
+      // Monatsersten verfällt. Genau das bleibt übrig: `art` = monatlich | aufbauend.
+      //
+      // Neu ist die Konto-Bindung: ein aufbauendes Budget ohne Konto ist eine Zahl ohne
+      // Deckung. Bestandsbudgets bekommen unten das Konto, über das am meisten gebucht
+      // wurde — eine Vorbelegung, keine Aussage; sie ist in der Maske änderbar.
+      `ALTER TABLE budget ADD COLUMN konto_id TEXT`,
+      `ALTER TABLE budget ADD COLUMN betrag_pro_monat INTEGER`,
+      `ALTER TABLE budget ADD COLUMN art TEXT`,
+      `ALTER TABLE budget ADD COLUMN start TEXT`,
+
+      // Datenumbau, deshalb streng wiederholbar formuliert: jedes UPDATE trifft nur
+      // Zeilen, die den Wert noch NICHT tragen. Ein zweiter Lauf ändert nichts mehr.
+      // (Migrationen laufen ohne Transaktion — siehe CLAUDE.md „Invarianten".)
+      `UPDATE budget SET betrag_pro_monat = CASE periode WHEN 'jaehrlich' THEN CAST(ROUND(rahmen / 12.0) AS INTEGER) ELSE rahmen END WHERE betrag_pro_monat IS NULL`,
+      `UPDATE budget SET art = 'monatlich' WHERE art IS NULL`,
+      // Fester Stichtag statt „heute": eine Migration muss bei jedem Lauf dasselbe tun.
+      `UPDATE budget SET start = '2026-08-01' WHERE start IS NULL`,
+      // Das meistgenutzte Konto, nicht das alphabetisch erste: „Depot" stand sonst vor
+      // „Girokonto" und hätte jedem Haushaltsbudget das falsche Konto verpasst.
+      // Die ID als zweites Sortierkriterium hält das Ergebnis bei Gleichstand stabil.
+      `UPDATE budget SET konto_id = (SELECT konto_id FROM ist_buchung GROUP BY konto_id ORDER BY COUNT(*) DESC, konto_id LIMIT 1) WHERE konto_id IS NULL`,
+      // Rückfall für eine Datenbank ohne Buchungen: irgendein Girokonto, sonst irgendeins.
+      `UPDATE budget SET konto_id = (SELECT id FROM zahlungskonto WHERE typ = 'Giro' ORDER BY bezeichnung LIMIT 1) WHERE konto_id IS NULL`,
+      `UPDATE budget SET konto_id = (SELECT id FROM zahlungskonto ORDER BY bezeichnung LIMIT 1) WHERE konto_id IS NULL`,
+    ],
+  },
+  {
+    version: 31, // … und erst danach abräumen
+    sql: [
+      // Warum getrennt von v30 und nicht in einer Version: v30 LIEST `periode` und
+      // `rahmen`. Stünde das Abräumen daneben und bräche der Lauf dazwischen ab, liefe
+      // v30 beim nächsten Start erneut — dann gegen eine Tabelle, der die gelesenen
+      // Spalten fehlen. SQLite prüft die Spaltennamen beim Parsen, das `WHERE … IS NULL`
+      // rettet nichts, und die App käme nicht mehr hoch. Als eigene Version ist v30
+      // abgeschlossen, bevor v31 ihm die Grundlage entzieht.
+      `ALTER TABLE budget DROP COLUMN rahmen`,
+      `ALTER TABLE budget DROP COLUMN periode`,
+
+      // ALPHA (siehe CLAUDE.md): weggenommen wird nur, was nachweislich leer ist. Geprüft
+      // am 2026-08-19 gegen den echten Bestand: `topf` trug 8 Zeilen, alle vom Typ
+      // „ersatz" — Altbestand, den `alle()` seit v18 herausfiltert, für den Code also
+      // längst nicht mehr existent. Lebende Töpfe (puffer/spartopf): 0. Ist-Buchungen mit
+      // `verwendung_topf_id`: 0. Es geht nichts verloren.
+      `DROP TABLE IF EXISTS topf`,
+      // Die „Verwendung" (ADR-0003, explizit benanntes Gegenkonto) hatte genau einen
+      // Fall — die Topf-Entnahme. Ohne Töpfe ist die Spalte ein leeres Konzept.
+      `ALTER TABLE ist_buchung DROP COLUMN verwendung_topf_id`,
+    ],
+  },
+  {
+    version: 32, // Nicht jeder Vertrag ist ein Abo
+    sql: [
+      // Arbeitsvertrag, Mietvertrag, Kindergeld: wiederkehrende Zahlungen mit Fristen,
+      // aber niemand sucht dort die nächste Gelegenheit auszusteigen. Bis hierher bekam
+      // ein Arbeitsvertrag ohne Mindestlaufzeit dieselbe Behandlung wie ein Abo
+      // („heute kündbar, bald!") und stand in der Warnung, die den kündbaren Verträgen
+      // gehört. Bestand bleibt „abo" — das war die bisherige Annahme, und sie stimmt
+      // für die Mehrheit.
+      `ALTER TABLE vertrag ADD COLUMN art TEXT NOT NULL DEFAULT 'abo'`,
+    ],
+  },
+  {
+    version: 33, // Verwaiste Umsätze: „verbucht", aber die Buchung gibt es nicht mehr
+    sql: [
+      // Wer eine Buchung über die Sammelbearbeitung entfernte, liess ihren Umsatz auf
+      // „verbucht" stehen — mit einer istbuchung_id, die ins Leere zeigte. Das ist ein
+      // Widerspruch in den Daten, und er wurde sichtbar, als die Dublettenprüfung in den
+      // Auszug wanderte: sie mahnte Zeilen an, die längst entfernt waren.
+      //
+      // Der Zielzustand ist derselbe, den der reparierte Use-Case ab jetzt herstellt:
+      // `verworfen` ohne Buchungsbezug. Nicht `neu` — diese Zeilen wurden bewusst
+      // weggeworfen, sie gehören nicht zurück in den Stapel. In der Datenbank bleiben
+      // sie: „das habe ich schon einmal weggeworfen" ist die Auskunft, die der nächste
+      // Import braucht (`bestandsSchluessel` liest sie unabhängig vom Status).
+      //
+      // Wiederholbar: nach dem ersten Lauf trifft die WHERE-Bedingung nichts mehr.
+      `UPDATE umsatz
+          SET status = 'verworfen', istbuchung_id = NULL
+        WHERE status = 'verbucht'
+          AND (istbuchung_id IS NULL
+               OR istbuchung_id NOT IN (SELECT id FROM ist_buchung))`,
+    ],
+  },
+  {
+    version: 34, // „Kein Duplikat" — die Entscheidung von Hand braucht einen Platz
+    sql: [
+      // Die Dublettenprüfung läuft bei JEDEM Hinsehen neu. Ohne diese Tabelle käme
+      // dieselbe Fehleinschätzung nach jedem Neuladen wieder, und die einzige Abhilfe
+      // wäre, eine der beiden richtigen Buchungen zu löschen.
+      //
+      // Gespeichert wird das PAAR, nicht die Buchung: dass A nicht dasselbe ist wie B,
+      // sagt nichts darüber, ob A dasselbe ist wie C. Die beiden Spalten sind aufsteigend
+      // sortiert, damit der Primärschlüssel in beide Richtungen greift — sortiert wird im
+      // Use-Case, die Datenbank kann das nicht erzwingen.
+      //
+      // Kein FOREIGN KEY: verschwindet ein Umsatz, steht hier eine Zeile ohne Wirkung,
+      // und die ist harmloser als ein Löschweg, der an einer Freigabe scheitert.
+      `CREATE TABLE IF NOT EXISTS dubletten_freigabe (
+         umsatz_a TEXT NOT NULL,
+         umsatz_b TEXT NOT NULL,
+         angelegt TEXT NOT NULL,
+         PRIMARY KEY (umsatz_a, umsatz_b)
+       )`,
+    ],
+  },
+  {
+    version: 35, // Kontostands-Anker: was an einem Stichtag wirklich da war
+    sql: [
+      // Bisher stand der von der Bank gemeldete Saldo an der Kontozuordnung und wurde bei
+      // JEDEM Abruf überschrieben. Damit ist die Frage „stimmt mein Konto?" mit einer Zahl
+      // zu beantworten, die Frage „seit wann nicht mehr?" mit gar nichts — und die zweite
+      // ist die nützlichere: aus 224 Buchungen über fünf Jahre werden zwei Wochen.
+      //
+      // Ein Anker ist eine BEOBACHTUNG, kein Rechenergebnis. Er wird deshalb nie ungültig
+      // und braucht keine Invalidierung, wenn jemand nachträglich eine Buchung davor
+      // einfügt — was sich ändert, ist die Differenz, und genau die will man sehen.
+      //
+      // Zwei Herkünfte: 'bank' (gemeldet) und 'hand' (Kassensturz beim Bargeld). Deshalb
+      // im Schlüssel: an einem Tag kann beides vorkommen.
+      `CREATE TABLE IF NOT EXISTS kontostand_anker (
+         konto_id   TEXT    NOT NULL,
+         datum      TEXT    NOT NULL,
+         herkunft   TEXT    NOT NULL,
+         betrag     INTEGER NOT NULL,
+         erfasst_am TEXT    NOT NULL,
+         PRIMARY KEY (konto_id, datum, herkunft)
+       )`,
+      // Der zuletzt gemeldete Stand wird zum ersten Anker — sonst begänne die Historie
+      // bei null und die erste brauchbare Aussage käme erst nach dem übernächsten Abruf.
+      // `INSERT OR IGNORE` macht das Statement wiederholbar.
+      `INSERT OR IGNORE INTO kontostand_anker (konto_id, datum, herkunft, betrag, erfasst_am)
+       SELECT zahlungskonto_id, bank_saldo_datum, 'bank', bank_saldo, bank_saldo_datum
+         FROM bankkonto_zuordnung
+        WHERE bank_saldo IS NOT NULL AND bank_saldo_datum IS NOT NULL`,
+    ],
+  },
+  {
+    version: 36, // … und erst danach die alten Spalten abräumen
+    sql: [
+      // Getrennte Version, weil v35 sie LIEST. Stünde beides zusammen und der Lauf bräche
+      // dazwischen ab, liefe v35 beim nächsten Start gegen die fehlenden Spalten — SQLite
+      // prüft Spaltennamen beim Parsen, da rettet keine WHERE-Bedingung.
+      `ALTER TABLE bankkonto_zuordnung DROP COLUMN bank_saldo`,
+      `ALTER TABLE bankkonto_zuordnung DROP COLUMN bank_saldo_datum`,
+    ],
+  },
 ];

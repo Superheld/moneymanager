@@ -6,17 +6,16 @@
 // Stammdaten, Training ist Arbeit am Modell.
 
 import { useEffect, useState } from "react";
-import type { Kategorie } from "../../core";
-import { sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
+import type { Kategorie } from "../../application";
+import { stammdaten } from "../dienste";
 import { KategorisierungCards } from "./KategorisierungCards";
 
 export function TrainingBereich() {
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
 
   useEffect(() => {
-    kategorieRepo
-      .alle()
-      .then(setKategorien)
+    stammdaten()
+      .then((d) => setKategorien([...d.kategorien]))
       .catch(() => setKategorien([])); // reiner Browser-Modus ohne SQLite
   }, []);
 

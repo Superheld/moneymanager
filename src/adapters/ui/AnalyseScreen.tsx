@@ -1,26 +1,34 @@
-// Historie (Rückblick) — Gegenstück zur zukunfts-reinen Übersicht: echte Einnahmen/
-// Ausgaben pro Monat aus den verbuchten Ist-Buchungen + realer Saldo-Verlauf über die Zeit.
+// Analyse (Rückblick) — echte Einnahmen und Ausgaben pro Monat aus den verbuchten
+// Ist-Buchungen, realer Saldo-Verlauf über die Zeit, Aufschlüsselung nach Kategorien.
 // Zeitraum wählbar (12/24 Monate, dieses Jahr, alles). Alles Geld über useGeld().
+//
+// Abgetrennt von der Übersicht (2026-08-19): dort steht, was JETZT gilt — die drei
+// Monatskarten und die Budgets des laufenden Monats. Alles, was einen Zeitraum
+// auswertet, hat einen eigenen Bereich bekommen. Vorher war das ein Screen, den man
+// nach unten scrollen musste, bis die Kategorien kamen.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { addMonate, buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, nachHauptgruppe, toIso, type Budget, type GruppenSumme, type Inventargegenstand, type IstBuchung, type Kategorie, type Zahlungskonto, type Zahlungsregel } from "../../core";
-import type { Umsatz } from "../../application/import";
-import { sqliteLedgerRepository as ledgerRepo } from "../persistence/sqliteLedgerRepository";
-import { sqliteUmsatzRepository as umsatzRepo } from "../persistence/sqliteImportRepositories";
-import { sqliteZahlungskontoRepository as kontoRepo, sqliteKategorieRepository as kategorieRepo } from "../persistence/sqliteStammdatenRepositories";
-import { sqliteZahlungsregelRepository as regelRepo } from "../persistence/sqliteZahlungsregelRepository";
-import { sqliteBudgetRepository as budgetRepo } from "../persistence/sqliteBudgetRepository";
-import { sqliteInventarRepository as inventarRepo } from "../persistence/sqliteInventarRepository";
+import {
+  analyseAufschluesselung,
+  analyseBuchungen,
+  analyseFenster,
+  analyseGruppen,
+  analyseVerlauf,
+  type Analysebasis,
+  type GruppenSumme,
+  type IstBuchung,
+} from "../../application";
+import { analyse } from "../dienste";
 import { Button, Card, CoverageTrack, DataTable, KPIStat } from "./ds";
 import { BuchungDetail } from "./BuchungDetail";
-import { MonatsAusblick } from "./MonatsAusblick";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { PageHead } from "./PageHead";
 import { useGeld } from "./einstellungenKontext";
+import { geldFarbe } from "./geldFarbe";
 
-import type { KategorieSumme } from "../../core";
+import type { KategorieSumme } from "../../application";
 
 type Zeitraum = "12" | "24" | "jahr" | "alles";
 
@@ -159,27 +167,16 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
   );
 }
 
-function aktuellerMonat(): { y: number; m: number; d: number } {
+/** Heute als ISO — die Uhr wird hier gelesen, gerechnet wird in der Anwendungsschicht. */
+function toIsoHeute(): string {
   const n = new Date();
-  return { y: n.getFullYear(), m: n.getMonth() + 1, d: 1 };
+  return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 }
 
-function heuteIso(): string {
-  const n = new Date();
-  return toIso({ y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() });
-}
-
-export function HistorieScreen() {
+export function AnalyseScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
-  const [ist, setIst] = useState<IstBuchung[]>([]);
-  const [konten, setKonten] = useState<Zahlungskonto[]>([]);
-  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
-  const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
-  const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
-  const [budgets, setBudgets] = useState<Budget[]>([]);
-  const [inventar, setInventar] = useState<Inventargegenstand[]>([]);
-  const heute = useMemo(heuteIso, []);
+  const [basis, setBasis] = useState<Analysebasis | null>(null);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("12");
   const [aktivMonat, setAktivMonat] = useState<number | null>(null);
   const [offeneKat, setOffeneKat] = useState<string | null>(null);
@@ -201,17 +198,7 @@ export function HistorieScreen() {
   // Aufschlüsselung gegen eine noch leere Kategorie-Liste rechnet (sonst „ohne Kategorie").
   async function laden() {
     try {
-      const [i, k, kat, u, r, b, inv] = await Promise.all([
-        ledgerRepo.alle(), kontoRepo.alle(), kategorieRepo.alle(), umsatzRepo.alle(), regelRepo.alle(), budgetRepo.alle(),
-        inventarRepo.alle(),
-      ]);
-      setIst(i);
-      setKonten(k);
-      setKategorien(kat);
-      setUmsaetze(u);
-      setRegeln(r);
-      setBudgets(b);
-      setInventar(inv);
+      setBasis(await analyse());
       setFehler(null);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -223,34 +210,24 @@ export function HistorieScreen() {
     laden();
   }, []);
 
-  const { von, bis } = useMemo(() => {
-    const bisYmd = aktuellerMonat();
-    const bisIso = toIso(bisYmd);
-    if (zeitraum === "jahr") return { von: `${bisYmd.y}-01-01`, bis: bisIso };
-    if (zeitraum === "alles") return { von: fruehesterMonat(ist) ?? bisIso, bis: bisIso };
-    const monate = zeitraum === "24" ? 23 : 11;
-    return { von: toIso(addMonate(bisYmd, -monate)), bis: bisIso };
-  }, [zeitraum, ist]);
+  const heute = useMemo(() => toIsoHeute(), []);
+  const { von, bis } = useMemo(
+    () => (basis ? analyseFenster(basis, zeitraum, heute) : { von: heute, bis: heute }),
+    [basis, zeitraum, heute],
+  );
 
-  const verlauf = useMemo(() => istMonatsverlauf(konten, ist, von, bis), [konten, ist, von, bis]);
+  const verlauf = useMemo(() => (basis ? analyseVerlauf(basis, von, bis) : []), [basis, von, bis]);
 
   const aufschluesselung = useMemo(() => {
-    if (verlauf.length === 0) return null;
+    if (!basis || verlauf.length === 0) return null;
     const idx = aktivMonat != null && aktivMonat < verlauf.length ? aktivMonat : null;
     const bvon = idx != null ? `${verlauf[idx].label}-01` : von;
     const bbis = idx != null ? `${verlauf[idx].label}-01` : bis;
-    // Interne Umbuchungen raus — sie verschieben nur Geld zwischen eigenen Konten.
-    const relevant = ist.filter((b) => !istInterneUmbuchung(b));
-    return { label: idx != null ? verlauf[idx].label : null, items: kategorieAggregat(relevant, bvon, bbis, kategorien) };
-  }, [aktivMonat, verlauf, ist, kategorien, von, bis]);
+    return { label: idx != null ? verlauf[idx].label : null, items: analyseAufschluesselung(basis, bvon, bbis) };
+  }, [aktivMonat, verlauf, basis, von, bis]);
 
-  const umsatzByIst = useMemo(() => {
-    const m = new Map<string, Umsatz>();
-    for (const u of umsaetze) if (u.istbuchungId) m.set(u.istbuchungId, u);
-    return m;
-  }, [umsaetze]);
-
-  const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
+  const ist = basis?.buchungen ?? [];
+  const kategorien = basis?.kategorien ?? [];
 
   const detailFenster = useMemo(() => {
     const idx = aktivMonat != null && aktivMonat < verlauf.length ? aktivMonat : null;
@@ -298,7 +275,7 @@ export function HistorieScreen() {
   const detailTd = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
 
   function detailTabelle(kategorieId: string) {
-    const bs = buchungenDerKategorie(ist, kategorieId, detailFenster.bvon, detailFenster.bbis);
+    const bs = basis ? analyseBuchungen(basis, kategorieId, detailFenster.bvon, detailFenster.bbis) : [];
     if (bs.length === 0) return <div className="muted" style={{ padding: "8px" }}>{t("historie.detailLeer")}</div>;
     return (
       <div style={{ background: "var(--surface-2, rgba(0,0,0,.015))", borderRadius: "var(--r-md)", padding: "4px 8px", margin: "4px 0 10px" }}>
@@ -313,18 +290,17 @@ export function HistorieScreen() {
             </tr>
           </thead>
           <tbody>
-            {bs.slice(0, 50).map((b) => {
-              const u = umsatzByIst.get(b.id);
-              const zweck = u?.verwendungszweck ?? "";
+            {bs.slice(0, 50).map((z) => {
+              const zweck = z.verwendungszweck;
               return (
                 // Anklickbar: beim Durchsehen einer Kategorie stößt man auf Buchungen,
                 // die eine Korrektur brauchen — der Umweg über den Konto-Auszug entfällt.
-                <tr key={b.id} onClick={() => setDetail(b)} style={{ cursor: "pointer" }} title={t("historie.detailOeffnen")}>
-                  <td style={detailTd}>{b.datum.split("-").reverse().join(".")}</td>
-                  <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>{u?.gegenpartei ?? b.notiz ?? "—"}</td>
+                <tr key={z.buchung.id} onClick={() => setDetail(z.buchung)} style={{ cursor: "pointer" }} title={t("historie.detailOeffnen")}>
+                  <td style={detailTd}>{z.buchung.datum.split("-").reverse().join(".")}</td>
+                  <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>{z.empfaenger || "—"}</td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 45 ? zweck.slice(0, 45) + "…" : zweck}</td>
-                  <td style={{ ...detailTd, color: "var(--ink-3)" }}>{kontoName.get(b.kontoId) ?? "—"}</td>
-                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{geld.format(b.betrag, { mitVorzeichen: true })}</td>
+                  <td style={{ ...detailTd, color: "var(--ink-3)" }}>{z.kontoName || "—"}</td>
+                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(z.buchung.betrag) }}>{geld.format(z.buchung.betrag, { mitVorzeichen: true })}</td>
                 </tr>
               );
             })}
@@ -337,15 +313,9 @@ export function HistorieScreen() {
 
   return (
     <div className="screen">
-      <PageHead title={t("historie.titel")} subtitle={t("historie.untertitel")} />
+      <PageHead title={t("analyse.titel")} subtitle={t("analyse.untertitel")} />
 
       {fehler && <Card style={{ borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
-
-      {/* Der Ausblick steht vor dem Rückblick: die Frage „was bleibt diesen Monat?" ist
-          beim Öffnen die dringendere. Er lebt vom Plan und braucht keine Ist-Buchungen. */}
-      {geladen && !fehler && (
-        <MonatsAusblick regeln={regeln} budgets={budgets} inventar={inventar} ist={ist} kategorien={kategorien} heute={heute} />
-      )}
 
       {!geladen ? null : ist.length === 0 && !fehler ? (
         <Card>{t("historie.leer")}</Card>
@@ -355,11 +325,11 @@ export function HistorieScreen() {
             <KPIStat size="chip" label={monat ? t("historie.kpiEinnahmenMonat", { monat: monat.label }) : t("historie.kpiEinnahmen")}
               value={geld.format(summeEin)} unit={geld.symbol} tone="ok" meta={vergleich(summeEin, oeEin)} />
             <KPIStat size="chip" label={monat ? t("historie.kpiAusgabenMonat", { monat: monat.label }) : t("historie.kpiAusgaben")}
-              value={geld.format(summeAus)} unit={geld.symbol} meta={vergleich(summeAus, oeAus)} />
+              value={geld.format(summeAus)} unit={geld.symbol} tone={summeAus < 0 ? "warn" : "default"} meta={vergleich(summeAus, oeAus)} />
             <KPIStat size="chip" label={t("historie.kpiNetto")} value={geld.format(netto, { mitVorzeichen: true })} unit={geld.symbol} tone={netto < 0 ? "warn" : "ok"} />
             {/* Der Maßstab: was ein Monat im Schnitt kostet. Bleibt beim Zeitraum-Ø,
                 auch wenn ein einzelner Monat gewählt ist — sonst gäbe es nichts zu vergleichen. */}
-            <KPIStat size="chip" label={t("historie.kpiOeAusgaben")} value={geld.format(oeAus)} unit={geld.symbol} />
+            <KPIStat size="chip" label={t("historie.kpiOeAusgaben")} value={geld.format(oeAus)} unit={geld.symbol} tone={oeAus < 0 ? "warn" : "default"} />
             <KPIStat size="chip" label={t("historie.kpiSaldo")} value={geld.format(saldoJetzt)} unit={geld.symbol} tone={saldoJetzt < 0 ? "warn" : "default"} />
           </div>
 
@@ -426,7 +396,7 @@ export function HistorieScreen() {
                   { key: "label", label: t("historie.spalteMonat") },
                   { key: "einnahmen", label: `${t("historie.spalteEinnahmen")} ${geld.symbol}`, align: "right", render: (m) => (m.einnahmen ? geld.format(m.einnahmen) : "—") },
                   { key: "ausgaben", label: `${t("historie.spalteAusgaben")} ${geld.symbol}`, align: "right", render: (m) => (m.ausgaben ? geld.format(m.ausgaben) : "—") },
-                  { key: "netto", label: `${t("historie.spalteNetto")} ${geld.symbol}`, align: "right", render: (m) => <span style={{ color: m.netto < 0 ? "var(--warn-deep)" : "var(--ink)", fontWeight: "var(--fw-bold)" }}>{geld.format(m.netto, { mitVorzeichen: true })}</span> },
+                  { key: "netto", label: `${t("historie.spalteNetto")} ${geld.symbol}`, align: "right", render: (m) => <span style={{ color: geldFarbe(m.netto), fontWeight: "var(--fw-bold)" }}>{geld.format(m.netto, { mitVorzeichen: true })}</span> },
                   { key: "umschichtung", label: `${t("historie.spalteUmschichtung")} ${geld.symbol}`, align: "right", render: (m) => (m.umschichtung ? geld.format(m.umschichtung, { mitVorzeichen: true }) : "—") },
                   { key: "saldo", label: `${t("historie.spalteSaldo")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.saldo, { mitVorzeichen: true }) },
                 ]}
@@ -458,7 +428,7 @@ export function HistorieScreen() {
                   <GruppenSektion
                     key={ch}
                     titel={titel}
-                    gruppen={nachHauptgruppe(items, kategorien)}
+                    gruppen={basis ? analyseGruppen(basis, items) : []}
                     ohneLabel={ohneLabel}
                     monate={monateImFenster}
                     offeneGruppe={offeneGruppe ?? undefined}

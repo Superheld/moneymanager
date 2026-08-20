@@ -22,7 +22,7 @@ import { KontenVerwaltungScreen } from "./KontenVerwaltungScreen";
 import { InventarScreen } from "./InventarScreen";
 import { BudgetsScreen } from "./BudgetsScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
-import { sqliteTopfRepository } from "../persistence/sqliteTopfRepository";
+import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import {
   sqliteKategorieRepository,
   sqliteZahlungskontoRepository,
@@ -68,50 +68,51 @@ async function klicke(nutzer: ReturnType<typeof userEvent.setup>, muster: RegExp
   return letzter;
 }
 
-/** Der aufbauende Teil der Budgets (früher der eigene Töpfe-Screen). */
-describe("Aufbauende Budgets — Formularpfade", () => {
-  /** Wählt im Anlege-Dialog die Art; der Dialog trägt seit der Zusammenlegung beide Fälle. */
-  async function artWaehlen(nutzer: ReturnType<typeof userEvent.setup>, wert: string) {
-    const feld = screen
-      .getAllByRole("combobox")
-      .find((s) => (s.textContent ?? "").includes("Spartopf"));
-    if (feld) await nutzer.selectOptions(feld, wert);
-  }
-
+describe("Budgets — Formularpfade", () => {
   it("bricht das Anlegen ab, ohne etwas zu speichern", async () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
     // Erst warten, bis der Screen steht: `klicke` sucht synchron, und auf einem noch
     // leeren Body fände es nichts — der Test liefe dann durch, ohne etwas zu tun.
     await nutzer.click(await screen.findByRole("button", { name: /anlegen/i }));
-    await artWaehlen(nutzer, "spartopf");
     await formularFuellen(nutzer, "Verworfen", "50");
     await klicke(nutzer, /abbrechen|schließen/i);
 
-    expect(await sqliteTopfRepository.alle()).toHaveLength(0);
+    expect(await sqliteBudgetRepository.alle()).toHaveLength(0);
     // Der Dialog ist zu — sonst hätte „abbrechen" nur nichts getroffen.
     await waitFor(() => expect(screen.queryByText("Verworfen")).not.toBeInTheDocument());
   });
 
-  it("entnimmt aus einem bestehenden Topf", async () => {
+  it("legt ein aufbauendes Budget über die Maske an", async () => {
     await sqliteZahlungskontoRepository.speichern({
-      id: "k1", bezeichnung: "Girokonto", typ: "Giro", inhaberIds: [], saldo: 100000,
+      id: "k1", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", inhaberIds: [], saldo: 100000,
     });
-    await sqliteTopfRepository.speichern({
-      id: "t1", typ: "spartopf", bezeichnung: "Urlaub", start: "2020-01-01",
-      zufuehrungProMonat: 10000, sparziel: 500000,
-    });
+    await sqliteKategorieRepository.speichern({ id: "kat1", name: "Urlaub", defaultCharakter: "Aufwand" });
+
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
-    await waitFor(() => expect(document.body.textContent).toMatch(/Urlaub/));
+    await nutzer.click(await screen.findByRole("button", { name: /anlegen/i }));
 
-    const entnehmen = await klicke(nutzer, /entnehmen|entnahme/i);
-    if (entnehmen) {
-      await formularFuellen(nutzer, "Reise", "25");
-      await klicke(nutzer, /speichern|entnehmen|buchen/i);
-    }
-    // Definierter Zustand: entweder gebucht oder begründet abgelehnt.
-    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+    // Art umstellen — seit der Zusammenlegung ist das nur noch ein Auswahlfeld.
+    const artFeld = screen.getAllByRole("combobox").find((s) => (s.textContent ?? "").includes("aufbauend"));
+    if (artFeld) await nutzer.selectOptions(artFeld, "aufbauend");
+
+    // Der Kategorie-Picker ist ein Knopf, der einen eigenen Dialog öffnet.
+    await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Urlaub/ }));
+
+    const betrag = screen.getAllByRole("textbox").find((f) => !(f as HTMLInputElement).value);
+    if (betrag) await nutzer.type(betrag, "50");
+    await klicke(nutzer, /^speichern$/i);
+
+    await waitFor(async () => {
+      const budgets = await sqliteBudgetRepository.alle();
+      expect(budgets).toHaveLength(1);
+      expect(budgets[0].art).toBe("aufbauend");
+      expect(budgets[0].kontoId).toBe("k1");
+      // Start immer auf dem Monatsersten — nie mitten im Monat.
+      expect(budgets[0].start.endsWith("-01")).toBe(true);
+    });
   });
 });
 
