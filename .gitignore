@@ -40,3 +40,14 @@ design-system/
 # NICHT ins Repo gehört die DK-Produktregistrierungsnummer. Sie steht in der .env
 # (oben ausgeschlossen); dass sie in keiner versionierten Datei landet, prüft
 # src/adapters/fints/produktId.test.ts bei jedem Testlauf.
+
+# Kein Datenbestand ins Repo. Die echte Datenbank liegt ausserhalb des Projekts
+# (~/Library/Application Support/…), aber eine Probekopie ist schnell mal hier gelandet:
+# waehrend Migrationen wird regelmaessig eine gezogen, und `git add -A` fragt nicht.
+# Dasselbe fuer Kontoauszuege — eine Finanzguru-CSV enthaelt alles auf einmal.
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.csv

@@ -126,10 +126,10 @@ describe("bankAnker", () => {
   });
 
   it("übernimmt Stichtag und Erfassungszeitpunkt getrennt", () => {
-    const a = bankAnker("giro", [Betrag], "2026-08-20", "2026-08-20T22:47:25.284Z");
+    const a = bankAnker("giro", 145678, "2026-08-20", "2026-08-20T22:47:25.284Z");
     expect(a).toEqual({
       kontoId: "giro", datum: "2026-08-20", herkunft: "bank",
-      betrag: [Betrag], erfasstAm: "2026-08-20T22:47:25.284Z",
+      betrag: 145678, erfasstAm: "2026-08-20T22:47:25.284Z",
     });
   });
 });

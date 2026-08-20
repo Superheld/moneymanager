@@ -243,7 +243,7 @@ describe("Kontostands-Anker (v35/v36)", () => {
     apply(db, 0, 34);
     db.run(
       `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id, bank_saldo, bank_saldo_datum)
-       VALUES ('z1', 's1', 'giro', [Betrag], '2026-08-20')`,
+       VALUES ('z1', 's1', 'giro', 145678, '2026-08-20')`,
     );
     // Ein Konto ohne gemeldeten Stand darf keinen Anker erzeugen.
     db.run(
@@ -254,7 +254,7 @@ describe("Kontostands-Anker (v35/v36)", () => {
     apply(db, 34, 35);
 
     expect(db.exec("SELECT konto_id, datum, herkunft, betrag FROM kontostand_anker")[0].values).toEqual([
-      ["giro", "2026-08-20", "bank", [Betrag]],
+      ["giro", "2026-08-20", "bank", 145678],
     ]);
     db.close();
   });
@@ -264,7 +264,7 @@ describe("Kontostands-Anker (v35/v36)", () => {
     apply(db, 0, 34);
     db.run(
       `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id, bank_saldo, bank_saldo_datum)
-       VALUES ('z1', 's1', 'giro', [Betrag], '2026-08-20')`,
+       VALUES ('z1', 's1', 'giro', 145678, '2026-08-20')`,
     );
     apply(db, 34, 35);
     apply(db, 34, 35);

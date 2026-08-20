@@ -665,18 +665,18 @@ describe("Dubletten-Freigabe — von Hand festgehalten", () => {
 describe("Kontostands-Anker", () => {
   it("trägt Stichtag, Herkunft und Erfassungszeitpunkt getrennt durch das Schema", async () => {
     await ankerRepository.speichern({
-      kontoId: "giro", datum: "2026-08-20", herkunft: "bank", betrag: [Betrag],
+      kontoId: "giro", datum: "2026-08-20", herkunft: "bank", betrag: 145678,
       erfasstAm: "2026-08-20T22:47:25.284Z",
     });
     expect(await ankerRepository.alle()).toEqual([
-      { kontoId: "giro", datum: "2026-08-20", herkunft: "bank", betrag: [Betrag], erfasstAm: "2026-08-20T22:47:25.284Z" },
+      { kontoId: "giro", datum: "2026-08-20", herkunft: "bank", betrag: 145678, erfasstAm: "2026-08-20T22:47:25.284Z" },
     ]);
   });
 
   it("überschreibt denselben Stichtag derselben Quelle, statt zu doppeln", async () => {
     // Zwei Abrufe an einem Tag sind zwei Aussagen über DENSELBEN Tag.
     const basis = { kontoId: "giro", datum: "2026-08-20", herkunft: "bank" as const };
-    await ankerRepository.speichern({ ...basis, betrag: [Betrag], erfasstAm: "2026-08-20T09:00:00.000Z" });
+    await ankerRepository.speichern({ ...basis, betrag: 145678, erfasstAm: "2026-08-20T09:00:00.000Z" });
     await ankerRepository.speichern({ ...basis, betrag: 170000, erfasstAm: "2026-08-20T22:00:00.000Z" });
     const alle = await ankerRepository.alle();
     expect(alle).toHaveLength(1);
