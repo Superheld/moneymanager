@@ -33,32 +33,64 @@ const WURZEL = join(import.meta.dirname, "..");
  * vor dem CLAUDE.md bei Kopien warnt: die Datenbank läuft im WAL-Modus, und sql.js liest
  * nur die Hauptdatei. Der erste Anlauf dieses Wächters tat genau das — und übersah
  * deshalb die ganze Anker-Tabelle samt der Kontostände darin, die zur selben Stunde in
- * zwei Testdateien standen. Ein Wächter, der die halbe Datenbank nicht sieht, ist
- * schlimmer als keiner: er beruhigt.
+ * zwei Testdateien standen.
+ *
+ * Und **nicht** mit `-readonly`: solange die App läuft, hält sie die Datenbank, und ein
+ * read-only-Zugriff scheitert dann mit „unable to open database file" — er darf die
+ * `-shm`-Datei nicht anlegen, die der WAL-Modus braucht. `PRAGMA query_only=ON` öffnet
+ * normal und verbietet trotzdem jedes Schreiben.
+ *
+ * Beides zusammen ist die eigentliche Lehre: ein Wächter, der die halbe Datenbank nicht
+ * sieht oder sie gar nicht aufbekommt, ist schlimmer als keiner — er beruhigt. Deshalb
+ * unterscheidet er unten hart zwischen „keine Datenbank da" (nichts zu prüfen) und
+ * „Datenbank da, aber nicht lesbar" (Abbruch).
  */
 const DB_PFAD = join(
   homedir(),
   "Library/Application Support/de.netmechanics.moneymanager/moneymanager.db",
 );
 
+/** Gibt es das `sqlite3`-Kommando überhaupt? Ohne es kann hier nichts geprüft werden. */
+function sqliteVorhanden(): boolean {
+  try {
+    execFileSync("sqlite3", ["-version"], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function merkmale(): string[] {
-  if (!existsSync(DB_PFAD)) return [];
+  if (!existsSync(DB_PFAD) || !sqliteVorhanden()) return [];
   const werte = new Set<string>();
 
-  function frage(sql: string): string[] {
+  function frage(sql: string, mussGehen = false): string[] {
     try {
-      return execFileSync("sqlite3", ["-readonly", DB_PFAD, sql], { encoding: "utf8" })
+      return execFileSync("sqlite3", ["-cmd", "PRAGMA query_only=ON", DB_PFAD, sql], {
+        encoding: "utf8",
+      })
         .split("\n")
         .filter(Boolean);
-    } catch {
-      return []; // kein sqlite3, oder Tabelle/Spalte gibt es (noch) nicht
+    } catch (e) {
+      // Eine Tabelle, die es (noch) nicht gibt, ist in Ordnung — eine Datenbank, die sich
+      // nicht öffnen lässt, nicht. Sonst liefe der Wächter grün, ohne etwas gesehen zu
+      // haben, und das ist der eine Fehler, den er sich nicht leisten darf.
+      if (mussGehen) {
+        throw new Error(
+          `Die Datenbank ist da, lässt sich aber nicht lesen — der Wächter hat NICHTS geprüft.\n${String(e).slice(0, 200)}`,
+        );
+      }
+      return [];
     }
   }
+
+  // Probeabfrage: geht die Datenbank überhaupt auf?
+  frage("SELECT count(*) FROM sqlite_master", true);
 
   // Beträge: als Zahl und in beiden Schreibweisen, in denen sie in Prosa landen.
   for (const roh of [
     ...frage("SELECT kontostand FROM zahlungskonto"),
-    ...frage("SELECT betrag FROM budget"),
+    ...frage("SELECT betrag_pro_monat FROM budget"),
     ...frage("SELECT betrag FROM kontostand_anker"),
     ...frage("SELECT sum(betrag) FROM ist_buchung GROUP BY konto_id"),
   ]) {
@@ -86,6 +118,15 @@ function merkmale(): string[] {
     if (wert.length >= 5) werte.add(wert);
   }
 
+  // Kam wirklich etwas heraus? Eine leere Merkmalsliste sieht aus wie „alles sauber",
+  // heisst aber „nichts geprüft" — genau der Zustand, in dem dieser Wächter zweimal
+  // grün lief, während die Daten im Repo standen.
+  if (werte.size === 0) {
+    throw new Error(
+      "Aus der Datenbank kam kein einziges Merkmal — entweder ist sie leer, oder die " +
+        "Abfragen passen nicht mehr zum Schema. Der Wächter hat nichts geprüft.",
+    );
+  }
   return [...werte];
 }
 
