@@ -18,23 +18,23 @@ const UHR = () => "2026-08-17T10:00:00.000Z";
 describe("Festlegung setzen", () => {
   it("speichert Muster, Kategorie und Zeitpunkt", async () => {
     const r = repo();
-    await festlegungSetzen(r, "netflix international", "k-abo", UHR);
+    await festlegungSetzen(r, "kesselmann international", "k-abo", UHR);
     expect(await r.alle()).toEqual([
-      { muster: "netflix international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" },
+      { muster: "kesselmann international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" },
     ]);
   });
 
   it("normalisiert das Muster", async () => {
     const r = repo();
-    await festlegungSetzen(r, "  NETFLIX  ", "k-abo", UHR);
-    expect((await r.alle())[0].muster).toBe("netflix");
+    await festlegungSetzen(r, "  KESSELMANN  ", "k-abo", UHR);
+    expect((await r.alle())[0].muster).toBe("kesselmann");
   });
 
   it("legt nichts an, wenn Muster oder Kategorie fehlen", async () => {
     // Eine leere Zeile in der Liste wäre eine Regel, die alles oder nichts trifft.
     const r = repo();
     expect(await festlegungSetzen(r, "   ", "k-abo", UHR)).toBeNull();
-    expect(await festlegungSetzen(r, "netflix", "", UHR)).toBeNull();
+    expect(await festlegungSetzen(r, "kesselmann", "", UHR)).toBeNull();
     expect(await r.alle()).toHaveLength(0);
   });
 
@@ -61,7 +61,7 @@ describe("Angebot an die Oberfläche", () => {
   ];
 
   it("schlägt die normalisierte Form des Empfängers vor", () => {
-    expect(festlegungAngebot([], "NETFLIX INTERNATIONAL BV", "k-abo")).toBe("netflix international");
+    expect(festlegungAngebot([], "KESSELMANN INTERNATIONAL BV", "k-abo")).toBe("kesselmann international");
   });
 
   it("schweigt, wenn genau das schon festgelegt ist", () => {

@@ -1,7 +1,7 @@
 // SQLite-Implementierung der Kategorie-Festlegungen (Migration 24).
 //
 // Eine Zeile je Muster. Kleingeschrieben und getrimmt gespeichert, weil der Vergleich
-// ohnehin ohne Groß-/Kleinschreibung läuft: stünde „[anonymisiert]" und „netflix" nebeneinander,
+// ohnehin ohne Groß-/Kleinschreibung läuft: stünde „Kesselmann" und „kesselmann" nebeneinander,
 // wären das zwei Zeilen mit derselben Wirkung, von denen das Löschen der einen nichts
 // ändert.
 

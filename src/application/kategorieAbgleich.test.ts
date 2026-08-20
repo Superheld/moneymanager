@@ -11,8 +11,8 @@ const KATEGORIEN: Kategorie[] = [
   { id: "k-sp", name: "Sparen & Anlegen", defaultCharakter: "Umschichtung" },
 ];
 
-/** Ein Kontext, in dem „rossmann" per Festlegung auf Drogerie zeigt. */
-function kontextMitFestlegung(muster = "rossmann", kategorieId = "k-dro"): Vorschlagskontext {
+/** Ein Kontext, in dem „talmer" per Festlegung auf Drogerie zeigt. */
+function kontextMitFestlegung(muster = "talmer", kategorieId = "k-dro"): Vorschlagskontext {
   return {
     katalogNachName: katalogNachName(KATEGORIEN),
     kategorieNachId: katalogNachId(KATEGORIEN),
@@ -25,7 +25,7 @@ function spur(over: Partial<Zahlungsspur> = {}): Zahlungsspur {
     id: "b1",
     datum: "2026-03-01",
     betrag: -1234,
-    gegenpartei: "[anonymisiert]",
+    gegenpartei: "Talmer",
     verwendungszweck: "Einkauf",
     charakter: "Aufwand",
     kategorieId: "k-so",
@@ -44,7 +44,7 @@ describe("Plan rechnen", () => {
         charakter: "Aufwand",
         vonCharakter: "Aufwand",
         quelle: "festlegung",
-        gegenpartei: "[anonymisiert]",
+        gegenpartei: "Talmer",
         betrag: -1234,
         datum: "2026-03-01",
       },
@@ -95,7 +95,7 @@ describe("Plan rechnen", () => {
   it("nimmt den Charakter der Zielkategorie mit", () => {
     // Die Kategorie zu ändern und den Charakter stehen zu lassen, ergäbe eine Buchung,
     // die ihrer eigenen Kategorie widerspricht.
-    const plan = kategorieAbgleich([spur()], kontextMitFestlegung("rossmann", "k-sp"));
+    const plan = kategorieAbgleich([spur()], kontextMitFestlegung("talmer", "k-sp"));
     expect(plan.setzen[0].charakter).toBe("Umschichtung");
   });
 
@@ -104,7 +104,7 @@ describe("Plan rechnen", () => {
     // Erfolgs- und Liquiditätswirksamkeit — die Vorschau muss ihn eigens nennen können.
     const plan = kategorieAbgleich(
       [spur({ id: "a" }), spur({ id: "b", gegenpartei: "REWE" })],
-      kontextMitFestlegung("rossmann", "k-sp"),
+      kontextMitFestlegung("talmer", "k-sp"),
     );
     expect(charakterWechsel(plan).map((w) => w.istbuchungId)).toEqual(["a"]);
   });
@@ -186,7 +186,7 @@ describe("Plan anwenden", () => {
 
   it("schreibt Kategorie und Charakter", async () => {
     const { port, inhalt } = ledger([BUCHUNG]);
-    const plan = kategorieAbgleich([spur()], kontextMitFestlegung("rossmann", "k-sp"));
+    const plan = kategorieAbgleich([spur()], kontextMitFestlegung("talmer", "k-sp"));
 
     expect(await planAnwenden(port, plan)).toBe(1);
     expect(inhalt.get("b1")).toMatchObject({ kategorieId: "k-sp", charakter: "Umschichtung" });

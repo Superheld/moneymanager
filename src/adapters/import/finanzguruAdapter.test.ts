@@ -60,7 +60,7 @@ describe("finanzguruAdapter.lies", () => {
     const { umsaetze, warnungen } = finanzguruAdapter.lies(
       datei(reihe({
         tag: TAG["2021-11-01"], konto: "DE31999999980000000002", betrag: "-6.55",
-        gegenpartei: "[anonymisiert]", zweck: "Kartenzahlung", unterkat: "Lebensmittel",
+        gegenpartei: "Brandeis", zweck: "Kartenzahlung", unterkat: "Lebensmittel",
         buchungsId: "2da83348289587cbe750f887563fd417135d354e",
       })),
     );
@@ -70,7 +70,7 @@ describe("finanzguruAdapter.lies", () => {
       buchungstag: "2021-11-01", // aus der Seriennummer 44501
       betrag: -655,
       waehrung: "EUR",
-      gegenpartei: "[anonymisiert]",
+      gegenpartei: "Brandeis",
       gegenparteiIban: undefined,
       verwendungszweck: "Kartenzahlung",
       kontoIban: "DE31999999980000000002",
@@ -128,7 +128,7 @@ describe("finanzguruAdapter.lies", () => {
   /** Rückfall: Excel kann ein Datum auch als Text ablegen, dann kommt keine Serie an. */
   it("nimmt ein Datum auch in Textform", () => {
     const { umsaetze } = finanzguruAdapter.lies(
-      datei(reihe({ tag: "01.11.2021", betrag: "-6.55", gegenpartei: "[anonymisiert]" })),
+      datei(reihe({ tag: "01.11.2021", betrag: "-6.55", gegenpartei: "Brandeis" })),
     );
     expect(umsaetze[0].buchungstag).toBe("2021-11-01");
   });
@@ -151,7 +151,7 @@ describe("finanzguruAdapter.lies", () => {
     const { umsaetze } = finanzguruAdapter.lies(
       datei(
         reihe({ tag: TAG["2022-05-01"], betrag: "-500.00", gegenpartei: "Eigenes Tagesgeld", umbuchung: "ja" }),
-        reihe({ tag: TAG["2022-05-01"], betrag: "-6.55", gegenpartei: "[anonymisiert]" }),
+        reihe({ tag: TAG["2022-05-01"], betrag: "-6.55", gegenpartei: "Brandeis" }),
       ),
     );
     expect(umsaetze[0].istUmbuchung).toBe(true);
@@ -167,9 +167,9 @@ describe("finanzguruAdapter.lies", () => {
   it("überspringt Teile einer Split-Buchung, deren Original in der Datei steht", () => {
     const { umsaetze, warnungen } = finanzguruAdapter.lies(
       datei(
-        reihe({ tag: TAG["2022-04-04"], betrag: "-123.75", gegenpartei: "[anonymisiert]", buchungsId: "orig-1", splitTyp: "Original" }),
-        reihe({ tag: TAG["2022-04-04"], betrag: "-49.95", gegenpartei: "[anonymisiert]", buchungsId: "teil-1", splitTyp: "Teilbuchung", originalId: "orig-1" }),
-        reihe({ tag: TAG["2022-04-04"], betrag: "-73.80", gegenpartei: "[anonymisiert]", buchungsId: "teil-2", splitTyp: "Restbetrag", originalId: "orig-1" }),
+        reihe({ tag: TAG["2022-04-04"], betrag: "-123.75", gegenpartei: "Ohlert", buchungsId: "orig-1", splitTyp: "Original" }),
+        reihe({ tag: TAG["2022-04-04"], betrag: "-49.95", gegenpartei: "Ohlert", buchungsId: "teil-1", splitTyp: "Teilbuchung", originalId: "orig-1" }),
+        reihe({ tag: TAG["2022-04-04"], betrag: "-73.80", gegenpartei: "Ohlert", buchungsId: "teil-2", splitTyp: "Restbetrag", originalId: "orig-1" }),
       ),
     );
     expect(umsaetze).toHaveLength(1);
@@ -185,7 +185,7 @@ describe("finanzguruAdapter.lies", () => {
    */
   it("übernimmt einen Teil, dessen Original nicht in der Datei steht", () => {
     const { umsaetze, warnungen } = finanzguruAdapter.lies(
-      datei(reihe({ tag: TAG["2022-04-04"], betrag: "-49.95", gegenpartei: "[anonymisiert]", buchungsId: "teil-1", splitTyp: "Teilbuchung", originalId: "fehlt" })),
+      datei(reihe({ tag: TAG["2022-04-04"], betrag: "-49.95", gegenpartei: "Ohlert", buchungsId: "teil-1", splitTyp: "Teilbuchung", originalId: "fehlt" })),
     );
     expect(umsaetze).toHaveLength(1);
     expect(warnungen.some((w) => w.includes("ohne zugehörige"))).toBe(true);
@@ -193,7 +193,7 @@ describe("finanzguruAdapter.lies", () => {
 
   it("lässt eine Original-Zeile unangetastet, auch wenn sie als Split markiert ist", () => {
     const { umsaetze } = finanzguruAdapter.lies(
-      datei(reihe({ tag: TAG["2022-04-04"], betrag: "-50.00", gegenpartei: "[anonymisiert]", buchungsId: "orig-2", splitTyp: "Original" })),
+      datei(reihe({ tag: TAG["2022-04-04"], betrag: "-50.00", gegenpartei: "Arnholt", buchungsId: "orig-2", splitTyp: "Original" })),
     );
     expect(umsaetze).toHaveLength(1);
     expect(umsaetze[0].betrag).toBe(-5000);

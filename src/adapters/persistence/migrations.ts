@@ -473,7 +473,7 @@ export const MIGRATIONS: Migration[] = [
       // Welches Bankkonto auf welches Zahlungskonto der App zeigt.
       //
       // Der Schlüssel ist `kontonummer|unterkontomerkmal`, NIE die Kontonummer allein:
-      // comdirect meldet Girokonto und Depot unter derselben Nummer und trennt sie über
+      // ein Institut meldet Girokonto und Depot unter derselben Nummer und trennt sie über
       // das Unterkontomerkmal, in dem der Produktname steht.
       //
       // `letzter_abruf_bis` trägt den fortlaufenden Abruf (S-6d): ab wo beim nächsten Mal
@@ -504,7 +504,7 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE umsatz ADD COLUMN e2e_referenz TEXT`,
       `ALTER TABLE umsatz ADD COLUMN umsatzart TEXT`,
       `ALTER TABLE umsatz ADD COLUMN buchungsschluessel TEXT`,
-      // Institutseigene Referenz aus dem Freitext (comdirect: `Ref. …`). Ausdrücklich
+      // Institutseigene Referenz aus dem Freitext (etwa `Ref. …`). Ausdrücklich
       // KEIN Schlüssel — im Spike waren von 64 nur 59 verschieden. Gespeichert wird sie,
       // damit sich am Bestand prüfen lässt, ob sie über mehrere Abrufe stabil bleibt.
       `ALTER TABLE umsatz ADD COLUMN bank_referenz TEXT`,

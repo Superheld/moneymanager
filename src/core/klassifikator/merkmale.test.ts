@@ -38,9 +38,9 @@ describe("Empfänger", () => {
   it("ein einwortiger Name bekommt KEIN Teil-Token", () => {
     // Sonst zählte derselbe Anbieter doppelt und bekäme gegenüber mehrwortigen Namen
     // stillschweigend mehr Gewicht.
-    const m = merkmaleFuer(quelle({ gegenpartei: "[anonymisiert] GmbH" }));
-    expect(m).toContain("emp=netcup");
-    expect(m).not.toContain("emp:netcup");
+    const m = merkmaleFuer(quelle({ gegenpartei: "Vibora GmbH" }));
+    expect(m).toContain("emp=vibora");
+    expect(m).not.toContain("emp:vibora");
   });
 
   it("Umlaute und Schreibweisen fallen zusammen", () => {
@@ -73,11 +73,11 @@ describe("Verwendungszweck", () => {
 
   it("schneidet angeklebte Nummern ab, statt das Wort wegzuwerfen", () => {
     // Am echten Bestand gemessen: Banken setzen zwischen Bezeichnung und Nummer kein
-    // Leerzeichen. Ohne das Abschneiden fielen „debitkarte" (1057×) und „comdirect"
-    // (366×) komplett aus dem Vokabular.
-    const m = merkmaleFuer(quelle({ verwendungszweck: "DEBITKARTE2025 3386[anonymisiert]" }));
+    // Leerzeichen. Ohne das Abschneiden fielen zwei der häufigsten Wörter überhaupt
+    // komplett aus dem Vokabular — der Kartenname und der Name der Bank.
+    const m = merkmaleFuer(quelle({ verwendungszweck: "DEBITKARTE2025 3386MUSTERBANK" }));
     expect(m).toContain("vwz:debitkarte");
-    expect(m).toContain("vwz:comdirect");
+    expect(m).toContain("vwz:musterbank");
   });
 
   it("behält eine dreistellige Abkürzung nach dem Abschneiden", () => {

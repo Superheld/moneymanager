@@ -5,8 +5,8 @@ const leererBestand = { hashes: [], nativeIds: [] };
 
 describe("rohHash", () => {
   it("ist deterministisch für gleiche fachliche Daten", () => {
-    const a = { kontoIban: "DE12 3456", buchungstag: "2022-01-01", betrag: -655, gegenpartei: "[anonymisiert]", verwendungszweck: "Kasse 1" };
-    const b = { kontoIban: "de123456", buchungstag: "2022-01-01", betrag: -655, gegenpartei: "trinkgut", verwendungszweck: "kasse 1" };
+    const a = { kontoIban: "DE12 3456", buchungstag: "2022-01-01", betrag: -655, gegenpartei: "Brandeis", verwendungszweck: "Kasse 1" };
+    const b = { kontoIban: "de123456", buchungstag: "2022-01-01", betrag: -655, gegenpartei: "brandeis", verwendungszweck: "kasse 1" };
     // IBAN-Normalisierung (Spaces/Case) sowie Zweck- und Gegenpartei-Normalisierung
     // greifen → gleicher Schlüssel.
     expect(rohHash(a)).toBe(rohHash(b));

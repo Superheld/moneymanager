@@ -242,7 +242,7 @@ export function vergleiche(a: Vergleichbar, b: Vergleichbar): Bewertung {
       punkte += 2;
       gruende.push("gleiche Gegenpartei");
     } else if (gpA.includes(gpB) || gpB.includes(gpA)) {
-      // „[anonymisiert]" steckt in „[anonymisiert]" — Finanzguru putzt, die Bank liefert roh.
+      // „Nordhoff" steckt in „KRT*NORDHOFF SUED" — Finanzguru putzt, die Bank liefert roh.
       punkte += 2;
       gruende.push("Gegenpartei steckt in der anderen");
     } else if (wortUeberlappung(a.gegenpartei, b.gegenpartei) >= 0.5) {

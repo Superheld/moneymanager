@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from "vitest";
 import { waehrungNachCode } from "../../core";
-import { bankbetragZuCent, [anonymisiert], isoDatum, zuRohUmsatz, type FintsBuchung } from "./uebersetzung";
+import { bankbetragZuCent, klartextAnreicherung, isoDatum, zuRohUmsatz, type FintsBuchung } from "./uebersetzung";
 
 describe("bankbetragZuCent", () => {
   it("rechnet Euro-Fließkomma in Cent um, auch wo die Multiplikation kippt", () => {
@@ -56,28 +56,28 @@ describe("isoDatum", () => {
   });
 });
 
-describe("[anonymisiert]", () => {
+describe("klartextAnreicherung", () => {
   it("zerlegt die Klartext-Etiketten ohne Trennzeichen", () => {
-    // So klebt comdirect es zusammen: kein CRED+/MREF+/SVWZ+, sondern deutsche Etiketten
+    // So kleben diese Banken es zusammen: kein CRED+/MREF+/SVWZ+, sondern deutsche Etiketten
     // direkt aneinander. Ein Wert endet dort, wo das nächste bekannte Etikett beginnt.
     const zweck =
       "LASTSCHRIFT / BELASTUNGBEISPIELHAENDLER - LASTSCHRIFTEINZUG 4711" +
-      "END-TO-END-REF.:4711CORE / MANDATSREF.:900001GLÄUBIGER-ID:[anonymisiert]Ref. A1B2C3D4E5F6G7H8";
+      "END-TO-END-REF.:4711CORE / MANDATSREF.:900001GLÄUBIGER-ID:DE98ZZZ09999999901Ref. A1B2C3D4E5F6G7H8";
 
-    const a = [anonymisiert](zweck);
+    const a = klartextAnreicherung(zweck);
     expect(a.buchungstext).toBe("LASTSCHRIFT / BELASTUNG");
     expect(a.zweck).toBe("BEISPIELHAENDLER - LASTSCHRIFTEINZUG 4711");
-    // Die SEPA-Sequenzart („CORE") klebt am Ende der Referenz — comdirect trennt sie
+    // Die SEPA-Sequenzart („CORE") klebt am Ende der Referenz — manche Banken trennen sie
     // nicht ab. Bleibt so: `e2eReferenz` wandert nicht in den RohUmsatz, sie ist
     // Diagnosewert. Getrimmt wird nur der Separator „ / ".
     expect(a.e2eReferenz).toBe("4711CORE");
     expect(a.mandatsreferenz).toBe("900001");
-    expect(a.glaeubigerId).toBe("[anonymisiert]");
+    expect(a.glaeubigerId).toBe("DE98ZZZ09999999901");
     expect(a.bankreferenz).toBe("A1B2C3D4E5F6G7H8");
   });
 
   it('behandelt „NICHT ANGEGEBEN" als leer, nicht als Wert', () => {
-    const a = [anonymisiert]("KARTENVERFÜGUNGIRGENDEIN LADENMANDATSREF.:NICHT ANGEGEBENRef. Z9Y8X7W6V5U4T3S2");
+    const a = klartextAnreicherung("KARTENVERFÜGUNGIRGENDEIN LADENMANDATSREF.:NICHT ANGEGEBENRef. Z9Y8X7W6V5U4T3S2");
     expect(a.mandatsreferenz).toBeUndefined();
     expect(a.zweck).toBe("IRGENDEIN LADEN");
     expect(a.bankreferenz).toBe("Z9Y8X7W6V5U4T3S2");
@@ -85,15 +85,15 @@ describe("[anonymisiert]", () => {
 
   it("lässt einen Zweck ohne bekannte Muster unangetastet", () => {
     // Das ist der Punkt der eigenen Naht: greift nichts, fehlen nur die Zusatzfelder.
-    const a = [anonymisiert]("Miete August, Wohnung 3");
+    const a = klartextAnreicherung("Miete August, Wohnung 3");
     expect(a.zweck).toBe("Miete August, Wohnung 3");
     expect(a.buchungstext).toBeUndefined();
     expect(a.glaeubigerId).toBeUndefined();
   });
 
   it("kommt mit leerem und fehlendem Zweck klar", () => {
-    expect([anonymisiert](undefined).zweck).toBe("");
-    expect([anonymisiert]("   ").zweck).toBe("");
+    expect(klartextAnreicherung(undefined).zweck).toBe("");
+    expect(klartextAnreicherung("   ").zweck).toBe("");
   });
 });
 
@@ -102,7 +102,7 @@ describe("zuRohUmsatz", () => {
     valueDate: new Date(2026, 7, 3, 0, 0, 0),
     entryDate: new Date(2026, 7, 4, 0, 0, 0),
     amount: -49.9,
-    purpose: "LASTSCHRIFT / BELASTUNGSTROMWERKE NORDABSCHLAG 08/2026GLÄUBIGER-ID:[anonymisiert]",
+    purpose: "LASTSCHRIFT / BELASTUNGSTROMWERKE NORDABSCHLAG 08/2026GLÄUBIGER-ID:DE98ZZZ09999999901",
     remoteName: "Stromwerke Nord",
     ...over,
   });
@@ -116,7 +116,7 @@ describe("zuRohUmsatz", () => {
     expect(u.waehrung).toBe("EUR");
     expect(u.gegenpartei).toBe("Stromwerke Nord");
     expect(u.verwendungszweck).toBe("STROMWERKE NORDABSCHLAG 08/2026");
-    expect(u.glaeubigerId).toBe("[anonymisiert]");
+    expect(u.glaeubigerId).toBe("DE98ZZZ09999999901");
     expect(u.kontoIban).toBe("DE31999999980000000002");
     expect(u.kontoName).toBe("Girokonto");
     expect(u.quelle).toBe("fints");

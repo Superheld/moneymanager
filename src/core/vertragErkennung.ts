@@ -164,8 +164,8 @@ const RECHTSFORMEN = new Set([
  * Empfängername → Gruppierungsschlüssel.
  *
  * Bewusst zurückhaltend: Kleinschreibung, Umlaute auflösen, Satzzeichen und Ziffern
- * raus, Rechtsformen raus. NICHT gekürzt auf die ersten Wörter — „[anonymisiert] Bonn" und
- * „[anonymisiert] Bremen" würden sonst zu einem Anbieter verschmelzen, und ein falsch
+ * raus, Rechtsformen raus. NICHT gekürzt auf die ersten Wörter — „Petrossen Bonn" und
+ * „Petrossen Bremen" würden sonst zu einem Anbieter verschmelzen, und ein falsch
  * zusammengefasster Vorschlag ist schlimmer als zwei getrennte.
  */
 export function anbieterSchluessel(name: string): string {
@@ -309,7 +309,7 @@ function auswerten(
   // Über `tageBis` und NICHT über `ord`: `ord` liefert den Sortierschlüssel YYYYMMDD,
   // keinen Tageszähler — „ord(heute) − 70" ergäbe ein Datum, das es nicht gibt, und
   // damit ein zufälliges Ergebnis. Auf echten Daten fielen dadurch laufende Verträge
-  // ([anonymisiert], letzte Zahlung vor einem Monat) in die Rubrik „beendet".
+  // (Musterbank, letzte Zahlung vor einem Monat) in die Rubrik „beendet".
   // Woran die Gruppe hängt: das „+" markiert nur die Richtung (Einnahmen) und gehört
   // nicht zum Wert. Trägt eine Spur genau diesen Wert als Gläubiger-ID, hat die ID
   // gruppiert — sonst war es der normalisierte Name.

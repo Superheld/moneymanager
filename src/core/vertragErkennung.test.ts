@@ -44,25 +44,25 @@ function zufluesse(opts: Parameters<typeof reihe>[0]): Zahlungsspur[] {
 
 describe("anbieterSchluessel", () => {
   it("fasst dieselbe Firma trotz Rechtsform und Schreibweise zusammen", () => {
-    expect(anbieterSchluessel("[anonymisiert] GmbH")).toBe(anbieterSchluessel("netcup"));
+    expect(anbieterSchluessel("Vibora GmbH")).toBe(anbieterSchluessel("vibora"));
     expect(anbieterSchluessel("Müller & Söhne KG")).toBe(anbieterSchluessel("Mueller und Soehne"));
   });
 
   /**
    * Die Gegenprobe ist die wichtigere: ein FALSCH zusammengefasster Vorschlag („alle
-   * [anonymisiert]") stiftet mehr Schaden als zwei getrennte, denn er nennt einen Betrag,
+   * Petrossen") stiftet mehr Schaden als zwei getrennte, denn er nennt einen Betrag,
    * den es nie gab. Deshalb wird nicht auf die ersten Wörter gekürzt.
    */
   it("wirft verschiedene Anbieter mit gleichem Anfang NICHT zusammen", () => {
-    expect(anbieterSchluessel("[anonymisiert] Bonn")).not.toBe(anbieterSchluessel("[anonymisiert] Bremen"));
+    expect(anbieterSchluessel("Petrossen Bonn")).not.toBe(anbieterSchluessel("Petrossen Bremen"));
   });
 });
 
 describe("vertragskandidaten", () => {
   it("erkennt eine monatliche Zahlung mit Rhythmus und Median-Betrag", () => {
-    const k = vertragskandidaten(reihe({ name: "[anonymisiert]", betrag: 1650, n: 12, tage: 30 }), HEUTE);
+    const k = vertragskandidaten(reihe({ name: "Vibora", betrag: 1650, n: 12, tage: 30 }), HEUTE);
     expect(k).toHaveLength(1);
-    expect(k[0].anbieter).toBe("[anonymisiert]");
+    expect(k[0].anbieter).toBe("Vibora");
     expect(k[0].rhythmus).toBe("monatlich");
     expect(k[0].betrag).toBe(1650);
     expect(k[0].anzahl).toBe(12);
@@ -96,7 +96,7 @@ describe("vertragskandidaten", () => {
         id: `e${i}`,
         datum: new Date(datum).toISOString().slice(0, 10),
         betrag: -(1000 + i * 700),
-        gegenpartei: "[anonymisiert]",
+        gegenpartei: "Nordhoff",
         charakter: "Aufwand" as const,
       };
     });
@@ -156,7 +156,7 @@ describe("vertragskandidaten", () => {
   });
 
   it("merkt sich Konto und Kategorie der Zahlungen für die Vorbelegung", () => {
-    const spuren = reihe({ name: "[anonymisiert]", betrag: 1650, n: 12, tage: 30 }).map((s, i) => ({
+    const spuren = reihe({ name: "Vibora", betrag: 1650, n: 12, tage: 30 }).map((s, i) => ({
       ...s,
       kontoId: i === 0 ? "giro-zweit" : "giro", // ein Ausreißer kippt die Vorbelegung nicht
       kategorieId: "kat-it",
@@ -168,13 +168,13 @@ describe("vertragskandidaten", () => {
 
   it("gruppiert über die Gläubiger-ID, auch wenn der Name im Auszug wechselt", () => {
     const spuren = [
-      ...reihe({ name: "O2", betrag: 3848, n: 6, tage: 30, glaeubigerId: "[anonymisiert]" }),
-      ...reihe({ name: "Telefonica Germany GmbH", betrag: 3848, n: 6, tage: 30, bis: "2024-08-16", glaeubigerId: "[anonymisiert]" }),
+      ...reihe({ name: "O2", betrag: 3848, n: 6, tage: 30, glaeubigerId: "DE98ZZZ09999999903" }),
+      ...reihe({ name: "Telefonica Germany GmbH", betrag: 3848, n: 6, tage: 30, bis: "2024-08-16", glaeubigerId: "DE98ZZZ09999999903" }),
     ];
     const k = vertragskandidaten(spuren, HEUTE);
     expect(k).toHaveLength(1);
     expect(k[0].anzahl).toBe(12);
-    expect(k[0].glaeubigerId).toBe("[anonymisiert]");
+    expect(k[0].glaeubigerId).toBe("DE98ZZZ09999999903");
   });
 
   it("meldet schwankende Beträge über die Stabilität, ohne den Vertrag zu verwerfen", () => {
@@ -194,7 +194,7 @@ describe("vertragskandidaten", () => {
    * einem Monat) in die Rubrik „beendet".
    */
   it("hält einen Vertrag für laufend, dessen letzte Zahlung einen Monat her ist", () => {
-    const k = vertragskandidaten(reihe({ name: "[anonymisiert]", betrag: 28730, n: 12, tage: 30, bis: "2026-07-15" }), HEUTE);
+    const k = vertragskandidaten(reihe({ name: "Musterbank", betrag: 28730, n: 12, tage: 30, bis: "2026-07-15" }), HEUTE);
     expect(k).toHaveLength(1);
     expect(k[0].laeuft).toBe(true);
   });
@@ -283,7 +283,7 @@ describe("Erkennungsbefund", () => {
     // 40 € Basis, jede zweite Zahlung 10 € daneben. Die Toleranz sind 5 % = 2 €,
     // die Ausreißer liegen weit darüber und fallen raus.
     const [k] = vertragskandidaten(
-      reihe({ name: "[anonymisiert]", betrag: 4000, n: 12, tage: 30, streuung: [0, 1000] }),
+      reihe({ name: "Petrossen", betrag: 4000, n: 12, tage: 30, streuung: [0, 1000] }),
       HEUTE,
     );
     expect(k.befund.betraegeGesamt).toBe(12);

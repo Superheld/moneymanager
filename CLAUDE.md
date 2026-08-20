@@ -206,6 +206,14 @@ Commit-Texten**. „Am echten Bestand gemessen" ist die überzeugendste Begründ
 Zahl dazu wirkt am überzeugendsten — genau deshalb rutscht sie mit. Die Aussage trägt auch
 ohne den Beleg: „ein überschrittener Rahmen" statt des Betrags.
 
+- **Ersetzen reicht nicht, es muss ANONYMISIEREN.** Ein erfundener Name, der die Branche
+  durchscheinen lässt, verrät dasselbe wie der echte: ein Fantasiename, dem man den
+  Streamingdienst ansieht, sagt weiterhin, dass es so ein Abo gibt — und die Kategorie
+  daneben bestätigt es.
+  Erfundene Anbieter sind deshalb **sektorneutral** („Kesselmann", „Vibora", „Ohlert"),
+  und ihre Kategorie folgt nicht aus dem Namen. Aus einer Fixture darf sich nichts über
+  den Haushalt ableiten lassen — weder aus einem Wert noch aus der Kombination. Kein
+  Wächter kann das prüfen; er findet nur den Originalwert. Der Rest ist Handarbeit.
 - **Test-IBANs tragen eine BLZ, die es nicht gibt** (Bereich `999999xx`, Prüfziffer
   rechnen). Eine IBAN mit echter BLZ kann zu einem echten Konto gehören; ob die
   Kontonummer vergeben ist, weiss hier niemand. Beispiel-IBANs aus dem Netz taugen nicht —

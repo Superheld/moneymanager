@@ -4,7 +4,7 @@
 // Vertrag gehört, leitete es jedes Mal neu aus dem Empfängernamen ab
 // (über `anbieterSchluessel`). Das reicht, um eine Pille an die Buchung zu hängen, und es
 // reicht für nichts, was rechnet: zwei Verträge beim selben Anbieter sind nicht
-// unterscheidbar, „[anonymisiert] Prime" und eine [anonymisiert]-Bestellung sehen gleich aus, und eine
+// unterscheidbar, „Arnholt Plus" und eine Arnholt-Bestellung sehen gleich aus, und eine
 // Korrektur von Hand hat nirgends Platz.
 //
 // Deshalb zwei getrennte Dinge:
@@ -54,7 +54,7 @@ export interface Erkennungsmerkmal {
  *
  * Alle Felder außer `merkmale` sind Einschränkungen: nicht gesetzt heißt „egal".
  * Die Merkmale allein sind bewusst NICHT genug — deshalb belegt `standardErkennung`
- * eine Betragsspanne vor. Ohne sie zöge ein Vertrag „[anonymisiert] Prime" jede [anonymisiert]-Bestellung
+ * eine Betragsspanne vor. Ohne sie zöge ein Vertrag „Arnholt Plus" jede Arnholt-Bestellung
  * mit sich, und der Fehler fiele erst auf, wenn ein Budget nicht mehr stimmt.
  */
 export interface Vertragserkennung {
@@ -126,8 +126,8 @@ export function standardErkennung(
  *
  * Der Empfänger wird gegen ZWEI Formen geprüft: den Namen, wie er im Auszug steht, und
  * seine normalisierte Form (klein, ohne Rechtsform und Satzzeichen). Grund: beide Texte
- * begegnen einem an verschiedenen Stellen — im Kontoauszug steht „[anonymisiert] GmbH", in der
- * Vorschlagsbegründung „netcup". Wer eine der beiden Formen abtippt, soll einen Treffer
+ * begegnen einem an verschiedenen Stellen — im Kontoauszug steht „Vibora GmbH", in der
+ * Vorschlagsbegründung „vibora". Wer eine der beiden Formen abtippt, soll einen Treffer
  * bekommen und nicht raten müssen, welche gemeint war.
  */
 function merkmalTrifft(m: Erkennungsmerkmal, s: Zahlungsspur): boolean {

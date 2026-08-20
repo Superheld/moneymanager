@@ -7,7 +7,7 @@ import { gegenbeinFuer, paareUmbuchungen, umsaetzeVerbuchen } from "./umsatzVerb
 function umsatz(over: Partial<Umsatz>): Umsatz {
   return {
     id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2022-01-01",
-    betrag: -655, waehrung: "EUR", gegenpartei: "[anonymisiert]", verwendungszweck: "x",
+    betrag: -655, waehrung: "EUR", gegenpartei: "Brandeis", verwendungszweck: "x",
     rohHash: "h1", status: "neu", ...over,
   };
 }

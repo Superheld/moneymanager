@@ -222,7 +222,7 @@ FinTS). Jetzt entscheidet eine Kette, von „festgelegt" zu „geraten":
   Bag-of-Words, rein, zero-dep. Linear ist Absicht — der Lern-Spike zeigte MLP und
   tief+breit gleichauf, der Deckel ist daten- und nicht modelllimitiert. Bei einem
   linearen Modell IST die Begründung das Modell: jede Entscheidung zerfällt ohne
-  Näherung in „woran lag es" ([anonymisiert] → Lebensmittel: `emp=[anonymisiert]` +2.30, `vwz:[anonymisiert]`
+  Näherung in „woran lag es" (NORDHOFF → Lebensmittel: `emp=nordhoff` +2.30, `vwz:nordhoff`
   +2.19). Am echten Bestand **89,1 % im Mittel über fünf Splits** (bester Einzelsplit
   90,5 % — bewusst nicht als Kalibrierziel genommen), 137 ms über 3689 Beispiele.
   Determinismus über einen gesetzten Generator statt `Math.random`: zweimal „Training
@@ -230,7 +230,7 @@ FinTS). Jetzt entscheidet eine Kette, von „festgelegt" zu „geraten":
 - **Merkmalsextraktion** mit getrennten Namensräumen (`emp=` ganzer Empfänger, `emp:`
   seine Einzelwörter, `vwz:`, `gid:`, `vz:`), am echten Bestand kalibriert: angeklebte
   Nummern werden abgeschnitten statt das Wort wegzuwerfen (ohne das fielen `debitkarte`
-  mit 1057 und `comdirect` mit 366 Belegen komplett aus dem Vokabular), Grenze bei drei
+  und der Bankname komplett aus dem Vokabular), Grenze bei drei
   Stellen, damit `o2` heil bleibt; maskierte Kartennummern (`xxxx`, 1060×) fliegen raus.
 - **Vier Karten in den Einstellungen** entlang des tatsächlichen Trainingsablaufs:
   Trainingsdaten → Merkmale → Ausschlüsse → Erkennungsmodell. Merkmalsquellen sind
@@ -275,7 +275,7 @@ Das reicht für eine Pille und für nichts, was rechnet.
 - **Typisierte Merkmale und Wildcards.** Jedes Merkmal trägt seine Art (`glaeubigerId` |
   `empfaenger`) und wird nur gegen das Feld seiner Art geprüft — vorher hing die
   Vorrangregel „ID schlägt Namen" an einer Vermutung. `*` steht für beliebigen Text; alles
-  andere wörtlich (ein Punkt in „E.ON" ist ein Punkt).
+  andere wörtlich (ein Punkt in „Petrossen" ist ein Punkt).
 - **Vertrag aus einer Buchung anlegen**, mit Vorbelegung. Und umgekehrt: eine Buchung
   zeigt, wenn ihr Empfänger schon ein Vertrag ist — wer dort nur „Vertrag daraus machen"
   liest, legt beim zweiten Blick auf dieselbe Miete einen zweiten Mietvertrag an.

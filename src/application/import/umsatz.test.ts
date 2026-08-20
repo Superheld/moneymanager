@@ -10,7 +10,7 @@ function basis(over: Partial<Umsatz> = {}): Umsatz {
     buchungstag: "2022-01-01",
     betrag: -655,
     waehrung: "EUR",
-    gegenpartei: "[anonymisiert]",
+    gegenpartei: "Brandeis",
     verwendungszweck: "Kartenzahlung",
     rohHash: "k1|2022-01-01|-655|kartenzahlung",
     nativeId: "abc",
