@@ -33,14 +33,16 @@
 //     kein Nebenweg, sondern der Hauptweg.
 
 import type {
-  ImportLaufRepository, KategorieRepository, LedgerPort, UmsatzRepository,
-  VertragserkennungRepository, VertragszuordnungRepository, ZahlungskontoRepository,
+  ImportLaufRepository, KategorieRepository, KontostandsankerRepository, LedgerPort,
+  UmsatzRepository, VertragserkennungRepository, VertragszuordnungRepository,
+  ZahlungskontoRepository,
 } from "../ports";
 import { zuordnungenAbgleichen } from "../vertragszuordnung";
 import type { Vorschlagskontext } from "../import/vorschlag";
 import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
 import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
+import { bankAnker } from "../../core";
 import type { Abrufadapter, Bankzugang, TanFrager } from "./abrufPort";
 import type { Kontozuordnung, KontozuordnungRepository } from "./bankzugangPort";
 import type { BankzugangRepository } from "./bankzugangPort";
@@ -78,6 +80,8 @@ export interface AbrufDeps {
    * eine Warteliste am Konto abnicken musste; siehe den Kopfkommentar unter Punkt 4.
    */
   readonly ledgerRepo: LedgerPort;
+  /** Die Kontostands-Anker — jeder Abruf legt einen dazu, sofern die Bank einen Saldo gibt. */
+  readonly ankerRepo: KontostandsankerRepository;
   /**
    * Erkennung und Zuordnung der Verträge — der Abruf gleicht am Ende ab.
    *
@@ -178,12 +182,30 @@ export async function abrufAusfuehren(
 
     // Der Saldo in EIGENEM try: er ist die Kontrollzahl und darf weder an einem
     // Umsatzfehler scheitern noch einen verursachen. Banken, die HKSAL nicht anbieten,
-    // liefern schlicht null — dann bleibt der letzte bekannte Stand stehen.
+    // liefern schlicht null — dann kommt für diesen Tag eben kein Anker dazu.
     let saldo: Awaited<ReturnType<typeof sitzung.saldo>> = null;
     try {
       saldo = await sitzung.saldo(bankkonto);
     } catch {
       saldo = null;
+    }
+
+    /**
+     * Den gemeldeten Stand als ANKER festhalten — aufgehoben, nicht überschrieben.
+     *
+     * Jeder Abruf ist ein Messpunkt gegen eine unabhängige Quelle. Wer sie wegwirft, kann
+     * hinterher nur sagen „hier fehlen 600 Euro", nicht „zwischen dem 31.07. und dem
+     * 31.08." — und die zweite Auskunft ist die, mit der man etwas anfangen kann.
+     *
+     * Auch dann, wenn die Umsätze scheitern: der Saldo allein sagt bereits, ob etwas
+     * fehlt. Ohne Datum von der Bank gilt der Abruftag; das ist die Aussage, die sie
+     * gerade gemacht hat.
+     */
+    async function ankerFesthalten() {
+      if (!saldo) return;
+      await deps.ankerRepo.speichern(
+        bankAnker(z.zahlungskontoId, saldo.betrag, saldo.datum ?? deps.heute, new Date().toISOString()),
+      );
     }
 
     try {
@@ -224,12 +246,8 @@ export async function abrufAusfuehren(
         });
       }
 
-      await deps.zuordnungRepo.speichern({
-        ...z,
-        letzterAbrufBis: deps.heute,
-        bankSaldo: saldo?.betrag ?? z.bankSaldo,
-        bankSaldoDatum: saldo?.datum ?? z.bankSaldoDatum,
-      });
+      await ankerFesthalten();
+      await deps.zuordnungRepo.speichern({ ...z, letzterAbrufBis: deps.heute });
       befunde.push({
         zahlungskontoId: z.zahlungskontoId,
         bezeichnung,
@@ -241,12 +259,9 @@ export async function abrufAusfuehren(
         bankSaldoDatum: saldo?.datum,
       });
     } catch (e) {
-      // Auch im Fehlerfall wird ein geholter Saldo festgehalten: er sagt bereits, ob
-      // etwas fehlt, selbst wenn die Umsätze nicht kamen. `letzterAbrufBis` bleibt
-      // dagegen stehen — der Zeitraum wurde ja nicht geholt.
-      if (saldo) {
-        await deps.zuordnungRepo.speichern({ ...z, bankSaldo: saldo.betrag, bankSaldoDatum: saldo.datum });
-      }
+      // Auch im Fehlerfall wird ein geholter Saldo festgehalten (siehe `ankerFesthalten`).
+      // `letzterAbrufBis` bleibt dagegen stehen — der Zeitraum wurde ja nicht geholt.
+      await ankerFesthalten();
       befunde.push({
         zahlungskontoId: z.zahlungskontoId,
         bezeichnung,

@@ -1,7 +1,6 @@
 // Ports rund um den Bankzugang. Getrennt von `ports.ts` gehalten, weil sie zum
 // Abruf-Kontext gehören und nicht zum Bestand der App.
 
-import type { Cent } from "../../core";
 import type { Bankzugang } from "./abrufPort";
 
 /**
@@ -22,16 +21,9 @@ export interface Kontozuordnung {
   readonly zahlungskontoId: string;
   /** Bis wohin zuletzt abgerufen wurde (ISO-Datum) — Grundlage des fortlaufenden Abrufs. */
   readonly letzterAbrufBis?: string;
-  /**
-   * Der Kontostand, den die BANK zuletzt gemeldet hat — die zweite, unabhängige Aussage.
-   *
-   * Ohne sie ist der Stand der App nur in sich schlüssig: Anfangsbestand plus alles, was
-   * hereingeschafft hat. Fehlt eine Buchung, fällt das nirgends auf. Mit ihr wird die
-   * Differenz zu einer Zahl, die bei jedem Abruf neu geprüft wird.
-   */
-  readonly bankSaldo?: Cent;
-  /** Stichtag des Saldos, wie die Bank ihn nennt (ISO-Datum). */
-  readonly bankSaldoDatum?: string;
+  // Der gemeldete Kontostand stand bis 2026-08-20 hier und wurde bei jedem Abruf
+  // überschrieben. Er ist jetzt ein Kontostands-Anker (`core/kontostand.ts`): aufgehoben
+  // statt überschrieben, damit sich eine Abweichung zeitlich einkreisen lässt.
 }
 
 export interface KontozuordnungRepository {

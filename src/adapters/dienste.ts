@@ -52,6 +52,7 @@ import {
   sqliteImportLaufRepository,
 } from "./persistence/sqliteImportRepositories";
 import { sqliteKategoriefestlegungRepository } from "./persistence/sqliteKategoriefestlegungRepository";
+import { sqliteKontostandsankerRepository } from "./persistence/sqliteKontostandRepository";
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
@@ -65,6 +66,10 @@ import {
   dublettenFreigabeAufheben as dublettenFreigabeAufhebenUseCase,
   dublettenFreigeben as dublettenFreigebenUseCase,
 } from "../application/dublettenFreigabe";
+import {
+  anfangsbestandAbgleichen as anfangsbestandAbgleichenUseCase,
+  kontostandFesthalten as kontostandFesthaltenUseCase,
+} from "../application/kontostandAnker";
 import {
   buchungBearbeiten as buchungBearbeitenUseCase,
   buchungErfassen as buchungErfassenUseCase,
@@ -467,6 +472,7 @@ export async function bankAbrufen(
     kontoRepo: sqliteZahlungskontoRepository,
     kategorieRepo: sqliteKategorieRepository,
     ledgerRepo: sqliteLedgerRepository,
+    ankerRepo: sqliteKontostandsankerRepository,
     umsatzRepo: sqliteUmsatzRepository,
     laufRepo: sqliteImportLaufRepository,
     // Der Abruf hängt die frisch gebuchten Zeilen selbst an ihre Verträge. Ohne das
@@ -595,8 +601,25 @@ export function konten(): Promise<Kontensicht> {
     umsatzRepo: sqliteUmsatzRepository,
     laufRepo: sqliteImportLaufRepository,
     freigabeRepo: sqliteDublettenfreigabeRepository,
+    ankerRepo: sqliteKontostandsankerRepository,
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
   });
+}
+
+const ANKER_DEPS = {
+  kontoRepo: sqliteZahlungskontoRepository,
+  ledger: sqliteLedgerRepository,
+  ankerRepo: sqliteKontostandsankerRepository,
+};
+
+/** Kassensturz: den Stand eines Kontos zu einem Stichtag festhalten. */
+export function kontostandFesthalten(eingabe: { kontoId: string; datum: string; betrag: number }) {
+  return kontostandFesthaltenUseCase(ANKER_DEPS, eingabe);
+}
+
+/** Den Anfangsbestand einmalig auf den jüngsten Anker ausrichten. */
+export function anfangsbestandAbgleichen(kontoId: string) {
+  return anfangsbestandAbgleichenUseCase(ANKER_DEPS, kontoId);
 }
 
 /** „Diese beiden sind NICHT dasselbe" — und der Weg zurück. */

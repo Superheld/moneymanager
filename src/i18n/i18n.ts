@@ -29,6 +29,11 @@ const de = {
   // Fehler-Codes (FachlicherFehler.code) → Text. Verschachtelt, weil i18next Punkte als
   // Pfadtrenner liest: code "betrag.groesserNull" → fehler.betrag.groesserNull.
   fehler: {
+    anker: {
+      kontoFehlt: "Das Konto gibt es nicht.",
+      betragUngueltig: "Der Stand muss ein Betrag in ganzen Cent sein.",
+      keinAnker: "Für dieses Konto ist noch kein Stand festgehalten.",
+    },
     dublette: {
       unvollstaendig: "Zum Festhalten braucht es beide Zeilen.",
       selbst: "Eine Zeile kann nicht ihr eigener Zwilling sein.",
@@ -617,6 +622,28 @@ const de = {
     btnBuchung: "Buchung",
     anfangsbestand: "Anfangsbestand",
     standHerkunft: "= Anfangsbestand {{anfang}} + gebuchte Bewegungen {{bewegung}}",
+    anker: {
+      gezaehlt: "gezählt: {{betrag}} am {{datum}}",
+      luecke: "{{betrag}} sind zwischen dem {{von}} und dem {{bis}} entstanden",
+      weitereLuecken: "und {{n}} früher",
+      abgleichen: "Anfangsbestand abgleichen",
+      abgleichTitel: "Anfangsbestand abgleichen",
+      abgleichBestaetigen: "Anfangsbestand setzen",
+      abgleichHinweis:
+        "Der Anfangsbestand überbrückt die Zeit vor deinem ersten Import — er ist geschätzt. Die Differenz wandert dorthin und ist danach nicht mehr sichtbar. Ab jetzt ist jede neue Abweichung ein echter Fehler.",
+      abgleichWarnung:
+        "Achtung: in {{n}} Zeiträumen passen die gemeldeten Stände nicht zu den Buchungen. Das sind vermutlich fehlende Buchungen und keine Altlast — sieh sie dir besser vorher an.",
+      alt: "bisher",
+      neu: "danach",
+      verschoben: "verschoben",
+      festhalten: "Stand festhalten",
+      kassensturzTitel: "Kontostand festhalten",
+      kassensturzHinweis:
+        "Was an diesem Tag wirklich da war — nachgezählt oder abgelesen. Die Angabe ändert nichts an deinen Buchungen; sie ist der Vergleichswert, an dem sich zeigt, ob etwas fehlt.",
+      stichtag: "Stichtag",
+      betrag: "Stand",
+      betragUnklar: "Der Betrag ist nicht lesbar.",
+    },
     dubletten: {
       filter: "{{n}} könnten doppelt sein",
       verdacht: "könnte doppelt sein",
@@ -1211,6 +1238,11 @@ const en: typeof de = {
     Umschichtung: "Savings & provision",
   },
   fehler: {
+    anker: {
+      kontoFehlt: "That account does not exist.",
+      betragUngueltig: "The balance must be an amount in whole cents.",
+      keinAnker: "No balance has been recorded for this account yet.",
+    },
     dublette: {
       unvollstaendig: "Both entries are needed to record this.",
       selbst: "An entry cannot be its own twin.",
@@ -1796,6 +1828,28 @@ const en: typeof de = {
     btnBuchung: "Entry",
     anfangsbestand: "Opening balance",
     standHerkunft: "= opening balance {{anfang}} + posted movements {{bewegung}}",
+    anker: {
+      gezaehlt: "counted: {{betrag}} on {{datum}}",
+      luecke: "{{betrag}} appeared between {{von}} and {{bis}}",
+      weitereLuecken: "and {{n}} earlier",
+      abgleichen: "Reconcile opening balance",
+      abgleichTitel: "Reconcile opening balance",
+      abgleichBestaetigen: "Set opening balance",
+      abgleichHinweis:
+        "The opening balance bridges the time before your first import — it is an estimate. The difference moves there and is no longer visible afterwards. From now on, every new discrepancy is a real error.",
+      abgleichWarnung:
+        "Careful: in {{n}} periods the reported balances do not match the entries. Those are most likely missing entries rather than old history — better look at them first.",
+      alt: "before",
+      neu: "after",
+      verschoben: "moved",
+      festhalten: "Record balance",
+      kassensturzTitel: "Record account balance",
+      kassensturzHinweis:
+        "What was really there on that day — counted or read off. This does not change any of your entries; it is the reference value that reveals whether something is missing.",
+      stichtag: "As of",
+      betrag: "Balance",
+      betragUnklar: "The amount cannot be read.",
+    },
     dubletten: {
       filter: "{{n}} may be duplicates",
       verdacht: "may be a duplicate",

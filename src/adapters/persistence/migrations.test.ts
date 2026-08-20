@@ -48,6 +48,7 @@ const ERWARTETE_TABELLEN = [
   "budget", "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
   "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
   "ist_buchung_aufteilung", "kategorie", "kategorie_festlegung", "klassifikator_modell",
+  "kontostand_anker", // v35 — was an einem Stichtag wirklich auf dem Konto lag
   "merkmal_ausschluss",
   "person",
   "umsatz", "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
@@ -230,6 +231,56 @@ describe("Budget-Umbau (v30/v31)", () => {
     expect(spalten(db, "budget")).not.toContain("periode");
     expect(tabellen(db)).not.toContain("topf");
     expect(spalten(db, "ist_buchung")).not.toContain("verwendung_topf_id");
+    db.close();
+  });
+});
+
+describe("Kontostands-Anker (v35/v36)", () => {
+  it("macht aus dem zuletzt gemeldeten Saldo den ersten Anker", () => {
+    // Sonst begänne die Historie bei null und die erste brauchbare Aussage („seit wann
+    // stimmt es nicht mehr?") käme erst nach dem übernächsten Abruf.
+    const db = new SQL.Database();
+    apply(db, 0, 34);
+    db.run(
+      `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id, bank_saldo, bank_saldo_datum)
+       VALUES ('z1', 's1', 'giro', [Betrag], '2026-08-20')`,
+    );
+    // Ein Konto ohne gemeldeten Stand darf keinen Anker erzeugen.
+    db.run(
+      `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id)
+       VALUES ('z1', 's2', 'depot')`,
+    );
+
+    apply(db, 34, 35);
+
+    expect(db.exec("SELECT konto_id, datum, herkunft, betrag FROM kontostand_anker")[0].values).toEqual([
+      ["giro", "2026-08-20", "bank", [Betrag]],
+    ]);
+    db.close();
+  });
+
+  it("läuft zweimal, ohne zu doppeln", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 34);
+    db.run(
+      `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id, bank_saldo, bank_saldo_datum)
+       VALUES ('z1', 's1', 'giro', [Betrag], '2026-08-20')`,
+    );
+    apply(db, 34, 35);
+    apply(db, 34, 35);
+    expect(db.exec("SELECT count(*) FROM kontostand_anker")[0].values).toEqual([[1]]);
+    db.close();
+  });
+
+  it("räumt die alten Spalten erst in der NÄCHSTEN Version ab", () => {
+    // Getrennte Versionen, weil v35 sie liest: bräche der Lauf dazwischen ab, liefe v35
+    // beim nächsten Start gegen fehlende Spalten und die App käme nicht mehr hoch.
+    const db = new SQL.Database();
+    apply(db, 0, 35);
+    expect(spalten(db, "bankkonto_zuordnung")).toContain("bank_saldo");
+    apply(db, 35, 36);
+    expect(spalten(db, "bankkonto_zuordnung")).not.toContain("bank_saldo");
+    expect(spalten(db, "bankkonto_zuordnung")).not.toContain("bank_saldo_datum");
     db.close();
   });
 });

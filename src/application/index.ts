@@ -133,6 +133,11 @@ export {
   type Dublettenverdacht,
 } from "./dublettensicht";
 export { dublettenFreigeben, dublettenFreigabeAufheben } from "./dublettenFreigabe";
+export {
+  anfangsbestandAbgleichen,
+  kontostandFesthalten,
+  type Abgleichergebnis,
+} from "./kontostandAnker";
 export { buchungErfassen, type BuchungEingabe } from "./buchungErfassen";
 export { umbuchungErfassen } from "./umbuchungErfassen";
 export { postenBezahltMarkieren, bezahltZuruecknehmen } from "./bezahltMarkieren";

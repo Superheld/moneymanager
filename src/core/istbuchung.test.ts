@@ -4,7 +4,6 @@ import type { Zahlungskonto } from "./konto";
 import {
   bezahlteSchluessel,
   findeIstZuPlan,
-  bankAbweichung,
   istSummeKonto,
   kategorieIstHandverlesen,
   liquideMittelReal,
@@ -66,23 +65,6 @@ describe("Reconciliation light", () => {
     expect(realerKontostand(k, [])).toBe(euroZuCent(1000));
   });
 
-  it("bankAbweichung = was die Bank meldet minus was die App rechnet", () => {
-    // Die einzige Zahl, die Vollständigkeit belegt statt zu behaupten.
-    const k = konto({ saldo: euroZuCent(1000) });
-    const buchungen = [ist({ betrag: euroZuCent(-200) })];
-    expect(bankAbweichung(k, buchungen, euroZuCent(800))).toBe(0);
-    // Bank hat mehr: der App fehlt eine Einnahme (oder eine Ausgabe steht zu viel drin).
-    expect(bankAbweichung(k, buchungen, euroZuCent(850))).toBe(euroZuCent(50));
-    // App hat mehr: eine Ausgabe fehlt — genau der Fall einer verworfenen Bankzeile.
-    expect(bankAbweichung(k, buchungen, euroZuCent(750))).toBe(euroZuCent(-50));
-  });
-
-  it("bankAbweichung kennt keine Toleranz", () => {
-    // Ein Cent ist eine fehlende Buchung, kein Rundungsfehler — gerechnet wird in
-    // Minor Units, da gibt es nichts zu runden.
-    const k = konto({ saldo: 0 });
-    expect(bankAbweichung(k, [], 1)).toBe(1);
-  });
 
   it("liquideMittelReal summiert reale Stände über alle Konten", () => {
     const konten = [konto({ id: "k1", saldo: euroZuCent(1000) }), konto({ id: "k2", saldo: euroZuCent(500) })];

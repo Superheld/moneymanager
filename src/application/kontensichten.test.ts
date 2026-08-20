@@ -57,6 +57,7 @@ function deps(
       async alle() { return freigaben; },
       async speichern() {}, async entfernen() {},
     },
+    ankerRepo: { async alle() { return []; }, async speichern() {}, async entfernen() {} },
     kontozuordnungen: async () => [],
   };
 }
