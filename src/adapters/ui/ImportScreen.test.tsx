@@ -45,7 +45,7 @@ const T_2026_01_05 = "46027";
 
 function reihe(o: { tag: string; betrag: string; gegenpartei: string; zweck?: string; id?: string }) {
   return [
-    o.tag, "[entfernt]", "Girokonto", o.betrag, "63.09", "EUR",
+    o.tag, "DE93999999990000000001", "Girokonto", o.betrag, "63.09", "EUR",
     o.gegenpartei, "", o.zweck ?? "", "", "", "",
     "Essen & Trinken", "Lebensmittel", "nein", "", "", "nein", "nein", "Kartenzahlung",
     "Ausgaben", "2026-01", "2026-01", "2026-Q1", "2026", o.id ?? "", "", "",
@@ -126,7 +126,7 @@ describe("ImportScreen", () => {
   it("übernimmt die Umsätze und schreibt sie in die Datenbank", async () => {
     await sqliteZahlungskontoRepository.speichern({
       id: "k1", bezeichnung: "Girokonto", typ: "Giro",
-      iban: "[entfernt]", inhaberIds: [], saldo: 100000,
+      iban: "DE93999999990000000001", inhaberIds: [], saldo: 100000,
     });
 
     const nutzer = userEvent.setup();
@@ -154,7 +154,7 @@ describe("ImportScreen", () => {
   it("erkennt beim zweiten Einlesen derselben Datei die Dubletten", async () => {
     await sqliteZahlungskontoRepository.speichern({
       id: "k1", bezeichnung: "Girokonto", typ: "Giro",
-      iban: "[entfernt]", inhaberIds: [], saldo: 100000,
+      iban: "DE93999999990000000001", inhaberIds: [], saldo: 100000,
     });
     // Bestand direkt setzen, damit der zweite Durchlauf dagegen deduppen muss.
     await sqliteUmsatzRepository.speichern({
