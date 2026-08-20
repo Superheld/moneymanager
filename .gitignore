@@ -51,5 +51,7 @@ design-system/
 *.sqlite3
 *.csv
 
-# Lokale Umgebungsnotizen dieser Maschine (Pfade, Rezepte) — nicht ins Repo.
-.claude/CLAUDE.md
+# Lokale Projektanweisungen dieser Maschine (Pfade, Rezepte). Claude Code laedt
+# CLAUDE.local.md automatisch neben CLAUDE.md; .claude/CLAUDE.md waere dagegen der
+# Ort fuer TEAM-geteilte Projektanweisungen und gehoerte damit ins Repo.
+CLAUDE.local.md

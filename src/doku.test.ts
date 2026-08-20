@@ -27,7 +27,8 @@ const WURZEL = resolve(__dirname, "..");
 const AUSSERHALB: readonly string[] = [
   // Maschinenspezifische Rezepte (Pfade zur echten DB, Cache-Verzeichnisse). Gehören
   // nicht ins öffentliche Repo und werden in CLAUDE.md ausdrücklich als lokal benannt.
-  ".claude/CLAUDE.md",
+  // `CLAUDE.local.md` ist der von Claude Code vorgesehene Ort für lokale Anweisungen.
+  "CLAUDE.local.md",
 ];
 
 /** Alle vom Repo verwalteten Dateien. Ohne git ist die Prüfung wertlos — dann soll sie brechen. */

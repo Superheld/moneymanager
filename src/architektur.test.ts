@@ -26,9 +26,8 @@ const WURZEL = resolve(__dirname);
 /**
  * UI-Dateien, die noch direkt auf `core` oder `adapters/persistence` zugreifen.
  *
- * **Sie ist leer.** Seit 2026-08-20 geht die gesamte Oberfläche über `application/` —
- * 27 Screens sind in acht Schritten migriert worden, die Liste war dabei die
- * Migrationsschuld, sichtbar im Repo statt in einem Ticket.
+ * **Sie ist leer.** Die gesamte Oberfläche geht über `application/`; solange die
+ * Migration lief, stand die Restschuld hier — sichtbar im Repo statt in einem Ticket.
  *
  * Sie bleibt stehen, weil sie zwei Dinge kann, die ein gelöschtes Array nicht kann: sie
  * benennt den Ausnahmefall, falls es je wieder einen gibt, und der Test darunter hält

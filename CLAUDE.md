@@ -6,15 +6,18 @@ Diese Datei hält **Systemdesign**: was wir bauen, wo es liegt, nach welchen Reg
 jeder Regel den Grund, weil eine Regel ohne Grund am nächsten Randfall falsch angewendet
 wird. Was einmal passiert ist (Vorfälle, Datenstände, einzelne Migrationen), gehört **nicht**
 hierher, sondern in die Doku außerhalb des Repos. Maschinenspezifische Rezepte stehen in
-`.claude/CLAUDE.md` (nicht versioniert).
+`CLAUDE.local.md` (nicht versioniert).
 
 ## Orientierung
 
-### Die App in acht Bereichen
+### Die App in zehn Bereichen
 
-Navigation in `adapters/ui/AppShell.tsx`, je Bereich ein `*Screen.tsx` daneben:
+Die Navigation steht in `adapters/ui/AppShell.tsx` (Typ `ScreenId`, zwei Gruppen), die
+Zuordnung zur Komponente in `App.tsx`:
 
-| Bereich | Screen | worum es geht |
+**Überblick** — was gilt und was war:
+
+| Bereich | Komponente | worum es geht |
 |---|---|---|
 | Übersicht | `UebersichtScreen` | wie stehe ich gerade da — drei Monatskarten, Budgets des Monats |
 | Konten | `KontenScreen` | Auszug je Konto: suchen, filtern, bearbeiten, paaren |
@@ -22,8 +25,15 @@ Navigation in `adapters/ui/AppShell.tsx`, je Bereich ein `*Screen.tsx` daneben:
 | Analyse | `AnalyseScreen` | alles, was einen ZEITRAUM auswertet |
 | Inventar | `InventarScreen` | Wiederbeschaffung ÷ Nutzungsdauer = monatliche Rücklage |
 | Verträge | `VertraegeScreen` | Wiederkehrendes mit eigener Erkennungsregel |
-| Import | `ImportScreen` | Dateiimport → Inbox → verbuchen |
-| Einstellungen | `EinstellungenScreen` | Stammdaten, Bankzugänge, Klassifikator-Karten |
+
+**Verwaltung** — woher die Daten kommen und wie sie sortiert werden:
+
+| Bereich | Komponente | worum es geht |
+|---|---|---|
+| Konten verwalten | `KontenVerwaltungScreen` | Konten anlegen, Bankzugänge (`BankzugaengeScreen`) |
+| Import | `ImportScreen` | Dateiimport → Inbox (`ReviewScreen`) → verbuchen |
+| Training | `TrainingBereich` | die Karten der Kategorie-Erkennung (`KategorisierungCards`) |
+| Einstellungen | `EinstellungenScreen` | Stammdaten und Voreinstellungen |
 
 Übersicht beantwortet „wie stehe ich **gerade** da", Analyse „wie war es über einen
 **Zeitraum**" — diese Grenze ist beabsichtigt und entscheidet, wo Neues hingehört.
@@ -119,7 +129,7 @@ npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
 
 Node kommt über **mise** (`mise.toml`: node 26); die CI pinnt dieselbe Hauptversion getrennt
 in `.github/workflows/ci.yml`, weil Actions die `mise.toml` nicht liest. Wer sie hier hebt,
-hebt sie dort mit. Die Kommandozeilen für diese Maschine stehen in `.claude/CLAUDE.md`.
+hebt sie dort mit. Die Kommandozeilen für diese Maschine stehen in `CLAUDE.local.md`.
 
 ## Die Schichtenregeln
 
@@ -221,16 +231,18 @@ misslungenen Migration ist eine NEUE Version.
   Danach am echten Bestand nachsehen, ob sie gewirkt hat.
 - **Neue Migrations-SQL vorher auf einer Kopie durchspielen** und das Ergebnis ansehen.
   Vorbelegungen greifen sonst plausibel daneben, und kein Test merkt es. Wie man eine
-  belastbare Kopie zieht (nicht mit `cp` — WAL), steht in `.claude/CLAUDE.md`.
+  belastbare Kopie zieht (nicht mit `cp` — WAL), steht in `CLAUDE.local.md`.
 
 ## Tests schreiben
 
 - **Kern/Use-Cases:** reine Funktionen, In-Memory-Fakes für Ports. Node-Umgebung, schnell.
-- **Repositories und UI:** laufen gegen echte In-Memory-SQLite (sql.js) — `getDb` wird per
-  `vi.mock("../persistence/db")` umgebogen, `src/test/harness.tsx` liefert `frischeDb()`,
-  `pluginApi()` (übersetzt die tauri-plugin-sql-API mit `$1`-Platzhaltern) und `rendere()`
-  (rendert im EinstellungenProvider). Bewusst KEINE Repo-Attrappen: ein falsches
-  Spalten-Mapping soll im Test auffallen, nicht erst in der App.
+- **Repositories und UI:** laufen gegen echte In-Memory-SQLite (sql.js). `getDb` wird per
+  `vi.mock("../persistence/db")` umgebogen — auf einen `vi.hoisted`-Halter, weil `vi.mock`
+  vor den Imports läuft und die Datenbank je Test frisch ist. `src/test/harness.tsx`
+  liefert dazu `sqlLaden` (einmal in `beforeAll`), `frischeDb()`, `pluginApi()` (übersetzt
+  die tauri-plugin-sql-API mit `$1`-Platzhaltern) und `rendere()` (rendert im
+  EinstellungenProvider). Bewusst KEINE Repo-Attrappen: ein falsches Spalten-Mapping soll
+  im Test auffallen, nicht erst in der App.
 - **UI-Tests** brauchen `/** @vitest-environment jsdom */` als erste Zeile — sonst laufen auch
   die Kern-Tests unnötig in jsdom.
 - Nach **Daten** suchen, die der Test selbst angelegt hat, nicht nach Formulierungen — sonst
@@ -245,7 +257,7 @@ misslungenen Migration ist eine NEUE Version.
 WebDriver). Playwright gegen `npm run dev` bringt nichts: die Webview allein hat kein
 SQLite-Plugin und damit keine Daten. Es tragen zwei Ersatzwege: die jsdom-Tests laufen von
 der Oberfläche bis ins Schema (echte In-Memory-SQLite), und App-Code-Pfade lassen sich
-headless gegen eine Lesekopie der echten Datenbank fahren (Rezept in `.claude/CLAUDE.md`).
+headless gegen eine Lesekopie der echten Datenbank fahren (Rezept in `CLAUDE.local.md`).
 
 ## Nichts aus dem echten Bestand ins Repo
 
