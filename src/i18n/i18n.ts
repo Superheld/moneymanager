@@ -617,6 +617,30 @@ const de = {
         "Dieses Konto wird von Hand geführt. Verbinden lässt es sich über `+ Konto` → online: " +
         "dort das gemeldete Bankkonto auf `mit vorhandenem verknüpfen` stellen.",
     },
+    herkunft: {
+      register: "Herkunft",
+      untertitel: "Was hereinkam — jede eingelesene Zeile, auch die weggelegten",
+      laeufeTitel: "Eingelesen wurde",
+      keineLaeufe: "Für dieses Konto wurde noch nie etwas eingelesen.",
+      laufZeile: "{{zeilen}} Zeilen · {{verbucht}} gebucht · {{weggelegt}} weggelegt",
+      ohneWirkung: "{{n}} weitere Läufe ohne neue Zeilen",
+      keineZeilen: "Keine Zeile passt zu diesem Filter.",
+      spalteStatus: "Was daraus wurde",
+      buchungFehlt: "Buchung fehlt",
+      zurueckholen: "zurückholen",
+      filter: {
+        alle: "alle",
+        verbucht: "gebucht",
+        weggelegt: "weggelegt",
+        offen: "offen",
+      },
+      status: {
+        neu: "offen",
+        verbucht: "gebucht",
+        verworfen: "verworfen",
+        duplikat: "Duplikat",
+      },
+    },
     abgleichBereich: {
       register: "Abgleich",
       untertitel: "Stimmt der Stand? Was gemeldet wurde, gegen das, was wir rechnen",
@@ -1949,6 +1973,30 @@ const en: typeof de = {
       hinweisOffline:
         "This account is kept by hand. To connect it, use “+ account” → online and set the reported " +
         "bank account to “link to existing”.",
+    },
+    herkunft: {
+      register: "Origin",
+      untertitel: "What came in — every imported row, including the ones set aside",
+      laeufeTitel: "Imported on",
+      keineLaeufe: "Nothing has ever been imported for this account.",
+      laufZeile: "{{zeilen}} rows · {{verbucht}} booked · {{weggelegt}} set aside",
+      ohneWirkung: "{{n}} further runs without new rows",
+      keineZeilen: "No row matches this filter.",
+      spalteStatus: "Outcome",
+      buchungFehlt: "entry missing",
+      zurueckholen: "restore",
+      filter: {
+        alle: "all",
+        verbucht: "booked",
+        weggelegt: "set aside",
+        offen: "open",
+      },
+      status: {
+        neu: "open",
+        verbucht: "booked",
+        verworfen: "discarded",
+        duplikat: "duplicate",
+      },
     },
     abgleichBereich: {
       register: "Reconciliation",

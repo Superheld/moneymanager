@@ -20,6 +20,7 @@ import {
 import { Bereich } from "../bausteine/Bereich";
 import { AbgleichBereich } from "./AbgleichBereich";
 import { BankzugaengeScreen } from "./BankzugaengeScreen";
+import { HerkunftBereich } from "./HerkunftBereich";
 import { KontenVerwaltung, type KontoVerbindung } from "./KontenVerwaltung";
 
 export function KontenVerwaltungScreen() {
@@ -96,6 +97,12 @@ export function KontenVerwaltungScreen() {
           label: t("konten.abgleichBereich.register"),
           untertitel: t("konten.abgleichBereich.untertitel"),
           inhalt: () => <AbgleichBereich />,
+        },
+        {
+          id: "herkunft",
+          label: t("konten.herkunft.register"),
+          untertitel: t("konten.herkunft.untertitel"),
+          inhalt: () => <HerkunftBereich />,
         },
         {
           id: "zugaenge",
