@@ -1,7 +1,8 @@
 // Trainingsmaterial — was vom gebuchten Bestand als Lernbeispiel taugt, und was nicht.
 //
-// Die Frage steht VOR dem Modell, nicht daneben: ein Klassifikator, der auf 4426 Zeilen
-// trainiert, von denen 300 gar keine Kategorie tragen und 40 aufgeteilt sind, lernt
+// Die Frage steht VOR dem Modell, nicht daneben: ein Klassifikator, der auf dem ganzen
+// Bestand trainiert, von dem ein Teil gar keine Kategorie trägt und ein weiterer
+// aufgeteilt ist, lernt
 // stillschweigend etwas anderes, als man glaubt. Deshalb wird hier gezählt und begründet,
 // bevor irgendwo gerechnet wird — und dasselbe Ergebnis speist die Anzeige in den
 // Einstellungen.
@@ -81,10 +82,10 @@ export interface Vokabularbefund {
  * Ein Merkmal mit dem, was es taugt.
  *
  * `konzentration` ist der Anteil der häufigsten Kategorie an allen Belegen und damit das
- * Maß, das beim Ausschließen zählt — nicht die Häufigkeit. Ein Wort, das 451-mal
- * vorkommt und dabei zu 100 % in einer Kategorie liegt, ist das schärfste Merkmal
- * überhaupt; eines mit 83 Belegen über 17 Kategorien ist Rauschen, egal wie vertraut es
- * aussieht. Ohne diese Zahl neben dem Wort wäre die Pflege der Ausschlussliste ein
+ * Maß, das beim Ausschließen zählt — nicht die Häufigkeit. Ein Wort, das oft vorkommt
+ * und dabei zu 100 % in einer Kategorie liegt, ist ein scharfes Merkmal; eines mit
+ * ähnlich vielen Belegen quer über ein Dutzend Kategorien ist Rauschen, egal wie
+ * vertraut es aussieht. Ohne diese Zahl neben dem Wort wäre die Pflege der Ausschlussliste ein
  * Ratespiel, das das Modell verschlechtert.
  */
 export interface Merkmalswert {

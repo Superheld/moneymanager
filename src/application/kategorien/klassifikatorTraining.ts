@@ -1,8 +1,8 @@
 // Use-Case „Klassifikator trainieren" — lädt das Material, trainiert, misst, speichert.
 //
 // Warum ein Neutraining und kein Nachjustieren einzelner Korrekturen: Das Modell ist
-// linear und über den ganzen Bestand in Millisekunden neu gerechnet (137 ms über 3689
-// Beispiele, gemessen 2026-08-16). Inkrementelles Lernen brächte dafür alles mit, was man
+// linear und über den ganzen Bestand in Millisekunden neu gerechnet — auch über einen
+// mehrjährigen. Inkrementelles Lernen brächte dafür alles mit, was man
 // sich damit einhandelt — Abhängigkeit von der Reihenfolge, Abdriften über die Zeit, und
 // die Frage, wie schwer eine einzelne Korrektur wiegen darf. Die Wahrheit ist ohnehin der
 // Bestand: jede Korrektur verändert ihn, und ein Training daraus ist die ehrlichere
@@ -104,8 +104,8 @@ export interface Modellzustand {
  * Ab wie vielen neuen Beispielen ein Training sich lohnt.
  *
  * Bewusst keine Automatik, sondern ein Hinweis: das Modell soll sich nicht hinter dem
- * Rücken ändern. Die Schwelle ist grob — bei ~3700 Beispielen ändern fünfzig neue Zeilen
- * wenig, aber sie sind ein sichtbares Zeichen, dass sich etwas getan hat.
+ * Rücken ändern. Die Schwelle ist grob — bei einem gewachsenen Bestand ändern fünfzig
+ * neue Zeilen wenig, aber sie sind ein sichtbares Zeichen, dass sich etwas getan hat.
  */
 export const ZUWACHS_SCHWELLE = 50;
 

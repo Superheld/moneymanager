@@ -134,7 +134,7 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
    * v20 fügt die Spalte MIT Default hinzu — und der Default ist die eigentliche Aussage
    * der Migration: der Bestand kam über den Import und das FG-Remapping herein, also
    * automatisch. Ohne ihn stünde dort NULL, und der erste rückwirkende Lauf müsste raten,
-   * ob er 5279 Zeilen anfassen darf.
+   * ob er den ganzen Bestand anfassen darf.
    */
   it("gibt bestehenden Ist-Buchungen die Kategorie-Herkunft „automatisch“ (v20)", () => {
     const db = new SQL.Database();

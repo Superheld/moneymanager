@@ -16,7 +16,7 @@ export interface Kategorie {
  *
  * Warum: Budgets und Auswertungen hängen an einer HAUPTkategorie („Lebenshaltung"),
  * gebucht wird aber auf deren Kindern („Lebensmittel", „Drogerie"). Wer nur auf die
- * eine ID prüft, findet nichts — auf echten Daten trafen 0 von 5207 Buchungen ihre
+ * eine ID prüft, findet nichts — auf echten Daten traf KEINE EINZIGE Buchung ihre
  * Budget-Kategorie direkt, jeder Budget-Verbrauch stand deshalb auf 0.
  *
  * Unbekannte `wurzelId` liefert die einelementige Menge — die Buchungen tragen die ID

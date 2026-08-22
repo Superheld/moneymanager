@@ -281,6 +281,36 @@ Die ausführlichen Regeln für Testdaten (anonymisieren statt ersetzen, Namen je
 IBANs mit nicht existierender BLZ) stehen in **`src/CLAUDE.md`**, weil man sie dort liest, wo
 man sie braucht.
 
+### Keine Zahlen aus dem Bestand in Prosa — auch keine harmlosen
+
+In **Kommentaren, Markdown-Dateien und Commit-Nachrichten** steht keine Zahl, die am echten
+Bestand gemessen wurde. Nicht nur die offensichtlich privaten (Beträge, Kontostände),
+sondern auch die scheinbar harmlosen: Buchungszahlen, Trefferquoten, „93 von 738 geprüften
+Zahlungen", „1060-mal vorgekommen", Laufzeiten mit Beispielzahl.
+
+Zwei Gründe, und der zweite wiegt schwerer als erwartet:
+
+**Sie verraten etwas.** Wie viele Buchungen jemand hat, über wie viele Jahre, wie oft er
+irgendwo einkauft — daraus lässt sich ableiten, auch ohne einen Betrag. Und eine Zahl ist
+das, was am ehesten mitrutscht: „am echten Bestand gemessen" ist die überzeugendste
+Begründung, und der Beleg dazu wirkt am überzeugendsten.
+
+**Sie werden zu Lügen.** Ein Kommentar mit „137 ms über 3689 Beispiele" ist beim nächsten
+Import falsch und bleibt es. Wer ihn dann liest, glaubt einer Messung, die nie wieder
+stimmt. Eine Aussage ohne Zahl altert nicht: „in Millisekunden neu gerechnet" gilt weiter.
+
+**Was bleibt:** Rechenbeispiele und Kapazitätsabschätzungen, die keine Messung sind — „bei
+2000 Merkmalen × 50 Kategorien wären das 100.000 Zeilen" beschreibt eine Konstruktion, kein
+Konto. Sie altern auch nicht.
+
+**Was an ihre Stelle tritt:** die Aussage selbst. „Keine einzige Buchung traf ihre
+Budget-Kategorie direkt" ist stärker als „0 von 5207". „Ein nennenswerter Teil der Zeilen"
+reicht, wo es auf die Größenordnung ankommt. Wo die genaue Zahl wirklich zählt, gehört sie
+in die Doku außerhalb des Repos.
+
+Der Muster-Guard findet davon nur die Beträge. Der Rest ist Handarbeit — dieselbe Art wie
+bei Regel 2 und 3 der Testdaten.
+
 ### Zwei Wächter, die verschiedene Fehler finden
 
 **Der Wert-Abgleich** (`src/privatsphaere.test.ts`, dazu der `pre-push`-Hook) kennt die

@@ -335,7 +335,7 @@ export const MIGRATIONS: Migration[] = [
       // EINE Zeile, feste Id — es gibt genau ein aktuelles Modell, und ein Training
       // ersetzt es vollständig. Keine Historie: ein altes Modell ist nicht „auch eine
       // Meinung", sondern ein überholter Stand, und aus dem Bestand jederzeit in
-      // Millisekunden neu herstellbar (137 ms über 3689 Beispiele).
+      // Millisekunden neu herstellbar.
       //
       // Vokabular und Kategorien als Textliste, die Gewichte als base64-kodierte
       // Float32-Matrix. Kein eigenes Zahlenformat, keine Zeile je Gewicht: bei ~2000
@@ -433,8 +433,8 @@ export const MIGRATIONS: Migration[] = [
       // Förmlichkeit: sie ist der Grund, warum die Reparatur hier steht und nicht in v23.
       //
       // Folge ohne diesen Nachtrag: die Vertragsstufe der Kategorisierungs-Kette wäre auf
-      // dem echten Bestand tot — 93 von 738 geprüften Zahlungen fielen durch auf das
-      // Modell, obwohl für sie eine getroffene Zuordnung existiert.
+      // dem echten Bestand weitgehend tot — ein guter Teil der geprüften Zahlungen fiel
+      // durch auf das Modell, obwohl für sie eine getroffene Zuordnung existiert.
       //
       // Wiederholbar wie in v23: `WHERE kategorie_id IS NULL` greift nach dem ersten Lauf
       // nur noch dort, wo auch die Regel nichts hat, und schreibt wieder NULL.
@@ -497,8 +497,8 @@ export const MIGRATIONS: Migration[] = [
       //
       // Der Anlass ist der Dublettenfinder: Gläubiger-ID PLUS Mandatsreferenz ist der
       // einzige von der Bank vergebene Schlüssel, den beide Quellen tragen — und die
-      // Mandatsreferenz haben wir bisher weggeworfen, obwohl sie in der Datei steht
-      // (422 von 5279 Zeilen).
+      // Mandatsreferenz haben wir bisher weggeworfen, obwohl sie in einem nennenswerten
+      // Teil der Zeilen steht.
       `ALTER TABLE umsatz ADD COLUMN gegenpartei_iban TEXT`,
       `ALTER TABLE umsatz ADD COLUMN mandatsreferenz TEXT`,
       `ALTER TABLE umsatz ADD COLUMN e2e_referenz TEXT`,
@@ -666,7 +666,7 @@ export const MIGRATIONS: Migration[] = [
       // Bisher stand der von der Bank gemeldete Saldo an der Kontozuordnung und wurde bei
       // JEDEM Abruf überschrieben. Damit ist die Frage „stimmt mein Konto?" mit einer Zahl
       // zu beantworten, die Frage „seit wann nicht mehr?" mit gar nichts — und die zweite
-      // ist die nützlichere: aus 224 Buchungen über fünf Jahre werden zwei Wochen.
+      // ist die nützlichere: aus einer mehrjährigen Historie werden zwei Wochen.
       //
       // Ein Anker ist eine BEOBACHTUNG, kein Rechenergebnis. Er wird deshalb nie ungültig
       // und braucht keine Invalidierung, wenn jemand nachträglich eine Buchung davor
