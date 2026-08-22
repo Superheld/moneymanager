@@ -235,9 +235,9 @@ function pruefe(wort: string): { token: string } | { grund: Verwurfsgrund } {
   // und sagt über die Kategorie nichts.
   if (/^\d+$/.test(wort)) return { grund: "ziffern" };
 
-  // Maskierte Kartennummern (`xxxx`) und Sternchenblöcke. Sie sind häufig — auf echten
-  // Daten kam `xxxx` 1060-mal vor — und tragen per Konstruktion keine Information: was
-  // sie verdecken, ist genau das, was interessant wäre.
+  // Maskierte Kartennummern (`xxxx`) und Sternchenblöcke. Sie gehören zu den häufigsten
+  // Wörtern im Bestand und tragen per Konstruktion keine Information: was sie verdecken,
+  // ist genau das, was interessant wäre.
   if (/^(.)\1{2,}$/.test(wort)) return { grund: "platzhalter" };
 
   const kern = ohneRandziffern(wort);

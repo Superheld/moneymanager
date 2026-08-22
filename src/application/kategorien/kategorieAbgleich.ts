@@ -41,8 +41,8 @@ export interface Kategoriewechsel {
   readonly charakter: Charakter;
   /**
    * Der Charakter VORHER. Steht hier, damit die Vorschau die wenigen Fälle benennen kann,
-   * in denen sich nicht nur das Etikett ändert: auf echten Daten waren das 9 von 198 —
-   * meist Rückerstattungen, die in eine Aufwandskategorie wandern. Ein Kategoriewechsel
+   * in denen sich nicht nur das Etikett ändert: auf echten Daten eine Handvoll von
+   * hunderten — meist Rückerstattungen, die in eine Aufwandskategorie wandern. Ein Kategoriewechsel
    * ist eine Sortierfrage, ein Charakterwechsel eine über Erfolgs- und
    * Liquiditätswirksamkeit. Die beiden ungetrennt zu zeigen, hieße die zweite zu
    * verstecken.

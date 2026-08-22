@@ -13,10 +13,10 @@
 // gemeldet hat, bleibt wahr, egal was danach nachgebucht wird. Was sich ändert, ist die
 // DIFFERENZ — und die ist genau die Information, die man sehen will.
 //
-// **Was ein einzelner Anker nicht kann.** Er sagt „hier fehlen 600 Euro", aber nicht, wo.
-// Bei 224 Buchungen über fünf Jahre ist das keine brauchbare Auskunft. Deshalb werden sie
-// aufgehoben statt überschrieben: zwischen zwei Ankern lässt sich die Differenz einkreisen
-// (`abweichungsfenster`), und aus fünf Jahren werden zwei Wochen.
+// **Was ein einzelner Anker nicht kann.** Er sagt „hier fehlt etwas", aber nicht, wo. Über
+// eine mehrjährige Historie ist das keine brauchbare Auskunft. Deshalb werden Anker
+// aufgehoben statt überschrieben: zwischen zweien lässt sich die Differenz einkreisen
+// (`abweichungsfenster`), und aus Jahren werden Wochen.
 //
 // **Der Anfangsbestand ist selbst nur eine Schätzung** — er überbrückt die Historie vor
 // dem ersten Import. Deshalb rechnet `abweichungsfenster` bewusst OHNE ihn: es vergleicht

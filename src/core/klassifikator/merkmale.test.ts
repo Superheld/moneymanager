@@ -94,7 +94,8 @@ describe("Verwendungszweck", () => {
   });
 
   it("erkennt maskierte Kartennummern als Platzhalter", () => {
-    // „xxxx" kam auf echten Daten 1060-mal vor. Was es verdeckt, wäre das Interessante.
+    // „xxxx" gehört zu den häufigsten Wörtern überhaupt. Was es verdeckt, wäre das
+    // Interessante.
     const b = merkmalsbefund(quelle({ verwendungszweck: "VISA XXXX" }));
     expect(b.merkmale).not.toContain("vwz:xxxx");
     expect(b.verworfen).toContainEqual({ wort: "xxxx", grund: "platzhalter", herkunft: "vwz" });
