@@ -62,6 +62,8 @@ function fakeAdapter(opt: {
   wirft?: boolean;
   saldo?: number;
   saldoWirft?: boolean;
+  /** Die Stände, die in den gelieferten Auszügen stehen. */
+  auszugsSalden?: { datum: string; betrag: number }[];
   profil?: Bankprofil;
 }) {
   const anfragen: { schluessel: string; von: string; bis: string; bevorzugt?: string }[] = [];
@@ -84,6 +86,9 @@ function fakeAdapter(opt: {
       return {
         format: "MT940",
         hinweise: [],
+        // Was die Bank im Auszug mitschickt: Stand davor und Stand danach. Über den
+        // Testschalter, damit auch der Fall „Format liefert keine" geprüft werden kann.
+        auszugsSalden: opt.auszugsSalden ?? [],
         ergebnis: {
           quelle: "fints",
           warnungen: [],
@@ -450,5 +455,62 @@ describe("abrufAusfuehren", () => {
     expect(ergebnis.konten).toEqual([]);
     expect(ergebnis.depots).toEqual([]);
     expect(anfragen).toEqual([]);
+  });
+});
+
+/**
+ * Die Stände aus den Auszügen sind der eigentliche Gewinn des Abrufs für den Abgleich:
+ * `HKSAL` bieten nicht alle Banken an und es sagt nur, wie es HEUTE steht — die
+ * Auszugsstände decken den abgefragten Zeitraum ab und fallen nebenbei an.
+ */
+describe("Auszugsstände als Anker", () => {
+  const zuordnung: Kontozuordnung = {
+    zugangId: "z1",
+    schluessel: "9876543210|Girokonto",
+    zahlungskontoId: "k1",
+  };
+
+  it("legt für jeden gelieferten Stand einen Anker an", async () => {
+    const { adapter } = fakeAdapter({
+      konten: [bankkonto()],
+      auszugsSalden: [
+        { datum: "2026-07-31", betrag: 120000 },
+        { datum: "2026-08-18", betrag: 133050 },
+      ],
+    });
+    const f = fakes([zuordnung]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    const datumsListe = f.anker.filter((a) => a.herkunft === "bank").map((a) => a.datum);
+    expect(datumsListe).toEqual(expect.arrayContaining(["2026-07-31", "2026-08-18"]));
+    expect(f.anker.find((a) => a.datum === "2026-07-31")?.betrag).toBe(120000);
+  });
+
+  /**
+   * Ein Format ohne Stände darf nichts kaputtmachen — die Umsätze sind das Wichtigere,
+   * und ein fehlender Anker heisst nur, dass eine Prüfmöglichkeit fehlt.
+   */
+  it("läuft durch, wenn das Format keine Stände trägt", async () => {
+    const { adapter } = fakeAdapter({ konten: [bankkonto()], auszugsSalden: [] });
+    const f = fakes([zuordnung]);
+    const ergebnis = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    expect(ergebnis.konten[0].fehler).toBeUndefined();
+  });
+
+  it("übergeht einen Stand mit unbrauchbarem Datum, statt den Abruf zu kippen", async () => {
+    const { adapter } = fakeAdapter({
+      konten: [bankkonto()],
+      auszugsSalden: [
+        { datum: "kein-datum", betrag: 1 },
+        { datum: "2026-08-18", betrag: 133050 },
+      ],
+    });
+    const f = fakes([zuordnung]);
+    const ergebnis = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(ergebnis.konten[0].fehler).toBeUndefined();
+    expect(f.anker.some((a) => a.datum === "2026-08-18")).toBe(true);
+    expect(f.anker.some((a) => a.datum === "kein-datum")).toBe(false);
   });
 });
