@@ -6,9 +6,15 @@
 # Budgetbetraege und Buchungszahlen in einem Dutzend Beschreibungen, weil "am echten
 # Bestand gemessen" die ueberzeugendste Begruendung ist.
 #
-# Deshalb hier zweierlei:
+# Deshalb hier dreierlei:
 #   1. die beiden Waechter aus der Testsuite (Datenbestand, Produkt-ID)
-#   2. ein Abgleich der AUSGEHENDEN Commit-Texte gegen die echte Datenbank
+#   2. der MUSTER-Guard ueber alles, was uebertragen wird — Diff UND Commit-Texte
+#   3. ein Abgleich der AUSGEHENDEN Commit-Texte gegen die echte Datenbank
+#
+# Der Muster-Guard und der Datenbank-Abgleich ersetzen einander NICHT. Der eine kennt die
+# Formen (IBAN, Token, Betrag in Prosa) und findet auch Fremdes; der andere kennt die
+# Werte und findet sie in jeder Schreibweise. An genau der Naht ist einmal etwas
+# durchgerutscht: eine Kontonummer aus einem FinTS-Mitschnitt, die in keiner Tabelle steht.
 #
 # Gelesen wird ueber `sqlite3` mit `PRAGMA query_only=ON` — nicht mit `-readonly`:
 # solange die App laeuft, haelt sie die Datenbank, und read-only scheitert dann mit
@@ -35,6 +41,35 @@ npx vitest run src/privatsphaere.test.ts src/adapters/fints/produktId.test.ts \
     echo "pre-push: ABGEBROCHEN — ein Waechter schlaegt an. Details: npx vitest run src/privatsphaere.test.ts"
     exit 1
   }
+
+# Git schickt die ausgehenden Refs auf STDIN — und zwar genau einmal. Beide Pruefungen
+# unten brauchen sie, deshalb wird stdin hier EINMAL eingelesen und danach aus der
+# Variablen gefuettert. Wer die zweite Schleife weiter aus stdin liest, laesst sie leer
+# laufen: sie sieht keinen einzigen Ref und meldet „nichts gefunden".
+#
+# Gefuettert wird per Here-String und nicht per Pipe: eine Pipe startet eine Subshell, und
+# ein dort gesetztes `fehler=1` ist nach der Schleife wieder weg. Der Hook liefe gruen
+# durch, obwohl er angeschlagen hat.
+REFS=$(cat)
+WURZEL=$(git rev-parse --show-toplevel)
+
+# Der Muster-Guard laeuft ueber JEDEN ausgehenden Bereich — auch wenn es die Datenbank
+# unten gar nicht gibt. Er braucht sie nicht.
+guard_fehler=0
+while read -r _lokal_ref lokal_sha _remote_ref remote_sha; do
+  [ -z "$lokal_sha" ] && continue
+  [ "$lokal_sha" = "0000000000000000000000000000000000000000" ] && continue
+  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
+    bereich="$lokal_sha"
+  else
+    bereich="$remote_sha..$lokal_sha"
+  fi
+  node "$WURZEL/scripts/privacy-guard.mjs" --range "$bereich" || guard_fehler=1
+done <<EOF
+$REFS
+EOF
+
+[ "$guard_fehler" = "0" ] || exit 1
 
 [ -f "$DB" ] || exit 0
 command -v sqlite3 >/dev/null || exit 0
@@ -84,6 +119,7 @@ kennungen=$(lesen "SELECT iban FROM zahlungskonto WHERE iban IS NOT NULL AND iba
 
 fehler=0
 while read -r lokal_ref lokal_sha remote_ref remote_sha; do
+  [ -z "$lokal_sha" ] && continue
   [ "$lokal_sha" = "0000000000000000000000000000000000000000" ] && continue
   if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
     bereich="$lokal_sha"
@@ -108,7 +144,9 @@ while read -r lokal_ref lokal_sha remote_ref remote_sha; do
       fehler=1
     fi
   done
-done
+done <<EOF
+$REFS
+EOF
 
 [ "$fehler" = "0" ] || exit 1
 echo "pre-push: nichts aus dem echten Bestand in den ausgehenden Commit-Texten."

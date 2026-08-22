@@ -1,0 +1,20 @@
+# Begriffe, die nicht ins Repo gehören — eine je Zeile, `#` leitet einen Kommentar ein.
+#
+# Diese Datei ist die VORLAGE. Kopieren nach `.privacy-terms` (git-ignoriert) und
+# ausfüllen. Ohne sie prüft der Muster-Guard keine Namen; er sagt das dann auch, damit
+# niemand mehr Schutz annimmt, als da ist.
+#
+# Hier hinein gehört, was ein Muster nicht erkennen kann und was nicht in der Datenbank
+# steht — sonst fände der Datenbank-Abgleich es ohnehin:
+#
+#   • Namen von Personen aus dem Umfeld, die nirgends als Konto-Inhaber gespeichert sind
+#   • Arbeitgeber, Vereine, Vermieter, Ärzte — alles, woraus sich Lebensumstände ableiten
+#   • Ortsnamen, wenn sie klein genug sind, um jemanden einzugrenzen
+#   • Kundennummern und Vertragskennungen, die keinem der Muster folgen
+#
+# Einträge unter vier Zeichen werden ignoriert: zu kurz, um nicht überall zu treffen.
+# Gross-/Kleinschreibung ist egal.
+
+# Beispiele — löschen und durch echte ersetzen:
+# Musterfirma GmbH
+# Kleinkleckersdorf

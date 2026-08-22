@@ -1,0 +1,9 @@
+#!/bin/sh
+# Die Nachricht selbst ist die Stelle, an der Werte aus dem echten Bestand am
+# zuverlaessigsten landen: „am echten Bestand gemessen" ist die ueberzeugendste
+# Begruendung, und die Zahl dazu wirkt am ueberzeugendsten — genau deshalb rutscht sie
+# mit (CLAUDE.md).
+#
+# Der pre-push-Hook prueft die Nachrichten ebenfalls, aber gegen die DATENBANK. Hier
+# laufen die MUSTER, und die finden auch, was nicht aus der eigenen Datenbank stammt.
+exec node "$(git rev-parse --show-toplevel)/scripts/privacy-guard.mjs" --message "$1"
