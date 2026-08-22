@@ -629,11 +629,22 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         >
           <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
-        {/* Die Notiz gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt den
-            Verwendungszweck der Bank, und der steht unter „Herkunft". */}
+        {/* Die Bezeichnung gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt
+            den Verwendungszweck der Bank, und der steht unter „Herkunft".
+
+            Der PLATZHALTER zeigt, was ohne eigene Angabe in der Registerzeile steht:
+            Empfänger, sonst Verwendungszweck (dieselbe Kette wie in `registerSicht`). Ohne
+            das ist nicht zu sehen, dass die Zeile schon eine Beschriftung HAT und dieses
+            Feld sie überschreibt — man tippt dann ab, was ohnehin dasteht. Was hier leer
+            bleibt, bleibt automatisch. */}
         {!istEntwurf && (
-          <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
-            <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.buchung.notizPlatzhalter")} />
+          <FormField label={t("konten.feldBezeichnung")} hint={t("konten.optional")}>
+            <input
+              className="field"
+              value={notiz}
+              onChange={(e) => setNotiz(e.target.value)}
+              placeholder={umsatz?.gegenpartei || umsatz?.verwendungszweck || t("konten.buchung.notizPlatzhalter")}
+            />
           </FormField>
         )}
       </div>

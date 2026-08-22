@@ -790,7 +790,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
         <FormField label={t("konten.feldBetrag")} required>
           <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
-        <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
+        <FormField label={t("konten.feldBezeichnung")} hint={t("konten.optional")}>
           <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
         </FormField>
       </div>
