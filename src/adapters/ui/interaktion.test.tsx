@@ -26,6 +26,7 @@ import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import {
+  sqliteDublettenfreigabeRepository,
   sqliteImportLaufRepository,
   sqliteUmsatzRepository,
 } from "../persistence/sqliteImportRepositories";
@@ -1005,5 +1006,101 @@ describe("Vertrag aus einer Buchung", () => {
     await detailOeffnen(nutzer);
     await screen.findByText(/Gegenkonto/i);
     expect(screen.queryByRole("button", { name: /vertrag daraus machen/i })).toBeNull();
+  });
+});
+
+/**
+ * Der Vergleich ist der Ort, an dem über ein Dublettenpaar entschieden wird. Geprüft wird
+ * an dem, was danach in der Datenbank steht — nicht an Beschriftungen: welche der beiden
+ * Zeilen verschwindet, ist die ganze Frage, und ein Dialog, der die falsche nimmt, sähe
+ * im Markup genauso richtig aus.
+ */
+describe("Dubletten nebeneinander vergleichen", () => {
+  /**
+   * Dasselbe Paar, wie es im echten Bestand vorkommt: eine Zeile aus einer Datei, eine aus
+   * dem Bankabruf, gleicher Tag, gleicher Betrag. Nur so entsteht überhaupt ein Verdacht
+   * im Ledger — innerhalb EINES Laufs wird bewusst nicht gemeldet.
+   */
+  async function paarAnlegen() {
+    await grunddaten();
+    await sqliteImportLaufRepository.speichern({
+      id: "l-datei", quelle: "finanzguru", zeitpunkt: "2026-08-10T09:00:00.000Z",
+      dateiname: "auszug.csv", eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    await sqliteImportLaufRepository.speichern({
+      id: "l-bank", quelle: "fints", zeitpunkt: "2026-08-12T09:00:00.000Z",
+      eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    for (const [ist, lauf, umsatz, hash] of [
+      ["i-datei", "l-datei", "u-datei", "h-datei"],
+      ["i-bank", "l-bank", "u-bank", "h-bank"],
+    ] as const) {
+      await sqliteLedgerRepository.speichern({
+        id: ist, datum: "2026-07-20", betrag: -7430, kontoId: "k1",
+        charakter: "Aufwand", quelle: "import", kategorieId: "kat1",
+      });
+      await sqliteUmsatzRepository.speichern({
+        id: umsatz, laufId: lauf, zahlungskontoId: "k1", buchungstag: "2026-07-20",
+        betrag: -7430, waehrung: "EUR", gegenpartei: "Vibora Ohlert",
+        verwendungszweck: "Rechnung 4711", rohHash: hash, status: "verbucht", istbuchungId: ist,
+      });
+    }
+  }
+
+  async function vergleichOeffnen(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    const pillen = await screen.findAllByRole("button", { name: /nebeneinander vergleichen/i });
+    await nutzer.click(pillen[0]);
+  }
+
+  it("zeigt beide Zeilen mit ihrer Herkunft, sobald die Markierung angeklickt wird", async () => {
+    await paarAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await vergleichOeffnen(nutzer);
+
+    // Nach den DATEN suchen, die der Test angelegt hat: beide Herkünfte stehen im Dialog,
+    // und genau daran unterscheidet man die zwei Spalten.
+    await waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("auszug.csv");
+      expect(text).toContain("h-datei");
+      expect(text).toContain("h-bank");
+    });
+  });
+
+  it("verwirft die Bankzeile und lässt die Zeile aus der Datei stehen", async () => {
+    await paarAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await vergleichOeffnen(nutzer);
+
+    // Die Bankzeile ist die zweite Spalte (später importiert, gleiches Datum → rechts
+    // steht der Zwilling). Der Knopf heisst bei ihr „verwerfen", bei der Datei „löschen" —
+    // das ist der sichtbare Unterschied zwischen den beiden Wegen.
+    await nutzer.click(await screen.findByRole("button", { name: /diese zeile verwerfen/i }));
+
+    await waitFor(async () => {
+      const ids = (await sqliteLedgerRepository.alle()).map((b) => b.id);
+      expect(ids).toEqual(["i-datei"]);
+      const bank = (await sqliteUmsatzRepository.alle()).find((u) => u.id === "u-bank");
+      expect(bank?.status).toBe("verworfen");
+    });
+  });
+
+  it("hält „kein Duplikat“ fest, ohne eine der beiden anzufassen", async () => {
+    await paarAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await vergleichOeffnen(nutzer);
+    await nutzer.click(await screen.findByRole("button", { name: /kein duplikat/i }));
+
+    await waitFor(async () => {
+      expect(await sqliteDublettenfreigabeRepository.alle()).toHaveLength(1);
+      expect(await sqliteLedgerRepository.alle()).toHaveLength(2);
+    });
   });
 });

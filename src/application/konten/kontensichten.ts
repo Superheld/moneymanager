@@ -29,7 +29,7 @@ import {
   type Kontostandsanker,
   type Zahlungsregel,
 } from "../../core";
-import { ABRUF_QUELLEN, type Umsatz } from "../import";
+import { ABRUF_QUELLEN, type ImportLauf, type Umsatz } from "../import";
 import {
   freigegebenePaare,
   ledgerVerdacht,
@@ -129,6 +129,12 @@ export interface Kontensicht {
   readonly buchungen: readonly IstBuchung[];
   readonly regeln: readonly Zahlungsregel[];
   /**
+   * Die Import-Läufe — geladen werden sie hier ohnehin, um `ausBankabruf` zu bestimmen.
+   * Mitgegeben, weil der Dublettenvergleich zu jeder Zeile sagen können muss, WOHER sie
+   * kam: dieselbe Zahlung aus Datei und Abruf ist genau der Fall, um den es dort geht.
+   */
+  readonly laeufe: readonly ImportLauf[];
+  /**
    * IDs der Buchungen, die aus einem Bankabruf stammen — nur die sind vor dem Löschen
    * geschützt (siehe Kopf).
    */
@@ -215,6 +221,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     buchungen,
     regeln,
+    laeufe,
     ausBankabruf,
     umsatzZuBuchung,
     dublettenverdacht,

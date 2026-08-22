@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import {
   registerSicht,
   type Charakter,
+  type Dublettenverdacht,
   type IstBuchung,
   type Kontensicht,
   type Registerzeile,
@@ -26,6 +27,7 @@ import {
 import type { ScreenId } from "../bausteine/AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { BuchungDetail } from "../buchung/BuchungDetail";
+import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVergleich";
 import { SammelDialog } from "../buchung/SammelDialog";
 import { AbrufDialog } from "./AbrufDialog";
 import { DepotAuszug } from "./DepotAuszug";
@@ -80,6 +82,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
    * auffiele — die Frage „steht das schon drin?" gehört deshalb an den Auszug selbst.
    */
   const [nurDubletten, setNurDubletten] = useState(false);
+  /** Das Paar, das gerade nebeneinander liegt — beide Seiten und der Grund. */
+  const [vergleich, setVergleich] = useState<{ links: Vergleichsseite; rechts: Vergleichsseite; verdacht: Dublettenverdacht } | null>(null);
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
@@ -165,6 +169,29 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       return true;
     });
   }, [register, katFilter, artFilter, regSuche, nurDubletten, geld]);
+
+  /**
+   * Baut die zwei Seiten eines Vergleichs. Fehlt der Zwilling im Ledger, kommt nichts
+   * zurück — dann ist der Verdacht ohnehin veraltet und der Dialog hätte nur eine Spalte.
+   */
+  function vergleichOeffnen(buchung: IstBuchung, d: Dublettenverdacht) {
+    const zwilling = d.zwillingIstId ? ist.find((b) => b.id === d.zwillingIstId) : undefined;
+    if (!zwilling || !sicht) return;
+    const seite = (b: IstBuchung): Vergleichsseite => {
+      const u = sicht.umsatzZuBuchung.get(b.id);
+      return {
+        buchung: b,
+        umsatz: u,
+        lauf: u ? sicht.laeufe.find((l) => l.id === u.laufId) : undefined,
+        kontoName: kontoName.get(b.kontoId) ?? "",
+        kategorieName: b.kategorieId ? kategorieName.get(b.kategorieId) ?? "" : "",
+      };
+    };
+    // Die ältere Zeile steht links: eine Leserichtung, die nicht davon abhängt, welche
+    // der beiden man angeklickt hat.
+    const [links, rechts] = buchung.datum <= zwilling.datum ? [buchung, zwilling] : [zwilling, buchung];
+    setVergleich({ links: seite(links), rechts: seite(rechts), verdacht: d });
+  }
 
   /** Wie viele Zeilen des Registers überhaupt einen Verdacht tragen. */
   const dublettenAnzahl = useMemo(
@@ -563,14 +590,22 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                         // Der title sitzt am Wrapper, nicht an der Pille: `bausteine/` ist teils aus
                         // dem Design-System kopiert und kennt die Eigenschaft nicht —
                         // dort wird nichts erfunden.
-                        <span
-                          style={{ flex: "0 0 auto", display: "inline-flex" }}
-                          title={`${r.dublette.gruende.join(" · ")} · ${t("konten.dubletten.zwilling", { datum: r.dublette.zwillingDatum })}`}
+                        <button
+                          type="button"
+                          aria-label={t("konten.vergleich.oeffnen")}
+                          style={{ flex: "0 0 auto", display: "inline-flex", background: "none", border: 0, padding: 0, cursor: "pointer" }}
+                          title={`${r.dublette.gruende.join(" · ")} · ${t("konten.dubletten.zwilling", { datum: r.dublette.zwillingDatum })} · ${t("konten.vergleich.oeffnen")}`}
+                          onClick={(e) => {
+                            // Die Zeile selbst öffnet das Detail — der Vergleich ist eine
+                            // eigene Frage und darf sie nicht mitauslösen.
+                            e.stopPropagation();
+                            if (r.buchung && r.dublette) vergleichOeffnen(r.buchung, r.dublette);
+                          }}
                         >
                           <Pill variant="warn">
                             {t(r.dublette.urteil === "identisch" ? "konten.dubletten.sicher" : "konten.dubletten.verdacht")}
                           </Pill>
-                        </span>
+                        </button>
                       )}
                     </span>
                   ),
@@ -657,6 +692,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           // und wird schlicht gelöscht.
           ausBankabruf={ausBankabruf.has(editBuchung.id)}
           onClose={() => setEditBuchung(null)}
+          onGeaendert={laden}
+        />
+      )}
+
+      {vergleich && (
+        <DublettenVergleich
+          links={vergleich.links}
+          rechts={vergleich.rechts}
+          verdacht={vergleich.verdacht}
+          onClose={() => setVergleich(null)}
           onGeaendert={laden}
         />
       )}
