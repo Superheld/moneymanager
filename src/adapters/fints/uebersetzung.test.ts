@@ -8,7 +8,14 @@
 
 import { describe, expect, it } from "vitest";
 import { waehrungNachCode } from "../../core";
-import { bankbetragZuCent, klartextAnreicherung, isoDatum, zuRohUmsatz, type FintsBuchung } from "./uebersetzung";
+import {
+  auszugsStaende,
+  bankbetragZuCent,
+  klartextAnreicherung,
+  isoDatum,
+  zuRohUmsatz,
+  type FintsBuchung,
+} from "./uebersetzung";
 
 describe("bankbetragZuCent", () => {
   it("rechnet Euro-Fließkomma in Cent um, auch wo die Multiplikation kippt", () => {
@@ -155,5 +162,63 @@ describe("zuRohUmsatz", () => {
     const u = zuRohUmsatz(buchung({ remoteName: undefined, purpose: undefined }), {});
     expect(u.gegenpartei).toBe("");
     expect(u.verwendungszweck).toBe("");
+  });
+});
+
+/**
+ * Die Stände aus den Auszügen sind die Grundlage des Kontoabgleichs — und die Stelle, an
+ * der eine Erfindung der Bibliothek gefährlich wird: der CAMT-Parser legt einen
+ * Anfangssaldo von NULL an, wenn die Bank keinen mitschickt. Ungeprüft übernommen wäre das
+ * ein Anker „an diesem Tag lag nichts auf dem Konto", und der meldet die gesamte
+ * Kontodeckung als Fehlbetrag.
+ */
+describe("auszugsStaende", () => {
+  const stand = (iso: string, euro: number) => ({
+    date: new Date(`${iso}T00:00:00`),
+    currency: "EUR",
+    value: euro,
+  });
+
+  it("nimmt Anfangs- und Schlusssaldo, wenn sie auf verschiedene Tage fallen", () => {
+    const staende = auszugsStaende([
+      { openingBalance: stand("2026-07-31", 1200), closingBalance: stand("2026-08-22", 1330.5) },
+    ]);
+    expect(staende).toEqual([
+      { datum: "2026-07-31", betrag: 120000 },
+      { datum: "2026-08-22", betrag: 133050 },
+    ]);
+  });
+
+  it("lässt einen Anfangssaldo weg, der auf denselben Tag fällt wie der Schluss", () => {
+    // Genau die Form, die der CAMT-Parser erfindet: Wert null, Datum vom Schluss.
+    const staende = auszugsStaende([
+      { openingBalance: stand("2026-08-22", 0), closingBalance: stand("2026-08-22", 843.07) },
+    ]);
+    expect(staende).toEqual([{ datum: "2026-08-22", betrag: 84307 }]);
+  });
+
+  it("nimmt mehrere Auszüge in ihrer Reihenfolge", () => {
+    const staende = auszugsStaende([
+      { openingBalance: stand("2026-06-30", 100), closingBalance: stand("2026-07-31", 200) },
+      { openingBalance: stand("2026-07-31", 200), closingBalance: stand("2026-08-31", 300) },
+    ]);
+    expect(staende.map((s) => s.datum)).toEqual([
+      "2026-06-30", "2026-07-31", "2026-07-31", "2026-08-31",
+    ]);
+  });
+
+  it("kommt ohne Schlusssaldo klar, statt zu werfen", () => {
+    expect(auszugsStaende([{ openingBalance: stand("2026-08-01", 500) }])).toEqual([]);
+  });
+
+  it("übergeht einen Auszug mit kaputtem Datum und vermerkt es", () => {
+    const warnungen: string[] = [];
+    const kaputt = { date: new Date("nichts"), currency: "EUR", value: 5 };
+    const staende = auszugsStaende(
+      [{ closingBalance: kaputt }, { closingBalance: stand("2026-08-22", 10) }],
+      warnungen,
+    );
+    expect(staende).toEqual([{ datum: "2026-08-22", betrag: 1000 }]);
+    expect(warnungen).toHaveLength(1);
   });
 });
