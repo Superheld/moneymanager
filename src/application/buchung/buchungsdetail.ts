@@ -46,6 +46,13 @@ export interface BuchungsdetailDeps {
   readonly vertragRepo: VertragRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly freigabeRepo: DublettenfreigabeRepository;
+  /**
+   * Die Konto-Zuordnungen der Bankzugänge — daran hängt, welches Konto ONLINE geführt
+   * wird. Optional, damit ein Aufrufer ohne Bankanbindung (Tests, Analyse) den Dialog
+   * bekommt, ohne ein Repository mitzubringen, das er nicht hat: fehlt es, gilt kein
+   * Konto als online, und das ist genau der Stand vor der Bankanbindung.
+   */
+  readonly kontozuordnungen?: () => Promise<readonly { readonly zahlungskontoId: string }[]>;
 }
 
 export interface Buchungsdetaildaten {
@@ -74,6 +81,16 @@ export interface Buchungsdetaildaten {
   /** Die „ist kein Duplikat"-Entscheidungen, als Paarschlüssel. */
   readonly freigegeben: ReadonlySet<string>;
   readonly freigaben: readonly Dublettenfreigabe[];
+  /**
+   * Konten, die an einer Bankverbindung hängen.
+   *
+   * Auf ihnen bestimmt die BANK, was steht: Datum und Betrag sind dort Tatsachen, keine
+   * Eingabe, und eine von Hand geänderte Zahl wäre eine Behauptung gegen den Kontoauszug,
+   * die beim nächsten Abgleich als Abweichung auftaucht — ohne dass noch jemand wüsste,
+   * dass sie von Hand entstanden ist. Was sich hier ändern lässt, ist die EINORDNUNG
+   * (Bezeichnung, Kategorie, Vertrag): die gehört dem Nutzer, nicht der Bank.
+   */
+  readonly onlineKonten: ReadonlySet<string>;
 }
 
 export async function buchungsdetailLaden(
@@ -91,6 +108,7 @@ export async function buchungsdetailLaden(
       deps.zuordnungRepo.alle(),
       deps.freigabeRepo.alle(),
     ]);
+  const zuordnungen_online = deps.kontozuordnungen ? await deps.kontozuordnungen() : [];
 
   const umsatzZuBuchung = new Map<string, Umsatz>();
   for (const u of umsaetze) if (u.istbuchungId) umsatzZuBuchung.set(u.istbuchungId, u);
@@ -105,5 +123,6 @@ export async function buchungsdetailLaden(
     dublettenverdacht: ledgerVerdacht(umsaetze, new Set(buchungen.map((b) => b.id)), freigegeben),
     freigegeben,
     freigaben,
+    onlineKonten: new Set(zuordnungen_online.map((z) => z.zahlungskontoId)),
   };
 }

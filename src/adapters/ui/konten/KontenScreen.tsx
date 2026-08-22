@@ -132,6 +132,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const ausBankabruf = sicht?.ausBankabruf ?? LEERE_IDS;
   const aktivZeile = kontozeilen.find((z) => z.konto.id === aktivId);
   const aktiv = aktivZeile?.konto;
+  /**
+   * Konten ohne Bankverbindung — die einzigen, auf denen von Hand gebucht wird.
+   *
+   * Auf einem abgerufenen Konto sagt die BANK, was daraufsteht. Eine von Hand angelegte
+   * Zeile wäre dort eine Behauptung gegen den Kontoauszug: sie steht im Saldo, die Bank
+   * kennt sie nicht, und beim nächsten Abgleich taucht die Differenz auf, ohne dass noch
+   * jemand wüsste, woher sie kam. Was fehlt, holt der Abruf; was falsch ist, wird
+   * verworfen.
+   */
+  const offlineKonten = useMemo(() => kontozeilen.filter((z) => !z.online).map((z) => z.konto), [kontozeilen]);
 
   const register = useMemo(
     () => (sicht && aktiv ? registerSicht(sicht, aktiv, heute, tage) : null),
@@ -464,8 +474,14 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               <select className="field" style={{ width: "auto" }} value={tage} onChange={(e) => setTage(Number(e.target.value))}>
                 {TAGE_OPTIONEN.map((d) => (<option key={d} value={d}>{t("konten.kommendeTage", { tage: d })}</option>))}
               </select>
-              {kontozeilen.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>}
-              <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>{t("konten.btnBuchung")}</Button>
+              {/* Umbuchen legt ZWEI neue Buchungen an — beide müssen auf Konten landen,
+                  die von Hand geführt werden. Für die Gegenseite einer Bank-Abhebung gibt
+                  es den anderen Weg: im Detail der abgerufenen Zeile das Gegenbein
+                  erzeugen. Dort erfindet niemand die Bankbuchung, sie ist schon da. */}
+              {offlineKonten.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>}
+              {aktivZeile && !aktivZeile.online && (
+                <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>{t("konten.btnBuchung")}</Button>
+              )}
             </span>
           </div>
 
@@ -718,7 +734,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
       {umbuchenOffen && aktiv && (
         <UmbuchungModal
-          konten={kontozeilen.map((z) => z.konto)}
+          konten={offlineKonten}
           vonId={aktivId}
           heute={heute}
           onClose={() => setUmbuchenOffen(false)}
@@ -749,7 +765,11 @@ function Zeile({ links, betrag, charakter, saldo, faint, aktion }: { links: Reac
 function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Zahlungskonto[]; vonId: string; heute: string; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const [von, setVon] = useState(vonId);
+  // Vorbelegt wird das aktive Konto nur, wenn es überhaupt in der Liste steht: ist gerade
+  // ein Online-Konto gewählt, fehlt es hier, und ein `value`, das keine Option trifft,
+  // zeigt im Browser stumm die erste an — gespeichert würde dann ein anderes Konto als
+  // das angezeigte.
+  const [von, setVon] = useState(konten.some((k) => k.id === vonId) ? vonId : konten[0]?.id ?? "");
   const [nach, setNach] = useState(konten.find((k) => k.id !== vonId)?.id ?? "");
   const [datum, setDatum] = useState(heute);
   const [betrag, setBetrag] = useState("");
@@ -791,7 +811,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
           <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
         <FormField label={t("konten.feldBezeichnung")} hint={t("konten.optional")}>
-          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
+          <input className="field" aria-label={t("konten.feldBezeichnung")} value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
         </FormField>
       </div>
     </Modal>
