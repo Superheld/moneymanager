@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Zahlungskonto } from "../../core";
-import type { Abrufadapter, Abrufsitzung, Bankkonto, Bankzugang } from "./abrufPort";
+import type { Abrufadapter, Abrufsitzung, Bankkonto, Bankzugang, Formatvorgabe } from "./abrufPort";
 import type { Kontozuordnung } from "./bankzugangPort";
 import type { Bankprofil } from "./abrufPort";
 import { ERSTABRUF_TAGE, RUECKGRIFF_TAGE, abrufAusfuehren, abrufZeitraum } from "./abrufAusfuehren";
@@ -66,7 +66,7 @@ function fakeAdapter(opt: {
   auszugsSalden?: { datum: string; betrag: number }[];
   profil?: Bankprofil;
 }) {
-  const anfragen: { schluessel: string; von: string; bis: string; bevorzugt?: string }[] = [];
+  const anfragen: { schluessel: string; von: string; bis: string; bevorzugt?: Formatvorgabe }[] = [];
   const sitzung: Abrufsitzung = {
     konten: opt.konten,
     bankparameter: () => '{"systemId":"S"}',
@@ -317,7 +317,11 @@ describe("abrufAusfuehren", () => {
 
     const befunde = (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
-    expect(anfragen).toEqual([{ schluessel: "9876543210|Girokonto", von: "2026-07-19", bis: HEUTE }]);
+    expect(anfragen).toEqual([
+      // `bevorzugt` steht immer da, auch leer: der Abruf reicht Gedächtnis und Wahl
+      // gemeinsam durch, und beide dürfen fehlen.
+      { schluessel: "9876543210|Girokonto", von: "2026-07-19", bis: HEUTE, bevorzugt: { wahl: undefined, zuletzt: undefined } },
+    ]);
     expect(befunde).toHaveLength(1);
     expect(befunde[0].ergebnis?.neu).toBe(1);
     expect(befunde[0].format).toBe("MT940");
@@ -429,7 +433,9 @@ describe("abrufAusfuehren", () => {
     ]);
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    expect(anfragen[0].bevorzugt).toBe("MT940");
+    expect(anfragen[0].bevorzugt?.zuletzt).toBe("MT940");
+    // Und ohne Festlegung — das Gedächtnis dreht nur die Reihenfolge.
+    expect(anfragen[0].bevorzugt?.wahl).toBeUndefined();
   });
 
   it("fragt ohne Gedächtnis ohne Vorgabe", async () => {
@@ -437,7 +443,8 @@ describe("abrufAusfuehren", () => {
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    expect(anfragen[0].bevorzugt).toBeUndefined();
+    expect(anfragen[0].bevorzugt?.zuletzt).toBeUndefined();
+    expect(anfragen[0].bevorzugt?.wahl).toBeUndefined();
   });
 
   it("schreibt das getragene Format fort", async () => {
@@ -540,5 +547,41 @@ describe("Herkunft am Lauf", () => {
       zahlungskontoId: "k1",
       format: "MT940",
     });
+  });
+});
+
+/**
+ * Der Unterschied zwischen Gedächtnis und Festlegung ist die ganze Existenzberechtigung
+ * der Wahl: das Gedächtnis dreht nur die Reihenfolge und lässt den zweiten Versuch
+ * zu — die Wahl schliesst ihn aus.
+ */
+describe("Formatwahl", () => {
+  it("reicht die Festlegung des Kontos an den Adapter durch", async () => {
+    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([
+      {
+        zugangId: "z1",
+        schluessel: "9876543210|Girokonto",
+        zahlungskontoId: "k1",
+        letztesFormat: "CAMT",
+        formatwahl: "MT940",
+      },
+    ]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    // Beides kommt an: die Wahl entscheidet, das Gedächtnis bleibt als Information.
+    expect(anfragen[0].bevorzugt).toEqual({ wahl: "MT940", zuletzt: "CAMT" });
+  });
+
+  it("gibt „automatisch“ weiter wie keine Wahl", async () => {
+    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([
+      { zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1", formatwahl: "automatisch" },
+    ]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(anfragen[0].bevorzugt?.wahl).toBe("automatisch");
   });
 });

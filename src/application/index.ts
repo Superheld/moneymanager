@@ -219,7 +219,7 @@ export type {
   TanVerfahren,
   Vorfallprofil,
 } from "./fints/abrufPort";
-export type { Kontozuordnung } from "./fints/bankzugangPort";
+export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
 export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
 // Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen

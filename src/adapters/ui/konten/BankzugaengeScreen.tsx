@@ -19,6 +19,7 @@ import type {
   Bankprofil,
   Bankzugang,
   Kontozuordnung,
+  Formatwahl,
   TanHerausforderung,
 } from "../../../application";
 import { fintsAbruf, fintsEinsatzbereit } from "../../fints";
@@ -26,6 +27,7 @@ import {
   bankzugaenge,
   bankzugangLoeschen,
   bankzugangSpeichern,
+  kontozuordnungSpeichern,
   kontozuordnungen,
 } from "../../dienste";
 import { Bankprofilkarte } from "./Bankprofilkarte";
@@ -166,6 +168,35 @@ export function BankzugaengeScreen() {
       label: t("bankabruf.spalteSaldo"),
       align: "right" as const,
       render: (r: KontoZeile) => (r.saldo === undefined ? "—" : geld.format(r.saldo)),
+    },
+    {
+      // Das Umsatzformat je Konto. Steht hier und nicht am Zugang: dieselbe Bank kann
+      // sich je Konto unterschiedlich verhalten, und eine Festlegung, die alle Konten
+      // mitzieht, ist beim Nachjustieren im Weg.
+      key: "format",
+      label: t("bankzugaenge.format.spalte"),
+      sortable: false,
+      render: (r: KontoZeile) => {
+        const zuordnung = zuordnungen.find((z) => z.schluessel === r.schluessel);
+        if (!zuordnung) return "—";
+        return (
+          <select
+            className="field"
+            aria-label={t("bankzugaenge.format.spalte")}
+            style={{ width: "auto", fontSize: "var(--fs-xs)", padding: "3px 6px" }}
+            value={zuordnung.formatwahl ?? "automatisch"}
+            title={t(`bankzugaenge.format.hinweis.${zuordnung.formatwahl ?? "automatisch"}`)}
+            onChange={async (e) => {
+              await kontozuordnungSpeichern({ ...zuordnung, formatwahl: e.target.value as Formatwahl });
+              await laden();
+            }}
+          >
+            {(["automatisch", "CAMT", "MT940"] as const).map((w) => (
+              <option key={w} value={w}>{t(`bankzugaenge.format.${w}`)}</option>
+            ))}
+          </select>
+        );
+      },
     },
     {
       key: "kann",

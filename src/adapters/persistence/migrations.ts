@@ -885,4 +885,24 @@ export const MIGRATIONS: Migration[] = [
       // weil auch künftig Dateiimporte ohne Zugang entstehen.
     ],
   },
+  {
+    version: 43, // Umsatzformat je Konto WÄHLBAR, nicht nur gelernt
+    sql: [
+      // `letztes_format` daneben ist ein GEDÄCHTNIS: es dreht die Reihenfolge der beiden
+      // Versuche um, damit die absehbar vergebliche erste Runde entfällt. Es schliesst
+      // nichts aus — der zweite Versuch bleibt, und ein Institut, das CAMT nachrüstet,
+      // kommt von selbst wieder darauf.
+      //
+      // Diese Spalte ist eine FESTLEGUNG. Sie wird gebraucht, weil das Gedächtnis genau
+      // dann nicht greift, wenn man es am nötigsten hätte: liefert der erste Versuch
+      // etwas — und sei es eine von der Bank gedeckelte Teilmenge —, gilt er als
+      // erfolgreich und der zweite läuft nie. Wer den anderen Weg sehen will, muss den
+      // ersten ausschliessen können.
+      //
+      // Am KONTO und nicht am Zugang: dieselbe Bank kann sich je Konto unterschiedlich
+      // verhalten, und eine Festlegung, die alle Konten mitzieht, ist beim Nachjustieren
+      // im Weg. Leer heisst „automatisch" — das bisherige Verhalten.
+      `ALTER TABLE bankkonto_zuordnung ADD COLUMN format_wahl TEXT`,
+    ],
+  },
 ];
