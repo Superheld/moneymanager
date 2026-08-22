@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Abgleichzeile } from "../../../application";
 import { abgleich as abgleichLaden } from "../../dienste";
-import { Pill } from "../bausteine";
+import { Card, Pill } from "../bausteine";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { AbgleichModal, KassensturzModal } from "./KontostandModal";
@@ -64,10 +64,10 @@ export function AbgleichBereich() {
       {sortiert.map((z) => {
         const aufgeklappt = offen === z.konto.id;
         return (
-          <div
-            key={z.konto.id}
-            style={{ border: "1px solid var(--line)", borderRadius: "var(--r-md)", padding: "var(--sp-3)" }}
-          >
+          // Eine Karte je Konto — sie trägt die Fläche und den Rahmen. Selbst gezogene
+          // Ränder sähen ähnlich aus, stünden aber auf dem nackten Seitenhintergrund und
+          // liefen beim nächsten Token-Wechsel auseinander.
+          <Card key={z.konto.id}>
             {/* Die Kopfzeile beantwortet die Frage schon: stimmt es, und wenn nicht, um
                 wieviel. Alles Weitere ist die Begründung darunter. */}
             <button
@@ -189,7 +189,7 @@ export function AbgleichBereich() {
                 </div>
               </div>
             )}
-          </div>
+          </Card>
         );
       })}
 
