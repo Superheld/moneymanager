@@ -316,7 +316,7 @@ function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void
  *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
  *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, ausBankabruf, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; ausBankabruf?: boolean; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, ausBankabruf, onlineKonten, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; ausBankabruf?: boolean; onlineKonten: ReadonlySet<string>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const istEntwurf = !!entwurf;
@@ -359,6 +359,19 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
   const musterAngebot = musterVorschlag(umsatz?.gegenpartei ?? "");
   const kategorieGeaendert = kategorieId !== (buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
   const konto = konten.find((k) => k.id === kontoId);
+  /**
+   * Auf einem Konto mit Bankverbindung sind Datum und Betrag Tatsachen, keine Eingabe.
+   *
+   * Eine von Hand geänderte Zahl wäre eine Behauptung gegen den Kontoauszug: sie taucht
+   * beim nächsten Abgleich als Abweichung auf, und dann weiss niemand mehr, dass sie von
+   * Hand entstanden ist — sie sieht aus wie eine fehlende Buchung. Wer eine Bankzeile für
+   * falsch hält, verwirft sie; korrigieren lässt sie sich nicht.
+   *
+   * Die EINORDNUNG bleibt frei: Bezeichnung, Kategorie, Vertrag, Aufteilung gehören dem
+   * Nutzer, nicht der Bank. Beim Anlegen von Hand (`istNeu`) greift die Sperre nicht —
+   * dort ist noch kein Konto gewählt, und die Auswahlliste bietet ohnehin nur offline an.
+   */
+  const kontoIstOnline = !istNeu && onlineKonten.has(kontoId);
   const istUmschichtung = charakter === "Umschichtung";
   const andereKonten = konten.filter((k) => k.id !== kontoId);
 
@@ -619,15 +632,15 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         </FormField>
         {/* Tag und Betrag der Bank sind Tatsachen, keine Eingabe — im Entwurf stehen sie
             nur da. Wer korrigieren muss, tut das nach dem Übernehmen an der Buchung. */}
-        <FormField label={t("konten.feldDatum")} required hint={istEntwurf ? t("konten.entwurf.vonDerBank") : undefined}>
-          <input className="field" type="date" aria-label={t("konten.feldDatum")} value={datum} disabled={istEntwurf} onChange={(e) => setDatum(e.target.value)} />
+        <FormField label={t("konten.feldDatum")} required hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : undefined}>
+          <input className="field" type="date" aria-label={t("konten.feldDatum")} value={datum} disabled={istEntwurf || kontoIstOnline} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
         <FormField
           label={t("konten.feldBetrag")}
           required
-          hint={istEntwurf ? t("konten.entwurf.vonDerBank") : istNeu ? t("konten.buchung.betragHinweis") : undefined}
+          hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : istNeu ? t("konten.buchung.betragHinweis") : undefined}
         >
-          <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
+          <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf || kontoIstOnline} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
         {/* Die Bezeichnung gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt
             den Verwendungszweck der Bank, und der steht unter „Herkunft".
@@ -641,6 +654,7 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
           <FormField label={t("konten.feldBezeichnung")} hint={t("konten.optional")}>
             <input
               className="field"
+              aria-label={t("konten.feldBezeichnung")}
               value={notiz}
               onChange={(e) => setNotiz(e.target.value)}
               placeholder={umsatz?.gegenpartei || umsatz?.verwendungszweck || t("konten.buchung.notizPlatzhalter")}
@@ -1218,6 +1232,7 @@ export function BuchungDetail(props: {
   const [dublettenverdacht, setDublettenverdacht] = useState<ReadonlyMap<string, Dublettenverdacht>>(LEERE_KARTE);
   const [freigegeben, setFreigegeben] = useState<ReadonlySet<string>>(LEERE_MENGE);
   const [freigaben, setFreigaben] = useState<readonly Dublettenfreigabe[]>([]);
+  const [onlineKonten, setOnlineKonten] = useState<ReadonlySet<string>>(LEERE_MENGE);
 
   async function laden() {
     const d = await buchungsdetail();
@@ -1225,6 +1240,7 @@ export function BuchungDetail(props: {
     setUmsaetze([...d.umsaetze]); setLaeufe([...d.laeufe]); setAlle([...d.buchungen]);
     setVertraege([...d.vertraege]); setZuordnungen([...d.zuordnungen]);
     setDublettenverdacht(d.dublettenverdacht); setFreigegeben(d.freigegeben); setFreigaben(d.freigaben);
+    setOnlineKonten(d.onlineKonten);
     // Die gezeigte Buchung aus dem frischen Stand nachziehen (nach dem Speichern).
     setAktuelle((b) => (b ? d.buchungen.find((x) => x.id === b.id) ?? b : undefined));
   }
@@ -1430,6 +1446,7 @@ export function BuchungDetail(props: {
       onSaved={async () => { await nachAenderung(); onClose(); }}
       onDelete={entfernen}
       ausBankabruf={ausBankabruf}
+      onlineKonten={onlineKonten}
       onZurUmbuchung={() => aktuelle && setUmbuchenAus(aktuelle)}
       vertragsBindung={
         aktuelle

@@ -32,6 +32,10 @@ import {
 } from "../persistence/sqliteImportRepositories";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import {
+  sqliteBankzugangRepository,
+  sqliteKontozuordnungRepository,
+} from "../persistence/sqliteBankzugangRepositories";
+import {
   sqliteVertragserkennungRepository,
   sqliteVertragszuordnungRepository,
   vertragsAbgleichDeps,
@@ -1102,5 +1106,100 @@ describe("Dubletten nebeneinander vergleichen", () => {
       expect(await sqliteDublettenfreigabeRepository.alle()).toHaveLength(1);
       expect(await sqliteLedgerRepository.alle()).toHaveLength(2);
     });
+  });
+});
+
+/**
+ * Auf einem abgerufenen Konto sagt die BANK, was daraufsteht. Eine von Hand angelegte oder
+ * geänderte Zeile wäre dort eine Behauptung gegen den Kontoauszug: sie taucht beim
+ * nächsten Abgleich als Abweichung auf, und dann weiss niemand mehr, dass sie von Hand
+ * entstanden ist — sie sieht aus wie eine fehlende Buchung.
+ *
+ * Was sich ändern lässt, ist die EINORDNUNG (Bezeichnung, Kategorie): die gehört dem
+ * Nutzer. Genau diese Trennung prüfen die Tests hier — dass gar nichts mehr ginge, wäre
+ * derselbe Fehler in die andere Richtung.
+ */
+describe("Online geführte Konten werden nicht von Hand bebucht", () => {
+  const heute = "2026-08-12";
+
+  /** Macht das Girokonto zu einem Online-Konto; „Bargeld" bleibt von Hand geführt. */
+  async function mitBankverbindung() {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteBankzugangRepository.speichern({
+      id: "z1", bezeichnung: "Testbank", url: "https://example.invalid/fints",
+      blz: "99999901", benutzer: "nutzer", angelegtAm: "2026-08-01T09:00:00.000Z",
+    });
+    await sqliteKontozuordnungRepository.speichern({
+      zugangId: "z1", schluessel: "1234567|", zahlungskontoId: "k1",
+    });
+  }
+
+  it("bietet auf dem Bankkonto keine neue Buchung an, auf dem Bargeldkonto schon", async () => {
+    await mitBankverbindung();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    // Der Knopf traegt ein fuehrendes „+" aus der Button-Komponente — verankert wird
+    // trotzdem am ganzen Namen, damit „Buchungsdetails" nicht mitzaehlt.
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /^\+\s*buchung$/i })).not.toBeInTheDocument();
+    });
+
+    await nutzer.click((await screen.findAllByText("Bargeld"))[0]);
+    expect(await screen.findByRole("button", { name: /^\+\s*buchung$/i })).toBeInTheDocument();
+  });
+
+  /**
+   * Umbuchen legt ZWEI neue Buchungen an. Mit nur einem Konto von Hand bleibt kein Paar
+   * übrig, für das der Dialog etwas anlegen dürfte — also erscheint er gar nicht.
+   */
+  it("bietet kein Umbuchen an, wenn nur ein Konto von Hand geführt wird", async () => {
+    await mitBankverbindung();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Bargeld"))[0]);
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /umbuchen/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it("sperrt Betrag und Datum einer Buchung auf dem Bankkonto, nicht aber ihre Bezeichnung", async () => {
+    await mitBankverbindung();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -1234, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+
+    expect(await screen.findByLabelText(/betrag/i)).toBeDisabled();
+    expect(await screen.findByLabelText(/datum/i)).toBeDisabled();
+    // Die Einordnung bleibt frei — sonst wäre die Zeile gar nicht mehr zu pflegen.
+    const bezeichnung = await screen.findByRole("textbox", { name: /bezeichnung/i });
+    expect(bezeichnung).not.toBeDisabled();
+  });
+
+  it("lässt Betrag und Datum auf einem von Hand geführten Konto in Ruhe", async () => {
+    await mitBankverbindung();
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: -500, kontoId: "k2",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Bargeld"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+
+    expect(await screen.findByLabelText(/betrag/i)).not.toBeDisabled();
+    expect(await screen.findByLabelText(/datum/i)).not.toBeDisabled();
   });
 });

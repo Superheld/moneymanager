@@ -692,6 +692,7 @@ export function buchungsdetail(): Promise<Buchungsdetaildaten> {
     vertragRepo: sqliteVertragRepository,
     zuordnungRepo: sqliteVertragszuordnungRepository,
     freigabeRepo: sqliteDublettenfreigabeRepository,
+    kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
   });
 }
 
