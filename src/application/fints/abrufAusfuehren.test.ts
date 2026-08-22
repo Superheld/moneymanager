@@ -127,12 +127,14 @@ function fakes(zuordnungen: Kontozuordnung[]) {
   const umsaetze: any[] = [];
   const buchungen: any[] = [];
   const anker: any[] = [];
+  const laeufe: any[] = [];
   return {
     gespeicherteZuordnungen,
     zugaenge,
     umsaetze,
     buchungen,
     anker,
+    laeufe,
     deps: {
       zugangRepo: {
         alle: async () => [],
@@ -180,7 +182,7 @@ function fakes(zuordnungen: Kontozuordnung[]) {
           if (i >= 0) buchungen.splice(i, 1);
         },
       },
-      laufRepo: { alle: async () => [], speichern: async () => {}, loeschen: async () => {} },
+      laufRepo: { alle: async () => [...laeufe], speichern: async (l: any) => void laeufe.push(l), loeschen: async () => {} },
       ankerRepo: {
         alle: async () => [...anker],
         speichern: async (a: any) => {
@@ -512,5 +514,31 @@ describe("Auszugsstände als Anker", () => {
     expect(ergebnis.konten[0].fehler).toBeUndefined();
     expect(f.anker.some((a) => a.datum === "2026-08-18")).toBe(true);
     expect(f.anker.some((a) => a.datum === "kein-datum")).toBe(false);
+  });
+});
+
+/**
+ * Der Abruf ist die einzige Quelle, die ihre Herkunft KENNT: ein Zugang, ein Konto, ein
+ * Format. Bisher stand das nur im Dateinamen als Fliesstext — lesbar, aber nicht
+ * auswertbar, und bei jeder Umbenennung eine Ratepartie.
+ */
+describe("Herkunft am Lauf", () => {
+  const zuordnung: Kontozuordnung = {
+    zugangId: "z1",
+    schluessel: "9876543210|Girokonto",
+    zahlungskontoId: "k1",
+  };
+
+  it("schreibt Zugang, Konto und Format an den Lauf", async () => {
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([zuordnung]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(f.laeufe[0]).toMatchObject({
+      zugangId: "z1",
+      zahlungskontoId: "k1",
+      format: "MT940",
+    });
   });
 });

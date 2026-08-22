@@ -32,6 +32,20 @@ export interface UebernahmeEingabe {
   readonly zeitpunkt: string; // ISO-Datetime (vom Aufrufer; Webview-Date)
   readonly rohUmsaetze: readonly RohUmsatz[];
   readonly konten: readonly UebernahmeKonto[];
+  /**
+   * Woher der Lauf kam — nur ein ABRUF weiss das.
+   *
+   * Steht am Lauf und wird nicht aus den Umsätzen hergeleitet: gerade die Läufe ohne
+   * Ergebnis sind interessant („was habe ich wann abgefragt"), und die haben keine
+   * Umsätze, aus denen sich etwas ableiten liesse.
+   */
+  readonly herkunft?: {
+    readonly zugangId?: string;
+    readonly zahlungskontoId?: string;
+    readonly format?: string;
+    /** Die Bank hat die Trefferzahl gedeckelt — es gibt mehr, als hier ankam. */
+    readonly abgeschnitten?: boolean;
+  };
 }
 
 export interface UebernahmeErgebnis {
@@ -257,6 +271,7 @@ async function uebernahmeIntern(
     neu: umsaetze.length,
     // Als Dublette zählt beides: der exakte Schlüsseltreffer und der Fund des Finders.
     duplikate: duplikate.length + (kandidaten.length - gefunden.length),
+    ...eingabe.herkunft,
   });
 
   return {

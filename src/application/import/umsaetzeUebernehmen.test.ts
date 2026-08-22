@@ -343,3 +343,59 @@ describe("Dublettenfinder beim Übernehmen", () => {
     expect(f.umsaetze[0].mandatsreferenz).toBe("M-4711");
   });
 });
+
+/**
+ * Woher ein Lauf kam, steht AM LAUF und wird nicht aus seinen Umsätzen hergeleitet.
+ *
+ * Der Unterschied ist nicht theoretisch: gerade die interessanten Läufe haben keine
+ * Umsätze. Der Rückgriff holt bei jedem Abruf dieselben Tage nochmal, die Mehrzahl aller
+ * Läufe bringt deshalb nichts Neues — und genau die fielen aus jeder Auswertung heraus,
+ * wenn der Bezug über die Umsätze liefe.
+ */
+describe("Herkunft am Lauf", () => {
+  it("schreibt Zugang, Konto und Format ins Protokoll", async () => {
+    const { deps, laeufe } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "fints",
+        zeitpunkt: "2026-08-22T10:00:00.000Z",
+        rohUmsaetze: [roh({ betrag: -1000 })],
+        konten: [{ quelleKey: "k1", kontoId: "k1" }],
+        herkunft: { zugangId: "z1", zahlungskontoId: "k1", format: "CAMT" },
+      },
+      deps,
+    );
+    expect(laeufe[0]).toMatchObject({ zugangId: "z1", zahlungskontoId: "k1", format: "CAMT" });
+  });
+
+  it("hält fest, wenn die Bank die Trefferzahl gedeckelt hat", async () => {
+    const { deps, laeufe } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "fints",
+        zeitpunkt: "2026-08-22T10:00:00.000Z",
+        rohUmsaetze: [roh({ betrag: -1000 })],
+        konten: [{ quelleKey: "k1", kontoId: "k1" }],
+        herkunft: { abgeschnitten: true },
+      },
+      deps,
+    );
+    expect(laeufe[0].abgeschnitten).toBe(true);
+  });
+
+  /** Ein Dateiimport kennt weder Zugang noch ein einzelnes Konto — das Feld bleibt leer. */
+  it("lässt die Herkunft weg, wenn keine mitkommt", async () => {
+    const { deps, laeufe } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "finanzguru",
+        zeitpunkt: "2026-08-22T10:00:00.000Z",
+        rohUmsaetze: [roh({ betrag: -1000 })],
+        konten: [{ quelleKey: "k1", kontoId: "k1" }],
+      },
+      deps,
+    );
+    expect(laeufe[0].zugangId).toBeUndefined();
+    expect(laeufe[0].format).toBeUndefined();
+  });
+});

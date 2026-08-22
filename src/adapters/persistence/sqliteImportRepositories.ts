@@ -20,13 +20,18 @@ interface LaufZeile {
   eingelesen: number;
   neu: number;
   duplikate: number;
+  zugang_id: string | null;
+  zahlungskonto_id: string | null;
+  format: string | null;
+  abgeschnitten: number | null;
 }
 
 export const sqliteImportLaufRepository: ImportLaufRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<LaufZeile[]>(
-      `SELECT id, quelle, zeitpunkt, dateiname, eingelesen, neu, duplikate
+      `SELECT id, quelle, zeitpunkt, dateiname, eingelesen, neu, duplikate,
+              zugang_id, zahlungskonto_id, format, abgeschnitten
          FROM import_lauf ORDER BY zeitpunkt DESC`,
     );
     return zeilen.map(
@@ -38,18 +43,30 @@ export const sqliteImportLaufRepository: ImportLaufRepository = {
         eingelesen: z.eingelesen,
         neu: z.neu,
         duplikate: z.duplikate,
+        zugangId: z.zugang_id ?? undefined,
+        zahlungskontoId: z.zahlungskonto_id ?? undefined,
+        format: z.format ?? undefined,
+        // Nur setzen, wenn er WIRKLICH steht: `false` überall wäre dasselbe wie
+        // undefined, macht aber jeden Vergleich in Tests unnötig laut.
+        abgeschnitten: z.abgeschnitten ? true : undefined,
       }),
     );
   },
   async speichern(l: ImportLauf) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO import_lauf (id, quelle, zeitpunkt, dateiname, eingelesen, neu, duplikate)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO import_lauf (id, quelle, zeitpunkt, dateiname, eingelesen, neu, duplikate,
+                                zugang_id, zahlungskonto_id, format, abgeschnitten)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        ON CONFLICT(id) DO UPDATE SET quelle = excluded.quelle, zeitpunkt = excluded.zeitpunkt,
          dateiname = excluded.dateiname, eingelesen = excluded.eingelesen,
-         neu = excluded.neu, duplikate = excluded.duplikate`,
-      [l.id, l.quelle, l.zeitpunkt, l.dateiname ?? null, l.eingelesen, l.neu, l.duplikate],
+         neu = excluded.neu, duplikate = excluded.duplikate,
+         zugang_id = excluded.zugang_id, zahlungskonto_id = excluded.zahlungskonto_id,
+         format = excluded.format, abgeschnitten = excluded.abgeschnitten`,
+      [
+        l.id, l.quelle, l.zeitpunkt, l.dateiname ?? null, l.eingelesen, l.neu, l.duplikate,
+        l.zugangId ?? null, l.zahlungskontoId ?? null, l.format ?? null, l.abgeschnitten ? 1 : 0,
+      ],
     );
   },
   async loeschen(id: string) {

@@ -853,4 +853,36 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE ist_buchung ADD COLUMN zu_pruefen INTEGER NOT NULL DEFAULT 0`,
     ],
   },
+  {
+    version: 42, // Ein Lauf weiss, WOHER er kam — Zugang, Konto und Format
+    sql: [
+      // Bisher stand der Zusammenhang nur im `dateiname`, als Fliesstext nach dem Muster
+      // „<Bank> · <Konto> · <von> bis <bis>". Lesbar für Menschen, unbrauchbar für alles
+      // andere — wer die Läufe EINES Zugangs oder EINES Kontos sehen will, müsste den Text
+      // zerlegen und bei jeder Umbenennung neu raten.
+      //
+      // Der Bezug wird bewusst NICHT über die Umsätze hergeleitet. Das ginge für Läufe
+      // mit Ergebnis, aber gerade die interessanten haben oft keines: von den bisherigen
+      // Abrufen brachte die Mehrzahl keine einzige neue Zeile, weil der Rückgriff
+      // dieselben Tage nochmal holt. Genau diese Läufe fielen aus jeder Auswertung
+      // heraus — „was habe ich wann abgefragt" bliebe unbeantwortbar.
+      `ALTER TABLE import_lauf ADD COLUMN zugang_id TEXT`,
+      `ALTER TABLE import_lauf ADD COLUMN zahlungskonto_id TEXT`,
+      // Welches Umsatzformat getragen hat („CAMT" oder „MT940"). Die Frage „warum kamen
+      // bei diesem Abruf nur 500 Zeilen" ist ohne diese Angabe nicht zu beantworten: die
+      // beiden Formate haben verschiedene Grenzen, und welches lief, wusste hinterher
+      // niemand mehr.
+      `ALTER TABLE import_lauf ADD COLUMN format TEXT`,
+      // Was die Bank an Zeilen hergab, bevor die Dublettenprüfung darüberlief. `eingelesen`
+      // zählt schon dasselbe — aber nur, solange niemand die Bedeutung verschiebt. Diese
+      // Spalte hält fest, ob der Abruf an eine ANZAHLGRENZE gestossen ist: ein Lauf, der
+      // bei genau 500 endet, sieht sonst aus wie ein vollständiger.
+      `ALTER TABLE import_lauf ADD COLUMN abgeschnitten INTEGER NOT NULL DEFAULT 0`,
+      //
+      // Für den BESTAND wird nichts geraten. Die vorhandenen Läufe tragen ihren Zugang im
+      // Dateinamen, und ein Parser darüber wäre genau die Textraterei, die diese Migration
+      // abschafft. Sie bleiben ohne Bezug; die Ansichten müssen das ohnehin aushalten,
+      // weil auch künftig Dateiimporte ohne Zugang entstehen.
+    ],
+  },
 ];
