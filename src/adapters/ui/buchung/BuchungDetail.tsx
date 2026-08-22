@@ -58,6 +58,7 @@ import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../../application/buc
 import {
   buchungBearbeiten,
   buchungErfassen,
+  bankzeileVerwerfen,
   buchungLoeschen,
   buchungenPaaren,
   buchungSplitten,
@@ -315,7 +316,7 @@ function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void
  *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
  *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, loeschenGesperrt, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; loeschenGesperrt?: boolean; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, ausBankabruf, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; ausBankabruf?: boolean; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const istEntwurf = !!entwurf;
@@ -558,11 +559,14 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
               {t(dublette ? "konten.neue.schonGebucht" : "konten.entwurf.verwerfen")}
             </button>
           )}
-          {buchung && !loeschenGesperrt && (
-            <button className="linkbtn" style={{ marginLeft: "auto", color: "var(--warn-deep)" }} onClick={() => onDelete()}>{t("konten.loeschen")}</button>
-          )}
-          {buchung && loeschenGesperrt && (
-            <span className="muted" style={{ marginLeft: "auto", fontSize: "var(--fs-xs)" }}>{t("konten.detail.loeschenOnline")}</span>
+          {buchung && (
+            <button
+              className="linkbtn"
+              style={{ marginLeft: "auto", color: "var(--warn-deep)" }}
+              onClick={() => onDelete()}
+            >
+              {t(ausBankabruf ? "konten.detail.verwerfenBankzeile" : "konten.loeschen")}
+            </button>
           )}
           {fehler && <span className="err">{fehler}</span>}
         </>
@@ -908,10 +912,18 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         </div>
       )}
 
-      {/* „Löschen" sagt nicht die ganze Wahrheit, wenn die Buchung aus einem Import
-          stammt: die Bankzeile bleibt und steht danach wieder unter den Entwürfen. Wer
-          sie endgültig weghaben will, verwirft sie dort. */}
-      {buchung?.quelle === "import" && (
+      {/* Was das Verwerfen kostet, beziffert und nicht nur behauptet — dieselbe Auskunft,
+          die ein Entwurf oben bekommt. Die Zeile verschwindet aus dem Saldo, die Bank
+          kennt sie weiterhin, also weicht der Stand danach um genau diesen Betrag ab. */}
+      {buchung && ausBankabruf && (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+          {t("konten.detail.verwerfenFolge", { betrag: geld.formatMitSymbol(-buchung.betrag, { mitVorzeichen: true }) })}
+        </div>
+      )}
+
+      {/* „Löschen" sagt nicht die ganze Wahrheit, wenn die Buchung aus einer DATEI kam:
+          die eingelesene Zeile bleibt und steht danach wieder in der Import-Inbox. */}
+      {buchung?.quelle === "import" && !ausBankabruf && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
           {t("konten.detail.loeschenHinweis")}
         </div>
@@ -1150,11 +1162,13 @@ export function BuchungDetail(props: {
   entwurf?: undefined;
   vorgabe?: undefined;
   /**
-   * Löschen ausblenden. Gesetzt für Buchungen auf Konten, die an einer Bankverbindung
-   * hängen: was die Bank geliefert hat, wird nicht von Hand entfernt — beim nächsten
-   * Abruf käme es zurück, und bis dahin stimmte der Saldo nicht mehr mit ihr überein.
+   * Diese Zeile kam aus einem BANKABRUF und wird nicht gelöscht, sondern verworfen.
+   *
+   * Der Unterschied steht im Use-Case (`bankzeileVerwerfen`) und ist kein Wording: gelöscht
+   * käme sie beim nächsten Abruf zurück, verworfen bleibt sie als Entscheidung gespeichert.
+   * Der Knopf heisst deshalb anders und der Hinweis darunter nennt die Folge für den Saldo.
    */
-  loeschenGesperrt?: boolean;
+  ausBankabruf?: boolean;
   onClose: () => void;
   onGeaendert: () => void | Promise<void>;
 } | {
@@ -1171,7 +1185,7 @@ export function BuchungDetail(props: {
   onGeaendert: () => void | Promise<void>;
 }) {
   const { buchung, entwurf, vorgabe, onClose, onGeaendert } = props;
-  const loeschenGesperrt = "loeschenGesperrt" in props ? props.loeschenGesperrt : false;
+  const ausBankabruf = "ausBankabruf" in props ? props.ausBankabruf : false;
   const { t } = useTranslation();
   const geld = useGeld();
   // Welche Buchung gerade gezeigt wird — der Sprung zur Gegenbuchung (und zum Zwilling
@@ -1287,10 +1301,19 @@ export function BuchungDetail(props: {
     }
   }
 
-  /** Löscht die Buchung — bei einer Umbuchung BEIDE Beine, sonst bliebe eines verwaist. */
+  /**
+   * Löscht die Buchung — bei einer Umbuchung BEIDE Beine, sonst bliebe eines verwaist.
+   *
+   * Eine Zeile aus dem Bankabruf nimmt den anderen Weg: sie wird VERWORFEN, damit der
+   * nächste Abruf sie nicht zurückholt (`bankzeileVerwerfen`). Der Use-Case löst dabei
+   * eine Paarung selbst, nimmt das Gegenbein aber nicht mit — es kann aus einer Datei
+   * stammen und ist von der Entscheidung über diese eine Zeile nicht betroffen.
+   */
   async function entfernen() {
     if (!aktuelle) return;
-    if (aktuelle.transferId) {
+    if (ausBankabruf) {
+      await bankzeileVerwerfen(aktuelle.id);
+    } else if (aktuelle.transferId) {
       const beine = alle.filter((x) => x.transferId === aktuelle.transferId);
       await umbuchungLoeschen(aktuelle.transferId);
       await umsaetzeZuruecksetzen(beine.map((x) => x.id));
@@ -1395,7 +1418,7 @@ export function BuchungDetail(props: {
       onClose={onClose}
       onSaved={async () => { await nachAenderung(); onClose(); }}
       onDelete={entfernen}
-      loeschenGesperrt={loeschenGesperrt}
+      ausBankabruf={ausBankabruf}
       onZurUmbuchung={() => aktuelle && setUmbuchenAus(aktuelle)}
       vertragsBindung={
         aktuelle

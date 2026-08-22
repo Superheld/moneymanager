@@ -74,6 +74,13 @@ const de = {
     anbieter: { fehlt: "Bitte einen Anbieter angeben." },
     beginn: { ungueltig: "Bitte ein gültiges Beginn-Datum angeben." },
     bezahlt: { keinKonto: "Kein Konto hinterlegt — bitte der Zahlung/Regel ein Konto zuordnen." },
+    import: {
+      bankzeile: {
+        fehlt: "Diese Buchung gibt es nicht mehr.",
+        ohneUmsatz:
+          "Zu dieser Buchung ist keine eingelesene Zeile gespeichert — sie lässt sich nur löschen, nicht verwerfen.",
+      },
+    },
   },
   shell: {
     gruppeUeberblick: "Überblick",
@@ -623,7 +630,7 @@ const de = {
     abrufen: "Abrufen",
     abruf: {
       titel: "Bei der Bank abrufen",
-      untertitel: "Holt die Umsätze seit dem letzten Abruf und legt sie in die Import-Inbox",
+      untertitel: "Holt die Umsätze seit dem letzten Abruf und bucht sie direkt ins Konto",
       feldZugang: "Bankzugang",
       starten: "Abrufen",
       laeuft: "ruft ab …",
@@ -739,7 +746,8 @@ const de = {
       umbuchungHinweis: "{{n}} davon sind Umbuchungen — sie tragen keine Kategorie und bleiben unverändert.",
       onlineHinweis: "{{n}} davon liegen auf einem Bankkonto und lassen sich nicht löschen.",
       loeschenFrage: "{{n}} Buchungen endgültig löschen?",
-      loeschenGesperrt: "{{n}} weitere bleiben stehen — sie kommen von der Bank.",
+      loeschenGesperrt:
+        "{{n}} weitere bleiben stehen — sie kommen von der Bank und werden einzeln verworfen, im Buchungsdetail.",
       loeschenBestaetigen: "{{n}} löschen",
     },
     suche: "Suche (Empfänger, Zweck, Betrag) …",
@@ -832,9 +840,11 @@ const de = {
       ohneImport: "In der App erfasst — kein Import-Kontext vorhanden.",
       bearbeitbar: "Änderbar",
       kontoGepaart: "fest — erst die Paarung lösen",
-      loeschenOnline: "Von der Bank geliefert — löschen geht nur über das Verwerfen im Abruf.",
+      verwerfenBankzeile: "Verwerfen",
+      verwerfenFolge:
+        "Verwerfen nimmt die Zeile aus dem Konto und hält fest, dass sie nicht hineingehört — der nächste Abruf holt sie nicht zurück. Der Kontostand weicht danach um {{betrag}} von dem ab, was die Bank meldet.",
       loeschenHinweis:
-        "Löschen entfernt die Buchung aus dem Konto. Die Zeile der Bank bleibt erhalten und steht danach wieder unter „Neu von der Bank“ — dort lässt sie sich verwerfen.",
+        "Löschen entfernt die Buchung aus dem Konto. Die eingelesene Zeile bleibt erhalten und steht danach wieder in der Import-Inbox.",
     },
     entwurf: {
       titel: "Neu von der Bank",
@@ -1353,6 +1363,13 @@ const en: typeof de = {
     anbieter: { fehlt: "Please enter a provider." },
     beginn: { ungueltig: "Please enter a valid start date." },
     bezahlt: { keinKonto: "No account assigned — please assign an account to the payment/rule." },
+    import: {
+      bankzeile: {
+        fehlt: "That entry no longer exists.",
+        ohneUmsatz:
+          "No imported row is stored for this entry — it can only be deleted, not discarded.",
+      },
+    },
   },
   shell: {
     gruppeUeberblick: "Overview",
@@ -1900,7 +1917,7 @@ const en: typeof de = {
     abrufen: "Retrieve",
     abruf: {
       titel: "Retrieve from the bank",
-      untertitel: "Fetches transactions since the last retrieval into the import inbox",
+      untertitel: "Fetches transactions since the last retrieval and books them straight into the account",
       feldZugang: "Bank access",
       starten: "Retrieve",
       laeuft: "retrieving …",
@@ -2016,7 +2033,8 @@ const en: typeof de = {
       umbuchungHinweis: "{{n}} of them are transfers — they carry no category and stay as they are.",
       onlineHinweis: "{{n}} of them sit on a bank account and cannot be deleted.",
       loeschenFrage: "Delete {{n}} entries for good?",
-      loeschenGesperrt: "{{n}} more stay — they come from the bank.",
+      loeschenGesperrt:
+        "{{n}} more stay — they come from the bank and are discarded one at a time, in the entry details.",
       loeschenBestaetigen: "Delete {{n}}",
     },
     suche: "Search (payee, reference, amount) …",
@@ -2109,9 +2127,11 @@ const en: typeof de = {
       ohneImport: "Captured in the app — no import context available.",
       bearbeitbar: "Editable",
       kontoGepaart: "fixed — unpair the transfer first",
-      loeschenOnline: "Delivered by the bank — deleting only works by discarding it in the retrieval.",
+      verwerfenBankzeile: "Discard",
+      verwerfenFolge:
+        "Discarding takes the row out of the account and records that it does not belong there — the next retrieval will not bring it back. The balance will then differ by {{betrag}} from what the bank reports.",
       loeschenHinweis:
-        "Deleting removes the entry from the account. The bank row itself remains and reappears under “New from the bank”, where it can be discarded.",
+        "Deleting removes the entry from the account. The imported row itself remains and reappears in the import inbox.",
     },
     entwurf: {
       titel: "New from the bank",

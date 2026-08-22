@@ -474,11 +474,15 @@ describe("Buchungsdetails", () => {
     });
   });
 
-  // Gesperrt ist die HERKUNFT, nicht das Konto. Vorher hing die Sperre am Konto: alles
+  // Entscheidend ist die HERKUNFT, nicht das Konto. Vorher hing die Sperre am Konto: alles
   // auf einem Konto mit Bankverbindung war tabu, also auch die Zeilen, die per Datei
   // dorthin kamen — die kennt die Bank aber gar nicht, und ohne Löschweg blieb eine
   // falsch importierte Zeile für immer im Saldo stehen.
-  it("sperrt das Löschen für Zeilen aus dem Bankabruf", async () => {
+  //
+  // Eine Zeile aus dem ABRUF wird nicht gelöscht, sondern verworfen: die Buchung fällt
+  // aus dem Ledger, der Umsatz bleibt als Entscheidung stehen. Nur so holt der nächste
+  // Abruf sie nicht zurück — geprüft wird deshalb an beidem, nicht am Knopf.
+  it("verwirft eine Zeile aus dem Bankabruf, statt sie zu löschen", async () => {
     await zweiKonten();
     await sqliteImportLaufRepository.speichern({
       id: "l-bank", quelle: "fints", zeitpunkt: "2026-08-12T09:00:00.000Z",
@@ -490,15 +494,29 @@ describe("Buchungsdetails", () => {
     });
     await sqliteUmsatzRepository.speichern({
       id: "u1", laufId: "l-bank", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
-      waehrung: "EUR", gegenpartei: "Bank AG", verwendungszweck: "Abbuchung",
+      waehrung: "EUR", gegenpartei: "Ohlert Vibora", verwendungszweck: "Abbuchung",
       rohHash: "h-bank", nativeId: "fints-1", status: "verbucht", istbuchungId: "i1",
     });
     const nutzer = userEvent.setup();
     rendere(<KontenScreen onNavigate={() => {}} />);
 
     await detailOeffnen(nutzer, "Girokonto");
-    expect(await screen.findByText(/Von der Bank geliefert/)).toBeInTheDocument();
+
+    // Kein „Löschen" — der Weg für diese Zeile heisst anders und tut etwas anderes.
     expect(screen.queryByRole("button", { name: /^löschen$/i })).not.toBeInTheDocument();
+    const verwerfen = await screen.findAllByRole("button", { name: /^verwerfen$/i });
+    await nutzer.click(verwerfen[verwerfen.length - 1]);
+
+    await waitFor(async () => {
+      expect(await sqliteLedgerRepository.alle()).toHaveLength(0);
+      const umsatz = (await sqliteUmsatzRepository.alle()).find((u) => u.id === "u1");
+      expect(umsatz?.status).toBe("verworfen");
+      expect(umsatz?.istbuchungId).toBeUndefined();
+    });
+
+    // Der Roh-Hash bleibt im Bestand: genau er blockt den Reimport beim nächsten Abruf.
+    const schluessel = await sqliteUmsatzRepository.bestandsSchluessel();
+    expect(schluessel.hashes).toContain("h-bank");
   });
 
   it("lässt eine Zeile aus einem Dateiimport löschen, auch auf einem Bankkonto", async () => {

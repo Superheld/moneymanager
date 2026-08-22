@@ -29,7 +29,7 @@ import {
   type Kontostandsanker,
   type Zahlungsregel,
 } from "../../core";
-import type { Umsatz } from "../import";
+import { ABRUF_QUELLEN, type Umsatz } from "../import";
 import {
   freigegebenePaare,
   ledgerVerdacht,
@@ -53,8 +53,9 @@ import type {
 // gemeinsam, nicht nur fürs Register.
 export type { Dublettenverdacht };
 
-/** Quellen, die als Bankabruf gelten — deren Zeilen sind nicht von Hand löschbar. */
-export const ABRUF_QUELLEN: ReadonlySet<string> = new Set(["fints"]);
+// Welche Quelle ein Abruf ist, steht am Lauf (`import/importLauf.ts`) und wird hier nur
+// weitergereicht: die Sicht wendet die Regel an, sie besitzt sie nicht.
+export { ABRUF_QUELLEN };
 
 export interface KontenDeps {
   readonly kontoRepo: ZahlungskontoRepository;

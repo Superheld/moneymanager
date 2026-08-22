@@ -12,3 +12,14 @@ export interface ImportLauf {
   readonly neu: number;
   readonly duplikate: number;
 }
+
+/**
+ * Quellen, die ein ABRUF sind und keine Datei.
+ *
+ * Der Unterschied hat Folgen, deshalb steht er hier am Lauf und nicht in einer Sicht:
+ * eine Datei ist ein Stapel, den jemand ausgewählt hat, ein Abruf ist die Aussage der
+ * Bank über den Stand ihres Kontos. Was von der Bank kam, wird deshalb nicht gelöscht,
+ * sondern verworfen — die Zeile bleibt als Entscheidung stehen, sonst holt der nächste
+ * Abruf sie zurück.
+ */
+export const ABRUF_QUELLEN: ReadonlySet<string> = new Set(["fints"]);

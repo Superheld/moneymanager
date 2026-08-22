@@ -652,11 +652,10 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {editBuchung && (
         <BuchungDetail
           buchung={editBuchung}
-          // Was die BANK geliefert hat, wird nicht von Hand gelöscht — beim nächsten
-          // Abruf käme es zurück, und bis dahin stimmte der Saldo nicht mehr mit ihr
-          // überein. Der Weg für so eine Zeile ist das Verwerfen im Abruf. Was aus einer
-          // Datei kam, hat diese Bindung nicht und ist löschbar.
-          loeschenGesperrt={ausBankabruf.has(editBuchung.id)}
+          // Was die BANK geliefert hat, wird verworfen statt gelöscht: gelöscht käme es
+          // beim nächsten Abruf zurück. Was aus einer Datei kam, hat diese Bindung nicht
+          // und wird schlicht gelöscht.
+          ausBankabruf={ausBankabruf.has(editBuchung.id)}
           onClose={() => setEditBuchung(null)}
           onGeaendert={laden}
         />
