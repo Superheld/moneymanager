@@ -325,7 +325,12 @@ export async function abrufAusfuehren(
 
     try {
       // Das zuletzt getragene Format als Reihenfolge mitgeben — nicht als Festlegung.
-      const abruf = await sitzung.umsaetze(bankkonto, von, deps.heute, z.letztesFormat);
+      // Das zuletzt getragene Format als Reihenfolge, die Wahl des Nutzers als Festlegung
+      // — der Adapter hält die beiden auseinander (siehe `Formatvorgabe`).
+      const abruf = await sitzung.umsaetze(bankkonto, von, deps.heute, {
+        wahl: z.formatwahl,
+        zuletzt: z.letztesFormat,
+      });
       await auszugsSaldenFesthalten(abruf.auszugsSalden);
 
       // Das Ziel steht fest — es kommt aus der Zuordnung, nicht aus einem Konto-Match

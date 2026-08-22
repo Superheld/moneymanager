@@ -246,6 +246,29 @@ export interface Auszugsstand {
   readonly betrag: Cent;
 }
 
+/**
+ * Wie das Umsatzformat für einen Abruf bestimmt wird.
+ *
+ * Zwei Dinge, die man leicht verwechselt, und der Unterschied entscheidet über das
+ * Ergebnis:
+ *
+ *  • **`zuletzt`** ist ein GEDÄCHTNIS — was für dieses Konto beim letzten Mal getragen
+ *    hat. Es entscheidet nur die REIHENFOLGE der beiden Versuche, nie das Ergebnis:
+ *    bleibt der erste leer, läuft der zweite. Damit spart ein Konto, das nur über MT940
+ *    geht, die vergebliche CAMT-Runde — und ein Institut, das CAMT nachrüstet, kommt
+ *    trotzdem wieder darauf, statt für immer auf dem alten Weg zu bleiben.
+ *
+ *  • **`wahl`** ist eine FESTLEGUNG und schliesst den anderen Weg aus. Sie wird
+ *    gebraucht, weil das Gedächtnis genau dann nicht greift, wenn man es am nötigsten
+ *    hätte: liefert der erste Versuch etwas — und sei es eine von der Bank gedeckelte
+ *    Teilmenge —, gilt er als erfolgreich, und der zweite läuft nie. Wer den anderen Weg
+ *    sehen will, muss den ersten ausschliessen können.
+ */
+export interface Formatvorgabe {
+  readonly wahl?: "automatisch" | "CAMT" | "MT940";
+  readonly zuletzt?: string;
+}
+
 /** Ergebnis eines Umsatzabrufs: das kanonische Import-Ergebnis plus, was die Bank dazu sagte. */
 export interface AbrufErgebnis {
   readonly ergebnis: ImportErgebnis;
@@ -280,17 +303,14 @@ export interface Abrufsitzung {
   /**
    * Umsätze holen.
    *
-   * `bevorzugtesFormat` ist das, was für dieses Konto zuletzt getragen hat („CAMT" oder
-   * „MT940"). Es entscheidet nur die REIHENFOLGE der beiden Versuche, nie das Ergebnis:
-   * bleibt der erste leer, läuft der zweite. Damit spart ein Konto, das nur über MT940
-   * geht, die ergebnislose CAMT-Runde — und ein Institut, das CAMT nachrüstet, kommt
-   * trotzdem wieder darauf, statt für immer auf dem alten Weg zu bleiben.
+   * Siehe `Formatvorgabe`: das Gedächtnis dreht nur die Reihenfolge, die Wahl schliesst
+   * einen Weg aus.
    */
   umsaetze(
     konto: Bankkonto,
     vonIso: string,
     bisIso: string,
-    bevorzugtesFormat?: string,
+    format?: Formatvorgabe,
   ): Promise<AbrufErgebnis>;
   /**
    * Die Depotaufstellung, sofern die Bank sie für dieses Konto freigibt.

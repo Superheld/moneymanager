@@ -550,6 +550,19 @@ const de = {
     keine: "— keine —",
   },
   bankzugaenge: {
+    format: {
+      spalte: "Format",
+      automatisch: "automatisch",
+      CAMT: "nur CAMT",
+      MT940: "nur MT940",
+      hinweis: {
+        automatisch:
+          "Beide Wege werden probiert. Bleibt der erste ohne Ergebnis, läuft der zweite — das ist der Normalfall und passt sich an, wenn die Bank etwas ändert.",
+        CAMT: "Nur CAMT. Liefert die SEPA-Angaben einzeln statt als Fliesstext, kennt aber keinen Pflicht-Anfangssaldo. Wenn nichts kommt, kommt nichts — es wird nicht auf MT940 ausgewichen.",
+        MT940:
+          "Nur MT940. Trägt Anfangs- und Schlusssaldo als Pflichtfeld, dafür stecken Empfänger und Referenzen in einem Fliesstext. Wenn nichts kommt, kommt nichts — es wird nicht auf CAMT ausgewichen.",
+      },
+    },
     titel: "Hinterlegte Bankzugänge",
     untertitel: "Was verbunden ist, und was die Bank dazu freigibt",
     leer: "Kein Bankzugang hinterlegt. Er entsteht beim Anlegen eines Online-Kontos.",
@@ -1907,6 +1920,19 @@ const en: typeof de = {
     keine: "— none —",
   },
   bankzugaenge: {
+    format: {
+      spalte: "Format",
+      automatisch: "automatic",
+      CAMT: "CAMT only",
+      MT940: "MT940 only",
+      hinweis: {
+        automatisch:
+          "Both routes are tried. If the first returns nothing, the second runs — the normal case, and it adapts when the bank changes something.",
+        CAMT: "CAMT only. Delivers the SEPA details as separate fields rather than free text, but has no mandatory opening balance. If nothing arrives, nothing arrives — there is no fallback to MT940.",
+        MT940:
+          "MT940 only. Carries opening and closing balance as mandatory fields, but packs payee and references into free text. If nothing arrives, nothing arrives — there is no fallback to CAMT.",
+      },
+    },
     titel: "Stored bank access",
     untertitel: "What is connected, and what the bank allows for it",
     leer: "No bank access stored. It is created when you add an online account.",
