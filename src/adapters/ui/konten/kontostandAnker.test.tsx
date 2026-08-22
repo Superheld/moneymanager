@@ -16,6 +16,7 @@ const halter = vi.hoisted(() => {
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { AbgleichBereich } from "./AbgleichBereich";
 import { KontenScreen } from "./KontenScreen";
 import { sqliteLedgerRepository as ledgerRepo } from "../../persistence/sqliteLedgerRepository";
 import { sqliteKontostandsankerRepository as ankerRepo } from "../../persistence/sqliteKontostandRepository";
@@ -54,16 +55,18 @@ describe("Kontostand gegen den Anker", () => {
   });
 
   it("grenzt die Lücke auf den Zeitraum zwischen zwei Ankern ein", async () => {
-    // Das ist der eigentliche Gewinn: nicht „irgendwo fehlen 600 €", sondern „im August".
+    // Das ist der eigentliche Gewinn: nicht „irgendwo fehlt etwas", sondern „im August".
     await konto(10000);
     await buchung("b1", "2026-07-10", -3000);
     await buchung("b2", "2026-08-05", -1000);
     await anker("2026-07-31", 7000); // bis hierhin passt alles
-    await anker("2026-08-31", 66000); // danach fehlen 600,00 €
+    await anker("2026-08-31", 66000); // danach fehlt etwas
 
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    const nutzer = userEvent.setup();
+    rendere(<AbgleichBereich />);
 
-    // Der Zeitraum steht da, mit beiden Stichtagen.
+    // Die Fenster stehen im aufgeklappten Bereich — die Kopfzeile beantwortet nur, OB.
+    await nutzer.click(await screen.findByRole("button", { name: /Girokonto/ }));
     expect(await screen.findByText(/31\.07\.2026.*31\.08\.2026/)).toBeInTheDocument();
   });
 
@@ -73,8 +76,9 @@ describe("Kontostand gegen den Anker", () => {
     await anker("2026-07-31", 5000);
     const nutzer = userEvent.setup();
 
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<AbgleichBereich />);
 
+    await nutzer.click(await screen.findByRole("button", { name: /Girokonto/ }));
     await nutzer.click(await screen.findByRole("button", { name: /anfangsbestand abgleichen/i }));
     const dialog = within(await screen.findByRole("dialog"));
     await nutzer.click(dialog.getByRole("button", { name: /anfangsbestand setzen/i }));
@@ -93,8 +97,9 @@ describe("Kontostand gegen den Anker", () => {
     await konto(4750);
     const nutzer = userEvent.setup();
 
-    rendere(<KontenScreen onNavigate={() => {}} />);
+    rendere(<AbgleichBereich />);
 
+    await nutzer.click(await screen.findByRole("button", { name: /Girokonto/ }));
     await nutzer.click(await screen.findByRole("button", { name: /stand festhalten/i }));
     const dialog = within(await screen.findByRole("dialog"));
     await nutzer.clear(dialog.getByLabelText(/stichtag/i));

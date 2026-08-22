@@ -32,7 +32,6 @@ import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVe
 import { SammelDialog } from "../buchung/SammelDialog";
 import { AbrufDialog } from "./AbrufDialog";
 import { DepotAuszug } from "./DepotAuszug";
-import { AbgleichModal, KassensturzModal } from "./KontostandModal";
 import { Modal } from "../bausteine/Modal";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton } from "../bausteine/IconButton";
@@ -97,9 +96,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [sammelOffen, setSammelOffen] = useState(false);
   const [abruf, setAbruf] = useState(false);
   /** Der Abgleich des Anfangsbestands — ein Eingriff, deshalb mit Vorschau. */
-  const [abgleichOffen, setAbgleichOffen] = useState(false);
-  /** Kassensturz für ein Konto ohne Bankverbindung. */
-  const [kassensturzOffen, setKassensturzOffen] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
   // EIN Ladevorgang, EIN setState. Gestaffelte await/setState-Paare lassen abgeleitete
@@ -336,23 +332,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         )}
       </Card>
 
-      {abgleichOffen && aktivZeile && (
-        <AbgleichModal
-          zeile={aktivZeile}
-          onClose={() => setAbgleichOffen(false)}
-          onFertig={laden}
-        />
-      )}
-
-      {kassensturzOffen && aktiv && (
-        <KassensturzModal
-          kontoId={aktiv.id}
-          bezeichnung={aktiv.bezeichnung}
-          heute={heute}
-          onClose={() => setKassensturzOffen(false)}
-          onGespeichert={laden}
-        />
-      )}
 
       {abruf && (
         <AbrufDialog
@@ -405,71 +384,27 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
                   Und seit es eine Anker-HISTORIE gibt, steht darunter die Auskunft, die
                   wirklich weiterhilft: nicht nur wieviel fehlt, sondern seit wann. */}
-              {(() => {
-                const anker = aktivZeile?.anker;
-                if (!anker) return null;
-                const diff = aktivZeile?.abweichung ?? 0;
-                const luecke = aktivZeile?.luecken[aktivZeile.luecken.length - 1];
-                return (
-                  <div style={{ fontSize: "var(--fs-xs)", marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
-                    <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
-                      <Pill variant={diff === 0 ? "ok" : "warn"}>
-                        {diff === 0
-                          ? t("konten.abgleich.stimmt")
-                          : t("konten.abgleich.differenz", { betrag: geld.formatMitSymbol(diff, { mitVorzeichen: true }) })}
-                      </Pill>
-                      <span className="muted">
-                        {t(anker.herkunft === "bank" ? "konten.abgleich.bankSagt" : "konten.anker.gezaehlt", {
-                          betrag: geld.formatMitSymbol(anker.betrag),
-                          datum: datumKurz(anker.datum),
-                        })}
-                      </span>
-                      {diff !== 0 && (
-                        <span className="muted">
-                          {t(diff > 0 ? "konten.abgleich.bankMehr" : "konten.abgleich.appMehr")}
-                        </span>
-                      )}
-                    </div>
-                    {/* Die Lücke schlägt die Gesamtdifferenz: sie zeigt auf einen Zeitraum
-                        statt auf fünf Jahre. Der jüngste zuerst — dort sucht man. */}
-                    {luecke && (
-                      <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
-                        <span className="muted">
-                          {t("konten.anker.luecke", {
-                            betrag: geld.formatMitSymbol(luecke.betrag, { mitVorzeichen: true }),
-                            von: datumKurz(luecke.von),
-                            bis: datumKurz(luecke.bis),
-                          })}
-                        </span>
-                        {aktivZeile!.luecken.length > 1 && (
-                          <span className="muted">{t("konten.anker.weitereLuecken", { n: aktivZeile!.luecken.length - 1 })}</span>
-                        )}
-                      </div>
-                    )}
-                    {/* Der einmalige Abgleich. Er verschiebt die Differenz in den
-                        Anfangsbestand — richtig, solange der nur die fehlende
-                        Vorgeschichte überbrückt, und deshalb auf Zuruf statt automatisch. */}
-                    {aktivZeile?.anfangsbestandVorschlag != null && (
-                      <div>
-                        <button className="linkbtn" style={{ padding: 0 }} onClick={() => setAbgleichOffen(true)}>
-                          {t("konten.anker.abgleichen")}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Für Konten ohne Bank ist der Kassensturz die einzige unabhängige
-                  Aussage, die es je geben wird — und genauso viel wert wie eine
-                  Bankmeldung. */}
-              {aktivZeile && !aktivZeile.online && (
-                <div style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-                  <button className="linkbtn" style={{ padding: 0 }} onClick={() => setKassensturzOffen(true)}>
-                    {t("konten.anker.festhalten")}
-                  </button>
+              {/* Nur noch die AUSKUNFT, nicht mehr der Arbeitsplatz.
+                  Ob der Stand stimmt, will man hier sehen — warum er nicht stimmt und was
+                  dagegen zu tun ist, ist eine eigene Frage mit eigenem Platz (Verwaltung →
+                  Konten → Abgleich). Sie stand hier als Pille mit einer Zahl, die sagt
+                  „irgendwo fehlen 600 Euro", ohne hinzuzeigen — die Auskunft, die am
+                  wenigsten hilft. */}
+              {aktivZeile?.anker && (
+                <div style={{ fontSize: "var(--fs-xs)", marginTop: 6, display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
+                  <Pill variant={(aktivZeile.abweichung ?? 0) === 0 ? "ok" : "warn"}>
+                    {(aktivZeile.abweichung ?? 0) === 0
+                      ? t("konten.abgleich.stimmt")
+                      : t("konten.abgleich.differenz", { betrag: geld.formatMitSymbol(aktivZeile.abweichung ?? 0, { mitVorzeichen: true }) })}
+                  </Pill>
+                  {(aktivZeile.abweichung ?? 0) !== 0 && (
+                    <button className="linkbtn" style={{ padding: 0 }} onClick={() => onNavigate("kontenverwaltung")}>
+                      {t("konten.abgleichBereich.hinweg")}
+                    </button>
+                  )}
                 </div>
               )}
+
             </div>
             <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
               <select className="field" style={{ width: "auto" }} value={tage} onChange={(e) => setTage(Number(e.target.value))}>

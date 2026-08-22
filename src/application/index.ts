@@ -120,6 +120,12 @@ export { pruefmarkerSetzen } from "./buchung/pruefmarker";
 export { zuordnungenAbgleichen, zuordnungVonHand } from "./vertraege/vertragszuordnung";
 export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertraege/vertragsvorschlaege";
 export {
+  abgleichLaden,
+  type Abgleichzeile,
+  type Ankerpunkt,
+  type AbgleichDeps,
+} from "./konten/abgleichsicht";
+export {
   kontenLaden,
   registerSicht,
   ABRUF_QUELLEN,
