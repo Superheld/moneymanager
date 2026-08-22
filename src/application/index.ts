@@ -116,6 +116,7 @@ export {
   type VertragErgebnis,
 } from "./vertraege/vertragAnlegen";
 export { zahlungsspuren } from "./buchung/zahlungsspuren";
+export { pruefmarkerSetzen } from "./buchung/pruefmarker";
 export { zuordnungenAbgleichen, zuordnungVonHand } from "./vertraege/vertragszuordnung";
 export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertraege/vertragsvorschlaege";
 export {

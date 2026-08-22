@@ -60,6 +60,7 @@ import {
   buchungErfassen,
   bankzeileVerwerfen,
   buchungLoeschen,
+  pruefmarkerSetzen,
   buchungenPaaren,
   buchungSplitten,
   buchungsdetail,
@@ -316,7 +317,7 @@ function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void
  *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
  *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, ausBankabruf, onlineKonten, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; ausBankabruf?: boolean; onlineKonten: ReadonlySet<string>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, ausBankabruf, onlineKonten, aktuelle, onPruefmarker, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; ausBankabruf?: boolean; onlineKonten: ReadonlySet<string>; aktuelle?: IstBuchung; onPruefmarker: (vorgemerkt: boolean) => Promise<void>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const istEntwurf = !!entwurf;
@@ -650,6 +651,26 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
             das ist nicht zu sehen, dass die Zeile schon eine Beschriftung HAT und dieses
             Feld sie überschreibt — man tippt dann ab, was ohnehin dasteht. Was hier leer
             bleibt, bleibt automatisch. */}
+        {/* Der Prüfmarker wirkt SOFORT, nicht erst beim Speichern — wie die Pille im
+            Register auch. Er ist eine Handlung („gesehen"), keine Eigenschaft, die man
+            miterfasst; wer den Dialog ohne Speichern schliesst, hat ihn trotzdem gesetzt.
+            Deshalb steht er als Kästchen und nicht im Formularraster darüber. */}
+        {!istEntwurf && buchung && (
+          <FormField label={t("konten.pruefenFeld")} hint={t("konten.pruefenHinweis")}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)", fontSize: "var(--fs-sm)", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={!!aktuelle?.zuPruefen}
+                disabled={busy}
+                onChange={async (e) => {
+                  await onPruefmarker(e.target.checked);
+                }}
+                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+              />
+              {t("konten.pillPruefen")}
+            </label>
+          </FormField>
+        )}
         {!istEntwurf && (
           <FormField label={t("konten.feldBezeichnung")} hint={t("konten.optional")}>
             <input
@@ -1352,6 +1373,13 @@ export function BuchungDetail(props: {
     onClose();
   }
 
+  /** Setzt den „noch ansehen"-Marker oder nimmt ihn weg — sofort, ohne Speichern. */
+  async function pruefmarkerUmschalten(vorgemerkt: boolean) {
+    if (!aktuelle) return;
+    await pruefmarkerSetzen(aktuelle.id, vorgemerkt);
+    await nachAenderung();
+  }
+
   async function nachAenderung() {
     await laden();
     await onGeaendert();
@@ -1447,6 +1475,8 @@ export function BuchungDetail(props: {
       onDelete={entfernen}
       ausBankabruf={ausBankabruf}
       onlineKonten={onlineKonten}
+      aktuelle={aktuelle}
+      onPruefmarker={pruefmarkerUmschalten}
       onZurUmbuchung={() => aktuelle && setUmbuchenAus(aktuelle)}
       vertragsBindung={
         aktuelle

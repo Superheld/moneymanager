@@ -1130,7 +1130,7 @@ describe("Online geführte Konten werden nicht von Hand bebucht", () => {
     });
     await sqliteBankzugangRepository.speichern({
       id: "z1", bezeichnung: "Testbank", url: "https://example.invalid/fints",
-      blz: "99999901", benutzer: "nutzer", angelegtAm: "2026-08-01T09:00:00.000Z",
+      blz: "99999901", benutzer: "nutzer",
     });
     await sqliteKontozuordnungRepository.speichern({
       zugangId: "z1", schluessel: "1234567|", zahlungskontoId: "k1",
@@ -1201,5 +1201,88 @@ describe("Online geführte Konten werden nicht von Hand bebucht", () => {
 
     expect(await screen.findByLabelText(/betrag/i)).not.toBeDisabled();
     expect(await screen.findByLabelText(/datum/i)).not.toBeDisabled();
+  });
+});
+
+/**
+ * Der Marker beantwortet keine Frage über die Zahlung, sondern eine über den Nutzer: habe
+ * ich mir das angesehen? Deshalb wird hier an den DATEN geprüft, was nach dem Klick steht —
+ * eine Pille, die verschwindet, ohne dass sich etwas gemerkt hat, sähe genauso aus.
+ */
+describe("Prüfmarker im Auszug", () => {
+  const heute = "2026-08-12";
+
+  async function buchungMitMarker(zuPruefen: boolean) {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -1250, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Ohlert",
+      zuPruefen: zuPruefen || undefined,
+    });
+  }
+
+  it("nimmt den Marker weg, wenn man auf die Pille klickt", async () => {
+    await buchungMitMarker(true);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click(await screen.findByRole("button", { name: /marker entfernen/i }));
+
+    await waitFor(async () => {
+      const b = (await sqliteLedgerRepository.alle()).find((x) => x.id === "i1");
+      expect(b?.zuPruefen).toBeUndefined();
+    });
+    expect(screen.queryByRole("button", { name: /marker entfernen/i })).not.toBeInTheDocument();
+  });
+
+  it("zeigt gar keine Pille, wenn nichts vorgemerkt ist", async () => {
+    await buchungMitMarker(false);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await screen.findAllByRole("button", { name: "bearbeiten" });
+    expect(screen.queryByRole("button", { name: /marker entfernen/i })).not.toBeInTheDocument();
+  });
+
+  /** Der zweite Weg: im Detail von Hand vormerken — auch bei einer Zeile ohne Marker. */
+  it("merkt eine Zeile über das Kästchen im Detail vor", async () => {
+    await buchungMitMarker(false);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+
+    const kasten = await screen.findByRole("checkbox", { name: /ansehen/i });
+    expect(kasten).not.toBeChecked();
+    await nutzer.click(kasten);
+
+    await waitFor(async () => {
+      const b = (await sqliteLedgerRepository.alle()).find((x) => x.id === "i1");
+      expect(b?.zuPruefen).toBe(true);
+    });
+  });
+
+  /**
+   * Der Marker wirkt SOFORT, nicht erst beim Speichern: er ist eine Handlung („gesehen"),
+   * keine Eigenschaft, die man miterfasst. Wer den Dialog ohne Speichern schliesst, hat
+   * ihn trotzdem gesetzt.
+   */
+  it("wirkt sofort, auch ohne Speichern", async () => {
+    await buchungMitMarker(true);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+    await nutzer.click(await screen.findByRole("checkbox", { name: /ansehen/i }));
+    await nutzer.click(await screen.findByRole("button", { name: /abbrechen/i }));
+
+    await waitFor(async () => {
+      const b = (await sqliteLedgerRepository.alle()).find((x) => x.id === "i1");
+      expect(b?.zuPruefen).toBeUndefined();
+    });
   });
 });

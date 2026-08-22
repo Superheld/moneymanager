@@ -74,6 +74,7 @@ const de = {
     anbieter: { fehlt: "Bitte einen Anbieter angeben." },
     beginn: { ungueltig: "Bitte ein gültiges Beginn-Datum angeben." },
     bezahlt: { keinKonto: "Kein Konto hinterlegt — bitte der Zahlung/Regel ein Konto zuordnen." },
+    buchung: { fehlt: "Diese Buchung gibt es nicht mehr." },
     import: {
       bankzeile: {
         fehlt: "Diese Buchung gibt es nicht mehr.",
@@ -766,6 +767,11 @@ const de = {
     editUntertitelImport: "Importierte Buchung — Korrekturen bleiben erhalten, die Import-Spur auch.",
     pillUmbuchung: "Umbuchung",
     pillManuell: "manuell",
+    pillPruefen: "ansehen",
+    pruefenWeg: "Erledigt — Marker entfernen",
+    pruefenFeld: "Noch ansehen",
+    pruefenHinweis:
+      "Merkt die Zeile im Auszug vor. Zeilen aus einem Bankabruf tragen den Marker von selbst — sie werden gebucht, ohne dass jemand sie gesehen hat.",
     pillBezahlt: "bezahlt",
     bearbeiten: "bearbeiten",
     loeschen: "löschen",
@@ -1382,6 +1388,7 @@ const en: typeof de = {
     anbieter: { fehlt: "Please enter a provider." },
     beginn: { ungueltig: "Please enter a valid start date." },
     bezahlt: { keinKonto: "No account assigned — please assign an account to the payment/rule." },
+    buchung: { fehlt: "That entry no longer exists." },
     import: {
       bankzeile: {
         fehlt: "That entry no longer exists.",
@@ -2072,6 +2079,11 @@ const en: typeof de = {
     editUntertitelImport: "Imported transaction — your edits are kept, and so is the import trail.",
     pillUmbuchung: "Transfer",
     pillManuell: "manual",
+    pillPruefen: "review",
+    pruefenWeg: "Done — remove the marker",
+    pruefenFeld: "Still to review",
+    pruefenHinweis:
+      "Flags the entry in the statement. Rows from a bank retrieval carry the marker by themselves — they are booked without anyone having seen them.",
     pillBezahlt: "paid",
     bearbeiten: "edit",
     loeschen: "delete",

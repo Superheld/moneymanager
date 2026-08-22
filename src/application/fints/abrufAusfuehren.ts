@@ -330,6 +330,10 @@ export async function abrufAusfuehren(
           // Kategorie darf danach kommen — sie fehlt sonst als Grund, eine Tatsache
           // nicht zu buchen.
           auchOhneKategorie: true,
+          // Und als „noch anzusehen" vormerken: der Abruf bucht direkt, niemand hat die
+          // Zeile zwischen Bank und Saldo in der Hand gehabt. Die Datei-Inbox setzt das
+          // NICHT — dort übernimmt man jede Zeile einzeln und hat sie damit gesehen.
+          zumPruefenVormerken: true,
         });
       }
 

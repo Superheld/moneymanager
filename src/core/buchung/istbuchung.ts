@@ -138,6 +138,21 @@ export interface IstBuchung {
   readonly aufteilungen?: readonly Aufteilung[];
   /** Roh-Hash der Importzeile (Dedup gegen Bankimport, später). */
   readonly rohHash?: string;
+  /**
+   * „Das hier sollte ich mir ansehen."
+   *
+   * Anders als alles andere an dieser Buchung beschreibt der Marker keine TATSACHE über
+   * die Zahlung, sondern eine Beziehung zwischen ihr und dem Nutzer: noch nicht
+   * angeschaut. Deshalb setzt ihn niemand aus den Daten ab und niemand rechnet mit ihm —
+   * er wird gesetzt und wieder weggenommen, und beides darf von Hand geschehen.
+   *
+   * Gesetzt wird er, wo eine Zeile UNGESEHEN im Saldo landet: beim Bankabruf, der direkt
+   * bucht. Was durch die Import-Inbox lief, hat jemand einzeln übernommen und damit
+   * angesehen.
+   *
+   * Fehlend zählt als „nicht vorgemerkt" — der Bestand vor der Einführung ist gesehen.
+   */
+  readonly zuPruefen?: boolean;
 }
 
 /** Stabiler Schlüssel eines Plan-Postens (Quelle + Fälligkeit) für 1:1-Matching. */

@@ -80,6 +80,7 @@ import {
 } from "../application/buchung/buchungErfassen";
 import { umbuchungLoeschen as umbuchungLoeschenUseCase } from "../application/buchung/umbuchungErfassen";
 import { bankzeileVerwerfen as bankzeileVerwerfenUseCase } from "../application/import/bankzeileVerwerfen";
+import { pruefmarkerSetzen as pruefmarkerSetzenUseCase } from "../application/buchung/pruefmarker";
 import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchung/buchungSplitten";
 import { paarungLoesen as paarungLoesenUseCase } from "../application/buchung/umbuchungAusBuchung";
 import {
@@ -706,6 +707,11 @@ export function buchungBearbeiten(buchung: IstBuchung, eingabe: Parameters<typeo
 
 export function buchungLoeschen(id: string) {
   return buchungLoeschenUseCase(sqliteLedgerRepository, id);
+}
+
+/** Setzt den „noch ansehen"-Marker einer Buchung oder nimmt ihn weg. */
+export function pruefmarkerSetzen(istbuchungId: string, vorgemerkt: boolean) {
+  return pruefmarkerSetzenUseCase(sqliteLedgerRepository, istbuchungId, vorgemerkt);
 }
 
 export function umbuchungLoeschen(transferId: string) {
