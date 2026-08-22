@@ -277,9 +277,9 @@ quellenagnostisch, er vergleicht Bankzeile gegen Dateizeile, ohne zu wissen, wel
 welche ist. Kein Modell: die Frage ist Identität, nicht Ähnlichkeit, und bei einer
 Fehlentscheidung muss der Grund lesbar sein. Betrag und Konto sind harte Vorbedingungen,
 darüber ein Punktesystem aus Datum (Buchungstag ODER Valuta), Gläubiger-ID plus
-Mandatsreferenz, Zweck-Präfix und Gegenpartei. Am echten Bestand gemessen: 50 identisch,
-3 zur Bestätigung vorgelegt, 7 wirklich neu; ein Reimport derselben Datei erkennt
-5279 von 5279 wieder, in 2 ms. Wird eine Zeile wiedererkannt, entsteht keine zweite —
+Mandatsreferenz, Zweck-Präfix und Gegenpartei. Am echten Bestand gemessen: die grosse Mehrheit
+identisch, eine Handvoll zur Bestätigung vorgelegt, einzelne wirklich neu; ein Reimport
+derselben Datei erkennt jede Zeile wieder, in wenigen Millisekunden. Wird eine Zeile wiedererkannt, entsteht keine zweite —
 die vorhandene bekommt die Felder, die ihr fehlen.
 
 **Bankabgleich.** Bei jedem Abruf wird der Kontostand geholt, den die BANK meldet, und
@@ -551,12 +551,12 @@ und die Planungsseite fliegt raus, weil sie das falsche Versprechen gab.
 
 ### Behoben
 - **Budget-Verbrauch stand dauerhaft auf 0.** Budgets hängen an Hauptkategorien, gebucht
-  wird auf deren Kindern — von 5207 Ist-Buchungen traf keine einzige ihre Budget-Kategorie
-  direkt. `budgetVerbrauch` zählt jetzt den Unterbaum; die Kategorienliste ist Pflichtparameter,
+  wird auf deren Kindern — im gesamten Bestand traf keine einzige Ist-Buchung ihre
+  Budget-Kategorie direkt. `budgetVerbrauch` zählt jetzt den Unterbaum; die Kategorienliste ist Pflichtparameter,
   damit man sie nicht vergessen kann.
 - **Doppelzählung beim Import.** Finanzguru liefert gesplittete Buchungen zweimal — als
-  Original UND zerlegt in Teilbuchung/Restbetrag. In der echten Datei 78 Teile zu 38
-  Originalen; ohne Fix wären 3.568,17 € doppelt gezählt worden.
+  Original UND zerlegt in Teilbuchung/Restbetrag. In der echten Datei kam auf jedes
+  Original gut ein Teil; ohne Fix wäre deren Summe doppelt in den Saldo gelaufen.
 - **`laeuft` rechnete über `ord`**, das einen Sortierschlüssel liefert und keinen Tageszähler
   — laufende Verträge landeten unter „beendet".
 - **Gläubiger-ID ging beim Import verloren** (Migration 16); sie ist der präzisere Schlüssel

@@ -55,3 +55,6 @@ design-system/
 # CLAUDE.local.md automatisch neben CLAUDE.md; .claude/CLAUDE.md waere dagegen der
 # Ort fuer TEAM-geteilte Projektanweisungen und gehoerte damit ins Repo.
 CLAUDE.local.md
+
+# Begriffsliste des Muster-Guards: die Vorlage ist versioniert, die echte nicht.
+.privacy-terms
