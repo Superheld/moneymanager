@@ -379,12 +379,49 @@ class FintsSitzung implements Abrufsitzung {
       ergebnis: { quelle: FINTS_QUELLE, umsaetze, warnungen },
       format,
       hinweise,
+      auszugsSalden: alleStaende(antwort.statements, warnungen),
     };
   }
 }
 
 function alleBuchungen(statements: readonly Statement[]) {
   return statements.flatMap((s) => s.transactions);
+}
+
+/**
+ * Die Stände, die in den Auszügen stehen — Anfangs- UND Schlusssaldo jedes Auszugs.
+ *
+ * Beide, nicht nur der Schluss: der Anfangssaldo des ersten Auszugs ist der Stand VOR dem
+ * abgefragten Zeitraum und damit der früheste, den die Bank überhaupt hergibt. Bei
+ * lückenlosen Auszügen ist der Anfang des einen der Schluss des vorigen — die Dopplung
+ * kostet nichts, weil ein Anker über (Konto, Datum, Herkunft) eindeutig ist und der
+ * zweite den ersten schlicht überschreibt.
+ *
+ * NICHT übernommen werden `availableBalance` (`:64:`) und `forwardBalances` (`:65:`): das
+ * eine ist der verfügbare Betrag und beantwortet eine andere Frage als „was lag auf dem
+ * Konto", das andere sind Vorausvaluta — Aussagen über die Zukunft, keine Beobachtungen.
+ */
+function alleStaende(statements: readonly Statement[], warnungen: string[]) {
+  const staende = [];
+  for (const s of statements) {
+    for (const b of [s.openingBalance, s.closingBalance]) {
+      if (!b) continue;
+      try {
+        staende.push({
+          datum: isoDatum(b.date),
+          // In CENT, nicht in Euro: die Übersetzung gehört in den Adapter, die
+          // Anwendungsschicht bekommt Domänenwerte. Dieselbe Regel wie beim Saldo aus
+          // `HKSAL` und bei jedem Buchungsbetrag.
+          betrag: bankbetragZuCent(b.value, waehrungNachCode(b.currency)),
+        });
+      } catch (e) {
+        // Ein unlesbarer Saldo kippt den Abruf nicht — die Buchungen sind das Wichtigere,
+        // und ein fehlender Anker heisst nur, dass eine Prüfmöglichkeit fehlt.
+        warnungen.push(`Auszugssaldo übersprungen: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+  return staende;
 }
 
 export function fintsAdapter(opt: FintsAdapterOptionen): Abrufadapter {

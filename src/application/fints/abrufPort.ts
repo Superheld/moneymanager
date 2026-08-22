@@ -227,12 +227,38 @@ export interface Saldo {
   readonly waehrung: string;
 }
 
+/**
+ * Ein Kontostand, den die Bank IM AUSZUG mitgeliefert hat.
+ *
+ * Ein Kontoauszug ist aufgebaut wie der auf Papier: oben der alte Stand mit seinem Datum,
+ * unten der neue, dazwischen die Buchungen. In MT940 sind das die Felder `:60F:` und
+ * `:62F:`, und beide sind Pflicht — jede Bank liefert sie, ohne dass man danach fragen
+ * muss.
+ *
+ * Das ist der Unterschied zum Saldo aus `HKSAL`: den bieten nicht alle Institute an, und
+ * er sagt nur, wie es HEUTE steht. Diese hier fallen bei jedem Abruf nebenbei an, auch
+ * rückwirkend — ein Abruf über zwei Jahre bringt die Stände dieser zwei Jahre mit.
+ */
+export interface Auszugsstand {
+  /** Stichtag (ISO-Datum) — auf DIESEN Tag bezieht sich der Betrag. */
+  readonly datum: string;
+  /** In Minor Units, vom Adapter übersetzt — wie jeder Betrag an dieser Grenze. */
+  readonly betrag: Cent;
+}
+
 /** Ergebnis eines Umsatzabrufs: das kanonische Import-Ergebnis plus, was die Bank dazu sagte. */
 export interface AbrufErgebnis {
   readonly ergebnis: ImportErgebnis;
   /** „MT940" oder „CAMT" — was die Bank tatsächlich geliefert hat, nicht was gewünscht war. */
   readonly format: string;
   readonly hinweise: readonly string[];
+  /**
+   * Die Stände aus den Auszügen, in der Reihenfolge, in der sie kamen.
+   *
+   * Leer, wenn das gelieferte Format keine trägt — der Aufrufer darf sich nicht darauf
+   * verlassen, dass welche dabei sind, aber er verliert auch nichts, wenn keine kommen.
+   */
+  readonly auszugsSalden: readonly Auszugsstand[];
 }
 
 /**

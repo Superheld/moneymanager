@@ -45,7 +45,7 @@ import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
 import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
 import { bankAnker } from "../../core";
-import type { Abrufadapter, Bankprofil, Bankzugang, TanFrager } from "./abrufPort";
+import type { Abrufadapter, Auszugsstand, Bankprofil, Bankzugang, TanFrager } from "./abrufPort";
 import { abruffenster, erstabrufTage } from "./bankprofil";
 import type { Kontozuordnung, KontozuordnungRepository } from "./bankzugangPort";
 import type { BankzugangRepository } from "./bankzugangPort";
@@ -294,9 +294,39 @@ export async function abrufAusfuehren(
       );
     }
 
+    /**
+     * Die Stände aus den AUSZÜGEN als Anker festhalten — die eigentliche Ausbeute.
+     *
+     * Der Saldo oben kommt aus einer eigenen Abfrage (`HKSAL`), die nicht jede Bank
+     * anbietet, und er sagt nur, wie es HEUTE steht. Die Auszugsstände fallen bei jedem
+     * Abruf nebenbei an und decken den ABGEFRAGTEN ZEITRAUM ab: ein Abruf über zwei Jahre
+     * bringt die Stände dieser zwei Jahre mit.
+     *
+     * Das ist der Unterschied zwischen „irgendwo in fünf Jahren fehlt etwas" und „zwischen
+     * diesen beiden Stichtagen". Erst mit mehreren Ankern kann `abweichungsfenster`
+     * überhaupt etwas eingrenzen — mit einem einzigen vergleicht es Anker gegen nichts.
+     *
+     * Auch dann, wenn die Umsätze scheitern: die Stände sind eine eigenständige Aussage.
+     */
+    async function auszugsSaldenFesthalten(staende: readonly Auszugsstand[]) {
+      const erfasstAm = new Date().toISOString();
+      for (const stand of staende) {
+        // Ein einzelner unplausibler Stand darf den Abruf nicht kippen: `bankAnker` prüft
+        // das Datum und wirft bei Unsinn. Die Buchungen sind das Wichtigere.
+        try {
+          await deps.ankerRepo.speichern(
+            bankAnker(z.zahlungskontoId, stand.betrag, stand.datum, erfasstAm),
+          );
+        } catch {
+          // stillschweigend übergehen — der Stand ist eine Zugabe, keine Bedingung
+        }
+      }
+    }
+
     try {
       // Das zuletzt getragene Format als Reihenfolge mitgeben — nicht als Festlegung.
       const abruf = await sitzung.umsaetze(bankkonto, von, deps.heute, z.letztesFormat);
+      await auszugsSaldenFesthalten(abruf.auszugsSalden);
 
       // Das Ziel steht fest — es kommt aus der Zuordnung, nicht aus einem Konto-Match
       // über die IBAN. Deshalb wird hier auch nichts angelegt.
