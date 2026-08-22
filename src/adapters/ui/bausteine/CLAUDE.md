@@ -21,15 +21,16 @@ Wahrheit — und prüft, was hier inzwischen weiterentwickelt wurde.
 `index.ts` bündelt diesen Block, damit ein Screen `from "../bausteine"` schreiben kann. Die
 eigenen Bausteine daneben werden einzeln importiert.
 
-## `Auswahlpille` — eine Wahl in einer Tabellenzeile
+## `Zeilenauswahl` — eine Wahl in einer Tabellenzeile
 
 Ein `<select className="field">` ist für FORMULARE gebaut: volle Breite, grosse
 Innenabstände, eigene Zeile. In einer Tabellenzelle sprengt es die Zeilenhöhe und erzwingt
-eine Spaltenbreite, die der Inhalt nicht braucht. `Auswahlpille` ist so gross wie eine
+eine Spaltenbreite, die der Inhalt nicht braucht. `Zeilenauswahl` ist so gross wie eine
 `Pill` daneben und gehört dorthin, wo eine Zeile eine kleine Entscheidung trägt.
 
 Sie ist bewusst **keine Pill-Variante**: eine Pille ist ein Etikett und sagt, was etwas
-IST. Hier wird gewählt, und das muss man ihr ansehen — Rahmen, Zeiger, Auswahlpfeil.
+IST. Hier wird gewählt, und das muss man ihr ansehen — Rahmen, Zeiger, Auswahlpfeil. Wer
+sie „Pille" nennt, baut sie früher oder später auch wie eine und verliert die Auswahl.
 
 Zwei Dinge, die der Typ erzwingt, weil sie sonst verlorengehen:
 

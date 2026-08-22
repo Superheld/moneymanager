@@ -1,14 +1,17 @@
-// Auswahlpille — eine Auswahl in Pillengrösse, für eine Entscheidung IN einer Tabellenzeile.
+// Zeilenauswahl — ein Auswahlfeld für eine Entscheidung IN einer Tabellenzeile.
 //
-// Ein `<select className="field">` ist auf Formulare ausgelegt: volle Breite, grosse
+// Der Name sagt, wo es hingehört, und das ist der ganze Zweck. Ein
+// `<select className="field">` ist auf Formulare ausgelegt: volle Breite, grosse
 // Innenabstände, eigene Zeile. In einer Tabellenzelle sprengt es die Zeilenhöhe und
-// erzwingt eine Spaltenbreite, die der Inhalt nicht braucht. Diese Variante ist so gross
-// wie eine `Pill` daneben und passt damit dorthin, wo eine Zeile eine kleine Entscheidung
-// trägt — Format je Konto, Rolle je Person, Einheit je Position.
+// erzwingt eine Spaltenbreite, die der Inhalt nicht braucht.
 //
-// Sie ist bewusst KEINE Pill-Variante: eine Pille ist ein Etikett und sagt, was etwas IST.
-// Hier wird gewählt, und das muss man ihr ansehen — daher der Rahmen, der Zeiger und der
-// eingebaute Auswahlpfeil des Systems.
+// Es ist bewusst KEINE Pill-Variante, auch wenn es daneben ähnlich gross ist: eine Pille
+// ist ein Etikett und sagt, was etwas IST. Hier wird gewählt, und das muss man dem Feld
+// ansehen — daher Rahmen, Zeiger und der Auswahlpfeil des Systems. Wer es „Pille" nennt,
+// wird es früher oder später auch wie eine bauen und die Auswahl verlieren.
+//
+// Passt überall dorthin, wo eine Zeile eine kleine Entscheidung trägt: Format je Konto,
+// Rolle je Person, Einheit je Position.
 //
 // **Ein `aria-label` ist Pflicht.** In einer Tabelle steht die Beschriftung in der
 // Kopfzeile und nicht am Feld; ohne den Namen meldet eine Vorlesehilfe nur „Auswahl" und
@@ -16,7 +19,7 @@
 
 import type { ReactNode } from "react";
 
-export interface Auswahlmoeglichkeit<T extends string> {
+export interface Wahlmoeglichkeit<T extends string> {
   readonly wert: T;
   readonly text: ReactNode;
   /** Erklärt, was diese Wahl bedeutet — landet im `title` der Option. */
@@ -31,7 +34,7 @@ export interface Auswahlmoeglichkeit<T extends string> {
   readonly gesperrt?: boolean;
 }
 
-export function Auswahlpille<T extends string>({
+export function Zeilenauswahl<T extends string>({
   wert,
   moeglichkeiten,
   onChange,
@@ -40,7 +43,7 @@ export function Auswahlpille<T extends string>({
   disabled,
 }: {
   readonly wert: T;
-  readonly moeglichkeiten: readonly Auswahlmoeglichkeit<T>[];
+  readonly moeglichkeiten: readonly Wahlmoeglichkeit<T>[];
   readonly onChange: (wert: T) => void | Promise<void>;
   /** Der Name des Feldes — in einer Tabelle die Spaltenüberschrift. Pflicht, siehe Kopf. */
   readonly label: string;

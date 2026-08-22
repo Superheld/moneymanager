@@ -31,7 +31,8 @@ import {
   kontozuordnungen,
 } from "../../dienste";
 import { kannVorfall } from "../../../application";
-import { Auswahlpille } from "../bausteine/Auswahlpille";
+import { beiEnter } from "../bausteine/beiEnter";
+import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
 import { Bankprofilkarte } from "./Bankprofilkarte";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
@@ -204,7 +205,7 @@ export function BankzugaengeScreen() {
         if (!zuordnung) return "—";
         const wahl = zuordnung.formatwahl ?? "automatisch";
         return (
-          <Auswahlpille
+          <Zeilenauswahl
             label={t("bankzugaenge.format.spalte")}
             wert={wahl}
             hinweis={t(`bankzugaenge.format.hinweis.${wahl}`)}
@@ -396,7 +397,15 @@ export function BankzugaengeScreen() {
           }
         >
           <FormField label={t("bankabruf.feldPin")} required hint={t("bankabruf.feldPinHinweis")}>
-            <input className="field" type="password" value={pinText} onChange={(e) => setPinText(e.target.value)} autoComplete="off" autoFocus />
+            <input
+              className="field"
+              type="password"
+              value={pinText}
+              onChange={(e) => setPinText(e.target.value)}
+              onKeyDown={beiEnter(() => void pruefen(pin.zugang, pinText), !!pinText.trim() && !busy)}
+              autoComplete="off"
+              autoFocus
+            />
           </FormField>
         </Modal>
       )}

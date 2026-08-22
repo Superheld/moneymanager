@@ -30,6 +30,7 @@ import {
 import { BankSuche } from "./BankSuche";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, FormField, Pill } from "../bausteine";
+import { beiEnter } from "../bausteine/beiEnter";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 
@@ -333,7 +334,14 @@ export function KontoAnlegenModal({
                 />
               </FormField>
               <FormField label={t("bankabruf.feldPin")} required hint={t("bankabruf.feldPinHinweis")}>
-                <input className="field" type="password" value={pin} onChange={(e) => setPin(e.target.value)} autoComplete="off" />
+                <input
+                  className="field"
+                  type="password"
+                  value={pin}
+                  onChange={(e) => setPin(e.target.value)}
+                  onKeyDown={beiEnter(() => void verbinden(), !!pin.trim() && !busy)}
+                  autoComplete="off"
+                />
               </FormField>
             </div>
           </>

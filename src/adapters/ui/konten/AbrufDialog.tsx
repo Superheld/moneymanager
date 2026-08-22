@@ -15,6 +15,7 @@ import { bankAbrufen, bankzugaenge } from "../../dienste";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { Button, FormField } from "../bausteine";
+import { beiEnter } from "../bausteine/beiEnter";
 import { Modal } from "../bausteine/Modal";
 
 function heuteIso(): string {
@@ -144,7 +145,15 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
               </FormField>
             )}
             <FormField label={t("bankabruf.feldPin")} required hint={t("bankabruf.feldPinHinweis")}>
-              <input className="field" type="password" value={pin} onChange={(e) => setPin(e.target.value)} autoComplete="off" autoFocus />
+              <input
+                className="field"
+                type="password"
+                value={pin}
+                onChange={(e) => setPin(e.target.value)}
+                onKeyDown={beiEnter(() => void abrufen(), !!pin.trim() && !busy)}
+                autoComplete="off"
+                autoFocus
+              />
             </FormField>
             <FormField
               label={t("konten.abruf.feldZeitraum")}

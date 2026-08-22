@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TanHerausforderung } from "../../../application/fints/abrufPort";
 import { Button, FormField } from "../bausteine";
+import { beiEnter } from "../bausteine/beiEnter";
 import { Modal } from "../bausteine/Modal";
 
 /** Eine offene Rückfrage: was die Bank will, und der Weg, die Antwort zurückzugeben. */
@@ -42,19 +43,6 @@ export function TanDialog({ frage, onFertig }: { frage: TanFrage; onFertig: () =
     onFertig();
   }
 
-  /**
-   * Enter im TAN-Feld bestätigt.
-   *
-   * Eine TAN wird abgetippt oder aus einem Lesegerät übernommen, und dabei liegt die Hand
-   * auf der Tastatur — zur Maus zu greifen, um einen Knopf zu treffen, ist genau an dieser
-   * Stelle der unnötigste Weg. Leere Eingabe tut nichts: ein Abbruch geschieht über das
-   * Schliessen, nicht über ein leeres Enter, das wie ein Versehen aussieht.
-   */
-  function beiTaste(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== "Enter") return;
-    e.preventDefault();
-    if (tan.trim()) beantworten(tan);
-  }
 
   return (
     <Modal
@@ -79,7 +67,7 @@ export function TanDialog({ frage, onFertig }: { frage: TanFrage; onFertig: () =
             className="field"
             value={tan}
             onChange={(e) => setTan(e.target.value)}
-            onKeyDown={beiTaste}
+            onKeyDown={beiEnter(() => beantworten(tan), !!tan.trim())}
             autoFocus
           />
         </FormField>
