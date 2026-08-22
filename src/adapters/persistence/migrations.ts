@@ -835,4 +835,22 @@ export const MIGRATIONS: Migration[] = [
       `UPDATE zahlungskonto SET klasse = 'liquide'  WHERE klasse IS NULL`,
     ],
   },
+  {
+    version: 41, // Prüfmarker — „das hier sollte ich mir ansehen"
+    sql: [
+      // „Neu" ist keine Eigenschaft der Buchung, sondern eine Beziehung zwischen ihr und
+      // dem Nutzer: noch nicht angeschaut. Die Herkunft steht längst da (`umsatz.laufId`
+      // → `import_lauf`, mit Zeitpunkt und Quelle) und beantwortet die Frage nicht — sie
+      // sagt, woher die Zeile kam, nicht ob jemand sie gesehen hat.
+      //
+      // Ein Zeitstempel „zuletzt gesehen" in `einstellung` wäre billiger gewesen, kann
+      // aber nur ALLES auf einmal abräumen. Gebraucht wird beides einzeln: eine Zeile
+      // wegklicken, und eine andere von Hand zum Prüfen vormerken. Das geht nur an der
+      // Buchung.
+      //
+      // Kein DEFAULT 1: was schon im Bestand liegt, ist angesehen. Sonst trüge nach der
+      // Migration jede Zeile den Marker, und ein Merker, der überall steht, sagt nichts.
+      `ALTER TABLE ist_buchung ADD COLUMN zu_pruefen INTEGER NOT NULL DEFAULT 0`,
+    ],
+  },
 ];

@@ -30,6 +30,15 @@ export interface VerbuchenDeps {
    * durchgesehen habe", und ungeprüfte Zeilen sollen dort liegen bleiben.
    */
   readonly auchOhneKategorie?: boolean;
+  /**
+   * Die erzeugten Buchungen als „noch anzusehen" vormerken.
+   *
+   * Ein eigenes Flag neben `auchOhneKategorie`, obwohl es heute derselbe Aufrufer setzt:
+   * die beiden beantworten verschiedene Fragen. Das eine sagt, ob eine Zeile OHNE
+   * Kategorie gebucht werden darf, das andere, ob sie ungesehen im Saldo landet. Sie
+   * fallen nur zusammen, solange der Abruf der einzige Weg am Menschen vorbei ist.
+   */
+  readonly zumPruefenVormerken?: boolean;
 }
 
 export interface VerbuchenErgebnis {
@@ -166,10 +175,12 @@ export async function umsaetzeVerbuchen(
     const istAb: IstBuchung = {
       id: deps.id(), datum: ab.buchungstag, betrag: ab.betrag, kontoId: ab.zahlungskontoId,
       charakter: "Umschichtung", quelle: "import", transferId, gegenkontoId: zu.zahlungskontoId, rohHash: ab.rohHash,
+      zuPruefen: deps.zumPruefenVormerken || undefined,
     };
     const istZu: IstBuchung = {
       id: deps.id(), datum: zu.buchungstag, betrag: zu.betrag, kontoId: zu.zahlungskontoId,
       charakter: "Umschichtung", quelle: "import", transferId, gegenkontoId: ab.zahlungskontoId, rohHash: zu.rohHash,
+      zuPruefen: deps.zumPruefenVormerken || undefined,
     };
     await deps.ledgerRepo.speichern(istAb);
     await deps.ledgerRepo.speichern(istZu);
@@ -202,6 +213,7 @@ export async function umsaetzeVerbuchen(
       charakter: u.vorschlag?.charakter ?? (u.betrag < 0 ? "Aufwand" : "Ertrag"),
       quelle: "import",
       rohHash: u.rohHash,
+      zuPruefen: deps.zumPruefenVormerken || undefined,
     };
     await deps.ledgerRepo.speichern(ist);
     await deps.umsatzRepo.speichern(verbuchen(u, ist.id));

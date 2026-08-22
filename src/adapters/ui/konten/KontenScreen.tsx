@@ -22,6 +22,7 @@ import {
   alsBezahltMarkieren,
   bezahltZurueck,
   konten as kontenLaden,
+  pruefmarkerSetzen,
   umbuchungErfassen,
 } from "../../dienste";
 import type { ScreenId } from "../bausteine/AppShell";
@@ -599,6 +600,24 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                     <span title={r.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
                       {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
+                      {/* Der „ansehen"-Marker steht VOR den anderen Pillen: die übrigen
+                          sagen, was eine Zeile IST, dieser sagt, was noch zu tun ist.
+                          Klick nimmt ihn weg — dafür ist er ein Knopf und kein Etikett. */}
+                      {r.buchung?.zuPruefen && (
+                        <button
+                          type="button"
+                          aria-label={t("konten.pruefenWeg")}
+                          title={t("konten.pruefenWeg")}
+                          style={{ flex: "0 0 auto", display: "inline-flex", background: "none", border: 0, padding: 0, cursor: "pointer" }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await pruefmarkerSetzen(r.buchung!.id, false);
+                            await laden();
+                          }}
+                        >
+                          <Pill variant="ok">{t("konten.pillPruefen")}</Pill>
+                        </button>
+                      )}
                       {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
                       {/* Der Verdacht steht an BEIDEN Zeilen — es gibt kein Original.
                           Die Gründe hängen im title, entschieden wird im Detail. */}
