@@ -555,6 +555,7 @@ const de = {
       automatisch: "automatisch",
       CAMT: "nur CAMT",
       MT940: "nur MT940",
+      kannBankNicht: "kann diese Bank nicht",
       hinweis: {
         automatisch:
           "Beide Wege werden probiert. Bleibt der erste ohne Ergebnis, läuft der zweite — das ist der Normalfall und passt sich an, wenn die Bank etwas ändert.",
@@ -1925,6 +1926,7 @@ const en: typeof de = {
       automatisch: "automatic",
       CAMT: "CAMT only",
       MT940: "MT940 only",
+      kannBankNicht: "not offered by this bank",
       hinweis: {
         automatisch:
           "Both routes are tried. If the first returns nothing, the second runs — the normal case, and it adapts when the bank changes something.",
