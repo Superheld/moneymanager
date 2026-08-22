@@ -1286,3 +1286,74 @@ describe("Prüfmarker im Auszug", () => {
     });
   });
 });
+
+/**
+ * Der Umbuchungs-Dialog kennt zwei Wege: eine vorhandene Gegenbuchung VERBINDEN (S-1b)
+ * und ein fehlendes Gegenbein ERZEUGEN (S-1a). Nur der zweite legt etwas an, das die Bank
+ * nicht kennt — deshalb steht er auf einem abgerufenen Konto nicht zur Wahl.
+ */
+describe("Gegenbein erzeugen nur auf Konten ohne Bankverbindung", () => {
+  const heute = "2026-08-12";
+
+  /** Giro und Tagesgeld hängen an der Bank, Bargeld nicht. */
+  async function dreiKonten(bargeld: boolean) {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k-tg", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    if (bargeld) {
+      await sqliteZahlungskontoRepository.speichern({
+        id: "k-bar", bezeichnung: "Bargeld", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+      });
+    }
+    await sqliteBankzugangRepository.speichern({
+      id: "z1", bezeichnung: "Testbank", url: "https://example.invalid/fints",
+      blz: "99999901", benutzer: "nutzer",
+    });
+    for (const [schluessel, kontoId] of [["1234567|", "k1"], ["7654321|", "k-tg"]] as const) {
+      await sqliteKontozuordnungRepository.speichern({ zugangId: "z1", schluessel, zahlungskontoId: kontoId });
+    }
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -20000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Abhebung",
+    });
+  }
+
+  async function umbuchungsdialog(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+    // Exakt: „Umbuchen" in der Werkzeugleiste und „Zur Umbuchung machen" im Dialog
+    // treffen beide auf einen toleranten Ausdruck.
+    await nutzer.click(await screen.findByRole("button", { name: "Zur Umbuchung machen" }));
+  }
+
+  it("bietet nur das Bargeldkonto als Ziel an, nicht das zweite Bankkonto", async () => {
+    await dreiKonten(true);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await umbuchungsdialog(nutzer);
+
+    const ziel = await screen.findByRole("combobox", { name: "Gegenbein neu erzeugen auf" });
+    const namen = [...ziel.querySelectorAll("option")].map((o) => o.textContent);
+    expect(namen).toContain("Bargeld");
+    expect(namen).not.toContain("Tagesgeld");
+  });
+
+  /**
+   * Bleibt gar kein Ziel übrig, verschwindet der Weg ganz — ein Radio-Knopf über einer
+   * leeren Auswahlliste wäre eine Handlung, die nicht geht.
+   */
+  it("lässt den Erzeugen-Weg weg, wenn alle anderen Konten an der Bank hängen", async () => {
+    await dreiKonten(false);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await umbuchungsdialog(nutzer);
+
+    await waitFor(() => {
+      expect(document.body.textContent).toMatch(/nur verbunden/i);
+    });
+    expect(screen.queryByRole("combobox", { name: "Gegenbein neu erzeugen auf" })).not.toBeInTheDocument();
+  });
+});

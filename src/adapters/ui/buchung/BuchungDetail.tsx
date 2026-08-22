@@ -374,7 +374,15 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
    */
   const kontoIstOnline = !istNeu && onlineKonten.has(kontoId);
   const istUmschichtung = charakter === "Umschichtung";
-  const andereKonten = konten.filter((k) => k.id !== kontoId);
+  /**
+   * Konten, auf denen ein Gegenbein ERZEUGT werden darf.
+   *
+   * Nicht bloss „die anderen": auf einem abgerufenen Konto anzulegen hiesse, eine Buchung
+   * zu erfinden, die es bei der Bank nicht gibt. Zwei abgerufene Konten brauchen das auch
+   * gar nicht — beide Seiten meldet die Bank ohnehin, sie stehen als Gegenbuchung in der
+   * Liste darüber und werden VERBUNDEN statt erzeugt.
+   */
+  const andereKonten = konten.filter((k) => k.id !== kontoId && !onlineKonten.has(k.id));
 
   // ── Gegenbein-Suche im Entwurf ──────────────────────────────────────────────────────
   //
@@ -1099,14 +1107,18 @@ function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung: IstBuc
  * „Gegenbein neu erzeugen" (S-1a, Zielkonto wird nicht importiert). Der Nutzer soll nicht
  * vorher wissen müssen, welcher Fall vorliegt — die Liste beantwortet das.
  */
-function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzByIst, onClose, onSaved }: { buchung: IstBuchung; konten: Zahlungskonto[]; alleBuchungen: IstBuchung[]; kontoName: Map<string, string>; umsatzByIst: Map<string, Umsatz>; onClose: () => void; onSaved: () => void }) {
+function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen, kontoName, umsatzByIst, onClose, onSaved }: { buchung: IstBuchung; konten: Zahlungskonto[]; onlineKonten: ReadonlySet<string>; alleBuchungen: IstBuchung[]; kontoName: Map<string, string>; umsatzByIst: Map<string, Umsatz>; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const kandidaten = useMemo(() => paarungsKandidaten(alleBuchungen, buchung), [alleBuchungen, buchung]);
-  const andereKonten = konten.filter((k) => k.id !== buchung.kontoId);
-  // Vorauswahl: der beste Kandidat, sonst der Weg über ein neu erzeugtes Gegenbein.
-  const [wahl, setWahl] = useState<string>(kandidaten[0]?.id ?? "__neu");
+  // Erzeugt wird nur auf Konten ohne Bankverbindung — siehe `gegenbeinErzeugen`. Die
+  // Gegenbuchungen darüber sind davon nicht betroffen: die existieren schon.
+  const andereKonten = konten.filter((k) => k.id !== buchung.kontoId && !onlineKonten.has(k.id));
+  // Vorauswahl: der beste Kandidat, sonst der Weg über ein neu erzeugtes Gegenbein — den
+  // aber nur, wenn es überhaupt ein Konto gibt, auf dem erzeugt werden darf.
+  const [wahl, setWahl] = useState<string>(kandidaten[0]?.id ?? (andereKonten.length > 0 ? "__neu" : ""));
   const [neuKontoId, setNeuKontoId] = useState(andereKonten[0]?.id ?? "");
+  const nichtsZuTun = kandidaten.length === 0 && andereKonten.length === 0;
   const [fehler, setFehler] = useState<string | null>(null);
 
   /** Beschriftung einer Gegenbuchung: Empfänger aus dem Import, sonst Notiz. */
@@ -1135,7 +1147,13 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
       title={t("konten.zurUmbuchung.titel")}
       subtitle={t("konten.zurUmbuchung.untertitel")}
       onClose={onClose}
-      footer={<><Button variant="primary" onClick={speichern}>{t("konten.zurUmbuchung.bestaetigen")}</Button><button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
+      footer={<>
+        {/* Gibt es weder eine Gegenbuchung noch ein Konto, auf dem erzeugt werden darf,
+            hat der Knopf nichts zu bestätigen — dann führt nur der Weg zurück. */}
+        {!nichtsZuTun && <Button variant="primary" onClick={speichern}>{t("konten.zurUmbuchung.bestaetigen")}</Button>}
+        <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+        {fehler && <span className="err">{fehler}</span>}
+      </>}
     >
       {/* Die Buchung, um die es geht */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", marginBottom: "var(--sp-4)" }}>
@@ -1166,20 +1184,33 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
         ))
       )}
 
-      {/* Ausweg: kein Gegenbein vorhanden (S-1a) */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "var(--sp-4) 0 var(--sp-3)", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)" }}>
-        <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        {t("konten.zurUmbuchung.oder")}
-        <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-      </div>
-      <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-        <input type="radio" name="gegenbein" value="__neu" checked={wahl === "__neu"} onChange={() => setWahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
-        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
-        <select className="field" style={{ width: "auto" }} value={neuKontoId} onChange={(e) => { setNeuKontoId(e.target.value); setWahl("__neu"); }}>
-          {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-        </select>
-      </label>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
+      {/* Ausweg: kein Gegenbein vorhanden (S-1a).
+
+          Fällt ganz weg, wenn alle übrigen Konten an einer Bank hängen — dort darf nichts
+          erzeugt werden, und ein Radio-Knopf über einer leeren Auswahlliste wäre eine
+          Handlung, die nicht geht. Statt dessen steht dort, warum: die Gegenseite meldet
+          die Bank ohnehin, sie muss nur verbunden werden. */}
+      {andereKonten.length > 0 ? (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "var(--sp-4) 0 var(--sp-3)", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)" }}>
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+            {t("konten.zurUmbuchung.oder")}
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+            <input type="radio" name="gegenbein" value="__neu" checked={wahl === "__neu"} onChange={() => setWahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
+            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
+            <select className="field" aria-label={t("konten.zurUmbuchung.neu")} style={{ width: "auto" }} value={neuKontoId} onChange={(e) => { setNeuKontoId(e.target.value); setWahl("__neu"); }}>
+              {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
+            </select>
+          </label>
+          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
+        </>
+      ) : (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-4)" }}>
+          {t("konten.zurUmbuchung.nurVerbinden")}
+        </div>
+      )}
 
       {buchung.kategorieId && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)" }}>
@@ -1414,6 +1445,7 @@ export function BuchungDetail(props: {
   if (umbuchenAus) {
     return (
       <ZurUmbuchungModal
+        onlineKonten={onlineKonten}
         buchung={umbuchenAus}
         konten={konten}
         alleBuchungen={alle}

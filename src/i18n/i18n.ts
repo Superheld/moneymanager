@@ -64,6 +64,8 @@ const de = {
     },
     umbuchung: {
       schonGepaart: "Diese Buchung gehört bereits zu einer Umbuchung.",
+      zielOnline:
+        "Auf einem Konto mit Bankverbindung wird keine Gegenbuchung angelegt — was dort steht, meldet die Bank. Die passende Zeile ist schon da und muss nur verbunden werden.",
       selbeBuchung: "Eine Buchung kann nicht mit sich selbst gepaart werden.",
       betragGegen: "Die beiden Beträge müssen sich zu null ergänzen.",
     },
@@ -805,6 +807,8 @@ const de = {
       keineKandidaten: "Keine passende Gegenbuchung gefunden (gleicher Betrag mit umgekehrtem Vorzeichen, anderes Konto, höchstens {{tage}} Tage entfernt).",
       oder: "oder",
       neu: "Gegenbein neu erzeugen auf",
+      nurVerbinden:
+        "Alle übrigen Konten hängen an einer Bank. Dort wird keine Gegenbuchung angelegt: die Bank meldet beide Seiten ohnehin, sie müssen nur verbunden werden. Steht die passende Zeile noch nicht oben, kommt sie mit dem nächsten Abruf.",
       neuHinweis: "Für Konten, die nicht importiert werden — typisch Bargeld.",
       bestaetigen: "Umbuchung anlegen",
       kategorieHinweis: "Die Kategorie entfällt: verschobenes Geld zählt nicht ins Budget.",
@@ -1378,6 +1382,8 @@ const en: typeof de = {
     },
     umbuchung: {
       schonGepaart: "This transaction is already part of a transfer.",
+      zielOnline:
+        "No counter-entry is created on an account with a bank connection — what stands there is reported by the bank. The matching row is already present and only needs to be linked.",
       selbeBuchung: "A transaction cannot be paired with itself.",
       betragGegen: "The two amounts must add up to zero.",
     },
@@ -2113,6 +2119,8 @@ const en: typeof de = {
       keineKandidaten: "No matching counter entry found (same amount with opposite sign, different account, at most {{tage}} days apart).",
       oder: "or",
       neu: "Create the counter entry on",
+      nurVerbinden:
+        "All other accounts are connected to a bank. No counter-entry is created there: the bank reports both sides anyway, they only need to be linked. If the matching row is not listed above yet, it will arrive with the next retrieval.",
       neuHinweis: "For accounts that are never imported — typically cash.",
       bestaetigen: "Create transfer",
       kategorieHinweis: "The category is dropped: moved money does not count against a budget.",
