@@ -16,7 +16,7 @@ import { useTranslation } from "react-i18next";
 import type { Kontoherkunft } from "../../../application";
 import { zurueckholen, type Umsatz } from "../../../application/import";
 import { herkunft as herkunftLaden, umsatzSpeichern } from "../../dienste";
-import { Pill } from "../bausteine";
+import { Card, Pill } from "../bausteine";
 import { DataTable } from "../bausteine/DataTable";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -101,11 +101,11 @@ export function HerkunftBereich() {
 
       {aktiv && (
         <>
-          {/* Die Läufe: wann wurde für dieses Konto etwas eingelesen, und was kam an. */}
-          <div>
-            <div style={{ color: "var(--ink-3)", fontSize: "var(--fs-2xs)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", marginBottom: "var(--sp-2)" }}>
-              {t("konten.herkunft.laeufeTitel")}
-            </div>
+          {/* Die Läufe: wann wurde für dieses Konto etwas eingelesen, und was kam an.
+              In einer Karte, wie jeder Inhalt in dieser App — sie trägt die Fläche
+              (`background: var(--surface)`), ohne sie steht der Text auf dem nackten
+              Seitenhintergrund. */}
+          <Card title={t("konten.herkunft.laeufeTitel")}>
             {mitWirkung.length === 0 && ohneWirkung.length === 0 ? (
               <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.herkunft.keineLaeufe")}</div>
             ) : (
@@ -138,11 +138,11 @@ export function HerkunftBereich() {
                 )}
               </div>
             )}
-          </div>
+          </Card>
 
           {/* Die Rohzeilen. Der Filter ist der Punkt: weggelegte Zeilen waren bisher
               nirgends je Konto zu sehen. */}
-          <div>
+          <Card>
             <div style={{ display: "flex", gap: "var(--sp-2)", marginBottom: "var(--sp-2)", flexWrap: "wrap" }}>
               {(["alle", "verbucht", "weggelegt", "offen"] as const).map((f) => (
                 <button
@@ -213,7 +213,7 @@ export function HerkunftBereich() {
                 rows={[...gefiltert]}
               />
             )}
-          </div>
+          </Card>
         </>
       )}
     </div>

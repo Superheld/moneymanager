@@ -32,6 +32,18 @@ für die ganze App, nicht eine je Screen.
 Zeilenaktionen sind Icons über `bausteine/IconButton.tsx` — ihr Text wandert in
 `title`/`aria-label`, statt zu verschwinden.
 
+## Die Fläche kommt von `Card`
+
+**Inhalt steht in einer `Card`, nicht auf dem nackten Seitenhintergrund.** Sie trägt
+`background: var(--surface)`, den Haarlinien-Rahmen und die Innenabstände; `.screen`
+darunter ist nur ein Layout-Container ohne eigene Fläche. Ein Bereich, der seine Teile in
+blanke `<div>`s setzt, sieht deshalb auf den ersten Blick „hintergrundlos" aus — und
+danach fragt niemand nach dem Grund, sondern nach dem Fehler.
+
+Selbst gezogene Rahmen (`border: 1px solid var(--line)` plus Radius) sehen ähnlich aus und
+sind trotzdem falsch: die Fläche fehlt weiterhin, und beim nächsten Token-Wechsel laufen
+sie gegen die Karten auseinander.
+
 ## Laden
 
 **Verwandte Repos in EINEM Effekt per `Promise.all` laden und zusammen setzen.** Gestaffelte
