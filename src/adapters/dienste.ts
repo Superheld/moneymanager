@@ -81,6 +81,7 @@ import {
 import { umbuchungLoeschen as umbuchungLoeschenUseCase } from "../application/buchung/umbuchungErfassen";
 import { bankzeileVerwerfen as bankzeileVerwerfenUseCase } from "../application/import/bankzeileVerwerfen";
 import { abgleichLaden as abgleichLadenUseCase } from "../application/konten/abgleichsicht";
+import { herkunftLaden as herkunftLadenUseCase } from "../application/konten/herkunftsicht";
 import { pruefmarkerSetzen as pruefmarkerSetzenUseCase } from "../application/buchung/pruefmarker";
 import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchung/buchungSplitten";
 import { paarungLoesen as paarungLoesenUseCase } from "../application/buchung/umbuchungAusBuchung";
@@ -696,6 +697,16 @@ export function abgleich() {
     ledger: sqliteLedgerRepository,
     ankerRepo: sqliteKontostandsankerRepository,
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
+  });
+}
+
+/** Woher die Zeilen eines Kontos kommen — Läufe und Rohdaten, auch die weggelegten. */
+export function herkunft() {
+  return herkunftLadenUseCase({
+    kontoRepo: sqliteZahlungskontoRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    laufRepo: sqliteImportLaufRepository,
+    ledger: sqliteLedgerRepository,
   });
 }
 
