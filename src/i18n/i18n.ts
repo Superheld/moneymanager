@@ -862,6 +862,22 @@ const de = {
       verwerfenFolge:
         "Verwerfen: zu dieser Zeile gibt es kein Gegenstück im Bestand. Der Kontostand weicht danach um {{betrag}} von dem ab, was die Bank meldet.",
     },
+    vergleich: {
+      titel: "Zwei Zeilen vergleichen",
+      untertitel: "Nebeneinander — markiert ist, was sich unterscheidet",
+      oeffnen: "Nebeneinander vergleichen",
+      valuta: "Wertstellung",
+      notiz: "Notiz",
+      umsatzart: "Umsatzart",
+      glaeubigerId: "Gläubiger-ID",
+      mandatsreferenz: "Mandatsreferenz",
+      e2eReferenz: "End-to-End-Referenz",
+      bankreferenz: "Referenz der Bank",
+      dieseVerwerfen: "Diese Zeile verwerfen",
+      dieseLoeschen: "Diese Zeile löschen",
+      folge:
+        "Verwerfen gilt für Zeilen der Bank: die Zeile bleibt als Entscheidung gespeichert und kommt beim nächsten Abruf nicht zurück. Löschen gilt für eingelesene Dateizeilen — die stehen danach wieder in der Import-Inbox.",
+    },
     dublette: {
       oeffnen: "Gegenstück öffnen",
       hinweis:
@@ -2148,6 +2164,22 @@ const en: typeof de = {
       vertragOffen: "Left blank, the automatic detection decides.",
       verwerfenFolge:
         "Discard: there is no counterpart for this row. The balance will then differ by {{betrag}} from what the bank reports.",
+    },
+    vergleich: {
+      titel: "Compare two entries",
+      untertitel: "Side by side — what differs is highlighted",
+      oeffnen: "Compare side by side",
+      valuta: "Value date",
+      notiz: "Note",
+      umsatzart: "Transaction type",
+      glaeubigerId: "Creditor ID",
+      mandatsreferenz: "Mandate reference",
+      e2eReferenz: "End-to-end reference",
+      bankreferenz: "Bank reference",
+      dieseVerwerfen: "Discard this entry",
+      dieseLoeschen: "Delete this entry",
+      folge:
+        "Discarding applies to rows from the bank: the row stays on record as a decision and will not come back on the next retrieval. Deleting applies to imported file rows — those reappear in the import inbox.",
     },
     dublette: {
       oeffnen: "Open the counterpart",
