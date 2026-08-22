@@ -1,28 +1,28 @@
 /** @vitest-environment jsdom */
-// Die Auswahlpille trägt eine Entscheidung IN einer Tabellenzeile. Geprüft wird, was dabei
+// Die Zeilenauswahl trägt eine Entscheidung IN einer Tabellenzeile. Geprüft wird, was dabei
 // leicht verlorengeht: der Name (in einer Tabelle steht er in der Kopfzeile, nicht am
 // Feld) und die gesperrte Möglichkeit, die sichtbar bleiben muss.
 
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Auswahlpille } from "./Auswahlpille";
+import { Zeilenauswahl } from "./Zeilenauswahl";
 
 const MOEGLICH = [
   { wert: "a" as const, text: "Erstes" },
   { wert: "b" as const, text: "Zweites" },
 ];
 
-describe("Auswahlpille", () => {
+describe("Zeilenauswahl", () => {
   it("trägt ihren Namen, auch wenn keine Beschriftung danebensteht", () => {
-    render(<Auswahlpille label="Format" wert="a" moeglichkeiten={MOEGLICH} onChange={() => {}} />);
+    render(<Zeilenauswahl label="Format" wert="a" moeglichkeiten={MOEGLICH} onChange={() => {}} />);
     expect(screen.getByRole("combobox", { name: "Format" })).toBeInTheDocument();
   });
 
   it("meldet die neue Wahl", async () => {
     const gewaehlt = vi.fn();
     const nutzer = userEvent.setup();
-    render(<Auswahlpille label="Format" wert="a" moeglichkeiten={MOEGLICH} onChange={gewaehlt} />);
+    render(<Zeilenauswahl label="Format" wert="a" moeglichkeiten={MOEGLICH} onChange={gewaehlt} />);
 
     await nutzer.selectOptions(screen.getByRole("combobox", { name: "Format" }), "b");
     expect(gewaehlt).toHaveBeenCalledWith("b");
@@ -35,7 +35,7 @@ describe("Auswahlpille", () => {
    */
   it("zeigt Gesperrtes, statt es wegzulassen", () => {
     render(
-      <Auswahlpille
+      <Zeilenauswahl
         label="Format"
         wert="a"
         moeglichkeiten={[...MOEGLICH, { wert: "c" as const, text: "Drittes", gesperrt: true }]}
