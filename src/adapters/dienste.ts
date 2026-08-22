@@ -741,8 +741,17 @@ export function buchungenPaaren(a: IstBuchung, b: IstBuchung) {
   return buchungenPaarenUseCase(sqliteLedgerRepository, a, b);
 }
 
-export function gegenbeinErzeugen(buchung: IstBuchung, kontoId: string) {
-  return gegenbeinErzeugenUseCase(sqliteLedgerRepository, buchung, kontoId);
+export async function gegenbeinErzeugen(buchung: IstBuchung, kontoId: string) {
+  // Die Online-Konten werden hier frisch geholt und nicht vom Aufrufer mitgegeben: der
+  // Dialog kann seit Minuten offen sein, und eine inzwischen angelegte Bankverbindung
+  // soll sofort greifen.
+  const zuordnungen = await sqliteKontozuordnungRepository.alle();
+  return gegenbeinErzeugenUseCase(
+    sqliteLedgerRepository,
+    buchung,
+    kontoId,
+    new Set(zuordnungen.map((z) => z.zahlungskontoId)),
+  );
 }
 
 export function umbuchungsBeinBearbeiten(buchung: IstBuchung, eingabe: Parameters<typeof umbuchungsBeinBearbeitenUseCase>[2]) {

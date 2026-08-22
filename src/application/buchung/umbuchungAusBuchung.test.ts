@@ -77,12 +77,15 @@ describe("paarungsKandidaten", () => {
   });
 });
 
+/** Kein Konto haengt an einer Bankverbindung — der Normalfall dieser Tests. */
+const OHNE_BANK: ReadonlySet<string> = new Set();
+
 describe("gegenbeinErzeugen (S-1a)", () => {
   it("erzeugt das fehlende Bein mit gespiegeltem Betrag und verknüpft beide", async () => {
     const abhebung = buchung({ id: "a", kontoId: "giro", betrag: euroZuCent(-200) });
     const ledger = memLedger([abhebung]);
 
-    const { bestehend, erzeugt } = await gegenbeinErzeugen(ledger, abhebung, "bar");
+    const { bestehend, erzeugt } = await gegenbeinErzeugen(ledger, abhebung, "bar", OHNE_BANK);
 
     expect(erzeugt.betrag).toBe(euroZuCent(200));
     expect(erzeugt.kontoId).toBe("bar");
@@ -99,7 +102,7 @@ describe("gegenbeinErzeugen (S-1a)", () => {
     const einzahlung = buchung({ id: "a", kontoId: "giro", betrag: euroZuCent(200), charakter: "Ertrag" });
     const ledger = memLedger([einzahlung]);
 
-    const { erzeugt } = await gegenbeinErzeugen(ledger, einzahlung, "bar");
+    const { erzeugt } = await gegenbeinErzeugen(ledger, einzahlung, "bar", OHNE_BANK);
 
     expect(erzeugt.betrag).toBe(euroZuCent(-200));
     expect(erzeugt.kontoId).toBe("bar");
@@ -113,7 +116,7 @@ describe("gegenbeinErzeugen (S-1a)", () => {
     const ledger = memLedger([abhebung]);
     const konten = [konto("giro", 1000), konto("bar", 0)];
 
-    await gegenbeinErzeugen(ledger, abhebung, "bar");
+    await gegenbeinErzeugen(ledger, abhebung, "bar", OHNE_BANK);
     const beine = await ledger.alle();
 
     expect(liquideMittelReal(konten, beine)).toBe(liquideMittelReal(konten, []));
@@ -129,7 +132,7 @@ describe("gegenbeinErzeugen (S-1a)", () => {
     });
     const ledger = memLedger([mitKategorie]);
 
-    const { bestehend } = await gegenbeinErzeugen(ledger, mitKategorie, "bar");
+    const { bestehend } = await gegenbeinErzeugen(ledger, mitKategorie, "bar", OHNE_BANK);
 
     expect(bestehend.kategorieId).toBeUndefined();
     expect(bestehend.rohHash).toBe("h1");
@@ -141,9 +144,9 @@ describe("gegenbeinErzeugen (S-1a)", () => {
   it("weist gleiches Konto, fehlendes Konto und bereits gepaarte Buchungen ab", async () => {
     const b = buchung({ id: "a", kontoId: "giro", betrag: euroZuCent(-200) });
     const ledger = memLedger([b]);
-    await expect(gegenbeinErzeugen(ledger, b, "giro")).rejects.toThrow("konten.verschieden");
-    await expect(gegenbeinErzeugen(ledger, b, "")).rejects.toThrow("konto.waehlen");
-    await expect(gegenbeinErzeugen(ledger, { ...b, transferId: "t1" }, "bar")).rejects.toThrow(
+    await expect(gegenbeinErzeugen(ledger, b, "giro", OHNE_BANK)).rejects.toThrow("konten.verschieden");
+    await expect(gegenbeinErzeugen(ledger, b, "", OHNE_BANK)).rejects.toThrow("konto.waehlen");
+    await expect(gegenbeinErzeugen(ledger, { ...b, transferId: "t1" }, "bar", OHNE_BANK)).rejects.toThrow(
       "umbuchung.schonGepaart",
     );
   });
@@ -281,5 +284,43 @@ describe("paarungLoesen", () => {
     await paarungLoesen(ledger, paar.ab.transferId!);
 
     expect(ledger.daten.find((b) => b.id === "fremd")!.transferId).toBe("t9");
+  });
+});
+
+/**
+ * Erzeugen heisst: eine Buchung anlegen, die es bei der Bank nicht gibt. Auf einem
+ * abgerufenen Konto wäre das eine Behauptung gegen den Kontoauszug — sie taucht beim
+ * nächsten Abgleich als Abweichung auf, und dann sieht sie aus wie eine FEHLENDE Buchung.
+ *
+ * Für zwei abgerufene Konten braucht es das auch gar nicht: beide Seiten meldet die Bank,
+ * sie müssen nur verbunden werden. Genau das prüft der zweite Test — die Sperre gilt fürs
+ * Erzeugen, nicht fürs Paaren.
+ */
+describe("Gegenbein und online geführte Konten", () => {
+  const abhebung = buchung({ id: "a", kontoId: "giro", betrag: euroZuCent(-200) });
+
+  it("legt kein Gegenbein auf einem Konto mit Bankverbindung an", async () => {
+    const ledger = memLedger([abhebung]);
+    await expect(
+      gegenbeinErzeugen(ledger, abhebung, "bar", new Set(["bar"])),
+    ).rejects.toThrow("umbuchung.zielOnline");
+    // Und es bleibt wirklich bei einer Zeile — nicht halb angelegt.
+    expect(ledger.daten).toHaveLength(1);
+  });
+
+  it("erlaubt es weiterhin auf einem Konto ohne Bankverbindung", async () => {
+    const ledger = memLedger([abhebung]);
+    const { erzeugt } = await gegenbeinErzeugen(ledger, abhebung, "bar", new Set(["giro"]));
+    expect(erzeugt.kontoId).toBe("bar");
+    expect(ledger.daten).toHaveLength(2);
+  });
+
+  /** Die Sperre gilt fürs ERZEUGEN, nicht fürs Paaren — beide Zeilen existieren schon. */
+  it("paart zwei bestehende Buchungen auch dann, wenn beide Konten online sind", async () => {
+    const gegen = buchung({ id: "b2", kontoId: "bar", betrag: euroZuCent(200) });
+    const ledger = memLedger([abhebung, gegen]);
+    const paar = await buchungenPaaren(ledger, abhebung, gegen);
+    expect(paar.ab.transferId).toBeDefined();
+    expect(paar.ab.transferId).toBe(paar.zu.transferId);
   });
 });
