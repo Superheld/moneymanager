@@ -617,6 +617,23 @@ const de = {
         "Dieses Konto wird von Hand geführt. Verbinden lässt es sich über `+ Konto` → online: " +
         "dort das gemeldete Bankkonto auf `mit vorhandenem verknüpfen` stellen.",
     },
+    abgleichBereich: {
+      register: "Abgleich",
+      untertitel: "Stimmt der Stand? Was gemeldet wurde, gegen das, was wir rechnen",
+      hinweg: "prüfen",
+      ohneMeldung: "nie gemeldet",
+      ohneBank: "ohne Bank",
+      stichtag: "Stichtag",
+      gemeldet: "gemeldet",
+      gerechnet: "gerechnet",
+      differenz: "Differenz",
+      vonBank: "von der Bank",
+      gezaehlt: "gezählt",
+      keineStichtage:
+        "Für dieses Konto hat noch nie jemand einen Stand gemeldet. Ohne eine zweite, unabhängige Aussage lässt sich nicht prüfen, ob die Rechnung stimmt — sie geht immer auf.",
+      fensterTitel: "Hier läuft es auseinander",
+      zusammensetzung: "Anfangsbestand {{anfang}} · Bewegungen {{bewegungen}}",
+    },
     abgleich: {
       stimmt: "stimmt mit der Bank",
       differenz: "Differenz {{betrag}}",
@@ -1932,6 +1949,23 @@ const en: typeof de = {
       hinweisOffline:
         "This account is kept by hand. To connect it, use “+ account” → online and set the reported " +
         "bank account to “link to existing”.",
+    },
+    abgleichBereich: {
+      register: "Reconciliation",
+      untertitel: "Does the balance match? What was reported, against what we calculate",
+      hinweg: "check",
+      ohneMeldung: "never reported",
+      ohneBank: "no bank",
+      stichtag: "As of",
+      gemeldet: "reported",
+      gerechnet: "calculated",
+      differenz: "Difference",
+      vonBank: "from the bank",
+      gezaehlt: "counted",
+      keineStichtage:
+        "Nobody has ever reported a balance for this account. Without a second, independent statement there is no way to check the calculation — it always adds up.",
+      fensterTitel: "This is where it diverges",
+      zusammensetzung: "Opening balance {{anfang}} · movements {{bewegungen}}",
     },
     abgleich: {
       stimmt: "matches the bank",

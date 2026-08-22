@@ -80,6 +80,7 @@ import {
 } from "../application/buchung/buchungErfassen";
 import { umbuchungLoeschen as umbuchungLoeschenUseCase } from "../application/buchung/umbuchungErfassen";
 import { bankzeileVerwerfen as bankzeileVerwerfenUseCase } from "../application/import/bankzeileVerwerfen";
+import { abgleichLaden as abgleichLadenUseCase } from "../application/konten/abgleichsicht";
 import { pruefmarkerSetzen as pruefmarkerSetzenUseCase } from "../application/buchung/pruefmarker";
 import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchung/buchungSplitten";
 import { paarungLoesen as paarungLoesenUseCase } from "../application/buchung/umbuchungAusBuchung";
@@ -682,6 +683,22 @@ export function buchungenLoeschen(
 // --- Buchungsdialog --------------------------------------------------------
 
 /** Alles, was der Dialog LESEND braucht — Herkunft, Gegenbein, Vertrag, Auswahl. */
+/**
+ * Der Kontoabgleich — unsere Rechnung gegen die Meldungen von Bank und Kassensturz.
+ *
+ * Eigener Dienst statt eines Ausschnitts aus `konten()`: die Kontensicht lädt Umsätze,
+ * Regeln, Kategorien und Dublettenurteile mit, weil ein Register das alles braucht. Der
+ * Abgleich braucht davon nichts.
+ */
+export function abgleich() {
+  return abgleichLadenUseCase({
+    kontoRepo: sqliteZahlungskontoRepository,
+    ledger: sqliteLedgerRepository,
+    ankerRepo: sqliteKontostandsankerRepository,
+    kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
+  });
+}
+
 export function buchungsdetail(): Promise<Buchungsdetaildaten> {
   return buchungsdetailLaden({
     kontoRepo: sqliteZahlungskontoRepository,

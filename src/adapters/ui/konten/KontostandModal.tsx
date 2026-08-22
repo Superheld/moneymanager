@@ -11,7 +11,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Kontozeile } from "../../../application";
+import type { Cent, Zahlungskonto } from "../../../application";
 import { anfangsbestandAbgleichen, kontostandFesthalten } from "../../dienste";
 import { Button, FormField } from "../bausteine";
 import { Modal } from "../bausteine/Modal";
@@ -101,12 +101,26 @@ export function KassensturzModal({
 }
 
 /** Der einmalige Abgleich des Anfangsbestands auf den jüngsten Anker. */
+/**
+ * Nimmt die drei Angaben, die es wirklich braucht — nicht eine ganze `Kontozeile`.
+ *
+ * Der Abgleich wird inzwischen von zwei Seiten aufgerufen, und die zweite (die
+ * Abgleichsansicht in der Verwaltung) lädt bewusst eine schlankere Sicht: sie braucht
+ * weder Umsätze noch Regeln noch Dublettenurteile. Ein Modal, das die ganze Registerzeile
+ * verlangt, zwingt sie, die schwere Sicht mitzuladen — für drei Felder.
+ */
 export function AbgleichModal({
-  zeile,
+  konto,
+  vorschlag,
+  offeneFenster,
   onClose,
   onFertig,
 }: {
-  zeile: Kontozeile;
+  konto: Zahlungskonto;
+  /** Der Anfangsbestand, der die Rechnung am jüngsten Anker glattzieht. */
+  vorschlag: Cent;
+  /** Wie viele Zeiträume nicht aufgehen — die Warnung hängt daran. */
+  offeneFenster: number;
   onClose: () => void;
   onFertig: () => void | Promise<void>;
 }) {
@@ -114,13 +128,13 @@ export function AbgleichModal({
   const geld = useGeld();
   const [fehler, setFehler] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const neu = zeile.anfangsbestandVorschlag ?? zeile.konto.saldo;
+  const neu = vorschlag;
 
   async function anwenden() {
     setFehler(null);
     setBusy(true);
     try {
-      await anfangsbestandAbgleichen(zeile.konto.id);
+      await anfangsbestandAbgleichen(konto.id);
       await onFertig();
       onClose();
     } catch (e) {
@@ -133,7 +147,7 @@ export function AbgleichModal({
   return (
     <Modal
       title={t("konten.anker.abgleichTitel")}
-      subtitle={zeile.konto.bezeichnung}
+      subtitle={konto.bezeichnung}
       onClose={onClose}
       footer={
         <>
@@ -151,7 +165,7 @@ export function AbgleichModal({
         <tbody>
           <tr>
             <td style={{ padding: "4px 0", color: "var(--ink-3)" }}>{t("konten.anker.alt")}</td>
-            <td className="num" style={{ padding: "4px 0", textAlign: "right" }}>{geld.formatMitSymbol(zeile.konto.saldo)}</td>
+            <td className="num" style={{ padding: "4px 0", textAlign: "right" }}>{geld.formatMitSymbol(konto.saldo)}</td>
           </tr>
           <tr>
             <td style={{ padding: "4px 0", color: "var(--ink-3)" }}>{t("konten.anker.neu")}</td>
@@ -160,7 +174,7 @@ export function AbgleichModal({
           <tr>
             <td style={{ padding: "4px 0", color: "var(--ink-3)" }}>{t("konten.anker.verschoben")}</td>
             <td className="num" style={{ padding: "4px 0", textAlign: "right" }}>
-              {geld.formatMitSymbol(neu - zeile.konto.saldo, { mitVorzeichen: true })}
+              {geld.formatMitSymbol(neu - konto.saldo, { mitVorzeichen: true })}
             </td>
           </tr>
         </tbody>
@@ -168,9 +182,9 @@ export function AbgleichModal({
       <p className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 0 }}>
         {t("konten.anker.abgleichHinweis")}
       </p>
-      {zeile.luecken.length > 0 && (
+      {offeneFenster > 0 && (
         <p style={{ fontSize: "var(--fs-xs)", color: "var(--warn-deep)", marginBottom: 0 }}>
-          {t("konten.anker.abgleichWarnung", { n: zeile.luecken.length })}
+          {t("konten.anker.abgleichWarnung", { n: offeneFenster })}
         </p>
       )}
     </Modal>
