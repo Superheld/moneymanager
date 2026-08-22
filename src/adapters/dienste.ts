@@ -79,6 +79,7 @@ import {
   type BuchungEingabe,
 } from "../application/buchung/buchungErfassen";
 import { umbuchungLoeschen as umbuchungLoeschenUseCase } from "../application/buchung/umbuchungErfassen";
+import { bankzeileVerwerfen as bankzeileVerwerfenUseCase } from "../application/import/bankzeileVerwerfen";
 import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchung/buchungSplitten";
 import { paarungLoesen as paarungLoesenUseCase } from "../application/buchung/umbuchungAusBuchung";
 import {
@@ -708,6 +709,17 @@ export function buchungLoeschen(id: string) {
 
 export function umbuchungLoeschen(transferId: string) {
   return umbuchungLoeschenUseCase(sqliteLedgerRepository, transferId);
+}
+
+/**
+ * Verwirft eine Bankzeile: Buchung raus, Umsatz auf „verworfen" — der nächste Abruf holt
+ * sie damit nicht zurück. Der Gegenweg zum Löschen einer Datei-Zeile.
+ */
+export function bankzeileVerwerfen(istbuchungId: string) {
+  return bankzeileVerwerfenUseCase(
+    { ledger: sqliteLedgerRepository, umsatzRepo: sqliteUmsatzRepository },
+    istbuchungId,
+  );
 }
 
 export function buchungSplitten(buchung: IstBuchung, teile: Parameters<typeof buchungSplittenUseCase>[2]) {
