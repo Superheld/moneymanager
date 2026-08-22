@@ -337,6 +337,14 @@ export async function abrufAusfuehren(
           zeitpunkt: new Date().toISOString(),
           rohUmsaetze: abruf.ergebnis.umsaetze,
           konten: [{ quelleKey: quelleKeyFuer(bankkonto.iban), kontoId: zahlungskonto.id }],
+          // Ein Abruf gilt genau EINEM Konto eines Zugangs, und er weiss, welches Format
+          // getragen hat. Bisher stand das nur im `dateiname` als Fliesstext — lesbar,
+          // aber nicht auswertbar, und bei jeder Umbenennung eine Ratepartie.
+          herkunft: {
+            zugangId: zugang.id,
+            zahlungskontoId: zahlungskonto.id,
+            format: abruf.format,
+          },
         },
         {
           kontoRepo: deps.kontoRepo,
