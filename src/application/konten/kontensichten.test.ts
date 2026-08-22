@@ -138,3 +138,48 @@ describe("Dublettenmarkierung im Ledger", () => {
     }
   });
 });
+
+/**
+ * Die Beschriftung einer Registerzeile fällt über mehrere Stufen zurück. Sie ist keine
+ * Kosmetik: eine Zeile ohne jede Beschriftung sieht im Register aus wie ein Datenfehler,
+ * obwohl die Angabe da ist — nur in einem anderen Feld.
+ */
+describe("Bezeichnung der Registerzeile", () => {
+  function ersteZeile(b: IstBuchung, u: Umsatz) {
+    return kontenLaden(deps([b], [u])).then((sicht) =>
+      registerSicht(sicht, KONTO, "2026-08-20", 30).gebucht[0],
+    );
+  }
+
+  it("nimmt den Verwendungszweck, wenn die Bank keinen Empfänger mitschickt", async () => {
+    const zeile = await ersteZeile(
+      buchung({ id: "b1" }),
+      umsatz({ gegenpartei: "", verwendungszweck: "Kartenzahlung Beleg 4711" }),
+    );
+    expect(zeile.bezeichnung).toBe("Kartenzahlung Beleg 4711");
+  });
+
+  it("lässt dem Empfänger den Vortritt, solange es einen gibt", async () => {
+    const zeile = await ersteZeile(
+      buchung({ id: "b1" }),
+      umsatz({ gegenpartei: "Kesselmann", verwendungszweck: "Rechnung 4711" }),
+    );
+    expect(zeile.bezeichnung).toBe("Kesselmann");
+  });
+
+  it("lässt die eigene Bezeichnung gegen beides gewinnen", async () => {
+    const zeile = await ersteZeile(
+      buchung({ id: "b1", notiz: "Talmberg" }),
+      umsatz({ gegenpartei: "Kesselmann", verwendungszweck: "Rechnung 4711" }),
+    );
+    expect(zeile.bezeichnung).toBe("Talmberg");
+  });
+
+  it("bleibt leer, wenn die Quelle gar nichts geliefert hat", async () => {
+    const zeile = await ersteZeile(
+      buchung({ id: "b1" }),
+      umsatz({ gegenpartei: "", verwendungszweck: "" }),
+    );
+    expect(zeile.bezeichnung).toBe("");
+  });
+});

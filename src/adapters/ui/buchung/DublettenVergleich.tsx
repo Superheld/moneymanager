@@ -75,7 +75,7 @@ export function DublettenVergleich({
       { schluessel: "valuta", label: t("konten.vergleich.valuta"), wert: (s) => s.umsatz?.valuta ?? "" },
       { schluessel: "empfaenger", label: t("konten.detail.empfaenger"), wert: (s) => s.umsatz?.gegenpartei ?? "" },
       { schluessel: "zweck", label: t("konten.detail.zweck"), wert: (s) => s.umsatz?.verwendungszweck ?? "", lang: true },
-      { schluessel: "notiz", label: t("konten.vergleich.notiz"), wert: (s) => s.buchung.notiz ?? "", lang: true },
+      { schluessel: "notiz", label: t("konten.feldBezeichnung"), wert: (s) => s.buchung.notiz ?? "", lang: true },
       { schluessel: "kategorie", label: t("konten.spalteKategorie"), wert: (s) => s.kategorieName },
       { schluessel: "konto", label: t("konten.detail.konto"), wert: (s) => s.kontoName },
       {

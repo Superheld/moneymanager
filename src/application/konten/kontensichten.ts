@@ -271,10 +271,22 @@ export function registerSicht(
       return {
         zeile,
         buchung,
+        // Die Kette der Rückfallebenen, von der eigenen Angabe zur fremden:
+        //
+        //   eigene Bezeichnung → Empfänger aus dem Import → VERWENDUNGSZWECK → Füllwort
+        //
+        // Der Verwendungszweck steht in der Kette, weil ein Teil der Bankzeilen gar keinen
+        // Empfänger mitbringt: MT940 füllt das Feld je nach Institut und Geschäftsvorfall
+        // nicht, und der ganze Inhalt steckt dann im Zweck-Freitext. Ohne diese Stufe
+        // stünde die Zeile im Register ohne jede Beschriftung da — sichtbar leer, obwohl
+        // die Angabe vorhanden ist. Am echten Bestand betrifft das eine zweistellige Zahl
+        // von Zeilen, praktisch nur aus dem Abruf.
+        //
         // „Buchung" ist Füllwort aus dem Register und zählt als leer.
         bezeichnung:
           buchung?.notiz ||
           umsatz?.gegenpartei ||
+          umsatz?.verwendungszweck ||
           (zeile.bezeichnung && zeile.bezeichnung !== "Buchung" ? zeile.bezeichnung : ""),
         verwendungszweck: umsatz?.verwendungszweck ?? "",
         kategorieName: zeile.kategorieId ? kategorieNamen.get(zeile.kategorieId) ?? "" : "",
