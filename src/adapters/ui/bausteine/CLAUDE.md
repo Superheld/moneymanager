@@ -21,6 +21,25 @@ Wahrheit — und prüft, was hier inzwischen weiterentwickelt wurde.
 `index.ts` bündelt diesen Block, damit ein Screen `from "../bausteine"` schreiben kann. Die
 eigenen Bausteine daneben werden einzeln importiert.
 
+## `Auswahlpille` — eine Wahl in einer Tabellenzeile
+
+Ein `<select className="field">` ist für FORMULARE gebaut: volle Breite, grosse
+Innenabstände, eigene Zeile. In einer Tabellenzelle sprengt es die Zeilenhöhe und erzwingt
+eine Spaltenbreite, die der Inhalt nicht braucht. `Auswahlpille` ist so gross wie eine
+`Pill` daneben und gehört dorthin, wo eine Zeile eine kleine Entscheidung trägt.
+
+Sie ist bewusst **keine Pill-Variante**: eine Pille ist ein Etikett und sagt, was etwas
+IST. Hier wird gewählt, und das muss man ihr ansehen — Rahmen, Zeiger, Auswahlpfeil.
+
+Zwei Dinge, die der Typ erzwingt, weil sie sonst verlorengehen:
+
+- **`label` ist Pflicht.** In einer Tabelle steht die Beschriftung in der Kopfzeile und
+  nicht am Feld; ohne den Namen meldet eine Vorlesehilfe nur „Auswahl", und die Spalte ist
+  für sie verloren.
+- **Gesperrtes bleibt sichtbar** (`gesperrt`, nicht weglassen). Eine Möglichkeit, die es
+  gerade nicht gibt, verschwindet sonst stumm — und dann steht in der Datenbank etwas
+  anderes als auf dem Bildschirm.
+
 ## Zwei Fallen, die man kennen muss
 
 **`DataTable` ist die App-Fassung**, nicht die des Design-Systems: sie trägt Sortierung,

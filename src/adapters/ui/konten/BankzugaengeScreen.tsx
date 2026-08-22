@@ -18,8 +18,8 @@ import type {
   Bankkonto,
   Bankprofil,
   Bankzugang,
-  Kontozuordnung,
   Formatwahl,
+  Kontozuordnung,
   TanHerausforderung,
 } from "../../../application";
 import { fintsAbruf, fintsEinsatzbereit } from "../../fints";
@@ -30,6 +30,8 @@ import {
   kontozuordnungSpeichern,
   kontozuordnungen,
 } from "../../dienste";
+import { kannVorfall } from "../../../application";
+import { Auswahlpille } from "../bausteine/Auswahlpille";
 import { Bankprofilkarte } from "./Bankprofilkarte";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
@@ -159,6 +161,27 @@ export function BankzugaengeScreen() {
     await laden();
   }
 
+  /**
+   * Welche Formate für dieses Konto zur Wahl stehen.
+   *
+   * Nicht jede Bank kann beides — die Vorfälle stehen im Bankprofil. Ein Format
+   * anzubieten, das die Bank nicht beherrscht, führt zu einer Festlegung, die JEDEN
+   * weiteren Abruf leer laufen lässt: bei einer Wahl gibt es keinen Rückfall.
+   *
+   * Was nicht geht, wird trotzdem GEZEIGT, nur gesperrt. Eine bestehende Wahl darf nicht
+   * stumm verschwinden, weil die Bank ihr Profil geändert hat — sonst steht in der
+   * Datenbank etwas anderes als auf dem Bildschirm. Und die aktuelle Wahl bleibt immer
+   * wählbar, auch wenn sie inzwischen unmöglich aussieht.
+   */
+  function formatmoeglichkeiten(profil: Bankprofil | undefined, aktuell: Formatwahl) {
+    const kann = (segment: string) => !profil || kannVorfall(profil, segment);
+    return [
+      { wert: "automatisch" as const, gesperrt: false },
+      { wert: "CAMT" as const, gesperrt: !kann("HKCAZ") && aktuell !== "CAMT" },
+      { wert: "MT940" as const, gesperrt: !kann("HKKAZ") && aktuell !== "MT940" },
+    ];
+  }
+
   const kontenSpalten = [
     { key: "bezeichnung", label: t("bankabruf.spalteKonto") },
     { key: "iban", label: t("bankabruf.spalteIban"), render: (r: KontoZeile) => r.iban ?? "—" },
@@ -179,22 +202,22 @@ export function BankzugaengeScreen() {
       render: (r: KontoZeile) => {
         const zuordnung = zuordnungen.find((z) => z.schluessel === r.schluessel);
         if (!zuordnung) return "—";
+        const wahl = zuordnung.formatwahl ?? "automatisch";
         return (
-          <select
-            className="field"
-            aria-label={t("bankzugaenge.format.spalte")}
-            style={{ width: "auto", fontSize: "var(--fs-xs)", padding: "3px 6px" }}
-            value={zuordnung.formatwahl ?? "automatisch"}
-            title={t(`bankzugaenge.format.hinweis.${zuordnung.formatwahl ?? "automatisch"}`)}
-            onChange={async (e) => {
-              await kontozuordnungSpeichern({ ...zuordnung, formatwahl: e.target.value as Formatwahl });
+          <Auswahlpille
+            label={t("bankzugaenge.format.spalte")}
+            wert={wahl}
+            hinweis={t(`bankzugaenge.format.hinweis.${wahl}`)}
+            moeglichkeiten={formatmoeglichkeiten(pruefung?.profil, wahl).map((m) => ({
+              ...m,
+              text: t(`bankzugaenge.format.${m.wert}`) + (m.gesperrt ? ` — ${t("bankzugaenge.format.kannBankNicht")}` : ""),
+              hinweis: t(`bankzugaenge.format.hinweis.${m.wert}`),
+            }))}
+            onChange={async (neueWahl) => {
+              await kontozuordnungSpeichern({ ...zuordnung, formatwahl: neueWahl });
               await laden();
             }}
-          >
-            {(["automatisch", "CAMT", "MT940"] as const).map((w) => (
-              <option key={w} value={w}>{t(`bankzugaenge.format.${w}`)}</option>
-            ))}
-          </select>
+          />
         );
       },
     },
