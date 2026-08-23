@@ -1048,4 +1048,18 @@ export const MIGRATIONS: Migration[] = [
        ALTER TABLE dubletten_freigabe_neu RENAME TO dubletten_freigabe`,
     ],
   },
+  {
+    version: 46, // Der Dedup-Griff ins Ledger lief als Tabellen-Scan
+    sql: [
+      // `bestandsSchluessel` fragt bei JEDEM Import auch die Roh-Hashes der verbuchten
+      // Ist-Buchungen ab — die decken den Fall ab, dass die Umsatz-Zeile längst
+      // aufgeräumt ist. Ohne Index war das ein SCAN über das ganze Ledger, und das Ledger
+      // wächst monoton, während der Import gleich teuer bleiben sollte.
+      //
+      // Teilindex: Buchungen ohne Roh-Hash sind alle von Hand erfassten, und die
+      // interessieren beim Dedup nie. Der Index trägt damit nur, was gefragt wird.
+      `CREATE INDEX IF NOT EXISTS ix_ist_buchung_roh_hash
+         ON ist_buchung (roh_hash) WHERE roh_hash IS NOT NULL`,
+    ],
+  },
 ];
