@@ -1474,4 +1474,20 @@ export const MIGRATIONS: Migration[] = [
        ALTER TABLE depot_neu RENAME TO depot`,
     ],
   },
+  {
+    version: 52, // Das Format gehört an den Lauf, nicht zusätzlich an jede Zeile
+    sql: [
+      // Die Spalte kam in v44 mit — mit dem Gedanken, den Wert eines
+      // formatabhängigen Feldes (`umsatzart`, `buchungsschluessel`) an der Zeile selbst
+      // deuten zu können. Sie ist überflüssig: eine Zeile gehört zu genau EINEM Lauf,
+      // und der Lauf trägt das Format seit v42. Sie stünde also zweimal da und könnte
+      // auseinanderlaufen.
+      //
+      // Wer wissen will, aus welchem Vokabular ein Wert stammt, joint über `lauf_id` —
+      // dieselbe Antwort wie bei der Frage nach einer zweiten Referenz von der Buchung
+      // zum Beleg (v46): der Weg ist schon da, ein zweiter macht ihn nicht kürzer,
+      // sondern unzuverlässiger.
+      `ALTER TABLE umsatz_roh DROP COLUMN format`,
+    ],
+  },
 ];
