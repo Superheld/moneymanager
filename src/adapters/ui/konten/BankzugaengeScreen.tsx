@@ -33,6 +33,7 @@ import {
 import { kannVorfall } from "../../../application";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { Bankprofilkarte } from "./Bankprofilkarte";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
@@ -54,11 +55,27 @@ interface Pruefung {
   profil: Bankprofil;
 }
 
-export function BankzugaengeScreen() {
+export function BankzugaengeScreen({
+  kontoNamen,
+  onKontoOeffnen,
+}: {
+  /** Kontobezeichnungen je Id — der Screen daneben hat sie schon geladen. */
+  kontoNamen?: ReadonlyMap<string, string>;
+  /** Klick auf ein zugeordnetes Konto — führt zu dessen Importzeilen. */
+  onKontoOeffnen?: (kontoId: string) => void;
+} = {}) {
   const { t } = useTranslation();
   const geld = useGeld();
   const [zugaenge, setZugaenge] = useState<Bankzugang[]>([]);
   const [zuordnungen, setZuordnungen] = useState<Kontozuordnung[]>([]);
+  /**
+   * Welcher Zugang seine Konten zeigt.
+   *
+   * Die Spalte daneben nennt nur die ANZAHL — die beantwortet „habe ich hier schon etwas
+   * zugeordnet", aber nicht „welches Konto ist das eigentlich". Genau die Frage stellt
+   * sich, wenn ein Abruf nichts bringt.
+   */
+  const [kontenOffen, setKontenOffen] = useState<string | null>(null);
   const [pin, setPin] = useState<{ zugang: Bankzugang } | null>(null);
   const [pinText, setPinText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -76,10 +93,9 @@ export function BankzugaengeScreen() {
   const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
 
   async function laden() {
-    const [z, zo] = await Promise.all([
-      bankzugaenge(),
-      kontozuordnungen(),
-    ]);
+    // In EINEM Effekt und zusammen gesetzt: gestaffelte Zustaende liessen die Kontenliste
+    // kurz gegen eine leere Zuordnung rechnen (ui/CLAUDE.md).
+    const [z, zo] = await Promise.all([bankzugaenge(), kontozuordnungen()]);
     setZugaenge(z);
     setZuordnungen(zo);
   }
@@ -252,7 +268,18 @@ export function BankzugaengeScreen() {
         ) : (
           <DataTable
             columns={[
-              { key: "bezeichnung", label: t("bankzugaenge.spalteBank") },
+              {
+                key: "bezeichnung",
+                label: t("bankzugaenge.spalteBank"),
+                render: (z: Bankzugang) => (
+                  <Zeilenlink
+                    onKlick={() => setKontenOffen(kontenOffen === z.id ? null : z.id)}
+                    titel={t("bankzugaenge.zeigeKonten", { bank: z.bezeichnung })}
+                  >
+                    {z.bezeichnung}
+                  </Zeilenlink>
+                ),
+              },
               { key: "blz", label: t("bankabruf.feldBlz") },
               { key: "benutzer", label: t("bankabruf.feldBenutzer") },
               {
@@ -320,6 +347,52 @@ export function BankzugaengeScreen() {
         )}
         {fehler && !pin && <div className="err" style={{ marginTop: "var(--sp-3)" }}>{fehler}</div>}
       </Card>
+
+      {/* Welche Konten an einem Zugang hängen — und von dort weiter zu dem, was
+          hereingekommen ist. Die Spalte in der Tabelle nennt nur die ANZAHL; die
+          beantwortet „habe ich hier schon etwas zugeordnet", aber nicht „welches Konto ist
+          das eigentlich". Genau die Frage stellt sich, wenn ein Abruf nichts bringt. */}
+      {kontenOffen && (
+        <Card
+          style={{ marginTop: "var(--gap-card)" }}
+          title={t("bankzugaenge.kontenDesZugangs", {
+            bank: zugaenge.find((z) => z.id === kontenOffen)?.bezeichnung ?? "",
+          })}
+        >
+          {zuordnungen.filter((z) => z.zugangId === kontenOffen).length === 0 ? (
+            <div className="muted">{t("bankzugaenge.keineKonten")}</div>
+          ) : (
+            <DataTable
+              columns={[
+                {
+                  key: "konto",
+                  label: t("bankzugaenge.spalteKonto"),
+                  render: (z: Kontozuordnung) => {
+                    const name = kontoNamen?.get(z.zahlungskontoId) ?? z.zahlungskontoId;
+                    return onKontoOeffnen ? (
+                      <Zeilenlink
+                        onKlick={() => onKontoOeffnen(z.zahlungskontoId)}
+                        titel={t("konten.herkunft.zeigeZeilen", { konto: name })}
+                      >
+                        {name}
+                      </Zeilenlink>
+                    ) : (
+                      name
+                    );
+                  },
+                },
+                { key: "schluessel", label: t("bankzugaenge.spalteSchluessel") },
+                {
+                  key: "abruf",
+                  label: t("bankzugaenge.spalteLetzterAbruf"),
+                  render: (z: Kontozuordnung) => z.letzterAbrufBis ?? "—",
+                },
+              ]}
+              rows={zuordnungen.filter((z) => z.zugangId === kontenOffen)}
+            />
+          )}
+        </Card>
+      )}
 
       {pruefung && (
         <Card

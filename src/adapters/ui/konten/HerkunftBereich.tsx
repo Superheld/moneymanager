@@ -28,11 +28,14 @@ function datumKurz(iso: string): string {
   return `${d}.${m}.${j.slice(2)}`;
 }
 
-export function HerkunftBereich() {
+export function HerkunftBereich({ kontoId }: { kontoId?: string } = {}) {
   const { t } = useTranslation();
   const geld = useGeld();
   const [konten, setKonten] = useState<readonly Kontoherkunft[]>([]);
-  const [gewaehlt, setGewaehlt] = useState<string>("");
+  // Von aussen vorgewaehlt, wenn jemand aus der Kontenliste hierher gesprungen ist.
+  // Danach fuehrt der Bereich seine Auswahl selbst weiter — wer hier ankommt, will sich
+  // umsehen und nicht bei jedem Klick zurueckgesetzt werden.
+  const [gewaehlt, setGewaehlt] = useState<string>(kontoId ?? "");
   const [filter, setFilter] = useState<Statusfilter>("alle");
   const [laeufeOffen, setLaeufeOffen] = useState(false);
 
