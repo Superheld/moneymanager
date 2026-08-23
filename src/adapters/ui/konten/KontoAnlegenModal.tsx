@@ -70,6 +70,7 @@ export function KontoAnlegenModal({
   const [zugang, setZugang] = useState<Bankzugang>({
     id: crypto.randomUUID(),
     bezeichnung: "",
+    art: "fints",
     url: "",
     blz: "",
     benutzer: "",
