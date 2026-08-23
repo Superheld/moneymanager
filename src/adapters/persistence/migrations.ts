@@ -1490,4 +1490,33 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE umsatz_roh DROP COLUMN format`,
     ],
   },
+  {
+    version: 53, // Was mit einer Buchung geschah — nicht nur, was zuletzt an ihr steht
+    sql: [
+      // Der BELEG ist seit v44 geschützt: `umsatz_roh` wird nach dem Anlegen nicht mehr
+      // geschrieben. Die BUCHUNG war es nie. Jede Änderung überschrieb still, jedes
+      // Löschen löschte wirklich, und was vorher dastand, war danach nicht mehr
+      // feststellbar — auch nicht für den, der es selbst geändert hat.
+      //
+      // KEIN FREMDSCHLÜSSEL auf `ist_buchung`, und das ist der Kern der Sache: das
+      // Journal muss die Löschung ÜBERLEBEN. Ein Schlüssel mit CASCADE räumte genau den
+      // Eintrag weg, für den es die Tabelle gibt; einer mit RESTRICT verböte das Löschen
+      // ganz. Die Spalte ist deshalb ein blosser Verweis, und der Wächter-Test führt sie
+      // namentlich als Ausnahme.
+      //
+      // `vorher` und `nachher` halten den GANZEN Zustand als JSON, nicht die Unterschiede.
+      // Ein Eintrag soll für sich lesbar sein: wer eine Kette von Diffs zurückrechnen
+      // muss, um den Stand von damals zu sehen, hat kein Protokoll, sondern eine Aufgabe.
+      `CREATE TABLE IF NOT EXISTS buchung_journal (
+         id            TEXT PRIMARY KEY,
+         istbuchung_id TEXT NOT NULL,
+         zeitpunkt     TEXT NOT NULL,
+         art           TEXT NOT NULL,
+         vorher        TEXT,
+         nachher       TEXT
+       )`,
+      `CREATE INDEX IF NOT EXISTS ix_journal_buchung ON buchung_journal (istbuchung_id)`,
+      `CREATE INDEX IF NOT EXISTS ix_journal_zeit ON buchung_journal (zeitpunkt)`,
+    ],
+  },
 ];

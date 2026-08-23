@@ -10,6 +10,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { MIGRATIONS } from "./migrations";
+import type { IstBuchung } from "../../core";
 
 const halter = vi.hoisted(() => {
   let aktuell: unknown = null;
@@ -858,5 +859,102 @@ describe("Depot — Beobachtungen statt Buchungen", () => {
     expect(await depotRepository.alle()).toEqual([]);
     expect(await depotRepository.werte()).toEqual([]);
     expect(await depotRepository.positionen("d1")).toEqual([]);
+  });
+});
+
+describe("Ledger-Journal — was mit einer Buchung geschah", () => {
+  function buchung(over: Partial<IstBuchung> = {}): IstBuchung {
+    return {
+      id: "b1", datum: "2026-08-11", betrag: -4500, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", ...over,
+    };
+  }
+
+  function journal(): { art: string; vorher: string | null; nachher: string | null }[] {
+    const r = db.exec("SELECT art, vorher, nachher FROM buchung_journal ORDER BY rowid");
+    return r.length
+      ? r[0].values.map((z) => ({
+          art: String(z[0]),
+          vorher: z[1] === null ? null : String(z[1]),
+          nachher: z[2] === null ? null : String(z[2]),
+        }))
+      : [];
+  }
+
+  it("haelt das Anlegen fest", async () => {
+    await ledgerRepository.speichern(buchung());
+    expect(journal()).toHaveLength(1);
+    expect(journal()[0].art).toBe("angelegt");
+    expect(journal()[0].vorher).toBeNull();
+  });
+
+  /**
+   * Der Kern: nach einer Aenderung muss der URSPRUENGLICHE Inhalt feststellbar bleiben.
+   * Vorher ueberschrieb jedes Speichern still, und was dastand, war danach fort.
+   */
+  it("bewahrt den alten Betrag, wenn er geaendert wird", async () => {
+    await ledgerRepository.speichern(buchung({ betrag: -4500 }));
+    await ledgerRepository.speichern(buchung({ betrag: -9900 }));
+
+    const eintraege = journal();
+    expect(eintraege.map((e) => e.art)).toEqual(["angelegt", "geaendert"]);
+    expect(JSON.parse(eintraege[1].vorher!).betrag).toBe(-4500);
+    expect(JSON.parse(eintraege[1].nachher!).betrag).toBe(-9900);
+  });
+
+  /**
+   * Das Loeschen ist der Fall, fuer den es die Tabelle gibt — und der Grund, warum sie
+   * KEINEN Fremdschluessel auf die Buchung traegt. Mit CASCADE raeumte die Loeschung
+   * genau den Eintrag weg, der sie festhaelt.
+   */
+  it("ueberlebt das Loeschen der Buchung, die es protokolliert", async () => {
+    await ledgerRepository.speichern(buchung({ notiz: "Rechnung Talmberg" }));
+    await ledgerRepository.loeschen("b1");
+
+    expect(await ledgerRepository.alle()).toHaveLength(0);
+    const eintraege = journal();
+    expect(eintraege.map((e) => e.art)).toEqual(["angelegt", "geloescht"]);
+    // Der letzte Stand bleibt lesbar, obwohl die Buchung fort ist.
+    expect(JSON.parse(eintraege[1].vorher!).notiz).toBe("Rechnung Talmberg");
+    expect(eintraege[1].nachher).toBeNull();
+  });
+
+  /**
+   * Ein Speichern ohne Aenderung ist keine Tatsache ueber das Geld. Ein Protokoll, das
+   * jeden Klick festhaelt, wird zu Rauschen, in dem die echten Aenderungen untergehen.
+   */
+  it("schreibt nichts, wenn sich nichts geaendert hat", async () => {
+    await ledgerRepository.speichern(buchung());
+    await ledgerRepository.speichern(buchung());
+    expect(journal()).toHaveLength(1);
+  });
+
+  it("zaehlt auch eine geaenderte Aufteilung als Aenderung", async () => {
+    await ledgerRepository.speichern(buchung({
+      aufteilungen: [{ kategorieId: "kat", betrag: -4500 }],
+    }));
+    await ledgerRepository.speichern(buchung({
+      aufteilungen: [{ kategorieId: "kat", betrag: -2000 }, { kategorieId: "kat2", betrag: -2500 }],
+    }));
+
+    const eintraege = journal();
+    expect(eintraege).toHaveLength(2);
+    expect(JSON.parse(eintraege[1].vorher!).aufteilungen).toHaveLength(1);
+    expect(JSON.parse(eintraege[1].nachher!).aufteilungen).toHaveLength(2);
+  });
+
+  /**
+   * Die Vertragszuordnung steht seit v47 an derselben Zeile, wird aber vom
+   * Ledger-Repository nicht geschrieben. Sie im Protokoll wegzulassen liesse es
+   * behaupten, sie sei entfernt worden.
+   */
+  it("laesst die Vertragszuordnung im Protokoll stehen, obwohl es sie nicht schreibt", async () => {
+    await ledgerRepository.speichern(buchung());
+    db.run("UPDATE ist_buchung SET vertrag_id='v1', vertrag_herkunft='manuell' WHERE id='b1'");
+    await ledgerRepository.speichern(buchung({ betrag: -9900 }));
+
+    const eintraege = journal();
+    const letzte = eintraege[eintraege.length - 1];
+    expect(JSON.parse(letzte.nachher!).vertrag_id).toBe("v1");
   });
 });

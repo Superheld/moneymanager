@@ -77,6 +77,7 @@ function indexExistiert(db: Database, name: string): boolean {
 
 const ERWARTETE_TABELLEN = [
   "bankkonto_zuordnung", "bankzugang", // v26 — Bankzugang für den FinTS-Direktabruf
+  "buchung_journal", // v53 — was mit einer Buchung geschah, nicht nur ihr letzter Stand
   "budget",
   "depot", "depotposition", "depotwert", // v38 — Depots: Beobachtungen statt Buchungen
   "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
@@ -939,6 +940,10 @@ describe("Migration 50 — der Rest der Verweise", () => {
       "ist_buchung.plan_quelle_id",
       // JSON-Liste, kein Einzelverweis.
       "zahlungskonto.inhaber_ids",
+      // Das Journal muss die LOESCHUNG ueberleben — dafuer gibt es die Tabelle. Ein
+      // Schluessel mit CASCADE raeumte genau den Eintrag weg, der die Loeschung
+      // festhaelt; einer mit RESTRICT verboete das Loeschen ganz.
+      "buchung_journal.istbuchung_id",
     ]);
 
     const tabellen = db
