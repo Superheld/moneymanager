@@ -52,6 +52,43 @@ export const HANSEATIC_BASIS_URL = "https://connecthb.hanseaticbank.de";
 
 const HOSTS = [HANSEATIC_BASIS_URL, "https://meine.hanseaticbank.de"];
 
+/**
+ * Zwei Header nachreichen, die im Webview fehlen.
+ *
+ * Die Bibliothek ist fuer Node gebaut. Dort setzt die Laufzeit von sich aus einen
+ * `user-agent`; ueber den Tauri-Transport kommt keiner an. Genau daran scheiterte die
+ * Anmeldung: die Bank nahm Ausweis, Grant und Zugangsdaten an und stieg erst beim
+ * Einleiten der Geraetebestaetigung mit einem internen Fehler aus (`HBSCA500`) — einem
+ * Code, den nicht einmal ihre eigene Weboberflaeche kennt. Derselbe Aufruf aus Node lief
+ * durch, Zeichen fuer Zeichen gleich; der Unterschied lag ausserhalb dessen, was die
+ * Anfrage selbst mitbringt.
+ *
+ * `accept-language` steht zusaetzlich im Header-Satz ihrer Weboberflaeche. Welcher der
+ * beiden noetig ist, ist NICHT auseinandersortiert — dazu braeuchte es je einen weiteren
+ * Anmeldeversuch gegen die echte Bank. Beide zu senden ist ehrlich und billig; die Sprache
+ * ist ohnehin sinnvoll, wenn die Bank eine Nachricht ans Handy schickt.
+ *
+ * Ueberschrieben wird nichts: was die Bibliothek selbst setzt, gewinnt.
+ */
+let kopfzeilenInstalliert = false;
+function kopfzeilenNachruesten(): void {
+  if (kopfzeilenInstalliert) return;
+  kopfzeilenInstalliert = true;
+  const vorher = globalThis.fetch.bind(globalThis);
+  globalThis.fetch = ((eingabe: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof eingabe === "string" ? eingabe : eingabe instanceof URL ? eingabe.href : eingabe.url;
+    if (!url.includes("hanseaticbank.de")) return vorher(eingabe, init);
+    return vorher(eingabe, {
+      ...init,
+      headers: {
+        "user-agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15",
+        "accept-language": "de-DE,de;q=0.9,en-US;q=0.8,en;q=0.7",
+        ...((init?.headers ?? {}) as Record<string, string>),
+      },
+    });
+  }) as typeof globalThis.fetch;
+}
+
 export const HANSEATIC_ADAPTER_ID = "hanseatic";
 
 /**
@@ -327,6 +364,7 @@ export function hanseaticAdapter(
       // keinen `Access-Control-Allow-Origin`-Header, und daran scheitert jeder Abruf,
       // bevor er die Bank ueberhaupt erreicht.
       for (const host of HOSTS) bankEndpunktFreigeben(host);
+      kopfzeilenNachruesten();
 
       const speicher = new Tokenspeicher(tokenAus(zugang.bankparameter));
       const client = fabrik({ clientBasic: zugang.token, store: speicher });
