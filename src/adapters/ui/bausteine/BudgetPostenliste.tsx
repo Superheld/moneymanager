@@ -73,8 +73,12 @@ export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbrauc
         );
       })}
       <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0 5px", borderTop: "1px solid var(--line)", fontSize: "12.5px", fontWeight: "var(--fw-bold)" }}>
-        <span>{t("uebersicht.budgetSumme")}</span>
-        <span className="num">{geld.formatMitSymbol(verbraucht)}</span>
+        {/* Ist die Summe negativ, kam unterm Strich Geld ZURÜCK. Das Wort „Verbraucht"
+            über einem Minusbetrag behauptet das Gegenteil dessen, was daneben steht —
+            und ein Wort gewinnt gegen ein Vorzeichen. Die EINZELNEN Posten behalten ihres:
+            dort widerspricht ihm keins. */}
+        <span>{t(verbraucht < 0 ? "uebersicht.budgetSummeZurueck" : "uebersicht.budgetSumme")}</span>
+        <span className="num">{geld.formatMitSymbol(Math.abs(verbraucht))}</span>
       </div>
     </div>
   );

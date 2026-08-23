@@ -16,20 +16,33 @@ export function BudgetFortschreibung({ monat }: { monat: Budgetmonat }) {
   const { t } = useTranslation();
   const geld = useGeld();
 
+  // Die KOMPAKTE Zeile zeigt Geldfluss: die Rate kommt hinzu (+), der Verbrauch geht ab
+  // (−). `verbraucht` ist positiv geführt (ein Rückfluss negativ) und wird deshalb
+  // gedreht — ein Erstattungsmonat steht damit als Plus da, und das stimmt: es kam Geld
+  // zurück. Nur Zahlen mit Vorzeichen, kein Wort, das etwas anderes behaupten könnte.
   const werte = {
     uebertrag: geld.format(monat.uebertrag),
-    // Vorzeichen aus der Sicht des Budgets: die Rate kommt hinzu, der Verbrauch geht ab.
-    // `verbraucht` ist positiv geführt (eine Erstattung negativ) — deshalb hier gedreht,
-    // damit ein Erstattungsmonat als Plus erscheint und nicht als negatives Minus.
     zufuehrung: geld.format(monat.zufuehrung, { mitVorzeichen: true }),
     verbraucht: geld.format(-monat.verbraucht, { mitVorzeichen: true }),
+  };
+
+  // Der SATZ dahinter braucht das Gegenteil. „verbraucht" mit einem Plusbetrag dahinter
+  // liest sich als ausgegeben, obwohl der Rest im selben Atemzug wächst — ein Vorzeichen
+  // gewinnt nie gegen ein Wort, das ihm widerspricht. Deshalb hier der Betrag ohne
+  // Vorzeichen und stattdessen das passende Wort.
+  const zurueck = monat.verbraucht < 0;
+  const satz = {
+    uebertrag: geld.formatMitSymbol(monat.uebertrag),
+    zufuehrung: geld.formatMitSymbol(monat.zufuehrung),
+    verbraucht: geld.formatMitSymbol(Math.abs(monat.verbraucht)),
+    rest: geld.formatMitSymbol(monat.rest),
   };
 
   return (
     <span
       className="muted"
       style={{ fontSize: "var(--fs-2xs)", whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}
-      title={t("budgets.fortschreibungTitel", { ...werte, rest: geld.formatMitSymbol(monat.rest) })}
+      title={t(zurueck ? "budgets.fortschreibungTitelZurueck" : "budgets.fortschreibungTitel", satz)}
     >
       {t("budgets.fortschreibung", werte)}
     </span>

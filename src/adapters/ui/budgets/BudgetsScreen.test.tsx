@@ -359,6 +359,39 @@ describe("BudgetsScreen · Verlauf", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
   });
 
+  /**
+   * Ein RUECKFLUSS — eine Erstattung, die in die Kategorie der Ausgabe gehoert und dort
+   * das Budget entlastet. Er steht als Aufwand mit positivem Betrag in der Datenbank, und
+   * der Verbrauch des Monats wird dadurch negativ.
+   *
+   * Genau da log die Anzeige: „Verbraucht" ueber einem Minusbetrag, waehrend der Rest im
+   * selben Bild waechst. Ein Wort gewinnt gegen ein Vorzeichen — also wechselt das Wort.
+   */
+  it("nennt einen Rueckfluss nicht „verbraucht“", async () => {
+    await aufbauendMitHistorie();
+    await sqliteLedgerRepository.speichern({
+      id: "e1", datum: `${monatVersetzt(0)}-08`, betrag: 3490, kontoId: "k2",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat2", notiz: "Ruecksendung",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+
+    await nutzer.click(await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ }));
+    await screen.findByText(/Verlauf · Urlaubskasse/);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Ruecksendung/));
+
+    // Die Summe unter der Liste heisst anders und traegt den Betrag OHNE Minus: das
+    // Vorzeichen steckt schon im Wort, zweimal waere es eine doppelte Verneinung.
+    const fuss = (await screen.findByText("Zurückgeflossen")).parentElement!;
+    expect(fuss.textContent).toMatch(/34,90/);
+    expect(fuss.textContent).not.toMatch(/−/);
+
+    // Und die Aufrechnung daneben sagt „zurückgeflossen" statt „verbraucht“.
+    await waitFor(() =>
+      expect(document.querySelector('[title*="zurückgeflossen"]')).not.toBeNull(),
+    );
+  });
+
   it("hält die Verlaufskarte NEBEN der Liste, nicht darin", async () => {
     await aufbauendMitHistorie();
     const nutzer = userEvent.setup();

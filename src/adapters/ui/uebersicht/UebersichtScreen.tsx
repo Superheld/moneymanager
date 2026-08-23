@@ -175,7 +175,7 @@ export function UebersichtScreen() {
                           {z.monat.ohnePlan ? (
                             // In diesem Monat gab es für die Kategorie noch keinen Rahmen.
                             // Ein Rest von „−x von 0,00" läse sich als überzogen.
-                            <span className="muted">{t("budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(z.monat.verbraucht) })}</span>
+                            <span className="muted">{t(z.monat.verbraucht < 0 ? "budgets.verlaufOhnePlanZurueck" : "budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(Math.abs(z.monat.verbraucht)) })}</span>
                           ) : (
                           <span
                             style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}

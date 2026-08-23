@@ -190,6 +190,33 @@ Budgetrechnung ist darauf ausgelegt — `Verbrauchsposten.betrag` ist ausdrückl
 (eine Erstattung ist entsprechend negativ)", und damit entlastet sie das Budget der
 Kategorie, in der die Ausgabe stattgefunden hat.
 
+**Ein Rückfluss gehört IMMER in die Kategorie der Ausgabe.** Es gibt darum keine Kategorie
+für Erstattungen unter den Einnahmen, und es soll auch keine geben: dieselbe Zahlung stünde
+sonst je nach Einsortierung für zwei verschiedene Aussagen — einmal entlastet sie das
+Budget, in dem die Ausgabe stattfand, einmal bläht sie die Einnahmen auf und gleicht nie
+etwas aus. Welche von beiden gilt, entschiede dann die Kategorie-Erkennung, und die nimmt
+gern die falsche: das Wort steht oft genug im Verwendungszweck.
+
+Das gilt auch, wenn die ursprüngliche Ausgabe gar nicht im Bestand steht — eine
+Steuerrückerstattung gehört zu „Steuern", eine Kautionsrückzahlung zu „Wohnen". Eine
+Verknüpfung zur erstatteten Buchung braucht es dafür nicht: solange beide im selben Monat
+liegen, kommt die Verrechnung über die Kategorie auf dasselbe Ergebnis, und über
+Monatsgrenzen hinweg würde eine solche Verknüpfung einen abgeschlossenen Monat rückwirkend
+ändern — genau das, was der Budgetbetrag weiter unten aus gutem Grund nicht tut.
+
+**Von Hand braucht die Richtung ein eigenes Wort.** Ohne Beleg leitet
+`vorzeichenbehaftet()` sie aus dem Charakter ab, und das geht nur so lange gut, wie
+Einordnung und Richtung dasselbe sagen. Beim Rückfluss tun sie es nicht. Die
+Buchungseingabe trägt deshalb ein `gegenrichtung`-Feld, das die Ableitung umdreht; für
+eine PLANGRÖSSE (Zahlungsregel, Vertragsrate) bleibt die Ableitung, denn eine geplante
+Rate hat genau eine Richtung.
+
+**Und wo ein Wort neben der Zahl steht, muss es mitwandern.** Ein negativer Verbrauch unter
+der Überschrift „verbraucht" liest sich als ausgegeben, auch wenn das Minus davorsteht und
+der Rest im selben Bild wächst — ein Wort gewinnt gegen ein Vorzeichen. Die Anzeigen zum
+Budgetverlauf wechseln deshalb das Wort und zeigen den Betrag ohne Vorzeichen, statt beides
+zu vermischen.
+
 #### Der Budgetbetrag ist eine Reihe, kein Wert
 
 `budget_betrag` hält je Budget die Beträge mit dem **Monat, ab dem sie gelten**. Ein Budget

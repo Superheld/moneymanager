@@ -79,11 +79,16 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
           const klickbar = !!onMonatClick;
           return (
             <g key={m.monat} onClick={klickbar ? () => onMonatClick!(i) : undefined} style={klickbar ? { cursor: "pointer" } : undefined}>
-              <title>{m.ohnePlan ? `${m.monat} · ${t("budgets.verlaufOhnePlanKurz", { verbraucht: geld.formatMitSymbol(m.verbraucht) })}` : `${m.monat} · ${t("budgets.verlaufTooltip", {
-                verfuegbar: geld.formatMitSymbol(m.verfuegbar),
-                verbraucht: geld.formatMitSymbol(m.verbraucht),
-                rest: geld.formatMitSymbol(m.rest),
-              })}`}</title>
+              {/* Ein negativer Verbrauch ist ein RÜCKFLUSS. „verbraucht" vor einem
+                  Minusbetrag liest sich trotzdem als ausgegeben — das Wort gewinnt gegen
+                  das Vorzeichen. Also das Wort wechseln und den Betrag ohne zeigen. */}
+              <title>{m.ohnePlan
+                ? `${m.monat} · ${t(m.verbraucht < 0 ? "budgets.verlaufOhnePlanKurzZurueck" : "budgets.verlaufOhnePlanKurz", { verbraucht: geld.formatMitSymbol(Math.abs(m.verbraucht)) })}`
+                : `${m.monat} · ${t(m.verbraucht < 0 ? "budgets.verlaufTooltipZurueck" : "budgets.verlaufTooltip", {
+                    verfuegbar: geld.formatMitSymbol(m.verfuegbar),
+                    verbraucht: geld.formatMitSymbol(Math.abs(m.verbraucht)),
+                    rest: geld.formatMitSymbol(m.rest),
+                  })}`}</title>
               {aktivIndex === i && (
                 <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="var(--accent)" opacity="0.1" />
               )}
