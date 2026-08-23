@@ -51,6 +51,26 @@ export interface RohUmsatz {
   /** Geschäftsvorfallcode der Bank (MT940 `:61:`, z. B. 005, 700, 820). */
   readonly buchungsschluessel?: string;
   /**
+   * SEPA-Verwendungszweckcode — `SALA` (Gehalt), `RENT` (Miete), `LOAN` … Nur CAMT
+   * liefert ihn.
+   *
+   * Eine Einordnung, die die BANK schon vorgenommen hat. Anders als `umsatzart` ist das
+   * kein Vokabular, das je Institut anders aussieht, sondern eine feste Liste aus dem
+   * SEPA-Standard — und damit das einzige Merkmal dieser Art, das man ohne Umdeutung
+   * verwenden kann.
+   */
+  readonly zweckCode?: string;
+  /**
+   * Wer die Zahlung WIRKLICH bekommt oder schickt, wenn ein Zahlungsdienstleister
+   * dazwischensteht. Nur CAMT (`UltmtCdtr`/`UltmtDbtr`).
+   *
+   * Ohne dieses Feld steht in `gegenpartei` der Dienstleister, und der Händler dahinter
+   * lässt sich aus dem Verwendungszweck bestenfalls raten — bei manchen Anbietern gar
+   * nicht. Für die Kategorie-Erkennung ist der Unterschied erheblich: der Dienstleister
+   * ist bei jedem Händler derselbe.
+   */
+  readonly endempfaenger?: string;
+  /**
    * Institutseigene Referenz aus dem Freitext (etwa `Ref. …`).
    *
    * ABSICHTLICH KEIN Dedup-Schlüssel: im Spike trugen 64 von 65 Buchungen eine, davon

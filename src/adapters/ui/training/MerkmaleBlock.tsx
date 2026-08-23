@@ -6,8 +6,8 @@
 // im ganzen Bestand anrichtet.
 //
 // Beide Zahlen zusammen sind der Punkt. Der Einzelfall allein verführt zum Wegwerfen von
-// allem, was hässlich aussieht — `vwz:paschmannmuelheimkarte` ist eine Buchstabenwurst und
-// zugleich das schärfste Merkmal im Bestand. Die Statistik allein sagt nicht, worum es
+// allem, was hässlich aussieht — ein zusammengelaufener Schlüssel aus Händlername, Ort
+// und „karte" ist eine Buchstabenwurst und zugleich das schärfste Merkmal im Bestand. Die Statistik allein sagt nicht, worum es
 // bei der Zahlung ging.
 //
 // Geladen wird erst auf Klick: die Trennschärfe braucht den gesamten Bestand, und ein

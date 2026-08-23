@@ -57,7 +57,7 @@ async function monatsreihe(praefix: string, gegenpartei: string, betrag: number,
     await sqliteLedgerRepository.speichern({
       id, datum, betrag: -betrag, kontoId: "k1", charakter: "Aufwand", quelle: "import",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
       betrag: -betrag, waehrung: "EUR", gegenpartei, verwendungszweck: "",
       rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
@@ -73,7 +73,7 @@ async function einnahmereihe(praefix: string, gegenpartei: string, betrag: numbe
     await sqliteLedgerRepository.speichern({
       id, datum, betrag, kontoId: "k1", charakter: "Ertrag", quelle: "import",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
       betrag, waehrung: "EUR", gegenpartei, verwendungszweck: "",
       rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
@@ -338,7 +338,7 @@ describe("VertraegeScreen — Vorschläge", () => {
         id: `e${i}`, datum, betrag: -(1000 + i * 800), kontoId: "k1",
         charakter: "Aufwand", quelle: "import",
       });
-      await sqliteUmsatzRepository.speichern({
+      await sqliteUmsatzRepository.anlegen({
         id: `ue${i}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
         betrag: -(1000 + i * 800), waehrung: "EUR", gegenpartei: "Nordhoff",
         verwendungszweck: "", rohHash: `he${i}`, status: "verbucht", istbuchungId: `e${i}`,
@@ -471,7 +471,7 @@ describe("VertraegeScreen — Vorschläge", () => {
       await sqliteLedgerRepository.speichern({
         id, datum, betrag: -4000, kontoId: "k1", charakter: "Aufwand", quelle: "import",
       });
-      await sqliteUmsatzRepository.speichern({
+      await sqliteUmsatzRepository.anlegen({
         id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
         betrag: -4000, waehrung: "EUR", gegenpartei: "Vibora GmbH", verwendungszweck: "",
         rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
@@ -607,5 +607,76 @@ describe("VertraegeScreen — Vorschläge", () => {
     rendere(<VertraegeScreen />);
     expect(await screen.findByText("Octopus Energy")).toBeInTheDocument();
     expect(screen.queryByText("Vibora GmbH")).not.toBeInTheDocument();
+  });
+});
+
+describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
+  /**
+   * Die Spalte nennt die ANZAHL zugeordneter Zahlungen. Die sagt „die Regel greift" —
+   * aber nicht, WAS sie greift. Und genau daran erkennt man den Fehlgriff: eine fremde
+   * Zahlung an denselben Empfaenger zaehlt genauso mit und macht aus einer falschen
+   * Zuordnung eine gute Kennzahl.
+   */
+  async function vertragMitZahlung() {
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Talmberg Energie", beginn: "2026-01-01",
+      verlaengerung: "keine", status: "aktiv",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "b1", datum: "2026-08-11", betrag: -4500, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import",
+    });
+    // VON HAND zugeordnet: `vertraegeLaden` gleicht die Zuordnungen beim Laden ab, und
+    // eine automatische ohne passende Erkennungsregel raeumt es dabei weg. Handarbeit
+    // bleibt — genau dafuer gibt es die Herkunft.
+    await sqliteVertragszuordnungRepository.speichern({
+      istbuchungId: "b1", vertragId: "v1", herkunft: "manuell",
+    });
+  }
+
+  it("klappt die zugeordneten Zahlungen unter der Tabelle auf", async () => {
+    await vertragMitZahlung();
+    rendere(<VertraegeScreen />);
+
+    const link = await screen.findByRole("button", { name: /Talmberg Energie/ });
+    // Vorher steht der Betrag der Zahlung nirgends.
+    expect(document.body.textContent ?? "").not.toMatch(/45,00/);
+
+    await userEvent.click(link);
+
+    await waitFor(() => expect(document.body.textContent ?? "").toMatch(/45,00/));
+  });
+
+  it("klappt beim zweiten Klick wieder zu", async () => {
+    await vertragMitZahlung();
+    rendere(<VertraegeScreen />);
+
+    const link = await screen.findByRole("button", { name: /Talmberg Energie/ });
+    await userEvent.click(link);
+    await waitFor(() => expect(document.body.textContent ?? "").toMatch(/45,00/));
+
+    await userEvent.click(link);
+    await waitFor(() => expect(document.body.textContent ?? "").not.toMatch(/45,00/));
+  });
+
+  /**
+   * Eine Null in der Spalte heisst „die Regel findet nichts". Wer dem nachgeht, soll das
+   * auch aufgeklappt bestaetigt bekommen und nicht vor einer leeren Flaeche stehen.
+   */
+  it("sagt es, wenn die Regel auf nichts greift", async () => {
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Ohlert Seewinkel", beginn: "2026-01-01",
+      verlaengerung: "keine", status: "aktiv",
+    });
+    rendere(<VertraegeScreen />);
+
+    await userEvent.click(await screen.findByRole("button", { name: /Ohlert Seewinkel/ }));
+    await waitFor(() => expect(document.body.textContent ?? "").toMatch(/greift noch auf keine/i));
   });
 });

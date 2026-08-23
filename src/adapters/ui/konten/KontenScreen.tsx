@@ -11,6 +11,7 @@ import { useTranslation } from "react-i18next";
 import {
   registerSicht,
   type Charakter,
+  type Dublettenverdacht,
   type IstBuchung,
   type Kontensicht,
   type Registerzeile,
@@ -21,15 +22,16 @@ import {
   alsBezahltMarkieren,
   bezahltZurueck,
   konten as kontenLaden,
+  pruefmarkerSetzen,
   umbuchungErfassen,
 } from "../../dienste";
 import type { ScreenId } from "../bausteine/AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { BuchungDetail } from "../buchung/BuchungDetail";
+import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVergleich";
 import { SammelDialog } from "../buchung/SammelDialog";
 import { AbrufDialog } from "./AbrufDialog";
 import { DepotAuszug } from "./DepotAuszug";
-import { AbgleichModal, KassensturzModal } from "./KontostandModal";
 import { Modal } from "../bausteine/Modal";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton } from "../bausteine/IconButton";
@@ -80,6 +82,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
    * auffiele — die Frage „steht das schon drin?" gehört deshalb an den Auszug selbst.
    */
   const [nurDubletten, setNurDubletten] = useState(false);
+  /** Das Paar, das gerade nebeneinander liegt — beide Seiten und der Grund. */
+  const [vergleich, setVergleich] = useState<{ links: Vergleichsseite; rechts: Vergleichsseite; verdacht: Dublettenverdacht } | null>(null);
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
@@ -92,9 +96,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [sammelOffen, setSammelOffen] = useState(false);
   const [abruf, setAbruf] = useState(false);
   /** Der Abgleich des Anfangsbestands — ein Eingriff, deshalb mit Vorschau. */
-  const [abgleichOffen, setAbgleichOffen] = useState(false);
-  /** Kassensturz für ein Konto ohne Bankverbindung. */
-  const [kassensturzOffen, setKassensturzOffen] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
   // EIN Ladevorgang, EIN setState. Gestaffelte await/setState-Paare lassen abgeleitete
@@ -128,6 +129,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const ausBankabruf = sicht?.ausBankabruf ?? LEERE_IDS;
   const aktivZeile = kontozeilen.find((z) => z.konto.id === aktivId);
   const aktiv = aktivZeile?.konto;
+  /**
+   * Konten ohne Bankverbindung — die einzigen, auf denen von Hand gebucht wird.
+   *
+   * Auf einem abgerufenen Konto sagt die BANK, was daraufsteht. Eine von Hand angelegte
+   * Zeile wäre dort eine Behauptung gegen den Kontoauszug: sie steht im Saldo, die Bank
+   * kennt sie nicht, und beim nächsten Abgleich taucht die Differenz auf, ohne dass noch
+   * jemand wüsste, woher sie kam. Was fehlt, holt der Abruf; was falsch ist, wird
+   * verworfen.
+   */
+  const offlineKonten = useMemo(() => kontozeilen.filter((z) => !z.online).map((z) => z.konto), [kontozeilen]);
 
   const register = useMemo(
     () => (sicht && aktiv ? registerSicht(sicht, aktiv, heute, tage) : null),
@@ -165,6 +176,29 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       return true;
     });
   }, [register, katFilter, artFilter, regSuche, nurDubletten, geld]);
+
+  /**
+   * Baut die zwei Seiten eines Vergleichs. Fehlt der Zwilling im Ledger, kommt nichts
+   * zurück — dann ist der Verdacht ohnehin veraltet und der Dialog hätte nur eine Spalte.
+   */
+  function vergleichOeffnen(buchung: IstBuchung, d: Dublettenverdacht) {
+    const zwilling = d.zwillingIstId ? ist.find((b) => b.id === d.zwillingIstId) : undefined;
+    if (!zwilling || !sicht) return;
+    const seite = (b: IstBuchung): Vergleichsseite => {
+      const u = sicht.umsatzZuBuchung.get(b.id);
+      return {
+        buchung: b,
+        umsatz: u,
+        lauf: u ? sicht.laeufe.find((l) => l.id === u.laufId) : undefined,
+        kontoName: kontoName.get(b.kontoId) ?? "",
+        kategorieName: b.kategorieId ? kategorieName.get(b.kategorieId) ?? "" : "",
+      };
+    };
+    // Die ältere Zeile steht links: eine Leserichtung, die nicht davon abhängt, welche
+    // der beiden man angeklickt hat.
+    const [links, rechts] = buchung.datum <= zwilling.datum ? [buchung, zwilling] : [zwilling, buchung];
+    setVergleich({ links: seite(links), rechts: seite(rechts), verdacht: d });
+  }
 
   /** Wie viele Zeilen des Registers überhaupt einen Verdacht tragen. */
   const dublettenAnzahl = useMemo(
@@ -298,23 +332,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         )}
       </Card>
 
-      {abgleichOffen && aktivZeile && (
-        <AbgleichModal
-          zeile={aktivZeile}
-          onClose={() => setAbgleichOffen(false)}
-          onFertig={laden}
-        />
-      )}
-
-      {kassensturzOffen && aktiv && (
-        <KassensturzModal
-          kontoId={aktiv.id}
-          bezeichnung={aktiv.bezeichnung}
-          heute={heute}
-          onClose={() => setKassensturzOffen(false)}
-          onGespeichert={laden}
-        />
-      )}
 
       {abruf && (
         <AbrufDialog
@@ -367,78 +384,40 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
                   Und seit es eine Anker-HISTORIE gibt, steht darunter die Auskunft, die
                   wirklich weiterhilft: nicht nur wieviel fehlt, sondern seit wann. */}
-              {(() => {
-                const anker = aktivZeile?.anker;
-                if (!anker) return null;
-                const diff = aktivZeile?.abweichung ?? 0;
-                const luecke = aktivZeile?.luecken[aktivZeile.luecken.length - 1];
-                return (
-                  <div style={{ fontSize: "var(--fs-xs)", marginTop: 6, display: "flex", flexDirection: "column", gap: 4 }}>
-                    <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
-                      <Pill variant={diff === 0 ? "ok" : "warn"}>
-                        {diff === 0
-                          ? t("konten.abgleich.stimmt")
-                          : t("konten.abgleich.differenz", { betrag: geld.formatMitSymbol(diff, { mitVorzeichen: true }) })}
-                      </Pill>
-                      <span className="muted">
-                        {t(anker.herkunft === "bank" ? "konten.abgleich.bankSagt" : "konten.anker.gezaehlt", {
-                          betrag: geld.formatMitSymbol(anker.betrag),
-                          datum: datumKurz(anker.datum),
-                        })}
-                      </span>
-                      {diff !== 0 && (
-                        <span className="muted">
-                          {t(diff > 0 ? "konten.abgleich.bankMehr" : "konten.abgleich.appMehr")}
-                        </span>
-                      )}
-                    </div>
-                    {/* Die Lücke schlägt die Gesamtdifferenz: sie zeigt auf einen Zeitraum
-                        statt auf fünf Jahre. Der jüngste zuerst — dort sucht man. */}
-                    {luecke && (
-                      <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
-                        <span className="muted">
-                          {t("konten.anker.luecke", {
-                            betrag: geld.formatMitSymbol(luecke.betrag, { mitVorzeichen: true }),
-                            von: datumKurz(luecke.von),
-                            bis: datumKurz(luecke.bis),
-                          })}
-                        </span>
-                        {aktivZeile!.luecken.length > 1 && (
-                          <span className="muted">{t("konten.anker.weitereLuecken", { n: aktivZeile!.luecken.length - 1 })}</span>
-                        )}
-                      </div>
-                    )}
-                    {/* Der einmalige Abgleich. Er verschiebt die Differenz in den
-                        Anfangsbestand — richtig, solange der nur die fehlende
-                        Vorgeschichte überbrückt, und deshalb auf Zuruf statt automatisch. */}
-                    {aktivZeile?.anfangsbestandVorschlag != null && (
-                      <div>
-                        <button className="linkbtn" style={{ padding: 0 }} onClick={() => setAbgleichOffen(true)}>
-                          {t("konten.anker.abgleichen")}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-
-              {/* Für Konten ohne Bank ist der Kassensturz die einzige unabhängige
-                  Aussage, die es je geben wird — und genauso viel wert wie eine
-                  Bankmeldung. */}
-              {aktivZeile && !aktivZeile.online && (
-                <div style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-                  <button className="linkbtn" style={{ padding: 0 }} onClick={() => setKassensturzOffen(true)}>
-                    {t("konten.anker.festhalten")}
-                  </button>
+              {/* Nur noch die AUSKUNFT, nicht mehr der Arbeitsplatz.
+                  Ob der Stand stimmt, will man hier sehen — warum er nicht stimmt und was
+                  dagegen zu tun ist, ist eine eigene Frage mit eigenem Platz (Verwaltung →
+                  Konten → Abgleich). Sie stand hier als Pille mit einer Zahl, die sagt
+                  „irgendwo fehlen 600 Euro", ohne hinzuzeigen — die Auskunft, die am
+                  wenigsten hilft. */}
+              {aktivZeile?.anker && (
+                <div style={{ fontSize: "var(--fs-xs)", marginTop: 6, display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
+                  <Pill variant={(aktivZeile.abweichung ?? 0) === 0 ? "ok" : "warn"}>
+                    {(aktivZeile.abweichung ?? 0) === 0
+                      ? t("konten.abgleich.stimmt")
+                      : t("konten.abgleich.differenz", { betrag: geld.formatMitSymbol(aktivZeile.abweichung ?? 0, { mitVorzeichen: true }) })}
+                  </Pill>
+                  {(aktivZeile.abweichung ?? 0) !== 0 && (
+                    <button className="linkbtn" style={{ padding: 0 }} onClick={() => onNavigate("kontenverwaltung")}>
+                      {t("konten.abgleichBereich.hinweg")}
+                    </button>
+                  )}
                 </div>
               )}
+
             </div>
             <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
               <select className="field" style={{ width: "auto" }} value={tage} onChange={(e) => setTage(Number(e.target.value))}>
                 {TAGE_OPTIONEN.map((d) => (<option key={d} value={d}>{t("konten.kommendeTage", { tage: d })}</option>))}
               </select>
-              {kontozeilen.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>}
-              <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>{t("konten.btnBuchung")}</Button>
+              {/* Umbuchen legt ZWEI neue Buchungen an — beide müssen auf Konten landen,
+                  die von Hand geführt werden. Für die Gegenseite einer Bank-Abhebung gibt
+                  es den anderen Weg: im Detail der abgerufenen Zeile das Gegenbein
+                  erzeugen. Dort erfindet niemand die Bankbuchung, sie ist schon da. */}
+              {offlineKonten.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>}
+              {aktivZeile && !aktivZeile.online && (
+                <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>{t("konten.btnBuchung")}</Button>
+              )}
             </span>
           </div>
 
@@ -556,6 +535,24 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                     <span title={r.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
                       {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
+                      {/* Der „ansehen"-Marker steht VOR den anderen Pillen: die übrigen
+                          sagen, was eine Zeile IST, dieser sagt, was noch zu tun ist.
+                          Klick nimmt ihn weg — dafür ist er ein Knopf und kein Etikett. */}
+                      {r.buchung?.zuPruefen && (
+                        <button
+                          type="button"
+                          aria-label={t("konten.pruefenWeg")}
+                          title={t("konten.pruefenWeg")}
+                          style={{ flex: "0 0 auto", display: "inline-flex", background: "none", border: 0, padding: 0, cursor: "pointer" }}
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            await pruefmarkerSetzen(r.buchung!.id, false);
+                            await laden();
+                          }}
+                        >
+                          <Pill variant="ok">{t("konten.pillPruefen")}</Pill>
+                        </button>
+                      )}
                       {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
                       {/* Der Verdacht steht an BEIDEN Zeilen — es gibt kein Original.
                           Die Gründe hängen im title, entschieden wird im Detail. */}
@@ -563,14 +560,22 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                         // Der title sitzt am Wrapper, nicht an der Pille: `bausteine/` ist teils aus
                         // dem Design-System kopiert und kennt die Eigenschaft nicht —
                         // dort wird nichts erfunden.
-                        <span
-                          style={{ flex: "0 0 auto", display: "inline-flex" }}
-                          title={`${r.dublette.gruende.join(" · ")} · ${t("konten.dubletten.zwilling", { datum: r.dublette.zwillingDatum })}`}
+                        <button
+                          type="button"
+                          aria-label={t("konten.vergleich.oeffnen")}
+                          style={{ flex: "0 0 auto", display: "inline-flex", background: "none", border: 0, padding: 0, cursor: "pointer" }}
+                          title={`${r.dublette.gruende.join(" · ")} · ${t("konten.dubletten.zwilling", { datum: r.dublette.zwillingDatum })} · ${t("konten.vergleich.oeffnen")}`}
+                          onClick={(e) => {
+                            // Die Zeile selbst öffnet das Detail — der Vergleich ist eine
+                            // eigene Frage und darf sie nicht mitauslösen.
+                            e.stopPropagation();
+                            if (r.buchung && r.dublette) vergleichOeffnen(r.buchung, r.dublette);
+                          }}
                         >
                           <Pill variant="warn">
                             {t(r.dublette.urteil === "identisch" ? "konten.dubletten.sicher" : "konten.dubletten.verdacht")}
                           </Pill>
-                        </span>
+                        </button>
                       )}
                     </span>
                   ),
@@ -652,12 +657,21 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {editBuchung && (
         <BuchungDetail
           buchung={editBuchung}
-          // Was die BANK geliefert hat, wird nicht von Hand gelöscht — beim nächsten
-          // Abruf käme es zurück, und bis dahin stimmte der Saldo nicht mehr mit ihr
-          // überein. Der Weg für so eine Zeile ist das Verwerfen im Abruf. Was aus einer
-          // Datei kam, hat diese Bindung nicht und ist löschbar.
-          loeschenGesperrt={ausBankabruf.has(editBuchung.id)}
+          // Was die BANK geliefert hat, wird verworfen statt gelöscht: gelöscht käme es
+          // beim nächsten Abruf zurück. Was aus einer Datei kam, hat diese Bindung nicht
+          // und wird schlicht gelöscht.
+          ausBankabruf={ausBankabruf.has(editBuchung.id)}
           onClose={() => setEditBuchung(null)}
+          onGeaendert={laden}
+        />
+      )}
+
+      {vergleich && (
+        <DublettenVergleich
+          links={vergleich.links}
+          rechts={vergleich.rechts}
+          verdacht={vergleich.verdacht}
+          onClose={() => setVergleich(null)}
           onGeaendert={laden}
         />
       )}
@@ -674,7 +688,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
       {umbuchenOffen && aktiv && (
         <UmbuchungModal
-          konten={kontozeilen.map((z) => z.konto)}
+          konten={offlineKonten}
           vonId={aktivId}
           heute={heute}
           onClose={() => setUmbuchenOffen(false)}
@@ -705,7 +719,11 @@ function Zeile({ links, betrag, charakter, saldo, faint, aktion }: { links: Reac
 function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Zahlungskonto[]; vonId: string; heute: string; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const [von, setVon] = useState(vonId);
+  // Vorbelegt wird das aktive Konto nur, wenn es überhaupt in der Liste steht: ist gerade
+  // ein Online-Konto gewählt, fehlt es hier, und ein `value`, das keine Option trifft,
+  // zeigt im Browser stumm die erste an — gespeichert würde dann ein anderes Konto als
+  // das angezeigte.
+  const [von, setVon] = useState(konten.some((k) => k.id === vonId) ? vonId : konten[0]?.id ?? "");
   const [nach, setNach] = useState(konten.find((k) => k.id !== vonId)?.id ?? "");
   const [datum, setDatum] = useState(heute);
   const [betrag, setBetrag] = useState("");
@@ -746,8 +764,8 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
         <FormField label={t("konten.feldBetrag")} required>
           <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
-        <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
-          <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
+        <FormField label={t("konten.feldBezeichnung")} hint={t("konten.optional")}>
+          <input className="field" aria-label={t("konten.feldBezeichnung")} value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
         </FormField>
       </div>
     </Modal>

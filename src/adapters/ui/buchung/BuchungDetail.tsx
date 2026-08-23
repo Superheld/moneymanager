@@ -58,7 +58,9 @@ import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../../application/buc
 import {
   buchungBearbeiten,
   buchungErfassen,
+  bankzeileVerwerfen,
   buchungLoeschen,
+  pruefmarkerSetzen,
   buchungenPaaren,
   buchungSplitten,
   buchungsdetail,
@@ -315,7 +317,7 @@ function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void
  *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
  *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
  */
-function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, loeschenGesperrt, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; loeschenGesperrt?: boolean; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, ausBankabruf, onlineKonten, aktuelle, onPruefmarker, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; ausBankabruf?: boolean; onlineKonten: ReadonlySet<string>; aktuelle?: IstBuchung; onPruefmarker: (vorgemerkt: boolean) => Promise<void>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const istEntwurf = !!entwurf;
@@ -358,8 +360,29 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
   const musterAngebot = musterVorschlag(umsatz?.gegenpartei ?? "");
   const kategorieGeaendert = kategorieId !== (buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
   const konto = konten.find((k) => k.id === kontoId);
+  /**
+   * Auf einem Konto mit Bankverbindung sind Datum und Betrag Tatsachen, keine Eingabe.
+   *
+   * Eine von Hand geänderte Zahl wäre eine Behauptung gegen den Kontoauszug: sie taucht
+   * beim nächsten Abgleich als Abweichung auf, und dann weiss niemand mehr, dass sie von
+   * Hand entstanden ist — sie sieht aus wie eine fehlende Buchung. Wer eine Bankzeile für
+   * falsch hält, verwirft sie; korrigieren lässt sie sich nicht.
+   *
+   * Die EINORDNUNG bleibt frei: Bezeichnung, Kategorie, Vertrag, Aufteilung gehören dem
+   * Nutzer, nicht der Bank. Beim Anlegen von Hand (`istNeu`) greift die Sperre nicht —
+   * dort ist noch kein Konto gewählt, und die Auswahlliste bietet ohnehin nur offline an.
+   */
+  const kontoIstOnline = !istNeu && onlineKonten.has(kontoId);
   const istUmschichtung = charakter === "Umschichtung";
-  const andereKonten = konten.filter((k) => k.id !== kontoId);
+  /**
+   * Konten, auf denen ein Gegenbein ERZEUGT werden darf.
+   *
+   * Nicht bloss „die anderen": auf einem abgerufenen Konto anzulegen hiesse, eine Buchung
+   * zu erfinden, die es bei der Bank nicht gibt. Zwei abgerufene Konten brauchen das auch
+   * gar nicht — beide Seiten meldet die Bank ohnehin, sie stehen als Gegenbuchung in der
+   * Liste darüber und werden VERBUNDEN statt erzeugt.
+   */
+  const andereKonten = konten.filter((k) => k.id !== kontoId && !onlineKonten.has(k.id));
 
   // ── Gegenbein-Suche im Entwurf ──────────────────────────────────────────────────────
   //
@@ -558,11 +581,14 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
               {t(dublette ? "konten.neue.schonGebucht" : "konten.entwurf.verwerfen")}
             </button>
           )}
-          {buchung && !loeschenGesperrt && (
-            <button className="linkbtn" style={{ marginLeft: "auto", color: "var(--warn-deep)" }} onClick={() => onDelete()}>{t("konten.loeschen")}</button>
-          )}
-          {buchung && loeschenGesperrt && (
-            <span className="muted" style={{ marginLeft: "auto", fontSize: "var(--fs-xs)" }}>{t("konten.detail.loeschenOnline")}</span>
+          {buchung && (
+            <button
+              className="linkbtn"
+              style={{ marginLeft: "auto", color: "var(--warn-deep)" }}
+              onClick={() => onDelete()}
+            >
+              {t(ausBankabruf ? "konten.detail.verwerfenBankzeile" : "konten.loeschen")}
+            </button>
           )}
           {fehler && <span className="err">{fehler}</span>}
         </>
@@ -615,21 +641,53 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         </FormField>
         {/* Tag und Betrag der Bank sind Tatsachen, keine Eingabe — im Entwurf stehen sie
             nur da. Wer korrigieren muss, tut das nach dem Übernehmen an der Buchung. */}
-        <FormField label={t("konten.feldDatum")} required hint={istEntwurf ? t("konten.entwurf.vonDerBank") : undefined}>
-          <input className="field" type="date" aria-label={t("konten.feldDatum")} value={datum} disabled={istEntwurf} onChange={(e) => setDatum(e.target.value)} />
+        <FormField label={t("konten.feldDatum")} required hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : undefined}>
+          <input className="field" type="date" aria-label={t("konten.feldDatum")} value={datum} disabled={istEntwurf || kontoIstOnline} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
         <FormField
           label={t("konten.feldBetrag")}
           required
-          hint={istEntwurf ? t("konten.entwurf.vonDerBank") : istNeu ? t("konten.buchung.betragHinweis") : undefined}
+          hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : istNeu ? t("konten.buchung.betragHinweis") : undefined}
         >
-          <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
+          <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf || kontoIstOnline} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
-        {/* Die Notiz gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt den
-            Verwendungszweck der Bank, und der steht unter „Herkunft". */}
+        {/* Die Bezeichnung gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt
+            den Verwendungszweck der Bank, und der steht unter „Herkunft".
+
+            Der PLATZHALTER zeigt, was ohne eigene Angabe in der Registerzeile steht:
+            Empfänger, sonst Verwendungszweck (dieselbe Kette wie in `registerSicht`). Ohne
+            das ist nicht zu sehen, dass die Zeile schon eine Beschriftung HAT und dieses
+            Feld sie überschreibt — man tippt dann ab, was ohnehin dasteht. Was hier leer
+            bleibt, bleibt automatisch. */}
+        {/* Der Prüfmarker wirkt SOFORT, nicht erst beim Speichern — wie die Pille im
+            Register auch. Er ist eine Handlung („gesehen"), keine Eigenschaft, die man
+            miterfasst; wer den Dialog ohne Speichern schliesst, hat ihn trotzdem gesetzt.
+            Deshalb steht er als Kästchen und nicht im Formularraster darüber. */}
+        {!istEntwurf && buchung && (
+          <FormField label={t("konten.pruefenFeld")} hint={t("konten.pruefenHinweis")}>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)", fontSize: "var(--fs-sm)", cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={!!aktuelle?.zuPruefen}
+                disabled={busy}
+                onChange={async (e) => {
+                  await onPruefmarker(e.target.checked);
+                }}
+                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+              />
+              {t("konten.pillPruefen")}
+            </label>
+          </FormField>
+        )}
         {!istEntwurf && (
-          <FormField label={t("konten.feldNotiz")} hint={t("konten.optional")}>
-            <input className="field" value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.buchung.notizPlatzhalter")} />
+          <FormField label={t("konten.feldBezeichnung")} hint={t("konten.optional")}>
+            <input
+              className="field"
+              aria-label={t("konten.feldBezeichnung")}
+              value={notiz}
+              onChange={(e) => setNotiz(e.target.value)}
+              placeholder={umsatz?.gegenpartei || umsatz?.verwendungszweck || t("konten.buchung.notizPlatzhalter")}
+            />
           </FormField>
         )}
       </div>
@@ -908,10 +966,18 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         </div>
       )}
 
-      {/* „Löschen" sagt nicht die ganze Wahrheit, wenn die Buchung aus einem Import
-          stammt: die Bankzeile bleibt und steht danach wieder unter den Entwürfen. Wer
-          sie endgültig weghaben will, verwirft sie dort. */}
-      {buchung?.quelle === "import" && (
+      {/* Was das Verwerfen kostet, beziffert und nicht nur behauptet — dieselbe Auskunft,
+          die ein Entwurf oben bekommt. Die Zeile verschwindet aus dem Saldo, die Bank
+          kennt sie weiterhin, also weicht der Stand danach um genau diesen Betrag ab. */}
+      {buchung && ausBankabruf && (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+          {t("konten.detail.verwerfenFolge", { betrag: geld.formatMitSymbol(-buchung.betrag, { mitVorzeichen: true }) })}
+        </div>
+      )}
+
+      {/* „Löschen" sagt nicht die ganze Wahrheit, wenn die Buchung aus einer DATEI kam:
+          die eingelesene Zeile bleibt und steht danach wieder in der Import-Inbox. */}
+      {buchung?.quelle === "import" && !ausBankabruf && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
           {t("konten.detail.loeschenHinweis")}
         </div>
@@ -1041,14 +1107,18 @@ function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung: IstBuc
  * „Gegenbein neu erzeugen" (S-1a, Zielkonto wird nicht importiert). Der Nutzer soll nicht
  * vorher wissen müssen, welcher Fall vorliegt — die Liste beantwortet das.
  */
-function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzByIst, onClose, onSaved }: { buchung: IstBuchung; konten: Zahlungskonto[]; alleBuchungen: IstBuchung[]; kontoName: Map<string, string>; umsatzByIst: Map<string, Umsatz>; onClose: () => void; onSaved: () => void }) {
+function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen, kontoName, umsatzByIst, onClose, onSaved }: { buchung: IstBuchung; konten: Zahlungskonto[]; onlineKonten: ReadonlySet<string>; alleBuchungen: IstBuchung[]; kontoName: Map<string, string>; umsatzByIst: Map<string, Umsatz>; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const kandidaten = useMemo(() => paarungsKandidaten(alleBuchungen, buchung), [alleBuchungen, buchung]);
-  const andereKonten = konten.filter((k) => k.id !== buchung.kontoId);
-  // Vorauswahl: der beste Kandidat, sonst der Weg über ein neu erzeugtes Gegenbein.
-  const [wahl, setWahl] = useState<string>(kandidaten[0]?.id ?? "__neu");
+  // Erzeugt wird nur auf Konten ohne Bankverbindung — siehe `gegenbeinErzeugen`. Die
+  // Gegenbuchungen darüber sind davon nicht betroffen: die existieren schon.
+  const andereKonten = konten.filter((k) => k.id !== buchung.kontoId && !onlineKonten.has(k.id));
+  // Vorauswahl: der beste Kandidat, sonst der Weg über ein neu erzeugtes Gegenbein — den
+  // aber nur, wenn es überhaupt ein Konto gibt, auf dem erzeugt werden darf.
+  const [wahl, setWahl] = useState<string>(kandidaten[0]?.id ?? (andereKonten.length > 0 ? "__neu" : ""));
   const [neuKontoId, setNeuKontoId] = useState(andereKonten[0]?.id ?? "");
+  const nichtsZuTun = kandidaten.length === 0 && andereKonten.length === 0;
   const [fehler, setFehler] = useState<string | null>(null);
 
   /** Beschriftung einer Gegenbuchung: Empfänger aus dem Import, sonst Notiz. */
@@ -1077,7 +1147,13 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
       title={t("konten.zurUmbuchung.titel")}
       subtitle={t("konten.zurUmbuchung.untertitel")}
       onClose={onClose}
-      footer={<><Button variant="primary" onClick={speichern}>{t("konten.zurUmbuchung.bestaetigen")}</Button><button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
+      footer={<>
+        {/* Gibt es weder eine Gegenbuchung noch ein Konto, auf dem erzeugt werden darf,
+            hat der Knopf nichts zu bestätigen — dann führt nur der Weg zurück. */}
+        {!nichtsZuTun && <Button variant="primary" onClick={speichern}>{t("konten.zurUmbuchung.bestaetigen")}</Button>}
+        <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+        {fehler && <span className="err">{fehler}</span>}
+      </>}
     >
       {/* Die Buchung, um die es geht */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", marginBottom: "var(--sp-4)" }}>
@@ -1108,20 +1184,33 @@ function ZurUmbuchungModal({ buchung, konten, alleBuchungen, kontoName, umsatzBy
         ))
       )}
 
-      {/* Ausweg: kein Gegenbein vorhanden (S-1a) */}
-      <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "var(--sp-4) 0 var(--sp-3)", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)" }}>
-        <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-        {t("konten.zurUmbuchung.oder")}
-        <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-      </div>
-      <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-        <input type="radio" name="gegenbein" value="__neu" checked={wahl === "__neu"} onChange={() => setWahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
-        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
-        <select className="field" style={{ width: "auto" }} value={neuKontoId} onChange={(e) => { setNeuKontoId(e.target.value); setWahl("__neu"); }}>
-          {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-        </select>
-      </label>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
+      {/* Ausweg: kein Gegenbein vorhanden (S-1a).
+
+          Fällt ganz weg, wenn alle übrigen Konten an einer Bank hängen — dort darf nichts
+          erzeugt werden, und ein Radio-Knopf über einer leeren Auswahlliste wäre eine
+          Handlung, die nicht geht. Statt dessen steht dort, warum: die Gegenseite meldet
+          die Bank ohnehin, sie muss nur verbunden werden. */}
+      {andereKonten.length > 0 ? (
+        <>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "var(--sp-4) 0 var(--sp-3)", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)" }}>
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+            {t("konten.zurUmbuchung.oder")}
+            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
+          </div>
+          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+            <input type="radio" name="gegenbein" value="__neu" checked={wahl === "__neu"} onChange={() => setWahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
+            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
+            <select className="field" aria-label={t("konten.zurUmbuchung.neu")} style={{ width: "auto" }} value={neuKontoId} onChange={(e) => { setNeuKontoId(e.target.value); setWahl("__neu"); }}>
+              {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
+            </select>
+          </label>
+          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
+        </>
+      ) : (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-4)" }}>
+          {t("konten.zurUmbuchung.nurVerbinden")}
+        </div>
+      )}
 
       {buchung.kategorieId && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)" }}>
@@ -1150,11 +1239,13 @@ export function BuchungDetail(props: {
   entwurf?: undefined;
   vorgabe?: undefined;
   /**
-   * Löschen ausblenden. Gesetzt für Buchungen auf Konten, die an einer Bankverbindung
-   * hängen: was die Bank geliefert hat, wird nicht von Hand entfernt — beim nächsten
-   * Abruf käme es zurück, und bis dahin stimmte der Saldo nicht mehr mit ihr überein.
+   * Diese Zeile kam aus einem BANKABRUF und wird nicht gelöscht, sondern verworfen.
+   *
+   * Der Unterschied steht im Use-Case (`bankzeileVerwerfen`) und ist kein Wording: gelöscht
+   * käme sie beim nächsten Abruf zurück, verworfen bleibt sie als Entscheidung gespeichert.
+   * Der Knopf heisst deshalb anders und der Hinweis darunter nennt die Folge für den Saldo.
    */
-  loeschenGesperrt?: boolean;
+  ausBankabruf?: boolean;
   onClose: () => void;
   onGeaendert: () => void | Promise<void>;
 } | {
@@ -1171,7 +1262,7 @@ export function BuchungDetail(props: {
   onGeaendert: () => void | Promise<void>;
 }) {
   const { buchung, entwurf, vorgabe, onClose, onGeaendert } = props;
-  const loeschenGesperrt = "loeschenGesperrt" in props ? props.loeschenGesperrt : false;
+  const ausBankabruf = "ausBankabruf" in props ? props.ausBankabruf : false;
   const { t } = useTranslation();
   const geld = useGeld();
   // Welche Buchung gerade gezeigt wird — der Sprung zur Gegenbuchung (und zum Zwilling
@@ -1193,6 +1284,7 @@ export function BuchungDetail(props: {
   const [dublettenverdacht, setDublettenverdacht] = useState<ReadonlyMap<string, Dublettenverdacht>>(LEERE_KARTE);
   const [freigegeben, setFreigegeben] = useState<ReadonlySet<string>>(LEERE_MENGE);
   const [freigaben, setFreigaben] = useState<readonly Dublettenfreigabe[]>([]);
+  const [onlineKonten, setOnlineKonten] = useState<ReadonlySet<string>>(LEERE_MENGE);
 
   async function laden() {
     const d = await buchungsdetail();
@@ -1200,6 +1292,7 @@ export function BuchungDetail(props: {
     setUmsaetze([...d.umsaetze]); setLaeufe([...d.laeufe]); setAlle([...d.buchungen]);
     setVertraege([...d.vertraege]); setZuordnungen([...d.zuordnungen]);
     setDublettenverdacht(d.dublettenverdacht); setFreigegeben(d.freigegeben); setFreigaben(d.freigaben);
+    setOnlineKonten(d.onlineKonten);
     // Die gezeigte Buchung aus dem frischen Stand nachziehen (nach dem Speichern).
     setAktuelle((b) => (b ? d.buchungen.find((x) => x.id === b.id) ?? b : undefined));
   }
@@ -1287,10 +1380,19 @@ export function BuchungDetail(props: {
     }
   }
 
-  /** Löscht die Buchung — bei einer Umbuchung BEIDE Beine, sonst bliebe eines verwaist. */
+  /**
+   * Löscht die Buchung — bei einer Umbuchung BEIDE Beine, sonst bliebe eines verwaist.
+   *
+   * Eine Zeile aus dem Bankabruf nimmt den anderen Weg: sie wird VERWORFEN, damit der
+   * nächste Abruf sie nicht zurückholt (`bankzeileVerwerfen`). Der Use-Case löst dabei
+   * eine Paarung selbst, nimmt das Gegenbein aber nicht mit — es kann aus einer Datei
+   * stammen und ist von der Entscheidung über diese eine Zeile nicht betroffen.
+   */
   async function entfernen() {
     if (!aktuelle) return;
-    if (aktuelle.transferId) {
+    if (ausBankabruf) {
+      await bankzeileVerwerfen(aktuelle.id);
+    } else if (aktuelle.transferId) {
       const beine = alle.filter((x) => x.transferId === aktuelle.transferId);
       await umbuchungLoeschen(aktuelle.transferId);
       await umsaetzeZuruecksetzen(beine.map((x) => x.id));
@@ -1300,6 +1402,13 @@ export function BuchungDetail(props: {
     }
     await onGeaendert();
     onClose();
+  }
+
+  /** Setzt den „noch ansehen"-Marker oder nimmt ihn weg — sofort, ohne Speichern. */
+  async function pruefmarkerUmschalten(vorgemerkt: boolean) {
+    if (!aktuelle) return;
+    await pruefmarkerSetzen(aktuelle.id, vorgemerkt);
+    await nachAenderung();
   }
 
   async function nachAenderung() {
@@ -1336,6 +1445,7 @@ export function BuchungDetail(props: {
   if (umbuchenAus) {
     return (
       <ZurUmbuchungModal
+        onlineKonten={onlineKonten}
         buchung={umbuchenAus}
         konten={konten}
         alleBuchungen={alle}
@@ -1395,7 +1505,10 @@ export function BuchungDetail(props: {
       onClose={onClose}
       onSaved={async () => { await nachAenderung(); onClose(); }}
       onDelete={entfernen}
-      loeschenGesperrt={loeschenGesperrt}
+      ausBankabruf={ausBankabruf}
+      onlineKonten={onlineKonten}
+      aktuelle={aktuelle}
+      onPruefmarker={pruefmarkerUmschalten}
       onZurUmbuchung={() => aktuelle && setUmbuchenAus(aktuelle)}
       vertragsBindung={
         aktuelle

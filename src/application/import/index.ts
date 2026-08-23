@@ -10,3 +10,4 @@ export * from "./kontoMatch";
 export * from "./vorschlag";
 export * from "./umsaetzeUebernehmen";
 export * from "./umsatzVerbuchen";
+export * from "./bankzeileVerwerfen";

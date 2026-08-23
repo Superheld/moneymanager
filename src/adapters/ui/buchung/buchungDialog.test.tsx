@@ -56,7 +56,7 @@ async function grunddaten() {
 
 /** Eine abgerufene, noch nicht übernommene Zeile. */
 async function entwurf(over: Record<string, unknown> = {}) {
-  await umsatzRepo.speichern({
+  await umsatzRepo.anlegen({
     id: "e1", laufId: "l-datei", zahlungskontoId: "k1", buchungstag: "2026-08-17",
     betrag: -4990, waehrung: "EUR", gegenpartei: "Testhaendler Nord",
     verwendungszweck: "Einkauf", rohHash: "h-e1", status: "neu",
@@ -151,7 +151,7 @@ describe("Entwurf prüfen", () => {
     await entwurf();
     // Dieselbe Zahlung liegt schon auf dem Konto — gleicher Betrag, gleicher Tag,
     // gleicher Empfänger.
-    await umsatzRepo.speichern({
+    await umsatzRepo.anlegen({
       id: "alt", laufId: "l-abruf", zahlungskontoId: "k1", buchungstag: "2026-08-17",
       betrag: -4990, waehrung: "EUR", gegenpartei: "Testhaendler Nord",
       verwendungszweck: "Einkauf", rohHash: "h-alt", status: "verbucht", istbuchungId: "b-alt",
@@ -197,7 +197,7 @@ describe("Weglegen und zurueckholen", () => {
     // dort ist zu sehen, WORAUF sich der Verdacht bezieht.
     await grunddaten();
     await entwurf();
-    await umsatzRepo.speichern({
+    await umsatzRepo.anlegen({
       id: "alt", laufId: "l-abruf", zahlungskontoId: "k1", buchungstag: "2026-08-17",
       betrag: -4990, waehrung: "EUR", gegenpartei: "Testhaendler Nord",
       verwendungszweck: "Einkauf", rohHash: "h-alt", status: "verbucht", istbuchungId: "b-alt",

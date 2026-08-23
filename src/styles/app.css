@@ -293,6 +293,33 @@ select.field {
   color: var(--warn-deep);
 }
 
+/* --- Der Bezeichner einer Zeile, der weiterfuehrt ---
+   Nicht zu verwechseln mit `.linkbtn` darueber, und der Unterschied ist Absicht:
+   `.linkbtn` ist eine gedaempfte NEBENAKTION in einer Zeile („Profil ansehen") und soll
+   sich zurueckhalten. Dies hier ist der Weg weiter und muss sich zeigen — Akzentfarbe und
+   Unterstrich, damit man ueberhaupt sieht, dass es etwas zu klicken gibt. Ohne das steht
+   eine Tabelle stumm da, und niemand probiert die Zeilen durch. */
+.zeilenlink {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  text-align: inherit;
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  cursor: pointer;
+  /* Ohne das reisst ein langer Bezeichner die Spaltenbreite auf, die `DataTable` sonst
+     kappt: der Knopf ist ein eigener Block und erbt die Kappung nicht. */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.zeilenlink:hover {
+  color: var(--accent);
+}
+
 /* --- Monatsausblick: drei Karten im goldenen Schnitt ---
    Der laufende Monat trägt eine Zahlenspalte mehr und bekommt die breite Seite
    (38,2 %); die beiden Vorschauen teilen sich den Rest. Eine hälftige Aufteilung

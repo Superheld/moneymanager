@@ -45,7 +45,7 @@ import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
 import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
 import { bankAnker } from "../../core";
-import type { Abrufadapter, Bankprofil, Bankzugang, TanFrager } from "./abrufPort";
+import type { Abrufadapter, Auszugsstand, Bankprofil, Bankzugang, TanFrager } from "./abrufPort";
 import { abruffenster, erstabrufTage } from "./bankprofil";
 import type { Kontozuordnung, KontozuordnungRepository } from "./bankzugangPort";
 import type { BankzugangRepository } from "./bankzugangPort";
@@ -294,9 +294,44 @@ export async function abrufAusfuehren(
       );
     }
 
+    /**
+     * Die Stände aus den AUSZÜGEN als Anker festhalten — die eigentliche Ausbeute.
+     *
+     * Der Saldo oben kommt aus einer eigenen Abfrage (`HKSAL`), die nicht jede Bank
+     * anbietet, und er sagt nur, wie es HEUTE steht. Die Auszugsstände fallen bei jedem
+     * Abruf nebenbei an und decken den ABGEFRAGTEN ZEITRAUM ab: ein Abruf über zwei Jahre
+     * bringt die Stände dieser zwei Jahre mit.
+     *
+     * Das ist der Unterschied zwischen „irgendwo in fünf Jahren fehlt etwas" und „zwischen
+     * diesen beiden Stichtagen". Erst mit mehreren Ankern kann `abweichungsfenster`
+     * überhaupt etwas eingrenzen — mit einem einzigen vergleicht es Anker gegen nichts.
+     *
+     * Auch dann, wenn die Umsätze scheitern: die Stände sind eine eigenständige Aussage.
+     */
+    async function auszugsSaldenFesthalten(staende: readonly Auszugsstand[]) {
+      const erfasstAm = new Date().toISOString();
+      for (const stand of staende) {
+        // Ein einzelner unplausibler Stand darf den Abruf nicht kippen: `bankAnker` prüft
+        // das Datum und wirft bei Unsinn. Die Buchungen sind das Wichtigere.
+        try {
+          await deps.ankerRepo.speichern(
+            bankAnker(z.zahlungskontoId, stand.betrag, stand.datum, erfasstAm),
+          );
+        } catch {
+          // stillschweigend übergehen — der Stand ist eine Zugabe, keine Bedingung
+        }
+      }
+    }
+
     try {
       // Das zuletzt getragene Format als Reihenfolge mitgeben — nicht als Festlegung.
-      const abruf = await sitzung.umsaetze(bankkonto, von, deps.heute, z.letztesFormat);
+      // Das zuletzt getragene Format als Reihenfolge, die Wahl des Nutzers als Festlegung
+      // — der Adapter hält die beiden auseinander (siehe `Formatvorgabe`).
+      const abruf = await sitzung.umsaetze(bankkonto, von, deps.heute, {
+        wahl: z.formatwahl,
+        zuletzt: z.letztesFormat,
+      });
+      await auszugsSaldenFesthalten(abruf.auszugsSalden);
 
       // Das Ziel steht fest — es kommt aus der Zuordnung, nicht aus einem Konto-Match
       // über die IBAN. Deshalb wird hier auch nichts angelegt.
@@ -307,6 +342,14 @@ export async function abrufAusfuehren(
           zeitpunkt: new Date().toISOString(),
           rohUmsaetze: abruf.ergebnis.umsaetze,
           konten: [{ quelleKey: quelleKeyFuer(bankkonto.iban), kontoId: zahlungskonto.id }],
+          // Ein Abruf gilt genau EINEM Konto eines Zugangs, und er weiss, welches Format
+          // getragen hat. Bisher stand das nur im `dateiname` als Fliesstext — lesbar,
+          // aber nicht auswertbar, und bei jeder Umbenennung eine Ratepartie.
+          herkunft: {
+            zugangId: zugang.id,
+            zahlungskontoId: zahlungskonto.id,
+            format: abruf.format,
+          },
         },
         {
           kontoRepo: deps.kontoRepo,
@@ -330,6 +373,10 @@ export async function abrufAusfuehren(
           // Kategorie darf danach kommen — sie fehlt sonst als Grund, eine Tatsache
           // nicht zu buchen.
           auchOhneKategorie: true,
+          // Und als „noch anzusehen" vormerken: der Abruf bucht direkt, niemand hat die
+          // Zeile zwischen Bank und Saldo in der Hand gehabt. Die Datei-Inbox setzt das
+          // NICHT — dort übernimmt man jede Zeile einzeln und hat sie damit gesehen.
+          zumPruefenVormerken: true,
         });
       }
 

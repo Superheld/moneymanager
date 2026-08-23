@@ -1,0 +1,45 @@
+#!/bin/sh
+# Zwei Fragen, bevor etwas in die Historie geht — und beide sind schwer zu heilen, wenn
+# man sie erst spaeter stellt.
+#
+#   1. Steht etwas Privates in dem, was gleich festgeschrieben wird?
+#   2. Sitzt der Commit auf dem richtigen Branch?
+#
+# Warum HIER und nicht erst beim Push: was einmal committet ist, steht in der Historie.
+# Sie laesst sich umschreiben, aber nie vollstaendig — Forks und alte SHAs bleiben bei
+# GitHub abrufbar. Der billigste Zeitpunkt ist der, an dem es noch gar nicht drin ist.
+#
+# Aktiv ueber:        git config core.hooksPath .githooks
+# Umgehen im Notfall: git commit --no-verify
+set -e
+WURZEL=$(git rev-parse --show-toplevel)
+
+# ── 1. Muster-Guard ueber das Vorgemerkte ────────────────────────────────────────────
+node "$WURZEL/scripts/privacy-guard.mjs" --staged || exit 1
+
+# ── 2. Branch-Schutz ─────────────────────────────────────────────────────────────────
+#
+# `develop` ist der Sammelpunkt, `main` der veroeffentlichte Stand. Auf beiden wird nicht
+# gearbeitet, sondern nur gemergt (CLAUDE.md, „Branches").
+#
+# MERGES sind davon nicht betroffen: Git ruft fuer sie `pre-merge-commit`, nicht diesen
+# Hook. Ein `git merge --no-ff` laeuft also normal durch, und genau das soll es.
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+case "$BRANCH" in
+  develop|main)
+    echo "" >&2
+    echo "✋ Kein direkter Commit auf '$BRANCH'." >&2
+    echo "" >&2
+    echo "   Jede Aenderung bekommt einen eigenen Branch und wird von dort per --no-ff" >&2
+    echo "   gemergt. Merges laufen weiter durch — nur das Arbeiten direkt hier nicht." >&2
+    echo "" >&2
+    echo "   Der Weg von hier aus, ohne etwas zu verlieren:" >&2
+    echo "     git switch -c <branchname>       # nimmt das Vorgemerkte mit" >&2
+    echo "     git commit" >&2
+    echo "     git switch $BRANCH && git merge --no-ff <branchname>" >&2
+    echo "" >&2
+    echo "   Wirklich hier committen: git commit --no-verify" >&2
+    echo "" >&2
+    exit 1
+    ;;
+esac

@@ -23,6 +23,8 @@ import {
 } from "../../../application";
 import { kontoAnlegen, kontoLoeschen } from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
+import { HerkunftBereich } from "./HerkunftBereich";
 import { IconButton } from "../bausteine/IconButton";
 import { KontoAnlegenModal } from "./KontoAnlegenModal";
 import { Modal } from "../bausteine/Modal";
@@ -59,11 +61,21 @@ export function KontenVerwaltung({
   /** Löst die Verbindung eines Kontos (der Zugang selbst bleibt bestehen). */
   onTrennen: (v: KontoVerbindung) => Promise<void>;
   onChange: () => void;
+
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
   const stand = new Map(kontostaende.map((k) => [k.konto.id, k]));
   const [offen, setOffen] = useState(false);
+  /**
+   * Welches Konto seine eingelesenen Zeilen zeigt — direkt unter der Tabelle.
+   *
+   * Derselbe Aufbau wie im Kontoauszug: oben die Liste, darunter das Gewählte. Ein Sprung
+   * in ein anderes Register waere schneller getippt und im Gebrauch schlechter — man
+   * verliert die Zeile aus den Augen, von der man ausgegangen ist, und muss zurück, um
+   * das nächste Konto anzusehen.
+   */
+  const [zeilenVon, setZeilenVon] = useState<string | null>(null);
   const [anlegen, setAnlegen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [bezeichnung, setBezeichnung] = useState("");
@@ -115,6 +127,7 @@ export function KontenVerwaltung({
   }
 
   return (
+    <>
     <Card action={<Button variant="primary" plus onClick={() => setAnlegen(true)}>{t("einstellungen.konto.anlegen")}</Button>}>
       {hatGebuchtes && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
@@ -126,7 +139,21 @@ export function KontenVerwaltung({
       ) : (
         <DataTable
           columns={[
-            { key: "bezeichnung", label: t("einstellungen.konto.spalteBezeichnung") },
+            {
+              key: "bezeichnung",
+              label: t("einstellungen.konto.spalteBezeichnung"),
+              // Der Bezeichner führt weiter — sichtbar, weil er wie ein Link aussieht.
+              // Die Zeile selbst bleibt stumm: eine unsichtbare Klickfläche findet
+              // niemand, und wer sie zufällig trifft, hat sie nicht gemeint.
+              render: (k: Zahlungskonto) => (
+                <Zeilenlink
+                  onKlick={() => setZeilenVon(zeilenVon === k.id ? null : k.id)}
+                  titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
+                >
+                  {k.bezeichnung}
+                </Zeilenlink>
+              ),
+            },
             { key: "typ", label: t("einstellungen.konto.spalteTyp"), render: (k) => t(`einstellungen.konto.typ.${k.typ}`) },
             {
               key: "klasse",
@@ -158,6 +185,7 @@ export function KontenVerwaltung({
           rows={konten}
         />
       )}
+
       {offen && (
         <Modal
           title={editId ? t("einstellungen.konto.modalBearbeiten") : t("einstellungen.konto.modalAnlegen")}
@@ -254,6 +282,18 @@ export function KontenVerwaltung({
         />
       )}
     </Card>
+
+    {/* Die Buchungsliste steht als EIGENE Tabelle unter der Kontentabelle — nicht in ihr.
+        Sie bringt eine eigene Karte mit, und eine Karte in einer Karte ergibt zwei
+        Rahmen um dieselbe Sache: der Inhalt rückt zweimal ein, und die Trennung, die
+        eine Karte leisten soll, wird zur Verschachtelung. Dasselbe Muster wie bei den
+        Bankzugängen, wo die Kontenliste ebenfalls daneben steht. */}
+    {zeilenVon && (
+      <div style={{ marginTop: "var(--gap-card)" }}>
+        <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} />
+      </div>
+    )}
+    </>
   );
 }
 

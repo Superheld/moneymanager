@@ -7,6 +7,7 @@ import {
   hauptkategorie,
   RHYTHMUS_MONATE,
   type Charakter,
+  type IstBuchung,
   type Rhythmus,
   type Vertrag,
   type Vertragskandidat,
@@ -22,6 +23,8 @@ import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { Modal } from "../bausteine/Modal";
 import type { DataColumn } from "../bausteine/DataTable";
 import { PageHead } from "../bausteine/PageHead";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
+import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
 import {
   formularAusKandidat,
@@ -150,6 +153,8 @@ export function VertraegeScreen() {
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Vertragssicht | null>(null);
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
+  /** Welcher Vertrag seine zugeordneten Zahlungen zeigt — aufgeklappt unter der Tabelle. */
+  const [zahlungenVon, setZahlungenVon] = useState<string | null>(null);
 
   /**
    * Die offene Maske: `start` ist ihr Anfangszustand, `editId` unterscheidet Ändern von
@@ -179,6 +184,7 @@ export function VertraegeScreen() {
   const personName = sicht?.personNamen ?? LEERE_NAMEN;
   const summe = sicht?.kennzahlen ?? LEERE_KENNZAHLEN;
   const zeileZu = useMemo(() => new Map(zeilen.map((z) => [z.vertrag.id, z])), [zeilen]);
+  const zahlungsdetail = zahlungenVon ? zeileZu.get(zahlungenVon) : undefined;
 
   /** Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort. */
   function vorschlagUebernehmen(k: Vertragskandidat) {
@@ -210,7 +216,17 @@ export function VertraegeScreen() {
         // jeder Zeile („Abo") sagte nichts und kostete eine Spaltenbreite.
         render: (v) => (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-            {v.anbieter}
+            {/* Der Anbieter führt zu den Zahlungen, die der Abgleich diesem Vertrag
+                zugeordnet hat. Die Spalte daneben nennt nur ihre ANZAHL — die sagt „die
+                Regel greift", aber nicht WAS sie greift. Erst an der Liste sieht man den
+                Fehlgriff: eine fremde Zahlung an denselben Empfänger zählt genauso mit
+                und macht aus einer falschen Zuordnung eine gute Kennzahl. */}
+            <Zeilenlink
+              onKlick={() => setZahlungenVon(zahlungenVon === v.id ? null : v.id)}
+              titel={t("vertraege.zeigeZahlungen", { anbieter: v.anbieter })}
+            >
+              {v.anbieter}
+            </Zeilenlink>
             {v.art === "dauervertrag" && <Pill variant="neutral">{t("vertraege.artKurz.dauervertrag")}</Pill>}
           </span>
         ),
@@ -614,6 +630,44 @@ export function VertraegeScreen() {
               pageSize={25}
               columns={spalten(false)}
               rows={ansicht === "faelligkeit" ? nachFaelligkeit : nachBetrag}
+            />
+          )}
+        </Card>
+      )}
+
+      {/* Die Zahlungen des gewählten Vertrags. Sie stehen UNTER der Tabelle und nicht in
+          einem Dialog: man vergleicht sie mit dem, was in der Zeile darüber steht — Betrag,
+          Rhythmus, nächste Fälligkeit —, und ein Dialog verdeckte genau das. */}
+      {zahlungsdetail && (
+        <Card
+          style={{ marginTop: "var(--gap-card)" }}
+          title={t("vertraege.zahlungenTitel", { anbieter: zahlungsdetail.vertrag.anbieter })}
+        >
+          {zahlungsdetail.zahlungsliste.length === 0 ? (
+            <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              {t("vertraege.keineZahlungen")}
+            </div>
+          ) : (
+            <DataTable
+              sortable
+              pageSize={15}
+              columns={[
+                { key: "datum", label: t("konten.spalteDatum") },
+                {
+                  key: "betrag",
+                  label: `${t("konten.spalteBetrag")} ${geld.symbol}`,
+                  align: "right" as const,
+                  render: (b: IstBuchung) => (
+                    <span style={{ color: geldFarbe(b.betrag) }}>{geld.format(b.betrag)}</span>
+                  ),
+                },
+                {
+                  key: "charakter",
+                  label: t("vertraege.spalteCharakter"),
+                  render: (b: IstBuchung) => t(`charakter.${b.charakter}`),
+                },
+              ]}
+              rows={[...zahlungsdetail.zahlungsliste]}
             />
           )}
         </Card>

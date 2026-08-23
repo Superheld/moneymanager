@@ -44,14 +44,20 @@ function buchung(o: {
      VALUES ($id, '2026-03-01', $betrag, 'k1', $kat, $char, 'import')`,
     { $id: o.id, $betrag: o.betrag, $kat: o.kategorieId ?? null, $char: o.charakter ?? "Aufwand" },
   );
+  // Beleg und Verarbeitungsstand stehen seit dem Umbau getrennt.
   db.run(
-    `INSERT INTO umsatz (id, lauf_id, zahlungskonto_id, buchungstag, betrag, waehrung,
-                         gegenpartei, verwendungszweck, roh_hash, status, istbuchung_id)
-     VALUES ($uid, 'l1', 'k1', '2026-03-01', $betrag, 'EUR', $gp, $zweck, $hash, 'verbucht', $id)`,
+    `INSERT INTO umsatz_roh (id, lauf_id, buchungstag, betrag, waehrung,
+                             gegenpartei, verwendungszweck, roh_hash)
+     VALUES ($uid, 'l1', '2026-03-01', $betrag, 'EUR', $gp, $zweck, $hash)`,
     {
-      $uid: `u-${o.id}`, $id: o.id, $betrag: o.betrag, $gp: o.gegenpartei ?? "REWE Markt",
+      $uid: `u-${o.id}`, $betrag: o.betrag, $gp: o.gegenpartei ?? "REWE Markt",
       $zweck: o.zweck ?? "Einkauf", $hash: `h-${o.id}`,
     },
+  );
+  db.run(
+    `INSERT INTO umsatz_verarbeitung (umsatz_id, zahlungskonto_id, status, istbuchung_id, geaendert_am)
+     VALUES ($uid, 'k1', 'verbucht', $id, '2026-03-01T00:00:00.000Z')`,
+    { $uid: `u-${o.id}`, $id: o.id },
   );
 }
 

@@ -25,6 +25,8 @@
 import { FinTSClient, FinTSConfig } from "lib-fints";
 import { waehrungNachCode } from "../../core";
 import type { BankAccount, BankingInformation, ClientResponse, Statement } from "lib-fints";
+import type { Formatvorgabe } from "../../application/fints/abrufPort";
+import { formatplan } from "./formatwahl";
 import type {
   AbrufErgebnis,
   Abrufadapter,
@@ -43,6 +45,7 @@ import {
   FINTS_QUELLE,
   bankbetragZuCent,
   depotStichtag,
+  auszugsStaende,
   isoDatum,
   zuDepotposition,
   zuRohUmsatz,
@@ -306,7 +309,7 @@ class FintsSitzung implements Abrufsitzung {
     konto: Bankkonto,
     vonIso: string,
     bisIso: string,
-    bevorzugtesFormat?: string,
+    format?: Formatvorgabe,
   ): Promise<AbrufErgebnis> {
     if (!konto.kannUmsaetze) throw new Error("Die Bank gibt für dieses Konto keine Umsätze frei.");
 
@@ -328,11 +331,15 @@ class FintsSitzung implements Abrufsitzung {
     // setzt es auf `höchster Rückmeldecode < 9000`, und `3010` liegt darunter. Ein leeres
     // Ergebnis ist der einzige verlässliche Indikator.
     //
-    // `bevorzugtesFormat` dreht die Reihenfolge um, wo MT940 zuletzt getragen hat. Das
-    // spart die ergebnislose erste Runde — und weil der zweite Versuch bleibt, kommt ein
-    // Institut, das CAMT nachrüstet, von selbst wieder darauf. Ein Gedächtnis, keine
-    // Festlegung.
-    const zuerstCamt = bevorzugtesFormat !== "MT940";
+    // `zuletzt` dreht die Reihenfolge um, wo MT940 zuletzt getragen hat. Das spart die
+    // ergebnislose erste Runde — und weil der zweite Versuch bleibt, kommt ein Institut,
+    // das CAMT nachrüstet, von selbst wieder darauf. Ein Gedächtnis, keine Festlegung.
+    //
+    // `wahl` dagegen IST eine Festlegung und schliesst den anderen Weg aus. Sie wird
+    // gebraucht, weil das Gedächtnis genau dann nicht greift, wenn man es am nötigsten
+    // hätte: liefert der erste Versuch etwas — und sei es eine von der Bank gedeckelte
+    // Teilmenge —, gilt er als erfolgreich, und der zweite läuft nie.
+    const { zuerstCamt, nurEines } = formatplan(format);
 
     const holen = async (camt: boolean) => {
       let a = await this.client.getAccountStatements(this.bankkonto(konto), von, bis, camt);
@@ -343,18 +350,24 @@ class FintsSitzung implements Abrufsitzung {
 
     const name = (camt: boolean) => (camt ? "CAMT" : "MT940");
 
-    let format = name(zuerstCamt);
+    let gelaufen = name(zuerstCamt);
     let antwort = await holen(zuerstCamt);
 
     if (!antwort.success || antwort.statements.length === 0) {
       const abgelehnt = antwort.bankAnswers.find((a) => a.code === 3010);
-      hinweise.push(
-        abgelehnt
-          ? `${format} wurde abgelehnt (${abgelehnt.code} ${abgelehnt.text}) — zweiter Versuch mit ${name(!zuerstCamt)}.`
-          : `${format} lieferte nichts — zweiter Versuch mit ${name(!zuerstCamt)}.`,
-      );
-      format = name(!zuerstCamt);
-      antwort = await holen(!zuerstCamt);
+      const grund = abgelehnt
+        ? `${gelaufen} wurde abgelehnt (${abgelehnt.code} ${abgelehnt.text})`
+        : `${gelaufen} lieferte nichts`;
+      // Bei einer Festlegung endet es hier: wer ein Format WÄHLT, will das Ergebnis
+      // dieses Formats sehen — auch das leere. Ein stiller Rückfall würde die Frage
+      // beantworten, die niemand gestellt hat.
+      if (nurEines) {
+        hinweise.push(`${grund} — kein zweiter Versuch, das Format ist festgelegt.`);
+      } else {
+        hinweise.push(`${grund} — zweiter Versuch mit ${name(!zuerstCamt)}.`);
+        gelaufen = name(!zuerstCamt);
+        antwort = await holen(!zuerstCamt);
+      }
     }
 
     if (!antwort.success) {
@@ -377,8 +390,9 @@ class FintsSitzung implements Abrufsitzung {
 
     return {
       ergebnis: { quelle: FINTS_QUELLE, umsaetze, warnungen },
-      format,
+      format: gelaufen,
       hinweise,
+      auszugsSalden: auszugsStaende(antwort.statements, warnungen),
     };
   }
 }
@@ -386,6 +400,7 @@ class FintsSitzung implements Abrufsitzung {
 function alleBuchungen(statements: readonly Statement[]) {
   return statements.flatMap((s) => s.transactions);
 }
+
 
 export function fintsAdapter(opt: FintsAdapterOptionen): Abrufadapter {
   return {

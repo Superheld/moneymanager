@@ -42,6 +42,7 @@ async function zeige(element: Parameters<typeof rendere>[0]) {
 const zugang: Bankzugang = {
   id: "z1",
   bezeichnung: "Kesselmann Bank",
+  art: "fints",
   url: "https://fints.example/fints",
   blz: "99999901",
   benutzer: "10203040",

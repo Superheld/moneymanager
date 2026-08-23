@@ -96,8 +96,8 @@ function reiheZuRohUmsatz(r: Reihe): RohUmsatz | string {
     // sie wird bewusst NICHT zum Abgleich benutzt, weil die Bank ein anderes Vokabular
     // verwendet („KARTENVERFÜGUNG").
     //
-    // Was der Export sonst noch führt, bleibt draußen: `E-Ref` ist in allen 5279 Zeilen
-    // leer, `Kontostand` gehört an das Konto und nicht an die Buchung, und die
+    // Was der Export sonst noch führt, bleibt draußen: `E-Ref` ist in jeder geprüften
+    // Zeile leer, `Kontostand` gehört an das Konto und nicht an die Buchung, und die
     // `Analyse-*`-Spalten sind Finanzgurus eigene Auswertung — die machen wir selbst.
     mandatsreferenz: leerZuUndefined(r[SP.mandatsreferenz]),
     umsatzart: leerZuUndefined(r[SP.umsatzart]),

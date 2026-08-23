@@ -20,6 +20,7 @@ import {
   ruecklagenbedarf,
   RHYTHMUS_MONATE,
   type Cent,
+  type IstBuchung,
   type Kategorie,
   type Kuendigungstermin,
   type Person,
@@ -77,6 +78,15 @@ export interface Vertragszeile {
    * erst, wenn irgendwo eine Auswertung nicht stimmt.
    */
   readonly zahlungen: number;
+  /**
+   * Die zugeordneten Zahlungen selbst — für die Liste, die sich unter der Vertragszeile
+   * aufklappt.
+   *
+   * Die Zahl darüber sagt „die Regel greift", diese Liste sagt WAS sie greift. Erst daran
+   * sieht man einen Fehlgriff: eine fremde Zahlung an denselben Empfänger zählt genauso
+   * mit und macht aus einer falschen Zuordnung eine gute Kennzahl.
+   */
+  readonly zahlungsliste: readonly IstBuchung[];
   /** Was ein nicht-monatlicher Abfluss im Monat kostet, obwohl er nicht abgeht. */
   readonly ruecklage: Cent;
 }
@@ -105,22 +115,33 @@ export async function vertraegeLaden(
   await erkennungenNachziehen(deps.vertragRepo, deps.regelRepo, deps.erkennungRepo);
   await zuordnungenAbgleichen(deps.abgleich);
 
-  const [vertraege, regeln, personen, kategorien, zuordnungen, ignoriert] = await Promise.all([
-    deps.vertragRepo.alle(),
-    deps.regelRepo.alle(),
-    deps.personRepo.alle(),
-    deps.kategorieRepo.alle(),
-    deps.zuordnungRepo.alle(),
-    ignorierteSchluessel(deps.einstellungenRepo),
-  ]);
+  const [vertraege, regeln, personen, kategorien, zuordnungen, buchungen, ignoriert] =
+    await Promise.all([
+      deps.vertragRepo.alle(),
+      deps.regelRepo.alle(),
+      deps.personRepo.alle(),
+      deps.kategorieRepo.alle(),
+      deps.zuordnungRepo.alle(),
+      deps.ledger.alle(),
+      ignorierteSchluessel(deps.einstellungenRepo),
+    ]);
 
   const regelZuVertrag = new Map<string, Zahlungsregel>();
   for (const r of regeln) if (r.vertragId) regelZuVertrag.set(r.vertragId, r);
 
-  const zahlungenJeVertrag = new Map<string, number>();
+  // Die Zahlungen je Vertrag, neueste zuerst — dieselbe Ordnung wie überall sonst, wo
+  // Buchungen stehen.
+  const buchungJeId = new Map(buchungen.map((b) => [b.id, b]));
+  const zahlungenJeVertrag = new Map<string, IstBuchung[]>();
   for (const z of zuordnungen) {
-    if (z.vertragId) zahlungenJeVertrag.set(z.vertragId, (zahlungenJeVertrag.get(z.vertragId) ?? 0) + 1);
+    if (!z.vertragId) continue;
+    const b = buchungJeId.get(z.istbuchungId);
+    if (!b) continue;
+    const liste = zahlungenJeVertrag.get(z.vertragId) ?? [];
+    liste.push(b);
+    zahlungenJeVertrag.set(z.vertragId, liste);
   }
+  for (const liste of zahlungenJeVertrag.values()) liste.sort((a, b) => b.datum.localeCompare(a.datum));
 
   const zeilen = vertraege.map((vertrag): Vertragszeile => {
     const regel = regelZuVertrag.get(vertrag.id);
@@ -130,7 +151,8 @@ export async function vertraegeLaden(
       naechsteZahlung: regel ? naechsteFaelligkeit(regel, heute) : null,
       kuendigungstermin: naechsterKuendigungstermin(vertrag, heute),
       kuendigungNaht: kuendigungsterminNaht(vertrag, heute),
-      zahlungen: zahlungenJeVertrag.get(vertrag.id) ?? 0,
+      zahlungen: zahlungenJeVertrag.get(vertrag.id)?.length ?? 0,
+      zahlungsliste: zahlungenJeVertrag.get(vertrag.id) ?? [],
       ruecklage: regel ? ruecklageProMonat(regel) : 0,
     };
   });

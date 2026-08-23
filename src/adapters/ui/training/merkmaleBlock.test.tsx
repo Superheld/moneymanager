@@ -54,11 +54,17 @@ function bestand(n = 30) {
        VALUES ($id, '2026-03-01', -1234, 'k1', 'kat-lm', 'Aufwand', 'import')`,
       { $id: `x${i}` },
     );
+    // Beleg und Verarbeitungsstand stehen seit dem Umbau getrennt.
     db.run(
-      `INSERT INTO umsatz (id, lauf_id, zahlungskonto_id, buchungstag, betrag, waehrung,
-                           gegenpartei, verwendungszweck, roh_hash, status, istbuchung_id)
-       VALUES ($uid, 'l1', 'k1', '2026-03-01', -1234, 'EUR', 'REWE Markt', 'Einkauf', $hash, 'verbucht', $id)`,
-      { $uid: `u-x${i}`, $id: `x${i}`, $hash: `h-x${i}` },
+      `INSERT INTO umsatz_roh (id, lauf_id, buchungstag, betrag, waehrung,
+                               gegenpartei, verwendungszweck, roh_hash)
+       VALUES ($uid, 'l1', '2026-03-01', -1234, 'EUR', 'REWE Markt', 'Einkauf', $hash)`,
+      { $uid: `u-x${i}`, $hash: `h-x${i}` },
+    );
+    db.run(
+      `INSERT INTO umsatz_verarbeitung (umsatz_id, zahlungskonto_id, status, istbuchung_id, geaendert_am)
+       VALUES ($uid, 'k1', 'verbucht', $id, '2026-03-01T00:00:00.000Z')`,
+      { $uid: `u-x${i}`, $id: `x${i}` },
     );
   }
 }

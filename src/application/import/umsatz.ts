@@ -56,6 +56,10 @@ export interface Umsatz {
   readonly umsatzart?: string;
   /** Geschäftsvorfallcode der Bank (MT940 `:61:`). */
   readonly buchungsschluessel?: string;
+  /** SEPA-Verwendungszweckcode (`SALA`, `RENT` …) — eine Einordnung der Bank, nur CAMT. */
+  readonly zweckCode?: string;
+  /** Der Empfänger hinter einem Zahlungsdienstleister, soweit die Quelle ihn nennt. */
+  readonly endempfaenger?: string;
   /** Institutseigene Referenz aus dem Freitext — Diagnose, ausdrücklich kein Schlüssel. */
   readonly bankreferenz?: string;
   /** Quellen-agnostischer Dedup-Schlüssel (siehe rohHash). */
@@ -66,15 +70,11 @@ export interface Umsatz {
   readonly vorschlag?: Kategorisierungsvorschlag;
   /** Gesetzt genau dann, wenn status === "verbucht". */
   readonly istbuchungId?: string;
-  /**
-   * Verdacht des Dublettenfinders: auf welchen vorhandenen Umsatz diese Zeile
-   * vermutlich zeigt. Bewusst KEIN eigener Status — die Zeile ist ganz normal „neu"
-   * und lässt sich verbuchen; der Verdacht ist ein Hinweis für die Durchsicht, keine
-   * Sperre.
-   */
-  readonly verdachtAufId?: string;
-  /** Warum der Finder das vermutet — in Klartext, für die Anzeige. */
-  readonly verdachtGruende?: readonly string[];
+  // KEIN Dublettenverdacht an der Zeile. Er stand hier einmal und wurde beim Import
+  // angeschrieben — gelesen hat ihn nie jemand. Alle Anzeigen rechnen ihn beim HINSEHEN
+  // (`dubletten/dublettensicht.ts`), und das ist die richtige Stelle: ein angeschriebener
+  // Verdacht gilt für den Stand von damals und wird nie korrigiert, wenn später aus einer
+  // anderen Quelle etwas dazukommt.
 }
 
 /**

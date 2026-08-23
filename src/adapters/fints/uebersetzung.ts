@@ -48,6 +48,70 @@ export function isoDatum(d: Date): string {
   return `${j}-${m}-${t}`;
 }
 
+/** Der Ausschnitt eines Auszugs, auf den die Übersetzung angewiesen ist. */
+export interface Auszug {
+  readonly openingBalance?: { readonly date: Date; readonly currency: string; readonly value: number };
+  readonly closingBalance?: { readonly date: Date; readonly currency: string; readonly value: number };
+}
+
+/** Ein Stand, den die Bank im Auszug mitgeliefert hat — Datum und Betrag in Cent. */
+export interface Auszugsstand {
+  readonly datum: string;
+  readonly betrag: Cent;
+}
+
+/**
+ * Die Stände, die in den Auszügen stehen — Anfangs- UND Schlusssaldo jedes Auszugs.
+ *
+ * Beide, nicht nur der Schluss: der Anfangssaldo des ersten Auszugs ist der Stand VOR dem
+ * abgefragten Zeitraum und damit der früheste, den die Bank überhaupt hergibt. Bei
+ * lückenlosen Auszügen ist der Anfang des einen der Schluss des vorigen — die Dopplung
+ * kostet nichts, weil ein Anker über (Konto, Datum, Herkunft) eindeutig ist.
+ *
+ * **Der Anfangssaldo wird nur genommen, wenn er VOR dem Schluss liegt.** Das ist keine
+ * Kosmetik, sondern Schutz vor einem erfundenen Wert: der CAMT-Parser der Bibliothek legt
+ * einen Anfangssaldo von NULL an, wenn die Bank keinen mitschickt, und zwar mit dem Datum
+ * des Schlusssaldos („If missing opening balance, create a zero balance for the same date
+ * as closing"). Ungeprüft übernommen wäre das ein Anker „an diesem Tag lag nichts auf dem
+ * Konto" — und der meldet die gesamte Kontodeckung als Fehlbetrag.
+ *
+ * Ein Anfangssaldo, der auf denselben Tag fällt wie der Schluss, sagt ohnehin nichts: er
+ * ist entweder erfunden oder er wiederholt den Schluss.
+ *
+ * NICHT übernommen werden `availableBalance` (`:64:`) und `forwardBalances` (`:65:`): das
+ * eine ist der verfügbare Betrag und beantwortet eine andere Frage als „was lag auf dem
+ * Konto", das andere sind Vorausvaluta — Aussagen über die Zukunft, keine Beobachtungen.
+ */
+export function auszugsStaende(
+  statements: readonly Auszug[],
+  warnungen: string[] = [],
+): Auszugsstand[] {
+  const staende = [];
+  for (const s of statements) {
+    const brauchbar = [s.closingBalance];
+    if (s.openingBalance && s.closingBalance && s.openingBalance.date < s.closingBalance.date) {
+      brauchbar.unshift(s.openingBalance);
+    }
+    for (const b of brauchbar) {
+      if (!b) continue;
+      try {
+        staende.push({
+          datum: isoDatum(b.date),
+          // In CENT, nicht in Euro: die Übersetzung gehört in den Adapter, die
+          // Anwendungsschicht bekommt Domänenwerte. Dieselbe Regel wie beim Saldo aus
+          // `HKSAL` und bei jedem Buchungsbetrag.
+          betrag: bankbetragZuCent(b.value, waehrungNachCode(b.currency)),
+        });
+      } catch (e) {
+        // Ein unlesbarer Saldo kippt den Abruf nicht — die Buchungen sind das Wichtigere,
+        // und ein fehlender Anker heisst nur, dass eine Prüfmöglichkeit fehlt.
+        warnungen.push(`Auszugssaldo übersprungen: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+  }
+  return staende;
+}
+
 // ── Depot: MT535-Aufstellung → Bestand ────────────────────────────────────────────────────
 //
 // Anders als bei den Umsätzen gibt es hier keine Naht zu einem bestehenden Modell: ein
@@ -243,7 +307,14 @@ export interface FintsBuchung {
   readonly amount: number;
   readonly purpose?: string;
   readonly remoteName?: string;
+  /** Was das Format gerade hergibt: in CAMT die IBAN, in MT940 die Kontonummer aus `?31`. */
   readonly remoteAccountNumber?: string;
+  /**
+   * Wo die Bank AUSDRÜCKLICH eine IBAN nennt — CAMT immer, MT940 im Unterfeld `?38`.
+   * Getrennt von `remoteAccountNumber`, weil dort beides stehen kann und keine Angabe
+   * sagt, welches.
+   */
+  readonly remoteIban?: string;
   readonly remoteBankId?: string;
   /** Geschäftsvorfallcode (MT940 `:61:`), z. B. 005, 700, 820. */
   readonly transactionCode?: string;
@@ -252,6 +323,10 @@ export interface FintsBuchung {
   readonly mandateReference?: string;
   readonly e2eReference?: string;
   readonly bookingText?: string;
+  /** SEPA-Verwendungszweckcode (`SALA`, `RENT` …) — nur CAMT. */
+  readonly purposeCode?: string;
+  /** Der Empfänger hinter einem Zahlungsdienstleister — nur CAMT. */
+  readonly ultimateParty?: string;
 }
 
 export interface KontoKontext {
@@ -274,12 +349,21 @@ export interface KontoKontext {
 export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
   const a = klartextAnreicherung(b.purpose);
   const waehrung = waehrungNachCode(konto.waehrung ?? "EUR");
-  // MT940 füllt `remoteAccountNumber` je nach Bank mit einer IBAN ODER einer nationalen
-  // Kontonummer. Nur was eine gültige IBAN ist, darf als solche weitergereicht werden —
-  // der Konto-Match und `rohHash` normalisieren IBANs, eine Kontonummer würde dort
-  // stillschweigend zu Müll.
+  // ZWEI FELDER FÜR EINE FRAGE, und die Reihenfolge ist der Punkt.
+  //
+  // `remoteIban` steht da, wo die Bank ausdrücklich eine IBAN nennt — CAMT tut das immer,
+  // MT940 im Unterfeld `?38`. Es hat Vorrang, weil es eine Zusage ist und keine Deutung.
+  //
+  // `remoteAccountNumber` trägt dagegen, was das Format gerade hergibt: in CAMT die IBAN,
+  // in MT940 die nationale Kontonummer aus `?31`. Beides landet in derselben Eigenschaft,
+  // und keine Angabe sagt, welches von beiden. Deshalb die Prüfung — der Konto-Match und
+  // `rohHash` normalisieren IBANs, eine Kontonummer würde dort stillschweigend zu Müll.
   const gegenIban =
-    b.remoteAccountNumber && ibanGueltig(b.remoteAccountNumber) ? b.remoteAccountNumber : undefined;
+    b.remoteIban && ibanGueltig(b.remoteIban)
+      ? b.remoteIban
+      : b.remoteAccountNumber && ibanGueltig(b.remoteAccountNumber)
+        ? b.remoteAccountNumber
+        : undefined;
   return {
     buchungstag: isoDatum(b.entryDate),
     valuta: isoDatum(b.valueDate),
@@ -296,8 +380,29 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
     // sich das ändert, ist die Angabe der Bibliothek die verlässlichere.
     mandatsreferenz: b.mandateReference?.trim() || a.mandatsreferenz,
     e2eReferenz: b.e2eReference?.trim() || a.e2eReferenz,
+    // ACHTUNG, DIESE BEIDEN SIND FORMATABHÄNGIG — derselbe Feldname trägt je nach
+    // Abrufweg etwas anderes:
+    //
+    //   umsatzart          MT940: `?00`, ein kurzes Etikett („SEPA-LASTSCHRIFT")
+    //                      CAMT:  `AddtlNtryInf`, ein Freitext der Bank
+    //   buchungsschluessel MT940: der DK-Geschäftsvorfallcode, NUMERISCH
+    //                      CAMT:  `SubFmlyCd`, ALPHABETISCH
+    //
+    // Sie werden trotzdem in dieselbe Spalte geschrieben, und das ist eine bewusste,
+    // unfertige Entscheidung: eine Abbildung zwischen beiden Vokabularen liesse sich nur
+    // aus der DK-Spezifikation gewinnen, und eine geratene wäre schlimmer als keine.
+    //
+    // Deutbar bleibt der Wert trotzdem, denn das Format steht am LAUF (`import_lauf`),
+    // und jede Zeile gehört zu genau einem. Wer die Werte auswertet — allen voran die
+    // Kategorie-Erkennung —, muss danach unterscheiden; sonst lernt sie zwei getrennte
+    // Merkmalsräume für dieselbe Sache, ohne dass irgendwo ein Fehler auftaucht.
     umsatzart: b.bookingText?.trim() || a.buchungstext,
     buchungsschluessel: b.transactionCode?.trim() || undefined,
+    // Zwei Einordnungen, die die BANK schon vorgenommen hat und die wir nicht besser
+    // nachbauen könnten. Nur CAMT liefert sie; bei MT940 bleiben sie leer, und das ist
+    // eine ehrliche Lücke und kein Grund, etwas zu erfinden.
+    zweckCode: b.purposeCode?.trim() || undefined,
+    endempfaenger: b.ultimateParty?.trim() || undefined,
     bankreferenz: a.bankreferenz,
     istUmbuchung: false,
     quelle: FINTS_QUELLE,

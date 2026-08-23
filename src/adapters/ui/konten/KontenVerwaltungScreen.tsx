@@ -18,6 +18,7 @@ import {
   stammdaten,
 } from "../../dienste";
 import { Bereich } from "../bausteine/Bereich";
+import { AbgleichBereich } from "./AbgleichBereich";
 import { BankzugaengeScreen } from "./BankzugaengeScreen";
 import { KontenVerwaltung, type KontoVerbindung } from "./KontenVerwaltung";
 
@@ -64,6 +65,7 @@ export function KontenVerwaltungScreen() {
 
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
 
+
   return (
     <Bereich
       titel={t("konten.verwaltungTitel")}
@@ -91,10 +93,18 @@ export function KontenVerwaltungScreen() {
           ),
         },
         {
+          id: "abgleich",
+          label: t("konten.abgleichBereich.register"),
+          untertitel: t("konten.abgleichBereich.untertitel"),
+          inhalt: () => <AbgleichBereich />,
+        },
+        {
           id: "zugaenge",
           label: t("konten.registerZugaenge"),
           untertitel: t("bankzugaenge.untertitel"),
-          inhalt: () => <BankzugaengeScreen />,
+          inhalt: () => (
+            <BankzugaengeScreen kontoNamen={new Map(konten.map((k) => [k.id, k.bezeichnung]))} />
+          ),
         },
       ]}
     />

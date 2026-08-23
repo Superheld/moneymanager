@@ -6,6 +6,7 @@
 import type { Bankzugang } from "../../application/fints/abrufPort";
 import type {
   BankzugangRepository,
+  Formatwahl,
   Kontozuordnung,
   KontozuordnungRepository,
 } from "../../application/fints/bankzugangPort";
@@ -14,6 +15,8 @@ import { getDb } from "./db";
 interface ZugangZeile {
   id: string;
   bezeichnung: string;
+  art: string | null;
+  token: string | null;
   url: string;
   blz: string;
   benutzer: string;
@@ -30,19 +33,24 @@ interface ZuordnungZeile {
   zahlungskonto_id: string;
   letzter_abruf_bis: string | null;
   letztes_format: string | null;
+  format_wahl: string | null;
 }
 
 export const sqliteBankzugangRepository: BankzugangRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<ZugangZeile[]>(
-      `SELECT id, bezeichnung, url, blz, benutzer, kunden_id, bankparameter,
+      `SELECT id, bezeichnung, art, token, url, blz, benutzer, kunden_id, bankparameter,
               tan_verfahren_id, tan_medium, profil
          FROM bankzugang ORDER BY bezeichnung`,
     );
     return zeilen.map((z) => ({
       id: z.id,
       bezeichnung: z.bezeichnung,
+      // Der Bestand kennt die Spalte nicht und IST FinTS. Ein unbekannter Wert faellt
+      // ebenfalls darauf zurueck: lieber der Weg, der jede Bank bedient, als gar keiner.
+      art: z.art === "hanseatic" ? "hanseatic" : "fints",
+      token: z.token ?? undefined,
       url: z.url,
       blz: z.blz,
       benutzer: z.benutzer,
@@ -57,10 +65,12 @@ export const sqliteBankzugangRepository: BankzugangRepository = {
   async speichern(z: Bankzugang) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO bankzugang (id, bezeichnung, url, blz, benutzer, kunden_id, bankparameter,
-                               tan_verfahren_id, tan_medium, profil, angelegt_am)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      `INSERT INTO bankzugang (id, bezeichnung, art, token, url, blz, benutzer, kunden_id,
+                               bankparameter, tan_verfahren_id, tan_medium, profil, angelegt_am)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT(id) DO UPDATE SET bezeichnung      = excluded.bezeichnung,
+                                     art              = excluded.art,
+                                     token            = excluded.token,
                                      url              = excluded.url,
                                      blz              = excluded.blz,
                                      benutzer         = excluded.benutzer,
@@ -72,6 +82,8 @@ export const sqliteBankzugangRepository: BankzugangRepository = {
       [
         z.id,
         z.bezeichnung,
+        z.art,
+        z.token ?? null,
         z.url,
         z.blz,
         z.benutzer,
@@ -96,7 +108,7 @@ export const sqliteKontozuordnungRepository: KontozuordnungRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<ZuordnungZeile[]>(
-      `SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis, letztes_format
+      `SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis, letztes_format, format_wahl
          FROM bankkonto_zuordnung`,
     );
     return zeilen.map((z) => ({
@@ -105,13 +117,14 @@ export const sqliteKontozuordnungRepository: KontozuordnungRepository = {
       zahlungskontoId: z.zahlungskonto_id,
       letzterAbrufBis: z.letzter_abruf_bis ?? undefined,
       letztesFormat: z.letztes_format ?? undefined,
+      formatwahl: (z.format_wahl as Formatwahl | null) ?? undefined,
     }));
   },
 
   async nachZugang(zugangId: string) {
     const db = await getDb();
     const zeilen = await db.select<ZuordnungZeile[]>(
-      `SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis, letztes_format
+      `SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis, letztes_format, format_wahl
          FROM bankkonto_zuordnung WHERE zugang_id = $1`,
       [zugangId],
     );
@@ -121,6 +134,7 @@ export const sqliteKontozuordnungRepository: KontozuordnungRepository = {
       zahlungskontoId: z.zahlungskonto_id,
       letzterAbrufBis: z.letzter_abruf_bis ?? undefined,
       letztesFormat: z.letztes_format ?? undefined,
+      formatwahl: (z.format_wahl as Formatwahl | null) ?? undefined,
     }));
   },
 
@@ -128,17 +142,21 @@ export const sqliteKontozuordnungRepository: KontozuordnungRepository = {
     const db = await getDb();
     await db.execute(
       `INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis,
-                                        letztes_format)
-       VALUES ($1, $2, $3, $4, $5)
+                                        letztes_format, format_wahl)
+       VALUES ($1, $2, $3, $4, $5, $6)
        ON CONFLICT(zugang_id, schluessel) DO UPDATE SET zahlungskonto_id  = excluded.zahlungskonto_id,
                                                        letzter_abruf_bis = excluded.letzter_abruf_bis,
-                                                       letztes_format    = excluded.letztes_format`,
+                                                       letztes_format    = excluded.letztes_format,
+                                                       format_wahl       = excluded.format_wahl`,
       [
         z.zugangId,
         z.schluessel,
         z.zahlungskontoId,
         z.letzterAbrufBis ?? null,
         z.letztesFormat ?? null,
+        // „automatisch" ist die Abwesenheit einer Festlegung und wird als NULL abgelegt —
+        // sonst stünde derselbe Zustand in zwei Schreibweisen in der Tabelle.
+        z.formatwahl && z.formatwahl !== "automatisch" ? z.formatwahl : null,
       ],
     );
   },

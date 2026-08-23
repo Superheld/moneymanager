@@ -36,9 +36,9 @@
 // Tokens liefern, und welche Wörter draußen bleiben. Beides ist Sache des Nutzers, nicht
 // des Codes — aber nur, weil die Oberfläche die Wirkung jeder Änderung misst. Ohne diese
 // Messung wäre es eine Geschmacksfrage, und die schlechteste Antwort auf „welches Merkmal
-// taugt" ist ein Bauchgefühl: `vwz:paschmannmuelheimkarte` sieht nach Müll aus und ist
-// 342-mal zu 100 % Lebensmittel, `vwz:[anonymisiert]` sieht harmlos aus und streut über 17
-// Kategorien.
+// taugt" ist ein Bauchgefühl: ein zusammengelaufener Schlüssel aus Händlername, Ort und
+// „karte" sieht nach Müll aus und trifft dreistellig oft zu 100 % dieselbe Kategorie,
+// während ein sauber lesbares Wort daneben über ein Dutzend Kategorien streut.
 
 import type { Cent } from "../basis/geld";
 import { anbieterSchluessel } from "../vertraege/vertragErkennung";
@@ -235,9 +235,9 @@ function pruefe(wort: string): { token: string } | { grund: Verwurfsgrund } {
   // und sagt über die Kategorie nichts.
   if (/^\d+$/.test(wort)) return { grund: "ziffern" };
 
-  // Maskierte Kartennummern (`xxxx`) und Sternchenblöcke. Sie sind häufig — auf echten
-  // Daten kam `xxxx` 1060-mal vor — und tragen per Konstruktion keine Information: was
-  // sie verdecken, ist genau das, was interessant wäre.
+  // Maskierte Kartennummern (`xxxx`) und Sternchenblöcke. Sie gehören zu den häufigsten
+  // Wörtern im Bestand und tragen per Konstruktion keine Information: was sie verdecken,
+  // ist genau das, was interessant wäre.
   if (/^(.)\1{2,}$/.test(wort)) return { grund: "platzhalter" };
 
   const kern = ohneRandziffern(wort);

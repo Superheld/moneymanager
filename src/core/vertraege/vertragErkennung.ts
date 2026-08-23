@@ -9,8 +9,8 @@
 //
 // Der Schlüssel, über den gruppiert wird, ist zweistufig:
 //   1. **Gläubiger-ID** (SEPA-Lastschrift) — stabil, auch wenn der Name im Auszug
-//      schwankt. Deckt aber nur einen kleinen Teil ab: nur wer EINZIEHT, hat eine.
-//      Auf echten Daten waren es 8 % der Buchungen (418 von 5279).
+//      schwankt. Deckt aber nur einen kleinen Teil ab: nur wer EINZIEHT, hat eine —
+//      auf echten Daten eine einstellige Prozentzahl der Buchungen.
 //   2. **normalisierter Empfängername** — der Hauptweg. Dauerauftrag, Überweisung und
 //      Kartenzahlung tragen keine Gläubiger-ID.
 // Deshalb ist die Gläubiger-ID hier ein Präzisionsgewinn, kein Fundament.

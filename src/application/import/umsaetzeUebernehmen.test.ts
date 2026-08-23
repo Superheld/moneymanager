@@ -45,7 +45,21 @@ function fakes() {
       if (i >= 0) umsaetze[i] = u;
       else umsaetze.push(u);
     },
-    speichernViele: async (us) => { umsaetze.push(...us); },
+    anlegenViele: async (us) => { umsaetze.push(...us); },
+    anlegen: async (u) => { umsaetze.push(u); },
+    // Wie das echte Repository: nur FEHLENDE Felder werden nachgetragen, Bestehendes
+    // bleibt stehen. Eine Attrappe, die einfach ersetzt, liesse den Ergaenzen-Fall auch
+    // dann gruen aussehen, wenn er in Wahrheit ueberschreibt.
+    ergaenzen: async (u) => {
+      const i = umsaetze.findIndex((x) => x.id === u.id);
+      if (i < 0) return;
+      const alt = umsaetze[i] as unknown as Record<string, unknown>;
+      const neu = { ...alt };
+      for (const [k, v] of Object.entries(u as unknown as Record<string, unknown>)) {
+        if (neu[k] === undefined && v !== undefined) neu[k] = v;
+      }
+      umsaetze[i] = neu as unknown as Umsatz;
+    },
     alle: async () => umsaetze,
     nachLauf: async (laufId) => umsaetze.filter((u) => u.laufId === laufId),
     offene: async () => umsaetze.filter((u) => u.status === "neu"),
@@ -265,11 +279,12 @@ describe("Dublettenfinder beim Übernehmen", () => {
       f.deps,
     );
 
+    // Die Zeile wird ANGELEGT und der Verdacht GEZAEHLT — er ist ein Hinweis fuer die
+    // Durchsicht, keine Sperre. An die Zeile geschrieben wird er nicht: alle Anzeigen
+    // rechnen ihn beim Hinsehen, damit er nicht auf dem Stand von damals einfriert.
     expect(ergebnis.neu).toBe(1);
     expect(ergebnis.verdacht).toBe(1);
-    const angelegt = f.umsaetze[f.umsaetze.length - 1];
-    expect(angelegt.verdachtAufId).toBe(f.umsaetze[0].id);
-    expect(angelegt.verdachtGruende?.length).toBeGreaterThan(0);
+    expect(f.umsaetze).toHaveLength(2);
   });
 
   it("lässt eine echt neue Buchung neu sein", async () => {
@@ -287,7 +302,6 @@ describe("Dublettenfinder beim Übernehmen", () => {
 
     expect(ergebnis.neu).toBe(1);
     expect(ergebnis.verdacht).toBe(0);
-    expect(f.umsaetze[f.umsaetze.length - 1].verdachtAufId).toBeUndefined();
   });
 
   it("holt eine verworfene Buchung nicht zurück", async () => {
@@ -341,5 +355,61 @@ describe("Dublettenfinder beim Übernehmen", () => {
     expect(ergebnis.neu).toBe(0);
     expect(f.umsaetze).toHaveLength(vorher);
     expect(f.umsaetze[0].mandatsreferenz).toBe("M-4711");
+  });
+});
+
+/**
+ * Woher ein Lauf kam, steht AM LAUF und wird nicht aus seinen Umsätzen hergeleitet.
+ *
+ * Der Unterschied ist nicht theoretisch: gerade die interessanten Läufe haben keine
+ * Umsätze. Der Rückgriff holt bei jedem Abruf dieselben Tage nochmal, die Mehrzahl aller
+ * Läufe bringt deshalb nichts Neues — und genau die fielen aus jeder Auswertung heraus,
+ * wenn der Bezug über die Umsätze liefe.
+ */
+describe("Herkunft am Lauf", () => {
+  it("schreibt Zugang, Konto und Format ins Protokoll", async () => {
+    const { deps, laeufe } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "fints",
+        zeitpunkt: "2026-08-22T10:00:00.000Z",
+        rohUmsaetze: [roh({ betrag: -1000 })],
+        konten: [{ quelleKey: "k1", kontoId: "k1" }],
+        herkunft: { zugangId: "z1", zahlungskontoId: "k1", format: "CAMT" },
+      },
+      deps,
+    );
+    expect(laeufe[0]).toMatchObject({ zugangId: "z1", zahlungskontoId: "k1", format: "CAMT" });
+  });
+
+  it("hält fest, wenn die Bank die Trefferzahl gedeckelt hat", async () => {
+    const { deps, laeufe } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "fints",
+        zeitpunkt: "2026-08-22T10:00:00.000Z",
+        rohUmsaetze: [roh({ betrag: -1000 })],
+        konten: [{ quelleKey: "k1", kontoId: "k1" }],
+        herkunft: { abgeschnitten: true },
+      },
+      deps,
+    );
+    expect(laeufe[0].abgeschnitten).toBe(true);
+  });
+
+  /** Ein Dateiimport kennt weder Zugang noch ein einzelnes Konto — das Feld bleibt leer. */
+  it("lässt die Herkunft weg, wenn keine mitkommt", async () => {
+    const { deps, laeufe } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "finanzguru",
+        zeitpunkt: "2026-08-22T10:00:00.000Z",
+        rohUmsaetze: [roh({ betrag: -1000 })],
+        konten: [{ quelleKey: "k1", kontoId: "k1" }],
+      },
+      deps,
+    );
+    expect(laeufe[0].zugangId).toBeUndefined();
+    expect(laeufe[0].format).toBeUndefined();
   });
 });

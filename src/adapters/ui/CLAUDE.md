@@ -32,6 +32,39 @@ für die ganze App, nicht eine je Screen.
 Zeilenaktionen sind Icons über `bausteine/IconButton.tsx` — ihr Text wandert in
 `title`/`aria-label`, statt zu verschwinden.
 
+## Die Fläche kommt von `Card`
+
+**Inhalt steht in einer `Card`, nicht auf dem nackten Seitenhintergrund.** Sie trägt
+`background: var(--surface)`, den Haarlinien-Rahmen und die Innenabstände; `.screen`
+darunter ist nur ein Layout-Container ohne eigene Fläche. Ein Bereich, der seine Teile in
+blanke `<div>`s setzt, sieht deshalb auf den ersten Blick „hintergrundlos" aus — und
+danach fragt niemand nach dem Grund, sondern nach dem Fehler.
+
+Selbst gezogene Rahmen (`border: 1px solid var(--line)` plus Radius) sehen ähnlich aus und
+sind trotzdem falsch: die Fläche fehlt weiterhin, und beim nächsten Token-Wechsel laufen
+sie gegen die Karten auseinander.
+
+**Und keine Karte IN einer Karte.** Zwei Rahmen um dieselbe Sache, der Inhalt rückt
+zweimal ein, und die Trennung, die eine Karte leisten soll, wird zur Verschachtelung. Die
+Falle ist die Detailliste unter einer Tabelle: sie dort einzuhängen ist naheliegend, und
+dass die Tabelle selbst schon in einer Karte steckt, sieht man dem Code nicht an — das
+steht eine Datei weiter oben. Aufgeklapptes gehört NEBEN die Karte, nicht hinein.
+`kartenschachtelung.test.tsx` prüft das am gerenderten DOM, weil die Verschachtelung erst
+dort entsteht.
+
+## Zwei Fragen, die verschieden aussehen müssen
+
+Derselbe Bereich (`konten/HerkunftBereich`) beantwortet zwei Fragen, und wer sie
+gleichbehandelt, beantwortet eine davon falsch:
+
+- **Unter der Kontenliste:** „Was steht für dieses Konto überhaupt in der Datenbank?"
+  → ALLE Zeilen, aus jeder Quelle. Eine nach Abrufwegen getrennte Antwort wäre keine.
+- **Unter einem Bankzugang:** „Was hat DIESER Abruf gebracht?" → nur die Läufe dieses
+  Zugangs, und die Zeilen erst, wenn einer davon gewählt ist. Eine Zeile aus einer Datei
+  gehört hier nicht hin, auch wenn sie zum selben Konto gehört.
+
+Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweite.
+
 ## Laden
 
 **Verwandte Repos in EINEM Effekt per `Promise.all` laden und zusammen setzen.** Gestaffelte

@@ -13,6 +13,17 @@ export interface BankzugangRepository {
   loeschen(id: string): Promise<void>;
 }
 
+/**
+ * Welches Umsatzformat für dieses Konto abgerufen wird.
+ *
+ * `automatisch` ist der Normalfall: beide Wege werden probiert, das Gedächtnis
+ * (`letztesFormat`) entscheidet nur über die Reihenfolge. Die beiden anderen Werte
+ * SCHLIESSEN den jeweils anderen Weg aus — das ist der ganze Unterschied und der Grund,
+ * warum es sie gibt: liefert der erste Versuch etwas, und sei es eine gedeckelte
+ * Teilmenge, gilt er als erfolgreich und der zweite läuft nie.
+ */
+export type Formatwahl = "automatisch" | "CAMT" | "MT940";
+
 /** Ein Bankkonto der Bank ist einem Zahlungskonto der App zugeordnet. */
 export interface Kontozuordnung {
   readonly zugangId: string;
@@ -30,6 +41,11 @@ export interface Kontozuordnung {
    * Profil kann sich ändern, und ein Abruf darf ihn jederzeit überschreiben.
    */
   readonly letztesFormat?: string;
+  /**
+   * Die FESTLEGUNG des Nutzers. Fehlt sie, gilt „automatisch" — das Gedächtnis oben
+   * bestimmt dann nur die Reihenfolge.
+   */
+  readonly formatwahl?: Formatwahl;
   // Der gemeldete Kontostand stand bis 2026-08-20 hier und wurde bei jedem Abruf
   // überschrieben. Er ist jetzt ein Kontostands-Anker (`core/kontostand.ts`): aufgehoben
   // statt überschrieben, damit sich eine Abweichung zeitlich einkreisen lässt.

@@ -26,10 +26,15 @@ import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import {
+  sqliteDublettenfreigabeRepository,
   sqliteImportLaufRepository,
   sqliteUmsatzRepository,
 } from "../persistence/sqliteImportRepositories";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
+import {
+  sqliteBankzugangRepository,
+  sqliteKontozuordnungRepository,
+} from "../persistence/sqliteBankzugangRepositories";
 import {
   sqliteVertragserkennungRepository,
   sqliteVertragszuordnungRepository,
@@ -453,9 +458,9 @@ describe("Buchungsdetails", () => {
       id: "i1", datum: heute, betrag: -949, kontoId: "k1",
       charakter: "Aufwand", quelle: "import", kategorieId: "kat1",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
-      waehrung: "EUR", gegenpartei: "Nordhoff Paschmann", verwendungszweck: "EDK*NORDHOFF Muelheim",
+      waehrung: "EUR", gegenpartei: "Thalberg Vibora", verwendungszweck: "EDK*THALBERG Seewinkel",
       rohHash: "hash-abc", nativeId: "fg-12345", status: "verbucht", istbuchungId: "i1",
     });
     const nutzer = userEvent.setup();
@@ -466,19 +471,23 @@ describe("Buchungsdetails", () => {
     // Nach den DATEN suchen, die der Test angelegt hat — nicht nach Beschriftungen.
     await waitFor(() => {
       const text = document.body.textContent ?? "";
-      expect(text).toContain("Nordhoff Paschmann");
-      expect(text).toContain("EDK*NORDHOFF Muelheim");
+      expect(text).toContain("Thalberg Vibora");
+      expect(text).toContain("EDK*THALBERG Seewinkel");
       expect(text).toContain("fg-12345");
       expect(text).toContain("hash-abc");
       expect(text).toContain("umsaetze.csv");
     });
   });
 
-  // Gesperrt ist die HERKUNFT, nicht das Konto. Vorher hing die Sperre am Konto: alles
+  // Entscheidend ist die HERKUNFT, nicht das Konto. Vorher hing die Sperre am Konto: alles
   // auf einem Konto mit Bankverbindung war tabu, also auch die Zeilen, die per Datei
   // dorthin kamen — die kennt die Bank aber gar nicht, und ohne Löschweg blieb eine
   // falsch importierte Zeile für immer im Saldo stehen.
-  it("sperrt das Löschen für Zeilen aus dem Bankabruf", async () => {
+  //
+  // Eine Zeile aus dem ABRUF wird nicht gelöscht, sondern verworfen: die Buchung fällt
+  // aus dem Ledger, der Umsatz bleibt als Entscheidung stehen. Nur so holt der nächste
+  // Abruf sie nicht zurück — geprüft wird deshalb an beidem, nicht am Knopf.
+  it("verwirft eine Zeile aus dem Bankabruf, statt sie zu löschen", async () => {
     await zweiKonten();
     await sqliteImportLaufRepository.speichern({
       id: "l-bank", quelle: "fints", zeitpunkt: "2026-08-12T09:00:00.000Z",
@@ -488,17 +497,31 @@ describe("Buchungsdetails", () => {
       id: "i1", datum: heute, betrag: -949, kontoId: "k1",
       charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Von der Bank",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l-bank", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
-      waehrung: "EUR", gegenpartei: "Bank AG", verwendungszweck: "Abbuchung",
+      waehrung: "EUR", gegenpartei: "Ohlert Vibora", verwendungszweck: "Abbuchung",
       rohHash: "h-bank", nativeId: "fints-1", status: "verbucht", istbuchungId: "i1",
     });
     const nutzer = userEvent.setup();
     rendere(<KontenScreen onNavigate={() => {}} />);
 
     await detailOeffnen(nutzer, "Girokonto");
-    expect(await screen.findByText(/Von der Bank geliefert/)).toBeInTheDocument();
+
+    // Kein „Löschen" — der Weg für diese Zeile heisst anders und tut etwas anderes.
     expect(screen.queryByRole("button", { name: /^löschen$/i })).not.toBeInTheDocument();
+    const verwerfen = await screen.findAllByRole("button", { name: /^verwerfen$/i });
+    await nutzer.click(verwerfen[verwerfen.length - 1]);
+
+    await waitFor(async () => {
+      expect(await sqliteLedgerRepository.alle()).toHaveLength(0);
+      const umsatz = (await sqliteUmsatzRepository.alle()).find((u) => u.id === "u1");
+      expect(umsatz?.status).toBe("verworfen");
+      expect(umsatz?.istbuchungId).toBeUndefined();
+    });
+
+    // Der Roh-Hash bleibt im Bestand: genau er blockt den Reimport beim nächsten Abruf.
+    const schluessel = await sqliteUmsatzRepository.bestandsSchluessel();
+    expect(schluessel.hashes).toContain("h-bank");
   });
 
   it("lässt eine Zeile aus einem Dateiimport löschen, auch auf einem Bankkonto", async () => {
@@ -511,9 +534,9 @@ describe("Buchungsdetails", () => {
       id: "i1", datum: heute, betrag: -949, kontoId: "k1",
       charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Aus der Datei",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l-datei", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
-      waehrung: "EUR", gegenpartei: "Nordhoff", verwendungszweck: "Einkauf",
+      waehrung: "EUR", gegenpartei: "Thalberg", verwendungszweck: "Einkauf",
       rohHash: "h-datei", nativeId: "fg-1", status: "verbucht", istbuchungId: "i1",
     });
     const nutzer = userEvent.setup();
@@ -850,7 +873,7 @@ describe("Vertrag aus einer Buchung", () => {
       id: "l1", quelle: "finanzguru", dateiname: "a.xlsx", zeitpunkt: "2026-08-12T10:00:00Z",
       eingelesen: 1, neu: 1, duplikate: 0,
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: heute, betrag: -2999,
       waehrung: "EUR", gegenpartei: "Telefonica Germany GmbH", verwendungszweck: "Mobilfunk",
       rohHash: "h1", status: "verbucht", istbuchungId: "i1",
@@ -987,5 +1010,350 @@ describe("Vertrag aus einer Buchung", () => {
     await detailOeffnen(nutzer);
     await screen.findByText(/Gegenkonto/i);
     expect(screen.queryByRole("button", { name: /vertrag daraus machen/i })).toBeNull();
+  });
+});
+
+/**
+ * Der Vergleich ist der Ort, an dem über ein Dublettenpaar entschieden wird. Geprüft wird
+ * an dem, was danach in der Datenbank steht — nicht an Beschriftungen: welche der beiden
+ * Zeilen verschwindet, ist die ganze Frage, und ein Dialog, der die falsche nimmt, sähe
+ * im Markup genauso richtig aus.
+ */
+describe("Dubletten nebeneinander vergleichen", () => {
+  /**
+   * Dasselbe Paar, wie es im echten Bestand vorkommt: eine Zeile aus einer Datei, eine aus
+   * dem Bankabruf, gleicher Tag, gleicher Betrag. Nur so entsteht überhaupt ein Verdacht
+   * im Ledger — innerhalb EINES Laufs wird bewusst nicht gemeldet.
+   */
+  async function paarAnlegen() {
+    await grunddaten();
+    await sqliteImportLaufRepository.speichern({
+      id: "l-datei", quelle: "finanzguru", zeitpunkt: "2026-08-10T09:00:00.000Z",
+      dateiname: "auszug.csv", eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    await sqliteImportLaufRepository.speichern({
+      id: "l-bank", quelle: "fints", zeitpunkt: "2026-08-12T09:00:00.000Z",
+      eingelesen: 1, neu: 1, duplikate: 0,
+    });
+    for (const [ist, lauf, umsatz, hash] of [
+      ["i-datei", "l-datei", "u-datei", "h-datei"],
+      ["i-bank", "l-bank", "u-bank", "h-bank"],
+    ] as const) {
+      await sqliteLedgerRepository.speichern({
+        id: ist, datum: "2026-07-20", betrag: -7430, kontoId: "k1",
+        charakter: "Aufwand", quelle: "import", kategorieId: "kat1",
+      });
+      await sqliteUmsatzRepository.anlegen({
+        id: umsatz, laufId: lauf, zahlungskontoId: "k1", buchungstag: "2026-07-20",
+        betrag: -7430, waehrung: "EUR", gegenpartei: "Vibora Ohlert",
+        verwendungszweck: "Rechnung 4711", rohHash: hash, status: "verbucht", istbuchungId: ist,
+      });
+    }
+  }
+
+  async function vergleichOeffnen(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    const pillen = await screen.findAllByRole("button", { name: /nebeneinander vergleichen/i });
+    await nutzer.click(pillen[0]);
+  }
+
+  it("zeigt beide Zeilen mit ihrer Herkunft, sobald die Markierung angeklickt wird", async () => {
+    await paarAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await vergleichOeffnen(nutzer);
+
+    // Nach den DATEN suchen, die der Test angelegt hat: beide Herkünfte stehen im Dialog,
+    // und genau daran unterscheidet man die zwei Spalten.
+    await waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("auszug.csv");
+      expect(text).toContain("h-datei");
+      expect(text).toContain("h-bank");
+    });
+  });
+
+  it("verwirft die Bankzeile und lässt die Zeile aus der Datei stehen", async () => {
+    await paarAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await vergleichOeffnen(nutzer);
+
+    // Die Bankzeile ist die zweite Spalte (später importiert, gleiches Datum → rechts
+    // steht der Zwilling). Der Knopf heisst bei ihr „verwerfen", bei der Datei „löschen" —
+    // das ist der sichtbare Unterschied zwischen den beiden Wegen.
+    await nutzer.click(await screen.findByRole("button", { name: /diese zeile verwerfen/i }));
+
+    await waitFor(async () => {
+      const ids = (await sqliteLedgerRepository.alle()).map((b) => b.id);
+      expect(ids).toEqual(["i-datei"]);
+      const bank = (await sqliteUmsatzRepository.alle()).find((u) => u.id === "u-bank");
+      expect(bank?.status).toBe("verworfen");
+    });
+  });
+
+  it("hält „kein Duplikat“ fest, ohne eine der beiden anzufassen", async () => {
+    await paarAnlegen();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await vergleichOeffnen(nutzer);
+    await nutzer.click(await screen.findByRole("button", { name: /kein duplikat/i }));
+
+    await waitFor(async () => {
+      expect(await sqliteDublettenfreigabeRepository.alle()).toHaveLength(1);
+      expect(await sqliteLedgerRepository.alle()).toHaveLength(2);
+    });
+  });
+});
+
+/**
+ * Auf einem abgerufenen Konto sagt die BANK, was daraufsteht. Eine von Hand angelegte oder
+ * geänderte Zeile wäre dort eine Behauptung gegen den Kontoauszug: sie taucht beim
+ * nächsten Abgleich als Abweichung auf, und dann weiss niemand mehr, dass sie von Hand
+ * entstanden ist — sie sieht aus wie eine fehlende Buchung.
+ *
+ * Was sich ändern lässt, ist die EINORDNUNG (Bezeichnung, Kategorie): die gehört dem
+ * Nutzer. Genau diese Trennung prüfen die Tests hier — dass gar nichts mehr ginge, wäre
+ * derselbe Fehler in die andere Richtung.
+ */
+describe("Online geführte Konten werden nicht von Hand bebucht", () => {
+  const heute = "2026-08-12";
+
+  /** Macht das Girokonto zu einem Online-Konto; „Bargeld" bleibt von Hand geführt. */
+  async function mitBankverbindung() {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteBankzugangRepository.speichern({
+      id: "z1", bezeichnung: "Testbank", art: "fints", url: "https://example.invalid/fints",
+      blz: "99999901", benutzer: "nutzer",
+    });
+    await sqliteKontozuordnungRepository.speichern({
+      zugangId: "z1", schluessel: "1234567|", zahlungskontoId: "k1",
+    });
+  }
+
+  it("bietet auf dem Bankkonto keine neue Buchung an, auf dem Bargeldkonto schon", async () => {
+    await mitBankverbindung();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    // Der Knopf traegt ein fuehrendes „+" aus der Button-Komponente — verankert wird
+    // trotzdem am ganzen Namen, damit „Buchungsdetails" nicht mitzaehlt.
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /^\+\s*buchung$/i })).not.toBeInTheDocument();
+    });
+
+    await nutzer.click((await screen.findAllByText("Bargeld"))[0]);
+    expect(await screen.findByRole("button", { name: /^\+\s*buchung$/i })).toBeInTheDocument();
+  });
+
+  /**
+   * Umbuchen legt ZWEI neue Buchungen an. Mit nur einem Konto von Hand bleibt kein Paar
+   * übrig, für das der Dialog etwas anlegen dürfte — also erscheint er gar nicht.
+   */
+  it("bietet kein Umbuchen an, wenn nur ein Konto von Hand geführt wird", async () => {
+    await mitBankverbindung();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Bargeld"))[0]);
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /umbuchen/i })).not.toBeInTheDocument();
+    });
+  });
+
+  it("sperrt Betrag und Datum einer Buchung auf dem Bankkonto, nicht aber ihre Bezeichnung", async () => {
+    await mitBankverbindung();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -1234, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+
+    expect(await screen.findByLabelText(/betrag/i)).toBeDisabled();
+    expect(await screen.findByLabelText(/datum/i)).toBeDisabled();
+    // Die Einordnung bleibt frei — sonst wäre die Zeile gar nicht mehr zu pflegen.
+    const bezeichnung = await screen.findByRole("textbox", { name: /bezeichnung/i });
+    expect(bezeichnung).not.toBeDisabled();
+  });
+
+  it("lässt Betrag und Datum auf einem von Hand geführten Konto in Ruhe", async () => {
+    await mitBankverbindung();
+    await sqliteLedgerRepository.speichern({
+      id: "i2", datum: heute, betrag: -500, kontoId: "k2",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Bargeld"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+
+    expect(await screen.findByLabelText(/betrag/i)).not.toBeDisabled();
+    expect(await screen.findByLabelText(/datum/i)).not.toBeDisabled();
+  });
+});
+
+/**
+ * Der Marker beantwortet keine Frage über die Zahlung, sondern eine über den Nutzer: habe
+ * ich mir das angesehen? Deshalb wird hier an den DATEN geprüft, was nach dem Klick steht —
+ * eine Pille, die verschwindet, ohne dass sich etwas gemerkt hat, sähe genauso aus.
+ */
+describe("Prüfmarker im Auszug", () => {
+  const heute = "2026-08-12";
+
+  async function buchungMitMarker(zuPruefen: boolean) {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -1250, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Ohlert",
+      zuPruefen: zuPruefen || undefined,
+    });
+  }
+
+  it("nimmt den Marker weg, wenn man auf die Pille klickt", async () => {
+    await buchungMitMarker(true);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click(await screen.findByRole("button", { name: /marker entfernen/i }));
+
+    await waitFor(async () => {
+      const b = (await sqliteLedgerRepository.alle()).find((x) => x.id === "i1");
+      expect(b?.zuPruefen).toBeUndefined();
+    });
+    expect(screen.queryByRole("button", { name: /marker entfernen/i })).not.toBeInTheDocument();
+  });
+
+  it("zeigt gar keine Pille, wenn nichts vorgemerkt ist", async () => {
+    await buchungMitMarker(false);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await screen.findAllByRole("button", { name: "bearbeiten" });
+    expect(screen.queryByRole("button", { name: /marker entfernen/i })).not.toBeInTheDocument();
+  });
+
+  /** Der zweite Weg: im Detail von Hand vormerken — auch bei einer Zeile ohne Marker. */
+  it("merkt eine Zeile über das Kästchen im Detail vor", async () => {
+    await buchungMitMarker(false);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+
+    const kasten = await screen.findByRole("checkbox", { name: /ansehen/i });
+    expect(kasten).not.toBeChecked();
+    await nutzer.click(kasten);
+
+    await waitFor(async () => {
+      const b = (await sqliteLedgerRepository.alle()).find((x) => x.id === "i1");
+      expect(b?.zuPruefen).toBe(true);
+    });
+  });
+
+  /**
+   * Der Marker wirkt SOFORT, nicht erst beim Speichern: er ist eine Handlung („gesehen"),
+   * keine Eigenschaft, die man miterfasst. Wer den Dialog ohne Speichern schliesst, hat
+   * ihn trotzdem gesetzt.
+   */
+  it("wirkt sofort, auch ohne Speichern", async () => {
+    await buchungMitMarker(true);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+    await nutzer.click(await screen.findByRole("checkbox", { name: /ansehen/i }));
+    await nutzer.click(await screen.findByRole("button", { name: /abbrechen/i }));
+
+    await waitFor(async () => {
+      const b = (await sqliteLedgerRepository.alle()).find((x) => x.id === "i1");
+      expect(b?.zuPruefen).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * Der Umbuchungs-Dialog kennt zwei Wege: eine vorhandene Gegenbuchung VERBINDEN (S-1b)
+ * und ein fehlendes Gegenbein ERZEUGEN (S-1a). Nur der zweite legt etwas an, das die Bank
+ * nicht kennt — deshalb steht er auf einem abgerufenen Konto nicht zur Wahl.
+ */
+describe("Gegenbein erzeugen nur auf Konten ohne Bankverbindung", () => {
+  const heute = "2026-08-12";
+
+  /** Giro und Tagesgeld hängen an der Bank, Bargeld nicht. */
+  async function dreiKonten(bargeld: boolean) {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k-tg", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    if (bargeld) {
+      await sqliteZahlungskontoRepository.speichern({
+        id: "k-bar", bezeichnung: "Bargeld", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+      });
+    }
+    await sqliteBankzugangRepository.speichern({
+      id: "z1", bezeichnung: "Testbank", art: "fints", url: "https://example.invalid/fints",
+      blz: "99999901", benutzer: "nutzer",
+    });
+    for (const [schluessel, kontoId] of [["1234567|", "k1"], ["7654321|", "k-tg"]] as const) {
+      await sqliteKontozuordnungRepository.speichern({ zugangId: "z1", schluessel, zahlungskontoId: kontoId });
+    }
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: heute, betrag: -20000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Abhebung",
+    });
+  }
+
+  async function umbuchungsdialog(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await nutzer.click((await screen.findAllByRole("button", { name: "bearbeiten" }))[0]);
+    // Exakt: „Umbuchen" in der Werkzeugleiste und „Zur Umbuchung machen" im Dialog
+    // treffen beide auf einen toleranten Ausdruck.
+    await nutzer.click(await screen.findByRole("button", { name: "Zur Umbuchung machen" }));
+  }
+
+  it("bietet nur das Bargeldkonto als Ziel an, nicht das zweite Bankkonto", async () => {
+    await dreiKonten(true);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await umbuchungsdialog(nutzer);
+
+    const ziel = await screen.findByRole("combobox", { name: "Gegenbein neu erzeugen auf" });
+    const namen = [...ziel.querySelectorAll("option")].map((o) => o.textContent);
+    expect(namen).toContain("Bargeld");
+    expect(namen).not.toContain("Tagesgeld");
+  });
+
+  /**
+   * Bleibt gar kein Ziel übrig, verschwindet der Weg ganz — ein Radio-Knopf über einer
+   * leeren Auswahlliste wäre eine Handlung, die nicht geht.
+   */
+  it("lässt den Erzeugen-Weg weg, wenn alle anderen Konten an der Bank hängen", async () => {
+    await dreiKonten(false);
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await umbuchungsdialog(nutzer);
+
+    await waitFor(() => {
+      expect(document.body.textContent).toMatch(/nur verbunden/i);
+    });
+    expect(screen.queryByRole("combobox", { name: "Gegenbein neu erzeugen auf" })).not.toBeInTheDocument();
   });
 });

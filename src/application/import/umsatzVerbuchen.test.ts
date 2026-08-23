@@ -23,7 +23,9 @@ function fakes() {
   };
   const umsatzRepo = {
     speichern: async (u: Umsatz) => { gespeichert.push(u); },
-    speichernViele: async () => {},
+    anlegenViele: async () => {},
+    anlegen: async () => {},
+    ergaenzen: async () => {},
     alle: async () => gespeichert,
     nachLauf: async () => [],
     offene: async () => [],
@@ -164,5 +166,50 @@ describe("gegenbeinFuer", () => {
     const ab = um({ id: "a", zahlungskontoId: "giro", betrag: -15000, buchungstag: "2026-08-17" });
     const spaet = um({ id: "b", zahlungskontoId: "tagesgeld", betrag: 15000, buchungstag: "2026-08-25" });
     expect(gegenbeinFuer(ab, [spaet])).toBeUndefined();
+  });
+});
+
+/**
+ * Wer die Zeile schon gesehen hat, braucht keinen Marker. Der Abruf bucht direkt — dort
+ * hat niemand die Zeile zwischen Bank und Saldo in der Hand gehabt. Die Import-Inbox
+ * dagegen lässt jede Zeile einzeln übernehmen, und damit ist sie angesehen.
+ */
+describe("Prüfmarker beim Verbuchen", () => {
+  it("merkt Zeilen vor, wenn der Aufrufer es verlangt", async () => {
+    const { deps, ledger } = fakes();
+    await umsaetzeVerbuchen(
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      { ...deps, zumPruefenVormerken: true },
+    );
+    expect(ledger[0].zuPruefen).toBe(true);
+  });
+
+  it("lässt sie ohne Marker, wenn nicht", async () => {
+    const { deps, ledger } = fakes();
+    await umsaetzeVerbuchen(
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      deps,
+    );
+    expect(ledger[0].zuPruefen).toBeUndefined();
+  });
+
+  /** Auch beide Beine einer Umbuchung — sonst trüge nur die Hälfte den Marker. */
+  it("merkt beide Beine einer gepaarten Umbuchung vor", async () => {
+    const { deps, ledger } = fakes();
+    await umsaetzeVerbuchen(
+      [
+        umsatz({ id: "ua", betrag: -5000, zahlungskontoId: "k1", rohHash: "ha",
+                 vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" } }),
+        umsatz({ id: "ub", betrag: 5000, zahlungskontoId: "k2", rohHash: "hb",
+                 vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" } }),
+      ],
+      { ...deps, zumPruefenVormerken: true },
+    );
+    expect(ledger).toHaveLength(2);
+    // Erst sicherstellen, dass hier wirklich GEPAART wurde — zwei einzeln verbuchte
+    // Zeilen sähen an der Länge genauso aus und der Test wäre gegenstandslos.
+    expect(ledger[0].transferId).toBeDefined();
+    expect(ledger[0].transferId).toBe(ledger[1].transferId);
+    expect(ledger.every((b) => b.zuPruefen === true)).toBe(true);
   });
 });

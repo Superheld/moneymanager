@@ -82,14 +82,29 @@ function alsBein(b: IstBuchung, transferId: string, gegenkontoId: string): IstBu
 /**
  * S-1a — erzeugt das fehlende Gegenbein auf `nachKontoId` und verknüpft beide.
  * Datum und Notiz übernimmt das neue Bein von der bestehenden Buchung.
+ *
+ * **Das Ziel darf kein ONLINE geführtes Konto sein.** Erzeugen heisst hier: eine Buchung
+ * anlegen, die es bei der Bank nicht gibt — auf einem abgerufenen Konto wäre das eine
+ * Behauptung gegen den Kontoauszug, die beim nächsten Abgleich als Abweichung auftaucht,
+ * ohne dass noch jemand wüsste, dass sie von Hand entstanden ist.
+ *
+ * Für zwei abgerufene Konten ist der richtige Weg ein anderer: beide Seiten meldet die
+ * Bank ohnehin, sie müssen nur VERBUNDEN werden (`buchungenPaaren`, S-1b). Erzeugt wird
+ * ein Gegenbein nur dort, wo niemand es liefert — typisch Bargeld.
+ *
+ * Die Regel steht hier und nicht nur in der Auswahlliste der Oberfläche: eine Regel, die
+ * die UI umgehen kann, umgeht sie irgendwann. `onlineKonten` ist deshalb ein Pflichtfeld
+ * und kein optionales — wer eine leere Menge übergibt, tut das sichtbar.
  */
 export async function gegenbeinErzeugen(
   ledger: LedgerPort,
   buchung: IstBuchung,
   nachKontoId: string,
+  onlineKonten: ReadonlySet<string>,
 ): Promise<{ bestehend: IstBuchung; erzeugt: IstBuchung }> {
   if (!nachKontoId) throw new FachlicherFehler("konto.waehlen");
   if (nachKontoId === buchung.kontoId) throw new FachlicherFehler("konten.verschieden");
+  if (onlineKonten.has(nachKontoId)) throw new FachlicherFehler("umbuchung.zielOnline");
   if (schonGepaart(buchung)) throw new FachlicherFehler("umbuchung.schonGepaart");
 
   const transferId = crypto.randomUUID();

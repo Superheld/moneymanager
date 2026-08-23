@@ -116,8 +116,21 @@ export {
   type VertragErgebnis,
 } from "./vertraege/vertragAnlegen";
 export { zahlungsspuren } from "./buchung/zahlungsspuren";
+export { pruefmarkerSetzen } from "./buchung/pruefmarker";
 export { zuordnungenAbgleichen, zuordnungVonHand } from "./vertraege/vertragszuordnung";
 export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertraege/vertragsvorschlaege";
+export {
+  herkunftLaden,
+  type Herkunftszeile,
+  type Kontoherkunft,
+  type Laufbefund,
+} from "./konten/herkunftsicht";
+export {
+  abgleichLaden,
+  type Abgleichzeile,
+  type Ankerpunkt,
+  type AbgleichDeps,
+} from "./konten/abgleichsicht";
 export {
   kontenLaden,
   registerSicht,
@@ -205,8 +218,9 @@ export type {
   TanHerausforderung,
   TanVerfahren,
   Vorfallprofil,
+  Zugangsart,
 } from "./fints/abrufPort";
-export type { Kontozuordnung } from "./fints/bankzugangPort";
+export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
 export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
 // Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen
@@ -225,6 +239,14 @@ export {
   regionWaehlen,
   type Haushaltseinstellungen,
 } from "./einstellungen";
+export {
+  EXPERIMENTE,
+  EXPERIMENTE_AUS,
+  experimenteLaden,
+  experimentSchalten,
+  type ExperimentId,
+  type Experimente,
+} from "./experimente";
 export {
   uebersichtLaden,
   waehlbareMonate,

@@ -2,7 +2,11 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    /* ES2022.Error und sonst nichts aus ES2022: `new Error(msg, { cause })` verkettet
+       Fehler, ohne die urspruengliche Ursache in eine Textnachricht zu quetschen. Nur
+       dieser eine Baustein statt der ganzen ES2022-Bibliothek — was der Compiler
+       zulaesst, wird irgendwann benutzt, und das Ziel bleibt bewusst ES2020. */
+    "lib": ["ES2020", "ES2022.Error", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
 

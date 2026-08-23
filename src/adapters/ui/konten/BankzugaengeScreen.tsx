@@ -18,16 +18,24 @@ import type {
   Bankkonto,
   Bankprofil,
   Bankzugang,
+  Formatwahl,
   Kontozuordnung,
   TanHerausforderung,
 } from "../../../application";
-import { fintsAbruf, fintsEinsatzbereit } from "../../fints";
+import { fintsEinsatzbereit } from "../../fints";
 import {
+  abrufAdapterFuer,
   bankzugaenge,
   bankzugangLoeschen,
   bankzugangSpeichern,
+  kontozuordnungSpeichern,
   kontozuordnungen,
 } from "../../dienste";
+import { kannVorfall } from "../../../application";
+import { beiEnter } from "../bausteine/beiEnter";
+import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
+import { HerkunftBereich } from "./HerkunftBereich";
 import { Bankprofilkarte } from "./Bankprofilkarte";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
@@ -49,11 +57,32 @@ interface Pruefung {
   profil: Bankprofil;
 }
 
-export function BankzugaengeScreen() {
+export function BankzugaengeScreen({
+  kontoNamen,
+}: {
+  /** Kontobezeichnungen je Id — der Screen daneben hat sie schon geladen. */
+  kontoNamen?: ReadonlyMap<string, string>;
+} = {}) {
   const { t } = useTranslation();
   const geld = useGeld();
   const [zugaenge, setZugaenge] = useState<Bankzugang[]>([]);
   const [zuordnungen, setZuordnungen] = useState<Kontozuordnung[]>([]);
+  /**
+   * Welcher Zugang seine Konten zeigt.
+   *
+   * Die Spalte daneben nennt nur die ANZAHL — die beantwortet „habe ich hier schon etwas
+   * zugeordnet", aber nicht „welches Konto ist das eigentlich". Genau die Frage stellt
+   * sich, wenn ein Abruf nichts bringt.
+   */
+  const [kontenOffen, setKontenOffen] = useState<string | null>(null);
+  /**
+   * Welches Konto seine eingelesenen Zeilen zeigt — die dritte Stufe.
+   *
+   * Zugang aufklappen, darin ein Konto aufklappen, darunter steht, was hereinkam. Alles
+   * auf derselben Seite: wer der Frage nachgeht, warum ein Abruf nichts brachte, will die
+   * Kette sehen und nicht dreimal die Ansicht wechseln.
+   */
+  const [zeilenVon, setZeilenVon] = useState<string | null>(null);
   const [pin, setPin] = useState<{ zugang: Bankzugang } | null>(null);
   const [pinText, setPinText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,10 +100,9 @@ export function BankzugaengeScreen() {
   const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
 
   async function laden() {
-    const [z, zo] = await Promise.all([
-      bankzugaenge(),
-      kontozuordnungen(),
-    ]);
+    // In EINEM Effekt und zusammen gesetzt: gestaffelte Zustaende liessen die Kontenliste
+    // kurz gegen eine leere Zuordnung rechnen (ui/CLAUDE.md).
+    const [z, zo] = await Promise.all([bankzugaenge(), kontozuordnungen()]);
     setZugaenge(z);
     setZuordnungen(zo);
   }
@@ -91,7 +119,9 @@ export function BankzugaengeScreen() {
     setBusy(true);
     setFehler(null);
     try {
-      const sitzung = await fintsAbruf.anmelden(zugang, geheim, frageTan);
+      // Welcher Weg: steht am Zugang. Fest verdrahtetes FinTS pruefte hier sonst einen
+      // Zugang, der gar nicht darueber laeuft — und meldete einen Fehler der falschen Bank.
+      const sitzung = await abrufAdapterFuer(zugang.art).anmelden(zugang, geheim, frageTan);
       // Das Profil geht mit — es ist aus denselben Parametern abgeleitet und wäre sonst
       // genau dann veraltet, wenn sich etwas geändert hat.
       await bankzugangSpeichern({
@@ -157,6 +187,27 @@ export function BankzugaengeScreen() {
     await laden();
   }
 
+  /**
+   * Welche Formate für dieses Konto zur Wahl stehen.
+   *
+   * Nicht jede Bank kann beides — die Vorfälle stehen im Bankprofil. Ein Format
+   * anzubieten, das die Bank nicht beherrscht, führt zu einer Festlegung, die JEDEN
+   * weiteren Abruf leer laufen lässt: bei einer Wahl gibt es keinen Rückfall.
+   *
+   * Was nicht geht, wird trotzdem GEZEIGT, nur gesperrt. Eine bestehende Wahl darf nicht
+   * stumm verschwinden, weil die Bank ihr Profil geändert hat — sonst steht in der
+   * Datenbank etwas anderes als auf dem Bildschirm. Und die aktuelle Wahl bleibt immer
+   * wählbar, auch wenn sie inzwischen unmöglich aussieht.
+   */
+  function formatmoeglichkeiten(profil: Bankprofil | undefined, aktuell: Formatwahl) {
+    const kann = (segment: string) => !profil || kannVorfall(profil, segment);
+    return [
+      { wert: "automatisch" as const, gesperrt: false },
+      { wert: "CAMT" as const, gesperrt: !kann("HKCAZ") && aktuell !== "CAMT" },
+      { wert: "MT940" as const, gesperrt: !kann("HKKAZ") && aktuell !== "MT940" },
+    ];
+  }
+
   const kontenSpalten = [
     { key: "bezeichnung", label: t("bankabruf.spalteKonto") },
     { key: "iban", label: t("bankabruf.spalteIban"), render: (r: KontoZeile) => r.iban ?? "—" },
@@ -166,6 +217,35 @@ export function BankzugaengeScreen() {
       label: t("bankabruf.spalteSaldo"),
       align: "right" as const,
       render: (r: KontoZeile) => (r.saldo === undefined ? "—" : geld.format(r.saldo)),
+    },
+    {
+      // Das Umsatzformat je Konto. Steht hier und nicht am Zugang: dieselbe Bank kann
+      // sich je Konto unterschiedlich verhalten, und eine Festlegung, die alle Konten
+      // mitzieht, ist beim Nachjustieren im Weg.
+      key: "format",
+      label: t("bankzugaenge.format.spalte"),
+      sortable: false,
+      render: (r: KontoZeile) => {
+        const zuordnung = zuordnungen.find((z) => z.schluessel === r.schluessel);
+        if (!zuordnung) return "—";
+        const wahl = zuordnung.formatwahl ?? "automatisch";
+        return (
+          <Zeilenauswahl
+            label={t("bankzugaenge.format.spalte")}
+            wert={wahl}
+            hinweis={t(`bankzugaenge.format.hinweis.${wahl}`)}
+            moeglichkeiten={formatmoeglichkeiten(pruefung?.profil, wahl).map((m) => ({
+              ...m,
+              text: t(`bankzugaenge.format.${m.wert}`) + (m.gesperrt ? ` — ${t("bankzugaenge.format.kannBankNicht")}` : ""),
+              hinweis: t(`bankzugaenge.format.hinweis.${m.wert}`),
+            }))}
+            onChange={async (neueWahl) => {
+              await kontozuordnungSpeichern({ ...zuordnung, formatwahl: neueWahl });
+              await laden();
+            }}
+          />
+        );
+      },
     },
     {
       key: "kann",
@@ -197,7 +277,18 @@ export function BankzugaengeScreen() {
         ) : (
           <DataTable
             columns={[
-              { key: "bezeichnung", label: t("bankzugaenge.spalteBank") },
+              {
+                key: "bezeichnung",
+                label: t("bankzugaenge.spalteBank"),
+                render: (z: Bankzugang) => (
+                  <Zeilenlink
+                    onKlick={() => setKontenOffen(kontenOffen === z.id ? null : z.id)}
+                    titel={t("bankzugaenge.zeigeKonten", { bank: z.bezeichnung })}
+                  >
+                    {z.bezeichnung}
+                  </Zeilenlink>
+                ),
+              },
               { key: "blz", label: t("bankabruf.feldBlz") },
               { key: "benutzer", label: t("bankabruf.feldBenutzer") },
               {
@@ -265,6 +356,65 @@ export function BankzugaengeScreen() {
         )}
         {fehler && !pin && <div className="err" style={{ marginTop: "var(--sp-3)" }}>{fehler}</div>}
       </Card>
+
+      {/* Welche Konten an einem Zugang hängen — und von dort weiter zu dem, was
+          hereingekommen ist. Die Spalte in der Tabelle nennt nur die ANZAHL; die
+          beantwortet „habe ich hier schon etwas zugeordnet", aber nicht „welches Konto ist
+          das eigentlich". Genau die Frage stellt sich, wenn ein Abruf nichts bringt. */}
+      {kontenOffen && (
+        <Card
+          style={{ marginTop: "var(--gap-card)" }}
+          title={t("bankzugaenge.kontenDesZugangs", {
+            bank: zugaenge.find((z) => z.id === kontenOffen)?.bezeichnung ?? "",
+          })}
+        >
+          {zuordnungen.filter((z) => z.zugangId === kontenOffen).length === 0 ? (
+            <div className="muted">{t("bankzugaenge.keineKonten")}</div>
+          ) : (
+            <DataTable
+              columns={[
+                {
+                  key: "konto",
+                  label: t("bankzugaenge.spalteKonto"),
+                  render: (z: Kontozuordnung) => {
+                    const name = kontoNamen?.get(z.zahlungskontoId) ?? z.zahlungskontoId;
+                    return (
+                      <Zeilenlink
+                        onKlick={() =>
+                          setZeilenVon(zeilenVon === z.zahlungskontoId ? null : z.zahlungskontoId)
+                        }
+                        titel={t("konten.herkunft.zeigeZeilen", { konto: name })}
+                      >
+                        {name}
+                      </Zeilenlink>
+                    );
+                  },
+                },
+                { key: "schluessel", label: t("bankzugaenge.spalteSchluessel") },
+                {
+                  key: "abruf",
+                  label: t("bankzugaenge.spalteLetzterAbruf"),
+                  render: (z: Kontozuordnung) => z.letzterAbrufBis ?? "—",
+                },
+              ]}
+              rows={zuordnungen.filter((z) => z.zugangId === kontenOffen)}
+            />
+          )}
+
+        </Card>
+      )}
+
+      {/* Und darunter — als EIGENE Tabelle neben der Kontenliste, nicht in ihr — die
+          IMPORTE dieses Kontos über DIESEN Zugang. Erst der Klick auf einen Import zeigt,
+          was er gebracht hat.
+          Die Zeilen aus Dateien bleiben hier aussen vor: sie gehören zum selben Konto,
+          aber nicht zu diesem Abrufweg. Wer sie alle sehen will, findet sie im Register
+          „Herkunft" oder unter der Kontenliste. */}
+      {kontenOffen && zeilenVon && (
+        <div style={{ marginTop: "var(--gap-card)" }}>
+          <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} zugangId={kontenOffen} />
+        </div>
+      )}
 
       {pruefung && (
         <Card
@@ -342,7 +492,15 @@ export function BankzugaengeScreen() {
           }
         >
           <FormField label={t("bankabruf.feldPin")} required hint={t("bankabruf.feldPinHinweis")}>
-            <input className="field" type="password" value={pinText} onChange={(e) => setPinText(e.target.value)} autoComplete="off" autoFocus />
+            <input
+              className="field"
+              type="password"
+              value={pinText}
+              onChange={(e) => setPinText(e.target.value)}
+              onKeyDown={beiEnter(() => void pruefen(pin.zugang, pinText), !!pinText.trim() && !busy)}
+              autoComplete="off"
+              autoFocus
+            />
           </FormField>
         </Modal>
       )}

@@ -29,6 +29,7 @@ import {
 } from "../application/fints/abrufAusfuehren";
 import type { TanHerausforderung } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
+import { hanseaticAbruf } from "./hanseatic";
 import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
 import { trainingsmaterial, type Materialbefund } from "../application/kategorien/trainingsmaterial";
 import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
@@ -57,6 +58,12 @@ import { sqliteDepotRepository } from "./persistence/sqliteDepotRepository";
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
+import {
+  experimenteLaden,
+  experimentSchalten,
+  type ExperimentId,
+  type Experimente,
+} from "../application/experimente";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { inventarLaden, type Inventarsicht } from "../application/inventar/inventarsichten";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
@@ -79,6 +86,10 @@ import {
   type BuchungEingabe,
 } from "../application/buchung/buchungErfassen";
 import { umbuchungLoeschen as umbuchungLoeschenUseCase } from "../application/buchung/umbuchungErfassen";
+import { bankzeileVerwerfen as bankzeileVerwerfenUseCase } from "../application/import/bankzeileVerwerfen";
+import { abgleichLaden as abgleichLadenUseCase } from "../application/konten/abgleichsicht";
+import { herkunftLaden as herkunftLadenUseCase } from "../application/konten/herkunftsicht";
+import { pruefmarkerSetzen as pruefmarkerSetzenUseCase } from "../application/buchung/pruefmarker";
 import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchung/buchungSplitten";
 import { paarungLoesen as paarungLoesenUseCase } from "../application/buchung/umbuchungAusBuchung";
 import {
@@ -123,7 +134,7 @@ import {
   type PersonEingabe,
 } from "../application/stammdaten/stammdatenAnlegen";
 import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/kategorien/standardkategorien";
-import type { Bankzugang } from "../application/fints/abrufPort";
+import type { Abrufadapter, Bankzugang, Zugangsart } from "../application/fints/abrufPort";
 import type { Kontozuordnung } from "../application/fints/bankzugangPort";
 import {
   sqliteBankzugangRepository,
@@ -192,6 +203,15 @@ export function einstellungen(): Promise<Haushaltseinstellungen> {
 
 export function regionSetzen(locale: string): Promise<void> {
   return regionWaehlen(sqliteEinstellungenRepository, locale);
+}
+
+/** Welche experimentellen Funktionen eingeschaltet sind. Ohne Zutun: alle aus. */
+export function experimente(): Promise<Experimente> {
+  return experimenteLaden(sqliteEinstellungenRepository);
+}
+
+export function experimentSetzen(id: ExperimentId, an: boolean): Promise<void> {
+  return experimentSchalten(sqliteEinstellungenRepository, id, an);
 }
 
 
@@ -469,6 +489,20 @@ export async function umsaetzeBuchen(umsaetze: readonly Umsatz[]) {
  * Die PIN wird durchgereicht und nirgends gespeichert — sie lebt im State des Dialogs
  * und ist mit dem Schließen weg.
  */
+/**
+ * Welcher Adapter diesen Zugang bedient.
+ *
+ * Die einzige Stelle, an der aus der Art eines Zugangs sein Abrufweg wird. Sie steht hier
+ * und nicht in der Oberflaeche, weil sonst jeder Aufrufer die Zuordnung selbst kennen
+ * muesste — und der naechste sie anders traefe.
+ *
+ * Ein unbekannter Wert kann hier nicht ankommen: `Zugangsart` ist eine geschlossene
+ * Aufzaehlung, und das Repository faengt ab, was in der Spalte sonst noch stehen koennte.
+ */
+export function abrufAdapterFuer(art: Zugangsart): Abrufadapter {
+  return art === "hanseatic" ? hanseaticAbruf : fintsAbruf;
+}
+
 export async function bankAbrufen(
   zugang: Bankzugang,
   pin: string,
@@ -477,7 +511,7 @@ export async function bankAbrufen(
   rueckgriffTage?: number,
 ): Promise<Abrufergebnis> {
   return abrufAusfuehren(zugang, pin, frageTan, {
-    adapter: fintsAbruf,
+    adapter: abrufAdapterFuer(zugang.art),
     zugangRepo: sqliteBankzugangRepository,
     zuordnungRepo: sqliteKontozuordnungRepository,
     kontoRepo: sqliteZahlungskontoRepository,
@@ -680,6 +714,32 @@ export function buchungenLoeschen(
 // --- Buchungsdialog --------------------------------------------------------
 
 /** Alles, was der Dialog LESEND braucht — Herkunft, Gegenbein, Vertrag, Auswahl. */
+/**
+ * Der Kontoabgleich — unsere Rechnung gegen die Meldungen von Bank und Kassensturz.
+ *
+ * Eigener Dienst statt eines Ausschnitts aus `konten()`: die Kontensicht lädt Umsätze,
+ * Regeln, Kategorien und Dublettenurteile mit, weil ein Register das alles braucht. Der
+ * Abgleich braucht davon nichts.
+ */
+export function abgleich() {
+  return abgleichLadenUseCase({
+    kontoRepo: sqliteZahlungskontoRepository,
+    ledger: sqliteLedgerRepository,
+    ankerRepo: sqliteKontostandsankerRepository,
+    kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
+  });
+}
+
+/** Woher die Zeilen eines Kontos kommen — Läufe und Rohdaten, auch die weggelegten. */
+export function herkunft() {
+  return herkunftLadenUseCase({
+    kontoRepo: sqliteZahlungskontoRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    laufRepo: sqliteImportLaufRepository,
+    ledger: sqliteLedgerRepository,
+  });
+}
+
 export function buchungsdetail(): Promise<Buchungsdetaildaten> {
   return buchungsdetailLaden({
     kontoRepo: sqliteZahlungskontoRepository,
@@ -691,6 +751,7 @@ export function buchungsdetail(): Promise<Buchungsdetaildaten> {
     vertragRepo: sqliteVertragRepository,
     zuordnungRepo: sqliteVertragszuordnungRepository,
     freigabeRepo: sqliteDublettenfreigabeRepository,
+    kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
   });
 }
 
@@ -706,8 +767,24 @@ export function buchungLoeschen(id: string) {
   return buchungLoeschenUseCase(sqliteLedgerRepository, id);
 }
 
+/** Setzt den „noch ansehen"-Marker einer Buchung oder nimmt ihn weg. */
+export function pruefmarkerSetzen(istbuchungId: string, vorgemerkt: boolean) {
+  return pruefmarkerSetzenUseCase(sqliteLedgerRepository, istbuchungId, vorgemerkt);
+}
+
 export function umbuchungLoeschen(transferId: string) {
   return umbuchungLoeschenUseCase(sqliteLedgerRepository, transferId);
+}
+
+/**
+ * Verwirft eine Bankzeile: Buchung raus, Umsatz auf „verworfen" — der nächste Abruf holt
+ * sie damit nicht zurück. Der Gegenweg zum Löschen einer Datei-Zeile.
+ */
+export function bankzeileVerwerfen(istbuchungId: string) {
+  return bankzeileVerwerfenUseCase(
+    { ledger: sqliteLedgerRepository, umsatzRepo: sqliteUmsatzRepository },
+    istbuchungId,
+  );
 }
 
 export function buchungSplitten(buchung: IstBuchung, teile: Parameters<typeof buchungSplittenUseCase>[2]) {
@@ -722,8 +799,17 @@ export function buchungenPaaren(a: IstBuchung, b: IstBuchung) {
   return buchungenPaarenUseCase(sqliteLedgerRepository, a, b);
 }
 
-export function gegenbeinErzeugen(buchung: IstBuchung, kontoId: string) {
-  return gegenbeinErzeugenUseCase(sqliteLedgerRepository, buchung, kontoId);
+export async function gegenbeinErzeugen(buchung: IstBuchung, kontoId: string) {
+  // Die Online-Konten werden hier frisch geholt und nicht vom Aufrufer mitgegeben: der
+  // Dialog kann seit Minuten offen sein, und eine inzwischen angelegte Bankverbindung
+  // soll sofort greifen.
+  const zuordnungen = await sqliteKontozuordnungRepository.alle();
+  return gegenbeinErzeugenUseCase(
+    sqliteLedgerRepository,
+    buchung,
+    kontoId,
+    new Set(zuordnungen.map((z) => z.zahlungskontoId)),
+  );
 }
 
 export function umbuchungsBeinBearbeiten(buchung: IstBuchung, eingabe: Parameters<typeof umbuchungsBeinBearbeitenUseCase>[2]) {

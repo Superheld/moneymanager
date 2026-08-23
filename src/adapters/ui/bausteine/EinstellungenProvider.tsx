@@ -7,10 +7,21 @@
 // (siehe Kopfkommentar dort).
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { STANDARD_EINSTELLUNGEN, type Haushaltseinstellungen } from "../../../application";
+import {
+  EXPERIMENTE_AUS,
+  STANDARD_EINSTELLUNGEN,
+  type ExperimentId,
+  type Experimente,
+  type Haushaltseinstellungen,
+} from "../../../application";
 // Umbenannt importiert: die Kontext-Eigenschaft heisst genauso, und `regionSetzen`
 // im Rumpf sähe dann nach einem Aufruf ihrer selbst aus.
-import { einstellungen as einstellungenHolen, regionSetzen as regionSpeichern } from "../../dienste";
+import {
+  einstellungen as einstellungenHolen,
+  experimente as experimenteHolen,
+  experimentSetzen as experimentSpeichern,
+  regionSetzen as regionSpeichern,
+} from "../../dienste";
 import i18n from "../../../i18n/i18n";
 import { EinstellungenContext, type ContextWert } from "./einstellungenKontext";
 
@@ -20,14 +31,21 @@ import { EinstellungenContext, type ContextWert } from "./einstellungenKontext";
  */
 export function EinstellungenProvider({ children }: { children: ReactNode }) {
   const [einstellungen, setEinstellungen] = useState<Haushaltseinstellungen | null>(null);
+  const [experimente, setExperimente] = useState<Experimente | null>(null);
 
   async function anwenden(e: Haushaltseinstellungen) {
     if (e.sprache !== i18n.language) await i18n.changeLanguage(e.sprache);
     setEinstellungen(e);
   }
 
+  // Beides in EINEM Effekt und zusammen gesetzt. Gestaffelt gerendert stuende einen
+  // Durchgang lang "alles aus" da — ein Experiment, das aufblitzt und wieder
+  // verschwindet, sieht aus wie ein Fehler und nicht wie eine Voreinstellung.
   useEffect(() => {
-    einstellungenHolen().then(anwenden);
+    Promise.all([einstellungenHolen(), experimenteHolen()]).then(async ([e, x]) => {
+      await anwenden(e);
+      setExperimente(x);
+    });
   }, []);
 
   const wert = useMemo<ContextWert>(
@@ -37,10 +55,15 @@ export function EinstellungenProvider({ children }: { children: ReactNode }) {
         await regionSpeichern(locale);
         await anwenden(await einstellungenHolen());
       },
+      experimente: experimente ?? EXPERIMENTE_AUS,
+      experimentSetzen: async (id: ExperimentId, an: boolean) => {
+        await experimentSpeichern(id, an);
+        setExperimente(await experimenteHolen());
+      },
     }),
-    [einstellungen],
+    [einstellungen, experimente],
   );
 
-  if (!einstellungen) return null;
+  if (!einstellungen || !experimente) return null;
   return <EinstellungenContext.Provider value={wert}>{children}</EinstellungenContext.Provider>;
 }

@@ -29,7 +29,7 @@ import {
   type Kontostandsanker,
   type Zahlungsregel,
 } from "../../core";
-import type { Umsatz } from "../import";
+import { ABRUF_QUELLEN, type ImportLauf, type Umsatz } from "../import";
 import {
   freigegebenePaare,
   ledgerVerdacht,
@@ -53,8 +53,9 @@ import type {
 // gemeinsam, nicht nur fürs Register.
 export type { Dublettenverdacht };
 
-/** Quellen, die als Bankabruf gelten — deren Zeilen sind nicht von Hand löschbar. */
-export const ABRUF_QUELLEN: ReadonlySet<string> = new Set(["fints"]);
+// Welche Quelle ein Abruf ist, steht am Lauf (`import/importLauf.ts`) und wird hier nur
+// weitergereicht: die Sicht wendet die Regel an, sie besitzt sie nicht.
+export { ABRUF_QUELLEN };
 
 export interface KontenDeps {
   readonly kontoRepo: ZahlungskontoRepository;
@@ -127,6 +128,12 @@ export interface Kontensicht {
   readonly kontoNamen: ReadonlyMap<string, string>;
   readonly buchungen: readonly IstBuchung[];
   readonly regeln: readonly Zahlungsregel[];
+  /**
+   * Die Import-Läufe — geladen werden sie hier ohnehin, um `ausBankabruf` zu bestimmen.
+   * Mitgegeben, weil der Dublettenvergleich zu jeder Zeile sagen können muss, WOHER sie
+   * kam: dieselbe Zahlung aus Datei und Abruf ist genau der Fall, um den es dort geht.
+   */
+  readonly laeufe: readonly ImportLauf[];
   /**
    * IDs der Buchungen, die aus einem Bankabruf stammen — nur die sind vor dem Löschen
    * geschützt (siehe Kopf).
@@ -214,6 +221,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     buchungen,
     regeln,
+    laeufe,
     ausBankabruf,
     umsatzZuBuchung,
     dublettenverdacht,
@@ -263,10 +271,22 @@ export function registerSicht(
       return {
         zeile,
         buchung,
+        // Die Kette der Rückfallebenen, von der eigenen Angabe zur fremden:
+        //
+        //   eigene Bezeichnung → Empfänger aus dem Import → VERWENDUNGSZWECK → Füllwort
+        //
+        // Der Verwendungszweck steht in der Kette, weil ein Teil der Bankzeilen gar keinen
+        // Empfänger mitbringt: MT940 füllt das Feld je nach Institut und Geschäftsvorfall
+        // nicht, und der ganze Inhalt steckt dann im Zweck-Freitext. Ohne diese Stufe
+        // stünde die Zeile im Register ohne jede Beschriftung da — sichtbar leer, obwohl
+        // die Angabe vorhanden ist. Am echten Bestand betrifft das eine zweistellige Zahl
+        // von Zeilen, praktisch nur aus dem Abruf.
+        //
         // „Buchung" ist Füllwort aus dem Register und zählt als leer.
         bezeichnung:
           buchung?.notiz ||
           umsatz?.gegenpartei ||
+          umsatz?.verwendungszweck ||
           (zeile.bezeichnung && zeile.bezeichnung !== "Buchung" ? zeile.bezeichnung : ""),
         verwendungszweck: umsatz?.verwendungszweck ?? "",
         kategorieName: zeile.kategorieId ? kategorieNamen.get(zeile.kategorieId) ?? "" : "",

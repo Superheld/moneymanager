@@ -64,6 +64,8 @@ const de = {
     },
     umbuchung: {
       schonGepaart: "Diese Buchung gehört bereits zu einer Umbuchung.",
+      zielOnline:
+        "Auf einem Konto mit Bankverbindung wird keine Gegenbuchung angelegt — was dort steht, meldet die Bank. Die passende Zeile ist schon da und muss nur verbunden werden.",
       selbeBuchung: "Eine Buchung kann nicht mit sich selbst gepaart werden.",
       betragGegen: "Die beiden Beträge müssen sich zu null ergänzen.",
     },
@@ -74,6 +76,14 @@ const de = {
     anbieter: { fehlt: "Bitte einen Anbieter angeben." },
     beginn: { ungueltig: "Bitte ein gültiges Beginn-Datum angeben." },
     bezahlt: { keinKonto: "Kein Konto hinterlegt — bitte der Zahlung/Regel ein Konto zuordnen." },
+    buchung: { fehlt: "Diese Buchung gibt es nicht mehr." },
+    import: {
+      bankzeile: {
+        fehlt: "Diese Buchung gibt es nicht mehr.",
+        ohneUmsatz:
+          "Zu dieser Buchung ist keine eingelesene Zeile gespeichert — sie lässt sich nur löschen, nicht verwerfen.",
+      },
+    },
   },
   shell: {
     gruppeUeberblick: "Überblick",
@@ -119,6 +129,25 @@ const de = {
     feldBenutzerHinweis: "Bei manchen Banken die Zugangsnummer, nicht die Kontonummer.",
     feldKundenId: "Kunden-ID",
     feldKundenIdHinweis: "Nur ausfüllen, wenn die Bank eine abweichende Kunden-ID verlangt.",
+    profilOhneVorfaelle:
+      "Diese Bank meldet keine Geschäftsvorfälle — sie nimmt am FinTS-Verfahren nicht " +
+      "teil. Was mit ihren Konten möglich ist, steht an den Konten selbst.",
+    feldWeg: "Zugangsweg",
+    feldWegHinweis: "Wie diese Bank erreicht wird",
+    wegFints: "FinTS (Standard)",
+    wegHanseatic: "Hanseatic Bank (experimentell)",
+    hanseaticHinweis:
+      "Diese Bank bietet kein FinTS an. Der Abruf geht über dieselbe Schnittstelle wie " +
+      "ihre Weboberfläche — nur lesend, mit deinen Zugangsdaten. Sie ist von der Bank " +
+      "nicht zugesichert und kann jederzeit aufhören zu funktionieren.",
+    feldToken: "Client-Kennung",
+    feldTokenHinweis:
+      "Weist die App gegenüber der Bank aus — kein Passwort. Sie wird einmalig aus einem " +
+      "Mitschnitt der eigenen Anmeldung gewonnen und hier gespeichert.",
+    feldAnmeldekennung: "Anmeldekennung",
+    feldAnmeldekennungHinweis: "Dieselbe, mit der du dich im Onlinebanking anmeldest.",
+    feldPasswort: "Passwort",
+    feldPasswortHinweis: "Wird nicht gespeichert und gilt nur für diese Sitzung.",
     feldPin: "PIN",
     feldPinHinweis: "Wird nirgends gespeichert.",
     anmelden: "Anmelden",
@@ -540,11 +569,30 @@ const de = {
     keine: "— keine —",
   },
   bankzugaenge: {
+    format: {
+      spalte: "Format",
+      automatisch: "automatisch",
+      CAMT: "nur CAMT",
+      MT940: "nur MT940",
+      kannBankNicht: "kann diese Bank nicht",
+      hinweis: {
+        automatisch:
+          "Beide Wege werden probiert. Bleibt der erste ohne Ergebnis, läuft der zweite — das ist der Normalfall und passt sich an, wenn die Bank etwas ändert.",
+        CAMT: "Nur CAMT. Liefert die SEPA-Angaben einzeln statt als Fliesstext, kennt aber keinen Pflicht-Anfangssaldo. Wenn nichts kommt, kommt nichts — es wird nicht auf MT940 ausgewichen.",
+        MT940:
+          "Nur MT940. Trägt Anfangs- und Schlusssaldo als Pflichtfeld, dafür stecken Empfänger und Referenzen in einem Fliesstext. Wenn nichts kommt, kommt nichts — es wird nicht auf CAMT ausgewichen.",
+      },
+    },
     titel: "Hinterlegte Bankzugänge",
     untertitel: "Was verbunden ist, und was die Bank dazu freigibt",
     leer: "Kein Bankzugang hinterlegt. Er entsteht beim Anlegen eines Online-Kontos.",
     spalteBank: "Bank",
     spalteKonten: "Konten",
+    zeigeKonten: "Zeigt die Konten von {{bank}}",
+    kontenDesZugangs: "Konten bei {{bank}}",
+    keineKonten: "An diesem Zugang hängt noch kein Konto.",
+    spalteKonto: "Konto",
+    spalteSchluessel: "Schlüssel bei der Bank",
     spalteLetzterAbruf: "Abgerufen bis",
     pruefen: "Prüfen",
     pruefenTitel: "{{bank}} prüfen",
@@ -607,6 +655,52 @@ const de = {
         "Dieses Konto wird von Hand geführt. Verbinden lässt es sich über `+ Konto` → online: " +
         "dort das gemeldete Bankkonto auf `mit vorhandenem verknüpfen` stellen.",
     },
+    herkunft: {
+      laeufeTitel: "Eingelesen wurde",
+      keineLaeufe: "Für dieses Konto wurde noch nie etwas eingelesen.",
+      laufZeile: "{{zeilen}} Zeilen · {{verbucht}} gebucht · {{weggelegt}} weggelegt",
+      ohneWirkung: "{{n}} weitere Läufe ohne neue Zeilen",
+      keineZeilen: "Keine Zeile passt zu diesem Filter.",
+      spalteImport: "Import",
+      spalteZeilen: "Zeilen",
+      nichtsNeues: "nichts Neues",
+      zeigeLauf: "Zeigt nur, was am {{datum}} hereinkam",
+      laufWaehlen: "Oben einen Import wählen, um seine Zeilen zu sehen.",
+      keineLaeufeZugang: "Über diesen Zugang wurde für dieses Konto noch nichts abgerufen.",
+      zeigeZeilen: "Zeigt, was für {{konto}} eingelesen wurde",
+      spalteStatus: "Was daraus wurde",
+      buchungFehlt: "Buchung fehlt",
+      zurueckholen: "zurückholen",
+      filter: {
+        alle: "alle",
+        verbucht: "gebucht",
+        weggelegt: "weggelegt",
+        offen: "offen",
+      },
+      status: {
+        neu: "offen",
+        verbucht: "gebucht",
+        verworfen: "verworfen",
+        duplikat: "Duplikat",
+      },
+    },
+    abgleichBereich: {
+      register: "Abgleich",
+      untertitel: "Stimmt der Stand? Was gemeldet wurde, gegen das, was wir rechnen",
+      hinweg: "prüfen",
+      ohneMeldung: "nie gemeldet",
+      ohneBank: "ohne Bank",
+      stichtag: "Stichtag",
+      gemeldet: "gemeldet",
+      gerechnet: "gerechnet",
+      differenz: "Differenz",
+      vonBank: "von der Bank",
+      gezaehlt: "gezählt",
+      keineStichtage:
+        "Für dieses Konto hat noch nie jemand einen Stand gemeldet. Ohne eine zweite, unabhängige Aussage lässt sich nicht prüfen, ob die Rechnung stimmt — sie geht immer auf.",
+      fensterTitel: "Hier läuft es auseinander",
+      zusammensetzung: "Anfangsbestand {{anfang}} · Bewegungen {{bewegungen}}",
+    },
     abgleich: {
       stimmt: "stimmt mit der Bank",
       differenz: "Differenz {{betrag}}",
@@ -623,7 +717,7 @@ const de = {
     abrufen: "Abrufen",
     abruf: {
       titel: "Bei der Bank abrufen",
-      untertitel: "Holt die Umsätze seit dem letzten Abruf und legt sie in die Import-Inbox",
+      untertitel: "Holt die Umsätze seit dem letzten Abruf und bucht sie direkt ins Konto",
       feldZugang: "Bankzugang",
       starten: "Abrufen",
       laeuft: "ruft ab …",
@@ -739,7 +833,8 @@ const de = {
       umbuchungHinweis: "{{n}} davon sind Umbuchungen — sie tragen keine Kategorie und bleiben unverändert.",
       onlineHinweis: "{{n}} davon liegen auf einem Bankkonto und lassen sich nicht löschen.",
       loeschenFrage: "{{n}} Buchungen endgültig löschen?",
-      loeschenGesperrt: "{{n}} weitere bleiben stehen — sie kommen von der Bank.",
+      loeschenGesperrt:
+        "{{n}} weitere bleiben stehen — sie kommen von der Bank und werden einzeln verworfen, im Buchungsdetail.",
       loeschenBestaetigen: "{{n}} löschen",
     },
     suche: "Suche (Empfänger, Zweck, Betrag) …",
@@ -750,7 +845,7 @@ const de = {
     realerStandLabel: "realer Stand",
     keineGebucht: "Noch keine gebuchten Buchungen.",
     spalteDatum: "Datum",
-    spalteBeschreibung: "Beschreibung",
+    spalteBeschreibung: "Bezeichnung",
     spalteKategorie: "Kategorie",
     spalteBetrag: "Betrag",
     spalteSaldo: "Saldo",
@@ -758,6 +853,11 @@ const de = {
     editUntertitelImport: "Importierte Buchung — Korrekturen bleiben erhalten, die Import-Spur auch.",
     pillUmbuchung: "Umbuchung",
     pillManuell: "manuell",
+    pillPruefen: "ansehen",
+    pruefenWeg: "Erledigt — Marker entfernen",
+    pruefenFeld: "Noch ansehen",
+    pruefenHinweis:
+      "Merkt die Zeile im Auszug vor. Zeilen aus einem Bankabruf tragen den Marker von selbst — sie werden gebucht, ohne dass jemand sie gesehen hat.",
     pillBezahlt: "bezahlt",
     bearbeiten: "bearbeiten",
     loeschen: "löschen",
@@ -768,7 +868,11 @@ const de = {
     abbrechen: "Abbrechen",
     feldDatum: "Datum",
     feldBetrag: "Betrag",
-    feldNotiz: "Notiz",
+    // Im Code heisst das Feld `notiz` — in der Oberfläche „Bezeichnung", weil es genau
+    // das ist: der Text, der in der Registerzeile gegen Empfänger und Verwendungszweck
+    // gewinnt. Als „Notiz" liest es sich wie ein Kommentar am Rand, und wer eine Zeile
+    // umbenennen will, sucht dort nicht.
+    feldBezeichnung: "Bezeichnung",
     feldCharakter: "Charakter",
     feldKategorie: "Kategorie",
     optional: "optional",
@@ -787,6 +891,8 @@ const de = {
       keineKandidaten: "Keine passende Gegenbuchung gefunden (gleicher Betrag mit umgekehrtem Vorzeichen, anderes Konto, höchstens {{tage}} Tage entfernt).",
       oder: "oder",
       neu: "Gegenbein neu erzeugen auf",
+      nurVerbinden:
+        "Alle übrigen Konten hängen an einer Bank. Dort wird keine Gegenbuchung angelegt: die Bank meldet beide Seiten ohnehin, sie müssen nur verbunden werden. Steht die passende Zeile noch nicht oben, kommt sie mit dem nächsten Abruf.",
       neuHinweis: "Für Konten, die nicht importiert werden — typisch Bargeld.",
       bestaetigen: "Umbuchung anlegen",
       kategorieHinweis: "Die Kategorie entfällt: verschobenes Geld zählt nicht ins Budget.",
@@ -832,9 +938,11 @@ const de = {
       ohneImport: "In der App erfasst — kein Import-Kontext vorhanden.",
       bearbeitbar: "Änderbar",
       kontoGepaart: "fest — erst die Paarung lösen",
-      loeschenOnline: "Von der Bank geliefert — löschen geht nur über das Verwerfen im Abruf.",
+      verwerfenBankzeile: "Verwerfen",
+      verwerfenFolge:
+        "Verwerfen nimmt die Zeile aus dem Konto und hält fest, dass sie nicht hineingehört — der nächste Abruf holt sie nicht zurück. Der Kontostand weicht danach um {{betrag}} von dem ab, was die Bank meldet.",
       loeschenHinweis:
-        "Löschen entfernt die Buchung aus dem Konto. Die Zeile der Bank bleibt erhalten und steht danach wieder unter „Neu von der Bank“ — dort lässt sie sich verwerfen.",
+        "Löschen entfernt die Buchung aus dem Konto. Die eingelesene Zeile bleibt erhalten und steht danach wieder in der Import-Inbox.",
     },
     entwurf: {
       titel: "Neu von der Bank",
@@ -851,6 +959,21 @@ const de = {
       vertragOffen: "Ohne Angabe entscheidet die automatische Erkennung.",
       verwerfenFolge:
         "Verwerfen: zu dieser Zeile gibt es kein Gegenstück im Bestand. Der Kontostand weicht danach um {{betrag}} von dem ab, was die Bank meldet.",
+    },
+    vergleich: {
+      titel: "Zwei Zeilen vergleichen",
+      untertitel: "Nebeneinander — markiert ist, was sich unterscheidet",
+      oeffnen: "Nebeneinander vergleichen",
+      valuta: "Wertstellung",
+      umsatzart: "Umsatzart",
+      glaeubigerId: "Gläubiger-ID",
+      mandatsreferenz: "Mandatsreferenz",
+      e2eReferenz: "End-to-End-Referenz",
+      bankreferenz: "Referenz der Bank",
+      dieseVerwerfen: "Diese Zeile verwerfen",
+      dieseLoeschen: "Diese Zeile löschen",
+      folge:
+        "Verwerfen gilt für Zeilen der Bank: die Zeile bleibt als Entscheidung gespeichert und kommt beim nächsten Abruf nicht zurück. Löschen gilt für eingelesene Dateizeilen — die stehen danach wieder in der Import-Inbox.",
     },
     dublette: {
       oeffnen: "Gegenstück öffnen",
@@ -909,6 +1032,23 @@ const de = {
       untertitel: "Gilt für den ganzen Haushalt",
       feld: "Region",
       hinweis: "bestimmt Sprache, Zahlenformat und Währung",
+    },
+    experiment: {
+      titel: "Experimente",
+      untertitel: "Unfertiges zum Einschalten — auf eigene Verantwortung",
+      hinweis:
+        "Experimentelle Funktionen sind bewusst unfertig. Sie setzen Handarbeit bei der " +
+        "Einrichtung voraus, hängen an Schnittstellen, die niemand zugesichert hat, und " +
+        "können jederzeit aufhören zu funktionieren. Nichts davon läuft, solange du es " +
+        "nicht einschaltest.",
+      an: "eingeschaltet",
+      aus: "ausgeschaltet",
+      hanseaticTitel: "Hanseatic Bank",
+      hanseaticText:
+        "Konten, Salden und Umsätze der Hanseatic Bank abrufen. Die Bank bietet kein " +
+        "FinTS an; der Abruf geht deshalb über dieselbe Schnittstelle wie ihre " +
+        "Weboberfläche — nur lesend. Die Einrichtung verlangt einen einmaligen " +
+        "Mitschnitt der eigenen Anmeldung.",
     },
     person: {
       titel: "Personen",
@@ -1184,6 +1324,9 @@ const de = {
     spalteRuecklage: "zurücklegen/Mt",
     spalteZugeordnet: "Zahlungen",
     keineZuordnung: "keine erkannt",
+    zeigeZahlungen: "Zeigt die Zahlungen, die {{anbieter}} zugeordnet sind",
+    zahlungenTitel: "Zahlungen von {{anbieter}}",
+    keineZahlungen: "Die Regel greift noch auf keine Buchung.",
     gruppeOhneRegel: "ohne hinterlegte Zahlung",
     gruppeMeta: "{{count}} Verträge · {{betrag}} pro Monat",
     gruppeMetaTurnus: "{{count}} Verträge · {{summe}} je Fälligkeit · {{proMonat}} pro Monat",
@@ -1343,6 +1486,8 @@ const en: typeof de = {
     },
     umbuchung: {
       schonGepaart: "This transaction is already part of a transfer.",
+      zielOnline:
+        "No counter-entry is created on an account with a bank connection — what stands there is reported by the bank. The matching row is already present and only needs to be linked.",
       selbeBuchung: "A transaction cannot be paired with itself.",
       betragGegen: "The two amounts must add up to zero.",
     },
@@ -1353,6 +1498,14 @@ const en: typeof de = {
     anbieter: { fehlt: "Please enter a provider." },
     beginn: { ungueltig: "Please enter a valid start date." },
     bezahlt: { keinKonto: "No account assigned — please assign an account to the payment/rule." },
+    buchung: { fehlt: "That entry no longer exists." },
+    import: {
+      bankzeile: {
+        fehlt: "That entry no longer exists.",
+        ohneUmsatz:
+          "No imported row is stored for this entry — it can only be deleted, not discarded.",
+      },
+    },
   },
   shell: {
     gruppeUeberblick: "Overview",
@@ -1398,6 +1551,25 @@ const en: typeof de = {
     feldBenutzerHinweis: "At some banks this is the access number, not the account number.",
     feldKundenId: "Customer ID",
     feldKundenIdHinweis: "Only fill in if the bank requires a separate customer ID.",
+    profilOhneVorfaelle:
+      "This bank reports no business transactions — it does not take part in FinTS. " +
+      "What its accounts support is shown on the accounts themselves.",
+    feldWeg: "Access method",
+    feldWegHinweis: "How this bank is reached",
+    wegFints: "FinTS (standard)",
+    wegHanseatic: "Hanseatic Bank (experimental)",
+    hanseaticHinweis:
+      "This bank offers no FinTS access. Retrieval uses the same interface as its web " +
+      "front end — read-only, with your own credentials. It is not guaranteed by the " +
+      "bank and may stop working at any time.",
+    feldToken: "Client key",
+    feldTokenHinweis:
+      "Identifies the app to the bank — not a password. It is obtained once from a " +
+      "capture of your own login and stored here.",
+    feldAnmeldekennung: "Login ID",
+    feldAnmeldekennungHinweis: "The same one you use for online banking.",
+    feldPasswort: "Password",
+    feldPasswortHinweis: "Not stored; valid for this session only.",
     feldPin: "PIN",
     feldPinHinweis: "Never stored.",
     anmelden: "Log in",
@@ -1817,11 +1989,30 @@ const en: typeof de = {
     keine: "— none —",
   },
   bankzugaenge: {
+    format: {
+      spalte: "Format",
+      automatisch: "automatic",
+      CAMT: "CAMT only",
+      MT940: "MT940 only",
+      kannBankNicht: "not offered by this bank",
+      hinweis: {
+        automatisch:
+          "Both routes are tried. If the first returns nothing, the second runs — the normal case, and it adapts when the bank changes something.",
+        CAMT: "CAMT only. Delivers the SEPA details as separate fields rather than free text, but has no mandatory opening balance. If nothing arrives, nothing arrives — there is no fallback to MT940.",
+        MT940:
+          "MT940 only. Carries opening and closing balance as mandatory fields, but packs payee and references into free text. If nothing arrives, nothing arrives — there is no fallback to CAMT.",
+      },
+    },
     titel: "Stored bank access",
     untertitel: "What is connected, and what the bank allows for it",
     leer: "No bank access stored. It is created when you add an online account.",
     spalteBank: "Bank",
     spalteKonten: "Accounts",
+    zeigeKonten: "Shows the accounts at {{bank}}",
+    kontenDesZugangs: "Accounts at {{bank}}",
+    keineKonten: "No account is linked to this access yet.",
+    spalteKonto: "Account",
+    spalteSchluessel: "Key at the bank",
     spalteLetzterAbruf: "Retrieved through",
     pruefen: "Check",
     pruefenTitel: "Check {{bank}}",
@@ -1884,6 +2075,52 @@ const en: typeof de = {
         "This account is kept by hand. To connect it, use “+ account” → online and set the reported " +
         "bank account to “link to existing”.",
     },
+    herkunft: {
+      laeufeTitel: "Imported on",
+      keineLaeufe: "Nothing has ever been imported for this account.",
+      laufZeile: "{{zeilen}} rows · {{verbucht}} booked · {{weggelegt}} set aside",
+      ohneWirkung: "{{n}} further runs without new rows",
+      keineZeilen: "No row matches this filter.",
+      spalteImport: "Import",
+      spalteZeilen: "Rows",
+      nichtsNeues: "nothing new",
+      zeigeLauf: "Shows only what came in on {{datum}}",
+      laufWaehlen: "Pick an import above to see its rows.",
+      keineLaeufeZugang: "Nothing has been retrieved for this account through this access yet.",
+      zeigeZeilen: "Shows what was imported for {{konto}}",
+      spalteStatus: "Outcome",
+      buchungFehlt: "entry missing",
+      zurueckholen: "restore",
+      filter: {
+        alle: "all",
+        verbucht: "booked",
+        weggelegt: "set aside",
+        offen: "open",
+      },
+      status: {
+        neu: "open",
+        verbucht: "booked",
+        verworfen: "discarded",
+        duplikat: "duplicate",
+      },
+    },
+    abgleichBereich: {
+      register: "Reconciliation",
+      untertitel: "Does the balance match? What was reported, against what we calculate",
+      hinweg: "check",
+      ohneMeldung: "never reported",
+      ohneBank: "no bank",
+      stichtag: "As of",
+      gemeldet: "reported",
+      gerechnet: "calculated",
+      differenz: "Difference",
+      vonBank: "from the bank",
+      gezaehlt: "counted",
+      keineStichtage:
+        "Nobody has ever reported a balance for this account. Without a second, independent statement there is no way to check the calculation — it always adds up.",
+      fensterTitel: "This is where it diverges",
+      zusammensetzung: "Opening balance {{anfang}} · movements {{bewegungen}}",
+    },
     abgleich: {
       stimmt: "matches the bank",
       differenz: "Difference {{betrag}}",
@@ -1900,7 +2137,7 @@ const en: typeof de = {
     abrufen: "Retrieve",
     abruf: {
       titel: "Retrieve from the bank",
-      untertitel: "Fetches transactions since the last retrieval into the import inbox",
+      untertitel: "Fetches transactions since the last retrieval and books them straight into the account",
       feldZugang: "Bank access",
       starten: "Retrieve",
       laeuft: "retrieving …",
@@ -2016,7 +2253,8 @@ const en: typeof de = {
       umbuchungHinweis: "{{n}} of them are transfers — they carry no category and stay as they are.",
       onlineHinweis: "{{n}} of them sit on a bank account and cannot be deleted.",
       loeschenFrage: "Delete {{n}} entries for good?",
-      loeschenGesperrt: "{{n}} more stay — they come from the bank.",
+      loeschenGesperrt:
+        "{{n}} more stay — they come from the bank and are discarded one at a time, in the entry details.",
       loeschenBestaetigen: "Delete {{n}}",
     },
     suche: "Search (payee, reference, amount) …",
@@ -2027,7 +2265,7 @@ const en: typeof de = {
     realerStandLabel: "real balance",
     keineGebucht: "No booked transactions yet.",
     spalteDatum: "Date",
-    spalteBeschreibung: "Description",
+    spalteBeschreibung: "Label",
     spalteKategorie: "Category",
     spalteBetrag: "Amount",
     spalteSaldo: "Balance",
@@ -2035,6 +2273,11 @@ const en: typeof de = {
     editUntertitelImport: "Imported transaction — your edits are kept, and so is the import trail.",
     pillUmbuchung: "Transfer",
     pillManuell: "manual",
+    pillPruefen: "review",
+    pruefenWeg: "Done — remove the marker",
+    pruefenFeld: "Still to review",
+    pruefenHinweis:
+      "Flags the entry in the statement. Rows from a bank retrieval carry the marker by themselves — they are booked without anyone having seen them.",
     pillBezahlt: "paid",
     bearbeiten: "edit",
     loeschen: "delete",
@@ -2045,7 +2288,7 @@ const en: typeof de = {
     abbrechen: "Cancel",
     feldDatum: "Date",
     feldBetrag: "Amount",
-    feldNotiz: "Note",
+    feldBezeichnung: "Label",
     feldCharakter: "Character",
     feldKategorie: "Category",
     optional: "optional",
@@ -2064,6 +2307,8 @@ const en: typeof de = {
       keineKandidaten: "No matching counter entry found (same amount with opposite sign, different account, at most {{tage}} days apart).",
       oder: "or",
       neu: "Create the counter entry on",
+      nurVerbinden:
+        "All other accounts are connected to a bank. No counter-entry is created there: the bank reports both sides anyway, they only need to be linked. If the matching row is not listed above yet, it will arrive with the next retrieval.",
       neuHinweis: "For accounts that are never imported — typically cash.",
       bestaetigen: "Create transfer",
       kategorieHinweis: "The category is dropped: moved money does not count against a budget.",
@@ -2109,9 +2354,11 @@ const en: typeof de = {
       ohneImport: "Captured in the app — no import context available.",
       bearbeitbar: "Editable",
       kontoGepaart: "fixed — unpair the transfer first",
-      loeschenOnline: "Delivered by the bank — deleting only works by discarding it in the retrieval.",
+      verwerfenBankzeile: "Discard",
+      verwerfenFolge:
+        "Discarding takes the row out of the account and records that it does not belong there — the next retrieval will not bring it back. The balance will then differ by {{betrag}} from what the bank reports.",
       loeschenHinweis:
-        "Deleting removes the entry from the account. The bank row itself remains and reappears under “New from the bank”, where it can be discarded.",
+        "Deleting removes the entry from the account. The imported row itself remains and reappears in the import inbox.",
     },
     entwurf: {
       titel: "New from the bank",
@@ -2128,6 +2375,21 @@ const en: typeof de = {
       vertragOffen: "Left blank, the automatic detection decides.",
       verwerfenFolge:
         "Discard: there is no counterpart for this row. The balance will then differ by {{betrag}} from what the bank reports.",
+    },
+    vergleich: {
+      titel: "Compare two entries",
+      untertitel: "Side by side — what differs is highlighted",
+      oeffnen: "Compare side by side",
+      valuta: "Value date",
+      umsatzart: "Transaction type",
+      glaeubigerId: "Creditor ID",
+      mandatsreferenz: "Mandate reference",
+      e2eReferenz: "End-to-end reference",
+      bankreferenz: "Bank reference",
+      dieseVerwerfen: "Discard this entry",
+      dieseLoeschen: "Delete this entry",
+      folge:
+        "Discarding applies to rows from the bank: the row stays on record as a decision and will not come back on the next retrieval. Deleting applies to imported file rows — those reappear in the import inbox.",
     },
     dublette: {
       oeffnen: "Open the counterpart",
@@ -2186,6 +2448,21 @@ const en: typeof de = {
       untertitel: "Applies to the whole household",
       feld: "Region",
       hinweis: "determines language, number format and currency",
+    },
+    experiment: {
+      titel: "Experiments",
+      untertitel: "Unfinished features you can switch on — at your own risk",
+      hinweis:
+        "Experimental features are deliberately unfinished. They require manual setup, " +
+        "rely on interfaces nobody has guaranteed, and may stop working at any time. " +
+        "None of them run unless you switch them on.",
+      an: "on",
+      aus: "off",
+      hanseaticTitel: "Hanseatic Bank",
+      hanseaticText:
+        "Fetch accounts, balances and transactions from Hanseatic Bank. The bank offers " +
+        "no FinTS access, so the retrieval uses the same interface as its web front end " +
+        "— read-only. Setup requires a one-time capture of your own login.",
     },
     person: {
       titel: "People",
@@ -2460,6 +2737,9 @@ const en: typeof de = {
     spalteRuecklage: "set aside/mo",
     spalteZugeordnet: "payments",
     keineZuordnung: "none matched",
+    zeigeZahlungen: "Shows the payments matched to {{anbieter}}",
+    zahlungenTitel: "Payments matched to {{anbieter}}",
+    keineZahlungen: "The rule does not match any booking yet.",
     gruppeOhneRegel: "no payment on file",
     gruppeMeta: "{{count}} contracts · {{betrag}} per month",
     gruppeMetaTurnus: "{{count}} contracts · {{summe}} per due date · {{proMonat}} per month",

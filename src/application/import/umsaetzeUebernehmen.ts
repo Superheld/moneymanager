@@ -32,6 +32,20 @@ export interface UebernahmeEingabe {
   readonly zeitpunkt: string; // ISO-Datetime (vom Aufrufer; Webview-Date)
   readonly rohUmsaetze: readonly RohUmsatz[];
   readonly konten: readonly UebernahmeKonto[];
+  /**
+   * Woher der Lauf kam — nur ein ABRUF weiss das.
+   *
+   * Steht am Lauf und wird nicht aus den Umsätzen hergeleitet: gerade die Läufe ohne
+   * Ergebnis sind interessant („was habe ich wann abgefragt"), und die haben keine
+   * Umsätze, aus denen sich etwas ableiten liesse.
+   */
+  readonly herkunft?: {
+    readonly zugangId?: string;
+    readonly zahlungskontoId?: string;
+    readonly format?: string;
+    /** Die Bank hat die Trefferzahl gedeckelt — es gibt mehr, als hier ankam. */
+    readonly abgeschnitten?: boolean;
+  };
 }
 
 export interface UebernahmeErgebnis {
@@ -235,19 +249,26 @@ async function uebernahmeIntern(
     e2eReferenz: k.roh.e2eReferenz,
     umsatzart: k.roh.umsatzart,
     buchungsschluessel: k.roh.buchungsschluessel,
+    zweckCode: k.roh.zweckCode,
+    endempfaenger: k.roh.endempfaenger,
     bankreferenz: k.roh.bankreferenz,
     verwendungszweck: k.roh.verwendungszweck,
     rohHash: k.rohHash,
     nativeId: k.nativeId,
     status: "neu",
     vorschlag: vorschlagFuer(k.roh, kontext, k.zahlungskontoId),
-    verdachtAufId: verdacht.get(k)?.auf.id,
-    verdachtGruende: verdacht.get(k)?.gruende,
   }));
 
-  // 7. Persistieren: Ergänzungen, neue Umsätze, Lauf-Protokoll.
-  for (const u of zuErgaenzen) await umsatzRepo.speichern(u);
-  await umsatzRepo.speichernViele(umsaetze);
+  // 7. Persistieren: Lauf-Protokoll, Ergänzungen, neue Umsätze.
+  //
+  // Der LAUF ZUERST. Jede neue Zeile verweist über `lauf_id` auf ihn, und seit das Schema
+  // Fremdschlüssel trägt, ist die Reihenfolge keine Geschmacksfrage mehr: andersherum
+  // zeigen die Zeilen auf einen Lauf, den es noch nicht gibt, und die ganze Übernahme
+  // scheitert mit „FOREIGN KEY constraint failed".
+  //
+  // Dass es vorher gutging, lag an der Testumgebung: sql.js prüft Fremdschlüssel nicht,
+  // die App tut es. Ein grüner Test war hier also nie eine Aussage über diesen Fall —
+  // aufgefallen ist es erst beim ersten echten Abruf nach der Schema-Umstellung.
   await laufRepo.speichern({
     id: laufId,
     quelle: eingabe.quelle,
@@ -257,7 +278,10 @@ async function uebernahmeIntern(
     neu: umsaetze.length,
     // Als Dublette zählt beides: der exakte Schlüsseltreffer und der Fund des Finders.
     duplikate: duplikate.length + (kandidaten.length - gefunden.length),
+    ...eingabe.herkunft,
   });
+  for (const u of zuErgaenzen) await umsatzRepo.ergaenzen(u);
+  await umsatzRepo.anlegenViele(umsaetze);
 
   return {
     laufId,

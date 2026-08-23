@@ -5,7 +5,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { Zahlungskonto } from "../../core";
-import type { Abrufadapter, Abrufsitzung, Bankkonto, Bankzugang } from "./abrufPort";
+import type { Abrufadapter, Abrufsitzung, Bankkonto, Bankzugang, Formatvorgabe } from "./abrufPort";
 import type { Kontozuordnung } from "./bankzugangPort";
 import type { Bankprofil } from "./abrufPort";
 import { ERSTABRUF_TAGE, RUECKGRIFF_TAGE, abrufAusfuehren, abrufZeitraum } from "./abrufAusfuehren";
@@ -15,6 +15,7 @@ const HEUTE = "2026-08-18";
 const zugang: Bankzugang = {
   id: "z1",
   bezeichnung: "Musterbank",
+  art: "fints",
   url: "https://fints.example/fints",
   blz: "10000001",
   benutzer: "12345",
@@ -62,9 +63,11 @@ function fakeAdapter(opt: {
   wirft?: boolean;
   saldo?: number;
   saldoWirft?: boolean;
+  /** Die Stände, die in den gelieferten Auszügen stehen. */
+  auszugsSalden?: { datum: string; betrag: number }[];
   profil?: Bankprofil;
 }) {
-  const anfragen: { schluessel: string; von: string; bis: string; bevorzugt?: string }[] = [];
+  const anfragen: { schluessel: string; von: string; bis: string; bevorzugt?: Formatvorgabe }[] = [];
   const sitzung: Abrufsitzung = {
     konten: opt.konten,
     bankparameter: () => '{"systemId":"S"}',
@@ -84,6 +87,9 @@ function fakeAdapter(opt: {
       return {
         format: "MT940",
         hinweise: [],
+        // Was die Bank im Auszug mitschickt: Stand davor und Stand danach. Über den
+        // Testschalter, damit auch der Fall „Format liefert keine" geprüft werden kann.
+        auszugsSalden: opt.auszugsSalden ?? [],
         ergebnis: {
           quelle: "fints",
           warnungen: [],
@@ -122,12 +128,14 @@ function fakes(zuordnungen: Kontozuordnung[]) {
   const umsaetze: any[] = [];
   const buchungen: any[] = [];
   const anker: any[] = [];
+  const laeufe: any[] = [];
   return {
     gespeicherteZuordnungen,
     zugaenge,
     umsaetze,
     buchungen,
     anker,
+    laeufe,
     deps: {
       zugangRepo: {
         alle: async () => [],
@@ -157,7 +165,9 @@ function fakes(zuordnungen: Kontozuordnung[]) {
           const i = umsaetze.findIndex((x) => x.id === u.id);
           if (i >= 0) umsaetze[i] = u; else umsaetze.push(u);
         },
-        speichernViele: async (u: readonly any[]) => void umsaetze.push(...u),
+        anlegenViele: async (u: readonly any[]) => void umsaetze.push(...u),
+        anlegen: async (u: any) => void umsaetze.push(u),
+        ergaenzen: async () => {},
         alle: async () => [...umsaetze],
         nachLauf: async (laufId: string) => umsaetze.filter((u) => u.laufId === laufId),
         offene: async () => umsaetze.filter((u) => u.status === "neu"),
@@ -175,7 +185,7 @@ function fakes(zuordnungen: Kontozuordnung[]) {
           if (i >= 0) buchungen.splice(i, 1);
         },
       },
-      laufRepo: { alle: async () => [], speichern: async () => {}, loeschen: async () => {} },
+      laufRepo: { alle: async () => [...laeufe], speichern: async (l: any) => void laeufe.push(l), loeschen: async () => {} },
       ankerRepo: {
         alle: async () => [...anker],
         speichern: async (a: any) => {
@@ -299,8 +309,8 @@ describe("abrufAusfuehren", () => {
     (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     const frisch = f.umsaetze.find((u) => u.id !== "alt");
-    expect(frisch.verdachtAufId).toBe("alt"); // der Verdacht steht dran …
-    expect(frisch.status).toBe("verbucht"); // … hält aber nichts mehr auf
+    // Der Verdacht haelt nichts auf: die Zeile wird ganz normal verbucht.
+    expect(frisch.status).toBe("verbucht");
     expect(f.buchungen).toHaveLength(1);
   });
 
@@ -310,7 +320,11 @@ describe("abrufAusfuehren", () => {
 
     const befunde = (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
-    expect(anfragen).toEqual([{ schluessel: "9876543210|Girokonto", von: "2026-07-19", bis: HEUTE }]);
+    expect(anfragen).toEqual([
+      // `bevorzugt` steht immer da, auch leer: der Abruf reicht Gedächtnis und Wahl
+      // gemeinsam durch, und beide dürfen fehlen.
+      { schluessel: "9876543210|Girokonto", von: "2026-07-19", bis: HEUTE, bevorzugt: { wahl: undefined, zuletzt: undefined } },
+    ]);
     expect(befunde).toHaveLength(1);
     expect(befunde[0].ergebnis?.neu).toBe(1);
     expect(befunde[0].format).toBe("MT940");
@@ -422,7 +436,9 @@ describe("abrufAusfuehren", () => {
     ]);
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    expect(anfragen[0].bevorzugt).toBe("MT940");
+    expect(anfragen[0].bevorzugt?.zuletzt).toBe("MT940");
+    // Und ohne Festlegung — das Gedächtnis dreht nur die Reihenfolge.
+    expect(anfragen[0].bevorzugt?.wahl).toBeUndefined();
   });
 
   it("fragt ohne Gedächtnis ohne Vorgabe", async () => {
@@ -430,7 +446,8 @@ describe("abrufAusfuehren", () => {
     const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    expect(anfragen[0].bevorzugt).toBeUndefined();
+    expect(anfragen[0].bevorzugt?.zuletzt).toBeUndefined();
+    expect(anfragen[0].bevorzugt?.wahl).toBeUndefined();
   });
 
   it("schreibt das getragene Format fort", async () => {
@@ -450,5 +467,124 @@ describe("abrufAusfuehren", () => {
     expect(ergebnis.konten).toEqual([]);
     expect(ergebnis.depots).toEqual([]);
     expect(anfragen).toEqual([]);
+  });
+});
+
+/**
+ * Die Stände aus den Auszügen sind der eigentliche Gewinn des Abrufs für den Abgleich:
+ * `HKSAL` bieten nicht alle Banken an und es sagt nur, wie es HEUTE steht — die
+ * Auszugsstände decken den abgefragten Zeitraum ab und fallen nebenbei an.
+ */
+describe("Auszugsstände als Anker", () => {
+  const zuordnung: Kontozuordnung = {
+    zugangId: "z1",
+    schluessel: "9876543210|Girokonto",
+    zahlungskontoId: "k1",
+  };
+
+  it("legt für jeden gelieferten Stand einen Anker an", async () => {
+    const { adapter } = fakeAdapter({
+      konten: [bankkonto()],
+      auszugsSalden: [
+        { datum: "2026-07-31", betrag: 120000 },
+        { datum: "2026-08-18", betrag: 133050 },
+      ],
+    });
+    const f = fakes([zuordnung]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    const datumsListe = f.anker.filter((a) => a.herkunft === "bank").map((a) => a.datum);
+    expect(datumsListe).toEqual(expect.arrayContaining(["2026-07-31", "2026-08-18"]));
+    expect(f.anker.find((a) => a.datum === "2026-07-31")?.betrag).toBe(120000);
+  });
+
+  /**
+   * Ein Format ohne Stände darf nichts kaputtmachen — die Umsätze sind das Wichtigere,
+   * und ein fehlender Anker heisst nur, dass eine Prüfmöglichkeit fehlt.
+   */
+  it("läuft durch, wenn das Format keine Stände trägt", async () => {
+    const { adapter } = fakeAdapter({ konten: [bankkonto()], auszugsSalden: [] });
+    const f = fakes([zuordnung]);
+    const ergebnis = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+    expect(ergebnis.konten[0].fehler).toBeUndefined();
+  });
+
+  it("übergeht einen Stand mit unbrauchbarem Datum, statt den Abruf zu kippen", async () => {
+    const { adapter } = fakeAdapter({
+      konten: [bankkonto()],
+      auszugsSalden: [
+        { datum: "kein-datum", betrag: 1 },
+        { datum: "2026-08-18", betrag: 133050 },
+      ],
+    });
+    const f = fakes([zuordnung]);
+    const ergebnis = await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(ergebnis.konten[0].fehler).toBeUndefined();
+    expect(f.anker.some((a) => a.datum === "2026-08-18")).toBe(true);
+    expect(f.anker.some((a) => a.datum === "kein-datum")).toBe(false);
+  });
+});
+
+/**
+ * Der Abruf ist die einzige Quelle, die ihre Herkunft KENNT: ein Zugang, ein Konto, ein
+ * Format. Bisher stand das nur im Dateinamen als Fliesstext — lesbar, aber nicht
+ * auswertbar, und bei jeder Umbenennung eine Ratepartie.
+ */
+describe("Herkunft am Lauf", () => {
+  const zuordnung: Kontozuordnung = {
+    zugangId: "z1",
+    schluessel: "9876543210|Girokonto",
+    zahlungskontoId: "k1",
+  };
+
+  it("schreibt Zugang, Konto und Format an den Lauf", async () => {
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([zuordnung]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(f.laeufe[0]).toMatchObject({
+      zugangId: "z1",
+      zahlungskontoId: "k1",
+      format: "MT940",
+    });
+  });
+});
+
+/**
+ * Der Unterschied zwischen Gedächtnis und Festlegung ist die ganze Existenzberechtigung
+ * der Wahl: das Gedächtnis dreht nur die Reihenfolge und lässt den zweiten Versuch
+ * zu — die Wahl schliesst ihn aus.
+ */
+describe("Formatwahl", () => {
+  it("reicht die Festlegung des Kontos an den Adapter durch", async () => {
+    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([
+      {
+        zugangId: "z1",
+        schluessel: "9876543210|Girokonto",
+        zahlungskontoId: "k1",
+        letztesFormat: "CAMT",
+        formatwahl: "MT940",
+      },
+    ]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    // Beides kommt an: die Wahl entscheidet, das Gedächtnis bleibt als Information.
+    expect(anfragen[0].bevorzugt).toEqual({ wahl: "MT940", zuletzt: "CAMT" });
+  });
+
+  it("gibt „automatisch“ weiter wie keine Wahl", async () => {
+    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([
+      { zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1", formatwahl: "automatisch" },
+    ]);
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    expect(anfragen[0].bevorzugt?.wahl).toBe("automatisch");
   });
 });

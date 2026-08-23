@@ -1,0 +1,21 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "hanseatic",
+  "description": "HTTP-Transport fuer den zweiten, experimentellen Abrufweg. Eigene Datei, weil fints-banken.json aus der DK-Bankenliste erzeugt wird und dieses Institut dort nicht steht — es nimmt am Verfahren nicht teil. Zwei Hosts: das Gateway traegt alle Aufrufe, die Weboberflaeche liefert beim Anmelden den oeffentlichen Client-Schluessel.",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    {
+      "identifier": "http:default",
+      "allow": [
+        {
+          "url": "https://connecthb.hanseaticbank.de/*"
+        },
+        {
+          "url": "https://meine.hanseaticbank.de/*"
+        }
+      ]
+    }
+  ]
+}

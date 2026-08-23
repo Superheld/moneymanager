@@ -1,0 +1,46 @@
+#!/bin/sh
+# Was darf nach `main`?
+#
+# `main` ist der veroeffentlichte Stand und wird ausschliesslich aus `develop` bedient —
+# dort ist alles gesammelt, getestet und in der Reihenfolge, in der es entstanden ist.
+# Ein Feature-Branch, der direkt nach main geht, umgeht genau diese Sammelstelle.
+#
+# WARUM DIESER HOOK und nicht `pre-merge-commit`, wo man ihn zuerst vermutet: dort gibt es
+# `MERGE_HEAD` noch NICHT. Git legt die Datei erst danach an; ein Hook, der dort nach der
+# Merge-Quelle sucht, findet nichts und winkt durch — gemessen, nicht vermutet. Hier ist
+# sie da, und `$2` sagt ausserdem, dass es ueberhaupt ein Merge ist.
+#
+# Umgehen im Notfall: git merge --no-verify
+set -e
+
+# $1 = Datei mit der Nachricht, $2 = woher sie kommt (message|merge|squash|commit|template)
+[ "$2" = "merge" ] || exit 0
+[ "$(git rev-parse --abbrev-ref HEAD)" = "main" ] || exit 0
+
+GITDIR=$(git rev-parse --git-dir)
+if [ ! -f "$GITDIR/MERGE_HEAD" ]; then
+  echo "" >&2
+  echo "✋ Der Branch-Waechter kann die Merge-Quelle nicht lesen ($GITDIR/MERGE_HEAD fehlt)." >&2
+  echo "   Er haette NICHTS geprueft — lieber anhalten als beruhigen." >&2
+  echo "   Wirklich mergen: git merge --no-verify" >&2
+  echo "" >&2
+  exit 1
+fi
+
+HEREIN=$(cat "$GITDIR/MERGE_HEAD")
+DEVELOP=$(git rev-parse --verify --quiet develop || true)
+
+if [ "$HEREIN" != "$DEVELOP" ]; then
+  QUELLE=$(git name-rev --name-only --always "$HEREIN")
+  echo "" >&2
+  echo "✋ Nach 'main' wird nur aus 'develop' gemergt — hier kommt '$QUELLE'." >&2
+  echo "" >&2
+  echo "   develop ist die Sammelstelle: dort steht alles beieinander, getestet und in" >&2
+  echo "   der Reihenfolge, in der es entstanden ist. Ein Branch, der direkt nach main" >&2
+  echo "   geht, umgeht sie — und main ist der Stand, der veroeffentlicht ist." >&2
+  echo "" >&2
+  echo "   Der Weg: erst nach develop mergen, dann develop nach main." >&2
+  echo "   Wirklich so:  git merge --no-verify" >&2
+  echo "" >&2
+  exit 1
+fi

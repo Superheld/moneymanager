@@ -8,7 +8,14 @@
 
 import { describe, expect, it } from "vitest";
 import { waehrungNachCode } from "../../core";
-import { bankbetragZuCent, klartextAnreicherung, isoDatum, zuRohUmsatz, type FintsBuchung } from "./uebersetzung";
+import {
+  auszugsStaende,
+  bankbetragZuCent,
+  klartextAnreicherung,
+  isoDatum,
+  zuRohUmsatz,
+  type FintsBuchung,
+} from "./uebersetzung";
 
 describe("bankbetragZuCent", () => {
   it("rechnet Euro-Fließkomma in Cent um, auch wo die Multiplikation kippt", () => {
@@ -155,5 +162,135 @@ describe("zuRohUmsatz", () => {
     const u = zuRohUmsatz(buchung({ remoteName: undefined, purpose: undefined }), {});
     expect(u.gegenpartei).toBe("");
     expect(u.verwendungszweck).toBe("");
+  });
+});
+
+/**
+ * Die Stände aus den Auszügen sind die Grundlage des Kontoabgleichs — und die Stelle, an
+ * der eine Erfindung der Bibliothek gefährlich wird: der CAMT-Parser legt einen
+ * Anfangssaldo von NULL an, wenn die Bank keinen mitschickt. Ungeprüft übernommen wäre das
+ * ein Anker „an diesem Tag lag nichts auf dem Konto", und der meldet die gesamte
+ * Kontodeckung als Fehlbetrag.
+ */
+describe("auszugsStaende", () => {
+  const stand = (iso: string, euro: number) => ({
+    date: new Date(`${iso}T00:00:00`),
+    currency: "EUR",
+    value: euro,
+  });
+
+  it("nimmt Anfangs- und Schlusssaldo, wenn sie auf verschiedene Tage fallen", () => {
+    const staende = auszugsStaende([
+      { openingBalance: stand("2026-07-31", 1200), closingBalance: stand("2026-08-22", 1330.5) },
+    ]);
+    expect(staende).toEqual([
+      { datum: "2026-07-31", betrag: 120000 },
+      { datum: "2026-08-22", betrag: 133050 },
+    ]);
+  });
+
+  it("lässt einen Anfangssaldo weg, der auf denselben Tag fällt wie der Schluss", () => {
+    // Genau die Form, die der CAMT-Parser erfindet: Wert null, Datum vom Schluss.
+    const staende = auszugsStaende([
+      { openingBalance: stand("2026-08-22", 0), closingBalance: stand("2026-08-22", 843.07) },
+    ]);
+    expect(staende).toEqual([{ datum: "2026-08-22", betrag: 84307 }]);
+  });
+
+  it("nimmt mehrere Auszüge in ihrer Reihenfolge", () => {
+    const staende = auszugsStaende([
+      { openingBalance: stand("2026-06-30", 100), closingBalance: stand("2026-07-31", 200) },
+      { openingBalance: stand("2026-07-31", 200), closingBalance: stand("2026-08-31", 300) },
+    ]);
+    expect(staende.map((s) => s.datum)).toEqual([
+      "2026-06-30", "2026-07-31", "2026-07-31", "2026-08-31",
+    ]);
+  });
+
+  it("kommt ohne Schlusssaldo klar, statt zu werfen", () => {
+    expect(auszugsStaende([{ openingBalance: stand("2026-08-01", 500) }])).toEqual([]);
+  });
+
+  it("übergeht einen Auszug mit kaputtem Datum und vermerkt es", () => {
+    const warnungen: string[] = [];
+    const kaputt = { date: new Date("nichts"), currency: "EUR", value: 5 };
+    const staende = auszugsStaende(
+      [{ closingBalance: kaputt }, { closingBalance: stand("2026-08-22", 10) }],
+      warnungen,
+    );
+    expect(staende).toEqual([{ datum: "2026-08-22", betrag: 1000 }]);
+    expect(warnungen).toHaveLength(1);
+  });
+});
+
+describe("zuRohUmsatz — was die Bank ausdruecklich nennt", () => {
+  const konto = { iban: "DE31999999980000000002", name: "Girokonto", waehrung: "EUR" };
+  const buchung = (over: Partial<FintsBuchung> = {}): FintsBuchung => ({
+    valueDate: new Date(2026, 7, 3, 0, 0, 0),
+    entryDate: new Date(2026, 7, 4, 0, 0, 0),
+    amount: -49.9,
+    purpose: "Rechnung",
+    remoteName: "Talmberg Energie",
+    ...over,
+  });
+
+  /**
+   * Der Grund, warum es beide Felder gibt. `remoteAccountNumber` traegt, was das Format
+   * gerade hergibt — in CAMT die IBAN, in MT940 die nationale Kontonummer aus `?31` —, und
+   * keine Angabe sagt, welches von beiden. `remoteIban` ist dagegen eine Zusage.
+   */
+  it("nimmt die ausdrueckliche IBAN, auch wenn daneben eine Kontonummer steht", () => {
+    const u = zuRohUmsatz(
+      buchung({ remoteIban: "DE04999999980000000003", remoteAccountNumber: "234567" }),
+      konto,
+    );
+    expect(u.gegenparteiIban).toBe("DE04999999980000000003");
+  });
+
+  it("faellt auf remoteAccountNumber zurueck, wenn dort eine IBAN steht", () => {
+    const u = zuRohUmsatz(buchung({ remoteAccountNumber: "DE04999999980000000003" }), konto);
+    expect(u.gegenparteiIban).toBe("DE04999999980000000003");
+  });
+
+  /**
+   * Die MT940-Kontonummer aus `?31` darf NICHT als IBAN durchgehen: Konto-Match und
+   * rohHash normalisieren IBANs, eine Kontonummer wuerde dort stillschweigend zu Muell.
+   */
+  it("laesst eine nationale Kontonummer nicht als IBAN durch", () => {
+    const u = zuRohUmsatz(buchung({ remoteAccountNumber: "234567" }), konto);
+    expect(u.gegenparteiIban).toBeUndefined();
+  });
+
+  it("uebernimmt Zweckcode und Endempfaenger, wo die Bank sie nennt", () => {
+    const u = zuRohUmsatz(
+      buchung({
+        purposeCode: "SALA",
+        ultimateParty: "Buchhandlung Talmberg",
+        remoteName: "Zahlungsdienstleister",
+      }),
+      konto,
+    );
+    expect(u.zweckCode).toBe("SALA");
+    // Die direkte Gegenpartei bleibt, was sie ist — der Endempfaenger steht DANEBEN.
+    // Wer beides vermischt, verliert die Information, ueber wen gezahlt wurde.
+    expect(u.gegenpartei).toBe("Zahlungsdienstleister");
+    expect(u.endempfaenger).toBe("Buchhandlung Talmberg");
+  });
+
+  /**
+   * MT940 liefert beides nie. Das ist eine ehrliche Luecke und kein Grund, etwas zu
+   * erfinden — ein aus dem Verwendungszweck geratener Endempfaenger saehe aus wie eine
+   * Angabe der Bank.
+   */
+  it("laesst beide leer, wo das Format sie nicht kennt", () => {
+    const u = zuRohUmsatz(buchung(), konto);
+    expect(u.zweckCode).toBeUndefined();
+    expect(u.endempfaenger).toBeUndefined();
+  });
+
+  it("behandelt Leerstrings wie fehlende Angaben", () => {
+    const u = zuRohUmsatz(buchung({ purposeCode: "  ", ultimateParty: "" }), konto);
+    expect(u.zweckCode).toBeUndefined();
+    expect(u.endempfaenger).toBeUndefined();
   });
 });

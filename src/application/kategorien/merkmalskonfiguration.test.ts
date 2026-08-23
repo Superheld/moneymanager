@@ -157,7 +157,8 @@ describe("Wirkungsmessung", () => {
     }
     const ledger: LedgerPort = { alle: async () => buchungen, speichern: async () => {}, loeschen: async () => {} };
     const umsatzRepo = {
-      speichern: async () => {}, speichernViele: async () => {}, alle: async () => umsaetze,
+      speichern: async () => {}, anlegen: async () => {}, anlegenViele: async () => {},
+      ergaenzen: async () => {}, alle: async () => umsaetze,
       nachLauf: async () => [], offene: async () => [], loeschen: async () => {},
       bestandsSchluessel: async () => ({ hashes: [], nativeIds: [] }),
     } satisfies UmsatzRepository;

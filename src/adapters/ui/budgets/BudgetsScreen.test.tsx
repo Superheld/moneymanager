@@ -184,7 +184,7 @@ describe("BudgetsScreen — Vorschläge", () => {
     await sqliteLedgerRepository.speichern({
       id, datum, betrag: -betrag, kontoId: "k1", charakter: "Aufwand", quelle: "import", kategorieId,
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum, betrag: -betrag,
       waehrung: "EUR", gegenpartei, verwendungszweck: "", rohHash: `h-${id}`,
       status: "verbucht", istbuchungId: id,
@@ -277,7 +277,7 @@ describe("BudgetsScreen — Vorschläge", () => {
     // die Vorschläge geladen. Ohne ihn prüfte der Test gegen einen Bildschirm, auf dem
     // die Karte schlicht noch nicht gerendert ist — und wäre auch grün, wenn nichts
     // gespeichert würde.
-    await einkaufsreihe("f", "freizeit", 20000, "Kino Muelheim");
+    await einkaufsreihe("f", "freizeit", 20000, "Kino Seewinkel");
 
     const nutzer = userEvent.setup();
     const ersteAnsicht = rendere(<BudgetsScreen />);

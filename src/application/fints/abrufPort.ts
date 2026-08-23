@@ -29,13 +29,33 @@ import type { ImportErgebnis } from "../import";
  * (BPD/UPD + systemId). Ohne diese Aufbewahrung synchronisiert jeder Abruf neu — zwei
  * zusätzliche Dialogrunden und im ungünstigen Fall eine TAN mehr.
  */
+/**
+ * Über welchen Weg ein Zugang seine Bank erreicht.
+ *
+ * FinTS ist der Normalfall und deckt jedes Institut ab, das am Verfahren teilnimmt. Wer
+ * nicht teilnimmt, ist damit nicht erreichbar — und dafür gibt es die zweite Art: einen
+ * Weg über die Schnittstelle der Weboberfläche des Instituts. Der ist experimentell,
+ * institutsspezifisch und hinter einem Schalter (`application/experimente.ts`).
+ *
+ * Die Art steht am ZUGANG und nicht am Adapter, weil sie eine Eigenschaft dieser
+ * Verbindung ist: dasselbe Institut könnte morgen FinTS anbieten, und dann wechselt der
+ * Weg, ohne dass sich am Rest etwas ändert.
+ */
+export type Zugangsart = "fints" | "hanseatic";
+
 export interface Bankzugang {
   readonly id: string;
   /** Anzeigename der Bank, wie sie sich selbst nennt. */
   readonly bezeichnung: string;
-  /** FinTS-PIN/TAN-Endpunkt der Bank. */
+  /**
+   * Welcher Abrufweg diesen Zugang bedient — Pflicht, damit niemand sie versehentlich
+   * offenlässt. In der DATENBANK darf die Spalte beim Bestand fehlen; dort gilt FinTS,
+   * weil bis dahin jeder Zugang einer war.
+   */
+  readonly art: Zugangsart;
+  /** FinTS-PIN/TAN-Endpunkt der Bank; bei anderen Arten deren Basis-Adresse. */
   readonly url: string;
-  /** Bankleitzahl. */
+  /** Bankleitzahl. Leer, wenn der Weg dieses Instituts keine braucht. */
   readonly blz: string;
   /** Anmeldename — bei manchen Banken die Zugangsnummer, NICHT die Kontonummer. */
   readonly benutzer: string;
@@ -55,6 +75,20 @@ export interface Bankzugang {
    * Objekt der Bibliothek und bleibt im Adapter.
    */
   readonly profil?: string;
+  /**
+   * Ein Ausweis, mit dem sich die ANWENDUNG gegenüber der Bank ausweist — nicht der
+   * Nutzer.
+   *
+   * Er wird gespeichert, und das ist der Unterschied zur PIN, die es ausdrücklich nicht
+   * wird: die PIN ist das Geheimnis des Nutzers und lebt nur in der Sitzung. Dieser
+   * Ausweis gehört zur Anwendung, ist bei jedem Aufruf nötig und ändert sich nicht — ihn
+   * bei jedem Abruf erneut zu erfragen, hiesse den Nutzer etwas abtippen zu lassen, das
+   * er selbst irgendwo herauslesen musste. Dieselbe Überlegung wie bei der
+   * FinTS-Produkt-ID: Konfiguration, nie Konstante, und nie im Quelltext.
+   *
+   * FinTS-Zugänge brauchen ihn nicht.
+   */
+  readonly token?: string;
 }
 
 /**
@@ -227,12 +261,61 @@ export interface Saldo {
   readonly waehrung: string;
 }
 
+/**
+ * Ein Kontostand, den die Bank IM AUSZUG mitgeliefert hat.
+ *
+ * Ein Kontoauszug ist aufgebaut wie der auf Papier: oben der alte Stand mit seinem Datum,
+ * unten der neue, dazwischen die Buchungen. In MT940 sind das die Felder `:60F:` und
+ * `:62F:`, und beide sind Pflicht — jede Bank liefert sie, ohne dass man danach fragen
+ * muss.
+ *
+ * Das ist der Unterschied zum Saldo aus `HKSAL`: den bieten nicht alle Institute an, und
+ * er sagt nur, wie es HEUTE steht. Diese hier fallen bei jedem Abruf nebenbei an, auch
+ * rückwirkend — ein Abruf über zwei Jahre bringt die Stände dieser zwei Jahre mit.
+ */
+export interface Auszugsstand {
+  /** Stichtag (ISO-Datum) — auf DIESEN Tag bezieht sich der Betrag. */
+  readonly datum: string;
+  /** In Minor Units, vom Adapter übersetzt — wie jeder Betrag an dieser Grenze. */
+  readonly betrag: Cent;
+}
+
+/**
+ * Wie das Umsatzformat für einen Abruf bestimmt wird.
+ *
+ * Zwei Dinge, die man leicht verwechselt, und der Unterschied entscheidet über das
+ * Ergebnis:
+ *
+ *  • **`zuletzt`** ist ein GEDÄCHTNIS — was für dieses Konto beim letzten Mal getragen
+ *    hat. Es entscheidet nur die REIHENFOLGE der beiden Versuche, nie das Ergebnis:
+ *    bleibt der erste leer, läuft der zweite. Damit spart ein Konto, das nur über MT940
+ *    geht, die vergebliche CAMT-Runde — und ein Institut, das CAMT nachrüstet, kommt
+ *    trotzdem wieder darauf, statt für immer auf dem alten Weg zu bleiben.
+ *
+ *  • **`wahl`** ist eine FESTLEGUNG und schliesst den anderen Weg aus. Sie wird
+ *    gebraucht, weil das Gedächtnis genau dann nicht greift, wenn man es am nötigsten
+ *    hätte: liefert der erste Versuch etwas — und sei es eine von der Bank gedeckelte
+ *    Teilmenge —, gilt er als erfolgreich, und der zweite läuft nie. Wer den anderen Weg
+ *    sehen will, muss den ersten ausschliessen können.
+ */
+export interface Formatvorgabe {
+  readonly wahl?: "automatisch" | "CAMT" | "MT940";
+  readonly zuletzt?: string;
+}
+
 /** Ergebnis eines Umsatzabrufs: das kanonische Import-Ergebnis plus, was die Bank dazu sagte. */
 export interface AbrufErgebnis {
   readonly ergebnis: ImportErgebnis;
   /** „MT940" oder „CAMT" — was die Bank tatsächlich geliefert hat, nicht was gewünscht war. */
   readonly format: string;
   readonly hinweise: readonly string[];
+  /**
+   * Die Stände aus den Auszügen, in der Reihenfolge, in der sie kamen.
+   *
+   * Leer, wenn das gelieferte Format keine trägt — der Aufrufer darf sich nicht darauf
+   * verlassen, dass welche dabei sind, aber er verliert auch nichts, wenn keine kommen.
+   */
+  readonly auszugsSalden: readonly Auszugsstand[];
 }
 
 /**
@@ -254,17 +337,14 @@ export interface Abrufsitzung {
   /**
    * Umsätze holen.
    *
-   * `bevorzugtesFormat` ist das, was für dieses Konto zuletzt getragen hat („CAMT" oder
-   * „MT940"). Es entscheidet nur die REIHENFOLGE der beiden Versuche, nie das Ergebnis:
-   * bleibt der erste leer, läuft der zweite. Damit spart ein Konto, das nur über MT940
-   * geht, die ergebnislose CAMT-Runde — und ein Institut, das CAMT nachrüstet, kommt
-   * trotzdem wieder darauf, statt für immer auf dem alten Weg zu bleiben.
+   * Siehe `Formatvorgabe`: das Gedächtnis dreht nur die Reihenfolge, die Wahl schliesst
+   * einen Weg aus.
    */
   umsaetze(
     konto: Bankkonto,
     vonIso: string,
     bisIso: string,
-    bevorzugtesFormat?: string,
+    format?: Formatvorgabe,
   ): Promise<AbrufErgebnis>;
   /**
    * Die Depotaufstellung, sofern die Bank sie für dieses Konto freigibt.
