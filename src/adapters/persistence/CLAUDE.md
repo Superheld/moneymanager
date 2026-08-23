@@ -30,9 +30,19 @@ mehr hoch. SQLite prüft Spaltennamen beim Parsen — ein `WHERE … IS NULL` re
 einer Migration verbuchen, bevor alle Statements drinstehen — der Rest läuft dann nie. Danach
 am echten Bestand nachsehen, ob sie gewirkt hat.
 
-**Neue Migrations-SQL vorher auf einer Kopie durchspielen.** Vorbelegungen greifen sonst
-plausibel daneben, und kein Test merkt es. Wie man eine belastbare Kopie zieht — nicht mit
-`cp`, die Datenbank läuft im WAL-Modus —, steht in `CLAUDE.local.md`.
+**Neue Migrations-SQL vorher auf einer Kopie durchspielen** — dafür gibt es
+`scripts/migrationsprobe.mjs`:
+
+```bash
+sqlite3 -readonly "$DB" ".backup '/tmp/kopie.db'"   # nicht `cp`, die DB läuft im WAL-Modus
+npx vite-node scripts/migrationsprobe.mjs -- /tmp/kopie.db
+```
+
+Es fährt die Kette gegen echte Daten, meldet jede Tabelle, deren Zeilenzahl sich verändert
+hat, und prüft am Ende die Fremdschlüssel. **Das ist kein Ersatz für `npm test`, sondern
+die Prüfung, die `npm test` nicht leisten kann** — der Grund steht unten bei den
+Fremdschlüsseln. Beim Umbau auf Fremdschlüssel war der Test grün, und die App wäre
+gescheitert; gefunden hat es dieses Skript.
 
 Im Alpha-Stadium dürfen Migrationen auch **wegnehmen**; vor dem Abräumen prüfen, dass die
 Ziele leer sind.
