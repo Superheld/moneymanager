@@ -20,7 +20,7 @@
 //
 // PILOT für ADR-0004: alle sichtbaren Strings über t()/<Trans>, alles Geld über useGeld().
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   minorZuMajor,
@@ -63,6 +63,23 @@ export function BudgetsScreen() {
    * untereinander schöben die Liste aus dem Bild, von der man ausgegangen ist.
    */
   const [offenesBudget, setOffenesBudget] = useState<string | null>(null);
+  /**
+   * Der Verlauf steht unter der ganzen Liste, nicht unter der geklickten Zeile — eine
+   * Tabelle kann nichts zwischen zwei Zeilen einhängen. Bei sechs Budgets plus
+   * Vorschlagskarte liegt er damit unter dem Sichtbaren, und wer klickt, sieht nichts
+   * passieren und hält es für kaputt. Deshalb wird er beim Aufklappen herangeholt.
+   */
+  const verlaufRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // `?.` auch am Aufruf: jsdom kennt `scrollIntoView` nicht, und ein Screen-Test soll
+    // nicht an einer Bequemlichkeit scheitern.
+    if (offenesBudget) verlaufRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+  }, [offenesBudget]);
+
+  /** Auf- und zuklappen — von der Zeile wie vom Namen aus dieselbe Geste. */
+  function verlaufUmschalten(id: string) {
+    setOffenesBudget((cur) => (cur === id ? null : id));
+  }
 
   // Anlege-/Bearbeiten-Dialog
   const [offen, setOffen] = useState(false);
@@ -285,12 +302,19 @@ export function BudgetsScreen() {
                     // klickbare Zeile sieht man einer Tabelle nicht an (siehe
                     // `bausteine/Zeilenlink`), und die Zeile trägt daneben schon zwei
                     // Aktionen, die etwas anderes tun.
-                    <span style={{ paddingLeft: z.tiefe * 18, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    // `stopPropagation` auf dem Block um den Link: sonst schaltet der
+                    // Klick zweimal um — einmal über den Link, einmal über die Zeile —
+                    // und das Aufklappen hebt sich selbst auf. Der Block ist so breit wie
+                    // sein Inhalt, der Rest der Zelle bleibt also Trefferfläche der Zeile.
+                    <span
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ paddingLeft: z.tiefe * 18, display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
                       {z.tiefe > 0 && <span style={{ color: "var(--ink-3)" }}>└</span>}
                       <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)" }}>
                         <Zeilenlink
                           titel={t("budgets.verlaufOeffnen", { name: z.kategorieName })}
-                          onKlick={() => setOffenesBudget((cur) => (cur === z.budget.id ? null : z.budget.id))}
+                          onKlick={() => verlaufUmschalten(z.budget.id)}
                         >
                           {z.kategorieName}
                         </Zeilenlink>
@@ -376,14 +400,23 @@ export function BudgetsScreen() {
                   align: "right",
                   sortable: false,
                   render: (z: Budgetstand) => (
-                    <IconLeiste>
-                      <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z.budget)} />
-                      <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => void budgetLoeschen(z.budget.id).then(laden)} />
-                    </IconLeiste>
+                    // Der Klick auf ein Zeilen-Icon darf nicht zusätzlich den Verlauf
+                    // umschalten: er blubberte sonst zur Zeile hoch, und „löschen" öffnete
+                    // nebenbei ein Diagramm zu einem Budget, das es nicht mehr gibt.
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <IconLeiste>
+                        <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z.budget)} />
+                        <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => void budgetLoeschen(z.budget.id).then(laden)} />
+                      </IconLeiste>
+                    </span>
                   ),
                 },
               ]}
               rows={[...zeilen]}
+              // Der Name TRÄGT die Möglichkeit sichtbar (siehe `bausteine/Zeilenlink`);
+              // die ganze Zeile als Ziel kommt dazu, weil man nach dem ersten Mal die
+              // Trefferfläche will und nicht die Zielübung.
+              onRowClick={(z: Budgetstand) => verlaufUmschalten(z.budget.id)}
               istAktiv={(z: Budgetstand) => z.budget.id === offenesBudget}
             />
             {zeilen.some((z) => z.proMonat !== z.budget.betragProMonat) && (
@@ -400,6 +433,7 @@ export function BudgetsScreen() {
           dass beim Wechsel auf ein anderes Budget die Monatsauswahl neu anfängt statt auf
           einem Index zu stehen, den die kürzere Reihe womöglich gar nicht hat. */}
       {bereich && offenesZeile && (
+        <div ref={verlaufRef}>
         <BudgetVerlauf
           key={offenesZeile.budget.id}
           sicht={bereich.sicht}
@@ -409,6 +443,7 @@ export function BudgetsScreen() {
           empfaenger={bereich.empfaenger}
           onSchliessen={() => setOffenesBudget(null)}
         />
+        </div>
       )}
 
       {offen && (

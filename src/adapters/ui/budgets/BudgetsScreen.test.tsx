@@ -376,6 +376,38 @@ describe("BudgetsScreen · Verlauf", () => {
     expect(karten.filter((k) => karten.some((a) => a !== k && a.contains(k)))).toHaveLength(0);
   });
 
+  /**
+   * Der Name trägt die Möglichkeit sichtbar, die Zeile ist die Trefferfläche. Beide
+   * dürfen nicht ZUSAMMEN feuern: der Klick auf den Link blubberte sonst zur Zeile hoch,
+   * schaltete ein zweites Mal um, und das Aufklappen hob sich selbst auf.
+   */
+  it("öffnet den Verlauf auch aus der Zeile heraus — und nicht zweimal", async () => {
+    await aufbauendMitHistorie();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+    await screen.findByText(/Urlaubskasse/);
+
+    // Irgendwo in der Zeile, aber nicht auf dem Namen: die Art-Pille.
+    await nutzer.click(screen.getByText("aufbauend"));
+    await screen.findByText(/Verlauf · Urlaubskasse/);
+
+    // Und der Name schaltet weiterhin genau einmal um — nicht hin und gleich zurück.
+    await nutzer.click(screen.getByRole("button", { name: /Urlaubskasse — Verlauf/ }));
+    await waitFor(() => expect(screen.queryByText(/Verlauf · Urlaubskasse/)).toBeNull());
+  });
+
+  it("lässt die Zeilen-Icons den Verlauf in Ruhe", async () => {
+    await aufbauendMitHistorie();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+    await screen.findByText(/Urlaubskasse/);
+
+    // „bearbeiten" öffnet den Dialog — und nicht nebenbei ein Diagramm.
+    await nutzer.click(screen.getByRole("button", { name: "bearbeiten" }));
+    await screen.findByText(/Budget bearbeiten/);
+    expect(screen.queryByText(/Verlauf · Urlaubskasse/)).toBeNull();
+  });
+
   it("sagt es, wenn ein aufbauendes Budget erst später anfängt zu sammeln", async () => {
     await stammdatenBasis();
     await sqliteKategorieRepository.speichern({ id: "kat3", name: "Rennrad", defaultCharakter: "Aufwand" });
