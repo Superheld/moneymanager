@@ -398,11 +398,14 @@ export function BankzugaengeScreen({
             />
           )}
 
-          {/* Und darunter, was für dieses Konto hereinkam — dieselbe Ansicht wie unter
-              der Kontenliste, nur eine Stufe tiefer in der Kette. */}
+          {/* Und darunter die IMPORTE dieses Kontos über DIESEN Zugang — nicht seine
+              Zeilen. Erst der Klick auf einen Import zeigt, was er gebracht hat.
+              Die Zeilen aus Dateien bleiben hier aussen vor: sie gehören zum selben
+              Konto, aber nicht zu diesem Abrufweg. Wer sie alle sehen will, findet sie
+              im Register „Herkunft" oder unter der Kontenliste. */}
           {zeilenVon && (
             <div style={{ marginTop: "var(--gap-card)" }}>
-              <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} />
+              <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} zugangId={kontenOffen} />
             </div>
           )}
         </Card>
