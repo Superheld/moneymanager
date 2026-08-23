@@ -222,3 +222,75 @@ describe("auszugsStaende", () => {
     expect(warnungen).toHaveLength(1);
   });
 });
+
+describe("zuRohUmsatz — was die Bank ausdruecklich nennt", () => {
+  const konto = { iban: "DE31999999980000000002", name: "Girokonto", waehrung: "EUR" };
+  const buchung = (over: Partial<FintsBuchung> = {}): FintsBuchung => ({
+    valueDate: new Date(2026, 7, 3, 0, 0, 0),
+    entryDate: new Date(2026, 7, 4, 0, 0, 0),
+    amount: -49.9,
+    purpose: "Rechnung",
+    remoteName: "Talmberg Energie",
+    ...over,
+  });
+
+  /**
+   * Der Grund, warum es beide Felder gibt. `remoteAccountNumber` traegt, was das Format
+   * gerade hergibt — in CAMT die IBAN, in MT940 die nationale Kontonummer aus `?31` —, und
+   * keine Angabe sagt, welches von beiden. `remoteIban` ist dagegen eine Zusage.
+   */
+  it("nimmt die ausdrueckliche IBAN, auch wenn daneben eine Kontonummer steht", () => {
+    const u = zuRohUmsatz(
+      buchung({ remoteIban: "DE04999999980000000003", remoteAccountNumber: "234567" }),
+      konto,
+    );
+    expect(u.gegenparteiIban).toBe("DE04999999980000000003");
+  });
+
+  it("faellt auf remoteAccountNumber zurueck, wenn dort eine IBAN steht", () => {
+    const u = zuRohUmsatz(buchung({ remoteAccountNumber: "DE04999999980000000003" }), konto);
+    expect(u.gegenparteiIban).toBe("DE04999999980000000003");
+  });
+
+  /**
+   * Die MT940-Kontonummer aus `?31` darf NICHT als IBAN durchgehen: Konto-Match und
+   * rohHash normalisieren IBANs, eine Kontonummer wuerde dort stillschweigend zu Muell.
+   */
+  it("laesst eine nationale Kontonummer nicht als IBAN durch", () => {
+    const u = zuRohUmsatz(buchung({ remoteAccountNumber: "234567" }), konto);
+    expect(u.gegenparteiIban).toBeUndefined();
+  });
+
+  it("uebernimmt Zweckcode und Endempfaenger, wo die Bank sie nennt", () => {
+    const u = zuRohUmsatz(
+      buchung({
+        purposeCode: "SALA",
+        ultimateParty: "Buchhandlung Talmberg",
+        remoteName: "Zahlungsdienstleister",
+      }),
+      konto,
+    );
+    expect(u.zweckCode).toBe("SALA");
+    // Die direkte Gegenpartei bleibt, was sie ist — der Endempfaenger steht DANEBEN.
+    // Wer beides vermischt, verliert die Information, ueber wen gezahlt wurde.
+    expect(u.gegenpartei).toBe("Zahlungsdienstleister");
+    expect(u.endempfaenger).toBe("Buchhandlung Talmberg");
+  });
+
+  /**
+   * MT940 liefert beides nie. Das ist eine ehrliche Luecke und kein Grund, etwas zu
+   * erfinden — ein aus dem Verwendungszweck geratener Endempfaenger saehe aus wie eine
+   * Angabe der Bank.
+   */
+  it("laesst beide leer, wo das Format sie nicht kennt", () => {
+    const u = zuRohUmsatz(buchung(), konto);
+    expect(u.zweckCode).toBeUndefined();
+    expect(u.endempfaenger).toBeUndefined();
+  });
+
+  it("behandelt Leerstrings wie fehlende Angaben", () => {
+    const u = zuRohUmsatz(buchung({ purposeCode: "  ", ultimateParty: "" }), konto);
+    expect(u.zweckCode).toBeUndefined();
+    expect(u.endempfaenger).toBeUndefined();
+  });
+});

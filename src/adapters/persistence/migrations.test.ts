@@ -1002,6 +1002,31 @@ describe("Migration 50 — der Rest der Verweise", () => {
   });
 });
 
+
+describe("Migration 54 — zwei Einordnungen der Bank", () => {
+  it("legt Zweckcode und Endempfaenger am Beleg an", () => {
+    const db = new SQL.Database();
+    apply(db);
+    // Am BELEG und nicht am Verarbeitungsstand: beides kommt von der Bank und aendert
+    // sich nie wieder.
+    expect(spalten(db, "umsatz_roh")).toEqual(
+      expect.arrayContaining(["zweck_code", "endempfaenger"]),
+    );
+    expect(spalten(db, "umsatz_verarbeitung")).not.toContain("zweck_code");
+    db.close();
+  });
+
+  it("laesst nach dem Zweckcode ueber den Index suchen", () => {
+    const db = new SQL.Database();
+    apply(db);
+    const plan = db.exec(
+      "EXPLAIN QUERY PLAN SELECT id FROM umsatz_roh WHERE zweck_code = 'SALA'",
+    )[0].values.map((z) => String(z[3])).join(" ");
+    expect(plan).toContain("ix_umsatz_roh_zweck");
+    db.close();
+  });
+});
+
 describe("Versionsschema", () => {
   it("hat streng aufsteigende, eindeutige Versionen", () => {
     const versionen = MIGRATIONS.map((m) => m.version);

@@ -1519,4 +1519,27 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_journal_zeit ON buchung_journal (zeitpunkt)`,
     ],
   },
+  {
+    version: 54, // Zwei Einordnungen, die die Bank schon vorgenommen hat
+    sql: [
+      // Beide liefert nur CAMT, und beide standen bisher im Beleg nicht, obwohl die Bank
+      // sie mitschickt — die Bibliothek hat sie verworfen (im Fork nachgerüstet).
+      //
+      // `zweck_code` ist der SEPA-Verwendungszweckcode: SALA für Gehalt, RENT für Miete,
+      // LOAN für Kredit. Anders als `umsatzart` ist das kein Vokabular, das je Institut
+      // anders aussieht, sondern eine feste Liste aus dem Standard — das einzige Merkmal
+      // dieser Art, das ohne Umdeutung brauchbar ist.
+      `ALTER TABLE umsatz_roh ADD COLUMN zweck_code TEXT`,
+
+      // `endempfaenger` ist der, der die Zahlung WIRKLICH bekommt, wenn ein
+      // Zahlungsdienstleister dazwischensteht. Ohne ihn steht in `gegenpartei` der
+      // Dienstleister — und der ist bei jedem Händler derselbe, was die
+      // Kategorie-Erkennung genau dort blind macht, wo sie am meisten zu tun hätte.
+      `ALTER TABLE umsatz_roh ADD COLUMN endempfaenger TEXT`,
+
+      // Der Zweckcode ist ein Merkmal, nach dem die Erkennung filtert; die Liste ist
+      // kurz, der Index deshalb klein und trennscharf.
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_zweck ON umsatz_roh (zweck_code) WHERE zweck_code IS NOT NULL`,
+    ],
+  },
 ];

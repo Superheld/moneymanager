@@ -101,6 +101,8 @@ interface UmsatzZeile {
   e2e_referenz: string | null;
   umsatzart: string | null;
   buchungsschluessel: string | null;
+  zweck_code: string | null;
+  endempfaenger: string | null;
   bank_referenz: string | null;
   roh_hash: string;
   native_id: string | null;
@@ -128,6 +130,8 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
     e2eReferenz: z.e2e_referenz ?? undefined,
     umsatzart: z.umsatzart ?? undefined,
     buchungsschluessel: z.buchungsschluessel ?? undefined,
+    zweckCode: z.zweck_code ?? undefined,
+    endempfaenger: z.endempfaenger ?? undefined,
     bankreferenz: z.bank_referenz ?? undefined,
     rohHash: z.roh_hash,
     nativeId: z.native_id ?? undefined,
@@ -153,7 +157,8 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
 // als „neu" — siehe `zuUmsatz`.
 const SELECT = `SELECT r.id, r.lauf_id, v.zahlungskonto_id, r.buchungstag, r.valuta, r.betrag,
        r.waehrung, r.gegenpartei, r.verwendungszweck, r.glaeubiger_id, r.gegenpartei_iban,
-       r.mandatsreferenz, r.e2e_referenz, r.umsatzart, r.buchungsschluessel, r.bank_referenz,
+       r.mandatsreferenz, r.e2e_referenz, r.umsatzart, r.buchungsschluessel,
+       r.zweck_code, r.endempfaenger, r.bank_referenz,
        r.roh_hash, r.native_id,
        v.status, v.vorschlag_kategorie_id, v.vorschlag_charakter, v.vorschlag_quelle,
        v.istbuchung_id
@@ -176,14 +181,16 @@ function rohAnweisung(u: Umsatz): Anweisung {
     sql: `INSERT INTO umsatz_roh
        (id, lauf_id, buchungstag, valuta, betrag, waehrung, gegenpartei,
         gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz, e2e_referenz,
-        umsatzart, buchungsschluessel, bank_referenz, roh_hash, native_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        umsatzart, buchungsschluessel, zweck_code, endempfaenger, bank_referenz,
+        roh_hash, native_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      ON CONFLICT(id) DO NOTHING`,
     werte: [
       u.id, u.laufId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
       u.gegenpartei, u.gegenparteiIban ?? null, u.verwendungszweck, u.glaeubigerId ?? null,
       u.mandatsreferenz ?? null, u.e2eReferenz ?? null, u.umsatzart ?? null,
-      u.buchungsschluessel ?? null, u.bankreferenz ?? null, u.rohHash, u.nativeId ?? null,
+      u.buchungsschluessel ?? null, u.zweckCode ?? null, u.endempfaenger ?? null,
+      u.bankreferenz ?? null, u.rohHash, u.nativeId ?? null,
     ],
   };
 }
@@ -268,12 +275,14 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
          mandatsreferenz = COALESCE(mandatsreferenz, $5),
          e2e_referenz = COALESCE(e2e_referenz, $6), umsatzart = COALESCE(umsatzart, $7),
          buchungsschluessel = COALESCE(buchungsschluessel, $8),
-         bank_referenz = COALESCE(bank_referenz, $9), native_id = COALESCE(native_id, $10)
+         bank_referenz = COALESCE(bank_referenz, $9), native_id = COALESCE(native_id, $10),
+         zweck_code = COALESCE(zweck_code, $11), endempfaenger = COALESCE(endempfaenger, $12)
        WHERE id = $1`,
       [
         u.id, u.valuta ?? null, u.glaeubigerId ?? null, u.gegenparteiIban ?? null,
         u.mandatsreferenz ?? null, u.e2eReferenz ?? null, u.umsatzart ?? null,
         u.buchungsschluessel ?? null, u.bankreferenz ?? null, u.nativeId ?? null,
+        u.zweckCode ?? null, u.endempfaenger ?? null,
       ],
     );
   },

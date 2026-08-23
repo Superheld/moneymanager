@@ -307,7 +307,14 @@ export interface FintsBuchung {
   readonly amount: number;
   readonly purpose?: string;
   readonly remoteName?: string;
+  /** Was das Format gerade hergibt: in CAMT die IBAN, in MT940 die Kontonummer aus `?31`. */
   readonly remoteAccountNumber?: string;
+  /**
+   * Wo die Bank AUSDRÜCKLICH eine IBAN nennt — CAMT immer, MT940 im Unterfeld `?38`.
+   * Getrennt von `remoteAccountNumber`, weil dort beides stehen kann und keine Angabe
+   * sagt, welches.
+   */
+  readonly remoteIban?: string;
   readonly remoteBankId?: string;
   /** Geschäftsvorfallcode (MT940 `:61:`), z. B. 005, 700, 820. */
   readonly transactionCode?: string;
@@ -316,6 +323,10 @@ export interface FintsBuchung {
   readonly mandateReference?: string;
   readonly e2eReference?: string;
   readonly bookingText?: string;
+  /** SEPA-Verwendungszweckcode (`SALA`, `RENT` …) — nur CAMT. */
+  readonly purposeCode?: string;
+  /** Der Empfänger hinter einem Zahlungsdienstleister — nur CAMT. */
+  readonly ultimateParty?: string;
 }
 
 export interface KontoKontext {
@@ -338,12 +349,21 @@ export interface KontoKontext {
 export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
   const a = klartextAnreicherung(b.purpose);
   const waehrung = waehrungNachCode(konto.waehrung ?? "EUR");
-  // MT940 füllt `remoteAccountNumber` je nach Bank mit einer IBAN ODER einer nationalen
-  // Kontonummer. Nur was eine gültige IBAN ist, darf als solche weitergereicht werden —
-  // der Konto-Match und `rohHash` normalisieren IBANs, eine Kontonummer würde dort
-  // stillschweigend zu Müll.
+  // ZWEI FELDER FÜR EINE FRAGE, und die Reihenfolge ist der Punkt.
+  //
+  // `remoteIban` steht da, wo die Bank ausdrücklich eine IBAN nennt — CAMT tut das immer,
+  // MT940 im Unterfeld `?38`. Es hat Vorrang, weil es eine Zusage ist und keine Deutung.
+  //
+  // `remoteAccountNumber` trägt dagegen, was das Format gerade hergibt: in CAMT die IBAN,
+  // in MT940 die nationale Kontonummer aus `?31`. Beides landet in derselben Eigenschaft,
+  // und keine Angabe sagt, welches von beiden. Deshalb die Prüfung — der Konto-Match und
+  // `rohHash` normalisieren IBANs, eine Kontonummer würde dort stillschweigend zu Müll.
   const gegenIban =
-    b.remoteAccountNumber && ibanGueltig(b.remoteAccountNumber) ? b.remoteAccountNumber : undefined;
+    b.remoteIban && ibanGueltig(b.remoteIban)
+      ? b.remoteIban
+      : b.remoteAccountNumber && ibanGueltig(b.remoteAccountNumber)
+        ? b.remoteAccountNumber
+        : undefined;
   return {
     buchungstag: isoDatum(b.entryDate),
     valuta: isoDatum(b.valueDate),
@@ -378,6 +398,11 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
     // Merkmalsräume für dieselbe Sache, ohne dass irgendwo ein Fehler auftaucht.
     umsatzart: b.bookingText?.trim() || a.buchungstext,
     buchungsschluessel: b.transactionCode?.trim() || undefined,
+    // Zwei Einordnungen, die die BANK schon vorgenommen hat und die wir nicht besser
+    // nachbauen könnten. Nur CAMT liefert sie; bei MT940 bleiben sie leer, und das ist
+    // eine ehrliche Lücke und kein Grund, etwas zu erfinden.
+    zweckCode: b.purposeCode?.trim() || undefined,
+    endempfaenger: b.ultimateParty?.trim() || undefined,
     bankreferenz: a.bankreferenz,
     istUmbuchung: false,
     quelle: FINTS_QUELLE,
