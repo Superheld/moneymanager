@@ -10,6 +10,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { MIGRATIONS } from "./migrations";
+import type { IstBuchung } from "../../core";
 
 const halter = vi.hoisted(() => {
   let aktuell: unknown = null;
@@ -377,7 +378,7 @@ describe("Import-Repositories", () => {
       id: "l1", quelle: "finanzguru", zeitpunkt: "2026-01-06T10:00:00Z",
       eingelesen: 1, neu: 1, duplikate: 0,
     });
-    await umsatzRepository.speichernViele([umsatz()]);
+    await umsatzRepository.anlegenViele([umsatz()]);
     const laeufe = await importLaufRepository.alle();
     expect(laeufe).toHaveLength(1);
     const ausLauf = await umsatzRepository.nachLauf("l1");
@@ -386,7 +387,7 @@ describe("Import-Repositories", () => {
   });
 
   it("liefert offene Umsätze und den Bestandsschlüssel", async () => {
-    await umsatzRepository.speichernViele([
+    await umsatzRepository.anlegenViele([
       umsatz({ id: "u1", rohHash: "h1", nativeId: "n1" }),
       umsatz({ id: "u2", rohHash: "h2" }),
     ]);
@@ -399,13 +400,13 @@ describe("Import-Repositories", () => {
   });
 
   it("löscht einen Umsatz", async () => {
-    await umsatzRepository.speichern(umsatz());
+    await umsatzRepository.anlegen(umsatz());
     await umsatzRepository.loeschen("u1");
     expect(await umsatzRepository.alle()).toHaveLength(0);
   });
 
   it("hält Vorschlag und Ist-Buchungs-Verknüpfung über die Rundreise", async () => {
-    await umsatzRepository.speichern(
+    await umsatzRepository.anlegen(
       umsatz({
         vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" },
         istbuchungId: "i1",
@@ -477,6 +478,10 @@ describe("Vertragszuordnung — Persistenz", () => {
    * von „noch nicht entschieden" zu unterscheiden.
    */
   it("hält das ausdrückliche „kein Vertrag“ über die Rundreise", async () => {
+    // Die Zuordnung steht seit v47 AN der Buchung. Ohne Buchung gibt es sie nicht mehr —
+    // und genau das war der Bug: es standen Zuordnungen zu gelöschten Buchungen herum.
+    db.run(`INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle)
+            VALUES ('i1','2026-08-11',-5700,'k1','Aufwand','manuell')`);
     await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: null, herkunft: "manuell" });
     const [z] = await zuordnungRepository.alle();
     expect(z.vertragId).toBeNull();
@@ -484,11 +489,26 @@ describe("Vertragszuordnung — Persistenz", () => {
   });
 
   it("überschreibt eine bestehende Zuordnung statt zu doppeln", async () => {
+    db.run(`INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle)
+            VALUES ('i1','2026-08-11',-5700,'k1','Aufwand','manuell')`);
     await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: "v1", herkunft: "automatisch" });
     await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: "v2", herkunft: "manuell" });
     const alle = await zuordnungRepository.alle();
     expect(alle).toHaveLength(1);
     expect(alle[0].vertragId).toBe("v2");
+  });
+
+  /**
+   * Zurücknehmen muss BEIDE Spalten räumen. Bliebe `vertrag_herkunft` stehen, sähe die
+   * Buchung aus wie „ausdrücklich keinem Vertrag zugeordnet" — und die Automatik liesse
+   * sie künftig in Ruhe, obwohl sie gerade wieder ran darf.
+   */
+  it("gibt die Buchung nach dem Zuruecknehmen wieder frei", async () => {
+    db.run(`INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle)
+            VALUES ('i1','2026-08-11',-5700,'k1','Aufwand','manuell')`);
+    await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: null, herkunft: "manuell" });
+    await zuordnungRepository.loeschen("i1");
+    expect(await zuordnungRepository.alle()).toHaveLength(0);
   });
 });
 
@@ -839,5 +859,138 @@ describe("Depot — Beobachtungen statt Buchungen", () => {
     expect(await depotRepository.alle()).toEqual([]);
     expect(await depotRepository.werte()).toEqual([]);
     expect(await depotRepository.positionen("d1")).toEqual([]);
+  });
+});
+
+describe("Ledger-Journal — was mit einer Buchung geschah", () => {
+  function buchung(over: Partial<IstBuchung> = {}): IstBuchung {
+    return {
+      id: "b1", datum: "2026-08-11", betrag: -4500, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", ...over,
+    };
+  }
+
+  function journal(): { art: string; vorher: string | null; nachher: string | null }[] {
+    const r = db.exec("SELECT art, vorher, nachher FROM buchung_journal ORDER BY rowid");
+    return r.length
+      ? r[0].values.map((z) => ({
+          art: String(z[0]),
+          vorher: z[1] === null ? null : String(z[1]),
+          nachher: z[2] === null ? null : String(z[2]),
+        }))
+      : [];
+  }
+
+  it("haelt das Anlegen fest", async () => {
+    await ledgerRepository.speichern(buchung());
+    expect(journal()).toHaveLength(1);
+    expect(journal()[0].art).toBe("angelegt");
+    expect(journal()[0].vorher).toBeNull();
+  });
+
+  /**
+   * Der Kern: nach einer Aenderung muss der URSPRUENGLICHE Inhalt feststellbar bleiben.
+   * Vorher ueberschrieb jedes Speichern still, und was dastand, war danach fort.
+   */
+  it("bewahrt den alten Betrag, wenn er geaendert wird", async () => {
+    await ledgerRepository.speichern(buchung({ betrag: -4500 }));
+    await ledgerRepository.speichern(buchung({ betrag: -9900 }));
+
+    const eintraege = journal();
+    expect(eintraege.map((e) => e.art)).toEqual(["angelegt", "geaendert"]);
+    expect(JSON.parse(eintraege[1].vorher!).betrag).toBe(-4500);
+    expect(JSON.parse(eintraege[1].nachher!).betrag).toBe(-9900);
+  });
+
+  /**
+   * Das Loeschen ist der Fall, fuer den es die Tabelle gibt — und der Grund, warum sie
+   * KEINEN Fremdschluessel auf die Buchung traegt. Mit CASCADE raeumte die Loeschung
+   * genau den Eintrag weg, der sie festhaelt.
+   */
+  it("ueberlebt das Loeschen der Buchung, die es protokolliert", async () => {
+    await ledgerRepository.speichern(buchung({ notiz: "Rechnung Talmberg" }));
+    await ledgerRepository.loeschen("b1");
+
+    expect(await ledgerRepository.alle()).toHaveLength(0);
+    const eintraege = journal();
+    expect(eintraege.map((e) => e.art)).toEqual(["angelegt", "geloescht"]);
+    // Der letzte Stand bleibt lesbar, obwohl die Buchung fort ist.
+    expect(JSON.parse(eintraege[1].vorher!).notiz).toBe("Rechnung Talmberg");
+    expect(eintraege[1].nachher).toBeNull();
+  });
+
+  /**
+   * Ein Speichern ohne Aenderung ist keine Tatsache ueber das Geld. Ein Protokoll, das
+   * jeden Klick festhaelt, wird zu Rauschen, in dem die echten Aenderungen untergehen.
+   */
+  it("schreibt nichts, wenn sich nichts geaendert hat", async () => {
+    await ledgerRepository.speichern(buchung());
+    await ledgerRepository.speichern(buchung());
+    expect(journal()).toHaveLength(1);
+  });
+
+  it("zaehlt auch eine geaenderte Aufteilung als Aenderung", async () => {
+    await ledgerRepository.speichern(buchung({
+      aufteilungen: [{ kategorieId: "kat", betrag: -4500 }],
+    }));
+    await ledgerRepository.speichern(buchung({
+      aufteilungen: [{ kategorieId: "kat", betrag: -2000 }, { kategorieId: "kat2", betrag: -2500 }],
+    }));
+
+    const eintraege = journal();
+    expect(eintraege).toHaveLength(2);
+    expect(JSON.parse(eintraege[1].vorher!).aufteilungen).toHaveLength(1);
+    expect(JSON.parse(eintraege[1].nachher!).aufteilungen).toHaveLength(2);
+  });
+
+  /**
+   * Die Vertragszuordnung steht seit v47 an derselben Zeile, wird aber vom
+   * Ledger-Repository nicht geschrieben. Sie im Protokoll wegzulassen liesse es
+   * behaupten, sie sei entfernt worden.
+   */
+  it("laesst die Vertragszuordnung im Protokoll stehen, obwohl es sie nicht schreibt", async () => {
+    await ledgerRepository.speichern(buchung());
+    db.run("UPDATE ist_buchung SET vertrag_id='v1', vertrag_herkunft='manuell' WHERE id='b1'");
+    await ledgerRepository.speichern(buchung({ betrag: -9900 }));
+
+    const eintraege = journal();
+    const letzte = eintraege[eintraege.length - 1];
+    expect(JSON.parse(letzte.nachher!).vertrag_id).toBe("v1");
+  });
+});
+
+describe("Beleg — die Felder, die nur CAMT liefert", () => {
+  const umsatz = (over: Record<string, unknown> = {}) => ({
+    id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-08-11",
+    betrag: -4500, waehrung: "EUR", gegenpartei: "Zahlungsdienstleister",
+    verwendungszweck: "Bestellung", rohHash: "h1", status: "neu" as const, ...over,
+  });
+
+  it("traegt Zweckcode und Endempfaenger durch die Rundreise", async () => {
+    await umsatzRepository.anlegen(umsatz({ zweckCode: "SALA", endempfaenger: "Buchhandlung Talmberg" }));
+    const [u] = await umsatzRepository.alle();
+    expect(u.zweckCode).toBe("SALA");
+    expect(u.endempfaenger).toBe("Buchhandlung Talmberg");
+    // Die direkte Gegenpartei bleibt daneben stehen.
+    expect(u.gegenpartei).toBe("Zahlungsdienstleister");
+  });
+
+  /**
+   * Der Ergaenzen-Fall: eine Zeile aus MT940 kennt beide Felder nicht, ein spaeterer
+   * CAMT-Abruf schon. Nachgetragen wird nur, was FEHLT — bestehende Werte bleiben.
+   */
+  it("traegt sie nach, wenn eine zweite Quelle sie kennt", async () => {
+    await umsatzRepository.anlegen(umsatz());
+    await umsatzRepository.ergaenzen(umsatz({ zweckCode: "RENT", endempfaenger: "Talmberg Wohnen" }));
+
+    const [u] = await umsatzRepository.alle();
+    expect(u.zweckCode).toBe("RENT");
+    expect(u.endempfaenger).toBe("Talmberg Wohnen");
+  });
+
+  it("ueberschreibt dabei nicht, was schon dasteht", async () => {
+    await umsatzRepository.anlegen(umsatz({ zweckCode: "SALA" }));
+    await umsatzRepository.ergaenzen(umsatz({ zweckCode: "RENT" }));
+    expect((await umsatzRepository.alle())[0].zweckCode).toBe("SALA");
   });
 });

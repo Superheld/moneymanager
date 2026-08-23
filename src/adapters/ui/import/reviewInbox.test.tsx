@@ -48,12 +48,12 @@ describe("Import-Inbox", () => {
   it("meldet an der Zeile, dass es sie womöglich schon gibt", async () => {
     await grunddaten();
     // Die Bank hat dieselbe Zahlung schon gebracht und sie ist längst gebucht.
-    await umsatzRepo.speichern({
+    await umsatzRepo.anlegen({
       ...GEMEINSAM, id: "u-bank", laufId: "l-bank", rohHash: "h-bank",
       status: "verbucht", istbuchungId: "b-bank",
     });
     // Und jetzt kommt sie aus einer Datei noch einmal herein.
-    await umsatzRepo.speichern({
+    await umsatzRepo.anlegen({
       ...GEMEINSAM, id: "u-datei", laufId: "l-datei", rohHash: "h-datei", status: "neu",
     });
 
@@ -70,7 +70,7 @@ describe("Import-Inbox", () => {
 
   it("schweigt bei einer Zeile ohne Gegenstück", async () => {
     await grunddaten();
-    await umsatzRepo.speichern({
+    await umsatzRepo.anlegen({
       ...GEMEINSAM, id: "u-datei", laufId: "l-datei", rohHash: "h-datei", status: "neu",
     });
 

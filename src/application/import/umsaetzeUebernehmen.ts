@@ -249,19 +249,19 @@ async function uebernahmeIntern(
     e2eReferenz: k.roh.e2eReferenz,
     umsatzart: k.roh.umsatzart,
     buchungsschluessel: k.roh.buchungsschluessel,
+    zweckCode: k.roh.zweckCode,
+    endempfaenger: k.roh.endempfaenger,
     bankreferenz: k.roh.bankreferenz,
     verwendungszweck: k.roh.verwendungszweck,
     rohHash: k.rohHash,
     nativeId: k.nativeId,
     status: "neu",
     vorschlag: vorschlagFuer(k.roh, kontext, k.zahlungskontoId),
-    verdachtAufId: verdacht.get(k)?.auf.id,
-    verdachtGruende: verdacht.get(k)?.gruende,
   }));
 
   // 7. Persistieren: Ergänzungen, neue Umsätze, Lauf-Protokoll.
-  for (const u of zuErgaenzen) await umsatzRepo.speichern(u);
-  await umsatzRepo.speichernViele(umsaetze);
+  for (const u of zuErgaenzen) await umsatzRepo.ergaenzen(u);
+  await umsatzRepo.anlegenViele(umsaetze);
   await laufRepo.speichern({
     id: laufId,
     quelle: eingabe.quelle,

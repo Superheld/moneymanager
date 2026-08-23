@@ -165,7 +165,9 @@ function fakes(zuordnungen: Kontozuordnung[]) {
           const i = umsaetze.findIndex((x) => x.id === u.id);
           if (i >= 0) umsaetze[i] = u; else umsaetze.push(u);
         },
-        speichernViele: async (u: readonly any[]) => void umsaetze.push(...u),
+        anlegenViele: async (u: readonly any[]) => void umsaetze.push(...u),
+        anlegen: async (u: any) => void umsaetze.push(u),
+        ergaenzen: async () => {},
         alle: async () => [...umsaetze],
         nachLauf: async (laufId: string) => umsaetze.filter((u) => u.laufId === laufId),
         offene: async () => umsaetze.filter((u) => u.status === "neu"),
@@ -307,8 +309,8 @@ describe("abrufAusfuehren", () => {
     (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     const frisch = f.umsaetze.find((u) => u.id !== "alt");
-    expect(frisch.verdachtAufId).toBe("alt"); // der Verdacht steht dran …
-    expect(frisch.status).toBe("verbucht"); // … hält aber nichts mehr auf
+    // Der Verdacht haelt nichts auf: die Zeile wird ganz normal verbucht.
+    expect(frisch.status).toBe("verbucht");
     expect(f.buchungen).toHaveLength(1);
   });
 

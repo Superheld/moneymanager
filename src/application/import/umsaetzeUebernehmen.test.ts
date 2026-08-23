@@ -45,7 +45,21 @@ function fakes() {
       if (i >= 0) umsaetze[i] = u;
       else umsaetze.push(u);
     },
-    speichernViele: async (us) => { umsaetze.push(...us); },
+    anlegenViele: async (us) => { umsaetze.push(...us); },
+    anlegen: async (u) => { umsaetze.push(u); },
+    // Wie das echte Repository: nur FEHLENDE Felder werden nachgetragen, Bestehendes
+    // bleibt stehen. Eine Attrappe, die einfach ersetzt, liesse den Ergaenzen-Fall auch
+    // dann gruen aussehen, wenn er in Wahrheit ueberschreibt.
+    ergaenzen: async (u) => {
+      const i = umsaetze.findIndex((x) => x.id === u.id);
+      if (i < 0) return;
+      const alt = umsaetze[i] as unknown as Record<string, unknown>;
+      const neu = { ...alt };
+      for (const [k, v] of Object.entries(u as unknown as Record<string, unknown>)) {
+        if (neu[k] === undefined && v !== undefined) neu[k] = v;
+      }
+      umsaetze[i] = neu as unknown as Umsatz;
+    },
     alle: async () => umsaetze,
     nachLauf: async (laufId) => umsaetze.filter((u) => u.laufId === laufId),
     offene: async () => umsaetze.filter((u) => u.status === "neu"),
@@ -265,11 +279,12 @@ describe("Dublettenfinder beim Übernehmen", () => {
       f.deps,
     );
 
+    // Die Zeile wird ANGELEGT und der Verdacht GEZAEHLT — er ist ein Hinweis fuer die
+    // Durchsicht, keine Sperre. An die Zeile geschrieben wird er nicht: alle Anzeigen
+    // rechnen ihn beim Hinsehen, damit er nicht auf dem Stand von damals einfriert.
     expect(ergebnis.neu).toBe(1);
     expect(ergebnis.verdacht).toBe(1);
-    const angelegt = f.umsaetze[f.umsaetze.length - 1];
-    expect(angelegt.verdachtAufId).toBe(f.umsaetze[0].id);
-    expect(angelegt.verdachtGruende?.length).toBeGreaterThan(0);
+    expect(f.umsaetze).toHaveLength(2);
   });
 
   it("lässt eine echt neue Buchung neu sein", async () => {
@@ -287,7 +302,6 @@ describe("Dublettenfinder beim Übernehmen", () => {
 
     expect(ergebnis.neu).toBe(1);
     expect(ergebnis.verdacht).toBe(0);
-    expect(f.umsaetze[f.umsaetze.length - 1].verdachtAufId).toBeUndefined();
   });
 
   it("holt eine verworfene Buchung nicht zurück", async () => {

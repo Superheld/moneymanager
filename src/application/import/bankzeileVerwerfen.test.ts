@@ -40,7 +40,9 @@ function fakes(buchungen: IstBuchung[], umsaetze: Umsatz[]) {
       if (i >= 0) bestand[i] = u;
       else bestand.push(u);
     },
-    speichernViele: async () => {},
+    anlegenViele: async () => {},
+    anlegen: async () => {},
+    ergaenzen: async () => {},
     alle: async () => bestand,
     nachLauf: async () => [],
     offene: async () => bestand.filter((u) => u.status === "neu"),

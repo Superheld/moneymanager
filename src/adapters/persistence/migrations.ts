@@ -906,7 +906,644 @@ export const MIGRATIONS: Migration[] = [
     ],
   },
   {
-    version: 44, // Ein Zugang weiss, ÜBER WELCHEN WEG er seine Bank erreicht
+    version: 44, // Der Beleg und was wir daraus gemacht haben — zwei Tabellen statt einer
+    sql: [
+      // WARUM DAS AUSEINANDERGEHT. `umsatz` trug dreierlei in einer Zeile: die Rohdaten,
+      // wie die Quelle sie lieferte; die Zuordnung zu Lauf und Konto; und den Zustand
+      // unserer Verarbeitung (Status, erzeugte Buchung, Kategorievorschlag). Das erste
+      // darf sich nie ändern, das letzte ändert sich bei jeder Durchsicht — in einer
+      // Tabelle ist beides nur durch Disziplin getrennt, und Disziplin hält keinen
+      // Randfall aus.
+      //
+      // Es ist NICHT die Kardinalität, die hier trennt: 1:1 gehörte nach Lehrbuch in eine
+      // Tabelle. Es ist der Lebenszyklus. Die Probe darauf ist „auf den Stand der Quelle
+      // zurücksetzen": das wird jetzt ein DELETE auf einer Tabelle, und die Rohzeile hat
+      // es nie gemerkt.
+      `CREATE TABLE IF NOT EXISTS umsatz_roh (
+         id                 TEXT    PRIMARY KEY,
+         lauf_id            TEXT    NOT NULL REFERENCES import_lauf(id),
+         format             TEXT,
+         buchungstag        TEXT    NOT NULL,
+         valuta             TEXT,
+         betrag             INTEGER NOT NULL,
+         waehrung           TEXT    NOT NULL,
+         gegenpartei        TEXT    NOT NULL,
+         gegenpartei_iban   TEXT,
+         verwendungszweck   TEXT    NOT NULL,
+         glaeubiger_id      TEXT,
+         mandatsreferenz    TEXT,
+         e2e_referenz       TEXT,
+         umsatzart          TEXT,
+         buchungsschluessel TEXT,
+         bank_referenz      TEXT,
+         roh_hash           TEXT    NOT NULL,
+         native_id          TEXT
+       )`,
+
+      // `istbuchung_id` trägt bewusst KEIN ON DELETE CASCADE: verschwindet eine Buchung,
+      // soll die Importzeile bleiben und wieder verbuchbar werden — nicht mitsterben.
+      // SET NULL allein reicht dafür nicht, der Status müsste mit; das erledigt der
+      // Anwendungscode beim Verwerfen. Der FK verhindert hier vor allem den stummen
+      // Widerspruch „verbucht, aber es gibt nichts".
+      // `zahlungskonto_id` steht hier und NICHT beim Beleg, obwohl man es zuerst dort
+      // sucht. Die Quelle liefert eine IBAN oder Kontonummer — das ist Beleg. WELCHES
+      // unserer Konten damit gemeint ist, ist unsere Zuordnung: bei einer Datei entsteht
+      // sie über den Konto-Match, und beim Verbuchen lässt der Dialog sie ändern. Etwas,
+      // das der Mensch korrigieren darf, ist kein Beleg.
+      `CREATE TABLE IF NOT EXISTS umsatz_verarbeitung (
+         umsatz_id              TEXT PRIMARY KEY REFERENCES umsatz_roh(id) ON DELETE CASCADE,
+         zahlungskonto_id       TEXT NOT NULL REFERENCES zahlungskonto(id),
+         status                 TEXT NOT NULL,
+         istbuchung_id          TEXT REFERENCES ist_buchung(id) ON DELETE SET NULL,
+         vorschlag_kategorie_id TEXT,
+         vorschlag_charakter    TEXT,
+         vorschlag_quelle       TEXT,
+         verdacht_auf_id        TEXT,
+         verdacht_gruende       TEXT,
+         geaendert_am           TEXT NOT NULL
+       )`,
+
+      // WIDERSPRUCH AUFLÖSEN, BEVOR DER FK IHN VERBIETET. Im Bestand stehen Zeilen auf
+      // „verbucht", deren Buchung es nicht mehr gibt — der Zustand, den `herkunftsicht`
+      // heute aufdeckt und der beim Löschen importierter Zeilen entstand. Mit dem FK
+      // scheiterte das Kopieren daran.
+      //
+      // Sie werden NICHT gelöscht und nicht stillschweigend auf „verworfen" gesetzt,
+      // sondern auf „neu" zurückgestellt: dann stehen sie wieder in der Durchsicht, und
+      // die Entscheidung trifft der Mensch. Sichtbar statt beruhigend.
+      `-- @wennTabelle umsatz
+       UPDATE umsatz SET status = 'neu', istbuchung_id = NULL
+       WHERE istbuchung_id IS NOT NULL
+         AND istbuchung_id NOT IN (SELECT id FROM ist_buchung)`,
+
+      `-- @wennTabelle umsatz
+       INSERT OR IGNORE INTO umsatz_roh (
+         id, lauf_id, buchungstag, valuta, betrag, waehrung,
+         gegenpartei, gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz,
+         e2e_referenz, umsatzart, buchungsschluessel, bank_referenz, roh_hash, native_id)
+       SELECT id, lauf_id, buchungstag, valuta, betrag, waehrung,
+         gegenpartei, gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz,
+         e2e_referenz, umsatzart, buchungsschluessel, bank_referenz, roh_hash, native_id
+       FROM umsatz`,
+
+      // `geaendert_am` bekommt beim Übernehmen den Zeitpunkt des Laufs, nicht „jetzt":
+      // ein Bestandsstand ist nicht dadurch frisch, dass er migriert wurde.
+      `-- @wennTabelle umsatz
+       INSERT OR IGNORE INTO umsatz_verarbeitung (
+         umsatz_id, zahlungskonto_id, status, istbuchung_id, vorschlag_kategorie_id,
+         vorschlag_charakter, vorschlag_quelle, verdacht_auf_id, verdacht_gruende, geaendert_am)
+       SELECT u.id, u.zahlungskonto_id, u.status, u.istbuchung_id, u.vorschlag_kategorie_id,
+         u.vorschlag_charakter, u.vorschlag_quelle, u.verdacht_auf_id, u.verdacht_gruende,
+         COALESCE(l.zeitpunkt, u.buchungstag)
+       FROM umsatz u LEFT JOIN import_lauf l ON l.id = u.lauf_id`,
+
+      `DROP TABLE IF EXISTS umsatz`,
+
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_hash ON umsatz_roh (roh_hash)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_native ON umsatz_roh (native_id) WHERE native_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_konto ON umsatz_verarbeitung (zahlungskonto_id)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_lauf ON umsatz_roh (lauf_id)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_glaeubiger ON umsatz_roh (glaeubiger_id) WHERE glaeubiger_id IS NOT NULL`,
+      // Die Inbox fragt nach offenen Zeilen, der Detail-Join nach der Buchung.
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_status ON umsatz_verarbeitung (status)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_buchung ON umsatz_verarbeitung (istbuchung_id) WHERE istbuchung_id IS NOT NULL`,
+    ],
+  },
+  {
+    version: 45, // Der gespeicherte Dublettenverdacht war tot — und widersprach dem gerechneten
+    sql: [
+      // WARUM DAS WEGFÄLLT UND NICHTS AN SEINE STELLE TRITT. Der Import schrieb an jede
+      // Zeile, worauf sie vermutlich zeigt. Gelesen hat das nie jemand: sämtliche
+      // Dublettenanzeigen rechnen beim HINSEHEN (`ledgerVerdacht`, `entwurfVerdacht`,
+      // `stapelVerdacht` in `dublettensicht.ts`), und der Kopfkommentar dort begründet
+      // auch, warum — ein beim Import angeschriebener Verdacht gilt für den Stand von
+      // damals, und was später aus einer anderen Quelle dazukam, würde ihn nie
+      // korrigieren.
+      //
+      // Zwei Wahrheiten über dieselbe Frage, von denen eine niemand liest und die andere
+      // recht hat: da ist Wegnehmen die Antwort und keine neue Tabelle.
+      `ALTER TABLE umsatz_verarbeitung DROP COLUMN verdacht_auf_id`,
+      `ALTER TABLE umsatz_verarbeitung DROP COLUMN verdacht_gruende`,
+
+      // Die FREIGABE bleibt: „diese beiden sind nicht dasselbe" ist eine Entscheidung des
+      // Menschen und aus den Daten nicht wiederherstellbar. Sie bekommt nur endlich
+      // Fremdschlüssel — bisher blieben verwaiste Paare nach einem Löschen stehen und
+      // griffen beim nächsten Import nicht mehr, weil die neue Zeile eine neue ID hat.
+      // Am Bestand geprüft: es gibt keine verwaisten Paare, die Constraints halten.
+      `CREATE TABLE IF NOT EXISTS dubletten_freigabe_neu (
+         umsatz_a TEXT NOT NULL REFERENCES umsatz_roh(id) ON DELETE CASCADE,
+         umsatz_b TEXT NOT NULL REFERENCES umsatz_roh(id) ON DELETE CASCADE,
+         angelegt TEXT NOT NULL,
+         PRIMARY KEY (umsatz_a, umsatz_b)
+       )`,
+      `-- @wennTabelle dubletten_freigabe
+       INSERT OR IGNORE INTO dubletten_freigabe_neu (umsatz_a, umsatz_b, angelegt)
+       SELECT f.umsatz_a, f.umsatz_b, f.angelegt FROM dubletten_freigabe f
+       WHERE f.umsatz_a IN (SELECT id FROM umsatz_roh)
+         AND f.umsatz_b IN (SELECT id FROM umsatz_roh)`,
+      `DROP TABLE IF EXISTS dubletten_freigabe`,
+      // Beim zweiten Durchgang ist die Zwischentabelle schon umbenannt — ohne die
+      // Bedingung scheiterte das RENAME an „no such table".
+      `-- @wennTabelle dubletten_freigabe_neu
+       ALTER TABLE dubletten_freigabe_neu RENAME TO dubletten_freigabe`,
+    ],
+  },
+  {
+    version: 46, // Der Dedup-Griff ins Ledger lief als Tabellen-Scan
+    sql: [
+      // `bestandsSchluessel` fragt bei JEDEM Import auch die Roh-Hashes der verbuchten
+      // Ist-Buchungen ab — die decken den Fall ab, dass die Umsatz-Zeile längst
+      // aufgeräumt ist. Ohne Index war das ein SCAN über das ganze Ledger, und das Ledger
+      // wächst monoton, während der Import gleich teuer bleiben sollte.
+      //
+      // Teilindex: Buchungen ohne Roh-Hash sind alle von Hand erfassten, und die
+      // interessieren beim Dedup nie. Der Index trägt damit nur, was gefragt wird.
+      `CREATE INDEX IF NOT EXISTS ix_ist_buchung_roh_hash
+         ON ist_buchung (roh_hash) WHERE roh_hash IS NOT NULL`,
+    ],
+  },
+  {
+    version: 47, // Die Vertragszuordnung gehört an die Buchung, nicht in eine 1:1-Tabelle
+    sql: [
+      // WARUM DIE TABELLE VERSCHWINDET. `vertrag_zuordnung` hielt eine N:1-Beziehung
+      // (viele Buchungen, ein Vertrag) in einer Tabelle mit `istbuchung_id` als
+      // Primärschlüssel — also 1:1 zur Buchung. Nach Kardinalität gehört das als Spalte
+      // an die Buchung, genau wie `kategorie_id` daneben.
+      //
+      // Der Lebenszyklus-Grund, der bei `umsatz_roh`/`umsatz_verarbeitung` für die
+      // Trennung spricht, greift hier NICHT: beides ändert sich gleich oft, und keines
+      // von beiden ist ein Beleg.
+      //
+      // Am Bestand gemessen und der eigentliche Anlass: es stehen Zuordnungen zu
+      // Buchungen da, die es nicht mehr gibt. Als Spalte derselben Zeile kann das nicht
+      // mehr passieren — Löschen räumt beides zugleich.
+      `ALTER TABLE ist_buchung ADD COLUMN vertrag_id TEXT REFERENCES vertrag(id)`,
+      `ALTER TABLE ist_buchung ADD COLUMN vertrag_herkunft TEXT`,
+
+      // DIE SUBTILE STELLE, und sie entscheidet über die Fachlichkeit: `vertrag_id IS
+      // NULL` ist zweideutig geworden. Es kann heissen „noch nie zugeordnet" — dann darf
+      // die Automatik ran — oder „gehört AUSDRÜCKLICH zu keinem Vertrag", eine
+      // Handentscheidung, die ein Fehlgriff der Automatik nicht überschreiben darf.
+      //
+      // Die Unterscheidung trägt `vertrag_herkunft`: gesetzt heisst „es gibt eine
+      // Entscheidung". In der alten Tabelle trug das die blosse EXISTENZ der Zeile.
+      // Wer das übersieht, holt den korrigierten Fehlgriff beim nächsten Abgleich zurück.
+      `-- @wennTabelle vertrag_zuordnung
+       UPDATE ist_buchung SET
+         vertrag_id = (SELECT z.vertrag_id FROM vertrag_zuordnung z WHERE z.istbuchung_id = ist_buchung.id),
+         vertrag_herkunft = (SELECT z.herkunft FROM vertrag_zuordnung z WHERE z.istbuchung_id = ist_buchung.id)
+       WHERE id IN (SELECT istbuchung_id FROM vertrag_zuordnung)`,
+
+      `DROP TABLE IF EXISTS vertrag_zuordnung`,
+
+      // Die Vertragsansicht sucht die Zahlungen eines Vertrags — bisher über
+      // ix_vertrag_zuordnung_vertrag, das mit der Tabelle wegfällt.
+      `CREATE INDEX IF NOT EXISTS ix_ist_buchung_vertrag
+         ON ist_buchung (vertrag_id) WHERE vertrag_id IS NOT NULL`,
+    ],
+  },
+  {
+    version: 48, // Verweise ins Leere räumen — vorher, denn danach verbietet sie der Schlüssel
+    sql: [
+      // Am Bestand gemessen: es zeigen Buchungen auf Kategorien, die es nicht mehr gibt,
+      // und dasselbe bei den Kategorievorschlägen der Importzeilen. In der Anzeige sieht
+      // das aus wie „ohne Kategorie" — in einer Auswertung, die über die Kategorie
+      // gruppiert, fällt die Zeile still heraus.
+      //
+      // Aufgeräumt wird auf NULL und nicht durch Löschen der Zeile: die Buchung ist
+      // richtig, nur ihre Einordnung ist verlorengegangen. NULL ist hier die ehrliche
+      // Aussage — sie steht wieder in „ohne Kategorie" und lässt sich neu einordnen.
+      //
+      // EIGENE VERSION, weil die Fremdschlüssel danach kommen: mit ihnen scheiterte der
+      // Umbau an genau diesen Zeilen (`CLAUDE.md`: Lesen und Abräumen getrennt halten).
+      `UPDATE ist_buchung SET kategorie_id = NULL
+        WHERE kategorie_id IS NOT NULL AND kategorie_id NOT IN (SELECT id FROM kategorie)`,
+      `UPDATE umsatz_verarbeitung SET vorschlag_kategorie_id = NULL
+        WHERE vorschlag_kategorie_id IS NOT NULL
+          AND vorschlag_kategorie_id NOT IN (SELECT id FROM kategorie)`,
+      `UPDATE ist_buchung SET gegenkonto_id = NULL
+        WHERE gegenkonto_id IS NOT NULL AND gegenkonto_id NOT IN (SELECT id FROM zahlungskonto)`,
+    ],
+  },
+  {
+    version: 49, // Fremdschlüssel für die Achse Buchung–Konto–Kategorie und die Anhängsel
+    sql: [
+      // WAS EIN FREMDSCHLÜSSEL HIER LEISTET. sqlx schaltet `foreign_keys` auf jeder
+      // Verbindung ein — die Constraints greifen also sofort und nicht erst, wenn jemand
+      // daran denkt. Bis hierher war jede Verbindung eine blosse Textspalte, und zwei
+      // Sorten Widerspruch haben sich darüber angesammelt: verbuchte Umsätze ohne
+      // Buchung (v44) und Zuordnungen zu gelöschten Buchungen (v47). Beide waren
+      // MESSBAR, keine Theorie.
+      //
+      // SQLite kann Constraints nicht per ALTER TABLE nachrüsten, deshalb werden die
+      // Tabellen neu gebaut: anlegen, umkopieren, tauschen. Jeder Schritt für sich
+      // wiederholbar (`-- @wennTabelle`), weil Migrationen hier ohne Transaktion laufen.
+      //
+      // DIE LÖSCHREGELN sind fachliche Entscheidungen und keine Formsache:
+      //
+      //  • CASCADE, wo das Angehängte ohne sein Gegenstück gegenstandslos ist —
+      //    Aufteilungen einer Buchung, Werte und Positionen eines Depots.
+      //  • SET NULL, wo der Verweis wegfällt, die Zeile aber richtig bleibt: eine
+      //    gelöschte Kategorie macht die Buchung nicht falsch, nur uneingeordnet.
+      //  • Ohne Angabe (= RESTRICT), wo ein Löschen ein Fehler wäre: ein Konto mit
+      //    Buchungen darf nicht verschwinden, sonst fehlt sein Geld im Saldo.
+      `CREATE TABLE IF NOT EXISTS ist_buchung_neu (
+         id               TEXT    PRIMARY KEY,
+         datum            TEXT    NOT NULL,
+         betrag           INTEGER NOT NULL,
+         konto_id         TEXT    NOT NULL REFERENCES zahlungskonto(id),
+         kategorie_id     TEXT    REFERENCES kategorie(id) ON DELETE SET NULL,
+         charakter        TEXT    NOT NULL,
+         quelle           TEXT    NOT NULL,
+         plan_quelle_id   TEXT,
+         plan_faelligkeit TEXT,
+         roh_hash         TEXT,
+         notiz            TEXT,
+         transfer_id      TEXT,
+         gegenkonto_id    TEXT    REFERENCES zahlungskonto(id) ON DELETE SET NULL,
+         kategorie_herkunft TEXT  NOT NULL DEFAULT 'automatisch',
+         zu_pruefen       INTEGER NOT NULL DEFAULT 0,
+         vertrag_id       TEXT    REFERENCES vertrag(id) ON DELETE SET NULL,
+         vertrag_herkunft TEXT
+       )`,
+      // `transfer_id` bekommt bewusst KEINEN Fremdschlüssel: sie ist kein Verweis auf
+      // eine Zeile, sondern eine gemeinsame Marke der beiden Beine einer Umbuchung.
+      // Ein Schlüssel darauf zeigte im Kreis.
+      `-- @wennTabelle ist_buchung
+       INSERT OR IGNORE INTO ist_buchung_neu
+         SELECT id, datum, betrag, konto_id, kategorie_id, charakter, quelle,
+                plan_quelle_id, plan_faelligkeit, roh_hash, notiz, transfer_id,
+                gegenkonto_id, kategorie_herkunft, zu_pruefen, vertrag_id, vertrag_herkunft
+         FROM ist_buchung`,
+      `DROP TABLE IF EXISTS ist_buchung`,
+      `-- @wennTabelle ist_buchung_neu
+       ALTER TABLE ist_buchung_neu RENAME TO ist_buchung`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS ux_ist_planref
+         ON ist_buchung (plan_quelle_id, plan_faelligkeit) WHERE plan_quelle_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS ix_ist_buchung_roh_hash
+         ON ist_buchung (roh_hash) WHERE roh_hash IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS ix_ist_buchung_vertrag
+         ON ist_buchung (vertrag_id) WHERE vertrag_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS ix_ist_buchung_konto ON ist_buchung (konto_id)`,
+
+      // Eine Aufteilung ohne ihre Buchung ist Geld ohne Herkunft — CASCADE.
+      `CREATE TABLE IF NOT EXISTS ist_buchung_aufteilung_neu (
+         id            TEXT    PRIMARY KEY,
+         istbuchung_id TEXT    NOT NULL REFERENCES ist_buchung(id) ON DELETE CASCADE,
+         kategorie_id  TEXT    NOT NULL REFERENCES kategorie(id),
+         betrag        INTEGER NOT NULL,
+         notiz         TEXT
+       )`,
+      `-- @wennTabelle ist_buchung_aufteilung
+       INSERT OR IGNORE INTO ist_buchung_aufteilung_neu
+         SELECT id, istbuchung_id, kategorie_id, betrag, notiz FROM ist_buchung_aufteilung`,
+      `DROP TABLE IF EXISTS ist_buchung_aufteilung`,
+      `-- @wennTabelle ist_buchung_aufteilung_neu
+       ALTER TABLE ist_buchung_aufteilung_neu RENAME TO ist_buchung_aufteilung`,
+      `CREATE INDEX IF NOT EXISTS ix_aufteilung_buchung
+         ON ist_buchung_aufteilung (istbuchung_id)`,
+
+      // Anker, Depotwerte und Depotpositionen sind BEOBACHTUNGEN zu ihrem Gegenstück.
+      // Fällt das Konto oder das Depot, sind sie gegenstandslos.
+      `CREATE TABLE IF NOT EXISTS kontostand_anker_neu (
+         konto_id   TEXT    NOT NULL REFERENCES zahlungskonto(id) ON DELETE CASCADE,
+         datum      TEXT    NOT NULL,
+         herkunft   TEXT    NOT NULL,
+         betrag     INTEGER NOT NULL,
+         erfasst_am TEXT    NOT NULL,
+         PRIMARY KEY (konto_id, datum, herkunft)
+       )`,
+      `-- @wennTabelle kontostand_anker
+       INSERT OR IGNORE INTO kontostand_anker_neu SELECT * FROM kontostand_anker`,
+      `DROP TABLE IF EXISTS kontostand_anker`,
+      `-- @wennTabelle kontostand_anker_neu
+       ALTER TABLE kontostand_anker_neu RENAME TO kontostand_anker`,
+
+      `CREATE TABLE IF NOT EXISTS depotwert_neu (
+         depot_id   TEXT    NOT NULL REFERENCES depot(id) ON DELETE CASCADE,
+         stichtag   TEXT    NOT NULL,
+         gesamtwert INTEGER NOT NULL,
+         erfasst_am TEXT    NOT NULL,
+         PRIMARY KEY (depot_id, stichtag)
+       )`,
+      `-- @wennTabelle depotwert
+       INSERT OR IGNORE INTO depotwert_neu SELECT * FROM depotwert`,
+      `DROP TABLE IF EXISTS depotwert`,
+      `-- @wennTabelle depotwert_neu
+       ALTER TABLE depotwert_neu RENAME TO depotwert`,
+
+      `CREATE TABLE IF NOT EXISTS depotposition_neu (
+         depot_id       TEXT NOT NULL REFERENCES depot(id) ON DELETE CASCADE,
+         stichtag       TEXT NOT NULL,
+         kennung        TEXT NOT NULL,
+         isin           TEXT,
+         wkn            TEXT,
+         name           TEXT,
+         stueck         REAL,
+         kurs           REAL,
+         wert           INTEGER,
+         waehrung       TEXT,
+         einstand_datum TEXT,
+         einstand_kurs  REAL,
+         PRIMARY KEY (depot_id, stichtag, kennung)
+       )`,
+      `-- @wennTabelle depotposition
+       INSERT OR IGNORE INTO depotposition_neu SELECT * FROM depotposition`,
+      `DROP TABLE IF EXISTS depotposition`,
+      `-- @wennTabelle depotposition_neu
+       ALTER TABLE depotposition_neu RENAME TO depotposition`,
+
+      // Eine Erkennungsregel ohne ihren Vertrag erkennt für niemanden — CASCADE.
+      `CREATE TABLE IF NOT EXISTS vertrag_erkennung_neu (
+         vertrag_id  TEXT    PRIMARY KEY REFERENCES vertrag(id) ON DELETE CASCADE,
+         schluessel  TEXT    NOT NULL,
+         betrag_von  INTEGER,
+         betrag_bis  INTEGER,
+         gueltig_ab  TEXT,
+         gueltig_bis TEXT,
+         konto_id    TEXT    REFERENCES zahlungskonto(id) ON DELETE SET NULL
+       )`,
+      `-- @wennTabelle vertrag_erkennung
+       INSERT OR IGNORE INTO vertrag_erkennung_neu SELECT * FROM vertrag_erkennung`,
+      `DROP TABLE IF EXISTS vertrag_erkennung`,
+      `-- @wennTabelle vertrag_erkennung_neu
+       ALTER TABLE vertrag_erkennung_neu RENAME TO vertrag_erkennung`,
+    ],
+  },
+  {
+    version: 50, // Der Rest der Verweise — Ordnen, Planen, Erkennen
+    sql: [
+      // Dieselbe Übung wie in v49, für die Tabellen, die auf Kategorie, Konto und Vertrag
+      // zeigen. Am Bestand ist hier heute nichts verwaist — aber genau das ist der
+      // Zeitpunkt, an dem ein Fremdschlüssel billig ist: er hält, ohne dass vorher etwas
+      // repariert werden müsste.
+      //
+      // SET NULL durchgehend statt CASCADE: ein Budget, eine Zahlungsregel oder ein
+      // Inventargegenstand ist nicht gegenstandslos, weil seine Kategorie verschwindet.
+      // Er ist dann uneingeordnet, und das soll man sehen und geraderücken können.
+      `CREATE TABLE IF NOT EXISTS kategorie_neu (
+         id                TEXT PRIMARY KEY,
+         name              TEXT NOT NULL,
+         eltern_id         TEXT REFERENCES kategorie(id) ON DELETE SET NULL,
+         default_charakter TEXT NOT NULL
+       )`,
+      `-- @wennTabelle kategorie
+       INSERT OR IGNORE INTO kategorie_neu SELECT * FROM kategorie`,
+      `DROP TABLE IF EXISTS kategorie`,
+      `-- @wennTabelle kategorie_neu
+       ALTER TABLE kategorie_neu RENAME TO kategorie`,
+
+      // `kategorie_id` ist NOT NULL — eine Budgetzeile ohne Kategorie hätte keinen
+      // Gegenstand. Deshalb hier CASCADE: fällt die Kategorie, fällt ihr Budget mit.
+      `CREATE TABLE IF NOT EXISTS budget_neu (
+         id               TEXT PRIMARY KEY,
+         kategorie_id     TEXT NOT NULL REFERENCES kategorie(id) ON DELETE CASCADE,
+         konto_id         TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL,
+         betrag_pro_monat INTEGER,
+         art              TEXT,
+         start            TEXT
+       )`,
+      `-- @wennTabelle budget
+       INSERT OR IGNORE INTO budget_neu SELECT id, kategorie_id, konto_id, betrag_pro_monat, art, start FROM budget`,
+      `DROP TABLE IF EXISTS budget`,
+      `-- @wennTabelle budget_neu
+       ALTER TABLE budget_neu RENAME TO budget`,
+
+      `CREATE TABLE IF NOT EXISTS zahlungsregel_neu (
+         id           TEXT PRIMARY KEY,
+         bezeichnung  TEXT    NOT NULL,
+         betrag       INTEGER NOT NULL,
+         rhythmus     TEXT    NOT NULL,
+         startdatum   TEXT    NOT NULL,
+         charakter    TEXT    NOT NULL,
+         konto_id     TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL,
+         kategorie_id TEXT REFERENCES kategorie(id) ON DELETE SET NULL,
+         vertrag_id   TEXT REFERENCES vertrag(id) ON DELETE SET NULL
+       )`,
+      `-- @wennTabelle zahlungsregel
+       INSERT OR IGNORE INTO zahlungsregel_neu
+         SELECT id, bezeichnung, betrag, rhythmus, startdatum, charakter,
+                konto_id, kategorie_id, vertrag_id FROM zahlungsregel`,
+      `DROP TABLE IF EXISTS zahlungsregel`,
+      `-- @wennTabelle zahlungsregel_neu
+       ALTER TABLE zahlungsregel_neu RENAME TO zahlungsregel`,
+
+      `CREATE TABLE IF NOT EXISTS inventargegenstand_neu (
+         id                   TEXT PRIMARY KEY,
+         bezeichnung          TEXT    NOT NULL,
+         wiederbeschaffung    INTEGER NOT NULL,
+         nutzungsdauer_monate INTEGER NOT NULL,
+         anschaffung          TEXT    NOT NULL,
+         kategorie_id         TEXT REFERENCES kategorie(id) ON DELETE SET NULL,
+         konto_id             TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL
+       )`,
+      `-- @wennTabelle inventargegenstand
+       INSERT OR IGNORE INTO inventargegenstand_neu
+         SELECT id, bezeichnung, wiederbeschaffung, nutzungsdauer_monate, anschaffung,
+                kategorie_id, konto_id FROM inventargegenstand`,
+      `DROP TABLE IF EXISTS inventargegenstand`,
+      `-- @wennTabelle inventargegenstand_neu
+       ALTER TABLE inventargegenstand_neu RENAME TO inventargegenstand`,
+
+      // Eine Festlegung ohne ihre Kategorie ist eine Regel, die auf nichts zeigt —
+      // CASCADE. Sie neu zu setzen ist ein Klick, sie stumm ins Leere zeigen zu lassen
+      // kostet eine Fehlersuche.
+      `CREATE TABLE IF NOT EXISTS kategorie_festlegung_neu (
+         muster       TEXT PRIMARY KEY,
+         kategorie_id TEXT NOT NULL REFERENCES kategorie(id) ON DELETE CASCADE,
+         angelegt_am  TEXT NOT NULL
+       )`,
+      `-- @wennTabelle kategorie_festlegung
+       INSERT OR IGNORE INTO kategorie_festlegung_neu SELECT * FROM kategorie_festlegung`,
+      `DROP TABLE IF EXISTS kategorie_festlegung`,
+      `-- @wennTabelle kategorie_festlegung_neu
+       ALTER TABLE kategorie_festlegung_neu RENAME TO kategorie_festlegung`,
+
+      // Der Kategorievorschlag der Importzeile — hier war Schaden GEMESSEN (v48 hat ihn
+      // aufgeräumt). SET NULL: die Zeile bleibt, nur der Vorschlag ist hinfällig.
+      `CREATE TABLE IF NOT EXISTS umsatz_verarbeitung_neu (
+         umsatz_id              TEXT PRIMARY KEY REFERENCES umsatz_roh(id) ON DELETE CASCADE,
+         zahlungskonto_id       TEXT NOT NULL REFERENCES zahlungskonto(id),
+         status                 TEXT NOT NULL,
+         istbuchung_id          TEXT REFERENCES ist_buchung(id) ON DELETE SET NULL,
+         vorschlag_kategorie_id TEXT REFERENCES kategorie(id) ON DELETE SET NULL,
+         vorschlag_charakter    TEXT,
+         vorschlag_quelle       TEXT,
+         geaendert_am           TEXT NOT NULL
+       )`,
+      `-- @wennTabelle umsatz_verarbeitung
+       INSERT OR IGNORE INTO umsatz_verarbeitung_neu SELECT * FROM umsatz_verarbeitung`,
+      `DROP TABLE IF EXISTS umsatz_verarbeitung`,
+      `-- @wennTabelle umsatz_verarbeitung_neu
+       ALTER TABLE umsatz_verarbeitung_neu RENAME TO umsatz_verarbeitung`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_status ON umsatz_verarbeitung (status)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_buchung ON umsatz_verarbeitung (istbuchung_id) WHERE istbuchung_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_konto ON umsatz_verarbeitung (zahlungskonto_id)`,
+    ],
+  },
+  {
+    version: 51, // Die letzten sieben Verweise — Vertrag, Lauf, Bankzuordnung, Depot
+    sql: [
+      // Diese sieben hatte ich beim Durchgehen übersehen; gefunden hat sie der Test, der
+      // JEDE Verweisspalte gegen die Fremdschlüsselliste hält. Das ist der Grund, warum
+      // so ein Test mehr wert ist als eine sorgfältige Liste: die Liste war sorgfältig
+      // und trotzdem unvollständig.
+      `CREATE TABLE IF NOT EXISTS vertrag_neu (
+         id                      TEXT PRIMARY KEY,
+         anbieter                TEXT NOT NULL,
+         vertragsnummer          TEXT,
+         inhaber_id              TEXT REFERENCES person(id) ON DELETE SET NULL,
+         beginn                  TEXT NOT NULL,
+         mindestlaufzeit_monate  INTEGER,
+         verlaengerung           TEXT NOT NULL,
+         verlaengerung_monate    INTEGER,
+         kuendigungsfrist_monate INTEGER,
+         status                  TEXT NOT NULL,
+         notizen                 TEXT,
+         kategorie_id            TEXT REFERENCES kategorie(id) ON DELETE SET NULL,
+         art                     TEXT NOT NULL DEFAULT 'abo'
+       )`,
+      `-- @wennTabelle vertrag
+       INSERT OR IGNORE INTO vertrag_neu
+         SELECT id, anbieter, vertragsnummer, inhaber_id, beginn, mindestlaufzeit_monate,
+                verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status,
+                notizen, kategorie_id, art FROM vertrag`,
+      `DROP TABLE IF EXISTS vertrag`,
+      `-- @wennTabelle vertrag_neu
+       ALTER TABLE vertrag_neu RENAME TO vertrag`,
+
+      // Der LAUF ist ein Protokoll: was einmal abgerufen wurde, bleibt wahr, auch wenn
+      // Zugang oder Konto später verschwinden. Deshalb SET NULL und nicht CASCADE — die
+      // Herkunft einer Zeile darf nicht rückwirkend gelöscht werden.
+      `CREATE TABLE IF NOT EXISTS import_lauf_neu (
+         id               TEXT PRIMARY KEY,
+         quelle           TEXT    NOT NULL,
+         zeitpunkt        TEXT    NOT NULL,
+         dateiname        TEXT,
+         eingelesen       INTEGER NOT NULL DEFAULT 0,
+         neu              INTEGER NOT NULL DEFAULT 0,
+         duplikate        INTEGER NOT NULL DEFAULT 0,
+         zugang_id        TEXT REFERENCES bankzugang(id) ON DELETE SET NULL,
+         zahlungskonto_id TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL,
+         format           TEXT,
+         abgeschnitten    INTEGER NOT NULL DEFAULT 0
+       )`,
+      `-- @wennTabelle import_lauf
+       INSERT OR IGNORE INTO import_lauf_neu
+         SELECT id, quelle, zeitpunkt, dateiname, eingelesen, neu, duplikate,
+                zugang_id, zahlungskonto_id, format, abgeschnitten FROM import_lauf`,
+      `DROP TABLE IF EXISTS import_lauf`,
+      `-- @wennTabelle import_lauf_neu
+       ALTER TABLE import_lauf_neu RENAME TO import_lauf`,
+
+      // Die Zuordnung eines Bankkontos ist ohne ihren Zugang gegenstandslos — CASCADE.
+      // Beim Zahlungskonto dagegen RESTRICT: solange eine Zuordnung darauf zeigt, ist das
+      // Konto online geführt, und ein Löschen wäre ein Versehen.
+      `CREATE TABLE IF NOT EXISTS bankkonto_zuordnung_neu (
+         zugang_id         TEXT NOT NULL REFERENCES bankzugang(id) ON DELETE CASCADE,
+         schluessel        TEXT NOT NULL,
+         zahlungskonto_id  TEXT NOT NULL REFERENCES zahlungskonto(id),
+         letzter_abruf_bis TEXT,
+         letztes_format    TEXT,
+         format_wahl       TEXT,
+         PRIMARY KEY (zugang_id, schluessel)
+       )`,
+      `-- @wennTabelle bankkonto_zuordnung
+       INSERT OR IGNORE INTO bankkonto_zuordnung_neu
+         SELECT zugang_id, schluessel, zahlungskonto_id, letzter_abruf_bis,
+                letztes_format, format_wahl FROM bankkonto_zuordnung`,
+      `DROP TABLE IF EXISTS bankkonto_zuordnung`,
+      `-- @wennTabelle bankkonto_zuordnung_neu
+       ALTER TABLE bankkonto_zuordnung_neu RENAME TO bankkonto_zuordnung`,
+
+      // Ein Depot ist die Sicht der Bank auf ein Wertpapierkonto; ohne den Zugang, über
+      // den es abgerufen wird, gibt es nichts mehr nachzuführen. Die Werte und Positionen
+      // hängen ihrerseits am Depot (v49) und gehen die Kette mit.
+      `CREATE TABLE IF NOT EXISTS depot_neu (
+         id          TEXT PRIMARY KEY,
+         zugang_id   TEXT NOT NULL REFERENCES bankzugang(id) ON DELETE CASCADE,
+         schluessel  TEXT NOT NULL,
+         bezeichnung TEXT NOT NULL,
+         waehrung    TEXT,
+         UNIQUE (zugang_id, schluessel)
+       )`,
+      `-- @wennTabelle depot
+       INSERT OR IGNORE INTO depot_neu SELECT id, zugang_id, schluessel, bezeichnung, waehrung FROM depot`,
+      `DROP TABLE IF EXISTS depot`,
+      `-- @wennTabelle depot_neu
+       ALTER TABLE depot_neu RENAME TO depot`,
+    ],
+  },
+  {
+    version: 52, // Das Format gehört an den Lauf, nicht zusätzlich an jede Zeile
+    sql: [
+      // Die Spalte kam in v44 mit — mit dem Gedanken, den Wert eines
+      // formatabhängigen Feldes (`umsatzart`, `buchungsschluessel`) an der Zeile selbst
+      // deuten zu können. Sie ist überflüssig: eine Zeile gehört zu genau EINEM Lauf,
+      // und der Lauf trägt das Format seit v42. Sie stünde also zweimal da und könnte
+      // auseinanderlaufen.
+      //
+      // Wer wissen will, aus welchem Vokabular ein Wert stammt, joint über `lauf_id` —
+      // dieselbe Antwort wie bei der Frage nach einer zweiten Referenz von der Buchung
+      // zum Beleg (v46): der Weg ist schon da, ein zweiter macht ihn nicht kürzer,
+      // sondern unzuverlässiger.
+      `ALTER TABLE umsatz_roh DROP COLUMN format`,
+    ],
+  },
+  {
+    version: 53, // Was mit einer Buchung geschah — nicht nur, was zuletzt an ihr steht
+    sql: [
+      // Der BELEG ist seit v44 geschützt: `umsatz_roh` wird nach dem Anlegen nicht mehr
+      // geschrieben. Die BUCHUNG war es nie. Jede Änderung überschrieb still, jedes
+      // Löschen löschte wirklich, und was vorher dastand, war danach nicht mehr
+      // feststellbar — auch nicht für den, der es selbst geändert hat.
+      //
+      // KEIN FREMDSCHLÜSSEL auf `ist_buchung`, und das ist der Kern der Sache: das
+      // Journal muss die Löschung ÜBERLEBEN. Ein Schlüssel mit CASCADE räumte genau den
+      // Eintrag weg, für den es die Tabelle gibt; einer mit RESTRICT verböte das Löschen
+      // ganz. Die Spalte ist deshalb ein blosser Verweis, und der Wächter-Test führt sie
+      // namentlich als Ausnahme.
+      //
+      // `vorher` und `nachher` halten den GANZEN Zustand als JSON, nicht die Unterschiede.
+      // Ein Eintrag soll für sich lesbar sein: wer eine Kette von Diffs zurückrechnen
+      // muss, um den Stand von damals zu sehen, hat kein Protokoll, sondern eine Aufgabe.
+      `CREATE TABLE IF NOT EXISTS buchung_journal (
+         id            TEXT PRIMARY KEY,
+         istbuchung_id TEXT NOT NULL,
+         zeitpunkt     TEXT NOT NULL,
+         art           TEXT NOT NULL,
+         vorher        TEXT,
+         nachher       TEXT
+       )`,
+      `CREATE INDEX IF NOT EXISTS ix_journal_buchung ON buchung_journal (istbuchung_id)`,
+      `CREATE INDEX IF NOT EXISTS ix_journal_zeit ON buchung_journal (zeitpunkt)`,
+    ],
+  },
+  {
+    version: 54, // Zwei Einordnungen, die die Bank schon vorgenommen hat
+    sql: [
+      // Beide liefert nur CAMT, und beide standen bisher im Beleg nicht, obwohl die Bank
+      // sie mitschickt — die Bibliothek hat sie verworfen (im Fork nachgerüstet).
+      //
+      // `zweck_code` ist der SEPA-Verwendungszweckcode: SALA für Gehalt, RENT für Miete,
+      // LOAN für Kredit. Anders als `umsatzart` ist das kein Vokabular, das je Institut
+      // anders aussieht, sondern eine feste Liste aus dem Standard — das einzige Merkmal
+      // dieser Art, das ohne Umdeutung brauchbar ist.
+      `ALTER TABLE umsatz_roh ADD COLUMN zweck_code TEXT`,
+
+      // `endempfaenger` ist der, der die Zahlung WIRKLICH bekommt, wenn ein
+      // Zahlungsdienstleister dazwischensteht. Ohne ihn steht in `gegenpartei` der
+      // Dienstleister — und der ist bei jedem Händler derselbe, was die
+      // Kategorie-Erkennung genau dort blind macht, wo sie am meisten zu tun hätte.
+      `ALTER TABLE umsatz_roh ADD COLUMN endempfaenger TEXT`,
+
+      // Der Zweckcode ist ein Merkmal, nach dem die Erkennung filtert; die Liste ist
+      // kurz, der Index deshalb klein und trennscharf.
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_zweck ON umsatz_roh (zweck_code) WHERE zweck_code IS NOT NULL`,
+    ],
+  },
+  {
+    version: 55, // Ein Zugang weiss, ÜBER WELCHEN WEG er seine Bank erreicht
     sql: [
       // Bis hierher war jeder Bankzugang ein FinTS-Zugang — das stand nirgends, es war
       // schlicht der einzige Weg. Sobald es einen zweiten gibt, muss die Wahl irgendwo

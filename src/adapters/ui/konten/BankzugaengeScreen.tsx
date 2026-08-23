@@ -34,6 +34,8 @@ import {
 import { kannVorfall } from "../../../application";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
+import { HerkunftBereich } from "./HerkunftBereich";
 import { Bankprofilkarte } from "./Bankprofilkarte";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
@@ -55,11 +57,32 @@ interface Pruefung {
   profil: Bankprofil;
 }
 
-export function BankzugaengeScreen() {
+export function BankzugaengeScreen({
+  kontoNamen,
+}: {
+  /** Kontobezeichnungen je Id — der Screen daneben hat sie schon geladen. */
+  kontoNamen?: ReadonlyMap<string, string>;
+} = {}) {
   const { t } = useTranslation();
   const geld = useGeld();
   const [zugaenge, setZugaenge] = useState<Bankzugang[]>([]);
   const [zuordnungen, setZuordnungen] = useState<Kontozuordnung[]>([]);
+  /**
+   * Welcher Zugang seine Konten zeigt.
+   *
+   * Die Spalte daneben nennt nur die ANZAHL — die beantwortet „habe ich hier schon etwas
+   * zugeordnet", aber nicht „welches Konto ist das eigentlich". Genau die Frage stellt
+   * sich, wenn ein Abruf nichts bringt.
+   */
+  const [kontenOffen, setKontenOffen] = useState<string | null>(null);
+  /**
+   * Welches Konto seine eingelesenen Zeilen zeigt — die dritte Stufe.
+   *
+   * Zugang aufklappen, darin ein Konto aufklappen, darunter steht, was hereinkam. Alles
+   * auf derselben Seite: wer der Frage nachgeht, warum ein Abruf nichts brachte, will die
+   * Kette sehen und nicht dreimal die Ansicht wechseln.
+   */
+  const [zeilenVon, setZeilenVon] = useState<string | null>(null);
   const [pin, setPin] = useState<{ zugang: Bankzugang } | null>(null);
   const [pinText, setPinText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -77,10 +100,9 @@ export function BankzugaengeScreen() {
   const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
 
   async function laden() {
-    const [z, zo] = await Promise.all([
-      bankzugaenge(),
-      kontozuordnungen(),
-    ]);
+    // In EINEM Effekt und zusammen gesetzt: gestaffelte Zustaende liessen die Kontenliste
+    // kurz gegen eine leere Zuordnung rechnen (ui/CLAUDE.md).
+    const [z, zo] = await Promise.all([bankzugaenge(), kontozuordnungen()]);
     setZugaenge(z);
     setZuordnungen(zo);
   }
@@ -255,7 +277,18 @@ export function BankzugaengeScreen() {
         ) : (
           <DataTable
             columns={[
-              { key: "bezeichnung", label: t("bankzugaenge.spalteBank") },
+              {
+                key: "bezeichnung",
+                label: t("bankzugaenge.spalteBank"),
+                render: (z: Bankzugang) => (
+                  <Zeilenlink
+                    onKlick={() => setKontenOffen(kontenOffen === z.id ? null : z.id)}
+                    titel={t("bankzugaenge.zeigeKonten", { bank: z.bezeichnung })}
+                  >
+                    {z.bezeichnung}
+                  </Zeilenlink>
+                ),
+              },
               { key: "blz", label: t("bankabruf.feldBlz") },
               { key: "benutzer", label: t("bankabruf.feldBenutzer") },
               {
@@ -323,6 +356,63 @@ export function BankzugaengeScreen() {
         )}
         {fehler && !pin && <div className="err" style={{ marginTop: "var(--sp-3)" }}>{fehler}</div>}
       </Card>
+
+      {/* Welche Konten an einem Zugang hängen — und von dort weiter zu dem, was
+          hereingekommen ist. Die Spalte in der Tabelle nennt nur die ANZAHL; die
+          beantwortet „habe ich hier schon etwas zugeordnet", aber nicht „welches Konto ist
+          das eigentlich". Genau die Frage stellt sich, wenn ein Abruf nichts bringt. */}
+      {kontenOffen && (
+        <Card
+          style={{ marginTop: "var(--gap-card)" }}
+          title={t("bankzugaenge.kontenDesZugangs", {
+            bank: zugaenge.find((z) => z.id === kontenOffen)?.bezeichnung ?? "",
+          })}
+        >
+          {zuordnungen.filter((z) => z.zugangId === kontenOffen).length === 0 ? (
+            <div className="muted">{t("bankzugaenge.keineKonten")}</div>
+          ) : (
+            <DataTable
+              columns={[
+                {
+                  key: "konto",
+                  label: t("bankzugaenge.spalteKonto"),
+                  render: (z: Kontozuordnung) => {
+                    const name = kontoNamen?.get(z.zahlungskontoId) ?? z.zahlungskontoId;
+                    return (
+                      <Zeilenlink
+                        onKlick={() =>
+                          setZeilenVon(zeilenVon === z.zahlungskontoId ? null : z.zahlungskontoId)
+                        }
+                        titel={t("konten.herkunft.zeigeZeilen", { konto: name })}
+                      >
+                        {name}
+                      </Zeilenlink>
+                    );
+                  },
+                },
+                { key: "schluessel", label: t("bankzugaenge.spalteSchluessel") },
+                {
+                  key: "abruf",
+                  label: t("bankzugaenge.spalteLetzterAbruf"),
+                  render: (z: Kontozuordnung) => z.letzterAbrufBis ?? "—",
+                },
+              ]}
+              rows={zuordnungen.filter((z) => z.zugangId === kontenOffen)}
+            />
+          )}
+
+          {/* Und darunter die IMPORTE dieses Kontos über DIESEN Zugang — nicht seine
+              Zeilen. Erst der Klick auf einen Import zeigt, was er gebracht hat.
+              Die Zeilen aus Dateien bleiben hier aussen vor: sie gehören zum selben
+              Konto, aber nicht zu diesem Abrufweg. Wer sie alle sehen will, findet sie
+              im Register „Herkunft" oder unter der Kontenliste. */}
+          {zeilenVon && (
+            <div style={{ marginTop: "var(--gap-card)" }}>
+              <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} zugangId={kontenOffen} />
+            </div>
+          )}
+        </Card>
+      )}
 
       {pruefung && (
         <Card

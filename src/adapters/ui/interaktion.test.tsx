@@ -458,7 +458,7 @@ describe("Buchungsdetails", () => {
       id: "i1", datum: heute, betrag: -949, kontoId: "k1",
       charakter: "Aufwand", quelle: "import", kategorieId: "kat1",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
       waehrung: "EUR", gegenpartei: "Thalberg Vibora", verwendungszweck: "EDK*THALBERG Seewinkel",
       rohHash: "hash-abc", nativeId: "fg-12345", status: "verbucht", istbuchungId: "i1",
@@ -497,7 +497,7 @@ describe("Buchungsdetails", () => {
       id: "i1", datum: heute, betrag: -949, kontoId: "k1",
       charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Von der Bank",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l-bank", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
       waehrung: "EUR", gegenpartei: "Ohlert Vibora", verwendungszweck: "Abbuchung",
       rohHash: "h-bank", nativeId: "fints-1", status: "verbucht", istbuchungId: "i1",
@@ -534,7 +534,7 @@ describe("Buchungsdetails", () => {
       id: "i1", datum: heute, betrag: -949, kontoId: "k1",
       charakter: "Aufwand", quelle: "import", kategorieId: "kat1", notiz: "Aus der Datei",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l-datei", zahlungskontoId: "k1", buchungstag: heute, betrag: -949,
       waehrung: "EUR", gegenpartei: "Thalberg", verwendungszweck: "Einkauf",
       rohHash: "h-datei", nativeId: "fg-1", status: "verbucht", istbuchungId: "i1",
@@ -873,7 +873,7 @@ describe("Vertrag aus einer Buchung", () => {
       id: "l1", quelle: "finanzguru", dateiname: "a.xlsx", zeitpunkt: "2026-08-12T10:00:00Z",
       eingelesen: 1, neu: 1, duplikate: 0,
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: heute, betrag: -2999,
       waehrung: "EUR", gegenpartei: "Telefonica Germany GmbH", verwendungszweck: "Mobilfunk",
       rohHash: "h1", status: "verbucht", istbuchungId: "i1",
@@ -1043,7 +1043,7 @@ describe("Dubletten nebeneinander vergleichen", () => {
         id: ist, datum: "2026-07-20", betrag: -7430, kontoId: "k1",
         charakter: "Aufwand", quelle: "import", kategorieId: "kat1",
       });
-      await sqliteUmsatzRepository.speichern({
+      await sqliteUmsatzRepository.anlegen({
         id: umsatz, laufId: lauf, zahlungskontoId: "k1", buchungstag: "2026-07-20",
         betrag: -7430, waehrung: "EUR", gegenpartei: "Vibora Ohlert",
         verwendungszweck: "Rechnung 4711", rohHash: hash, status: "verbucht", istbuchungId: ist,

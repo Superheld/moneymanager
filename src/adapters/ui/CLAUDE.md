@@ -44,6 +44,19 @@ Selbst gezogene Rahmen (`border: 1px solid var(--line)` plus Radius) sehen ähnl
 sind trotzdem falsch: die Fläche fehlt weiterhin, und beim nächsten Token-Wechsel laufen
 sie gegen die Karten auseinander.
 
+## Zwei Fragen, die verschieden aussehen müssen
+
+Derselbe Bereich (`konten/HerkunftBereich`) beantwortet zwei Fragen, und wer sie
+gleichbehandelt, beantwortet eine davon falsch:
+
+- **Unter der Kontenliste:** „Was steht für dieses Konto überhaupt in der Datenbank?"
+  → ALLE Zeilen, aus jeder Quelle. Eine nach Abrufwegen getrennte Antwort wäre keine.
+- **Unter einem Bankzugang:** „Was hat DIESER Abruf gebracht?" → nur die Läufe dieses
+  Zugangs, und die Zeilen erst, wenn einer davon gewählt ist. Eine Zeile aus einer Datei
+  gehört hier nicht hin, auch wenn sie zum selben Konto gehört.
+
+Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweite.
+
 ## Laden
 
 **Verwandte Repos in EINEM Effekt per `Promise.all` laden und zusammen setzen.** Gestaffelte

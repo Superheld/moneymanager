@@ -17,6 +17,7 @@ import type { Kontoherkunft } from "../../../application";
 import { zurueckholen, type Umsatz } from "../../../application/import";
 import { herkunft as herkunftLaden, umsatzSpeichern } from "../../dienste";
 import { Card, Pill } from "../bausteine";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { DataTable } from "../bausteine/DataTable";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -28,11 +29,35 @@ function datumKurz(iso: string): string {
   return `${d}.${m}.${j.slice(2)}`;
 }
 
-export function HerkunftBereich() {
+/**
+ * Was für ein Konto hereinkam — in zwei Lesarten, und der Unterschied ist der Punkt.
+ *
+ * **Ohne `zugangId`** (Register „Herkunft", Kontenliste): ALLE Zeilen des Kontos, aus
+ * jeder Quelle. Die Frage dort ist „was steht für dieses Konto überhaupt in der
+ * Datenbank" — und darauf wäre eine nach Quellen getrennte Antwort keine Antwort.
+ *
+ * **Mit `zugangId`** (unter einem Bankzugang): nur die Läufe DIESES Zugangs, und die
+ * Zeilen erst, wenn einer davon gewählt ist. Die Frage dort ist eine andere: „was hat
+ * dieser Abruf gebracht". Wer ihr nachgeht, will die Läufe nebeneinander sehen — ein
+ * Stapel aller Zeilen beantwortet sie nicht, sondern verdeckt sie.
+ *
+ * Mit `kontoId` steht der Bereich unter der Zeile, die ihn geöffnet hat, und führt keine
+ * eigene Kontowahl. Derselbe Aufbau wie im Kontoauszug: oben die Liste, darunter das
+ * Gewählte.
+ */
+export function HerkunftBereich({
+  kontoId,
+  zugangId,
+}: { kontoId?: string; zugangId?: string } = {}) {
+  /** Welcher Lauf seine Zeilen zeigt. Nur im Zugangs-Fall überhaupt wählbar. */
+  const [laufId, setLaufId] = useState<string | null>(null);
   const { t } = useTranslation();
   const geld = useGeld();
   const [konten, setKonten] = useState<readonly Kontoherkunft[]>([]);
-  const [gewaehlt, setGewaehlt] = useState<string>("");
+  // Von aussen vorgewaehlt, wenn jemand aus der Kontenliste hierher gesprungen ist.
+  // Danach fuehrt der Bereich seine Auswahl selbst weiter — wer hier ankommt, will sich
+  // umsehen und nicht bei jedem Klick zurueckgesetzt werden.
+  const [gewaehlt, setGewaehlt] = useState<string>(kontoId ?? "");
   const [filter, setFilter] = useState<Statusfilter>("alle");
   const [laeufeOffen, setLaeufeOffen] = useState(false);
 
@@ -50,24 +75,30 @@ export function HerkunftBereich() {
   const aktiv = konten.find((k) => k.konto.id === gewaehlt);
 
   const gefiltert = useMemo(() => {
-    const zeilen = aktiv?.zeilen ?? [];
+    let zeilen = aktiv?.zeilen ?? [];
+    // Unter einem Bankzugang zählt nur, was ÜBER IHN hereinkam. Eine Zeile aus einer
+    // Datei gehört zwar zum selben Konto, aber nicht zu diesem Abrufweg — sie hier
+    // mitzuzeigen beantwortete die gestellte Frage nicht, sondern eine andere.
+    if (zugangId) zeilen = zeilen.filter((z) => z.lauf?.zugangId === zugangId);
+    // Und wenn ein einzelner Import gewählt ist, nur dessen Zeilen.
+    if (laufId) zeilen = zeilen.filter((z) => z.lauf?.id === laufId);
     if (filter === "alle") return zeilen;
     return zeilen.filter((z) => {
       if (filter === "verbucht") return z.umsatz.status === "verbucht";
       if (filter === "offen") return z.umsatz.status === "neu";
       return z.umsatz.status === "verworfen" || z.umsatz.status === "duplikat";
     });
-  }, [aktiv, filter]);
+  }, [aktiv, filter, zugangId, laufId]);
 
   // Läufe mit Wirkung nach vorn. „Ohne Wirkung" heisst: für DIESES Konto kam nichts an —
   // der Lauf hat geholt und alles als bekannt verworfen.
   const { mitWirkung, ohneWirkung } = useMemo(() => {
-    const alle = aktiv?.laeufe ?? [];
+    const alle = (aktiv?.laeufe ?? []).filter((l) => !zugangId || l.lauf.zugangId === zugangId);
     return {
       mitWirkung: alle.filter((l) => l.verbucht > 0 || l.offen > 0),
       ohneWirkung: alle.filter((l) => l.verbucht === 0 && l.offen === 0),
     };
-  }, [aktiv]);
+  }, [aktiv, zugangId]);
 
   async function zurueck(umsatz: Umsatz) {
     await umsatzSpeichern(zurueckholen(umsatz));
@@ -77,7 +108,11 @@ export function HerkunftBereich() {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
       {/* Kontowahl. Konten ohne eingelesene Zeilen bleiben wählbar — dass nichts da ist,
-          ist selbst eine Auskunft. */}
+          ist selbst eine Auskunft.
+          ENTFÄLLT, wenn das Konto von aussen kommt: dann steht dieser Bereich unter einer
+          Tabelle, in der schon gewählt wurde, und eine zweite Auswahl daneben fragte
+          dasselbe noch einmal. */}
+      {!kontoId && (
       <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
         {konten.map((k) => (
           <button
@@ -98,6 +133,7 @@ export function HerkunftBereich() {
           </button>
         ))}
       </div>
+      )}
 
       {aktiv && (
         <>
@@ -111,8 +147,34 @@ export function HerkunftBereich() {
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: "var(--fs-sm)" }}>
                 {mitWirkung.map((l) => (
-                  <div key={l.lauf.id} style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", alignItems: "baseline" }}>
-                    <span style={{ minWidth: "9rem" }}>{l.lauf.zeitpunkt.slice(0, 10).split("-").reverse().join(".")}</span>
+                  <div
+                    key={l.lauf.id}
+                    style={{
+                      display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", alignItems: "baseline",
+                      // Der gewählte Import hebt sich ab, sonst weiss man nach dem Klick
+                      // nicht mehr, welche Zeilen man gerade vor sich hat.
+                      background: laufId === l.lauf.id ? "var(--accent-wash)" : "transparent",
+                      borderRadius: "var(--r-sm)",
+                      padding: laufId === l.lauf.id ? "2px 6px" : "2px 0",
+                    }}
+                  >
+                    <span style={{ minWidth: "9rem" }}>
+                      {/* Nur unter einem Zugang führt der Lauf weiter: dort ist die Frage
+                          „was hat DIESER Abruf gebracht". Im Register daneben stehen alle
+                          Zeilen des Kontos ohnehin schon vollständig da. */}
+                      {zugangId ? (
+                        <Zeilenlink
+                          onKlick={() => setLaufId(laufId === l.lauf.id ? null : l.lauf.id)}
+                          titel={t("konten.herkunft.zeigeLauf", {
+                            datum: l.lauf.zeitpunkt.slice(0, 10).split("-").reverse().join("."),
+                          })}
+                        >
+                          {l.lauf.zeitpunkt.slice(0, 10).split("-").reverse().join(".")}
+                        </Zeilenlink>
+                      ) : (
+                        l.lauf.zeitpunkt.slice(0, 10).split("-").reverse().join(".")
+                      )}
+                    </span>
                     <Pill variant="neutral">{l.lauf.quelle}</Pill>
                     <span className="muted">
                       {t("konten.herkunft.laufZeile", { zeilen: l.zeilen, verbucht: l.verbucht, weggelegt: l.weggelegt })}
@@ -141,7 +203,19 @@ export function HerkunftBereich() {
           </Card>
 
           {/* Die Rohzeilen. Der Filter ist der Punkt: weggelegte Zeilen waren bisher
-              nirgends je Konto zu sehen. */}
+              nirgends je Konto zu sehen.
+              Unter einem Zugang erscheinen sie erst NACH der Wahl eines Imports: dort
+              lautet die Frage „was hat dieser Abruf gebracht", und ein Stapel aller Zeilen
+              verdeckt sie, statt sie zu beantworten. */}
+          {zugangId && !laufId ? (
+            <Card>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                {mitWirkung.length + ohneWirkung.length === 0
+                  ? t("konten.herkunft.keineLaeufeZugang")
+                  : t("konten.herkunft.laufWaehlen")}
+              </div>
+            </Card>
+          ) : (
           <Card>
             <div style={{ display: "flex", gap: "var(--sp-2)", marginBottom: "var(--sp-2)", flexWrap: "wrap" }}>
               {(["alle", "verbucht", "weggelegt", "offen"] as const).map((f) => (
@@ -214,6 +288,7 @@ export function HerkunftBereich() {
               />
             )}
           </Card>
+          )}
         </>
       )}
     </div>

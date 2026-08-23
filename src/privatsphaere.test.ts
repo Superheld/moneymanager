@@ -137,24 +137,25 @@ function merkmale(): string[] {
     "Gutschrift", "Retour", "Tanken", "Tankstelle", "Transact", "Urlaub", "Veranstaltung",
     "Verrechnungskonto", "Tagesgeldkonto", "Kreditkarte",
   ]);
-  //
-  // Die Quelle heisst `umsatz_roh` und nicht mehr `umsatz`: der Beleg wurde vom Stand
-  // getrennt. Beim Umbenennen blieb diese Liste stehen — `frage()` gibt fuer eine fehlende
-  // Tabelle still ein leeres Ergebnis zurueck (richtig so, sonst schluckt jede Migration
-  // den Waechter), und damit fielen drei Merkmalsquellen auf einmal weg, ohne dass etwas
-  // rot wurde. Aufgefallen ist es nur, weil eine begruendete Ausnahme ploetzlich ins Leere
-  // griff und der Selbstreinigungstest darauf ansprang.
-  //
-  // Genau davor warnt `src/CLAUDE.md`: zu jeder neuen Tabelle mit Namen oder Betraegen
-  // gehoert eine Zeile hier, im selben Schritt wie die Migration.
+  // Die Importzeilen liegen seit dem Umbau in `umsatz_roh`. Der Name wird ERMITTELT und
+  // nicht angenommen: die echte Datenbank wandert erst beim nächsten App-Start mit, und
+  // ein Wächter, der bis dahin ins Leere fragt, meldet beruhigend nichts — die
+  // gefährlichste Art zu versagen. Verschwinden BEIDE Tabellen, schlägt `frage` an, statt
+  // still durchzuwinken.
+  const umsatzTabelle =
+    frage("SELECT name FROM sqlite_master WHERE type='table' AND name='umsatz_roh'").length > 0
+      ? "umsatz_roh"
+      : "umsatz";
+
   for (const roh of [
-    ...frage("SELECT DISTINCT gegenpartei FROM umsatz_roh WHERE length(gegenpartei) >= 6"),
+    ...frage(`SELECT DISTINCT gegenpartei FROM ${umsatzTabelle} WHERE length(gegenpartei) >= 6`),
     ...frage("SELECT DISTINCT anbieter FROM vertrag WHERE length(anbieter) >= 6"),
-    ...frage("SELECT DISTINCT glaeubiger_id FROM umsatz_roh WHERE glaeubiger_id IS NOT NULL"),
-    ...frage("SELECT DISTINCT mandatsreferenz FROM umsatz_roh WHERE length(mandatsreferenz) >= 8"),
+    ...frage(`SELECT DISTINCT glaeubiger_id FROM ${umsatzTabelle} WHERE glaeubiger_id IS NOT NULL`),
+    ...frage(`SELECT DISTINCT mandatsreferenz FROM ${umsatzTabelle} WHERE length(mandatsreferenz) >= 8`),
     // Beim selben Umbau dazugekommen und nie geprueft: der abweichende Endempfaenger
-    // einer Lastschrift. Ein Name wie jeder andere.
-    ...frage("SELECT DISTINCT endempfaenger FROM umsatz_roh WHERE length(endempfaenger) >= 6"),
+    // einer Lastschrift. Ein Name wie jeder andere — nur steht er in einer Spalte, die
+    // der Waechter noch nicht kannte.
+    ...frage(`SELECT DISTINCT endempfaenger FROM ${umsatzTabelle} WHERE length(endempfaenger) >= 6`),
   ]) {
     const wert = String(roh ?? "").trim();
     if (wert.length < 6 || ALLERWELT.has(wert)) continue;

@@ -107,16 +107,17 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-24 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+25 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
-- **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `umsatz` (Import-Kontext:
-  Empfänger, Verwendungszweck — steht **nicht** an der Buchung) · `zahlungskonto` (mit Typ
+- **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `buchung_journal`
+  (was mit einer Buchung geschah) · `umsatz_roh` +
+  `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ
   UND Klasse, siehe unten) ·
   `kontostand_anker` · `import_lauf` · `dubletten_freigabe`
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` · `vertrag` ·
-  `vertrag_erkennung` · `vertrag_zuordnung` · `zahlungsregel` · `inventargegenstand`
+  `vertrag_erkennung` · `zahlungsregel` · `inventargegenstand`
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
 - **Bank:** `bankzugang` (samt Bankfähigkeitsprofil) · `bankkonto_zuordnung`
 - **Besitzen:** `depot` · `depotwert` (Reihe der Stichtagswerte) · `depotposition` —
@@ -124,7 +125,73 @@ ist sie:
 - **Sonstiges:** `person` · `einstellung`
 
 Gedroppt und nicht wiederzubeleben: `topf`, `szenario`, `szenario_posten` — aufgegangen in
-den Budgets bzw. im Monatsausblick.
+den Budgets bzw. im Monatsausblick. Ebenso `umsatz`, aufgeteilt in die beiden folgenden,
+und `vertrag_zuordnung`, aufgegangen in zwei Spalten der Buchung (siehe unten).
+
+#### Der Beleg und was wir daraus gemacht haben
+
+Eine Importzeile steht in **zwei** Tabellen, und die Grenze dazwischen ist der
+**Lebenszyklus**, nicht die Kardinalität — 1:1 gehörte nach Lehrbuch in eine Tabelle:
+
+- **`umsatz_roh`** — was die Quelle lieferte. Nach dem Anlegen unveränderlich.
+- **`umsatz_verarbeitung`** — was wir daraus gemacht haben: Status, Kontozuordnung,
+  Kategorievorschlag, erzeugte Buchung, Dublettenverdacht. Ändert sich bei jeder Durchsicht.
+
+Nach oben ist es weiterhin EIN `Umsatz`; die Trennung sieht man nur an den Schreibwegen.
+`anlegen` schreibt beides in einer Transaktion, `speichern` nur den Stand, und `ergaenzen`
+ist die einzige Stelle, die Rohdaten überhaupt noch anfasst — und auch dort nur, was fehlt
+(`COALESCE`), nie was schon dasteht.
+
+Zwei Zuordnungen, die man auf der falschen Seite sucht:
+
+- **`zahlungskonto_id` steht beim STAND**, nicht beim Beleg. Die Quelle liefert eine IBAN —
+  das ist Beleg. Welches unserer Konten gemeint ist, ist unsere Zuordnung, und der
+  Verbuchen-Dialog lässt sie ändern. Was der Mensch korrigieren darf, ist kein Beleg.
+- **`lauf_id` steht beim BELEG.** Aus welchem Abruf eine Zeile kam, ändert sich nie.
+
+Die Probe auf die Trennung: „auf den Stand der Quelle zurücksetzen" ist ein `DELETE` auf
+`umsatz_verarbeitung`, und der Beleg merkt nichts davon.
+
+**Zwei Felder liefert nur CAMT**, und beide sind Einordnungen, die die Bank schon
+vorgenommen hat: `zweck_code` (SEPA-Verwendungszweckcode — `SALA`, `RENT`, `LOAN`) und
+`endempfaenger` (wer die Zahlung wirklich bekommt, wenn ein Zahlungsdienstleister
+dazwischensteht). Bei MT940 bleiben sie leer — eine ehrliche Lücke und kein Grund, etwas
+aus dem Verwendungszweck zu raten, das dann aussähe wie eine Angabe der Bank.
+
+Der `endempfaenger` steht **neben** `gegenpartei`, nicht statt dessen: dort bleibt der
+Dienstleister, und über wen gezahlt wurde, ist eine eigene Information. Für die
+Kategorie-Erkennung ist der Unterschied erheblich — der Dienstleister ist bei jedem Händler
+derselbe.
+
+**Zwei Felder des Belegs sind formatabhängig** und tragen je nach Abrufweg Verschiedenes:
+`umsatzart` (MT940 ein kurzes Etikett, CAMT ein Freitext) und `buchungsschluessel` (MT940
+numerisch, CAMT alphabetisch). Sie stehen trotzdem in einer Spalte — deutbar, weil das
+Format am **Lauf** steht und jede Zeile zu genau einem gehört. Wer sie auswertet, allen
+voran die Kategorie-Erkennung, muss über `lauf_id` danach unterscheiden. Eine Abbildung
+zwischen den beiden Vokabularen gibt es nicht; sie liesse sich nur aus der
+DK-Spezifikation gewinnen, und eine geratene wäre schlimmer als keine.
+
+#### Zuordnungen stehen an der Buchung
+
+`kategorie_id` und `vertrag_id` sind **Spalten von `ist_buchung`**, nicht eigene Tabellen.
+Beide Beziehungen sind N:1 (viele Buchungen, eine Kategorie bzw. ein Vertrag), und dafür
+ist eine Fremdschlüsselspalte die Form. Der Lebenszyklus-Grund von oben greift hier nicht:
+keine der beiden ist ein Beleg, und beide ändern sich gleich oft.
+
+Zu jeder gehört eine **Herkunft** (`kategorie_herkunft`, `vertrag_herkunft`), und die
+leistet mehr, als ihr Name sagt. Sie unterscheidet nicht nur Automatik von Handarbeit,
+sondern trägt beim Vertrag auch, was vorher die blosse Existenz einer Zeile trug:
+
+| `vertrag_id` | `vertrag_herkunft` | heisst |
+|---|---|---|
+| leer | leer | noch nie entschieden — die Automatik darf ran |
+| leer | gesetzt | **gehört ausdrücklich zu keinem Vertrag** — Hand, bleibt |
+| gesetzt | — | zugeordnet |
+
+Die mittlere Zeile ist der Grund, warum es die Spalte gibt: ohne sie käme ein von Hand
+korrigierter Fehlgriff der Automatik beim nächsten Abgleich zurück. Wer `vertrag_id`
+zurücksetzt, muss `vertrag_herkunft` mit zurücksetzen — sonst bleibt die Buchung für die
+Automatik gesperrt.
 
 ### Einstieg
 
@@ -136,6 +203,51 @@ den Budgets bzw. im Monatsausblick.
 
 Jede Schicht trägt ihre eigene `CLAUDE.md` — sie lädt, sobald man dort arbeitet. Die
 Übersicht steht unten unter *Die Regeln je Schicht*.
+
+## Wie weit die App den GoBD folgt
+
+Die GoBD gelten für **Buchführungspflichtige**. Diese App führt einen privaten Haushalt und
+ist ihnen **nicht unterworfen** — ihre Grundsätze sind hier trotzdem das richtige Maß, weil
+sie beschreiben, was eine Aufzeichnung glaubwürdig macht. Der Abschnitt steht hier, damit
+niemand später raten muss, was bewusst erfüllt ist und was bewusst nicht.
+
+| Grundsatz | Stand |
+|---|---|
+| **Nachvollziehbarkeit** | Beleg und Buchung sind verbunden (`umsatz_verarbeitung.istbuchung_id`), Änderungen an Buchungen stehen im `buchung_journal` |
+| **Vollständigkeit** | Der Import legt jede Zeile an, auch Verworfenes bleibt sichtbar |
+| **Richtigkeit** | Geld ist Integer Cent, Fremdschlüssel halten das Schema zusammen |
+| **Ordnung** | Ein Ort je Sachverhalt, keine verwaisten Verweise mehr |
+| **Unveränderbarkeit** | **teilweise** — siehe unten |
+| **Aufbewahrung** | lokal, nichts verfällt von selbst |
+| **Verfahrensdokumentation** | diese Datei und die Doku ausserhalb des Repos |
+
+### Was die Unveränderbarkeit heute leistet
+
+**Der Beleg ist geschützt.** `umsatz_roh` wird nach dem Anlegen nicht mehr beschrieben; die
+einzige Ausnahme ist `ergaenzen`, und die trägt nur FEHLENDE Felder nach (`COALESCE`), nie
+vorhandene. Was die Bank geliefert hat, steht unverändert da.
+
+**Änderungen an Buchungen sind protokolliert.** Jedes Anlegen, Ändern und Löschen schreibt
+einen Eintrag ins `buchung_journal` — mit dem ganzen Zustand vorher und nachher, nicht mit
+Unterschieden. Der ursprüngliche Inhalt bleibt damit feststellbar, auch nachdem die Buchung
+gelöscht wurde. Deshalb trägt die Tabelle bewusst **keinen** Fremdschlüssel auf
+`ist_buchung`: sie muss die Löschung überleben.
+
+### Was offen ist, und warum
+
+- **Storno statt Löschen.** Eine gelöschte Buchung verschwindet weiterhin aus dem Ledger;
+  nur ihr letzter Stand bleibt im Journal. Streng genommen verlangen die GoBD, dass sie
+  sichtbar bleibt und durch eine Gegenbuchung aufgehoben wird. Das ist eine
+  Bedienentscheidung, keine technische — und sie ändert, wie sich die App anfühlt.
+- **Wer etwas geändert hat**, wird nicht festgehalten. Bei einem Einzelnutzer ohne Anmeldung
+  gibt es nichts zu unterscheiden; sobald es mehrere Nutzer gibt, fehlt es.
+- **Das Journal ist nicht fälschungssicher.** Wer die Datei öffnet, kann es ändern. Dagegen
+  hülfe nur eine Signaturkette, und die wäre für eine lokale Haushalts-App ein Aufwand ohne
+  Gegenwert — der Angreifer wäre der Nutzer selbst.
+- **Kein Änderungsprotokoll für Stammdaten** (Konten, Kategorien, Verträge, Budgets). Sie
+  beschreiben keine Zahlung; ihre Historie wäre Aufwand ohne Zweck.
+- **`kontostand_anker` und `depotwert` werden nicht protokolliert.** Sie sind Beobachtungen
+  zu einem Stichtag und werden nur ergänzt, nicht geändert.
 
 ## Stadium: Alpha
 
