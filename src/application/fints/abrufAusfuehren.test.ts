@@ -308,8 +308,8 @@ describe("abrufAusfuehren", () => {
     (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
 
     const frisch = f.umsaetze.find((u) => u.id !== "alt");
-    expect(frisch.verdachtAufId).toBe("alt"); // der Verdacht steht dran …
-    expect(frisch.status).toBe("verbucht"); // … hält aber nichts mehr auf
+    // Der Verdacht haelt nichts auf: die Zeile wird ganz normal verbucht.
+    expect(frisch.status).toBe("verbucht");
     expect(f.buchungen).toHaveLength(1);
   });
 

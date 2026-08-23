@@ -279,11 +279,12 @@ describe("Dublettenfinder beim Übernehmen", () => {
       f.deps,
     );
 
+    // Die Zeile wird ANGELEGT und der Verdacht GEZAEHLT — er ist ein Hinweis fuer die
+    // Durchsicht, keine Sperre. An die Zeile geschrieben wird er nicht: alle Anzeigen
+    // rechnen ihn beim Hinsehen, damit er nicht auf dem Stand von damals einfriert.
     expect(ergebnis.neu).toBe(1);
     expect(ergebnis.verdacht).toBe(1);
-    const angelegt = f.umsaetze[f.umsaetze.length - 1];
-    expect(angelegt.verdachtAufId).toBe(f.umsaetze[0].id);
-    expect(angelegt.verdachtGruende?.length).toBeGreaterThan(0);
+    expect(f.umsaetze).toHaveLength(2);
   });
 
   it("lässt eine echt neue Buchung neu sein", async () => {
@@ -301,7 +302,6 @@ describe("Dublettenfinder beim Übernehmen", () => {
 
     expect(ergebnis.neu).toBe(1);
     expect(ergebnis.verdacht).toBe(0);
-    expect(f.umsaetze[f.umsaetze.length - 1].verdachtAufId).toBeUndefined();
   });
 
   it("holt eine verworfene Buchung nicht zurück", async () => {

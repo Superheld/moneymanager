@@ -109,8 +109,6 @@ interface UmsatzZeile {
   vorschlag_charakter: string | null;
   vorschlag_quelle: string | null;
   istbuchung_id: string | null;
-  verdacht_auf_id: string | null;
-  verdacht_gruende: string | null;
 }
 
 function zuUmsatz(z: UmsatzZeile): Umsatz {
@@ -143,8 +141,6 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
         }
       : undefined,
     istbuchungId: z.istbuchung_id ?? undefined,
-    verdachtAufId: z.verdacht_auf_id ?? undefined,
-    verdachtGruende: z.verdacht_gruende ? (JSON.parse(z.verdacht_gruende) as string[]) : undefined,
   };
 }
 
@@ -160,7 +156,7 @@ const SELECT = `SELECT r.id, r.lauf_id, v.zahlungskonto_id, r.buchungstag, r.val
        r.mandatsreferenz, r.e2e_referenz, r.umsatzart, r.buchungsschluessel, r.bank_referenz,
        r.roh_hash, r.native_id,
        v.status, v.vorschlag_kategorie_id, v.vorschlag_charakter, v.vorschlag_quelle,
-       v.istbuchung_id, v.verdacht_auf_id, v.verdacht_gruende
+       v.istbuchung_id
   FROM umsatz_roh r LEFT JOIN umsatz_verarbeitung v ON v.umsatz_id = r.id`;
 
 /**
@@ -202,23 +198,19 @@ function standAnweisung(u: Umsatz, jetzt: string): Anweisung {
   return {
     sql: `INSERT INTO umsatz_verarbeitung
        (umsatz_id, zahlungskonto_id, status, istbuchung_id, vorschlag_kategorie_id,
-        vorschlag_charakter, vorschlag_quelle, verdacht_auf_id, verdacht_gruende, geaendert_am)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+        vorschlag_charakter, vorschlag_quelle, geaendert_am)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT(umsatz_id) DO UPDATE SET
        zahlungskonto_id = excluded.zahlungskonto_id,
        status = excluded.status, istbuchung_id = excluded.istbuchung_id,
        vorschlag_kategorie_id = excluded.vorschlag_kategorie_id,
        vorschlag_charakter = excluded.vorschlag_charakter,
        vorschlag_quelle = excluded.vorschlag_quelle,
-       verdacht_auf_id = excluded.verdacht_auf_id,
-       verdacht_gruende = excluded.verdacht_gruende,
        geaendert_am = excluded.geaendert_am`,
     werte: [
       u.id, u.zahlungskontoId, u.status, u.istbuchungId ?? null,
       u.vorschlag?.kategorieId ?? null, u.vorschlag?.charakter ?? null,
       u.vorschlag?.quelle ?? null,
-      u.verdachtAufId ?? null,
-      u.verdachtGruende ? JSON.stringify(u.verdachtGruende) : null,
       jetzt,
     ],
   };

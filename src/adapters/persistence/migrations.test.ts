@@ -24,20 +24,27 @@ beforeAll(async () => {
  * anderes als die App tut. `-- @wennTabelle x` überspringt ein Statement, wenn `x` fehlt;
  * gebraucht beim Umbau einer Tabelle, deren Quelle im zweiten Durchgang schon weg ist.
  *
- * Die beiden Spaltenprüfungen aus `migrate()` fehlen hier bewusst: sql.js meldet ein
- * doppeltes ADD COLUMN als Fehler, und genau das soll auffallen — jede Migration hält
- * `IF NOT EXISTS` bzw. die Reihenfolge selbst ein.
+ * Ebenso gespiegelt: `ALTER TABLE … DROP COLUMN` wird übersprungen, wenn die Spalte schon
+ * fehlt. Ohne das scheitert jeder zweite Durchgang an „no such column", und der Test
+ * meldete einen Fehler, den die App gar nicht hat.
  */
 function apply(db: Database, from = 0, to = Infinity): void {
   const bedingung = (sql: string) => sql.match(/^\s*--\s*@wennTabelle\s+(\w+)/i)?.[1];
   const hatTabelle = (name: string) =>
     db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${name}'`).length > 0;
+  const abgang = (sql: string) => sql.match(/^\s*ALTER\s+TABLE\s+(\w+)\s+DROP\s+COLUMN\s+(\w+)/i);
+  const hatSpalte = (tabelle: string, spalte: string) => {
+    const r = db.exec(`PRAGMA table_info(${tabelle})`);
+    return r.length > 0 && r[0].values.some((z) => String(z[1]) === spalte);
+  };
 
   for (const m of MIGRATIONS) {
     if (m.version > from && m.version <= to) {
       for (const sql of m.sql) {
         const noetig = bedingung(sql);
         if (noetig && !hatTabelle(noetig)) continue;
+        const weg = abgang(sql);
+        if (weg && !hatSpalte(weg[1], weg[2])) continue;
         db.run(sql);
       }
     }
@@ -525,6 +532,89 @@ describe("Migration 44 — Beleg und Verarbeitung trennen", () => {
     db.run("DELETE FROM umsatz_roh WHERE id='u1'");
 
     expect(db.exec("SELECT COUNT(*) FROM umsatz_verarbeitung")[0].values).toEqual([[0]]);
+    db.close();
+  });
+});
+
+
+describe("Migration 45 — der tote Verdacht faellt, die Freigabe wird abgesichert", () => {
+  function vorbereitet() {
+    const db = new SQL.Database();
+    apply(db, 0, 44);
+    db.run("INSERT INTO import_lauf (id, quelle, zeitpunkt) VALUES ('l1','fints','2026-08-11T09:00:00.000Z')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('giro','Girokonto','Giro','[]')");
+    for (const id of ["u1", "u2"]) {
+      db.run(
+        `INSERT INTO umsatz_roh (id, lauf_id, buchungstag, betrag, waehrung, gegenpartei,
+           verwendungszweck, roh_hash) VALUES (?, 'l1', '2026-08-11', -5700, 'EUR', 'Kesselmann', 'Rechnung', ?)`,
+        [id, `h-${id}`],
+      );
+      db.run(
+        `INSERT INTO umsatz_verarbeitung (umsatz_id, zahlungskonto_id, status, geaendert_am)
+         VALUES (?, 'giro', 'neu', '2026-08-11T09:00:00.000Z')`,
+        [id],
+      );
+    }
+    return db;
+  }
+
+  it("nimmt die Verdachtsspalten weg", () => {
+    const db = vorbereitet();
+    apply(db, 44, 45);
+    expect(spalten(db, "umsatz_verarbeitung")).not.toContain("verdacht_auf_id");
+    expect(spalten(db, "umsatz_verarbeitung")).not.toContain("verdacht_gruende");
+    db.close();
+  });
+
+  /**
+   * Die FREIGABE bleibt, und zwar mit Inhalt: „diese beiden sind nicht dasselbe" ist eine
+   * Entscheidung des Menschen und aus den Daten nicht wiederherstellbar. Wer sie beim
+   * Umbau der Tabelle verliert, bekommt morgen dieselbe Mahnung wieder.
+   */
+  it("rettet vorhandene Freigaben in die neue Tabelle", () => {
+    const db = vorbereitet();
+    db.run("INSERT INTO dubletten_freigabe (umsatz_a, umsatz_b, angelegt) VALUES ('u1','u2','2026-08-12T00:00:00.000Z')");
+
+    apply(db, 44, 45);
+
+    expect(db.exec("SELECT umsatz_a, umsatz_b FROM dubletten_freigabe")[0].values)
+      .toEqual([["u1", "u2"]]);
+    db.close();
+  });
+
+  it("laesst eine verwaiste Freigabe zurueck, statt am Fremdschluessel zu scheitern", () => {
+    const db = vorbereitet();
+    db.run("INSERT INTO dubletten_freigabe (umsatz_a, umsatz_b, angelegt) VALUES ('u1','weg','2026-08-12T00:00:00.000Z')");
+
+    expect(() => apply(db, 44, 45)).not.toThrow();
+    expect(db.exec("SELECT COUNT(*) FROM dubletten_freigabe")[0].values).toEqual([[0]]);
+    db.close();
+  });
+
+  /**
+   * Der Grund fuer den ganzen Tabellenumbau: bisher blieb ein Freigabe-Paar nach dem
+   * Loeschen einer Zeile stehen und griff beim naechsten Import nicht mehr, weil die neue
+   * Zeile eine neue ID hat. Jetzt raeumt der Fremdschluessel mit auf.
+   */
+  it("raeumt die Freigabe mit weg, wenn ein Beleg geloescht wird", () => {
+    const db = vorbereitet();
+    db.run("INSERT INTO dubletten_freigabe (umsatz_a, umsatz_b, angelegt) VALUES ('u1','u2','2026-08-12T00:00:00.000Z')");
+    apply(db, 44, 45);
+
+    db.run("PRAGMA foreign_keys = ON");
+    db.run("DELETE FROM umsatz_roh WHERE id='u1'");
+
+    expect(db.exec("SELECT COUNT(*) FROM dubletten_freigabe")[0].values).toEqual([[0]]);
+    db.close();
+  });
+
+  it("laeuft ein zweites Mal folgenlos durch", () => {
+    const db = vorbereitet();
+    db.run("INSERT INTO dubletten_freigabe (umsatz_a, umsatz_b, angelegt) VALUES ('u1','u2','2026-08-12T00:00:00.000Z')");
+    apply(db, 44, 45);
+    const vorher = db.exec("SELECT umsatz_a, umsatz_b FROM dubletten_freigabe")[0].values;
+    expect(() => apply(db, 44, 45)).not.toThrow();
+    expect(db.exec("SELECT umsatz_a, umsatz_b FROM dubletten_freigabe")[0].values).toEqual(vorher);
     db.close();
   });
 });
