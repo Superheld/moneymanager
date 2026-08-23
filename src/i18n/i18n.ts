@@ -656,8 +656,6 @@ const de = {
         "dort das gemeldete Bankkonto auf `mit vorhandenem verknüpfen` stellen.",
     },
     herkunft: {
-      register: "Herkunft",
-      untertitel: "Was hereinkam — jede eingelesene Zeile, auch die weggelegten",
       laeufeTitel: "Eingelesen wurde",
       keineLaeufe: "Für dieses Konto wurde noch nie etwas eingelesen.",
       laufZeile: "{{zeilen}} Zeilen · {{verbucht}} gebucht · {{weggelegt}} weggelegt",
@@ -2078,8 +2076,6 @@ const en: typeof de = {
         "bank account to “link to existing”.",
     },
     herkunft: {
-      register: "Origin",
-      untertitel: "What came in — every imported row, including the ones set aside",
       laeufeTitel: "Imported on",
       keineLaeufe: "Nothing has ever been imported for this account.",
       laufZeile: "{{zeilen}} rows · {{verbucht}} booked · {{weggelegt}} set aside",

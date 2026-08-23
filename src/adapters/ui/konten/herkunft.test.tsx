@@ -63,7 +63,7 @@ async function bestand() {
 describe("Herkunft je Konto", () => {
   it("zeigt weggelegte Zeilen, die sonst nirgends sichtbar sind", async () => {
     await bestand();
-    rendere(<HerkunftBereich />);
+    rendere(<HerkunftBereich kontoId="k1" />);
 
     await waitFor(() => {
       const text = document.body.textContent ?? "";
@@ -75,7 +75,7 @@ describe("Herkunft je Konto", () => {
   it("filtert auf die weggelegten", async () => {
     await bestand();
     const nutzer = userEvent.setup();
-    rendere(<HerkunftBereich />);
+    rendere(<HerkunftBereich kontoId="k1" />);
 
     await nutzer.click(await screen.findByRole("button", { name: /^weggelegt$/i }));
 
@@ -94,7 +94,7 @@ describe("Herkunft je Konto", () => {
   it("holt eine weggelegte Zeile zurück in den Stapel", async () => {
     await bestand();
     const nutzer = userEvent.setup();
-    rendere(<HerkunftBereich />);
+    rendere(<HerkunftBereich kontoId="k1" />);
 
     await nutzer.click(await screen.findByRole("button", { name: /^weggelegt$/i }));
     await nutzer.click(await screen.findByRole("button", { name: /zurückholen/i }));

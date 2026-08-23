@@ -31,7 +31,7 @@ Zuordnung zur Komponente in `App.tsx`:
 
 | Bereich | Komponente | worum es geht |
 |---|---|---|
-| Konten verwalten | `KontenVerwaltungScreen` | Konten anlegen, Bankzugänge (`BankzugaengeScreen`) |
+| Konten verwalten | `KontenVerwaltungScreen` | Konten anlegen, Abgleich, Bankzugänge (`BankzugaengeScreen`) |
 | Import | `ImportScreen` | Dateiimport → Inbox (`ReviewScreen`) → verbuchen |
 | Training | `TrainingBereich` | die Karten der Kategorie-Erkennung (`KategorisierungCards`) |
 | Einstellungen | `EinstellungenScreen` | Stammdaten und Voreinstellungen |
