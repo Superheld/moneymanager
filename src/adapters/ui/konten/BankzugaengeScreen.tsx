@@ -22,8 +22,9 @@ import type {
   Kontozuordnung,
   TanHerausforderung,
 } from "../../../application";
-import { fintsAbruf, fintsEinsatzbereit } from "../../fints";
+import { fintsEinsatzbereit } from "../../fints";
 import {
+  abrufAdapterFuer,
   bankzugaenge,
   bankzugangLoeschen,
   bankzugangSpeichern,
@@ -96,7 +97,9 @@ export function BankzugaengeScreen() {
     setBusy(true);
     setFehler(null);
     try {
-      const sitzung = await fintsAbruf.anmelden(zugang, geheim, frageTan);
+      // Welcher Weg: steht am Zugang. Fest verdrahtetes FinTS pruefte hier sonst einen
+      // Zugang, der gar nicht darueber laeuft — und meldete einen Fehler der falschen Bank.
+      const sitzung = await abrufAdapterFuer(zugang.art).anmelden(zugang, geheim, frageTan);
       // Das Profil geht mit — es ist aus denselben Parametern abgeleitet und wäre sonst
       // genau dann veraltet, wenn sich etwas geändert hat.
       await bankzugangSpeichern({
