@@ -112,7 +112,7 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
               überzogen, obwohl damals niemand etwas überzogen hat. */}
           {monat.ohnePlan ? (
             <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
-              <span className="muted">{t("budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(monat.verbraucht) })}</span>
+              <span className="muted">{t(monat.verbraucht < 0 ? "budgets.verlaufOhnePlanZurueck" : "budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(Math.abs(monat.verbraucht)) })}</span>
             </span>
           ) : (
             <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>

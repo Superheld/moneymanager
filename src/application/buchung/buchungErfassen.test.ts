@@ -201,7 +201,8 @@ describe("Die Richtung kommt beim Import vom Beleg", () => {
   /**
    * Bei einer VON HAND erfassten Buchung bleibt es beim alten Weg: dort tippt man eine
    * Betragshoehe und sagt, was es ist — das Vorzeichen ist die Folge der Einordnung, weil
-   * es keinen Beleg gibt, der es besser wuesste.
+   * es keinen Beleg gibt, der es besser wuesste. Solange nichts anderes gesagt wird:
+   * `gegenrichtung` ist genau dieses andere (siehe unten).
    */
   it("laesst den Charakter bei einer Handbuchung weiter das Vorzeichen bestimmen", async () => {
     const ledger = memLedger();
@@ -214,5 +215,69 @@ describe("Die Richtung kommt beim Import vom Beleg", () => {
     });
 
     expect(u.betrag).toBe(euroZuCent(20));
+  });
+});
+
+/**
+ * Der Rueckfluss — ein Zufluss, der in eine AUFWANDSkategorie gehoert.
+ *
+ * Entschieden: Rueckfluesse gehoeren immer in die Kategorie der Ausgabe. Eine Erstattung
+ * fuer Kleidung entlastet dort das Budget; unter „Einnahmen" gebucht taete sie das nie.
+ * Damit faellt die Richtung mit der Einordnung auseinander, und die Eingabe braucht ein
+ * eigenes Wort dafuer — vorher liess sich so ein Fall von Hand gar nicht erfassen.
+ */
+describe("Gegenrichtung von Hand", () => {
+  it("bucht einen Aufwand als ZUFLUSS, wenn die Gegenrichtung gesetzt ist", async () => {
+    const ledger = memLedger();
+    const b = await buchungErfassen(ledger, {
+      kontoId: "giro", datum: "2026-04-08", betrag: euroZuCent(34.9),
+      charakter: "Aufwand", gegenrichtung: true, kategorieId: "kat-kleidung",
+    });
+
+    expect(b.betrag).toBe(euroZuCent(34.9));
+    // Die Einordnung bleibt, was sie ist — sie sagt WOFUER das Geld war.
+    expect(b.charakter).toBe("Aufwand");
+    expect(b.kategorieId).toBe("kat-kleidung");
+  });
+
+  it("bucht einen Ertrag als ABFLUSS, wenn die Gegenrichtung gesetzt ist", async () => {
+    const ledger = memLedger();
+    const b = await buchungErfassen(ledger, {
+      kontoId: "giro", datum: "2026-04-08", betrag: euroZuCent(212),
+      charakter: "Ertrag", gegenrichtung: true,
+    });
+
+    expect(b.betrag).toBe(euroZuCent(-212));
+  });
+
+  it("dreht auch beim Bearbeiten einer Handbuchung", async () => {
+    const ledger = memLedger();
+    const vonHand: IstBuchung = {
+      id: "b7", datum: "2026-04-08", betrag: euroZuCent(-34.9), kontoId: "giro",
+      charakter: "Aufwand", quelle: "manuell",
+    };
+    const u = await buchungBearbeiten(ledger, vonHand, {
+      datum: "2026-04-08", betrag: euroZuCent(34.9), charakter: "Aufwand", gegenrichtung: true,
+    });
+
+    expect(u.betrag).toBe(euroZuCent(34.9));
+  });
+
+  /**
+   * Und sie kommt gegen einen BELEG nicht an. Beim Import ist die Richtung eine Tatsache
+   * der Bank; eine Angabe aus der Maske darf sie nicht umdrehen — sonst stuende in der
+   * App etwas anderes als auf dem Kontoauszug.
+   */
+  it("laesst eine importierte Buchung unberuehrt", async () => {
+    const ledger = memLedger();
+    const ausDemBeleg: IstBuchung = {
+      id: "i7", datum: "2026-04-08", betrag: euroZuCent(-34.9), kontoId: "giro",
+      charakter: "Aufwand", quelle: "import", rohHash: "h7",
+    };
+    const u = await buchungBearbeiten(ledger, ausDemBeleg, {
+      datum: "2026-04-08", betrag: euroZuCent(34.9), charakter: "Aufwand", gegenrichtung: true,
+    });
+
+    expect(u.betrag).toBe(euroZuCent(-34.9));
   });
 });

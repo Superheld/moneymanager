@@ -21,10 +21,25 @@ export interface ZahlungsregelEingabe {
   kategorieId?: string;
 }
 
-/** Ertrag fließt zu (+), Aufwand und Umschichtung fließen ab (−). */
-export function vorzeichenbehaftet(betrag: Cent, charakter: Charakter): number {
+/**
+ * Ertrag fließt zu (+), Aufwand und Umschichtung fließen ab (−) — und `gegenrichtung`
+ * dreht das um.
+ *
+ * Ohne den dritten Parameter leitet diese Funktion die RICHTUNG aus der EINORDNUNG ab,
+ * und das geht nur so lange gut, wie beide dasselbe sagen. Eine Erstattung ist der Fall,
+ * wo sie auseinanderfallen: sie gehört in die Kategorie der Ausgabe (also Aufwand), aber
+ * das Geld kam herein. Wer sie von Hand erfasste, bekam bis hier zwangsläufig einen
+ * Abfluss — die Höhe liess sich eingeben, die Richtung nicht.
+ *
+ * Beim Import stellt sich die Frage nicht: dort ist das Vorzeichen eine Tatsache vom
+ * Beleg und wird nie abgeleitet (siehe `buchungBearbeiten`). Für eine PLANGRÖSSE
+ * (Zahlungsregel, Vertragsrate) genügt die Ableitung weiterhin — eine geplante Rate hat
+ * genau eine Richtung, sonst wäre sie keine.
+ */
+export function vorzeichenbehaftet(betrag: Cent, charakter: Charakter, gegenrichtung = false): number {
   const cent = Math.abs(betrag);
-  return charakter === "Ertrag" ? cent : -cent;
+  const fliesstZu = charakter === "Ertrag";
+  return fliesstZu !== gegenrichtung ? cent : -cent;
 }
 
 export async function zahlungsregelAnlegen(

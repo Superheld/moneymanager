@@ -2,6 +2,18 @@
 // Jede Gruppe hat einen Default-Charakter; einzelne Kinder können ihn überschreiben
 // (z. B. „Sparen & Anlegen" = Umschichtung in der ansonsten Aufwand-Gruppe Finanzen).
 // Einnahmen = Ertrag, Vorsorge/Sparen = Umschichtung, sonst Aufwand.
+//
+// KEINE Kategorie für Erstattungen, und das ist Absicht. Ein Rückfluss gehört in die
+// Kategorie der AUSGABE: eine Erstattung für Kleidung entlastet das Kleidungsbudget.
+// Unter „Einnahmen" gebucht täte sie das nie — sie blähte stattdessen die Einnahmen auf,
+// und derselbe Vorgang stünde je nach Einsortierung für zwei völlig verschiedene
+// Aussagen. Es braucht dafür auch nichts: der Charakter sagt WOFÜR das Geld war, das
+// Vorzeichen sagt, wohin es floss, und eine Erstattung ist damit ein Aufwand mit
+// positivem Betrag (CLAUDE.md → „Die Richtung kommt vom Beleg").
+//
+// Das gilt auch, wenn die ursprüngliche Ausgabe gar nicht im Bestand steht: eine
+// Steuerrückerstattung gehört zu „Steuern", eine Kautionsrückzahlung zu „Wohnen".
+// Migration v60 räumt die alte Kategorie weg, sofern sie leer geblieben ist.
 
 import type { Charakter, Kategorie } from "../../core";
 import type { KategorieRepository } from "../ports";
@@ -17,7 +29,7 @@ interface Gruppe {
 }
 
 export const STANDARDKATEGORIEN: Gruppe[] = [
-  { name: "Einnahmen", charakter: "Ertrag", kinder: ["Gehalt", "Nebeneinkünfte", "Kapitalerträge", "Kindergeld", "Erstattungen", "Sonstige Einnahmen"] },
+  { name: "Einnahmen", charakter: "Ertrag", kinder: ["Gehalt", "Nebeneinkünfte", "Kapitalerträge", "Kindergeld", "Sonstige Einnahmen"] },
   { name: "Wohnen", charakter: "Aufwand", kinder: ["Miete / Rate", "Nebenkosten", "Strom & Gas", "Internet & Telefon", "Rundfunkbeitrag", "Instandhaltung", "Einrichtung & Geräte"] },
   { name: "Lebenshaltung", charakter: "Aufwand", kinder: ["Lebensmittel", "Auswärts essen", "Lieferservice", "Drogerie", "Haushalt", "Genussmittel"] },
   { name: "Mobilität", charakter: "Aufwand", kinder: ["ÖPNV & Tickets", "Sprit & Laden", "Kfz (Steuer & Wartung)", "Fahrrad"] },

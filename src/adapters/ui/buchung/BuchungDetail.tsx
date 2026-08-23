@@ -327,6 +327,20 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
   const startBetrag = buchung?.betrag ?? entwurf?.betrag;
   const [betrag, setBetrag] = useState(startBetrag == null ? "" : String(minorZuMajor(Math.abs(startBetrag), geld.waehrung)));
   const [charakter, setCharakter] = useState<Charakter>(buchung?.charakter ?? entwurf?.vorschlag?.charakter ?? "Aufwand");
+  /**
+   * Floss das Geld ENTGEGEN dem, was die Kategorie erwarten lässt? Eine Erstattung
+   * gehört in die Kategorie der Ausgabe — dort entlastet sie das Budget —, und trotzdem
+   * kam Geld herein. Ohne diese Frage liesse sich das von Hand nicht erfassen: das
+   * Betragsfeld nimmt nur die Höhe, und die Richtung käme sonst allein aus dem Charakter.
+   *
+   * Der Startwert wird aus dem VORZEICHEN der bestehenden Buchung zurückgelesen, nicht
+   * gespeichert. Ein eigenes Feld dafür wäre eine zweite Wahrheit neben dem Betrag, und
+   * die beiden liefen beim ersten Import auseinander.
+   */
+  const [gegenrichtung, setGegenrichtung] = useState(() => {
+    if (buchung == null || buchung.charakter === "Umschichtung") return false;
+    return buchung.charakter === "Ertrag" ? buchung.betrag < 0 : buchung.betrag > 0;
+  });
   const [kategorieId, setKategorieId] = useState(buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
 
   /**
@@ -374,6 +388,8 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
    */
   const kontoIstOnline = !istNeu && onlineKonten.has(kontoId);
   const istUmschichtung = charakter === "Umschichtung";
+  // Die Richtung ist nur dort eine Frage, wo sie noch offen ist — siehe Kommentar am Feld.
+  const richtungWaehlbar = !istUmschichtung && !istEntwurf && !kontoIstOnline && !gepaart && buchung?.quelle !== "import";
   /**
    * Konten, auf denen ein Gegenbein ERZEUGT werden darf.
    *
@@ -499,11 +515,11 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
           await vertragZuordnenVonHand(neueBuchung.id, vertragWahl === "__keiner" ? null : vertragWahl);
         }
       } else if (!buchung) {
-        await buchungErfassen({ kontoId, datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz });
+        await buchungErfassen({ kontoId, datum, betrag: geld.parse(betrag) ?? 0, charakter, gegenrichtung, kategorieId: kategorieId || undefined, notiz });
       } else if (gepaart) {
         await umbuchungsBeinBearbeiten(buchung, { datum, notiz });
       } else {
-        await buchungBearbeiten(buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, kategorieId: kategorieId || undefined, notiz, kontoId });
+        await buchungBearbeiten(buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, gegenrichtung, kategorieId: kategorieId || undefined, notiz, kontoId });
         // Zieht das Konto um, zieht der Umsatz mit: sein `zahlungskontoId` ist das
         // Ergebnis des Konto-Matches beim Import, also eine Vermutung. Wer die Buchung
         // vor sich hat, korrigiert damit genau diese Vermutung — bliebe der Umsatz
@@ -651,6 +667,30 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         >
           <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf || kontoIstOnline} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
+        {/* Die Richtung — nur dort, wo sie überhaupt eine Frage ist.
+            Nicht beim Entwurf und nicht auf einem online geführten Konto: dort ist das
+            Vorzeichen eine Tatsache vom Beleg, und `buchungBearbeiten` behält es auch.
+            Nicht bei einer Umbuchung: die Richtung hängt am Gegenbein.
+            Ein Kästchen und keine zwei Knöpfe, weil der eine Fall der Normalfall ist. */}
+        {richtungWaehlbar && (
+          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: "var(--fs-sm)", padding: "2px 0 6px" }}>
+            <input
+              type="checkbox"
+              aria-label={t(charakter === "Ertrag" ? "konten.buchung.gegenrichtungErtrag" : "konten.buchung.gegenrichtungAufwand")}
+              checked={gegenrichtung}
+              onChange={(e) => setGegenrichtung(e.target.checked)}
+              style={{ marginTop: 3 }}
+            />
+            <span>
+              {t(charakter === "Ertrag" ? "konten.buchung.gegenrichtungErtrag" : "konten.buchung.gegenrichtungAufwand")}
+              {gegenrichtung && (
+                <span className="muted" style={{ display: "block", fontSize: "var(--fs-xs)" }}>
+                  {t("konten.buchung.gegenrichtungHinweis")}
+                </span>
+              )}
+            </span>
+          </label>
+        )}
         {/* Die Bezeichnung gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt
             den Verwendungszweck der Bank, und der steht unter „Herkunft".
 
