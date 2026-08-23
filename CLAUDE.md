@@ -107,11 +107,12 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-24 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+25 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
-- **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `umsatz_roh` +
+- **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `buchung_journal`
+  (was mit einer Buchung geschah) · `umsatz_roh` +
   `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ
   UND Klasse, siehe unten) ·
   `kontostand_anker` · `import_lauf` · `dubletten_freigabe`
@@ -191,6 +192,51 @@ Automatik gesperrt.
 
 Jede Schicht trägt ihre eigene `CLAUDE.md` — sie lädt, sobald man dort arbeitet. Die
 Übersicht steht unten unter *Die Regeln je Schicht*.
+
+## Wie weit die App den GoBD folgt
+
+Die GoBD gelten für **Buchführungspflichtige**. Diese App führt einen privaten Haushalt und
+ist ihnen **nicht unterworfen** — ihre Grundsätze sind hier trotzdem das richtige Maß, weil
+sie beschreiben, was eine Aufzeichnung glaubwürdig macht. Der Abschnitt steht hier, damit
+niemand später raten muss, was bewusst erfüllt ist und was bewusst nicht.
+
+| Grundsatz | Stand |
+|---|---|
+| **Nachvollziehbarkeit** | Beleg und Buchung sind verbunden (`umsatz_verarbeitung.istbuchung_id`), Änderungen an Buchungen stehen im `buchung_journal` |
+| **Vollständigkeit** | Der Import legt jede Zeile an, auch Verworfenes bleibt sichtbar |
+| **Richtigkeit** | Geld ist Integer Cent, Fremdschlüssel halten das Schema zusammen |
+| **Ordnung** | Ein Ort je Sachverhalt, keine verwaisten Verweise mehr |
+| **Unveränderbarkeit** | **teilweise** — siehe unten |
+| **Aufbewahrung** | lokal, nichts verfällt von selbst |
+| **Verfahrensdokumentation** | diese Datei und die Doku ausserhalb des Repos |
+
+### Was die Unveränderbarkeit heute leistet
+
+**Der Beleg ist geschützt.** `umsatz_roh` wird nach dem Anlegen nicht mehr beschrieben; die
+einzige Ausnahme ist `ergaenzen`, und die trägt nur FEHLENDE Felder nach (`COALESCE`), nie
+vorhandene. Was die Bank geliefert hat, steht unverändert da.
+
+**Änderungen an Buchungen sind protokolliert.** Jedes Anlegen, Ändern und Löschen schreibt
+einen Eintrag ins `buchung_journal` — mit dem ganzen Zustand vorher und nachher, nicht mit
+Unterschieden. Der ursprüngliche Inhalt bleibt damit feststellbar, auch nachdem die Buchung
+gelöscht wurde. Deshalb trägt die Tabelle bewusst **keinen** Fremdschlüssel auf
+`ist_buchung`: sie muss die Löschung überleben.
+
+### Was offen ist, und warum
+
+- **Storno statt Löschen.** Eine gelöschte Buchung verschwindet weiterhin aus dem Ledger;
+  nur ihr letzter Stand bleibt im Journal. Streng genommen verlangen die GoBD, dass sie
+  sichtbar bleibt und durch eine Gegenbuchung aufgehoben wird. Das ist eine
+  Bedienentscheidung, keine technische — und sie ändert, wie sich die App anfühlt.
+- **Wer etwas geändert hat**, wird nicht festgehalten. Bei einem Einzelnutzer ohne Anmeldung
+  gibt es nichts zu unterscheiden; sobald es mehrere Nutzer gibt, fehlt es.
+- **Das Journal ist nicht fälschungssicher.** Wer die Datei öffnet, kann es ändern. Dagegen
+  hülfe nur eine Signaturkette, und die wäre für eine lokale Haushalts-App ein Aufwand ohne
+  Gegenwert — der Angreifer wäre der Nutzer selbst.
+- **Kein Änderungsprotokoll für Stammdaten** (Konten, Kategorien, Verträge, Budgets). Sie
+  beschreiben keine Zahlung; ihre Historie wäre Aufwand ohne Zweck.
+- **`kontostand_anker` und `depotwert` werden nicht protokolliert.** Sie sind Beobachtungen
+  zu einem Stichtag und werden nur ergänzt, nicht geändert.
 
 ## Stadium: Alpha
 

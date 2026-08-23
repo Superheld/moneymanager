@@ -90,5 +90,19 @@ Redundanz: zwei Wahrheiten über dieselbe 1:1-Beziehung, die auseinanderlaufen k
 verbuchte Buchung deduppen. Deshalb steht er da, und deshalb ist er seit v46 indiziert —
 die Abfrage lief vorher als Scan über das ganze Ledger, bei jedem Import.
 
+**Jede Änderung am Ledger schreibt ins `buchung_journal`** — Anlegen, Ändern, Löschen, je
+mit dem ganzen Zustand vorher und nachher. Zwei Dinge daran sind Absicht und sehen von
+aussen wie Fehler aus:
+
+- **Kein Fremdschlüssel** auf `ist_buchung`. Das Journal muss die Löschung überleben, sonst
+  protokolliert es genau den Fall nicht, für den es da ist.
+- **JSON mit sortierten Schlüsseln** (`alsText`). Ohne das Sortieren schlägt der Vergleich
+  „hat sich etwas geändert" bei jedem Speichern an, weil `SELECT *` die Spalten in
+  Tabellenreihenfolge liefert und ein Objektliteral in seiner eigenen. Gemessen.
+
+Buchung und Aufteilungen werden **in einer Transaktion** geschrieben. Vorher waren es
+einzelne Statements: brach es dazwischen ab, stand die Buchung ohne ihre Teile da, und
+Σ Teile ≠ Betrag — eine Invariante, die der Kern voraussetzt.
+
 **Repositories werden in Tests nicht ersetzt.** Sie laufen gegen echte In-Memory-SQLite
 (sql.js), damit ein falsches Spalten-Mapping im Test auffällt und nicht erst in der App.
