@@ -209,9 +209,48 @@ function heute(): string {
  * Angereichert wird nur ganz aussen, nach der Fallunterscheidung: `code` muss vorher
  * unangetastet bleiben, sonst greift die Freigabe-Erkennung nicht mehr.
  */
+/**
+ * Die bankeigenen Fehlercodes.
+ *
+ * Diese Bank antwortet auf eine abgelehnte Anmeldung NICHT mit den OAuth-Codes
+ * (`invalid_grant`, `invalid_client`), auf die die Bibliothek prüft, sondern mit einem
+ * eigenen `error_code`. Ohne diese Tabelle sieht ein falsches Passwort deshalb genauso
+ * aus wie ein Transportfehler: „Die Bank antwortete mit 400" — und der Nutzer sucht an
+ * der falschen Stelle.
+ *
+ * Die Zuordnung stammt aus dem Frontend ihrer eigenen Weboberfläche, das dieselben Codes
+ * auf Meldungen abbildet. `HBSCA500` steht dort NICHT — es ist ein interner Fehler ihres
+ * Bestätigungsdienstes und bleibt deshalb ohne eigene Übersetzung.
+ */
+const BANKCODES: Readonly<Record<string, string>> = {
+  HBAUTH400: "Anmeldekennung oder Passwort stimmen nicht.",
+  HBAUTH401: "Anmeldekennung oder Passwort stimmen nicht.",
+  HBAUTH412: "Der Zugang ist gesperrt. Das lässt sich nur bei der Bank selbst klären.",
+  HBAUTH423: "Der Zugang ist gesperrt. Das lässt sich nur bei der Bank selbst klären.",
+  HBSCA400: "Die Bestätigung wurde abgelehnt.",
+  HBSCA422: "Die eingegebene Bestätigung war nicht gültig.",
+  HBSCA423: "Der Zugang ist gesperrt. Das lässt sich nur bei der Bank selbst klären.",
+};
+
+/**
+ * Was die Bank gesagt hat, verständlich machen.
+ *
+ * Zuerst der bankeigene Code, dann — wenn keiner passt — wenigstens der Antworttext. Die
+ * Bibliothek legt ihn gekürzt ab, ihre eigene Meldung nennt nur den Status, und „400"
+ * allein ist die unbrauchbarste Sorte Fehlermeldung: sie sagt, dass etwas nicht ging, und
+ * verschweigt als Einziges das, was weiterhülfe.
+ *
+ * Angereichert wird nur ganz aussen, nach der Fallunterscheidung: `code` muss vorher
+ * unangetastet bleiben, sonst greift die Freigabe-Erkennung nicht mehr.
+ */
 function mitBankantwort(e: unknown): unknown {
   const f = e as { message?: unknown; details?: unknown };
   if (typeof f?.message !== "string" || typeof f?.details !== "string" || !f.details) return e;
+
+  const code = f.details.match(/"error_code"\s*:\s*"([^"]+)"/)?.[1];
+  const klartext = code ? BANKCODES[code] : undefined;
+  if (klartext) return new Error(klartext, { cause: e });
+
   return new Error(`${f.message} — Antwort der Bank: ${f.details}`, { cause: e });
 }
 

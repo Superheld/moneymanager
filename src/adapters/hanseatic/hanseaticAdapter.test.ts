@@ -124,6 +124,37 @@ describe("anmelden", () => {
       .rejects.toThrow(/invalid_request/);
   });
 
+  // Diese Bank antwortet auf ein falsches Passwort NICHT mit den OAuth-Codes, auf die die
+  // Bibliothek prueft, sondern mit einem eigenen. Ohne Uebersetzung sieht ein Tippfehler
+  // deshalb aus wie ein Transportproblem — und man sucht an der falschen Stelle.
+  it("nennt falsche Zugangsdaten beim Namen, statt den Status zu melden", async () => {
+    const { fabrik } = attrappe({
+      async login() {
+        throw Object.assign(new Error("Die Bank antwortete mit 400 auf /token"), {
+          code: "http",
+          status: 400,
+          details: '{"error_code":"HBAUTH401"}',
+        });
+      },
+    });
+    await expect(hanseaticAdapter(fabrik).anmelden(ZUGANG, "falsch", async () => undefined))
+      .rejects.toThrow(/Anmeldekennung oder Passwort/);
+  });
+
+  it("erkennt einen gesperrten Zugang", async () => {
+    const { fabrik } = attrappe({
+      async login() {
+        throw Object.assign(new Error("Die Bank antwortete mit 400 auf /token"), {
+          code: "http",
+          status: 400,
+          details: '{"error_code":"HBAUTH423"}',
+        });
+      },
+    });
+    await expect(hanseaticAdapter(fabrik).anmelden(ZUGANG, "geheim", async () => undefined))
+      .rejects.toThrow(/gesperrt/);
+  });
+
   it("laesst einen Fehler ohne Antworttext unveraendert", async () => {
     const { fabrik } = attrappe({
       async login() {

@@ -259,9 +259,16 @@ async function uebernahmeIntern(
     vorschlag: vorschlagFuer(k.roh, kontext, k.zahlungskontoId),
   }));
 
-  // 7. Persistieren: Ergänzungen, neue Umsätze, Lauf-Protokoll.
-  for (const u of zuErgaenzen) await umsatzRepo.ergaenzen(u);
-  await umsatzRepo.anlegenViele(umsaetze);
+  // 7. Persistieren: Lauf-Protokoll, Ergänzungen, neue Umsätze.
+  //
+  // Der LAUF ZUERST. Jede neue Zeile verweist über `lauf_id` auf ihn, und seit das Schema
+  // Fremdschlüssel trägt, ist die Reihenfolge keine Geschmacksfrage mehr: andersherum
+  // zeigen die Zeilen auf einen Lauf, den es noch nicht gibt, und die ganze Übernahme
+  // scheitert mit „FOREIGN KEY constraint failed".
+  //
+  // Dass es vorher gutging, lag an der Testumgebung: sql.js prüft Fremdschlüssel nicht,
+  // die App tut es. Ein grüner Test war hier also nie eine Aussage über diesen Fall —
+  // aufgefallen ist es erst beim ersten echten Abruf nach der Schema-Umstellung.
   await laufRepo.speichern({
     id: laufId,
     quelle: eingabe.quelle,
@@ -273,6 +280,8 @@ async function uebernahmeIntern(
     duplikate: duplikate.length + (kandidaten.length - gefunden.length),
     ...eingabe.herkunft,
   });
+  for (const u of zuErgaenzen) await umsatzRepo.ergaenzen(u);
+  await umsatzRepo.anlegenViele(umsaetze);
 
   return {
     laufId,
