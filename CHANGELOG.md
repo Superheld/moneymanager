@@ -3,6 +3,92 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.19.0] — 2026-08-24
+
+Die Runde, in der ein Budget eine Geschichte bekommt: was in einem bestimmten Monat galt,
+was darin abfloss — und wie sich der Rahmen über die Zeit verändert hat.
+
+### Hinzugefügt
+
+**Der Verlauf je Budget.** Ein Klick auf eine Zeile der Budgetliste klappt daneben eine
+Karte auf: zwölf Monate als Balken, je Monat hell, was verfügbar war, und massiv, was davon
+abfloss. Ein Klick auf einen Balken — oder die Monatsauswahl darüber — zeigt darunter die
+Buchungen genau dieses Monats. Die Karte liegt NEBEN der Liste, nicht darin; die Liste
+steckt schon in einer.
+
+Dahinter steht `core/budgets/budgetverlauf` mit `budgetFortschreibung`, `budgetMonatsstand`
+und `verlaufsfenster`. Das ist keine zweite Rechnung neben `budgetStand`, sondern dessen
+Zerlegung:
+
+    verfuegbar − verbrauchtImMonat
+      = (rahmenKumuliert − verbrauchtBisher) − (verbrauchtKumuliert − verbrauchtBisher)
+      = rest
+
+Der Rest bleibt also überall derselbe; was sich ändert, sind die beiden Zahlen daneben.
+Genau das ist festgehalten — Monat für Monat, für beide Budgetarten, bei einem Start mitten
+im Monat, bei einem Fenster, das erst mitten in der Historie beginnt, und über einen Wechsel
+des Betrags hinweg.
+
+**Monate vor der ersten Planung stehen trotzdem im Verlauf**, ohne Rahmen und ausdrücklich
+als „kein Budget in diesem Monat". Was ausgegeben wurde, ist eine Tatsache; ohne Rahmen ist
+es aber keine Überziehung und wird auch nicht als eine gezeichnet. Nur das aufbauende Budget
+bleibt an seinem Start begrenzt — sein Verbrauch davor zählt auch für `budgetStand` nicht.
+
+**`-- @wennSpalte x.y`** als Marker für Migrationen, eine Ebene unter `@wennTabelle`: das
+Statement läuft nur, solange es die Spalte gibt. Ohne ihn scheitert der zweite Lauf einer
+Migration, die eine später gedroppte Spalte liest, schon am Parser — SQLite prüft
+Spaltennamen beim Parsen und nicht erst beim Ausführen.
+
+### Geändert
+
+**Der Betrag eines Budgets ist eine Reihe, kein Wert.** Bisher stand er als Spalte am
+Budget, und wer ihn anhob, schrieb damit die Vergangenheit um: rückwirkend war jeder Monat
+mit dem neuen Rahmen geplant, und wogegen damals gemessen wurde, war nicht mehr feststellbar.
+Bei einem aufbauenden Budget rechnete es zusätzlich den ganzen Sockel neu, weil dessen
+Rahmen Rate × Monate war.
+
+`budget_betrag` hält jetzt je Budget die Beträge mit dem Monat, ab dem sie gelten. MONAT und
+nicht Datum: ein Budget ist eine Monatsgrösse, ein Wechsel mitten im Monat müsste anteilig
+gerechnet werden, und dafür gibt es keinen fachlichen Grund. Versioniert wird nur der
+BETRAG — Art, Konto und Kategorie bleiben Eigenschaften des Budgets.
+
+Der Kern fragt überall `betragImMonat` statt eines Feldes; vor der ersten Version ist der
+Rahmen 0 und nicht der erste Betrag, denn da war nichts geplant. `budgetRahmen` summiert
+beim Aufbauenden entsprechend über die Monate, statt zu multiplizieren.
+
+Gespeichert wird ab dem laufenden Monat. Korrigieren und Rückdatieren gehen über die
+Versionsliste im Dialog: jede Version einzeln änderbar und löschbar, nur die letzte nicht —
+ein Budget ohne Betrag wäre eine Kategorie mit einem Etikett.
+
+**Der Monat statt der Summe seit Start.** Ein aufbauendes Budget zeigte „Rest von Rahmen",
+und der Rahmen war die Rate mal die Monate seit Start: der Betrag, der hineingegangen wäre,
+hätte man nie etwas ausgegeben. Er wächst jeden Monat weiter und sagt über den laufenden
+nichts. An seiner Stelle steht die Fortschreibung — Übertrag aus dem Vormonat, Rate dieses
+Monats, Verbrauch dieses Monats. Das gilt in der Budgetliste („verfügbar", „verbraucht")
+ebenso wie in der aufgeklappten Buchungsliste der Übersicht: zwei Zeitbegriffe in einer
+Zeile wären genau der Widerspruch, an dem die Budgetrechnung hier schon einmal gescheitert
+ist.
+
+**Ein Wechsel des Rahmens ist im Verlauf zu sehen.** Der helle Balken springt am
+Wechselmonat von selbst; dazu kommen eine Marke an der Stelle und der vorherige Betrag in
+der Monatszeile, sonst liest sich die Stufe wie ein Rechenfehler.
+
+**Die ganze Zeile öffnet den Verlauf**, nicht nur der Name. Die Spalte ist breiter als das
+Wort, und ein Klick daneben ging ins Leere; der Name bleibt als sichtbarer Hinweis, dass es
+die Geste gibt. Beim Aufklappen wird die Karte herangeholt — sie steht unter der ganzen
+Liste, und mit Vorschlägen, Erklärtext und Kennzahlen darüber lag sie ausserhalb des
+Sichtbaren.
+
+**`BudgetPostenliste` und `BudgetFortschreibung` liegen in `bausteine/`**, weil sie jetzt
+zwei Bereiche bedienen.
+
+### Schema
+
+- **neu `budget_betrag`** (`budget_id`, `ab_monat`, `betrag`) — die Reihe der Beträge je
+  Budget, Fremdschlüssel mit CASCADE. Die Migration übernimmt den bisherigen Wert als erste
+  Version, gültig ab dem Startmonat des Budgets.
+- **entfällt `budget.betrag_pro_monat`** — aufgegangen in der Reihe.
+
 ## [0.18.0] — 2026-08-23
 
 Die Runde, in der das Schema aufgeräumt wird — und in der die App anfängt, sich zu merken,
