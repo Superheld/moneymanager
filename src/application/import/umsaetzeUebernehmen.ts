@@ -255,8 +255,6 @@ async function uebernahmeIntern(
     nativeId: k.nativeId,
     status: "neu",
     vorschlag: vorschlagFuer(k.roh, kontext, k.zahlungskontoId),
-    verdachtAufId: verdacht.get(k)?.auf.id,
-    verdachtGruende: verdacht.get(k)?.gruende,
   }));
 
   // 7. Persistieren: Ergänzungen, neue Umsätze, Lauf-Protokoll.

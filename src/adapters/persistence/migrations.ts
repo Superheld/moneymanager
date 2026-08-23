@@ -1009,4 +1009,43 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_buchung ON umsatz_verarbeitung (istbuchung_id) WHERE istbuchung_id IS NOT NULL`,
     ],
   },
+  {
+    version: 45, // Der gespeicherte Dublettenverdacht war tot — und widersprach dem gerechneten
+    sql: [
+      // WARUM DAS WEGFÄLLT UND NICHTS AN SEINE STELLE TRITT. Der Import schrieb an jede
+      // Zeile, worauf sie vermutlich zeigt. Gelesen hat das nie jemand: sämtliche
+      // Dublettenanzeigen rechnen beim HINSEHEN (`ledgerVerdacht`, `entwurfVerdacht`,
+      // `stapelVerdacht` in `dublettensicht.ts`), und der Kopfkommentar dort begründet
+      // auch, warum — ein beim Import angeschriebener Verdacht gilt für den Stand von
+      // damals, und was später aus einer anderen Quelle dazukam, würde ihn nie
+      // korrigieren.
+      //
+      // Zwei Wahrheiten über dieselbe Frage, von denen eine niemand liest und die andere
+      // recht hat: da ist Wegnehmen die Antwort und keine neue Tabelle.
+      `ALTER TABLE umsatz_verarbeitung DROP COLUMN verdacht_auf_id`,
+      `ALTER TABLE umsatz_verarbeitung DROP COLUMN verdacht_gruende`,
+
+      // Die FREIGABE bleibt: „diese beiden sind nicht dasselbe" ist eine Entscheidung des
+      // Menschen und aus den Daten nicht wiederherstellbar. Sie bekommt nur endlich
+      // Fremdschlüssel — bisher blieben verwaiste Paare nach einem Löschen stehen und
+      // griffen beim nächsten Import nicht mehr, weil die neue Zeile eine neue ID hat.
+      // Am Bestand geprüft: es gibt keine verwaisten Paare, die Constraints halten.
+      `CREATE TABLE IF NOT EXISTS dubletten_freigabe_neu (
+         umsatz_a TEXT NOT NULL REFERENCES umsatz_roh(id) ON DELETE CASCADE,
+         umsatz_b TEXT NOT NULL REFERENCES umsatz_roh(id) ON DELETE CASCADE,
+         angelegt TEXT NOT NULL,
+         PRIMARY KEY (umsatz_a, umsatz_b)
+       )`,
+      `-- @wennTabelle dubletten_freigabe
+       INSERT OR IGNORE INTO dubletten_freigabe_neu (umsatz_a, umsatz_b, angelegt)
+       SELECT f.umsatz_a, f.umsatz_b, f.angelegt FROM dubletten_freigabe f
+       WHERE f.umsatz_a IN (SELECT id FROM umsatz_roh)
+         AND f.umsatz_b IN (SELECT id FROM umsatz_roh)`,
+      `DROP TABLE IF EXISTS dubletten_freigabe`,
+      // Beim zweiten Durchgang ist die Zwischentabelle schon umbenannt — ohne die
+      // Bedingung scheiterte das RENAME an „no such table".
+      `-- @wennTabelle dubletten_freigabe_neu
+       ALTER TABLE dubletten_freigabe_neu RENAME TO dubletten_freigabe`,
+    ],
+  },
 ];
