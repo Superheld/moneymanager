@@ -57,6 +57,17 @@ async function stammdatenBasis() {
   });
 }
 
+
+/**
+ * Ein Monat relativ zum laufenden, als „YYYY-MM". Die Screens lesen die Uhr selbst; ein
+ * fester Monat im Test wäre nach dem nächsten Monatswechsel eine andere Aussage.
+ */
+function monatVersetzt(n: number): string {
+  const jetzt = new Date();
+  const d = new Date(jetzt.getFullYear(), jetzt.getMonth() + n, 1);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
 describe("BudgetsScreen", () => {
   it("zeigt im Leerzustand keine leeren Kennzahlen", async () => {
     rendere(<BudgetsScreen />);
@@ -292,5 +303,105 @@ describe("BudgetsScreen — Vorschläge", () => {
     rendere(<BudgetsScreen />);
     expect(await screen.findByText("Freizeit")).toBeInTheDocument();
     expect(screen.queryByText("Lebenshaltung")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Der Verlauf — zwölf Monate als Balken, darunter die Buchungen des gewählten Monats.
+ *
+ * Der zweite Test hier ist der fachlich wichtige: ein aufbauendes Budget zeigt in der
+ * Liste die Zahlen DIESES Monats, nicht die Summe seit Start. Vorher stand dort der
+ * Betrag, der hineingegangen wäre, hätte man nie etwas ausgegeben.
+ */
+describe("BudgetsScreen · Verlauf", () => {
+  /** Ein aufbauendes Budget, das vor drei Monaten angefangen hat, mit einer Ausgabe. */
+  async function aufbauendMitHistorie() {
+    await stammdatenBasis();
+    await sqliteKategorieRepository.speichern({ id: "kat2", name: "Urlaubskasse", defaultCharakter: "Aufwand" });
+    await sqliteBudgetRepository.speichern({
+      id: "b2", kategorieId: "kat2", kontoId: "k2", betragProMonat: 10000,
+      art: "aufbauend", start: `${monatVersetzt(-2)}-01`,
+    });
+    // Im Vormonat 30,00 ausgegeben: Übertrag 200,00 − 30,00 = 170,00 kommen hier an,
+    // plus die Rate dieses Monats ergibt 270,00 verfügbar.
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: `${monatVersetzt(-1)}-05`, betrag: -3000, kontoId: "k2",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat2", notiz: "Fährticket",
+    });
+  }
+
+  it("zeigt beim aufbauenden Budget die Zahlen DIESES Monats, nicht die Summe seit Start", async () => {
+    await aufbauendMitHistorie();
+    rendere(<BudgetsScreen />);
+    await screen.findByText(/Urlaubskasse/);
+
+    // 170,00 Übertrag + 100,00 Rate = 270,00 verfügbar, davon in diesem Monat nichts weg.
+    await waitFor(() => expect(document.body.textContent).toMatch(/270,00/));
+    // Der kumulierte Rahmen (3 × 100,00) steht nirgends mehr als Anzeigewert.
+    expect(document.body.textContent).not.toMatch(/300,00/);
+  });
+
+  it("klappt über den Namen den Verlauf auf und zeigt die Buchungen des gewählten Monats", async () => {
+    await aufbauendMitHistorie();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+
+    const link = await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ });
+    await nutzer.click(link);
+
+    await screen.findByText(/Verlauf · Urlaubskasse/);
+    // Vorbelegt ist der laufende Monat — dort ist nichts gebucht.
+    await waitFor(() => expect(document.body.textContent).toMatch(/nichts gebucht/));
+
+    // Den Vormonat wählen: jetzt steht die Buchung da, die ihn belastet hat.
+    const auswahl = await screen.findByLabelText("Monat");
+    await nutzer.selectOptions(auswahl, monatVersetzt(-1));
+    await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
+  });
+
+  it("hält die Verlaufskarte NEBEN der Liste, nicht darin", async () => {
+    await aufbauendMitHistorie();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+
+    const link = await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ });
+    await nutzer.click(link);
+    await screen.findByText(/Verlauf · Urlaubskasse/);
+
+    // Karten erkennt man an ihrer Fläche, nicht an einer Klasse — wie in
+    // `kartenschachtelung.test.tsx`.
+    const karten = [...document.querySelectorAll<HTMLElement>("div")].filter((d) =>
+      d.getAttribute("style")?.includes("var(--surface)"),
+    );
+    expect(karten.filter((k) => karten.some((a) => a !== k && a.contains(k)))).toHaveLength(0);
+  });
+
+  it("sagt es, wenn ein aufbauendes Budget erst später anfängt zu sammeln", async () => {
+    await stammdatenBasis();
+    await sqliteKategorieRepository.speichern({ id: "kat3", name: "Rennrad", defaultCharakter: "Aufwand" });
+    await sqliteBudgetRepository.speichern({
+      id: "b3", kategorieId: "kat3", kontoId: "k2", betragProMonat: 10000,
+      art: "aufbauend", start: `${monatVersetzt(2)}-01`,
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+    await nutzer.click(await screen.findByRole("button", { name: /Rennrad — Verlauf/ }));
+
+    // Leere Balken für Monate vor dem Start zeigten Ausgaben, die das Budget nie
+    // belastet haben — hier steht stattdessen, warum nichts da ist.
+    await waitFor(() => expect(document.body.textContent).toMatch(/fängt erst später an/));
+  });
+
+  it("schliesst den Verlauf beim zweiten Klick auf denselben Namen wieder", async () => {
+    await aufbauendMitHistorie();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+
+    const link = await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ });
+    await nutzer.click(link);
+    await screen.findByText(/Verlauf · Urlaubskasse/);
+    await nutzer.click(link);
+    await waitFor(() => expect(screen.queryByText(/Verlauf · Urlaubskasse/)).toBeNull());
   });
 });

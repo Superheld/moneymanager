@@ -11,6 +11,13 @@
 // Die Kennzahlen stehen als eigene Reihe ÜBER den Karten, nicht darin — wie auf der
 // Übersicht. In der Karte konkurrierten sie mit der Tabelle um dieselbe Fläche.
 //
+// **Die Zahlen der Liste gelten für den laufenden MONAT, auch beim Aufbauenden.** Vorher
+// standen dort Rahmen und Verbrauch kumuliert („seit Start"), und dieselbe Zeile trug
+// damit zwei Zeitbegriffe nebeneinander: eine Spalte über Jahre, die daneben über den
+// Monat. Der Rest ändert sich dadurch nicht — `verfügbar − verbraucht` ist in beiden
+// Lesarten derselbe Betrag (Herleitung in `core/budgets/budgetverlauf`). Was sich ändert,
+// ist, dass die Zahlen daneben etwas über DIESEN Monat sagen.
+//
 // PILOT für ADR-0004: alle sichtbaren Strings über t()/<Trans>, alles Geld über useGeld().
 
 import { useEffect, useMemo, useState } from "react";
@@ -25,6 +32,8 @@ import {
 } from "../../../application";
 import { budgetAnlegen as budgetSpeichern, budgetbereich, budgetLoeschen, vorschlagIgnorieren } from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "../bausteine";
+import { BudgetVerlauf } from "./BudgetVerlauf";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { PageHead } from "../bausteine/PageHead";
@@ -49,6 +58,11 @@ export function BudgetsScreen() {
   const heute = useMemo(heuteIso, []);
 
   const [bereich, setBereich] = useState<Budgetbereich | null>(null);
+  /**
+   * Welches Budget seinen Verlauf zeigt — höchstens eines. Zwei aufgeklappte Charts
+   * untereinander schöben die Liste aus dem Bild, von der man ausgegangen ist.
+   */
+  const [offenesBudget, setOffenesBudget] = useState<string | null>(null);
 
   // Anlege-/Bearbeiten-Dialog
   const [offen, setOffen] = useState(false);
@@ -81,6 +95,8 @@ export function BudgetsScreen() {
   const konten = bereich?.konten ?? [];
   const vorschlaege = bereich?.vorschlaege ?? [];
   const kontoName = bereich?.kontoNamen ?? LEERE_NAMEN;
+  /** Die Zeile, deren Verlauf offen ist — sie kann nach einem Löschen weg sein. */
+  const offenesZeile = zeilen.find((z) => z.budget.id === offenesBudget);
 
   /**
    * Die Kennzahlen zählen nur die EFFEKTIVEN Beträge — sonst stünde ein eingebettetes
@@ -90,8 +106,8 @@ export function BudgetsScreen() {
     let proMonat = 0, rahmen = 0, verbraucht = 0;
     for (const z of zeilen) {
       proMonat += z.proMonat;
-      rahmen += z.rahmen;
-      verbraucht += z.verbraucht;
+      rahmen += z.monat.verfuegbar;
+      verbraucht += z.monat.verbraucht;
     }
     return {
       proMonat,
@@ -265,10 +281,19 @@ export function BudgetsScreen() {
                   render: (z: Budgetstand) => (
                     // Einrückung statt eigener Spalte: die Verschachtelung ist eine
                     // Eigenschaft der Kategorie, keine zweite Information daneben.
+                    // Der Verlauf hängt am Bezeichner, nicht an der ganzen Zeile: eine
+                    // klickbare Zeile sieht man einer Tabelle nicht an (siehe
+                    // `bausteine/Zeilenlink`), und die Zeile trägt daneben schon zwei
+                    // Aktionen, die etwas anderes tun.
                     <span style={{ paddingLeft: z.tiefe * 18, display: "inline-flex", alignItems: "center", gap: 6 }}>
                       {z.tiefe > 0 && <span style={{ color: "var(--ink-3)" }}>└</span>}
                       <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)" }}>
-                        {z.kategorieName}
+                        <Zeilenlink
+                          titel={t("budgets.verlaufOeffnen", { name: z.kategorieName })}
+                          onKlick={() => setOffenesBudget((cur) => (cur === z.budget.id ? null : z.budget.id))}
+                        >
+                          {z.kategorieName}
+                        </Zeilenlink>
                       </span>
                     </span>
                   ),
@@ -297,19 +322,35 @@ export function BudgetsScreen() {
                   ),
                 },
                 {
-                  // Bei „aufbauend" das bisher Angesammelte, bei „monatlich" der
-                  // Monatsbetrag — dieselbe Spalte, weil es dieselbe Frage ist:
-                  // wieviel steht zur Verfügung?
+                  // Was in DIESEM Monat zur Verfügung steht: beim Monatlichen der
+                  // Monatsbetrag, beim Aufbauenden der Übertrag plus die Rate. Der Titel
+                  // legt die Aufrechnung offen, statt sie erraten zu lassen.
                   key: "rahmen",
                   label: `${t("budgets.spalteRahmen")} ${geld.symbol}`,
                   align: "right",
-                  render: (z: Budgetstand) => geld.format(z.rahmen),
+                  sortValue: (z: Budgetstand) => z.monat.verfuegbar,
+                  render: (z: Budgetstand) => (
+                    <span
+                      title={
+                        z.budget.art === "aufbauend"
+                          ? t("budgets.verfuegbarHinweis", {
+                              uebertrag: geld.formatMitSymbol(z.monat.uebertrag),
+                              zufuehrung: geld.formatMitSymbol(z.monat.zufuehrung),
+                              gesamt: geld.formatMitSymbol(z.rahmen),
+                            })
+                          : undefined
+                      }
+                    >
+                      {geld.format(z.monat.verfuegbar)}
+                    </span>
+                  ),
                 },
                 {
                   key: "verbraucht",
                   label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`,
                   align: "right",
-                  render: (z: Budgetstand) => geld.format(z.verbraucht),
+                  sortValue: (z: Budgetstand) => z.monat.verbraucht,
+                  render: (z: Budgetstand) => geld.format(z.monat.verbraucht),
                 },
                 {
                   key: "rest",
@@ -325,7 +366,7 @@ export function BudgetsScreen() {
                   sortable: false,
                   render: (z: Budgetstand) => (
                     <span style={{ display: "block", minWidth: 90 }}>
-                      <CoverageTrack value={Math.max(0, z.verbraucht)} max={Math.max(1, z.rahmen)} over={z.rest < 0} label="" right="" />
+                      <CoverageTrack value={Math.max(0, z.monat.verbraucht)} max={Math.max(1, z.monat.verfuegbar)} over={z.rest < 0} label="" right="" />
                     </span>
                   ),
                 },
@@ -343,6 +384,7 @@ export function BudgetsScreen() {
                 },
               ]}
               rows={[...zeilen]}
+              istAktiv={(z: Budgetstand) => z.budget.id === offenesBudget}
             />
             {zeilen.some((z) => z.proMonat !== z.budget.betragProMonat) && (
               <div className="muted" style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-2)" }}>
@@ -352,6 +394,22 @@ export function BudgetsScreen() {
           </>
         )}
       </Card>
+
+      {/* Der Verlauf NEBEN der Liste, nicht darin: die Liste steckt schon in einer Karte,
+          und eine zweite darin wären zwei Rahmen um dieselbe Sache. Der `key` sorgt dafür,
+          dass beim Wechsel auf ein anderes Budget die Monatsauswahl neu anfängt statt auf
+          einem Index zu stehen, den die kürzere Reihe womöglich gar nicht hat. */}
+      {bereich && offenesZeile && (
+        <BudgetVerlauf
+          key={offenesZeile.budget.id}
+          sicht={bereich.sicht}
+          stand={offenesZeile}
+          heute={heute}
+          kategorieNamen={bereich.kategorieNamen}
+          empfaenger={bereich.empfaenger}
+          onSchliessen={() => setOffenesBudget(null)}
+        />
+      )}
 
       {offen && (
         <Modal

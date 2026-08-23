@@ -19,11 +19,15 @@
 
 import {
   budgetBuchungen,
+  budgetFortschreibung,
+  budgetMonatsstand,
   budgetStand,
   effektiverMonatsbetrag,
   elternBudget,
   verbrauchsFenster,
+  verlaufsfenster,
   type Budget,
+  type Budgetmonat,
   type BudgetSicht,
   type Budgetvorschlag,
   type Cent,
@@ -62,12 +66,25 @@ export interface Budgetstand {
    * Planung, den man sehen soll.
    */
   readonly proMonat: Cent;
+  /**
+   * Rahmen und Verbrauch KUMULIERT — bei `aufbauend` also alles seit dem Start.
+   *
+   * Sie stehen hier als Beleg, nicht als Anzeigewert: `rest` ist ihre Differenz, und die
+   * Fortschreibung in `monat` muss auf denselben Rest kommen. Was eine Zeile ZEIGT, kommt
+   * aus `monat` — „140 von 200" sagte einem aufbauenden Budget nur, wieviel hineingegangen
+   * wäre, hätte man nie etwas ausgegeben.
+   */
   readonly rahmen: Cent;
   readonly verbraucht: Cent;
   readonly rest: Cent;
   /** Das Fenster, über das `verbraucht` zählt (monatlich vs. aufbauend). */
   readonly von: string;
   readonly bis: string;
+  /**
+   * Derselbe Stand als Aufrechnung DIESES Monats: Übertrag + Zuführung − Verbrauch = Rest.
+   * `monat.rest === rest`, immer — siehe `core/budgets/budgetverlauf`.
+   */
+  readonly monat: Budgetmonat;
 }
 
 export interface Budgetuebersicht {
@@ -138,6 +155,7 @@ export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
         proMonat: effektiverMonatsbetrag(b, budgets, kategorien),
         ...budgetStand(sicht, b, am),
         ...verbrauchsFenster(b, am),
+        monat: budgetMonatsstand(sicht, b, am),
       });
       gehe(b.id, tiefe + 1);
     }
@@ -146,12 +164,48 @@ export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
   return raus;
 }
 
-/** Die Einzelposten hinter dem Verbrauch EINES Budgets — für die aufgeklappte Zeile. */
+/**
+ * Die Einzelposten hinter dem Verbrauch EINES Budgets im gezeigten Monat.
+ *
+ * Bewusst der MONAT und nicht das kumulierte Fenster: darüber steht die Aufrechnung
+ * dieses Monats, und eine Liste, die bei einem aufbauenden Budget alles seit dem Start
+ * zeigte, summierte sich auf eine andere Zahl als die Zeile darüber. Wer die früheren
+ * Monate sehen will, wählt sie — in der Übersicht über den Monatsumschalter, unter
+ * Budgets über den Verlauf.
+ */
 export function budgetPostenZu(
   sicht: BudgetSicht,
   stand: Budgetstand,
 ): readonly Verbrauchsposten[] {
-  return budgetBuchungen(sicht, stand.budget, stand.von, stand.bis);
+  return budgetPostenImMonat(sicht, stand.budget, stand.monat);
+}
+
+/** Dieselbe Auswahl für einen beliebigen Monat des Verlaufs. */
+export function budgetPostenImMonat(
+  sicht: BudgetSicht,
+  budget: Budget,
+  monat: Budgetmonat,
+): readonly Verbrauchsposten[] {
+  return budgetBuchungen(sicht, budget, monat.von, monat.bis);
+}
+
+/**
+ * Der Verlauf eines Budgets: die letzten `anzahl` Monate bis einschließlich des Monats
+ * von `am`, jeder als Aufrechnung.
+ *
+ * Rein und ohne Ladevorgang — der Bereich hat seine Sicht schon, und ein Nachladen je
+ * aufgeklappter Zeile rechnete gegen einen womöglich anderen Bestand als die Zeile selbst.
+ * Kürzer als `anzahl` wird die Reihe, wenn ein aufbauendes Budget später angefangen hat;
+ * ein Balken vor seinem Start zeigte Ausgaben, die es nie belastet haben.
+ */
+export function budgetVerlauf(
+  sicht: BudgetSicht,
+  budget: Budget,
+  am: string,
+  anzahl = 12,
+): Budgetmonat[] {
+  const { vonMonat, bisMonat } = verlaufsfenster(am, anzahl);
+  return budgetFortschreibung(sicht, budget, vonMonat, bisMonat);
 }
 
 
@@ -171,6 +225,10 @@ export interface Budgetbereich extends Budgetuebersicht {
   /** Für die Konto-Spalte und die Kontoauswahl im Dialog. */
   readonly konten: readonly Zahlungskonto[];
   readonly kontoNamen: ReadonlyMap<string, string>;
+  /** Kategorie-ID → Name, für die Einzelposten eines aufgeklappten Monats. */
+  readonly kategorieNamen: ReadonlyMap<string, string>;
+  /** Buchungs-ID → Empfänger aus dem Import. Steht am Umsatz, nicht an der Buchung. */
+  readonly empfaenger: ReadonlyMap<string, string>;
   /** Rahmenvorschläge für Hauptkategorien ohne Budget. */
   readonly vorschlaege: readonly Budgetvorschlag[];
 }
@@ -179,10 +237,11 @@ export async function budgetbereichLaden(
   deps: BudgetbereichDeps,
   heute: string,
 ): Promise<Budgetbereich> {
-  const [uebersicht, konten, ignoriert] = await Promise.all([
+  const [uebersicht, konten, ignoriert, umsaetze] = await Promise.all([
     budgetuebersichtLaden(deps, heute),
     deps.kontoRepo.alle(),
     ignorierteBudgetvorschlaege(deps.einstellungenRepo),
+    deps.umsatzRepo.alle(),
   ]);
   const vorschlaege = await budgetvorschlaegeLaden(
     deps.ledger, deps.umsatzRepo, deps.kategorieRepo, deps.budgetRepo,
@@ -193,6 +252,12 @@ export async function budgetbereichLaden(
     kategorien: uebersicht.sicht.kategorien,
     konten,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
+    kategorieNamen: new Map(uebersicht.sicht.kategorien.map((k: Kategorie) => [k.id, k.name])),
+    empfaenger: new Map(
+      umsaetze
+        .filter((u) => u.istbuchungId && u.gegenpartei)
+        .map((u) => [u.istbuchungId!, u.gegenpartei!]),
+    ),
     vorschlaege,
   };
 }

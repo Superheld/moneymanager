@@ -84,6 +84,8 @@ export {
   budgetuebersichtLaden,
   budgetstaende,
   budgetPostenZu,
+  budgetPostenImMonat,
+  budgetVerlauf,
   vertragsBuchungenLaden,
   type Budgetstand,
   type Budgetuebersicht,

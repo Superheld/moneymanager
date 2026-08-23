@@ -232,6 +232,56 @@ describe("UebersichtScreen", () => {
     // Vormonat: 400,00 − 300,00 = 100,00.
     await waitFor(() => expect(document.body.textContent).toMatch(/100,00/));
   });
+
+  /**
+   * Der Punkt, um den es beim Aufbauenden geht: dort stand vorher „x von 300" — der
+   * Betrag, der hineingegangen wäre, hätte man nie etwas ausgegeben. Er wächst jeden
+   * Monat weiter und sagt über den laufenden nichts. An seiner Stelle steht jetzt die
+   * Aufrechnung dieses Monats.
+   */
+  it("zeigt beim aufbauenden Budget die Fortschreibung statt der Summe seit Start", async () => {
+    await grunddaten();
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 10000,
+      art: "aufbauend", start: `${monat(2)}-01`,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: `${monat(1)}-05`, betrag: -3000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+
+    rendere(<UebersichtScreen />);
+    await screen.findByText(/Lebensmittel/);
+    // Übertrag 170,00 + Rate 100,00, in diesem Monat nichts weg → Rest 270,00.
+    await waitFor(() => expect(document.body.textContent).toMatch(/Übertrag 170,00/));
+    expect(document.body.textContent).toMatch(/270,00/);
+    // Der kumulierte Rahmen (3 × 100,00) steht nicht mehr als Anzeigewert daneben.
+    expect(document.body.textContent).not.toMatch(/von 300,00/);
+  });
+
+  it("zeigt beim aufgeklappten Budget die Buchungen DIESES Monats, nicht alle seit Start", async () => {
+    await grunddaten();
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 10000,
+      art: "aufbauend", start: `${monat(2)}-01`,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "alt", datum: `${monat(1)}-05`, betrag: -3000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Fährticket",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "neu", datum: `${monat(0)}-05`, betrag: -2000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Zeltplatz",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<UebersichtScreen />);
+    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel — Buchungen zeigen/ }));
+
+    await waitFor(() => expect(document.body.textContent).toMatch(/Zeltplatz/));
+    // Sonst summierte sich die Liste auf eine andere Zahl als die Zeile darüber.
+    expect(document.body.textContent).not.toMatch(/Fährticket/);
+  });
 });
 
 describe("AnalyseScreen", () => {
