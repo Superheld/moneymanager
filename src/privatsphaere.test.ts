@@ -191,6 +191,54 @@ function versionierteDateien(): string[] {
  */
 const FREMDE_BESTAENDE = ["public/bankenliste.json"];
 
+/**
+ * Begründete Einzelausnahmen — für Werte, die im Repo stehen MÜSSEN.
+ *
+ * Es gibt sie: sobald das Repo irgendwo spezifisch wird, kann ein Wort unvermeidlich
+ * werden, das auch im eigenen Bestand steht. Ein Institutsname ist der Regelfall — er
+ * benennt kein Konto und keinen Betrag, steht aber als Gegenpartei in den Umsätzen, und
+ * wer die Anbindung an genau dieses Institut baut, kann ihn nicht umgehen. Für Institute
+ * aus der DK-Liste erledigt das der `bankNamen`-Filter oben; für alle anderen gab es
+ * bisher keinen Weg.
+ *
+ * Ohne einen solchen Weg bliebe der Wächter dauerhaft rot — und ein dauerhaft roter
+ * Wächter wird mit `--no-verify` umgangen. Danach prüft er GAR nichts mehr. Diese Liste
+ * ist der schmale Ausweg, der ihn am Leben hält, und sie ist absichtlich unbequem.
+ *
+ * Drei Dinge halten sie schmal, alle drei ausführbar geprüft:
+ *
+ *  • **Ein Grund ist Pflicht.** Kein Feld zum Leerlassen — ein Eintrag ohne tragende
+ *    Begründung lässt den Test fehlschlagen. Wer den Grund nicht formulieren kann, hat
+ *    keine Ausnahme, sondern ein Leck.
+ *  • **Sie gilt nur, wo sie muss.** `nurIn` nennt die Pfade; global gibt es nicht.
+ *    Derselbe Wert in einem Screen-Test schlägt weiterhin an.
+ *  • **Sie stirbt, wenn sie nichts mehr tut.** Eine Ausnahme, die nirgends mehr greift,
+ *    lässt den Test fehlschlagen — dasselbe Prinzip wie die ALTLAST in
+ *    `architektur.test.ts`. Sonst sammelt sich hier über Jahre eine Liste blinder
+ *    Flecken, die niemand mehr nachprüft.
+ */
+interface Ausnahme {
+  /** Der Wert, der trotz Vorkommen im echten Bestand im Repo stehen darf. */
+  readonly wert: string;
+  /** Pfad-Präfixe, für die die Freigabe gilt. Nie leer — es gibt keine globale Ausnahme. */
+  readonly nurIn: readonly string[];
+  /** Warum das kein Bestandsdatum ist. Ein Satz, der vor dem nächsten Leser trägt. */
+  readonly grund: string;
+}
+
+const AUSNAHMEN: readonly Ausnahme[] = [];
+
+/** Ist dieser Fund an dieser Stelle bewusst freigegeben? */
+function freigegeben(
+  datei: string,
+  wert: string,
+  liste: readonly Ausnahme[] = AUSNAHMEN,
+): boolean {
+  return liste.some(
+    (a) => a.wert === wert && a.nurIn.length > 0 && a.nurIn.some((p) => datei.startsWith(p)),
+  );
+}
+
 /** Inhalt aller versionierten Textdateien — einmal gelesen, dann durchsucht. */
 function textbestand(): { datei: string; inhalt: string }[] {
   return versionierteDateien().flatMap((datei) => {
@@ -221,7 +269,7 @@ describe("Daten aus dem echten Bestand", () => {
         const trifft = /^[\d.,]+$/.test(wert)
           ? new RegExp(`(^|[^\\d])${wert.replace(/[.]/g, "\\.")}([^\\d]|$)`).test(inhalt)
           : inhalt.includes(wert);
-        if (trifft) funde.push(`${datei}: „${wert}"`);
+        if (trifft && !freigegeben(datei, wert)) funde.push(`${datei}: „${wert}"`);
       }
     }
 
@@ -266,6 +314,59 @@ describe("Daten aus dem echten Bestand", () => {
       funde,
       `IBANs mit der Bankleitzahl einer ECHTEN Bank:\n  ${[...new Set(funde)].join("\n  ")}\n` +
         "Nimm eine BLZ, die es nicht gibt (999999xx), und rechne die Prüfziffer neu.",
+    ).toEqual([]);
+  });
+});
+
+describe("Begründete Ausnahmen", () => {
+  it("tragen alle einen Geltungsbereich und einen Grund", () => {
+    for (const a of AUSNAHMEN) {
+      expect(
+        a.nurIn.length,
+        `Die Ausnahme „${a.wert}" gilt nirgends: „nurIn" ist leer. Eine Ausnahme ohne ` +
+          "Geltungsbereich wäre eine globale — die gibt es hier bewusst nicht.",
+      ).toBeGreaterThan(0);
+      expect(
+        a.grund.trim().length,
+        `Die Ausnahme „${a.wert}" trägt keinen Grund. Wer nicht in einem Satz sagen kann, ` +
+          "warum dieser Wert kein Bestandsdatum ist, hat keine Ausnahme, sondern ein Leck.",
+      ).toBeGreaterThanOrEqual(30);
+    }
+  });
+
+  it("greifen nur dort, wo sie angemeldet sind", () => {
+    const probe: Ausnahme[] = [
+      {
+        wert: "Beispielwert",
+        nurIn: ["src/vendor/beispiel/"],
+        grund: "Nur für diesen Test — prüft, dass der Geltungsbereich wirklich begrenzt.",
+      },
+    ];
+    expect(freigegeben("src/vendor/beispiel/README.md", "Beispielwert", probe)).toBe(true);
+    // Derselbe Wert, andere Stelle: schlägt weiterhin an. Das ist der Punkt.
+    expect(freigegeben("src/adapters/ui/Irgendein.test.tsx", "Beispielwert", probe)).toBe(false);
+    expect(freigegeben("src/vendor/beispiel/README.md", "AndererWert", probe)).toBe(false);
+    // Ohne Geltungsbereich gibt es keine Freigabe, auch nicht versehentlich.
+    const ohne: Ausnahme[] = [{ wert: "X", nurIn: [], grund: "leer" }];
+    expect(freigegeben("src/beliebig.ts", "X", ohne)).toBe(false);
+  });
+
+  it("sterben, wenn sie nichts mehr freigeben", () => {
+    if (AUSNAHMEN.length === 0) return; // noch keine — nichts zu prüfen
+    const gesucht = new Set(merkmale());
+    if (gesucht.size === 0) return; // keine Datenbank, siehe oben
+    const bestand = textbestand();
+
+    const tot = AUSNAHMEN.filter(
+      (a) =>
+        !gesucht.has(a.wert) ||
+        !bestand.some(({ datei, inhalt }) => freigegeben(datei, a.wert) && inhalt.includes(a.wert)),
+    ).map((a) => a.wert);
+
+    expect(
+      tot,
+      `Diese Ausnahmen geben nichts mehr frei:\n  ${tot.join("\n  ")}\n` +
+        "Lösch sie. Eine Ausnahme, die nichts mehr tut, ist nur noch ein blinder Fleck.",
     ).toEqual([]);
   });
 });
