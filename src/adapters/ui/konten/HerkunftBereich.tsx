@@ -6,23 +6,30 @@
 // Weggelegtes aus Dateien, und die Abruf-Historie sah man nur einmal, im Dialog direkt
 // nach dem Abruf.
 //
-// **Die Läufe ohne Wirkung stehen zusammengefasst.** Der Rückgriff holt bei jedem Abruf
-// einige Tage doppelt, damit nachgetragene Buchungen nicht verlorengehen; die Mehrzahl
-// aller Läufe bringt deshalb nichts Neues. Eine Liste, die jeden Lauf gleich gross zeigt,
-// besteht überwiegend aus Rauschen, und die wenigen mit Wirkung gehen darin unter.
+// **Läufe ohne Wirkung bleiben in der Liste, gekennzeichnet.** Der Rückgriff holt bei
+// jedem Abruf einige Tage doppelt, damit nachgetragene Buchungen nicht verlorengehen; die
+// Mehrzahl aller Läufe bringt deshalb nichts Neues. Sie wegzulassen sähe aus, als wäre nie
+// abgerufen worden — und genau das ist die Frage, mit der man hierherkommt. Sie stehen
+// deshalb da und tragen einen Vermerk; sortieren kann man ohnehin nach jeder Spalte.
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { Kontoherkunft } from "../../../application";
+import type { Kontoherkunft, Laufbefund } from "../../../application";
 import { zurueckholen, type Umsatz } from "../../../application/import";
 import { herkunft as herkunftLaden, umsatzSpeichern } from "../../dienste";
 import { Card, Pill } from "../bausteine";
+import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { DataTable } from "../bausteine/DataTable";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 
 type Statusfilter = "alle" | "verbucht" | "weggelegt" | "offen";
+
+/** „2026-08-11T09:00:00.000Z" → „11.08.2026" — der Import trägt sein Datum voll aus. */
+function datumLang(iso: string): string {
+  return iso.slice(0, 10).split("-").reverse().join(".");
+}
 
 function datumKurz(iso: string): string {
   const [j, m, d] = iso.split("-");
@@ -32,14 +39,16 @@ function datumKurz(iso: string): string {
 /**
  * Was für ein Konto hereinkam — in zwei Lesarten, und der Unterschied ist der Punkt.
  *
- * **Ohne `zugangId`** (Register „Herkunft", Kontenliste): ALLE Zeilen des Kontos, aus
- * jeder Quelle. Die Frage dort ist „was steht für dieses Konto überhaupt in der
- * Datenbank" — und darauf wäre eine nach Quellen getrennte Antwort keine Antwort.
+ * **Ohne `zugangId`** (Register „Herkunft", Kontenliste): EINE Tabelle mit allen Zeilen
+ * des Kontos, aus jeder Quelle, dazu die Filter. Die Frage dort ist „was steht für dieses
+ * Konto überhaupt in der Datenbank" — und darauf wäre eine nach Abrufen getrennte Antwort
+ * keine Antwort. Die Läufe stehen hier bewusst NICHT: sie zerlegen genau die Liste, die
+ * man am Stück sehen will. Aus welchem Import eine Zeile kam, sagt ihre Spalte.
  *
- * **Mit `zugangId`** (unter einem Bankzugang): nur die Läufe DIESES Zugangs, und die
- * Zeilen erst, wenn einer davon gewählt ist. Die Frage dort ist eine andere: „was hat
- * dieser Abruf gebracht". Wer ihr nachgeht, will die Läufe nebeneinander sehen — ein
- * Stapel aller Zeilen beantwortet sie nicht, sondern verdeckt sie.
+ * **Mit `zugangId`** (unter einem Bankzugang): die Importe DIESES Zugangs als eigene
+ * Tabelle, und die Zeilen erst, wenn einer davon gewählt ist. Die Frage dort ist eine
+ * andere: „was hat dieser Abruf gebracht". Wer ihr nachgeht, will die Importe
+ * nebeneinander vergleichen — ein Stapel aller Zeilen beantwortet sie nicht.
  *
  * Mit `kontoId` steht der Bereich unter der Zeile, die ihn geöffnet hat, und führt keine
  * eigene Kontowahl. Derselbe Aufbau wie im Kontoauszug: oben die Liste, darunter das
@@ -59,7 +68,14 @@ export function HerkunftBereich({
   // umsehen und nicht bei jedem Klick zurueckgesetzt werden.
   const [gewaehlt, setGewaehlt] = useState<string>(kontoId ?? "");
   const [filter, setFilter] = useState<Statusfilter>("alle");
-  const [laeufeOffen, setLaeufeOffen] = useState(false);
+  /**
+   * Nach QUELLE eingrenzen — auf der Kontenseite, wo die Importliste bewusst fehlt.
+   *
+   * Dort steht alles in EINER Tabelle, und die Frage „was kam eigentlich aus der Bank und
+   * was aus einer Datei" muss trotzdem beantwortbar bleiben. Über die Zeilen zu blättern
+   * und die Herkunftsspalte zu lesen ist keine Antwort.
+   */
+  const [quelle, setQuelle] = useState<string>("alle");
 
   async function laden() {
     const daten = await herkunftLaden();
@@ -82,23 +98,26 @@ export function HerkunftBereich({
     if (zugangId) zeilen = zeilen.filter((z) => z.lauf?.zugangId === zugangId);
     // Und wenn ein einzelner Import gewählt ist, nur dessen Zeilen.
     if (laufId) zeilen = zeilen.filter((z) => z.lauf?.id === laufId);
+    if (quelle !== "alle") zeilen = zeilen.filter((z) => z.lauf?.quelle === quelle);
     if (filter === "alle") return zeilen;
     return zeilen.filter((z) => {
       if (filter === "verbucht") return z.umsatz.status === "verbucht";
       if (filter === "offen") return z.umsatz.status === "neu";
       return z.umsatz.status === "verworfen" || z.umsatz.status === "duplikat";
     });
-  }, [aktiv, filter, zugangId, laufId]);
+  }, [aktiv, filter, zugangId, laufId, quelle]);
 
-  // Läufe mit Wirkung nach vorn. „Ohne Wirkung" heisst: für DIESES Konto kam nichts an —
-  // der Lauf hat geholt und alles als bekannt verworfen.
-  const { mitWirkung, ohneWirkung } = useMemo(() => {
-    const alle = (aktiv?.laeufe ?? []).filter((l) => !zugangId || l.lauf.zugangId === zugangId);
-    return {
-      mitWirkung: alle.filter((l) => l.verbucht > 0 || l.offen > 0),
-      ohneWirkung: alle.filter((l) => l.verbucht === 0 && l.offen === 0),
-    };
-  }, [aktiv, zugangId]);
+  /** Welche Quellen dieses Konto überhaupt gespeist haben — nur die stehen zur Wahl. */
+  const quellen = useMemo(
+    () => [...new Set((aktiv?.zeilen ?? []).map((z) => z.lauf?.quelle).filter(Boolean))] as string[],
+    [aktiv],
+  );
+
+  /** Die Importe dieses Kontos — unter einem Zugang nur die über IHN gelaufenen. */
+  const alleLaeufe = useMemo(
+    () => (aktiv?.laeufe ?? []).filter((l) => !zugangId || l.lauf.zugangId === zugangId),
+    [aktiv, zugangId],
+  );
 
   async function zurueck(umsatz: Umsatz) {
     await umsatzSpeichern(zurueckholen(umsatz));
@@ -137,70 +156,60 @@ export function HerkunftBereich({
 
       {aktiv && (
         <>
-          {/* Die Läufe: wann wurde für dieses Konto etwas eingelesen, und was kam an.
-              In einer Karte, wie jeder Inhalt in dieser App — sie trägt die Fläche
-              (`background: var(--surface)`), ohne sie steht der Text auf dem nackten
-              Seitenhintergrund. */}
+          {/* Die IMPORTE dieses Zugangs — eine eigene Tabelle, in der man sie
+              nebeneinander vergleichen kann. Nur hier: unter der Kontenliste zerlegten
+              sie die Zeilenliste, die man dort am Stück sehen will. */}
+          {zugangId && (
           <Card title={t("konten.herkunft.laeufeTitel")}>
-            {mitWirkung.length === 0 && ohneWirkung.length === 0 ? (
+            {alleLaeufe.length === 0 ? (
               <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.herkunft.keineLaeufe")}</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 2, fontSize: "var(--fs-sm)" }}>
-                {mitWirkung.map((l) => (
-                  <div
-                    key={l.lauf.id}
-                    style={{
-                      display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", alignItems: "baseline",
-                      // Der gewählte Import hebt sich ab, sonst weiss man nach dem Klick
-                      // nicht mehr, welche Zeilen man gerade vor sich hat.
-                      background: laufId === l.lauf.id ? "var(--accent-wash)" : "transparent",
-                      borderRadius: "var(--r-sm)",
-                      padding: laufId === l.lauf.id ? "2px 6px" : "2px 0",
-                    }}
-                  >
-                    <span style={{ minWidth: "9rem" }}>
-                      {/* Nur unter einem Zugang führt der Lauf weiter: dort ist die Frage
-                          „was hat DIESER Abruf gebracht". Im Register daneben stehen alle
-                          Zeilen des Kontos ohnehin schon vollständig da. */}
-                      {zugangId ? (
-                        <Zeilenlink
-                          onKlick={() => setLaufId(laufId === l.lauf.id ? null : l.lauf.id)}
-                          titel={t("konten.herkunft.zeigeLauf", {
-                            datum: l.lauf.zeitpunkt.slice(0, 10).split("-").reverse().join("."),
-                          })}
-                        >
-                          {l.lauf.zeitpunkt.slice(0, 10).split("-").reverse().join(".")}
-                        </Zeilenlink>
-                      ) : (
-                        l.lauf.zeitpunkt.slice(0, 10).split("-").reverse().join(".")
-                      )}
-                    </span>
-                    <Pill variant="neutral">{l.lauf.quelle}</Pill>
-                    <span className="muted">
-                      {t("konten.herkunft.laufZeile", { zeilen: l.zeilen, verbucht: l.verbucht, weggelegt: l.weggelegt })}
-                    </span>
-                  </div>
-                ))}
-                {ohneWirkung.length > 0 && (
-                  <div style={{ marginTop: 4 }}>
-                    <button className="linkbtn" style={{ padding: 0, fontSize: "var(--fs-xs)" }} onClick={() => setLaeufeOffen((x) => !x)}>
-                      {t("konten.herkunft.ohneWirkung", { n: ohneWirkung.length })}
-                    </button>
-                    {laeufeOffen && (
-                      <div style={{ marginTop: 4, display: "flex", flexDirection: "column", gap: 2 }}>
-                        {ohneWirkung.map((l) => (
-                          <div key={l.lauf.id} className="muted" style={{ fontSize: "var(--fs-xs)", display: "flex", gap: "var(--sp-3)" }}>
-                            <span style={{ minWidth: "9rem" }}>{l.lauf.zeitpunkt.slice(0, 10).split("-").reverse().join(".")}</span>
-                            <span>{t("konten.herkunft.laufZeile", { zeilen: l.zeilen, verbucht: l.verbucht, weggelegt: l.weggelegt })}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
+              <DataTable
+                sortable
+                istAktiv={(l: Laufbefund) => l.lauf.id === laufId}
+                columns={[
+                  {
+                    key: "zeitpunkt",
+                    label: t("konten.herkunft.spalteImport"),
+                    render: (l: Laufbefund) => (
+                      <Zeilenlink
+                        onKlick={() => setLaufId(laufId === l.lauf.id ? null : l.lauf.id)}
+                        titel={t("konten.herkunft.zeigeLauf", { datum: datumLang(l.lauf.zeitpunkt) })}
+                      >
+                        {datumLang(l.lauf.zeitpunkt)}
+                      </Zeilenlink>
+                    ),
+                  },
+                  {
+                    key: "quelle",
+                    label: t("konten.detail.herkunft"),
+                    render: (l: Laufbefund) => <Pill variant="neutral">{l.lauf.quelle}</Pill>,
+                  },
+                  { key: "zeilen", label: t("konten.herkunft.spalteZeilen"), align: "right" as const },
+                  { key: "verbucht", label: t("konten.herkunft.status.verbucht"), align: "right" as const },
+                  { key: "offen", label: t("konten.herkunft.status.neu"), align: "right" as const },
+                  { key: "weggelegt", label: t("konten.herkunft.filter.weggelegt"), align: "right" as const },
+                  {
+                    key: "_wirkung",
+                    label: "",
+                    // Der Rückgriff holt bei jedem Abruf einige Tage doppelt, damit
+                    // nachgetragene Buchungen nicht verlorengehen; die Mehrzahl aller Läufe
+                    // bringt deshalb nichts Neues. Sie bleiben in der Liste — verschwiegen
+                    // sähe es aus, als wäre nie abgerufen worden — und sind als solche
+                    // gekennzeichnet.
+                    render: (l: Laufbefund) =>
+                      l.verbucht === 0 && l.offen === 0 ? (
+                        <span className="muted" style={{ fontSize: "var(--fs-2xs)" }}>
+                          {t("konten.herkunft.nichtsNeues")}
+                        </span>
+                      ) : null,
+                  },
+                ]}
+                rows={alleLaeufe}
+              />
             )}
           </Card>
+          )}
 
           {/* Die Rohzeilen. Der Filter ist der Punkt: weggelegte Zeilen waren bisher
               nirgends je Konto zu sehen.
@@ -210,7 +219,7 @@ export function HerkunftBereich({
           {zugangId && !laufId ? (
             <Card>
               <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-                {mitWirkung.length + ohneWirkung.length === 0
+                {alleLaeufe.length === 0
                   ? t("konten.herkunft.keineLaeufeZugang")
                   : t("konten.herkunft.laufWaehlen")}
               </div>
@@ -237,6 +246,22 @@ export function HerkunftBereich({
                   {t(`konten.herkunft.filter.${f}`)}
                 </button>
               ))}
+
+              {/* Nach Quelle eingrenzen — nur wo es überhaupt mehrere gibt. Ein Filter mit
+                  einer einzigen Möglichkeit fragt nach etwas, das schon feststeht.
+                  Unter einem Zugang entfällt er: dort steht die Quelle über die Wahl des
+                  Imports ohnehin fest. */}
+              {!zugangId && quellen.length > 1 && (
+                <Zeilenauswahl
+                  label={t("konten.detail.herkunft")}
+                  wert={quelle}
+                  onChange={setQuelle}
+                  moeglichkeiten={[
+                    { wert: "alle", text: t("konten.herkunft.filter.alle") },
+                    ...quellen.map((q) => ({ wert: q, text: q })),
+                  ]}
+                />
+              )}
             </div>
 
             {gefiltert.length === 0 ? (
