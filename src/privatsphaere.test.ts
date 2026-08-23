@@ -242,15 +242,21 @@ interface Ausnahme {
 const AUSNAHMEN: readonly Ausnahme[] = [
   {
     wert: "Hanseatic Bank",
+    // Zuerst standen hier einzelne Dateien, und die Liste wuchs mit jedem Schritt:
+    // Sprachdatei, Doku, Notizen, Adapter. Vier Eintraege fuer dieselbe Sache sind kein
+    // enger Geltungsbereich mehr, sondern eine Liste, die niemand mehr liest. Jetzt sind
+    // es die beiden Verzeichnisse, die zusammen DIE ANBINDUNG an dieses Institut sind —
+    // dort ist sein Name unvermeidlich. Ueberall sonst schlaegt er weiter an, und genau
+    // das ist der Zweck: in einem Screen-Test hat er nichts zu suchen.
     nurIn: [
       "src/i18n/i18n.ts",
-      "src/vendor/hanseatic-bank/docs/",
-      "src/vendor/hanseatic-bank/CLAUDE.md",
+      "src/adapters/hanseatic/",
+      "src/vendor/hanseatic-bank/",
     ],
     grund:
       "Institutsname, kein Bestandsdatum — er benennt weder ein Konto noch einen Betrag. " +
       "Er steht zugleich als Gegenpartei in den eigenen Umsaetzen und unvermeidlich in der " +
-      "Beschriftung des Schalters und im Titel der eingebetteten Schnittstellen-Doku. " +
+      "Beschriftung des Schalters, im Adapter und in der eingebetteten Doku. " +
       "Fuer Institute aus der DK-Liste erledigt das der bankNamen-Filter oben; diese Bank " +
       "bietet kein FinTS an und steht deshalb nicht darin.",
   },

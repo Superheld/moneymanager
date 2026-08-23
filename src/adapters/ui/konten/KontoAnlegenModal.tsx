@@ -17,11 +17,13 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KONTOTYPEN, type Bankkonto, type Bankzugang, type Kontotyp, type Person, type TanHerausforderung, type Zahlungskonto } from "../../../application";
+import { KONTOTYPEN, type Bankkonto, type Bankzugang, type Kontotyp, type Person, type TanHerausforderung, type Zahlungskonto, type Zugangsart } from "../../../application";
 import { typAusName } from "../../../application/import";
-import { fintsAbruf, fintsEinsatzbereit } from "../../fints";
+import { fintsEinsatzbereit } from "../../fints";
+import { HANSEATIC_BASIS_URL } from "../../hanseatic";
 import type { Bankeintrag } from "../../fints/bankenliste";
 import {
+  abrufAdapterFuer,
   bankzugangSpeichern,
   kontoAnlegen,
   kontozuordnungSpeichern,
@@ -32,7 +34,7 @@ import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, FormField, Pill } from "../bausteine";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Modal } from "../bausteine/Modal";
-import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
+import { fehlerNachricht, useExperimente, useGeld } from "../bausteine/einstellungenKontext";
 
 type Art = "offline" | "online";
 
@@ -55,6 +57,7 @@ export function KontoAnlegenModal({
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  const experimente = useExperimente();
   const [art, setArt] = useState<Art>("offline");
   const [fehler, setFehler] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -113,11 +116,27 @@ export function KontoAnlegenModal({
     setZugang((z) => ({ ...z, blz: b.blz, url: b.url, bezeichnung: z.bezeichnung || b.name }));
   }
 
+  /**
+   * Den Zugangsweg wechseln.
+   *
+   * Dabei werden die Felder mitgeraeumt, die zum anderen Weg gehoerten. Sie stehen zu
+   * lassen waere schlimmer als es aussieht: eine Bankleitzahl aus einer FinTS-Suche
+   * landete sonst an einem Zugang, der gar keine hat, und die Adresse zeigte auf einen
+   * Endpunkt, den diese Bank nicht bedient.
+   */
+  function wegWaehlen(neuerWeg: Zugangsart) {
+    setZugang((z) =>
+      neuerWeg === "hanseatic"
+        ? { ...z, art: neuerWeg, blz: "", kundenId: undefined, url: HANSEATIC_BASIS_URL }
+        : { ...z, art: neuerWeg, token: undefined, url: "" },
+    );
+  }
+
   async function verbinden() {
     setBusy(true);
     setFehler(null);
     try {
-      const sitzung = await fintsAbruf.anmelden(zugang, pin, frageTan);
+      const sitzung = await abrufAdapterFuer(zugang.art).anmelden(zugang, pin, frageTan);
       const gespeichert = { ...zugang, bankparameter: sitzung.bankparameter() };
       await bankzugangSpeichern(gespeichert);
       setZugang(gespeichert);
@@ -301,11 +320,33 @@ export function KontoAnlegenModal({
           </div>
         )}
 
-        {art === "online" && !fintsEinsatzbereit && <div className="err">{t("bankabruf.keineProduktId")}</div>}
+        {art === "online" && zugang.art === "fints" && !fintsEinsatzbereit && (
+          <div className="err">{t("bankabruf.keineProduktId")}</div>
+        )}
 
         {art === "online" && bankkonten === null && (
           <>
-            <BankSuche onWaehlen={bankGewaehlt} />
+            {/* Die Wahl steht nur da, wenn es etwas zu waehlen gibt: ohne eingeschaltetes
+                Experiment ist FinTS der einzige Weg, und eine Auswahl mit einem Eintrag
+                waere eine Frage ohne Antwortmoeglichkeit. */}
+            {experimente.hanseatic && (
+              <FormField label={t("bankabruf.feldWeg")} hint={t("bankabruf.feldWegHinweis")}>
+                <select
+                  className="field"
+                  value={zugang.art}
+                  onChange={(e) => wegWaehlen(e.target.value as Zugangsart)}
+                >
+                  <option value="fints">{t("bankabruf.wegFints")}</option>
+                  <option value="hanseatic">{t("bankabruf.wegHanseatic")}</option>
+                </select>
+              </FormField>
+            )}
+
+            {zugang.art === "hanseatic" && <div className="hint">{t("bankabruf.hanseaticHinweis")}</div>}
+
+            {/* Die Banksuche gilt der DK-Liste. Wer nicht am Verfahren teilnimmt, steht
+                dort nicht — dann hilft sie nicht, sie verwirrt nur. */}
+            {zugang.art === "fints" && <BankSuche onWaehlen={bankGewaehlt} />}
             <div className="form-grid">
               <FormField label={t("bankabruf.feldBezeichnung")} required>
                 <input
@@ -314,27 +355,59 @@ export function KontoAnlegenModal({
                   onChange={(e) => setZugang({ ...zugang, bezeichnung: e.target.value })}
                 />
               </FormField>
-              <FormField label={t("bankabruf.feldBlz")} required>
-                <input className="field" value={zugang.blz} onChange={(e) => setZugang({ ...zugang, blz: e.target.value })} />
-              </FormField>
-              <FormField label={t("bankabruf.feldUrl")} required hint={t("bankabruf.feldUrlHinweis")}>
-                <input className="field" value={zugang.url} onChange={(e) => setZugang({ ...zugang, url: e.target.value })} />
-              </FormField>
-              <FormField label={t("bankabruf.feldBenutzer")} required hint={t("bankabruf.feldBenutzerHinweis")}>
+              {zugang.art === "fints" && (
+                <>
+                  <FormField label={t("bankabruf.feldBlz")} required>
+                    <input className="field" value={zugang.blz} onChange={(e) => setZugang({ ...zugang, blz: e.target.value })} />
+                  </FormField>
+                  <FormField label={t("bankabruf.feldUrl")} required hint={t("bankabruf.feldUrlHinweis")}>
+                    <input className="field" value={zugang.url} onChange={(e) => setZugang({ ...zugang, url: e.target.value })} />
+                  </FormField>
+                </>
+              )}
+              <FormField
+                label={zugang.art === "hanseatic" ? t("bankabruf.feldAnmeldekennung") : t("bankabruf.feldBenutzer")}
+                required
+                hint={
+                  zugang.art === "hanseatic"
+                    ? t("bankabruf.feldAnmeldekennungHinweis")
+                    : t("bankabruf.feldBenutzerHinweis")
+                }
+              >
                 <input
                   className="field"
                   value={zugang.benutzer}
                   onChange={(e) => setZugang({ ...zugang, benutzer: e.target.value })}
                 />
               </FormField>
-              <FormField label={t("bankabruf.feldKundenId")} hint={t("bankabruf.feldKundenIdHinweis")}>
-                <input
-                  className="field"
-                  value={zugang.kundenId ?? ""}
-                  onChange={(e) => setZugang({ ...zugang, kundenId: e.target.value || undefined })}
-                />
-              </FormField>
-              <FormField label={t("bankabruf.feldPin")} required hint={t("bankabruf.feldPinHinweis")}>
+              {zugang.art === "fints" && (
+                <FormField label={t("bankabruf.feldKundenId")} hint={t("bankabruf.feldKundenIdHinweis")}>
+                  <input
+                    className="field"
+                    value={zugang.kundenId ?? ""}
+                    onChange={(e) => setZugang({ ...zugang, kundenId: e.target.value || undefined })}
+                  />
+                </FormField>
+              )}
+              {zugang.art === "hanseatic" && (
+                <FormField label={t("bankabruf.feldToken")} required hint={t("bankabruf.feldTokenHinweis")}>
+                  <input
+                    className="field"
+                    value={zugang.token ?? ""}
+                    onChange={(e) => setZugang({ ...zugang, token: e.target.value || undefined })}
+                    autoComplete="off"
+                  />
+                </FormField>
+              )}
+              <FormField
+                label={zugang.art === "hanseatic" ? t("bankabruf.feldPasswort") : t("bankabruf.feldPin")}
+                required
+                hint={
+                  zugang.art === "hanseatic"
+                    ? t("bankabruf.feldPasswortHinweis")
+                    : t("bankabruf.feldPinHinweis")
+                }
+              >
                 <input
                   className="field"
                   type="password"

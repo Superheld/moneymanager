@@ -7,7 +7,7 @@
 // Experimente-Schalter, nicht dieser Adapter.
 
 export { HANSEATIC_QUELLE, betragZuCent, zuImportErgebnis, zuRohUmsatz } from "./uebersetzung";
-export { HANSEATIC_ADAPTER_ID, hanseaticAdapter, zuBankkonto } from "./hanseaticAdapter";
+export { HANSEATIC_ADAPTER_ID, HANSEATIC_BASIS_URL, hanseaticAdapter, zuBankkonto } from "./hanseaticAdapter";
 
 import { hanseaticAdapter } from "./hanseaticAdapter";
 

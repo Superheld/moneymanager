@@ -47,7 +47,10 @@ import { bankEndpunktFreigeben } from "../fints/transport";
  * in `src-tauri/capabilities/hanseatic.json` stehen — die Freigabe hier ist nur die Seite
  * in der Webview. Fehlt sie dort, antwortet nicht die Bank, sondern ein Berechtigungsfehler.
  */
-const HOSTS = ["https://connecthb.hanseaticbank.de", "https://meine.hanseaticbank.de"];
+/** Das Gateway. Exportiert, weil die Maske es beim Anlegen als Adresse einträgt. */
+export const HANSEATIC_BASIS_URL = "https://connecthb.hanseaticbank.de";
+
+const HOSTS = [HANSEATIC_BASIS_URL, "https://meine.hanseaticbank.de"];
 
 export const HANSEATIC_ADAPTER_ID = "hanseatic";
 

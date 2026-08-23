@@ -129,6 +129,22 @@ const de = {
     feldBenutzerHinweis: "Bei manchen Banken die Zugangsnummer, nicht die Kontonummer.",
     feldKundenId: "Kunden-ID",
     feldKundenIdHinweis: "Nur ausfüllen, wenn die Bank eine abweichende Kunden-ID verlangt.",
+    feldWeg: "Zugangsweg",
+    feldWegHinweis: "Wie diese Bank erreicht wird",
+    wegFints: "FinTS (Standard)",
+    wegHanseatic: "Hanseatic Bank (experimentell)",
+    hanseaticHinweis:
+      "Diese Bank bietet kein FinTS an. Der Abruf geht über dieselbe Schnittstelle wie " +
+      "ihre Weboberfläche — nur lesend, mit deinen Zugangsdaten. Sie ist von der Bank " +
+      "nicht zugesichert und kann jederzeit aufhören zu funktionieren.",
+    feldToken: "Client-Kennung",
+    feldTokenHinweis:
+      "Weist die App gegenüber der Bank aus — kein Passwort. Sie wird einmalig aus einem " +
+      "Mitschnitt der eigenen Anmeldung gewonnen und hier gespeichert.",
+    feldAnmeldekennung: "Anmeldekennung",
+    feldAnmeldekennungHinweis: "Dieselbe, mit der du dich im Onlinebanking anmeldest.",
+    feldPasswort: "Passwort",
+    feldPasswortHinweis: "Wird nicht gespeichert und gilt nur für diese Sitzung.",
     feldPin: "PIN",
     feldPinHinweis: "Wird nirgends gespeichert.",
     anmelden: "Anmelden",
@@ -1519,6 +1535,22 @@ const en: typeof de = {
     feldBenutzerHinweis: "At some banks this is the access number, not the account number.",
     feldKundenId: "Customer ID",
     feldKundenIdHinweis: "Only fill in if the bank requires a separate customer ID.",
+    feldWeg: "Access method",
+    feldWegHinweis: "How this bank is reached",
+    wegFints: "FinTS (standard)",
+    wegHanseatic: "Hanseatic Bank (experimental)",
+    hanseaticHinweis:
+      "This bank offers no FinTS access. Retrieval uses the same interface as its web " +
+      "front end — read-only, with your own credentials. It is not guaranteed by the " +
+      "bank and may stop working at any time.",
+    feldToken: "Client key",
+    feldTokenHinweis:
+      "Identifies the app to the bank — not a password. It is obtained once from a " +
+      "capture of your own login and stored here.",
+    feldAnmeldekennung: "Login ID",
+    feldAnmeldekennungHinweis: "The same one you use for online banking.",
+    feldPasswort: "Password",
+    feldPasswortHinweis: "Not stored; valid for this session only.",
     feldPin: "PIN",
     feldPinHinweis: "Never stored.",
     anmelden: "Log in",
