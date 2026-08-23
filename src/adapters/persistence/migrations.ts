@@ -1565,4 +1565,49 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE bankzugang ADD COLUMN token TEXT`,
     ],
   },
+  {
+    version: 56, // Abrufe von VOR v42 wussten nicht, aus welchem Zugang sie kamen
+    sql: [
+      // `import_lauf.zugang_id` kam erst mit v42. Alle Abrufe davor haben sie leer — und
+      // seit die Bankzugänge ihre Importe je Zugang zeigen, fallen sie damit aus der
+      // Liste. Die Ansicht ist dann leer, obwohl abgerufen wurde: die schlechteste Art zu
+      // irren, weil sie aussieht wie eine Auskunft.
+      //
+      // WEG 1, der belastbare: über die Zeilen des Laufs. Ein Abruf gilt genau einem
+      // Konto, und `bankkonto_zuordnung` sagt, zu welchem Zugang das Konto gehört. Am
+      // Bestand geprüft: kein Lauf berührt mehr als ein Konto, die Zuordnung ist also
+      // eindeutig. Das `HAVING COUNT(DISTINCT …) = 1` hält sie es auch, wenn doch einmal
+      // einer auftaucht — dann bleibt er lieber leer als falsch zugeordnet.
+      `UPDATE import_lauf SET zahlungskonto_id = (
+         SELECT v.zahlungskonto_id FROM umsatz_roh r
+         JOIN umsatz_verarbeitung v ON v.umsatz_id = r.id
+         WHERE r.lauf_id = import_lauf.id
+         GROUP BY r.lauf_id HAVING COUNT(DISTINCT v.zahlungskonto_id) = 1)
+       WHERE quelle = 'fints' AND zahlungskonto_id IS NULL`,
+
+      `UPDATE import_lauf SET zugang_id = (
+         SELECT z.zugang_id FROM bankkonto_zuordnung z
+         WHERE z.zahlungskonto_id = import_lauf.zahlungskonto_id
+         GROUP BY z.zahlungskonto_id HAVING COUNT(DISTINCT z.zugang_id) = 1)
+       WHERE quelle = 'fints' AND zugang_id IS NULL AND zahlungskonto_id IS NOT NULL`,
+
+      // WEG 2, für die Läufe OHNE Zeilen — und die sind der Regelfall, nicht die Ausnahme:
+      // der Rückgriff holt bei jedem Abruf einige Tage doppelt, und die Mehrzahl aller
+      // Abrufe bringt deshalb nichts Neues. Über die Zeilen ist da nichts abzuleiten.
+      //
+      // Der Dateiname trug den Zugangsnamen als Präfix („<Bank> · <Konto> · <von> bis
+      // <bis>"). Das ist Fliesstext und genau der Grund, warum v42 die Spalte eingeführt
+      // hat — für EINMALIGES Nachtragen taugt er trotzdem. Ein Zugang, der seither
+      // umbenannt wurde, fällt durch; er bliebe dann leer, was er vorher auch war.
+      // Die Eindeutigkeit steht im WHERE und nicht als HAVING in der Unterabfrage: SQLite
+      // lässt die äussere Spalte dort nicht gruppieren. Passen zwei Zugänge auf denselben
+      // Dateinamen, bleibt der Lauf leer — lieber gar nicht zugeordnet als falsch.
+      `UPDATE import_lauf SET zugang_id = (
+         SELECT b.id FROM bankzugang b
+         WHERE import_lauf.dateiname LIKE b.bezeichnung || ' %')
+       WHERE quelle = 'fints' AND zugang_id IS NULL AND dateiname IS NOT NULL
+         AND (SELECT COUNT(*) FROM bankzugang b2
+              WHERE import_lauf.dateiname LIKE b2.bezeichnung || ' %') = 1`,
+    ],
+  },
 ];
