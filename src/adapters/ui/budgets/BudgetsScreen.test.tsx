@@ -83,10 +83,10 @@ describe("BudgetsScreen", () => {
     await sqliteKategorieRepository.speichern({ id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand" });
     await sqliteKategorieRepository.speichern({ id: "kat2", name: "Urlaubskasse", defaultCharakter: "Aufwand" });
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000, art: "monatlich", start: "2026-01-01",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: "2026-01", betrag: 40000 }], art: "monatlich", start: "2026-01-01",
     });
     await sqliteBudgetRepository.speichern({
-      id: "b2", kategorieId: "kat2", kontoId: "k2", betragProMonat: 10000, art: "aufbauend", start: "2026-01-01",
+      id: "b2", kategorieId: "kat2", kontoId: "k2", betraege: [{ abMonat: "2026-01", betrag: 10000 }], art: "aufbauend", start: "2026-01-01",
     });
 
     rendere(<BudgetsScreen />);
@@ -102,10 +102,10 @@ describe("BudgetsScreen", () => {
     await sqliteKategorieRepository.speichern({ id: "frei", name: "Freizeit", defaultCharakter: "Aufwand" });
     await sqliteKategorieRepository.speichern({ id: "urlaub", name: "Urlaub", elternId: "frei", defaultCharakter: "Aufwand" });
     await sqliteBudgetRepository.speichern({
-      id: "dach", kategorieId: "frei", kontoId: "k1", betragProMonat: 20000, art: "monatlich", start: "2026-01-01",
+      id: "dach", kategorieId: "frei", kontoId: "k1", betraege: [{ abMonat: "2026-01", betrag: 20000 }], art: "monatlich", start: "2026-01-01",
     });
     await sqliteBudgetRepository.speichern({
-      id: "kind", kategorieId: "urlaub", kontoId: "k2", betragProMonat: 8000, art: "aufbauend", start: "2026-01-01",
+      id: "kind", kategorieId: "urlaub", kontoId: "k2", betraege: [{ abMonat: "2026-01", betrag: 8000 }], art: "aufbauend", start: "2026-01-01",
     });
 
     rendere(<BudgetsScreen />);
@@ -119,7 +119,7 @@ describe("BudgetsScreen", () => {
     await stammdatenBasis();
     await sqliteKategorieRepository.speichern({ id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand" });
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000, art: "monatlich", start: "2026-01-01",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: "2026-01", betrag: 40000 }], art: "monatlich", start: "2026-01-01",
     });
     const heute = new Date();
     const imMonat = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}-05`;
@@ -159,7 +159,7 @@ describe("BudgetsScreen", () => {
       const gespeichert = await sqliteBudgetRepository.alle();
       expect(gespeichert).toHaveLength(1);
       expect(gespeichert[0].art).toBe("aufbauend");
-      expect(gespeichert[0].betragProMonat).toBe(10000);
+      expect(gespeichert[0].betraege).toEqual([{ abMonat: "2026-08", betrag: 10000 }]);
     });
   });
 
@@ -274,7 +274,7 @@ describe("BudgetsScreen — Vorschläge", () => {
       const budgets = await sqliteBudgetRepository.alle();
       expect(budgets).toHaveLength(1);
       expect(budgets[0].kategorieId).toBe("leben");
-      expect(budgets[0].betragProMonat).toBe(44000);
+      expect(budgets[0].betraege[budgets[0].betraege.length - 1].betrag).toBe(44000);
     });
     // Und der Vorschlag ist weg, weil es das Budget jetzt gibt.
     await waitFor(() => expect(document.body.textContent).not.toMatch(/Aus deinen Ausgaben abgeleitet/));
@@ -319,7 +319,7 @@ describe("BudgetsScreen · Verlauf", () => {
     await stammdatenBasis();
     await sqliteKategorieRepository.speichern({ id: "kat2", name: "Urlaubskasse", defaultCharakter: "Aufwand" });
     await sqliteBudgetRepository.speichern({
-      id: "b2", kategorieId: "kat2", kontoId: "k2", betragProMonat: 10000,
+      id: "b2", kategorieId: "kat2", kontoId: "k2", betraege: [{ abMonat: monatVersetzt(-2), betrag: 10000 }],
       art: "aufbauend", start: `${monatVersetzt(-2)}-01`,
     });
     // Im Vormonat 30,00 ausgegeben: Übertrag 200,00 − 30,00 = 170,00 kommen hier an,
@@ -412,7 +412,7 @@ describe("BudgetsScreen · Verlauf", () => {
     await stammdatenBasis();
     await sqliteKategorieRepository.speichern({ id: "kat3", name: "Rennrad", defaultCharakter: "Aufwand" });
     await sqliteBudgetRepository.speichern({
-      id: "b3", kategorieId: "kat3", kontoId: "k2", betragProMonat: 10000,
+      id: "b3", kategorieId: "kat3", kontoId: "k2", betraege: [{ abMonat: monatVersetzt(2), betrag: 10000 }],
       art: "aufbauend", start: `${monatVersetzt(2)}-01`,
     });
 
@@ -435,5 +435,150 @@ describe("BudgetsScreen · Verlauf", () => {
     await screen.findByText(/Verlauf · Urlaubskasse/);
     await nutzer.click(link);
     await waitFor(() => expect(screen.queryByText(/Verlauf · Urlaubskasse/)).toBeNull());
+  });
+});
+
+/**
+ * Der Betrag ist versioniert: ihn zu ändern legt eine neue Version ab dem laufenden Monat
+ * an, statt die Vergangenheit zu überschreiben. Vorher sah ein Budget rückwirkend so aus,
+ * als hätte man immer schon mit dem heutigen Rahmen geplant.
+ */
+describe("BudgetsScreen · Betragsversionen", () => {
+  async function monatlichesBudget() {
+    await stammdatenBasis();
+    await sqliteKategorieRepository.speichern({ id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand" });
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "kat1", kontoId: "k1", art: "monatlich",
+      start: `${monatVersetzt(-3)}-01`,
+      betraege: [{ abMonat: `${monatVersetzt(-3)}`, betrag: 40000 }],
+    });
+  }
+
+  /** Öffnet den Bearbeiten-Dialog, trägt einen Betrag ein und speichert. */
+  async function betragAendern(nutzer: ReturnType<typeof userEvent.setup>, neuerBetrag: string) {
+    await nutzer.click(await screen.findByRole("button", { name: "bearbeiten" }));
+    await screen.findByText(/Budget bearbeiten/);
+    const feld = screen.getByPlaceholderText("0,00");
+    await nutzer.clear(feld);
+    await nutzer.type(feld, neuerBetrag);
+    await nutzer.click(screen.getByRole("button", { name: "Speichern" }));
+  }
+
+  it("legt beim Ändern eine neue Version ab dem laufenden Monat an, statt die alte zu ersetzen", async () => {
+    await monatlichesBudget();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+    await screen.findByText(/Lebensmittel/);
+
+    await betragAendern(nutzer, "450");
+
+    await waitFor(async () => {
+      const [b] = await sqliteBudgetRepository.alle();
+      expect(b.betraege).toEqual([
+        { abMonat: monatVersetzt(-3), betrag: 40000 },
+        { abMonat: monatVersetzt(0), betrag: 45000 },
+      ]);
+    });
+  });
+
+  it("zeigt im Verlauf für jeden Monat die Rate, die damals galt", async () => {
+    await monatlichesBudget();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+    await screen.findByText(/Lebensmittel/);
+    await betragAendern(nutzer, "450");
+
+    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel — Verlauf/ }));
+    await screen.findByText(/Verlauf · Lebensmittel/);
+
+    // Laufender Monat: der neue Rahmen, plus der Hinweis auf den Wechsel.
+    await waitFor(() => expect(document.body.textContent).toMatch(/Rahmen geändert/));
+    expect(document.body.textContent).toMatch(/vorher 400,00/);
+
+    // Vormonat: der alte Rahmen — und KEIN Hinweis, da hat sich nichts geändert.
+    await nutzer.selectOptions(await screen.findByLabelText("Monat"), monatVersetzt(-1));
+    await waitFor(() => expect(document.body.textContent).toMatch(/von 400,00/));
+    expect(document.body.textContent).not.toMatch(/Rahmen geändert:/);
+  });
+
+  it("führt die Beträge im Dialog auf und lässt eine alte Version korrigieren", async () => {
+    await monatlichesBudget();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+    await screen.findByText(/Lebensmittel/);
+    await betragAendern(nutzer, "450");
+    // Erst wenn der Dialog zu ist, ist gespeichert — sonst öffnet der nächste Klick ihn
+    // nicht neu, sondern trifft den noch offenen mit dem alten Stand.
+    await waitFor(() => expect(screen.queryByText(/Budget bearbeiten/)).toBeNull());
+
+    await nutzer.click(await screen.findByRole("button", { name: "bearbeiten" }));
+    await screen.findByText(/Beträge im Zeitverlauf/);
+    expect(document.body.textContent).toMatch(new RegExp(`ab ${monatVersetzt(-3)}`));
+
+    // Die ALTE Version ins Feld holen und dort korrigieren — nicht eine dritte anlegen.
+    await nutzer.click(screen.getByRole("button", { name: `Betrag ab ${monatVersetzt(-3)} korrigieren` }));
+    const feld = screen.getByPlaceholderText("0,00");
+    await nutzer.clear(feld);
+    await nutzer.type(feld, "380");
+    await nutzer.click(screen.getByRole("button", { name: "Speichern" }));
+
+    await waitFor(async () => {
+      const [b] = await sqliteBudgetRepository.alle();
+      expect(b.betraege).toEqual([
+        { abMonat: monatVersetzt(-3), betrag: 38000 },
+        { abMonat: monatVersetzt(0), betrag: 45000 },
+      ]);
+    });
+  });
+
+  it("zeigt Monate vor dem ersten Betrag als „kein Budget“, nicht als überzogen", async () => {
+    await stammdatenBasis();
+    await sqliteKategorieRepository.speichern({ id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand" });
+    // Wie im echten Bestand: ein monatliches Budget trägt als Start den Tag, an dem es
+    // angelegt wurde — der Verlauf reicht trotzdem zurück.
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "kat1", kontoId: "k1", art: "monatlich",
+      start: `${monatVersetzt(0)}-01`,
+      betraege: [{ abMonat: monatVersetzt(0), betrag: 40000 }],
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "alt", datum: `${monatVersetzt(-2)}-05`, betrag: -7000, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel — Verlauf/ }));
+    await screen.findByText(/Verlauf · Lebensmittel/);
+
+    await nutzer.selectOptions(await screen.findByLabelText("Monat"), monatVersetzt(-2));
+    // Nicht „−70,00 von 0,00": damals gab es keinen Rahmen, also auch keine Überziehung.
+    await waitFor(() => expect(document.body.textContent).toMatch(/kein Budget in diesem Monat/));
+    expect(document.body.textContent).toMatch(/70,00/);
+  });
+
+  it("bietet das Löschen erst an, wenn es mehr als eine Version gibt", async () => {
+    await monatlichesBudget();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+    await screen.findByText(/Lebensmittel/);
+
+    // Eine einzige Version: kein Löschen — ein Budget ohne Betrag wäre nur ein Etikett.
+    await nutzer.click(await screen.findByRole("button", { name: "bearbeiten" }));
+    await screen.findByText(/Beträge im Zeitverlauf/);
+    expect(screen.queryByRole("button", { name: /Betrag ab .* entfernen/ })).toBeNull();
+
+    await nutzer.click(screen.getByRole("button", { name: "Abbrechen" }));
+    await betragAendern(nutzer, "450");
+    await waitFor(() => expect(screen.queryByText(/Budget bearbeiten/)).toBeNull());
+
+    await nutzer.click(await screen.findByRole("button", { name: "bearbeiten" }));
+    await screen.findByText(/Beträge im Zeitverlauf/);
+    await nutzer.click(screen.getByRole("button", { name: `Betrag ab ${monatVersetzt(0)} entfernen` }));
+
+    await waitFor(async () => {
+      const [b] = await sqliteBudgetRepository.alle();
+      expect(b.betraege).toEqual([{ abMonat: monatVersetzt(-3), betrag: 40000 }]);
+    });
   });
 });

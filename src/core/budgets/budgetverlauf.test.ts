@@ -21,10 +21,16 @@ const BAUM: Kategorie[] = [
   { id: "fremd", name: "Mobilität", defaultCharakter: "Aufwand" },
 ];
 
-function budget(over: Partial<Budget> = {}): Budget {
-  return {
+/** Wie in `budget.test.ts`: `betragProMonat` wird zur Reihe mit einer Version. */
+function budget(over: Partial<Budget> & { betragProMonat?: number } = {}): Budget {
+  const { betragProMonat = euroZuCent(50), ...rest } = over;
+  const basis = {
     id: "b", kategorieId: "urlaub", kontoId: "giro",
-    betragProMonat: euroZuCent(50), art: "aufbauend", start: "2026-01-01", ...over,
+    art: "aufbauend" as const, start: "2026-01-01", ...rest,
+  };
+  return {
+    ...basis,
+    betraege: rest.betraege ?? [{ abMonat: basis.start.slice(0, 7), betrag: betragProMonat }],
   };
 }
 
@@ -52,8 +58,12 @@ describe("fruehesterVerlaufsmonat", () => {
   it("begrenzt das Aufbauende auf seinen Startmonat", () => {
     expect(fruehesterVerlaufsmonat(budget({ start: "2026-04-15" }))).toBe("2026-04");
   });
-  it("lässt das Monatliche unbegrenzt — dort ist der Start ohne Wirkung", () => {
-    expect(fruehesterVerlaufsmonat(budget({ art: "monatlich" }))).toBeNull();
+  it("lässt das Monatliche unbegrenzt — dort steht jeder Monat für sich", () => {
+    // Es bekommt keinen erfundenen Rahmen für die Zeit davor, sondern `ohnePlan` (siehe
+    // unten). Eine Untergrenze liesse vom Verlauf oft einen einzigen Balken übrig: ein
+    // monatliches Budget trägt als `start` den Tag, an dem es angelegt wurde.
+    const b = budget({ art: "monatlich", betraege: [{ abMonat: "2026-03", betrag: euroZuCent(200) }] });
+    expect(fruehesterVerlaufsmonat(b)).toBeNull();
   });
 });
 
@@ -71,10 +81,20 @@ describe("budgetFortschreibung, monatlich", () => {
     ]);
   });
 
-  it("reicht auch vor den Start zurück — dort ist er ohne Wirkung", () => {
+  it("zeigt die Monate vor der ersten Version — ohne Rahmen, aber mit dem Verbrauch", () => {
     const spaet = budget({ art: "monatlich", betragProMonat: euroZuCent(200), start: "2026-06-01" });
-    const reihe = budgetFortschreibung(sicht([], [spaet]), spaet, "2026-04", "2026-05");
-    expect(reihe.map((m) => m.zufuehrung)).toEqual([euroZuCent(200), euroZuCent(200)]);
+    const ist = [buchung({ id: "1", datum: "2026-04-10", betrag: euroZuCent(-70) })];
+    const reihe = budgetFortschreibung(sicht(ist, [spaet]), spaet, "2026-04", "2026-06");
+
+    // April und Mai: kein Rahmen (es gab noch keinen), aber die Ausgabe ist eine Tatsache.
+    expect(reihe.map((m) => [m.monat, m.zufuehrung, m.verbraucht, m.ohnePlan])).toEqual([
+      ["2026-04", 0, euroZuCent(70), true],
+      ["2026-05", 0, 0, true],
+      ["2026-06", euroZuCent(200), 0, undefined],
+    ]);
+    // Und der Anfang der Planung ist KEINE Rahmenänderung — „vorher 0,00" wäre die
+    // falsche Auskunft.
+    expect(reihe[2].zufuehrungVorher).toBeUndefined();
   });
 });
 
@@ -185,6 +205,103 @@ describe("Fortschreibung und budgetStand kommen auf denselben Rest", () => {
     const s = sicht(ist, [b]);
     for (const m of budgetFortschreibung(s, b, "2026-01", "2026-06")) {
       expect(m.rest).toBe(budgetStand(s, b, `${m.monat}-28`).rest);
+    }
+  });
+});
+
+/**
+ * Der Betrag ist versioniert — und die Fortschreibung ist die Stelle, an der man das
+ * sieht: jeder Monat bekommt die Rate, die DAMALS galt.
+ */
+describe("Betragsversionen", () => {
+  const zweiStufen = budget({
+    art: "monatlich",
+    betraege: [
+      { abMonat: "2026-01", betrag: euroZuCent(200) },
+      { abMonat: "2026-04", betrag: euroZuCent(300) },
+    ],
+  });
+
+  it("gibt jedem Monat die Rate, die damals galt", () => {
+    const reihe = budgetFortschreibung(sicht([], [zweiStufen]), zweiStufen, "2026-02", "2026-05");
+    expect(reihe.map((m) => [m.monat, m.zufuehrung])).toEqual([
+      ["2026-02", euroZuCent(200)],
+      ["2026-03", euroZuCent(200)],
+      ["2026-04", euroZuCent(300)],
+      ["2026-05", euroZuCent(300)],
+    ]);
+  });
+
+  it("merkt den Monat an, in dem sich die Rate ändert", () => {
+    const reihe = budgetFortschreibung(sicht([], [zweiStufen]), zweiStufen, "2026-02", "2026-05");
+    // Nur der Wechselmonat trägt die Marke — sonst stünde an jedem Balken ein Hinweis.
+    expect(reihe.map((m) => m.zufuehrungVorher)).toEqual([
+      undefined, undefined, euroZuCent(200), undefined,
+    ]);
+  });
+
+  it("hält die Marke am ANFANG der Reihe zurück, wenn sie mitten in der Historie beginnt", () => {
+    // Sonst wäre die erste Zeile jedes Zwölf-Monats-Fensters eine Änderung — sie hat nun
+    // einmal keinen Vorgänger IN der Reihe, aber sehr wohl einen davor.
+    const reihe = budgetFortschreibung(sicht([], [zweiStufen]), zweiStufen, "2026-04", "2026-05");
+    expect(reihe[0].monat).toBe("2026-04");
+    expect(reihe[0].zufuehrungVorher).toBe(euroZuCent(200));
+
+    const abAnfang = budgetFortschreibung(sicht([], [zweiStufen]), zweiStufen, "2026-01", "2026-02");
+    expect(abAnfang[0].zufuehrungVorher).toBeUndefined();
+  });
+
+  it("aufbauend: sammelt mit der jeweils gültigen Rate, nicht mit der heutigen", () => {
+    const b = budget({
+      art: "aufbauend",
+      start: "2026-01-01",
+      betraege: [
+        { abMonat: "2026-01", betrag: euroZuCent(50) },
+        { abMonat: "2026-03", betrag: euroZuCent(100) },
+      ],
+    });
+    const reihe = budgetFortschreibung(sicht([], [b]), b, "2026-01", "2026-04");
+    // 50 + 50 + 100 + 100 = 300 — und NICHT 4 × 100, wie eine Multiplikation es rechnete.
+    expect(reihe.map((m) => m.rest)).toEqual([
+      euroZuCent(50), euroZuCent(100), euroZuCent(200), euroZuCent(300),
+    ]);
+    expect(budgetStand(sicht([], [b]), b, "2026-04-28").rest).toBe(euroZuCent(300));
+  });
+
+  it("aufbauend: holt auch den Übertrag mit den damaligen Raten, nicht mit der heutigen", () => {
+    const b = budget({
+      art: "aufbauend",
+      start: "2026-01-01",
+      betraege: [
+        { abMonat: "2026-01", betrag: euroZuCent(50) },
+        { abMonat: "2026-03", betrag: euroZuCent(100) },
+      ],
+    });
+    // Fenster erst ab April: der Übertrag kommt aus der Vorgeschichte und muss dieselben
+    // 300 ergeben wie die durchgerechnete Reihe oben.
+    const reihe = budgetFortschreibung(sicht([], [b]), b, "2026-04", "2026-04");
+    expect(reihe[0].uebertrag).toBe(euroZuCent(200));
+    expect(reihe[0].rest).toBe(euroZuCent(300));
+  });
+
+  it("bleibt mit budgetStand im Gleichschritt, auch über einen Wechsel hinweg", () => {
+    const ist = [
+      buchung({ id: "1", datum: "2026-02-10", betrag: euroZuCent(-40) }),
+      buchung({ id: "2", datum: "2026-04-11", betrag: euroZuCent(-260) }),
+    ];
+    for (const art of ["monatlich", "aufbauend"] as const) {
+      const b = budget({
+        art,
+        start: "2026-01-01",
+        betraege: [
+          { abMonat: "2026-01", betrag: euroZuCent(200) },
+          { abMonat: "2026-04", betrag: euroZuCent(300) },
+        ],
+      });
+      const s = sicht(ist, [b]);
+      for (const m of budgetFortschreibung(s, b, "2026-01", "2026-06")) {
+        expect([art, m.monat, m.rest]).toEqual([art, m.monat, budgetStand(s, b, `${m.monat}-28`).rest]);
+      }
     }
   });
 });

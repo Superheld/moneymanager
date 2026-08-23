@@ -47,6 +47,18 @@ gescheitert; gefunden hat es dieses Skript.
 Im Alpha-Stadium dürfen Migrationen auch **wegnehmen**; vor dem Abräumen prüfen, dass die
 Ziele leer sind.
 
+**Eine Spalte ABLÖSEN: `-- @wennSpalte x.y` vor das Statement, das sie ein letztes Mal
+liest.** Eine Version liest die Spalte (etwa in eine neue Tabelle), die nächste lässt sie
+fallen — läuft die lesende danach noch einmal, scheitert ihr SELECT an „no such column".
+SQLite prüft Spaltennamen beim PARSEN; ein `WHERE` oder `COALESCE` rettet daran nichts.
+Beispiel: v58/v59 (der Budgetbetrag wird eine Reihe).
+
+Und der Anspruch dahinter ist genau abgesteckt: **eine Version muss in dem Zustand
+wiederholbar sein, den sie selbst hinterlässt** — das ist der Fall, den es gibt (Abbruch
+mittendrin, Version noch nicht verbucht, nächster Start fährt sie erneut). Sie in einem
+SPÄTEREN Schemastand zu wiederholen verlangt `migrate()` nie, und es wäre auch nicht
+einlösbar, sobald eine Spalte abgelöst wurde.
+
 **Eine Tabelle UMBAUEN: `-- @wennTabelle x` vor jedes Statement, das aus der alten liest.**
 Kopieren und dann die Quelle fallen lassen ist beim zweiten Durchgang ein Widerspruch — die
 Version steht noch nicht, die Migration wiederholt sich, und `INSERT … SELECT FROM alt`

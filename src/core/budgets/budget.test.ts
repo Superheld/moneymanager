@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { euroZuCent } from "../basis/geld";
 import {
+  betragImMonat,
   budgetKategorien,
   budgetRahmen,
   budgetStand,
@@ -18,15 +19,24 @@ import {
 import type { IstBuchung } from "../buchung/istbuchung";
 import type { Kategorie } from "../kategorien/kategorie";
 
-function budget(over: Partial<Budget> = {}): Budget {
-  return {
+/**
+ * Ein Budget fürs Testen. `betragProMonat` ist eine Bequemlichkeit der Fabrik und KEIN
+ * Feld des Aggregats: daraus wird eine Betragsreihe mit genau einer Version, gültig ab
+ * dem Startmonat. Wer mehrere Versionen braucht, setzt `betraege` selbst.
+ */
+function budget(over: Partial<Budget> & { betragProMonat?: number } = {}): Budget {
+  const { betragProMonat = euroZuCent(400), ...rest } = over;
+  const basis = {
     id: "b",
     kategorieId: "k",
     kontoId: "giro",
-    betragProMonat: euroZuCent(400),
-    art: "monatlich",
+    art: "monatlich" as const,
     start: "2026-01-01",
-    ...over,
+    ...rest,
+  };
+  return {
+    ...basis,
+    betraege: rest.betraege ?? [{ abMonat: basis.start.slice(0, 7), betrag: betragProMonat }],
   };
 }
 
@@ -109,21 +119,23 @@ describe("Verschachtelung", () => {
   });
 
   it("rechnet den Betrag des Kindes aus dem Dach heraus", () => {
-    expect(effektiverMonatsbetrag(dach, alle, BAUM)).toBe(euroZuCent(120));
-    expect(effektiverMonatsbetrag(kind, alle, BAUM)).toBe(euroZuCent(80));
+    expect(effektiverMonatsbetrag(dach, alle, BAUM, "2026-06")).toBe(euroZuCent(120));
+    expect(effektiverMonatsbetrag(kind, alle, BAUM, "2026-06")).toBe(euroZuCent(80));
     // Zusammen bleibt es bei dem, was das Dach ansagt — nichts entsteht, nichts fällt weg.
-    expect(effektiverMonatsbetrag(dach, alle, BAUM) + effektiverMonatsbetrag(kind, alle, BAUM))
-      .toBe(dach.betragProMonat);
+    expect(
+      effektiverMonatsbetrag(dach, alle, BAUM, "2026-06") +
+        effektiverMonatsbetrag(kind, alle, BAUM, "2026-06"),
+    ).toBe(betragImMonat(dach, "2026-06"));
   });
 
   it("lässt einen negativen Rest stehen, statt ihn auf null zu klemmen", () => {
     // Das Kind fordert mehr, als das Dach hergibt — ein Widerspruch, den man sehen soll.
-    const gierig = { ...kind, betragProMonat: euroZuCent(500) };
-    expect(effektiverMonatsbetrag(dach, [dach, gierig], BAUM)).toBe(euroZuCent(-300));
+    const gierig = { ...kind, betraege: [{ abMonat: "2026-01", betrag: euroZuCent(500) }] };
+    expect(effektiverMonatsbetrag(dach, [dach, gierig], BAUM, "2026-06")).toBe(euroZuCent(-300));
   });
 
   it("glättet den Monatsabfluss für die Planung auf den effektiven Betrag", () => {
-    expect(geglaetteterMonatsabfluss(dach, alle, BAUM)).toBe(euroZuCent(-120));
+    expect(geglaetteterMonatsabfluss(dach, alle, BAUM, "2026-06")).toBe(euroZuCent(-120));
   });
 });
 

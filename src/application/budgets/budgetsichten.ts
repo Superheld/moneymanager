@@ -18,6 +18,7 @@
 // tauschen also kein Verhalten, sondern nur eine Vermutung gegen eine Tatsache.
 
 import {
+  betragImMonat,
   budgetBuchungen,
   budgetFortschreibung,
   budgetMonatsstand,
@@ -66,6 +67,14 @@ export interface Budgetstand {
    * Planung, den man sehen soll.
    */
   readonly proMonat: Cent;
+  /**
+   * Der eigene Betrag dieses Monats, VOR Abzug der eingebetteten Budgets.
+   *
+   * Steht hier, damit die Oberfläche „* gekürzt um die Budgets darin" zeigen kann, ohne
+   * die Betragsreihe selbst auszuwerten — welcher Betrag in einem Monat gilt, ist eine
+   * Entscheidung und gehört hinter einen Use-Case (`ui/CLAUDE.md`).
+   */
+  readonly vollerMonatsbetrag: Cent;
   /**
    * Rahmen und Verbrauch KUMULIERT — bei `aufbauend` also alles seit dem Start.
    *
@@ -152,7 +161,8 @@ export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
         budget: b,
         kategorieName: name.get(b.kategorieId) ?? "?",
         tiefe,
-        proMonat: effektiverMonatsbetrag(b, budgets, kategorien),
+        proMonat: effektiverMonatsbetrag(b, budgets, kategorien, am.slice(0, 7)),
+        vollerMonatsbetrag: betragImMonat(b, am.slice(0, 7)),
         ...budgetStand(sicht, b, am),
         ...verbrauchsFenster(b, am),
         monat: budgetMonatsstand(sicht, b, am),

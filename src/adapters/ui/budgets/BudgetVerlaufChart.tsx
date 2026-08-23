@@ -6,6 +6,15 @@
 // Balken ist, nicht welcher der beiden höher steht. Bei einem aufbauenden Budget wächst
 // der helle Balken mit — genau daran sieht man, dass es sammelt.
 //
+// Ändert sich der Rahmen von einem Monat auf den nächsten, springt der helle Balken. Das
+// sieht ohne Erklärung aus wie ein Rechenfehler — deshalb steht am Wechselmonat eine Marke
+// auf der Grundlinie, und die Zeile unter dem Chart nennt den vorherigen Betrag.
+//
+// Monate VOR der ersten Betragsversion tragen keinen hellen Balken und färben sich nie
+// als überzogen: dort gab es keinen Rahmen, und ein Verbrauch ohne Rahmen ist keine
+// Überziehung, sondern die Zeit davor. Sie stehen trotzdem da — „wie war es, bevor ich das
+// Budget hatte" ist die interessanteste Frage am Verlauf.
+//
 // Der Verbrauch kann NEGATIV werden (ein Monat, in dem eine Erstattung die Ausgaben
 // überwiegt). Solche Monate wachsen nach unten statt auf null geklemmt zu werden: ein
 // leerer Balken hiesse „nichts ausgegeben", und das wäre eine andere Aussage.
@@ -64,13 +73,13 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
         {monate.map((m, i) => {
           const cx = padL + slot * i + slot / 2;
           const rahmenH = Math.max(0, nulllinie - y(Math.max(0, m.verfuegbar)));
-          const ueberzogen = m.verbraucht > m.verfuegbar;
+          const ueberzogen = !m.ohnePlan && m.verbraucht > m.verfuegbar;
           const oberkante = y(Math.max(0, m.verbraucht));
           const verbrauchH = Math.abs(nulllinie - oberkante);
           const klickbar = !!onMonatClick;
           return (
             <g key={m.monat} onClick={klickbar ? () => onMonatClick!(i) : undefined} style={klickbar ? { cursor: "pointer" } : undefined}>
-              <title>{`${m.monat} · ${t("budgets.verlaufTooltip", {
+              <title>{m.ohnePlan ? `${m.monat} · ${t("budgets.verlaufOhnePlanKurz", { verbraucht: geld.formatMitSymbol(m.verbraucht) })}` : `${m.monat} · ${t("budgets.verlaufTooltip", {
                 verfuegbar: geld.formatMitSymbol(m.verfuegbar),
                 verbraucht: geld.formatMitSymbol(m.verbraucht),
                 rest: geld.formatMitSymbol(m.rest),
@@ -86,8 +95,17 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
                 height={verbrauchH}
                 rx="2"
                 fill={ueberzogen ? "var(--warn-deep)" : m.verbraucht < 0 ? "var(--ok)" : "var(--ink)"}
-                opacity={ueberzogen ? 0.9 : 0.78}
+                opacity={ueberzogen ? 0.9 : m.ohnePlan ? 0.3 : 0.78}
               />
+              {/* Die Marke sitzt an der LINKEN Kante des Slots: die Änderung gilt AB
+                  diesem Monat, sie gehört also zwischen ihn und seinen Vorgänger. */}
+              {m.zufuehrungVorher != null && (
+                <g>
+                  <line x1={padL + slot * i} y1={padT} x2={padL + slot * i} y2={nulllinie + 5}
+                    stroke="var(--accent-deep)" strokeWidth="1.2" strokeDasharray="3 3" />
+                  <circle cx={padL + slot * i} cy={nulllinie} r="3" fill="var(--accent-deep)" />
+                </g>
+              )}
               {klickbar && <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="transparent" />}
               {i % jedes === 0 && (
                 <text x={cx} y={height - 8} textAnchor="middle" fontSize="10.5" fill="var(--ink-3)" fontFamily="var(--font-ui)">{m.monat}</text>
@@ -100,6 +118,12 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
         <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.13, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeVerfuegbar")}</span>
         <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.78, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeVerbraucht")}</span>
         <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--warn-deep)", verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeUeberzogen")}</span>
+        {monate.some((m) => m.ohnePlan) && (
+          <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.3, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeOhnePlan")}</span>
+        )}
+        {monate.some((m) => m.zufuehrungVorher != null) && (
+          <span><span style={{ display: "inline-block", width: 2, height: 11, background: "var(--accent-deep)", verticalAlign: "middle", marginRight: 8, marginLeft: 4 }} />{t("budgets.legendeAenderung")}</span>
+        )}
       </div>
     </div>
   );

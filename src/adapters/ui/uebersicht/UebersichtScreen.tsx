@@ -172,23 +172,29 @@ export function UebersichtScreen() {
                           eingezahlt" eine eigene, seltenere Frage ist. */}
                       <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
                         <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
+                          {z.monat.ohnePlan ? (
+                            // In diesem Monat gab es für die Kategorie noch keinen Rahmen.
+                            // Ein Rest von „−x von 0,00" läse sich als überzogen.
+                            <span className="muted">{t("budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(z.monat.verbraucht) })}</span>
+                          ) : (
                           <span
                             style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}
                             title={z.budget.art === "aufbauend" ? t("uebersicht.budgetGesamt", { rahmen: geld.formatMitSymbol(z.rahmen) }) : undefined}
                           >
                             {geld.format(z.rest)}
                           </span>
-                          {z.budget.art === "monatlich" && (
+                          )}
+                          {z.budget.art === "monatlich" && !z.monat.ohnePlan && (
                             <span className="muted"> {t("uebersicht.vonRahmen", { rahmen: geld.formatMitSymbol(z.monat.verfuegbar) })}</span>
                           )}
                         </span>
-                        {z.budget.art === "aufbauend" && <BudgetFortschreibung monat={z.monat} />}
+                        {z.budget.art === "aufbauend" && !z.monat.ohnePlan && <BudgetFortschreibung monat={z.monat} />}
                       </span>
                     </div>
                     <CoverageTrack
                       value={Math.max(0, z.monat.verbraucht)}
                       max={Math.max(1, z.monat.verfuegbar)}
-                      over={z.rest < 0}
+                      over={!z.monat.ohnePlan && z.rest < 0}
                       label=""
                       right=""
                     />

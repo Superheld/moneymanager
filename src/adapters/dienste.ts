@@ -21,7 +21,11 @@ import {
   type Budgetuebersicht,
 } from "../application/budgets/budgetsichten";
 import { uebersichtLaden, type Uebersichtsdaten } from "../application/uebersicht";
-import { budgetAnlegen as budgetAnlegenUseCase, type BudgetEingabe } from "../application/budgets/budgetAnlegen";
+import {
+  budgetAnlegen as budgetAnlegenUseCase,
+  budgetBetragLoeschen as budgetBetragLoeschenUseCase,
+  type BudgetEingabe,
+} from "../application/budgets/budgetAnlegen";
 import { budgetvorschlagIgnorieren } from "../application/budgets/budgetvorschlaege";
 import {
   abrufAusfuehren,
@@ -186,6 +190,10 @@ export function budgetbereich(heute: string): Promise<Budgetbereich> {
 
 export function budgetLoeschen(id: string): Promise<void> {
   return budgetLoeschenUseCase(sqliteBudgetRepository, id);
+}
+
+export function budgetBetragLoeschen(budgetId: string, abMonat: string): Promise<void> {
+  return budgetBetragLoeschenUseCase(sqliteBudgetRepository, budgetId, abMonat);
 }
 
 export function budgetAnlegen(eingabe: BudgetEingabe, id?: string) {

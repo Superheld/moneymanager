@@ -91,15 +91,35 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
       <div
         style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--sp-3)", flexWrap: "wrap", marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}
       >
-        <span style={{ fontWeight: "var(--fw-bold)" }}>{monat.monat}</span>
+        <span style={{ display: "inline-flex", alignItems: "baseline", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+          <span style={{ fontWeight: "var(--fw-bold)" }}>{monat.monat}</span>
+          {/* Die Stufe im Chart braucht ihren Grund neben sich, sonst liest sie sich wie
+              ein Rechenfehler. */}
+          {monat.zufuehrungVorher != null && (
+            <span style={{ fontSize: "var(--fs-2xs)", color: "var(--accent-deep)", fontWeight: "var(--fw-semi)" }}>
+              {t("budgets.rahmenGeaendert", {
+                vorher: geld.formatMitSymbol(monat.zufuehrungVorher),
+                jetzt: geld.formatMitSymbol(monat.zufuehrung),
+              })}
+            </span>
+          )}
+        </span>
         <span style={{ display: "inline-flex", gap: "var(--sp-3)", alignItems: "baseline", flexWrap: "wrap" }}>
           {/* Der Übertrag hat nur beim Aufbauenden etwas zu sagen: beim Monatlichen ist er
               immer 0, und eine Zeile „Übertrag 0,00" wäre eine Aussage über nichts. */}
-          {stand.budget.art === "aufbauend" && <BudgetFortschreibung monat={monat} />}
-          <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
-            <span style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(monat.rest) }}>{geld.format(monat.rest)}</span>
-            <span className="muted"> {t("uebersicht.vonRahmen", { rahmen: geld.formatMitSymbol(monat.verfuegbar) })}</span>
-          </span>
+          {stand.budget.art === "aufbauend" && !monat.ohnePlan && <BudgetFortschreibung monat={monat} />}
+          {/* Ohne Rahmen gibt es keinen Rest — „−70,00 von 0,00" läse sich als heftig
+              überzogen, obwohl damals niemand etwas überzogen hat. */}
+          {monat.ohnePlan ? (
+            <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
+              <span className="muted">{t("budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(monat.verbraucht) })}</span>
+            </span>
+          ) : (
+            <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
+              <span style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(monat.rest) }}>{geld.format(monat.rest)}</span>
+              <span className="muted"> {t("uebersicht.vonRahmen", { rahmen: geld.formatMitSymbol(monat.verfuegbar) })}</span>
+            </span>
+          )}
         </span>
       </div>
 

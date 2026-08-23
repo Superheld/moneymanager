@@ -23,11 +23,13 @@
 // Budgetrechnung hier schon einmal gescheitert.
 
 import type { Cent } from "../basis/geld";
-import { addMonate, monateZwischen, parseIso, toIso } from "../basis/datum";
+import { addMonate, parseIso, toIso } from "../basis/datum";
 import {
   budgetVerbrauch,
-  effektiverMonatsbetrag,
+  ersterBudgetmonat,
+  monatDanach,
   monatsFenster,
+  zufuehrungIm,
   type Budget,
   type BudgetSicht,
 } from "./budget";
@@ -49,6 +51,26 @@ export interface Budgetmonat {
    * dem Start des Budgets liegt; ein Budget rückwirkend zu füllen wäre erfunden.
    */
   readonly zufuehrung: Cent;
+  /**
+   * Die Zuführung des VORmonats, wenn sie eine andere war — sonst `undefined`.
+   *
+   * Damit die Stufe im Verlauf erklärbar ist: ein Rahmen, der von einem Monat auf den
+   * nächsten springt, sieht sonst aus wie ein Rechenfehler. Sie wird aus der EFFEKTIVEN
+   * Zuführung abgeleitet und nicht aus der Betragsreihe, weil sie sich auch ändert, wenn
+   * ein eingebettetes Budget eine neue Version bekommt — beides ist für den Betrachter
+   * dasselbe Ereignis: „hier gilt ab jetzt etwas anderes".
+   */
+  readonly zufuehrungVorher?: Cent;
+  /**
+   * Der Monat liegt VOR der ersten Betragsversion: damals gab es für diese Kategorie
+   * keinen Rahmen.
+   *
+   * Er steht trotzdem in der Reihe, weil das Ausgegebene eine Tatsache ist und die
+   * interessanteste Frage am Verlauf beantwortet: „wie war es, bevor ich das Budget
+   * hatte?". Ohne die Kennzeichnung läse sich so ein Monat als Rahmen 0 bei vollem
+   * Verbrauch — also als heftig überzogen, obwohl niemand etwas überzogen hat.
+   */
+  readonly ohnePlan?: true;
   /** `uebertrag + zufuehrung` — der Rahmen DIESES Monats. */
   readonly verfuegbar: Cent;
   /** Verbrauch in diesem Monat, positiv (eine Erstattung ist entsprechend negativ). */
@@ -61,17 +83,23 @@ export interface Budgetmonat {
 }
 
 /**
- * Ab welchem Monat ein Verlauf frühestens beginnen darf.
+ * Ab welchem Monat ein Verlauf frühestens beginnen darf — `null` heisst: unbegrenzt.
  *
- * Bei `aufbauend` ist das der Startmonat: davor gibt es keine Zuführung, und der Verbrauch
- * zählt dort auch für `budgetStand` nicht (sein Fenster beginnt am Start). Ein Balken für
- * einen Monat davor zeigte Ausgaben, die das Budget nie belastet haben.
+ * **Nur das Aufbauende ist begrenzt**, auf seinen ersten Monat. Sein Verbrauch davor
+ * zählt auch für `budgetStand` nicht (dessen Fenster beginnt am Start), ein Balken dort
+ * zeigte also Ausgaben, die das Budget nie belastet haben.
  *
- * Bei `monatlich` gibt es keine Untergrenze — der Start ist dort ohne Wirkung, jeder Monat
- * hat seinen vollen Rahmen.
+ * Beim Monatlichen ist es umgekehrt: sein Fenster IST der Monat, jeder Monat steht für
+ * sich, und was vor der ersten Betragsversion ausgegeben wurde, ist eine Tatsache und die
+ * interessanteste Zeile am Verlauf — „so war es, bevor ich das Budget hatte". Diese Monate
+ * bekommen keinen erfundenen Rahmen, sondern `ohnePlan`.
+ *
+ * Am echten Bestand gemessen ist das kein Randfall: die monatlichen Budgets tragen als
+ * `start` den Tag ihres Anlegens, eine Untergrenze darauf liesse vom Verlauf einen
+ * einzigen Balken übrig.
  */
 export function fruehesterVerlaufsmonat(budget: Budget): string | null {
-  return budget.art === "aufbauend" ? budget.start.slice(0, 7) : null;
+  return budget.art === "aufbauend" ? ersterBudgetmonat(budget) : null;
 }
 
 /**
@@ -88,20 +116,33 @@ export function budgetFortschreibung(
   vonMonat: string,
   bisMonat: string,
 ): Budgetmonat[] {
-  const proMonat = effektiverMonatsbetrag(budget, sicht.budgets, sicht.kategorien);
   const untergrenze = fruehesterVerlaufsmonat(budget);
   const start = untergrenze && untergrenze > vonMonat ? untergrenze : vonMonat;
+  const geplantAb = ersterBudgetmonat(budget);
+  const rate = (m: string) => zufuehrungIm(budget, sicht.budgets, sicht.kategorien, m);
 
-  let uebertrag = budget.art === "aufbauend" ? vorgeschichte(sicht, budget, proMonat, start) : 0;
+  let uebertrag = budget.art === "aufbauend" ? vorgeschichte(sicht, budget, start, rate) : 0;
 
   const raus: Budgetmonat[] = [];
-  for (let m = start; m <= bisMonat; m = naechsterMonat(m)) {
+  for (let m = start; m <= bisMonat; m = monatDanach(m)) {
     const { von, bis } = monatsfensterAb(budget, m);
-    const zufuehrung = zufuehrungIm(budget, proMonat, m);
+    const zufuehrung = rate(m);
+    // Der Vergleich läuft über den echten Vormonat, nicht über die vorige Zeile: die
+    // Reihe kann mitten in der Historie anfangen, und dann wäre die erste Zeile immer
+    // eine Änderung.
+    const ohnePlan = m < geplantAb;
+    // Die Marke nur zwischen zwei GEPLANTEN Monaten: der Sprung von „gar kein Budget" auf
+    // die erste Rate ist keine Änderung des Rahmens, sondern sein Anfang, und „vorher
+    // 0,00" wäre dafür die falsche Auskunft.
+    const vorher = !ohnePlan && vormonat(m) >= geplantAb ? rate(vormonat(m)) : zufuehrung;
     const verfuegbar = uebertrag + zufuehrung;
     const verbraucht = budgetVerbrauch(sicht, budget, von, bis);
     const rest = verfuegbar - verbraucht;
-    raus.push({ monat: m, von, bis, uebertrag, zufuehrung, verfuegbar, verbraucht, rest });
+    raus.push({
+      monat: m, von, bis, uebertrag, zufuehrung, verfuegbar, verbraucht, rest,
+      ...(vorher !== zufuehrung ? { zufuehrungVorher: vorher } : {}),
+      ...(ohnePlan ? { ohnePlan: true as const } : {}),
+    });
     // Genau hier steht der ganze Unterschied zwischen den beiden Arten: das Aufbauende
     // nimmt seinen Rest mit, das Monatliche lässt ihn liegen.
     uebertrag = budget.art === "aufbauend" ? rest : 0;
@@ -140,23 +181,30 @@ function monatsfensterAb(budget: Budget, monat: string): { von: string; bis: str
   return fenster;
 }
 
-/** Was ein aufbauendes Budget zwischen seinem Start und `bisMonat` angesammelt hat. */
-function vorgeschichte(sicht: BudgetSicht, budget: Budget, proMonat: Cent, bisMonat: string): Cent {
-  const startMonat = budget.start.slice(0, 7);
-  if (startMonat >= bisMonat) return 0;
-  const monate = monateZwischen(`${startMonat}-01`, `${bisMonat}-01`);
-  return proMonat * monate - budgetVerbrauch(sicht, budget, budget.start, `${bisMonat}-01`);
+/**
+ * Was ein aufbauendes Budget zwischen seinem ersten Monat und `bisMonat` angesammelt hat.
+ *
+ * Aufsummiert und nicht multipliziert: mit mehreren Betragsversionen ist die Rate über die
+ * Vorgeschichte nicht dieselbe, und eine Multiplikation rechnete den heutigen Betrag
+ * rückwirkend in jeden vergangenen Monat hinein — genau das, was die Versionierung
+ * abstellen soll.
+ */
+function vorgeschichte(
+  sicht: BudgetSicht,
+  budget: Budget,
+  bisMonat: string,
+  rate: (monat: string) => Cent,
+): Cent {
+  const erster = ersterBudgetmonat(budget);
+  if (erster >= bisMonat) return 0;
+  let summe = 0;
+  for (let m = erster; m < bisMonat; m = monatDanach(m)) summe += rate(m);
+  return summe - budgetVerbrauch(sicht, budget, budget.start, `${bisMonat}-01`);
 }
 
-/** 0 vor dem Start, sonst der effektive Monatsbetrag. */
-function zufuehrungIm(budget: Budget, proMonat: Cent, monat: string): Cent {
-  if (budget.art === "aufbauend" && monat < budget.start.slice(0, 7)) return 0;
-  return proMonat;
-}
-
-/** `YYYY-MM` einen Monat weiter — String-Arithmetik über die vorhandenen Datumshelfer. */
-function naechsterMonat(monat: string): string {
-  return toIso(addMonate(parseIso(`${monat}-01`), 1)).slice(0, 7);
+/** `YYYY-MM` einen Monat zurück. */
+function vormonat(monat: string): string {
+  return toIso(addMonate(parseIso(`${monat}-01`), -1)).slice(0, 7);
 }
 
 /**

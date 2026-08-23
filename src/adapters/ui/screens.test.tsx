@@ -105,7 +105,7 @@ describe("BudgetsScreen", () => {
   it("zeigt ein Budget mit Kategorie und Rahmen", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000, art: "monatlich", start: "2026-01-01",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: "2026-01", betrag: 40000 }], art: "monatlich", start: "2026-01-01",
     });
     rendere(<BudgetsScreen />);
     expect(await screen.findByText(/Lebensmittel/)).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe("BudgetsScreen", () => {
   it("rechnet gebuchte Aufwände als Verbrauch gegen das Budget", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000, art: "monatlich", start: "2026-01-01",
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: "2026-01", betrag: 40000 }], art: "monatlich", start: "2026-01-01",
     });
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: new Date().toISOString().slice(0, 10), betrag: -15000,
@@ -196,7 +196,7 @@ describe("UebersichtScreen", () => {
   it("zeigt die Budgets des laufenden Monats mit ihrem Rest", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000,
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: monat(6), betrag: 40000 }],
       art: "monatlich", start: `${monat(6)}-01`,
     });
     await sqliteLedgerRepository.speichern({
@@ -213,7 +213,7 @@ describe("UebersichtScreen", () => {
   it("schaltet auf einen vergangenen Monat um und rechnet dessen Verbrauch", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 40000,
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: monat(6), betrag: 40000 }],
       art: "monatlich", start: `${monat(6)}-01`,
     });
     // Nur im VORmonat gebucht — im laufenden ist der Rahmen unangetastet.
@@ -242,7 +242,7 @@ describe("UebersichtScreen", () => {
   it("zeigt beim aufbauenden Budget die Fortschreibung statt der Summe seit Start", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 10000,
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: monat(2), betrag: 10000 }],
       art: "aufbauend", start: `${monat(2)}-01`,
     });
     await sqliteLedgerRepository.speichern({
@@ -262,7 +262,7 @@ describe("UebersichtScreen", () => {
   it("zeigt beim aufgeklappten Budget die Buchungen DIESES Monats, nicht alle seit Start", async () => {
     await grunddaten();
     await sqliteBudgetRepository.speichern({
-      id: "b1", kategorieId: "kat1", kontoId: "k1", betragProMonat: 10000,
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: monat(2), betrag: 10000 }],
       art: "aufbauend", start: `${monat(2)}-01`,
     });
     await sqliteLedgerRepository.speichern({

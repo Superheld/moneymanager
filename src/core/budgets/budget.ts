@@ -8,7 +8,10 @@
 //     gebraucht wird: Urlaub, Reparaturen, das neue Rad.
 //
 // Mehr unterscheidet die Arten nicht. Kein Ziel, keine Frist, kein Schätzbetrag —
-// eingegeben wird in beiden Fällen genau eine Zahl: der Betrag pro Monat.
+// eingegeben wird in beiden Fällen genau eine Zahl: der Betrag pro Monat. Der ändert sich
+// über die Zeit, und deshalb steht er als REIHE am Budget (`betraege`) und nicht als Wert:
+// wer im August von 400 auf 450 geht, hat im Juli mit 400 geplant, und das soll so
+// stehenbleiben. Wer den Betrag eines Monats braucht, fragt `betragImMonat`.
 //
 // Vorgänger war ein Paar aus `Budget` (Rahmen je Periode monatlich/jährlich) und `Topf`
 // (Puffer mit Schätzbetrag+Frist, Spartopf mit Zuführung+Sparziel, plus eigener
@@ -40,9 +43,27 @@
 import type { Cent } from "../basis/geld";
 import { kategorieAnteile, type IstBuchung } from "../buchung/istbuchung";
 import { kategorieUnterbaum, type Kategorie } from "../kategorien/kategorie";
-import { monateZwischen } from "../basis/datum";
+import { addMonate, parseIso, toIso } from "../basis/datum";
 
 export type Budgetart = "monatlich" | "aufbauend";
+
+/**
+ * Ein Betrag und der Monat, ab dem er gilt (`YYYY-MM`).
+ *
+ * Ein Budget hat davon eine REIHE, nicht einen Wert. Bis dahin überschrieb eine Änderung
+ * die Vergangenheit: wer im August von 400 auf 450 ging, sah rückwirkend jeden Monat mit
+ * 450 geplant, und es war nicht mehr feststellbar, wogegen er damals gemessen hatte. Bei
+ * einem aufbauenden Budget rechnete es zusätzlich den ganzen Sockel neu.
+ *
+ * MONAT und nicht Datum: ein Budget ist eine Monatsgrösse. Ein Wechsel mitten im Monat
+ * müsste anteilig gerechnet werden, und dafür gibt es keinen fachlichen Grund.
+ */
+export interface Budgetbetrag {
+  /** `YYYY-MM`. */
+  readonly abMonat: string;
+  /** Positiver Betrag in Cent (> 0). */
+  readonly betrag: Cent;
+}
 
 export interface Budget {
   readonly id: string;
@@ -57,8 +78,14 @@ export interface Budget {
    * Buchungen still übersieht, zeigt zu viel Rest an.
    */
   readonly kontoId: string;
-  /** Was pro Monat hineingeht, positiver Betrag in Cent (> 0). */
-  readonly betragProMonat: Cent;
+  /**
+   * Was pro Monat hineingeht — aufsteigend nach `abMonat`, mindestens ein Eintrag.
+   *
+   * Nicht leer, und das ist eine Invariante und keine Bequemlichkeit: ein Budget ohne
+   * Betrag ist eine Kategorie mit einem Etikett. Der Use-Case lässt deshalb die letzte
+   * verbleibende Version nicht löschen.
+   */
+  readonly betraege: readonly Budgetbetrag[];
   readonly art: Budgetart;
   /**
    * Ab wann gerechnet wird (ISO). Kein Ziel und keine Frist — nur der Anker, ohne den
@@ -67,6 +94,54 @@ export interface Budget {
    * da ist und mal nicht, muss überall geprüft werden).
    */
   readonly start: string;
+}
+
+/**
+ * Der Betrag, der im Monat `monat` (`YYYY-MM`) gilt: die jüngste Version, die nicht in der
+ * Zukunft liegt.
+ *
+ * **0 vor der ersten Version** — nicht der erste Betrag. Vor seiner ersten Version war das
+ * Budget nicht geplant, und einen Rahmen rückwirkend anzunehmen hiesse, eine Planung zu
+ * erfinden, die es nie gab. Genau darum geht es bei der Versionierung.
+ */
+export function betragImMonat(budget: Budget, monat: string): Cent {
+  let treffer = 0;
+  for (const v of budget.betraege) {
+    if (v.abMonat > monat) break;
+    treffer = v.betrag;
+  }
+  return treffer;
+}
+
+/**
+ * Der erste Monat, für den dieses Budget etwas aussagt.
+ *
+ * Beim Aufbauenden zusätzlich durch `start` begrenzt: dort ist der Start der Anker, ab dem
+ * gesammelt wird, und eine Betragsversion davor wäre eine Zuführung in ein Budget, das
+ * noch nicht sammelt.
+ */
+export function ersterBudgetmonat(budget: Budget): string {
+  const erste = budget.betraege[0]?.abMonat ?? budget.start.slice(0, 7);
+  const startMonat = budget.start.slice(0, 7);
+  return budget.art === "aufbauend" && startMonat > erste ? startMonat : erste;
+}
+
+/**
+ * Was in `monat` in dieses Budget hineingeht, nach Abzug der eingebetteten — 0, solange
+ * der Monat vor seinem ersten liegt.
+ *
+ * Die eine Stelle, die „wieviel bekommt dieses Budget in DIESEM Monat" beantwortet.
+ * `budgetRahmen` und die Fortschreibung fragen beide hier, damit sie nicht auseinander
+ * laufen können, wenn eine Version dazukommt.
+ */
+export function zufuehrungIm(
+  budget: Budget,
+  alle: readonly Budget[],
+  kategorien: readonly Kategorie[],
+  monat: string,
+): Cent {
+  if (monat < ersterBudgetmonat(budget)) return 0;
+  return effektiverMonatsbetrag(budget, alle, kategorien, monat);
 }
 
 /**
@@ -137,8 +212,12 @@ export function effektiverMonatsbetrag(
   budget: Budget,
   alle: readonly Budget[],
   kategorien: readonly Kategorie[],
+  monat: string,
 ): Cent {
-  return kindBudgets(budget, alle, kategorien).reduce((s, k) => s - k.betragProMonat, budget.betragProMonat);
+  return kindBudgets(budget, alle, kategorien).reduce(
+    (s, k) => s - betragImMonat(k, monat),
+    betragImMonat(budget, monat),
+  );
 }
 
 /**
@@ -150,8 +229,9 @@ export function geglaetteterMonatsabfluss(
   budget: Budget,
   alle: readonly Budget[],
   kategorien: readonly Kategorie[],
+  monat: string,
 ): Cent {
-  return -effektiverMonatsbetrag(budget, alle, kategorien);
+  return -effektiverMonatsbetrag(budget, alle, kategorien, monat);
 }
 
 /**
@@ -191,10 +271,21 @@ export function budgetRahmen(
   kategorien: readonly Kategorie[],
   am: string,
 ): Cent {
-  const proMonat = effektiverMonatsbetrag(budget, alle, kategorien);
-  if (budget.art === "monatlich") return proMonat;
-  const monate = monateZwischen(budget.start, monatsFenster(am).von) + 1;
-  return monate <= 0 ? 0 : proMonat * monate;
+  const monat = am.slice(0, 7);
+  if (budget.art === "monatlich") return zufuehrungIm(budget, alle, kategorien, monat);
+  // Aufsummiert statt „Rate mal Monate": mit mehreren Betragsversionen ist die Rate nicht
+  // mehr über die ganze Laufzeit dieselbe, und eine Multiplikation rechnete den heutigen
+  // Betrag rückwirkend in jeden vergangenen Monat hinein.
+  let summe = 0;
+  for (let m = ersterBudgetmonat(budget); m <= monat; m = monatDanach(m)) {
+    summe += zufuehrungIm(budget, alle, kategorien, m);
+  }
+  return summe;
+}
+
+/** `YYYY-MM` einen Monat weiter — reine String-Arithmetik über die Datumshelfer. */
+export function monatDanach(monat: string): string {
+  return toIso(addMonate(parseIso(`${monat}-01`), 1)).slice(0, 7);
 }
 
 /**

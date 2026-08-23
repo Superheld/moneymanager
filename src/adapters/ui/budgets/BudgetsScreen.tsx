@@ -24,13 +24,18 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   minorZuMajor,
-  type Budget,
   type Budgetart,
   type Budgetbereich,
   type Budgetstand,
   type Budgetvorschlag,
 } from "../../../application";
-import { budgetAnlegen as budgetSpeichern, budgetbereich, budgetLoeschen, vorschlagIgnorieren } from "../../dienste";
+import {
+  budgetAnlegen as budgetSpeichern,
+  budgetbereich,
+  budgetBetragLoeschen,
+  budgetLoeschen,
+  vorschlagIgnorieren,
+} from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "../bausteine";
 import { BudgetVerlauf } from "./BudgetVerlauf";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
@@ -89,6 +94,15 @@ export function BudgetsScreen() {
   const [kontoId, setKontoId] = useState("");
   const [betragText, setBetragText] = useState("");
   const [start, setStart] = useState(heute);
+  /**
+   * Der Monat, für den der eingetippte Betrag gilt.
+   *
+   * Beim Anlegen der Startmonat, beim Bearbeiten der LAUFENDE: ein geänderter Rahmen gilt
+   * ab jetzt, die Monate davor behalten ihre Planung. Über die Liste im Dialog lässt er
+   * sich auf einen früheren Monat umstellen — dann wird dort korrigiert statt eine neue
+   * Version anzulegen.
+   */
+  const [zielMonat, setZielMonat] = useState(heute.slice(0, 7));
   const [fehler, setFehler] = useState<string | null>(null);
 
   // EIN Ladevorgang, EIN setState: gestaffelte await/setState-Paare lassen abgeleitete
@@ -114,6 +128,8 @@ export function BudgetsScreen() {
   const kontoName = bereich?.kontoNamen ?? LEERE_NAMEN;
   /** Die Zeile, deren Verlauf offen ist — sie kann nach einem Löschen weg sein. */
   const offenesZeile = zeilen.find((z) => z.budget.id === offenesBudget);
+  /** Das Budget, das der Dialog gerade bearbeitet — für die Liste seiner Beträge. */
+  const bearbeitetesBudget = zeilen.find((z) => z.budget.id === editId)?.budget;
 
   /**
    * Die Kennzahlen zählen nur die EFFEKTIVEN Beträge — sonst stünde ein eingebettetes
@@ -142,18 +158,44 @@ export function BudgetsScreen() {
     setKontoId(konten[0]?.id ?? "");
     setBetragText("");
     setStart(heute);
+    setZielMonat(heute.slice(0, 7));
     setFehler(null);
     setOffen(true);
   }
 
-  function bearbeiten(b: Budget) {
+  function bearbeiten(z: Budgetstand) {
+    const b = z.budget;
     neu();
     setEditId(b.id);
     setArt(b.art);
     setKategorieId(b.kategorieId);
     setKontoId(b.kontoId);
-    setBetragText(String(minorZuMajor(b.betragProMonat, geld.waehrung)));
+    // Der Betrag DIESES Monats, nicht „der Betrag" — es gibt eine Reihe davon, und was
+    // im Feld steht, ist der Ausgangspunkt für die nächste Version.
+    setBetragText(String(minorZuMajor(z.vollerMonatsbetrag, geld.waehrung)));
     setStart(b.start);
+    setZielMonat(heute.slice(0, 7));
+  }
+
+  /** Eine bestehende Version zum Korrigieren ins Feld holen. */
+  function versionBearbeiten(abMonat: string, betrag: number) {
+    setZielMonat(abMonat);
+    setBetragText(String(minorZuMajor(betrag, geld.waehrung)));
+    setFehler(null);
+  }
+
+  async function versionLoeschen(abMonat: string) {
+    if (!editId) return;
+    setFehler(null);
+    try {
+      await budgetBetragLoeschen(editId, abMonat);
+      await laden();
+      // Stand der gelöschte Monat gerade im Feld, zeigt es sonst auf etwas, das es nicht
+      // mehr gibt — zurück auf den laufenden Monat.
+      if (zielMonat === abMonat) setZielMonat(heute.slice(0, 7));
+    } catch (e) {
+      setFehler(fehlerNachricht(t, e));
+    }
   }
 
   /** Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort. */
@@ -172,7 +214,12 @@ export function BudgetsScreen() {
     setFehler(null);
     try {
       await budgetSpeichern(
-        { kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, art, start },
+        // `abMonat`: beim Anlegen der Startmonat, beim Bearbeiten der laufende. Ein
+        // geänderter Rahmen gilt ab jetzt — die Monate davor behalten ihre Planung.
+        {
+          kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, art, start,
+          abMonat: editId ? zielMonat : start.slice(0, 7),
+        },
         editId ?? undefined,
       );
       setOffen(false);
@@ -339,9 +386,9 @@ export function BudgetsScreen() {
                   label: `${t("budgets.spalteProMonat")} ${geld.symbol}`,
                   align: "right",
                   render: (z: Budgetstand) => (
-                    <span title={z.proMonat !== z.budget.betragProMonat ? t("budgets.abzugHinweis", { voll: geld.format(z.budget.betragProMonat) }) : undefined}>
+                    <span title={z.proMonat !== z.vollerMonatsbetrag ? t("budgets.abzugHinweis", { voll: geld.format(z.vollerMonatsbetrag) }) : undefined}>
                       {geld.format(z.proMonat)}
-                      {z.proMonat !== z.budget.betragProMonat && <span className="muted"> *</span>}
+                      {z.proMonat !== z.vollerMonatsbetrag && <span className="muted"> *</span>}
                     </span>
                   ),
                 },
@@ -405,7 +452,7 @@ export function BudgetsScreen() {
                     // nebenbei ein Diagramm zu einem Budget, das es nicht mehr gibt.
                     <span onClick={(e) => e.stopPropagation()}>
                       <IconLeiste>
-                        <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z.budget)} />
+                        <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z)} />
                         <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => void budgetLoeschen(z.budget.id).then(laden)} />
                       </IconLeiste>
                     </span>
@@ -419,7 +466,7 @@ export function BudgetsScreen() {
               onRowClick={(z: Budgetstand) => verlaufUmschalten(z.budget.id)}
               istAktiv={(z: Budgetstand) => z.budget.id === offenesBudget}
             />
-            {zeilen.some((z) => z.proMonat !== z.budget.betragProMonat) && (
+            {zeilen.some((z) => z.proMonat !== z.vollerMonatsbetrag) && (
               <div className="muted" style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-2)" }}>
                 {t("budgets.abzugFussnote")}
               </div>
@@ -487,9 +534,56 @@ export function BudgetsScreen() {
               </select>
             </FormField>
 
-            <FormField label={`${t("budgets.feldBetrag")} ${geld.symbol}`} required hint={t("budgets.feldBetragHinweis")}>
+            <FormField
+              label={`${t("budgets.feldBetrag")} ${geld.symbol}`}
+              required
+              hint={editId ? t("budgets.giltAbHinweis", { monat: zielMonat }) : t("budgets.feldBetragHinweis")}
+            >
               <input className="field" inputMode="decimal" value={betragText} onChange={(e) => setBetragText(e.target.value)} placeholder={geld.format(0)} />
             </FormField>
+
+            {/* Die Reihe der bisherigen Beträge — nur beim Bearbeiten, beim Anlegen gibt
+                es sie noch nicht. Sie steht hier und nicht auf dem Screen, weil sie die
+                Frage beantwortet, die man genau hier hat: „was habe ich zuletzt geplant,
+                und wo greift meine Eingabe hinein?" */}
+            {editId && bearbeitetesBudget && (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", marginBottom: "var(--sp-2)" }}>
+                  {t("budgets.versionenTitel")}
+                </div>
+                {bearbeitetesBudget.betraege.map((v) => {
+                  const aktiv = v.abMonat === zielMonat;
+                  return (
+                    <div
+                      key={v.abMonat}
+                      style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent", fontSize: "12.5px" }}
+                    >
+                      <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
+                        {t("budgets.versionAb", { monat: v.abMonat })}
+                      </span>
+                      <span className="num" style={{ marginLeft: "auto", fontWeight: "var(--fw-semi)" }}>
+                        {geld.formatMitSymbol(v.betrag)}
+                      </span>
+                      <IconLeiste>
+                        <IconButton icon="bearbeiten" label={t("budgets.versionAendern", { monat: v.abMonat })} onClick={() => versionBearbeiten(v.abMonat, v.betrag)} />
+                        {/* Die letzte Version bleibt: ein Budget ohne Betrag wäre eine
+                            Kategorie mit einem Etikett. Der Use-Case weist es ohnehin ab —
+                            der Knopf verschwindet, damit man nicht erst dagegen läuft. */}
+                        {bearbeitetesBudget.betraege.length > 1 && (
+                          <IconButton icon="loeschen" ton="gefahr" label={t("budgets.versionLoeschen", { monat: v.abMonat })} onClick={() => void versionLoeschen(v.abMonat)} />
+                        )}
+                      </IconLeiste>
+                    </div>
+                  );
+                })}
+                {/* Zurück auf „ab jetzt", wenn gerade eine alte Version im Feld steht. */}
+                {!bearbeitetesBudget.betraege.some((v) => v.abMonat === zielMonat) ? null : zielMonat !== heute.slice(0, 7) && (
+                  <button className="linkbtn" type="button" onClick={() => setZielMonat(heute.slice(0, 7))}>
+                    {t("budgets.wiederAbLaufend", { monat: heute.slice(0, 7) })}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Nur beim Aufbauenden: ohne Anker weiss es nicht, wie viele Monate es
                 schon gesammelt hat. Beim Monatlichen wäre das Feld ohne Wirkung. */}
