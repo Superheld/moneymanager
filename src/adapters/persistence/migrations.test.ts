@@ -757,6 +757,243 @@ describe("Migration 47 — die Vertragszuordnung wandert an die Buchung", () => 
   });
 });
 
+
+describe("Migrationen 48/49 — Fremdschluessel fuer die Achse Buchung-Konto-Kategorie", () => {
+  function bestand() {
+    const db = new SQL.Database();
+    apply(db, 0, 47);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('giro','Girokonto','Giro','[]')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('bar','Bargeld','Bargeld','[]')");
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat','Lebensmittel','Aufwand')");
+    return db;
+  }
+
+  function buchung(db: InstanceType<typeof SQL.Database>, id: string, katId: string | null) {
+    db.run(
+      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle,
+         notiz, transfer_id, gegenkonto_id, kategorie_herkunft, zu_pruefen, roh_hash)
+       VALUES (?, '2026-08-11', -4500, 'giro', ?, 'Aufwand', 'import',
+         'eine Notiz', 't-1', 'bar', 'manuell', 1, ?)`,
+      [id, katId, `h-${id}`],
+    );
+  }
+
+  /**
+   * Am Bestand gemessen: es zeigen Buchungen auf geloeschte Kategorien. In der Anzeige
+   * sieht das aus wie "ohne Kategorie" — in einer Auswertung, die ueber die Kategorie
+   * gruppiert, faellt die Zeile still heraus.
+   */
+  it("raeumt Verweise auf geloeschte Kategorien auf, statt sie mitzuschleppen", () => {
+    const db = bestand();
+    buchung(db, "b-heil", "kat");
+    buchung(db, "b-verwaist", "weg");
+
+    apply(db, 47, 48);
+
+    expect(db.exec("SELECT id, kategorie_id FROM ist_buchung ORDER BY id")[0].values).toEqual([
+      // Die Buchung bleibt und ist richtig — nur ihre Einordnung ist verlorengegangen.
+      ["b-heil", "kat"],
+      ["b-verwaist", null],
+    ]);
+    db.close();
+  });
+
+  /**
+   * DIE RISKANTESTE STELLE DES GANZEN UMBAUS. SQLite kann Constraints nicht nachruesten,
+   * die Tabelle wird also neu gebaut und umkopiert. Eine dabei vergessene Spalte faellt
+   * niemandem auf — sie ist einfach leer, und das Ledger ist die falsche Tabelle, um das
+   * erst spaeter zu merken.
+   */
+  it("traegt beim Neubau der Buchungstabelle JEDEN Wert mit", () => {
+    const db = bestand();
+    db.run(`INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, art)
+            VALUES ('v1','Talmberg Energie','2026-01-01','automatisch','aktiv','laufend')`);
+    buchung(db, "b1", "kat");
+    db.run("UPDATE ist_buchung SET vertrag_id='v1', vertrag_herkunft='manuell', plan_quelle_id='r1', plan_faelligkeit='2026-08-01'");
+
+    const vorher = db.exec("SELECT * FROM ist_buchung")[0];
+    apply(db, 47, 49);
+    const nachher = db.exec("SELECT * FROM ist_buchung")[0];
+
+    expect(nachher.columns).toEqual(vorher.columns);
+    expect(nachher.values).toEqual(vorher.values);
+    db.close();
+  });
+
+  it("haelt die Indizes der Buchungstabelle ueber den Neubau", () => {
+    const db = new SQL.Database();
+    apply(db);
+    for (const i of ["ux_ist_planref", "ix_ist_buchung_roh_hash", "ix_ist_buchung_vertrag"]) {
+      expect(indexExistiert(db, i)).toBe(true);
+    }
+    db.close();
+  });
+
+  /**
+   * Die Loeschregeln sind fachliche Entscheidungen, keine Formsache — deshalb wird jede
+   * einzeln geprueft und nicht bloss, dass "Fremdschluessel da sind".
+   */
+  it("nimmt Aufteilungen mit, wenn ihre Buchung faellt", () => {
+    const db = bestand();
+    buchung(db, "b1", "kat");
+    db.run("INSERT INTO ist_buchung_aufteilung (id, istbuchung_id, kategorie_id, betrag) VALUES ('a1','b1','kat',-4500)");
+    apply(db, 47, 49);
+
+    db.run("PRAGMA foreign_keys = ON");
+    db.run("DELETE FROM ist_buchung WHERE id='b1'");
+    expect(db.exec("SELECT COUNT(*) FROM ist_buchung_aufteilung")[0].values).toEqual([[0]]);
+    db.close();
+  });
+
+  it("laesst die Buchung stehen, wenn ihre Kategorie faellt", () => {
+    const db = bestand();
+    buchung(db, "b1", "kat");
+    apply(db, 47, 49);
+
+    db.run("PRAGMA foreign_keys = ON");
+    db.run("DELETE FROM kategorie WHERE id='kat'");
+    // Die Zahlung hat stattgefunden — nur ihre Einordnung ist weg.
+    expect(db.exec("SELECT id, kategorie_id FROM ist_buchung")[0].values).toEqual([["b1", null]]);
+    db.close();
+  });
+
+  /**
+   * Andersherum als die beiden davor: ein Konto mit Buchungen darf NICHT verschwinden.
+   * Ohne diese Sperre faellt sein Geld aus jedem Saldo, und die Buchungen zeigen ins Leere.
+   */
+  it("verweigert das Loeschen eines Kontos, an dem Buchungen haengen", () => {
+    const db = bestand();
+    buchung(db, "b1", "kat");
+    apply(db, 47, 49);
+
+    db.run("PRAGMA foreign_keys = ON");
+    expect(() => db.run("DELETE FROM zahlungskonto WHERE id='giro'")).toThrow();
+    db.close();
+  });
+
+  it("nimmt Depotwerte und -positionen mit ihrem Depot", () => {
+    const db = bestand();
+    db.run(`INSERT INTO bankzugang (id, bezeichnung, url, blz, benutzer, angelegt_am)
+            VALUES ('z1','Talmberger Bank','https://example.invalid','99999999','nutzer','2026-08-11T00:00:00.000Z')`);
+    db.run("INSERT INTO depot (id, zugang_id, schluessel, bezeichnung) VALUES ('d1','z1','s1','Depot')");
+    db.run("INSERT INTO depotwert (depot_id, stichtag, gesamtwert, erfasst_am) VALUES ('d1','2026-08-11',100000,'2026-08-11T00:00:00.000Z')");
+    db.run("INSERT INTO depotposition (depot_id, stichtag, kennung) VALUES ('d1','2026-08-11','k1')");
+    apply(db, 47, 49);
+
+    db.run("PRAGMA foreign_keys = ON");
+    db.run("DELETE FROM depot WHERE id='d1'");
+    expect(db.exec("SELECT COUNT(*) FROM depotwert")[0].values).toEqual([[0]]);
+    expect(db.exec("SELECT COUNT(*) FROM depotposition")[0].values).toEqual([[0]]);
+    db.close();
+  });
+
+  it("laeuft ein zweites Mal folgenlos durch", () => {
+    const db = bestand();
+    buchung(db, "b1", "kat");
+    apply(db, 47, 49);
+    const vorher = db.exec("SELECT * FROM ist_buchung")[0].values;
+    expect(() => apply(db, 47, 49)).not.toThrow();
+    expect(db.exec("SELECT * FROM ist_buchung")[0].values).toEqual(vorher);
+    db.close();
+  });
+
+  /**
+   * Die Gesamtprobe: nach der ganzen Kette darf SQLite selbst nichts zu bemaengeln haben.
+   * Mit eingeschalteten Fremdschluesseln, so wie die App laeuft — sql.js hat sie aus.
+   */
+  it("hinterlaesst eine Datenbank ohne verletzte Fremdschluessel", () => {
+    const db = bestand();
+    buchung(db, "b1", "kat");
+    apply(db, 47);
+    db.run("PRAGMA foreign_keys = ON");
+    expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
+    db.close();
+  });
+});
+
+
+describe("Migration 50 — der Rest der Verweise", () => {
+  /**
+   * Der Nachweis, dass hier nichts unter den Tisch faellt: nach der ganzen Kette traegt
+   * JEDE Verweisspalte, die auf eine unserer Tabellen zeigt, auch einen Fremdschluessel.
+   * Ohne so einen Test bleibt beim naechsten Umbau eine Tabelle uebrig, und niemand
+   * merkt es — die Datenbank laeuft ja weiter.
+   *
+   * Die Ausnahmen stehen NAMENTLICH da und mit Grund. Eine Ausnahmeliste ohne Begruendung
+   * waechst, bis sie alles enthaelt.
+   */
+  it("laesst keine Verweisspalte ohne Fremdschluessel zurueck", () => {
+    const db = new SQL.Database();
+    apply(db);
+
+    const OHNE_SCHLUESSEL_MIT_GRUND = new Set([
+      // Keine Verweise auf unsere Tabellen, sondern Kennungen der Bank bzw. der Quelle.
+      "bankzugang.kunden_id", "bankzugang.tan_verfahren_id",
+      "umsatz_roh.glaeubiger_id", "umsatz_roh.native_id",
+      // Gemeinsame Marke der beiden Beine einer Umbuchung, kein Verweis auf eine Zeile.
+      "ist_buchung.transfer_id",
+      // Verweist auf eine PROJIZIERTE Faelligkeit, die es als Zeile nicht gibt.
+      "ist_buchung.plan_quelle_id",
+      // JSON-Liste, kein Einzelverweis.
+      "zahlungskonto.inhaber_ids",
+    ]);
+
+    const tabellen = db
+      .exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name != '_migration'")[0]
+      .values.map((z) => String(z[0]));
+
+    const ohne: string[] = [];
+    for (const tabelle of tabellen) {
+      const spalten = db.exec(`PRAGMA table_info(${tabelle})`)[0].values;
+      const fk = db.exec(`PRAGMA foreign_key_list(${tabelle})`);
+      const abgesichert = new Set(
+        fk.length ? fk[0].values.map((z) => String(z[3])) : [],
+      );
+      for (const s of spalten) {
+        const name = String(s[1]);
+        const istPk = Number(s[5]) > 0;
+        if (istPk && name === "id") continue;
+        if (!name.endsWith("_id") && !name.endsWith("_ids")) continue;
+        const voll = `${tabelle}.${name}`;
+        if (OHNE_SCHLUESSEL_MIT_GRUND.has(voll)) continue;
+        if (!abgesichert.has(name)) ohne.push(voll);
+      }
+    }
+
+    expect(ohne).toEqual([]);
+    db.close();
+  });
+
+  it("laesst ein Budget mit seiner Kategorie fallen, eine Zahlungsregel aber nicht", () => {
+    const db = new SQL.Database();
+    apply(db);
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat','Wohnen','Aufwand')");
+    db.run("INSERT INTO budget (id, kategorie_id, betrag_pro_monat, art) VALUES ('b1','kat',-50000,'monatlich')");
+    db.run(`INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, kategorie_id)
+            VALUES ('r1','Miete',-50000,'monatlich','2026-01-01','Aufwand','kat')`);
+
+    db.run("PRAGMA foreign_keys = ON");
+    db.run("DELETE FROM kategorie WHERE id='kat'");
+
+    // Ein Budget OHNE Kategorie haette keinen Gegenstand — es faellt mit.
+    expect(db.exec("SELECT COUNT(*) FROM budget")[0].values).toEqual([[0]]);
+    // Eine Zahlungsregel dagegen bleibt und ist nur uneingeordnet: die Zahlung findet
+    // weiter statt, sie gehoert nur gerade nirgendwohin.
+    expect(db.exec("SELECT id, kategorie_id FROM zahlungsregel")[0].values).toEqual([["r1", null]]);
+    db.close();
+  });
+
+  it("laeuft ein zweites Mal folgenlos durch", () => {
+    const db = new SQL.Database();
+    apply(db);
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat','Wohnen','Aufwand')");
+    const vorher = db.exec("SELECT id, name FROM kategorie")[0].values;
+    expect(() => apply(db, 49)).not.toThrow();
+    expect(db.exec("SELECT id, name FROM kategorie")[0].values).toEqual(vorher);
+    db.close();
+  });
+});
+
 describe("Versionsschema", () => {
   it("hat streng aufsteigende, eindeutige Versionen", () => {
     const versionen = MIGRATIONS.map((m) => m.version);

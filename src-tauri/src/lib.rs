@@ -16,7 +16,7 @@ pub fn run() {
         .plugin(tauri_plugin_http::init())
         // Mehrere Statements atomar: was ueber tauri-plugin-sql nicht geht, weil dort jedes
         // Statement eine andere Pool-Verbindung erwischt. Siehe transaktion.rs.
-        .invoke_handler(tauri::generate_handler![transaktion::transaktion])
+        .invoke_handler(tauri::generate_handler![transaktion::transaktion, transaktion::schema_umbau])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
