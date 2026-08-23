@@ -107,6 +107,33 @@ describe("anmelden", () => {
     expect(tan.gefragt[0]?.bild).toBeUndefined();
   });
 
+  // "Die Bank antwortete mit 400" ist die unbrauchbarste Sorte Fehlermeldung: sie sagt,
+  // dass etwas nicht ging, und verschweigt als Einziges das, was weiterhuelfe. Gerade bei
+  // 400 steht in der Antwort, WAS der Bank fehlte.
+  it("reicht die Antwort der Bank mit durch, nicht nur den Status", async () => {
+    const { fabrik } = attrappe({
+      async login() {
+        throw Object.assign(new Error("Die Bank antwortete mit 400 auf /token"), {
+          code: "http",
+          status: 400,
+          details: '{"error":"invalid_request"}',
+        });
+      },
+    });
+    await expect(hanseaticAdapter(fabrik).anmelden(ZUGANG, "geheim", async () => undefined))
+      .rejects.toThrow(/invalid_request/);
+  });
+
+  it("laesst einen Fehler ohne Antworttext unveraendert", async () => {
+    const { fabrik } = attrappe({
+      async login() {
+        throw new Error("Verbindung zur Bank fehlgeschlagen");
+      },
+    });
+    await expect(hanseaticAdapter(fabrik).anmelden(ZUGANG, "geheim", async () => undefined))
+      .rejects.toThrow(/^Verbindung zur Bank fehlgeschlagen$/);
+  });
+
   it("meldet ein leeres Konten-Ergebnis als Hinweis, statt still nichts zu liefern", async () => {
     const { fabrik } = attrappe({ async getAccounts() { return []; } });
     const s = await hanseaticAdapter(fabrik).anmelden(ZUGANG, "geheim", async () => undefined);

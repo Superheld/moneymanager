@@ -160,6 +160,24 @@ function heute(): string {
   return `${d.getFullYear()}-${m}-${t}`;
 }
 
+/**
+ * Was die Bank gesagt hat, sichtbar machen.
+ *
+ * Die Bibliothek legt die Antwort der Bank gekürzt in `details` ab, ihre Meldung nennt
+ * aber nur den Status. „Die Bank antwortete mit 400" ist damit alles, was ankommt — und
+ * das ist die unbrauchbarste Sorte Fehlermeldung: sie sagt, dass etwas nicht ging, und
+ * verschweigt als Einziges das, was weiterhülfe. Gerade bei 400 steht in der Antwort, WAS
+ * der Bank fehlte.
+ *
+ * Angereichert wird nur ganz aussen, nach der Fallunterscheidung: `code` muss vorher
+ * unangetastet bleiben, sonst greift die Freigabe-Erkennung nicht mehr.
+ */
+function mitBankantwort(e: unknown): unknown {
+  const f = e as { message?: unknown; details?: unknown };
+  if (typeof f?.message !== "string" || typeof f?.details !== "string" || !f.details) return e;
+  return new Error(`${f.message} — Antwort der Bank: ${f.details}`, { cause: e });
+}
+
 /** Ist das der Fehler, den die Bibliothek für „erst bestätigen" benutzt? */
 function brauchtFreigabe(e: unknown): boolean {
   return typeof e === "object" && e !== null && (e as { code?: unknown }).code === "not_elevated";
@@ -226,12 +244,16 @@ class Sitzung implements Abrufsitzung {
     try {
       seite = await this.#client.getTransactions(konto.schluessel, zeitraum);
     } catch (e) {
-      if (!brauchtFreigabe(e)) throw e;
+      if (!brauchtFreigabe(e)) throw mitBankantwort(e);
       // Ältere Buchungen liegen hinter einer zweiten Bestätigung. Die Bibliothek wirft
       // vorher, statt eine Teilmenge zu liefern — deshalb ist hier ein Wiederholen nach
       // der Freigabe richtig und kein Herumraten.
       await this.#freigeben();
-      seite = await this.#client.getTransactions(konto.schluessel, zeitraum);
+      try {
+        seite = await this.#client.getTransactions(konto.schluessel, zeitraum);
+      } catch (zweiter) {
+        throw mitBankantwort(zweiter);
+      }
     }
 
     return this.#ergebnis(seite, k);
@@ -309,19 +331,28 @@ export function hanseaticAdapter(
       const speicher = new Tokenspeicher(tokenAus(zugang.bankparameter));
       const client = fabrik({ clientBasic: zugang.token, store: speicher });
 
-      await client.login(
-        { loginId: zugang.benutzer, password: pin },
-        {
-          onChallenge: () => {
-            void frageTan({
-              decoupled: true,
-              text: "Bitte die Anmeldung in der Secure-App bestätigen.",
-            });
+      try {
+        await client.login(
+          { loginId: zugang.benutzer, password: pin },
+          {
+            onChallenge: () => {
+              void frageTan({
+                decoupled: true,
+                text: "Bitte die Anmeldung in der Secure-App bestätigen.",
+              });
+            },
           },
-        },
-      );
+        );
+      } catch (e) {
+        throw mitBankantwort(e);
+      }
 
-      const konten = await client.getAccounts();
+      let konten: Account[];
+      try {
+        konten = await client.getAccounts();
+      } catch (e) {
+        throw mitBankantwort(e);
+      }
       const hinweise = konten.length === 0 ? ["Die Bank meldete kein Konto."] : [];
       return new Sitzung(client, speicher, konten, frageTan, hinweise);
     },
