@@ -29,13 +29,33 @@ import type { ImportErgebnis } from "../import";
  * (BPD/UPD + systemId). Ohne diese Aufbewahrung synchronisiert jeder Abruf neu — zwei
  * zusätzliche Dialogrunden und im ungünstigen Fall eine TAN mehr.
  */
+/**
+ * Über welchen Weg ein Zugang seine Bank erreicht.
+ *
+ * FinTS ist der Normalfall und deckt jedes Institut ab, das am Verfahren teilnimmt. Wer
+ * nicht teilnimmt, ist damit nicht erreichbar — und dafür gibt es die zweite Art: einen
+ * Weg über die Schnittstelle der Weboberfläche des Instituts. Der ist experimentell,
+ * institutsspezifisch und hinter einem Schalter (`application/experimente.ts`).
+ *
+ * Die Art steht am ZUGANG und nicht am Adapter, weil sie eine Eigenschaft dieser
+ * Verbindung ist: dasselbe Institut könnte morgen FinTS anbieten, und dann wechselt der
+ * Weg, ohne dass sich am Rest etwas ändert.
+ */
+export type Zugangsart = "fints" | "hanseatic";
+
 export interface Bankzugang {
   readonly id: string;
   /** Anzeigename der Bank, wie sie sich selbst nennt. */
   readonly bezeichnung: string;
-  /** FinTS-PIN/TAN-Endpunkt der Bank. */
+  /**
+   * Welcher Abrufweg diesen Zugang bedient — Pflicht, damit niemand sie versehentlich
+   * offenlässt. In der DATENBANK darf die Spalte beim Bestand fehlen; dort gilt FinTS,
+   * weil bis dahin jeder Zugang einer war.
+   */
+  readonly art: Zugangsart;
+  /** FinTS-PIN/TAN-Endpunkt der Bank; bei anderen Arten deren Basis-Adresse. */
   readonly url: string;
-  /** Bankleitzahl. */
+  /** Bankleitzahl. Leer, wenn der Weg dieses Instituts keine braucht. */
   readonly blz: string;
   /** Anmeldename — bei manchen Banken die Zugangsnummer, NICHT die Kontonummer. */
   readonly benutzer: string;
@@ -55,6 +75,20 @@ export interface Bankzugang {
    * Objekt der Bibliothek und bleibt im Adapter.
    */
   readonly profil?: string;
+  /**
+   * Ein Ausweis, mit dem sich die ANWENDUNG gegenüber der Bank ausweist — nicht der
+   * Nutzer.
+   *
+   * Er wird gespeichert, und das ist der Unterschied zur PIN, die es ausdrücklich nicht
+   * wird: die PIN ist das Geheimnis des Nutzers und lebt nur in der Sitzung. Dieser
+   * Ausweis gehört zur Anwendung, ist bei jedem Aufruf nötig und ändert sich nicht — ihn
+   * bei jedem Abruf erneut zu erfragen, hiesse den Nutzer etwas abtippen zu lassen, das
+   * er selbst irgendwo herauslesen musste. Dieselbe Überlegung wie bei der
+   * FinTS-Produkt-ID: Konfiguration, nie Konstante, und nie im Quelltext.
+   *
+   * FinTS-Zugänge brauchen ihn nicht.
+   */
+  readonly token?: string;
 }
 
 /**

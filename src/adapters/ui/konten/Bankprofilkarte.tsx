@@ -89,7 +89,15 @@ export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert }:
       title={t("bankabruf.profilTitel")}
       subtitle={t("bankabruf.profilHinweis", { stand: profil.standAm })}
     >
-      <DataTable columns={spalten} rows={[...profil.vorfaelle]} />
+      {/* Eine leere Tabelle unter der Ueberschrift "was diese Bank kann" liest sich wie
+          "sie kann nichts". Vorfaelle sind FinTS-Segmente; wer nicht am Verfahren
+          teilnimmt, meldet keine — das ist keine fehlende Faehigkeit, sondern eine
+          andere Sprache. */}
+      {profil.vorfaelle.length === 0 ? (
+        <div className="muted">{t("bankabruf.profilOhneVorfaelle")}</div>
+      ) : (
+        <DataTable columns={spalten} rows={[...profil.vorfaelle]} />
+      )}
 
       {profil.nationaleFelderErlaubt === false && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>

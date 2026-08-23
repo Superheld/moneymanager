@@ -1542,4 +1542,27 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_zweck ON umsatz_roh (zweck_code) WHERE zweck_code IS NOT NULL`,
     ],
   },
+  {
+    version: 55, // Ein Zugang weiss, ÜBER WELCHEN WEG er seine Bank erreicht
+    sql: [
+      // Bis hierher war jeder Bankzugang ein FinTS-Zugang — das stand nirgends, es war
+      // schlicht der einzige Weg. Sobald es einen zweiten gibt, muss die Wahl irgendwo
+      // stehen, und sie gehört an den ZUGANG: dasselbe Institut könnte morgen FinTS
+      // anbieten, und dann wechselt der Weg, ohne dass sich sonst etwas ändert.
+      //
+      // Der Standard trägt den Bestand: alles Vorhandene IST FinTS, ohne Datenwanderung.
+      `ALTER TABLE bankzugang ADD COLUMN art TEXT NOT NULL DEFAULT 'fints'`,
+      //
+      // Der Ausweis, mit dem sich die ANWENDUNG gegenüber der Bank ausweist — nicht der
+      // Nutzer. Er wird gespeichert, und das ist der Unterschied zur PIN, die es
+      // ausdrücklich nicht wird: die PIN ist das Geheimnis des Nutzers und lebt nur in
+      // der Sitzung. Dieser Ausweis gehört zur Anwendung, ist bei jedem Aufruf nötig und
+      // ändert sich nicht — ihn jedes Mal erneut zu erfragen hiesse, den Nutzer etwas
+      // abtippen zu lassen, das er selbst erst aus seiner eigenen Anmeldung herauslesen
+      // musste.
+      //
+      // FinTS-Zugänge lassen die Spalte leer; deshalb NULL erlaubt und kein Standardwert.
+      `ALTER TABLE bankzugang ADD COLUMN token TEXT`,
+    ],
+  },
 ];

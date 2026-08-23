@@ -15,6 +15,7 @@ const HEUTE = "2026-08-18";
 const zugang: Bankzugang = {
   id: "z1",
   bezeichnung: "Musterbank",
+  art: "fints",
   url: "https://fints.example/fints",
   blz: "10000001",
   benutzer: "12345",

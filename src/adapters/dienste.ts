@@ -29,6 +29,7 @@ import {
 } from "../application/fints/abrufAusfuehren";
 import type { TanHerausforderung } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
+import { hanseaticAbruf } from "./hanseatic";
 import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
 import { trainingsmaterial, type Materialbefund } from "../application/kategorien/trainingsmaterial";
 import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
@@ -57,6 +58,12 @@ import { sqliteDepotRepository } from "./persistence/sqliteDepotRepository";
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
+import {
+  experimenteLaden,
+  experimentSchalten,
+  type ExperimentId,
+  type Experimente,
+} from "../application/experimente";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { inventarLaden, type Inventarsicht } from "../application/inventar/inventarsichten";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
@@ -127,7 +134,7 @@ import {
   type PersonEingabe,
 } from "../application/stammdaten/stammdatenAnlegen";
 import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/kategorien/standardkategorien";
-import type { Bankzugang } from "../application/fints/abrufPort";
+import type { Abrufadapter, Bankzugang, Zugangsart } from "../application/fints/abrufPort";
 import type { Kontozuordnung } from "../application/fints/bankzugangPort";
 import {
   sqliteBankzugangRepository,
@@ -196,6 +203,15 @@ export function einstellungen(): Promise<Haushaltseinstellungen> {
 
 export function regionSetzen(locale: string): Promise<void> {
   return regionWaehlen(sqliteEinstellungenRepository, locale);
+}
+
+/** Welche experimentellen Funktionen eingeschaltet sind. Ohne Zutun: alle aus. */
+export function experimente(): Promise<Experimente> {
+  return experimenteLaden(sqliteEinstellungenRepository);
+}
+
+export function experimentSetzen(id: ExperimentId, an: boolean): Promise<void> {
+  return experimentSchalten(sqliteEinstellungenRepository, id, an);
 }
 
 
@@ -473,6 +489,20 @@ export async function umsaetzeBuchen(umsaetze: readonly Umsatz[]) {
  * Die PIN wird durchgereicht und nirgends gespeichert — sie lebt im State des Dialogs
  * und ist mit dem Schließen weg.
  */
+/**
+ * Welcher Adapter diesen Zugang bedient.
+ *
+ * Die einzige Stelle, an der aus der Art eines Zugangs sein Abrufweg wird. Sie steht hier
+ * und nicht in der Oberflaeche, weil sonst jeder Aufrufer die Zuordnung selbst kennen
+ * muesste — und der naechste sie anders traefe.
+ *
+ * Ein unbekannter Wert kann hier nicht ankommen: `Zugangsart` ist eine geschlossene
+ * Aufzaehlung, und das Repository faengt ab, was in der Spalte sonst noch stehen koennte.
+ */
+export function abrufAdapterFuer(art: Zugangsart): Abrufadapter {
+  return art === "hanseatic" ? hanseaticAbruf : fintsAbruf;
+}
+
 export async function bankAbrufen(
   zugang: Bankzugang,
   pin: string,
@@ -481,7 +511,7 @@ export async function bankAbrufen(
   rueckgriffTage?: number,
 ): Promise<Abrufergebnis> {
   return abrufAusfuehren(zugang, pin, frageTan, {
-    adapter: fintsAbruf,
+    adapter: abrufAdapterFuer(zugang.art),
     zugangRepo: sqliteBankzugangRepository,
     zuordnungRepo: sqliteKontozuordnungRepository,
     kontoRepo: sqliteZahlungskontoRepository,

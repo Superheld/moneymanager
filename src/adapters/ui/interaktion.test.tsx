@@ -1129,7 +1129,7 @@ describe("Online geführte Konten werden nicht von Hand bebucht", () => {
       id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
     });
     await sqliteBankzugangRepository.speichern({
-      id: "z1", bezeichnung: "Testbank", url: "https://example.invalid/fints",
+      id: "z1", bezeichnung: "Testbank", art: "fints", url: "https://example.invalid/fints",
       blz: "99999901", benutzer: "nutzer",
     });
     await sqliteKontozuordnungRepository.speichern({
@@ -1307,7 +1307,7 @@ describe("Gegenbein erzeugen nur auf Konten ohne Bankverbindung", () => {
       });
     }
     await sqliteBankzugangRepository.speichern({
-      id: "z1", bezeichnung: "Testbank", url: "https://example.invalid/fints",
+      id: "z1", bezeichnung: "Testbank", art: "fints", url: "https://example.invalid/fints",
       blz: "99999901", benutzer: "nutzer",
     });
     for (const [schluessel, kontoId] of [["1234567|", "k1"], ["7654321|", "k-tg"]] as const) {

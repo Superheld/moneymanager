@@ -218,6 +218,7 @@ export type {
   TanHerausforderung,
   TanVerfahren,
   Vorfallprofil,
+  Zugangsart,
 } from "./fints/abrufPort";
 export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
 export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
@@ -238,6 +239,14 @@ export {
   regionWaehlen,
   type Haushaltseinstellungen,
 } from "./einstellungen";
+export {
+  EXPERIMENTE,
+  EXPERIMENTE_AUS,
+  experimenteLaden,
+  experimentSchalten,
+  type ExperimentId,
+  type Experimente,
+} from "./experimente";
 export {
   uebersichtLaden,
   waehlbareMonate,

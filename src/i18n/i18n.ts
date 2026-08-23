@@ -129,6 +129,25 @@ const de = {
     feldBenutzerHinweis: "Bei manchen Banken die Zugangsnummer, nicht die Kontonummer.",
     feldKundenId: "Kunden-ID",
     feldKundenIdHinweis: "Nur ausfüllen, wenn die Bank eine abweichende Kunden-ID verlangt.",
+    profilOhneVorfaelle:
+      "Diese Bank meldet keine Geschäftsvorfälle — sie nimmt am FinTS-Verfahren nicht " +
+      "teil. Was mit ihren Konten möglich ist, steht an den Konten selbst.",
+    feldWeg: "Zugangsweg",
+    feldWegHinweis: "Wie diese Bank erreicht wird",
+    wegFints: "FinTS (Standard)",
+    wegHanseatic: "Hanseatic Bank (experimentell)",
+    hanseaticHinweis:
+      "Diese Bank bietet kein FinTS an. Der Abruf geht über dieselbe Schnittstelle wie " +
+      "ihre Weboberfläche — nur lesend, mit deinen Zugangsdaten. Sie ist von der Bank " +
+      "nicht zugesichert und kann jederzeit aufhören zu funktionieren.",
+    feldToken: "Client-Kennung",
+    feldTokenHinweis:
+      "Weist die App gegenüber der Bank aus — kein Passwort. Sie wird einmalig aus einem " +
+      "Mitschnitt der eigenen Anmeldung gewonnen und hier gespeichert.",
+    feldAnmeldekennung: "Anmeldekennung",
+    feldAnmeldekennungHinweis: "Dieselbe, mit der du dich im Onlinebanking anmeldest.",
+    feldPasswort: "Passwort",
+    feldPasswortHinweis: "Wird nicht gespeichert und gilt nur für diese Sitzung.",
     feldPin: "PIN",
     feldPinHinweis: "Wird nirgends gespeichert.",
     anmelden: "Anmelden",
@@ -1013,6 +1032,23 @@ const de = {
       feld: "Region",
       hinweis: "bestimmt Sprache, Zahlenformat und Währung",
     },
+    experiment: {
+      titel: "Experimente",
+      untertitel: "Unfertiges zum Einschalten — auf eigene Verantwortung",
+      hinweis:
+        "Experimentelle Funktionen sind bewusst unfertig. Sie setzen Handarbeit bei der " +
+        "Einrichtung voraus, hängen an Schnittstellen, die niemand zugesichert hat, und " +
+        "können jederzeit aufhören zu funktionieren. Nichts davon läuft, solange du es " +
+        "nicht einschaltest.",
+      an: "eingeschaltet",
+      aus: "ausgeschaltet",
+      hanseaticTitel: "Hanseatic Bank",
+      hanseaticText:
+        "Konten, Salden und Umsätze der Hanseatic Bank abrufen. Die Bank bietet kein " +
+        "FinTS an; der Abruf geht deshalb über dieselbe Schnittstelle wie ihre " +
+        "Weboberfläche — nur lesend. Die Einrichtung verlangt einen einmaligen " +
+        "Mitschnitt der eigenen Anmeldung.",
+    },
     person: {
       titel: "Personen",
       untertitel: "Mitglieder des Haushalts — Dimension, kein eigener Mandant",
@@ -1511,6 +1547,25 @@ const en: typeof de = {
     feldBenutzerHinweis: "At some banks this is the access number, not the account number.",
     feldKundenId: "Customer ID",
     feldKundenIdHinweis: "Only fill in if the bank requires a separate customer ID.",
+    profilOhneVorfaelle:
+      "This bank reports no business transactions — it does not take part in FinTS. " +
+      "What its accounts support is shown on the accounts themselves.",
+    feldWeg: "Access method",
+    feldWegHinweis: "How this bank is reached",
+    wegFints: "FinTS (standard)",
+    wegHanseatic: "Hanseatic Bank (experimental)",
+    hanseaticHinweis:
+      "This bank offers no FinTS access. Retrieval uses the same interface as its web " +
+      "front end — read-only, with your own credentials. It is not guaranteed by the " +
+      "bank and may stop working at any time.",
+    feldToken: "Client key",
+    feldTokenHinweis:
+      "Identifies the app to the bank — not a password. It is obtained once from a " +
+      "capture of your own login and stored here.",
+    feldAnmeldekennung: "Login ID",
+    feldAnmeldekennungHinweis: "The same one you use for online banking.",
+    feldPasswort: "Password",
+    feldPasswortHinweis: "Not stored; valid for this session only.",
     feldPin: "PIN",
     feldPinHinweis: "Never stored.",
     anmelden: "Log in",
@@ -2388,6 +2443,21 @@ const en: typeof de = {
       untertitel: "Applies to the whole household",
       feld: "Region",
       hinweis: "determines language, number format and currency",
+    },
+    experiment: {
+      titel: "Experiments",
+      untertitel: "Unfinished features you can switch on — at your own risk",
+      hinweis:
+        "Experimental features are deliberately unfinished. They require manual setup, " +
+        "rely on interfaces nobody has guaranteed, and may stop working at any time. " +
+        "None of them run unless you switch them on.",
+      an: "on",
+      aus: "off",
+      hanseaticTitel: "Hanseatic Bank",
+      hanseaticText:
+        "Fetch accounts, balances and transactions from Hanseatic Bank. The bank offers " +
+        "no FinTS access, so the retrieval uses the same interface as its web front end " +
+        "— read-only. Setup requires a one-time capture of your own login.",
     },
     person: {
       titel: "People",
