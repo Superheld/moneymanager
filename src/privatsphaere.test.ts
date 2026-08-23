@@ -229,11 +229,15 @@ interface Ausnahme {
 const AUSNAHMEN: readonly Ausnahme[] = [
   {
     wert: "Hanseatic Bank",
-    nurIn: ["src/i18n/i18n.ts"],
+    nurIn: [
+      "src/i18n/i18n.ts",
+      "src/vendor/hanseatic-bank/docs/",
+      "src/vendor/hanseatic-bank/CLAUDE.md",
+    ],
     grund:
       "Institutsname, kein Bestandsdatum — er benennt weder ein Konto noch einen Betrag. " +
       "Er steht zugleich als Gegenpartei in den eigenen Umsaetzen und unvermeidlich in der " +
-      "Beschriftung des Schalters, der die Anbindung an genau dieses Institut freischaltet. " +
+      "Beschriftung des Schalters und im Titel der eingebetteten Schnittstellen-Doku. " +
       "Fuer Institute aus der DK-Liste erledigt das der bankNamen-Filter oben; diese Bank " +
       "bietet kein FinTS an und steht deshalb nicht darin.",
   },

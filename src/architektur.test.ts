@@ -104,6 +104,28 @@ describe("Schichtgrenzen", () => {
     expect(verstoesse).toEqual([]);
   });
 
+  // Eingebetteter Fremdcode (`vendor/`) ist Infrastruktur, kein Kern. Er kennt dieses
+  // Projekt nicht — und sobald er es kennte, liesse er sich nicht mehr gegen seine
+  // Herkunft abgleichen: jeder Import in unsere Richtung waere eine Aenderung, die beim
+  // naechsten Abgleich entweder verlorengeht oder ihn blockiert.
+  it("vendor kennt das Projekt nicht", () => {
+    const verstoesse = DATEIEN.filter((d) => schicht(d) === "vendor")
+      .map((d) => ({ datei: kurz(d), zieht: [...importierteSchichten(d)].filter((z) => z !== "vendor") }))
+      .filter((v) => v.zieht.length > 0);
+    expect(verstoesse).toEqual([]);
+  });
+
+  // Und die Gegenrichtung: fremde Datenformen kommen nur über einen Adapter herein, der
+  // sie uebersetzt. Zoege die UI direkt aus `vendor/`, stuenden Fliesskomma-Betraege und
+  // fremde Feldnamen mitten im Screen — genau das, was die Schichtgrenze verhindert.
+  it("nur die Adapter benutzen vendor — nicht der Kern, nicht die Anwendung, nicht die UI", () => {
+    const draussen = new Set(["core", "application", "adapters/ui"]);
+    const verstoesse = DATEIEN.filter((d) => draussen.has(schicht(d)))
+      .map((d) => ({ datei: kurz(d), zieht: [...importierteSchichten(d)].filter((z) => z === "vendor") }))
+      .filter((v) => v.zieht.length > 0);
+    expect(verstoesse).toEqual([]);
+  });
+
   // Ohne diese Prüfung wäre die ALTLAST eine Liste, die niemand je wieder anfasst: ein
   // migrierter Screen bliebe darin stehen, und beim nächsten Direktzugriff fiele es
   // keinem auf. Sie muss mit jeder Migration kürzer werden.
