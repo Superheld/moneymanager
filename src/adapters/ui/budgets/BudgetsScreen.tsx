@@ -11,20 +11,34 @@
 // Die Kennzahlen stehen als eigene Reihe ÜBER den Karten, nicht darin — wie auf der
 // Übersicht. In der Karte konkurrierten sie mit der Tabelle um dieselbe Fläche.
 //
+// **Die Zahlen der Liste gelten für den laufenden MONAT, auch beim Aufbauenden.** Vorher
+// standen dort Rahmen und Verbrauch kumuliert („seit Start"), und dieselbe Zeile trug
+// damit zwei Zeitbegriffe nebeneinander: eine Spalte über Jahre, die daneben über den
+// Monat. Der Rest ändert sich dadurch nicht — `verfügbar − verbraucht` ist in beiden
+// Lesarten derselbe Betrag (Herleitung in `core/budgets/budgetverlauf`). Was sich ändert,
+// ist, dass die Zahlen daneben etwas über DIESEN Monat sagen.
+//
 // PILOT für ADR-0004: alle sichtbaren Strings über t()/<Trans>, alles Geld über useGeld().
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
   minorZuMajor,
-  type Budget,
   type Budgetart,
   type Budgetbereich,
   type Budgetstand,
   type Budgetvorschlag,
 } from "../../../application";
-import { budgetAnlegen as budgetSpeichern, budgetbereich, budgetLoeschen, vorschlagIgnorieren } from "../../dienste";
+import {
+  budgetAnlegen as budgetSpeichern,
+  budgetbereich,
+  budgetBetragLoeschen,
+  budgetLoeschen,
+  vorschlagIgnorieren,
+} from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "../bausteine";
+import { BudgetVerlauf } from "./BudgetVerlauf";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { PageHead } from "../bausteine/PageHead";
@@ -49,6 +63,28 @@ export function BudgetsScreen() {
   const heute = useMemo(heuteIso, []);
 
   const [bereich, setBereich] = useState<Budgetbereich | null>(null);
+  /**
+   * Welches Budget seinen Verlauf zeigt — höchstens eines. Zwei aufgeklappte Charts
+   * untereinander schöben die Liste aus dem Bild, von der man ausgegangen ist.
+   */
+  const [offenesBudget, setOffenesBudget] = useState<string | null>(null);
+  /**
+   * Der Verlauf steht unter der ganzen Liste, nicht unter der geklickten Zeile — eine
+   * Tabelle kann nichts zwischen zwei Zeilen einhängen. Bei sechs Budgets plus
+   * Vorschlagskarte liegt er damit unter dem Sichtbaren, und wer klickt, sieht nichts
+   * passieren und hält es für kaputt. Deshalb wird er beim Aufklappen herangeholt.
+   */
+  const verlaufRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    // `?.` auch am Aufruf: jsdom kennt `scrollIntoView` nicht, und ein Screen-Test soll
+    // nicht an einer Bequemlichkeit scheitern.
+    if (offenesBudget) verlaufRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+  }, [offenesBudget]);
+
+  /** Auf- und zuklappen — von der Zeile wie vom Namen aus dieselbe Geste. */
+  function verlaufUmschalten(id: string) {
+    setOffenesBudget((cur) => (cur === id ? null : id));
+  }
 
   // Anlege-/Bearbeiten-Dialog
   const [offen, setOffen] = useState(false);
@@ -58,6 +94,15 @@ export function BudgetsScreen() {
   const [kontoId, setKontoId] = useState("");
   const [betragText, setBetragText] = useState("");
   const [start, setStart] = useState(heute);
+  /**
+   * Der Monat, für den der eingetippte Betrag gilt.
+   *
+   * Beim Anlegen der Startmonat, beim Bearbeiten der LAUFENDE: ein geänderter Rahmen gilt
+   * ab jetzt, die Monate davor behalten ihre Planung. Über die Liste im Dialog lässt er
+   * sich auf einen früheren Monat umstellen — dann wird dort korrigiert statt eine neue
+   * Version anzulegen.
+   */
+  const [zielMonat, setZielMonat] = useState(heute.slice(0, 7));
   const [fehler, setFehler] = useState<string | null>(null);
 
   // EIN Ladevorgang, EIN setState: gestaffelte await/setState-Paare lassen abgeleitete
@@ -81,6 +126,10 @@ export function BudgetsScreen() {
   const konten = bereich?.konten ?? [];
   const vorschlaege = bereich?.vorschlaege ?? [];
   const kontoName = bereich?.kontoNamen ?? LEERE_NAMEN;
+  /** Die Zeile, deren Verlauf offen ist — sie kann nach einem Löschen weg sein. */
+  const offenesZeile = zeilen.find((z) => z.budget.id === offenesBudget);
+  /** Das Budget, das der Dialog gerade bearbeitet — für die Liste seiner Beträge. */
+  const bearbeitetesBudget = zeilen.find((z) => z.budget.id === editId)?.budget;
 
   /**
    * Die Kennzahlen zählen nur die EFFEKTIVEN Beträge — sonst stünde ein eingebettetes
@@ -90,8 +139,8 @@ export function BudgetsScreen() {
     let proMonat = 0, rahmen = 0, verbraucht = 0;
     for (const z of zeilen) {
       proMonat += z.proMonat;
-      rahmen += z.rahmen;
-      verbraucht += z.verbraucht;
+      rahmen += z.monat.verfuegbar;
+      verbraucht += z.monat.verbraucht;
     }
     return {
       proMonat,
@@ -109,18 +158,44 @@ export function BudgetsScreen() {
     setKontoId(konten[0]?.id ?? "");
     setBetragText("");
     setStart(heute);
+    setZielMonat(heute.slice(0, 7));
     setFehler(null);
     setOffen(true);
   }
 
-  function bearbeiten(b: Budget) {
+  function bearbeiten(z: Budgetstand) {
+    const b = z.budget;
     neu();
     setEditId(b.id);
     setArt(b.art);
     setKategorieId(b.kategorieId);
     setKontoId(b.kontoId);
-    setBetragText(String(minorZuMajor(b.betragProMonat, geld.waehrung)));
+    // Der Betrag DIESES Monats, nicht „der Betrag" — es gibt eine Reihe davon, und was
+    // im Feld steht, ist der Ausgangspunkt für die nächste Version.
+    setBetragText(String(minorZuMajor(z.vollerMonatsbetrag, geld.waehrung)));
     setStart(b.start);
+    setZielMonat(heute.slice(0, 7));
+  }
+
+  /** Eine bestehende Version zum Korrigieren ins Feld holen. */
+  function versionBearbeiten(abMonat: string, betrag: number) {
+    setZielMonat(abMonat);
+    setBetragText(String(minorZuMajor(betrag, geld.waehrung)));
+    setFehler(null);
+  }
+
+  async function versionLoeschen(abMonat: string) {
+    if (!editId) return;
+    setFehler(null);
+    try {
+      await budgetBetragLoeschen(editId, abMonat);
+      await laden();
+      // Stand der gelöschte Monat gerade im Feld, zeigt es sonst auf etwas, das es nicht
+      // mehr gibt — zurück auf den laufenden Monat.
+      if (zielMonat === abMonat) setZielMonat(heute.slice(0, 7));
+    } catch (e) {
+      setFehler(fehlerNachricht(t, e));
+    }
   }
 
   /** Übernimmt einen Vorschlag in die Anlege-Maske — bestätigt wird dort. */
@@ -139,7 +214,12 @@ export function BudgetsScreen() {
     setFehler(null);
     try {
       await budgetSpeichern(
-        { kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, art, start },
+        // `abMonat`: beim Anlegen der Startmonat, beim Bearbeiten der laufende. Ein
+        // geänderter Rahmen gilt ab jetzt — die Monate davor behalten ihre Planung.
+        {
+          kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, art, start,
+          abMonat: editId ? zielMonat : start.slice(0, 7),
+        },
         editId ?? undefined,
       );
       setOffen(false);
@@ -265,10 +345,26 @@ export function BudgetsScreen() {
                   render: (z: Budgetstand) => (
                     // Einrückung statt eigener Spalte: die Verschachtelung ist eine
                     // Eigenschaft der Kategorie, keine zweite Information daneben.
-                    <span style={{ paddingLeft: z.tiefe * 18, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                    // Der Verlauf hängt am Bezeichner, nicht an der ganzen Zeile: eine
+                    // klickbare Zeile sieht man einer Tabelle nicht an (siehe
+                    // `bausteine/Zeilenlink`), und die Zeile trägt daneben schon zwei
+                    // Aktionen, die etwas anderes tun.
+                    // `stopPropagation` auf dem Block um den Link: sonst schaltet der
+                    // Klick zweimal um — einmal über den Link, einmal über die Zeile —
+                    // und das Aufklappen hebt sich selbst auf. Der Block ist so breit wie
+                    // sein Inhalt, der Rest der Zelle bleibt also Trefferfläche der Zeile.
+                    <span
+                      onClick={(e) => e.stopPropagation()}
+                      style={{ paddingLeft: z.tiefe * 18, display: "inline-flex", alignItems: "center", gap: 6 }}
+                    >
                       {z.tiefe > 0 && <span style={{ color: "var(--ink-3)" }}>└</span>}
                       <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)" }}>
-                        {z.kategorieName}
+                        <Zeilenlink
+                          titel={t("budgets.verlaufOeffnen", { name: z.kategorieName })}
+                          onKlick={() => verlaufUmschalten(z.budget.id)}
+                        >
+                          {z.kategorieName}
+                        </Zeilenlink>
                       </span>
                     </span>
                   ),
@@ -290,26 +386,42 @@ export function BudgetsScreen() {
                   label: `${t("budgets.spalteProMonat")} ${geld.symbol}`,
                   align: "right",
                   render: (z: Budgetstand) => (
-                    <span title={z.proMonat !== z.budget.betragProMonat ? t("budgets.abzugHinweis", { voll: geld.format(z.budget.betragProMonat) }) : undefined}>
+                    <span title={z.proMonat !== z.vollerMonatsbetrag ? t("budgets.abzugHinweis", { voll: geld.format(z.vollerMonatsbetrag) }) : undefined}>
                       {geld.format(z.proMonat)}
-                      {z.proMonat !== z.budget.betragProMonat && <span className="muted"> *</span>}
+                      {z.proMonat !== z.vollerMonatsbetrag && <span className="muted"> *</span>}
                     </span>
                   ),
                 },
                 {
-                  // Bei „aufbauend" das bisher Angesammelte, bei „monatlich" der
-                  // Monatsbetrag — dieselbe Spalte, weil es dieselbe Frage ist:
-                  // wieviel steht zur Verfügung?
+                  // Was in DIESEM Monat zur Verfügung steht: beim Monatlichen der
+                  // Monatsbetrag, beim Aufbauenden der Übertrag plus die Rate. Der Titel
+                  // legt die Aufrechnung offen, statt sie erraten zu lassen.
                   key: "rahmen",
                   label: `${t("budgets.spalteRahmen")} ${geld.symbol}`,
                   align: "right",
-                  render: (z: Budgetstand) => geld.format(z.rahmen),
+                  sortValue: (z: Budgetstand) => z.monat.verfuegbar,
+                  render: (z: Budgetstand) => (
+                    <span
+                      title={
+                        z.budget.art === "aufbauend"
+                          ? t("budgets.verfuegbarHinweis", {
+                              uebertrag: geld.formatMitSymbol(z.monat.uebertrag),
+                              zufuehrung: geld.formatMitSymbol(z.monat.zufuehrung),
+                              gesamt: geld.formatMitSymbol(z.rahmen),
+                            })
+                          : undefined
+                      }
+                    >
+                      {geld.format(z.monat.verfuegbar)}
+                    </span>
+                  ),
                 },
                 {
                   key: "verbraucht",
                   label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`,
                   align: "right",
-                  render: (z: Budgetstand) => geld.format(z.verbraucht),
+                  sortValue: (z: Budgetstand) => z.monat.verbraucht,
+                  render: (z: Budgetstand) => geld.format(z.monat.verbraucht),
                 },
                 {
                   key: "rest",
@@ -325,7 +437,7 @@ export function BudgetsScreen() {
                   sortable: false,
                   render: (z: Budgetstand) => (
                     <span style={{ display: "block", minWidth: 90 }}>
-                      <CoverageTrack value={Math.max(0, z.verbraucht)} max={Math.max(1, z.rahmen)} over={z.rest < 0} label="" right="" />
+                      <CoverageTrack value={Math.max(0, z.monat.verbraucht)} max={Math.max(1, z.monat.verfuegbar)} over={z.rest < 0} label="" right="" />
                     </span>
                   ),
                 },
@@ -335,16 +447,26 @@ export function BudgetsScreen() {
                   align: "right",
                   sortable: false,
                   render: (z: Budgetstand) => (
-                    <IconLeiste>
-                      <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z.budget)} />
-                      <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => void budgetLoeschen(z.budget.id).then(laden)} />
-                    </IconLeiste>
+                    // Der Klick auf ein Zeilen-Icon darf nicht zusätzlich den Verlauf
+                    // umschalten: er blubberte sonst zur Zeile hoch, und „löschen" öffnete
+                    // nebenbei ein Diagramm zu einem Budget, das es nicht mehr gibt.
+                    <span onClick={(e) => e.stopPropagation()}>
+                      <IconLeiste>
+                        <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z)} />
+                        <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => void budgetLoeschen(z.budget.id).then(laden)} />
+                      </IconLeiste>
+                    </span>
                   ),
                 },
               ]}
               rows={[...zeilen]}
+              // Der Name TRÄGT die Möglichkeit sichtbar (siehe `bausteine/Zeilenlink`);
+              // die ganze Zeile als Ziel kommt dazu, weil man nach dem ersten Mal die
+              // Trefferfläche will und nicht die Zielübung.
+              onRowClick={(z: Budgetstand) => verlaufUmschalten(z.budget.id)}
+              istAktiv={(z: Budgetstand) => z.budget.id === offenesBudget}
             />
-            {zeilen.some((z) => z.proMonat !== z.budget.betragProMonat) && (
+            {zeilen.some((z) => z.proMonat !== z.vollerMonatsbetrag) && (
               <div className="muted" style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-2)" }}>
                 {t("budgets.abzugFussnote")}
               </div>
@@ -352,6 +474,24 @@ export function BudgetsScreen() {
           </>
         )}
       </Card>
+
+      {/* Der Verlauf NEBEN der Liste, nicht darin: die Liste steckt schon in einer Karte,
+          und eine zweite darin wären zwei Rahmen um dieselbe Sache. Der `key` sorgt dafür,
+          dass beim Wechsel auf ein anderes Budget die Monatsauswahl neu anfängt statt auf
+          einem Index zu stehen, den die kürzere Reihe womöglich gar nicht hat. */}
+      {bereich && offenesZeile && (
+        <div ref={verlaufRef}>
+        <BudgetVerlauf
+          key={offenesZeile.budget.id}
+          sicht={bereich.sicht}
+          stand={offenesZeile}
+          heute={heute}
+          kategorieNamen={bereich.kategorieNamen}
+          empfaenger={bereich.empfaenger}
+          onSchliessen={() => setOffenesBudget(null)}
+        />
+        </div>
+      )}
 
       {offen && (
         <Modal
@@ -394,9 +534,56 @@ export function BudgetsScreen() {
               </select>
             </FormField>
 
-            <FormField label={`${t("budgets.feldBetrag")} ${geld.symbol}`} required hint={t("budgets.feldBetragHinweis")}>
+            <FormField
+              label={`${t("budgets.feldBetrag")} ${geld.symbol}`}
+              required
+              hint={editId ? t("budgets.giltAbHinweis", { monat: zielMonat }) : t("budgets.feldBetragHinweis")}
+            >
               <input className="field" inputMode="decimal" value={betragText} onChange={(e) => setBetragText(e.target.value)} placeholder={geld.format(0)} />
             </FormField>
+
+            {/* Die Reihe der bisherigen Beträge — nur beim Bearbeiten, beim Anlegen gibt
+                es sie noch nicht. Sie steht hier und nicht auf dem Screen, weil sie die
+                Frage beantwortet, die man genau hier hat: „was habe ich zuletzt geplant,
+                und wo greift meine Eingabe hinein?" */}
+            {editId && bearbeitetesBudget && (
+              <div style={{ gridColumn: "1 / -1" }}>
+                <div style={{ fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", marginBottom: "var(--sp-2)" }}>
+                  {t("budgets.versionenTitel")}
+                </div>
+                {bearbeitetesBudget.betraege.map((v) => {
+                  const aktiv = v.abMonat === zielMonat;
+                  return (
+                    <div
+                      key={v.abMonat}
+                      style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent", fontSize: "12.5px" }}
+                    >
+                      <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
+                        {t("budgets.versionAb", { monat: v.abMonat })}
+                      </span>
+                      <span className="num" style={{ marginLeft: "auto", fontWeight: "var(--fw-semi)" }}>
+                        {geld.formatMitSymbol(v.betrag)}
+                      </span>
+                      <IconLeiste>
+                        <IconButton icon="bearbeiten" label={t("budgets.versionAendern", { monat: v.abMonat })} onClick={() => versionBearbeiten(v.abMonat, v.betrag)} />
+                        {/* Die letzte Version bleibt: ein Budget ohne Betrag wäre eine
+                            Kategorie mit einem Etikett. Der Use-Case weist es ohnehin ab —
+                            der Knopf verschwindet, damit man nicht erst dagegen läuft. */}
+                        {bearbeitetesBudget.betraege.length > 1 && (
+                          <IconButton icon="loeschen" ton="gefahr" label={t("budgets.versionLoeschen", { monat: v.abMonat })} onClick={() => void versionLoeschen(v.abMonat)} />
+                        )}
+                      </IconLeiste>
+                    </div>
+                  );
+                })}
+                {/* Zurück auf „ab jetzt", wenn gerade eine alte Version im Feld steht. */}
+                {!bearbeitetesBudget.betraege.some((v) => v.abMonat === zielMonat) ? null : zielMonat !== heute.slice(0, 7) && (
+                  <button className="linkbtn" type="button" onClick={() => setZielMonat(heute.slice(0, 7))}>
+                    {t("budgets.wiederAbLaufend", { monat: heute.slice(0, 7) })}
+                  </button>
+                )}
+              </div>
+            )}
 
             {/* Nur beim Aufbauenden: ohne Anker weiss es nicht, wie viele Monate es
                 schon gesammelt hat. Beim Monatlichen wäre das Feld ohne Wirkung. */}

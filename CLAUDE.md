@@ -107,7 +107,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-25 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+26 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
@@ -116,7 +116,8 @@ ist sie:
   `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ
   UND Klasse, siehe unten) ·
   `kontostand_anker` · `import_lauf` · `dubletten_freigabe`
-- **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` · `vertrag` ·
+- **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` + `budget_betrag` (die
+  Reihe seiner Beträge, siehe unten) · `vertrag` ·
   `vertrag_erkennung` · `zahlungsregel` · `inventargegenstand`
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
 - **Bank:** `bankzugang` (samt Bankfähigkeitsprofil) · `bankkonto_zuordnung`
@@ -188,6 +189,28 @@ Widerspruch: „Aufwand" sagt, WOFÜR das Geld war, das Vorzeichen sagt, wohin e
 Budgetrechnung ist darauf ausgelegt — `Verbrauchsposten.betrag` ist ausdrücklich „POSITIV
 (eine Erstattung ist entsprechend negativ)", und damit entlastet sie das Budget der
 Kategorie, in der die Ausgabe stattgefunden hat.
+
+#### Der Budgetbetrag ist eine Reihe, kein Wert
+
+`budget_betrag` hält je Budget die Beträge mit dem **Monat, ab dem sie gelten**. Ein Budget
+ohne Zeile dort ist keins — die letzte Version lässt sich nicht löschen, nur das ganze
+Budget.
+
+Der Grund ist derselbe wie beim Beleg: **eine Änderung darf die Vergangenheit nicht
+umschreiben.** Vorher stand der Betrag als Spalte an `budget`, und wer im August von 400 auf
+450 ging, sah rückwirkend jeden Monat mit 450 geplant — nicht mehr feststellbar, wogegen er
+damals gemessen hatte. Bei einem aufbauenden Budget rechnete es zusätzlich den ganzen Sockel
+neu, weil dessen Rahmen `Rate × Monate` war.
+
+**MONAT und nicht Datum.** Ein Budget ist eine Monatsgrösse; ein Wechsel mitten im Monat
+müsste anteilig gerechnet werden, und dafür gibt es keinen fachlichen Grund. Geändert wird
+zum Ersten.
+
+Wer den Betrag eines Monats braucht, fragt `betragImMonat` — **nie `betraege[0]` und nie den
+letzten Eintrag.** Vor der ersten Version ist er 0, nicht der erste Betrag: da war nichts
+geplant, und einen Rahmen rückwirkend anzunehmen hiesse, eine Planung zu erfinden, die es
+nie gab. Aus demselben Grund summiert `budgetRahmen` beim Aufbauenden über die Monate,
+statt zu multiplizieren.
 
 #### Zuordnungen stehen an der Buchung
 

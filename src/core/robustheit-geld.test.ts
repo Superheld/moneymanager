@@ -58,6 +58,8 @@ function memBudgets(): BudgetRepository & { daten: Budget[] } {
     daten,
     async alle() { return [...daten]; },
     async speichern(b) { daten.push(b); },
+    async betragSpeichern() {},
+    async betragLoeschen() {},
     async loeschen(id) { const i = daten.findIndex((x) => x.id === id); if (i >= 0) daten.splice(i, 1); },
   };
 }
@@ -224,7 +226,7 @@ describe("Use-Cases — Integer-Cent-Invariante", () => {
   it("[ROT] budgetAnlegen lehnt Nachkommastellen ab", async () => {
     const repo = memBudgets();
     await expect(
-      budgetAnlegen(repo, { kategorieId: "k", kontoId: "k1", betragProMonat: 40000.5, art: "monatlich", start: "2026-06-01" }),
+      budgetAnlegen(repo, { kategorieId: "k", kontoId: "k1", betragProMonat: 40000.5, art: "monatlich", start: "2026-06-01", abMonat: "2026-06" }),
     ).rejects.toThrow();
   });
 
@@ -317,7 +319,7 @@ describe("Inventar — Validierung vor Rundung", () => {
 
 const LEBENSMITTEL_BUDGET: Budget = {
   id: "b-lm", kategorieId: "lebensmittel", kontoId: "k1",
-  betragProMonat: 40000, art: "monatlich", start: "2026-01-01",
+  betraege: [{ abMonat: "2026-01", betrag: 40000 }], art: "monatlich", start: "2026-01-01",
 };
 
 describe("budgetVerbrauch — Erstattungen", () => {

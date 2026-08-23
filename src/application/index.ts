@@ -84,6 +84,8 @@ export {
   budgetuebersichtLaden,
   budgetstaende,
   budgetPostenZu,
+  budgetPostenImMonat,
+  budgetVerlauf,
   vertragsBuchungenLaden,
   type Budgetstand,
   type Budgetuebersicht,
@@ -93,7 +95,11 @@ export {
   type Budgetbereich,
   type BudgetbereichDeps,
 } from "./budgets/budgetsichten";
-export { budgetAnlegen, type BudgetEingabe } from "./budgets/budgetAnlegen";
+export {
+  budgetAnlegen,
+  budgetBetragLoeschen,
+  type BudgetEingabe,
+} from "./budgets/budgetAnlegen";
 export {
   budgetvorschlaegeLaden,
   budgetvorschlagIgnorieren,

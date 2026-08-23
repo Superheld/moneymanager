@@ -9,6 +9,18 @@ function memRepo(): BudgetRepository & { daten: Budget[] } {
     daten,
     async alle() { return [...daten]; },
     async speichern(b) { const i = daten.findIndex((x) => x.id === b.id); if (i >= 0) daten[i] = b; else daten.push(b); },
+    async betragSpeichern(budgetId, betrag) {
+      const b = daten.find((x) => x.id === budgetId);
+      if (!b) return;
+      const reihe = [...b.betraege.filter((v) => v.abMonat !== betrag.abMonat), betrag]
+        .sort((x, y) => x.abMonat.localeCompare(y.abMonat));
+      daten[daten.indexOf(b)] = { ...b, betraege: reihe };
+    },
+    async betragLoeschen(budgetId, abMonat) {
+      const b = daten.find((x) => x.id === budgetId);
+      if (!b) return;
+      daten[daten.indexOf(b)] = { ...b, betraege: b.betraege.filter((v) => v.abMonat !== abMonat) };
+    },
     async loeschen(id) { const i = daten.findIndex((x) => x.id === id); if (i >= 0) daten.splice(i, 1); },
   };
 }
@@ -16,7 +28,7 @@ function memRepo(): BudgetRepository & { daten: Budget[] } {
 function eingabe(over: Partial<BudgetEingabe> = {}): BudgetEingabe {
   return {
     kategorieId: "kat1", kontoId: "giro", betragProMonat: 35000,
-    art: "monatlich", start: "2026-08-19", ...over,
+    art: "monatlich", start: "2026-08-19", abMonat: "2026-08", ...over,
   };
 }
 
@@ -24,7 +36,8 @@ describe("budgetAnlegen", () => {
   it("legt ein Budget an und übernimmt die Minor Units unverändert", async () => {
     const repo = memRepo();
     const b = await budgetAnlegen(repo, eingabe());
-    expect(b.betragProMonat).toBe(35000);
+    // Ein Betrag, EINE Version — ab dem Monat, den die Eingabe ansagt.
+    expect(b.betraege).toEqual([{ abMonat: "2026-08", betrag: 35000 }]);
     expect(b.art).toBe("monatlich");
     expect(repo.daten).toHaveLength(1);
   });
