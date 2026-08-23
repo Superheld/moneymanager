@@ -19,6 +19,7 @@ vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { HerkunftBereich } from "./HerkunftBereich";
+import { KontenVerwaltung } from "./KontenVerwaltung";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../../persistence/sqliteStammdatenRepositories";
 import {
   sqliteImportLaufRepository as laufRepo,
@@ -130,5 +131,75 @@ describe("Herkunft je Konto", () => {
     rendere(<HerkunftBereich />);
 
     await waitFor(() => expect(document.body.textContent).toMatch(/noch nie etwas eingelesen/i));
+  });
+});
+
+describe("Der Weg dorthin — vom Konto zu dem, was hereinkam", () => {
+  /**
+   * Die Verwaltung stand lange stumm da: vier Register voller Tabellen, in denen nichts
+   * zu klicken schien. `DataTable` KANN die ganze Zeile klickbar machen, aber das sieht
+   * man ihr nicht an — der Cursor wechselt, sonst nichts, und wer eine Tabelle vor sich
+   * hat, probiert nicht jede Zeile durch.
+   *
+   * Geprueft wird deshalb beides: dass der Bezeichner ueberhaupt ein Bedienelement IST
+   * (eine Vorlesehilfe findet ihn sonst nicht), und dass er das richtige Konto meint.
+   */
+  it("macht den Bezeichner zu einem Bedienelement mit erklaertem Ziel", async () => {
+    await bestand();
+    await kontoRepo.speichern({
+      id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage",
+      inhaberIds: [], saldo: 0,
+    });
+
+    const gerufen: string[] = [];
+    rendere(
+      <KontenVerwaltung
+        konten={[
+          { id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 },
+          { id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 0 },
+        ]}
+        personen={[]}
+        personName={new Map()}
+        kontostaende={[]}
+        hatGebuchtes={false}
+        verbindungen={new Map()}
+        onTrennen={async () => {}}
+        onChange={() => {}}
+        onKontoOeffnen={(id) => gerufen.push(id)}
+      />,
+    );
+
+    // Ueber den Titel gegriffen und nicht ueber die Beschriftung: dass die Vorlesehilfe
+    // erfaehrt, WOHIN es geht, ist Teil der Zusicherung.
+    const link = await screen.findByRole("button", { name: /Girokonto/ });
+    await userEvent.click(link);
+
+    expect(gerufen).toEqual(["k1"]);
+  });
+
+  /**
+   * Der zweite Teil der Kette: die Herkunft zeigt das Konto, das gemeint war — und nicht
+   * das erste der Liste, das sie sich sonst selbst aussucht.
+   */
+  it("oeffnet die Herkunft beim uebergebenen Konto", async () => {
+    await bestand();
+    await kontoRepo.speichern({
+      id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage",
+      inhaberIds: [], saldo: 0,
+    });
+    await umsatzRepo.anlegen({
+      id: "u-tg", laufId: "l1", zahlungskontoId: "k2", buchungstag: "2026-08-07",
+      betrag: -900, waehrung: "EUR", gegenpartei: "Kesselmann Anlagen",
+      verwendungszweck: "Uebertrag", rohHash: "h3", status: "neu",
+    });
+
+    rendere(<HerkunftBereich kontoId="k2" />);
+
+    await waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("Kesselmann Anlagen");
+      // Und NICHT die Zeilen des anderen Kontos.
+      expect(text).not.toContain("Thalberg Vibora");
+    });
   });
 });

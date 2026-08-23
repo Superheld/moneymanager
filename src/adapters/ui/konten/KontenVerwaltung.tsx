@@ -23,6 +23,7 @@ import {
 } from "../../../application";
 import { kontoAnlegen, kontoLoeschen } from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { IconButton } from "../bausteine/IconButton";
 import { KontoAnlegenModal } from "./KontoAnlegenModal";
 import { Modal } from "../bausteine/Modal";
@@ -46,6 +47,7 @@ export function KontenVerwaltung({
   verbindungen,
   onTrennen,
   onChange,
+  onKontoOeffnen,
 }: {
   konten: Zahlungskonto[];
   personen: Person[];
@@ -59,6 +61,8 @@ export function KontenVerwaltung({
   /** Löst die Verbindung eines Kontos (der Zugang selbst bleibt bestehen). */
   onTrennen: (v: KontoVerbindung) => Promise<void>;
   onChange: () => void;
+  /** Klick auf den Bezeichner — führt zu den Importzeilen dieses Kontos. */
+  onKontoOeffnen?: (kontoId: string) => void;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -126,7 +130,23 @@ export function KontenVerwaltung({
       ) : (
         <DataTable
           columns={[
-            { key: "bezeichnung", label: t("einstellungen.konto.spalteBezeichnung") },
+            {
+              key: "bezeichnung",
+              label: t("einstellungen.konto.spalteBezeichnung"),
+              // Der Bezeichner führt weiter — sichtbar, weil er wie ein Link aussieht.
+              // Die Zeile selbst bleibt stumm: eine unsichtbare Klickfläche findet
+              // niemand, und wer sie zufällig trifft, hat sie nicht gemeint.
+              render: onKontoOeffnen
+                ? (k: Zahlungskonto) => (
+                    <Zeilenlink
+                      onKlick={() => onKontoOeffnen(k.id)}
+                      titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
+                    >
+                      {k.bezeichnung}
+                    </Zeilenlink>
+                  )
+                : undefined,
+            },
             { key: "typ", label: t("einstellungen.konto.spalteTyp"), render: (k) => t(`einstellungen.konto.typ.${k.typ}`) },
             {
               key: "klasse",

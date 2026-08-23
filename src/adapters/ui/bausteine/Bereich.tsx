@@ -30,13 +30,32 @@ export function Bereich({
   titel,
   register,
   start,
+  gewaehlt,
+  onWechsel,
 }: {
   titel: string;
   register: readonly RegisterDef[];
   /** Register, das beim Betreten offen ist. Vorgabe: das erste. */
   start?: string;
+  /**
+   * Von aussen gesetztes Register — dann führt der Aufrufer den Zustand.
+   *
+   * Gebraucht, sobald aus einem Register heraus in ein anderes gesprungen wird: ein Konto
+   * in der Liste anklicken und in der Herkunft landen. `start` reicht dafür nicht, es ist
+   * nur der Anfangswert und wird danach nie wieder gelesen.
+   *
+   * Ohne diese beiden Angaben bleibt es beim eigenen Zustand — die meisten Bereiche
+   * brauchen nichts weiter.
+   */
+  gewaehlt?: string;
+  onWechsel?: (id: string) => void;
 }) {
-  const [aktiv, setAktiv] = useState(start ?? register[0]?.id);
+  const [eigenes, setEigenes] = useState(start ?? register[0]?.id);
+  const aktiv = gewaehlt ?? eigenes;
+  const setAktiv = (id: string) => {
+    setEigenes(id);
+    onWechsel?.(id);
+  };
   const offen = register.find((r) => r.id === aktiv) ?? register[0];
 
   return (
