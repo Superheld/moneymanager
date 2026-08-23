@@ -1,6 +1,6 @@
 # Öffentliche API der Library
 
-Was **wir** anbieten. Die Gegenseite steht in [bank-api.md](bank-api.md), die Belege in
+Was **wir** anbieten. Was die Bank tut — und was an ihr ungeklärt blieb — steht in
 [bank-api.md](bank-api.md).
 
 ## Leitgedanken
@@ -217,10 +217,10 @@ Bestätigung und gehört entsprechend behandelt: wie ein Passwort.
 
 **Die Client-Kennung muss der Nutzer einmal einrichten.** Sie ist nicht Teil des Pakets
 (Begründung im README). Die einbettende Anwendung braucht dafür einen Einrichtungsschritt
-— entweder ruft sie `hanseatic setup` auf, oder sie führt den Nutzer selbst durch die
-einmalige Anmeldung im Browser. Ohne diesen Schritt ist die Bibliothek nicht benutzbar,
-und das sollte in der Einrichtung stehen, nicht als Fehlermeldung beim ersten Abgleich
-auftauchen.
+— entweder ruft sie `hanseatic extract-client <datei.har>` auf, oder sie führt den
+Nutzer selbst durch die einmalige Anmeldung im Browser. Ohne diesen Schritt ist die
+Bibliothek nicht benutzbar, und das sollte in der Einrichtung stehen, nicht als
+Fehlermeldung beim ersten Abgleich auftauchen.
 
 ### Fehler, die behandelt werden wollen
 
@@ -238,6 +238,15 @@ try {
   }
 }
 ```
+
+## Referenzimplementierung
+
+Das Herkunfts-Repository enthaelt hier zwei vollstaendige Aufrufer: ein Beispiel fuer
+einen Abgleichlauf ohne Menschen davor, und die Kommandozeile. **Beide sind in diesem
+eingebetteten Stand nicht
+enthalten** — die Kommandozeile zieht `node:fs` und laeuft im Webview nicht, und ohne sie
+haengt auch das Beispiel in der Luft. Wer sie lesen will, findet sie dort; siehe die
+`CLAUDE.md` neben diesem Ordner.
 
 ## Typen
 

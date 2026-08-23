@@ -31,7 +31,11 @@ Mal wieder:
    `../../../CLAUDE.md`, „Keine Zahlen aus dem Bestand in Prosa"). Zahlen, die die API
    beschreiben — Token-Laufzeiten, Abfragetakt, Formatlängen, Seitengrösse —, sind
    geblieben: sie tragen die Sache und altern nicht mit einem Konto.
-3. **`src/cli/` fehlt.** Sie zieht `node:fs`, `node:os` und `process` und läuft im
+3. **Der Abschnitt "Referenzimplementierung" in `docs/api.md` nennt keine Pfade.** Dort
+   stehen im Herkunfts-Repository Verweise auf ein Beispielskript und die Kommandozeile —
+   Dateien, die hier nicht eingebettet sind. Ein Verweis auf etwas, das es nicht gibt, ist
+   schlimmer als keiner, und `doku.test.ts` faengt ihn ohnehin.
+4. **`src/cli/` fehlt.** Sie zieht `node:fs`, `node:os` und `process` und läuft im
    Webview nicht. Der Kern der Bibliothek ist frei davon — das ist der Grund, warum sie
    hier überhaupt funktioniert.
 
