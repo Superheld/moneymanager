@@ -3,6 +3,137 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.18.0] — 2026-08-23
+
+Die Runde, in der das Schema aufgeräumt wird — und in der die App anfängt, sich zu merken,
+was mit einer Buchung geschehen ist.
+
+### Geändert
+
+**Der Beleg und was wir daraus gemacht haben, stehen getrennt.** `umsatz` trug dreierlei
+in einer Zeile: die Rohdaten, wie die Quelle sie lieferte; die Zuordnung; und den Zustand
+unserer Verarbeitung. Das erste darf sich nie ändern, das letzte ändert sich bei jeder
+Durchsicht — in einer Tabelle trennt das nur Disziplin, und Disziplin hält keinen Randfall
+aus. Es sind jetzt `umsatz_roh` und `umsatz_verarbeitung`.
+
+Nicht die Kardinalität trennt hier: 1:1 gehörte nach Lehrbuch in eine Tabelle. Es ist der
+Lebenszyklus. Die Probe darauf ist „auf den Stand der Quelle zurückgehen" — das wird ein
+`DELETE` auf einer Tabelle, und die Rohzeile merkt nichts davon.
+
+Nach oben bleibt es EIN `Umsatz`. Sichtbar wird die Trennung nur an den Schreibwegen, und
+das ist der eigentliche Gewinn: `anlegen` schreibt beides, `speichern` nur den Stand,
+`ergaenzen` als einzige noch Rohdaten — und dort nur Fehlendes. Vorher konnte eine blosse
+Statusänderung unbemerkt Rohfelder mitziehen.
+
+**Die Kontozuordnung gehört nicht zum Beleg.** Die Quelle liefert eine IBAN — das ist
+Beleg. Welches unserer Konten gemeint ist, ist unsere Zuordnung, und der Verbuchen-Dialog
+lässt sie ändern. Was der Mensch korrigieren darf, ist kein Beleg.
+
+**Die Vertragszuordnung steht an der Buchung.** `vertrag_zuordnung` hielt eine N:1-Beziehung
+in einer Tabelle mit `istbuchung_id` als Primärschlüssel, also 1:1 zur Buchung — nach
+Kardinalität gehört das als Spalte dorthin, wie `kategorie_id` daneben. Der Anlass war
+handfest: es standen Zuordnungen zu Buchungen da, die es nicht mehr gab.
+
+Die subtile Stelle dabei: in der alten Tabelle trug die blosse EXISTENZ der Zeile die
+Aussage „hier wurde entschieden". Als Spalte wäre `vertrag_id IS NULL` zweideutig — „noch
+nie zugeordnet" gegen „gehört ausdrücklich zu keinem Vertrag". Das trägt jetzt
+`vertrag_herkunft`; ohne die Unterscheidung käme ein von Hand korrigierter Fehlgriff der
+Automatik beim nächsten Abgleich zurück.
+
+**Das ganze Schema hat Fremdschlüssel.** Bis hierher war jede Verbindung zwischen zwei
+Tabellen eine blosse Textspalte mit einer ID darin, und drei Sorten Widerspruch hatten sich
+darüber angesammelt — verbuchte Umsätze ohne Buchung, Zuordnungen zu gelöschten Buchungen,
+Verweise auf gelöschte Kategorien. Alle drei waren messbar, keine Theorie.
+
+Die Löschregeln sind fachliche Entscheidungen und keine Formsache: CASCADE, wo das
+Angehängte ohne sein Gegenstück gegenstandslos ist (Aufteilungen einer Buchung, Werte eines
+Depots); SET NULL, wo der Verweis wegfällt, die Zeile aber richtig bleibt (eine gelöschte
+Kategorie macht eine Zahlungsregel nicht falsch, nur uneingeordnet); RESTRICT, wo ein
+Löschen ein Fehler wäre (ein Konto mit Buchungen darf nicht verschwinden).
+
+### Hinzugefügt
+
+**Änderungen an Buchungen stehen im Journal.** Der Beleg war geschützt, die BUCHUNG nie:
+jede Änderung überschrieb still, jedes Löschen löschte wirklich, und was vorher dastand,
+war danach nicht mehr feststellbar — auch nicht für den, der es selbst geändert hat. Das
+ist der Kern dessen, was die GoBD Unveränderbarkeit nennen, und die einzige ihrer
+Forderungen, an der diese App wirklich vorbeilief.
+
+`buchung_journal` hält jedes Anlegen, Ändern und Löschen fest, mit dem GANZEN Zustand
+vorher und nachher. Es trägt bewusst KEINEN Fremdschlüssel auf die Buchung: es muss die
+Löschung überleben, sonst protokolliert es genau den Fall nicht, für den es da ist.
+
+Wie weit die App den GoBD folgt und was bewusst offen bleibt — Storno statt Löschen, wer
+etwas geändert hat, Fälschungssicherheit —, steht jetzt in der `CLAUDE.md`.
+
+**Mehrere Statements laufen atomar.** `tauri-plugin-sql` führt jedes Statement über den
+Verbindungs-Pool aus und bekommt dabei irgendeine Verbindung; ein `BEGIN` landete damit auf
+der einen, die Schreibvorgänge auf anderen. Über das Plugin war eine Transaktion also nicht
+möglich — auch zur Laufzeit nicht, nicht nur in Migrationen. Ein eigener Command hält jetzt
+eine Verbindung fest.
+
+Sichtbar wird das an einer Stelle sofort: das Ledger schrieb die Buchung, löschte dann alle
+Aufteilungen und legte sie neu an. Brach es dazwischen ab, stand die Buchung ohne ihre Teile
+da, und Σ Teile ≠ Betrag — eine Invariante, die der Kern voraussetzt.
+
+**Ein zweiter Abrufweg neben FinTS.** Für ein Institut, das kein FinTS anbietet, liegt eine
+eingebettete Bibliothek bei, hinter einem Experimente-Schalter.
+
+**Die Bank liefert drei Angaben mehr.** Der Fork von `lib-fints` liest jetzt die IBAN des
+Gegenkontos auch aus MT940 (Unterfeld `?38`), den SEPA-Verwendungszweckcode und den
+Empfänger hinter einem Zahlungsdienstleister.
+
+Die IBAN ist der greifbarste Gewinn: bisher trug `remoteAccountNumber` je nach Format die
+IBAN ODER die nationale Kontonummer, und über MT940 kam deshalb nie eine Gegen-IBAN an.
+Der Zweckcode (`SALA`, `RENT`) ist eine Einordnung, die die Bank schon vorgenommen hat —
+anders als die Umsatzart kein Vokabular, das je Institut anders aussieht. Und der
+Endempfänger steht NEBEN der Gegenpartei: dort bleibt der Dienstleister, und der ist bei
+jedem Händler derselbe.
+
+**Ein Werkzeug, das Migrationen gegen echte Daten fährt.** `npm test` prüft sie gegen
+sql.js — und das hat Fremdschlüssel standardmässig AUS, während sie in der App AN sind.
+Eine Migration kann deshalb grün sein und in der App scheitern oder still Daten löschen.
+Genau das ist beim Umbau passiert; gefunden hat es eine Probe gegen eine Lesekopie.
+
+### Behoben
+
+**Die Verwaltung war stumm.** Von den Tabellen der App waren zwei klickbar, und in der
+ganzen Verwaltung ging nichts — obwohl genau dort die Wege liegen, die man gehen will.
+Jetzt führt der Bezeichner weiter: unter der Kontentabelle klappen die eingelesenen Zeilen
+auf, unter einem Bankzugang seine Konten und darunter seine Importe.
+
+Der Link sitzt im Bezeichner und nicht auf der Zeile. `DataTable` kann die ganze Zeile
+klickbar machen, und das sieht man ihr nicht an — der Cursor wechselt, sonst nichts. Wer
+eine Tabelle vor sich hat, probiert nicht jede Zeile durch.
+
+**Die Importliste eines Bankzugangs war leer, obwohl abgerufen wurde.** Die Spalte, die den
+Zugang am Lauf festhält, kam erst später dazu; alle Abrufe davor haben sie leer und fielen
+damit aus der Liste. Das ist die schlechteste Art zu irren, weil sie aussieht wie eine
+Auskunft. Nachgetragen wird über die Zeilen des Laufs und, für die Läufe ohne Zeilen, über
+den Dateinamen — beide Wege prüfen auf Eindeutigkeit.
+
+**Eine Erstattung wurde beim Einsortieren zur Ausgabe.** Sie kam als Zufluss herein, wurde
+in die Kategorie gelegt, in der die Ausgabe stattgefunden hatte — dort gehört sie hin, damit
+sie das Budget entlastet —, und belastete es danach ein zweites Mal. Die Ursache: das
+Vorzeichen wurde beim Bearbeiten aus dem CHARAKTER neu gebildet, und die Kategorie gibt
+„Aufwand" vor.
+
+Das Betragsfeld ist bei Online-Konten gesperrt. Es hat also niemand etwas eingegeben, das
+sich hätte ändern dürfen. Die Regel lautet jetzt: bei einer von Hand erfassten Buchung folgt
+das Vorzeichen dem Charakter, bei einer importierten kommt die Richtung vom Beleg. Die Bank
+hat gebucht, wohin das Geld floss — das ist eine Tatsache, und eine Einordnung dreht keine
+Tatsache um.
+
+### Entfernt
+
+- **Das Register „Herkunft"** in der Verwaltung. Es stellte dieselbe Frage ein zweites Mal,
+  seit die Kontentabelle selbst aufklappt.
+- **Der gespeicherte Dublettenverdacht.** Er wurde beim Import geschrieben und von keiner
+  Anzeige gelesen — sämtliche Dublettenanzeigen rechnen ihn beim Hinsehen, und das aus
+  gutem Grund: ein angeschriebener Verdacht gilt für den Stand von damals.
+- **`umsatz_roh.format`.** Eine Zeile gehört zu genau einem Lauf, und der Lauf trägt das
+  Format bereits.
+
 ## [0.17.0] — 2026-08-21
 
 Die Runde, in der der Bankabruf erwachsen wird — und in der die App zum ersten Mal etwas
