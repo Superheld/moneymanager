@@ -127,39 +127,62 @@ export const sqliteVertragserkennungRepository: VertragserkennungRepository = {
 };
 
 interface ZuordnungZeile {
-  istbuchung_id: string;
+  id: string;
   vertrag_id: string | null;
-  herkunft: string;
+  vertrag_herkunft: string;
 }
 
+/**
+ * Die Zuordnung steht an der BUCHUNG, nicht in einer eigenen Tabelle.
+ *
+ * Sie war einmal `vertrag_zuordnung` mit `istbuchung_id` als Primärschlüssel — eine
+ * 1:1-Tabelle für eine N:1-Beziehung. Nach Kardinalität gehört das als Spalte an die
+ * Buchung, so wie `kategorie_id` daneben. Der Anlass war handfest: es standen Zuordnungen
+ * zu Buchungen da, die es nicht mehr gab. In derselben Zeile kann das nicht mehr passieren.
+ *
+ * **`vertrag_herkunft` trägt jetzt, was vorher die Existenz der Zeile trug.** Gesetzt
+ * heisst „zu dieser Buchung gibt es eine Entscheidung". Das ist nötig, weil `vertrag_id IS
+ * NULL` sonst zweideutig wäre: „noch nie zugeordnet" (die Automatik darf ran) gegen
+ * „gehört AUSDRÜCKLICH zu keinem Vertrag" (eine Handentscheidung, die bleiben muss).
+ * Ohne die Unterscheidung käme ein korrigierter Fehlgriff beim nächsten Abgleich zurück.
+ */
 export const sqliteVertragszuordnungRepository: VertragszuordnungRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<ZuordnungZeile[]>(
-      "SELECT istbuchung_id, vertrag_id, herkunft FROM vertrag_zuordnung",
+      "SELECT id, vertrag_id, vertrag_herkunft FROM ist_buchung WHERE vertrag_herkunft IS NOT NULL",
     );
     return zeilen.map((z): Vertragszuordnung => ({
-      istbuchungId: z.istbuchung_id,
+      istbuchungId: z.id,
       // NULL bleibt null und wird NICHT zu undefined: es ist die Aussage „gehört zu
-      // keinem Vertrag", nicht ein fehlender Wert.
+      // keinem Vertrag", nicht ein fehlender Wert. Dass diese Zeile überhaupt
+      // zurückkommt, sagt die Filterbedingung oben.
       vertragId: z.vertrag_id,
-      herkunft: z.herkunft as Zuordnungsherkunft,
+      herkunft: z.vertrag_herkunft as Zuordnungsherkunft,
     }));
   },
 
   async speichern(z) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO vertrag_zuordnung (istbuchung_id, vertrag_id, herkunft) VALUES ($1,$2,$3)
-       ON CONFLICT(istbuchung_id) DO UPDATE SET
-         vertrag_id = excluded.vertrag_id, herkunft = excluded.herkunft`,
+      "UPDATE ist_buchung SET vertrag_id = $2, vertrag_herkunft = $3 WHERE id = $1",
       [z.istbuchungId, z.vertragId, z.herkunft],
     );
   },
 
+  /**
+   * Nimmt die Entscheidung zurück — beide Spalten zusammen.
+   *
+   * `vertrag_herkunft` MUSS mit auf NULL: bliebe sie stehen, sähe die Buchung aus wie
+   * „ausdrücklich keinem Vertrag zugeordnet", und die Automatik liesse sie künftig in
+   * Ruhe. Zurücknehmen heisst aber, dass sie wieder ran darf.
+   */
   async loeschen(istbuchungId) {
     const db = await getDb();
-    await db.execute("DELETE FROM vertrag_zuordnung WHERE istbuchung_id = $1", [istbuchungId]);
+    await db.execute(
+      "UPDATE ist_buchung SET vertrag_id = NULL, vertrag_herkunft = NULL WHERE id = $1",
+      [istbuchungId],
+    );
   },
 };
 

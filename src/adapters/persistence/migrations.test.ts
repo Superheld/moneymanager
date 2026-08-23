@@ -24,14 +24,19 @@ beforeAll(async () => {
  * anderes als die App tut. `-- @wennTabelle x` überspringt ein Statement, wenn `x` fehlt;
  * gebraucht beim Umbau einer Tabelle, deren Quelle im zweiten Durchgang schon weg ist.
  *
- * Ebenso gespiegelt: `ALTER TABLE … DROP COLUMN` wird übersprungen, wenn die Spalte schon
- * fehlt. Ohne das scheitert jeder zweite Durchgang an „no such column", und der Test
- * meldete einen Fehler, den die App gar nicht hat.
+ * Ebenso gespiegelt: `ALTER TABLE … ADD/DROP COLUMN` wird übersprungen, wenn die Spalte
+ * schon da ist bzw. schon fehlt. Ohne das scheitert jeder zweite Durchgang an „duplicate
+ * column name" oder „no such column" — und der Test meldete einen Fehler, den die App
+ * gar nicht hat, weil `migrate()` beides abfängt.
+ *
+ * Die Regel dahinter gilt über diese Datei hinaus: was `migrate()` prüft, prüft `apply()`
+ * mit. Jede Abweichung heisst, dass der Test etwas anderes misst als die App tut.
  */
 function apply(db: Database, from = 0, to = Infinity): void {
   const bedingung = (sql: string) => sql.match(/^\s*--\s*@wennTabelle\s+(\w+)/i)?.[1];
   const hatTabelle = (name: string) =>
     db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${name}'`).length > 0;
+  const zugang = (sql: string) => sql.match(/^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i);
   const abgang = (sql: string) => sql.match(/^\s*ALTER\s+TABLE\s+(\w+)\s+DROP\s+COLUMN\s+(\w+)/i);
   const hatSpalte = (tabelle: string, spalte: string) => {
     const r = db.exec(`PRAGMA table_info(${tabelle})`);
@@ -43,6 +48,8 @@ function apply(db: Database, from = 0, to = Infinity): void {
       for (const sql of m.sql) {
         const noetig = bedingung(sql);
         if (noetig && !hatTabelle(noetig)) continue;
+        const dazu = zugang(sql);
+        if (dazu && hatSpalte(dazu[1], dazu[2])) continue;
         const weg = abgang(sql);
         if (weg && !hatSpalte(weg[1], weg[2])) continue;
         db.run(sql);
@@ -80,7 +87,8 @@ const ERWARTETE_TABELLEN = [
   "person",
   // v44 — der Beleg und was wir daraus gemacht haben, getrennt nach Lebenszyklus
   "umsatz_roh", "umsatz_verarbeitung",
-  "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
+  // v47 — die Zuordnung steht jetzt an der Buchung, `vertrag_zuordnung` ist weg
+  "vertrag", "vertrag_erkennung",
   "zahlungskonto", "zahlungsregel",
 ];
 
@@ -648,6 +656,103 @@ describe("Migration 46 — der Dedup-Griff ins Ledger", () => {
       db.exec("SELECT sql FROM sqlite_master WHERE name='ix_ist_buchung_roh_hash'")[0].values[0][0],
     );
     expect(sql).toContain("WHERE roh_hash IS NOT NULL");
+    db.close();
+  });
+});
+
+
+describe("Migration 47 — die Vertragszuordnung wandert an die Buchung", () => {
+  function vorbereitet() {
+    const db = new SQL.Database();
+    apply(db, 0, 46);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('giro','Girokonto','Giro','[]')");
+    db.run(`INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, art)
+            VALUES ('v1','Talmberg Energie','2026-01-01','automatisch','aktiv','laufend')`);
+    for (const id of ["b-zugeordnet", "b-ausdruecklich-keiner", "b-unberuehrt"]) {
+      db.run(
+        `INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle)
+         VALUES (?, '2026-08-11', -4500, 'giro', 'Aufwand', 'import')`,
+        [id],
+      );
+    }
+    return db;
+  }
+
+  it("uebernimmt eine Zuordnung als Spalten der Buchung", () => {
+    const db = vorbereitet();
+    db.run("INSERT INTO vertrag_zuordnung (istbuchung_id, vertrag_id, herkunft) VALUES ('b-zugeordnet','v1','automatisch')");
+
+    apply(db, 46, 47);
+
+    expect(db.exec("SELECT vertrag_id, vertrag_herkunft FROM ist_buchung WHERE id='b-zugeordnet'")[0].values)
+      .toEqual([["v1", "automatisch"]]);
+    expect(db.exec("SELECT name FROM sqlite_master WHERE name='vertrag_zuordnung'")).toEqual([]);
+    db.close();
+  });
+
+  /**
+   * DIE STELLE, an der die Fachlichkeit hängt. In der alten Tabelle trug die blosse
+   * EXISTENZ der Zeile die Aussage „hier wurde entschieden". Als Spalte wäre
+   * `vertrag_id IS NULL` zweideutig: „noch nie zugeordnet" gegen „gehört ausdrücklich zu
+   * keinem Vertrag". Die zweite ist eine Handentscheidung, die einen Fehlgriff der
+   * Automatik korrigiert — geht sie verloren, kommt der Fehlgriff beim nächsten Abgleich
+   * zurück.
+   *
+   * Unterschieden werden die beiden Fälle jetzt an `vertrag_herkunft`.
+   */
+  it("haelt ein ausdrueckliches Nein von noch-nie-entschieden auseinander", () => {
+    const db = vorbereitet();
+    db.run("INSERT INTO vertrag_zuordnung (istbuchung_id, vertrag_id, herkunft) VALUES ('b-ausdruecklich-keiner', NULL, 'manuell')");
+
+    apply(db, 46, 47);
+
+    const [entschieden] = db.exec(
+      "SELECT vertrag_id, vertrag_herkunft FROM ist_buchung WHERE id='b-ausdruecklich-keiner'",
+    )[0].values;
+    expect(entschieden).toEqual([null, "manuell"]);
+
+    // Die unberuehrte Buchung hat BEIDES leer — daran haengt, dass die Automatik ran darf.
+    const [unberuehrt] = db.exec(
+      "SELECT vertrag_id, vertrag_herkunft FROM ist_buchung WHERE id='b-unberuehrt'",
+    )[0].values;
+    expect(unberuehrt).toEqual([null, null]);
+    db.close();
+  });
+
+  /**
+   * Am echten Bestand gemessen und der eigentliche Anlass des Umbaus: es standen
+   * Zuordnungen zu Buchungen da, die es nicht mehr gab. Sie haben nach dem Umzug keinen
+   * Ort mehr — und koennen nicht wiederkommen, weil Zuordnung und Buchung dieselbe Zeile
+   * sind.
+   */
+  it("laesst eine Zuordnung ohne Buchung zurueck", () => {
+    const db = vorbereitet();
+    db.run("INSERT INTO vertrag_zuordnung (istbuchung_id, vertrag_id, herkunft) VALUES ('gibtesnicht','v1','automatisch')");
+
+    expect(() => apply(db, 46, 47)).not.toThrow();
+    expect(db.exec("SELECT COUNT(*) FROM ist_buchung WHERE vertrag_herkunft IS NOT NULL")[0].values)
+      .toEqual([[0]]);
+    db.close();
+  });
+
+  it("laeuft ein zweites Mal folgenlos durch", () => {
+    const db = vorbereitet();
+    db.run("INSERT INTO vertrag_zuordnung (istbuchung_id, vertrag_id, herkunft) VALUES ('b-zugeordnet','v1','automatisch')");
+    apply(db, 46, 47);
+    const vorher = db.exec("SELECT id, vertrag_id, vertrag_herkunft FROM ist_buchung ORDER BY id")[0].values;
+    expect(() => apply(db, 46, 47)).not.toThrow();
+    expect(db.exec("SELECT id, vertrag_id, vertrag_herkunft FROM ist_buchung ORDER BY id")[0].values)
+      .toEqual(vorher);
+    db.close();
+  });
+
+  it("laesst die Zahlungen eines Vertrags ueber den Index finden", () => {
+    const db = new SQL.Database();
+    apply(db);
+    const plan = db.exec(
+      "EXPLAIN QUERY PLAN SELECT id FROM ist_buchung WHERE vertrag_id = 'v1'",
+    )[0].values.map((z) => String(z[3])).join(" ");
+    expect(plan).toContain("ix_ist_buchung_vertrag");
     db.close();
   });
 });

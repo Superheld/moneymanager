@@ -477,6 +477,10 @@ describe("Vertragszuordnung — Persistenz", () => {
    * von „noch nicht entschieden" zu unterscheiden.
    */
   it("hält das ausdrückliche „kein Vertrag“ über die Rundreise", async () => {
+    // Die Zuordnung steht seit v47 AN der Buchung. Ohne Buchung gibt es sie nicht mehr —
+    // und genau das war der Bug: es standen Zuordnungen zu gelöschten Buchungen herum.
+    db.run(`INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle)
+            VALUES ('i1','2026-08-11',-5700,'k1','Aufwand','manuell')`);
     await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: null, herkunft: "manuell" });
     const [z] = await zuordnungRepository.alle();
     expect(z.vertragId).toBeNull();
@@ -484,11 +488,26 @@ describe("Vertragszuordnung — Persistenz", () => {
   });
 
   it("überschreibt eine bestehende Zuordnung statt zu doppeln", async () => {
+    db.run(`INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle)
+            VALUES ('i1','2026-08-11',-5700,'k1','Aufwand','manuell')`);
     await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: "v1", herkunft: "automatisch" });
     await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: "v2", herkunft: "manuell" });
     const alle = await zuordnungRepository.alle();
     expect(alle).toHaveLength(1);
     expect(alle[0].vertragId).toBe("v2");
+  });
+
+  /**
+   * Zurücknehmen muss BEIDE Spalten räumen. Bliebe `vertrag_herkunft` stehen, sähe die
+   * Buchung aus wie „ausdrücklich keinem Vertrag zugeordnet" — und die Automatik liesse
+   * sie künftig in Ruhe, obwohl sie gerade wieder ran darf.
+   */
+  it("gibt die Buchung nach dem Zuruecknehmen wieder frei", async () => {
+    db.run(`INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle)
+            VALUES ('i1','2026-08-11',-5700,'k1','Aufwand','manuell')`);
+    await zuordnungRepository.speichern({ istbuchungId: "i1", vertragId: null, herkunft: "manuell" });
+    await zuordnungRepository.loeschen("i1");
+    expect(await zuordnungRepository.alle()).toHaveLength(0);
   });
 });
 

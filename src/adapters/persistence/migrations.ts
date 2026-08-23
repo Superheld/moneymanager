@@ -1062,4 +1062,44 @@ export const MIGRATIONS: Migration[] = [
          ON ist_buchung (roh_hash) WHERE roh_hash IS NOT NULL`,
     ],
   },
+  {
+    version: 47, // Die Vertragszuordnung gehört an die Buchung, nicht in eine 1:1-Tabelle
+    sql: [
+      // WARUM DIE TABELLE VERSCHWINDET. `vertrag_zuordnung` hielt eine N:1-Beziehung
+      // (viele Buchungen, ein Vertrag) in einer Tabelle mit `istbuchung_id` als
+      // Primärschlüssel — also 1:1 zur Buchung. Nach Kardinalität gehört das als Spalte
+      // an die Buchung, genau wie `kategorie_id` daneben.
+      //
+      // Der Lebenszyklus-Grund, der bei `umsatz_roh`/`umsatz_verarbeitung` für die
+      // Trennung spricht, greift hier NICHT: beides ändert sich gleich oft, und keines
+      // von beiden ist ein Beleg.
+      //
+      // Am Bestand gemessen und der eigentliche Anlass: es stehen Zuordnungen zu
+      // Buchungen da, die es nicht mehr gibt. Als Spalte derselben Zeile kann das nicht
+      // mehr passieren — Löschen räumt beides zugleich.
+      `ALTER TABLE ist_buchung ADD COLUMN vertrag_id TEXT REFERENCES vertrag(id)`,
+      `ALTER TABLE ist_buchung ADD COLUMN vertrag_herkunft TEXT`,
+
+      // DIE SUBTILE STELLE, und sie entscheidet über die Fachlichkeit: `vertrag_id IS
+      // NULL` ist zweideutig geworden. Es kann heissen „noch nie zugeordnet" — dann darf
+      // die Automatik ran — oder „gehört AUSDRÜCKLICH zu keinem Vertrag", eine
+      // Handentscheidung, die ein Fehlgriff der Automatik nicht überschreiben darf.
+      //
+      // Die Unterscheidung trägt `vertrag_herkunft`: gesetzt heisst „es gibt eine
+      // Entscheidung". In der alten Tabelle trug das die blosse EXISTENZ der Zeile.
+      // Wer das übersieht, holt den korrigierten Fehlgriff beim nächsten Abgleich zurück.
+      `-- @wennTabelle vertrag_zuordnung
+       UPDATE ist_buchung SET
+         vertrag_id = (SELECT z.vertrag_id FROM vertrag_zuordnung z WHERE z.istbuchung_id = ist_buchung.id),
+         vertrag_herkunft = (SELECT z.herkunft FROM vertrag_zuordnung z WHERE z.istbuchung_id = ist_buchung.id)
+       WHERE id IN (SELECT istbuchung_id FROM vertrag_zuordnung)`,
+
+      `DROP TABLE IF EXISTS vertrag_zuordnung`,
+
+      // Die Vertragsansicht sucht die Zahlungen eines Vertrags — bisher über
+      // ix_vertrag_zuordnung_vertrag, das mit der Tabelle wegfällt.
+      `CREATE INDEX IF NOT EXISTS ix_ist_buchung_vertrag
+         ON ist_buchung (vertrag_id) WHERE vertrag_id IS NOT NULL`,
+    ],
+  },
 ];
