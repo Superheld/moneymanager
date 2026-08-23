@@ -67,5 +67,15 @@ nur den Stand, `ergaenzen` als einzige Rohdaten — und dort nur Fehlendes, per 
 Wer eine neue Zeile mit `speichern` anlegt, bekommt einen Stand ohne Beleg und findet die
 Zeile nie wieder. Die Begründung der Trennung steht in der Wurzel-`CLAUDE.md`.
 
+**Von der Buchung zum Beleg wird GEJOINT, nicht gesucht.** Der Weg ist
+`umsatz_verarbeitung.istbuchung_id` — indiziert und per Fremdschlüssel abgesichert. Eine
+zweite Referenz an der Buchung (`herkunft_umsatz_id` o. ä.) sieht naheliegend aus und wäre
+Redundanz: zwei Wahrheiten über dieselbe 1:1-Beziehung, die auseinanderlaufen können.
+
+**`ist_buchung.roh_hash` ist dafür NICHT gedacht** und trotzdem kein Überbleibsel: er
+überlebt das Löschen der Umsatz-Zeile und lässt einen späteren Bankimport gegen die
+verbuchte Buchung deduppen. Deshalb steht er da, und deshalb ist er seit v46 indiziert —
+die Abfrage lief vorher als Scan über das ganze Ledger, bei jedem Import.
+
 **Repositories werden in Tests nicht ersetzt.** Sie laufen gegen echte In-Memory-SQLite
 (sql.js), damit ein falsches Spalten-Mapping im Test auffällt und nicht erst in der App.

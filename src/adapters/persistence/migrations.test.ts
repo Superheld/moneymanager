@@ -619,6 +619,39 @@ describe("Migration 45 — der tote Verdacht faellt, die Freigabe wird abgesiche
   });
 });
 
+
+describe("Migration 46 — der Dedup-Griff ins Ledger", () => {
+  /**
+   * Gemessen und nicht vermutet: die Abfrage aus `bestandsSchluessel` lief als SCAN. Der
+   * Test prüft deshalb den ABFRAGEPLAN und nicht bloss, dass ein Index existiert — ein
+   * Index, den der Planer nicht nimmt, ist keiner.
+   */
+  it("laesst die Dedup-Abfrage ueber den Index laufen statt zu scannen", () => {
+    const db = new SQL.Database();
+    apply(db);
+    const plan = db.exec(
+      "EXPLAIN QUERY PLAN SELECT roh_hash FROM ist_buchung WHERE roh_hash IS NOT NULL",
+    )[0].values.map((z) => String(z[3])).join(" ");
+    expect(plan).toContain("ix_ist_buchung_roh_hash");
+    expect(plan).not.toContain("SCAN ist_buchung");
+    db.close();
+  });
+
+  /**
+   * Teilindex: von Hand erfasste Buchungen tragen keinen Roh-Hash und interessieren beim
+   * Dedup nie. Steht das WHERE nicht im Index, traegt er sie mit.
+   */
+  it("nimmt nur Buchungen mit Roh-Hash auf", () => {
+    const db = new SQL.Database();
+    apply(db);
+    const sql = String(
+      db.exec("SELECT sql FROM sqlite_master WHERE name='ix_ist_buchung_roh_hash'")[0].values[0][0],
+    );
+    expect(sql).toContain("WHERE roh_hash IS NOT NULL");
+    db.close();
+  });
+});
+
 describe("Versionsschema", () => {
   it("hat streng aufsteigende, eindeutige Versionen", () => {
     const versionen = MIGRATIONS.map((m) => m.version);
