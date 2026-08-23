@@ -34,7 +34,7 @@ function memLedger(start: IstBuchung[] = []): LedgerPort & { daten: IstBuchung[]
 /** Je ein Budget auf den beiden Kategorien der Aufteilung. */
 const BUDGET_LM: Budget = {
   id: "b-lm", kategorieId: "lebensmittel", kontoId: "giro",
-  betragProMonat: euroZuCent(400), art: "monatlich", start: "2026-01-01",
+  betraege: [{ abMonat: "2026-01", betrag: euroZuCent(400) }], art: "monatlich", start: "2026-01-01",
 };
 const BUDGET_DR: Budget = { ...BUDGET_LM, id: "b-dr", kategorieId: "drogerie" };
 

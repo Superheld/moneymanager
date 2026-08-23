@@ -3,6 +3,7 @@
 
 import type {
   Budget,
+  Budgetbetrag,
   Depot,
   Depotposition,
   Depotwert,
@@ -90,7 +91,11 @@ export interface KategoriefestlegungRepository {
 
 export interface BudgetRepository {
   alle(): Promise<Budget[]>;
+  /** Rührt `betraege` NICHT an — die Reihe hat ihren eigenen Weg. */
   speichern(budget: Budget): Promise<void>;
+  /** Legt eine Betragsversion an oder überschreibt die eines Monats. */
+  betragSpeichern(budgetId: string, betrag: Budgetbetrag): Promise<void>;
+  betragLoeschen(budgetId: string, abMonat: string): Promise<void>;
   loeschen(id: string): Promise<void>;
 }
 

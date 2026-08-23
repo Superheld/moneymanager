@@ -105,7 +105,7 @@ function merkmale(): string[] {
   // Beträge: als Zahl und in beiden Schreibweisen, in denen sie in Prosa landen.
   for (const roh of [
     ...frage("SELECT kontostand FROM zahlungskonto"),
-    ...frage("SELECT betrag_pro_monat FROM budget"),
+    ...frage("SELECT betrag FROM budget_betrag"),
     ...frage("SELECT betrag FROM kontostand_anker"),
     ...frage("SELECT sum(betrag) FROM ist_buchung GROUP BY konto_id"),
     // Depots: der Gesamtwert und die Werte der einzelnen Positionen. Ergänzt am

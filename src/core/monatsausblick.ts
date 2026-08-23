@@ -336,7 +336,9 @@ function budgetsZeile(
         schluessel: b.id,
         // Der Name der Kategorie steht nicht im Budget — die Oberfläche löst ihn auf.
         bezeichnung: b.kategorieId,
-        plan: geglaetteterMonatsabfluss(b, budgets, kategorien),
+        // Der Monat der Zeile: seit der Betrag versioniert ist, plant ein Budget im
+        // September womöglich mit einer anderen Rate als im Juli.
+        plan: geglaetteterMonatsabfluss(b, budgets, kategorien, von.slice(0, 7)),
         ist: verbrauch,
         status: verbrauch == null || verbrauch === 0 ? "offen" : "gebucht",
       };

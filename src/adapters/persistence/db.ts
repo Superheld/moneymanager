@@ -41,6 +41,20 @@ function tabellenBedingung(sql: string): string | null {
   return m ? m[1] : null;
 }
 
+/**
+ * `-- @wennSpalte x.y` am Anfang eines Statements → Tabelle und Spalte; sonst null.
+ *
+ * Das Gegenstück zu `@wennTabelle`, eine Ebene tiefer, und gebraucht beim ABLÖSEN einer
+ * Spalte: eine Version liest sie ein letztes Mal (etwa in eine neue Tabelle), die nächste
+ * lässt sie fallen. Läuft die lesende Version danach noch einmal — die Migrationen sind
+ * ausdrücklich einzeln wiederholbar —, scheiterte ihr SELECT an „no such column", und
+ * SQLite prüft Spaltennamen beim PARSEN: ein `WHERE` oder `COALESCE` rettet daran nichts.
+ */
+function spaltenBedingung(sql: string): { tabelle: string; spalte: string } | null {
+  const m = sql.match(/^\s*--\s*@wennSpalte\s+(\w+)\.(\w+)/i);
+  return m ? { tabelle: m[1], spalte: m[2] } : null;
+}
+
 async function tabelleExistiert(db: MigrationsDb, tabelle: string): Promise<boolean> {
   const zeilen = await db.select<{ name: string }[]>(
     `SELECT name FROM sqlite_master WHERE type='table' AND name='${tabelle}'`,
@@ -81,6 +95,8 @@ async function spalteExistiert(db: MigrationsDb, tabelle: string, spalte: string
  *  • `-- @wennTabelle x` vor einem Statement überspringt es, wenn `x` fehlt. Für den
  *    UMBAU einer Tabelle: kopieren, dann die alte fallen lassen — beim zweiten Lauf ist
  *    die Quelle weg, und ein `INSERT … SELECT` daraus scheiterte.
+ *  • `-- @wennSpalte x.y` dasselbe für eine Spalte. Für das ABLÖSEN einer Spalte: eine
+ *    Version liest sie ein letztes Mal, die nächste lässt sie fallen.
  *
  * **Die Statements laufen OHNE Fremdschlüsselprüfung, geprüft wird am Ende.** SQLite kann
  * Constraints nicht nachrüsten; eine Tabelle bekommt sie nur durch Neubau. Mit
@@ -110,6 +126,8 @@ export async function migrate(db: MigrationsDb): Promise<void> {
     for (const stmt of m.sql) {
       const bedingung = tabellenBedingung(stmt);
       if (bedingung && !(await tabelleExistiert(db, bedingung))) continue;
+      const spaltig = spaltenBedingung(stmt);
+      if (spaltig && !(await spalteExistiert(db, spaltig.tabelle, spaltig.spalte))) continue;
       const zugang = spaltenZugang(stmt);
       if (zugang && (await spalteExistiert(db, zugang.tabelle, zugang.spalte))) continue;
       const abgang = spaltenAbgang(stmt);

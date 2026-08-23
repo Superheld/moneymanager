@@ -1645,4 +1645,54 @@ export const MIGRATIONS: Migration[] = [
          WHERE b.betrag <> 0 AND r.betrag <> 0 AND ((b.betrag < 0) <> (r.betrag < 0)))`,
     ],
   },
+
+  {
+    version: 58, // Ein Budget hat nicht EINEN Betrag, sondern eine Reihe davon
+    sql: [
+      // Der Rahmen eines Budgets ändert sich — und bis hierher überschrieb eine Änderung
+      // die Vergangenheit: wer im August von 400 auf 450 ging, sah rückwirkend jeden Monat
+      // mit 450 geplant. Damit ist nicht mehr feststellbar, wogegen man damals gemessen
+      // hat, und ein aufbauendes Budget rechnete seinen ganzen Sockel neu.
+      //
+      // `ab_monat` und nicht `ab_datum`: ein Budget ist eine Monatsgrösse. Ein Wechsel
+      // mitten im Monat müsste anteilig gerechnet werden, und dafür gibt es keinen
+      // fachlichen Grund — geändert wird zum Ersten.
+      //
+      // CASCADE wie beim Budget selbst: eine Betragszeile ohne ihr Budget hätte keinen
+      // Gegenstand.
+      `CREATE TABLE IF NOT EXISTS budget_betrag (
+         budget_id TEXT    NOT NULL REFERENCES budget(id) ON DELETE CASCADE,
+         ab_monat  TEXT    NOT NULL,
+         betrag    INTEGER NOT NULL,
+         PRIMARY KEY (budget_id, ab_monat)
+       )`,
+
+      // Der bisherige Betrag wird die ERSTE Version, gültig ab dem Startmonat des
+      // Budgets. Rückwirkend etwas anderes anzunehmen wäre erfunden: mehr als „so war es
+      // zuletzt geplant" wissen wir über die Vergangenheit nicht.
+      //
+      // `INSERT OR IGNORE` über den Primärschlüssel macht das Statement wiederholbar —
+      // ein zweiter Lauf schreibt nichts, und schon von Hand geänderte Zeilen bleiben.
+      // `@wennSpalte`, weil v59 die Spalte gleich danach fallen lässt: läuft diese
+      // Version noch einmal, gäbe es sie nicht mehr, und SQLite prüft Spaltennamen beim
+      // Parsen — ein `WHERE … IS NOT NULL` rettete daran nichts.
+      `-- @wennSpalte budget.betrag_pro_monat
+       INSERT OR IGNORE INTO budget_betrag (budget_id, ab_monat, betrag)
+         SELECT id, substr(start, 1, 7), betrag_pro_monat
+         FROM budget WHERE betrag_pro_monat IS NOT NULL`,
+    ],
+  },
+
+  {
+    version: 59, // Der alte Einzelbetrag ist weg — er lag jetzt zweimal da
+    sql: [
+      // Eigene Version, weil v58 die Spalte LIEST. Stünde beides zusammen und der Lauf
+      // bräche dazwischen ab, liefe v58 beim nächsten Start gegen die fehlende Spalte —
+      // SQLite prüft Spaltennamen beim Parsen, ein `WHERE` rettet daran nichts.
+      //
+      // Wegnehmen dürfen wir im Alpha (CLAUDE.md); zwei Orte für denselben Betrag wären
+      // sonst genau die Altlast, aus der beim nächsten Anfassen zwei Wahrheiten werden.
+      `ALTER TABLE budget DROP COLUMN betrag_pro_monat`,
+    ],
+  },
 ];

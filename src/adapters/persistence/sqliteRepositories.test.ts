@@ -180,17 +180,27 @@ describe("Budget-Repository", () => {
   it("macht die Rundreise für beide Arten", async () => {
     await budgetRepository.speichern({
       id: "b1", kategorieId: "k1", kontoId: "giro",
-      betragProMonat: 40000, art: "monatlich", start: "2026-08-01",
+      betraege: [{ abMonat: "2026-08", betrag: 40000 }], art: "monatlich", start: "2026-08-01",
     });
     await budgetRepository.speichern({
       id: "b2", kategorieId: "k2", kontoId: "tagesgeld",
-      betragProMonat: 5000, art: "aufbauend", start: "2026-01-01",
+      betraege: [{ abMonat: "2026-01", betrag: 5000 }], art: "aufbauend", start: "2026-01-01",
     });
+    // `speichern` rührt die Beträge nicht an — die Reihe hat ihren eigenen Weg. Genau
+    // deshalb überlebt sie ein Bearbeiten von Konto oder Art.
+    await budgetRepository.betragSpeichern("b1", { abMonat: "2026-08", betrag: 40000 });
+    await budgetRepository.betragSpeichern("b1", { abMonat: "2026-10", betrag: 45000 });
+    await budgetRepository.betragSpeichern("b2", { abMonat: "2026-01", betrag: 5000 });
+
     const alle = await budgetRepository.alle();
     expect(alle).toHaveLength(2);
 
     const monatlich = alle.find((b) => b.id === "b1");
-    expect(monatlich?.betragProMonat).toBe(40000);
+    // Aufsteigend — `betragImMonat` verlässt sich darauf.
+    expect(monatlich?.betraege).toEqual([
+      { abMonat: "2026-08", betrag: 40000 },
+      { abMonat: "2026-10", betrag: 45000 },
+    ]);
     expect(monatlich?.art).toBe("monatlich");
     expect(monatlich?.kontoId).toBe("giro");
 
@@ -202,7 +212,7 @@ describe("Budget-Repository", () => {
   it("löscht ein Budget", async () => {
     await budgetRepository.speichern({
       id: "b1", kategorieId: "k1", kontoId: "giro",
-      betragProMonat: 40000, art: "monatlich", start: "2026-08-01",
+      betraege: [{ abMonat: "2026-08", betrag: 40000 }], art: "monatlich", start: "2026-08-01",
     });
     await budgetRepository.loeschen("b1");
     expect(await budgetRepository.alle()).toHaveLength(0);

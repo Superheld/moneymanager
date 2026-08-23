@@ -34,6 +34,7 @@ beforeAll(async () => {
  */
 function apply(db: Database, from = 0, to = Infinity): void {
   const bedingung = (sql: string) => sql.match(/^\s*--\s*@wennTabelle\s+(\w+)/i)?.[1];
+  const spaltenbedingung = (sql: string) => sql.match(/^\s*--\s*@wennSpalte\s+(\w+)\.(\w+)/i);
   const hatTabelle = (name: string) =>
     db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${name}'`).length > 0;
   const zugang = (sql: string) => sql.match(/^\s*ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)/i);
@@ -48,6 +49,8 @@ function apply(db: Database, from = 0, to = Infinity): void {
       for (const sql of m.sql) {
         const noetig = bedingung(sql);
         if (noetig && !hatTabelle(noetig)) continue;
+        const noetigeSpalte = spaltenbedingung(sql);
+        if (noetigeSpalte && !hatSpalte(noetigeSpalte[1], noetigeSpalte[2])) continue;
         const dazu = zugang(sql);
         if (dazu && hatSpalte(dazu[1], dazu[2])) continue;
         const weg = abgang(sql);
@@ -79,6 +82,7 @@ const ERWARTETE_TABELLEN = [
   "bankkonto_zuordnung", "bankzugang", // v26 — Bankzugang für den FinTS-Direktabruf
   "buchung_journal", // v53 — was mit einer Buchung geschah, nicht nur ihr letzter Stand
   "budget",
+  "budget_betrag",
   "depot", "depotposition", "depotwert", // v38 — Depots: Beobachtungen statt Buchungen
   "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
   "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
@@ -976,32 +980,106 @@ describe("Migration 50 — der Rest der Verweise", () => {
     const db = new SQL.Database();
     apply(db);
     db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat','Wohnen','Aufwand')");
-    db.run("INSERT INTO budget (id, kategorie_id, betrag_pro_monat, art) VALUES ('b1','kat',-50000,'monatlich')");
+    db.run("INSERT INTO budget (id, kategorie_id, art) VALUES ('b1','kat','monatlich')");
+    db.run("INSERT INTO budget_betrag (budget_id, ab_monat, betrag) VALUES ('b1','2026-01',50000)");
     db.run(`INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, kategorie_id)
             VALUES ('r1','Miete',-50000,'monatlich','2026-01-01','Aufwand','kat')`);
 
     db.run("PRAGMA foreign_keys = ON");
     db.run("DELETE FROM kategorie WHERE id='kat'");
 
-    // Ein Budget OHNE Kategorie haette keinen Gegenstand — es faellt mit.
+    // Ein Budget OHNE Kategorie haette keinen Gegenstand — es faellt mit. Und seine
+    // Betragsreihe mit ihm: sie haengt per CASCADE am Budget.
     expect(db.exec("SELECT COUNT(*) FROM budget")[0].values).toEqual([[0]]);
+    expect(db.exec("SELECT COUNT(*) FROM budget_betrag")[0].values).toEqual([[0]]);
     // Eine Zahlungsregel dagegen bleibt und ist nur uneingeordnet: die Zahlung findet
     // weiter statt, sie gehoert nur gerade nirgendwohin.
     expect(db.exec("SELECT id, kategorie_id FROM zahlungsregel")[0].values).toEqual([["r1", null]]);
     db.close();
   });
 
+  /**
+   * Der Anspruch ist genau dieser: eine Version muss in dem Zustand wiederholbar sein,
+   * den sie selbst hinterlässt. Das ist der Fall, den es in der App gibt — v50 bricht
+   * mittendrin ab, die Version steht noch nicht, der nächste Start fährt sie erneut.
+   *
+   * Vorher stand hier `apply(db)` gefolgt von `apply(db, 49)`: v50 wurde also im
+   * ENDzustand des Schemas wiederholt, mitsamt allem, was danach kam. Das ist strenger,
+   * als `migrate()` es je verlangt — eine verbuchte Version läuft nicht noch einmal —,
+   * und es kollidiert mit dem ABLÖSEN einer Spalte: v58 liest `budget.betrag_pro_monat`
+   * ein letztes Mal, v59 lässt sie fallen, und danach kommt auch v50 nicht mehr an sie
+   * heran. Dass die ganze Kette folgenlos wiederholbar ist, prüft weiter unten der Test
+   * über `migrate()` selbst, und der weiss von den Versionen.
+   */
   it("laeuft ein zweites Mal folgenlos durch", () => {
     const db = new SQL.Database();
-    apply(db);
+    apply(db, 0, 50);
     db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat','Wohnen','Aufwand')");
     const vorher = db.exec("SELECT id, name FROM kategorie")[0].values;
-    expect(() => apply(db, 49)).not.toThrow();
+    expect(() => apply(db, 49, 50)).not.toThrow();
     expect(db.exec("SELECT id, name FROM kategorie")[0].values).toEqual(vorher);
     db.close();
   });
 });
 
+
+describe("Migration 58/59 — der Budgetbetrag wird eine Reihe", () => {
+  it("macht aus dem Einzelbetrag die erste Version, gültig ab dem Startmonat", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 57);
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('k1','Wohnen','Aufwand')");
+    db.run(`INSERT INTO budget (id, kategorie_id, betrag_pro_monat, art, start)
+            VALUES ('b1','k1',43000,'monatlich','2026-03-01')`);
+
+    apply(db, 57, 58);
+
+    // Rückwirkend etwas anderes anzunehmen wäre erfunden: mehr als „so war es zuletzt
+    // geplant" wissen wir über die Vergangenheit nicht.
+    expect(db.exec("SELECT budget_id, ab_monat, betrag FROM budget_betrag")[0].values).toEqual([
+      ["b1", "2026-03", 43000],
+    ]);
+    db.close();
+  });
+
+  it("räumt die alte Spalte erst in der NÄCHSTEN Version ab", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 58);
+    // Nach v58 steht der Betrag noch zweimal da — das ist der Zwischenzustand, in dem ein
+    // Abbruch keinen Schaden anrichtet.
+    expect(spalten(db, "budget")).toContain("betrag_pro_monat");
+    apply(db, 58, 59);
+    expect(spalten(db, "budget")).not.toContain("betrag_pro_monat");
+    db.close();
+  });
+
+  /**
+   * `-- @wennSpalte budget.betrag_pro_monat` ist der Grund, warum v58 nach v59 nicht mehr
+   * scheitert: SQLite prüft Spaltennamen beim PARSEN, ein `WHERE … IS NOT NULL` rettete
+   * daran nichts, und ein Statement, das die App beim nächsten Start umbringt, ist genau
+   * das, wogegen die Wiederholbarkeit steht.
+   */
+  it("überspringt das Einlesen, wenn die Spalte schon weg ist", () => {
+    const db = new SQL.Database();
+    apply(db);
+    expect(spalten(db, "budget")).not.toContain("betrag_pro_monat");
+    expect(() => apply(db, 57, 58)).not.toThrow();
+    db.close();
+  });
+
+  it("lässt die Betragsreihe mit ihrem Budget fallen", () => {
+    const db = new SQL.Database();
+    apply(db);
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('k1','Wohnen','Aufwand')");
+    db.run("INSERT INTO budget (id, kategorie_id, art, start) VALUES ('b1','k1','monatlich','2026-03-01')");
+    db.run("INSERT INTO budget_betrag (budget_id, ab_monat, betrag) VALUES ('b1','2026-03',43000)");
+
+    db.run("PRAGMA foreign_keys = ON");
+    db.run("DELETE FROM budget WHERE id='b1'");
+
+    expect(db.exec("SELECT COUNT(*) FROM budget_betrag")[0].values).toEqual([[0]]);
+    db.close();
+  });
+});
 
 describe("Migration 54 — zwei Einordnungen der Bank", () => {
   it("legt Zweckcode und Endempfaenger am Beleg an", () => {

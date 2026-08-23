@@ -52,7 +52,7 @@ const REGELN: Zahlungsregel[] = [
   { id: "r-lohn", bezeichnung: "Arbeitgeber", betrag: 247536, rhythmus: "monatlich", startdatum: "2026-01-28", charakter: "Ertrag", kategorieId: "gehalt" },
 ];
 
-const BUDGETS: Budget[] = [{ id: "b1", kategorieId: "lebenshaltung", kontoId: "giro", betragProMonat: 43000, art: "monatlich", start: "2026-01-01" }];
+const BUDGETS: Budget[] = [{ id: "b1", kategorieId: "lebenshaltung", kontoId: "giro", betraege: [{ abMonat: "2026-01", betrag: 43000 }], art: "monatlich", start: "2026-01-01" }];
 
 const IST: IstBuchung[] = [
   { id: "i1", datum: "2026-08-05", betrag: -45925, kontoId: "giro", kategorieId: "miete", charakter: "Aufwand", quelle: "import" },

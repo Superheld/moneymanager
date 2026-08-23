@@ -42,15 +42,22 @@ function ist(over: Partial<IstBuchung> = {}): IstBuchung {
   };
 }
 
-const budget = (over: Partial<Budget> = {}): Budget => ({
-  id: "b1",
-  kategorieId: "lebenshaltung",
-  kontoId: "giro",
-  betragProMonat: euroZuCent(430),
-  art: "monatlich",
-  start: "2026-01-01",
-  ...over,
-});
+/** `betragProMonat` ist Bequemlichkeit der Fabrik und wird zur Reihe mit einer Version. */
+const budget = (over: Partial<Budget> & { betragProMonat?: number } = {}): Budget => {
+  const { betragProMonat = euroZuCent(430), ...rest } = over;
+  const basis = {
+    id: "b1",
+    kategorieId: "lebenshaltung",
+    kontoId: "giro",
+    art: "monatlich" as const,
+    start: "2026-01-01",
+    ...rest,
+  };
+  return {
+    ...basis,
+    betraege: rest.betraege ?? [{ abMonat: basis.start.slice(0, 7), betrag: betragProMonat }],
+  };
+};
 
 const basis = {
   regeln: [], budgets: [], ist: [], kategorien: KATEGORIEN,
