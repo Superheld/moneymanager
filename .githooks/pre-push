@@ -55,15 +55,47 @@ WURZEL=$(git rev-parse --show-toplevel)
 
 # Der Muster-Guard laeuft ueber JEDEN ausgehenden Bereich — auch wenn es die Datenbank
 # unten gar nicht gibt. Er braucht sie nicht.
+
+# Der ausgehende Bereich eines Refs — was der Remote noch NICHT hat.
+#
+# Bei einem bekannten Ref ist das `alt..neu`. Bei einem NEUEN Ref gibt Git als Gegenstueck
+# lauter Nullen, und die naheliegende Lesart „dann eben alles" ist bei einem TAG falsch:
+# ein Tag fuegt keinen Commit hinzu, er zeigt auf einen, der ueber seinen Branch laengst
+# geprueft wurde. Die ganze Historie zu pruefen meldete dann jede Altlast erneut — und ein
+# Waechter, der bei jedem Release dieselben alten Funde bringt, wird abgeschaltet.
+#
+# Deshalb wird gefragt, was DIESER Remote schon kennt. Bleibt nichts uebrig, gibt es auch
+# nichts zu pruefen; sonst laeuft der Bereich ab dem Elternteil des aeltesten neuen Commits.
+#
+# `--remotes=$ZIEL` und nicht `--remotes`: sonst gaelte als geprueft, was auf IRGENDEINEM
+# Remote liegt. Wer neben `origin` einen zweiten Fernzugriff hat — beim lib-fints-Klon ist
+# das der Normalfall —, schoebe damit alles daran vorbei, was dort schon liegt und hier
+# noch nicht. Eine Pruefung, die den falschen Vergleichspunkt nimmt, ist keine.
+# Der Remote, zu dem gepusht wird — Git uebergibt ihn als erstes Argument. Ohne Fallback
+# waere `--remotes=` leer und truege damit ALLE Remotes ein; das ist genau die Aufweichung,
+# die hier vermieden werden soll.
+ZIEL="${1:-origin}"
+
+ausgehender_bereich() {
+  _sha="$1" _remote="$2"
+  if [ "$_remote" != "0000000000000000000000000000000000000000" ]; then
+    printf '%s..%s' "$_remote" "$_sha"
+    return 0
+  fi
+  _aeltester=$(git rev-list "$_sha" --not "--remotes=$ZIEL" 2>/dev/null | tail -1)
+  [ -z "$_aeltester" ] && return 1
+  if git rev-parse -q --verify "$_aeltester^" >/dev/null 2>&1; then
+    printf '%s^..%s' "$_aeltester" "$_sha"
+  else
+    printf '%s' "$_sha"
+  fi
+}
+
 guard_fehler=0
 while read -r _lokal_ref lokal_sha _remote_ref remote_sha; do
   [ -z "$lokal_sha" ] && continue
   [ "$lokal_sha" = "0000000000000000000000000000000000000000" ] && continue
-  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-    bereich="$lokal_sha"
-  else
-    bereich="$remote_sha..$lokal_sha"
-  fi
+  bereich=$(ausgehender_bereich "$lokal_sha" "$remote_sha") || continue
   node "$WURZEL/scripts/privacy-guard.mjs" --range "$bereich" || guard_fehler=1
 done <<EOF
 $REFS
@@ -121,11 +153,7 @@ fehler=0
 while read -r lokal_ref lokal_sha remote_ref remote_sha; do
   [ -z "$lokal_sha" ] && continue
   [ "$lokal_sha" = "0000000000000000000000000000000000000000" ] && continue
-  if [ "$remote_sha" = "0000000000000000000000000000000000000000" ]; then
-    bereich="$lokal_sha"
-  else
-    bereich="$remote_sha..$lokal_sha"
-  fi
+  bereich=$(ausgehender_bereich "$lokal_sha" "$remote_sha") || continue
   texte=$(git log --format='%B' "$bereich" 2>/dev/null) || continue
   for wert in $merkmale $kennungen; do
     # Zahlen an der Wortgrenze pruefen: sonst schlaegt "15000" in "150000" an, und ein
