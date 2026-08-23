@@ -9,7 +9,7 @@
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
-import { inTransaktion, type AusfuehrbareDb } from "./transaktion";
+import { fremdschluesselPruefen, inTransaktion, type AusfuehrbareDb, type PruefbareDb } from "./transaktion";
 
 const require = createRequire(import.meta.url);
 let SQL: SqlJsStatic;
@@ -105,5 +105,42 @@ describe("inTransaktion", () => {
       { sql: "INSERT INTO probe (id, wert) VALUES ($1, $2)", werte: ["danach", 1] },
     ]);
     expect(zeilen()).toBe(1);
+  });
+});
+
+describe("fremdschluesselPruefen", () => {
+  /** Dieselbe Abbildung wie oben, plus `select` — den braucht die Prüfung. */
+  function pruefbar(): PruefbareDb {
+    return {
+      ...api(),
+      async select<T>(sql: string): Promise<T> {
+        const stmt = db.prepare(sql);
+        const zeilen: unknown[] = [];
+        while (stmt.step()) zeilen.push(stmt.getAsObject());
+        stmt.free();
+        return zeilen as unknown as T;
+      },
+    };
+  }
+
+  it("laesst eine saubere Datenbank durch", async () => {
+    await expect(fremdschluesselPruefen(pruefbar())).resolves.toBeUndefined();
+  });
+
+  /**
+   * Der eigentliche Punkt. Waehrend eines Tabellenumbaus ist die Pruefung abgeschaltet —
+   * wer sie danach nicht nachholt, hat sie abgeschafft. Ein Waechter, der nie anschlaegt,
+   * ist schlimmer als keiner, weil er beruhigt.
+   *
+   * Die Verletzung wird hier absichtlich mit ausgeschalteter Pruefung erzeugt: genau so
+   * entsteht sie auch in echt.
+   */
+  it("schlaegt an, wenn ein Verweis ins Leere zeigt", async () => {
+    db.run("PRAGMA foreign_keys = OFF");
+    db.run(`CREATE TABLE eltern (id TEXT PRIMARY KEY)`);
+    db.run(`CREATE TABLE kind (id TEXT PRIMARY KEY, eltern_id TEXT REFERENCES eltern(id))`);
+    db.run("INSERT INTO kind (id, eltern_id) VALUES ('k1','gibtesnicht')");
+
+    await expect(fremdschluesselPruefen(pruefbar())).rejects.toThrow(/Fremdschluessel/);
   });
 });
