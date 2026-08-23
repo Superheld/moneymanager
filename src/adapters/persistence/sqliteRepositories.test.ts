@@ -377,7 +377,7 @@ describe("Import-Repositories", () => {
       id: "l1", quelle: "finanzguru", zeitpunkt: "2026-01-06T10:00:00Z",
       eingelesen: 1, neu: 1, duplikate: 0,
     });
-    await umsatzRepository.speichernViele([umsatz()]);
+    await umsatzRepository.anlegenViele([umsatz()]);
     const laeufe = await importLaufRepository.alle();
     expect(laeufe).toHaveLength(1);
     const ausLauf = await umsatzRepository.nachLauf("l1");
@@ -386,7 +386,7 @@ describe("Import-Repositories", () => {
   });
 
   it("liefert offene Umsätze und den Bestandsschlüssel", async () => {
-    await umsatzRepository.speichernViele([
+    await umsatzRepository.anlegenViele([
       umsatz({ id: "u1", rohHash: "h1", nativeId: "n1" }),
       umsatz({ id: "u2", rohHash: "h2" }),
     ]);
@@ -399,13 +399,13 @@ describe("Import-Repositories", () => {
   });
 
   it("löscht einen Umsatz", async () => {
-    await umsatzRepository.speichern(umsatz());
+    await umsatzRepository.anlegen(umsatz());
     await umsatzRepository.loeschen("u1");
     expect(await umsatzRepository.alle()).toHaveLength(0);
   });
 
   it("hält Vorschlag und Ist-Buchungs-Verknüpfung über die Rundreise", async () => {
-    await umsatzRepository.speichern(
+    await umsatzRepository.anlegen(
       umsatz({
         vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" },
         istbuchungId: "i1",

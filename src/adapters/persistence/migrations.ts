@@ -905,4 +905,108 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE bankkonto_zuordnung ADD COLUMN format_wahl TEXT`,
     ],
   },
+  {
+    version: 44, // Der Beleg und was wir daraus gemacht haben — zwei Tabellen statt einer
+    sql: [
+      // WARUM DAS AUSEINANDERGEHT. `umsatz` trug dreierlei in einer Zeile: die Rohdaten,
+      // wie die Quelle sie lieferte; die Zuordnung zu Lauf und Konto; und den Zustand
+      // unserer Verarbeitung (Status, erzeugte Buchung, Kategorievorschlag). Das erste
+      // darf sich nie ändern, das letzte ändert sich bei jeder Durchsicht — in einer
+      // Tabelle ist beides nur durch Disziplin getrennt, und Disziplin hält keinen
+      // Randfall aus.
+      //
+      // Es ist NICHT die Kardinalität, die hier trennt: 1:1 gehörte nach Lehrbuch in eine
+      // Tabelle. Es ist der Lebenszyklus. Die Probe darauf ist „auf den Stand der Quelle
+      // zurücksetzen": das wird jetzt ein DELETE auf einer Tabelle, und die Rohzeile hat
+      // es nie gemerkt.
+      `CREATE TABLE IF NOT EXISTS umsatz_roh (
+         id                 TEXT    PRIMARY KEY,
+         lauf_id            TEXT    NOT NULL REFERENCES import_lauf(id),
+         format             TEXT,
+         buchungstag        TEXT    NOT NULL,
+         valuta             TEXT,
+         betrag             INTEGER NOT NULL,
+         waehrung           TEXT    NOT NULL,
+         gegenpartei        TEXT    NOT NULL,
+         gegenpartei_iban   TEXT,
+         verwendungszweck   TEXT    NOT NULL,
+         glaeubiger_id      TEXT,
+         mandatsreferenz    TEXT,
+         e2e_referenz       TEXT,
+         umsatzart          TEXT,
+         buchungsschluessel TEXT,
+         bank_referenz      TEXT,
+         roh_hash           TEXT    NOT NULL,
+         native_id          TEXT
+       )`,
+
+      // `istbuchung_id` trägt bewusst KEIN ON DELETE CASCADE: verschwindet eine Buchung,
+      // soll die Importzeile bleiben und wieder verbuchbar werden — nicht mitsterben.
+      // SET NULL allein reicht dafür nicht, der Status müsste mit; das erledigt der
+      // Anwendungscode beim Verwerfen. Der FK verhindert hier vor allem den stummen
+      // Widerspruch „verbucht, aber es gibt nichts".
+      // `zahlungskonto_id` steht hier und NICHT beim Beleg, obwohl man es zuerst dort
+      // sucht. Die Quelle liefert eine IBAN oder Kontonummer — das ist Beleg. WELCHES
+      // unserer Konten damit gemeint ist, ist unsere Zuordnung: bei einer Datei entsteht
+      // sie über den Konto-Match, und beim Verbuchen lässt der Dialog sie ändern. Etwas,
+      // das der Mensch korrigieren darf, ist kein Beleg.
+      `CREATE TABLE IF NOT EXISTS umsatz_verarbeitung (
+         umsatz_id              TEXT PRIMARY KEY REFERENCES umsatz_roh(id) ON DELETE CASCADE,
+         zahlungskonto_id       TEXT NOT NULL REFERENCES zahlungskonto(id),
+         status                 TEXT NOT NULL,
+         istbuchung_id          TEXT REFERENCES ist_buchung(id) ON DELETE SET NULL,
+         vorschlag_kategorie_id TEXT,
+         vorschlag_charakter    TEXT,
+         vorschlag_quelle       TEXT,
+         verdacht_auf_id        TEXT,
+         verdacht_gruende       TEXT,
+         geaendert_am           TEXT NOT NULL
+       )`,
+
+      // WIDERSPRUCH AUFLÖSEN, BEVOR DER FK IHN VERBIETET. Im Bestand stehen Zeilen auf
+      // „verbucht", deren Buchung es nicht mehr gibt — der Zustand, den `herkunftsicht`
+      // heute aufdeckt und der beim Löschen importierter Zeilen entstand. Mit dem FK
+      // scheiterte das Kopieren daran.
+      //
+      // Sie werden NICHT gelöscht und nicht stillschweigend auf „verworfen" gesetzt,
+      // sondern auf „neu" zurückgestellt: dann stehen sie wieder in der Durchsicht, und
+      // die Entscheidung trifft der Mensch. Sichtbar statt beruhigend.
+      `-- @wennTabelle umsatz
+       UPDATE umsatz SET status = 'neu', istbuchung_id = NULL
+       WHERE istbuchung_id IS NOT NULL
+         AND istbuchung_id NOT IN (SELECT id FROM ist_buchung)`,
+
+      `-- @wennTabelle umsatz
+       INSERT OR IGNORE INTO umsatz_roh (
+         id, lauf_id, buchungstag, valuta, betrag, waehrung,
+         gegenpartei, gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz,
+         e2e_referenz, umsatzart, buchungsschluessel, bank_referenz, roh_hash, native_id)
+       SELECT id, lauf_id, buchungstag, valuta, betrag, waehrung,
+         gegenpartei, gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz,
+         e2e_referenz, umsatzart, buchungsschluessel, bank_referenz, roh_hash, native_id
+       FROM umsatz`,
+
+      // `geaendert_am` bekommt beim Übernehmen den Zeitpunkt des Laufs, nicht „jetzt":
+      // ein Bestandsstand ist nicht dadurch frisch, dass er migriert wurde.
+      `-- @wennTabelle umsatz
+       INSERT OR IGNORE INTO umsatz_verarbeitung (
+         umsatz_id, zahlungskonto_id, status, istbuchung_id, vorschlag_kategorie_id,
+         vorschlag_charakter, vorschlag_quelle, verdacht_auf_id, verdacht_gruende, geaendert_am)
+       SELECT u.id, u.zahlungskonto_id, u.status, u.istbuchung_id, u.vorschlag_kategorie_id,
+         u.vorschlag_charakter, u.vorschlag_quelle, u.verdacht_auf_id, u.verdacht_gruende,
+         COALESCE(l.zeitpunkt, u.buchungstag)
+       FROM umsatz u LEFT JOIN import_lauf l ON l.id = u.lauf_id`,
+
+      `DROP TABLE IF EXISTS umsatz`,
+
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_hash ON umsatz_roh (roh_hash)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_native ON umsatz_roh (native_id) WHERE native_id IS NOT NULL`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_konto ON umsatz_verarbeitung (zahlungskonto_id)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_lauf ON umsatz_roh (lauf_id)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_glaeubiger ON umsatz_roh (glaeubiger_id) WHERE glaeubiger_id IS NOT NULL`,
+      // Die Inbox fragt nach offenen Zeilen, der Detail-Join nach der Buchung.
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_status ON umsatz_verarbeitung (status)`,
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_verarbeitung_buchung ON umsatz_verarbeitung (istbuchung_id) WHERE istbuchung_id IS NOT NULL`,
+    ],
+  },
 ];

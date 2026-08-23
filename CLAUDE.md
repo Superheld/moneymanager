@@ -107,12 +107,12 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-24 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+25 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
-- **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `umsatz` (Import-Kontext:
-  Empfänger, Verwendungszweck — steht **nicht** an der Buchung) · `zahlungskonto` (mit Typ
+- **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `umsatz_roh` +
+  `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ
   UND Klasse, siehe unten) ·
   `kontostand_anker` · `import_lauf` · `dubletten_freigabe`
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` · `vertrag` ·
@@ -124,7 +124,31 @@ ist sie:
 - **Sonstiges:** `person` · `einstellung`
 
 Gedroppt und nicht wiederzubeleben: `topf`, `szenario`, `szenario_posten` — aufgegangen in
-den Budgets bzw. im Monatsausblick.
+den Budgets bzw. im Monatsausblick. Ebenso `umsatz`, aufgeteilt in die beiden folgenden.
+
+#### Der Beleg und was wir daraus gemacht haben
+
+Eine Importzeile steht in **zwei** Tabellen, und die Grenze dazwischen ist der
+**Lebenszyklus**, nicht die Kardinalität — 1:1 gehörte nach Lehrbuch in eine Tabelle:
+
+- **`umsatz_roh`** — was die Quelle lieferte. Nach dem Anlegen unveränderlich.
+- **`umsatz_verarbeitung`** — was wir daraus gemacht haben: Status, Kontozuordnung,
+  Kategorievorschlag, erzeugte Buchung, Dublettenverdacht. Ändert sich bei jeder Durchsicht.
+
+Nach oben ist es weiterhin EIN `Umsatz`; die Trennung sieht man nur an den Schreibwegen.
+`anlegen` schreibt beides in einer Transaktion, `speichern` nur den Stand, und `ergaenzen`
+ist die einzige Stelle, die Rohdaten überhaupt noch anfasst — und auch dort nur, was fehlt
+(`COALESCE`), nie was schon dasteht.
+
+Zwei Zuordnungen, die man auf der falschen Seite sucht:
+
+- **`zahlungskonto_id` steht beim STAND**, nicht beim Beleg. Die Quelle liefert eine IBAN —
+  das ist Beleg. Welches unserer Konten gemeint ist, ist unsere Zuordnung, und der
+  Verbuchen-Dialog lässt sie ändern. Was der Mensch korrigieren darf, ist kein Beleg.
+- **`lauf_id` steht beim BELEG.** Aus welchem Abruf eine Zeile kam, ändert sich nie.
+
+Die Probe auf die Trennung: „auf den Stand der Quelle zurücksetzen" ist ein `DELETE` auf
+`umsatz_verarbeitung`, und der Beleg merkt nichts davon.
 
 ### Einstieg
 

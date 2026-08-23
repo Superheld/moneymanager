@@ -37,11 +37,35 @@ plausibel daneben, und kein Test merkt es. Wie man eine belastbare Kopie zieht �
 Im Alpha-Stadium dürfen Migrationen auch **wegnehmen**; vor dem Abräumen prüfen, dass die
 Ziele leer sind.
 
+**Eine Tabelle UMBAUEN: `-- @wennTabelle x` vor jedes Statement, das aus der alten liest.**
+Kopieren und dann die Quelle fallen lassen ist beim zweiten Durchgang ein Widerspruch — die
+Version steht noch nicht, die Migration wiederholt sich, und `INSERT … SELECT FROM alt`
+scheitert an „no such table". Der Marker überspringt das Statement, wenn die Tabelle fehlt.
+Derselbe Gedanke wie bei den Spaltenprüfungen, eine Ebene höher. Beispiel: v44.
+
+**Fremdschlüssel sind in der App AN, im Test AUS.** sqlx setzt `foreign_keys=ON` als
+Startup-Pragma auf jeder Pool-Verbindung; sql.js und die `sqlite3`-CLI defaulten auf OFF.
+Eine Migration mit `REFERENCES` kann deshalb im Test grün sein und in der App an verwaisten
+Verweisen scheitern — an genau der Sorte Widerspruch, die sich über Monate ansammelt. Wer
+Constraints einführt, prüft vorher am echten Bestand, ob sie halten, und räumt den
+Widerspruch in derselben Migration auf. Ein Test dazu setzt `PRAGMA foreign_keys = ON`
+selbst; sonst prüft er etwas anderes als die App tut.
+
+**SQLite kann Constraints nicht per `ALTER TABLE` nachrüsten.** Wer einen Fremdschlüssel an
+eine bestehende Tabelle hängen will, baut sie neu — mit dem Marker oben.
+
 ## Zwei Fallen im Schema
 
-**`IstBuchung` trägt KEINEN Empfänger und keinen Verwendungszweck.** Die stehen am `Umsatz`
-(dem Import-Kontext). Für Detail- und Reporting-Ansichten wird über `Umsatz.istbuchungId`
+**`IstBuchung` trägt KEINEN Empfänger und keinen Verwendungszweck.** Die stehen am Beleg
+(`umsatz_roh`). Für Detail- und Reporting-Ansichten wird über `Umsatz.istbuchungId`
 gejoint. Wer sie an der Buchung sucht, findet nichts und baut sich ein zweites Feld.
+
+**Ein `Umsatz` steht in ZWEI Tabellen und kommt als EIN Objekt zurück.** `umsatz_roh` ist
+der Beleg und nach dem Anlegen unveränderlich, `umsatz_verarbeitung` der Stand. Sichtbar ist
+das nur an den Schreibwegen: `anlegen` schreibt beides (in einer Transaktion), `speichern`
+nur den Stand, `ergaenzen` als einzige Rohdaten — und dort nur Fehlendes, per `COALESCE`.
+Wer eine neue Zeile mit `speichern` anlegt, bekommt einen Stand ohne Beleg und findet die
+Zeile nie wieder. Die Begründung der Trennung steht in der Wurzel-`CLAUDE.md`.
 
 **Repositories werden in Tests nicht ersetzt.** Sie laufen gegen echte In-Memory-SQLite
 (sql.js), damit ein falsches Spalten-Mapping im Test auffällt und nicht erst in der App.

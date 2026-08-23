@@ -46,7 +46,7 @@ async function grunddaten() {
 
 /** Eine offene Zeile in der Inbox, standardmäßig mit einem Vorschlag der Erkennung. */
 async function offeneZeile(id: string, over: { quelle?: "ki" | "manuell"; kategorieId?: string } = {}) {
-  await umsatzRepo.speichern({
+  await umsatzRepo.anlegen({
     id, laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-03-01",
     betrag: -37500, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
     verwendungszweck: "Betreuung", rohHash: `h-${id}`, status: "neu",
@@ -157,7 +157,7 @@ describe("Festlegung aus der Import-Inbox", () => {
   it("setzt die Kategorie bei einer neuen Zeile ohne Umweg über das Modell", async () => {
     await grunddaten();
     await festlegungRepo.speichern({ muster: "britta musterfrau", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
-    await umsatzRepo.speichern({
+    await umsatzRepo.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-03-01",
       betrag: -37500, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
       verwendungszweck: "Betreuung", rohHash: "h1", status: "neu",
@@ -178,7 +178,7 @@ describe("Festlegung aus dem Buchungsdialog", () => {
       id: "b1", datum: "2026-03-01", betrag: -37500, kontoId: "k1",
       kategorieId: "kat-so", charakter: "Aufwand", quelle: "import",
     });
-    await umsatzRepo.speichern({
+    await umsatzRepo.anlegen({
       id: "u-b1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-03-01",
       betrag: -37500, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
       verwendungszweck: "Betreuung", rohHash: "h-b1", status: "verbucht", istbuchungId: "b1",

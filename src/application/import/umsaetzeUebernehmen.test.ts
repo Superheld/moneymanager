@@ -45,7 +45,21 @@ function fakes() {
       if (i >= 0) umsaetze[i] = u;
       else umsaetze.push(u);
     },
-    speichernViele: async (us) => { umsaetze.push(...us); },
+    anlegenViele: async (us) => { umsaetze.push(...us); },
+    anlegen: async (u) => { umsaetze.push(u); },
+    // Wie das echte Repository: nur FEHLENDE Felder werden nachgetragen, Bestehendes
+    // bleibt stehen. Eine Attrappe, die einfach ersetzt, liesse den Ergaenzen-Fall auch
+    // dann gruen aussehen, wenn er in Wahrheit ueberschreibt.
+    ergaenzen: async (u) => {
+      const i = umsaetze.findIndex((x) => x.id === u.id);
+      if (i < 0) return;
+      const alt = umsaetze[i] as unknown as Record<string, unknown>;
+      const neu = { ...alt };
+      for (const [k, v] of Object.entries(u as unknown as Record<string, unknown>)) {
+        if (neu[k] === undefined && v !== undefined) neu[k] = v;
+      }
+      umsaetze[i] = neu as unknown as Umsatz;
+    },
     alle: async () => umsaetze,
     nachLauf: async (laufId) => umsaetze.filter((u) => u.laufId === laufId),
     offene: async () => umsaetze.filter((u) => u.status === "neu"),

@@ -65,11 +65,11 @@ async function doppelteBuchung({ zweiteImLedger = true } = {}) {
     zahlungskontoId: "k1", buchungstag: "2026-08-11", betrag: -5700, waehrung: "EUR",
     gegenpartei: "Musterladen", status: "verbucht" as const,
   };
-  await umsatzRepo.speichern({
+  await umsatzRepo.anlegen({
     ...gemeinsam, id: "u-datei", laufId: "l-datei", istbuchungId: "b-datei",
     verwendungszweck: "Musterladen, Musterstadt", rohHash: "h1",
   });
-  await umsatzRepo.speichern({
+  await umsatzRepo.anlegen({
     ...gemeinsam, id: "u-bank", laufId: "l-bank", istbuchungId: "b-bank",
     verwendungszweck: "Musterladen, Musterstadt DEKarte Nr 1", rohHash: "h2",
   });
