@@ -45,6 +45,12 @@ function inTauri(): boolean {
   return typeof globalThis === "object" && "__TAURI_INTERNALS__" in globalThis;
 }
 
+// Die beiden `invoke`-Zweige darunter erreicht kein Test dieser Datei, und das lässt sich
+// nicht ändern: sie laufen nur in der Tauri-Shell. Ihre Gegenstücke — der Fallback-Weg und
+// die Prüfung — sind geprüft, und was der Rust-Command leistet, steht in
+// `src-tauri/src/transaktion.rs`. Wer die Zweige „abdecken" will, indem er `invoke`
+// wegmockt, testet die Attrappe und nicht den Weg.
+
 /**
  * Führt alle Anweisungen in EINER Transaktion aus; bei einem Fehler wird nichts davon
  * wirksam.
