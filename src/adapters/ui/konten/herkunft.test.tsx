@@ -110,27 +110,36 @@ describe("Herkunft je Konto", () => {
    * gleichwertig in der Liste, wäre sie überwiegend Rauschen — und die Läufe, bei denen
    * etwas passiert ist, gingen darin unter.
    */
-  it("fasst Läufe ohne neue Zeilen zusammen, statt sie einzeln zu zeigen", async () => {
+  /**
+   * Der Rueckgriff holt bei jedem Abruf einige Tage doppelt, damit nachgetragene
+   * Buchungen nicht verlorengehen — die Mehrzahl aller Laeufe bringt deshalb nichts Neues.
+   * Sie wegzulassen saehe aus, als waere nie abgerufen worden, und genau das ist die
+   * Frage, mit der man hierherkommt. Sie stehen also da und tragen einen Vermerk.
+   */
+  it("nennt einen Import, der nichts Neues brachte, beim Namen", async () => {
     await bestand();
+    await laufRepo.speichern({
+      id: "l-leer", quelle: "fints", zugangId: "z1",
+      zeitpunkt: "2026-08-21T09:00:00.000Z", eingelesen: 9, neu: 0, duplikate: 9,
+    });
     // Ein Umsatz aus dem Abruf, der als Duplikat weggelegt wurde: der Lauf hat also
     // gearbeitet, aber nichts beigetragen.
     await umsatzRepo.anlegen({
-      id: "u-dup", laufId: "l2", zahlungskontoId: "k1", buchungstag: "2026-08-05",
+      id: "u-dup", laufId: "l-leer", zahlungskontoId: "k1", buchungstag: "2026-08-05",
       betrag: -1250, waehrung: "EUR", gegenpartei: "Thalberg Vibora", verwendungszweck: "Rechnung",
       rohHash: "h3", status: "duplikat",
     });
-    rendere(<HerkunftBereich />);
+    rendere(<HerkunftBereich kontoId="k1" zugangId="z1" />);
 
-    expect(await screen.findByRole("button", { name: /1 weitere/i })).toBeInTheDocument();
+    await waitFor(() => expect(document.body.textContent ?? "").toContain("21.08.2026"));
+    expect(document.body.textContent ?? "").toMatch(/nichts Neues/i);
   });
 
-  it("sagt es, wenn für ein Konto noch nie etwas eingelesen wurde", async () => {
-    await kontoRepo.speichern({
-      id: "k2", bezeichnung: "Bargeld", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
-    });
-    rendere(<HerkunftBereich />);
+  it("sagt es, wenn ueber diesen Zugang noch nie etwas abgerufen wurde", async () => {
+    await bestand();
+    rendere(<HerkunftBereich kontoId="k1" zugangId="z-ohne-abruf" />);
 
-    await waitFor(() => expect(document.body.textContent).toMatch(/noch nie etwas eingelesen/i));
+    await waitFor(() => expect(document.body.textContent).toMatch(/noch nichts abgerufen/i));
   });
 });
 
