@@ -129,6 +129,9 @@ const de = {
     feldBenutzerHinweis: "Bei manchen Banken die Zugangsnummer, nicht die Kontonummer.",
     feldKundenId: "Kunden-ID",
     feldKundenIdHinweis: "Nur ausfüllen, wenn die Bank eine abweichende Kunden-ID verlangt.",
+    profilOhneVorfaelle:
+      "Diese Bank meldet keine Geschäftsvorfälle — sie nimmt am FinTS-Verfahren nicht " +
+      "teil. Was mit ihren Konten möglich ist, steht an den Konten selbst.",
     feldWeg: "Zugangsweg",
     feldWegHinweis: "Wie diese Bank erreicht wird",
     wegFints: "FinTS (Standard)",
@@ -1535,6 +1538,9 @@ const en: typeof de = {
     feldBenutzerHinweis: "At some banks this is the access number, not the account number.",
     feldKundenId: "Customer ID",
     feldKundenIdHinweis: "Only fill in if the bank requires a separate customer ID.",
+    profilOhneVorfaelle:
+      "This bank reports no business transactions — it does not take part in FinTS. " +
+      "What its accounts support is shown on the accounts themselves.",
     feldWeg: "Access method",
     feldWegHinweis: "How this bank is reached",
     wegFints: "FinTS (standard)",
