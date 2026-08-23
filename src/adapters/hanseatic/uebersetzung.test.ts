@@ -158,6 +158,28 @@ describe("zuImportErgebnis", () => {
     expect(e.warnungen[0]).toMatch(/2026-03-09/);
   });
 
+  // Diese Bank vergibt Buchungsdaten, die in der Zukunft liegen. Die Zeile wird
+  // uebernommen — die Bank fuehrt sie bereits im Saldo, und wer sie weglaesst, erzeugt
+  // eine Differenz, die niemand erklaeren kann. Sichtbar gemacht wird sie trotzdem.
+  it("uebernimmt eine Buchung mit Datum in der Zukunft und weist darauf hin", () => {
+    const e = zuImportErgebnis([buchung({ bookingDate: "2026-03-25" })], undefined, "2026-03-20");
+    expect(e.umsaetze).toHaveLength(1);
+    expect(e.umsaetze[0]?.buchungstag).toBe("2026-03-25");
+    expect(e.warnungen.join(" ")).toMatch(/Zukunft/);
+  });
+
+  it("schweigt, wenn keine Buchung in der Zukunft liegt", () => {
+    const e = zuImportErgebnis([buchung({ bookingDate: "2026-03-11" })], undefined, "2026-03-20");
+    expect(e.warnungen).toEqual([]);
+  });
+
+  // Ohne Stichtag gibt es nichts zu vergleichen — dann schweigt sie ebenfalls, statt zu raten.
+  it("meldet nichts, wenn kein Stichtag mitkommt", () => {
+    const e = zuImportErgebnis([buchung({ bookingDate: "2099-01-01" })]);
+    expect(e.umsaetze).toHaveLength(1);
+    expect(e.warnungen).toEqual([]);
+  });
+
   it("kommt mit einem leeren Abruf zurecht", () => {
     const e = zuImportErgebnis([]);
     expect(e.umsaetze).toEqual([]);

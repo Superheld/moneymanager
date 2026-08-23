@@ -97,16 +97,24 @@ export function zuRohUmsatz(t: Transaction, konto?: Account): RohUmsatz {
 export function zuImportErgebnis(
   buchungen: readonly Transaction[],
   konto?: Account,
+  heuteIso?: string,
 ): ImportErgebnis {
   const umsaetze: RohUmsatz[] = [];
   const warnungen: string[] = [];
   let vorgemerkt = 0;
+  let zukuenftig = 0;
 
   for (const t of buchungen) {
     if (!t.booked) {
       vorgemerkt++;
       continue;
     }
+    // Diese Bank vergibt Buchungsdaten, die in der Zukunft liegen — eine heute
+    // veranlasste Ueberweisung traegt den Buchungstag von morgen. Sie wird UEBERNOMMEN,
+    // denn die Bank hat sie bereits im Saldo; wer sie weglaesst, erzeugt eine Differenz,
+    // die niemand erklaeren kann. Gezaehlt wird sie trotzdem: eine Buchung, die noch
+    // nicht stattgefunden hat, soll man sehen, bevor man sich ueber sie wundert.
+    if (heuteIso && t.bookingDate > heuteIso) zukuenftig++;
     try {
       umsaetze.push(zuRohUmsatz(t, konto));
     } catch (e) {
@@ -114,6 +122,14 @@ export function zuImportErgebnis(
         `Zeile vom ${t.bookingDate} übersprungen: ${e instanceof Error ? e.message : String(e)}`,
       );
     }
+  }
+
+  if (zukuenftig > 0) {
+    warnungen.push(
+      zukuenftig === 1
+        ? "Eine Buchung trägt ein Buchungsdatum in der Zukunft — die Bank führt sie bereits im Saldo."
+        : `${zukuenftig} Buchungen tragen ein Buchungsdatum in der Zukunft — die Bank führt sie bereits im Saldo.`,
+    );
   }
 
   if (vorgemerkt > 0) {

@@ -246,6 +246,27 @@ describe("Umsätze", () => {
     expect(tan.gefragt[0]?.decoupled).toBe(true);
   });
 
+  // Diese Bank vergibt Buchungsdaten, die in der Zukunft liegen: eine heute veranlasste
+  // Ueberweisung traegt den Buchungstag von morgen. Wer bis "heute" fragt und dort hart
+  // abschneidet, verliert genau die juengste Buchung — waehrend der Saldo sie enthaelt.
+  // Die App zeigt dann eine Differenz, die sie nicht erklaeren kann.
+  it("fragt ueber das angefragte Ende hinaus, weil die Bank in die Zukunft bucht", async () => {
+    let gefragt: { from?: Date; to?: Date } | undefined;
+    const { fabrik } = attrappe({
+      async getTransactions(_id, zeitraum) {
+        gefragt = zeitraum;
+        return seite();
+      },
+    });
+    const s = await hanseaticAdapter(fabrik).anmelden(ZUGANG, "geheim", async () => undefined);
+
+    await s.umsaetze(s.konten[0]!, "2026-03-01", "2026-03-31");
+
+    expect(gefragt?.from?.toISOString().slice(0, 10)).toBe("2026-03-01");
+    // Sieben Tage Vorlauf — das Ende liegt hinter dem angefragten Tag, nicht darauf.
+    expect(gefragt?.to?.toISOString().slice(0, 10)).toBe("2026-04-07");
+  });
+
   it("reicht einen anderen Fehler durch, statt blind freizuschalten", async () => {
     const { fabrik, protokoll } = attrappe({
       async getTransactions() {

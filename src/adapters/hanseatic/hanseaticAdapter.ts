@@ -190,6 +190,29 @@ function profil(standAm: string): Bankprofil {
   };
 }
 
+/**
+ * Das obere Ende eines Abrufs, um einige Tage nach hinten geschoben.
+ *
+ * Diese Bank vergibt Buchungsdaten, die IN DER ZUKUNFT liegen können — eine heute
+ * veranlasste Überweisung trägt den Buchungstag von morgen. Der Aufrufer fragt aber bis
+ * „heute", weil das bei einem Konto mit fortlaufender Buchung die richtige Grenze ist.
+ *
+ * Ohne diese Verschiebung fällt genau die jüngste Buchung heraus — und zwar die
+ * unauffälligste Art von Fehler: der Saldo der Bank enthält sie längst, die Buchungen
+ * nicht. Die App zeigt dann eine Differenz, die sie nicht erklären kann, und wer sie
+ * sucht, sucht sie im Zeitraum zuletzt.
+ *
+ * Sieben Tage sind grosszügig genug für den Vorlauf, den diese Bank vergibt, und
+ * schaden nicht: was es noch nicht gibt, kommt auch nicht zurück.
+ */
+const VORLAUF_TAGE = 7;
+
+function obergrenze(bisIso: string): Date {
+  const d = new Date(bisIso);
+  d.setDate(d.getDate() + VORLAUF_TAGE);
+  return d;
+}
+
 function heute(): string {
   const d = new Date();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -314,7 +337,7 @@ class Sitzung implements Abrufsitzung {
 
   async umsaetze(konto: Bankkonto, vonIso: string, bisIso: string): Promise<AbrufErgebnis> {
     const k = this.#rohkonten.find((r) => r.id === konto.schluessel);
-    const zeitraum = { from: new Date(vonIso), to: new Date(bisIso) };
+    const zeitraum = { from: new Date(vonIso), to: obergrenze(bisIso) };
 
     let seite: TransactionPage;
     try {
@@ -356,7 +379,7 @@ class Sitzung implements Abrufsitzung {
   }
 
   #ergebnis(seite: TransactionPage, konto?: Account): AbrufErgebnis {
-    const ergebnis = zuImportErgebnis(seite.transactions as readonly Transaction[], konto);
+    const ergebnis = zuImportErgebnis(seite.transactions as readonly Transaction[], konto, heute());
     const hinweise: string[] = [];
 
     // „Alles, was zu haben war" ist nicht dasselbe wie „der Zeitraum ist abgedeckt".
