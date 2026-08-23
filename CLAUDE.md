@@ -107,7 +107,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-25 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+24 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
@@ -116,7 +116,7 @@ ist sie:
   UND Klasse, siehe unten) ·
   `kontostand_anker` · `import_lauf` · `dubletten_freigabe`
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` · `vertrag` ·
-  `vertrag_erkennung` · `vertrag_zuordnung` · `zahlungsregel` · `inventargegenstand`
+  `vertrag_erkennung` · `zahlungsregel` · `inventargegenstand`
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
 - **Bank:** `bankzugang` (samt Bankfähigkeitsprofil) · `bankkonto_zuordnung`
 - **Besitzen:** `depot` · `depotwert` (Reihe der Stichtagswerte) · `depotposition` —
@@ -124,7 +124,8 @@ ist sie:
 - **Sonstiges:** `person` · `einstellung`
 
 Gedroppt und nicht wiederzubeleben: `topf`, `szenario`, `szenario_posten` — aufgegangen in
-den Budgets bzw. im Monatsausblick. Ebenso `umsatz`, aufgeteilt in die beiden folgenden.
+den Budgets bzw. im Monatsausblick. Ebenso `umsatz`, aufgeteilt in die beiden folgenden,
+und `vertrag_zuordnung`, aufgegangen in zwei Spalten der Buchung (siehe unten).
 
 #### Der Beleg und was wir daraus gemacht haben
 
@@ -149,6 +150,28 @@ Zwei Zuordnungen, die man auf der falschen Seite sucht:
 
 Die Probe auf die Trennung: „auf den Stand der Quelle zurücksetzen" ist ein `DELETE` auf
 `umsatz_verarbeitung`, und der Beleg merkt nichts davon.
+
+#### Zuordnungen stehen an der Buchung
+
+`kategorie_id` und `vertrag_id` sind **Spalten von `ist_buchung`**, nicht eigene Tabellen.
+Beide Beziehungen sind N:1 (viele Buchungen, eine Kategorie bzw. ein Vertrag), und dafür
+ist eine Fremdschlüsselspalte die Form. Der Lebenszyklus-Grund von oben greift hier nicht:
+keine der beiden ist ein Beleg, und beide ändern sich gleich oft.
+
+Zu jeder gehört eine **Herkunft** (`kategorie_herkunft`, `vertrag_herkunft`), und die
+leistet mehr, als ihr Name sagt. Sie unterscheidet nicht nur Automatik von Handarbeit,
+sondern trägt beim Vertrag auch, was vorher die blosse Existenz einer Zeile trug:
+
+| `vertrag_id` | `vertrag_herkunft` | heisst |
+|---|---|---|
+| leer | leer | noch nie entschieden — die Automatik darf ran |
+| leer | gesetzt | **gehört ausdrücklich zu keinem Vertrag** — Hand, bleibt |
+| gesetzt | — | zugeordnet |
+
+Die mittlere Zeile ist der Grund, warum es die Spalte gibt: ohne sie käme ein von Hand
+korrigierter Fehlgriff der Automatik beim nächsten Abgleich zurück. Wer `vertrag_id`
+zurücksetzt, muss `vertrag_herkunft` mit zurücksetzen — sonst bleibt die Buchung für die
+Automatik gesperrt.
 
 ### Einstieg
 
