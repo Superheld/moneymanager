@@ -144,3 +144,75 @@ describe("Herkunft der Kategorie", () => {
     expect(nachher.kategorieHerkunft).toBe("manuell");
   });
 });
+
+describe("Die Richtung kommt beim Import vom Beleg", () => {
+  /** Eine Erstattung, wie sie hereinkam: ein ZUFLUSS aus einem Bankabruf. */
+  function erstattung(): IstBuchung {
+    return {
+      id: "b1", datum: "2026-08-11", betrag: euroZuCent(49.95), kontoId: "giro",
+      charakter: "Ertrag", quelle: "import", rohHash: "h1",
+    };
+  }
+
+  /**
+   * Der gemeldete Fall. Eine Erstattung kommt als Zufluss herein und wird in die
+   * Kategorie gelegt, in der die AUSGABE stattgefunden hat — dort gehoert sie hin, damit
+   * sie das Budget entlastet. Deren Vorgabe ist "Aufwand", und daraus wurde bisher ein
+   * Abfluss: aus dem Zufluss wurde eine zweite Ausgabe.
+   *
+   * Das Betragsfeld ist bei einem Online-Konto GESPERRT. Es hat also niemand etwas
+   * eingegeben, das sich haette aendern duerfen.
+   */
+  it("dreht einen Zufluss nicht um, wenn die Kategorie Aufwand vorgibt", async () => {
+    const ledger = memLedger();
+    const u = await buchungBearbeiten(ledger, erstattung(), {
+      datum: "2026-08-11", betrag: euroZuCent(49.95), charakter: "Aufwand", kategorieId: "kleidung",
+    });
+
+    expect(u.betrag).toBe(euroZuCent(49.95));
+    // Der Charakter folgt der Einordnung — das ist kein Widerspruch: "Aufwand" sagt,
+    // WOFUER das Geld war, das Vorzeichen sagt, wohin es floss.
+    expect(u.charakter).toBe("Aufwand");
+  });
+
+  it("dreht umgekehrt auch einen Abfluss nicht um", async () => {
+    const ledger = memLedger();
+    const ausgabe: IstBuchung = { ...erstattung(), betrag: euroZuCent(-49.95), charakter: "Aufwand" };
+    const u = await buchungBearbeiten(ledger, ausgabe, {
+      datum: "2026-08-11", betrag: euroZuCent(49.95), charakter: "Ertrag", kategorieId: "k1",
+    });
+
+    expect(u.betrag).toBe(euroZuCent(-49.95));
+  });
+
+  /**
+   * Die Betragshoehe bleibt aenderbar — gesperrt ist sie nur bei Online-Konten, und das
+   * entscheidet die Oberflaeche. Nur die RICHTUNG steht fest.
+   */
+  it("laesst die Hoehe aendern und behaelt die Richtung", async () => {
+    const ledger = memLedger();
+    const u = await buchungBearbeiten(ledger, erstattung(), {
+      datum: "2026-08-11", betrag: euroZuCent(30), charakter: "Aufwand",
+    });
+
+    expect(u.betrag).toBe(euroZuCent(30));
+  });
+
+  /**
+   * Bei einer VON HAND erfassten Buchung bleibt es beim alten Weg: dort tippt man eine
+   * Betragshoehe und sagt, was es ist — das Vorzeichen ist die Folge der Einordnung, weil
+   * es keinen Beleg gibt, der es besser wuesste.
+   */
+  it("laesst den Charakter bei einer Handbuchung weiter das Vorzeichen bestimmen", async () => {
+    const ledger = memLedger();
+    const vonHand: IstBuchung = {
+      id: "b2", datum: "2026-08-11", betrag: euroZuCent(-20), kontoId: "bar",
+      charakter: "Aufwand", quelle: "manuell",
+    };
+    const u = await buchungBearbeiten(ledger, vonHand, {
+      datum: "2026-08-11", betrag: euroZuCent(20), charakter: "Ertrag",
+    });
+
+    expect(u.betrag).toBe(euroZuCent(20));
+  });
+});

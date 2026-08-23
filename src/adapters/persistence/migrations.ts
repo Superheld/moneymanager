@@ -1610,4 +1610,39 @@ export const MIGRATIONS: Migration[] = [
               WHERE import_lauf.dateiname LIKE b2.bezeichnung || ' %') = 1`,
     ],
   },
+  {
+    version: 57, // Buchungen, die ihrem eigenen Beleg widersprechen
+    sql: [
+      // WIE DAS ENTSTEHEN KONNTE. Beim Bearbeiten wurde das Vorzeichen aus dem CHARAKTER
+      // neu gebildet. Wer eine Erstattung in die Kategorie legte, in der die Ausgabe
+      // stattgefunden hatte — dort gehört sie hin, damit sie das Budget entlastet —, bekam
+      // deren Vorgabe „Aufwand" und damit aus einem Zufluss einen Abfluss.
+      //
+      // Das Betragsfeld ist bei Online-Konten gesperrt. Es hat also niemand etwas
+      // eingegeben, das sich hätte ändern dürfen; die Buchung drehte sich beim Speichern
+      // der Kategorie um. Behoben ist das in `buchungBearbeiten` — dort kommt die Richtung
+      // jetzt vom Beleg. Die Buchungen, die es schon erwischt hat, kommen hier zurecht.
+      //
+      // Erst das JOURNAL, dann die Änderung: sonst hielte es einen Zustand fest, den es
+      // zum Zeitpunkt des Eintrags schon nicht mehr gibt. Eine Korrektur, die sich selbst
+      // nicht protokolliert, ist genau die Sorte stille Änderung, gegen die es das
+      // Journal gibt — auch wenn sie diesmal von uns kommt.
+      `INSERT INTO buchung_journal (id, istbuchung_id, zeitpunkt, art, vorher, nachher)
+       SELECT lower(hex(randomblob(16))), b.id, strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+              'geaendert',
+              json_object('betrag', b.betrag, 'hinweis', 'Richtung widersprach dem Beleg'),
+              json_object('betrag', -b.betrag, 'hinweis', 'Richtung aus dem Beleg wiederhergestellt')
+       FROM ist_buchung b
+       JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+       JOIN umsatz_roh r ON r.id = v.umsatz_id
+       WHERE b.betrag <> 0 AND r.betrag <> 0 AND ((b.betrag < 0) <> (r.betrag < 0))`,
+
+      `UPDATE ist_buchung SET betrag = -betrag
+       WHERE id IN (
+         SELECT b.id FROM ist_buchung b
+         JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+         JOIN umsatz_roh r ON r.id = v.umsatz_id
+         WHERE b.betrag <> 0 AND r.betrag <> 0 AND ((b.betrag < 0) <> (r.betrag < 0)))`,
+    ],
+  },
 ];
