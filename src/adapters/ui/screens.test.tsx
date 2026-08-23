@@ -345,7 +345,7 @@ describe("ReviewScreen", () => {
 
   it("listet offene Umsätze aus dem Import", async () => {
     await grunddaten();
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
       betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
       verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
@@ -360,7 +360,7 @@ describe("ReviewScreen", () => {
     // Der gemeldete Fall: neun Zeilen aus einem Dateiimport standen dauerhaft in der
     // Inbox — ohne Kategorie, ohne Weg nach vorn und ohne Weg hinaus.
     await grunddaten();
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
       betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
       verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
@@ -381,7 +381,7 @@ describe("ReviewScreen", () => {
 
   it("zeigt bei jedem Vorschlag, woher er kommt", async () => {
     await grunddaten();
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
       betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
       verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
@@ -404,7 +404,7 @@ describe("ReviewScreen", () => {
       ]),
       trainiertAm: "2026-08-17T10:00:00.000Z",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
       betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
       verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",

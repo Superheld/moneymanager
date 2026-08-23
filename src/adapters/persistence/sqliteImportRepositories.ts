@@ -1,6 +1,15 @@
-// SQLite-Adapter der Import-Ports (TAKTIK-IMPORT). import_lauf = dünnes Protokoll,
-// umsatz = der Entwurfs-Stapel mit Dedup-Schlüsseln (roh_hash + native_id) und dem
-// flach abgelegten Kategorie-Vorschlag.
+// SQLite-Adapter der Import-Ports. `import_lauf` ist ein dünnes Protokoll; die Importzeile
+// selbst steht in ZWEI Tabellen:
+//
+//   umsatz_roh           der Beleg, wie die Quelle ihn lieferte — nach dem Anlegen
+//                        unveränderlich, mit den Dedup-Schlüsseln (roh_hash, native_id)
+//   umsatz_verarbeitung  was wir daraus gemacht haben — Status, Kategorievorschlag,
+//                        erzeugte Buchung, Dublettenverdacht
+//
+// Nach oben ist es EIN `Umsatz`: die Trennung ist eine Frage des Lebenszyklus, keine der
+// Domäne. Sichtbar wird sie nur an den Schreibwegen — `anlegen` schreibt beides,
+// `speichern` nur den Stand, und `ergaenzen` ist die einzige Ausnahme, die Rohdaten noch
+// anfasst.
 
 import type { Charakter } from "../../core";
 import type {
@@ -11,6 +20,7 @@ import type {
 import type { Dublettenfreigabe } from "../../application/dubletten/dublettensicht";
 import type { ImportLauf, Umsatz, UmsatzStatus, VorschlagQuelle } from "../../application/import";
 import { getDb } from "./db";
+import { inTransaktion, type Anweisung } from "./transaktion";
 
 interface LaufZeile {
   id: string;
@@ -94,7 +104,7 @@ interface UmsatzZeile {
   bank_referenz: string | null;
   roh_hash: string;
   native_id: string | null;
-  status: string;
+  status: string | null;
   vorschlag_kategorie_id: string | null;
   vorschlag_charakter: string | null;
   vorschlag_quelle: string | null;
@@ -123,7 +133,8 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
     bankreferenz: z.bank_referenz ?? undefined,
     rohHash: z.roh_hash,
     nativeId: z.native_id ?? undefined,
-    status: z.status as UmsatzStatus,
+    // Ohne Verarbeitungszeile ist die Zeile unangetastet — also „neu".
+    status: (z.status ?? "neu") as UmsatzStatus,
     vorschlag: z.vorschlag_charakter
       ? {
           kategorieId: z.vorschlag_kategorie_id ?? undefined,
@@ -137,79 +148,162 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
   };
 }
 
-const SELECT = `SELECT id, lauf_id, zahlungskonto_id, buchungstag, valuta, betrag, waehrung,
-       gegenpartei, verwendungszweck, glaeubiger_id, gegenpartei_iban, mandatsreferenz,
-       e2e_referenz, umsatzart, buchungsschluessel, bank_referenz,
-       roh_hash, native_id, status,
-       vorschlag_kategorie_id, vorschlag_charakter, vorschlag_quelle, istbuchung_id,
-       verdacht_auf_id, verdacht_gruende
-  FROM umsatz`;
+// Der Umsatz steht in ZWEI Tabellen und kommt als EIN Objekt zurück. Das ist Absicht:
+// die Trennung ist eine Frage des Lebenszyklus (Beleg unveränderlich, Verarbeitung nicht)
+// und keine der Domäne — die Anwendung arbeitet weiter mit der Importzeile als Ganzem.
+//
+// LEFT JOIN, nicht INNER: eine Rohzeile ohne Verarbeitungsstand ist kein Datenfehler,
+// sondern der Zustand direkt nach „auf den Stand der Quelle zurücksetzen". Sie zählt dann
+// als „neu" — siehe `zuUmsatz`.
+const SELECT = `SELECT r.id, r.lauf_id, v.zahlungskonto_id, r.buchungstag, r.valuta, r.betrag,
+       r.waehrung, r.gegenpartei, r.verwendungszweck, r.glaeubiger_id, r.gegenpartei_iban,
+       r.mandatsreferenz, r.e2e_referenz, r.umsatzart, r.buchungsschluessel, r.bank_referenz,
+       r.roh_hash, r.native_id,
+       v.status, v.vorschlag_kategorie_id, v.vorschlag_charakter, v.vorschlag_quelle,
+       v.istbuchung_id, v.verdacht_auf_id, v.verdacht_gruende
+  FROM umsatz_roh r LEFT JOIN umsatz_verarbeitung v ON v.umsatz_id = r.id`;
 
-async function einfuegen(db: Awaited<ReturnType<typeof getDb>>, u: Umsatz): Promise<void> {
-  await db.execute(
-    // Beim Aktualisieren werden auch die Quellenfelder nachgezogen: das ist der
-    // Ergänzen-Fall des Dublettenfinders — eine bekannte Zeile bekommt, was die neue
-    // Quelle mehr weiß (Mandatsreferenz, Valuta, Umsatzart …), ohne dass eine zweite
-    // Zeile entsteht. Der Aufrufer entscheidet, was er übergibt; leer überschreibt nicht,
-    // weil er den Bestand vorher hineinmischt.
-    `INSERT INTO umsatz
-       (id, lauf_id, zahlungskonto_id, buchungstag, valuta, betrag, waehrung, gegenpartei,
-        verwendungszweck, glaeubiger_id, gegenpartei_iban, mandatsreferenz, e2e_referenz,
-        umsatzart, buchungsschluessel, bank_referenz, roh_hash, native_id, status,
-        vorschlag_kategorie_id, vorschlag_charakter, vorschlag_quelle, istbuchung_id,
-        verdacht_auf_id, verdacht_gruende)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25)
-     ON CONFLICT(id) DO UPDATE SET zahlungskonto_id = excluded.zahlungskonto_id,
-       valuta = excluded.valuta, glaeubiger_id = excluded.glaeubiger_id,
-       gegenpartei_iban = excluded.gegenpartei_iban, mandatsreferenz = excluded.mandatsreferenz,
-       e2e_referenz = excluded.e2e_referenz, umsatzart = excluded.umsatzart,
-       buchungsschluessel = excluded.buchungsschluessel, bank_referenz = excluded.bank_referenz,
-       native_id = excluded.native_id,
-       status = excluded.status, vorschlag_kategorie_id = excluded.vorschlag_kategorie_id,
-       vorschlag_charakter = excluded.vorschlag_charakter, vorschlag_quelle = excluded.vorschlag_quelle,
-       istbuchung_id = excluded.istbuchung_id,
-       verdacht_auf_id = excluded.verdacht_auf_id, verdacht_gruende = excluded.verdacht_gruende`,
-    [
-      u.id, u.laufId, u.zahlungskontoId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
-      u.gegenpartei, u.verwendungszweck, u.glaeubigerId ?? null, u.gegenparteiIban ?? null,
+/**
+ * Wann der Verarbeitungsstand zuletzt angefasst wurde.
+ *
+ * Die Uhr steht im Adapter, nicht im Kern — der Kern kennt keine (CLAUDE.md). Ein Import
+ * setzt für alle seine Zeilen DENSELBEN Zeitpunkt: sie gehören zu einem Vorgang, und
+ * Millisekunden-Unterschiede darin wären erfunden, nicht gemessen.
+ */
+function jetzt(): string {
+  return new Date().toISOString();
+}
+
+/** Die Rohzeile — der Beleg. Wird beim Anlegen geschrieben und danach nie wieder. */
+function rohAnweisung(u: Umsatz): Anweisung {
+  return {
+    sql: `INSERT INTO umsatz_roh
+       (id, lauf_id, buchungstag, valuta, betrag, waehrung, gegenpartei,
+        gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz, e2e_referenz,
+        umsatzart, buchungsschluessel, bank_referenz, roh_hash, native_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+     ON CONFLICT(id) DO NOTHING`,
+    werte: [
+      u.id, u.laufId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
+      u.gegenpartei, u.gegenparteiIban ?? null, u.verwendungszweck, u.glaeubigerId ?? null,
       u.mandatsreferenz ?? null, u.e2eReferenz ?? null, u.umsatzart ?? null,
-      u.buchungsschluessel ?? null, u.bankreferenz ?? null,
-      u.rohHash, u.nativeId ?? null, u.status,
-      u.vorschlag?.kategorieId ?? null, u.vorschlag?.charakter ?? null, u.vorschlag?.quelle ?? null,
-      u.istbuchungId ?? null,
+      u.buchungsschluessel ?? null, u.bankreferenz ?? null, u.rohHash, u.nativeId ?? null,
+    ],
+  };
+}
+
+/**
+ * Der Verarbeitungsstand — alles, was wir aus dem Beleg gemacht haben.
+ *
+ * `DO NOTHING` beim Anlegen wäre hier falsch: Status und Vorschlag ändern sich, das ist
+ * ihr Zweck. Deshalb `DO UPDATE`.
+ */
+function standAnweisung(u: Umsatz, jetzt: string): Anweisung {
+  return {
+    sql: `INSERT INTO umsatz_verarbeitung
+       (umsatz_id, zahlungskonto_id, status, istbuchung_id, vorschlag_kategorie_id,
+        vorschlag_charakter, vorschlag_quelle, verdacht_auf_id, verdacht_gruende, geaendert_am)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+     ON CONFLICT(umsatz_id) DO UPDATE SET
+       zahlungskonto_id = excluded.zahlungskonto_id,
+       status = excluded.status, istbuchung_id = excluded.istbuchung_id,
+       vorschlag_kategorie_id = excluded.vorschlag_kategorie_id,
+       vorschlag_charakter = excluded.vorschlag_charakter,
+       vorschlag_quelle = excluded.vorschlag_quelle,
+       verdacht_auf_id = excluded.verdacht_auf_id,
+       verdacht_gruende = excluded.verdacht_gruende,
+       geaendert_am = excluded.geaendert_am`,
+    werte: [
+      u.id, u.zahlungskontoId, u.status, u.istbuchungId ?? null,
+      u.vorschlag?.kategorieId ?? null, u.vorschlag?.charakter ?? null,
+      u.vorschlag?.quelle ?? null,
       u.verdachtAufId ?? null,
       u.verdachtGruende ? JSON.stringify(u.verdachtGruende) : null,
+      jetzt,
     ],
-  );
+  };
 }
 
 export const sqliteUmsatzRepository: UmsatzRepository = {
+  /**
+   * Legt eine Importzeile an: Beleg UND Verarbeitungsstand, in EINER Transaktion.
+   *
+   * Ohne die Klammer entstünde bei einem Abbruch eine Rohzeile ohne Stand — die läse sich
+   * als „neu" und käme beim nächsten Import als Dublette wieder. Genau dafür gibt es den
+   * Transaktions-Command.
+   */
+  async anlegen(u: Umsatz) {
+    const db = await getDb();
+    await inTransaktion(db, [rohAnweisung(u), standAnweisung(u, jetzt())]);
+  },
+  async anlegenViele(umsaetze: readonly Umsatz[]) {
+    const db = await getDb();
+    const zeit = jetzt();
+    await inTransaktion(
+      db,
+      umsaetze.flatMap((u) => [rohAnweisung(u), standAnweisung(u, zeit)]),
+    );
+  },
+  /**
+   * Schreibt NUR den Verarbeitungsstand. Der Beleg bleibt, wie er kam.
+   *
+   * Das ist der Unterschied zu früher, als eine Methode beides schrieb: eine
+   * Statusänderung konnte damals unbemerkt Rohfelder mitziehen. Wer Rohdaten ändern
+   * MUSS, nimmt `ergaenzen` — und man sieht an der Aufrufstelle, dass es passiert.
+   */
   async speichern(u: Umsatz) {
     const db = await getDb();
-    await einfuegen(db, u);
+    const a = standAnweisung(u, jetzt());
+    await db.execute(a.sql, [...(a.werte ?? [])]);
   },
-  async speichernViele(umsaetze: readonly Umsatz[]) {
+  /**
+   * Die EINZIGE Stelle, an der Rohdaten nachträglich wachsen.
+   *
+   * Der Fall des Dublettenfinders: eine bekannte Zeile taucht in einer zweiten Quelle
+   * auf, die mehr weiß (Mandatsreferenz, Valuta, Umsatzart …). Statt einer zweiten Zeile
+   * bekommt die vorhandene die fehlenden Felder.
+   *
+   * Nur FEHLENDE — `COALESCE(vorhandener Wert, neuer Wert)` lässt Bestehendes stehen. Die
+   * erste Quelle behält recht, denn alles am Umsatz hängt an ihr. Damit bleibt der Beleg
+   * auch hier nur ergänzbar, nicht überschreibbar.
+   */
+  async ergaenzen(u: Umsatz) {
     const db = await getDb();
-    for (const u of umsaetze) await einfuegen(db, u);
+    await db.execute(
+      `UPDATE umsatz_roh SET
+         valuta = COALESCE(valuta, $2), glaeubiger_id = COALESCE(glaeubiger_id, $3),
+         gegenpartei_iban = COALESCE(gegenpartei_iban, $4),
+         mandatsreferenz = COALESCE(mandatsreferenz, $5),
+         e2e_referenz = COALESCE(e2e_referenz, $6), umsatzart = COALESCE(umsatzart, $7),
+         buchungsschluessel = COALESCE(buchungsschluessel, $8),
+         bank_referenz = COALESCE(bank_referenz, $9), native_id = COALESCE(native_id, $10)
+       WHERE id = $1`,
+      [
+        u.id, u.valuta ?? null, u.glaeubigerId ?? null, u.gegenparteiIban ?? null,
+        u.mandatsreferenz ?? null, u.e2eReferenz ?? null, u.umsatzart ?? null,
+        u.buchungsschluessel ?? null, u.bankreferenz ?? null, u.nativeId ?? null,
+      ],
+    );
   },
   async alle() {
     const db = await getDb();
-    const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} ORDER BY buchungstag`);
+    const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} ORDER BY r.buchungstag`);
     return zeilen.map(zuUmsatz);
   },
   async nachLauf(laufId: string) {
     const db = await getDb();
-    const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} WHERE lauf_id = $1 ORDER BY buchungstag`, [laufId]);
+    const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} WHERE r.lauf_id = $1 ORDER BY r.buchungstag`, [laufId]);
     return zeilen.map(zuUmsatz);
   },
   async offene() {
     const db = await getDb();
-    const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} WHERE status = 'neu' ORDER BY buchungstag`);
+    const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} WHERE COALESCE(v.status, 'neu') = 'neu' ORDER BY r.buchungstag`);
     return zeilen.map(zuUmsatz);
   },
   async loeschen(id: string) {
     const db = await getDb();
-    await db.execute("DELETE FROM umsatz WHERE id = $1", [id]);
+    // Der Verarbeitungsstand geht per ON DELETE CASCADE mit.
+    await db.execute("DELETE FROM umsatz_roh WHERE id = $1", [id]);
   },
   async bestandsSchluessel() {
     const db = await getDb();
@@ -218,13 +312,13 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
     // wurden sie bisher nie. Solange die Umsatz-Zeile existiert, deckt sie den Fall ab;
     // sobald Umsätze aufgeräumt werden (der Port kann löschen), fiele die Grundlage weg.
     const h = await db.select<{ roh_hash: string }[]>(
-      `SELECT roh_hash FROM umsatz
+      `SELECT roh_hash FROM umsatz_roh
        UNION
        SELECT roh_hash FROM ist_buchung WHERE roh_hash IS NOT NULL`,
     );
-    const n = await db.select<{ native_id: string }[]>("SELECT native_id FROM umsatz WHERE native_id IS NOT NULL");
+    const n = await db.select<{ native_id: string }[]>("SELECT native_id FROM umsatz_roh WHERE native_id IS NOT NULL");
     const o = await db.select<{ roh_hash: string }[]>(
-      "SELECT roh_hash FROM umsatz WHERE native_id IS NULL",
+      "SELECT roh_hash FROM umsatz_roh WHERE native_id IS NULL",
     );
     return {
       hashes: h.map((r) => r.roh_hash),

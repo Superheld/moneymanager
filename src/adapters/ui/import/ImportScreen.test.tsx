@@ -157,7 +157,7 @@ describe("ImportScreen", () => {
       iban: "DE93999999990000000001", inhaberIds: [], saldo: 100000,
     });
     // Bestand direkt setzen, damit der zweite Durchlauf dagegen deduppen muss.
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
       betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung",
       verwendungszweck: "", rohHash: "egal", nativeId: "fg-1", status: "neu",

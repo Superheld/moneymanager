@@ -47,12 +47,12 @@ async function bestand() {
     id: "l2", quelle: "fints", zeitpunkt: "2026-08-20T09:00:00.000Z",
     eingelesen: 9, neu: 0, duplikate: 9,
   });
-  await umsatzRepo.speichern({
+  await umsatzRepo.anlegen({
     id: "u-gebucht", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-08-05",
     betrag: -1250, waehrung: "EUR", gegenpartei: "Thalberg Vibora", verwendungszweck: "Rechnung",
     rohHash: "h1", status: "verbucht", istbuchungId: "b1",
   });
-  await umsatzRepo.speichern({
+  await umsatzRepo.anlegen({
     id: "u-weg", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-08-06",
     betrag: -4400, waehrung: "EUR", gegenpartei: "Ohlert Seewinkel", verwendungszweck: "Beitrag",
     rohHash: "h2", status: "verworfen",
@@ -113,7 +113,7 @@ describe("Herkunft je Konto", () => {
     await bestand();
     // Ein Umsatz aus dem Abruf, der als Duplikat weggelegt wurde: der Lauf hat also
     // gearbeitet, aber nichts beigetragen.
-    await umsatzRepo.speichern({
+    await umsatzRepo.anlegen({
       id: "u-dup", laufId: "l2", zahlungskontoId: "k1", buchungstag: "2026-08-05",
       betrag: -1250, waehrung: "EUR", gegenpartei: "Thalberg Vibora", verwendungszweck: "Rechnung",
       rohHash: "h3", status: "duplikat",

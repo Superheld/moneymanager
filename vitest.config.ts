@@ -14,6 +14,12 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     setupFiles: ["./src/testwerkzeug/setup.ts"],
+    // Worktrees unter `.claude/` sind KOPIEN des Projekts mit eigenem Stand. Ohne diesen
+    // Ausschluss laufen ihre Tests mit, verdoppeln die Zahlen und melden Fehler aus einem
+    // fremden Branch als eigene — eine Messung, die schlimmer ist als keine. Die
+    // Vorgabe-Ausschlüsse (node_modules, dist) gehen dabei verloren, deshalb stehen sie
+    // hier wieder mit.
+    exclude: ["**/node_modules/**", "**/dist/**", ".claude/worktrees/**"],
     coverage: {
       provider: "v8",
       all: true,

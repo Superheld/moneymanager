@@ -17,11 +17,29 @@ beforeAll(async () => {
   SQL = await initSqlJs({ locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm") });
 });
 
-/** Wendet die Migrationen im Versionsbereich (from, to] an — wie db.ts, aber gegen sql.js. */
+/**
+ * Wendet die Migrationen im Versionsbereich (from, to] an — wie db.ts, aber gegen sql.js.
+ *
+ * Die Bedingungen aus `migrate()` gehören hierher gespiegelt, sonst prüft der Test etwas
+ * anderes als die App tut. `-- @wennTabelle x` überspringt ein Statement, wenn `x` fehlt;
+ * gebraucht beim Umbau einer Tabelle, deren Quelle im zweiten Durchgang schon weg ist.
+ *
+ * Die beiden Spaltenprüfungen aus `migrate()` fehlen hier bewusst: sql.js meldet ein
+ * doppeltes ADD COLUMN als Fehler, und genau das soll auffallen — jede Migration hält
+ * `IF NOT EXISTS` bzw. die Reihenfolge selbst ein.
+ */
 function apply(db: Database, from = 0, to = Infinity): void {
+  const bedingung = (sql: string) => sql.match(/^\s*--\s*@wennTabelle\s+(\w+)/i)?.[1];
+  const hatTabelle = (name: string) =>
+    db.exec(`SELECT name FROM sqlite_master WHERE type='table' AND name='${name}'`).length > 0;
+
   for (const m of MIGRATIONS) {
     if (m.version > from && m.version <= to) {
-      for (const sql of m.sql) db.run(sql);
+      for (const sql of m.sql) {
+        const noetig = bedingung(sql);
+        if (noetig && !hatTabelle(noetig)) continue;
+        db.run(sql);
+      }
     }
   }
 }
@@ -53,7 +71,9 @@ const ERWARTETE_TABELLEN = [
   "kontostand_anker", // v35 — was an einem Stichtag wirklich auf dem Konto lag
   "merkmal_ausschluss",
   "person",
-  "umsatz", "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
+  // v44 — der Beleg und was wir daraus gemacht haben, getrennt nach Lebenszyklus
+  "umsatz_roh", "umsatz_verarbeitung",
+  "vertrag", "vertrag_erkennung", "vertrag_zuordnung",
   "zahlungskonto", "zahlungsregel",
 ];
 
@@ -115,7 +135,7 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     // v23 — der Vertrag trägt die Kategorie, an der die Kategorisierungs-Kette hängt
     expect(spalten(db, "vertrag")).toContain("kategorie_id");
     // v9/v10/v11/v13
-    expect(spalten(db, "umsatz")).toContain("glaeubiger_id"); // v16
+    expect(spalten(db, "umsatz_roh")).toContain("glaeubiger_id"); // v16, seit v44 in umsatz_roh
     expect(spalten(db, "ist_buchung")).toEqual(
       expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
     );
@@ -165,20 +185,32 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     db.close();
   });
 
-  it("legt Import-Lauf und Umsatz mit Dedup-Indizes an (v14)", () => {
+  it("legt Import-Lauf und Umsatz mit Dedup-Indizes an (v14, seit v44 zweigeteilt)", () => {
     const db = new SQL.Database();
     apply(db);
     expect(spalten(db, "import_lauf")).toEqual(
       expect.arrayContaining(["quelle", "zeitpunkt", "dateiname", "eingelesen", "neu", "duplikate"]),
     );
-    expect(spalten(db, "umsatz")).toEqual(
+    // Der Beleg trägt, was die Quelle lieferte …
+    expect(spalten(db, "umsatz_roh")).toEqual(
       expect.arrayContaining([
-        "lauf_id", "zahlungskonto_id", "buchungstag", "betrag", "roh_hash", "native_id",
-        "status", "vorschlag_kategorie_id", "vorschlag_charakter", "vorschlag_quelle", "istbuchung_id",
+        "lauf_id", "buchungstag", "betrag", "roh_hash", "native_id", "format",
       ]),
     );
+    // … der Stand, was wir daraus gemacht haben. Die Trennung ist der Punkt: keine dieser
+    // Spalten darf zurück in den Beleg wandern.
+    expect(spalten(db, "umsatz_verarbeitung")).toEqual(
+      expect.arrayContaining([
+        "zahlungskonto_id", "status", "vorschlag_kategorie_id", "vorschlag_charakter",
+        "vorschlag_quelle", "istbuchung_id", "geaendert_am",
+      ]),
+    );
+    expect(spalten(db, "umsatz_roh")).not.toContain("status");
+    // Die Kontozuordnung ist korrigierbar (der Verbuchen-Dialog lässt sie ändern) und
+    // deshalb kein Beleg — sonst wäre der Beleg an dieser Stelle doch beschreibbar.
+    expect(spalten(db, "umsatz_roh")).not.toContain("zahlungskonto_id");
     expect(indexExistiert(db, "ix_umsatz_roh_hash")).toBe(true);
-    expect(indexExistiert(db, "ix_umsatz_native_id")).toBe(true);
+    expect(indexExistiert(db, "ix_umsatz_roh_native")).toBe(true);
     db.close();
   });
 });
@@ -368,6 +400,131 @@ describe("Verwaiste Umsätze (v33)", () => {
     const vorher = db.exec("SELECT id, status FROM umsatz")[0].values;
     apply(db, 32, 33);
     expect(db.exec("SELECT id, status FROM umsatz")[0].values).toEqual(vorher);
+    db.close();
+  });
+});
+
+
+describe("Migration 44 — Beleg und Verarbeitung trennen", () => {
+  /** Eine Umsatzzeile im ALTEN Schema (vor v44), wie sie im Bestand steht. */
+  function altzeile(
+    db: InstanceType<typeof SQL.Database>,
+    id: string,
+    over: { status?: string; istId?: string | null; valuta?: string } = {},
+  ) {
+    db.run(
+      `INSERT INTO umsatz (id, lauf_id, zahlungskonto_id, buchungstag, valuta, betrag,
+         waehrung, gegenpartei, verwendungszweck, roh_hash, status, istbuchung_id,
+         vorschlag_charakter, vorschlag_quelle)
+       VALUES (?, 'l1', 'giro', '2026-08-11', ?, -5700, 'EUR', 'Kesselmann', 'Rechnung', ?,
+               ?, ?, 'Aufwand', 'regel')`,
+      [id, over.valuta ?? null, `h-${id}`, over.status ?? "neu", over.istId ?? null],
+    );
+  }
+
+  function vorbereitet() {
+    const db = new SQL.Database();
+    apply(db, 0, 43);
+    db.run("INSERT INTO import_lauf (id, quelle, zeitpunkt) VALUES ('l1','fints','2026-08-11T09:00:00.000Z')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('giro','Girokonto','Giro','[]')");
+    return db;
+  }
+
+  it("verteilt jede Zeile auf Beleg und Verarbeitungsstand", () => {
+    const db = vorbereitet();
+    altzeile(db, "u1", { valuta: "2026-08-12" });
+    apply(db, 43, 44);
+
+    expect(db.exec("SELECT gegenpartei, valuta FROM umsatz_roh WHERE id='u1'")[0].values)
+      .toEqual([["Kesselmann", "2026-08-12"]]);
+    expect(db.exec("SELECT status, vorschlag_quelle, zahlungskonto_id FROM umsatz_verarbeitung WHERE umsatz_id='u1'")[0].values)
+      .toEqual([["neu", "regel", "giro"]]);
+    // Die alte Tabelle ist weg — nicht zurückgelassen, damit niemand versehentlich
+    // weiterhin dorthin schreibt.
+    expect(db.exec("SELECT name FROM sqlite_master WHERE name='umsatz'")).toEqual([]);
+    db.close();
+  });
+
+  /**
+   * Am echten Bestand gemessen und der Grund, warum diese Migration mehr tut als kopieren:
+   * es stehen Zeilen auf „verbucht", deren Buchung es nicht mehr gibt. Mit dem
+   * Fremdschlüssel auf `ist_buchung` scheiterte das Kopieren daran — und zwar NUR in der
+   * App, weil sqlx Fremdschlüssel einschaltet und die sqlite3-CLI nicht.
+   */
+  it("stellt eine Zeile zurück, deren Buchung es nicht mehr gibt", () => {
+    const db = vorbereitet();
+    db.run("INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle) VALUES ('b-da','2026-08-11',-5700,'giro','Aufwand','import')");
+    altzeile(db, "u-heil", { status: "verbucht", istId: "b-da" });
+    altzeile(db, "u-verwaist", { status: "verbucht", istId: "b-weg" });
+
+    apply(db, 43, 44);
+
+    const zeilen = db.exec("SELECT umsatz_id, status, istbuchung_id FROM umsatz_verarbeitung ORDER BY umsatz_id")[0].values;
+    expect(zeilen).toEqual([
+      ["u-heil", "verbucht", "b-da"],
+      // Zurück auf „neu" und NICHT gelöscht: die Zeile steht wieder in der Durchsicht,
+      // die Entscheidung trifft ein Mensch.
+      ["u-verwaist", "neu", null],
+    ]);
+    // Der Beleg bleibt in jedem Fall erhalten.
+    expect(db.exec("SELECT COUNT(*) FROM umsatz_roh")[0].values).toEqual([[2]]);
+    db.close();
+  });
+
+  it("übernimmt als Änderungszeitpunkt den Lauf, nicht das Jetzt", () => {
+    const db = vorbereitet();
+    altzeile(db, "u1");
+    apply(db, 43, 44);
+    expect(db.exec("SELECT geaendert_am FROM umsatz_verarbeitung WHERE umsatz_id='u1'")[0].values)
+      .toEqual([["2026-08-11T09:00:00.000Z"]]);
+    db.close();
+  });
+
+  /**
+   * Die Migration bricht mittendrin ab, die Version steht noch nicht, der nächste Start
+   * wiederholt sie — dann gibt es `umsatz` nicht mehr, und ein `INSERT … SELECT` daraus
+   * scheiterte an „no such table". Dagegen steht `-- @wennTabelle`.
+   */
+  it("läuft ein zweites Mal folgenlos durch", () => {
+    const db = vorbereitet();
+    altzeile(db, "u1");
+    apply(db, 43, 44);
+    const vorher = db.exec("SELECT umsatz_id, status FROM umsatz_verarbeitung")[0].values;
+    expect(() => apply(db, 43, 44)).not.toThrow();
+    expect(db.exec("SELECT umsatz_id, status FROM umsatz_verarbeitung")[0].values).toEqual(vorher);
+    db.close();
+  });
+
+  /**
+   * Der Grund, warum die Trennung überhaupt gebaut wurde: „auf den Stand der Quelle
+   * zurücksetzen" ist jetzt ein DELETE auf EINER Tabelle, und der Beleg merkt nichts.
+   */
+  it("lässt den Verarbeitungsstand löschen, ohne den Beleg anzutasten", () => {
+    const db = vorbereitet();
+    altzeile(db, "u1", { status: "verbucht", istId: null });
+    apply(db, 43, 44);
+
+    db.run("DELETE FROM umsatz_verarbeitung WHERE umsatz_id='u1'");
+
+    expect(db.exec("SELECT gegenpartei FROM umsatz_roh WHERE id='u1'")[0].values)
+      .toEqual([["Kesselmann"]]);
+    db.close();
+  });
+
+  /**
+   * Umgekehrt hängt der Stand am Beleg: verschwindet der Beleg, hat der Stand keinen
+   * Gegenstand mehr. Das erledigt ON DELETE CASCADE — geprüft mit EINGESCHALTETEN
+   * Fremdschlüsseln, weil sql.js sie standardmässig aus hat und die App (über sqlx) an.
+   */
+  it("nimmt den Verarbeitungsstand mit, wenn der Beleg gelöscht wird", () => {
+    const db = vorbereitet();
+    altzeile(db, "u1");
+    apply(db, 43, 44);
+
+    db.run("PRAGMA foreign_keys = ON");
+    db.run("DELETE FROM umsatz_roh WHERE id='u1'");
+
+    expect(db.exec("SELECT COUNT(*) FROM umsatz_verarbeitung")[0].values).toEqual([[0]]);
     db.close();
   });
 });

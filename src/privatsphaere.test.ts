@@ -137,11 +137,21 @@ function merkmale(): string[] {
     "Gutschrift", "Retour", "Tanken", "Tankstelle", "Transact", "Urlaub", "Veranstaltung",
     "Verrechnungskonto", "Tagesgeldkonto", "Kreditkarte",
   ]);
+  // Die Importzeilen liegen seit dem Umbau in `umsatz_roh`. Der Name wird ERMITTELT und
+  // nicht angenommen: die echte Datenbank wandert erst beim nächsten App-Start mit, und
+  // ein Wächter, der bis dahin ins Leere fragt, meldet beruhigend nichts — die
+  // gefährlichste Art zu versagen. Verschwinden BEIDE Tabellen, schlägt `frage` an, statt
+  // still durchzuwinken.
+  const umsatzTabelle =
+    frage("SELECT name FROM sqlite_master WHERE type='table' AND name='umsatz_roh'").length > 0
+      ? "umsatz_roh"
+      : "umsatz";
+
   for (const roh of [
-    ...frage("SELECT DISTINCT gegenpartei FROM umsatz WHERE length(gegenpartei) >= 6"),
+    ...frage(`SELECT DISTINCT gegenpartei FROM ${umsatzTabelle} WHERE length(gegenpartei) >= 6`),
     ...frage("SELECT DISTINCT anbieter FROM vertrag WHERE length(anbieter) >= 6"),
-    ...frage("SELECT DISTINCT glaeubiger_id FROM umsatz WHERE glaeubiger_id IS NOT NULL"),
-    ...frage("SELECT DISTINCT mandatsreferenz FROM umsatz WHERE length(mandatsreferenz) >= 8"),
+    ...frage(`SELECT DISTINCT glaeubiger_id FROM ${umsatzTabelle} WHERE glaeubiger_id IS NOT NULL`),
+    ...frage(`SELECT DISTINCT mandatsreferenz FROM ${umsatzTabelle} WHERE length(mandatsreferenz) >= 8`),
   ]) {
     const wert = String(roh ?? "").trim();
     if (wert.length < 6 || ALLERWELT.has(wert)) continue;

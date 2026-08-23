@@ -93,7 +93,12 @@ function fakes() {
     } as unknown as UebernahmeDeps["kategorieRepo"],
     umsatzRepo: {
       speichern: async (u: Umsatz) => { umsaetze.push(u); },
-      speichernViele: async (us: readonly Umsatz[]) => { umsaetze.push(...us); },
+      anlegenViele: async (us: readonly Umsatz[]) => { umsaetze.push(...us); },
+      anlegen: async (u: Umsatz) => { umsaetze.push(u); },
+      ergaenzen: async (u: Umsatz) => {
+        const i = umsaetze.findIndex((x) => x.id === u.id);
+        if (i >= 0) umsaetze[i] = { ...u, ...umsaetze[i] };
+      },
       alle: async () => umsaetze,
       nachLauf: async () => [],
       offene: async () => umsaetze,
@@ -542,7 +547,7 @@ describe("Migrationskette", () => {
     // exakt die Abfrage aus bestandsSchluessel() — sie liest jetzt auch die Roh-Hashes
     // verbuchter Ist-Buchungen, nicht nur die der Umsatz-Zeilen.
     const treffer = db.exec(
-      `SELECT roh_hash FROM umsatz
+      `SELECT roh_hash FROM umsatz_roh
        UNION
        SELECT roh_hash FROM ist_buchung WHERE roh_hash IS NOT NULL`,
     );
@@ -627,11 +632,14 @@ describe("Standgehalten — kein Fund", () => {
     db.close();
     expect(spalten).not.toContain("gegenpartei");
     expect(spalten).not.toContain("verwendungszweck");
-    // Gegenprobe: der Umsatz trägt sie und die Ist-Buchung ist über istbuchung_id verbunden.
+    // Gegenprobe: der Beleg trägt Empfänger und Zweck, und die Verbindung zur Ist-Buchung
+    // steht im VERARBEITUNGSSTAND — seit v44 zwei Tabellen, aus zwei Lebenszyklen.
     const dbu = frischeDb();
-    const uSpalten = dbu.exec("PRAGMA table_info(umsatz)")[0].values.map((r) => String(r[1]));
+    const rohSpalten = dbu.exec("PRAGMA table_info(umsatz_roh)")[0].values.map((r) => String(r[1]));
+    const standSpalten = dbu.exec("PRAGMA table_info(umsatz_verarbeitung)")[0].values.map((r) => String(r[1]));
     dbu.close();
-    expect(uSpalten).toEqual(expect.arrayContaining(["gegenpartei", "verwendungszweck", "istbuchung_id"]));
+    expect(rohSpalten).toEqual(expect.arrayContaining(["gegenpartei", "verwendungszweck"]));
+    expect(standSpalten).toContain("istbuchung_id");
   });
 
   it("hat eine lückenlos aufsteigende, doppelfreie Migrationskette", () => {

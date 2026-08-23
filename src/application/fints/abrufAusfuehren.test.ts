@@ -164,7 +164,9 @@ function fakes(zuordnungen: Kontozuordnung[]) {
           const i = umsaetze.findIndex((x) => x.id === u.id);
           if (i >= 0) umsaetze[i] = u; else umsaetze.push(u);
         },
-        speichernViele: async (u: readonly any[]) => void umsaetze.push(...u),
+        anlegenViele: async (u: readonly any[]) => void umsaetze.push(...u),
+        anlegen: async (u: any) => void umsaetze.push(u),
+        ergaenzen: async () => {},
         alle: async () => [...umsaetze],
         nachLauf: async (laufId: string) => umsaetze.filter((u) => u.laufId === laufId),
         offene: async () => umsaetze.filter((u) => u.status === "neu"),

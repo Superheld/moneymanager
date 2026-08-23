@@ -184,7 +184,7 @@ describe("BudgetsScreen — Vorschläge", () => {
     await sqliteLedgerRepository.speichern({
       id, datum, betrag: -betrag, kontoId: "k1", charakter: "Aufwand", quelle: "import", kategorieId,
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum, betrag: -betrag,
       waehrung: "EUR", gegenpartei, verwendungszweck: "", rohHash: `h-${id}`,
       status: "verbucht", istbuchungId: id,

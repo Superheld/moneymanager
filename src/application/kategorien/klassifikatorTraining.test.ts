@@ -13,7 +13,8 @@ function fakes(buchungen: IstBuchung[], umsaetze: Umsatz[]) {
     loeschen: async () => {},
   };
   const umsatzRepo = {
-    speichern: async () => {}, speichernViele: async () => {},
+    speichern: async () => {}, anlegen: async () => {}, anlegenViele: async () => {},
+    ergaenzen: async () => {},
     alle: async () => umsaetze, nachLauf: async () => [], offene: async () => [],
     loeschen: async () => {}, bestandsSchluessel: async () => ({ hashes: [], nativeIds: [] }),
   } satisfies UmsatzRepository;

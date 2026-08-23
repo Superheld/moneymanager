@@ -260,8 +260,8 @@ async function uebernahmeIntern(
   }));
 
   // 7. Persistieren: Ergänzungen, neue Umsätze, Lauf-Protokoll.
-  for (const u of zuErgaenzen) await umsatzRepo.speichern(u);
-  await umsatzRepo.speichernViele(umsaetze);
+  for (const u of zuErgaenzen) await umsatzRepo.ergaenzen(u);
+  await umsatzRepo.anlegenViele(umsaetze);
   await laufRepo.speichern({
     id: laufId,
     quelle: eingabe.quelle,

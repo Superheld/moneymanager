@@ -57,7 +57,7 @@ async function monatsreihe(praefix: string, gegenpartei: string, betrag: number,
     await sqliteLedgerRepository.speichern({
       id, datum, betrag: -betrag, kontoId: "k1", charakter: "Aufwand", quelle: "import",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
       betrag: -betrag, waehrung: "EUR", gegenpartei, verwendungszweck: "",
       rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
@@ -73,7 +73,7 @@ async function einnahmereihe(praefix: string, gegenpartei: string, betrag: numbe
     await sqliteLedgerRepository.speichern({
       id, datum, betrag, kontoId: "k1", charakter: "Ertrag", quelle: "import",
     });
-    await sqliteUmsatzRepository.speichern({
+    await sqliteUmsatzRepository.anlegen({
       id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
       betrag, waehrung: "EUR", gegenpartei, verwendungszweck: "",
       rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
@@ -338,7 +338,7 @@ describe("VertraegeScreen — Vorschläge", () => {
         id: `e${i}`, datum, betrag: -(1000 + i * 800), kontoId: "k1",
         charakter: "Aufwand", quelle: "import",
       });
-      await sqliteUmsatzRepository.speichern({
+      await sqliteUmsatzRepository.anlegen({
         id: `ue${i}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
         betrag: -(1000 + i * 800), waehrung: "EUR", gegenpartei: "Nordhoff",
         verwendungszweck: "", rohHash: `he${i}`, status: "verbucht", istbuchungId: `e${i}`,
@@ -471,7 +471,7 @@ describe("VertraegeScreen — Vorschläge", () => {
       await sqliteLedgerRepository.speichern({
         id, datum, betrag: -4000, kontoId: "k1", charakter: "Aufwand", quelle: "import",
       });
-      await sqliteUmsatzRepository.speichern({
+      await sqliteUmsatzRepository.anlegen({
         id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
         betrag: -4000, waehrung: "EUR", gegenpartei: "Vibora GmbH", verwendungszweck: "",
         rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,

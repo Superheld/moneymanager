@@ -232,8 +232,22 @@ export interface DublettenfreigabeRepository {
 }
 
 export interface UmsatzRepository {
+  /**
+   * Legt eine neue Importzeile an — Beleg und Verarbeitungsstand zusammen.
+   *
+   * Getrennt von `speichern`, weil die Rohdaten danach feststehen. Eine Methode, die
+   * beides kann, zieht bei einer blossen Statusänderung irgendwann Rohfelder mit, und
+   * niemand sieht der Aufrufstelle an, dass es passiert.
+   */
+  anlegen(umsatz: Umsatz): Promise<void>;
+  anlegenViele(umsaetze: readonly Umsatz[]): Promise<void>;
+  /** Schreibt NUR den Verarbeitungsstand (Status, Vorschlag, Verbuchung, Verdacht). */
   speichern(umsatz: Umsatz): Promise<void>;
-  speichernViele(umsaetze: readonly Umsatz[]): Promise<void>;
+  /**
+   * Trägt an einer vorhandenen Zeile nach, was eine zweite Quelle mehr weiss — und nur
+   * das Fehlende. Die einzige Stelle, an der Rohdaten nachträglich wachsen.
+   */
+  ergaenzen(umsatz: Umsatz): Promise<void>;
   /** Alle Umsätze (inkl. verbuchte) — z. B. für Detail-Join über istbuchungId. */
   alle(): Promise<Umsatz[]>;
   /** Umsätze eines Laufs. */

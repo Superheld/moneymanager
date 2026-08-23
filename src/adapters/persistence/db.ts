@@ -26,6 +26,27 @@ function spaltenAbgang(sql: string): { tabelle: string; spalte: string } | null 
   return m ? { tabelle: m[1], spalte: m[2] } : null;
 }
 
+/**
+ * `-- @wennTabelle x` am Anfang eines Statements → der Tabellenname; sonst null.
+ *
+ * Gebraucht beim UMBAU einer Tabelle: die Daten werden in die neue kopiert, dann fällt
+ * die alte. Beim zweiten Lauf (die Migration brach vorher ab, die Version steht noch
+ * nicht) gibt es die Quelle nicht mehr, und ein `INSERT … SELECT FROM alt` scheiterte an
+ * „no such table" — die App käme nicht mehr hoch. Derselbe Grund wie bei den beiden
+ * Spaltenprüfungen darunter, nur eine Ebene höher.
+ */
+function tabellenBedingung(sql: string): string | null {
+  const m = sql.match(/^\s*--\s*@wennTabelle\s+(\w+)/i);
+  return m ? m[1] : null;
+}
+
+async function tabelleExistiert(db: MigrationsDb, tabelle: string): Promise<boolean> {
+  const zeilen = await db.select<{ name: string }[]>(
+    `SELECT name FROM sqlite_master WHERE type='table' AND name='${tabelle}'`,
+  );
+  return zeilen.length > 0;
+}
+
 async function spalteExistiert(db: MigrationsDb, tabelle: string, spalte: string): Promise<boolean> {
   const zeilen = await db.select<{ name: string }[]>(`PRAGMA table_info(${tabelle})`);
   return zeilen.some((z) => z.name === spalte);
@@ -56,6 +77,9 @@ async function spalteExistiert(db: MigrationsDb, tabelle: string, spalte: string
  *  • `ALTER TABLE … DROP COLUMN` genauso, nur andersherum: fehlt die Spalte schon, ist
  *    nichts zu tun. Ohne diese Prüfung scheiterte der zweite Lauf an „no such column"
  *    und die App käme nicht mehr hoch.
+ *  • `-- @wennTabelle x` vor einem Statement überspringt es, wenn `x` fehlt. Für den
+ *    UMBAU einer Tabelle: kopieren, dann die alte fallen lassen — beim zweiten Lauf ist
+ *    die Quelle weg, und ein `INSERT … SELECT` daraus scheiterte.
  *
  * Der Versionseintrag kommt zuletzt: lieber eine Migration zweimal laufen lassen (sie ist
  * wiederholbar) als sie fälschlich für erledigt halten.
@@ -73,6 +97,8 @@ export async function migrate(db: MigrationsDb): Promise<void> {
   for (const m of MIGRATIONS) {
     if (m.version <= aktuell) continue;
     for (const stmt of m.sql) {
+      const bedingung = tabellenBedingung(stmt);
+      if (bedingung && !(await tabelleExistiert(db, bedingung))) continue;
       const zugang = spaltenZugang(stmt);
       if (zugang && (await spalteExistiert(db, zugang.tabelle, zugang.spalte))) continue;
       const abgang = spaltenAbgang(stmt);
