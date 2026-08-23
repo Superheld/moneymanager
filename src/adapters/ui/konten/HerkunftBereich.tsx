@@ -39,7 +39,7 @@ function datumKurz(iso: string): string {
 /**
  * Was für ein Konto hereinkam — in zwei Lesarten, und der Unterschied ist der Punkt.
  *
- * **Ohne `zugangId`** (Register „Herkunft", Kontenliste): EINE Tabelle mit allen Zeilen
+ * **Ohne `zugangId`** (unter der Kontenliste): EINE Tabelle mit allen Zeilen
  * des Kontos, aus jeder Quelle, dazu die Filter. Die Frage dort ist „was steht für dieses
  * Konto überhaupt in der Datenbank" — und darauf wäre eine nach Abrufen getrennte Antwort
  * keine Antwort. Die Läufe stehen hier bewusst NICHT: sie zerlegen genau die Liste, die
@@ -50,14 +50,19 @@ function datumKurz(iso: string): string {
  * andere: „was hat dieser Abruf gebracht". Wer ihr nachgeht, will die Importe
  * nebeneinander vergleichen — ein Stapel aller Zeilen beantwortet sie nicht.
  *
- * Mit `kontoId` steht der Bereich unter der Zeile, die ihn geöffnet hat, und führt keine
- * eigene Kontowahl. Derselbe Aufbau wie im Kontoauszug: oben die Liste, darunter das
- * Gewählte.
+ * Er steht IMMER unter der Zeile, die ihn geöffnet hat, und führt keine eigene Kontowahl
+ * — deshalb ist `kontoId` Pflicht. Es gab einmal ein Register „Herkunft" mit eigener
+ * Kontowahl davor; seit die Kontentabelle selbst aufklappt, stellte es dieselbe Frage ein
+ * zweites Mal und ist entfallen.
  */
 export function HerkunftBereich({
   kontoId,
   zugangId,
-}: { kontoId?: string; zugangId?: string } = {}) {
+}: {
+  /** Das Konto, dessen Zeilen gezeigt werden. Pflicht — siehe Kopf. */
+  kontoId: string;
+  zugangId?: string;
+}) {
   /** Welcher Lauf seine Zeilen zeigt. Nur im Zugangs-Fall überhaupt wählbar. */
   const [laufId, setLaufId] = useState<string | null>(null);
   const { t } = useTranslation();
@@ -66,7 +71,7 @@ export function HerkunftBereich({
   // Von aussen vorgewaehlt, wenn jemand aus der Kontenliste hierher gesprungen ist.
   // Danach fuehrt der Bereich seine Auswahl selbst weiter — wer hier ankommt, will sich
   // umsehen und nicht bei jedem Klick zurueckgesetzt werden.
-  const [gewaehlt, setGewaehlt] = useState<string>(kontoId ?? "");
+  const [gewaehlt] = useState<string>(kontoId);
   const [filter, setFilter] = useState<Statusfilter>("alle");
   /**
    * Nach QUELLE eingrenzen — auf der Kontenseite, wo die Importliste bewusst fehlt.
@@ -78,9 +83,7 @@ export function HerkunftBereich({
   const [quelle, setQuelle] = useState<string>("alle");
 
   async function laden() {
-    const daten = await herkunftLaden();
-    setKonten(daten);
-    setGewaehlt((id) => id || daten.find((k) => k.zeilen.length > 0)?.konto.id || daten[0]?.konto.id || "");
+    setKonten(await herkunftLaden());
   }
   useEffect(() => {
     laden().catch(() => {
@@ -126,33 +129,6 @@ export function HerkunftBereich({
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
-      {/* Kontowahl. Konten ohne eingelesene Zeilen bleiben wählbar — dass nichts da ist,
-          ist selbst eine Auskunft.
-          ENTFÄLLT, wenn das Konto von aussen kommt: dann steht dieser Bereich unter einer
-          Tabelle, in der schon gewählt wurde, und eine zweite Auswahl daneben fragte
-          dasselbe noch einmal. */}
-      {!kontoId && (
-      <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
-        {konten.map((k) => (
-          <button
-            key={k.konto.id}
-            type="button"
-            onClick={() => setGewaehlt(k.konto.id)}
-            className="linkbtn"
-            style={{
-              padding: "4px 10px",
-              borderRadius: "var(--r-sm)",
-              border: "1px solid var(--line)",
-              fontWeight: k.konto.id === gewaehlt ? "var(--fw-bold)" : "normal",
-              background: k.konto.id === gewaehlt ? "var(--accent-wash)" : "transparent",
-            }}
-          >
-            {k.konto.bezeichnung}{" "}
-            <span className="muted" style={{ fontSize: "var(--fs-2xs)" }}>{k.zeilen.length}</span>
-          </button>
-        ))}
-      </div>
-      )}
 
       {aktiv && (
         <>
