@@ -249,6 +249,8 @@ async function uebernahmeIntern(
     e2eReferenz: k.roh.e2eReferenz,
     umsatzart: k.roh.umsatzart,
     buchungsschluessel: k.roh.buchungsschluessel,
+    zweckCode: k.roh.zweckCode,
+    endempfaenger: k.roh.endempfaenger,
     bankreferenz: k.roh.bankreferenz,
     verwendungszweck: k.roh.verwendungszweck,
     rohHash: k.rohHash,

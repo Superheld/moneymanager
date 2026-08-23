@@ -958,3 +958,39 @@ describe("Ledger-Journal — was mit einer Buchung geschah", () => {
     expect(JSON.parse(letzte.nachher!).vertrag_id).toBe("v1");
   });
 });
+
+describe("Beleg — die Felder, die nur CAMT liefert", () => {
+  const umsatz = (over: Record<string, unknown> = {}) => ({
+    id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-08-11",
+    betrag: -4500, waehrung: "EUR", gegenpartei: "Zahlungsdienstleister",
+    verwendungszweck: "Bestellung", rohHash: "h1", status: "neu" as const, ...over,
+  });
+
+  it("traegt Zweckcode und Endempfaenger durch die Rundreise", async () => {
+    await umsatzRepository.anlegen(umsatz({ zweckCode: "SALA", endempfaenger: "Buchhandlung Talmberg" }));
+    const [u] = await umsatzRepository.alle();
+    expect(u.zweckCode).toBe("SALA");
+    expect(u.endempfaenger).toBe("Buchhandlung Talmberg");
+    // Die direkte Gegenpartei bleibt daneben stehen.
+    expect(u.gegenpartei).toBe("Zahlungsdienstleister");
+  });
+
+  /**
+   * Der Ergaenzen-Fall: eine Zeile aus MT940 kennt beide Felder nicht, ein spaeterer
+   * CAMT-Abruf schon. Nachgetragen wird nur, was FEHLT — bestehende Werte bleiben.
+   */
+  it("traegt sie nach, wenn eine zweite Quelle sie kennt", async () => {
+    await umsatzRepository.anlegen(umsatz());
+    await umsatzRepository.ergaenzen(umsatz({ zweckCode: "RENT", endempfaenger: "Talmberg Wohnen" }));
+
+    const [u] = await umsatzRepository.alle();
+    expect(u.zweckCode).toBe("RENT");
+    expect(u.endempfaenger).toBe("Talmberg Wohnen");
+  });
+
+  it("ueberschreibt dabei nicht, was schon dasteht", async () => {
+    await umsatzRepository.anlegen(umsatz({ zweckCode: "SALA" }));
+    await umsatzRepository.ergaenzen(umsatz({ zweckCode: "RENT" }));
+    expect((await umsatzRepository.alle())[0].zweckCode).toBe("SALA");
+  });
+});

@@ -56,6 +56,10 @@ export interface Umsatz {
   readonly umsatzart?: string;
   /** Geschäftsvorfallcode der Bank (MT940 `:61:`). */
   readonly buchungsschluessel?: string;
+  /** SEPA-Verwendungszweckcode (`SALA`, `RENT` …) — eine Einordnung der Bank, nur CAMT. */
+  readonly zweckCode?: string;
+  /** Der Empfänger hinter einem Zahlungsdienstleister, soweit die Quelle ihn nennt. */
+  readonly endempfaenger?: string;
   /** Institutseigene Referenz aus dem Freitext — Diagnose, ausdrücklich kein Schlüssel. */
   readonly bankreferenz?: string;
   /** Quellen-agnostischer Dedup-Schlüssel (siehe rohHash). */

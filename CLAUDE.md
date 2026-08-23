@@ -152,6 +152,17 @@ Zwei Zuordnungen, die man auf der falschen Seite sucht:
 Die Probe auf die Trennung: „auf den Stand der Quelle zurücksetzen" ist ein `DELETE` auf
 `umsatz_verarbeitung`, und der Beleg merkt nichts davon.
 
+**Zwei Felder liefert nur CAMT**, und beide sind Einordnungen, die die Bank schon
+vorgenommen hat: `zweck_code` (SEPA-Verwendungszweckcode — `SALA`, `RENT`, `LOAN`) und
+`endempfaenger` (wer die Zahlung wirklich bekommt, wenn ein Zahlungsdienstleister
+dazwischensteht). Bei MT940 bleiben sie leer — eine ehrliche Lücke und kein Grund, etwas
+aus dem Verwendungszweck zu raten, das dann aussähe wie eine Angabe der Bank.
+
+Der `endempfaenger` steht **neben** `gegenpartei`, nicht statt dessen: dort bleibt der
+Dienstleister, und über wen gezahlt wurde, ist eine eigene Information. Für die
+Kategorie-Erkennung ist der Unterschied erheblich — der Dienstleister ist bei jedem Händler
+derselbe.
+
 **Zwei Felder des Belegs sind formatabhängig** und tragen je nach Abrufweg Verschiedenes:
 `umsatzart` (MT940 ein kurzes Etikett, CAMT ein Freitext) und `buchungsschluessel` (MT940
 numerisch, CAMT alphabetisch). Sie stehen trotzdem in einer Spalte — deutbar, weil das
