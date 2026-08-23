@@ -1120,6 +1120,101 @@ describe("Migration 56 — Abrufe von vor v42 finden ihren Zugang", () => {
   });
 });
 
+
+describe("Migration 57 — Buchungen, die ihrem Beleg widersprechen", () => {
+  function bestand() {
+    const db = new SQL.Database();
+    apply(db, 0, 56);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k1','Girokonto','Giro','[]')");
+    db.run("INSERT INTO import_lauf (id, quelle, zeitpunkt) VALUES ('l1','fints','2026-08-11T09:00:00.000Z')");
+    return db;
+  }
+
+  /** Beleg und Buchung mit frei waehlbaren Vorzeichen. */
+  function paar(db: InstanceType<typeof SQL.Database>, id: string, belegBetrag: number, buchungBetrag: number) {
+    db.run(
+      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle)
+       VALUES (?, '2026-08-11', ?, 'k1', 'Aufwand', 'import')`,
+      [id, buchungBetrag],
+    );
+    db.run(
+      `INSERT INTO umsatz_roh (id, lauf_id, buchungstag, betrag, waehrung, gegenpartei,
+         verwendungszweck, roh_hash) VALUES (?, 'l1', '2026-08-11', ?, 'EUR', 'Talmberg', 'Erstattung', ?)`,
+      [`u-${id}`, belegBetrag, `h-${id}`],
+    );
+    db.run(
+      `INSERT INTO umsatz_verarbeitung (umsatz_id, zahlungskonto_id, status, istbuchung_id, geaendert_am)
+       VALUES (?, 'k1', 'verbucht', ?, '2026-08-11T09:00:00.000Z')`,
+      [`u-${id}`, id],
+    );
+  }
+
+  /**
+   * Der gemeldete Fall: eine Erstattung kam als ZUFLUSS herein und wurde beim Einsortieren
+   * in eine Aufwandskategorie zum Abfluss. Im Budget belastete sie damit, statt zu
+   * entlasten.
+   */
+  it("stellt die Richtung aus dem Beleg wieder her", () => {
+    const db = bestand();
+    paar(db, "b-verdreht", 4995, -4995);
+    paar(db, "b-heil", -4995, -4995);
+
+    apply(db, 56, 57);
+
+    expect(db.exec("SELECT id, betrag FROM ist_buchung ORDER BY id")[0].values).toEqual([
+      ["b-heil", -4995],
+      ["b-verdreht", 4995],
+    ]);
+    db.close();
+  });
+
+  /**
+   * Eine Korrektur, die sich selbst nicht protokolliert, ist genau die stille Aenderung,
+   * gegen die es das Journal gibt — auch wenn sie diesmal von uns kommt.
+   */
+  it("haelt die Korrektur im Journal fest, mit dem Zustand davor", () => {
+    const db = bestand();
+    paar(db, "b-verdreht", 4995, -4995);
+
+    apply(db, 56, 57);
+
+    const eintraege = db.exec(
+      "SELECT istbuchung_id, art, vorher, nachher FROM buchung_journal",
+    )[0].values;
+    expect(eintraege).toHaveLength(1);
+    expect(String(eintraege[0][1])).toBe("geaendert");
+    expect(JSON.parse(String(eintraege[0][2])).betrag).toBe(-4995);
+    expect(JSON.parse(String(eintraege[0][3])).betrag).toBe(4995);
+    db.close();
+  });
+
+  it("laesst Buchungen ohne Beleg in Ruhe", () => {
+    const db = bestand();
+    db.run(`INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle)
+            VALUES ('b-hand','2026-08-11',-2000,'k1','Aufwand','manuell')`);
+
+    apply(db, 56, 57);
+
+    expect(db.exec("SELECT betrag FROM ist_buchung WHERE id='b-hand'")[0].values).toEqual([[-2000]]);
+    expect(db.exec("SELECT COUNT(*) FROM buchung_journal")[0].values).toEqual([[0]]);
+    db.close();
+  });
+
+  it("laeuft ein zweites Mal folgenlos durch", () => {
+    const db = bestand();
+    paar(db, "b-verdreht", 4995, -4995);
+    apply(db, 56, 57);
+    const vorher = db.exec("SELECT id, betrag FROM ist_buchung")[0].values;
+
+    expect(() => apply(db, 56, 57)).not.toThrow();
+
+    // Und vor allem: NICHT wieder zurueckgedreht, und kein zweiter Journaleintrag.
+    expect(db.exec("SELECT id, betrag FROM ist_buchung")[0].values).toEqual(vorher);
+    expect(db.exec("SELECT COUNT(*) FROM buchung_journal")[0].values).toEqual([[1]]);
+    db.close();
+  });
+});
+
 describe("Versionsschema", () => {
   it("hat streng aufsteigende, eindeutige Versionen", () => {
     const versionen = MIGRATIONS.map((m) => m.version);

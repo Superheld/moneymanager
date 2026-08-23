@@ -171,6 +171,24 @@ voran die Kategorie-Erkennung, muss über `lauf_id` danach unterscheiden. Eine A
 zwischen den beiden Vokabularen gibt es nicht; sie liesse sich nur aus der
 DK-Spezifikation gewinnen, und eine geratene wäre schlimmer als keine.
 
+#### Die Richtung kommt vom Beleg, der Charakter ordnet ein
+
+Bei einer **von Hand** erfassten Buchung folgt das Vorzeichen dem Charakter: man tippt eine
+Betragshöhe und sagt „Aufwand", daraus wird ein Abfluss. Es gibt keinen Beleg, der es
+besser wüsste.
+
+Bei einer **importierten** Buchung ist es umgekehrt. Die Bank hat gebucht, in welche
+Richtung das Geld geflossen ist — das ist eine **Tatsache**. Der Charakter ist eine
+**Einordnung**, und eine Einordnung darf eine Tatsache nicht umdrehen. `buchungBearbeiten`
+behält deshalb bei `quelle === "import"` das Vorzeichen des Originals und übernimmt aus der
+Eingabe nur die Höhe.
+
+**Eine Erstattung ist damit ein Aufwand mit positivem Betrag**, und das ist kein
+Widerspruch: „Aufwand" sagt, WOFÜR das Geld war, das Vorzeichen sagt, wohin es floss. Die
+Budgetrechnung ist darauf ausgelegt — `Verbrauchsposten.betrag` ist ausdrücklich „POSITIV
+(eine Erstattung ist entsprechend negativ)", und damit entlastet sie das Budget der
+Kategorie, in der die Ausgabe stattgefunden hat.
+
 #### Zuordnungen stehen an der Buchung
 
 `kategorie_id` und `vertrag_id` sind **Spalten von `ist_buchung`**, nicht eigene Tabellen.

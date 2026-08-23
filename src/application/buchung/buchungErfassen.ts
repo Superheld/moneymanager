@@ -75,11 +75,32 @@ export async function buchungBearbeiten(
   const neueKategorie = e.kategorieId || undefined;
   const kategorieGeaendert = neueKategorie !== original.kategorieId;
 
+  // DIE RICHTUNG KOMMT BEIM IMPORT VOM BELEG, nicht aus dem Charakter.
+  //
+  // Bei einer von Hand erfassten Buchung ist das Vorzeichen eine Folge der Einordnung:
+  // man tippt eine Betragshöhe und sagt „Aufwand", und daraus wird ein Abfluss. Bei einer
+  // importierten Buchung ist es umgekehrt — die Bank hat gebucht, in welche Richtung das
+  // Geld geflossen ist. Das ist eine TATSACHE, und der Charakter ist eine EINORDNUNG;
+  // eine Einordnung darf eine Tatsache nicht umdrehen.
+  //
+  // Gemeldet und nachgemessen an einer Erstattung: sie kam als Zufluss herein, wurde in
+  // die Kategorie gelegt, in der die Ausgabe stattgefunden hatte — und weil deren Vorgabe
+  // „Aufwand" ist, wurde daraus ein Abfluss. Im Budget belastete sie damit, statt zu
+  // entlasten. Das Betragsfeld war dabei GESPERRT (Online-Konto), es hat also niemand
+  // etwas eingegeben, das sich hätte ändern dürfen.
+  //
+  // Eine Erstattung ist damit ein Aufwand mit positivem Betrag, und das ist kein
+  // Widerspruch: „Aufwand" sagt, WOFÜR das Geld war, das Vorzeichen sagt, wohin es floss.
+  // Die Budgetrechnung ist darauf ausgelegt — `Verbrauchsposten.betrag` ist ausdrücklich
+  // „POSITIV (eine Erstattung ist entsprechend negativ)".
+  const ausDemBeleg = original.quelle === "import";
   const aktualisiert: IstBuchung = {
     ...original,
     kontoId: e.kontoId || original.kontoId,
     datum: e.datum,
-    betrag: vorzeichenbehaftet(e.betrag, e.charakter),
+    betrag: ausDemBeleg
+      ? Math.sign(original.betrag) * Math.abs(e.betrag)
+      : vorzeichenbehaftet(e.betrag, e.charakter),
     charakter: e.charakter,
     kategorieId: neueKategorie,
     kategorieHerkunft: kategorieGeaendert ? "manuell" : original.kategorieHerkunft,
