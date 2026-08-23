@@ -2,6 +2,8 @@
 // Fenster + Plugins; die Fachlogik lebt im TS-Kern (src/core), Persistenz
 // läuft über tauri-plugin-sql (SQLite) und wird vom TS-Adapter angesprochen.
 
+mod transaktion;
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -12,6 +14,9 @@ pub fn run() {
         // Dieser fetch läuft durch Rust und kennt kein CORS. Keine Domänenlogik —
         // welche URLs erlaubt sind, steht in capabilities/default.json.
         .plugin(tauri_plugin_http::init())
+        // Mehrere Statements atomar: was ueber tauri-plugin-sql nicht geht, weil dort jedes
+        // Statement eine andere Pool-Verbindung erwischt. Siehe transaktion.rs.
+        .invoke_handler(tauri::generate_handler![transaktion::transaktion])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
