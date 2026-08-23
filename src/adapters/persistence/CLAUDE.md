@@ -52,7 +52,20 @@ Widerspruch in derselben Migration auf. Ein Test dazu setzt `PRAGMA foreign_keys
 selbst; sonst prüft er etwas anderes als die App tut.
 
 **SQLite kann Constraints nicht per `ALTER TABLE` nachrüsten.** Wer einen Fremdschlüssel an
-eine bestehende Tabelle hängen will, baut sie neu — mit dem Marker oben.
+eine bestehende Tabelle hängen will, baut sie neu — anlegen, umkopieren, alte fallen
+lassen, umbenennen, mit dem Marker oben.
+
+**Und dabei muss die Prüfung AUS sein.** Mit eingeschalteten Fremdschlüsseln geht beim
+Neubau zweierlei schief, beides gemessen: `DROP TABLE` scheitert, wenn ein Schlüssel mit
+RESTRICT darauf zeigt, und es **löscht still**, wo einer mit CASCADE darauf zeigt — SQLite
+behandelt den Drop wie das Löschen aller Zeilen. Das erledigt `migrate()` von selbst: jedes
+Migrations-Statement läuft über `schemaStatement`, und nach der Kette holt
+`fremdschluesselPruefen` die Prüfung nach. In der App braucht es dafür den Rust-Weg, weil
+`PRAGMA foreign_keys` pro Verbindung gilt und der Plugin-Pool eine beliebige erwischt.
+
+Genau diese Asymmetrie ist der Grund, warum so etwas lange unentdeckt bleibt: sql.js hat
+Fremdschlüssel aus, der Test war grün, und die App wäre gescheitert. **Wer am Schema
+arbeitet, prüft gegen eine Lesekopie des echten Bestands** — Rezept in `CLAUDE.local.md`.
 
 ## Zwei Fallen im Schema
 

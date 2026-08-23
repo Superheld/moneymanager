@@ -108,3 +108,73 @@ pub async fn transaktion(
         }
     }
 }
+
+/// Führt Schema-Statements auf EINER Verbindung mit abgeschalteten Fremdschlüsseln aus.
+///
+/// **Warum das nötig ist.** SQLite kann Constraints nicht per `ALTER TABLE` nachrüsten;
+/// eine Tabelle bekommt sie nur durch Neubau — anlegen, umkopieren, alte fallen lassen,
+/// umbenennen. Mit eingeschalteten Fremdschlüsseln geht dabei zweierlei schief, und beides
+/// ist gemessen: `DROP TABLE` scheitert, wenn ein Schlüssel mit RESTRICT darauf zeigt, und
+/// es LÖSCHT STILL, wo einer mit CASCADE darauf zeigt — SQLite behandelt den Drop wie das
+/// Löschen aller Zeilen. Die offizielle Umbau-Prozedur schaltet die Prüfung deshalb ab.
+///
+/// Das kann nur, wer die Verbindung festhält: `PRAGMA foreign_keys` gilt pro Verbindung,
+/// und über den Pool des Plugins erwischte es eine beliebige.
+///
+/// **Keine Transaktion.** Migrationen sind hier bewusst einzeln wiederholbar statt in eine
+/// Klammer gefasst (siehe `db.ts`): bricht ein Lauf ab, steht die Version noch nicht, und
+/// der nächste Start wiederholt sie folgenlos. Eine Transaktion würde das Gegenteil
+/// erzwingen — ganz oder gar nicht — und den Wiederanlauf schwerer machen, nicht leichter.
+///
+/// **Geprüft wird nicht hier, sondern EINMAL nach der ganzen Kette** (`migrate` in
+/// `db.ts`). Der Grund ist die Aufrufform: die Migrationsschleife prüft zwischen den
+/// Statements den Zwischenzustand — ob eine Tabelle noch da ist, ob eine Spalte schon
+/// existiert — und ruft deshalb je Statement einmal hierher. Ein `foreign_key_check` über
+/// die ganze Datenbank bei jedem einzelnen Statement wäre der teuerste denkbare Weg zum
+/// selben Ergebnis. Wer die Prüfung abschaltet, muss sie nachholen; nur eben am Ende.
+#[tauri::command]
+pub async fn schema_umbau(
+    db: String,
+    anweisungen: Vec<Anweisung>,
+    instanzen: State<'_, DbInstances>,
+) -> Result<u64, String> {
+    let instanzen = instanzen.0.read().await;
+    let pool = instanzen
+        .get(&db)
+        .ok_or_else(|| format!("Datenbank '{db}' ist nicht geöffnet"))?;
+
+    #[allow(irrefutable_let_patterns)]
+    let DbPool::Sqlite(pool) = pool else {
+        return Err("Nur SQLite wird unterstützt".to_string());
+    };
+
+    let mut conn = pool.acquire().await.map_err(|e| e.to_string())?;
+
+    // Ab hier gilt: was auch schiefgeht, die Prüfung wird wieder eingeschaltet. Eine
+    // Verbindung, die ohne Fremdschlüssel in den Pool zurückgeht, nimmt die nächste
+    // Schreiboperation mit — und niemand sucht den Fehler dort.
+    sqlx::query("PRAGMA foreign_keys = OFF")
+        .execute(&mut *conn)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let ergebnis = async {
+        let mut betroffen = 0u64;
+        for a in &anweisungen {
+            let query = binden(sqlx::query(&a.sql), &a.werte);
+            betroffen += conn.execute(query).await?.rows_affected();
+        }
+        Ok::<_, sqlx::Error>(betroffen)
+    }
+    .await;
+
+    let wieder_an = sqlx::query("PRAGMA foreign_keys = ON").execute(&mut *conn).await;
+
+    match ergebnis {
+        Err(e) => Err(e.to_string()),
+        Ok(betroffen) => {
+            wieder_an.map_err(|e| e.to_string())?;
+            Ok(betroffen)
+        }
+    }
+}
