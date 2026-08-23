@@ -226,7 +226,18 @@ interface Ausnahme {
   readonly grund: string;
 }
 
-const AUSNAHMEN: readonly Ausnahme[] = [];
+const AUSNAHMEN: readonly Ausnahme[] = [
+  {
+    wert: "Hanseatic Bank",
+    nurIn: ["src/i18n/i18n.ts"],
+    grund:
+      "Institutsname, kein Bestandsdatum — er benennt weder ein Konto noch einen Betrag. " +
+      "Er steht zugleich als Gegenpartei in den eigenen Umsaetzen und unvermeidlich in der " +
+      "Beschriftung des Schalters, der die Anbindung an genau dieses Institut freischaltet. " +
+      "Fuer Institute aus der DK-Liste erledigt das der bankNamen-Filter oben; diese Bank " +
+      "bietet kein FinTS an und steht deshalb nicht darin.",
+  },
+];
 
 /** Ist dieser Fund an dieser Stelle bewusst freigegeben? */
 function freigegeben(

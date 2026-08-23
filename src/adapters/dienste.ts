@@ -57,6 +57,12 @@ import { sqliteDepotRepository } from "./persistence/sqliteDepotRepository";
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
+import {
+  experimenteLaden,
+  experimentSchalten,
+  type ExperimentId,
+  type Experimente,
+} from "../application/experimente";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { inventarLaden, type Inventarsicht } from "../application/inventar/inventarsichten";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
@@ -196,6 +202,15 @@ export function einstellungen(): Promise<Haushaltseinstellungen> {
 
 export function regionSetzen(locale: string): Promise<void> {
   return regionWaehlen(sqliteEinstellungenRepository, locale);
+}
+
+/** Welche experimentellen Funktionen eingeschaltet sind. Ohne Zutun: alle aus. */
+export function experimente(): Promise<Experimente> {
+  return experimenteLaden(sqliteEinstellungenRepository);
+}
+
+export function experimentSetzen(id: ExperimentId, an: boolean): Promise<void> {
+  return experimentSchalten(sqliteEinstellungenRepository, id, an);
 }
 
 

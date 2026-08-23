@@ -16,6 +16,7 @@ import { createContext, useContext, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   FachlicherFehler,
+  EXPERIMENTE_AUS,
   STANDARD_EINSTELLUNGEN,
   geldFormatieren,
   geldFormatierenMitSymbol,
@@ -24,6 +25,8 @@ import {
   type Cent,
   type Charakter,
   type FormatOptionen,
+  type ExperimentId,
+  type Experimente,
   type Haushaltseinstellungen,
 } from "../../../application";
 
@@ -31,15 +34,43 @@ export interface ContextWert {
   einstellungen: Haushaltseinstellungen;
   /** Region wechseln (speichert die Locale, lädt neu, schaltet die UI-Sprache um). */
   regionSetzen: (locale: string) => Promise<void>;
+  /**
+   * Welche experimentellen Funktionen eingeschaltet sind.
+   *
+   * Steht hier und nicht in `einstellungen`, weil es zwei verschiedene Fragen sind: die
+   * Einstellungen sagen, was der HAUSHALT ist, der Schalter, was das PROGRAMM anbietet.
+   * Getragen wird beides vom selben Provider, weil beides denselben Anspruch hat — es
+   * muss VOR dem ersten Rendern feststehen. Ein Experiment, das kurz aufblitzt und dann
+   * verschwindet, ist schlimmer als eines, das gar nicht da ist.
+   */
+  experimente: Experimente;
+  /** Ein Experiment ein- oder ausschalten (speichert und lädt den Stand neu). */
+  experimentSetzen: (id: ExperimentId, an: boolean) => Promise<void>;
 }
 
 export const EinstellungenContext = createContext<ContextWert>({
   einstellungen: STANDARD_EINSTELLUNGEN,
   regionSetzen: async () => {},
+  experimente: EXPERIMENTE_AUS,
+  experimentSetzen: async () => {},
 });
 
 export function useEinstellungen(): Haushaltseinstellungen {
   return useContext(EinstellungenContext).einstellungen;
+}
+
+/**
+ * Der Stand der Experimente — für jede Stelle, die etwas nur zeigen darf, wenn es
+ * eingeschaltet ist.
+ */
+export function useExperimente(): Experimente {
+  return useContext(EinstellungenContext).experimente;
+}
+
+/** Stand + Setter, für das Schalter-UI in den Einstellungen. */
+export function useExperimentSchalter() {
+  const { experimente, experimentSetzen } = useContext(EinstellungenContext);
+  return { experimente, experimentSetzen };
 }
 
 /** Region-Umschalter: aktuelle Locale + Setter (für das Auswahl-UI in der Shell). */

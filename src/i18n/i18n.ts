@@ -1004,6 +1004,23 @@ const de = {
       feld: "Region",
       hinweis: "bestimmt Sprache, Zahlenformat und Währung",
     },
+    experiment: {
+      titel: "Experimente",
+      untertitel: "Unfertiges zum Einschalten — auf eigene Verantwortung",
+      hinweis:
+        "Experimentelle Funktionen sind bewusst unfertig. Sie setzen Handarbeit bei der " +
+        "Einrichtung voraus, hängen an Schnittstellen, die niemand zugesichert hat, und " +
+        "können jederzeit aufhören zu funktionieren. Nichts davon läuft, solange du es " +
+        "nicht einschaltest.",
+      an: "eingeschaltet",
+      aus: "ausgeschaltet",
+      hanseaticTitel: "Hanseatic Bank",
+      hanseaticText:
+        "Konten, Salden und Umsätze der Hanseatic Bank abrufen. Die Bank bietet kein " +
+        "FinTS an; der Abruf geht deshalb über dieselbe Schnittstelle wie ihre " +
+        "Weboberfläche — nur lesend. Die Einrichtung verlangt einen einmaligen " +
+        "Mitschnitt der eigenen Anmeldung.",
+    },
     person: {
       titel: "Personen",
       untertitel: "Mitglieder des Haushalts — Dimension, kein eigener Mandant",
@@ -2370,6 +2387,21 @@ const en: typeof de = {
       untertitel: "Applies to the whole household",
       feld: "Region",
       hinweis: "determines language, number format and currency",
+    },
+    experiment: {
+      titel: "Experiments",
+      untertitel: "Unfinished features you can switch on — at your own risk",
+      hinweis:
+        "Experimental features are deliberately unfinished. They require manual setup, " +
+        "rely on interfaces nobody has guaranteed, and may stop working at any time. " +
+        "None of them run unless you switch them on.",
+      an: "on",
+      aus: "off",
+      hanseaticTitel: "Hanseatic Bank",
+      hanseaticText:
+        "Fetch accounts, balances and transactions from Hanseatic Bank. The bank offers " +
+        "no FinTS access, so the retrieval uses the same interface as its web front end " +
+        "— read-only. Setup requires a one-time capture of your own login.",
     },
     person: {
       titel: "People",

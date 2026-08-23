@@ -239,6 +239,14 @@ export {
   type Haushaltseinstellungen,
 } from "./einstellungen";
 export {
+  EXPERIMENTE,
+  EXPERIMENTE_AUS,
+  experimenteLaden,
+  experimentSchalten,
+  type ExperimentId,
+  type Experimente,
+} from "./experimente";
+export {
   uebersichtLaden,
   waehlbareMonate,
   type Uebersichtsdaten,

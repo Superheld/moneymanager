@@ -28,7 +28,11 @@ import { IconButton } from "../bausteine/IconButton";
 import { Bereich } from "../bausteine/Bereich";
 import { FestlegungenCard } from "../training/FestlegungenCard";
 import { Modal } from "../bausteine/Modal";
-import { fehlerNachricht, useRegionUmschalter } from "../bausteine/einstellungenKontext";
+import {
+  fehlerNachricht,
+  useExperimentSchalter,
+  useRegionUmschalter,
+} from "../bausteine/einstellungenKontext";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };
@@ -75,6 +79,12 @@ export function EinstellungenScreen() {
           untertitel: t("einstellungen.festlegung.untertitel"),
           inhalt: () => <FestlegungenCard kategorien={kategorien} />,
         },
+        {
+          id: "experimente",
+          label: t("einstellungen.experiment.titel"),
+          untertitel: t("einstellungen.experiment.untertitel"),
+          inhalt: () => <ExperimenteCard />,
+        },
       ]}
     />
   );
@@ -96,6 +106,70 @@ function RegionCard() {
         </select>
       </FormField>
     </Card>
+  );
+}
+
+/**
+ * Experimentelle Funktionen — aus, bis jemand sie einschaltet.
+ *
+ * Der Hinweistext steht ueber den Schaltern und nicht an jedem einzelnen: er gilt fuer
+ * alle, und wiederholt an jeder Zeile liest ihn niemand mehr. Was NUR fuer ein Experiment
+ * gilt, steht an seiner Zeile.
+ */
+function ExperimenteCard() {
+  const { t } = useTranslation();
+  const { experimente, experimentSetzen } = useExperimentSchalter();
+  return (
+    <Card>
+      <p className="muted" style={{ marginTop: 0 }}>
+        {t("einstellungen.experiment.hinweis")}
+      </p>
+      <div style={{ display: "grid", gap: "var(--sp-3)" }}>
+        <ExperimentZeile
+          titel={t("einstellungen.experiment.hanseaticTitel")}
+          text={t("einstellungen.experiment.hanseaticText")}
+          an={experimente.hanseatic}
+          aufSchalten={(an) => experimentSetzen("hanseatic", an)}
+        />
+      </div>
+    </Card>
+  );
+}
+
+function ExperimentZeile({
+  titel,
+  text,
+  an,
+  aufSchalten,
+}: {
+  titel: string;
+  text: string;
+  an: boolean;
+  aufSchalten: (an: boolean) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <label style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-start", cursor: "pointer" }}>
+      <input
+        type="checkbox"
+        checked={an}
+        // Die Beschriftung steht daneben, nicht im Feld — ohne den Namen meldet eine
+        // Vorlesehilfe nur "Kontrollkaestchen", und mit dem zweiten Experiment waeren
+        // beide nicht mehr auseinanderzuhalten.
+        aria-label={titel}
+        onChange={(e) => aufSchalten(e.target.checked)}
+        style={{ marginTop: 3 }}
+      />
+      <span>
+        <span style={{ fontWeight: "var(--fw-bold)" }}>{titel}</span>
+        {" · "}
+        <span className="muted">
+          {an ? t("einstellungen.experiment.an") : t("einstellungen.experiment.aus")}
+        </span>
+        <br />
+        <span className="muted">{text}</span>
+      </span>
+    </label>
   );
 }
 
