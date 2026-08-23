@@ -117,13 +117,23 @@ fi
 
 # Jede Tabelle EINZELN: eine Spalte, die es nicht (mehr) gibt, wuerde sonst die ganze
 # Abfrage kippen — und der Hook liefe mit leerer Merkmalsliste gruen durch.
+#
+# Und wenn eine Abfrage nicht mehr passt, wird das GESAGT. Unter `set -e` riss ein Fehler
+# hier den Hook wortlos ab: der Push scheiterte ohne eine Zeile Begruendung, und das sah
+# nach einer Ablehnung des Remotes aus statt nach einem Waechter, der sein Merkmal
+# verloren hat. Genau so lief es, als `budget.betrag_pro_monat` einer Reihe wich.
 roh=$(for sql in \
     "SELECT kontostand FROM zahlungskonto" \
-    "SELECT betrag_pro_monat FROM budget" \
+    "SELECT betrag FROM budget_betrag" \
     "SELECT betrag FROM kontostand_anker" \
     "SELECT sum(betrag) FROM ist_buchung GROUP BY konto_id"; do
-  lesen "$sql;"
-done)
+  lesen "$sql;" || {
+    echo "pre-push: ABGEBROCHEN — diese Abfrage passt nicht mehr zum Schema:" >&2
+    echo "          $sql" >&2
+    echo "          Ohne sie fehlt dem Abgleich eine ganze Sorte Merkmal." >&2
+    exit 1
+  }
+done) || exit 1
 
 merkmale=$(printf '%s\n' "$roh" \
   | awk '{ c = $1 < 0 ? -$1 : $1
