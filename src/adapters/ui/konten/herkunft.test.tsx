@@ -135,53 +135,7 @@ describe("Herkunft je Konto", () => {
 });
 
 describe("Der Weg dorthin — vom Konto zu dem, was hereinkam", () => {
-  /**
-   * Die Verwaltung stand lange stumm da: vier Register voller Tabellen, in denen nichts
-   * zu klicken schien. `DataTable` KANN die ganze Zeile klickbar machen, aber das sieht
-   * man ihr nicht an — der Cursor wechselt, sonst nichts, und wer eine Tabelle vor sich
-   * hat, probiert nicht jede Zeile durch.
-   *
-   * Geprueft wird deshalb beides: dass der Bezeichner ueberhaupt ein Bedienelement IST
-   * (eine Vorlesehilfe findet ihn sonst nicht), und dass er das richtige Konto meint.
-   */
-  it("macht den Bezeichner zu einem Bedienelement mit erklaertem Ziel", async () => {
-    await bestand();
-    await kontoRepo.speichern({
-      id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage",
-      inhaberIds: [], saldo: 0,
-    });
-
-    const gerufen: string[] = [];
-    rendere(
-      <KontenVerwaltung
-        konten={[
-          { id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 },
-          { id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 0 },
-        ]}
-        personen={[]}
-        personName={new Map()}
-        kontostaende={[]}
-        hatGebuchtes={false}
-        verbindungen={new Map()}
-        onTrennen={async () => {}}
-        onChange={() => {}}
-        onKontoOeffnen={(id) => gerufen.push(id)}
-      />,
-    );
-
-    // Ueber den Titel gegriffen und nicht ueber die Beschriftung: dass die Vorlesehilfe
-    // erfaehrt, WOHIN es geht, ist Teil der Zusicherung.
-    const link = await screen.findByRole("button", { name: /Girokonto/ });
-    await userEvent.click(link);
-
-    expect(gerufen).toEqual(["k1"]);
-  });
-
-  /**
-   * Der zweite Teil der Kette: die Herkunft zeigt das Konto, das gemeint war — und nicht
-   * das erste der Liste, das sie sich sonst selbst aussucht.
-   */
-  it("oeffnet die Herkunft beim uebergebenen Konto", async () => {
+  async function zweiKonten() {
     await bestand();
     await kontoRepo.speichern({
       id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage",
@@ -192,14 +146,81 @@ describe("Der Weg dorthin — vom Konto zu dem, was hereinkam", () => {
       betrag: -900, waehrung: "EUR", gegenpartei: "Kesselmann Anlagen",
       verwendungszweck: "Uebertrag", rohHash: "h3", status: "neu",
     });
+  }
 
-    rendere(<HerkunftBereich kontoId="k2" />);
+  const konten = [
+    { id: "k1", bezeichnung: "Girokonto", typ: "Giro" as const, klasse: "liquide" as const, inhaberIds: [], saldo: 0 },
+    { id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld" as const, klasse: "ruecklage" as const, inhaberIds: [], saldo: 0 },
+  ];
+
+  function verwaltung() {
+    return rendere(
+      <KontenVerwaltung
+        konten={konten}
+        personen={[]}
+        personName={new Map()}
+        kontostaende={[]}
+        hatGebuchtes={false}
+        verbindungen={new Map()}
+        onTrennen={async () => {}}
+        onChange={() => {}}
+      />,
+    );
+  }
+
+  /**
+   * Die Verwaltung stand lange stumm da: Tabellen, in denen nichts zu klicken schien.
+   * `DataTable` KANN die ganze Zeile klickbar machen, aber das sieht man ihr nicht an —
+   * der Cursor wechselt, sonst nichts, und wer eine Tabelle vor sich hat, probiert nicht
+   * jede Zeile durch.
+   *
+   * Ueber die Rolle gegriffen und nicht ueber den Text: dass der Bezeichner ueberhaupt
+   * ein BEDIENELEMENT ist, ist die halbe Zusicherung — sonst findet ihn keine
+   * Vorlesehilfe.
+   */
+  it("klappt die eingelesenen Zeilen unter der Tabelle auf", async () => {
+    await zweiKonten();
+    verwaltung();
+
+    // Vorher steht dort nichts davon.
+    expect(document.body.textContent ?? "").not.toContain("Kesselmann Anlagen");
+
+    await userEvent.click(await screen.findByRole("button", { name: /Tagesgeld/ }));
 
     await waitFor(() => {
       const text = document.body.textContent ?? "";
       expect(text).toContain("Kesselmann Anlagen");
-      // Und NICHT die Zeilen des anderen Kontos.
+      // Und NUR dieses Konto — nicht die Zeilen des anderen.
       expect(text).not.toContain("Thalberg Vibora");
     });
+  });
+
+  /**
+   * Aufklappen heisst auch zuklappen. Ein Bedienelement, das nur in eine Richtung geht,
+   * zwingt zum Neuladen, um wieder zur Uebersicht zu kommen.
+   */
+  it("klappt beim zweiten Klick wieder zu", async () => {
+    await zweiKonten();
+    verwaltung();
+
+    const link = await screen.findByRole("button", { name: /Tagesgeld/ });
+    await userEvent.click(link);
+    await waitFor(() => expect(document.body.textContent ?? "").toContain("Kesselmann Anlagen"));
+
+    await userEvent.click(link);
+    await waitFor(() => expect(document.body.textContent ?? "").not.toContain("Kesselmann Anlagen"));
+  });
+
+  /**
+   * Eingebettet fuehrt der Bereich KEINE eigene Kontowahl mehr: er steht unter einer
+   * Tabelle, in der schon gewaehlt wurde, und eine zweite Auswahl daneben fragte dasselbe
+   * noch einmal.
+   */
+  it("zeigt eingebettet keine zweite Kontowahl", async () => {
+    await zweiKonten();
+    rendere(<HerkunftBereich kontoId="k2" />);
+
+    await waitFor(() => expect(document.body.textContent ?? "").toContain("Kesselmann Anlagen"));
+    expect(screen.queryByRole("button", { name: /^Girokonto/ })).toBeNull();
   });
 });

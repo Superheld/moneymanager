@@ -52,6 +52,13 @@ nichts zu klicken schien.
 Ein Link im Bezeichner zeigt sich dagegen selbst an. Er ist die kleinere Trefferfläche und
 trotzdem der bessere Weg, weil man ihn überhaupt findet.
 
+**Wohin er führt: nach UNTEN, nicht woandershin.** Der Klick klappt das Gewählte unter der
+Tabelle auf — derselbe Aufbau wie im Kontoauszug, wo unter der Kontenliste das gewählte
+Konto steht. Ein Sprung in ein anderes Register ist schneller gebaut und im Gebrauch
+schlechter: man verliert die Zeile aus den Augen, von der man ausgegangen ist, und muss
+zurück, um die nächste anzusehen. Der zweite Klick auf denselben Bezeichner klappt wieder
+zu.
+
 **Nicht verwechseln mit `.linkbtn`.** Die Klasse gibt es schon und sie ist für das
 Gegenteil da: eine gedämpfte NEBENAKTION in einer Zeile („Profil ansehen"), die sich
 zurückhalten soll. `Zeilenlink` ist der Weg weiter und muss sich zeigen — Akzentfarbe,

@@ -66,27 +66,10 @@ export function KontenVerwaltungScreen() {
 
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
 
-  // Welches Register offen ist, führt jetzt dieser Screen — weil aus der Kontenliste
-  // heraus in die Herkunft gesprungen wird. `springeZu` setzt beides in einem Zug:
-  // das Register und das Konto, das dort gemeint ist.
-  const [register, setRegister] = useState("konten");
-  const [herkunftKonto, setHerkunftKonto] = useState<string | undefined>();
-
-  function zurHerkunft(kontoId: string) {
-    setHerkunftKonto(kontoId);
-    setRegister("herkunft");
-  }
 
   return (
     <Bereich
       titel={t("konten.verwaltungTitel")}
-      gewaehlt={register}
-      onWechsel={(id) => {
-        setRegister(id);
-        // Wer von Hand auf die Herkunft geht, will die ganze Liste und nicht das Konto,
-        // das er vor drei Klicks einmal geöffnet hatte.
-        if (id !== "herkunft") setHerkunftKonto(undefined);
-      }}
       register={[
         {
           id: "konten",
@@ -107,7 +90,6 @@ export function KontenVerwaltungScreen() {
                 await laden();
               }}
               onChange={() => void laden()}
-              onKontoOeffnen={zurHerkunft}
             />
           ),
         },
@@ -121,20 +103,14 @@ export function KontenVerwaltungScreen() {
           id: "herkunft",
           label: t("konten.herkunft.register"),
           untertitel: t("konten.herkunft.untertitel"),
-          // Der `key` erzwingt einen frischen Stand, wenn aus der Kontenliste gesprungen
-          // wird — sonst behielte der Bereich das Konto, das beim ersten Öffnen gewählt
-          // war, und der Klick sähe folgenlos aus.
-          inhalt: () => <HerkunftBereich key={herkunftKonto ?? "alle"} kontoId={herkunftKonto} />,
+          inhalt: () => <HerkunftBereich />,
         },
         {
           id: "zugaenge",
           label: t("konten.registerZugaenge"),
           untertitel: t("bankzugaenge.untertitel"),
           inhalt: () => (
-            <BankzugaengeScreen
-              kontoNamen={new Map(konten.map((k) => [k.id, k.bezeichnung]))}
-              onKontoOeffnen={zurHerkunft}
-            />
+            <BankzugaengeScreen kontoNamen={new Map(konten.map((k) => [k.id, k.bezeichnung]))} />
           ),
         },
       ]}
