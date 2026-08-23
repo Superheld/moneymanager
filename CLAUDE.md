@@ -151,6 +151,14 @@ Zwei Zuordnungen, die man auf der falschen Seite sucht:
 Die Probe auf die Trennung: „auf den Stand der Quelle zurücksetzen" ist ein `DELETE` auf
 `umsatz_verarbeitung`, und der Beleg merkt nichts davon.
 
+**Zwei Felder des Belegs sind formatabhängig** und tragen je nach Abrufweg Verschiedenes:
+`umsatzart` (MT940 ein kurzes Etikett, CAMT ein Freitext) und `buchungsschluessel` (MT940
+numerisch, CAMT alphabetisch). Sie stehen trotzdem in einer Spalte — deutbar, weil das
+Format am **Lauf** steht und jede Zeile zu genau einem gehört. Wer sie auswertet, allen
+voran die Kategorie-Erkennung, muss über `lauf_id` danach unterscheiden. Eine Abbildung
+zwischen den beiden Vokabularen gibt es nicht; sie liesse sich nur aus der
+DK-Spezifikation gewinnen, und eine geratene wäre schlimmer als keine.
+
 #### Zuordnungen stehen an der Buchung
 
 `kategorie_id` und `vertrag_id` sind **Spalten von `ist_buchung`**, nicht eigene Tabellen.

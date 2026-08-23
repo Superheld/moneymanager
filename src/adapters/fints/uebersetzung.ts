@@ -360,6 +360,22 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
     // sich das ändert, ist die Angabe der Bibliothek die verlässlichere.
     mandatsreferenz: b.mandateReference?.trim() || a.mandatsreferenz,
     e2eReferenz: b.e2eReference?.trim() || a.e2eReferenz,
+    // ACHTUNG, DIESE BEIDEN SIND FORMATABHÄNGIG — derselbe Feldname trägt je nach
+    // Abrufweg etwas anderes:
+    //
+    //   umsatzart          MT940: `?00`, ein kurzes Etikett („SEPA-LASTSCHRIFT")
+    //                      CAMT:  `AddtlNtryInf`, ein Freitext der Bank
+    //   buchungsschluessel MT940: der DK-Geschäftsvorfallcode, NUMERISCH
+    //                      CAMT:  `SubFmlyCd`, ALPHABETISCH
+    //
+    // Sie werden trotzdem in dieselbe Spalte geschrieben, und das ist eine bewusste,
+    // unfertige Entscheidung: eine Abbildung zwischen beiden Vokabularen liesse sich nur
+    // aus der DK-Spezifikation gewinnen, und eine geratene wäre schlimmer als keine.
+    //
+    // Deutbar bleibt der Wert trotzdem, denn das Format steht am LAUF (`import_lauf`),
+    // und jede Zeile gehört zu genau einem. Wer die Werte auswertet — allen voran die
+    // Kategorie-Erkennung —, muss danach unterscheiden; sonst lernt sie zwei getrennte
+    // Merkmalsräume für dieselbe Sache, ohne dass irgendwo ein Fehler auftaucht.
     umsatzart: b.bookingText?.trim() || a.buchungstext,
     buchungsschluessel: b.transactionCode?.trim() || undefined,
     bankreferenz: a.bankreferenz,

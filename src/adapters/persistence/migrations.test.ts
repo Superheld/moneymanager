@@ -209,7 +209,7 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     // Der Beleg trägt, was die Quelle lieferte …
     expect(spalten(db, "umsatz_roh")).toEqual(
       expect.arrayContaining([
-        "lauf_id", "buchungstag", "betrag", "roh_hash", "native_id", "format",
+        "lauf_id", "buchungstag", "betrag", "roh_hash", "native_id",
       ]),
     );
     // … der Stand, was wir daraus gemacht haben. Die Trennung ist der Punkt: keine dieser
@@ -224,6 +224,9 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     // Die Kontozuordnung ist korrigierbar (der Verbuchen-Dialog lässt sie ändern) und
     // deshalb kein Beleg — sonst wäre der Beleg an dieser Stelle doch beschreibbar.
     expect(spalten(db, "umsatz_roh")).not.toContain("zahlungskonto_id");
+    // Das Format steht am LAUF und nur dort — eine Zeile gehört zu genau einem Lauf.
+    expect(spalten(db, "umsatz_roh")).not.toContain("format");
+    expect(spalten(db, "import_lauf")).toContain("format");
     expect(indexExistiert(db, "ix_umsatz_roh_hash")).toBe(true);
     expect(indexExistiert(db, "ix_umsatz_roh_native")).toBe(true);
     db.close();
