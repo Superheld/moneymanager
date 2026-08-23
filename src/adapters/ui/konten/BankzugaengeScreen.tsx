@@ -34,6 +34,7 @@ import { kannVorfall } from "../../../application";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
+import { HerkunftBereich } from "./HerkunftBereich";
 import { Bankprofilkarte } from "./Bankprofilkarte";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
@@ -57,12 +58,9 @@ interface Pruefung {
 
 export function BankzugaengeScreen({
   kontoNamen,
-  onKontoOeffnen,
 }: {
   /** Kontobezeichnungen je Id — der Screen daneben hat sie schon geladen. */
   kontoNamen?: ReadonlyMap<string, string>;
-  /** Klick auf ein zugeordnetes Konto — führt zu dessen Importzeilen. */
-  onKontoOeffnen?: (kontoId: string) => void;
 } = {}) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -76,6 +74,14 @@ export function BankzugaengeScreen({
    * sich, wenn ein Abruf nichts bringt.
    */
   const [kontenOffen, setKontenOffen] = useState<string | null>(null);
+  /**
+   * Welches Konto seine eingelesenen Zeilen zeigt — die dritte Stufe.
+   *
+   * Zugang aufklappen, darin ein Konto aufklappen, darunter steht, was hereinkam. Alles
+   * auf derselben Seite: wer der Frage nachgeht, warum ein Abruf nichts brachte, will die
+   * Kette sehen und nicht dreimal die Ansicht wechseln.
+   */
+  const [zeilenVon, setZeilenVon] = useState<string | null>(null);
   const [pin, setPin] = useState<{ zugang: Bankzugang } | null>(null);
   const [pinText, setPinText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -369,15 +375,15 @@ export function BankzugaengeScreen({
                   label: t("bankzugaenge.spalteKonto"),
                   render: (z: Kontozuordnung) => {
                     const name = kontoNamen?.get(z.zahlungskontoId) ?? z.zahlungskontoId;
-                    return onKontoOeffnen ? (
+                    return (
                       <Zeilenlink
-                        onKlick={() => onKontoOeffnen(z.zahlungskontoId)}
+                        onKlick={() =>
+                          setZeilenVon(zeilenVon === z.zahlungskontoId ? null : z.zahlungskontoId)
+                        }
                         titel={t("konten.herkunft.zeigeZeilen", { konto: name })}
                       >
                         {name}
                       </Zeilenlink>
-                    ) : (
-                      name
                     );
                   },
                 },
@@ -390,6 +396,14 @@ export function BankzugaengeScreen({
               ]}
               rows={zuordnungen.filter((z) => z.zugangId === kontenOffen)}
             />
+          )}
+
+          {/* Und darunter, was für dieses Konto hereinkam — dieselbe Ansicht wie unter
+              der Kontenliste, nur eine Stufe tiefer in der Kette. */}
+          {zeilenVon && (
+            <div style={{ marginTop: "var(--gap-card)" }}>
+              <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} />
+            </div>
           )}
         </Card>
       )}

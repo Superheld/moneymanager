@@ -28,6 +28,14 @@ function datumKurz(iso: string): string {
   return `${d}.${m}.${j.slice(2)}`;
 }
 
+/**
+ * Was für ein Konto hereinkam — als eigener Bereich ODER eingebettet unter einer Tabelle.
+ *
+ * Mit `kontoId` steht er unter der Zeile, die ihn geöffnet hat, und zeigt nur dieses eine
+ * Konto; ohne führt er seine Kontowahl selbst. Das ist derselbe Aufbau wie im Kontoauszug:
+ * oben die Liste, darunter das Gewählte — statt eines Sprungs in ein anderes Register,
+ * bei dem man die Zeile aus den Augen verliert, von der man ausgegangen ist.
+ */
 export function HerkunftBereich({ kontoId }: { kontoId?: string } = {}) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -80,7 +88,11 @@ export function HerkunftBereich({ kontoId }: { kontoId?: string } = {}) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
       {/* Kontowahl. Konten ohne eingelesene Zeilen bleiben wählbar — dass nichts da ist,
-          ist selbst eine Auskunft. */}
+          ist selbst eine Auskunft.
+          ENTFÄLLT, wenn das Konto von aussen kommt: dann steht dieser Bereich unter einer
+          Tabelle, in der schon gewählt wurde, und eine zweite Auswahl daneben fragte
+          dasselbe noch einmal. */}
+      {!kontoId && (
       <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
         {konten.map((k) => (
           <button
@@ -101,6 +113,7 @@ export function HerkunftBereich({ kontoId }: { kontoId?: string } = {}) {
           </button>
         ))}
       </div>
+      )}
 
       {aktiv && (
         <>
