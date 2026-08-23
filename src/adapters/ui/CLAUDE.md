@@ -44,6 +44,14 @@ Selbst gezogene Rahmen (`border: 1px solid var(--line)` plus Radius) sehen ähnl
 sind trotzdem falsch: die Fläche fehlt weiterhin, und beim nächsten Token-Wechsel laufen
 sie gegen die Karten auseinander.
 
+**Und keine Karte IN einer Karte.** Zwei Rahmen um dieselbe Sache, der Inhalt rückt
+zweimal ein, und die Trennung, die eine Karte leisten soll, wird zur Verschachtelung. Die
+Falle ist die Detailliste unter einer Tabelle: sie dort einzuhängen ist naheliegend, und
+dass die Tabelle selbst schon in einer Karte steckt, sieht man dem Code nicht an — das
+steht eine Datei weiter oben. Aufgeklapptes gehört NEBEN die Karte, nicht hinein.
+`kartenschachtelung.test.tsx` prüft das am gerenderten DOM, weil die Verschachtelung erst
+dort entsteht.
+
 ## Zwei Fragen, die verschieden aussehen müssen
 
 Derselbe Bereich (`konten/HerkunftBereich`) beantwortet zwei Fragen, und wer sie

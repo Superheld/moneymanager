@@ -127,6 +127,7 @@ export function KontenVerwaltung({
   }
 
   return (
+    <>
     <Card action={<Button variant="primary" plus onClick={() => setAnlegen(true)}>{t("einstellungen.konto.anlegen")}</Button>}>
       {hatGebuchtes && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
@@ -183,14 +184,6 @@ export function KontenVerwaltung({
           ]}
           rows={konten}
         />
-      )}
-
-      {/* Was für dieses Konto hereinkam — direkt darunter, wie der Auszug unter der
-          Kontenliste. Der Bereich bringt seine eigenen Karten mit. */}
-      {zeilenVon && (
-        <div style={{ marginTop: "var(--gap-card)" }}>
-          <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} />
-        </div>
       )}
 
       {offen && (
@@ -289,6 +282,18 @@ export function KontenVerwaltung({
         />
       )}
     </Card>
+
+    {/* Die Buchungsliste steht als EIGENE Tabelle unter der Kontentabelle — nicht in ihr.
+        Sie bringt eine eigene Karte mit, und eine Karte in einer Karte ergibt zwei
+        Rahmen um dieselbe Sache: der Inhalt rückt zweimal ein, und die Trennung, die
+        eine Karte leisten soll, wird zur Verschachtelung. Dasselbe Muster wie bei den
+        Bankzugängen, wo die Kontenliste ebenfalls daneben steht. */}
+    {zeilenVon && (
+      <div style={{ marginTop: "var(--gap-card)" }}>
+        <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} />
+      </div>
+    )}
+    </>
   );
 }
 
