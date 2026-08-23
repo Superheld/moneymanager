@@ -1027,6 +1027,99 @@ describe("Migration 54 — zwei Einordnungen der Bank", () => {
   });
 });
 
+
+describe("Migration 56 — Abrufe von vor v42 finden ihren Zugang", () => {
+  function bestand() {
+    const db = new SQL.Database();
+    apply(db, 0, 55);
+    db.run(`INSERT INTO bankzugang (id, bezeichnung, url, blz, benutzer, angelegt_am)
+            VALUES ('z1','Talmberger Bank','https://example.invalid','99999998','nutzer','2026-08-01T00:00:00.000Z')`);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k1','Girokonto','Giro','[]')");
+    db.run(`INSERT INTO bankkonto_zuordnung (zugang_id, schluessel, zahlungskonto_id)
+            VALUES ('z1','s1','k1')`);
+    return db;
+  }
+
+  /** Ein Abruf im Zustand von vor v42: ohne zugang_id und ohne zahlungskonto_id. */
+  function altlauf(db: InstanceType<typeof SQL.Database>, id: string, dateiname: string | null) {
+    db.run(
+      `INSERT INTO import_lauf (id, quelle, zeitpunkt, dateiname) VALUES (?, 'fints', ?, ?)`,
+      [id, "2026-08-11T09:00:00.000Z", dateiname],
+    );
+  }
+
+  it("leitet den Zugang aus den Zeilen des Laufs ab", () => {
+    const db = bestand();
+    altlauf(db, "l1", null);
+    db.run(`INSERT INTO umsatz_roh (id, lauf_id, buchungstag, betrag, waehrung, gegenpartei,
+              verwendungszweck, roh_hash) VALUES ('u1','l1','2026-08-11',-4500,'EUR','Kesselmann','Rechnung','h1')`);
+    db.run(`INSERT INTO umsatz_verarbeitung (umsatz_id, zahlungskonto_id, status, geaendert_am)
+            VALUES ('u1','k1','neu','2026-08-11T09:00:00.000Z')`);
+
+    apply(db, 55, 56);
+
+    expect(db.exec("SELECT zugang_id, zahlungskonto_id FROM import_lauf WHERE id='l1'")[0].values)
+      .toEqual([["z1", "k1"]]);
+    db.close();
+  });
+
+  /**
+   * Der Regelfall, nicht die Ausnahme: der Rueckgriff holt bei jedem Abruf einige Tage
+   * doppelt, und die Mehrzahl aller Abrufe bringt deshalb nichts Neues. Ueber die Zeilen
+   * ist da nichts abzuleiten — der Dateiname trug den Zugangsnamen als Praefix.
+   */
+  it("leitet ihn bei einem Lauf ohne Zeilen aus dem Dateinamen ab", () => {
+    const db = bestand();
+    altlauf(db, "l-leer", "Talmberger Bank · Girokonto · 2026-07-01 bis 2026-08-11");
+
+    apply(db, 55, 56);
+
+    expect(db.exec("SELECT zugang_id FROM import_lauf WHERE id='l-leer'")[0].values)
+      .toEqual([["z1"]]);
+    db.close();
+  });
+
+  /**
+   * Lieber gar nicht zugeordnet als falsch: passen zwei Zugaenge auf denselben
+   * Dateinamen, bleibt der Lauf leer. Eine geratene Zuordnung saehe aus wie eine
+   * gemessene und waere schlechter als die Luecke.
+   */
+  it("laesst ihn leer, wenn zwei Zugaenge passen wuerden", () => {
+    const db = bestand();
+    db.run(`INSERT INTO bankzugang (id, bezeichnung, url, blz, benutzer, angelegt_am)
+            VALUES ('z2','Talmberger','https://example.invalid','99999997','nutzer','2026-08-01T00:00:00.000Z')`);
+    altlauf(db, "l-leer", "Talmberger Bank · Girokonto · 2026-07-01 bis 2026-08-11");
+
+    apply(db, 55, 56);
+
+    expect(db.exec("SELECT zugang_id FROM import_lauf WHERE id='l-leer'")[0].values)
+      .toEqual([[null]]);
+    db.close();
+  });
+
+  it("laesst Datei-Importe unberuehrt", () => {
+    const db = bestand();
+    db.run(`INSERT INTO import_lauf (id, quelle, zeitpunkt, dateiname)
+            VALUES ('l-datei','finanzguru','2026-08-11T09:00:00.000Z','Talmberger Bank auszug.csv')`);
+
+    apply(db, 55, 56);
+
+    expect(db.exec("SELECT zugang_id FROM import_lauf WHERE id='l-datei'")[0].values)
+      .toEqual([[null]]);
+    db.close();
+  });
+
+  it("laeuft ein zweites Mal folgenlos durch", () => {
+    const db = bestand();
+    altlauf(db, "l-leer", "Talmberger Bank · Girokonto · 2026-07-01 bis 2026-08-11");
+    apply(db, 55, 56);
+    const vorher = db.exec("SELECT id, zugang_id FROM import_lauf")[0].values;
+    expect(() => apply(db, 55, 56)).not.toThrow();
+    expect(db.exec("SELECT id, zugang_id FROM import_lauf")[0].values).toEqual(vorher);
+    db.close();
+  });
+});
+
 describe("Versionsschema", () => {
   it("hat streng aufsteigende, eindeutige Versionen", () => {
     const versionen = MIGRATIONS.map((m) => m.version);
