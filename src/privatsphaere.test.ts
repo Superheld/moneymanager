@@ -137,11 +137,24 @@ function merkmale(): string[] {
     "Gutschrift", "Retour", "Tanken", "Tankstelle", "Transact", "Urlaub", "Veranstaltung",
     "Verrechnungskonto", "Tagesgeldkonto", "Kreditkarte",
   ]);
+  //
+  // Die Quelle heisst `umsatz_roh` und nicht mehr `umsatz`: der Beleg wurde vom Stand
+  // getrennt. Beim Umbenennen blieb diese Liste stehen — `frage()` gibt fuer eine fehlende
+  // Tabelle still ein leeres Ergebnis zurueck (richtig so, sonst schluckt jede Migration
+  // den Waechter), und damit fielen drei Merkmalsquellen auf einmal weg, ohne dass etwas
+  // rot wurde. Aufgefallen ist es nur, weil eine begruendete Ausnahme ploetzlich ins Leere
+  // griff und der Selbstreinigungstest darauf ansprang.
+  //
+  // Genau davor warnt `src/CLAUDE.md`: zu jeder neuen Tabelle mit Namen oder Betraegen
+  // gehoert eine Zeile hier, im selben Schritt wie die Migration.
   for (const roh of [
-    ...frage("SELECT DISTINCT gegenpartei FROM umsatz WHERE length(gegenpartei) >= 6"),
+    ...frage("SELECT DISTINCT gegenpartei FROM umsatz_roh WHERE length(gegenpartei) >= 6"),
     ...frage("SELECT DISTINCT anbieter FROM vertrag WHERE length(anbieter) >= 6"),
-    ...frage("SELECT DISTINCT glaeubiger_id FROM umsatz WHERE glaeubiger_id IS NOT NULL"),
-    ...frage("SELECT DISTINCT mandatsreferenz FROM umsatz WHERE length(mandatsreferenz) >= 8"),
+    ...frage("SELECT DISTINCT glaeubiger_id FROM umsatz_roh WHERE glaeubiger_id IS NOT NULL"),
+    ...frage("SELECT DISTINCT mandatsreferenz FROM umsatz_roh WHERE length(mandatsreferenz) >= 8"),
+    // Beim selben Umbau dazugekommen und nie geprueft: der abweichende Endempfaenger
+    // einer Lastschrift. Ein Name wie jeder andere.
+    ...frage("SELECT DISTINCT endempfaenger FROM umsatz_roh WHERE length(endempfaenger) >= 6"),
   ]) {
     const wert = String(roh ?? "").trim();
     if (wert.length < 6 || ALLERWELT.has(wert)) continue;
