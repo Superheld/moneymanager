@@ -93,9 +93,31 @@ describe("Muster-Guard — was er finden MUSS", () => {
   it("ein Passwort mit Wert", () => {
     expect(pruefe(`const pin = "8471";`).fund).toBe(true);
   });
+
+  /**
+   * Die Ausnahme fuer den Co-Authored-By-Trailer ist eng geschnitten, und diese drei
+   * Faelle halten sie eng: eine echte Adresse in demselben Trailer, eine noreply-Adresse
+   * irgendwo sonst, und beides ohne einander.
+   */
+  it("eine ECHTE Adresse, auch im Co-Authored-By-Trailer", () => {
+    expect(pruefe("Co-Authored-By: Jemand <vorname.nachname@irgendeinehausbank.de>").fund).toBe(true);
+  });
+
+  it("eine noreply-Adresse ausserhalb des Trailers", () => {
+    expect(pruefe("Schreib an noreply@irgendeinehausbank.de, das kommt nie an.").fund).toBe(true);
+  });
 });
 
 describe("Muster-Guard — was durchgehen MUSS", () => {
+  /**
+   * Git-Konvention und oeffentlich dokumentiert, keine Kontaktadresse eines Menschen.
+   * Ohne die Ausnahme schluege der Guard bei JEDEM solchen Commit an, und man muesste
+   * jedes Mal an `privacy-ok` denken — wer aber jedes Mal daran denken muss, vergisst es.
+   */
+  it("die noreply-Adresse im Co-Authored-By-Trailer", () => {
+    expect(pruefe("Co-Authored-By: Claude <noreply@anthropic.com>").fund).toBe(false);
+  });
+
   it("eine Test-IBAN mit erfundener Bankleitzahl", () => {
     const iban = mitPruefziffer("DE", `${erfundeneBlz}0000000001`);
     expect(pruefe(`const konto = "${iban}";`).fund).toBe(false);

@@ -193,13 +193,25 @@ const REGELN = [
     id: "email",
     was: "E-Mail-Adresse",
     re: /\b[\w.+-]+@[\w-]+(?:\.[\w-]+)*\.[A-Za-z]{2,}\b/g,
-    // Drei Dinge sehen aus wie eine Adresse und sind keine, und alle drei stehen in
+    // Vier Dinge sehen aus wie eine Adresse und sind keine, und alle vier stehen in
     // diesem Repo: der Dateiname „icons/128x128@2x.png", die SSH-Herkunft eines Pakets
-    // („git@github.com") und die üblichen Beispieldomänen.
-    pruefe: (t) =>
+    // („git@github.com"), die üblichen Beispieldomänen — und der `Co-Authored-By`-Trailer.
+    //
+    // DER TRAILER ist der einzige Fall, für den die Regel die ganze ZEILE braucht, und die
+    // Ausnahme ist deshalb eng geschnitten: nur in einer Zeile, die mit `Co-Authored-By:`
+    // beginnt, und nur für eine `noreply`-Adresse. Beides muss zutreffen.
+    //
+    // Warum überhaupt: die Adresse ist Git-Konvention und öffentlich dokumentiert, keine
+    // Kontaktadresse eines Menschen. Ohne die Ausnahme schlägt der Guard bei JEDEM solchen
+    // Commit an, und man müsste jedes Mal an `privacy-ok` denken — wer aber jedes Mal
+    // daran denken muss, vergisst es, und dann steht die Freigabe irgendwann aus Gewohnheit
+    // dort, wo sie nicht hingehört. Eine Ausnahme, die man einmal begründet, ist besser
+    // als eine, die man ständig von Hand setzt.
+    pruefe: (t, zeile = "") =>
       !/@(example|test|invalid|localhost|beispiel)\./i.test(t) &&
       !/^(?:git|npm|node)@/i.test(t) &&
-      !/\.(png|jpe?g|gif|svg|ico|icns|webp|json|ts|tsx|js|mjs|css|md|html?)$/i.test(t),
+      !/\.(png|jpe?g|gif|svg|ico|icns|webp|json|ts|tsx|js|mjs|css|md|html?)$/i.test(t) &&
+      !(/^\s*Co-Authored-By:/i.test(zeile) && /^noreply@/i.test(t)),
   },
   {
     id: "jwt",
@@ -268,7 +280,9 @@ function pruefeText(text, herkunft, funde, regeln, abZeile = 1) {
       if (regel.nur && !regel.nur.test(herkunft)) continue;
       regel.re.lastIndex = 0;
       for (const m of zeile.matchAll(regel.re)) {
-        if (regel.pruefe && !regel.pruefe(m[0])) continue;
+        // Die ganze Zeile kommt mit: manche Regel kann den Treffer allein nicht
+        // beurteilen. Siehe `email` und den Co-Authored-By-Trailer.
+        if (regel.pruefe && !regel.pruefe(m[0], zeile)) continue;
         funde.push({ herkunft, zeile: abZeile + i, regel: regel.id, was: regel.was, treffer: m[0] });
       }
     }
