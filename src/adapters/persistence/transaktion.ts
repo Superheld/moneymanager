@@ -22,6 +22,7 @@
 // liest vorher.
 
 import { invoke } from "@tauri-apps/api/core";
+import { DB_URL } from "./datenbankdatei";
 
 /** Ein Statement mit seinen Parametern. */
 export interface Anweisung {
@@ -63,7 +64,7 @@ export async function inTransaktion(db: AusfuehrbareDb, anweisungen: readonly An
 
   if (inTauri()) {
     await invoke("transaktion", {
-      db: "sqlite:moneymanager.db",
+      db: DB_URL,
       anweisungen: anweisungen.map((a) => ({ sql: a.sql, werte: [...(a.werte ?? [])] })),
     });
     return;
@@ -103,7 +104,7 @@ export async function inTransaktion(db: AusfuehrbareDb, anweisungen: readonly An
 export async function schemaStatement(db: AusfuehrbareDb, sql: string): Promise<void> {
   if (inTauri()) {
     await invoke("schema_umbau", {
-      db: "sqlite:moneymanager.db",
+      db: DB_URL,
       anweisungen: [{ sql, werte: [] }],
     });
     return;

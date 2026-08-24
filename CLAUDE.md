@@ -350,11 +350,76 @@ npm test            # Vitest: Kern, Use-Cases, Repositories, UI, Schichtgrenzen
 npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 %)
 npm run typecheck
 npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
+npm run seed        # Spielstand für die Entwicklung neu schreiben (siehe unten)
+npm run installieren # macOS: bauen und nach /Applications installieren
 ```
 
 Node kommt über **mise** (`mise.toml`: node 26); die CI pinnt dieselbe Hauptversion getrennt
 in `.github/workflows/ci.yml`, weil Actions die `mise.toml` nicht liest. Wer sie hier hebt,
 hebt sie dort mit. Die Kommandozeilen für diese Maschine stehen in `CLAUDE.local.md`.
+
+## Auslieferung: lokal gebaut, lokal installiert
+
+Es gibt **keinen Release-Weg**. Die App wird auf der eigenen Maschine gebaut und von dort
+nach `/Applications` installiert (`npm run installieren`, macOS). Kein GitHub-Release, kein
+Updater, keine Signierung — und das ist eine Entscheidung, kein Rückstand: solange es genau
+einen Nutzer auf genau einer Maschine gibt, kostet jede Stufe dazwischen Aufwand ohne
+Gegenwert.
+
+Drei Dinge, die dabei zusammengehören und von denen das dritte gern vergessen wird:
+
+- **Die Produktregistrierungsnummer wird zur BAUZEIT eingebacken.** Vite ersetzt
+  `import.meta.env.VITE_FINTS_PRODUKT_ID` beim Bündeln; fehlt die `.env` im Moment des
+  Bauens, fehlt sie der fertigen App, und der Bankabruf meldet das erst beim ersten
+  Versuch. `scripts/installieren.sh` warnt vorher.
+- **Gatekeeper hält die App an.** Sie ist nicht mit einem Apple-Developer-Zertifikat
+  signiert; macOS meldet sie deshalb als „beschädigt", was sie nicht ist. Das
+  Quarantäne-Merkmal einmal abräumen (`xattr -dr com.apple.quarantine`) ist die ganze
+  Sache, und das Skript tut es mit.
+- **Der Datenbestand überlebt die Neuinstallation.** Er liegt im App-Datenverzeichnis, nicht
+  im Bundle.
+
+Was ein Release später bräuchte, ist damit nicht weg, sondern nur nicht gebaut:
+`tauri-plugin-updater` (auf Linux ausschliesslich mit AppImage), ein Signaturschlüssel, ein
+Workflow mit `VITE_FINTS_PRODUKT_ID` als Repository-Secret. Der Secret-Weg ist dabei nicht
+Geheimniskrämerei, sondern die **Produktgrenze**: ein Fork ist laut DK-Bedingungen ein
+anderes Produkt und hat das Secret nicht — sein Build läuft ohne Nummer und wird damit zur
+eigenen Registrierung geschoben, statt still unter unserem Namen zu laufen.
+
+### Zwei Datenbestände, eine Zeile Unterschied
+
+Die installierte App verwaltet echtes Geld; die Entwicklung soll frei rumprobieren können.
+Beides auf derselben Datei geht nicht gut aus — im Alpha-Stadium dürfen Migrationen
+ausdrücklich **wegnehmen**, und ein Versuch, der schiefgeht, träfe dann den einzigen
+Bestand, den es gibt. Die Trennung ist deshalb keine Bequemlichkeit, sondern die Grenze
+zwischen „kaputt" und „weg".
+
+| | Datei | wer sie öffnet |
+|---|---|---|
+| echt | `moneymanager.db` | die installierte App (`tauri build`) |
+| Spielstand | `moneymanager-dev.db` | `npm run tauri dev` |
+
+Entschieden wird das an genau einer Stelle:
+`src/adapters/persistence/datenbankdatei.ts`. **Der Dateiname trennt, nicht der
+Identifier** — der bestimmt zwar das Datenverzeichnis, aber auch die Identität der
+installierten App: wer ihn anfasst, schickt sie in ein neues, leeres Verzeichnis, und der
+echte Bestand sieht aus wie verschwunden. Beide Dateien liegen deshalb nebeneinander, und
+die Rezepte aus `CLAUDE.local.md` finden auch die Spielkopie.
+
+Den Spielstand schreibt `npm run seed` — vollständig migriert, mit erfundenen Daten in
+jedem Bereich. Zwei Dinge daran sind Absicht:
+
+- **Er weist `moneymanager.db` am Dateinamen ab.** Das Skript überschreibt sein Ziel
+  vollständig; ein vertippter Pfad wäre nicht ein Fehler, sondern der Verlust der Daten,
+  um deren Trennung es geht.
+- **Sein Zufall ist gesät.** Derselbe Aufruf erzeugt denselben Bestand — ein Screenshot von
+  gestern zeigt dieselben Zahlen wie einer von heute.
+
+Die Daten selbst stehen in `src/testwerkzeug/seedDaten.ts`, nicht im Skript. Der Grund ist
+derselbe wie bei allen Wächtern hier: ein Seed **verrottet still**, wenn die Kette wandert
+und seine INSERTs stehenbleiben, und der Fehler zeigt sich erst, wenn man eigentlich etwas
+anderes vorhatte. `src/seed.test.ts` fährt ihn deshalb bei jedem `npm test` gegen die
+aktuelle Migrationskette.
 
 ## Mitgelieferte Skills
 
