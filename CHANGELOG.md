@@ -3,6 +3,72 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.21.0] — 2026-08-25
+
+Die Runde, in der die Oberfläche aufhört, geliehen auszusehen: ein eigenes Zeichen im Dock,
+eigene Bedienteile statt der Fenster des Betriebssystems, und Platz für den Inhalt, der
+vorher an die Seitenleiste ging.
+
+### Hinzugefügt
+
+**Ein eigenes App-Icon.** Bis hierher startete die App mit dem mitgelieferten Tauri-Zeichen
+— erkennbar als „irgendeine Tauri-App", nicht als diese. Das Motiv ist das, was die App
+tut: drei Budgetrahmen, gleich hoch, verschieden weit gefüllt. Kein Balkendiagramm, bei dem
+die Höhe alles sagt; hier sagt sie nichts ohne den Rahmen daneben, und genau das ist der
+Unterschied zwischen „ausgegeben" und „ausgegeben von wieviel". Die SVG-Quelle liegt im
+Repo, samt Rezept — sechzehn PNG ohne Vorlage wären eine Sackgasse.
+
+**Auswahlfelder im Design der App.** Ein natives Auswahlfeld öffnet die Liste des
+Betriebssystems: andere Schrift, andere Abstände, andere Farben, je Plattform anders. In
+einer Oberfläche, in der alles andere aus denselben Tokens gebaut ist, ist das der sichtbare
+Bruch. Dafür kommt mit Base UI die erste UI-Bibliothek ins Projekt — sie liefert
+ausschliesslich die Mechanik, die man nicht nebenbei richtig schreibt (Tastaturbedienung
+samt Tippsuche, ARIA zwischen Knopf und Liste, Fokusfalle), und kein Aussehen.
+
+**Ein Datumsfeld, in das man auch tippen kann.** Der Kalender ist von Hand gebaut, weil die
+Bibliothek keinen mitbringt — ein Grid mit Pfeiltasten ist die ungleich kleinere Aufgabe.
+Es ist ausdrücklich eine EINGABE mit Kalenderknopf und kein blosser Knopf: wer ein Datum
+kennt, tippt es schneller, als er es sucht. Gelesen wird tolerant (Punkte, Schrägstriche,
+durchgetippte Ziffern), und ob der Tag oder der Monat vorn steht, entscheidet die Sprache
+und keine Annahme.
+
+### Geändert
+
+**Das Fenster startet breiter, die Seitenleiste klappt zusammen.** 248 Pixel sind bei einem
+breiten Fenster ein Viertel und bei einem schmalen ein Drittel; der Inhalt bekam den Rest,
+und Text brach an Stellen um, an denen er nicht umbrechen musste. Wird es eng, zeigt die
+Leiste nur noch ihre Icons — die es dafür überhaupt erst brauchte, denn zehn gleiche Punkte
+untereinander sind keine Navigation.
+
+**Der Prüfmarker im Auszug heisst „erledigt".** Er ist dort ein Knopf, und ein Knopf soll
+seine Handlung nennen, nicht den Zustand, den er beendet. Am Kästchen im Detaildialog bleibt
+es beim alten Wort — dessen Haken bedeutet das Gegenteil.
+
+**Buchungen mit einem Buchungstag in der Zukunft sind gedämpft.** Manche Banken vergeben
+für eine heute veranlasste Überweisung den Buchungstag von morgen und führen sie bereits im
+Saldo. Solche Zeilen sind gebucht und keine Vorhersage, sie stehen also weiterhin oben —
+sahen dort aber aus wie längst geschehen.
+
+### Behoben
+
+**Die Budgetzeile der Übersicht schiebt nichts mehr aus der Karte.** Sichtbar wurde es beim
+aufbauenden Budget, weil dort zusätzlich die Aufrechnung steht; die Ursache lag daneben —
+ein Flex-Kind schrumpft ohne `min-width: 0` nicht unter seinen Inhalt und drängt stattdessen
+die rechte Spalte nach aussen. Jetzt weicht der Name zurück und sonst nichts.
+
+**Der Aktualisierungsknopf überlebt die schmale Seitenleiste.** Beim Einklappen fällt die
+Fusszeile weg, und der Knopf wäre stumm mitgegangen. Auskunft darf weichen, eine Handlung
+nicht — ein Update, von dem niemand erfährt, ist keines.
+
+### Abgesichert
+
+**Der Rückfluss hat einen eigenen Prüfstand.** Eine Erstattung ist ein Aufwand mit positivem
+Betrag: „Aufwand" sagt, wofür das Geld war, das Vorzeichen, wohin es floss. Der Fehler ist
+dabei nie eine einzelne falsche Funktion, sondern immer derselbe Griff — jemand leitet das
+Vorzeichen aus der Einordnung ab, statt das vorhandene zu nehmen —, und er wandert dorthin,
+wo gerade kein Test steht. Jetzt laufen alle Rechenwege, die auf den Charakter verzweigen,
+an einem Ort gegen denselben Fall.
+
 ## [0.20.0] — 2026-08-24
 
 Die Runde, in der die App den Rechner wechselt: sie wird installiert statt gestartet, sie
