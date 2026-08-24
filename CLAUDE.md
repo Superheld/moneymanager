@@ -497,17 +497,28 @@ Bei einem echten Release gibt es diese Lücke nicht — dort wird `package.json`
 
 ### Was am Update-Weg noch fehlt
 
-Der Mechanismus ist vollständig und durchgespielt; was fehlt, ist die Gegenstelle.
+Mechanismus und Release-Workflow stehen. Offen ist:
 
-- **Ein echter Endpunkt.** `plugins.updater.endpoints` zeigt auf ein Release-Manifest bei
-  GitHub, das es noch nicht gibt. Bis dahin schlägt die Prüfung fehl — und schweigt, wie
-  vorgesehen. Dazu gehört ein Workflow, der bei einem Tag baut, signiert und Artefakte
-  samt Manifest anhängt.
+- **Die Repository-Secrets.** Ohne `TAURI_SIGNING_PRIVATE_KEY` bricht der Workflow ab
+  (richtig so — ein unsigniertes Update nimmt keine App an). Ohne `FINTS_PRODUKT_ID` läuft
+  er durch, und die veröffentlichte App hat einen gesperrten Bankabruf.
+- **Das erste Release.** Bis es eines gibt, liefert der Endpunkt eine 404, die Prüfung
+  schlägt fehl und schweigt — wie vorgesehen.
 - **Linux.** Braucht AppImage als Bundle-Ziel und einen zweiten Bauplatz; macOS lässt sich
-  nicht auf Linux bauen und umgekehrt.
+  nicht auf Linux bauen und umgekehrt. Und der Updater kann dort ausschliesslich AppImages
+  ersetzen.
 - **Kein Schalter in den Einstellungen.** Die Abschaltbarkeit ist gebaut und geprüft
   (`pruefungSchalten`, `dienste.aktualisierungspruefungSetzen`), hat aber noch keine
   Oberfläche — abschalten geht derzeit nur über die Einstellungstabelle.
+
+**Was in einem veröffentlichten Archiv steckt** und was nicht, weil die Frage naheliegt:
+keine Zugangsdaten, keine Kontodaten, kein Datenbestand — die Datenbank liegt im
+App-Datenverzeichnis, nicht im Bundle. Aber die **DK-Produktregistrierungsnummer** ist
+darin, zur Bauzeit eingebacken. Sie ist kein Geheimnis (sie geht bei jeder
+Dialoginitialisierung im Klartext an die Bank), aber sie identifiziert dieses Produkt
+gegenüber allen Banken, und wer ein Release herunterlädt, spricht mit seiner Bank unter
+unserer Registrierung. Das ist der normale Zustand eines Softwareherstellers — aber es ist
+eine Entscheidung, einer zu sein.
 
 ### Zwei Datenbestände, eine Zeile Unterschied
 
@@ -574,17 +585,29 @@ verschwiegen, weil dort die Fremdschlüssel aus sind.
 
 ### Eine Version ausliefern
 
-Heute lokal, ohne Release (siehe *Auslieferung*):
-
 1. `develop` ist grün und enthält alles, was mit soll.
 2. Version in `package.json` heben — **eine** Stelle, `tauri.conf.json` und `version.ts`
    lesen von dort.
 3. `CHANGELOG.md` schreiben. Keine Zahl aus dem echten Bestand hinein.
-4. Nach `main` mergen (nur aus `develop`, der Hook lässt nichts anderes zu), Tag setzen.
-5. `npm run installieren`.
+4. Nach `main` mergen (nur aus `develop`, der Hook lässt nichts anderes zu).
+5. Tag setzen und pushen — **das löst `.github/workflows/release.yml` aus**: bauen,
+   signieren, Release anlegen, Archiv, DMG und Manifest anhängen.
 6. **Die installierte App einmal starten.** Das ist kein Ritual: der Build kann
    durchlaufen und die App trotzdem nicht hochkommen — an einer Migration, an einer
    fehlenden Capability, an Gatekeeper.
+
+Für den eigenen Rechner geht es auch ohne Release: `npm run installieren` baut und
+installiert lokal. Beide Wege erzeugen dasselbe Bundle; der Unterschied ist nur, ob es
+jemand anders erreichen kann.
+
+**Zwei Schalter im Release-Workflow dürfen nicht auf „vorsichtig" stehen**, und beide sind
+verlockend:
+
+- **`releaseDraft: false`** — die Assets eines Entwurfs sind ohne Anmeldung nicht
+  abrufbar. Ein Entwurf wäre bequem zum Nachsehen und macht den Updater blind.
+- **`prerelease: false`** — `releases/latest/` **überspringt Vorabversionen**. Bei einer
+  App im Alpha-Stadium ist „prerelease" die naheliegende Wahl, und der Endpunkt liefert
+  dann eine 404, die für den Updater aussieht wie „kein Update da".
 
 **Der Punkt, an dem man sonst das Falsche tut:** vor dem Bauen prüfen, dass die `.env`
 steht. Sie ist gitignoriert, in einem frischen Klon oder Worktree also nicht da, und die
