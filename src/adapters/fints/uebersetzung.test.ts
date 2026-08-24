@@ -19,9 +19,9 @@ import {
 
 describe("bankbetragZuCent", () => {
   it("rechnet Euro-Fließkomma in Cent um, auch wo die Multiplikation kippt", () => {
-    // -102.55 * 100 ist in IEEE 754 -10254.999999999998. Ohne Rundung stünde hier ein
+    // -128.14 * 100 ist in IEEE 754 -12813.999999999998. Ohne Rundung stünde hier ein
     // gebrochener Cent — und die Anwendungsgrenze (istCent) wiese ihn zurück.
-    expect(bankbetragZuCent(-102.55)).toBe(-10255);
+    expect(bankbetragZuCent(-128.14)).toBe(-12814);
     expect(bankbetragZuCent(-8.37)).toBe(-837);
     expect(bankbetragZuCent(300)).toBe(30000);
     expect(bankbetragZuCent(0)).toBe(0);

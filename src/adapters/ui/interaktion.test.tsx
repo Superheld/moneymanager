@@ -224,7 +224,7 @@ describe("Inventar anlegen", () => {
   // Stand abgeglichen. Der Test sucht nach den DATEN, die er selbst angelegt hat.
   it("gleicht die Rücklage gegen den realen Stand des zugeordneten Kontos ab", async () => {
     await sqliteZahlungskontoRepository.speichern({
-      id: "k-rueck", bezeichnung: "Rücklagenkonto", typ: "Giro", klasse: "liquide", saldo: 12500, inhaberIds: [],
+      id: "k-rueck", bezeichnung: "Rücklagenkonto", typ: "Giro", klasse: "liquide", saldo: 13800, inhaberIds: [],
     });
     await sqliteInventarRepository.speichern({
       id: "g1", bezeichnung: "Trockner", anschaffung: "2024-01-01",
@@ -232,8 +232,8 @@ describe("Inventar anlegen", () => {
     });
     rendere(<InventarScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Rücklagenkonto/));
-    // Auf dem Konto liegen 125,00 — die müssen als tatsächlich gedeckter Teil auftauchen.
-    await waitFor(() => expect(document.body.textContent).toMatch(/125,00/));
+    // Auf dem Konto liegen 138,00 — die müssen als tatsächlich gedeckter Teil auftauchen.
+    await waitFor(() => expect(document.body.textContent).toMatch(/138,00/));
   });
 });
 

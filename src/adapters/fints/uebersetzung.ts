@@ -3,7 +3,7 @@
 // Reine Funktionen, kein Netz, kein Zustand — hier laufen die Tests. Zwei der drei
 // Fallen sind Invarianten-Kollisionen, die NICHT auffallen, wenn man sie falsch macht:
 //
-//  1. `amount` ist EURO als Fließkomma (`-102.55`), hier gilt Integer Cent.
+//  1. `amount` ist EURO als Fließkomma (`-128.14`), hier gilt Integer Cent.
 //  2. Datumsfelder sind `Date`-Objekte auf LOKALER Mitternacht — in Mitteleuropa also
 //     `…T22:00:00.000Z`. Ein naives `toISOString().slice(0,10)` liefert den VORTAG, bei
 //     jeder Buchung, lautlos, und verschiebt damit jede Monatsgrenze mit.
@@ -23,7 +23,7 @@ export const FINTS_QUELLE = "fints";
  *
  * Die Umrechnung selbst macht `majorZuMinor` aus dem Kern — sie kennt die Skala der
  * Währung (EUR 2, JPY 0, KWD 3) und rundet kaufmännisch. Hier kommt nur der Wächter
- * dazu: `-102.55 * 100` ist in IEEE 754 `-10254.999999999998`, und was danach kein
+ * dazu: `-128.14 * 100` ist in IEEE 754 `-12813.999999999998`, und was danach kein
  * sicherer Integer ist, darf gar nicht erst in die App. Lieber ein lauter Fehler als
  * ein stiller Zahlendreher im Geld.
  */
@@ -187,8 +187,8 @@ interface DepotpositionRoh {
 // Kein `CRED+`/`MREF+`/`SVWZ+` wie in der SEPA-Norm, sondern deutsche Etiketten OHNE
 // Trennzeichen, direkt aneinandergeklebt:
 //
-//   LASTSCHRIFT / BELASTUNGHÄNDLER XY - EINZUG 806315
-//   END-TO-END-REF.:8063154CORE / MANDATSREF.:648026GLÄUBIGER-ID:DE98ZZZ09999999901Ref. 5D2C2…
+//   LASTSCHRIFT / BELASTUNGHÄNDLER XY - EINZUG 400271
+//   END-TO-END-REF.:4002713CORE / MANDATSREF.:517390GLÄUBIGER-ID:DE98ZZZ09999999901Ref. 5D2C2…
 //
 // Weil es keine Trennzeichen gibt, endet ein Wert dort, wo das nächste bekannte Etikett
 // beginnt. Deshalb wird nicht mit verschachtelten Regex gearbeitet, sondern die Etiketten

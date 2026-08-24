@@ -79,7 +79,7 @@ describe("ruecklagenDeckung", () => {
   });
 
   it("verteilt den realen Kontostand anteilig am Soll", () => {
-    // Soll am 2026-07-01: Auto 720,00 + Laptop 150,00 = 870,00. Auf dem Konto: 435,00.
+    // Soll am 2026-07-01: Auto 720,00 + Laptop 150,00 = 870,00, auf dem Konto die Hälfte.
     const items = [
       { ...auto, kontoId: "k1" },
       { ...laptop, kontoId: "k1" },

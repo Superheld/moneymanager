@@ -19,7 +19,7 @@ function konto(ueber: Partial<Account> = {}): Account {
     holder: "Test Person",
     iban: "DE00000000000000000000", // privacy-ok — erfundener Testwert
     productLabel: "Testkarte",
-    balance: -102.55,
+    balance: -133.72,
     currency: "EUR",
     ...ueber,
   };
@@ -195,7 +195,7 @@ describe("Saldo", () => {
     protokoll.length = 0;
 
     const saldo = await s.saldo(s.konten[0]!);
-    expect(saldo?.betrag).toBe(-10255);
+    expect(saldo?.betrag).toBe(-13372);
     expect(saldo?.waehrung).toBe("EUR");
     // Kein weiterer Aufruf an die Bank: der Wert lag schon vor.
     expect(protokoll).toEqual([]);

@@ -413,7 +413,7 @@ Und: `StatementOfHoldings` trägt **kein Datum**. Der Stichtag steht an den Posi
 
 Das ist der Abschnitt, der beim Übersetzen in ein eigenes Modell zählt.
 
-**`amount` ist Euro als Fließkomma, nicht Cent.** Werte wie `-102.55`, `300`, `-8.37`.
+**`amount` ist Euro als Fließkomma, nicht Cent.** Werte wie `-128.14`, `300`, `-8.37`.
 Wer intern mit Integer-Cent rechnet, muss umrechnen — und `betrag * 100` erzeugt dabei
 die üblichen Fließkomma-Reste. Über eine gerundete Umrechnung gehen und das Ergebnis
 prüfen.

@@ -213,10 +213,10 @@ describe("budgetVerbrauch", () => {
 
   it("lässt Vertragszahlungen draußen — sie sind anderswo geplant", () => {
     // Der Fehler, wegen dem `vertragsBuchungen` Pflichtfeld ist: auf der Übersicht stand
-    // „Familie & Kinder" mit 425,00 € Verbrauch bei 110,00 € Rahmen, obwohl die 425 € die
-    // Kinderbetreuung waren — ein erfasster Vertrag mit eigener Zeile im Ausblick.
+    // ein Budget weit über seinem Rahmen, und der ganze Überhang war eine Vertragsrate —
+    // ein erfasster Vertrag mit eigener Zeile im Ausblick, hier ein zweites Mal gezählt.
     const ist = [
-      b({ id: "vertrag", betrag: euroZuCent(-425) }),
+      b({ id: "vertrag", betrag: euroZuCent(-380) }),
       b({ id: "frei", betrag: euroZuCent(-20) }),
     ];
     expect(budgetVerbrauch(sicht(ist, [dach], new Set(["vertrag"])), dach, von, bis))

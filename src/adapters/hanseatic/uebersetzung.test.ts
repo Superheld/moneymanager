@@ -32,7 +32,7 @@ describe("betragZuCent — Euro als Fliesskomma ist die einzige verbliebene Fall
   // korrekt ab. Ein Test darauf prüfte nicht die Umrechnung, sondern die Binärdarstellung
   // — und die Bank liefert ohnehin nur zwei Nachkommastellen.
   it("verliert am Fliesskomma-Rest keinen Cent", () => {
-    expect(betragZuCent(-102.55)).toBe(-10255);
+    expect(betragZuCent(-118.64)).toBe(-11864);
     expect(betragZuCent(-0.07)).toBe(-7);
     expect(betragZuCent(29.99)).toBe(2999);
     expect(betragZuCent(-1234.56)).toBe(-123456);
