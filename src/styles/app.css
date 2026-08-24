@@ -404,3 +404,46 @@ select.field {
 .iconbtn-gefahr:hover:not(:disabled) {
   color: var(--warn-deep);
 }
+
+/* ============================================================
+   Schmales Fenster — die Seitenleiste klappt auf ihre Icons zusammen.
+
+   Warum ueberhaupt: 248 px sind bei einem breiten Fenster ein Viertel und bei einem
+   schmalen ein Drittel. Der Inhalt bekam den Rest, und Text brach an Stellen um, an
+   denen er nicht umbrechen muesste. Eingeklappt bleibt die Navigation vollstaendig
+   erreichbar — sie kostet nur keinen Platz mehr, den der Inhalt braucht.
+
+   Ohne JavaScript und ohne Schalter: die Fensterbreite ist die Frage, die hier
+   beantwortet wird, und die beantwortet CSS von selbst. Ein Schalter waere ein
+   Zustand mehr, den jemand pflegen und speichern muss.
+
+   Der NAME haengt am `title` jedes Eintrags (siehe AppShell) — ein Icon ohne Namen
+   ist ein Raetsel, und geraten wird in einer Finanz-App ungern.
+   ============================================================ */
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 68px 1fr; }
+
+  .side {
+    padding: var(--sp-5) 9px;
+    align-items: center;
+    gap: var(--sp-4);
+  }
+
+  /* Alles, was nur Beschriftung ist, weicht. Die Icons bleiben. */
+  .side .lbl,
+  .side .nlbl { display: none; }
+
+  .nav a {
+    justify-content: center;
+    padding: 10px 0;
+  }
+  /* Das Kennzeichen sass per `margin-left: auto` am rechten Rand — ohne Beschriftung
+     daneben draengt es das Icon aus der Mitte. */
+  .nav a .bdg { display: none; }
+
+  .brand { justify-content: center; }
+
+  /* In der Fusszeile bleibt der Aktualisierungsknopf, der Rest ist Text. */
+  .side .foot > div { display: none; }
+  .side .foot { text-align: center; }
+}
