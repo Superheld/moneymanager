@@ -79,7 +79,7 @@ describe("ruecklageProMonat", () => {
 
   /** Eine jährliche Einnahme (Steuererstattung) braucht keine Rücklage. */
   it("verlangt für Zuflüsse nichts", () => {
-    expect(ruecklageProMonat(regel({ betrag: 97172 }))).toBe(0);
+    expect(ruecklageProMonat(regel({ betrag: 88431 }))).toBe(0);
   });
 
   it("summiert über mehrere Regeln", () => {

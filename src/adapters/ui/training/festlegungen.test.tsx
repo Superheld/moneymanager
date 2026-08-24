@@ -48,7 +48,7 @@ async function grunddaten() {
 async function offeneZeile(id: string, over: { quelle?: "ki" | "manuell"; kategorieId?: string } = {}) {
   await umsatzRepo.anlegen({
     id, laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-03-01",
-    betrag: -37500, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
+    betrag: -38150, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
     verwendungszweck: "Betreuung", rohHash: `h-${id}`, status: "neu",
     vorschlag: { kategorieId: over.kategorieId ?? "kat-so", charakter: "Aufwand", quelle: over.quelle ?? "ki" },
   });
@@ -159,7 +159,7 @@ describe("Festlegung aus der Import-Inbox", () => {
     await festlegungRepo.speichern({ muster: "britta musterfrau", kategorieId: "kat-kb", angelegtAm: "2026-08-17T10:00:00.000Z" });
     await umsatzRepo.anlegen({
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-03-01",
-      betrag: -37500, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
+      betrag: -38150, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
       verwendungszweck: "Betreuung", rohHash: "h1", status: "neu",
       vorschlag: { kategorieId: "kat-kb", charakter: "Aufwand", quelle: "festlegung" },
     });
@@ -175,12 +175,12 @@ describe("Festlegung aus dem Buchungsdialog", () => {
   async function verbuchteZahlung() {
     await grunddaten();
     await ledgerRepo.speichern({
-      id: "b1", datum: "2026-03-01", betrag: -37500, kontoId: "k1",
+      id: "b1", datum: "2026-03-01", betrag: -38150, kontoId: "k1",
       kategorieId: "kat-so", charakter: "Aufwand", quelle: "import",
     });
     await umsatzRepo.anlegen({
       id: "u-b1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-03-01",
-      betrag: -37500, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
+      betrag: -38150, waehrung: "EUR", gegenpartei: "Britta Musterfrau",
       verwendungszweck: "Betreuung", rohHash: "h-b1", status: "verbucht", istbuchungId: "b1",
     });
   }

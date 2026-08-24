@@ -20,7 +20,7 @@ function regel(over: Partial<Zahlungsregel> = {}): Zahlungsregel {
   return {
     id: "r-miete",
     bezeichnung: "Vermieter",
-    betrag: euroZuCent(-471.41),
+    betrag: euroZuCent(-530),
     rhythmus: "monatlich",
     startdatum: "2026-01-04",
     charakter: "Aufwand",
@@ -33,7 +33,7 @@ function ist(over: Partial<IstBuchung> = {}): IstBuchung {
   return {
     id: "i1",
     datum: "2026-08-05",
-    betrag: euroZuCent(-459.25),
+    betrag: euroZuCent(-518),
     kontoId: "giro",
     kategorieId: "miete",
     charakter: "Aufwand",
@@ -92,23 +92,23 @@ describe("monatsAusblick — Plan-Spalte aus den Verträgen", () => {
       ...basis,
       regeln: [
         regel(),
-        regel({ id: "r-lohn", bezeichnung: "Arbeitgeber", betrag: euroZuCent(2475.36), charakter: "Ertrag", kategorieId: "gehalt", startdatum: "2026-01-28" }),
+        regel({ id: "r-lohn", bezeichnung: "Arbeitgeber", betrag: euroZuCent(2800), charakter: "Ertrag", kategorieId: "gehalt", startdatum: "2026-01-28" }),
       ],
       budgets: [budget()],
       monatAb: "2026-09-01",
     });
 
-    expect(zeile(a, "einnahmen")!.plan).toBe(euroZuCent(2475.36));
-    expect(zeile(a, "vertraege")!.plan).toBe(euroZuCent(-471.41));
+    expect(zeile(a, "einnahmen")!.plan).toBe(euroZuCent(2800));
+    expect(zeile(a, "vertraege")!.plan).toBe(euroZuCent(-530));
     expect(zeile(a, "budgets")!.plan).toBe(euroZuCent(-430));
-    expect(a.restPlan).toBe(euroZuCent(2475.36 - 471.41 - 430));
+    expect(a.restPlan).toBe(euroZuCent(2800 - 530 - 430));
   });
 
   it("zeigt ohne Einnahme-Vertrag ehrlich 0 statt einer Hochrechnung aus dem Ist", () => {
     const a = monatsAusblick({
       ...basis,
       // Einnahmen sind im Ist reichlich da — geplant ist trotzdem keine.
-      ist: [ist({ id: "e", betrag: euroZuCent(2475.36), kategorieId: "gehalt", charakter: "Ertrag" })],
+      ist: [ist({ id: "e", betrag: euroZuCent(2800), kategorieId: "gehalt", charakter: "Ertrag" })],
       monatAb: "2026-09-01",
     });
     expect(zeile(a, "einnahmen")!.plan).toBe(0);
@@ -139,9 +139,9 @@ describe("monatsAusblick — Plan-Spalte aus den Verträgen", () => {
   });
 
   it("nimmt eine quartalsweise Rate nur im Fälligkeitsmonat auf", () => {
-    const q = regel({ id: "r-ard", bezeichnung: "Rundfunk", betrag: euroZuCent(-55.08), rhythmus: "quartalsweise", startdatum: "2026-06-15" });
+    const q = regel({ id: "r-ard", bezeichnung: "Rundfunk", betrag: euroZuCent(-55.44), rhythmus: "quartalsweise", startdatum: "2026-06-15" });
     const eingabe = { ...basis, regeln: [q] };
-    expect(zeile(monatsAusblick({ ...eingabe, monatAb: "2026-09-01" }), "vertraege")!.plan).toBe(euroZuCent(-55.08));
+    expect(zeile(monatsAusblick({ ...eingabe, monatAb: "2026-09-01" }), "vertraege")!.plan).toBe(euroZuCent(-55.44));
     expect(zeile(monatsAusblick({ ...eingabe, monatAb: "2026-10-01" }), "vertraege")!.plan).toBe(0);
   });
 });
@@ -150,7 +150,7 @@ describe("monatsAusblick — Ist-Spalte des laufenden Monats", () => {
   it("ordnet eine Ist-Buchung über Kategorie und Betragsnähe ihrem Plan-Posten zu", () => {
     const a = monatsAusblick({ ...basis, regeln: [regel()], ist: [ist()], monatAb: "2026-08-01" });
     const v = zeile(a, "vertraege")!;
-    expect(v.ist).toBe(euroZuCent(-459.25)); // der ECHTE Betrag, nicht der geplante
+    expect(v.ist).toBe(euroZuCent(-518)); // der ECHTE Betrag, nicht der geplante
     expect(v.posten[0].status).toBe("gebucht");
   });
 
@@ -173,14 +173,14 @@ describe("monatsAusblick — Ist-Spalte des laufenden Monats", () => {
       ...basis,
       regeln: [regel()],
       ist: [
-        ist({ id: "haken", betrag: euroZuCent(-471.41), planRef: { quelleId: "r-miete", faelligkeit: "2026-08-04" }, quelle: "bezahlt-markiert" }),
-        ist({ id: "nah", betrag: euroZuCent(-459.25) }),
+        ist({ id: "haken", betrag: euroZuCent(-530), planRef: { quelleId: "r-miete", faelligkeit: "2026-08-04" }, quelle: "bezahlt-markiert" }),
+        ist({ id: "nah", betrag: euroZuCent(-518) }),
       ],
       monatAb: "2026-08-01",
     });
     const v = zeile(a, "vertraege")!;
     expect(v.posten[0].status).toBe("bezahlt");
-    expect(v.posten[0].ist).toBe(euroZuCent(-471.41));
+    expect(v.posten[0].ist).toBe(euroZuCent(-530));
   });
 
   it("vergibt jede Ist-Buchung nur einmal — der passendere Posten gewinnt", () => {
@@ -314,10 +314,10 @@ describe("monatsAusblick — Ist-Spalte des laufenden Monats", () => {
 
   it("die Ist-Spalte summiert auf alles Gebuchte des Monats", () => {
     const buchungen = [
-      ist({ id: "1", betrag: euroZuCent(-459.25), kategorieId: "miete" }),
+      ist({ id: "1", betrag: euroZuCent(-518), kategorieId: "miete" }),
       ist({ id: "2", betrag: euroZuCent(-62.5), kategorieId: "lebensmittel" }),
       ist({ id: "3", betrag: euroZuCent(-17.9), kategorieId: "wohnen" }),
-      ist({ id: "4", betrag: euroZuCent(2475.36), kategorieId: "gehalt", charakter: "Ertrag" }),
+      ist({ id: "4", betrag: euroZuCent(2800), kategorieId: "gehalt", charakter: "Ertrag" }),
     ];
     const a = monatsAusblick({ ...basis, regeln: [regel()], budgets: [budget()], ist: buchungen, monatAb: "2026-08-01" });
     expect(a.restIst).toBe(buchungen.reduce((s, b) => s + b.betrag, 0));

@@ -167,14 +167,14 @@ describe("finanzguruAdapter.lies", () => {
   it("überspringt Teile einer Split-Buchung, deren Original in der Datei steht", () => {
     const { umsaetze, warnungen } = finanzguruAdapter.lies(
       datei(
-        reihe({ tag: TAG["2022-04-04"], betrag: "-123.75", gegenpartei: "Ohlert", buchungsId: "orig-1", splitTyp: "Original" }),
+        reihe({ tag: TAG["2022-04-04"], betrag: "-138.42", gegenpartei: "Ohlert", buchungsId: "orig-1", splitTyp: "Original" }),
         reihe({ tag: TAG["2022-04-04"], betrag: "-49.95", gegenpartei: "Ohlert", buchungsId: "teil-1", splitTyp: "Teilbuchung", originalId: "orig-1" }),
         reihe({ tag: TAG["2022-04-04"], betrag: "-73.80", gegenpartei: "Ohlert", buchungsId: "teil-2", splitTyp: "Restbetrag", originalId: "orig-1" }),
       ),
     );
     expect(umsaetze).toHaveLength(1);
     expect(umsaetze[0].nativeId).toBe("orig-1");
-    expect(umsaetze[0].betrag).toBe(-12375); // der Betrag, der wirklich vom Konto ging
+    expect(umsaetze[0].betrag).toBe(-13842); // der Betrag, der wirklich vom Konto ging
     expect(warnungen.some((w) => w.includes("übersprungen"))).toBe(true);
   });
 

@@ -24,170 +24,58 @@
 // Dieser Wächter kann beides nicht prüfen — er findet nur den Originalwert. Der Rest ist
 // Handarbeit.
 //
-// Geprüft wird ein bewusst KLEINER, dafür eindeutiger Satz von Merkmalen: Kontostände,
-// Budgetbeträge, Anker, IBANs, Personennamen und Bankzugänge. Nicht geprüft werden die
-// Beträge einzelner Buchungen — „12,50" steht in jeder zweiten Fixture, und ein Wächter,
-// der ständig grundlos anschlägt, wird abgeschaltet.
+// **Die Beträge EINZELNER Buchungen sind seit 2026-08-24 dabei**, und das war vorher
+// ausdrücklich anders begründet: „12,50 steht in jeder zweiten Fixture, und ein Wächter,
+// der ständig grundlos anschlägt, wird abgeschaltet." Das stimmte — nur lag es nicht an
+// den Beträgen, sondern an der SCHREIBWEISE, in der man nach ihnen sucht.
+//
+// Nachgemessen: alle drei Formen über den ganzen Baum ergaben Treffer in fünfzig Dateien,
+// darunter `Cargo.lock` und `package-lock.json`. Unbrauchbar. Nur die Cent-Rohform allein
+// war für über achtzig Prozent davon verantwortlich: eine vierstellige Zahl ohne
+// Trennzeichen ist in einer Codebasis kein Betrag, sondern ein FinTS-Rückmeldungscode,
+// eine Token-Laufzeit in Sekunden, eine Portnummer, eine Jahreszahl.
+//
+// In der Euro-Schreibweise blieb ein Bruchteil übrig — und darunter ein echter Fund, der
+// zwei Monate im öffentlichen Repo stand: die Toleranz im Monatsausblick war mit der
+// eigenen Miete begründet, Planbetrag und gebuchter Betrag im Klartext, und dieselben
+// Zahlen lagen als Testdaten daneben. Genau der Fall, für den es diesen Wächter gibt.
+//
+// Daraus die Regel unten: die Euro-Schreibweisen immer, die Cent-Rohform erst ab dreistellig
+// (100 EUR). Was darunter liegt, findet die Euro-Form ohnehin, sobald es als Betrag
+// GESCHRIEBEN wird — und nur dann ist es ein Beleg.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { homedir } from "node:os";
+import { readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const WURZEL = join(import.meta.dirname, "..");
 
 /**
- * Die echte Datenbank — read-only gelesen, nie geschrieben.
+ * Die Merkmale des echten Bestands — aus `scripts/bestandsmerkmale.mjs`.
  *
- * Gelesen wird über das `sqlite3`-Kommando, NICHT über sql.js. Der Grund ist derselbe,
- * vor dem CLAUDE.md bei Kopien warnt: die Datenbank läuft im WAL-Modus, und sql.js liest
- * nur die Hauptdatei. Der erste Anlauf dieses Wächters tat genau das — und übersah
- * deshalb die ganze Anker-Tabelle samt der Kontostände darin, die zur selben Stunde in
- * zwei Testdateien standen.
+ * Die Abfragen stehen dort und nicht hier, weil `.githooks/pre-push` DIESELBEN braucht:
+ * dieser Test prüft den Arbeitsbaum, der Hook die ausgehenden Commit-Texte. Zwei Listen
+ * für dieselbe Sache driften, und sie haben es getan — als `budget.betrag_pro_monat`
+ * einer Reihe wich, zog der Test mit und der Hook nicht.
  *
- * Und **nicht** mit `-readonly`: solange die App läuft, hält sie die Datenbank, und ein
- * read-only-Zugriff scheitert dann mit „unable to open database file" — er darf die
- * `-shm`-Datei nicht anlegen, die der WAL-Modus braucht. `PRAGMA query_only=ON` öffnet
- * normal und verbietet trotzdem jedes Schreiben.
- *
- * Beides zusammen ist die eigentliche Lehre: ein Wächter, der die halbe Datenbank nicht
- * sieht oder sie gar nicht aufbekommt, ist schlimmer als keiner — er beruhigt. Deshalb
- * unterscheidet er unten hart zwischen „keine Datenbank da" (nichts zu prüfen) und
- * „Datenbank da, aber nicht lesbar" (Abbruch).
+ * Aufgerufen wird das Skript als KOMMANDO und nicht als Import: `scripts/` liegt
+ * ausserhalb von `tsconfig.include`, und `scripts/privacy-guard.test.ts` macht es
+ * nebenan genauso. Ein Merkmal je Zeile.
  */
-const DB_PFAD = join(
-  homedir(),
-  "Library/Application Support/de.netmechanics.moneymanager/moneymanager.db",
-);
-
-/** Gibt es das `sqlite3`-Kommando überhaupt? Ohne es kann hier nichts geprüft werden. */
-function sqliteVorhanden(): boolean {
-  try {
-    execFileSync("sqlite3", ["-version"], { stdio: "ignore" });
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 function merkmale(): string[] {
-  if (!existsSync(DB_PFAD) || !sqliteVorhanden()) return [];
-  const werte = new Set<string>();
-  const banken = JSON.parse(readFileSync(join(WURZEL, "public/bankenliste.json"), "utf8"));
-  const bankNamen = new Set<string>(
-    (Object.values(banken).find(Array.isArray) as { name: string }[]).map((b) => b.name),
-  );
-
-  function frage(sql: string, mussGehen = false): string[] {
-    try {
-      return execFileSync("sqlite3", ["-cmd", "PRAGMA query_only=ON", DB_PFAD, sql], {
-        encoding: "utf8",
-      })
-        .split("\n")
-        .filter(Boolean);
-    } catch (e) {
-      // Eine Tabelle, die es (noch) nicht gibt, ist in Ordnung — eine Datenbank, die sich
-      // nicht öffnen lässt, nicht. Sonst liefe der Wächter grün, ohne etwas gesehen zu
-      // haben, und das ist der eine Fehler, den er sich nicht leisten darf.
-      if (mussGehen) {
-        throw new Error(
-          `Die Datenbank ist da, lässt sich aber nicht lesen — der Wächter hat NICHTS geprüft.\n${String(e).slice(0, 200)}`,
-        );
-      }
-      return [];
-    }
+  const skript = join(WURZEL, "scripts/bestandsmerkmale.mjs");
+  try {
+    return execFileSync("node", [skript], { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
+      .split("\n")
+      .filter(Boolean);
+  } catch (e) {
+    // Das Skript gibt eine leere Liste zurück, wenn es nichts zu prüfen GIBT (kein
+    // Datenbestand, frischer Klon, CI). Bricht es dagegen ab, hat es etwas gefunden, das
+    // es nicht lesen konnte — und dann darf hier nichts stillschweigend grün werden.
+    const meldung = (e as { stderr?: Buffer }).stderr?.toString() ?? String(e);
+    throw new Error(`Die Merkmale liessen sich nicht ermitteln:\n${meldung.slice(0, 400)}`);
   }
-
-  // Probeabfrage: geht die Datenbank überhaupt auf?
-  frage("SELECT count(*) FROM sqlite_master", true);
-
-  // Beträge: als Zahl und in beiden Schreibweisen, in denen sie in Prosa landen.
-  for (const roh of [
-    ...frage("SELECT kontostand FROM zahlungskonto"),
-    ...frage("SELECT betrag FROM budget_betrag"),
-    ...frage("SELECT betrag FROM kontostand_anker"),
-    ...frage("SELECT sum(betrag) FROM ist_buchung GROUP BY konto_id"),
-    // Depots: der Gesamtwert und die Werte der einzelnen Positionen. Ergänzt am
-    // 2026-08-21, weil genau dieser Weg offen war — ein Depotwert aus dem echten Bestand
-    // stand als Erwartung in einem Screen-Test, und der Wächter sah ihn nicht. Ein Wert
-    // ist ein Wert, gleich in welcher Tabelle er steht.
-    ...frage("SELECT gesamtwert FROM depotwert"),
-    ...frage("SELECT wert FROM depotposition"),
-  ]) {
-    const cent = Number(roh);
-    // Kleinbeträge und glatte Zehner sind zu unspezifisch: „0,00", „10,00" oder „100,00"
-    // stehen in jeder zweiten Fixture und sagen über niemanden etwas aus.
-    if (!Number.isFinite(cent) || Math.abs(cent) < 1000 || cent % 1000 === 0) continue;
-    const euro = Math.trunc(Math.abs(cent) / 100);
-    const rest = String(Math.abs(cent) % 100).padStart(2, "0");
-    werte.add(`${euro},${rest}`); //  1234,56
-    werte.add(`${euro.toLocaleString("de-DE")},${rest}`); //  1.234,56
-    werte.add(String(cent)); // und die Rohform in Cent, wie sie in Fixtures steht
-  }
-
-  // Empfänger, Vertragsanbieter und Gläubiger-IDs — das, was verrät, WO jemand einkauft.
-  //
-  // Mit Ausnahmeliste, und die ist der Grund, warum diese Gruppe lange gefehlt hat:
-  // hunderte Empfängernamen sind Allerweltswörter („Tanken", „Friseur", „Urlaub"), die in
-  // jedem zweiten Test stehen. Ein Wächter, der darauf anschlägt, wird abgeschaltet.
-  // Deshalb hier: alles meldet sich, ausser was einmal bewusst freigegeben wurde.
-  const ALLERWELT = new Set([
-    "Abbuchung", "Action", "Baecker", "Bargeld", "Friseur", "Geschenk", "Girokonto",
-    "Gutschrift", "Retour", "Tanken", "Tankstelle", "Transact", "Urlaub", "Veranstaltung",
-    "Verrechnungskonto", "Tagesgeldkonto", "Kreditkarte",
-  ]);
-  // Die Importzeilen liegen seit dem Umbau in `umsatz_roh`. Der Name wird ERMITTELT und
-  // nicht angenommen: die echte Datenbank wandert erst beim nächsten App-Start mit, und
-  // ein Wächter, der bis dahin ins Leere fragt, meldet beruhigend nichts — die
-  // gefährlichste Art zu versagen. Verschwinden BEIDE Tabellen, schlägt `frage` an, statt
-  // still durchzuwinken.
-  const umsatzTabelle =
-    frage("SELECT name FROM sqlite_master WHERE type='table' AND name='umsatz_roh'").length > 0
-      ? "umsatz_roh"
-      : "umsatz";
-
-  for (const roh of [
-    ...frage(`SELECT DISTINCT gegenpartei FROM ${umsatzTabelle} WHERE length(gegenpartei) >= 6`),
-    ...frage("SELECT DISTINCT anbieter FROM vertrag WHERE length(anbieter) >= 6"),
-    ...frage(`SELECT DISTINCT glaeubiger_id FROM ${umsatzTabelle} WHERE glaeubiger_id IS NOT NULL`),
-    ...frage(`SELECT DISTINCT mandatsreferenz FROM ${umsatzTabelle} WHERE length(mandatsreferenz) >= 8`),
-    // Beim selben Umbau dazugekommen und nie geprueft: der abweichende Endempfaenger
-    // einer Lastschrift. Ein Name wie jeder andere — nur steht er in einer Spalte, die
-    // der Waechter noch nicht kannte.
-    ...frage(`SELECT DISTINCT endempfaenger FROM ${umsatzTabelle} WHERE length(endempfaenger) >= 6`),
-  ]) {
-    const wert = String(roh ?? "").trim();
-    if (wert.length < 6 || ALLERWELT.has(wert)) continue;
-    // Namen echter Banken stehen ohnehin in der öffentlichen DK-Liste im Repo — auch als
-    // Bestandteil („Sparkasse" steckt in „Sparkasse Essen").
-    if ([...bankNamen].some((n) => n.includes(wert))) continue;
-    werte.add(wert);
-  }
-
-  // Zeichenketten: alles, was eine Person oder ein Konto benennt.
-  for (const roh of [
-    ...frage("SELECT iban FROM zahlungskonto WHERE iban IS NOT NULL AND iban <> ''"),
-    ...frage("SELECT name FROM person"),
-    ...frage("SELECT bezeichnung FROM bankzugang"),
-    ...frage("SELECT blz FROM bankzugang"),
-    ...frage("SELECT benutzer FROM bankzugang"),
-  ]) {
-    const wert = String(roh ?? "").trim();
-    // Zu kurze Werte („EUR", ein Vorname mit drei Buchstaben) träfen überall.
-    if (wert.length >= 5) werte.add(wert);
-  }
-
-  // Kam wirklich etwas heraus? Eine leere Merkmalsliste sieht aus wie „alles sauber",
-  // heisst aber „nichts geprüft" — genau der Zustand, in dem dieser Wächter zweimal
-  // grün lief, während die Daten im Repo standen.
-  if (werte.size === 0) {
-    throw new Error(
-      "Aus der Datenbank kam kein einziges Merkmal — entweder ist sie leer, oder die " +
-        "Abfragen passen nicht mehr zum Schema. Der Wächter hat nichts geprüft.",
-    );
-  }
-  return [...werte];
 }
 
 function versionierteDateien(): string[] {
