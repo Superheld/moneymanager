@@ -75,6 +75,36 @@ volle Breite. Die Unterscheidung ist dieselbe wie vorher zwischen `Zeilenauswahl
 **Der Bestand wandert nach und nach.** Es gibt weiterhin native `<select>` in der App;
 jedes davon ist eine Stelle, die noch nicht umgestellt wurde, keine bewusste Ausnahme.
 
+## `Datumsfeld` — ein Datum eingeben oder aussuchen
+
+Der Ersatz für `<input type="date">`. Der Wert ist immer ISO (`yyyy-mm-dd`) oder leer;
+angezeigt und gelesen wird in der Sprache des Nutzers.
+
+**Es ist eine EINGABE mit Kalenderknopf, kein blosser Knopf.** Der erste Entwurf war
+letzteres — schöner anzusehen und im Gebrauch ein Rückschritt: wer ein Datum kennt, tippt
+es schneller, als er es im Kalender sucht, und das native Feld konnte das. Aufgefallen ist
+es daran, dass ein bestehender Screen-Test das Datum eintippte und rot wurde. Der Test
+hatte recht.
+
+**Warum hier selbst gebaut, wo `Auswahl` eine Bibliothek benutzt:** Base UI hat keinen
+Datepicker (nachgesehen, nicht vermutet). Das wiegt weniger schwer, als es klingt — die
+schwierige Hälfte eines Auswahlfeldes ist die Combobox-Semantik. Ein Kalender ist ein
+`role="grid"` mit einem Fokuspunkt, den die Pfeiltasten bewegen, und das ist eine kleine,
+klare Konvention. Positionierung, Schliessen bei Klick daneben und Fokusrückgabe kommen
+trotzdem aus Base UIs Popover und werden nicht nachgebaut.
+
+Vier Dinge, die man beim Anfassen wissen muss:
+
+- **Die Reihenfolge von Tag und Monat kommt aus `Intl`**, nicht aus einer Annahme. `05.03.`
+  und `03/05/` sind dieselben Ziffern mit anderer Bedeutung; eine feste Reihenfolge baut je
+  nach Sprache still das falsche Datum.
+- **ISO wird immer erkannt**, unabhängig von der Sprache — so steht es in der Datenbank,
+  und wer es eintippt, meint es auch so.
+- **Übernommen wird beim Verlassen und bei Enter**, nicht bei jedem Anschlag. Während
+  „05.0" getippt ist, gibt es noch kein Datum.
+- **Unlesbares ändert den Wert nicht**, das Feld springt zurück. Eine halb getippte Eingabe
+  darf nicht als Datum durchgehen.
+
 ## `Zeilenlink` — der Bezeichner, der weiterführt
 
 `DataTable` kann per `onRowClick` die ganze Zeile klickbar machen, und **das sieht man ihr

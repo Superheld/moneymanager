@@ -524,3 +524,146 @@ select.field {
   flex: 0 0 auto;
   color: var(--accent);
 }
+
+/* ============================================================
+   Datumsfeld — der Ersatz fuer <input type="date">.
+
+   Der Knopf traegt zusaetzlich `.field` und sieht damit aus wie jedes Eingabefeld
+   daneben. Das Blatt darunter ist ein Grid mit sieben Spalten; die Zellen sind
+   quadratisch, damit die Wochen als Raster lesbar bleiben und nicht als Textzeilen.
+   ============================================================ */
+/* Die Huelle traegt `.field` und sieht damit aus wie ein Eingabefeld — weil sie eines
+   IST. Innen liegen die nackte Eingabe und der Kalenderknopf; beide bringen ihren
+   eigenen Rahmen nicht mit, sonst haette das Feld drei. */
+.datumsfeld-huelle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 8px 0 12px;
+}
+.datumsfeld-huelle:focus-within {
+  border-color: var(--accent);
+}
+.datumsfeld-huelle[data-gesperrt] {
+  opacity: 0.55;
+}
+.datumsfeld-eingabe {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  padding: 10px 0;
+  font-size: 13.5px;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.datumsfeld-knopf {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  background: none;
+  border-radius: var(--r-sm);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.datumsfeld-knopf:hover { background: var(--surface-2); color: var(--ink-2); }
+.datumsfeld-knopf[data-popup-open] { color: var(--accent); }
+
+.datumsfeld-popup {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-2, 0 8px 24px rgba(0, 0, 0, 0.10));
+  padding: 10px;
+  outline: none;
+}
+
+.datumsfeld-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: 8px;
+}
+.datumsfeld-monat {
+  font-size: 13.5px;
+  font-weight: var(--fw-bold);
+  color: var(--ink);
+  text-transform: capitalize;
+}
+.datumsfeld-pfeil {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  font-size: 15px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.datumsfeld-pfeil:hover { background: var(--surface-2); }
+
+.datumsfeld-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 32px);
+  gap: 2px;
+  outline: none;
+}
+/* Das Grid selbst traegt den Fokus (die Zellen haben tabIndex -1), also braucht es
+   auch die sichtbare Fokusmarke — sonst bedient man es blind. */
+.datumsfeld-grid:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+.datumsfeld-wt {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  color: var(--ink-3);
+  text-align: center;
+  padding-bottom: 4px;
+  text-transform: uppercase;
+}
+.datumsfeld-leer { height: 30px; }
+
+.datumsfeld-tag {
+  height: 30px;
+  border: 0;
+  background: none;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  cursor: pointer;
+}
+.datumsfeld-tag:hover { background: var(--surface-2); }
+/* HEUTE ist ein Ring, GEWAEHLT ist eine Flaeche: beides kann auf denselben Tag fallen,
+   und dann muessen noch beide Aussagen lesbar sein. Zwei Flaechen gingen nicht. */
+.datumsfeld-tag[data-heute] {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.datumsfeld-tag[data-gewaehlt] {
+  background: var(--accent);
+  color: #fff;
+  font-weight: var(--fw-bold);
+}
+/* Der Tastatur-Punkt ist NICHT die Auswahl — er zeigt nur, wo man gerade steht. */
+.datumsfeld-grid:focus-visible .datumsfeld-tag[data-fokus]:not([data-gewaehlt]) {
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+}
+
+.datumsfeld-fuss {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}

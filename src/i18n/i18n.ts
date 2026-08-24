@@ -26,6 +26,16 @@ const de = {
     Ertrag: "Ertrag",
     Umschichtung: "Sparen & Vorsorge",
   },
+  // Bedienung des Kalenders. Die Monats- und Wochentagsnamen stehen bewusst NICHT hier:
+  // die liefert `Intl` je Sprache, und hier laegen sie nur als Uebersetzungspflicht, die
+  // niemand pflegt.
+  datum: {
+    kalenderOeffnen: "Kalender öffnen",
+    vorherigerMonat: "Voriger Monat",
+    naechsterMonat: "Nächster Monat",
+    heute: "Heute",
+    leeren: "Leeren",
+  },
   // Fehler-Codes (FachlicherFehler.code) → Text. Verschachtelt, weil i18next Punkte als
   // Pfadtrenner liest: code "betrag.groesserNull" → fehler.betrag.groesserNull.
   fehler: {
@@ -1497,6 +1507,13 @@ const en: typeof de = {
     Aufwand: "Expense",
     Ertrag: "Income",
     Umschichtung: "Savings & provision",
+  },
+  datum: {
+    kalenderOeffnen: "Open calendar",
+    vorherigerMonat: "Previous month",
+    naechsterMonat: "Next month",
+    heute: "Today",
+    leeren: "Clear",
   },
   fehler: {
     anker: {
