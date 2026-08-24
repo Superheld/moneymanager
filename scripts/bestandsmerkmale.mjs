@@ -73,6 +73,11 @@ const ALLERWELT = new Set([
   "Gutschrift", "Retour", "Tanken", "Tankstelle", "Transact", "Urlaub", "Veranstaltung",
   "Verrechnungskonto", "Tagesgeldkonto", "Kreditkarte",
   "Waschmaschine", "Geschirrspüler", "Laptop", "Fahrrad", "Sparkonto",
+  // Alltagsdeutsch, das zufaellig auch im Bestand steht: es benennt niemanden, und dass es
+  // dort vorkommt, sagt ueber den Haushalt nichts. Ohne solche Eintraege trifft der
+  // Waechter jeden Kommentar, der die Woerter benutzt — und wer eine Meldung dreimal
+  // wegdruecken musste, drueckt die vierte auch weg, ohne hinzusehen.
+  "Technik", "nicht angegeben",
 ]);
 
 function sqliteVorhanden() {
