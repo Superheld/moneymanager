@@ -3,6 +3,7 @@
 // Migrationssystem (BAUPLAN: Migrationen ab Phase 1) — vorwärts und append-only.
 
 import Database from "@tauri-apps/plugin-sql";
+import { DB_URL } from "./datenbankdatei";
 import { MIGRATIONS } from "./migrations";
 import { schemaStatement, fremdschluesselPruefen } from "./transaktion";
 
@@ -148,7 +149,7 @@ let dbPromise: Promise<Database> | null = null;
 
 export function getDb(): Promise<Database> {
   if (!dbPromise) {
-    dbPromise = Database.load("sqlite:moneymanager.db").then(async (db) => {
+    dbPromise = Database.load(DB_URL).then(async (db) => {
       await migrate(db);
       return db;
     });

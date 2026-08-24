@@ -106,6 +106,9 @@ const de = {
     footLokal: "Lokal · keine Cloud",
     regionLabel: "Region",
     spaeterePhase: "kommt in einer späteren Phase",
+    aktualisierungBereit: "Version {{version}} installieren",
+    aktualisierungLaeuft: "wird installiert …",
+    aktualisierungFehler: "Installation fehlgeschlagen",
   },
   bankabruf: {
     titel: "Bankabruf",
@@ -1568,6 +1571,9 @@ const en: typeof de = {
     footLokal: "Local · no cloud",
     regionLabel: "Region",
     spaeterePhase: "coming in a later phase",
+    aktualisierungBereit: "Install version {{version}}",
+    aktualisierungLaeuft: "installing …",
+    aktualisierungFehler: "Installation failed",
   },
   bankabruf: {
     titel: "Bank retrieval",

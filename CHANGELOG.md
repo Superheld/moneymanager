@@ -3,6 +3,84 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.20.0] — 2026-08-24
+
+Die Runde, in der die App den Rechner wechselt: sie wird installiert statt gestartet, sie
+holt sich ihre Nachfolgerin selbst — und die Entwicklung hört auf, mit echtem Geld zu
+spielen.
+
+### Hinzugefügt
+
+**Selbstaktualisierung.** Beim Start prüft die App still nach. Liegt nichts bereit,
+verändert sich nichts — kein Hinweis, kein Haken, kein Platzhalter; das ist der
+überwiegende Fall, und in ihm soll die Oberfläche sich nicht bewegen. Liegt etwas bereit,
+erscheint unten links in der Seitenleiste ein Knopf, neben Version und Stadium. Dort steht
+schon, WELCHE Version läuft; „0.19.0" und „0.20.0 installieren" beantworten dieselbe Frage.
+Ein Klick lädt, installiert und startet neu.
+
+**Zwei Fehlerarten, zwei Antworten.** Ein Fehlschlag beim PRÜFEN ist kein Fehler: kein
+Netz, Endpunkt weg, Antwort kaputt — in allen Fällen lautet die Antwort „nichts Neues".
+Eine Updater-Fehlermeldung wäre Beunruhigung ohne Handlungsmöglichkeit für jemanden, der
+gerade Ausgaben eintragen wollte. Beim EINSPIELEN dreht sich das um: dort hat jemand
+geklickt und wartet, und ein stiller Fehlschlag hinterliesse einen Knopf, der nichts tut.
+
+Die Prüfung ist der erste Netzzugriff, den die App **von sich aus** macht — bisher sprach
+sie nur nach draussen, wenn jemand einen Bankabruf auslöste. Sie ist deshalb abschaltbar;
+ohne Zutun ist sie an, denn ein Update, von dem niemand erfährt, ist keines.
+
+**`npm run installieren`** baut die App und legt sie nach `/Applications`, samt dem
+Handgriff, den man vergisst: das Quarantäne-Merkmal abräumen. Ohne ihn meldet macOS die
+unsignierte App als „beschädigt", was sie nicht ist, und die Meldung zeigt in die falsche
+Richtung.
+
+**Ein Release-Workflow.** Ein Tag `v*` baut auf macOS, signiert und hängt Archiv, DMG und
+Manifest an ein GitHub-Release — genau das Manifest, das der Updater anfragt. Typecheck
+und Tests laufen davor: ein Release aus rotem Code wäre schlimmer als keines, denn es liegt
+danach draussen und wird von installierten Apps eingespielt.
+
+**Ein Spielstand für die Entwicklung** (`npm run seed`): vollständig migriert, mit
+erfundenen Daten in jedem Bereich — Konten, Kategorien, Budgets samt Betragsreihe, mehrere
+Monate Buchungen, Verträge, Inventar, ein Depotverlauf, Belege aus zwei Quellen in allen
+vier Status, Zwillinge mit und ohne Freigabe, Zahlungsregeln. Sein Zufall ist gesät: derselbe
+Aufruf erzeugt denselben Bestand, ein Screenshot von gestern zeigt dieselben Zahlen wie
+einer von heute.
+
+### Geändert
+
+**Die Entwicklung läuft auf einer eigenen Datenbank.** Bisher zeigten `tauri dev` und ein
+gebautes Bundle auf dieselbe Datei. Das ist die Grenze zwischen „kaputt" und „weg": im
+Alpha-Stadium dürfen Migrationen ausdrücklich wegnehmen, und ein Versuch, der schiefgeht,
+träfe sonst den einzigen Bestand, den es gibt. Getrennt wird am DATEINAMEN
+(`moneymanager.db` gegen `moneymanager-dev.db`), entschieden an einer Stelle
+(`adapters/persistence/datenbankdatei.ts`) — nicht über den Bundle-Identifier, denn der
+bestimmt auch die Identität der installierten App: wer ihn anfasst, schickt sie in ein
+neues, leeres Verzeichnis, und der echte Bestand sieht aus wie verschwunden.
+
+**`scripts/bestandsmerkmale.mjs` ist jetzt versioniert.** Es war nie ignoriert, nur nie
+committet — und lag damit ausschliesslich in einer Arbeitskopie. In jedem frischen Klon und
+jedem Worktree fehlte es, und der `pre-push`-Wächter brach dort ab, statt zu prüfen. Der
+Wert-Abgleich lief seit seiner Einführung an genau einer Stelle; ein Wächter, den nur eine
+Maschine hat, schützt nur diese eine, und das Repo ist öffentlich.
+
+**`vite-node` ist deklariert.** Es war nie eine Abhängigkeit, sondern wurde von npx
+stillschweigend nachgeladen — was auch das schon dokumentierte
+`scripts/migrationsprobe.mjs` betraf.
+
+### Dokumentation
+
+**Drei Abläufe** in `CLAUDE.md` — eine Änderung machen, eine Version ausliefern, wann der
+Spielstand neu geschrieben wird — je mit dem Punkt, an dem man sonst das Falsche tut. Der
+wichtigste ist kontraintuitiv: *nicht* reflexhaft nach jeder Migration neu seeden. Eine
+Migration über einen bestehenden Spielstand laufen zu lassen ist die einzige Gelegenheit,
+ihr beim Wandern zuzusehen; ein frischer Seed entsteht direkt im Zielschema und hat nie
+migriert. Wer sofort neu seedet, tauscht den Test gegen sein Ergebnis.
+
+Dazu die Fallen des Update-Wegs, alle gemessen und nicht vermutet: die Signatur-Variable
+heisst `TAURI_SIGNING_PRIVATE_KEY` und nicht `…_PATH`; ein `http`-Endpunkt lässt die App
+gar nicht erst starten (Tauri prüft das Schema beim Initialisieren des Plugins und panict);
+`releases/latest/` überspringt Vorabversionen, weshalb „prerelease" bei einer Alpha den
+Endpunkt tot macht.
+
 ## [0.19.0] — 2026-08-24
 
 Die Runde, in der ein Budget eine Geschichte bekommt: was in einem bestimmten Monat galt,

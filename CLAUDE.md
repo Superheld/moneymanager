@@ -377,11 +377,304 @@ npm test            # Vitest: Kern, Use-Cases, Repositories, UI, Schichtgrenzen
 npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 %)
 npm run typecheck
 npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
+npm run seed        # Spielstand für die Entwicklung neu schreiben (siehe unten)
+npm run installieren # macOS: bauen und nach /Applications installieren
 ```
 
 Node kommt über **mise** (`mise.toml`: node 26); die CI pinnt dieselbe Hauptversion getrennt
 in `.github/workflows/ci.yml`, weil Actions die `mise.toml` nicht liest. Wer sie hier hebt,
 hebt sie dort mit. Die Kommandozeilen für diese Maschine stehen in `CLAUDE.local.md`.
+
+## Auslieferung: lokal gebaut, lokal installiert
+
+Es gibt **keinen Release-Weg**. Die App wird auf der eigenen Maschine gebaut und von dort
+nach `/Applications` installiert (`npm run installieren`, macOS). Kein GitHub-Release, kein
+Updater, keine Signierung — und das ist eine Entscheidung, kein Rückstand: solange es genau
+einen Nutzer auf genau einer Maschine gibt, kostet jede Stufe dazwischen Aufwand ohne
+Gegenwert.
+
+Drei Dinge, die dabei zusammengehören und von denen das dritte gern vergessen wird:
+
+- **Die Produktregistrierungsnummer wird zur BAUZEIT eingebacken.** Vite ersetzt
+  `import.meta.env.VITE_FINTS_PRODUKT_ID` beim Bündeln; fehlt die `.env` im Moment des
+  Bauens, fehlt sie der fertigen App, und der Bankabruf meldet das erst beim ersten
+  Versuch. `scripts/installieren.sh` warnt vorher.
+- **Gatekeeper hält die App an.** Sie ist nicht mit einem Apple-Developer-Zertifikat
+  signiert; macOS meldet sie deshalb als „beschädigt", was sie nicht ist. Das
+  Quarantäne-Merkmal einmal abräumen (`xattr -dr com.apple.quarantine`) ist die ganze
+  Sache, und das Skript tut es mit.
+- **Der Datenbestand überlebt die Neuinstallation.** Er liegt im App-Datenverzeichnis, nicht
+  im Bundle.
+
+Was ein Release später bräuchte, ist damit nicht weg, sondern nur nicht gebaut:
+`tauri-plugin-updater` (auf Linux ausschliesslich mit AppImage), ein Signaturschlüssel, ein
+Workflow mit `VITE_FINTS_PRODUKT_ID` als Repository-Secret. Der Secret-Weg ist dabei nicht
+Geheimniskrämerei, sondern die **Produktgrenze**: ein Fork ist laut DK-Bedingungen ein
+anderes Produkt und hat das Secret nicht — sein Build läuft ohne Nummer und wird damit zur
+eigenen Registrierung geschoben, statt still unter unserem Namen zu laufen.
+
+### Der Update-Knopf
+
+Die App prüft beim Start still nach. Ist nichts da, verändert sich nichts — kein Hinweis,
+kein Haken, keine Meldung. Ist etwas da, erscheint **unten links in der Seitenleiste**,
+neben Version und Stadium, ein Knopf; ein Klick lädt, installiert und startet neu.
+
+Der Ort ist nicht beliebig: dort steht schon, welche Version läuft. „0.19.0" und „0.20.0
+installieren" beantworten dieselbe Frage.
+
+**Ein Fehlschlag beim PRÜFEN ist kein Fehler.** Kein Netz, Endpunkt weg, Antwort kaputt —
+in allen Fällen lautet die Antwort „nichts Neues". Ein Haushalt, der Ausgaben eintragen
+will, hat mit einer Updater-Fehlermeldung nichts zu tun; sie wäre Beunruhigung ohne
+Handlungsmöglichkeit. Beim **Einspielen** dreht sich das um: dort hat jemand geklickt und
+wartet, und ein Fehler gehört ihm gesagt.
+
+**Die Prüfung ist der erste Netzzugriff, den die App von sich aus macht.** Bisher sprach
+sie nur nach draussen, wenn jemand einen Bankabruf auslöste. Deshalb ist sie abschaltbar
+(`aktualisierungPruefen` in `einstellung`); ohne Zutun ist sie an, denn ein Update, von
+dem niemand erfährt, ist keines.
+
+Wo was liegt:
+
+| Stück | Datei |
+|---|---|
+| Use-Case und Port | `src/application/aktualisierung.ts` |
+| Der Port auf das Tauri-Plugin | `src/adapters/aktualisierung.ts` |
+| Der Knopf | `src/adapters/ui/bausteine/AktualisierungKnopf.tsx` |
+| Schlüssel, Endpunkt, Artefakte | `src-tauri/tauri.conf.json` |
+
+**Der private Signaturschlüssel liegt ausserhalb des Repos** (`~/.moneymanager-schluessel/`)
+und ist **unersetzlich**: geht er verloren, kann keine installierte App je wieder ein
+Update annehmen — sie prüft gegen den öffentlichen Schlüssel, der in ihrem Bundle steckt.
+Er gehört gesichert. Solange nichts veröffentlicht ist, kostet ein Neuerzeugen nichts;
+nach dem ersten Release kostet es jede Installation da draussen.
+
+Zwei Dinge, die man dabei auseinanderhalten muss:
+
+- **Die Updater-Signatur hat mit Apple nichts zu tun.** Sie ist minisign und verhindert,
+  dass jemand anderes ein Update unterschiebt. Gatekeeper bleibt davon unberührt: eine
+  unsignierte App aktualisiert sich klaglos, sobald sie einmal starten durfte.
+- **Auf Linux kann der Updater ausschliesslich AppImages ersetzen.** Ein `.deb` kann sich
+  nicht selbst austauschen. Das entscheidet also das Bundle-Format mit, nicht erst die
+  Verteilung.
+
+### Den Update-Weg durchspielen
+
+Halb prüfen geht nicht: entweder eine installierte App findet ein signiertes Paket, lädt
+es, ersetzt sich und startet neu — oder man weiss nichts. Dafür gibt es einen Endpunkt auf
+`127.0.0.1`, der nur läuft, solange man ihn laufen lässt.
+
+```bash
+export TAURI_SIGNING_PRIVATE_KEY=~/.moneymanager-schluessel/updater.key
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=
+
+# 1. Die ALTE Fassung bauen und installieren — mit dem Probe-Endpunkt.
+npm run tauri build -- --config src-tauri/tauri.updater-probe.conf.json
+rm -rf /Applications/Moneymanager.app
+cp -R src-tauri/target/release/bundle/macos/Moneymanager.app /Applications/
+xattr -dr com.apple.quarantine /Applications/Moneymanager.app
+
+# 2. Die NEUE Fassung bauen. Die höhere Version steht in der Config, nicht in
+#    package.json — eine Probe soll die Versionsangabe des Projekts nicht anfassen.
+npm run tauri build -- --config src-tauri/tauri.updater-probe-neu.conf.json
+
+# 3. Endpunkt starten. Er nimmt, was im Bundle-Verzeichnis liegt, und bietet es unter
+#    der mitgegebenen Version an.
+npm run updater-probe -- 0.20.0
+
+# 4. Die INSTALLIERTE App starten. Der Knopf muss unten links erscheinen.
+```
+
+Drei Fallen, alle drei gemessen und nicht vermutet:
+
+- **Die Variable heisst `TAURI_SIGNING_PRIVATE_KEY`**, nicht `…_PATH` — sie nimmt den Pfad
+  genauso wie den Schlüssel selbst. Mit der `_PATH`-Variante läuft der Build durch und
+  bricht ganz am Ende beim Signieren ab („A public key has been found, but no private
+  key"); das Archiv liegt dann unsigniert da.
+- **Ein `http`-Endpunkt lässt die App gar nicht erst starten.** Tauri prüft das Schema beim
+  INITIALISIEREN des Plugins, nicht beim Abruf, und wirft: *„The configured updater
+  endpoint must use a secure protocol like `https`"* — die gebaute App panict beim Start.
+  Für die Probe hebt `dangerousInsecureTransportProtocol` das auf; der Schalter steht
+  ausschliesslich in den Probe-Overlays, und `src/auslieferung.test.ts` hält ihn aus
+  `tauri.conf.json` heraus.
+- **Der Plattformschlüssel im Manifest muss exakt passen** (`darwin-aarch64` auf Apple
+  Silicon). Steht dort etwas anderes, meldet der Updater „nichts Neues" statt eines
+  Fehlers — und man sucht lange an der falschen Stelle.
+
+**Der Endpunkt steckt im Bundle, nicht in der laufenden App.** Eine App, die ohne
+`--config` gebaut wurde, fragt GitHub und findet nichts — sie lässt sich nachträglich nicht
+auf den Probe-Endpunkt umbiegen. Wer den Knopf nicht sieht, prüft das zuerst.
+
+**Den Endpunkt nicht laufen lassen, während gebaut wird.** Er liefert die Dateien aus dem
+Bundle-Verzeichnis aus, und ein Build schreibt genau dort. Wer dazwischen klickt, lädt ein
+Archiv, das nicht mehr zu der Signatur im Manifest passt — der Updater weist es dann ab
+(richtig so), und man sucht den Fehler beim Schlüssel. Erst bauen, dann den Endpunkt
+starten; er erzeugt das Manifest beim Start neu.
+
+**Und die Seitenleiste zeigt beim Probelauf weiter die ALTE Nummer.** `version.ts` liest
+`package.json`, die höhere Version steht aber nur im Config-Overlay. Ob das Update
+ankam, sagt deshalb nicht die Anzeige, sondern das Bundle:
+
+```bash
+/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" \
+  /Applications/Moneymanager.app/Contents/Info.plist
+```
+
+Bei einem echten Release gibt es diese Lücke nicht — dort wird `package.json` gehoben, und
+`tauri.conf.json` liest die Version von dort. Beide Zahlen haben dann dieselbe Quelle.
+
+### Was am Update-Weg noch fehlt
+
+Mechanismus und Release-Workflow stehen. Offen ist:
+
+- **Die Repository-Secrets.** Ohne `TAURI_SIGNING_PRIVATE_KEY` bricht der Workflow ab
+  (richtig so — ein unsigniertes Update nimmt keine App an). Ohne `FINTS_PRODUKT_ID` läuft
+  er durch, und die veröffentlichte App hat einen gesperrten Bankabruf.
+- **Das erste Release.** Bis es eines gibt, liefert der Endpunkt eine 404, die Prüfung
+  schlägt fehl und schweigt — wie vorgesehen.
+- **Linux.** Braucht AppImage als Bundle-Ziel und einen zweiten Bauplatz; macOS lässt sich
+  nicht auf Linux bauen und umgekehrt. Und der Updater kann dort ausschliesslich AppImages
+  ersetzen.
+- **Kein Schalter in den Einstellungen.** Die Abschaltbarkeit ist gebaut und geprüft
+  (`pruefungSchalten`, `dienste.aktualisierungspruefungSetzen`), hat aber noch keine
+  Oberfläche — abschalten geht derzeit nur über die Einstellungstabelle.
+
+**Was in einem veröffentlichten Archiv steckt** und was nicht, weil die Frage naheliegt:
+keine Zugangsdaten, keine Kontodaten, kein Datenbestand — die Datenbank liegt im
+App-Datenverzeichnis, nicht im Bundle. Aber die **DK-Produktregistrierungsnummer** ist
+darin, zur Bauzeit eingebacken. Sie ist kein Geheimnis (sie geht bei jeder
+Dialoginitialisierung im Klartext an die Bank), aber sie identifiziert dieses Produkt
+gegenüber allen Banken, und wer ein Release herunterlädt, spricht mit seiner Bank unter
+unserer Registrierung. Das ist der normale Zustand eines Softwareherstellers — aber es ist
+eine Entscheidung, einer zu sein.
+
+### Zwei Datenbestände, eine Zeile Unterschied
+
+Die installierte App verwaltet echtes Geld; die Entwicklung soll frei rumprobieren können.
+Beides auf derselben Datei geht nicht gut aus — im Alpha-Stadium dürfen Migrationen
+ausdrücklich **wegnehmen**, und ein Versuch, der schiefgeht, träfe dann den einzigen
+Bestand, den es gibt. Die Trennung ist deshalb keine Bequemlichkeit, sondern die Grenze
+zwischen „kaputt" und „weg".
+
+| | Datei | wer sie öffnet |
+|---|---|---|
+| echt | `moneymanager.db` | die installierte App (`tauri build`) |
+| Spielstand | `moneymanager-dev.db` | `npm run tauri dev` |
+
+Entschieden wird das an genau einer Stelle:
+`src/adapters/persistence/datenbankdatei.ts`. **Der Dateiname trennt, nicht der
+Identifier** — der bestimmt zwar das Datenverzeichnis, aber auch die Identität der
+installierten App: wer ihn anfasst, schickt sie in ein neues, leeres Verzeichnis, und der
+echte Bestand sieht aus wie verschwunden. Beide Dateien liegen deshalb nebeneinander, und
+die Rezepte aus `CLAUDE.local.md` finden auch die Spielkopie.
+
+Den Spielstand schreibt `npm run seed` — vollständig migriert, mit erfundenen Daten in
+jedem Bereich. Zwei Dinge daran sind Absicht:
+
+- **Er weist `moneymanager.db` am Dateinamen ab.** Das Skript überschreibt sein Ziel
+  vollständig; ein vertippter Pfad wäre nicht ein Fehler, sondern der Verlust der Daten,
+  um deren Trennung es geht.
+- **Sein Zufall ist gesät.** Derselbe Aufruf erzeugt denselben Bestand — ein Screenshot von
+  gestern zeigt dieselben Zahlen wie einer von heute.
+
+Die Daten selbst stehen in `src/testwerkzeug/seedDaten.ts`, nicht im Skript. Der Grund ist
+derselbe wie bei allen Wächtern hier: ein Seed **verrottet still**, wenn die Kette wandert
+und seine INSERTs stehenbleiben, und der Fehler zeigt sich erst, wenn man eigentlich etwas
+anderes vorhatte. `src/seed.test.ts` fährt ihn deshalb bei jedem `npm test` gegen die
+aktuelle Migrationskette.
+
+## Abläufe
+
+Drei Wege, die oft genug vorkommen, dass sie festliegen sollten — und je einen Punkt, an
+dem man sonst das Falsche tut.
+
+### Eine Änderung machen
+
+```
+Branch von develop  →  npm run tauri dev  →  npm test && npm run typecheck  →  merge --no-ff
+```
+
+1. **Branch von `develop`.** Steht das Paket schon, gleich anlegen; ist das Bild noch
+   unklar, erst arbeiten und den Branch nachziehen. Der `pre-commit`-Hook weist einen
+   direkten Commit auf `develop` ohnehin ab.
+2. **`npm run tauri dev`** — läuft auf dem **Spielstand**, nicht auf dem echten Bestand.
+   Kaputtspielen ist hier folgenlos, und genau dafür ist er da.
+3. **`npm test` und `npm run typecheck` grün**, bevor gemerged wird. Beides muss ohnehin,
+   der Testlauf dauert Sekunden.
+4. **`--no-ff` nach `develop`.** Dort parkt alles, bis bewusst nach `main` durchgereicht
+   wird.
+
+**Der Punkt, an dem man sonst das Falsche tut:** Wer am **Schema** arbeitet, prüft nicht
+gegen den Spielstand, sondern gegen eine **Lesekopie des echten Bestands**
+(`scripts/migrationsprobe.mjs`, Rezept in `CLAUDE.local.md`). Der Spielstand ist
+widerspruchsfrei — er wurde gerade erst erzeugt. Der echte Bestand ist es nicht, und genau
+dort scheitern Migrationen. Ein grüner Testlauf gegen sql.js hat das schon einmal
+verschwiegen, weil dort die Fremdschlüssel aus sind.
+
+### Eine Version ausliefern
+
+1. `develop` ist grün und enthält alles, was mit soll.
+2. Version in `package.json` heben — **eine** Stelle, `tauri.conf.json` und `version.ts`
+   lesen von dort.
+3. `CHANGELOG.md` schreiben. Keine Zahl aus dem echten Bestand hinein.
+4. Nach `main` mergen (nur aus `develop`, der Hook lässt nichts anderes zu).
+5. Tag setzen und pushen — **das löst `.github/workflows/release.yml` aus**: bauen,
+   signieren, Release anlegen, Archiv, DMG und Manifest anhängen.
+6. **Die installierte App einmal starten.** Das ist kein Ritual: der Build kann
+   durchlaufen und die App trotzdem nicht hochkommen — an einer Migration, an einer
+   fehlenden Capability, an Gatekeeper.
+
+Für den eigenen Rechner geht es auch ohne Release: `npm run installieren` baut und
+installiert lokal. Beide Wege erzeugen dasselbe Bundle; der Unterschied ist nur, ob es
+jemand anders erreichen kann.
+
+**Zwei Schalter im Release-Workflow dürfen nicht auf „vorsichtig" stehen**, und beide sind
+verlockend:
+
+- **`releaseDraft: false`** — die Assets eines Entwurfs sind ohne Anmeldung nicht
+  abrufbar. Ein Entwurf wäre bequem zum Nachsehen und macht den Updater blind.
+- **`prerelease: false`** — `releases/latest/` **überspringt Vorabversionen**. Bei einer
+  App im Alpha-Stadium ist „prerelease" die naheliegende Wahl, und der Endpunkt liefert
+  dann eine 404, die für den Updater aussieht wie „kein Update da".
+
+**Der Punkt, an dem man sonst das Falsche tut:** vor dem Bauen prüfen, dass die `.env`
+steht. Sie ist gitignoriert, in einem frischen Klon oder Worktree also nicht da, und die
+Produktregistrierungsnummer wird zur **Bauzeit** eingebacken. Fehlt sie, ist die App
+fertig und der Bankabruf tot — und das merkt man erst beim ersten Abruf.
+`scripts/installieren.sh` warnt, aber es bricht nicht ab.
+
+**Zwei Dinge müssen ausserhalb des Repos bereitliegen**, und beide fehlen in einem frischen
+Klon:
+
+| | wo | wenn es fehlt |
+|---|---|---|
+| Produkt-ID | `.env` | App läuft, Bankabruf gesperrt |
+| Signaturschlüssel | `~/.moneymanager-schluessel/updater.key` | **Build bricht ab** |
+
+Der Schlüssel wird seit `createUpdaterArtifacts` bei **jedem** Build gebraucht, auch bei
+einem, der mit Updates nichts vorhat. Tauri baut dabei erst alles fertig und bricht im
+letzten Schritt ab — `installieren.sh` prüft deshalb vorher, statt den ganzen Build für
+eine Fehlermeldung abzuwarten.
+
+### Wann der Spielstand neu geschrieben wird
+
+`npm run seed` überschreibt ihn vollständig. Das ist billig und folgenlos — er ist
+**Wegwerfware**, im Gegensatz zum echten Bestand.
+
+Neu schreiben, wenn:
+
+- ein **neuer Fall** dazugehört, den er noch nicht enthält (dann erst
+  `src/testwerkzeug/seedDaten.ts` ergänzen, mit einer Zusicherung in `src/seed.test.ts`);
+- man ihn **kaputtgespielt** hat und einen sauberen Stand will;
+- `src/seed.test.ts` **rot** ist — dann passt er nicht mehr zum Schema, und das Ergänzen
+  ist die eigentliche Arbeit, nicht das Neuschreiben.
+
+**Der Punkt, an dem man sonst das Falsche tut — und er ist der wichtigste hier:** *nicht*
+reflexhaft nach jeder Migration neu seeden. Eine Migration über einen **bestehenden**
+Spielstand laufen zu lassen ist die einzige Gelegenheit, sie überhaupt beim Wandern
+zuzusehen; ein frisch geschriebener Seed entsteht direkt im Zielschema und hat nie
+migriert. Wer sofort neu seedet, tauscht den Test gegen sein Ergebnis. Also: erst die App
+starten und die Migration über den alten Spielstand fahren lassen, **dann** neu seeden,
+wenn man einen sauberen Stand braucht.
 
 ## Mitgelieferte Skills
 

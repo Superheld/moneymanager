@@ -1,0 +1,93 @@
+name: Release
+
+# Baut bei einem Versions-Tag die macOS-App, signiert sie für den Updater und hängt
+# Archiv, DMG und Manifest an ein GitHub-Release.
+#
+# WOZU ES DAS GIBT. Der Update-Knopf in der App fragt
+# `releases/latest/download/latest.json`. Ohne ein Release, das genau diese Datei trägt,
+# schlägt die Prüfung fehl — und schweigt, wie vorgesehen. Dieser Workflow ist die
+# Gegenstelle.
+#
+# ZWEI EINSTELLUNGEN, DIE MAN NICHT ÄNDERN DARF, ohne den Updater zu brechen:
+#
+#   • `releaseDraft: false` — Assets eines Entwurfs sind ohne Anmeldung nicht abrufbar.
+#     Ein Entwurf wäre bequem zum Nachsehen und macht den Updater blind.
+#   • `prerelease: false` — `releases/latest/` überspringt Vorabversionen. Bei einer App
+#     im Alpha-Stadium ist „prerelease" die naheliegende Wahl und liefert dann eine 404,
+#     die aussieht wie „kein Update da".
+#
+# Beides ist der Grund, warum hier nichts auf „vorsichtig" steht: der Endpunkt muss
+# erreichbar sein, sonst ist der ganze Weg tot.
+
+on:
+  push:
+    tags:
+      - "v*"
+# Bewusst NICHT von Hand auslösbar: `tauri-action` braucht einen Tag-Namen, und ein
+# erfundener erzeugte ein echtes Release mit einer Version, die es nicht gibt. Wer den
+# Workflow prüfen will, setzt einen Tag und löscht ihn samt Release wieder.
+
+jobs:
+  macos:
+    # macos-14 und neuer sind arm64. Intel-Macs bräuchten ein Universal-Binary
+    # (`--target universal-apple-darwin`) — solange niemand eines hat, wäre das
+    # Bauzeit ohne Empfänger.
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # Muss zur mise.toml im Repo passen — GitHub Actions liest die nicht selbst.
+          node-version: "26"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust-Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install
+        run: npm ci
+
+      # Dieselben Prüfungen wie in der CI. Ein Release aus rotem Code wäre schlimmer als
+      # keines: es liegt danach draussen und wird von installierten Apps eingespielt.
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Tests
+        run: npm test
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Ohne diesen Schlüssel entsteht keine Signatur, und ohne Signatur weist jede
+          # installierte App das Update ab. Der Build bricht dann ab — richtig so.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # Die DK-Produktregistrierungsnummer. Sie wird zur BAUZEIT eingebacken; fehlt
+          # das Secret, ist die App vollständig und der Bankabruf gesperrt. Ein Fork hat
+          # dieses Secret nicht — das ist die Produktgrenze, mechanisch durchgesetzt.
+          VITE_FINTS_PRODUKT_ID: ${{ secrets.FINTS_PRODUKT_ID }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: Moneymanager __VERSION__
+          releaseBody: |
+            Lokale Haushalts-Finanz-App, Stadium **Alpha**.
+
+            Nicht mit einem Apple-Zertifikat signiert: macOS meldet die App beim ersten
+            Start als „beschädigt". Sie ist es nicht — einmalig freigeben mit
+
+                xattr -dr com.apple.quarantine /Applications/Moneymanager.app
+          # Siehe Kopf: beides muss false bleiben, sonst findet der Updater nichts.
+          releaseDraft: false
+          prerelease: false
+          # Erzeugt `latest.json` neben den Artefakten — genau die Datei, die
+          # `plugins.updater.endpoints` in tauri.conf.json anfragt.
+          includeUpdaterJson: true
