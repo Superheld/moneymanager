@@ -20,6 +20,17 @@ export interface RegisterZeile {
   readonly kategorieId?: string;
   /** Laufender Saldo NACH dieser Zeile. */
   readonly saldo: Cent;
+  /**
+   * Nur bei `art: "ist"`: die Buchung ist gebucht, ihr Buchungstag liegt aber NACH
+   * `heute`. Das gibt es wirklich — manche Banken vergeben den Buchungstag von morgen
+   * fuer eine heute veranlasste Ueberweisung und fuehren sie schon im Saldo. Solche
+   * Zeilen stehen deshalb bei `gebucht` und nicht bei `geplant`: sie sind keine
+   * Vorhersage, sie sind passiert.
+   *
+   * Ohne dieses Merkmal sehen sie im Auszug aus wie jede andere gebuchte Zeile und
+   * stehen oberhalb des „heute"-Trenners, obwohl ihr Datum dahinter liegt.
+   */
+  readonly zukuenftig?: boolean;
   // nur bei art === "ist":
   readonly istId?: string;
   readonly quelle?: IstBuchung["quelle"];
@@ -68,6 +79,7 @@ export function kontoRegister(
     return {
       art: "ist",
       datum: b.datum,
+      zukuenftig: b.datum > heute,
       bezeichnung: b.notiz ?? standardBez,
       betrag: b.betrag,
       charakter: b.charakter,

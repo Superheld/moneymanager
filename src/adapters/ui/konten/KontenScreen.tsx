@@ -601,6 +601,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 },
               ]}
               rows={gebuchtFuerTabelle}
+              // Gebucht, aber der Buchungstag liegt noch vor uns: die Bank fuehrt die
+              // Zeile bereits im Saldo, passiert ist sie noch nicht. Sie steht deshalb
+              // hier oben und nicht unter „geplant" — gedaempft, damit man den
+              // Unterschied sieht, statt sich spaeter ueber sie zu wundern.
+              rowStyle={(r: Registerzeile) => (r.zeile.zukuenftig ? { opacity: 0.55 } : undefined)}
             />
           )}
 
