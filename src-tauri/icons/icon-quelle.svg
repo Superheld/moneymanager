@@ -1,0 +1,41 @@
+<!-- Die QUELLE des App-Icons. Alle PNG/ICNS/ICO daneben sind daraus erzeugt:
+
+       rsvg-convert -w 1024 -h 1024 src-tauri/icons/icon-quelle.svg -o /tmp/icon-1024.png
+       npm run tauri icon /tmp/icon-1024.png
+
+     Danach die von `tauri icon` zusaetzlich angelegten Ordner `android/` und `ios/`
+     sowie `64x64.png` wieder wegraeumen: es gibt keine Mobile-Builds, und
+     tauri.conf.json listet nur 32, 128, 128@2x, icns und ico.
+
+     Die Farben sind die Tokens aus src/styles/tokens/colors.css, aus oklch nach sRGB
+     gerechnet: --accent #11846E, --accent-deep #006455, --cream #F9F5EC. Wer sie dort
+     aendert, aendert sie hier mit — sonst steht das Icon neben der App statt in ihr. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="grund" x1="0" y1="0" x2="0.85" y2="1">
+      <stop offset="0" stop-color="#11846E"/>
+      <stop offset="1" stop-color="#006455"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Grundform: macOS-nahe Squircle-Proportion (Inhalt 840 in 1024, Radius 188). -->
+  <rect x="92" y="92" width="840" height="840" rx="188" fill="url(#grund)"/>
+
+  <!-- Drei Budgetrahmen, gleich hoch: der Rahmen ist bei jedem derselbe. -->
+  <g fill="none" stroke="#F9F5EC" stroke-opacity="0.34" stroke-width="13">
+    <rect x="253.5" y="346.5" width="143" height="377" rx="30"/>
+    <rect x="440.5" y="346.5" width="143" height="377" rx="30"/>
+    <rect x="627.5" y="346.5" width="143" height="377" rx="30"/>
+  </g>
+
+  <!-- Der Fuellstand. Oberkante GERADE, nur unten rund: eine oben abgerundete Fuellung
+       liest sich als eigener Balken, eine gerade als Pegel im Rahmen. -->
+  <g fill="#F9F5EC">
+    <path d="M260,593.5 H396 V701.5 A22,22 0 0 1 374,723.5 H282 A22,22 0 0 1 260,701.5 Z"/>
+    <path d="M447,483.5 H583 V701.5 A22,22 0 0 1 561,723.5 H469 A22,22 0 0 1 447,701.5 Z"/>
+    <path d="M634,393.5 H770 V701.5 A22,22 0 0 1 748,723.5 H656 A22,22 0 0 1 634,701.5 Z"/>
+  </g>
+
+  <!-- Die Grundlinie, auf der alles steht. -->
+  <rect x="243" y="757" width="538" height="17" rx="8.5" fill="#F9F5EC" fill-opacity="0.5"/>
+</svg>
