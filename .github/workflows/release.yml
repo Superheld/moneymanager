@@ -49,7 +49,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
 
       - name: Rust-Cache
-        uses: swatinem/rust-cache@v2
+        uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri
 
