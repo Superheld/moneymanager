@@ -550,7 +550,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                             await laden();
                           }}
                         >
-                          <Pill variant="ok">{t("konten.pillPruefen")}</Pill>
+                          <Pill variant="ok">{t("konten.pillErledigt")}</Pill>
                         </button>
                       )}
                       {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}

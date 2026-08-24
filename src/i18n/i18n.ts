@@ -894,6 +894,10 @@ const de = {
     pillUmbuchung: "Umbuchung",
     pillManuell: "manuell",
     pillPruefen: "ansehen",
+    // Zwei Woerter fuer denselben Marker, weil zwei verschiedene Dinge danebenstehen:
+    // im Register ein KNOPF (Klick erledigt ihn), im Detaildialog ein KAESTCHEN, dessen
+    // Haken „noch anzusehen" bedeutet. Ein „erledigt" am Kaestchen kehrte die Bedeutung um.
+    pillErledigt: "erledigt",
     pruefenWeg: "Erledigt — Marker entfernen",
     pruefenFeld: "Noch ansehen",
     pruefenHinweis:
@@ -2357,6 +2361,7 @@ const en: typeof de = {
     pillUmbuchung: "Transfer",
     pillManuell: "manual",
     pillPruefen: "review",
+    pillErledigt: "done",
     pruefenWeg: "Done — remove the marker",
     pruefenFeld: "Still to review",
     pruefenHinweis:
