@@ -87,10 +87,28 @@ if (!existsSync(verzeichnis)) mkdirSync(verzeichnis, { recursive: true });
 writeFileSync(ziel, Buffer.from(db.export()));
 
 const zaehle = (tabelle) => db.exec(`SELECT COUNT(*) FROM ${tabelle}`)[0].values[0][0];
+const zaehleWo = (tabelle, wo) => db.exec(`SELECT COUNT(*) FROM ${tabelle} WHERE ${wo}`)[0].values[0][0];
+const status = (s) => zaehleWo("umsatz_verarbeitung", `status = '${s}'`);
+
 console.log(`Spielstand geschrieben: ${ziel}`);
 console.log(
-  `  Konten ${zaehle("zahlungskonto")} · Kategorien ${zaehle("kategorie")} · ` +
-    `Budgets ${zaehle("budget")} · Buchungen ${zaehle("ist_buchung")} · ` +
-    `Vertraege ${zaehle("vertrag")} · Inventar ${zaehle("inventargegenstand")} · ` +
-    `Posteingang ${zaehle("umsatz_roh")} · Depotwerte ${zaehle("depotwert")}`,
+  `  Bestand    Konten ${zaehle("zahlungskonto")} · Kategorien ${zaehle("kategorie")} · ` +
+    `Budgets ${zaehle("budget")} · Vertraege ${zaehle("vertrag")} · ` +
+    `Inventar ${zaehle("inventargegenstand")} · Depotwerte ${zaehle("depotwert")}`,
+);
+console.log(
+  `  Buchungen  ${zaehle("ist_buchung")} gesamt · ${zaehleWo("ist_buchung", "quelle = 'import'")} aus dem Abruf · ` +
+    `${zaehleWo("ist_buchung", "zu_pruefen = 1")} noch anzusehen · ` +
+    `${zaehleWo("ist_buchung", "vertrag_id IS NOT NULL")} einem Vertrag zugeordnet`,
+);
+console.log(
+  `  Belege     ${zaehle("umsatz_roh")} aus ${zaehle("import_lauf")} Laeufen ` +
+    `(${db.exec("SELECT COUNT(DISTINCT quelle) FROM import_lauf")[0].values[0][0]} Quellen) · ` +
+    `neu ${status("neu")} · verbucht ${status("verbucht")} · ` +
+    `duplikat ${status("duplikat")} · verworfen ${status("verworfen")}`,
+);
+console.log(
+  `  Planung    ${zaehle("zahlungsregel")} Zahlungsregeln · ` +
+    `${zaehle("kategorie_festlegung")} Festlegungen · ` +
+    `${zaehle("dubletten_freigabe")} Dubletten-Freigabe(n)`,
 );

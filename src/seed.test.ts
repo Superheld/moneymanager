@@ -134,6 +134,92 @@ describe("Spielstand", () => {
     expect(summe(a)).toBe(summe(b));
   });
 
+  it("holt Belege aus mehreren Quellen", () => {
+    const db = mitSeed();
+    // Ein Spielstand mit nur einer Quelle zeigt die Faelle nicht, die es nur zwischen
+    // Quellen gibt — allen voran die Zwillinge.
+    expect(zahl(db, "SELECT COUNT(DISTINCT quelle) FROM import_lauf")).toBeGreaterThanOrEqual(2);
+    expect(zahl(db, "SELECT COUNT(DISTINCT format) FROM import_lauf WHERE format IS NOT NULL"))
+      .toBeGreaterThanOrEqual(2);
+  });
+
+  it("enthaelt jeden Umsatz-Status", () => {
+    const db = mitSeed();
+    // „neu", „verbucht", „duplikat", „verworfen" — Weggelegtes bleibt sichtbar, und beim
+    // Durchsehen zaehlt es mit.
+    for (const status of ["neu", "verbucht", "duplikat", "verworfen"]) {
+      expect(
+        zahl(db, `SELECT COUNT(*) FROM umsatz_verarbeitung WHERE status = '${status}'`),
+        status,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("verbindet jede verbuchte Zeile mit einer Buchung, und zwar ueber denselben Hash", () => {
+    const db = mitSeed();
+    // Der Weg von der Buchung zum Beleg ist ein JOIN ueber `istbuchung_id`. Zeigt er ins
+    // Leere, fehlen in jeder Detailansicht Empfaenger und Verwendungszweck — die stehen
+    // NICHT an der Buchung.
+    expect(
+      zahl(db, "SELECT COUNT(*) FROM umsatz_verarbeitung WHERE status = 'verbucht' AND istbuchung_id IS NULL"),
+    ).toBe(0);
+    expect(
+      zahl(
+        db,
+        `SELECT COUNT(*) FROM umsatz_verarbeitung v
+         JOIN umsatz_roh r ON r.id = v.umsatz_id
+         JOIN ist_buchung b ON b.id = v.istbuchung_id
+         WHERE b.roh_hash IS NOT NULL AND b.roh_hash <> r.roh_hash`,
+      ),
+    ).toBe(0);
+  });
+
+  it("legt echte Zwillinge an, nicht angeschriebene Verdachte", () => {
+    const db = mitSeed();
+    // Der Verdacht wird beim HINSEHEN gerechnet. Ein Spielstand kann ihn deshalb nur
+    // erzeugen, indem er wirklich zwei aehnliche Zeilen enthaelt: gleicher Betrag, gleicher
+    // Empfaenger, dicht beieinander, aus VERSCHIEDENEN Laeufen.
+    const paare = zahl(
+      db,
+      `SELECT COUNT(*) FROM umsatz_roh a
+       JOIN umsatz_roh b ON b.betrag = a.betrag AND b.gegenpartei = a.gegenpartei
+         AND b.id > a.id AND b.lauf_id <> a.lauf_id
+         AND ABS(julianday(b.buchungstag) - julianday(a.buchungstag)) <= 2`,
+    );
+    expect(paare).toBeGreaterThan(0);
+  });
+
+  it("haelt eine Dubletten-Freigabe als sortiertes Paar", () => {
+    const db = mitSeed();
+    expect(zahl(db, "SELECT COUNT(*) FROM dubletten_freigabe")).toBeGreaterThan(0);
+    // Die Reihenfolge traegt keine Bedeutung und ist deshalb festgelegt — sonst stuende
+    // dasselbe Paar zweimal drin, einmal je Richtung.
+    expect(zahl(db, "SELECT COUNT(*) FROM dubletten_freigabe WHERE umsatz_a >= umsatz_b")).toBe(0);
+  });
+
+  it("laesst Buchungen offen, die noch angesehen werden muessen", () => {
+    const db = mitSeed();
+    expect(zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE zu_pruefen = 1")).toBeGreaterThan(0);
+  });
+
+  it("enthaelt die Zahlung, die AUSDRUECKLICH zu keinem Vertrag gehoert", () => {
+    const db = mitSeed();
+    // Der Fall, fuer den `vertrag_herkunft` existiert (Wurzel-`CLAUDE.md`): ohne die
+    // Herkunft holte der naechste Abgleich die Buchung zurueck.
+    expect(
+      zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE vertrag_id IS NULL AND vertrag_herkunft IS NOT NULL"),
+    ).toBeGreaterThan(0);
+    // Und die Gegenprobe: es gibt auch zugeordnete.
+    expect(zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE vertrag_id IS NOT NULL")).toBeGreaterThan(0);
+  });
+
+  it("traegt Plangroessen, damit der Monatsausblick etwas zu rechnen hat", () => {
+    const db = mitSeed();
+    expect(zahl(db, "SELECT COUNT(*) FROM zahlungsregel")).toBeGreaterThanOrEqual(4);
+    // Nicht nur monatliche — sonst bliebe die Projektionsarithmetik ungeprueft.
+    expect(zahl(db, "SELECT COUNT(DISTINCT rhythmus) FROM zahlungsregel")).toBeGreaterThanOrEqual(2);
+  });
+
   it("traegt keine IBAN mit existierender Bankleitzahl", () => {
     const db = mitSeed();
     // Regel aus `src/CLAUDE.md`: eine Test-IBAN traegt eine BLZ aus dem Bereich 999999xx,

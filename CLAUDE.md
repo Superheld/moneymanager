@@ -467,6 +467,75 @@ und seine INSERTs stehenbleiben, und der Fehler zeigt sich erst, wenn man eigent
 anderes vorhatte. `src/seed.test.ts` fährt ihn deshalb bei jedem `npm test` gegen die
 aktuelle Migrationskette.
 
+## Abläufe
+
+Drei Wege, die oft genug vorkommen, dass sie festliegen sollten — und je einen Punkt, an
+dem man sonst das Falsche tut.
+
+### Eine Änderung machen
+
+```
+Branch von develop  →  npm run tauri dev  →  npm test && npm run typecheck  →  merge --no-ff
+```
+
+1. **Branch von `develop`.** Steht das Paket schon, gleich anlegen; ist das Bild noch
+   unklar, erst arbeiten und den Branch nachziehen. Der `pre-commit`-Hook weist einen
+   direkten Commit auf `develop` ohnehin ab.
+2. **`npm run tauri dev`** — läuft auf dem **Spielstand**, nicht auf dem echten Bestand.
+   Kaputtspielen ist hier folgenlos, und genau dafür ist er da.
+3. **`npm test` und `npm run typecheck` grün**, bevor gemerged wird. Beides muss ohnehin,
+   der Testlauf dauert Sekunden.
+4. **`--no-ff` nach `develop`.** Dort parkt alles, bis bewusst nach `main` durchgereicht
+   wird.
+
+**Der Punkt, an dem man sonst das Falsche tut:** Wer am **Schema** arbeitet, prüft nicht
+gegen den Spielstand, sondern gegen eine **Lesekopie des echten Bestands**
+(`scripts/migrationsprobe.mjs`, Rezept in `CLAUDE.local.md`). Der Spielstand ist
+widerspruchsfrei — er wurde gerade erst erzeugt. Der echte Bestand ist es nicht, und genau
+dort scheitern Migrationen. Ein grüner Testlauf gegen sql.js hat das schon einmal
+verschwiegen, weil dort die Fremdschlüssel aus sind.
+
+### Eine Version ausliefern
+
+Heute lokal, ohne Release (siehe *Auslieferung*):
+
+1. `develop` ist grün und enthält alles, was mit soll.
+2. Version in `package.json` heben — **eine** Stelle, `tauri.conf.json` und `version.ts`
+   lesen von dort.
+3. `CHANGELOG.md` schreiben. Keine Zahl aus dem echten Bestand hinein.
+4. Nach `main` mergen (nur aus `develop`, der Hook lässt nichts anderes zu), Tag setzen.
+5. `npm run installieren`.
+6. **Die installierte App einmal starten.** Das ist kein Ritual: der Build kann
+   durchlaufen und die App trotzdem nicht hochkommen — an einer Migration, an einer
+   fehlenden Capability, an Gatekeeper.
+
+**Der Punkt, an dem man sonst das Falsche tut:** vor dem Bauen prüfen, dass die `.env`
+steht. Sie ist gitignoriert, in einem frischen Klon oder Worktree also nicht da, und die
+Produktregistrierungsnummer wird zur **Bauzeit** eingebacken. Fehlt sie, ist die App
+fertig und der Bankabruf tot — und das merkt man erst beim ersten Abruf.
+`scripts/installieren.sh` warnt, aber es bricht nicht ab.
+
+### Wann der Spielstand neu geschrieben wird
+
+`npm run seed` überschreibt ihn vollständig. Das ist billig und folgenlos — er ist
+**Wegwerfware**, im Gegensatz zum echten Bestand.
+
+Neu schreiben, wenn:
+
+- ein **neuer Fall** dazugehört, den er noch nicht enthält (dann erst
+  `src/testwerkzeug/seedDaten.ts` ergänzen, mit einer Zusicherung in `src/seed.test.ts`);
+- man ihn **kaputtgespielt** hat und einen sauberen Stand will;
+- `src/seed.test.ts` **rot** ist — dann passt er nicht mehr zum Schema, und das Ergänzen
+  ist die eigentliche Arbeit, nicht das Neuschreiben.
+
+**Der Punkt, an dem man sonst das Falsche tut — und er ist der wichtigste hier:** *nicht*
+reflexhaft nach jeder Migration neu seeden. Eine Migration über einen **bestehenden**
+Spielstand laufen zu lassen ist die einzige Gelegenheit, sie überhaupt beim Wandern
+zuzusehen; ein frisch geschriebener Seed entsteht direkt im Zielschema und hat nie
+migriert. Wer sofort neu seedet, tauscht den Test gegen sein Ergebnis. Also: erst die App
+starten und die Migration über den alten Spielstand fahren lassen, **dann** neu seeden,
+wenn man einen sauberen Stand braucht.
+
 ## Mitgelieferte Skills
 
 `.claude/skills/` — Wissen, das zum Projekt gehört, aber in keine Quelldatei passt. Es
