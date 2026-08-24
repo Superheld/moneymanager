@@ -96,7 +96,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
 
   const konten = [
     { id: "konto-giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", iban: iban("99999901", 1002003), stand: 248000 },
-    { id: "konto-bar", bezeichnung: "Haushaltskasse", typ: "Bargeld", klasse: "liquide", iban: null, stand: 12500 },
+    { id: "konto-bar", bezeichnung: "Haushaltskasse", typ: "Bargeld", klasse: "liquide", iban: null, stand: 13740 },
     { id: "konto-tagesgeld", bezeichnung: "Ruecklage", typ: "Tagesgeld", klasse: "ruecklage", iban: iban("99999902", 4005006), stand: 890000 },
     { id: "konto-kk", bezeichnung: "Kreditkarte", typ: "Kreditkarte", klasse: "liquide", iban: null, stand: -32000 },
   ];
@@ -407,7 +407,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     "hash-pruef-1": buchung(tagIn(0, 3), -8790, "konto-giro", null, "Aufwand", {
       quelle: "import", rohHash: "hash-pruef-1", zuPruefen: true, kategorieHerkunft: "automatisch",
     }),
-    "hash-pruef-2": buchung(tagIn(0, 6), -15400, "konto-kk", "kat-anschaffung", "Aufwand", {
+    "hash-pruef-2": buchung(tagIn(0, 6), -16820, "konto-kk", "kat-anschaffung", "Aufwand", {
       quelle: "import", rohHash: "hash-pruef-2", zuPruefen: true, kategorieHerkunft: "automatisch",
     }),
     "hash-pruef-3": buchung(tagIn(-1, 24), 9900, "konto-giro", "kat-sonstige-ertrag", "Ertrag", {
@@ -568,7 +568,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // Pruefmerker, aber nichts, woran man sie pruefen koennte.
   const zuPruefen = [
     { hash: "hash-pruef-1", datum: tagIn(0, 3), betrag: -8790, partei: "Kolbeck", zweck: "Abbuchung ohne klaren Bezug", konto: "konto-giro" },
-    { hash: "hash-pruef-2", datum: tagIn(0, 6), betrag: -15400, partei: "Dessloch", zweck: "Bestellung", konto: "konto-kk" },
+    { hash: "hash-pruef-2", datum: tagIn(0, 6), betrag: -16820, partei: "Dessloch", zweck: "Bestellung", konto: "konto-kk" },
     { hash: "hash-pruef-3", datum: tagIn(-1, 24), betrag: 9900, partei: "Ohlert", zweck: "Gutschrift", konto: "konto-giro" },
   ];
   for (const p of zuPruefen) {
