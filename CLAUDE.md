@@ -385,6 +385,25 @@ Node kommt über **mise** (`mise.toml`: node 26); die CI pinnt dieselbe Hauptver
 in `.github/workflows/ci.yml`, weil Actions die `mise.toml` nicht liest. Wer sie hier hebt,
 hebt sie dort mit. Die Kommandozeilen für diese Maschine stehen in `CLAUDE.local.md`.
 
+### In einem Worktree dauert der erste Start sonst Minuten
+
+`src-tauri/target/` ist gitignoriert und existiert in einem frischen Worktree deshalb
+**nicht** — `npm run tauri dev` baut dort alle Rust-Abhängigkeiten von null, obwohl der
+fertige Cache im Hauptcheckout liegt. Wer ihn mitbenutzt, ist in Sekunden statt Minuten
+oben:
+
+```bash
+CARGO_TARGET_DIR=<hauptcheckout>/src-tauri/target npm run tauri dev
+```
+
+Zwei Dinge dazu, die man wissen sollte: Cargo sperrt das Verzeichnis, ein paralleler Build
+im Hauptcheckout **wartet** also (er scheitert nicht). Und weil beide Stände dieselben
+Artefakte schreiben, kostet der Wechsel zwischen ihnen eine Neuübersetzung der geänderten
+Kisten — immer noch ein Bruchteil eines Vollbaus.
+
+**Die `.env` fehlt im Worktree ebenfalls** (gitignoriert). Die App startet ohne sie, der
+Bankabruf ist dann gesperrt — dieselbe Falle wie beim Ausliefern, nur früher.
+
 ## Auslieferung: lokal gebaut, lokal installiert
 
 Es gibt **keinen Release-Weg**. Die App wird auf der eigenen Maschine gebaut und von dort
@@ -421,6 +440,13 @@ neben Version und Stadium, ein Knopf; ein Klick lädt, installiert und startet n
 
 Der Ort ist nicht beliebig: dort steht schon, welche Version läuft. „0.19.0" und „0.20.0
 installieren" beantworten dieselbe Frage.
+
+**Bei schmalem Fenster steht er allein.** Die Seitenleiste klappt unter 1100 px auf ihre
+Icons zusammen, und Version und Stadium fallen dabei weg — das Nebeneinander, das den Ort
+begründet, also auch. Der Knopf bleibt trotzdem, als Icon mit `title`. Er ist das einzige
+Stück der Fusszeile, das schmal überlebt, und daran hängt eine Regel, die über diesen Fall
+hinausgeht: **Auskunft darf weichen, eine Handlung nicht.** Ein Update, von dem niemand
+erfährt, ist keines.
 
 **Ein Fehlschlag beim PRÜFEN ist kein Fehler.** Kein Netz, Endpunkt weg, Antwort kaputt —
 in allen Fällen lautet die Antwort „nichts Neues". Ein Haushalt, der Ausgaben eintragen
@@ -702,7 +728,7 @@ Sie stehen dort, wo man sie beim Schreiben liest — diese Datei zeigt nur, was 
 | `src/core/CLAUDE.md` | Geld als Integer Cent, Datum, Charakter, Kontostands-Anker |
 | `src/application/CLAUDE.md` | Use-Cases orchestrieren, `istCent()` an der Grenze, Ports |
 | `src/adapters/persistence/CLAUDE.md` | Migrationen (forward-only, ohne Transaktionen) |
-| `src/adapters/ui/CLAUDE.md` | `useGeld`, `Promise.all`, i18n, Screen-Tests |
+| `src/adapters/ui/CLAUDE.md` | `useGeld`, `Promise.all`, i18n, Screen-Tests, Base UI, die einklappbare Seitenleiste |
 | `src/adapters/ui/bausteine/CLAUDE.md` | was geteilt wird und was nicht |
 
 Vier Dinge gelten überall und stehen deshalb hier:

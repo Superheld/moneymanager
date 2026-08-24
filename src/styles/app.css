@@ -140,6 +140,11 @@ body {
 }
 .aktualisierungbtn {
   width: 100%;
+  /* Flex, weil der Knopf seit dem Einklappen ein Icon VOR dem Text traegt: schmal faellt
+     der Text weg und das Icon bleibt als einziger Inhalt uebrig. */
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 10px;
   border: 1px solid var(--accent);
   border-radius: var(--r-md);
@@ -443,9 +448,13 @@ select.field {
 
   .brand { justify-content: center; }
 
-  /* In der Fusszeile bleibt der Aktualisierungsknopf, der Rest ist Text. */
-  .side .foot > div { display: none; }
+  /* In der Fusszeile bleibt der Aktualisierungsknopf, der Rest ist Text.
+     Die Ausnahme ist woertlich zu nehmen: `.aktualisierung` ist selbst ein `div` und
+     waere von einem pauschalen `.foot > div` mit ausgeblendet worden — der Knopf haette
+     bei schmalem Fenster gefehlt, und ein Update, von dem niemand erfaehrt, ist keines. */
+  .side .foot > div:not(.aktualisierung) { display: none; }
   .side .foot { text-align: center; }
+  .aktualisierungbtn { justify-content: center; }
 }
 
 /* ============================================================

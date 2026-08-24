@@ -23,10 +23,13 @@ eigenen Bausteine daneben werden einzeln importiert.
 
 ## `Zeilenauswahl` — eine Wahl in einer Tabellenzeile
 
-Ein `<select className="field">` ist für FORMULARE gebaut: volle Breite, grosse
-Innenabstände, eigene Zeile. In einer Tabellenzelle sprengt es die Zeilenhöhe und erzwingt
-eine Spaltenbreite, die der Inhalt nicht braucht. `Zeilenauswahl` ist so gross wie eine
-`Pill` daneben und gehört dorthin, wo eine Zeile eine kleine Entscheidung trägt.
+Ein Formularfeld ist für FORMULARE gebaut: volle Breite, grosse Innenabstände, eigene
+Zeile. In einer Tabellenzelle sprengt es die Zeilenhöhe und erzwingt eine Spaltenbreite,
+die der Inhalt nicht braucht. `Zeilenauswahl` ist so gross wie eine `Pill` daneben und
+gehört dorthin, wo eine Zeile eine kleine Entscheidung trägt.
+
+Das Gegenstück im Formular ist heute `Auswahl` (siehe unten) und war früher
+`<select className="field">`; an der Aufgabenteilung ändert das nichts.
 
 Sie ist bewusst **keine Pill-Variante**: eine Pille ist ein Etikett und sagt, was etwas
 IST. Hier wird gewählt, und das muss man ihr ansehen — Rahmen, Zeiger, Auswahlpfeil. Wer
@@ -138,9 +141,14 @@ nicht, dass hier etwas passiert, und dem Sehenden nicht, was.
 ## Zwei Fallen, die man kennen muss
 
 **`DataTable` ist die App-Fassung**, nicht die des Design-Systems: sie trägt Sortierung,
-Pagination, Zeilenklick, Spaltenbreiten, feste Zeilenhöhe und die Breitenkappung (innerer
-Block mit `max-width` je Zelle, plus Fangnetz-Scrollrahmen). Beim Nachziehen aus dem
-Design-System nicht überschreiben — dort ist weniger drin.
+Pagination, Zeilenklick, Spaltenbreiten, feste Zeilenhöhe, die Breitenkappung (innerer
+Block mit `max-width` je Zelle, plus Fangnetz-Scrollrahmen) und `rowStyle`. Beim Nachziehen
+aus dem Design-System nicht überschreiben — dort ist weniger drin.
+
+`rowStyle(row)` liegt ZULETZT auf der Zeile und ist für `opacity` gedacht: das dämpft den
+ganzen Teilbaum auf einmal, auch die Zellen, die ihre Farbe selbst setzen (Beträge). Über
+`color` ginge das nicht, die Zellen überschreiben es. Benutzt wird es im Kontoauszug für
+Buchungen, deren Buchungstag noch vor uns liegt.
 
 **`Input` hat kein `onChange`** und ist für berechnete oder abgeleitete Felder gedacht.
 Editierbare Texteingaben bauen wir mit echten `<input>` im selben Token-Stil. Wer das
