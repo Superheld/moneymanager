@@ -592,6 +592,19 @@ Produktregistrierungsnummer wird zur **Bauzeit** eingebacken. Fehlt sie, ist die
 fertig und der Bankabruf tot — und das merkt man erst beim ersten Abruf.
 `scripts/installieren.sh` warnt, aber es bricht nicht ab.
 
+**Zwei Dinge müssen ausserhalb des Repos bereitliegen**, und beide fehlen in einem frischen
+Klon:
+
+| | wo | wenn es fehlt |
+|---|---|---|
+| Produkt-ID | `.env` | App läuft, Bankabruf gesperrt |
+| Signaturschlüssel | `~/.moneymanager-schluessel/updater.key` | **Build bricht ab** |
+
+Der Schlüssel wird seit `createUpdaterArtifacts` bei **jedem** Build gebraucht, auch bei
+einem, der mit Updates nichts vorhat. Tauri baut dabei erst alles fertig und bricht im
+letzten Schritt ab — `installieren.sh` prüft deshalb vorher, statt den ganzen Build für
+eine Fehlermeldung abzuwarten.
+
 ### Wann der Spielstand neu geschrieben wird
 
 `npm run seed` überschreibt ihn vollständig. Das ist billig und folgenlos — er ist

@@ -33,6 +33,31 @@ if [[ ! -f "$WURZEL/.env" ]] || ! grep -q "^VITE_FINTS_PRODUKT_ID=." "$WURZEL/.e
   echo
 fi
 
+# Der SIGNATURSCHLUESSEL. Seit `createUpdaterArtifacts` an ist, braucht JEDER Build ihn —
+# auch dieser hier, der mit Updates nichts vorhat. Tauri baut erst alles fertig und bricht
+# dann im letzten Schritt ab; ohne diese Pruefung wartet man also den ganzen Build ab, um
+# eine Fehlermeldung zu bekommen.
+#
+# Er liegt ausserhalb des Repos, weil er dort nichts zu suchen hat. Eine schon gesetzte
+# Variable gewinnt — so laesst sich der Schluessel woanders halten, ohne das Skript zu
+# aendern.
+SCHLUESSEL="${TAURI_SIGNING_PRIVATE_KEY:-$HOME/.moneymanager-schluessel/updater.key}"
+if [[ ! -f "$SCHLUESSEL" && ! "$SCHLUESSEL" =~ ^dW50 ]]; then
+  echo "Kein Signaturschluessel unter $SCHLUESSEL." >&2
+  echo >&2
+  echo "Jeder Build braucht ihn, seit der Updater eingebaut ist. Entweder den vorhandenen" >&2
+  echo "Schluessel dorthin legen, oder einen neuen erzeugen:" >&2
+  echo "  npx tauri signer generate --ci -p '' -w \"$SCHLUESSEL\"" >&2
+  echo >&2
+  echo "ACHTUNG bei einem neuen Schluessel: der oeffentliche Teil gehoert in" >&2
+  echo "src-tauri/tauri.conf.json (plugins.updater.pubkey). Passt er nicht zum privaten," >&2
+  echo "nimmt keine installierte App das Update an." >&2
+  exit 2
+fi
+export TAURI_SIGNING_PRIVATE_KEY="$SCHLUESSEL"
+# Muss GESETZT sein, auch leer: sonst fragt Tauri interaktiv nach und das Skript haengt.
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="${TAURI_SIGNING_PRIVATE_KEY_PASSWORD-}"
+
 echo "==> Bauen (das dauert)"
 cd "$WURZEL"
 npm run tauri build
