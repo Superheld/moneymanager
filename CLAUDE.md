@@ -386,6 +386,52 @@ Geheimniskrämerei, sondern die **Produktgrenze**: ein Fork ist laut DK-Bedingun
 anderes Produkt und hat das Secret nicht — sein Build läuft ohne Nummer und wird damit zur
 eigenen Registrierung geschoben, statt still unter unserem Namen zu laufen.
 
+### Der Update-Knopf — festgeschrieben, noch nicht gebaut
+
+Der Zielzustand steht hier, damit er beim Bauen nicht neu erfunden wird. **Er ist
+absichtlich noch nicht umgesetzt:** solange lokal gebaut und installiert wird, gibt es
+nichts, wogegen ein Updater prüfen könnte — ein Update-Knopf ohne Endpunkt ist nicht
+testbar, sondern nur totes Bedienelement. Gebaut wird er, wenn die Installation sich als
+stabil erwiesen hat und Releases dazukommen.
+
+**Wie es sich anfühlen soll.** Die App prüft beim Start still nach. Ist nichts da,
+verändert sich nichts — kein Hinweis, kein Haken, keine Meldung. Ist etwas da, erscheint
+**unten links in der Seitenleiste**, direkt neben Version und Stadium (`AppShell.tsx`,
+`div.foot`), ein Knopf. Ein Klick lädt, installiert und startet neu. Kein Dialog, keine
+Rückfrage, keine Versionsauswahl.
+
+Der Ort ist nicht beliebig: dort steht schon, welche Version läuft. „Version 0.19.0" und
+„0.20.0 installieren" gehören nebeneinander, weil sie dieselbe Frage beantworten. Ein
+Banner über dem Inhalt beantwortet sie auch, aber es unterbricht dabei etwas.
+
+**Was dazu gehört**, in der Reihenfolge, in der es gebraucht wird:
+
+| Stück | wo |
+|---|---|
+| Signaturschlüssel erzeugen | `npm run tauri signer generate` — privater Schlüssel + Passwort als Repository-Secrets, öffentlicher als `plugins.updater.pubkey` in `tauri.conf.json` |
+| Updater-Artefakte bauen | `bundle.createUpdaterArtifacts: true`; auf macOS entsteht daraus `.app.tar.gz` samt `.sig` |
+| Plugin einhängen | `tauri-plugin-updater` (Rust) und `@tauri-apps/plugin-updater` (TS), dazu `updater:default` und `process:allow-restart` in `capabilities/default.json` |
+| Endpunkt | `plugins.updater.endpoints` zeigt auf ein Manifest beim Release (herkömmlich latest dot json); darin je Plattform Version, Signatur und URL |
+| Oberfläche | `check()` beim Start, bei Treffer der Knopf; `downloadAndInstall()`, dann Neustart |
+
+**Drei Dinge, die man vorher wissen muss:**
+
+- **Die Signatur des Updaters hat mit Apple nichts zu tun.** Sie ist minisign und schützt
+  davor, dass jemand anderes ein Update unterschiebt. Gatekeeper bleibt davon unberührt —
+  eine unsignierte App aktualisiert sich klaglos, sobald sie einmal gestartet werden
+  durfte.
+- **Auf Linux kann der Updater ausschliesslich AppImages ersetzen.** Ein `.deb` kann sich
+  nicht selbst austauschen. Das entscheidet das Bundle-Format mit, nicht erst die
+  Verteilung.
+- **Der private Signaturschlüssel ist unersetzlich.** Geht er verloren, kann keine
+  installierte App je wieder ein Update annehmen — sie prüft gegen den eingebauten
+  öffentlichen Schlüssel. Er gehört gesichert, bevor das erste Release rausgeht.
+
+**Und die Prüfung selbst ist ein Netzzugriff.** Die App ist bisher vollständig lokal; der
+Updater ist die erste Stelle, an der sie von sich aus nach draussen spricht. Das ist eine
+Eigenschaft, keine Nebensache — sie gehört in die Einstellungen abschaltbar, und der
+Zielhost in die Capabilities, wie die Bankadressen auch.
+
 ### Zwei Datenbestände, eine Zeile Unterschied
 
 Die installierte App verwaltet echtes Geld; die Entwicklung soll frei rumprobieren können.
