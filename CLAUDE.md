@@ -386,51 +386,128 @@ Geheimniskrämerei, sondern die **Produktgrenze**: ein Fork ist laut DK-Bedingun
 anderes Produkt und hat das Secret nicht — sein Build läuft ohne Nummer und wird damit zur
 eigenen Registrierung geschoben, statt still unter unserem Namen zu laufen.
 
-### Der Update-Knopf — festgeschrieben, noch nicht gebaut
+### Der Update-Knopf
 
-Der Zielzustand steht hier, damit er beim Bauen nicht neu erfunden wird. **Er ist
-absichtlich noch nicht umgesetzt:** solange lokal gebaut und installiert wird, gibt es
-nichts, wogegen ein Updater prüfen könnte — ein Update-Knopf ohne Endpunkt ist nicht
-testbar, sondern nur totes Bedienelement. Gebaut wird er, wenn die Installation sich als
-stabil erwiesen hat und Releases dazukommen.
+Die App prüft beim Start still nach. Ist nichts da, verändert sich nichts — kein Hinweis,
+kein Haken, keine Meldung. Ist etwas da, erscheint **unten links in der Seitenleiste**,
+neben Version und Stadium, ein Knopf; ein Klick lädt, installiert und startet neu.
 
-**Wie es sich anfühlen soll.** Die App prüft beim Start still nach. Ist nichts da,
-verändert sich nichts — kein Hinweis, kein Haken, keine Meldung. Ist etwas da, erscheint
-**unten links in der Seitenleiste**, direkt neben Version und Stadium (`AppShell.tsx`,
-`div.foot`), ein Knopf. Ein Klick lädt, installiert und startet neu. Kein Dialog, keine
-Rückfrage, keine Versionsauswahl.
+Der Ort ist nicht beliebig: dort steht schon, welche Version läuft. „0.19.0" und „0.20.0
+installieren" beantworten dieselbe Frage.
 
-Der Ort ist nicht beliebig: dort steht schon, welche Version läuft. „Version 0.19.0" und
-„0.20.0 installieren" gehören nebeneinander, weil sie dieselbe Frage beantworten. Ein
-Banner über dem Inhalt beantwortet sie auch, aber es unterbricht dabei etwas.
+**Ein Fehlschlag beim PRÜFEN ist kein Fehler.** Kein Netz, Endpunkt weg, Antwort kaputt —
+in allen Fällen lautet die Antwort „nichts Neues". Ein Haushalt, der Ausgaben eintragen
+will, hat mit einer Updater-Fehlermeldung nichts zu tun; sie wäre Beunruhigung ohne
+Handlungsmöglichkeit. Beim **Einspielen** dreht sich das um: dort hat jemand geklickt und
+wartet, und ein Fehler gehört ihm gesagt.
 
-**Was dazu gehört**, in der Reihenfolge, in der es gebraucht wird:
+**Die Prüfung ist der erste Netzzugriff, den die App von sich aus macht.** Bisher sprach
+sie nur nach draussen, wenn jemand einen Bankabruf auslöste. Deshalb ist sie abschaltbar
+(`aktualisierungPruefen` in `einstellung`); ohne Zutun ist sie an, denn ein Update, von
+dem niemand erfährt, ist keines.
 
-| Stück | wo |
+Wo was liegt:
+
+| Stück | Datei |
 |---|---|
-| Signaturschlüssel erzeugen | `npm run tauri signer generate` — privater Schlüssel + Passwort als Repository-Secrets, öffentlicher als `plugins.updater.pubkey` in `tauri.conf.json` |
-| Updater-Artefakte bauen | `bundle.createUpdaterArtifacts: true`; auf macOS entsteht daraus `.app.tar.gz` samt `.sig` |
-| Plugin einhängen | `tauri-plugin-updater` (Rust) und `@tauri-apps/plugin-updater` (TS), dazu `updater:default` und `process:allow-restart` in `capabilities/default.json` |
-| Endpunkt | `plugins.updater.endpoints` zeigt auf ein Manifest beim Release (herkömmlich latest dot json); darin je Plattform Version, Signatur und URL |
-| Oberfläche | `check()` beim Start, bei Treffer der Knopf; `downloadAndInstall()`, dann Neustart |
+| Use-Case und Port | `src/application/aktualisierung.ts` |
+| Der Port auf das Tauri-Plugin | `src/adapters/aktualisierung.ts` |
+| Der Knopf | `src/adapters/ui/bausteine/AktualisierungKnopf.tsx` |
+| Schlüssel, Endpunkt, Artefakte | `src-tauri/tauri.conf.json` |
 
-**Drei Dinge, die man vorher wissen muss:**
+**Der private Signaturschlüssel liegt ausserhalb des Repos** (`~/.moneymanager-schluessel/`)
+und ist **unersetzlich**: geht er verloren, kann keine installierte App je wieder ein
+Update annehmen — sie prüft gegen den öffentlichen Schlüssel, der in ihrem Bundle steckt.
+Er gehört gesichert. Solange nichts veröffentlicht ist, kostet ein Neuerzeugen nichts;
+nach dem ersten Release kostet es jede Installation da draussen.
 
-- **Die Signatur des Updaters hat mit Apple nichts zu tun.** Sie ist minisign und schützt
-  davor, dass jemand anderes ein Update unterschiebt. Gatekeeper bleibt davon unberührt —
-  eine unsignierte App aktualisiert sich klaglos, sobald sie einmal gestartet werden
-  durfte.
+Zwei Dinge, die man dabei auseinanderhalten muss:
+
+- **Die Updater-Signatur hat mit Apple nichts zu tun.** Sie ist minisign und verhindert,
+  dass jemand anderes ein Update unterschiebt. Gatekeeper bleibt davon unberührt: eine
+  unsignierte App aktualisiert sich klaglos, sobald sie einmal starten durfte.
 - **Auf Linux kann der Updater ausschliesslich AppImages ersetzen.** Ein `.deb` kann sich
-  nicht selbst austauschen. Das entscheidet das Bundle-Format mit, nicht erst die
+  nicht selbst austauschen. Das entscheidet also das Bundle-Format mit, nicht erst die
   Verteilung.
-- **Der private Signaturschlüssel ist unersetzlich.** Geht er verloren, kann keine
-  installierte App je wieder ein Update annehmen — sie prüft gegen den eingebauten
-  öffentlichen Schlüssel. Er gehört gesichert, bevor das erste Release rausgeht.
 
-**Und die Prüfung selbst ist ein Netzzugriff.** Die App ist bisher vollständig lokal; der
-Updater ist die erste Stelle, an der sie von sich aus nach draussen spricht. Das ist eine
-Eigenschaft, keine Nebensache — sie gehört in die Einstellungen abschaltbar, und der
-Zielhost in die Capabilities, wie die Bankadressen auch.
+### Den Update-Weg durchspielen
+
+Halb prüfen geht nicht: entweder eine installierte App findet ein signiertes Paket, lädt
+es, ersetzt sich und startet neu — oder man weiss nichts. Dafür gibt es einen Endpunkt auf
+`127.0.0.1`, der nur läuft, solange man ihn laufen lässt.
+
+```bash
+export TAURI_SIGNING_PRIVATE_KEY=~/.moneymanager-schluessel/updater.key
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=
+
+# 1. Die ALTE Fassung bauen und installieren — mit dem Probe-Endpunkt.
+npm run tauri build -- --config src-tauri/tauri.updater-probe.conf.json
+rm -rf /Applications/Moneymanager.app
+cp -R src-tauri/target/release/bundle/macos/Moneymanager.app /Applications/
+xattr -dr com.apple.quarantine /Applications/Moneymanager.app
+
+# 2. Die NEUE Fassung bauen. Die höhere Version steht in der Config, nicht in
+#    package.json — eine Probe soll die Versionsangabe des Projekts nicht anfassen.
+npm run tauri build -- --config src-tauri/tauri.updater-probe-neu.conf.json
+
+# 3. Endpunkt starten. Er nimmt, was im Bundle-Verzeichnis liegt, und bietet es unter
+#    der mitgegebenen Version an.
+npm run updater-probe -- 0.20.0
+
+# 4. Die INSTALLIERTE App starten. Der Knopf muss unten links erscheinen.
+```
+
+Drei Fallen, alle drei gemessen und nicht vermutet:
+
+- **Die Variable heisst `TAURI_SIGNING_PRIVATE_KEY`**, nicht `…_PATH` — sie nimmt den Pfad
+  genauso wie den Schlüssel selbst. Mit der `_PATH`-Variante läuft der Build durch und
+  bricht ganz am Ende beim Signieren ab („A public key has been found, but no private
+  key"); das Archiv liegt dann unsigniert da.
+- **Ein `http`-Endpunkt lässt die App gar nicht erst starten.** Tauri prüft das Schema beim
+  INITIALISIEREN des Plugins, nicht beim Abruf, und wirft: *„The configured updater
+  endpoint must use a secure protocol like `https`"* — die gebaute App panict beim Start.
+  Für die Probe hebt `dangerousInsecureTransportProtocol` das auf; der Schalter steht
+  ausschliesslich in den Probe-Overlays, und `src/auslieferung.test.ts` hält ihn aus
+  `tauri.conf.json` heraus.
+- **Der Plattformschlüssel im Manifest muss exakt passen** (`darwin-aarch64` auf Apple
+  Silicon). Steht dort etwas anderes, meldet der Updater „nichts Neues" statt eines
+  Fehlers — und man sucht lange an der falschen Stelle.
+
+**Der Endpunkt steckt im Bundle, nicht in der laufenden App.** Eine App, die ohne
+`--config` gebaut wurde, fragt GitHub und findet nichts — sie lässt sich nachträglich nicht
+auf den Probe-Endpunkt umbiegen. Wer den Knopf nicht sieht, prüft das zuerst.
+
+**Den Endpunkt nicht laufen lassen, während gebaut wird.** Er liefert die Dateien aus dem
+Bundle-Verzeichnis aus, und ein Build schreibt genau dort. Wer dazwischen klickt, lädt ein
+Archiv, das nicht mehr zu der Signatur im Manifest passt — der Updater weist es dann ab
+(richtig so), und man sucht den Fehler beim Schlüssel. Erst bauen, dann den Endpunkt
+starten; er erzeugt das Manifest beim Start neu.
+
+**Und die Seitenleiste zeigt beim Probelauf weiter die ALTE Nummer.** `version.ts` liest
+`package.json`, die höhere Version steht aber nur im Config-Overlay. Ob das Update
+ankam, sagt deshalb nicht die Anzeige, sondern das Bundle:
+
+```bash
+/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" \
+  /Applications/Moneymanager.app/Contents/Info.plist
+```
+
+Bei einem echten Release gibt es diese Lücke nicht — dort wird `package.json` gehoben, und
+`tauri.conf.json` liest die Version von dort. Beide Zahlen haben dann dieselbe Quelle.
+
+### Was am Update-Weg noch fehlt
+
+Der Mechanismus ist vollständig und durchgespielt; was fehlt, ist die Gegenstelle.
+
+- **Ein echter Endpunkt.** `plugins.updater.endpoints` zeigt auf ein Release-Manifest bei
+  GitHub, das es noch nicht gibt. Bis dahin schlägt die Prüfung fehl — und schweigt, wie
+  vorgesehen. Dazu gehört ein Workflow, der bei einem Tag baut, signiert und Artefakte
+  samt Manifest anhängt.
+- **Linux.** Braucht AppImage als Bundle-Ziel und einen zweiten Bauplatz; macOS lässt sich
+  nicht auf Linux bauen und umgekehrt.
+- **Kein Schalter in den Einstellungen.** Die Abschaltbarkeit ist gebaut und geprüft
+  (`pruefungSchalten`, `dienste.aktualisierungspruefungSetzen`), hat aber noch keine
+  Oberfläche — abschalten geht derzeit nur über die Einstellungstabelle.
 
 ### Zwei Datenbestände, eine Zeile Unterschied
 

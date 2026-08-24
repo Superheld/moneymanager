@@ -259,3 +259,12 @@ export {
   type Uebersichtsdaten,
   type UebersichtDeps,
 } from "./uebersicht";
+export {
+  aktualisierungEinspielen,
+  aktualisierungPruefen,
+  pruefungErlaubt,
+  pruefungSchalten,
+  SCHLUESSEL_AKTUALISIERUNG,
+  type Aktualisierung,
+  type AktualisierungPort,
+} from "./aktualisierung";

@@ -17,13 +17,16 @@
     "tauri": "tauri",
     "seed": "vite-node scripts/seed-anlegen.mjs",
     "installieren": "bash scripts/installieren.sh",
+    "updater-probe": "node scripts/updater-probe.mjs",
     "bankenliste": "node scripts/bankenliste-erzeugen.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-sql": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.10.1",
     "buffer": "^6.0.3",
     "fflate": "^0.8.3",
     "i18next": "^26.3.6",
