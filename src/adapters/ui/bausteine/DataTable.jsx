@@ -32,7 +32,7 @@ import React from 'react';
 /** Kappungsbreite, wenn eine Spalte keine eigene angibt. Zahlen/Daten bleiben darunter. */
 const STANDARD_MAX = '32ch';
 
-export function DataTable({ columns, rows, onRowClick, istAktiv, sortable = false, pageSize,
+export function DataTable({ columns, rows, onRowClick, istAktiv, rowStyle, sortable = false, pageSize,
   labelSeite, labelErste, labelLetzte, labelZurueck, labelVor }) {
   const [sort, setSort] = React.useState(null); // { idx, dir: 'asc' | 'desc' }
   const [page, setPage] = React.useState(0);
@@ -85,8 +85,13 @@ export function DataTable({ columns, rows, onRowClick, istAktiv, sortable = fals
       })}</tr></thead>
       <tbody>{sichtbareRows.map(function(row,ri){
         var zeileAktiv = istAktiv ? istAktiv(row) : false;
+        // `rowStyle` liegt ZULETZT drauf, damit eine Zeile sich auch gegen die Vorgaben
+        // stellen kann. Gedacht ist es fuer `opacity`: das daempft den ganzen Teilbaum
+        // auf einmal, auch die Zellen, die ihre Farbe selbst setzen (Betraege). Ueber
+        // `color` ginge das nicht — die Zellen ueberschreiben es.
+        var eigen = rowStyle ? rowStyle(row) : null;
         return <tr key={ri} onClick={onRowClick?function(){onRowClick(row);}:undefined}
-          style={{ cursor:onRowClick?'pointer':'default', background:zeileAktiv?'var(--accent-soft, rgba(20,160,160,.10))':'transparent' }}>{columns.map(function(c,ci){
+          style={Object.assign({ cursor:onRowClick?'pointer':'default', background:zeileAktiv?'var(--accent-soft, rgba(20,160,160,.10))':'transparent' }, eigen)}>{columns.map(function(c,ci){
           var v=c.render?c.render(row):row[c.key];
           // Nur echter Text taugt als Tooltip; ein gerendertes Element hat keinen.
           var titel = (typeof v === 'string' || typeof v === 'number') ? String(v) : undefined;

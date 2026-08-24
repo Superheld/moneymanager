@@ -26,6 +26,16 @@ const de = {
     Ertrag: "Ertrag",
     Umschichtung: "Sparen & Vorsorge",
   },
+  // Bedienung des Kalenders. Die Monats- und Wochentagsnamen stehen bewusst NICHT hier:
+  // die liefert `Intl` je Sprache, und hier laegen sie nur als Uebersetzungspflicht, die
+  // niemand pflegt.
+  datum: {
+    kalenderOeffnen: "Kalender öffnen",
+    vorherigerMonat: "Voriger Monat",
+    naechsterMonat: "Nächster Monat",
+    heute: "Heute",
+    leeren: "Leeren",
+  },
   // Fehler-Codes (FachlicherFehler.code) → Text. Verschachtelt, weil i18next Punkte als
   // Pfadtrenner liest: code "betrag.groesserNull" → fehler.betrag.groesserNull.
   fehler: {
@@ -894,6 +904,10 @@ const de = {
     pillUmbuchung: "Umbuchung",
     pillManuell: "manuell",
     pillPruefen: "ansehen",
+    // Zwei Woerter fuer denselben Marker, weil zwei verschiedene Dinge danebenstehen:
+    // im Register ein KNOPF (Klick erledigt ihn), im Detaildialog ein KAESTCHEN, dessen
+    // Haken „noch anzusehen" bedeutet. Ein „erledigt" am Kaestchen kehrte die Bedeutung um.
+    pillErledigt: "erledigt",
     pruefenWeg: "Erledigt — Marker entfernen",
     pruefenFeld: "Noch ansehen",
     pruefenHinweis:
@@ -1493,6 +1507,13 @@ const en: typeof de = {
     Aufwand: "Expense",
     Ertrag: "Income",
     Umschichtung: "Savings & provision",
+  },
+  datum: {
+    kalenderOeffnen: "Open calendar",
+    vorherigerMonat: "Previous month",
+    naechsterMonat: "Next month",
+    heute: "Today",
+    leeren: "Clear",
   },
   fehler: {
     anker: {
@@ -2357,6 +2378,7 @@ const en: typeof de = {
     pillUmbuchung: "Transfer",
     pillManuell: "manual",
     pillPruefen: "review",
+    pillErledigt: "done",
     pruefenWeg: "Done — remove the marker",
     pruefenFeld: "Still to review",
     pruefenHinweis:

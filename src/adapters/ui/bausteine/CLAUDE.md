@@ -23,10 +23,13 @@ eigenen Bausteine daneben werden einzeln importiert.
 
 ## `Zeilenauswahl` — eine Wahl in einer Tabellenzeile
 
-Ein `<select className="field">` ist für FORMULARE gebaut: volle Breite, grosse
-Innenabstände, eigene Zeile. In einer Tabellenzelle sprengt es die Zeilenhöhe und erzwingt
-eine Spaltenbreite, die der Inhalt nicht braucht. `Zeilenauswahl` ist so gross wie eine
-`Pill` daneben und gehört dorthin, wo eine Zeile eine kleine Entscheidung trägt.
+Ein Formularfeld ist für FORMULARE gebaut: volle Breite, grosse Innenabstände, eigene
+Zeile. In einer Tabellenzelle sprengt es die Zeilenhöhe und erzwingt eine Spaltenbreite,
+die der Inhalt nicht braucht. `Zeilenauswahl` ist so gross wie eine `Pill` daneben und
+gehört dorthin, wo eine Zeile eine kleine Entscheidung trägt.
+
+Das Gegenstück im Formular ist heute `Auswahl` (siehe unten) und war früher
+`<select className="field">`; an der Aufgabenteilung ändert das nichts.
 
 Sie ist bewusst **keine Pill-Variante**: eine Pille ist ein Etikett und sagt, was etwas
 IST. Hier wird gewählt, und das muss man ihr ansehen — Rahmen, Zeiger, Auswahlpfeil. Wer
@@ -40,6 +43,70 @@ Zwei Dinge, die der Typ erzwingt, weil sie sonst verlorengehen:
 - **Gesperrtes bleibt sichtbar** (`gesperrt`, nicht weglassen). Eine Möglichkeit, die es
   gerade nicht gibt, verschwindet sonst stumm — und dann steht in der Datenbank etwas
   anderes als auf dem Bildschirm.
+
+## `Auswahl` — die Wahl aus einer Liste
+
+Der Ersatz für `<select className="field">` in FORMULAREN, gebaut auf Base UI
+(`@base-ui/react`) — der einzigen UI-Bibliothek im Projekt.
+
+**Warum überhaupt eine Bibliothek**, wo hier sonst alles selbst geschrieben ist: ein
+natives `<select>` öffnet die Liste des Betriebssystems, und die folgt nicht dem Design der
+App — andere Schrift, andere Abstände, andere Farben, je Plattform anders. In einer
+Oberfläche, in der alles andere aus denselben Tokens kommt, ist genau das der sichtbare
+Bruch.
+
+**Warum nicht selbst gebaut.** Ein Auswahlfeld ist eine der undankbarsten Komponenten
+überhaupt: Tastaturbedienung samt Tippsuche, ARIA zwischen Knopf und Liste, Fokusfalle,
+Schliessen bei Klick daneben, Positionierung am Fensterrand. Wer das selbst schreibt, hat
+am Ende eine Komponente, die mit der Maus gut aussieht und mit der Tastatur nicht
+funktioniert. Base UI liefert diese Mechanik und **kein Aussehen** — das steht in
+`app.css` und kommt aus denselben Tokens wie der Rest.
+
+Zwei Dinge, die man wissen muss:
+
+- **`items` ist nicht optional.** Ohne die Zuordnung Wert → Text zeigt der geschlossene
+  Knopf den WERT an, und der ist bei uns fast überall eine UUID.
+- **Die Optionen kommen als Liste, nicht als Kinder.** An den meisten Stellen entstanden
+  die `<option>` ohnehin aus einem `map` über Konten, Kategorien oder Verträge — eine
+  Liste hereinzureichen ist dort weniger Code als vorher, nicht mehr.
+
+**Nicht verwechseln mit `Zeilenauswahl`.** Die ist für eine kleine Entscheidung IN einer
+Tabellenzeile und so gross wie eine Pille daneben; `Auswahl` ist das Formularfeld über die
+volle Breite. Die Unterscheidung ist dieselbe wie vorher zwischen `Zeilenauswahl` und
+`select.field`.
+
+**Der Bestand wandert nach und nach.** Es gibt weiterhin native `<select>` in der App;
+jedes davon ist eine Stelle, die noch nicht umgestellt wurde, keine bewusste Ausnahme.
+
+## `Datumsfeld` — ein Datum eingeben oder aussuchen
+
+Der Ersatz für `<input type="date">`. Der Wert ist immer ISO (`yyyy-mm-dd`) oder leer;
+angezeigt und gelesen wird in der Sprache des Nutzers.
+
+**Es ist eine EINGABE mit Kalenderknopf, kein blosser Knopf.** Der erste Entwurf war
+letzteres — schöner anzusehen und im Gebrauch ein Rückschritt: wer ein Datum kennt, tippt
+es schneller, als er es im Kalender sucht, und das native Feld konnte das. Aufgefallen ist
+es daran, dass ein bestehender Screen-Test das Datum eintippte und rot wurde. Der Test
+hatte recht.
+
+**Warum hier selbst gebaut, wo `Auswahl` eine Bibliothek benutzt:** Base UI hat keinen
+Datepicker (nachgesehen, nicht vermutet). Das wiegt weniger schwer, als es klingt — die
+schwierige Hälfte eines Auswahlfeldes ist die Combobox-Semantik. Ein Kalender ist ein
+`role="grid"` mit einem Fokuspunkt, den die Pfeiltasten bewegen, und das ist eine kleine,
+klare Konvention. Positionierung, Schliessen bei Klick daneben und Fokusrückgabe kommen
+trotzdem aus Base UIs Popover und werden nicht nachgebaut.
+
+Vier Dinge, die man beim Anfassen wissen muss:
+
+- **Die Reihenfolge von Tag und Monat kommt aus `Intl`**, nicht aus einer Annahme. `05.03.`
+  und `03/05/` sind dieselben Ziffern mit anderer Bedeutung; eine feste Reihenfolge baut je
+  nach Sprache still das falsche Datum.
+- **ISO wird immer erkannt**, unabhängig von der Sprache — so steht es in der Datenbank,
+  und wer es eintippt, meint es auch so.
+- **Übernommen wird beim Verlassen und bei Enter**, nicht bei jedem Anschlag. Während
+  „05.0" getippt ist, gibt es noch kein Datum.
+- **Unlesbares ändert den Wert nicht**, das Feld springt zurück. Eine halb getippte Eingabe
+  darf nicht als Datum durchgehen.
 
 ## `Zeilenlink` — der Bezeichner, der weiterführt
 
@@ -74,12 +141,18 @@ nicht, dass hier etwas passiert, und dem Sehenden nicht, was.
 ## Zwei Fallen, die man kennen muss
 
 **`DataTable` ist die App-Fassung**, nicht die des Design-Systems: sie trägt Sortierung,
-Pagination, Zeilenklick, Spaltenbreiten, feste Zeilenhöhe und die Breitenkappung (innerer
-Block mit `max-width` je Zelle, plus Fangnetz-Scrollrahmen). Beim Nachziehen aus dem
-Design-System nicht überschreiben — dort ist weniger drin.
+Pagination, Zeilenklick, Spaltenbreiten, feste Zeilenhöhe, die Breitenkappung (innerer
+Block mit `max-width` je Zelle, plus Fangnetz-Scrollrahmen) und `rowStyle`. Beim Nachziehen
+aus dem Design-System nicht überschreiben — dort ist weniger drin.
+
+`rowStyle(row)` liegt ZULETZT auf der Zeile und ist für `opacity` gedacht: das dämpft den
+ganzen Teilbaum auf einmal, auch die Zellen, die ihre Farbe selbst setzen (Beträge). Über
+`color` ginge das nicht, die Zellen überschreiben es. Benutzt wird es im Kontoauszug für
+Buchungen, deren Buchungstag noch vor uns liegt.
 
 **`Input` hat kein `onChange`** und ist für berechnete oder abgeleitete Felder gedacht.
-Editierbare Eingaben bauen wir mit echten `<input>`/`<select>` im selben Token-Stil. Wer das
-übersieht, baut ein Feld, das sich nicht tippen lässt.
+Editierbare Texteingaben bauen wir mit echten `<input>` im selben Token-Stil. Wer das
+übersieht, baut ein Feld, das sich nicht tippen lässt. Für eine AUSWAHL gilt das nicht mehr
+— dafür gibt es `Auswahl` (siehe oben).
 
 Die Tokens liegen getrennt unter `src/styles/`, nicht hier.
