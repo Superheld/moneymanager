@@ -33,6 +33,7 @@ import { BankSuche } from "./BankSuche";
 import { TanDialog, type TanFrage } from "./TanDialog";
 import { Button, FormField, Pill } from "../bausteine";
 import { beiEnter } from "../bausteine/beiEnter";
+import { Auswahl } from "../bausteine/Auswahl";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useExperimente, useGeld } from "../bausteine/einstellungenKontext";
 
@@ -288,13 +289,12 @@ export function KontoAnlegenModal({
               <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} />
             </FormField>
             <FormField label={t("einstellungen.konto.feldTyp")}>
-              <select className="field" value={typ} onChange={(e) => setTyp(e.target.value as Kontotyp)}>
-                {KONTOTYPEN.map((k) => (
-                  <option key={k} value={k}>
-                    {t(`einstellungen.konto.typ.${k}`)}
-                  </option>
-                ))}
-              </select>
+              <Auswahl
+                wert={typ}
+                aufAenderung={(v) => setTyp(v as Kontotyp)}
+                optionen={KONTOTYPEN.map((k) => ({ wert: k, text: t(`einstellungen.konto.typ.${k}`) }))}
+                ariaLabel={t("einstellungen.konto.feldTyp")}
+              />
             </FormField>
             <FormField label={t("einstellungen.konto.feldIban")} hint={t("einstellungen.konto.feldIbanHinweis")}>
               <input className="field" value={iban} onChange={(e) => setIban(e.target.value)} />

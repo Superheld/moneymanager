@@ -447,3 +447,80 @@ select.field {
   .side .foot > div { display: none; }
   .side .foot { text-align: center; }
 }
+
+/* ============================================================
+   Auswahl — der Ersatz fuer das native <select>.
+
+   Base UI liefert die Mechanik und KEIN Aussehen; das steht hier. Der Knopf traegt
+   zusaetzlich `.field`, damit er neben einem Eingabefeld nicht auffaellt — geerbt wird
+   Rahmen, Radius, Polsterung und Fokusfarbe.
+   ============================================================ */
+.auswahl-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  cursor: pointer;
+  text-align: left;
+  /* Das native Feld liess rechts Platz fuer sein Hintergrundbild. Hier ist der Winkel
+     ein echtes Element, die Polsterung darf also gleichmaessig sein. */
+  padding-right: 12px;
+}
+.auswahl-trigger[data-disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+.auswahl-trigger[data-popup-open] {
+  border-color: var(--accent);
+}
+.auswahl-wert {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auswahl-caret {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--ink-3);
+}
+
+.auswahl-popup {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-2, 0 8px 24px rgba(0, 0, 0, 0.10));
+  padding: 4px;
+  /* Eine lange Liste (Kategorien, Vertraege) darf das Fenster nicht sprengen. */
+  max-height: min(320px, var(--available-height, 320px));
+  overflow-y: auto;
+  min-width: var(--anchor-width);
+  outline: none;
+}
+.auswahl-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  font-size: 13.5px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+/* `data-highlighted` ist Tastatur UND Maus — ein eigener :hover daneben brachte beide
+   Markierungen gleichzeitig aufs Bild und man sah nicht mehr, wo die Eingabe landet. */
+.auswahl-item[data-highlighted] {
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+}
+.auswahl-item[data-disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.auswahl-haken {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--accent);
+}

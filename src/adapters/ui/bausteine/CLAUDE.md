@@ -41,6 +41,40 @@ Zwei Dinge, die der Typ erzwingt, weil sie sonst verlorengehen:
   gerade nicht gibt, verschwindet sonst stumm — und dann steht in der Datenbank etwas
   anderes als auf dem Bildschirm.
 
+## `Auswahl` — die Wahl aus einer Liste
+
+Der Ersatz für `<select className="field">` in FORMULAREN, gebaut auf Base UI
+(`@base-ui/react`) — der einzigen UI-Bibliothek im Projekt.
+
+**Warum überhaupt eine Bibliothek**, wo hier sonst alles selbst geschrieben ist: ein
+natives `<select>` öffnet die Liste des Betriebssystems, und die folgt nicht dem Design der
+App — andere Schrift, andere Abstände, andere Farben, je Plattform anders. In einer
+Oberfläche, in der alles andere aus denselben Tokens kommt, ist genau das der sichtbare
+Bruch.
+
+**Warum nicht selbst gebaut.** Ein Auswahlfeld ist eine der undankbarsten Komponenten
+überhaupt: Tastaturbedienung samt Tippsuche, ARIA zwischen Knopf und Liste, Fokusfalle,
+Schliessen bei Klick daneben, Positionierung am Fensterrand. Wer das selbst schreibt, hat
+am Ende eine Komponente, die mit der Maus gut aussieht und mit der Tastatur nicht
+funktioniert. Base UI liefert diese Mechanik und **kein Aussehen** — das steht in
+`app.css` und kommt aus denselben Tokens wie der Rest.
+
+Zwei Dinge, die man wissen muss:
+
+- **`items` ist nicht optional.** Ohne die Zuordnung Wert → Text zeigt der geschlossene
+  Knopf den WERT an, und der ist bei uns fast überall eine UUID.
+- **Die Optionen kommen als Liste, nicht als Kinder.** An den meisten Stellen entstanden
+  die `<option>` ohnehin aus einem `map` über Konten, Kategorien oder Verträge — eine
+  Liste hereinzureichen ist dort weniger Code als vorher, nicht mehr.
+
+**Nicht verwechseln mit `Zeilenauswahl`.** Die ist für eine kleine Entscheidung IN einer
+Tabellenzeile und so gross wie eine Pille daneben; `Auswahl` ist das Formularfeld über die
+volle Breite. Die Unterscheidung ist dieselbe wie vorher zwischen `Zeilenauswahl` und
+`select.field`.
+
+**Der Bestand wandert nach und nach.** Es gibt weiterhin native `<select>` in der App;
+jedes davon ist eine Stelle, die noch nicht umgestellt wurde, keine bewusste Ausnahme.
+
 ## `Zeilenlink` — der Bezeichner, der weiterführt
 
 `DataTable` kann per `onRowClick` die ganze Zeile klickbar machen, und **das sieht man ihr
@@ -79,7 +113,8 @@ Block mit `max-width` je Zelle, plus Fangnetz-Scrollrahmen). Beim Nachziehen aus
 Design-System nicht überschreiben — dort ist weniger drin.
 
 **`Input` hat kein `onChange`** und ist für berechnete oder abgeleitete Felder gedacht.
-Editierbare Eingaben bauen wir mit echten `<input>`/`<select>` im selben Token-Stil. Wer das
-übersieht, baut ein Feld, das sich nicht tippen lässt.
+Editierbare Texteingaben bauen wir mit echten `<input>` im selben Token-Stil. Wer das
+übersieht, baut ein Feld, das sich nicht tippen lässt. Für eine AUSWAHL gilt das nicht mehr
+— dafür gibt es `Auswahl` (siehe oben).
 
 Die Tokens liegen getrennt unter `src/styles/`, nicht hier.
