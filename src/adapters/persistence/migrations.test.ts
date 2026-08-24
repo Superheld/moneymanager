@@ -1497,3 +1497,94 @@ describe("Vertrags-Kategorie erneut nachtragen (v25)", () => {
     db.close();
   });
 });
+
+/**
+ * Migration 60 — „Einnahmen > Erstattungen" faellt weg.
+ *
+ * Entschieden: ein Rueckfluss gehoert in die Kategorie der AUSGABE. Eine Kategorie fuer
+ * Erstattungen UNTER den Einnahmen widerspricht dem frontal — derselbe Vorgang stuende je
+ * nach Einsortierung fuer zwei verschiedene Aussagen, und die Erkennung nahm liebend gern
+ * die falsche.
+ *
+ * Geloescht wird nur, was leer ist. Das ist keine Vorsicht um ihrer selbst willen: eine
+ * Kategorie mit Buchungen wegzuraeumen hiesse, Zuordnungen still zu verlieren, und was
+ * dann in der Auswertung fehlt, sucht man an einer ganz anderen Stelle.
+ */
+describe("Migration 60 — die Kategorie fuer Erstattungen", () => {
+  function mitErstattungen(db: InstanceType<typeof SQL.Database>) {
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('einn','Einnahmen','Ertrag')");
+    db.run("INSERT INTO kategorie (id, name, eltern_id, default_charakter) VALUES ('erst','Erstattungen','einn','Ertrag')");
+  }
+  const namen = (db: InstanceType<typeof SQL.Database>) =>
+    (db.exec("SELECT name FROM kategorie ORDER BY name")[0]?.values ?? []).map((z) => z[0]);
+
+  it("raeumt sie weg, solange sie leer ist", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 59);
+    mitErstattungen(db);
+
+    apply(db, 59, 60);
+
+    expect(namen(db)).toEqual(["Einnahmen"]);
+    db.close();
+  });
+
+  it("laesst sie stehen, wenn Buchungen daran haengen", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 59);
+    mitErstattungen(db);
+    db.run(
+      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle)
+       VALUES ('b1','2026-04-08',3490,'giro','erst','Ertrag','import')`,
+    );
+
+    apply(db, 59, 60);
+
+    expect(namen(db)).toContain("Erstattungen");
+    db.close();
+  });
+
+  /**
+   * Nicht nur Buchungen halten sie fest. Ein Budget, eine Zahlungsregel, ein Vertrag —
+   * jede Spalte, die auf eine Kategorie zeigt, ist ein Grund; eine davon zu vergessen
+   * hiesse, einen Verweis ins Leere laufen zu lassen.
+   */
+  it("laesst sie stehen, wenn eine Zahlungsregel darauf zeigt", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 59);
+    mitErstattungen(db);
+    db.run(
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, kategorie_id)
+       VALUES ('r1','Kesselmann',2990,'monatlich','2026-01-01','Ertrag','erst')`,
+    );
+
+    apply(db, 59, 60);
+
+    expect(namen(db)).toContain("Erstattungen");
+    db.close();
+  });
+
+  it("ruehrt eine gleichnamige Kategorie ausserhalb der Einnahmen nicht an", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 59);
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('wohn','Wohnen','Aufwand')");
+    db.run("INSERT INTO kategorie (id, name, eltern_id, default_charakter) VALUES ('erst2','Erstattungen','wohn','Aufwand')");
+
+    apply(db, 59, 60);
+
+    expect(namen(db)).toContain("Erstattungen");
+    db.close();
+  });
+
+  it("laeuft ein zweites Mal folgenlos durch", () => {
+    const db = new SQL.Database();
+    apply(db, 0, 59);
+    mitErstattungen(db);
+
+    apply(db, 59, 60);
+    expect(() => apply(db, 59, 60)).not.toThrow();
+
+    expect(namen(db)).toEqual(["Einnahmen"]);
+    db.close();
+  });
+});

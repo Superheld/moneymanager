@@ -9,9 +9,19 @@ import { vorzeichenbehaftet } from "./zahlungsregelAnlegen";
 export interface BuchungEingabe {
   kontoId: string;
   datum: string; // ISO
-  /** Positiver Betrag in Minor Units; das Vorzeichen ergibt sich aus dem Charakter. */
+  /** Positiver Betrag in Minor Units; die Richtung sagen `charakter` und `gegenrichtung`. */
   betrag: Cent;
   charakter: Charakter;
+  /**
+   * Das Geld floss ENTGEGEN dem, was die Einordnung erwarten lässt: eine Erstattung auf
+   * eine Aufwandskategorie, eine zurückgebuchte Einnahme.
+   *
+   * Es gibt das Feld, weil der Charakter sagt, WOFÜR das Geld war, und nicht, wohin es
+   * floss. Ein Rückfluss gehört in die Kategorie der Ausgabe — dort entlastet er das
+   * Budget, statt als Einnahme aufzutauchen, die nie etwas ausgleicht. Ohne das Feld
+   * liesse sich ein solcher Fall von Hand gar nicht erfassen.
+   */
+  gegenrichtung?: boolean;
   kategorieId?: string;
   notiz?: string;
 }
@@ -28,7 +38,7 @@ export async function buchungErfassen(
   const buchung: IstBuchung = {
     id: id ?? crypto.randomUUID(),
     datum: e.datum,
-    betrag: vorzeichenbehaftet(e.betrag, e.charakter),
+    betrag: vorzeichenbehaftet(e.betrag, e.charakter, e.gegenrichtung),
     kontoId: e.kontoId,
     kategorieId: e.kategorieId || undefined,
     // Wer die Buchung von Hand erfasst UND dabei eine Kategorie wählt, hat entschieden —
@@ -52,7 +62,7 @@ export async function buchungErfassen(
 export async function buchungBearbeiten(
   ledger: LedgerPort,
   original: IstBuchung,
-  e: { datum: string; betrag: Cent; charakter: Charakter; kategorieId?: string; notiz?: string; kontoId?: string },
+  e: { datum: string; betrag: Cent; charakter: Charakter; gegenrichtung?: boolean; kategorieId?: string; notiz?: string; kontoId?: string },
 ): Promise<IstBuchung> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
   if (!istCent(e.betrag) || e.betrag <= 0) throw new FachlicherFehler("betrag.groesserNull");
@@ -78,7 +88,8 @@ export async function buchungBearbeiten(
   // DIE RICHTUNG KOMMT BEIM IMPORT VOM BELEG, nicht aus dem Charakter.
   //
   // Bei einer von Hand erfassten Buchung ist das Vorzeichen eine Folge der Einordnung:
-  // man tippt eine Betragshöhe und sagt „Aufwand", und daraus wird ein Abfluss. Bei einer
+  // man tippt eine Betragshöhe und sagt „Aufwand", und daraus wird ein Abfluss — es sei
+  // denn, `gegenrichtung` sagt ausdrücklich das Gegenteil (Erstattung). Bei einer
   // importierten Buchung ist es umgekehrt — die Bank hat gebucht, in welche Richtung das
   // Geld geflossen ist. Das ist eine TATSACHE, und der Charakter ist eine EINORDNUNG;
   // eine Einordnung darf eine Tatsache nicht umdrehen.
@@ -100,7 +111,7 @@ export async function buchungBearbeiten(
     datum: e.datum,
     betrag: ausDemBeleg
       ? Math.sign(original.betrag) * Math.abs(e.betrag)
-      : vorzeichenbehaftet(e.betrag, e.charakter),
+      : vorzeichenbehaftet(e.betrag, e.charakter, e.gegenrichtung),
     charakter: e.charakter,
     kategorieId: neueKategorie,
     kategorieHerkunft: kategorieGeaendert ? "manuell" : original.kategorieHerkunft,

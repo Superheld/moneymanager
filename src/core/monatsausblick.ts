@@ -103,11 +103,13 @@ export interface MonatsAusblick {
 
 /**
  * Relative Toleranz, innerhalb derer eine Ist-Buchung als „das ist dieser Plan-Posten"
- * gilt. 15 %, weil geplante Beträge veralten: die Miete stand als 471,41 in der Regel
- * und wurde als 459,25 gebucht (2,6 % Abstand) — mit einer engen Grenze hätte die
- * Zeile „offen" gezeigt, obwohl sie längst abgebucht war. Nach oben begrenzt das die
- * Fehlzuordnung: zwei Posten derselben Kategorie mit stark verschiedenen Beträgen
- * werden nicht verwechselt.
+ * gilt. 15 %, weil geplante Beträge veralten: eine Miete wird angehoben, die Regel
+ * daneben bleibt auf dem alten Stand, und der Abstand zwischen beiden ist dann klein,
+ * aber nicht null — mit einer engen Grenze zeigte die Zeile „offen", obwohl sie längst
+ * abgebucht war. Am eigenen Bestand nachgerechnet und danach gewählt; die Zahlen dazu
+ * stehen bewusst nicht hier, sie gehören keinem Kommentar (CLAUDE.md → „Keine Zahlen
+ * aus dem Bestand in Prosa"). Nach oben begrenzt die Toleranz die Fehlzuordnung: zwei
+ * Posten derselben Kategorie mit stark verschiedenen Beträgen werden nicht verwechselt.
  */
 const BETRAGS_TOLERANZ = 0.15;
 

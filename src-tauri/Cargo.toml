@@ -28,3 +28,5 @@ serde_json = "1"
 # ueber den Pool aus und kann deshalb keine Transaktion klammern. Version an das Plugin
 # gebunden (es traegt sqlx 0.8) - zwei sqlx-Versionen waeren zwei verschiedene Typen.
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
+tauri-plugin-updater = "2.10.1"
+tauri-plugin-process = "2.3.1"

@@ -111,8 +111,8 @@ describe("VertraegeScreen — Ansichten", () => {
   async function bestand() {
     await konto();
     await vertragMitRegel("a", "Alpha", -12000, "jaehrlich", tagNach(40));
-    await vertragMitRegel("b", "Beta", -5508, "quartalsweise", tagNach(10));
-    await vertragMitRegel("c", "Gamma", -4500, "monatlich", tagNach(100));
+    await vertragMitRegel("b", "Beta", -5544, "quartalsweise", tagNach(10));
+    await vertragMitRegel("c", "Gamma", -4700, "monatlich", tagNach(100));
   }
 
   /** Anbieternamen in der Reihenfolge, in der sie in den Tabellen stehen. */
@@ -122,12 +122,12 @@ describe("VertraegeScreen — Ansichten", () => {
       .filter((x) => ["Alpha", "Beta", "Gamma"].includes(x));
   }
 
-  /** 120 €/Jahr → 10,00 pro Monat; 55,08 €/Quartal → 18,36; monatlich zählt nicht mit. */
+  /** 120 €/Jahr → 10,00 pro Monat; 55,44 €/Quartal → 18,48; monatlich zählt nicht mit. */
   it("nennt den monatlichen Rücklagenbedarf der nicht-monatlichen Verträge", async () => {
     await bestand();
     rendere(<VertraegeScreen />);
     await screen.findByText("Alpha");
-    await waitFor(() => expect(document.body.textContent).toMatch(/28,36/));
+    await waitFor(() => expect(document.body.textContent).toMatch(/28,48/));
   });
 
   it("sortiert die Fälligkeits-Ansicht nach der nächsten Zahlung", async () => {
@@ -151,7 +151,7 @@ describe("VertraegeScreen — Ansichten", () => {
     // Vom kürzesten zum längsten Takt: monatlich, quartalsweise, jährlich.
     await waitFor(() => expect(zeilenfolge()).toEqual(["Gamma", "Beta", "Alpha"]));
     // Die Rücklagen-Spalte steht nur in den nicht-monatlichen Gruppen.
-    expect(document.body.textContent).toMatch(/18,36/);
+    expect(document.body.textContent).toMatch(/18,48/);
     expect(document.body.textContent).toMatch(/10,00/);
   });
 
@@ -626,7 +626,7 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
       verlaengerung: "keine", status: "aktiv",
     });
     await sqliteLedgerRepository.speichern({
-      id: "b1", datum: "2026-08-11", betrag: -4500, kontoId: "k1",
+      id: "b1", datum: "2026-08-11", betrag: -4720, kontoId: "k1",
       charakter: "Aufwand", quelle: "import",
     });
     // VON HAND zugeordnet: `vertraegeLaden` gleicht die Zuordnungen beim Laden ab, und
@@ -643,11 +643,11 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
 
     const link = await screen.findByRole("button", { name: /Talmberg Energie/ });
     // Vorher steht der Betrag der Zahlung nirgends.
-    expect(document.body.textContent ?? "").not.toMatch(/45,00/);
+    expect(document.body.textContent ?? "").not.toMatch(/47,20/);
 
     await userEvent.click(link);
 
-    await waitFor(() => expect(document.body.textContent ?? "").toMatch(/45,00/));
+    await waitFor(() => expect(document.body.textContent ?? "").toMatch(/47,20/));
   });
 
   it("klappt beim zweiten Klick wieder zu", async () => {
@@ -656,10 +656,10 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
 
     const link = await screen.findByRole("button", { name: /Talmberg Energie/ });
     await userEvent.click(link);
-    await waitFor(() => expect(document.body.textContent ?? "").toMatch(/45,00/));
+    await waitFor(() => expect(document.body.textContent ?? "").toMatch(/47,20/));
 
     await userEvent.click(link);
-    await waitFor(() => expect(document.body.textContent ?? "").not.toMatch(/45,00/));
+    await waitFor(() => expect(document.body.textContent ?? "").not.toMatch(/47,20/));
   });
 
   /**

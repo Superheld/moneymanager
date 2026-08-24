@@ -48,15 +48,15 @@ const KATEGORIEN: Kategorie[] = [
 ];
 
 const REGELN: Zahlungsregel[] = [
-  { id: "r-miete", bezeichnung: "Vermieter", betrag: -47141, rhythmus: "monatlich", startdatum: "2026-01-04", charakter: "Aufwand", kategorieId: "miete" },
-  { id: "r-lohn", bezeichnung: "Arbeitgeber", betrag: 247536, rhythmus: "monatlich", startdatum: "2026-01-28", charakter: "Ertrag", kategorieId: "gehalt" },
+  { id: "r-miete", bezeichnung: "Vermieter", betrag: -53000, rhythmus: "monatlich", startdatum: "2026-01-04", charakter: "Aufwand", kategorieId: "miete" },
+  { id: "r-lohn", bezeichnung: "Arbeitgeber", betrag: 280000, rhythmus: "monatlich", startdatum: "2026-01-28", charakter: "Ertrag", kategorieId: "gehalt" },
 ];
 
 const BUDGETS: Budget[] = [{ id: "b1", kategorieId: "lebenshaltung", kontoId: "giro", betraege: [{ abMonat: "2026-01", betrag: 43000 }], art: "monatlich", start: "2026-01-01" }];
 
 const IST: IstBuchung[] = [
-  { id: "i1", datum: "2026-08-05", betrag: -45925, kontoId: "giro", kategorieId: "miete", charakter: "Aufwand", quelle: "import" },
-  { id: "i2", datum: "2026-08-11", betrag: -6250, kontoId: "giro", kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "import" },
+  { id: "i1", datum: "2026-08-05", betrag: -51800, kontoId: "giro", kategorieId: "miete", charakter: "Aufwand", quelle: "import" },
+  { id: "i2", datum: "2026-08-11", betrag: -7000, kontoId: "giro", kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "import" },
 ];
 
 // Rücklage: 12.000,00 auf 100 Monate → 120,00 im Monat. Kalkulatorisch, nie gebucht.
@@ -109,12 +109,12 @@ describe("MonatsAusblick", () => {
     rendere(<MonatsAusblick {...props()} />);
     const august = await karte("August 2026");
     // Unter dem Strich steht BEIDES nebeneinander, jede Zahl in ihrer Spalte:
-    // gebucht −459,25 − 62,50 = −521,75, geplant 2475,36 − 471,41 − 430,00 = +1573,95.
-    expect(within(august).getByText("−521,75 €")).toBeInTheDocument();
-    expect(within(august).getByText("+1.573,95 €")).toBeInTheDocument();
+    // gebucht −518,00 − 70,00 = −588,00, geplant 2800,00 − 530,00 − 430,00 = +1840,00.
+    expect(within(august).getByText("−588,00 €")).toBeInTheDocument();
+    expect(within(august).getByText("+1.840,00 €")).toBeInTheDocument();
     // Die Zeilen selbst tragen weiterhin beide Spalten.
     expect(within(august).getByText("gebucht")).toBeInTheDocument();
-    expect(within(august).getByText("−471,41")).toBeInTheDocument();
+    expect(within(august).getByText("−530,00")).toBeInTheDocument();
   });
 
   it("stellt das Gebuchte vor das Geplante", async () => {
@@ -130,7 +130,7 @@ describe("MonatsAusblick", () => {
     rendere(<MonatsAusblick {...props()} />);
     const september = await karte("September 2026");
     expect(within(september).queryByText("gebucht")).not.toBeInTheDocument();
-    expect(within(september).getByText("+1.573,95 €")).toBeInTheDocument();
+    expect(within(september).getByText("+1.840,00 €")).toBeInTheDocument();
     // Ohne Ist gibt es auch nichts zu vergleichen.
     expect(within(september).queryByText(/gegenüber Plan/)).not.toBeInTheDocument();
   });
@@ -150,7 +150,7 @@ describe("MonatsAusblick", () => {
     expect(within(august).getByTitle("Vermieter")).toBeInTheDocument();
     // Der TATSÄCHLICH gebuchte Betrag steht am Posten, nicht der geplante — einmal in
     // der Zeilensumme, einmal am aufgeklappten Posten.
-    expect(within(august).getAllByText("−459,25")).toHaveLength(2);
+    expect(within(august).getAllByText("−518,00")).toHaveLength(2);
   });
 
   it("klappt die Budgets auf und zeigt, wie weit der Rahmen durch ist", async () => {
@@ -160,7 +160,7 @@ describe("MonatsAusblick", () => {
 
     await nutzer.click(within(august).getByText("Budgets"));
     expect(within(august).getByText("Lebenshaltung")).toBeInTheDocument();
-    expect(within(august).getByText("62,50 / 430,00 €")).toBeInTheDocument();
+    expect(within(august).getByText("70,00 / 430,00 €")).toBeInTheDocument();
   });
 
   it("weist darauf hin, wenn gar keine Einnahmen geplant sind", async () => {
@@ -181,15 +181,15 @@ describe("MonatsAusblick", () => {
     const september = await karte("September 2026");
     expect(within(september).getByText("Rücklagen")).toBeInTheDocument();
     expect(within(september).getByText("−120,00")).toBeInTheDocument();
-    // Ohne Rücklage blieben +1.573,95 — mit ihr 120,00 weniger.
-    expect(within(september).getByText("+1.453,95 €")).toBeInTheDocument();
+    // Ohne Rücklage blieben +1.840,00 — mit ihr 120,00 weniger.
+    expect(within(september).getByText("+1.720,00 €")).toBeInTheDocument();
   });
 
   it("senkt auch das Gebuchte des laufenden Monats um die Rücklage", async () => {
     rendere(<MonatsAusblick {...props({ inventar: INVENTAR })} />);
     const august = await karte("August 2026");
-    // −521,75 gebucht − 120,00 Rücklage.
-    expect(within(august).getByText("−641,75 €")).toBeInTheDocument();
+    // −588,00 gebucht − 120,00 Rücklage.
+    expect(within(august).getByText("−708,00 €")).toBeInTheDocument();
   });
 
   it("lässt die Zeile weg, wenn es kein Inventar gibt", async () => {

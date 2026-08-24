@@ -130,6 +130,39 @@ body {
   color: var(--ink-3);
 }
 
+/* --- Der Aktualisierungs-Knopf in der Seitenleiste (siehe bausteine/AktualisierungKnopf.tsx) ---
+   Er steht neben einer Zeile, die sich NIE aendert („Moneymanager 0.19.0 Alpha"), und ist
+   das einzige dort, was sich je bewegt. Deshalb bekommt er Akzentfarbe und eine Flaeche:
+   in gedaempftem Grau neben zwei gedaempft grauen Zeilen wuerde er schlicht uebersehen.
+   Gleichzeitig bleibt er klein — er unterbricht nichts, er wartet. */
+.aktualisierung {
+  margin-top: var(--sp-2);
+}
+.aktualisierungbtn {
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid var(--accent);
+  border-radius: var(--r-md);
+  background: var(--accent-wash);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  font-family: var(--font-ui);
+  text-align: left;
+}
+.aktualisierungbtn:hover:not(:disabled) {
+  background: var(--accent);
+  color: var(--surface-1);
+}
+.aktualisierungbtn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.aktualisierungfehler {
+  margin-top: 4px;
+  color: var(--warn-deep);
+}
+
 /* --- Main --- */
 .main {
   overflow: auto;

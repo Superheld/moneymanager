@@ -5,6 +5,7 @@
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { APP_STADIUM, APP_VERSION } from "../../../version";
+import { AktualisierungKnopf } from "./AktualisierungKnopf";
 
 export type ScreenId =
   | "uebersicht"
@@ -107,6 +108,8 @@ export function AppShell({
             Moneymanager {APP_VERSION} <span className="bdg">{APP_STADIUM}</span>
           </div>
           <div>{t("shell.footLokal")}</div>
+          {/* Erscheint nur, wenn wirklich etwas bereitliegt — sonst rendert er nichts. */}
+          <AktualisierungKnopf />
         </div>
       </aside>
 

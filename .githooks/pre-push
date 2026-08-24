@@ -103,61 +103,46 @@ EOF
 
 [ "$guard_fehler" = "0" ] || exit 1
 
-[ -f "$DB" ] || exit 0
-command -v sqlite3 >/dev/null || exit 0
-
-# Merkmale aus der echten Datenbank: Betraege in beiden Schreibweisen und in Cent.
-lesen() { sqlite3 -cmd "PRAGMA query_only=ON" "$DB" "$1" 2>/dev/null; }
-
-if ! lesen "SELECT count(*) FROM sqlite_master;" >/dev/null; then
-  echo "pre-push: ABGEBROCHEN — die Datenbank ist da, laesst sich aber nicht lesen."
+# Die Merkmale kommen aus `scripts/bestandsmerkmale.mjs` — DERSELBEN Quelle, aus der auch
+# `src/privatsphaere.test.ts` liest.
+#
+# Vorher standen die Abfragen hier ein zweites Mal, und genau das ist schiefgegangen: als
+# `budget.betrag_pro_monat` einer Reihe wich, zog der Test mit und dieser Hook nicht. Er
+# lief danach nicht mit einem Merkmal weniger — er brach unter `set -e` wortlos ab, und
+# der Push scheiterte ohne eine Zeile Begruendung. Von aussen sah das aus wie eine
+# Ablehnung des Remotes, und die naheliegende Reaktion darauf ist `--no-verify`.
+#
+# Das Skript unterscheidet selbst zwischen „nichts zu pruefen" (leere Ausgabe, Exit 0) und
+# „da ist etwas, das ich nicht lesen kann" (Abbruch mit Meldung). Beides wird hier
+# uebernommen, statt es ein zweites Mal zu entscheiden.
+if ! merkmale=$(node "$WURZEL/scripts/bestandsmerkmale.mjs" 2>&1); then
+  echo "pre-push: ABGEBROCHEN — die Merkmale liessen sich nicht ermitteln."
+  echo "          $(printf '%s' "$merkmale" | head -3)"
   echo "          Der Hook haette NICHTS geprueft. Lieber anhalten als beruhigen."
   exit 1
 fi
 
-# Jede Tabelle EINZELN: eine Spalte, die es nicht (mehr) gibt, wuerde sonst die ganze
-# Abfrage kippen — und der Hook liefe mit leerer Merkmalsliste gruen durch.
+# Keine Merkmale heisst: es gibt keinen Bestand zu schuetzen (frischer Klon, anderer
+# Rechner, kein sqlite3). Der Muster-Guard oben ist da laengst gelaufen.
+[ -n "$merkmale" ] || exit 0
+
+# Gesucht wird ueber MUSTERDATEIEN, nicht in einer Schleife ueber die Werte. Zwei Gruende,
+# und beide sind Fehler, die eine Schleife hier zwangslaeufig macht:
 #
-# Und wenn eine Abfrage nicht mehr passt, wird das GESAGT. Unter `set -e` riss ein Fehler
-# hier den Hook wortlos ab: der Push scheiterte ohne eine Zeile Begruendung, und das sah
-# nach einer Ablehnung des Remotes aus statt nach einem Waechter, der sein Merkmal
-# verloren hat. Genau so lief es, als `budget.betrag_pro_monat` einer Reihe wich.
-roh=$(for sql in \
-    "SELECT kontostand FROM zahlungskonto" \
-    "SELECT betrag FROM budget_betrag" \
-    "SELECT betrag FROM kontostand_anker" \
-    "SELECT sum(betrag) FROM ist_buchung GROUP BY konto_id"; do
-  lesen "$sql;" || {
-    echo "pre-push: ABGEBROCHEN — diese Abfrage passt nicht mehr zum Schema:" >&2
-    echo "          $sql" >&2
-    echo "          Ohne sie fehlt dem Abgleich eine ganze Sorte Merkmal." >&2
-    exit 1
-  }
-done) || exit 1
-
-merkmale=$(printf '%s\n' "$roh" \
-  | awk '{ c = $1 < 0 ? -$1 : $1
-           if (c < 1000) next
-           printf "%d\n", $1
-           euro = sprintf("%d", c/100); rest = sprintf("%02d", c%100)
-           printf "%s,%s\n", euro, rest
-           mit = ""
-           while (length(euro) > 3) {
-             mit = "." substr(euro, length(euro)-2) mit
-             euro = substr(euro, 1, length(euro)-3)
-           }
-           printf "%s%s,%s\n", euro, mit, rest }' | sort -u)
-
-if [ -z "$merkmale" ]; then
-  echo "pre-push: ABGEBROCHEN — aus der Datenbank kam KEIN einziges Merkmal."
-  echo "          Entweder ist sie leer, oder die Abfragen passen nicht mehr zum Schema."
-  echo "          So oder so haette der Hook nichts geprueft."
-  exit 1
-fi
-
-# Dazu Kennungen: IBANs und Personennamen.
-kennungen=$(lesen "SELECT iban FROM zahlungskonto WHERE iban IS NOT NULL AND iban <> ''
-  UNION SELECT name FROM person;" | awk 'length($0) >= 8')
+#   • `for wert in $merkmale` zerlegt an LEERZEICHEN. Ein Empfaenger mit zwei Wortteilen
+#     wird zu zwei Suchbegriffen, und einer davon ist irgendwann ein Allerweltswort, das
+#     in einem Commit-Text voellig zu Recht steht. Der Waechter meldet dann etwas, das
+#     nicht da ist — und ein Waechter mit Fehlalarmen wird umgangen statt gelesen.
+#   • Ein `grep` je Merkmal sind bei ueber tausend Merkmalen ebenso viele Prozesse, und
+#     das je ausgehendem Ref.
+#
+# Zwei Dateien, weil die beiden Sorten verschieden gesucht werden: Zahlen nur an der
+# Wortgrenze (sonst steckt "15000" in "150000"), Text als fester Teilstring.
+TMPV=$(mktemp -d)
+trap 'rm -rf "$TMPV"' EXIT INT TERM
+printf '%s\n' "$merkmale" | grep -E '^[0-9.,-]+$' \
+  | sed 's/[.]/\\./g; s/^/(^|[^0-9])/; s/$/([^0-9]|$)/' > "$TMPV/zahlen"
+printf '%s\n' "$merkmale" | grep -vE '^[0-9.,-]+$' > "$TMPV/texte"
 
 fehler=0
 while read -r lokal_ref lokal_sha remote_ref remote_sha; do
@@ -165,23 +150,21 @@ while read -r lokal_ref lokal_sha remote_ref remote_sha; do
   [ "$lokal_sha" = "0000000000000000000000000000000000000000" ] && continue
   bereich=$(ausgehender_bereich "$lokal_sha" "$remote_sha") || continue
   texte=$(git log --format='%B' "$bereich" 2>/dev/null) || continue
-  for wert in $merkmale $kennungen; do
-    # Zahlen an der Wortgrenze pruefen: sonst schlaegt "15000" in "150000" an, und ein
-    # Waechter mit Fehlalarmen wird umgangen statt gelesen.
-    case "$wert" in
-      # `|| true`, weil grep -c bei null Treffern mit 1 endet — unter `set -e` waere das
-      # ein stiller Abbruch des ganzen Hooks, und der saehe aus wie „alles geprueft".
-      *[!0-9.,]*) treffer=$(printf '%s' "$texte" | grep -cF -- "$wert" || true) ;;
-      *)          treffer=$(printf '%s' "$texte" | grep -cE "(^|[^0-9])$wert([^0-9]|$)" || true) ;;
-    esac
-    if [ "$treffer" -gt 0 ]; then
-      echo "pre-push: ABGEBROCHEN — ein Wert aus dem echten Bestand steht in einem Commit-Text ($lokal_ref)."
-      echo "          Laenge $(printf '%s' "$wert" | wc -c | tr -d ' '), gefunden im Bereich $bereich."
-      echo "          Der Wert wird hier bewusst nicht ausgegeben. Suche ihn mit:"
-      echo "            git log --format='%B' $bereich | grep -nF \"\$(sqlite3 -readonly \"\$DB\" '…')\""
-      fehler=1
-    fi
-  done
+  # `|| true`, weil grep -c bei null Treffern mit 1 endet — unter `set -e` waere das ein
+  # stiller Abbruch des ganzen Hooks, und der saehe aus wie „alles geprueft".
+  n_zahlen=0
+  n_texte=0
+  [ -s "$TMPV/zahlen" ] && n_zahlen=$(printf '%s' "$texte" | grep -cE -f "$TMPV/zahlen" || true)
+  [ -s "$TMPV/texte" ]  && n_texte=$(printf '%s' "$texte" | grep -cF -f "$TMPV/texte" || true)
+  if [ "$n_zahlen" -gt 0 ] || [ "$n_texte" -gt 0 ]; then
+    echo "pre-push: ABGEBROCHEN — ein Wert aus dem echten Bestand steht in einem Commit-Text ($lokal_ref)."
+    echo "          Bereich $bereich, betroffene Zeilen: $((n_zahlen + n_texte))."
+    echo "          Der Wert wird hier bewusst NICHT ausgegeben — diese Ausgabe landet in"
+    echo "          Protokollen. Sichtbar machen mit:"
+    echo "            node scripts/bestandsmerkmale.mjs > /tmp/m && \\"
+    echo "              git log --format='%B' $bereich | grep -nFf /tmp/m; rm /tmp/m"
+    fehler=1
+  fi
 done <<EOF
 $REFS
 EOF

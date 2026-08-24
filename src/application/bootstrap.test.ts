@@ -19,6 +19,22 @@ function memRepo(initial: Kategorie[] = []): KategorieRepository {
 const ERWARTET = STANDARDKATEGORIEN.reduce((n, g) => n + 1 + g.kinder.length, 0);
 
 describe("Standardkategorien-Seed/Backfill", () => {
+  /**
+   * ENTSCHIEDEN: ein Rueckfluss gehoert in die Kategorie der AUSGABE — eine Erstattung
+   * fuer Kleidung entlastet dort das Budget. Eine Kategorie fuer Erstattungen unter den
+   * EINNAHMEN gibt es deshalb nicht mehr, und sie darf auch nicht zurueckkommen: unter
+   * ihr gebucht taete dieselbe Zahlung das Gegenteil, sie bliebe eine Einnahme und
+   * entlastete nie etwas. Der Test steht hier, weil das Wiedereinfuegen der naheliegende
+   * Handgriff ist — die Liste sieht ohne sie unvollstaendig aus.
+   */
+  it("kennt keine Kategorie fuer Erstattungen", () => {
+    const alle = STANDARDKATEGORIEN.flatMap((g) => [
+      g.name,
+      ...g.kinder.map((k) => (typeof k === "string" ? k : k.name)),
+    ]);
+    expect(alle.filter((n) => /rstattung/.test(n))).toEqual([]);
+  });
+
   it("legt auf leerer DB alle Standardkategorien an", async () => {
     const repo = memRepo();
     await standardkategorienAnlegen(repo);

@@ -1695,4 +1695,41 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE budget DROP COLUMN betrag_pro_monat`,
     ],
   },
+
+  {
+    version: 60, // „Einnahmen > Erstattungen" widerspricht der Regel und faellt weg
+    sql: [
+      // ENTSCHIEDEN: ein Rueckfluss gehoert in die Kategorie der AUSGABE, nicht unter die
+      // Einnahmen. Eine Erstattung fuer Kleidung entlastet das Kleidungsbudget; als
+      // Ertrag gebucht blaeht sie die Einnahmen auf und entlastet nichts. Beide Wege
+      // standen bis hier offen, und die Kategorie-Erkennung nahm liebend gern den
+      // falschen — das Wort steht oft genug im Verwendungszweck.
+      //
+      // Der Charakter bleibt, was er ist: er sagt WOFUER das Geld war. Das Vorzeichen
+      // sagt, wohin es floss. Eine Erstattung ist damit ein Aufwand mit positivem Betrag
+      // (siehe CLAUDE.md), und dafuer braucht es keine eigene Kategorie.
+      //
+      // Geloescht wird nur, wenn die Kategorie WIRKLICH leer ist — geprueft gegen jede
+      // Spalte, die auf eine Kategorie zeigt, und gegen eigene Kinder. Hat jemand sie
+      // benutzt, bleibt sie stehen: dann ist es sein Bestand, und was damit geschieht,
+      // ist eine Entscheidung und keine Migration. Zweiter Lauf: nichts mehr da, nichts
+      // passiert — wiederholbar ohne Marker.
+      //
+      // `klassifikator_modell.kategorien` bleibt bewusst aussen vor. Das Modell ist
+      // abgeleitet und wird neu trainiert; ein trainierter Name waere ein Grund, ein
+      // Modell zu erneuern, aber keiner, eine leere Kategorie zu behalten.
+      `DELETE FROM kategorie
+         WHERE name = 'Erstattungen'
+           AND eltern_id IN (SELECT id FROM kategorie WHERE name = 'Einnahmen' AND eltern_id IS NULL)
+           AND NOT EXISTS (SELECT 1 FROM kategorie x            WHERE x.eltern_id             = kategorie.id)
+           AND NOT EXISTS (SELECT 1 FROM ist_buchung x          WHERE x.kategorie_id          = kategorie.id)
+           AND NOT EXISTS (SELECT 1 FROM ist_buchung_aufteilung x WHERE x.kategorie_id        = kategorie.id)
+           AND NOT EXISTS (SELECT 1 FROM budget x               WHERE x.kategorie_id          = kategorie.id)
+           AND NOT EXISTS (SELECT 1 FROM zahlungsregel x        WHERE x.kategorie_id          = kategorie.id)
+           AND NOT EXISTS (SELECT 1 FROM inventargegenstand x   WHERE x.kategorie_id          = kategorie.id)
+           AND NOT EXISTS (SELECT 1 FROM kategorie_festlegung x WHERE x.kategorie_id          = kategorie.id)
+           AND NOT EXISTS (SELECT 1 FROM vertrag x              WHERE x.kategorie_id          = kategorie.id)
+           AND NOT EXISTS (SELECT 1 FROM umsatz_verarbeitung x  WHERE x.vorschlag_kategorie_id = kategorie.id)`,
+    ],
+  },
 ];

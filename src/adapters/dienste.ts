@@ -63,6 +63,14 @@ import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikator
 import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
 import {
+  aktualisierungEinspielen,
+  aktualisierungPruefen,
+  pruefungErlaubt,
+  pruefungSchalten,
+  type Aktualisierung,
+} from "../application/aktualisierung";
+import { tauriAktualisierung } from "./aktualisierung";
+import {
   experimenteLaden,
   experimentSchalten,
   type ExperimentId,
@@ -220,6 +228,28 @@ export function experimente(): Promise<Experimente> {
 
 export function experimentSetzen(id: ExperimentId, an: boolean): Promise<void> {
   return experimentSchalten(sqliteEinstellungenRepository, id, an);
+}
+
+/**
+ * Liegt eine neuere Fassung bereit? `null` heißt „nein" — und ebenso „ging nicht" und
+ * „ist abgeschaltet". Die Oberfläche behandelt alle drei gleich, absichtlich.
+ */
+export function aktualisierungSuchen(): Promise<Aktualisierung | null> {
+  return aktualisierungPruefen(tauriAktualisierung, sqliteEinstellungenRepository);
+}
+
+/** Spielt die bereitliegende Fassung ein und startet neu. Kehrt im Erfolgsfall nie zurück. */
+export function aktualisierungInstallieren(): Promise<void> {
+  return aktualisierungEinspielen(tauriAktualisierung);
+}
+
+/** Ob beim Start nach Aktualisierungen gesucht wird. Ohne Zutun: ja. */
+export async function aktualisierungspruefung(): Promise<boolean> {
+  return pruefungErlaubt(await sqliteEinstellungenRepository.lesen());
+}
+
+export function aktualisierungspruefungSetzen(erlaubt: boolean): Promise<void> {
+  return pruefungSchalten(sqliteEinstellungenRepository, erlaubt);
 }
 
 
