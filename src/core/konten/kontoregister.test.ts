@@ -85,3 +85,40 @@ describe("kontoRegister — geplante Vorschau", () => {
     expect(r.geplant).toHaveLength(0);
   });
 });
+
+// Manche Banken vergeben fuer eine heute veranlasste Ueberweisung den Buchungstag von
+// morgen und fuehren sie bereits im Saldo. Solche Zeilen sind GEBUCHT, nicht geplant —
+// wer sie weglaesst, erzeugt eine Differenz zum Bankstand, die niemand erklaeren kann.
+// Sichtbar unterscheidbar muessen sie trotzdem sein.
+describe("kontoRegister — gebucht, aber Buchungstag in der Zukunft", () => {
+  it("markiert eine Buchung nach heute als zukuenftig", () => {
+    const r = kontoRegister(konto(), [ist({ id: "z", datum: "2026-06-20" })], [], "2026-06-15", 30);
+    expect(r.gebucht[0].zukuenftig).toBe(true);
+  });
+
+  it("markiert heute und frueher NICHT", () => {
+    const r = kontoRegister(
+      konto(),
+      [ist({ id: "a", datum: "2026-06-10" }), ist({ id: "b", datum: "2026-06-15" })],
+      [],
+      "2026-06-15",
+      30,
+    );
+    expect(r.gebucht.map((z) => z.zukuenftig)).toEqual([false, false]);
+  });
+
+  it("laesst sie im GEBUCHTEN Teil und im Saldo stehen", () => {
+    // Der Kern der Sache: sie ist keine Vorhersage. Sie gehoert nicht nach `geplant`,
+    // und `standHeute` muss sie enthalten — sonst laeuft der Stand von dem der Bank weg.
+    const r = kontoRegister(
+      konto({ saldo: euroZuCent(1000) }),
+      [ist({ id: "z", datum: "2026-06-20", betrag: euroZuCent(-40) })],
+      [],
+      "2026-06-15",
+      30,
+    );
+    expect(r.gebucht).toHaveLength(1);
+    expect(r.geplant.some((z) => z.datum === "2026-06-20")).toBe(false);
+    expect(r.standHeute).toBe(euroZuCent(960));
+  });
+});

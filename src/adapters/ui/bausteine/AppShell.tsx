@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { APP_STADIUM, APP_VERSION } from "../../../version";
 import { AktualisierungKnopf } from "./AktualisierungKnopf";
+import { Icon } from "./IconButton";
 
 export type ScreenId =
   | "uebersicht"
@@ -72,7 +73,7 @@ export function AppShell({
       <aside className="side">
         <div className="brand">
           <div className="mk">M</div>
-          <div>
+          <div className="lbl">
             <div className="nm">Moneymanager</div>
             <div className="sub">{t("shell.brandSub")}</div>
           </div>
@@ -89,11 +90,14 @@ export function AppShell({
                   <a
                     key={e.labelKey}
                     className={[aktiv ? "on" : "", klickbar ? "" : "disabled"].join(" ").trim()}
-                    title={klickbar ? undefined : t("shell.spaeterePhase")}
+                    // Der Titel traegt den Namen IMMER, nicht nur bei gesperrten
+                    // Eintraegen: schmal eingeklappt ist das Icon alles, was bleibt,
+                    // und ein Icon ohne Namen ist ein Raetsel.
+                    title={klickbar ? t(e.labelKey) : t("shell.spaeterePhase")}
                     onClick={klickbar ? () => onNavigate(e.id!) : undefined}
                   >
-                    <span className="dot" />
-                    {t(e.labelKey)}
+                    {e.id ? <Icon name={e.id} groesse={17} /> : <span className="dot" />}
+                    <span className="lbl">{t(e.labelKey)}</span>
                   </a>
                 );
               })}

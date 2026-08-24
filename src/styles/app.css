@@ -140,6 +140,11 @@ body {
 }
 .aktualisierungbtn {
   width: 100%;
+  /* Flex, weil der Knopf seit dem Einklappen ein Icon VOR dem Text traegt: schmal faellt
+     der Text weg und das Icon bleibt als einziger Inhalt uebrig. */
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 6px 10px;
   border: 1px solid var(--accent);
   border-radius: var(--r-md);
@@ -403,4 +408,271 @@ select.field {
 }
 .iconbtn-gefahr:hover:not(:disabled) {
   color: var(--warn-deep);
+}
+
+/* ============================================================
+   Schmales Fenster — die Seitenleiste klappt auf ihre Icons zusammen.
+
+   Warum ueberhaupt: 248 px sind bei einem breiten Fenster ein Viertel und bei einem
+   schmalen ein Drittel. Der Inhalt bekam den Rest, und Text brach an Stellen um, an
+   denen er nicht umbrechen muesste. Eingeklappt bleibt die Navigation vollstaendig
+   erreichbar — sie kostet nur keinen Platz mehr, den der Inhalt braucht.
+
+   Ohne JavaScript und ohne Schalter: die Fensterbreite ist die Frage, die hier
+   beantwortet wird, und die beantwortet CSS von selbst. Ein Schalter waere ein
+   Zustand mehr, den jemand pflegen und speichern muss.
+
+   Der NAME haengt am `title` jedes Eintrags (siehe AppShell) — ein Icon ohne Namen
+   ist ein Raetsel, und geraten wird in einer Finanz-App ungern.
+   ============================================================ */
+@media (max-width: 1100px) {
+  .app { grid-template-columns: 68px 1fr; }
+
+  .side {
+    padding: var(--sp-5) 9px;
+    align-items: center;
+    gap: var(--sp-4);
+  }
+
+  /* Alles, was nur Beschriftung ist, weicht. Die Icons bleiben. */
+  .side .lbl,
+  .side .nlbl { display: none; }
+
+  .nav a {
+    justify-content: center;
+    padding: 10px 0;
+  }
+  /* Das Kennzeichen sass per `margin-left: auto` am rechten Rand — ohne Beschriftung
+     daneben draengt es das Icon aus der Mitte. */
+  .nav a .bdg { display: none; }
+
+  .brand { justify-content: center; }
+
+  /* In der Fusszeile bleibt der Aktualisierungsknopf, der Rest ist Text.
+     Die Ausnahme ist woertlich zu nehmen: `.aktualisierung` ist selbst ein `div` und
+     waere von einem pauschalen `.foot > div` mit ausgeblendet worden — der Knopf haette
+     bei schmalem Fenster gefehlt, und ein Update, von dem niemand erfaehrt, ist keines. */
+  .side .foot > div:not(.aktualisierung) { display: none; }
+  .side .foot { text-align: center; }
+  .aktualisierungbtn { justify-content: center; }
+}
+
+/* ============================================================
+   Auswahl — der Ersatz fuer das native <select>.
+
+   Base UI liefert die Mechanik und KEIN Aussehen; das steht hier. Der Knopf traegt
+   zusaetzlich `.field`, damit er neben einem Eingabefeld nicht auffaellt — geerbt wird
+   Rahmen, Radius, Polsterung und Fokusfarbe.
+   ============================================================ */
+.auswahl-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  cursor: pointer;
+  text-align: left;
+  /* Das native Feld liess rechts Platz fuer sein Hintergrundbild. Hier ist der Winkel
+     ein echtes Element, die Polsterung darf also gleichmaessig sein. */
+  padding-right: 12px;
+}
+.auswahl-trigger[data-disabled] {
+  opacity: 0.55;
+  cursor: default;
+}
+.auswahl-trigger[data-popup-open] {
+  border-color: var(--accent);
+}
+.auswahl-wert {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.auswahl-caret {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--ink-3);
+}
+
+.auswahl-popup {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-2, 0 8px 24px rgba(0, 0, 0, 0.10));
+  padding: 4px;
+  /* Eine lange Liste (Kategorien, Vertraege) darf das Fenster nicht sprengen. */
+  max-height: min(320px, var(--available-height, 320px));
+  overflow-y: auto;
+  min-width: var(--anchor-width);
+  outline: none;
+}
+.auswahl-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-3);
+  padding: 7px 10px;
+  border-radius: var(--r-sm);
+  font-size: 13.5px;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+/* `data-highlighted` ist Tastatur UND Maus — ein eigener :hover daneben brachte beide
+   Markierungen gleichzeitig aufs Bild und man sah nicht mehr, wo die Eingabe landet. */
+.auswahl-item[data-highlighted] {
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+}
+.auswahl-item[data-disabled] {
+  opacity: 0.45;
+  cursor: default;
+}
+.auswahl-haken {
+  display: flex;
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+/* ============================================================
+   Datumsfeld — der Ersatz fuer <input type="date">.
+
+   Der Knopf traegt zusaetzlich `.field` und sieht damit aus wie jedes Eingabefeld
+   daneben. Das Blatt darunter ist ein Grid mit sieben Spalten; die Zellen sind
+   quadratisch, damit die Wochen als Raster lesbar bleiben und nicht als Textzeilen.
+   ============================================================ */
+/* Die Huelle traegt `.field` und sieht damit aus wie ein Eingabefeld — weil sie eines
+   IST. Innen liegen die nackte Eingabe und der Kalenderknopf; beide bringen ihren
+   eigenen Rahmen nicht mit, sonst haette das Feld drei. */
+.datumsfeld-huelle {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: 0 8px 0 12px;
+}
+.datumsfeld-huelle:focus-within {
+  border-color: var(--accent);
+}
+.datumsfeld-huelle[data-gesperrt] {
+  opacity: 0.55;
+}
+.datumsfeld-eingabe {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: none;
+  padding: 10px 0;
+  font-size: 13.5px;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+}
+.datumsfeld-knopf {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  background: none;
+  border-radius: var(--r-sm);
+  color: var(--ink-3);
+  cursor: pointer;
+}
+.datumsfeld-knopf:hover { background: var(--surface-2); color: var(--ink-2); }
+.datumsfeld-knopf[data-popup-open] { color: var(--accent); }
+
+.datumsfeld-popup {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--sh-2, 0 8px 24px rgba(0, 0, 0, 0.10));
+  padding: 10px;
+  outline: none;
+}
+
+.datumsfeld-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sp-2);
+  margin-bottom: 8px;
+}
+.datumsfeld-monat {
+  font-size: 13.5px;
+  font-weight: var(--fw-bold);
+  color: var(--ink);
+  text-transform: capitalize;
+}
+.datumsfeld-pfeil {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  font-size: 15px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.datumsfeld-pfeil:hover { background: var(--surface-2); }
+
+.datumsfeld-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 32px);
+  gap: 2px;
+  outline: none;
+}
+/* Das Grid selbst traegt den Fokus (die Zellen haben tabIndex -1), also braucht es
+   auch die sichtbare Fokusmarke — sonst bedient man es blind. */
+.datumsfeld-grid:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--r-sm);
+}
+.datumsfeld-wt {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  color: var(--ink-3);
+  text-align: center;
+  padding-bottom: 4px;
+  text-transform: uppercase;
+}
+.datumsfeld-leer { height: 30px; }
+
+.datumsfeld-tag {
+  height: 30px;
+  border: 0;
+  background: none;
+  border-radius: var(--r-sm);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  cursor: pointer;
+}
+.datumsfeld-tag:hover { background: var(--surface-2); }
+/* HEUTE ist ein Ring, GEWAEHLT ist eine Flaeche: beides kann auf denselben Tag fallen,
+   und dann muessen noch beide Aussagen lesbar sein. Zwei Flaechen gingen nicht. */
+.datumsfeld-tag[data-heute] {
+  box-shadow: inset 0 0 0 1.5px var(--accent);
+}
+.datumsfeld-tag[data-gewaehlt] {
+  background: var(--accent);
+  color: #fff;
+  font-weight: var(--fw-bold);
+}
+/* Der Tastatur-Punkt ist NICHT die Auswahl — er zeigt nur, wo man gerade steht. */
+.datumsfeld-grid:focus-visible .datumsfeld-tag[data-fokus]:not([data-gewaehlt]) {
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+}
+
+.datumsfeld-fuss {
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
 }

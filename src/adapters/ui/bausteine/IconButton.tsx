@@ -23,7 +23,20 @@ export type IconName =
   | "entnehmen"
   | "uebernehmen"
   | "verwerfen"
-  | "oeffnen";
+  | "oeffnen"
+  // Die Navigation. Sie heissen wie die `ScreenId`, damit die Sidebar sie ohne
+  // Umsetzungstabelle nachschlagen kann — eine Tabelle mehr waere eine Stelle mehr,
+  // die beim naechsten Bereich vergessen wird.
+  | "uebersicht"
+  | "konten"
+  | "budgets"
+  | "analyse"
+  | "inventar"
+  | "vertraege"
+  | "kontenverwaltung"
+  | "import"
+  | "training"
+  | "einstellungen";
 
 /** Die Pfade je Icon — 24×24, nur Striche, kein Fill. */
 const PFADE: Record<IconName, ReactElement> = {
@@ -43,6 +56,32 @@ const PFADE: Record<IconName, ReactElement> = {
   verwerfen: <><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>,
   // Pfeil nach rechts in ein Fenster
   oeffnen: <><path d="M14 4h6v6" /><path d="M20 4l-8 8" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>,
+
+  // --- Navigation ---
+  // Vier Kacheln — der Blick auf alles auf einmal.
+  uebersicht: <><path d="M4 4h6v6H4z" /><path d="M14 4h6v6h-6z" /><path d="M4 14h6v6H4z" /><path d="M14 14h6v6h-6z" /></>,
+  // Karte mit Streifen.
+  konten: <><path d="M3 6h18v12H3z" /><path d="M3 10.5h18" /></>,
+  // Ein Rahmen mit gefuelltem Sockel — dasselbe Bild wie im App-Icon: Verbrauch im
+  // Rahmen. Die FUELLUNG ist hier ein bewusster Bruch mit „nur Striche": als blosse
+  // Querlinie war das Icon von `konten` (Karte mit Streifen) kaum zu unterscheiden,
+  // und zwei fast gleiche Icons in einer Leiste, in der man schnell klickt, sind
+  // schlimmer als eine Ausnahme in der Zeichenregel.
+  budgets: <><path d="M6 4h12v16H6z" /><path d="M7.4 13.2h9.2v5.4H7.4z" fill="currentColor" stroke="none" /></>,
+  // Verlaufslinie.
+  analyse: <><path d="M4 18l5-6 4 3 7-8" /><path d="M4 4v16h16" /></>,
+  // Kiste in Schraegsicht.
+  inventar: <><path d="M3 8l9-4 9 4v8l-9 4-9-4V8Z" /><path d="M3 8l9 4 9-4" /><path d="M12 12v8" /></>,
+  // Blatt mit umgeknickter Ecke.
+  vertraege: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /><path d="M9 12h6M9 16h6" /></>,
+  // Gebaeude mit Saeulen.
+  kontenverwaltung: <><path d="M3 9l9-5 9 5" /><path d="M5 9v9M9.5 9v9M14.5 9v9M19 9v9" /><path d="M3 20h18" /></>,
+  // Pfeil hinunter in eine Ablage.
+  "import": <><path d="M12 3v10" /><path d="M8 9l4 4 4-4" /><path d="M4 16v4h16v-4" /></>,
+  // Etikett mit Loch — das Einsortieren.
+  training: <><path d="M4 12.5V5a1 1 0 0 1 1-1h7.5L20 11.5 12.5 19 4 12.5Z" /><circle cx="8.5" cy="8.5" r="1.3" /></>,
+  // Schieberegler.
+  einstellungen: <><path d="M4 7h16M4 12h16M4 17h16" /><circle cx="9" cy="7" r="1.9" /><circle cx="15" cy="12" r="1.9" /><circle cx="7" cy="17" r="1.9" /></>,
 };
 
 export function Icon({ name, groesse = 16 }: { name: IconName; groesse?: number }) {

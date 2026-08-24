@@ -32,6 +32,47 @@ für die ganze App, nicht eine je Screen.
 Zeilenaktionen sind Icons über `bausteine/IconButton.tsx` — ihr Text wandert in
 `title`/`aria-label`, statt zu verschwinden.
 
+## Bedienteile: fast alles von Hand, eine Ausnahme
+
+**Base UI (`@base-ui/react`) ist die einzige UI-Bibliothek im Projekt**, und sie liefert
+ausschliesslich MECHANIK — kein Aussehen. Alles Sichtbare kommt weiterhin aus `app.css`
+und den Tokens.
+
+Sie steht heute unter genau zwei Bausteinen:
+
+| Baustein | statt | woher die Mechanik |
+|---|---|---|
+| `bausteine/Auswahl` | `<select className="field">` im Formular | Base UI `Select` |
+| `bausteine/Datumsfeld` | `<input type="date">` | Base UI `Popover`, Kalender von Hand |
+
+**Die Grenze, an der die Entscheidung fiel:** ein Auswahlfeld braucht Combobox-Semantik
+(Knopf und Liste über ARIA verbunden, Tippsuche, Rollen) — das schreibt man nicht nebenbei
+richtig. Ein Kalender ist dagegen ein `role="grid"` mit einem Fokuspunkt, den die
+Pfeiltasten bewegen; das ist klein und klar, und Base UI hat ohnehin keinen Datepicker.
+Positionierung, Schliessen bei Klick daneben und Fokusrückgabe kommen trotzdem aus dem
+Popover statt aus Eigenbau.
+
+Was das für neuen Code heisst: **im Formular `Auswahl` und `Datumsfeld` nehmen**, nicht die
+nativen Elemente. Es stehen noch native `<select>` und `<input type="date">` in der App —
+das sind Stellen, die noch nicht gewandert sind, keine bewussten Ausnahmen.
+
+## Die Seitenleiste klappt ein
+
+Unter 1100 px Fensterbreite schrumpft sie auf 68 px und zeigt nur noch Icons. Das steuert
+allein CSS (`app.css`, Abschnitt „Schmales Fenster") — kein Zustand, kein Schalter.
+
+Der Mechanismus ist eine einzige Klasse: **was `.lbl` trägt, verschwindet dort.** Wer der
+Shell etwas hinzufügt, kapselt die Beschriftung entsprechend und hängt den Namen zusätzlich
+an `title` — schmal ist das Icon alles, was bleibt.
+
+Zwei Fallen, beide schon einmal zugeschnappt:
+
+- **Der Aktualisierungsknopf ist selbst ein `div` in der Fusszeile.** Eine pauschale Regel
+  `.side .foot > div { display: none }` nimmt ihn mit, und dann fehlt bei schmalem Fenster
+  der einzige Hinweis auf ein Update. Die Ausnahme steht wörtlich im CSS.
+- **Auskunft darf weichen, eine Handlung nicht.** Version und Stadium fallen schmal weg,
+  der Knopf bleibt. Das ist die Regel, nach der man im Zweifel entscheidet.
+
 ## Die Fläche kommt von `Card`
 
 **Inhalt steht in einer `Card`, nicht auf dem nackten Seitenhintergrund.** Sie trägt

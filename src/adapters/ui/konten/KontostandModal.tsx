@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import type { Cent, Zahlungskonto } from "../../../application";
 import { anfangsbestandAbgleichen, kontostandFesthalten } from "../../dienste";
 import { Button, FormField } from "../bausteine";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 
@@ -77,12 +78,10 @@ export function KassensturzModal({
       </p>
       <div className="form-grid">
         <FormField label={t("konten.anker.stichtag")} required>
-          <input
-            className="field"
-            type="date"
-            aria-label={t("konten.anker.stichtag")}
-            value={datum}
-            onChange={(e) => setDatum(e.target.value)}
+          <Datumsfeld
+            wert={datum}
+            aufAenderung={setDatum}
+            ariaLabel={t("konten.anker.stichtag")}
           />
         </FormField>
         <FormField label={t("konten.anker.betrag")} required>

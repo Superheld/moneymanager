@@ -20,6 +20,11 @@ export interface DataTableProps {
   onRowClick?: (row: any) => void;
   /** Optional: markiert die aktive Zeile (Hervorhebung). */
   istAktiv?: (row: any) => boolean;
+  /**
+   * Optional: Stil je Zeile, zuletzt aufgetragen. Gedacht fuer `opacity` — das daempft
+   * den ganzen Teilbaum inklusive der Zellen, die ihre Farbe selbst setzen.
+   */
+  rowStyle?: (row: any) => React.CSSProperties | undefined;
   /** Spaltenkopf-Klick sortiert (auf → ab → original). Pro Spalte via sortable abschaltbar. */
   sortable?: boolean;
   /** Wenn gesetzt, paginiert die Tabelle mit dieser Seitengröße (Steuerung unten). */

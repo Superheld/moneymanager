@@ -157,20 +157,25 @@ export function UebersichtScreen() {
                       }
                       style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--sp-3)", marginBottom: 4, cursor: "pointer" }}
                     >
-                      <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)", display: "inline-flex", alignItems: "center", gap: 6 }}>
-                        {z.tiefe > 0 && <span style={{ color: "var(--ink-3)" }}>└</span>}
-                        <span style={{ color: "var(--ink-3)" }}>{offen ? "▾" : "▸"}</span>
-                        {name}
+                      {/* Schmal wird es zuerst hier eng. Der NAME ist der einzige Teil, der
+                          zurückweicht — Pille und Zahlen tragen Information, die ein
+                          abgeschnittenes Wort nicht ersetzt. Ohne `minWidth: 0` schrumpft
+                          ein Flex-Kind nicht unter seinen Inhalt und schiebt stattdessen
+                          die rechte Spalte aus der Karte. */}
+                      <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, flex: "1 1 auto" }}>
+                        {z.tiefe > 0 && <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>└</span>}
+                        <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>{offen ? "▾" : "▸"}</span>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={name}>{name}</span>
                         {/* Nur das Aufbauende bekommt eine Pille — es ist der Sonderfall.
                             Zwei Pillen nebeneinander in jeder Zeile wären nur Rauschen. */}
-                        {z.budget.art === "aufbauend" && <Pill variant="um">{t("budgets.art.aufbauend")}</Pill>}
+                        {z.budget.art === "aufbauend" && <span style={{ flex: "0 0 auto", display: "inline-flex" }}><Pill variant="um">{t("budgets.art.aufbauend")}</Pill></span>}
                       </span>
                       {/* Rechts der Rest, darunter die Herkunft. Beim Monatlichen genügt
                           „von 200": der Rahmen IST der Monatsbetrag, es gibt nichts
                           fortzuschreiben. Beim Aufbauenden steht dort die Aufrechnung —
                           der kumulierte Rahmen hängt nur noch im Titel, weil „insgesamt
                           eingezahlt" eine eigene, seltenere Frage ist. */}
-                      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 1 }}>
+                      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flex: "0 0 auto" }}>
                         <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
                           {z.monat.ohnePlan ? (
                             // In diesem Monat gab es für die Kategorie noch keinen Rahmen.
