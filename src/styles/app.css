@@ -256,35 +256,51 @@ select.field {
 }
 
 /* ============================================================
-   Der Kontoauszug: gebucht links, geplant rechts.
+   Der Kontoauszug: gebucht links, geplant rechts — zwei Karten, kein geteilter Kasten.
 
    Der goldene Schnitt zugunsten der Buchungen (1,618 : 1) und nicht die Hälfte: links
-   stehen sieben Spalten und ein Seitenschalter, rechts vier. Ein hälftiger Schnitt gäbe
+   stehen sieben Spalten und ein Seitenschalter, rechts fuenf. Ein hälftiger Schnitt gäbe
    der schmalen Seite Platz, den sie nicht braucht, und nähme ihn der breiten.
 
-   `min-width: 0` an den Spalten ist Pflicht und nicht Kosmetik: ein Grid-Kind ist von
+   `min-width: 0` an den Kindern ist Pflicht und nicht Kosmetik: ein Grid-Kind ist von
    sich aus mindestens so breit wie sein Inhalt, und dann wächst eine Tabelle die Spalte
    auf, statt in ihrem eigenen Scrollrahmen zu bleiben — die ganze Seite zieht sich breit.
 
-   Unter 1280 px stapelt es wieder. Zwei waagerecht scrollende Tabellen nebeneinander sind
-   keine zwei Tabellen mehr, sondern zwei Ausschnitte. Die Zahl haengt an `.screen`, nicht
-   am Fenster: der Inhalt ist auf 1040 px gedeckelt, links davon bleiben also hoechstens
-   rund 630 px — knapp genug fuer die sieben Spalten der Buchungstabelle, und darunter
-   faengt sie an, selbst zu scrollen.
+   **Die Zahlen, an denen die Breakpoints haengen** — nachgerechnet, nicht geschaetzt.
+   Jede Karte kostet zweimal `--pad-card` (48 px). Die geplante Tabelle braucht fuer ihre
+   fuenf Spalten rund 370 px Inhalt, also gut 420 px Karte; bei 0,382 Anteil heisst das
+   rund 1110 px Inhaltsbreite, und mit Seitenleiste und Seitenrand rund 1440 px Fenster.
+   Darunter stapelt es. Zwei waagerecht scrollende Tabellen nebeneinander sind keine zwei
+   Tabellen mehr, sondern zwei Ausschnitte.
    ============================================================ */
 .auszug-spalten {
   display: grid;
   grid-template-columns: 1.618fr 1fr;
-  gap: var(--sp-5);
+  gap: var(--gap-card);
   align-items: start;
 }
-.auszug-spalte {
+.auszug-spalten > * {
   min-width: 0;
 }
-@media (max-width: 1280px) {
+@media (max-width: 1440px) {
   .auszug-spalten {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================
+   Ein Screen, der breiter sein darf als der Lesetext.
+
+   `.screen` deckelt bei 1040 px, und das ist fuer alles richtig, was man LIEST. Der
+   Kontoauszug liest man nicht, man sucht darin: zwei Tabellen nebeneinander, zusammen
+   zwoelf Spalten. Bei 1040 px blieben davon nach zwei Kartenpolsterungen 582 px links und
+   342 px rechts — die rechte Tabelle faengt dort an, waagerecht zu scrollen.
+
+   Die Grenze steht trotzdem, nur weiter draussen: ohne Deckel liefe die Tabelle auf einem
+   breiten Monitor ueber die ganze Flaeche, und dann sucht das Auge die Zeile.
+   ============================================================ */
+.screen--breit {
+  max-width: 1280px;
 }
 
 /* ============================================================
@@ -392,15 +408,19 @@ select.field.tabellenfilter {
   text-align: left;
   cursor: pointer;
 }
-/* `data-markiert` ist die Tastaturmarkierung und sieht aus wie :hover — beides zeigt
-   dieselbe Sache: hier landet die Eingabe. Zwei verschiedene Markierungen gleichzeitig
-   auf dem Bild waeren schlimmer als keine; wer die Maus bewegt, sieht ohnehin nur eine
-   davon unter dem Zeiger. Der Rahmen links macht den Unterschied trotzdem ablesbar. */
-.pickrow:hover,
+/* EINE Markierung, egal ob Maus oder Tastatur.
+
+   Ein eigener `:hover` daneben brachte beide gleichzeitig aufs Bild: die Zeile unter dem
+   Zeiger und die, auf der die Pfeiltasten stehen — zwei Antworten auf dieselbe Frage
+   („wo landet die Eingabe"), und man sah nicht mehr, welche gilt. Deshalb gibt es hier
+   keinen `:hover`: die Maus SETZT `data-markiert` (siehe `Pickzeile`), statt daneben eine
+   zweite Auszeichnung zu malen.
+
+   Genau dieselbe Entscheidung steht ein Stueck weiter oben bei `.auswahl-item`, wo Base
+   UI `data-highlighted` fuer beides setzt. Der Fehler ist hier ein zweites Mal gemacht
+   und ein zweites Mal aufgefallen. */
 .pickrow[data-markiert] {
   background: var(--accent-wash);
-}
-.pickrow[data-markiert] {
   box-shadow: inset 2px 0 0 var(--accent);
 }
 .linkbtn {
