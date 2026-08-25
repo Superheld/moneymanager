@@ -1,7 +1,12 @@
 /* ============================================================
-   FONTS — Hanken Grotesk via Google Fonts.
-   NOTE: loaded from CDN (no binaries shipped). If you need
-   offline/self-hosted fonts, drop .woff2 files in assets/fonts
-   and replace this @import with @font-face rules.
+   FONTS — Hanken Grotesk, LOKAL gebündelt.
+   Bis 2026-08-25 kam sie über @import von fonts.googleapis.com.
+   Das war ein Netzzugriff bei jedem Start (Google sieht IP und
+   Zeitpunkt) und hätte die CSP löchrig gemacht: wer
+   fonts.googleapis.com erlauben muss, hat einen Kanal nach
+   draussen, über den sich Daten in einer URL hinausschmuggeln
+   lassen. Eine CSP mit diesem Loch beruhigt, ohne zu wirken.
+   Das Paket bringt nur woff2 und CSS mit, keinen ausführbaren
+   Code; Vite bündelt die Dateien in die App.
    ============================================================ */
-@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap');
+@import "@fontsource-variable/hanken-grotesk/wght.css";

@@ -356,6 +356,54 @@ gelöscht wurde. Deshalb trägt die Tabelle bewusst **keinen** Fremdschlüssel a
 - **`kontostand_anker` und `depotwert` werden nicht protokolliert.** Sie sind Beobachtungen
   zu einem Stichtag und werden nur ergänzt, nicht geändert.
 
+## Was die App nach draussen spricht
+
+Eine lokale Finanz-App, die still mit fremden Servern redet, ist keine lokale Finanz-App.
+Es gibt deshalb genau **drei** Wege nach draussen, und zwei davon setzen ein Zutun voraus:
+
+| Weg | wann | abschaltbar |
+|---|---|---|
+| Bankabruf | nur wenn jemand ihn auslöst | entfällt (er IST die Handlung) |
+| Update-Prüfung | beim Start, still | ja (`aktualisierungPruefen`) |
+| sonst | — | — |
+
+Die dritte Zeile ist leer, und das wird von `src/absicherung.test.ts` durchgesetzt.
+
+**Bis 2026-08-25 stimmte das nicht.** Die Schrift kam über ein `@import` von einem
+Schriften-Dienst — ein Netzzugriff bei jedem Start, bei dem der Betreiber IP und Zeitpunkt
+sieht. Die Behauptung weiter unten, die Update-Prüfung sei der erste ungefragte
+Netzzugriff, war damit falsch. Sie ist es erst, seit die Schrift im Bündel liegt
+(`@fontsource-variable/hanken-grotesk`).
+
+### Die CSP ist die Sperre, nicht die Absicht
+
+`app.security.csp` in `tauri.conf.json` erlaubt nur `'self'` und den Tauri-IPC. Das
+schützt nicht gegen einen Angreifer am Schreibtisch, sondern gegen den realistischen Fall:
+eine **Abhängigkeit**, die eines Tages etwas mitbringt, das niemand bestellt hat. Der
+Webview hat über `sql:allow-execute` Vollzugriff auf den Bestand — lesen kann fremder Code
+also alles. Was die CSP nimmt, ist der Rückweg: **fortschaffen kann er nichts.**
+
+Drei Dinge, die man dabei wissen muss:
+
+- **Der Bankabruf ist davon unberührt.** Er läuft über `tauri-plugin-http` durch Rust
+  (`adapters/fints/transport.ts` legt einen Umleiter über `globalThis.fetch`), also am
+  Webview vorbei. Die CSP sieht ihn nie; begrenzt wird er von den Capabilities.
+- **`devCsp` ist getrennt und lockerer.** Vite und React-Refresh spritzen ihre Skripte
+  inline ein; ohne `'unsafe-inline'` startet der Dev-Modus nicht. Die ausgelieferte
+  Fassung hat es ausdrücklich nicht, und der Wächter hält das auseinander.
+- **Eine Schrift aus dem Netz würde die CSP entwerten**, nicht nur ergänzen. Wer einen
+  fremden Host in `font-src` und `style-src` erlauben muss, hat einen Kanal, über den sich
+  Daten in einer URL hinaustragen lassen. Deshalb prüft der Wächter beides zusammen: die
+  CSP und dass keine CSS-Datei etwas nachlädt. Eine CSP mit diesem Loch beruhigt, ohne zu
+  wirken — und ein Wächter, der nichts sieht, ist schlimmer als keiner.
+
+### Was die CSP NICHT leistet
+
+Sie hindert fremden Code nicht am **Lesen**, und sie greift nicht gegen jemanden, der als
+du auf dieser Maschine läuft. Dagegen hülfe nur eine verschlüsselte Datenbank mit
+Passphrase — die lohnt sich, sobald ein Bestand die Maschine verlässt (Cloud, Sync), und
+solange er das nicht tut, deckt FileVault dasselbe Szenario ab.
+
 ## Stadium: Alpha
 
 Die App ist **nicht veröffentlicht**. Es gibt genau einen Datenbestand — den lokalen —, und
