@@ -17,8 +17,10 @@ import {
   budgetVerlauf,
   type BudgetSicht,
   type Budgetstand,
+  type IstBuchung,
 } from "../../../application";
 import { Button, Card } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
 import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -33,9 +35,16 @@ interface Props {
   kategorieNamen: ReadonlyMap<string, string>;
   empfaenger: ReadonlyMap<string, string>;
   onSchliessen: () => void;
+  /**
+   * Klick auf eine Buchung der Liste — der Bildschirm darüber öffnet sie.
+   *
+   * Nicht hier: der Verlauf ist eine ANZEIGE und weiss nichts vom Nachladen. Wer den
+   * Dialog aufmacht, muss danach die Sicht neu rechnen lassen, und die gehört dem Screen.
+   */
+  onBuchung?: (buchung: IstBuchung) => void;
 }
 
-export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger, onSchliessen }: Props) {
+export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger, onSchliessen, onBuchung }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
 
@@ -66,18 +75,13 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
       title={t("budgets.verlaufTitel", { name: stand.kategorieName })}
       subtitle={t("budgets.verlaufUntertitel", { monate: monate.length })}
       action={
-        <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
-          <select
-            className="field"
-            style={{ width: "auto" }}
-            aria-label={t("budgets.verlaufMonatWaehlen")}
-            value={gewaehlt}
-            onChange={(e) => setGewaehlt(Number(e.target.value))}
-          >
-            {monate.map((m, i) => (
-              <option key={m.monat} value={i}>{m.monat}</option>
-            ))}
-          </select>
+        <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+          <Auswahl
+            ariaLabel={t("budgets.verlaufMonatWaehlen")}
+            wert={String(gewaehlt)}
+            aufAenderung={(v) => setGewaehlt(Number(v))}
+            optionen={monate.map((m, i) => ({ wert: String(i), text: m.monat }))}
+          />
           <Button variant="ghost" onClick={onSchliessen}>{t("budgets.verlaufSchliessen")}</Button>
         </span>
       }
@@ -129,6 +133,7 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
         kategorieNamen={kategorieNamen}
         verbraucht={monat.verbraucht}
         leerText={t("budgets.verlaufMonatLeer", { monat: monat.monat })}
+        onBuchung={onBuchung}
       />
     </Card>
   );

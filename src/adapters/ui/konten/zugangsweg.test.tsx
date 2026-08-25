@@ -17,7 +17,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { KontenVerwaltungScreen } from "./KontenVerwaltungScreen";
 import { sqliteEinstellungenRepository } from "../../persistence/sqliteEinstellungenRepository";
 import i18n from "../../../i18n/i18n";
@@ -53,7 +53,9 @@ async function onlineMaske(nutzer: ReturnType<typeof userEvent.setup>) {
   );
   const knopf = knoepfe.find((b) => /^\+?\s*Konto$/i.test(b.textContent ?? ""));
   await nutzer.click(knopf!);
-  await nutzer.selectOptions(await feld(T.art()), "online");
+  // Seit 2026-08-25 eine `Auswahl` statt eines nativen `<select>`: Knopf aufklappen,
+  // Eintrag anklicken. Gewählt wird über den sichtbaren TEXT, nicht über den Wert.
+  await auswahlWaehlen(nutzer, T.art(), i18n.t("konten.anlegen.artOnline"));
 }
 
 describe("Zugangsweg in der Konto-Maske", () => {
@@ -90,7 +92,7 @@ describe("Zugangsweg in der Konto-Maske", () => {
     expect(await feld(T.blz())).toBeTruthy();
     expect(feldFehlt(T.token())).toBeNull();
 
-    await nutzer.selectOptions(await feld(T.weg()), "hanseatic");
+    await auswahlWaehlen(nutzer, T.weg(), T.wegHanseatic());
 
     // Nachher: Client-Kennung statt Bankleitzahl.
     expect(await feld(T.token())).toBeTruthy();
@@ -103,8 +105,18 @@ describe("Zugangsweg in der Konto-Maske", () => {
     rendere(<KontenVerwaltungScreen />);
     await onlineMaske(nutzer);
 
-    const wahl = (await feld(T.weg())) as HTMLSelectElement;
-    const namen = [...wahl.options].map((o) => o.textContent);
+    // Die Liste einer `Auswahl` steht erst im DOM, wenn sie offen ist — anders als bei
+    // einem `<select>`, dessen `<option>`n immer da sind.
+    // Die Liste einer `Auswahl` steht erst im DOM, wenn sie offen ist — anders als bei
+    // einem `<select>`, dessen `<option>`n immer da sind. Gesucht wird IN der Liste, weil
+    // native Optionen anderer Felder dieselbe Rolle melden.
+    await nutzer.click(await screen.findByRole("combobox", { name: T.weg() }));
+    const liste = await waitFor(() => {
+      const el = document.querySelector('.auswahl-popup:not([data-closed])');
+      if (!el) throw new Error("Liste nicht offen");
+      return el;
+    });
+    const namen = [...liste.querySelectorAll('[role="option"]')].map((o) => o.textContent);
     expect(namen).toContain(T.wegHanseatic());
   });
 });

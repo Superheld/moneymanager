@@ -11,6 +11,8 @@
 // jede Anpassung ein Blindflug — man dreht an einer Betragsgrenze und erfährt erst nach
 // dem Speichern, ob man zu viel oder zu wenig eingefangen hat.
 
+import { Auswahl } from "../bausteine/Auswahl";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -246,19 +248,23 @@ export function VertragErkennungModal({
                 value={f.betragBisText} onChange={(e) => setze("betragBisText", e.target.value)} />
             </FormField>
             <FormField label={t("vertraege.regel.gueltigAb")} hint={t("vertraege.regel.zeitraumHinweis")}>
-              <input className="field" type="date" aria-label={t("vertraege.regel.gueltigAb")}
-                value={f.gueltigAb} onChange={(e) => setze("gueltigAb", e.target.value)} />
+              <Datumsfeld ariaLabel={t("vertraege.regel.gueltigAb")}
+                wert={f.gueltigAb} aufAenderung={(v) => setze("gueltigAb", v)} />
             </FormField>
             <FormField label={t("vertraege.regel.gueltigBis")}>
-              <input className="field" type="date" aria-label={t("vertraege.regel.gueltigBis")}
-                value={f.gueltigBis} onChange={(e) => setze("gueltigBis", e.target.value)} />
+              <Datumsfeld ariaLabel={t("vertraege.regel.gueltigBis")}
+                wert={f.gueltigBis} aufAenderung={(v) => setze("gueltigBis", v)} />
             </FormField>
             <FormField label={t("vertraege.regel.konto")}>
-              <select className="field" aria-label={t("vertraege.regel.konto")} value={f.kontoId}
-                onChange={(e) => setze("kontoId", e.target.value)}>
-                <option value="">{t("vertraege.regel.alleKonten")}</option>
-                {konten.map((k) => <option key={k.id} value={k.id}>{k.bezeichnung}</option>)}
-              </select>
+              <Auswahl
+                ariaLabel={t("vertraege.regel.konto")}
+                wert={f.kontoId}
+                aufAenderung={(v) => setze("kontoId", v)}
+                optionen={[
+                  { wert: "", text: t("vertraege.regel.alleKonten") },
+                  ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung })),
+                ]}
+              />
             </FormField>
           </div>
 

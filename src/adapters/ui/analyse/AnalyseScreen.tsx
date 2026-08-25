@@ -22,10 +22,12 @@ import {
 } from "../../../application";
 import { analyse, depots } from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, KPIStat } from "../bausteine";
+import { AUFKLAPP_ZEILEN_BREIT, AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { DepotAnsicht } from "./DepotAnsicht";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
+import { Auswahl } from "../bausteine/Auswahl";
 import { PageHead } from "../bausteine/PageHead";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -139,7 +141,21 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
               />
             </div>
             {offen && (
-              <div style={{ marginLeft: "var(--sp-4)", borderLeft: "2px solid var(--line-soft)", paddingLeft: "var(--sp-2)" }}>
+              <div style={{
+                marginLeft: "var(--sp-4)", borderLeft: "2px solid var(--line-soft)", paddingLeft: "var(--sp-2)",
+                // Fünf Unterkategorien, dann wird gescrollt (siehe bausteine/aufklappen.ts).
+                // Die 43 px sind die gerechnete Zeilenhöhe: Polsterung 5 px oben und unten,
+                // darin der Balken mit seiner Beschriftung.
+                //
+                // Der Deckel gilt NUR, solange nichts darin aufgeklappt ist. Sonst läge die
+                // Buchungstabelle einer Unterkategorie in einem Rahmen von fünf Zeilen
+                // Höhe — ein Scrollbereich in einem Scrollbereich, und der äussere frisst
+                // die Hälfte des inneren.
+                maxHeight: g.kinder.some((k) => !!k.kategorieId && offeneKat === k.kategorieId)
+                  ? undefined
+                  : aufklappHoehe(AUFKLAPP_ZEILEN_SCHMAL, 43),
+                overflowY: "auto",
+              }}>
                 {g.kinder.map((k) => {
                   const katOffen = !!k.kategorieId && offeneKat === k.kategorieId;
                   return (
@@ -281,14 +297,27 @@ export function AnalyseScreen() {
     return t("historie.vsDurchschnitt", { prozent: (a > 0 ? "+" : "\u2212") + Math.abs(a) });
   }
 
-  const detailTh = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" } as const;
+  // `sticky`: die Kopfzeile bleibt beim Scrollen im aufgeklappten Bereich stehen. Ohne das
+  // scrollt sie nach oben weg, und ab der elften Zeile steht man vor fuenf namenlosen
+  // Spalten. Der Hintergrund ist Pflicht — ein durchsichtiger Kopf laesst die Zeilen
+  // durchscheinen, waehrend sie darunter durchlaufen.
+  const detailTh = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 } as const;
   const detailTd = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
 
   function detailTabelle(kategorieId: string) {
     const bs = basis ? analyseBuchungen(basis, kategorieId, detailFenster.bvon, detailFenster.bbis) : [];
     if (bs.length === 0) return <div className="muted" style={{ padding: "8px" }}>{t("historie.detailLeer")}</div>;
     return (
-      <div style={{ background: "var(--surface-2, rgba(0,0,0,.015))", borderRadius: "var(--r-md)", padding: "4px 8px", margin: "4px 0 10px" }}>
+      <div style={{
+        background: "var(--surface-2, rgba(0,0,0,.015))", borderRadius: "var(--r-md)",
+        padding: "4px 8px", margin: "4px 0 10px",
+        // Zehn Zeilen, dann wird gescrollt (siehe bausteine/aufklappen.ts). Die Zahlen sind
+        // die gerechnete Zeilenhoehe dieser Tabelle: 8 px Polsterung oben und unten, eine
+        // Textzeile in 12,5 px und die Haarlinie darunter; die Kopfzeile faellt etwas
+        // niedriger aus, weil ihre Schrift kleiner ist.
+        maxHeight: aufklappHoehe(AUFKLAPP_ZEILEN_BREIT, 36, 34),
+        overflowY: "auto",
+      }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
           <thead>
             <tr>
@@ -305,7 +334,12 @@ export function AnalyseScreen() {
               return (
                 // Anklickbar: beim Durchsehen einer Kategorie stößt man auf Buchungen,
                 // die eine Korrektur brauchen — der Umweg über den Konto-Auszug entfällt.
-                <tr key={z.buchung.id} onClick={() => setDetail(z.buchung)} style={{ cursor: "pointer" }} title={t("historie.detailOeffnen")}>
+                //
+                // `buchungszeile` faerbt die Zeile beim Ueberfahren ein. Der Zeiger allein
+                // war zu wenig: er zeigt sich erst, wenn man schon draufsteht, und in einer
+                // Liste probiert niemand jede Zeile durch. Dieselbe Klasse tragen die
+                // Buchungszeilen in der Uebersicht — was gleich funktioniert, sieht gleich aus.
+                <tr key={z.buchung.id} className="buchungszeile" onClick={() => setDetail(z.buchung)} title={t("historie.detailOeffnen")}>
                   <td style={detailTd}>{z.buchung.datum.split("-").reverse().join(".")}</td>
                   <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>{z.empfaenger || "—"}</td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 45 ? zweck.slice(0, 45) + "…" : zweck}</td>
@@ -347,25 +381,29 @@ export function AnalyseScreen() {
             title={t("historie.verlaufTitel")}
             subtitle={t(`historie.verlauf.${ansicht}`)}
             action={
-              <span style={{ display: "inline-flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+              <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
                 {/* Monat direkt wählbar — der Klick auf den Chart macht dasselbe, ist bei
                     vielen Monaten aber Zielübung. Beide schreiben denselben Zustand. */}
-                <select
-                  className="field"
-                  style={{ width: "auto" }}
-                  aria-label={t("historie.monatWaehlen")}
-                  value={aktivMonat ?? ""}
-                  onChange={(e) => { setAktivMonat(e.target.value === "" ? null : Number(e.target.value)); setOffeneKat(null); }}
-                >
-                  <option value="">{t("historie.alleMonate")}</option>
-                  {verlauf.map((m, i) => (<option key={m.label} value={i}>{m.label}</option>))}
-                </select>
-                <select className="field" style={{ width: "auto" }} value={zeitraum} onChange={(e) => { setZeitraum(e.target.value as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}>
-                  <option value="12">{t("historie.zr12")}</option>
-                  <option value="24">{t("historie.zr24")}</option>
-                  <option value="jahr">{t("historie.zrJahr")}</option>
-                  <option value="alles">{t("historie.zrAlles")}</option>
-                </select>
+                <Auswahl
+                  ariaLabel={t("historie.monatWaehlen")}
+                  wert={aktivMonat == null ? "" : String(aktivMonat)}
+                  aufAenderung={(v) => { setAktivMonat(v === "" ? null : Number(v)); setOffeneKat(null); }}
+                  optionen={[
+                    { wert: "", text: t("historie.alleMonate") },
+                    ...verlauf.map((m, i) => ({ wert: String(i), text: m.label })),
+                  ]}
+                />
+                <Auswahl
+                  ariaLabel={t("historie.zeitraumWaehlen")}
+                  wert={zeitraum}
+                  aufAenderung={(v) => { setZeitraum(v as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}
+                  optionen={[
+                    { wert: "12", text: t("historie.zr12") },
+                    { wert: "24", text: t("historie.zr24") },
+                    { wert: "jahr", text: t("historie.zrJahr") },
+                    { wert: "alles", text: t("historie.zrAlles") },
+                  ]}
+                />
               </span>
             }
           >
@@ -420,13 +458,17 @@ export function AnalyseScreen() {
               title={t("historie.katTitel")}
               subtitle={aufschluesselung.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
               action={
-                <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+                <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
                   {aufschluesselung.label && <Button variant="ghost" onClick={() => setAktivMonat(null)}>{t("historie.alleMonate")}</Button>}
-                  <select className="field" style={{ width: "auto" }} aria-label={t("historie.ebeneWaehlen")}
-                    value={ebene} onChange={(e) => { setEbene(e.target.value as "kategorie" | "gruppe"); setOffeneKat(null); setOffeneGruppe(null); }}>
-                    <option value="kategorie">{t("historie.ebeneKategorie")}</option>
-                    <option value="gruppe">{t("historie.ebeneGruppe")}</option>
-                  </select>
+                  <Auswahl
+                    ariaLabel={t("historie.ebeneWaehlen")}
+                    wert={ebene}
+                    aufAenderung={(v) => { setEbene(v as "kategorie" | "gruppe"); setOffeneKat(null); setOffeneGruppe(null); }}
+                    optionen={[
+                      { wert: "kategorie", text: t("historie.ebeneKategorie") },
+                      { wert: "gruppe", text: t("historie.ebeneGruppe") },
+                    ]}
+                  />
                 </span>
               }
                          >

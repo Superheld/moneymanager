@@ -53,8 +53,131 @@ Positionierung, Schliessen bei Klick daneben und Fokusrückgabe kommen trotzdem 
 Popover statt aus Eigenbau.
 
 Was das für neuen Code heisst: **im Formular `Auswahl` und `Datumsfeld` nehmen**, nicht die
-nativen Elemente. Es stehen noch native `<select>` und `<input type="date">` in der App —
-das sind Stellen, die noch nicht gewandert sind, keine bewussten Ausnahmen.
+nativen Elemente. Seit 2026-08-25 ist der Bestand vollständig gewandert — in `ui/` steht
+kein `<select>` und kein `<input type="date">` mehr (ausserhalb von `Zeilenauswahl`, die
+bewusst ein natives `<select>` bleibt: sie ist so gross wie eine Pille und braucht keine
+eigene Liste). Ein neu auftauchendes natives Element ist damit kein Rest mehr, sondern ein
+Rückschritt.
+
+**Tests wählen darin über `auswahlWaehlen`** aus `testwerkzeug/harness` —
+`userEvent.selectOptions` greift nicht mehr, weil eine `Auswahl` ein Knopf mit einer Liste
+im Portal ist. Zwei Fallen stecken in dem Helfer, beide gemessen: die Liste wird über ihre
+Klasse gesucht und nicht über die Rolle (native `<option>`-Elemente anderer Felder auf
+derselben Seite melden dieselbe), und eine gerade geschlossene Liste bleibt für ihre
+Animation noch kurz im DOM (`:not([data-closed])`). Wer das übersieht, klickt etwas an, die
+Auswahl bleibt stehen, und die Zusicherung fällt erst am Ende um.
+
+Ein `Datumsfeld` zeigt die **Landesschreibweise** (`12.08.2026`), nicht ISO — Tests, die
+den Anzeigewert prüfen, erwarten sie. Getippt werden darf trotzdem ISO, das erkennt es
+immer.
+
+## Der Buchungsdialog liegt in Teilen
+
+`buchung/BuchungDetail.tsx` trägt das Formular — alle drei Rollen (anlegen, Entwurf
+prüfen, bearbeiten) in EINER Maske, und das bleibt so: jede Erweiterung soll an einer
+Stelle ankommen statt an dreien. Was daneben liegt, braucht den Zustand der Maske nicht
+und wurde deshalb 2026-08-25 herausgezogen:
+
+| Datei | beantwortet |
+|---|---|
+| `VertragsBlock` | gehört diese Zahlung zu einem Vertrag? |
+| `DublettenBlock` | steht sie womöglich schon ein zweites Mal da? |
+| `BuchungsHerkunft` | woher sie kommt — reine Anzeige |
+| `Richtungswahl` | Höhe und Richtung des Betrags, samt der Zerlegung dahinter |
+| `SplitModal` · `ZurUmbuchungModal` | die beiden Folge-Dialoge (S-7, S-1) |
+
+**Das Kriterium war nicht die Grösse, sondern die Abhängigkeit:** herausgezogen ist, was
+seine Daten hereinbekommt und Entscheidungen zurückmeldet. Der Rest gehört zum Formular
+und bleibt dort, auch wenn die Funktion damit die grösste im Bereich ist.
+
+Keins davon ist ein `bausteine/`-Kandidat: alle werden von genau einem Screen benutzt
+(siehe `bausteine/CLAUDE.md`). `buchung/ddmm.ts` ist die Ausnahme von der Ausnahme — vier Zeilen,
+drei Nutzer im selben Bereich, und kein natürlicher Besitzer; über `BuchungDetail` zu
+importieren hätte einen Ring gebaut.
+
+## Tabellenfilter sind kleiner als Formularfelder
+
+Ein `.field` ist auf ein Formular ausgelegt: volle Breite, grosse Innenabstände, eigene
+Zeile. Über einer Tabelle steht es dagegen NEBEN der Tabelle und konkurriert mit ihr um
+Aufmerksamkeit — die Filterleiste wirkte dort wie das Hauptereignis der Karte, obwohl sie
+nur einstellt, was darunter zu sehen ist.
+
+Die Klasse **`tabellenfilter`** (in `app.css`) zieht sie auf Tabellengrösse zusammen. Sie
+wirkt am Container **und** direkt am Feld: eine Leiste mit fünf Feldern beschriftet man
+einmal, ein einzelner Monatswähler in einer Kartenkopfzeile braucht dafür keine Hülle, die
+es sonst nicht gäbe. Die Masse sind nicht erfunden — die Filterleiste der Import-Durchsicht
+trug sie längst als eigenen Inline-Stil und sah als einzige richtig aus.
+
+Die Regel dahinter ist dieselbe wie bei `Zeilenauswahl`: **die Grösse eines Bedienteils
+folgt dem, wo es steht, nicht dem, was es tut.**
+
+## Aus einer aufgeklappten Liste in die Buchung
+
+Wo einzelne Buchungen stehen — unter einem Budget (Übersicht, Budget-Verlauf) oder unter
+einer Kategorie (Analyse) —, führt der Klick in den Buchungsdialog. Das ist die Stelle, an
+der man den Fehler SIEHT: eine Zeile in der falschen Kategorie fällt beim Durchsehen einer
+Auswertung auf, nicht im Kontoauszug. Ohne diesen Weg musste man sie sich merken und dort
+wiederfinden.
+
+Die gemeinsame Klasse heisst **`buchungszeile`** (`app.css`) und trägt die Fläche beim
+Überfahren. Ein blosser `cursor: pointer` reicht dafür nicht — er zeigt sich erst, wenn der
+Zeiger schon draufsteht, und in einer Liste probiert niemand jede Zeile durch. Dieselbe
+Überlegung wie bei `Zeilenlink`, nur für eine Zeile, die zu kurz für einen Link ist.
+
+Zwei Dinge, die beim Einbauen zählen:
+
+- **Der Baustein bekommt den Klick als Option** (`onBuchung`), er baut den Dialog nicht
+  selbst. Wer ihn anbietet, muss danach die Sicht neu rechnen lassen — eine geänderte
+  Kategorie verschiebt Geld zwischen Budgets, und der Ausblick daneben rechnet aus
+  denselben Buchungen. Ohne die Angabe bleiben die Zeilen Text; ein Knopf, der nichts tut,
+  wäre schlechter als keiner.
+- **Nur was eine Buchung IST.** Ein geplanter Posten ohne `istId` beschreibt, was fällig
+  wird — ihn zu öffnen hiesse, einen Dialog auf etwas zu zeigen, das es nicht gibt.
+
+## Der Kontoauszug steht in drei Karten
+
+Kopf, Gebuchtes und Geplantes — das Gebuchte links, das Geplante rechts, im goldenen
+Schnitt zugunsten der Buchungen (`.auszug-spalten` in `app.css`, wo auch steht, warum
+1,618 : 1 und nicht die Hälfte). Untereinander war die geplante Liste erst nach der ganzen
+Buchungstabelle erreichbar, also bei einem Konto mit Historie nach zwei Bildschirmhöhen;
+sie beantwortet aber die Frage „was kommt noch".
+
+**Zwei Karten und nicht eine geteilte.** In einer Karte waren es zwei Tabellen unter einer
+Fläche, und die Überschriften mussten die Trennung allein tragen, die eine Karte von sich
+aus leistet. Sie liegen NEBEN der Kopf-Karte, nicht darin — die Klammer, die sie sonst
+umschlösse, steht zweihundert Zeilen weiter oben und ist im Code nicht zu sehen. Deshalb
+prüft `kartenschachtelung.test.tsx` diesen Fall inzwischen mit.
+
+Der Stand von heute ist dabei die Unterzeile der Vorschau-Karte geworden und nicht mehr ein
+Trenner zwischen beiden Listen: er ist der Punkt, ab dem die Vorschau rechnet. Zwischen
+zwei Listen stehend beschriftete er beide und keine.
+
+**Der Screen ist so breit wie jeder andere** — und alle sind breiter geworden, siehe unten.
+Ein eigener Deckel für diesen einen Bereich war der erste Versuch und fiel sofort auf: eine
+Seite, die breiter aufzieht als alle Nachbarn, sieht nach einem Fehler aus und nicht nach
+einer Entscheidung.
+
+Die Vorschau spart trotzdem, wo es nichts kostet: sie zeigt ihr Datum **ohne Jahr**, weil
+sie höchstens 90 Tage nach vorn reicht und das Jahr dort nichts unterscheidet. Wer ihr eine
+Spalte hinzufügt, rechnet nicht am Deckel nach, sondern am Breakpoint — dort ist es eng,
+nicht bei 1280 px.
+
+## Was im Konto steht, hat jemand belegt
+
+Die Vorschau neben dem Auszug ZEIGT, was kommt — sie bucht es nicht. Bis 2026-08-25 hing an
+jeder geplanten Zeile ein Kästchen „als bezahlt markieren", und ein Klick legte daraus eine
+Ist-Buchung an (`quelle: "bezahlt-markiert"`). Damit stand im Konto eine Zahlung, die
+niemand belegt hatte: die Bank kannte sie nicht, ein Beleg existierte nicht, und beim
+nächsten Abruf kam die echte Zeile zusätzlich dazu.
+
+**Eine Ist-Buchung entsteht nur noch auf zwei Wegen: aus dem Abruf/Import oder von Hand.**
+Eine Hochrechnung ist kein dritter. Der Use-Case dahinter ist entfernt, geprüft in
+`interaktion.test.tsx`.
+
+Zwei Reste stehen bewusst noch: `IstQuelle` kennt weiterhin `"bezahlt-markiert"` und
+`IstBuchung.planRef` gibt es noch — beides nur zum LESEN, damit ein Bestand mit solchen
+Zeilen sich nicht selbst widerspricht. Erzeugen kann sie nichts mehr; wer sie ganz abräumt,
+fasst dabei das Schema, den Monatsausblick (Status `bezahlt`) und die Projektion mit an.
 
 ## Die Seitenleiste klappt ein
 
@@ -72,6 +195,29 @@ Zwei Fallen, beide schon einmal zugeschnappt:
   der einzige Hinweis auf ein Update. Die Ausnahme steht wörtlich im CSS.
 - **Auskunft darf weichen, eine Handlung nicht.** Version und Stadium fallen schmal weg,
   der Knopf bleibt. Das ist die Regel, nach der man im Zweifel entscheidet.
+
+## Wie breit eine Seite wird
+
+`.screen` deckelt bei **1280 px**, nicht mehr bei 1040. Der alte Wert war der klassische
+Lesedeckel und hier am falschen Inhalt gemessen: diese App liest man nicht, man sucht darin.
+Konten, Analyse, Verträge, Inventar, Import und die Verwaltung führen alle mit einer
+Tabelle, und jede davon war schmaler, als sie sein musste.
+
+**Formulare halten das aus, ohne Zutun.** Genau das war der Einwand gegen mehr Breite — ein
+600 px breites Eingabefeld taugt nichts —, und er greift hier nicht: *jedes* `form-grid` der
+App sitzt in einem Modal, und die Dialoge deckeln bei 680 px. Auf einem Screen steht kein
+einziges Formular. Das ist nachgesehen und nicht angenommen; beim ersten Anlauf war es
+andersherum angenommen, und es hat eine Sonderbreite für einen einzigen Bereich gekostet,
+die zwei Runden später wieder rausflog.
+
+**Prosa braucht ihre eigene Grenze**: `.screen p { max-width: 78ch }`. Ein `<p>` steht in
+dieser Codebasis ausschliesslich für Erklärtext (15 Stellen), nie für Tabellen- oder
+Zeilentext — deshalb trifft die Regel genau das Richtige. Modale erwischt sie nicht, die
+hängen per Portal am `body`.
+
+Was dabei mitwächst und darf: `karten-paar` und `ausblick-karten` sind `fr`-Raster, die
+KPI-Leiste bricht um, und die Charts skalieren über ihre `viewBox` — die laufen ohnehin
+zwischen halber und voller Kartenbreite.
 
 ## Die Fläche kommt von `Card`
 

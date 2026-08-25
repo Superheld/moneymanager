@@ -10,11 +10,12 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { speicherzeitraumTage, type Abrufergebnis, type Bankprofil, type Bankzugang, type TanHerausforderung } from "../../../application";
+import { speicherzeitraumTage, type Abrufergebnis, type Bankprofil, type Bankzugang } from "../../../application";
 import { bankAbrufen, bankzugaenge } from "../../dienste";
-import { TanDialog, type TanFrage } from "./TanDialog";
+import { TanDialog, useTanFrage } from "./TanDialog";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { Button, FormField } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Modal } from "../bausteine/Modal";
 
@@ -49,7 +50,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [befunde, setBefunde] = useState<Abrufergebnis | null>(null);
-  const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
+  const { tanFrage, tanFrageSchliessen, frageTan } = useTanFrage();
 
   useEffect(() => {
     bankzugaenge()
@@ -77,10 +78,6 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
 
   const gewuenscht = rueckgriff ? Number(rueckgriff) : undefined;
   const ueberGrenze = grenze != null && gewuenscht != null && gewuenscht > grenze;
-
-  function frageTan(h: TanHerausforderung): Promise<string | undefined> {
-    return new Promise((antworten) => setTanFrage({ herausforderung: h, antworten }));
-  }
 
   async function abrufen() {
     const zugang = zugaenge.find((z) => z.id === zugangId);
@@ -135,13 +132,12 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
           <>
             {zugaenge.length > 1 && (
               <FormField label={t("konten.abruf.feldZugang")}>
-                <select className="field" value={zugangId} onChange={(e) => setZugangId(e.target.value)}>
-                  {zugaenge.map((z) => (
-                    <option key={z.id} value={z.id}>
-                      {z.bezeichnung}
-                    </option>
-                  ))}
-                </select>
+                <Auswahl
+                  ariaLabel={t("konten.abruf.feldZugang")}
+                  wert={zugangId}
+                  aufAenderung={setZugangId}
+                  optionen={zugaenge.map((z) => ({ wert: z.id, text: z.bezeichnung }))}
+                />
               </FormField>
             )}
             <FormField label={t("bankabruf.feldPin")} required hint={t("bankabruf.feldPinHinweis")}>
@@ -163,26 +159,24 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
                   : t("konten.abruf.zeitraumHinweis")
               }
             >
-              <select
-                className="field"
-                aria-label={t("konten.abruf.feldZeitraum")}
-                value={eigenerZeitraum ? "eigen" : rueckgriff}
-                onChange={(e) => {
-                  if (e.target.value === "eigen") {
+              <Auswahl
+                ariaLabel={t("konten.abruf.feldZeitraum")}
+                wert={eigenerZeitraum ? "eigen" : rueckgriff}
+                aufAenderung={(v) => {
+                  if (v === "eigen") {
                     setEigenerZeitraum(true);
                     setRueckgriff("");
                   } else {
                     setEigenerZeitraum(false);
-                    setRueckgriff(e.target.value);
+                    setRueckgriff(v);
                   }
                 }}
-              >
-                <option value="">{t("konten.abruf.zeitraumFortlaufend")}</option>
-                {[30, 90, 180, 360].map((n) => (
-                  <option key={n} value={n}>{t("konten.abruf.zeitraumTage", { n })}</option>
-                ))}
-                <option value="eigen">{t("konten.abruf.zeitraumEigen")}</option>
-              </select>
+                optionen={[
+                  { wert: "", text: t("konten.abruf.zeitraumFortlaufend") },
+                  ...[30, 90, 180, 360].map((n) => ({ wert: String(n), text: t("konten.abruf.zeitraumTage", { n }) })),
+                  { wert: "eigen", text: t("konten.abruf.zeitraumEigen") },
+                ]}
+              />
               {eigenerZeitraum && (
                 <input
                   className="field"
@@ -267,7 +261,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
         )}
       </Modal>
 
-      {tanFrage && <TanDialog frage={tanFrage} onFertig={() => setTanFrage(null)} />}
+      {tanFrage && <TanDialog frage={tanFrage} onFertig={tanFrageSchliessen} />}
     </>
   );
 }

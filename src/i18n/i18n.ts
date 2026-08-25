@@ -59,7 +59,10 @@ const de = {
       letzterBetrag: "Der letzte Betrag bleibt — ein Budget ohne Betrag wäre nur ein Etikett. Lösche stattdessen das Budget.",
     },
     bezeichnung: { fehlt: "Bitte eine Bezeichnung angeben." },
-    betrag: { groesserNull: "Der Betrag muss größer als 0 sein." },
+    betrag: {
+      groesserNull: "Der Betrag muss größer als 0 sein.",
+      nichtNull: "Bitte einen Betrag angeben — 0 ist keine Buchung. Ein Minus davor heißt: Geld ist abgeflossen.",
+    },
     startdatum: { ungueltig: "Bitte ein gültiges Startdatum angeben." },
     name: { fehlt: "Bitte einen Namen angeben." },
     konto: { waehlen: "Bitte ein Konto wählen." },
@@ -114,7 +117,6 @@ const de = {
     navEinstellungen: "Einstellungen",
     brandSub: "deine private Bilanz",
     footLokal: "Lokal · keine Cloud",
-    regionLabel: "Region",
     spaeterePhase: "kommt in einer späteren Phase",
     aktualisierungBereit: "Version {{version}} installieren",
     aktualisierungLaeuft: "wird installiert …",
@@ -247,10 +249,8 @@ const de = {
       "Ein Depot hat keine Buchungen — gekauft und verkauft wird über das Verrechnungskonto. Wie sich der Wert entwickelt hat, steht in der Analyse.",
   },
   import: {
-    titel: "Import",
     untertitel: "Bankdaten einlesen — Vorschau ohne Speichern",
     registerDatei: "Datei",
-    registerBank: "Bankabruf",
     registerInbox: "Inbox",
     dateiWaehlen: "Datei wählen",
     hinweis: "Excel-Export aus Finanzguru (.xlsx). Die Datei wird lokal gelesen; nichts wird gespeichert oder verschickt.",
@@ -267,6 +267,9 @@ const de = {
     spalteQuelle: "Aus der Datei",
     spalteZiel: "App-Konto",
     buchungenAnzahl: "{{n}} Buchungen",
+    // Die Zeile trägt den Kontonamen der Quelldatei, nicht die Frage — ohne diesen Namen
+    // meldet eine Vorlesehilfe nur den gewählten Wert.
+    zielKonto: "Wohin die Buchungen sollen",
     neuAnlegen: "➕ Neu anlegen",
     feldBezeichnung: "Bezeichnung",
     feldTyp: "Typ",
@@ -401,6 +404,8 @@ const de = {
     vonRahmen: "von {{rahmen}}",
     budgetAufklappen: "{{name}} — Buchungen zeigen",
     budgetOhneBuchungen: "In diesem Zeitraum ist auf dieses Budget nichts gebucht.",
+    // Titel an einer Buchungszeile in einer aufgeklappten Liste — sie oeffnet den Dialog.
+    buchungOeffnen: "Buchung bearbeiten",
     budgetBuchung: "Buchung",
     budgetSumme: "Verbraucht",
     budgetSummeZurueck: "Zurückgeflossen",
@@ -421,6 +426,10 @@ const de = {
     kpiAusgabenMonat: "Ausgaben {{monat}}",
     kpiOeAusgaben: "Ø Ausgaben / Monat",
     monatWaehlen: "Monat",
+    // Der Zeitraum hatte als natives `<select>` keinen Namen — die Optionen sprachen für
+    // sich („Letzte 12 Monate"). Eine `Auswahl` zeigt geschlossen nur die gewählte, und
+    // ohne Namen meldet eine Vorlesehilfe genau die als ganze Auskunft.
+    zeitraumWaehlen: "Zeitraum",
     vsDurchschnitt: "{{prozent}} % vs. Ø",
     kpiNetto: "Netto",
     kpiSaldo: "Saldo heute",
@@ -596,9 +605,6 @@ const de = {
     feldKontoHinweis: "optional — wo das Geld tatsächlich liegt",
     kontoKeins: "kein Konto",
     feldNeuwertHinweis: "Wiederbeschaffungswert für den nächsten Zyklus",
-    nutzungsdauer: "Nutzungsdauer",
-    monate: "Monate",
-    wiederbeschaffung: "Wiederbeschaffung",
     modalBearbeiten: "Gegenstand bearbeiten",
     modalAnlegen: "Gegenstand aufnehmen",
     modalUntertitel: "Wiederbeschaffung ÷ Nutzungsdauer → monatliche Rücklage",
@@ -657,7 +663,6 @@ const de = {
     },
     merkmale: {
       titel: "Was die Erkennung hier sieht",
-      aufklappen: "Merkmale dieser Buchung anzeigen",
       laedt: "rechne …",
       keineMerkmale: "Aus dieser Buchung entsteht kein einziges Merkmal — Empfänger und Verwendungszweck geben nichts her.",
       verwendet: "Verwendet",
@@ -755,11 +760,7 @@ const de = {
       stimmt: "stimmt mit der Bank",
       differenz: "Differenz {{betrag}}",
       bankSagt: "Bank meldet {{betrag}} (Stand {{datum}})",
-      bankMehr: "Die Bank hat mehr — es fehlt eine Einnahme, oder eine Ausgabe steht zu viel im Konto.",
-      appMehr: "Die App hat mehr — es fehlt eine Ausgabe, oder eine Buchung liegt doppelt vor.",
       gemeldet: "Kontostand der Bank übernommen (Stand {{datum}})",
-      spalte: "Abgleich",
-      nieAbgeglichen: "noch kein Bankstand",
     },
     spalteVerbindung: "Verbindung",
     online: "Online",
@@ -801,6 +802,9 @@ const de = {
       zuordnenHinweis:
         "Die Bank meldet diese Konten. Zu jedem entscheidest du, ob daraus ein neues Konto entsteht, " +
         "ob es zu einem vorhandenen gehört oder ob es außen vor bleibt.",
+      // Der Name der Wahl steht nicht daneben — die Zeile trägt den Kontonamen der
+      // Bank, nicht die Frage. Ohne ihn meldet eine Vorlesehilfe nur „nicht übernehmen".
+      zielFeld: "Was damit geschehen soll",
       zielIgnorieren: "nicht übernehmen",
       zielNeu: "neu anlegen",
       zielVorhanden: "mit vorhandenem verknüpfen",
@@ -832,7 +836,6 @@ const de = {
     anker: {
       gezaehlt: "gezählt: {{betrag}} am {{datum}}",
       luecke: "{{betrag}} sind zwischen dem {{von}} und dem {{bis}} entstanden",
-      weitereLuecken: "und {{n}} früher",
       abgleichen: "Anfangsbestand abgleichen",
       abgleichTitel: "Anfangsbestand abgleichen",
       abgleichBestaetigen: "Anfangsbestand setzen",
@@ -903,12 +906,22 @@ const de = {
     editUntertitelImport: "Importierte Buchung — Korrekturen bleiben erhalten, die Import-Spur auch.",
     pillUmbuchung: "Umbuchung",
     pillManuell: "manuell",
+    // ZWEI Woerter fuer denselben Marker, weil zwei verschiedene Dinge danebenstehen:
+    // im Detaildialog ein KAESTCHEN, dessen Haken „noch anzusehen" bedeutet
+    // (`pillPruefen`), im Register eine PILLE, die den Zustand der Zeile nennt
+    // (`pillZuPruefen`). Ein Wort, das an beiden Stellen passt, gibt es nicht — am
+    // Kaestchen waere ein Imperativ eine Anweisung an den Haken statt an den Leser.
     pillPruefen: "ansehen",
-    // Zwei Woerter fuer denselben Marker, weil zwei verschiedene Dinge danebenstehen:
-    // im Register ein KNOPF (Klick erledigt ihn), im Detaildialog ein KAESTCHEN, dessen
-    // Haken „noch anzusehen" bedeutet. Ein „erledigt" am Kaestchen kehrte die Bedeutung um.
-    pillErledigt: "erledigt",
-    pruefenWeg: "Erledigt — Marker entfernen",
+    // Die Pille hiess bis 2026-08-25 „erledigt" und war gruen — und las sich damit als
+    // Haken: hier ist nichts mehr zu tun. Gemeint war das Gegenteil. Was danebensteht,
+    // sagt, was eine Zeile IST; dieser Marker sagt, was noch ANSTEHT, und das ist eine
+    // Aufforderung. Deshalb ein Verb im Imperativ und die Warnfarbe statt der
+    // Bestaetigungsfarbe.
+    //
+    // Der Klick nimmt den Marker weg — das steht im `title` (`pruefenWeg`), wo eine
+    // Wirkung hingehoert, und nicht auf der Pille selbst.
+    pillZuPruefen: "prüfen",
+    pruefenWeg: "Geprüft — Marker entfernen",
     pruefenFeld: "Noch ansehen",
     pruefenHinweis:
       "Merkt die Zeile im Auszug vor. Zeilen aus einem Bankabruf tragen den Marker von selbst — sie werden gebucht, ohne dass jemand sie gesehen hat.",
@@ -917,7 +930,9 @@ const de = {
     loeschen: "löschen",
     heuteRealerStand: "heute · realer Stand {{stand}} {{symbol}}",
     keineGeplanten: "Keine geplanten Buchungen in den nächsten {{tage}} Tagen für dieses Konto.",
-    alsBezahltMarkieren: "als bezahlt markieren",
+    geplantTitel: "Geplant",
+    gebuchtTitel: "Gebucht",
+    zeitraumWaehlen: "Wie weit die Vorschau reicht",
     speichern: "Speichern",
     abbrechen: "Abbrechen",
     feldDatum: "Datum",
@@ -990,7 +1005,6 @@ const de = {
       planbezug: "Geplant als",
       planbezugWert: "{{regel}} · fällig {{faelligkeit}}",
       ohneImport: "In der App erfasst — kein Import-Kontext vorhanden.",
-      bearbeitbar: "Änderbar",
       kontoGepaart: "fest — erst die Paarung lösen",
       verwerfenBankzeile: "Verwerfen",
       verwerfenFolge:
@@ -1053,11 +1067,12 @@ const de = {
       bearbeiten: "Aufteilung ändern",
       aufheben: "Aufteilung aufheben",
       aufhebenHinweis: "Die Buchung steht danach ohne Kategorie da.",
+      // Steht im Auszug in der Kategorie-Spalte. Ein Strich hiesse dort „ohne Kategorie",
+      // und das ist etwas anderes als „auf mehrere verteilt".
+      pille: "aufgeteilt",
       zeileHinzufuegen: "Kategorie hinzufügen",
       zeileEntfernen: "entfernen",
-      spalteKategorie: "Kategorie",
       spalteBetrag: "Betrag",
-      spalteNotiz: "Notiz",
       gesamt: "Gesamtbetrag",
       verteilt: "Verteilt",
       restOffen: "Noch zu verteilen: {{betrag}}",
@@ -1070,10 +1085,14 @@ const de = {
       titel: "Buchung erfassen · {{konto}}",
       untertitelVorlaeufig: "vorläufig — der spätere Bankimport gleicht sie ab",
       untertitelBargeld: "Bargeld — manuelle Erfassung ist hier die Dauerquelle",
-      betragHinweis: "positiv — die Richtung steht darunter",
-      gegenrichtungAufwand: "Geld kam zurück (Erstattung, Rückzahlung)",
-      gegenrichtungErtrag: "Geld ging zurück (Rückbuchung, Storno)",
-      gegenrichtungHinweis: "Die Kategorie bleibt die der Ausgabe — dort entlastet der Rückfluss das Budget.",
+      // Zwei Wörter für die zwei Möglichkeiten, und beide sagen dasselbe aus der Sicht
+      // des KONTOS: ging Geld weg oder kam welches an. „Ausgabe/Einnahme" wäre die
+      // Einordnung und damit dieselbe Verwechslung noch einmal — eine Erstattung ist eine
+      // Ausgabenkategorie, bei der Geld ankommt.
+      richtung: "Richtung",
+      richtungAb: "Abfluss",
+      richtungZu: "Zufluss",
+      gegenrichtungHinweis: "Geht gegen die Kategorie — also ein Rückfluss (Erstattung, Retoure, Storno). Die Kategorie bleibt die der Ausgabe: dort entlastet er das Budget.",
       notizPlatzhalter: "z. B. Bäcker, Tankstelle",
     },
   },
@@ -1089,6 +1108,18 @@ const de = {
       untertitel: "Gilt für den ganzen Haushalt",
       feld: "Region",
       hinweis: "bestimmt Sprache, Zahlenformat und Währung",
+    },
+    aktualisierung: {
+      titel: "Aktualisierung",
+      untertitel: "Ob die App beim Start nach einer neueren Fassung sucht",
+      // Der Satz sagt, WAS passiert, und nennt den Grund, warum es diesen Schalter gibt.
+      // Ohne ihn liest sich das Kästchen wie eine Bequemlichkeit; es ist aber die einzige
+      // Stelle, an der die App ungefragt nach draußen spricht.
+      hinweis:
+        "Das ist der einzige Netzzugriff, den die App von sich aus macht — sonst spricht sie nur nach draußen, wenn du einen Bankabruf auslöst. Abgerufen wird ausschließlich, ob es eine neuere Fassung gibt; es werden keine Daten von dir übertragen.",
+      schalterTitel: "Beim Start nach Aktualisierungen suchen",
+      schalterText:
+        "Liegt eine neuere Fassung bereit, erscheint unten links in der Seitenleiste ein Knopf. Findet die Prüfung nichts oder scheitert sie, passiert nichts — es gibt dann keine Meldung.",
     },
     experiment: {
       titel: "Experimente",
@@ -1498,7 +1529,6 @@ const de = {
   charts: {
     einnahmen: "Einnahmen",
     ausgabenInklBudgets: "Ausgaben (inkl. Budgets)",
-    planSaldo: "Plan-Saldo",
   },
 };
 
@@ -1536,7 +1566,10 @@ const en: typeof de = {
       letzterBetrag: "The last amount stays — a budget without an amount is just a label. Delete the budget instead.",
     },
     bezeichnung: { fehlt: "Please enter a name." },
-    betrag: { groesserNull: "The amount must be greater than 0." },
+    betrag: {
+      groesserNull: "The amount must be greater than 0.",
+      nichtNull: "Please enter an amount — 0 is not a booking. A leading minus means money went out.",
+    },
     startdatum: { ungueltig: "Please enter a valid start date." },
     name: { fehlt: "Please enter a name." },
     konto: { waehlen: "Please select an account." },
@@ -1590,7 +1623,6 @@ const en: typeof de = {
     navEinstellungen: "Settings",
     brandSub: "your private balance sheet",
     footLokal: "Local · no cloud",
-    regionLabel: "Region",
     spaeterePhase: "coming in a later phase",
     aktualisierungBereit: "Install version {{version}}",
     aktualisierungLaeuft: "installing …",
@@ -1723,10 +1755,8 @@ const en: typeof de = {
       "A portfolio has no bookings — buying and selling runs through the settlement account. How its value developed is in Analysis.",
   },
   import: {
-    titel: "Import",
     untertitel: "Read in bank data — preview without saving",
     registerDatei: "File",
-    registerBank: "Bank retrieval",
     registerInbox: "Inbox",
     dateiWaehlen: "Choose file",
     hinweis: "Finanzguru Excel export (.xlsx). The file is read locally; nothing is saved or sent.",
@@ -1743,6 +1773,7 @@ const en: typeof de = {
     spalteQuelle: "From the file",
     spalteZiel: "App account",
     buchungenAnzahl: "{{n}} transactions",
+    zielKonto: "Where the transactions go",
     neuAnlegen: "➕ Create new",
     feldBezeichnung: "Name",
     feldTyp: "Type",
@@ -1875,6 +1906,7 @@ const en: typeof de = {
     vonRahmen: "of {{rahmen}}",
     budgetAufklappen: "{{name}} — show entries",
     budgetOhneBuchungen: "Nothing was posted to this budget in this period.",
+    buchungOeffnen: "Edit transaction",
     budgetBuchung: "Entry",
     budgetSumme: "Spent",
     budgetSummeZurueck: "Refunded",
@@ -1895,6 +1927,7 @@ const en: typeof de = {
     kpiAusgabenMonat: "Expenses {{monat}}",
     kpiOeAusgaben: "Avg. expenses / month",
     monatWaehlen: "Month",
+    zeitraumWaehlen: "Period",
     vsDurchschnitt: "{{prozent}} % vs. avg.",
     kpiNetto: "Net",
     kpiSaldo: "Balance today",
@@ -2070,9 +2103,6 @@ const en: typeof de = {
     feldKontoHinweis: "optional — where the money actually sits",
     kontoKeins: "no account",
     feldNeuwertHinweis: "replacement value for the next cycle",
-    nutzungsdauer: "Useful life",
-    monate: "months",
-    wiederbeschaffung: "Replacement value",
     modalBearbeiten: "Edit item",
     modalAnlegen: "Add item",
     modalUntertitel: "Replacement value ÷ useful life → monthly reserve",
@@ -2131,7 +2161,6 @@ const en: typeof de = {
     },
     merkmale: {
       titel: "What the recognition sees here",
-      aufklappen: "Show this payment's features",
       laedt: "computing …",
       keineMerkmale: "This payment yields no feature at all — payee and reference text give nothing.",
       verwendet: "Used",
@@ -2229,11 +2258,7 @@ const en: typeof de = {
       stimmt: "matches the bank",
       differenz: "Difference {{betrag}}",
       bankSagt: "Bank reports {{betrag}} (as of {{datum}})",
-      bankMehr: "The bank has more — an income is missing, or an expense is booked that should not be.",
-      appMehr: "The app has more — an expense is missing, or an entry is duplicated.",
       gemeldet: "Bank balance taken over (as of {{datum}})",
-      spalte: "Reconciliation",
-      nieAbgeglichen: "no bank balance yet",
     },
     spalteVerbindung: "Connection",
     online: "Online",
@@ -2275,6 +2300,7 @@ const en: typeof de = {
       zuordnenHinweis:
         "These are the accounts the bank reports. For each one, decide whether it becomes a new account, " +
         "belongs to an existing one, or stays out.",
+      zielFeld: "What to do with it",
       zielIgnorieren: "do not add",
       zielNeu: "create new",
       zielVorhanden: "link to existing",
@@ -2306,7 +2332,6 @@ const en: typeof de = {
     anker: {
       gezaehlt: "counted: {{betrag}} on {{datum}}",
       luecke: "{{betrag}} appeared between {{von}} and {{bis}}",
-      weitereLuecken: "and {{n}} earlier",
       abgleichen: "Reconcile opening balance",
       abgleichTitel: "Reconcile opening balance",
       abgleichBestaetigen: "Set opening balance",
@@ -2378,8 +2403,8 @@ const en: typeof de = {
     pillUmbuchung: "Transfer",
     pillManuell: "manual",
     pillPruefen: "review",
-    pillErledigt: "done",
-    pruefenWeg: "Done — remove the marker",
+    pillZuPruefen: "review",
+    pruefenWeg: "Reviewed — remove the marker",
     pruefenFeld: "Still to review",
     pruefenHinweis:
       "Flags the entry in the statement. Rows from a bank retrieval carry the marker by themselves — they are booked without anyone having seen them.",
@@ -2388,7 +2413,9 @@ const en: typeof de = {
     loeschen: "delete",
     heuteRealerStand: "today · balance {{stand}} {{symbol}}",
     keineGeplanten: "No planned entries in the next {{tage}} days for this account.",
-    alsBezahltMarkieren: "mark as paid",
+    geplantTitel: "Planned",
+    gebuchtTitel: "Booked",
+    zeitraumWaehlen: "How far the preview looks ahead",
     speichern: "Save",
     abbrechen: "Cancel",
     feldDatum: "Date",
@@ -2457,7 +2484,6 @@ const en: typeof de = {
       planbezug: "Planned as",
       planbezugWert: "{{regel}} · due {{faelligkeit}}",
       ohneImport: "Captured in the app — no import context available.",
-      bearbeitbar: "Editable",
       kontoGepaart: "fixed — unpair the transfer first",
       verwerfenBankzeile: "Discard",
       verwerfenFolge:
@@ -2520,11 +2546,10 @@ const en: typeof de = {
       bearbeiten: "Change split",
       aufheben: "Remove split",
       aufhebenHinweis: "The transaction is left without a category afterwards.",
+      pille: "split",
       zeileHinzufuegen: "Add category",
       zeileEntfernen: "remove",
-      spalteKategorie: "Category",
       spalteBetrag: "Amount",
-      spalteNotiz: "Note",
       gesamt: "Total amount",
       verteilt: "Allocated",
       restOffen: "Still to allocate: {{betrag}}",
@@ -2537,10 +2562,10 @@ const en: typeof de = {
       titel: "Add entry · {{konto}}",
       untertitelVorlaeufig: "provisional — the later bank import reconciles it",
       untertitelBargeld: "Cash — manual capture is the permanent source here",
-      betragHinweis: "positive — the direction is set below",
-      gegenrichtungAufwand: "Money came back (refund, reimbursement)",
-      gegenrichtungErtrag: "Money went back (reversal, chargeback)",
-      gegenrichtungHinweis: "The category stays the one of the expense — that is where the refund relieves the budget.",
+      richtung: "Direction",
+      richtungAb: "Money out",
+      richtungZu: "Money in",
+      gegenrichtungHinweis: "Runs against the category — so it is a refund (reimbursement, return, reversal). The category stays the one of the expense: that is where it relieves the budget.",
       notizPlatzhalter: "e.g. bakery, gas station",
     },
   },
@@ -2556,6 +2581,15 @@ const en: typeof de = {
       untertitel: "Applies to the whole household",
       feld: "Region",
       hinweis: "determines language, number format and currency",
+    },
+    aktualisierung: {
+      titel: "Updates",
+      untertitel: "Whether the app looks for a newer version at startup",
+      hinweis:
+        "This is the only network request the app makes on its own — otherwise it only talks to the outside when you start a bank retrieval. All it asks is whether a newer version exists; none of your data is sent.",
+      schalterTitel: "Look for updates at startup",
+      schalterText:
+        "If a newer version is ready, a button appears at the bottom left of the sidebar. If the check finds nothing or fails, nothing happens — there is no message.",
     },
     experiment: {
       titel: "Experiments",
@@ -2962,7 +2996,6 @@ const en: typeof de = {
   charts: {
     einnahmen: "Income",
     ausgabenInklBudgets: "Expenses (incl. budgets)",
-    planSaldo: "Plan balance",
   },
 };
 

@@ -50,7 +50,14 @@ export function Bereich({
           gap: "var(--sp-4)",
           borderBottom: "1px solid var(--line)",
           marginBottom: "var(--sp-4)",
+          // Die Leiste darf waagerecht rollen, wenn viele Register nebeneinander stehen.
+          // `overflow-y` MUSS dabei ausdrücklich dastehen: sobald eine der beiden Achsen
+          // nicht mehr `visible` ist, rechnet der Browser die andere zu `auto` um — und
+          // die Reiter ragen mit ihrem `marginBottom: -1` genau einen Pixel über den
+          // Kasten hinaus. Das reicht für einen senkrechten Rollbalken an einer Leiste,
+          // die nur eine Zeile hoch ist.
           overflowX: "auto",
+          overflowY: "hidden",
         }}
       >
         {register.map((r) => {

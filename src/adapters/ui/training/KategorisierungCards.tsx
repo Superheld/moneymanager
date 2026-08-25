@@ -49,6 +49,7 @@ import {
 } from "../../dienste";
 import type { GespeicherterAusschluss } from "../../../application/ports";
 import { Button, Card, DataTable, FormField, KPIStat, Pill } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
 import { Bereich } from "../bausteine/Bereich";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 
@@ -691,12 +692,15 @@ function AusschluesseInhalt({
           />
         </FormField>
         <FormField label={t("einstellungen.lernmaterial.nurIn")}>
-          <select className="field" value={nurIn} onChange={(e) => setNurIn(e.target.value as Merkmalsherkunft | "")}>
-            <option value="">{t("einstellungen.lernmaterial.ueberall")}</option>
-            {MERKMALSHERKUENFTE.map((h) => (
-              <option key={h} value={h}>{t(`einstellungen.lernmaterial.herkunft.${h}`)}</option>
-            ))}
-          </select>
+          <Auswahl
+            ariaLabel={t("einstellungen.lernmaterial.nurIn")}
+            wert={nurIn}
+            aufAenderung={(v) => setNurIn(v as Merkmalsherkunft | "")}
+            optionen={[
+              { wert: "", text: t("einstellungen.lernmaterial.ueberall") },
+              ...MERKMALSHERKUENFTE.map((h) => ({ wert: h, text: t(`einstellungen.lernmaterial.herkunft.${h}`) })),
+            ]}
+          />
         </FormField>
         <Button variant="primary" plus onClick={hinzufuegen}>
           {t("einstellungen.lernmaterial.ausschliessen")}

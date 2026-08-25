@@ -173,12 +173,39 @@ body {
   overflow: auto;
   padding: var(--pad-screen);
 }
+/* Die Inhaltsbreite.
+ *
+ * Lange bei 1040 px — der klassische Lesedeckel. Der war hier aber am falschen Inhalt
+ * gemessen: diese App liest man nicht, man sucht darin. Konten, Analyse, Vertraege,
+ * Inventar, Import und die Verwaltung fuehren alle mit einer Tabelle, und jede von ihnen
+ * war schmaler, als sie sein musste.
+ *
+ * **Formulare halten das aus, und zwar ohne Zutun.** Das war der Einwand gegen mehr Breite
+ * — ein 600 px breites Eingabefeld taugt nichts —, und er greift hier nicht: JEDES
+ * `form-grid` der App sitzt in einem Modal, und die Dialoge deckeln bei 680 px. Auf einem
+ * Screen steht kein einziges Formular. Nachgesehen, nicht angenommen; beim ersten Anlauf
+ * war es andersherum angenommen und hat eine Sonderbreite fuer einen einzigen Bereich
+ * gekostet.
+ *
+ * Was bleibt, ist die Prosa darunter.
+ */
 .screen {
-  max-width: 1040px;
+  max-width: 1280px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--gap-card);
+}
+
+/* Ein Absatz braucht eine Zeilenlaenge, eine Tabelle nicht.
+ *
+ * Bei 1280 px liefe ein Erklaertext auf rund 200 Zeichen je Zeile, und beim Zeilenwechsel
+ * verliert man die Spur. `<p>` steht in dieser Codebasis ausschliesslich fuer Prosa (15
+ * Stellen), nie fuer Tabellen- oder Zeilentext — deshalb greift die Regel genau dort und
+ * sonst nirgends. Modale trifft sie nicht: die haengen per Portal am `body` und liegen
+ * ausserhalb von `.screen`. */
+.screen p {
+  max-width: 78ch;
 }
 
 .phead h1 {
@@ -255,6 +282,130 @@ select.field {
   margin-top: 0 !important;
 }
 
+/* ============================================================
+   Der Kontoauszug: gebucht links, geplant rechts — zwei Karten, kein geteilter Kasten.
+
+   Der goldene Schnitt zugunsten der Buchungen (1,618 : 1) und nicht die Hälfte: links
+   stehen sieben Spalten und ein Seitenschalter, rechts fuenf. Ein hälftiger Schnitt gäbe
+   der schmalen Seite Platz, den sie nicht braucht, und nähme ihn der breiten.
+
+   `min-width: 0` an den Kindern ist Pflicht und nicht Kosmetik: ein Grid-Kind ist von
+   sich aus mindestens so breit wie sein Inhalt, und dann wächst eine Tabelle die Spalte
+   auf, statt in ihrem eigenen Scrollrahmen zu bleiben — die ganze Seite zieht sich breit.
+
+   **Die Zahlen, an denen der Breakpoint haengt** — nachgerechnet, nicht geschaetzt.
+   Am Deckel (1280 px) gehen 16 px Spalte ab; links bleiben 781 px, rechts 483 px, und jede
+   Karte kostet zweimal `--pad-card` (48 px). Die geplante Tabelle braucht fuer ihre vier
+   Spalten rund 340 px Inhalt und haette 435 — Luft genug.
+
+   Eng wird es erst, wenn das Fenster den Deckel unterschreitet: bei 1400 px Fensterbreite
+   bleiben der rechten Karte noch 355 px Inhalt. Darunter stapelt es, denn zwei waagerecht
+   scrollende Tabellen nebeneinander sind keine zwei Tabellen mehr, sondern zwei
+   Ausschnitte. Wer der Vorschau eine Spalte ergaenzt, rechnet an DIESER Stelle nach — nicht
+   am Deckel, wo alles bequem aussieht.
+   ============================================================ */
+.auszug-spalten {
+  display: grid;
+  grid-template-columns: 1.618fr 1fr;
+  gap: var(--gap-card);
+  align-items: start;
+}
+.auszug-spalten > * {
+  min-width: 0;
+}
+@media (max-width: 1400px) {
+  .auszug-spalten {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   Eine Buchungszeile in einer aufgeklappten Liste.
+
+   Wo einzelne Buchungen stehen — unter einem Budget, unter einer Ausblickzeile, unter
+   einer Kategorie in der Analyse —, fuehrt der Klick in den Buchungsdialog. Das ist die
+   Stelle, an der man den Fehler SIEHT: eine Zeile in der falschen Kategorie faellt beim
+   Durchsehen einer Auswertung auf, nicht im Kontoauszug. Ohne den Weg von hier aus musste
+   man sie sich merken und im Auszug wiederfinden.
+
+   **Man muss der Zeile ansehen, dass sie einer ist.** Ein blosser `cursor: pointer` ist
+   kein Hinweis — er zeigt sich erst, wenn der Zeiger schon draufsteht, und in einer Liste
+   probiert niemand jede Zeile durch. Die Flaeche beim Ueberfahren ist der Hinweis; sie
+   kostet nichts und ist dieselbe wie in jeder anderen Liste der App.
+
+   Der Knopf-Reset ist noetig, weil die Zeilen ECHTE Knoepfe sind und keine `div`s mit
+   Klick: nur so sind sie mit der Tastatur erreichbar. Ein `div onClick` sieht im Browser
+   gleich aus und ist fuer jeden, der nicht mit der Maus arbeitet, gar nicht da.
+   ============================================================ */
+.buchungszeile {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.buchungszeile:hover {
+  background: var(--accent-wash);
+}
+.buchungszeile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Die Analyse-Zeile ist ein `tr` und kann kein Knopf sein — dort traegt die Zeile nur die
+   Flaeche. Die Tastaturfrage stellt sich dort schon laenger und haengt an `DataTable`. */
+tr.buchungszeile {
+  display: table-row;
+  border-radius: 0;
+}
+
+/* ============================================================
+   Tabellenfilter — kleiner als ein Formularfeld, und aus gutem Grund.
+
+   Ein `.field` ist auf ein Formular ausgelegt: volle Breite, grosse Innenabstände, eigene
+   Zeile. Über einer Tabelle steht es dagegen NEBEN der Tabelle und konkurriert mit ihr um
+   Aufmerksamkeit — die Filterleiste wirkte dort wie das Hauptereignis der Karte, obwohl
+   sie nur einstellt, was darunter zu sehen ist.
+
+   Deshalb dieselbe Verkleinerung wie bei `Zeilenauswahl`: Schriftgrad der Tabelle
+   (13 px), knappere Polsterung. Die Masse sind nicht erfunden — die Filterleiste der
+   Import-Durchsicht hatte sie längst als eigenen Inline-Stil, und die sah als einzige
+   richtig aus. Hier ist daraus eine Klasse geworden.
+
+   Sie wirkt am CONTAINER **und** direkt am Feld: eine Leiste mit fünf Feldern beschriftet
+   man einmal, ein einzelner Monatswähler in einer Kartenkopfzeile braucht dafür keine
+   Hülle, die es sonst nicht gäbe.
+   ============================================================ */
+.tabellenfilter .field,
+.field.tabellenfilter {
+  font-size: 13px;
+  padding: 5px 9px;
+  border-radius: var(--r-md);
+}
+.tabellenfilter select.field,
+select.field.tabellenfilter {
+  padding-right: 26px;
+  background-position: right 8px center;
+}
+/* Der Kalenderknopf sitzt IN der Hülle und bringt seine eigene Grösse mit. */
+.tabellenfilter .datumsfeld-huelle {
+  padding: 0 4px 0 9px;
+}
+.tabellenfilter .datumsfeld-eingabe {
+  padding: 5px 0;
+  font-size: 13px;
+}
+.tabellenfilter .datumsfeld-knopf {
+  width: 22px;
+  height: 22px;
+}
+.tabellenfilter .auswahl-trigger {
+  padding-right: 9px;
+}
+
 .form-actions {
   margin-top: var(--sp-4);
   display: flex;
@@ -316,8 +467,20 @@ select.field {
   text-align: left;
   cursor: pointer;
 }
-.pickrow:hover {
+/* EINE Markierung, egal ob Maus oder Tastatur.
+
+   Ein eigener `:hover` daneben brachte beide gleichzeitig aufs Bild: die Zeile unter dem
+   Zeiger und die, auf der die Pfeiltasten stehen — zwei Antworten auf dieselbe Frage
+   („wo landet die Eingabe"), und man sah nicht mehr, welche gilt. Deshalb gibt es hier
+   keinen `:hover`: die Maus SETZT `data-markiert` (siehe `Pickzeile`), statt daneben eine
+   zweite Auszeichnung zu malen.
+
+   Genau dieselbe Entscheidung steht ein Stueck weiter oben bei `.auswahl-item`, wo Base
+   UI `data-highlighted` fuer beides setzt. Der Fehler ist hier ein zweites Mal gemacht
+   und ein zweites Mal aufgefallen. */
+.pickrow[data-markiert] {
   background: var(--accent-wash);
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .linkbtn {
   background: none;
@@ -438,9 +601,19 @@ select.field {
   .side .lbl,
   .side .nlbl { display: none; }
 
+  /* Ein QUADRAT um das Icon, kein Streifen ueber die ganze Breite.
+     Aufgeklappt liegen um das Icon 9px oben und unten und 11px links — die Markierung
+     hat also ringsum Luft. Eingeklappt behielt sie die Polsterung nur oben und unten
+     (`padding: 10px 0`) und wurde vom `align-items: stretch` der Spalte auf die volle
+     Breite der Leiste gezogen: links und rechts sass sie dann direkt am Icon.
+     Deshalb hier eine feste Kantenlaenge (17px Icon + 2x9px) statt Polsterung, und die
+     Spalte zentriert ihre Eintraege, statt sie zu dehnen. */
+  .nav { align-items: center; }
   .nav a {
     justify-content: center;
-    padding: 10px 0;
+    padding: 0;
+    width: 35px;
+    height: 35px;
   }
   /* Das Kennzeichen sass per `margin-left: auto` am rechten Rand — ohne Beschriftung
      daneben draengt es das Icon aus der Mitte. */
@@ -455,6 +628,27 @@ select.field {
   .side .foot > div:not(.aktualisierung) { display: none; }
   .side .foot { text-align: center; }
   .aktualisierungbtn { justify-content: center; }
+}
+
+/* ============================================================
+   Schwebende Ebenen — wer ueber wem liegt.
+
+   Base UI haengt Auswahlliste und Kalender per Portal an `document.body`. Dort sind sie
+   Geschwister der ganzen App und tragen von sich aus GAR KEINEN z-Index; ein Modal-Layer
+   traegt 50 (verschachtelt 60) und gewinnt damit gegen jedes `z-index: auto`, egal wie
+   weit hinten es im Dokument steht. Genau das war der Fehler: ein Auswahlfeld oder ein
+   Kalender, aus einem Dialog heraus geoeffnet, klappte HINTER dem Dialog auf.
+
+   Der Wert liegt deshalb ueber allen Modal-Ebenen. Er gehoert an den POSITIONER und nicht
+   an das Popup darin: der Positioner ist das Element, das Base UI fixiert positioniert,
+   und nur ein positioniertes Element nimmt einen z-Index ueberhaupt an.
+   ============================================================ */
+:root {
+  --z-schwebend: 1000;
+}
+.auswahl-positioner,
+.datumsfeld-positioner {
+  z-index: var(--z-schwebend);
 }
 
 /* ============================================================

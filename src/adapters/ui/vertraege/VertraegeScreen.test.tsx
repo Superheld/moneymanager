@@ -7,7 +7,7 @@
 // lassen, sondern still nichts finden — deshalb geht dieser Test durch die echte DB.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { fireEvent, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -295,10 +295,17 @@ describe("VertraegeScreen — Beginn und Fälligkeit", () => {
     await nutzer.click(await screen.findByRole("button", { name: /Vertragsdaten/i }));
 
     // Die erste Fälligkeit kommt aus der Regel, nicht aus dem Vertragsbeginn.
-    const faelligkeit = await screen.findByDisplayValue("2026-04-01");
-    const vertragsbeginn = screen.getByDisplayValue("2015-03-01");
-    fireEvent.change(vertragsbeginn, { target: { value: "2014-01-15" } });
-    expect((faelligkeit as HTMLInputElement).value).toBe("2026-04-01");
+    //
+    // Beide Felder sind seit 2026-08-25 ein `Datumsfeld` und keine nativen `input[type=date]`
+    // mehr: sie zeigen das Datum in der Sprache des Nutzers und übernehmen es beim
+    // VERLASSEN, nicht bei jedem Anschlag. Getippt wird hier trotzdem ISO — das erkennt
+    // das Feld immer, unabhängig von der Sprache.
+    const faelligkeit = await screen.findByRole("textbox", { name: "Erste Fälligkeit" });
+    const vertragsbeginn = screen.getByRole("textbox", { name: "Beginn" });
+    expect(faelligkeit).toHaveValue("01.04.2026");
+    await nutzer.clear(vertragsbeginn);
+    await nutzer.type(vertragsbeginn, "2014-01-15{Enter}");
+    expect(faelligkeit).toHaveValue("01.04.2026");
 
     const speichern = screen.getAllByRole("button", { name: /speichern/i });
     await nutzer.click(speichern[speichern.length - 1]);

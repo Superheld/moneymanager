@@ -4,26 +4,41 @@
 
 import { FachlicherFehler, istCent, type Cent, type Charakter, type IstBuchung } from "../../core";
 import type { LedgerPort } from "../ports";
-import { vorzeichenbehaftet } from "./zahlungsregelAnlegen";
 
 export interface BuchungEingabe {
   kontoId: string;
   datum: string; // ISO
-  /** Positiver Betrag in Minor Units; die Richtung sagen `charakter` und `gegenrichtung`. */
+  /**
+   * Betrag VORZEICHENBEHAFTET in Minor Units: negativ = abgeflossen, positiv = zugeflossen.
+   *
+   * Das Vorzeichen ist die RICHTUNG, und die kommt hier vollständig vom Aufrufer — nichts
+   * leitet sie mehr aus dem Charakter ab. Der Charakter sagt, WOFÜR das Geld war; wohin es
+   * floss, sagt allein diese Zahl. Wo beide auseinanderfallen (eine Erstattung ist ein
+   * Aufwand, bei dem Geld hereinkam; eine Retoure in bar ebenso), gewinnt das Vorzeichen,
+   * ohne dass es dafür ein zweites Feld braucht.
+   *
+   * Bis 2026-08-25 stand hier eine Höhe ohne Vorzeichen, und die Richtung ergab sich aus
+   * `charakter` — mit einem Schalter `gegenrichtung`, der die Ableitung umdrehte. Das
+   * scheiterte an drei Stellen zugleich: die Maske zeigte den gespeicherten Betrag ohne
+   * sein Vorzeichen, ein eingetipptes Minus wurde als Fehler abgewiesen, und bei einer
+   * importierten Zeile musste eine Sonderregel das Vorzeichen des Belegs gegen die
+   * Ableitung verteidigen. Eine Zahl, die die Richtung schon trägt, braucht davon nichts.
+   */
   betrag: Cent;
   charakter: Charakter;
-  /**
-   * Das Geld floss ENTGEGEN dem, was die Einordnung erwarten lässt: eine Erstattung auf
-   * eine Aufwandskategorie, eine zurückgebuchte Einnahme.
-   *
-   * Es gibt das Feld, weil der Charakter sagt, WOFÜR das Geld war, und nicht, wohin es
-   * floss. Ein Rückfluss gehört in die Kategorie der Ausgabe — dort entlastet er das
-   * Budget, statt als Einnahme aufzutauchen, die nie etwas ausgleicht. Ohne das Feld
-   * liesse sich ein solcher Fall von Hand gar nicht erfassen.
-   */
-  gegenrichtung?: boolean;
   kategorieId?: string;
   notiz?: string;
+}
+
+/**
+ * Ein Betrag von 0 ist keine Buchung, ein gebrochener Cent keine Zahlung — beides fliegt
+ * raus. Das Vorzeichen dagegen ist frei: ein Abfluss auf einer Ertragskategorie
+ * (Rückbuchung) und ein Zufluss auf einer Aufwandskategorie (Erstattung, Retoure) sind
+ * beide gültige Sachverhalte, und keiner von beiden hängt daran, welches Konto oder
+ * welche Kategorie beteiligt ist.
+ */
+function betragPruefen(betrag: Cent): void {
+  if (!istCent(betrag) || betrag === 0) throw new FachlicherFehler("betrag.nichtNull");
 }
 
 export async function buchungErfassen(
@@ -33,12 +48,12 @@ export async function buchungErfassen(
 ): Promise<IstBuchung> {
   if (!e.kontoId) throw new FachlicherFehler("konto.waehlen");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
-  if (!istCent(e.betrag) || e.betrag <= 0) throw new FachlicherFehler("betrag.groesserNull");
+  betragPruefen(e.betrag);
 
   const buchung: IstBuchung = {
     id: id ?? crypto.randomUUID(),
     datum: e.datum,
-    betrag: vorzeichenbehaftet(e.betrag, e.charakter, e.gegenrichtung),
+    betrag: e.betrag,
     kontoId: e.kontoId,
     kategorieId: e.kategorieId || undefined,
     // Wer die Buchung von Hand erfasst UND dabei eine Kategorie wählt, hat entschieden —
@@ -62,10 +77,10 @@ export async function buchungErfassen(
 export async function buchungBearbeiten(
   ledger: LedgerPort,
   original: IstBuchung,
-  e: { datum: string; betrag: Cent; charakter: Charakter; gegenrichtung?: boolean; kategorieId?: string; notiz?: string; kontoId?: string },
+  e: { datum: string; betrag: Cent; charakter: Charakter; kategorieId?: string; notiz?: string; kontoId?: string },
 ): Promise<IstBuchung> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(e.datum)) throw new FachlicherFehler("datum.ungueltig");
-  if (!istCent(e.betrag) || e.betrag <= 0) throw new FachlicherFehler("betrag.groesserNull");
+  betragPruefen(e.betrag);
   // Das Konto darf sich ändern — der Konto-Match des Imports ist eine Vermutung, und wer
   // die Buchung vor sich hat, weiß es besser. NICHT bei einem Umbuchungs-Bein: dort hängt
   // das Gegenkonto der anderen Seite daran, und ein einseitiger Wechsel würde die Paarung
@@ -85,33 +100,28 @@ export async function buchungBearbeiten(
   const neueKategorie = e.kategorieId || undefined;
   const kategorieGeaendert = neueKategorie !== original.kategorieId;
 
-  // DIE RICHTUNG KOMMT BEIM IMPORT VOM BELEG, nicht aus dem Charakter.
+  // DAS VORZEICHEN IST DIE RICHTUNG, UND DIE KOMMT AUS DER EINGABE — sonst nirgendwoher.
   //
-  // Bei einer von Hand erfassten Buchung ist das Vorzeichen eine Folge der Einordnung:
-  // man tippt eine Betragshöhe und sagt „Aufwand", und daraus wird ein Abfluss — es sei
-  // denn, `gegenrichtung` sagt ausdrücklich das Gegenteil (Erstattung). Bei einer
-  // importierten Buchung ist es umgekehrt — die Bank hat gebucht, in welche Richtung das
-  // Geld geflossen ist. Das ist eine TATSACHE, und der Charakter ist eine EINORDNUNG;
-  // eine Einordnung darf eine Tatsache nicht umdrehen.
+  // Hier stand bis 2026-08-25 eine Fallunterscheidung: bei `quelle === "import"` das
+  // Vorzeichen des Originals behalten, sonst aus dem Charakter ableiten. Sie war nötig,
+  // weil die Ableitung eine importierte Erstattung umgedreht hätte — der Charakter
+  // „Aufwand" machte aus einem Zufluss einen Abfluss, und im Budget belastete sie dann,
+  // statt zu entlasten.
   //
-  // Gemeldet und nachgemessen an einer Erstattung: sie kam als Zufluss herein, wurde in
-  // die Kategorie gelegt, in der die Ausgabe stattgefunden hatte — und weil deren Vorgabe
-  // „Aufwand" ist, wurde daraus ein Abfluss. Im Budget belastete sie damit, statt zu
-  // entlasten. Das Betragsfeld war dabei GESPERRT (Online-Konto), es hat also niemand
-  // etwas eingegeben, das sich hätte ändern dürfen.
+  // Nötig ist die Fallunterscheidung nur, solange es die Ableitung gibt. Ohne sie trägt
+  // die Eingabe das Vorzeichen selbst, und beide Fälle fallen zusammen: wer nichts an der
+  // Richtung ändert, reicht das Vorzeichen des Belegs unverändert durch (die Maske füllt
+  // das Feld vorzeichenbehaftet vor), und wer es ändert, meint genau das. Der Satz aus
+  // CLAUDE.md gilt unverändert und sogar strenger: eine EINORDNUNG dreht keine Tatsache
+  // um — nur ein Mensch tut das, ausdrücklich und sichtbar.
   //
-  // Eine Erstattung ist damit ein Aufwand mit positivem Betrag, und das ist kein
-  // Widerspruch: „Aufwand" sagt, WOFÜR das Geld war, das Vorzeichen sagt, wohin es floss.
-  // Die Budgetrechnung ist darauf ausgelegt — `Verbrauchsposten.betrag` ist ausdrücklich
-  // „POSITIV (eine Erstattung ist entsprechend negativ)".
-  const ausDemBeleg = original.quelle === "import";
+  // Wo das Feld gar nicht angefasst werden DARF (Online-Konto, Umbuchungs-Bein), sperrt
+  // die Maske es; gespeichert wird dann der vorgefüllte Wert, also der bisherige.
   const aktualisiert: IstBuchung = {
     ...original,
     kontoId: e.kontoId || original.kontoId,
     datum: e.datum,
-    betrag: ausDemBeleg
-      ? Math.sign(original.betrag) * Math.abs(e.betrag)
-      : vorzeichenbehaftet(e.betrag, e.charakter, e.gegenrichtung),
+    betrag: e.betrag,
     charakter: e.charakter,
     kategorieId: neueKategorie,
     kategorieHerkunft: kategorieGeaendert ? "manuell" : original.kategorieHerkunft,

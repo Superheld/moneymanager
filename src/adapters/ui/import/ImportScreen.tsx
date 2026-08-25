@@ -18,6 +18,7 @@ import {
 // Selbst-Registrierung des Finanzguru-Adapters auslösen.
 import "../../import/finanzguruAdapter";
 import { Button, Card, DataTable } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
 import { useGeld } from "../bausteine/einstellungenKontext";
 
 const VORSCHAU_MAX = 500;
@@ -183,14 +184,17 @@ export function ImportScreen() {
                     </td>
                     <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)" }}>
                       <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "center" }}>
-                        <select
-                          value={z.modus === "existing" ? z.kontoId : "__neu"}
-                          onChange={(e) => zielGewaehlt(m, e.target.value)}
-                          style={eingabeStil}
-                        >
-                          <option value="__neu">{t("import.neuAnlegen")}</option>
-                          {bestehende.map((k) => <option key={k.id} value={k.id}>{k.bezeichnung}</option>)}
-                        </select>
+                        <span style={{ minWidth: 170 }}>
+                          <Auswahl
+                            ariaLabel={t("import.zielKonto")}
+                            wert={z.modus === "existing" ? (z.kontoId ?? "__neu") : "__neu"}
+                            aufAenderung={(v) => zielGewaehlt(m, v)}
+                            optionen={[
+                              { wert: "__neu", text: t("import.neuAnlegen") },
+                              ...bestehende.map((k) => ({ wert: k.id, text: k.bezeichnung })),
+                            ]}
+                          />
+                        </span>
                         {z.modus === "neu" && (
                           <>
                             <input
@@ -199,9 +203,14 @@ export function ImportScreen() {
                               placeholder={t("import.feldBezeichnung")}
                               style={{ ...eingabeStil, minWidth: 140 }}
                             />
-                            <select value={z.typ} onChange={(e) => setZiel(m.quelleKey, { typ: e.target.value as Kontotyp })} style={eingabeStil}>
-                              {KONTOTYPEN.map((kt) => <option key={kt} value={kt}>{t(`konten.typ.${kt}`)}</option>)}
-                            </select>
+                            <span style={{ minWidth: 150 }}>
+                              <Auswahl
+                                ariaLabel={t("import.feldTyp")}
+                                wert={z.typ}
+                                aufAenderung={(v) => setZiel(m.quelleKey, { typ: v as Kontotyp })}
+                                optionen={KONTOTYPEN.map((kt) => ({ wert: kt, text: t(`konten.typ.${kt}`) }))}
+                              />
+                            </span>
                           </>
                         )}
                       </div>

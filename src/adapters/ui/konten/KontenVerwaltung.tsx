@@ -23,6 +23,7 @@ import {
 } from "../../../application";
 import { kontoAnlegen, kontoLoeschen } from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { IconButton } from "../bausteine/IconButton";
@@ -225,30 +226,30 @@ export function KontenVerwaltung({
               <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder={t("einstellungen.konto.feldBezeichnungPlaceholder")} />
             </FormField>
             <FormField label={t("einstellungen.konto.feldTyp")}>
-              <select
-                className="field"
-                value={typ}
-                onChange={(e) => {
-                  const neu = e.target.value as Kontotyp;
+              <Auswahl
+                ariaLabel={t("einstellungen.konto.feldTyp")}
+                wert={typ}
+                aufAenderung={(v) => {
+                  const neu = v as Kontotyp;
                   setTyp(neu);
                   // Nur beim ANLEGEN nachziehen. Wer ein bestehendes Konto bearbeitet, hat
                   // seine Klasse womöglich bewusst gesetzt — die wegen eines Typwechsels
                   // zurückzusetzen, wäre eine stille Änderung an der Liquiditätsrechnung.
                   if (!editId) setKlasse(klasseVorschlag(neu));
                 }}
-              >
-                {KONTOTYPEN.map((kt) => (<option key={kt} value={kt}>{t(`einstellungen.konto.typ.${kt}`)}</option>))}
-              </select>
+                optionen={KONTOTYPEN.map((kt) => ({ wert: kt, text: t(`einstellungen.konto.typ.${kt}`) }))}
+              />
             </FormField>
             <FormField
               label={t("einstellungen.konto.feldKlasse")}
               hint={t(`einstellungen.konto.klasseHinweis.${klasse}`)}
             >
-              <select className="field" value={klasse} onChange={(e) => setKlasse(e.target.value as Kontoklasse)}>
-                {KONTOKLASSEN.map((kk) => (
-                  <option key={kk} value={kk}>{t(`einstellungen.konto.klasse.${kk}`)}</option>
-                ))}
-              </select>
+              <Auswahl
+                ariaLabel={t("einstellungen.konto.feldKlasse")}
+                wert={klasse}
+                aufAenderung={(v) => setKlasse(v as Kontoklasse)}
+                optionen={KONTOKLASSEN.map((kk) => ({ wert: kk, text: t(`einstellungen.konto.klasse.${kk}`) }))}
+              />
             </FormField>
             <FormField label={t("einstellungen.konto.feldIban")} hint={t("einstellungen.konto.feldIbanHinweis")}>
               <input className="field" value={iban} onChange={(e) => setIban(e.target.value)} placeholder={t("einstellungen.konto.ibanPlatzhalter")} />

@@ -31,7 +31,7 @@ import {
   abrufAusfuehren,
   type Abrufergebnis,
 } from "../application/fints/abrufAusfuehren";
-import type { TanHerausforderung } from "../application/fints/abrufPort";
+import type { TanFrager } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
 import { hanseaticAbruf } from "./hanseatic";
 import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
@@ -111,13 +111,12 @@ import {
 } from "../application/buchung/umbuchungAusBuchung";
 import { zuordnungVonHand as zuordnungVonHandUseCase, zuordnungZuruecksetzen as zuordnungZuruecksetzenUseCase } from "../application/vertraege/vertragszuordnung";
 import { umbuchungErfassen as umbuchungErfassenUseCase } from "../application/buchung/umbuchungErfassen";
-import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../application/buchung/bezahltMarkieren";
 import {
   buchungenLoeschen as buchungenLoeschenUseCase,
   buchungenSammelbearbeiten as buchungenSammelbearbeitenUseCase,
   type SammelAenderung,
 } from "../application/buchung/buchungenSammelbearbeiten";
-import type { IstBuchung, Zahlungsregel } from "../core";
+import type { IstBuchung } from "../core";
 import {
   vertragAktualisieren as vertragAktualisierenUseCase,
   vertragAnlegen as vertragAnlegenUseCase,
@@ -544,7 +543,10 @@ export function abrufAdapterFuer(art: Zugangsart): Abrufadapter {
 export async function bankAbrufen(
   zugang: Bankzugang,
   pin: string,
-  frageTan: (h: TanHerausforderung) => Promise<string | undefined>,
+  // Der Typ aus dem Port, nicht eine eigene Schreibweise davon: die hier ausgeschriebene
+  // Ein-Parameter-Fassung nahm den Aufrufern still den zweiten weg (das Rückzugssignal
+  // bei decoupled), und der Adapter reichte ihn dann ins Leere.
+  frageTan: TanFrager,
   heute: string,
   rueckgriffTage?: number,
 ): Promise<Abrufergebnis> {
@@ -723,13 +725,7 @@ export function umbuchungErfassen(eingabe: Parameters<typeof umbuchungErfassenUs
   return umbuchungErfassenUseCase(sqliteLedgerRepository, eingabe);
 }
 
-export function alsBezahltMarkieren(regel: Zahlungsregel, faelligkeit: string, kontoId: string) {
-  return postenBezahltMarkieren(sqliteLedgerRepository, { regel, faelligkeit, kontoId });
-}
 
-export function bezahltZurueck(quelleId: string, faelligkeit: string) {
-  return bezahltZuruecknehmen(sqliteLedgerRepository, quelleId, faelligkeit);
-}
 
 export function buchungenSammelbearbeiten(
   buchungen: readonly IstBuchung[],

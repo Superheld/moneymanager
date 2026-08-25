@@ -12,7 +12,7 @@
 //    Dann wartet der Adapter und fragt die Bank in ihren eigenen Abständen nach; hier
 //    steht nur, dass gewartet wird.
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TanHerausforderung } from "../../../application/fints/abrufPort";
 import { Button, FormField } from "../bausteine";
@@ -23,6 +23,41 @@ import { Modal } from "../bausteine/Modal";
 export interface TanFrage {
   readonly herausforderung: TanHerausforderung;
   readonly antworten: (tan: string | undefined) => void;
+}
+
+/**
+ * Die Rückfrage als Zustand eines Screens — dreimal gebraucht (Abruf, Bankzugänge, Konto
+ * anlegen) und dreimal identisch, deshalb hier und nicht dort.
+ *
+ * Der Rückgabewert `frageTan` ist ein `TanFrager` und wird so an den Adapter gereicht.
+ * Sein zweiter Parameter ist der Grund für diesen Hook: bei decoupled beantwortet niemand
+ * die Frage im Dialog, sondern die Bank, und der Adapter zieht sie dann zurück. Wer nur
+ * `antworten` kennt, bekommt das nie mit — der Hinweis blieb bis zum Wegklicken stehen.
+ */
+export function useTanFrage() {
+  const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
+
+  const frageTan = useCallback(
+    (h: TanHerausforderung, zurueckgezogen?: AbortSignal) =>
+      new Promise<string | undefined>((antworten) => {
+        const frage: TanFrage = { herausforderung: h, antworten };
+        setTanFrage(frage);
+        zurueckgezogen?.addEventListener(
+          "abort",
+          () => {
+            // Nur die EIGENE Frage wegnehmen: bis das Signal kommt, kann längst eine
+            // zweite offen sein (ein Abruf über mehrere Konten fragt mehrfach), und die
+            // gehört nicht dieser hier.
+            setTanFrage((aktuell) => (aktuell === frage ? null : aktuell));
+            antworten(undefined);
+          },
+          { once: true },
+        );
+      }),
+    [],
+  );
+
+  return { tanFrage, tanFrageSchliessen: () => setTanFrage(null), frageTan };
 }
 
 export function TanDialog({ frage, onFertig }: { frage: TanFrage; onFertig: () => void }) {

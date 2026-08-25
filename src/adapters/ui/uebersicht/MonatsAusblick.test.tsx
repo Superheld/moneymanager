@@ -163,6 +163,27 @@ describe("MonatsAusblick", () => {
     expect(within(august).getByText("70,00 / 430,00 €")).toBeInTheDocument();
   });
 
+  /**
+   * Kam in einem Monat unterm Strich Geld ZURÜCK — eine Erstattung oder Retoure, die
+   * höher war als die Ausgaben derselben Kategorie —, dann ist nichts verbraucht worden.
+   * Hier stand `Math.abs`, und das behauptete das Gegenteil: der Rückfluss erschien als
+   * Verbrauch in genau seiner Höhe, und der Balken wuchs mit.
+   */
+  it("zeigt einen Rückfluss nicht als Verbrauch", async () => {
+    const nutzer = userEvent.setup();
+    const zurueck: IstBuchung[] = [
+      IST[0],
+      // Ein Zufluss auf einer AUFWANDskategorie: die Retoure gehört in die Kategorie der
+      // Ausgabe, dort entlastet sie das Budget.
+      { id: "i3", datum: "2026-08-12", betrag: 9000, kontoId: "giro", kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "manuell" },
+    ];
+    rendere(<MonatsAusblick {...props({ ist: zurueck })} />);
+    const august = await karte("August 2026");
+
+    await nutzer.click(within(august).getByText("Budgets"));
+    expect(within(august).getByText("\u221290,00 / 430,00 €")).toBeInTheDocument();
+  });
+
   it("weist darauf hin, wenn gar keine Einnahmen geplant sind", async () => {
     rendere(<MonatsAusblick {...props({ regeln: [REGELN[0]] })} />);
     expect(await screen.findByText(/Einnahmen kommen aus Verträgen/)).toBeInTheDocument();
@@ -262,5 +283,37 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     await nutzer.click(kopf);
     expect(await screen.findByText("Wocheneinkauf")).toBeInTheDocument();
     expect(screen.getByText("Verbraucht")).toBeInTheDocument();
+  });
+
+  /**
+   * Und von dort aus weiter in die Buchung.
+   *
+   * Die aufgeklappte Liste ist die Stelle, an der eine falsch einsortierte Zeile auffällt:
+   * man sieht sie unter einem Budget stehen, in das sie nicht gehört. Ohne den Weg von
+   * hier aus musste man sie sich merken und im Kontoauszug wiederfinden.
+   */
+  it("öffnet die Buchung aus der aufgeklappten Budgetliste", async () => {
+    for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
+    for (const b of BUDGETS) await sqliteBudgetRepository.speichern(b);
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
+    const jetzt = new Date();
+    const monatsErster = `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, "0")}-01`;
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: monatsErster, betrag: -6250, kontoId: "giro",
+      kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "manuell", notiz: "Wocheneinkauf",
+    });
+
+    rendere(<UebersichtScreen />);
+    const nutzer = userEvent.setup();
+    await nutzer.click(await screen.findByLabelText(/Lebenshaltung/));
+
+    // Die Zeile ist ein Knopf, kein Text — nur so ist sie auch mit der Tastatur erreichbar.
+    const zeile = (await screen.findByText("Wocheneinkauf")).closest("button");
+    expect(zeile).not.toBeNull();
+
+    await nutzer.click(zeile!);
+    const dialog = await screen.findByRole("dialog");
+    // Nach den DATEN suchen, die der Test angelegt hat: der Dialog zeigt die Buchung.
+    expect(within(dialog).getAllByDisplayValue("Wocheneinkauf").length).toBeGreaterThan(0);
   });
 });

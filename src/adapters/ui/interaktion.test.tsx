@@ -17,7 +17,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
 import { AppShell } from "./bausteine/AppShell";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
 import { InventarScreen } from "./inventar/InventarScreen";
@@ -467,6 +467,9 @@ describe("Buchungsdetails", () => {
     rendere(<KontenScreen onNavigate={() => {}} />);
 
     await detailOeffnen(nutzer, "Girokonto");
+    // Die Herkunft ist zugeklappt, bis jemand danach fragt — sie steht ganz unten im
+    // Dialog und wird selten gebraucht.
+    await nutzer.click(await screen.findByRole("button", { name: /herkunft/i }));
 
     // Nach den DATEN suchen, die der Test angelegt hat — nicht nach Beschriftungen.
     await waitFor(() => {
@@ -558,6 +561,7 @@ describe("Buchungsdetails", () => {
     rendere(<KontenScreen onNavigate={() => {}} />);
 
     await detailOeffnen(nutzer, "Girokonto");
+    await nutzer.click(await screen.findByRole("button", { name: /herkunft/i }));
 
     await waitFor(() => expect(document.body.textContent).toMatch(/kein Import-Kontext/i));
   });
@@ -576,12 +580,16 @@ describe("Buchungsdetails", () => {
     const nutzer = userEvent.setup();
     rendere(<KontenScreen onNavigate={() => {}} />);
 
-    /** Der Wert IM FORMULAR, nicht im Kopf: der kommt aus dem State der Komponente. */
+    /**
+     * Der Wert IM FORMULAR, nicht im Kopf: der kommt aus dem State der Komponente.
+     * Seit 2026-08-25 ist das ein `Datumsfeld` und kein `input[type=date]` mehr — es
+     * zeigt die Landesschreibweise und trägt seinen Namen als `aria-label`.
+     */
     const datumsfeld = () =>
-      (document.querySelector('input[type="date"]') as HTMLInputElement | null)?.value;
+      (screen.queryByRole("textbox", { name: "Datum" }) as HTMLInputElement | null)?.value;
 
     await detailOeffnen(nutzer, "Girokonto");
-    await waitFor(() => expect(datumsfeld()).toBe("2026-08-12"));
+    await waitFor(() => expect(datumsfeld()).toBe("12.08.2026"));
 
     await nutzer.click(await screen.findByTitle(/Gegenbuchung/i));
 
@@ -590,7 +598,7 @@ describe("Buchungsdetails", () => {
     // ohne key={buchung.id} das alte Datum stehen, während der Kopf (aus props) längst
     // die neue Buchung anzeigt.
     await waitFor(() => {
-      expect(datumsfeld()).toBe("2026-08-14");
+      expect(datumsfeld()).toBe("14.08.2026");
       expect(document.body.textContent).toContain("Bargeld-Bein");
     });
   });
@@ -898,10 +906,12 @@ describe("Vertrag aus einer Buchung", () => {
     // Die Maske trägt den Betrag POSITIV — die Richtung steckt im Charakter.
     await screen.findByDisplayValue("29.99");
     // Sichtbar ist die erste Fälligkeit; der Vertragsbeginn liegt im zugeklappten
-    // Konditionen-Block und trägt dasselbe Datum.
-    expect(await screen.findAllByDisplayValue(heute)).toHaveLength(1);
+    // Konditionen-Block und trägt dasselbe Datum. Beide sind seit 2026-08-25 ein
+    // `Datumsfeld` und zeigen deshalb die Landesschreibweise, nicht mehr ISO.
+    const heuteAngezeigt = "12.08.2026";
+    expect(await screen.findAllByDisplayValue(heuteAngezeigt)).toHaveLength(1);
     await nutzer.click(screen.getByRole("button", { name: /Vertragsdaten/i }));
-    expect(await screen.findAllByDisplayValue(heute)).toHaveLength(2);
+    expect(await screen.findAllByDisplayValue(heuteAngezeigt)).toHaveLength(2);
   });
 
   it("legt Vertrag und Zahlungsregel an", async () => {
@@ -975,8 +985,7 @@ describe("Vertrag aus einer Buchung", () => {
     rendere(<KontenScreen onNavigate={() => {}} />);
     await detailOeffnen(nutzer);
 
-    const auswahl = await screen.findByRole("combobox", { name: /vertrag zuordnen/i });
-    await nutzer.selectOptions(auswahl, "__keiner");
+    await auswahlWaehlen(nutzer, /vertrag zuordnen/i, "kein Vertrag");
 
     await waitFor(async () => {
       const z = (await sqliteVertragszuordnungRepository.alle())[0];
@@ -1168,6 +1177,62 @@ describe("Online geführte Konten werden nicht von Hand bebucht", () => {
     });
   });
 
+  /**
+   * Die Vorschau ZEIGT, was kommt — sie bucht es nicht.
+   *
+   * Bis 2026-08-25 hing an jeder geplanten Zeile ein Kästchen „als bezahlt markieren", und
+   * ein Klick legte daraus eine Ist-Buchung an. Damit stand im Konto eine Zahlung, die
+   * niemand belegt hatte: die Bank kannte sie nicht, ein Beleg existierte nicht, und beim
+   * nächsten Abruf kam die echte Zeile dazu. Was im Konto steht, kommt jetzt aus dem Abruf
+   * oder von Hand — nicht aus einer Hochrechnung.
+   */
+  it("legt aus der geplanten Vorschau keine Buchung an", async () => {
+    await grunddaten();
+    const jetzt = new Date();
+    const inFuenfTagen = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + 5);
+    const iso = `${inFuenfTagen.getFullYear()}-${String(inFuenfTagen.getMonth() + 1).padStart(2, "0")}-${String(inFuenfTagen.getDate()).padStart(2, "0")}`;
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r1", bezeichnung: "Ohlert Beitrag", betrag: -2500, rhythmus: "monatlich",
+      startdatum: iso, charakter: "Aufwand", kategorieId: "kat1", kontoId: "k1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    // Die Vorschau steht da — daran haengt der Test, sonst prueft er eine leere Liste.
+    const zeile = await screen.findByText("Ohlert Beitrag");
+
+    // Kein Kaestchen an der Zeile, und auch sonst keins ausser dem Sammelmodus-Schalter.
+    expect(within(zeile.closest("tr")!).queryByRole("checkbox")).toBeNull();
+    expect(await sqliteLedgerRepository.alle()).toHaveLength(0);
+  });
+
+  /**
+   * Und auch mit genug Konten von Hand nicht, solange ein ONLINE-Konto offen ist.
+   *
+   * Die Umbuchung geht immer von dem Auszug aus, den man gerade vor sich hat. Bei einem
+   * Bankkonto wäre das eine Ausgangsseite, auf der von Hand gar nicht gebucht werden darf
+   * — der Dialog bot sie an und fiel dann still auf ein anderes Konto zurück.
+   */
+  it("bietet auf einem Online-Konto kein Umbuchen an, auch wenn zwei Konten von Hand da sind", async () => {
+    await mitBankverbindung();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k3", bezeichnung: "Spardose", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /umbuchen/i })).not.toBeInTheDocument();
+    });
+
+    // Auf einem Konto von Hand steht er dagegen — sonst prüfte der Test nur, dass gar
+    // nichts erscheint.
+    await nutzer.click((await screen.findAllByText("Bargeld"))[0]);
+    expect(await screen.findByRole("button", { name: /umbuchen/i })).toBeInTheDocument();
+  });
+
   it("sperrt Betrag und Datum einer Buchung auf dem Bankkonto, nicht aber ihre Bezeichnung", async () => {
     await mitBankverbindung();
     await sqliteLedgerRepository.speichern({
@@ -1334,8 +1399,9 @@ describe("Gegenbein erzeugen nur auf Konten ohne Bankverbindung", () => {
 
     await umbuchungsdialog(nutzer);
 
-    const ziel = await screen.findByRole("combobox", { name: "Gegenbein neu erzeugen auf" });
-    const namen = [...ziel.querySelectorAll("option")].map((o) => o.textContent);
+    // Die Liste einer `Auswahl` steht erst im DOM, wenn sie offen ist.
+    await nutzer.click(await screen.findByRole("combobox", { name: "Gegenbein neu erzeugen auf" }));
+    const namen = (await screen.findAllByRole("option")).map((o) => o.textContent);
     expect(namen).toContain("Bargeld");
     expect(namen).not.toContain("Tagesgeld");
   });
