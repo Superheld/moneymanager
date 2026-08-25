@@ -173,12 +173,39 @@ body {
   overflow: auto;
   padding: var(--pad-screen);
 }
+/* Die Inhaltsbreite.
+ *
+ * Lange bei 1040 px — der klassische Lesedeckel. Der war hier aber am falschen Inhalt
+ * gemessen: diese App liest man nicht, man sucht darin. Konten, Analyse, Vertraege,
+ * Inventar, Import und die Verwaltung fuehren alle mit einer Tabelle, und jede von ihnen
+ * war schmaler, als sie sein musste.
+ *
+ * **Formulare halten das aus, und zwar ohne Zutun.** Das war der Einwand gegen mehr Breite
+ * — ein 600 px breites Eingabefeld taugt nichts —, und er greift hier nicht: JEDES
+ * `form-grid` der App sitzt in einem Modal, und die Dialoge deckeln bei 680 px. Auf einem
+ * Screen steht kein einziges Formular. Nachgesehen, nicht angenommen; beim ersten Anlauf
+ * war es andersherum angenommen und hat eine Sonderbreite fuer einen einzigen Bereich
+ * gekostet.
+ *
+ * Was bleibt, ist die Prosa darunter.
+ */
 .screen {
-  max-width: 1040px;
+  max-width: 1280px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
   gap: var(--gap-card);
+}
+
+/* Ein Absatz braucht eine Zeilenlaenge, eine Tabelle nicht.
+ *
+ * Bei 1280 px liefe ein Erklaertext auf rund 200 Zeichen je Zeile, und beim Zeilenwechsel
+ * verliert man die Spur. `<p>` steht in dieser Codebasis ausschliesslich fuer Prosa (15
+ * Stellen), nie fuer Tabellen- oder Zeilentext — deshalb greift die Regel genau dort und
+ * sonst nirgends. Modale trifft sie nicht: die haengen per Portal am `body` und liegen
+ * ausserhalb von `.screen`. */
+.screen p {
+  max-width: 78ch;
 }
 
 .phead h1 {
@@ -267,15 +294,15 @@ select.field {
    auf, statt in ihrem eigenen Scrollrahmen zu bleiben — die ganze Seite zieht sich breit.
 
    **Die Zahlen, an denen der Breakpoint haengt** — nachgerechnet, nicht geschaetzt.
-   `.screen` deckelt bei 1040 px, davon gehen 16 px Spalte ab; links bleiben 632 px, rechts
-   392 px, und jede Karte kostet zweimal `--pad-card` (48 px). Die geplante Tabelle braucht
-   fuer ihre vier Spalten rund 340 px Inhalt und hat 344 — es passt, aber ohne Reserve. Wer
-   dort eine Spalte ergaenzt, rechnet vorher nach; sie war schon einmal eine zuviel.
+   Am Deckel (1280 px) gehen 16 px Spalte ab; links bleiben 781 px, rechts 483 px, und jede
+   Karte kostet zweimal `--pad-card` (48 px). Die geplante Tabelle braucht fuer ihre vier
+   Spalten rund 340 px Inhalt und haette 435 — Luft genug.
 
-   Unterhalb von 1040 px Inhaltsbreite schrumpfen beide Seiten mit, und irgendwann scrollen
-   sie. Der Deckel ist bei rund 1400 px Fensterbreite erreicht (1040 plus Seitenleiste und
-   Seitenrand); darunter stapelt es. Zwei waagerecht scrollende Tabellen nebeneinander sind
-   keine zwei Tabellen mehr, sondern zwei Ausschnitte.
+   Eng wird es erst, wenn das Fenster den Deckel unterschreitet: bei 1400 px Fensterbreite
+   bleiben der rechten Karte noch 355 px Inhalt. Darunter stapelt es, denn zwei waagerecht
+   scrollende Tabellen nebeneinander sind keine zwei Tabellen mehr, sondern zwei
+   Ausschnitte. Wer der Vorschau eine Spalte ergaenzt, rechnet an DIESER Stelle nach — nicht
+   am Deckel, wo alles bequem aussieht.
    ============================================================ */
 .auszug-spalten {
   display: grid;

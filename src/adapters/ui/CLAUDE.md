@@ -152,15 +152,15 @@ Der Stand von heute ist dabei die Unterzeile der Vorschau-Karte geworden und nic
 Trenner zwischen beiden Listen: er ist der Punkt, ab dem die Vorschau rechnet. Zwischen
 zwei Listen stehend beschriftete er beide und keine.
 
-**Der Screen ist so breit wie jeder andere.** Ein eigener, weiterer Deckel für diesen einen
-Bereich war der erste Versuch und fiel sofort auf: eine Seite, die breiter aufzieht als alle
-Nachbarn, sieht nach einem Fehler aus, nicht nach einer Entscheidung. Der Platz kommt
-stattdessen aus dem Inhalt — die Vorschau trägt vier Spalten statt fünf und zeigt ihr Datum
-**ohne Jahr** (sie reicht höchstens 90 Tage nach vorn, dort unterscheidet das Jahr nichts).
-Damit passt sie in ihre 344 px.
+**Der Screen ist so breit wie jeder andere** — und alle sind breiter geworden, siehe unten.
+Ein eigener Deckel für diesen einen Bereich war der erste Versuch und fiel sofort auf: eine
+Seite, die breiter aufzieht als alle Nachbarn, sieht nach einem Fehler aus und nicht nach
+einer Entscheidung.
 
-Es passt **ohne Reserve**. Wer der Vorschau eine Spalte hinzufügt, rechnet vorher nach; die
-Zahlen stehen ausgerechnet im CSS. Sie war schon einmal eine Spalte zu breit.
+Die Vorschau spart trotzdem, wo es nichts kostet: sie zeigt ihr Datum **ohne Jahr**, weil
+sie höchstens 90 Tage nach vorn reicht und das Jahr dort nichts unterscheidet. Wer ihr eine
+Spalte hinzufügt, rechnet nicht am Deckel nach, sondern am Breakpoint — dort ist es eng,
+nicht bei 1280 px.
 
 ## Was im Konto steht, hat jemand belegt
 
@@ -195,6 +195,29 @@ Zwei Fallen, beide schon einmal zugeschnappt:
   der einzige Hinweis auf ein Update. Die Ausnahme steht wörtlich im CSS.
 - **Auskunft darf weichen, eine Handlung nicht.** Version und Stadium fallen schmal weg,
   der Knopf bleibt. Das ist die Regel, nach der man im Zweifel entscheidet.
+
+## Wie breit eine Seite wird
+
+`.screen` deckelt bei **1280 px**, nicht mehr bei 1040. Der alte Wert war der klassische
+Lesedeckel und hier am falschen Inhalt gemessen: diese App liest man nicht, man sucht darin.
+Konten, Analyse, Verträge, Inventar, Import und die Verwaltung führen alle mit einer
+Tabelle, und jede davon war schmaler, als sie sein musste.
+
+**Formulare halten das aus, ohne Zutun.** Genau das war der Einwand gegen mehr Breite — ein
+600 px breites Eingabefeld taugt nichts —, und er greift hier nicht: *jedes* `form-grid` der
+App sitzt in einem Modal, und die Dialoge deckeln bei 680 px. Auf einem Screen steht kein
+einziges Formular. Das ist nachgesehen und nicht angenommen; beim ersten Anlauf war es
+andersherum angenommen, und es hat eine Sonderbreite für einen einzigen Bereich gekostet,
+die zwei Runden später wieder rausflog.
+
+**Prosa braucht ihre eigene Grenze**: `.screen p { max-width: 78ch }`. Ein `<p>` steht in
+dieser Codebasis ausschliesslich für Erklärtext (15 Stellen), nie für Tabellen- oder
+Zeilentext — deshalb trifft die Regel genau das Richtige. Modale erwischt sie nicht, die
+hängen per Portal am `body`.
+
+Was dabei mitwächst und darf: `karten-paar` und `ausblick-karten` sind `fr`-Raster, die
+KPI-Leiste bricht um, und die Charts skalieren über ihre `viewBox` — die laufen ohnehin
+zwischen halber und voller Kartenbreite.
 
 ## Die Fläche kommt von `Card`
 
