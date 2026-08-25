@@ -29,6 +29,7 @@ import {
   type Budgetbereich,
   type Budgetstand,
   type Budgetvorschlag,
+  type IstBuchung,
 } from "../../../application";
 import {
   budgetAnlegen as budgetSpeichern,
@@ -38,6 +39,7 @@ import {
   vorschlagIgnorieren,
 } from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "../bausteine";
+import { BuchungDetail } from "../buchung/BuchungDetail";
 import { BudgetVerlauf } from "./BudgetVerlauf";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
@@ -70,6 +72,14 @@ export function BudgetsScreen() {
    * untereinander schöben die Liste aus dem Bild, von der man ausgegangen ist.
    */
   const [offenesBudget, setOffenesBudget] = useState<string | null>(null);
+  /**
+   * Die Buchung aus der Verbrauchsliste, die gerade im Dialog steht.
+   *
+   * Der Verlauf zeigt, WORAUS der Verbrauch eines Monats besteht — und das ist die
+   * Stelle, an der eine falsch einsortierte Zeile auffällt. Von hier aus zu korrigieren
+   * spart den Umweg über den Kontoauszug.
+   */
+  const [detail, setDetail] = useState<IstBuchung | null>(null);
   /**
    * Der Verlauf steht unter der ganzen Liste, nicht unter der geklickten Zeile — eine
    * Tabelle kann nichts zwischen zwei Zeilen einhängen. Bei sechs Budgets plus
@@ -491,6 +501,7 @@ export function BudgetsScreen() {
           kategorieNamen={bereich.kategorieNamen}
           empfaenger={bereich.empfaenger}
           onSchliessen={() => setOffenesBudget(null)}
+          onBuchung={setDetail}
         />
         </div>
       )}
@@ -598,6 +609,12 @@ export function BudgetsScreen() {
             )}
           </div>
         </Modal>
+      )}
+
+      {/* Nach einer Änderung den ganzen Bereich neu rechnen: eine geänderte Kategorie
+          verschiebt Geld zwischen Budgets, nicht nur innerhalb des offenen. */}
+      {detail && (
+        <BuchungDetail buchung={detail} onClose={() => setDetail(null)} onGeaendert={laden} />
       )}
     </div>
   );

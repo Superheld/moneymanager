@@ -17,6 +17,7 @@ import {
   budgetVerlauf,
   type BudgetSicht,
   type Budgetstand,
+  type IstBuchung,
 } from "../../../application";
 import { Button, Card } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -34,9 +35,16 @@ interface Props {
   kategorieNamen: ReadonlyMap<string, string>;
   empfaenger: ReadonlyMap<string, string>;
   onSchliessen: () => void;
+  /**
+   * Klick auf eine Buchung der Liste — der Bildschirm darüber öffnet sie.
+   *
+   * Nicht hier: der Verlauf ist eine ANZEIGE und weiss nichts vom Nachladen. Wer den
+   * Dialog aufmacht, muss danach die Sicht neu rechnen lassen, und die gehört dem Screen.
+   */
+  onBuchung?: (buchung: IstBuchung) => void;
 }
 
-export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger, onSchliessen }: Props) {
+export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger, onSchliessen, onBuchung }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
 
@@ -125,6 +133,7 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
         kategorieNamen={kategorieNamen}
         verbraucht={monat.verbraucht}
         leerText={t("budgets.verlaufMonatLeer", { monat: monat.monat })}
+        onBuchung={onBuchung}
       />
     </Card>
   );

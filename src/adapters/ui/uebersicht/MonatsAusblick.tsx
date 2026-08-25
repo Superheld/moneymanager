@@ -29,6 +29,7 @@ export function MonatsAusblick({
   hatPlandaten,
   kategorieNamen,
   empfaenger,
+  onBuchung,
 }: {
   /** Fertig aufgerechnet aus `uebersichtLaden` — hier wird nichts mehr gerechnet. */
   ausblicke: readonly Ausblick[];
@@ -42,6 +43,14 @@ export function MonatsAusblick({
    * eine ungeplante Zeile wiedererkennt.
    */
   empfaenger: ReadonlyMap<string, string>;
+  /**
+   * Klick auf einen Posten, hinter dem genau EINE Buchung steht — er öffnet sie.
+   *
+   * Die ID reicht: welche Buchung dahintersteckt, weiss der Bildschirm darüber, der die
+   * Sicht ohnehin schon geladen hat. Hier eine ganze `IstBuchung` durchzureichen hiesse,
+   * den Ausblick um Daten zu erweitern, die er zum Rechnen nicht braucht.
+   */
+  onBuchung?: (istId: string) => void;
 }) {
   const { t } = useTranslation();
   const ohneEinnahmeplan = ausblicke.every((a) => a.zeilen.find((z) => z.id === "einnahmen")!.plan === 0);
@@ -61,6 +70,7 @@ export function MonatsAusblick({
             ausblick={a}
             kategorieName={kategorieNamen}
             empfaenger={empfaenger}
+            onBuchung={onBuchung}
           />
         ))}
       </div>
@@ -79,10 +89,12 @@ function AusblickKarte({
   ausblick,
   kategorieName,
   empfaenger,
+  onBuchung,
 }: {
   ausblick: Ausblick;
   kategorieName: ReadonlyMap<string, string>;
   empfaenger: ReadonlyMap<string, string>;
+  onBuchung?: (istId: string) => void;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -118,6 +130,7 @@ function AusblickKarte({
           onToggle={() => setOffen((cur) => (cur === z.id ? null : z.id))}
           kategorieName={kategorieName}
           empfaenger={empfaenger}
+          onBuchung={onBuchung}
         />
       ))}
 
@@ -174,6 +187,7 @@ function ZeileMitPosten({
   onToggle,
   kategorieName,
   empfaenger,
+  onBuchung,
 }: {
   zeile: AusblickZeile;
   zweiSpalten: boolean;
@@ -183,6 +197,7 @@ function ZeileMitPosten({
   onToggle: () => void;
   kategorieName: ReadonlyMap<string, string>;
   empfaenger: ReadonlyMap<string, string>;
+  onBuchung?: (istId: string) => void;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -247,6 +262,7 @@ function ZeileMitPosten({
                   zweiSpalten={zweiSpalten}
                   kategorieName={kategorieName}
                   empfaenger={empfaenger}
+                  onBuchung={onBuchung}
                 />
               ))}
         </div>
@@ -262,12 +278,14 @@ function PlanPosten({
   zweiSpalten,
   kategorieName,
   empfaenger,
+  onBuchung,
 }: {
   posten: AusblickPosten;
   zeile: AusblickZeile["id"];
   zweiSpalten: boolean;
   kategorieName: ReadonlyMap<string, string>;
   empfaenger: ReadonlyMap<string, string>;
+  onBuchung?: (istId: string) => void;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -287,8 +305,17 @@ function PlanPosten({
   /** Die Kategorie als Zusatz — nur, wenn sie nicht schon der Name ist. */
   const kategorie = posten.kategorieId ? kategorieName.get(posten.kategorieId) : undefined;
 
-  return (
-    <div style={{ ...zeileGrid(zweiSpalten), padding: "5px 0", fontSize: "12.5px", alignItems: "baseline" }}>
+  /**
+   * Klickbar nur, wenn hinter dem Posten genau EINE Buchung steht.
+   *
+   * Ein geplanter Posten ohne `istId` ist noch nichts Gebuchtes — er beschreibt, was
+   * fällig wird. Ihn zu öffnen hiesse, einen Dialog auf eine Buchung zu zeigen, die es
+   * nicht gibt; ein Knopf, der nichts tun kann, ist eine Frage ohne Antwort.
+   */
+  const istId = posten.istId;
+  const oeffnen = istId && onBuchung ? () => onBuchung(istId) : undefined;
+  const inhalt = (
+    <>
       {/* Anbieternamen aus dem Import sind lang („SWB - Service - Wohnungsvermietungs-
           und -baugesellschaft mbH"). Eine Zeile, abgeschnitten; der volle Name steht im
           title — umbrechend zerlegte er die Karte. */}
@@ -308,7 +335,18 @@ function PlanPosten({
       <span className="num" style={{ textAlign: "right", color: "var(--ink-3)" }}>
         {posten.plan === 0 ? "—" : geld.format(posten.plan, { mitVorzeichen: true })}
       </span>
-    </div>
+    </>
+  );
+
+  // Dieselbe Zeile, einmal als Text und einmal als Knopf. Am Aussehen ändert sich nichts:
+  // was hier klickbar ist, entscheidet der Inhalt der Zeile, nicht ihre Gestalt.
+  const zeilenstil = { ...zeileGrid(zweiSpalten), padding: "5px 0", fontSize: "12.5px", alignItems: "baseline" } as const;
+  return oeffnen ? (
+    <button type="button" className="buchungszeile" title={t("uebersicht.buchungOeffnen")} style={zeilenstil} onClick={oeffnen}>
+      {inhalt}
+    </button>
+  ) : (
+    <div style={zeilenstil}>{inhalt}</div>
   );
 }
 

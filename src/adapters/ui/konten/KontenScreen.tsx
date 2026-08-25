@@ -19,8 +19,6 @@ import {
   type Zahlungskonto,
 } from "../../../application";
 import {
-  alsBezahltMarkieren,
-  bezahltZurueck,
   buchungenSammelbearbeiten,
   konten as kontenLaden,
   pruefmarkerSetzen,
@@ -249,22 +247,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   // Standardansicht: neueste zuerst (Tabelle sortiert/paginiert intern weiter).
   const gebuchtFuerTabelle = useMemo(() => [...gebuchtGefiltert].reverse(), [gebuchtGefiltert]);
 
-  async function abhaken(z: RegisterZeile, schonBezahlt: boolean) {
-    if (!z.planRef) return;
-    setFehler(null);
-    try {
-      if (schonBezahlt) {
-        await bezahltZurueck(z.planRef.quelleId, z.planRef.faelligkeit);
-      } else {
-        const regel = (sicht?.regeln ?? []).find((r) => r.id === z.planRef!.quelleId);
-        if (regel) await alsBezahltMarkieren(regel, z.planRef.faelligkeit, aktivId);
-      }
-      await laden();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
-  }
-
   /** Die markierten Zeilen als echte Buchungen — nur die, die es noch gibt. */
   const gewaehlteBuchungen = useMemo(
     () => ist.filter((b) => auswahl.has(b.id)),
@@ -296,10 +278,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
 
   return (
-    // `screen--breit`: hier stehen zwei Tabellen nebeneinander, zusammen zwoelf Spalten.
-    // Der Lesedeckel von 1040 px liesse der rechten davon 342 px — sie scrollt dann
-    // waagerecht (siehe app.css).
-    <div className="screen screen--breit">
+    <div className="screen">
       <PageHead title={t("konten.titel")} subtitle={t("konten.untertitel")} />
 
       <Card
@@ -745,22 +724,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             ) : (
               <DataTable
                 columns={[
-                  {
-                    // Abhaken heisst „ist doch schon bezahlt" und legt die Buchung an —
-                    // deshalb ein Kästchen und kein Knopf: es beantwortet eine Frage, die
-                    // an der Zeile steht, statt eine neue zu stellen.
-                    key: "_ab", label: "", sortable: false, maxWidth: 24,
-                    render: (z: RegisterZeile) => (
-                      <input
-                        type="checkbox"
-                        checked={false}
-                        onChange={() => abhaken(z, false)}
-                        title={t("konten.alsBezahltMarkieren")}
-                        aria-label={t("konten.alsBezahltMarkieren")}
-                        style={{ cursor: "pointer", accentColor: "var(--accent-deep)" }}
-                      />
-                    ),
-                  },
                   {
                     // OHNE Jahr, anders als im Auszug links. Dort stehen alle Buchungen
                     // eines Kontos, und ueber den Jahreswechsel hinweg waere „12.08."

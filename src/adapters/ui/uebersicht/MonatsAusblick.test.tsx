@@ -284,4 +284,36 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     expect(await screen.findByText("Wocheneinkauf")).toBeInTheDocument();
     expect(screen.getByText("Verbraucht")).toBeInTheDocument();
   });
+
+  /**
+   * Und von dort aus weiter in die Buchung.
+   *
+   * Die aufgeklappte Liste ist die Stelle, an der eine falsch einsortierte Zeile auffällt:
+   * man sieht sie unter einem Budget stehen, in das sie nicht gehört. Ohne den Weg von
+   * hier aus musste man sie sich merken und im Kontoauszug wiederfinden.
+   */
+  it("öffnet die Buchung aus der aufgeklappten Budgetliste", async () => {
+    for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
+    for (const b of BUDGETS) await sqliteBudgetRepository.speichern(b);
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
+    const jetzt = new Date();
+    const monatsErster = `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, "0")}-01`;
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: monatsErster, betrag: -6250, kontoId: "giro",
+      kategorieId: "lebensmittel", charakter: "Aufwand", quelle: "manuell", notiz: "Wocheneinkauf",
+    });
+
+    rendere(<UebersichtScreen />);
+    const nutzer = userEvent.setup();
+    await nutzer.click(await screen.findByLabelText(/Lebenshaltung/));
+
+    // Die Zeile ist ein Knopf, kein Text — nur so ist sie auch mit der Tastatur erreichbar.
+    const zeile = (await screen.findByText("Wocheneinkauf")).closest("button");
+    expect(zeile).not.toBeNull();
+
+    await nutzer.click(zeile!);
+    const dialog = await screen.findByRole("dialog");
+    // Nach den DATEN suchen, die der Test angelegt hat: der Dialog zeigt die Buchung.
+    expect(within(dialog).getAllByDisplayValue("Wocheneinkauf").length).toBeGreaterThan(0);
+  });
 });

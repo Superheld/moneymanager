@@ -33,11 +33,13 @@ import {
   budgetstaende,
   toIso,
   type Depotdaten,
+  type IstBuchung,
   type Uebersichtsdaten,
 } from "../../../application";
 import { depots, uebersicht } from "../../dienste";
 import { Card, CoverageTrack, Pill } from "../bausteine";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
+import { BuchungDetail } from "../buchung/BuchungDetail";
 import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
 import { AUFKLAPP_ZEILEN_SCHMAL } from "../bausteine/aufklappen";
 import { DepotKarte } from "./DepotKarte";
@@ -71,11 +73,28 @@ export function UebersichtScreen() {
   const [monat, setMonat] = useState(dieserMonat);
   /** Welches Budget seine Buchungen zeigt — höchstens eines, sonst wird die Karte endlos. */
   const [offenesBudget, setOffenesBudget] = useState<string | null>(null);
+  /**
+   * Die Buchung, die gerade im Dialog steht.
+   *
+   * Der Weg dorthin führt über die aufgeklappten Listen: ein Budget zeigt seine Buchungen,
+   * der Ausblick seine Posten — und genau dort SIEHT man, dass eine Zeile in der falschen
+   * Kategorie hängt. Ohne den Dialog von hier aus musste man sie sich merken und im
+   * Kontoauszug wiederfinden.
+   */
+  const [detail, setDetail] = useState<IstBuchung | null>(null);
+
+  async function laden() {
+    try {
+      const d = await uebersicht(heute);
+      setDaten(d);
+      setFehler(null);
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    }
+  }
 
   useEffect(() => {
-    uebersicht(heute)
-      .then((d) => { setDaten(d); setFehler(null); })
-      .catch((e) => setFehler(e instanceof Error ? e.message : String(e)));
+    laden();
     depots()
       .then(setDepotdaten)
       .catch(() => setDepotdaten(null));
@@ -106,6 +125,14 @@ export function UebersichtScreen() {
           hatPlandaten={daten.hatPlandaten}
           kategorieNamen={daten.kategorieNamen}
           empfaenger={daten.empfaenger}
+          // Der Ausblick reicht nur die ID heraus; die Buchung selbst steht in der Sicht,
+          // die dieser Bildschirm ohnehin schon geladen hat. Findet sich nichts, passiert
+          // nichts — eine Zeile, deren Buchung inzwischen gelöscht ist, soll keinen leeren
+          // Dialog öffnen.
+          onBuchung={(istId) => {
+            const b = daten.sicht.buchungen.find((x) => x.id === istId);
+            if (b) setDetail(b);
+          }}
         />
       )}
 
@@ -214,6 +241,7 @@ export function UebersichtScreen() {
                         empfaenger={daten.empfaenger}
                         kategorieNamen={daten.kategorieNamen}
                         verbraucht={z.monat.verbraucht}
+                        onBuchung={setDetail}
                       />
                     )}
                   </div>
@@ -226,6 +254,14 @@ export function UebersichtScreen() {
 
       {depotdaten && <DepotKarte daten={depotdaten} />}
       </div>
+
+      {/* Nach einer Änderung wird die ganze Übersicht neu gerechnet, nicht nur die Zeile:
+          eine geänderte Kategorie verschiebt Geld zwischen Budgets, und der Ausblick
+          daneben rechnet aus denselben Buchungen. Eine Karte nachzuziehen und die andere
+          stehenzulassen zeigte zwei Wahrheiten nebeneinander. */}
+      {detail && (
+        <BuchungDetail buchung={detail} onClose={() => setDetail(null)} onGeaendert={laden} />
+      )}
     </div>
   );
 }

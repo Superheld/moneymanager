@@ -334,7 +334,12 @@ export function AnalyseScreen() {
               return (
                 // Anklickbar: beim Durchsehen einer Kategorie stößt man auf Buchungen,
                 // die eine Korrektur brauchen — der Umweg über den Konto-Auszug entfällt.
-                <tr key={z.buchung.id} onClick={() => setDetail(z.buchung)} style={{ cursor: "pointer" }} title={t("historie.detailOeffnen")}>
+                //
+                // `buchungszeile` faerbt die Zeile beim Ueberfahren ein. Der Zeiger allein
+                // war zu wenig: er zeigt sich erst, wenn man schon draufsteht, und in einer
+                // Liste probiert niemand jede Zeile durch. Dieselbe Klasse tragen die
+                // Buchungszeilen in der Uebersicht — was gleich funktioniert, sieht gleich aus.
+                <tr key={z.buchung.id} className="buchungszeile" onClick={() => setDetail(z.buchung)} title={t("historie.detailOeffnen")}>
                   <td style={detailTd}>{z.buchung.datum.split("-").reverse().join(".")}</td>
                   <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>{z.empfaenger || "—"}</td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 45 ? zweck.slice(0, 45) + "…" : zweck}</td>

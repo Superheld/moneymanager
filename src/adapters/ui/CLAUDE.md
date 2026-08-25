@@ -111,6 +111,29 @@ trug sie längst als eigenen Inline-Stil und sah als einzige richtig aus.
 Die Regel dahinter ist dieselbe wie bei `Zeilenauswahl`: **die Grösse eines Bedienteils
 folgt dem, wo es steht, nicht dem, was es tut.**
 
+## Aus einer aufgeklappten Liste in die Buchung
+
+Wo einzelne Buchungen stehen — unter einem Budget (Übersicht, Budget-Verlauf) oder unter
+einer Kategorie (Analyse) —, führt der Klick in den Buchungsdialog. Das ist die Stelle, an
+der man den Fehler SIEHT: eine Zeile in der falschen Kategorie fällt beim Durchsehen einer
+Auswertung auf, nicht im Kontoauszug. Ohne diesen Weg musste man sie sich merken und dort
+wiederfinden.
+
+Die gemeinsame Klasse heisst **`buchungszeile`** (`app.css`) und trägt die Fläche beim
+Überfahren. Ein blosser `cursor: pointer` reicht dafür nicht — er zeigt sich erst, wenn der
+Zeiger schon draufsteht, und in einer Liste probiert niemand jede Zeile durch. Dieselbe
+Überlegung wie bei `Zeilenlink`, nur für eine Zeile, die zu kurz für einen Link ist.
+
+Zwei Dinge, die beim Einbauen zählen:
+
+- **Der Baustein bekommt den Klick als Option** (`onBuchung`), er baut den Dialog nicht
+  selbst. Wer ihn anbietet, muss danach die Sicht neu rechnen lassen — eine geänderte
+  Kategorie verschiebt Geld zwischen Budgets, und der Ausblick daneben rechnet aus
+  denselben Buchungen. Ohne die Angabe bleiben die Zeilen Text; ein Knopf, der nichts tut,
+  wäre schlechter als keiner.
+- **Nur was eine Buchung IST.** Ein geplanter Posten ohne `istId` beschreibt, was fällig
+  wird — ihn zu öffnen hiesse, einen Dialog auf etwas zu zeigen, das es nicht gibt.
+
 ## Der Kontoauszug steht in drei Karten
 
 Kopf, Gebuchtes und Geplantes — das Gebuchte links, das Geplante rechts, im goldenen
@@ -129,15 +152,32 @@ Der Stand von heute ist dabei die Unterzeile der Vorschau-Karte geworden und nic
 Trenner zwischen beiden Listen: er ist der Punkt, ab dem die Vorschau rechnet. Zwischen
 zwei Listen stehend beschriftete er beide und keine.
 
-**Der Screen trägt `screen--breit`.** `.screen` deckelt bei 1040 px, und das ist für alles
-richtig, was man LIEST. Hier stehen zwei Tabellen mit zusammen zwölf Spalten nebeneinander;
-nach zweimal Kartenpolsterung blieben davon 582 px links und 342 px rechts, und die rechte
-fängt dort an, waagerecht zu scrollen. Die Zahlen, an denen die Breite und der Breakpoint
-hängen, stehen ausgerechnet im CSS — wer sie ändert, rechnet sie nach, statt zu schätzen.
+**Der Screen ist so breit wie jeder andere.** Ein eigener, weiterer Deckel für diesen einen
+Bereich war der erste Versuch und fiel sofort auf: eine Seite, die breiter aufzieht als alle
+Nachbarn, sieht nach einem Fehler aus, nicht nach einer Entscheidung. Der Platz kommt
+stattdessen aus dem Inhalt — die Vorschau trägt vier Spalten statt fünf und zeigt ihr Datum
+**ohne Jahr** (sie reicht höchstens 90 Tage nach vorn, dort unterscheidet das Jahr nichts).
+Damit passt sie in ihre 344 px.
 
-Aus demselben Grund zeigt die Vorschau ihr Datum **ohne Jahr**: sie reicht höchstens 90
-Tage nach vorn, dort unterscheidet das Jahr nichts. Der Auszug links braucht es, weil dort
-alle Buchungen eines Kontos stehen.
+Es passt **ohne Reserve**. Wer der Vorschau eine Spalte hinzufügt, rechnet vorher nach; die
+Zahlen stehen ausgerechnet im CSS. Sie war schon einmal eine Spalte zu breit.
+
+## Was im Konto steht, hat jemand belegt
+
+Die Vorschau neben dem Auszug ZEIGT, was kommt — sie bucht es nicht. Bis 2026-08-25 hing an
+jeder geplanten Zeile ein Kästchen „als bezahlt markieren", und ein Klick legte daraus eine
+Ist-Buchung an (`quelle: "bezahlt-markiert"`). Damit stand im Konto eine Zahlung, die
+niemand belegt hatte: die Bank kannte sie nicht, ein Beleg existierte nicht, und beim
+nächsten Abruf kam die echte Zeile zusätzlich dazu.
+
+**Eine Ist-Buchung entsteht nur noch auf zwei Wegen: aus dem Abruf/Import oder von Hand.**
+Eine Hochrechnung ist kein dritter. Der Use-Case dahinter ist entfernt, geprüft in
+`interaktion.test.tsx`.
+
+Zwei Reste stehen bewusst noch: `IstQuelle` kennt weiterhin `"bezahlt-markiert"` und
+`IstBuchung.planRef` gibt es noch — beides nur zum LESEN, damit ein Bestand mit solchen
+Zeilen sich nicht selbst widerspricht. Erzeugen kann sie nichts mehr; wer sie ganz abräumt,
+fasst dabei das Schema, den Monatsausblick (Status `bezahlt`) und die Projektion mit an.
 
 ## Die Seitenleiste klappt ein
 
