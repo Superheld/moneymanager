@@ -463,7 +463,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               Die Aufteilung ist der goldene Schnitt zugunsten der Buchungen (1,618 : 1):
               die haben sieben Spalten und einen Seitenschalter, die Vorschau vier. Ein
               hälftiger Schnitt gäbe der schmaleren Seite Platz, den sie nicht braucht,
-              und nähme ihn der breiteren. Unter 1200 px stapelt es wieder — zwei
+              und nähme ihn der breiteren. Unter 1280 px stapelt es wieder — zwei
               waagerecht scrollende Tabellen nebeneinander sind keine. */}
           <div className="auszug-spalten">
           <div className="auszug-spalte">

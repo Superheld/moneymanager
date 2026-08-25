@@ -93,6 +93,57 @@ describe("Buchung aufteilen", () => {
     });
   });
 
+  // Der Auszug muss einer geteilten Buchung ansehen lassen, dass sie geteilt IST. Ein
+  // Strich in der Kategoriespalte hiesse „noch einzusortieren", und danach sucht man
+  // vergeblich.
+  it("zeigt die geteilte Buchung im Auszug als aufgeteilt", async () => {
+    const nutzer = userEvent.setup();
+    await bestand();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    const dialog = await aufteilenOeffnen(nutzer);
+
+    await zeileFuellen(nutzer, 1, "Haushalt", "55");
+    await zeileFuellen(nutzer, 2, "Werkzeug", "35");
+    await nutzer.click(dialog.getByRole("button", { name: /^speichern$/i }));
+
+    // Der Buchungsdialog steht nach dem Speichern der Teile noch offen und trägt denselben
+    // Text im Kopf — erst zumachen, dann in die Tabelle sehen.
+    const detail = within(await screen.findByRole("dialog"));
+    await nutzer.click(detail.getByRole("button", { name: /^abbrechen$/i }));
+
+    await waitFor(() => {
+      const zeile = screen.getAllByRole("row").find((r) => r.textContent?.includes("Sammelposten Ohlert"));
+      expect(zeile?.textContent).toMatch(/aufgeteilt/i);
+    });
+  });
+
+  // Die Aufteilung aufzuheben ist ein Schritt IM Dialog, kein Abschluss: danach steht die
+  // Buchung ohne Kategorie da, und genau dann will man eine vergeben. Vorher schloss sich
+  // der Dialog weg und man musste die Zeile im Auszug wiederfinden.
+  it("lässt den Dialog offen, wenn die Aufteilung aufgehoben wird", async () => {
+    const nutzer = userEvent.setup();
+    await bestand();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    const dialog = await aufteilenOeffnen(nutzer);
+
+    await zeileFuellen(nutzer, 1, "Haushalt", "55");
+    await zeileFuellen(nutzer, 2, "Werkzeug", "35");
+    await nutzer.click(dialog.getByRole("button", { name: /^speichern$/i }));
+
+    const detail = within(await screen.findByRole("dialog"));
+    await nutzer.click(await detail.findByRole("button", { name: /aufteilung aufheben/i }));
+
+    await waitFor(async () => {
+      const b = (await ledgerRepo.alle()).find((x) => x.id === "b-split");
+      expect(b?.aufteilungen ?? []).toHaveLength(0);
+    });
+    // Der Dialog steht noch — und statt der Teileliste bietet er wieder den Weg zum
+    // Aufteilen an, ist also zurück im ungeteilten Zustand.
+    const offen = within(await screen.findByRole("dialog"));
+    await offen.findByRole("button", { name: /auf kategorien aufteilen/i });
+    expect(offen.queryByRole("button", { name: /aufteilung aufheben/i })).toBeNull();
+  });
+
   it("weist eine Aufteilung zurück, die den Betrag verfehlt", async () => {
     const nutzer = userEvent.setup();
     await bestand();

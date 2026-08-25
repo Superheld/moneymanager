@@ -80,6 +80,46 @@ mehr — ausser dem einen in `Zeilenauswahl`, und das ist eine Entscheidung: dor
 Feld so gross wie eine Pille daneben, und eine eigene Liste im Portal wäre für drei
 Einträge in einer Tabellenzeile Aufwand ohne Gegenwert.
 
+## `Modal` — der Dialog-Layer, und zwei Dinge, die nur verschachtelt auffallen
+
+**Der Layer hängt per Portal am `document.body`.** Ein Modal wird dort gerendert, wo es
+aufgeht — seit die Kategorie in der Auszugszeile wählbar ist, also mitten in einer
+Tabellenzelle. Steht über ihm irgendwo eine `opacity` (der Auszug dämpft damit Zeilen,
+deren Buchungstag noch vor uns liegt), erbt ein `position: fixed`-Kind sie: der Dialog
+erscheint durchscheinend, liegt im Stapel der Zeile statt über der Seite, und der Scrim
+deckt nur die Tabelle ab. Das Portal nimmt ihn aus dem Baum, und alle drei Wirkungen sind
+weg. Wer den Layer je wieder inline rendert, holt sie zurück.
+
+**Escape schliesst nur den OBERSTEN Dialog** — den auslösenden nie. Dafür führt `Modal.tsx`
+eine Menge offener Nummern, und die Nummer wird beim ersten **Render** vergeben, nicht im
+Effekt: React rendert von aussen nach innen und führt die Effekte von innen nach aussen
+aus. Ein Stapel, in den sich jeder Dialog im Effekt einträgt, steht deshalb auf dem Kopf,
+und der äussere schluckt die Taste, die dem inneren galt. Gemessen, nicht vermutet.
+
+Geprüft in `Modal.test.tsx` — beides an einem verschachtelten Aufbau, weil ein einzelner
+Dialog auf leerer Seite sich in beiden Fällen richtig verhält.
+
+**Schwebende Ebenen ausserhalb des Modals** (Auswahlliste, Kalenderblatt) hängen ebenfalls
+am body, tragen aber von sich aus keinen z-Index — und ein Modal-Layer trägt 50, gewinnt
+also gegen jedes `z-index: auto`, egal wie weit hinten es im Dokument steht. Deshalb setzt
+`app.css` (Abschnitt „Schwebende Ebenen") einen Wert am **Positioner**; am Popup darin
+wirkte er nicht, weil nur ein positioniertes Element einen z-Index annimmt.
+
+## Aufklappbereiche: zehn Zeilen breit, fünf Zeilen schmal
+
+`aufklappen.ts` hält die beiden Zahlen und sonst nichts. Sie stehen in ZEILEN und nicht in
+Pixeln: ein Deckel soll „hier ist mehr, als hineinpasst" sagen, und das liest man an
+angeschnittenen Zeilen ab. Die Höhe einer Zeile weiss nur die Stelle, die sie zeichnet —
+sie kommt von dort, die Anzahl von hier.
+
+Zwei Zahlen, weil es zwei Breiten gibt: eine Tabelle über die volle Kartenbreite verträgt
+zehn Zeilen, eine Liste in einer halb so breiten Karte steht neben einer zweiten, die
+dabei mitwächst. Die Grenze folgt der Breite, nicht der Art des Inhalts.
+
+Eine Falle: **ein Deckel gilt nicht, solange etwas DARIN aufgeklappt ist.** Sonst läge eine
+Buchungstabelle in einem Rahmen von fünf Zeilen Höhe — ein Scrollbereich im Scrollbereich,
+und der äussere frisst die Hälfte des inneren. So gelöst in `AnalyseScreen/GruppenSektion`.
+
 ## `CategoryPicker` — die Kategorie, in zwei Grössen
 
 Ein Knopf, der ein Such-Modal mit dem gruppierten Kategoriebaum öffnet. `kompakt` ändert
@@ -94,6 +134,20 @@ gescheitert ist.
 Er steht in der Kategoriespalte des Kontoauszugs, und das ist kein Beiwerk: die Kategorie
 ist die Angabe, die nach einem Import am häufigsten nicht stimmt. Eine Spalte, die sie nur
 ANZEIGT, schickt für jede Korrektur durch den Dialog.
+
+**Getippt wird gesucht, mit den Pfeiltasten gewählt, mit Enter übernommen.** Der Fokus
+bleibt dabei im Suchfeld — sonst könnte man nach dem ersten Pfeildruck nicht weitersuchen;
+die Markierung ist deshalb nur eine Einfärbung (`data-markiert`).
+
+Zwei Entscheidungen dazu, die man kennen muss:
+
+- **Die Zeilen bleiben gewöhnliche `button`.** Eine `listbox` mit `option`-Zeilen wäre die
+  lehrbuchgetreue Form und hätte den Weg genommen, der schon da ist: Knöpfe stehen in der
+  Tab-Reihenfolge, wer nicht mit der Maus arbeitet, kommt seit jeher per Tab und Enter
+  durch die Liste. Die Pfeiltasten sind ein ZUSATZ für den, der ohnehin tippt.
+- **Beim Suchen markiert der erste TREFFER**, nicht die erste sichtbare Zeile. Eine Gruppe
+  steht auch dann da, wenn nur eines ihrer Kinder passt — sie ist sichtbar, aber nicht
+  gemeint. Dafür trägt die flache Navigationsliste je Zeile ein `treffer`-Merkmal.
 
 ## `Datumsfeld` — ein Datum eingeben oder aussuchen
 

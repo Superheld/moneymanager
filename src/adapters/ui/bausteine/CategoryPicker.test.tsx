@@ -78,6 +78,64 @@ describe("CategoryPicker", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/Lebensmittel/));
   });
 
+  // Die Tastaturwahl. Sie ist der Grund, warum die Suche ueberhaupt etwas taugt: wer drei
+  // Buchstaben tippt, hat den Treffer vor sich und soll nicht zur Maus greifen muessen.
+  it("waehlt den ersten Treffer der Suche mit Enter", async () => {
+    const nutzer = userEvent.setup();
+    const gewaehlt: string[] = [];
+    render(<CategoryPicker kategorien={kategorien} value="" onChange={(id) => gewaehlt.push(id)} />);
+
+    await nutzer.click(screen.getAllByRole("button")[0]);
+    const suchfeld = await screen.findByRole("textbox");
+    await nutzer.type(suchfeld, "strom");
+    await nutzer.keyboard("{Enter}");
+
+    await waitFor(() => expect(gewaehlt).toEqual(["strom"]));
+  });
+
+  it("wandert mit den Pfeiltasten durch die Liste — quer ueber die Gruppengrenze", async () => {
+    const nutzer = userEvent.setup();
+    const gewaehlt: string[] = [];
+    render(<CategoryPicker kategorien={kategorien} value="" onChange={(id) => gewaehlt.push(id)} />);
+
+    await nutzer.click(screen.getAllByRole("button")[0]);
+    const suchfeld = await screen.findByRole("textbox");
+    // Die Reihenfolge ist die sichtbare: keine Kategorie, Wohnen, Miete, Strom, …
+    // Der zweite Schritt landet also in einer UNTERkategorie und nicht bei der naechsten
+    // Hauptgruppe — genau das ist der Punkt einer flachen Reihe.
+    await nutzer.type(suchfeld, "{ArrowDown}{ArrowDown}");
+    await nutzer.keyboard("{Enter}");
+
+    await waitFor(() => expect(gewaehlt).toEqual(["miete"]));
+  });
+
+  it("nimmt mit Enter ohne Suche die erste Zeile — „keine Kategorie\u201c", async () => {
+    const nutzer = userEvent.setup();
+    const gewaehlt: string[] = [];
+    render(<CategoryPicker kategorien={kategorien} value="miete" onChange={(id) => gewaehlt.push(id)} />);
+
+    await nutzer.click(screen.getAllByRole("button")[0]);
+    const suchfeld = await screen.findByRole("textbox");
+    await nutzer.type(suchfeld, "{Enter}");
+
+    await waitFor(() => expect(gewaehlt).toEqual([""]));
+  });
+
+  it("laeuft am oberen und unteren Ende nicht aus der Liste heraus", async () => {
+    const nutzer = userEvent.setup();
+    const gewaehlt: string[] = [];
+    render(<CategoryPicker kategorien={kategorien} value="" onChange={(id) => gewaehlt.push(id)} />);
+
+    await nutzer.click(screen.getAllByRole("button")[0]);
+    const suchfeld = await screen.findByRole("textbox");
+    // Zehnmal nach oben aus einer Liste mit sechs Zeilen: die Markierung bleibt oben
+    // stehen, statt in einen Index zu laufen, den es nicht gibt.
+    await nutzer.type(suchfeld, "{ArrowUp>10/}");
+    await nutzer.keyboard("{Enter}");
+
+    await waitFor(() => expect(gewaehlt).toEqual([""]));
+  });
+
   it("kommt mit einer leeren Kategorienliste zurecht", async () => {
     const nutzer = userEvent.setup();
     render(<CategoryPicker kategorien={[]} value="" onChange={() => {}} />);

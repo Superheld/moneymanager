@@ -18,8 +18,19 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Dialog } from "./Dialog";
 
-/** Wer gerade offen ist, in der Reihenfolge des Öffnens. Nur der letzte hört auf Esc. */
-const stapel: object[] = [];
+/**
+ * Wer gerade offen ist — als Nummern, nicht als Reihenfolge.
+ *
+ * Die Nummer wird beim ersten RENDER vergeben und nicht im Effekt. Das ist der ganze
+ * Trick: React rendert von aussen nach innen, führt die Effekte aber von innen nach
+ * aussen aus. Ein Stapel, in den sich jeder Dialog im Effekt einträgt, steht deshalb auf
+ * dem Kopf — der äussere landet obenauf und schluckt die Escape, die dem inneren galt.
+ * Gemessen, nicht vermutet: genau daran ist die erste Fassung gescheitert.
+ *
+ * Die höchste Nummer ist der oberste Dialog. Nur er reagiert.
+ */
+let naechsteNummer = 0;
+const offeneDialoge = new Set<number>();
 
 export function Modal({
   title,
@@ -44,24 +55,28 @@ export function Modal({
   const schliessen = useRef(onClose);
   schliessen.current = onClose;
 
+  // Die eigene Nummer, einmal beim ersten Render vergeben. Sie steht in einer Ref und
+  // nicht in `useState`, weil sie nichts neu zeichnet — sie ist nur eine Identität.
+  const nummerRef = useRef<number | null>(null);
+  if (nummerRef.current === null) nummerRef.current = ++naechsteNummer;
+  const nummer = nummerRef.current;
+
   useEffect(() => {
-    const ich = {};
-    stapel.push(ich);
+    offeneDialoge.add(nummer);
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       // Hat schon jemand anders reagiert (ein offenes Auswahlfeld, ein Kalender), ist
       // die Taste verbraucht — sonst schlösse dieselbe Escape zwei Ebenen auf einmal.
       if (e.defaultPrevented) return;
-      if (stapel[stapel.length - 1] !== ich) return;
+      if (Math.max(...offeneDialoge) !== nummer) return;
       schliessen.current();
     };
     window.addEventListener("keydown", onKey);
     return () => {
       window.removeEventListener("keydown", onKey);
-      const i = stapel.indexOf(ich);
-      if (i >= 0) stapel.splice(i, 1);
+      offeneDialoge.delete(nummer);
     };
-  }, []);
+  }, [nummer]);
 
   return createPortal(
     // role/aria-modal am Layer: das DS-Dialog liefert nur das Aussehen. Ohne die Rolle

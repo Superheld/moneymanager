@@ -266,8 +266,11 @@ select.field {
    sich aus mindestens so breit wie sein Inhalt, und dann wächst eine Tabelle die Spalte
    auf, statt in ihrem eigenen Scrollrahmen zu bleiben — die ganze Seite zieht sich breit.
 
-   Unter 1200 px stapelt es wieder. Zwei waagerecht scrollende Tabellen nebeneinander
-   sind keine zwei Tabellen mehr, sondern zwei Ausschnitte.
+   Unter 1280 px stapelt es wieder. Zwei waagerecht scrollende Tabellen nebeneinander sind
+   keine zwei Tabellen mehr, sondern zwei Ausschnitte. Die Zahl haengt an `.screen`, nicht
+   am Fenster: der Inhalt ist auf 1040 px gedeckelt, links davon bleiben also hoechstens
+   rund 630 px — knapp genug fuer die sieben Spalten der Buchungstabelle, und darunter
+   faengt sie an, selbst zu scrollen.
    ============================================================ */
 .auszug-spalten {
   display: grid;
@@ -278,7 +281,7 @@ select.field {
 .auszug-spalte {
   min-width: 0;
 }
-@media (max-width: 1200px) {
+@media (max-width: 1280px) {
   .auszug-spalten {
     grid-template-columns: 1fr;
   }
@@ -389,8 +392,16 @@ select.field.tabellenfilter {
   text-align: left;
   cursor: pointer;
 }
-.pickrow:hover {
+/* `data-markiert` ist die Tastaturmarkierung und sieht aus wie :hover — beides zeigt
+   dieselbe Sache: hier landet die Eingabe. Zwei verschiedene Markierungen gleichzeitig
+   auf dem Bild waeren schlimmer als keine; wer die Maus bewegt, sieht ohnehin nur eine
+   davon unter dem Zeiger. Der Rahmen links macht den Unterschied trotzdem ablesbar. */
+.pickrow:hover,
+.pickrow[data-markiert] {
   background: var(--accent-wash);
+}
+.pickrow[data-markiert] {
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .linkbtn {
   background: none;

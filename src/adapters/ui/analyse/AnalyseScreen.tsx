@@ -22,6 +22,7 @@ import {
 } from "../../../application";
 import { analyse, depots } from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, KPIStat } from "../bausteine";
+import { AUFKLAPP_ZEILEN_BREIT, AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { DepotAnsicht } from "./DepotAnsicht";
@@ -140,7 +141,21 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
               />
             </div>
             {offen && (
-              <div style={{ marginLeft: "var(--sp-4)", borderLeft: "2px solid var(--line-soft)", paddingLeft: "var(--sp-2)" }}>
+              <div style={{
+                marginLeft: "var(--sp-4)", borderLeft: "2px solid var(--line-soft)", paddingLeft: "var(--sp-2)",
+                // Fünf Unterkategorien, dann wird gescrollt (siehe bausteine/aufklappen.ts).
+                // Die 43 px sind die gerechnete Zeilenhöhe: Polsterung 5 px oben und unten,
+                // darin der Balken mit seiner Beschriftung.
+                //
+                // Der Deckel gilt NUR, solange nichts darin aufgeklappt ist. Sonst läge die
+                // Buchungstabelle einer Unterkategorie in einem Rahmen von fünf Zeilen
+                // Höhe — ein Scrollbereich in einem Scrollbereich, und der äussere frisst
+                // die Hälfte des inneren.
+                maxHeight: g.kinder.some((k) => !!k.kategorieId && offeneKat === k.kategorieId)
+                  ? undefined
+                  : aufklappHoehe(AUFKLAPP_ZEILEN_SCHMAL, 43),
+                overflowY: "auto",
+              }}>
                 {g.kinder.map((k) => {
                   const katOffen = !!k.kategorieId && offeneKat === k.kategorieId;
                   return (
@@ -282,14 +297,27 @@ export function AnalyseScreen() {
     return t("historie.vsDurchschnitt", { prozent: (a > 0 ? "+" : "\u2212") + Math.abs(a) });
   }
 
-  const detailTh = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" } as const;
+  // `sticky`: die Kopfzeile bleibt beim Scrollen im aufgeklappten Bereich stehen. Ohne das
+  // scrollt sie nach oben weg, und ab der elften Zeile steht man vor fuenf namenlosen
+  // Spalten. Der Hintergrund ist Pflicht — ein durchsichtiger Kopf laesst die Zeilen
+  // durchscheinen, waehrend sie darunter durchlaufen.
+  const detailTh = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 } as const;
   const detailTd = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
 
   function detailTabelle(kategorieId: string) {
     const bs = basis ? analyseBuchungen(basis, kategorieId, detailFenster.bvon, detailFenster.bbis) : [];
     if (bs.length === 0) return <div className="muted" style={{ padding: "8px" }}>{t("historie.detailLeer")}</div>;
     return (
-      <div style={{ background: "var(--surface-2, rgba(0,0,0,.015))", borderRadius: "var(--r-md)", padding: "4px 8px", margin: "4px 0 10px" }}>
+      <div style={{
+        background: "var(--surface-2, rgba(0,0,0,.015))", borderRadius: "var(--r-md)",
+        padding: "4px 8px", margin: "4px 0 10px",
+        // Zehn Zeilen, dann wird gescrollt (siehe bausteine/aufklappen.ts). Die Zahlen sind
+        // die gerechnete Zeilenhoehe dieser Tabelle: 8 px Polsterung oben und unten, eine
+        // Textzeile in 12,5 px und die Haarlinie darunter; die Kopfzeile faellt etwas
+        // niedriger aus, weil ihre Schrift kleiner ist.
+        maxHeight: aufklappHoehe(AUFKLAPP_ZEILEN_BREIT, 36, 34),
+        overflowY: "auto",
+      }}>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
           <thead>
             <tr>

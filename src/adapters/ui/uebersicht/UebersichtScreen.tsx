@@ -39,6 +39,7 @@ import { depots, uebersicht } from "../../dienste";
 import { Card, CoverageTrack, Pill } from "../bausteine";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
 import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
+import { AUFKLAPP_ZEILEN_SCHMAL } from "../bausteine/aufklappen";
 import { DepotKarte } from "./DepotKarte";
 import { MonatsAusblick } from "./MonatsAusblick";
 import { PageHead } from "../bausteine/PageHead";
@@ -206,6 +207,9 @@ export function UebersichtScreen() {
                     />
                     {offen && (
                       <BudgetPostenliste
+                        // Schmale Karte: sie steht neben einer zweiten, die beim
+                        // Aufklappen mitwächst (siehe bausteine/aufklappen.ts).
+                        zeilen={AUFKLAPP_ZEILEN_SCHMAL}
                         posten={budgetPostenZu(daten.sicht, z)}
                         empfaenger={daten.empfaenger}
                         kategorieNamen={daten.kategorieNamen}
