@@ -3,8 +3,12 @@
    Numbers use tabular figures where alignment matters.
    ============================================================ */
 :root{
-  --font-ui: 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
-  --font-num: 'Hanken Grotesk', system-ui, sans-serif; /* tnum via .num */
+  /* 'Hanken Grotesk Variable' ist der Name, den das lokale Paket vergibt —
+     NICHT 'Hanken Grotesk'. Steht hier der falsche, greift stumm der Fallback
+     und das Schriftbild wandert, ohne dass etwas kaputt aussieht. Die zweite
+     Stelle bleibt fuer eine im System installierte Fassung. */
+  --font-ui: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  --font-num: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, sans-serif; /* tnum via .num */
 
   /* type scale (px) */
   --fs-display: 64px;  /* the one hero number  */
