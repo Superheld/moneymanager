@@ -1,12 +1,29 @@
-// Robustheits-Tests „Geld & Rechnen" (Branch test/robustheit).
+// Robustheits-Tests „Geld & Rechnen".
 //
 // Ziel: die zentrale Invariante aus CLAUDE.md — **Geld ist immer Integer Cent, nie
-// Float** — und die Rundungs-/Vorzeichen-Ränder unter Druck setzen. Tests, die einen
-// echten Fund belegen, sind mit [ROT] markiert und dürfen fehlschlagen; sie
-// beschreiben im Kommentar erwartet/tatsächlich/warum falsch. Tests mit [GRÜN] sichern
-// Verhalten ab, das nachweislich hält.
+// Float** — und die Rundungs-/Vorzeichen-Ränder unter Druck setzen.
 //
-// Kein Produktivcode wurde geändert.
+// ENTSTANDEN ALS BEFUNDLISTE, HEUTE EIN NETZ. Die Datei kam aus einem Robustheits-Spike:
+// jeder Test, der einen echten Fund belegte, war mit `[BEHOBEN]` markiert und durfte
+// fehlschlagen — im Kommentar stand erwartet/tatsächlich/warum falsch, und im Kopf stand
+// „kein Produktivcode wurde geändert". Beides galt für genau einen Tag. Die Funde wurden
+// behoben; die Tests blieben stehen und sind seither grün.
+//
+// Bis 2026-08-25 stand die alte Markierung trotzdem noch da, und damit las sich die Datei
+// wie eine Liste von zwölf offenen Fehlern. Das ist der Grund für diesen Absatz: eine
+// Befundliste, die nach der Behebung nicht umgeschrieben wird, ist schlimmer als keine —
+// sie beunruhigt, ohne dass jemand etwas tun könnte, und beim nächsten echten Fund glaubt
+// ihr niemand mehr.
+//
+// Deshalb heissen sie jetzt:
+//
+//   • `[BEHOBEN]` — war ein echter Fehler, ist behoben, der Test hält ihn fest. Der
+//     Kommentar darüber beschreibt den Stand VOR der Behebung; er steht im Präsens des
+//     Fundes und ist als Begründung zu lesen, nicht als Zustandsbeschreibung.
+//   • `[GRÜN]` — hat von Anfang an gehalten, wird nur abgesichert.
+//
+// Beide dürfen ab jetzt NICHT mehr fehlschlagen. Wird einer rot, ist ein behobener Fehler
+// zurückgekommen.
 
 import { describe, it, expect } from "vitest";
 import {
@@ -80,35 +97,35 @@ function ist(p: Partial<IstBuchung> & { betrag: Cent }): IstBuchung {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("parseBetrag — Vorzeichen", () => {
-  // [ROT] Fund 1 — nachgestelltes Minus kippt das Vorzeichen.
+  // [BEHOBEN] Fund 1 — nachgestelltes Minus kippt das Vorzeichen.
   // Erwartet: „1.234,56-" → −123456 (nachgestelltes Minus ist die gängige Konvention
   //   in deutschen Bank-/SAP-/DATEV-CSV-Exporten und in Excel-Buchhaltungsformaten).
-  // Tatsächlich: +123456. geld.ts:92 prüft nur `bereinigt.startsWith("-")`; das Minus
+  // Tatsächlich: +123456. geld.ts prüft nur `bereinigt.startsWith("-")`; das Minus
   //   am Ende wird in Zeile 93 kommentarlos weggeworfen.
-  // Warum falsch: Der Adapter (adapters/import/finanzguruAdapter.ts:66) reicht
+  // Warum falsch: Der Adapter (adapters/import/finanzguruAdapter.ts) reicht
   //   ungeprüften CSV-Text hier hinein. Eine Ausgabe wird zur Einnahme — Saldo, Historie
   //   und Budgetverbrauch liegen um den doppelten Betrag daneben, ohne jede Warnung.
-  it("[ROT] nachgestelltes Minus bleibt negativ", () => {
+  it("[BEHOBEN] nachgestelltes Minus bleibt negativ", () => {
     expect(parseBetrag("1.234,56-", EUR)).toBe(-123456);
   });
 
-  // [ROT] Fund 2 — das eigene U+2212-Minus wird verschluckt.
+  // [BEHOBEN] Fund 2 — das eigene U+2212-Minus wird verschluckt.
   // Erwartet: Round-Trip geldFormatieren(−x) → parseBetrag → −x.
-  // Tatsächlich: parseBetrag liefert +x. geld.ts:90 filtert mit /[^0-9.,-]/g auf den
-  //   ASCII-Bindestrich; das U+2212, das geldFormatieren (geld.ts:61) selbst erzeugt,
+  // Tatsächlich: parseBetrag liefert +x. geld.ts filtert mit /[^0-9.,-]/g auf den
+  //   ASCII-Bindestrich; das U+2212, das geldFormatieren (geld.ts) selbst erzeugt,
   //   fällt heraus.
   // Warum falsch: Die App produziert einen String, den sie selbst nicht mehr korrekt
   //   liest. Copy/Paste aus einer eigenen Tabelle in ein Betragsfeld dreht das Vorzeichen.
-  it("[ROT] Round-Trip über das eigene Ausgabeformat erhält das Vorzeichen", () => {
+  it("[BEHOBEN] Round-Trip über das eigene Ausgabeformat erhält das Vorzeichen", () => {
     const formatiert = geldFormatieren(-123456, { waehrung: EUR, locale: "de-DE" });
     expect(formatiert).toBe("−1.234,56"); // U+2212
     expect(parseBetrag(formatiert, EUR)).toBe(-123456);
   });
 
-  // [ROT] Fund 2b — Klammer-Notation (Buchhaltung) verliert ebenfalls das Vorzeichen.
+  // [BEHOBEN] Fund 2b — Klammer-Notation (Buchhaltung) verliert ebenfalls das Vorzeichen.
   // Erwartet: „(1.234,56)" → −123456 oder null (klare Ablehnung).
   // Tatsächlich: +123456 — die Klammern werden stillschweigend entfernt.
-  it("[ROT] Klammer-Notation wird nicht als negativ gelesen", () => {
+  it("[BEHOBEN] Klammer-Notation wird nicht als negativ gelesen", () => {
     expect(parseBetrag("(1.234,56)", EUR)).toBe(-123456);
   });
 
@@ -123,26 +140,26 @@ describe("parseBetrag — Vorzeichen", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("parseBetrag — Müll-Eingaben", () => {
-  // [ROT] Fund 3 — unplausible Eingaben liefern eine Zahl statt null.
+  // [BEHOBEN] Fund 3 — unplausible Eingaben liefern eine Zahl statt null.
   // Erwartet: null (der Vertrag der Funktion lautet „null bei leerer/unparsebarer
   //   Eingabe"; der Import wertet null als „Zeile übersprungen" + Warnung aus).
   // Tatsächlich: „1-2" → 1200, „12,34,56" → 123456, „1.2.3" → 1230.
-  // Warum falsch: geld.ts:93 entfernt ALLE Minuszeichen und geld.ts:99 alle Trenner
+  // Warum falsch: geld.ts entfernt ALLE Minuszeichen und geld.ts alle Trenner
   //   links vom rechtesten — es gibt keine Struktur-Prüfung. Ein Tippfehler im
   //   Betragsfeld oder eine kaputte CSV-Zelle wird nicht abgelehnt, sondern als falscher
   //   Betrag verbucht. Genau die Zeilen, die als Warnung sichtbar werden müssten,
   //   rutschen still durch.
-  it("[ROT] „1-2“ ist kein gültiger Betrag", () => {
+  it("[BEHOBEN] „1-2“ ist kein gültiger Betrag", () => {
     expect(parseBetrag("1-2", EUR)).toBeNull();
   });
-  it("[ROT] „12,34,56“ ist kein gültiger Betrag", () => {
+  it("[BEHOBEN] „12,34,56“ ist kein gültiger Betrag", () => {
     expect(parseBetrag("12,34,56", EUR)).toBeNull();
   });
-  it("[ROT] „1.2.3“ ist kein gültiger Betrag", () => {
+  it("[BEHOBEN] „1.2.3“ ist kein gültiger Betrag", () => {
     expect(parseBetrag("1.2.3", EUR)).toBeNull();
   });
 
-  // [ROT] Fund 4 — keine Obergrenze: das Ergebnis ist kein sicherer Integer mehr.
+  // [BEHOBEN] Fund 4 — keine Obergrenze: das Ergebnis ist kein sicherer Integer mehr.
   // Erwartet: Entweder null oder ein Wert mit Number.isSafeInteger === true —
   //   sonst ist die Cent-Invariante („Integer Cent") verletzt, bevor irgendetwas rechnet.
   // Tatsächlich: 1e22. Ab 2^53 Cent ist jede Addition verlustbehaftet und
@@ -150,18 +167,18 @@ describe("parseBetrag — Müll-Eingaben", () => {
   //   werden ab hier lautlos falsch.
   // Warum falsch: Der Wert stammt aus einem Textfeld bzw. einer CSV-Zelle. Ein
   //   Fat-Finger („zu viele Nullen") vergiftet jede spätere Summe unumkehrbar.
-  it("[ROT] extrem große Eingabe liefert keinen unsicheren Integer", () => {
+  it("[BEHOBEN] extrem große Eingabe liefert keinen unsicheren Integer", () => {
     const c = parseBetrag("99999999999999999999", EUR);
     expect(c === null || Number.isSafeInteger(c)).toBe(true);
   });
 
-  // [ROT] Fund 4b — Exponentialschreibweise wird zu einer anderen Zahl.
+  // [BEHOBEN] Fund 4b — Exponentialschreibweise wird zu einer anderen Zahl.
   // Erwartet: null (oder 100000). Tatsächlich: „1e3" → das „e" wird weggefiltert,
   //   übrig bleibt „13" → 1300. Aus 1000 € werden 13 €.
   // Reachable: String(minorZuMajor(x)) liefert bei sehr großen Werten
   //   Exponentialschreibweise; die Edit-Formulare befüllen ihre Felder genau so
-  //   (z. B. KontenScreen.tsx:452, VertraegeScreen.tsx:135).
-  it("[ROT] Exponentialschreibweise wird nicht still zu einer anderen Zahl", () => {
+  //   (z. B. KontenScreen.tsx, VertraegeScreen.tsx).
+  it("[BEHOBEN] Exponentialschreibweise wird nicht still zu einer anderen Zahl", () => {
     expect(parseBetrag("1e3", EUR)).toBeNull();
   });
 
@@ -173,7 +190,7 @@ describe("parseBetrag — Müll-Eingaben", () => {
 
   // [GRÜN] dokumentierter Tradeoff, hier nur festgenagelt: „1.234" (deutscher
   // Tausenderpunkt ohne Nachkomma) wird als 1,234 gelesen → 123 Cent. Das ist die in
-  // geld.ts:85-87 bewusst gewählte Regel, kein Versehen — aber ein Faktor 1000 für eine
+  // geld.ts-87 bewusst gewählte Regel, kein Versehen — aber ein Faktor 1000 für eine
   // Eingabe, die ein deutscher Nutzer als „1234 €" meint.
   it("[GRÜN/Risiko] „1.234“ wird per Regel als 1,234 gelesen (123 Cent)", () => {
     expect(parseBetrag("1.234", EUR)).toBe(123);
@@ -191,51 +208,51 @@ describe("parseBetrag — Müll-Eingaben", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("Use-Cases — Integer-Cent-Invariante", () => {
-  // [ROT] Fund 5 — Nachkomma-„Cents" kommen ungeprüft durch.
+  // [BEHOBEN] Fund 5 — Nachkomma-„Cents" kommen ungeprüft durch.
   // Erwartet: buchungErfassen lehnt einen nicht-ganzzahligen Betrag ab (Invariante
   //   „Geld = Integer Cent, nie Float", CLAUDE.md).
-  // Tatsächlich: gespeichert wird betrag = −10.5. buchungErfassen.ts:26 prüft nur
+  // Tatsächlich: gespeichert wird betrag = −10.5. buchungErfassen.ts prüft nur
   //   `!(e.betrag > 0)`; das lässt jeden positiven Float passieren.
   // Warum falsch: Ab hier ist der Kern kontaminiert — jede Folgesumme rechnet in
   //   Binär-Gleitkomma (siehe nächster Test), und die DB speichert einen Wert, den
   //   niemand mehr als Cent interpretieren kann.
-  it("[ROT] buchungErfassen lehnt Nachkommastellen ab", async () => {
+  it("[BEHOBEN] buchungErfassen lehnt Nachkommastellen ab", async () => {
     const ledger = memLedger();
     await expect(
       buchungErfassen(ledger, { kontoId: "k1", datum: "2026-06-01", betrag: 10.5, charakter: "Aufwand" }),
     ).rejects.toThrow();
   });
 
-  // [ROT] Fund 5b — Infinity passiert die Validierung ebenfalls.
+  // [BEHOBEN] Fund 5b — Infinity passiert die Validierung ebenfalls.
   // Erwartet: Ablehnung. Tatsächlich: `Infinity > 0` ist true → gespeichert wird
   //   betrag = −Infinity. Jeder Saldo, in den diese Buchung eingeht, wird −Infinity.
-  it("[ROT] buchungErfassen lehnt Infinity ab", async () => {
+  it("[BEHOBEN] buchungErfassen lehnt Infinity ab", async () => {
     const ledger = memLedger();
     await expect(
       buchungErfassen(ledger, { kontoId: "k1", datum: "2026-06-01", betrag: Infinity, charakter: "Aufwand" }),
     ).rejects.toThrow();
   });
 
-  // [ROT] Fund 5c — dieselbe Lücke in umbuchungErfassen und budgetAnlegen.
-  it("[ROT] umbuchungErfassen lehnt Nachkommastellen ab", async () => {
+  // [BEHOBEN] Fund 5c — dieselbe Lücke in umbuchungErfassen und budgetAnlegen.
+  it("[BEHOBEN] umbuchungErfassen lehnt Nachkommastellen ab", async () => {
     const ledger = memLedger();
     await expect(
       umbuchungErfassen(ledger, { vonKontoId: "a", nachKontoId: "b", datum: "2026-06-01", betrag: 33.33 }),
     ).rejects.toThrow();
   });
-  it("[ROT] budgetAnlegen lehnt Nachkommastellen ab", async () => {
+  it("[BEHOBEN] budgetAnlegen lehnt Nachkommastellen ab", async () => {
     const repo = memBudgets();
     await expect(
       budgetAnlegen(repo, { kategorieId: "k", kontoId: "k1", betragProMonat: 40000.5, art: "monatlich", start: "2026-06-01", abMonat: "2026-06" }),
     ).rejects.toThrow();
   });
 
-  // [ROT] Fund 5d — Beleg für die Folgekosten: Float-Cents brechen die Saldo-Rechnung.
+  // [BEHOBEN] Fund 5d — Beleg für die Folgekosten: Float-Cents brechen die Saldo-Rechnung.
   // Erwartet: der laufende Saldo in kontoRegister ist ein exakter Integer.
   // Tatsächlich: 10.1 + 20.2 = 30.299999999999997 — der klassische Binär-Rundungsfehler,
   //   genau der, gegen den die Cent-Invariante existiert. Der Test zeigt, dass der Kern
   //   selbst keinerlei Schutz hat, sobald ein Float hereinkommt.
-  it("[ROT] laufender Saldo bleibt ganzzahlig, auch bei Float-Eingaben", () => {
+  it("[BEHOBEN] laufender Saldo bleibt ganzzahlig, auch bei Float-Eingaben", () => {
     const konto: Zahlungskonto = { id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 };
     const buchungen = [
       ist({ betrag: 10.1, datum: "2026-06-01", charakter: "Ertrag" }),
@@ -281,7 +298,7 @@ describe("Use-Cases — Integer-Cent-Invariante", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("Inventar — Validierung vor Rundung", () => {
-  // [ROT] Fund 6 — `> 0` wird VOR dem Runden geprüft, gerundet wird danach auf 0.
+  // [BEHOBEN] Fund 6 — `> 0` wird VOR dem Runden geprüft, gerundet wird danach auf 0.
   // Erwartet: nutzungsdauerMonate 0.4 wird abgelehnt. Tatsächlich (damals): die Prüfung
   //   ließ 0.4 durch, `Math.round(0.4)` machte 0 daraus, und das Aggregat lag dauerhaft
   //   kaputt in der DB — jede Rate daraus wurde Infinity, jeder Sollstand NaN.
@@ -300,7 +317,7 @@ describe("Inventar — Validierung vor Rundung", () => {
     expect(gespeichert).toHaveLength(0);
   });
 
-  // [ROT] Fund 7 — die Rate erreicht das Ziel am Ende der Nutzungsdauer nicht.
+  // [BEHOBEN] Fund 7 — die Rate erreicht das Ziel am Ende der Nutzungsdauer nicht.
   // Erwartet: nach genau `nutzungsdauerMonate` Monaten ist der Sollstand == Zielwert.
   //   Das ist die fachliche Zusage der Inventar-Rücklage: am Ende ist die
   //   Wiederbeschaffung beisammen.
@@ -326,19 +343,19 @@ const LEBENSMITTEL_BUDGET: Budget = {
 };
 
 describe("budgetVerbrauch — Erstattungen", () => {
-  // [ROT] Fund 9 — eine Erstattung ERHÖHT den Budgetverbrauch.
+  // [BEHOBEN] Fund 9 — eine Erstattung ERHÖHT den Budgetverbrauch.
   // Erwartet: Einkauf −50 € plus Rückerstattung +20 € auf derselben Kategorie ergeben
   //   30 € Verbrauch.
-  // Tatsächlich: 70 € — budget.ts:66 summiert `Math.abs(b.betrag)`, das Vorzeichen der
+  // Tatsächlich: 70 € — budget.ts summiert `Math.abs(b.betrag)`, das Vorzeichen der
   //   Erstattung geht verloren. Fehler = 2× Erstattungsbetrag.
   // Warum reachable: Der Import verbucht `betrag: u.betrag` (Vorzeichen aus der CSV)
   //   zusammen mit `charakter: kategorie.defaultCharakter`
-  //   (application/import/umsatzVerbuchen.ts:120/122). Eine Rücküberweisung eines
+  //   (application/import/umsatzVerbuchen.ts/122). Eine Rücküberweisung eines
   //   Händlers in Kategorie „Lebensmittel" landet damit als positiver Aufwand im Ledger.
-  // Warum falsch: Historie rechnet vorzeichenrichtig (historie.ts:118), Budget nicht —
+  // Warum falsch: Historie rechnet vorzeichenrichtig (historie.ts), Budget nicht —
   //   zwei Screens zeigen für dieselben Daten verschiedene Zahlen, und der Budget-Rest
   //   ist zu klein.
-  it("[ROT] Erstattung senkt den Budgetverbrauch", () => {
+  it("[BEHOBEN] Erstattung senkt den Budgetverbrauch", () => {
     const buchungen = [
       ist({ betrag: -5000, datum: "2026-06-05", kategorieId: "lebensmittel", charakter: "Aufwand" }),
       ist({ betrag: 2000, datum: "2026-06-12", kategorieId: "lebensmittel", charakter: "Aufwand" }),
@@ -365,28 +382,28 @@ describe("budgetVerbrauch — Erstattungen", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("geldFormatieren — Ränder", () => {
-  // [ROT] Fund 11 — nicht-endliche Werte werden ungefiltert angezeigt.
+  // [BEHOBEN] Fund 11 — nicht-endliche Werte werden ungefiltert angezeigt.
   // Erwartet: ein Platzhalter („—") oder ein geworfener Fehler.
   // Tatsächlich: „NaN" bzw. „∞" landen direkt in der UI. In Kombination mit Fund 6
   //   ist das der sichtbare Endzustand: der Nutzer sieht „NaN €" ohne jeden Hinweis,
   //   welcher Datensatz schuld ist.
-  it("[ROT] NaN wird nicht als „NaN“ ausgegeben", () => {
+  it("[BEHOBEN] NaN wird nicht als „NaN“ ausgegeben", () => {
     expect(geldFormatieren(NaN, { waehrung: EUR, locale: "de-DE" })).not.toBe("NaN");
   });
-  it("[ROT] Infinity wird nicht als „∞“ ausgegeben", () => {
+  it("[BEHOBEN] Infinity wird nicht als „∞“ ausgegeben", () => {
     expect(geldFormatieren(Infinity, { waehrung: EUR, locale: "de-DE" })).not.toBe("∞");
   });
 
-  // [ROT] Fund 11b — schon bei MAX_SAFE_INTEGER Cent verliert die Anzeige einen Cent.
+  // [BEHOBEN] Fund 11b — schon bei MAX_SAFE_INTEGER Cent verliert die Anzeige einen Cent.
   // Erwartet: 9007199254740991 Cent → „90.071.992.547.409,91".
-  // Tatsächlich: „90.071.992.547.409,90". geld.ts:56 rechnet `Math.abs(cent) / 100`
+  // Tatsächlich: „90.071.992.547.409,90". geld.ts rechnet `Math.abs(cent) / 100`
   //   und verlässt damit den sicheren Integer-Bereich: 90071992547409.91 ist als
   //   Double nicht exakt darstellbar, toLocaleString rundet ab.
   // Warum das zählt: Der Wert selbst ist ein gültiger sicherer Integer — die Division
   //   nach Major macht ihn kaputt, nicht die Eingabe. Die Formatierung ist also nicht
   //   über den gesamten Wertebereich verlustfrei, den der Typ Cent zulässt.
   //   Praktisch trifft das nur absurde Beträge (900 Mrd. €), erreichbar über Fund 4.
-  it("[ROT] MAX_SAFE_INTEGER formatiert verlustfrei", () => {
+  it("[BEHOBEN] MAX_SAFE_INTEGER formatiert verlustfrei", () => {
     const s = geldFormatieren(Number.MAX_SAFE_INTEGER, { waehrung: EUR, locale: "de-DE" });
     expect(s).toBe("90.071.992.547.409,91");
   });
@@ -414,7 +431,7 @@ describe("geldFormatieren — Ränder", () => {
 
 describe("parseBetrag — Haushaltswährung", () => {
   // [ROT/latent] Fund 12 — der Import parst immer mit der Standardwährung.
-  // adapters/import/finanzguruAdapter.ts:66 ruft `parseBetrag(text)` ohne
+  // adapters/import/finanzguruAdapter.ts ruft `parseBetrag(text)` ohne
   //   Währungsargument; damit gilt STANDARD_WAEHRUNG (EUR, Skala 2) statt der
   //   Haushaltswährung. Der Test zeigt den Rechenfehler, den das bei abweichender
   //   Skala erzeugt: „1200" in einer Skala-0-Währung sind 1200 Minor Units, mit der
@@ -437,14 +454,14 @@ describe("parseBetrag — Haushaltswährung", () => {
   });
 
   // [ROT/latent] Fund 14 — der „damit nie etwas crasht"-Fallback greift zu kurz.
-  // waehrung.ts:22-23 verspricht: ungültige Codes fallen auf Skala 2 zurück, „damit nie
+  // waehrung.ts-23 verspricht: ungültige Codes fallen auf Skala 2 zurück, „damit nie
   //   etwas crasht". waehrungNachCode fängt den Fehler zwar ab, gibt aber den ungültigen
-  //   CODE unverändert weiter — und geldFormatierenMitSymbol (geld.ts:73) reicht genau
+  //   CODE unverändert weiter — und geldFormatierenMitSymbol (geld.ts) reicht genau
   //   diesen Code an Intl mit style:"currency" durch und wirft dort RangeError.
   // Erwartet: geldFormatierenMitSymbol wirft nicht (Fallback auf den Code als Symbol,
-  //   wie es waehrungssymbol in geld.ts:36 bereits macht).
+  //   wie es waehrungssymbol in geld.ts bereits macht).
   // Tatsächlich: RangeError „Invalid currency code".
-  // Heute nicht auslösbar: regionNachLocale (region.ts:38) fällt auf de-DE zurück, die
+  // Heute nicht auslösbar: regionNachLocale (region.ts) fällt auf de-DE zurück, die
   //   Haushaltswährung stammt also immer aus der kuratierten Liste. Der Fund ist eine
   //   nicht eingelöste Zusage im Fallback, kein Live-Crash.
   it("[ROT/latent] ungültiger Währungscode crasht die Formatierung mit Symbol", () => {
@@ -461,7 +478,7 @@ describe("parseBetrag — Haushaltswährung", () => {
 // ══════════════════════════════════════════════════════════════════════════════
 
 describe("liquideMittel — Überlauf", () => {
-  // [ROT] Fund 13 — keine Absicherung gegen den Verlust der Integer-Genauigkeit.
+  // [BEHOBEN] Fund 13 — keine Absicherung gegen den Verlust der Integer-Genauigkeit.
   // Erwartet: entweder ein exaktes Ergebnis oder ein erkennbarer Fehler.
   // Tatsächlich: die Summe zweier Konten mit je MAX_SAFE_INTEGER Cent liefert
   //   18014398509481982 — jenseits von 2^53 ist das Ergebnis nicht mehr exakt

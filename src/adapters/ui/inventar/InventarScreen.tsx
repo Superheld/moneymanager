@@ -10,7 +10,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
-  centZuEuro,
   minorZuMajor,
   monatsRuecklage,
   type Inventarsicht,
@@ -197,10 +196,16 @@ export function InventarScreen() {
                     </span>
                   </div>
 
-                  {/* Die Rechnung: wie weit die Abschreibung fortgeschritten ist. */}
+                  {/* Die Rechnung: wie weit die Abschreibung fortgeschritten ist.
+                      Der Balken bekommt die CENT-Werte direkt: er rechnet nur ein
+                      Verhältnis, und die Umrechnung in Euro kürzte sich darin ohnehin
+                      weg. Sie lief bis 2026-08-25 über `centZuEuro` — den EUR-festen
+                      Helfer, der laut seinem eigenen `@deprecated` in keinem neuen Code
+                      mehr stehen soll. In einem Haushalt mit anderer Währung hätte er
+                      hier die falsche Nachkommastelle angesetzt. */}
                   <CoverageTrack
-                    value={centZuEuro(p.soll)}
-                    max={centZuEuro(g.wiederbeschaffung)}
+                    value={p.soll}
+                    max={g.wiederbeschaffung}
                     label={t("inventar.fortschrittLabel")}
                     right={`${geld.format(p.soll)} / ${geld.format(g.wiederbeschaffung)} ${geld.symbol}`}
                   />
@@ -214,8 +219,8 @@ export function InventarScreen() {
                   {p.tatsaechlich != null && (
                     <div style={{ marginTop: 6 }}>
                       <CoverageTrack
-                        value={centZuEuro(p.tatsaechlich)}
-                        max={centZuEuro(Math.max(1, g.wiederbeschaffung))}
+                        value={p.tatsaechlich}
+                        max={Math.max(1, g.wiederbeschaffung)}
                         over={p.tatsaechlich < p.soll}
                         label={t("inventar.gedecktDurch", { konto: kontoName.get(g.kontoId!) ?? "?" })}
                         right={`${geld.format(p.tatsaechlich)} / ${geld.format(g.wiederbeschaffung)} ${geld.symbol}`}
