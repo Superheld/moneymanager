@@ -26,6 +26,7 @@ import { BuchungDetail } from "../buchung/BuchungDetail";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { DepotAnsicht } from "./DepotAnsicht";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
+import { Auswahl } from "../bausteine/Auswahl";
 import { PageHead } from "../bausteine/PageHead";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -350,22 +351,26 @@ export function AnalyseScreen() {
               <span style={{ display: "inline-flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
                 {/* Monat direkt wählbar — der Klick auf den Chart macht dasselbe, ist bei
                     vielen Monaten aber Zielübung. Beide schreiben denselben Zustand. */}
-                <select
-                  className="field"
-                  style={{ width: "auto" }}
-                  aria-label={t("historie.monatWaehlen")}
-                  value={aktivMonat ?? ""}
-                  onChange={(e) => { setAktivMonat(e.target.value === "" ? null : Number(e.target.value)); setOffeneKat(null); }}
-                >
-                  <option value="">{t("historie.alleMonate")}</option>
-                  {verlauf.map((m, i) => (<option key={m.label} value={i}>{m.label}</option>))}
-                </select>
-                <select className="field" style={{ width: "auto" }} value={zeitraum} onChange={(e) => { setZeitraum(e.target.value as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}>
-                  <option value="12">{t("historie.zr12")}</option>
-                  <option value="24">{t("historie.zr24")}</option>
-                  <option value="jahr">{t("historie.zrJahr")}</option>
-                  <option value="alles">{t("historie.zrAlles")}</option>
-                </select>
+                <Auswahl
+                  ariaLabel={t("historie.monatWaehlen")}
+                  wert={aktivMonat == null ? "" : String(aktivMonat)}
+                  aufAenderung={(v) => { setAktivMonat(v === "" ? null : Number(v)); setOffeneKat(null); }}
+                  optionen={[
+                    { wert: "", text: t("historie.alleMonate") },
+                    ...verlauf.map((m, i) => ({ wert: String(i), text: m.label })),
+                  ]}
+                />
+                <Auswahl
+                  ariaLabel={t("historie.zeitraumWaehlen")}
+                  wert={zeitraum}
+                  aufAenderung={(v) => { setZeitraum(v as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}
+                  optionen={[
+                    { wert: "12", text: t("historie.zr12") },
+                    { wert: "24", text: t("historie.zr24") },
+                    { wert: "jahr", text: t("historie.zrJahr") },
+                    { wert: "alles", text: t("historie.zrAlles") },
+                  ]}
+                />
               </span>
             }
           >
@@ -422,11 +427,15 @@ export function AnalyseScreen() {
               action={
                 <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
                   {aufschluesselung.label && <Button variant="ghost" onClick={() => setAktivMonat(null)}>{t("historie.alleMonate")}</Button>}
-                  <select className="field" style={{ width: "auto" }} aria-label={t("historie.ebeneWaehlen")}
-                    value={ebene} onChange={(e) => { setEbene(e.target.value as "kategorie" | "gruppe"); setOffeneKat(null); setOffeneGruppe(null); }}>
-                    <option value="kategorie">{t("historie.ebeneKategorie")}</option>
-                    <option value="gruppe">{t("historie.ebeneGruppe")}</option>
-                  </select>
+                  <Auswahl
+                    ariaLabel={t("historie.ebeneWaehlen")}
+                    wert={ebene}
+                    aufAenderung={(v) => { setEbene(v as "kategorie" | "gruppe"); setOffeneKat(null); setOffeneGruppe(null); }}
+                    optionen={[
+                      { wert: "kategorie", text: t("historie.ebeneKategorie") },
+                      { wert: "gruppe", text: t("historie.ebeneGruppe") },
+                    ]}
+                  />
                 </span>
               }
                          >

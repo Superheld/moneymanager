@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  istGeteilt,
   registerSicht,
   type Charakter,
   type Dublettenverdacht,
@@ -21,6 +22,7 @@ import {
 import {
   alsBezahltMarkieren,
   bezahltZurueck,
+  buchungenSammelbearbeiten,
   konten as kontenLaden,
   pruefmarkerSetzen,
   umbuchungErfassen,
@@ -32,6 +34,9 @@ import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVe
 import { SammelDialog } from "../buchung/SammelDialog";
 import { AbrufDialog } from "./AbrufDialog";
 import { DepotAuszug } from "./DepotAuszug";
+import { Auswahl } from "../bausteine/Auswahl";
+import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { Modal } from "../bausteine/Modal";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton } from "../bausteine/IconButton";
@@ -176,6 +181,29 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       return true;
     });
   }, [register, katFilter, artFilter, regSuche, nurDubletten, geld]);
+
+  /**
+   * Kategorie einer Zeile setzen oder leeren — direkt aus der Liste heraus.
+   *
+   * Über `buchungenSammelbearbeiten` mit genau einer Buchung und nicht über
+   * `buchungBearbeiten`: der Sammelweg nimmt Betrag, Datum und Konto GAR NICHT an. Eine
+   * Kategoriewahl kann damit an keiner anderen Angabe etwas verstellen, und das ist an
+   * einer Stelle, die man beim Durchsehen im Vorbeigehen bedient, mehr wert als der
+   * kürzere Aufruf. Er zieht ausserdem den Charakter mit und setzt die Herkunft auf
+   * „manuell" — dieselben zwei Dinge, die auch der Dialog tut.
+   *
+   * `null` statt `""`: leeren ist eine Entscheidung („gehört in keine Kategorie") und
+   * etwas anderes als „nicht angegeben".
+   */
+  async function kategorieZuweisen(b: IstBuchung, kategorieId: string) {
+    setFehler(null);
+    try {
+      await buchungenSammelbearbeiten([b], { kategorieId: kategorieId || null }, [...kategorien]);
+      await laden();
+    } catch (e) {
+      setFehler(fehlerNachricht(t, e));
+    }
+  }
 
   /**
    * Baut die zwei Seiten eines Vergleichs. Fehlt der Zwilling im Ledger, kommt nichts
@@ -407,9 +435,12 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
             </div>
             <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
-              <select className="field" style={{ width: "auto" }} value={tage} onChange={(e) => setTage(Number(e.target.value))}>
-                {TAGE_OPTIONEN.map((d) => (<option key={d} value={d}>{t("konten.kommendeTage", { tage: d })}</option>))}
-              </select>
+              <Auswahl
+                ariaLabel={t("konten.kommendeTage", { tage })}
+                wert={String(tage)}
+                aufAenderung={(v) => setTage(Number(v))}
+                optionen={TAGE_OPTIONEN.map((d) => ({ wert: String(d), text: t("konten.kommendeTage", { tage: d }) }))}
+              />
               {/* Umbuchen legt ZWEI neue Buchungen an — beide müssen auf Konten landen,
                   die von Hand geführt werden. Für die Gegenseite einer Bank-Abhebung gibt
                   es den anderen Weg: im Detail der abgerufenen Zeile das Gegenbein
@@ -437,11 +468,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 );
               })}
             </div>
-            <select className="field" style={{ width: "auto" }} value={katFilter} onChange={(e) => setKatFilter(e.target.value)}>
-              <option value="alle">{t("konten.alleKategorien")}</option>
-              {kategorienImRegister.map((k) => <option key={k.id} value={k.id}>{k.name}</option>)}
-              <option value="__ohne">{t("konten.ohneKategorie")}</option>
-            </select>
+            <Auswahl
+              ariaLabel={t("konten.alleKategorien")}
+              wert={katFilter}
+              aufAenderung={setKatFilter}
+              optionen={[
+                { wert: "alle", text: t("konten.alleKategorien") },
+                ...kategorienImRegister.map((k) => ({ wert: k.id, text: k.name })),
+                { wert: "__ohne", text: t("konten.ohneKategorie") },
+              ]}
+            />
             <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
             {/* Erscheint nur, wenn es etwas zu sehen gibt. Ein Schalter, der dauerhaft
                 „0 mögliche Dubletten" anbietet, ist eine Frage ohne Antwort. */}
@@ -535,9 +571,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                     <span title={r.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
                       {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
-                      {/* Der „ansehen"-Marker steht VOR den anderen Pillen: die übrigen
-                          sagen, was eine Zeile IST, dieser sagt, was noch zu tun ist.
-                          Klick nimmt ihn weg — dafür ist er ein Knopf und kein Etikett. */}
+                      {/* Der Prüf-Marker steht VOR den anderen Pillen: die übrigen sagen,
+                          was eine Zeile IST, dieser sagt, was noch zu tun ist. Klick nimmt
+                          ihn weg — dafür ist er ein Knopf und kein Etikett.
+                          Warnfarbe und Imperativ, weil er eine AUFFORDERUNG ist; grün und
+                          „erledigt" lasen sich als Haken und damit als das Gegenteil. */}
                       {r.buchung?.zuPruefen && (
                         <button
                           type="button"
@@ -550,7 +588,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                             await laden();
                           }}
                         >
-                          <Pill variant="ok">{t("konten.pillErledigt")}</Pill>
+                          <Pill variant="warn">{t("konten.pillZuPruefen")}</Pill>
                         </button>
                       )}
                       {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
@@ -588,10 +626,33 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   // daneben einen Strich — zwei Zeichen für dieselbe Aussage.
                   key: "kat", label: t("konten.spalteKategorie"), maxWidth: 180,
                   sortValue: (r) => (r.zeile.gegenkontoId ? "" : r.kategorieName),
+                  // Die Kategorie ist hier ÄNDERBAR, nicht nur abzulesen.
+                  //
+                  // Sie ist die Angabe, die nach einem Import am häufigsten nicht stimmt,
+                  // und sie stand in einer Spalte, die aussah wie eine Anzeige: wer sie
+                  // korrigieren wollte, musste den Dialog öffnen, eine Kategorie wählen,
+                  // speichern und schliessen — vier Schritte für eine Entscheidung, die
+                  // man beim Durchsehen der Liste schon getroffen hat.
+                  //
+                  // Zwei Zeilen bekommen den Wähler NICHT, und beide aus demselben Grund:
+                  // sie haben keine EINE Kategorie, in die eine Wahl passen würde. Ein
+                  // Umbuchungs-Bein trägt gar keine (es verschiebt eigenes Geld), eine
+                  // aufgeteilte Buchung trägt mehrere. Bei ihnen bliebe unklar, was ein
+                  // Klick eigentlich täte.
                   render: (r) =>
                     r.zeile.gegenkontoId
                       ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill>
-                      : r.kategorieName || "—",
+                      : r.buchung && !istGeteilt(r.buchung)
+                        ? (
+                            <CategoryPicker
+                              kompakt
+                              ariaLabel={t("konten.spalteKategorie")}
+                              kategorien={[...kategorien]}
+                              value={r.zeile.kategorieId ?? ""}
+                              onChange={(id) => void kategorieZuweisen(r.buchung!, id)}
+                            />
+                          )
+                        : r.kategorieName || "—",
                 },
                 { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (r) => r.zeile.betrag, render: (r) => <span className="num" style={{ fontWeight: 700, color: geldFarbe(r.zeile.betrag) }}>{geld.format(r.zeile.betrag, { mitVorzeichen: true })}</span> },
                 { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (r) => r.zeile.saldo, render: (r) => geld.format(r.zeile.saldo) },
@@ -754,17 +815,23 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
     >
       <div className="form-grid">
         <FormField label={t("konten.umbuchung.vonKonto")} required>
-          <select className="field" value={von} onChange={(e) => setVon(e.target.value)}>
-            {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-          </select>
+          <Auswahl
+            ariaLabel={t("konten.umbuchung.vonKonto")}
+            wert={von}
+            aufAenderung={setVon}
+            optionen={konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+          />
         </FormField>
         <FormField label={t("konten.umbuchung.nachKonto")} required>
-          <select className="field" value={nach} onChange={(e) => setNach(e.target.value)}>
-            {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-          </select>
+          <Auswahl
+            ariaLabel={t("konten.umbuchung.nachKonto")}
+            wert={nach}
+            aufAenderung={setNach}
+            optionen={konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+          />
         </FormField>
         <FormField label={t("konten.feldDatum")} required>
-          <input className="field" type="date" value={datum} onChange={(e) => setDatum(e.target.value)} />
+          <Datumsfeld ariaLabel={t("konten.feldDatum")} wert={datum} aufAenderung={setDatum} />
         </FormField>
         <FormField label={t("konten.feldBetrag")} required>
           <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />

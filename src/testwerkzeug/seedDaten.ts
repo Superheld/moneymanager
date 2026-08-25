@@ -85,6 +85,38 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     anschaffung: ["Dessloch", "Weimbrand"],
   };
 
+  /**
+   * Der Anlass zur Zahlung — die zweite Haelfte einer Bezeichnung.
+   *
+   * Er sagt, WOFUER gezahlt wurde, und darf das auch: die Regel aus `src/CLAUDE.md`
+   * verlangt sektorneutrale NAMEN, damit aus einem Fantasienamen nicht hervorgeht, was es
+   * beim echten Haushalt an Vertraegen gibt. Ein Anlasswort ist kein Name und steht in
+   * einem Bestand, der von A bis Z erfunden ist — aus ihm laesst sich nichts ableiten.
+   * Ohne ihn liest sich der Auszug wie eine Liste von Nachnamen.
+   */
+  const ANLAESSE = {
+    lebensmittel: ["Wocheneinkauf", "Einkauf", "Nachkauf", "Markttag"],
+    freizeit: ["Monatsbeitrag", "Eintritt", "Kursgebuehr"],
+    mobilitaet: ["Fahrschein", "Monatskarte", "Tankfuellung"],
+    gesundheit: ["Rechnung", "Zuzahlung", "Rezept"],
+    anschaffung: ["Bestellung", "Ersatzteil", "Neuanschaffung"],
+  };
+
+  /**
+   * Eine Bezeichnung fuer eine Alltagsbuchung — ERZEUGT, nicht abgeschrieben.
+   *
+   * Bis 2026-08-25 schrieb der Spielstand ueberhaupt keine `notiz`, und der Auszug zeigte
+   * seitenweise Zeilen ohne Beschriftung. Eine feste Liste waere die naheliegende Antwort
+   * gewesen und die schlechtere: sie muesste mit jeder neuen Buchungsart mitwachsen, und
+   * bei sechs bis zehn Einkaeufen im Monat staende ueberall dasselbe.
+   *
+   * Gezogen wird aus dem GESAETEN Wuerfel, wie alles hier. Derselbe Aufruf erzeugt damit
+   * denselben Bestand — ein Screenshot von gestern zeigt dieselben Zeilen wie einer von
+   * heute, Bezeichnungen eingeschlossen.
+   */
+  const bezeichnung = (bereich: keyof typeof GEGENPARTEIEN): string =>
+    `${einesVon(GEGENPARTEIEN[bereich])} ${einesVon(ANLAESSE[bereich])}`;
+
   // ------------------------------------------------------------ Stammdaten
 
   setzen("INSERT INTO einstellung (schluessel, wert) VALUES (?, ?)", ["locale", "de-DE"]);
@@ -273,12 +305,18 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       kategorieHerkunft?: string;
       vertragId?: string | null;
       vertragHerkunft?: string | null;
+      /**
+       * Die Bezeichnung der Zeile. Leer lassen darf sie nur, wer einen BELEG dazu anlegt:
+       * dann zeigt der Auszug den Empfaenger von dort. Alles andere stuende sonst ohne
+       * Beschriftung in der Liste — und das war bis 2026-08-25 der Normalfall.
+       */
+      notiz?: string;
     } = {},
   ): string => {
     const id = `buchung-${String(++lfd).padStart(4, "0")}`;
     setzen(
-      "INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle, kategorie_herkunft, zu_pruefen, roh_hash, vertrag_id, vertrag_herkunft) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle, kategorie_herkunft, zu_pruefen, roh_hash, vertrag_id, vertrag_herkunft, notiz) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         id,
         datum,
@@ -292,6 +330,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
         extra.rohHash ?? null,
         extra.vertragId ?? null,
         extra.vertragHerkunft ?? null,
+        extra.notiz ?? null,
       ],
     );
     return id;
@@ -333,6 +372,9 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       const datum = tagIn(-m, tag);
       const hash = `hash-sync-${m}-${partei.toLowerCase()}`;
       const id = buchung(datum, betrag, kontoId, kategorieId, charakter, {
+        // Dieselben Woerter wie am Beleg. Bei den von Hand erfassten Monaten gibt es
+        // keinen, und ohne die Bezeichnung staende die Zeile dort leer da.
+        notiz: `${partei} ${zweck}`,
         quelle: gesynct ? "import" : "manuell",
         rohHash: gesynct ? hash : undefined,
         kategorieHerkunft: gesynct ? "automatisch" : "manuell",
@@ -352,8 +394,12 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     fest(15, -8900, "konto-giro", "kat-versicherung", "Aufwand", "Mordhorst", "Beitrag", "vertrag-versicherung");
     fest(8, -zahlZwischen(6000, 11000), "konto-giro", "kat-energie", "Aufwand", "Wendlandt", "Abschlag");
     // Eine Umschichtung hat ZWEI Seiten — sonst zeigt der Verlauf einen Stand, den es nie gab.
-    buchung(tagIn(-m, 2), -30000, "konto-giro", "kat-uebertrag", "Umschichtung");
-    buchung(tagIn(-m, 2), 30000, "konto-tagesgeld", "kat-uebertrag", "Umschichtung");
+    buchung(tagIn(-m, 2), -30000, "konto-giro", "kat-uebertrag", "Umschichtung", {
+      notiz: "Uebertrag zur Ruecklage",
+    });
+    buchung(tagIn(-m, 2), 30000, "konto-tagesgeld", "kat-uebertrag", "Umschichtung", {
+      notiz: "Uebertrag vom Girokonto",
+    });
 
     // Alltag — streut, damit die Budgets mal passen und mal nicht
     for (let i = 0; i < zahlZwischen(6, 10); i++) {
@@ -363,33 +409,48 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
         einesVon(["konto-giro", "konto-bar", "konto-kk"]),
         "kat-lebensmittel",
         "Aufwand",
+        { notiz: bezeichnung("lebensmittel") },
       );
     }
     for (let i = 0; i < zahlZwischen(1, 4); i++) {
-      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(1200, 7800), "konto-kk", "kat-freizeit", "Aufwand");
+      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(1200, 7800), "konto-kk", "kat-freizeit", "Aufwand", {
+        notiz: bezeichnung("freizeit"),
+      });
     }
     for (let i = 0; i < zahlZwischen(1, 3); i++) {
-      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(900, 5400), "konto-giro", "kat-mobilitaet", "Aufwand");
+      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(900, 5400), "konto-giro", "kat-mobilitaet", "Aufwand", {
+        notiz: bezeichnung("mobilitaet"),
+      });
     }
     if (zufall() < 0.45) {
-      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(2500, 18000), "konto-giro", "kat-gesundheit", "Aufwand");
+      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(2500, 18000), "konto-giro", "kat-gesundheit", "Aufwand", {
+        notiz: bezeichnung("gesundheit"),
+      });
     }
     if (zufall() < 0.3) {
-      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(8000, 42000), "konto-tagesgeld", "kat-anschaffung", "Aufwand");
+      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(8000, 42000), "konto-tagesgeld", "kat-anschaffung", "Aufwand", {
+        notiz: bezeichnung("anschaffung"),
+      });
     }
   }
 
   // Ein Rueckfluss — Aufwand mit POSITIVEM Betrag, in der Kategorie der Ausgabe. Der Fall
   // steht ausdruecklich in der Wurzel-`CLAUDE.md`, und ohne ihn im Spielstand faellt eine
   // Regression daran erst am echten Bestand auf.
-  buchung(tagIn(-1, 20), 6400, "konto-giro", "kat-gesundheit", "Aufwand");
+  buchung(tagIn(-1, 20), 6400, "konto-giro", "kat-gesundheit", "Aufwand", {
+    notiz: `${einesVon(GEGENPARTEIEN.gesundheit)} Erstattung`,
+  });
   // Dasselbe eine Ebene groesser: eine Steuerrueckerstattung gehoert zu „Steuern", auch
   // wenn die urspruengliche Zahlung gar nicht im Bestand steht.
-  buchung(tagIn(-3, 12), 48500, "konto-giro", "kat-steuern", "Aufwand");
+  buchung(tagIn(-3, 12), 48500, "konto-giro", "kat-steuern", "Aufwand", {
+    notiz: "Rueckerstattung Vorjahr",
+  });
 
   // Eine aufgeteilte Buchung. Summe der Teile MUSS dem Betrag entsprechen — das setzt der
   // Kern voraus, und der Spielstand soll den Fall enthalten, nicht nur den Normalfall.
-  const geteilt = buchung(tagIn(-1, 14), -12600, "konto-giro", "kat-lebensmittel", "Aufwand");
+  const geteilt = buchung(tagIn(-1, 14), -12600, "konto-giro", "kat-lebensmittel", "Aufwand", {
+    notiz: `${einesVon(GEGENPARTEIEN.lebensmittel)} Sammelposten`,
+  });
   setzen(
     "INSERT INTO ist_buchung_aufteilung (id, istbuchung_id, kategorie_id, betrag, notiz) VALUES (?, ?, ?, ?, ?)",
     ["teil-1", geteilt, "kat-lebensmittel", -8100, null],
@@ -420,6 +481,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // die Herkunft holte der naechste Abgleich sie zurueck, und die Handkorrektur waere
   // jedes Mal aufs Neue zu machen.
   buchung(tagIn(-1, 9), -4500, "konto-giro", "kat-internet", "Aufwand", {
+    notiz: "Einmalige Zusatzleistung",
     vertragId: null, vertragHerkunft: "manuell",
   });
 

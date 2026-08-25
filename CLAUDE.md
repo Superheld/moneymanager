@@ -172,17 +172,35 @@ voran die Kategorie-Erkennung, muss über `lauf_id` danach unterscheiden. Eine A
 zwischen den beiden Vokabularen gibt es nicht; sie liesse sich nur aus der
 DK-Spezifikation gewinnen, und eine geratene wäre schlimmer als keine.
 
-#### Die Richtung kommt vom Beleg, der Charakter ordnet ein
+#### Das Vorzeichen ist die Richtung, der Charakter ordnet ein
 
-Bei einer **von Hand** erfassten Buchung folgt das Vorzeichen dem Charakter: man tippt eine
-Betragshöhe und sagt „Aufwand", daraus wird ein Abfluss. Es gibt keinen Beleg, der es
-besser wüsste.
+**Der Betrag einer Ist-Buchung trägt sein Vorzeichen selbst, überall.** Er kommt
+vorzeichenbehaftet in `buchungErfassen` und `buchungBearbeiten` herein und wird unverändert
+gebucht — beim Import ist das die **Tatsache** vom Beleg, von Hand das, was jemand eintippt.
+Nichts leitet die Richtung mehr aus dem Charakter ab, und deshalb kann auch nichts sie
+umdrehen. Geprüft wird nur noch, dass sie nicht 0 ist (`betrag.nichtNull`); **negative
+Beträge sind auf jedem Konto und in jeder Kategorie erlaubt**, denn eine Retoure ist eine.
 
-Bei einer **importierten** Buchung ist es umgekehrt. Die Bank hat gebucht, in welche
-Richtung das Geld geflossen ist — das ist eine **Tatsache**. Der Charakter ist eine
-**Einordnung**, und eine Einordnung darf eine Tatsache nicht umdrehen. `buchungBearbeiten`
-behält deshalb bei `quelle === "import"` das Vorzeichen des Originals und übernimmt aus der
-Eingabe nur die Höhe.
+Der Charakter ist eine **Einordnung**: er sagt, WOFÜR das Geld war. Eine Einordnung darf
+eine Tatsache nicht umdrehen — das gilt seit dem Wegfall der Ableitung nicht mehr nur für
+importierte Zeilen, sondern immer.
+
+**Die Maske trennt HÖHE und RICHTUNG in zwei Felder.** Das Betragsfeld nimmt die Höhe,
+daneben steht die Richtung als Wahl mit zwei sichtbaren Möglichkeiten (Abfluss/Zufluss);
+beim Öffnen wird der gespeicherte Betrag in beide zerlegt, beim Speichern wieder
+zusammengesetzt. Ein mitgebrachtes Vorzeichen — getippt oder eingefügt — wandert in diese
+Wahl, statt im Feld stehenzubleiben oder abgewiesen zu werden.
+
+Die Wahl bleibt auch dort **sichtbar, wo sie gesperrt ist** (Online-Konto, Entwurf,
+Umbuchungs-Bein): was die Bank gebucht hat, soll man ablesen können, ohne es ändern zu
+dürfen. Ein Feld, das nur erscheint, wenn man es bedienen darf, lässt die Frage sonst
+unbeantwortet — genau das war der Fehler des Kästchens davor.
+
+Die Kategorie setzt die Richtung nur, **solange niemand sie selbst gewählt hat**. Danach
+gilt die Wahl, und kein Kategoriewechsel nimmt sie wieder weg; eine bestehende Buchung
+zählt von Anfang an als selbst gesetzt. Das ist nicht die alte Ableitung mit anderem
+Namen: die lief unsichtbar hinter dem Feld, diese bewegt einen Schalter, den man vor sich
+sieht und jederzeit zurückstellen kann.
 
 **Eine Erstattung ist damit ein Aufwand mit positivem Betrag**, und das ist kein
 Widerspruch: „Aufwand" sagt, WOFÜR das Geld war, das Vorzeichen sagt, wohin es floss. Die
@@ -204,18 +222,39 @@ liegen, kommt die Verrechnung über die Kategorie auf dasselbe Ergebnis, und üb
 Monatsgrenzen hinweg würde eine solche Verknüpfung einen abgeschlossenen Monat rückwirkend
 ändern — genau das, was der Budgetbetrag weiter unten aus gutem Grund nicht tut.
 
-**Von Hand braucht die Richtung ein eigenes Wort.** Ohne Beleg leitet
-`vorzeichenbehaftet()` sie aus dem Charakter ab, und das geht nur so lange gut, wie
-Einordnung und Richtung dasselbe sagen. Beim Rückfluss tun sie es nicht. Die
-Buchungseingabe trägt deshalb ein `gegenrichtung`-Feld, das die Ableitung umdreht; für
-eine PLANGRÖSSE (Zahlungsregel, Vertragsrate) bleibt die Ableitung, denn eine geplante
-Rate hat genau eine Richtung.
+**Für eine PLANGRÖSSE bleibt die Ableitung.** `vorzeichenbehaftet()` gibt es weiterhin,
+aber nur noch für Zahlungsregel und Vertragsrate: eine geplante Rate hat genau eine
+Richtung, sonst wäre sie keine Rate. Für eine IST-Buchung gilt sie nicht — dort fallen
+Einordnung und Richtung beim Rückfluss auseinander, und dann gewinnt die Richtung.
+
+Drei Versuche davor sind an derselben Stelle gescheitert und stehen hier, damit kein
+vierter unternommen wird:
+
+1. Eine Sonderregel in `buchungBearbeiten`, die bei `quelle === "import"` das Vorzeichen
+   des Originals gegen die Ableitung verteidigte.
+2. Ein Kästchen `gegenrichtung`, das die Ableitung umdrehte — es gab das Kästchen aber nur
+   in der Hälfte der Fälle, bei importierten Zeilen also nie.
+3. Das Vorzeichen im Betragsfeld selbst. Richtig gerechnet, und trotzdem zu wenig: es
+   verlangt, dass man auf die Idee kommt, ein Minus zu tippen.
+
+Die ersten beiden reparierten die FOLGEN der Ableitung, statt sie wegzunehmen — die Maske
+zeigte weiter `Math.abs(betrag)`, und ein eingetipptes Minus flog mit
+`betrag.groesserNull` raus. Der dritte nahm sie weg und liess die Richtung trotzdem etwas
+sein, das man dem Feld ansehen muss. **Eine Wahl mit zwei sichtbaren Möglichkeiten
+verlangt weder Wissen noch Vertrauen** — das ist der Unterschied, an dem die drei davor
+gescheitert sind.
 
 **Und wo ein Wort neben der Zahl steht, muss es mitwandern.** Ein negativer Verbrauch unter
 der Überschrift „verbraucht" liest sich als ausgegeben, auch wenn das Minus davorsteht und
 der Rest im selben Bild wächst — ein Wort gewinnt gegen ein Vorzeichen. Die Anzeigen zum
 Budgetverlauf wechseln deshalb das Wort und zeigen den Betrag ohne Vorzeichen, statt beides
 zu vermischen.
+
+**Aber `Math.abs` auf einem Verbrauch ist fast immer ein Fehler.** Wo der Wert einen
+Rückfluss tragen KANN, macht das Wegwerfen des Vorzeichens aus „es kam Geld zurück" ein
+„es wurde genau so viel ausgegeben". Der Unterschied zum Absatz davor: dort steht ein Wort
+daneben, das mitwandert; hier steht nur die Zahl. Ein Balken darf bei 0 anschlagen
+(`Math.max(0, …)`), die Zahl daneben behält ihr Vorzeichen.
 
 #### Der Budgetbetrag ist eine Reihe, kein Wert
 
@@ -459,6 +498,13 @@ sie nur nach draussen, wenn jemand einen Bankabruf auslöste. Deshalb ist sie ab
 (`aktualisierungPruefen` in `einstellung`); ohne Zutun ist sie an, denn ein Update, von
 dem niemand erfährt, ist keines.
 
+Der Schalter dafür steht seit 2026-08-25 unter **Einstellungen → Aktualisierung**, in
+einem eigenen Register und nicht bei den Experimenten: die Prüfung ist keins, sie ist an,
+und der Grund für den Schalter — der einzige ungefragte Netzzugriff — gehört
+daneben geschrieben statt in eine Fussnote. Ein fehlender Schlüssel heisst dabei „nie
+entschieden" und nicht „abgelehnt", weshalb das Kästchen ohne Zeile in der Tabelle
+angehakt ist.
+
 Wo was liegt:
 
 | Stück | Datei |
@@ -560,9 +606,6 @@ Mechanismus und Release-Workflow stehen. Offen ist:
 - **Linux.** Braucht AppImage als Bundle-Ziel und einen zweiten Bauplatz; macOS lässt sich
   nicht auf Linux bauen und umgekehrt. Und der Updater kann dort ausschliesslich AppImages
   ersetzen.
-- **Kein Schalter in den Einstellungen.** Die Abschaltbarkeit ist gebaut und geprüft
-  (`pruefungSchalten`, `dienste.aktualisierungspruefungSetzen`), hat aber noch keine
-  Oberfläche — abschalten geht derzeit nur über die Einstellungstabelle.
 
 **Was in einem veröffentlichten Archiv steckt** und was nicht, weil die Frage naheliegt:
 keine Zugangsdaten, keine Kontodaten, kein Datenbestand — die Datenbank liegt im

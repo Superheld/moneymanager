@@ -5,6 +5,7 @@
 // Konten nach „Konten". Beides ist keine Einstellung, sondern eigene Arbeit — ein Konto
 // hat einen Stand, eine Bankverbindung und bald einen Abruf auf Knopfdruck.
 
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -16,6 +17,8 @@ import {
   type Person,
 } from "../../../application";
 import {
+  aktualisierungspruefung,
+  aktualisierungspruefungSetzen,
   kategorieAnlegen,
   kategorieLoeschen,
   personAnlegen,
@@ -25,6 +28,7 @@ import {
 } from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
+import { Auswahl } from "../bausteine/Auswahl";
 import { Bereich } from "../bausteine/Bereich";
 import { FestlegungenCard } from "../training/FestlegungenCard";
 import { Modal } from "../bausteine/Modal";
@@ -80,6 +84,12 @@ export function EinstellungenScreen() {
           inhalt: () => <FestlegungenCard kategorien={kategorien} />,
         },
         {
+          id: "aktualisierung",
+          label: t("einstellungen.aktualisierung.titel"),
+          untertitel: t("einstellungen.aktualisierung.untertitel"),
+          inhalt: () => <AktualisierungCard />,
+        },
+        {
           id: "experimente",
           label: t("einstellungen.experiment.titel"),
           untertitel: t("einstellungen.experiment.untertitel"),
@@ -97,13 +107,15 @@ function RegionCard() {
   return (
     <Card>
       <FormField label={t("einstellungen.region.feld")} hint={t("einstellungen.region.hinweis")}>
-        <select className="field" value={aktuelleLocale} onChange={(e) => regionSetzen(e.target.value)}>
-          {REGIONEN.map((r) => (
-            <option key={r.locale} value={r.locale}>
-              {r.label} · {waehrungssymbol(waehrungNachCode(r.waehrungCode), r.locale)}
-            </option>
-          ))}
-        </select>
+        <Auswahl
+          ariaLabel={t("einstellungen.region.feld")}
+          wert={aktuelleLocale}
+          aufAenderung={regionSetzen}
+          optionen={REGIONEN.map((r) => ({
+            wert: r.locale,
+            text: `${r.label} · ${waehrungssymbol(waehrungNachCode(r.waehrungCode), r.locale)}`,
+          }))}
+        />
       </FormField>
     </Card>
   );
@@ -125,7 +137,7 @@ function ExperimenteCard() {
         {t("einstellungen.experiment.hinweis")}
       </p>
       <div style={{ display: "grid", gap: "var(--sp-3)" }}>
-        <ExperimentZeile
+        <SchalterZeile
           titel={t("einstellungen.experiment.hanseaticTitel")}
           text={t("einstellungen.experiment.hanseaticText")}
           an={experimente.hanseatic}
@@ -136,7 +148,16 @@ function ExperimenteCard() {
   );
 }
 
-function ExperimentZeile({
+/**
+ * Eine Zeile mit einem Schalter: Kaestchen, fetter Titel, der aktuelle Stand und eine
+ * Erklaerung darunter.
+ *
+ * Hiess bis 2026-08-25 `ExperimentZeile` — nach ihrem ersten Anwendungsfall, nicht nach
+ * dem, was sie ist. Beim zweiten (der Aktualisierungspruefung, die kein Experiment ist)
+ * haette der Name gegen die Sache gestanden, und der naechste haette entweder einen
+ * falschen Namen benutzt oder die Zeile ein zweites Mal gebaut.
+ */
+function SchalterZeile({
   titel,
   text,
   an,
@@ -170,6 +191,50 @@ function ExperimentZeile({
         <span className="muted">{text}</span>
       </span>
     </label>
+  );
+}
+
+/**
+ * Ob die App beim Start nach einer neueren Fassung sucht.
+ *
+ * Der Schalter war seit dem Update-Weg gebaut und geprueft (`pruefungSchalten`), hatte
+ * aber keine Oberflaeche — abschalten ging nur ueber die Einstellungstabelle. Eine
+ * Faehigkeit, die niemand erreicht, ist keine.
+ *
+ * Er steht in einem EIGENEN Register und nicht bei den Experimenten: die Pruefung ist
+ * keins, sie ist an, und sie ist der einzige Netzzugriff, den die App von sich aus macht
+ * (siehe `application/aktualisierung.ts`). Genau das ist der Grund, warum sie abschaltbar
+ * sein muss — und der gehoert danebengeschrieben, nicht in eine Fussnote.
+ */
+function AktualisierungCard() {
+  const { t } = useTranslation();
+  const [an, setAn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void aktualisierungspruefung().then(setAn);
+  }, []);
+
+  async function schalten(neu: boolean) {
+    // Erst schreiben, dann anzeigen: bliebe das Kaestchen bei einem Fehler umgelegt
+    // stehen, zeigte es einen Zustand, den die Datenbank nicht hat.
+    await aktualisierungspruefungSetzen(neu);
+    setAn(neu);
+  }
+
+  return (
+    <Card>
+      <p className="muted" style={{ marginTop: 0 }}>
+        {t("einstellungen.aktualisierung.hinweis")}
+      </p>
+      {an != null && (
+        <SchalterZeile
+          titel={t("einstellungen.aktualisierung.schalterTitel")}
+          text={t("einstellungen.aktualisierung.schalterText")}
+          an={an}
+          aufSchalten={(neu) => void schalten(neu)}
+        />
+      )}
+    </Card>
   );
 }
 
@@ -238,7 +303,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
             <input className="field" value={rolle} onChange={(e) => setRolle(e.target.value)} placeholder={t("einstellungen.person.feldRollePlaceholder")} />
           </FormField>
           <FormField label={t("einstellungen.person.feldGeburtsdatum")} hint={t("einstellungen.person.feldGeburtsdatumHinweis")}>
-            <input className="field" type="date" value={geburtsdatum} onChange={(e) => setGeburtsdatum(e.target.value)} />
+            <Datumsfeld ariaLabel={t("einstellungen.person.feldGeburtsdatum")} wert={geburtsdatum} aufAenderung={setGeburtsdatum} />
           </FormField>
         </Modal>
       )}
@@ -332,15 +397,23 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
               <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("einstellungen.kategorie.feldNamePlaceholder")} />
             </FormField>
             <FormField label={t("einstellungen.kategorie.feldEltern")} hint={t("einstellungen.kategorie.feldElternHinweis")}>
-              <select className="field" value={elternId} onChange={(e) => setElternId(e.target.value)}>
-                <option value="">{t("einstellungen.kategorie.wurzel")}</option>
-                {kategorien.filter((k) => k.id !== editId).map((k) => (<option key={k.id} value={k.id}>{k.name}</option>))}
-              </select>
+              <Auswahl
+                ariaLabel={t("einstellungen.kategorie.feldEltern")}
+                wert={elternId}
+                aufAenderung={setElternId}
+                optionen={[
+                  { wert: "", text: t("einstellungen.kategorie.wurzel") },
+                  ...kategorien.filter((k) => k.id !== editId).map((k) => ({ wert: k.id, text: k.name })),
+                ]}
+              />
             </FormField>
             <FormField label={t("einstellungen.kategorie.feldCharakter")}>
-              <select className="field" value={defaultCharakter} onChange={(e) => setDefaultCharakter(e.target.value as Charakter)}>
-                {CHARAKTERE.map((c) => (<option key={c} value={c}>{t(`charakter.${c}`)}</option>))}
-              </select>
+              <Auswahl
+                ariaLabel={t("einstellungen.kategorie.feldCharakter")}
+                wert={defaultCharakter}
+                aufAenderung={(v) => setDefaultCharakter(v as Charakter)}
+                optionen={CHARAKTERE.map((c) => ({ wert: c, text: t(`charakter.${c}`) }))}
+              />
             </FormField>
           </div>
         </Modal>

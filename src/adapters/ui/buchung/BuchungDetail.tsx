@@ -26,11 +26,10 @@
 // nur dieser Dialog braucht. „Selbst" heisst seit 2026-08-19: über `buchungsdetail()`
 // aus der Anwendungsschicht, nicht über acht Repositories von Hand.
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   istGeteilt,
-  minorZuMajor,
   musterVorschlag,
   type Charakter,
   type IstBuchung,
@@ -53,8 +52,10 @@ import {
   type Dublettenfreigabe,
   type Dublettenverdacht,
 } from "../../../application";
-import { offenerRest } from "../../../application/buchung/buchungSplitten";
-import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../../application/buchung/umbuchungAusBuchung";
+import { SplitModal } from "./SplitModal";
+import { ZurUmbuchungModal } from "./ZurUmbuchungModal";
+import { vorzeichenbehaftet } from "../../../application/buchung/zahlungsregelAnlegen";
+import { paarungsKandidaten } from "../../../application/buchung/umbuchungAusBuchung";
 import {
   buchungBearbeiten,
   buchungErfassen,
@@ -62,7 +63,6 @@ import {
   buchungLoeschen,
   pruefmarkerSetzen,
   buchungenPaaren,
-  buchungSplitten,
   buchungsdetail,
   dublettenFreigabeAufheben,
   dublettenFreigeben,
@@ -79,215 +79,50 @@ import {
   vertragZuordnungZuruecksetzen,
 } from "../../dienste";
 import { Button, FormField, Pill } from "../bausteine";
-import { IconButton } from "../bausteine/IconButton";
 import { formularAusBuchung, VertragModal } from "../vertraege/VertragModal";
+import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { MerkmaleBlock } from "../training/MerkmaleBlock";
 import { Modal } from "../bausteine/Modal";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
-
-function ddmm(iso: string): string {
-  const [, m, d] = iso.split("-");
-  return `${d}.${m}.`;
-}
-
-/** Ein Label/Wert-Paar im Herkunfts-Abschnitt. Lange Werte (Hash, Zweck) dürfen umbrechen. */
-function Infozeile({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
-  return (
-    <div style={{ display: "flex", gap: "var(--sp-3)", padding: "5px 0", alignItems: "baseline" }}>
-      <span style={{ flex: "0 0 34%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>{label}</span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13, wordBreak: "break-word", fontFamily: mono ? "var(--font-mono, monospace)" : undefined, color: mono ? "var(--ink-2)" : "var(--ink)" }}>
-        {children}
-      </span>
-    </div>
-  );
-}
-
-/**
- * Alles, was diese Buchung mit einem Vertrag verbindet — und die Wege, das zu ändern.
- * Als eigenes Objekt gebündelt, weil es sonst fünf weitere Einzel-Props an einem Modal
- * wären, das schon reichlich davon trägt.
- */
-interface VertragsBindung {
-  /** Der zugeordnete Vertrag, falls es einen gibt. */
-  readonly vertrag?: Vertrag;
-  /** Die gespeicherte Zuordnung — ihre Herkunft entscheidet, was angeboten wird. */
-  readonly zuordnung?: Vertragszuordnung;
-  /** Alle Verträge, zur Auswahl von Hand. */
-  readonly alle: readonly Vertrag[];
-  /** Von Hand setzen; `null` heißt „gehört ausdrücklich zu keinem Vertrag". */
-  readonly zuordnen: (vertragId: string | null) => void | Promise<void>;
-  /** Handentscheidung zurücknehmen — ab dann entscheidet wieder die Automatik. */
-  readonly zuruecksetzen: () => void | Promise<void>;
-  /** Aus dieser Buchung einen neuen Vertrag machen. */
-  readonly neuAnlegen: () => void;
-}
-
-/**
- * Der Vertragsblock im Buchungsdialog. Drei Zustände an EINER Stelle, weil es dieselbe
- * Frage ist: gehört diese Zahlung zu einem Vertrag, zu keinem, oder soll sie einer werden?
- *
- * Sichtbar ist immer auch die HERKUNFT der Antwort. Das ist kein Beiwerk: „automatisch
- * erkannt" darf man überstimmen und der nächste Abgleich rechnet es neu, „von Hand"
- * bleibt stehen, bis man es zurücknimmt. Wer den Unterschied nicht sieht, weiß nicht,
- * ob seine Korrektur hält.
- */
-function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
-  const { t } = useTranslation();
-  const { vertrag, zuordnung, alle } = bindung;
-  const vonHand = zuordnung?.herkunft === "manuell";
-  // Ausdrücklich zu keinem Vertrag: eine Aussage, kein fehlender Wert.
-  const ausgeschlossen = vonHand && zuordnung?.vertragId === null;
-
-  return (
-    <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
-        {vertrag ? (
-          <>
-            <Pill variant="ok">{t("konten.zuVertrag.gehoertZu")}</Pill>
-            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{vertrag.anbieter}</span>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-              {t(vonHand ? "konten.zuVertrag.vonHand" : "konten.zuVertrag.automatisch")}
-            </span>
-          </>
-        ) : ausgeschlossen ? (
-          <>
-            <Pill variant="neutral">{t("konten.zuVertrag.keiner")}</Pill>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.zuVertrag.vonHand")}</span>
-          </>
-        ) : (
-          <Button onClick={bindung.neuAnlegen}>{t("konten.zuVertrag.aktion")}</Button>
-        )}
-      </div>
-
-      {/* Zuordnen von Hand — auch der Weg zurück: „kein Vertrag" ist eine gültige Wahl. */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
-        <select
-          className="field"
-          style={{ width: "auto", maxWidth: "100%" }}
-          aria-label={t("konten.zuVertrag.waehlen")}
-          value={vertrag?.id ?? (ausgeschlossen ? "__keiner" : "")}
-          onChange={(e) =>
-            bindung.zuordnen(e.target.value === "__keiner" || e.target.value === "" ? null : e.target.value)
-          }
-        >
-          <option value="">{t("konten.zuVertrag.offen")}</option>
-          <option value="__keiner">{t("konten.zuVertrag.keiner")}</option>
-          {alle.map((v) => (
-            <option key={v.id} value={v.id}>{v.anbieter}</option>
-          ))}
-        </select>
-        {vonHand && (
-          <button className="linkbtn" onClick={() => bindung.zuruecksetzen()}>
-            {t("konten.zuVertrag.zuruecksetzen")}
-          </button>
-        )}
-      </div>
-
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-        {t(vonHand ? "konten.zuVertrag.vonHandHinweis" : vertrag ? "konten.zuVertrag.gehoertZuHinweis" : "konten.zuVertrag.untertitel")}
-      </div>
-    </div>
-  );
-}
+import { ddmm } from "./ddmm";
+import { BuchungsHerkunft } from "./BuchungsHerkunft";
+import {
+  betragsHoehe,
+  richtungVon,
+  Richtungswahl,
+  vorzeichenAbspalten,
+  type Richtung,
+} from "./Richtungswahl";
+import { DublettenBlock, FreigabeHinweis, type Dublettenbefund } from "./DublettenBlock";
+import { VertragsBlock, type VertragsBindung } from "./VertragsBlock";
 
 /** Stabile Leerwerte — als Literal im useState-Aufruf wäre jeder Render ein neues Objekt. */
 const LEERE_KARTE: ReadonlyMap<string, Dublettenverdacht> = new Map();
 const LEERE_MENGE: ReadonlySet<string> = new Set();
 
-/** Was die Dublettenprüfung zu dieser Buchung sagt — samt der Zeile, die sie meint. */
-export interface Dublettenbefund {
-  readonly verdacht: Dublettenverdacht;
-  readonly zwilling: Umsatz;
-}
-
-/**
- * Dublettenprüfung im Dialog: steht dasselbe womöglich schon ein zweites Mal im Bestand?
- *
- * Der Block erscheint NUR, wenn es etwas zu sagen gibt — der Finder urteilt „identisch"
- * oder „verdacht". Gerechnet wird beim Hinsehen und nicht einmalig beim Import: der
- * Verdacht, den ein Import an die Zeile schreibt, gilt für den Stand von damals, und was
- * später aus einer anderen Quelle dazukam, würde nie nachträglich angeschrieben.
- *
- * Er entscheidet nichts. Die Gründe stehen im Klartext da, das Gegenstück ist einen Klick
- * entfernt, und „ist kein Duplikat" ist die dritte Antwort neben „eine davon löschen" und
- * „stehen lassen": der Finder rechnet mit Punkten und liegt manchmal daneben. Ohne diesen
- * Knopf stünde die Mahnung nach jedem Neuladen wieder da, denn geprüft wird bei jedem
- * Hinsehen neu.
- */
-function DublettenBlock({
-  befund,
-  imLedger,
-  onZwillingOeffnen,
-  onKeinDuplikat,
-}: {
-  befund: Dublettenbefund;
-  /** Gebuchte Zeile (beide stehen im Saldo) oder noch ein Entwurf? Der Hinweis unterscheidet sich. */
-  imLedger: boolean;
-  onZwillingOeffnen?: () => void;
-  onKeinDuplikat?: () => void | Promise<void>;
-}) {
-  const { t } = useTranslation();
-  const geld = useGeld();
-  const { verdacht, zwilling } = befund;
-  const sicher = verdacht.urteil === "identisch";
-
-  return (
-    <div style={{ marginBottom: "var(--sp-4)", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--warn-wash, var(--surface-2))", border: "1px solid var(--warn, var(--line))" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
-        <Pill variant="warn">{t(sicher ? "konten.neue.dubletteSicher" : "konten.neue.dublette")}</Pill>
-        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
-          {ddmm(zwilling.buchungstag)} · {zwilling.gegenpartei || t("konten.neue.ohneGegenpartei")}
-        </span>
-        <span className="num" style={{ fontWeight: 700, color: geldFarbe(zwilling.betrag) }}>{geld.formatMitSymbol(zwilling.betrag, { mitVorzeichen: true })}</span>
-        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-          {t(`konten.neue.status.${zwilling.status}`)}
-        </span>
-        {onZwillingOeffnen && (
-          <IconButton icon="oeffnen" label={t("konten.dublette.oeffnen")} onClick={onZwillingOeffnen} style={{ marginLeft: "auto" }} />
-        )}
-      </div>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-        {t("konten.neue.dubletteHinweis", { gruende: verdacht.gruende.join(", ") })}
-      </div>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
-        {t(imLedger ? "konten.dublette.hinweisLedger" : "konten.dublette.hinweis")}
-      </div>
-      {onKeinDuplikat && (
-        <button
-          className="linkbtn"
-          style={{ marginTop: 6, padding: 0 }}
-          onClick={() => void onKeinDuplikat()}
-        >
-          {t("konten.dublette.keinDuplikat")}
-        </button>
-      )}
-    </div>
-  );
-}
-
-/**
- * Die Gegenprobe: hier wurde einmal entschieden, dass es KEIN Duplikat ist.
- *
- * Ohne diese Zeile wäre die Entscheidung unsichtbar und unumkehrbar — die Markierung
- * bliebe weg, und niemand wüsste warum. Wer sich vertan hat, hätte zwei Zeilen im Saldo
- * und nichts, was darauf zeigt.
- */
-function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void> }) {
-  const { t } = useTranslation();
-  return (
-    <div className="muted" style={{ marginBottom: "var(--sp-4)", fontSize: "var(--fs-xs)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-      <span>{t("konten.dublette.freigegeben")}</span>
-      <button className="linkbtn" style={{ padding: 0 }} onClick={() => void onAufheben()}>
-        {t("konten.dublette.freigabeAufheben")}
-      </button>
-    </div>
-  );
-}
-
 /**
  * Die Maske selbst — alle drei Rollen in EINEM Formular.
+ *
+ * WAS HIER LIEGT UND WAS DANEBEN. Die Datei war 1751 Zeilen lang, davon eine Funktion mit
+ * 762; am 2026-08-25 ist sie entzerrt worden. Ausgezogen ist, was den Zustand der Maske
+ * NICHT braucht — jeder dieser Teile bekommt seine Daten herein und meldet Entscheidungen
+ * zurück, mehr nicht:
+ *
+ *   `VertragsBlock`      gehört diese Zahlung zu einem Vertrag?
+ *   `DublettenBlock`     steht sie womöglich schon ein zweites Mal da?
+ *   `BuchungsHerkunft`   woher sie kommt — reine Anzeige
+ *   `Richtungswahl`      Höhe und Richtung des Betrags, samt der Zerlegung dahinter
+ *   `SplitModal`         aufteilen (S-7)
+ *   `ZurUmbuchungModal`  zur Umbuchung machen (S-1)
+ *
+ * Was BLIEB, ist das Formular: die Felder, ihr Zustand und der Weg zum Speichern. Es ist
+ * immer noch die grösste Funktion im Bereich, und das ist kein Rest, den man noch
+ * wegräumen könnte — es ist der Preis für einen Dialog in drei Rollen. Wer sie kleiner
+ * haben will, muss den Dialog teilen, und dann fehlt genau das, wofür es ihn gibt: dass
+ * jede Erweiterung an EINER Stelle ankommt statt an dreien (siehe oben).
  *
  * Welche gilt, entscheidet sich an den Daten, die hereinkommen:
  *  • weder `buchung` noch `entwurf` → anlegen (`buchungErfassen`)
@@ -309,38 +144,161 @@ function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void
  *
  * Zwei Gesichter beim Bearbeiten:
  *  • frei — alle Felder editierbar, plus der Einstieg „Zur Umbuchung machen" (S-1).
- *  • Bein einer Umbuchung — Konto, Betrag, Charakter und Kategorie sind FEST.
- *    `buchungBearbeiten` leitet das Vorzeichen über `vorzeichenbehaftet()` aus dem
- *    Charakter ab, und das macht eine Umschichtung immer negativ: das Zugangs-Bein (+500)
- *    würde beim Speichern auf −500 kippen und die Netto-Null der Umbuchung brechen. Das
- *    Konto wiederum steht als Gegenkonto am anderen Bein; ein einseitiger Wechsel zöge die
- *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
- *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
+ *  • Bein einer Umbuchung — Konto, Betrag, Charakter und Kategorie sind FEST. Betrag und
+ *    Charakter gehören dem PAAR: die beiden Beine tragen dieselbe Summe mit
+ *    entgegengesetztem Vorzeichen, und eines davon allein zu ändern risse die Netto-Null
+ *    der Umbuchung auf. Das Konto wiederum steht als Gegenkonto am anderen Bein; ein
+ *    einseitiger Wechsel zöge die Paarung auf zwei verschiedene Aussagen auseinander.
+ *    Datum und Notiz sind unkritisch (die beiden Beine dürfen ohnehin an verschiedenen
+ *    Tagen liegen); dafür gibt es `umbuchungsBeinBearbeiten`.
  */
-function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, ausBankabruf, onlineKonten, aktuelle, onPruefmarker, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; ausBankabruf?: boolean; onlineKonten: ReadonlySet<string>; aktuelle?: IstBuchung; onPruefmarker: (vorgemerkt: boolean) => Promise<void>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
+/**
+ * Was das Formular hereinbekommt.
+ *
+ * Ein benannter Typ statt einer Inline-Signatur, seit `BuchungDetail.tsx` 2026-08-25
+ * entzerrt wurde. Vorher standen dreissig Eigenschaften in EINER Zeile mit über
+ * zweitausend Zeichen — man konnte weder nachsehen, was das Formular braucht, noch etwas
+ * ergänzen, ohne die Zeile vorher zu entziffern. Ein Diff darauf war unlesbar.
+ *
+ * Gruppiert nach der Frage, die jede Gruppe beantwortet, nicht alphabetisch: die Zahl der
+ * Eigenschaften ist der Preis für EINEN Dialog in drei Rollen (siehe Kopf), und wer sie
+ * senken will, muss den Dialog teilen — nicht die Liste umsortieren.
+ */
+interface FormularProps {
+  // ── In welcher Rolle: genau eines von beiden, oder keins (neu anlegen) ──────────────
+  buchung?: IstBuchung;
+  entwurf?: Umsatz;
+  /** Konto und Tag der Stelle, von der aus geöffnet wurde — Vorbelegung beim Anlegen. */
+  vorgabe: { kontoId: string; datum: string };
+
+  // ── Bezugsdaten, die der Dialog nicht selbst lädt ───────────────────────────────────
+  konten: Zahlungskonto[];
+  kategorien: Kategorie[];
+  vertraege: readonly Vertrag[];
+  kontoName: Map<string, string>;
+  kategorieName: Map<string, string>;
+  /** Konten mit Bankverbindung — dort sind Datum und Betrag Tatsachen, keine Eingabe. */
+  onlineKonten: ReadonlySet<string>;
+
+  // ── Was über DIESE Zeile bekannt ist ────────────────────────────────────────────────
+  /** Der Beleg, falls die Buchung aus einem Import stammt. */
+  umsatz?: Umsatz;
+  importLauf?: ImportLauf;
+  regel?: Zahlungsregel;
+  /** Das andere Bein, wenn die Buchung Teil einer Umbuchung ist. */
+  gegenbuchung?: IstBuchung;
+  /** Der frisch gelesene Stand — der Prüfmarker wirkt sofort, nicht erst beim Speichern. */
+  aktuelle?: IstBuchung;
+  ausBankabruf?: boolean;
+
+  // ── Dublettenverdacht ───────────────────────────────────────────────────────────────
+  dublette?: Dublettenbefund;
+  /** Die anderen Entwürfe desselben Laufs — für die Suche nach dem Gegenbein. */
+  andereEntwuerfe: readonly Umsatz[];
+  alleBuchungen: readonly IstBuchung[];
+  onZwillingOeffnen?: () => void;
+  onKeinDuplikat?: () => void | Promise<void>;
+  onFreigabeAufheben?: () => void | Promise<void>;
+
+  // ── Vertragszuordnung ───────────────────────────────────────────────────────────────
+  vertragsBindung?: VertragsBindung;
+
+  // ── Wege, die von hier ausgehen ─────────────────────────────────────────────────────
+  onClose: () => void;
+  onSaved: () => void;
+  onDelete: () => void | Promise<void>;
+  onPruefmarker: (vorgemerkt: boolean) => Promise<void>;
+  onZurUmbuchung: () => void;
+  onLoesen: () => void | Promise<void>;
+  onGegenbuchung: (b: IstBuchung) => void;
+  onSplitten: () => void;
+  onSplitAufheben: () => void | Promise<void>;
+}
+
+function BuchungFormular({
+  buchung,
+  entwurf,
+  andereEntwuerfe,
+  alleBuchungen,
+  vertraege,
+  vorgabe,
+  konten,
+  kategorien,
+  kontoName,
+  kategorieName,
+  umsatz,
+  importLauf,
+  regel,
+  gegenbuchung,
+  dublette,
+  onZwillingOeffnen,
+  onKeinDuplikat,
+  onFreigabeAufheben,
+  onClose,
+  onSaved,
+  onDelete,
+  ausBankabruf,
+  onlineKonten,
+  aktuelle,
+  onPruefmarker,
+  onZurUmbuchung,
+  vertragsBindung,
+  onLoesen,
+  onGegenbuchung,
+  onSplitten,
+  onSplitAufheben,
+}: FormularProps) {
   const { t } = useTranslation();
   const geld = useGeld();
   const istEntwurf = !!entwurf;
   const istNeu = !buchung && !entwurf;
   const [kontoId, setKontoId] = useState(buchung?.kontoId ?? entwurf?.zahlungskontoId ?? vorgabe.kontoId);
   const [datum, setDatum] = useState(buchung?.datum ?? entwurf?.buchungstag ?? vorgabe.datum);
-  const startBetrag = buchung?.betrag ?? entwurf?.betrag;
-  const [betrag, setBetrag] = useState(startBetrag == null ? "" : String(minorZuMajor(Math.abs(startBetrag), geld.waehrung)));
-  const [charakter, setCharakter] = useState<Charakter>(buchung?.charakter ?? entwurf?.vorschlag?.charakter ?? "Aufwand");
   /**
-   * Floss das Geld ENTGEGEN dem, was die Kategorie erwarten lässt? Eine Erstattung
-   * gehört in die Kategorie der Ausgabe — dort entlastet sie das Budget —, und trotzdem
-   * kam Geld herein. Ohne diese Frage liesse sich das von Hand nicht erfassen: das
-   * Betragsfeld nimmt nur die Höhe, und die Richtung käme sonst allein aus dem Charakter.
+   * HÖHE und RICHTUNG stehen getrennt — zwei Felder, beide sichtbar.
    *
-   * Der Startwert wird aus dem VORZEICHEN der bestehenden Buchung zurückgelesen, nicht
-   * gespeichert. Ein eigenes Feld dafür wäre eine zweite Wahrheit neben dem Betrag, und
-   * die beiden liefen beim ersten Import auseinander.
+   * Der Betrag im Ledger ist vorzeichenbehaftet; die Maske zerlegt ihn beim Öffnen und
+   * setzt ihn beim Speichern wieder zusammen. Was dabei gewonnen ist: die Richtung ist
+   * nicht mehr etwas, das man dem Feld ansehen (oder erraten) muss, sondern eine Wahl
+   * mit zwei Möglichkeiten nebeneinander.
+   *
+   * `richtungVonHand` merkt sich, WER zuletzt gesprochen hat, und nur das. Solange
+   * niemand die Auswahl angefasst hat, folgt sie der Kategorie — Aufwand fliesst ab,
+   * Ertrag fliesst zu; sobald jemand sie anfasst, gilt seine Wahl und kein
+   * Kategoriewechsel nimmt sie ihm wieder weg. Eine bestehende Buchung zählt von Anfang
+   * an als von Hand gesetzt: ihre Richtung ist eine Tatsache (beim Import die der Bank),
+   * und ein Kategoriewechsel darf sie nicht umdrehen.
+   *
+   * Das ist NICHT die alte Ableitung mit anderem Namen. Die lief unsichtbar hinter dem
+   * Feld; diese hier bewegt einen Schalter, den man vor sich sieht, und man kann ihn
+   * jederzeit zurückstellen.
    */
-  const [gegenrichtung, setGegenrichtung] = useState(() => {
-    if (buchung == null || buchung.charakter === "Umschichtung") return false;
-    return buchung.charakter === "Ertrag" ? buchung.betrag < 0 : buchung.betrag > 0;
-  });
+  const startBetrag = buchung?.betrag ?? entwurf?.betrag;
+  const [betrag, setBetrag] = useState(startBetrag == null ? "" : betragsHoehe(startBetrag, geld));
+  const [richtung, setRichtung] = useState<Richtung>(startBetrag == null ? "ab" : richtungVon(startBetrag));
+  const [richtungVonHand, setRichtungVonHand] = useState(startBetrag != null);
+
+  /**
+   * Was ins Betragsfeld getippt wird, ist die Höhe. Bringt es ein Vorzeichen mit
+   * (getippt oder eingefügt), wandert das in die Richtungsauswahl, statt im Feld
+   * stehenzubleiben — dort hätte es keine Wirkung und sähe trotzdem aus, als hätte es
+   * eine.
+   */
+  function betragTippen(text: string) {
+    const { rest, richtung: gemeint } = vorzeichenAbspalten(text);
+    setBetrag(rest);
+    if (gemeint) {
+      setRichtung(gemeint);
+      setRichtungVonHand(true);
+    }
+  }
+
+  function richtungWaehlen(gewaehlt: Richtung) {
+    setRichtung(gewaehlt);
+    setRichtungVonHand(true);
+  }
+
+  const [charakter, setCharakter] = useState<Charakter>(buchung?.charakter ?? entwurf?.vorschlag?.charakter ?? "Aufwand");
   const [kategorieId, setKategorieId] = useState(buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
 
   /**
@@ -360,7 +318,11 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
     setKategorieId(id);
     if (charakter === "Umschichtung") return;
     const gewaehlt = kategorien.find((k) => k.id === id);
-    if (gewaehlt) setCharakter(gewaehlt.defaultCharakter);
+    if (!gewaehlt) return;
+    setCharakter(gewaehlt.defaultCharakter);
+    // Die Richtung nur, solange sie niemand selbst gesetzt hat — siehe `richtungVonHand`.
+    // Der Normalfall bleibt damit ein Handgriff: Kategorie wählen, Höhe tippen, fertig.
+    if (!richtungVonHand) setRichtung(gewaehlt.defaultCharakter === "Ertrag" ? "zu" : "ab");
   }
   const [notiz, setNotiz] = useState(buchung?.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
@@ -388,8 +350,17 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
    */
   const kontoIstOnline = !istNeu && onlineKonten.has(kontoId);
   const istUmschichtung = charakter === "Umschichtung";
-  // Die Richtung ist nur dort eine Frage, wo sie noch offen ist — siehe Kommentar am Feld.
-  const richtungWaehlbar = !istUmschichtung && !istEntwurf && !kontoIstOnline && !gepaart && buchung?.quelle !== "import";
+  /**
+   * Was beim Speichern in den Ledger geht — Höhe mal Richtung, sonst nichts.
+   *
+   * Keine Ableitung mehr an dieser Stelle: was in der Auswahl steht, wird gebucht. Ein
+   * Zufluss auf einer Aufwandskategorie ist damit erlaubt und richtig — eine Erstattung
+   * oder Retoure gehört in die Kategorie der Ausgabe, dort entlastet sie deren Budget.
+   */
+  const gebuchterBetrag = (richtung === "ab" ? -1 : 1) * Math.abs(geld.parse(betrag) ?? 0);
+  /** Floss das Geld entgegen dem, was die Einordnung erwarten lässt? (Erstattung, Storno) */
+  const gegenDerEinordnung =
+    gebuchterBetrag !== 0 && gebuchterBetrag !== vorzeichenbehaftet(gebuchterBetrag, charakter);
   /**
    * Konten, auf denen ein Gegenbein ERZEUGT werden darf.
    *
@@ -515,11 +486,11 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
           await vertragZuordnenVonHand(neueBuchung.id, vertragWahl === "__keiner" ? null : vertragWahl);
         }
       } else if (!buchung) {
-        await buchungErfassen({ kontoId, datum, betrag: geld.parse(betrag) ?? 0, charakter, gegenrichtung, kategorieId: kategorieId || undefined, notiz });
+        await buchungErfassen({ kontoId, datum, betrag: gebuchterBetrag, charakter, kategorieId: kategorieId || undefined, notiz });
       } else if (gepaart) {
         await umbuchungsBeinBearbeiten(buchung, { datum, notiz });
       } else {
-        await buchungBearbeiten(buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, gegenrichtung, kategorieId: kategorieId || undefined, notiz, kontoId });
+        await buchungBearbeiten(buchung, { datum, betrag: gebuchterBetrag, charakter, kategorieId: kategorieId || undefined, notiz, kontoId });
         // Zieht das Konto um, zieht der Umsatz mit: sein `zahlungskontoId` ist das
         // Ergebnis des Konto-Matches beim Import, also eine Vermutung. Wer die Buchung
         // vor sich hat, korrigiert damit genau diese Vermutung — bliebe der Umsatz
@@ -651,45 +622,46 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
               (kein htmlFor, kein Umschließen) — ohne das hat die Auswahl für Screenreader
               gar keinen Namen. Gilt für die drei Felder hier; die DS-Lücke selbst gehört
               dort behoben. */}
-          <select className="field" aria-label={t("konten.detail.konto")} value={kontoId} disabled={gepaart} onChange={(e) => setKontoId(e.target.value)}>
-            {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-          </select>
+          <Auswahl
+            ariaLabel={t("konten.detail.konto")}
+            wert={kontoId}
+            deaktiviert={gepaart}
+            aufAenderung={setKontoId}
+            optionen={konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+          />
         </FormField>
         {/* Tag und Betrag der Bank sind Tatsachen, keine Eingabe — im Entwurf stehen sie
             nur da. Wer korrigieren muss, tut das nach dem Übernehmen an der Buchung. */}
         <FormField label={t("konten.feldDatum")} required hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : undefined}>
-          <input className="field" type="date" aria-label={t("konten.feldDatum")} value={datum} disabled={istEntwurf || kontoIstOnline} onChange={(e) => setDatum(e.target.value)} />
+          <Datumsfeld ariaLabel={t("konten.feldDatum")} wert={datum} deaktiviert={istEntwurf || kontoIstOnline} aufAenderung={setDatum} />
         </FormField>
+        {/* Das Feld nimmt die HÖHE, die Richtung steht als eigene Wahl daneben. Beide
+            zusammen sind der Betrag; keins von beidem wird abgeleitet. */}
         <FormField
           label={t("konten.feldBetrag")}
           required
-          hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : istNeu ? t("konten.buchung.betragHinweis") : undefined}
+          hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : undefined}
         >
-          <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf || kontoIstOnline} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
+          <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf || kontoIstOnline} onChange={(e) => betragTippen(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
-        {/* Die Richtung — nur dort, wo sie überhaupt eine Frage ist.
-            Nicht beim Entwurf und nicht auf einem online geführten Konto: dort ist das
-            Vorzeichen eine Tatsache vom Beleg, und `buchungBearbeiten` behält es auch.
-            Nicht bei einer Umbuchung: die Richtung hängt am Gegenbein.
-            Ein Kästchen und keine zwei Knöpfe, weil der eine Fall der Normalfall ist. */}
-        {richtungWaehlbar && (
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: "var(--fs-sm)", padding: "2px 0 6px" }}>
-            <input
-              type="checkbox"
-              aria-label={t(charakter === "Ertrag" ? "konten.buchung.gegenrichtungErtrag" : "konten.buchung.gegenrichtungAufwand")}
-              checked={gegenrichtung}
-              onChange={(e) => setGegenrichtung(e.target.checked)}
-              style={{ marginTop: 3 }}
-            />
-            <span>
-              {t(charakter === "Ertrag" ? "konten.buchung.gegenrichtungErtrag" : "konten.buchung.gegenrichtungAufwand")}
-              {gegenrichtung && (
-                <span className="muted" style={{ display: "block", fontSize: "var(--fs-xs)" }}>
-                  {t("konten.buchung.gegenrichtungHinweis")}
-                </span>
-              )}
-            </span>
-          </label>
+        {/* Die Richtung — zwei Möglichkeiten nebeneinander, immer beide sichtbar.
+            Sie steht auch da, wo sie gesperrt ist: was die Bank gebucht hat, soll man
+            SEHEN können, ohne es ändern zu dürfen. Ein Feld, das nur erscheint, wenn man
+            es bedienen darf, lässt die Frage sonst unbeantwortet. */}
+        <FormField label={t("konten.buchung.richtung")} required>
+          <Richtungswahl
+            wert={richtung}
+            aufAenderung={richtungWaehlen}
+            deaktiviert={gepaart || istEntwurf || kontoIstOnline}
+          />
+        </FormField>
+        {/* Der Rückfluss braucht einen Satz, kein Kästchen mehr: dass ein Zufluss auf einer
+            Aufwandskategorie erlaubt IST, sieht man dem Feld nicht an — dass er dort auch
+            richtig liegt, erst recht nicht. */}
+        {!istEntwurf && !gepaart && !kontoIstOnline && !istUmschichtung && gegenDerEinordnung && (
+          <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "-4px 0 6px" }}>
+            {t("konten.buchung.gegenrichtungHinweis")}
+          </div>
         )}
         {/* Die Bezeichnung gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt
             den Verwendungszweck der Bank, und der steht unter „Herkunft".
@@ -786,9 +758,14 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                 <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer", flexWrap: "wrap" }}>
                   <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === "__neu"} onChange={() => setGegenwahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
                   <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
-                  <select className="field" style={{ width: "auto" }} aria-label={t("konten.zurUmbuchung.neu")} value={neuKontoGewaehlt} onChange={(e) => { setNeuKontoId(e.target.value); setGegenwahl("__neu"); }}>
-                    {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-                  </select>
+                  <span style={{ minWidth: 180 }}>
+                    <Auswahl
+                      ariaLabel={t("konten.zurUmbuchung.neu")}
+                      wert={neuKontoGewaehlt}
+                      aufAenderung={(v) => { setNeuKontoId(v); setGegenwahl("__neu"); }}
+                      optionen={andereKonten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+                    />
+                  </span>
                 </label>
               )}
 
@@ -935,17 +912,16 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
           <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
             {t("konten.zuVertrag.gehoertZu")}
           </div>
-          <select
-            className="field"
-            style={{ width: "auto", maxWidth: "100%" }}
-            aria-label={t("konten.zuVertrag.waehlen")}
-            value={vertragWahl}
-            onChange={(e) => setVertragWahl(e.target.value)}
-          >
-            <option value="">{t("konten.zuVertrag.offen")}</option>
-            <option value="__keiner">{t("konten.zuVertrag.keiner")}</option>
-            {vertraege.map((v) => (<option key={v.id} value={v.id}>{v.anbieter}</option>))}
-          </select>
+          <Auswahl
+            ariaLabel={t("konten.zuVertrag.waehlen")}
+            wert={vertragWahl}
+            aufAenderung={setVertragWahl}
+            optionen={[
+              { wert: "", text: t("konten.zuVertrag.offen") },
+              { wert: "__keiner", text: t("konten.zuVertrag.keiner") },
+              ...vertraege.map((v) => ({ wert: v.id, text: v.anbieter })),
+            ]}
+          />
           <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
             {vertragWahl ? t("konten.entwurf.vertragVorgemerkt") : t("konten.entwurf.vertragOffen")}
           </div>
@@ -953,43 +929,13 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
       )}
 
       {/* Herkunft — alles, was bekannt ist, aber hier nicht geändert wird. */}
-      {(buchung || entwurf) && (
-        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-          <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
-            {t("konten.detail.herkunft")}
-          </div>
-
-          {buchung && <Infozeile label={t("konten.detail.erfasstUeber")}>{t(`konten.quelleName.${buchung.quelle}`)}</Infozeile>}
-
-          {kopfUmsatz ? (
-            <>
-              <Infozeile label={t("konten.detail.empfaenger")}>{kopfUmsatz.gegenpartei || "—"}</Infozeile>
-              <Infozeile label={t("konten.detail.zweck")}>{kopfUmsatz.verwendungszweck || "—"}</Infozeile>
-              {importLauf && (
-                <Infozeile label={t("konten.detail.importlauf")}>
-                  {t("konten.detail.importlaufWert", {
-                    quelle: importLauf.dateiname || importLauf.quelle,
-                    zeitpunkt: importLauf.zeitpunkt.slice(0, 10),
-                  })}
-                </Infozeile>
-              )}
-              {kopfUmsatz.nativeId && <Infozeile label={t("konten.detail.nativeId")} mono>{kopfUmsatz.nativeId}</Infozeile>}
-              <Infozeile label={t("konten.detail.rohHash")} mono>{kopfUmsatz.rohHash}</Infozeile>
-            </>
-          ) : (
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.detail.ohneImport")}</div>
-          )}
-
-          {buchung?.planRef && (
-            <Infozeile label={t("konten.detail.planbezug")}>
-              {t("konten.detail.planbezugWert", {
-                regel: regel?.bezeichnung ?? buchung.planRef.quelleId,
-                faelligkeit: ddmm(buchung.planRef.faelligkeit),
-              })}
-            </Infozeile>
-          )}
-        </div>
-      )}
+      <BuchungsHerkunft
+        buchung={buchung}
+        entwurf={entwurf}
+        umsatz={kopfUmsatz}
+        importLauf={importLauf}
+        regel={regel}
+      />
 
       {/* Was hier NICHT geht und warum — statt Knöpfen, die ins Leere greifen. */}
       {istEntwurf && (
@@ -1020,241 +966,6 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
       {buchung?.quelle === "import" && !ausBankabruf && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
           {t("konten.detail.loeschenHinweis")}
-        </div>
-      )}
-    </Modal>
-  );
-}
-
-/**
- * S-7 — Buchung auf mehrere Kategorien aufteilen. Der Betrag der Buchung bleibt, was er
- * ist; verteilt wird nur die Kategorie-Zuordnung. Der Dialog lässt sich nicht speichern,
- * solange der Rest nicht null ist — die Invariante steht im Use-Case, hier wird sie nur
- * früh genug sichtbar gemacht.
- *
- * Beträge werden POSITIV eingegeben; das Vorzeichen kommt von der Buchung.
- */
-function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung: IstBuchung; kategorien: Kategorie[]; onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation();
-  const geld = useGeld();
-
-  /** Vorbelegung: eine bestehende Aufteilung weiterbearbeiten, sonst zwei leere Zeilen. */
-  const [zeilen, setZeilen] = useState<{ kategorieId: string; betrag: string; notiz: string }[]>(() =>
-    buchung.aufteilungen?.length
-      ? buchung.aufteilungen.map((a) => ({
-          kategorieId: a.kategorieId,
-          betrag: String(minorZuMajor(Math.abs(a.betrag), geld.waehrung)),
-          notiz: a.notiz ?? "",
-        }))
-      : [
-          { kategorieId: buchung.kategorieId ?? "", betrag: String(minorZuMajor(Math.abs(buchung.betrag), geld.waehrung)), notiz: "" },
-          { kategorieId: "", betrag: "", notiz: "" },
-        ],
-  );
-  const [fehler, setFehler] = useState<string | null>(null);
-
-  const eingaben = zeilen.map((z) => ({ kategorieId: z.kategorieId, betrag: geld.parse(z.betrag) ?? 0, notiz: z.notiz }));
-  const rest = offenerRest(buchung, eingaben);
-  const verteilt = Math.abs(buchung.betrag) - rest;
-
-  function aendere(i: number, feld: "kategorieId" | "betrag" | "notiz", wert: string) {
-    setZeilen((zs) => zs.map((z, j) => (j === i ? { ...z, [feld]: wert } : z)));
-  }
-
-  /** Den offenen Rest in eine Zeile übernehmen — spart das Kopfrechnen bei drei Teilen. */
-  function restEinsetzen(i: number) {
-    const schon = geld.parse(zeilen[i].betrag) ?? 0;
-    setZeilen((zs) => zs.map((z, j) => (j === i ? { ...z, betrag: String(minorZuMajor(schon + rest, geld.waehrung)) } : z)));
-  }
-
-  async function speichern() {
-    setFehler(null);
-    try {
-      await buchungSplitten(buchung, eingaben);
-      onSaved();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
-  }
-
-  return (
-    <Modal
-      title={t("konten.split.titel")}
-      subtitle={t("konten.split.untertitel")}
-      onClose={onClose}
-      footer={
-        <>
-          <Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button>
-          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
-          {fehler && <span className="err">{fehler}</span>}
-        </>
-      }
-    >
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
-        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.split.gesamt")}</span>
-        <span className="num" style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-black)", color: geldFarbe(buchung.betrag) }}>
-          {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
-        </span>
-      </div>
-
-      {zeilen.map((z, i) => (
-        <div key={i} style={{ display: "flex", gap: "var(--sp-2)", alignItems: "flex-start", padding: "6px 0", borderBottom: "1px solid var(--line-soft)", flexWrap: "wrap" }}>
-          <span style={{ flex: "2 1 180px", minWidth: 150 }}>
-            <CategoryPicker kategorien={kategorien} value={z.kategorieId} onChange={(v) => aendere(i, "kategorieId", v)} />
-          </span>
-          <input
-            className="field"
-            inputMode="decimal"
-            style={{ flex: "0 1 110px", minWidth: 90 }}
-            value={z.betrag}
-            onChange={(e) => aendere(i, "betrag", e.target.value)}
-            placeholder={geld.format(0)}
-            aria-label={`${t("konten.split.spalteBetrag")} ${i + 1}`}
-          />
-          {rest !== 0 && (
-            <button className="linkbtn" title={t("konten.split.restVerteilen")} onClick={() => restEinsetzen(i)} style={{ padding: "6px 4px" }}>+</button>
-          )}
-          {zeilen.length > 2 && (
-            <button className="linkbtn" onClick={() => setZeilen((zs) => zs.filter((_, j) => j !== i))}>
-              {t("konten.split.zeileEntfernen")}
-            </button>
-          )}
-        </div>
-      ))}
-
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginTop: "var(--sp-3)" }}>
-        <Button plus onClick={() => setZeilen((zs) => [...zs, { kategorieId: "", betrag: "", notiz: "" }])}>
-          {t("konten.split.zeileHinzufuegen")}
-        </Button>
-        <span style={{ fontSize: 13, fontWeight: "var(--fw-bold)", color: rest === 0 ? "var(--ok-deep)" : "var(--warn-deep)" }}>
-          {rest === 0
-            ? t("konten.split.restPasst")
-            : rest > 0
-              ? t("konten.split.restOffen", { betrag: geld.formatMitSymbol(rest) })
-              : t("konten.split.restZuviel", { betrag: geld.formatMitSymbol(-rest) })}
-        </span>
-      </div>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-        {t("konten.split.hinweisPositiv")} · {t("konten.split.verteilt")}: {geld.formatMitSymbol(verteilt)}
-      </div>
-    </Modal>
-  );
-}
-
-/**
- * S-1 — macht aus einer bestehenden Buchung eine Umbuchung. EIN Dialog für beide Fälle:
- * oben die passenden Gegenbuchungen (S-1b, nachträgliche Paarung), darunter der Ausweg
- * „Gegenbein neu erzeugen" (S-1a, Zielkonto wird nicht importiert). Der Nutzer soll nicht
- * vorher wissen müssen, welcher Fall vorliegt — die Liste beantwortet das.
- */
-function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen, kontoName, umsatzByIst, onClose, onSaved }: { buchung: IstBuchung; konten: Zahlungskonto[]; onlineKonten: ReadonlySet<string>; alleBuchungen: IstBuchung[]; kontoName: Map<string, string>; umsatzByIst: Map<string, Umsatz>; onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation();
-  const geld = useGeld();
-  const kandidaten = useMemo(() => paarungsKandidaten(alleBuchungen, buchung), [alleBuchungen, buchung]);
-  // Erzeugt wird nur auf Konten ohne Bankverbindung — siehe `gegenbeinErzeugen`. Die
-  // Gegenbuchungen darüber sind davon nicht betroffen: die existieren schon.
-  const andereKonten = konten.filter((k) => k.id !== buchung.kontoId && !onlineKonten.has(k.id));
-  // Vorauswahl: der beste Kandidat, sonst der Weg über ein neu erzeugtes Gegenbein — den
-  // aber nur, wenn es überhaupt ein Konto gibt, auf dem erzeugt werden darf.
-  const [wahl, setWahl] = useState<string>(kandidaten[0]?.id ?? (andereKonten.length > 0 ? "__neu" : ""));
-  const [neuKontoId, setNeuKontoId] = useState(andereKonten[0]?.id ?? "");
-  const nichtsZuTun = kandidaten.length === 0 && andereKonten.length === 0;
-  const [fehler, setFehler] = useState<string | null>(null);
-
-  /** Beschriftung einer Gegenbuchung: Empfänger aus dem Import, sonst Notiz. */
-  function kandidatLabel(k: IstBuchung): string {
-    return umsatzByIst.get(k.id)?.gegenpartei || k.notiz || "";
-  }
-
-  async function speichern() {
-    setFehler(null);
-    try {
-      if (wahl === "__neu") {
-        await gegenbeinErzeugen(buchung, neuKontoId);
-      } else {
-        const gegen = alleBuchungen.find((b) => b.id === wahl);
-        if (!gegen) return;
-        await buchungenPaaren(buchung, gegen);
-      }
-      onSaved();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
-  }
-
-  return (
-    <Modal
-      title={t("konten.zurUmbuchung.titel")}
-      subtitle={t("konten.zurUmbuchung.untertitel")}
-      onClose={onClose}
-      footer={<>
-        {/* Gibt es weder eine Gegenbuchung noch ein Konto, auf dem erzeugt werden darf,
-            hat der Knopf nichts zu bestätigen — dann führt nur der Weg zurück. */}
-        {!nichtsZuTun && <Button variant="primary" onClick={speichern}>{t("konten.zurUmbuchung.bestaetigen")}</Button>}
-        <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
-        {fehler && <span className="err">{fehler}</span>}
-      </>}
-    >
-      {/* Die Buchung, um die es geht */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", marginBottom: "var(--sp-4)" }}>
-        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
-          {ddmm(buchung.datum)} · {kandidatLabel(buchung) || kontoName.get(buchung.kontoId) || ""}
-        </span>
-        <span className="num" style={{ fontWeight: 700, color: geldFarbe(buchung.betrag) }}>
-          {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
-        </span>
-      </div>
-
-      <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
-        {t("konten.zurUmbuchung.kandidatenTitel")}
-      </div>
-      {kandidaten.length === 0 ? (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.zurUmbuchung.keineKandidaten", { tage: MAX_VORSCHLAG_TAGE })}</div>
-      ) : (
-        kandidaten.map((k) => (
-          <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
-            <input type="radio" name="gegenbein" value={k.id} checked={wahl === k.id} onChange={() => setWahl(k.id)} style={{ accentColor: "var(--accent-deep)" }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(k.datum)}</span>
-            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
-              {kontoName.get(k.kontoId) ?? "?"}
-              {kandidatLabel(k) && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{kandidatLabel(k)}</span>}
-            </span>
-            <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
-          </label>
-        ))
-      )}
-
-      {/* Ausweg: kein Gegenbein vorhanden (S-1a).
-
-          Fällt ganz weg, wenn alle übrigen Konten an einer Bank hängen — dort darf nichts
-          erzeugt werden, und ein Radio-Knopf über einer leeren Auswahlliste wäre eine
-          Handlung, die nicht geht. Statt dessen steht dort, warum: die Gegenseite meldet
-          die Bank ohnehin, sie muss nur verbunden werden. */}
-      {andereKonten.length > 0 ? (
-        <>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "var(--sp-4) 0 var(--sp-3)", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)" }}>
-            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-            {t("konten.zurUmbuchung.oder")}
-            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-          </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-            <input type="radio" name="gegenbein" value="__neu" checked={wahl === "__neu"} onChange={() => setWahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
-            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
-            <select className="field" aria-label={t("konten.zurUmbuchung.neu")} style={{ width: "auto" }} value={neuKontoId} onChange={(e) => { setNeuKontoId(e.target.value); setWahl("__neu"); }}>
-              {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-            </select>
-          </label>
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
-        </>
-      ) : (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-4)" }}>
-          {t("konten.zurUmbuchung.nurVerbinden")}
-        </div>
-      )}
-
-      {buchung.kategorieId && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)" }}>
-          {t("konten.zurUmbuchung.kategorieHinweis")}
         </div>
       )}
     </Modal>

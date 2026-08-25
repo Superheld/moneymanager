@@ -75,8 +75,25 @@ Tabellenzeile und so gross wie eine Pille daneben; `Auswahl` ist das Formularfel
 volle Breite. Die Unterscheidung ist dieselbe wie vorher zwischen `Zeilenauswahl` und
 `select.field`.
 
-**Der Bestand wandert nach und nach.** Es gibt weiterhin native `<select>` in der App;
-jedes davon ist eine Stelle, die noch nicht umgestellt wurde, keine bewusste Ausnahme.
+**Der Bestand ist gewandert.** Seit 2026-08-25 steht in `ui/` kein natives `<select>`
+mehr — ausser dem einen in `Zeilenauswahl`, und das ist eine Entscheidung: dort ist das
+Feld so gross wie eine Pille daneben, und eine eigene Liste im Portal wäre für drei
+Einträge in einer Tabellenzeile Aufwand ohne Gegenwert.
+
+## `CategoryPicker` — die Kategorie, in zwei Grössen
+
+Ein Knopf, der ein Such-Modal mit dem gruppierten Kategoriebaum öffnet. `kompakt` ändert
+NUR den Knopf: im Formular ein Feld über die volle Breite, in einer Tabellenzeile ein
+kleines Etikett in der Grösse einer `Zeilenauswahl`. Das Modal bleibt dasselbe.
+
+**Nicht durch eine `Zeilenauswahl` ersetzen**, auch wenn es in der Zeile danach aussieht:
+die ist für eine Handvoll fester Werte gebaut. Ein Kategoriebaum braucht Gruppierung und
+Suche, und die flach in eine Liste zu kippen war genau das, woran die native Fassung
+gescheitert ist.
+
+Er steht in der Kategoriespalte des Kontoauszugs, und das ist kein Beiwerk: die Kategorie
+ist die Angabe, die nach einem Import am häufigsten nicht stimmt. Eine Spalte, die sie nur
+ANZEIGT, schickt für jede Korrektur durch den Dialog.
 
 ## `Datumsfeld` — ein Datum eingeben oder aussuchen
 

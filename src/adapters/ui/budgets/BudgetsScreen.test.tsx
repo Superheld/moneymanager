@@ -20,7 +20,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { BudgetsScreen } from "./BudgetsScreen";
 import { sqliteBudgetRepository } from "../../persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
@@ -38,15 +38,6 @@ beforeEach(() => {
   db = frischeDb();
   halter.setzen(pluginApi(db));
 });
-
-/** Das Auswahlfeld für die Art. */
-function artFeld(): HTMLElement {
-  const treffer = screen
-    .getAllByRole("combobox")
-    .find((s) => (s.textContent ?? "").includes("aufbauend"));
-  if (!treffer) throw new Error("Art-Auswahl nicht gefunden");
-  return treffer;
-}
 
 async function stammdatenBasis() {
   await sqliteZahlungskontoRepository.speichern({
@@ -144,7 +135,7 @@ describe("BudgetsScreen", () => {
 
     // Das Startdatum gibt es nur beim Aufbauenden — beim Monatlichen wäre es ohne Wirkung.
     expect(document.body.textContent).not.toMatch(/Sammelt ab/);
-    await nutzer.selectOptions(artFeld(), "aufbauend");
+    await auswahlWaehlen(nutzer, "Art", /aufbauend/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Sammelt ab/));
 
     await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
@@ -354,8 +345,7 @@ describe("BudgetsScreen · Verlauf", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/nichts gebucht/));
 
     // Den Vormonat wählen: jetzt steht die Buchung da, die ihn belastet hat.
-    const auswahl = await screen.findByLabelText("Monat");
-    await nutzer.selectOptions(auswahl, monatVersetzt(-1));
+    await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
     await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
   });
 
@@ -529,7 +519,7 @@ describe("BudgetsScreen · Betragsversionen", () => {
     expect(document.body.textContent).toMatch(/vorher 400,00/);
 
     // Vormonat: der alte Rahmen — und KEIN Hinweis, da hat sich nichts geändert.
-    await nutzer.selectOptions(await screen.findByLabelText("Monat"), monatVersetzt(-1));
+    await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
     await waitFor(() => expect(document.body.textContent).toMatch(/von 400,00/));
     expect(document.body.textContent).not.toMatch(/Rahmen geändert:/);
   });
@@ -584,7 +574,7 @@ describe("BudgetsScreen · Betragsversionen", () => {
     await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel — Verlauf/ }));
     await screen.findByText(/Verlauf · Lebensmittel/);
 
-    await nutzer.selectOptions(await screen.findByLabelText("Monat"), monatVersetzt(-2));
+    await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-2));
     // Nicht „−70,00 von 0,00": damals gab es keinen Rahmen, also auch keine Überziehung.
     await waitFor(() => expect(document.body.textContent).toMatch(/kein Budget in diesem Monat/));
     expect(document.body.textContent).toMatch(/70,00/);

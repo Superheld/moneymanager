@@ -1,6 +1,13 @@
 // CategoryPicker — Auswahl einer Kategorie über ein Such-Modal statt eines riesigen
 // nativen Dropdowns. Button zeigt die aktuelle Wahl; Klick öffnet ein Modal mit
 // Suchfeld (tippen filtert) und dem gruppierten Baum (Hauptgruppen → Unterkategorien).
+//
+// **Zwei Grössen, ein Modal.** `kompakt` ändert nur den KNOPF: im Formular ein Feld über
+// die volle Breite, in einer Tabellenzeile ein kleines Etikett in der Grösse einer
+// `Zeilenauswahl` daneben. Die Auswahl selbst bleibt dieselbe — ein Kategoriebaum ist
+// auch in einer Tabellenzeile ein Kategoriebaum, und ihn dort als flache Klappliste
+// nachzubauen hiesse, die Gruppierung und die Suche wegzuwerfen, an denen die native
+// Liste gescheitert ist.
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -15,12 +22,22 @@ export function CategoryPicker({
   value,
   onChange,
   placeholder,
+  kompakt,
+  ariaLabel,
 }: {
   kategorien: Kategorie[];
   value: string;
   onChange: (id: string) => void;
   /** Text, solange nichts gewählt ist. Ohne Angabe der übersetzte Standard. */
   placeholder?: string;
+  /** Knopf in Zeilengrösse statt als Formularfeld — für eine Wahl IN einer Tabellenzeile. */
+  kompakt?: boolean;
+  /**
+   * Der Name des Feldes. In einer Tabelle steht die Beschriftung in der Kopfzeile und
+   * nicht am Knopf; ohne ihn meldet eine Vorlesehilfe nur den aktuellen Wert, und wozu
+   * er gehört, bleibt offen. Im Formular trägt das `FormField` den Namen.
+   */
+  ariaLabel?: string;
 }) {
   const { t } = useTranslation();
   const [offen, setOffen] = useState(false);
@@ -44,9 +61,39 @@ export function CategoryPicker({
 
   return (
     <>
-      <button type="button" className="field" style={{ cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }} onClick={() => setOffen(true)}>
-        <span style={{ color: gewaehlt ? "var(--ink)" : "var(--ink-3)" }}>{gewaehlt ? gewaehlt.name : placeholder ?? t("kategoriePicker.leer")}</span>
-        <span style={{ color: "var(--ink-3)" }}>▾</span>
+      {/* Der kompakte Knopf ist bewusst so gross wie eine `Zeilenauswahl` und trägt
+          Rahmen, Zeiger und den Auswahlpfeil: eine Zelle, die nur Text zeigt, sieht aus
+          wie eine Anzeige, und niemand klickt darauf. Was gewählt WERDEN kann, muss man
+          ihm ansehen — dieselbe Überlegung wie bei `Zeilenauswahl`, dieselbe Grösse. */}
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        title={ariaLabel}
+        className={kompakt ? undefined : "field"}
+        style={
+          kompakt
+            ? {
+                font: "inherit",
+                fontSize: "var(--fs-xs)",
+                padding: "2px 8px",
+                borderRadius: "var(--r-pill, 999px)",
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                color: gewaehlt ? "var(--ink-2)" : "var(--ink-3)",
+                cursor: "pointer",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                maxWidth: "100%",
+              }
+            : { cursor: "pointer", textAlign: "left", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }
+        }
+        onClick={() => setOffen(true)}
+      >
+        <span style={kompakt ? { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" } : { color: gewaehlt ? "var(--ink)" : "var(--ink-3)" }}>
+          {gewaehlt ? gewaehlt.name : placeholder ?? t("kategoriePicker.leer")}
+        </span>
+        <span aria-hidden="true" style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>▾</span>
       </button>
 
       {offen && (

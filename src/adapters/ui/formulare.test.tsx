@@ -16,7 +16,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../testwerkzeug/harness";
 import { EinstellungenScreen } from "./einstellungen/EinstellungenScreen";
 import { KontenVerwaltungScreen } from "./konten/KontenVerwaltungScreen";
 import { InventarScreen } from "./inventar/InventarScreen";
@@ -94,8 +94,7 @@ describe("Budgets — Formularpfade", () => {
     await nutzer.click(await screen.findByRole("button", { name: /anlegen/i }));
 
     // Art umstellen — seit der Zusammenlegung ist das nur noch ein Auswahlfeld.
-    const artFeld = screen.getAllByRole("combobox").find((s) => (s.textContent ?? "").includes("aufbauend"));
-    if (artFeld) await nutzer.selectOptions(artFeld, "aufbauend");
+    await auswahlWaehlen(nutzer, "Art", /aufbauend/);
 
     // Der Kategorie-Picker ist ein Knopf, der einen eigenen Dialog öffnet.
     await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen|—|▾/ }));

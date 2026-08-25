@@ -22,24 +22,21 @@ export interface ZahlungsregelEingabe {
 }
 
 /**
- * Ertrag fließt zu (+), Aufwand und Umschichtung fließen ab (−) — und `gegenrichtung`
- * dreht das um.
+ * Ertrag fließt zu (+), Aufwand und Umschichtung fließen ab (−).
  *
- * Ohne den dritten Parameter leitet diese Funktion die RICHTUNG aus der EINORDNUNG ab,
- * und das geht nur so lange gut, wie beide dasselbe sagen. Eine Erstattung ist der Fall,
- * wo sie auseinanderfallen: sie gehört in die Kategorie der Ausgabe (also Aufwand), aber
- * das Geld kam herein. Wer sie von Hand erfasste, bekam bis hier zwangsläufig einen
- * Abfluss — die Höhe liess sich eingeben, die Richtung nicht.
+ * Die Funktion leitet die RICHTUNG aus der EINORDNUNG ab, und das geht nur so lange gut,
+ * wie beide dasselbe sagen. Für eine PLANGRÖSSE (Zahlungsregel, Vertragsrate) tun sie das
+ * immer: eine geplante Rate hat genau eine Richtung, sonst wäre sie keine Rate.
  *
- * Beim Import stellt sich die Frage nicht: dort ist das Vorzeichen eine Tatsache vom
- * Beleg und wird nie abgeleitet (siehe `buchungBearbeiten`). Für eine PLANGRÖSSE
- * (Zahlungsregel, Vertragsrate) genügt die Ableitung weiterhin — eine geplante Rate hat
- * genau eine Richtung, sonst wäre sie keine.
+ * Für eine IST-BUCHUNG gilt das nicht, und deshalb ruft `buchungErfassen` diese Funktion
+ * seit 2026-08-25 nicht mehr auf. Eine Erstattung ist der Fall, in dem Einordnung und
+ * Richtung auseinanderfallen: sie gehört in die Kategorie der Ausgabe (also Aufwand), aber
+ * das Geld kam herein. Dort trägt der Betrag sein Vorzeichen selbst — beim Import vom
+ * Beleg, von Hand aus dem, was jemand eintippt.
  */
-export function vorzeichenbehaftet(betrag: Cent, charakter: Charakter, gegenrichtung = false): number {
+export function vorzeichenbehaftet(betrag: Cent, charakter: Charakter): number {
   const cent = Math.abs(betrag);
-  const fliesstZu = charakter === "Ertrag";
-  return fliesstZu !== gegenrichtung ? cent : -cent;
+  return charakter === "Ertrag" ? cent : -cent;
 }
 
 export async function zahlungsregelAnlegen(

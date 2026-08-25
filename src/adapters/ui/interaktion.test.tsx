@@ -17,7 +17,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
 import { AppShell } from "./bausteine/AppShell";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
 import { InventarScreen } from "./inventar/InventarScreen";
@@ -576,12 +576,16 @@ describe("Buchungsdetails", () => {
     const nutzer = userEvent.setup();
     rendere(<KontenScreen onNavigate={() => {}} />);
 
-    /** Der Wert IM FORMULAR, nicht im Kopf: der kommt aus dem State der Komponente. */
+    /**
+     * Der Wert IM FORMULAR, nicht im Kopf: der kommt aus dem State der Komponente.
+     * Seit 2026-08-25 ist das ein `Datumsfeld` und kein `input[type=date]` mehr — es
+     * zeigt die Landesschreibweise und trägt seinen Namen als `aria-label`.
+     */
     const datumsfeld = () =>
-      (document.querySelector('input[type="date"]') as HTMLInputElement | null)?.value;
+      (screen.queryByRole("textbox", { name: "Datum" }) as HTMLInputElement | null)?.value;
 
     await detailOeffnen(nutzer, "Girokonto");
-    await waitFor(() => expect(datumsfeld()).toBe("2026-08-12"));
+    await waitFor(() => expect(datumsfeld()).toBe("12.08.2026"));
 
     await nutzer.click(await screen.findByTitle(/Gegenbuchung/i));
 
@@ -590,7 +594,7 @@ describe("Buchungsdetails", () => {
     // ohne key={buchung.id} das alte Datum stehen, während der Kopf (aus props) längst
     // die neue Buchung anzeigt.
     await waitFor(() => {
-      expect(datumsfeld()).toBe("2026-08-14");
+      expect(datumsfeld()).toBe("14.08.2026");
       expect(document.body.textContent).toContain("Bargeld-Bein");
     });
   });
@@ -898,10 +902,12 @@ describe("Vertrag aus einer Buchung", () => {
     // Die Maske trägt den Betrag POSITIV — die Richtung steckt im Charakter.
     await screen.findByDisplayValue("29.99");
     // Sichtbar ist die erste Fälligkeit; der Vertragsbeginn liegt im zugeklappten
-    // Konditionen-Block und trägt dasselbe Datum.
-    expect(await screen.findAllByDisplayValue(heute)).toHaveLength(1);
+    // Konditionen-Block und trägt dasselbe Datum. Beide sind seit 2026-08-25 ein
+    // `Datumsfeld` und zeigen deshalb die Landesschreibweise, nicht mehr ISO.
+    const heuteAngezeigt = "12.08.2026";
+    expect(await screen.findAllByDisplayValue(heuteAngezeigt)).toHaveLength(1);
     await nutzer.click(screen.getByRole("button", { name: /Vertragsdaten/i }));
-    expect(await screen.findAllByDisplayValue(heute)).toHaveLength(2);
+    expect(await screen.findAllByDisplayValue(heuteAngezeigt)).toHaveLength(2);
   });
 
   it("legt Vertrag und Zahlungsregel an", async () => {
@@ -975,8 +981,7 @@ describe("Vertrag aus einer Buchung", () => {
     rendere(<KontenScreen onNavigate={() => {}} />);
     await detailOeffnen(nutzer);
 
-    const auswahl = await screen.findByRole("combobox", { name: /vertrag zuordnen/i });
-    await nutzer.selectOptions(auswahl, "__keiner");
+    await auswahlWaehlen(nutzer, /vertrag zuordnen/i, "kein Vertrag");
 
     await waitFor(async () => {
       const z = (await sqliteVertragszuordnungRepository.alle())[0];
@@ -1334,8 +1339,9 @@ describe("Gegenbein erzeugen nur auf Konten ohne Bankverbindung", () => {
 
     await umbuchungsdialog(nutzer);
 
-    const ziel = await screen.findByRole("combobox", { name: "Gegenbein neu erzeugen auf" });
-    const namen = [...ziel.querySelectorAll("option")].map((o) => o.textContent);
+    // Die Liste einer `Auswahl` steht erst im DOM, wenn sie offen ist.
+    await nutzer.click(await screen.findByRole("combobox", { name: "Gegenbein neu erzeugen auf" }));
+    const namen = (await screen.findAllByRole("option")).map((o) => o.textContent);
     expect(namen).toContain("Bargeld");
     expect(namen).not.toContain("Tagesgeld");
   });

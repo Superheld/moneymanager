@@ -25,6 +25,7 @@
 // die Fortschreibung ist die Zerlegung von `budgetStand`, keine zweite Rechnung
 // (Herleitung in `core/budgets/budgetverlauf`).
 
+import { Auswahl } from "../bausteine/Auswahl";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -117,19 +118,15 @@ export function UebersichtScreen() {
           subtitle={monat === dieserMonat ? t("uebersicht.budgetsLaufend") : t("uebersicht.budgetsVergangen")}
           action={
             staende.length > 0 ? (
-              <select
-                className="field"
-                style={{ width: "auto" }}
-                aria-label={t("uebersicht.monatWaehlen")}
-                value={monat}
-                onChange={(e) => setMonat(e.target.value)}
-              >
-                {daten.monate.map((m) => (
-                  <option key={m} value={m}>
-                    {m === dieserMonat ? t("uebersicht.monatDieser", { monat: m }) : m}
-                  </option>
-                ))}
-              </select>
+              <Auswahl
+                ariaLabel={t("uebersicht.monatWaehlen")}
+                wert={monat}
+                aufAenderung={setMonat}
+                optionen={daten.monate.map((m) => ({
+                  wert: m,
+                  text: m === dieserMonat ? t("uebersicht.monatDieser", { monat: m }) : m,
+                }))}
+              />
             ) : undefined
           }
         >

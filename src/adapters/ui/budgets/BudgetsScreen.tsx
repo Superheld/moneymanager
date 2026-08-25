@@ -20,6 +20,7 @@
 //
 // PILOT für ADR-0004: alle sichtbaren Strings über t()/<Trans>, alles Geld über useGeld().
 
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
@@ -43,6 +44,7 @@ import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { PageHead } from "../bausteine/PageHead";
 import { Modal } from "../bausteine/Modal";
+import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
@@ -514,11 +516,12 @@ export function BudgetsScreen() {
             {/* Die Art ist jetzt jederzeit umstellbar — beide liegen in derselben
                 Tabelle, ein Wechsel ist kein Aggregatwechsel mehr. */}
             <FormField label={t("budgets.feldArt")} hint={t(`budgets.artHinweis.${art}`)}>
-              <select className="field" value={art} onChange={(e) => setArt(e.target.value as Budgetart)}>
-                {ARTEN.map((a) => (
-                  <option key={a} value={a}>{t(`budgets.art.${a}`)}</option>
-                ))}
-              </select>
+              <Auswahl
+                ariaLabel={t("budgets.feldArt")}
+                wert={art}
+                aufAenderung={(v) => setArt(v as Budgetart)}
+                optionen={ARTEN.map((a) => ({ wert: a, text: t(`budgets.art.${a}`) }))}
+              />
             </FormField>
 
             <FormField label={t("budgets.feldKategorie")} required hint={t("budgets.feldKategorieHinweis")}>
@@ -526,12 +529,13 @@ export function BudgetsScreen() {
             </FormField>
 
             <FormField label={t("budgets.feldKonto")} required hint={t("budgets.feldKontoHinweis")}>
-              <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
-                <option value="">{t("budgets.kontoWaehlen")}</option>
-                {konten.map((k) => (
-                  <option key={k.id} value={k.id}>{k.bezeichnung}</option>
-                ))}
-              </select>
+              <Auswahl
+                ariaLabel={t("budgets.feldKonto")}
+                wert={kontoId}
+                aufAenderung={setKontoId}
+                platzhalter={t("budgets.kontoWaehlen")}
+                optionen={[{ wert: "", text: t("budgets.kontoWaehlen") }, ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
+              />
             </FormField>
 
             <FormField
@@ -589,7 +593,7 @@ export function BudgetsScreen() {
                 schon gesammelt hat. Beim Monatlichen wäre das Feld ohne Wirkung. */}
             {art === "aufbauend" && (
               <FormField label={t("budgets.feldStart")} hint={t("budgets.feldStartHinweis")}>
-                <input className="field" type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+                <Datumsfeld ariaLabel={t("budgets.feldStart")} wert={start} aufAenderung={setStart} />
               </FormField>
             )}
           </div>
