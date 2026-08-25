@@ -266,12 +266,16 @@ select.field {
    sich aus mindestens so breit wie sein Inhalt, und dann wächst eine Tabelle die Spalte
    auf, statt in ihrem eigenen Scrollrahmen zu bleiben — die ganze Seite zieht sich breit.
 
-   **Die Zahlen, an denen die Breakpoints haengen** — nachgerechnet, nicht geschaetzt.
-   Jede Karte kostet zweimal `--pad-card` (48 px). Die geplante Tabelle braucht fuer ihre
-   fuenf Spalten rund 370 px Inhalt, also gut 420 px Karte; bei 0,382 Anteil heisst das
-   rund 1110 px Inhaltsbreite, und mit Seitenleiste und Seitenrand rund 1440 px Fenster.
-   Darunter stapelt es. Zwei waagerecht scrollende Tabellen nebeneinander sind keine zwei
-   Tabellen mehr, sondern zwei Ausschnitte.
+   **Die Zahlen, an denen der Breakpoint haengt** — nachgerechnet, nicht geschaetzt.
+   `.screen` deckelt bei 1040 px, davon gehen 16 px Spalte ab; links bleiben 632 px, rechts
+   392 px, und jede Karte kostet zweimal `--pad-card` (48 px). Die geplante Tabelle braucht
+   fuer ihre vier Spalten rund 340 px Inhalt und hat 344 — es passt, aber ohne Reserve. Wer
+   dort eine Spalte ergaenzt, rechnet vorher nach; sie war schon einmal eine zuviel.
+
+   Unterhalb von 1040 px Inhaltsbreite schrumpfen beide Seiten mit, und irgendwann scrollen
+   sie. Der Deckel ist bei rund 1400 px Fensterbreite erreicht (1040 plus Seitenleiste und
+   Seitenrand); darunter stapelt es. Zwei waagerecht scrollende Tabellen nebeneinander sind
+   keine zwei Tabellen mehr, sondern zwei Ausschnitte.
    ============================================================ */
 .auszug-spalten {
   display: grid;
@@ -282,25 +286,53 @@ select.field {
 .auszug-spalten > * {
   min-width: 0;
 }
-@media (max-width: 1440px) {
+@media (max-width: 1400px) {
   .auszug-spalten {
     grid-template-columns: 1fr;
   }
 }
 
 /* ============================================================
-   Ein Screen, der breiter sein darf als der Lesetext.
+   Eine Buchungszeile in einer aufgeklappten Liste.
 
-   `.screen` deckelt bei 1040 px, und das ist fuer alles richtig, was man LIEST. Der
-   Kontoauszug liest man nicht, man sucht darin: zwei Tabellen nebeneinander, zusammen
-   zwoelf Spalten. Bei 1040 px blieben davon nach zwei Kartenpolsterungen 582 px links und
-   342 px rechts — die rechte Tabelle faengt dort an, waagerecht zu scrollen.
+   Wo einzelne Buchungen stehen — unter einem Budget, unter einer Ausblickzeile, unter
+   einer Kategorie in der Analyse —, fuehrt der Klick in den Buchungsdialog. Das ist die
+   Stelle, an der man den Fehler SIEHT: eine Zeile in der falschen Kategorie faellt beim
+   Durchsehen einer Auswertung auf, nicht im Kontoauszug. Ohne den Weg von hier aus musste
+   man sie sich merken und im Auszug wiederfinden.
 
-   Die Grenze steht trotzdem, nur weiter draussen: ohne Deckel liefe die Tabelle auf einem
-   breiten Monitor ueber die ganze Flaeche, und dann sucht das Auge die Zeile.
+   **Man muss der Zeile ansehen, dass sie einer ist.** Ein blosser `cursor: pointer` ist
+   kein Hinweis — er zeigt sich erst, wenn der Zeiger schon draufsteht, und in einer Liste
+   probiert niemand jede Zeile durch. Die Flaeche beim Ueberfahren ist der Hinweis; sie
+   kostet nichts und ist dieselbe wie in jeder anderen Liste der App.
+
+   Der Knopf-Reset ist noetig, weil die Zeilen ECHTE Knoepfe sind und keine `div`s mit
+   Klick: nur so sind sie mit der Tastatur erreichbar. Ein `div onClick` sieht im Browser
+   gleich aus und ist fuer jeden, der nicht mit der Maus arbeitet, gar nicht da.
    ============================================================ */
-.screen--breit {
-  max-width: 1280px;
+.buchungszeile {
+  width: 100%;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--r-sm);
+}
+.buchungszeile:hover {
+  background: var(--accent-wash);
+}
+.buchungszeile:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Die Analyse-Zeile ist ein `tr` und kann kein Knopf sein — dort traegt die Zeile nur die
+   Flaeche. Die Tastaturfrage stellt sich dort schon laenger und haengt an `DataTable`. */
+tr.buchungszeile {
+  display: table-row;
+  border-radius: 0;
 }
 
 /* ============================================================

@@ -111,13 +111,12 @@ import {
 } from "../application/buchung/umbuchungAusBuchung";
 import { zuordnungVonHand as zuordnungVonHandUseCase, zuordnungZuruecksetzen as zuordnungZuruecksetzenUseCase } from "../application/vertraege/vertragszuordnung";
 import { umbuchungErfassen as umbuchungErfassenUseCase } from "../application/buchung/umbuchungErfassen";
-import { postenBezahltMarkieren, bezahltZuruecknehmen } from "../application/buchung/bezahltMarkieren";
 import {
   buchungenLoeschen as buchungenLoeschenUseCase,
   buchungenSammelbearbeiten as buchungenSammelbearbeitenUseCase,
   type SammelAenderung,
 } from "../application/buchung/buchungenSammelbearbeiten";
-import type { IstBuchung, Zahlungsregel } from "../core";
+import type { IstBuchung } from "../core";
 import {
   vertragAktualisieren as vertragAktualisierenUseCase,
   vertragAnlegen as vertragAnlegenUseCase,
@@ -726,13 +725,7 @@ export function umbuchungErfassen(eingabe: Parameters<typeof umbuchungErfassenUs
   return umbuchungErfassenUseCase(sqliteLedgerRepository, eingabe);
 }
 
-export function alsBezahltMarkieren(regel: Zahlungsregel, faelligkeit: string, kontoId: string) {
-  return postenBezahltMarkieren(sqliteLedgerRepository, { regel, faelligkeit, kontoId });
-}
 
-export function bezahltZurueck(quelleId: string, faelligkeit: string) {
-  return bezahltZuruecknehmen(sqliteLedgerRepository, quelleId, faelligkeit);
-}
 
 export function buchungenSammelbearbeiten(
   buchungen: readonly IstBuchung[],

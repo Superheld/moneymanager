@@ -163,7 +163,6 @@ export {
 } from "./konten/kontostandAnker";
 export { buchungErfassen, type BuchungEingabe } from "./buchung/buchungErfassen";
 export { umbuchungErfassen } from "./buchung/umbuchungErfassen";
-export { postenBezahltMarkieren, bezahltZuruecknehmen } from "./buchung/bezahltMarkieren";
 export {
   buchungenSammelbearbeiten,
   buchungenLoeschen,
