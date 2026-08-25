@@ -202,6 +202,44 @@ describe("Spielstand", () => {
     expect(zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE zu_pruefen = 1")).toBeGreaterThan(0);
   });
 
+  /**
+   * JEDE Zeile im Auszug traegt eine Beschriftung — entweder eine eigene Bezeichnung oder
+   * einen Beleg, aus dem der Auszug den Empfaenger nimmt.
+   *
+   * Der Spielstand schrieb bis 2026-08-25 gar keine `notiz`, und der Auszug zeigte
+   * seitenweise Zeilen, an denen nur ein Datum und ein Betrag standen. Aufgefallen ist das
+   * beim Hinsehen, nicht beim Testlauf — deshalb steht die Zusicherung jetzt hier: eine
+   * neue Buchungsart im Seed faellt sonst genauso still wieder ohne Beschriftung an.
+   */
+  it("beschriftet jede Buchung — eigene Bezeichnung oder Beleg", () => {
+    const db = mitSeed();
+    const ohne = zahl(
+      db,
+      `SELECT COUNT(*) FROM ist_buchung b
+        WHERE (b.notiz IS NULL OR TRIM(b.notiz) = '')
+          AND NOT EXISTS (
+            SELECT 1 FROM umsatz_verarbeitung v
+             JOIN umsatz_roh r ON r.id = v.umsatz_id
+            WHERE v.istbuchung_id = b.id AND TRIM(COALESCE(r.gegenpartei, '')) <> ''
+          )`,
+    );
+    expect(ohne).toBe(0);
+  });
+
+  /**
+   * Und sie sind ERZEUGT, nicht abgeschrieben: bei sechs bis zehn Einkaeufen im Monat
+   * staende sonst ueberall dasselbe. Gezogen wird aus dem gesaeten Wuerfel, die
+   * Wiederholbarkeit oben bleibt davon unberuehrt.
+   */
+  it("beschriftet die Alltagsbuchungen verschieden", () => {
+    const db = mitSeed();
+    const verschiedene = zahl(
+      db,
+      "SELECT COUNT(DISTINCT notiz) FROM ist_buchung WHERE kategorie_id = 'kat-lebensmittel'",
+    );
+    expect(verschiedene).toBeGreaterThan(3);
+  });
+
   it("enthaelt die Zahlung, die AUSDRUECKLICH zu keinem Vertrag gehoert", () => {
     const db = mitSeed();
     // Der Fall, fuer den `vertrag_herkunft` existiert (Wurzel-`CLAUDE.md`): ohne die
