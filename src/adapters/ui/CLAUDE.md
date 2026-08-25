@@ -71,6 +71,30 @@ Ein `Datumsfeld` zeigt die **Landesschreibweise** (`12.08.2026`), nicht ISO — 
 den Anzeigewert prüfen, erwarten sie. Getippt werden darf trotzdem ISO, das erkennt es
 immer.
 
+## Der Buchungsdialog liegt in Teilen
+
+`buchung/BuchungDetail.tsx` trägt das Formular — alle drei Rollen (anlegen, Entwurf
+prüfen, bearbeiten) in EINER Maske, und das bleibt so: jede Erweiterung soll an einer
+Stelle ankommen statt an dreien. Was daneben liegt, braucht den Zustand der Maske nicht
+und wurde deshalb 2026-08-25 herausgezogen:
+
+| Datei | beantwortet |
+|---|---|
+| `VertragsBlock` | gehört diese Zahlung zu einem Vertrag? |
+| `DublettenBlock` | steht sie womöglich schon ein zweites Mal da? |
+| `BuchungsHerkunft` | woher sie kommt — reine Anzeige |
+| `Richtungswahl` | Höhe und Richtung des Betrags, samt der Zerlegung dahinter |
+| `SplitModal` · `ZurUmbuchungModal` | die beiden Folge-Dialoge (S-7, S-1) |
+
+**Das Kriterium war nicht die Grösse, sondern die Abhängigkeit:** herausgezogen ist, was
+seine Daten hereinbekommt und Entscheidungen zurückmeldet. Der Rest gehört zum Formular
+und bleibt dort, auch wenn die Funktion damit die grösste im Bereich ist.
+
+Keins davon ist ein `bausteine/`-Kandidat: alle werden von genau einem Screen benutzt
+(siehe `bausteine/CLAUDE.md`). `buchung/ddmm.ts` ist die Ausnahme von der Ausnahme — vier Zeilen,
+drei Nutzer im selben Bereich, und kein natürlicher Besitzer; über `BuchungDetail` zu
+importieren hätte einen Ring gebaut.
+
 ## Die Seitenleiste klappt ein
 
 Unter 1100 px Fensterbreite schrumpft sie auf 68 px und zeigt nur noch Icons. Das steuert
