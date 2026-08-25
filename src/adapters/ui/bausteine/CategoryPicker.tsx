@@ -123,6 +123,20 @@ export function CategoryPicker({
     setMarkiert(null);
   }
 
+  /**
+   * Die Maus markiert dieselbe Zeile, die auch die Pfeiltasten markieren wuerden.
+   *
+   * Vorher hatte die Liste ZWEI Markierungen gleichzeitig: `:hover` unter dem Zeiger und
+   * `data-markiert` unter der Tastatur. Beide sagen dasselbe — „hier landet die Eingabe" —,
+   * und zwei Antworten auf dieselbe Frage sind schlechter als eine. Dieselbe Entscheidung
+   * steckt in `Auswahl`, wo Base UI `data-highlighted` fuer Maus UND Tastatur setzt; der
+   * Kommentar dort in `app.css` beschreibt genau diesen Fehler.
+   */
+  function zeigen(id: string) {
+    const i = sichtbar.findIndex((e) => e.id === id);
+    if (i >= 0) setMarkiert(i);
+  }
+
   function beiTaste(e: React.KeyboardEvent) {
     switch (e.key) {
       // `preventDefault`, weil die Pfeiltasten in einem Textfeld sonst den Schreibzeiger
@@ -196,7 +210,7 @@ export function CategoryPicker({
             onKeyDown={beiTaste}
           />
           <div style={{ maxHeight: 360, overflow: "auto", marginTop: "var(--sp-2)" }}>
-            <Pickzeile id="" markiert={markierteId} klasse="katrow katmain pickrow" markiertRef={markierteZeile} onWaehlen={waehle}>
+            <Pickzeile id="" markiert={markierteId} klasse="katrow katmain pickrow" markiertRef={markierteZeile} onWaehlen={waehle} onZeigen={zeigen}>
               <span className="nm" style={{ color: "var(--ink-3)" }}>{t("kategoriePicker.keine")}</span>
             </Pickzeile>
             {wurzeln.map((w) => {
@@ -208,11 +222,11 @@ export function CategoryPicker({
               const sichtbareKinder = q ? kinderHit : kinder;
               return (
                 <div key={w.id} className="katgroup">
-                  <Pickzeile id={w.id} markiert={markierteId} klasse="katrow katmain pickrow" markiertRef={markierteZeile} onWaehlen={waehle}>
+                  <Pickzeile id={w.id} markiert={markierteId} klasse="katrow katmain pickrow" markiertRef={markierteZeile} onWaehlen={waehle} onZeigen={zeigen}>
                     <span className="nm">{w.name} <Pill variant={CHARAKTER_PILL[w.defaultCharakter]}>{w.defaultCharakter}</Pill></span>
                   </Pickzeile>
                   {sichtbareKinder.map((c) => (
-                    <Pickzeile key={c.id} id={c.id} markiert={markierteId} klasse="katrow katchild pickrow" markiertRef={markierteZeile} onWaehlen={waehle}>
+                    <Pickzeile key={c.id} id={c.id} markiert={markierteId} klasse="katrow katchild pickrow" markiertRef={markierteZeile} onWaehlen={waehle} onZeigen={zeigen}>
                       <span className="nm">{c.name} <Pill variant={CHARAKTER_PILL[c.defaultCharakter]}>{c.defaultCharakter}</Pill></span>
                     </Pickzeile>
                   ))}
@@ -236,12 +250,14 @@ export function CategoryPicker({
  * **Die Ref hängt nur an der MARKIERTEN Zeile.** Eine Ref an allen dreien liesse die letzte
  * gewinnen, und gescrollt würde ans Listenende statt zur Markierung.
  */
-function Pickzeile({ id, markiert, klasse, markiertRef, onWaehlen, children }: {
+function Pickzeile({ id, markiert, klasse, markiertRef, onWaehlen, onZeigen, children }: {
   id: string;
   markiert?: string;
   klasse: string;
   markiertRef: React.RefObject<HTMLButtonElement | null>;
   onWaehlen: (id: string) => void;
+  /** Die Maus steht auf dieser Zeile — sie wird damit die markierte. */
+  onZeigen: (id: string) => void;
   children: ReactNode;
 }) {
   const istMarkiert = markiert === id;
@@ -253,6 +269,11 @@ function Pickzeile({ id, markiert, klasse, markiertRef, onWaehlen, children }: {
       className={klasse}
       style={{ width: "100%" }}
       onClick={() => onWaehlen(id)}
+      // `mousemove` und nicht `mouseenter`: beim Blaettern mit den Pfeiltasten scrollt die
+      // Liste unter einem STILLSTEHENDEN Zeiger durch, und `mouseenter` feuert dabei —
+      // die Maus riesse die Markierung zurueck, sobald eine Zeile unter ihr durchlaeuft.
+      // `mousemove` verlangt eine echte Bewegung.
+      onMouseMove={() => onZeigen(id)}
     >
       {children}
     </button>

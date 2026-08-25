@@ -111,16 +111,33 @@ trug sie längst als eigenen Inline-Stil und sah als einzige richtig aus.
 Die Regel dahinter ist dieselbe wie bei `Zeilenauswahl`: **die Grösse eines Bedienteils
 folgt dem, wo es steht, nicht dem, was es tut.**
 
-## Der Kontoauszug steht in zwei Spalten
+## Der Kontoauszug steht in drei Karten
 
-Gebucht links, geplant rechts, im goldenen Schnitt zugunsten der Buchungen — `.auszug-spalten`
-in `app.css`, wo auch steht, warum 1,618 : 1 und nicht die Hälfte. Untereinander war die
-geplante Liste erst nach der ganzen Buchungstabelle erreichbar, also bei einem Konto mit
-Historie nach zwei Bildschirmhöhen; sie beantwortet aber die Frage „was kommt noch".
+Kopf, Gebuchtes und Geplantes — das Gebuchte links, das Geplante rechts, im goldenen
+Schnitt zugunsten der Buchungen (`.auszug-spalten` in `app.css`, wo auch steht, warum
+1,618 : 1 und nicht die Hälfte). Untereinander war die geplante Liste erst nach der ganzen
+Buchungstabelle erreichbar, also bei einem Konto mit Historie nach zwei Bildschirmhöhen;
+sie beantwortet aber die Frage „was kommt noch".
 
-Der Stand von heute ist dabei die Überschrift der Vorschau geworden und nicht mehr ein
+**Zwei Karten und nicht eine geteilte.** In einer Karte waren es zwei Tabellen unter einer
+Fläche, und die Überschriften mussten die Trennung allein tragen, die eine Karte von sich
+aus leistet. Sie liegen NEBEN der Kopf-Karte, nicht darin — die Klammer, die sie sonst
+umschlösse, steht zweihundert Zeilen weiter oben und ist im Code nicht zu sehen. Deshalb
+prüft `kartenschachtelung.test.tsx` diesen Fall inzwischen mit.
+
+Der Stand von heute ist dabei die Unterzeile der Vorschau-Karte geworden und nicht mehr ein
 Trenner zwischen beiden Listen: er ist der Punkt, ab dem die Vorschau rechnet. Zwischen
 zwei Listen stehend beschriftete er beide und keine.
+
+**Der Screen trägt `screen--breit`.** `.screen` deckelt bei 1040 px, und das ist für alles
+richtig, was man LIEST. Hier stehen zwei Tabellen mit zusammen zwölf Spalten nebeneinander;
+nach zweimal Kartenpolsterung blieben davon 582 px links und 342 px rechts, und die rechte
+fängt dort an, waagerecht zu scrollen. Die Zahlen, an denen die Breite und der Breakpoint
+hängen, stehen ausgerechnet im CSS — wer sie ändert, rechnet sie nach, statt zu schätzen.
+
+Aus demselben Grund zeigt die Vorschau ihr Datum **ohne Jahr**: sie reicht höchstens 90
+Tage nach vorn, dort unterscheidet das Jahr nichts. Der Auszug links braucht es, weil dort
+alle Buchungen eines Kontos stehen.
 
 ## Die Seitenleiste klappt ein
 
