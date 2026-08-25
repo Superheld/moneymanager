@@ -906,12 +906,22 @@ const de = {
     editUntertitelImport: "Importierte Buchung — Korrekturen bleiben erhalten, die Import-Spur auch.",
     pillUmbuchung: "Umbuchung",
     pillManuell: "manuell",
+    // ZWEI Woerter fuer denselben Marker, weil zwei verschiedene Dinge danebenstehen:
+    // im Detaildialog ein KAESTCHEN, dessen Haken „noch anzusehen" bedeutet
+    // (`pillPruefen`), im Register eine PILLE, die den Zustand der Zeile nennt
+    // (`pillZuPruefen`). Ein Wort, das an beiden Stellen passt, gibt es nicht — am
+    // Kaestchen waere ein Imperativ eine Anweisung an den Haken statt an den Leser.
     pillPruefen: "ansehen",
-    // Zwei Woerter fuer denselben Marker, weil zwei verschiedene Dinge danebenstehen:
-    // im Register ein KNOPF (Klick erledigt ihn), im Detaildialog ein KAESTCHEN, dessen
-    // Haken „noch anzusehen" bedeutet. Ein „erledigt" am Kaestchen kehrte die Bedeutung um.
-    pillErledigt: "erledigt",
-    pruefenWeg: "Erledigt — Marker entfernen",
+    // Die Pille hiess bis 2026-08-25 „erledigt" und war gruen — und las sich damit als
+    // Haken: hier ist nichts mehr zu tun. Gemeint war das Gegenteil. Was danebensteht,
+    // sagt, was eine Zeile IST; dieser Marker sagt, was noch ANSTEHT, und das ist eine
+    // Aufforderung. Deshalb ein Verb im Imperativ und die Warnfarbe statt der
+    // Bestaetigungsfarbe.
+    //
+    // Der Klick nimmt den Marker weg — das steht im `title` (`pruefenWeg`), wo eine
+    // Wirkung hingehoert, und nicht auf der Pille selbst.
+    pillZuPruefen: "prüfen",
+    pruefenWeg: "Geprüft — Marker entfernen",
     pruefenFeld: "Noch ansehen",
     pruefenHinweis:
       "Merkt die Zeile im Auszug vor. Zeilen aus einem Bankabruf tragen den Marker von selbst — sie werden gebucht, ohne dass jemand sie gesehen hat.",
@@ -1073,8 +1083,13 @@ const de = {
       titel: "Buchung erfassen · {{konto}}",
       untertitelVorlaeufig: "vorläufig — der spätere Bankimport gleicht sie ab",
       untertitelBargeld: "Bargeld — manuelle Erfassung ist hier die Dauerquelle",
-      richtungAb: "Minus = abgeflossen",
-      richtungZu: "ohne Minus = zugeflossen",
+      // Zwei Wörter für die zwei Möglichkeiten, und beide sagen dasselbe aus der Sicht
+      // des KONTOS: ging Geld weg oder kam welches an. „Ausgabe/Einnahme" wäre die
+      // Einordnung und damit dieselbe Verwechslung noch einmal — eine Erstattung ist eine
+      // Ausgabenkategorie, bei der Geld ankommt.
+      richtung: "Richtung",
+      richtungAb: "Abfluss",
+      richtungZu: "Zufluss",
       gegenrichtungHinweis: "Geht gegen die Kategorie — also ein Rückfluss (Erstattung, Retoure, Storno). Die Kategorie bleibt die der Ausgabe: dort entlastet er das Budget.",
       notizPlatzhalter: "z. B. Bäcker, Tankstelle",
     },
@@ -2383,8 +2398,8 @@ const en: typeof de = {
     pillUmbuchung: "Transfer",
     pillManuell: "manual",
     pillPruefen: "review",
-    pillErledigt: "done",
-    pruefenWeg: "Done — remove the marker",
+    pillZuPruefen: "review",
+    pruefenWeg: "Reviewed — remove the marker",
     pruefenFeld: "Still to review",
     pruefenHinweis:
       "Flags the entry in the statement. Rows from a bank retrieval carry the marker by themselves — they are booked without anyone having seen them.",
@@ -2542,8 +2557,9 @@ const en: typeof de = {
       titel: "Add entry · {{konto}}",
       untertitelVorlaeufig: "provisional — the later bank import reconciles it",
       untertitelBargeld: "Cash — manual capture is the permanent source here",
-      richtungAb: "minus = went out",
-      richtungZu: "no minus = came in",
+      richtung: "Direction",
+      richtungAb: "Money out",
+      richtungZu: "Money in",
       gegenrichtungHinweis: "Runs against the category — so it is a refund (reimbursement, return, reversal). The category stays the one of the expense: that is where it relieves the budget.",
       notizPlatzhalter: "e.g. bakery, gas station",
     },

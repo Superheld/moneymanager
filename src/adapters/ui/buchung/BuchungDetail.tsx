@@ -288,30 +288,123 @@ function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void
 }
 
 /**
- * Der Text fürs Betragsfeld — IMMER mit Vorzeichen, auch beim Plus.
+ * Der Text fürs Betragsfeld — die HÖHE, ohne Vorzeichen.
  *
- * Ohne das Plus wäre eine blosse Zahl wieder zweideutig: Ausgabe oder Rückfluss? Genau diese
- * Zweideutigkeit hat die vorige Lösung (Höhe + Kästchen) gekostet. Minus ist U+2212 wie
- * überall in der Anzeige; getippt werden darf beides, `parseBetrag` nimmt auch das
- * ASCII-Minus, die Klammerschreibweise und ein nachgestelltes Vorzeichen.
+ * Die Richtung steht daneben als eigene Auswahl und nicht im Feld. Zwei Anläufe davor
+ * haben sie im Feld untergebracht: erst als blosse Höhe mit einer Ableitung aus dem
+ * Charakter dahinter, dann als eingetipptes Vorzeichen. Das erste war unsichtbar, das
+ * zweite verlangte, dass man auf die Idee kommt, ein Minus zu tippen — und wies es bis
+ * 2026-08-25 sogar ab. Eine Wahl, die man SIEHT und die zwei Möglichkeiten nebeneinander
+ * zeigt, verlangt weder Wissen noch Vertrauen.
  *
- * Formatiert wird über `useGeld` und nicht mehr über `String(minorZuMajor(…))`: das
- * schrieb einen Punkt als Dezimaltrenner und liess die zweite Nachkommastelle weg, also
- * genau das, was daneben in der Liste anders aussah.
+ * Formatiert wird über `useGeld` und nicht über `String(minorZuMajor(…))`: das schrieb
+ * einen Punkt als Dezimaltrenner und liess die zweite Nachkommastelle weg, also genau
+ * das, was daneben in der Liste anders aussah.
  */
-function betragMitVorzeichen(cent: number, geld: Geld): string {
-  return geld.format(cent, { mitVorzeichen: true });
+function betragsHoehe(cent: number, geld: Geld): string {
+  return geld.format(Math.abs(cent));
+}
+
+/** Ab- oder Zufluss — die Richtung als eigene Grösse neben der Höhe. */
+type Richtung = "ab" | "zu";
+
+function richtungVon(cent: number): Richtung {
+  return cent < 0 ? "ab" : "zu";
 }
 
 /**
- * Hat jemand im Feld eine Richtung ausgesprochen? Gefragt wird der TEXT, nicht ein
- * Merker daneben — ein zweiter Zustand neben dem Feld liefe beim ersten Vorfüllen
- * auseinander, und ausgerechnet daran krankte die Vorgängerlösung.
+ * Ein getipptes oder eingefügtes Vorzeichen ist eine Richtungsangabe und wird als solche
+ * genommen: es wandert aus dem Feld in die Auswahl daneben, statt abgewiesen zu werden.
  *
- * Dieselben Schreibweisen wie in `parseBetrag`: vorne, hinten, oder Klammern für negativ.
+ * Wer einen Betrag von woanders hereinkopiert, bringt das Vorzeichen mit — es dort stumm
+ * zu verschlucken hiesse, die Hälfte der Angabe wegzuwerfen. Erkannt werden dieselben
+ * Schreibweisen wie in `parseBetrag`: vorne, hinten, oder Klammern für negativ.
  */
-function traegtVorzeichen(text: string): boolean {
-  return /^\s*[-\u2212+(]/.test(text) || /[-\u2212+]\s*$/.test(text);
+function vorzeichenAbspalten(text: string): { rest: string; richtung?: Richtung } {
+  const klammer = /^\s*\((.*)\)\s*$/.exec(text);
+  if (klammer) return { rest: klammer[1], richtung: "ab" };
+  const vorne = /^\s*([-\u2212+])\s*/.exec(text);
+  if (vorne) return { rest: text.slice(vorne[0].length), richtung: vorne[1] === "+" ? "zu" : "ab" };
+  const hinten = /\s*([-\u2212+])\s*$/.exec(text);
+  if (hinten) return { rest: text.slice(0, hinten.index), richtung: hinten[1] === "+" ? "zu" : "ab" };
+  return { rest: text };
+}
+
+/**
+ * Die Richtungswahl — zwei Knöpfe, immer beide sichtbar.
+ *
+ * **Warum zwei Knöpfe und kein Kästchen.** Ein Kästchen zeigt eine Möglichkeit und
+ * verschweigt die andere: „Geld kam zurück" ohne Haken heisst irgendetwas, und was, muss
+ * man wissen. Genau daran ist der Vorgänger gescheitert. Zwei Knöpfe nebeneinander zeigen
+ * beide Möglichkeiten und welche gerade gilt — dafür braucht es kein Vorwissen.
+ *
+ * **Warum kein `Auswahl`.** Es sind genau zwei Werte, und die passen nebeneinander. Eine
+ * Klappliste versteckte die Hälfte der Antwort hinter einem Klick, um Platz zu sparen,
+ * den es hier nicht zu sparen gibt.
+ *
+ * **Warum Farbe.** Ab und Zu sind dieselben Farben wie überall, wo ein Betrag steht
+ * (`geldFarbe`): Minus in der Warnfarbe, Plus in Grün. Wer die Liste kennt, erkennt die
+ * Wahl wieder, ohne das Wort zu lesen.
+ *
+ * **Warum es sichtbar bleibt, wenn es gesperrt ist.** Bei einer Bankzeile ist die
+ * Richtung eine Tatsache — die soll man ablesen können. Ein Feld, das dann verschwindet,
+ * beantwortet die Frage gar nicht.
+ *
+ * `radiogroup` und nicht zwei Umschalter: es ist EINE Frage mit zwei Antworten, und die
+ * Pfeiltasten sollen zwischen ihnen wechseln.
+ */
+function Richtungswahl({
+  wert,
+  aufAenderung,
+  deaktiviert,
+}: {
+  wert: Richtung;
+  aufAenderung: (r: Richtung) => void;
+  deaktiviert?: boolean;
+}) {
+  const { t } = useTranslation();
+  const moeglichkeiten: readonly { r: Richtung; zeichen: string; textKey: string; farbe: string }[] = [
+    { r: "ab", zeichen: "\u2212", textKey: "konten.buchung.richtungAb", farbe: "var(--warn-deep)" },
+    { r: "zu", zeichen: "+", textKey: "konten.buchung.richtungZu", farbe: "var(--ok-deep)" },
+  ];
+  return (
+    <div role="radiogroup" aria-label={t("konten.buchung.richtung")} style={{ display: "flex", gap: 6 }}>
+      {moeglichkeiten.map((m) => {
+        const aktiv = m.r === wert;
+        return (
+          <button
+            key={m.r}
+            type="button"
+            role="radio"
+            aria-checked={aktiv}
+            aria-label={t(m.textKey)}
+            disabled={deaktiviert}
+            onClick={() => aufAenderung(m.r)}
+            className="field"
+            style={{
+              flex: 1,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              cursor: deaktiviert ? "default" : "pointer",
+              fontWeight: aktiv ? "var(--fw-bold)" : "var(--fw-semi)",
+              // Die gewählte Seite trägt Farbe und Fläche, die andere bleibt ein blasses
+              // Feld. Nur Fettschrift reichte nicht — nebeneinander sehen zwei Kästen mit
+              // leicht verschiedener Strichstärke gleich aus.
+              color: aktiv ? m.farbe : "var(--ink-3)",
+              borderColor: aktiv ? m.farbe : "var(--line)",
+              background: aktiv ? "color-mix(in oklab, currentColor 10%, transparent)" : "transparent",
+              opacity: deaktiviert && !aktiv ? 0.5 : 1,
+            }}
+          >
+            <span aria-hidden="true" style={{ fontWeight: "var(--fw-black)" }}>{m.zeichen}</span>
+            {t(m.textKey)}
+          </button>
+        );
+      })}
+    </div>
+  );
 }
 
 /**
@@ -353,20 +446,49 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
   const [kontoId, setKontoId] = useState(buchung?.kontoId ?? entwurf?.zahlungskontoId ?? vorgabe.kontoId);
   const [datum, setDatum] = useState(buchung?.datum ?? entwurf?.buchungstag ?? vorgabe.datum);
   /**
-   * Das Betragsfeld trägt das VORZEICHEN — sichtbar und änderbar.
+   * HÖHE und RICHTUNG stehen getrennt — zwei Felder, beide sichtbar.
    *
-   * Vorher stand hier `Math.abs(...)`: eine Ausgabe und ein gleich hoher Rückfluss
-   * erschienen als dieselbe Zahl, und welche der beiden man vor sich hatte, war der Maske
-   * nicht anzusehen. Die Richtung hing an einem Kästchen darunter, das es nur in der
-   * Hälfte der Fälle gab.
+   * Der Betrag im Ledger ist vorzeichenbehaftet; die Maske zerlegt ihn beim Öffnen und
+   * setzt ihn beim Speichern wieder zusammen. Was dabei gewonnen ist: die Richtung ist
+   * nicht mehr etwas, das man dem Feld ansehen (oder erraten) muss, sondern eine Wahl
+   * mit zwei Möglichkeiten nebeneinander.
    *
-   * Jetzt steht im Feld, was im Ledger steht. Wer nichts anfasst, speichert dasselbe
-   * wieder; wer das Minus wegnimmt, macht aus der Ausgabe einen Rückfluss und sieht das
-   * auch. Ein Vorzeichen wird immer geschrieben, auch das Plus — sonst wäre die blosse
-   * Zahl wieder zweideutig, und genau daran ist die alte Lösung gescheitert.
+   * `richtungVonHand` merkt sich, WER zuletzt gesprochen hat, und nur das. Solange
+   * niemand die Auswahl angefasst hat, folgt sie der Kategorie — Aufwand fliesst ab,
+   * Ertrag fliesst zu; sobald jemand sie anfasst, gilt seine Wahl und kein
+   * Kategoriewechsel nimmt sie ihm wieder weg. Eine bestehende Buchung zählt von Anfang
+   * an als von Hand gesetzt: ihre Richtung ist eine Tatsache (beim Import die der Bank),
+   * und ein Kategoriewechsel darf sie nicht umdrehen.
+   *
+   * Das ist NICHT die alte Ableitung mit anderem Namen. Die lief unsichtbar hinter dem
+   * Feld; diese hier bewegt einen Schalter, den man vor sich sieht, und man kann ihn
+   * jederzeit zurückstellen.
    */
   const startBetrag = buchung?.betrag ?? entwurf?.betrag;
-  const [betrag, setBetrag] = useState(startBetrag == null ? "" : betragMitVorzeichen(startBetrag, geld));
+  const [betrag, setBetrag] = useState(startBetrag == null ? "" : betragsHoehe(startBetrag, geld));
+  const [richtung, setRichtung] = useState<Richtung>(startBetrag == null ? "ab" : richtungVon(startBetrag));
+  const [richtungVonHand, setRichtungVonHand] = useState(startBetrag != null);
+
+  /**
+   * Was ins Betragsfeld getippt wird, ist die Höhe. Bringt es ein Vorzeichen mit
+   * (getippt oder eingefügt), wandert das in die Richtungsauswahl, statt im Feld
+   * stehenzubleiben — dort hätte es keine Wirkung und sähe trotzdem aus, als hätte es
+   * eine.
+   */
+  function betragTippen(text: string) {
+    const { rest, richtung: gemeint } = vorzeichenAbspalten(text);
+    setBetrag(rest);
+    if (gemeint) {
+      setRichtung(gemeint);
+      setRichtungVonHand(true);
+    }
+  }
+
+  function richtungWaehlen(gewaehlt: Richtung) {
+    setRichtung(gewaehlt);
+    setRichtungVonHand(true);
+  }
+
   const [charakter, setCharakter] = useState<Charakter>(buchung?.charakter ?? entwurf?.vorschlag?.charakter ?? "Aufwand");
   const [kategorieId, setKategorieId] = useState(buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
 
@@ -387,7 +509,11 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
     setKategorieId(id);
     if (charakter === "Umschichtung") return;
     const gewaehlt = kategorien.find((k) => k.id === id);
-    if (gewaehlt) setCharakter(gewaehlt.defaultCharakter);
+    if (!gewaehlt) return;
+    setCharakter(gewaehlt.defaultCharakter);
+    // Die Richtung nur, solange sie niemand selbst gesetzt hat — siehe `richtungVonHand`.
+    // Der Normalfall bleibt damit ein Handgriff: Kategorie wählen, Höhe tippen, fertig.
+    if (!richtungVonHand) setRichtung(gewaehlt.defaultCharakter === "Ertrag" ? "zu" : "ab");
   }
   const [notiz, setNotiz] = useState(buchung?.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
@@ -416,22 +542,13 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
   const kontoIstOnline = !istNeu && onlineKonten.has(kontoId);
   const istUmschichtung = charakter === "Umschichtung";
   /**
-   * Was beim Speichern in den Ledger geht — vorzeichenbehaftet.
+   * Was beim Speichern in den Ledger geht — Höhe mal Richtung, sonst nichts.
    *
-   * Zwei Regeln, mehr nicht:
-   *  • Steht im Feld ein Vorzeichen, gilt es. Auch entgegen der Kategorie: ein Zufluss
-   *    auf einer Aufwandskategorie ist eine Erstattung oder eine Retoure, und die gehört
-   *    genau dorthin — dort entlastet sie das Budget der Ausgabe.
-   *  • Steht keins da (frisch getippte Zahl), entscheidet der Charakter: Aufwand und
-   *    Umschichtung fließen ab, Ertrag fließt zu.
-   *
-   * Die zweite Regel greift praktisch nur beim Anlegen: eine bestehende Buchung füllt das
-   * Feld vorzeichenbehaftet vor, ein Entwurf ebenso.
+   * Keine Ableitung mehr an dieser Stelle: was in der Auswahl steht, wird gebucht. Ein
+   * Zufluss auf einer Aufwandskategorie ist damit erlaubt und richtig — eine Erstattung
+   * oder Retoure gehört in die Kategorie der Ausgabe, dort entlastet sie deren Budget.
    */
-  const gebuchterBetrag = (() => {
-    const wert = geld.parse(betrag) ?? 0;
-    return traegtVorzeichen(betrag) ? wert : vorzeichenbehaftet(wert, charakter);
-  })();
+  const gebuchterBetrag = (richtung === "ab" ? -1 : 1) * Math.abs(geld.parse(betrag) ?? 0);
   /** Floss das Geld entgegen dem, was die Einordnung erwarten lässt? (Erstattung, Storno) */
   const gegenDerEinordnung =
     gebuchterBetrag !== 0 && gebuchterBetrag !== vorzeichenbehaftet(gebuchterBetrag, charakter);
@@ -705,21 +822,25 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         <FormField label={t("konten.feldDatum")} required hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : undefined}>
           <input className="field" type="date" aria-label={t("konten.feldDatum")} value={datum} disabled={istEntwurf || kontoIstOnline} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
-        {/* Das Vorzeichen steht IM Feld und ist die Richtung — siehe `gebuchterBetrag`.
-            Der Hinweis darunter sagt, was daraus wird, damit niemand raten muss: bei einem
-            gesperrten Feld die Herkunft der Zahl, sonst die Richtung im Klartext. */}
+        {/* Das Feld nimmt die HÖHE, die Richtung steht als eigene Wahl daneben. Beide
+            zusammen sind der Betrag; keins von beidem wird abgeleitet. */}
         <FormField
           label={t("konten.feldBetrag")}
           required
-          hint={
-            istEntwurf || kontoIstOnline
-              ? t("konten.entwurf.vonDerBank")
-              : gepaart
-                ? undefined
-                : t(gebuchterBetrag < 0 ? "konten.buchung.richtungAb" : "konten.buchung.richtungZu")
-          }
+          hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : undefined}
         >
-          <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf || kontoIstOnline} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
+          <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf || kontoIstOnline} onChange={(e) => betragTippen(e.target.value)} placeholder={geld.format(0)} />
+        </FormField>
+        {/* Die Richtung — zwei Möglichkeiten nebeneinander, immer beide sichtbar.
+            Sie steht auch da, wo sie gesperrt ist: was die Bank gebucht hat, soll man
+            SEHEN können, ohne es ändern zu dürfen. Ein Feld, das nur erscheint, wenn man
+            es bedienen darf, lässt die Frage sonst unbeantwortet. */}
+        <FormField label={t("konten.buchung.richtung")} required>
+          <Richtungswahl
+            wert={richtung}
+            aufAenderung={richtungWaehlen}
+            deaktiviert={gepaart || istEntwurf || kontoIstOnline}
+          />
         </FormField>
         {/* Der Rückfluss braucht einen Satz, kein Kästchen mehr: dass ein Zufluss auf einer
             Aufwandskategorie erlaubt IST, sieht man dem Feld nicht an — dass er dort auch

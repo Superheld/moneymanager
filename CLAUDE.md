@@ -185,15 +185,22 @@ Der Charakter ist eine **Einordnung**: er sagt, WOFÜR das Geld war. Eine Einord
 eine Tatsache nicht umdrehen — das gilt seit dem Wegfall der Ableitung nicht mehr nur für
 importierte Zeilen, sondern immer.
 
-**Die Maske zeigt das Vorzeichen und lässt es ändern.** Das Betragsfeld im Buchungsdialog
-wird vorzeichenbehaftet vorgefüllt und schreibt immer ein Zeichen, auch das Plus — ohne
-das wäre eine blosse Zahl wieder zweideutig (Ausgabe oder Rückfluss?), und genau daran war
-die Vorgängerlösung gescheitert. Nur wo gar nicht korrigiert werden darf, sperrt die Maske
-das Feld: auf einem online geführten Konto, im Entwurf und am Bein einer Umbuchung.
+**Die Maske trennt HÖHE und RICHTUNG in zwei Felder.** Das Betragsfeld nimmt die Höhe,
+daneben steht die Richtung als Wahl mit zwei sichtbaren Möglichkeiten (Abfluss/Zufluss);
+beim Öffnen wird der gespeicherte Betrag in beide zerlegt, beim Speichern wieder
+zusammengesetzt. Ein mitgebrachtes Vorzeichen — getippt oder eingefügt — wandert in diese
+Wahl, statt im Feld stehenzubleiben oder abgewiesen zu werden.
 
-Ein Vorzeichen leitet die Maske nur an einer Stelle ab: bei einer **frisch getippten Zahl
-ohne Vorzeichen**. Dann entscheidet der Charakter der gewählten Kategorie — Aufwand und
-Umschichtung fliessen ab, Ertrag fliesst zu. Sobald im Feld ein Zeichen steht, gilt es.
+Die Wahl bleibt auch dort **sichtbar, wo sie gesperrt ist** (Online-Konto, Entwurf,
+Umbuchungs-Bein): was die Bank gebucht hat, soll man ablesen können, ohne es ändern zu
+dürfen. Ein Feld, das nur erscheint, wenn man es bedienen darf, lässt die Frage sonst
+unbeantwortet — genau das war der Fehler des Kästchens davor.
+
+Die Kategorie setzt die Richtung nur, **solange niemand sie selbst gewählt hat**. Danach
+gilt die Wahl, und kein Kategoriewechsel nimmt sie wieder weg; eine bestehende Buchung
+zählt von Anfang an als selbst gesetzt. Das ist nicht die alte Ableitung mit anderem
+Namen: die lief unsichtbar hinter dem Feld, diese bewegt einen Schalter, den man vor sich
+sieht und jederzeit zurückstellen kann.
 
 **Eine Erstattung ist damit ein Aufwand mit positivem Betrag**, und das ist kein
 Widerspruch: „Aufwand" sagt, WOFÜR das Geld war, das Vorzeichen sagt, wohin es floss. Die
@@ -220,13 +227,22 @@ aber nur noch für Zahlungsregel und Vertragsrate: eine geplante Rate hat genau 
 Richtung, sonst wäre sie keine Rate. Für eine IST-Buchung gilt sie nicht — dort fallen
 Einordnung und Richtung beim Rückfluss auseinander, und dann gewinnt die Richtung.
 
-Zwei Versuche davor sind an derselben Stelle gescheitert und stehen hier, damit sie kein
-drittes Mal unternommen werden: eine Sonderregel in `buchungBearbeiten`, die bei
-`quelle === "import"` das Vorzeichen des Originals gegen die Ableitung verteidigte, und ein
-Kästchen `gegenrichtung`, das die Ableitung umdrehte. Beide reparierten die Folgen der
-Ableitung, statt sie wegzunehmen — die Maske zeigte weiter `Math.abs(betrag)`, ein
-eingetipptes Minus flog mit `betrag.groesserNull` raus, und das Kästchen gab es nur in der
-Hälfte der Fälle. Eine Zahl, die die Richtung schon trägt, braucht von alledem nichts.
+Drei Versuche davor sind an derselben Stelle gescheitert und stehen hier, damit kein
+vierter unternommen wird:
+
+1. Eine Sonderregel in `buchungBearbeiten`, die bei `quelle === "import"` das Vorzeichen
+   des Originals gegen die Ableitung verteidigte.
+2. Ein Kästchen `gegenrichtung`, das die Ableitung umdrehte — es gab das Kästchen aber nur
+   in der Hälfte der Fälle, bei importierten Zeilen also nie.
+3. Das Vorzeichen im Betragsfeld selbst. Richtig gerechnet, und trotzdem zu wenig: es
+   verlangt, dass man auf die Idee kommt, ein Minus zu tippen.
+
+Die ersten beiden reparierten die FOLGEN der Ableitung, statt sie wegzunehmen — die Maske
+zeigte weiter `Math.abs(betrag)`, und ein eingetipptes Minus flog mit
+`betrag.groesserNull` raus. Der dritte nahm sie weg und liess die Richtung trotzdem etwas
+sein, das man dem Feld ansehen muss. **Eine Wahl mit zwei sichtbaren Möglichkeiten
+verlangt weder Wissen noch Vertrauen** — das ist der Unterschied, an dem die drei davor
+gescheitert sind.
 
 **Und wo ein Wort neben der Zahl steht, muss es mitwandern.** Ein negativer Verbrauch unter
 der Überschrift „verbraucht" liest sich als ausgegeben, auch wenn das Minus davorsteht und

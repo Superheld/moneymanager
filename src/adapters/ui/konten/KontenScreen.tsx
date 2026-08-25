@@ -535,9 +535,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                     <span title={r.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
                       {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
-                      {/* Der „ansehen"-Marker steht VOR den anderen Pillen: die übrigen
-                          sagen, was eine Zeile IST, dieser sagt, was noch zu tun ist.
-                          Klick nimmt ihn weg — dafür ist er ein Knopf und kein Etikett. */}
+                      {/* Der Prüf-Marker steht VOR den anderen Pillen: die übrigen sagen,
+                          was eine Zeile IST, dieser sagt, was noch zu tun ist. Klick nimmt
+                          ihn weg — dafür ist er ein Knopf und kein Etikett.
+                          Warnfarbe und Imperativ, weil er eine AUFFORDERUNG ist; grün und
+                          „erledigt" lasen sich als Haken und damit als das Gegenteil. */}
                       {r.buchung?.zuPruefen && (
                         <button
                           type="button"
@@ -550,7 +552,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                             await laden();
                           }}
                         >
-                          <Pill variant="ok">{t("konten.pillErledigt")}</Pill>
+                          <Pill variant="warn">{t("konten.pillZuPruefen")}</Pill>
                         </button>
                       )}
                       {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}

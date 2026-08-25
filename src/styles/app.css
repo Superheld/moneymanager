@@ -438,9 +438,19 @@ select.field {
   .side .lbl,
   .side .nlbl { display: none; }
 
+  /* Ein QUADRAT um das Icon, kein Streifen ueber die ganze Breite.
+     Aufgeklappt liegen um das Icon 9px oben und unten und 11px links — die Markierung
+     hat also ringsum Luft. Eingeklappt behielt sie die Polsterung nur oben und unten
+     (`padding: 10px 0`) und wurde vom `align-items: stretch` der Spalte auf die volle
+     Breite der Leiste gezogen: links und rechts sass sie dann direkt am Icon.
+     Deshalb hier eine feste Kantenlaenge (17px Icon + 2x9px) statt Polsterung, und die
+     Spalte zentriert ihre Eintraege, statt sie zu dehnen. */
+  .nav { align-items: center; }
   .nav a {
     justify-content: center;
-    padding: 10px 0;
+    padding: 0;
+    width: 35px;
+    height: 35px;
   }
   /* Das Kennzeichen sass per `margin-left: auto` am rechten Rand — ohne Beschriftung
      daneben draengt es das Icon aus der Mitte. */

@@ -352,10 +352,11 @@ describe("Charakter folgt der Kategorie", () => {
  * sich damit gar nicht erfassen, und an einer importierten Zeile war nicht zu sehen, in
  * welche Richtung sie ging.
  *
- * Jetzt gilt: was im Feld steht, ist die Richtung. Fehlt ein Vorzeichen — nur beim frisch
- * Antippen —, entscheidet der Charakter der Kategorie.
+ * Jetzt nimmt das Feld die HÖHE und daneben steht die Richtung als eigene Wahl mit zwei
+ * sichtbaren Möglichkeiten. Ein mitgebrachtes Vorzeichen wandert in diese Wahl, statt
+ * abgewiesen zu werden. Solange niemand sie anfasst, folgt sie der Kategorie.
  */
-describe("Das Vorzeichen steht im Betragsfeld", () => {
+describe("Höhe und Richtung stehen getrennt", () => {
   it("nimmt ein getipptes Minus an, auch auf einer Ertragskategorie", async () => {
     await grunddaten();
     await kategorieRepo.speichern({ id: "kat-lohn", name: "Gehalt", defaultCharakter: "Ertrag" });
@@ -404,7 +405,7 @@ describe("Das Vorzeichen steht im Betragsfeld", () => {
     });
   });
 
-  it("zeigt das Vorzeichen einer gebuchten Zeile im Feld und speichert es unverändert", async () => {
+  it("zeigt die Richtung einer gebuchten Zeile und speichert sie unverändert", async () => {
     await grunddaten();
     await ledgerRepo.speichern({
       id: "b-ret", kontoId: "k1", datum: "2026-08-14", betrag: 3490,
@@ -418,9 +419,12 @@ describe("Das Vorzeichen steht im Betragsfeld", () => {
     await nutzer.click((await screen.findAllByRole("button", { name: /bearbeiten/i }))[0]);
     const dialog = within(await screen.findByRole("dialog"));
 
-    // Vorher stand hier die blosse Höhe — ein Zufluss war von einem Abfluss nicht zu
+    // Das Feld trägt die HÖHE, die Richtung steht daneben und ist abzulesen. Vorher
+    // stand hier nur die Höhe, und ein Zufluss war von einem Abfluss nicht zu
     // unterscheiden.
-    expect(dialog.getByRole("textbox", { name: /^Betrag$/ })).toHaveValue("+34,90");
+    expect(dialog.getByRole("textbox", { name: /^Betrag$/ })).toHaveValue("34,90");
+    expect(dialog.getByRole("radio", { name: /Zufluss/ })).toBeChecked();
+    expect(dialog.getByRole("radio", { name: /Abfluss/ })).not.toBeChecked();
 
     await nutzer.click(dialog.getByRole("button", { name: /^speichern$/i }));
 
@@ -428,6 +432,67 @@ describe("Das Vorzeichen steht im Betragsfeld", () => {
       const alle = await ledgerRepo.alle();
       expect(alle).toHaveLength(1);
       expect(alle[0].betrag).toBe(3490);
+    });
+  });
+
+  /**
+   * Der Kern der Sache: die Richtung ist eine WAHL, kein Nebenprodukt. Ein Klick auf
+   * „Zufluss" dreht eine Ausgabe zur Erstattung, ohne dass die Kategorie sich ändert.
+   */
+  it("dreht die Richtung per Klick, ohne die Kategorie anzufassen", async () => {
+    await grunddaten();
+    await ledgerRepo.speichern({
+      id: "b-um", kontoId: "k1", datum: "2026-08-14", betrag: -2000,
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat-le",
+      notiz: "Wocheneinkauf Kesselmann",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await screen.findByText("Wocheneinkauf Kesselmann");
+    await nutzer.click((await screen.findAllByRole("button", { name: /bearbeiten/i }))[0]);
+    const dialog = within(await screen.findByRole("dialog"));
+
+    expect(dialog.getByRole("radio", { name: /Abfluss/ })).toBeChecked();
+    await nutzer.click(dialog.getByRole("radio", { name: /Zufluss/ }));
+    await nutzer.click(dialog.getByRole("button", { name: /^speichern$/i }));
+
+    await waitFor(async () => {
+      const alle = await ledgerRepo.alle();
+      expect(alle[0].betrag).toBe(2000);
+      expect(alle[0].charakter).toBe("Aufwand");
+      expect(alle[0].kategorieId).toBe("kat-le");
+    });
+  });
+
+  /**
+   * Und ein Kategoriewechsel nimmt eine getroffene Wahl nicht wieder weg. Genau das war
+   * der Fehler der Ableitung: sie sprach immer, auch wenn schon jemand gesprochen hatte.
+   */
+  it("lässt eine gewählte Richtung vom Kategoriewechsel unberührt", async () => {
+    await grunddaten();
+    await kategorieRepo.speichern({ id: "kat-lohn", name: "Gehalt", defaultCharakter: "Ertrag" });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByRole("button", { name: /^\+?\s*Buchung$/ }))[0]);
+    const dialog = within(await screen.findByRole("dialog"));
+    await dialog.findByRole("combobox", { name: /^Konto$/ });
+
+    await nutzer.type(dialog.getByRole("textbox", { name: /^Betrag$/ }), "80");
+    // Erst die Richtung von Hand, DANN die Kategorie: die Wahl muss überleben.
+    await nutzer.click(dialog.getByRole("radio", { name: /Abfluss/ }));
+    await nutzer.click(dialog.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Gehalt/ }));
+
+    expect(dialog.getByRole("radio", { name: /Abfluss/ })).toBeChecked();
+    await nutzer.click(dialog.getByRole("button", { name: /^speichern$/i }));
+
+    await waitFor(async () => {
+      const alle = await ledgerRepo.alle();
+      expect(alle).toHaveLength(1);
+      expect(alle[0].charakter).toBe("Ertrag");
+      expect(alle[0].betrag).toBe(-8000);
     });
   });
 });
