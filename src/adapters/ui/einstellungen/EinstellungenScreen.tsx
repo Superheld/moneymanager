@@ -17,6 +17,8 @@ import {
   type Person,
 } from "../../../application";
 import {
+  aktualisierungspruefung,
+  aktualisierungspruefungSetzen,
   kategorieAnlegen,
   kategorieLoeschen,
   personAnlegen,
@@ -82,6 +84,12 @@ export function EinstellungenScreen() {
           inhalt: () => <FestlegungenCard kategorien={kategorien} />,
         },
         {
+          id: "aktualisierung",
+          label: t("einstellungen.aktualisierung.titel"),
+          untertitel: t("einstellungen.aktualisierung.untertitel"),
+          inhalt: () => <AktualisierungCard />,
+        },
+        {
           id: "experimente",
           label: t("einstellungen.experiment.titel"),
           untertitel: t("einstellungen.experiment.untertitel"),
@@ -129,7 +137,7 @@ function ExperimenteCard() {
         {t("einstellungen.experiment.hinweis")}
       </p>
       <div style={{ display: "grid", gap: "var(--sp-3)" }}>
-        <ExperimentZeile
+        <SchalterZeile
           titel={t("einstellungen.experiment.hanseaticTitel")}
           text={t("einstellungen.experiment.hanseaticText")}
           an={experimente.hanseatic}
@@ -140,7 +148,16 @@ function ExperimenteCard() {
   );
 }
 
-function ExperimentZeile({
+/**
+ * Eine Zeile mit einem Schalter: Kaestchen, fetter Titel, der aktuelle Stand und eine
+ * Erklaerung darunter.
+ *
+ * Hiess bis 2026-08-25 `ExperimentZeile` — nach ihrem ersten Anwendungsfall, nicht nach
+ * dem, was sie ist. Beim zweiten (der Aktualisierungspruefung, die kein Experiment ist)
+ * haette der Name gegen die Sache gestanden, und der naechste haette entweder einen
+ * falschen Namen benutzt oder die Zeile ein zweites Mal gebaut.
+ */
+function SchalterZeile({
   titel,
   text,
   an,
@@ -174,6 +191,50 @@ function ExperimentZeile({
         <span className="muted">{text}</span>
       </span>
     </label>
+  );
+}
+
+/**
+ * Ob die App beim Start nach einer neueren Fassung sucht.
+ *
+ * Der Schalter war seit dem Update-Weg gebaut und geprueft (`pruefungSchalten`), hatte
+ * aber keine Oberflaeche — abschalten ging nur ueber die Einstellungstabelle. Eine
+ * Faehigkeit, die niemand erreicht, ist keine.
+ *
+ * Er steht in einem EIGENEN Register und nicht bei den Experimenten: die Pruefung ist
+ * keins, sie ist an, und sie ist der einzige Netzzugriff, den die App von sich aus macht
+ * (siehe `application/aktualisierung.ts`). Genau das ist der Grund, warum sie abschaltbar
+ * sein muss — und der gehoert danebengeschrieben, nicht in eine Fussnote.
+ */
+function AktualisierungCard() {
+  const { t } = useTranslation();
+  const [an, setAn] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void aktualisierungspruefung().then(setAn);
+  }, []);
+
+  async function schalten(neu: boolean) {
+    // Erst schreiben, dann anzeigen: bliebe das Kaestchen bei einem Fehler umgelegt
+    // stehen, zeigte es einen Zustand, den die Datenbank nicht hat.
+    await aktualisierungspruefungSetzen(neu);
+    setAn(neu);
+  }
+
+  return (
+    <Card>
+      <p className="muted" style={{ marginTop: 0 }}>
+        {t("einstellungen.aktualisierung.hinweis")}
+      </p>
+      {an != null && (
+        <SchalterZeile
+          titel={t("einstellungen.aktualisierung.schalterTitel")}
+          text={t("einstellungen.aktualisierung.schalterText")}
+          an={an}
+          aufSchalten={(neu) => void schalten(neu)}
+        />
+      )}
+    </Card>
   );
 }
 

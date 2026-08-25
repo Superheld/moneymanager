@@ -498,6 +498,13 @@ sie nur nach draussen, wenn jemand einen Bankabruf auslöste. Deshalb ist sie ab
 (`aktualisierungPruefen` in `einstellung`); ohne Zutun ist sie an, denn ein Update, von
 dem niemand erfährt, ist keines.
 
+Der Schalter dafür steht seit 2026-08-25 unter **Einstellungen → Aktualisierung**, in
+einem eigenen Register und nicht bei den Experimenten: die Prüfung ist keins, sie ist an,
+und der Grund für den Schalter — der einzige ungefragte Netzzugriff — gehört
+daneben geschrieben statt in eine Fussnote. Ein fehlender Schlüssel heisst dabei „nie
+entschieden" und nicht „abgelehnt", weshalb das Kästchen ohne Zeile in der Tabelle
+angehakt ist.
+
 Wo was liegt:
 
 | Stück | Datei |
@@ -599,9 +606,6 @@ Mechanismus und Release-Workflow stehen. Offen ist:
 - **Linux.** Braucht AppImage als Bundle-Ziel und einen zweiten Bauplatz; macOS lässt sich
   nicht auf Linux bauen und umgekehrt. Und der Updater kann dort ausschliesslich AppImages
   ersetzen.
-- **Kein Schalter in den Einstellungen.** Die Abschaltbarkeit ist gebaut und geprüft
-  (`pruefungSchalten`, `dienste.aktualisierungspruefungSetzen`), hat aber noch keine
-  Oberfläche — abschalten geht derzeit nur über die Einstellungstabelle.
 
 **Was in einem veröffentlichten Archiv steckt** und was nicht, weil die Frage naheliegt:
 keine Zugangsdaten, keine Kontodaten, kein Datenbestand — die Datenbank liegt im

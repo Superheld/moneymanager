@@ -1102,6 +1102,18 @@ const de = {
       feld: "Region",
       hinweis: "bestimmt Sprache, Zahlenformat und Währung",
     },
+    aktualisierung: {
+      titel: "Aktualisierung",
+      untertitel: "Ob die App beim Start nach einer neueren Fassung sucht",
+      // Der Satz sagt, WAS passiert, und nennt den Grund, warum es diesen Schalter gibt.
+      // Ohne ihn liest sich das Kästchen wie eine Bequemlichkeit; es ist aber die einzige
+      // Stelle, an der die App ungefragt nach draußen spricht.
+      hinweis:
+        "Das ist der einzige Netzzugriff, den die App von sich aus macht — sonst spricht sie nur nach draußen, wenn du einen Bankabruf auslöst. Abgerufen wird ausschließlich, ob es eine neuere Fassung gibt; es werden keine Daten von dir übertragen.",
+      schalterTitel: "Beim Start nach Aktualisierungen suchen",
+      schalterText:
+        "Liegt eine neuere Fassung bereit, erscheint unten links in der Seitenleiste ein Knopf. Findet die Prüfung nichts oder scheitert sie, passiert nichts — es gibt dann keine Meldung.",
+    },
     experiment: {
       titel: "Experimente",
       untertitel: "Unfertiges zum Einschalten — auf eigene Verantwortung",
@@ -2558,6 +2570,15 @@ const en: typeof de = {
       untertitel: "Applies to the whole household",
       feld: "Region",
       hinweis: "determines language, number format and currency",
+    },
+    aktualisierung: {
+      titel: "Updates",
+      untertitel: "Whether the app looks for a newer version at startup",
+      hinweis:
+        "This is the only network request the app makes on its own — otherwise it only talks to the outside when you start a bank retrieval. All it asks is whether a newer version exists; none of your data is sent.",
+      schalterTitel: "Look for updates at startup",
+      schalterText:
+        "If a newer version is ready, a button appears at the bottom left of the sidebar. If the check finds nothing or fails, nothing happens — there is no message.",
     },
     experiment: {
       titel: "Experiments",
