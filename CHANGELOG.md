@@ -3,6 +3,83 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.22.0] — 2026-08-25
+
+Eine Runde über die Kanten, die man erst beim täglichen Gebrauch bemerkt: Dialoge, die sich
+hinter anderen Dialogen versteckten, Listen ohne erkennbaren Weg weiter, und eine Funktion,
+die Zahlungen erfand, die niemand belegt hatte.
+
+### Behoben
+
+**Auswahllisten und Kalender klappen nicht mehr hinter dem Dialog auf, aus dem sie kommen.**
+Sie hängen per Portal am Dokument und trugen von sich aus keine Ebene; ein Dialog trug eine
+und gewann damit gegen sie, egal wie weit hinten sie standen. Der Wert sitzt jetzt an der
+Stelle, die ihn überhaupt annehmen kann.
+
+**Der Buchungsdialog erscheint wieder über der Seite statt in der Tabellenzeile.** Seit die
+Kategorie in der Auszugszeile wählbar ist, geht er dort auf — und stand eine Zeile auf
+gedämpft (weil ihr Buchungstag noch vor uns liegt), erbte er das: durchscheinend, im Stapel
+der Zeile, und der Scrim deckte nur die Tabelle. Alle drei Wirkungen sind mit einem Portal
+weg.
+
+**Escape schliesst nur noch den obersten Dialog.** Bei zwei offenen ging der auslösende
+gleich mit.
+
+**Die TAN-Rückfrage räumt sich selbst weg.** Bei einer Freigabe in der Banking-App tippt
+niemand etwas ein — die Bank antwortet, und nur der Abruf erfährt wann. Der Hinweis blieb
+bis zum Wegklicken stehen, obwohl längst weitergelaufen wurde.
+
+**Die Aufteilung aufzuheben schliesst den Dialog nicht mehr.** Danach steht die Buchung ohne
+Kategorie da, also genau in dem Zustand, in dem man als Nächstes eine vergibt.
+
+**Umbuchen wird nur noch angeboten, wo es geht.** Auf einem Konto mit Bankverbindung bot der
+Dialog eine Ausgangsseite an, auf der von Hand gar nicht gebucht werden darf, und fiel dann
+still auf ein anderes Konto zurück.
+
+**Eine aufgeteilte Buchung zeigt „aufgeteilt" statt eines Strichs.** Sie trägt keine
+Kategorie, weil die Teile die Wahrheit sind — nicht, weil eine fehlt.
+
+### Geändert
+
+**Der Kontoauszug steht in zwei Karten nebeneinander:** gebucht links, geplant rechts, im
+goldenen Schnitt zugunsten der Buchungen. Untereinander war die geplante Liste erst nach der
+ganzen Buchungstabelle erreichbar, also bei einem Konto mit Historie nach zwei
+Bildschirmhöhen — dabei beantwortet gerade sie die Frage „was kommt noch".
+
+**Aus einer Auswertung führt der Klick in die Buchung.** Unter einem Budget und unter einer
+Kategorie stehen einzelne Buchungen, und das ist die Stelle, an der eine falsch einsortierte
+Zeile auffällt. Vorher musste man sie sich merken und im Kontoauszug wiederfinden.
+
+**Im Kategorie-Picker wählen die Pfeiltasten und Enter übernimmt.** Vorher war die Suche
+eine halbe Sache: drei Buchstaben getippt, den Treffer vor Augen — und dann zur Maus
+greifen. Maus und Tastatur markieren dabei dieselbe Zeile; zwei Markierungen gleichzeitig
+beantworteten dieselbe Frage zweimal verschieden.
+
+**Der Buchungsdialog ist kürzer geworden.** Die Herkunft am Ende ist zugeklappt, bis jemand
+danach fragt, und der Vertragsblock steht in einer Zeile statt in zweien — der Anbietername
+stand dort zweimal.
+
+**Aufklappbereiche haben einen Deckel:** zehn Zeilen über die volle Breite, fünf in einer
+halben Karte, dann wird gescrollt. Ohne ihn schob ein einziger Klick alles darunter aus dem
+Bild, auch die Zeile, von der man ausgegangen war.
+
+**Alle Seiten dürfen breiter werden** (1280 statt 1040 Pixel). Der alte Deckel war die
+klassische Lesebreite und hier am falschen Inhalt gemessen — diese App liest man nicht, man
+sucht darin, und fast jeder Bereich führt mit einer Tabelle. Erklärtexte behalten ihre
+Zeilenlänge.
+
+**Tabellenfilter sind kleiner als Formularfelder.** Über einer Tabelle stehen sie neben ihr
+und konkurrieren mit ihr um Aufmerksamkeit; die Filterleiste sah aus wie das Hauptereignis
+der Karte, obwohl sie nur einstellt, was darunter zu sehen ist.
+
+### Entfernt
+
+**„Als bezahlt markieren" gibt es nicht mehr.** An jeder geplanten Zeile hing ein Kästchen,
+und ein Klick legte daraus eine Ist-Buchung an. Damit stand im Konto eine Zahlung, die
+niemand belegt hatte: die Bank kannte sie nicht, ein Beleg existierte nicht, und beim
+nächsten Abruf kam die echte Zeile zusätzlich dazu. Eine Ist-Buchung entsteht jetzt nur noch
+aus dem Abruf beziehungsweise Import oder von Hand — eine Hochrechnung ist kein dritter Weg.
+
 ## [0.21.0] — 2026-08-25
 
 Die Runde, in der die Oberfläche aufhört, geliehen auszusehen: ein eigenes Zeichen im Dock,
