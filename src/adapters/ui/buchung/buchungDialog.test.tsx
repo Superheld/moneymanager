@@ -20,7 +20,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { KontenScreen } from "../konten/KontenScreen";
 import { ReviewScreen } from "../import/ReviewScreen";
 import { sqliteLedgerRepository as ledgerRepo } from "../../persistence/sqliteLedgerRepository";
@@ -100,7 +100,7 @@ describe("Entwurf prüfen", () => {
     rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
-    await nutzer.selectOptions(dialog.getByRole("combobox", { name: /^Konto$/ }), "k2");
+    await auswahlWaehlen(nutzer, /^Konto$/, "Zweitkonto", dialog);
     await nutzer.click(await dialog.findByRole("button", { name: /Sonstiges/ }));
     await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel/ }));
     await nutzer.click(dialog.getByRole("button", { name: /übernehmen/i }));
@@ -276,7 +276,7 @@ describe("Umbuchung und Vertrag am Entwurf", () => {
     rendere(<ReviewScreen />);
     const dialog = await entwurfOeffnen(nutzer);
 
-    await nutzer.selectOptions(await dialog.findByRole("combobox", { name: /vertrag zuordnen/i }), "v1");
+    await auswahlWaehlen(nutzer, /vertrag zuordnen/i, "Testanbieter", dialog);
     await nutzer.click(dialog.getByRole("button", { name: /übernehmen/i }));
 
     await waitFor(async () => expect(await ledgerRepo.alle()).toHaveLength(1));
@@ -299,7 +299,7 @@ describe("Buchung von Hand anlegen", () => {
     const dialog = within(await screen.findByRole("dialog"));
     await dialog.findByRole("combobox", { name: /^Konto$/ });
 
-    await nutzer.selectOptions(dialog.getByRole("combobox", { name: /^Konto$/ }), "k2");
+    await auswahlWaehlen(nutzer, /^Konto$/, "Zweitkonto", dialog);
     await nutzer.type(dialog.getByRole("textbox", { name: /^Betrag$/ }), "12,50");
     await nutzer.click(dialog.getByRole("button", { name: /speichern/i }));
 

@@ -270,17 +270,18 @@ export function KontoAnlegenModal({
         footer={art === "offline" ? fussOffline : fussOnline}
       >
         <FormField label={t("konten.anlegen.feldArt")} hint={t("konten.anlegen.feldArtHinweis")}>
-          <select
-            className="field"
-            value={art}
-            onChange={(e) => {
-              setArt(e.target.value as Art);
+          <Auswahl
+            ariaLabel={t("konten.anlegen.feldArt")}
+            wert={art}
+            aufAenderung={(v) => {
+              setArt(v as Art);
               setFehler(null);
             }}
-          >
-            <option value="offline">{t("konten.anlegen.artOffline")}</option>
-            <option value="online">{t("konten.anlegen.artOnline")}</option>
-          </select>
+            optionen={[
+              { wert: "offline", text: t("konten.anlegen.artOffline") },
+              { wert: "online", text: t("konten.anlegen.artOnline") },
+            ]}
+          />
         </FormField>
 
         {art === "offline" && (
@@ -331,14 +332,15 @@ export function KontoAnlegenModal({
                 waere eine Frage ohne Antwortmoeglichkeit. */}
             {experimente.hanseatic && (
               <FormField label={t("bankabruf.feldWeg")} hint={t("bankabruf.feldWegHinweis")}>
-                <select
-                  className="field"
-                  value={zugang.art}
-                  onChange={(e) => wegWaehlen(e.target.value as Zugangsart)}
-                >
-                  <option value="fints">{t("bankabruf.wegFints")}</option>
-                  <option value="hanseatic">{t("bankabruf.wegHanseatic")}</option>
-                </select>
+                <Auswahl
+                  ariaLabel={t("bankabruf.feldWeg")}
+                  wert={zugang.art}
+                  aufAenderung={(v) => wegWaehlen(v as Zugangsart)}
+                  optionen={[
+                    { wert: "fints", text: t("bankabruf.wegFints") },
+                    { wert: "hanseatic", text: t("bankabruf.wegHanseatic") },
+                  ]}
+                />
               </FormField>
             )}
 
@@ -448,32 +450,29 @@ export function KontoAnlegenModal({
                     </div>
                   )}
                   <div style={{ display: "flex", gap: "var(--sp-2)", marginTop: "var(--sp-2)", flexWrap: "wrap" }}>
-                    <select
-                      className="field"
-                      style={{ maxWidth: 220 }}
-                      value={wahl.ziel}
-                      onChange={(e) =>
-                        setWahlen({ ...wahlen, [k.schluessel]: { ...wahl, ziel: e.target.value as Wahl["ziel"] } })
-                      }
-                    >
-                      <option value="ignorieren">{t("konten.anlegen.zielIgnorieren")}</option>
-                      <option value="neu">{t("konten.anlegen.zielNeu")}</option>
-                      <option value="vorhanden">{t("konten.anlegen.zielVorhanden")}</option>
-                    </select>
+                    <span style={{ maxWidth: 220, flex: "1 1 160px" }}>
+                      <Auswahl
+                        ariaLabel={t("konten.anlegen.zielFeld")}
+                        wert={wahl.ziel}
+                        aufAenderung={(v) =>
+                          setWahlen({ ...wahlen, [k.schluessel]: { ...wahl, ziel: v as Wahl["ziel"] } })
+                        }
+                        optionen={[
+                          { wert: "ignorieren", text: t("konten.anlegen.zielIgnorieren") },
+                          { wert: "neu", text: t("konten.anlegen.zielNeu") },
+                          { wert: "vorhanden", text: t("konten.anlegen.zielVorhanden") },
+                        ]}
+                      />
+                    </span>
                     {wahl.ziel === "vorhanden" && (
-                      <select
-                        className="field"
-                        style={{ maxWidth: 260 }}
-                        value={wahl.kontoId ?? ""}
-                        onChange={(e) => setWahlen({ ...wahlen, [k.schluessel]: { ...wahl, kontoId: e.target.value } })}
-                      >
-                        <option value="">—</option>
-                        {konten.map((z) => (
-                          <option key={z.id} value={z.id}>
-                            {z.bezeichnung}
-                          </option>
-                        ))}
-                      </select>
+                      <span style={{ maxWidth: 260, flex: "1 1 180px" }}>
+                        <Auswahl
+                          ariaLabel={t("konten.anlegen.zielVorhanden")}
+                          wert={wahl.kontoId ?? ""}
+                          aufAenderung={(v) => setWahlen({ ...wahlen, [k.schluessel]: { ...wahl, kontoId: v } })}
+                          optionen={[{ wert: "", text: "—" }, ...konten.map((z) => ({ wert: z.id, text: z.bezeichnung }))]}
+                        />
+                      </span>
                     )}
                   </div>
                 </div>

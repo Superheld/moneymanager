@@ -20,7 +20,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../testwerkzeug/harness";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
 import { EinstellungenScreen } from "./einstellungen/EinstellungenScreen";
 import { AnalyseScreen } from "./analyse/AnalyseScreen";
@@ -228,7 +228,7 @@ describe("UebersichtScreen", () => {
     // Laufender Monat: nichts verbraucht, voller Rahmen.
     await waitFor(() => expect(document.body.textContent).toMatch(/400,00/));
 
-    await nutzer.selectOptions(screen.getByLabelText("Monat"), monat(1));
+    await auswahlWaehlen(nutzer, "Monat", monat(1));
     // Vormonat: 400,00 − 300,00 = 100,00.
     await waitFor(() => expect(document.body.textContent).toMatch(/100,00/));
   });
@@ -328,9 +328,8 @@ describe("AnalyseScreen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/33,33/));
 
     // Einen Monat wählen — die Kennzahlen zeigen dann diesen Monat.
-    const auswahl = await screen.findByLabelText("Monat");
     const laufend = `${heute.getFullYear()}-${String(heute.getMonth() + 1).padStart(2, "0")}`;
-    await nutzer.selectOptions(auswahl, screen.getByRole("option", { name: laufend }));
+    await auswahlWaehlen(nutzer, "Monat", laufend);
 
     await waitFor(() => {
       const text = document.body.textContent ?? "";
@@ -376,7 +375,7 @@ describe("AnalyseScreen", () => {
     rendere(<AnalyseScreen />);
 
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
-    await nutzer.selectOptions(await screen.findByLabelText("Gliederung"), "gruppe");
+    await auswahlWaehlen(nutzer, "Gliederung", "Hauptgruppen");
 
     // Jetzt steht die Hauptgruppe da; die Unterkategorie erst nach dem Aufklappen.
     await waitFor(() => expect(screen.getByText(/Lebenshaltung/)).toBeInTheDocument());

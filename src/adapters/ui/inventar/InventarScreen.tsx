@@ -25,6 +25,8 @@ import {
   inventarLoeschen,
 } from "../../dienste";
 import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
@@ -245,13 +247,15 @@ export function InventarScreen() {
               <input className="field" inputMode="numeric" value={nutzungsdauerMonate} onChange={(e) => setNutzungsdauerMonate(e.target.value)} placeholder="96" />
             </FormField>
             <FormField label={t("inventar.feldAnschaffung")}>
-              <input className="field" type="date" value={anschaffung} onChange={(e) => setAnschaffung(e.target.value)} />
+              <Datumsfeld ariaLabel={t("inventar.feldAnschaffung")} wert={anschaffung} aufAenderung={setAnschaffung} />
             </FormField>
             <FormField label={t("inventar.feldKonto")} hint={t("inventar.feldKontoHinweis")}>
-              <select className="field" value={kontoId} onChange={(e) => setKontoId(e.target.value)}>
-                <option value="">{t("inventar.kontoKeins")}</option>
-                {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-              </select>
+              <Auswahl
+                ariaLabel={t("inventar.feldKonto")}
+                wert={kontoId}
+                aufAenderung={setKontoId}
+                optionen={[{ wert: "", text: t("inventar.kontoKeins") }, ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
+              />
             </FormField>
           </div>
         </Modal>
@@ -266,7 +270,7 @@ export function InventarScreen() {
         >
           <div className="form-grid">
             <FormField label={t("inventar.feldAnschaffung")} required>
-              <input className="field" type="date" value={ersDatum} onChange={(e) => setErsDatum(e.target.value)} />
+              <Datumsfeld ariaLabel={t("inventar.feldAnschaffung")} wert={ersDatum} aufAenderung={setErsDatum} />
             </FormField>
             <FormField label={`${t("inventar.feldWiederbeschaffung")} ${geld.symbol}`} required hint={t("inventar.feldNeuwertHinweis")}>
               <input className="field" inputMode="decimal" value={ersWert} onChange={(e) => setErsWert(e.target.value)} placeholder={geld.format(0)} />

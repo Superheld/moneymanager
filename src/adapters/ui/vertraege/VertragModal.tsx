@@ -31,7 +31,9 @@ import {
 } from "../../dienste";
 import { Button, FormField } from "../bausteine";
 import { Modal } from "../bausteine/Modal";
+import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useGeld, fehlerNachricht, type Geld } from "../bausteine/einstellungenKontext";
 
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
@@ -339,38 +341,34 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
             <input className="field" inputMode="decimal" value={f.betragText} onChange={(e) => setze("betragText", e.target.value)} placeholder={geld.format(0)} />
           </FormField>
           <FormField label={t("vertraege.feldRhythmus")}>
-            <select className="field" value={f.rhythmus} onChange={(e) => setze("rhythmus", e.target.value as Rhythmus)}>
-              {RHYTHMEN.map((r) => (
-                <option key={r} value={r}>
-                  {t(`vertraege.rhythmus.${r}`)}
-                </option>
-              ))}
-            </select>
+            <Auswahl
+              ariaLabel={t("vertraege.feldRhythmus")}
+              wert={f.rhythmus}
+              aufAenderung={(v) => setze("rhythmus", v as Rhythmus)}
+              optionen={RHYTHMEN.map((r) => ({ wert: r, text: t(`vertraege.rhythmus.${r}`) }))}
+            />
           </FormField>
           <FormField label={t("vertraege.feldErsteZahlung")} hint={t("vertraege.feldErsteZahlungHinweis")}>
-            <input className="field" type="date" value={f.ersteZahlung} onChange={(e) => setze("ersteZahlung", e.target.value)} />
+            <Datumsfeld ariaLabel={t("vertraege.feldErsteZahlung")} wert={f.ersteZahlung} aufAenderung={(v) => setze("ersteZahlung", v)} />
           </FormField>
           <FormField label={t("vertraege.feldKonto")} hint={t("vertraege.optional")}>
-            <select className="field" value={f.kontoId} onChange={(e) => setze("kontoId", e.target.value)}>
-              <option value="">—</option>
-              {konten.map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.bezeichnung}
-                </option>
-              ))}
-            </select>
+            <Auswahl
+              ariaLabel={t("vertraege.feldKonto")}
+              wert={f.kontoId}
+              aufAenderung={(v) => setze("kontoId", v)}
+              optionen={[{ wert: "", text: "—" }, ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
+            />
           </FormField>
           <FormField label={t("vertraege.feldKategorie")} hint={t("vertraege.feldKategorieHinweis")}>
             <CategoryPicker kategorien={kategorien} value={f.kategorieId} onChange={kategorieWaehlen} />
           </FormField>
           <FormField label={t("vertraege.feldCharakter")}>
-            <select className="field" value={f.charakter} onChange={(e) => setze("charakter", e.target.value as Charakter)}>
-              {CHARAKTERE.map((c) => (
-                <option key={c} value={c}>
-                  {t(`charakter.${c}`)}
-                </option>
-              ))}
-            </select>
+            <Auswahl
+              ariaLabel={t("vertraege.feldCharakter")}
+              wert={f.charakter}
+              aufAenderung={(v) => setze("charakter", v as Charakter)}
+              optionen={CHARAKTERE.map((c) => ({ wert: c, text: t(`charakter.${c}`) }))}
+            />
           </FormField>
         </div>
       </Abschnitt>
@@ -388,23 +386,26 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
           {/* Die Art steht VOR den Fristen: sie entscheidet, ob die Kündigungswarnung
               überhaupt gemeint ist. */}
           <FormField label={t("vertraege.feldArt")} hint={t(`vertraege.artHinweis.${f.art}`)}>
-            <select className="field" aria-label={t("vertraege.feldArt")} value={f.art} onChange={(e) => setze("art", e.target.value as Vertragsart)}>
-              <option value="abo">{t("vertraege.art.abo")}</option>
-              <option value="dauervertrag">{t("vertraege.art.dauervertrag")}</option>
-            </select>
+            <Auswahl
+              ariaLabel={t("vertraege.feldArt")}
+              wert={f.art}
+              aufAenderung={(v) => setze("art", v as Vertragsart)}
+              optionen={[
+                { wert: "abo", text: t("vertraege.art.abo") },
+                { wert: "dauervertrag", text: t("vertraege.art.dauervertrag") },
+              ]}
+            />
           </FormField>
           <FormField label={t("vertraege.feldBeginn")} hint={t("vertraege.feldBeginnHinweis")}>
-            <input className="field" type="date" value={f.beginn} onChange={(e) => setze("beginn", e.target.value)} />
+            <Datumsfeld ariaLabel={t("vertraege.feldBeginn")} wert={f.beginn} aufAenderung={(v) => setze("beginn", v)} />
           </FormField>
           <FormField label={t("vertraege.feldInhaber")} hint={t("vertraege.optional")}>
-            <select className="field" value={f.inhaberId} onChange={(e) => setze("inhaberId", e.target.value)}>
-              <option value="">—</option>
-              {personen.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <Auswahl
+              ariaLabel={t("vertraege.feldInhaber")}
+              wert={f.inhaberId}
+              aufAenderung={(v) => setze("inhaberId", v)}
+              optionen={[{ wert: "", text: "—" }, ...personen.map((p) => ({ wert: p.id, text: p.name }))]}
+            />
           </FormField>
           <FormField label={t("vertraege.feldMindestlaufzeit")} hint={t("vertraege.optional")}>
             <input className="field" inputMode="numeric" value={f.mindestlaufzeit} onChange={(e) => setze("mindestlaufzeit", e.target.value)} placeholder={t("vertraege.feldMindestlaufzeitPlatzhalter")} />
@@ -413,10 +414,15 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
             <input className="field" inputMode="numeric" value={f.kuendigungsfrist} onChange={(e) => setze("kuendigungsfrist", e.target.value)} placeholder={t("vertraege.feldKuendigungsfristPlatzhalter")} />
           </FormField>
           <FormField label={t("vertraege.feldVerlaengerung")}>
-            <select className="field" value={f.verlaengerung} onChange={(e) => setze("verlaengerung", e.target.value as Verlaengerungsart)}>
-              <option value="automatisch">{t("vertraege.verlaengerung.automatisch")}</option>
-              <option value="keine">{t("vertraege.verlaengerung.keine")}</option>
-            </select>
+            <Auswahl
+              ariaLabel={t("vertraege.feldVerlaengerung")}
+              wert={f.verlaengerung}
+              aufAenderung={(v) => setze("verlaengerung", v as Verlaengerungsart)}
+              optionen={[
+                { wert: "automatisch", text: t("vertraege.verlaengerung.automatisch") },
+                { wert: "keine", text: t("vertraege.verlaengerung.keine") },
+              ]}
+            />
           </FormField>
           {/* Ohne automatische Verlängerung hat der Schritt keine Bedeutung — ein Feld,
               das nichts tut, kostet in jeder Maske Aufmerksamkeit. */}

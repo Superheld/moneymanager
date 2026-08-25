@@ -5,6 +5,7 @@
 // Konten nach „Konten". Beides ist keine Einstellung, sondern eigene Arbeit — ein Konto
 // hat einen Stand, eine Bankverbindung und bald einen Abruf auf Knopfdruck.
 
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -25,6 +26,7 @@ import {
 } from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
+import { Auswahl } from "../bausteine/Auswahl";
 import { Bereich } from "../bausteine/Bereich";
 import { FestlegungenCard } from "../training/FestlegungenCard";
 import { Modal } from "../bausteine/Modal";
@@ -97,13 +99,15 @@ function RegionCard() {
   return (
     <Card>
       <FormField label={t("einstellungen.region.feld")} hint={t("einstellungen.region.hinweis")}>
-        <select className="field" value={aktuelleLocale} onChange={(e) => regionSetzen(e.target.value)}>
-          {REGIONEN.map((r) => (
-            <option key={r.locale} value={r.locale}>
-              {r.label} · {waehrungssymbol(waehrungNachCode(r.waehrungCode), r.locale)}
-            </option>
-          ))}
-        </select>
+        <Auswahl
+          ariaLabel={t("einstellungen.region.feld")}
+          wert={aktuelleLocale}
+          aufAenderung={regionSetzen}
+          optionen={REGIONEN.map((r) => ({
+            wert: r.locale,
+            text: `${r.label} · ${waehrungssymbol(waehrungNachCode(r.waehrungCode), r.locale)}`,
+          }))}
+        />
       </FormField>
     </Card>
   );
@@ -238,7 +242,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
             <input className="field" value={rolle} onChange={(e) => setRolle(e.target.value)} placeholder={t("einstellungen.person.feldRollePlaceholder")} />
           </FormField>
           <FormField label={t("einstellungen.person.feldGeburtsdatum")} hint={t("einstellungen.person.feldGeburtsdatumHinweis")}>
-            <input className="field" type="date" value={geburtsdatum} onChange={(e) => setGeburtsdatum(e.target.value)} />
+            <Datumsfeld ariaLabel={t("einstellungen.person.feldGeburtsdatum")} wert={geburtsdatum} aufAenderung={setGeburtsdatum} />
           </FormField>
         </Modal>
       )}
@@ -332,15 +336,23 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
               <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("einstellungen.kategorie.feldNamePlaceholder")} />
             </FormField>
             <FormField label={t("einstellungen.kategorie.feldEltern")} hint={t("einstellungen.kategorie.feldElternHinweis")}>
-              <select className="field" value={elternId} onChange={(e) => setElternId(e.target.value)}>
-                <option value="">{t("einstellungen.kategorie.wurzel")}</option>
-                {kategorien.filter((k) => k.id !== editId).map((k) => (<option key={k.id} value={k.id}>{k.name}</option>))}
-              </select>
+              <Auswahl
+                ariaLabel={t("einstellungen.kategorie.feldEltern")}
+                wert={elternId}
+                aufAenderung={setElternId}
+                optionen={[
+                  { wert: "", text: t("einstellungen.kategorie.wurzel") },
+                  ...kategorien.filter((k) => k.id !== editId).map((k) => ({ wert: k.id, text: k.name })),
+                ]}
+              />
             </FormField>
             <FormField label={t("einstellungen.kategorie.feldCharakter")}>
-              <select className="field" value={defaultCharakter} onChange={(e) => setDefaultCharakter(e.target.value as Charakter)}>
-                {CHARAKTERE.map((c) => (<option key={c} value={c}>{t(`charakter.${c}`)}</option>))}
-              </select>
+              <Auswahl
+                ariaLabel={t("einstellungen.kategorie.feldCharakter")}
+                wert={defaultCharakter}
+                aufAenderung={(v) => setDefaultCharakter(v as Charakter)}
+                optionen={CHARAKTERE.map((c) => ({ wert: c, text: t(`charakter.${c}`) }))}
+              />
             </FormField>
           </div>
         </Modal>

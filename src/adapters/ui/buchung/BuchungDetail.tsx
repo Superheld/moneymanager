@@ -82,7 +82,9 @@ import {
 import { Button, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
 import { formularAusBuchung, VertragModal } from "../vertraege/VertragModal";
+import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { MerkmaleBlock } from "../training/MerkmaleBlock";
 import { Modal } from "../bausteine/Modal";
 import { useGeld, fehlerNachricht, type Geld } from "../bausteine/einstellungenKontext";
@@ -164,21 +166,16 @@ function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
 
       {/* Zuordnen von Hand — auch der Weg zurück: „kein Vertrag" ist eine gültige Wahl. */}
       <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
-        <select
-          className="field"
-          style={{ width: "auto", maxWidth: "100%" }}
-          aria-label={t("konten.zuVertrag.waehlen")}
-          value={vertrag?.id ?? (ausgeschlossen ? "__keiner" : "")}
-          onChange={(e) =>
-            bindung.zuordnen(e.target.value === "__keiner" || e.target.value === "" ? null : e.target.value)
-          }
-        >
-          <option value="">{t("konten.zuVertrag.offen")}</option>
-          <option value="__keiner">{t("konten.zuVertrag.keiner")}</option>
-          {alle.map((v) => (
-            <option key={v.id} value={v.id}>{v.anbieter}</option>
-          ))}
-        </select>
+        <Auswahl
+          ariaLabel={t("konten.zuVertrag.waehlen")}
+          wert={vertrag?.id ?? (ausgeschlossen ? "__keiner" : "")}
+          aufAenderung={(v) => bindung.zuordnen(v === "__keiner" || v === "" ? null : v)}
+          optionen={[
+            { wert: "", text: t("konten.zuVertrag.offen") },
+            { wert: "__keiner", text: t("konten.zuVertrag.keiner") },
+            ...alle.map((v) => ({ wert: v.id, text: v.anbieter })),
+          ]}
+        />
         {vonHand && (
           <button className="linkbtn" onClick={() => bindung.zuruecksetzen()}>
             {t("konten.zuVertrag.zuruecksetzen")}
@@ -813,14 +810,18 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
               (kein htmlFor, kein Umschließen) — ohne das hat die Auswahl für Screenreader
               gar keinen Namen. Gilt für die drei Felder hier; die DS-Lücke selbst gehört
               dort behoben. */}
-          <select className="field" aria-label={t("konten.detail.konto")} value={kontoId} disabled={gepaart} onChange={(e) => setKontoId(e.target.value)}>
-            {konten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-          </select>
+          <Auswahl
+            ariaLabel={t("konten.detail.konto")}
+            wert={kontoId}
+            deaktiviert={gepaart}
+            aufAenderung={setKontoId}
+            optionen={konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+          />
         </FormField>
         {/* Tag und Betrag der Bank sind Tatsachen, keine Eingabe — im Entwurf stehen sie
             nur da. Wer korrigieren muss, tut das nach dem Übernehmen an der Buchung. */}
         <FormField label={t("konten.feldDatum")} required hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : undefined}>
-          <input className="field" type="date" aria-label={t("konten.feldDatum")} value={datum} disabled={istEntwurf || kontoIstOnline} onChange={(e) => setDatum(e.target.value)} />
+          <Datumsfeld ariaLabel={t("konten.feldDatum")} wert={datum} deaktiviert={istEntwurf || kontoIstOnline} aufAenderung={setDatum} />
         </FormField>
         {/* Das Feld nimmt die HÖHE, die Richtung steht als eigene Wahl daneben. Beide
             zusammen sind der Betrag; keins von beidem wird abgeleitet. */}
@@ -945,9 +946,14 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
                 <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer", flexWrap: "wrap" }}>
                   <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === "__neu"} onChange={() => setGegenwahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
                   <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
-                  <select className="field" style={{ width: "auto" }} aria-label={t("konten.zurUmbuchung.neu")} value={neuKontoGewaehlt} onChange={(e) => { setNeuKontoId(e.target.value); setGegenwahl("__neu"); }}>
-                    {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-                  </select>
+                  <span style={{ minWidth: 180 }}>
+                    <Auswahl
+                      ariaLabel={t("konten.zurUmbuchung.neu")}
+                      wert={neuKontoGewaehlt}
+                      aufAenderung={(v) => { setNeuKontoId(v); setGegenwahl("__neu"); }}
+                      optionen={andereKonten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+                    />
+                  </span>
                 </label>
               )}
 
@@ -1094,17 +1100,16 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
           <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
             {t("konten.zuVertrag.gehoertZu")}
           </div>
-          <select
-            className="field"
-            style={{ width: "auto", maxWidth: "100%" }}
-            aria-label={t("konten.zuVertrag.waehlen")}
-            value={vertragWahl}
-            onChange={(e) => setVertragWahl(e.target.value)}
-          >
-            <option value="">{t("konten.zuVertrag.offen")}</option>
-            <option value="__keiner">{t("konten.zuVertrag.keiner")}</option>
-            {vertraege.map((v) => (<option key={v.id} value={v.id}>{v.anbieter}</option>))}
-          </select>
+          <Auswahl
+            ariaLabel={t("konten.zuVertrag.waehlen")}
+            wert={vertragWahl}
+            aufAenderung={setVertragWahl}
+            optionen={[
+              { wert: "", text: t("konten.zuVertrag.offen") },
+              { wert: "__keiner", text: t("konten.zuVertrag.keiner") },
+              ...vertraege.map((v) => ({ wert: v.id, text: v.anbieter })),
+            ]}
+          />
           <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
             {vertragWahl ? t("konten.entwurf.vertragVorgemerkt") : t("konten.entwurf.vertragOffen")}
           </div>
@@ -1399,9 +1404,14 @@ function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen, konto
           <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
             <input type="radio" name="gegenbein" value="__neu" checked={wahl === "__neu"} onChange={() => setWahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
             <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
-            <select className="field" aria-label={t("konten.zurUmbuchung.neu")} style={{ width: "auto" }} value={neuKontoId} onChange={(e) => { setNeuKontoId(e.target.value); setWahl("__neu"); }}>
-              {andereKonten.map((k) => (<option key={k.id} value={k.id}>{k.bezeichnung}</option>))}
-            </select>
+            <span style={{ minWidth: 180 }}>
+              <Auswahl
+                ariaLabel={t("konten.zurUmbuchung.neu")}
+                wert={neuKontoId}
+                aufAenderung={(v) => { setNeuKontoId(v); setWahl("__neu"); }}
+                optionen={andereKonten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+              />
+            </span>
           </label>
           <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
         </>

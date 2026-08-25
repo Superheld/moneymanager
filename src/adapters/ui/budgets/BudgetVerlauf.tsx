@@ -19,6 +19,7 @@ import {
   type Budgetstand,
 } from "../../../application";
 import { Button, Card } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
 import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -67,17 +68,12 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
       subtitle={t("budgets.verlaufUntertitel", { monate: monate.length })}
       action={
         <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
-          <select
-            className="field"
-            style={{ width: "auto" }}
-            aria-label={t("budgets.verlaufMonatWaehlen")}
-            value={gewaehlt}
-            onChange={(e) => setGewaehlt(Number(e.target.value))}
-          >
-            {monate.map((m, i) => (
-              <option key={m.monat} value={i}>{m.monat}</option>
-            ))}
-          </select>
+          <Auswahl
+            ariaLabel={t("budgets.verlaufMonatWaehlen")}
+            wert={String(gewaehlt)}
+            aufAenderung={(v) => setGewaehlt(Number(v))}
+            optionen={monate.map((m, i) => ({ wert: String(i), text: m.monat }))}
+          />
           <Button variant="ghost" onClick={onSchliessen}>{t("budgets.verlaufSchliessen")}</Button>
         </span>
       }

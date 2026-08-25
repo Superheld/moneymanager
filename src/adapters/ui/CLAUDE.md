@@ -53,8 +53,23 @@ Positionierung, Schliessen bei Klick daneben und Fokusrückgabe kommen trotzdem 
 Popover statt aus Eigenbau.
 
 Was das für neuen Code heisst: **im Formular `Auswahl` und `Datumsfeld` nehmen**, nicht die
-nativen Elemente. Es stehen noch native `<select>` und `<input type="date">` in der App —
-das sind Stellen, die noch nicht gewandert sind, keine bewussten Ausnahmen.
+nativen Elemente. Seit 2026-08-25 ist der Bestand vollständig gewandert — in `ui/` steht
+kein `<select>` und kein `<input type="date">` mehr (ausserhalb von `Zeilenauswahl`, die
+bewusst ein natives `<select>` bleibt: sie ist so gross wie eine Pille und braucht keine
+eigene Liste). Ein neu auftauchendes natives Element ist damit kein Rest mehr, sondern ein
+Rückschritt.
+
+**Tests wählen darin über `auswahlWaehlen`** aus `testwerkzeug/harness` —
+`userEvent.selectOptions` greift nicht mehr, weil eine `Auswahl` ein Knopf mit einer Liste
+im Portal ist. Zwei Fallen stecken in dem Helfer, beide gemessen: die Liste wird über ihre
+Klasse gesucht und nicht über die Rolle (native `<option>`-Elemente anderer Felder auf
+derselben Seite melden dieselbe), und eine gerade geschlossene Liste bleibt für ihre
+Animation noch kurz im DOM (`:not([data-closed])`). Wer das übersieht, klickt etwas an, die
+Auswahl bleibt stehen, und die Zusicherung fällt erst am Ende um.
+
+Ein `Datumsfeld` zeigt die **Landesschreibweise** (`12.08.2026`), nicht ISO — Tests, die
+den Anzeigewert prüfen, erwarten sie. Getippt werden darf trotzdem ISO, das erkennt es
+immer.
 
 ## Die Seitenleiste klappt ein
 

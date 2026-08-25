@@ -44,6 +44,7 @@ import {
 import { festlegungAngebot } from "../../../application/kategorien/kategoriefestlegungen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { Button, Card, Pill } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -371,15 +372,29 @@ export function ReviewScreen() {
           }
         >
           <div style={{ display: "flex", gap: "var(--sp-3)", marginBottom: "var(--sp-3)", flexWrap: "wrap" }}>
-            <select value={kontoFilter} onChange={(e) => { setKontoFilter(e.target.value); setSeite(0); }} style={select}>
-              <option value="alle">{t("review.alleKonten")}</option>
-              {konten.map((k) => <option key={k.id} value={k.id}>{k.bezeichnung}</option>)}
-            </select>
-            <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as typeof statusFilter); setSeite(0); }} style={select}>
-              <option value="alle">{t("review.statusAlle")}</option>
-              <option value="offen">{t("review.statusOffen")}</option>
-              <option value="fertig">{t("review.statusFertig")}</option>
-            </select>
+            <span style={{ minWidth: 160 }}>
+              <Auswahl
+                ariaLabel={t("review.alleKonten")}
+                wert={kontoFilter}
+                aufAenderung={(v) => { setKontoFilter(v); setSeite(0); }}
+                optionen={[
+                  { wert: "alle", text: t("review.alleKonten") },
+                  ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung })),
+                ]}
+              />
+            </span>
+            <span style={{ minWidth: 150 }}>
+              <Auswahl
+                ariaLabel={t("review.statusAlle")}
+                wert={statusFilter}
+                aufAenderung={(v) => { setStatusFilter(v as typeof statusFilter); setSeite(0); }}
+                optionen={[
+                  { wert: "alle", text: t("review.statusAlle") },
+                  { wert: "offen", text: t("review.statusOffen") },
+                  { wert: "fertig", text: t("review.statusFertig") },
+                ]}
+              />
+            </span>
             <input
               value={suche}
               onChange={(e) => { setSuche(e.target.value); setSeite(0); }}

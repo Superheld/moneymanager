@@ -270,6 +270,9 @@ const de = {
     spalteQuelle: "Aus der Datei",
     spalteZiel: "App-Konto",
     buchungenAnzahl: "{{n}} Buchungen",
+    // Die Zeile trägt den Kontonamen der Quelldatei, nicht die Frage — ohne diesen Namen
+    // meldet eine Vorlesehilfe nur den gewählten Wert.
+    zielKonto: "Wohin die Buchungen sollen",
     neuAnlegen: "➕ Neu anlegen",
     feldBezeichnung: "Bezeichnung",
     feldTyp: "Typ",
@@ -424,6 +427,10 @@ const de = {
     kpiAusgabenMonat: "Ausgaben {{monat}}",
     kpiOeAusgaben: "Ø Ausgaben / Monat",
     monatWaehlen: "Monat",
+    // Der Zeitraum hatte als natives `<select>` keinen Namen — die Optionen sprachen für
+    // sich („Letzte 12 Monate"). Eine `Auswahl` zeigt geschlossen nur die gewählte, und
+    // ohne Namen meldet eine Vorlesehilfe genau die als ganze Auskunft.
+    zeitraumWaehlen: "Zeitraum",
     vsDurchschnitt: "{{prozent}} % vs. Ø",
     kpiNetto: "Netto",
     kpiSaldo: "Saldo heute",
@@ -804,6 +811,9 @@ const de = {
       zuordnenHinweis:
         "Die Bank meldet diese Konten. Zu jedem entscheidest du, ob daraus ein neues Konto entsteht, " +
         "ob es zu einem vorhandenen gehört oder ob es außen vor bleibt.",
+      // Der Name der Wahl steht nicht daneben — die Zeile trägt den Kontonamen der
+      // Bank, nicht die Frage. Ohne ihn meldet eine Vorlesehilfe nur „nicht übernehmen".
+      zielFeld: "Was damit geschehen soll",
       zielIgnorieren: "nicht übernehmen",
       zielNeu: "neu anlegen",
       zielVorhanden: "mit vorhandenem verknüpfen",
@@ -1763,6 +1773,7 @@ const en: typeof de = {
     spalteQuelle: "From the file",
     spalteZiel: "App account",
     buchungenAnzahl: "{{n}} transactions",
+    zielKonto: "Where the transactions go",
     neuAnlegen: "➕ Create new",
     feldBezeichnung: "Name",
     feldTyp: "Type",
@@ -1915,6 +1926,7 @@ const en: typeof de = {
     kpiAusgabenMonat: "Expenses {{monat}}",
     kpiOeAusgaben: "Avg. expenses / month",
     monatWaehlen: "Month",
+    zeitraumWaehlen: "Period",
     vsDurchschnitt: "{{prozent}} % vs. avg.",
     kpiNetto: "Net",
     kpiSaldo: "Balance today",
@@ -2295,6 +2307,7 @@ const en: typeof de = {
       zuordnenHinweis:
         "These are the accounts the bank reports. For each one, decide whether it becomes a new account, " +
         "belongs to an existing one, or stays out.",
+      zielFeld: "What to do with it",
       zielIgnorieren: "do not add",
       zielNeu: "create new",
       zielVorhanden: "link to existing",
