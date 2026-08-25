@@ -222,9 +222,9 @@ describe("umbuchungsBeinBearbeiten", () => {
     expect(neu.gegenkontoId).toBe("giro");
   });
 
-  // Der Grund, warum es diesen Use-Case überhaupt gibt: `buchungBearbeiten` leitet das
-  // Vorzeichen über vorzeichenbehaftet() aus dem Charakter ab und macht jede
-  // Umschichtung negativ — das Zugangs-Bein kippte dabei und risse die Netto-Null auf.
+  // Der Grund, warum es diesen Use-Case überhaupt gibt: Betrag und Charakter gehören dem
+  // PAAR. Ein Weg, der sie am einzelnen Bein annimmt, kann die Netto-Null aufreissen —
+  // dieser nimmt sie gar nicht erst an.
   it("hält die Netto-Null des Paares, auch am Zugangs-Bein", async () => {
     const ab = buchung({ id: "ab", kontoId: "giro", betrag: euroZuCent(-500) });
     const zu = buchung({ id: "zu", kontoId: "tg", betrag: euroZuCent(500) });

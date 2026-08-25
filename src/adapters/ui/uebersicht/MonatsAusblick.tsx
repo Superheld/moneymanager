@@ -316,11 +316,20 @@ function PlanPosten({
 function BudgetPosten({ posten, name, zeigeIst }: { posten: AusblickPosten; name: string; zeigeIst: boolean }) {
   const geld = useGeld();
   const rahmen = Math.abs(posten.plan);
-  const verbraucht = Math.abs(posten.ist ?? 0);
+  /**
+   * `posten.ist` ist vorzeichenbehaftet wie eine Buchung: ein Verbrauch ist NEGATIV. Hier
+   * wird daraus die Verbrauchshöhe, also positiv — deshalb das Minus und nicht `Math.abs`.
+   *
+   * Der Unterschied zeigt sich genau im Rückfluss-Monat: kam unterm Strich mehr zurück,
+   * als ausgegeben wurde (Erstattung, Retoure), ist `ist` positiv, und `Math.abs`
+   * behauptete dann, es sei genau so viel VERBRAUCHT worden. Jetzt steht dort ein
+   * Minusbetrag, und der Balken bleibt leer statt zu wachsen.
+   */
+  const verbraucht = -(posten.ist ?? 0);
   return (
     <div style={{ padding: "6px 0" }}>
       <CoverageTrack
-        value={zeigeIst ? verbraucht : 0}
+        value={zeigeIst ? Math.max(0, verbraucht) : 0}
         max={Math.max(1, rahmen)}
         label={<span style={{ fontSize: "12.5px" }}>{name}</span>}
         right={

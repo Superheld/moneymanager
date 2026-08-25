@@ -54,6 +54,7 @@ import {
   type Dublettenverdacht,
 } from "../../../application";
 import { offenerRest } from "../../../application/buchung/buchungSplitten";
+import { vorzeichenbehaftet } from "../../../application/buchung/zahlungsregelAnlegen";
 import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../../application/buchung/umbuchungAusBuchung";
 import {
   buchungBearbeiten,
@@ -84,7 +85,7 @@ import { formularAusBuchung, VertragModal } from "../vertraege/VertragModal";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { MerkmaleBlock } from "../training/MerkmaleBlock";
 import { Modal } from "../bausteine/Modal";
-import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useGeld, fehlerNachricht, type Geld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 
 function ddmm(iso: string): string {
@@ -287,6 +288,33 @@ function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void
 }
 
 /**
+ * Der Text fürs Betragsfeld — IMMER mit Vorzeichen, auch beim Plus.
+ *
+ * Ohne das Plus wäre eine blosse Zahl wieder zweideutig: Ausgabe oder Rückfluss? Genau diese
+ * Zweideutigkeit hat die vorige Lösung (Höhe + Kästchen) gekostet. Minus ist U+2212 wie
+ * überall in der Anzeige; getippt werden darf beides, `parseBetrag` nimmt auch das
+ * ASCII-Minus, die Klammerschreibweise und ein nachgestelltes Vorzeichen.
+ *
+ * Formatiert wird über `useGeld` und nicht mehr über `String(minorZuMajor(…))`: das
+ * schrieb einen Punkt als Dezimaltrenner und liess die zweite Nachkommastelle weg, also
+ * genau das, was daneben in der Liste anders aussah.
+ */
+function betragMitVorzeichen(cent: number, geld: Geld): string {
+  return geld.format(cent, { mitVorzeichen: true });
+}
+
+/**
+ * Hat jemand im Feld eine Richtung ausgesprochen? Gefragt wird der TEXT, nicht ein
+ * Merker daneben — ein zweiter Zustand neben dem Feld liefe beim ersten Vorfüllen
+ * auseinander, und ausgerechnet daran krankte die Vorgängerlösung.
+ *
+ * Dieselben Schreibweisen wie in `parseBetrag`: vorne, hinten, oder Klammern für negativ.
+ */
+function traegtVorzeichen(text: string): boolean {
+  return /^\s*[-\u2212+(]/.test(text) || /[-\u2212+]\s*$/.test(text);
+}
+
+/**
  * Die Maske selbst — alle drei Rollen in EINEM Formular.
  *
  * Welche gilt, entscheidet sich an den Daten, die hereinkommen:
@@ -309,13 +337,13 @@ function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promise<void
  *
  * Zwei Gesichter beim Bearbeiten:
  *  • frei — alle Felder editierbar, plus der Einstieg „Zur Umbuchung machen" (S-1).
- *  • Bein einer Umbuchung — Konto, Betrag, Charakter und Kategorie sind FEST.
- *    `buchungBearbeiten` leitet das Vorzeichen über `vorzeichenbehaftet()` aus dem
- *    Charakter ab, und das macht eine Umschichtung immer negativ: das Zugangs-Bein (+500)
- *    würde beim Speichern auf −500 kippen und die Netto-Null der Umbuchung brechen. Das
- *    Konto wiederum steht als Gegenkonto am anderen Bein; ein einseitiger Wechsel zöge die
- *    Paarung auf zwei verschiedene Aussagen auseinander. Datum und Notiz sind unkritisch
- *    (die beiden Beine dürfen ohnehin an verschiedenen Tagen liegen).
+ *  • Bein einer Umbuchung — Konto, Betrag, Charakter und Kategorie sind FEST. Betrag und
+ *    Charakter gehören dem PAAR: die beiden Beine tragen dieselbe Summe mit
+ *    entgegengesetztem Vorzeichen, und eines davon allein zu ändern risse die Netto-Null
+ *    der Umbuchung auf. Das Konto wiederum steht als Gegenkonto am anderen Bein; ein
+ *    einseitiger Wechsel zöge die Paarung auf zwei verschiedene Aussagen auseinander.
+ *    Datum und Notiz sind unkritisch (die beiden Beine dürfen ohnehin an verschiedenen
+ *    Tagen liegen); dafür gibt es `umbuchungsBeinBearbeiten`.
  */
 function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, vertraege, vorgabe, konten, kategorien, kontoName, kategorieName, umsatz, importLauf, regel, gegenbuchung, dublette, onZwillingOeffnen, onKeinDuplikat, onFreigabeAufheben, onClose, onSaved, onDelete, ausBankabruf, onlineKonten, aktuelle, onPruefmarker, onZurUmbuchung, vertragsBindung, onLoesen, onGegenbuchung, onSplitten, onSplitAufheben }: { buchung?: IstBuchung; entwurf?: Umsatz; andereEntwuerfe: readonly Umsatz[]; alleBuchungen: readonly IstBuchung[]; vertraege: readonly Vertrag[]; vorgabe: { kontoId: string; datum: string }; konten: Zahlungskonto[]; kategorien: Kategorie[]; kontoName: Map<string, string>; umsatz?: Umsatz; importLauf?: ImportLauf; regel?: Zahlungsregel; gegenbuchung?: IstBuchung; dublette?: Dublettenbefund; onZwillingOeffnen?: () => void; onKeinDuplikat?: () => void | Promise<void>; onFreigabeAufheben?: () => void | Promise<void>; kategorieName: Map<string, string>; onClose: () => void; onSaved: () => void; onDelete: () => void | Promise<void>; ausBankabruf?: boolean; onlineKonten: ReadonlySet<string>; aktuelle?: IstBuchung; onPruefmarker: (vorgemerkt: boolean) => Promise<void>; onZurUmbuchung: () => void; vertragsBindung?: VertragsBindung; onLoesen: () => void | Promise<void>; onGegenbuchung: (b: IstBuchung) => void; onSplitten: () => void; onSplitAufheben: () => void | Promise<void> }) {
   const { t } = useTranslation();
@@ -324,23 +352,22 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
   const istNeu = !buchung && !entwurf;
   const [kontoId, setKontoId] = useState(buchung?.kontoId ?? entwurf?.zahlungskontoId ?? vorgabe.kontoId);
   const [datum, setDatum] = useState(buchung?.datum ?? entwurf?.buchungstag ?? vorgabe.datum);
-  const startBetrag = buchung?.betrag ?? entwurf?.betrag;
-  const [betrag, setBetrag] = useState(startBetrag == null ? "" : String(minorZuMajor(Math.abs(startBetrag), geld.waehrung)));
-  const [charakter, setCharakter] = useState<Charakter>(buchung?.charakter ?? entwurf?.vorschlag?.charakter ?? "Aufwand");
   /**
-   * Floss das Geld ENTGEGEN dem, was die Kategorie erwarten lässt? Eine Erstattung
-   * gehört in die Kategorie der Ausgabe — dort entlastet sie das Budget —, und trotzdem
-   * kam Geld herein. Ohne diese Frage liesse sich das von Hand nicht erfassen: das
-   * Betragsfeld nimmt nur die Höhe, und die Richtung käme sonst allein aus dem Charakter.
+   * Das Betragsfeld trägt das VORZEICHEN — sichtbar und änderbar.
    *
-   * Der Startwert wird aus dem VORZEICHEN der bestehenden Buchung zurückgelesen, nicht
-   * gespeichert. Ein eigenes Feld dafür wäre eine zweite Wahrheit neben dem Betrag, und
-   * die beiden liefen beim ersten Import auseinander.
+   * Vorher stand hier `Math.abs(...)`: eine Ausgabe und ein gleich hoher Rückfluss
+   * erschienen als dieselbe Zahl, und welche der beiden man vor sich hatte, war der Maske
+   * nicht anzusehen. Die Richtung hing an einem Kästchen darunter, das es nur in der
+   * Hälfte der Fälle gab.
+   *
+   * Jetzt steht im Feld, was im Ledger steht. Wer nichts anfasst, speichert dasselbe
+   * wieder; wer das Minus wegnimmt, macht aus der Ausgabe einen Rückfluss und sieht das
+   * auch. Ein Vorzeichen wird immer geschrieben, auch das Plus — sonst wäre die blosse
+   * Zahl wieder zweideutig, und genau daran ist die alte Lösung gescheitert.
    */
-  const [gegenrichtung, setGegenrichtung] = useState(() => {
-    if (buchung == null || buchung.charakter === "Umschichtung") return false;
-    return buchung.charakter === "Ertrag" ? buchung.betrag < 0 : buchung.betrag > 0;
-  });
+  const startBetrag = buchung?.betrag ?? entwurf?.betrag;
+  const [betrag, setBetrag] = useState(startBetrag == null ? "" : betragMitVorzeichen(startBetrag, geld));
+  const [charakter, setCharakter] = useState<Charakter>(buchung?.charakter ?? entwurf?.vorschlag?.charakter ?? "Aufwand");
   const [kategorieId, setKategorieId] = useState(buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
 
   /**
@@ -388,8 +415,26 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
    */
   const kontoIstOnline = !istNeu && onlineKonten.has(kontoId);
   const istUmschichtung = charakter === "Umschichtung";
-  // Die Richtung ist nur dort eine Frage, wo sie noch offen ist — siehe Kommentar am Feld.
-  const richtungWaehlbar = !istUmschichtung && !istEntwurf && !kontoIstOnline && !gepaart && buchung?.quelle !== "import";
+  /**
+   * Was beim Speichern in den Ledger geht — vorzeichenbehaftet.
+   *
+   * Zwei Regeln, mehr nicht:
+   *  • Steht im Feld ein Vorzeichen, gilt es. Auch entgegen der Kategorie: ein Zufluss
+   *    auf einer Aufwandskategorie ist eine Erstattung oder eine Retoure, und die gehört
+   *    genau dorthin — dort entlastet sie das Budget der Ausgabe.
+   *  • Steht keins da (frisch getippte Zahl), entscheidet der Charakter: Aufwand und
+   *    Umschichtung fließen ab, Ertrag fließt zu.
+   *
+   * Die zweite Regel greift praktisch nur beim Anlegen: eine bestehende Buchung füllt das
+   * Feld vorzeichenbehaftet vor, ein Entwurf ebenso.
+   */
+  const gebuchterBetrag = (() => {
+    const wert = geld.parse(betrag) ?? 0;
+    return traegtVorzeichen(betrag) ? wert : vorzeichenbehaftet(wert, charakter);
+  })();
+  /** Floss das Geld entgegen dem, was die Einordnung erwarten lässt? (Erstattung, Storno) */
+  const gegenDerEinordnung =
+    gebuchterBetrag !== 0 && gebuchterBetrag !== vorzeichenbehaftet(gebuchterBetrag, charakter);
   /**
    * Konten, auf denen ein Gegenbein ERZEUGT werden darf.
    *
@@ -515,11 +560,11 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
           await vertragZuordnenVonHand(neueBuchung.id, vertragWahl === "__keiner" ? null : vertragWahl);
         }
       } else if (!buchung) {
-        await buchungErfassen({ kontoId, datum, betrag: geld.parse(betrag) ?? 0, charakter, gegenrichtung, kategorieId: kategorieId || undefined, notiz });
+        await buchungErfassen({ kontoId, datum, betrag: gebuchterBetrag, charakter, kategorieId: kategorieId || undefined, notiz });
       } else if (gepaart) {
         await umbuchungsBeinBearbeiten(buchung, { datum, notiz });
       } else {
-        await buchungBearbeiten(buchung, { datum, betrag: geld.parse(betrag) ?? 0, charakter, gegenrichtung, kategorieId: kategorieId || undefined, notiz, kontoId });
+        await buchungBearbeiten(buchung, { datum, betrag: gebuchterBetrag, charakter, kategorieId: kategorieId || undefined, notiz, kontoId });
         // Zieht das Konto um, zieht der Umsatz mit: sein `zahlungskontoId` ist das
         // Ergebnis des Konto-Matches beim Import, also eine Vermutung. Wer die Buchung
         // vor sich hat, korrigiert damit genau diese Vermutung — bliebe der Umsatz
@@ -660,36 +705,29 @@ function BuchungFormular({ buchung, entwurf, andereEntwuerfe, alleBuchungen, ver
         <FormField label={t("konten.feldDatum")} required hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : undefined}>
           <input className="field" type="date" aria-label={t("konten.feldDatum")} value={datum} disabled={istEntwurf || kontoIstOnline} onChange={(e) => setDatum(e.target.value)} />
         </FormField>
+        {/* Das Vorzeichen steht IM Feld und ist die Richtung — siehe `gebuchterBetrag`.
+            Der Hinweis darunter sagt, was daraus wird, damit niemand raten muss: bei einem
+            gesperrten Feld die Herkunft der Zahl, sonst die Richtung im Klartext. */}
         <FormField
           label={t("konten.feldBetrag")}
           required
-          hint={istEntwurf || kontoIstOnline ? t("konten.entwurf.vonDerBank") : istNeu ? t("konten.buchung.betragHinweis") : undefined}
+          hint={
+            istEntwurf || kontoIstOnline
+              ? t("konten.entwurf.vonDerBank")
+              : gepaart
+                ? undefined
+                : t(gebuchterBetrag < 0 ? "konten.buchung.richtungAb" : "konten.buchung.richtungZu")
+          }
         >
           <input className="field" inputMode="decimal" aria-label={t("konten.feldBetrag")} value={betrag} disabled={gepaart || istEntwurf || kontoIstOnline} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
         </FormField>
-        {/* Die Richtung — nur dort, wo sie überhaupt eine Frage ist.
-            Nicht beim Entwurf und nicht auf einem online geführten Konto: dort ist das
-            Vorzeichen eine Tatsache vom Beleg, und `buchungBearbeiten` behält es auch.
-            Nicht bei einer Umbuchung: die Richtung hängt am Gegenbein.
-            Ein Kästchen und keine zwei Knöpfe, weil der eine Fall der Normalfall ist. */}
-        {richtungWaehlbar && (
-          <label style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: "var(--fs-sm)", padding: "2px 0 6px" }}>
-            <input
-              type="checkbox"
-              aria-label={t(charakter === "Ertrag" ? "konten.buchung.gegenrichtungErtrag" : "konten.buchung.gegenrichtungAufwand")}
-              checked={gegenrichtung}
-              onChange={(e) => setGegenrichtung(e.target.checked)}
-              style={{ marginTop: 3 }}
-            />
-            <span>
-              {t(charakter === "Ertrag" ? "konten.buchung.gegenrichtungErtrag" : "konten.buchung.gegenrichtungAufwand")}
-              {gegenrichtung && (
-                <span className="muted" style={{ display: "block", fontSize: "var(--fs-xs)" }}>
-                  {t("konten.buchung.gegenrichtungHinweis")}
-                </span>
-              )}
-            </span>
-          </label>
+        {/* Der Rückfluss braucht einen Satz, kein Kästchen mehr: dass ein Zufluss auf einer
+            Aufwandskategorie erlaubt IST, sieht man dem Feld nicht an — dass er dort auch
+            richtig liegt, erst recht nicht. */}
+        {!istEntwurf && !gepaart && !kontoIstOnline && !istUmschichtung && gegenDerEinordnung && (
+          <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "-4px 0 6px" }}>
+            {t("konten.buchung.gegenrichtungHinweis")}
+          </div>
         )}
         {/* Die Bezeichnung gehört an die Ist-Buchung. Ein Entwurf trägt keine — er trägt
             den Verwendungszweck der Bank, und der steht unter „Herkunft".

@@ -154,11 +154,16 @@ export async function buchungenPaaren(
 /**
  * Ändert an einem Umbuchungs-Bein nur, was gefahrlos änderbar ist: Datum und Notiz.
  *
- * Warum nicht `buchungBearbeiten`? Das leitet das Vorzeichen über `vorzeichenbehaftet()`
- * aus dem Charakter ab — und eine Umschichtung wird dort IMMER negativ. Das Zugangs-Bein
- * (+500) kippte beim Speichern auf −500 und risse die Netto-Null der Umbuchung auf.
- * Betrag und Charakter gehören dem Paar, nicht dem einzelnen Bein; wer sie ändern will,
- * löst die Paarung erst.
+ * Warum nicht `buchungBearbeiten`? Betrag und Charakter gehören dem PAAR, nicht dem
+ * einzelnen Bein: die beiden Beine tragen dieselbe Summe mit entgegengesetztem Vorzeichen,
+ * und eines davon allein zu ändern risse die Netto-Null der Umbuchung auf. Ein Use-Case,
+ * der die Felder gar nicht erst annimmt, kann das nicht — eine Maske, die sie nur sperrt,
+ * schon (ein Aufrufer mehr, und die Sperre fehlt).
+ *
+ * Bis 2026-08-25 kam ein zweiter Grund dazu: `buchungBearbeiten` leitete das Vorzeichen
+ * aus dem Charakter ab, und eine Umschichtung wurde dort immer negativ — das Zugangs-Bein
+ * kippte schon beim blossen Speichern. Diese Ableitung gibt es nicht mehr; der Grund oben
+ * trägt allein.
  *
  * Die beiden Beine dürfen an verschiedenen Tagen liegen (so importiert Finanzguru sie),
  * deshalb wandert das Datum NICHT ans andere Bein mit.

@@ -343,3 +343,91 @@ describe("Charakter folgt der Kategorie", () => {
     });
   });
 });
+
+/**
+ * DAS VORZEICHEN IM BETRAGSFELD.
+ *
+ * Zweimal gemeldet, beide Male derselbe Kern: die Maske zeigte den gespeicherten Betrag
+ * ohne sein Vorzeichen, und ein eingetipptes Minus wurde abgewiesen. Eine Retoure liess
+ * sich damit gar nicht erfassen, und an einer importierten Zeile war nicht zu sehen, in
+ * welche Richtung sie ging.
+ *
+ * Jetzt gilt: was im Feld steht, ist die Richtung. Fehlt ein Vorzeichen — nur beim frisch
+ * Antippen —, entscheidet der Charakter der Kategorie.
+ */
+describe("Das Vorzeichen steht im Betragsfeld", () => {
+  it("nimmt ein getipptes Minus an, auch auf einer Ertragskategorie", async () => {
+    await grunddaten();
+    await kategorieRepo.speichern({ id: "kat-lohn", name: "Gehalt", defaultCharakter: "Ertrag" });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByRole("button", { name: /^\+?\s*Buchung$/ }))[0]);
+    const dialog = within(await screen.findByRole("dialog"));
+    await dialog.findByRole("combobox", { name: /^Konto$/ });
+
+    await nutzer.type(dialog.getByRole("textbox", { name: /^Betrag$/ }), "\u221212,50");
+    await nutzer.click(dialog.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Gehalt/ }));
+    await nutzer.click(dialog.getByRole("button", { name: /^speichern$/i }));
+
+    await waitFor(async () => {
+      const alle = await ledgerRepo.alle();
+      expect(alle).toHaveLength(1);
+      // Der Charakter folgt der Kategorie, die RICHTUNG dem Feld — eine Rückbuchung.
+      expect(alle[0].charakter).toBe("Ertrag");
+      expect(alle[0].betrag).toBe(-1250);
+    });
+  });
+
+  it("bucht einen Rückfluss auf einer Aufwandskategorie als Zufluss", async () => {
+    await grunddaten();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByRole("button", { name: /^\+?\s*Buchung$/ }))[0]);
+    const dialog = within(await screen.findByRole("dialog"));
+    await dialog.findByRole("combobox", { name: /^Konto$/ });
+
+    await nutzer.type(dialog.getByRole("textbox", { name: /^Betrag$/ }), "+34,90");
+    await nutzer.click(dialog.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel/ }));
+    await nutzer.click(dialog.getByRole("button", { name: /^speichern$/i }));
+
+    await waitFor(async () => {
+      const alle = await ledgerRepo.alle();
+      expect(alle).toHaveLength(1);
+      // Die Kategorie bleibt die der Ausgabe — dort entlastet der Rückfluss das Budget.
+      expect(alle[0].charakter).toBe("Aufwand");
+      expect(alle[0].kategorieId).toBe("kat-le");
+      expect(alle[0].betrag).toBe(3490);
+    });
+  });
+
+  it("zeigt das Vorzeichen einer gebuchten Zeile im Feld und speichert es unverändert", async () => {
+    await grunddaten();
+    await ledgerRepo.speichern({
+      id: "b-ret", kontoId: "k1", datum: "2026-08-14", betrag: 3490,
+      charakter: "Aufwand", quelle: "import", rohHash: "hr", kategorieId: "kat-le",
+      notiz: "Rückläufer Fahrradteile",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await screen.findByText("Rückläufer Fahrradteile");
+    await nutzer.click((await screen.findAllByRole("button", { name: /bearbeiten/i }))[0]);
+    const dialog = within(await screen.findByRole("dialog"));
+
+    // Vorher stand hier die blosse Höhe — ein Zufluss war von einem Abfluss nicht zu
+    // unterscheiden.
+    expect(dialog.getByRole("textbox", { name: /^Betrag$/ })).toHaveValue("+34,90");
+
+    await nutzer.click(dialog.getByRole("button", { name: /^speichern$/i }));
+
+    await waitFor(async () => {
+      const alle = await ledgerRepo.alle();
+      expect(alle).toHaveLength(1);
+      expect(alle[0].betrag).toBe(3490);
+    });
+  });
+});

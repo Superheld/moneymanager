@@ -256,12 +256,15 @@ describe("Use-Cases — Integer-Cent-Invariante", () => {
     expect(Number.isSafeInteger(reg.standHeute)).toBe(true);
   });
 
-  // [GRÜN] 0 und negative Beträge werden korrekt abgelehnt.
-  it("[GRÜN] Betrag 0 und negative Beträge werden abgelehnt", async () => {
+  // [GRÜN] 0 und Unzahlen werden abgelehnt — ein NEGATIVER Betrag dagegen nicht mehr:
+  // seit 2026-08-25 ist das Vorzeichen die Richtung, und ein Abfluss ist der Normalfall.
+  it("[GRÜN] Betrag 0 und Unzahlen werden abgelehnt, negative aber angenommen", async () => {
     const ledger = memLedger();
-    await expect(buchungErfassen(ledger, { kontoId: "k1", datum: "2026-06-01", betrag: 0, charakter: "Aufwand" })).rejects.toThrow("betrag.groesserNull");
-    await expect(buchungErfassen(ledger, { kontoId: "k1", datum: "2026-06-01", betrag: -100, charakter: "Aufwand" })).rejects.toThrow("betrag.groesserNull");
-    await expect(buchungErfassen(ledger, { kontoId: "k1", datum: "2026-06-01", betrag: NaN, charakter: "Aufwand" })).rejects.toThrow("betrag.groesserNull");
+    await expect(buchungErfassen(ledger, { kontoId: "k1", datum: "2026-06-01", betrag: 0, charakter: "Aufwand" })).rejects.toThrow("betrag.nichtNull");
+    await expect(buchungErfassen(ledger, { kontoId: "k1", datum: "2026-06-01", betrag: NaN, charakter: "Aufwand" })).rejects.toThrow("betrag.nichtNull");
+
+    const b = await buchungErfassen(ledger, { kontoId: "k1", datum: "2026-06-01", betrag: -100, charakter: "Aufwand" });
+    expect(b.betrag).toBe(-100);
   });
 
   // [GRÜN] negative Null wird nicht als negativer Betrag angezeigt.

@@ -172,17 +172,28 @@ voran die Kategorie-Erkennung, muss über `lauf_id` danach unterscheiden. Eine A
 zwischen den beiden Vokabularen gibt es nicht; sie liesse sich nur aus der
 DK-Spezifikation gewinnen, und eine geratene wäre schlimmer als keine.
 
-#### Die Richtung kommt vom Beleg, der Charakter ordnet ein
+#### Das Vorzeichen ist die Richtung, der Charakter ordnet ein
 
-Bei einer **von Hand** erfassten Buchung folgt das Vorzeichen dem Charakter: man tippt eine
-Betragshöhe und sagt „Aufwand", daraus wird ein Abfluss. Es gibt keinen Beleg, der es
-besser wüsste.
+**Der Betrag einer Ist-Buchung trägt sein Vorzeichen selbst, überall.** Er kommt
+vorzeichenbehaftet in `buchungErfassen` und `buchungBearbeiten` herein und wird unverändert
+gebucht — beim Import ist das die **Tatsache** vom Beleg, von Hand das, was jemand eintippt.
+Nichts leitet die Richtung mehr aus dem Charakter ab, und deshalb kann auch nichts sie
+umdrehen. Geprüft wird nur noch, dass sie nicht 0 ist (`betrag.nichtNull`); **negative
+Beträge sind auf jedem Konto und in jeder Kategorie erlaubt**, denn eine Retoure ist eine.
 
-Bei einer **importierten** Buchung ist es umgekehrt. Die Bank hat gebucht, in welche
-Richtung das Geld geflossen ist — das ist eine **Tatsache**. Der Charakter ist eine
-**Einordnung**, und eine Einordnung darf eine Tatsache nicht umdrehen. `buchungBearbeiten`
-behält deshalb bei `quelle === "import"` das Vorzeichen des Originals und übernimmt aus der
-Eingabe nur die Höhe.
+Der Charakter ist eine **Einordnung**: er sagt, WOFÜR das Geld war. Eine Einordnung darf
+eine Tatsache nicht umdrehen — das gilt seit dem Wegfall der Ableitung nicht mehr nur für
+importierte Zeilen, sondern immer.
+
+**Die Maske zeigt das Vorzeichen und lässt es ändern.** Das Betragsfeld im Buchungsdialog
+wird vorzeichenbehaftet vorgefüllt und schreibt immer ein Zeichen, auch das Plus — ohne
+das wäre eine blosse Zahl wieder zweideutig (Ausgabe oder Rückfluss?), und genau daran war
+die Vorgängerlösung gescheitert. Nur wo gar nicht korrigiert werden darf, sperrt die Maske
+das Feld: auf einem online geführten Konto, im Entwurf und am Bein einer Umbuchung.
+
+Ein Vorzeichen leitet die Maske nur an einer Stelle ab: bei einer **frisch getippten Zahl
+ohne Vorzeichen**. Dann entscheidet der Charakter der gewählten Kategorie — Aufwand und
+Umschichtung fliessen ab, Ertrag fliesst zu. Sobald im Feld ein Zeichen steht, gilt es.
 
 **Eine Erstattung ist damit ein Aufwand mit positivem Betrag**, und das ist kein
 Widerspruch: „Aufwand" sagt, WOFÜR das Geld war, das Vorzeichen sagt, wohin es floss. Die
@@ -204,18 +215,30 @@ liegen, kommt die Verrechnung über die Kategorie auf dasselbe Ergebnis, und üb
 Monatsgrenzen hinweg würde eine solche Verknüpfung einen abgeschlossenen Monat rückwirkend
 ändern — genau das, was der Budgetbetrag weiter unten aus gutem Grund nicht tut.
 
-**Von Hand braucht die Richtung ein eigenes Wort.** Ohne Beleg leitet
-`vorzeichenbehaftet()` sie aus dem Charakter ab, und das geht nur so lange gut, wie
-Einordnung und Richtung dasselbe sagen. Beim Rückfluss tun sie es nicht. Die
-Buchungseingabe trägt deshalb ein `gegenrichtung`-Feld, das die Ableitung umdreht; für
-eine PLANGRÖSSE (Zahlungsregel, Vertragsrate) bleibt die Ableitung, denn eine geplante
-Rate hat genau eine Richtung.
+**Für eine PLANGRÖSSE bleibt die Ableitung.** `vorzeichenbehaftet()` gibt es weiterhin,
+aber nur noch für Zahlungsregel und Vertragsrate: eine geplante Rate hat genau eine
+Richtung, sonst wäre sie keine Rate. Für eine IST-Buchung gilt sie nicht — dort fallen
+Einordnung und Richtung beim Rückfluss auseinander, und dann gewinnt die Richtung.
+
+Zwei Versuche davor sind an derselben Stelle gescheitert und stehen hier, damit sie kein
+drittes Mal unternommen werden: eine Sonderregel in `buchungBearbeiten`, die bei
+`quelle === "import"` das Vorzeichen des Originals gegen die Ableitung verteidigte, und ein
+Kästchen `gegenrichtung`, das die Ableitung umdrehte. Beide reparierten die Folgen der
+Ableitung, statt sie wegzunehmen — die Maske zeigte weiter `Math.abs(betrag)`, ein
+eingetipptes Minus flog mit `betrag.groesserNull` raus, und das Kästchen gab es nur in der
+Hälfte der Fälle. Eine Zahl, die die Richtung schon trägt, braucht von alledem nichts.
 
 **Und wo ein Wort neben der Zahl steht, muss es mitwandern.** Ein negativer Verbrauch unter
 der Überschrift „verbraucht" liest sich als ausgegeben, auch wenn das Minus davorsteht und
 der Rest im selben Bild wächst — ein Wort gewinnt gegen ein Vorzeichen. Die Anzeigen zum
 Budgetverlauf wechseln deshalb das Wort und zeigen den Betrag ohne Vorzeichen, statt beides
 zu vermischen.
+
+**Aber `Math.abs` auf einem Verbrauch ist fast immer ein Fehler.** Wo der Wert einen
+Rückfluss tragen KANN, macht das Wegwerfen des Vorzeichens aus „es kam Geld zurück" ein
+„es wurde genau so viel ausgegeben". Der Unterschied zum Absatz davor: dort steht ein Wort
+daneben, das mitwandert; hier steht nur die Zahl. Ein Balken darf bei 0 anschlagen
+(`Math.max(0, …)`), die Zahl daneben behält ihr Vorzeichen.
 
 #### Der Budgetbetrag ist eine Reihe, kein Wert
 
