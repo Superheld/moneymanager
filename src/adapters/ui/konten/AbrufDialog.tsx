@@ -10,9 +10,9 @@
 
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { speicherzeitraumTage, type Abrufergebnis, type Bankprofil, type Bankzugang, type TanHerausforderung } from "../../../application";
+import { speicherzeitraumTage, type Abrufergebnis, type Bankprofil, type Bankzugang } from "../../../application";
 import { bankAbrufen, bankzugaenge } from "../../dienste";
-import { TanDialog, type TanFrage } from "./TanDialog";
+import { TanDialog, useTanFrage } from "./TanDialog";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { Button, FormField } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -50,7 +50,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [befunde, setBefunde] = useState<Abrufergebnis | null>(null);
-  const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
+  const { tanFrage, tanFrageSchliessen, frageTan } = useTanFrage();
 
   useEffect(() => {
     bankzugaenge()
@@ -78,10 +78,6 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
 
   const gewuenscht = rueckgriff ? Number(rueckgriff) : undefined;
   const ueberGrenze = grenze != null && gewuenscht != null && gewuenscht > grenze;
-
-  function frageTan(h: TanHerausforderung): Promise<string | undefined> {
-    return new Promise((antworten) => setTanFrage({ herausforderung: h, antworten }));
-  }
 
   async function abrufen() {
     const zugang = zugaenge.find((z) => z.id === zugangId);
@@ -265,7 +261,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
         )}
       </Modal>
 
-      {tanFrage && <TanDialog frage={tanFrage} onFertig={() => setTanFrage(null)} />}
+      {tanFrage && <TanDialog frage={tanFrage} onFertig={tanFrageSchliessen} />}
     </>
   );
 }

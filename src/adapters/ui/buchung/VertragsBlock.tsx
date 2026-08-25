@@ -38,6 +38,12 @@ export interface VertragsBindung {
  * erkannt" darf man überstimmen und der nächste Abgleich rechnet es neu, „von Hand"
  * bleibt stehen, bis man es zurücknimmt. Wer den Unterschied nicht sieht, weiß nicht,
  * ob seine Korrektur hält.
+ *
+ * **Alles davon steht in EINER Zeile.** Vorher waren es zwei: oben eine Pille mit dem
+ * Anbieternamen, darunter das Auswahlfeld. Der Name stand damit zweimal da — das
+ * Auswahlfeld zeigt die getroffene Wahl ohnehin an —, und dieselbe Aussage über zwei
+ * Zeilen verteilt liest sich wie zwei Angaben. Übrig bleibt, was das Feld NICHT sagt:
+ * woher die Zuordnung kommt, und die beiden Wege daneben.
  */
 export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
   const { t } = useTranslation();
@@ -48,26 +54,11 @@ export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
 
   return (
     <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
-        {vertrag ? (
-          <>
-            <Pill variant="ok">{t("konten.zuVertrag.gehoertZu")}</Pill>
-            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{vertrag.anbieter}</span>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-              {t(vonHand ? "konten.zuVertrag.vonHand" : "konten.zuVertrag.automatisch")}
-            </span>
-          </>
-        ) : ausgeschlossen ? (
-          <>
-            <Pill variant="neutral">{t("konten.zuVertrag.keiner")}</Pill>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.zuVertrag.vonHand")}</span>
-          </>
-        ) : (
-          <Button onClick={bindung.neuAnlegen}>{t("konten.zuVertrag.aktion")}</Button>
-        )}
-      </div>
-
-      {/* Zuordnen von Hand — auch der Weg zurück: „kein Vertrag" ist eine gültige Wahl. */}
+      {/* Zuordnen von Hand — auch der Weg zurück: „kein Vertrag" ist eine gültige Wahl.
+          Die Pille daneben sagt, WOHER die angezeigte Wahl kommt; sie erscheint nur,
+          wenn es überhaupt eine gibt. Bei „noch offen" gäbe es keine Herkunft zu
+          melden, und eine Pille „automatisch" an einem leeren Feld hiesse, die
+          Erkennung hätte sich entschieden — sie hat nur nichts gefunden. */}
       <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
         <Auswahl
           ariaLabel={t("konten.zuVertrag.waehlen")}
@@ -79,10 +70,20 @@ export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
             ...alle.map((v) => ({ wert: v.id, text: v.anbieter })),
           ]}
         />
+        {(vertrag || ausgeschlossen) && (
+          <Pill variant={vonHand ? "neutral" : "ok"}>
+            {t(vonHand ? "konten.zuVertrag.vonHand" : "konten.zuVertrag.automatisch")}
+          </Pill>
+        )}
         {vonHand && (
           <button className="linkbtn" onClick={() => bindung.zuruecksetzen()}>
             {t("konten.zuVertrag.zuruecksetzen")}
           </button>
+        )}
+        {/* „Vertrag daraus machen" gibt es nur, solange keiner zugeordnet ist — sonst
+            wäre es ein Angebot, zwei Verträge für dieselbe Zahlung anzulegen. */}
+        {!vertrag && !ausgeschlossen && (
+          <Button onClick={bindung.neuAnlegen}>{t("konten.zuVertrag.aktion")}</Button>
         )}
       </div>
 

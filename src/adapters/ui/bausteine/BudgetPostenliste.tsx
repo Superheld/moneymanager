@@ -12,6 +12,7 @@
 
 import { useTranslation } from "react-i18next";
 import type { Verbrauchsposten } from "../../../application";
+import { AUFKLAPP_ZEILEN_BREIT, aufklappHoehe } from "./aufklappen";
 import { useGeld } from "./einstellungenKontext";
 
 export interface BudgetPostenlisteProps {
@@ -23,9 +24,18 @@ export interface BudgetPostenlisteProps {
   verbraucht: number;
   /** Was über der Liste steht, wenn sie leer ist. Ohne Angabe der Standardtext. */
   leerText?: string;
+  /**
+   * Wieviele Zeilen sichtbar bleiben, bevor gescrollt wird.
+   *
+   * Steht hier und nicht fest im Baustein, weil dieselbe Liste in zwei verschiedenen
+   * Breiten hängt: im Verlauf über die volle Kartenbreite, in der Übersicht in einer
+   * halben Karte neben einer zweiten, die mitwächst. Die Regel dazu steht in
+   * `aufklappen.ts`; ohne Angabe gilt die breite.
+   */
+  zeilen?: number;
 }
 
-export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbraucht, leerText }: BudgetPostenlisteProps) {
+export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbraucht, leerText, zeilen = AUFKLAPP_ZEILEN_BREIT }: BudgetPostenlisteProps) {
   const { t } = useTranslation();
   const geld = useGeld();
 
@@ -44,7 +54,9 @@ export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbrauc
         borderRadius: "var(--r-md)",
         padding: "4px 10px",
         margin: "8px 0 2px",
-        maxHeight: 260,
+        // Die 30 px sind die gerechnete Zeilenhöhe unten: 5 px Polsterung oben und unten,
+        // eine Textzeile in 12,5 px und die Haarlinie darunter.
+        maxHeight: aufklappHoehe(zeilen, 30),
         overflowY: "auto",
       }}
     >

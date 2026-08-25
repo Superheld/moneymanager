@@ -31,7 +31,7 @@ import {
   abrufAusfuehren,
   type Abrufergebnis,
 } from "../application/fints/abrufAusfuehren";
-import type { TanHerausforderung } from "../application/fints/abrufPort";
+import type { TanFrager } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
 import { hanseaticAbruf } from "./hanseatic";
 import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
@@ -544,7 +544,10 @@ export function abrufAdapterFuer(art: Zugangsart): Abrufadapter {
 export async function bankAbrufen(
   zugang: Bankzugang,
   pin: string,
-  frageTan: (h: TanHerausforderung) => Promise<string | undefined>,
+  // Der Typ aus dem Port, nicht eine eigene Schreibweise davon: die hier ausgeschriebene
+  // Ein-Parameter-Fassung nahm den Aufrufern still den zweiten weg (das Rückzugssignal
+  // bei decoupled), und der Adapter reichte ihn dann ins Leere.
+  frageTan: TanFrager,
   heute: string,
   rueckgriffTage?: number,
 ): Promise<Abrufergebnis> {

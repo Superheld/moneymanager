@@ -364,18 +364,28 @@ class Sitzung implements Abrufsitzung {
   }
 
   async #freigeben(): Promise<void> {
-    await this.#client.elevate({
-      onConfirm: () => {
-        // Die Rückfrage der Bibliothek ist synchron, unsere Anzeige ist es nicht. Das
-        // Warten übernimmt die Bibliothek selbst (sie fragt den Stand ab, bis bestätigt
-        // ist); hier wird nur der Hinweis angestossen. Auf sein Ergebnis zu warten wäre
-        // sogar falsch — es gibt nichts einzutippen, worauf man warten könnte.
-        void this.#frageTan({
-          decoupled: true,
-          text: "Bitte in der Secure-App bestätigen, um ältere Umsätze freizugeben.",
-        });
-      },
-    });
+    // Der Hinweis wird zurückgezogen, sobald `elevate` zurückkommt — dann hat die Bank
+    // geantwortet, und nur hier ist das bekannt. Siehe `TanFrager` im Port.
+    const rueckzug = new AbortController();
+    try {
+      await this.#client.elevate({
+        onConfirm: () => {
+          // Die Rückfrage der Bibliothek ist synchron, unsere Anzeige ist es nicht. Das
+          // Warten übernimmt die Bibliothek selbst (sie fragt den Stand ab, bis bestätigt
+          // ist); hier wird nur der Hinweis angestossen. Auf sein Ergebnis zu warten wäre
+          // sogar falsch — es gibt nichts einzutippen, worauf man warten könnte.
+          void this.#frageTan(
+            {
+              decoupled: true,
+              text: "Bitte in der Secure-App bestätigen, um ältere Umsätze freizugeben.",
+            },
+            rueckzug.signal,
+          );
+        },
+      });
+    } finally {
+      rueckzug.abort();
+    }
   }
 
   #ergebnis(seite: TransactionPage, konto?: Account): AbrufErgebnis {
@@ -431,20 +441,27 @@ export function hanseaticAdapter(
       const speicher = new Tokenspeicher(tokenAus(zugang.bankparameter));
       const client = fabrik({ clientBasic: zugang.token, store: speicher });
 
+      // Wie bei `#freigeben`: der Hinweis gilt nur, solange die Anmeldung läuft.
+      const rueckzug = new AbortController();
       try {
         await client.login(
           { loginId: zugang.benutzer, password: pin },
           {
             onChallenge: () => {
-              void frageTan({
-                decoupled: true,
-                text: "Bitte die Anmeldung in der Secure-App bestätigen.",
-              });
+              void frageTan(
+                {
+                  decoupled: true,
+                  text: "Bitte die Anmeldung in der Secure-App bestätigen.",
+                },
+                rueckzug.signal,
+              );
             },
           },
         );
       } catch (e) {
         throw mitBankantwort(e);
+      } finally {
+        rueckzug.abort();
       }
 
       let konten: Account[];

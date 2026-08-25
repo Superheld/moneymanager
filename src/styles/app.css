@@ -255,6 +255,82 @@ select.field {
   margin-top: 0 !important;
 }
 
+/* ============================================================
+   Der Kontoauszug: gebucht links, geplant rechts.
+
+   Der goldene Schnitt zugunsten der Buchungen (1,618 : 1) und nicht die Hälfte: links
+   stehen sieben Spalten und ein Seitenschalter, rechts vier. Ein hälftiger Schnitt gäbe
+   der schmalen Seite Platz, den sie nicht braucht, und nähme ihn der breiten.
+
+   `min-width: 0` an den Spalten ist Pflicht und nicht Kosmetik: ein Grid-Kind ist von
+   sich aus mindestens so breit wie sein Inhalt, und dann wächst eine Tabelle die Spalte
+   auf, statt in ihrem eigenen Scrollrahmen zu bleiben — die ganze Seite zieht sich breit.
+
+   Unter 1280 px stapelt es wieder. Zwei waagerecht scrollende Tabellen nebeneinander sind
+   keine zwei Tabellen mehr, sondern zwei Ausschnitte. Die Zahl haengt an `.screen`, nicht
+   am Fenster: der Inhalt ist auf 1040 px gedeckelt, links davon bleiben also hoechstens
+   rund 630 px — knapp genug fuer die sieben Spalten der Buchungstabelle, und darunter
+   faengt sie an, selbst zu scrollen.
+   ============================================================ */
+.auszug-spalten {
+  display: grid;
+  grid-template-columns: 1.618fr 1fr;
+  gap: var(--sp-5);
+  align-items: start;
+}
+.auszug-spalte {
+  min-width: 0;
+}
+@media (max-width: 1280px) {
+  .auszug-spalten {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ============================================================
+   Tabellenfilter — kleiner als ein Formularfeld, und aus gutem Grund.
+
+   Ein `.field` ist auf ein Formular ausgelegt: volle Breite, grosse Innenabstände, eigene
+   Zeile. Über einer Tabelle steht es dagegen NEBEN der Tabelle und konkurriert mit ihr um
+   Aufmerksamkeit — die Filterleiste wirkte dort wie das Hauptereignis der Karte, obwohl
+   sie nur einstellt, was darunter zu sehen ist.
+
+   Deshalb dieselbe Verkleinerung wie bei `Zeilenauswahl`: Schriftgrad der Tabelle
+   (13 px), knappere Polsterung. Die Masse sind nicht erfunden — die Filterleiste der
+   Import-Durchsicht hatte sie längst als eigenen Inline-Stil, und die sah als einzige
+   richtig aus. Hier ist daraus eine Klasse geworden.
+
+   Sie wirkt am CONTAINER **und** direkt am Feld: eine Leiste mit fünf Feldern beschriftet
+   man einmal, ein einzelner Monatswähler in einer Kartenkopfzeile braucht dafür keine
+   Hülle, die es sonst nicht gäbe.
+   ============================================================ */
+.tabellenfilter .field,
+.field.tabellenfilter {
+  font-size: 13px;
+  padding: 5px 9px;
+  border-radius: var(--r-md);
+}
+.tabellenfilter select.field,
+select.field.tabellenfilter {
+  padding-right: 26px;
+  background-position: right 8px center;
+}
+/* Der Kalenderknopf sitzt IN der Hülle und bringt seine eigene Grösse mit. */
+.tabellenfilter .datumsfeld-huelle {
+  padding: 0 4px 0 9px;
+}
+.tabellenfilter .datumsfeld-eingabe {
+  padding: 5px 0;
+  font-size: 13px;
+}
+.tabellenfilter .datumsfeld-knopf {
+  width: 22px;
+  height: 22px;
+}
+.tabellenfilter .auswahl-trigger {
+  padding-right: 9px;
+}
+
 .form-actions {
   margin-top: var(--sp-4);
   display: flex;
@@ -316,8 +392,16 @@ select.field {
   text-align: left;
   cursor: pointer;
 }
-.pickrow:hover {
+/* `data-markiert` ist die Tastaturmarkierung und sieht aus wie :hover — beides zeigt
+   dieselbe Sache: hier landet die Eingabe. Zwei verschiedene Markierungen gleichzeitig
+   auf dem Bild waeren schlimmer als keine; wer die Maus bewegt, sieht ohnehin nur eine
+   davon unter dem Zeiger. Der Rahmen links macht den Unterschied trotzdem ablesbar. */
+.pickrow:hover,
+.pickrow[data-markiert] {
   background: var(--accent-wash);
+}
+.pickrow[data-markiert] {
+  box-shadow: inset 2px 0 0 var(--accent);
 }
 .linkbtn {
   background: none;
@@ -465,6 +549,27 @@ select.field {
   .side .foot > div:not(.aktualisierung) { display: none; }
   .side .foot { text-align: center; }
   .aktualisierungbtn { justify-content: center; }
+}
+
+/* ============================================================
+   Schwebende Ebenen — wer ueber wem liegt.
+
+   Base UI haengt Auswahlliste und Kalender per Portal an `document.body`. Dort sind sie
+   Geschwister der ganzen App und tragen von sich aus GAR KEINEN z-Index; ein Modal-Layer
+   traegt 50 (verschachtelt 60) und gewinnt damit gegen jedes `z-index: auto`, egal wie
+   weit hinten es im Dokument steht. Genau das war der Fehler: ein Auswahlfeld oder ein
+   Kalender, aus einem Dialog heraus geoeffnet, klappte HINTER dem Dialog auf.
+
+   Der Wert liegt deshalb ueber allen Modal-Ebenen. Er gehoert an den POSITIONER und nicht
+   an das Popup darin: der Positioner ist das Element, das Base UI fixiert positioniert,
+   und nur ein positioniertes Element nimmt einen z-Index ueberhaupt an.
+   ============================================================ */
+:root {
+  --z-schwebend: 1000;
+}
+.auswahl-positioner,
+.datumsfeld-positioner {
+  z-index: var(--z-schwebend);
 }
 
 /* ============================================================

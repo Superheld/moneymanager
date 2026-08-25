@@ -14,7 +14,7 @@ const halter = vi.hoisted(() => {
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
-import { TanDialog, type TanFrage } from "./TanDialog";
+import { TanDialog, useTanFrage, type TanFrage } from "./TanDialog";
 
 let db: Database;
 
@@ -77,5 +77,53 @@ describe("TanDialog", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Bestätigen" })).not.toBeInTheDocument();
     expect(screen.getByText(/Banking-App freigeben/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * Der Weg, auf dem die Rückfrage wieder VERSCHWINDET.
+ *
+ * Bei decoupled tippt niemand etwas ein — die Freigabe geschieht in der Banking-App, und
+ * nur der Adapter erfährt, wann die Bank zugestimmt hat. Ohne diesen Rückweg blieb der
+ * Hinweis stehen, bis jemand ihn wegklickte, obwohl der Abruf längst weiterlief.
+ */
+describe("useTanFrage", () => {
+  /** Ein Screen im Kleinen: er zeigt die Frage an und reicht den Frager nach aussen. */
+  function Probe({ melde }: { melde: (frageTan: ReturnType<typeof useTanFrage>["frageTan"]) => void }) {
+    const { tanFrage, tanFrageSchliessen, frageTan } = useTanFrage();
+    melde(frageTan);
+    return tanFrage ? <TanDialog frage={tanFrage} onFertig={tanFrageSchliessen} /> : null;
+  }
+
+  it("nimmt die Rückfrage weg, sobald der Adapter sie zurückzieht", async () => {
+    let frageTan: ReturnType<typeof useTanFrage>["frageTan"] | null = null;
+    rendere(<Probe melde={(f) => { frageTan = f; }} />);
+    await waitFor(() => expect(frageTan).not.toBeNull());
+
+    const rueckzug = new AbortController();
+    void frageTan!({ text: "Bitte in der App bestätigen", decoupled: true }, rueckzug.signal);
+    await waitFor(() => expect(screen.getByText(/Bitte in der App bestätigen/)).toBeInTheDocument());
+
+    // Die Bank hat geantwortet — der Adapter zieht die Frage zurück.
+    rueckzug.abort();
+    await waitFor(() => expect(screen.queryByText(/Bitte in der App bestätigen/)).not.toBeInTheDocument());
+  });
+
+  it("lässt eine INZWISCHEN gestellte zweite Frage stehen", async () => {
+    // Ein Abruf über mehrere Konten fragt mehrfach. Ein spät eintreffendes Signal darf
+    // nur die eigene Frage wegnehmen, nicht die, die gerade auf eine Antwort wartet.
+    let frageTan: ReturnType<typeof useTanFrage>["frageTan"] | null = null;
+    rendere(<Probe melde={(f) => { frageTan = f; }} />);
+    await waitFor(() => expect(frageTan).not.toBeNull());
+
+    const ersterRueckzug = new AbortController();
+    void frageTan!({ text: "Erste Freigabe", decoupled: true }, ersterRueckzug.signal);
+    await waitFor(() => expect(screen.getByText(/Erste Freigabe/)).toBeInTheDocument());
+
+    void frageTan!({ text: "Zweite Freigabe", decoupled: true }, new AbortController().signal);
+    await waitFor(() => expect(screen.getByText(/Zweite Freigabe/)).toBeInTheDocument());
+
+    ersterRueckzug.abort();
+    await waitFor(() => expect(screen.getByText(/Zweite Freigabe/)).toBeInTheDocument());
   });
 });

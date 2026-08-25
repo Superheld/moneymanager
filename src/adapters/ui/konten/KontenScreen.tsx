@@ -6,12 +6,11 @@
 // i18n + Mehrwährung (ADR-0004): alle sichtbaren Strings über t()/<Trans>, alles Geld über
 // useGeld() (Parse bei Eingabe, Format + Symbol bei Anzeige).
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   istGeteilt,
   registerSicht,
-  type Charakter,
   type Dublettenverdacht,
   type IstBuchung,
   type Kontensicht,
@@ -435,25 +434,46 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
             </div>
             <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center" }}>
-              <Auswahl
-                ariaLabel={t("konten.kommendeTage", { tage })}
-                wert={String(tage)}
-                aufAenderung={(v) => setTage(Number(v))}
-                optionen={TAGE_OPTIONEN.map((d) => ({ wert: String(d), text: t("konten.kommendeTage", { tage: d }) }))}
-              />
               {/* Umbuchen legt ZWEI neue Buchungen an — beide müssen auf Konten landen,
                   die von Hand geführt werden. Für die Gegenseite einer Bank-Abhebung gibt
                   es den anderen Weg: im Detail der abgerufenen Zeile das Gegenbein
-                  erzeugen. Dort erfindet niemand die Bankbuchung, sie ist schon da. */}
-              {offlineKonten.length >= 2 && <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>}
+                  erzeugen. Dort erfindet niemand die Bankbuchung, sie ist schon da.
+
+                  Deshalb steht der Knopf auch nur an einem OFFLINE-Konto: die Umbuchung
+                  geht immer VON dem Auszug aus, der gerade offen ist (`vonId={aktivId}`).
+                  Bei einem Online-Konto wäre die Ausgangsseite eine, auf der von Hand gar
+                  nicht gebucht werden darf — der Dialog bot sie an und konnte sie nicht
+                  einlösen; `UmbuchungModal` fiel dann still auf das erste Konto seiner
+                  Liste zurück. Für den Zufluss auf einem Online-Konto ist derselbe Weg
+                  zuständig wie für den Abfluss: das Gegenbein aus der abgerufenen Zeile. */}
+              {aktivZeile && !aktivZeile.online && offlineKonten.length >= 2 && (
+                <Button plus onClick={() => { setFehler(null); setUmbuchenOffen(true); }}>{t("konten.umbuchen")}</Button>
+              )}
               {aktivZeile && !aktivZeile.online && (
                 <Button variant="primary" plus onClick={() => { setFehler(null); setBuchenOffen(true); }}>{t("konten.btnBuchung")}</Button>
               )}
             </span>
           </div>
 
+          {/* Gebucht und Geplant stehen NEBENEINANDER, nicht untereinander.
+              Untereinander war die geplante Liste erst nach der ganzen Buchungstabelle
+              erreichbar — bei einem Konto mit Historie also nach zwei Bildschirmhöhen
+              Scrollen, obwohl gerade sie die Frage „was kommt noch" beantwortet.
+
+              Die Aufteilung ist der goldene Schnitt zugunsten der Buchungen (1,618 : 1):
+              die haben sieben Spalten und einen Seitenschalter, die Vorschau vier. Ein
+              hälftiger Schnitt gäbe der schmaleren Seite Platz, den sie nicht braucht,
+              und nähme ihn der breiteren. Unter 1280 px stapelt es wieder — zwei
+              waagerecht scrollende Tabellen nebeneinander sind keine. */}
+          <div className="auszug-spalten">
+          <div className="auszug-spalte">
+          {/* Beide Spalten tragen eine Überschrift. Eine allein beschriftete Liste neben
+              einer unbeschrifteten liest sich, als gehörte die Überschrift zu beiden. */}
+          <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: "var(--sp-3)" }}>
+            {t("konten.gebuchtTitel")}
+          </div>
           {/* Filterleiste: Suche · Art (segmented) · Kategorie · Treffer */}
-          <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
+          <div className="tabellenfilter" style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
             <span style={{ position: "relative", flex: "1 1 200px", minWidth: 160, display: "inline-flex", alignItems: "center" }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2.2" style={{ position: "absolute", left: 10, pointerEvents: "none" }}><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
               <input className="field" style={{ width: "100%", paddingLeft: 30 }} value={regSuche} onChange={(e) => setRegSuche(e.target.value)} placeholder={t("konten.suche")} />
@@ -639,20 +659,28 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   // Umbuchungs-Bein trägt gar keine (es verschiebt eigenes Geld), eine
                   // aufgeteilte Buchung trägt mehrere. Bei ihnen bliebe unklar, was ein
                   // Klick eigentlich täte.
+                  //
+                  // Die aufgeteilte Zeile zeigt dafür eine PILLE und keinen Strich: sie
+                  // trägt keine Kategorie, weil die Teile die Wahrheit sind — nicht, weil
+                  // niemand eine vergeben hätte. Ein Strich sagte hier „noch
+                  // einzusortieren" und schickte auf die Suche nach einer Lücke, die
+                  // keine ist.
                   render: (r) =>
                     r.zeile.gegenkontoId
                       ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill>
-                      : r.buchung && !istGeteilt(r.buchung)
-                        ? (
-                            <CategoryPicker
-                              kompakt
-                              ariaLabel={t("konten.spalteKategorie")}
-                              kategorien={[...kategorien]}
-                              value={r.zeile.kategorieId ?? ""}
-                              onChange={(id) => void kategorieZuweisen(r.buchung!, id)}
-                            />
-                          )
-                        : r.kategorieName || "—",
+                      : r.buchung && istGeteilt(r.buchung)
+                        ? <Pill variant="neutral">{t("konten.split.pille")}</Pill>
+                        : r.buchung
+                          ? (
+                              <CategoryPicker
+                                kompakt
+                                ariaLabel={t("konten.spalteKategorie")}
+                                kategorien={[...kategorien]}
+                                value={r.zeile.kategorieId ?? ""}
+                                onChange={(id) => void kategorieZuweisen(r.buchung!, id)}
+                              />
+                            )
+                          : r.kategorieName || "—",
                 },
                 { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (r) => r.zeile.betrag, render: (r) => <span className="num" style={{ fontWeight: 700, color: geldFarbe(r.zeile.betrag) }}>{geld.format(r.zeile.betrag, { mitVorzeichen: true })}</span> },
                 { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (r) => r.zeile.saldo, render: (r) => geld.format(r.zeile.saldo) },
@@ -669,42 +697,79 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               rowStyle={(r: Registerzeile) => (r.zeile.zukuenftig ? { opacity: 0.55 } : undefined)}
             />
           )}
-
-          {/* Trenner heute */}
-          <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "12px 0 8px", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-wide, .04em)" }}>
-            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-            {t("konten.heuteRealerStand", { stand: geld.format(register.standHeute), symbol: geld.symbol })}
-            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
 
-          {/* Geplante Vorschau */}
-          {register.geplant.length === 0 ? (
-            <div className="muted" style={{ paddingTop: 4 }}>{t("konten.keineGeplanten", { tage })}</div>
-          ) : (
-            register.geplant.map((z, i) => (
-              <Zeile
-                key={`g${i}`}
-                faint
-                links={
-                  <>
-                    <input
-                      type="checkbox"
-                      checked={false}
-                      onChange={() => abhaken(z, false)}
-                      title={t("konten.alsBezahltMarkieren")}
-                      style={{ cursor: "pointer", accentColor: "var(--accent-deep)" }}
-                    />
-                    <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 66 }}>{datumKurz(z.datum)}</span>
-                    {z.bezeichnung}
-                    {z.charakter === "Umschichtung" && <Pill variant="um">{charakterLabel("Umschichtung")}</Pill>}
-                  </>
-                }
-                betrag={z.betrag}
-                charakter={z.charakter}
-                saldo={z.saldo}
+          {/* Die geplante Vorschau — eigene Spalte, eigene Tabelle.
+              Der Stand von heute steht hier als Überschrift und nicht mehr als Trenner
+              quer über die Karte: er ist der Punkt, ab dem die Vorschau rechnet, und
+              gehört damit an ihren Anfang. Zwischen zwei Listen stehend beschriftete er
+              beide und keine. */}
+          <div className="auszug-spalte">
+            {/* Der Zeitraum-Wähler steht bei der Vorschau und nicht mehr oben bei den
+                Knöpfen: er stellt ausschliesslich ein, wie weit DIESE Liste nach vorn
+                schaut. Neben „Buchung erfassen" sah er aus wie eine Einstellung des
+                ganzen Auszugs. */}
+            <div className="tabellenfilter" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-2)", flexWrap: "wrap", marginBottom: "var(--sp-2)" }}>
+              <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>
+                {t("konten.geplantTitel")}
+              </span>
+              <Auswahl
+                ariaLabel={t("konten.zeitraumWaehlen")}
+                wert={String(tage)}
+                aufAenderung={(v) => setTage(Number(v))}
+                optionen={TAGE_OPTIONEN.map((d) => ({ wert: String(d), text: t("konten.kommendeTage", { tage: d }) }))}
               />
-            ))
-          )}
+            </div>
+            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
+              {t("konten.heuteRealerStand", { stand: geld.format(register.standHeute), symbol: geld.symbol })}
+            </div>
+
+            {register.geplant.length === 0 ? (
+              <div className="muted">{t("konten.keineGeplanten", { tage })}</div>
+            ) : (
+              <DataTable
+                columns={[
+                  {
+                    // Abhaken heisst „ist doch schon bezahlt" und legt die Buchung an —
+                    // deshalb ein Kästchen und kein Knopf: es beantwortet eine Frage, die
+                    // an der Zeile steht, statt eine neue zu stellen.
+                    key: "_ab", label: "", sortable: false, maxWidth: 24,
+                    render: (z: RegisterZeile) => (
+                      <input
+                        type="checkbox"
+                        checked={false}
+                        onChange={() => abhaken(z, false)}
+                        title={t("konten.alsBezahltMarkieren")}
+                        aria-label={t("konten.alsBezahltMarkieren")}
+                        style={{ cursor: "pointer", accentColor: "var(--accent-deep)" }}
+                      />
+                    ),
+                  },
+                  { key: "datum", label: t("konten.spalteDatum"), render: (z: RegisterZeile) => datumKurz(z.datum) },
+                  {
+                    key: "bez", label: t("konten.spalteBeschreibung"), maxWidth: 220,
+                    render: (z: RegisterZeile) => (
+                      <span title={z.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
+                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{z.bezeichnung}</span>
+                        {z.charakter === "Umschichtung" && <Pill variant="um">{charakterLabel("Umschichtung")}</Pill>}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right",
+                    render: (z: RegisterZeile) => <span className="num" style={{ fontWeight: 700, color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span>,
+                  },
+                  { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", render: (z: RegisterZeile) => geld.format(z.saldo) },
+                ]}
+                rows={[...register.geplant]}
+                // Gedämpft wie zuvor: nichts davon ist passiert. Der Unterschied zu einer
+                // gebuchten Zeile muss sichtbar bleiben, auch wenn beide jetzt in einer
+                // Tabelle stehen.
+                rowStyle={() => ({ opacity: 0.62 })}
+              />
+            )}
+          </div>
+          </div>
 
           {fehler && <div className="err" style={{ marginTop: 10 }}>{fehler}</div>}
         </Card>
@@ -761,23 +826,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           onSaved={async () => { setUmbuchenOffen(false); await laden(); }}
         />
       )}
-    </div>
-  );
-}
-
-/** Eine Registerzeile: linke Beschreibung, Betrag, laufender Saldo, optionale Aktion rechts. */
-function Zeile({ links, betrag, charakter, saldo, faint, aktion }: { links: ReactNode; betrag?: number; charakter?: Charakter; saldo: number; faint?: boolean; aktion?: ReactNode }) {
-  const geld = useGeld();
-  return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, padding: "10px 0", borderBottom: "1px solid var(--line-soft)", opacity: faint ? 0.62 : 1 }}>
-      <span style={{ fontSize: 13.5, fontWeight: 600, display: "flex", alignItems: "center", gap: 9, minWidth: 0, flexWrap: "wrap" }}>{links}</span>
-      <span style={{ display: "flex", gap: 18, whiteSpace: "nowrap", alignItems: "center" }}>
-        {betrag != null && charakter != null && (
-          <span className="num" style={{ fontSize: 13.5, fontWeight: 700, color: geldFarbe(betrag), minWidth: 92, textAlign: "right" }}>{geld.formatMitSymbol(betrag, { mitVorzeichen: true })}</span>
-        )}
-        <span className="num" style={{ fontSize: 13.5, fontWeight: 600, color: "var(--ink-2)", minWidth: 92, textAlign: "right" }}>{geld.formatMitSymbol(saldo)}</span>
-        {aktion != null && <span style={{ minWidth: 64, textAlign: "right" }}>{aktion}</span>}
-      </span>
     </div>
   );
 }

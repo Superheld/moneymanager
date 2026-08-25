@@ -467,6 +467,9 @@ describe("Buchungsdetails", () => {
     rendere(<KontenScreen onNavigate={() => {}} />);
 
     await detailOeffnen(nutzer, "Girokonto");
+    // Die Herkunft ist zugeklappt, bis jemand danach fragt — sie steht ganz unten im
+    // Dialog und wird selten gebraucht.
+    await nutzer.click(await screen.findByRole("button", { name: /herkunft/i }));
 
     // Nach den DATEN suchen, die der Test angelegt hat — nicht nach Beschriftungen.
     await waitFor(() => {
@@ -558,6 +561,7 @@ describe("Buchungsdetails", () => {
     rendere(<KontenScreen onNavigate={() => {}} />);
 
     await detailOeffnen(nutzer, "Girokonto");
+    await nutzer.click(await screen.findByRole("button", { name: /herkunft/i }));
 
     await waitFor(() => expect(document.body.textContent).toMatch(/kein Import-Kontext/i));
   });
@@ -1171,6 +1175,32 @@ describe("Online geführte Konten werden nicht von Hand bebucht", () => {
     await waitFor(() => {
       expect(screen.queryByRole("button", { name: /umbuchen/i })).not.toBeInTheDocument();
     });
+  });
+
+  /**
+   * Und auch mit genug Konten von Hand nicht, solange ein ONLINE-Konto offen ist.
+   *
+   * Die Umbuchung geht immer von dem Auszug aus, den man gerade vor sich hat. Bei einem
+   * Bankkonto wäre das eine Ausgangsseite, auf der von Hand gar nicht gebucht werden darf
+   * — der Dialog bot sie an und fiel dann still auf ein anderes Konto zurück.
+   */
+  it("bietet auf einem Online-Konto kein Umbuchen an, auch wenn zwei Konten von Hand da sind", async () => {
+    await mitBankverbindung();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k3", bezeichnung: "Spardose", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+
+    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: /umbuchen/i })).not.toBeInTheDocument();
+    });
+
+    // Auf einem Konto von Hand steht er dagegen — sonst prüfte der Test nur, dass gar
+    // nichts erscheint.
+    await nutzer.click((await screen.findAllByText("Bargeld"))[0]);
+    expect(await screen.findByRole("button", { name: /umbuchen/i })).toBeInTheDocument();
   });
 
   it("sperrt Betrag und Datum einer Buchung auf dem Bankkonto, nicht aber ihre Bezeichnung", async () => {

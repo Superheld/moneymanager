@@ -202,8 +202,20 @@ export interface TanHerausforderung {
 /**
  * Holt die TAN beim Nutzer. `undefined` heißt „abgebrochen"; bei decoupled wird die
  * Funktion gar nicht nach einer Eingabe gefragt, sondern nur zur Anzeige gerufen.
+ *
+ * **`zurueckgezogen` beendet die Rückfrage von der anderen Seite.** Bei decoupled tippt
+ * niemand etwas ein — die Freigabe geschieht in der Banking-App, und der Adapter fragt
+ * die Bank in ihren eigenen Abständen nach. Wer die Frage gestellt hat, weiß deshalb als
+ * Einziger, wann sie beantwortet ist. Ohne dieses Signal bleibt der Hinweis stehen,
+ * nachdem die Bank längst zugestimmt hat, und muss von Hand weggeklickt werden.
+ *
+ * Es ist ein `AbortSignal` und kein eigener Typ, weil es genau dessen Bedeutung hat: die
+ * Anfrage gilt nicht mehr. Wer sie anzeigt, hört darauf und räumt sie weg.
  */
-export type TanFrager = (h: TanHerausforderung) => Promise<string | undefined>;
+export type TanFrager = (
+  h: TanHerausforderung,
+  zurueckgezogen?: AbortSignal,
+) => Promise<string | undefined>;
 
 /**
  * Eine Position im Depot, zu einem Stichtag.

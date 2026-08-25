@@ -39,6 +39,7 @@ import { depots, uebersicht } from "../../dienste";
 import { Card, CoverageTrack, Pill } from "../bausteine";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
 import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
+import { AUFKLAPP_ZEILEN_SCHMAL } from "../bausteine/aufklappen";
 import { DepotKarte } from "./DepotKarte";
 import { MonatsAusblick } from "./MonatsAusblick";
 import { PageHead } from "../bausteine/PageHead";
@@ -118,15 +119,19 @@ export function UebersichtScreen() {
           subtitle={monat === dieserMonat ? t("uebersicht.budgetsLaufend") : t("uebersicht.budgetsVergangen")}
           action={
             staende.length > 0 ? (
-              <Auswahl
-                ariaLabel={t("uebersicht.monatWaehlen")}
-                wert={monat}
-                aufAenderung={setMonat}
-                optionen={daten.monate.map((m) => ({
-                  wert: m,
-                  text: m === dieserMonat ? t("uebersicht.monatDieser", { monat: m }) : m,
-                }))}
-              />
+              // `tabellenfilter`: der Wähler stellt ein, was die Karte darunter zeigt —
+              // er ist ihr Filter und nicht ihr Inhalt (siehe app.css).
+              <span className="tabellenfilter">
+                <Auswahl
+                  ariaLabel={t("uebersicht.monatWaehlen")}
+                  wert={monat}
+                  aufAenderung={setMonat}
+                  optionen={daten.monate.map((m) => ({
+                    wert: m,
+                    text: m === dieserMonat ? t("uebersicht.monatDieser", { monat: m }) : m,
+                  }))}
+                />
+              </span>
             ) : undefined
           }
         >
@@ -202,6 +207,9 @@ export function UebersichtScreen() {
                     />
                     {offen && (
                       <BudgetPostenliste
+                        // Schmale Karte: sie steht neben einer zweiten, die beim
+                        // Aufklappen mitwächst (siehe bausteine/aufklappen.ts).
+                        zeilen={AUFKLAPP_ZEILEN_SCHMAL}
                         posten={budgetPostenZu(daten.sicht, z)}
                         empfaenger={daten.empfaenger}
                         kategorieNamen={daten.kategorieNamen}

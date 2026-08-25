@@ -95,6 +95,33 @@ Keins davon ist ein `bausteine/`-Kandidat: alle werden von genau einem Screen be
 drei Nutzer im selben Bereich, und kein natürlicher Besitzer; über `BuchungDetail` zu
 importieren hätte einen Ring gebaut.
 
+## Tabellenfilter sind kleiner als Formularfelder
+
+Ein `.field` ist auf ein Formular ausgelegt: volle Breite, grosse Innenabstände, eigene
+Zeile. Über einer Tabelle steht es dagegen NEBEN der Tabelle und konkurriert mit ihr um
+Aufmerksamkeit — die Filterleiste wirkte dort wie das Hauptereignis der Karte, obwohl sie
+nur einstellt, was darunter zu sehen ist.
+
+Die Klasse **`tabellenfilter`** (in `app.css`) zieht sie auf Tabellengrösse zusammen. Sie
+wirkt am Container **und** direkt am Feld: eine Leiste mit fünf Feldern beschriftet man
+einmal, ein einzelner Monatswähler in einer Kartenkopfzeile braucht dafür keine Hülle, die
+es sonst nicht gäbe. Die Masse sind nicht erfunden — die Filterleiste der Import-Durchsicht
+trug sie längst als eigenen Inline-Stil und sah als einzige richtig aus.
+
+Die Regel dahinter ist dieselbe wie bei `Zeilenauswahl`: **die Grösse eines Bedienteils
+folgt dem, wo es steht, nicht dem, was es tut.**
+
+## Der Kontoauszug steht in zwei Spalten
+
+Gebucht links, geplant rechts, im goldenen Schnitt zugunsten der Buchungen — `.auszug-spalten`
+in `app.css`, wo auch steht, warum 1,618 : 1 und nicht die Hälfte. Untereinander war die
+geplante Liste erst nach der ganzen Buchungstabelle erreichbar, also bei einem Konto mit
+Historie nach zwei Bildschirmhöhen; sie beantwortet aber die Frage „was kommt noch".
+
+Der Stand von heute ist dabei die Überschrift der Vorschau geworden und nicht mehr ein
+Trenner zwischen beiden Listen: er ist der Punkt, ab dem die Vorschau rechnet. Zwischen
+zwei Listen stehend beschriftete er beide und keine.
+
 ## Die Seitenleiste klappt ein
 
 Unter 1100 px Fensterbreite schrumpft sie auf 68 px und zeigt nur noch Icons. Das steuert

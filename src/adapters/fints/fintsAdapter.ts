@@ -105,14 +105,25 @@ async function mitTan<T extends ClientResponse>(
   if (decoupled) {
     // Freigabe geschieht in der Banking-App; es wird nichts eingetippt. Die Wartezeiten
     // gibt die Bank selbst vor — nicht raten.
-    void frageTan({ text: antwort.tanChallenge, bild, decoupled: true });
-    await warte(decoupled.waitingSecondsBeforeFirstStatusRequest || 5);
-    for (let i = 0; i < (decoupled.maxStatusRequests || 20); i++) {
-      const stand = await weiter(antwort.tanReference, undefined);
-      if (!stand.requiresTan) return stand;
-      await warte(decoupled.waitingSecondsBetweenStatusRequests || 5);
+    //
+    // Der Hinweis wird ZURUeCKGEZOGEN, sobald diese Schleife endet — egal ob die Bank
+    // zugestimmt hat, die Geduld abgelaufen ist oder etwas geworfen hat. Nur hier ist
+    // bekannt, dass die Frage beantwortet ist; die Anzeige kann es nicht wissen, und ein
+    // stehengebliebener „bitte in der App bestätigen"-Kasten sieht nach einem Hänger aus,
+    // obwohl der Abruf längst weiterläuft.
+    const rueckzug = new AbortController();
+    void frageTan({ text: antwort.tanChallenge, bild, decoupled: true }, rueckzug.signal);
+    try {
+      await warte(decoupled.waitingSecondsBeforeFirstStatusRequest || 5);
+      for (let i = 0; i < (decoupled.maxStatusRequests || 20); i++) {
+        const stand = await weiter(antwort.tanReference, undefined);
+        if (!stand.requiresTan) return stand;
+        await warte(decoupled.waitingSecondsBetweenStatusRequests || 5);
+      }
+      throw new Error("Die Freigabe in der Banking-App kam nicht rechtzeitig.");
+    } finally {
+      rueckzug.abort();
     }
-    throw new Error("Die Freigabe in der Banking-App kam nicht rechtzeitig.");
   }
 
   const tan = await frageTan({ text: antwort.tanChallenge, bild, decoupled: false });

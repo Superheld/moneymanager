@@ -345,7 +345,10 @@ export function Datumsfeld({
       </div>
 
       <Popover.Portal>
-        <Popover.Positioner sideOffset={4} align="start">
+        {/* Die Klasse traegt nur den z-Index (siehe app.css, „Schwebende Ebenen"): das
+            Blatt haengt per Portal am body und laege sonst hinter jedem Dialog, aus dem
+            heraus es geoeffnet wurde. */}
+        <Popover.Positioner className="datumsfeld-positioner" sideOffset={4} align="start">
           <Popover.Popup className="datumsfeld-popup">
             <div className="datumsfeld-kopf">
               <button

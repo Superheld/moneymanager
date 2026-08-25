@@ -67,7 +67,7 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
       title={t("budgets.verlaufTitel", { name: stand.kategorieName })}
       subtitle={t("budgets.verlaufUntertitel", { monate: monate.length })}
       action={
-        <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+        <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
           <Auswahl
             ariaLabel={t("budgets.verlaufMonatWaehlen")}
             wert={String(gewaehlt)}

@@ -20,7 +20,6 @@ import type {
   Bankzugang,
   Formatwahl,
   Kontozuordnung,
-  TanHerausforderung,
 } from "../../../application";
 import { fintsEinsatzbereit } from "../../fints";
 import {
@@ -37,7 +36,7 @@ import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { Bankprofilkarte } from "./Bankprofilkarte";
-import { TanDialog, type TanFrage } from "./TanDialog";
+import { TanDialog, useTanFrage } from "./TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
 import { Modal } from "../bausteine/Modal";
@@ -97,7 +96,7 @@ export function BankzugaengeScreen({
    */
   const [angesehen, setAngesehen] = useState<string | null>(null);
   const [tanGespeichert, setTanGespeichert] = useState(false);
-  const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
+  const { tanFrage, tanFrageSchliessen, frageTan } = useTanFrage();
 
   async function laden() {
     // In EINEM Effekt und zusammen gesetzt: gestaffelte Zustaende liessen die Kontenliste
@@ -110,10 +109,6 @@ export function BankzugaengeScreen({
   useEffect(() => {
     laden().catch(() => setZugaenge([]));
   }, []);
-
-  function frageTan(h: TanHerausforderung): Promise<string | undefined> {
-    return new Promise((antworten) => setTanFrage({ herausforderung: h, antworten }));
-  }
 
   async function pruefen(zugang: Bankzugang, geheim: string) {
     setBusy(true);
@@ -505,7 +500,7 @@ export function BankzugaengeScreen({
         </Modal>
       )}
 
-      {tanFrage && <TanDialog frage={tanFrage} onFertig={() => setTanFrage(null)} />}
+      {tanFrage && <TanDialog frage={tanFrage} onFertig={tanFrageSchliessen} />}
     </>
   );
 }
