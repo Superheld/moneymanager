@@ -118,15 +118,19 @@ export function UebersichtScreen() {
           subtitle={monat === dieserMonat ? t("uebersicht.budgetsLaufend") : t("uebersicht.budgetsVergangen")}
           action={
             staende.length > 0 ? (
-              <Auswahl
-                ariaLabel={t("uebersicht.monatWaehlen")}
-                wert={monat}
-                aufAenderung={setMonat}
-                optionen={daten.monate.map((m) => ({
-                  wert: m,
-                  text: m === dieserMonat ? t("uebersicht.monatDieser", { monat: m }) : m,
-                }))}
-              />
+              // `tabellenfilter`: der Wähler stellt ein, was die Karte darunter zeigt —
+              // er ist ihr Filter und nicht ihr Inhalt (siehe app.css).
+              <span className="tabellenfilter">
+                <Auswahl
+                  ariaLabel={t("uebersicht.monatWaehlen")}
+                  wert={monat}
+                  aufAenderung={setMonat}
+                  optionen={daten.monate.map((m) => ({
+                    wert: m,
+                    text: m === dieserMonat ? t("uebersicht.monatDieser", { monat: m }) : m,
+                  }))}
+                />
+              </span>
             ) : undefined
           }
         >

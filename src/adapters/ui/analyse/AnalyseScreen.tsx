@@ -348,7 +348,7 @@ export function AnalyseScreen() {
             title={t("historie.verlaufTitel")}
             subtitle={t(`historie.verlauf.${ansicht}`)}
             action={
-              <span style={{ display: "inline-flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+              <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
                 {/* Monat direkt wählbar — der Klick auf den Chart macht dasselbe, ist bei
                     vielen Monaten aber Zielübung. Beide schreiben denselben Zustand. */}
                 <Auswahl
@@ -425,7 +425,7 @@ export function AnalyseScreen() {
               title={t("historie.katTitel")}
               subtitle={aufschluesselung.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
               action={
-                <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+                <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
                   {aufschluesselung.label && <Button variant="ghost" onClick={() => setAktivMonat(null)}>{t("historie.alleMonate")}</Button>}
                   <Auswahl
                     ariaLabel={t("historie.ebeneWaehlen")}

@@ -1287,7 +1287,13 @@ export function BuchungDetail(props: {
       onLoesen={async () => { if (!aktuelle?.transferId) return; await paarungLoesen(aktuelle.transferId); await nachAenderung(); onClose(); }}
       onGegenbuchung={setAktuelle}
       onSplitten={() => aktuelle && setSplitten(aktuelle)}
-      onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(aktuelle); await nachAenderung(); onClose(); }}
+      // Kein `onClose()`: die Aufteilung aufzuheben ist ein Schritt IM Dialog, kein
+      // Abschluss. Danach steht die Buchung ohne Kategorie da (siehe `splitAufheben`) —
+      // also genau in dem Zustand, in dem man als Nächstes eine vergeben will. Der Dialog
+      // schloss sich weg und man musste die Zeile im Auszug wiederfinden.
+      // `nachAenderung` zieht die gezeigte Buchung nach, der Block wechselt von selbst
+      // von der Teileliste auf das Kategoriefeld.
+      onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(aktuelle); await nachAenderung(); }}
     />
   );
 }

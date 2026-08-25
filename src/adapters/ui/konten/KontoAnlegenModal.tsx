@@ -17,7 +17,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KONTOTYPEN, type Bankkonto, type Bankzugang, type Kontotyp, type Person, type TanHerausforderung, type Zahlungskonto, type Zugangsart } from "../../../application";
+import { KONTOTYPEN, type Bankkonto, type Bankzugang, type Kontotyp, type Person, type Zahlungskonto, type Zugangsart } from "../../../application";
 import { typAusName } from "../../../application/import";
 import { fintsEinsatzbereit } from "../../fints";
 import { HANSEATIC_BASIS_URL } from "../../hanseatic";
@@ -30,7 +30,7 @@ import {
   umsaetze,
 } from "../../dienste";
 import { BankSuche } from "./BankSuche";
-import { TanDialog, type TanFrage } from "./TanDialog";
+import { TanDialog, useTanFrage } from "./TanDialog";
 import { Button, FormField, Pill } from "../bausteine";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -83,14 +83,10 @@ export function KontoAnlegenModal({
   const [bankkonten, setBankkonten] = useState<Bankkonto[] | null>(null);
   const [salden, setSalden] = useState<Record<string, number>>({});
   const [wahlen, setWahlen] = useState<Record<string, Wahl>>({});
-  const [tanFrage, setTanFrage] = useState<TanFrage | null>(null);
+  const { tanFrage, tanFrageSchliessen, frageTan } = useTanFrage();
 
   function toggleInhaber(id: string) {
     setInhaberIds((ids) => (ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]));
-  }
-
-  function frageTan(h: TanHerausforderung): Promise<string | undefined> {
-    return new Promise((antworten) => setTanFrage({ herausforderung: h, antworten }));
   }
 
   async function offlineSpeichern() {
@@ -485,7 +481,7 @@ export function KontoAnlegenModal({
         )}
       </Modal>
 
-      {tanFrage && <TanDialog frage={tanFrage} onFertig={() => setTanFrage(null)} />}
+      {tanFrage && <TanDialog frage={tanFrage} onFertig={tanFrageSchliessen} />}
     </>
   );
 }
