@@ -28,22 +28,49 @@ export interface Aufbewahrung {
   woechentlich: number;
   /** Davor N Monate, je einer. */
   monatlich: number;
-  /** Davor N Jahre, je eins. */
+  /** Davor N Quartale, je eins. */
+  quartalsweise: number;
+  /** Davor N Halbjahre, je eins. */
+  halbjaehrlich: number;
+  /** Davor N Jahre, je eins. `Infinity` heisst: alle, für immer. */
   jaehrlich: number;
 }
 
 /**
- * Der Standard: eine Woche täglich, ein Monat wöchentlich, ein Jahr monatlich, drei
- * Jahre jährlich. Zusammen höchstens 26 Dateien.
+ * Der Standard: eine Woche täglich, ein Monat wöchentlich, ein Jahr monatlich — und
+ * jährlich **ohne Ende**.
  *
- * Die Zahlen sind nicht ausgerechnet, sondern gewählt — jede Stufe reicht ungefähr so
- * weit, wie die nächstgröbere ihre Schrittweite hat, damit keine Lücke entsteht.
+ * **Die Zahlen folgen einer Regel, nicht dem Geschmack: jede Stufe reicht genau so weit,
+ * wie die nächstgröbere ihre Schrittweite hat.** Sieben Tage bis zur Wochenstufe, vier
+ * Wochen bis zur Monatsstufe, drei Monate bis zum Quartal, zwei Quartale bis zum
+ * Halbjahr, zwei Halbjahre bis zum Jahr. Keine Lücke, keine Überdeckung.
+ *
+ * Quartal und Halbjahr sind nicht Zierrat, sondern das, was die Menge klein hält: ohne
+ * sie müsste die Monatsstufe das ganze Jahr überbrücken (zwölf Stände statt drei). So
+ * sind es 18 endliche Dateien statt 23 — bei glatterem Übergang.
+ *
+ * **Warum die Jahresstufe nie ausläuft.** Eine Sicherung enthält immer den GANZEN
+ * Bestand — alte Stände tragen also keine Buchung, die der neueste nicht auch hätte. Was
+ * sie tragen, ist der Stand, BEVOR etwas verschwand: eine versehentliche Löschung, eine
+ * Migration, die wegnimmt (im Alpha-Stadium ausdrücklich erlaubt), ein Fehler, den
+ * niemand bemerkt hat. Solange die Bank die Umsätze noch führt, ist das ärgerlich und
+ * behebbar — man ruft sie neu ab.
+ *
+ * Genau das hört aber auf. Institute halten Umsätze eine begrenzte Zeit vor; danach ist
+ * dieser Bestand die einzige Stelle, an der die Jahre davor noch stehen. Ab dann wäre
+ * eine weggeworfene Jahressicherung nicht ein verlorener Wiederherstellungspunkt,
+ * sondern ein verlorenes Jahr.
+ *
+ * Der Preis ist eine Datei pro Jahr, und sie wächst mit dem Bestand. Gemessen an dem,
+ * was sie absichert, ist das der billigste Posten in diesem Projekt.
  */
 export const AUFBEWAHRUNG: Aufbewahrung = {
   taeglich: 7,
   woechentlich: 4,
-  monatlich: 12,
-  jaehrlich: 3,
+  monatlich: 3,
+  quartalsweise: 2,
+  halbjaehrlich: 2,
+  jaehrlich: Infinity,
 };
 
 /** Ein Sieben-Tage-Block. Bewusst NICHT die ISO-Woche: für eine Staffelung zählt der
@@ -52,7 +79,18 @@ function wochenschluessel(iso: string): string {
   return String(Math.floor(ord(parseIso(iso)) / 7));
 }
 
+/** Kalenderquartal: `2026-08-26` -> `2026-Q3`. */
+function quartalsschluessel(iso: string): string {
+  return `${iso.slice(0, 4)}-Q${Math.ceil(Number(iso.slice(5, 7)) / 3)}`;
+}
+
+/** Kalenderhalbjahr: `2026-08-26` -> `2026-H2`. */
+function halbjahresschluessel(iso: string): string {
+  return `${iso.slice(0, 4)}-H${Math.ceil(Number(iso.slice(5, 7)) / 6)}`;
+}
+
 function stufe(sortiert: string[], schluessel: (iso: string) => string, anzahl: number): string[] {
+  // `slice(0, Infinity)` gibt alle — die unbegrenzte Jahresstufe braucht keinen Sonderweg.
   if (anzahl <= 0) return [];
   const neuesteJeGruppe = new Map<string, string>();
   // `sortiert` läuft von neu nach alt, der erste Treffer je Gruppe ist also der neueste.
@@ -77,6 +115,8 @@ export function zuBehalten(stichtage: string[], regel: Aufbewahrung = AUFBEWAHRU
     ...stufe(sortiert, (iso) => iso, regel.taeglich),
     ...stufe(sortiert, wochenschluessel, regel.woechentlich),
     ...stufe(sortiert, (iso) => iso.slice(0, 7), regel.monatlich),
+    ...stufe(sortiert, quartalsschluessel, regel.quartalsweise),
+    ...stufe(sortiert, halbjahresschluessel, regel.halbjaehrlich),
     ...stufe(sortiert, (iso) => iso.slice(0, 4), regel.jaehrlich),
   ]);
   return sortiert.filter((iso) => behalten.has(iso));

@@ -77,7 +77,8 @@ describe("Sicherungen pflegen", () => {
   it("hält sich an eine mitgegebene Regel", async () => {
     const { port, stand } = fakePort(["2026-08-24", "2026-08-25"]);
     await sicherungPflegen(port, "2026-08-26", {
-      taeglich: 1, woechentlich: 0, monatlich: 0, jaehrlich: 0,
+      taeglich: 1, woechentlich: 0, monatlich: 0,
+      quartalsweise: 0, halbjaehrlich: 0, jaehrlich: 0,
     });
 
     expect([...stand]).toEqual(["2026-08-26"]);

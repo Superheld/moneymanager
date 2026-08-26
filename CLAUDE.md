@@ -705,7 +705,7 @@ schiefgeht. Danach zu sichern hiesse, den kaputten Stand zu sichern.
 | wo | `<App-Datenverzeichnis>/sicherungen/<name>-<YYYY-MM-DD>.db` |
 | wie | `VACUUM INTO` — **nicht kopieren** |
 | wann | beim Start, höchstens eine je Kalendertag |
-| wie viele | 7 täglich · 4 wöchentlich · 12 monatlich · 3 jährlich, zusammen höchstens 26 |
+| wie viele | 7 täglich · 4 wöchentlich · 3 monatlich · 2 quartalsweise · 2 halbjährlich · **jährlich ohne Ende** |
 
 Vier Dinge, die man wissen muss:
 
@@ -721,6 +721,24 @@ Vier Dinge, die man wissen muss:
   braucht seine alten Stände am dringendsten.
 - **Ein Fehlschlag hält den Start nicht auf.** Wer die App öffnet, will seine Ausgaben
   sehen; dieselbe Abwägung wie bei der Update-Prüfung.
+- **Die Zahlen folgen einer Regel, nicht dem Geschmack:** jede Stufe reicht genau so weit,
+  wie die nächstgröbere ihre Schrittweite hat — sieben Tage bis zur Woche, vier Wochen bis
+  zum Monat, drei Monate bis zum Quartal, zwei Quartale bis zum Halbjahr, zwei Halbjahre
+  bis zum Jahr. Quartal und Halbjahr sind dabei kein Zierrat: ohne sie müsste die
+  Monatsstufe das ganze Jahr überbrücken (zwölf Stände statt drei).
+
+**Die Jahresstufe läuft nie aus, und das ist der wichtigste Teil.** Eine Sicherung enthält
+immer den GANZEN Bestand — alte Stände tragen also keine Buchung, die der neueste nicht
+auch hätte. Was sie tragen, ist der Stand, BEVOR etwas verschwand: eine versehentliche
+Löschung, eine Migration, die wegnimmt (im Alpha-Stadium ausdrücklich erlaubt), ein Fehler,
+den niemand bemerkt hat.
+
+Solange die Bank die Umsätze noch führt, ist so etwas ärgerlich und behebbar — man ruft sie
+neu ab. Genau das hört aber auf: Institute halten Umsätze eine begrenzte Zeit vor, danach
+ist dieser Bestand die einzige Stelle, an der die Jahre davor noch stehen. Ab dann wäre
+eine weggeworfene Jahressicherung nicht ein verlorener Wiederherstellungspunkt, sondern ein
+verlorenes Jahr. Der Preis ist eine Datei pro Jahr — gemessen daran der billigste Posten in
+diesem Projekt.
 
 Wo was liegt: die Staffelung in `src/core/sicherung/rotation.ts` (rein, ohne Uhr), der
 Use-Case in `src/application/sicherung.ts`, das Dateisystem in
