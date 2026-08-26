@@ -3,6 +3,7 @@
 // läuft über tauri-plugin-sql (SQLite) und wird vom TS-Adapter angesprochen.
 
 mod dateirechte;
+mod datenbank;
 mod krypto;
 mod schluessel;
 mod sicherung;
@@ -18,7 +19,12 @@ pub fn run() {
 
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_sql::Builder::new().build())
+        // Die Datenbank haengt nicht mehr am SQL-Plugin, sondern an einem eigenen Pool
+        // (datenbank.rs). Der Grund ist `PRAGMA key`: es gilt pro Verbindung, und ueber
+        // den Pool des Plugins erwischte es eine beliebige. Der Nebengewinn ist, dass
+        // `sql:allow-execute` aus den Capabilities faellt — der Webview kann kein
+        // beliebiges SQL mehr an eine beliebige Datenbank schicken.
+        .manage(datenbank::Datenbank::default())
         // Reiner Transport für FinTS: der Bank-Endpunkt sendet kein
         // Access-Control-Allow-Origin, aus der Webview stirbt der POST an CORS.
         // Dieser fetch läuft durch Rust und kennt kein CORS. Keine Domänenlogik —
@@ -33,6 +39,11 @@ pub fn run() {
         // Mehrere Statements atomar: was ueber tauri-plugin-sql nicht geht, weil dort jedes
         // Statement eine andere Pool-Verbindung erwischt. Siehe transaktion.rs.
         .invoke_handler(tauri::generate_handler![
+            datenbank::datenbank_oeffnen,
+            datenbank::datenbank_schliessen,
+            datenbank::datenbank_ist_offen,
+            datenbank::db_select,
+            datenbank::db_execute,
             transaktion::transaktion,
             transaktion::schema_umbau,
             sicherung::sicherung_anlegen,

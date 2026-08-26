@@ -1,6 +1,6 @@
 # `persistence/` — SQLite hinter den Ports
 
-Umsetzung der Ports aus `application/ports.ts`, über `tauri-plugin-sql`. Diese Schicht darf
+Umsetzung der Ports aus `application/ports.ts`, über eigene Tauri-Kommandos. Diese Schicht darf
 `core` kennen (sie baut Domänenobjekte), aber niemand kennt sie außer `adapters/dienste.ts`.
 
 ## Migrationen

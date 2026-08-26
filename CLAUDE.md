@@ -892,6 +892,13 @@ Vier Dinge gelten überall und stehen deshalb hier:
   `geldFormatieren` (Kern), nie mit eigenem `toFixed`. Minus ist U+2212.
 - **Die UI kennt nur `application/`** — weder `core/` noch die Persistenz. Was AUSWÄHLT oder
   RECHNET, liegt hinter einem Use-Case, auch beim reinen Lesen.
+- **Der Datenbankzugang läuft über eigene Kommandos**, nicht über `tauri-plugin-sql`
+  (abgelöst 2026-08-26). Der Grund ist `PRAGMA key`: es gilt pro Verbindung, und über den
+  Pool des Plugins erwischte es eine beliebige — gemessen in `src-tauri/src/krypto.rs`.
+  Der eigene Pool (`src-tauri/src/datenbank.rs`) setzt den Schlüssel in den
+  Verbindungsoptionen, damit bekommt ihn jede Verbindung, die je entsteht. **Nach oben
+  ist die Naht dieselbe geblieben** (`select`, `execute`); kein Repository musste dafür
+  angefasst werden. Nebengewinn: `sql:allow-execute` ist aus den Capabilities gefallen.
 - **Migrationen sind forward-only und append-only** und klammern nichts in Transaktionen;
   jedes Statement muss für sich wiederholbar sein.
 - **Kein Wert aus dem echten Bestand ins Repo** (unten ausführlich).

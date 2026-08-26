@@ -19,7 +19,7 @@ use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use sqlx::{Executor, Sqlite, Transaction};
 use tauri::State;
-use tauri_plugin_sql::{DbInstances, DbPool};
+use crate::datenbank::Datenbank;
 
 #[derive(Deserialize)]
 pub struct Anweisung {
@@ -76,23 +76,10 @@ async fn ausfuehren(
 /// nie einen halb geschriebenen Stand.
 #[tauri::command]
 pub async fn transaktion(
-    db: String,
     anweisungen: Vec<Anweisung>,
-    instanzen: State<'_, DbInstances>,
+    db: State<'_, Datenbank>,
 ) -> Result<u64, String> {
-    let instanzen = instanzen.0.read().await;
-    let pool = instanzen
-        .get(&db)
-        .ok_or_else(|| format!("Datenbank '{db}' ist nicht geöffnet"))?;
-
-    // Solange nur das sqlite-Feature des Plugins aktiv ist, hat `DbPool` genau eine
-    // Variante und der Zweig darunter ist tot. Er bleibt trotzdem stehen: kommt je ein
-    // weiteres Feature dazu, ist er sofort richtig, statt still das Falsche zu tun.
-    #[allow(irrefutable_let_patterns)]
-    let DbPool::Sqlite(pool) = pool else {
-        return Err("Nur SQLite wird unterstützt".to_string());
-    };
-
+    let pool = db.pool().await?;
     let mut tx = pool.begin().await.map_err(|e| e.to_string())?;
 
     match ausfuehren(&mut tx, &anweisungen).await {
@@ -134,20 +121,10 @@ pub async fn transaktion(
 /// selben Ergebnis. Wer die Prüfung abschaltet, muss sie nachholen; nur eben am Ende.
 #[tauri::command]
 pub async fn schema_umbau(
-    db: String,
     anweisungen: Vec<Anweisung>,
-    instanzen: State<'_, DbInstances>,
+    db: State<'_, Datenbank>,
 ) -> Result<u64, String> {
-    let instanzen = instanzen.0.read().await;
-    let pool = instanzen
-        .get(&db)
-        .ok_or_else(|| format!("Datenbank '{db}' ist nicht geöffnet"))?;
-
-    #[allow(irrefutable_let_patterns)]
-    let DbPool::Sqlite(pool) = pool else {
-        return Err("Nur SQLite wird unterstützt".to_string());
-    };
-
+    let pool = db.pool().await?;
     let mut conn = pool.acquire().await.map_err(|e| e.to_string())?;
 
     // Ab hier gilt: was auch schiefgeht, die Prüfung wird wieder eingeschaltet. Eine
