@@ -9,6 +9,13 @@ on:
     branches: [main, develop]
   pull_request:
 
+# Ausdrueckliche Rechte statt der Standardrechte des Tokens. Bei `pull_request` aus einem
+# Fork ist er ohnehin nur lesend — aber das ist eine Eigenschaft der Ausloeser, nicht
+# dieser Datei. Wer spaeter einen Ausloeser ergaenzt, erbt sonst still mehr, als der Lauf
+# braucht: er baut und prueft, er schreibt nichts.
+permissions:
+  contents: read
+
 jobs:
   app:
     runs-on: ubuntu-latest

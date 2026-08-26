@@ -209,6 +209,44 @@ describe("Budget-Repository", () => {
     expect(aufbauend?.start).toBe("2026-01-01");
   });
 
+  // Die Stelle, an der `speichern` die Reihe auf den uebergebenen Stand zurechtstutzt:
+  // was nicht mitkommt, faellt weg. Vorher stand die Monatsliste dafuer als
+  // handgequotete Zeichenkette im SQL — jetzt sind es gebundene Platzhalter, und der
+  // Test haelt fest, dass sich am Verhalten nichts geaendert hat.
+  it("wirft beim Speichern die Beträge weg, die nicht mitkommen", async () => {
+    await budgetRepository.speichern({
+      id: "b9", kategorieId: "k9", kontoId: "giro", art: "monatlich", start: "2026-03-01",
+      betraege: [
+        { abMonat: "2026-03", betrag: 12000 },
+        { abMonat: "2026-05", betrag: 13000 },
+        { abMonat: "2026-07", betrag: 14000 },
+      ],
+    });
+
+    await budgetRepository.speichern({
+      id: "b9", kategorieId: "k9", kontoId: "giro", art: "monatlich", start: "2026-03-01",
+      betraege: [{ abMonat: "2026-05", betrag: 13000 }],
+    });
+
+    const b = (await budgetRepository.alle()).find((x) => x.id === "b9");
+    expect(b?.betraege).toEqual([{ abMonat: "2026-05", betrag: 13000 }]);
+  });
+
+  it("räumt die ganze Reihe, wenn kein Betrag mitkommt", async () => {
+    await budgetRepository.speichern({
+      id: "b10", kategorieId: "k10", kontoId: "giro", art: "aufbauend", start: "2026-02-01",
+      betraege: [{ abMonat: "2026-02", betrag: 7500 }],
+    });
+
+    await budgetRepository.speichern({
+      id: "b10", kategorieId: "k10", kontoId: "giro", art: "aufbauend", start: "2026-02-01",
+      betraege: [],
+    });
+
+    const b = (await budgetRepository.alle()).find((x) => x.id === "b10");
+    expect(b?.betraege).toEqual([]);
+  });
+
   it("löscht ein Budget", async () => {
     await budgetRepository.speichern({
       id: "b1", kategorieId: "k1", kontoId: "giro",
