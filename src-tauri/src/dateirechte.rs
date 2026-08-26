@@ -139,6 +139,24 @@ mod tests {
         assert_eq!(bestand_absichern(&dir), 0, "schon eng — nichts zu tun");
     }
 
+    /// Der eigentliche Beweis fuer die `umask`: eine Datei, die NIEMAND nachtraeglich
+    /// angefasst hat, entsteht bereits eng. Genau das kann das `chmod` nicht leisten —
+    /// `-wal` und `-shm` legt SQLite bei jedem Oeffnen neu an.
+    ///
+    /// Der Aufruf wirkt prozessweit und damit auch auf die uebrigen Tests. Das ist
+    /// unschaedlich: alle anderen setzen ihre Rechte ausdruecklich ueber
+    /// `set_permissions`, und das ist absolut, nicht von der `umask` abhaengig.
+    #[test]
+    fn neue_dateien_entstehen_bereits_eng() {
+        let dir = testverzeichnis("umask");
+        standardrechte_einschraenken();
+
+        let pfad = dir.join("frisch.db");
+        fs::write(&pfad, b"x").expect("Testdatei schreiben");
+
+        assert_eq!(modus(&pfad), 0o600, "ohne jedes nachtraegliche chmod");
+    }
+
     #[test]
     fn ein_fehlendes_verzeichnis_ist_kein_fehler() {
         let dir = std::env::temp_dir().join("moneymanager-rechte-gibtsnicht");
