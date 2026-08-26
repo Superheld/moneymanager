@@ -67,6 +67,31 @@ jobs:
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # APPLE-SIGNIERUNG UND NOTARISIERUNG. Ohne diese Secrets baut tauri-action
+          # klaglos ein UNSIGNIERTES Bundle — es bricht nicht ab. Was dann herauskommt,
+          # meldet macOS beim ersten Start als „beschaedigt", und die einzige Abhilfe ist
+          # die xattr-Zeile im Release-Text unten: eine Anleitung an Fremde, bei einer
+          # FINANZ-App eine Sicherheitspruefung abzuschalten. Genau deshalb steht hier
+          # alles bereit, sobald die Secrets da sind.
+          #
+          # Was hinterlegt werden muss (Repository -> Settings -> Secrets):
+          #   APPLE_CERTIFICATE          Developer-ID-Application-Zertifikat als .p12,
+          #                              base64-kodiert
+          #   APPLE_CERTIFICATE_PASSWORD das Kennwort dieser .p12
+          #   APPLE_SIGNING_IDENTITY     "Developer ID Application: <Name> (<TeamID>)"
+          #   APPLE_ID                   die Apple-ID fuer die Notarisierung
+          #   APPLE_PASSWORD             ein app-spezifisches Kennwort, NICHT das echte
+          #   APPLE_TEAM_ID              die Team-ID
+          #
+          # Die Notarisierung laeuft erst, wenn APPLE_ID, APPLE_PASSWORD und
+          # APPLE_TEAM_ID zusammen gesetzt sind — Signierung allein genuegt nicht:
+          # Gatekeeper verlangt bei einem geladenen Bundle beides.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # Ohne diesen Schlüssel entsteht keine Signatur, und ohne Signatur weist jede
           # installierte App das Update ab. Der Build bricht dann ab — richtig so.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -78,6 +103,11 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Moneymanager __VERSION__
+          # DIESER TEXT MUSS MIT DER SIGNIERUNG WEG. Solange unsigniert ausgeliefert
+          # wird, ist er notwendig — ohne ihn kommt niemand in die App. Sobald die
+          # Apple-Secrets oben stehen, ist er FALSCH und zugleich schädlich: er bringt
+          # Leuten bei, bei einer Finanz-App eine Sicherheitswarnung wegzuklicken.
+          # `src/auslieferung.test.ts` hält beides zusammen.
           releaseBody: |
             Lokale Haushalts-Finanz-App, Stadium **Alpha**.
 

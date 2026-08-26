@@ -875,6 +875,25 @@ Produktregistrierungsnummer wird zur **Bauzeit** eingebacken. Fehlt sie, ist die
 fertig und der Bankabruf tot — und das merkt man erst beim ersten Abruf.
 `scripts/installieren.sh` warnt, aber es bricht nicht ab.
 
+### Signierung und Notarisierung: vorbereitet, nicht aktiv
+
+Der Release-Workflow reicht **sechs Apple-Secrets** durch (`APPLE_CERTIFICATE`,
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`,
+`APPLE_TEAM_ID`). Sobald sie im Repository hinterlegt sind, signiert und notarisiert
+`tauri-action` von selbst — es braucht keine Änderung am Workflow mehr.
+
+**Signierung allein genügt nicht.** Gatekeeper verlangt bei einem geladenen Bundle auch
+die Notarisierung; dafür sind die letzten drei da. `APPLE_PASSWORD` ist ein
+app-spezifisches Kennwort, nie das echte.
+
+**Ohne die Secrets bricht nichts ab** — `tauri-action` baut klaglos ein unsigniertes
+Bundle. Gemerkt wird es erst, wenn jemand die App herunterlädt und macOS sie als
+„beschädigt" meldet. Deshalb steht im Release-Text die `xattr`-Anleitung, und deshalb
+**muss sie mit der Signierung wieder weg**: solange unsigniert ausgeliefert wird, ist sie
+notwendig; sobald signiert wird, bringt sie Leuten bei, bei einer Finanz-App eine
+Sicherheitswarnung wegzuklicken. `src/auslieferung.test.ts` hält die beiden zusammen —
+wer die Zeile entfernt, muss den Test anfassen und liest dabei, worauf zu achten ist.
+
 **Zwei Dinge müssen ausserhalb des Repos bereitliegen**, und beide fehlen in einem frischen
 Klon:
 
