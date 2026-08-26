@@ -78,21 +78,29 @@ describe("Der Release-Workflow und die Apple-Signierung", () => {
     }
   });
 
-  it("hält die xattr-Anleitung und die Signierung zusammen", () => {
-    // **Die beiden gehören gekoppelt, und zwar in dieser Richtung:** solange unsigniert
-    // ausgeliefert wird, MUSS die Anleitung dastehen — ohne sie kommt niemand in die App.
-    // Sobald signiert wird, muss sie WEG: dann ist sie falsch und bringt Leuten bei, bei
-    // einer Finanz-App eine Sicherheitswarnung wegzuklicken.
+  it("bricht ab, wenn die Signierungs-Secrets fehlen", () => {
+    // **Der Kern der Sache, und er hängt NICHT am Zertifikat.** Ohne diesen Schritt baut
+    // `tauri-action` klaglos ein unsigniertes Bundle und hängt es an ein öffentliches
+    // Release. Ein Zertifikat kann man nachreichen; ein Release, das draussen ist, nicht
+    // mehr.
     //
-    // Welcher der beiden Zustände gilt, kann dieser Test nicht wissen — ob Secrets
-    // hinterlegt sind, steht nicht im Repo. Was er kann: dafür sorgen, dass die Kopplung
-    // beim Umschalten nicht übersehen wird. Wer die xattr-Zeile entfernt, muss diesen
-    // Test anfassen und liest dabei, worauf er zu achten hat.
-    const hatAnleitung = WORKFLOW.includes("xattr -dr com.apple.quarantine");
+    // Geprüft wird auf `exit 1` im Workflow — ein Schritt, der nur warnt, ist keiner.
+    expect(WORKFLOW).toContain("Ohne Apple-Signierung kein oeffentliches Release");
+    expect(WORKFLOW, "Der Türsteher warnt nur, statt abzubrechen").toContain("exit 1");
+  });
+
+  it("führt im Release-Text KEINE Anleitung zum Abschalten von Gatekeeper", () => {
+    // Sie war notwendig, solange unsigniert ausgeliefert wurde — und genau das kann seit
+    // dem Türsteher nicht mehr passieren. Käme sie zurück, hiesse das: es wird wieder
+    // unsigniert ausgeliefert, und Fremden wird beigebracht, bei einer Finanz-App eine
+    // Sicherheitsprüfung wegzuklicken.
+    //
+    // Im LOKALEN Installationsskript ist dieselbe Zeile in Ordnung: wer auf der eigenen
+    // Maschine baut und dort installiert, weiss, was er tut.
     expect(
-      hatAnleitung,
-      "Die xattr-Anleitung ist weg — dann muss die Signierung stehen und dieser Test " +
-        "auf das Gegenteil umgestellt werden.",
-    ).toBe(true);
+      WORKFLOW.includes("xattr -dr com.apple.quarantine"),
+      "Die xattr-Anleitung ist im Release-Text zurück — dann wird wieder unsigniert " +
+        "ausgeliefert, und der Türsteher oben ist umgangen worden.",
+    ).toBe(false);
   });
 });
