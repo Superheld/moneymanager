@@ -4,6 +4,7 @@
 
 mod dateirechte;
 mod krypto;
+mod schluessel;
 mod sicherung;
 mod transaktion;
 
