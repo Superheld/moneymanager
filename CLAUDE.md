@@ -1071,6 +1071,11 @@ allein schützt nur, solange niemand ihn erneuert.
 
 ## Build-Stolpersteine
 
+- **Der erste Rust-Build nach einem frischen Klon dauert länger als früher.** Seit
+  SQLCipher im Baum ist (`libsqlite3-sys` mit `bundled-sqlcipher-vendored-openssl`), wird
+  OpenSSL mitgebaut. Danach liegt es im Cache und die Sache ist erledigt. `-vendored-`
+  ist Absicht: sonst müsste OpenSSL aus dem System kommen, und dort ist es auf einem
+  frischen Rechner und in einem CI-Läufer nicht.
 - **cargo-deny vor `cargo update`:** ein gezieltes `cargo update -p <kiste>` ist der Weg,
   eine Meldung zu beheben — blind über den ganzen Baum ist es der Weg, den brotli-Pin
   unten zu verlieren. Danach `npm run test:rust`.

@@ -3,6 +3,7 @@
 // läuft über tauri-plugin-sql (SQLite) und wird vom TS-Adapter angesprochen.
 
 mod dateirechte;
+mod krypto;
 mod sicherung;
 mod transaktion;
 
