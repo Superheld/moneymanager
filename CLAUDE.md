@@ -404,6 +404,15 @@ du auf dieser Maschine läuft. Dagegen hülfe nur eine verschlüsselte Datenbank
 Passphrase — die lohnt sich, sobald ein Bestand die Maschine verlässt (Cloud, Sync), und
 solange er das nicht tut, deckt FileVault dasselbe Szenario ab.
 
+Gegen einen **anderen Account** auf derselben Maschine greift dagegen etwas Billigeres,
+und das ist seit 2026-08-26 eingebaut: die App setzt beim Start ihre `umask` auf 0077 und
+zieht vorhandene Datenbankdateien auf 0600 (`src-tauri/src/dateirechte.rs`). Vorher
+entstand der Bestand mit `-rw-r--r--` und war für jeden Nutzer des Rechners lesbar. Die
+`umask` ist dabei die eigentliche Massnahme, nicht das `chmod`: SQLite legt `-wal` und
+`-shm` bei jedem Öffnen neu an, und sie entstünden sonst wieder offen. Auf Windows greift
+weder das eine noch das andere — dort deckt die Rechteverwaltung des Nutzerprofils den
+Fall ab.
+
 ## Stadium: Alpha
 
 Die App ist **nicht veröffentlicht**. Es gibt genau einen Datenbestand — den lokalen —, und
@@ -461,6 +470,7 @@ Ausweg lässt, wird abgeschaltet statt umgangen, und dann ist er ganz weg.
 npm run tauri dev   # Desktop-Fenster
 npm run dev         # nur Frontend (Webview ohne SQLite-Plugin — hat keine Daten)
 npm test            # Vitest: Kern, Use-Cases, Repositories, UI, Schichtgrenzen
+npm run test:rust   # die wenigen Rust-Tests der Shell (Dateirechte) — laufen NICHT in `npm test`
 npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 %)
 npm run typecheck
 npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten

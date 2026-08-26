@@ -2,10 +2,17 @@
 // Fenster + Plugins; die Fachlogik lebt im TS-Kern (src/core), Persistenz
 // läuft über tauri-plugin-sql (SQLite) und wird vom TS-Adapter angesprochen.
 
+mod dateirechte;
 mod transaktion;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // MUSS als Erstes laufen: alles, was danach eine Datei anlegt — die Datenbank, ihre
+    // WAL- und SHM-Beidateien, Zwischenstaende der Plugins — erbt diese Standardrechte.
+    // Ein spaeteres `chmod` kaeme fuer die Beidateien zu spaet, weil SQLite sie bei jedem
+    // Oeffnen neu erzeugt. Siehe dateirechte.rs.
+    dateirechte::standardrechte_einschraenken();
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_sql::Builder::new().build())
@@ -23,6 +30,17 @@ pub fn run() {
         // Mehrere Statements atomar: was ueber tauri-plugin-sql nicht geht, weil dort jedes
         // Statement eine andere Pool-Verbindung erwischt. Siehe transaktion.rs.
         .invoke_handler(tauri::generate_handler![transaktion::transaktion, transaktion::schema_umbau])
+        // Was VOR dieser Aenderung entstanden ist, traegt noch die alten offenen Rechte —
+        // die `umask` oben wirkt nur auf Neues. Ein Fehlschlag darf den Start nicht
+        // verhindern: eine App, die wegen einer Datei nicht hochkommt, an der sie nichts
+        // aendern durfte, waere schlechter als eine mit einer zu offenen Datei.
+        .setup(|app| {
+            use tauri::Manager;
+            if let Ok(verzeichnis) = app.path().app_data_dir() {
+                dateirechte::bestand_absichern(&verzeichnis);
+            }
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

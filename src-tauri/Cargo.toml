@@ -30,3 +30,8 @@ serde_json = "1"
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
+
+# Nur fuer `umask` beim Start (dateirechte.rs). Steckt ohnehin transitiv im Baum;
+# explizit, weil wir es direkt aufrufen. Auf Windows gibt es weder umask noch POSIX-Modi.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
