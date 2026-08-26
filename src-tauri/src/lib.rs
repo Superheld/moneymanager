@@ -8,6 +8,7 @@ mod krypto;
 mod schluessel;
 mod sicherung;
 mod transaktion;
+mod zugang;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -44,6 +45,12 @@ pub fn run() {
             datenbank::datenbank_ist_offen,
             datenbank::db_select,
             datenbank::db_execute,
+            zugang::zugang_stand,
+            zugang::zugang_einrichten,
+            zugang::zugang_entsperren,
+            zugang::zugang_mit_code,
+            zugang::zugang_passphrase_wechseln,
+            zugang::zugang_code_zeigen,
             transaktion::transaktion,
             transaktion::schema_umbau,
             sicherung::sicherung_anlegen,

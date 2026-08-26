@@ -861,3 +861,56 @@ export function vertragZuordnungZuruecksetzen(istbuchungId: string) {
 export function paarungLoesen(transferId: string) {
   return paarungLoesenUseCase(sqliteLedgerRepository, transferId);
 }
+
+// --- Zugang: einrichten, entsperren, sperren ------------------------------------
+
+import {
+  mitCodeRetten,
+  passphraseWechseln as passphraseWechselnUseCase,
+  zugangEinrichten as zugangEinrichtenUseCase,
+  type Einrichtung,
+  type Rettung,
+  type Wechsel,
+  type Zugangsstand,
+} from "../application/zugang";
+import { tauriZugangPort } from "./persistence/zugang";
+import {
+  zeitsperreLaden,
+  zeitsperreSetzen as zeitsperreSetzenUseCase,
+} from "../application/einstellungen";
+
+export function zugangsstand(): Promise<Zugangsstand> {
+  return tauriZugangPort.stand();
+}
+
+export function zugangEinrichten(passphrase: string): Promise<Einrichtung> {
+  return zugangEinrichtenUseCase(tauriZugangPort, passphrase);
+}
+
+export function zugangEntsperren(passphrase: string): Promise<boolean> {
+  return tauriZugangPort.entsperren(passphrase);
+}
+
+export function zugangMitCode(code: string, neue: string): Promise<Rettung> {
+  return mitCodeRetten(tauriZugangPort, code, neue);
+}
+
+export function zugangPassphraseWechseln(alte: string, neue: string): Promise<Wechsel> {
+  return passphraseWechselnUseCase(tauriZugangPort, alte, neue);
+}
+
+export function zugangCodeZeigen(passphrase: string): Promise<string | null> {
+  return tauriZugangPort.codeZeigen(passphrase);
+}
+
+export function zugangSperren(): Promise<void> {
+  return tauriZugangPort.sperren();
+}
+
+export function zeitsperre(): Promise<number> {
+  return zeitsperreLaden(sqliteEinstellungenRepository);
+}
+
+export function zeitsperreSetzen(minuten: number): Promise<void> {
+  return zeitsperreSetzenUseCase(sqliteEinstellungenRepository, minuten);
+}

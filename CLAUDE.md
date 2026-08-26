@@ -694,6 +694,58 @@ installierten App: wer ihn anfasst, schickt sie in ein neues, leeres Verzeichnis
 echte Bestand sieht aus wie verschwunden. Beide Dateien liegen deshalb nebeneinander, und
 die Rezepte aus `CLAUDE.local.md` finden auch die Spielkopie.
 
+### Der Bestand liegt verschlüsselt
+
+Seit 2026-08-27. **Die Einrichtung ist nicht abzulehnen** — beim ersten Start, egal ob
+neuer Nutzer oder vorhandener Bestand. Es gibt kein „später" und kein „ohne
+Verschlüsselung": wer beim ersten Start unter Zeitdruck steht, klickt genau das weg und
+legt dann für immer offen ab, ohne es je wieder zu bemerken.
+
+**Die Passphrase ist nicht der Schlüssel, sie wickelt ihn ein.** Ein gewürfelter
+Datenschlüssel verschlüsselt die Datenbank; er selbst liegt, mit einem aus der Passphrase
+abgeleiteten Schlüssel verschlüsselt, in `<name>.schluessel.json` daneben. Der Umweg
+kostet eine Datei und leistet zweierlei, was direkt nicht ginge: die Passphrase zu
+wechseln dauert Sekunden statt einer Neuverschlüsselung des Bestands, und ein
+**Wiederherstellungscode** ist überhaupt erst möglich — er IST der Datenschlüssel in
+lesbarer Form.
+
+| Stück | Datei |
+|---|---|
+| Schlüssel, Hülle, Wiederherstellungscode | `src-tauri/src/schluessel.rs` |
+| Einrichten, Entsperren, Überführen | `src-tauri/src/zugang.rs` |
+| Der Pool mit `PRAGMA key` | `src-tauri/src/datenbank.rs` |
+| Nachweis, dass wirklich verschlüsselt wird | `src-tauri/src/krypto.rs` |
+| Das Tor | `src/adapters/ui/zugang/` |
+
+Fünf Dinge, die man wissen muss:
+
+- **`PRAGMA key` gilt pro Verbindung**, und es muss als ERSTES kommen. Deshalb steht es in
+  den Verbindungsoptionen und nicht in `after_connect`: dieser Haken läuft nach sqlx'
+  eigenen Pragmas, und `journal_mode` liest den Dateikopf. Bei einer verschlüsselten
+  Datenbank scheitert das mit „file is not a database" — einer Meldung, die nach kaputtem
+  Bestand aussieht statt nach fehlendem Schlüssel.
+- **Ein Pool lässt sich auch mit falschem Schlüssel anlegen.** Erst die erste echte
+  Abfrage fällt um. `datenbank_oeffnen` prüft deshalb mit einem Zugriff, statt einen
+  Erfolg zu melden und die App mit leeren Screens dastehen zu lassen.
+- **Die Überführung ist so gelegt, dass es keinen Moment gibt, in dem beide Fassungen
+  unbrauchbar sind:** sichern, daneben schreiben, nachweisen dass es heil ist, erst dann
+  die alte wegwerfen. Bricht es vorher ab, steht der Altbestand unberührt da.
+- **Die Sicherungen aus der Klartext-Zeit werden dabei weggeworfen** — geprüft am
+  Dateikopf, nicht am Namen. Sie liegen zu lassen hiesse, den ganzen Aufwand durch die
+  Hintertür wieder aufzugeben.
+- **Eine vergessene Passphrase nimmt auch das Jahresarchiv mit.** `VACUUM INTO` schreibt
+  mit dem Schlüssel der offenen Verbindung; alle Sicherungen sind damit verschlüsselt.
+  Deshalb ist der Wiederherstellungscode Pflicht und nicht Komfort.
+
+**Was es NICHT leistet:** gegen Schadcode, der als der Nutzer läuft, während die App
+offen ist, wirkt es nicht — der Schlüssel liegt dann im selben Speicher. Das ist Fall D
+aus dem Bedrohungsmodell und bleibt Sache von CSP und Capabilities.
+
+Die **Zeitsperre** (Einstellungen → Verschlüsselung, Vorgabe 15 Minuten, abschaltbar)
+deckt den Fall ab, den weder Dateirechte noch Verschlüsselung erreichen: jemand setzt
+sich an den entsperrten Rechner. Aus demselben Grund ist der Wiederherstellungscode dort
+nur gegen die Passphrase einzusehen — läge er offen, wäre die Sperre umsonst.
+
 ### Die App sichert sich selbst, gestaffelt
 
 Beim Start legt die App eine Sicherung des Tages an — **vor den Migrationen**, und das ist

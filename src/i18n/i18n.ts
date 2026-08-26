@@ -1526,6 +1526,74 @@ const de = {
       jaehrlich: "jährlich",
     },
   },
+  zugang: {
+    einrichtenTitel: "Zugang einrichten",
+    einrichtenNeu:
+      "Deine Finanzdaten werden verschlüsselt auf dieser Maschine abgelegt. " +
+      "Dafür brauchst du eine Passphrase — ohne sie kommt niemand an den Bestand, " +
+      "auch du nicht.",
+    einrichtenAltbestand:
+      "Dein bisheriger Bestand liegt unverschlüsselt auf der Platte. Er wird jetzt " +
+      "einmalig überführt: vorher entsteht eine Sicherung, und die alte Datei fällt " +
+      "erst weg, wenn die neue nachweislich lesbar ist.",
+    feldPassphrase: "Passphrase",
+    feldWiederholung: "Noch einmal",
+    feldNeuePassphrase: "Neue Passphrase",
+    feldCode: "Wiederherstellungscode",
+    hinweisLaenge:
+      "Mindestens {{mindestens}} Zeichen. Vier gewöhnliche Wörter sind leichter zu " +
+      "merken und schwerer zu raten als ein Kunstwort mit Sonderzeichen.",
+    einrichtenKnopf: "Einrichten",
+    laeuftEinrichten: "wird eingerichtet …",
+    entsperrenTitel: "Bestand entsperren",
+    entsperrenKnopf: "Entsperren",
+    laeuft: "läuft …",
+    weiter: "Weiter",
+    zurueck: "Zurück",
+    vergessen: "Passphrase vergessen",
+    passphraseFalsch: "Die Passphrase passt nicht.",
+    stimmtNichtUeberein: "Die beiden Eingaben stimmen nicht überein.",
+    zuKurz: "Zu kurz — mindestens {{mindestens}} Zeichen.",
+    nurLeerzeichen: "Das sind nur Leerzeichen.",
+    fehlerAllgemein: "Das hat nicht geklappt.",
+    codeTitel: "Dein Wiederherstellungscode",
+    codeErklaerung:
+      "Schreib ihn ab oder druck ihn aus und leg ihn an einen sicheren Ort. Mit ihm " +
+      "kommst du an deinen Bestand, wenn du die Passphrase vergisst.",
+    codeWarnung:
+      "Er wird nur dieses eine Mal gezeigt. Später kannst du ihn in den Einstellungen " +
+      "erneut abrufen — dafür brauchst du dann die Passphrase.",
+    codeNotiert: "Ich habe ihn notiert.",
+    rettungTitel: "Mit dem Wiederherstellungscode hinein",
+    rettungErklaerung:
+      "Gib den Code ein und setz gleich eine neue Passphrase. Der Bestand selbst bleibt " +
+      "unberührt.",
+    rettungKnopf: "Entsperren und neu setzen",
+    codeUnbrauchbar: "Mit diesem Code lässt sich der Bestand nicht öffnen.",
+    gesperrtTitel: "Gesperrt",
+    // Einstellungen
+    kartenTitel: "Verschlüsselung",
+    kartenText:
+      "Der Bestand liegt verschlüsselt auf dieser Maschine. Die Passphrase wickelt den " +
+      "Schlüssel ein — sie zu ändern kostet Sekunden, der Bestand bleibt wie er ist.",
+    wechselnTitel: "Passphrase ändern",
+    feldAltePassphrase: "Bisherige Passphrase",
+    wechselnKnopf: "Ändern",
+    wechselFertig: "Die Passphrase ist geändert.",
+    alteFalsch: "Die bisherige Passphrase passt nicht.",
+    codeAbrufenTitel: "Wiederherstellungscode ansehen",
+    codeAbrufenText:
+      "Nur gegen die Passphrase — sonst läge er für jeden offen, der an einem " +
+      "entsperrten Rechner sitzt.",
+    codeAbrufenKnopf: "Anzeigen",
+    sperreTitel: "Zeitsperre",
+    sperreText:
+      "Nach dieser Zeit ohne Bedienung wird der Bestand wieder zugesperrt. Das ist der " +
+      "Schutz gegen jemanden, der an deinem entsperrten Rechner sitzt.",
+    sperreAus: "aus",
+    sperreMinuten: "{{minuten}} Minuten",
+    jetztSperren: "Jetzt sperren",
+  },
   charts: {
     einnahmen: "Einnahmen",
     ausgabenInklBudgets: "Ausgaben (inkl. Budgets)",
@@ -2992,6 +3060,71 @@ const en: typeof de = {
       halbjaehrlich: "semi-annually",
       jaehrlich: "yearly",
     },
+  },
+  zugang: {
+    einrichtenTitel: "Set up access",
+    einrichtenNeu:
+      "Your financial data is stored encrypted on this machine. You need a passphrase " +
+      "for that — without it nobody reaches the data, not even you.",
+    einrichtenAltbestand:
+      "Your existing data is stored unencrypted. It will now be migrated once: a backup " +
+      "is taken first, and the old file is only removed once the new one is provably " +
+      "readable.",
+    feldPassphrase: "Passphrase",
+    feldWiederholung: "Again",
+    feldNeuePassphrase: "New passphrase",
+    feldCode: "Recovery code",
+    hinweisLaenge:
+      "At least {{mindestens}} characters. Four ordinary words are easier to remember " +
+      "and harder to guess than an invented word with special characters.",
+    einrichtenKnopf: "Set up",
+    laeuftEinrichten: "setting up …",
+    entsperrenTitel: "Unlock data",
+    entsperrenKnopf: "Unlock",
+    laeuft: "working …",
+    weiter: "Continue",
+    zurueck: "Back",
+    vergessen: "Forgot passphrase",
+    passphraseFalsch: "That passphrase does not match.",
+    stimmtNichtUeberein: "The two entries do not match.",
+    zuKurz: "Too short — at least {{mindestens}} characters.",
+    nurLeerzeichen: "That is only whitespace.",
+    fehlerAllgemein: "That did not work.",
+    codeTitel: "Your recovery code",
+    codeErklaerung:
+      "Write it down or print it and keep it somewhere safe. It gets you back to your " +
+      "data if you forget the passphrase.",
+    codeWarnung:
+      "It is shown this once only. You can retrieve it later in the settings — you will " +
+      "need the passphrase for that.",
+    codeNotiert: "I have written it down.",
+    rettungTitel: "Enter with the recovery code",
+    rettungErklaerung:
+      "Enter the code and set a new passphrase right away. The data itself is untouched.",
+    rettungKnopf: "Unlock and set anew",
+    codeUnbrauchbar: "This code does not open the data.",
+    gesperrtTitel: "Locked",
+    kartenTitel: "Encryption",
+    kartenText:
+      "The data is stored encrypted on this machine. The passphrase wraps the key — " +
+      "changing it takes seconds, the data stays as it is.",
+    wechselnTitel: "Change passphrase",
+    feldAltePassphrase: "Current passphrase",
+    wechselnKnopf: "Change",
+    wechselFertig: "The passphrase has been changed.",
+    alteFalsch: "The current passphrase does not match.",
+    codeAbrufenTitel: "View recovery code",
+    codeAbrufenText:
+      "Only against the passphrase — otherwise it would lie open to anyone sitting at " +
+      "an unlocked machine.",
+    codeAbrufenKnopf: "Show",
+    sperreTitel: "Auto-lock",
+    sperreText:
+      "After this long without use the data is locked again. This is the protection " +
+      "against someone sitting at your unlocked machine.",
+    sperreAus: "off",
+    sperreMinuten: "{{minuten}} minutes",
+    jetztSperren: "Lock now",
   },
   charts: {
     einnahmen: "Income",

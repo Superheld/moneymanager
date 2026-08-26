@@ -31,6 +31,7 @@ import { IconButton } from "../bausteine/IconButton";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Bereich } from "../bausteine/Bereich";
 import { FestlegungenCard } from "../training/FestlegungenCard";
+import { VerschluesselungCard } from "../zugang/VerschluesselungCard";
 import { Modal } from "../bausteine/Modal";
 import {
   fehlerNachricht,
@@ -41,7 +42,7 @@ import {
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };
 
-export function EinstellungenScreen() {
+export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
   const { t } = useTranslation();
   const [personen, setPersonen] = useState<Person[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
@@ -88,6 +89,12 @@ export function EinstellungenScreen() {
           label: t("einstellungen.aktualisierung.titel"),
           untertitel: t("einstellungen.aktualisierung.untertitel"),
           inhalt: () => <AktualisierungCard />,
+        },
+        {
+          id: "verschluesselung",
+          label: t("zugang.kartenTitel"),
+          untertitel: t("zugang.kartenText"),
+          inhalt: () => <VerschluesselungCard onSperren={onSperren} />,
         },
         {
           id: "experimente",

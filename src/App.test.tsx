@@ -17,6 +17,19 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("./adapters/persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
+// Das Tor vor der App redet mit Rust. Im Test gibt es kein Rust — hier steht es auf
+// „eingerichtet und offen", damit die Navigationstests das prüfen, worum es ihnen geht.
+// Der Sperrbildschirm selbst hat eigene Tests.
+vi.mock("./adapters/dienste", async () => {
+  const echt = await vi.importActual<typeof import("./adapters/dienste")>("./adapters/dienste");
+  return {
+    ...echt,
+    zugangsstand: async () => ({ eingerichtet: true, offen: true, altbestand: false }),
+    zeitsperre: async () => 0,
+    zugangSperren: async () => {},
+  };
+});
+
 import { frischeDb, pluginApi, sqlLaden } from "./testwerkzeug/harness";
 import App from "./App";
 import { sqliteKategorieRepository } from "./adapters/persistence/sqliteStammdatenRepositories";
