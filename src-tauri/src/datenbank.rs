@@ -122,13 +122,42 @@ async fn pool_von(pfad: &Path, o: &Oeffnung) -> Result<SqlitePool, sqlx::Error> 
 /// der ohne gueltigen Schluessel scheitern MUSS. Ein Pool laesst sich naemlich auch mit
 /// falschem Schluessel anlegen: die Verbindung entsteht, und erst die erste echte
 /// Abfrage faellt um. Ohne diese Probe waere die App „entsperrt" und jeder Screen leer.
-#[tauri::command]
-pub async fn datenbank_oeffnen(
-    app: AppHandle,
+/// Ein Pool auf eine UNVERSCHLUESSELTE Datei, an einem beliebigen Pfad.
+///
+/// Nur fuer die Ueberfuehrung des Altbestands (`zugang.rs`) — nicht als Kommando
+/// erreichbar. Der Pfad kommt dort aus dem Datenverzeichnis, nicht aus dem Webview.
+///
+/// **`anlegen: true`, obwohl die Datei existiert.** Nicht wegen der Hauptdatei, sondern
+/// wegen `ATTACH`: die angehaengte Datenbank erbt die Oeffnungsflags der Verbindung, und
+/// ohne das CREATE-Flag kann `ATTACH` die Zieldatei der Ueberfuehrung nicht anlegen. Der
+/// Fehler lautet dann „unable to open database" und zeigt auf die NEUE Datei — man sucht
+/// ihn zuverlaessig an der falschen Stelle. Gemessen, nicht vermutet.
+pub async fn pool_klartext(pfad: &Path) -> Result<SqlitePool, sqlx::Error> {
+    pool_von(pfad, &Oeffnung { datei: String::new(), pragma: None, anlegen: true }).await
+}
+
+/// Wie `pool_klartext`, aber legt die Datei an. Nur fuer Tests.
+#[cfg(test)]
+pub async fn pool_anlegen_klartext(pfad: &Path) -> Result<SqlitePool, sqlx::Error> {
+    pool_von(pfad, &Oeffnung { datei: String::new(), pragma: None, anlegen: true }).await
+}
+
+/// Dasselbe mit Schluessel — fuer die Pruefung der frisch ueberfuehrten Datei.
+pub async fn pool_mit_schluessel(pfad: &Path, pragma: &str) -> Result<SqlitePool, sqlx::Error> {
+    pool_von(
+        pfad,
+        &Oeffnung { datei: String::new(), pragma: Some(pragma.to_string()), anlegen: false },
+    )
+    .await
+}
+
+/// Der Kern von `datenbank_oeffnen`, auch von innen aufrufbar.
+pub async fn oeffnen_intern(
+    app: &AppHandle,
     o: Oeffnung,
-    db: State<'_, Datenbank>,
+    db: &State<'_, Datenbank>,
 ) -> Result<bool, String> {
-    let pfad = datei_im_datenverzeichnis(&app, &o.datei)?;
+    let pfad = datei_im_datenverzeichnis(app, &o.datei)?;
     let pool = pool_von(&pfad, &o).await.map_err(|e| e.to_string())?;
 
     let taugt = sqlx::query("SELECT count(*) FROM sqlite_master")
@@ -147,6 +176,15 @@ pub async fn datenbank_oeffnen(
     }
     *halter = Some(pool);
     Ok(true)
+}
+
+#[tauri::command]
+pub async fn datenbank_oeffnen(
+    app: AppHandle,
+    o: Oeffnung,
+    db: State<'_, Datenbank>,
+) -> Result<bool, String> {
+    oeffnen_intern(&app, o, &db).await
 }
 
 /// Schliesst die Datenbank. Danach ist der Bestand wieder zu.

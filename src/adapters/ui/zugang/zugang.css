@@ -1,0 +1,55 @@
+/* Der Sperrbildschirm. Bewusst karg: hier gibt es nichts zu tun ausser dem einen. */
+
+.zugang-buehne {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--sp-6, 1.5rem);
+  background: var(--bg, #fff);
+}
+
+.zugang-inhalt {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-4, 1rem);
+}
+
+.zugang-knoepfe {
+  display: flex;
+  gap: var(--sp-3, 0.75rem);
+  justify-content: flex-end;
+}
+
+.zugang-fehler {
+  color: var(--danger, #b3261e);
+  margin: 0;
+}
+
+/* Der Wiederherstellungscode wird abgeschrieben oder ausgedruckt. Deshalb gross, in
+   gleicher Zeichenbreite und umbruchfähig — nicht in einer Zeile, die am Rand abreisst. */
+.zugang-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  letter-spacing: 0.04em;
+  white-space: pre-wrap;
+  word-break: break-all;
+  padding: var(--sp-4, 1rem);
+  border: 1px solid var(--line, #ddd);
+  border-radius: var(--r-md, 8px);
+  margin: 0;
+  user-select: all;
+}
+
+.zugang-bestaetigung {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 0.5rem);
+}
+
+@media print {
+  /* Ausdrucken soll den Code hergeben und sonst nichts. */
+  .zugang-buehne { min-height: auto; }
+  .zugang-knoepfe, .zugang-bestaetigung { display: none; }
+}
