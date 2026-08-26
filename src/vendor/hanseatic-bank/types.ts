@@ -21,7 +21,7 @@ export interface Account {
  *
  * Umsatz- und Buchungsdatum liegen bis zu sechs Tage auseinander und fallen damit über
  * Monatsgrenzen — deshalb kommen beide heraus. Der Zeitraumfilter greift auf
- * `bookingDate`, weil allein dieses Datum monoton fällt (siehe docs/bank-api.md).
+ * `bookingDate`, weil allein dieses Datum monoton fällt.
  */
 export type TransactionType =
   | 'card'         // Kartenumsatz (KARTEN-UMS.) — trägt als einziger eine Kennung

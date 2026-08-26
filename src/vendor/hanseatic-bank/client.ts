@@ -184,7 +184,7 @@ export class HanseaticClient {
   }
 
   // --- Sync-Fassade: dieselben Vorgänge unter den Namen, die eine Finanzverwaltung
-  // erwartet. Weiterleitungen, keine zweite Ebene (docs/api.md).
+  // erwartet. Weiterleitungen, keine zweite Ebene.
 
   syncBalances (): Promise<Account[]> {
     return this.getAccounts()

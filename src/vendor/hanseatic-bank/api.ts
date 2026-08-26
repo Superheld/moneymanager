@@ -6,7 +6,7 @@ import type {
 /**
  * Die rohen Aufrufe — eins zu eins, ohne Deutung.
  *
- * Nur lesende Endpoints. Die schreibenden sind in docs/bank-api.md beschrieben und
+ * Nur lesende Endpoints. Die schreibenden sind bewusst nicht dabei und
  * bewusst nicht hier: eine Library, die Salden liest, hat keinen Grund, Geld zu bewegen.
  */
 
