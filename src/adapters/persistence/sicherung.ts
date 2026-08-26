@@ -17,8 +17,7 @@ export function heute(jetzt: Date = new Date()): string {
 }
 
 export const tauriSicherungPort: SicherungPort = {
-  anlegen: (stichtag) =>
-    invoke<boolean>("sicherung_anlegen", { db: `sqlite:${DATEINAME}`, quelle: DATEINAME, stichtag }),
+  anlegen: (stichtag) => invoke<boolean>("sicherung_anlegen", { quelle: DATEINAME, stichtag }),
   auflisten: () => invoke<string[]>("sicherungen_auflisten", { quelle: DATEINAME }),
   entfernen: (stichtage) =>
     invoke<number>("sicherungen_entfernen", { quelle: DATEINAME, stichtage }),

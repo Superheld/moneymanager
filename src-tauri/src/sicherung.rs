@@ -16,7 +16,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
-use tauri_plugin_sql::{DbInstances, DbPool};
+use crate::datenbank::Datenbank;
 
 /// Unterhalb des App-Datenverzeichnisses, damit die Sicherungen nicht zwischen den
 /// laufenden Datenbankdateien liegen — dort sind sie schon einmal übersehen worden.
@@ -64,30 +64,20 @@ fn stichtag_aus(name: &str, quelle: &str) -> Option<String> {
 #[tauri::command]
 pub async fn sicherung_anlegen(
     app: AppHandle,
-    db: String,
     quelle: String,
     stichtag: String,
-    instanzen: State<'_, DbInstances>,
+    db: State<'_, Datenbank>,
 ) -> Result<bool, String> {
     let ziel = verzeichnis(&app)?.join(dateiname(&quelle, &stichtag));
     if ziel.exists() {
         return Ok(false);
     }
 
-    let instanzen = instanzen.0.read().await;
-    let pool = instanzen
-        .get(&db)
-        .ok_or_else(|| format!("Datenbank '{db}' ist nicht geöffnet"))?;
-
-    #[allow(irrefutable_let_patterns)]
-    let DbPool::Sqlite(pool) = pool else {
-        return Err("Nur SQLite wird unterstützt".to_string());
-    };
-
+    let pool = db.pool().await?;
     let ziel_text = ziel.to_string_lossy().to_string();
     sqlx::query("VACUUM INTO ?")
         .bind(&ziel_text)
-        .execute(pool)
+        .execute(&pool)
         .await
         .map_err(|e| format!("Sicherung fehlgeschlagen: {e}"))?;
 

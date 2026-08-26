@@ -18,6 +18,11 @@
 // RustCrypto-Projekt. Bei Krypto ist die eigene Konstruktion immer die schlechtere; was
 // hier steht, ist die Verdrahtung, nicht das Verfahren.
 
+// Noch nicht verdrahtet: die Oberflaeche zum Einrichten und Entsperren ist die naechste
+// Scheibe. Bis dahin sieht der Nicht-Test-Build hier lauter Ungenutztes — und eine
+// Warnung, die man wegzuschauen lernt, nimmt die naechste echte mit.
+#![allow(dead_code)]
+
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};

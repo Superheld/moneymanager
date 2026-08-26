@@ -230,6 +230,64 @@ mod tests {
         pool.close().await;
     }
 
+    /// **Die Frage, die den Zuschnitt aller weiteren Scheiben entscheidet.**
+    ///
+    /// `PRAGMA key` gilt PRO VERBINDUNG. `tauri-plugin-sql` oeffnet aber einen Pool und
+    /// holt sich fuer jedes Statement eine beliebige Verbindung daraus — genau die Falle,
+    /// die bei `PRAGMA foreign_keys` schon zugeschlagen hat (siehe transaktion.rs).
+    ///
+    /// Wenn ein `PRAGMA key` ueber den Pool nur die eine Verbindung erwischt, die es
+    /// gerade bekommen hat, dann laesst sich eine verschluesselte Datenbank ueber das
+    /// Plugin GAR NICHT betreiben — und der eigene Persistenz-Adapter (S-10f) waere keine
+    /// Kuer mehr, sondern Voraussetzung.
+    #[tokio::test]
+    async fn ein_pragma_key_ueber_einen_pool_mit_mehreren_verbindungen() {
+        use crate::schluessel::Datenschluessel;
+
+        let datei = pfad("pool");
+        let dk = Datenschluessel::wuerfeln();
+
+        // Anlegen wie gehabt, mit genau einer Verbindung.
+        let pool = oeffnen(&datei, Some(&dk.als_pragma())).await.expect("anlegen");
+        pool.execute("CREATE TABLE probe (a INTEGER)").await.expect("tabelle");
+        pool.execute("INSERT INTO probe VALUES (1)").await.expect("insert");
+        pool.close().await;
+
+        // Und jetzt so, wie das Plugin es tut: mehrere Verbindungen im Pool.
+        let opts = SqliteConnectOptions::new().filename(&datei).create_if_missing(false);
+        let pool = SqlitePoolOptions::new()
+            .max_connections(5)
+            .min_connections(0)
+            .connect_with(opts)
+            .await
+            .expect("pool");
+
+        pool.execute(format!("PRAGMA key = {}", dk.als_pragma()).as_str())
+            .await
+            .expect("key auf irgendeiner Verbindung");
+
+        // Genug Abfragen, dass der Pool weitere Verbindungen aufmachen muss.
+        let mut fehler = 0;
+        for _ in 0..20 {
+            if sqlx::query_scalar::<_, i64>("SELECT COUNT(*) FROM probe")
+                .fetch_one(&pool)
+                .await
+                .is_err()
+            {
+                fehler += 1;
+            }
+        }
+        pool.close().await;
+
+        // Diese Zusicherung haelt das MESSERGEBNIS fest, nicht einen Wunsch. Schlaegt sie
+        // eines Tages um, hat sich sqlx' oder SQLCiphers Verhalten geaendert — und die
+        // Architektur der Persistenz haengt daran.
+        assert!(
+            fehler > 0,
+            "Ein einzelnes PRAGMA key hat den ganzen Pool bedient. Dann waere der Umweg              ueber einen eigenen Adapter nicht noetig — diese Annahme gehoert geprueft."
+        );
+    }
+
     #[tokio::test]
     async fn der_klartext_steht_nicht_in_der_datei() {
         let datei = pfad("klartext");

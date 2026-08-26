@@ -20,13 +20,13 @@ tauri-build = { version = "2", features = [] }
 [dependencies]
 tauri = { version = "2", features = [] }
 tauri-plugin-opener = "2"
-tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 tauri-plugin-http = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-# Direkt gebraucht fuer den Transaktions-Command: tauri-plugin-sql fuehrt jedes Statement
-# ueber den Pool aus und kann deshalb keine Transaktion klammern. Version an das Plugin
-# gebunden (es traegt sqlx 0.8) - zwei sqlx-Versionen waeren zwei verschiedene Typen.
+# Der ganze Datenbankzugang laeuft hierueber (datenbank.rs). Frueher lag er beim
+# SQL-Plugin und sqlx war nur fuer den Transaktions-Command noetig; seit `PRAGMA key`
+# eine Verbindung braucht, die wir selbst in der Hand haben, ist das Plugin ganz
+# abgeloest.
 sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
@@ -59,6 +59,10 @@ chacha20poly1305 = "0.10"
 rand = "0.8"
 zeroize = { version = "1", features = ["derive"] }
 data-encoding = "2"
+
+# Der Lese-/Schreib-Schutz um den Pool (datenbank.rs). sqlx zieht tokio ohnehin —
+# hier wird nur das `sync`-Feature ausdruecklich angefordert.
+tokio = { version = "1", features = ["sync"] }
 
 [dev-dependencies]
 # Nur fuer die Tests der Verschluesselung: sqlx ist async, und ohne Laufzeit laeuft kein

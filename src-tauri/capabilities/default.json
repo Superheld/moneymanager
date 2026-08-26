@@ -1,13 +1,13 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "Capability for the main window. Ohne sql:* — die Datenbank laeuft ueber eigene Kommandos (datenbank.rs), nicht ueber tauri-plugin-sql.",
+  "windows": [
+    "main"
+  ],
   "permissions": [
     "core:default",
     "opener:default",
-    "sql:default",
-    "sql:allow-execute",
     "updater:default",
     "process:allow-restart"
   ]
