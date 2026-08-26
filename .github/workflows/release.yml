@@ -64,6 +64,46 @@ jobs:
       - name: Tests
         run: npm test
 
+      # DER TÜRSTEHER. Ohne ihn baut `tauri-action` klaglos ein unsigniertes Bundle,
+      # haengt es an ein oeffentliches Release, und der Release-Text muss den Leuten
+      # dann beibringen, bei einer FINANZ-App eine Sicherheitspruefung abzuschalten.
+      #
+      # Das ist der eigentliche Fehler — nicht das fehlende Zertifikat. Ein Zertifikat
+      # kann man nachreichen; ein Release, das drausssen ist, nicht mehr. Deshalb bricht
+      # der Lauf hier ab, statt etwas zu erzeugen, das niemand veroeffentlichen sollte.
+      #
+      # Dieselbe Regel gilt schon fuer den Updater-Schluessel, nur setzt tauri das dort
+      # selbst durch. Hier tut es niemand, also tun wir es.
+      #
+      # Der LOKALE Weg (`npm run installieren`) ist davon unberuehrt: wer auf der eigenen
+      # Maschine baut und dort installiert, weiss, was er tut. Gefaehrlich wird es erst,
+      # wenn es Fremde herunterladen.
+      - name: Ohne Apple-Signierung kein oeffentliches Release
+        env:
+          ZERTIFIKAT: ${{ secrets.APPLE_CERTIFICATE }}
+          IDENTITAET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          fehlt=""
+          [ -n "$ZERTIFIKAT" ] || fehlt="$fehlt APPLE_CERTIFICATE"
+          [ -n "$IDENTITAET" ] || fehlt="$fehlt APPLE_SIGNING_IDENTITY"
+          [ -n "$APPLE_ID" ]   || fehlt="$fehlt APPLE_ID"
+          [ -n "$TEAM" ]       || fehlt="$fehlt APPLE_TEAM_ID"
+          if [ -n "$fehlt" ]; then
+            echo "ABGEBROCHEN — es fehlen:$fehlt"
+            echo
+            echo "Ein unsigniertes Bundle waere lauffaehig und trotzdem falsch: macOS"
+            echo "meldet es als beschaedigt, und die einzige Abhilfe waere eine Anleitung"
+            echo "an Fremde, Gatekeeper abzuschalten. Bei einer Finanz-App ist das der"
+            echo "schlechteste Rat, den man geben kann."
+            echo
+            echo "Bis das Zertifikat da ist, laeuft der lokale Weg weiter:"
+            echo "  npm run installieren"
+            exit 1
+          fi
+          echo "Alle Signierungs-Secrets vorhanden."
+
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -103,18 +143,16 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Moneymanager __VERSION__
-          # DIESER TEXT MUSS MIT DER SIGNIERUNG WEG. Solange unsigniert ausgeliefert
-          # wird, ist er notwendig — ohne ihn kommt niemand in die App. Sobald die
-          # Apple-Secrets oben stehen, ist er FALSCH und zugleich schädlich: er bringt
-          # Leuten bei, bei einer Finanz-App eine Sicherheitswarnung wegzuklicken.
-          # `src/auslieferung.test.ts` hält beides zusammen.
+          # KEINE xattr-Anleitung mehr. Sie war notwendig, solange unsigniert
+          # ausgeliefert wurde — und genau das kann seit dem Türsteher oben nicht mehr
+          # passieren. Ein Release aus diesem Workflow ist signiert und notarisiert,
+          # sonst gibt es keines. `src/auslieferung.test.ts` hält beides zusammen.
           releaseBody: |
             Lokale Haushalts-Finanz-App, Stadium **Alpha**.
 
-            Nicht mit einem Apple-Zertifikat signiert: macOS meldet die App beim ersten
-            Start als „beschädigt". Sie ist es nicht — einmalig freigeben mit
-
-                xattr -dr com.apple.quarantine /Applications/Moneymanager.app
+            Signiert und notarisiert. Der Bestand wird beim ersten Start verschlüsselt —
+            die Passphrase wird dabei gesetzt, und der Wiederherstellungscode gehört
+            aufgeschrieben.
           # Siehe Kopf: beides muss false bleiben, sonst findet der Updater nichts.
           releaseDraft: false
           prerelease: false

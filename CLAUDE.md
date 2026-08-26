@@ -886,13 +886,27 @@ Der Release-Workflow reicht **sechs Apple-Secrets** durch (`APPLE_CERTIFICATE`,
 die Notarisierung; dafür sind die letzten drei da. `APPLE_PASSWORD` ist ein
 app-spezifisches Kennwort, nie das echte.
 
-**Ohne die Secrets bricht nichts ab** — `tauri-action` baut klaglos ein unsigniertes
-Bundle. Gemerkt wird es erst, wenn jemand die App herunterlädt und macOS sie als
-„beschädigt" meldet. Deshalb steht im Release-Text die `xattr`-Anleitung, und deshalb
-**muss sie mit der Signierung wieder weg**: solange unsigniert ausgeliefert wird, ist sie
-notwendig; sobald signiert wird, bringt sie Leuten bei, bei einer Finanz-App eine
-Sicherheitswarnung wegzuklicken. `src/auslieferung.test.ts` hält die beiden zusammen —
-wer die Zeile entfernt, muss den Test anfassen und liest dabei, worauf zu achten ist.
+**Ohne die Secrets bricht der Release-Workflow ab** — und zwar bevor irgendetwas gebaut
+wird. Das ist die eigentliche Maßnahme, und sie hängt NICHT am Zertifikat: `tauri-action`
+würde sonst klaglos ein unsigniertes Bundle bauen und an ein öffentliches Release hängen.
+Gemerkt würde es erst beim Nutzer, wenn macOS die App als „beschädigt" meldet.
+
+**Ein Zertifikat kann man nachreichen; ein Release, das draussen ist, nicht mehr.** Genau
+dieselbe Regel gilt schon für den Updater-Signaturschlüssel — nur setzt Tauri sie dort
+selbst durch, und hier tut es niemand.
+
+Damit ist auch die `xattr`-Anleitung aus dem Release-Text verschwunden. Sie war
+notwendig, solange unsigniert ausgeliefert wurde; jetzt kann das nicht mehr passieren.
+**Im lokalen Installationsskript bleibt sie** — wer auf der eigenen Maschine baut und
+dort installiert, weiss, was er tut. Gefährlich wird es erst, wenn Fremde herunterladen.
+
+`src/auslieferung.test.ts` hält beides fest: dass der Türsteher wirklich abbricht (`exit
+1`, nicht nur eine Warnung), und dass die Anleitung nicht in den Release-Text
+zurückkehrt.
+
+**Bis das Zertifikat da ist, läuft der lokale Weg unverändert:** `npm run installieren`
+baut und installiert nach `/Applications`. Was fehlt, ist nur die Möglichkeit, ein
+öffentliches Release zu erzeugen — und das ist Absicht.
 
 **Zwei Dinge müssen ausserhalb des Repos bereitliegen**, und beide fehlen in einem frischen
 Klon:
