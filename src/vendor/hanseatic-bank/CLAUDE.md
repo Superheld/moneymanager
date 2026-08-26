@@ -16,6 +16,14 @@ Die Bibliothek ist bewusst **kein Produkt** — sie ist unfertig und für techni
 Leute brauchbar, nicht für jeden. Genau deshalb hängt sie hier hinter einem
 Experimente-Schalter (`application/experimente.ts`) und nicht an der Oberfläche.
 
+**Hier steht nur, was zum Laufen nötig ist.** Keine Beschreibung der Schnittstelle,
+keine Einrichtungsanleitung, kein Beispielmitschnitt — wer diesen Weg benutzt, weiss,
+was er tut, und das ist die Voraussetzung, nicht die Hürde. Der nächste Schritt geht
+weiter: der Code soll aus der ausgelieferten App verschwinden und nur noch in einem
+Build erscheinen, der ihn ausdrücklich anfordert. Ein Laufzeit-Schalter leistet das
+nicht — `adapters/dienste.ts` importiert statisch, damit steckt dieser Ordner heute in
+jedem Bündel.
+
 ## Was hier ANDERS ist als im Herkunfts-Repository
 
 Wer abgleicht, muss diese drei Punkte kennen — sonst überschreibt er sie beim nächsten
@@ -25,17 +33,12 @@ Mal wieder:
    laufen die Prüfungen zwar durch, aber es findet keine Suite und meldet die Datei als
    Fehler. Getauscht sind nur Importe und Assertions; die Fälle und ihre Werte sind
    Zeile für Zeile dieselben.
-2. **Die Doku ist entschärft.** `docs/` trug Zahlen, die am echten Bestand gemessen
-   waren — Reichweite der Historie, Zeilenzahlen einer Seite, Grösse eines Auszugs. Im
-   privaten Herkunfts-Repository war das in Ordnung, hier nicht (siehe
-   `../../../CLAUDE.md`, „Keine Zahlen aus dem Bestand in Prosa"). Zahlen, die die API
-   beschreiben — Token-Laufzeiten, Abfragetakt, Formatlängen, Seitengrösse —, sind
-   geblieben: sie tragen die Sache und altern nicht mit einem Konto.
-3. **Der Abschnitt "Referenzimplementierung" in `docs/api.md` nennt keine Pfade.** Dort
-   stehen im Herkunfts-Repository Verweise auf ein Beispielskript und die Kommandozeile —
-   Dateien, die hier nicht eingebettet sind. Ein Verweis auf etwas, das es nicht gibt, ist
-   schlimmer als keiner, und `doku.test.ts` faengt ihn ohnehin.
-4. **`src/cli/` fehlt.** Sie zieht `node:fs`, `node:os` und `process` und läuft im
+2. **`docs/` ist gar nicht mehr da** (seit 2026-08-26). Dort stand die Schnittstelle der
+   Bank Schritt für Schritt beschrieben — Protokollwissen, das in ein öffentliches
+   Repository nicht gehört und das dieser Code zum Laufen nicht braucht. Es bleibt im
+   privaten Herkunfts-Repository. Wer abgleicht, findet es dort; wer hier arbeitet, hat
+   den Code.
+3. **`src/cli/` fehlt.** Sie zieht `node:fs`, `node:os` und `process` und läuft im
    Webview nicht. Der Kern der Bibliothek ist frei davon — das ist der Grund, warum sie
    hier überhaupt funktioniert.
 
@@ -59,9 +62,6 @@ Fliesskomma-Euro**, nicht als Integer Cent. Wer sie ungerechnet weiterreicht, br
 erste Regel dieses Projekts. Ebenso trägt `amount` das Vorzeichen bereits selbst — eine
 zweite Ableitung über den Buchungsschlüssel wäre nicht nur überflüssig, sondern bei
 jedem neuen Schlüssel der Bank stillschweigend falsch.
-
-Was die Bank tatsächlich liefert, steht in `docs/bank-api.md`; was diese Bibliothek
-daraus anbietet, in `docs/api.md`.
 
 ## Einrichtung
 
