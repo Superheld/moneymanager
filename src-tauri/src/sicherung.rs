@@ -13,7 +13,7 @@
 // Adapter steht, lässt sich nicht ohne Dateien testen.
 
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_sql::{DbInstances, DbPool};

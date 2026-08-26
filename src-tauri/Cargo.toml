@@ -31,6 +31,26 @@ sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runti
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
 
+# NICHT direkt benutzt — und trotzdem noetig.
+#
+# sqlx-sqlite bindet dieselbe Kiste; Cargo vereinigt die Features aller Nutzer einer
+# Abhaengigkeit, also bekommt sqlx die hier gewaehlte C-Bibliothek. `bundled-sqlcipher`
+# tauscht SQLite gegen SQLCipher aus: gleiche API, zusaetzlich `PRAGMA key`. Ohne diesen
+# Eintrag gaebe es keinen Weg, an sqlx' Wahl der C-Bibliothek heranzukommen, ausser das
+# Plugin zu forken.
+#
+# `-vendored-openssl`, weil sonst OpenSSL aus dem System kommen muesste — auf einem
+# frischen Rechner und in der CI ist es dort nicht. Der Preis ist Bauzeit beim ersten Mal.
+#
+# Die Version muss zu der passen, die sqlx zieht (0.30.x). Zwei Fassungen waeren zwei
+# verschiedene C-Bibliotheken im selben Prozess.
+libsqlite3-sys = { version = "0.30.1", features = ["bundled-sqlcipher-vendored-openssl"] }
+
+[dev-dependencies]
+# Nur fuer die Tests der Verschluesselung: sqlx ist async, und ohne Laufzeit laeuft kein
+# einziger davon.
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
 # Nur fuer `umask` beim Start (dateirechte.rs). Steckt ohnehin transitiv im Baum;
 # explizit, weil wir es direkt aufrufen. Auf Windows gibt es weder umask noch POSIX-Modi.
 [target.'cfg(unix)'.dependencies]
