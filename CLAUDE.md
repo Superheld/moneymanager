@@ -961,8 +961,40 @@ Design-System schreibt UI-Wörter vor („Spartopf", „Puffer", „Ansparrate")
 Töpfe-Zeit stammen und heute nirgends mehr vorkommen — es beschreibt einen überholten Stand
 und ist keine Quelle mehr. Was an seine Stelle tritt, ist offen.
 
+## Die Lieferkette
+
+Zwei Ökosysteme, zwei Wächter, beide in der CI (`.github/workflows/ci.yml`):
+
+| | prüft | wo konfiguriert |
+|---|---|---|
+| `npm audit --omit=dev --audit-level=high` | die npm-Seite | Flags im Workflow |
+| `cargo-deny check advisories sources` | die Rust-Seite | `deny.toml` |
+
+Der Rust-Wächter läuft als **eigener Job, der nichts baut** — `cargo-deny` liest nur
+`Cargo.lock` und die RustSec-Datenbank. Damit bleibt die Entscheidung bestehen, den
+schweren Tauri-Build aus der CI herauszuhalten.
+
+Drei Dinge, die man beim Kalibrieren wissen muss, weil sie sonst zu Dauerrot führen —
+und ein Wächter, der bei jedem Lauf dasselbe meldet, wird abgeschaltet statt gelesen:
+
+- **`unmaintained` gilt nur für den Workspace.** Sonst fällt bei jedem Lauf halb Tauri
+  an: die GTK3-Bindings, `proc-macro-error`, die `unic-*`-Reihe. Alle transitiv, keine
+  von hier aus wechselbar. **Schwachstellen zählen weiterhin überall im Baum** — nur die
+  Wartungslage nicht.
+- **Lizenzen werden nicht geprüft.** Eigene Frage, eigene Kriterien; eine halb gepflegte
+  Allowlist nähme die Schwachstellenprüfung mit in den Abgrund.
+- **Jede Einzelfreigabe trägt ihren Grund in `deny.toml`.** Ohne ihn steht dort in einem
+  Jahr eine Kennung, die niemand mehr einordnen kann — und die deshalb bleibt.
+
+`lib-fints` hängt an einem **Commit-SHA**, nicht mehr an einem Branch. Ein beweglicher
+Ref bedeutet, dass ein `npm update` stillschweigend fremden Code einzieht; der Lockfile
+allein schützt nur, solange niemand ihn erneuert.
+
 ## Build-Stolpersteine
 
+- **cargo-deny vor `cargo update`:** ein gezieltes `cargo update -p <kiste>` ist der Weg,
+  eine Meldung zu beheben — blind über den ganzen Baum ist es der Weg, den brotli-Pin
+  unten zu verlieren. Danach `npm run test:rust`.
 - **brotli / rustc:** Tauri zieht `brotli 8.0.3`, das via `alloc-stdlib 0.2.3`
   `alloc-no-stdlib 3.0.0` einbindet, selbst aber `alloc-no-stdlib 2.0.4` nutzt →
   Trait-Konflikt (`StandardAlloc` implementiert `Allocator` nicht). In `Cargo.lock` gepinnt:

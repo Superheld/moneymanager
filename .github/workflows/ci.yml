@@ -40,3 +40,31 @@ jobs:
 
       - name: Build (Frontend)
         run: npx vite build
+
+      # Der Waechter fuer die npm-Seite. `--omit=dev` mit Absicht: eine Schwachstelle in
+      # Vitest oder jsdom erreicht niemanden, der die App benutzt, und Dauerrot aus dem
+      # Werkzeugkasten kostet den Waechter seine Glaubwuerdigkeit. `high` als Schwelle,
+      # weil darunter fast nur transitive DoS-Meldungen liegen, gegen die eine lokale
+      # App nichts einzuwenden hat.
+      - name: Abhaengigkeiten (npm)
+        run: npm audit --omit=dev --audit-level=high
+
+  # Die Rust-Seite. Ein EIGENER Job, weil er absichtlich NICHTS baut: `cargo-deny` liest
+  # die Cargo.lock und die RustSec-Datenbank, mehr nicht. Damit bleibt die Entscheidung
+  # oben unangetastet, den schweren Tauri-Build aus der CI herauszuhalten — der brauchte
+  # System-Bibliotheken und Minuten, dieser Lauf braucht Sekunden.
+  #
+  # Die Konfiguration steht in deny.toml, samt Begruendung fuer jede Einzelfreigabe.
+  lieferkette:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Eine Fremd-Action im Lieferketten-Waechter ist nicht ohne Ironie. Sie laedt ein
+      # fertiges Binary statt `cargo install` (Minuten). Wer das enger haben will, pinnt
+      # sie auf einen Commit-SHA statt auf `v2` — dann faellt allerdings auch jede
+      # Fehlerbehebung darin aus, bis jemand den SHA hebt.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: src-tauri/Cargo.toml
+          command: check advisories sources
