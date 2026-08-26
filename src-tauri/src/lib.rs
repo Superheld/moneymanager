@@ -3,6 +3,7 @@
 // läuft über tauri-plugin-sql (SQLite) und wird vom TS-Adapter angesprochen.
 
 mod dateirechte;
+mod sicherung;
 mod transaktion;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -29,7 +30,14 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         // Mehrere Statements atomar: was ueber tauri-plugin-sql nicht geht, weil dort jedes
         // Statement eine andere Pool-Verbindung erwischt. Siehe transaktion.rs.
-        .invoke_handler(tauri::generate_handler![transaktion::transaktion, transaktion::schema_umbau])
+        .invoke_handler(tauri::generate_handler![
+            transaktion::transaktion,
+            transaktion::schema_umbau,
+            sicherung::sicherung_anlegen,
+            sicherung::sicherungen_auflisten,
+            sicherung::sicherungen_entfernen,
+            sicherung::sicherungsordner
+        ])
         // Was VOR dieser Aenderung entstanden ist, traegt noch die alten offenen Rechte —
         // die `umask` oben wirkt nur auf Neues. Ein Fehlschlag darf den Start nicht
         // verhindern: eine App, die wegen einer Datei nicht hochkommt, an der sie nichts

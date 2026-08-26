@@ -25,7 +25,7 @@
  * `tauri dev` auf `true` und bei `tauri build` auf `false` — also genau dort, wo auch die
  * fachliche Grenze liegt: was aus dem Bundle startet, ist die echte App.
  */
-const DATEINAME = import.meta.env.VITE_DB_DATEI ?? (import.meta.env.DEV ? "moneymanager-dev.db" : "moneymanager.db");
+export const DATEINAME = import.meta.env.VITE_DB_DATEI ?? (import.meta.env.DEV ? "moneymanager-dev.db" : "moneymanager.db");
 
 /**
  * Was `tauri-plugin-sql` als Verbindungszeichenkette erwartet. Der relative Pfad wird
