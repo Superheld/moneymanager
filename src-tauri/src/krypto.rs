@@ -30,16 +30,25 @@ mod tests {
     /// Die Reihenfolge ist nicht verhandelbar: `PRAGMA key` muss vor jedem Zugriff auf
     /// die Datenbank kommen. Danach ist es zu spaet — SQLCipher hat dann schon versucht,
     /// den Kopf der Datei zu lesen, und scheitert.
-    async fn oeffnen(datei: &PathBuf, schluessel: Option<&str>) -> Result<SqlitePool, sqlx::Error> {
+    ///
+    /// **`pragma` ist der FERTIGE Ausdruck, nicht der nackte Wert.** SQLCipher kennt zwei
+    /// Formen, und sie sehen fast gleich aus: `'wort'` ist ein Passwort und geht durch
+    /// SQLCiphers eigene Ableitung, `x'hex'` ist der Rohschluessel und wird direkt
+    /// benutzt. Wer hier noch einmal Anfuehrungszeichen herumlegt, macht aus dem einen
+    /// das andere — oder kaputtes SQL. Genau das ist beim ersten Anlauf passiert.
+    async fn oeffnen(datei: &PathBuf, pragma: Option<&str>) -> Result<SqlitePool, sqlx::Error> {
         let opts = SqliteConnectOptions::new().filename(datei).create_if_missing(true);
         let pool = SqlitePoolOptions::new().max_connections(1).connect_with(opts).await?;
-        if let Some(k) = schluessel {
-            // Der Schluessel wird hier einfach eingesetzt statt gebunden: `PRAGMA` nimmt
-            // keine Platzhalter. Im Produktivcode kommt er nicht vom Nutzer, sondern ist
-            // ein zufaelliger Datenschluessel in Hex — dort gibt es nichts zu escapen.
-            pool.execute(format!("PRAGMA key = '{k}'").as_str()).await?;
+        if let Some(k) = pragma {
+            // Eingesetzt statt gebunden: `PRAGMA` nimmt keine Platzhalter.
+            pool.execute(format!("PRAGMA key = {k}").as_str()).await?;
         }
         Ok(pool)
+    }
+
+    /// Ein Passwort in der Form, die SQLCipher dafuer erwartet.
+    fn als_passwort(wort: &str) -> String {
+        format!("'{}'", wort.replace('\'', "''"))
     }
 
     const SCHLUESSEL: &str = "probe-schluessel-nur-fuer-diesen-test";
@@ -66,7 +75,7 @@ mod tests {
     #[tokio::test]
     async fn eine_verschluesselte_datei_traegt_keinen_sqlite_kopf() {
         let datei = pfad("kopf");
-        let pool = oeffnen(&datei, Some(SCHLUESSEL)).await.expect("oeffnen");
+        let pool = oeffnen(&datei, Some(&als_passwort(SCHLUESSEL))).await.expect("oeffnen");
         pool.execute("CREATE TABLE probe (a TEXT)").await.expect("tabelle");
         pool.close().await;
 
@@ -83,7 +92,7 @@ mod tests {
     #[tokio::test]
     async fn ohne_schluessel_kommt_man_nicht_heran() {
         let datei = pfad("ohne");
-        let pool = oeffnen(&datei, Some(SCHLUESSEL)).await.expect("oeffnen");
+        let pool = oeffnen(&datei, Some(&als_passwort(SCHLUESSEL))).await.expect("oeffnen");
         pool.execute("CREATE TABLE probe (a TEXT)").await.expect("tabelle");
         pool.execute("INSERT INTO probe VALUES ('geheim')").await.expect("insert");
         pool.close().await;
@@ -99,11 +108,11 @@ mod tests {
     #[tokio::test]
     async fn mit_dem_falschen_schluessel_ebenfalls_nicht() {
         let datei = pfad("falsch");
-        let pool = oeffnen(&datei, Some(SCHLUESSEL)).await.expect("oeffnen");
+        let pool = oeffnen(&datei, Some(&als_passwort(SCHLUESSEL))).await.expect("oeffnen");
         pool.execute("CREATE TABLE probe (a TEXT)").await.expect("tabelle");
         pool.close().await;
 
-        let pool = oeffnen(&datei, Some("ein-anderer-schluessel")).await.expect("oeffnen");
+        let pool = oeffnen(&datei, Some(&als_passwort("ein-anderer-schluessel"))).await.expect("oeffnen");
         let ergebnis: Result<i64, _> = sqlx::query_scalar("SELECT COUNT(*) FROM probe")
             .fetch_one(&pool)
             .await;
@@ -114,12 +123,12 @@ mod tests {
     #[tokio::test]
     async fn mit_dem_richtigen_schluessel_steht_alles_wieder_da() {
         let datei = pfad("rundreise");
-        let pool = oeffnen(&datei, Some(SCHLUESSEL)).await.expect("oeffnen");
+        let pool = oeffnen(&datei, Some(&als_passwort(SCHLUESSEL))).await.expect("oeffnen");
         pool.execute("CREATE TABLE probe (a TEXT)").await.expect("tabelle");
         pool.execute("INSERT INTO probe VALUES ('wieder da')").await.expect("insert");
         pool.close().await;
 
-        let pool = oeffnen(&datei, Some(SCHLUESSEL)).await.expect("wieder oeffnen");
+        let pool = oeffnen(&datei, Some(&als_passwort(SCHLUESSEL))).await.expect("wieder oeffnen");
         let wert: String = sqlx::query_scalar("SELECT a FROM probe").fetch_one(&pool).await.expect("lesen");
         assert_eq!(wert, "wieder da");
         pool.close().await;
@@ -160,10 +169,71 @@ mod tests {
         pool.close().await;
     }
 
+    /// **Die Naht zwischen Schluesselverwaltung und Datenbank.**
+    ///
+    /// Hier faellt auf, wenn `als_pragma()` die falsche Form liefert: ohne die Klammerung
+    /// `x'…'` fasst SQLCipher den Wert als Passwort auf und jagt ihn durch seine eigene
+    /// Ableitung. Es funktionierte trotzdem — nur waere dann nicht der Schluessel, den
+    /// wir gesichert haben, der die Datei verschluesselt. Der Fehler zeigte sich erst am
+    /// Tag, an dem jemand den Wiederherstellungscode braucht.
+    #[tokio::test]
+    async fn der_datenschluessel_oeffnet_eine_sqlcipher_datenbank() {
+        use crate::schluessel::Datenschluessel;
+
+        let datei = pfad("datenschluessel");
+        let dk = Datenschluessel::wuerfeln();
+
+        let pool = oeffnen(&datei, Some(&dk.als_pragma())).await.expect("anlegen");
+        pool.execute("CREATE TABLE probe (a TEXT)").await.expect("tabelle");
+        pool.execute("INSERT INTO probe VALUES ('mit gewuerfeltem Schluessel')")
+            .await
+            .expect("insert");
+        pool.close().await;
+
+        assert!(
+            !std::fs::read(&datei).expect("lesen").starts_with(b"SQLite format 3\0"),
+            "Mit einem Rohschluessel muss verschluesselt worden sein."
+        );
+
+        let pool = oeffnen(&datei, Some(&dk.als_pragma())).await.expect("wieder oeffnen");
+        let wert: String = sqlx::query_scalar("SELECT a FROM probe").fetch_one(&pool).await.expect("lesen");
+        assert_eq!(wert, "mit gewuerfeltem Schluessel");
+        pool.close().await;
+    }
+
+    /// **Der Test, der den Wiederherstellungscode zu einem Versprechen macht.**
+    ///
+    /// Ein Code, der sich sauber zurueckrechnen laesst, aber die Datenbank nicht
+    /// aufschliesst, ist schlimmer als keiner: er wird aufgeschrieben und weggelegt, und
+    /// sein Wert zeigt sich erst in dem Moment, in dem nichts anderes mehr hilft.
+    #[tokio::test]
+    async fn der_wiederherstellungscode_oeffnet_die_echte_datenbank() {
+        use crate::schluessel::Datenschluessel;
+
+        let datei = pfad("code-oeffnet");
+        let dk = Datenschluessel::wuerfeln();
+        let code = dk.als_wiederherstellungscode();
+
+        let pool = oeffnen(&datei, Some(&dk.als_pragma())).await.expect("anlegen");
+        pool.execute("CREATE TABLE probe (a TEXT)").await.expect("tabelle");
+        pool.execute("INSERT INTO probe VALUES ('gerettet')").await.expect("insert");
+        pool.close().await;
+        drop(dk); // Die Passphrase ist vergessen, der Schluessel weg — nur der Zettel bleibt.
+
+        let aus_zettel = Datenschluessel::aus_wiederherstellungscode(&code).expect("Code");
+        let pool = oeffnen(&datei, Some(&aus_zettel.als_pragma())).await.expect("oeffnen");
+        let wert: String = sqlx::query_scalar("SELECT a FROM probe")
+            .fetch_one(&pool)
+            .await
+            .expect("Der Wiederherstellungscode oeffnete die Datenbank NICHT.");
+        assert_eq!(wert, "gerettet");
+        pool.close().await;
+    }
+
     #[tokio::test]
     async fn der_klartext_steht_nicht_in_der_datei() {
         let datei = pfad("klartext");
-        let pool = oeffnen(&datei, Some(SCHLUESSEL)).await.expect("oeffnen");
+        let pool = oeffnen(&datei, Some(&als_passwort(SCHLUESSEL))).await.expect("oeffnen");
         pool.execute("CREATE TABLE umsatz (empfaenger TEXT)").await.expect("tabelle");
         pool.execute("INSERT INTO umsatz VALUES ('MUSTERMANN-UNIKAT-ZEICHENKETTE')")
             .await
