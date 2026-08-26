@@ -487,6 +487,10 @@ mod tests {
         assert!(verletzt.is_empty(), "Fremdschluessel verletzt nach der Ueberfuehrung");
 
         println!("Ueberfuehrung geprueft: Tabellen, Indizes, Buchungen und Summe unveraendert.");
+        // Ausgegeben, damit sich die ueberfuehrte Probe danach auch von aussen oeffnen
+        // laesst — etwa um das Werkzeug `bestandslesen` daran zu pruefen. Es ist eine
+        // Kopie und ein gewuerfelter Schluessel; beides ist nach dem Lauf wertlos.
+        println!("PROBE-CODE {}", dk.als_wiederherstellungscode());
         nachher.close().await;
     }
 
