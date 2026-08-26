@@ -151,6 +151,20 @@ pub async fn pool_mit_schluessel(pfad: &Path, pragma: &str) -> Result<SqlitePool
     .await
 }
 
+/// Ein NUR LESENDER Pool auf eine verschluesselte Datei — fuer das Werkzeug
+/// `bestandslesen`, das die Privatsphaere-Waechter speist.
+///
+/// `query_only` steht hier und nicht in den Argumenten des Werkzeugs: was ein Waechter
+/// darf, gehoert nicht in die Hand dessen, der ihn aufruft.
+pub async fn pool_lesend(pfad: &Path, pragma: &str) -> Result<SqlitePool, sqlx::Error> {
+    let opts = SqliteConnectOptions::new()
+        .filename(pfad)
+        .create_if_missing(false)
+        .pragma("key", pragma.to_string())
+        .pragma("query_only", "ON");
+    SqlitePoolOptions::new().max_connections(1).connect_with(opts).await
+}
+
 /// Der Kern von `datenbank_oeffnen`, auch von innen aufrufbar.
 pub async fn oeffnen_intern(
     app: &AppHandle,

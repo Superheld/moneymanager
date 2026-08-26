@@ -1024,6 +1024,35 @@ in die Doku außerhalb des Repos.
 Der Muster-Guard findet davon nur die Beträge. Der Rest ist Handarbeit — dieselbe Art wie
 bei Regel 2 und 3 der Testdaten.
 
+### Wie die Wächter eine verschlüsselte Datenbank lesen
+
+`sqlite3` bekommt eine SQLCipher-Datei nicht auf. Der Wert-Abgleich liest den echten
+Bestand aber zur Laufzeit — er bräche ab, und ein Wächter, der nicht mehr arbeiten kann,
+ist am Ende ein abgeschalteter Wächter. Genau das Gegenteil von dem, wofür die
+Verschlüsselung da ist.
+
+`scripts/bestandsmerkmale.mjs` entscheidet deshalb **am Dateikopf**, welchen Weg es
+nimmt: unverschlüsselt über `sqlite3`, verschlüsselt über das eigene Werkzeug
+`src-tauri/src/bin/bestandslesen.rs`. Einmal bauen:
+
+```bash
+cargo build --manifest-path src-tauri/Cargo.toml --bin bestandslesen
+```
+
+Der Schlüssel kommt aus `~/.moneymanager-schluessel/entwicklung.code` — dem
+**Wiederherstellungscode**, nicht der Passphrase: der Code IST der Datenschlüssel, es
+braucht kein Argon2 und keine Eingabe. Ein Wächter, der interaktiv nach einem Kennwort
+fragt, läuft in keinem Hook.
+
+**Das ist eine bewusste Schwächung und gehört benannt.** Wer diese Datei hat, hat den
+Bestand — die Verschlüsselung schützt dann nur noch gegen jemanden, der die Datenbank
+OHNE das Verzeichnis erwischt: ein Backup, eine Kopie, ein zweiter Account. Dieselbe
+Abwägung wie beim Updater-Signaturschlüssel, der ebenfalls dort liegt. Auf einer
+Maschine, auf der nicht entwickelt wird, gibt es die Datei nicht.
+
+Fehlt das Werkzeug oder der Code, **bricht der Wächter ab** statt durchzuwinken — beides
+geprüft.
+
 ### Zwei Wächter, die verschiedene Fehler finden
 
 **Der Wert-Abgleich** (`src/privatsphaere.test.ts`, dazu der `pre-push`-Hook) kennt die

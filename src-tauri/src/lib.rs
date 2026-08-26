@@ -3,9 +3,10 @@
 // läuft über tauri-plugin-sql (SQLite) und wird vom TS-Adapter angesprochen.
 
 mod dateirechte;
-mod datenbank;
+// Oeffentlich, weil das Werkzeug `bestandslesen` sie braucht (src/bin/).
+pub mod datenbank;
 mod krypto;
-mod schluessel;
+pub mod schluessel;
 mod sicherung;
 mod transaktion;
 mod zugang;
