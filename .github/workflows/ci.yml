@@ -8,6 +8,15 @@ on:
   push:
     branches: [main, develop]
   pull_request:
+  # WOZU DER WOCHENLAUF. Die Waechter unten pruefen Abhaengigkeiten gegen Datenbanken,
+  # die sich ohne unser Zutun aendern: eine Schwachstelle wird gemeldet, waehrend hier
+  # niemand etwas tippt. Ein Lauf, der nur bei Push startet, findet sie erst beim
+  # naechsten Commit — bei einem Solo-Projekt koennen das Wochen sein. Montags frueh,
+  # damit der Befund am Wochenanfang dasteht und nicht Freitagabend.
+  schedule:
+    - cron: "0 6 * * 1"
+  # Von Hand ausloesbar, weil man nach einem Fund nicht bis Montag warten will.
+  workflow_dispatch:
 
 # Ausdrueckliche Rechte statt der Standardrechte des Tokens. Bei `pull_request` aus einem
 # Fork ist er ohnehin nur lesend — aber das ist eine Eigenschaft der Ausloeser, nicht
@@ -20,9 +29,9 @@ jobs:
   app:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           # Muss zur mise.toml im Repo passen — GitHub Actions liest die nicht selbst.
           node-version: "26"
@@ -49,6 +58,17 @@ jobs:
       - name: Abhaengigkeiten (npm)
         run: npm audit --omit=dev --audit-level=high
 
+      # Kommen die Pakete wirklich von der Registry? Prueft die Signaturen und
+      # Herkunftsnachweise dessen, was installiert wurde. Faengt eine andere Sorte
+      # Angriff als `npm audit`: nicht „bekannte Luecke", sondern „untergeschoben".
+      - name: Signaturen (npm)
+        run: npm audit signatures
+
+      # Kein Paket fuehrt beim Installieren unbemerkt Code aus. Siehe den Kopf des
+      # Skripts — warum es eine Allowlist ist und keine `ignore-scripts=true`.
+      - name: Install-Skripte
+        run: node scripts/install-skripte-pruefen.mjs
+
   # Die Rust-Seite. Ein EIGENER Job, weil er absichtlich NICHTS baut: `cargo-deny` liest
   # die Cargo.lock und die RustSec-Datenbank, mehr nicht. Damit bleibt die Entscheidung
   # oben unangetastet, den schweren Tauri-Build aus der CI herauszuhalten — der brauchte
@@ -58,13 +78,13 @@ jobs:
   lieferkette:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       # Eine Fremd-Action im Lieferketten-Waechter ist nicht ohne Ironie. Sie laedt ein
       # fertiges Binary statt `cargo install` (Minuten). Wer das enger haben will, pinnt
       # sie auf einen Commit-SHA statt auf `v2` — dann faellt allerdings auch jede
       # Fehlerbehebung darin aus, bis jemand den SHA hebt.
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
         with:
           manifest-path: src-tauri/Cargo.toml
           command: check advisories sources

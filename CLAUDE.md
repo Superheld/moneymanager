@@ -963,12 +963,37 @@ und ist keine Quelle mehr. Was an seine Stelle tritt, ist offen.
 
 ## Die Lieferkette
 
-Zwei Ökosysteme, zwei Wächter, beide in der CI (`.github/workflows/ci.yml`):
+Vier Wächter in der CI (`.github/workflows/ci.yml`), und sie finden verschiedene Dinge:
 
 | | prüft | wo konfiguriert |
 |---|---|---|
-| `npm audit --omit=dev --audit-level=high` | die npm-Seite | Flags im Workflow |
-| `cargo-deny check advisories sources` | die Rust-Seite | `deny.toml` |
+| `npm audit --omit=dev --audit-level=high` | **bekannte Lücken**, npm-Seite | Flags im Workflow |
+| `cargo-deny check advisories sources` | **bekannte Lücken**, Rust-Seite | `deny.toml` |
+| `npm audit signatures` | **Herkunft**: kam das Paket wirklich von der Registry | — |
+| `scripts/install-skripte-pruefen.mjs` | **Ausführung beim Installieren** | `allowScripts` in `package.json` |
+
+Die dritte und vierte Zeile fangen etwas anderes als die ersten beiden: nicht „bekannte
+Lücke", sondern „untergeschoben" bzw. „läuft ungefragt". **Der vierte ist der wichtigste**
+— ein `postinstall` läuft mit den Rechten dessen, der `npm ci` tippt, vor jedem Test und
+in jeder CI. Eine Lücke IM Code muss erst erreicht werden; ein Install-Skript läuft von
+selbst.
+
+**Warum dort eine Allowlist steht und kein `ignore-scripts=true`:** gemessen, nicht
+vermutet — ein globales Verbot bricht den Build. `lib-fints` kommt aus einem
+Git-Repository und wird beim Installieren über sein `prepare`-Skript gebaut; ohne das
+fehlt sein `dist/`, und Vite bricht mit „failed to resolve import" ab. Ein Verbot, das
+den Build kostet, wird abgeschaltet. Freigeben mit `npm install-scripts approve <paket>`,
+und der Moment der Freigabe ist die Gelegenheit hinzusehen.
+
+**Der Wochenlauf ist kein Beiwerk.** Beide Advisory-Datenbanken ändern sich ohne unser
+Zutun: eine Schwachstelle wird gemeldet, während hier niemand etwas tippt. Ein Lauf, der
+nur bei Push startet, findet sie erst beim nächsten Commit — bei einem Solo-Projekt
+können das Wochen sein.
+
+**Die Actions hängen an Commit-SHAs**, nicht an Tags. Ein Tag ist beweglich; wer ihn
+kontrolliert, führt Code in unserer CI aus, und die hat das Signaturgeheimnis. Der Preis:
+SHAs altern stumm — deshalb steht `github-actions` in `.github/dependabot.yml`, das sie
+hebt und den Tag als Kommentar dahinterschreibt.
 
 Der Rust-Wächter läuft als **eigener Job, der nichts baut** — `cargo-deny` liest nur
 `Cargo.lock` und die RustSec-Datenbank. Damit bleibt die Entscheidung bestehen, den
