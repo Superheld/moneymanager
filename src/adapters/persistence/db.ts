@@ -6,6 +6,8 @@ import Database from "@tauri-apps/plugin-sql";
 import { DB_URL } from "./datenbankdatei";
 import { MIGRATIONS } from "./migrations";
 import { schemaStatement, fremdschluesselPruefen } from "./transaktion";
+import { sicherungPflegen } from "../../application/sicherung";
+import { heute, tauriSicherungPort } from "./sicherung";
 
 /**
  * Das Minimum, das `migrate` von einer Datenbank braucht. Hält die Migrationslogik
@@ -147,9 +149,29 @@ export async function migrate(db: MigrationsDb): Promise<void> {
 
 let dbPromise: Promise<Database> | null = null;
 
+/**
+ * Die Sicherung des Tages — VOR den Migrationen.
+ *
+ * Der Ort ist der ganze Punkt: der Fall, für den es Sicherungen gibt, ist eine
+ * Schemaänderung, die schiefgeht. Danach zu sichern hiesse, den kaputten Stand zu
+ * sichern. Läuft heute schon eine, passiert hier nichts.
+ *
+ * **Ein Fehlschlag hält den Start nicht auf.** Wer die App öffnet, will seine Ausgaben
+ * sehen; dass keine Sicherung entstand, ist kein Grund, ihm das zu verweigern. Es steht
+ * in der Konsole und sonst nirgends — dieselbe Abwägung wie bei der Update-Prüfung.
+ */
+async function sicherungVersuchen(): Promise<void> {
+  try {
+    await sicherungPflegen(tauriSicherungPort, heute());
+  } catch (fehler) {
+    console.warn("Sicherung nicht möglich:", fehler);
+  }
+}
+
 export function getDb(): Promise<Database> {
   if (!dbPromise) {
     dbPromise = Database.load(DB_URL).then(async (db) => {
+      await sicherungVersuchen();
       await migrate(db);
       return db;
     });

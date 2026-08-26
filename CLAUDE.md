@@ -694,6 +694,42 @@ installierten App: wer ihn anfasst, schickt sie in ein neues, leeres Verzeichnis
 echte Bestand sieht aus wie verschwunden. Beide Dateien liegen deshalb nebeneinander, und
 die Rezepte aus `CLAUDE.local.md` finden auch die Spielkopie.
 
+### Die App sichert sich selbst, gestaffelt
+
+Beim Start legt die App eine Sicherung des Tages an — **vor den Migrationen**, und das ist
+der ganze Punkt: der Fall, für den es Sicherungen gibt, ist eine Schemaänderung, die
+schiefgeht. Danach zu sichern hiesse, den kaputten Stand zu sichern.
+
+| | |
+|---|---|
+| wo | `<App-Datenverzeichnis>/sicherungen/<name>-<YYYY-MM-DD>.db` |
+| wie | `VACUUM INTO` — **nicht kopieren** |
+| wann | beim Start, höchstens eine je Kalendertag |
+| wie viele | 7 täglich · 4 wöchentlich · 12 monatlich · 3 jährlich, zusammen höchstens 26 |
+
+Vier Dinge, die man wissen muss:
+
+- **`VACUUM INTO` statt Kopieren, weil eine Kopie das WAL nicht mitnimmt.** Die jüngsten
+  Schreibvorgänge stehen dort und nicht in der Hauptdatei; die Kopie sähe vollständig aus
+  und wäre es nicht — das merkt man erst beim Wiederherstellen.
+- **Eine vorhandene Sicherung wird nicht überschrieben.** Wer die App am selben Tag zum
+  dritten Mal startet, behält den Stand von heute früh: der ist der, in dem eine inzwischen
+  kaputtgegangene Änderung noch nicht steckt.
+- **Eine Stufe zählt vorhandene Stände, keine Kalendereinheiten.** „Vier wöchentlich"
+  heisst: die vier jüngsten Sieben-Tage-Blöcke, in denen es eine Sicherung GIBT. Sonst
+  bliebe von einem, der die App wochenlang nicht startet, gar nichts übrig — und genau der
+  braucht seine alten Stände am dringendsten.
+- **Ein Fehlschlag hält den Start nicht auf.** Wer die App öffnet, will seine Ausgaben
+  sehen; dieselbe Abwägung wie bei der Update-Prüfung.
+
+Wo was liegt: die Staffelung in `src/core/sicherung/rotation.ts` (rein, ohne Uhr), der
+Use-Case in `src/application/sicherung.ts`, das Dateisystem in
+`src-tauri/src/sicherung.rs`.
+
+**Wenn der Bestand einmal verschlüsselt ist, sind es die Sicherungen mit** — `VACUUM INTO`
+schreibt mit dem Schlüssel der offenen Verbindung. Das ist bequem und hat eine Kehrseite,
+die in das Recovery-Konzept gehört: eine vergessene Passphrase nimmt die Sicherungen mit.
+
 Den Spielstand schreibt `npm run seed` — vollständig migriert, mit erfundenen Daten in
 jedem Bereich. Zwei Dinge daran sind Absicht:
 
