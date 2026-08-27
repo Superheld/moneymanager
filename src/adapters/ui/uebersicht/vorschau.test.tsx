@@ -42,7 +42,7 @@ const kontoNamen = new Map([
 
 const zeile = (over: Partial<Vorschauzeile> & { datum: string }): Vorschauzeile => ({
   bezeichnung: "Ohlert Beitrag",
-  betrag: -2500,
+  betrag: -1234,
   charakter: "Aufwand",
   kontoId: "k1",
   planRef: { quelleId: "r1", faelligkeit: over.datum },
@@ -60,7 +60,7 @@ describe("VorschauKarte", () => {
   it("zeigt Fälligkeiten mehrerer Konten in einer Liste, mit dem Konto als Spalte", async () => {
     await zeige([
       zeile({ datum: inTagen(3), bezeichnung: "Kesselmann Rate", kontoId: "k1" }),
-      zeile({ datum: inTagen(4), bezeichnung: "Vibora Beitrag", kontoId: "k2", betrag: -1800 }),
+      zeile({ datum: inTagen(4), bezeichnung: "Vibora Beitrag", kontoId: "k2", betrag: -4321 }),
     ]);
 
     expect(await screen.findByText("Kesselmann Rate")).toBeInTheDocument();
@@ -76,12 +76,12 @@ describe("VorschauKarte", () => {
    */
   it("summiert über alle Konten", async () => {
     await zeige([
-      zeile({ datum: inTagen(3), betrag: -2500, kontoId: "k1" }),
-      zeile({ datum: inTagen(4), betrag: -1800, kontoId: "k2" }),
+      zeile({ datum: inTagen(3), betrag: -1234, kontoId: "k1" }),
+      zeile({ datum: inTagen(4), betrag: -4321, kontoId: "k2" }),
     ]);
-    // Nach dem WERT suchen, nicht nach der Formulierung: 25,00 + 18,00 = 43,00 Abfluss.
+    // Nach dem WERT suchen, nicht nach der Formulierung: 12,34 + 43,21 ergeben 55,55.
     await waitFor(() => {
-      expect(screen.getByText(/43,00/)).toBeInTheDocument();
+      expect(screen.getByText(/55,55/)).toBeInTheDocument();
     });
   });
 

@@ -598,6 +598,24 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                         </button>
                       )}
                       {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
+                      {/* Gehört die Zeile zu einem Vertrag, steht der Anbieter dran.
+                          Der NAME und nicht bloss „Vertrag": dass es einer ist, sieht man
+                          an der Pille ohnehin — WELCHER, ist die Auskunft, für die man
+                          vorher die Zeile öffnen musste. */}
+                      {r.vertragsname && (
+                        // Der title sitzt am Wrapper und nicht an der Pille — dieselbe
+                        // Regel wie beim Dublettenverdacht darunter: `bausteine/` ist
+                        // teils aus dem Design-System kopiert und kennt die Eigenschaft
+                        // nicht, und dort wird nichts erfunden.
+                        <span
+                          title={t("konten.pillVertrag", { anbieter: r.vertragsname })}
+                          style={{ flex: "0 0 auto", display: "inline-flex", maxWidth: 120, overflow: "hidden" }}
+                        >
+                          <Pill variant="plan" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {r.vertragsname}
+                          </Pill>
+                        </span>
+                      )}
                       {/* Der Verdacht steht an BEIDEN Zeilen — es gibt kein Original.
                           Die Gründe hängen im title, entschieden wird im Detail. */}
                       {r.dublette && (

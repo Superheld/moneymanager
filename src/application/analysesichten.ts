@@ -30,10 +30,13 @@ import {
   type Zahlungskonto,
 } from "../core";
 import type { Umsatz } from "./import";
+import { vertragsnamenLaden } from "./vertraege/vertragszuordnung";
 import type {
   KategorieRepository,
   LedgerPort,
   UmsatzRepository,
+  VertragRepository,
+  VertragszuordnungRepository,
   ZahlungskontoRepository,
 } from "./ports";
 
@@ -45,6 +48,9 @@ export interface AnalyseDeps {
   readonly kontoRepo: ZahlungskontoRepository;
   readonly kategorieRepo: KategorieRepository;
   readonly umsatzRepo: UmsatzRepository;
+  /** Für die Vertragsmarkierung in den aufgeklappten Zeilen. */
+  readonly zuordnungRepo: VertragszuordnungRepository;
+  readonly vertragRepo: VertragRepository;
 }
 
 export interface Analysebasis {
@@ -54,14 +60,17 @@ export interface Analysebasis {
   readonly kontoNamen: ReadonlyMap<string, string>;
   /** Buchungs-ID → Umsatz: Empfänger und Verwendungszweck stehen dort, nicht an der Buchung. */
   readonly umsatzZuBuchung: ReadonlyMap<string, Umsatz>;
+  /** Buchungs-ID → Anbieter des Vertrags, zu dem sie gehört. */
+  readonly vertragsnamen: ReadonlyMap<string, string>;
 }
 
 export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
-  const [buchungen, konten, kategorien, umsaetze] = await Promise.all([
+  const [buchungen, konten, kategorien, umsaetze, vertragsnamen] = await Promise.all([
     deps.ledger.alle(),
     deps.kontoRepo.alle(),
     deps.kategorieRepo.alle(),
     deps.umsatzRepo.alle(),
+    vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
   ]);
   const umsatzZuBuchung = new Map<string, Umsatz>();
   for (const u of umsaetze) if (u.istbuchungId) umsatzZuBuchung.set(u.istbuchungId, u);
@@ -71,6 +80,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
     kategorien,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     umsatzZuBuchung,
+    vertragsnamen,
   };
 }
 
@@ -138,6 +148,8 @@ export interface Analysezeile {
   readonly empfaenger: string;
   readonly verwendungszweck: string;
   readonly kontoName: string;
+  /** Der Vertrag, zu dem die Buchung gehört — als Anbietername. Fehlt, wenn keiner. */
+  readonly vertragsname?: string;
 }
 
 export function analyseBuchungen(
@@ -153,6 +165,7 @@ export function analyseBuchungen(
       empfaenger: u?.gegenpartei ?? buchung.notiz ?? "",
       verwendungszweck: u?.verwendungszweck ?? "",
       kontoName: basis.kontoNamen.get(buchung.kontoId) ?? "",
+      vertragsname: basis.vertragsnamen.get(buchung.id),
     };
   });
 }
