@@ -72,6 +72,17 @@ export interface AbrufBefund {
    * vollständiger.
    */
   readonly speicherzeitraumErreicht?: number;
+  /**
+   * Was beim Übersetzen auffiel, ohne den Abruf zu kippen: übersprungene Zeilen,
+   * unlesbare Salden — und die Summenprobe des Auszugs.
+   *
+   * Bis hierher endeten diese Meldungen im Nichts. Der Adapter sammelte sie (`warnungen`
+   * am Ergebnis), der Dateiimport zeigt sie seit jeher, und der Bankabruf liess sie
+   * fallen: das Feld gab es hier gar nicht. Eine Zeile, die beim Abruf übersprungen wird,
+   * fehlt danach lautlos im Bestand — und das ist die Sorte Fehler, die man drei Monate
+   * später als unerklärliche Differenz wiederfindet.
+   */
+  readonly warnungen?: readonly string[];
   /** Gesetzt, wenn dieses Konto nicht abgerufen werden konnte — der Rest läuft weiter. */
   readonly fehler?: string;
 }
@@ -398,6 +409,7 @@ export async function abrufAusfuehren(
         bankSaldo: saldo?.betrag,
         bankSaldoDatum: saldo?.datum,
         speicherzeitraumErreicht: zeitraum.gedeckelt ? zeitraum.grenze : undefined,
+        warnungen: abruf.ergebnis.warnungen.length > 0 ? abruf.ergebnis.warnungen : undefined,
       });
     } catch (e) {
       // Auch im Fehlerfall wird ein geholter Saldo festgehalten (siehe `ankerFesthalten`).
