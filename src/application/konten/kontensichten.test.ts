@@ -130,7 +130,7 @@ describe("Dublettenmarkierung im Ledger", () => {
     const sicht = await kontenLaden(
       deps([buchung({ id: "b-datei" }), buchung({ id: "b-bank" })], [AUS_DATEI, AUS_BANK]),
     );
-    const register = registerSicht(sicht, KONTO, "2026-08-20", 30);
+    const register = registerSicht(sicht, KONTO, "2026-08-20");
     expect(register.gebucht).toHaveLength(2);
     for (const zeile of register.gebucht) {
       expect(zeile.dublette?.urteil).toBe("identisch");
@@ -147,7 +147,7 @@ describe("Dublettenmarkierung im Ledger", () => {
 describe("Bezeichnung der Registerzeile", () => {
   function ersteZeile(b: IstBuchung, u: Umsatz) {
     return kontenLaden(deps([b], [u])).then((sicht) =>
-      registerSicht(sicht, KONTO, "2026-08-20", 30).gebucht[0],
+      registerSicht(sicht, KONTO, "2026-08-20").gebucht[0],
     );
   }
 

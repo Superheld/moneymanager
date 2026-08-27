@@ -249,18 +249,27 @@ export interface Registerzeile {
 
 export interface Registersicht {
   readonly gebucht: readonly Registerzeile[];
-  readonly geplant: readonly RegisterZeile[];
   /** Realer Stand jetzt = Anfangsbestand + Σ gebuchte Bewegungen. */
   readonly standHeute: Cent;
 }
 
+/**
+ * Der Auszug EINES Kontos — nur noch das Gebuchte.
+ *
+ * Die geplanten Fälligkeiten standen bis 2026-08-27 mit hier drin und sind in die
+ * Übersicht gewandert (`vorschauAlleKonten`). Damit ist auch der Tagesparameter weg: er
+ * stellte allein ein, wie weit die Vorschau reicht, und ohne sie stellte er nichts mehr
+ * ein. Ein Parameter, den niemand auswertet, ist eine Zusage, die keine ist.
+ */
 export function registerSicht(
   sicht: Kontensicht,
   konto: Zahlungskonto,
   heute: string,
-  tage: number,
 ): Registersicht {
-  const register: KontoRegister = kontoRegister(konto, [...sicht.buchungen], [...sicht.regeln], heute, tage);
+  // Null Tage Vorschau: `kontoRegister` rechnet sie weiterhin, weil der laufende Saldo
+  // und die Vorschau dieselbe Funktion sind — was hier herausfällt, ist nur, dass wir
+  // sie noch weiterreichen.
+  const register: KontoRegister = kontoRegister(konto, [...sicht.buchungen], [...sicht.regeln], heute, 0);
   const buchungJeId = new Map(sicht.buchungen.map((b) => [b.id, b]));
   const kategorieNamen = new Map(sicht.kategorien.map((k) => [k.id, k.name]));
 
@@ -293,7 +302,6 @@ export function registerSicht(
         dublette: zeile.istId ? sicht.dublettenverdacht.get(zeile.istId) : undefined,
       };
     }),
-    geplant: register.geplant,
     standHeute: register.standHeute,
   };
 }
