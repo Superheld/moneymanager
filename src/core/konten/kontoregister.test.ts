@@ -3,7 +3,7 @@ import { euroZuCent } from "../basis/geld";
 import type { Zahlungskonto } from "./konto";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
 import type { IstBuchung } from "../buchung/istbuchung";
-import { kontoRegister } from "./kontoregister";
+import { kontoRegister, vorschauAlleKonten } from "./kontoregister";
 
 function konto(over: Partial<Zahlungskonto> = {}): Zahlungskonto {
   return { id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: euroZuCent(1000), ...over };
@@ -120,5 +120,84 @@ describe("kontoRegister — gebucht, aber Buchungstag in der Zukunft", () => {
     expect(r.gebucht).toHaveLength(1);
     expect(r.geplant.some((z) => z.datum === "2026-06-20")).toBe(false);
     expect(r.standHeute).toBe(euroZuCent(960));
+  });
+});
+
+/**
+ * Die kontoübergreifende Vorschau — was die Übersicht zeigt, seit sie aus dem Kontoauszug
+ * ausgezogen ist.
+ *
+ * Die Zusage ist nicht „dieselben Zeilen wie vorher, nur zusammengeschüttet": sie muss
+ * DIESELBE Regel benutzen, welche Fälligkeit noch offen ist. Deshalb rechnet sie über
+ * `kontoRegister` und nicht neu — und deshalb prüft der erste Test genau das.
+ */
+describe("vorschauAlleKonten", () => {
+  const giro = konto({ id: "k1", bezeichnung: "Giro" });
+  const zweit = konto({ id: "k2", bezeichnung: "Zweitkonto" });
+
+  it("führt die Fälligkeiten mehrerer Konten chronologisch zusammen", () => {
+    const zeilen = vorschauAlleKonten(
+      [giro, zweit],
+      [],
+      [
+        regel({ id: "r-spaet", bezeichnung: "Spät", startdatum: "2026-06-20", kontoId: "k1" }),
+        regel({ id: "r-frueh", bezeichnung: "Früh", startdatum: "2026-06-10", kontoId: "k2" }),
+      ],
+      "2026-06-01",
+      30,
+    );
+    expect(zeilen.map((z) => [z.datum, z.kontoId])).toEqual([
+      ["2026-06-10", "k2"],
+      ["2026-06-20", "k1"],
+    ]);
+  });
+
+  it("lässt eine bereits bezahlte Fälligkeit weg — dieselbe Regel wie im Register", () => {
+    const bezahlt = ist({
+      id: "b1",
+      datum: "2026-06-10",
+      kontoId: "k2",
+      planRef: { quelleId: "r-frueh", faelligkeit: "2026-06-10" },
+    });
+    const zeilen = vorschauAlleKonten(
+      [giro, zweit],
+      [bezahlt],
+      [regel({ id: "r-frueh", startdatum: "2026-06-10", kontoId: "k2" })],
+      "2026-06-01",
+      30,
+    );
+    expect(zeilen).toHaveLength(0);
+  });
+
+  it("nimmt nur Regeln, deren Konto in der Liste steht", () => {
+    const zeilen = vorschauAlleKonten(
+      [giro],
+      [],
+      [regel({ id: "fremd", startdatum: "2026-06-10", kontoId: "k9" })],
+      "2026-06-01",
+      30,
+    );
+    expect(zeilen).toHaveLength(0);
+  });
+
+  it("liefert bei gleichem Tag eine stabile Reihenfolge, unabhängig von der Kontenliste", () => {
+    const regeln = [
+      regel({ id: "ra", startdatum: "2026-06-10", kontoId: "k1" }),
+      regel({ id: "rb", startdatum: "2026-06-10", kontoId: "k2" }),
+    ];
+    const vorwaerts = vorschauAlleKonten([giro, zweit], [], regeln, "2026-06-01", 30);
+    const rueckwaerts = vorschauAlleKonten([zweit, giro], [], regeln, "2026-06-01", 30);
+    expect(vorwaerts.map((z) => z.kontoId)).toEqual(rueckwaerts.map((z) => z.kontoId));
+  });
+
+  it("schneidet am Tagesfenster ab", () => {
+    const zeilen = vorschauAlleKonten(
+      [giro],
+      [],
+      [regel({ id: "r1", startdatum: "2026-06-25", kontoId: "k1" })],
+      "2026-06-01",
+      10,
+    );
+    expect(zeilen).toHaveLength(0);
   });
 });

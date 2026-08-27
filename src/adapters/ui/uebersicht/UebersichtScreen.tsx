@@ -44,6 +44,7 @@ import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
 import { AUFKLAPP_ZEILEN_SCHMAL } from "../bausteine/aufklappen";
 import { DepotKarte } from "./DepotKarte";
 import { MonatsAusblick } from "./MonatsAusblick";
+import { VorschauKarte } from "./VorschauKarte";
 import { PageHead } from "../bausteine/PageHead";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
@@ -135,6 +136,11 @@ export function UebersichtScreen() {
           }}
         />
       )}
+
+      {/* Was noch kommt — zwischen den Monatskarten und den Budgets, weil es genau
+          dazwischen gehört: die Karten sagen, wie der Monat ausgeht, die Budgets, was in
+          ihm noch da ist, und diese Liste nennt die Zahlungen, aus denen beides folgt. */}
+      {daten && <VorschauKarte zeilen={daten.vorschau} kontoNamen={daten.kontoNamen} />}
 
       {/* Budgets und Depots nebeneinander. Fehlt eines von beiden, nimmt das andere die
           volle Breite — das erledigt `auto-fit` im Raster, ohne dass hier eine Bedingung

@@ -1177,35 +1177,9 @@ describe("Online geführte Konten werden nicht von Hand bebucht", () => {
     });
   });
 
-  /**
-   * Die Vorschau ZEIGT, was kommt — sie bucht es nicht.
-   *
-   * Bis 2026-08-25 hing an jeder geplanten Zeile ein Kästchen „als bezahlt markieren", und
-   * ein Klick legte daraus eine Ist-Buchung an. Damit stand im Konto eine Zahlung, die
-   * niemand belegt hatte: die Bank kannte sie nicht, ein Beleg existierte nicht, und beim
-   * nächsten Abruf kam die echte Zeile dazu. Was im Konto steht, kommt jetzt aus dem Abruf
-   * oder von Hand — nicht aus einer Hochrechnung.
-   */
-  it("legt aus der geplanten Vorschau keine Buchung an", async () => {
-    await grunddaten();
-    const jetzt = new Date();
-    const inFuenfTagen = new Date(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate() + 5);
-    const iso = `${inFuenfTagen.getFullYear()}-${String(inFuenfTagen.getMonth() + 1).padStart(2, "0")}-${String(inFuenfTagen.getDate()).padStart(2, "0")}`;
-    await sqliteZahlungsregelRepository.speichern({
-      id: "r1", bezeichnung: "Ohlert Beitrag", betrag: -2500, rhythmus: "monatlich",
-      startdatum: iso, charakter: "Aufwand", kategorieId: "kat1", kontoId: "k1",
-    });
-    const nutzer = userEvent.setup();
-    rendere(<KontenScreen onNavigate={() => {}} />);
-
-    await nutzer.click((await screen.findAllByText("Girokonto"))[0]);
-    // Die Vorschau steht da — daran haengt der Test, sonst prueft er eine leere Liste.
-    const zeile = await screen.findByText("Ohlert Beitrag");
-
-    // Kein Kaestchen an der Zeile, und auch sonst keins ausser dem Sammelmodus-Schalter.
-    expect(within(zeile.closest("tr")!).queryByRole("checkbox")).toBeNull();
-    expect(await sqliteLedgerRepository.alle()).toHaveLength(0);
-  });
+  // Der Test „legt aus der geplanten Vorschau keine Buchung an" stand hier und ist mit der
+  // Vorschau in die Übersicht gezogen (`uebersicht/vorschau.test.tsx`). Die Zusage gilt
+  // unverändert — sie gilt nur nicht mehr diesem Bildschirm.
 
   /**
    * Und auch mit genug Konten von Hand nicht, solange ein ONLINE-Konto offen ist.

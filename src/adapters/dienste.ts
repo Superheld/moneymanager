@@ -177,7 +177,13 @@ export function budgetuebersicht(am: string): Promise<Budgetuebersicht> {
 /** Alles, was der Übersichts-Screen zeigt — drei Monatskarten plus Budgetliste. */
 export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
   return uebersichtLaden(
-    { ...BUDGET_DEPS, regelRepo: sqliteZahlungsregelRepository, inventarRepo: sqliteInventarRepository, umsatzRepo: sqliteUmsatzRepository },
+    {
+      ...BUDGET_DEPS,
+      regelRepo: sqliteZahlungsregelRepository,
+      inventarRepo: sqliteInventarRepository,
+      umsatzRepo: sqliteUmsatzRepository,
+      kontoRepo: sqliteZahlungskontoRepository,
+    },
     heute,
   );
 }

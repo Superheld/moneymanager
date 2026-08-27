@@ -256,6 +256,7 @@ export {
 export {
   uebersichtLaden,
   waehlbareMonate,
+  VORSCHAU_TAGE,
   type Uebersichtsdaten,
   type UebersichtDeps,
 } from "./uebersicht";

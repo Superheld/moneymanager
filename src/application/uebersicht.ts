@@ -13,7 +13,14 @@
 // Reload pro Dropdown-Klick wäre nicht nur langsam, er würde die Liste auch gegen einen
 // inzwischen veränderten Bestand rechnen, während die Karten oben den alten zeigen.
 
-import { fruehesterMonat, monatsAusblicke, type Kategorie, type MonatsAusblick } from "../core";
+import {
+  fruehesterMonat,
+  monatsAusblicke,
+  vorschauAlleKonten,
+  type Kategorie,
+  type MonatsAusblick,
+  type Vorschauzeile,
+} from "../core";
 import { budgetstaende, vertragsBuchungenLaden, type Budgetstand } from "./budgets/budgetsichten";
 import type { BudgetSicht } from "../core";
 import type {
@@ -23,6 +30,7 @@ import type {
   LedgerPort,
   UmsatzRepository,
   VertragszuordnungRepository,
+  ZahlungskontoRepository,
   ZahlungsregelRepository,
 } from "./ports";
 
@@ -37,6 +45,7 @@ export interface UebersichtDeps {
   readonly inventarRepo: InventarRepository;
   readonly umsatzRepo: UmsatzRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
+  readonly kontoRepo: ZahlungskontoRepository;
 }
 
 export interface Uebersichtsdaten {
@@ -57,13 +66,38 @@ export interface Uebersichtsdaten {
    * Karten Nullen, und das liest sich wie ein Datenfehler statt wie ein leerer Plan.
    */
   readonly hatPlandaten: boolean;
+  /**
+   * Was in den nächsten Tagen fällig wird, über alle Konten — und die Namen dazu.
+   *
+   * Sie stand bis hierher im Kontoauszug, je Konto eine eigene Liste. Dort beantwortete
+   * sie eine Frage, die niemand kontoweise stellt: „was kommt noch" gilt dem Haushalt,
+   * nicht dem Girokonto. Wer vier Konten führt, musste vier Auszüge öffnen und im Kopf
+   * zusammenzählen — und der Auszug, der „was ist passiert" beantwortet, trug eine
+   * zweite Liste über die Zukunft neben sich.
+   *
+   * Das Fenster ist bewusst weit (`VORSCHAU_TAGE`) und wird erst in der Oberfläche
+   * enger gestellt: ein Wechsel des Zeitraums soll nicht neu laden, genauso wenig wie
+   * der Monatswechsel der Budgetliste weiter oben.
+   */
+  readonly vorschau: readonly Vorschauzeile[];
+  /** Konto-ID → Bezeichnung. Die Vorschau gibt IDs heraus, die Oberfläche zeigt Namen. */
+  readonly kontoNamen: ReadonlyMap<string, string>;
 }
+
+/**
+ * Wie weit die Vorschau vorgerechnet wird — unabhängig davon, wie weit sie ZEIGT.
+ *
+ * Der Wert ist die grösste Spanne, die die Oberfläche anbietet. Enger stellt sie selbst,
+ * aus denselben Daten; weiter kommt sie nicht, und das ist die Grenze, an der ein
+ * Nachladen nötig wäre.
+ */
+export const VORSCHAU_TAGE = 90;
 
 export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, inventar, umsaetze, vertragsBuchungen] =
+  const [buchungen, kategorien, regeln, budgets, inventar, umsaetze, vertragsBuchungen, konten] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -72,6 +106,7 @@ export async function uebersichtLaden(
       deps.inventarRepo.alle(),
       deps.umsatzRepo.alle(),
       vertragsBuchungenLaden(deps.zuordnungRepo),
+      deps.kontoRepo.alle(),
     ]);
 
   const sicht: BudgetSicht = { buchungen, kategorien, budgets, vertragsBuchungen };
@@ -91,6 +126,8 @@ export async function uebersichtLaden(
     ),
     monate: waehlbareMonate(fruehesterMonat(buchungen) ?? heute, dieserMonat),
     hatPlandaten: regeln.length > 0 || budgets.length > 0 || inventar.length > 0,
+    vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
+    kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
   };
 }
 
