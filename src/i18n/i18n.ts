@@ -917,6 +917,7 @@ const de = {
     editTitel: "Buchung bearbeiten",
     editUntertitelImport: "Importierte Buchung — Korrekturen bleiben erhalten, die Import-Spur auch.",
     pillUmbuchung: "Umbuchung",
+    pillVertrag: "Gehört zum Vertrag „{{anbieter}}“",
     pillManuell: "manuell",
     // ZWEI Woerter fuer denselben Marker, weil zwei verschiedene Dinge danebenstehen:
     // im Detaildialog ein KAESTCHEN, dessen Haken „noch anzusehen" bedeutet
@@ -2493,6 +2494,7 @@ const en: typeof de = {
     editTitel: "Edit transaction",
     editUntertitelImport: "Imported transaction — your edits are kept, and so is the import trail.",
     pillUmbuchung: "Transfer",
+    pillVertrag: "Belongs to the contract “{{anbieter}}”",
     pillManuell: "manual",
     pillPruefen: "review",
     pillZuPruefen: "review",

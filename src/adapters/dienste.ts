@@ -385,6 +385,8 @@ export function analyse(): Promise<Analysebasis> {
     kontoRepo: sqliteZahlungskontoRepository,
     kategorieRepo: sqliteKategorieRepository,
     umsatzRepo: sqliteUmsatzRepository,
+    zuordnungRepo: sqliteVertragszuordnungRepository,
+    vertragRepo: sqliteVertragRepository,
   });
 }
 
@@ -699,6 +701,9 @@ export function konten(): Promise<Kontensicht> {
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
     // Damit ein Depot-Konto seinen Bestand zeigt statt einer leeren Buchungsliste.
     depotRepo: sqliteDepotRepository,
+    // Damit eine Vertragszahlung im Auszug als solche zu erkennen ist.
+    zuordnungRepo: sqliteVertragszuordnungRepository,
+    vertragRepo: sqliteVertragRepository,
   });
 }
 

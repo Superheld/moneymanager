@@ -37,6 +37,7 @@ import {
 } from "../dubletten/dublettensicht";
 import type { Kontozuordnung } from "../fints/bankzugangPort";
 import { depotJeKonto, depotsLaden, type Depotsicht } from "../depot/depotsichten";
+import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
 import type {
   DepotRepository,
   DublettenfreigabeRepository,
@@ -45,6 +46,8 @@ import type {
   KontostandsankerRepository,
   LedgerPort,
   UmsatzRepository,
+  VertragRepository,
+  VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
 } from "../ports";
@@ -70,6 +73,9 @@ export interface KontenDeps {
   readonly ankerRepo: KontostandsankerRepository;
   /** Bankverbindungen — daran hängt der Abruf-Knopf und der Abgleich. */
   readonly kontozuordnungen: () => Promise<Kontozuordnung[]>;
+  /** Für die Vertragsmarkierung im Auszug — beide zusammen ergeben den Anbieternamen. */
+  readonly zuordnungRepo: VertragszuordnungRepository;
+  readonly vertragRepo: VertragRepository;
   /**
    * Die Depots. Optional — ohne sie fehlt an einem Depot-Konto nur die Bestandsansicht,
    * alles andere läuft unverändert.
@@ -163,10 +169,19 @@ export interface Kontensicht {
   readonly dublettenverdacht: ReadonlyMap<string, Dublettenverdacht>;
   /** Die „ist kein Duplikat"-Entscheidungen als Paarschlüssel — auch die Inbox achtet darauf. */
   readonly freigegeben: ReadonlySet<string>;
+  /**
+   * Buchungs-ID → Anbieter des Vertrags, zu dem sie gehört.
+   *
+   * Im Auszug sah eine Vertragszahlung bis 2026-08-27 aus wie jede andere Ausgabe; die
+   * Zuordnung stand zwar an der Buchung, aber nur der Dialog zeigte sie. Wer wissen
+   * wollte, ob eine Zeile zu einem Vertrag gehört, musste sie öffnen — bei einer Liste
+   * genau die Frage, die man nebenbei beantwortet haben will.
+   */
+  readonly vertragsnamen: ReadonlyMap<string, string>;
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -178,6 +193,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.freigabeRepo.alle(),
       deps.ankerRepo.alle(),
       deps.depotRepo ? depotsLaden({ depotRepo: deps.depotRepo }) : Promise.resolve(null),
+      vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
     ]);
 
   const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
@@ -226,6 +242,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     umsatzZuBuchung,
     dublettenverdacht,
     freigegeben,
+    vertragsnamen,
   };
 }
 
@@ -245,6 +262,8 @@ export interface Registerzeile {
   readonly kategorieName: string;
   /** Gesetzt, wenn dieselbe Zahlung womöglich ein zweites Mal im Konto steht. */
   readonly dublette?: Dublettenverdacht;
+  /** Der Vertrag, zu dem diese Zeile gehört — als Anbietername. Fehlt, wenn keiner. */
+  readonly vertragsname?: string;
 }
 
 export interface Registersicht {
@@ -300,6 +319,7 @@ export function registerSicht(
         verwendungszweck: umsatz?.verwendungszweck ?? "",
         kategorieName: zeile.kategorieId ? kategorieNamen.get(zeile.kategorieId) ?? "" : "",
         dublette: zeile.istId ? sicht.dublettenverdacht.get(zeile.istId) : undefined,
+        vertragsname: zeile.istId ? sicht.vertragsnamen.get(zeile.istId) : undefined,
       };
     }),
     standHeute: register.standHeute,
