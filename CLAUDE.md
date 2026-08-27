@@ -478,6 +478,14 @@ npm run seed        # Spielstand für die Entwicklung neu schreiben (siehe unten
 npm run installieren # macOS: bauen und nach /Applications installieren
 ```
 
+Zwei Dinge, die ein grüner Lauf verschweigt:
+
+- **`cargo test --lib` verdeckt `dead_code`-Warnungen**, die der App-Build zeigt: was nur
+  Tests benutzen, gilt dort als benutzt. Vor dem Commit einmal `cargo build --lib`.
+- **`src/doku.test.ts` liest `git ls-files`.** Eine neue Datei, die in einer `CLAUDE.md`
+  steht, muss **vor** dem Testlauf `git add`-ed sein — sonst meldet der Wächter einen
+  toten Verweis auf etwas, das längst dasteht.
+
 Node kommt über **mise** (`mise.toml`: node 26); die CI pinnt dieselbe Hauptversion getrennt
 in `.github/workflows/ci.yml`, weil Actions die `mise.toml` nicht liest. Wer sie hier hebt,
 hebt sie dort mit. Die Kommandozeilen für diese Maschine stehen in `CLAUDE.local.md`.
@@ -835,6 +843,12 @@ Branch von develop  →  npm run tauri dev  →  npm test && npm run typecheck  
    der Testlauf dauert Sekunden.
 4. **`--no-ff` nach `develop`.** Dort parkt alles, bis bewusst nach `main` durchgereicht
    wird.
+
+**Ein laufender Prozess beweist nichts.** Die App kommt auch hoch, wenn die Datenbank
+nicht aufgeht — sie zeigt dann leere Screens, und im Log steht nichts. Der billige Beweis
+ist die Tagessicherung: die von heute löschen, App starten, und wenn sie neu entsteht, ist
+die Datenbank geöffnet und die Migrationen sind gelaufen. Dasselbe gilt für `pgrep` — dass
+ein Prozess da ist, sagt über den Zustand dahinter nichts.
 
 **Der Punkt, an dem man sonst das Falsche tut:** Wer am **Schema** arbeitet, prüft nicht
 gegen den Spielstand, sondern gegen eine **Lesekopie des echten Bestands**

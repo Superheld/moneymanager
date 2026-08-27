@@ -89,6 +89,23 @@ Genau diese Asymmetrie ist der Grund, warum so etwas lange unentdeckt bleibt: sq
 Fremdschlüssel aus, der Test war grün, und die App wäre gescheitert. **Wer am Schema
 arbeitet, prüft gegen eine Lesekopie des echten Bestands** — Rezept in `CLAUDE.local.md`.
 
+## Was an der VERBINDUNG hängt, hängt nicht an der Datei
+
+`PRAGMA foreign_keys`, `PRAGMA key`, `ATTACH`, eine offene Transaktion: alle gelten pro
+Verbindung. Über einen Pool erwischt jedes Statement eine beliebige — und das Ergebnis ist
+nicht ein Fehler, sondern ein **sporadischer**: die erste Abfrage geht, die zweite nicht,
+und es sieht nach allem aus ausser nach der Ursache.
+
+Wer so etwas setzt, hält die Verbindung fest (`pool.acquire()`) oder legt es in die
+Verbindungsoptionen. Diese eine Falle hat in diesem Projekt inzwischen vier Bauteile
+gekostet: den Transaktions-Command, den Schema-Umbau, den Schlüssel der verschlüsselten
+Datenbank und die Überführung des Altbestands (`ATTACH` und `sqlcipher_export` müssen auf
+DERSELBEN Verbindung laufen, sonst meldet SQLite „unknown database").
+
+Beim Schlüssel kommt hinzu, dass er das ERSTE Statement sein muss — deshalb steht er in
+den Verbindungsoptionen und nicht im `after_connect`-Haken, der nach sqlx' eigenen
+Pragmas läuft. Einzelheiten in `src-tauri/src/datenbank.rs`.
+
 ## Zwei Fallen im Schema
 
 **`IstBuchung` trägt KEINEN Empfänger und keinen Verwendungszweck.** Die stehen am Beleg
