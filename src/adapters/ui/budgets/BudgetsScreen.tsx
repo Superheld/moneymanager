@@ -50,6 +50,7 @@ import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 const ARTEN: Budgetart[] = ["monatlich", "aufbauend"];
 
@@ -62,6 +63,7 @@ function heuteIso(): string {
 }
 
 export function BudgetsScreen() {
+  const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const geld = useGeld();
   const heute = useMemo(heuteIso, []);
@@ -465,7 +467,11 @@ export function BudgetsScreen() {
                     <span onClick={(e) => e.stopPropagation()}>
                       <IconLeiste>
                         <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z)} />
-                        <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => void budgetLoeschen(z.budget.id).then(laden)} />
+                        <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => loeschfrage.stellen({
+                          name: z.kategorieName,
+                          folgen: t("budgets.loeschenFolgen"),
+                          ausfuehren: async () => { await budgetLoeschen(z.budget.id); await laden(); },
+                        })} />
                       </IconLeiste>
                     </span>
                   ),
@@ -585,7 +591,11 @@ export function BudgetsScreen() {
                             Kategorie mit einem Etikett. Der Use-Case weist es ohnehin ab —
                             der Knopf verschwindet, damit man nicht erst dagegen läuft. */}
                         {bearbeitetesBudget.betraege.length > 1 && (
-                          <IconButton icon="loeschen" ton="gefahr" label={t("budgets.versionLoeschen", { monat: v.abMonat })} onClick={() => void versionLoeschen(v.abMonat)} />
+                          <IconButton icon="loeschen" ton="gefahr" label={t("budgets.versionLoeschen", { monat: v.abMonat })} onClick={() => loeschfrage.stellen({
+                              name: t("budgets.versionName", { monat: v.abMonat }),
+                              folgen: t("budgets.versionLoeschenFolgen"),
+                              ausfuehren: () => versionLoeschen(v.abMonat),
+                            })} />
                         )}
                       </IconLeiste>
                     </div>
@@ -616,6 +626,8 @@ export function BudgetsScreen() {
       {detail && (
         <BuchungDetail buchung={detail} onClose={() => setDetail(null)} onGeaendert={laden} />
       )}
+      {loeschfrage.dialog}
+
     </div>
   );
 }

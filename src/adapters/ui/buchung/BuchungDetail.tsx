@@ -80,6 +80,7 @@ import {
 } from "../../dienste";
 import { Button, FormField, Pill } from "../bausteine";
 import { formularAusBuchung, VertragModal } from "../vertraege/VertragModal";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
@@ -332,6 +333,7 @@ function BuchungFormular({
   // nebenbei Regeln anzulegen; die Festlegung soll aus einer Korrektur entstehen.
   const [immer, setImmer] = useState(false);
   const gepaart = !!buchung?.transferId;
+  const loeschfrage = useLoeschfrage();
   const geteilt = !!buchung && istGeteilt(buchung);
   const musterAngebot = musterVorschlag(umsatz?.gegenpartei ?? "");
   const kategorieGeaendert = kategorieId !== (buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
@@ -537,6 +539,7 @@ function BuchungFormular({
   const kopfUmsatz = entwurf ?? umsatz;
 
   return (
+    <>
     <Modal
       title={
         istEntwurf
@@ -572,7 +575,29 @@ function BuchungFormular({
             <button
               className="linkbtn"
               style={{ marginLeft: "auto", color: "var(--warn-deep)" }}
-              onClick={() => onDelete()}
+              // Die Rückfrage sitzt HIER und nicht in `entfernen`: dort ist schon
+              // entschieden. Was hier weggeht, ist eine Tatsache über Geld — der
+              // folgenreichste Löschweg der App, und bis 2026-08-27 der einzige ohne
+              // jeden Zwischenschritt.
+              onClick={() =>
+                loeschfrage.stellen({
+                  // Woran man die Buchung wiedererkennt — dieselbe Kette wie im
+                  // Auszug: eigene Notiz, sonst Empfänger, sonst Verwendungszweck.
+                  name:
+                    notiz ||
+                    umsatz?.gegenpartei ||
+                    umsatz?.verwendungszweck ||
+                    t("konten.dieseBuchungName"),
+                  folgen: t(
+                    ausBankabruf
+                      ? "konten.detailVerwerfenFolgen"
+                      : gepaart
+                        ? "konten.detailLoeschenFolgenPaar"
+                        : "konten.detailLoeschenFolgen",
+                  ),
+                  ausfuehren: () => onDelete(),
+                })
+              }
             >
               {t(ausBankabruf ? "konten.detail.verwerfenBankzeile" : "konten.loeschen")}
             </button>
@@ -969,6 +994,12 @@ function BuchungFormular({
         </div>
       )}
     </Modal>
+      {/* Ausserhalb des Modals, als Geschwister: der Modal-Stapel gibt Escape dem
+          OBERSTEN Dialog, und das soll hier die Rückfrage sein und nicht die Maske
+          darunter. Ineinander verschachtelt hinge die Rückfrage am Lebenszyklus der
+          Maske — sie verschwände beim Schliessen mit. */}
+      {loeschfrage.dialog}
+    </>
   );
 }
 

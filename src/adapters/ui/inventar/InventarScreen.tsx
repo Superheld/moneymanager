@@ -31,6 +31,7 @@ import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { Modal } from "../bausteine/Modal";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -42,6 +43,7 @@ function heuteIso(): string {
 }
 
 export function InventarScreen() {
+  const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const geld = useGeld();
   const heute = useMemo(heuteIso, []);
@@ -191,7 +193,11 @@ export function InventarScreen() {
                       <IconLeiste>
                         <IconButton icon="uebernehmen" label={t("inventar.ersetzt")} onClick={() => ersetztOeffnen(g)} />
                         <IconButton icon="bearbeiten" label={t("inventar.bearbeiten")} onClick={() => bearbeiten(g)} />
-                        <IconButton icon="loeschen" ton="gefahr" label={t("inventar.loeschen")} onClick={() => void inventarLoeschen(g.id).then(laden)} />
+                        <IconButton icon="loeschen" ton="gefahr" label={t("inventar.loeschen")} onClick={() => loeschfrage.stellen({
+                            name: g.bezeichnung,
+                            folgen: t("inventar.loeschenFolgen"),
+                            ausfuehren: async () => { await inventarLoeschen(g.id); await laden(); },
+                          })} />
                       </IconLeiste>
                     </span>
                   </div>
@@ -283,6 +289,8 @@ export function InventarScreen() {
           </div>
         </Modal>
       )}
+      {loeschfrage.dialog}
+
     </div>
   );
 }

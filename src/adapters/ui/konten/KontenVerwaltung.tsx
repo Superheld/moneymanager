@@ -31,6 +31,7 @@ import { KontoAnlegenModal } from "./KontoAnlegenModal";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 /** Woran ein Konto hängt: welcher Zugang, welches Bankkonto, bis wann geholt. */
 export interface KontoVerbindung {
@@ -62,9 +63,9 @@ export function KontenVerwaltung({
   /** Löst die Verbindung eines Kontos (der Zugang selbst bleibt bestehen). */
   onTrennen: (v: KontoVerbindung) => Promise<void>;
   onChange: () => void;
-
 }) {
   const { t } = useTranslation();
+  const loeschfrage = useLoeschfrage();
   const geld = useGeld();
   const stand = new Map(kontostaende.map((k) => [k.konto.id, k]));
   const [offen, setOffen] = useState(false);
@@ -181,7 +182,13 @@ export function KontenVerwaltung({
                 ]
               : []),
             { key: "_e", label: "", align: "right", render: (k) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} /> },
-            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void kontoLoeschen(k.id).then(onChange)} /> },
+            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => loeschfrage.stellen({
+              name: k.bezeichnung,
+              // Ein Konto mit Buchungen laesst der Fremdschluessel gar nicht erst
+              // loeschen — der Dialog bleibt dann stehen und zeigt, woran es lag.
+              folgen: t("konten.kontoLoeschenFolgen"),
+              ausfuehren: async () => { await kontoLoeschen(k.id); onChange(); },
+            })} /> },
           ]}
           rows={konten}
         />
@@ -294,6 +301,8 @@ export function KontenVerwaltung({
         <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} />
       </div>
     )}
+    {loeschfrage.dialog}
+
     </>
   );
 }
