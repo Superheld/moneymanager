@@ -13,6 +13,7 @@ import {
   analyseAufschluesselung,
   analyseBuchungen,
   analyseFenster,
+  analyseFensterTaggenau,
   analyseGruppen,
   analyseVerlauf,
   type Analysebasis,
@@ -241,6 +242,11 @@ export function AnalyseScreen() {
     () => (basis ? analyseFenster(basis, zeitraum, heute) : { von: heute, bis: heute }),
     [basis, zeitraum, heute],
   );
+
+  // Der Monatsverlauf rechnet in Monaten und bekommt deshalb `bis` als Monatsmarke.
+  // Alles, was an einzelnen TAGEN hängt — bislang nur das Depot —, braucht das Ende
+  // desselben Monats, sonst fällt der halbe laufende Monat aus dem Fenster.
+  const bisTag = useMemo(() => analyseFensterTaggenau(bis), [bis]);
 
   const verlauf = useMemo(() => (basis ? analyseVerlauf(basis, von, bis) : []), [basis, von, bis]);
 
@@ -513,7 +519,7 @@ export function AnalyseScreen() {
           {depotdaten && depotdaten.depots.length > 0 && (
             <div className="karten-paar">
               {depotdaten.depots.map((d) => (
-                <DepotAnsicht key={d.depot.id} sicht={d} von={von} bis={bis} />
+                <DepotAnsicht key={d.depot.id} sicht={d} von={von} bis={bisTag} />
               ))}
             </div>
           )}

@@ -151,10 +151,16 @@ export function formularAusBuchung(
   e: { datum: string; betrag: number; charakter: Charakter; kategorieId?: string; kontoId: string },
   anbieter: string,
   geld: Geld,
+  glaeubigerId?: string,
 ): VertragFormular {
   return {
     ...leeresFormular(e.datum),
     anbieter,
+    // Die Gläubiger-ID vom BELEG, wenn es eine gibt. Sie ist das einzige Merkmal, das den
+    // Einzieher eindeutig benennt — der Empfängername ist Text mit Unschärfe. Sie hier
+    // wegzulassen hiess: der Beleg trug die belastbare Angabe, und die Regel, die aus ihm
+    // entsteht, verliess sich trotzdem allein auf den Namen.
+    glaeubigerId: glaeubigerId ?? "",
     betragText: String(minorZuMajor(Math.abs(e.betrag), geld.waehrung)),
     charakter: e.charakter,
     kategorieId: e.kategorieId ?? "",
