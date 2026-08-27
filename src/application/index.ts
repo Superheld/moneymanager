@@ -171,6 +171,7 @@ export {
 export {
   analyseLaden,
   analyseFenster,
+  analyseFensterTaggenau,
   analyseVerlauf,
   analyseAufschluesselung,
   analyseGruppen,

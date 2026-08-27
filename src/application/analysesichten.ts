@@ -20,6 +20,7 @@ import {
   kategorieAggregat,
   nachHauptgruppe,
   parseIso,
+  tageImMonat,
   toIso,
   type GruppenSumme,
   type IstBuchung,
@@ -84,6 +85,27 @@ export function analyseFenster(
   if (zeitraum === "jahr") return { von: `${bisYmd.y}-01-01`, bis };
   if (zeitraum === "alles") return { von: fruehesterMonat(basis.buchungen) ?? bis, bis };
   return { von: toIso(addMonate(bisYmd, zeitraum === "24" ? -23 : -11)), bis };
+}
+
+/**
+ * Dasselbe Fenster, aber TAGGENAU zu Ende gedacht.
+ *
+ * `analyseFenster` liefert Monatsmarken: `bis` ist der ERSTE des laufenden Monats, weil
+ * der Monatsverlauf in Monaten rechnet und jeden Monat an seinem Ersten benennt. Für
+ * alles, was an einzelnen TAGEN hängt, ist diese Marke die falsche Grenze — sie schneidet
+ * den halben laufenden Monat weg.
+ *
+ * Genau daran ging der Depot-Verlauf leer aus: seine Stichtage sind Abruftage, liegen
+ * also mitten im Monat und damit hinter dem Ersten. Die Analyse meldete „zu wenig
+ * Punkte", während die Stände vollzählig in der Datenbank standen — ein Fehler, der wie
+ * verlorene Daten aussieht und keine sind.
+ *
+ * Deshalb hier der LETZTE Tag desselben Monats: das Fenster meint den ganzen Monat, und
+ * bei einem laufenden Monat schliesst das jeden Tag ein, der schon vergangen ist.
+ */
+export function analyseFensterTaggenau(bis: string): string {
+  const { y, m } = parseIso(bis);
+  return toIso({ y, m, d: tageImMonat(y, m) });
 }
 
 export function analyseVerlauf(basis: Analysebasis, von: string, bis: string): MonatsIst[] {

@@ -1182,10 +1182,11 @@ export function BuchungDetail(props: {
     // Der Anbieter ist das, woran man die Zahlung wiedererkennt: der Empfänger aus dem
     // Import, sonst die Notiz. Leer lassen wäre schlechter als ein Vorschlag, den man
     // überschreibt — Pflichtfeld ist er ohnehin.
-    const anbieter = umsatzByIst.get(vertragAus.id)?.gegenpartei || vertragAus.notiz || "";
+    const belegHier = umsatzByIst.get(vertragAus.id);
+    const anbieter = belegHier?.gegenpartei || vertragAus.notiz || "";
     return (
       <VertragModal
-        start={formularAusBuchung(vertragAus, anbieter, geld)}
+        start={formularAusBuchung(vertragAus, anbieter, geld, belegHier?.glaeubigerId)}
         hinweis={t("konten.zuVertrag.hinweis")}
         onClose={() => setVertragAus(null)}
         onSaved={async () => { setVertragAus(null); await nachAenderung(); }}

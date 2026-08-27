@@ -523,7 +523,14 @@ describe("VertraegeScreen — Vorschläge", () => {
       id: "v1", anbieter: "Petrossen Bonn", beginn: "2024-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
-    await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "Petrossen Bonn", 5000));
+    // Bewusst OHNE Stern angelegt — nicht über `standardErkennung`, die seit 2026-08-27
+    // von sich aus einen anhängt. Gebraucht wird hier die enge Ausgangslage, damit die
+    // Änderung durch die Maske überhaupt etwas bewegt; wäre sie aus der Vorbelegung
+    // geborgt, prüfte der Test ab dem nächsten Wechsel der Vorbelegung nichts mehr.
+    await sqliteVertragserkennungRepository.speichern({
+      ...standardErkennung("v1", "Petrossen Bonn", 5000),
+      merkmale: [{ art: "empfaenger", muster: "petrossen bonn" }],
+    });
     await zuordnungenAbgleichen(vertragsAbgleichDeps);
     // Nur die exakt geschriebenen vier — die drei mit Zusatz fallen durch.
     expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(4);

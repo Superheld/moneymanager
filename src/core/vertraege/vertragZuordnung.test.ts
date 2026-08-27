@@ -156,8 +156,25 @@ describe("standardErkennung", () => {
 
   it("nimmt die Gläubiger-ID als zweiten Schlüssel auf", () => {
     const e = standardErkennung("v1", "Vibora GmbH", 1650, "DE98ZZZ09999999999");
-    expect(e.merkmale).toContainEqual({ art: "empfaenger", muster: "vibora" });
+    expect(e.merkmale).toContainEqual({ art: "empfaenger", muster: "vibora*" });
     expect(e.merkmale).toContainEqual({ art: "glaeubigerId", muster: "DE98ZZZ09999999999" });
+  });
+
+  /**
+   * Der Fall, an dem die Zuordnung vorher zur Hälfte scheiterte: derselbe Anbieter bucht
+   * mal unter seinem blossen Namen, mal mit angehängtem Produkt- oder Rechnungszusatz.
+   * Ohne Stern in der Vorbelegung traf die Regel nur die erste Schreibweise, und der Rest
+   * stand als „keinem Vertrag zugeordnet" da — was aussieht, als hätte die Erkennung gar
+   * nicht gelaufen.
+   */
+  it("trifft denselben Anbieter auch mit angehängtem Zusatz", () => {
+    const e = standardErkennung("v1", "Ohlert", 1800);
+    expect(passtZu(e, spur({ gegenpartei: "Ohlert", betrag: -1800 }))).toBe(true);
+    expect(passtZu(e, spur({ gegenpartei: "Ohlert* Monatspaket", betrag: -1800 }))).toBe(true);
+    // Die Betragsspanne bleibt die Bremse — sie ist es, die Fremdes draussen hält.
+    expect(passtZu(e, spur({ gegenpartei: "Ohlert* Grossbestellung", betrag: -19900 }))).toBe(false);
+    // Und der Stern hängt HINTEN: wer den Namen nur irgendwo im Text trägt, ist nicht gemeint.
+    expect(passtZu(e, spur({ gegenpartei: "Zahlung an Ohlert", betrag: -1800 }))).toBe(false);
   });
 
   it("setzt ohne Betrag keine Spanne", () => {

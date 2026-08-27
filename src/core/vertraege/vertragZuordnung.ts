@@ -100,6 +100,19 @@ export interface Vertragszuordnung {
  * weil Preise steigen und selten fallen. Sie soll nicht die Zahlungen dieses Vertrags
  * aussortieren, sondern FREMDE Zahlungen an denselben Empfänger draußen halten.
  * `betrag` ist die Betragshöhe (positiv); 0 oder negativ ⇒ keine Spanne.
+ *
+ * **Der Name bekommt einen Stern**, und ohne den war die Regel praktisch wirkungslos.
+ * `musterTrifft` vergleicht ein Muster OHNE Stern exakt — der Empfänger im Auszug trägt
+ * aber fast nie nur den Anbieternamen: er trägt Produktnamen, Vertragsnummern,
+ * Ortsangaben. Ein Anbieter, der mal unter seinem blossen Namen und mal mit Zusatz
+ * bucht, wurde damit genau zur Hälfte erkannt, und der Rest sah aus wie „nicht
+ * zugeordnet". Der Kommentar an `Erkennungsmerkmal` beschreibt genau diesen Fall als
+ * den Grund, warum es Platzhalter gibt — die Standardregel hat ihn nur nie benutzt.
+ *
+ * Bewusst ein NACHgestellter Stern und keine Einschliessung: „alles, was mit diesem
+ * Anbieter beginnt" ist die Form, in der Empfängerfelder aufgebaut sind (Name zuerst,
+ * Zusatz dahinter). `*name*` fände zusätzlich jeden Text, in dem der Name irgendwo
+ * vorkommt — und ein Vertrag soll fremde Zahlungen draussen halten, nicht einsammeln.
  */
 export function standardErkennung(
   vertragId: string,
@@ -109,7 +122,7 @@ export function standardErkennung(
 ): Vertragserkennung {
   const merkmale: Erkennungsmerkmal[] = [];
   const name = anbieterSchluessel(anbieter.trim());
-  if (name) merkmale.push({ art: "empfaenger", muster: name });
+  if (name) merkmale.push({ art: "empfaenger", muster: `${name}*` });
   const id = glaeubigerId?.trim();
   if (id) merkmale.push({ art: "glaeubigerId", muster: id });
   const hoehe = Math.abs(betrag);
