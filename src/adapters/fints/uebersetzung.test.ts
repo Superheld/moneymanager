@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import { waehrungNachCode } from "../../core";
 import {
+  auszugsProben,
   auszugsStaende,
   bankbetragZuCent,
   klartextAnreicherung,
@@ -220,6 +221,114 @@ describe("auszugsStaende", () => {
     );
     expect(staende).toEqual([{ datum: "2026-08-22", betrag: 1000 }]);
     expect(warnungen).toHaveLength(1);
+  });
+});
+
+/**
+ * Die Summenprobe. Der Fall aus der Praxis, gegen den sie gebaut ist: EINE Zeile mit
+ * falschem Vorzeichen. Im Bestand ist die später nicht mehr auffindbar — der Kontoabgleich
+ * zeigt sie als konstanten Versatz über alle Anker, und genau so sieht auch ein zu hoch
+ * geschätzter Anfangsbestand aus. Die beiden sind ohne einen Anker VOR dem Fehler nicht zu
+ * unterscheiden. Hier ist der Fehler dagegen auf einen Auszug eingegrenzt.
+ *
+ * Ebenso wichtig ist, wann die Probe SCHWEIGT: ein Wächter, der bei jedem Lauf meldet,
+ * wird abgeschaltet statt gelesen.
+ */
+describe("auszugsProben", () => {
+  const stand = (iso: string, euro: number, currency = "EUR") => ({
+    date: new Date(`${iso}T00:00:00`),
+    currency,
+    value: euro,
+  });
+  const b = (euro: number) => ({ amount: euro });
+
+  it("schweigt, wenn die Buchungen die gemeldete Veränderung ergeben", () => {
+    expect(
+      auszugsProben([
+        {
+          openingBalance: stand("2026-07-31", 1000),
+          closingBalance: stand("2026-08-31", 940.1),
+          transactions: [b(-50), b(-20.15), b(10.25)],
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("findet eine Zeile mit falschem Vorzeichen und nennt die doppelte Lücke", () => {
+    // Die Bank buchte 49,95 ab, geliefert kam sie als Zufluss. Der Fehler verschiebt um
+    // 2 × Betrag — dieselbe Signatur, die core/CLAUDE.md für ein gedrehtes Vorzeichen nennt.
+    const proben = auszugsProben([
+      {
+        openingBalance: stand("2026-07-31", 1000),
+        closingBalance: stand("2026-08-31", 950.05),
+        transactions: [b(49.95)],
+      },
+    ]);
+    expect(proben).toHaveLength(1);
+    expect(proben[0]).toMatchObject({ datum: "2026-08-31", luecke: -9990, buchungen: 1 });
+  });
+
+  it("findet eine fehlende Buchung", () => {
+    const proben = auszugsProben([
+      {
+        openingBalance: stand("2026-07-31", 1000),
+        closingBalance: stand("2026-08-31", 800),
+        transactions: [b(-150)],
+      },
+    ]);
+    expect(proben[0].luecke).toBe(-5000);
+  });
+
+  it("schweigt ohne Anfangssaldo — da gibt es nichts zu prüfen", () => {
+    expect(
+      auszugsProben([{ closingBalance: stand("2026-08-31", 800), transactions: [b(-150)] }]),
+    ).toEqual([]);
+  });
+
+  /**
+   * Der wichtigste Schweigefall. Der CAMT-Parser der Bibliothek erfindet einen
+   * Anfangssaldo von NULL mit dem Datum des Schlusssaldos, wenn die Bank keinen liefert.
+   * Dagegen geprüft meldete die Probe bei jedem solchen Auszug den vollen Kontostand als
+   * Lücke — dieselbe Regel wie in `auszugsStaende`, aus demselben Grund.
+   */
+  it("schweigt bei einem Anfangssaldo, den die Bibliothek erfunden hat", () => {
+    expect(
+      auszugsProben([
+        {
+          openingBalance: stand("2026-08-31", 0),
+          closingBalance: stand("2026-08-31", 843.07),
+          transactions: [b(-150)],
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("schweigt, wenn die beiden Salden in verschiedenen Währungen stehen", () => {
+    expect(
+      auszugsProben([
+        {
+          openingBalance: stand("2026-07-31", 1000, "CHF"),
+          closingBalance: stand("2026-08-31", 800, "EUR"),
+          transactions: [b(-150)],
+        },
+      ]),
+    ).toEqual([]);
+  });
+
+  it("prüft jeden Auszug für sich", () => {
+    const proben = auszugsProben([
+      {
+        openingBalance: stand("2026-06-30", 100),
+        closingBalance: stand("2026-07-31", 50),
+        transactions: [b(-50)],
+      },
+      {
+        openingBalance: stand("2026-07-31", 50),
+        closingBalance: stand("2026-08-31", 30),
+        transactions: [b(-10)],
+      },
+    ]);
+    expect(proben.map((p) => p.datum)).toEqual(["2026-08-31"]);
   });
 });
 
