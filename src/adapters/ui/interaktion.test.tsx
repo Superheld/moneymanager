@@ -422,6 +422,8 @@ describe("Umbuchung aus einer bestehenden Buchung", () => {
     await detailOeffnen(nutzer, "Girokonto");
     const loeschen = screen.getAllByRole("button", { name: /^löschen$/i });
     await nutzer.click(loeschen[loeschen.length - 1]);
+    // Seit 2026-08-27 fragt der Löschweg nach — auch hier.
+    await nutzer.click(await screen.findByRole("button", { name: "Endgültig löschen" }));
 
     await waitFor(async () => {
       expect(await sqliteLedgerRepository.alle()).toHaveLength(0);
@@ -514,6 +516,8 @@ describe("Buchungsdetails", () => {
     expect(screen.queryByRole("button", { name: /^löschen$/i })).not.toBeInTheDocument();
     const verwerfen = await screen.findAllByRole("button", { name: /^verwerfen$/i });
     await nutzer.click(verwerfen[verwerfen.length - 1]);
+    // Seit 2026-08-27 fragt der Löschweg nach — auch beim Verwerfen einer Bankzeile.
+    await nutzer.click(await screen.findByRole("button", { name: "Endgültig löschen" }));
 
     await waitFor(async () => {
       expect(await sqliteLedgerRepository.alle()).toHaveLength(0);
@@ -548,6 +552,7 @@ describe("Buchungsdetails", () => {
     await detailOeffnen(nutzer, "Girokonto");
     const loeschen = await screen.findAllByRole("button", { name: /^löschen$/i });
     await nutzer.click(loeschen[loeschen.length - 1]);
+    await nutzer.click(await screen.findByRole("button", { name: "Endgültig löschen" }));
     await waitFor(async () => expect(await sqliteLedgerRepository.alle()).toHaveLength(0));
   });
 

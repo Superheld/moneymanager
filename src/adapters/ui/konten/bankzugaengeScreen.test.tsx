@@ -156,6 +156,8 @@ describe("Bankzugänge", () => {
     await screen.findByText("Kesselmann Bank");
 
     await nutzer.click(screen.getByRole("button", { name: /löschen/i }));
+    // Seit 2026-08-27 fragt jeder Löschweg nach — bestätigen gehört jetzt dazu.
+    await nutzer.click(await screen.findByRole("button", { name: "Endgültig löschen" }));
 
     await waitFor(async () => expect(await sqliteBankzugangRepository.alle()).toHaveLength(0));
     await waitFor(() => expect(screen.queryByText("Kesselmann Bank")).toBeNull());

@@ -391,6 +391,14 @@ const de = {
     leer: "Für den Ausblick fehlen die Plan-Daten: Er rechnet Einnahmen und Verträge (beides Zahlungsregeln) gegen die Budgets auf. Beides wird unter Verträge und Budgets gepflegt — aus den Ist-Buchungen allein wird hier nichts geschätzt.",
     leerUntertitel: "Die nächsten drei Monate",
   },
+  loeschen: {
+    titel: "Löschen",
+    untertitel: "{{name}}",
+    frage: "„{{name}}“ wird gelöscht. Das lässt sich nicht rückgängig machen.",
+    bestaetigen: "Endgültig löschen",
+    abbrechen: "Abbrechen",
+    laeuft: "wird gelöscht …",
+  },
   uebersicht: {
     titel: "Übersicht",
     untertitel: "Wie du gerade dastehst — dieser Monat und die beiden nächsten",
@@ -497,6 +505,9 @@ const de = {
     spalteSaldo: "Saldo",
   },
   budgets: {
+    loeschenFolgen: "Das Budget verschwindet samt allen Beträgen, die es je hatte. Die Buchungen bleiben — ein Budget misst sie, es besitzt sie nicht.",
+    versionName: "Betrag ab {{monat}}",
+    versionLoeschenFolgen: "Nur dieser eine Betrag geht weg. Die Monate, für die er galt, fallen auf den vorigen Betrag zurück — vor dem ersten auf gar keine Planung.",
     titel: "Budgets",
     untertitel: "Was du monatlich zurücklegst — was verfällt und was sich aufbaut",
     anlegen: "Budget anlegen",
@@ -589,6 +600,7 @@ const de = {
     modalUntertitel: "Ein Budget je Kategorie — für Feineres eine Unterkategorie nehmen",
   },
   inventar: {
+    loeschenFolgen: "Der Gegenstand verschwindet samt seiner monatlichen Rücklage. Buchungen, die zu ihm gehörten, bleiben — sie hängen an ihrer Kategorie, nicht an ihm.",
     titel: "Inventar",
     untertitel: "Dinge, die du besitzt und ersetzen musst — und was sie dich monatlich kosten",
     gegenstand: "Gegenstand",
@@ -668,6 +680,12 @@ const de = {
     verknuepft: "verknüpft",
   },
   konten: {
+    dieseBuchungName: "diese Buchung",
+    detailLoeschenFolgen: "Die Buchung verschwindet aus dem Konto und der Saldo ändert sich. Ihr letzter Stand bleibt im Journal — wiederherstellen lässt sie sich daraus aber nicht.",
+    detailLoeschenFolgenPaar: "Beide Beine der Umbuchung verschwinden — die Gegenseite auf dem anderen Konto gehört dazu und bliebe sonst allein zurück.",
+    detailVerwerfenFolgen: "Die Bankzeile wird verworfen. Der Beleg bleibt erhalten, und die Zeile lässt sich aus der Inbox erneut verbuchen — der Abruf holt sie nicht noch einmal.",
+    zugangLoeschenFolgen: "Die abgerufenen Buchungen bleiben; sie stehen im Konto und hängen nicht am Zugang. Weg ist der Weg zur Bank — für weitere Abrufe muss der Zugang neu eingerichtet werden.",
+    kontoLoeschenFolgen: "Ein Konto mit Buchungen lässt sich nicht löschen — die Buchungen müssten zuerst weg. Ohne Buchungen verschwindet nur das Konto selbst.",
     festlegung: {
       immerLabel: "Diese Kategorie immer bei diesem Empfänger",
       immer: "Immer bei „{{muster}}“ diese Kategorie",
@@ -1110,6 +1128,8 @@ const de = {
     },
   },
   einstellungen: {
+    personLoeschenFolgen: "Die Person verschwindet aus den Stammdaten. Konten und Verträge, die sie als Inhaber nennen, laufen weiter — dann ohne Inhaber.",
+    kategorieLoeschenFolgen: "Die Buchungen dieser Kategorie bleiben — sie stehen danach ohne Kategorie da. Budgets, die darauf aufbauen, verlieren ihre Grundlage.",
     titel: "Einstellungen",
     untertitel: "Sprache & Währung · Personen · Konten · Kategorien — für den ganzen Haushalt",
     bearbeiten: "bearbeiten",
@@ -1388,6 +1408,7 @@ const de = {
     },
   },
   vertraege: {
+    loeschenFolgen: "Der Vertrag nimmt seine Zahlungsregel, seine Erkennungsregel und JEDE Zuordnung mit — auch die von Hand gesetzten. Die Buchungen selbst bleiben; sie verlieren nur ihre Vertragsmarkierung.",
     titel: "Verträge",
     untertitel: "Wiederkehrende Zahlungen inkl. Einnahmen · Fristen & Kündigungstermine",
     anlegen: "Vertrag anlegen",
@@ -1974,6 +1995,14 @@ const en: typeof de = {
     leer: "The outlook needs plan data: it offsets income and contracts (both payment rules) against the budgets. Both live under Contracts and Budgets — nothing here is estimated from posted transactions.",
     leerUntertitel: "The next three months",
   },
+  loeschen: {
+    titel: "Delete",
+    untertitel: "{{name}}",
+    frage: "“{{name}}” will be deleted. This cannot be undone.",
+    bestaetigen: "Delete permanently",
+    abbrechen: "Cancel",
+    laeuft: "deleting …",
+  },
   uebersicht: {
     titel: "Overview",
     untertitel: "Where you stand right now — this month and the next two",
@@ -2076,6 +2105,9 @@ const en: typeof de = {
     spalteSaldo: "Balance",
   },
   budgets: {
+    loeschenFolgen: "The budget disappears together with every amount it ever had. The entries stay — a budget measures them, it does not own them.",
+    versionName: "Amount from {{monat}}",
+    versionLoeschenFolgen: "Only this one amount goes. The months it covered fall back to the previous amount — or, before the first one, to no plan at all.",
     titel: "Budgets",
     untertitel: "What you set aside each month — what expires and what builds up",
     anlegen: "Add budget",
@@ -2168,6 +2200,7 @@ const en: typeof de = {
     modalUntertitel: "One budget per category — use a subcategory for anything finer",
   },
   inventar: {
+    loeschenFolgen: "The item disappears along with its monthly reserve. Entries that belonged to it stay — they hang off their category, not off the item.",
     titel: "Inventory",
     untertitel: "Things you own and have to replace — and what they cost you per month",
     gegenstand: "Item",
@@ -2247,6 +2280,12 @@ const en: typeof de = {
     verknuepft: "linked",
   },
   konten: {
+    dieseBuchungName: "this entry",
+    detailLoeschenFolgen: "The entry disappears from the account and the balance changes. Its last state stays in the journal — but it cannot be restored from there.",
+    detailLoeschenFolgenPaar: "Both legs of the transfer disappear — the counterpart on the other account belongs to it and would otherwise be left behind.",
+    detailVerwerfenFolgen: "The bank line is discarded. The receipt is kept and the line can be posted again from the inbox — the retrieval will not fetch it a second time.",
+    zugangLoeschenFolgen: "The retrieved entries stay; they live in the account and do not hang off the access. What goes is the route to the bank — further retrievals need it set up again.",
+    kontoLoeschenFolgen: "An account with entries cannot be deleted — the entries would have to go first. Without any, only the account itself disappears.",
     festlegung: {
       immerLabel: "Always use this category for this payee",
       immer: "Always use this category for “{{muster}}”",
@@ -2664,6 +2703,8 @@ const en: typeof de = {
     },
   },
   einstellungen: {
+    personLoeschenFolgen: "The person disappears from the master data. Accounts and contracts naming them as holder keep running, just without one.",
+    kategorieLoeschenFolgen: "The entries in this category stay — afterwards they have no category. Budgets built on it lose their basis.",
     titel: "Settings",
     untertitel: "Language & currency · people · accounts · categories — for the whole household",
     bearbeiten: "edit",
@@ -2936,6 +2977,7 @@ const en: typeof de = {
     },
   },
   vertraege: {
+    loeschenFolgen: "The contract takes its payment rule, its recognition rule and EVERY assignment with it — including the ones you set by hand. The entries themselves stay; they lose only their contract marking.",
     titel: "Contracts",
     untertitel: "Recurring payments incl. income · deadlines & cancellation dates",
     anlegen: "Add contract",
