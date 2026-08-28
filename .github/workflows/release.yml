@@ -28,16 +28,61 @@ on:
 # Workflow prüfen will, setzt einen Tag und löscht ihn samt Release wieder.
 
 jobs:
-  macos:
-    # macos-14 und neuer sind arm64. Intel-Macs bräuchten ein Universal-Binary
-    # (`--target universal-apple-darwin`) — solange niemand eines hat, wäre das
-    # Bauzeit ohne Empfänger.
-    runs-on: macos-latest
+  bauen:
+    strategy:
+      # NACHEINANDER, und das ist keine Vorsicht, sondern Pflicht.
+      #
+      # `latest.json` ist die Datei, die der Updater fragt, und sie traegt alle
+      # Plattformen zusammen. tauri-action baut sie als READ-MODIFY-WRITE: es laedt die
+      # vorhandene Datei vom Release, uebernimmt ihre `platforms` und schreibt die eigene
+      # dazu (nachgesehen in `src/upload-version-json.ts` beim gepinnten SHA). Zwei Jobs,
+      # die gleichzeitig lesen, sehen denselben Stand — und der zweite ueberschreibt den
+      # Eintrag des ersten.
+      #
+      # Der Fehlschlag waere dabei STILL: die verlorene Plattform bekaeme vom Updater
+      # "nichts Neues" statt eines Fehlers. Dieselbe Falle wie ein falscher
+      # Plattformschluessel, und man sucht sie lange an der falschen Stelle.
+      max-parallel: 1
+      # macOS zuerst: der erste Job LEGT das Release an und setzt damit den Text (spaetere
+      # finden es vor und lassen ihn unberuehrt). Faellt einer aus, sollen die anderen
+      # trotzdem liefern — eine kaputte Plattform darf die uebrigen nicht mitnehmen.
+      fail-fast: false
+      matrix:
+        include:
+          # macos-14 und neuer sind arm64. Intel-Macs braeuchten ein Universal-Binary
+          # (`--target universal-apple-darwin`) — solange niemand eines hat, waere das
+          # Bauzeit ohne Empfaenger.
+          - plattform: macos-latest
+            ziele: app,dmg
+          # NUR AppImage. Ein `.deb` kann sich nicht selbst austauschen, der Updater kann
+          # es also nie ersetzen — es laege im Release und saehe aus wie ein Weg, der
+          # keiner ist. Dieselbe Sorte Falle wie ein Knopf, der nichts tut.
+          #
+          # 22.04 und nicht `ubuntu-latest`: ein AppImage laeuft nur auf Systemen mit
+          # mindestens der glibc, gegen die es gebaut wurde. Die aelteste unterstuetzte
+          # Umgebung ist damit die richtige Wahl, nicht die neueste.
+          - plattform: ubuntu-22.04
+            ziele: appimage
+          # NSIS und nicht MSI: der Updater kann beide ersetzen, aber ein NSIS-Installer
+          # braucht keine Administratorrechte.
+          - plattform: windows-latest
+            ziele: nsis
+    runs-on: ${{ matrix.plattform }}
     permissions:
       contents: write
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # Die Systempakete, ohne die Tauri auf Linux nicht baut. Auf den anderen beiden
+      # Laeufern bringt das Abbild alles mit.
+      - name: Linux-Systempakete
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev build-essential curl wget file patchelf
 
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
@@ -87,6 +132,10 @@ jobs:
       # ohne sie — Gatekeeper prüft nicht erneut.
       - name: Signierungsstand feststellen und Release-Text bauen
         id: text
+        # OHNE DAS LAEUFT DER SCHRITT AUF WINDOWS IN POWERSHELL und stirbt an der ersten
+        # Zeile. `bash` ist auf allen drei Laeufern da (auf Windows ueber Git Bash), also
+        # gibt es genau ein Skript statt dreier.
+        shell: bash
         env:
           ZERTIFIKAT: ${{ secrets.APPLE_CERTIFICATE }}
           ZERTIFIKAT_KENNWORT: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
@@ -120,7 +169,9 @@ jobs:
           # gibt, einen Schluessel WEGZULASSEN — nur einen leeren Wert zu setzen, und
           # genau der ist das Problem. Was hier nicht geschrieben wird, existiert im
           # naechsten Schritt nicht.
-          if [ "$signiert" = "ja" ]; then
+          # Nur auf macOS: auf den anderen Laeufern gaebe es nichts zu signieren, und ein
+          # Zertifikat in der Umgebung eines Linux-Builds ist Geheimnis ohne Zweck.
+          if [ "$signiert" = "ja" ] && [ "$RUNNER_OS" = "macOS" ]; then
             {
               echo "APPLE_CERTIFICATE<<WERTENDE"
               echo "$ZERTIFIKAT"
@@ -137,6 +188,11 @@ jobs:
             echo "body<<TEXTENDE"
             echo "Lokale Haushalts-Finanz-App, Stadium **Alpha**."
             echo
+            echo "Der Bestand wird beim ersten Start verschluesselt — die Passphrase wird dabei"
+            echo "gesetzt, und der Wiederherstellungscode gehoert aufgeschrieben."
+            echo
+            echo "**macOS** (\`.dmg\`)"
+            echo
             if [ "$signiert" = "ja" ]; then
               echo "Signiert und notarisiert."
             else
@@ -148,13 +204,22 @@ jobs:
               echo "Start als „beschaedigt“. Sie ist es nicht — einmalig freigeben mit"
               echo
               echo "    xattr -dr com.apple.quarantine /Applications/Moneymanager.app"
-              echo
-              echo "Ein bereits installierter Moneymanager aktualisiert sich ohne diesen Schritt:"
-              echo "der Updater prueft seine eigene Signatur, Gatekeeper ist daran unbeteiligt."
             fi
             echo
-            echo "Der Bestand wird beim ersten Start verschluesselt — die Passphrase wird dabei"
-            echo "gesetzt, und der Wiederherstellungscode gehoert aufgeschrieben."
+            echo "**Windows** (\`.exe\`)"
+            echo
+            echo "Nicht mit einem Authenticode-Zertifikat signiert: SmartScreen meldet einen"
+            echo "unbekannten Herausgeber. Ueber \"Weitere Informationen\" laesst sich der Start"
+            echo "erlauben."
+            echo
+            echo "**Linux** (\`.AppImage\`)"
+            echo
+            echo "Ausfuehrbar machen und starten; eine Signatur braucht es hier nicht. Nur das"
+            echo "AppImage kann sich selbst aktualisieren — ein \`.deb\` koennte das nie, deshalb"
+            echo "gibt es keins."
+            echo
+            echo "Ein bereits installierter Moneymanager aktualisiert sich ohne all das: der"
+            echo "Updater prueft seine eigene Signatur, und die ist unabhaengig davon."
             echo "TEXTENDE"
           } >> "$GITHUB_OUTPUT"
 
@@ -188,6 +253,10 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Moneymanager __VERSION__
+          # Je Plattform genau die Formate, die der Updater auch ersetzen kann (siehe
+          # Matrix oben). `bundle.targets` in tauri.conf.json steht auf "all" und bleibt
+          # es — das ist die Vorgabe fuer einen Bau von Hand; hier wird eingegrenzt.
+          args: --bundles ${{ matrix.ziele }}
           # Der Text kommt aus dem Schritt oben und nicht als Literal hierher: er hängt
           # davon ab, ob wirklich signiert wurde. Ein fest eingetragener Satz wäre in
           # genau dem Fall falsch, in dem es darauf ankommt.

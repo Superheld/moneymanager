@@ -3,6 +3,40 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.24.0] — 2026-08-28
+
+Dieselbe App auf drei Plattformen. Am Programm ändert sich nichts — nur daran, wer es
+starten kann.
+
+### Neu
+
+**Linux und Windows.** Der Release-Workflow baut eine Matrix statt eines Jobs: macOS liefert
+App und DMG, Linux ein AppImage, Windows einen NSIS-Installer. Cross-Compile gibt es bei
+Tauri nicht, jede Plattform braucht ihren eigenen Bauplatz.
+
+**Linux bekommt bewusst nur das AppImage.** Ein `.deb` kann sich nicht selbst austauschen —
+der Updater könnte es nie ersetzen, und es läge im Release als Weg, der keiner ist.
+
+**Der Release-Text sagt bei jeder Plattform, was einen erwartet:** Gatekeeper auf macOS,
+SmartScreen auf Windows, nichts auf Linux. Und dass ein bereits installierter Moneymanager
+das alles nicht braucht — der Updater prüft seine eigene Signatur, und die ist von beidem
+unabhängig.
+
+### Behoben
+
+**Ein fehlendes Signierungs-Secret brach den Release-Build ab**, nachdem er sechseinhalb
+Minuten durchgelaufen war. In einem `env`-Block wird ein fehlendes Secret zum leeren String,
+und die Variable ist damit gesetzt; die Signierung prüft „ist gesetzt", nicht „hat Inhalt",
+und versuchte den Import eines Zertifikats, das es nicht gibt.
+
+### Geändert
+
+**Aus dem Türsteher ist eine Weiche geworden.** Er brach den Release ab, wenn die
+Apple-Secrets fehlten, und begründete das ausdrücklich damit, dass der lokale Bauweg offen
+bleibe. Der ist zu — ausgeliefert wird über GitHub. Damit blockierte er nicht mehr das
+Riskante, sondern das Einzige. Was von ihm bleibt, ist der wertvollere Teil: der Release-Text
+sagt die Wahrheit über den Signierungsstand, statt sie zu behaupten.
+
 ## [0.23.0] — 2026-08-28
 
 Die Runde, in der die App aufhört, ihre Daten offen liegen zu lassen. Der Bestand ist
