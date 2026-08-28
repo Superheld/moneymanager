@@ -115,16 +115,49 @@ export async function buchungenLoeschen(
   umsatzRepo?: UmsatzRepository,
 ): Promise<{ geloescht: number; gesperrt: number }> {
   const umsaetze = umsatzRepo ? await umsatzRepo.alle() : [];
+  // Für die Umbuchungen: das ganze Ledger, nicht nur die Auswahl. Das Gegenbein liegt auf
+  // einem ANDEREN Konto und steht deshalb fast nie mit in der Markierung — der Auszug
+  // zeigt ja immer nur eines.
+  const alle = await ledger.alle();
+
   let geloescht = 0;
   let gesperrt = 0;
+  const erledigt = new Set<string>();
+
   for (const b of buchungen) {
-    if (gesperrteIds.has(b.id)) {
+    if (erledigt.has(b.id)) continue;
+
+    // EINE UMBUCHUNG IST EIN PAAR ODER NICHTS.
+    //
+    // Hier stand bis 2026-08-28 ein blosses `ledger.loeschen(b.id)`, und damit liess der
+    // Sammelmodus ein Bein allein zurück: mit `transferId` auf ein Paar, das es nicht
+    // mehr gibt, und `gegenkontoId` auf ein Konto, auf dem nichts mehr steht. Am echten
+    // Bestand ist das genau einmal passiert und danach nicht mehr auffindbar gewesen —
+    // die Buchung sieht aus wie jede andere Umschichtung, nur dass das Geld auf der
+    // Gegenseite nie ankam.
+    //
+    // Der Einzeldialog macht es seit jeher richtig (`umbuchungLoeschen` nimmt beide
+    // Beine). Dieselbe Handlung an zwei Orten muss dasselbe bedeuten.
+    const beine = b.transferId ? alle.filter((x) => x.transferId === b.transferId) : [b];
+
+    // Ist EIN Bein geschützt, bleibt das ganze Paar stehen. Ein halb gelöschtes Paar wäre
+    // genau der Zustand, den dieser Block verhindert — und „das eine ging, das andere
+    // nicht" ist keine Auskunft, mit der jemand etwas anfangen kann.
+    if (beine.some((x) => gesperrteIds.has(x.id))) {
       gesperrt++;
+      for (const x of beine) erledigt.add(x.id);
       continue;
     }
-    await ledger.loeschen(b.id);
-    const u = umsaetze.find((x) => x.istbuchungId === b.id && x.status === "verbucht");
-    if (u && umsatzRepo) await umsatzRepo.speichern(verwerfen(zuruecksetzen(u)));
+
+    for (const x of beine) {
+      await ledger.loeschen(x.id);
+      const u = umsaetze.find((y) => y.istbuchungId === x.id && y.status === "verbucht");
+      if (u && umsatzRepo) await umsatzRepo.speichern(verwerfen(zuruecksetzen(u)));
+      erledigt.add(x.id);
+    }
+    // Ein Paar zählt als EINE Löschung: der Nutzer hat eine Zeile markiert und eine
+    // Umbuchung weggeworfen. „2 gelöscht" bei einer Markierung wäre eine Zahl, die
+    // niemand nachvollziehen kann.
     geloescht++;
   }
   return { geloescht, gesperrt };

@@ -131,7 +131,36 @@ export async function buchungBearbeiten(
   return aktualisiert;
 }
 
-/** Löscht eine Ist-Buchung. */
+/**
+ * Löscht eine Ist-Buchung — und lässt dabei keine halbe Umbuchung zurück.
+ *
+ * Eine Umbuchung besteht aus zwei Beinen auf zwei Konten, verbunden über `transferId`.
+ * Verschwindet eines davon, steht das andere mit einer `transferId` da, zu der es kein
+ * Paar mehr gibt, und einem `gegenkontoId`, auf dem nichts mehr steht. Die Zeile sieht
+ * danach aus wie eine gewöhnliche Umschichtung — nur dass das Geld auf der Gegenseite
+ * nie ankam. Am echten Bestand ist genau das einmal passiert und war hinterher nicht
+ * mehr auffindbar.
+ *
+ * Deshalb wird das übrige Bein GELÖST, nicht mitgelöscht. Der Unterschied ist fachlich:
+ *
+ *   • Wer eine UMBUCHUNG wegwirft, meint beide Beine — dafür gibt es
+ *     `umbuchungLoeschen`, und der Buchungsdialog ruft genau das auf.
+ *   • Wer EINE BUCHUNG löscht (ein Duplikat, eine falsch erfasste Zeile), meint diese
+ *     eine. Das Bein auf dem anderen Konto ist keine Dublette und keine Falscherfassung;
+ *     es hat nur seinen Partner verloren. Es zu löschen wäre eine Aussage über ein
+ *     Konto, über das niemand etwas gesagt hat.
+ *
+ * Dieselbe Auflösung nimmt `bankzeileVerwerfen` seit jeher vor. Sie steht jetzt hier,
+ * damit sie für JEDEN Aufrufer gilt und nicht für die, die daran gedacht haben.
+ */
 export async function buchungLoeschen(ledger: LedgerPort, id: string): Promise<void> {
+  const alle = await ledger.alle();
+  const buchung = alle.find((b) => b.id === id);
+  if (buchung?.transferId) {
+    for (const bein of alle) {
+      if (bein.transferId !== buchung.transferId || bein.id === id) continue;
+      await ledger.speichern({ ...bein, transferId: undefined, gegenkontoId: undefined });
+    }
+  }
   await ledger.loeschen(id);
 }
