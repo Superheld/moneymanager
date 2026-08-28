@@ -3,6 +3,113 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.23.0] — 2026-08-28
+
+Die Runde, in der die App aufhört, ihre Daten offen liegen zu lassen. Der Bestand ist
+verschlüsselt, die Dateien gehören nur noch dem Nutzer, und der einzige Netzzugriff, der
+ungefragt lief, ist weg. Dazu ein Kontoauszug, der die Frage beantwortet, die man ihm
+wirklich stellt — und Löschen, das vorher fragt.
+
+### Neu
+
+**Der Datenbestand liegt verschlüsselt.** Beim ersten Start wird der Zugang eingerichtet,
+und zwar ohne Ausweg: kein „später", kein „ohne Verschlüsselung". Wer beim ersten Start
+unter Zeitdruck steht, klickt genau das weg und legt dann für immer offen ab, ohne es je
+wieder zu bemerken. Ein vorhandener Bestand wird dabei überführt — gesichert, daneben neu
+geschrieben, nachgewiesen, erst dann die alte Fassung weggeworfen.
+
+**Die Passphrase ist nicht der Schlüssel, sie wickelt ihn ein.** Ein gewürfelter
+Datenschlüssel verschlüsselt die Datenbank und liegt selbst eingewickelt daneben. Der Umweg
+kostet eine Datei und leistet zweierlei, was direkt nicht ginge: die Passphrase zu wechseln
+dauert Sekunden statt einer Neuverschlüsselung, und ein **Wiederherstellungscode** ist
+überhaupt erst möglich — er IST der Datenschlüssel in lesbarer Form. Er ist Pflicht, nicht
+Komfort: eine vergessene Passphrase nimmt auch alle Sicherungen mit.
+
+**Eine Zeitsperre** (Einstellungen → Verschlüsselung, Vorgabe 15 Minuten, abschaltbar) deckt
+den Fall ab, den weder Dateirechte noch Verschlüsselung erreichen: jemand setzt sich an den
+entsperrten Rechner.
+
+**Die App sichert sich selbst, gestaffelt.** Beim Start, vor den Migrationen — der Fall, für
+den es Sicherungen gibt, ist eine Schemaänderung, die schiefgeht; danach zu sichern hiesse,
+den kaputten Stand zu sichern. Sieben tägliche, vier wöchentliche, drei monatliche, je zwei
+quartalsweise und halbjährliche — und **jährliche ohne Ende**. Solange die Bank die Umsätze
+noch führt, ist ein Verlust ärgerlich und behebbar. Genau das hört auf; ab dann wäre eine
+weggeworfene Jahressicherung nicht ein verlorener Wiederherstellungspunkt, sondern ein
+verlorenes Jahr.
+
+**„Was noch kommt" steht jetzt in der Übersicht**, über alle Konten hinweg, mit Kontospalte,
+Kontofilter und wählbarem Zeitraum. Im Kontoauszug stand die Vorschau je Konto einzeln — die
+Frage, die man aber wirklich stellt, ist nicht die eines Kontos, und wer sie dort beantwortet
+bekam, musste vier Konten nacheinander aufmachen und im Kopf zusammenzählen.
+
+**Eine Vertragszahlung ist in den Listen als solche zu erkennen** — mit dem Anbieternamen,
+nicht bloss einem Ja/Nein. Dass es ein Vertrag ist, sieht man an der Markierung ohnehin;
+welcher, war die Auskunft, für die man vorher jede Zeile öffnen musste.
+
+**Der Verlauf einer Buchung ist zu sehen und zurückzunehmen.** Das Änderungsprotokoll lief
+seit seiner Einführung mit, ohne dass es jemand zu Gesicht bekam. Es steht jetzt im
+Buchungsdialog: die Einträge, der Unterschied zum Stand bei der Entstehung, und ein Weg
+zurück. Ein Umbuchungs-Bein bleibt bewusst aussen vor — dafür gibt es „Paarung lösen", einen
+Weg, der beide Seiten anfasst.
+
+**Ein Auszug prüft sich selbst.** Beim Bankabruf wird geprüft, ob Schlussbestand minus
+Anfangsbestand der Summe der Umsätze entspricht. Stimmt es nicht, fehlt eine Zeile — und das
+soll man erfahren, bevor der Saldo auffällt. Die Warnungen des Bankabrufs wurden dabei
+bislang vollständig verworfen; nur der Dateiimport zeigte welche.
+
+**Die Vertragserkennung ist flexibler:** ein drittes Merkmal auf den Verwendungszweck (für
+Zahlungen an Privatpersonen, wo im Empfängerfeld ein Name steht, der über den Vertrag nichts
+sagt), und ein Vorschlag für die Betragsspanne dort, wo genau sie die Zeilen wegfiltert.
+
+### Behoben
+
+**Der Depot-Verlauf zeigte wieder nur einen Stand**, obwohl mehrere abgerufen waren. Das
+Auswertungsfenster endete am Monatsersten statt am Monatsletzten, und alles danach fiel
+heraus.
+
+**Eine gelöschte Buchung lässt keine halbe Umbuchung mehr zurück.** Im Sammelmodus und beim
+Dublettenvergleich wurde nur das markierte Bein entfernt; das Gegenbein blieb mit einem
+Verweis auf ein Paar stehen, das es nicht mehr gab, und sah von aussen aus wie jede andere
+Umschichtung. Beide Wege behandeln ein Paar jetzt als Einheit — so wie der Einzeldialog es
+seit jeher tat.
+
+**Der Hinweis „Namen als Empfänger aufnehmen" stand bei jedem Vertrag**, auch wenn der Name
+längst als Muster hinterlegt war: verglichen wurde auf Gleichheit statt auf Abdeckung.
+
+**Ein neu gebautes Erkennungsmerkmal wäre beim Laden stillschweigend verschwunden** — der
+Leser zählte die zulässigen Arten selbst auf, und was nicht in seiner Liste stand, fiel ohne
+Fehlermeldung weg.
+
+**Das Änderungsprotokoll filterte verschachtelte Felder mit.** Dass die Aufteilungen es
+überlebten, war Zufall, weil ihre drei Felder zufällig wie Spalten der Buchung heissen.
+
+### Geändert
+
+**Kein Löschen mehr ohne Rückfrage** — an allen Wegen, an denen bis dahin ein Klick sofort
+etwas entfernte. Und die Rückfrage sagt, was mitgeht: „Wirklich löschen?" ist eine
+Verzögerung und keine Information.
+
+**Der Datenbankzugang läuft über eigene Kommandos** statt über das SQL-Plugin. Der Grund ist
+`PRAGMA key`: es gilt pro Verbindung, und über den Pool des Plugins erwischte es eine
+beliebige. Nebengewinn: `sql:allow-execute` ist aus den Berechtigungen gefallen.
+
+**Die Datenbankdateien gehören nur noch dem Nutzer**, unter dem die App läuft. Vorher
+entstanden sie mit Leserechten für jeden Account des Rechners.
+
+**Die Schrift liegt im Bündel.** Sie kam über einen Schriften-Dienst — ein Netzzugriff bei
+jedem Start, bei dem der Betreiber IP und Zeitpunkt sah. Damit stimmt jetzt auch die
+Zusicherung, dass die Update-Prüfung der einzige ungefragte Weg nach draussen ist.
+
+**Vier Wächter in der Lieferkette:** bekannte Lücken auf beiden Seiten (npm und Rust), die
+Herkunft der Pakete, und was beim Installieren ungefragt ausgeführt wird. Der letzte ist der
+wichtigste — eine Lücke im Code muss erst erreicht werden, ein Install-Skript läuft von
+selbst.
+
+**Kein unsigniertes öffentliches Release mehr.** Der Release-Workflow bricht ab, wenn die
+Signierungs-Secrets fehlen, statt klaglos ein Bundle zu bauen, das macOS beim Empfänger als
+„beschädigt" meldet. Ein Zertifikat kann man nachreichen; ein Release, das draussen ist,
+nicht mehr. Der lokale Weg (`npm run installieren`) ist davon unberührt.
+
 ## [0.22.0] — 2026-08-25
 
 Eine Runde über die Kanten, die man erst beim täglichen Gebrauch bemerkt: Dialoge, die sich
