@@ -21,10 +21,45 @@ Alle Daten bleiben auf dem Gerät: keine Cloud, kein Benutzerkonto, keine Regist
 sie funktioniert ohne KI — der rechnende Kern ist Arithmetik, die automatische
 Kategorisierung ist Komfort obendrauf.
 
-> **Alpha, nicht veröffentlicht.** Es gibt genau einen Datenbestand, an dem entwickelt wird.
-> Das Schema darf sich noch ohne Rücksicht ändern, Migrationen dürfen auch wegnehmen. Dieses
-> Repo ist offen, weil der Weg dorthin interessanter ist als das Ziel — es ist kein Download
-> und keine Empfehlung, deine Finanzen darin zu führen.
+> **Alpha.** Es gibt genau einen Datenbestand, an dem entwickelt wird. Das Schema darf sich
+> noch ohne Rücksicht ändern, Migrationen dürfen auch wegnehmen. Dieses Repo ist offen, weil
+> der Weg dorthin interessanter ist als das Ziel — es ist keine Empfehlung, deine Finanzen
+> darin zu führen.
+
+## Nichts davon ist verifiziert
+
+Es gibt Releases mit fertigen Paketen für macOS, Linux und Windows. Bevor du eines
+herunterlädst, gehört das hier auf den Tisch — nicht als Kleingedrucktes, sondern weil es
+bei einer **Finanz**-App der Punkt ist, an dem man hinsehen sollte.
+
+**Keines der Pakete ist von einem Dritten geprüft oder beglaubigt.** Konkret heisst das je
+nach System etwas anderes:
+
+| | was passiert | warum |
+|---|---|---|
+| **macOS** | meldet die App als „beschädigt" | kein Apple-Developer-Zertifikat, keine Notarisierung |
+| **Windows** | SmartScreen meldet einen unbekannten Herausgeber | kein Authenticode-Zertifikat |
+| **Linux** | nichts | dort erwartet niemand eine Signatur |
+
+Die App ist in keinem der Fälle beschädigt — sie ist unbeglaubigt, und das Betriebssystem
+kann beides nicht unterscheiden. Wie man sie trotzdem startet, steht im jeweiligen
+Release-Text. **Ob man das tun will, ist eine eigene Frage**, und die Antwort hängt nicht am
+Zertifikat, sondern daran, ob du dem Quelltext hier traust: er liegt vollständig offen, und
+der Build läuft in einem öffentlichen Workflow, dessen Lauf du nachlesen kannst.
+
+**Eine Signatur gibt es doch, und sie leistet etwas anderes, als man denkt.** Jedes Update
+ist mit einem minisign-Schlüssel signiert, und die installierte App weist ein Update ab, das
+nicht dazu passt. Das verhindert, dass jemand *anderes* dir ein Update unterschiebt — es
+sagt nichts darüber, ob dieses Update gut ist. Herkunft, nicht Güte.
+
+**Und eine Sache, die man einem Finanz-Download nicht ansieht:** der Bankabruf spricht unter
+einer Produktregistrierung der Deutschen Kreditwirtschaft, die auf dieses Projekt läuft. Wer
+ein Release benutzt, redet mit seiner Bank also unter unserem Namen. Ein Fork hat diese
+Nummer nicht — sein Build läuft ohne, und der Abruf bleibt dort gesperrt, bis er sich selbst
+registriert.
+
+**Was nicht drin ist:** keine Zugangsdaten, keine Kontodaten, kein Datenbestand. Die
+Datenbank liegt im Datenverzeichnis der App, nicht im Paket.
 
 ## Was sie kann
 
