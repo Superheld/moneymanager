@@ -4,6 +4,12 @@ version = "0.1.0"
 description = "Moneymanager — lokale private Bilanz + Finanzplan"
 authors = ["Bruce"]
 edition = "2021"
+# Welches Binary `cargo run` meint. Seit `src/bin/bestandslesen.rs` dazugekommen ist (das
+# Werkzeug, mit dem die Waechter den verschluesselten Bestand lesen), gibt es zwei — und
+# ohne diese Zeile bricht `npm run tauri dev` ab, bevor die App startet: "could not
+# determine which binary to run". Der Fehler zeigt dabei auf cargo und nicht auf Tauri,
+# und man sucht ihn an der falschen Stelle.
+default-run = "moneymanager"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
