@@ -14,9 +14,25 @@ export interface MonatsIst {
   readonly label: string;
   readonly jahr: number;
   readonly monat: number; // 1–12
-  /** Σ Erträge des Monats (≥ 0). */
+  /**
+   * Σ Buchungen mit Charakter `Ertrag`, vorzeichenbehaftet.
+   *
+   * NICHT „≥ 0": eine Rückbuchung auf einer Ertragskategorie ist ein Abfluss und zieht
+   * hier ab. Die Zusicherung stand früher hier und war falsch.
+   */
   readonly einnahmen: Cent;
-  /** Σ Aufwände des Monats (≤ 0, vorzeichenbehaftet). */
+  /**
+   * Σ Buchungen mit Charakter `Aufwand`, vorzeichenbehaftet.
+   *
+   * Auch hier stand einmal „≤ 0", und auch das war falsch: eine Erstattung ist ein
+   * Aufwand mit POSITIVEM Betrag (siehe `core/CLAUDE.md`) und macht diese Summe kleiner.
+   * Genau so ist es gewollt — sie entlastet die Kategorie, in der die Ausgabe stattfand.
+   * Wer die Zusicherung erzwingen wollte (`Math.min(0, …)`), verlöre den Rückfluss aus
+   * der Rechnung, und der Saldo liefe von dem der Bank weg.
+   *
+   * Eine falsche Zusicherung im Kommentar ist dabei kein Schönheitsfehler: der nächste,
+   * der hier eine Prüfung oder eine Anzeige baut, verlässt sich darauf.
+   */
   readonly ausgaben: Cent;
   /** Σ Umschichtungen des Monats (vorzeichenbehaftet). */
   readonly umschichtung: Cent;
