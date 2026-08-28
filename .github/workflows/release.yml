@@ -89,16 +89,49 @@ jobs:
         id: text
         env:
           ZERTIFIKAT: ${{ secrets.APPLE_CERTIFICATE }}
+          ZERTIFIKAT_KENNWORT: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           IDENTITAET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_KENNUNG: ${{ secrets.APPLE_ID }}
+          APPLE_KENNWORT: ${{ secrets.APPLE_PASSWORD }}
           TEAM: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          if [ -n "$ZERTIFIKAT" ] && [ -n "$IDENTITAET" ] && [ -n "$APPLE_ID" ] && [ -n "$TEAM" ]; then
+          if [ -n "$ZERTIFIKAT" ] && [ -n "$IDENTITAET" ] && [ -n "$APPLE_KENNUNG" ] && [ -n "$TEAM" ]; then
             signiert=ja
           else
             signiert=nein
           fi
           echo "Signiert und notarisiert: $signiert"
+
+          # DIE APPLE-VARIABLEN ENTSTEHEN HIER ODER GAR NICHT.
+          #
+          # Sie standen bis zum 28.08.2026 im env-Block von tauri-action, und das war
+          # falsch: ein fehlendes Secret wird dort zum LEEREN STRING, und GitHub setzt
+          # die Variable trotzdem. Tauri prueft "ist gesetzt", nicht "hat Inhalt",
+          # versucht ein `security import` mit nichts und bricht ab:
+          #
+          #   security: SecKeychainItemImport: One or more parameters ... not valid.
+          #   failed codesign application: failed to import keychain certificate
+          #
+          # Gemessen, nicht vermutet — der Build lief 6:37 durch und starb erst beim
+          # Buendeln. Zwei Tage lang unsichtbar, weil der Tuersteher davor abbrach; die
+          # eine Aenderung hat den Fehler der anderen verdeckt.
+          #
+          # Ueber GITHUB_ENV und nicht ueber den env-Block, weil es dort keine Moeglichkeit
+          # gibt, einen Schluessel WEGZULASSEN — nur einen leeren Wert zu setzen, und
+          # genau der ist das Problem. Was hier nicht geschrieben wird, existiert im
+          # naechsten Schritt nicht.
+          if [ "$signiert" = "ja" ]; then
+            {
+              echo "APPLE_CERTIFICATE<<WERTENDE"
+              echo "$ZERTIFIKAT"
+              echo "WERTENDE"
+              echo "APPLE_CERTIFICATE_PASSWORD=$ZERTIFIKAT_KENNWORT"
+              echo "APPLE_SIGNING_IDENTITY=$IDENTITAET"
+              echo "APPLE_ID=$APPLE_KENNUNG"
+              echo "APPLE_PASSWORD=$APPLE_KENNWORT"
+              echo "APPLE_TEAM_ID=$TEAM"
+            } >> "$GITHUB_ENV"
+          fi
 
           {
             echo "body<<TEXTENDE"
@@ -128,12 +161,9 @@ jobs:
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # APPLE-SIGNIERUNG UND NOTARISIERUNG. Ohne diese Secrets baut tauri-action
-          # klaglos ein UNSIGNIERTES Bundle — es bricht nicht ab. Was dann herauskommt,
-          # meldet macOS beim ersten Start als „beschaedigt", und die einzige Abhilfe ist
-          # die xattr-Zeile im Release-Text unten: eine Anleitung an Fremde, bei einer
-          # FINANZ-App eine Sicherheitspruefung abzuschalten. Genau deshalb steht hier
-          # alles bereit, sobald die Secrets da sind.
+          # Die sechs APPLE_*-Variablen stehen hier bewusst NICHT: sie entstehen im
+          # Schritt darueber und nur dann, wenn die Secrets wirklich hinterlegt sind.
+          # Ein leerer Wert an dieser Stelle bricht das Buendeln ab — siehe dort.
           #
           # Was hinterlegt werden muss (Repository -> Settings -> Secrets):
           #   APPLE_CERTIFICATE          Developer-ID-Application-Zertifikat als .p12,
@@ -147,12 +177,6 @@ jobs:
           # Die Notarisierung laeuft erst, wenn APPLE_ID, APPLE_PASSWORD und
           # APPLE_TEAM_ID zusammen gesetzt sind — Signierung allein genuegt nicht:
           # Gatekeeper verlangt bei einem geladenen Bundle beides.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           # Ohne diesen Schlüssel entsteht keine Signatur, und ohne Signatur weist jede
           # installierte App das Update ab. Der Build bricht dann ab — richtig so.
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
