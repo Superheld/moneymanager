@@ -283,43 +283,6 @@ select.field {
 }
 
 /* ============================================================
-   Der Kontoauszug: gebucht links, geplant rechts — zwei Karten, kein geteilter Kasten.
-
-   Der goldene Schnitt zugunsten der Buchungen (1,618 : 1) und nicht die Hälfte: links
-   stehen sieben Spalten und ein Seitenschalter, rechts fuenf. Ein hälftiger Schnitt gäbe
-   der schmalen Seite Platz, den sie nicht braucht, und nähme ihn der breiten.
-
-   `min-width: 0` an den Kindern ist Pflicht und nicht Kosmetik: ein Grid-Kind ist von
-   sich aus mindestens so breit wie sein Inhalt, und dann wächst eine Tabelle die Spalte
-   auf, statt in ihrem eigenen Scrollrahmen zu bleiben — die ganze Seite zieht sich breit.
-
-   **Die Zahlen, an denen der Breakpoint haengt** — nachgerechnet, nicht geschaetzt.
-   Am Deckel (1280 px) gehen 16 px Spalte ab; links bleiben 781 px, rechts 483 px, und jede
-   Karte kostet zweimal `--pad-card` (48 px). Die geplante Tabelle braucht fuer ihre vier
-   Spalten rund 340 px Inhalt und haette 435 — Luft genug.
-
-   Eng wird es erst, wenn das Fenster den Deckel unterschreitet: bei 1400 px Fensterbreite
-   bleiben der rechten Karte noch 355 px Inhalt. Darunter stapelt es, denn zwei waagerecht
-   scrollende Tabellen nebeneinander sind keine zwei Tabellen mehr, sondern zwei
-   Ausschnitte. Wer der Vorschau eine Spalte ergaenzt, rechnet an DIESER Stelle nach — nicht
-   am Deckel, wo alles bequem aussieht.
-   ============================================================ */
-.auszug-spalten {
-  display: grid;
-  grid-template-columns: 1.618fr 1fr;
-  gap: var(--gap-card);
-  align-items: start;
-}
-.auszug-spalten > * {
-  min-width: 0;
-}
-@media (max-width: 1400px) {
-  .auszug-spalten {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ============================================================
    Eine Buchungszeile in einer aufgeklappten Liste.
 
    Wo einzelne Buchungen stehen — unter einem Budget, unter einer Ausblickzeile, unter
