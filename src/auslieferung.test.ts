@@ -102,6 +102,37 @@ describe("Der Release-Workflow und die Apple-Signierung", () => {
     );
   });
 
+  it("setzt die Apple-Variablen nur, wenn es die Secrets wirklich gibt", () => {
+    // **Gemessen, und es hat einen ganzen Release-Lauf gekostet.** Ein fehlendes Secret
+    // wird in einem `env:`-Block zum LEEREN STRING, und GitHub setzt die Variable
+    // trotzdem. Tauri prüft „ist gesetzt", nicht „hat Inhalt", versucht ein
+    // `security import` mit nichts und bricht beim Bündeln ab — nach sechseinhalb
+    // Minuten Build:
+    //
+    //   security: SecKeychainItemImport: One or more parameters ... not valid.
+    //   failed codesign application: failed to import keychain certificate
+    //
+    // Zwei Tage lang unsichtbar, weil der Türsteher davor abbrach: die eine Änderung hat
+    // den Fehler der anderen verdeckt. Deshalb entstehen die Variablen jetzt über
+    // GITHUB_ENV und nur im signierten Zweig — dort kann man einen Schlüssel WEGLASSEN,
+    // im env-Block nicht.
+    for (const name of [
+      "APPLE_CERTIFICATE",
+      "APPLE_CERTIFICATE_PASSWORD",
+      "APPLE_SIGNING_IDENTITY",
+      "APPLE_ID",
+      "APPLE_PASSWORD",
+      "APPLE_TEAM_ID",
+    ]) {
+      expect(
+        WORKFLOW.includes(`${name}: \${{ secrets.${name} }}`),
+        `${name} wird wieder direkt aus dem Secret gesetzt — bei fehlendem Secret ist ` +
+          "das ein leerer Wert, und das Bündeln bricht beim Signieren ab.",
+      ).toBe(false);
+    }
+    expect(WORKFLOW, "Die Variablen entstehen nicht über GITHUB_ENV").toContain('>> "$GITHUB_ENV"');
+  });
+
   it("führt beide Fassungen des Release-Texts — die signierte und die ehrliche", () => {
     // Der unsignierte Zweig MUSS die xattr-Anleitung tragen. Sie wegzulassen macht das
     // Bundle nicht sicherer; es macht nur den Fehlschlag unerklärlich — macOS meldet
