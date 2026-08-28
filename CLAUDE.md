@@ -1003,8 +1003,27 @@ macht das Bundle nicht sicherer; es macht den Fehlschlag unerklärlich — macOS
 „beschädigt", und wer die App nicht selbst gebaut hat, hat keine Handhabe. Sobald das
 Zertifikat da ist, verschwindet sie von selbst, ohne dass jemand daran denken muss.
 
-`src/auslieferung.test.ts` hält das fest: dass der Text BERECHNET wird und nicht behauptet,
-und dass beide Zweige dastehen.
+#### Ein leeres Secret ist nicht dasselbe wie kein Secret
+
+Die Falle, die den ersten Lauf von 0.23.0 gekostet hat, und sie kostet sechseinhalb
+Minuten, bevor sie sich zeigt: **ein fehlendes Secret wird in einem `env:`-Block zum leeren
+String, und GitHub setzt die Variable trotzdem.** Tauri prüft „ist gesetzt", nicht „hat
+Inhalt", versucht ein `security import` mit nichts und bricht beim Bündeln ab —
+`SecKeychainItemImport: One or more parameters ... not valid`. Der Build davor läuft
+vollständig durch.
+
+Die sechs `APPLE_*`-Variablen entstehen deshalb über `GITHUB_ENV` und nur im signierten
+Zweig. Im `env:`-Block gibt es keine Möglichkeit, einen Schlüssel WEGZULASSEN — nur, ihn
+leer zu setzen, und genau das ist der Fehler.
+
+**Zwei Tage lang war das unsichtbar**, weil der Türsteher davor abbrach: die eine Änderung
+hat den Fehler der anderen verdeckt. Beide kamen im selben Schritt herein. Das ist der
+allgemeine Teil daran — ein Wächter, der einen Weg sperrt, prüft den Weg dahinter nicht
+mehr, und was dort verrottet, merkt niemand.
+
+`src/auslieferung.test.ts` hält drei Dinge fest: dass der Text BERECHNET wird und nicht
+behauptet, dass beide Zweige dastehen, und dass keine `APPLE_*`-Variable wieder direkt aus
+ihrem Secret gesetzt wird.
 
 **Was das Zertifikat kostet und einbringt:** Apple Developer Program, jährlich. Danach
 laufen beide Wege — der Updater wie bisher, und zusätzlich kann jemand die App frisch
