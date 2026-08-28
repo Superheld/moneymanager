@@ -96,6 +96,16 @@ function standAus(b: IstBuchung, vorher: Stand | null): Stand {
   };
 }
 
+/** Rekursiv nach Schlüsseln sortiert — Arrays behalten ihre Reihenfolge. */
+function sortiert(wert: unknown): unknown {
+  if (Array.isArray(wert)) return wert.map(sortiert);
+  if (wert === null || typeof wert !== "object") return wert;
+  const quelle = wert as Record<string, unknown>;
+  const raus: Record<string, unknown> = {};
+  for (const k of Object.keys(quelle).sort()) raus[k] = sortiert(quelle[k]);
+  return raus;
+}
+
 /**
  * JSON mit SORTIERTEN Schlüsseln.
  *
@@ -103,9 +113,17 @@ function standAus(b: IstBuchung, vorher: Stand | null): Stand {
  * wurde — `SELECT *` liefert Tabellenreihenfolge, ein Objektliteral seine eigene —, und
  * der Vergleich „hat sich etwas geändert" schlüge bei jedem Speichern an, obwohl sich
  * nichts geändert hat. Gemessen: genau das passierte.
+ *
+ * **Sortiert wird rekursiv, und das ist seit 2026-08-28 keine Feinheit mehr.** Vorher
+ * stand hier `JSON.stringify(stand, Object.keys(stand).sort())` — die Schlüsselliste ist
+ * bei `JSON.stringify` aber ein FILTER, und er gilt auf allen Ebenen. Dass die
+ * Aufteilungen ihn überlebten, war Zufall: ihre drei Felder heißen zufällig wie
+ * Spalten der Buchung. Ein viertes Feld an einer Aufteilung wäre aus dem Protokoll
+ * verschwunden, ohne Fehler und ohne Spur — und aufgefallen wäre es erst dem, der es
+ * zurückholen will.
  */
 function alsText(stand: Stand): string {
-  return JSON.stringify(stand, Object.keys(stand).sort());
+  return JSON.stringify(sortiert(stand));
 }
 
 /**

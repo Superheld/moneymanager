@@ -340,6 +340,56 @@ Unterschieden. Der ursprüngliche Inhalt bleibt damit feststellbar, auch nachdem
 gelöscht wurde. Deshalb trägt die Tabelle bewusst **keinen** Fremdschlüssel auf
 `ist_buchung`: sie muss die Löschung überleben.
 
+### Und seit 2026-08-28 ist es lesbar
+
+Das Journal lief zwei Wochen mit, ohne dass es jemand zu sehen bekam. Es steht jetzt im
+Buchungsdialog unter **Verlauf** — die Einträge, der Unterschied zum Stand bei der
+Entstehung, und ein Weg zurück. Im Kontoauszug markiert eine Pille, zu welcher Zeile
+überhaupt etwas protokolliert ist; die ist ausdrücklich **vorläufig** und dient dem
+Nachsehen, solange das Journal jung ist.
+
+| Stück | Datei |
+|---|---|
+| Form eines Eintrags, Unterschied, Urzustand | `src/core/buchung/journal.ts` |
+| Historie laden, zurücksetzen | `src/application/buchung/buchungshistorie.ts` |
+| Lesen | `src/adapters/persistence/sqliteJournalRepository.ts` |
+| Anzeigen und zurücknehmen | `src/adapters/ui/buchung/JournalBlock.tsx` |
+
+**Es gibt ZWEI Wege zurück, und sie bedeuten Verschiedenes.** Gebaut ist bislang der erste:
+
+| | Quelle | reicht zurück bis | liefert |
+|---|---|---|---|
+| Stand bei Entstehung | Journal | 23.08.2026 | die Buchung, wie sie **damals** war |
+| Stand des Belegs | `umsatz_roh` | den ganzen Bestand | die Buchung, wie sie **heute** entstünde |
+
+Der zweite liefert den heutigen Kategorievorschlag, nicht den von damals — meist besser,
+aber eben eine andere Aussage. Beide unter einen Knopf zu legen und je nach Verfügbarkeit
+den einen oder anderen zu nehmen, ergäbe einen Knopf, der zwei Dinge tut, ohne dass man
+sieht welches. Wer den zweiten baut, baut ihn daneben.
+
+**Das Journal bleibt dabei eine Aufzeichnung und wird kein Speicher.** Der Unterschied ist
+nicht akademisch, er entscheidet über das Risiko: als **Angebot** darf sich ein Rückweg
+darauf stützen — fehlt der Eintrag, entfällt das Angebot, und verloren ist nichts, was
+nicht ohnehin verloren wäre. Als **Pflichtweg** dürfte er es nicht: dann wäre eine Lücke im
+Protokoll Datenverlust statt einer Lücke in der Nachvollziehbarkeit, es liesse sich nie
+mehr aufräumen, und „nicht fälschungssicher" (siehe unten) wäre keine hingenommene Grenze
+mehr, sondern ein Loch. Ein Ablauf, der einen Eintrag VORAUSSETZT, gehört nicht ans
+Journal.
+
+**Ein Umbuchungs-Bein lässt sich nicht zurücksetzen.** Ein Bein allein liefe auf einen von
+zwei Zuständen hinaus, die es nicht geben darf: entweder fällt die `transferId` weg und das
+Gegenbein zeigt auf ein Paar, das es nicht mehr gibt, oder sie kommt zurück und zeigt auf
+ein Bein, das inzwischen einen anderen Betrag trägt. Dafür gibt es „Paarung lösen" — einen
+Weg, der beide Seiten anfasst.
+
+**Zwei Felder kommen nicht mit:** `vertrag_id` und `vertrag_herkunft` stehen zwar im
+protokollierten Stand, gehören aber der Vertragszuordnung und nicht dem Ledger. Eine
+Vertragszuordnung überlebt das Zurücksetzen.
+
+Was damit möglich, aber noch nicht gebaut ist: eine **gelöschte** Buchung wieder anlegen.
+Der Stand dafür steht im Journal (`letzterStand`), und es wäre der halbe Weg zum Storno
+weiter unten.
+
 ### Was offen ist, und warum
 
 - **Storno statt Löschen.** Eine gelöschte Buchung verschwindet weiterhin aus dem Ledger;

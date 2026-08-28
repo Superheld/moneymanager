@@ -31,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import {
   istGeteilt,
   musterVorschlag,
+  type Buchungshistorie,
   type Charakter,
   type IstBuchung,
   type Kategorie,
@@ -63,7 +64,9 @@ import {
   buchungLoeschen,
   pruefmarkerSetzen,
   buchungenPaaren,
+  buchungshistorie,
   buchungsdetail,
+  buchungZuruecksetzen,
   dublettenFreigabeAufheben,
   dublettenFreigeben,
   festlegungSpeichern,
@@ -90,6 +93,7 @@ import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { ddmm } from "./ddmm";
 import { BuchungsHerkunft } from "./BuchungsHerkunft";
+import { JournalBlock } from "./JournalBlock";
 import {
   betragsHoehe,
   richtungVon,
@@ -190,6 +194,8 @@ interface FormularProps {
   gegenbuchung?: IstBuchung;
   /** Der frisch gelesene Stand — der Prüfmarker wirkt sofort, nicht erst beim Speichern. */
   aktuelle?: IstBuchung;
+  /** Was mit dieser Zeile geschah — fehlt, solange sie noch nicht gespeichert ist. */
+  historie?: Buchungshistorie;
   ausBankabruf?: boolean;
 
   // ── Dublettenverdacht ───────────────────────────────────────────────────────────────
@@ -214,6 +220,7 @@ interface FormularProps {
   onGegenbuchung: (b: IstBuchung) => void;
   onSplitten: () => void;
   onSplitAufheben: () => void | Promise<void>;
+  onZuruecksetzen: () => Promise<void>;
 }
 
 function BuchungFormular({
@@ -248,6 +255,8 @@ function BuchungFormular({
   onGegenbuchung,
   onSplitten,
   onSplitAufheben,
+  historie,
+  onZuruecksetzen,
 }: FormularProps) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -953,6 +962,19 @@ function BuchungFormular({
         </div>
       )}
 
+      {/* Verlauf — was an dieser Zeile geändert wurde, und der Weg zurück. Über der
+          Herkunft, weil er die eigene Arbeit betrifft: „was habe ich hier verstellt"
+          fragt man eher als „woher kam die Zeile". */}
+      {buchung && (
+        <JournalBlock
+          historie={historie}
+          aktuell={buchung}
+          kontoName={kontoName}
+          kategorieName={kategorieName}
+          onZuruecksetzen={onZuruecksetzen}
+        />
+      )}
+
       {/* Herkunft — alles, was bekannt ist, aber hier nicht geändert wird. */}
       <BuchungsHerkunft
         buchung={buchung}
@@ -1067,6 +1089,7 @@ export function BuchungDetail(props: {
   const [freigegeben, setFreigegeben] = useState<ReadonlySet<string>>(LEERE_MENGE);
   const [freigaben, setFreigaben] = useState<readonly Dublettenfreigabe[]>([]);
   const [onlineKonten, setOnlineKonten] = useState<ReadonlySet<string>>(LEERE_MENGE);
+  const [historie, setHistorie] = useState<Buchungshistorie | undefined>(undefined);
 
   async function laden() {
     const d = await buchungsdetail();
@@ -1079,6 +1102,16 @@ export function BuchungDetail(props: {
     setAktuelle((b) => (b ? d.buchungen.find((x) => x.id === b.id) ?? b : undefined));
   }
   useEffect(() => { laden(); }, []);
+
+  // Die Historie hängt an der GEZEIGTEN Buchung, nicht am Dialog: der Sprung zur
+  // Gegenbuchung wechselt sie. Deshalb ein eigener Effekt und nicht ein Feld in
+  // `buchungsdetail()`, das einmal beim Öffnen geladen würde.
+  useEffect(() => {
+    if (!aktuelle) { setHistorie(undefined); return; }
+    let verworfen = false;
+    void buchungshistorie(aktuelle).then((h) => { if (!verworfen) setHistorie(h); });
+    return () => { verworfen = true; };
+  }, [aktuelle]);
 
   const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
@@ -1326,6 +1359,10 @@ export function BuchungDetail(props: {
       // `nachAenderung` zieht die gezeigte Buchung nach, der Block wechselt von selbst
       // von der Teileliste auf das Kategoriefeld.
       onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(aktuelle); await nachAenderung(); }}
+      historie={historie}
+      // Kein `onClose()`: das Zurücknehmen ist ein Schritt IM Dialog. Man will danach
+      // sehen, was jetzt dasteht — dieselbe Überlegung wie beim Aufheben der Aufteilung.
+      onZuruecksetzen={async () => { if (!aktuelle) return; await buchungZuruecksetzen(aktuelle); await nachAenderung(); }}
     />
   );
 }
