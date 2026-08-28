@@ -140,3 +140,59 @@ describe("buchungenLoeschen", () => {
     expect(ledger.daten.map((x) => x.id)).toEqual(["2"]);
   });
 });
+
+/**
+ * Umbuchungen im Sammelmodus.
+ *
+ * Der Fall ist am echten Bestand einmal eingetreten und war danach nicht mehr zu finden:
+ * ein Bein blieb allein zurück — mit `transferId` auf ein Paar, das es nicht mehr gibt,
+ * und `gegenkontoId` auf ein Konto, auf dem nichts mehr steht. Die Zeile sieht aus wie
+ * jede andere Umschichtung, nur dass das Geld auf der Gegenseite nie ankam.
+ *
+ * Der Grund war, dass der Auszug immer nur EIN Konto zeigt: das Gegenbein liegt auf einem
+ * anderen und steht deshalb fast nie mit in der Markierung.
+ */
+describe("buchungenLoeschen — Umbuchungen", () => {
+  const bein = (id: string, konto: string, betrag: number) =>
+    b({ id, kontoId: konto, betrag, charakter: "Umschichtung", transferId: "t1",
+        gegenkontoId: konto === "giro" ? "spar" : "giro" });
+
+  it("nimmt das Gegenbein mit, auch wenn nur eines markiert ist", async () => {
+    const ledger = memLedger([bein("a", "giro", -5000), bein("b", "spar", 5000)]);
+    const erg = await buchungenLoeschen(ledger, [ledger.daten[0]], new Set());
+
+    expect(ledger.daten).toHaveLength(0);
+    // EINE Loeschung, nicht zwei: markiert war eine Zeile, weggeworfen eine Umbuchung.
+    expect(erg.geloescht).toBe(1);
+  });
+
+  it("zaehlt ein Paar auch dann einmal, wenn beide Beine markiert sind", async () => {
+    const ledger = memLedger([bein("a", "giro", -5000), bein("b", "spar", 5000)]);
+    const erg = await buchungenLoeschen(ledger, ledger.daten, new Set());
+    expect(ledger.daten).toHaveLength(0);
+    expect(erg.geloescht).toBe(1);
+  });
+
+  /**
+   * Ist EIN Bein geschützt, bleibt das ganze Paar stehen. Das halb geloeschte Paar ist
+   * genau der Zustand, den es zu verhindern gilt — und "das eine ging, das andere nicht"
+   * waere keine Auskunft, mit der jemand etwas anfangen kann.
+   */
+  it("laesst das Paar ganz stehen, wenn ein Bein geschuetzt ist", async () => {
+    const ledger = memLedger([bein("a", "giro", -5000), bein("b", "spar", 5000)]);
+    const erg = await buchungenLoeschen(ledger, [ledger.daten[0]], new Set(["b"]));
+
+    expect(ledger.daten).toHaveLength(2);
+    expect(erg).toEqual({ geloescht: 0, gesperrt: 1 });
+  });
+
+  it("laesst gewoehnliche Buchungen daneben unberuehrt", async () => {
+    const ledger = memLedger([
+      bein("a", "giro", -5000),
+      bein("b", "spar", 5000),
+      b({ id: "einzeln", kontoId: "giro" }),
+    ]);
+    await buchungenLoeschen(ledger, [ledger.daten[0]], new Set());
+    expect(ledger.daten.map((x) => x.id)).toEqual(["einzeln"]);
+  });
+});
