@@ -78,29 +78,41 @@ describe("Der Release-Workflow und die Apple-Signierung", () => {
     }
   });
 
-  it("bricht ab, wenn die Signierungs-Secrets fehlen", () => {
-    // **Der Kern der Sache, und er hängt NICHT am Zertifikat.** Ohne diesen Schritt baut
-    // `tauri-action` klaglos ein unsigniertes Bundle und hängt es an ein öffentliches
-    // Release. Ein Zertifikat kann man nachreichen; ein Release, das draussen ist, nicht
-    // mehr.
+  it("baut den Release-Text aus dem Signierungsstand, statt ihn zu behaupten", () => {
+    // **Der Kern der Sache, und er hat sich am 28.08.2026 verschoben.**
     //
-    // Geprüft wird auf `exit 1` im Workflow — ein Schritt, der nur warnt, ist keiner.
-    expect(WORKFLOW).toContain("Ohne Apple-Signierung kein oeffentliches Release");
-    expect(WORKFLOW, "Der Türsteher warnt nur, statt abzubrechen").toContain("exit 1");
+    // Vorher stand hier ein Türsteher, der den Lauf abbrach, wenn die Apple-Secrets
+    // fehlten. Seine Begründung nannte den lokalen Weg als die Tür, die offen bleibt —
+    // und die ist zu: gebaut und ausgeliefert wird ausschliesslich über GitHub, das
+    // Update kommt über den Updater. Ein Wächter, der daraufhin ALLES blockiert,
+    // blockiert nicht mehr das Riskante, sondern das Einzige, und wird abgeschaltet.
+    //
+    // Was bleibt und wichtiger ist als das Blockieren: der Release-Text darf nicht
+    // behaupten, was nicht stimmt. Ein unsigniertes Bundle unter der Zeile „Signiert und
+    // notarisiert" wäre der eigentliche Schaden — schlimmer als ein unsigniertes Bundle,
+    // dem man ansieht, dass es eines ist.
+    //
+    // Geprüft wird deshalb, dass der Text BERECHNET wird. Ein Literal an dieser Stelle
+    // ist genau in dem Fall falsch, in dem es darauf ankommt.
+    expect(WORKFLOW, "Der Release-Text kommt nicht aus dem Signierungs-Schritt").toContain(
+      "releaseBody: ${{ steps.text.outputs.body }}",
+    );
+    expect(WORKFLOW, "Der Signierungsstand wird nicht aus den Secrets ermittelt").toMatch(
+      /signiert=ja[\s\S]*signiert=nein/,
+    );
   });
 
-  it("führt im Release-Text KEINE Anleitung zum Abschalten von Gatekeeper", () => {
-    // Sie war notwendig, solange unsigniert ausgeliefert wurde — und genau das kann seit
-    // dem Türsteher nicht mehr passieren. Käme sie zurück, hiesse das: es wird wieder
-    // unsigniert ausgeliefert, und Fremden wird beigebracht, bei einer Finanz-App eine
-    // Sicherheitsprüfung wegzuklicken.
+  it("führt beide Fassungen des Release-Texts — die signierte und die ehrliche", () => {
+    // Der unsignierte Zweig MUSS die xattr-Anleitung tragen. Sie wegzulassen macht das
+    // Bundle nicht sicherer; es macht nur den Fehlschlag unerklärlich — macOS meldet
+    // „beschädigt", und wer die App nicht selbst gebaut hat, hat keine Handhabe.
     //
-    // Im LOKALEN Installationsskript ist dieselbe Zeile in Ordnung: wer auf der eigenen
-    // Maschine baut und dort installiert, weiss, was er tut.
-    expect(
-      WORKFLOW.includes("xattr -dr com.apple.quarantine"),
-      "Die xattr-Anleitung ist im Release-Text zurück — dann wird wieder unsigniert " +
-        "ausgeliefert, und der Türsteher oben ist umgangen worden.",
-    ).toBe(false);
+    // Der signierte Zweig muss weiterhin dastehen, damit die Anleitung von selbst
+    // verschwindet, sobald das Zertifikat da ist. Sonst bliebe sie stehen und behauptete
+    // dann ihrerseits etwas Falsches.
+    expect(WORKFLOW, "Der signierte Zweig fehlt").toContain("Signiert und notarisiert.");
+    expect(WORKFLOW, "Der unsignierte Zweig nennt den Weg nicht").toContain(
+      "xattr -dr com.apple.quarantine",
+    );
   });
 });

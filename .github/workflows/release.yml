@@ -64,45 +64,66 @@ jobs:
       - name: Tests
         run: npm test
 
-      # DER TÜRSTEHER. Ohne ihn baut `tauri-action` klaglos ein unsigniertes Bundle,
-      # haengt es an ein oeffentliches Release, und der Release-Text muss den Leuten
-      # dann beibringen, bei einer FINANZ-App eine Sicherheitspruefung abzuschalten.
+      # DIE WEICHE. Sie entscheidet nicht, OB ausgeliefert wird, sondern WAS im
+      # Release-Text steht.
       #
-      # Das ist der eigentliche Fehler — nicht das fehlende Zertifikat. Ein Zertifikat
-      # kann man nachreichen; ein Release, das drausssen ist, nicht mehr. Deshalb bricht
-      # der Lauf hier ab, statt etwas zu erzeugen, das niemand veroeffentlichen sollte.
+      # Bis zum 28.08.2026 stand hier ein Türsteher, der den Lauf abbrach, wenn die
+      # Apple-Secrets fehlten. Seine Begründung nannte ausdrücklich den lokalen Weg als
+      # die Tür, die offen bleibt: „wer auf der eigenen Maschine baut und dort
+      # installiert, weiss, was er tut." Genau diese Tür ist zu — gebaut und ausgeliefert
+      # wird ausschliesslich über GitHub, das Update kommt über den Updater in der App.
+      # Ein Wächter, der daraufhin ALLES blockiert, blockiert nicht mehr das Riskante,
+      # sondern das Einzige.
       #
-      # Dieselbe Regel gilt schon fuer den Updater-Schluessel, nur setzt tauri das dort
-      # selbst durch. Hier tut es niemand, also tun wir es.
+      # Was von ihm bleibt und wichtiger ist als das Blockieren: **der Release-Text sagt
+      # die Wahrheit über den Signierungsstand.** Ein unsigniertes Bundle unter der
+      # Zeile „Signiert und notarisiert" wäre der eigentliche Schaden — schlimmer als
+      # ein unsigniertes Bundle, dem man ansieht, dass es eines ist.
       #
-      # Der LOKALE Weg (`npm run installieren`) ist davon unberuehrt: wer auf der eigenen
-      # Maschine baut und dort installiert, weiss, was er tut. Gefaehrlich wird es erst,
-      # wenn es Fremde herunterladen.
-      - name: Ohne Apple-Signierung kein oeffentliches Release
+      # Die beiden Signaturen sind dabei verschiedene Dinge und werden gern verwechselt:
+      # die minisign-Signatur des Updaters (weiter unten, ohne sie bricht der Build ab)
+      # verhindert, dass jemand ein Update unterschiebt. Die Apple-Signatur erlaubt einen
+      # FRISCHEN Download zu starten. Eine bereits laufende App aktualisiert sich auch
+      # ohne sie — Gatekeeper prüft nicht erneut.
+      - name: Signierungsstand feststellen und Release-Text bauen
+        id: text
         env:
           ZERTIFIKAT: ${{ secrets.APPLE_CERTIFICATE }}
           IDENTITAET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           APPLE_ID: ${{ secrets.APPLE_ID }}
           TEAM: ${{ secrets.APPLE_TEAM_ID }}
         run: |
-          fehlt=""
-          [ -n "$ZERTIFIKAT" ] || fehlt="$fehlt APPLE_CERTIFICATE"
-          [ -n "$IDENTITAET" ] || fehlt="$fehlt APPLE_SIGNING_IDENTITY"
-          [ -n "$APPLE_ID" ]   || fehlt="$fehlt APPLE_ID"
-          [ -n "$TEAM" ]       || fehlt="$fehlt APPLE_TEAM_ID"
-          if [ -n "$fehlt" ]; then
-            echo "ABGEBROCHEN — es fehlen:$fehlt"
-            echo
-            echo "Ein unsigniertes Bundle waere lauffaehig und trotzdem falsch: macOS"
-            echo "meldet es als beschaedigt, und die einzige Abhilfe waere eine Anleitung"
-            echo "an Fremde, Gatekeeper abzuschalten. Bei einer Finanz-App ist das der"
-            echo "schlechteste Rat, den man geben kann."
-            echo
-            echo "Bis das Zertifikat da ist, laeuft der lokale Weg weiter:"
-            echo "  npm run installieren"
-            exit 1
+          if [ -n "$ZERTIFIKAT" ] && [ -n "$IDENTITAET" ] && [ -n "$APPLE_ID" ] && [ -n "$TEAM" ]; then
+            signiert=ja
+          else
+            signiert=nein
           fi
-          echo "Alle Signierungs-Secrets vorhanden."
+          echo "Signiert und notarisiert: $signiert"
+
+          {
+            echo "body<<TEXTENDE"
+            echo "Lokale Haushalts-Finanz-App, Stadium **Alpha**."
+            echo
+            if [ "$signiert" = "ja" ]; then
+              echo "Signiert und notarisiert."
+            else
+              # Solange unsigniert ausgeliefert wird, MUSS die Anleitung dabeistehen.
+              # Sie wegzulassen macht das Bundle nicht sicherer — es macht nur den
+              # Fehlschlag unerklaerlich: macOS meldet "beschaedigt", und wer die App
+              # nicht selbst gebaut hat, hat keine Handhabe.
+              echo "Nicht mit einem Apple-Zertifikat signiert: macOS meldet die App beim ersten"
+              echo "Start als „beschaedigt“. Sie ist es nicht — einmalig freigeben mit"
+              echo
+              echo "    xattr -dr com.apple.quarantine /Applications/Moneymanager.app"
+              echo
+              echo "Ein bereits installierter Moneymanager aktualisiert sich ohne diesen Schritt:"
+              echo "der Updater prueft seine eigene Signatur, Gatekeeper ist daran unbeteiligt."
+            fi
+            echo
+            echo "Der Bestand wird beim ersten Start verschluesselt — die Passphrase wird dabei"
+            echo "gesetzt, und der Wiederherstellungscode gehoert aufgeschrieben."
+            echo "TEXTENDE"
+          } >> "$GITHUB_OUTPUT"
 
       - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
@@ -143,16 +164,10 @@ jobs:
         with:
           tagName: ${{ github.ref_name }}
           releaseName: Moneymanager __VERSION__
-          # KEINE xattr-Anleitung mehr. Sie war notwendig, solange unsigniert
-          # ausgeliefert wurde — und genau das kann seit dem Türsteher oben nicht mehr
-          # passieren. Ein Release aus diesem Workflow ist signiert und notarisiert,
-          # sonst gibt es keines. `src/auslieferung.test.ts` hält beides zusammen.
-          releaseBody: |
-            Lokale Haushalts-Finanz-App, Stadium **Alpha**.
-
-            Signiert und notarisiert. Der Bestand wird beim ersten Start verschlüsselt —
-            die Passphrase wird dabei gesetzt, und der Wiederherstellungscode gehört
-            aufgeschrieben.
+          # Der Text kommt aus dem Schritt oben und nicht als Literal hierher: er hängt
+          # davon ab, ob wirklich signiert wurde. Ein fest eingetragener Satz wäre in
+          # genau dem Fall falsch, in dem es darauf ankommt.
+          releaseBody: ${{ steps.text.outputs.body }}
           # Siehe Kopf: beides muss false bleiben, sonst findet der Updater nichts.
           releaseDraft: false
           prerelease: false
