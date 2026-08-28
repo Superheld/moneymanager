@@ -17,6 +17,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   anbieterSchluessel,
+  musterTrifft,
   minorZuMajor,
   erkennungProbieren,
   type Erkennungsmerkmal,
@@ -50,6 +51,7 @@ interface RegelFormular {
   empfaengerText: string;
   /** Eine Gläubiger-ID je Zeile. */
   glaeubigerText: string;
+  zweckText: string;
   betragVonText: string;
   betragBisText: string;
   gueltigAb: string;
@@ -76,6 +78,7 @@ function ausRegel(e: Vertragserkennung | undefined, waehrung: Waehrung): RegelFo
   return {
     empfaengerText: zeilen(e, "empfaenger"),
     glaeubigerText: zeilen(e, "glaeubigerId"),
+    zweckText: zeilen(e, "verwendungszweck"),
     betragVonText: zahl(e?.betragVon),
     betragBisText: zahl(e?.betragBis),
     gueltigAb: e?.gueltigAb ?? "",
@@ -125,6 +128,7 @@ export function VertragErkennungModal({
       merkmale: [
         ...ausZeilen(f.glaeubigerText, "glaeubigerId"),
         ...ausZeilen(f.empfaengerText, "empfaenger"),
+        ...ausZeilen(f.zweckText, "verwendungszweck"),
       ],
       betragVon: geld.parse(f.betragVonText) ?? undefined,
       betragBis: geld.parse(f.betragBisText) ?? undefined,
@@ -179,10 +183,26 @@ export function VertragErkennungModal({
     }
   }
 
-  /** Den normalisierten Anbieternamen als Empfänger-Muster anbieten, wenn er fehlt. */
+  /**
+   * Den Anbieternamen als Empfänger-Muster anbieten — aber nur, wenn ihn wirklich noch
+   * keins abdeckt.
+   *
+   * Geprüft wird mit `musterTrifft` und NICHT auf Gleichheit. Der Unterschied ist nicht
+   * theoretisch: seit `standardErkennung` den Stern anhängt, steht in der Regel
+   * `anthropic*` und nicht `anthropic` — ein Gleichheitsvergleich fand ihn nie mehr und
+   * der Dialog bot bei JEDEM Vertrag an, etwas zu ergänzen, das längst dasteht. Ein Klick
+   * darauf hätte ein zweites, engeres Muster danebengesetzt.
+   *
+   * Angeboten wird die Form MIT Stern, aus demselben Grund, aus dem die Vorbelegung sie
+   * hat: Empfängerfelder tragen Produktnamen, Rechnungs- und Ortsangaben hinter dem
+   * Anbieter.
+   */
   const nameSchluessel = anbieterSchluessel(vertrag.anbieter);
+  const nameMuster = nameSchluessel ? `${nameSchluessel}*` : "";
   const nameFehlt =
-    !!f && !!nameSchluessel && !regel?.merkmale.some((m) => m.muster === nameSchluessel);
+    !!f &&
+    !!nameSchluessel &&
+    !regel?.merkmale.some((m) => m.art === "empfaenger" && musterTrifft(m.muster, nameSchluessel));
 
   return (
     <Modal
@@ -221,9 +241,9 @@ export function VertragErkennungModal({
             <button
               className="linkbtn"
               style={{ marginBottom: "var(--sp-3)" }}
-              onClick={() => setze("empfaengerText", `${f.empfaengerText}\n${nameSchluessel}`.trim())}
+              onClick={() => setze("empfaengerText", `${f.empfaengerText}\n${nameMuster}`.trim())}
             >
-              {t("vertraege.regel.nameHinzufuegen", { name: nameSchluessel })}
+              {t("vertraege.regel.nameHinzufuegen", { name: nameMuster })}
             </button>
           )}
 
@@ -235,6 +255,23 @@ export function VertragErkennungModal({
               style={{ width: "100%", fontFamily: "var(--font-mono, monospace)", fontSize: 13 }}
               value={f.glaeubigerText}
               onChange={(e) => setze("glaeubigerText", e.target.value)}
+            />
+          </FormField>
+
+          {/* Der Verwendungszweck — ein NACHTRAG und bewusst leer vorbelegt.
+              Vorgabe bleibt: ein Vertrag hängt am Empfänger, nicht am Text, und
+              `standardErkennung` legt hier nie etwas an. Als Decke stimmte das aber
+              nicht: bei einer Dauerüberweisung an eine Privatperson steht im
+              Empfängerfeld ein Name, der über den Vertrag nichts sagt, und die einzige
+              unterscheidende Angabe steht im Zweck. */}
+          <FormField label={t("vertraege.regel.zweck")} hint={t("vertraege.regel.zweckHinweis")} style={{ marginTop: "var(--sp-3)" }}>
+            <textarea
+              className="field"
+              aria-label={t("vertraege.regel.zweck")}
+              rows={Math.max(1, f.zweckText.split("\n").length)}
+              style={{ width: "100%", fontFamily: "var(--font-mono, monospace)", fontSize: 13 }}
+              value={f.zweckText}
+              onChange={(e) => setze("zweckText", e.target.value)}
             />
           </FormField>
 
@@ -267,6 +304,29 @@ export function VertragErkennungModal({
               />
             </FormField>
           </div>
+
+          {/* Die Spanne an das anpassen, was tatsächlich da ist.
+              Die Betragsstufe ist die, an der eine Regel am häufigsten zu viel wegnimmt:
+              `standardErkennung` leitet sie aus EINEM Betrag ab (0,6× bis 1,8×), was für
+              eine feste Rate stimmt und für alles Schwankende nicht — Verbrauch,
+              Fremdwährung, Abos mit wechselndem Umfang. Die Diagnose darunter sagte schon
+              immer, DASS der Betrag die Engstelle ist; sie konnte nur nicht sagen, welche
+              Spanne stattdessen passt. Der Knopf erscheint deshalb auch nur dann. */}
+          {probe.spanne && (
+            <button
+              className="linkbtn"
+              style={{ marginTop: "var(--sp-2)" }}
+              onClick={() => {
+                setze("betragVonText", String(minorZuMajor(probe.spanne!.von, geld.waehrung)));
+                setze("betragBisText", String(minorZuMajor(probe.spanne!.bis, geld.waehrung)));
+              }}
+            >
+              {t("vertraege.regel.spanneAnpassen", {
+                von: geld.formatMitSymbol(probe.spanne.von),
+                bis: geld.formatMitSymbol(probe.spanne.bis),
+              })}
+            </button>
+          )}
 
           {/* Vorschau — der Grund, warum diese Maske überhaupt bedienbar ist. */}
           <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
