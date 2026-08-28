@@ -728,9 +728,10 @@ Mechanismus, Workflow und Releases stehen. Offen ist:
 - **Das Apple-Zertifikat** und die sechs Secrets dazu. Ohne sie wird unsigniert
   ausgeliefert, und das Release sagt es (siehe unten). Die drei anderen Secrets liegen:
   `TAURI_SIGNING_PRIVATE_KEY`, dessen Passwort und `FINTS_PRODUKT_ID`.
-- **Linux.** Braucht AppImage als Bundle-Ziel und einen zweiten Bauplatz; macOS lässt sich
-  nicht auf Linux bauen und umgekehrt. Und der Updater kann dort ausschliesslich AppImages
-  ersetzen.
+- **Ob Linux und Windows wirklich bauen.** Der Workflow baut sie seit dem 28.08.2026, aber
+  es hat vorher nie jemand versucht — die CI baut Rust absichtlich nicht. Der wahrscheinlichste
+  Stolperstein ist Windows: SQLCipher zieht OpenSSL mit
+  (`bundled-sqlcipher-vendored-openssl`), und dessen Bauweg braucht dort Perl und NASM.
 
 **Was in einem veröffentlichten Archiv steckt** und was nicht, weil die Frage naheliegt:
 keine Zugangsdaten, keine Kontodaten, kein Datenbestand — die Datenbank liegt im
@@ -1002,6 +1003,43 @@ die Ausgabe des Schritts.
 macht das Bundle nicht sicherer; es macht den Fehlschlag unerklärlich — macOS meldet
 „beschädigt", und wer die App nicht selbst gebaut hat, hat keine Handhabe. Sobald das
 Zertifikat da ist, verschwindet sie von selbst, ohne dass jemand daran denken muss.
+
+### Drei Plattformen aus einem Workflow
+
+Seit dem 28.08.2026 baut der Release-Workflow eine **Matrix** statt eines Jobs. Cross-Compile
+gibt es bei Tauri nicht — jede Plattform braucht ihren eigenen Läufer:
+
+| | Läufer | Bundle | signiert |
+|---|---|---|---|
+| macOS | `macos-latest` (arm64) | `app`, `dmg` | sobald das Zertifikat da ist |
+| Linux | `ubuntu-22.04` | `appimage` | braucht es nicht |
+| Windows | `windows-latest` | `nsis` | nein — SmartScreen meldet einen unbekannten Herausgeber |
+
+Vier Entscheidungen darin, die man nicht anfassen sollte, ohne den Grund zu kennen:
+
+- **`max-parallel: 1`, und das ist Pflicht, keine Vorsicht.** Die Datei latest.json trägt
+  alle Plattformen zusammen, und tauri-action baut sie als READ-MODIFY-WRITE: es lädt die
+  vorhandene vom Release, übernimmt ihre `platforms` und schreibt die eigene dazu
+  (nachgesehen im Quelltext von tauri-action, Datei upload-version-json.ts, beim
+  gepinnten SHA). Zwei Jobs, die
+  gleichzeitig lesen, sehen denselben Stand — der zweite überschreibt den Eintrag des
+  ersten. Der Fehlschlag ist **still**: die verlorene Plattform bekommt vom Updater
+  „nichts Neues" statt eines Fehlers.
+- **Der Release-Text kommt vom ERSTEN Job.** tauri-action setzt Titel und Text nur beim
+  ANLEGEN des Releases; wer es vorfindet, lässt beides unberührt. Deshalb steht macOS in
+  der Matrix oben. Alle drei Jobs rechnen denselben Text aus, das Ergebnis hängt also
+  nicht daran — aber die Reihenfolge ist trotzdem kein Zufall.
+- **`shell: bash` am Textschritt.** Ohne ihn nimmt GitHub auf Windows PowerShell, und das
+  Skript stirbt an der ersten Zeile. Ein Schritt, der auf zwei von drei Läufern
+  funktioniert, fällt erst im Release auf.
+- **Linux liefert NUR ein AppImage.** Ein `.deb` kann sich nicht selbst austauschen, der
+  Updater könnte es nie ersetzen — es läge im Release und sähe aus wie ein Weg, der keiner
+  ist. Und `ubuntu-22.04` statt `latest`, weil ein AppImage nur auf Systemen mit
+  mindestens seiner Bau-glibc läuft: die älteste unterstützte Umgebung ist hier die
+  richtige, nicht die neueste.
+
+`bundle.targets` in `tauri.conf.json` bleibt auf `"all"` — das ist die Vorgabe für einen
+Bau von Hand. Eingegrenzt wird im Workflow über `--bundles`.
 
 #### Ein leeres Secret ist nicht dasselbe wie kein Secret
 

@@ -102,6 +102,37 @@ describe("Der Release-Workflow und die Apple-Signierung", () => {
     );
   });
 
+  it("baut die drei Plattformen NACHEINANDER", () => {
+    // `latest.json` ist die Datei, die der Updater fragt, und sie trägt alle Plattformen
+    // zusammen. tauri-action baut sie als READ-MODIFY-WRITE: es lädt die vorhandene Datei
+    // vom Release, übernimmt ihre `platforms` und schreibt die eigene dazu (nachgesehen
+    // in `src/upload-version-json.ts` beim gepinnten SHA). Zwei Jobs, die gleichzeitig
+    // lesen, sehen denselben Stand — und der zweite überschreibt den Eintrag des ersten.
+    //
+    // Der Fehlschlag wäre STILL: die verlorene Plattform bekäme vom Updater „nichts
+    // Neues" statt eines Fehlers.
+    expect(WORKFLOW, "Die Plattformen bauen parallel — latest.json verliert dabei Einträge").toContain(
+      "max-parallel: 1",
+    );
+  });
+
+  it("lässt den Textschritt überall in bash laufen", () => {
+    // Ohne `shell: bash` nimmt GitHub auf Windows PowerShell, und das Skript stirbt an
+    // der ersten Zeile. Ein Schritt, der auf zwei von drei Läufern funktioniert, ist
+    // schlimmer als einer, der nirgends läuft: er fällt erst im Release auf.
+    expect(WORKFLOW, "Der Textschritt läuft auf Windows in PowerShell").toContain("shell: bash");
+  });
+
+  it("baut für Linux nur das AppImage", () => {
+    // Ein `.deb` kann sich nicht selbst austauschen — der Updater könnte es nie ersetzen.
+    // Es läge im Release und sähe aus wie ein Weg, der keiner ist.
+    expect(WORKFLOW).toContain("ziele: appimage");
+    expect(
+      /ziele:.*\bdeb\b/.test(WORKFLOW),
+      "Ein .deb im Release: der Updater kann es nie ersetzen, es sieht aber aus wie ein Weg.",
+    ).toBe(false);
+  });
+
   it("setzt die Apple-Variablen nur, wenn es die Secrets wirklich gibt", () => {
     // **Gemessen, und es hat einen ganzen Release-Lauf gekostet.** Ein fehlendes Secret
     // wird in einem `env:`-Block zum LEEREN STRING, und GitHub setzt die Variable
