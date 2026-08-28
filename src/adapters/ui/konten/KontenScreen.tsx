@@ -616,6 +616,19 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           </Pill>
                         </span>
                       )}
+                      {/* VORLÄUFIG, zum Nachsehen: gibt es zu dieser Zeile einen
+                          Journaleintrag? Der Verlauf selbst steht im Dialog; hier steht
+                          nur, wo es überhaupt etwas zu sehen gibt. Das Journal ist jung
+                          (seit 2026-08-23), und ohne diese Markierung müsste man Zeilen
+                          aufmachen, um zu erfahren, dass nichts drinsteht. */}
+                      {!!r.journaleintraege && (
+                        <span
+                          title={t("konten.pillVerlauf", { anzahl: r.journaleintraege })}
+                          style={{ flex: "0 0 auto", display: "inline-flex" }}
+                        >
+                          <Pill variant="neutral">{t("konten.pillVerlaufKurz", { anzahl: r.journaleintraege })}</Pill>
+                        </span>
+                      )}
                       {/* Der Verdacht steht an BEIDEN Zeilen — es gibt kein Original.
                           Die Gründe hängen im title, entschieden wird im Detail. */}
                       {r.dublette && (

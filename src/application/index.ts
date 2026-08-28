@@ -125,6 +125,12 @@ export {
   type VertragErgebnis,
 } from "./vertraege/vertragAnlegen";
 export { zahlungsspuren } from "./buchung/zahlungsspuren";
+export {
+  historieLaden,
+  buchungZuruecksetzen,
+  type Buchungshistorie,
+  type Rueckwegstand,
+} from "./buchung/buchungshistorie";
 export { pruefmarkerSetzen } from "./buchung/pruefmarker";
 export { zuordnungenAbgleichen, zuordnungVonHand, vertragsnamenLaden } from "./vertraege/vertragszuordnung";
 export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertraege/vertragsvorschlaege";

@@ -42,6 +42,7 @@ import type {
   DepotRepository,
   DublettenfreigabeRepository,
   ImportLaufRepository,
+  JournalRepository,
   KategorieRepository,
   KontostandsankerRepository,
   LedgerPort,
@@ -81,6 +82,16 @@ export interface KontenDeps {
    * alles andere läuft unverändert.
    */
   readonly depotRepo?: DepotRepository;
+  /**
+   * Das Buchungsjournal. Optional wie die Depots — ohne es fehlt im Auszug nur die
+   * Markierung, ob zu einer Zeile etwas protokolliert ist.
+   *
+   * **Vorläufig, zum Nachsehen.** Der Verlauf einer Buchung steht in ihrem Dialog; diese
+   * Markierung sagt von aussen, wo es überhaupt etwas zu sehen gibt. Das Journal ist
+   * jung (seit 2026-08-23), und ohne sie müsste man Zeilen aufmachen, um zu erfahren,
+   * dass nichts drinsteht.
+   */
+  readonly journalRepo?: JournalRepository;
 }
 
 /** Ein Konto in der oberen Liste. */
@@ -178,10 +189,17 @@ export interface Kontensicht {
    * genau die Frage, die man nebenbei beantwortet haben will.
    */
   readonly vertragsnamen: ReadonlyMap<string, string>;
+  /**
+   * Buchungs-ID → Zahl der Journaleinträge. Leer, wenn kein Journal-Port mitgegeben wurde.
+   *
+   * Die ZAHL und nicht bloss ein Ja/Nein, weil es dieselbe Abfrage kostet und „dreimal
+   * geändert" etwas anderes sagt als „einmal angelegt".
+   */
+  readonly journalAnzahl: ReadonlyMap<string, number>;
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen, journalAnzahl] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -194,6 +212,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.ankerRepo.alle(),
       deps.depotRepo ? depotsLaden({ depotRepo: deps.depotRepo }) : Promise.resolve(null),
       vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
+      deps.journalRepo?.anzahlen() ?? Promise.resolve(new Map<string, number>()),
     ]);
 
   const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
@@ -243,6 +262,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     dublettenverdacht,
     freigegeben,
     vertragsnamen,
+    journalAnzahl,
   };
 }
 
@@ -264,6 +284,8 @@ export interface Registerzeile {
   readonly dublette?: Dublettenverdacht;
   /** Der Vertrag, zu dem diese Zeile gehört — als Anbietername. Fehlt, wenn keiner. */
   readonly vertragsname?: string;
+  /** Wie viele Journaleinträge es zu dieser Buchung gibt. Fehlt, wenn keiner. */
+  readonly journaleintraege?: number;
 }
 
 export interface Registersicht {
@@ -320,6 +342,7 @@ export function registerSicht(
         kategorieName: zeile.kategorieId ? kategorieNamen.get(zeile.kategorieId) ?? "" : "",
         dublette: zeile.istId ? sicht.dublettenverdacht.get(zeile.istId) : undefined,
         vertragsname: zeile.istId ? sicht.vertragsnamen.get(zeile.istId) : undefined,
+        journaleintraege: zeile.istId ? sicht.journalAnzahl.get(zeile.istId) : undefined,
       };
     }),
     standHeute: register.standHeute,

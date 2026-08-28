@@ -83,6 +83,7 @@ und wurde deshalb 2026-08-25 herausgezogen:
 | `VertragsBlock` | gehört diese Zahlung zu einem Vertrag? |
 | `DublettenBlock` | steht sie womöglich schon ein zweites Mal da? |
 | `BuchungsHerkunft` | woher sie kommt — reine Anzeige |
+| `JournalBlock` | was daran geändert wurde — und der Weg zurück |
 | `Richtungswahl` | Höhe und Richtung des Betrags, samt der Zerlegung dahinter |
 | `SplitModal` · `ZurUmbuchungModal` | die beiden Folge-Dialoge (S-7, S-1) |
 

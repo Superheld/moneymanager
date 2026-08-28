@@ -9,6 +9,7 @@ import type {
   Depotwert,
   Inventargegenstand,
   IstBuchung,
+  Journaleintrag,
   Kategorie,
   Kategoriefestlegung,
   Merkmalsausschluss,
@@ -113,6 +114,26 @@ export interface LedgerPort {
   alle(): Promise<IstBuchung[]>;
   speichern(buchung: IstBuchung): Promise<void>;
   loeschen(id: string): Promise<void>;
+}
+
+/**
+ * Lesender Zugang zum Buchungsjournal. Geschrieben wird es vom Ledger-Adapter selbst —
+ * eine Aufzeichnung, die man von aussen befuellen kann, ist keine.
+ *
+ * Getrennt vom `LedgerPort` und nicht als dessen vierte Methode: das Journal ist ein
+ * ANGEBOT (siehe `core/buchung/journal`). Wer Buchungen speichert, muss es nicht lesen
+ * koennen, und jede Attrappe des Ledgers in den Tests muesste es sonst mitbringen.
+ */
+export interface JournalRepository {
+  /** Alle Eintraege zu einer Buchung, aeltester zuerst. Leer heisst: nichts protokolliert. */
+  zuBuchung(istbuchungId: string): Promise<Journaleintrag[]>;
+  /**
+   * Buchungs-Id -> Zahl der Eintraege, ueber den ganzen Bestand.
+   *
+   * Fuer Listen: dort will man je Zeile wissen, OB es etwas gibt, und eine Abfrage je
+   * Zeile waere ein N+1 ueber tausende Buchungen.
+   */
+  anzahlen(): Promise<ReadonlyMap<string, number>>;
 }
 
 /**

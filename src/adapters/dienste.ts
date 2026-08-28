@@ -105,6 +105,11 @@ import { pruefmarkerSetzen as pruefmarkerSetzenUseCase } from "../application/bu
 import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchung/buchungSplitten";
 import { paarungLoesen as paarungLoesenUseCase } from "../application/buchung/umbuchungAusBuchung";
 import {
+  buchungZuruecksetzen as buchungZuruecksetzenUseCase,
+  historieLaden as historieLadenUseCase,
+} from "../application/buchung/buchungshistorie";
+import { sqliteJournalRepository } from "./persistence/sqliteJournalRepository";
+import {
   buchungenPaaren as buchungenPaarenUseCase,
   gegenbeinErzeugen as gegenbeinErzeugenUseCase,
   umbuchungsBeinBearbeiten as umbuchungsBeinBearbeitenUseCase,
@@ -704,6 +709,8 @@ export function konten(): Promise<Kontensicht> {
     // Damit eine Vertragszahlung im Auszug als solche zu erkennen ist.
     zuordnungRepo: sqliteVertragszuordnungRepository,
     vertragRepo: sqliteVertragRepository,
+    // Vorläufig: die Markierung, zu welcher Zeile etwas protokolliert ist.
+    journalRepo: sqliteJournalRepository,
   });
 }
 
@@ -871,6 +878,16 @@ export function vertragZuordnungZuruecksetzen(istbuchungId: string) {
 
 export function paarungLoesen(transferId: string) {
   return paarungLoesenUseCase(sqliteLedgerRepository, transferId);
+}
+
+/** Was mit dieser Buchung geschah — und ob sich etwas davon zurücknehmen lässt. */
+export function buchungshistorie(aktuell: IstBuchung) {
+  return historieLadenUseCase(sqliteJournalRepository, aktuell);
+}
+
+/** Zurück auf den Stand bei der Entstehung. Wirft, wenn der Weg verschlossen ist. */
+export function buchungZuruecksetzen(aktuell: IstBuchung) {
+  return buchungZuruecksetzenUseCase(sqliteLedgerRepository, sqliteJournalRepository, aktuell);
 }
 
 // --- Zugang: einrichten, entsperren, sperren ------------------------------------
