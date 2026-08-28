@@ -33,7 +33,7 @@ serde_json = "1"
 # SQL-Plugin und sqlx war nur fuer den Transaktions-Command noetig; seit `PRAGMA key`
 # eine Verbindung braucht, die wir selbst in der Hand haben, ist das Plugin ganz
 # abgeloest.
-sqlx = { version = "0.8", default-features = false, features = ["sqlite", "runtime-tokio"] }
+sqlx = { version = "0.9", default-features = false, features = ["sqlite", "runtime-tokio"] }
 tauri-plugin-updater = "2.10.1"
 tauri-plugin-process = "2.3.1"
 
