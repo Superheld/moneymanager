@@ -107,11 +107,31 @@ describe("Inventar — ersetzt", () => {
 });
 
 describe("Inventar — löschen", () => {
+  /**
+   * Die eigentliche Zusage der Rückfrage — und die einzige, die man testen muss: dass
+   * Abbrechen NICHTS tut. Ein Dialog, der aufgeht und trotzdem löscht, wäre schlimmer
+   * als gar keiner, weil er Sicherheit vortäuscht.
+   */
+  it("löscht nicht, wenn die Rückfrage abgebrochen wird", async () => {
+    const nutzer = userEvent.setup();
+    await mitGegenstand("Naehmaschine", 25000, 84);
+
+    await nutzer.click(screen.getByRole("button", { name: "löschen" }));
+    await nutzer.click(await screen.findByRole("button", { name: "Abbrechen" }));
+
+    await waitFor(() => {
+      expect(screen.queryByRole("button", { name: "Endgültig löschen" })).toBeNull();
+    });
+    expect(await sqliteInventarRepository.alle()).toHaveLength(1);
+  });
+
   it("entfernt den Gegenstand aus dem Bestand", async () => {
     const nutzer = userEvent.setup();
     await mitGegenstand("Naehmaschine", 25000, 84);
 
     await nutzer.click(screen.getByRole("button", { name: "löschen" }));
+    // Seit 2026-08-27 fragt jeder Löschweg nach — bestätigen gehört jetzt dazu.
+    await nutzer.click(await screen.findByRole("button", { name: "Endgültig löschen" }));
 
     await waitFor(async () => {
       expect(await sqliteInventarRepository.alle()).toHaveLength(0);

@@ -25,7 +25,7 @@ export function deutschesDatumZuIso (wert: string | undefined): string {
  *
  * Bevorzugt `transactionDateTime`, weil es schon ISO ist; `date` ist derselbe Tag in
  * deutscher Schreibweise und dient als Rückfall. **Nicht** `transactionDate` — das ist
- * das Umsatzdatum und fällt nicht monoton (docs/bank-api.md).
+ * das Umsatzdatum und fällt nicht monoton.
  */
 export function buchungsdatum (roh: RawTransaction): string {
   if (roh.transactionDateTime && roh.transactionDateTime.length >= 10) {

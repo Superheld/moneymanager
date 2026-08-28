@@ -105,6 +105,11 @@ import { pruefmarkerSetzen as pruefmarkerSetzenUseCase } from "../application/bu
 import { buchungSplitten as buchungSplittenUseCase, splitAufheben as splitAufhebenUseCase } from "../application/buchung/buchungSplitten";
 import { paarungLoesen as paarungLoesenUseCase } from "../application/buchung/umbuchungAusBuchung";
 import {
+  buchungZuruecksetzen as buchungZuruecksetzenUseCase,
+  historieLaden as historieLadenUseCase,
+} from "../application/buchung/buchungshistorie";
+import { sqliteJournalRepository } from "./persistence/sqliteJournalRepository";
+import {
   buchungenPaaren as buchungenPaarenUseCase,
   gegenbeinErzeugen as gegenbeinErzeugenUseCase,
   umbuchungsBeinBearbeiten as umbuchungsBeinBearbeitenUseCase,
@@ -177,7 +182,13 @@ export function budgetuebersicht(am: string): Promise<Budgetuebersicht> {
 /** Alles, was der Übersichts-Screen zeigt — drei Monatskarten plus Budgetliste. */
 export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
   return uebersichtLaden(
-    { ...BUDGET_DEPS, regelRepo: sqliteZahlungsregelRepository, inventarRepo: sqliteInventarRepository, umsatzRepo: sqliteUmsatzRepository },
+    {
+      ...BUDGET_DEPS,
+      regelRepo: sqliteZahlungsregelRepository,
+      inventarRepo: sqliteInventarRepository,
+      umsatzRepo: sqliteUmsatzRepository,
+      kontoRepo: sqliteZahlungskontoRepository,
+    },
     heute,
   );
 }
@@ -379,6 +390,8 @@ export function analyse(): Promise<Analysebasis> {
     kontoRepo: sqliteZahlungskontoRepository,
     kategorieRepo: sqliteKategorieRepository,
     umsatzRepo: sqliteUmsatzRepository,
+    zuordnungRepo: sqliteVertragszuordnungRepository,
+    vertragRepo: sqliteVertragRepository,
   });
 }
 
@@ -693,6 +706,11 @@ export function konten(): Promise<Kontensicht> {
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
     // Damit ein Depot-Konto seinen Bestand zeigt statt einer leeren Buchungsliste.
     depotRepo: sqliteDepotRepository,
+    // Damit eine Vertragszahlung im Auszug als solche zu erkennen ist.
+    zuordnungRepo: sqliteVertragszuordnungRepository,
+    vertragRepo: sqliteVertragRepository,
+    // Vorläufig: die Markierung, zu welcher Zeile etwas protokolliert ist.
+    journalRepo: sqliteJournalRepository,
   });
 }
 
@@ -860,4 +878,67 @@ export function vertragZuordnungZuruecksetzen(istbuchungId: string) {
 
 export function paarungLoesen(transferId: string) {
   return paarungLoesenUseCase(sqliteLedgerRepository, transferId);
+}
+
+/** Was mit dieser Buchung geschah — und ob sich etwas davon zurücknehmen lässt. */
+export function buchungshistorie(aktuell: IstBuchung) {
+  return historieLadenUseCase(sqliteJournalRepository, aktuell);
+}
+
+/** Zurück auf den Stand bei der Entstehung. Wirft, wenn der Weg verschlossen ist. */
+export function buchungZuruecksetzen(aktuell: IstBuchung) {
+  return buchungZuruecksetzenUseCase(sqliteLedgerRepository, sqliteJournalRepository, aktuell);
+}
+
+// --- Zugang: einrichten, entsperren, sperren ------------------------------------
+
+import {
+  mitCodeRetten,
+  passphraseWechseln as passphraseWechselnUseCase,
+  zugangEinrichten as zugangEinrichtenUseCase,
+  type Einrichtung,
+  type Rettung,
+  type Wechsel,
+  type Zugangsstand,
+} from "../application/zugang";
+import { tauriZugangPort } from "./persistence/zugang";
+import {
+  zeitsperreLaden,
+  zeitsperreSetzen as zeitsperreSetzenUseCase,
+} from "../application/einstellungen";
+
+export function zugangsstand(): Promise<Zugangsstand> {
+  return tauriZugangPort.stand();
+}
+
+export function zugangEinrichten(passphrase: string): Promise<Einrichtung> {
+  return zugangEinrichtenUseCase(tauriZugangPort, passphrase);
+}
+
+export function zugangEntsperren(passphrase: string): Promise<boolean> {
+  return tauriZugangPort.entsperren(passphrase);
+}
+
+export function zugangMitCode(code: string, neue: string): Promise<Rettung> {
+  return mitCodeRetten(tauriZugangPort, code, neue);
+}
+
+export function zugangPassphraseWechseln(alte: string, neue: string): Promise<Wechsel> {
+  return passphraseWechselnUseCase(tauriZugangPort, alte, neue);
+}
+
+export function zugangCodeZeigen(passphrase: string): Promise<string | null> {
+  return tauriZugangPort.codeZeigen(passphrase);
+}
+
+export function zugangSperren(): Promise<void> {
+  return tauriZugangPort.sperren();
+}
+
+export function zeitsperre(): Promise<number> {
+  return zeitsperreLaden(sqliteEinstellungenRepository);
+}
+
+export function zeitsperreSetzen(minuten: number): Promise<void> {
+  return zeitsperreSetzenUseCase(sqliteEinstellungenRepository, minuten);
 }

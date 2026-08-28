@@ -1,0 +1,30 @@
+# Damit Abhaengigkeiten nicht erst beim naechsten Waechter-Lauf auffallen, sondern als
+# Vorschlag hereinkommen.
+#
+# DIE DRITTE ZEILE IST DIE UNGEWOHNTE. Auch GitHub Actions sind Abhaengigkeiten — und
+# seit sie hier auf Commit-SHA gepinnt sind, altern sie stumm: ein Tag wandert, ein SHA
+# nicht. Ohne diesen Eintrag bliebe `actions/checkout` auf dem Stand des Tages, an dem
+# jemand den SHA eingetragen hat. Dependabot hebt den SHA und schreibt den Tag als
+# Kommentar dahinter — genau die Form, die hier steht.
+#
+# Woechentlich und nicht taeglich: ein Solo-Projekt, das jeden Morgen fuenf offene
+# Vorschlaege vorfindet, schaut irgendwann nicht mehr hin.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

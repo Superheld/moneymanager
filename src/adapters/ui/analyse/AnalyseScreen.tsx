@@ -13,6 +13,7 @@ import {
   analyseAufschluesselung,
   analyseBuchungen,
   analyseFenster,
+  analyseFensterTaggenau,
   analyseGruppen,
   analyseVerlauf,
   type Analysebasis,
@@ -21,7 +22,7 @@ import {
   type IstBuchung,
 } from "../../../application";
 import { analyse, depots } from "../../dienste";
-import { Button, Card, CoverageTrack, DataTable, KPIStat } from "../bausteine";
+import { Button, Card, CoverageTrack, DataTable, KPIStat, Pill } from "../bausteine";
 import { AUFKLAPP_ZEILEN_BREIT, AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { MonatsFlussChart } from "./MonatsFlussChart";
@@ -242,6 +243,11 @@ export function AnalyseScreen() {
     [basis, zeitraum, heute],
   );
 
+  // Der Monatsverlauf rechnet in Monaten und bekommt deshalb `bis` als Monatsmarke.
+  // Alles, was an einzelnen TAGEN hängt — bislang nur das Depot —, braucht das Ende
+  // desselben Monats, sonst fällt der halbe laufende Monat aus dem Fenster.
+  const bisTag = useMemo(() => analyseFensterTaggenau(bis), [bis]);
+
   const verlauf = useMemo(() => (basis ? analyseVerlauf(basis, von, bis) : []), [basis, von, bis]);
 
   const aufschluesselung = useMemo(() => {
@@ -341,7 +347,23 @@ export function AnalyseScreen() {
                 // Buchungszeilen in der Uebersicht — was gleich funktioniert, sieht gleich aus.
                 <tr key={z.buchung.id} className="buchungszeile" onClick={() => setDetail(z.buchung)} title={t("historie.detailOeffnen")}>
                   <td style={detailTd}>{z.buchung.datum.split("-").reverse().join(".")}</td>
-                  <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>{z.empfaenger || "—"}</td>
+                  <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>
+                    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {z.empfaenger || "—"}
+                      </span>
+                      {/* Dieselbe Markierung wie im Kontoauszug. Sie zählt hier sogar
+                          mehr: die Analyse fragt „wofür ging das Geld", und dass ein
+                          Posten aus einem laufenden Vertrag stammt, ist die halbe
+                          Antwort — bei ihm ist die Frage nicht „war das nötig", sondern
+                          „läuft der noch". */}
+                      {z.vertragsname && (
+                        <span title={t("konten.pillVertrag", { anbieter: z.vertragsname })} style={{ flex: "0 0 auto" }}>
+                          <Pill variant="plan">{z.vertragsname}</Pill>
+                        </span>
+                      )}
+                    </span>
+                  </td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 45 ? zweck.slice(0, 45) + "…" : zweck}</td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{z.kontoName || "—"}</td>
                   <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(z.buchung.betrag) }}>{geld.format(z.buchung.betrag, { mitVorzeichen: true })}</td>
@@ -513,7 +535,7 @@ export function AnalyseScreen() {
           {depotdaten && depotdaten.depots.length > 0 && (
             <div className="karten-paar">
               {depotdaten.depots.map((d) => (
-                <DepotAnsicht key={d.depot.id} sicht={d} von={von} bis={bis} />
+                <DepotAnsicht key={d.depot.id} sicht={d} von={von} bis={bisTag} />
               ))}
             </div>
           )}

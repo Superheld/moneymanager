@@ -33,10 +33,17 @@ export interface Zahlungsspur {
   readonly betrag: Cent;
   readonly gegenpartei: string;
   /**
-   * Verwendungszweck der Quellzeile. Die Vertragserkennung nutzt ihn NICHT — ein Vertrag
-   * hängt am Empfänger, nicht am Text. Er steht hier, weil die Kategorisierung ihn
-   * braucht und aus demselben Join stammt (`application/zahlungsspuren`); ein zweiter
-   * Lader für dieselbe Verbindung wären zwei Antworten auf dieselbe Frage.
+   * Verwendungszweck der Quellzeile.
+   *
+   * Die Vertragserkennung nutzt ihn NICHT VON SELBST — ein Vertrag hängt am Empfänger,
+   * nicht am Text, und `standardErkennung` legt nie ein Zweck-Merkmal an. Seit
+   * 2026-08-28 kann man von Hand eines eintragen (`Merkmalsart: "verwendungszweck"`),
+   * für den Fall, in dem der Empfänger nichts hergibt: eine Dauerüberweisung an eine
+   * Privatperson, bei der nur der Zweck sagt, worum es geht.
+   *
+   * Er steht ohnehin hier, weil die Kategorisierung ihn braucht und aus demselben Join
+   * stammt (`application/zahlungsspuren`); ein zweiter Lader für dieselbe Verbindung
+   * wären zwei Antworten auf dieselbe Frage.
    */
   readonly verwendungszweck?: string;
   readonly glaeubigerId?: string;

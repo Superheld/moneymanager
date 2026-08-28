@@ -79,12 +79,18 @@ export const sqliteBudgetRepository: BudgetRepository = {
         [b.id, v.abMonat, v.betrag],
       );
     }
-    const behalten = b.betraege.map((v) => `'${v.abMonat.replace(/'/g, "''")}'`).join(",");
+    // Was in die Liste hineininterpoliert wird, sind PLATZHALTER, keine Werte — die
+    // Anzahl muss im SQL stehen, die Monate gehen gebunden daneben. Vorher standen die
+    // Monate selbst hier, mit einem von Hand verdoppelten Apostroph als einziger
+    // Absicherung. Das war an dieser Stelle harmlos (ein Monat ist `YYYY-MM`) und
+    // trotzdem die falsche Form: sie ist die einzige ihrer Art im ganzen Projekt, und
+    // wer sie beim naechsten Mal nachahmt, tut es womoeglich mit einem Freitext.
+    const platzhalter = b.betraege.map((_, i) => `$${i + 2}`).join(",");
     await db.execute(
-      behalten
-        ? `DELETE FROM budget_betrag WHERE budget_id = $1 AND ab_monat NOT IN (${behalten})`
+      platzhalter
+        ? `DELETE FROM budget_betrag WHERE budget_id = $1 AND ab_monat NOT IN (${platzhalter})`
         : "DELETE FROM budget_betrag WHERE budget_id = $1",
-      [b.id],
+      [b.id, ...b.betraege.map((v) => v.abMonat)],
     );
   },
 

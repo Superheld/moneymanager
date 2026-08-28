@@ -227,6 +227,15 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
                     {t("konten.abgleich.gemeldet", { datum: b.bankSaldoDatum ?? b.bis })}
                   </div>
                 )}
+                {/* Was auffiel, ohne den Abruf zu kippen — übersprungene Zeilen, unlesbare
+                    Salden, die Summenprobe des Auszugs. Nicht als Fehler ausgezeichnet: der
+                    Abruf hat geliefert. Aber sichtbar, denn der Befund gilt dem Bestand und
+                    nicht dem Vorgang, und er verschwindet mit dem Dialog nicht aus der Welt. */}
+                {b.warnungen?.map((w, i) => (
+                  <div key={i} style={{ fontSize: "var(--fs-xs)", color: "var(--warn-deep)" }}>
+                    {w}
+                  </div>
+                ))}
               </li>
             ))}
             {/* Depots stehen getrennt: sie liefern keine Buchungen, sondern einen Stand. */}

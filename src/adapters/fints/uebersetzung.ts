@@ -52,6 +52,8 @@ export function isoDatum(d: Date): string {
 export interface Auszug {
   readonly openingBalance?: { readonly date: Date; readonly currency: string; readonly value: number };
   readonly closingBalance?: { readonly date: Date; readonly currency: string; readonly value: number };
+  /** Die Buchungen zwischen den beiden Salden — nur für die Summenprobe. */
+  readonly transactions?: readonly { readonly amount: number }[];
 }
 
 /** Ein Stand, den die Bank im Auszug mitgeliefert hat — Datum und Betrag in Cent. */
@@ -110,6 +112,76 @@ export function auszugsStaende(
     }
   }
   return staende;
+}
+
+/**
+ * Die Summenprobe: ergeben die Buchungen eines Auszugs die Veränderung, die seine Salden
+ * behaupten?
+ *
+ * Ein Auszug trägt Anfangs- UND Schlusssaldo, und dazwischen die Buchungen. Damit prüft
+ * er sich selbst — das ist keine Erfindung von uns, sondern der Grund, warum beide Salden
+ * überhaupt im Format stehen. Wir haben beide Zahlen bisher nur als Anker gelesen und die
+ * Probe nie gemacht.
+ *
+ * Warum sie sich lohnt: eine einzelne Zeile mit falschem Vorzeichen oder verschlucktem
+ * Betrag ist im Bestand später **nicht mehr auffindbar**. Der Kontoabgleich zeigt sie als
+ * konstanten Versatz, und ein konstanter Versatz sieht exakt so aus wie ein zu hoch
+ * geschätzter Anfangsbestand — die beiden sind ohne einen Anker VOR dem Fehler nicht zu
+ * trennen. Hier dagegen ist der Fehler auf einen Auszug eingegrenzt, und zwar in dem
+ * Moment, in dem er entsteht.
+ *
+ * Zwei Auszüge werden bewusst ÜBERSPRUNGEN statt gemeldet:
+ *
+ *   • Ohne beide Salden gibt es nichts zu prüfen.
+ *   • Fällt der Anfangssaldo auf denselben Tag wie der Schluss, ist er nach derselben
+ *     Regel wie in `auszugsStaende` unbrauchbar: der CAMT-Parser der Bibliothek erfindet
+ *     in dem Fall eine Null. Gegen eine erfundene Null geprüft, meldete die Probe bei
+ *     JEDEM solchen Auszug den vollen Kontostand als Lücke — ein Wächter, der immer
+ *     anschlägt, wird abgeschaltet.
+ *
+ * Ebenso übersprungen wird ein Auszug, dessen Salden in verschiedenen Währungen stehen:
+ * deren Differenz ist keine Zahl, die etwas bedeutet.
+ */
+export interface Auszugsprobe {
+  readonly datum: string;
+  /** Schluss minus Anfang — was die Bank an Veränderung behauptet. */
+  readonly gemeldet: Cent;
+  /** Summe der Buchungen des Auszugs. */
+  readonly gebucht: Cent;
+  /** gemeldet minus gebucht. Nie 0 — ein stimmiger Auszug erzeugt keine Probe. */
+  readonly luecke: Cent;
+  readonly buchungen: number;
+}
+
+export function auszugsProben(statements: readonly Auszug[]): Auszugsprobe[] {
+  const proben: Auszugsprobe[] = [];
+  for (const s of statements) {
+    const { openingBalance: anfang, closingBalance: schluss } = s;
+    if (!anfang || !schluss) continue;
+    if (!(anfang.date < schluss.date)) continue;
+    if (anfang.currency !== schluss.currency) continue;
+
+    try {
+      const waehrung = waehrungNachCode(schluss.currency);
+      const gemeldet = bankbetragZuCent(schluss.value, waehrung) - bankbetragZuCent(anfang.value, waehrung);
+      let gebucht = 0;
+      for (const t of s.transactions ?? []) gebucht += bankbetragZuCent(t.amount, waehrung);
+      if (gemeldet === gebucht) continue;
+      proben.push({
+        datum: isoDatum(schluss.date),
+        gemeldet,
+        gebucht,
+        luecke: gemeldet - gebucht,
+        buchungen: s.transactions?.length ?? 0,
+      });
+    } catch {
+      // Ein unlesbarer Betrag macht die Probe unmöglich, nicht falsch. Er wird an anderer
+      // Stelle schon gemeldet (`auszugsStaende`, `zuRohUmsatz`); hier ihn ein zweites Mal
+      // zu melden hiesse, denselben Fehler doppelt zu zählen.
+      continue;
+    }
+  }
+  return proben;
 }
 
 // ── Depot: MT535-Aufstellung → Bestand ────────────────────────────────────────────────────

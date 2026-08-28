@@ -7,7 +7,7 @@ import { describe, expect, test } from 'vitest'
 import { buchungsart, buchungsdatum, deutschesDatumZuIso, mapAccount, mapTransaction } from './map.js'
 
 // Die Werte hier sind erfunden. Echte Kontodaten gehören nicht in Tests — was die Bank
-// tatsächlich liefert, steht als Struktur in docs/bank-api.md.
+// tatsächlich liefert, steht im Herkunfts-Repository.
 
 describe('map', () => {
   test('deutsches Datum wird ISO', () => {

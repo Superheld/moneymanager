@@ -1,11 +1,22 @@
-// SQLite-Zugang über tauri-plugin-sql. Eine geladene DB-Instanz pro App, im
-// App-Datenverzeichnis (lokal first). Schema über ein einfaches, versioniertes
-// Migrationssystem (BAUPLAN: Migrationen ab Phase 1) — vorwärts und append-only.
+// SQLite-Zugang über EIGENE Kommandos, nicht mehr über tauri-plugin-sql. Eine geöffnete
+// Datenbank pro App, im App-Datenverzeichnis (lokal first). Schema über ein einfaches,
+// versioniertes Migrationssystem — vorwärts und append-only.
+//
+// **Warum nicht mehr das Plugin.** Eine verschlüsselte Datenbank verlangt `PRAGMA key`,
+// und das gilt pro Verbindung. Das Plugin hält einen Pool und holt für jedes Statement
+// eine beliebige daraus; ein einmal gesetzter Schlüssel erwischt genau eine davon. Der
+// eigene Pool in `src-tauri/src/datenbank.rs` setzt ihn stattdessen in den
+// Verbindungsoptionen — damit bekommt ihn jede Verbindung, die je entsteht.
+//
+// **Die Naht ist absichtlich schmal.** Nach oben sieht das aus wie vorher: `select` und
+// `execute`, dieselben Signaturen. Kein einziges Repository musste angefasst werden.
 
-import Database from "@tauri-apps/plugin-sql";
-import { DB_URL } from "./datenbankdatei";
+import { invoke } from "@tauri-apps/api/core";
+import { DATEINAME } from "./datenbankdatei";
 import { MIGRATIONS } from "./migrations";
 import { schemaStatement, fremdschluesselPruefen } from "./transaktion";
+import { sicherungPflegen } from "../../application/sicherung";
+import { heute, tauriSicherungPort } from "./sicherung";
 
 /**
  * Das Minimum, das `migrate` von einer Datenbank braucht. Hält die Migrationslogik
@@ -145,14 +156,91 @@ export async function migrate(db: MigrationsDb): Promise<void> {
   if (gelaufen) await fremdschluesselPruefen(db);
 }
 
-let dbPromise: Promise<Database> | null = null;
+/**
+ * Was die Anwendung von der Datenbank sieht — dieselben zwei Methoden wie zuvor beim
+ * Plugin, damit der Tausch nach oben unsichtbar bleibt.
+ */
+export interface Datenbankzugang {
+  select<T>(sql: string, werte?: unknown[]): Promise<T>;
+  execute(sql: string, werte?: unknown[]): Promise<{ rowsAffected: number; lastInsertId: number }>;
+}
 
-export function getDb(): Promise<Database> {
+const zugang: Datenbankzugang = {
+  select: <T,>(sql: string, werte: unknown[] = []) => invoke<T>("db_select", { sql, werte }),
+  execute: (sql: string, werte: unknown[] = []) =>
+    invoke<{ rowsAffected: number; lastInsertId: number }>("db_execute", { sql, werte }),
+};
+
+/**
+ * Die Datenbank öffnen.
+ *
+ * `pragma` ist der fertige Wert für `PRAGMA key` — oder `null` für eine unverschlüsselte
+ * Datenbank. Letzteres ist heute der Normalfall und wird es nicht bleiben.
+ *
+ * Gibt `false` zurück, wenn der Schlüssel nicht passt. Das ist kein Fehler, sondern eine
+ * Antwort: eine falsch eingetippte Passphrase ist keine Ausnahme, sondern der häufigste
+ * Fall beim Entsperren.
+ */
+export async function datenbankOeffnen(pragma: string | null): Promise<boolean> {
+  return invoke<boolean>("datenbank_oeffnen", {
+    o: { datei: DATEINAME, pragma, anlegen: true },
+  });
+}
+
+/** Die Datenbank schliessen — der Bestand ist danach wieder zu. */
+export function datenbankSchliessen(): Promise<void> {
+  return invoke<void>("datenbank_schliessen");
+}
+
+/**
+ * Ob gerade offen.
+ *
+ * Gebraucht nach einem Neuladen des Webviews: die Oberfläche weiss dann nicht mehr, ob
+ * schon entsperrt wurde, der Rust-Teil aber schon.
+ */
+export function datenbankIstOffen(): Promise<boolean> {
+  return invoke<boolean>("datenbank_ist_offen");
+}
+
+let dbPromise: Promise<Datenbankzugang> | null = null;
+
+/**
+ * Die Sicherung des Tages — VOR den Migrationen.
+ *
+ * Der Ort ist der ganze Punkt: der Fall, für den es Sicherungen gibt, ist eine
+ * Schemaänderung, die schiefgeht. Danach zu sichern hiesse, den kaputten Stand zu
+ * sichern. Läuft heute schon eine, passiert hier nichts.
+ *
+ * **Ein Fehlschlag hält den Start nicht auf.** Wer die App öffnet, will seine Ausgaben
+ * sehen; dass keine Sicherung entstand, ist kein Grund, ihm das zu verweigern. Es steht
+ * in der Konsole und sonst nirgends — dieselbe Abwägung wie bei der Update-Prüfung.
+ */
+async function sicherungVersuchen(): Promise<void> {
+  try {
+    await sicherungPflegen(tauriSicherungPort, heute());
+  } catch (fehler) {
+    console.warn("Sicherung nicht möglich:", fehler);
+  }
+}
+
+export function getDb(): Promise<Datenbankzugang> {
   if (!dbPromise) {
-    dbPromise = Database.load(DB_URL).then(async (db) => {
-      await migrate(db);
-      return db;
-    });
+    dbPromise = (async () => {
+      await datenbankOeffnen(null);
+      await sicherungVersuchen();
+      await migrate(zugang);
+      return zugang;
+    })();
   }
   return dbPromise;
+}
+
+/**
+ * Den gemerkten Zugang vergessen — nach dem Sperren.
+ *
+ * Ohne das gäbe `getDb()` weiter die zwischengespeicherte Zusage zurück, und der nächste
+ * Zugriff liefe gegen eine geschlossene Datenbank statt in den Entsperr-Bildschirm.
+ */
+export function zugangVergessen(): void {
+  dbPromise = null;
 }

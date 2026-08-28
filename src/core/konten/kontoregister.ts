@@ -125,6 +125,58 @@ export function kontoRegister(
   return { gebucht, geplant, standHeute };
 }
 
+/** Eine Fälligkeit in der kontoübergreifenden Vorschau — mit dem Konto, auf dem sie liegt. */
+export interface Vorschauzeile {
+  readonly datum: string;
+  readonly bezeichnung: string;
+  readonly betrag: Cent;
+  readonly charakter: Charakter;
+  readonly kontoId: string;
+  readonly planRef: PlanRef;
+}
+
+/**
+ * Was in den nächsten `tage` Tagen fällig wird — über ALLE Konten, chronologisch.
+ *
+ * Warum das nicht mehr im Kontoauszug steht: der Auszug beantwortet „was ist passiert",
+ * und dort stand die Vorschau als zweite Liste daneben, je Konto einzeln. Die Frage, die
+ * man aber wirklich stellt, ist „was kommt noch auf mich zu" — und die ist nicht die
+ * Frage eines Kontos. Wer sie im Auszug beantwortet bekommt, muss vier Konten
+ * nacheinander aufmachen und im Kopf zusammenzählen.
+ *
+ * Gerechnet wird je Konto über `kontoRegister` und nicht neu: die Regel, welche
+ * Fälligkeit noch offen ist (`bezahlteSchluessel`), soll es genau einmal geben. Der
+ * laufende Saldo fällt dabei weg, und zwar nicht aus Bequemlichkeit — über mehrere
+ * Konten hinweg gibt es keinen, den man fortschreiben könnte. Wer den Verlauf EINES
+ * Kontos sehen will, hat ihn weiterhin in `kontoRegister`.
+ */
+export function vorschauAlleKonten(
+  konten: readonly Zahlungskonto[],
+  ist: IstBuchung[],
+  regeln: Zahlungsregel[],
+  heute: string,
+  tage: number,
+): Vorschauzeile[] {
+  const zeilen: Vorschauzeile[] = [];
+  for (const konto of konten) {
+    for (const z of kontoRegister(konto, ist, regeln, heute, tage).geplant) {
+      // `geplant` trägt immer einen planRef — ohne ihn gäbe es die Zeile nicht.
+      if (!z.planRef) continue;
+      zeilen.push({
+        datum: z.datum,
+        bezeichnung: z.bezeichnung,
+        betrag: z.betrag,
+        charakter: z.charakter,
+        kontoId: konto.id,
+        planRef: z.planRef,
+      });
+    }
+  }
+  // Nach Datum, bei Gleichstand nach Konto — damit zwei Läufe dieselbe Reihenfolge
+  // liefern und nicht die der Kontenliste, die sich beim Umbenennen ändert.
+  return zeilen.sort((a, b) => a.datum.localeCompare(b.datum) || a.kontoId.localeCompare(b.kontoId));
+}
+
 /** Datum X Tage ab heute (ISO) — Helfer für die Fenster-Beschriftung in der UI. */
 export function fensterEnde(heute: string, tage: number): string {
   return toIso(addTage(parseIso(heute), tage));

@@ -75,6 +75,13 @@ Sie liegen als `*.test.ts` **neben dem Code**, es gibt keinen Testordner —
   `adapters/ui/CLAUDE.md`.
 - Nach **Daten** suchen, die der Test selbst angelegt hat, nicht nach Formulierungen — sonst
   wird die Suite beim nächsten Wording-Durchgang reihenweise rot.
+- Bei **UI-Texten** nach dem i18n-SCHLÜSSEL suchen (`"zugang.feldPassphrase"`), nicht nach
+  dem deutschen Wortlaut: in den Tests ist i18n nicht aufgesetzt, `t()` gibt den Schlüssel
+  zurück. Dieselbe Regel wie oben, eine Ebene tiefer.
+- **Keine deutschen Anführungszeichen in Testnamen.** `it("nimmt 0 als „aus"", …)` bricht
+  den Parser: das schliessende `"` beendet die Zeichenkette, das folgende `"` steht dann
+  allein. Gemeldet wird „no tests" — und zwar für die GANZE Datei, nicht für den Testfall.
+  Zweimal passiert, beide Male suchte man zuerst beim Testfall.
 
 ### Kein E2E — und was stattdessen trägt
 

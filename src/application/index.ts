@@ -64,6 +64,9 @@ export {
   // Eigenschaften EINER Buchung bzw. EINES Empfängernamens.
   istGeteilt,
   musterVorschlag,
+  // Trifft ein Muster diesen Text? Ein Vergleich, keine Auswahl — und die Oberfläche
+  // braucht ihn, um zu erkennen, ob ein vorhandenes Muster einen Namen schon abdeckt.
+  musterTrifft,
   anbieterSchluessel,
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,
@@ -122,8 +125,14 @@ export {
   type VertragErgebnis,
 } from "./vertraege/vertragAnlegen";
 export { zahlungsspuren } from "./buchung/zahlungsspuren";
+export {
+  historieLaden,
+  buchungZuruecksetzen,
+  type Buchungshistorie,
+  type Rueckwegstand,
+} from "./buchung/buchungshistorie";
 export { pruefmarkerSetzen } from "./buchung/pruefmarker";
-export { zuordnungenAbgleichen, zuordnungVonHand } from "./vertraege/vertragszuordnung";
+export { zuordnungenAbgleichen, zuordnungVonHand, vertragsnamenLaden } from "./vertraege/vertragszuordnung";
 export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertraege/vertragsvorschlaege";
 export {
   herkunftLaden,
@@ -171,6 +180,7 @@ export {
 export {
   analyseLaden,
   analyseFenster,
+  analyseFensterTaggenau,
   analyseVerlauf,
   analyseAufschluesselung,
   analyseGruppen,
@@ -255,6 +265,7 @@ export {
 export {
   uebersichtLaden,
   waehlbareMonate,
+  VORSCHAU_TAGE,
   type Uebersichtsdaten,
   type UebersichtDeps,
 } from "./uebersicht";

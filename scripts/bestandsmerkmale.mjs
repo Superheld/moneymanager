@@ -15,7 +15,7 @@
 // Datenbank, damit das, wovor sie schützt, nirgends im Repo steht.
 
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { closeSync, existsSync, openSync, readFileSync, readSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -41,10 +41,13 @@ const WURZEL = join(dirname(fileURLToPath(import.meta.url)), "..");
  * wird unten hart unterschieden zwischen „keine Datenbank da" (nichts zu prüfen) und
  * „Datenbank da, aber nicht lesbar" (Abbruch).
  */
-export const DB_PFAD = join(
-  homedir(),
-  "Library/Application Support/de.netmechanics.moneymanager/moneymanager.db",
-);
+export const DB_PFAD =
+  // Umbiegbar NUR fuer Proben — etwa um den verschluesselten Leseweg an einer Lesekopie
+  // durchzuspielen, ohne den echten Bestand anzufassen. Ein Wächter, den man auf eine
+  // leere Datei zeigen lassen kann, waere aushebelbar; dagegen steht, dass er weiter
+  // WIRFT, wenn kein einziges Merkmal herauskommt.
+  process.env.MONEYMANAGER_DB ||
+  join(homedir(), "Library/Application Support/de.netmechanics.moneymanager/moneymanager.db");
 
 /**
  * Untergrenze für die DICHTE Gruppe: die Beträge einzelner Buchungen und Importzeilen.
@@ -90,6 +93,40 @@ function sqliteVorhanden() {
 }
 
 /**
+ * Ist die Datenbank verschlüsselt?
+ *
+ * Am Dateikopf erkannt: eine unverschlüsselte SQLite-Datei beginnt mit genau diesen
+ * sechzehn Bytes. Das ist billiger und ehrlicher als ein Öffnungsversuch — der könnte an
+ * einem Dutzend anderer Dinge scheitern und würde jedes davon zu „verschlüsselt" erklären.
+ */
+function istVerschluesselt() {
+  const kopf = Buffer.alloc(16);
+  const fd = openSync(DB_PFAD, "r");
+  try {
+    readSync(fd, kopf, 0, 16, 0);
+  } finally {
+    closeSync(fd);
+  }
+  return kopf.toString("latin1") !== "SQLite format 3\0";
+}
+
+/**
+ * Das Werkzeug, das eine SQLCipher-Datei lesen kann.
+ *
+ * `sqlite3` bekommt sie nicht auf — und ein Wächter, der nicht mehr arbeiten kann, ist am
+ * Ende ein abgeschalteter Wächter. Gebaut wird es mit
+ * `cargo build --manifest-path src-tauri/Cargo.toml --bin bestandslesen`; der Schlüssel
+ * kommt aus `~/.moneymanager-schluessel/entwicklung.code`. Beides steht in CLAUDE.md.
+ */
+function leseWerkzeug() {
+  for (const profil of ["release", "debug"]) {
+    const pfad = join(WURZEL, "src-tauri/target", profil, "bestandslesen");
+    if (existsSync(pfad)) return pfad;
+  }
+  return null;
+}
+
+/**
  * Die Zeichenketten aus einem Einstellungswert.
  *
  * Manche Einstellung hält eine LISTE — die weggeklickten Vertragsvorschläge etwa sind ein
@@ -126,14 +163,30 @@ export function bestandsmerkmale() {
     Object.values(banken).find(Array.isArray).map((b) => b.name),
   );
 
+  // Verschlüsselt wird über das eigene Werkzeug gelesen, sonst über `sqlite3`. Die
+  // Entscheidung fällt EINMAL, nicht je Abfrage.
+  const verschluesselt = istVerschluesselt();
+  const werkzeug = verschluesselt ? leseWerkzeug() : null;
+  if (verschluesselt && !werkzeug) {
+    throw new Error(
+      "Der Bestand ist verschlüsselt, und das Lesewerkzeug fehlt — es wurde NICHTS geprüft.\n" +
+        "  cargo build --manifest-path src-tauri/Cargo.toml --bin bestandslesen\n" +
+        "Und der Wiederherstellungscode muss unter ~/.moneymanager-schluessel/entwicklung.code liegen.",
+    );
+  }
+
   function frage(sql, mussGehen = false) {
     try {
-      return execFileSync("sqlite3", ["-cmd", "PRAGMA query_only=ON", DB_PFAD, sql], {
-        encoding: "utf8",
-        maxBuffer: 256 * 1024 * 1024,
-      })
-        .split("\n")
-        .filter(Boolean);
+      const ausgabe = werkzeug
+        ? execFileSync(werkzeug, [DB_PFAD, sql], {
+            encoding: "utf8",
+            maxBuffer: 256 * 1024 * 1024,
+          })
+        : execFileSync("sqlite3", ["-cmd", "PRAGMA query_only=ON", DB_PFAD, sql], {
+            encoding: "utf8",
+            maxBuffer: 256 * 1024 * 1024,
+          });
+      return ausgabe.split("\n").filter(Boolean);
     } catch (e) {
       // Eine Tabelle, die es (noch) nicht gibt, ist in Ordnung — eine Datenbank, die sich
       // nicht öffnen lässt, nicht.

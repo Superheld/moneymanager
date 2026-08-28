@@ -31,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import {
   istGeteilt,
   musterVorschlag,
+  type Buchungshistorie,
   type Charakter,
   type IstBuchung,
   type Kategorie,
@@ -63,7 +64,9 @@ import {
   buchungLoeschen,
   pruefmarkerSetzen,
   buchungenPaaren,
+  buchungshistorie,
   buchungsdetail,
+  buchungZuruecksetzen,
   dublettenFreigabeAufheben,
   dublettenFreigeben,
   festlegungSpeichern,
@@ -80,6 +83,7 @@ import {
 } from "../../dienste";
 import { Button, FormField, Pill } from "../bausteine";
 import { formularAusBuchung, VertragModal } from "../vertraege/VertragModal";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
@@ -89,6 +93,7 @@ import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { ddmm } from "./ddmm";
 import { BuchungsHerkunft } from "./BuchungsHerkunft";
+import { JournalBlock } from "./JournalBlock";
 import {
   betragsHoehe,
   richtungVon,
@@ -189,6 +194,8 @@ interface FormularProps {
   gegenbuchung?: IstBuchung;
   /** Der frisch gelesene Stand — der Prüfmarker wirkt sofort, nicht erst beim Speichern. */
   aktuelle?: IstBuchung;
+  /** Was mit dieser Zeile geschah — fehlt, solange sie noch nicht gespeichert ist. */
+  historie?: Buchungshistorie;
   ausBankabruf?: boolean;
 
   // ── Dublettenverdacht ───────────────────────────────────────────────────────────────
@@ -213,6 +220,7 @@ interface FormularProps {
   onGegenbuchung: (b: IstBuchung) => void;
   onSplitten: () => void;
   onSplitAufheben: () => void | Promise<void>;
+  onZuruecksetzen: () => Promise<void>;
 }
 
 function BuchungFormular({
@@ -247,6 +255,8 @@ function BuchungFormular({
   onGegenbuchung,
   onSplitten,
   onSplitAufheben,
+  historie,
+  onZuruecksetzen,
 }: FormularProps) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -332,6 +342,7 @@ function BuchungFormular({
   // nebenbei Regeln anzulegen; die Festlegung soll aus einer Korrektur entstehen.
   const [immer, setImmer] = useState(false);
   const gepaart = !!buchung?.transferId;
+  const loeschfrage = useLoeschfrage();
   const geteilt = !!buchung && istGeteilt(buchung);
   const musterAngebot = musterVorschlag(umsatz?.gegenpartei ?? "");
   const kategorieGeaendert = kategorieId !== (buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
@@ -537,6 +548,7 @@ function BuchungFormular({
   const kopfUmsatz = entwurf ?? umsatz;
 
   return (
+    <>
     <Modal
       title={
         istEntwurf
@@ -572,7 +584,29 @@ function BuchungFormular({
             <button
               className="linkbtn"
               style={{ marginLeft: "auto", color: "var(--warn-deep)" }}
-              onClick={() => onDelete()}
+              // Die Rückfrage sitzt HIER und nicht in `entfernen`: dort ist schon
+              // entschieden. Was hier weggeht, ist eine Tatsache über Geld — der
+              // folgenreichste Löschweg der App, und bis 2026-08-27 der einzige ohne
+              // jeden Zwischenschritt.
+              onClick={() =>
+                loeschfrage.stellen({
+                  // Woran man die Buchung wiedererkennt — dieselbe Kette wie im
+                  // Auszug: eigene Notiz, sonst Empfänger, sonst Verwendungszweck.
+                  name:
+                    notiz ||
+                    umsatz?.gegenpartei ||
+                    umsatz?.verwendungszweck ||
+                    t("konten.dieseBuchungName"),
+                  folgen: t(
+                    ausBankabruf
+                      ? "konten.detailVerwerfenFolgen"
+                      : gepaart
+                        ? "konten.detailLoeschenFolgenPaar"
+                        : "konten.detailLoeschenFolgen",
+                  ),
+                  ausfuehren: () => onDelete(),
+                })
+              }
             >
               {t(ausBankabruf ? "konten.detail.verwerfenBankzeile" : "konten.loeschen")}
             </button>
@@ -928,6 +962,19 @@ function BuchungFormular({
         </div>
       )}
 
+      {/* Verlauf — was an dieser Zeile geändert wurde, und der Weg zurück. Über der
+          Herkunft, weil er die eigene Arbeit betrifft: „was habe ich hier verstellt"
+          fragt man eher als „woher kam die Zeile". */}
+      {buchung && (
+        <JournalBlock
+          historie={historie}
+          aktuell={buchung}
+          kontoName={kontoName}
+          kategorieName={kategorieName}
+          onZuruecksetzen={onZuruecksetzen}
+        />
+      )}
+
       {/* Herkunft — alles, was bekannt ist, aber hier nicht geändert wird. */}
       <BuchungsHerkunft
         buchung={buchung}
@@ -969,6 +1016,12 @@ function BuchungFormular({
         </div>
       )}
     </Modal>
+      {/* Ausserhalb des Modals, als Geschwister: der Modal-Stapel gibt Escape dem
+          OBERSTEN Dialog, und das soll hier die Rückfrage sein und nicht die Maske
+          darunter. Ineinander verschachtelt hinge die Rückfrage am Lebenszyklus der
+          Maske — sie verschwände beim Schliessen mit. */}
+      {loeschfrage.dialog}
+    </>
   );
 }
 
@@ -1036,6 +1089,7 @@ export function BuchungDetail(props: {
   const [freigegeben, setFreigegeben] = useState<ReadonlySet<string>>(LEERE_MENGE);
   const [freigaben, setFreigaben] = useState<readonly Dublettenfreigabe[]>([]);
   const [onlineKonten, setOnlineKonten] = useState<ReadonlySet<string>>(LEERE_MENGE);
+  const [historie, setHistorie] = useState<Buchungshistorie | undefined>(undefined);
 
   async function laden() {
     const d = await buchungsdetail();
@@ -1048,6 +1102,16 @@ export function BuchungDetail(props: {
     setAktuelle((b) => (b ? d.buchungen.find((x) => x.id === b.id) ?? b : undefined));
   }
   useEffect(() => { laden(); }, []);
+
+  // Die Historie hängt an der GEZEIGTEN Buchung, nicht am Dialog: der Sprung zur
+  // Gegenbuchung wechselt sie. Deshalb ein eigener Effekt und nicht ein Feld in
+  // `buchungsdetail()`, das einmal beim Öffnen geladen würde.
+  useEffect(() => {
+    if (!aktuelle) { setHistorie(undefined); return; }
+    let verworfen = false;
+    void buchungshistorie(aktuelle).then((h) => { if (!verworfen) setHistorie(h); });
+    return () => { verworfen = true; };
+  }, [aktuelle]);
 
   const kontoName = useMemo(() => new Map(konten.map((k) => [k.id, k.bezeichnung])), [konten]);
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
@@ -1182,10 +1246,11 @@ export function BuchungDetail(props: {
     // Der Anbieter ist das, woran man die Zahlung wiedererkennt: der Empfänger aus dem
     // Import, sonst die Notiz. Leer lassen wäre schlechter als ein Vorschlag, den man
     // überschreibt — Pflichtfeld ist er ohnehin.
-    const anbieter = umsatzByIst.get(vertragAus.id)?.gegenpartei || vertragAus.notiz || "";
+    const belegHier = umsatzByIst.get(vertragAus.id);
+    const anbieter = belegHier?.gegenpartei || vertragAus.notiz || "";
     return (
       <VertragModal
-        start={formularAusBuchung(vertragAus, anbieter, geld)}
+        start={formularAusBuchung(vertragAus, anbieter, geld, belegHier?.glaeubigerId)}
         hinweis={t("konten.zuVertrag.hinweis")}
         onClose={() => setVertragAus(null)}
         onSaved={async () => { setVertragAus(null); await nachAenderung(); }}
@@ -1294,6 +1359,10 @@ export function BuchungDetail(props: {
       // `nachAenderung` zieht die gezeigte Buchung nach, der Block wechselt von selbst
       // von der Teileliste auf das Kategoriefeld.
       onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(aktuelle); await nachAenderung(); }}
+      historie={historie}
+      // Kein `onClose()`: das Zurücknehmen ist ein Schritt IM Dialog. Man will danach
+      // sehen, was jetzt dasteht — dieselbe Überlegung wie beim Aufheben der Aufteilung.
+      onZuruecksetzen={async () => { if (!aktuelle) return; await buchungZuruecksetzen(aktuelle); await nachAenderung(); }}
     />
   );
 }

@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import { kontenLaden, registerSicht, type KontenDeps } from "./kontensichten";
 import type { ImportLauf, Umsatz } from "../import";
-import type { IstBuchung, Zahlungskonto } from "../../core";
+import type { IstBuchung, Vertrag, Vertragszuordnung, Zahlungskonto } from "../../core";
 import { freigabeAus, type Dublettenfreigabe } from "../dubletten/dublettensicht";
 
 const KONTO: Zahlungskonto = {
@@ -39,6 +39,7 @@ function deps(
   buchungen: IstBuchung[],
   umsaetze: Umsatz[],
   freigaben: Dublettenfreigabe[] = [],
+  vertraege: { zuordnungen?: Vertragszuordnung[]; vertraege?: Vertrag[] } = {},
 ): KontenDeps {
   return {
     kontoRepo: { async alle() { return [KONTO]; }, async speichern() {}, async loeschen() {} },
@@ -59,6 +60,14 @@ function deps(
     },
     ankerRepo: { async alle() { return []; }, async speichern() {}, async entfernen() {} },
     kontozuordnungen: async () => [],
+    zuordnungRepo: {
+      async alle() { return vertraege.zuordnungen ?? []; },
+      async speichern() {}, async loeschen() {},
+    },
+    vertragRepo: {
+      async alle() { return vertraege.vertraege ?? []; },
+      async speichern() {}, async loeschen() {},
+    } as unknown as KontenDeps["vertragRepo"],
   };
 }
 
@@ -130,7 +139,7 @@ describe("Dublettenmarkierung im Ledger", () => {
     const sicht = await kontenLaden(
       deps([buchung({ id: "b-datei" }), buchung({ id: "b-bank" })], [AUS_DATEI, AUS_BANK]),
     );
-    const register = registerSicht(sicht, KONTO, "2026-08-20", 30);
+    const register = registerSicht(sicht, KONTO, "2026-08-20");
     expect(register.gebucht).toHaveLength(2);
     for (const zeile of register.gebucht) {
       expect(zeile.dublette?.urteil).toBe("identisch");
@@ -147,7 +156,7 @@ describe("Dublettenmarkierung im Ledger", () => {
 describe("Bezeichnung der Registerzeile", () => {
   function ersteZeile(b: IstBuchung, u: Umsatz) {
     return kontenLaden(deps([b], [u])).then((sicht) =>
-      registerSicht(sicht, KONTO, "2026-08-20", 30).gebucht[0],
+      registerSicht(sicht, KONTO, "2026-08-20").gebucht[0],
     );
   }
 
@@ -181,5 +190,57 @@ describe("Bezeichnung der Registerzeile", () => {
       umsatz({ gegenpartei: "", verwendungszweck: "" }),
     );
     expect(zeile.bezeichnung).toBe("");
+  });
+});
+
+/**
+ * Die Vertragsmarkierung im Auszug.
+ *
+ * Die Zuordnung stand seit jeher an der Buchung — sichtbar war sie nur im Dialog. In der
+ * Liste musste man jede Zeile einzeln öffnen, um zu erfahren, ob sie zu einem Vertrag
+ * gehört; genau die Frage, die man in einer Liste nebenbei beantwortet haben will.
+ */
+describe("Vertragsmarkierung", () => {
+  const buchung: IstBuchung = {
+    id: "b1", datum: "2026-08-11", betrag: -5700, kontoId: "giro",
+    charakter: "Aufwand", quelle: "import",
+  };
+  const vertrag = { id: "v1", anbieter: "Ohlert", beginn: "2024-01-01",
+    verlaengerung: "automatisch", status: "aktiv" } as Vertrag;
+
+  it("hängt den Anbieternamen an die Registerzeile", async () => {
+    const sicht = await kontenLaden(
+      deps([buchung], [], [], {
+        zuordnungen: [{ istbuchungId: "b1", vertragId: "v1", herkunft: "automatisch" }],
+        vertraege: [vertrag],
+      }),
+    );
+    const zeile = registerSicht(sicht, KONTO, "2026-08-20").gebucht[0];
+    expect(zeile.vertragsname).toBe("Ohlert");
+  });
+
+  /**
+   * `vertragId: null` ist kein fehlender Wert, sondern die Aussage „gehört ausdrücklich
+   * zu keinem Vertrag". Sie darf keine Markierung erzeugen — sonst behauptete die Liste
+   * das Gegenteil dessen, was jemand entschieden hat.
+   */
+  it("markiert nicht, wo ausdrücklich kein Vertrag gilt", async () => {
+    const sicht = await kontenLaden(
+      deps([buchung], [], [], {
+        zuordnungen: [{ istbuchungId: "b1", vertragId: null, herkunft: "manuell" }],
+        vertraege: [vertrag],
+      }),
+    );
+    expect(registerSicht(sicht, KONTO, "2026-08-20").gebucht[0].vertragsname).toBeUndefined();
+  });
+
+  it("markiert nicht bei einem Verweis auf einen Vertrag, den es nicht mehr gibt", async () => {
+    const sicht = await kontenLaden(
+      deps([buchung], [], [], {
+        zuordnungen: [{ istbuchungId: "b1", vertragId: "weg", herkunft: "automatisch" }],
+        vertraege: [vertrag],
+      }),
+    );
+    expect(registerSicht(sicht, KONTO, "2026-08-20").gebucht[0].vertragsname).toBeUndefined();
   });
 });

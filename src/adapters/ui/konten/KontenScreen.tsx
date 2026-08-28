@@ -15,7 +15,6 @@ import {
   type IstBuchung,
   type Kontensicht,
   type Registerzeile,
-  type RegisterZeile,
   type Zahlungskonto,
 } from "../../../application";
 import {
@@ -37,14 +36,13 @@ import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { Modal } from "../bausteine/Modal";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton } from "../bausteine/IconButton";
-import { useGeld, useCharakterLabel, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
 const LEERE_IDS: ReadonlySet<string> = new Set();
 
-const TAGE_OPTIONEN = [14, 30, 60, 90];
 const ART_OPTS = [
   { v: "alle", k: "konten.artAlle" },
   { v: "einnahmen", k: "konten.artEinnahmen" },
@@ -66,20 +64,12 @@ function datumKurz(iso: string): string {
   return `${d}.${m}.${j}`;
 }
 
-/** Dasselbe ohne Jahr — nur fuer die Vorschau, siehe die Spalte dort. */
-function datumOhneJahr(iso: string): string {
-  const [, m, d] = iso.split("-");
-  return `${d}.${m}.`;
-}
-
 export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => void }) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const charakterLabel = useCharakterLabel();
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Kontensicht | null>(null);
   const [aktivId, setAktivId] = useState("");
-  const [tage, setTage] = useState(30);
   const [katFilter, setKatFilter] = useState("alle");
   const [artFilter, setArtFilter] = useState<"alle" | "einnahmen" | "ausgaben" | "umbuchung">("alle");
   const [regSuche, setRegSuche] = useState("");
@@ -149,8 +139,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const offlineKonten = useMemo(() => kontozeilen.filter((z) => !z.online).map((z) => z.konto), [kontozeilen]);
 
   const register = useMemo(
-    () => (sicht && aktiv ? registerSicht(sicht, aktiv, heute, tage) : null),
-    [sicht, aktiv, heute, tage],
+    () => (sicht && aktiv ? registerSicht(sicht, aktiv, heute) : null),
+    [sicht, aktiv, heute],
   );
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
@@ -608,6 +598,37 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                         </button>
                       )}
                       {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
+                      {/* Gehört die Zeile zu einem Vertrag, steht der Anbieter dran.
+                          Der NAME und nicht bloss „Vertrag": dass es einer ist, sieht man
+                          an der Pille ohnehin — WELCHER, ist die Auskunft, für die man
+                          vorher die Zeile öffnen musste. */}
+                      {r.vertragsname && (
+                        // Der title sitzt am Wrapper und nicht an der Pille — dieselbe
+                        // Regel wie beim Dublettenverdacht darunter: `bausteine/` ist
+                        // teils aus dem Design-System kopiert und kennt die Eigenschaft
+                        // nicht, und dort wird nichts erfunden.
+                        <span
+                          title={t("konten.pillVertrag", { anbieter: r.vertragsname })}
+                          style={{ flex: "0 0 auto", display: "inline-flex", maxWidth: 120, overflow: "hidden" }}
+                        >
+                          <Pill variant="plan" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {r.vertragsname}
+                          </Pill>
+                        </span>
+                      )}
+                      {/* VORLÄUFIG, zum Nachsehen: gibt es zu dieser Zeile einen
+                          Journaleintrag? Der Verlauf selbst steht im Dialog; hier steht
+                          nur, wo es überhaupt etwas zu sehen gibt. Das Journal ist jung
+                          (seit 2026-08-23), und ohne diese Markierung müsste man Zeilen
+                          aufmachen, um zu erfahren, dass nichts drinsteht. */}
+                      {!!r.journaleintraege && (
+                        <span
+                          title={t("konten.pillVerlauf", { anzahl: r.journaleintraege })}
+                          style={{ flex: "0 0 auto", display: "inline-flex" }}
+                        >
+                          <Pill variant="neutral">{t("konten.pillVerlaufKurz", { anzahl: r.journaleintraege })}</Pill>
+                        </span>
+                      )}
                       {/* Der Verdacht steht an BEIDEN Zeilen — es gibt kein Original.
                           Die Gründe hängen im title, entschieden wird im Detail. */}
                       {r.dublette && (
@@ -695,67 +716,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           )}
           </Card>
 
-          {/* Die geplante Vorschau.
-              Der Stand von heute steht als Unterzeile der Karte und nicht mehr als Trenner
-              quer über den Auszug: er ist der Punkt, ab dem die Vorschau rechnet, und
-              gehört damit an ihren Anfang. Zwischen zwei Listen stehend beschriftete er
-              beide und keine.
+          {/* Die geplante Vorschau STAND HIER und steht jetzt in der Übersicht.
+              Zwei Gründe, und der zweite wiegt schwerer: der Auszug beantwortet „was ist
+              passiert", eine Liste über die Zukunft daneben beantwortet eine andere Frage
+              im selben Bild. Und „was kommt noch auf mich zu" ist keine Frage EINES
+              Kontos — wer vier führt, musste vier Auszüge öffnen und zusammenzählen.
+              Dieselbe Trennung, die den Kontoabgleich schon aus der Kontenliste in einen
+              eigenen Bereich geschoben hat.
 
-              Der Zeitraum-Wähler sitzt im `action` der Karte und nicht mehr oben bei den
-              Knöpfen: er stellt ausschliesslich ein, wie weit DIESE Liste nach vorn
-              schaut. Neben „Buchung erfassen" sah er aus wie eine Einstellung des ganzen
-              Auszugs. */}
-          <Card
-            title={t("konten.geplantTitel")}
-            subtitle={t("konten.heuteRealerStand", { stand: geld.format(register.standHeute), symbol: geld.symbol })}
-            action={
-              <span className="tabellenfilter">
-                <Auswahl
-                  ariaLabel={t("konten.zeitraumWaehlen")}
-                  wert={String(tage)}
-                  aufAenderung={(v) => setTage(Number(v))}
-                  optionen={TAGE_OPTIONEN.map((d) => ({ wert: String(d), text: t("konten.kommendeTage", { tage: d }) }))}
-                />
-              </span>
-            }
-          >
-            {register.geplant.length === 0 ? (
-              <div className="muted">{t("konten.keineGeplanten", { tage })}</div>
-            ) : (
-              <DataTable
-                columns={[
-                  {
-                    // OHNE Jahr, anders als im Auszug links. Dort stehen alle Buchungen
-                    // eines Kontos, und ueber den Jahreswechsel hinweg waere „12.08."
-                    // zweideutig. Die Vorschau reicht hoechstens 90 Tage nach vorn — dort
-                    // unterscheidet das Jahr nichts und kostet nur Spaltenbreite, die
-                    // diese schmale Tabelle nicht hat.
-                    key: "datum", label: t("konten.spalteDatum"),
-                    render: (z: RegisterZeile) => datumOhneJahr(z.datum),
-                  },
-                  {
-                    key: "bez", label: t("konten.spalteBeschreibung"), maxWidth: 220,
-                    render: (z: RegisterZeile) => (
-                      <span title={z.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{z.bezeichnung}</span>
-                        {z.charakter === "Umschichtung" && <Pill variant="um">{charakterLabel("Umschichtung")}</Pill>}
-                      </span>
-                    ),
-                  },
-                  {
-                    key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right",
-                    render: (z: RegisterZeile) => <span className="num" style={{ fontWeight: 700, color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span>,
-                  },
-                  { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", render: (z: RegisterZeile) => geld.format(z.saldo) },
-                ]}
-                rows={[...register.geplant]}
-                // Gedämpft wie zuvor: nichts davon ist passiert. Der Unterschied zu einer
-                // gebuchten Zeile muss sichtbar bleiben, auch wenn beide jetzt in einer
-                // Tabelle stehen.
-                rowStyle={() => ({ opacity: 0.62 })}
-              />
-            )}
-          </Card>
+              Der reale Stand von heute bleibt hier: er ist eine Auskunft ÜBER dieses
+              Konto und steht oben in der Kopfzeile, wo er hingehört. */}
         </div>
       )}
 

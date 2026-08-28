@@ -45,6 +45,7 @@ import {
   FINTS_QUELLE,
   bankbetragZuCent,
   depotStichtag,
+  auszugsProben,
   auszugsStaende,
   isoDatum,
   zuDepotposition,
@@ -397,6 +398,23 @@ class FintsSitzung implements Abrufsitzung {
         // Regel wie beim Dateiimport).
         warnungen.push(`Buchung übersprungen: ${e instanceof Error ? e.message : String(e)}`);
       }
+    }
+
+    // Die Summenprobe: stimmen die Buchungen mit dem, was die Salden des Auszugs
+    // behaupten? Sie steht hier und nicht in der Anwendungsschicht, weil sie die
+    // Auszugsstruktur der Bank braucht — die endet an dieser Naht. Was danach kommt, sind
+    // einzelne Umsätze ohne Auszug drumherum, und dort ist die Frage nicht mehr stellbar.
+    //
+    // Ein Befund KIPPT den Abruf nicht. Die Buchungen sind trotzdem das Wertvollere, und
+    // was die Probe meldet, ist „hier stimmt etwas nicht" und nicht „welche Zeile" — den
+    // Abruf daran scheitern zu lassen nähme dem Nutzer die Daten UND die Möglichkeit,
+    // selbst nachzusehen.
+    for (const p of auszugsProben(antwort.statements)) {
+      warnungen.push(
+        `Auszug zum ${p.datum}: die Bank meldet eine Veränderung, die ${p.buchungen} gelieferte ` +
+          `Buchungen nicht ergeben (Lücke ${p.luecke} in Minor Units). Eine Zeile fehlt, ist doppelt ` +
+          `oder hat das falsche Vorzeichen.`,
+      );
     }
 
     return {

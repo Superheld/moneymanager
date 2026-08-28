@@ -177,7 +177,21 @@ function textbestand(): { datei: string; inhalt: string }[] {
 }
 
 describe("Daten aus dem echten Bestand", () => {
-  it("stehen in keiner versionierten Datei", () => {
+  /**
+   * Eigene Frist statt der Fünf-Sekunden-Vorgabe.
+   *
+   * Dieser Fall liest den ECHTEN Bestand zur Laufzeit (`scripts/bestandsmerkmale.mjs`,
+   * bei verschlüsselter Datenbank über ein Rust-Werkzeug) und danach jede versionierte
+   * Datei. Allein gefahren dauert das ein paar Sekunden; im vollen Lauf konkurriert er
+   * mit über hundert anderen Dateien um dieselben Kerne, und dann reichten fünf Sekunden
+   * nicht mehr — gemessen, nicht befürchtet.
+   *
+   * Warum das mehr ist als ein flackernder Test: ein Zeitüberschreiter meldet ROT, ohne
+   * geprüft zu haben. Das ist genau der Zustand, vor dem `CLAUDE.md` warnt — ein Wächter,
+   * der nichts sieht, ist schlimmer als keiner. Und ein Wächter, der ohne Grund rot wird,
+   * wird abgeschaltet statt gelesen; dann sieht er gar nichts mehr.
+   */
+  it("stehen in keiner versionierten Datei", { timeout: 60_000 }, () => {
     const gesucht = merkmale();
     if (gesucht.length === 0) return; // keine Datenbank — nichts zu schützen
 

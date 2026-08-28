@@ -340,6 +340,56 @@ Unterschieden. Der ursprüngliche Inhalt bleibt damit feststellbar, auch nachdem
 gelöscht wurde. Deshalb trägt die Tabelle bewusst **keinen** Fremdschlüssel auf
 `ist_buchung`: sie muss die Löschung überleben.
 
+### Und seit 2026-08-28 ist es lesbar
+
+Das Journal lief zwei Wochen mit, ohne dass es jemand zu sehen bekam. Es steht jetzt im
+Buchungsdialog unter **Verlauf** — die Einträge, der Unterschied zum Stand bei der
+Entstehung, und ein Weg zurück. Im Kontoauszug markiert eine Pille, zu welcher Zeile
+überhaupt etwas protokolliert ist; die ist ausdrücklich **vorläufig** und dient dem
+Nachsehen, solange das Journal jung ist.
+
+| Stück | Datei |
+|---|---|
+| Form eines Eintrags, Unterschied, Urzustand | `src/core/buchung/journal.ts` |
+| Historie laden, zurücksetzen | `src/application/buchung/buchungshistorie.ts` |
+| Lesen | `src/adapters/persistence/sqliteJournalRepository.ts` |
+| Anzeigen und zurücknehmen | `src/adapters/ui/buchung/JournalBlock.tsx` |
+
+**Es gibt ZWEI Wege zurück, und sie bedeuten Verschiedenes.** Gebaut ist bislang der erste:
+
+| | Quelle | reicht zurück bis | liefert |
+|---|---|---|---|
+| Stand bei Entstehung | Journal | 23.08.2026 | die Buchung, wie sie **damals** war |
+| Stand des Belegs | `umsatz_roh` | den ganzen Bestand | die Buchung, wie sie **heute** entstünde |
+
+Der zweite liefert den heutigen Kategorievorschlag, nicht den von damals — meist besser,
+aber eben eine andere Aussage. Beide unter einen Knopf zu legen und je nach Verfügbarkeit
+den einen oder anderen zu nehmen, ergäbe einen Knopf, der zwei Dinge tut, ohne dass man
+sieht welches. Wer den zweiten baut, baut ihn daneben.
+
+**Das Journal bleibt dabei eine Aufzeichnung und wird kein Speicher.** Der Unterschied ist
+nicht akademisch, er entscheidet über das Risiko: als **Angebot** darf sich ein Rückweg
+darauf stützen — fehlt der Eintrag, entfällt das Angebot, und verloren ist nichts, was
+nicht ohnehin verloren wäre. Als **Pflichtweg** dürfte er es nicht: dann wäre eine Lücke im
+Protokoll Datenverlust statt einer Lücke in der Nachvollziehbarkeit, es liesse sich nie
+mehr aufräumen, und „nicht fälschungssicher" (siehe unten) wäre keine hingenommene Grenze
+mehr, sondern ein Loch. Ein Ablauf, der einen Eintrag VORAUSSETZT, gehört nicht ans
+Journal.
+
+**Ein Umbuchungs-Bein lässt sich nicht zurücksetzen.** Ein Bein allein liefe auf einen von
+zwei Zuständen hinaus, die es nicht geben darf: entweder fällt die `transferId` weg und das
+Gegenbein zeigt auf ein Paar, das es nicht mehr gibt, oder sie kommt zurück und zeigt auf
+ein Bein, das inzwischen einen anderen Betrag trägt. Dafür gibt es „Paarung lösen" — einen
+Weg, der beide Seiten anfasst.
+
+**Zwei Felder kommen nicht mit:** `vertrag_id` und `vertrag_herkunft` stehen zwar im
+protokollierten Stand, gehören aber der Vertragszuordnung und nicht dem Ledger. Eine
+Vertragszuordnung überlebt das Zurücksetzen.
+
+Was damit möglich, aber noch nicht gebaut ist: eine **gelöschte** Buchung wieder anlegen.
+Der Stand dafür steht im Journal (`letzterStand`), und es wäre der halbe Weg zum Storno
+weiter unten.
+
 ### Was offen ist, und warum
 
 - **Storno statt Löschen.** Eine gelöschte Buchung verschwindet weiterhin aus dem Ledger;
@@ -355,6 +405,63 @@ gelöscht wurde. Deshalb trägt die Tabelle bewusst **keinen** Fremdschlüssel a
   beschreiben keine Zahlung; ihre Historie wäre Aufwand ohne Zweck.
 - **`kontostand_anker` und `depotwert` werden nicht protokolliert.** Sie sind Beobachtungen
   zu einem Stichtag und werden nur ergänzt, nicht geändert.
+
+## Was die App nach draussen spricht
+
+Eine lokale Finanz-App, die still mit fremden Servern redet, ist keine lokale Finanz-App.
+Es gibt deshalb genau **drei** Wege nach draussen, und zwei davon setzen ein Zutun voraus:
+
+| Weg | wann | abschaltbar |
+|---|---|---|
+| Bankabruf | nur wenn jemand ihn auslöst | entfällt (er IST die Handlung) |
+| Update-Prüfung | beim Start, still | ja (`aktualisierungPruefen`) |
+| sonst | — | — |
+
+Die dritte Zeile ist leer, und das wird von `src/absicherung.test.ts` durchgesetzt.
+
+**Bis 2026-08-25 stimmte das nicht.** Die Schrift kam über ein `@import` von einem
+Schriften-Dienst — ein Netzzugriff bei jedem Start, bei dem der Betreiber IP und Zeitpunkt
+sieht. Die Behauptung weiter unten, die Update-Prüfung sei der erste ungefragte
+Netzzugriff, war damit falsch. Sie ist es erst, seit die Schrift im Bündel liegt
+(`@fontsource-variable/hanken-grotesk`).
+
+### Die CSP ist die Sperre, nicht die Absicht
+
+`app.security.csp` in `tauri.conf.json` erlaubt nur `'self'` und den Tauri-IPC. Das
+schützt nicht gegen einen Angreifer am Schreibtisch, sondern gegen den realistischen Fall:
+eine **Abhängigkeit**, die eines Tages etwas mitbringt, das niemand bestellt hat. Der
+Webview hat über `sql:allow-execute` Vollzugriff auf den Bestand — lesen kann fremder Code
+also alles. Was die CSP nimmt, ist der Rückweg: **fortschaffen kann er nichts.**
+
+Drei Dinge, die man dabei wissen muss:
+
+- **Der Bankabruf ist davon unberührt.** Er läuft über `tauri-plugin-http` durch Rust
+  (`adapters/fints/transport.ts` legt einen Umleiter über `globalThis.fetch`), also am
+  Webview vorbei. Die CSP sieht ihn nie; begrenzt wird er von den Capabilities.
+- **`devCsp` ist getrennt und lockerer.** Vite und React-Refresh spritzen ihre Skripte
+  inline ein; ohne `'unsafe-inline'` startet der Dev-Modus nicht. Die ausgelieferte
+  Fassung hat es ausdrücklich nicht, und der Wächter hält das auseinander.
+- **Eine Schrift aus dem Netz würde die CSP entwerten**, nicht nur ergänzen. Wer einen
+  fremden Host in `font-src` und `style-src` erlauben muss, hat einen Kanal, über den sich
+  Daten in einer URL hinaustragen lassen. Deshalb prüft der Wächter beides zusammen: die
+  CSP und dass keine CSS-Datei etwas nachlädt. Eine CSP mit diesem Loch beruhigt, ohne zu
+  wirken — und ein Wächter, der nichts sieht, ist schlimmer als keiner.
+
+### Was die CSP NICHT leistet
+
+Sie hindert fremden Code nicht am **Lesen**, und sie greift nicht gegen jemanden, der als
+du auf dieser Maschine läuft. Dagegen hülfe nur eine verschlüsselte Datenbank mit
+Passphrase — die lohnt sich, sobald ein Bestand die Maschine verlässt (Cloud, Sync), und
+solange er das nicht tut, deckt FileVault dasselbe Szenario ab.
+
+Gegen einen **anderen Account** auf derselben Maschine greift dagegen etwas Billigeres,
+und das ist seit 2026-08-26 eingebaut: die App setzt beim Start ihre `umask` auf 0077 und
+zieht vorhandene Datenbankdateien auf 0600 (`src-tauri/src/dateirechte.rs`). Vorher
+entstand der Bestand mit `-rw-r--r--` und war für jeden Nutzer des Rechners lesbar. Die
+`umask` ist dabei die eigentliche Massnahme, nicht das `chmod`: SQLite legt `-wal` und
+`-shm` bei jedem Öffnen neu an, und sie entstünden sonst wieder offen. Auf Windows greift
+weder das eine noch das andere — dort deckt die Rechteverwaltung des Nutzerprofils den
+Fall ab.
 
 ## Stadium: Alpha
 
@@ -413,12 +520,21 @@ Ausweg lässt, wird abgeschaltet statt umgangen, und dann ist er ganz weg.
 npm run tauri dev   # Desktop-Fenster
 npm run dev         # nur Frontend (Webview ohne SQLite-Plugin — hat keine Daten)
 npm test            # Vitest: Kern, Use-Cases, Repositories, UI, Schichtgrenzen
+npm run test:rust   # die wenigen Rust-Tests der Shell (Dateirechte) — laufen NICHT in `npm test`
 npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 %)
 npm run typecheck
 npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
 npm run seed        # Spielstand für die Entwicklung neu schreiben (siehe unten)
 npm run installieren # macOS: bauen und nach /Applications installieren
 ```
+
+Zwei Dinge, die ein grüner Lauf verschweigt:
+
+- **`cargo test --lib` verdeckt `dead_code`-Warnungen**, die der App-Build zeigt: was nur
+  Tests benutzen, gilt dort als benutzt. Vor dem Commit einmal `cargo build --lib`.
+- **`src/doku.test.ts` liest `git ls-files`.** Eine neue Datei, die in einer `CLAUDE.md`
+  steht, muss **vor** dem Testlauf `git add`-ed sein — sonst meldet der Wächter einen
+  toten Verweis auf etwas, das längst dasteht.
 
 Node kommt über **mise** (`mise.toml`: node 26); die CI pinnt dieselbe Hauptversion getrennt
 in `.github/workflows/ci.yml`, weil Actions die `mise.toml` nicht liest. Wer sie hier hebt,
@@ -636,6 +752,112 @@ installierten App: wer ihn anfasst, schickt sie in ein neues, leeres Verzeichnis
 echte Bestand sieht aus wie verschwunden. Beide Dateien liegen deshalb nebeneinander, und
 die Rezepte aus `CLAUDE.local.md` finden auch die Spielkopie.
 
+### Der Bestand liegt verschlüsselt
+
+Seit 2026-08-27. **Die Einrichtung ist nicht abzulehnen** — beim ersten Start, egal ob
+neuer Nutzer oder vorhandener Bestand. Es gibt kein „später" und kein „ohne
+Verschlüsselung": wer beim ersten Start unter Zeitdruck steht, klickt genau das weg und
+legt dann für immer offen ab, ohne es je wieder zu bemerken.
+
+**Die Passphrase ist nicht der Schlüssel, sie wickelt ihn ein.** Ein gewürfelter
+Datenschlüssel verschlüsselt die Datenbank; er selbst liegt, mit einem aus der Passphrase
+abgeleiteten Schlüssel verschlüsselt, in `<name>.schluessel.json` daneben. Der Umweg
+kostet eine Datei und leistet zweierlei, was direkt nicht ginge: die Passphrase zu
+wechseln dauert Sekunden statt einer Neuverschlüsselung des Bestands, und ein
+**Wiederherstellungscode** ist überhaupt erst möglich — er IST der Datenschlüssel in
+lesbarer Form.
+
+| Stück | Datei |
+|---|---|
+| Schlüssel, Hülle, Wiederherstellungscode | `src-tauri/src/schluessel.rs` |
+| Einrichten, Entsperren, Überführen | `src-tauri/src/zugang.rs` |
+| Der Pool mit `PRAGMA key` | `src-tauri/src/datenbank.rs` |
+| Nachweis, dass wirklich verschlüsselt wird | `src-tauri/src/krypto.rs` |
+| Das Tor | `src/adapters/ui/zugang/` |
+
+Fünf Dinge, die man wissen muss:
+
+- **`PRAGMA key` gilt pro Verbindung**, und es muss als ERSTES kommen. Deshalb steht es in
+  den Verbindungsoptionen und nicht in `after_connect`: dieser Haken läuft nach sqlx'
+  eigenen Pragmas, und `journal_mode` liest den Dateikopf. Bei einer verschlüsselten
+  Datenbank scheitert das mit „file is not a database" — einer Meldung, die nach kaputtem
+  Bestand aussieht statt nach fehlendem Schlüssel.
+- **Ein Pool lässt sich auch mit falschem Schlüssel anlegen.** Erst die erste echte
+  Abfrage fällt um. `datenbank_oeffnen` prüft deshalb mit einem Zugriff, statt einen
+  Erfolg zu melden und die App mit leeren Screens dastehen zu lassen.
+- **Die Überführung ist so gelegt, dass es keinen Moment gibt, in dem beide Fassungen
+  unbrauchbar sind:** sichern, daneben schreiben, nachweisen dass es heil ist, erst dann
+  die alte wegwerfen. Bricht es vorher ab, steht der Altbestand unberührt da.
+- **Die Sicherungen aus der Klartext-Zeit werden dabei weggeworfen** — geprüft am
+  Dateikopf, nicht am Namen. Sie liegen zu lassen hiesse, den ganzen Aufwand durch die
+  Hintertür wieder aufzugeben.
+- **Eine vergessene Passphrase nimmt auch das Jahresarchiv mit.** `VACUUM INTO` schreibt
+  mit dem Schlüssel der offenen Verbindung; alle Sicherungen sind damit verschlüsselt.
+  Deshalb ist der Wiederherstellungscode Pflicht und nicht Komfort.
+
+**Was es NICHT leistet:** gegen Schadcode, der als der Nutzer läuft, während die App
+offen ist, wirkt es nicht — der Schlüssel liegt dann im selben Speicher. Das ist Fall D
+aus dem Bedrohungsmodell und bleibt Sache von CSP und Capabilities.
+
+Die **Zeitsperre** (Einstellungen → Verschlüsselung, Vorgabe 15 Minuten, abschaltbar)
+deckt den Fall ab, den weder Dateirechte noch Verschlüsselung erreichen: jemand setzt
+sich an den entsperrten Rechner. Aus demselben Grund ist der Wiederherstellungscode dort
+nur gegen die Passphrase einzusehen — läge er offen, wäre die Sperre umsonst.
+
+### Die App sichert sich selbst, gestaffelt
+
+Beim Start legt die App eine Sicherung des Tages an — **vor den Migrationen**, und das ist
+der ganze Punkt: der Fall, für den es Sicherungen gibt, ist eine Schemaänderung, die
+schiefgeht. Danach zu sichern hiesse, den kaputten Stand zu sichern.
+
+| | |
+|---|---|
+| wo | `<App-Datenverzeichnis>/sicherungen/<name>-<YYYY-MM-DD>.db` |
+| wie | `VACUUM INTO` — **nicht kopieren** |
+| wann | beim Start, höchstens eine je Kalendertag |
+| wie viele | 7 täglich · 4 wöchentlich · 3 monatlich · 2 quartalsweise · 2 halbjährlich · **jährlich ohne Ende** |
+
+Vier Dinge, die man wissen muss:
+
+- **`VACUUM INTO` statt Kopieren, weil eine Kopie das WAL nicht mitnimmt.** Die jüngsten
+  Schreibvorgänge stehen dort und nicht in der Hauptdatei; die Kopie sähe vollständig aus
+  und wäre es nicht — das merkt man erst beim Wiederherstellen.
+- **Eine vorhandene Sicherung wird nicht überschrieben.** Wer die App am selben Tag zum
+  dritten Mal startet, behält den Stand von heute früh: der ist der, in dem eine inzwischen
+  kaputtgegangene Änderung noch nicht steckt.
+- **Eine Stufe zählt vorhandene Stände, keine Kalendereinheiten.** „Vier wöchentlich"
+  heisst: die vier jüngsten Sieben-Tage-Blöcke, in denen es eine Sicherung GIBT. Sonst
+  bliebe von einem, der die App wochenlang nicht startet, gar nichts übrig — und genau der
+  braucht seine alten Stände am dringendsten.
+- **Ein Fehlschlag hält den Start nicht auf.** Wer die App öffnet, will seine Ausgaben
+  sehen; dieselbe Abwägung wie bei der Update-Prüfung.
+- **Die Zahlen folgen einer Regel, nicht dem Geschmack:** jede Stufe reicht genau so weit,
+  wie die nächstgröbere ihre Schrittweite hat — sieben Tage bis zur Woche, vier Wochen bis
+  zum Monat, drei Monate bis zum Quartal, zwei Quartale bis zum Halbjahr, zwei Halbjahre
+  bis zum Jahr. Quartal und Halbjahr sind dabei kein Zierrat: ohne sie müsste die
+  Monatsstufe das ganze Jahr überbrücken (zwölf Stände statt drei).
+
+**Die Jahresstufe läuft nie aus, und das ist der wichtigste Teil.** Eine Sicherung enthält
+immer den GANZEN Bestand — alte Stände tragen also keine Buchung, die der neueste nicht
+auch hätte. Was sie tragen, ist der Stand, BEVOR etwas verschwand: eine versehentliche
+Löschung, eine Migration, die wegnimmt (im Alpha-Stadium ausdrücklich erlaubt), ein Fehler,
+den niemand bemerkt hat.
+
+Solange die Bank die Umsätze noch führt, ist so etwas ärgerlich und behebbar — man ruft sie
+neu ab. Genau das hört aber auf: Institute halten Umsätze eine begrenzte Zeit vor, danach
+ist dieser Bestand die einzige Stelle, an der die Jahre davor noch stehen. Ab dann wäre
+eine weggeworfene Jahressicherung nicht ein verlorener Wiederherstellungspunkt, sondern ein
+verlorenes Jahr. Der Preis ist eine Datei pro Jahr — gemessen daran der billigste Posten in
+diesem Projekt.
+
+Wo was liegt: die Staffelung in `src/core/sicherung/rotation.ts` (rein, ohne Uhr), der
+Use-Case in `src/application/sicherung.ts`, das Dateisystem in
+`src-tauri/src/sicherung.rs`.
+
+**Wenn der Bestand einmal verschlüsselt ist, sind es die Sicherungen mit** — `VACUUM INTO`
+schreibt mit dem Schlüssel der offenen Verbindung. Das ist bequem und hat eine Kehrseite,
+die in das Recovery-Konzept gehört: eine vergessene Passphrase nimmt die Sicherungen mit.
+
 Den Spielstand schreibt `npm run seed` — vollständig migriert, mit erfundenen Daten in
 jedem Bereich. Zwei Dinge daran sind Absicht:
 
@@ -671,6 +893,12 @@ Branch von develop  →  npm run tauri dev  →  npm test && npm run typecheck  
    der Testlauf dauert Sekunden.
 4. **`--no-ff` nach `develop`.** Dort parkt alles, bis bewusst nach `main` durchgereicht
    wird.
+
+**Ein laufender Prozess beweist nichts.** Die App kommt auch hoch, wenn die Datenbank
+nicht aufgeht — sie zeigt dann leere Screens, und im Log steht nichts. Der billige Beweis
+ist die Tagessicherung: die von heute löschen, App starten, und wenn sie neu entsteht, ist
+die Datenbank geöffnet und die Migrationen sind gelaufen. Dasselbe gilt für `pgrep` — dass
+ein Prozess da ist, sagt über den Zustand dahinter nichts.
 
 **Der Punkt, an dem man sonst das Falsche tut:** Wer am **Schema** arbeitet, prüft nicht
 gegen den Spielstand, sondern gegen eine **Lesekopie des echten Bestands**
@@ -710,6 +938,39 @@ steht. Sie ist gitignoriert, in einem frischen Klon oder Worktree also nicht da,
 Produktregistrierungsnummer wird zur **Bauzeit** eingebacken. Fehlt sie, ist die App
 fertig und der Bankabruf tot — und das merkt man erst beim ersten Abruf.
 `scripts/installieren.sh` warnt, aber es bricht nicht ab.
+
+### Signierung und Notarisierung: vorbereitet, nicht aktiv
+
+Der Release-Workflow reicht **sechs Apple-Secrets** durch (`APPLE_CERTIFICATE`,
+`APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`,
+`APPLE_TEAM_ID`). Sobald sie im Repository hinterlegt sind, signiert und notarisiert
+`tauri-action` von selbst — es braucht keine Änderung am Workflow mehr.
+
+**Signierung allein genügt nicht.** Gatekeeper verlangt bei einem geladenen Bundle auch
+die Notarisierung; dafür sind die letzten drei da. `APPLE_PASSWORD` ist ein
+app-spezifisches Kennwort, nie das echte.
+
+**Ohne die Secrets bricht der Release-Workflow ab** — und zwar bevor irgendetwas gebaut
+wird. Das ist die eigentliche Maßnahme, und sie hängt NICHT am Zertifikat: `tauri-action`
+würde sonst klaglos ein unsigniertes Bundle bauen und an ein öffentliches Release hängen.
+Gemerkt würde es erst beim Nutzer, wenn macOS die App als „beschädigt" meldet.
+
+**Ein Zertifikat kann man nachreichen; ein Release, das draussen ist, nicht mehr.** Genau
+dieselbe Regel gilt schon für den Updater-Signaturschlüssel — nur setzt Tauri sie dort
+selbst durch, und hier tut es niemand.
+
+Damit ist auch die `xattr`-Anleitung aus dem Release-Text verschwunden. Sie war
+notwendig, solange unsigniert ausgeliefert wurde; jetzt kann das nicht mehr passieren.
+**Im lokalen Installationsskript bleibt sie** — wer auf der eigenen Maschine baut und
+dort installiert, weiss, was er tut. Gefährlich wird es erst, wenn Fremde herunterladen.
+
+`src/auslieferung.test.ts` hält beides fest: dass der Türsteher wirklich abbricht (`exit
+1`, nicht nur eine Warnung), und dass die Anleitung nicht in den Release-Text
+zurückkehrt.
+
+**Bis das Zertifikat da ist, läuft der lokale Weg unverändert:** `npm run installieren`
+baut und installiert nach `/Applications`. Was fehlt, ist nur die Möglichkeit, ein
+öffentliches Release zu erzeugen — und das ist Absicht.
 
 **Zwei Dinge müssen ausserhalb des Repos bereitliegen**, und beide fehlen in einem frischen
 Klon:
@@ -780,6 +1041,13 @@ Vier Dinge gelten überall und stehen deshalb hier:
   `geldFormatieren` (Kern), nie mit eigenem `toFixed`. Minus ist U+2212.
 - **Die UI kennt nur `application/`** — weder `core/` noch die Persistenz. Was AUSWÄHLT oder
   RECHNET, liegt hinter einem Use-Case, auch beim reinen Lesen.
+- **Der Datenbankzugang läuft über eigene Kommandos**, nicht über `tauri-plugin-sql`
+  (abgelöst 2026-08-26). Der Grund ist `PRAGMA key`: es gilt pro Verbindung, und über den
+  Pool des Plugins erwischte es eine beliebige — gemessen in `src-tauri/src/krypto.rs`.
+  Der eigene Pool (`src-tauri/src/datenbank.rs`) setzt den Schlüssel in den
+  Verbindungsoptionen, damit bekommt ihn jede Verbindung, die je entsteht. **Nach oben
+  ist die Naht dieselbe geblieben** (`select`, `execute`); kein Repository musste dafür
+  angefasst werden. Nebengewinn: `sql:allow-execute` ist aus den Capabilities gefallen.
 - **Migrationen sind forward-only und append-only** und klammern nichts in Transaktionen;
   jedes Statement muss für sich wiederholbar sein.
 - **Kein Wert aus dem echten Bestand ins Repo** (unten ausführlich).
@@ -853,6 +1121,35 @@ in die Doku außerhalb des Repos.
 Der Muster-Guard findet davon nur die Beträge. Der Rest ist Handarbeit — dieselbe Art wie
 bei Regel 2 und 3 der Testdaten.
 
+### Wie die Wächter eine verschlüsselte Datenbank lesen
+
+`sqlite3` bekommt eine SQLCipher-Datei nicht auf. Der Wert-Abgleich liest den echten
+Bestand aber zur Laufzeit — er bräche ab, und ein Wächter, der nicht mehr arbeiten kann,
+ist am Ende ein abgeschalteter Wächter. Genau das Gegenteil von dem, wofür die
+Verschlüsselung da ist.
+
+`scripts/bestandsmerkmale.mjs` entscheidet deshalb **am Dateikopf**, welchen Weg es
+nimmt: unverschlüsselt über `sqlite3`, verschlüsselt über das eigene Werkzeug
+`src-tauri/src/bin/bestandslesen.rs`. Einmal bauen:
+
+```bash
+cargo build --manifest-path src-tauri/Cargo.toml --bin bestandslesen
+```
+
+Der Schlüssel kommt aus `~/.moneymanager-schluessel/entwicklung.code` — dem
+**Wiederherstellungscode**, nicht der Passphrase: der Code IST der Datenschlüssel, es
+braucht kein Argon2 und keine Eingabe. Ein Wächter, der interaktiv nach einem Kennwort
+fragt, läuft in keinem Hook.
+
+**Das ist eine bewusste Schwächung und gehört benannt.** Wer diese Datei hat, hat den
+Bestand — die Verschlüsselung schützt dann nur noch gegen jemanden, der die Datenbank
+OHNE das Verzeichnis erwischt: ein Backup, eine Kopie, ein zweiter Account. Dieselbe
+Abwägung wie beim Updater-Signaturschlüssel, der ebenfalls dort liegt. Auf einer
+Maschine, auf der nicht entwickelt wird, gibt es die Datei nicht.
+
+Fehlt das Werkzeug oder der Code, **bricht der Wächter ab** statt durchzuwinken — beides
+geprüft.
+
 ### Zwei Wächter, die verschiedene Fehler finden
 
 **Der Wert-Abgleich** (`src/privatsphaere.test.ts`, dazu der `pre-push`-Hook) kennt die
@@ -903,8 +1200,70 @@ Design-System schreibt UI-Wörter vor („Spartopf", „Puffer", „Ansparrate")
 Töpfe-Zeit stammen und heute nirgends mehr vorkommen — es beschreibt einen überholten Stand
 und ist keine Quelle mehr. Was an seine Stelle tritt, ist offen.
 
+## Die Lieferkette
+
+Vier Wächter in der CI (`.github/workflows/ci.yml`), und sie finden verschiedene Dinge:
+
+| | prüft | wo konfiguriert |
+|---|---|---|
+| `npm audit --omit=dev --audit-level=high` | **bekannte Lücken**, npm-Seite | Flags im Workflow |
+| `cargo-deny check advisories sources` | **bekannte Lücken**, Rust-Seite | `deny.toml` |
+| `npm audit signatures` | **Herkunft**: kam das Paket wirklich von der Registry | — |
+| `scripts/install-skripte-pruefen.mjs` | **Ausführung beim Installieren** | `allowScripts` in `package.json` |
+
+Die dritte und vierte Zeile fangen etwas anderes als die ersten beiden: nicht „bekannte
+Lücke", sondern „untergeschoben" bzw. „läuft ungefragt". **Der vierte ist der wichtigste**
+— ein `postinstall` läuft mit den Rechten dessen, der `npm ci` tippt, vor jedem Test und
+in jeder CI. Eine Lücke IM Code muss erst erreicht werden; ein Install-Skript läuft von
+selbst.
+
+**Warum dort eine Allowlist steht und kein `ignore-scripts=true`:** gemessen, nicht
+vermutet — ein globales Verbot bricht den Build. `lib-fints` kommt aus einem
+Git-Repository und wird beim Installieren über sein `prepare`-Skript gebaut; ohne das
+fehlt sein `dist/`, und Vite bricht mit „failed to resolve import" ab. Ein Verbot, das
+den Build kostet, wird abgeschaltet. Freigeben mit `npm install-scripts approve <paket>`,
+und der Moment der Freigabe ist die Gelegenheit hinzusehen.
+
+**Der Wochenlauf ist kein Beiwerk.** Beide Advisory-Datenbanken ändern sich ohne unser
+Zutun: eine Schwachstelle wird gemeldet, während hier niemand etwas tippt. Ein Lauf, der
+nur bei Push startet, findet sie erst beim nächsten Commit — bei einem Solo-Projekt
+können das Wochen sein.
+
+**Die Actions hängen an Commit-SHAs**, nicht an Tags. Ein Tag ist beweglich; wer ihn
+kontrolliert, führt Code in unserer CI aus, und die hat das Signaturgeheimnis. Der Preis:
+SHAs altern stumm — deshalb steht `github-actions` in `.github/dependabot.yml`, das sie
+hebt und den Tag als Kommentar dahinterschreibt.
+
+Der Rust-Wächter läuft als **eigener Job, der nichts baut** — `cargo-deny` liest nur
+`Cargo.lock` und die RustSec-Datenbank. Damit bleibt die Entscheidung bestehen, den
+schweren Tauri-Build aus der CI herauszuhalten.
+
+Drei Dinge, die man beim Kalibrieren wissen muss, weil sie sonst zu Dauerrot führen —
+und ein Wächter, der bei jedem Lauf dasselbe meldet, wird abgeschaltet statt gelesen:
+
+- **`unmaintained` gilt nur für den Workspace.** Sonst fällt bei jedem Lauf halb Tauri
+  an: die GTK3-Bindings, `proc-macro-error`, die `unic-*`-Reihe. Alle transitiv, keine
+  von hier aus wechselbar. **Schwachstellen zählen weiterhin überall im Baum** — nur die
+  Wartungslage nicht.
+- **Lizenzen werden nicht geprüft.** Eigene Frage, eigene Kriterien; eine halb gepflegte
+  Allowlist nähme die Schwachstellenprüfung mit in den Abgrund.
+- **Jede Einzelfreigabe trägt ihren Grund in `deny.toml`.** Ohne ihn steht dort in einem
+  Jahr eine Kennung, die niemand mehr einordnen kann — und die deshalb bleibt.
+
+`lib-fints` hängt an einem **Commit-SHA**, nicht mehr an einem Branch. Ein beweglicher
+Ref bedeutet, dass ein `npm update` stillschweigend fremden Code einzieht; der Lockfile
+allein schützt nur, solange niemand ihn erneuert.
+
 ## Build-Stolpersteine
 
+- **Der erste Rust-Build nach einem frischen Klon dauert länger als früher.** Seit
+  SQLCipher im Baum ist (`libsqlite3-sys` mit `bundled-sqlcipher-vendored-openssl`), wird
+  OpenSSL mitgebaut. Danach liegt es im Cache und die Sache ist erledigt. `-vendored-`
+  ist Absicht: sonst müsste OpenSSL aus dem System kommen, und dort ist es auf einem
+  frischen Rechner und in einem CI-Läufer nicht.
+- **cargo-deny vor `cargo update`:** ein gezieltes `cargo update -p <kiste>` ist der Weg,
+  eine Meldung zu beheben — blind über den ganzen Baum ist es der Weg, den brotli-Pin
+  unten zu verlieren. Danach `npm run test:rust`.
 - **brotli / rustc:** Tauri zieht `brotli 8.0.3`, das via `alloc-stdlib 0.2.3`
   `alloc-no-stdlib 3.0.0` einbindet, selbst aber `alloc-no-stdlib 2.0.4` nutzt →
   Trait-Konflikt (`StandardAlloc` implementiert `Allocator` nicht). In `Cargo.lock` gepinnt:

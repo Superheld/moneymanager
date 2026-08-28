@@ -12,7 +12,15 @@ export class HanseaticError extends Error {
   readonly code: HanseaticErrorCode
   /** HTTP-Status, sofern es einen gab. */
   readonly status?: number
-  /** Antwort der Bank, gekürzt — hilft beim Nachvollziehen, ohne alles zu speichern. */
+  /**
+   * Antwort der Bank, gekürzt — hilft beim Nachvollziehen, ohne alles zu speichern.
+   *
+   * **Gehört in kein Protokoll und in keine Datenbank.** Was hier steht, kommt roh vom
+   * `/token`-Endpunkt und kann alles enthalten, was die Bank in eine Fehlerantwort legt.
+   * Heute landet es nirgends: es steht ABSICHTLICH nicht in `message`, und die App
+   * protokolliert nur `message`. Genau das ist die Schutzmassnahme — wer die beiden
+   * zusammenlegt, um die Fehlersuche zu erleichtern, hebt sie auf.
+   */
   readonly details?: string
 
   constructor (code: HanseaticErrorCode, message: string,

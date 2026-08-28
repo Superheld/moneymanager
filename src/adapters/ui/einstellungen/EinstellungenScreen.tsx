@@ -31,7 +31,9 @@ import { IconButton } from "../bausteine/IconButton";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Bereich } from "../bausteine/Bereich";
 import { FestlegungenCard } from "../training/FestlegungenCard";
+import { VerschluesselungCard } from "../zugang/VerschluesselungCard";
 import { Modal } from "../bausteine/Modal";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import {
   fehlerNachricht,
   useExperimentSchalter,
@@ -41,7 +43,7 @@ import {
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };
 
-export function EinstellungenScreen() {
+export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
   const { t } = useTranslation();
   const [personen, setPersonen] = useState<Person[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
@@ -88,6 +90,12 @@ export function EinstellungenScreen() {
           label: t("einstellungen.aktualisierung.titel"),
           untertitel: t("einstellungen.aktualisierung.untertitel"),
           inhalt: () => <AktualisierungCard />,
+        },
+        {
+          id: "verschluesselung",
+          label: t("zugang.kartenTitel"),
+          untertitel: t("zugang.kartenText"),
+          inhalt: () => <VerschluesselungCard onSperren={onSperren} />,
         },
         {
           id: "experimente",
@@ -239,6 +247,7 @@ function AktualisierungCard() {
 }
 
 function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: () => void }) {
+  const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -285,7 +294,11 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
             { key: "rolle", label: t("einstellungen.person.spalteRolle"), render: (p) => p.rolle ?? "—" },
             { key: "geburtsdatum", label: t("einstellungen.person.spalteGeburtsdatum"), render: (p) => p.geburtsdatum ?? "—" },
             { key: "_e", label: "", align: "right", render: (p) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(p)} /> },
-            { key: "_x", label: "", align: "right", render: (p) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void personLoeschen(p.id).then(onChange)} /> },
+            { key: "_x", label: "", align: "right", render: (p) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => loeschfrage.stellen({
+              name: p.name,
+              folgen: t("einstellungen.personLoeschenFolgen"),
+              ausfuehren: async () => { await personLoeschen(p.id); onChange(); },
+            })} /> },
           ]}
           rows={personen}
         />
@@ -307,11 +320,13 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
           </FormField>
         </Modal>
       )}
+      {loeschfrage.dialog}
     </Card>
   );
 }
 
 function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onChange: () => void }) {
+  const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const [offen, setOffen] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
@@ -359,7 +374,14 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
         </span>
         <span style={{ display: "flex", gap: "var(--sp-3)" }}>
           <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} />
-          <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void kategorieLoeschen(k.id).then(onChange)} />
+          <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => loeschfrage.stellen({
+            name: k.name,
+            // Der Fremdschluessel steht auf ON DELETE SET NULL: die Buchungen bleiben,
+            // sie stehen danach ohne Kategorie da. Das gehoert gesagt — es sieht sonst
+            // aus, als waere Geld verschwunden.
+            folgen: t("einstellungen.kategorieLoeschenFolgen"),
+            ausfuehren: async () => { await kategorieLoeschen(k.id); onChange(); },
+          })} />
         </span>
       </div>
     );
@@ -418,6 +440,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
           </div>
         </Modal>
       )}
+      {loeschfrage.dialog}
     </Card>
   );
 }

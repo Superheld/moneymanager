@@ -1,0 +1,46 @@
+# Was in den Rust-Abhaengigkeiten nicht vorkommen darf.
+#
+# Geprueft werden bewusst nur ZWEI Dinge, und beide betreffen Sicherheit:
+#
+#   advisories — gemeldete Schwachstellen aus der RustSec-Datenbank
+#   sources    — woher eine Kiste kommt; alles ausserhalb crates.io faellt auf
+#
+# NICHT geprueft werden Lizenzen. Das ist eine eigene Frage mit eigenen Kriterien, und
+# eine halb gepflegte Lizenz-Allowlist macht den Waechter rot, ohne dass jemand etwas
+# gelernt haette — dann wird er abgeschaltet, und die Schwachstellenpruefung geht mit.
+#
+# Die npm-Seite deckt `npm audit` im CI-Lauf ab. Zwei Oekosysteme, zwei Waechter.
+
+[advisories]
+# Nur was WIR direkt einbinden, wird als unmaintained gemeldet. Sonst faellt hier bei
+# jedem Lauf halb Tauri an: die GTK3-Bindings, `proc-macro-error`, die `unic-*`-Reihe.
+# Alle drei sind transitiv, keine davon laesst sich von hier aus wechseln, und ein
+# Waechter, der bei jedem Lauf dasselbe Dutzend meldet, wird nicht gelesen, sondern
+# abgeschaltet. Schwachstellen (`vulnerability`) bleiben davon unberuehrt — die zaehlen
+# auch tief im Baum.
+unmaintained = "workspace"
+
+# Einzelfreigaben — jede mit dem Grund daneben, sonst steht in einem Jahr eine Kennung
+# ohne Geschichte da.
+ignore = [
+  # Beide betreffen `quick-xml` und beide setzen NICHT VERTRAUENSWUERDIGES XML voraus:
+  # quadratische Laufzeit bei vielen Attributen in einem Start-Tag, unbegrenzte
+  # Namensraum-Allokation. Bei uns kommt `quick-xml` ueber `plist` aus Tauri und liest
+  # genau eine Datei: die `Info.plist` des eigenen Bundles. Ein Angreifer, der die
+  # veraendern kann, hat laengst mehr erreicht, als ein DoS im XML-Parser wert waere.
+  #
+  # Nicht behebbar von hier: `plist` bindet `quick-xml` auf 0.39.x, ein
+  # `cargo update -p quick-xml` bewegt nichts. Faellt weg, sobald Tauri nachzieht —
+  # dann meldet cargo-deny die Freigabe als unnoetig, und sie kann hier raus.
+  { id = "RUSTSEC-2026-0194", reason = "quick-xml via plist/Tauri; liest nur die eigene Info.plist" },
+  { id = "RUSTSEC-2026-0195", reason = "quick-xml via plist/Tauri; liest nur die eigene Info.plist" },
+]
+
+[bans]
+# Tauri zieht zwangslaeufig mehrere Fassungen derselben Kiste. Das ist ein
+# Aufraeum-Thema, keine Sicherheitsfrage — und als Fehler waere es Dauerrot.
+multiple-versions = "allow"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

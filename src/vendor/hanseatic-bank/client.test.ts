@@ -10,7 +10,7 @@ import { HanseaticClient } from './client.js'
 import { HanseaticError } from './errors.js'
 
 // Geprüft wird die Blätter-Logik, nicht die Bank. Die Antworten sind erfunden und so
-// gebaut, dass sie sich verhalten wie das, was in docs/bank-api.md gemessen steht:
+// gebaut, dass sie sich verhalten wie das, was am echten Zugang gemessen wurde:
 // absteigend nach Buchungsdatum, `more` für weitere Seiten, `moreWithSCA` für das,
 // was hinter einer Bestätigung liegt.
 

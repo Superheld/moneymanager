@@ -1,7 +1,7 @@
 {
   "name": "moneymanager",
   "private": true,
-  "version": "0.22.0",
+  "version": "0.23.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -12,6 +12,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:rust": "cargo test --manifest-path src-tauri/Cargo.toml --lib",
     "coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
     "tauri": "tauri",
@@ -22,16 +23,16 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
+    "@fontsource-variable/hanken-grotesk": "^5.3.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-http": "^2.5.9",
     "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-process": "^2.3.1",
-    "@tauri-apps/plugin-sql": "^2.4.0",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "buffer": "^6.0.3",
     "fflate": "^0.8.3",
     "i18next": "^26.3.6",
-    "lib-fints": "github:Superheld/lib-fints#workshop",
+    "lib-fints": "git+https://github.com/Superheld/lib-fints.git#3a1015fd239246d3e043ce5fdd9a9020b11b3558",
     "papaparse": "^5.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
@@ -55,5 +56,8 @@
     "vite": "^8.2.1",
     "vite-node": "^6.0.0",
     "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "fsevents@2.3.3": true
   }
 }

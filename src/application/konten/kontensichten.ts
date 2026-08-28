@@ -37,14 +37,18 @@ import {
 } from "../dubletten/dublettensicht";
 import type { Kontozuordnung } from "../fints/bankzugangPort";
 import { depotJeKonto, depotsLaden, type Depotsicht } from "../depot/depotsichten";
+import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
 import type {
   DepotRepository,
   DublettenfreigabeRepository,
   ImportLaufRepository,
+  JournalRepository,
   KategorieRepository,
   KontostandsankerRepository,
   LedgerPort,
   UmsatzRepository,
+  VertragRepository,
+  VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
 } from "../ports";
@@ -70,11 +74,24 @@ export interface KontenDeps {
   readonly ankerRepo: KontostandsankerRepository;
   /** Bankverbindungen — daran hängt der Abruf-Knopf und der Abgleich. */
   readonly kontozuordnungen: () => Promise<Kontozuordnung[]>;
+  /** Für die Vertragsmarkierung im Auszug — beide zusammen ergeben den Anbieternamen. */
+  readonly zuordnungRepo: VertragszuordnungRepository;
+  readonly vertragRepo: VertragRepository;
   /**
    * Die Depots. Optional — ohne sie fehlt an einem Depot-Konto nur die Bestandsansicht,
    * alles andere läuft unverändert.
    */
   readonly depotRepo?: DepotRepository;
+  /**
+   * Das Buchungsjournal. Optional wie die Depots — ohne es fehlt im Auszug nur die
+   * Markierung, ob zu einer Zeile etwas protokolliert ist.
+   *
+   * **Vorläufig, zum Nachsehen.** Der Verlauf einer Buchung steht in ihrem Dialog; diese
+   * Markierung sagt von aussen, wo es überhaupt etwas zu sehen gibt. Das Journal ist
+   * jung (seit 2026-08-23), und ohne sie müsste man Zeilen aufmachen, um zu erfahren,
+   * dass nichts drinsteht.
+   */
+  readonly journalRepo?: JournalRepository;
 }
 
 /** Ein Konto in der oberen Liste. */
@@ -163,10 +180,26 @@ export interface Kontensicht {
   readonly dublettenverdacht: ReadonlyMap<string, Dublettenverdacht>;
   /** Die „ist kein Duplikat"-Entscheidungen als Paarschlüssel — auch die Inbox achtet darauf. */
   readonly freigegeben: ReadonlySet<string>;
+  /**
+   * Buchungs-ID → Anbieter des Vertrags, zu dem sie gehört.
+   *
+   * Im Auszug sah eine Vertragszahlung bis 2026-08-27 aus wie jede andere Ausgabe; die
+   * Zuordnung stand zwar an der Buchung, aber nur der Dialog zeigte sie. Wer wissen
+   * wollte, ob eine Zeile zu einem Vertrag gehört, musste sie öffnen — bei einer Liste
+   * genau die Frage, die man nebenbei beantwortet haben will.
+   */
+  readonly vertragsnamen: ReadonlyMap<string, string>;
+  /**
+   * Buchungs-ID → Zahl der Journaleinträge. Leer, wenn kein Journal-Port mitgegeben wurde.
+   *
+   * Die ZAHL und nicht bloss ein Ja/Nein, weil es dieselbe Abfrage kostet und „dreimal
+   * geändert" etwas anderes sagt als „einmal angelegt".
+   */
+  readonly journalAnzahl: ReadonlyMap<string, number>;
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen, journalAnzahl] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -178,6 +211,8 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.freigabeRepo.alle(),
       deps.ankerRepo.alle(),
       deps.depotRepo ? depotsLaden({ depotRepo: deps.depotRepo }) : Promise.resolve(null),
+      vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
+      deps.journalRepo?.anzahlen() ?? Promise.resolve(new Map<string, number>()),
     ]);
 
   const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
@@ -226,6 +261,8 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     umsatzZuBuchung,
     dublettenverdacht,
     freigegeben,
+    vertragsnamen,
+    journalAnzahl,
   };
 }
 
@@ -245,22 +282,35 @@ export interface Registerzeile {
   readonly kategorieName: string;
   /** Gesetzt, wenn dieselbe Zahlung womöglich ein zweites Mal im Konto steht. */
   readonly dublette?: Dublettenverdacht;
+  /** Der Vertrag, zu dem diese Zeile gehört — als Anbietername. Fehlt, wenn keiner. */
+  readonly vertragsname?: string;
+  /** Wie viele Journaleinträge es zu dieser Buchung gibt. Fehlt, wenn keiner. */
+  readonly journaleintraege?: number;
 }
 
 export interface Registersicht {
   readonly gebucht: readonly Registerzeile[];
-  readonly geplant: readonly RegisterZeile[];
   /** Realer Stand jetzt = Anfangsbestand + Σ gebuchte Bewegungen. */
   readonly standHeute: Cent;
 }
 
+/**
+ * Der Auszug EINES Kontos — nur noch das Gebuchte.
+ *
+ * Die geplanten Fälligkeiten standen bis 2026-08-27 mit hier drin und sind in die
+ * Übersicht gewandert (`vorschauAlleKonten`). Damit ist auch der Tagesparameter weg: er
+ * stellte allein ein, wie weit die Vorschau reicht, und ohne sie stellte er nichts mehr
+ * ein. Ein Parameter, den niemand auswertet, ist eine Zusage, die keine ist.
+ */
 export function registerSicht(
   sicht: Kontensicht,
   konto: Zahlungskonto,
   heute: string,
-  tage: number,
 ): Registersicht {
-  const register: KontoRegister = kontoRegister(konto, [...sicht.buchungen], [...sicht.regeln], heute, tage);
+  // Null Tage Vorschau: `kontoRegister` rechnet sie weiterhin, weil der laufende Saldo
+  // und die Vorschau dieselbe Funktion sind — was hier herausfällt, ist nur, dass wir
+  // sie noch weiterreichen.
+  const register: KontoRegister = kontoRegister(konto, [...sicht.buchungen], [...sicht.regeln], heute, 0);
   const buchungJeId = new Map(sicht.buchungen.map((b) => [b.id, b]));
   const kategorieNamen = new Map(sicht.kategorien.map((k) => [k.id, k.name]));
 
@@ -291,9 +341,10 @@ export function registerSicht(
         verwendungszweck: umsatz?.verwendungszweck ?? "",
         kategorieName: zeile.kategorieId ? kategorieNamen.get(zeile.kategorieId) ?? "" : "",
         dublette: zeile.istId ? sicht.dublettenverdacht.get(zeile.istId) : undefined,
+        vertragsname: zeile.istId ? sicht.vertragsnamen.get(zeile.istId) : undefined,
+        journaleintraege: zeile.istId ? sicht.journalAnzahl.get(zeile.istId) : undefined,
       };
     }),
-    geplant: register.geplant,
     standHeute: register.standHeute,
   };
 }

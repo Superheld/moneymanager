@@ -17,6 +17,7 @@ import {
   naechsterKuendigungstermin,
   ruecklageProMonat,
   passtZu,
+  spannenVorschlag,
   ruecklagenbedarf,
   RHYTHMUS_MONATE,
   type Cent,
@@ -205,6 +206,14 @@ export interface Erkennungsprobe {
   /** Treffer, jüngste zuerst: beim Nachsteuern interessiert der aktuelle Stand. */
   readonly treffer: readonly Zahlungsspur[];
   readonly diagnose: Erkennungsdiagnose | null;
+  /**
+   * Welche Betragsspanne alle Zahlungen fassen würde, die die Merkmale treffen.
+   *
+   * Nur gesetzt, wenn die vorhandene Spanne tatsächlich etwas wegnimmt — sonst böte die
+   * Oberfläche eine Handlung an, die nichts ändert. Das ist dieselbe Regel wie beim
+   * `anfangsbestandVorschlag` im Kontoabgleich.
+   */
+  readonly spanne?: { von: Cent; bis: Cent };
 }
 
 export function erkennungProbieren(
@@ -212,10 +221,17 @@ export function erkennungProbieren(
   spuren: readonly Zahlungsspur[],
 ): Erkennungsprobe {
   if (!regel || regel.merkmale.length === 0) return { treffer: [], diagnose: null };
+  const diagnose = erkennungsDiagnose(regel, spuren);
+  // Nur vorschlagen, wenn die Betragsstufe wirklich etwas wegnimmt. Bei einer Regel, die
+  // ohnehin alles durchlässt, wäre der Vorschlag eine Antwort auf eine ungestellte Frage.
+  const spanne = diagnose.nachBetrag < diagnose.nachMerkmalen
+    ? spannenVorschlag(regel, spuren)
+    : undefined;
   return {
     treffer: spuren
       .filter((s) => passtZu(regel, s))
       .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0)),
-    diagnose: erkennungsDiagnose(regel, spuren),
+    diagnose,
+    spanne,
   };
 }

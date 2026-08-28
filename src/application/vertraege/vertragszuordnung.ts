@@ -53,6 +53,38 @@ export async function zuordnungenAbgleichen(deps: AbgleichDeps): Promise<Abgleic
 }
 
 /**
+ * Buchungs-ID → Anbietername des Vertrags, dem sie gehört.
+ *
+ * Die Zuordnung steht seit jeher an der Buchung, sichtbar war sie aber nur im
+ * Buchungsdialog — man musste eine Zeile öffnen, um zu erfahren, ob sie zu einem Vertrag
+ * gehört. In jeder Liste sah eine Vertragszahlung damit aus wie jede andere Ausgabe, und
+ * die Frage „wovon ist das eigentlich der Vertrag" war nur einzeln zu beantworten.
+ *
+ * Der NAME und nicht bloss ein Ja/Nein: „gehört zu einem Vertrag" ist die uninteressante
+ * Hälfte der Auskunft. Welcher, sagt in einer Liste alles — und es kostet dieselbe
+ * Abfrage.
+ *
+ * Ausdrücklich NUR eindeutige Zuordnungen: eine Zeile mit `vertragId: null` ist die
+ * Aussage „gehört zu keinem Vertrag" (siehe `Vertragszuordnung`) und trägt hier nichts.
+ */
+export async function vertragsnamenLaden(
+  zuordnungRepo: VertragszuordnungRepository,
+  vertragRepo: VertragRepository,
+): Promise<ReadonlyMap<string, string>> {
+  const [zuordnungen, vertraege] = await Promise.all([zuordnungRepo.alle(), vertragRepo.alle()]);
+  const anbieter = new Map(vertraege.map((v) => [v.id, v.anbieter]));
+  const raus = new Map<string, string>();
+  for (const z of zuordnungen) {
+    if (!z.vertragId) continue;
+    const name = anbieter.get(z.vertragId);
+    // Ein Verweis ins Leere wird ÜBERGANGEN und nicht als leere Pille gezeigt: eine
+    // Markierung ohne Namen behauptet etwas und sagt nichts.
+    if (name) raus.set(z.istbuchungId, name);
+  }
+  return raus;
+}
+
+/**
  * Zuordnung von Hand setzen: diese Buchung gehört zu diesem Vertrag. `vertragId: null`
  * heißt „gehört ausdrücklich zu keinem Vertrag" — beides überlebt jeden Abgleich.
  */

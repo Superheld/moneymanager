@@ -20,6 +20,7 @@ import {
   kategorieAggregat,
   nachHauptgruppe,
   parseIso,
+  tageImMonat,
   toIso,
   type GruppenSumme,
   type IstBuchung,
@@ -29,10 +30,13 @@ import {
   type Zahlungskonto,
 } from "../core";
 import type { Umsatz } from "./import";
+import { vertragsnamenLaden } from "./vertraege/vertragszuordnung";
 import type {
   KategorieRepository,
   LedgerPort,
   UmsatzRepository,
+  VertragRepository,
+  VertragszuordnungRepository,
   ZahlungskontoRepository,
 } from "./ports";
 
@@ -44,6 +48,9 @@ export interface AnalyseDeps {
   readonly kontoRepo: ZahlungskontoRepository;
   readonly kategorieRepo: KategorieRepository;
   readonly umsatzRepo: UmsatzRepository;
+  /** Für die Vertragsmarkierung in den aufgeklappten Zeilen. */
+  readonly zuordnungRepo: VertragszuordnungRepository;
+  readonly vertragRepo: VertragRepository;
 }
 
 export interface Analysebasis {
@@ -53,14 +60,17 @@ export interface Analysebasis {
   readonly kontoNamen: ReadonlyMap<string, string>;
   /** Buchungs-ID → Umsatz: Empfänger und Verwendungszweck stehen dort, nicht an der Buchung. */
   readonly umsatzZuBuchung: ReadonlyMap<string, Umsatz>;
+  /** Buchungs-ID → Anbieter des Vertrags, zu dem sie gehört. */
+  readonly vertragsnamen: ReadonlyMap<string, string>;
 }
 
 export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
-  const [buchungen, konten, kategorien, umsaetze] = await Promise.all([
+  const [buchungen, konten, kategorien, umsaetze, vertragsnamen] = await Promise.all([
     deps.ledger.alle(),
     deps.kontoRepo.alle(),
     deps.kategorieRepo.alle(),
     deps.umsatzRepo.alle(),
+    vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
   ]);
   const umsatzZuBuchung = new Map<string, Umsatz>();
   for (const u of umsaetze) if (u.istbuchungId) umsatzZuBuchung.set(u.istbuchungId, u);
@@ -70,6 +80,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
     kategorien,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     umsatzZuBuchung,
+    vertragsnamen,
   };
 }
 
@@ -84,6 +95,27 @@ export function analyseFenster(
   if (zeitraum === "jahr") return { von: `${bisYmd.y}-01-01`, bis };
   if (zeitraum === "alles") return { von: fruehesterMonat(basis.buchungen) ?? bis, bis };
   return { von: toIso(addMonate(bisYmd, zeitraum === "24" ? -23 : -11)), bis };
+}
+
+/**
+ * Dasselbe Fenster, aber TAGGENAU zu Ende gedacht.
+ *
+ * `analyseFenster` liefert Monatsmarken: `bis` ist der ERSTE des laufenden Monats, weil
+ * der Monatsverlauf in Monaten rechnet und jeden Monat an seinem Ersten benennt. Für
+ * alles, was an einzelnen TAGEN hängt, ist diese Marke die falsche Grenze — sie schneidet
+ * den halben laufenden Monat weg.
+ *
+ * Genau daran ging der Depot-Verlauf leer aus: seine Stichtage sind Abruftage, liegen
+ * also mitten im Monat und damit hinter dem Ersten. Die Analyse meldete „zu wenig
+ * Punkte", während die Stände vollzählig in der Datenbank standen — ein Fehler, der wie
+ * verlorene Daten aussieht und keine sind.
+ *
+ * Deshalb hier der LETZTE Tag desselben Monats: das Fenster meint den ganzen Monat, und
+ * bei einem laufenden Monat schliesst das jeden Tag ein, der schon vergangen ist.
+ */
+export function analyseFensterTaggenau(bis: string): string {
+  const { y, m } = parseIso(bis);
+  return toIso({ y, m, d: tageImMonat(y, m) });
 }
 
 export function analyseVerlauf(basis: Analysebasis, von: string, bis: string): MonatsIst[] {
@@ -116,6 +148,8 @@ export interface Analysezeile {
   readonly empfaenger: string;
   readonly verwendungszweck: string;
   readonly kontoName: string;
+  /** Der Vertrag, zu dem die Buchung gehört — als Anbietername. Fehlt, wenn keiner. */
+  readonly vertragsname?: string;
 }
 
 export function analyseBuchungen(
@@ -131,6 +165,7 @@ export function analyseBuchungen(
       empfaenger: u?.gegenpartei ?? buchung.notiz ?? "",
       verwendungszweck: u?.verwendungszweck ?? "",
       kontoName: basis.kontoNamen.get(buchung.kontoId) ?? "",
+      vertragsname: basis.vertragsnamen.get(buchung.id),
     };
   });
 }

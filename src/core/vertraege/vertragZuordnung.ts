@@ -28,13 +28,36 @@ import { musterTrifft } from "../basis/muster";
 import type { Cent } from "../basis/geld";
 
 /**
- * Woran EIN Merkmal ansetzt. Die beiden Arten sind nicht austauschbar und sollen es auch
- * nicht sein: die Gläubiger-ID identifiziert den Einzieher eindeutig, der Empfängername
- * ist Text mit Unschärfe. In einer gemeinsamen Liste war einem Eintrag nicht anzusehen,
- * als was er gemeint war — und die Vorrangregel bei mehreren Treffern hing damit an einer
- * Vermutung statt an einer Angabe.
+ * Woran EIN Merkmal ansetzt. Die Arten sind nicht austauschbar und sollen es auch nicht
+ * sein: die Gläubiger-ID identifiziert den Einzieher eindeutig, der Empfängername ist
+ * Text mit Unschärfe, der Verwendungszweck ist Freitext. In einer gemeinsamen Liste war
+ * einem Eintrag nicht anzusehen, als was er gemeint war — und die Vorrangregel bei
+ * mehreren Treffern hing damit an einer Vermutung statt an einer Angabe.
+ *
+ * **`verwendungszweck` ist ein NACHTRAG und bewusst nie vorbelegt.** An `Zahlungsspur`
+ * stand lange, die Vertragserkennung nutze den Zweck nicht — „ein Vertrag hängt am
+ * Empfänger, nicht am Text". Als Vorgabe stimmt das weiterhin, und `standardErkennung`
+ * legt deshalb kein solches Merkmal an. Als Decke stimmt es nicht: bei einer Dauerüberweisung
+ * an eine Privatperson steht im Empfängerfeld ein Name, der über den Vertrag nichts sagt,
+ * und die einzige unterscheidende Angabe steht im Zweck. Wer das braucht, tippt es ein;
+ * wer nicht, merkt von dieser Art nichts.
  */
-export type Merkmalsart = "glaeubigerId" | "empfaenger";
+export const MERKMALSARTEN = ["glaeubigerId", "empfaenger", "verwendungszweck"] as const;
+
+export type Merkmalsart = (typeof MERKMALSARTEN)[number];
+
+/**
+ * Ist das eine bekannte Merkmalsart?
+ *
+ * Steht hier und nicht im Repository, damit eine NEUE Art nicht an zwei Stellen
+ * nachgetragen werden muss. Genau das war der Fallstrick: der Leser in
+ * `sqliteVertragZuordnungRepositories` zählte die Arten selbst auf und liess alles andere
+ * weg — nicht mit einem Fehler, sondern stillschweigend. Ein von Hand eingetragenes
+ * Merkmal einer neuen Art wäre gespeichert worden und beim nächsten Laden weg gewesen.
+ */
+export function istMerkmalsart(wert: unknown): wert is Merkmalsart {
+  return typeof wert === "string" && (MERKMALSARTEN as readonly string[]).includes(wert);
+}
 
 /**
  * Ein Erkennungsmerkmal: Art plus Muster.
@@ -100,6 +123,19 @@ export interface Vertragszuordnung {
  * weil Preise steigen und selten fallen. Sie soll nicht die Zahlungen dieses Vertrags
  * aussortieren, sondern FREMDE Zahlungen an denselben Empfänger draußen halten.
  * `betrag` ist die Betragshöhe (positiv); 0 oder negativ ⇒ keine Spanne.
+ *
+ * **Der Name bekommt einen Stern**, und ohne den war die Regel praktisch wirkungslos.
+ * `musterTrifft` vergleicht ein Muster OHNE Stern exakt — der Empfänger im Auszug trägt
+ * aber fast nie nur den Anbieternamen: er trägt Produktnamen, Vertragsnummern,
+ * Ortsangaben. Ein Anbieter, der mal unter seinem blossen Namen und mal mit Zusatz
+ * bucht, wurde damit genau zur Hälfte erkannt, und der Rest sah aus wie „nicht
+ * zugeordnet". Der Kommentar an `Erkennungsmerkmal` beschreibt genau diesen Fall als
+ * den Grund, warum es Platzhalter gibt — die Standardregel hat ihn nur nie benutzt.
+ *
+ * Bewusst ein NACHgestellter Stern und keine Einschliessung: „alles, was mit diesem
+ * Anbieter beginnt" ist die Form, in der Empfängerfelder aufgebaut sind (Name zuerst,
+ * Zusatz dahinter). `*name*` fände zusätzlich jeden Text, in dem der Name irgendwo
+ * vorkommt — und ein Vertrag soll fremde Zahlungen draussen halten, nicht einsammeln.
  */
 export function standardErkennung(
   vertragId: string,
@@ -109,7 +145,7 @@ export function standardErkennung(
 ): Vertragserkennung {
   const merkmale: Erkennungsmerkmal[] = [];
   const name = anbieterSchluessel(anbieter.trim());
-  if (name) merkmale.push({ art: "empfaenger", muster: name });
+  if (name) merkmale.push({ art: "empfaenger", muster: `${name}*` });
   const id = glaeubigerId?.trim();
   if (id) merkmale.push({ art: "glaeubigerId", muster: id });
   const hoehe = Math.abs(betrag);
@@ -134,6 +170,10 @@ function merkmalTrifft(m: Erkennungsmerkmal, s: Zahlungsspur): boolean {
   const muster = m.muster.trim();
   if (!muster) return false;
   if (m.art === "glaeubigerId") return musterTrifft(muster, s.glaeubigerId?.trim() ?? "");
+  // Der Zweck wird NUR gegen sich selbst geprüft, ohne Normalisierung: er ist Freitext
+  // mit Vertrags- und Rechnungsnummern, und `anbieterSchluessel` würde genau die Ziffern
+  // wegwerfen, wegen derer man ihn überhaupt heranzieht.
+  if (m.art === "verwendungszweck") return musterTrifft(muster, s.verwendungszweck?.trim() ?? "");
   const roh = s.gegenpartei.trim();
   return musterTrifft(muster, roh) || musterTrifft(muster, anbieterSchluessel(roh));
 }
@@ -205,6 +245,50 @@ export function erkennungsDiagnose(
     nachZeitraum: nachZeitraum.length,
     nachKonto: nachKonto.length,
   };
+}
+
+/**
+ * Welche Spanne würde ALLE Zahlungen fassen, die die Merkmale treffen?
+ *
+ * Der Grund, warum es das gibt: die Betragsspanne ist die Stufe, an der eine Regel am
+ * häufigsten zu viel wegnimmt. `standardErkennung` leitet sie aus EINEM Betrag ab (0,6×
+ * bis 1,8×), und das ist richtig für eine feste Rate und falsch für alles, was schwankt —
+ * Verbrauchsabrechnungen, Fremdwährung, Abos mit wechselndem Umfang. Die Diagnose im
+ * Dialog zeigt seit jeher, dass der Betrag die Engstelle ist; was sie nicht konnte, ist
+ * sagen, welche Spanne stattdessen passen würde.
+ *
+ * Gerechnet wird über die Zahlungen, die die MERKMALE treffen — bewusst ohne die
+ * Betragsspanne selbst, sonst käme immer die vorhandene wieder heraus. Zeitraum und Konto
+ * bleiben drin: es sind ausdrückliche Eingrenzungen, und was jemand ausgeschlossen hat,
+ * soll die Spanne nicht durch die Hintertür wieder hereinholen.
+ *
+ * `undefined`, wenn gar nichts zutrifft — dann ist der Betrag nicht das Problem, und ein
+ * Vorschlag wäre eine Antwort auf eine ungestellte Frage.
+ */
+export function spannenVorschlag(
+  e: Vertragserkennung,
+  spuren: readonly Zahlungsspur[],
+): { von: Cent; bis: Cent } | undefined {
+  const passend = spuren.filter((s) => {
+    if (s.charakter === "Umschichtung") return false;
+    if (!e.merkmale.some((m) => merkmalTrifft(m, s))) return false;
+    if (e.gueltigAb && s.datum < e.gueltigAb) return false;
+    if (e.gueltigBis && s.datum > e.gueltigBis) return false;
+    if (e.kontoId && s.kontoId !== e.kontoId) return false;
+    return true;
+  });
+  if (passend.length === 0) return undefined;
+
+  const hoehen = passend.map((s) => Math.abs(s.betrag));
+  const von = Math.min(...hoehen);
+  const bis = Math.max(...hoehen);
+
+  // Etwas Luft nach oben, keine nach unten. Dieselbe Unsymmetrie wie bei
+  // `standardErkennung`, aus demselben Grund: Preise steigen und fallen selten, und eine
+  // Spanne, die exakt am höchsten bisherigen Wert endet, lässt die nächste Erhöhung
+  // durchfallen. Nach unten braucht es die Luft nicht — der kleinste beobachtete Wert IST
+  // schon der kleinste.
+  return { von, bis: Math.round(bis * 1.15) };
 }
 
 /**

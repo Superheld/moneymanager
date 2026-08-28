@@ -48,6 +48,11 @@ const de = {
       unvollstaendig: "Zum Festhalten braucht es beide Zeilen.",
       selbst: "Eine Zeile kann nicht ihr eigener Zwilling sein.",
     },
+    journal: {
+      keinUrzustand: "Für diese Buchung ist kein Stand bei der Entstehung festgehalten.",
+      unveraendert: "Es gibt nichts zurückzunehmen — die Buchung steht so da, wie sie entstanden ist.",
+      paarung: "Ein Bein einer Umbuchung lässt sich nicht allein zurücksetzen. Erst die Paarung lösen.",
+    },
     kategorie: {
       waehlen: "Bitte eine Kategorie wählen.",
       zyklus: "Diese Elternkategorie würde einen Zyklus erzeugen.",
@@ -391,10 +396,30 @@ const de = {
     leer: "Für den Ausblick fehlen die Plan-Daten: Er rechnet Einnahmen und Verträge (beides Zahlungsregeln) gegen die Budgets auf. Beides wird unter Verträge und Budgets gepflegt — aus den Ist-Buchungen allein wird hier nichts geschätzt.",
     leerUntertitel: "Die nächsten drei Monate",
   },
+  loeschen: {
+    titel: "Löschen",
+    untertitel: "{{name}}",
+    frage: "„{{name}}“ wird gelöscht. Das lässt sich nicht rückgängig machen.",
+    bestaetigen: "Endgültig löschen",
+    abbrechen: "Abbrechen",
+    laeuft: "wird gelöscht …",
+  },
   uebersicht: {
     titel: "Übersicht",
     untertitel: "Wie du gerade dastehst — dieser Monat und die beiden nächsten",
     fehlerDb: "Laden geht nur in der Desktop-App (tauri dev).",
+    vorschauTitel: "Was noch kommt",
+    vorschauUntertitel: "Fällige Zahlungen der nächsten {{tage}} Tage — über alle Konten",
+    vorschauLeer: "In den nächsten {{tage}} Tagen ist nichts fällig.",
+    vorschauLeerKonto: "In den nächsten {{tage}} Tagen ist auf diesem Konto nichts fällig.",
+    vorschauKonto: "Konto",
+    vorschauAlleKonten: "Alle Konten",
+    vorschauZeitraum: "Wie weit die Vorschau reicht",
+    vorschauSpalteDatum: "Fällig",
+    vorschauSpalteKonto: "Konto",
+    vorschauSpalteBeschreibung: "Beschreibung",
+    vorschauSpalteBetrag: "Betrag",
+    vorschauSumme: "Zusammen {{betrag}}",
     budgetsTitel: "Budgets",
     budgetsLaufend: "Was in diesem Monat noch da ist",
     budgetsVergangen: "Rückblick auf einen abgeschlossenen Monat",
@@ -485,6 +510,9 @@ const de = {
     spalteSaldo: "Saldo",
   },
   budgets: {
+    loeschenFolgen: "Das Budget verschwindet samt allen Beträgen, die es je hatte. Die Buchungen bleiben — ein Budget misst sie, es besitzt sie nicht.",
+    versionName: "Betrag ab {{monat}}",
+    versionLoeschenFolgen: "Nur dieser eine Betrag geht weg. Die Monate, für die er galt, fallen auf den vorigen Betrag zurück — vor dem ersten auf gar keine Planung.",
     titel: "Budgets",
     untertitel: "Was du monatlich zurücklegst — was verfällt und was sich aufbaut",
     anlegen: "Budget anlegen",
@@ -577,6 +605,7 @@ const de = {
     modalUntertitel: "Ein Budget je Kategorie — für Feineres eine Unterkategorie nehmen",
   },
   inventar: {
+    loeschenFolgen: "Der Gegenstand verschwindet samt seiner monatlichen Rücklage. Buchungen, die zu ihm gehörten, bleiben — sie hängen an ihrer Kategorie, nicht an ihm.",
     titel: "Inventar",
     untertitel: "Dinge, die du besitzt und ersetzen musst — und was sie dich monatlich kosten",
     gegenstand: "Gegenstand",
@@ -656,6 +685,12 @@ const de = {
     verknuepft: "verknüpft",
   },
   konten: {
+    dieseBuchungName: "diese Buchung",
+    detailLoeschenFolgen: "Die Buchung verschwindet aus dem Konto und der Saldo ändert sich. Ihr letzter Stand bleibt im Journal — wiederherstellen lässt sie sich daraus aber nicht.",
+    detailLoeschenFolgenPaar: "Beide Beine der Umbuchung verschwinden — die Gegenseite auf dem anderen Konto gehört dazu und bliebe sonst allein zurück.",
+    detailVerwerfenFolgen: "Die Bankzeile wird verworfen. Der Beleg bleibt erhalten, und die Zeile lässt sich aus der Inbox erneut verbuchen — der Abruf holt sie nicht noch einmal.",
+    zugangLoeschenFolgen: "Die abgerufenen Buchungen bleiben; sie stehen im Konto und hängen nicht am Zugang. Weg ist der Weg zur Bank — für weitere Abrufe muss der Zugang neu eingerichtet werden.",
+    kontoLoeschenFolgen: "Ein Konto mit Buchungen lässt sich nicht löschen — die Buchungen müssten zuerst weg. Ohne Buchungen verschwindet nur das Konto selbst.",
     festlegung: {
       immerLabel: "Diese Kategorie immer bei diesem Empfänger",
       immer: "Immer bei „{{muster}}“ diese Kategorie",
@@ -905,6 +940,7 @@ const de = {
     editTitel: "Buchung bearbeiten",
     editUntertitelImport: "Importierte Buchung — Korrekturen bleiben erhalten, die Import-Spur auch.",
     pillUmbuchung: "Umbuchung",
+    pillVertrag: "Gehört zum Vertrag „{{anbieter}}“",
     pillManuell: "manuell",
     // ZWEI Woerter fuer denselben Marker, weil zwei verschiedene Dinge danebenstehen:
     // im Detaildialog ein KAESTCHEN, dessen Haken „noch anzusehen" bedeutet
@@ -981,6 +1017,50 @@ const de = {
         "Diese Zuordnung hast du selbst gesetzt — sie bleibt, auch wenn die Erkennung etwas anderes rechnen würde. Zurücksetzen gibt die Entscheidung wieder an die Automatik.",
       zuruecksetzen: "Automatik entscheiden lassen",
       hinweis: "Empfänger, Betrag, Kategorie und Konto stammen aus dieser Buchung. Den Rhythmus kennt sie nicht — der gehört geprüft.",
+    },
+    pillVerlauf: "{{anzahl}} Einträge im Verlauf — im Detail nachzulesen",
+    pillVerlaufKurz: "Verlauf {{anzahl}}",
+    journal: {
+      titel: "Verlauf",
+      leer: "Für diese Buchung ist nichts protokolliert. Das Journal gibt es seit dem 23.08.2026 — was davor entstand, hat keinen Eintrag.",
+      seitEntstehung: "Seit der Entstehung geändert",
+      zuruecksetzen: "Änderungen zurücknehmen",
+      frage: "Die Buchung geht zurück auf den Stand bei ihrer Entstehung. Das Zurücknehmen steht danach selbst im Verlauf.",
+      bestaetigen: "Zurücknehmen",
+      abbrechen: "Abbrechen",
+      laeuft: "Wird zurückgesetzt …",
+      gepaart: "gepaart",
+      vorgemerkt: "vorgemerkt",
+      ohneTeile: "nicht aufgeteilt",
+      teileAnzahl: "{{anzahl}} Teile",
+      art: {
+        angelegt: "angelegt",
+        geaendert: "geändert",
+        geloescht: "gelöscht",
+      },
+      herkunft: {
+        automatisch: "von der Erkennung",
+        manuell: "von Hand",
+      },
+      feld: {
+        datum: "Datum",
+        betrag: "Betrag",
+        kontoId: "Konto",
+        kategorieId: "Kategorie",
+        kategorieHerkunft: "Kategorie gesetzt",
+        charakter: "Charakter",
+        notiz: "Bezeichnung",
+        aufteilungen: "Aufteilung",
+        transferId: "Umbuchung",
+        gegenkontoId: "Gegenkonto",
+        planRef: "Planbezug",
+        zuPruefen: "Prüfmarker",
+      },
+      zu: {
+        keinUrzustand: "Von hier führt kein Weg zurück: für diese Buchung ist kein Stand bei der Entstehung festgehalten.",
+        unveraendert: "Sie steht noch so da, wie sie entstanden ist.",
+        paarung: "Sie ist Bein einer Umbuchung. Ein Bein allein zurückzusetzen ließe das andere mit einem Verweis ins Leere stehen — dafür gibt es \u201ePaarung lösen\u201c.",
+      },
     },
     paarung: {
       titel: "Umbuchung",
@@ -1097,6 +1177,8 @@ const de = {
     },
   },
   einstellungen: {
+    personLoeschenFolgen: "Die Person verschwindet aus den Stammdaten. Konten und Verträge, die sie als Inhaber nennen, laufen weiter — dann ohne Inhaber.",
+    kategorieLoeschenFolgen: "Die Buchungen dieser Kategorie bleiben — sie stehen danach ohne Kategorie da. Budgets, die darauf aufbauen, verlieren ihre Grundlage.",
     titel: "Einstellungen",
     untertitel: "Sprache & Währung · Personen · Konten · Kategorien — für den ganzen Haushalt",
     bearbeiten: "bearbeiten",
@@ -1375,6 +1457,7 @@ const de = {
     },
   },
   vertraege: {
+    loeschenFolgen: "Der Vertrag nimmt seine Zahlungsregel, seine Erkennungsregel und JEDE Zuordnung mit — auch die von Hand gesetzten. Die Buchungen selbst bleiben; sie verlieren nur ihre Vertragsmarkierung.",
     titel: "Verträge",
     untertitel: "Wiederkehrende Zahlungen inkl. Einnahmen · Fristen & Kündigungstermine",
     anlegen: "Vertrag anlegen",
@@ -1467,6 +1550,9 @@ const de = {
     zusammenKuendigungsfrist: "Frist {{monate}} Monate",
     zusammenKeineVerlaengerung: "keine Verlängerung",
     regel: {
+      zweck: "Verwendungszweck",
+      zweckHinweis: "Bleibt normalerweise leer — ein Vertrag hängt am Empfänger. Nützlich, wenn der Empfänger nichts hergibt: eine Dauerüberweisung an eine Privatperson, bei der nur der Zweck sagt, worum es geht. Ein Muster je Zeile, * als Platzhalter.",
+      spanneAnpassen: "Betragsspanne auf {{von}} bis {{bis}} setzen — dann fallen keine Zahlungen mehr durch",
       aktion: "Erkennung",
       titel: "Woran wird dieser Vertrag erkannt?",
       hinweis:
@@ -1526,6 +1612,74 @@ const de = {
       jaehrlich: "jährlich",
     },
   },
+  zugang: {
+    einrichtenTitel: "Zugang einrichten",
+    einrichtenNeu:
+      "Deine Finanzdaten werden verschlüsselt auf dieser Maschine abgelegt. " +
+      "Dafür brauchst du eine Passphrase — ohne sie kommt niemand an den Bestand, " +
+      "auch du nicht.",
+    einrichtenAltbestand:
+      "Dein bisheriger Bestand liegt unverschlüsselt auf der Platte. Er wird jetzt " +
+      "einmalig überführt: vorher entsteht eine Sicherung, und die alte Datei fällt " +
+      "erst weg, wenn die neue nachweislich lesbar ist.",
+    feldPassphrase: "Passphrase",
+    feldWiederholung: "Noch einmal",
+    feldNeuePassphrase: "Neue Passphrase",
+    feldCode: "Wiederherstellungscode",
+    hinweisLaenge:
+      "Mindestens {{mindestens}} Zeichen. Vier gewöhnliche Wörter sind leichter zu " +
+      "merken und schwerer zu raten als ein Kunstwort mit Sonderzeichen.",
+    einrichtenKnopf: "Einrichten",
+    laeuftEinrichten: "wird eingerichtet …",
+    entsperrenTitel: "Bestand entsperren",
+    entsperrenKnopf: "Entsperren",
+    laeuft: "läuft …",
+    weiter: "Weiter",
+    zurueck: "Zurück",
+    vergessen: "Passphrase vergessen",
+    passphraseFalsch: "Die Passphrase passt nicht.",
+    stimmtNichtUeberein: "Die beiden Eingaben stimmen nicht überein.",
+    zuKurz: "Zu kurz — mindestens {{mindestens}} Zeichen.",
+    nurLeerzeichen: "Das sind nur Leerzeichen.",
+    fehlerAllgemein: "Das hat nicht geklappt.",
+    codeTitel: "Dein Wiederherstellungscode",
+    codeErklaerung:
+      "Schreib ihn ab oder druck ihn aus und leg ihn an einen sicheren Ort. Mit ihm " +
+      "kommst du an deinen Bestand, wenn du die Passphrase vergisst.",
+    codeWarnung:
+      "Er wird nur dieses eine Mal gezeigt. Später kannst du ihn in den Einstellungen " +
+      "erneut abrufen — dafür brauchst du dann die Passphrase.",
+    codeNotiert: "Ich habe ihn notiert.",
+    rettungTitel: "Mit dem Wiederherstellungscode hinein",
+    rettungErklaerung:
+      "Gib den Code ein und setz gleich eine neue Passphrase. Der Bestand selbst bleibt " +
+      "unberührt.",
+    rettungKnopf: "Entsperren und neu setzen",
+    codeUnbrauchbar: "Mit diesem Code lässt sich der Bestand nicht öffnen.",
+    gesperrtTitel: "Gesperrt",
+    // Einstellungen
+    kartenTitel: "Verschlüsselung",
+    kartenText:
+      "Der Bestand liegt verschlüsselt auf dieser Maschine. Die Passphrase wickelt den " +
+      "Schlüssel ein — sie zu ändern kostet Sekunden, der Bestand bleibt wie er ist.",
+    wechselnTitel: "Passphrase ändern",
+    feldAltePassphrase: "Bisherige Passphrase",
+    wechselnKnopf: "Ändern",
+    wechselFertig: "Die Passphrase ist geändert.",
+    alteFalsch: "Die bisherige Passphrase passt nicht.",
+    codeAbrufenTitel: "Wiederherstellungscode ansehen",
+    codeAbrufenText:
+      "Nur gegen die Passphrase — sonst läge er für jeden offen, der an einem " +
+      "entsperrten Rechner sitzt.",
+    codeAbrufenKnopf: "Anzeigen",
+    sperreTitel: "Zeitsperre",
+    sperreText:
+      "Nach dieser Zeit ohne Bedienung wird der Bestand wieder zugesperrt. Das ist der " +
+      "Schutz gegen jemanden, der an deinem entsperrten Rechner sitzt.",
+    sperreAus: "aus",
+    sperreMinuten: "{{minuten}} Minuten",
+    jetztSperren: "Jetzt sperren",
+  },
   charts: {
     einnahmen: "Einnahmen",
     ausgabenInklBudgets: "Ausgaben (inkl. Budgets)",
@@ -1554,6 +1708,11 @@ const en: typeof de = {
     dublette: {
       unvollstaendig: "Both entries are needed to record this.",
       selbst: "An entry cannot be its own twin.",
+    },
+    journal: {
+      keinUrzustand: "No state at creation is recorded for this transaction.",
+      unveraendert: "Nothing to undo — the transaction stands as it was created.",
+      paarung: "A single leg of a transfer cannot be reset on its own. Unlink the transfer first.",
     },
     kategorie: {
       waehlen: "Please select a category.",
@@ -1893,10 +2052,30 @@ const en: typeof de = {
     leer: "The outlook needs plan data: it offsets income and contracts (both payment rules) against the budgets. Both live under Contracts and Budgets — nothing here is estimated from posted transactions.",
     leerUntertitel: "The next three months",
   },
+  loeschen: {
+    titel: "Delete",
+    untertitel: "{{name}}",
+    frage: "“{{name}}” will be deleted. This cannot be undone.",
+    bestaetigen: "Delete permanently",
+    abbrechen: "Cancel",
+    laeuft: "deleting …",
+  },
   uebersicht: {
     titel: "Overview",
     untertitel: "Where you stand right now — this month and the next two",
     fehlerDb: "Loading only works in the desktop app (tauri dev).",
+    vorschauTitel: "What is coming",
+    vorschauUntertitel: "Payments due in the next {{tage}} days — across all accounts",
+    vorschauLeer: "Nothing is due in the next {{tage}} days.",
+    vorschauLeerKonto: "Nothing is due on this account in the next {{tage}} days.",
+    vorschauKonto: "Account",
+    vorschauAlleKonten: "All accounts",
+    vorschauZeitraum: "How far the preview looks ahead",
+    vorschauSpalteDatum: "Due",
+    vorschauSpalteKonto: "Account",
+    vorschauSpalteBeschreibung: "Description",
+    vorschauSpalteBetrag: "Amount",
+    vorschauSumme: "Together {{betrag}}",
     budgetsTitel: "Budgets",
     budgetsLaufend: "What is left in this month",
     budgetsVergangen: "Looking back at a finished month",
@@ -1983,6 +2162,9 @@ const en: typeof de = {
     spalteSaldo: "Balance",
   },
   budgets: {
+    loeschenFolgen: "The budget disappears together with every amount it ever had. The entries stay — a budget measures them, it does not own them.",
+    versionName: "Amount from {{monat}}",
+    versionLoeschenFolgen: "Only this one amount goes. The months it covered fall back to the previous amount — or, before the first one, to no plan at all.",
     titel: "Budgets",
     untertitel: "What you set aside each month — what expires and what builds up",
     anlegen: "Add budget",
@@ -2075,6 +2257,7 @@ const en: typeof de = {
     modalUntertitel: "One budget per category — use a subcategory for anything finer",
   },
   inventar: {
+    loeschenFolgen: "The item disappears along with its monthly reserve. Entries that belonged to it stay — they hang off their category, not off the item.",
     titel: "Inventory",
     untertitel: "Things you own and have to replace — and what they cost you per month",
     gegenstand: "Item",
@@ -2154,6 +2337,12 @@ const en: typeof de = {
     verknuepft: "linked",
   },
   konten: {
+    dieseBuchungName: "this entry",
+    detailLoeschenFolgen: "The entry disappears from the account and the balance changes. Its last state stays in the journal — but it cannot be restored from there.",
+    detailLoeschenFolgenPaar: "Both legs of the transfer disappear — the counterpart on the other account belongs to it and would otherwise be left behind.",
+    detailVerwerfenFolgen: "The bank line is discarded. The receipt is kept and the line can be posted again from the inbox — the retrieval will not fetch it a second time.",
+    zugangLoeschenFolgen: "The retrieved entries stay; they live in the account and do not hang off the access. What goes is the route to the bank — further retrievals need it set up again.",
+    kontoLoeschenFolgen: "An account with entries cannot be deleted — the entries would have to go first. Without any, only the account itself disappears.",
     festlegung: {
       immerLabel: "Always use this category for this payee",
       immer: "Always use this category for “{{muster}}”",
@@ -2401,6 +2590,7 @@ const en: typeof de = {
     editTitel: "Edit transaction",
     editUntertitelImport: "Imported transaction — your edits are kept, and so is the import trail.",
     pillUmbuchung: "Transfer",
+    pillVertrag: "Belongs to the contract “{{anbieter}}”",
     pillManuell: "manual",
     pillPruefen: "review",
     pillZuPruefen: "review",
@@ -2460,6 +2650,50 @@ const en: typeof de = {
         "You set this link yourself — it stays even if matching would compute something else. Resetting hands the decision back to automatic matching.",
       zuruecksetzen: "Let matching decide",
       hinweis: "Payee, amount, category and account come from this transaction. Its cycle is unknown — check it.",
+    },
+    pillVerlauf: "{{anzahl}} history entries — see the details",
+    pillVerlaufKurz: "History {{anzahl}}",
+    journal: {
+      titel: "History",
+      leer: "Nothing is recorded for this transaction. The journal exists since 2026-08-23 — anything created before has no entry.",
+      seitEntstehung: "Changed since creation",
+      zuruecksetzen: "Undo changes",
+      frage: "The transaction goes back to its state at creation. The undo itself will appear in the history.",
+      bestaetigen: "Undo",
+      abbrechen: "Cancel",
+      laeuft: "Undoing …",
+      gepaart: "linked",
+      vorgemerkt: "flagged",
+      ohneTeile: "not split",
+      teileAnzahl: "{{anzahl}} parts",
+      art: {
+        angelegt: "created",
+        geaendert: "changed",
+        geloescht: "deleted",
+      },
+      herkunft: {
+        automatisch: "by matching",
+        manuell: "by hand",
+      },
+      feld: {
+        datum: "Date",
+        betrag: "Amount",
+        kontoId: "Account",
+        kategorieId: "Category",
+        kategorieHerkunft: "Category set",
+        charakter: "Character",
+        notiz: "Label",
+        aufteilungen: "Split",
+        transferId: "Transfer",
+        gegenkontoId: "Counter account",
+        planRef: "Plan reference",
+        zuPruefen: "Review flag",
+      },
+      zu: {
+        keinUrzustand: "No way back from here: no state at creation is recorded for this transaction.",
+        unveraendert: "It still stands as it was created.",
+        paarung: "It is a leg of a transfer. Resetting one leg alone would leave the other pointing nowhere — use \u201aUnlink transfer\u2018 instead.",
+      },
     },
     paarung: {
       titel: "Transfer",
@@ -2570,6 +2804,8 @@ const en: typeof de = {
     },
   },
   einstellungen: {
+    personLoeschenFolgen: "The person disappears from the master data. Accounts and contracts naming them as holder keep running, just without one.",
+    kategorieLoeschenFolgen: "The entries in this category stay — afterwards they have no category. Budgets built on it lose their basis.",
     titel: "Settings",
     untertitel: "Language & currency · people · accounts · categories — for the whole household",
     bearbeiten: "edit",
@@ -2842,6 +3078,7 @@ const en: typeof de = {
     },
   },
   vertraege: {
+    loeschenFolgen: "The contract takes its payment rule, its recognition rule and EVERY assignment with it — including the ones you set by hand. The entries themselves stay; they lose only their contract marking.",
     titel: "Contracts",
     untertitel: "Recurring payments incl. income · deadlines & cancellation dates",
     anlegen: "Add contract",
@@ -2934,6 +3171,9 @@ const en: typeof de = {
     zusammenKuendigungsfrist: "notice {{monate}} months",
     zusammenKeineVerlaengerung: "no renewal",
     regel: {
+      zweck: "Payment reference",
+      zweckHinweis: "Usually stays empty — a contract hangs off the payee. Useful when the payee says nothing: a standing order to a private person where only the reference tells you what it is. One pattern per line, * as wildcard.",
+      spanneAnpassen: "Set the amount range to {{von}} – {{bis}} so no payments fall through",
       aktion: "Matching",
       titel: "How is this contract matched?",
       hinweis:
@@ -2992,6 +3232,71 @@ const en: typeof de = {
       halbjaehrlich: "semi-annually",
       jaehrlich: "yearly",
     },
+  },
+  zugang: {
+    einrichtenTitel: "Set up access",
+    einrichtenNeu:
+      "Your financial data is stored encrypted on this machine. You need a passphrase " +
+      "for that — without it nobody reaches the data, not even you.",
+    einrichtenAltbestand:
+      "Your existing data is stored unencrypted. It will now be migrated once: a backup " +
+      "is taken first, and the old file is only removed once the new one is provably " +
+      "readable.",
+    feldPassphrase: "Passphrase",
+    feldWiederholung: "Again",
+    feldNeuePassphrase: "New passphrase",
+    feldCode: "Recovery code",
+    hinweisLaenge:
+      "At least {{mindestens}} characters. Four ordinary words are easier to remember " +
+      "and harder to guess than an invented word with special characters.",
+    einrichtenKnopf: "Set up",
+    laeuftEinrichten: "setting up …",
+    entsperrenTitel: "Unlock data",
+    entsperrenKnopf: "Unlock",
+    laeuft: "working …",
+    weiter: "Continue",
+    zurueck: "Back",
+    vergessen: "Forgot passphrase",
+    passphraseFalsch: "That passphrase does not match.",
+    stimmtNichtUeberein: "The two entries do not match.",
+    zuKurz: "Too short — at least {{mindestens}} characters.",
+    nurLeerzeichen: "That is only whitespace.",
+    fehlerAllgemein: "That did not work.",
+    codeTitel: "Your recovery code",
+    codeErklaerung:
+      "Write it down or print it and keep it somewhere safe. It gets you back to your " +
+      "data if you forget the passphrase.",
+    codeWarnung:
+      "It is shown this once only. You can retrieve it later in the settings — you will " +
+      "need the passphrase for that.",
+    codeNotiert: "I have written it down.",
+    rettungTitel: "Enter with the recovery code",
+    rettungErklaerung:
+      "Enter the code and set a new passphrase right away. The data itself is untouched.",
+    rettungKnopf: "Unlock and set anew",
+    codeUnbrauchbar: "This code does not open the data.",
+    gesperrtTitel: "Locked",
+    kartenTitel: "Encryption",
+    kartenText:
+      "The data is stored encrypted on this machine. The passphrase wraps the key — " +
+      "changing it takes seconds, the data stays as it is.",
+    wechselnTitel: "Change passphrase",
+    feldAltePassphrase: "Current passphrase",
+    wechselnKnopf: "Change",
+    wechselFertig: "The passphrase has been changed.",
+    alteFalsch: "The current passphrase does not match.",
+    codeAbrufenTitel: "View recovery code",
+    codeAbrufenText:
+      "Only against the passphrase — otherwise it would lie open to anyone sitting at " +
+      "an unlocked machine.",
+    codeAbrufenKnopf: "Show",
+    sperreTitel: "Auto-lock",
+    sperreText:
+      "After this long without use the data is locked again. This is the protection " +
+      "against someone sitting at your unlocked machine.",
+    sperreAus: "off",
+    sperreMinuten: "{{minuten}} minutes",
+    jetztSperren: "Lock now",
   },
   charts: {
     einnahmen: "Income",

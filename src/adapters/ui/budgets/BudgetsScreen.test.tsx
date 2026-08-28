@@ -598,6 +598,8 @@ describe("BudgetsScreen · Betragsversionen", () => {
     await nutzer.click(await screen.findByRole("button", { name: "bearbeiten" }));
     await screen.findByText(/Beträge im Zeitverlauf/);
     await nutzer.click(screen.getByRole("button", { name: `Betrag ab ${monatVersetzt(0)} entfernen` }));
+    // Seit 2026-08-27 fragt jeder Löschweg nach — bestätigen gehört jetzt dazu.
+    await nutzer.click(await screen.findByRole("button", { name: "Endgültig löschen" }));
 
     await waitFor(async () => {
       const [b] = await sqliteBudgetRepository.alle();

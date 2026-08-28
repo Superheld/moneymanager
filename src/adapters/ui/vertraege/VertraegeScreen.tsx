@@ -35,6 +35,7 @@ import {
 } from "./VertragModal";
 import { VertragErkennungModal } from "./VertragErkennungModal";
 import { useGeld } from "../bausteine/einstellungenKontext";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -148,6 +149,7 @@ function heuteIso(): string {
 }
 
 export function VertraegeScreen() {
+  const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const geld = useGeld();
   const heute = useMemo(heuteIso, []);
@@ -318,7 +320,14 @@ export function VertraegeScreen() {
             icon="loeschen"
             ton="gefahr"
             label={t("vertraege.loeschen")}
-            onClick={() => void vertragLoeschen(v.id).then(laden)}
+            onClick={() => loeschfrage.stellen({
+              name: v.vertrag.anbieter,
+              // Die Kaskade ist hier echt und nicht klein: vertragLoeschen nimmt die
+              // Zahlungsregel, die Erkennungsregel und JEDE Zuordnung mit — auch die von
+              // Hand gesetzten. Wer das nicht weiss, verliert Handarbeit.
+              folgen: t("vertraege.loeschenFolgen"),
+              ausfuehren: async () => { await vertragLoeschen(v.id); await laden(); },
+            })}
           />
         ),
       },
@@ -691,6 +700,8 @@ export function VertraegeScreen() {
           onSaved={async () => { setMaske(null); await laden(); }}
         />
       )}
+      {loeschfrage.dialog}
+
     </div>
   );
 }

@@ -316,3 +316,53 @@ describe("Rueckfluesse von Hand", () => {
     ).rejects.toThrow("betrag.nichtNull");
   });
 });
+
+/**
+ * Eine gelöschte Buchung lässt keine halbe Umbuchung zurück.
+ *
+ * Am echten Bestand stand genau ein solches Bein: `transferId` auf ein Paar, das es nicht
+ * mehr gibt, `gegenkontoId` auf ein Konto, auf dem nichts mehr steht. Von aussen sieht es
+ * aus wie eine gewöhnliche Umschichtung — nur dass das Geld auf der Gegenseite nie ankam.
+ */
+describe("buchungLoeschen und Umbuchungen", () => {
+  const paar = (): IstBuchung[] => [
+    { id: "a", datum: "2026-08-12", betrag: -5000, kontoId: "giro",
+      charakter: "Umschichtung", quelle: "import", transferId: "t1", gegenkontoId: "spar" },
+    { id: "b", datum: "2026-08-12", betrag: 5000, kontoId: "spar",
+      charakter: "Umschichtung", quelle: "import", transferId: "t1", gegenkontoId: "giro" },
+  ];
+
+  it("löst das übrige Bein, statt es hängen zu lassen", async () => {
+    const ledger = memLedger();
+    for (const b of paar()) await ledger.speichern(b);
+
+    await buchungLoeschen(ledger, "a");
+
+    expect(ledger.daten).toHaveLength(1);
+    const uebrig = ledger.daten[0];
+    expect(uebrig.id).toBe("b");
+    expect(uebrig.transferId).toBeUndefined();
+    expect(uebrig.gegenkontoId).toBeUndefined();
+  });
+
+  /**
+   * Gelöst, NICHT mitgelöscht. Wer eine Buchung löscht, meint diese eine; das Bein auf
+   * dem anderen Konto ist keine Falscherfassung, es hat nur seinen Partner verloren.
+   * Wer die ganze Umbuchung meint, ruft `umbuchungLoeschen`.
+   */
+  it("löscht das Gegenbein nicht mit", async () => {
+    const ledger = memLedger();
+    for (const b of paar()) await ledger.speichern(b);
+    await buchungLoeschen(ledger, "a");
+    expect(ledger.daten.map((x) => x.id)).toEqual(["b"]);
+    expect(ledger.daten[0].betrag).toBe(5000);
+  });
+
+  it("lässt eine Buchung ohne Paarung unverändert durchgehen", async () => {
+    const ledger = memLedger();
+    await ledger.speichern({ id: "x", datum: "2026-08-12", betrag: -900, kontoId: "giro",
+      charakter: "Aufwand", quelle: "manuell" });
+    await buchungLoeschen(ledger, "x");
+    expect(ledger.daten).toHaveLength(0);
+  });
+});

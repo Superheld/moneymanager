@@ -5,7 +5,7 @@ import type { Credentials } from './types.js'
 import type { StateStore } from './store.js'
 
 /**
- * Die Anmeldung, in vier Schritten (docs/bank-api.md).
+ * Die Anmeldung, in vier Schritten.
  *
  * Zwei Clients sind im Spiel und dürfen nicht verwechselt werden: Der **Page-Client**
  * steht offen im HTML der Weboberfläche und darf nur `client_credentials`; der
@@ -89,7 +89,7 @@ async function bootstrapToken (): Promise<string> {
  * Schritt 3: Warten, bis im Handy bestätigt wurde.
  *
  * Abgebrochen wird bei `complete` — **nicht** bei „nicht mehr `open`". Dazwischen liegt
- * `accepted` (docs/bank-api.md).
+ * `accepted`.
  */
 async function warteAufBestätigung (sub: string, scaId: string, bearer: string,
                                     timeoutMs: number): Promise<RawScaStatus> {
@@ -151,7 +151,7 @@ export async function login (creds: Credentials, clientBasic: string, store: Sta
     loginId: creds.loginId,
   }
   // Wird nicht benutzt: Der Erneuerungsaufruf ist nie beobachtet worden, und was nicht
-  // gemessen ist, wird hier nicht implementiert (docs/bank-api.md).
+  // gemessen ist, wird hier nicht implementiert.
   if (antwort.refresh_token) sitzung.refreshToken = antwort.refresh_token
   return sitzung
 }

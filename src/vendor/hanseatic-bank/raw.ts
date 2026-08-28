@@ -3,7 +3,7 @@
  *
  * Nichts davon verlässt die Library: `map.ts` übersetzt in die Typen aus `types.ts`.
  * Alles ist optional, weil die Bank Felder je nach Buchungsart und Seite weglässt —
- * `transactionTime` fehlt auf Folgeseiten sogar als Schlüssel (docs/bank-api.md).
+ * `transactionTime` fehlt auf Folgeseiten sogar als Schlüssel.
  */
 
 export interface RawCreditAccount {

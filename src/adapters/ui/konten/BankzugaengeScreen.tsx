@@ -41,6 +41,7 @@ import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
 import { Modal } from "../bausteine/Modal";
 import { useGeld } from "../bausteine/einstellungenKontext";
+import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 interface KontoZeile extends Bankkonto {
   saldo?: number;
@@ -62,6 +63,7 @@ export function BankzugaengeScreen({
   /** Kontobezeichnungen je Id — der Screen daneben hat sie schon geladen. */
   kontoNamen?: ReadonlyMap<string, string>;
 } = {}) {
+  const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const geld = useGeld();
   const [zugaenge, setZugaenge] = useState<Bankzugang[]>([]);
@@ -342,7 +344,13 @@ export function BankzugaengeScreen({
                 label: "",
                 align: "right" as const,
                 render: (z: Bankzugang) => (
-                  <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => void loeschen(z.id)} />
+                  <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => loeschfrage.stellen({
+                      name: z.bezeichnung,
+                      // Die abgerufenen Buchungen bleiben — sie stehen im Ledger und
+                      // haengen nicht am Zugang. Was weggeht, ist der WEG dorthin.
+                      folgen: t("konten.zugangLoeschenFolgen"),
+                      ausfuehren: () => loeschen(z.id),
+                    })} />
                 ),
               },
             ]}
@@ -501,6 +509,7 @@ export function BankzugaengeScreen({
       )}
 
       {tanFrage && <TanDialog frage={tanFrage} onFertig={tanFrageSchliessen} />}
+      {loeschfrage.dialog}
     </>
   );
 }
