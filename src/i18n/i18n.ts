@@ -1501,6 +1501,9 @@ const de = {
     zusammenKuendigungsfrist: "Frist {{monate}} Monate",
     zusammenKeineVerlaengerung: "keine Verlängerung",
     regel: {
+      zweck: "Verwendungszweck",
+      zweckHinweis: "Bleibt normalerweise leer — ein Vertrag hängt am Empfänger. Nützlich, wenn der Empfänger nichts hergibt: eine Dauerüberweisung an eine Privatperson, bei der nur der Zweck sagt, worum es geht. Ein Muster je Zeile, * als Platzhalter.",
+      spanneAnpassen: "Betragsspanne auf {{von}} bis {{bis}} setzen — dann fallen keine Zahlungen mehr durch",
       aktion: "Erkennung",
       titel: "Woran wird dieser Vertrag erkannt?",
       hinweis:
@@ -3070,6 +3073,9 @@ const en: typeof de = {
     zusammenKuendigungsfrist: "notice {{monate}} months",
     zusammenKeineVerlaengerung: "no renewal",
     regel: {
+      zweck: "Payment reference",
+      zweckHinweis: "Usually stays empty — a contract hangs off the payee. Useful when the payee says nothing: a standing order to a private person where only the reference tells you what it is. One pattern per line, * as wildcard.",
+      spanneAnpassen: "Set the amount range to {{von}} – {{bis}} so no payments fall through",
       aktion: "Matching",
       titel: "How is this contract matched?",
       hinweis:

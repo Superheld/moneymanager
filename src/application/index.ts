@@ -64,6 +64,9 @@ export {
   // Eigenschaften EINER Buchung bzw. EINES Empfängernamens.
   istGeteilt,
   musterVorschlag,
+  // Trifft ein Muster diesen Text? Ein Vergleich, keine Auswahl — und die Oberfläche
+  // braucht ihn, um zu erkennen, ob ein vorhandenes Muster einen Namen schon abdeckt.
+  musterTrifft,
   anbieterSchluessel,
   // Aufzählungen, die die UI als Auswahl anbietet
   KONTOTYPEN,

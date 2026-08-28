@@ -8,7 +8,10 @@
 import { describe, expect, it } from "vitest";
 import {
   erkennungsDiagnose,
+  istMerkmalsart,
+  MERKMALSARTEN,
   passtZu,
+  spannenVorschlag,
   standardErkennung,
   vertragFuer,
   zuordnungAbgleich,
@@ -303,5 +306,98 @@ describe("erkennungsDiagnose", () => {
       spuren,
     );
     expect(d.nachMerkmalen).toBe(0);
+  });
+});
+
+/**
+ * Das Zweck-Merkmal — ein Nachtrag, und der Test hält vor allem fest, was sich NICHT
+ * geändert hat: die Vorbelegung legt keins an. „Ein Vertrag hängt am Empfänger, nicht am
+ * Text" bleibt die Vorgabe; sie ist nur keine Decke mehr.
+ */
+describe("Merkmal auf den Verwendungszweck", () => {
+  it("legt die Vorbelegung nicht von selbst an", () => {
+    const e = standardErkennung("v1", "Ohlert", 1800);
+    expect(e.merkmale.some((m) => m.art === "verwendungszweck")).toBe(false);
+  });
+
+  it("trifft über den Zweck, wo der Empfänger nichts hergibt", () => {
+    const e: Vertragserkennung = {
+      vertragId: "v1",
+      merkmale: [{ art: "verwendungszweck", muster: "*Miete Wohnung 12*" }],
+    };
+    // Empfänger ist ein Personenname und sagt über den Vertrag nichts.
+    expect(passtZu(e, spur({ gegenpartei: "Talmberg", verwendungszweck: "Miete Wohnung 12 August" }))).toBe(true);
+    expect(passtZu(e, spur({ gegenpartei: "Talmberg", verwendungszweck: "Geburtstag" }))).toBe(false);
+  });
+
+  /**
+   * Der Zweck wird NICHT normalisiert. `anbieterSchluessel` wirft Ziffern weg — genau die
+   * Vertrags- und Rechnungsnummern, wegen derer man den Zweck überhaupt heranzieht.
+   */
+  it("behält Ziffern im Zweck, statt sie wegzunormalisieren", () => {
+    const e: Vertragserkennung = {
+      vertragId: "v1",
+      merkmale: [{ art: "verwendungszweck", muster: "*4711*" }],
+    };
+    expect(passtZu(e, spur({ verwendungszweck: "Kundennummer 4711" }))).toBe(true);
+    expect(passtZu(e, spur({ verwendungszweck: "Kundennummer 4712" }))).toBe(false);
+  });
+
+  it("kennt genau die Arten, die der Kern aufzählt", () => {
+    expect(MERKMALSARTEN).toEqual(["glaeubigerId", "empfaenger", "verwendungszweck"]);
+    expect(istMerkmalsart("verwendungszweck")).toBe(true);
+    expect(istMerkmalsart("empfaenger")).toBe(true);
+    expect(istMerkmalsart("betrag")).toBe(false);
+    expect(istMerkmalsart(undefined)).toBe(false);
+  });
+});
+
+/**
+ * Der Spannen-Vorschlag. Der Fall, für den es ihn gibt: ein Vertrag mit schwankendem
+ * Betrag — Verbrauchsabrechnung, Fremdwährung —, bei dem die aus EINEM Betrag abgeleitete
+ * Vorbelegung (0,6× bis 1,8×) den grössten Teil der Zahlungen wegfiltert.
+ */
+describe("spannenVorschlag", () => {
+  const merkmale = [{ art: "empfaenger" as const, muster: "ohlert*" }];
+
+  it("umspannt alle Zahlungen, die die Merkmale treffen", () => {
+    const e: Vertragserkennung = { vertragId: "v1", merkmale, betragVon: 1000, betragBis: 3000 };
+    const spuren = [
+      spur({ id: "a", gegenpartei: "Ohlert", betrag: -500 }),
+      spur({ id: "b", gegenpartei: "Ohlert", betrag: -2000 }),
+      spur({ id: "c", gegenpartei: "Ohlert", betrag: -8000 }),
+    ];
+    // Untergrenze exakt der kleinste Wert, Obergrenze mit 15 % Luft nach oben.
+    expect(spannenVorschlag(e, spuren)).toEqual({ von: 500, bis: 9200 });
+  });
+
+  /**
+   * Zeitraum und Konto bleiben drin, die Betragsspanne selbst nicht. Sonst käme immer
+   * die vorhandene Spanne wieder heraus — und was jemand ausdrücklich ausgeschlossen
+   * hat, soll der Vorschlag nicht durch die Hintertür einsammeln.
+   */
+  it("achtet auf den Zeitraum, aber nicht auf die eigene Betragsspanne", () => {
+    const e: Vertragserkennung = {
+      vertragId: "v1", merkmale, betragVon: 1000, betragBis: 3000, gueltigAb: "2026-01-01",
+    };
+    const spuren = [
+      spur({ id: "alt", gegenpartei: "Ohlert", betrag: -99900, datum: "2025-06-01" }),
+      spur({ id: "neu", gegenpartei: "Ohlert", betrag: -2000, datum: "2026-06-01" }),
+    ];
+    expect(spannenVorschlag(e, spuren)).toEqual({ von: 2000, bis: 2300 });
+  });
+
+  it("schweigt, wenn die Merkmale gar nichts treffen", () => {
+    const e: Vertragserkennung = { vertragId: "v1", merkmale };
+    expect(spannenVorschlag(e, [spur({ gegenpartei: "Vibora", betrag: -2000 })])).toBeUndefined();
+  });
+
+  it("lässt Umschichtungen draussen — sie sind nie Vertragszahlungen", () => {
+    const e: Vertragserkennung = { vertragId: "v1", merkmale };
+    const spuren = [
+      spur({ id: "a", gegenpartei: "Ohlert", betrag: -2000 }),
+      spur({ id: "b", gegenpartei: "Ohlert", betrag: -50000, charakter: "Umschichtung" }),
+    ];
+    expect(spannenVorschlag(e, spuren)).toEqual({ von: 2000, bis: 2300 });
   });
 });

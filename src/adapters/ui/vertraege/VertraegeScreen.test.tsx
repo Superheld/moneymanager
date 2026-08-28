@@ -510,6 +510,59 @@ describe("VertraegeScreen — Vorschläge", () => {
   });
 
   /**
+   * Der Dialog darf nicht anbieten, was schon dasteht.
+   *
+   * Die Vorbelegung legt den Anbieternamen seit 2026-08-27 MIT Stern an (`ohlert*`). Der
+   * Hinweis „Namen ergänzen" verglich aber auf Gleichheit gegen die sternlose Form, fand
+   * ihn nie mehr und stand damit bei JEDEM Vertrag da — ein Klick hätte ein zweites,
+   * engeres Muster danebengesetzt. Geprüft wird jetzt, ob ein vorhandenes Muster den
+   * Namen ABDECKT.
+   */
+  it("bietet den Anbieternamen nicht an, wenn ein Muster ihn schon abdeckt", async () => {
+    await konto();
+    await monatsreihe("a", "Ohlert", 5000, 3);
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Ohlert", beginn: "2024-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "Ohlert", 5000));
+
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Ohlert");
+    await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
+
+    // Das Feld trägt die Vorbelegung mit Stern …
+    const empfaenger = await screen.findByRole("textbox", { name: /^empfänger$/i });
+    expect(empfaenger).toHaveValue("ohlert*");
+    // … und deshalb gibt es nichts zu ergänzen.
+    expect(screen.queryByRole("button", { name: /als Empfänger aufnehmen/i })).toBeNull();
+  });
+
+  /** Die Gegenprobe: fehlt der Name wirklich, wird er weiterhin angeboten — mit Stern. */
+  it("bietet den Anbieternamen mit Stern an, wenn gar kein Muster ihn abdeckt", async () => {
+    await konto();
+    await monatsreihe("a", "Ohlert", 5000, 3);
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Ohlert", beginn: "2024-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await sqliteVertragserkennungRepository.speichern({
+      vertragId: "v1",
+      merkmale: [{ art: "empfaenger", muster: "vibora" }],
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Ohlert");
+    await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
+
+    const angebot = await screen.findByRole("button", { name: /als Empfänger aufnehmen/i });
+    await nutzer.click(angebot);
+    expect(await screen.findByRole("textbox", { name: /^empfänger$/i })).toHaveValue("vibora\nohlert*");
+  });
+
+  /**
    * Wildcards durch die Maske. Der Fall: derselbe Anbieter taucht im Auszug mit
    * angehängter Rechnungs- oder Vertragsangabe auf — ohne Platzhalter bräuchte jede
    * Schreibweise eine eigene Zeile. Zugleich der Beweis, dass das Empfänger-Feld auch

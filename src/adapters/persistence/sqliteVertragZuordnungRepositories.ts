@@ -17,6 +17,7 @@ import type {
   Vertragszuordnung,
   Zuordnungsherkunft,
 } from "../../core";
+import { istMerkmalsart } from "../../core";
 import type {
   VertragserkennungRepository,
   VertragszuordnungRepository,
@@ -73,7 +74,9 @@ function parseMerkmale(json: string): Erkennungsmerkmal[] {
     }
     if (eintrag && typeof eintrag === "object") {
       const { art, muster } = eintrag as { art?: unknown; muster?: unknown };
-      if (typeof muster === "string" && (art === "glaeubigerId" || art === "empfaenger")) {
+      // Die Arten kommen aus dem Kern (`istMerkmalsart`) und stehen NICHT hier: eine
+      // neue Art wäre sonst gespeichert und beim nächsten Laden stillschweigend weg.
+      if (typeof muster === "string" && istMerkmalsart(art)) {
         return [{ art, muster }];
       }
     }
