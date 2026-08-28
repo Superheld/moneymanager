@@ -559,13 +559,24 @@ Kisten — immer noch ein Bruchteil eines Vollbaus.
 **Die `.env` fehlt im Worktree ebenfalls** (gitignoriert). Die App startet ohne sie, der
 Bankabruf ist dann gesperrt — dieselbe Falle wie beim Ausliefern, nur früher.
 
-## Auslieferung: lokal gebaut, lokal installiert
+## Auslieferung: GitHub-Release, Update in der App
 
-Es gibt **keinen Release-Weg**. Die App wird auf der eigenen Maschine gebaut und von dort
-nach `/Applications` installiert (`npm run installieren`, macOS). Kein GitHub-Release, kein
-Updater, keine Signierung — und das ist eine Entscheidung, kein Rückstand: solange es genau
-einen Nutzer auf genau einer Maschine gibt, kostet jede Stufe dazwischen Aufwand ohne
-Gegenwert.
+**Ausgeliefert wird über ein GitHub-Release, eingespielt über den Updater in der App.** Ein
+Tag `v*` löst `.github/workflows/release.yml` aus; der Workflow baut, signiert für den
+Updater, legt das Release an und hängt Archiv, DMG und das Update-Manifest daran. Die laufende
+App fragt beim Start die Datei latest.json unter releases/latest/download ab und bietet
+den Knopf an.
+
+Bis zum 28.08.2026 stand hier das Gegenteil („es gibt keinen Release-Weg"), und das war seit
+`v0.16.0` schlicht überholt — die Doku beschrieb eine Welt, die es nicht mehr gab, und der
+Abschnitt weiter unten beschrieb daneben die richtige. Wer beide las, konnte sich aussuchen,
+was gilt.
+
+**Lokal gebaut wird nicht mehr.** `npm run installieren` gibt es weiterhin und es
+funktioniert; als Auslieferungsweg ist es abgelöst. Das ist keine Kleinigkeit, sondern die
+Voraussetzung dafür, dass der Weg überhaupt geprüft wird: ein Release, das nur im Notfall
+benutzt wird, ist beim nächsten Notfall kaputt. Und es hat eine Folge, die weiter unten
+zuschlägt — ein Wächter, der das Release blockiert, blockiert damit alles.
 
 Drei Dinge, die dabei zusammengehören und von denen das dritte gern vergessen wird:
 
@@ -580,9 +591,9 @@ Drei Dinge, die dabei zusammengehören und von denen das dritte gern vergessen w
 - **Der Datenbestand überlebt die Neuinstallation.** Er liegt im App-Datenverzeichnis, nicht
   im Bundle.
 
-Was ein Release später bräuchte, ist damit nicht weg, sondern nur nicht gebaut:
-`tauri-plugin-updater` (auf Linux ausschliesslich mit AppImage), ein Signaturschlüssel, ein
-Workflow mit `VITE_FINTS_PRODUKT_ID` als Repository-Secret. Der Secret-Weg ist dabei nicht
+Der Weg selbst steht: `tauri-plugin-updater` (auf Linux ausschliesslich mit AppImage), der
+Signaturschlüssel, der Workflow mit `VITE_FINTS_PRODUKT_ID` als Repository-Secret. Der
+Secret-Weg ist dabei nicht
 Geheimniskrämerei, sondern die **Produktgrenze**: ein Fork ist laut DK-Bedingungen ein
 anderes Produkt und hat das Secret nicht — sein Build läuft ohne Nummer und wird damit zur
 eigenen Registrierung geschoben, statt still unter unserem Namen zu laufen.
@@ -712,13 +723,11 @@ Bei einem echten Release gibt es diese Lücke nicht — dort wird `package.json`
 
 ### Was am Update-Weg noch fehlt
 
-Mechanismus und Release-Workflow stehen. Offen ist:
+Mechanismus, Workflow und Releases stehen. Offen ist:
 
-- **Die Repository-Secrets.** Ohne `TAURI_SIGNING_PRIVATE_KEY` bricht der Workflow ab
-  (richtig so — ein unsigniertes Update nimmt keine App an). Ohne `FINTS_PRODUKT_ID` läuft
-  er durch, und die veröffentlichte App hat einen gesperrten Bankabruf.
-- **Das erste Release.** Bis es eines gibt, liefert der Endpunkt eine 404, die Prüfung
-  schlägt fehl und schweigt — wie vorgesehen.
+- **Das Apple-Zertifikat** und die sechs Secrets dazu. Ohne sie wird unsigniert
+  ausgeliefert, und das Release sagt es (siehe unten). Die drei anderen Secrets liegen:
+  `TAURI_SIGNING_PRIVATE_KEY`, dessen Passwort und `FINTS_PRODUKT_ID`.
 - **Linux.** Braucht AppImage als Bundle-Ziel und einen zweiten Bauplatz; macOS lässt sich
   nicht auf Linux bauen und umgekehrt. Und der Updater kann dort ausschliesslich AppImages
   ersetzen.
@@ -939,38 +948,68 @@ Produktregistrierungsnummer wird zur **Bauzeit** eingebacken. Fehlt sie, ist die
 fertig und der Bankabruf tot — und das merkt man erst beim ersten Abruf.
 `scripts/installieren.sh` warnt, aber es bricht nicht ab.
 
-### Signierung und Notarisierung: vorbereitet, nicht aktiv
+### Signierung: zwei Signaturen, die nichts miteinander zu tun haben
+
+Sie werden regelmässig verwechselt, und die Verwechslung führt zu falschen Schlüssen:
+
+| | wofür | Stand |
+|---|---|---|
+| **minisign** (Updater) | verhindert, dass jemand ein Update unterschiebt | liegt, Secret hinterlegt |
+| **Apple** (Gatekeeper) | erlaubt, einen **frischen Download** zu starten | fehlt |
+
+**Eine bereits laufende App aktualisiert sich auch ohne Apple-Signatur** — Gatekeeper prüft
+eine App, die einmal starten durfte, nicht erneut. Die Apple-Signatur zählt für den, der auf
+der Releases-Seite landet und zum ersten Mal herunterlädt. Ohne die minisign-Signatur
+dagegen bricht schon der Build ab, und das setzt Tauri selbst durch.
 
 Der Release-Workflow reicht **sechs Apple-Secrets** durch (`APPLE_CERTIFICATE`,
 `APPLE_CERTIFICATE_PASSWORD`, `APPLE_SIGNING_IDENTITY`, `APPLE_ID`, `APPLE_PASSWORD`,
-`APPLE_TEAM_ID`). Sobald sie im Repository hinterlegt sind, signiert und notarisiert
-`tauri-action` von selbst — es braucht keine Änderung am Workflow mehr.
+`APPLE_TEAM_ID`). Sobald sie hinterlegt sind, signiert und notarisiert `tauri-action` von
+selbst — es braucht keine Änderung am Workflow mehr. **Signierung allein genügt nicht:**
+Gatekeeper verlangt bei einem geladenen Bundle auch die Notarisierung, dafür sind die
+letzten drei da. `APPLE_PASSWORD` ist ein app-spezifisches Kennwort, nie das echte.
 
-**Signierung allein genügt nicht.** Gatekeeper verlangt bei einem geladenen Bundle auch
-die Notarisierung; dafür sind die letzten drei da. `APPLE_PASSWORD` ist ein
-app-spezifisches Kennwort, nie das echte.
+#### Der Türsteher, und warum er eine Weiche geworden ist
 
-**Ohne die Secrets bricht der Release-Workflow ab** — und zwar bevor irgendetwas gebaut
-wird. Das ist die eigentliche Maßnahme, und sie hängt NICHT am Zertifikat: `tauri-action`
-würde sonst klaglos ein unsigniertes Bundle bauen und an ein öffentliches Release hängen.
-Gemerkt würde es erst beim Nutzer, wenn macOS die App als „beschädigt" meldet.
+Vom 26. bis zum 28.08.2026 **brach der Workflow ab**, wenn die Apple-Secrets fehlten —
+bevor irgendetwas gebaut wurde. Der Gedanke war richtig und ist es weiterhin: `tauri-action`
+baut sonst klaglos ein unsigniertes Bundle und hängt es an ein öffentliches Release, und ein
+Zertifikat kann man nachreichen, ein Release nicht zurückholen.
 
-**Ein Zertifikat kann man nachreichen; ein Release, das draussen ist, nicht mehr.** Genau
-dieselbe Regel gilt schon für den Updater-Signaturschlüssel — nur setzt Tauri sie dort
-selbst durch, und hier tut es niemand.
+Seine Begründung stand im Workflow und nannte die Tür, die offen bleibt: *„Der LOKALE Weg
+ist davon unberührt — wer auf der eigenen Maschine baut und dort installiert, weiss, was er
+tut."* **Genau diese Tür ist zu**, seit lokal nicht mehr gebaut wird (siehe oben). Damit
+blockierte er nicht mehr das Riskante, sondern das Einzige — und ein Wächter, der jede
+Auslieferung verhindert, wird abgeschaltet statt umgangen. Das ist dieselbe Überlegung, aus
+der jeder Hook hier ein `--no-verify` hat.
 
-Damit ist auch die `xattr`-Anleitung aus dem Release-Text verschwunden. Sie war
-notwendig, solange unsigniert ausgeliefert wurde; jetzt kann das nicht mehr passieren.
-**Im lokalen Installationsskript bleibt sie** — wer auf der eigenen Maschine baut und
-dort installiert, weiss, was er tut. Gefährlich wird es erst, wenn Fremde herunterladen.
+**Was von ihm bleibt, ist der wertvollere Teil: der Release-Text sagt die Wahrheit über den
+Signierungsstand.** Der Schritt prüft weiterhin die vier Secrets, bricht aber nicht mehr ab,
+sondern baut daraus den Text:
 
-`src/auslieferung.test.ts` hält beides fest: dass der Türsteher wirklich abbricht (`exit
-1`, nicht nur eine Warnung), und dass die Anleitung nicht in den Release-Text
-zurückkehrt.
+| Secrets da | Release-Text |
+|---|---|
+| ja | „Signiert und notarisiert." |
+| nein | was macOS melden wird, die `xattr`-Zeile, und dass ein installierter Moneymanager sie nicht braucht |
 
-**Bis das Zertifikat da ist, läuft der lokale Weg unverändert:** `npm run installieren`
-baut und installiert nach `/Applications`. Was fehlt, ist nur die Möglichkeit, ein
-öffentliches Release zu erzeugen — und das ist Absicht.
+Der Schaden, um den es wirklich geht, ist nicht das unsignierte Bundle — es ist ein
+unsigniertes Bundle unter der Zeile „Signiert und notarisiert". Ein Release, dem man
+ansieht, dass es unsigniert ist, ist ehrlich; ein Literal im Workflow wäre genau dann
+falsch, wenn es darauf ankommt. Deshalb ist `releaseBody` kein fester Text mehr, sondern
+die Ausgabe des Schritts.
+
+**Die `xattr`-Anleitung ist damit zurück, aber nur im unsignierten Zweig.** Sie wegzulassen
+macht das Bundle nicht sicherer; es macht den Fehlschlag unerklärlich — macOS meldet
+„beschädigt", und wer die App nicht selbst gebaut hat, hat keine Handhabe. Sobald das
+Zertifikat da ist, verschwindet sie von selbst, ohne dass jemand daran denken muss.
+
+`src/auslieferung.test.ts` hält das fest: dass der Text BERECHNET wird und nicht behauptet,
+und dass beide Zweige dastehen.
+
+**Was das Zertifikat kostet und einbringt:** Apple Developer Program, jährlich. Danach
+laufen beide Wege — der Updater wie bisher, und zusätzlich kann jemand die App frisch
+herunterladen und starten. Der Weg dorthin ist ein `gh run rerun` auf den bestehenden Tag,
+keine Tag-Chirurgie.
 
 **Zwei Dinge müssen ausserhalb des Repos bereitliegen**, und beide fehlen in einem frischen
 Klon:
