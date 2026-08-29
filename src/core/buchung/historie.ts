@@ -234,9 +234,26 @@ export function nachHauptgruppe(
 
 /**
  * Interne Umbuchung (Geld zwischen eigenen Konten) — gehört NICHT in eine Ausgaben-/
- * Einnahmen-Auswertung. Erkennung: verknüpftes Transfer-Bein (transferId) ODER
- * Umschichtung ohne Kategorie (so importieren wir Umbuchungen). Gesparte „Umschichtung MIT
- * Kategorie" (z. B. Sparen & Anlegen) bleibt erhalten.
+ * Einnahmen-Auswertung.
+ *
+ * Zwei Erkennungswege, und sie fangen Verschiedenes:
+ *
+ *   1. **`transferId`** — die beiden Beine sind verknüpft. Das setzt `umsatzVerbuchen`,
+ *      wenn es beim Import ein Paar gefunden hat, und die Paarung von Hand.
+ *   2. **Umschichtung OHNE Kategorie** — trägt nur noch ALTBESTAND.
+ *
+ * Weg 2 fing einseitige Umschichtungen: ein Umbuchungs-Bein, dessen Gegenstück nie
+ * gefunden wurde. Seit 2026-08-29 entstehen die nicht mehr — **eine Umbuchung ohne
+ * Gegenbuchung gibt es nicht.** Steht das Gegenkonto nicht im Bestand, hat das Geld den
+ * erfassten Bereich verlassen, und das ist ein Abfluss (siehe
+ * `application/import/umsatzVerbuchen`, Schritt 2).
+ *
+ * Der Weg bleibt trotzdem, weil solche Zeilen im Bestand liegen können. Wer ihn eines
+ * Tages entfernt, prüft vorher am echten Bestand — und weiss dann auch, dass er ihn nicht
+ * für neue Daten braucht.
+ *
+ * Eine „Umschichtung MIT Kategorie" (Sparen & Anlegen) bleibt bewusst erhalten — sie ist
+ * eine Umschichtung, die man in der Auswertung SEHEN will.
  */
 export function istInterneUmbuchung(b: IstBuchung): boolean {
   return b.transferId != null || (b.charakter === "Umschichtung" && !b.kategorieId);

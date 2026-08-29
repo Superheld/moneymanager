@@ -9,7 +9,6 @@
 import type { Cent } from "../basis/geld";
 import { RHYTHMUS_MONATE, type Charakter, type Zahlungsregel } from "../basis/zahlungsregel";
 import { addMonate, ord, parseIso, toIso } from "../basis/datum";
-import { planRefKey } from "./istbuchung";
 
 
 /** Eine berechnete Plan-Zahlung (nicht persistiert). */
@@ -26,15 +25,20 @@ export interface Planbuchung {
  * Beginnt beim Startdatum und schreitet im Rhythmus voran; Fälligkeiten vor
  * dem Fensterstart werden übersprungen (die Regel kann älter sein als das Fenster).
  *
- * `bezahlt` (optional): Schlüssel bereits per Ist bestätigter Posten (planRefKey).
  * Solche Fälligkeiten sind Fakt, kein Plan mehr → sie werden aus der Vorschau
  * entfernt, damit sie nicht doppelt zählen (der reale Saldo trägt sie schon).
  */
+/**
+ * Deckel für die Fälligkeitsschleife — sie zählt vom ersten Zyklus IM Fenster hoch, ein
+ * Fenster ist also nie annähernd so gross. Der Deckel schützt nur davor, dass ein
+ * kaputter Rhythmus (Schritt 0) endlos läuft.
+ */
+const MAX_SCHRITTE = 10_000;
+
 export function projiziereRegel(
   regel: Zahlungsregel,
   ab: string,
   monate: number,
-  bezahlt?: ReadonlySet<string>,
 ): Planbuchung[] {
   const schritt = RHYTHMUS_MONATE[regel.rhythmus];
   const fensterStart = parseIso(ab);
@@ -50,19 +54,18 @@ export function projiziereRegel(
 
   // Beim ersten Zyklus IM Fenster einsteigen, statt vom Regelstart hochzuzählen: eine
   // Regel mit sehr altem Startdatum verschwand sonst kommentarlos aus der Projektion,
-  // weil der Schleifendeckel (10000 Schritte) bei monatlichem Rhythmus nur rund
+  // weil der Schleifendeckel (`MAX_SCHRITTE`) bei monatlichem Rhythmus nur rund
   // 833 Jahre weit reicht. Der Posten stand in der Vertragsliste, tauchte im
   // Liquiditätsplan aber nie auf — der projizierte Saldo war zu hoch.
   const monateBisFenster =
     (fensterStart.y - start.y) * 12 + (fensterStart.m - start.m);
   const kStart = Math.max(0, Math.floor(monateBisFenster / schritt));
 
-  for (let k = kStart; k < kStart + 10000; k++) {
+  for (let k = kStart; k < kStart + MAX_SCHRITTE; k++) {
     const faellig = addMonate(start, k * schritt);
     if (ord(faellig) >= endeOrd) break;
     if (ord(faellig) >= startOrd) {
       const datum = toIso(faellig);
-      if (bezahlt?.has(planRefKey(regel.id, datum))) continue;
       buchungen.push({
         regelId: regel.id,
         bezeichnung: regel.bezeichnung,

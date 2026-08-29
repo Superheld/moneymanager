@@ -17,6 +17,7 @@
 // Betragsheuristik des Monatsausblicks (0,00 / 131,00 / 45,87 / 289,51 / 26,50); wir
 // tauschen also kein Verhalten, sondern nur eine Vermutung gegen eine Tatsache.
 
+import { empfaengerJeBuchung } from "../buchung/belegZuBuchung";
 import {
   betragImMonat,
   budgetBuchungen,
@@ -263,11 +264,7 @@ export async function budgetbereichLaden(
     konten,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     kategorieNamen: new Map(uebersicht.sicht.kategorien.map((k: Kategorie) => [k.id, k.name])),
-    empfaenger: new Map(
-      umsaetze
-        .filter((u) => u.istbuchungId && u.gegenpartei)
-        .map((u) => [u.istbuchungId!, u.gegenpartei!]),
-    ),
+    empfaenger: empfaengerJeBuchung(umsaetze),
     vorschlaege,
   };
 }

@@ -1756,4 +1756,22 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_kontogruppe_konto ON kontogruppe_konto(konto_id)`,
     ],
   },
+  {
+    version: 62, // Der Plan-Bezug an der Ist-Buchung faellt — es gab ihn nie
+    sql: [
+      // `plan_quelle_id`/`plan_faelligkeit` sollten eine Buchung tragen, die einen
+      // Plan-Posten per Haekchen bestaetigt. Das Haekchen wurde nie gebaut: kein
+      // Use-Case hat die Spalten je beschrieben, und im Bestand ist keine einzige Zeile
+      // gesetzt (geprueft vor dem Abraeumen, wie das Alpha-Stadium es verlangt).
+      //
+      // Was bleibt, ist der Typ `PlanRef` im Kern — er identifiziert weiterhin eine
+      // PROJIZIERTE Zeile im Kontoregister. Nur die Ist-Seite faellt.
+      //
+      // Der Index zuerst: er steht auf beiden Spalten, und SQLite laesst eine Spalte
+      // nicht fallen, solange ein Index sie braucht.
+      `DROP INDEX IF EXISTS ux_ist_planref`,
+      `ALTER TABLE ist_buchung DROP COLUMN plan_quelle_id`,
+      `ALTER TABLE ist_buchung DROP COLUMN plan_faelligkeit`,
+    ],
+  },
 ];

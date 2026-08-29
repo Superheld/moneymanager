@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { trainieren, type IstBuchung, type Kategorie, type Zahlungsspur } from "../../core";
 import { charakterWechsel, kategorieAbgleich, planAnwenden, uebergaenge } from "./kategorieAbgleich";
-import { katalogNachId, katalogNachName, type Vorschlagskontext } from "../import/vorschlag";
+import { katalogNachId, type Vorschlagskontext } from "../import/vorschlag";
 import type { LedgerPort } from "../ports";
 
 const KATEGORIEN: Kategorie[] = [
@@ -14,7 +14,6 @@ const KATEGORIEN: Kategorie[] = [
 /** Ein Kontext, in dem „talmer" per Festlegung auf Drogerie zeigt. */
 function kontextMitFestlegung(muster = "talmer", kategorieId = "k-dro"): Vorschlagskontext {
   return {
-    katalogNachName: katalogNachName(KATEGORIEN),
     kategorieNachId: katalogNachId(KATEGORIEN),
     festlegungen: [{ muster, kategorieId, angelegtAm: "2026-08-17T10:00:00.000Z" }],
   };
@@ -116,7 +115,6 @@ describe("Plan rechnen", () => {
 
   it("nutzt dieselbe Kette wie der Import — auch das Modell", () => {
     const kontext: Vorschlagskontext = {
-      katalogNachName: katalogNachName(KATEGORIEN),
       kategorieNachId: katalogNachId(KATEGORIEN),
       modell: trainieren([
         { merkmale: ["emp=rewe markt", "vwz:einkauf"], kategorieId: "k-le" },
@@ -131,7 +129,6 @@ describe("Plan rechnen", () => {
     // Eine gebuchte Zahlung trägt keine Fremdkategorie mehr; die Kette dürfte hier keine
     // erfinden.
     const kontext: Vorschlagskontext = {
-      katalogNachName: katalogNachName(KATEGORIEN),
       kategorieNachId: katalogNachId(KATEGORIEN),
     };
     expect(kategorieAbgleich([spur()], kontext).setzen).toHaveLength(0);

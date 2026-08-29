@@ -4,8 +4,10 @@
 // entschieden, WANN gerechnet wird. Der Abgleich ist bewusst EIN Lauf über den ganzen
 // Bestand statt eines Hakens an jeder Stelle, an der Buchungen entstehen:
 //
-//   • Buchungen entstehen an drei Stellen (Import, manuelle Erfassung, bezahlt-markiert)
-//     — drei Haken wären drei Gelegenheiten, einen zu vergessen.
+//   • Buchungen entstehen an mehreren Stellen (Bankabruf, Dateiimport, manuelle
+//     Erfassung, beide Beine einer Umbuchung) — je ein Haken dort wären ebenso viele
+//     Gelegenheiten, einen zu vergessen. Das Argument haengt nicht an ihrer Zahl: es
+//     gilt, solange es mehr als eine ist, und eine kommt eher dazu als weg.
 //   • Ein neu erfasster Vertrag muss RÜCKWIRKEND greifen. Sonst trüge nur das, was nach
 //     dem Anlegen gebucht wurde, seine Zuordnung, und der Bestand bliebe für immer blind.
 //   • Er ist idempotent und schreibt nur Deltas, kostet also nichts, wenn nichts zu tun ist.

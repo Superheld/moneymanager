@@ -11,6 +11,7 @@
 // und kann deshalb auch nicht versehentlich eine andere Buchungsmenge hineinreichen als
 // die Nachbarzahl.
 
+import { belegZuBuchung } from "./buchung/belegZuBuchung";
 import {
   addMonate,
   blindeFlecken,
@@ -26,11 +27,13 @@ import {
   planWirkung,
   projiziereRegel,
   vertragstreue,
+  betragInKategorie,
   buchungenDerKategorie,
   fruehesterMonat,
   istInterneUmbuchung,
   istMonatsverlauf,
   kategorieAggregat,
+  monateImFenster,
   nachHauptgruppe,
   parseIso,
   tageImMonat,
@@ -112,8 +115,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
       deps.vertragRepo.alle(),
       deps.regelRepo.alle(),
     ]);
-  const umsatzZuBuchung = new Map<string, Umsatz>();
-  for (const u of umsaetze) if (u.istbuchungId) umsatzZuBuchung.set(u.istbuchungId, u);
+  const umsatzZuBuchung = belegZuBuchung(umsaetze);
   return {
     buchungen,
     konten,
@@ -189,6 +191,16 @@ export function analyseGruppen(basis: Analysebasis, items: readonly KategorieSum
 /** Eine Zeile der aufgeklappten Kategorie — schon mit dem, was am Umsatz hängt. */
 export interface Analysezeile {
   readonly buchung: IstBuchung;
+  /**
+   * Der Betrag, mit dem diese Buchung auf DIESE Kategorie wirkt.
+   *
+   * Bei einer geteilten Buchung ihr Teil, sonst der volle Betrag — und deshalb nicht
+   * dasselbe wie `buchung.betrag`. Die Liste steht unter einem Aggregat, das über
+   * `kategorieAnteile` rechnet; zeigte sie den Gesamtbetrag, summierten sich ihre Zeilen
+   * nicht auf die Zahl darüber, und der Wocheneinkauf stünde unter „Drogerie" mit dem
+   * Betrag, den er insgesamt gekostet hat.
+   */
+  readonly betrag: Cent;
   readonly empfaenger: string;
   readonly verwendungszweck: string;
   readonly kontoName: string;
@@ -206,6 +218,7 @@ export function analyseBuchungen(
     const u = basis.umsatzZuBuchung.get(buchung.id);
     return {
       buchung,
+      betrag: betragInKategorie(buchung, kategorieId),
       empfaenger: u?.gegenpartei ?? buchung.notiz ?? "",
       verwendungszweck: u?.verwendungszweck ?? "",
       kontoName: basis.kontoNamen.get(buchung.kontoId) ?? "",
@@ -321,7 +334,7 @@ function sollImFenster(
 ): Cent | undefined {
   const eigene = regeln.filter((r) => r.vertragId === vertragId);
   if (eigene.length === 0) return undefined;
-  const monate = monateImFensterAus(von, bis);
+  const monate = monateImFenster(von, bis);
   let soll = 0;
   for (const r of eigene) {
     for (const p of projiziereRegel(r, von, monate)) {
@@ -329,13 +342,6 @@ function sollImFenster(
     }
   }
   return soll;
-}
-
-/** Monate des Fensters, beide Enden eingeschlossen — wie im Kern. */
-function monateImFensterAus(von: string, bis: string): number {
-  const a = parseIso(von);
-  const b = parseIso(bis);
-  return Math.max(1, (b.y - a.y) * 12 + (b.m - a.m) + 1);
 }
 
 /** Ein Monat im Verlauf — gewesen oder geplant. */

@@ -21,7 +21,7 @@
 // Rein, kein IO.
 
 import { musterSchaerfe, musterTrifft } from "../basis/muster";
-import { anbieterSchluessel } from "../vertraege/vertragErkennung";
+import { anbieterSchluessel } from "../basis/gegenpartei";
 
 /**
  * Eine Festlegung: Empfängermuster → Kategorie.

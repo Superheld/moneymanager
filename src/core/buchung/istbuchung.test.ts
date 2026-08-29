@@ -2,12 +2,9 @@ import { describe, it, expect } from "vitest";
 import { euroZuCent } from "../basis/geld";
 import type { Zahlungskonto } from "../konten/konto";
 import {
-  bezahlteSchluessel,
-  findeIstZuPlan,
   istSummeKonto,
   kategorieIstHandverlesen,
   liquideMittelReal,
-  planRefKey,
   realerKontostand,
   type IstBuchung,
 } from "./istbuchung";
@@ -19,8 +16,7 @@ function ist(over: Partial<IstBuchung> = {}): IstBuchung {
     betrag: euroZuCent(-200),
     kontoId: "k1",
     charakter: "Aufwand",
-    quelle: "bezahlt-markiert",
-    planRef: { quelleId: "r1", faelligkeit: "2026-06-01" },
+    quelle: "manuell",
     ...over,
   };
 }
@@ -28,29 +24,6 @@ function ist(over: Partial<IstBuchung> = {}): IstBuchung {
 function konto(over: Partial<Zahlungskonto> = {}): Zahlungskonto {
   return { id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: euroZuCent(1000), ...over };
 }
-
-describe("planRefKey / bezahlteSchluessel / findeIstZuPlan", () => {
-  it("baut einen stabilen Schlüssel aus Quelle und Fälligkeit", () => {
-    expect(planRefKey("r1", "2026-06-01")).toBe("r1@2026-06-01");
-  });
-
-  it("sammelt alle belegten Plan-Posten als Schlüssel", () => {
-    const s = bezahlteSchluessel([
-      ist(),
-      ist({ id: "i2", planRef: { quelleId: "r2", faelligkeit: "2026-07-01" } }),
-      ist({ id: "i3", quelle: "import", planRef: undefined }), // ohne planRef → ignoriert
-    ]);
-    expect(s.has("r1@2026-06-01")).toBe(true);
-    expect(s.has("r2@2026-07-01")).toBe(true);
-    expect(s.size).toBe(2);
-  });
-
-  it("findet die Ist-Buchung zu einem Plan-Posten", () => {
-    const buchungen = [ist()];
-    expect(findeIstZuPlan(buchungen, "r1", "2026-06-01")?.id).toBe("i1");
-    expect(findeIstZuPlan(buchungen, "r1", "2026-07-01")).toBeUndefined();
-  });
-});
 
 describe("Reconciliation light", () => {
   it("istSummeKonto summiert nur das passende Konto, vorzeichenbehaftet", () => {

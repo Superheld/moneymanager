@@ -246,7 +246,6 @@ const de = {
     spalteKurs: "Kurs",
     spalteWert: "Wert",
     spalteErgebnis: "seit Kauf",
-    anteil: "{{prozent}} %",
     wertLabel: "Depotwert",
     standErklaerung: "So hat die Bank es am {{datum}} aufgestellt.",
     keinePositionen: "Die Bank hat für diesen Stichtag keine Positionen gemeldet.",
@@ -291,7 +290,6 @@ const de = {
       festlegung: "Festgelegt",
       regel: "Vertrag",
       ki: "Erkennung",
-      remapping: "Import",
       manuell: "von Hand",
     },
     herkunftTitel: {
@@ -299,7 +297,6 @@ const de = {
       festlegung: "Für diesen Empfänger wurde ausdrücklich festgelegt, welche Kategorie gilt.",
       regel: "Die Zahlung passt auf die Erkennungsregel eines Vertrags — sie erbt dessen Kategorie.",
       ki: "Das trainierte Modell hat entschieden.",
-      remapping: "Die Kategorie kam mit der Importdatei und wurde auf unseren Baum übersetzt.",
       manuell: "Hier hat jemand von Hand entschieden.",
     },
     festlegung: {
@@ -470,7 +467,6 @@ const de = {
     spalteIst: "gebucht",
     bleibt: "Bleibt übrig",
     bleibtErklaerung: "Einnahmen minus Verträge, Budgets und Rücklagen",
-    statusBezahlt: "abgehakt",
     statusOffen: "offen",
     zeile: {
       einnahmen: "Einnahmen",
@@ -1080,7 +1076,6 @@ const de = {
     pruefenFeld: "Noch ansehen",
     pruefenHinweis:
       "Merkt die Zeile im Auszug vor. Zeilen aus einem Bankabruf tragen den Marker von selbst — sie werden gebucht, ohne dass jemand sie gesehen hat.",
-    pillBezahlt: "bezahlt",
     bearbeiten: "bearbeiten",
     loeschen: "löschen",
     heuteRealerStand: "heute · realer Stand {{stand}} {{symbol}}",
@@ -1201,8 +1196,6 @@ const de = {
       importlaufWert: "{{quelle}} · {{zeitpunkt}}",
       nativeId: "ID der Quelle",
       rohHash: "Dedup-Schlüssel",
-      planbezug: "Geplant als",
-      planbezugWert: "{{regel}} · fällig {{faelligkeit}}",
       ohneImport: "In der App erfasst — kein Import-Kontext vorhanden.",
       kontoGepaart: "fest — erst die Paarung lösen",
       verwerfenBankzeile: "Verwerfen",
@@ -1255,7 +1248,6 @@ const de = {
     quelleName: {
       import: "Bankimport",
       manuell: "manuelle Erfassung",
-      "bezahlt-markiert": "Plan-Posten abgehakt",
     },
     split: {
       titel: "Buchung aufteilen",
@@ -2025,7 +2017,6 @@ const en: typeof de = {
     spalteKurs: "Price",
     spalteWert: "Value",
     spalteErgebnis: "since purchase",
-    anteil: "{{prozent}} %",
     wertLabel: "Portfolio value",
     standErklaerung: "This is how the bank listed it on {{datum}}.",
     keinePositionen: "The bank reported no holdings for this date.",
@@ -2068,7 +2059,6 @@ const en: typeof de = {
       festlegung: "Pinned",
       regel: "Contract",
       ki: "Recognition",
-      remapping: "Import",
       manuell: "by hand",
     },
     herkunftTitel: {
@@ -2076,7 +2066,6 @@ const en: typeof de = {
       festlegung: "Someone pinned a category for this payee.",
       regel: "The payment matches a contract's recognition rule — it inherits that category.",
       ki: "The trained model decided.",
-      remapping: "The category came with the import file and was mapped onto our tree.",
       manuell: "Someone decided this by hand.",
     },
     festlegung: {
@@ -2244,7 +2233,6 @@ const en: typeof de = {
     spalteIst: "posted",
     bleibt: "Left over",
     bleibtErklaerung: "Income minus contracts, budgets and reserves",
-    statusBezahlt: "ticked off",
     statusOffen: "open",
     zeile: {
       einnahmen: "Income",
@@ -2834,7 +2822,6 @@ const en: typeof de = {
     pruefenFeld: "Still to review",
     pruefenHinweis:
       "Flags the entry in the statement. Rows from a bank retrieval carry the marker by themselves — they are booked without anyone having seen them.",
-    pillBezahlt: "paid",
     bearbeiten: "edit",
     loeschen: "delete",
     heuteRealerStand: "today · balance {{stand}} {{symbol}}",
@@ -2951,8 +2938,6 @@ const en: typeof de = {
       importlaufWert: "{{quelle}} · {{zeitpunkt}}",
       nativeId: "Source ID",
       rohHash: "Dedup key",
-      planbezug: "Planned as",
-      planbezugWert: "{{regel}} · due {{faelligkeit}}",
       ohneImport: "Captured in the app — no import context available.",
       kontoGepaart: "fixed — unpair the transfer first",
       verwerfenBankzeile: "Discard",
@@ -3005,7 +2990,6 @@ const en: typeof de = {
     quelleName: {
       import: "bank import",
       manuell: "manual entry",
-      "bezahlt-markiert": "planned item ticked off",
     },
     split: {
       titel: "Split transaction",

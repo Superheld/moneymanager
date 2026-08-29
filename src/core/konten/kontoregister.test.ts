@@ -50,15 +50,18 @@ describe("kontoRegister — gebuchtes Ist", () => {
     expect(r.gebucht[0].quelle).toBe("manuell");
   });
 
-  it("benennt aus Plan bestätigtes Ist über die Regel-Bezeichnung", () => {
+  it("benennt eine gebuchte Zeile ohne Notiz neutral", () => {
+    // Sie hiess einmal wie die Zahlungsregel, wenn sie deren Fälligkeit bestätigte.
+    // Diese Bestätigung gibt es nicht mehr (siehe `IstQuelle`), und aus dem blossen
+    // Betrag eine Regel zu erraten wäre eine Zuordnung, die niemand getroffen hat.
     const r = kontoRegister(
       konto(),
-      [ist({ id: "a", notiz: undefined, planRef: { quelleId: "miete", faelligkeit: "2026-06-01" }, betrag: euroZuCent(-1200) })],
+      [ist({ id: "a", notiz: undefined, betrag: euroZuCent(-1200) })],
       [regel()],
       "2026-06-15",
       30,
     );
-    expect(r.gebucht[0].bezeichnung).toBe("Miete");
+    expect(r.gebucht[0].bezeichnung).toBe("Buchung");
   });
 });
 
@@ -70,14 +73,6 @@ describe("kontoRegister — geplante Vorschau", () => {
     expect(r.geplant[0].datum).toBe("2026-07-01");
     expect(r.geplant[0].saldo).toBe(euroZuCent(800)); // 2000 − 1200
     expect(r.geplant[0].planRef).toEqual({ quelleId: "miete", faelligkeit: "2026-07-01" });
-  });
-
-  it("schließt bereits bezahlte Fälligkeiten aus der Vorschau aus", () => {
-    const bezahltIst = ist({ id: "p", datum: "2026-07-01", betrag: euroZuCent(-1200), planRef: { quelleId: "miete", faelligkeit: "2026-07-01" }, quelle: "bezahlt-markiert" });
-    const r = kontoRegister(konto(), [bezahltIst], [regel()], "2026-06-15", 30);
-    expect(r.geplant).toHaveLength(0);
-    // die bezahlte Fälligkeit erscheint stattdessen im gebuchten Teil
-    expect(r.gebucht.some((z) => z.planRef?.faelligkeit === "2026-07-01")).toBe(true);
   });
 
   it("ignoriert Regeln, die einem anderen Konto zugeordnet sind", () => {
@@ -150,23 +145,6 @@ describe("vorschauAlleKonten", () => {
       ["2026-06-10", "k2"],
       ["2026-06-20", "k1"],
     ]);
-  });
-
-  it("lässt eine bereits bezahlte Fälligkeit weg — dieselbe Regel wie im Register", () => {
-    const bezahlt = ist({
-      id: "b1",
-      datum: "2026-06-10",
-      kontoId: "k2",
-      planRef: { quelleId: "r-frueh", faelligkeit: "2026-06-10" },
-    });
-    const zeilen = vorschauAlleKonten(
-      [giro, zweit],
-      [bezahlt],
-      [regel({ id: "r-frueh", startdatum: "2026-06-10", kontoId: "k2" })],
-      "2026-06-01",
-      30,
-    );
-    expect(zeilen).toHaveLength(0);
   });
 
   it("nimmt nur Regeln, deren Konto in der Liste steht", () => {

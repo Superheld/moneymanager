@@ -41,7 +41,7 @@
 // während ein sauber lesbares Wort daneben über ein Dutzend Kategorien streut.
 
 import type { Cent } from "../basis/geld";
-import { anbieterSchluessel } from "../vertraege/vertragErkennung";
+import { anbieterSchluessel } from "../basis/gegenpartei";
 
 /** Was von einer Zahlung in die Extraktion geht. Bewusst flach — kein Aggregat. */
 export interface Merkmalsquelle {

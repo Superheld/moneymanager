@@ -190,7 +190,22 @@ export async function umsaetzeVerbuchen(
     umbuchungen++;
   }
 
-  // 2. Rest einzeln (inkl. ungepaarter Umbuchungen → einseitige Umschichtung als Fallback).
+  // 2. Rest einzeln — darunter Umbuchungs-Beine, für die kein Gegenstück gefunden wurde.
+  //
+  // Sie werden NICHT als Umschichtung gebucht, und das ist die Fachlichkeit selbst:
+  // **eine Umbuchung ohne Gegenbuchung gibt es nicht.** Die Markierung sagt „dieses Geld
+  // hat nur das Konto gewechselt" — und wenn das Gegenkonto nicht im Bestand steht, hat es
+  // den erfassten Bereich verlassen. Aus SEINER Sicht ist das ein Abfluss, keine
+  // Verschiebung.
+  //
+  // Bis 2026-08-29 entstand hier eine einseitige Umschichtung, und die rechnete falsch:
+  // sie zählt in kein Budget und in keine Ausgabe, das Geld ist aber weg. Der Bestand sah
+  // vermögender aus, als er war — und ausgerechnet der Fall, in dem etwas nach draussen
+  // fliesst, war der unsichtbare.
+  //
+  // Was stattdessen passiert: die Richtung entscheidet (Abfluss → Aufwand), die Kategorie
+  // bleibt leer, und die Zeile landet in der Review-Inbox. Dort gehört sie hin — welche
+  // Ausgabe es war, weiss nur der Mensch.
   for (const u of einzeln) {
     if (!verbuchbar(u, deps.auchOhneKategorie)) {
       uebersprungen++;
@@ -201,16 +216,25 @@ export async function umsaetzeVerbuchen(
       datum: u.buchungstag,
       betrag: u.betrag,
       kontoId: u.zahlungskontoId,
+      // Ein ungepaartes Umbuchungs-Bein trägt keine Kategorie (die Umbuchungsstufe
+      // vergibt keine) — es bleibt offen und wartet in der Review-Inbox.
       kategorieId: u.vorschlag?.kategorieId,
       // Hat jemand in der Review-Inbox von Hand kategorisiert, ist das eine Entscheidung
-      // und überlebt jeden späteren automatischen Lauf. Alles andere (Remapping, Regel,
+      // und überlebt jeden späteren automatischen Lauf. Alles andere (Festlegung, Vertrag,
       // Modell) bleibt automatisch — und damit korrigierbar, ohne dass jemand die Zeile
       // zuerst freigeben muss.
       kategorieHerkunft: u.vorschlag?.quelle === "manuell" ? "manuell" : "automatisch",
-      // Ohne Vorschlag entscheidet die Richtung: was abfliesst, ist Aufwand, was
-      // zufliesst, Ertrag. Eine Umschichtung kann daraus nicht werden — die braucht ein
-      // zweites Bein, und das steht in der Paarung oben.
-      charakter: u.vorschlag?.charakter ?? (u.betrag < 0 ? "Aufwand" : "Ertrag"),
+      // Die Richtung entscheidet: was abfliesst, ist Aufwand, was zufliesst, Ertrag.
+      // Eine Umschichtung kann hier nicht herauskommen — sie braucht ein zweites Bein,
+      // und das steht in der Paarung oben. Deshalb wird der Umbuchungs-Vorschlag hier
+      // ausdrücklich VERWORFEN und nicht wie jeder andere übernommen: er hat seine
+      // Chance in Schritt 1 gehabt.
+      charakter:
+        u.vorschlag && u.vorschlag.quelle !== "umbuchung"
+          ? u.vorschlag.charakter
+          : u.betrag < 0
+            ? "Aufwand"
+            : "Ertrag",
       quelle: "import",
       rohHash: u.rohHash,
       zuPruefen: deps.zumPruefenVormerken || undefined,

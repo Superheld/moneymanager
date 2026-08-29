@@ -80,8 +80,6 @@ function alsBuchung(roh: string | null): IstBuchung | undefined {
   const betrag = zahl(stand, "betrag");
   if (!id || !datum || !kontoId || !charakter || !quelle || betrag === undefined) return undefined;
 
-  const planQuelle = text(stand, "plan_quelle_id");
-  const planFaellig = text(stand, "plan_faelligkeit");
 
   return {
     id,
@@ -95,7 +93,6 @@ function alsBuchung(roh: string | null): IstBuchung | undefined {
     notiz: text(stand, "notiz"),
     transferId: text(stand, "transfer_id"),
     gegenkontoId: text(stand, "gegenkonto_id"),
-    planRef: planQuelle && planFaellig ? { quelleId: planQuelle, faelligkeit: planFaellig } : undefined,
     rohHash: text(stand, "roh_hash"),
     zuPruefen: zahl(stand, "zu_pruefen") === 1 ? true : undefined,
     aufteilungen: teile(stand),

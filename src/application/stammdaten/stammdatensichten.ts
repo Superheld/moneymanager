@@ -68,7 +68,7 @@ export async function stammdatenLaden(deps: StammdatenDeps): Promise<Stammdaten>
     personen,
     konten,
     kategorien,
-    hatGebuchtes: buchungen.some((b) => b.planRef || b.quelle === "import"),
+    hatGebuchtes: buchungen.some((b) => b.quelle === "import"),
     kontostaende: konten.map((konto) => ({
       konto,
       bewegungen: istSummeKonto(buchungen, konto.id),

@@ -12,6 +12,8 @@ export * from "./konten/konto";
 export * from "./kategorien/kategorie";
 export * from "./vertraege/vertrag";
 export * from "./basis/muster";
+export * from "./basis/gegenpartei";
+export * from "./buchung/zahlungsspur";
 export * from "./vertraege/vertragErkennung";
 export * from "./vertraege/vertragZuordnung";
 export * from "./kategorien/kategoriefestlegung";

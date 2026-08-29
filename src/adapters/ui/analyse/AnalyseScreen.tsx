@@ -385,7 +385,7 @@ export function AnalyseScreen() {
                   </td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 45 ? zweck.slice(0, 45) + "…" : zweck}</td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{z.kontoName || "—"}</td>
-                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(z.buchung.betrag) }}>{geld.format(z.buchung.betrag, { mitVorzeichen: true })}</td>
+                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</td>
                 </tr>
               );
             })}

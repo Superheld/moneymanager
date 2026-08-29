@@ -18,8 +18,10 @@
 // überhaupt beeinflussen?" — dafür wäre nur die Verknüpfung zu wenig, weil sie das noch
 // nicht Erfasste übersieht und der Rahmen dann zu hoch ausfiele.
 
+import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
 import { budgetvorschlaege as berechnen, vertragskandidaten } from "../../core";
-import type { Budgetvorschlag, Zahlungsspur } from "../../core";
+import type { Budgetvorschlag } from "../../core";
+import { spurenAus } from "../buchung/zahlungsspuren";
 import type {
   BudgetRepository,
   EinstellungenRepository,
@@ -34,23 +36,14 @@ const SCHLUESSEL_IGNORIERT = "budgetvorschlag.ignoriert";
 export async function ignorierteBudgetvorschlaege(
   repo: EinstellungenRepository,
 ): Promise<Set<string>> {
-  const roh = (await repo.lesen())[SCHLUESSEL_IGNORIERT];
-  if (!roh) return new Set();
-  try {
-    const gelesen: unknown = JSON.parse(roh);
-    return new Set(Array.isArray(gelesen) ? gelesen.filter((x): x is string => typeof x === "string") : []);
-  } catch {
-    return new Set();
-  }
+  return ignorierteLesen(repo, SCHLUESSEL_IGNORIERT);
 }
 
 export async function budgetvorschlagIgnorieren(
   repo: EinstellungenRepository,
   kategorieId: string,
 ): Promise<void> {
-  const menge = await ignorierteBudgetvorschlaege(repo);
-  menge.add(kategorieId);
-  await repo.schreiben(SCHLUESSEL_IGNORIERT, JSON.stringify([...menge]));
+  await ignorierenVermerken(repo, SCHLUESSEL_IGNORIERT, kategorieId);
 }
 
 /**
@@ -77,23 +70,9 @@ export async function budgetvorschlaegeLaden(
     budgetRepo.alle(),
   ]);
 
-  const umsatzZuBuchung = new Map<string, (typeof umsaetze)[number]>();
-  for (const u of umsaetze) {
-    if (u.istbuchungId && !umsatzZuBuchung.has(u.istbuchungId)) umsatzZuBuchung.set(u.istbuchungId, u);
-  }
-  const spuren: Zahlungsspur[] = buchungen.map((b) => {
-    const u = umsatzZuBuchung.get(b.id);
-    return {
-      id: b.id,
-      datum: b.datum,
-      betrag: b.betrag,
-      gegenpartei: u?.gegenpartei ?? "",
-      glaeubigerId: u?.glaeubigerId,
-      kategorieId: b.kategorieId,
-      charakter: b.charakter,
-    };
-  });
-  const vertraglich = new Set(vertragskandidaten(spuren, heute).flatMap((k) => k.buchungIds));
+  const vertraglich = new Set(
+    vertragskandidaten(spurenAus(buchungen, umsaetze), heute).flatMap((k) => k.buchungIds),
+  );
   // Dazu, was ausdrücklich an einem Vertrag hängt — auch wenn die Wiederkehr-Erkennung
   // es nicht als Kandidat sieht (zu wenige Zahlungen, zu unregelmäßig, von Hand gesetzt).
   for (const z of (await zuordnungRepo?.alle()) ?? []) {

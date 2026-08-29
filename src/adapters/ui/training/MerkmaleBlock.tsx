@@ -13,6 +13,7 @@
 // Geladen wird erst auf Klick: die Trennschärfe braucht den gesamten Bestand, und ein
 // Buchungsdialog soll sich nicht deshalb verzögern.
 
+import { useProzent } from "../bausteine/einstellungenKontext";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -28,6 +29,7 @@ import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 
 export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz?: Umsatz }) {
   const { t } = useTranslation();
+  const prozent = useProzent();
   const { locale } = useGeld();
   const [offen, setOffen] = useState(false);
   const [stand, setStand] = useState<Merkmalsansicht | null>(null);
@@ -61,7 +63,6 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
     await laden();
   }
 
-  const prozent = (x: number) => `${(x * 100).toLocaleString(locale, { maximumFractionDigits: 0 })} %`;
   const zahl = (n: number) => n.toLocaleString(locale);
   /** Das nackte Wort ohne Präfix — nur das steht in der Ausschlussliste. */
   const wortVon = (merkmal: string) => merkmal.slice(merkmal.search(/[=:]/) + 1);

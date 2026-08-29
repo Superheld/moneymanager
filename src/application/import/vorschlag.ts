@@ -14,12 +14,15 @@
 //      beim Erfassen des Vertrags getroffen hat.
 //   4. **Modell** — der trainierte Klassifikator. Er legt sich immer fest; auf echten
 //      Daten trifft er in rund 89 % der Fälle.
-//   5. **Remapping** — die Kategorie, die Finanzguru mitgeliefert hat, auf unseren Baum
-//      übersetzt. Steht bewusst HINTER dem Modell: eine Fremdklassifikation nach fremdem
-//      Kategoriebaum ist schwächer als ein Modell, das auf den eigenen Korrekturen
-//      trainiert wurde. Sie trägt den Kaltstart, solange nichts trainiert ist.
-//
 // Trifft nichts, bleibt der Umsatz unkategorisiert und landet in der Review-Inbox.
+//
+// Eine fünfte Stufe gab es bis 2026-08-29: das Remapping der Kategorie, die Finanzguru
+// mitgeliefert hatte. Sie trug den Kaltstart, solange nichts trainiert war — und mit
+// einem mitgelieferten Modell gibt es keinen Kaltstart mehr. Sie stand hinter dem
+// Modell, wurde also ohnehin nur erreicht, wenn dieses nichts fand; zugleich lief der
+// `kategorieHinweis` des Hanseatic-Abrufs still durch eine Finanzguru-Tabelle und
+// konnte dort nur zufällig treffen. Der `kategorieHinweis` bleibt am BELEG (er ist,
+// was die Quelle lieferte) — ausgewertet wird er nicht mehr.
 //
 // Rein: alles, was die Kette braucht, kommt als Kontext herein. Der lädt sich in
 // `application/kategorisierungsquellen`.
@@ -38,7 +41,6 @@ import {
   type Vertragserkennung,
   type Zahlungsspur,
 } from "../../core";
-import { unsereKategorieFuer } from "./remapping";
 import type { Kategorisierungsvorschlag } from "./umsatz";
 
 /**
@@ -46,8 +48,8 @@ import type { Kategorisierungsvorschlag } from "./umsatz";
  *
  * Bewusst schmaler als `RohUmsatz` (den es strukturell erfüllt): dieselbe Rechnung wird
  * auch für einen bereits übernommenen `Umsatz` gebraucht — in der Review-Inbox, wo die
- * Frage „warum diese Kategorie?" gestellt wird. Der trägt kein `istUmbuchung` und keinen
- * `kategorieHinweis` mehr; beide sind beim Import verbraucht und hier optional.
+ * Frage „warum diese Kategorie?" gestellt wird. Der trägt kein `istUmbuchung` mehr;
+ * es ist beim Import verbraucht und hier optional.
  */
 export interface Vorschlagseingabe {
   readonly buchungstag: string;
@@ -56,13 +58,10 @@ export interface Vorschlagseingabe {
   readonly verwendungszweck: string;
   readonly glaeubigerId?: string;
   readonly istUmbuchung?: boolean;
-  readonly kategorieHinweis?: string;
 }
 
 /** Alles, woraus ein Vorschlag entstehen kann. Jeder Teil ist optional. */
 export interface Vorschlagskontext {
-  /** Kategorien nach kleingeschriebenem Namen — für das Remapping. */
-  readonly katalogNachName: ReadonlyMap<string, Kategorie>;
   /** Kategorien nach Id — liefert den Charakter zur gewählten Kategorie. */
   readonly kategorieNachId: ReadonlyMap<string, Kategorie>;
   /** Ausdrückliche Festlegungen „immer bei diesem Empfänger". */
@@ -177,13 +176,6 @@ export function vorschlagsbefundFuer(
     }
   }
 
-  // 4. Remapping der mitgelieferten Kategorie.
-  const name = unsereKategorieFuer(roh.kategorieHinweis);
-  const kat = name ? kontext.katalogNachName.get(name.toLowerCase()) : undefined;
-  if (kat) {
-    return { vorschlag: { kategorieId: kat.id, charakter: kat.defaultCharakter, quelle: "remapping" } };
-  }
-
   return {};
 }
 
@@ -194,11 +186,6 @@ export function vorschlagFuer(
   zahlungskontoId?: string,
 ): Kategorisierungsvorschlag | undefined {
   return vorschlagsbefundFuer(roh, kontext, zahlungskontoId).vorschlag;
-}
-
-/** Hilfsindex: Kategorien nach kleingeschriebenem Namen. */
-export function katalogNachName(kategorien: readonly Kategorie[]): Map<string, Kategorie> {
-  return new Map(kategorien.map((k) => [k.name.toLowerCase(), k]));
 }
 
 /** Hilfsindex: Kategorien nach Id. */

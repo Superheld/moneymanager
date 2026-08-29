@@ -11,6 +11,7 @@
 // für immer im Saldo. Richtig ist die HERKUNFT, und die steht am Import-Lauf — also an
 // einer Stelle, die eine Tabellenspalte nicht kennen kann.
 
+import { belegZuBuchung } from "../buchung/belegZuBuchung";
 import {
   abweichungsfenster,
   anfangsbestandAusAnker,
@@ -217,12 +218,10 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
 
   const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
 
+  const umsatzZuBuchung = belegZuBuchung(umsaetze);
   const ausBankabruf = new Set<string>();
-  const umsatzZuBuchung = new Map<string, Umsatz>();
   for (const u of umsaetze) {
-    if (!u.istbuchungId) continue;
-    if (!umsatzZuBuchung.has(u.istbuchungId)) umsatzZuBuchung.set(u.istbuchungId, u);
-    if (abrufLaeufe.has(u.laufId)) ausBankabruf.add(u.istbuchungId);
+    if (u.istbuchungId && abrufLaeufe.has(u.laufId)) ausBankabruf.add(u.istbuchungId);
   }
 
   const zuordnungJeKonto = new Map(zuordnungen.map((z) => [z.zahlungskontoId, z]));

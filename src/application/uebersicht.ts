@@ -13,6 +13,7 @@
 // Reload pro Dropdown-Klick wäre nicht nur langsam, er würde die Liste auch gegen einen
 // inzwischen veränderten Bestand rechnen, während die Karten oben den alten zeigen.
 
+import { empfaengerJeBuchung } from "./buchung/belegZuBuchung";
 import {
   fruehesterMonat,
   monatsAusblicke,
@@ -119,11 +120,7 @@ export async function uebersichtLaden(
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,
     kategorieNamen: new Map(kategorien.map((k: Kategorie) => [k.id, k.name])),
-    empfaenger: new Map(
-      umsaetze
-        .filter((u) => u.istbuchungId && u.gegenpartei)
-        .map((u) => [u.istbuchungId!, u.gegenpartei!]),
-    ),
+    empfaenger: empfaengerJeBuchung(umsaetze),
     monate: waehlbareMonate(fruehesterMonat(buchungen) ?? heute, dieserMonat),
     hatPlandaten: regeln.length > 0 || budgets.length > 0 || inventar.length > 0,
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),

@@ -9,9 +9,8 @@
 
 import { useTranslation } from "react-i18next";
 import { useState, type ReactNode } from "react";
-import type { IstBuchung, Zahlungsregel } from "../../../application";
+import type { IstBuchung } from "../../../application";
 import type { ImportLauf, Umsatz } from "../../../application/import";
-import { ddmm } from "./ddmm";
 
 /** Ein Label/Wert-Paar im Herkunfts-Abschnitt. Lange Werte (Hash, Zweck) dürfen umbrechen. */
 function Infozeile({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
@@ -41,14 +40,12 @@ export function BuchungsHerkunft({
   entwurf,
   umsatz,
   importLauf,
-  regel,
 }: {
   buchung?: IstBuchung;
   entwurf?: Umsatz;
   /** Der Beleg: beim Entwurf er selbst, bei einer Buchung der Umsatz dahinter. */
   umsatz?: Umsatz;
   importLauf?: ImportLauf;
-  regel?: Zahlungsregel;
 }) {
   const { t } = useTranslation();
   const [offen, setOffen] = useState(false);
@@ -83,14 +80,6 @@ export function BuchungsHerkunft({
             <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.detail.ohneImport")}</div>
           )}
 
-          {buchung?.planRef && (
-            <Infozeile label={t("konten.detail.planbezug")}>
-              {t("konten.detail.planbezugWert", {
-                regel: regel?.bezeichnung ?? buchung.planRef.quelleId,
-                faelligkeit: ddmm(buchung.planRef.faelligkeit),
-              })}
-            </Infozeile>
-          )}
         </div>
       )}
     </div>

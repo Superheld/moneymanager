@@ -7,8 +7,9 @@
 //    │  └─verwerfen──▶ verworfen
 //    └────alsDuplikat▶ duplikat
 // verbucht/duplikat/verworfen sind terminal. Im Status „neu" ist der Kategorie-Vorschlag
-// frei editierbar (das deckt TAKTIK-IMPORTs „kategorisiert/bestätigt" pragmatisch ab —
-// die Review-Schicht arbeitet auf `vorschlag`, nicht auf eigenen Zwischenständen).
+// frei editierbar — es gibt bewusst KEINE Zwischenstände „kategorisiert" und
+// „bestätigt": die Review-Schicht arbeitet auf `vorschlag`, und ein eigener Status
+// dafür wäre eine zweite Aussage über dasselbe (ist ein Vorschlag da oder nicht).
 
 import { FachlicherFehler, type Cent, type Charakter } from "../../core";
 import type { RohUmsatz } from "./rohUmsatz";
@@ -17,7 +18,6 @@ export type UmsatzStatus = "neu" | "verbucht" | "duplikat" | "verworfen";
 
 /** Woher der Kategorie-Vorschlag stammt — Transparenz und Basis des späteren Lern-Loops. */
 export type VorschlagQuelle =
-  | "remapping"
   | "umbuchung"
   | "manuell"
   | "festlegung"

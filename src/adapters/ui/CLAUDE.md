@@ -23,11 +23,16 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 `kategorien/` wie in Kern und Anwendung. Die drei bereichsübergreifenden Tests (`screens`,
 `interaktion`, `formulare`) liegen in der Wurzel.
 
-## Geld anzeigen
+## Zahlen anzeigen
 
 **`useGeld()`** — nie eigenes `toFixed`, nie an der Locale-Schicht vorbei. Die Farbe kommt
 aus **`bausteine/geldFarbe.ts`**: Plus grün, Minus `--warn-deep`, Null neutral. Eine Farbregel
 für die ganze App, nicht eine je Screen.
+
+**`useProzent()`** für Anteile (0…1) — dieselbe Regel, derselbe Ort. Sie stand hier lange
+nur für Geld, und direkt daneben formatierten die Depot-Anteile mit `toFixed`: im Deutschen
+„12.5 %" statt „12,5 %". Eine Locale-Regel, die nur für einen Zahlentyp gilt, wird für die
+anderen umgangen. `stellen` ist die Obergrenze, eine glatte Zahl bleibt glatt.
 
 Zeilenaktionen sind Icons über `bausteine/IconButton.tsx` — ihr Text wandert in
 `title`/`aria-label`, statt zu verschwinden.
@@ -170,10 +175,22 @@ nächsten Abruf kam die echte Zeile zusätzlich dazu.
 Eine Hochrechnung ist kein dritter. Der Use-Case dahinter ist entfernt, geprüft in
 `interaktion.test.tsx`.
 
-Zwei Reste stehen bewusst noch: `IstQuelle` kennt weiterhin `"bezahlt-markiert"` und
-`IstBuchung.planRef` gibt es noch — beides nur zum LESEN, damit ein Bestand mit solchen
-Zeilen sich nicht selbst widerspricht. Erzeugen kann sie nichts mehr; wer sie ganz abräumt,
-fasst dabei das Schema, den Monatsausblick (Status `bezahlt`) und die Projektion mit an.
+**Seit 2026-08-29 sind auch die Reste weg.** `IstQuelle` kannte weiterhin
+`"bezahlt-markiert"`, und `IstBuchung.planRef` gab es noch — beides nur zum Lesen, damit
+ein Bestand mit solchen Zeilen sich nicht selbst widerspricht. Solche Zeilen gab es nie:
+weder im Bestand noch in der Migrationsgeschichte trug eine Buchung den Verweis. Damit
+war der Grund für die Schonung entfallen, und die Reste kosteten mehr als sie trugen —
+allen voran eine Rangstufe im Monatsausblick, die als „eindeutig, schlägt alles"
+dokumentiert war und nie griff.
+
+Abgeräumt wurde genau das, was hier vorhergesagt stand: das Schema (Migration 62 nimmt
+`plan_quelle_id`, `plan_faelligkeit` und ihren Unique-Index), der Monatsausblick (Status
+`bezahlt` samt Pille) und die Projektion (`projiziereRegel` hatte einen Filter `bezahlt`,
+den nur das Kontoregister füllte — mit einer immer leeren Menge).
+
+**Der Typ `PlanRef` ist geblieben**, und der Unterschied ist der Punkt: er identifiziert
+weiterhin eine PROJIZIERTE Zeile im Kontoregister. Was fiel, ist allein die Ist-Seite —
+die Behauptung, eine Buchung könne einen Plan-Posten belegen.
 
 ## Die Seitenleiste klappt ein
 

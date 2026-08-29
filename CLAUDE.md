@@ -802,6 +802,11 @@ Fünf Dinge, die man wissen muss:
 - **Die Sicherungen aus der Klartext-Zeit werden dabei weggeworfen** — geprüft am
   Dateikopf, nicht am Namen. Sie liegen zu lassen hiesse, den ganzen Aufwand durch die
   Hintertür wieder aufzugeben.
+- **Aber nur die im Ordner `sicherungen/`.** `alte_sicherungen_wegwerfen` schaut genau
+  dort; was von Hand daneben ins Datenverzeichnis gelegt wurde (`.bak-…`, `.vor-…`), sieht
+  die Überführung nie und bleibt im Klartext liegen. Das ist die unangenehmere Hälfte:
+  solche Kopien entstehen aus Sorgfalt vor einem riskanten Schritt, und danach denkt
+  niemand mehr an sie.
 - **Eine vergessene Passphrase nimmt auch das Jahresarchiv mit.** `VACUUM INTO` schreibt
   mit dem Schlüssel der offenen Verbindung; alle Sicherungen sind damit verschlüsselt.
   Deshalb ist der Wiederherstellungscode Pflicht und nicht Komfort.
@@ -1259,6 +1264,12 @@ Maschine, auf der nicht entwickelt wird, gibt es die Datei nicht.
 
 Fehlt das Werkzeug oder der Code, **bricht der Wächter ab** statt durchzuwinken — beides
 geprüft.
+
+Praktisch heisst das: **`npm test` ist dann rot, und zwar unabhängig von allem, was man
+gerade ändert.** Wer in einem frischen Klon anfängt, sucht den Fehler sonst in seiner
+eigenen Arbeit. Zwei Testfälle in `privatsphaere.test.ts` schlagen fehl, der Rest läuft
+durch; der `pre-push`-Hook blockiert damit jeden Push. Das Rezept zum Hinterlegen steht in
+`CLAUDE.local.md`.
 
 ### Zwei Wächter, die verschiedene Fehler finden
 
