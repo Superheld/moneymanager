@@ -203,7 +203,7 @@ export async function umsaetzeVerbuchen(
       kontoId: u.zahlungskontoId,
       kategorieId: u.vorschlag?.kategorieId,
       // Hat jemand in der Review-Inbox von Hand kategorisiert, ist das eine Entscheidung
-      // und überlebt jeden späteren automatischen Lauf. Alles andere (Remapping, Regel,
+      // und überlebt jeden späteren automatischen Lauf. Alles andere (Festlegung, Vertrag,
       // Modell) bleibt automatisch — und damit korrigierbar, ohne dass jemand die Zeile
       // zuerst freigeben muss.
       kategorieHerkunft: u.vorschlag?.quelle === "manuell" ? "manuell" : "automatisch",

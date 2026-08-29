@@ -115,8 +115,13 @@ export interface InventarRepository {
 }
 
 /**
- * Ledger-Port (ADR-0002) — Zugang zum app-seitigen Ist-Journal. Hinter DIESEM Port
- * docken später das echte Buchungspackage und der Bankimport an (austauschbar).
+ * Ledger-Port (ADR-0002) — Zugang zum app-seitigen Ist-Journal.
+ *
+ * Hier stand, dass „später das echte Buchungspackage und der Bankimport" andocken. Der
+ * Bankimport tut es längst (`adapters/fints`, `adapters/import`); das Buchungspackage
+ * gibt es im Repo nicht, siehe `core/buchung/istbuchung`. Ein Port, dessen Zweck in der
+ * Zukunft steht, lädt dazu ein, an ihm vorbeizubauen — er trägt heute den ganzen
+ * Schreibverkehr auf Buchungen und ist die einzige Stelle, die ins Journal schreibt.
  */
 export interface LedgerPort {
   alle(): Promise<IstBuchung[]>;
@@ -203,8 +208,11 @@ export interface MerkmalskonfigurationRepository {
 }
 
 /**
- * Import-Repositories (TAKTIK-IMPORT §5). Der Entwurfs-Stapel: Umsätze überleben den
- * Lauf, werden in der Review-Inbox bearbeitet und erst beim Verbuchen zu Ist-Buchungen.
+ * Import-Repositories. Der Entwurfs-Stapel: Umsätze überleben den Lauf, werden in der
+ * Review-Inbox bearbeitet und erst beim Verbuchen zu Ist-Buchungen.
+ *
+ * (Der Verweis auf „TAKTIK-IMPORT §5" stand hier und zeigte auf ein Dokument ausserhalb
+ * des Repos — in einem Klon nicht auffindbar und damit keine Auskunft.)
  */
 export interface ImportLaufRepository {
   alle(): Promise<ImportLauf[]>;

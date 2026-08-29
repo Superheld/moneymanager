@@ -1,7 +1,21 @@
-// Ist-Buchung — die provisorische „Published Language" des Ist-Schritts (ADR-0002).
-// Hält FAKTEN (was tatsächlich geflossen ist), getrennt von der Plan-Schicht.
-// Bewusst NICHT das volle A5-Buchungsformat: minimal, vorläufig, später per ACL auf
-// das echte Buchungspackage gemappt. Betrag vorzeichenbehaftet (negativ = Abfluss).
+// Ist-Buchung — hält FAKTEN (was tatsächlich geflossen ist), getrennt von der
+// Plan-Schicht. Betrag vorzeichenbehaftet (negativ = Abfluss).
+//
+// **Zum Stand dieses Typs, weil der Kommentar hier lange etwas anderes sagte.** Er
+// bezeichnete sich als „provisorische Published Language" (ADR-0002), die „später per
+// ACL auf das echte Buchungspackage" gemappt wird — ein volles A5-Buchungsformat.
+//
+// Im Repo gibt es davon nichts: kein Buchungspackage, keinen ACL, keine Stelle, die
+// darauf hinarbeitet. Die Begriffe kommen ausser hier nirgends vor. `IstBuchung` ist
+// seit Monaten der einzige und gelebte Buchungstyp — alles, was mit Geldbewegungen
+// rechnet, rechnet mit ihm.
+//
+// Das ist keine Entscheidung GEGEN das Format, sondern eine Feststellung: wer es baut,
+// baut es von vorn, und dieser Typ ist dann sein Ausgangspunkt und nicht sein Platzhalter.
+// Solange das nicht passiert, gilt er als das, was er ist. Der Unterschied ist praktisch
+// — an einem Provisorium baut man anders als an einem Fundament, und was hier fehlt
+// (Empfänger, Verwendungszweck: siehe `core/buchung/zahlungsspur`), fehlt einem
+// Fundament zu Unrecht.
 
 import type { Cent } from "../basis/geld";
 import type { Charakter } from "../basis/zahlungsregel";
