@@ -189,6 +189,45 @@ describe("Spielstand", () => {
     ).toBe(0);
   });
 
+  /**
+   * Ein Umbuchungs-Bein ohne Gegenstueck. Es darf KEINE Umschichtung sein: liegt das
+   * Gegenkonto nicht im Bestand, hat das Geld den erfassten Bereich verlassen, und eine
+   * Umschichtung zaehlte in kein Budget und in keine Ausgabe — das Geld waere weg und
+   * fehlte nirgends.
+   */
+  it("enthaelt ein ungepaartes Umbuchungs-Bein, und zwar als Aufwand", () => {
+    const db = mitSeed();
+    const zeilen = db.exec(
+      `SELECT b.charakter, b.kategorie_id, b.transfer_id
+         FROM ist_buchung b
+         JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+         JOIN umsatz_roh r ON r.id = v.umsatz_id
+        WHERE r.roh_hash = 'hash-halbe-umbuchung'`,
+    );
+    expect(zeilen).toHaveLength(1);
+    const [charakter, kategorie, transfer] = zeilen[0].values[0];
+    expect(charakter).toBe("Aufwand");
+    expect(kategorie).toBeNull();
+    expect(transfer).toBeNull();
+  });
+
+  /**
+   * `endempfaenger` steht NEBEN `gegenpartei`, nicht statt dessen: dort bleibt der
+   * Zahlungsdienstleister, und wer die Zahlung wirklich bekommt, ist eine eigene Angabe.
+   * Fuer die Kategorie-Erkennung ist der Unterschied erheblich — der Dienstleister ist
+   * bei jedem Haendler derselbe.
+   */
+  it("enthaelt eine Zahlung ueber einen Dienstleister, mit Endempfaenger daneben", () => {
+    const db = mitSeed();
+    const zeilen = db.exec(
+      "SELECT gegenpartei, endempfaenger FROM umsatz_roh WHERE roh_hash = 'hash-dienstleister'",
+    );
+    expect(zeilen).toHaveLength(1);
+    const [partei, endempfaenger] = zeilen[0].values[0];
+    expect(String(endempfaenger).length).toBeGreaterThan(0);
+    expect(endempfaenger).not.toBe(partei);
+  });
+
   it("legt echte Zwillinge an, nicht angeschriebene Verdachte", () => {
     const db = mitSeed();
     // Der Verdacht wird beim HINSEHEN gerechnet. Ein Spielstand kann ihn deshalb nur
