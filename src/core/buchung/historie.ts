@@ -240,18 +240,20 @@ export function nachHauptgruppe(
  *
  *   1. **`transferId`** — die beiden Beine sind verknüpft. Das setzt `umsatzVerbuchen`,
  *      wenn es beim Import ein Paar gefunden hat, und die Paarung von Hand.
- *   2. **Umschichtung OHNE Kategorie** — ein Bein, dessen Gegenstück nie gefunden wurde.
- *      Ohne diesen Weg zählte eine ungepaarte Umbuchung als Ausgabe.
+ *   2. **Umschichtung OHNE Kategorie** — trägt nur noch ALTBESTAND.
+ *
+ * Weg 2 fing einseitige Umschichtungen: ein Umbuchungs-Bein, dessen Gegenstück nie
+ * gefunden wurde. Seit 2026-08-29 entstehen die nicht mehr — **eine Umbuchung ohne
+ * Gegenbuchung gibt es nicht.** Steht das Gegenkonto nicht im Bestand, hat das Geld den
+ * erfassten Bereich verlassen, und das ist ein Abfluss (siehe
+ * `application/import/umsatzVerbuchen`, Schritt 2).
+ *
+ * Der Weg bleibt trotzdem, weil solche Zeilen im Bestand liegen können. Wer ihn eines
+ * Tages entfernt, prüft vorher am echten Bestand — und weiss dann auch, dass er ihn nicht
+ * für neue Daten braucht.
  *
  * Eine „Umschichtung MIT Kategorie" (Sparen & Anlegen) bleibt bewusst erhalten — sie ist
  * eine Umschichtung, die man in der Auswertung SEHEN will.
- *
- * **Und genau daran hängt eine Falle für jeden, der Umbuchungen künftig Kategorien geben
- * will.** Weg 2 unterscheidet heute „ungepaarte Umbuchung" von „gewollte Umschichtung"
- * allein an der Kategorie. Bekommt jede Umbuchung eine, fällt Weg 2 in sich zusammen: die
- * ungepaarten Beine wandern in die Ausgaben, und zwar lautlos — sie sehen dann aus wie
- * eine Sparrate. Wer das baut, braucht vorher ein anderes Merkmal für „ungepaart"
- * (etwa `gegenkontoId` gesetzt, `transferId` nicht) und muss diese Funktion mit ändern.
  */
 export function istInterneUmbuchung(b: IstBuchung): boolean {
   return b.transferId != null || (b.charakter === "Umschichtung" && !b.kategorieId);
