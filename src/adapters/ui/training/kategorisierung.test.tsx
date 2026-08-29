@@ -168,11 +168,12 @@ describe("2 · Wörter — die Quellen", () => {
     rendere(<TrainingBereich />);
     await oeffne(nutzer, KARTEN.woerter);
 
-    const schalter = within(karteninhalt(KARTEN.woerter)).getAllByRole("checkbox");
-    await nutzer.click(schalter[schalter.length - 1]); // Vorzeichen
+    await nutzer.click(
+      within(karteninhalt(KARTEN.woerter)).getByRole("checkbox", { name: /Verwendungszweck/ }),
+    );
 
     await waitFor(async () => {
-      expect(await merkmalRepo.herkuenfteLesen()).not.toContain("vz");
+      expect(await merkmalRepo.herkuenfteLesen()).not.toContain("vwz");
     });
   });
 
@@ -189,8 +190,9 @@ describe("2 · Wörter — die Quellen", () => {
       expect(within(karteninhalt(KARTEN.woerter)).queryByText("Kein Wort passt zu dieser Suche.")).toBeNull(),
     );
 
-    const schalter = within(karteninhalt(KARTEN.woerter)).getAllByRole("checkbox");
-    await nutzer.click(schalter[schalter.length - 1]); // Verwendungszweck
+    await nutzer.click(
+      within(karteninhalt(KARTEN.woerter)).getByRole("checkbox", { name: /Verwendungszweck/ }),
+    );
 
     // Die Karte rechnet nach dem Schalten neu — die Merkmale dürfen nicht stehen bleiben.
     await waitFor(() =>
@@ -198,7 +200,7 @@ describe("2 · Wörter — die Quellen", () => {
     );
   });
 
-  it("stellt die vier Maße nebeneinander", async () => {
+  it("stellt die vier Maße nebeneinander — zwei in der Liste, zwei am gewählten Wort", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
@@ -208,10 +210,65 @@ describe("2 · Wörter — die Quellen", () => {
     // Trennschärfe allein führt in die Irre, weil sie das Seltene überschätzt.
     const inhalt = karteninhalt(KARTEN.woerter);
     expect(within(inhalt).getByText("Belege")).toBeTruthy();
-    expect(within(inhalt).getByText("Deckung")).toBeTruthy();
-    expect(within(inhalt).getByText("Trennschärfe")).toBeTruthy();
     expect(within(inhalt).getByText("Trennkraft")).toBeTruthy();
     expect(within(inhalt).getByText("kesselmann markt")).toBeTruthy();
+
+    // Deckung und Trennschärfe braucht man beim Beurteilen EINER Zeile, nicht beim
+    // Überfliegen — sie stehen deshalb im Detail und nicht in einer zehnten Spalte.
+    await nutzer.click(within(inhalt).getByText("kesselmann markt"));
+    await waitFor(() => {
+      const jetzt = karteninhalt(KARTEN.woerter);
+      expect(within(jetzt).getByText("Deckung")).toBeTruthy();
+      expect(within(jetzt).getByText("Trennschärfe")).toBeTruthy();
+    });
+  });
+
+  it("blendet die mitgelieferten Wörter aus, bis man sie anfordert", async () => {
+    material(2);
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    // Über hundert Stoppwörter, die niemand gesetzt hat, füllen sonst jede Seite und
+    // schieben die eigenen Entscheidungen nach hinten.
+    const inhalt = karteninhalt(KARTEN.woerter);
+    await nutzer.type(within(inhalt).getByPlaceholderText("Wort eingeben …"), "einer");
+    await waitFor(() =>
+      expect(within(karteninhalt(KARTEN.woerter)).getByText("Kein Wort passt zu dieser Suche.")).toBeTruthy(),
+    );
+
+    await nutzer.click(within(karteninhalt(KARTEN.woerter)).getByRole("checkbox", { name: /mitgelieferte/ }));
+    await waitFor(() =>
+      expect(within(karteninhalt(KARTEN.woerter)).getByText("einer")).toBeTruthy(),
+    );
+  });
+
+  it("holt eine gelöschte Grundausstattung zurück, ohne Eigenes anzufassen", async () => {
+    material(2);
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    // Ein eigenes Wort setzen, dann ein mitgeliefertes entfernen.
+    const inhalt = karteninhalt(KARTEN.woerter);
+    await nutzer.type(within(inhalt).getByPlaceholderText("z. B. kdn"), "eigenwort");
+    await nutzer.click(within(inhalt).getByRole("button", { name: /Wort sperren/ }));
+    await waitFor(async () =>
+      expect((await merkmalRepo.ausschluesseLesen()).map((a) => a.wort)).toContain("eigenwort"),
+    );
+    await merkmalRepo.ausschlussEntfernen("sepa");
+
+    await nutzer.click(
+      within(karteninhalt(KARTEN.woerter)).getByRole("button", { name: /Grundausstattung/ }),
+    );
+
+    await waitFor(async () => {
+      const liste = await merkmalRepo.ausschluesseLesen();
+      expect(liste.map((a) => a.wort)).toContain("sepa");
+      // Das eigene Wort behält seine Quelle — sonst fiele es beim nächsten Ausblenden
+      // aus der eigenen Liste heraus.
+      expect(liste.find((a) => a.wort === "eigenwort")?.quelle).toBe("manuell");
+    });
   });
 
   it("schließt ein Wort aus der Liste heraus aus — in seiner Quelle", async () => {
@@ -381,6 +438,44 @@ describe("2 · Wörter — der Bestand", () => {
     await nutzer.type(suchfeld, "sepa");
     await waitFor(() =>
       expect(within(karteninhalt(KARTEN.woerter)).getAllByText("mitgeliefert").length).toBeGreaterThan(0),
+    );
+  });
+});
+
+describe("2 · Wörter — was jede Kategorie auszeichnet", () => {
+  it("sagt ohne Modell, dass es nichts abzulesen gibt", async () => {
+    material(2);
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    // Eine Wolke aus blossen Häufigkeiten sähe aus wie eine Auskunft über die Erkennung
+    // und wäre keine — solange nichts trainiert ist, gibt es keine Gewichte.
+    expect(
+      within(karteninhalt(KARTEN.woerter)).getByText(/Noch kein Modell trainiert/),
+    ).toBeTruthy();
+  });
+
+  it("zeigt nach dem Training je Kategorie ihre Wörter — und führt zurück in die Liste", async () => {
+    material();
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.modell);
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+    await waitFor(() => expect(screen.getByText(/Zuletzt trainiert am/)).toBeTruthy());
+
+    await oeffne(nutzer, KARTEN.woerter);
+    const wolken = within(karteninhalt(KARTEN.woerter));
+    await waitFor(() => expect(wolken.getAllByText("Lebensmittel").length).toBeGreaterThan(0));
+
+    // Der Klick auf ein Wort in der Wolke sucht es oben in der Liste — sonst wären es
+    // zwei getrennte Werkzeuge auf derselben Seite.
+    const wort = wolken.getAllByRole("button", { name: "kesselmann markt" })[0];
+    await nutzer.click(wort);
+    await waitFor(() =>
+      expect(
+        (within(karteninhalt(KARTEN.woerter)).getByPlaceholderText("Wort eingeben …") as HTMLInputElement).value,
+      ).toBe("kesselmann markt"),
     );
   });
 });

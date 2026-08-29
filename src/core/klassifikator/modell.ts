@@ -253,6 +253,62 @@ export function klassifizieren(
   };
 }
 
+/** Ein Merkmal und wie stark es für seine Kategorie spricht. */
+export interface Kennzeichen {
+  readonly merkmal: string;
+  /** Zentriertes Gewicht: um wie viel stärker als im Durchschnitt aller Kategorien. */
+  readonly staerke: number;
+}
+
+/** Was eine Kategorie im Modell auszeichnet. */
+export interface Kategorieprofil {
+  readonly kategorieId: string;
+  /** Die stärksten Kennzeichen, absteigend. */
+  readonly kennzeichen: readonly Kennzeichen[];
+}
+
+/**
+ * Liest das Modell zeilenweise: welche Merkmale sprechen für welche Kategorie.
+ *
+ * Bei einem linearen Modell ist das keine nachgebaute Erklärung, sondern die Rechnung
+ * selbst — `gewichte[k * V + j]` IST, wie stark Merkmal j für Kategorie k spricht. Genau
+ * deshalb steht hier das Modell und nicht die Häufigkeitsverteilung aus dem
+ * Trainingsmaterial: die sagt, wo ein Wort VORKAM, das Gewicht sagt, was die Erkennung
+ * daraus gemacht hat. Wo beides auseinanderfällt, ist das Gewicht die ehrlichere Auskunft.
+ *
+ * **Zentriert über die Kategorien**, und daran hängt die Brauchbarkeit: ein Merkmal, das
+ * in jeder Zeile steht, bekommt überall ein ähnliches Gewicht und stünde sonst in JEDER
+ * Wolke groß da — als Kennzeichen von allem, also von nichts. Der Abstand zum Mittel über
+ * alle Kategorien nimmt genau diesen Sockel weg.
+ *
+ * Nur positive Stärken: ein negatives Gewicht heißt „spricht gegen diese Kategorie", und
+ * das ist eine andere Frage als „was zeichnet sie aus".
+ */
+export function kategorieprofile(modell: Modell, proKategorie = 25): Kategorieprofil[] {
+  const K = modell.kategorien.length;
+  const V = modell.vokabular.length;
+  if (K === 0 || V === 0) return [];
+
+  // Der Sockel je Merkmal — einmal für alle Kategorien gerechnet.
+  const mittel = new Float64Array(V);
+  for (let k = 0; k < K; k++) {
+    const zeile = k * V;
+    for (let j = 0; j < V; j++) mittel[j] += modell.gewichte[zeile + j];
+  }
+  for (let j = 0; j < V; j++) mittel[j] /= K;
+
+  return modell.kategorien.map((kategorieId, k) => {
+    const zeile = k * V;
+    const kennzeichen: Kennzeichen[] = [];
+    for (let j = 0; j < V; j++) {
+      const staerke = modell.gewichte[zeile + j] - mittel[j];
+      if (staerke > 0) kennzeichen.push({ merkmal: modell.vokabular[j], staerke });
+    }
+    kennzeichen.sort((a, b) => b.staerke - a.staerke || a.merkmal.localeCompare(b.merkmal));
+    return { kategorieId, kennzeichen: kennzeichen.slice(0, proKategorie) };
+  });
+}
+
 export interface Kategoriewert {
   readonly kategorieId: string;
   readonly richtig: number;

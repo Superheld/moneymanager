@@ -1463,6 +1463,16 @@ const de = {
       datenUntertitel: "Was an gebuchten Zahlungen zum Lernen taugt",
       woerterTitel: "2 · Wörter",
       woerterUntertitel: "Was die Erkennung liest — und was sie nicht liest",
+      wolkenTitel: "Was jede Kategorie auszeichnet",
+      wolkenHinweis:
+        "Die Wörter, an denen die Erkennung eine Kategorie festmacht — je größer, desto stärker. Sie kommen aus dem trainierten Modell und nicht aus der Häufigkeit: die sagt, wo ein Wort vorkam, das Gewicht sagt, was die Erkennung daraus gemacht hat. Ein Klick sucht das Wort oben in der Liste.",
+      wolkenOhneModell:
+        "Noch kein Modell trainiert — bis dahin gibt es keine Gewichte, an denen sich ablesen ließe, woran die Erkennung eine Kategorie festmacht.",
+      wolkeLeer: "Kein Wort spricht deutlich für diese Kategorie.",
+      mitStandard: "mitgelieferte zeigen",
+      grundausstattung: "Grundausstattung wiederherstellen",
+      grundausstattungHinweis:
+        "Die mitgelieferten Wörter stehen normalerweise nicht in der Liste — es sind über hundert, die niemand gesetzt hat, und sie schieben die eigenen Entscheidungen nach hinten. Sichtbar sind sie trotzdem, sobald sie in deinen Daten vorkommen. Gelöschte holt dieser Knopf zurück, ohne eigene Einträge anzufassen.",
       // --- Der Wortbestand: eine Liste über alles, was die Erkennung an Wörtern kennt ---
       bestandTitel: "Wortbestand",
       bestandHinweis:
@@ -3188,6 +3198,16 @@ const en: typeof de = {
       datenUntertitel: "What booked payments are usable for learning",
       woerterTitel: "2 · Words",
       woerterUntertitel: "What the recognition reads — and what it does not",
+      wolkenTitel: "What marks each category",
+      wolkenHinweis:
+        "The words the recognition pins a category on — the larger, the stronger. They come from the trained model, not from frequency: frequency says where a word occurred, the weight says what the recognition made of it. Click one to find it in the list above.",
+      wolkenOhneModell:
+        "No model trained yet — until then there are no weights to read off what the recognition pins a category on.",
+      wolkeLeer: "No word speaks clearly for this category.",
+      mitStandard: "show bundled",
+      grundausstattung: "Restore default list",
+      grundausstattungHinweis:
+        "The bundled words are normally not listed — there are over a hundred nobody chose, and they push your own decisions out of sight. They do show up once they occur in your data. This button brings deleted ones back without touching your own entries.",
       // --- The word inventory: one list for everything the recognition knows ---
       bestandTitel: "Word inventory",
       bestandHinweis:

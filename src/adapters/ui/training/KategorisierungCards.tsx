@@ -15,9 +15,12 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   MERKMALSHERKUENFTE,
+  kategorieprofile,
   verwechslungsmatrix,
+  wortVon,
   type Bewertung,
   type Kategorie,
+  type Kategorieprofil,
   type Matrixzeile,
   type Merkmalsherkunft,
 } from "../../../application";
@@ -49,6 +52,7 @@ import {
   modellStand,
   modellTrainieren,
   trainingsdaten,
+  grundausstattungZurueck,
   wortFreigeben,
   wortSperren,
 } from "../../dienste";
@@ -229,6 +233,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
                   nachAenderung(wortSperren(wort, herkuenfte))
                 }
                 aufZulassen={(wort) => nachAenderung(wortFreigeben(wort))}
+                aufGrundausstattung={() => nachAenderung(grundausstattungZurueck())}
               />
             </Card>
           ),
@@ -499,7 +504,7 @@ function DatenInhalt({ t, daten, kategorieName, zahl }: Hilfe) {
  */
 function WoerterInhalt({
   t, daten, kategorieName, zahl, prozent, wirkung, misst,
-  aufWirkung, aufSchalten, aufAusschliessen, aufZulassen,
+  aufWirkung, aufSchalten, aufAusschliessen, aufZulassen, aufGrundausstattung,
 }: Hilfe & {
   wirkung: { basis: number; wirkungen: Wirkung[] } | null;
   misst: boolean;
@@ -507,12 +512,22 @@ function WoerterInhalt({
   aufSchalten: (h: Merkmalsherkunft, aktiv: boolean) => void;
   aufAusschliessen: (wort: string, herkuenfte?: readonly Merkmalsherkunft[]) => void;
   aufZulassen: (wort: string) => void;
+  aufGrundausstattung: () => void;
 }) {
   const feinerProzent = useProzent();
   const [suche, setSuche] = useState("");
   const [zustandFilter, setZustandFilter] = useState<Wortzustand | "">("");
   const [herkunftFilter, setHerkunftFilter] = useState<Merkmalsherkunft | "">("");
   const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  /**
+   * Ob die mitgelieferte Grundausstattung mit in der Liste steht. Voreinstellung: NEIN.
+   *
+   * Über hundert Stoppwörter, die niemand gesetzt hat, füllen sonst jede Seite und
+   * schieben die eigenen Entscheidungen nach hinten — genau das machte den Eindruck, ein
+   * frisch gesperrtes Wort sei „verschwunden". Sichtbar bleiben sie trotzdem auf Wunsch:
+   * ein Eintrag, den man nicht sieht, ist einer, den man nie wieder aufräumt.
+   */
+  const [mitStandard, setMitStandard] = useState(false);
   const [neu, setNeu] = useState("");
   const [nurIn, setNurIn] = useState<Merkmalsherkunft | "">("");
 
@@ -522,15 +537,28 @@ function WoerterInhalt({
   );
   const zahlen = useMemo(() => bestandszahlen(alle), [alle]);
 
+  // Die Wolken kommen aus dem MODELL, nicht aus der Häufigkeitsverteilung: die sagt, wo
+  // ein Wort vorkam, das Gewicht sagt, was die Erkennung daraus gemacht hat. Ohne
+  // trainiertes Modell gibt es sie deshalb nicht — und das ist ehrlicher als eine Wolke
+  // aus Häufigkeiten, die aussähe wie eine Auskunft über die Erkennung.
+  const profile = useMemo(
+    () => (daten?.zustand.stand ? kategorieprofile(daten.zustand.stand.modell) : []),
+    [daten],
+  );
+
   const sichtbar = useMemo(() => {
     const suchbegriff = suche.trim().toLowerCase();
     return alle.filter(
       (z) =>
+        // Ein mitgeliefertes Wort, das im Bestand VORKOMMT, bleibt immer sichtbar: es
+        // wirkt auf die eigenen Daten, und das ist eine Entscheidung wie jede andere.
+        // Ausgeblendet wird nur, was nichts tut — der grosse Rest der Grundausstattung.
+        (mitStandard || z.quelle !== "standard" || z.belege > 0) &&
         (!zustandFilter || z.zustand === zustandFilter) &&
         (!herkunftFilter || z.herkunft === herkunftFilter) &&
         (!suchbegriff || z.anzeige.includes(suchbegriff) || z.wort.includes(suchbegriff)),
     );
-  }, [alle, suche, zustandFilter, herkunftFilter]);
+  }, [alle, suche, zustandFilter, herkunftFilter, mitStandard]);
 
   // Bezugsgröße für den Balken: das Maximum der GEZEIGTEN Zeilen, nicht des Bestands.
   // Wer auf eine Herkunft filtert, will die dort vergleichen — an einem bestandsweiten
@@ -558,6 +586,7 @@ function WoerterInhalt({
     setSuche(wort.toLowerCase());
     setZustandFilter("");
     setHerkunftFilter("");
+    setMitStandard(true);
   }
 
   return (
@@ -683,6 +712,14 @@ function WoerterInhalt({
               ]}
             />
           </FormField>
+          <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", paddingBottom: "var(--sp-2)", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={mitStandard}
+              onChange={(e) => setMitStandard(e.target.checked)}
+            />
+            <span>{t("einstellungen.lernmaterial.mitStandard")}</span>
+          </label>
           <span className="muted" style={{ paddingBottom: "var(--sp-2)" }}>
             {t("einstellungen.lernmaterial.bestandZahl", {
               gezeigt: zahl(sichtbar.length),
@@ -704,21 +741,25 @@ function WoerterInhalt({
                 {
                   key: "anzeige",
                   label: t("einstellungen.lernmaterial.spalteWort"),
-                  // Weicht die Listenform ab, gehört sie danebengeschrieben: an ihr hängt
-                  // das Sperren, und ohne sie ist nicht zu sehen, warum ein Ausschluss
-                  // auf ein Wort wirkt, das anders geschrieben dasteht.
+                  // Die Herkunft steht als grauer Zusatz DANEBEN statt in einer eigenen
+                  // Spalte: sie ist kurz, gehört zum Wort, und die Liste hatte zehn
+                  // Spalten — zu viele, um eine Zeile noch auf einen Blick zu lesen.
+                  // Sortieren muss man danach nicht, dafür gibt es den Filter.
+                  //
+                  // Weicht die Listenform ab, gehört auch sie daneben: an ihr hängt das
+                  // Sperren, und ohne sie ist nicht zu sehen, warum ein Ausschluss auf
+                  // ein Wort wirkt, das anders geschrieben dasteht.
                   render: (r) => (
                     <span>
                       {r.anzeige}
                       {r.wort !== r.anzeige && <span className="muted"> → {r.wort}</span>}
+                      {r.herkunft && (
+                        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                          {" "}· {t(`einstellungen.lernmaterial.herkunft.${r.herkunft}`)}
+                        </span>
+                      )}
                     </span>
                   ),
-                },
-                {
-                  key: "herkunft",
-                  label: t("einstellungen.lernmaterial.spalteGeltung"),
-                  render: (r) =>
-                    r.herkunft ? t(`einstellungen.lernmaterial.herkunft.${r.herkunft}`) : "—",
                 },
                 {
                   key: "zustand",
@@ -747,29 +788,10 @@ function WoerterInhalt({
                   render: (r) => zahl(r.belege),
                 },
                 {
-                  key: "deckung",
-                  label: t("einstellungen.lernmaterial.spalteDeckung"),
-                  align: "right",
-                  render: (r) => (r.belege ? feinerProzent(r.deckung, 1) : "—"),
-                },
-                {
                   key: "kategorien",
                   label: t("einstellungen.lernmaterial.spalteKategorien"),
                   align: "right",
                   render: (r) => (r.kategorien ? zahl(r.kategorien) : "—"),
-                },
-                {
-                  key: "konzentration",
-                  label: t("einstellungen.lernmaterial.trennschaerfe"),
-                  align: "right",
-                  render: (r) =>
-                    r.belege && r.kategorien ? (
-                      <span style={{ color: r.konzentration >= 0.8 ? "var(--ok-deep)" : r.konzentration < 0.5 ? "var(--warn-deep)" : undefined }}>
-                        {prozent(r.konzentration)}
-                      </span>
-                    ) : (
-                      "—"
-                    ),
                 },
                 {
                   key: "trennkraft",
@@ -839,6 +861,41 @@ function WoerterInhalt({
         {zeile && <Wortdetail zeile={zeile} t={t} kategorieName={kategorieName} zahl={zahl} prozent={prozent} />}
       </Abschnitt>
 
+      <Abschnitt titel={t("einstellungen.lernmaterial.wolkenTitel")}>
+        <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+          {profile.length === 0
+            ? t("einstellungen.lernmaterial.wolkenOhneModell")
+            : t("einstellungen.lernmaterial.wolkenHinweis")}
+        </div>
+        {profile.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: "var(--sp-4)",
+            }}
+          >
+            {profile.map((p) => (
+              <Wortwolke
+                key={p.kategorieId}
+                profil={p}
+                name={kategorieName.get(p.kategorieId) ?? p.kategorieId}
+                leer={t("einstellungen.lernmaterial.wolkeLeer")}
+                aufWort={(merkmal) => {
+                  // Der Weg zurück in die Liste: dort steht, was das Wort im Bestand
+                  // anrichtet. Wolke und Liste zeigen dasselbe Wort von zwei Seiten —
+                  // ohne diesen Sprung wären es wieder zwei getrennte Werkzeuge.
+                  setSuche(wortVon(merkmal));
+                  setZustandFilter("");
+                  setHerkunftFilter("");
+                  setMitStandard(true);
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </Abschnitt>
+
       <Abschnitt titel={t("einstellungen.lernmaterial.neuesWort")}>
         <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
           {t("einstellungen.lernmaterial.neuesWortHinweis")}
@@ -870,9 +927,79 @@ function WoerterInhalt({
           <Button variant="primary" plus onClick={hinzufuegen}>
             {t("einstellungen.lernmaterial.wortSperren")}
           </Button>
+          {/* Der Weg zurück. Ohne ihn ist das Löschen eines mitgelieferten Wortes
+              endgültig, und dann räumt niemand darin auf — was den Sinn des Löschens
+              aufhebt. Er legt nur an, was fehlt: eigene Einträge bleiben eigene. */}
+          <Button onClick={aufGrundausstattung}>
+            {t("einstellungen.lernmaterial.grundausstattung")}
+          </Button>
+        </div>
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
+          {t("einstellungen.lernmaterial.grundausstattungHinweis")}
         </div>
       </Abschnitt>
     </>
+  );
+}
+
+/**
+ * Eine Kategorie und die Wörter, die sie auszeichnen — Schriftgröße nach Stärke.
+ *
+ * Eine Wolke und keine Tabelle, weil die Frage eine andere ist: nicht „welchen Wert hat
+ * dieses Wort", sondern „woran erkennt die Erkennung diesen Bucket". Darauf antwortet ein
+ * Bild schneller als eine Spalte, und der Vergleich zwischen zwei Kategorien wird zum
+ * Nebeneinanderlegen zweier Karten.
+ *
+ * Die Größe misst gegen die stärkste Stelle DIESER Karte, nicht gegen alle: sonst hätte
+ * eine Kategorie mit klaren Kennzeichen lauter grosse Wörter und eine mit lauter
+ * schwachen gar keine lesbaren — und genau die zweite ist die interessante.
+ */
+function Wortwolke({
+  profil, name, leer, aufWort,
+}: {
+  profil: Kategorieprofil;
+  name: string;
+  leer: string;
+  aufWort: (merkmal: string) => void;
+}) {
+  const max = profil.kennzeichen[0]?.staerke ?? 0;
+  /** 0,8 rem bis 1,8 rem — darunter unlesbar, darüber sprengt ein Wort die Karte. */
+  const groesse = (staerke: number) => 0.8 + (max > 0 ? staerke / max : 0) * 1;
+
+  return (
+    <div
+      style={{
+        border: "1px solid var(--line)",
+        borderRadius: "var(--radius-2, 6px)",
+        padding: "var(--sp-3)",
+      }}
+    >
+      <div style={{ fontWeight: "var(--fw-bold)", marginBottom: "var(--sp-2)" }}>{name}</div>
+      {profil.kennzeichen.length === 0 ? (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{leer}</div>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-2)", alignItems: "baseline" }}>
+          {profil.kennzeichen.map((k) => (
+            <button
+              key={k.merkmal}
+              className="linkbtn"
+              onClick={() => aufWort(k.merkmal)}
+              title={`${k.merkmal} · ${k.staerke.toFixed(2)}`}
+              style={{
+                fontSize: `${groesse(k.staerke).toFixed(2)}rem`,
+                lineHeight: 1.2,
+                // Das stärkste Drittel dunkler: die Reihenfolge steht schon in der Größe,
+                // aber bei eng beieinanderliegenden Stärken sieht man sie dort kaum.
+                color: k.staerke > max * 0.66 ? "var(--ink-1)" : undefined,
+                fontWeight: k.staerke > max * 0.66 ? "var(--fw-semi)" : undefined,
+              }}
+            >
+              {wortVon(k.merkmal)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -928,6 +1055,33 @@ function Wortdetail({
       {zeile.grund && (
         <div className="muted" style={{ marginTop: "var(--sp-2)" }}>
           {t(`einstellungen.lernmaterial.verwurf.${zeile.grund}`)} · {t("einstellungen.lernmaterial.strukturellHinweis")}
+        </div>
+      )}
+
+      {/* Die zwei Maße, die aus der Tabelle gefallen sind. Sie gehören hierher und nicht
+          in eine Spalte: gebraucht werden sie, wenn man EINE Zeile beurteilt, nicht beim
+          Überfliegen — und zehn Spalten liest niemand mehr auf einen Blick. */}
+      {zeile.belege > 0 && zeile.kategorien > 0 && (
+        <div style={{ display: "flex", gap: "var(--sp-5)", flexWrap: "wrap", marginTop: "var(--sp-3)" }}>
+          <span>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              {t("einstellungen.lernmaterial.spalteDeckung")}
+            </span>{" "}
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>{prozent(zeile.deckung)}</span>
+          </span>
+          <span>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              {t("einstellungen.lernmaterial.trennschaerfe")}
+            </span>{" "}
+            <span
+              style={{
+                fontVariantNumeric: "tabular-nums",
+                color: zeile.konzentration >= 0.8 ? "var(--ok-deep)" : zeile.konzentration < 0.5 ? "var(--warn-deep)" : undefined,
+              }}
+            >
+              {prozent(zeile.konzentration)}
+            </span>
+          </span>
         </div>
       )}
 

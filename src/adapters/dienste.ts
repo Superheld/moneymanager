@@ -34,7 +34,7 @@ import {
 import type { TanFrager } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
 import { hanseaticAbruf } from "./hanseatic";
-import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
+import { konfigurationLaden, grundausstattungHerstellen, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
 import { trainingsmaterial, type Materialbefund } from "../application/kategorien/trainingsmaterial";
 import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
 import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../application/kategorien/kategorieAbgleich";
@@ -660,6 +660,10 @@ export function wortSperren(wort: string, herkuenfte?: readonly Merkmalsherkunft
 
 export function wortFreigeben(wort: string) {
   return wortZulassen(sqliteMerkmalskonfigurationRepository, wort);
+}
+
+export function grundausstattungZurueck() {
+  return grundausstattungHerstellen(sqliteMerkmalskonfigurationRepository);
 }
 
 export function kategorieAbgleichVorschau(): Promise<Abgleichsplan> {

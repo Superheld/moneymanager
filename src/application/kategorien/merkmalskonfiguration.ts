@@ -111,6 +111,32 @@ export async function wortAusschliessen(
   });
 }
 
+/**
+ * Legt die mitgelieferte Grundausstattung neu an — ohne anzufassen, was schon dasteht.
+ *
+ * Sie ist loeschbar, und das soll sie sein: jeder Eintrag ist eine Behauptung darueber,
+ * was nichts bedeutet, und die kann falsch sein. Nur war der Weg bisher einbahnig — wer
+ * `sepa` einmal zugelassen hatte, bekam es nie wieder, ausser ueber Tippen. Ein Schalter,
+ * der etwas wegnimmt, braucht einen, der es zurueckholt; sonst raeumt niemand auf.
+ *
+ * `ausschlussSetzen` waere hier falsch: es ist ein Upsert und wuerde die QUELLE
+ * mitschreiben — ein Wort, das der Nutzer selbst gesetzt hat und das zufaellig auch in
+ * der Grundausstattung steht, faellt damit auf „mitgeliefert" zurueck und verschwindet
+ * beim naechsten Ausblenden aus seiner Liste. Deshalb wird nur angelegt, was fehlt.
+ */
+export async function grundausstattungHerstellen(
+  repo: MerkmalskonfigurationRepository,
+): Promise<number> {
+  const vorhanden = new Set((await repo.ausschluesseLesen()).map((a) => a.wort));
+  let neu = 0;
+  for (const a of STANDARD_KONFIGURATION.ausschluesse) {
+    if (vorhanden.has(a.wort)) continue;
+    await repo.ausschlussSetzen({ ...a, quelle: "standard" });
+    neu++;
+  }
+  return neu;
+}
+
 /** Nimmt ein Wort wieder ins Training auf. */
 export async function wortZulassen(
   repo: MerkmalskonfigurationRepository,
