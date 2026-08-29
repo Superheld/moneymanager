@@ -11,10 +11,15 @@
 //   • `if (u.istbuchungId && !map.has(id)) map.set(...)`  → der erste gewinnt
 //   • `if (u.istbuchungId) map.set(...)`                   → der letzte gewinnt
 //
-// Zeigen zwei Umsätze auf dieselbe Buchung, nannte die Analyse also einen anderen
-// Empfänger als der Kontoauszug. Der Widerspruch ist unsichtbar, solange beide Belege
-// dasselbe sagen — und genau deshalb fällt er nie auf, sondern erzeugt nur irgendwann
-// zwei Antworten auf dieselbe Frage.
+// **Der Konflikt ist heute nicht erreichbar**, und das gehört dazugesagt: `umsatzVerbuchen`
+// ruft `verbuchen(u, ist.id)` immer 1:1 auf, jeder Beleg bekommt seine eigene Buchung. Es
+// gibt keinen Weg, zwei Belege auf dieselbe zu setzen.
+//
+// Der Grund für die eine Stelle ist deshalb nicht ein Fehler, den es gibt, sondern einer,
+// den vier Kopien einer Schleife jederzeit bekommen können: die vierte wird beim nächsten
+// Umbau vergessen, und welche Regel dann gilt, sieht man ihr nicht an. Dass die Kopien
+// sich schon jetzt widersprachen, ohne dass es auffiel, ist der Beleg dafür — nicht ein
+// gemeldeter Fehler.
 
 import type { Umsatz } from "../import/umsatz";
 

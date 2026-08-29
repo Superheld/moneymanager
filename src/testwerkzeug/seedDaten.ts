@@ -596,15 +596,17 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     zweck: string; hash: string; status: string; istbuchungId?: string | null;
     vorschlagKategorie?: string | null; vorschlagCharakter?: string | null;
     vorschlagQuelle?: string | null; umsatzart?: string | null; zweckCode?: string | null;
+    /** Nur CAMT: wer die Zahlung wirklich bekommt, wenn ein Dienstleister dazwischensteht. */
+    endempfaenger?: string | null;
   }): string => {
     const id = `umsatz-${String(++umsatzNr).padStart(3, "0")}`;
     setzen(
-      "INSERT INTO umsatz_roh (id, lauf_id, buchungstag, valuta, betrag, waehrung, gegenpartei, gegenpartei_iban, verwendungszweck, roh_hash, umsatzart, zweck_code) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO umsatz_roh (id, lauf_id, buchungstag, valuta, betrag, waehrung, gegenpartei, gegenpartei_iban, verwendungszweck, roh_hash, umsatzart, zweck_code, endempfaenger) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         id, o.laufId, o.datum, o.datum, o.betrag, "EUR", o.partei,
         iban("99999904", 7000000 + umsatzNr), o.zweck, o.hash,
-        o.umsatzart ?? null, o.zweckCode ?? null,
+        o.umsatzart ?? null, o.zweckCode ?? null, o.endempfaenger ?? null,
       ],
     );
     setzen(
@@ -654,6 +656,61 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       istbuchungId: pruefBuchungen[p.hash],
     });
   }
+
+  // ------------------------------------------------------------ Sonderfaelle
+  //
+  // Faelle, die sich nur an echten Daten zeigten und deren Fehlen im Spielstand jedes Mal
+  // bedeutete, dass man zum Pruefen an den echten Bestand musste. Genau das soll nicht
+  // noetig sein: was hier steht, kann jeder nachvollziehen, der das Repo klont.
+
+  // (1) Ein Umbuchungs-Bein OHNE Gegenstueck.
+  //
+  // Der Beleg ist als Umbuchung markiert, aber das Gegenkonto liegt nicht im Bestand —
+  // Geld auf ein Konto ausserhalb des Moneymanagers. Es wird deshalb NICHT als
+  // Umschichtung gebucht, sondern nach seiner Richtung (Abfluss -> Aufwand), und bleibt
+  // ohne Kategorie in der Nacharbeit.
+  //
+  // Bis 2026-08-29 entstand hier eine einseitige Umschichtung, die in kein Budget und in
+  // keine Ausgabe zaehlte: das Geld war weg und fehlte nirgends.
+  const halbeUmbuchung = buchung(tagIn(-1, 9), -25000, "konto-giro", null, "Aufwand", {
+    quelle: "import",
+    rohHash: "hash-halbe-umbuchung",
+    kategorieHerkunft: "automatisch",
+  });
+  umsatzAnlegen({
+    laufId: LAUF_SYNC[1] ?? LAUF_SYNC[0],
+    kontoId: "konto-giro",
+    datum: tagIn(-1, 9),
+    betrag: -25000,
+    partei: "Uebertrag Depotkonto",
+    zweck: "Uebertrag",
+    hash: "hash-halbe-umbuchung",
+    status: "verbucht",
+    istbuchungId: halbeUmbuchung,
+    umsatzart: "Uebertrag",
+  });
+
+  // (2) Ein Zahlungsdienstleister zwischen Konto und Haendler.
+  //
+  // `gegenpartei` nennt den Dienstleister, `endempfaenger` den Haendler dahinter — zwei
+  // verschiedene Angaben, und die zweite liefert nur CAMT. Fuer die Kategorie-Erkennung
+  // ist der Unterschied erheblich: der Dienstleister ist bei JEDEM Haendler derselbe und
+  // taugt deshalb als Merkmal nichts.
+  //
+  // Der Spielstand traegt das Feld, damit sichtbar ist, dass es importiert und (Stand
+  // heute) von niemandem ausgewertet wird.
+  const ueberDienstleister = buchung(tagIn(0, 11), -3990, "konto-giro", "kat-freizeit", "Aufwand", {
+    quelle: "import",
+    rohHash: "hash-dienstleister",
+    kategorieHerkunft: "automatisch",
+  });
+  umsatzAnlegen({
+    laufId: LAUF_SYNC[0],
+    kontoId: "konto-giro", datum: tagIn(0, 11), betrag: -3990,
+    partei: "Zahlungsdienst Norderwiek", zweck: "Bestellung 4471", hash: "hash-dienstleister",
+    status: "verbucht", istbuchungId: ueberDienstleister,
+    endempfaenger: "Bierbaum Versand", zweckCode: "OTHR",
+  });
 
   // ------------------------------------------------------------ Posteingang
 
