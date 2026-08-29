@@ -11,6 +11,7 @@
 // und kann deshalb auch nicht versehentlich eine andere Buchungsmenge hineinreichen als
 // die Nachbarzahl.
 
+import { belegZuBuchung } from "./buchung/belegZuBuchung";
 import {
   addMonate,
   blindeFlecken,
@@ -113,8 +114,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
       deps.vertragRepo.alle(),
       deps.regelRepo.alle(),
     ]);
-  const umsatzZuBuchung = new Map<string, Umsatz>();
-  for (const u of umsaetze) if (u.istbuchungId) umsatzZuBuchung.set(u.istbuchungId, u);
+  const umsatzZuBuchung = belegZuBuchung(umsaetze);
   return {
     buchungen,
     konten,

@@ -16,22 +16,15 @@
 
 import { istGeteilt, type IstBuchung, type Zahlungsspur } from "../../core";
 import type { Umsatz } from "../import/umsatz";
+import { belegZuBuchung } from "./belegZuBuchung";
 import type { LedgerPort, UmsatzRepository } from "../ports";
 
-/**
- * Die Spuren aus bereits geladenen Buchungen und Umsätzen — rein, kein IO.
- *
- * Ein Umsatz je Buchung; bei mehreren gewinnt der erste. Empfänger und Gläubiger-ID sind
- * bei allen dieselben, sie stammen aus derselben Quellzeile.
- */
+/** Die Spuren aus bereits geladenen Buchungen und Umsätzen — rein, kein IO. */
 export function spurenAus(
   buchungen: readonly IstBuchung[],
   umsaetze: readonly Umsatz[],
 ): Zahlungsspur[] {
-  const umsatzZuBuchung = new Map<string, Umsatz>();
-  for (const u of umsaetze) {
-    if (u.istbuchungId && !umsatzZuBuchung.has(u.istbuchungId)) umsatzZuBuchung.set(u.istbuchungId, u);
-  }
+  const umsatzZuBuchung = belegZuBuchung(umsaetze);
 
   return buchungen.map((b) => {
     const u = umsatzZuBuchung.get(b.id);

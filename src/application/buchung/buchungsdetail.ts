@@ -9,6 +9,7 @@
 // Alles LESENDE steht hier. Die Schreibfälle bleiben eigene Use-Cases (buchungErfassen,
 // buchungSplitten, zuordnungVonHand …) — sie sind schon jeweils an ihrem Ort.
 
+import { belegZuBuchung } from "./belegZuBuchung";
 import type {
   IstBuchung,
   Kategorie,
@@ -110,8 +111,7 @@ export async function buchungsdetailLaden(
     ]);
   const zuordnungen_online = deps.kontozuordnungen ? await deps.kontozuordnungen() : [];
 
-  const umsatzZuBuchung = new Map<string, Umsatz>();
-  for (const u of umsaetze) if (u.istbuchungId) umsatzZuBuchung.set(u.istbuchungId, u);
+  const umsatzZuBuchung = belegZuBuchung(umsaetze);
 
   const freigegeben = freigegebenePaare(freigaben);
 
