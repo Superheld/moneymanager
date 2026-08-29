@@ -143,7 +143,13 @@ export interface IstBuchung {
    * Saldo, Register und Netto-Null rechnen weiter mit der EINEN Zeile.
    */
   readonly aufteilungen?: readonly Aufteilung[];
-  /** Roh-Hash der Importzeile (Dedup gegen Bankimport, später). */
+  /**
+   * Roh-Hash der Importzeile — der quellenagnostische Dedup-Schlüssel.
+   *
+   * Er trägt die gesamte Dublettenerkennung (Datei wie Bankabruf) und ist ausserdem der
+   * Weg zurück zum Beleg. Der Kommentar hier sagte bis 2026-08-29 „später"; das war seit
+   * dem Bankabruf überholt und las sich wie eine unfertige Stelle.
+   */
   readonly rohHash?: string;
   /**
    * „Das hier sollte ich mir ansehen."
