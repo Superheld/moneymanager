@@ -18,7 +18,7 @@ import {
   type Vertragserkennung,
   type Vertragszuordnung,
 } from "./vertragZuordnung";
-import type { Zahlungsspur } from "./vertragErkennung";
+import type { Zahlungsspur } from "../buchung/zahlungsspur";
 
 function spur(teil: Partial<Zahlungsspur> = {}): Zahlungsspur {
   return {

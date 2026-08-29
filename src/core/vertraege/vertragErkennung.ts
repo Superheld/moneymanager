@@ -18,58 +18,9 @@
 import type { Cent } from "../basis/geld";
 import { tageBis } from "../basis/datum";
 import type { Rhythmus } from "../basis/zahlungsregel";
+import { anbieterSchluessel } from "../basis/gegenpartei";
+import type { Zahlungsspur } from "../buchung/zahlungsspur";
 
-/**
- * Eine gebuchte Zahlung, so weit sie für die Erkennung zählt. Bewusst eine eigene,
- * flache Form statt `IstBuchung`: Empfänger und Gläubiger-ID stehen am `Umsatz`
- * (Import-Kontext), nicht an der Buchung — das Zusammenführen ist Sache der
- * aufrufenden Schicht, nicht des Kerns.
- */
-export interface Zahlungsspur {
-  readonly id: string;
-  /** ISO „YYYY-MM-DD". */
-  readonly datum: string;
-  /** Vorzeichenbehaftet; negativ = Abfluss. */
-  readonly betrag: Cent;
-  readonly gegenpartei: string;
-  /**
-   * Verwendungszweck der Quellzeile.
-   *
-   * Die Vertragserkennung nutzt ihn NICHT VON SELBST — ein Vertrag hängt am Empfänger,
-   * nicht am Text, und `standardErkennung` legt nie ein Zweck-Merkmal an. Seit
-   * 2026-08-28 kann man von Hand eines eintragen (`Merkmalsart: "verwendungszweck"`),
-   * für den Fall, in dem der Empfänger nichts hergibt: eine Dauerüberweisung an eine
-   * Privatperson, bei der nur der Zweck sagt, worum es geht.
-   *
-   * Er steht ohnehin hier, weil die Kategorisierung ihn braucht und aus demselben Join
-   * stammt (`application/zahlungsspuren`); ein zweiter Lader für dieselbe Verbindung
-   * wären zwei Antworten auf dieselbe Frage.
-   */
-  readonly verwendungszweck?: string;
-  readonly glaeubigerId?: string;
-  readonly kategorieId?: string;
-  /**
-   * Wer die Kategorie gesetzt hat. Wie `kategorieId` und `geteilt` steht das hier für die
-   * Kategorisierung, nicht für die Vertragserkennung: der rückwirkende Abgleich muss eine
-   * Handentscheidung erkennen können, ohne sich die Ist-Buchung dazu nochmal zu holen.
-   * Fehlend zählt als `automatisch`.
-   */
-  readonly kategorieHerkunft?: "automatisch" | "manuell";
-  /**
-   * Trägt die Buchung eine Aufteilung? Dann hat sie mehrere Kategorien und taugt weder
-   * als Trainingsbeispiel noch als Ziel eines automatischen Laufs.
-   */
-  readonly geteilt?: boolean;
-  /** Konto, über das die Zahlung lief — der Vorschlag reicht es an die Maske durch. */
-  readonly kontoId?: string;
-  /**
-   * `Aufwand` und `Ertrag` können ein Vertrag sein, `Umschichtung` nicht. Ohne diese
-   * Prüfung stand auf echten Daten das eigene „Tagesgeldkonto" als Vertragsvorschlag
-   * in der Liste: eine monatliche Umbuchung aufs Sparkonto ist perfekt regelmäßig —
-   * und trotzdem keine Zahlung an jemanden, sondern eigenes Geld, das den Platz wechselt.
-   */
-  readonly charakter: "Aufwand" | "Ertrag" | "Umschichtung";
-}
 
 /**
  * Was die Erkennung an EINER Gruppe gemessen hat — die Belege hinter dem Vorschlag.
@@ -159,31 +110,6 @@ const STANDARD: Required<ErkennungsOptionen> = {
   maxAbstandsAbweichung: 0.35,
   auchBeendete: false,
 };
-
-/** Rechtsformen und Füllwörter, die denselben Anbieter verschieden aussehen lassen. */
-const RECHTSFORMEN = new Set([
-  "gmbh", "mbh", "ag", "kg", "kgaa", "ohg", "gbr", "ug", "se", "ev", "eg",
-  "co", "cokg", "ltd", "plc", "sa", "sas", "bv", "nv", "as", "ab", "oy", "inc", "llc",
-  "und", "the",
-]);
-
-/**
- * Empfängername → Gruppierungsschlüssel.
- *
- * Bewusst zurückhaltend: Kleinschreibung, Umlaute auflösen, Satzzeichen und Ziffern
- * raus, Rechtsformen raus. NICHT gekürzt auf die ersten Wörter — „Petrossen Bonn" und
- * „Petrossen Bremen" würden sonst zu einem Anbieter verschmelzen, und ein falsch
- * zusammengefasster Vorschlag ist schlimmer als zwei getrennte.
- */
-export function anbieterSchluessel(name: string): string {
-  const roh = name
-    .toLowerCase()
-    .replace(/ä/g, "ae").replace(/ö/g, "oe").replace(/ü/g, "ue").replace(/ß/g, "ss")
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
-  const woerter = roh.split(" ").filter((w) => w && !RECHTSFORMEN.has(w) && !/^\d+$/.test(w));
-  return woerter.join(" ") || roh;
-}
 
 /** Median einer nicht-leeren Zahlenreihe (bei gerader Länge der untere der beiden mittleren). */
 function median(werte: number[]): number {
