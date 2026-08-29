@@ -418,6 +418,8 @@ export function analyse(): Promise<Analysebasis> {
     umsatzRepo: sqliteUmsatzRepository,
     zuordnungRepo: sqliteVertragszuordnungRepository,
     vertragRepo: sqliteVertragRepository,
+    budgetRepo: sqliteBudgetRepository,
+    regelRepo: sqliteZahlungsregelRepository,
   });
 }
 

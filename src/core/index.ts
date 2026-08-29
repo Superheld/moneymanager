@@ -27,5 +27,6 @@ export * from "./konten/kontostand";
 export * from "./buchung/historie";
 export * from "./buchung/journal";
 export * from "./monatsausblick";
+export * from "./auswertung";
 export * from "./klassifikator/merkmale";
 export * from "./klassifikator/modell";

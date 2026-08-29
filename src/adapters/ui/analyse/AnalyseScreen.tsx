@@ -14,6 +14,7 @@ import {
   analyseBuchungen,
   analyseFenster,
   analyseFensterTaggenau,
+  analyseBefunde,
   analyseGruppen,
   analyseVerlauf,
   type Analysebasis,
@@ -25,6 +26,7 @@ import { analyse, depots } from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, KPIStat, Pill } from "../bausteine";
 import { AUFKLAPP_ZEILEN_BREIT, AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
+import { BefundeBereich } from "./BefundeBereich";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { DepotAnsicht } from "./DepotAnsicht";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
@@ -257,6 +259,10 @@ export function AnalyseScreen() {
     const bbis = idx != null ? `${verlauf[idx].label}-01` : bis;
     return { label: idx != null ? verlauf[idx].label : null, items: analyseAufschluesselung(basis, bvon, bbis) };
   }, [aktivMonat, verlauf, basis, von, bis]);
+
+  // Die Befunde hängen am selben Fenster wie alles darüber — und werden in EINEM Zug
+  // gerechnet, damit zwei Zahlen auf einem Bildschirm nicht verschiedene Mengen meinen.
+  const befunde = useMemo(() => (basis ? analyseBefunde(basis, von, bis) : null), [basis, von, bis]);
 
   const ist = basis?.buchungen ?? [];
   const kategorien = basis?.kategorien ?? [];
@@ -527,6 +533,17 @@ export function AnalyseScreen() {
               {aufschluesselung.items.length === 0 && <div className="muted">{t("historie.katLeer")}</div>}
               <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)", marginTop: "var(--sp-2)" }}>{t("historie.katKlickHinweis")}</div>
             </Card>
+          )}
+
+          {/* Die Befunde stehen NACH den Kategorien und vor den Depots: sie setzen
+              voraus, dass man gesehen hat, wie viel wohin ging, und beantworten die
+              nächste Frage — ob das so tragfähig ist. */}
+          {befunde && basis && (
+            <BefundeBereich
+              befunde={befunde}
+              kontoNamen={basis.kontoNamen}
+              onBuchung={(b) => setDetail(b)}
+            />
           )}
 
           {/* Depots zuletzt: sie beantworten eine eigene Frage und mischen sich in die

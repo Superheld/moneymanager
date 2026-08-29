@@ -359,6 +359,90 @@ const de = {
     verbuchtErgebnis: "{{verbucht}} verbucht ({{umbuchungen}} Umbuchungen) · {{uebersprungen}} übersprungen",
     seite: "Seite {{seite}} / {{gesamt}}",
   },
+  // Die Befunde im Analyse-Bereich — was die Zahlen über den Zeitraum sagen.
+  befunde: {
+    titel: "Befunde",
+    monate: "Monate",
+    kpiFest: "Fest je Monat",
+    kpiFestMeta: "{{quote}} der Einnahmen sind vertraglich gebunden",
+    kpiFrei: "Frei je Monat",
+    kpiFreiMeta: "alles, was nicht an einem Vertrag hängt",
+    kpiSparquote: "Sparquote",
+    kpiSparquoteMeta: "was von den Einnahmen übrig blieb",
+    kpiReichweite: "Reichweite",
+    kpiReichweiteMeta: "wie lange die liquiden Mittel bei diesem Schnitt tragen",
+    lupe: {
+      fest: {
+        name: "Fest und frei",
+        untertitel:
+          "Was vertraglich gebunden war und was frei blieb — je Monat. Gebunden heißt " +
+          "„gehört zu einem Vertrag“: eine Miete ohne Vertrag steht hier als frei, und " +
+          "genau diese Lücke soll sichtbar sein.",
+      },
+      empfaenger: {
+        name: "Empfänger",
+        untertitel:
+          "Wohin das Geld geht, an der Kategorie vorbei. Die einzige Sicht, die eine " +
+          "falsch einsortierte Buchung trotzdem an der richtigen Stelle zeigt — und damit " +
+          "die Probe darauf, ob die Kategorien stimmen.",
+      },
+      kategorien: {
+        name: "Wie oft",
+        untertitel:
+          "Nicht wie viel, sondern wie oft und wie schwer. Eine Kategorie wird auf zwei " +
+          "Arten groß: selten und teuer oder oft und klein — dagegen hilft Verschiedenes.",
+      },
+      budgets: {
+        name: "Budgets",
+        untertitel:
+          "Hält der Plan — Monat für Monat, nicht in der Jahressumme. Ein Budget, das " +
+          "übers Jahr aufgeht, kann in jedem einzelnen Monat verfehlt worden sein.",
+      },
+      vertraege: {
+        name: "Verträge",
+        untertitel:
+          "Soll gegen Ist, und die Spanne dazwischen. Ein Ist weit unter dem Soll ist " +
+          "kein Sparerfolg, sondern eine Erkennung, die zu eng greift.",
+      },
+      ausreisser: {
+        name: "Ausreißer",
+        untertitel: "Die größten Einzelabflüsse — und was sie im Verhältnis zu einem Monat waren.",
+      },
+    },
+    spalteMonat: "Monat",
+    spalteFest: "Fest",
+    spalteFrei: "Frei",
+    spalteEinnahmen: "Einnahmen",
+    spalteGebunden: "gebunden",
+    spalteEmpfaenger: "Empfänger",
+    spalteSumme: "Summe",
+    spalteAnzahl: "Posten",
+    spalteMonate: "Monate",
+    spalteLetzte: "zuletzt",
+    spalteKategorie: "Kategorie",
+    spalteSchnitt: "Ø Posten",
+    spalteGroesster: "größter",
+    spalteBudget: "Budget",
+    spalteRahmen: "Rahmen",
+    spalteVerbraucht: "verbraucht",
+    spalteGehalten: "gehalten",
+    spalteSchlimmste: "schlimmster Monat",
+    spalteAnteil: "Anteil",
+    spalteVertrag: "Vertrag",
+    spalteSoll: "Soll",
+    spalteIst: "Ist",
+    spalteAbweichung: "Abweichung",
+    spalteSpanne: "Spanne",
+    spalteDatum: "Datum",
+    spalteKonto: "Konto",
+    spalteBetrag: "Betrag",
+    spalteVielfaches: "vom Monat",
+    gehaltenVon: "{{gehalten}} von {{monate}}",
+    keineBudgets: "Noch kein Budget angelegt — es gibt nichts, wogegen zu messen wäre.",
+    keineVertraege: "Noch kein Vertrag angelegt.",
+    blindTitel: "Ausgaben ohne Budget und ohne Vertrag",
+    blindKeine: "Alles, was abgeflossen ist, war entweder budgetiert oder vertraglich gebunden.",
+  },
   // Monatsausblick — die drei Karten oben in der Übersicht.
   ausblick: {
     untertitelLaufend: "gebucht und geplant",
@@ -2034,6 +2118,89 @@ const en: typeof de = {
     },
     verbuchtErgebnis: "{{verbucht}} posted ({{umbuchungen}} transfers) · {{uebersprungen}} skipped",
     seite: "Page {{seite}} / {{gesamt}}",
+  },
+  befunde: {
+    titel: "Findings",
+    monate: "months",
+    kpiFest: "Fixed per month",
+    kpiFestMeta: "{{quote}} of income is tied to contracts",
+    kpiFrei: "Free per month",
+    kpiFreiMeta: "everything not tied to a contract",
+    kpiSparquote: "Savings rate",
+    kpiSparquoteMeta: "what was left of the income",
+    kpiReichweite: "Runway",
+    kpiReichweiteMeta: "how long liquid funds last at this rate",
+    lupe: {
+      fest: {
+        name: "Fixed and free",
+        untertitel:
+          "What was tied to contracts and what stayed free, month by month. Tied means " +
+          "it belongs to a contract: rent without a contract shows up as free, and that " +
+          "gap is meant to be visible.",
+      },
+      empfaenger: {
+        name: "Payees",
+        untertitel:
+          "Where the money goes, bypassing categories. The only view that puts a " +
+          "miscategorised booking in the right place — and thus the test of whether the " +
+          "categories hold.",
+      },
+      kategorien: {
+        name: "How often",
+        untertitel:
+          "Not how much, but how often and how heavy. A category grows in two ways: rare " +
+          "and expensive, or frequent and small — and they call for different remedies.",
+      },
+      budgets: {
+        name: "Budgets",
+        untertitel:
+          "Does the plan hold — month by month, not in the yearly total. A budget that " +
+          "balances over a year may have missed in every single month.",
+      },
+      vertraege: {
+        name: "Contracts",
+        untertitel:
+          "Planned against actual, and the spread between. An actual far below plan is " +
+          "not a saving, it is recognition that matches too narrowly.",
+      },
+      ausreisser: {
+        name: "Outliers",
+        untertitel: "The largest single outflows — and what they were relative to a month.",
+      },
+    },
+    spalteMonat: "Month",
+    spalteFest: "Fixed",
+    spalteFrei: "Free",
+    spalteEinnahmen: "Income",
+    spalteGebunden: "tied",
+    spalteEmpfaenger: "Payee",
+    spalteSumme: "Total",
+    spalteAnzahl: "Items",
+    spalteMonate: "Months",
+    spalteLetzte: "last",
+    spalteKategorie: "Category",
+    spalteSchnitt: "Avg item",
+    spalteGroesster: "largest",
+    spalteBudget: "Budget",
+    spalteRahmen: "Allowance",
+    spalteVerbraucht: "used",
+    spalteGehalten: "held",
+    spalteSchlimmste: "worst month",
+    spalteAnteil: "Share",
+    spalteVertrag: "Contract",
+    spalteSoll: "Planned",
+    spalteIst: "Actual",
+    spalteAbweichung: "Deviation",
+    spalteSpanne: "Spread",
+    spalteDatum: "Date",
+    spalteKonto: "Account",
+    spalteBetrag: "Amount",
+    spalteVielfaches: "of a month",
+    gehaltenVon: "{{gehalten}} of {{monate}}",
+    keineBudgets: "No budget yet — there is nothing to measure against.",
+    keineVertraege: "No contract yet.",
+    blindTitel: "Spending with no budget and no contract",
+    blindKeine: "Everything that went out was either budgeted or tied to a contract.",
   },
   ausblick: {
     untertitelLaufend: "posted and planned",
