@@ -251,16 +251,19 @@ Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweit
 ## Die Analyse steht in zwei Blöcken
 
 Der obere beantwortet **„wie viel und wohin"** — Kennzahlen, Verlauf (Fluss · Saldo ·
-Tabelle) und die Aufschlüsselung nach Kategorien. Der untere (`BefundeBereich.tsx`)
-beantwortet **„und wie tragfähig ist das"**: fest gegen frei, Empfänger, Nutzung der
-Kategorien, Budget-Treue samt der Ausgaben, die in keinem Budget vorkommen, Verträge
-Soll gegen Ist, und die Ausreißer.
+Tabelle), der **Blick nach vorn** (`AusblickKarte.tsx`) und die Aufschlüsselung nach
+Kategorien. Der untere (`BefundeBereich.tsx`) beantwortet **„und wie tragfähig ist das"**:
+fest gegen frei, Budget-Treue, Ausgaben ohne Budget und ohne Vertrag, Verträge Soll gegen
+Ist, Empfänger, Nutzung der Kategorien, Ausreißer.
 
-**Sechs Lupen auf einer Fläche**, umschaltbar wie der Verlauf darüber. Untereinander
-wäre der Bereich vier Bildschirme lang, und was unten steht, sieht niemand — dieselbe
-Überlegung wie beim Verlauf, und derselbe Umschalter, damit es sich gleich bedient.
+**Jeder Befund ist eine eigene Karte, kein Register.** Der erste Versuch legte sie als
+umschaltbare Lupen auf eine Fläche — kürzer, und genau deshalb falsch: was hinter einem
+Reiter liegt, sucht niemand, und ein Befund, den man erst aufklappen muss, ist keiner. Der
+Bereich wird dadurch lang; das ist der Preis, und er ist richtig herum bezahlt. Die
+Seitengrösse der Tabellen ist dafür kleiner (8 statt 25) — sieben Karten, von denen jede
+eine Bildschirmhöhe frisst, schieben einander aus dem Blick.
 
-Zwei Dinge, die beim Anbauen zählen:
+Drei Dinge, die beim Anbauen zählen:
 
 - **Alle Befunde werden in EINEM Zug gerechnet** (`analyseBefunde`), aus derselben Basis
   wie die Zahlen darüber. Eine Karte, die sich ihre Buchungen selbst holt, rechnet früher
@@ -270,6 +273,16 @@ Zwei Dinge, die beim Anbauen zählen:
   steht im Kopf von `core/auswertung.ts`: `Math.abs` je Buchung macht aus „es kam Geld
   zurück" ein „es wurde noch mehr ausgegeben". Wer eine Spalte ergänzt, übernimmt die
   Regel mit.
+- **Der Blick nach vorn hängt NICHT am gewählten Zeitraum** — er steht fest bei sechs
+  Monaten zurück und sechs voraus. Eine Projektion wird nicht besser, wenn man sie über
+  zwei Jahre zieht; ihre späten Monate wären Behauptung statt Vorschau. Gezeichnet wird
+  EINE Linie, deren geplanter Teil gestrichelt ist (`SaldoVerlaufChart`, `abIndex`): es
+  ist derselbe Saldo, und zwei Linien behaupteten zwei Grössen.
+
+**Ein Screen-Test, der einen Kategorienamen sucht, muss ihn jetzt in seiner Karte
+suchen.** Derselbe Name steht in der Aufschlüsselung und in den Ranglisten darunter; eine
+Suche über das ganze Dokument findet mehrere Elemente und bricht ab. `screens.test.tsx`
+hat dafür `inAufschluesselung()`.
 
 ## Laden
 

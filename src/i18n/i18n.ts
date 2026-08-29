@@ -371,7 +371,7 @@ const de = {
     kpiSparquoteMeta: "was von den Einnahmen übrig blieb",
     kpiReichweite: "Reichweite",
     kpiReichweiteMeta: "wie lange die liquiden Mittel bei diesem Schnitt tragen",
-    lupe: {
+    block: {
       fest: {
         name: "Fest und frei",
         untertitel:
@@ -403,6 +403,13 @@ const de = {
         untertitel:
           "Soll gegen Ist, und die Spanne dazwischen. Ein Ist weit unter dem Soll ist " +
           "kein Sparerfolg, sondern eine Erkennung, die zu eng greift.",
+      },
+      blind: {
+        name: "Ohne Budget und ohne Vertrag",
+        untertitel:
+          "Was abgeflossen ist, ohne in einer Planung vorzukommen. Der Befund, der von " +
+          "selbst nie auffällt: wer auf seine Budgets schaut, sieht nur, was er schon " +
+          "geplant hat — man kann jedes Budget halten und trotzdem im Minus landen.",
       },
       ausreisser: {
         name: "Ausreißer",
@@ -440,10 +447,20 @@ const de = {
     gehaltenVon: "{{gehalten}} von {{monate}}",
     keineBudgets: "Noch kein Budget angelegt — es gibt nichts, wogegen zu messen wäre.",
     keineVertraege: "Noch kein Vertrag angelegt.",
-    blindTitel: "Ausgaben ohne Budget und ohne Vertrag",
     blindKeine: "Alles, was abgeflossen ist, war entweder budgetiert oder vertraglich gebunden.",
   },
   // Monatsausblick — die drei Karten oben in der Übersicht.
+  // Der Verlauf über die Gegenwart hinaus — Analyse, eigene Karte.
+  blickNachVorn: {
+    titel: "Blick nach vorn",
+    untertitel: "{{zurueck}} Monate gewesen, {{voraus}} geplant — derselbe Saldo, fortgeschrieben",
+    legendeIst: "gebucht",
+    legendePlan: "geplant",
+    pillPlan: "Plan",
+    warnungMinus:
+      "Im {{monat}} steht der vorhergesagte Stand bei {{betrag}}. Gerechnet ist monatsweise: " +
+      "innerhalb eines Monats kann es früher eng werden, als hier zu sehen ist.",
+  },
   ausblick: {
     untertitelLaufend: "gebucht und geplant",
     untertitelVorschau: "was der Plan sagt",
@@ -2130,7 +2147,7 @@ const en: typeof de = {
     kpiSparquoteMeta: "what was left of the income",
     kpiReichweite: "Runway",
     kpiReichweiteMeta: "how long liquid funds last at this rate",
-    lupe: {
+    block: {
       fest: {
         name: "Fixed and free",
         untertitel:
@@ -2162,6 +2179,13 @@ const en: typeof de = {
         untertitel:
           "Planned against actual, and the spread between. An actual far below plan is " +
           "not a saving, it is recognition that matches too narrowly.",
+      },
+      blind: {
+        name: "No budget, no contract",
+        untertitel:
+          "What went out without appearing in any plan. The finding that never surfaces " +
+          "on its own: looking at your budgets only shows what you already planned — you " +
+          "can hold every budget and still end up short.",
       },
       ausreisser: {
         name: "Outliers",
@@ -2199,8 +2223,17 @@ const en: typeof de = {
     gehaltenVon: "{{gehalten}} of {{monate}}",
     keineBudgets: "No budget yet — there is nothing to measure against.",
     keineVertraege: "No contract yet.",
-    blindTitel: "Spending with no budget and no contract",
     blindKeine: "Everything that went out was either budgeted or tied to a contract.",
+  },
+  blickNachVorn: {
+    titel: "Looking ahead",
+    untertitel: "{{zurueck}} months past, {{voraus}} planned — the same balance, carried forward",
+    legendeIst: "booked",
+    legendePlan: "planned",
+    pillPlan: "Plan",
+    warnungMinus:
+      "In {{monat}} the projected balance is {{betrag}}. This is calculated by month: " +
+      "within a month it can get tight earlier than shown here.",
   },
   ausblick: {
     untertitelLaufend: "posted and planned",

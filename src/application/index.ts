@@ -190,7 +190,9 @@ export {
   type AnalyseDeps,
   type Zeitraum,
   analyseBefunde,
+  analyseAusblick,
   type Befunde,
+  type Verlaufspunkt,
 } from "./analysesichten";
 export {
   depotsLaden,

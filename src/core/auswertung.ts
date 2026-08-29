@@ -550,3 +550,42 @@ export function vertragstreue(
     })
     .sort((a, b) => b.ist - a.ist);
 }
+
+// ------------------------------------------------------------ Blick nach vorn
+
+/**
+ * Was ein geplanter Monat für den KONTOSTAND bedeutet — Zufluss und Abfluss getrennt.
+ *
+ * Der Monatsausblick rechnet mehr zusammen, als ein Saldo tragen darf, und die Auswahl
+ * hier ist die eigentliche Entscheidung dieser Funktion:
+ *
+ * | Zeile | zählt | warum |
+ * |---|---|---|
+ * | `einnahmen` | ja | Geld kommt an |
+ * | `vertraege` | ja | Geld geht weg |
+ * | `budgets` | ja | Geld geht weg |
+ * | `sonstiges` | ja | Geld geht weg |
+ * | `ruecklagen` | **nein** | kalkulatorisch — sie werden NIE gebucht |
+ * | `umschichtung` | **nein** | wechselt das Konto, verlässt den Bestand nicht |
+ *
+ * Die Rücklage aus dem Inventar ist die wichtigere der beiden Ausnahmen: sie sagt, was
+ * man zurücklegen SOLLTE, und kein Euro davon verlässt das Konto. Sie in eine
+ * Saldo-Vorschau zu nehmen hiesse, jeden Monat eine Abbuchung zu erfinden, die nie
+ * kommt — der vorhergesagte Stand liefe immer weiter unter den echten.
+ */
+export const SALDOWIRKSAME_ZEILEN = ["einnahmen", "vertraege", "budgets", "sonstiges"] as const;
+
+export function planWirkung(zeilen: readonly { id: string; plan: Cent }[]): {
+  einnahmen: Cent;
+  ausgaben: Cent;
+  netto: Cent;
+} {
+  let einnahmen = 0;
+  let ausgaben = 0;
+  for (const z of zeilen) {
+    if (!(SALDOWIRKSAME_ZEILEN as readonly string[]).includes(z.id)) continue;
+    if (z.plan > 0) einnahmen += z.plan;
+    else ausgaben += z.plan;
+  }
+  return { einnahmen, ausgaben, netto: einnahmen + ausgaben };
+}
