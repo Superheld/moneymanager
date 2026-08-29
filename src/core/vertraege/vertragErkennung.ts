@@ -206,6 +206,28 @@ export const RHYTHMUS_FENSTER: Record<Rhythmus, readonly [number, number]> = {
 /** Anteil der Abstände, der nah am Median liegen muss, damit es ein Takt ist. */
 export const MIN_ANTEIL_NAH = 0.6;
 
+/**
+ * Wie weit ein Betrag vom Median abweichen darf und noch als derselbe gilt: der Anteil,
+ * und darunter ein fester Boden.
+ *
+ * Der Boden ist der Grund, warum es zwei Werte sind — bei einem kleinen Abo wäre ein
+ * reiner Prozentsatz so eng, dass jeder Cent Rundungsdifferenz als Betragssprung zählte.
+ */
+export const BETRAGS_TOLERANZ_ANTEIL = 0.05;
+/** Untergrenze der Betragstoleranz in Cent. */
+export const BETRAGS_TOLERANZ_MIN: Cent = 100;
+
+/**
+ * Ab wann ein Takt als abgerissen gilt: so viele Takte darf er aussetzen, plus Puffer.
+ *
+ * Der Faktor lässt EINE Zahlung ausfallen (Zahlungspause, verschobene Abbuchung), ohne
+ * dass der Vertrag als beendet gilt; der Puffer fängt Wochenend- und
+ * Feiertagsverschiebungen ab, die sonst am Rand jedes Fensters zuschlügen.
+ */
+export const AUSSETZER_FAKTOR = 2;
+/** Puffer in Tagen auf den ausgesetzten Takt. */
+export const VERSCHIEBUNGS_PUFFER_TAGE = 10;
+
 /** Tagesabstand → Rhythmus, oder null, wenn er zu keinem passt. */
 function rhythmusAus(tage: number): Rhythmus | null {
   for (const r of Object.keys(RHYTHMUS_FENSTER) as Rhythmus[]) {
@@ -305,14 +327,10 @@ function auswerten(
   const betraege = sortiert.map((s) => Math.abs(s.betrag));
   const medianBetrag = median(betraege);
   if (medianBetrag <= 0) return null;
-  // 5 % Toleranz, mindestens 1 € — sonst gälte bei einem 3-€-Abo jeder Cent als Sprung.
-  const toleranz = Math.max(100, Math.round(medianBetrag * 0.05));
+  const toleranz = Math.max(BETRAGS_TOLERANZ_MIN, Math.round(medianBetrag * BETRAGS_TOLERANZ_ANTEIL));
   const stabil = betraege.filter((b) => Math.abs(b - medianBetrag) <= toleranz).length;
 
   const letzte = termine[termine.length - 1];
-  // Ein Rhythmus darf einmal aussetzen (Zahlungspause, verschobene Abbuchung), bevor
-  // ein Vertrag als beendet gilt; 10 Tage Puffer für Wochenend-/Feiertagsverschiebung.
-  //
   // Über `tageBis` und NICHT über `ord`: `ord` liefert den Sortierschlüssel YYYYMMDD,
   // keinen Tageszähler — „ord(heute) − 70" ergäbe ein Datum, das es nicht gibt, und
   // damit ein zufälliges Ergebnis. Auf echten Daten fielen dadurch laufende Verträge
@@ -323,7 +341,7 @@ function auswerten(
   const basisWert = schluessel.replace(/^\+/, "");
   const schluesselArt = sortiert.some((s) => s.glaeubigerId?.trim() === basisWert) ? "glaeubigerId" : "name";
 
-  const beendetAbTagen = medianAbstand * 2 + 10;
+  const beendetAbTagen = medianAbstand * AUSSETZER_FAKTOR + VERSCHIEBUNGS_PUFFER_TAGE;
   const letzteVorTagen = tageBis(letzte, heute);
   const laeuft = letzteVorTagen <= beendetAbTagen;
 

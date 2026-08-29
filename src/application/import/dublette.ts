@@ -26,7 +26,7 @@
 // mit verschiedenen Beträgen sind nie dieselbe, egal wie ähnlich der Text ist.
 
 import type { Cent } from "../../core";
-import { normalisiereIban } from "../../core";
+import { normalisiereIban, tageBis } from "../../core";
 
 /** Was der Finder von einer Buchung braucht — der gemeinsame Nenner beider Quellen. */
 export interface Vergleichbar {
@@ -58,6 +58,22 @@ export const SCHWELLE_VERDACHT = 3;
 
 /** Wie weit der Buchungstag auseinanderliegen darf, damit überhaupt verglichen wird. */
 export const MAX_TAGE = 3;
+
+/**
+ * Punkte für einen Treffer, der keine Schätzung ist (gleiche Quell-ID, gleiches
+ * SEPA-Mandat). Der Wert liegt bewusst weit über `SCHWELLE_IDENTISCH` — er soll auch
+ * dann noch reichen, wenn jemand die Schwellen später anzieht.
+ */
+const PUNKTE_SICHER = 99;
+
+/** Ab diesem Anteil gemeinsamer Wörter gilt ein Verwendungszweck als überwiegend gleich. */
+const MIN_WORTUEBERLAPPUNG = 0.6;
+
+/** Zeichen, über die ein gemeinsamer Anfang des Verwendungszwecks zählt. */
+const PRAEFIX_LAENGE = 15;
+
+/** Kürzere Wörter tragen nichts zur Übereinstimmung bei („an", „für", Artikel). */
+const MIN_WORTLAENGE = 3;
 
 // ── Normalisierung ────────────────────────────────────────────────────────────────────
 
@@ -111,7 +127,7 @@ function woerter(text: string | undefined): Set<string> {
     (text ?? "")
       .toLowerCase()
       .split(/[^a-zA-ZäöüßÄÖÜ0-9]+/)
-      .filter((w) => w.length >= 3),
+      .filter((w) => w.length >= MIN_WORTLAENGE),
   );
 }
 
@@ -126,11 +142,7 @@ function wortUeberlappung(a: string | undefined, b: string | undefined): number 
 }
 
 function tageAbstand(a: string, b: string): number {
-  const zahl = (iso: string) => {
-    const [j, m, t] = iso.split("-").map(Number);
-    return Date.UTC(j, m - 1, t) / 86_400_000;
-  };
-  return Math.abs(zahl(a) - zahl(b));
+  return Math.abs(tageBis(a, b));
 }
 
 /**
@@ -170,7 +182,7 @@ export function vergleiche(a: Vergleichbar, b: Vergleichbar): Bewertung {
 
   // Stufe 1: dieselbe Quelle hat dieselbe ID vergeben. Das ist keine Schätzung.
   if (a.nativeId && b.nativeId && a.nativeId === b.nativeId) {
-    return { urteil: "identisch", punkte: 99, gruende: ["gleiche Buchungs-ID der Quelle"] };
+    return { urteil: "identisch", punkte: PUNKTE_SICHER, gruende: ["gleiche Buchungs-ID der Quelle"] };
   }
 
   // Stufe 2: der von der Bank vergebene SEPA-Schlüssel. Gilt nur für Lastschriften und
@@ -186,7 +198,7 @@ export function vergleiche(a: Vergleichbar, b: Vergleichbar): Bewertung {
   ) {
     return {
       urteil: "identisch",
-      punkte: 99,
+      punkte: PUNKTE_SICHER,
       gruende: ["gleiche Gläubiger-ID und Mandatsreferenz bei gleichem Betrag"],
     };
   }
@@ -220,10 +232,10 @@ export function vergleiche(a: Vergleichbar, b: Vergleichbar): Bewertung {
       // Quelle hängt noch etwas an (Finanzguru den Kartennummern-Block).
       punkte += 3;
       gruende.push("Verwendungszweck ist Anfang des anderen");
-    } else if (zwA.slice(0, 15) === zwB.slice(0, 15) && zwA.length >= 15) {
+    } else if (zwA.slice(0, PRAEFIX_LAENGE) === zwB.slice(0, PRAEFIX_LAENGE) && zwA.length >= PRAEFIX_LAENGE) {
       punkte += 2;
       gruende.push("Verwendungszweck beginnt gleich");
-    } else if (wortUeberlappung(a.verwendungszweck, b.verwendungszweck) >= 0.6) {
+    } else if (wortUeberlappung(a.verwendungszweck, b.verwendungszweck) >= MIN_WORTUEBERLAPPUNG) {
       punkte += 1;
       gruende.push("Verwendungszweck überwiegend gleiche Wörter");
     } else {
