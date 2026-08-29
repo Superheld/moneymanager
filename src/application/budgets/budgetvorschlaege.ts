@@ -19,7 +19,8 @@
 // nicht Erfasste übersieht und der Rahmen dann zu hoch ausfiele.
 
 import { budgetvorschlaege as berechnen, vertragskandidaten } from "../../core";
-import type { Budgetvorschlag, Zahlungsspur } from "../../core";
+import type { Budgetvorschlag } from "../../core";
+import { spurenAus } from "../buchung/zahlungsspuren";
 import type {
   BudgetRepository,
   EinstellungenRepository,
@@ -77,23 +78,9 @@ export async function budgetvorschlaegeLaden(
     budgetRepo.alle(),
   ]);
 
-  const umsatzZuBuchung = new Map<string, (typeof umsaetze)[number]>();
-  for (const u of umsaetze) {
-    if (u.istbuchungId && !umsatzZuBuchung.has(u.istbuchungId)) umsatzZuBuchung.set(u.istbuchungId, u);
-  }
-  const spuren: Zahlungsspur[] = buchungen.map((b) => {
-    const u = umsatzZuBuchung.get(b.id);
-    return {
-      id: b.id,
-      datum: b.datum,
-      betrag: b.betrag,
-      gegenpartei: u?.gegenpartei ?? "",
-      glaeubigerId: u?.glaeubigerId,
-      kategorieId: b.kategorieId,
-      charakter: b.charakter,
-    };
-  });
-  const vertraglich = new Set(vertragskandidaten(spuren, heute).flatMap((k) => k.buchungIds));
+  const vertraglich = new Set(
+    vertragskandidaten(spurenAus(buchungen, umsaetze), heute).flatMap((k) => k.buchungIds),
+  );
   // Dazu, was ausdrücklich an einem Vertrag hängt — auch wenn die Wiederkehr-Erkennung
   // es nicht als Kandidat sieht (zu wenige Zahlungen, zu unregelmäßig, von Hand gesetzt).
   for (const z of (await zuordnungRepo?.alle()) ?? []) {
