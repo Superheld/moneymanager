@@ -10,6 +10,7 @@
 // zieht den gesamten Ledger und rechnet die Merkmale darüber. Viermal getrennt zu laden
 // wäre dieselbe Arbeit vierfach.
 
+import { useProzent } from "../bausteine/einstellungenKontext";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
@@ -63,6 +64,7 @@ interface Daten {
 
 export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }) {
   const { t } = useTranslation();
+  const prozent = useProzent();
   const { locale } = useGeld();
   const [daten, setDaten] = useState<Daten | null>(null);
   const [angefordert, setAngefordert] = useState(false);
@@ -188,7 +190,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
     daten,
     kategorieName,
     zahl: (n: number) => n.toLocaleString(locale),
-    prozent: (x: number) => `${(x * 100).toLocaleString(locale, { maximumFractionDigits: 1 })} %`,
+    prozent: (x: number) => prozent(x, 1),
   };
 
   return (

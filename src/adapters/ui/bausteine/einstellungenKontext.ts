@@ -107,6 +107,33 @@ export function useGeld() {
  */
 export type Geld = ReturnType<typeof useGeld>;
 
+/**
+ * Ein Anteil (0…1) als Prozentangabe in der Locale des Nutzers.
+ *
+ * Es gibt das aus demselben Grund wie `useGeld`: die Formatierung stand an sieben Stellen
+ * in VIER Varianten — `toFixed(1)`, `toLocaleString` mit einer Nachkommastelle, dasselbe
+ * mit keiner, und `Math.round`. Derselbe Wert sah damit je nach Bildschirm verschieden
+ * genau aus.
+ *
+ * **`toFixed` war dabei nicht nur uneinheitlich, sondern falsch**: es kennt die Locale
+ * nicht und schreibt im Deutschen „12.5 %" statt „12,5 %". Dieselbe Falle, wegen der
+ * `CLAUDE.md` für Geld ausdrücklich „nie mit eigenem `toFixed`" verlangt.
+ *
+ * `stellen` ist die OBERgrenze und bleibt wählbar — eine Trefferquote will eine
+ * Nachkommastelle, ein Anteil an einer Aufstellung meist keine. Eine glatte Zahl bleibt
+ * dabei glatt („100 %", nicht „100,0 %"): eine erzwungene Nachkommastelle sähe nach
+ * Messgenauigkeit aus, die nicht da ist. Was nicht wählbar ist, ist die Locale.
+ */
+export function useProzent(): (anteil: number, stellen?: number) => string {
+  const { locale } = useEinstellungen();
+  return useMemo(
+    () =>
+      (anteil: number, stellen = 0) =>
+        `${(anteil * 100).toLocaleString(locale, { maximumFractionDigits: stellen })} %`,
+    [locale],
+  );
+}
+
 /** Enum-Label-Schicht: Charakter (gespeicherter Code) → übersetztes Anzeige-Label. */
 export function useCharakterLabel(): (c: Charakter) => string {
   const { t } = useTranslation();

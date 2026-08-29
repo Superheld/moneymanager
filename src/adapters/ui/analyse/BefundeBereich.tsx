@@ -15,6 +15,7 @@
 // was ausserhalb jedes Plans liegt, dann die Verträge, und zuletzt die drei Ranglisten,
 // mit denen man nachsieht, woran es liegt.
 
+import { useProzent } from "../bausteine/einstellungenKontext";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import type { Befunde, IstBuchung } from "../../../application";
@@ -41,12 +42,12 @@ export function BefundeBereich({
   onBuchung?: (b: IstBuchung) => void;
 }) {
   const { t } = useTranslation();
+  const prozent = useProzent();
   const geld = useGeld();
   const z = befunde.kennzahlen;
 
   /** Ein Bruchteil als Prozentzahl. `undefined` bleibt ein Strich — siehe Kern. */
-  const quote = (x?: number) =>
-    x == null ? "—" : `${(x * 100).toLocaleString(geld.locale, { maximumFractionDigits: 0 })} %`;
+  const quote = (x?: number) => (x == null ? "—" : prozent(x));
 
   const tabellentexte = {
     labelSeite: t("konten.seite"),
