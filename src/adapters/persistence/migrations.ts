@@ -1807,4 +1807,23 @@ export const MIGRATIONS: Migration[] = [
               )`,
     ],
   },
+  {
+    version: 64, // Die Kategorie-Festlegung faellt weg
+    sql: [
+      // „Immer bei diesem Empfaenger" war eine eigene Ebene ueber der Erkennung, direkt
+      // vor dem Vertrag. Sie war kein Schutz — eine Handkorrektur ist ueber
+      // `kategorie_herkunft` ohnehin sicher —, sondern eine VERALLGEMEINERUNG: sie trug
+      // eine Korrektur auf andere und kuenftige Zahlungen desselben Empfaengers.
+      //
+      // Genau das soll das Modell leisten, und zwar ueber alle Merkmale statt ueber den
+      // Empfaenger allein. Mit einem mitgelieferten Modell gibt es keinen Grund mehr,
+      // daneben eine zweite, schwaechere Verallgemeinerung zu pflegen.
+      //
+      // Hier wird ausnahmsweise NICHT geprueft, ob das Ziel leer ist: die Tabelle traegt
+      // Bedienentscheidungen, keine Zahlungen. Was verlorengeht, ist die Zuordnung selbst
+      // — und die steht an jeder betroffenen Buchung weiterhin in `kategorie_id`, dort
+      // von der Festlegung hineingeschrieben. Kein Betrag und kein Beleg haengt daran.
+      `DROP TABLE IF EXISTS kategorie_festlegung`,
+    ],
+  },
 ];

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { trainieren, type IstBuchung, type Kategorie, type Zahlungsspur } from "../../core";
+import { standardErkennung, trainieren, type IstBuchung, type Kategorie, type Zahlungsspur } from "../../core";
 import { charakterWechsel, kategorieAbgleich, planAnwenden, uebergaenge } from "./kategorieAbgleich";
 import { katalogNachId, type Vorschlagskontext } from "../import/vorschlag";
 import type { LedgerPort } from "../ports";
@@ -11,11 +11,17 @@ const KATEGORIEN: Kategorie[] = [
   { id: "k-sp", name: "Sparen & Anlegen", defaultCharakter: "Umschichtung" },
 ];
 
-/** Ein Kontext, in dem „talmer" per Festlegung auf Drogerie zeigt. */
-function kontextMitFestlegung(muster = "talmer", kategorieId = "k-dro"): Vorschlagskontext {
+/**
+ * Ein Kontext, in dem „talmer" über die Erkennungsregel eines Vertrags auf Drogerie zeigt.
+ *
+ * Das Vehikel ist austauschbar — geprüft wird der ABGLEICH, nicht die Quelle des
+ * Vorschlags. Bis 2026-08-29 stand hier eine Festlegung; die gibt es nicht mehr.
+ */
+function kontextMitVertrag(anbieter = "Talmer", kategorieId = "k-dro"): Vorschlagskontext {
   return {
     kategorieNachId: katalogNachId(KATEGORIEN),
-    festlegungen: [{ muster, kategorieId, angelegtAm: "2026-08-17T10:00:00.000Z" }],
+    erkennungen: [standardErkennung("v1", anbieter, 1250)],
+    vertragsKategorie: new Map([["v1", kategorieId]]),
   };
 }
 
@@ -34,7 +40,7 @@ function spur(over: Partial<Zahlungsspur> = {}): Zahlungsspur {
 
 describe("Plan rechnen", () => {
   it("schlägt den Wechsel samt Herkunft und Zielcharakter vor", () => {
-    const plan = kategorieAbgleich([spur()], kontextMitFestlegung());
+    const plan = kategorieAbgleich([spur()], kontextMitVertrag());
     expect(plan.setzen).toEqual([
       {
         istbuchungId: "b1",
@@ -42,7 +48,7 @@ describe("Plan rechnen", () => {
         nachKategorieId: "k-dro",
         charakter: "Aufwand",
         vonCharakter: "Aufwand",
-        quelle: "festlegung",
+        quelle: "regel",
         gegenpartei: "Talmer",
         betrag: -1234,
         datum: "2026-03-01",
@@ -51,27 +57,27 @@ describe("Plan rechnen", () => {
   });
 
   it("füllt auch eine Buchung ohne Kategorie", () => {
-    const plan = kategorieAbgleich([spur({ kategorieId: undefined })], kontextMitFestlegung());
+    const plan = kategorieAbgleich([spur({ kategorieId: undefined })], kontextMitVertrag());
     expect(plan.setzen[0].vonKategorieId).toBeUndefined();
     expect(plan.setzen[0].nachKategorieId).toBe("k-dro");
   });
 
   it("zählt als unverändert, was schon stimmt — und ist damit beim zweiten Lauf leer", () => {
-    const plan = kategorieAbgleich([spur({ kategorieId: "k-dro" })], kontextMitFestlegung());
+    const plan = kategorieAbgleich([spur({ kategorieId: "k-dro" })], kontextMitVertrag());
     expect(plan.setzen).toHaveLength(0);
     expect(plan.unveraendert).toBe(1);
   });
 
   it("lässt eine von Hand gesetzte Kategorie in Ruhe", () => {
     // Sonst wäre jede Korrektur nur bis zum nächsten Abgleich haltbar.
-    const plan = kategorieAbgleich([spur({ kategorieHerkunft: "manuell" })], kontextMitFestlegung());
+    const plan = kategorieAbgleich([spur({ kategorieHerkunft: "manuell" })], kontextMitVertrag());
     expect(plan.setzen).toHaveLength(0);
     expect(plan.uebersprungen.handverlesen).toBe(1);
   });
 
   it("lässt eine aufgeteilte Buchung in Ruhe", () => {
     // Sie trägt mehrere Kategorien und hat gar kein Feld, in das ein Vorschlag passt.
-    const plan = kategorieAbgleich([spur({ geteilt: true, kategorieId: undefined })], kontextMitFestlegung());
+    const plan = kategorieAbgleich([spur({ geteilt: true, kategorieId: undefined })], kontextMitVertrag());
     expect(plan.setzen).toHaveLength(0);
     expect(plan.uebersprungen.handverlesen).toBe(1);
   });
@@ -79,14 +85,14 @@ describe("Plan rechnen", () => {
   it("lässt Umschichtungen in Ruhe", () => {
     const plan = kategorieAbgleich(
       [spur({ charakter: "Umschichtung", kategorieId: undefined })],
-      kontextMitFestlegung(),
+      kontextMitVertrag(),
     );
     expect(plan.setzen).toHaveLength(0);
     expect(plan.uebersprungen.umschichtung).toBe(1);
   });
 
   it("zählt, wofür die Kette nichts anzubieten hatte", () => {
-    const plan = kategorieAbgleich([spur({ gegenpartei: "Jemand ganz anderes" })], kontextMitFestlegung());
+    const plan = kategorieAbgleich([spur({ gegenpartei: "Jemand ganz anderes" })], kontextMitVertrag());
     expect(plan.setzen).toHaveLength(0);
     expect(plan.uebersprungen.ohneVorschlag).toBe(1);
   });
@@ -94,7 +100,7 @@ describe("Plan rechnen", () => {
   it("nimmt den Charakter der Zielkategorie mit", () => {
     // Die Kategorie zu ändern und den Charakter stehen zu lassen, ergäbe eine Buchung,
     // die ihrer eigenen Kategorie widerspricht.
-    const plan = kategorieAbgleich([spur()], kontextMitFestlegung("talmer", "k-sp"));
+    const plan = kategorieAbgleich([spur()], kontextMitVertrag("Talmer", "k-sp"));
     expect(plan.setzen[0].charakter).toBe("Umschichtung");
   });
 
@@ -103,13 +109,13 @@ describe("Plan rechnen", () => {
     // Erfolgs- und Liquiditätswirksamkeit — die Vorschau muss ihn eigens nennen können.
     const plan = kategorieAbgleich(
       [spur({ id: "a" }), spur({ id: "b", gegenpartei: "REWE" })],
-      kontextMitFestlegung("talmer", "k-sp"),
+      kontextMitVertrag("Talmer", "k-sp"),
     );
     expect(charakterWechsel(plan).map((w) => w.istbuchungId)).toEqual(["a"]);
   });
 
   it("zählt keinen Charakterwechsel, wo keiner ist", () => {
-    const plan = kategorieAbgleich([spur()], kontextMitFestlegung());
+    const plan = kategorieAbgleich([spur()], kontextMitVertrag());
     expect(charakterWechsel(plan)).toHaveLength(0);
   });
 
@@ -136,7 +142,7 @@ describe("Plan rechnen", () => {
 });
 
 describe("Übergänge für die Vorschau", () => {
-  const kontext = kontextMitFestlegung();
+  const kontext = kontextMitVertrag();
 
   it("fasst gleiche Wechsel zusammen und sortiert nach Menge", () => {
     const viele = Array.from({ length: 5 }, (_, i) => spur({ id: `a${i}` }));
@@ -183,7 +189,7 @@ describe("Plan anwenden", () => {
 
   it("schreibt Kategorie und Charakter", async () => {
     const { port, inhalt } = ledger([BUCHUNG]);
-    const plan = kategorieAbgleich([spur()], kontextMitFestlegung("talmer", "k-sp"));
+    const plan = kategorieAbgleich([spur()], kontextMitVertrag("Talmer", "k-sp"));
 
     expect(await planAnwenden(port, plan)).toBe(1);
     expect(inhalt.get("b1")).toMatchObject({ kategorieId: "k-sp", charakter: "Umschichtung" });
@@ -193,28 +199,28 @@ describe("Plan anwenden", () => {
     // Sonst wäre der erste Abgleich zugleich der letzte: er erklärte seinen eigenen
     // Bestand zu Handarbeit.
     const { port, inhalt } = ledger([BUCHUNG]);
-    await planAnwenden(port, kategorieAbgleich([spur()], kontextMitFestlegung()));
+    await planAnwenden(port, kategorieAbgleich([spur()], kontextMitVertrag()));
     expect(inhalt.get("b1")?.kategorieHerkunft).toBe("automatisch");
   });
 
   it("rührt nichts an, was nicht im Plan steht", async () => {
     const fremd: IstBuchung = { ...BUCHUNG, id: "b2", kategorieId: "k-le" };
     const { port, inhalt } = ledger([BUCHUNG, fremd]);
-    await planAnwenden(port, kategorieAbgleich([spur()], kontextMitFestlegung()));
+    await planAnwenden(port, kategorieAbgleich([spur()], kontextMitVertrag()));
     expect(inhalt.get("b2")?.kategorieId).toBe("k-le");
   });
 
   it("übergeht einen Wechsel, dessen Buchung inzwischen weg ist", async () => {
     // Der Plan kann älter sein als der Bestand — das darf kein Fehler sein.
     const { port } = ledger([]);
-    expect(await planAnwenden(port, kategorieAbgleich([spur()], kontextMitFestlegung()))).toBe(0);
+    expect(await planAnwenden(port, kategorieAbgleich([spur()], kontextMitVertrag()))).toBe(0);
   });
 
   it("läuft ein zweites Mal folgenlos durch", async () => {
     const { port } = ledger([BUCHUNG]);
-    await planAnwenden(port, kategorieAbgleich([spur()], kontextMitFestlegung()));
+    await planAnwenden(port, kategorieAbgleich([spur()], kontextMitVertrag()));
     // Neu gerechnet auf dem geschriebenen Stand: nichts mehr zu tun.
-    const zweiter = kategorieAbgleich([spur({ kategorieId: "k-dro" })], kontextMitFestlegung());
+    const zweiter = kategorieAbgleich([spur({ kategorieId: "k-dro" })], kontextMitVertrag());
     expect(zweiter.setzen).toHaveLength(0);
   });
 });

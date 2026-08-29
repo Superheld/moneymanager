@@ -405,7 +405,12 @@ describe("Register", () => {
 });
 
 describe("5 · Bestand abgleichen", () => {
-  /** Bestand plus eine Festlegung, die etwas anderes sagt als die gebuchte Kategorie. */
+  /**
+   * Bestand plus eine Erkennungsregel, die etwas anderes sagt als die gebuchte Kategorie.
+   *
+   * Das Vehikel ist austauschbar — geprüft wird der ABGLEICH, nicht woher der Vorschlag
+   * kommt. Bis 2026-08-29 stand hier eine Festlegung; die gibt es nicht mehr.
+   */
   function schieflage() {
     kategorie("kat-lm", "Lebensmittel");
     kategorie("kat-dro", "Drogerie");
@@ -413,8 +418,15 @@ describe("5 · Bestand abgleichen", () => {
       buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "Talmer", zweck: "Einkauf" });
     }
     db.run(
-      `INSERT INTO kategorie_festlegung (muster, kategorie_id, angelegt_am)
-       VALUES ('talmer', 'kat-dro', '2026-08-17T10:00:00.000Z')`,
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, art, kategorie_id)
+       VALUES ('v-talmer', 'Talmer', '2026-01-01', 'automatisch', 'aktiv', 'laufend', 'kat-dro')`,
+    );
+    // `schluessel` traegt JSON mit typisierten Merkmalen — der Spaltenname ist aelter als
+    // ihr Inhalt (siehe sqliteVertragZuordnungRepositories). Klartext ergaebe eine leere
+    // Merkmalsliste, und die Regel traefe nie.
+    db.run(
+      `INSERT INTO vertrag_erkennung (vertrag_id, schluessel, betrag_von, betrag_bis)
+       VALUES ('v-talmer', '[{"art":"empfaenger","muster":"talmer*"}]', 1000, 1500)`,
     );
   }
 

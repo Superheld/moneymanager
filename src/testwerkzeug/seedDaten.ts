@@ -517,19 +517,6 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     );
   }
 
-  // Festlegungen: was jemand der Erkennung von Hand beigebracht hat. Sie schlagen jede
-  // Automatik, und der Trainingsbereich zeigt genau sie.
-  for (const f of [
-    { muster: "steenbeck", kat: "kat-miete" },
-    { muster: "wendlandt", kat: "kat-energie" },
-    { muster: "halvern", kat: "kat-internet" },
-  ]) {
-    setzen(
-      "INSERT INTO kategorie_festlegung (muster, kategorie_id, angelegt_am) VALUES (?, ?, ?)",
-      [f.muster, f.kat, JETZT],
-    );
-  }
-
   // ------------------------------------------------------------ Bankzugang
 
   // Ein zweiter Zugang, diesmal fuer den Zahlungsverkehr. Er traegt die Zuordnung Bankkonto
@@ -715,12 +702,12 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // ------------------------------------------------------------ Posteingang
 
   // Offene Zeilen mit VERSCHIEDEN begruendeten Vorschlaegen. Die Quelle des Vorschlags ist
-  // in der Durchsicht sichtbar, und sie soll dort nicht immer dieselbe sein: eine
-  // Festlegung wiegt anders als ein Modelltreffer.
+  // in der Durchsicht sichtbar, und sie soll dort nicht immer dieselbe sein: ein Treffer
+  // ueber die Erkennungsregel eines Vertrags wiegt anders als einer des Modells.
   const posteingang = [
     { partei: einesVon(GEGENPARTEIEN.lebensmittel), betrag: -4230, zweck: "Einkauf", kat: "kat-lebensmittel", quelle: "ki" },
     { partei: einesVon(GEGENPARTEIEN.freizeit), betrag: -1990, zweck: "Monatsbeitrag", kat: "kat-freizeit", quelle: "ki" },
-    { partei: "Wendlandt", betrag: -7350, zweck: "Abschlag", kat: "kat-energie", quelle: "festlegung" },
+    { partei: "Wendlandt", betrag: -7350, zweck: "Abschlag", kat: "kat-energie", quelle: "regel" },
     { partei: einesVon(GEGENPARTEIEN.mobilitaet), betrag: -6750, zweck: "Fahrschein", kat: "kat-mobilitaet", quelle: "regel" },
     { partei: einesVon(GEGENPARTEIEN.gesundheit), betrag: -3120, zweck: "Rechnung", kat: "kat-gesundheit", quelle: "ki" },
     // Ohne Vorschlag: die Automatik hat sich nicht getraut, und das ist eine ehrliche

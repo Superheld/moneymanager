@@ -38,12 +38,10 @@ import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsans
 import { trainingsmaterial, type Materialbefund } from "../application/kategorien/trainingsmaterial";
 import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
 import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../application/kategorien/kategorieAbgleich";
-import { festlegungAufheben, festlegungSetzen } from "../application/kategorien/kategoriefestlegungen";
 import type { Merkmalskonfiguration, Merkmalsherkunft } from "../core";
 import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnung";
 import { zahlungsspuren } from "../application/buchung/zahlungsspuren";
 import { kategorisierungsquellen } from "../application/kategorien/kategorisierungsquellen";
-import { festlegungAnwenden as festlegungAnwendenUseCase } from "../application/kategorien/kategoriefestlegungen";
 import { umsaetzeVerbuchen } from "../application/import";
 import type { Kategorie } from "../core";
 import {
@@ -56,7 +54,6 @@ import {
   sqliteDublettenfreigabeRepository,
   sqliteImportLaufRepository,
 } from "./persistence/sqliteImportRepositories";
-import { sqliteKategoriefestlegungRepository } from "./persistence/sqliteKategoriefestlegungRepository";
 import { sqliteKontostandsankerRepository } from "./persistence/sqliteKontostandRepository";
 import { sqliteDepotRepository } from "./persistence/sqliteDepotRepository";
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
@@ -492,7 +489,7 @@ export function spuren() {
 // --- Import ----------------------------------------------------------------
 
 /**
- * Die Kategorisierungs-Kette: Umbuchung → Festlegung → Vertrag → Modell.
+ * Die Kategorisierungs-Kette: Umbuchung → Vertrag → Modell.
  *
  * Einmal vor einem Lauf geladen, nicht je Zeile — der Bestand ändert sich währenddessen
  * nicht, und ein Import über tausende Zeilen soll nicht tausendmal dasselbe holen.
@@ -500,7 +497,6 @@ export function spuren() {
 export function kategorisierung() {
   return kategorisierungsquellen({
     kategorieRepo: sqliteKategorieRepository,
-    festlegungRepo: sqliteKategoriefestlegungRepository,
     vertragRepo: sqliteVertragRepository,
     erkennungRepo: sqliteVertragserkennungRepository,
     klassifikatorRepo: sqliteKlassifikatorRepository,
@@ -530,19 +526,6 @@ export function umsatzSpeichern(u: Umsatz): Promise<void> {
 
 export function importLaeufe() {
   return sqliteImportLaufRepository.alle();
-}
-
-/** „Immer bei diesem Empfänger" — setzen und sofort auf den offenen Stapel anwenden. */
-export function festlegungAnwenden(
-  muster: string,
-  kategorie: Kategorie,
-  offene: readonly Umsatz[],
-  ausserId: string,
-): Promise<number> {
-  return festlegungAnwendenUseCase(
-    { festlegungRepo: sqliteKategoriefestlegungRepository, umsatzRepo: sqliteUmsatzRepository },
-    muster, kategorie, offene, ausserId,
-  );
 }
 
 /** Offene Umsätze ins Ledger buchen und die frischen Zahlungen ihren Verträgen zuordnen. */
@@ -610,7 +593,7 @@ export async function bankAbrufen(
     erkennungRepo: sqliteVertragserkennungRepository,
     vertragszuordnungRepo: sqliteVertragszuordnungRepository,
     id: () => crypto.randomUUID(),
-    // Dieselbe Kette wie beim Dateiimport: Umbuchung → Festlegung → Vertrag → Modell.
+    // Dieselbe Kette wie beim Dateiimport: Umbuchung → Vertrag → Modell.
     kategorisierung: await kategorisierung(),
     heute,
     rueckgriffTage,
@@ -627,7 +610,6 @@ export async function bankAbrufen(
 /** Alle Quellen der Kategorisierungs-Kette — dieselben wie beim Import. */
 const KETTE = {
   kategorieRepo: sqliteKategorieRepository,
-  festlegungRepo: sqliteKategoriefestlegungRepository,
   vertragRepo: sqliteVertragRepository,
   erkennungRepo: sqliteVertragserkennungRepository,
   klassifikatorRepo: sqliteKlassifikatorRepository,
@@ -686,20 +668,6 @@ export function kategorieAbgleichVorschau(): Promise<Abgleichsplan> {
 
 export function kategorieAbgleichAnwenden(plan: Abgleichsplan) {
   return planAnwenden(sqliteLedgerRepository, plan);
-}
-
-// --- Kategorie-Festlegungen ------------------------------------------------
-
-export function festlegungen() {
-  return sqliteKategoriefestlegungRepository.alle();
-}
-
-export function festlegungSpeichern(muster: string, kategorieId: string) {
-  return festlegungSetzen(sqliteKategoriefestlegungRepository, muster, kategorieId);
-}
-
-export function festlegungEntfernen(muster: string) {
-  return festlegungAufheben(sqliteKategoriefestlegungRepository, muster);
 }
 
 /** Was das Modell an EINER Buchung sieht — die Antwort auf „warum diese Kategorie?". */

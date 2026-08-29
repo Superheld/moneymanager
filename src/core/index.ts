@@ -16,7 +16,6 @@ export * from "./basis/gegenpartei";
 export * from "./buchung/zahlungsspur";
 export * from "./vertraege/vertragErkennung";
 export * from "./vertraege/vertragZuordnung";
-export * from "./kategorien/kategoriefestlegung";
 export * from "./budgets/budget";
 export * from "./budgets/budgetverlauf";
 export * from "./budgets/budgetVorschlag";
