@@ -33,6 +33,7 @@ import {
   istInterneUmbuchung,
   istMonatsverlauf,
   kategorieAggregat,
+  monateImFenster,
   nachHauptgruppe,
   parseIso,
   tageImMonat,
@@ -333,7 +334,7 @@ function sollImFenster(
 ): Cent | undefined {
   const eigene = regeln.filter((r) => r.vertragId === vertragId);
   if (eigene.length === 0) return undefined;
-  const monate = monateImFensterAus(von, bis);
+  const monate = monateImFenster(von, bis);
   let soll = 0;
   for (const r of eigene) {
     for (const p of projiziereRegel(r, von, monate)) {
@@ -341,13 +342,6 @@ function sollImFenster(
     }
   }
   return soll;
-}
-
-/** Monate des Fensters, beide Enden eingeschlossen — wie im Kern. */
-function monateImFensterAus(von: string, bis: string): number {
-  const a = parseIso(von);
-  const b = parseIso(bis);
-  return Math.max(1, (b.y - a.y) * 12 + (b.m - a.m) + 1);
 }
 
 /** Ein Monat im Verlauf — gewesen oder geplant. */

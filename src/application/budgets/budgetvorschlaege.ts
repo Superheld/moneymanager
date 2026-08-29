@@ -18,6 +18,7 @@
 // überhaupt beeinflussen?" — dafür wäre nur die Verknüpfung zu wenig, weil sie das noch
 // nicht Erfasste übersieht und der Rahmen dann zu hoch ausfiele.
 
+import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
 import { budgetvorschlaege as berechnen, vertragskandidaten } from "../../core";
 import type { Budgetvorschlag } from "../../core";
 import { spurenAus } from "../buchung/zahlungsspuren";
@@ -35,23 +36,14 @@ const SCHLUESSEL_IGNORIERT = "budgetvorschlag.ignoriert";
 export async function ignorierteBudgetvorschlaege(
   repo: EinstellungenRepository,
 ): Promise<Set<string>> {
-  const roh = (await repo.lesen())[SCHLUESSEL_IGNORIERT];
-  if (!roh) return new Set();
-  try {
-    const gelesen: unknown = JSON.parse(roh);
-    return new Set(Array.isArray(gelesen) ? gelesen.filter((x): x is string => typeof x === "string") : []);
-  } catch {
-    return new Set();
-  }
+  return ignorierteLesen(repo, SCHLUESSEL_IGNORIERT);
 }
 
 export async function budgetvorschlagIgnorieren(
   repo: EinstellungenRepository,
   kategorieId: string,
 ): Promise<void> {
-  const menge = await ignorierteBudgetvorschlaege(repo);
-  menge.add(kategorieId);
-  await repo.schreiben(SCHLUESSEL_IGNORIERT, JSON.stringify([...menge]));
+  await ignorierenVermerken(repo, SCHLUESSEL_IGNORIERT, kategorieId);
 }
 
 /**

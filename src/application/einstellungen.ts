@@ -88,3 +88,40 @@ export async function zeitsperreSetzen(
   const sauber = Number.isFinite(minuten) && minuten > 0 ? Math.floor(minuten) : 0;
   await repo.schreiben(SCHLUESSEL_ZEITSPERRE, String(sauber));
 }
+
+/**
+ * Eine Menge weggeklickter Vorschläge lesen — Budgets wie Verträge führen so eine.
+ *
+ * Sie liegen als JSON-Liste in der generischen Einstellungs-Tabelle und nicht in einer
+ * eigenen: es sind Bedien-Notizen, keine Fachaggregate, und sie brauchen keine Migration.
+ *
+ * **Defensiv, und das ist der Grund für die gemeinsame Stelle.** Ein kaputter Eintrag
+ * darf die Vorschläge nicht ausfallen lassen — er ergibt eine leere Menge, keinen
+ * Fehler. Diese Zusage stand bis 2026-08-29 zweimal wortgleich da, einmal je Bereich,
+ * und eine defensive Regel, die man kopiert, ist eine, die irgendwann nur noch an einer
+ * Stelle defensiv ist.
+ */
+export async function ignorierteLesen(
+  repo: EinstellungenRepository,
+  schluessel: string,
+): Promise<Set<string>> {
+  const roh = (await repo.lesen())[schluessel];
+  if (!roh) return new Set();
+  try {
+    const gelesen: unknown = JSON.parse(roh);
+    return new Set(Array.isArray(gelesen) ? gelesen.filter((x): x is string => typeof x === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** Einen Vorschlag zur Menge der weggeklickten hinzufügen. */
+export async function ignorierenVermerken(
+  repo: EinstellungenRepository,
+  schluessel: string,
+  wert: string,
+): Promise<void> {
+  const menge = await ignorierteLesen(repo, schluessel);
+  menge.add(wert);
+  await repo.schreiben(schluessel, JSON.stringify([...menge]));
+}

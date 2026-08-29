@@ -34,3 +34,23 @@ export function belegZuBuchung(umsaetze: readonly Umsatz[]): Map<string, Umsatz>
   }
   return map;
 }
+
+/**
+ * Buchungs-Id → Empfängername. Nur Belege MIT Namen, erster gewinnt.
+ *
+ * Eine eigene Funktion und keine Ableitung aus `belegZuBuchung`, weil der Filter vor der
+ * Auswahl greifen muss: hat der erste Beleg keinen Empfänger und der zweite einen, ist
+ * der zweite die bessere Auskunft — ein leerer Name ist keine Antwort, sondern eine
+ * fehlende. Bei `belegZuBuchung` ist das anders, dort ist der Beleg als ganzer gemeint.
+ *
+ * Stand bis 2026-08-29 wortgleich in `uebersicht` und `budgets/budgetsichten`, dort mit
+ * „letzter gewinnt" — die fünfte Variante desselben Joins.
+ */
+export function empfaengerJeBuchung(umsaetze: readonly Umsatz[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const u of umsaetze) {
+    if (!u.istbuchungId || !u.gegenpartei) continue;
+    if (!map.has(u.istbuchungId)) map.set(u.istbuchungId, u.gegenpartei);
+  }
+  return map;
+}
