@@ -22,8 +22,16 @@ export interface SeedDb {
   run(sql: string, werte?: (string | number | null)[]): unknown;
 }
 
-/** Wie viele Monate zurueck der Spielstand reicht. */
-export const MONATE = 8;
+/**
+ * Wie viele Monate zurueck der Spielstand reicht.
+ *
+ * Achtzehn und nicht mehr acht, seit die Alltagszahlungen Belege tragen: erst damit gibt
+ * es genug Beispiele, um ein Modell zu trainieren UND es an zurueckgehaltenen Zeilen zu
+ * MESSEN (`MESSBAR_AB`). Mit acht Monaten lag der Bestand knapp ueber der Schwelle, und
+ * eine Trefferquote aus einer Handvoll Pruefzeilen sagt mehr ueber den Zufall der
+ * Aufteilung als ueber das Modell.
+ */
+export const MONATE = 18;
 
 /** Gesaeter Zufall (mulberry32) — wiederholbar, siehe Kopf. */
 function wuerfel(saat: number): () => number {
@@ -77,12 +85,27 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   const setzen = (sql: string, werte?: (string | number | null)[]) => db.run(sql, werte);
 
   // Sektorneutrale Fantasienamen: keiner laesst auf seine Kategorie schliessen.
+  //
+  // **Zwei Bauteile je Name, und beide haben eine Aufgabe.** Der Nachname ist einmalig und
+  // damit ein SCHARFES Merkmal — er entscheidet seine Kategorie praktisch allein. Der
+  // Zusatz („Sued", „Filiale", „Handel") kommt bewusst in mehreren Bereichen vor und
+  // STREUT: er trennt nichts, sieht aber aus wie ein brauchbares Wort.
+  //
+  // Ohne diese zweite Sorte zeigt der Trainingsbereich nichts. Trennschaerfe und
+  // Trennkraft unterscheiden sich erst, wo es beides gibt — ein Spielstand, in dem jedes
+  // Wort seine Kategorie eindeutig bestimmt, laesst jede Kennzahl gleich gut aussehen und
+  // beantwortet damit keine einzige Frage, fuer die die Zahlen da sind.
+  //
+  // Und mehrwortig muessen sie sein, weil `merkmalsbefund` bei einem EINwortigen Namen gar
+  // kein `emp:`-Token anlegt (es waere eine Kopie des ganzen Namens). Der Spielstand
+  // enthielt bis 2026-08-29 ausschliesslich einwortige — die halbe Merkmalsquelle war
+  // darin also nie zu sehen.
   const GEGENPARTEIEN = {
-    lebensmittel: ["Kesselmann", "Aukamp", "Rinsche", "Belvo"],
-    freizeit: ["Trentmoor", "Oemke", "Sindler"],
-    mobilitaet: ["Varnhold", "Petrell"],
-    gesundheit: ["Lauterbek", "Norhast"],
-    anschaffung: ["Dessloch", "Weimbrand"],
+    lebensmittel: ["Kesselmann Sued", "Aukamp Filiale", "Rinsche Markt", "Belvo Zentrum", "Talmer Markt"],
+    freizeit: ["Trentmoor Studio", "Oemke Zentrum", "Sindler Handel", "Volkart Buehne"],
+    mobilitaet: ["Varnhold Station", "Petrell Filiale", "Nordwig Verkehr"],
+    gesundheit: ["Lauterbek Praxis", "Norhast Sued", "Ehlbeck Handel"],
+    anschaffung: ["Dessloch Handel", "Weimbrand Versand", "Rautgund Sued"],
   };
 
   /**
@@ -103,6 +126,26 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   };
 
   /**
+   * Was eine Bank sonst noch in den Verwendungszweck schreibt.
+   *
+   * Ohne diesen Anteil ist der Spielstand zu sauber, um die Filter zu zeigen: die
+   * Stoppwortliste haette nichts zu tun, die Ziffernregel nichts zu greifen, und die
+   * abgeschnittenen Randziffern — der Fall, an dem das Zuruecknehmen eines Ausschlusses
+   * einmal ins Leere lief — kaemen ueberhaupt nicht vor.
+   *
+   * `Bankkarte2026` ist genau dieser Fall: das Wort traegt eine angeklebte Jahreszahl, das
+   * Token heisst `bankkarte`, und in der Liste stehen beide Formen nebeneinander.
+   */
+  const BANKTEXTE = [
+    "",
+    "Kartenzahlung Bankkarte2026",
+    "SEPA Basislastschrift Mandat",
+    "Referenz 88213 Kartenzahlung",
+    "Bankkarte2026",
+    "Beleg 4711",
+  ];
+
+  /**
    * Eine Bezeichnung fuer eine Alltagsbuchung — ERZEUGT, nicht abgeschrieben.
    *
    * Bis 2026-08-25 schrieb der Spielstand ueberhaupt keine `notiz`, und der Auszug zeigte
@@ -114,8 +157,13 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
    * denselben Bestand — ein Screenshot von gestern zeigt dieselben Zeilen wie einer von
    * heute, Bezeichnungen eingeschlossen.
    */
-  const bezeichnung = (bereich: keyof typeof GEGENPARTEIEN): string =>
-    `${einesVon(GEGENPARTEIEN[bereich])} ${einesVon(ANLAESSE[bereich])}`;
+  const bezeichnung = (bereich: keyof typeof GEGENPARTEIEN): { partei: string; zweck: string } => {
+    const banktext = einesVon(BANKTEXTE);
+    return {
+      partei: einesVon(GEGENPARTEIEN[bereich]),
+      zweck: `${einesVon(ANLAESSE[bereich])}${banktext ? ` ${banktext}` : ""}`,
+    };
+  };
 
   // ------------------------------------------------------------ Stammdaten
 
@@ -367,7 +415,20 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   }[] = [];
 
   /** Die letzten drei Monate kommen aus dem Abruf, alles davor ist Handarbeit. */
-  const AUS_ABRUF_AB = 2;
+  /**
+   * Ab welchem Monatsversatz die Zeilen aus dem Abruf stammen — und damit einen BELEG
+   * haben.
+   *
+   * Vorher stand hier 2, also nur die drei juengsten Monate, und das machte den
+   * Spielstand fuer die Kategorie-Erkennung unbrauchbar: Empfaenger und Verwendungszweck
+   * stehen an `umsatz_roh`, nicht an der Buchung. Alles ohne Beleg faellt im
+   * Trainingsmaterial unter „ohne Text" — es blieben eine Handvoll Zeilen mit immer
+   * denselben fuenf Empfaengern.
+   *
+   * Die aeltesten zwei Monate bleiben absichtlich von Hand erfasst: der Fall gehoert in
+   * den Bestand, und er ist der Grund, warum „ohne Text" ueberhaupt gezaehlt wird.
+   */
+  const AUS_ABRUF_AB = MONATE - 2;
 
   for (let m = MONATE; m >= 0; m--) {
     const gesynct = m <= AUS_ABRUF_AB;
@@ -414,36 +475,62 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       notiz: "Uebertrag vom Girokonto",
     });
 
+    /**
+     * Eine Alltagszahlung — MIT Beleg, sobald der Monat aus dem Abruf stammt.
+     *
+     * Der Unterschied zu `buchung()` ist genau der: Empfaenger und Verwendungszweck
+     * landen ueber `ausSync` in `umsatz_roh`. Vorher trugen diese Zeilen nur eine
+     * `notiz`, und `spurenAus` liest die nicht — sie waren im Trainingsmaterial
+     * unsichtbar, obwohl sie die grosse Mehrheit des Bestands ausmachen.
+     */
+    const alltag = (
+      bereich: keyof typeof GEGENPARTEIEN,
+      tag: number,
+      betrag: number,
+      kontoId: string,
+      kategorieId: string,
+    ) => {
+      const { partei, zweck } = bezeichnung(bereich);
+      const datum = tagIn(-m, tag);
+      const hash = `hash-alltag-${m}-${ausSync.length}`;
+      const id = buchung(datum, betrag, kontoId, kategorieId, "Aufwand", {
+        notiz: `${partei} ${zweck}`,
+        quelle: gesynct ? "import" : "manuell",
+        rohHash: gesynct ? hash : undefined,
+        kategorieHerkunft: gesynct ? "automatisch" : "manuell",
+      });
+      if (gesynct) {
+        ausSync.push({ buchungId: id, hash, datum, betrag, partei, zweck, kontoId, monatsversatz: m });
+      }
+    };
+
     // Alltag — streut, damit die Budgets mal passen und mal nicht
     for (let i = 0; i < zahlZwischen(6, 10); i++) {
-      buchung(
-        tagIn(-m, zahlZwischen(2, 27)),
+      alltag(
+        "lebensmittel",
+        zahlZwischen(2, 27),
         -zahlZwischen(1800, 9500),
         einesVon(["konto-giro", "konto-bar", "konto-kk"]),
         "kat-lebensmittel",
-        "Aufwand",
-        { notiz: bezeichnung("lebensmittel") },
       );
     }
     for (let i = 0; i < zahlZwischen(1, 4); i++) {
-      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(1200, 7800), "konto-kk", "kat-freizeit", "Aufwand", {
-        notiz: bezeichnung("freizeit"),
-      });
+      alltag("freizeit", zahlZwischen(3, 26), -zahlZwischen(1200, 7800), "konto-kk", "kat-freizeit");
     }
     for (let i = 0; i < zahlZwischen(1, 3); i++) {
-      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(900, 5400), "konto-giro", "kat-mobilitaet", "Aufwand", {
-        notiz: bezeichnung("mobilitaet"),
-      });
+      alltag("mobilitaet", zahlZwischen(3, 26), -zahlZwischen(900, 5400), "konto-giro", "kat-mobilitaet");
     }
     if (zufall() < 0.45) {
-      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(2500, 18000), "konto-giro", "kat-gesundheit", "Aufwand", {
-        notiz: bezeichnung("gesundheit"),
-      });
+      alltag("gesundheit", zahlZwischen(5, 24), -zahlZwischen(2500, 18000), "konto-giro", "kat-gesundheit");
     }
     if (zufall() < 0.3) {
-      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(8000, 42000), "konto-tagesgeld", "kat-anschaffung", "Aufwand", {
-        notiz: bezeichnung("anschaffung"),
-      });
+      alltag("anschaffung", zahlZwischen(5, 24), -zahlZwischen(8000, 42000), "konto-tagesgeld", "kat-anschaffung");
+    }
+    // Ein Anbieter, der in ZWEI Kategorien auftaucht — der Fall, an dem sich Trennschaerfe
+    // und Trennkraft ueberhaupt erst unterscheiden lassen. Ohne ihn traegt jedes Wort
+    // seine Kategorie eindeutig, und beide Kennzahlen saehen ueberall gleich gut aus.
+    if (zufall() < 0.5) {
+      alltag("lebensmittel", zahlZwischen(4, 25), -zahlZwischen(1500, 6000), "konto-kk", "kat-anschaffung");
     }
   }
 
@@ -544,6 +631,16 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // weiter unten — nicht aus einem doppelten Klick, sondern aus zwei Wegen zum selben Geld.
   const LAUF_FG = "lauf-fg-1";
   const LAUF_SYNC = ["lauf-fints-0", "lauf-fints-1", "lauf-fints-2"]; // Index = Monatsversatz
+  /**
+   * Der ERSTE Abruf, der die Historie auf einmal geholt hat — alles aelter als die drei
+   * monatlichen Laeufe haengt daran.
+   *
+   * Vorher fiel das ueber `?? LAUF_SYNC[0]` auf den JUENGSTEN Lauf zurueck: eine Zeile von
+   * vor einem Jahr stand dann in einem Abruf von diesem Monat. Das ist nicht bloss
+   * unsauber, es ist die Frage, die der Import-Verlauf beantworten soll — „was hat dieser
+   * Abruf gebracht" — mit einer falschen Antwort.
+   */
+  const LAUF_ERST = "lauf-fints-erst";
   const LAUF_KK = "lauf-kk-1";
 
   const laufAnlegen = (
@@ -570,6 +667,16 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       "camt",
       "zugang-giro",
     ),
+  );
+  // Und der Erstabruf, datiert auf den Beginn der Bankanbindung.
+  laufAnlegen(
+    LAUF_ERST,
+    "fints",
+    new Date(stichtag.getFullYear(), stichtag.getMonth() - AUS_ABRUF_AB, 28).toISOString(),
+    null,
+    "konto-giro",
+    "camt",
+    "zugang-giro",
   );
   // Die Kreditkarte liefert MT940 — dasselbe Haus, anderes Format. Wer `umsatzart` oder
   // `buchungsschluessel` auswertet, muss ueber `lauf_id` danach unterscheiden.
@@ -614,7 +721,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // stehen.
   for (const s of ausSync) {
     umsatzAnlegen({
-      laufId: LAUF_SYNC[s.monatsversatz] ?? LAUF_SYNC[0],
+      laufId: LAUF_SYNC[s.monatsversatz] ?? LAUF_ERST,
       kontoId: s.kontoId,
       datum: s.datum,
       betrag: s.betrag,
