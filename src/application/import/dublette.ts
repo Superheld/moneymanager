@@ -102,7 +102,7 @@ const BUCHUNGSTEXTE = [
 ];
 
 /** Klein, ohne Umlaute, nur Buchstaben und Ziffern. */
-export function schlank(text: string | undefined): string {
+function schlank(text: string | undefined): string {
   return (text ?? "")
     .toLowerCase()
     .replace(/ä/g, "ae")
@@ -153,7 +153,7 @@ function tageAbstand(a: string, b: string): number {
  * Bank vergibt dabei einen neuen Buchungstag. Die Wertstellung bleibt. Wer nur den
  * Buchungstag vergleicht, hält dieselbe Zahlung zweimal für zwei.
  */
-export function datumsAbstand(a: Vergleichbar, b: Vergleichbar): number {
+function datumsAbstand(a: Vergleichbar, b: Vergleichbar): number {
   const kandidaten = [tageAbstand(a.buchungstag, b.buchungstag)];
   if (a.valuta && b.valuta) kandidaten.push(tageAbstand(a.valuta, b.valuta));
   if (a.valuta) kandidaten.push(tageAbstand(a.valuta, b.buchungstag));

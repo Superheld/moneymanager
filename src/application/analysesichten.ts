@@ -26,6 +26,7 @@ import {
   planWirkung,
   projiziereRegel,
   vertragstreue,
+  betragInKategorie,
   buchungenDerKategorie,
   fruehesterMonat,
   istInterneUmbuchung,
@@ -189,6 +190,16 @@ export function analyseGruppen(basis: Analysebasis, items: readonly KategorieSum
 /** Eine Zeile der aufgeklappten Kategorie — schon mit dem, was am Umsatz hängt. */
 export interface Analysezeile {
   readonly buchung: IstBuchung;
+  /**
+   * Der Betrag, mit dem diese Buchung auf DIESE Kategorie wirkt.
+   *
+   * Bei einer geteilten Buchung ihr Teil, sonst der volle Betrag — und deshalb nicht
+   * dasselbe wie `buchung.betrag`. Die Liste steht unter einem Aggregat, das über
+   * `kategorieAnteile` rechnet; zeigte sie den Gesamtbetrag, summierten sich ihre Zeilen
+   * nicht auf die Zahl darüber, und der Wocheneinkauf stünde unter „Drogerie" mit dem
+   * Betrag, den er insgesamt gekostet hat.
+   */
+  readonly betrag: Cent;
   readonly empfaenger: string;
   readonly verwendungszweck: string;
   readonly kontoName: string;
@@ -206,6 +217,7 @@ export function analyseBuchungen(
     const u = basis.umsatzZuBuchung.get(buchung.id);
     return {
       buchung,
+      betrag: betragInKategorie(buchung, kategorieId),
       empfaenger: u?.gegenpartei ?? buchung.notiz ?? "",
       verwendungszweck: u?.verwendungszweck ?? "",
       kontoName: basis.kontoNamen.get(buchung.kontoId) ?? "",

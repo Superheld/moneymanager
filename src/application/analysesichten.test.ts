@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import type { Depotwert } from "../core";
 import { depotEntwicklung, type Depotsicht } from "./depot/depotsichten";
-import { analyseAusblick, analyseFensterTaggenau, type Analysebasis } from "./analysesichten";
+import { analyseAusblick, analyseBuchungen, analyseFensterTaggenau, type Analysebasis } from "./analysesichten";
 
 describe("analyseFensterTaggenau", () => {
   it("schiebt die Monatsmarke auf den letzten Tag desselben Monats", () => {
@@ -58,6 +58,59 @@ describe("Depot im Analysefenster", () => {
  * Der Verlauf über die Gegenwart hinaus. Alle Werte erfunden; echt ist die Frage, die
  * daran hängt — was von einem geplanten Monat überhaupt auf den Kontostand wirkt.
  */
+describe("analyseBuchungen — der Betrag der Zeile", () => {
+  /**
+   * Die Detailliste steht UNTER einem Aggregat, das über `kategorieAnteile` rechnet.
+   * Zeigte sie `buchung.betrag`, summierten sich ihre Zeilen nicht auf die Zahl darüber —
+   * und ein Wocheneinkauf stünde unter „Drogerie" mit dem Betrag, den er insgesamt
+   * gekostet hat. Genau das tat sie, bis `betragInKategorie` angeschlossen wurde.
+   */
+  const geteilt: Analysebasis = {
+    buchungen: [
+      {
+        id: "b1", datum: "2026-07-10", betrag: -5200, kontoId: "k1",
+        charakter: "Aufwand", quelle: "manuell",
+        aufteilungen: [
+          { kategorieId: "k-le", betrag: -4000 },
+          { kategorieId: "k-dro", betrag: -1200 },
+        ],
+      },
+    ],
+    konten: [{ id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 500000 }],
+    kategorien: [
+      { id: "k-le", name: "Lebensmittel", defaultCharakter: "Aufwand" },
+      { id: "k-dro", name: "Drogerie", defaultCharakter: "Aufwand" },
+    ],
+    kontoNamen: new Map([["k1", "Giro"]]),
+    umsatzZuBuchung: new Map(),
+    vertragsnamen: new Map(),
+    vertragZuBuchung: new Map(),
+    budgets: [],
+    vertraege: [],
+    regeln: [],
+  };
+
+  it("zeigt bei einer geteilten Buchung nur ihren Teil, nicht den Gesamtbetrag", () => {
+    const zeilen = analyseBuchungen(geteilt, "k-dro", "2026-07-01", "2026-08-01");
+    expect(zeilen).toHaveLength(1);
+    expect(zeilen[0].betrag).toBe(-1200);
+    expect(zeilen[0].buchung.betrag).toBe(-5200);
+  });
+
+  it("zeigt bei einer ungeteilten Buchung den vollen Betrag", () => {
+    const ungeteilt: Analysebasis = {
+      ...geteilt,
+      buchungen: [
+        {
+          id: "b2", datum: "2026-07-11", betrag: -1900, kontoId: "k1",
+          charakter: "Aufwand", quelle: "manuell", kategorieId: "k-dro",
+        },
+      ],
+    };
+    expect(analyseBuchungen(ungeteilt, "k-dro", "2026-07-01", "2026-08-01")[0].betrag).toBe(-1900);
+  });
+});
+
 describe("analyseAusblick", () => {
   const basis = (extra: Partial<Analysebasis> = {}): Analysebasis => ({
     buchungen: [
