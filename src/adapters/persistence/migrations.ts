@@ -1774,4 +1774,37 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE ist_buchung DROP COLUMN plan_faelligkeit`,
     ],
   },
+  {
+    version: 63, // Halbe Umbuchungen sind keine — sie bekommen ihre Richtung zurueck
+    sql: [
+      // Eine Umbuchung ohne Gegenbuchung gibt es nicht: liegt das Gegenkonto nicht im
+      // Bestand, hat das Geld den erfassten Bereich verlassen. Der Import erzeugte solche
+      // Zeilen bis 2026-08-29 als einseitige Umschichtung, und die zaehlte in kein Budget
+      // und in keine Ausgabe — das Geld war weg und fehlte nirgends.
+      //
+      // Sie werden NICHT geloescht: die Zahlung hat stattgefunden, ihr Betrag steht im
+      // Saldo. Was faellt, ist nur die Behauptung, sie sei eine Verschiebung gewesen.
+      //
+      // Die Kategorie bleibt leer — welche Ausgabe es war, weiss nur der Mensch. Die
+      // Zeilen sind danach ueber den Kategorie-Abgleich oder von Hand zu fuellen.
+      //
+      // Vier Bedingungen, und jede haelt einen Fall heraus, der bleiben muss:
+      //   transfer_id IS NULL      — ein echtes Paar bleibt ein Paar
+      //   kategorie_id IS NULL     — "Sparen & Anlegen" ist eine gewollte Umschichtung
+      //   keine Aufteilung         — dort stehen die Kategorien in einer eigenen Tabelle,
+      //                              kategorie_id ist dann leer OHNE unkategorisiert zu sein
+      //   betrag <> 0              — waere keine Buchung; kann per Invariante nicht sein
+      //
+      // Wiederholbar: nach dem ersten Lauf trifft WHERE nichts mehr.
+      `UPDATE ist_buchung
+          SET charakter = CASE WHEN betrag < 0 THEN 'Aufwand' ELSE 'Ertrag' END
+        WHERE charakter = 'Umschichtung'
+          AND transfer_id IS NULL
+          AND kategorie_id IS NULL
+          AND betrag <> 0
+          AND NOT EXISTS (
+                SELECT 1 FROM ist_buchung_aufteilung a WHERE a.istbuchung_id = ist_buchung.id
+              )`,
+    ],
+  },
 ];
