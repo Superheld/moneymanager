@@ -155,15 +155,31 @@ describe("buchungenDerKategorie", () => {
 
 describe("istInterneUmbuchung", () => {
   const mk = (over: Partial<IstBuchung>): IstBuchung => ({ id: "x", datum: "2022-01-01", betrag: -1, kontoId: "k1", charakter: "Aufwand", quelle: "import", ...over });
-  it("erkennt importierte Umbuchungen (Umschichtung ohne Kategorie)", () => {
-    expect(istInterneUmbuchung(mk({ charakter: "Umschichtung" }))).toBe(true);
-  });
-  it("erkennt manuelle Umbuchungen (transferId gesetzt)", () => {
+  it("erkennt eine Umbuchung an ihrem verknüpften Gegenbein", () => {
     expect(istInterneUmbuchung(mk({ charakter: "Umschichtung", transferId: "t1" }))).toBe(true);
   });
+
+  /**
+   * Der Kern der Regel: eine Umbuchung ohne Gegenbuchung gibt es nicht. Liegt das
+   * Gegenkonto nicht im Bestand, hat das Geld den erfassten Bereich verlassen — und ein
+   * Abfluss gehört in die Auswertung, sonst fehlt er nirgends und ist trotzdem weg.
+   */
+  it("lässt eine Umschichtung OHNE Gegenbein durch — sie ist keine", () => {
+    expect(istInterneUmbuchung(mk({ charakter: "Umschichtung" }))).toBe(false);
+  });
+
   it("lässt Sparen (Umschichtung MIT Kategorie) und normale Buchungen durch", () => {
     expect(istInterneUmbuchung(mk({ charakter: "Umschichtung", kategorieId: "sp" }))).toBe(false);
     expect(istInterneUmbuchung(mk({ charakter: "Aufwand", kategorieId: "le" }))).toBe(false);
+  });
+
+  /**
+   * Auch eine Umschichtung MIT Kategorie ist ein Transfer, wenn sie ein Gegenbein hat.
+   * Die Kategorie entscheidet nichts mehr darüber — genau das war die Schwäche des
+   * entfernten zweiten Erkennungswegs.
+   */
+  it("die Kategorie entscheidet nicht mehr mit", () => {
+    expect(istInterneUmbuchung(mk({ charakter: "Umschichtung", kategorieId: "sp", transferId: "t1" }))).toBe(true);
   });
 });
 

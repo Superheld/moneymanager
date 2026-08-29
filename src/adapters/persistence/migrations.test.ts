@@ -1555,3 +1555,91 @@ describe("Migration 60 — die Kategorie fuer Erstattungen", () => {
     db.close();
   });
 });
+
+describe("Migration 63 — halbe Umbuchungen bekommen ihre Richtung zurueck", () => {
+  /**
+   * Eine Umbuchung ohne Gegenbuchung gibt es nicht. Bis 2026-08-29 legte der Import solche
+   * Zeilen als einseitige Umschichtung an, und die zaehlte in kein Budget und in keine
+   * Ausgabe — das Geld war weg und fehlte nirgends.
+   *
+   * Die Zeilen werden NICHT geloescht: die Zahlung hat stattgefunden und steht im Saldo.
+   */
+  function bestand() {
+    const db = new SQL.Database();
+    apply(db, 0, 62);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('giro','Girokonto','Giro','[]')");
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('sp','Sparen','Umschichtung')");
+    return db;
+  }
+
+  function umschichtung(
+    db: InstanceType<typeof SQL.Database>,
+    id: string,
+    betrag: number,
+    over: { katId?: string | null; transferId?: string | null } = {},
+  ) {
+    db.run(
+      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle,
+         transfer_id, kategorie_herkunft)
+       VALUES (?, '2026-08-11', ?, 'giro', ?, 'Umschichtung', 'import', ?, 'automatisch')`,
+      [id, betrag, over.katId ?? null, over.transferId ?? null],
+    );
+  }
+
+  const charakterVon = (db: InstanceType<typeof SQL.Database>, id: string) =>
+    String(db.exec(`SELECT charakter FROM ist_buchung WHERE id='${id}'`)[0].values[0][0]);
+
+  it("macht aus einem halben Abgang einen Aufwand und aus einem Zugang einen Ertrag", () => {
+    const db = bestand();
+    umschichtung(db, "ab", -4500);
+    umschichtung(db, "zu", 4500);
+    apply(db, 62, 63);
+    expect(charakterVon(db, "ab")).toBe("Aufwand");
+    expect(charakterVon(db, "zu")).toBe("Ertrag");
+    // Die Zeilen bleiben — der Saldo haengt an ihnen.
+    expect(db.exec("SELECT count(*) FROM ist_buchung")[0].values[0][0]).toBe(2);
+    db.close();
+  });
+
+  it("laesst ein echtes Paar unberuehrt", () => {
+    const db = bestand();
+    umschichtung(db, "paar", -4500, { transferId: "t1" });
+    apply(db, 62, 63);
+    expect(charakterVon(db, "paar")).toBe("Umschichtung");
+    db.close();
+  });
+
+  it("laesst eine gewollte Umschichtung MIT Kategorie unberuehrt", () => {
+    const db = bestand();
+    umschichtung(db, "sparen", -4500, { katId: "sp" });
+    apply(db, 62, 63);
+    expect(charakterVon(db, "sparen")).toBe("Umschichtung");
+    db.close();
+  });
+
+  /**
+   * Der Fall, der ohne die vierte Bedingung falsch liefe: bei einer geteilten Buchung ist
+   * `kategorie_id` leer, OHNE dass sie unkategorisiert waere — ihre Kategorien stehen in
+   * `ist_buchung_aufteilung`. Sie sieht damit aus wie eine halbe Umbuchung.
+   */
+  it("laesst eine GETEILTE Umschichtung unberuehrt", () => {
+    const db = bestand();
+    umschichtung(db, "geteilt", -4500);
+    db.run(
+      "INSERT INTO ist_buchung_aufteilung (istbuchung_id, kategorie_id, betrag) VALUES ('geteilt','sp',-4500)",
+    );
+    apply(db, 62, 63);
+    expect(charakterVon(db, "geteilt")).toBe("Umschichtung");
+    db.close();
+  });
+
+  it("ist wiederholbar — ein zweiter Lauf aendert nichts mehr", () => {
+    const db = bestand();
+    umschichtung(db, "ab", -4500);
+    apply(db, 62, 63);
+    const nachErstem = db.exec("SELECT charakter, betrag FROM ist_buchung")[0].values;
+    apply(db, 62, 63);
+    expect(db.exec("SELECT charakter, betrag FROM ist_buchung")[0].values).toEqual(nachErstem);
+    db.close();
+  });
+});
