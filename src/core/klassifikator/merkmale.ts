@@ -18,16 +18,22 @@
 //   • `vwz:…`  Wörter aus dem Verwendungszweck. Bei Kartenzahlungen oft die einzige
 //              Stelle, an der überhaupt steht, worum es ging — aber auch das
 //              schmutzigste Feld (siehe STRUKTURFILTER).
-//   • `gid:…`  die SEPA-Gläubiger-ID. Nur bei Lastschrift dabei (auf echten Daten 8 %),
-//              dann aber ein sehr scharfes Signal. Kostet ein Token und wird ignoriert,
-//              wo sie fehlt.
 //
-// Dazu das VORZEICHEN als eigenes Token — mit einer Einschränkung, die gemessen ist:
-// es trägt nichts. Am echten Bestand (2026-08-17) kostete sein Weglassen 0,00 Punkte,
-// dasselbe gilt für die Gläubiger-ID. Die Vermutung, ohne Vorzeichen werde eine
-// Supermarkt-Gutschrift zur Lebensmittelausgabe, hat sich nicht bestätigt. Beide bleiben
-// abschaltbar statt gelöscht: die Zahlen gelten für DIESEN Bestand, und die Herkünfte
-// sind ohnehin einzeln steuerbar.
+// **Zwei Quellen sind 2026-08-29 gefallen: das VORZEICHEN und die GLÄUBIGER-ID.** Beide
+// kosteten am echten Bestand 0,00 Punkte, und beide waren in einer Liste von WÖRTERN ein
+// Fremdkörper — ein `+` ist kein Wort, eine Gläubiger-ID ist ein Bezeichner. Sie standen
+// dort als Zeilen, die niemand beurteilen konnte.
+//
+// Der Einwand dagegen gehört dazu, damit ihn niemand neu erfinden muss: dass ein Merkmal
+// beim WEGLASSEN nichts kostet, heisst nicht, dass es nichts tut. Die Gläubiger-ID hängt
+// nur an Lastschriften; wo sie steht, ist sie scharf, und über den ganzen Bestand
+// gemittelt verschwindet das. Die Entscheidung war trotzdem, sie zu nehmen — eine
+// abschaltbare Quelle, die man nicht beurteilen kann, ist ein Schalter ohne Grundlage.
+//
+// Damit liest die Extraktion nur noch TEXT. `Merkmalsquelle` hat deshalb weder Betrag
+// noch Gläubiger-ID mehr: beide waren ausschliesslich für diese zwei Quellen da, und ein
+// Feld, das durch die Kette gereicht und nirgends gelesen wird, sieht beim nächsten
+// Anfassen aus wie eine vergessene Auswertung.
 //
 // Getrennte Namensräume, weil sonst ein Wort aus dem Verwendungszweck ein Empfänger-Token
 // überstimmen kann und in der Begründung nicht mehr zu sehen ist, woher der Treffer kam.
@@ -40,30 +46,26 @@
 // „karte" sieht nach Müll aus und trifft dreistellig oft zu 100 % dieselbe Kategorie,
 // während ein sauber lesbares Wort daneben über ein Dutzend Kategorien streut.
 
-import type { Cent } from "../basis/geld";
 import { anbieterSchluessel } from "../basis/gegenpartei";
 
 /** Was von einer Zahlung in die Extraktion geht. Bewusst flach — kein Aggregat. */
 export interface Merkmalsquelle {
   readonly gegenpartei: string;
   readonly verwendungszweck: string;
-  readonly glaeubigerId?: string;
-  /** Vorzeichenbehaftet; nur das Vorzeichen wird verwendet, nicht die Höhe. */
-  readonly betrag: Cent;
 }
 
 /**
  * Woher ein Merkmal stammt — feiner als der Namensraum, weil `emp=` (ganzer Name) und
  * `emp:` (Einzelwörter) verschieden wirken und getrennt schaltbar sein müssen.
  */
-export type Merkmalsherkunft = "empGanz" | "empWort" | "vwz" | "gid" | "vz";
+export type Merkmalsherkunft = "empGanz" | "empWort" | "vwz";
 
 /** Alle Herkünfte in der Reihenfolge, in der sie in der Oberfläche stehen. */
-export const MERKMALSHERKUENFTE: readonly Merkmalsherkunft[] = ["empGanz", "empWort", "vwz", "gid", "vz"];
+export const MERKMALSHERKUENFTE: readonly Merkmalsherkunft[] = ["empGanz", "empWort", "vwz"];
 
 /** Präfix je Herkunft — die Trennung im Token selbst. */
 const PRAEFIX: Record<Merkmalsherkunft, string> = {
-  empGanz: "emp=", empWort: "emp:", vwz: "vwz:", gid: "gid:", vz: "vz:",
+  empGanz: "emp=", empWort: "emp:", vwz: "vwz:",
 };
 
 /** Die Herkunft eines fertigen Tokens, oder null bei unbekanntem Präfix. */
@@ -372,13 +374,6 @@ export function merkmalsbefund(
   }
 
   for (const w of zerlegen(q.verwendungszweck)) wortHinzu(w, "vwz");
-
-  const gid = q.glaeubigerId?.trim().toUpperCase();
-  if (gid && aktiv.has("gid") && !ausgeschlossen(gid.toLowerCase(), "gid")) hinzu(`gid:${gid}`);
-
-  // Kein Token bei Betrag 0: eine Null hat keine Richtung, und „ist weder Zu- noch
-  // Abfluss" ist eine Aussage, die kein Beispiel im Bestand stützt.
-  if (q.betrag !== 0 && aktiv.has("vz")) hinzu(q.betrag < 0 ? "vz:-" : "vz:+");
 
   return { merkmale, verworfen };
 }

@@ -74,8 +74,8 @@ describe("Herkünfte schalten", () => {
     const r = repo();
     await konfigurationLaden(r);
 
-    expect(await herkunftSchalten(r, "vz", false)).not.toContain("vz");
-    expect(await herkunftSchalten(r, "vz", true)).toContain("vz");
+    expect(await herkunftSchalten(r, "vwz", false)).not.toContain("vwz");
+    expect(await herkunftSchalten(r, "vwz", true)).toContain("vwz");
   });
 
   it("hält die feste Reihenfolge, nicht die Klick-Reihenfolge", async () => {
@@ -91,8 +91,8 @@ describe("Herkünfte schalten", () => {
   it("zweimal abschalten ändert nichts", async () => {
     const r = repo();
     await konfigurationLaden(r);
-    await herkunftSchalten(r, "gid", false);
-    expect(await herkunftSchalten(r, "gid", false)).not.toContain("gid");
+    await herkunftSchalten(r, "vwz", false);
+    expect(await herkunftSchalten(r, "vwz", false)).not.toContain("vwz");
   });
 });
 

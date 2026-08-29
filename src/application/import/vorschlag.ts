@@ -34,7 +34,6 @@
 // `application/kategorisierungsquellen`.
 
 import {
-  herkunftVon,
   klassifizieren,
   merkmalsbefund,
   vertragFuer,
@@ -147,18 +146,13 @@ export function vorschlagsbefundFuer(
   // 3. Modell.
   if (kontext.modell) {
     const befund = merkmalsbefund(
-      {
-        gegenpartei: roh.gegenpartei,
-        verwendungszweck: roh.verwendungszweck,
-        glaeubigerId: roh.glaeubigerId,
-        betrag: roh.betrag,
-      },
+      { gegenpartei: roh.gegenpartei, verwendungszweck: roh.verwendungszweck },
       kontext.merkmale,
     );
-    // Ein Vektor, in dem nur das Vorzeichen steht, trägt keine Entscheidung — dann käme
-    // für jede textlose Zahlung dieselbe Kategorie heraus.
-    const inhalt = befund.merkmale.filter((m) => herkunftVon(m) !== "vz");
-    if (inhalt.length > 0) {
+    // Ein leerer Vektor trägt keine Entscheidung — dann käme für jede textlose Zahlung
+    // dieselbe Kategorie heraus. Bis 2026-08-29 musste hier zusätzlich das Vorzeichen
+    // herausgerechnet werden: es allein war „ein Vektor", ohne einer zu sein.
+    if (befund.merkmale.length > 0) {
       const k = klassifizieren(kontext.modell, befund.merkmale);
       if (k) {
         const vorschlag = auf(k.kategorieId, "ki", kontext);

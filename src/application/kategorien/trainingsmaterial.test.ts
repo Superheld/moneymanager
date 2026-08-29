@@ -54,9 +54,12 @@ describe("Auswahl der Beispiele", () => {
     expect(b.ausgeschlossen.ohneText).toBe(1);
   });
 
-  it("eine Zeile mit nur einer Gläubiger-ID trägt genug", () => {
-    const b = materialBefund([spur({ gegenpartei: "", verwendungszweck: "", glaeubigerId: "DE98ZZZ0999" })]);
-    expect(b.beispiele).toHaveLength(1);
+  it("eine Zeile ohne jeden Text taugt nicht als Beispiel", () => {
+    // Seit dem Wegfall des Vorzeichens gibt es hier gar kein Token mehr — vorher blieb
+    // eines übrig und machte aus der Zeile ein scheinbares Beispiel.
+    const b = materialBefund([spur({ gegenpartei: "", verwendungszweck: "" })]);
+    expect(b.beispiele).toHaveLength(0);
+    expect(b.ausgeschlossen.ohneText).toBe(1);
   });
 });
 
@@ -74,20 +77,21 @@ describe("Was der Befund über die Daten sagt", () => {
   });
 
   it("zählt Vokabular je Namensraum", () => {
-    const b = materialBefund([spur({ glaeubigerId: "DE98ZZZ0999" })]);
+    const b = materialBefund([spur()]);
     expect(b.vokabular.jeNamensraum.emp).toBeGreaterThan(0);
     expect(b.vokabular.jeNamensraum.vwz).toBe(1); // „einkauf"
-    expect(b.vokabular.jeNamensraum.gid).toBe(1);
-    expect(b.vokabular.jeNamensraum.vz).toBe(1);
+    // Die beiden Namensräume ohne Wörter gibt es nicht mehr.
+    expect(b.vokabular.jeNamensraum.gid).toBeUndefined();
+    expect(b.vokabular.jeNamensraum.vz).toBeUndefined();
   });
 
   it("meldet die häufigsten Tokens absteigend, bei Gleichstand alphabetisch", () => {
     const b = materialBefund([spur({ id: "a" }), spur({ id: "b" }), spur({ id: "c", gegenpartei: "Anderer Laden" })]);
-    // „vwz:einkauf" und „vz:-" kommen beide 3× vor; der Gleichstand entscheidet sich
-    // alphabetisch, damit die Anzeige zwischen zwei Läufen nicht springt.
+    // „vwz:einkauf" steht in allen drei Zeilen; darunter folgen die Empfänger-Tokens
+    // mit je zwei Belegen, und unter ihnen entscheidet das Alphabet.
     expect(b.vokabular.merkmale.slice(0, 2).map((m) => [m.merkmal, m.belege])).toEqual([
       ["vwz:einkauf", 3],
-      ["vz:-", 3],
+      ["emp:markt", 2],
     ]);
   });
 
@@ -206,7 +210,7 @@ describe("Zurückholen eines ausgeschlossenen Wortes", () => {
     // und ohne Wirkung.
     const b = materialBefund(
       [spur({ verwendungszweck: "Bankkarte2026 Zahlung" })],
-      { herkuenfte: ["empGanz", "empWort", "vwz", "gid", "vz"], ausschluesse: [{ wort: "bankkarte" }] },
+      { herkuenfte: ["empGanz", "empWort", "vwz"], ausschluesse: [{ wort: "bankkarte" }] },
     );
     const eintrag = b.vokabular.verworfeneWoerter.find((v) => v.wort === "bankkarte2026")!;
     expect(eintrag.grund).toBe("ausgeschlossen");

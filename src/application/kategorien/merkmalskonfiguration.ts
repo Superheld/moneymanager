@@ -21,7 +21,6 @@ import {
   merkmalsbefund,
   trainieren,
   type Beispiel,
-  type Cent,
   type Klassifikation,
   type Merkmalsherkunft,
   type Merkmalskonfiguration,
@@ -209,7 +208,7 @@ export async function merkmalsansicht(
     readonly klassifikatorRepo: KlassifikatorRepository;
     readonly merkmalRepo: MerkmalskonfigurationRepository;
   },
-  quelle: { gegenpartei: string; verwendungszweck: string; glaeubigerId?: string; betrag: Cent },
+  quelle: { gegenpartei: string; verwendungszweck: string },
 ): Promise<Merkmalsansicht> {
   const konf = await konfigurationLaden(deps.merkmalRepo);
   const befund = merkmalsbefund(quelle, konf.konfiguration);

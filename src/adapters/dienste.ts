@@ -672,7 +672,7 @@ export function kategorieAbgleichAnwenden(plan: Abgleichsplan) {
 
 /** Was das Modell an EINER Buchung sieht — die Antwort auf „warum diese Kategorie?". */
 export function merkmaleZuBuchung(
-  quelle: { gegenpartei: string; verwendungszweck: string; glaeubigerId?: string; betrag: number },
+  quelle: { gegenpartei: string; verwendungszweck: string },
 ): Promise<Merkmalsansicht> {
   return merkmalsansicht(
     {

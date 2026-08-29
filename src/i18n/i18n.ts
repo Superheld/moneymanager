@@ -1458,7 +1458,7 @@ const de = {
       spalteKategorie: "Kategorie",
       spalteTrefferquote: "Trefferquote",
       spaltePruefungen: "Geprüft",
-      // --- Vier Karten entlang des Trainingsablaufs ---
+      // --- Die Karten entlang des Trainingsablaufs ---
       datenTitel: "1 · Trainingsdaten",
       datenUntertitel: "Was an gebuchten Zahlungen zum Lernen taugt",
       woerterTitel: "2 · Wörter",
@@ -1498,15 +1498,11 @@ const de = {
         empGanz: "Empfänger, ganz",
         empWort: "Empfänger, einzelne Wörter",
         vwz: "Verwendungszweck",
-        gid: "Gläubiger-ID",
-        vz: "Vorzeichen",
       },
       herkunftHinweis: {
         empGanz: "Der ganze normalisierte Name als ein Merkmal — trifft Wiederkehrer scharf.",
         empWort: "Die Einzelwörter des Namens — sie greifen auch bei fremden Anbietern.",
         vwz: "Die Wörter des Verwendungszwecks. Bei Kartenzahlungen oft die einzige Stelle, an der steht, worum es ging.",
-        gid: "Die SEPA-Gläubiger-ID, sofern die Bank sie liefert.",
-        vz: "Nur ob Zufluss oder Abfluss — nicht die Höhe.",
       },
       herkunftAnzahl: "{{anzahl}} Merkmale",
       herkunftAus: "abgeschaltet",
@@ -1546,8 +1542,6 @@ const de = {
       namensraum: {
         emp: "Empfänger",
         vwz: "Verwendungszweck",
-        gid: "Gläubiger-ID",
-        vz: "Vorzeichen",
       },
       spalteMerkmal: "Merkmal",
       spalteAnzahl: "Belege",
@@ -3229,15 +3223,11 @@ const en: typeof de = {
         empGanz: "Payee, whole",
         empWort: "Payee, single words",
         vwz: "Reference text",
-        gid: "Creditor ID",
-        vz: "Sign",
       },
       herkunftHinweis: {
         empGanz: "The whole normalised name as one feature — sharp on recurring payees.",
         empWort: "The single words of the name — they also catch unfamiliar payees.",
         vwz: "The words of the reference text. On card payments often the only place stating what it was.",
-        gid: "The SEPA creditor ID, where the bank supplies it.",
-        vz: "Only inflow or outflow — not the amount.",
       },
       herkunftAnzahl: "{{anzahl}} features",
       herkunftAus: "off",
@@ -3277,8 +3267,6 @@ const en: typeof de = {
       namensraum: {
         emp: "Payee",
         vwz: "Reference text",
-        gid: "Creditor ID",
-        vz: "Sign",
       },
       spalteMerkmal: "Feature",
       spalteAnzahl: "Occurrences",

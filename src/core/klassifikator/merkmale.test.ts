@@ -120,23 +120,18 @@ describe("Verwendungszweck", () => {
   });
 });
 
-describe("Gläubiger-ID und Vorzeichen", () => {
-  it("nimmt die Gläubiger-ID als eigenes Token auf, in Großschreibung", () => {
-    expect(merkmaleFuer(quelle({ glaeubigerId: "de98zzz09999999999" }))).toContain("gid:DE98ZZZ09999999999");
+describe("Was NICHT mehr in den Vektor geht", () => {
+  it("kennt nur noch die drei Textquellen", () => {
+    // Vorzeichen und Gläubiger-ID sind 2026-08-29 gefallen. Der Wächter steht hier,
+    // weil ihr Wiederkommen sonst unbemerkt bliebe: sie tauchten als Zeilen in einer
+    // Liste von WÖRTERN auf, und ein `+` ist keins.
+    expect(MERKMALSHERKUENFTE).toEqual(["empGanz", "empWort", "vwz"]);
   });
 
-  it("ohne Gläubiger-ID entsteht kein Token", () => {
-    expect(merkmaleFuer(quelle()).some((m) => namensraum(m) === "gid")).toBe(false);
-  });
-
-  it("trennt Abfluss und Zufluss", () => {
-    // Ohne das wäre eine Supermarkt-Gutschrift vom Einkauf nicht zu unterscheiden.
-    expect(merkmaleFuer(quelle({ betrag: -1234 }))).toContain("vz:-");
-    expect(merkmaleFuer(quelle({ betrag: 1234 }))).toContain("vz:+");
-  });
-
-  it("Betrag 0 bekommt kein Vorzeichen-Token", () => {
-    expect(merkmaleFuer(quelle({ betrag: 0 })).some((m) => namensraum(m) === "vz")).toBe(false);
+  it("legt aus einer Zahlung ohne Text gar kein Merkmal an", () => {
+    // Vorher blieb das Vorzeichen übrig — ein Vektor, der wie ein Beispiel aussah und
+    // für jede textlose Zeile dieselbe Kategorie lieferte.
+    expect(merkmaleFuer({ gegenpartei: "", verwendungszweck: "" })).toEqual([]);
   });
 });
 
@@ -154,13 +149,9 @@ describe("Form des Ergebnisses", () => {
     expect(m).toContain("vwz:markt");
   });
 
-  it("leere Eingabe liefert nur das Vorzeichen", () => {
-    expect(merkmaleFuer({ gegenpartei: "", verwendungszweck: "", betrag: -100 })).toEqual(["vz:-"]);
-  });
-
   it("namensraum liest das Präfix beider Trennzeichen", () => {
-    expect(namensraum("emp=rewe markt")).toBe("emp");
-    expect(namensraum("emp:rewe")).toBe("emp");
+    expect(namensraum("emp=kesselmann markt")).toBe("emp");
+    expect(namensraum("emp:kesselmann")).toBe("emp");
     expect(namensraum("ohnepraefix")).toBe("");
   });
 });
@@ -263,11 +254,12 @@ describe("Steuerung über die Konfiguration", () => {
   });
 
   it("herkunftVon liest die Herkunft aus dem Präfix", () => {
-    expect(herkunftVon("emp=rewe markt")).toBe("empGanz");
-    expect(herkunftVon("emp:rewe")).toBe("empWort");
+    expect(herkunftVon("emp=kesselmann markt")).toBe("empGanz");
+    expect(herkunftVon("emp:kesselmann")).toBe("empWort");
     expect(herkunftVon("vwz:einkauf")).toBe("vwz");
-    expect(herkunftVon("gid:DE98")).toBe("gid");
-    expect(herkunftVon("vz:-")).toBe("vz");
+    // Die Präfixe der gefallenen Quellen sind jetzt unbekannt wie jedes andere.
+    expect(herkunftVon("gid:DE98")).toBeNull();
+    expect(herkunftVon("vz:-")).toBeNull();
     expect(herkunftVon("ohnepraefix")).toBeNull();
   });
 });

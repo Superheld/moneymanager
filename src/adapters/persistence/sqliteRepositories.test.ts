@@ -639,8 +639,21 @@ describe("Merkmalskonfiguration — Persistenz", () => {
 
   it("überschreibt die Herkünfte statt sie zu ergänzen", async () => {
     await merkmalRepository.herkuenfteSetzen(["empGanz", "vwz"]);
-    await merkmalRepository.herkuenfteSetzen(["gid"]);
-    expect(await merkmalRepository.herkuenfteLesen()).toEqual(["gid"]);
+    await merkmalRepository.herkuenfteSetzen(["empWort"]);
+    expect(await merkmalRepository.herkuenfteLesen()).toEqual(["empWort"]);
+  });
+
+  it("lässt eine Herkunft weg, die es nicht mehr gibt", async () => {
+    // `gid` und `vz` sind gefallen, ihr Eintrag in der Einstellung bleibt stehen. Der
+    // Rückgabetyp behauptet gültige Herkünfte — eine tote Zeichenkette durchzureichen
+    // hiesse, sie erst weit oben als Nichts auffliegen zu lassen.
+    const db = halter.lesen() as { execute: (sql: string, w?: unknown[]) => Promise<unknown> };
+    await db.execute(
+      `INSERT INTO einstellung (schluessel, wert) VALUES ($1, $2)
+       ON CONFLICT(schluessel) DO UPDATE SET wert = excluded.wert`,
+      ["merkmalsherkuenfte", "empGanz,gid,vwz,vz"],
+    );
+    expect(await merkmalRepository.herkuenfteLesen()).toEqual(["empGanz", "vwz"]);
   });
 
   it("speichert einen globalen Ausschluss ohne Herkunftsliste", async () => {

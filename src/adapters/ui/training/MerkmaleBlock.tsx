@@ -43,8 +43,6 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
         await merkmaleZuBuchung({
           gegenpartei: umsatz?.gegenpartei ?? "",
           verwendungszweck: umsatz?.verwendungszweck ?? "",
-          glaeubigerId: umsatz?.glaeubigerId,
-          betrag: buchung.betrag,
         }),
       );
     } catch (e) {

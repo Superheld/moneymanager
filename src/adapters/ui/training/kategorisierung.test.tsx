@@ -150,7 +150,7 @@ describe("1 · Trainingsdaten", () => {
 });
 
 describe("2 · Wörter — die Quellen", () => {
-  it("führt die fünf Quellen mit Klartext-Namen", async () => {
+  it("führt die Quellen mit Klartext-Namen", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
@@ -159,7 +159,7 @@ describe("2 · Wörter — die Quellen", () => {
     // `emp=` und `emp:` sind aus dem Präfix nicht zu erraten — sie brauchen Namen.
     expect(screen.getAllByText("Empfänger, ganz").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Empfänger, einzelne Wörter").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("Vorzeichen").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Verwendungszweck").length).toBeGreaterThan(0);
   });
 
   it("schaltet eine Quelle ab und schreibt das in die Datenbank", async () => {
@@ -183,16 +183,16 @@ describe("2 · Wörter — die Quellen", () => {
     await oeffne(nutzer, KARTEN.woerter);
 
     // Über den Herkunftsfilter statt über den Token-Text: die Liste zeigt das WORT und
-    // die Herkunft in getrennten Spalten, ein „vz:-" steht nirgends mehr.
-    await auswahlWaehlen(nutzer, "gilt", "Vorzeichen");
+    // die Herkunft in getrennten Spalten, ein „vwz:einkauf" steht nirgends mehr.
+    await auswahlWaehlen(nutzer, "gilt", "Verwendungszweck");
     await waitFor(() =>
       expect(within(karteninhalt(KARTEN.woerter)).queryByText("Kein Wort passt zu dieser Suche.")).toBeNull(),
     );
 
     const schalter = within(karteninhalt(KARTEN.woerter)).getAllByRole("checkbox");
-    await nutzer.click(schalter[schalter.length - 1]);
+    await nutzer.click(schalter[schalter.length - 1]); // Verwendungszweck
 
-    // Die Karte rechnet nach dem Schalten neu — das Merkmal darf nicht stehen bleiben.
+    // Die Karte rechnet nach dem Schalten neu — die Merkmale dürfen nicht stehen bleiben.
     await waitFor(() =>
       expect(within(karteninhalt(KARTEN.woerter)).getByText("Kein Wort passt zu dieser Suche.")).toBeTruthy(),
     );

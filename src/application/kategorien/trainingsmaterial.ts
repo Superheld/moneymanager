@@ -220,19 +220,14 @@ export function materialBefund(
     }
 
     const befund = merkmalsbefund(
-      {
-        gegenpartei: s.gegenpartei,
-        verwendungszweck: s.verwendungszweck ?? "",
-        glaeubigerId: s.glaeubigerId,
-        betrag: s.betrag,
-      },
+      { gegenpartei: s.gegenpartei, verwendungszweck: s.verwendungszweck ?? "" },
       konfiguration,
     );
 
-    // Ein Vektor, in dem nur das Vorzeichen steht, ist kein Beispiel — er behauptet,
-    // „Abfluss" allein bestimme die Kategorie, und zieht das Modell zur häufigsten Klasse.
-    const inhalt = befund.merkmale.filter((m) => namensraum(m) !== "vz");
-    if (inhalt.length === 0) {
+    // Ohne ein einziges Token gibt es nichts zu lernen. Bis 2026-08-29 musste das
+    // Vorzeichen hier eigens abgezogen werden — es machte aus einer textlosen Zeile ein
+    // scheinbares Beispiel und zog das Modell zur häufigsten Klasse.
+    if (befund.merkmale.length === 0) {
       ausgeschlossen.ohneText++;
       continue;
     }
