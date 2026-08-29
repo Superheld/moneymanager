@@ -14,6 +14,7 @@ import {
   analyseBuchungen,
   analyseFenster,
   analyseFensterTaggenau,
+  analyseAusblick,
   analyseBefunde,
   analyseGruppen,
   analyseVerlauf,
@@ -26,6 +27,7 @@ import { analyse, depots } from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, KPIStat, Pill } from "../bausteine";
 import { AUFKLAPP_ZEILEN_BREIT, AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
+import { AusblickKarte } from "./AusblickKarte";
 import { BefundeBereich } from "./BefundeBereich";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { DepotAnsicht } from "./DepotAnsicht";
@@ -263,6 +265,17 @@ export function AnalyseScreen() {
   // Die Befunde hängen am selben Fenster wie alles darüber — und werden in EINEM Zug
   // gerechnet, damit zwei Zahlen auf einem Bildschirm nicht verschiedene Mengen meinen.
   const befunde = useMemo(() => (basis ? analyseBefunde(basis, von, bis) : null), [basis, von, bis]);
+
+  /**
+   * Der Blick nach vorn hängt NICHT am gewählten Zeitraum, sondern steht fest bei sechs
+   * und sechs. Er beantwortet eine andere Frage als die Auswertung darüber: die
+   * Projektion wird nicht besser, wenn man sie über zwei Jahre zieht — sie wird nur
+   * unsicherer, und die letzten Monate darin sind dann Behauptung statt Vorschau.
+   */
+  const ausblick = useMemo(
+    () => (basis ? analyseAusblick(basis, heute, 6, 6) : []),
+    [basis, heute],
+  );
 
   const ist = basis?.buchungen ?? [];
   const kategorien = basis?.kategorien ?? [];
@@ -534,6 +547,11 @@ export function AnalyseScreen() {
               <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)", marginTop: "var(--sp-2)" }}>{t("historie.katKlickHinweis")}</div>
             </Card>
           )}
+
+          {/* Der Blick nach vorn steht direkt unter dem Verlauf: es ist derselbe Saldo,
+              nur weitergedacht. Zwischen beide etwas zu setzen hiesse, die Linie zu
+              zerreissen, die sie verbindet. */}
+          <AusblickKarte punkte={ausblick} />
 
           {/* Die Befunde stehen NACH den Kategorien und vor den Depots: sie setzen
               voraus, dass man gesehen hat, wie viel wohin ging, und beantworten die

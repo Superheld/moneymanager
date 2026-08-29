@@ -10,6 +10,7 @@ import {
   kategorienutzung,
   kennzahlen,
   monateImFenster,
+  planWirkung,
   vertragstreue,
 } from "./auswertung";
 import type { IstBuchung } from "./buchung/istbuchung";
@@ -294,5 +295,30 @@ describe("Groesste Posten", () => {
     );
     expect(liste.map((z) => z.buchung.id)).toEqual(["gross", "klein"]);
     expect(liste[0].vielfaches).toBeCloseTo(4, 5);
+  });
+});
+
+describe("Plan-Wirkung auf den Saldo", () => {
+  const zeilen = [
+    { id: "einnahmen", plan: 300000 },
+    { id: "vertraege", plan: -120000 },
+    { id: "budgets", plan: -40000 },
+    { id: "ruecklagen", plan: -25000 },
+    { id: "umschichtung", plan: -50000 },
+    { id: "sonstiges", plan: -1000 },
+  ];
+
+  // Die beiden Ausnahmen sind der ganze Punkt: eine Ruecklage wird nie gebucht, und eine
+  // Umschichtung verlaesst den Bestand nicht. Beide in eine Saldo-Vorschau zu nehmen
+  // hiesse, jeden Monat eine Abbuchung zu erfinden, die nie kommt.
+  it("laesst Ruecklagen und Umschichtungen aus dem Saldo heraus", () => {
+    const w = planWirkung(zeilen);
+    expect(w.einnahmen).toBe(300000);
+    expect(w.ausgaben).toBe(-161000);
+    expect(w.netto).toBe(139000);
+  });
+
+  it("nimmt einen unbekannten Zeilentyp nicht stillschweigend mit", () => {
+    expect(planWirkung([{ id: "irgendwas", plan: -99999 }]).netto).toBe(0);
   });
 });

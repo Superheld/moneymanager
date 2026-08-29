@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 import type { Depotwert } from "../core";
 import { depotEntwicklung, type Depotsicht } from "./depot/depotsichten";
-import { analyseFensterTaggenau } from "./analysesichten";
+import { analyseAusblick, analyseFensterTaggenau, type Analysebasis } from "./analysesichten";
 
 describe("analyseFensterTaggenau", () => {
   it("schiebt die Monatsmarke auf den letzten Tag desselben Monats", () => {
@@ -50,5 +50,70 @@ describe("Depot im Analysefenster", () => {
     const bis = analyseFensterTaggenau("2026-08-01");
     expect(reihe.filter((w) => w.stichtag >= "2025-09-01" && w.stichtag <= bis)).toHaveLength(3);
     expect(depotEntwicklung(sicht, "2025-09-01", bis).veraenderung).toBe(80_00);
+  });
+});
+
+
+/**
+ * Der Verlauf über die Gegenwart hinaus. Alle Werte erfunden; echt ist die Frage, die
+ * daran hängt — was von einem geplanten Monat überhaupt auf den Kontostand wirkt.
+ */
+describe("analyseAusblick", () => {
+  const basis = (extra: Partial<Analysebasis> = {}): Analysebasis => ({
+    buchungen: [
+      {
+        id: "b1", datum: "2026-07-10", betrag: -20000, kontoId: "k1",
+        charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+      },
+    ],
+    konten: [
+      { id: "k1", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 500000 },
+    ],
+    kategorien: [{ id: "kat1", name: "Wohnen", defaultCharakter: "Aufwand" }],
+    kontoNamen: new Map([["k1", "Giro"]]),
+    umsatzZuBuchung: new Map(),
+    vertragsnamen: new Map(),
+    vertragZuBuchung: new Map(),
+    budgets: [],
+    vertraege: [],
+    regeln: [],
+    ...extra,
+  });
+
+  it("liefert gewesene und geplante Monate in einer Reihe und markiert die Naht", () => {
+    const punkte = analyseAusblick(basis(), "2026-08-15", 3, 3);
+    expect(punkte.map((p) => p.monat)).toEqual([
+      "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11",
+    ]);
+    // Der LAUFENDE Monat gehört zum Isten — er ist zur Hälfte gebucht.
+    expect(punkte.filter((p) => p.plan).map((p) => p.monat)).toEqual(["2026-09", "2026-10", "2026-11"]);
+  });
+
+  it("schreibt den Saldo an der Naht ohne Sprung fort", () => {
+    const regeln = [
+      {
+        id: "r1", bezeichnung: "Miete", betrag: -100000, rhythmus: "monatlich" as const,
+        startdatum: "2026-01-01", charakter: "Aufwand" as const, kontoId: "k1", kategorieId: "kat1",
+      },
+    ];
+    const punkte = analyseAusblick(basis({ regeln }), "2026-08-15", 2, 2);
+    const gewesen = punkte.filter((p) => !p.plan);
+    const letzterIst = gewesen[gewesen.length - 1];
+    const ersterPlan = punkte.find((p) => p.plan)!;
+    expect(ersterPlan.saldo).toBe(letzterIst.saldo + ersterPlan.netto);
+    expect(ersterPlan.netto).toBe(-100000);
+  });
+
+  // Die Entscheidung, die `planWirkung` trägt, hier im Zusammenspiel: eine Umschichtung
+  // wechselt nur das Konto und darf den vorhergesagten Stand nicht senken.
+  it("laesst eine geplante Umschichtung den Saldo unberuehrt", () => {
+    const regeln = [
+      {
+        id: "r2", bezeichnung: "Sparen", betrag: -50000, rhythmus: "monatlich" as const,
+        startdatum: "2026-01-01", charakter: "Umschichtung" as const, kontoId: "k1",
+      },
+    ];
+    const punkte = analyseAusblick(basis({ regeln }), "2026-08-15", 2, 2);
+    expect(punkte.filter((p) => p.plan).every((p) => p.netto === 0)).toBe(true);
   });
 });

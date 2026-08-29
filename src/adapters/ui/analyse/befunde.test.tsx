@@ -8,7 +8,6 @@
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
 const halter = vi.hoisted(() => {
@@ -63,9 +62,15 @@ async function buchung(id: string, datum: string, betrag: number, extra: Record<
   } as never);
 }
 
-async function lupeOeffnen(name: string) {
-  const nutzer = userEvent.setup();
-  await nutzer.click(await screen.findByText(text(`befunde.lupe.${name}.name`)));
+/**
+ * Warten, bis die Karte dieses Befunds gerendert ist — geklickt wird nichts mehr.
+ *
+ * `findAllByText`, weil ein Kartentitel und eine Spaltenüberschrift gleich heissen dürfen
+ * („Empfänger"): dass ein Wort zweimal dasteht, ist hier kein Fehler, sondern der Beleg,
+ * dass die Karte samt Tabelle da ist.
+ */
+async function block(name: string) {
+  await screen.findAllByText(text(`befunde.block.${name}.name`));
 }
 
 describe("Befunde im Analyse-Bereich", () => {
@@ -81,7 +86,7 @@ describe("Befunde im Analyse-Bereich", () => {
     await zuordnungen.speichern({ istbuchungId: "miete", vertragId: "v1", herkunft: "manuell" } as never);
 
     rendere(<AnalyseScreen />);
-    await lupeOeffnen("fest");
+    await block("fest");
 
     // Nur die Miete hängt an einem Vertrag; das Kino steht als frei daneben. Ohne die
     // Zuordnung wären beide frei — „gebunden" ist keine Eigenschaft des Betrags.
@@ -96,9 +101,7 @@ describe("Befunde im Analyse-Bereich", () => {
     await buchung("spontan", tag(0), -45600, { kategorieId: "kat-freizeit" });
 
     rendere(<AnalyseScreen />);
-    await lupeOeffnen("budgets");
-
-    await screen.findByText(text("befunde.blindTitel"));
+    await block("blind");
     await waitFor(() => expect(document.body.textContent).toMatch(/456,00/));
   });
 
@@ -110,7 +113,7 @@ describe("Befunde im Analyse-Bereich", () => {
     await buchung("b", tag(1), -3000, { kategorieId: "kat-freizeit", notiz: "Vibora" });
 
     rendere(<AnalyseScreen />);
-    await lupeOeffnen("empfaenger");
+    await block("empfaenger");
 
     await screen.findByText("Vibora");
     // Zwei Posten in zwei verschiedenen Monaten — erst beide Zahlen zusammen trennen das
@@ -126,7 +129,7 @@ describe("Befunde im Analyse-Bereich", () => {
     await buchung("retoure", tag(1), 5000, { kategorieId: "kat-freizeit", charakter: "Aufwand" });
 
     rendere(<AnalyseScreen />);
-    await lupeOeffnen("kategorien");
+    await block("kategorien");
 
     await waitFor(() => expect(document.body.textContent).toMatch(/150,00/));
     expect(document.body.textContent).not.toMatch(/250,00/);

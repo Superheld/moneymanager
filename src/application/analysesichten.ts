@@ -22,6 +22,8 @@ import {
   groessteposten,
   kategorienutzung,
   kennzahlen,
+  monatsAusblicke,
+  planWirkung,
   projiziereRegel,
   vertragstreue,
   buchungenDerKategorie,
@@ -334,4 +336,85 @@ function monateImFensterAus(von: string, bis: string): number {
   const a = parseIso(von);
   const b = parseIso(bis);
   return Math.max(1, (b.y - a.y) * 12 + (b.m - a.m) + 1);
+}
+
+/** Ein Monat im Verlauf — gewesen oder geplant. */
+export interface Verlaufspunkt {
+  /** „YYYY-MM". */
+  readonly monat: string;
+  /** Vorzeichenbehaftet, wie im Ist-Verlauf. */
+  readonly einnahmen: Cent;
+  readonly ausgaben: Cent;
+  readonly netto: Cent;
+  /** Stand am Monatsende — bei Planmonaten fortgeschrieben. */
+  readonly saldo: Cent;
+  /** true = projiziert, nicht gebucht. */
+  readonly plan: boolean;
+}
+
+/**
+ * Der Verlauf über die Gegenwart hinaus: `zurueck` gewesene Monate, `voraus` geplante.
+ *
+ * **Die Naht liegt am Monatsende und nicht bei „heute".** Der laufende Monat gehört zum
+ * ISTEN — er ist zur Hälfte gebucht, und ihn als Plan zu zeigen hiesse, das Gebuchte
+ * wegzuwerfen. Die Projektion setzt deshalb beim FOLGENDEN Monat an, auf dem Stand, den
+ * der laufende bis heute erreicht hat.
+ *
+ * **Fortgeschrieben wird der Saldo der liquiden Konten**, weil der Ist-Verlauf genau den
+ * liefert (`istMonatsverlauf` bildet seinen Sockel aus `liquideMittel`). Eine Vorschau,
+ * die eine andere Bezugsgrösse fortschreibt als die Linie davor, hätte an der Naht einen
+ * Sprung, den niemand erklären kann.
+ *
+ * Was ein Planmonat zum Saldo beiträgt, entscheidet `planWirkung` — Rücklagen und
+ * Umschichtungen bleiben draussen (siehe dort). Die Rücklagen aus dem Inventar werden
+ * hier deshalb gar nicht erst geladen.
+ */
+export function analyseAusblick(
+  basis: Analysebasis,
+  heute: string,
+  zurueck: number,
+  voraus: number,
+): Verlaufspunkt[] {
+  const jetzt = { ...parseIso(heute), d: 1 };
+  const von = toIso(addMonate(jetzt, -Math.max(0, zurueck - 1)));
+  const ist = istMonatsverlauf(basis.konten, basis.buchungen, von, toIso(jetzt));
+
+  const punkte: Verlaufspunkt[] = ist.map((m) => ({
+    monat: m.label,
+    einnahmen: m.einnahmen,
+    ausgaben: m.ausgaben,
+    netto: m.netto,
+    saldo: m.saldo,
+    plan: false,
+  }));
+
+  const vertragsBuchungen = new Set(basis.vertragsnamen.keys());
+  // `monatsAusblicke` beginnt beim laufenden Monat — der steht als Ist schon da, also
+  // einen mehr holen und den ersten überspringen.
+  const ausblicke = monatsAusblicke(
+    {
+      regeln: basis.regeln,
+      budgets: basis.budgets,
+      ist: basis.buchungen,
+      kategorien: basis.kategorien,
+      vertragsBuchungen,
+      heute,
+    },
+    Math.max(0, voraus) + 1,
+  ).slice(1);
+
+  let saldo = punkte.length > 0 ? punkte[punkte.length - 1].saldo : 0;
+  for (const a of ausblicke) {
+    const w = planWirkung(a.zeilen.map((z) => ({ id: z.id, plan: z.plan })));
+    saldo += w.netto;
+    punkte.push({
+      monat: a.label,
+      einnahmen: w.einnahmen,
+      ausgaben: w.ausgaben,
+      netto: w.netto,
+      saldo,
+      plan: true,
+    });
+  }
+  return punkte;
 }
