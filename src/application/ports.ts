@@ -11,7 +11,6 @@ import type {
   IstBuchung,
   Journaleintrag,
   Kategorie,
-  Kategoriefestlegung,
   Kontogruppe,
   Merkmalsausschluss,
   Merkmalsherkunft,
@@ -85,17 +84,6 @@ export interface VertragszuordnungRepository {
   alle(): Promise<Vertragszuordnung[]>;
   speichern(zuordnung: Vertragszuordnung): Promise<void>;
   loeschen(istbuchungId: string): Promise<void>;
-}
-
-/**
- * Die Kategorie-Festlegungen — „immer bei diesem Empfänger". Der Schlüssel ist das
- * Muster: ein zweites Festlegen auf denselben Text ersetzt die alte Aussage, statt eine
- * zweite danebenzustellen.
- */
-export interface KategoriefestlegungRepository {
-  alle(): Promise<Kategoriefestlegung[]>;
-  speichern(festlegung: Kategoriefestlegung): Promise<void>;
-  loeschen(muster: string): Promise<void>;
 }
 
 export interface BudgetRepository {

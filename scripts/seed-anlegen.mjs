@@ -152,6 +152,5 @@ console.log(
 );
 console.log(
   `  Planung    ${zaehle("zahlungsregel")} Zahlungsregeln · ` +
-    `${zaehle("kategorie_festlegung")} Festlegungen · ` +
     `${zaehle("dubletten_freigabe")} Dubletten-Freigabe(n)`,
 );

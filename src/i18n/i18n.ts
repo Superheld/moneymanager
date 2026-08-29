@@ -287,24 +287,15 @@ const de = {
   review: {
     herkunft: {
       umbuchung: "Umbuchung",
-      festlegung: "Festgelegt",
       regel: "Vertrag",
       ki: "Erkennung",
       manuell: "von Hand",
     },
     herkunftTitel: {
       umbuchung: "Die Quelle hat die Zahlung als Umbuchung markiert.",
-      festlegung: "Für diesen Empfänger wurde ausdrücklich festgelegt, welche Kategorie gilt.",
       regel: "Die Zahlung passt auf die Erkennungsregel eines Vertrags — sie erbt dessen Kategorie.",
       ki: "Das trainierte Modell hat entschieden.",
       manuell: "Hier hat jemand von Hand entschieden.",
-    },
-    festlegung: {
-      frage: "Immer bei „{{muster}}“?",
-      ja: "immer so",
-      nein: "nur hier",
-      gesetzt: "Festgelegt: „{{muster}}“",
-      gesetztWeitere: "Festgelegt: „{{muster}}“ — {{anzahl}} weitere offene Zeilen angepasst",
     },
     begruendungSicher: "{{wert}} sicher",
     titel: "Import-Inbox",
@@ -788,11 +779,6 @@ const de = {
     detailVerwerfenFolgen: "Die Bankzeile wird verworfen. Der Beleg bleibt erhalten, und die Zeile lässt sich aus der Inbox erneut verbuchen — der Abruf holt sie nicht noch einmal.",
     zugangLoeschenFolgen: "Die abgerufenen Buchungen bleiben; sie stehen im Konto und hängen nicht am Zugang. Weg ist der Weg zur Bank — für weitere Abrufe muss der Zugang neu eingerichtet werden.",
     kontoLoeschenFolgen: "Ein Konto mit Buchungen lässt sich nicht löschen — die Buchungen müssten zuerst weg. Ohne Buchungen verschwindet nur das Konto selbst.",
-    festlegung: {
-      immerLabel: "Diese Kategorie immer bei diesem Empfänger",
-      immer: "Immer bei „{{muster}}“ diese Kategorie",
-      hinweis: "Gilt ab jetzt für neue Zahlungen an diesen Empfänger. Aufheben lässt sich das in den Einstellungen.",
-    },
     merkmale: {
       titel: "Was die Erkennung hier sieht",
       laedt: "rechne …",
@@ -1398,19 +1384,6 @@ const de = {
       feldEltern: "Elternkategorie",
       feldElternHinweis: "optional",
       feldCharakter: "Default-Charakter",
-    },
-    festlegung: {
-      titel: "Festlegungen",
-      untertitel: "Empfänger, deren Kategorie ausdrücklich festgelegt ist",
-      laedt: "lädt …",
-      leer: "Noch nichts festgelegt. Festlegungen entstehen beim Korrigieren einer Kategorie — in der Import-Inbox oder im Buchungsdialog.",
-      hinweis:
-        "Diese Empfänger bekommen ihre Kategorie ohne Umweg über das Modell. Sie stehen ganz vorn in der Kette — vor dem Vertrag und vor der Erkennung. Ein „*“ im Muster steht für beliebigen Text.",
-      spalteMuster: "Empfänger",
-      spalteKategorie: "Kategorie",
-      spalteAngelegt: "seit",
-      kategorieWeg: "Kategorie gelöscht",
-      aufheben: "aufheben",
     },
     abgleich: {
       titel: "5 · Bestand abgleichen",
@@ -2056,24 +2029,15 @@ const en: typeof de = {
   review: {
     herkunft: {
       umbuchung: "Transfer",
-      festlegung: "Pinned",
       regel: "Contract",
       ki: "Recognition",
       manuell: "by hand",
     },
     herkunftTitel: {
       umbuchung: "The source marked this payment as a transfer.",
-      festlegung: "Someone pinned a category for this payee.",
       regel: "The payment matches a contract's recognition rule — it inherits that category.",
       ki: "The trained model decided.",
       manuell: "Someone decided this by hand.",
-    },
-    festlegung: {
-      frage: "Always for “{{muster}}”?",
-      ja: "always",
-      nein: "just here",
-      gesetzt: "Pinned: “{{muster}}”",
-      gesetztWeitere: "Pinned: “{{muster}}” — {{anzahl}} more open rows updated",
     },
     begruendungSicher: "{{wert}} confident",
     titel: "Import inbox",
@@ -2549,11 +2513,6 @@ const en: typeof de = {
     detailVerwerfenFolgen: "The bank line is discarded. The receipt is kept and the line can be posted again from the inbox — the retrieval will not fetch it a second time.",
     zugangLoeschenFolgen: "The retrieved entries stay; they live in the account and do not hang off the access. What goes is the route to the bank — further retrievals need it set up again.",
     kontoLoeschenFolgen: "An account with entries cannot be deleted — the entries would have to go first. Without any, only the account itself disappears.",
-    festlegung: {
-      immerLabel: "Always use this category for this payee",
-      immer: "Always use this category for “{{muster}}”",
-      hinweis: "Applies to new payments to this payee from now on. You can remove it in the settings.",
-    },
     merkmale: {
       titel: "What the recognition sees here",
       laedt: "computing …",
@@ -3129,19 +3088,6 @@ const en: typeof de = {
       feldEltern: "Parent category",
       feldElternHinweis: "optional",
       feldCharakter: "Default character",
-    },
-    festlegung: {
-      titel: "Pinned categories",
-      untertitel: "Payees whose category is fixed explicitly",
-      laedt: "loading …",
-      leer: "Nothing pinned yet. Pins are created when you correct a category — in the import inbox or the booking dialog.",
-      hinweis:
-        "These payees get their category without going through the model. They sit at the front of the chain — ahead of contracts and of the recognition. A “*” in the pattern stands for any text.",
-      spalteMuster: "Payee",
-      spalteKategorie: "Category",
-      spalteAngelegt: "since",
-      kategorieWeg: "category deleted",
-      aufheben: "remove",
     },
     abgleich: {
       titel: "5 · Reconcile existing bookings",

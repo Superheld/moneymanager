@@ -30,7 +30,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   istGeteilt,
-  musterVorschlag,
   type Buchungshistorie,
   type Charakter,
   type IstBuchung,
@@ -68,7 +67,6 @@ import {
   buchungZuruecksetzen,
   dublettenFreigabeAufheben,
   dublettenFreigeben,
-  festlegungSpeichern,
   gegenbeinErzeugen,
   paarungLoesen,
   splitAufheben,
@@ -334,15 +332,9 @@ function BuchungFormular({
   const [notiz, setNotiz] = useState(buchung?.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // „Immer bei diesem Empfänger" — nur angeboten, wenn die Kategorie hier gerade
-  // GEÄNDERT wird. Ein dauerhaft sichtbarer Haken wäre eine Einladung, beim Durchsehen
-  // nebenbei Regeln anzulegen; die Festlegung soll aus einer Korrektur entstehen.
-  const [immer, setImmer] = useState(false);
   const gepaart = !!buchung?.transferId;
   const loeschfrage = useLoeschfrage();
   const geteilt = !!buchung && istGeteilt(buchung);
-  const musterAngebot = musterVorschlag(umsatz?.gegenpartei ?? "");
-  const kategorieGeaendert = kategorieId !== (buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
   const konto = konten.find((k) => k.id === kontoId);
   /**
    * Auf einem Konto mit Bankverbindung sind Datum und Betrag Tatsachen, keine Eingabe.
@@ -506,11 +498,6 @@ function BuchungFormular({
         // verglichen gegen den falschen Bestand.
         if (umsatz && kontoId !== umsatz.zahlungskontoId) {
           await umsatzSpeichern({ ...umsatz, zahlungskontoId: kontoId });
-        }
-        // Die Festlegung entsteht NACH der Buchung: schlüge das Speichern fehl, stünde
-        // sonst eine Regel für eine Änderung, die es nicht gibt.
-        if (immer && kategorieId && musterAngebot) {
-          await festlegungSpeichern(musterAngebot, kategorieId);
         }
       }
       onSaved();
@@ -851,15 +838,6 @@ function BuchungFormular({
               <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
                 <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieSetzen} />
               </FormField>
-              {kategorieGeaendert && kategorieId && musterAngebot && !istEntwurf && (
-                <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", marginTop: 6, fontSize: "var(--fs-xs)" }}>
-                  <input type="checkbox" aria-label={t("konten.festlegung.immerLabel")} checked={immer} onChange={(e) => setImmer(e.target.checked)} />
-                  <span>
-                    {t("konten.festlegung.immer", { muster: musterAngebot })}
-                    <span className="muted" style={{ display: "block" }}>{t("konten.festlegung.hinweis")}</span>
-                  </span>
-                </label>
-              )}
               {/* Aufteilen setzt eine gespeicherte Buchung voraus — es verteilt deren
                   Betrag, und der ist vorher noch nicht gebucht. */}
               {buchung && (

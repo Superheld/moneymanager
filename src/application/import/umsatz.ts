@@ -20,7 +20,6 @@ export type UmsatzStatus = "neu" | "verbucht" | "duplikat" | "verworfen";
 export type VorschlagQuelle =
   | "umbuchung"
   | "manuell"
-  | "festlegung"
   | "regel"
   | "ki";
 

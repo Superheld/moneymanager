@@ -1,4 +1,4 @@
-// Einstellungen — Sprache & Währung, Personen, Kategorien, Festlegungen. Anlegen UND
+// Einstellungen — Sprache & Währung, Personen, Kategorien. Anlegen UND
 // Bearbeiten je im Modal (gleiche Maske, vorbefüllt). Reload-fest über die SQLite-Repos.
 //
 // Zwei Bereiche sind hier ausgezogen: die Kategorie-Erkennung nach „Training" und die
@@ -30,7 +30,6 @@ import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Bereich } from "../bausteine/Bereich";
-import { FestlegungenCard } from "../training/FestlegungenCard";
 import { VerschluesselungCard } from "../zugang/VerschluesselungCard";
 import { Modal } from "../bausteine/Modal";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
@@ -78,12 +77,6 @@ export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
           label: t("einstellungen.kategorie.titel"),
           untertitel: t("einstellungen.kategorie.untertitel"),
           inhalt: () => <KategorienCard kategorien={kategorien} onChange={laden} />,
-        },
-        {
-          id: "festlegungen",
-          label: t("einstellungen.festlegung.titel"),
-          untertitel: t("einstellungen.festlegung.untertitel"),
-          inhalt: () => <FestlegungenCard kategorien={kategorien} />,
         },
         {
           id: "aktualisierung",

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { trainieren, type Kategorie, type Zahlungskonto } from "../../core";
+import { standardErkennung, trainieren, type Kategorie, type Zahlungskonto } from "../../core";
 import type {
   ImportLaufRepository,
   KategorieRepository,
@@ -182,7 +182,7 @@ describe("Kategorisierungs-Kette beim Import", () => {
 
   it("der Katalog kommt IMMER frisch aus dem Repository", async () => {
     // Ein mitgereichter Kontext könnte einen älteren Kategorie-Stand tragen — hier einen
-    // LEEREN. Die Festlegung nennt nur eine Kategorie-Id; ihren Charakter kann nur der
+    // LEEREN. Die Vertragsregel nennt nur eine Kategorie-Id; ihren Charakter kann nur der
     // Katalog liefern. Löst sie auf, kam er frisch aus dem Repository.
     const { deps, umsaetze } = fakes();
     await umsaetzeUebernehmen(
@@ -195,12 +195,13 @@ describe("Kategorisierungs-Kette beim Import", () => {
         ...deps,
         kategorisierung: {
           kategorieNachId: new Map(),
-          festlegungen: [{ muster: "irgendwer", kategorieId: "k-le", angelegtAm: "2026-08-17T10:00:00.000Z" }],
+          erkennungen: [standardErkennung("v1", "Irgendwer", 655)],
+          vertragsKategorie: new Map([["v1", "k-le"]]),
         },
       },
     );
 
-    expect(umsaetze[0].vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "festlegung" });
+    expect(umsaetze[0].vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "regel" });
   });
 });
 

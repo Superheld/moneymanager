@@ -5,37 +5,41 @@
 //
 //   1. **Umbuchung** — die Quelle hat es markiert. Umschichtung, OHNE konkrete Kategorie:
 //      eigenes Geld, das das Konto wechselt, gehört in keine Ausgabenkategorie.
-//   2. **Festlegung** — jemand hat ausdrücklich gesagt „immer bei diesem Empfänger".
-//      Steht VOR dem Vertrag, weil sie das Jüngere und Speziellere ist: wer sie eintippt,
-//      hat den konkreten Fall vor Augen; die Kategorie am Vertrag ist eine Angabe von
-//      damals, oft nur beim Anlegen mitgelaufen.
-//   3. **Vertrag** — die Zahlung passt auf die Erkennungsregel eines Vertrags, und der
+//   2. **Vertrag** — die Zahlung passt auf die Erkennungsregel eines Vertrags, und der
 //      trägt eine Kategorie. Das ist keine Schätzung, sondern eine Zuordnung, die jemand
 //      beim Erfassen des Vertrags getroffen hat.
-//   4. **Modell** — der trainierte Klassifikator. Er legt sich immer fest; auf echten
-//      Daten trifft er in rund 89 % der Fälle.
+//   3. **Modell** — der trainierte Klassifikator. Er legt sich immer fest.
+//
 // Trifft nichts, bleibt der Umsatz unkategorisiert und landet in der Review-Inbox.
 //
-// Eine fünfte Stufe gab es bis 2026-08-29: das Remapping der Kategorie, die Finanzguru
-// mitgeliefert hatte. Sie trug den Kaltstart, solange nichts trainiert war — und mit
-// einem mitgelieferten Modell gibt es keinen Kaltstart mehr. Sie stand hinter dem
-// Modell, wurde also ohnehin nur erreicht, wenn dieses nichts fand; zugleich lief der
-// `kategorieHinweis` des Hanseatic-Abrufs still durch eine Finanzguru-Tabelle und
-// konnte dort nur zufällig treffen. Der `kategorieHinweis` bleibt am BELEG (er ist,
-// was die Quelle lieferte) — ausgewertet wird er nicht mehr.
+// **Zwei Stufen sind am 29.08.2026 weggefallen**, und beide aus demselben Grund: sie
+// beantworteten eine Frage, die inzwischen woanders beantwortet wird.
+//
+//   • Das **Remapping** übersetzte die Kategorie, die Finanzguru mitlieferte, auf unseren
+//     Baum. Es trug den Kaltstart, solange nichts trainiert war — und mit einem
+//     mitgelieferten Modell gibt es keinen Kaltstart mehr. Der `kategorieHinweis` bleibt
+//     am BELEG (er ist, was die Quelle lieferte), ausgewertet wird er nicht mehr.
+//   • Die **Festlegung** („immer bei diesem Empfänger") stand vor dem Vertrag. Sie war
+//     kein Schutz — eine Handkorrektur ist über `kategorieHerkunft` ohnehin sicher —,
+//     sondern eine VERALLGEMEINERUNG: sie übertrug eine Korrektur auf andere und künftige
+//     Zahlungen desselben Empfängers. Genau das soll das Modell leisten, und zwar über
+//     alle Merkmale statt über den Empfänger allein.
+//
+// Was daran hängt und beim Wiedereinbau bedacht werden muss: eine Korrektur wirkt jetzt
+// erst nach dem nächsten Training auf ähnliche Zahlungen. Bleibt das spürbar zu langsam,
+// ist die Antwort ein GEWICHT für Handkorrekturen im Training — nicht eine zweite Ebene
+// daneben.
 //
 // Rein: alles, was die Kette braucht, kommt als Kontext herein. Der lädt sich in
 // `application/kategorisierungsquellen`.
 
 import {
-  festlegungFuer,
   herkunftVon,
   klassifizieren,
   merkmalsbefund,
   vertragFuer,
   type Beitrag,
   type Kategorie,
-  type Kategoriefestlegung,
   type Merkmalskonfiguration,
   type Modell,
   type Vertragserkennung,
@@ -64,8 +68,6 @@ export interface Vorschlagseingabe {
 export interface Vorschlagskontext {
   /** Kategorien nach Id — liefert den Charakter zur gewählten Kategorie. */
   readonly kategorieNachId: ReadonlyMap<string, Kategorie>;
-  /** Ausdrückliche Festlegungen „immer bei diesem Empfänger". */
-  readonly festlegungen?: readonly Kategoriefestlegung[];
   /** Erkennungsregeln aller Verträge. */
   readonly erkennungen?: readonly Vertragserkennung[];
   /** Vertrag → Kategorie. Verträge ohne Kategorie fehlen hier und greifen nicht. */
@@ -84,8 +86,6 @@ export interface Vorschlagsbefund {
   readonly beitraege?: readonly Beitrag[];
   /** Name des Vertrags, wenn er den Vorschlag getragen hat. */
   readonly vertragId?: string;
-  /** Das Muster der Festlegung, wenn sie den Vorschlag getragen hat. */
-  readonly festlegung?: string;
   /** Sicherheit des Modells (0…1), sofern es entschieden hat. */
   readonly sicherheit?: number;
 }
@@ -132,15 +132,6 @@ export function vorschlagsbefundFuer(
 ): Vorschlagsbefund {
   if (roh.istUmbuchung) {
     return { vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" } };
-  }
-
-  // 1. Festlegung — die ausdrücklichste Aussage, die es hier gibt.
-  if (kontext.festlegungen?.length) {
-    const f = festlegungFuer(kontext.festlegungen, roh.gegenpartei);
-    if (f) {
-      const vorschlag = auf(f.kategorieId, "festlegung", kontext);
-      if (vorschlag) return { vorschlag, festlegung: f.muster };
-    }
   }
 
   // 2. Vertrag — eine getroffene Zuordnung schlägt jede Schätzung.

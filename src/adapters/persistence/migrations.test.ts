@@ -86,7 +86,7 @@ const ERWARTETE_TABELLEN = [
   "depot", "depotposition", "depotwert", // v38 — Depots: Beobachtungen statt Buchungen
   "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
   "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
-  "ist_buchung_aufteilung", "kategorie", "kategorie_festlegung", "klassifikator_modell",
+  "ist_buchung_aufteilung", "kategorie", "klassifikator_modell",
   // v61 — frei benannte Gruppen von Konten; eine Sicht, keine Rechenregel
   "kontogruppe", "kontogruppe_konto",
   "kontostand_anker", // v35 — was an einem Stichtag wirklich auf dem Konto lag
