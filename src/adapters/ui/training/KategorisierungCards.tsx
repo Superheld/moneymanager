@@ -1,14 +1,20 @@
-// Die automatische Kategorisierung in den Einstellungen — vier Karten entlang des
-// Ablaufs, den ein Training tatsächlich hat: Daten sichten, Merkmale wählen, Ausschlüsse
-// pflegen, trainieren und prüfen.
+// Die automatische Kategorisierung — vier Karten entlang des Ablaufs, den ein Training
+// tatsächlich hat: Daten sichten, Wörter beurteilen, trainieren und prüfen, Bestand
+// abgleichen.
 //
 // Vier statt einer, weil das die Reihenfolge ist, in der man die Fragen stellt. Eine
 // einzige Karte mit allem drin zeigte das Ergebnis oben und seine Grundlage unten — also
 // rückwärts — und war so lang, dass man den Anfang nicht mehr sah.
 //
-// Geladen wird gemeinsam und erst beim ersten Aufklappen einer der vier: die Auswertung
-// zieht den gesamten Ledger und rechnet die Merkmale darüber. Viermal getrennt zu laden
-// wäre dieselbe Arbeit vierfach.
+// **Es waren einmal fünf.** „Merkmale" und „Ausschlüsse" lagen getrennt, und das war der
+// Schnitt an der falschen Stelle: dieselben Wörter, zweimal gezeigt, mit verschiedenen
+// Spalten — wer eines abwählte, sah es hier verschwinden und musste es dort
+// wiederfinden. Sie sind zu „Wörter" verschmolzen, und ein Ausschluss wechselt jetzt den
+// Zustand einer Zeile, statt sie an einen anderen Ort zu verschieben.
+//
+// Geladen wird gemeinsam und erst beim Betreten des Bereichs: die Auswertung zieht den
+// gesamten Ledger und rechnet die Merkmale darüber. Je Karte getrennt zu laden wäre
+// dieselbe Arbeit mehrfach.
 
 import { useProzent } from "../bausteine/einstellungenKontext";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
