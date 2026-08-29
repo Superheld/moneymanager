@@ -189,6 +189,8 @@ export {
   type Analysezeile,
   type AnalyseDeps,
   type Zeitraum,
+  analyseBefunde,
+  type Befunde,
 } from "./analysesichten";
 export {
   depotsLaden,

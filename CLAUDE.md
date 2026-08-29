@@ -71,7 +71,7 @@ damit ein Thema an drei Stellen gleich heißt:
 
 ```
 core/         basis buchung konten budgets vertraege kategorien inventar depot
-              stammdaten klassifikator          + index, monatsausblick
+              stammdaten klassifikator          + index, monatsausblick, auswertung
 application/  buchung konten budgets vertraege kategorien inventar depot dubletten
               stammdaten import fints           + index, ports, bootstrap,
                                                   uebersicht, analysesichten, einstellungen
@@ -91,8 +91,8 @@ Drei Regeln, wohin eine neue Datei gehört:
 
 Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (`index.ts`,
 `ports.ts`), der Start (`bootstrap.ts`) und die bewusst querliegenden Sichten
-(`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`) — sie rechnen über mehrere
-Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
+(`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`, `core/auswertung.ts`) —
+sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 
 Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der

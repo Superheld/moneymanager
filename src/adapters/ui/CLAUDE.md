@@ -248,6 +248,29 @@ gleichbehandelt, beantwortet eine davon falsch:
 
 Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweite.
 
+## Die Analyse steht in zwei Blöcken
+
+Der obere beantwortet **„wie viel und wohin"** — Kennzahlen, Verlauf (Fluss · Saldo ·
+Tabelle) und die Aufschlüsselung nach Kategorien. Der untere (`BefundeBereich.tsx`)
+beantwortet **„und wie tragfähig ist das"**: fest gegen frei, Empfänger, Nutzung der
+Kategorien, Budget-Treue samt der Ausgaben, die in keinem Budget vorkommen, Verträge
+Soll gegen Ist, und die Ausreißer.
+
+**Sechs Lupen auf einer Fläche**, umschaltbar wie der Verlauf darüber. Untereinander
+wäre der Bereich vier Bildschirme lang, und was unten steht, sieht niemand — dieselbe
+Überlegung wie beim Verlauf, und derselbe Umschalter, damit es sich gleich bedient.
+
+Zwei Dinge, die beim Anbauen zählen:
+
+- **Alle Befunde werden in EINEM Zug gerechnet** (`analyseBefunde`), aus derselben Basis
+  wie die Zahlen darüber. Eine Karte, die sich ihre Buchungen selbst holt, rechnet früher
+  oder später gegen eine andere Menge als ihre Nachbarin — genau der Fehler, gegen den es
+  `analyseLaden` schon gibt.
+- **Eine Ausgabe wird durch Negieren der Summe positiv, nie mit `Math.abs`.** Die Regel
+  steht im Kopf von `core/auswertung.ts`: `Math.abs` je Buchung macht aus „es kam Geld
+  zurück" ein „es wurde noch mehr ausgegeben". Wer eine Spalte ergänzt, übernimmt die
+  Regel mit.
+
 ## Laden
 
 **Verwandte Repos in EINEM Effekt per `Promise.all` laden und zusammen setzen.** Gestaffelte
