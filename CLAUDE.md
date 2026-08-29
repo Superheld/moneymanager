@@ -1092,6 +1092,20 @@ eine Fehlermeldung abzuwarten.
 `npm run seed` überschreibt ihn vollständig. Das ist billig und folgenlos — er ist
 **Wegwerfware**, im Gegensatz zum echten Bestand.
 
+**Der frische Spielstand ist unverschlüsselt, und sein Zugang wird mit abgeräumt.** Der
+Seed schreibt über sql.js, kennt also kein SQLCipher; verschlüsselt wird die Datei erst,
+wenn die App sie beim nächsten Start vorfindet und durch die Einrichtung führt. Die
+Passphrase ist dabei frei wählbar (es ist der Spielstand), der Wiederherstellungscode
+wird gewürfelt und einmal angezeigt.
+
+Damit das überhaupt passiert, löscht das Skript die Schlüsselhülle `<name>.schluessel.json`
+mit — und die Sicherungen dieses Spielstands, die mit dem alten Datenschlüssel geschrieben
+sind und danach niemand mehr aufbekäme. **Ohne dieses Abräumen wäre der frische Spielstand
+nicht zu öffnen:** `zugang_stand` meldet „eingerichtet", sobald eine Hülle daliegt, die App
+verlangt dann eine Passphrase, packt den ALTEN Schlüssel aus und setzt ihn per `PRAGMA key`
+auf eine Klartext-Datei. Die Meldung lautet „file is not a database" und sieht nach
+kaputtem Bestand aus statt nach falschem Schlüssel.
+
 Neu schreiben, wenn:
 
 - ein **neuer Fall** dazugehört, den er noch nicht enthält (dann erst
