@@ -291,7 +291,6 @@ const de = {
       festlegung: "Festgelegt",
       regel: "Vertrag",
       ki: "Erkennung",
-      remapping: "Import",
       manuell: "von Hand",
     },
     herkunftTitel: {
@@ -299,7 +298,6 @@ const de = {
       festlegung: "Für diesen Empfänger wurde ausdrücklich festgelegt, welche Kategorie gilt.",
       regel: "Die Zahlung passt auf die Erkennungsregel eines Vertrags — sie erbt dessen Kategorie.",
       ki: "Das trainierte Modell hat entschieden.",
-      remapping: "Die Kategorie kam mit der Importdatei und wurde auf unseren Baum übersetzt.",
       manuell: "Hier hat jemand von Hand entschieden.",
     },
     festlegung: {
@@ -2068,7 +2066,6 @@ const en: typeof de = {
       festlegung: "Pinned",
       regel: "Contract",
       ki: "Recognition",
-      remapping: "Import",
       manuell: "by hand",
     },
     herkunftTitel: {
@@ -2076,7 +2073,6 @@ const en: typeof de = {
       festlegung: "Someone pinned a category for this payee.",
       regel: "The payment matches a contract's recognition rule — it inherits that category.",
       ki: "The trained model decided.",
-      remapping: "The category came with the import file and was mapped onto our tree.",
       manuell: "Someone decided this by hand.",
     },
     festlegung: {

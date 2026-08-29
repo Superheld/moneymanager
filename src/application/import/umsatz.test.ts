@@ -21,8 +21,8 @@ function basis(over: Partial<Umsatz> = {}): Umsatz {
 
 describe("Umsatz — Statusmaschine", () => {
   it("kategorisieren setzt den Vorschlag im Status neu", () => {
-    const u = kategorisieren(basis(), { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" });
-    expect(u.vorschlag).toEqual({ kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" });
+    const u = kategorisieren(basis(), { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" });
+    expect(u.vorschlag).toEqual({ kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" });
     expect(u.status).toBe("neu");
   });
 

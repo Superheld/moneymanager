@@ -39,7 +39,7 @@ describe("umsaetzeVerbuchen", () => {
   it("verbucht kategorisierte Umsätze als Ist-Buchung und schaltet den Umsatz auf verbucht", async () => {
     const { deps, ledger, gespeichert } = fakes();
     const r = await umsaetzeVerbuchen(
-      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" } })],
       deps,
     );
     expect(r).toEqual({ verbucht: 1, uebersprungen: 0, umbuchungen: 0 });
@@ -117,7 +117,7 @@ describe("Herkunft der Kategorie beim Verbuchen", () => {
   it("Remapping-Vorschlag wird als automatisch verbucht (bleibt korrigierbar)", async () => {
     const { deps, ledger } = fakes();
     await umsaetzeVerbuchen(
-      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" } })],
       deps,
     );
     expect(ledger[0].kategorieHerkunft).toBe("automatisch");
@@ -178,7 +178,7 @@ describe("Prüfmarker beim Verbuchen", () => {
   it("merkt Zeilen vor, wenn der Aufrufer es verlangt", async () => {
     const { deps, ledger } = fakes();
     await umsaetzeVerbuchen(
-      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" } })],
       { ...deps, zumPruefenVormerken: true },
     );
     expect(ledger[0].zuPruefen).toBe(true);
@@ -187,7 +187,7 @@ describe("Prüfmarker beim Verbuchen", () => {
   it("lässt sie ohne Marker, wenn nicht", async () => {
     const { deps, ledger } = fakes();
     await umsaetzeVerbuchen(
-      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" } })],
       deps,
     );
     expect(ledger[0].zuPruefen).toBeUndefined();

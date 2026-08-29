@@ -3,8 +3,7 @@ import { standardErkennung, trainieren, type Kategorie } from "../../core";
 import type { RohUmsatz } from "./rohUmsatz";
 import {
   katalogNachId,
-  katalogNachName,
-  vorschlagFuer,
+    vorschlagFuer,
   vorschlagsbefundFuer,
   type Vorschlagskontext,
 } from "./vorschlag";
@@ -17,7 +16,6 @@ const kategorien: Kategorie[] = [
 
 /** Nur der Katalog — der Zustand vor jeder weiteren Quelle. */
 const nurKatalog: Vorschlagskontext = {
-  katalogNachName: katalogNachName(kategorien),
   kategorieNachId: katalogNachId(kategorien),
 };
 
@@ -34,26 +32,10 @@ function roh(over: Partial<RohUmsatz> = {}): RohUmsatz {
   };
 }
 
-describe("Umbuchung und Remapping (Grundverhalten)", () => {
-  it("labelt Umbuchungen als Umschichtung, nicht nach FG-Hinweis", () => {
-    const v = vorschlagFuer(roh({ istUmbuchung: true, kategorieHinweis: "Restaurants" }), nurKatalog);
+describe("Umbuchung (Grundverhalten)", () => {
+  it("labelt Umbuchungen als Umschichtung, ohne konkrete Kategorie", () => {
+    const v = vorschlagFuer(roh({ istUmbuchung: true }), nurKatalog);
     expect(v).toEqual({ charakter: "Umschichtung", quelle: "umbuchung" });
-  });
-
-  it("mappt den FG-Hinweis auf unsere Kategorie inkl. Charakter", () => {
-    const v = vorschlagFuer(roh({ kategorieHinweis: "Lebensmittel" }), nurKatalog);
-    expect(v).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "remapping" });
-  });
-
-  it("nimmt den Charakter aus der Zielkategorie (Sparen → Umschichtung)", () => {
-    const v = vorschlagFuer(roh({ kategorieHinweis: "Kapitalanlage" }), nurKatalog);
-    expect(v).toEqual({ kategorieId: "k-sp", charakter: "Umschichtung", quelle: "remapping" });
-  });
-
-  it("liefert undefined, wenn der Hinweis unbekannt ist oder die Kategorie fehlt", () => {
-    expect(vorschlagFuer(roh({ kategorieHinweis: "Gibtsnicht" }), nurKatalog)).toBeUndefined();
-    // bekannter Hinweis, aber Zielkategorie nicht im Katalog des Nutzers:
-    expect(vorschlagFuer(roh({ kategorieHinweis: "Tanken" }), nurKatalog)).toBeUndefined();
   });
 
   it("ohne jede Quelle und ohne Hinweis bleibt die Zeile unkategorisiert", () => {
@@ -98,15 +80,6 @@ describe("Vertrag", () => {
       vertragsKategorie: new Map(),
     };
     expect(vorschlagFuer(roh({ gegenpartei: "Kesselmann International BV", betrag: -999 }), kontext)).toBeUndefined();
-  });
-
-  it("schlägt den Vertrag VOR das Remapping", () => {
-    // Eine getroffene Zuordnung ist stärker als eine Fremdklassifikation.
-    const v = vorschlagFuer(
-      roh({ gegenpartei: "Kesselmann International BV", betrag: -999, kategorieHinweis: "Lebensmittel" }),
-      mitVertrag(),
-    );
-    expect(v?.kategorieId).toBe("k-abo");
   });
 
   it("die Umbuchung schlägt auch den Vertrag", () => {
@@ -169,7 +142,7 @@ describe("Festlegung", () => {
       ...nurKatalog,
       festlegungen: [{ muster: "rewe", kategorieId: "geloescht", angelegtAm: "2026-08-17T10:00:00.000Z" }],
     };
-    expect(vorschlagFuer(roh({ gegenpartei: "REWE Markt", kategorieHinweis: "Lebensmittel" }), kontext)?.quelle).toBe("remapping");
+    expect(vorschlagFuer(roh({ gegenpartei: "REWE Markt" }), kontext)).toBeUndefined();
   });
 });
 
@@ -195,13 +168,6 @@ describe("Modell", () => {
     expect(b.sicherheit).toBeGreaterThan(0);
   });
 
-  it("steht VOR dem Remapping", () => {
-    // Ein Modell auf dem eigenen Kategoriebaum schlägt eine Fremdklassifikation.
-    const v = vorschlagFuer(roh({ kategorieHinweis: "Kapitalanlage" }), mitModell());
-    expect(v?.quelle).toBe("ki");
-    expect(v?.kategorieId).toBe("k-le");
-  });
-
   it("steht HINTER dem Vertrag", () => {
     const kontext: Vorschlagskontext = {
       ...mitModell(),
@@ -215,11 +181,6 @@ describe("Modell", () => {
     // Sonst bekäme jede textlose Zahlung dieselbe Kategorie — und zwar die häufigste.
     const v = vorschlagFuer(roh({ gegenpartei: "", verwendungszweck: "" }), mitModell());
     expect(v).toBeUndefined();
-  });
-
-  it("fällt aufs Remapping zurück, wenn kein Modell da ist", () => {
-    const v = vorschlagFuer(roh({ kategorieHinweis: "Lebensmittel" }), nurKatalog);
-    expect(v?.quelle).toBe("remapping");
   });
 
   it("schlägt keine Kategorie vor, die es im Katalog nicht mehr gibt", () => {

@@ -62,9 +62,8 @@ const ZAHLUNG = {
 };
 
 describe("Quellen laden", () => {
-  it("liefert beide Kategorie-Indizes", async () => {
+  it("liefert den Kategorie-Index nach Id", async () => {
     const q = await kategorisierungsquellen(repos());
-    expect(q.katalogNachName.get("lebensmittel")?.id).toBe("k-le");
     expect(q.kategorieNachId.get("k-le")?.name).toBe("Lebensmittel");
   });
 
@@ -138,6 +137,6 @@ describe("Quellen laden", () => {
     const q = await kategorisierungsquellen({ kategorieRepo });
     expect(q.erkennungen).toBeUndefined();
     expect(q.modell).toBeUndefined();
-    expect(q.katalogNachName.size).toBe(2);
+    expect(q.kategorieNachId.size).toBe(2);
   });
 });

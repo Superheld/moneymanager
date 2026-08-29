@@ -452,14 +452,14 @@ describe("ReviewScreen", () => {
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
       betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
       verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
-      vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" },
+      vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" },
     });
 
     rendere(<ReviewScreen />);
 
-    // Ohne die Herkunft ist einem Vorschlag nicht anzusehen, ob ihn ein Vertrag, ein
-    // Modell oder die Importdatei gesetzt hat — und damit nicht, wie sehr man ihm traut.
-    await waitFor(() => expect(screen.getAllByText("Import").length).toBeGreaterThan(0));
+    // Ohne die Herkunft ist einem Vorschlag nicht anzusehen, ob ihn ein Vertrag, eine
+    // Festlegung oder das Modell gesetzt hat — und damit nicht, wie sehr man ihm traut.
+    await waitFor(() => expect(screen.getAllByText("Erkennung").length).toBeGreaterThan(0));
   });
 
   it("begründet einen Vorschlag des Modells mit seinen Belegen", async () => {

@@ -17,7 +17,6 @@ export type UmsatzStatus = "neu" | "verbucht" | "duplikat" | "verworfen";
 
 /** Woher der Kategorie-Vorschlag stammt — Transparenz und Basis des späteren Lern-Loops. */
 export type VorschlagQuelle =
-  | "remapping"
   | "umbuchung"
   | "manuell"
   | "festlegung"

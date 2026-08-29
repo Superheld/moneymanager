@@ -10,7 +10,7 @@
 // frisch aufgesetzten App.
 
 import { STANDARD_KONFIGURATION, type Kategorie } from "../../core";
-import { katalogNachId, katalogNachName, type Vorschlagskontext } from "../import/vorschlag";
+import { katalogNachId, type Vorschlagskontext } from "../import/vorschlag";
 import { konfigurationLaden } from "./merkmalskonfiguration";
 import type {
   KategoriefestlegungRepository,
@@ -55,7 +55,6 @@ export async function kategorisierungsquellen(deps: QuellenDeps): Promise<Vorsch
   }
 
   return {
-    katalogNachName: katalogNachName(kategorien as Kategorie[]),
     kategorieNachId: katalogNachId(kategorien as Kategorie[]),
     festlegungen: festlegungen.length > 0 ? festlegungen : undefined,
     erkennungen: vertragsKategorie.size > 0 ? erkennungen : undefined,
