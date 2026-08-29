@@ -23,11 +23,16 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 `kategorien/` wie in Kern und Anwendung. Die drei bereichsübergreifenden Tests (`screens`,
 `interaktion`, `formulare`) liegen in der Wurzel.
 
-## Geld anzeigen
+## Zahlen anzeigen
 
 **`useGeld()`** — nie eigenes `toFixed`, nie an der Locale-Schicht vorbei. Die Farbe kommt
 aus **`bausteine/geldFarbe.ts`**: Plus grün, Minus `--warn-deep`, Null neutral. Eine Farbregel
 für die ganze App, nicht eine je Screen.
+
+**`useProzent()`** für Anteile (0…1) — dieselbe Regel, derselbe Ort. Sie stand hier lange
+nur für Geld, und direkt daneben formatierten die Depot-Anteile mit `toFixed`: im Deutschen
+„12.5 %" statt „12,5 %". Eine Locale-Regel, die nur für einen Zahlentyp gilt, wird für die
+anderen umgangen. `stellen` ist die Obergrenze, eine glatte Zahl bleibt glatt.
 
 Zeilenaktionen sind Icons über `bausteine/IconButton.tsx` — ihr Text wandert in
 `title`/`aria-label`, statt zu verschwinden.

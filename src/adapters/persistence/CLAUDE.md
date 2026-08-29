@@ -18,6 +18,9 @@ wiederholbar:
 
 - `CREATE …` trägt `IF NOT EXISTS`, `DROP …` trägt `IF EXISTS`
 - `ADD`/`DROP COLUMN` überspringt `migrate()` per `PRAGMA table_info`
+- **Ein Index vor seiner Spalte** — `DROP COLUMN` scheitert, solange ein Index sie nennt,
+  und die Meldung zeigt auf die Spalte. Erst `DROP INDEX IF EXISTS`, dann die Spalte
+  (Migration 62 räumt so `ux_ist_planref` samt `plan_quelle_id` ab).
 - ein Datenumbau (UPDATE/DELETE) braucht eine eigene wiederholbare Formulierung —
   `WHERE spalte IS NULL` statt einer Scheintransaktion
 
@@ -37,6 +40,11 @@ am echten Bestand nachsehen, ob sie gewirkt hat.
 sqlite3 -readonly "$DB" ".backup '/tmp/kopie.db'"   # nicht `cp`, die DB läuft im WAL-Modus
 npx vite-node scripts/migrationsprobe.mjs -- /tmp/kopie.db
 ```
+
+**Die Kopie danach vernichten.** `.backup` schreibt sie mit dem Schlüssel der offenen
+Verbindung — bei einem über `bestandslesen` entschlüsselten Bestand also im KLARTEXT. Eine
+liegengebliebene Probe ist ein vollständiger Bestand ohne jeden Schutz, und sie fällt
+niemandem mehr auf: die Verschlüsselung sagt nichts über ihre Kopien.
 
 Es fährt die Kette gegen echte Daten, meldet jede Tabelle, deren Zeilenzahl sich verändert
 hat, und prüft am Ende die Fremdschlüssel. **Das ist kein Ersatz für `npm test`, sondern
