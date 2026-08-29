@@ -1732,4 +1732,28 @@ export const MIGRATIONS: Migration[] = [
            AND NOT EXISTS (SELECT 1 FROM umsatz_verarbeitung x  WHERE x.vorschlag_kategorie_id = kategorie.id)`,
     ],
   },
+  {
+    version: 61, // Frei benannte Kontogruppen
+    sql: [
+      // Eine Gruppe ist eine SICHT, keine Rechenregel — sie steht deshalb NEBEN der
+      // Kontoklasse und ersetzt sie nicht: die Klasse entscheidet, ob ein Saldo zu den
+      // liquiden Mitteln zaehlt (genau eine je Konto), eine Gruppe buendelt nur, was man
+      // zusammen ansehen will (beliebig viele je Konto).
+      `CREATE TABLE IF NOT EXISTS kontogruppe (
+         id TEXT PRIMARY KEY,
+         bezeichnung TEXT NOT NULL
+       )`,
+      // Eigene Tabelle statt einer JSON-Spalte wie bei `zahlungskonto.inhaber_ids`, und
+      // der Grund ist der Fremdschluessel: ein geloeschtes Konto raeumt seine
+      // Mitgliedschaften mit ab. In einer JSON-Liste bliebe seine Id stehen, und ein
+      // verwaister Verweis in einem Textfeld faellt niemandem auf — bis eine Gruppe
+      // Konten zaehlt, die es nicht mehr gibt.
+      `CREATE TABLE IF NOT EXISTS kontogruppe_konto (
+         gruppe_id TEXT NOT NULL REFERENCES kontogruppe(id) ON DELETE CASCADE,
+         konto_id  TEXT NOT NULL REFERENCES zahlungskonto(id) ON DELETE CASCADE,
+         PRIMARY KEY (gruppe_id, konto_id)
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_kontogruppe_konto ON kontogruppe_konto(konto_id)`,
+    ],
+  },
 ];

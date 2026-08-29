@@ -211,6 +211,14 @@ export {
   type InventarEingabe,
 } from "./inventar/inventarAnlegen";
 export {
+  kontogruppeSpeichern,
+  kontogruppeLoeschen,
+  gruppensichten,
+  type KontogruppeEingabe,
+  type Gruppensicht,
+  type GruppenDeps,
+} from "./konten/gruppen";
+export {
   stammdatenLaden,
   type Stammdaten,
   type StammdatenDeps,

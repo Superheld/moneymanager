@@ -79,11 +79,26 @@ describe("Spielstand", () => {
       ["umsatz_roh", 6],
       ["umsatz_verarbeitung", 6],
       ["kontostand_anker", 4],
+      ["kontogruppe", 2],
+      ["kontogruppe_konto", 4],
     ] as const) {
       expect(zahl(db, `SELECT COUNT(*) FROM ${tabelle}`), tabelle).toBeGreaterThanOrEqual(
         mindestens,
       );
     }
+  });
+
+  // Der Fall, den eine feste Kontoklasse nicht abbilden kann und fuer den es Gruppen
+  // gibt: dasselbe Konto liegt in mehr als einer.
+  it("legt ein Konto in zwei Gruppen", () => {
+    const db = mitSeed();
+    expect(
+      zahl(
+        db,
+        "SELECT COUNT(*) FROM (SELECT konto_id FROM kontogruppe_konto " +
+          "GROUP BY konto_id HAVING COUNT(*) > 1)",
+      ),
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it("haelt die Invariante der Aufteilung: Summe der Teile = Betrag der Buchung", () => {
