@@ -18,6 +18,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   herkunftVon,
+  wortVon,
   type IstBuchung,
   type Merkmalsherkunft,
 } from "../../../application";
@@ -64,8 +65,6 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
   }
 
   const zahl = (n: number) => n.toLocaleString(locale);
-  /** Das nackte Wort ohne Präfix — nur das steht in der Ausschlussliste. */
-  const wortVon = (merkmal: string) => merkmal.slice(merkmal.search(/[=:]/) + 1);
 
   return (
     <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
@@ -169,9 +168,15 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
                           {t(`einstellungen.lernmaterial.herkunft.${v.herkunft}`)}
                         </span>
                         {/* Zurückholen geht nur bei Listeneinträgen — was der Code als
-                            Nummer oder Platzhalter aussortiert, steht nirgends. */}
-                        {v.grund === "ausgeschlossen" && stand.ausgeschlossen.has(v.wort) && (
-                          <button className="linkbtn" onClick={() => aendern(wortFreigeben(v.wort))}>
+                            Nummer oder Platzhalter aussortiert, steht nirgends.
+
+                            Und es hängt an `listenform`, nicht an `wort`: die Bank klebt
+                            Nummern ans Wort, gesperrt wurde der bereinigte Kern. Vorher
+                            stand hier `wort` — der Knopf erschien dann gar nicht, und in
+                            der Liste des Trainingsbereichs löschte derselbe Griff eine
+                            Zeile, die es nicht gibt: ohne Fehler und ohne Wirkung. */}
+                        {v.grund === "ausgeschlossen" && v.listenform && stand.ausgeschlossen.has(v.listenform) && (
+                          <button className="linkbtn" onClick={() => aendern(wortFreigeben(v.listenform!))}>
                             {t("konten.merkmale.zulassen")}
                           </button>
                         )}

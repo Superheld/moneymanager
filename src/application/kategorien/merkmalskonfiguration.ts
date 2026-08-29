@@ -220,9 +220,11 @@ export async function merkmalsansicht(
     deps.klassifikatorRepo.laden(),
   ]);
 
-  // Die Bestenliste deckt nur die häufigsten Merkmale ab; für ein seltenes Merkmal dieser
-  // Buchung gibt es dort keinen Eintrag — dann steht „kommt nur hier vor".
-  const statistik = new Map(material.vokabular.haeufigste.map((m) => [m.merkmal, m]));
+  // Vollständig, seit das Vokabular nicht mehr gekappt wird: ein Eintrag fehlt jetzt nur
+  // noch, wenn das Merkmal im LERNMATERIAL nicht vorkommt — etwa weil es allein in dieser
+  // Buchung steht und die keine Kategorie trägt. Vorher fehlte er auch dann, wenn das
+  // Merkmal bloss nicht zu den häufigsten gehörte, und beides sah gleich aus.
+  const statistik = new Map(material.vokabular.merkmale.map((m) => [m.merkmal, m]));
 
   return {
     verwendet: befund.merkmale.map((merkmal) => ({ merkmal, wert: statistik.get(merkmal) })),

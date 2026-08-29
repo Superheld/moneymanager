@@ -115,6 +115,16 @@ export interface VerworfenesWort {
   readonly grund: Verwurfsgrund;
   /** Aus welchem Feld das Wort stammt — nötig, um es gezielt dort auszuschließen. */
   readonly herkunft: Merkmalsherkunft;
+  /**
+   * Die BEREINIGTE Form, unter der das Wort auf der Ausschlussliste steht — nur bei
+   * `grund === "ausgeschlossen"` gesetzt, denn nur dort gibt es einen Listeneintrag.
+   *
+   * Sie kann von `wort` abweichen, und daran hing ein Fehler: `wort` ist immer das
+   * Original aus dem Kontoauszug (`debitkarte2025`), die Liste enthält aber das Token
+   * (`debitkarte`). Ein „Zulassen" auf das Original löschte eine Zeile, die es nicht
+   * gibt — kein Fehler, keine Wirkung. Wer den Eintrag anfassen will, braucht diese Form.
+   */
+  readonly listenform?: string;
 }
 
 export interface Merkmalsbefund {
@@ -332,7 +342,7 @@ export function merkmalsbefund(
       return;
     }
     if (ausgeschlossen(r.token, herkunft)) {
-      verworfen.push({ wort, grund: "ausgeschlossen", herkunft });
+      verworfen.push({ wort, grund: "ausgeschlossen", herkunft, listenform: r.token });
       return;
     }
     hinzu(`${PRAEFIX[herkunft]}${r.token}`);
@@ -379,6 +389,29 @@ export function merkmaleFuer(
   konfiguration: Merkmalskonfiguration = STANDARD_KONFIGURATION,
 ): string[] {
   return [...merkmalsbefund(q, konfiguration).merkmale];
+}
+
+/**
+ * Setzt ein Token aus Herkunft und Wort zusammen — die Umkehrung von `wortVon`.
+ *
+ * Gebraucht, wo ein Wort BEKANNT ist und sein Token erst gebildet werden muss: bei einem
+ * ausgeschlossenen Wort etwa, das im Vokabular gerade nicht steht und trotzdem an
+ * derselben Statistik gemessen werden soll wie eines, das drin ist.
+ */
+export function merkmalName(herkunft: Merkmalsherkunft, wort: string): string {
+  return `${PRAEFIX[herkunft]}${wort}`;
+}
+
+/**
+ * Das nackte Wort eines Tokens — die Form, unter der es auf der Ausschlussliste steht.
+ *
+ * Eine Funktion und keine drei Zeichen im Aufrufer, weil genau diese Zerlegung an drei
+ * Stellen der Oberfläche nachgebaut war und die Ausschlussliste an ihrem Ergebnis hängt:
+ * eine Abweichung davon trifft keine Zeile und meldet trotzdem Erfolg.
+ */
+export function wortVon(merkmal: string): string {
+  const i = merkmal.search(/[=:]/);
+  return i < 0 ? merkmal : merkmal.slice(i + 1);
 }
 
 /** Der Namensraum eines Tokens (`emp`, `vwz`, `gid`, `vz`) — für Anzeige und Gruppierung. */

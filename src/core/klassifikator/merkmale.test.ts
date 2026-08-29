@@ -221,7 +221,24 @@ describe("Steuerung über die Konfiguration", () => {
   it("ein Ausschluss erscheint mit Grund und Herkunft im Befund", () => {
     const k = { herkuenfte: MERKMALSHERKUENFTE, ausschluesse: [{ wort: "einkauf" }] };
     const b = merkmalsbefund(quelle({ verwendungszweck: "Einkauf" }), k);
-    expect(b.verworfen).toContainEqual({ wort: "einkauf", grund: "ausgeschlossen", herkunft: "vwz" });
+    expect(b.verworfen).toContainEqual({
+      wort: "einkauf", grund: "ausgeschlossen", herkunft: "vwz", listenform: "einkauf",
+    });
+  });
+
+  it("ein Ausschluss trägt die Form der Liste mit, wenn sie vom Auszug abweicht", () => {
+    // `wort` bleibt das Original — sonst stünde in der Anzeige ein Wort, das so nirgends
+    // in den Daten steht. `token` ist die Form, an der die Ausschlussliste hängt.
+    const k = { herkuenfte: MERKMALSHERKUENFTE, ausschluesse: [{ wort: "bankkarte" }] };
+    const b = merkmalsbefund(quelle({ verwendungszweck: "Bankkarte2026" }), k);
+    expect(b.verworfen).toContainEqual({
+      wort: "bankkarte2026", grund: "ausgeschlossen", herkunft: "vwz", listenform: "bankkarte",
+    });
+  });
+
+  it("ein strukturell verworfenes Wort trägt keine Listenform — es gibt keinen Eintrag dazu", () => {
+    const b = merkmalsbefund(quelle({ verwendungszweck: "RE2026004711" }));
+    expect(b.verworfen.find((v) => v.wort === "re2026004711")?.listenform).toBeUndefined();
   });
 
   it("greift auf die BEREINIGTE Form, nicht auf die Schreibweise im Auszug", () => {

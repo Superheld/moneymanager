@@ -85,7 +85,7 @@ describe("Was der Befund über die Daten sagt", () => {
     const b = materialBefund([spur({ id: "a" }), spur({ id: "b" }), spur({ id: "c", gegenpartei: "Anderer Laden" })]);
     // „vwz:einkauf" und „vz:-" kommen beide 3× vor; der Gleichstand entscheidet sich
     // alphabetisch, damit die Anzeige zwischen zwei Läufen nicht springt.
-    expect(b.vokabular.haeufigste.slice(0, 2).map((m) => [m.merkmal, m.belege])).toEqual([
+    expect(b.vokabular.merkmale.slice(0, 2).map((m) => [m.merkmal, m.belege])).toEqual([
       ["vwz:einkauf", 3],
       ["vz:-", 3],
     ]);
@@ -103,8 +103,11 @@ describe("Was der Befund über die Daten sagt", () => {
     ]);
     expect(b.vokabular.verworfen.ausgeschlossen).toBe(4); // 2× sepa, 2× lastschrift
     expect(b.vokabular.verworfen.ziffern).toBe(2);
-    expect(b.vokabular.haeufigsteVerworfen[0]).toEqual({
+    expect(b.vokabular.verworfeneWoerter[0]).toEqual({
       wort: "lastschrift", grund: "ausgeschlossen", herkunft: "vwz", anzahl: 2,
+      // Das Wort steht unverändert auf der Liste — dass hier überhaupt eine Form steht,
+      // ist der Unterschied zum Fall mit angeklebter Nummer (eigener Testfall unten).
+      listenform: "lastschrift",
     });
   });
 
@@ -122,5 +125,91 @@ describe("Was der Befund über die Daten sagt", () => {
     expect(b.beispiele).toHaveLength(0);
     expect(b.kategorien).toBe(0);
     expect(b.vokabular.groesse).toBe(0);
+  });
+});
+
+describe("Was ein Merkmal taugt", () => {
+  /**
+   * Vier Beispiele, zwei Kategorien zu gleichen Teilen — die Gesamtunsicherheit ist damit
+   * genau 1 Bit, und jede Trennkraft darunter liest sich als Anteil davon.
+   */
+  function bestand(): Zahlungsspur[] {
+    return [
+      spur({ id: "a1", gegenpartei: "Kesselmann", verwendungszweck: "Abschlag", kategorieId: "kat-a" }),
+      spur({ id: "a2", gegenpartei: "Kesselmann", verwendungszweck: "Abschlag Sonderposten", kategorieId: "kat-a" }),
+      spur({ id: "b1", gegenpartei: "Vibora", verwendungszweck: "Abschlag", kategorieId: "kat-b" }),
+      spur({ id: "b2", gegenpartei: "Vibora", verwendungszweck: "Abschlag", kategorieId: "kat-b" }),
+    ];
+  }
+
+  const nach = (b: ReturnType<typeof materialBefund>, merkmal: string) =>
+    b.vokabular.merkmale.find((m) => m.merkmal === merkmal)!;
+
+  it("misst die Deckung als Anteil der Beispiele", () => {
+    const b = materialBefund(bestand());
+    expect(nach(b, "emp=kesselmann").deckung).toBeCloseTo(0.5);
+    expect(nach(b, "vwz:abschlag").deckung).toBeCloseTo(1);
+  });
+
+  it("gibt einem Merkmal, das seine Kategorie allein bestimmt, die volle Trennkraft", () => {
+    const b = materialBefund(bestand());
+    expect(nach(b, "emp=kesselmann").trennkraft).toBeCloseTo(1);
+  });
+
+  it("gibt einem Merkmal, das in jeder Zeile steht, keine Trennkraft", () => {
+    // Es kommt überall vor und verteilt sich damit wie der Bestand selbst — es räumt
+    // keine Unsicherheit weg, obwohl es das häufigste Token ist.
+    const b = materialBefund(bestand());
+    expect(nach(b, "vwz:abschlag").belege).toBe(4);
+    expect(nach(b, "vwz:abschlag").trennkraft).toBeCloseTo(0);
+  });
+
+  it("trennt das seltene Merkmal vom starken, wo die Konzentration beide gleich aussehen lässt", () => {
+    // Der Kern der Sache: „sonderposten" steht genau einmal und liegt damit zu 100 % in
+    // einer Kategorie — dieselbe Konzentration wie beim Empfänger, der die halbe
+    // Kategorie trägt. Nur die Trennkraft sieht den Unterschied.
+    const b = materialBefund(bestand());
+    const selten = nach(b, "vwz:sonderposten");
+    const stark = nach(b, "emp=kesselmann");
+    expect(selten.konzentration).toBeCloseTo(1);
+    expect(stark.konzentration).toBeCloseTo(1);
+    expect(selten.trennkraft).toBeLessThan(stark.trennkraft);
+  });
+
+  it("nennt die Verteilung über die Kategorien vollständig und absteigend", () => {
+    const b = materialBefund([
+      ...bestand(),
+      spur({ id: "a3", gegenpartei: "Kesselmann", verwendungszweck: "Abschlag", kategorieId: "kat-c" }),
+    ]);
+    expect(nach(b, "emp=kesselmann").verteilung).toEqual([
+      { kategorieId: "kat-a", anzahl: 2 },
+      { kategorieId: "kat-c", anzahl: 1 },
+    ]);
+    expect(nach(b, "emp=kesselmann").kategorien).toBe(2);
+  });
+
+  it("liefert das Vokabular vollständig, nicht als Bestenliste", () => {
+    // Vorher waren es fünfundzwanzig, und alles darunter war nicht erreichbar.
+    const spuren = Array.from({ length: 40 }, (_, i) =>
+      spur({ id: `s${i}`, gegenpartei: `Anbieter${i}`, verwendungszweck: `Posten${i}` }),
+    );
+    const b = materialBefund(spuren);
+    expect(b.vokabular.merkmale).toHaveLength(b.vokabular.groesse);
+    expect(b.vokabular.merkmale.length).toBeGreaterThan(25);
+  });
+});
+
+describe("Zurückholen eines ausgeschlossenen Wortes", () => {
+  it("nennt die Form, unter der das Wort auf der Liste steht — nicht die aus dem Auszug", () => {
+    // Die Bank klebt die Nummer ans Wort; ausgeschlossen wurde der bereinigte Kern. Ein
+    // „Zulassen" auf das Original löschte eine Zeile, die es nicht gibt — ohne Fehler
+    // und ohne Wirkung.
+    const b = materialBefund(
+      [spur({ verwendungszweck: "Bankkarte2026 Zahlung" })],
+      { herkuenfte: ["empGanz", "empWort", "vwz", "gid", "vz"], ausschluesse: [{ wort: "bankkarte" }] },
+    );
+    const eintrag = b.vokabular.verworfeneWoerter.find((v) => v.wort === "bankkarte2026")!;
+    expect(eintrag.grund).toBe("ausgeschlossen");
+    expect(eintrag.listenform).toBe("bankkarte");
   });
 });
