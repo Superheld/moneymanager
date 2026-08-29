@@ -48,6 +48,21 @@ export type IstQuelle = "manuell" | "import";
  * schreibt die Automatik und darf sie jederzeit überschreiben, `manuell` rührt sie nie
  * an. Ohne diese Unterscheidung könnte ein rückwirkender Lauf eine Handentscheidung
  * nicht von seinem eigenen früheren Treffer unterscheiden.
+ *
+ * **An einer Stelle sind die beiden aber NICHT dieselbe Bauweise, und das ist Absicht.**
+ * Beim Vertrag trägt die Herkunft eine dritte Aussage: gesetzt bei leerer `vertrag_id`
+ * heisst „gehört AUSDRÜCKLICH zu keinem Vertrag" — eine Handentscheidung, die bleiben
+ * muss, sonst käme ein korrigierter Fehlgriff beim nächsten Abgleich zurück.
+ *
+ * Für die Kategorie gibt es diese dritte Aussage nicht, und sie fehlt nicht: „gehört zu
+ * keiner Kategorie" ist keine Entscheidung, die jemand trifft, sondern der Zustand vor
+ * jeder Entscheidung — die Zeile liegt dann in der Review-Inbox und wartet. Beim Vertrag
+ * ist das anders, weil die meisten Zahlungen zu Recht zu keinem gehören: ohne die dritte
+ * Aussage liesse sich „schon geprüft, gehört zu keinem" nicht von „noch nie angesehen"
+ * unterscheiden, und die Automatik liefe ewig über dieselben Zeilen.
+ *
+ * Wer die beiden angleichen will, muss zuerst diese Frage beantworten — nicht die nach
+ * dem Feld.
  */
 export type Kategorieherkunft = "automatisch" | "manuell";
 

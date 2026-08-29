@@ -234,9 +234,24 @@ export function nachHauptgruppe(
 
 /**
  * Interne Umbuchung (Geld zwischen eigenen Konten) — gehört NICHT in eine Ausgaben-/
- * Einnahmen-Auswertung. Erkennung: verknüpftes Transfer-Bein (transferId) ODER
- * Umschichtung ohne Kategorie (so importieren wir Umbuchungen). Gesparte „Umschichtung MIT
- * Kategorie" (z. B. Sparen & Anlegen) bleibt erhalten.
+ * Einnahmen-Auswertung.
+ *
+ * Zwei Erkennungswege, und sie fangen Verschiedenes:
+ *
+ *   1. **`transferId`** — die beiden Beine sind verknüpft. Das setzt `umsatzVerbuchen`,
+ *      wenn es beim Import ein Paar gefunden hat, und die Paarung von Hand.
+ *   2. **Umschichtung OHNE Kategorie** — ein Bein, dessen Gegenstück nie gefunden wurde.
+ *      Ohne diesen Weg zählte eine ungepaarte Umbuchung als Ausgabe.
+ *
+ * Eine „Umschichtung MIT Kategorie" (Sparen & Anlegen) bleibt bewusst erhalten — sie ist
+ * eine Umschichtung, die man in der Auswertung SEHEN will.
+ *
+ * **Und genau daran hängt eine Falle für jeden, der Umbuchungen künftig Kategorien geben
+ * will.** Weg 2 unterscheidet heute „ungepaarte Umbuchung" von „gewollte Umschichtung"
+ * allein an der Kategorie. Bekommt jede Umbuchung eine, fällt Weg 2 in sich zusammen: die
+ * ungepaarten Beine wandern in die Ausgaben, und zwar lautlos — sie sehen dann aus wie
+ * eine Sparrate. Wer das baut, braucht vorher ein anderes Merkmal für „ungepaart"
+ * (etwa `gegenkontoId` gesetzt, `transferId` nicht) und muss diese Funktion mit ändern.
  */
 export function istInterneUmbuchung(b: IstBuchung): boolean {
   return b.transferId != null || (b.charakter === "Umschichtung" && !b.kategorieId);
