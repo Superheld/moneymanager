@@ -75,9 +75,18 @@ Sie liegen als `*.test.ts` **neben dem Code**, es gibt keinen Testordner —
   `adapters/ui/CLAUDE.md`.
 - Nach **Daten** suchen, die der Test selbst angelegt hat, nicht nach Formulierungen — sonst
   wird die Suite beim nächsten Wording-Durchgang reihenweise rot.
-- Bei **UI-Texten** nach dem i18n-SCHLÜSSEL suchen (`"zugang.feldPassphrase"`), nicht nach
-  dem deutschen Wortlaut: in den Tests ist i18n nicht aufgesetzt, `t()` gibt den Schlüssel
-  zurück. Dieselbe Regel wie oben, eine Ebene tiefer.
+- Bei **UI-Texten** nach dem i18n-SCHLÜSSEL suchen, nicht nach dem deutschen Wortlaut —
+  dieselbe Regel wie oben, eine Ebene tiefer. **Wie man ihn sucht, hängt aber am Test:**
+
+  `src/i18n/i18n.ts` initialisiert sich beim IMPORTIEREN. Zieht die geprüfte Komponente es
+  über ihre Importkette herein (etwa über `dienste`), gibt `t()` deutschen Text zurück und
+  `findByText("konten.gruppen.keine")` findet nichts; tut sie es nicht, kommt der Schlüssel
+  selbst heraus. Beides gibt es im Bestand — `zugang/Sperrbildschirm.test.tsx` sucht
+  Schlüssel, `konten/gruppen.test.tsx` bekommt Text.
+
+  Der Weg, der in beiden Fällen trägt: `i18n.t(schluessel)` im Test aufrufen und danach
+  suchen. Der Test hängt dann am Schlüssel und nicht am Wortlaut, egal welcher Fall
+  vorliegt.
 - **Keine deutschen Anführungszeichen in Testnamen.** `it("nimmt 0 als „aus"", …)` bricht
   den Parser: das schliessende `"` beendet die Zeichenkette, das folgende `"` steht dann
   allein. Gemeldet wird „no tests" — und zwar für die GANZE Datei, nicht für den Testfall.
