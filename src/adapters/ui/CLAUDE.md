@@ -135,38 +135,33 @@ Zwei Dinge, die beim Einbauen zählen:
 - **Nur was eine Buchung IST.** Ein geplanter Posten ohne `istId` beschreibt, was fällig
   wird — ihn zu öffnen hiesse, einen Dialog auf etwas zu zeigen, das es nicht gibt.
 
-## Der Kontoauszug steht in drei Karten
+## Der Kontoauszug steht in zwei Karten
 
-Kopf, Gebuchtes und Geplantes — das Gebuchte links, das Geplante rechts, im goldenen
-Schnitt zugunsten der Buchungen (`.auszug-spalten` in `app.css`, wo auch steht, warum
-1,618 : 1 und nicht die Hälfte). Untereinander war die geplante Liste erst nach der ganzen
-Buchungstabelle erreichbar, also bei einem Konto mit Historie nach zwei Bildschirmhöhen;
-sie beantwortet aber die Frage „was kommt noch".
+Kopf und Gebuchtes, beide über die ganze Breite. Die zweite liegt NEBEN der ersten und
+nicht darin — keine Karte in einer Karte: die Klammer, die sie sonst umschlösse, stünde
+zweihundert Zeilen weiter oben und wäre im Code nicht zu sehen. Deshalb prüft
+`kartenschachtelung.test.tsx` diesen Fall mit.
 
-**Zwei Karten und nicht eine geteilte.** In einer Karte waren es zwei Tabellen unter einer
-Fläche, und die Überschriften mussten die Trennung allein tragen, die eine Karte von sich
-aus leistet. Sie liegen NEBEN der Kopf-Karte, nicht darin — die Klammer, die sie sonst
-umschlösse, steht zweihundert Zeilen weiter oben und ist im Code nicht zu sehen. Deshalb
-prüft `kartenschachtelung.test.tsx` diesen Fall inzwischen mit.
+**Das Geplante stand hier und steht jetzt in der Übersicht** (`uebersicht/VorschauKarte.tsx`).
+Der Auszug beantwortet „was ist passiert"; eine Liste über die Zukunft daneben beantwortet
+eine andere Frage im selben Bild. Und „was kommt noch auf mich zu" ist keine Frage EINES
+Kontos — wer vier führt, musste vier Auszüge öffnen und zusammenzählen.
 
-Der Stand von heute ist dabei die Unterzeile der Vorschau-Karte geworden und nicht mehr ein
-Trenner zwischen beiden Listen: er ist der Punkt, ab dem die Vorschau rechnet. Zwischen
-zwei Listen stehend beschriftete er beide und keine.
+**Mit ihr ist auch das Raster gegangen.** Die beiden Listen teilten sich den Platz im
+goldenen Schnitt zugunsten der Buchungen (1,618 : 1); als die Vorschau wegzog, blieb das
+Grid mit einer Spalte stehen, und die Buchungstabelle endete bei knapp zwei Dritteln der
+Breite — Platz, den nichts mehr beanspruchte. **Ein Raster überlebt die Karte nicht, die
+es begründet hat**, und ein einspaltiges Grid sieht im Code aus wie Absicht.
 
 **Der Screen ist so breit wie jeder andere** — und alle sind breiter geworden, siehe unten.
 Ein eigener Deckel für diesen einen Bereich war der erste Versuch und fiel sofort auf: eine
 Seite, die breiter aufzieht als alle Nachbarn, sieht nach einem Fehler aus und nicht nach
 einer Entscheidung.
 
-Die Vorschau spart trotzdem, wo es nichts kostet: sie zeigt ihr Datum **ohne Jahr**, weil
-sie höchstens 90 Tage nach vorn reicht und das Jahr dort nichts unterscheidet. Wer ihr eine
-Spalte hinzufügt, rechnet nicht am Deckel nach, sondern am Breakpoint — dort ist es eng,
-nicht bei 1280 px.
-
 ## Was im Konto steht, hat jemand belegt
 
-Die Vorschau neben dem Auszug ZEIGT, was kommt — sie bucht es nicht. Bis 2026-08-25 hing an
-jeder geplanten Zeile ein Kästchen „als bezahlt markieren", und ein Klick legte daraus eine
+Die Vorschau — heute in der Übersicht, damals neben dem Auszug — ZEIGT, was kommt; sie
+bucht es nicht. Bis 2026-08-25 hing an jeder geplanten Zeile ein Kästchen „als bezahlt markieren", und ein Klick legte daraus eine
 Ist-Buchung an (`quelle: "bezahlt-markiert"`). Damit stand im Konto eine Zahlung, die
 niemand belegt hatte: die Bank kannte sie nicht, ein Beleg existierte nicht, und beim
 nächsten Abruf kam die echte Zeile zusätzlich dazu.
