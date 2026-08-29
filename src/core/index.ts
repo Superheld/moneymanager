@@ -21,6 +21,7 @@ export * from "./budgets/budgetVorschlag";
 export * from "./inventar/inventar";
 export * from "./depot/depot";
 export * from "./buchung/istbuchung";
+export * from "./konten/gruppe";
 export * from "./konten/kontoregister";
 export * from "./konten/kontostand";
 export * from "./buchung/historie";

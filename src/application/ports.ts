@@ -12,6 +12,7 @@ import type {
   Journaleintrag,
   Kategorie,
   Kategoriefestlegung,
+  Kontogruppe,
   Merkmalsausschluss,
   Merkmalsherkunft,
   Modell,
@@ -42,6 +43,13 @@ export interface PersonRepository {
 export interface ZahlungskontoRepository {
   alle(): Promise<Zahlungskonto[]>;
   speichern(konto: Zahlungskonto): Promise<void>;
+  loeschen(id: string): Promise<void>;
+}
+
+export interface KontogruppeRepository {
+  alle(): Promise<Kontogruppe[]>;
+  /** Legt an oder ersetzt — die Mitgliederliste der uebergebenen Gruppe ist der Stand. */
+  speichern(gruppe: Kontogruppe): Promise<void>;
   loeschen(id: string): Promise<void>;
 }
 

@@ -144,6 +144,19 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     );
   }
 
+  // Zwei Gruppen, und die zweite ist der Fall, den eine feste Klasse nicht abbilden
+  // kann: dasselbe Konto liegt in beiden. Genau dafuer gibt es Gruppen NEBEN der Klasse.
+  const gruppen = [
+    { id: "gruppe-alltag", bezeichnung: "Lebenshaltung", konten: ["konto-giro", "konto-bar"] },
+    { id: "gruppe-urlaub", bezeichnung: "Urlaubskasse", konten: ["konto-bar", "konto-tagesgeld"] },
+  ];
+  for (const g of gruppen) {
+    setzen("INSERT INTO kontogruppe (id, bezeichnung) VALUES (?, ?)", [g.id, g.bezeichnung]);
+    for (const kontoId of g.konten) {
+      setzen("INSERT INTO kontogruppe_konto (gruppe_id, konto_id) VALUES (?, ?)", [g.id, kontoId]);
+    }
+  }
+
   // Der Baum: Oberkategorie, darunter das Feine. `default_charakter` entscheidet, wohin
   // eine Buchung ohne eigene Angabe faellt.
   const kategorien = [

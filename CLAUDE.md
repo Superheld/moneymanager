@@ -107,7 +107,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-26 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+28 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
@@ -115,7 +115,8 @@ ist sie:
   (was mit einer Buchung geschah) · `umsatz_roh` +
   `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ
   UND Klasse, siehe unten) ·
-  `kontostand_anker` · `import_lauf` · `dubletten_freigabe`
+  `kontostand_anker` · `import_lauf` · `dubletten_freigabe` ·
+  `kontogruppe` + `kontogruppe_konto` (frei benannte Gruppen, siehe unten)
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` + `budget_betrag` (die
   Reihe seiner Beträge, siehe unten) · `vertrag` ·
   `vertrag_erkennung` · `zahlungsregel` · `inventargegenstand`
@@ -1164,6 +1165,19 @@ Vier Dinge gelten überall und stehen deshalb hier:
   Wer die Klassen erweitert (`KONTOKLASSEN` in `core/konten/konto.ts`), muss für jeden neuen
   Wert entscheiden, ob er verfügbar ist. Bislang trennt die Klasse **nur** das; was Rücklage
   und Vorsorge sonst unterscheiden soll, ist offen.
+
+- **Eine Kontogruppe ist eine SICHT, die Klasse eine RECHENREGEL.** Das ist der Unterschied,
+  an dem sonst eine zweite Wahrheit entsteht. Die Klasse entscheidet mit — nur `liquide`
+  zählt zu den liquiden Mitteln — und ein Konto hat genau eine. Eine Gruppe
+  (`core/konten/gruppe.ts`, Tabellen `kontogruppe` + `kontogruppe_konto`) heißt, wie der
+  Nutzer sie nennt, bündelt beliebig viele Konten und entscheidet **nichts**; dasselbe Konto
+  darf in mehreren liegen, und genau dafür gibt es sie neben der Klasse. Wer eine Gruppe je
+  eine Rechnung tragen lässt („Gruppe X zählt als liquide"), hat zwei Felder, die dasselbe
+  verschieden sagen — und der Widerspruch fällt erst auf, wenn eine Summe nicht mehr aufgeht.
+
+  Was für eine Gruppe trotzdem gilt, weil es für jede Auswahl von Konten gilt: **Saldo und
+  Buchungen filtern mit derselben Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie
+  gab.
 
   **Saldo und Buchungen gehören dabei zusammen.** `istMonatsverlauf` bildet seinen Sockel aus
   `liquideMittel` und lässt Buchungen darüberlaufen. Nimmt man den Saldo eines Kontos heraus

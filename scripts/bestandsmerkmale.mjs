@@ -275,6 +275,10 @@ export function bestandsmerkmale() {
     ...frage(`SELECT DISTINCT endempfaenger FROM ${umsatzTabelle} WHERE length(endempfaenger) >= 6`),
     ...frage("SELECT DISTINCT bezeichnung FROM zahlungskonto"),
     ...frage("SELECT DISTINCT bezeichnung FROM zahlungsregel"),
+    // Eine Gruppe heisst, wie der Nutzer sie nennt — „Konten von <Name>" ist genauso
+    // moeglich wie „Lebenshaltung". Neue Tabelle, neue Zeile: der Waechter kennt nur,
+    // was hier steht, und was fehlt, meldet er nicht, sondern verschweigt es.
+    ...frage("SELECT DISTINCT bezeichnung FROM kontogruppe"),
     ...frage("SELECT DISTINCT bezeichnung FROM inventargegenstand"),
     ...frage("SELECT DISTINCT bezeichnung FROM depot"),
     ...frage("SELECT DISTINCT name FROM depotposition"),
