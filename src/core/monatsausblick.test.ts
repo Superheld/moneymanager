@@ -168,21 +168,6 @@ describe("monatsAusblick — Ist-Spalte des laufenden Monats", () => {
     expect(zeile(a, "sonstiges")!.ist).toBe(euroZuCent(-200));
   });
 
-  it("ein Häkchen (planRef) schlägt die Betragsheuristik", () => {
-    const a = monatsAusblick({
-      ...basis,
-      regeln: [regel()],
-      ist: [
-        ist({ id: "haken", betrag: euroZuCent(-530), planRef: { quelleId: "r-miete", faelligkeit: "2026-08-04" }, quelle: "bezahlt-markiert" }),
-        ist({ id: "nah", betrag: euroZuCent(-518) }),
-      ],
-      monatAb: "2026-08-01",
-    });
-    const v = zeile(a, "vertraege")!;
-    expect(v.posten[0].status).toBe("bezahlt");
-    expect(v.posten[0].ist).toBe(euroZuCent(-530));
-  });
-
   it("vergibt jede Ist-Buchung nur einmal — der passendere Posten gewinnt", () => {
     const a = monatsAusblick({
       ...basis,

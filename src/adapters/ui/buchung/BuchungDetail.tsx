@@ -38,7 +38,6 @@ import {
   type Vertrag,
   type Vertragszuordnung,
   type Zahlungskonto,
-  type Zahlungsregel,
 } from "../../../application";
 import {
   alsDuplikat,
@@ -189,7 +188,6 @@ interface FormularProps {
   /** Der Beleg, falls die Buchung aus einem Import stammt. */
   umsatz?: Umsatz;
   importLauf?: ImportLauf;
-  regel?: Zahlungsregel;
   /** Das andere Bein, wenn die Buchung Teil einer Umbuchung ist. */
   gegenbuchung?: IstBuchung;
   /** Der frisch gelesene Stand — der Prüfmarker wirkt sofort, nicht erst beim Speichern. */
@@ -236,7 +234,6 @@ function BuchungFormular({
   kategorieName,
   umsatz,
   importLauf,
-  regel,
   gegenbuchung,
   dublette,
   onZwillingOeffnen,
@@ -981,7 +978,6 @@ function BuchungFormular({
         entwurf={entwurf}
         umsatz={kopfUmsatz}
         importLauf={importLauf}
-        regel={regel}
       />
 
       {/* Was hier NICHT geht und warum — statt Knöpfen, die ins Leere greifen. */}
@@ -1079,7 +1075,6 @@ export function BuchungDetail(props: {
 
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
-  const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [laeufe, setLaeufe] = useState<ImportLauf[]>([]);
   const [alle, setAlle] = useState<IstBuchung[]>([]);
@@ -1093,7 +1088,7 @@ export function BuchungDetail(props: {
 
   async function laden() {
     const d = await buchungsdetail();
-    setKonten([...d.konten]); setKategorien([...d.kategorien]); setRegeln([...d.regeln]);
+    setKonten([...d.konten]); setKategorien([...d.kategorien]);
     setUmsaetze([...d.umsaetze]); setLaeufe([...d.laeufe]); setAlle([...d.buchungen]);
     setVertraege([...d.vertraege]); setZuordnungen([...d.zuordnungen]);
     setDublettenverdacht(d.dublettenverdacht); setFreigegeben(d.freigegeben); setFreigaben(d.freigaben);
@@ -1295,7 +1290,6 @@ export function BuchungDetail(props: {
       kategorieName={kategorieName}
       umsatz={umsatz}
       importLauf={(() => { const q = aktuellerEntwurf ?? umsatz; return q ? laeufe.find((l) => l.id === q.laufId) : undefined; })()}
-      regel={aktuelle?.planRef ? regeln.find((r) => r.id === aktuelle.planRef!.quelleId) : undefined}
       gegenbuchung={gegenbuchung}
       dublette={dublette}
       onZwillingOeffnen={zwillingBuchung ? () => setAktuelle(zwillingBuchung) : undefined}

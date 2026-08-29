@@ -9,12 +9,18 @@ import { istLiquide, type Zahlungskonto } from "../konten/konto";
 
 /**
  * Herkunft einer Ist-Buchung:
- *  • „bezahlt-markiert" — aus einem Plan-Posten 1:1 bestätigt (trägt planRef).
- *  • „manuell"         — frei erfasst. Bei Bar die Dauerquelle (kein Import möglich);
- *                        bei Bankkonten vorläufig, bis der Import sie abgleicht (ADR-0002).
- *  • „import"          — aus einem Bankimport (später).
+ *  • „manuell" — frei erfasst. Bei Bar die Dauerquelle (kein Import möglich);
+ *                bei Bankkonten vorläufig, bis der Import sie abgleicht (ADR-0002).
+ *  • „import"  — aus einem Bankimport.
+ *
+ * Ein dritter Wert `bezahlt-markiert` stand hier bis 2026-08-29, für eine Buchung, die
+ * einen Plan-Posten per Häkchen bestätigt. Diesen Weg gab es in der Oberfläche nie: kein
+ * Use-Case hat den Wert je geschrieben, und keine Buchung im Bestand trug ihn. Was von
+ * ihm blieb, war eine Rangstufe im Monatsausblick, die nie griff, und ein Feld, das jede
+ * Auswertung mitprüfen musste. Wer das Häkchen baut, baut beides zusammen — sonst
+ * entsteht wieder ein Halbteil, das aussieht, als sei es angeschlossen.
  */
-export type IstQuelle = "bezahlt-markiert" | "manuell" | "import";
+export type IstQuelle = "manuell" | "import";
 
 /**
  * Wer die KATEGORIE dieser Buchung gesetzt hat — und damit, wer sie ändern darf.
@@ -32,8 +38,11 @@ export type IstQuelle = "bezahlt-markiert" | "manuell" | "import";
 export type Kategorieherkunft = "automatisch" | "manuell";
 
 /**
- * Verweis auf den geplanten Posten, aus dem die Ist-Buchung entstand (1:1-Matching).
- * `quelleId` = Zahlungsregel-ID, `faelligkeit` = die projizierte Fälligkeit (ISO).
+ * Verweis auf einen geplanten Posten: `quelleId` = Zahlungsregel-ID, `faelligkeit` = die
+ * projizierte Fälligkeit (ISO).
+ *
+ * Er identifiziert eine PROJIZIERTE Zeile (Kontoregister, kontoübergreifende Vorschau) —
+ * nicht mehr eine Ist-Buchung, die einen Plan-Posten belegt. Siehe `IstQuelle`.
  */
 export interface PlanRef {
   readonly quelleId: string;
@@ -128,8 +137,6 @@ export interface IstBuchung {
   readonly transferId?: string;
   /** Das andere Konto bei einer Umbuchung (zur Anzeige der Richtung). */
   readonly gegenkontoId?: string;
-  /** Gesetzt bei „bezahlt-markiert"; ermöglicht 1:1-Abgleich mit dem Plan. */
-  readonly planRef?: PlanRef;
   /**
    * Aufteilung auf mehrere Kategorien (S-7). Gesetzt ⇒ `kategorieId` ist leer und die
    * Teile sind die Wahrheit; Σ Teile = `betrag`. Der Ledger-Betrag bleibt unberührt —
@@ -153,31 +160,6 @@ export interface IstBuchung {
    * Fehlend zählt als „nicht vorgemerkt" — der Bestand vor der Einführung ist gesehen.
    */
   readonly zuPruefen?: boolean;
-}
-
-/** Stabiler Schlüssel eines Plan-Postens (Quelle + Fälligkeit) für 1:1-Matching. */
-export function planRefKey(quelleId: string, faelligkeit: string): string {
-  return `${quelleId}@${faelligkeit}`;
-}
-
-/** Menge aller bereits per Ist belegten Plan-Posten (als Schlüssel). */
-export function bezahlteSchluessel(buchungen: IstBuchung[]): Set<string> {
-  const s = new Set<string>();
-  for (const b of buchungen) {
-    if (b.planRef) s.add(planRefKey(b.planRef.quelleId, b.planRef.faelligkeit));
-  }
-  return s;
-}
-
-/** Findet die Ist-Buchung zu einem Plan-Posten, falls vorhanden. */
-export function findeIstZuPlan(
-  buchungen: IstBuchung[],
-  quelleId: string,
-  faelligkeit: string,
-): IstBuchung | undefined {
-  return buchungen.find(
-    (b) => b.planRef && b.planRef.quelleId === quelleId && b.planRef.faelligkeit === faelligkeit,
-  );
 }
 
 /** Summe der Ist-Buchungen eines Kontos (vorzeichenbehaftet). */

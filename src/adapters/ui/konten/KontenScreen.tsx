@@ -598,7 +598,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           <Pill variant="warn">{t("konten.pillZuPruefen")}</Pill>
                         </button>
                       )}
-                      {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
+                      {!r.zeile.gegenkontoId && r.zeile.quelle === "manuell" && <Pill variant="neutral">{t("konten.pillManuell")}</Pill>}
                       {/* Gehört die Zeile zu einem Vertrag, steht der Anbieter dran.
                           Der NAME und nicht bloss „Vertrag": dass es einer ist, sieht man
                           an der Pille ohnehin — WELCHER, ist die Auskunft, für die man

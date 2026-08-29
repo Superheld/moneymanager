@@ -59,8 +59,6 @@ function feldWert(b: IstBuchung, feld: Vergleichsfeld, h: Lesehilfe): string {
         : h.t("konten.journal.ohneTeile");
     case "transferId":
       return b.transferId ? h.t("konten.journal.gepaart") : leer;
-    case "planRef":
-      return b.planRef ? ddmm(b.planRef.faelligkeit) : leer;
     case "zuPruefen":
       return b.zuPruefen ? h.t("konten.journal.vorgemerkt") : leer;
   }

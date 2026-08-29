@@ -159,7 +159,7 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     // v9/v10/v11/v13
     expect(spalten(db, "umsatz_roh")).toContain("glaeubiger_id"); // v16, seit v44 in umsatz_roh
     expect(spalten(db, "ist_buchung")).toEqual(
-      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
+      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
     );
     // v37 — das Bankfaehigkeitsprofil am Zugang, das getragene Format an der Zuordnung
     expect(spalten(db, "bankzugang")).toContain("profil");
@@ -190,13 +190,6 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
 
     const r = db.exec("SELECT kategorie_herkunft FROM ist_buchung WHERE id = 'alt'");
     expect(String(r[0].values[0][0])).toBe("automatisch");
-    db.close();
-  });
-
-  it("erzeugt den partiellen Unique-Index für die Plan-Dedup", () => {
-    const db = new SQL.Database();
-    apply(db);
-    expect(indexExistiert(db, "ux_ist_planref")).toBe(true);
     db.close();
   });
 
@@ -236,32 +229,6 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     expect(spalten(db, "import_lauf")).toContain("format");
     expect(indexExistiert(db, "ix_umsatz_roh_hash")).toBe(true);
     expect(indexExistiert(db, "ix_umsatz_roh_native")).toBe(true);
-    db.close();
-  });
-});
-
-describe("Dedup-Garantie über den Unique-Index", () => {
-  function einfuegen(db: Database, id: string, planQuelle: string | null, faellig: string | null) {
-    db.run(
-      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle, plan_quelle_id, plan_faelligkeit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, "2026-06-01", -100, "k1", "Aufwand", "bezahlt-markiert", planQuelle, faellig],
-    );
-  }
-
-  it("verbietet zwei Ist-Buchungen für denselben Plan-Posten", () => {
-    const db = new SQL.Database();
-    apply(db);
-    einfuegen(db, "i1", "r1", "2026-06-01");
-    expect(() => einfuegen(db, "i2", "r1", "2026-06-01")).toThrow();
-    db.close();
-  });
-
-  it("erlaubt mehrere freie (planlose) Buchungen", () => {
-    const db = new SQL.Database();
-    apply(db);
-    einfuegen(db, "m1", null, null);
-    expect(() => einfuegen(db, "m2", null, null)).not.toThrow();
     db.close();
   });
 });
@@ -819,7 +786,7 @@ describe("Migrationen 48/49 — Fremdschluessel fuer die Achse Buchung-Konto-Kat
     db.run(`INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, art)
             VALUES ('v1','Talmberg Energie','2026-01-01','automatisch','aktiv','laufend')`);
     buchung(db, "b1", "kat");
-    db.run("UPDATE ist_buchung SET vertrag_id='v1', vertrag_herkunft='manuell', plan_quelle_id='r1', plan_faelligkeit='2026-08-01'");
+    db.run("UPDATE ist_buchung SET vertrag_id='v1', vertrag_herkunft='manuell'");
 
     const vorher = db.exec("SELECT * FROM ist_buchung")[0];
     apply(db, 47, 49);
@@ -833,7 +800,7 @@ describe("Migrationen 48/49 — Fremdschluessel fuer die Achse Buchung-Konto-Kat
   it("haelt die Indizes der Buchungstabelle ueber den Neubau", () => {
     const db = new SQL.Database();
     apply(db);
-    for (const i of ["ux_ist_planref", "ix_ist_buchung_roh_hash", "ix_ist_buchung_vertrag"]) {
+    for (const i of ["ix_ist_buchung_roh_hash", "ix_ist_buchung_vertrag"]) {
       expect(indexExistiert(db, i)).toBe(true);
     }
     db.close();
@@ -942,8 +909,6 @@ describe("Migration 50 — der Rest der Verweise", () => {
       "umsatz_roh.glaeubiger_id", "umsatz_roh.native_id",
       // Gemeinsame Marke der beiden Beine einer Umbuchung, kein Verweis auf eine Zeile.
       "ist_buchung.transfer_id",
-      // Verweist auf eine PROJIZIERTE Faelligkeit, die es als Zeile nicht gibt.
-      "ist_buchung.plan_quelle_id",
       // JSON-Liste, kein Einzelverweis.
       "zahlungskonto.inhaber_ids",
       // Das Journal muss die LOESCHUNG ueberleben — dafuer gibt es die Tabelle. Ein

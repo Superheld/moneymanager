@@ -8,7 +8,7 @@ import { addTage, ord, parseIso, toIso } from "../basis/datum";
 import type { Charakter, Zahlungsregel } from "../basis/zahlungsregel";
 import type { Zahlungskonto } from "./konto";
 import { projiziereRegel } from "../buchung/projektion";
-import { bezahlteSchluessel, type IstBuchung, type PlanRef } from "../buchung/istbuchung";
+import type { IstBuchung, PlanRef } from "../buchung/istbuchung";
 
 /** Eine Zeile im Konto-Register — entweder gebuchtes Ist oder geplante Vorschau. */
 export interface RegisterZeile {
@@ -61,7 +61,6 @@ export function kontoRegister(
   heute: string,
   tage: number,
 ): KontoRegister {
-  const regelBez = new Map(regeln.map((r) => [r.id, r.bezeichnung]));
 
   // --- Gebuchtes Ist dieses Kontos, chronologisch ---
   const eigeneIst = ist
@@ -75,7 +74,7 @@ export function kontoRegister(
     // ist das Runden wirkungslos, bei kaputten hält es die Summe wenigstens
     // in Cent statt in Binär-Gleitkomma abzudriften.
     saldo = Math.round(saldo + b.betrag);
-    const standardBez = b.gegenkontoId ? "Umbuchung" : b.planRef ? regelBez.get(b.planRef.quelleId) ?? "Zahlung" : "Buchung";
+    const standardBez = b.gegenkontoId ? "Umbuchung" : "Buchung";
     return {
       art: "ist",
       datum: b.datum,
@@ -89,20 +88,18 @@ export function kontoRegister(
       quelle: b.quelle,
       transferId: b.transferId,
       gegenkontoId: b.gegenkontoId,
-      planRef: b.planRef,
     };
   });
   const standHeute = saldo;
 
   // --- Geplante Vorschau dieses Kontos im Tagesfenster ---
-  const bezahlt = bezahlteSchluessel(ist);
   const cutoff = ord(addTage(parseIso(heute), tage));
   const monate = Math.ceil(tage / 28) + 1; // großzügig projizieren, dann auf Tage filtern
 
   const vorschau = regeln
     .filter((r) => r.kontoId === konto.id)
     .flatMap((r) =>
-      projiziereRegel(r, heute, monate, bezahlt)
+      projiziereRegel(r, heute, monate)
         .filter((p) => ord(parseIso(p.datum)) <= cutoff)
         .map((p) => ({ p, regelId: r.id })),
     )
@@ -145,7 +142,7 @@ export interface Vorschauzeile {
  * nacheinander aufmachen und im Kopf zusammenzählen.
  *
  * Gerechnet wird je Konto über `kontoRegister` und nicht neu: die Regel, welche
- * Fälligkeit noch offen ist (`bezahlteSchluessel`), soll es genau einmal geben. Der
+ * Fälligkeiten ins Fenster fallen, soll es genau einmal geben. Der
  * laufende Saldo fällt dabei weg, und zwar nicht aus Bequemlichkeit — über mehrere
  * Konten hinweg gibt es keinen, den man fortschreiben könnte. Wer den Verlauf EINES
  * Kontos sehen will, hat ihn weiterhin in `kontoRegister`.

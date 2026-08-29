@@ -468,7 +468,6 @@ const de = {
     spalteIst: "gebucht",
     bleibt: "Bleibt übrig",
     bleibtErklaerung: "Einnahmen minus Verträge, Budgets und Rücklagen",
-    statusBezahlt: "abgehakt",
     statusOffen: "offen",
     zeile: {
       einnahmen: "Einnahmen",
@@ -1078,7 +1077,6 @@ const de = {
     pruefenFeld: "Noch ansehen",
     pruefenHinweis:
       "Merkt die Zeile im Auszug vor. Zeilen aus einem Bankabruf tragen den Marker von selbst — sie werden gebucht, ohne dass jemand sie gesehen hat.",
-    pillBezahlt: "bezahlt",
     bearbeiten: "bearbeiten",
     loeschen: "löschen",
     heuteRealerStand: "heute · realer Stand {{stand}} {{symbol}}",
@@ -1199,8 +1197,6 @@ const de = {
       importlaufWert: "{{quelle}} · {{zeitpunkt}}",
       nativeId: "ID der Quelle",
       rohHash: "Dedup-Schlüssel",
-      planbezug: "Geplant als",
-      planbezugWert: "{{regel}} · fällig {{faelligkeit}}",
       ohneImport: "In der App erfasst — kein Import-Kontext vorhanden.",
       kontoGepaart: "fest — erst die Paarung lösen",
       verwerfenBankzeile: "Verwerfen",
@@ -1253,7 +1249,6 @@ const de = {
     quelleName: {
       import: "Bankimport",
       manuell: "manuelle Erfassung",
-      "bezahlt-markiert": "Plan-Posten abgehakt",
     },
     split: {
       titel: "Buchung aufteilen",
@@ -2240,7 +2235,6 @@ const en: typeof de = {
     spalteIst: "posted",
     bleibt: "Left over",
     bleibtErklaerung: "Income minus contracts, budgets and reserves",
-    statusBezahlt: "ticked off",
     statusOffen: "open",
     zeile: {
       einnahmen: "Income",
@@ -2830,7 +2824,6 @@ const en: typeof de = {
     pruefenFeld: "Still to review",
     pruefenHinweis:
       "Flags the entry in the statement. Rows from a bank retrieval carry the marker by themselves — they are booked without anyone having seen them.",
-    pillBezahlt: "paid",
     bearbeiten: "edit",
     loeschen: "delete",
     heuteRealerStand: "today · balance {{stand}} {{symbol}}",
@@ -2947,8 +2940,6 @@ const en: typeof de = {
       importlaufWert: "{{quelle}} · {{zeitpunkt}}",
       nativeId: "Source ID",
       rohHash: "Dedup key",
-      planbezug: "Planned as",
-      planbezugWert: "{{regel}} · due {{faelligkeit}}",
       ohneImport: "Captured in the app — no import context available.",
       kontoGepaart: "fixed — unpair the transfer first",
       verwerfenBankzeile: "Discard",
@@ -3001,7 +2992,6 @@ const en: typeof de = {
     quelleName: {
       import: "bank import",
       manuell: "manual entry",
-      "bezahlt-markiert": "planned item ticked off",
     },
     split: {
       titel: "Split transaction",

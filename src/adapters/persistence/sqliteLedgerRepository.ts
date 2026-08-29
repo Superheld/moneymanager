@@ -1,6 +1,4 @@
 // SQLite-Implementierung des Ledger-Ports (ADR-0002) — das app-seitige Ist-Journal.
-// planRef wird auf zwei Spalten abgebildet (plan_quelle_id, plan_faelligkeit); ein
-// UNIQUE-Index darauf erzwingt 1:1-Matching. Später dockt hier der Bankimport an.
 
 import type { Aufteilung, Charakter, IstBuchung, IstQuelle, Kategorieherkunft } from "../../core";
 import type { LedgerPort } from "../../application/ports";
@@ -27,8 +25,6 @@ interface Zeile {
   notiz: string | null;
   transfer_id: string | null;
   gegenkonto_id: string | null;
-  plan_quelle_id: string | null;
-  plan_faelligkeit: string | null;
   roh_hash: string | null;
   zu_pruefen: number | null;
 }
@@ -82,8 +78,6 @@ function standAus(b: IstBuchung, vorher: Stand | null): Stand {
     notiz: b.notiz ?? null,
     transfer_id: b.transferId ?? null,
     gegenkonto_id: b.gegenkontoId ?? null,
-    plan_quelle_id: b.planRef?.quelleId ?? null,
-    plan_faelligkeit: b.planRef?.faelligkeit ?? null,
     roh_hash: b.rohHash ?? null,
     zu_pruefen: b.zuPruefen ? 1 : 0,
     vertrag_id: vorher?.vertrag_id ?? null,
@@ -156,8 +150,7 @@ export const sqliteLedgerRepository: LedgerPort = {
     const [zeilen, teile] = await Promise.all([
       db.select<Zeile[]>(
         `SELECT id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter,
-                quelle, notiz, transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit,
-                roh_hash, zu_pruefen
+                quelle, notiz, transfer_id, gegenkonto_id, roh_hash, zu_pruefen
            FROM ist_buchung ORDER BY datum`,
       ),
       db.select<AufteilungZeile[]>(
@@ -187,10 +180,6 @@ export const sqliteLedgerRepository: LedgerPort = {
         notiz: z.notiz ?? undefined,
         transferId: z.transfer_id ?? undefined,
         gegenkontoId: z.gegenkonto_id ?? undefined,
-        planRef:
-          z.plan_quelle_id && z.plan_faelligkeit
-            ? { quelleId: z.plan_quelle_id, faelligkeit: z.plan_faelligkeit }
-            : undefined,
         rohHash: z.roh_hash ?? undefined,
         // Nur setzen, wenn er WIRKLICH steht: `zuPruefen: false` überall wäre dasselbe
         // wie undefined, macht aber jeden Objektvergleich in Tests und jeden Diff
@@ -208,14 +197,13 @@ export const sqliteLedgerRepository: LedgerPort = {
       ...journalAnweisung(b.id, vorher, nachher),
       {
         sql: `INSERT INTO ist_buchung
-         (id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter, quelle, notiz, transfer_id, gegenkonto_id, plan_quelle_id, plan_faelligkeit, roh_hash, zu_pruefen)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+         (id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter, quelle, notiz, transfer_id, gegenkonto_id, roh_hash, zu_pruefen)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
        ON CONFLICT(id) DO UPDATE SET datum = excluded.datum, betrag = excluded.betrag,
          konto_id = excluded.konto_id, kategorie_id = excluded.kategorie_id,
          kategorie_herkunft = excluded.kategorie_herkunft,
          charakter = excluded.charakter, quelle = excluded.quelle, notiz = excluded.notiz,
          transfer_id = excluded.transfer_id, gegenkonto_id = excluded.gegenkonto_id,
-         plan_quelle_id = excluded.plan_quelle_id, plan_faelligkeit = excluded.plan_faelligkeit,
          roh_hash = excluded.roh_hash, zu_pruefen = excluded.zu_pruefen`,
         werte: [
           b.id, b.datum, b.betrag, b.kontoId, b.kategorieId ?? null,
@@ -223,7 +211,7 @@ export const sqliteLedgerRepository: LedgerPort = {
           // core/istbuchung#Kategorieherkunft) und wird hier explizit dazu gemacht.
           b.kategorieHerkunft ?? "automatisch",
           b.charakter, b.quelle, b.notiz ?? null, b.transferId ?? null, b.gegenkontoId ?? null,
-          b.planRef?.quelleId ?? null, b.planRef?.faelligkeit ?? null, b.rohHash ?? null,
+          b.rohHash ?? null,
           b.zuPruefen ? 1 : 0,
         ],
       },
