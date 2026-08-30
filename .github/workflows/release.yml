@@ -205,14 +205,22 @@ jobs:
             if [ "$signiert" = "ja" ]; then
               echo "Signiert und notarisiert."
             else
-              # Solange unsigniert ausgeliefert wird, MUSS die Anleitung dabeistehen.
-              # Sie wegzulassen macht das Bundle nicht sicherer — es macht nur den
-              # Fehlschlag unerklaerlich: macOS meldet "beschaedigt", und wer die App
-              # nicht selbst gebaut hat, hat keine Handhabe.
+              # KEINE ANLEITUNG, DIE GATEKEEPER AUSHEBELT — auch nicht fuer die eigene App.
+              #
+              # Bis zum 30.08.2026 stand hier die xattr-Zeile, mit der Begruendung, ihr
+              # Weglassen mache den Fehlschlag unerklaerlich. Der Einwand stimmt und wiegt
+              # trotzdem weniger: ein Release-Text ist eine oeffentliche Seite, und was
+              # dort steht, uebt jemand ein. „Quarantaene-Merkmal abraeumen, wenn eine App
+              # als beschaedigt gemeldet wird" ist als Gewohnheit genau der Griff, mit dem
+              # man sich das naechste Mal etwas anderes einfaengt — und dann steht die
+              # Anleitung dafuer bei uns.
+              #
+              # Der Zustand wird deshalb weiterhin BENANNT, nur nicht mehr umgangen. Wer
+              # ihn beheben will, hat einen Weg: das Zertifikat.
               echo "Nicht mit einem Apple-Zertifikat signiert: macOS meldet die App beim ersten"
-              echo "Start als „beschaedigt“. Sie ist es nicht — einmalig freigeben mit"
-              echo
-              echo "    xattr -dr com.apple.quarantine /Applications/Moneymanager.app"
+              echo "Start als „beschaedigt“ und startet sie nicht. Beschaedigt ist sie nicht —"
+              echo "es fehlt die Signatur. Solange das so ist, ist der frische Download auf"
+              echo "macOS kein Weg, den wir empfehlen."
             fi
             echo
             echo "**Windows** (\`.exe\`)"

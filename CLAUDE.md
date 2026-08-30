@@ -1115,7 +1115,7 @@ sondern baut daraus den Text:
 | Secrets da | Release-Text |
 |---|---|
 | ja | „Signiert und notarisiert." |
-| nein | was macOS melden wird, die `xattr`-Zeile, und dass ein installierter Moneymanager sie nicht braucht |
+| nein | was macOS melden wird, dass ein frischer Download deshalb kein empfohlener Weg ist, und dass ein installierter Moneymanager davon unberührt bleibt |
 
 Der Schaden, um den es wirklich geht, ist nicht das unsignierte Bundle — es ist ein
 unsigniertes Bundle unter der Zeile „Signiert und notarisiert". Ein Release, dem man
@@ -1123,10 +1123,25 @@ ansieht, dass es unsigniert ist, ist ehrlich; ein Literal im Workflow wäre gena
 falsch, wenn es darauf ankommt. Deshalb ist `releaseBody` kein fester Text mehr, sondern
 die Ausgabe des Schritts.
 
-**Die `xattr`-Anleitung ist damit zurück, aber nur im unsignierten Zweig.** Sie wegzulassen
-macht das Bundle nicht sicherer; es macht den Fehlschlag unerklärlich — macOS meldet
-„beschädigt", und wer die App nicht selbst gebaut hat, hat keine Handhabe. Sobald das
-Zertifikat da ist, verschwindet sie von selbst, ohne dass jemand daran denken muss.
+**Was der unsignierte Zweig NICHT mehr enthält, ist die `xattr`-Anleitung.** Sie stand dort
+bis zum 30.08.2026, und die Begründung dafür war richtig: ohne sie ist der Fehlschlag
+unerklärlich — macOS meldet „beschädigt", und wer die App nicht selbst gebaut hat, hat keine
+Handhabe. Sie wiegt trotzdem weniger als das, was eine öffentliche Seite **einübt**.
+„Quarantäne-Merkmal abräumen, wenn eine App als beschädigt gemeldet wird" ist als Gewohnheit
+genau der Griff, mit dem sich jemand das nächste Mal etwas anderes einfängt — und die
+Anleitung dazu stünde bei uns. Der Zustand wird weiterhin **benannt**, nur nicht mehr
+umgangen; wer ihn beheben will, hat einen Weg, und das ist das Zertifikat.
+
+`src/auslieferung.test.ts` hält beides fest: dass der unsignierte Zweig den Zustand nennt,
+und dass **im ganzen Workflow** kein Weg an Gatekeeper vorbei steht. Über den ganzen
+Workflow und nicht nur über den Textschritt, weil der Weg zurück sonst eine Zeile weiter
+oben läge, wo niemand hinsieht.
+
+**Für den LOKALEN Bau bleibt die Zeile stehen** (`scripts/installieren.sh`, die
+Updater-Probe weiter oben). Das ist kein Widerspruch, sondern der Unterschied, um den es
+geht: wer auf der eigenen Maschine baut, räumt die Quarantäne von etwas ab, das er selbst
+gerade erzeugt hat. Ein Release-Text richtet sich an jemanden, der eine fremde Datei
+heruntergeladen hat.
 
 ### Drei Plattformen aus einem Workflow
 
