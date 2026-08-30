@@ -15,8 +15,9 @@
 import { createReadStream, existsSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const WURZEL = new URL("..", import.meta.url).pathname;
+const WURZEL = fileURLToPath(new URL("..", import.meta.url));
 const BUNDLE = join(WURZEL, "src-tauri/target/release/bundle/macos");
 const ARCHIV = "Moneymanager.app.tar.gz";
 const PORT = 8787;
