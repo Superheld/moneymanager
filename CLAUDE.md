@@ -540,6 +540,11 @@ Zwei Dinge, die ein grüner Lauf verschweigt:
 
 - **`cargo test --lib` verdeckt `dead_code`-Warnungen**, die der App-Build zeigt: was nur
   Tests benutzen, gilt dort als benutzt. Vor dem Commit einmal `cargo build --lib`.
+- **Und `--lib` uebersieht `src/bin/`.** Dort liegt `bestandslesen`, und es benutzt
+  dieselbe Datenbank-Naht wie die App. Beim Sprung auf sqlx 0.9 blieb es deshalb kaputt
+  liegen, waehrend Bibliothek, Tests und Frontend gruen meldeten — gefunden erst, als
+  jemand das Werkzeug wieder brauchte. Wer an der Naht arbeitet, baut
+  **`cargo build --bins --lib`**.
 - **`src/doku.test.ts` liest `git ls-files`.** Eine neue Datei, die in einer `CLAUDE.md`
   steht, muss **vor** dem Testlauf `git add`-ed sein — sonst meldet der Wächter einen
   toten Verweis auf etwas, das längst dasteht.
@@ -1392,7 +1397,7 @@ grüner Haken vermuten lässt.** `app` baut ausschliesslich das Frontend, `liefe
 nur den Lockfile — ein Dependabot-PR auf eine Rust-Kiste ist also grün, ohne dass je ein
 Compiler auf ihn gesehen hat. Genau daran ist ein Vorschlag schon aufgelaufen: die
 Versionszeile stimmte, der Aufruf im Code war seit dem Major weg. **Eine Rust-Abhängigkeit
-wird deshalb lokal gebaut, bevor sie hereinkommt** — `cargo build --lib` dauert im warmen
+wird deshalb lokal gebaut, bevor sie hereinkommt** — `cargo build --bins --lib` dauert im warmen
 Cache Sekunden. Das ist keine Nachlässigkeit der CI, sondern der Preis der Entscheidung,
 den schweren Build draussen zu lassen; er ist es weiterhin wert, aber er wird hier bezahlt.
 
