@@ -273,6 +273,16 @@ export {
   type ExperimentId,
   type Experimente,
 } from "./experimente";
+
+export {
+  konfigurationExportieren,
+  exportDateiname,
+  inExportform,
+  EXPORT_FASSUNG,
+  type ExportZiel,
+  type ExportKategorie,
+  type Konfigurationsexport,
+} from "./konfiguration";
 export {
   uebersichtLaden,
   waehlbareMonate,

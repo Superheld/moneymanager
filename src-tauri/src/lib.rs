@@ -3,6 +3,7 @@
 // läuft über tauri-plugin-sql (SQLite) und wird vom TS-Adapter angesprochen.
 
 mod dateirechte;
+mod export;
 // Oeffentlich, weil das Werkzeug `bestandslesen` sie braucht (src/bin/).
 pub mod datenbank;
 mod krypto;
@@ -57,7 +58,8 @@ pub fn run() {
             sicherung::sicherung_anlegen,
             sicherung::sicherungen_auflisten,
             sicherung::sicherungen_entfernen,
-            sicherung::sicherungsordner
+            sicherung::sicherungsordner,
+            export::export_schreiben
         ])
         // Was VOR dieser Aenderung entstanden ist, traegt noch die alten offenen Rechte —
         // die `umask` oben wirkt nur auf Neues. Ein Fehlschlag darf den Start nicht

@@ -31,6 +31,7 @@ import { IconButton } from "../bausteine/IconButton";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Bereich } from "../bausteine/Bereich";
 import { VerschluesselungCard } from "../zugang/VerschluesselungCard";
+import { ExportCard } from "./ExportCard";
 import { Modal } from "../bausteine/Modal";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import {
@@ -44,6 +45,10 @@ const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand
 
 export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
   const { t } = useTranslation();
+  // Nur zum Lesen: das Export-Register gibt es erst, wenn das Experiment an ist. Der
+  // Hook liest aus dem Kontext, kostet also nichts, obwohl ihn die Experimente-Karte
+  // weiter unten ebenfalls zieht.
+  const { experimente } = useExperimentSchalter();
   const [personen, setPersonen] = useState<Person[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
 
@@ -96,6 +101,19 @@ export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
           untertitel: t("einstellungen.experiment.untertitel"),
           inhalt: () => <ExperimenteCard />,
         },
+        // Das Register erscheint erst, wenn das Experiment an ist — ein Reiter, der
+        // seinen Inhalt nur mit einem Hinweis „erst einschalten" fuellt, ist ein
+        // leeres Versprechen. Der Schalter darueber ist der Weg dorthin.
+        ...(experimente.export
+          ? [
+              {
+                id: "export",
+                label: t("einstellungen.export.titel"),
+                untertitel: t("einstellungen.export.untertitel"),
+                inhalt: () => <ExportCard />,
+              },
+            ]
+          : []),
       ]}
     />
   );
@@ -143,6 +161,12 @@ function ExperimenteCard() {
           text={t("einstellungen.experiment.hanseaticText")}
           an={experimente.hanseatic}
           aufSchalten={(an) => experimentSetzen("hanseatic", an)}
+        />
+        <SchalterZeile
+          titel={t("einstellungen.experiment.exportTitel")}
+          text={t("einstellungen.experiment.exportText")}
+          an={experimente.export}
+          aufSchalten={(an) => experimentSetzen("export", an)}
         />
       </div>
     </Card>

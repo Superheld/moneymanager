@@ -407,6 +407,44 @@ weiter unten.
 - **`kontostand_anker` und `depotwert` werden nicht protokolliert.** Sie sind Beobachtungen
   zu einem Stichtag und werden nur ergänzt, nicht geändert.
 
+## Konfiguration exportieren (Experiment)
+
+Seit 2026-08-30, hinter `experiment.export`. Exportiert wird, **wie der Haushalt ORDNET,
+nicht was in ihm passiert ist**: heute die Kategorien mit Baum und Charakter, später
+Budgets, Verträge, Kontogruppen, Erkennungsregeln. Keine Buchungen, keine Salden, keine
+Kontonummern.
+
+Diese Grenze ist der ganze Grund, warum die Datei weitergegeben werden darf — eine Ordnung
+lässt sich teilen, ein Kontoauszug nicht. `konfiguration.test.ts` hält sie als Zusicherung
+fest und nicht nur als Kommentar.
+
+| Stück | Datei |
+|---|---|
+| Form, Sortierung, Use-Case | `src/application/konfiguration.ts` |
+| Der Port auf das Kommando | `src/adapters/persistence/export.ts` |
+| Das Kommando | `src-tauri/src/export.rs` |
+| Die Karte | `src/adapters/ui/einstellungen/ExportCard.tsx` |
+
+Vier Entscheidungen, die man kennen muss:
+
+- **Ein eigenes Kommando, kein `<a download>`.** Im WKWebView landet ein Blob-Download je
+  nach Fassung nirgends oder wortlos im Papierkorb-Verzeichnis des Webviews. Ein Export,
+  von dem man nicht weiss, wo er liegt, ist keiner. Dieselbe Überlegung wie beim
+  Datenbankzugang.
+- **Das Ziel bestimmt NICHT der Aufrufer.** Immer `<App-Datenverzeichnis>/export/`, und der
+  Name muss ein einfacher Dateiname sein — derselbe Filter wie bei der Datenbankdatei. Ein
+  Webview, der irgendwohin schreiben darf, ist einer, der überall hinschreiben kann.
+- **Der Pfad wird angezeigt.** Ins App-Datenverzeichnis findet niemand von selbst; ein
+  „fertig" ohne Ort schickt den Nutzer suchen.
+- **Eltern stehen vor ihren Kindern.** Wer die Liste von oben nach unten einliest, findet
+  jede Elternkategorie bereits angelegt vor. Nach Namen sortiert müsste ein Importeur
+  zweimal laufen.
+
+**Einen Import gibt es nicht**, und das ist der Grund für den Experimente-Schalter: die
+schwierige Hälfte ist das Einlesen — eingelesene Kategorien treffen auf vorhandene, IDs
+kollidieren, Bäume müssen zusammengeführt werden. Bis das entschieden ist, sichert die
+Datei nur `fassung` zu.
+
 ## Was die App nach draussen spricht
 
 Eine lokale Finanz-App, die still mit fremden Servern redet, ist keine lokale Finanz-App.

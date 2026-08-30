@@ -73,6 +73,7 @@ import {
   type ExperimentId,
   type Experimente,
 } from "../application/experimente";
+import { konfigurationExportieren } from "../application/konfiguration";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { inventarLaden, type Inventarsicht } from "../application/inventar/inventarsichten";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
@@ -157,6 +158,7 @@ import { sqlitePersonRepository } from "./persistence/sqliteStammdatenRepositori
 import { sqliteBudgetRepository } from "./persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "./persistence/sqliteLedgerRepository";
 import { sqliteKategorieRepository } from "./persistence/sqliteStammdatenRepositories";
+import { tauriExportZiel } from "./persistence/export";
 import { sqliteVertragszuordnungRepository } from "./persistence/sqliteVertragZuordnungRepositories";
 import { sqliteZahlungsregelRepository } from "./persistence/sqliteZahlungsregelRepository";
 import { sqliteInventarRepository } from "./persistence/sqliteInventarRepository";
@@ -243,6 +245,16 @@ export function experimente(): Promise<Experimente> {
 
 export function experimentSetzen(id: ExperimentId, an: boolean): Promise<void> {
   return experimentSchalten(sqliteEinstellungenRepository, id, an);
+}
+
+/**
+ * Schreibt die Konfiguration ins Exportverzeichnis und meldet den Pfad.
+ *
+ * Die Uhr sitzt hier und nicht im Use-Case — derselbe Schnitt wie bei den Sicherungen:
+ * ein Zeitpunkt ist eine Beobachtung der Umwelt.
+ */
+export function konfigurationExport(): Promise<string> {
+  return konfigurationExportieren(sqliteKategorieRepository, tauriExportZiel, new Date());
 }
 
 /**
