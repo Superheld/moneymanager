@@ -1316,6 +1316,24 @@ const de = {
         "FinTS an; der Abruf geht deshalb über dieselbe Schnittstelle wie ihre " +
         "Weboberfläche — nur lesend. Die Einrichtung verlangt einen einmaligen " +
         "Mitschnitt der eigenen Anmeldung.",
+      exportTitel: "Konfiguration exportieren",
+      exportText:
+        "Schreibt die Ordnung des Haushalts als JSON-Datei — heute die Kategorien, " +
+        "später auch Budgets, Verträge und Erkennungsregeln. Keine Buchungen, keine " +
+        "Salden, keine Kontonummern. Einen Import dazu gibt es noch nicht, und die Form " +
+        "der Datei ist nicht zugesichert.",
+    },
+    export: {
+      titel: "Export",
+      untertitel: "Die Ordnung des Haushalts als Datei",
+      text:
+        "Exportiert wird, wie du ordnest — nicht, was du gebucht hast. Die Datei " +
+        "enthält die Kategorien mit ihrem Baum und ihrem Charakter; Buchungen, Salden " +
+        "und Kontonummern stehen nicht darin.",
+      knopf: "Kategorien exportieren",
+      laeuft: "Wird geschrieben …",
+      fertig: "Geschrieben nach:",
+      fehler: "Der Export ist fehlgeschlagen: {{grund}}",
     },
     person: {
       titel: "Personen",
@@ -3020,6 +3038,23 @@ const en: typeof de = {
         "Fetch accounts, balances and transactions from Hanseatic Bank. The bank offers " +
         "no FinTS access, so the retrieval uses the same interface as its web front end " +
         "— read-only. Setup requires a one-time capture of your own login.",
+      exportTitel: "Export configuration",
+      exportText:
+        "Writes how the household is organised as a JSON file — categories today, later " +
+        "budgets, contracts and matching rules too. No transactions, no balances, no " +
+        "account numbers. There is no import yet, and the file format is not guaranteed.",
+    },
+    export: {
+      titel: "Export",
+      untertitel: "How the household is organised, as a file",
+      text:
+        "What gets exported is how you organise things — not what you booked. The file " +
+        "holds the categories with their tree and their character; transactions, " +
+        "balances and account numbers are not in it.",
+      knopf: "Export categories",
+      laeuft: "Writing …",
+      fertig: "Written to:",
+      fehler: "The export failed: {{grund}}",
     },
     person: {
       titel: "People",
