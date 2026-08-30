@@ -59,8 +59,20 @@ describe("inExportform", () => {
 });
 
 describe("exportDateiname", () => {
-  it("trägt den Tag und sonst nichts", () => {
-    expect(exportDateiname(new Date("2026-08-30T14:12:00Z"))).toBe("konfiguration-2026-08-30.json");
+  it("trägt den Tag und den Bestand", () => {
+    expect(exportDateiname(new Date("2026-08-30T14:12:00Z"), "moneymanager.db")).toBe(
+      "konfiguration-moneymanager-2026-08-30.json",
+    );
+  });
+
+  it("hält echten Bestand und Spielstand auseinander", () => {
+    // Beide Dateien liegen im SELBEN App-Datenverzeichnis — der Identifier trennt sie
+    // nicht. Ohne die Kennung schriebe die installierte App denselben Namen wie der
+    // Spielstand und überschriebe ihn wortlos.
+    const tag = new Date("2026-08-30T14:12:00Z");
+    expect(exportDateiname(tag, "moneymanager.db")).not.toBe(
+      exportDateiname(tag, "moneymanager-dev.db"),
+    );
   });
 });
 
@@ -76,9 +88,10 @@ describe("konfigurationExportieren", () => {
         },
       },
       new Date("2026-08-30T14:12:00Z"),
+      "moneymanager-dev.db",
     );
 
-    expect(pfad).toBe("/irgendwo/konfiguration-2026-08-30.json");
+    expect(pfad).toBe("/irgendwo/konfiguration-moneymanager-dev-2026-08-30.json");
     const daten = JSON.parse(geschrieben!.inhalt) as Konfigurationsexport;
     expect(daten.fassung).toBe(EXPORT_FASSUNG);
     expect(daten.erzeugt).toBe("2026-08-30T14:12:00.000Z");
@@ -94,6 +107,7 @@ describe("konfigurationExportieren", () => {
       repo(BAUM),
       { schreiben: async (_n, i) => ((inhalt = i), "/x") },
       new Date("2026-08-30T00:00:00Z"),
+      "moneymanager-dev.db",
     );
     for (const verboten of ["betrag", "saldo", "iban", "buchung", "konto"]) {
       expect(inhalt.toLowerCase(), `„${verboten}" steht in der Exportdatei`).not.toContain(verboten);

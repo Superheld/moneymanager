@@ -18,9 +18,20 @@
 import type { Charakter, Kategorie } from "../../core";
 import type { KategorieRepository } from "../ports";
 
+/**
+ * Ein Eintrag im Baum. Ein blosser String ist die Kurzform für „Name, Charakter vom
+ * Elternteil, keine Kinder" — der Regelfall, und deshalb die Kurzform.
+ *
+ * **Kinder dürfen selbst Kinder haben.** Bis 2026-08-30 war die Liste auf zwei Ebenen
+ * festgelegt, und das war eine Beschränkung der VORLAGE, nicht der Domäne: eine Kategorie
+ * trägt seit jeher eine `elternId` und damit beliebige Tiefe. Aufgefallen ist es, als ein
+ * aufgeräumter Bestand eine dritte Ebene mitbrachte und die Vorlage sie nicht abbilden
+ * konnte.
+ */
 interface Kind {
   name: string;
-  charakter?: Charakter; // überschreibt den Gruppen-Charakter
+  charakter?: Charakter; // überschreibt den Charakter des Elternteils
+  kinder?: (string | Kind)[];
 }
 interface Gruppe {
   name: string;
@@ -29,52 +40,116 @@ interface Gruppe {
 }
 
 export const STANDARDKATEGORIEN: Gruppe[] = [
-  { name: "Einnahmen", charakter: "Ertrag", kinder: ["Gehalt", "Nebeneinkünfte", "Kapitalerträge", "Kindergeld", "Sonstige Einnahmen"] },
-  { name: "Wohnen", charakter: "Aufwand", kinder: ["Miete / Rate", "Nebenkosten", "Strom & Gas", "Internet & Telefon", "Rundfunkbeitrag", "Instandhaltung", "Einrichtung & Geräte"] },
-  { name: "Lebenshaltung", charakter: "Aufwand", kinder: ["Lebensmittel", "Auswärts essen", "Lieferservice", "Drogerie", "Haushalt", "Genussmittel"] },
-  { name: "Mobilität", charakter: "Aufwand", kinder: ["ÖPNV & Tickets", "Sprit & Laden", "Kfz (Steuer & Wartung)", "Fahrrad"] },
+  { name: "Einnahmen", charakter: "Ertrag", kinder: ["Gehalt", "Kapitalerträge", "Kindergeld", "Nebeneinkünfte", "Sonstige Einnahmen"] },
+  { name: "Familie & Kinder", charakter: "Aufwand", kinder: ["Haustier", "Kinderbetreuung", "Schule & Lernen", "Taschengeld", "Unterhalt"] },
+  { name: "Finanzen", charakter: "Aufwand", kinder: ["Bankgebühren", "Kredite & Zinsen", { name: "Sparen & Anlegen", charakter: "Umschichtung" }, "Spenden", "Steuern"] },
+  { name: "Freizeit & Kultur", charakter: "Aufwand", kinder: ["Ausgehen", "Bildung", "Freizeit & Hobby", "Gaming", "Mitgliedschaften", "Reisen & Urlaub", "Sport", "Veranstaltungen"] },
   { name: "Gesundheit", charakter: "Aufwand", kinder: ["Arzt & Apotheke", "Krankenversicherung", "Therapie"] },
-  // Lifestyle aufgeteilt (Erlebnisse vs. Konsum) — sonst zu groß; FG-Feinheiten übernommen.
-  { name: "Freizeit & Kultur", charakter: "Aufwand", kinder: ["Freizeit & Hobby", "Sport", "Gaming", "Veranstaltungen", "Ausgehen", "Reisen & Urlaub", "Mitgliedschaften", "Bildung"] },
-  { name: "Konsum & Lifestyle", charakter: "Aufwand", kinder: ["Elektronik", "Kleidung & Mode", "Geschenke", "Abos & Streaming", "Körperpflege & Wellness"] },
-  { name: "Familie & Kinder", charakter: "Aufwand", kinder: ["Kinderbetreuung", "Schule & Lernen", "Taschengeld", "Haustier"] },
-  { name: "Versicherungen", charakter: "Aufwand", kinder: ["Haftpflicht", "Hausrat", "KFZ-Versicherung", "Krankenzusatz", "Rechtsschutz", "Berufsunfähigkeit", "Weitere Versicherungen"] },
-  { name: "Vorsorge", charakter: "Umschichtung", kinder: ["Altersvorsorge", "Private Rente"] },
-  {
-    name: "Finanzen",
-    charakter: "Aufwand",
-    kinder: [{ name: "Sparen & Anlegen", charakter: "Umschichtung" }, "Kredite & Zinsen", "Bankgebühren", "Steuern", "Spenden"],
-  },
+  { name: "Konsum & Lifestyle", charakter: "Aufwand", kinder: ["Abos & Streaming", "Elektronik", "Geschenke", "Kleidung & Mode", "Körperpflege & Wellness"] },
+  { name: "Lebenshaltung", charakter: "Aufwand", kinder: ["Auswärts essen", "Drogerie", "Genussmittel", "Haushalt", "Lebensmittel", "Lieferservice"] },
+  { name: "Mobilität", charakter: "Aufwand", kinder: ["Fahrrad", "Kfz (Steuer & Wartung)", "KFZ-Wartung", "ÖPNV & Tickets", "Sprit & Laden"] },
   { name: "Sonstiges", charakter: "Aufwand", kinder: [] },
+  { name: "Versicherungen", charakter: "Aufwand", kinder: ["Berufsunfähigkeit", "Haftpflicht", "Hausrat", "KFZ-Versicherung", "Krankenzusatz", "Rechtsschutz", "Weitere Versicherungen"] },
+  { name: "Vorsorge", charakter: "Umschichtung", kinder: ["Altersvorsorge", "Private Rente"] },
+  { name: "Wohnen", charakter: "Aufwand", kinder: [{ name: "Einrichtung & Geräte", kinder: ["Anschaffungen"] }, "Energie", "Instandhaltung", "Internet & Telefon", "Miete", "Miete / Rate", "Nebenkosten", "Rundfunkbeitrag", "Strom & Gas"] },
 ];
+
+/**
+ * Der Baum flach, mit IDs, die aus den NAMEN folgen statt gewürfelt zu sein.
+ *
+ * **Gebraucht wird das vom Spielstand** (`npm run seed`), und der Grund ist der Fehler,
+ * den es beheben soll: der Seed führte bis 2026-08-30 eine eigene Kategorienliste mit
+ * eigenen Namen — `Mobilitaet` ohne Umlaut, `Miete` statt `Miete / Rate`, `Energie` statt
+ * `Strom & Gas`. `standardkategorienAnlegen` gleicht über den NAMEN ab; sieben der
+ * vierzehn fanden deshalb keinen Partner, und wer nach dem Seed „Standardkategorien
+ * laden" drückte, bekam sie doppelt. Zwei Listen für dieselbe Sache driften, und diese
+ * hier haben es getan.
+ *
+ * **Warum sprechende IDs und keine UUIDs:** der Spielstand muss reproduzierbar sein —
+ * derselbe Aufruf, derselbe Bestand, damit ein Screenshot von gestern dieselben Zahlen
+ * zeigt wie einer von heute. `crypto.randomUUID()` bricht das. Und sie sind lesbar:
+ * `kat-lebensmittel` in einer Fixture sagt, worum es geht, eine UUID nicht.
+ *
+ * **In der App bleibt es bei UUIDs.** Dort ist eine Kategorie ein Datensatz, den jemand
+ * umbenennen darf — eine ID, die den Namen trägt, wäre beim ersten Umbenennen eine Lüge.
+ */
+export function standardkategorienFlach(): Kategorie[] {
+  const ergebnis: Kategorie[] = [];
+
+  const zweig = (eintraege: readonly (string | Kind)[], elternId: string | undefined, erbe: Charakter) => {
+    for (const eintrag of eintraege) {
+      const name = typeof eintrag === "string" ? eintrag : eintrag.name;
+      const charakter = typeof eintrag === "string" ? erbe : eintrag.charakter ?? erbe;
+      const id = kategorieSlug(name);
+      ergebnis.push({ id, name, elternId, defaultCharakter: charakter });
+      if (typeof eintrag !== "string" && eintrag.kinder) zweig(eintrag.kinder, id, charakter);
+    }
+  };
+
+  for (const g of STANDARDKATEGORIEN) {
+    const id = kategorieSlug(g.name);
+    ergebnis.push({ id, name: g.name, defaultCharakter: g.charakter });
+    zweig(g.kinder, id, g.charakter);
+  }
+  return ergebnis;
+}
+
+/**
+ * Aus einem Namen eine ID: `Kfz (Steuer & Wartung)` → `kat-kfz-steuer-wartung`.
+ *
+ * Umlaute werden AUSGESCHRIEBEN und nicht weggeworfen — sonst würden `Mobilität` und
+ * `Mobilitt` dasselbe, und aus zwei Kategorien mit ähnlichem Namen könnte eine werden.
+ * Dass keine zwei Namen denselben Slug ergeben, prüft `standardkategorien.test.ts`; das
+ * ist keine Formalität, sondern die Bedingung dafür, dass die IDs überhaupt taugen.
+ */
+export function kategorieSlug(name: string): string {
+  const roh = name
+    .toLowerCase()
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `kat-${roh}`;
+}
 
 /**
  * Legt die Standardkategorien an. Idempotent: bereits vorhandene Namen werden
  * übersprungen. Liefert die Anzahl neu angelegter Kategorien.
  */
 export async function standardkategorienAnlegen(repo: KategorieRepository): Promise<number> {
-  const vorhanden = new Set((await repo.alle()).map((k) => k.name.toLowerCase()));
+  // **Einmal laden, dann die Karte fortschreiben.** Vorher stand mitten in der Schleife
+  // ein zweites `repo.alle()`, um die ID einer bereits vorhandenen Gruppe zu finden — bei
+  // zwölf Gruppen also bis zu zwölf zusätzliche Vollabfragen. Die Karte hier weiss
+  // dasselbe, weil sie um jeden neu angelegten Eintrag mitwächst.
+  const nachName = new Map<string, string>();
+  for (const k of await repo.alle()) nachName.set(k.name.toLowerCase(), k.id);
   let angelegt = 0;
 
-  const sichern = async (k: Kategorie) => {
-    if (vorhanden.has(k.name.toLowerCase())) return false;
+  /** Legt an, falls der Name noch fehlt, und meldet die ID — die neue oder die alte. */
+  const sichern = async (k: Kategorie): Promise<string> => {
+    const schluessel = k.name.toLowerCase();
+    const bekannt = nachName.get(schluessel);
+    if (bekannt) return bekannt;
     await repo.speichern(k);
-    vorhanden.add(k.name.toLowerCase());
+    nachName.set(schluessel, k.id);
     angelegt++;
-    return true;
+    return k.id;
   };
 
-  for (const g of STANDARDKATEGORIEN) {
-    const elternId = crypto.randomUUID();
-    const neu = await sichern({ id: elternId, name: g.name, defaultCharakter: g.charakter });
-    // Eltern-ID für Kinder bestimmen (auch wenn die Gruppe schon existierte).
-    const elter = neu ? elternId : (await repo.alle()).find((k) => k.name.toLowerCase() === g.name.toLowerCase())?.id;
-
-    for (const kind of g.kinder) {
-      const name = typeof kind === "string" ? kind : kind.name;
-      const charakter = typeof kind === "string" ? g.charakter : kind.charakter ?? g.charakter;
-      await sichern({ id: crypto.randomUUID(), name, elternId: elter, defaultCharakter: charakter });
+  async function zweig(eintraege: readonly (string | Kind)[], elternId: string, erbe: Charakter) {
+    for (const eintrag of eintraege) {
+      const name = typeof eintrag === "string" ? eintrag : eintrag.name;
+      const charakter = typeof eintrag === "string" ? erbe : eintrag.charakter ?? erbe;
+      const id = await sichern({ id: crypto.randomUUID(), name, elternId, defaultCharakter: charakter });
+      if (typeof eintrag !== "string" && eintrag.kinder) await zweig(eintrag.kinder, id, charakter);
     }
+  }
+
+  for (const g of STANDARDKATEGORIEN) {
+    const id = await sichern({ id: crypto.randomUUID(), name: g.name, defaultCharakter: g.charakter });
+    await zweig(g.kinder, id, g.charakter);
   }
   return angelegt;
 }
