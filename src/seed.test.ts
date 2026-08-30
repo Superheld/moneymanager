@@ -126,6 +126,41 @@ describe("Spielstand", () => {
     }
   });
 
+  /**
+   * Der Spielstand muss die Maske ueberstehen, nicht nur das Schema.
+   *
+   * Das Schema ist hier viel toleranter als die App: `budget.start` ist `TEXT` und nimmt
+   * jede Zeichenkette, `konto_id` ist nullable. `budgetAnlegen` verlangt aber ein DATUM
+   * (`YYYY-MM-DD`) und ein Konto — und beides prueft es beim SPEICHERN, also erst dann,
+   * wenn jemand ein bestehendes Budget bearbeiten will.
+   *
+   * Genau da klaffte es: der Seed schrieb einen Monat (`YYYY-MM`) und kein Konto. Jedes
+   * Budget im Spielstand liess sich anzeigen und keines aendern; die Meldung lautete
+   * „Startdatum angeben", und beim monatlichen Budget zeigt die Maske das Startdatum
+   * nicht einmal an. `foreign_key_check` und die INSERTs sahen davon nichts.
+   *
+   * Deshalb prueft dieser Test die FORM gegen die Regeln der Anwendungsschicht, nicht
+   * gegen die der Tabelle.
+   */
+  it("schreibt Budgets, die sich in der Maske auch bearbeiten lassen", () => {
+    const db = mitSeed();
+    const [zeilen] = db.exec("SELECT id, start, konto_id FROM budget");
+    expect(zeilen?.values.length ?? 0).toBeGreaterThan(0);
+    for (const [id, start, kontoId] of zeilen?.values ?? []) {
+      expect(String(start), `budget ${id}: start ist ein Datum, kein Monat`).toMatch(
+        /^\d{4}-\d{2}-\d{2}$/,
+      );
+      expect(kontoId, `budget ${id}: ohne Konto ist es eine Zahl ohne Deckung`).not.toBeNull();
+    }
+
+    const [versionen] = db.exec("SELECT budget_id, ab_monat FROM budget_betrag");
+    for (const [budgetId, abMonat] of versionen?.values ?? []) {
+      expect(String(abMonat), `budget_betrag ${budgetId}: ab_monat ist ein Monat`).toMatch(
+        /^\d{4}-\d{2}$/,
+      );
+    }
+  });
+
   // Der Fall, den eine feste Kontoklasse nicht abbilden kann und fuer den es Gruppen
   // gibt: dasselbe Konto liegt in mehr als einer.
   it("legt ein Konto in zwei Gruppen", () => {

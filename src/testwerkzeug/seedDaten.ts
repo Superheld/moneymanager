@@ -234,10 +234,22 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // Die Betraege sind eine REIHE mit Geltungsmonat — deshalb bekommt eines davon bewusst
   // zwei Versionen: so zeigt der Spielstand den Fall, fuer den `budget_betrag` ueberhaupt
   // existiert (eine Aenderung schreibt die Vergangenheit nicht um).
+  //
+  // ZWEI Dinge muessen dabei der Maske genuegen und nicht nur dem Schema — die Spalten
+  // sind `TEXT` bzw. nullable, die App ist strenger, und der Unterschied faellt erst beim
+  // BEARBEITEN auf:
+  //
+  // - `start` ist ein DATUM (`YYYY-MM-DD`), kein Monat. Hier stand `monat(...)`, und
+  //   damit wies `budgetAnlegen` jedes Speichern mit „Startdatum angeben" ab. Bei einem
+  //   monatlichen Budget zeigt die Maske das Startdatum gar nicht an — die Meldung war
+  //   also nicht einmal zu befolgen.
+  // - Das KONTO ist Pflicht. Hier stand `null`, und der Dialog verlangte eine Deckung,
+  //   die der Spielstand nie hatte.
   const budgets = [
     {
       id: "budget-lebensmittel",
       kategorie: "kat-lebensmittel",
+      konto: "konto-giro",
       art: "monatlich",
       betraege: [
         { ab: monat(-MONATE), betrag: 45000 },
@@ -247,12 +259,16 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     {
       id: "budget-freizeit",
       kategorie: "kat-freizeit-hobby",
+      konto: "konto-giro",
       art: "monatlich",
       betraege: [{ ab: monat(-MONATE), betrag: 18000 }],
     },
     {
+      // Das Aufbauende liegt auf der Ruecklage und nicht auf dem Giro: was sich ansammelt,
+      // soll auch dort liegen, wo es hingehoert.
       id: "budget-anschaffung",
       kategorie: "kat-anschaffungen",
+      konto: "konto-tagesgeld",
       art: "aufbauend",
       betraege: [{ ab: monat(-MONATE), betrag: 15000 }],
     },
@@ -261,9 +277,9 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     setzen("INSERT INTO budget (id, kategorie_id, konto_id, art, start) VALUES (?, ?, ?, ?, ?)", [
       b.id,
       b.kategorie,
-      null,
+      b.konto,
       b.art,
-      monat(-MONATE),
+      tagIn(-MONATE, 1),
     ]);
     for (const v of b.betraege) {
       setzen("INSERT INTO budget_betrag (budget_id, ab_monat, betrag) VALUES (?, ?, ?)", [
