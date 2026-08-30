@@ -495,6 +495,13 @@ direkten Commit auf `develop` oder `main` ab, `prepare-commit-msg` lässt nach `
 einen Merge aus `develop` zu. Merges per `--no-ff` laufen normal durch — Git ruft für sie
 einen anderen Hook. Im Notfall: `--no-verify`.
 
+**Beide Hooks sitzen auf dieser Maschine, und darin liegt ihre Grenze.** Ein Merge, der auf
+GitHub passiert, fragt keinen von ihnen — der Wachposten fällt lautlos genau dort aus, wo
+niemand ihn vermisst. Deshalb zielt auch **Dependabot auf `develop`** (`target-branch` in
+`.github/dependabot.yml`, geprüft von `src/lieferkette.test.ts`): ohne diese Angabe legt es
+seine Vorschläge gegen den Standardbranch an, und die liessen sich mit einem Klick nach
+`main` zusammenführen. Es war einmal so, und man sieht es einem grünen Vorschlag nicht an.
+
 ## Die Hooks
 
 Aktiv wird alles über **`git config core.hooksPath .githooks`** — einmal je Klon, sonst
@@ -1372,6 +1379,19 @@ hebt und den Tag als Kommentar dahinterschreibt.
 Der Rust-Wächter läuft als **eigener Job, der nichts baut** — `cargo-deny` liest nur
 `Cargo.lock` und die RustSec-Datenbank. Damit bleibt die Entscheidung bestehen, den
 schweren Tauri-Build aus der CI herauszuhalten.
+
+**Und weil dieser Job nichts baut, sagt er über einen Rust-Vorschlag weniger, als sein
+grüner Haken vermuten lässt.** `app` baut ausschliesslich das Frontend, `lieferkette` liest
+nur den Lockfile — ein Dependabot-PR auf eine Rust-Kiste ist also grün, ohne dass je ein
+Compiler auf ihn gesehen hat. Genau daran ist ein Vorschlag schon aufgelaufen: die
+Versionszeile stimmte, der Aufruf im Code war seit dem Major weg. **Eine Rust-Abhängigkeit
+wird deshalb lokal gebaut, bevor sie hereinkommt** — `cargo build --lib` dauert im warmen
+Cache Sekunden. Das ist keine Nachlässigkeit der CI, sondern der Preis der Entscheidung,
+den schweren Build draussen zu lassen; er ist es weiterhin wert, aber er wird hier bezahlt.
+
+Der Wächter über die Vorschläge selbst ist `src/lieferkette.test.ts`: er hält fest, dass es
+alle drei Ökosysteme gibt und dass **jedes** auf `develop` zielt. Der Fehler entsteht nicht
+beim Ändern der Datei, sondern beim Ergänzen eines vierten Eintrags.
 
 Drei Dinge, die man beim Kalibrieren wissen muss, weil sie sonst zu Dauerrot führen —
 und ein Wächter, der bei jedem Lauf dasselbe meldet, wird abgeschaltet statt gelesen:
