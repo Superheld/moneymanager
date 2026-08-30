@@ -209,8 +209,8 @@ export function VertraegeScreen() {
    * eine eigene Tabelle zeigt und nur dort die Rücklagen-Spalte trägt — innerhalb einer
    * Gruppe steht der Rhythmus fest, also ist die Spalte dort auch vergleichbar.
    */
-  function spalten(mitRuecklage: boolean): DataColumn[] {
-    const s: DataColumn[] = [
+  function spalten(mitRuecklage: boolean): DataColumn<Vertrag>[] {
+    const s: DataColumn<Vertrag>[] = [
       {
         key: "anbieter",
         label: t("vertraege.spalteAnbieter"),
