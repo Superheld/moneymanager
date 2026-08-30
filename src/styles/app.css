@@ -441,8 +441,12 @@ select.field.tabellenfilter {
 .katmain .nm {
   font-weight: var(--fw-bold);
 }
+/* Die Einrueckung folgt der EBENE, nicht der Tatsache „ist ein Kind".
+   Vorher gab es genau zwei Klassen, weil die Liste genau zwei Ebenen zeichnete — ein
+   Enkel wurde gar nicht erst gerendert und lag unsichtbar in der Datenbank. Die Tiefe
+   kommt jetzt als Variable von der Zeile; das CSS muss dafuer nichts mehr wissen. */
 .katchild {
-  padding-left: var(--sp-6);
+  padding-left: calc(var(--sp-6) * var(--kat-ebene, 1));
 }
 .katchild .nm {
   color: var(--ink-2);
