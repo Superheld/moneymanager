@@ -1295,6 +1295,27 @@ eigenen Arbeit. Zwei Testfälle in `privatsphaere.test.ts` schlagen fehl, der Re
 durch; der `pre-push`-Hook blockiert damit jeden Push. Das Rezept zum Hinterlegen steht in
 `CLAUDE.local.md`.
 
+#### Und es trifft nicht nur den frischen Klon
+
+**Der Rechner, auf dem die Verschlüsselung eingeführt wurde, sperrt sich in dem Moment
+selbst aus, in dem sie greift.** Vorher nahm `bestandsmerkmale.mjs` den `sqlite3`-Weg und
+bekam seine Merkmale ohne Zutun; mit der Überführung des Bestands fällt dieser Weg weg,
+und ab da braucht es die Codedatei, die es bis dahin nie gebraucht hat. Der Absatz oben
+liest sich, als sei das die Sorge eines Neuankömmlings. Es ist die Sorge dessen, der die
+Verschlüsselung gerade gebaut hat.
+
+**Und der Ausfall ist still.** Ein Push, der nicht stattfindet, sieht aus wie ein Tag ohne
+Push — es gibt keine Fehlermeldung, die einen suchen liesse, solange man nicht pusht. Wer
+in dieser Zeit weiterarbeitet, sammelt Commits an, die nirgends liegen ausser auf dieser
+einen Platte; genau der Zustand, gegen den ein Fernzugriff da ist. Das ist einmal passiert
+und blieb über einen Tag unbemerkt.
+
+Die Lehre ist nicht „Codedatei früher anlegen" — das wäre ein Merkposten, und Merkposten
+scheitern genau dann, wenn es darauf ankommt. Sie ist: **wer einen Wächter an eine neue
+Voraussetzung hängt, muss den Moment mitdenken, in dem diese Voraussetzung zum ersten Mal
+gilt.** Die Überführung hätte die Codedatei mit anlegen können — sie hat den Schlüssel in
+der Hand, während sie läuft.
+
 ### Zwei Wächter, die verschiedene Fehler finden
 
 **Der Wert-Abgleich** (`src/privatsphaere.test.ts`, dazu der `pre-push`-Hook) kennt die
