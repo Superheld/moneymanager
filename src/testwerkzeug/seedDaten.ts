@@ -163,7 +163,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   //
   // Bis 2026-08-30 standen hier vierzehn selbst gepflegte Eintraege, und sie hiessen
   // anders als die Vorlage dieselben Dinge nennt: `Mobilitaet` ohne Umlaut, `Miete` statt
-  // `Miete / Rate`, `Energie` statt `Strom & Gas`, `Freizeit` statt `Freizeit & Hobby`.
+  // `Miete & Nebenkosten`, `Energie` statt `Strom & Gas`, `Freizeit` statt `Freizeit & Hobby`.
   // `standardkategorienAnlegen` gleicht ueber den NAMEN ab — sieben der vierzehn fanden
   // keinen Partner, und wer nach einem `npm run seed` in der App auf
   // „Standardkategorien laden" drueckte, bekam sie ein zweites Mal. Zwei Listen fuer
@@ -399,7 +399,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
 
     // Wiederkehrendes — das Geruest, an dem der Monatsverlauf haengt
     fest(28, 315000, "konto-giro", "kat-gehalt", "Ertrag", "Auszahlung", "Bezuege");
-    fest(1, -98000, "konto-giro", "kat-miete", "Aufwand", "Steenbeck", "Monatsmiete");
+    fest(1, -98000, "konto-giro", "kat-miete-nebenkosten", "Aufwand", "Steenbeck", "Monatsmiete");
     fest(5, -4500, "konto-giro", "kat-internet-telefon", "Aufwand", "Halvern", "Grundgebuehr", "vertrag-internet");
     fest(15, -8900, "konto-giro", "kat-versicherungen", "Aufwand", "Mordhorst", "Beitrag", "vertrag-versicherung");
     fest(8, -zahlZwischen(6000, 11000), "konto-giro", "kat-energie", "Aufwand", "Wendlandt", "Abschlag");
@@ -500,7 +500,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // Zahlungsregeln tragen den Monatsausblick. Ohne sie zeigt die Uebersicht zwar Ist-Zahlen,
   // aber keine Vorschau — und der halbe Zweck des Bereichs bliebe unsichtbar.
   for (const r of [
-    { id: "regel-miete", bez: "Miete", betrag: -98000, rhythmus: "monatlich", tag: 1, kat: "kat-miete", charakter: "Aufwand", vertrag: null },
+    { id: "regel-miete", bez: "Miete", betrag: -98000, rhythmus: "monatlich", tag: 1, kat: "kat-miete-nebenkosten", charakter: "Aufwand", vertrag: null },
     { id: "regel-gehalt", bez: "Bezuege", betrag: 315000, rhythmus: "monatlich", tag: 28, kat: "kat-gehalt", charakter: "Ertrag", vertrag: null },
     { id: "regel-internet", bez: "Internet", betrag: -4500, rhythmus: "monatlich", tag: 5, kat: "kat-internet-telefon", charakter: "Aufwand", vertrag: "vertrag-internet" },
     { id: "regel-versicherung", bez: "Versicherung", betrag: -8900, rhythmus: "monatlich", tag: 15, kat: "kat-versicherungen", charakter: "Aufwand", vertrag: "vertrag-versicherung" },

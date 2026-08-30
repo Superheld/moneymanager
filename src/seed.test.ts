@@ -63,7 +63,7 @@ describe("Spielstand", () => {
   it("legt genau die Kategorien der Vorlage an — keine eigenen", () => {
     // **Der Fehler, den es hier zu verhindern gilt, ist einmal passiert.** Der Seed fuehrte
     // eine EIGENE Kategorienliste, und sie hiess dieselben Dinge anders als die Vorlage:
-    // `Mobilitaet` ohne Umlaut, `Miete` statt `Miete / Rate`. `standardkategorienAnlegen`
+    // `Mobilitaet` ohne Umlaut, `Miete` statt `Miete & Nebenkosten`. `standardkategorienAnlegen`
     // gleicht ueber den Namen ab, fand sieben davon nicht wieder und legte sie ein zweites
     // Mal an — der Spielstand hatte danach Dubletten, und man sah ihm nicht an, woher sie
     // kamen.
