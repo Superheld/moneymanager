@@ -116,6 +116,23 @@ describe("Der Release-Workflow und die Apple-Signierung", () => {
     );
   });
 
+  it("verlangt das Updater-Manifest ausdrücklich, und unter dem heutigen Namen", () => {
+    // Ohne `latest.json` fragt jede installierte App ins Leere und bekommt „nichts
+    // Neues" — der Fehlschlag, den man nie sieht, weil er wie Ruhe aussieht.
+    //
+    // Der Schalter hiess bis tauri-action v0 `includeUpdaterJson` und heisst seit
+    // v1.0.0 `uploadUpdaterJson`. Der alte Name fällt von selbst nicht auf: GitHub
+    // übergeht einen unbekannten Input wortlos, und der Vorgabewert des neuen ist
+    // `true`. Es liefe also weiter — aus dem falschen Grund, bis jemand die Vorgabe
+    // ändert. Deshalb steht hier beides: dass der Schalter da ist, und dass es der
+    // heutige ist.
+    expect(WORKFLOW, "Kein Updater-Manifest im Release").toContain("uploadUpdaterJson: true");
+    expect(
+      /^\s*includeUpdaterJson:/m.test(WORKFLOW),
+      "`includeUpdaterJson` ist der Name von tauri-action v0 und wird heute übergangen.",
+    ).toBe(false);
+  });
+
   it("lässt den Textschritt überall in bash laufen", () => {
     // Ohne `shell: bash` nimmt GitHub auf Windows PowerShell, und das Skript stirbt an
     // der ersten Zeile. Ein Schritt, der auf zwei von drei Läufern funktioniert, ist

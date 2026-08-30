@@ -43,9 +43,18 @@ jobs:
       # "nichts Neues" statt eines Fehlers. Dieselbe Falle wie ein falscher
       # Plattformschluessel, und man sucht sie lange an der falschen Stelle.
       max-parallel: 1
-      # macOS zuerst: der erste Job LEGT das Release an und setzt damit den Text (spaetere
-      # finden es vor und lassen ihn unberuehrt). Faellt einer aus, sollen die anderen
-      # trotzdem liefern — eine kaputte Plattform darf die uebrigen nicht mitnehmen.
+      # macOS zuerst: der erste Job LEGT das Release an und setzt damit den Text.
+      #
+      # Bis v0 war das die ganze Begruendung — spaetere Jobs fanden das Release vor und
+      # liessen Titel und Text unberuehrt. Seit v1.0.0 schreibt JEDER Job beides neu
+      # (`create-release.ts`, `updateRelease` bei einem vorgefundenen Release). Am
+      # Ergebnis aendert das nichts: alle drei Laeufer rechnen denselben Text aus, und
+      # `shell: bash` weiter unten sorgt dafuer, dass Windows dabei nicht ausschert.
+      # Was sich aendert, ist die Fehlerform — schert doch einmal einer aus, gewinnt
+      # nicht mehr der erste Job, sondern der letzte.
+      #
+      # Faellt einer aus, sollen die anderen trotzdem liefern — eine kaputte Plattform
+      # darf die uebrigen nicht mitnehmen.
       fail-fast: false
       matrix:
         include:
@@ -223,7 +232,7 @@ jobs:
             echo "TEXTENDE"
           } >> "$GITHUB_OUTPUT"
 
-      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
+      - uses: tauri-apps/tauri-action@1deb371b0cd8bd54025b384f1cd735e725c4060f # v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Die sechs APPLE_*-Variablen stehen hier bewusst NICHT: sie entstehen im
@@ -266,4 +275,10 @@ jobs:
           prerelease: false
           # Erzeugt `latest.json` neben den Artefakten — genau die Datei, die
           # `plugins.updater.endpoints` in tauri.conf.json anfragt.
-          includeUpdaterJson: true
+          #
+          # Bis v0 hiess der Schalter `includeUpdaterJson`. Der alte Name waere hier
+          # nicht aufgefallen: GitHub uebergeht einen unbekannten Input, und der
+          # Vorgabewert des neuen ist `true` — es haette also weiter funktioniert, aus
+          # dem falschen Grund, bis jemand die Vorgabe aendert. Genau die Sorte
+          # Fehlschlag, die erst im Release sichtbar wird.
+          uploadUpdaterJson: true
