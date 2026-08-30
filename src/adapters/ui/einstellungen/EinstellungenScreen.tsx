@@ -6,7 +6,7 @@
 // hat einen Stand, eine Bankverbindung und bald einen Abruf auf Knopfdruck.
 
 import { Datumsfeld } from "../bausteine/Datumsfeld";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   REGIONEN,
@@ -383,9 +383,27 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
     }
   }
 
-  function zeile(k: Kategorie, haupt: boolean) {
+  /**
+   * Eine Zeile samt allem, was darunter hängt.
+   *
+   * **Rekursiv, und das war es bis 2026-08-30 nicht.** Gezeichnet wurden Wurzeln und
+   * deren direkte Kinder, sonst nichts. Ein Enkel fiel durch beide Raster — er ist keine
+   * Wurzel (sein Elternteil existiert) und kein Kind einer Wurzel. Er lag damit in der
+   * Datenbank, ohne dass man ihn sehen, bearbeiten oder löschen konnte, und die Maske
+   * bot ihn weiterhin als Elternteil an: wer eine Kategorie dorthin verschob, sah sie
+   * nie wieder.
+   *
+   * Der Kern kennt diese Grenze nicht — eine Kategorie trägt eine `elternId`, damit
+   * beliebige Tiefe. Die Beschränkung sass allein in dieser Schleife.
+   */
+  function zeile(k: Kategorie, ebene: number) {
+    const haupt = ebene === 0;
     return (
-      <div key={k.id} className={`katrow ${haupt ? "katmain" : "katchild"}`}>
+      <div
+        key={k.id}
+        className={`katrow ${haupt ? "katmain" : "katchild"}`}
+        style={haupt ? undefined : ({ "--kat-ebene": ebene } as CSSProperties)}
+      >
         <span className="nm">
           {k.name} <Pill variant={CHARAKTER_PILL[k.defaultCharakter]}>{t(`charakter.${k.defaultCharakter}`)}</Pill>
         </span>
@@ -404,6 +422,11 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
     );
   }
 
+  /** Die Zeile und ihre Nachfahren — als flache Folge, die Tiefe steckt in der Einrückung. */
+  function zweig(k: Kategorie, ebene: number): ReactNode[] {
+    return [zeile(k, ebene), ...kinderVon(k.id).flatMap((c) => zweig(c, ebene + 1))];
+  }
+
   return (
     <Card
       action={
@@ -419,8 +442,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
         <div>
           {wurzeln.map((w) => (
             <div key={w.id} className="katgroup">
-              {zeile(w, true)}
-              {kinderVon(w.id).map((c) => zeile(c, false))}
+              {zweig(w, 0)}
             </div>
           ))}
         </div>
