@@ -76,6 +76,7 @@ import {
   type Experimente,
 } from "../application/experimente";
 import { konfigurationExportieren } from "../application/konfiguration";
+import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { inventarLaden, type Inventarsicht } from "../application/inventar/inventarsichten";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
@@ -259,6 +260,30 @@ export function experimentSetzen(id: ExperimentId, an: boolean): Promise<void> {
 export function konfigurationExport(): Promise<string> {
   return konfigurationExportieren(
     sqliteKategorieRepository,
+    tauriExportZiel,
+    new Date(),
+    DATEINAME,
+  );
+}
+
+/**
+ * Schreibt den BESTAND ins Exportverzeichnis und meldet den Pfad.
+ *
+ * Getrennt von `konfigurationExport` und nicht als dessen Parameter: die beiden Dateien
+ * tragen verschiedene Zusicherungen (Ordnung gegen Kontoauszug), und ein Schalter an einem
+ * Knopf machte aus zwei unterscheidbaren Dateien zwei gleich aussehende. Siehe
+ * `application/bestandsexport`.
+ */
+export function bestandExport(): Promise<string> {
+  return bestandExportieren(
+    {
+      ledger: sqliteLedgerRepository,
+      umsaetze: sqliteUmsatzRepository,
+      konten: sqliteZahlungskontoRepository,
+      personen: sqlitePersonRepository,
+      vertraege: sqliteVertragRepository,
+      vertragszuordnungen: sqliteVertragszuordnungRepository,
+    },
     tauriExportZiel,
     new Date(),
     DATEINAME,

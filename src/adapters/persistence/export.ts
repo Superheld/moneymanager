@@ -6,7 +6,7 @@
 // Dateisystem, und ein Webview, der eines aussuchen darf, könnte überall hinschreiben.
 
 import { invoke } from "@tauri-apps/api/core";
-import type { ExportZiel } from "../../application/konfiguration";
+import type { ExportZiel } from "../../application/export";
 
 export const tauriExportZiel: ExportZiel = {
   schreiben: (name, inhalt) => invoke<string>("export_schreiben", { name, inhalt }),

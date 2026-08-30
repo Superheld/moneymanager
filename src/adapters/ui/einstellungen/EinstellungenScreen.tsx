@@ -32,6 +32,7 @@ import { Auswahl } from "../bausteine/Auswahl";
 import { Bereich } from "../bausteine/Bereich";
 import { VerschluesselungCard } from "../zugang/VerschluesselungCard";
 import { ExportCard } from "./ExportCard";
+import { BestandsexportCard } from "./BestandsexportCard";
 import { Modal } from "../bausteine/Modal";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import {
@@ -110,7 +111,12 @@ export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
                 id: "export",
                 label: t("einstellungen.export.titel"),
                 untertitel: t("einstellungen.export.untertitel"),
-                inhalt: () => <ExportCard />,
+                inhalt: () => (
+                  <>
+                    <ExportCard />
+                    <BestandsexportCard />
+                  </>
+                ),
               },
             ]
           : []),
