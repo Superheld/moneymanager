@@ -21,6 +21,8 @@ export type VorschlagQuelle =
   | "umbuchung"
   | "manuell"
   | "regel"
+  /** Die Quelldatei brachte eine Kategorie mit, die ihr Adapter übersetzen konnte. */
+  | "fremdkategorie"
   | "ki";
 
 export interface Kategorisierungsvorschlag {

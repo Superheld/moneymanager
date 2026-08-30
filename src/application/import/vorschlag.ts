@@ -8,7 +8,11 @@
 //   2. **Vertrag** — die Zahlung passt auf die Erkennungsregel eines Vertrags, und der
 //      trägt eine Kategorie. Das ist keine Schätzung, sondern eine Zuordnung, die jemand
 //      beim Erfassen des Vertrags getroffen hat.
-//   3. **Modell** — der trainierte Klassifikator. Er legt sich immer fest.
+//   3. **Quelle** — die Importdatei brachte eine Kategorie mit, und ihr Adapter konnte
+//      sie übersetzen. Eine Angabe, keine Schätzung: dort steht, wie jemand diese Zahlung
+//      einsortiert HAT. Vor dem Modell, weil das sich immer festlegt und diese Stufe
+//      dahinter nie zum Zug käme.
+//   4. **Modell** — der trainierte Klassifikator. Er legt sich immer fest.
 //
 // Trifft nichts, bleibt der Umsatz unkategorisiert und landet in der Review-Inbox.
 //
@@ -17,8 +21,14 @@
 //
 //   • Das **Remapping** übersetzte die Kategorie, die Finanzguru mitlieferte, auf unseren
 //     Baum. Es trug den Kaltstart, solange nichts trainiert war — und mit einem
-//     mitgelieferten Modell gibt es keinen Kaltstart mehr. Der `kategorieHinweis` bleibt
-//     am BELEG (er ist, was die Quelle lieferte), ausgewertet wird er nicht mehr.
+//     mitgelieferten Modell gibt es keinen Kaltstart mehr.
+//
+//     **Seit dem 30.08.2026 gibt es die Übersetzung wieder, aber woanders:** nicht als
+//     Stufe mit Finanzguru-Wissen in dieser Datei, sondern beim Adapter, der die Datei
+//     liest (`adapters/import/finanzguruKategorien.ts`). Hier steht seitdem nur noch
+//     „die Quelle brachte eine Kategorie mit" — welches Vokabular sie sprach, weiss die
+//     Kette nicht. Ein WISO-Importeur bringt seine eigene Tabelle mit und braucht dafür
+//     keine zweite Stufe. Der `kategorieHinweis` bleibt unverändert am BELEG.
 //   • Die **Festlegung** („immer bei diesem Empfänger") stand vor dem Vertrag. Sie war
 //     kein Schutz — eine Handkorrektur ist über `kategorieHerkunft` ohnehin sicher —,
 //     sondern eine VERALLGEMEINERUNG: sie übertrug eine Korrektur auf andere und künftige
@@ -62,12 +72,23 @@ export interface Vorschlagseingabe {
   readonly verwendungszweck: string;
   readonly glaeubigerId?: string;
   readonly istUmbuchung?: boolean;
+  /**
+   * Die Kategorie, die die QUELLE mitbrachte — als Name in unserem Vokabular, übersetzt
+   * vom Adapter. Fehlt bei allem, was nicht aus einer Datei mit Kategorien kommt.
+   */
+  readonly kategorieVorschlag?: string;
 }
 
 /** Alles, woraus ein Vorschlag entstehen kann. Jeder Teil ist optional. */
 export interface Vorschlagskontext {
   /** Kategorien nach Id — liefert den Charakter zur gewählten Kategorie. */
   readonly kategorieNachId: ReadonlyMap<string, Kategorie>;
+  /**
+   * Dieselben Kategorien nach NAME — für den Vorschlag der Quelle, der einen Namen
+   * liefert und keine Id. Fehlt die Karte, entfällt die Stufe; sie ist nicht Pflicht,
+   * damit Aufrufer ohne Import (die Review-Begründung etwa) sie nicht bauen müssen.
+   */
+  readonly kategorieNachName?: ReadonlyMap<string, Kategorie>;
   /** Erkennungsregeln aller Verträge. */
   readonly erkennungen?: readonly Vertragserkennung[];
   /** Vertrag → Kategorie. Verträge ohne Kategorie fehlen hier und greifen nicht. */
@@ -144,7 +165,26 @@ export function vorschlagsbefundFuer(
     }
   }
 
-  // 3. Modell.
+  // 3. Was die Quelle mitbrachte — eine ANGABE, keine Schätzung.
+  //
+  // **Warum vor dem Modell und nicht danach:** das Modell legt sich immer fest. Stünde
+  // diese Stufe dahinter, käme sie nie zum Zug. Und der Rang ist auch fachlich richtig
+  // herum — in der Quelldatei steht, wie jemand diese Zahlung einsortiert HAT, im Modell
+  // steht, wie es hier üblich WÄRE.
+  //
+  // **Warum nicht vor dem Vertrag:** ein Vertrag ist eine Zuordnung, die jemand in
+  // DIESEM Bestand getroffen hat. Die Kategorie einer fremden App ist eine aus einem
+  // anderen Kontext — näher dran als eine Schätzung, weiter weg als die eigene
+  // Entscheidung.
+  if (roh.kategorieVorschlag && kontext.kategorieNachName?.size) {
+    const kat = kontext.kategorieNachName.get(roh.kategorieVorschlag);
+    if (kat) {
+      const vorschlag = auf(kat.id, "fremdkategorie", kontext);
+      if (vorschlag) return { vorschlag };
+    }
+  }
+
+  // 4. Modell.
   if (kontext.modell) {
     const befund = merkmalsbefund(
       {
@@ -182,4 +222,19 @@ export function vorschlagFuer(
 /** Hilfsindex: Kategorien nach Id. */
 export function katalogNachId(kategorien: readonly Kategorie[]): Map<string, Kategorie> {
   return new Map(kategorien.map((k) => [k.id, k]));
+}
+
+/**
+ * Der Katalog nach NAME — für den Vorschlag, den eine Quelle mitbringt.
+ *
+ * **Bei gleichem Namen gewinnt der erste.** Namen sind im Katalog nicht eindeutig: nichts
+ * hindert daran, unter zwei Gruppen je eine „Sonstiges" anzulegen. Für diese Stufe ist das
+ * hinnehmbar — sie liefert einen VORSCHLAG, den die Durchsicht überschreibt, und die
+ * Alternative (bei Mehrdeutigkeit gar nichts vorschlagen) wäre für den Nutzer schlechter:
+ * er sähe eine leere Kategorie und nicht, warum.
+ */
+export function katalogNachName(kategorien: readonly Kategorie[]): Map<string, Kategorie> {
+  const karte = new Map<string, Kategorie>();
+  for (const k of kategorien) if (!karte.has(k.name)) karte.set(k.name, k);
+  return karte;
 }

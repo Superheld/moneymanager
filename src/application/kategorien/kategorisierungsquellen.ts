@@ -10,7 +10,7 @@
 // frisch aufgesetzten App.
 
 import { STANDARD_KONFIGURATION, type Kategorie } from "../../core";
-import { katalogNachId, type Vorschlagskontext } from "../import/vorschlag";
+import { katalogNachId, katalogNachName, type Vorschlagskontext } from "../import/vorschlag";
 import { konfigurationLaden } from "./merkmalskonfiguration";
 import type {
   KategorieRepository,
@@ -53,6 +53,7 @@ export async function kategorisierungsquellen(deps: QuellenDeps): Promise<Vorsch
 
   return {
     kategorieNachId: katalogNachId(kategorien as Kategorie[]),
+    kategorieNachName: katalogNachName(kategorien as Kategorie[]),
     erkennungen: vertragsKategorie.size > 0 ? erkennungen : undefined,
     vertragsKategorie: vertragsKategorie.size > 0 ? vertragsKategorie : undefined,
     // Ein leeres Modell (nie trainiert oder ohne Material) würde nichts liefern und die

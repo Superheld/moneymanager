@@ -82,7 +82,30 @@ describe("finanzguruAdapter.lies", () => {
       quelle: "finanzguru",
       nativeId: "2da83348289587cbe750f887563fd417135d354e",
       kategorieHinweis: "Lebensmittel",
+      // Was Finanzguru sagte, steht oben; hier steht, was es bei uns heisst. Bei
+      // „Lebensmittel" ist beides gleich — die Uebersetzung faellt trotzdem an, und der
+      // Test haelt fest, dass sie ueberhaupt stattfindet.
+      kategorieVorschlag: "Lebensmittel",
     });
+  });
+
+  it("uebersetzt eine Kategorie, die bei Finanzguru anders heisst", () => {
+    // Der Fall, den der gleichlautende oben nicht zeigt: „Restaurants" gibt es bei uns
+    // nicht, „Auswaerts essen" schon.
+    const { umsaetze } = finanzguruAdapter.lies(
+      datei(reihe({ tag: TAG["2021-11-01"], betrag: "-6.55", unterkat: "Restaurants" })),
+    );
+    expect(umsaetze[0].kategorieHinweis).toBe("Restaurants");
+    expect(umsaetze[0].kategorieVorschlag).toBe("Auswärts essen");
+  });
+
+  it("laesst den Vorschlag leer, wo die Tabelle nichts weiss", () => {
+    // Kein Treffer heisst nicht „unkategorisiert" — danach kommen Vertrag und Modell.
+    const { umsaetze } = finanzguruAdapter.lies(
+      datei(reihe({ tag: TAG["2021-11-01"], betrag: "-6.55", unterkat: "Etwas Neues von FG" })),
+    );
+    expect(umsaetze[0].kategorieHinweis).toBe("Etwas Neues von FG");
+    expect(umsaetze[0].kategorieVorschlag).toBeUndefined();
   });
 
   it("liest die Mandatsreferenz — der einzige Bankschlüssel, den beide Quellen tragen", () => {
