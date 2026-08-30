@@ -18,20 +18,8 @@
 // will, hat `fassung` — mehr Versprechen gibt es nicht.
 
 import type { Kategorie } from "../core";
+import { exportDateiname, type ExportZiel } from "./export";
 import type { KategorieRepository } from "./ports";
-
-/**
- * Wohin eine Exportdatei geht.
- *
- * Der Port kennt keinen Pfad, nur einen Dateinamen: WO exportiert wird, entscheidet der
- * Adapter (und dahinter das Rust-Kommando), nicht der Use-Case. Ein Use-Case, der ein
- * Verzeichnis benennt, hätte eine Meinung über das Dateisystem — und die gehört nicht in
- * die Anwendungsschicht.
- */
-export interface ExportZiel {
-  /** Schreibt die Datei und meldet, wo sie gelandet ist. */
-  schreiben(name: string, inhalt: string): Promise<string>;
-}
 
 /** Die Fassung der Exportform. Steigt, sobald sich die Bedeutung eines Feldes ändert. */
 export const EXPORT_FASSUNG = 1;
@@ -85,23 +73,6 @@ export function inExportform(kategorien: readonly Kategorie[]): ExportKategorie[
 }
 
 /**
- * Der Dateiname zu einem Tag und einem Bestand.
- *
- * **Die Bestandskennung ist nicht Zierrat.** Der echte Bestand und der Spielstand liegen
- * in zwei Dateien, aber im SELBEN App-Datenverzeichnis — der Identifier trennt sie nicht
- * (siehe `datenbankdatei.ts`). Ohne Kennung schreiben beide Apps denselben Namen, und ein
- * Export aus der installierten App überschriebe den des Spielstands wortlos. Die beiden
- * sehen von aussen gleich aus; welcher gemeint war, wüsste danach niemand mehr.
- *
- * Ein Export je Tag und Bestand, der neuere ersetzt den älteren. Bei einer Momentaufnahme
- * ist das richtig — anders als bei den Sicherungen, wo der ALTE Stand der wertvolle ist.
- */
-export function exportDateiname(erzeugt: Date, bestand: string): string {
-  const kennung = bestand.replace(/\.db$/, "");
-  return `konfiguration-${kennung}-${erzeugt.toISOString().slice(0, 10)}.json`;
-}
-
-/**
  * Schreibt die Konfiguration und meldet, wo sie liegt.
  *
  * Der Zeitpunkt kommt herein und wird nicht hier geholt — dieselbe Regel wie überall:
@@ -119,7 +90,7 @@ export async function konfigurationExportieren(
     kategorien: inExportform(await repo.alle()),
   };
   return ziel.schreiben(
-    exportDateiname(erzeugt, bestand),
+    exportDateiname("konfiguration", erzeugt, bestand),
     JSON.stringify(inhalt, null, 2) + "\n",
   );
 }

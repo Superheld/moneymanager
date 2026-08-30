@@ -407,23 +407,37 @@ weiter unten.
 - **`kontostand_anker` und `depotwert` werden nicht protokolliert.** Sie sind Beobachtungen
   zu einem Stichtag und werden nur ergänzt, nicht geändert.
 
-## Konfiguration exportieren (Experiment)
+## Zwei Exporte, zwei Zusicherungen (Experiment)
 
-Seit 2026-08-30, hinter `experiment.export`. Exportiert wird, **wie der Haushalt ORDNET,
-nicht was in ihm passiert ist**: heute die Kategorien mit Baum und Charakter, später
-Budgets, Verträge, Kontogruppen, Erkennungsregeln. Keine Buchungen, keine Salden, keine
-Kontonummern.
+Seit 2026-08-30, beide hinter `experiment.export`, beide im selben Register
+**Einstellungen → Export** — untereinander, damit man den Unterschied sieht:
 
-Diese Grenze ist der ganze Grund, warum die Datei weitergegeben werden darf — eine Ordnung
-lässt sich teilen, ein Kontoauszug nicht. `konfiguration.test.ts` hält sie als Zusicherung
-fest und nicht nur als Kommentar.
+| Datei | enthält | darf man weitergeben |
+|---|---|---|
+| `konfiguration-<kennung>-<tag>.json` | wie der Haushalt ORDNET: Kategorien mit Baum und Charakter | **ja** |
+| `bestand-<kennung>-<tag>.json` | was in ihm PASSIERT ist: Buchungen samt Bankzeile, Konten, Verträge, Personen | **nein — das ist der Kontoauszug** |
+
+**Die Trennung IST die Zusicherung, und sie hält nur, solange es zwei Dateien sind.** Eine
+Ordnung lässt sich teilen, ein Kontoauszug nicht. Beide Seiten stehen als ausführbare
+Zusicherung da und nicht nur als Kommentar: `konfiguration.test.ts` prüft, dass in der
+einen kein Feld eine Buchung beschreibt, `bestandsexport.test.ts` prüft, dass in der
+anderen genau das drinsteht. **Die beiden Tests zusammen sind die Grenze** — einer allein
+wäre eine halbe Aussage, und wer die Exporte je zusammenlegen will, macht beide zugleich rot.
+
+Der naheliegende Weg war ein Häkchen „Buchungen mitnehmen" an der vorhandenen Karte. Er
+ist verworfen, und der Grund ist nicht Prinzipienreiterei: er erzeugte zwei Dateien, die
+gleich heissen und gleich aussehen, und im Dateimanager — oder im Anhang einer Mail —
+wüsste niemand mehr, welche er vor sich hat. **Der Dateiname ist die einzige Stelle, an
+der man einer Exportdatei ihre Zusicherung von aussen ansieht.**
 
 | Stück | Datei |
 |---|---|
-| Form, Sortierung, Use-Case | `src/application/konfiguration.ts` |
+| Port und Dateiname (geteilt) | `src/application/export.ts` |
+| Die Ordnung: Form, Sortierung, Use-Case | `src/application/konfiguration.ts` |
+| Der Bestand: Form, Join, Use-Case | `src/application/bestandsexport.ts` |
 | Der Port auf das Kommando | `src/adapters/persistence/export.ts` |
 | Das Kommando | `src-tauri/src/export.rs` |
-| Die Karte | `src/adapters/ui/einstellungen/ExportCard.tsx` |
+| Die Karten | `src/adapters/ui/einstellungen/ExportCard.tsx` · `BestandsexportCard.tsx` |
 
 Vier Entscheidungen, die man kennen muss:
 
@@ -446,8 +460,41 @@ Vier Entscheidungen, die man kennen muss:
 
 **Einen Import gibt es nicht**, und das ist der Grund für den Experimente-Schalter: die
 schwierige Hälfte ist das Einlesen — eingelesene Kategorien treffen auf vorhandene, IDs
-kollidieren, Bäume müssen zusammengeführt werden. Bis das entschieden ist, sichert die
-Datei nur `fassung` zu.
+kollidieren, Bäume müssen zusammengeführt werden. Bis das entschieden ist, sichert jede
+Datei nur ihre `fassung` zu. Die beiden Fassungsnummern sind dabei **getrennt**: sonst
+stiege die eine, weil sich an der anderen etwas geändert hat, und `fassung` sagte nichts mehr.
+
+### Was im Bestandsexport steht — und warum vollständig
+
+Er ist gebaut, um den Bestand einmal herauszuholen, anzusehen, aufzuräumen und
+**pseudonymisiert** weiterzuverwenden: als Vorlage für den Spielstand
+(`testwerkzeug/seedDaten.ts`) und für das mitgelieferte Kategorisierungsmodell.
+
+Bei einem Export, dessen Zweck Analyse ist, kostet ein weggelassenes Feld einen ganzen
+Zyklus — man merkt es erst beim Auswerten. Deshalb kommt jedes Feld mit, das eine AUSSAGE
+über die Zahlung trägt, `zweckCode` und `endempfaenger` eingeschlossen; draussen bleibt
+nur, was reiner technischer Schlüssel ist (`rohHash`, `nativeId`). Der Beleg steht **am
+Buchungssatz**, nicht in einem eigenen Abschnitt: für beide Zwecke ist genau die
+Verbindung das Interessante, und zwei Listen mit einer ID dazwischen zwängen jeden Leser,
+den Join nachzubauen, den `application/zahlungsspuren` längst kennt.
+
+**Konten allein reichten nicht** — das war die erste Annahme, und sie ist an zwei Stellen
+zu kurz: ein Konto zeigt über `inhaberIds` auf Personen, eine Buchung zusätzlich über
+`vertrag_id` auf einen Vertrag. Deshalb sind es vier Abschnitte und nicht zwei.
+`bestandsexport.test.ts` hält das fest, indem es jeden Verweis einer Buchung in der Datei
+wiederfindet.
+
+Was NICHT drin ist, damit niemand danach sucht: unverbuchte Zeilen (Inbox, verworfen) —
+exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso Budgets,
+Inventar, Depots, Kontogruppen und das Journal: sie hängen nicht an einer Buchung.
+
+**Der gefährliche Teil liegt hinter dem Export, nicht in ihm.** Beide Verwendungswege enden
+im ÖFFENTLICHEN Repo, und diese Datei ist der kürzeste Weg von der echten Datenbank
+dorthin. Die Pseudonymisierung passiert danach und ausserhalb — und **kein Wächter im Repo
+würde einen Empfängernamen finden**, der es doch hineinschafft: der Muster-Guard kennt
+Formen, keine Werte (siehe „Was er nicht kann"). Was aus dieser Datei ins Repo wandert,
+ist Handarbeit mit Vier-Augen-Anspruch, und was sich benennen lässt, gehört vorher in
+`.privacy-terms`.
 
 ## Was die App nach draussen spricht
 

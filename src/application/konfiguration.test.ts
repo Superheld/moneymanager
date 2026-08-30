@@ -3,7 +3,6 @@ import type { Kategorie } from "../core";
 import type { KategorieRepository } from "./ports";
 import {
   EXPORT_FASSUNG,
-  exportDateiname,
   inExportform,
   konfigurationExportieren,
   type Konfigurationsexport,
@@ -55,24 +54,6 @@ describe("inExportform", () => {
     // Waise darin: die Lücke fällt beim Einlesen auf, das Fehlen nicht.
     const waise: Kategorie = { id: "k-waise", name: "Waise", elternId: "gibt-es-nicht", defaultCharakter: "Aufwand" };
     expect(inExportform([...BAUM, waise]).map((k) => k.id)).toContain("k-waise");
-  });
-});
-
-describe("exportDateiname", () => {
-  it("trägt den Tag und den Bestand", () => {
-    expect(exportDateiname(new Date("2026-08-30T14:12:00Z"), "moneymanager.db")).toBe(
-      "konfiguration-moneymanager-2026-08-30.json",
-    );
-  });
-
-  it("hält echten Bestand und Spielstand auseinander", () => {
-    // Beide Dateien liegen im SELBEN App-Datenverzeichnis — der Identifier trennt sie
-    // nicht. Ohne die Kennung schriebe die installierte App denselben Namen wie der
-    // Spielstand und überschriebe ihn wortlos.
-    const tag = new Date("2026-08-30T14:12:00Z");
-    expect(exportDateiname(tag, "moneymanager.db")).not.toBe(
-      exportDateiname(tag, "moneymanager-dev.db"),
-    );
   });
 });
 

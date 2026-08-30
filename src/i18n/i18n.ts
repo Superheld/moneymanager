@@ -1357,15 +1357,29 @@ const de = {
     },
     export: {
       titel: "Export",
-      untertitel: "Die Ordnung des Haushalts als Datei",
-      text:
-        "Exportiert wird, wie du ordnest — nicht, was du gebucht hast. Die Datei " +
-        "enthält die Kategorien mit ihrem Baum und ihrem Charakter; Buchungen, Salden " +
-        "und Kontonummern stehen nicht darin.",
-      knopf: "Kategorien exportieren",
+      untertitel: "Zwei Dateien: wie du ordnest — und was passiert ist",
       laeuft: "Wird geschrieben …",
       fertig: "Geschrieben nach:",
       fehler: "Der Export ist fehlgeschlagen: {{grund}}",
+      konfiguration: {
+        titel: "Ordnung",
+        text:
+          "Exportiert wird, wie du ordnest — nicht, was du gebucht hast. Die Datei " +
+          "enthält die Kategorien mit ihrem Baum und ihrem Charakter; Buchungen, Salden " +
+          "und Kontonummern stehen nicht darin.",
+        hinweis: "Diese Datei darfst du weitergeben.",
+        knopf: "Kategorien exportieren",
+      },
+      bestand: {
+        titel: "Bestand",
+        text:
+          "Exportiert wird, was passiert ist: alle Buchungen mit ihrer Bankzeile, dazu " +
+          "die Konten, Verträge und Personen, auf die sie zeigen.",
+        warnung:
+          "Diese Datei ist dein Kontoauszug. Sie enthält IBANs, Kontostände, Empfänger " +
+          "und jeden Verwendungszweck — gib sie nicht weiter und lade sie nirgends hoch.",
+        knopf: "Bestand exportieren",
+      },
     },
     person: {
       titel: "Personen",
@@ -3109,15 +3123,29 @@ const en: typeof de = {
     },
     export: {
       titel: "Export",
-      untertitel: "How the household is organised, as a file",
-      text:
-        "What gets exported is how you organise things — not what you booked. The file " +
-        "holds the categories with their tree and their character; transactions, " +
-        "balances and account numbers are not in it.",
-      knopf: "Export categories",
+      untertitel: "Two files: how you organise — and what happened",
       laeuft: "Writing …",
       fertig: "Written to:",
       fehler: "The export failed: {{grund}}",
+      konfiguration: {
+        titel: "Structure",
+        text:
+          "What gets exported is how you organise things — not what you booked. The file " +
+          "holds the categories with their tree and their character; transactions, " +
+          "balances and account numbers are not in it.",
+        hinweis: "This file is safe to share.",
+        knopf: "Export categories",
+      },
+      bestand: {
+        titel: "Records",
+        text:
+          "What gets exported is what happened: every transaction with its bank line, " +
+          "plus the accounts, contracts and people they point to.",
+        warnung:
+          "This file is your bank statement. It holds IBANs, balances, payees and every " +
+          "reference line — do not share it and do not upload it anywhere.",
+        knopf: "Export records",
+      },
     },
     person: {
       titel: "People",

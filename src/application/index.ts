@@ -274,15 +274,25 @@ export {
   type Experimente,
 } from "./experimente";
 
+export { exportDateiname, type ExportZiel, type Exportart } from "./export";
 export {
   konfigurationExportieren,
-  exportDateiname,
   inExportform,
   EXPORT_FASSUNG,
-  type ExportZiel,
   type ExportKategorie,
   type Konfigurationsexport,
 } from "./konfiguration";
+export {
+  bestandExportieren,
+  BESTANDSEXPORT_FASSUNG,
+  type Bestandsexport,
+  type Bestandsquellen,
+  type ExportBuchung,
+  type ExportBeleg,
+  type ExportKonto,
+  type ExportPerson,
+  type ExportVertrag,
+} from "./bestandsexport";
 export {
   uebersichtLaden,
   waehlbareMonate,

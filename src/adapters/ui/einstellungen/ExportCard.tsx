@@ -35,13 +35,14 @@ export function ExportCard() {
   }
 
   return (
-    <Card title={t("einstellungen.export.titel")}>
-      <p className="muted">{t("einstellungen.export.text")}</p>
+    <Card title={t("einstellungen.export.konfiguration.titel")}>
+      <p className="muted">{t("einstellungen.export.konfiguration.text")}</p>
+      <p className="muted">{t("einstellungen.export.konfiguration.hinweis")}</p>
       {/* Kein `disabled` — der Baustein aus dem Design-System kennt es nicht, und ein
           zweiter Klick waehrend des Schreibens ueberschreibt nur dieselbe Datei mit
           demselben Inhalt. Der Text sagt trotzdem, dass gerade etwas laeuft. */}
       <Button variant="primary" onClick={() => !laeuft && void exportieren()}>
-        {laeuft ? t("einstellungen.export.laeuft") : t("einstellungen.export.knopf")}
+        {laeuft ? t("einstellungen.export.laeuft") : t("einstellungen.export.konfiguration.knopf")}
       </Button>
       {pfad && (
         <p style={{ marginBottom: 0 }}>
