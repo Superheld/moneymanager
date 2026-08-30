@@ -9,6 +9,7 @@ import {
   budgetVerbrauch,
   effektiverMonatsbetrag,
   elternBudget,
+  ersterBudgetmonat,
   geglaetteterMonatsabfluss,
   kindBudgets,
   monatsFenster,
@@ -294,5 +295,37 @@ describe("budgetStand", () => {
   it("meldet einen negativen Rest, wenn mehr ausgegeben wurde als da war", () => {
     const b = budget({ kategorieId: "urlaub", betragProMonat: euroZuCent(10) });
     expect(budgetStand(sicht(ist, [b]), b, "2026-03-15").rest).toBe(euroZuCent(-10));
+  });
+});
+
+/**
+ * Ein Budget ohne `start` kann die App nicht erzeugen — die Spalte ist aber nullable, und
+ * das Repository reicht sie unveraendert durch. Bis hierher warf `.slice` dann schon beim
+ * LADEN, und weil `budgetstaende` ueber alle Budgets laeuft, nahm ein einziges kaputtes
+ * den ganzen Screen mit: leere Seite, keine Meldung, kein Hinweis welches.
+ *
+ * Der Test steht im Kern und nicht in der UI, weil die Absicherung dort sitzt — und weil
+ * er sonst genau das braeuchte, was er verhindern soll: einen kaputten Bestand.
+ */
+describe("Budget ohne Startdatum", () => {
+  /** Der Zustand, den der Typ ausschliesst und die Datenbank hergibt. */
+  const ohneStart = (art: Budget["art"], betraege: Budget["betraege"]): Budget =>
+    ({ id: "b", kategorieId: "k", kontoId: "giro", art, betraege, start: null } as unknown as Budget);
+
+  it("faellt auf die erste Betragsversion zurueck, statt zu werfen", () => {
+    const b = ohneStart("monatlich", [{ abMonat: "2026-03", betrag: euroZuCent(100) }]);
+    expect(ersterBudgetmonat(b)).toBe("2026-03");
+  });
+
+  it("nimmt auch beim Aufbauenden die erste Version — der Anker ist ja weg", () => {
+    const b = ohneStart("aufbauend", [{ abMonat: "2026-03", betrag: euroZuCent(100) }]);
+    expect(ersterBudgetmonat(b)).toBe("2026-03");
+  });
+
+  it("rechnet weiter, statt den ganzen Bereich mitzunehmen", () => {
+    const b = ohneStart("monatlich", [{ abMonat: "2026-01", betrag: euroZuCent(400) }]);
+    const stand = budgetStand(sicht([], [b]), b, "2026-03-15");
+    expect(stand.rahmen).toBe(euroZuCent(400));
+    expect(stand.rest).toBe(euroZuCent(400));
   });
 });
