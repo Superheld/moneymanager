@@ -48,7 +48,7 @@ Die Rolle übernehmen bis dahin drei andere:
 - **Der Compiler.** `strict`, `noUnusedLocals`, `noUnusedParameters`,
   `noFallthroughCasesInSwitch` sind an. `npm run typecheck` muss grün sein.
 - **Tests als Wächter.** `architektur.test.ts` (Schichtgrenzen), `doku.test.ts`
-  (Verweise in der Doku), `privatsphaere.test.ts` (keine echten Daten), der i18n-Test
+  (Verweise in der Doku), `privatsphaere.test.ts` (keine IBAN einer echten Bank), der i18n-Test
   (de/en-Parität). Eine Regel, die zählt, wird ausführbar gemacht statt aufgeschrieben.
 - **Das LSP** (`typescript-lsp`, aktiviert in `.claude/settings.json`) liefert dieselben
   Auskünfte während der Arbeit statt erst im Testlauf: wo ein Symbol definiert ist, **alle**
@@ -134,28 +134,42 @@ ob die Kontonummer dahinter vergeben ist, weiss hier niemand. Beispiel-IBANs aus
 taugen dafür nicht: was als „bekanntes Dummy-Beispiel" kursiert, trägt regelmäßig die BLZ
 einer echten Bank.
 
-## Was die Wächter können — und was nicht
+## Was der Wächter kann — und was nicht
 
-`src/privatsphaere.test.ts` liest die Merkmale zur Laufzeit aus der echten Datenbank und
-prüft den Arbeitsbaum dagegen; `.githooks/pre-push` prüft zusätzlich die ausgehenden
-Commit-Texte. Beide finden nur den **Originalwert**. Ob ein Ersatz neutral ist und ob er
-sich über Testfälle hinweg wiederholt, kann keiner von beiden sehen. Regel 2 und 3 sind
-Handarbeit.
+**Bis zum 30.08.2026 stand hier mehr.** `src/privatsphaere.test.ts` las die Merkmale zur
+Laufzeit aus der echten Datenbank und prüfte den Arbeitsbaum dagegen, `.githooks/pre-push`
+zusätzlich die ausgehenden Commit-Texte. Dieser Wert-Abgleich ist ausgebaut — warum, steht
+in `../CLAUDE.md` unter „Der Wert-Abgleich ist weg, und was das kostet". Die Kurzfassung:
+er brauchte den Datenschlüssel im Klartext und sperrte ohne ihn jeden Push.
 
-**Der Wächter kennt nur die Tabellen, die jemand eingetragen hat.** Er liest keine Spalten
-„mit Beträgen", sondern eine feste Liste von Abfragen — und was dort fehlt, sieht er nicht.
-Deshalb gehört zu **jeder neuen Tabelle mit Beträgen, Namen oder Kontobezügen** eine Zeile
-in dieser Liste, im selben Schritt wie die Migration. Ein Wächter, der eine Tabelle nicht
-kennt, ist an dieser Stelle keiner — und er sagt es nicht, er schweigt.
+Was bleibt, sind **Formen**:
 
-Am 2026-08-21 durchgemessen, weil es passiert ist: die Depot-Tabellen kamen dazu, der
-Wächter kannte sie nicht, und ein Depotwert aus dem echten Bestand stand als Erwartung in
-einem Screen-Test. Gefunden wurde er von Hand, nicht vom Testlauf.
+- `scripts/privacy-guard.mjs` — IBAN, SEPA-Gläubiger-ID, Token, E-Mail, Produkt-ID,
+  Beträge in Prosa, verbotene Dateitypen.
+- `src/privatsphaere.test.ts` — keine IBAN im Repo trägt die BLZ einer echten Bank,
+  geprüft gegen die DK-Liste.
 
-**Eine Ergänzung, die man nicht hat scheitern sehen, ist ungeprüft.** Nach dem Eintragen
-den echten Wert kurz in den Arbeitsbaum setzen und nachsehen, ob der Wächter rot wird und
-Datei und Wert nennt — danach wieder entfernen. Das kostet eine Minute und ist der einzige
-Beleg, dass die neue Zeile trifft.
+**Was jetzt niemand mehr findet, und damit musst du rechnen:** einen Empfängernamen, einen
+Verwendungszweck, eine Buchungszahl, einen abgeschriebenen Betrag **im Code** (in Prosa
+greift der Muster-Guard). Das ist keine Nachlässigkeit, sondern der Preis dafür, dass kein
+Wächter mehr einen Generalschlüssel für den Bestand braucht.
+
+**Was du dagegen tun kannst, ohne auf Disziplin zu setzen:** Namen und Begriffe, die keinem
+Muster folgen, in `.privacy-terms` eintragen (git-ignoriert, Vorlage
+`.privacy-terms.example`). Dort greift der Muster-Guard sie wieder auf, und zwar in Code,
+Prosa und Commit-Texten. Wer beim Debuggen am echten Bestand auf einen Namen stösst, der
+leicht mitrutscht, trägt ihn dort ein — **bevor** er ihn irgendwohin kopiert.
+
+**Und eine Ergänzung, die man nicht hat scheitern sehen, ist ungeprüft.** Nach dem
+Eintragen den Wert kurz in den Arbeitsbaum setzen und nachsehen, ob der Guard rot wird —
+danach wieder entfernen. Das kostet eine Minute und ist der einzige Beleg, dass die neue
+Zeile trifft.
+
+Am 2026-08-21 ist der Fall real gewesen, damals noch mit dem alten Wächter: die
+Depot-Tabellen kamen dazu, er kannte sie nicht, und ein Depotwert aus dem echten Bestand
+stand als Erwartung in einem Screen-Test. Gefunden wurde er von Hand, nicht vom Testlauf.
+Diese Lücke ist mit dem Ausbau nicht grösser geworden — sie ist jetzt nur die Regel statt
+der Ausnahme.
 
 Warum das Repo überhaupt so behandelt wird und was die Wächter im Einzelnen tun, steht in
 `../CLAUDE.md` unter „Nichts aus dem echten Bestand ins Repo".
