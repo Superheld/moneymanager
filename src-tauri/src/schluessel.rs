@@ -27,7 +27,7 @@ use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
 use data_encoding::{BASE32_NOPAD, BASE64};
-use rand::RngCore;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -71,7 +71,7 @@ impl Datenschluessel {
     /// Ein frischer, gewuerfelter Schluessel.
     pub fn wuerfeln() -> Self {
         let mut bytes = [0u8; SCHLUESSEL_BYTES];
-        rand::thread_rng().fill_bytes(&mut bytes);
+        rand::rng().fill_bytes(&mut bytes);
         Self(bytes)
     }
 
@@ -203,8 +203,8 @@ fn kek(passphrase: &str, salz: &[u8], p: &KdfAngaben) -> Result<[u8; 32], Schlue
 pub fn einwickeln(dk: &Datenschluessel, passphrase: &str) -> Result<Huelle, SchluesselFehler> {
     let mut salz = [0u8; SALZ_BYTES];
     let mut nonce = [0u8; NONCE_BYTES];
-    rand::thread_rng().fill_bytes(&mut salz);
-    rand::thread_rng().fill_bytes(&mut nonce);
+    rand::rng().fill_bytes(&mut salz);
+    rand::rng().fill_bytes(&mut nonce);
 
     let angaben = KdfAngaben {
         art: "argon2id".into(),
