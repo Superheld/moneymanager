@@ -182,16 +182,26 @@ describe("Der Release-Workflow und die Apple-Signierung", () => {
   });
 
   it("führt beide Fassungen des Release-Texts — die signierte und die ehrliche", () => {
-    // Der unsignierte Zweig MUSS die xattr-Anleitung tragen. Sie wegzulassen macht das
-    // Bundle nicht sicherer; es macht nur den Fehlschlag unerklärlich — macOS meldet
-    // „beschädigt", und wer die App nicht selbst gebaut hat, hat keine Handhabe.
-    //
-    // Der signierte Zweig muss weiterhin dastehen, damit die Anleitung von selbst
-    // verschwindet, sobald das Zertifikat da ist. Sonst bliebe sie stehen und behauptete
-    // dann ihrerseits etwas Falsches.
+    // Beide Zweige müssen dastehen, damit der Text den Signierungsstand SAGT statt ihn zu
+    // behaupten — und damit der unsignierte von selbst verschwindet, sobald das Zertifikat
+    // da ist. Bliebe er stehen, behauptete er dann seinerseits etwas Falsches.
     expect(WORKFLOW, "Der signierte Zweig fehlt").toContain("Signiert und notarisiert.");
-    expect(WORKFLOW, "Der unsignierte Zweig nennt den Weg nicht").toContain(
-      "xattr -dr com.apple.quarantine",
+    expect(WORKFLOW, "Der unsignierte Zweig nennt den Zustand nicht").toContain(
+      "Nicht mit einem Apple-Zertifikat signiert",
+    );
+  });
+
+  it("erklärt niemandem, wie man Gatekeeper aushebelt", () => {
+    // Bis zum 30.08.2026 stand die xattr-Zeile im unsignierten Zweig, und der Grund dafür
+    // war gut: ohne sie ist der Fehlschlag unerklärlich. Er wiegt trotzdem weniger als
+    // das, was eine öffentliche Seite einübt. „Quarantäne-Merkmal abräumen, wenn eine App
+    // als beschädigt gemeldet wird" ist als GEWOHNHEIT der Griff, mit dem man sich das
+    // nächste Mal etwas anderes einfängt — und die Anleitung dafür stünde bei uns.
+    //
+    // Geprüft wird der ganze Workflow und nicht nur der Textschritt: der Weg zurück wäre
+    // sonst eine Zeile weiter oben, wo niemand hinsieht.
+    expect(WORKFLOW, "Der Workflow erklärt wieder, wie man die Quarantäne abräumt").not.toMatch(
+      /xattr\s+-[a-z]*d[a-z]*\s|com\.apple\.quarantine/,
     );
   });
 });
