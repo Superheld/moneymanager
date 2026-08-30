@@ -150,7 +150,10 @@ describe("BudgetsScreen", () => {
       const gespeichert = await sqliteBudgetRepository.alle();
       expect(gespeichert).toHaveLength(1);
       expect(gespeichert[0].art).toBe("aufbauend");
-      expect(gespeichert[0].betraege).toEqual([{ abMonat: "2026-08", betrag: 10000 }]);
+      // `monatVersetzt(0)` und kein fester Monat: der Screen liest die Uhr selbst
+      // (`heuteIso`), und ein hartkodierter Monat prueft ab dem naechsten Ersten etwas
+      // anderes, als er soll — er wird rot, ohne dass sich etwas geaendert haette.
+      expect(gespeichert[0].betraege).toEqual([{ abMonat: monatVersetzt(0), betrag: 10000 }]);
     });
   });
 
