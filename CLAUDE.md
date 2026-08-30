@@ -488,6 +488,16 @@ Was NICHT drin ist, damit niemand danach sucht: unverbuchte Zeilen (Inbox, verwo
 exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso Budgets,
 Inventar, Depots, Kontogruppen und das Journal: sie hängen nicht an einer Buchung.
 
+**Die Datei liegt im KLARTEXT, der Bestand daneben nicht.** Seit 2026-08-27 ist die
+Datenbank verschlüsselt und ihre Sicherungen sind es mit; ein Bestandsexport legt eine
+unverschlüsselte Vollkopie desselben Inhalts daneben und hebt den Schutz für diesen Ordner
+faktisch auf, solange sie liegt. Das ist dieselbe Lücke wie bei den von Hand angelegten
+Sicherungen, die die Überführung nie zu sehen bekommt — und sie entsteht aus demselben
+Grund: jemand tut etwas Sorgfältiges und denkt danach nicht mehr an die Kopie. Deshalb
+sagt die Karte es dazu, und deshalb steht es hier: **die Datei gehört nach Gebrauch
+gelöscht**, nicht aufgehoben. Ein Export je Tag und Bestand überschreibt sich zwar selbst,
+aber nur, solange am selben Tag exportiert wird.
+
 **Der gefährliche Teil liegt hinter dem Export, nicht in ihm.** Beide Verwendungswege enden
 im ÖFFENTLICHEN Repo, und diese Datei ist der kürzeste Weg von der echten Datenbank
 dorthin. Die Pseudonymisierung passiert danach und ausserhalb — und **kein Wächter im Repo

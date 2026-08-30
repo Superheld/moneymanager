@@ -43,6 +43,7 @@ export function BestandsexportCard() {
       {/* Die Warnung steht VOR dem Knopf und nicht darunter: was sie sagt, entscheidet
           darüber, ob man ihn drücken will. */}
       <p className="zugang-fehler">{t("einstellungen.export.bestand.warnung")}</p>
+      <p className="muted">{t("einstellungen.export.bestand.vergaenglich")}</p>
       <Button variant="primary" onClick={() => !laeuft && void exportieren()}>
         {laeuft ? t("einstellungen.export.laeuft") : t("einstellungen.export.bestand.knopf")}
       </Button>
