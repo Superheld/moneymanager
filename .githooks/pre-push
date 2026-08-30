@@ -6,21 +6,29 @@
 # Budgetbetraege und Buchungszahlen in einem Dutzend Beschreibungen, weil "am echten
 # Bestand gemessen" die ueberzeugendste Begruendung ist.
 #
-# Deshalb hier dreierlei:
-#   1. die beiden Waechter aus der Testsuite (Datenbestand, Produkt-ID)
+# Deshalb hier zweierlei:
+#   1. die beiden Waechter aus der Testsuite (Formen im Arbeitsbaum, Produkt-ID)
 #   2. der MUSTER-Guard ueber alles, was uebertragen wird — Diff UND Commit-Texte
-#   3. ein Abgleich der AUSGEHENDEN Commit-Texte gegen die echte Datenbank
 #
-# Der Muster-Guard und der Datenbank-Abgleich ersetzen einander NICHT. Der eine kennt die
-# Formen (IBAN, Token, Betrag in Prosa) und findet auch Fremdes; der andere kennt die
-# Werte und findet sie in jeder Schreibweise. An genau der Naht ist einmal etwas
-# durchgerutscht: eine Kontonummer aus einem FinTS-Mitschnitt, die in keiner Tabelle steht.
+# BIS 2026-08-30 GAB ES EINEN DRITTEN: einen Abgleich der ausgehenden Commit-Texte gegen
+# die ECHTE Datenbank. Er kannte die Werte und fand sie in jeder Schreibweise — das konnte
+# und kann der Muster-Guard nicht. Er ist trotzdem weg, und der Grund gehoert hierher,
+# damit ihn niemand aus Reflex wieder einbaut:
 #
-# Gelesen wird ueber `sqlite3` mit `PRAGMA query_only=ON` — nicht mit `-readonly`:
-# solange die App laeuft, haelt sie die Datenbank, und read-only scheitert dann mit
-# "unable to open database file" (der WAL-Modus braucht die -shm-Datei). Ohne Datenbank
-# oder ohne sqlite3 entfaellt Schritt 2; laesst sie sich nicht oeffnen, bricht der Hook ab
-# statt stillschweigend durchzuwinken.
+#   • Seit der Bestand verschluesselt ist, brauchte er den DATENSCHLUESSEL, abgelegt als
+#     Wiederherstellungscode im Klartext neben der Datenbank. Ein Waechter, der einen
+#     Generalschluessel verlangt, nimmt der Verschluesselung ihren Zweck.
+#   • Fehlte die Datei, brach er ab — richtig so, aber die Folge war, dass JEDER Push
+#     blockierte. Das traf auch den Rechner, auf dem die Verschluesselung eingefuehrt
+#     wurde, und zwar still: ein Push, der nicht stattfindet, sieht aus wie ein Tag ohne
+#     Push.
+#   • Seine Voraussetzung ist entfallen: es liegen keine Echtdaten im Rohformat mehr in
+#     der Entwicklung, und der Spielstand ist eine eigene Umgebung mit erfundenen Daten.
+#
+# WAS DAMIT UNGEPRUEFT BLEIBT: alles, was keiner Form folgt — ein Empfaengername, ein
+# Verwendungszweck, eine Buchungszahl. Wer so etwas benennen kann, traegt es in
+# `.privacy-terms` ein (git-ignoriert); dort greift der Muster-Guard es wieder auf. Der
+# Rest ist Handarbeit, so wie die Anonymisierung es immer schon war.
 #
 # ERSETZEN REICHT NICHT — es muss anonymisieren. Ein erfundener Name, der die Branche
 # durchscheinen laesst, verraet dasselbe wie der echte: ein Fantasiename, dem man den
@@ -33,7 +41,6 @@
 # Umgehen im Notfall:         git push --no-verify
 
 set -e
-DB="$HOME/Library/Application Support/de.netmechanics.moneymanager/moneymanager.db"
 
 echo "pre-push: Waechter laufen …"
 npx vitest run src/privatsphaere.test.ts src/adapters/fints/produktId.test.ts \
@@ -42,19 +49,14 @@ npx vitest run src/privatsphaere.test.ts src/adapters/fints/produktId.test.ts \
     exit 1
   }
 
-# Git schickt die ausgehenden Refs auf STDIN — und zwar genau einmal. Beide Pruefungen
-# unten brauchen sie, deshalb wird stdin hier EINMAL eingelesen und danach aus der
-# Variablen gefuettert. Wer die zweite Schleife weiter aus stdin liest, laesst sie leer
-# laufen: sie sieht keinen einzigen Ref und meldet „nichts gefunden".
+# Git schickt die ausgehenden Refs auf STDIN — und zwar genau einmal. Eingelesen wird
+# deshalb EINMAL in eine Variable und danach daraus gefuettert.
 #
 # Gefuettert wird per Here-String und nicht per Pipe: eine Pipe startet eine Subshell, und
 # ein dort gesetztes `fehler=1` ist nach der Schleife wieder weg. Der Hook liefe gruen
 # durch, obwohl er angeschlagen hat.
 REFS=$(cat)
 WURZEL=$(git rev-parse --show-toplevel)
-
-# Der Muster-Guard laeuft ueber JEDEN ausgehenden Bereich — auch wenn es die Datenbank
-# unten gar nicht gibt. Er braucht sie nicht.
 
 # Der ausgehende Bereich eines Refs — was der Remote noch NICHT hat.
 #
@@ -102,72 +104,4 @@ $REFS
 EOF
 
 [ "$guard_fehler" = "0" ] || exit 1
-
-# Die Merkmale kommen aus `scripts/bestandsmerkmale.mjs` — DERSELBEN Quelle, aus der auch
-# `src/privatsphaere.test.ts` liest.
-#
-# Vorher standen die Abfragen hier ein zweites Mal, und genau das ist schiefgegangen: als
-# `budget.betrag_pro_monat` einer Reihe wich, zog der Test mit und dieser Hook nicht. Er
-# lief danach nicht mit einem Merkmal weniger — er brach unter `set -e` wortlos ab, und
-# der Push scheiterte ohne eine Zeile Begruendung. Von aussen sah das aus wie eine
-# Ablehnung des Remotes, und die naheliegende Reaktion darauf ist `--no-verify`.
-#
-# Das Skript unterscheidet selbst zwischen „nichts zu pruefen" (leere Ausgabe, Exit 0) und
-# „da ist etwas, das ich nicht lesen kann" (Abbruch mit Meldung). Beides wird hier
-# uebernommen, statt es ein zweites Mal zu entscheiden.
-if ! merkmale=$(node "$WURZEL/scripts/bestandsmerkmale.mjs" 2>&1); then
-  echo "pre-push: ABGEBROCHEN — die Merkmale liessen sich nicht ermitteln."
-  echo "          $(printf '%s' "$merkmale" | head -3)"
-  echo "          Der Hook haette NICHTS geprueft. Lieber anhalten als beruhigen."
-  exit 1
-fi
-
-# Keine Merkmale heisst: es gibt keinen Bestand zu schuetzen (frischer Klon, anderer
-# Rechner, kein sqlite3). Der Muster-Guard oben ist da laengst gelaufen.
-[ -n "$merkmale" ] || exit 0
-
-# Gesucht wird ueber MUSTERDATEIEN, nicht in einer Schleife ueber die Werte. Zwei Gruende,
-# und beide sind Fehler, die eine Schleife hier zwangslaeufig macht:
-#
-#   • `for wert in $merkmale` zerlegt an LEERZEICHEN. Ein Empfaenger mit zwei Wortteilen
-#     wird zu zwei Suchbegriffen, und einer davon ist irgendwann ein Allerweltswort, das
-#     in einem Commit-Text voellig zu Recht steht. Der Waechter meldet dann etwas, das
-#     nicht da ist — und ein Waechter mit Fehlalarmen wird umgangen statt gelesen.
-#   • Ein `grep` je Merkmal sind bei ueber tausend Merkmalen ebenso viele Prozesse, und
-#     das je ausgehendem Ref.
-#
-# Zwei Dateien, weil die beiden Sorten verschieden gesucht werden: Zahlen nur an der
-# Wortgrenze (sonst steckt "15000" in "150000"), Text als fester Teilstring.
-TMPV=$(mktemp -d)
-trap 'rm -rf "$TMPV"' EXIT INT TERM
-printf '%s\n' "$merkmale" | grep -E '^[0-9.,-]+$' \
-  | sed 's/[.]/\\./g; s/^/(^|[^0-9])/; s/$/([^0-9]|$)/' > "$TMPV/zahlen"
-printf '%s\n' "$merkmale" | grep -vE '^[0-9.,-]+$' > "$TMPV/texte"
-
-fehler=0
-while read -r lokal_ref lokal_sha remote_ref remote_sha; do
-  [ -z "$lokal_sha" ] && continue
-  [ "$lokal_sha" = "0000000000000000000000000000000000000000" ] && continue
-  bereich=$(ausgehender_bereich "$lokal_sha" "$remote_sha") || continue
-  texte=$(git log --format='%B' "$bereich" 2>/dev/null) || continue
-  # `|| true`, weil grep -c bei null Treffern mit 1 endet — unter `set -e` waere das ein
-  # stiller Abbruch des ganzen Hooks, und der saehe aus wie „alles geprueft".
-  n_zahlen=0
-  n_texte=0
-  [ -s "$TMPV/zahlen" ] && n_zahlen=$(printf '%s' "$texte" | grep -cE -f "$TMPV/zahlen" || true)
-  [ -s "$TMPV/texte" ]  && n_texte=$(printf '%s' "$texte" | grep -cF -f "$TMPV/texte" || true)
-  if [ "$n_zahlen" -gt 0 ] || [ "$n_texte" -gt 0 ]; then
-    echo "pre-push: ABGEBROCHEN — ein Wert aus dem echten Bestand steht in einem Commit-Text ($lokal_ref)."
-    echo "          Bereich $bereich, betroffene Zeilen: $((n_zahlen + n_texte))."
-    echo "          Der Wert wird hier bewusst NICHT ausgegeben — diese Ausgabe landet in"
-    echo "          Protokollen. Sichtbar machen mit:"
-    echo "            node scripts/bestandsmerkmale.mjs > /tmp/m && \\"
-    echo "              git log --format='%B' $bereich | grep -nFf /tmp/m; rm /tmp/m"
-    fehler=1
-  fi
-done <<EOF
-$REFS
-EOF
-
-[ "$fehler" = "0" ] || exit 1
-echo "pre-push: nichts aus dem echten Bestand in den ausgehenden Commit-Texten."
+echo "pre-push: Muster-Guard sauber."

@@ -152,10 +152,11 @@ pub async fn pool_mit_schluessel(pfad: &Path, pragma: &str) -> Result<SqlitePool
 }
 
 /// Ein NUR LESENDER Pool auf eine verschluesselte Datei — fuer das Werkzeug
-/// `bestandslesen`, das die Privatsphaere-Waechter speist.
+/// `bestandslesen`, mit dem sich der verschluesselte Bestand von der Kommandozeile lesen
+/// laesst (Rezept in CLAUDE.local.md).
 ///
-/// `query_only` steht hier und nicht in den Argumenten des Werkzeugs: was ein Waechter
-/// darf, gehoert nicht in die Hand dessen, der ihn aufruft.
+/// `query_only` steht hier und nicht in den Argumenten des Werkzeugs: dass es nur liest,
+/// gehoert nicht in die Hand dessen, der es aufruft.
 pub async fn pool_lesend(pfad: &Path, pragma: &str) -> Result<SqlitePool, sqlx::Error> {
     let opts = SqliteConnectOptions::new()
         .filename(pfad)

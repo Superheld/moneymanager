@@ -512,7 +512,7 @@ greift keiner davon. Sie liegen im Repo, damit sie mitkommen und überprüfbar s
 | `pre-commit` | Muster-Guard über das Vorgemerkte · kein direkter Commit auf `develop`/`main` |
 | `commit-msg` | Muster-Guard über die Nachricht |
 | `prepare-commit-msg` | nach `main` nur aus `develop` |
-| `pre-push` | Wächter-Tests · Muster-Guard über Diff und Commit-Texte · Wert-Abgleich gegen die echte Datenbank |
+| `pre-push` | Wächter-Tests · Muster-Guard über Diff und Commit-Texte |
 
 Der Branch-Wächter sitzt in `prepare-commit-msg` und **nicht** in `pre-merge-commit`, wo
 man ihn zuerst sucht: dort gibt es `MERGE_HEAD` noch nicht, Git legt die Datei erst danach
@@ -1215,7 +1215,7 @@ Vier Dinge gelten überall und stehen deshalb hier:
   `core/konten/konto.test.ts` und `core/buchung/historie.test.ts`.
 
 Ausführbar geprüft wird das in `src/architektur.test.ts` (Schichtgrenzen),
-`src/doku.test.ts` (Verweise) und `src/privatsphaere.test.ts` (echte Daten).
+`src/doku.test.ts` (Verweise) und `src/privatsphaere.test.ts` (IBANs echter Banken).
 
 ## Nichts aus dem echten Bestand ins Repo
 
@@ -1260,68 +1260,44 @@ in die Doku außerhalb des Repos.
 Der Muster-Guard findet davon nur die Beträge. Der Rest ist Handarbeit — dieselbe Art wie
 bei Regel 2 und 3 der Testdaten.
 
-### Wie die Wächter eine verschlüsselte Datenbank lesen
+### Der Wert-Abgleich ist weg, und was das kostet
 
-`sqlite3` bekommt eine SQLCipher-Datei nicht auf. Der Wert-Abgleich liest den echten
-Bestand aber zur Laufzeit — er bräche ab, und ein Wächter, der nicht mehr arbeiten kann,
-ist am Ende ein abgeschalteter Wächter. Genau das Gegenteil von dem, wofür die
-Verschlüsselung da ist.
+Bis zum 30.08.2026 gab es einen zweiten Wächter: er las den **echten Bestand** zur Laufzeit
+und suchte dessen Werte im Arbeitsbaum und in den ausgehenden Commit-Texten. Er hat
+gefunden, wofür er gebaut war — eine IBAN in zwei Import-Tests, Kontostände in Kommentaren,
+eine mit der eigenen Miete begründete Toleranz im Monatsausblick.
 
-`scripts/bestandsmerkmale.mjs` entscheidet deshalb **am Dateikopf**, welchen Weg es
-nimmt: unverschlüsselt über `sqlite3`, verschlüsselt über das eigene Werkzeug
-`src-tauri/src/bin/bestandslesen.rs`. Einmal bauen:
+**Er ist ausgebaut, und der Grund ist nicht Bequemlichkeit.** Seit der Bestand verschlüsselt
+ist, kam er nur noch über den **Datenschlüssel** an seine Werte — als Wiederherstellungscode
+im Klartext neben der Datenbank. Ein Wächter, der einen Generalschlüssel verlangt, nimmt der
+Verschlüsselung genau das, wofür sie gebaut wurde. Und fehlte die Datei, war `npm test` rot
+und **jeder** Push blockiert; das traf nicht nur den frischen Klon, sondern auch den
+Rechner, auf dem die Verschlüsselung eingeführt wurde, dort in dem Moment, in dem sie
+griff — und still, denn ein Push, der nicht stattfindet, sieht aus wie ein Tag ohne Push.
+
+Dazu ist seine Voraussetzung entfallen: es liegen **keine Echtdaten im Rohformat** mehr in
+der Entwicklung, und der Spielstand (`npm run seed`) ist eine eigene Umgebung mit
+erfundenen Daten.
+
+**Was damit ungeprüft bleibt, und das ist der ehrliche Teil:** alles, was keiner Form folgt
+— ein Empfängername, ein Verwendungszweck, eine Buchungszahl, ein Kontostand in Prosa. Der
+Muster-Guard kennt Formen, nicht Werte. Wer so etwas benennen kann, trägt es in
+`.privacy-terms` ein (git-ignoriert, Vorlage `.privacy-terms.example`); dort greift der
+Muster-Guard es wieder auf. Der Rest ist Handarbeit — dieselbe Art wie bei der
+Anonymisierung, die ohnehin nie ein Wächter leisten konnte.
+
+**Das Werkzeug `bestandslesen` bleibt** (`src-tauri/src/bin/bestandslesen.rs`). Es ist der
+einzige Weg, den verschlüsselten Bestand von der Kommandozeile zu lesen, und dafür gibt es
+gute Gründe — einen Datenbug nachsehen statt raten. Der Unterschied zu vorher ist
+entscheidend: `~/.moneymanager-schluessel/entwicklung.code` ist jetzt **optional**. Wer sie
+anlegt, tut es bewusst und für eine Sitzung; kein Testlauf und kein Push verlangt sie mehr.
 
 ```bash
 cargo build --manifest-path src-tauri/Cargo.toml --bin bestandslesen
+./src-tauri/target/debug/bestandslesen "$DB" "SELECT …"
 ```
 
-Der Schlüssel kommt aus `~/.moneymanager-schluessel/entwicklung.code` — dem
-**Wiederherstellungscode**, nicht der Passphrase: der Code IST der Datenschlüssel, es
-braucht kein Argon2 und keine Eingabe. Ein Wächter, der interaktiv nach einem Kennwort
-fragt, läuft in keinem Hook.
-
-**Das ist eine bewusste Schwächung und gehört benannt.** Wer diese Datei hat, hat den
-Bestand — die Verschlüsselung schützt dann nur noch gegen jemanden, der die Datenbank
-OHNE das Verzeichnis erwischt: ein Backup, eine Kopie, ein zweiter Account. Dieselbe
-Abwägung wie beim Updater-Signaturschlüssel, der ebenfalls dort liegt. Auf einer
-Maschine, auf der nicht entwickelt wird, gibt es die Datei nicht.
-
-Fehlt das Werkzeug oder der Code, **bricht der Wächter ab** statt durchzuwinken — beides
-geprüft.
-
-Praktisch heisst das: **`npm test` ist dann rot, und zwar unabhängig von allem, was man
-gerade ändert.** Wer in einem frischen Klon anfängt, sucht den Fehler sonst in seiner
-eigenen Arbeit. Zwei Testfälle in `privatsphaere.test.ts` schlagen fehl, der Rest läuft
-durch; der `pre-push`-Hook blockiert damit jeden Push. Das Rezept zum Hinterlegen steht in
-`CLAUDE.local.md`.
-
-#### Und es trifft nicht nur den frischen Klon
-
-**Der Rechner, auf dem die Verschlüsselung eingeführt wurde, sperrt sich in dem Moment
-selbst aus, in dem sie greift.** Vorher nahm `bestandsmerkmale.mjs` den `sqlite3`-Weg und
-bekam seine Merkmale ohne Zutun; mit der Überführung des Bestands fällt dieser Weg weg,
-und ab da braucht es die Codedatei, die es bis dahin nie gebraucht hat. Der Absatz oben
-liest sich, als sei das die Sorge eines Neuankömmlings. Es ist die Sorge dessen, der die
-Verschlüsselung gerade gebaut hat.
-
-**Und der Ausfall ist still.** Ein Push, der nicht stattfindet, sieht aus wie ein Tag ohne
-Push — es gibt keine Fehlermeldung, die einen suchen liesse, solange man nicht pusht. Wer
-in dieser Zeit weiterarbeitet, sammelt Commits an, die nirgends liegen ausser auf dieser
-einen Platte; genau der Zustand, gegen den ein Fernzugriff da ist. Das ist einmal passiert
-und blieb über einen Tag unbemerkt.
-
-Die Lehre ist nicht „Codedatei früher anlegen" — das wäre ein Merkposten, und Merkposten
-scheitern genau dann, wenn es darauf ankommt. Sie ist: **wer einen Wächter an eine neue
-Voraussetzung hängt, muss den Moment mitdenken, in dem diese Voraussetzung zum ersten Mal
-gilt.** Die Überführung hätte die Codedatei mit anlegen können — sie hat den Schlüssel in
-der Hand, während sie läuft.
-
-### Zwei Wächter, die verschiedene Fehler finden
-
-**Der Wert-Abgleich** (`src/privatsphaere.test.ts`, dazu der `pre-push`-Hook) kennt die
-Daten nicht, sondern liest sie zur Laufzeit aus der echten Datenbank und prüft den
-Arbeitsbaum und die ausgehenden Commit-Texte dagegen. Er findet **deine** Werte, auch in
-anderer Schreibweise — und nur die.
+### Was der Muster-Guard findet
 
 **Der Muster-Guard** (`scripts/privacy-guard.mjs`) kennt die Formen: IBAN, SEPA-Gläubiger-ID,
 Token, E-Mail, Produkt-ID, Beträge in Prosa, verbotene Dateitypen. Er findet auch, was
@@ -1329,7 +1305,10 @@ Token, E-Mail, Produkt-ID, Beträge in Prosa, verbotene Dateitypen. Er findet au
 aus einem FinTS-Mitschnitt gerutscht ist (siehe „Mitgelieferte Skills"). Er läuft in
 `npm test` und an allen drei Hook-Zeitpunkten.
 
-Keiner ersetzt den anderen. Der eine kennt die Werte, der andere die Formen.
+Daneben steht in `src/privatsphaere.test.ts` noch **ein** Testfall, und er ist der einzige
+dort, der ohne Datenbank auskommt: keine IBAN im Repo darf die Bankleitzahl einer echten
+Bank tragen, geprüft gegen die DK-Liste. Er braucht kein Urteil und keinen Schlüssel —
+deshalb hat er den Ausbau überlebt.
 
 Zwei Entscheidungen im Muster-Guard, die man kennen muss:
 
@@ -1339,17 +1318,21 @@ Zwei Entscheidungen im Muster-Guard, die man kennen muss:
   ausserhalb des 9999er-Bereichs geht deshalb durch.
 - **Beträge prüft er nur in PROSA** (Markdown, Commit-Nachrichten), nicht im Code. In einer
   Finanz-App steht in jedem zweiten Test ein Betrag, und ein Muster kann den abgelesenen
-  nicht vom erfundenen trennen; dafür ist der Wert-Abgleich da. In Prosa dreht sich das um:
-  dort steht ein Betrag fast nie als Beispiel, sondern als Beleg.
+  nicht vom erfundenen trennen. Dafür war der Wert-Abgleich da; seit er weg ist, ist ein
+  abgelesener Betrag im CODE ungeprüft — das ist die grösste Lücke, die sein Ausbau
+  hinterlässt, und sie fällt in die Handarbeit. In Prosa dreht sich das um: dort steht ein
+  Betrag fast nie als Beispiel, sondern als Beleg.
 
 Einzelfall freigeben: `privacy-ok` in dieselbe Zeile. Namen und Begriffe, die keinem Muster
 folgen, kommen in `.privacy-terms` (git-ignoriert, Vorlage: `.privacy-terms.example`).
 
-### Was keiner von beiden kann
+### Was er nicht kann
 
-- Beide finden nur den **Originalwert**. Ob ein Ersatz neutral ist, sieht keiner von beiden.
-- Beide brechen ab, wenn sie nicht arbeiten können — fehlende Datenbank, kaputter Guard.
-  Ein Wächter, der nichts sieht, ist schlimmer als keiner: er beruhigt.
+- Er findet nur den **Originalwert**. Ob ein Ersatz neutral ist, sieht er nicht.
+- Er findet nur, was einer **Form** folgt. Namen, Verwendungszwecke und Buchungszahlen
+  gehören in `.privacy-terms`, sonst sieht sie niemand.
+- Er bricht ab, wenn er nicht arbeiten kann — kaputter Guard, fehlende Bankenliste. Ein
+  Wächter, der nichts sieht, ist schlimmer als keiner: er beruhigt.
 - Ein Rewrite ist **nie vollständig** — Forks und alte Commit-SHAs bleiben bei GitHub
   abrufbar. Es zählt nur, dass es gar nicht erst hineingerät.
 
