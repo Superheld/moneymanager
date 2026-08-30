@@ -283,43 +283,6 @@ select.field {
 }
 
 /* ============================================================
-   Der Kontoauszug: gebucht links, geplant rechts — zwei Karten, kein geteilter Kasten.
-
-   Der goldene Schnitt zugunsten der Buchungen (1,618 : 1) und nicht die Hälfte: links
-   stehen sieben Spalten und ein Seitenschalter, rechts fuenf. Ein hälftiger Schnitt gäbe
-   der schmalen Seite Platz, den sie nicht braucht, und nähme ihn der breiten.
-
-   `min-width: 0` an den Kindern ist Pflicht und nicht Kosmetik: ein Grid-Kind ist von
-   sich aus mindestens so breit wie sein Inhalt, und dann wächst eine Tabelle die Spalte
-   auf, statt in ihrem eigenen Scrollrahmen zu bleiben — die ganze Seite zieht sich breit.
-
-   **Die Zahlen, an denen der Breakpoint haengt** — nachgerechnet, nicht geschaetzt.
-   Am Deckel (1280 px) gehen 16 px Spalte ab; links bleiben 781 px, rechts 483 px, und jede
-   Karte kostet zweimal `--pad-card` (48 px). Die geplante Tabelle braucht fuer ihre vier
-   Spalten rund 340 px Inhalt und haette 435 — Luft genug.
-
-   Eng wird es erst, wenn das Fenster den Deckel unterschreitet: bei 1400 px Fensterbreite
-   bleiben der rechten Karte noch 355 px Inhalt. Darunter stapelt es, denn zwei waagerecht
-   scrollende Tabellen nebeneinander sind keine zwei Tabellen mehr, sondern zwei
-   Ausschnitte. Wer der Vorschau eine Spalte ergaenzt, rechnet an DIESER Stelle nach — nicht
-   am Deckel, wo alles bequem aussieht.
-   ============================================================ */
-.auszug-spalten {
-  display: grid;
-  grid-template-columns: 1.618fr 1fr;
-  gap: var(--gap-card);
-  align-items: start;
-}
-.auszug-spalten > * {
-  min-width: 0;
-}
-@media (max-width: 1400px) {
-  .auszug-spalten {
-    grid-template-columns: 1fr;
-  }
-}
-
-/* ============================================================
    Eine Buchungszeile in einer aufgeklappten Liste.
 
    Wo einzelne Buchungen stehen — unter einem Budget, unter einer Ausblickzeile, unter
@@ -406,6 +369,39 @@ select.field.tabellenfilter {
   padding-right: 9px;
 }
 
+/* ============================================================
+   FELDZEILE — ein Feld und der Knopf, der dazugehoert, NEBENEINANDER.
+
+   Ein Knopf unter einem einzelnen Feld sieht aus, als schloesse er ein Formular ab.
+   Steht er neben dem Feld, liest er sich als das, was er ist: eine zweite Moeglichkeit
+   an derselben Stelle — „waehl einen Vertrag ODER leg einen neuen an".
+
+   Zwei Dinge daran sind der eigentliche Inhalt dieser Klasse, und beide fehlten:
+
+   `align-items: flex-end`, weil ein `FormField` die BESCHRIFTUNG ueber das Feld setzt.
+   Mittig ausgerichtet stuende der Knopf auf halber Hoehe zwischen Label und Feld und
+   damit auf keiner Linie mit irgendetwas.
+
+   Und `min-width: 0` am Feld. `.field` ist `width: 100%` — in einem Flex-Container
+   heisst das: es nimmt die ganze Zeile, und der Knopf wird umgebrochen. Genau das ist
+   im Vertragsblock passiert, wo `display: flex` laengst dastand und trotzdem nichts
+   nebeneinander lag. Ein Flex-Container allein reicht nicht, wenn das Kind auf seiner
+   vollen Breite besteht.
+   ============================================================ */
+.feldzeile {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.feldzeile > .feldzeile-feld {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.feldzeile > .feldzeile-knopf {
+  flex: 0 0 auto;
+}
+
 .form-actions {
   margin-top: var(--sp-4);
   display: flex;
@@ -445,8 +441,12 @@ select.field.tabellenfilter {
 .katmain .nm {
   font-weight: var(--fw-bold);
 }
+/* Die Einrueckung folgt der EBENE, nicht der Tatsache „ist ein Kind".
+   Vorher gab es genau zwei Klassen, weil die Liste genau zwei Ebenen zeichnete — ein
+   Enkel wurde gar nicht erst gerendert und lag unsichtbar in der Datenbank. Die Tiefe
+   kommt jetzt als Variable von der Zeile; das CSS muss dafuer nichts mehr wissen. */
 .katchild {
-  padding-left: var(--sp-6);
+  padding-left: calc(var(--sp-6) * var(--kat-ebene, 1));
 }
 .katchild .nm {
   color: var(--ink-2);

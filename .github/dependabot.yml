@@ -9,22 +9,31 @@
 #
 # Woechentlich und nicht taeglich: ein Solo-Projekt, das jeden Morgen fuenf offene
 # Vorschlaege vorfindet, schaut irgendwann nicht mehr hin.
-
+#
+# `target-branch: develop` steht bei JEDEM Eintrag, und das ist kein Zierrat: ohne ihn
+# nimmt Dependabot den Standardbranch, also `main`. Dort wird aber nicht gearbeitet —
+# `main` ist der veroeffentlichte Stand und nimmt nur Merges aus `develop` an. Ein PR
+# gegen `main` laesst sich auf GitHub zusammenfuehren, ohne dass der `prepare-commit-msg`
+# Hook je gefragt wird: der sitzt auf dieser Maschine, der Merge passiert dort. Der
+# Wachposten faellt also genau dann aus, wenn er gebraucht wird, und niemand merkt es.
 version: 2
 updates:
   - package-ecosystem: npm
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
 
   - package-ecosystem: cargo
     directory: /src-tauri
+    target-branch: develop
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
 
   - package-ecosystem: github-actions
     directory: /
+    target-branch: develop
     schedule:
       interval: weekly

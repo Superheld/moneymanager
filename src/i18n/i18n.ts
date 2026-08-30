@@ -246,7 +246,6 @@ const de = {
     spalteKurs: "Kurs",
     spalteWert: "Wert",
     spalteErgebnis: "seit Kauf",
-    anteil: "{{prozent}} %",
     wertLabel: "Depotwert",
     standErklaerung: "So hat die Bank es am {{datum}} aufgestellt.",
     keinePositionen: "Die Bank hat für diesen Stichtag keine Positionen gemeldet.",
@@ -260,6 +259,20 @@ const de = {
     dateiWaehlen: "Datei wählen",
     hinweis: "Excel-Export aus Finanzguru (.xlsx). Die Datei wird lokal gelesen; nichts wird gespeichert oder verschickt.",
     nichtErkannt: "Format nicht erkannt — derzeit wird nur der Finanzguru-Export als Excel-Datei (.xlsx) unterstützt.",
+    fremd: {
+      titel: "Kategorien der Datei",
+      untertitel:
+        "Was die Quelle mitliefert und worauf es hier hinausläuft. Änderungen gelten für diesen Import.",
+      kurz: "{{n}} Kategorien aus der Datei — alle zugeordnet.",
+      kurzOffen: "{{n}} Kategorien aus der Datei · {{offen}} ohne Ziel in deinem Katalog.",
+      spalteQuelle: "In der Datei",
+      spalteZiel: "Wird hier zu",
+      nichtZuordnen: "nicht zuordnen",
+      zielFuer: "Kategorie für {{name}}",
+      zielFehlt: "Vorgesehen war „{{name}}“ — die Kategorie gibt es hier nicht.",
+      ohneUebersetzung: "Kein Vorschlag — diese Kategorie ist unbekannt.",
+      rest: "Dazu {{ohne}} Zeilen ohne Kategorieangabe und {{um}} Umbuchungen. Beide entscheidet die Datei nicht.",
+    },
     erkannt: "{{n}} Buchungen erkannt · Quelle: {{quelle}} · {{konten}} Konten",
     spalteDatum: "Datum",
     spalteBetrag: "Betrag",
@@ -269,6 +282,9 @@ const de = {
     zeigeAuszug: "Zeige erste {{zeige}} von {{gesamt}} Buchungen",
     kontenTitel: "Konten zuordnen",
     kontenHinweis: "Jedes Konto aus der Datei mit einem App-Konto verknüpfen oder neu anlegen. Die Buchungen kennen ihr Konto bereits.",
+    kontoImportieren: "{{name}} importieren",
+    alleKontenImportieren: "Alle Konten importieren",
+    kontoUebersprungen: "{{n}} Buchungen — wird nicht importiert",
     spalteQuelle: "Aus der Datei",
     spalteZiel: "App-Konto",
     buchungenAnzahl: "{{n}} Buchungen",
@@ -288,26 +304,20 @@ const de = {
   review: {
     herkunft: {
       umbuchung: "Umbuchung",
-      festlegung: "Festgelegt",
       regel: "Vertrag",
+      fremdkategorie: "aus der Datei",
       ki: "Erkennung",
-      remapping: "Import",
       manuell: "von Hand",
     },
     herkunftTitel: {
       umbuchung: "Die Quelle hat die Zahlung als Umbuchung markiert.",
-      festlegung: "Für diesen Empfänger wurde ausdrücklich festgelegt, welche Kategorie gilt.",
       regel: "Die Zahlung passt auf die Erkennungsregel eines Vertrags — sie erbt dessen Kategorie.",
+      fremdkategorie:
+        "Die importierte Datei brachte eine Kategorie mit, und sie liess sich auf deinen " +
+        "Baum übertragen. Eine Angabe aus einer anderen App — näher dran als eine " +
+        "Schätzung, aber aus einem anderen Zusammenhang.",
       ki: "Das trainierte Modell hat entschieden.",
-      remapping: "Die Kategorie kam mit der Importdatei und wurde auf unseren Baum übersetzt.",
       manuell: "Hier hat jemand von Hand entschieden.",
-    },
-    festlegung: {
-      frage: "Immer bei „{{muster}}“?",
-      ja: "immer so",
-      nein: "nur hier",
-      gesetzt: "Festgelegt: „{{muster}}“",
-      gesetztWeitere: "Festgelegt: „{{muster}}“ — {{anzahl}} weitere offene Zeilen angepasst",
     },
     begruendungSicher: "{{wert}} sicher",
     titel: "Import-Inbox",
@@ -330,6 +340,16 @@ const de = {
     verbuchen: "Verbuchen ({{n}})",
     verbuchenBusy: "Verbuche …",
     restVerwerfen: "Rest weglegen",
+    sammel: {
+      modus: "Mehrere bearbeiten",
+      gewaehlt: "{{n}} markiert",
+      alleWaehlen: "Alle Treffer markieren",
+      zeileWaehlen: "Diese Zeile markieren",
+      kategorieSetzen: "Kategorie für alle",
+      weglegen: "{{n}} weglegen",
+      aufheben: "Auswahl aufheben",
+      umbuchungHinweis: "{{n}} davon sind Umbuchungen — die bleiben, wie die Quelle sie einordnet.",
+    },
     verwerfenFrage: "{{n}} Zeilen ohne Kategorie weglegen?",
     verwerfenJa: "ja, weglegen",
     verwerfenNein: "abbrechen",
@@ -359,7 +379,108 @@ const de = {
     verbuchtErgebnis: "{{verbucht}} verbucht ({{umbuchungen}} Umbuchungen) · {{uebersprungen}} übersprungen",
     seite: "Seite {{seite}} / {{gesamt}}",
   },
+  // Die Befunde im Analyse-Bereich — was die Zahlen über den Zeitraum sagen.
+  befunde: {
+    titel: "Befunde",
+    monate: "Monate",
+    kpiFest: "Fest je Monat",
+    kpiFestMeta: "{{quote}} der Einnahmen sind vertraglich gebunden",
+    kpiFrei: "Frei je Monat",
+    kpiFreiMeta: "alles, was nicht an einem Vertrag hängt",
+    kpiSparquote: "Sparquote",
+    kpiSparquoteMeta: "was von den Einnahmen übrig blieb",
+    kpiReichweite: "Reichweite",
+    kpiReichweiteMeta: "wie lange die liquiden Mittel bei diesem Schnitt tragen",
+    block: {
+      fest: {
+        name: "Fest und frei",
+        untertitel:
+          "Was vertraglich gebunden war und was frei blieb — je Monat. Gebunden heißt " +
+          "„gehört zu einem Vertrag“: eine Miete ohne Vertrag steht hier als frei, und " +
+          "genau diese Lücke soll sichtbar sein.",
+      },
+      empfaenger: {
+        name: "Empfänger",
+        untertitel:
+          "Wohin das Geld geht, an der Kategorie vorbei. Die einzige Sicht, die eine " +
+          "falsch einsortierte Buchung trotzdem an der richtigen Stelle zeigt — und damit " +
+          "die Probe darauf, ob die Kategorien stimmen.",
+      },
+      kategorien: {
+        name: "Wie oft",
+        untertitel:
+          "Nicht wie viel, sondern wie oft und wie schwer. Eine Kategorie wird auf zwei " +
+          "Arten groß: selten und teuer oder oft und klein — dagegen hilft Verschiedenes.",
+      },
+      budgets: {
+        name: "Budgets",
+        untertitel:
+          "Hält der Plan — Monat für Monat, nicht in der Jahressumme. Ein Budget, das " +
+          "übers Jahr aufgeht, kann in jedem einzelnen Monat verfehlt worden sein.",
+      },
+      vertraege: {
+        name: "Verträge",
+        untertitel:
+          "Soll gegen Ist, und die Spanne dazwischen. Ein Ist weit unter dem Soll ist " +
+          "kein Sparerfolg, sondern eine Erkennung, die zu eng greift.",
+      },
+      blind: {
+        name: "Ohne Budget und ohne Vertrag",
+        untertitel:
+          "Was abgeflossen ist, ohne in einer Planung vorzukommen. Der Befund, der von " +
+          "selbst nie auffällt: wer auf seine Budgets schaut, sieht nur, was er schon " +
+          "geplant hat — man kann jedes Budget halten und trotzdem im Minus landen.",
+      },
+      ausreisser: {
+        name: "Ausreißer",
+        untertitel: "Die größten Einzelabflüsse — und was sie im Verhältnis zu einem Monat waren.",
+      },
+    },
+    spalteMonat: "Monat",
+    spalteFest: "Fest",
+    spalteFrei: "Frei",
+    spalteEinnahmen: "Einnahmen",
+    spalteGebunden: "gebunden",
+    spalteEmpfaenger: "Empfänger",
+    spalteSumme: "Summe",
+    spalteAnzahl: "Posten",
+    spalteMonate: "Monate",
+    spalteLetzte: "zuletzt",
+    spalteKategorie: "Kategorie",
+    spalteSchnitt: "Ø Posten",
+    spalteGroesster: "größter",
+    spalteBudget: "Budget",
+    spalteRahmen: "Rahmen",
+    spalteVerbraucht: "verbraucht",
+    spalteGehalten: "gehalten",
+    spalteSchlimmste: "schlimmster Monat",
+    spalteAnteil: "Anteil",
+    spalteVertrag: "Vertrag",
+    spalteSoll: "Soll",
+    spalteIst: "Ist",
+    spalteAbweichung: "Abweichung",
+    spalteSpanne: "Spanne",
+    spalteDatum: "Datum",
+    spalteKonto: "Konto",
+    spalteBetrag: "Betrag",
+    spalteVielfaches: "vom Monat",
+    gehaltenVon: "{{gehalten}} von {{monate}}",
+    keineBudgets: "Noch kein Budget angelegt — es gibt nichts, wogegen zu messen wäre.",
+    keineVertraege: "Noch kein Vertrag angelegt.",
+    blindKeine: "Alles, was abgeflossen ist, war entweder budgetiert oder vertraglich gebunden.",
+  },
   // Monatsausblick — die drei Karten oben in der Übersicht.
+  // Der Verlauf über die Gegenwart hinaus — Analyse, eigene Karte.
+  blickNachVorn: {
+    titel: "Blick nach vorn",
+    untertitel: "{{zurueck}} Monate gewesen, {{voraus}} geplant — derselbe Saldo, fortgeschrieben",
+    legendeIst: "gebucht",
+    legendePlan: "geplant",
+    pillPlan: "Plan",
+    warnungMinus:
+      "Im {{monat}} steht der vorhergesagte Stand bei {{betrag}}. Gerechnet ist monatsweise: " +
+      "innerhalb eines Monats kann es früher eng werden, als hier zu sehen ist.",
+  },
   ausblick: {
     untertitelLaufend: "gebucht und geplant",
     untertitelVorschau: "was der Plan sagt",
@@ -369,7 +490,6 @@ const de = {
     spalteIst: "gebucht",
     bleibt: "Bleibt übrig",
     bleibtErklaerung: "Einnahmen minus Verträge, Budgets und Rücklagen",
-    statusBezahlt: "abgehakt",
     statusOffen: "offen",
     zeile: {
       einnahmen: "Einnahmen",
@@ -691,11 +811,6 @@ const de = {
     detailVerwerfenFolgen: "Die Bankzeile wird verworfen. Der Beleg bleibt erhalten, und die Zeile lässt sich aus der Inbox erneut verbuchen — der Abruf holt sie nicht noch einmal.",
     zugangLoeschenFolgen: "Die abgerufenen Buchungen bleiben; sie stehen im Konto und hängen nicht am Zugang. Weg ist der Weg zur Bank — für weitere Abrufe muss der Zugang neu eingerichtet werden.",
     kontoLoeschenFolgen: "Ein Konto mit Buchungen lässt sich nicht löschen — die Buchungen müssten zuerst weg. Ohne Buchungen verschwindet nur das Konto selbst.",
-    festlegung: {
-      immerLabel: "Diese Kategorie immer bei diesem Empfänger",
-      immer: "Immer bei „{{muster}}“ diese Kategorie",
-      hinweis: "Gilt ab jetzt für neue Zahlungen an diesen Empfänger. Aufheben lässt sich das in den Einstellungen.",
-    },
     merkmale: {
       titel: "Was die Erkennung hier sieht",
       laedt: "rechne …",
@@ -735,7 +850,25 @@ const de = {
       },
     },
     registerKonten: "Konten",
+    registerGruppen: "Gruppen",
     registerZugaenge: "Bankzugänge",
+    gruppen: {
+      untertitel:
+        "Konten bündeln, wie du sie ansiehst — Lebenshaltung, Rücklagen, was du brauchst. " +
+        "Eine Gruppe rechnet nichts um: was verfügbar ist, entscheidet weiterhin die Klasse " +
+        "des einzelnen Kontos. Ein Konto darf in mehreren Gruppen liegen.",
+      anlegen: "Gruppe",
+      keine: "Noch keine Gruppe angelegt.",
+      leer: "Noch kein Konto in dieser Gruppe.",
+      anfangsbestand: "Anfangsbestände zusammen {{betrag}}",
+      bearbeiten: "Bearbeiten",
+      loeschen: "Löschen",
+      loeschFolgen: "Die Konten selbst bleiben — nur die Gruppierung geht weg.",
+      titelNeu: "Neue Gruppe",
+      titelBearbeiten: "Gruppe bearbeiten",
+      feldBezeichnung: "Bezeichnung",
+      feldKonten: "Konten in dieser Gruppe",
+    },
     verbindung: {
       titel: "Bankverbindung",
       abgerufenBis: "abgerufen bis {{datum}}",
@@ -961,7 +1094,6 @@ const de = {
     pruefenFeld: "Noch ansehen",
     pruefenHinweis:
       "Merkt die Zeile im Auszug vor. Zeilen aus einem Bankabruf tragen den Marker von selbst — sie werden gebucht, ohne dass jemand sie gesehen hat.",
-    pillBezahlt: "bezahlt",
     bearbeiten: "bearbeiten",
     loeschen: "löschen",
     heuteRealerStand: "heute · realer Stand {{stand}} {{symbol}}",
@@ -1082,8 +1214,6 @@ const de = {
       importlaufWert: "{{quelle}} · {{zeitpunkt}}",
       nativeId: "ID der Quelle",
       rohHash: "Dedup-Schlüssel",
-      planbezug: "Geplant als",
-      planbezugWert: "{{regel}} · fällig {{faelligkeit}}",
       ohneImport: "In der App erfasst — kein Import-Kontext vorhanden.",
       kontoGepaart: "fest — erst die Paarung lösen",
       verwerfenBankzeile: "Verwerfen",
@@ -1136,7 +1266,6 @@ const de = {
     quelleName: {
       import: "Bankimport",
       manuell: "manuelle Erfassung",
-      "bezahlt-markiert": "Plan-Posten abgehakt",
     },
     split: {
       titel: "Buchung aufteilen",
@@ -1219,6 +1348,41 @@ const de = {
         "FinTS an; der Abruf geht deshalb über dieselbe Schnittstelle wie ihre " +
         "Weboberfläche — nur lesend. Die Einrichtung verlangt einen einmaligen " +
         "Mitschnitt der eigenen Anmeldung.",
+      exportTitel: "Konfiguration exportieren",
+      exportText:
+        "Schreibt die Ordnung des Haushalts als JSON-Datei — heute die Kategorien, " +
+        "später auch Budgets, Verträge und Erkennungsregeln. Keine Buchungen, keine " +
+        "Salden, keine Kontonummern. Einen Import dazu gibt es noch nicht, und die Form " +
+        "der Datei ist nicht zugesichert.",
+    },
+    export: {
+      titel: "Export",
+      untertitel: "Zwei Dateien: wie du ordnest — und was passiert ist",
+      laeuft: "Wird geschrieben …",
+      fertig: "Geschrieben nach:",
+      fehler: "Der Export ist fehlgeschlagen: {{grund}}",
+      konfiguration: {
+        titel: "Ordnung",
+        text:
+          "Exportiert wird, wie du ordnest — nicht, was du gebucht hast. Die Datei " +
+          "enthält die Kategorien mit ihrem Baum und ihrem Charakter; Buchungen, Salden " +
+          "und Kontonummern stehen nicht darin.",
+        hinweis: "Diese Datei darfst du weitergeben.",
+        knopf: "Kategorien exportieren",
+      },
+      bestand: {
+        titel: "Bestand",
+        text:
+          "Exportiert wird, was passiert ist: alle Buchungen mit ihrer Bankzeile, dazu " +
+          "die Konten, Verträge und Personen, auf die sie zeigen.",
+        warnung:
+          "Diese Datei ist dein Kontoauszug. Sie enthält IBANs, Kontostände, Empfänger " +
+          "und jeden Verwendungszweck — gib sie nicht weiter und lade sie nirgends hoch.",
+        vergaenglich:
+          "Sie liegt unverschlüsselt, während deine Datenbank verschlüsselt ist. " +
+          "Lösch sie, sobald du sie nicht mehr brauchst.",
+        knopf: "Bestand exportieren",
+      },
     },
     person: {
       titel: "Personen",
@@ -1288,21 +1452,8 @@ const de = {
       feldElternHinweis: "optional",
       feldCharakter: "Default-Charakter",
     },
-    festlegung: {
-      titel: "Festlegungen",
-      untertitel: "Empfänger, deren Kategorie ausdrücklich festgelegt ist",
-      laedt: "lädt …",
-      leer: "Noch nichts festgelegt. Festlegungen entstehen beim Korrigieren einer Kategorie — in der Import-Inbox oder im Buchungsdialog.",
-      hinweis:
-        "Diese Empfänger bekommen ihre Kategorie ohne Umweg über das Modell. Sie stehen ganz vorn in der Kette — vor dem Vertrag und vor der Erkennung. Ein „*“ im Muster steht für beliebigen Text.",
-      spalteMuster: "Empfänger",
-      spalteKategorie: "Kategorie",
-      spalteAngelegt: "seit",
-      kategorieWeg: "Kategorie gelöscht",
-      aufheben: "aufheben",
-    },
     abgleich: {
-      titel: "5 · Bestand abgleichen",
+      titel: "4 · Bestand abgleichen",
       untertitel: "Vorhandene Buchungen mit dem aktuellen Stand der Erkennung durchrechnen",
       hinweis:
         "Alles Bisherige wirkt nur nach vorn: ein frisch trainiertes Modell, eine neue Festlegung, eine Kategorie am Vertrag lassen die schon gebuchten Zahlungen unberührt. Der Abgleich rechnet sie neu — und zeigt zuerst, was er ändern würde. Geschrieben wird erst auf Bestätigung.",
@@ -1374,28 +1525,61 @@ const de = {
       spalteKategorie: "Kategorie",
       spalteTrefferquote: "Trefferquote",
       spaltePruefungen: "Geprüft",
-      // --- Vier Karten entlang des Trainingsablaufs ---
+      // --- Die Karten entlang des Trainingsablaufs ---
       datenTitel: "1 · Trainingsdaten",
       datenUntertitel: "Was an gebuchten Zahlungen zum Lernen taugt",
-      merkmaleTitel: "2 · Merkmale",
-      merkmaleUntertitel: "Welche Felder in die Erkennung eingehen",
-      ausschluesseTitel: "3 · Ausschlüsse",
-      ausschluesseUntertitel: "Wörter, die nicht mitgelernt werden",
-      modellKarteTitel: "4 · Erkennungsmodell",
+      woerterTitel: "2 · Wörter",
+      woerterUntertitel: "Was die Erkennung liest — und was sie nicht liest",
+      wolkenTitel: "Was jede Kategorie auszeichnet",
+      wolkenHinweis:
+        "Die Wörter, an denen die Erkennung eine Kategorie festmacht — je größer, desto stärker. Sie kommen aus dem trainierten Modell und nicht aus der Häufigkeit: die sagt, wo ein Wort vorkam, das Gewicht sagt, was die Erkennung daraus gemacht hat. Ein Klick sucht das Wort oben in der Liste.",
+      wolkenOhneModell:
+        "Noch kein Modell trainiert — bis dahin gibt es keine Gewichte, an denen sich ablesen ließe, woran die Erkennung eine Kategorie festmacht.",
+      wolkeLeer: "Kein Wort spricht deutlich für diese Kategorie.",
+      mitStandard: "mitgelieferte zeigen",
+      grundausstattung: "Grundausstattung wiederherstellen",
+      grundausstattungHinweis:
+        "Die mitgelieferten Wörter stehen normalerweise nicht in der Liste — es sind über hundert, die niemand gesetzt hat, und sie schieben die eigenen Entscheidungen nach hinten. Sichtbar sind sie trotzdem, sobald sie in deinen Daten vorkommen. Gelöschte holt dieser Knopf zurück, ohne eigene Einträge anzufassen.",
+      // --- Der Wortbestand: eine Liste über alles, was die Erkennung an Wörtern kennt ---
+      bestandTitel: "Wortbestand",
+      bestandHinweis:
+        "Jedes Wort steht genau einmal hier — im Training, gesperrt oder an einer festen Regel aussortiert. Ein Klick auf die Zeile zeigt, in welchen Kategorien es steckt.",
+      masseHinweis:
+        "Belege ist das absolute Vorkommen, Deckung der Anteil aller Beispiele. Die Trennschärfe misst, wie stark sich die Belege auf eine Kategorie konzentrieren — sie überschätzt das Seltene, denn ein Wort mit zwei Belegen steht schnell bei 100 %. Die Trennkraft nimmt beides zusammen: wie viel Unsicherheit über die Kategorie dieses Wort tatsächlich wegräumt. Nach ihr zu sortieren lohnt sich.",
+      bestandZahl: "{{gezeigt}} von {{gesamt}}",
+      zustand: {
+        genutzt: "im Training",
+        gesperrt: "gesperrt",
+        strukturell: "aussortiert",
+      },
+      zustandMeta: {
+        genutzt: "Wörter, auf denen das Modell rechnet",
+        gesperrt: "stehen auf der Ausschlussliste",
+        strukturell: "an einer festen Regel gefallen — Nummern, Platzhalter, zu kurz",
+      },
+      spalteZustand: "Zustand",
+      spalteDeckung: "Deckung",
+      spalteTrennkraft: "Trennkraft",
+      suche: "suchen",
+      suchePlatzhalter: "Wort eingeben …",
+      filterAlle: "alle",
+      keineTreffer: "Kein Wort passt zu dieser Suche.",
+      verteilungTitel: "Verteilung über {{anzahl}} Kategorien",
+      ohneBelege: "Kommt im Lernmaterial nicht vor — der Ausschluss wirkt hier auf nichts.",
+      strukturellHinweis: "dafür gibt es keinen Listeneintrag, den man entfernen könnte",
+      neuesWortHinweis:
+        "Für ein Wort, das in den Daten noch nicht vorkommt. Was schon dasteht, sperrst du besser in der Liste darüber — dort steht daneben, was es kostet.",
+      modellKarteTitel: "3 · Erkennungsmodell",
       modellKarteUntertitel: "Trainieren und das Ergebnis prüfen",
       herkunft: {
         empGanz: "Empfänger, ganz",
         empWort: "Empfänger, einzelne Wörter",
         vwz: "Verwendungszweck",
-        gid: "Gläubiger-ID",
-        vz: "Vorzeichen",
       },
       herkunftHinweis: {
         empGanz: "Der ganze normalisierte Name als ein Merkmal — trifft Wiederkehrer scharf.",
         empWort: "Die Einzelwörter des Namens — sie greifen auch bei fremden Anbietern.",
         vwz: "Die Wörter des Verwendungszwecks. Bei Kartenzahlungen oft die einzige Stelle, an der steht, worum es ging.",
-        gid: "Die SEPA-Gläubiger-ID, sofern die Bank sie liefert.",
-        vz: "Nur ob Zufluss oder Abfluss — nicht die Höhe.",
       },
       herkunftAnzahl: "{{anzahl}} Merkmale",
       herkunftAus: "abgeschaltet",
@@ -1415,6 +1599,7 @@ const de = {
       ausschliessen: "ausschließen",
       zulassen: "zulassen",
       neuesWort: "Wort ausschließen",
+      wortSperren: "Wort sperren",
       neuesWortPlatzhalter: "z. B. kdn",
       nurIn: "nur in",
       ueberall: "überall",
@@ -1434,8 +1619,6 @@ const de = {
       namensraum: {
         emp: "Empfänger",
         vwz: "Verwendungszweck",
-        gid: "Gläubiger-ID",
-        vz: "Vorzeichen",
       },
       spalteMerkmal: "Merkmal",
       spalteAnzahl: "Belege",
@@ -1447,7 +1630,7 @@ const de = {
       verwurf: {
         zuKurz: "zu kurz",
         ziffern: "Nummer",
-        stoppwort: "Stoppwort",
+        ausgeschlossen: "gesperrt",
         platzhalter: "Platzhalter",
       },
       stoppwoerterTitel: "Feste Stoppwortliste ({{anzahl}})",
@@ -1906,7 +2089,6 @@ const en: typeof de = {
     spalteKurs: "Price",
     spalteWert: "Value",
     spalteErgebnis: "since purchase",
-    anteil: "{{prozent}} %",
     wertLabel: "Portfolio value",
     standErklaerung: "This is how the bank listed it on {{datum}}.",
     keinePositionen: "The bank reported no holdings for this date.",
@@ -1920,6 +2102,20 @@ const en: typeof de = {
     dateiWaehlen: "Choose file",
     hinweis: "Finanzguru Excel export (.xlsx). The file is read locally; nothing is saved or sent.",
     nichtErkannt: "Format not recognised — currently only the Finanzguru Excel export (.xlsx) is supported.",
+    fremd: {
+      titel: "Categories in the file",
+      untertitel:
+        "What the source brings along and what it turns into here. Changes apply to this import.",
+      kurz: "{{n}} categories from the file — all mapped.",
+      kurzOffen: "{{n}} categories from the file · {{offen}} without a target in your catalogue.",
+      spalteQuelle: "In the file",
+      spalteZiel: "Becomes",
+      nichtZuordnen: "do not map",
+      zielFuer: "Category for {{name}}",
+      zielFehlt: "Intended was \u201e{{name}}\u201c — there is no such category here.",
+      ohneUebersetzung: "No suggestion — this category is unknown.",
+      rest: "Plus {{ohne}} rows without a category and {{um}} transfers. The file decides neither.",
+    },
     erkannt: "{{n}} transactions detected · source: {{quelle}} · {{konten}} accounts",
     spalteDatum: "Date",
     spalteBetrag: "Amount",
@@ -1929,6 +2125,9 @@ const en: typeof de = {
     zeigeAuszug: "Showing first {{zeige}} of {{gesamt}} transactions",
     kontenTitel: "Map accounts",
     kontenHinweis: "Link each account from the file to an app account or create a new one. Transactions already know their account.",
+    kontoImportieren: "Import {{name}}",
+    alleKontenImportieren: "Import all accounts",
+    kontoUebersprungen: "{{n}} transactions — not imported",
     spalteQuelle: "From the file",
     spalteZiel: "App account",
     buchungenAnzahl: "{{n}} transactions",
@@ -1946,26 +2145,19 @@ const en: typeof de = {
   review: {
     herkunft: {
       umbuchung: "Transfer",
-      festlegung: "Pinned",
       regel: "Contract",
+      fremdkategorie: "from the file",
       ki: "Recognition",
-      remapping: "Import",
       manuell: "by hand",
     },
     herkunftTitel: {
       umbuchung: "The source marked this payment as a transfer.",
-      festlegung: "Someone pinned a category for this payee.",
       regel: "The payment matches a contract's recognition rule — it inherits that category.",
+      fremdkategorie:
+        "The imported file carried a category, and it could be mapped onto your tree. " +
+        "A statement from another app — closer than a guess, but from a different context.",
       ki: "The trained model decided.",
-      remapping: "The category came with the import file and was mapped onto our tree.",
       manuell: "Someone decided this by hand.",
-    },
-    festlegung: {
-      frage: "Always for “{{muster}}”?",
-      ja: "always",
-      nein: "just here",
-      gesetzt: "Pinned: “{{muster}}”",
-      gesetztWeitere: "Pinned: “{{muster}}” — {{anzahl}} more open rows updated",
     },
     begruendungSicher: "{{wert}} confident",
     titel: "Import inbox",
@@ -1988,6 +2180,16 @@ const en: typeof de = {
     verbuchen: "Post ({{n}})",
     verbuchenBusy: "Posting …",
     restVerwerfen: "Set the rest aside",
+    sammel: {
+      modus: "Edit several",
+      gewaehlt: "{{n}} selected",
+      alleWaehlen: "Select all matches",
+      zeileWaehlen: "Select this row",
+      kategorieSetzen: "Category for all",
+      weglegen: "Set {{n}} aside",
+      aufheben: "Clear selection",
+      umbuchungHinweis: "{{n}} of these are transfers — they keep the source's classification.",
+    },
     verwerfenFrage: "Set aside {{n}} rows without a category?",
     verwerfenJa: "yes, set aside",
     verwerfenNein: "cancel",
@@ -2017,6 +2219,105 @@ const en: typeof de = {
     verbuchtErgebnis: "{{verbucht}} posted ({{umbuchungen}} transfers) · {{uebersprungen}} skipped",
     seite: "Page {{seite}} / {{gesamt}}",
   },
+  befunde: {
+    titel: "Findings",
+    monate: "months",
+    kpiFest: "Fixed per month",
+    kpiFestMeta: "{{quote}} of income is tied to contracts",
+    kpiFrei: "Free per month",
+    kpiFreiMeta: "everything not tied to a contract",
+    kpiSparquote: "Savings rate",
+    kpiSparquoteMeta: "what was left of the income",
+    kpiReichweite: "Runway",
+    kpiReichweiteMeta: "how long liquid funds last at this rate",
+    block: {
+      fest: {
+        name: "Fixed and free",
+        untertitel:
+          "What was tied to contracts and what stayed free, month by month. Tied means " +
+          "it belongs to a contract: rent without a contract shows up as free, and that " +
+          "gap is meant to be visible.",
+      },
+      empfaenger: {
+        name: "Payees",
+        untertitel:
+          "Where the money goes, bypassing categories. The only view that puts a " +
+          "miscategorised booking in the right place — and thus the test of whether the " +
+          "categories hold.",
+      },
+      kategorien: {
+        name: "How often",
+        untertitel:
+          "Not how much, but how often and how heavy. A category grows in two ways: rare " +
+          "and expensive, or frequent and small — and they call for different remedies.",
+      },
+      budgets: {
+        name: "Budgets",
+        untertitel:
+          "Does the plan hold — month by month, not in the yearly total. A budget that " +
+          "balances over a year may have missed in every single month.",
+      },
+      vertraege: {
+        name: "Contracts",
+        untertitel:
+          "Planned against actual, and the spread between. An actual far below plan is " +
+          "not a saving, it is recognition that matches too narrowly.",
+      },
+      blind: {
+        name: "No budget, no contract",
+        untertitel:
+          "What went out without appearing in any plan. The finding that never surfaces " +
+          "on its own: looking at your budgets only shows what you already planned — you " +
+          "can hold every budget and still end up short.",
+      },
+      ausreisser: {
+        name: "Outliers",
+        untertitel: "The largest single outflows — and what they were relative to a month.",
+      },
+    },
+    spalteMonat: "Month",
+    spalteFest: "Fixed",
+    spalteFrei: "Free",
+    spalteEinnahmen: "Income",
+    spalteGebunden: "tied",
+    spalteEmpfaenger: "Payee",
+    spalteSumme: "Total",
+    spalteAnzahl: "Items",
+    spalteMonate: "Months",
+    spalteLetzte: "last",
+    spalteKategorie: "Category",
+    spalteSchnitt: "Avg item",
+    spalteGroesster: "largest",
+    spalteBudget: "Budget",
+    spalteRahmen: "Allowance",
+    spalteVerbraucht: "used",
+    spalteGehalten: "held",
+    spalteSchlimmste: "worst month",
+    spalteAnteil: "Share",
+    spalteVertrag: "Contract",
+    spalteSoll: "Planned",
+    spalteIst: "Actual",
+    spalteAbweichung: "Deviation",
+    spalteSpanne: "Spread",
+    spalteDatum: "Date",
+    spalteKonto: "Account",
+    spalteBetrag: "Amount",
+    spalteVielfaches: "of a month",
+    gehaltenVon: "{{gehalten}} of {{monate}}",
+    keineBudgets: "No budget yet — there is nothing to measure against.",
+    keineVertraege: "No contract yet.",
+    blindKeine: "Everything that went out was either budgeted or tied to a contract.",
+  },
+  blickNachVorn: {
+    titel: "Looking ahead",
+    untertitel: "{{zurueck}} months past, {{voraus}} planned — the same balance, carried forward",
+    legendeIst: "booked",
+    legendePlan: "planned",
+    pillPlan: "Plan",
+    warnungMinus:
+      "In {{monat}} the projected balance is {{betrag}}. This is calculated by month: " +
+      "within a month it can get tight earlier than shown here.",
+  },
   ausblick: {
     untertitelLaufend: "posted and planned",
     untertitelVorschau: "what the plan says",
@@ -2026,7 +2327,6 @@ const en: typeof de = {
     spalteIst: "posted",
     bleibt: "Left over",
     bleibtErklaerung: "Income minus contracts, budgets and reserves",
-    statusBezahlt: "ticked off",
     statusOffen: "open",
     zeile: {
       einnahmen: "Income",
@@ -2343,11 +2643,6 @@ const en: typeof de = {
     detailVerwerfenFolgen: "The bank line is discarded. The receipt is kept and the line can be posted again from the inbox — the retrieval will not fetch it a second time.",
     zugangLoeschenFolgen: "The retrieved entries stay; they live in the account and do not hang off the access. What goes is the route to the bank — further retrievals need it set up again.",
     kontoLoeschenFolgen: "An account with entries cannot be deleted — the entries would have to go first. Without any, only the account itself disappears.",
-    festlegung: {
-      immerLabel: "Always use this category for this payee",
-      immer: "Always use this category for “{{muster}}”",
-      hinweis: "Applies to new payments to this payee from now on. You can remove it in the settings.",
-    },
     merkmale: {
       titel: "What the recognition sees here",
       laedt: "computing …",
@@ -2387,7 +2682,25 @@ const en: typeof de = {
       },
     },
     registerKonten: "Accounts",
+    registerGruppen: "Groups",
     registerZugaenge: "Bank access",
+    gruppen: {
+      untertitel:
+        "Bundle accounts the way you look at them — living costs, reserves, whatever you need. " +
+        "A group changes no calculation: what counts as available is still decided by each " +
+        "account's class. An account may belong to several groups.",
+      anlegen: "Group",
+      keine: "No group yet.",
+      leer: "No account in this group yet.",
+      anfangsbestand: "Opening balances together {{betrag}}",
+      bearbeiten: "Edit",
+      loeschen: "Delete",
+      loeschFolgen: "The accounts themselves stay — only the grouping goes.",
+      titelNeu: "New group",
+      titelBearbeiten: "Edit group",
+      feldBezeichnung: "Name",
+      feldKonten: "Accounts in this group",
+    },
     verbindung: {
       titel: "Bank connection",
       abgerufenBis: "retrieved through {{datum}}",
@@ -2598,7 +2911,6 @@ const en: typeof de = {
     pruefenFeld: "Still to review",
     pruefenHinweis:
       "Flags the entry in the statement. Rows from a bank retrieval carry the marker by themselves — they are booked without anyone having seen them.",
-    pillBezahlt: "paid",
     bearbeiten: "edit",
     loeschen: "delete",
     heuteRealerStand: "today · balance {{stand}} {{symbol}}",
@@ -2715,8 +3027,6 @@ const en: typeof de = {
       importlaufWert: "{{quelle}} · {{zeitpunkt}}",
       nativeId: "Source ID",
       rohHash: "Dedup key",
-      planbezug: "Planned as",
-      planbezugWert: "{{regel}} · due {{faelligkeit}}",
       ohneImport: "Captured in the app — no import context available.",
       kontoGepaart: "fixed — unpair the transfer first",
       verwerfenBankzeile: "Discard",
@@ -2769,7 +3079,6 @@ const en: typeof de = {
     quelleName: {
       import: "bank import",
       manuell: "manual entry",
-      "bezahlt-markiert": "planned item ticked off",
     },
     split: {
       titel: "Split transaction",
@@ -2841,6 +3150,40 @@ const en: typeof de = {
         "Fetch accounts, balances and transactions from Hanseatic Bank. The bank offers " +
         "no FinTS access, so the retrieval uses the same interface as its web front end " +
         "— read-only. Setup requires a one-time capture of your own login.",
+      exportTitel: "Export configuration",
+      exportText:
+        "Writes how the household is organised as a JSON file — categories today, later " +
+        "budgets, contracts and matching rules too. No transactions, no balances, no " +
+        "account numbers. There is no import yet, and the file format is not guaranteed.",
+    },
+    export: {
+      titel: "Export",
+      untertitel: "Two files: how you organise — and what happened",
+      laeuft: "Writing …",
+      fertig: "Written to:",
+      fehler: "The export failed: {{grund}}",
+      konfiguration: {
+        titel: "Structure",
+        text:
+          "What gets exported is how you organise things — not what you booked. The file " +
+          "holds the categories with their tree and their character; transactions, " +
+          "balances and account numbers are not in it.",
+        hinweis: "This file is safe to share.",
+        knopf: "Export categories",
+      },
+      bestand: {
+        titel: "Records",
+        text:
+          "What gets exported is what happened: every transaction with its bank line, " +
+          "plus the accounts, contracts and people they point to.",
+        warnung:
+          "This file is your bank statement. It holds IBANs, balances, payees and every " +
+          "reference line — do not share it and do not upload it anywhere.",
+        vergaenglich:
+          "It sits unencrypted while your database is encrypted. Delete it as soon as " +
+          "you no longer need it.",
+        knopf: "Export records",
+      },
     },
     person: {
       titel: "People",
@@ -2910,21 +3253,8 @@ const en: typeof de = {
       feldElternHinweis: "optional",
       feldCharakter: "Default character",
     },
-    festlegung: {
-      titel: "Pinned categories",
-      untertitel: "Payees whose category is fixed explicitly",
-      laedt: "loading …",
-      leer: "Nothing pinned yet. Pins are created when you correct a category — in the import inbox or the booking dialog.",
-      hinweis:
-        "These payees get their category without going through the model. They sit at the front of the chain — ahead of contracts and of the recognition. A “*” in the pattern stands for any text.",
-      spalteMuster: "Payee",
-      spalteKategorie: "Category",
-      spalteAngelegt: "since",
-      kategorieWeg: "category deleted",
-      aufheben: "remove",
-    },
     abgleich: {
-      titel: "5 · Reconcile existing bookings",
+      titel: "4 · Reconcile existing bookings",
       untertitel: "Re-run existing bookings against the current state of the recognition",
       hinweis:
         "Everything so far only works going forward: a freshly trained model, a new pin, a category on a contract leave already-booked payments untouched. The reconciliation recomputes them — and shows what it would change first. Nothing is written until you confirm.",
@@ -2998,25 +3328,58 @@ const en: typeof de = {
       spaltePruefungen: "Evaluated",
       datenTitel: "1 · Training data",
       datenUntertitel: "What booked payments are usable for learning",
-      merkmaleTitel: "2 · Features",
-      merkmaleUntertitel: "Which fields feed into recognition",
-      ausschluesseTitel: "3 · Exclusions",
-      ausschluesseUntertitel: "Words that are not learned",
-      modellKarteTitel: "4 · Recognition model",
+      woerterTitel: "2 · Words",
+      woerterUntertitel: "What the recognition reads — and what it does not",
+      wolkenTitel: "What marks each category",
+      wolkenHinweis:
+        "The words the recognition pins a category on — the larger, the stronger. They come from the trained model, not from frequency: frequency says where a word occurred, the weight says what the recognition made of it. Click one to find it in the list above.",
+      wolkenOhneModell:
+        "No model trained yet — until then there are no weights to read off what the recognition pins a category on.",
+      wolkeLeer: "No word speaks clearly for this category.",
+      mitStandard: "show bundled",
+      grundausstattung: "Restore default list",
+      grundausstattungHinweis:
+        "The bundled words are normally not listed — there are over a hundred nobody chose, and they push your own decisions out of sight. They do show up once they occur in your data. This button brings deleted ones back without touching your own entries.",
+      // --- The word inventory: one list for everything the recognition knows ---
+      bestandTitel: "Word inventory",
+      bestandHinweis:
+        "Every word appears exactly once here — in training, blocked, or dropped by a fixed rule. Click a row to see which categories it sits in.",
+      masseHinweis:
+        "Occurrences is the absolute count, coverage the share of all examples. Discriminance measures how strongly the occurrences concentrate in one category — it overrates the rare, since a word with two occurrences easily reaches 100 %. Separating power combines both: how much uncertainty about the category this word actually removes. That is the column worth sorting by.",
+      bestandZahl: "{{gezeigt}} of {{gesamt}}",
+      zustand: {
+        genutzt: "in training",
+        gesperrt: "blocked",
+        strukturell: "dropped",
+      },
+      zustandMeta: {
+        genutzt: "words the model computes on",
+        gesperrt: "on the exclusion list",
+        strukturell: "dropped by a fixed rule — numbers, placeholders, too short",
+      },
+      spalteZustand: "State",
+      spalteDeckung: "Coverage",
+      spalteTrennkraft: "Separating power",
+      suche: "search",
+      suchePlatzhalter: "type a word …",
+      filterAlle: "all",
+      keineTreffer: "No word matches this search.",
+      verteilungTitel: "Spread across {{anzahl}} categories",
+      ohneBelege: "Does not occur in the learning material — this exclusion affects nothing.",
+      strukturellHinweis: "there is no list entry to remove for this",
+      neuesWortHinweis:
+        "For a word that does not appear in the data yet. Anything already listed above is better blocked there — the numbers next to it say what it costs.",
+      modellKarteTitel: "3 · Recognition model",
       modellKarteUntertitel: "Train and check the result",
       herkunft: {
         empGanz: "Payee, whole",
         empWort: "Payee, single words",
         vwz: "Reference text",
-        gid: "Creditor ID",
-        vz: "Sign",
       },
       herkunftHinweis: {
         empGanz: "The whole normalised name as one feature — sharp on recurring payees.",
         empWort: "The single words of the name — they also catch unfamiliar payees.",
         vwz: "The words of the reference text. On card payments often the only place stating what it was.",
-        gid: "The SEPA creditor ID, where the bank supplies it.",
-        vz: "Only inflow or outflow — not the amount.",
       },
       herkunftAnzahl: "{{anzahl}} features",
       herkunftAus: "off",
@@ -3036,6 +3399,7 @@ const en: typeof de = {
       ausschliessen: "exclude",
       zulassen: "allow",
       neuesWort: "Exclude word",
+      wortSperren: "Block word",
       neuesWortPlatzhalter: "e.g. kdn",
       nurIn: "only in",
       ueberall: "everywhere",
@@ -3055,8 +3419,6 @@ const en: typeof de = {
       namensraum: {
         emp: "Payee",
         vwz: "Reference text",
-        gid: "Creditor ID",
-        vz: "Sign",
       },
       spalteMerkmal: "Feature",
       spalteAnzahl: "Occurrences",
@@ -3068,7 +3430,7 @@ const en: typeof de = {
       verwurf: {
         zuKurz: "too short",
         ziffern: "number",
-        stoppwort: "stop word",
+        ausgeschlossen: "blocked",
         platzhalter: "placeholder",
       },
       stoppwoerterTitel: "Fixed stop word list ({{anzahl}})",

@@ -2,6 +2,11 @@
 // Übersetzt den Export („Alle Buchungen") in kanonische RohUmsätze. Reines Parsen,
 // null Domänenlogik (TAKTIK-IMPORT §6).
 //
+// **Eine Übersetzung ist keine Domänenlogik**, und deshalb steht die Kategorien-Tabelle
+// daneben (`finanzguruKategorien.ts`) und nicht in der Anwendungsschicht: sie entscheidet
+// nichts über eine Buchung, sie überträgt Finanzgurus Vokabular in unseres. Was daraus
+// wird, entscheidet die Kategorisierungskette — und die kennt Finanzguru nicht.
+//
 // **Seit 2026-08-16 xlsx statt CSV** — Finanzguru bietet nichts anderes mehr an. Die
 // Spaltennamen sind dabei unverändert geblieben, die WERTE nicht:
 //  - Datum als Excel-Seriennummer („46251"), nicht mehr „TT.MM.JJJJ"
@@ -15,6 +20,7 @@
 
 import { parseBetrag, tageImMonat, toIso, waehrungNachCode, type Cent } from "../../core";
 import { serienDatum, xlsxLesen } from "./xlsx";
+import { unsereKategorieFuer } from "./finanzguruKategorien";
 import {
   adapterRegistrieren,
   type ImportErgebnis,
@@ -105,6 +111,11 @@ function reiheZuRohUmsatz(r: Reihe): RohUmsatz | string {
     quelle: ID,
     nativeId: leerZuUndefined(r[SP.buchungsId]),
     kategorieHinweis: leerZuUndefined(r[SP.unterkategorie]),
+    // Was Finanzguru sagt, bleibt oben stehen; hier steht, was es bei UNS heisst. Die
+    // Tabelle liegt daneben (`finanzguruKategorien.ts`) und ist das einzige Stueck
+    // Uebersetzung im Adapter — sie entscheidet nichts, sie traegt ein fremdes Vokabular
+    // in unseres.
+    kategorieVorschlag: unsereKategorieFuer(leerZuUndefined(r[SP.unterkategorie])),
   };
 }
 

@@ -30,7 +30,6 @@ import { sqliteInventarRepository as inventarRepository } from "./sqliteInventar
 import { sqliteLedgerRepository as ledgerRepository } from "./sqliteLedgerRepository";
 import { sqliteKlassifikatorRepository as klassifikatorRepository } from "./sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository as merkmalRepository } from "./sqliteMerkmalskonfigurationRepository";
-import { sqliteKategoriefestlegungRepository as festlegungRepository } from "./sqliteKategoriefestlegungRepository";
 import { klassifizieren, trainieren } from "../../core";
 import { sqliteVertragRepository as vertragRepository } from "./sqliteVertragRepository";
 import {
@@ -640,8 +639,21 @@ describe("Merkmalskonfiguration — Persistenz", () => {
 
   it("überschreibt die Herkünfte statt sie zu ergänzen", async () => {
     await merkmalRepository.herkuenfteSetzen(["empGanz", "vwz"]);
-    await merkmalRepository.herkuenfteSetzen(["gid"]);
-    expect(await merkmalRepository.herkuenfteLesen()).toEqual(["gid"]);
+    await merkmalRepository.herkuenfteSetzen(["empWort"]);
+    expect(await merkmalRepository.herkuenfteLesen()).toEqual(["empWort"]);
+  });
+
+  it("lässt eine Herkunft weg, die es nicht mehr gibt", async () => {
+    // `gid` und `vz` sind gefallen, ihr Eintrag in der Einstellung bleibt stehen. Der
+    // Rückgabetyp behauptet gültige Herkünfte — eine tote Zeichenkette durchzureichen
+    // hiesse, sie erst weit oben als Nichts auffliegen zu lassen.
+    const db = halter.lesen() as { execute: (sql: string, w?: unknown[]) => Promise<unknown> };
+    await db.execute(
+      `INSERT INTO einstellung (schluessel, wert) VALUES ($1, $2)
+       ON CONFLICT(schluessel) DO UPDATE SET wert = excluded.wert`,
+      ["merkmalsherkuenfte", "empGanz,gid,vwz,vz"],
+    );
+    expect(await merkmalRepository.herkuenfteLesen()).toEqual(["empGanz", "vwz"]);
   });
 
   it("speichert einen globalen Ausschluss ohne Herkunftsliste", async () => {
@@ -679,36 +691,6 @@ describe("Merkmalskonfiguration — Persistenz", () => {
   });
 });
 
-describe("Kategorie-Festlegungen — Persistenz", () => {
-  it("trägt Muster, Kategorie und Zeitpunkt durch das Schema", async () => {
-    await festlegungRepository.speichern({
-      muster: "kesselmann international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z",
-    });
-
-    expect(await festlegungRepository.alle()).toEqual([
-      { muster: "kesselmann international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" },
-    ]);
-  });
-
-  it("normalisiert das Muster beim Speichern und Löschen", async () => {
-    // „Kesselmann" und „kesselmann" wirken gleich — als zwei Zeilen ließe sich die eine
-    // löschen, ohne dass sich etwas ändert.
-    await festlegungRepository.speichern({ muster: "  KESSELMANN  ", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" });
-    expect((await festlegungRepository.alle())[0].muster).toBe("kesselmann");
-
-    await festlegungRepository.loeschen("KESSELMANN");
-    expect(await festlegungRepository.alle()).toHaveLength(0);
-  });
-
-  it("ersetzt eine vorhandene Festlegung statt eine zweite anzulegen", async () => {
-    await festlegungRepository.speichern({ muster: "rewe", kategorieId: "k-le", angelegtAm: "2026-08-01T00:00:00.000Z" });
-    await festlegungRepository.speichern({ muster: "rewe", kategorieId: "k-abo", angelegtAm: "2026-08-17T00:00:00.000Z" });
-
-    const alle = await festlegungRepository.alle();
-    expect(alle).toHaveLength(1);
-    expect(alle[0].kategorieId).toBe("k-abo");
-  });
-});
 
 describe("Vertrag — Kategorie am Aggregat", () => {
   it("trägt die Kategorie durch das Schema", async () => {

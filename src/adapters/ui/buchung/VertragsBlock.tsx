@@ -59,17 +59,23 @@ export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
           wenn es überhaupt eine gibt. Bei „noch offen" gäbe es keine Herkunft zu
           melden, und eine Pille „automatisch" an einem leeren Feld hiesse, die
           Erkennung hätte sich entschieden — sie hat nur nichts gefunden. */}
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
-        <Auswahl
-          ariaLabel={t("konten.zuVertrag.waehlen")}
-          wert={vertrag?.id ?? (ausgeschlossen ? "__keiner" : "")}
-          aufAenderung={(v) => bindung.zuordnen(v === "__keiner" || v === "" ? null : v)}
-          optionen={[
-            { wert: "", text: t("konten.zuVertrag.offen") },
-            { wert: "__keiner", text: t("konten.zuVertrag.keiner") },
-            ...alle.map((v) => ({ wert: v.id, text: v.anbieter })),
-          ]}
-        />
+      {/* `feldzeile` und nicht ein eigenes Flex: hier stand laengst `display: flex`, und
+          trotzdem lag nichts nebeneinander. `.field` ist `width: 100%` — das Auswahlfeld
+          nahm die ganze Zeile, und alles Weitere brach um. Die Klasse gibt dem Feld das
+          `min-width: 0`, ohne das ein Flex-Kind auf seiner vollen Breite besteht. */}
+      <div className="feldzeile">
+        <div className="feldzeile-feld">
+          <Auswahl
+            ariaLabel={t("konten.zuVertrag.waehlen")}
+            wert={vertrag?.id ?? (ausgeschlossen ? "__keiner" : "")}
+            aufAenderung={(v) => bindung.zuordnen(v === "__keiner" || v === "" ? null : v)}
+            optionen={[
+              { wert: "", text: t("konten.zuVertrag.offen") },
+              { wert: "__keiner", text: t("konten.zuVertrag.keiner") },
+              ...alle.map((v) => ({ wert: v.id, text: v.anbieter })),
+            ]}
+          />
+        </div>
         {(vertrag || ausgeschlossen) && (
           <Pill variant={vonHand ? "neutral" : "ok"}>
             {t(vonHand ? "konten.zuVertrag.vonHand" : "konten.zuVertrag.automatisch")}
@@ -83,7 +89,9 @@ export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
         {/* „Vertrag daraus machen" gibt es nur, solange keiner zugeordnet ist — sonst
             wäre es ein Angebot, zwei Verträge für dieselbe Zahlung anzulegen. */}
         {!vertrag && !ausgeschlossen && (
-          <Button onClick={bindung.neuAnlegen}>{t("konten.zuVertrag.aktion")}</Button>
+          <div className="feldzeile-knopf">
+            <Button onClick={bindung.neuAnlegen}>{t("konten.zuVertrag.aktion")}</Button>
+          </div>
         )}
       </div>
 

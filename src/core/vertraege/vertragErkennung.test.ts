@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
-  anbieterSchluessel,
   jahresbetrag,
   vertragskandidaten,
-  type Zahlungsspur,
 } from "./vertragErkennung";
+import type { Zahlungsspur } from "../buchung/zahlungsspur";
+import { anbieterSchluessel } from "../basis/gegenpartei";
 
 const HEUTE = "2026-08-16";
 
@@ -41,22 +41,6 @@ function reihe(opts: {
 function zufluesse(opts: Parameters<typeof reihe>[0]): Zahlungsspur[] {
   return reihe(opts).map((s) => ({ ...s, betrag: -s.betrag, charakter: "Ertrag" as const }));
 }
-
-describe("anbieterSchluessel", () => {
-  it("fasst dieselbe Firma trotz Rechtsform und Schreibweise zusammen", () => {
-    expect(anbieterSchluessel("Vibora GmbH")).toBe(anbieterSchluessel("vibora"));
-    expect(anbieterSchluessel("Müller & Söhne KG")).toBe(anbieterSchluessel("Mueller und Soehne"));
-  });
-
-  /**
-   * Die Gegenprobe ist die wichtigere: ein FALSCH zusammengefasster Vorschlag („alle
-   * Petrossen") stiftet mehr Schaden als zwei getrennte, denn er nennt einen Betrag,
-   * den es nie gab. Deshalb wird nicht auf die ersten Wörter gekürzt.
-   */
-  it("wirft verschiedene Anbieter mit gleichem Anfang NICHT zusammen", () => {
-    expect(anbieterSchluessel("Petrossen Bonn")).not.toBe(anbieterSchluessel("Petrossen Bremen"));
-  });
-});
 
 describe("vertragskandidaten", () => {
   it("erkennt eine monatliche Zahlung mit Rhythmus und Median-Betrag", () => {

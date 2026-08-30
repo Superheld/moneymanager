@@ -23,12 +23,11 @@ function memLedger(): LedgerPort & { daten: IstBuchung[] } {
 }
 
 describe("buchungErfassen", () => {
-  it("legt eine manuelle Ausgabe an (Betrag negativ), ohne planRef", async () => {
+  it("legt eine manuelle Ausgabe an (Betrag negativ)", async () => {
     const ledger = memLedger();
     const b = await buchungErfassen(ledger, { kontoId: "bar", datum: "2026-06-17", betrag: euroZuCent(-12.5), charakter: "Aufwand", notiz: "Bäcker" });
     expect(b.betrag).toBe(euroZuCent(-12.5));
     expect(b.quelle).toBe("manuell");
-    expect(b.planRef).toBeUndefined();
     expect(b.notiz).toBe("Bäcker");
     expect(ledger.daten).toHaveLength(1);
   });

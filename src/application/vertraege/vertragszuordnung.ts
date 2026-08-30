@@ -4,8 +4,10 @@
 // entschieden, WANN gerechnet wird. Der Abgleich ist bewusst EIN Lauf über den ganzen
 // Bestand statt eines Hakens an jeder Stelle, an der Buchungen entstehen:
 //
-//   • Buchungen entstehen an drei Stellen (Import, manuelle Erfassung, bezahlt-markiert)
-//     — drei Haken wären drei Gelegenheiten, einen zu vergessen.
+//   • Buchungen entstehen an mehreren Stellen (Bankabruf, Dateiimport, manuelle
+//     Erfassung, beide Beine einer Umbuchung) — je ein Haken dort wären ebenso viele
+//     Gelegenheiten, einen zu vergessen. Das Argument haengt nicht an ihrer Zahl: es
+//     gilt, solange es mehr als eine ist, und eine kommt eher dazu als weg.
 //   • Ein neu erfasster Vertrag muss RÜCKWIRKEND greifen. Sonst trüge nur das, was nach
 //     dem Anlegen gebucht wurde, seine Zuordnung, und der Bestand bliebe für immer blind.
 //   • Er ist idempotent und schreibt nur Deltas, kostet also nichts, wenn nichts zu tun ist.
@@ -67,21 +69,46 @@ export async function zuordnungenAbgleichen(deps: AbgleichDeps): Promise<Abgleic
  * Ausdrücklich NUR eindeutige Zuordnungen: eine Zeile mit `vertragId: null` ist die
  * Aussage „gehört zu keinem Vertrag" (siehe `Vertragszuordnung`) und trägt hier nichts.
  */
-export async function vertragsnamenLaden(
+export interface Vertragsbindung {
+  /** Buchungs-ID → Anbietername des Vertrags. */
+  readonly namen: ReadonlyMap<string, string>;
+  /** Buchungs-ID → Vertrags-ID. Dieselbe Menge, nur mit dem Schlüssel statt dem Namen. */
+  readonly vertragIds: ReadonlyMap<string, string>;
+}
+
+/**
+ * Beide Sichten auf die Vertragszuordnung aus EINEM Laden.
+ *
+ * Zwei Karten, die verschieden zählen, was zu einem Vertrag gehört, wären zwei
+ * Wahrheiten — deshalb entsteht die Menge hier einmal, und wer den Namen braucht und
+ * wer den Schlüssel, nimmt sich seine Karte daraus.
+ */
+export async function vertragsbindungLaden(
   zuordnungRepo: VertragszuordnungRepository,
   vertragRepo: VertragRepository,
-): Promise<ReadonlyMap<string, string>> {
+): Promise<Vertragsbindung> {
   const [zuordnungen, vertraege] = await Promise.all([zuordnungRepo.alle(), vertragRepo.alle()]);
   const anbieter = new Map(vertraege.map((v) => [v.id, v.anbieter]));
-  const raus = new Map<string, string>();
+  const namen = new Map<string, string>();
+  const vertragIds = new Map<string, string>();
   for (const z of zuordnungen) {
     if (!z.vertragId) continue;
     const name = anbieter.get(z.vertragId);
     // Ein Verweis ins Leere wird ÜBERGANGEN und nicht als leere Pille gezeigt: eine
-    // Markierung ohne Namen behauptet etwas und sagt nichts.
-    if (name) raus.set(z.istbuchungId, name);
+    // Markierung ohne Namen behauptet etwas und sagt nichts. Er faellt damit auch aus
+    // der Auswertung — richtig so, denn der Vertrag dahinter existiert nicht mehr.
+    if (!name) continue;
+    namen.set(z.istbuchungId, name);
+    vertragIds.set(z.istbuchungId, z.vertragId);
   }
-  return raus;
+  return { namen, vertragIds };
+}
+
+export async function vertragsnamenLaden(
+  zuordnungRepo: VertragszuordnungRepository,
+  vertragRepo: VertragRepository,
+): Promise<ReadonlyMap<string, string>> {
+  return (await vertragsbindungLaden(zuordnungRepo, vertragRepo)).namen;
 }
 
 /**

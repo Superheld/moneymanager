@@ -39,7 +39,7 @@ describe("umsaetzeVerbuchen", () => {
   it("verbucht kategorisierte Umsätze als Ist-Buchung und schaltet den Umsatz auf verbucht", async () => {
     const { deps, ledger, gespeichert } = fakes();
     const r = await umsaetzeVerbuchen(
-      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" } })],
       deps,
     );
     expect(r).toEqual({ verbucht: 1, uebersprungen: 0, umbuchungen: 0 });
@@ -47,13 +47,40 @@ describe("umsaetzeVerbuchen", () => {
     expect(gespeichert[0]).toMatchObject({ status: "verbucht", istbuchungId: ledger[0].id });
   });
 
-  it("ungepaarte Umbuchung → einseitige Umschichtung als Fallback", async () => {
+  /**
+   * Eine Umbuchung OHNE Gegenbuchung gibt es nicht. Steht das Gegenkonto nicht im
+   * Bestand, hat das Geld den erfassten Bereich verlassen — aus dessen Sicht ist das ein
+   * Abfluss. Bis 2026-08-29 entstand hier eine einseitige Umschichtung, und die zählte in
+   * kein Budget und in keine Ausgabe, während das Geld weg war.
+   */
+  it("ungepaarte Umbuchung → Aufwand, offen für die Review-Inbox", async () => {
     const { deps, ledger } = fakes();
     await umsaetzeVerbuchen([umsatz({ vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" } })], deps);
     expect(ledger).toHaveLength(1);
-    expect(ledger[0].charakter).toBe("Umschichtung");
+    expect(ledger[0].charakter).toBe("Aufwand");
     expect(ledger[0].kategorieId).toBeUndefined();
     expect(ledger[0].transferId).toBeUndefined();
+  });
+
+  it("ein ungepaartes Bein mit ZUFLUSS wird zum Ertrag", async () => {
+    const { deps, ledger } = fakes();
+    await umsaetzeVerbuchen(
+      [umsatz({ betrag: 4200, vorschlag: { charakter: "Umschichtung", quelle: "umbuchung" } })],
+      deps,
+    );
+    expect(ledger[0].charakter).toBe("Ertrag");
+  });
+
+  it("ein NICHT-Umbuchungs-Vorschlag behält seinen Charakter", async () => {
+    // Die Verwerfung trifft ausdrücklich nur die Umbuchungsstufe — ein Vorschlag aus
+    // Festlegung, Vertrag oder Modell wird übernommen wie bisher.
+    const { deps, ledger } = fakes();
+    await umsaetzeVerbuchen(
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Umschichtung", quelle: "ki" } })],
+      deps,
+    );
+    expect(ledger[0].charakter).toBe("Umschichtung");
+    expect(ledger[0].kategorieId).toBe("kat1");
   });
 
   const umb = (over: Partial<Umsatz>): Umsatz =>
@@ -117,7 +144,7 @@ describe("Herkunft der Kategorie beim Verbuchen", () => {
   it("Remapping-Vorschlag wird als automatisch verbucht (bleibt korrigierbar)", async () => {
     const { deps, ledger } = fakes();
     await umsaetzeVerbuchen(
-      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" } })],
       deps,
     );
     expect(ledger[0].kategorieHerkunft).toBe("automatisch");
@@ -178,7 +205,7 @@ describe("Prüfmarker beim Verbuchen", () => {
   it("merkt Zeilen vor, wenn der Aufrufer es verlangt", async () => {
     const { deps, ledger } = fakes();
     await umsaetzeVerbuchen(
-      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" } })],
       { ...deps, zumPruefenVormerken: true },
     );
     expect(ledger[0].zuPruefen).toBe(true);
@@ -187,7 +214,7 @@ describe("Prüfmarker beim Verbuchen", () => {
   it("lässt sie ohne Marker, wenn nicht", async () => {
     const { deps, ledger } = fakes();
     await umsaetzeVerbuchen(
-      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" } })],
+      [umsatz({ vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" } })],
       deps,
     );
     expect(ledger[0].zuPruefen).toBeUndefined();

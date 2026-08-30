@@ -437,27 +437,28 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         </Card>
       )}
 
-      {/* Gebucht und Geplant stehen NEBENEINANDER, und jedes in einer EIGENEN Karte.
+      {/* Das Gebuchte steht in einer EIGENEN Karte und nimmt die ganze Breite.
 
-          Nebeneinander, weil die geplante Liste untereinander erst nach der ganzen
-          Buchungstabelle erreichbar war — bei einem Konto mit Historie also nach zwei
-          Bildschirmhöhen Scrollen, obwohl gerade sie die Frage „was kommt noch"
-          beantwortet.
+          Eine eigene Karte, weil es eine Sache für sich ist: sie liegt NEBEN der
+          Kopf-Karte und nicht darin — keine Karte in einer Karte (siehe ui/CLAUDE.md),
+          geprüft in `kartenschachtelung.test.tsx`.
 
-          In zwei Karten, weil es zwei Sachen sind. In einer Karte waren es zwei Tabellen
-          unter einer Fläche, und die Überschriften mussten die Trennung allein tragen,
-          die eine Karte von sich aus leistet. Sie liegen NEBEN der Auszugs-Karte und nicht
-          darin — keine Karte in einer Karte (siehe ui/CLAUDE.md), geprüft in
-          `kartenschachtelung.test.tsx`.
+          Die geplante Vorschau STAND daneben und steht jetzt in der Übersicht. Zwei
+          Gründe, und der zweite wiegt schwerer: der Auszug beantwortet „was ist
+          passiert", eine Liste über die Zukunft daneben beantwortet eine andere Frage im
+          selben Bild. Und „was kommt noch auf mich zu" ist keine Frage EINES Kontos — wer
+          vier führt, musste vier Auszüge öffnen und zusammenzählen. Dieselbe Trennung,
+          die den Kontoabgleich schon aus der Kontenliste in einen eigenen Bereich
+          geschoben hat. Der reale Stand von heute bleibt hier: er ist eine Auskunft ÜBER
+          dieses Konto und steht oben in der Kopfzeile, wo er hingehört.
 
-          Die Aufteilung ist der goldene Schnitt zugunsten der Buchungen (1,618 : 1): die
-          haben sieben Spalten und einen Seitenschalter, die Vorschau fünf. Ein hälftiger
-          Schnitt gäbe der schmaleren Seite Platz, den sie nicht braucht, und nähme ihn der
-          breiteren. Unter 1440 px stapelt es wieder — zwei waagerecht scrollende Tabellen
-          nebeneinander sind keine. */}
+          Und die ganze Breite ist die Folge davon. Der goldene Schnitt zugunsten der
+          Buchungen (1,618 : 1) teilte den Platz mit der Vorschau; ohne sie blieb ein
+          Raster mit einer Spalte stehen, und die Tabelle mit ihren sieben Spalten und dem
+          Seitenschalter endete bei knapp zwei Dritteln — Platz, den nichts mehr
+          beanspruchte. Ein Raster überlebt die Karte nicht, die es begründet hat. */}
       {aktiv && register && !aktivZeile?.depot && (
-        <div className="auszug-spalten">
-          <Card title={t("konten.gebuchtTitel")}>
+        <Card title={t("konten.gebuchtTitel")}>
           {/* Filterleiste: Suche · Art (segmented) · Kategorie · Treffer */}
           <div className="tabellenfilter" style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
             <span style={{ position: "relative", flex: "1 1 200px", minWidth: 160, display: "inline-flex", alignItems: "center" }}>
@@ -597,7 +598,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           <Pill variant="warn">{t("konten.pillZuPruefen")}</Pill>
                         </button>
                       )}
-                      {!r.zeile.gegenkontoId && (r.zeile.quelle === "manuell" ? <Pill variant="neutral">{t("konten.pillManuell")}</Pill> : r.zeile.quelle === "bezahlt-markiert" ? <Pill variant="neutral">{t("konten.pillBezahlt")}</Pill> : null)}
+                      {!r.zeile.gegenkontoId && r.zeile.quelle === "manuell" && <Pill variant="neutral">{t("konten.pillManuell")}</Pill>}
                       {/* Gehört die Zeile zu einem Vertrag, steht der Anbieter dran.
                           Der NAME und nicht bloss „Vertrag": dass es einer ist, sieht man
                           an der Pille ohnehin — WELCHER, ist die Auskunft, für die man
@@ -714,19 +715,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               rowStyle={(r: Registerzeile) => (r.zeile.zukuenftig ? { opacity: 0.55 } : undefined)}
             />
           )}
-          </Card>
-
-          {/* Die geplante Vorschau STAND HIER und steht jetzt in der Übersicht.
-              Zwei Gründe, und der zweite wiegt schwerer: der Auszug beantwortet „was ist
-              passiert", eine Liste über die Zukunft daneben beantwortet eine andere Frage
-              im selben Bild. Und „was kommt noch auf mich zu" ist keine Frage EINES
-              Kontos — wer vier führt, musste vier Auszüge öffnen und zusammenzählen.
-              Dieselbe Trennung, die den Kontoabgleich schon aus der Kontenliste in einen
-              eigenen Bereich geschoben hat.
-
-              Der reale Stand von heute bleibt hier: er ist eine Auskunft ÜBER dieses
-              Konto und steht oben in der Kopfzeile, wo er hingehört. */}
-        </div>
+        </Card>
       )}
 
       {/* Anlegen und Bearbeiten sind derselbe Dialog: ohne `buchung` legt er eine neue an,

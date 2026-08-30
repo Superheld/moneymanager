@@ -1,22 +1,24 @@
-// Ein `sqlite3` fuer die verschluesselte Datenbank — fuer die Waechter, sonst nichts.
+// Ein `sqlite3` fuer die verschluesselte Datenbank — von Hand, wenn man einen Datenbug
+// nachsehen will statt zu raten.
 //
-// **Warum es das braucht.** `scripts/bestandsmerkmale.mjs` liest den echten Bestand ueber
-// das `sqlite3`-Kommando und speist damit beide Privatsphaere-Waechter. Eine
-// SQLCipher-Datei bekommt `sqlite3` nicht auf; der Waechter braeche ab, und ein Waechter,
-// der nicht mehr arbeiten kann, ist am Ende ein abgeschalteter Waechter. Das ist das
-// Gegenteil von dem, wofuer die Verschluesselung da ist.
+// **Warum es das braucht.** Eine SQLCipher-Datei bekommt `sqlite3` nicht auf. Ohne dieses
+// Werkzeug bliebe nur, die App zu oeffnen und in der Oberflaeche zu suchen — und genau das
+// taugt nicht, wenn die Frage lautet, was in einer Spalte wirklich steht.
+//
+// **Bis zum 30.08.2026 war es Pflichtteil eines Waechters**, der den echten Bestand bei
+// jedem Testlauf und jedem Push las. Der ist ausgebaut (siehe `CLAUDE.md`), und damit hat
+// sich der Charakter dieses Werkzeugs geaendert: es laeuft nur noch, wenn jemand es
+// aufruft.
 //
 // **Der Schluessel kommt aus einer Datei ausserhalb des Repos** — dem
 // Wiederherstellungscode, abgelegt unter `~/.moneymanager-schluessel/entwicklung.code`
 // (oder wo `MONEYMANAGER_CODE_DATEI` hinzeigt). Der Code IST der Datenschluessel in
-// lesbarer Form; er braucht keine Passphrase und kein Argon2, und genau deshalb taugt er
-// hier: ein Waechter, der interaktiv nach einem Kennwort fragt, laeuft in keinem Hook.
+// lesbarer Form; er braucht keine Passphrase und kein Argon2.
 //
-// **Das ist eine bewusste Schwaechung, und sie gehoert benannt.** Wer diese Datei hat,
-// hat den Bestand — die Verschluesselung schuetzt dann nur noch gegen jemanden, der die
-// Datenbank OHNE das Verzeichnis erwischt (ein Backup, eine Kopie, ein zweiter Account).
-// Dieselbe Abwaegung wie beim Updater-Signaturschluessel, der ebenfalls dort liegt. Auf
-// einer Maschine, auf der nicht entwickelt wird, gibt es die Datei nicht.
+// **Wer diese Datei hat, hat den Bestand.** Das war als Dauerzustand eine Schwaechung, die
+// den Zweck der Verschluesselung untergrub — deshalb ist sie jetzt OPTIONAL und gehoert
+// nach getaner Arbeit geloescht. Kein Testlauf und kein Hook verlangt sie mehr; ohne sie
+// laeuft alles ausser diesem Werkzeug.
 //
 // LIEST NUR. `PRAGMA query_only=ON` steht fest im Code und nicht in den Argumenten.
 
@@ -25,7 +27,7 @@ use std::path::PathBuf;
 
 use moneymanager_lib::datenbank::pool_lesend;
 use moneymanager_lib::schluessel::Datenschluessel;
-use sqlx::{Column, Row, TypeInfo};
+use sqlx::{AssertSqlSafe, Column, Row, TypeInfo};
 
 fn codedatei() -> PathBuf {
     if let Ok(p) = std::env::var("MONEYMANAGER_CODE_DATEI") {
@@ -72,7 +74,7 @@ async fn main() {
         }
     };
 
-    let zeilen = match sqlx::query(&sql).fetch_all(&pool).await {
+    let zeilen = match sqlx::query(AssertSqlSafe(sql)).fetch_all(&pool).await {
         Ok(z) => z,
         Err(e) => {
             eprintln!("{e}");

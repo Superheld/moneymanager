@@ -86,7 +86,9 @@ const ERWARTETE_TABELLEN = [
   "depot", "depotposition", "depotwert", // v38 — Depots: Beobachtungen statt Buchungen
   "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
   "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
-  "ist_buchung_aufteilung", "kategorie", "kategorie_festlegung", "klassifikator_modell",
+  "ist_buchung_aufteilung", "kategorie", "klassifikator_modell",
+  // v61 — frei benannte Gruppen von Konten; eine Sicht, keine Rechenregel
+  "kontogruppe", "kontogruppe_konto",
   "kontostand_anker", // v35 — was an einem Stichtag wirklich auf dem Konto lag
   "merkmal_ausschluss",
   "person",
@@ -157,7 +159,7 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     // v9/v10/v11/v13
     expect(spalten(db, "umsatz_roh")).toContain("glaeubiger_id"); // v16, seit v44 in umsatz_roh
     expect(spalten(db, "ist_buchung")).toEqual(
-      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "plan_quelle_id", "plan_faelligkeit", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
+      expect.arrayContaining(["notiz", "transfer_id", "gegenkonto_id", "roh_hash", "kategorie_herkunft"]), // kategorie_herkunft: v20
     );
     // v37 — das Bankfaehigkeitsprofil am Zugang, das getragene Format an der Zuordnung
     expect(spalten(db, "bankzugang")).toContain("profil");
@@ -188,13 +190,6 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
 
     const r = db.exec("SELECT kategorie_herkunft FROM ist_buchung WHERE id = 'alt'");
     expect(String(r[0].values[0][0])).toBe("automatisch");
-    db.close();
-  });
-
-  it("erzeugt den partiellen Unique-Index für die Plan-Dedup", () => {
-    const db = new SQL.Database();
-    apply(db);
-    expect(indexExistiert(db, "ux_ist_planref")).toBe(true);
     db.close();
   });
 
@@ -234,32 +229,6 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     expect(spalten(db, "import_lauf")).toContain("format");
     expect(indexExistiert(db, "ix_umsatz_roh_hash")).toBe(true);
     expect(indexExistiert(db, "ix_umsatz_roh_native")).toBe(true);
-    db.close();
-  });
-});
-
-describe("Dedup-Garantie über den Unique-Index", () => {
-  function einfuegen(db: Database, id: string, planQuelle: string | null, faellig: string | null) {
-    db.run(
-      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle, plan_quelle_id, plan_faelligkeit)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, "2026-06-01", -100, "k1", "Aufwand", "bezahlt-markiert", planQuelle, faellig],
-    );
-  }
-
-  it("verbietet zwei Ist-Buchungen für denselben Plan-Posten", () => {
-    const db = new SQL.Database();
-    apply(db);
-    einfuegen(db, "i1", "r1", "2026-06-01");
-    expect(() => einfuegen(db, "i2", "r1", "2026-06-01")).toThrow();
-    db.close();
-  });
-
-  it("erlaubt mehrere freie (planlose) Buchungen", () => {
-    const db = new SQL.Database();
-    apply(db);
-    einfuegen(db, "m1", null, null);
-    expect(() => einfuegen(db, "m2", null, null)).not.toThrow();
     db.close();
   });
 });
@@ -817,7 +786,7 @@ describe("Migrationen 48/49 — Fremdschluessel fuer die Achse Buchung-Konto-Kat
     db.run(`INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, art)
             VALUES ('v1','Talmberg Energie','2026-01-01','automatisch','aktiv','laufend')`);
     buchung(db, "b1", "kat");
-    db.run("UPDATE ist_buchung SET vertrag_id='v1', vertrag_herkunft='manuell', plan_quelle_id='r1', plan_faelligkeit='2026-08-01'");
+    db.run("UPDATE ist_buchung SET vertrag_id='v1', vertrag_herkunft='manuell'");
 
     const vorher = db.exec("SELECT * FROM ist_buchung")[0];
     apply(db, 47, 49);
@@ -831,7 +800,7 @@ describe("Migrationen 48/49 — Fremdschluessel fuer die Achse Buchung-Konto-Kat
   it("haelt die Indizes der Buchungstabelle ueber den Neubau", () => {
     const db = new SQL.Database();
     apply(db);
-    for (const i of ["ux_ist_planref", "ix_ist_buchung_roh_hash", "ix_ist_buchung_vertrag"]) {
+    for (const i of ["ix_ist_buchung_roh_hash", "ix_ist_buchung_vertrag"]) {
       expect(indexExistiert(db, i)).toBe(true);
     }
     db.close();
@@ -940,8 +909,6 @@ describe("Migration 50 — der Rest der Verweise", () => {
       "umsatz_roh.glaeubiger_id", "umsatz_roh.native_id",
       // Gemeinsame Marke der beiden Beine einer Umbuchung, kein Verweis auf eine Zeile.
       "ist_buchung.transfer_id",
-      // Verweist auf eine PROJIZIERTE Faelligkeit, die es als Zeile nicht gibt.
-      "ist_buchung.plan_quelle_id",
       // JSON-Liste, kein Einzelverweis.
       "zahlungskonto.inhaber_ids",
       // Das Journal muss die LOESCHUNG ueberleben — dafuer gibt es die Tabelle. Ein
@@ -1585,6 +1552,94 @@ describe("Migration 60 — die Kategorie fuer Erstattungen", () => {
     expect(() => apply(db, 59, 60)).not.toThrow();
 
     expect(namen(db)).toEqual(["Einnahmen"]);
+    db.close();
+  });
+});
+
+describe("Migration 63 — halbe Umbuchungen bekommen ihre Richtung zurueck", () => {
+  /**
+   * Eine Umbuchung ohne Gegenbuchung gibt es nicht. Bis 2026-08-29 legte der Import solche
+   * Zeilen als einseitige Umschichtung an, und die zaehlte in kein Budget und in keine
+   * Ausgabe — das Geld war weg und fehlte nirgends.
+   *
+   * Die Zeilen werden NICHT geloescht: die Zahlung hat stattgefunden und steht im Saldo.
+   */
+  function bestand() {
+    const db = new SQL.Database();
+    apply(db, 0, 62);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('giro','Girokonto','Giro','[]')");
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('sp','Sparen','Umschichtung')");
+    return db;
+  }
+
+  function umschichtung(
+    db: InstanceType<typeof SQL.Database>,
+    id: string,
+    betrag: number,
+    over: { katId?: string | null; transferId?: string | null } = {},
+  ) {
+    db.run(
+      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle,
+         transfer_id, kategorie_herkunft)
+       VALUES (?, '2026-08-11', ?, 'giro', ?, 'Umschichtung', 'import', ?, 'automatisch')`,
+      [id, betrag, over.katId ?? null, over.transferId ?? null],
+    );
+  }
+
+  const charakterVon = (db: InstanceType<typeof SQL.Database>, id: string) =>
+    String(db.exec(`SELECT charakter FROM ist_buchung WHERE id='${id}'`)[0].values[0][0]);
+
+  it("macht aus einem halben Abgang einen Aufwand und aus einem Zugang einen Ertrag", () => {
+    const db = bestand();
+    umschichtung(db, "ab", -4500);
+    umschichtung(db, "zu", 4500);
+    apply(db, 62, 63);
+    expect(charakterVon(db, "ab")).toBe("Aufwand");
+    expect(charakterVon(db, "zu")).toBe("Ertrag");
+    // Die Zeilen bleiben — der Saldo haengt an ihnen.
+    expect(db.exec("SELECT count(*) FROM ist_buchung")[0].values[0][0]).toBe(2);
+    db.close();
+  });
+
+  it("laesst ein echtes Paar unberuehrt", () => {
+    const db = bestand();
+    umschichtung(db, "paar", -4500, { transferId: "t1" });
+    apply(db, 62, 63);
+    expect(charakterVon(db, "paar")).toBe("Umschichtung");
+    db.close();
+  });
+
+  it("laesst eine gewollte Umschichtung MIT Kategorie unberuehrt", () => {
+    const db = bestand();
+    umschichtung(db, "sparen", -4500, { katId: "sp" });
+    apply(db, 62, 63);
+    expect(charakterVon(db, "sparen")).toBe("Umschichtung");
+    db.close();
+  });
+
+  /**
+   * Der Fall, der ohne die vierte Bedingung falsch liefe: bei einer geteilten Buchung ist
+   * `kategorie_id` leer, OHNE dass sie unkategorisiert waere — ihre Kategorien stehen in
+   * `ist_buchung_aufteilung`. Sie sieht damit aus wie eine halbe Umbuchung.
+   */
+  it("laesst eine GETEILTE Umschichtung unberuehrt", () => {
+    const db = bestand();
+    umschichtung(db, "geteilt", -4500);
+    db.run(
+      "INSERT INTO ist_buchung_aufteilung (istbuchung_id, kategorie_id, betrag) VALUES ('geteilt','sp',-4500)",
+    );
+    apply(db, 62, 63);
+    expect(charakterVon(db, "geteilt")).toBe("Umschichtung");
+    db.close();
+  });
+
+  it("ist wiederholbar — ein zweiter Lauf aendert nichts mehr", () => {
+    const db = bestand();
+    umschichtung(db, "ab", -4500);
+    apply(db, 62, 63);
+    const nachErstem = db.exec("SELECT charakter, betrag FROM ist_buchung")[0].values;
+    apply(db, 62, 63);
+    expect(db.exec("SELECT charakter, betrag FROM ist_buchung")[0].values).toEqual(nachErstem);
     db.close();
   });
 });

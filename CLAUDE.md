@@ -71,7 +71,7 @@ damit ein Thema an drei Stellen gleich heißt:
 
 ```
 core/         basis buchung konten budgets vertraege kategorien inventar depot
-              stammdaten klassifikator          + index, monatsausblick
+              stammdaten klassifikator          + index, monatsausblick, auswertung
 application/  buchung konten budgets vertraege kategorien inventar depot dubletten
               stammdaten import fints           + index, ports, bootstrap,
                                                   uebersicht, analysesichten, einstellungen
@@ -91,8 +91,8 @@ Drei Regeln, wohin eine neue Datei gehört:
 
 Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (`index.ts`,
 `ports.ts`), der Start (`bootstrap.ts`) und die bewusst querliegenden Sichten
-(`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`) — sie rechnen über mehrere
-Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
+(`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`, `core/auswertung.ts`) —
+sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 
 Zwei Namen weichen ab, beide weil die OBERFLÄCHE der Navigation folgt und nicht der
@@ -107,7 +107,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-26 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+28 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
@@ -115,7 +115,8 @@ ist sie:
   (was mit einer Buchung geschah) · `umsatz_roh` +
   `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ
   UND Klasse, siehe unten) ·
-  `kontostand_anker` · `import_lauf` · `dubletten_freigabe`
+  `kontostand_anker` · `import_lauf` · `dubletten_freigabe` ·
+  `kontogruppe` + `kontogruppe_konto` (frei benannte Gruppen, siehe unten)
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` + `budget_betrag` (die
   Reihe seiner Beträge, siehe unten) · `vertrag` ·
   `vertrag_erkennung` · `zahlungsregel` · `inventargegenstand`
@@ -406,6 +407,105 @@ weiter unten.
 - **`kontostand_anker` und `depotwert` werden nicht protokolliert.** Sie sind Beobachtungen
   zu einem Stichtag und werden nur ergänzt, nicht geändert.
 
+## Zwei Exporte, zwei Zusicherungen (Experiment)
+
+Seit 2026-08-30, beide hinter `experiment.export`, beide im selben Register
+**Einstellungen → Export** — untereinander, damit man den Unterschied sieht:
+
+| Datei | enthält | darf man weitergeben |
+|---|---|---|
+| `konfiguration-<kennung>-<tag>.json` | wie der Haushalt ORDNET: Kategorien mit Baum und Charakter | **ja** |
+| `bestand-<kennung>-<tag>.json` | was in ihm PASSIERT ist: Buchungen samt Bankzeile, Konten, Verträge, Personen | **nein — das ist der Kontoauszug** |
+
+**Die Trennung IST die Zusicherung, und sie hält nur, solange es zwei Dateien sind.** Eine
+Ordnung lässt sich teilen, ein Kontoauszug nicht. Beide Seiten stehen als ausführbare
+Zusicherung da und nicht nur als Kommentar: `konfiguration.test.ts` prüft, dass in der
+einen kein Feld eine Buchung beschreibt, `bestandsexport.test.ts` prüft, dass in der
+anderen genau das drinsteht. **Die beiden Tests zusammen sind die Grenze** — einer allein
+wäre eine halbe Aussage, und wer die Exporte je zusammenlegen will, macht beide zugleich rot.
+
+Der naheliegende Weg war ein Häkchen „Buchungen mitnehmen" an der vorhandenen Karte. Er
+ist verworfen, und der Grund ist nicht Prinzipienreiterei: er erzeugte zwei Dateien, die
+gleich heissen und gleich aussehen, und im Dateimanager — oder im Anhang einer Mail —
+wüsste niemand mehr, welche er vor sich hat. **Der Dateiname ist die einzige Stelle, an
+der man einer Exportdatei ihre Zusicherung von aussen ansieht.**
+
+| Stück | Datei |
+|---|---|
+| Port und Dateiname (geteilt) | `src/application/export.ts` |
+| Die Ordnung: Form, Sortierung, Use-Case | `src/application/konfiguration.ts` |
+| Der Bestand: Form, Join, Use-Case | `src/application/bestandsexport.ts` |
+| Der Port auf das Kommando | `src/adapters/persistence/export.ts` |
+| Das Kommando | `src-tauri/src/export.rs` |
+| Die Karten | `src/adapters/ui/einstellungen/ExportCard.tsx` · `BestandsexportCard.tsx` |
+
+Vier Entscheidungen, die man kennen muss:
+
+- **Ein eigenes Kommando, kein `<a download>`.** Im WKWebView landet ein Blob-Download je
+  nach Fassung nirgends oder wortlos im Papierkorb-Verzeichnis des Webviews. Ein Export,
+  von dem man nicht weiss, wo er liegt, ist keiner. Dieselbe Überlegung wie beim
+  Datenbankzugang.
+- **Das Ziel bestimmt NICHT der Aufrufer.** Immer `<App-Datenverzeichnis>/export/`, und der
+  Name muss ein einfacher Dateiname sein — derselbe Filter wie bei der Datenbankdatei. Ein
+  Webview, der irgendwohin schreiben darf, ist einer, der überall hinschreiben kann.
+- **Der Pfad wird angezeigt.** Ins App-Datenverzeichnis findet niemand von selbst; ein
+  „fertig" ohne Ort schickt den Nutzer suchen.
+- **Der Dateiname trägt den Bestand** (`konfiguration-moneymanager-dev-<tag>.json`). Echter
+  Bestand und Spielstand liegen in zwei Dateien, aber im SELBEN Datenverzeichnis — der
+  Identifier trennt sie nicht. Ohne die Kennung überschriebe ein Export aus der
+  installierten App den des Spielstands wortlos, und von aussen sähen beide gleich aus.
+- **Eltern stehen vor ihren Kindern.** Wer die Liste von oben nach unten einliest, findet
+  jede Elternkategorie bereits angelegt vor. Nach Namen sortiert müsste ein Importeur
+  zweimal laufen.
+
+**Einen Import gibt es nicht**, und das ist der Grund für den Experimente-Schalter: die
+schwierige Hälfte ist das Einlesen — eingelesene Kategorien treffen auf vorhandene, IDs
+kollidieren, Bäume müssen zusammengeführt werden. Bis das entschieden ist, sichert jede
+Datei nur ihre `fassung` zu. Die beiden Fassungsnummern sind dabei **getrennt**: sonst
+stiege die eine, weil sich an der anderen etwas geändert hat, und `fassung` sagte nichts mehr.
+
+### Was im Bestandsexport steht — und warum vollständig
+
+Er ist gebaut, um den Bestand einmal herauszuholen, anzusehen, aufzuräumen und
+**pseudonymisiert** weiterzuverwenden: als Vorlage für den Spielstand
+(`testwerkzeug/seedDaten.ts`) und für das mitgelieferte Kategorisierungsmodell.
+
+Bei einem Export, dessen Zweck Analyse ist, kostet ein weggelassenes Feld einen ganzen
+Zyklus — man merkt es erst beim Auswerten. Deshalb kommt jedes Feld mit, das eine AUSSAGE
+über die Zahlung trägt, `zweckCode` und `endempfaenger` eingeschlossen; draussen bleibt
+nur, was reiner technischer Schlüssel ist (`rohHash`, `nativeId`). Der Beleg steht **am
+Buchungssatz**, nicht in einem eigenen Abschnitt: für beide Zwecke ist genau die
+Verbindung das Interessante, und zwei Listen mit einer ID dazwischen zwängen jeden Leser,
+den Join nachzubauen, den `application/zahlungsspuren` längst kennt.
+
+**Konten allein reichten nicht** — das war die erste Annahme, und sie ist an zwei Stellen
+zu kurz: ein Konto zeigt über `inhaberIds` auf Personen, eine Buchung zusätzlich über
+`vertrag_id` auf einen Vertrag. Deshalb sind es vier Abschnitte und nicht zwei.
+`bestandsexport.test.ts` hält das fest, indem es jeden Verweis einer Buchung in der Datei
+wiederfindet.
+
+Was NICHT drin ist, damit niemand danach sucht: unverbuchte Zeilen (Inbox, verworfen) —
+exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso Budgets,
+Inventar, Depots, Kontogruppen und das Journal: sie hängen nicht an einer Buchung.
+
+**Die Datei liegt im KLARTEXT, der Bestand daneben nicht.** Seit 2026-08-27 ist die
+Datenbank verschlüsselt und ihre Sicherungen sind es mit; ein Bestandsexport legt eine
+unverschlüsselte Vollkopie desselben Inhalts daneben und hebt den Schutz für diesen Ordner
+faktisch auf, solange sie liegt. Das ist dieselbe Lücke wie bei den von Hand angelegten
+Sicherungen, die die Überführung nie zu sehen bekommt — und sie entsteht aus demselben
+Grund: jemand tut etwas Sorgfältiges und denkt danach nicht mehr an die Kopie. Deshalb
+sagt die Karte es dazu, und deshalb steht es hier: **die Datei gehört nach Gebrauch
+gelöscht**, nicht aufgehoben. Ein Export je Tag und Bestand überschreibt sich zwar selbst,
+aber nur, solange am selben Tag exportiert wird.
+
+**Der gefährliche Teil liegt hinter dem Export, nicht in ihm.** Beide Verwendungswege enden
+im ÖFFENTLICHEN Repo, und diese Datei ist der kürzeste Weg von der echten Datenbank
+dorthin. Die Pseudonymisierung passiert danach und ausserhalb — und **kein Wächter im Repo
+würde einen Empfängernamen finden**, der es doch hineinschafft: der Muster-Guard kennt
+Formen, keine Werte (siehe „Was er nicht kann"). Was aus dieser Datei ins Repo wandert,
+ist Handarbeit mit Vier-Augen-Anspruch, und was sich benennen lässt, gehört vorher in
+`.privacy-terms`.
+
 ## Was die App nach draussen spricht
 
 Eine lokale Finanz-App, die still mit fremden Servern redet, ist keine lokale Finanz-App.
@@ -494,6 +594,13 @@ direkten Commit auf `develop` oder `main` ab, `prepare-commit-msg` lässt nach `
 einen Merge aus `develop` zu. Merges per `--no-ff` laufen normal durch — Git ruft für sie
 einen anderen Hook. Im Notfall: `--no-verify`.
 
+**Beide Hooks sitzen auf dieser Maschine, und darin liegt ihre Grenze.** Ein Merge, der auf
+GitHub passiert, fragt keinen von ihnen — der Wachposten fällt lautlos genau dort aus, wo
+niemand ihn vermisst. Deshalb zielt auch **Dependabot auf `develop`** (`target-branch` in
+`.github/dependabot.yml`, geprüft von `src/lieferkette.test.ts`): ohne diese Angabe legt es
+seine Vorschläge gegen den Standardbranch an, und die liessen sich mit einem Klick nach
+`main` zusammenführen. Es war einmal so, und man sieht es einem grünen Vorschlag nicht an.
+
 ## Die Hooks
 
 Aktiv wird alles über **`git config core.hooksPath .githooks`** — einmal je Klon, sonst
@@ -504,7 +611,7 @@ greift keiner davon. Sie liegen im Repo, damit sie mitkommen und überprüfbar s
 | `pre-commit` | Muster-Guard über das Vorgemerkte · kein direkter Commit auf `develop`/`main` |
 | `commit-msg` | Muster-Guard über die Nachricht |
 | `prepare-commit-msg` | nach `main` nur aus `develop` |
-| `pre-push` | Wächter-Tests · Muster-Guard über Diff und Commit-Texte · Wert-Abgleich gegen die echte Datenbank |
+| `pre-push` | Wächter-Tests · Muster-Guard über Diff und Commit-Texte |
 
 Der Branch-Wächter sitzt in `prepare-commit-msg` und **nicht** in `pre-merge-commit`, wo
 man ihn zuerst sucht: dort gibt es `MERGE_HEAD` noch nicht, Git legt die Datei erst danach
@@ -532,6 +639,11 @@ Zwei Dinge, die ein grüner Lauf verschweigt:
 
 - **`cargo test --lib` verdeckt `dead_code`-Warnungen**, die der App-Build zeigt: was nur
   Tests benutzen, gilt dort als benutzt. Vor dem Commit einmal `cargo build --lib`.
+- **Und `--lib` uebersieht `src/bin/`.** Dort liegt `bestandslesen`, und es benutzt
+  dieselbe Datenbank-Naht wie die App. Beim Sprung auf sqlx 0.9 blieb es deshalb kaputt
+  liegen, waehrend Bibliothek, Tests und Frontend gruen meldeten — gefunden erst, als
+  jemand das Werkzeug wieder brauchte. Wer an der Naht arbeitet, baut
+  **`cargo build --bins --lib`**.
 - **`src/doku.test.ts` liest `git ls-files`.** Eine neue Datei, die in einer `CLAUDE.md`
   steht, muss **vor** dem Testlauf `git add`-ed sein — sonst meldet der Wächter einen
   toten Verweis auf etwas, das längst dasteht.
@@ -801,6 +913,11 @@ Fünf Dinge, die man wissen muss:
 - **Die Sicherungen aus der Klartext-Zeit werden dabei weggeworfen** — geprüft am
   Dateikopf, nicht am Namen. Sie liegen zu lassen hiesse, den ganzen Aufwand durch die
   Hintertür wieder aufzugeben.
+- **Aber nur die im Ordner `sicherungen/`.** `alte_sicherungen_wegwerfen` schaut genau
+  dort; was von Hand daneben ins Datenverzeichnis gelegt wurde (`.bak-…`, `.vor-…`), sieht
+  die Überführung nie und bleibt im Klartext liegen. Das ist die unangenehmere Hälfte:
+  solche Kopien entstehen aus Sorgfalt vor einem riskanten Schritt, und danach denkt
+  niemand mehr an sie.
 - **Eine vergessene Passphrase nimmt auch das Jahresarchiv mit.** `VACUUM INTO` schreibt
   mit dem Schlüssel der offenen Verbindung; alle Sicherungen sind damit verschlüsselt.
   Deshalb ist der Wiederherstellungscode Pflicht und nicht Komfort.
@@ -1021,14 +1138,17 @@ Vier Entscheidungen darin, die man nicht anfassen sollte, ohne den Grund zu kenn
   alle Plattformen zusammen, und tauri-action baut sie als READ-MODIFY-WRITE: es lädt die
   vorhandene vom Release, übernimmt ihre `platforms` und schreibt die eigene dazu
   (nachgesehen im Quelltext von tauri-action, Datei upload-version-json.ts, beim
-  gepinnten SHA). Zwei Jobs, die
+  gepinnten SHA — auch nach dem Sprung auf 1.0.0 noch). Zwei Jobs, die
   gleichzeitig lesen, sehen denselben Stand — der zweite überschreibt den Eintrag des
   ersten. Der Fehlschlag ist **still**: die verlorene Plattform bekommt vom Updater
   „nichts Neues" statt eines Fehlers.
-- **Der Release-Text kommt vom ERSTEN Job.** tauri-action setzt Titel und Text nur beim
-  ANLEGEN des Releases; wer es vorfindet, lässt beides unberührt. Deshalb steht macOS in
-  der Matrix oben. Alle drei Jobs rechnen denselben Text aus, das Ergebnis hängt also
-  nicht daran — aber die Reihenfolge ist trotzdem kein Zufall.
+- **Der Release-Text kommt vom ersten Job — und seit tauri-action 1.0.0 auch von jedem
+  weiteren.** Bis v0 setzte die Action Titel und Text nur beim ANLEGEN des Releases und
+  liess ein vorgefundenes unberührt; jetzt schreibt jeder Job beides neu. Am Ergebnis
+  ändert das nichts, weil alle drei Läufer denselben Text ausrechnen. Es ändert die
+  **Fehlerform**: scherte früher ein Läufer aus, gewann trotzdem der erste Job, heute
+  gewinnt der letzte. Deshalb steht macOS weiterhin oben, und deshalb ist `shell: bash`
+  am Textschritt wichtiger geworden als vorher.
 - **`shell: bash` am Textschritt.** Ohne ihn nimmt GitHub auf Windows PowerShell, und das
   Skript stirbt an der ersten Zeile. Ein Schritt, der auf zwei von drei Läufern
   funktioniert, fällt erst im Release auf.
@@ -1085,6 +1205,20 @@ eine Fehlermeldung abzuwarten.
 
 `npm run seed` überschreibt ihn vollständig. Das ist billig und folgenlos — er ist
 **Wegwerfware**, im Gegensatz zum echten Bestand.
+
+**Der frische Spielstand ist unverschlüsselt, und sein Zugang wird mit abgeräumt.** Der
+Seed schreibt über sql.js, kennt also kein SQLCipher; verschlüsselt wird die Datei erst,
+wenn die App sie beim nächsten Start vorfindet und durch die Einrichtung führt. Die
+Passphrase ist dabei frei wählbar (es ist der Spielstand), der Wiederherstellungscode
+wird gewürfelt und einmal angezeigt.
+
+Damit das überhaupt passiert, löscht das Skript die Schlüsselhülle `<name>.schluessel.json`
+mit — und die Sicherungen dieses Spielstands, die mit dem alten Datenschlüssel geschrieben
+sind und danach niemand mehr aufbekäme. **Ohne dieses Abräumen wäre der frische Spielstand
+nicht zu öffnen:** `zugang_stand` meldet „eingerichtet", sobald eine Hülle daliegt, die App
+verlangt dann eine Passphrase, packt den ALTEN Schlüssel aus und setzt ihn per `PRAGMA key`
+auf eine Klartext-Datei. Die Meldung lautet „file is not a database" und sieht nach
+kaputtem Bestand aus statt nach falschem Schlüssel.
 
 Neu schreiben, wenn:
 
@@ -1165,6 +1299,19 @@ Vier Dinge gelten überall und stehen deshalb hier:
   Wert entscheiden, ob er verfügbar ist. Bislang trennt die Klasse **nur** das; was Rücklage
   und Vorsorge sonst unterscheiden soll, ist offen.
 
+- **Eine Kontogruppe ist eine SICHT, die Klasse eine RECHENREGEL.** Das ist der Unterschied,
+  an dem sonst eine zweite Wahrheit entsteht. Die Klasse entscheidet mit — nur `liquide`
+  zählt zu den liquiden Mitteln — und ein Konto hat genau eine. Eine Gruppe
+  (`core/konten/gruppe.ts`, Tabellen `kontogruppe` + `kontogruppe_konto`) heißt, wie der
+  Nutzer sie nennt, bündelt beliebig viele Konten und entscheidet **nichts**; dasselbe Konto
+  darf in mehreren liegen, und genau dafür gibt es sie neben der Klasse. Wer eine Gruppe je
+  eine Rechnung tragen lässt („Gruppe X zählt als liquide"), hat zwei Felder, die dasselbe
+  verschieden sagen — und der Widerspruch fällt erst auf, wenn eine Summe nicht mehr aufgeht.
+
+  Was für eine Gruppe trotzdem gilt, weil es für jede Auswahl von Konten gilt: **Saldo und
+  Buchungen filtern mit derselben Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie
+  gab.
+
   **Saldo und Buchungen gehören dabei zusammen.** `istMonatsverlauf` bildet seinen Sockel aus
   `liquideMittel` und lässt Buchungen darüberlaufen. Nimmt man den Saldo eines Kontos heraus
   und seine Buchungen nicht, zeigt der Verlauf einen Stand, den es nie gab — beide Seiten
@@ -1172,7 +1319,7 @@ Vier Dinge gelten überall und stehen deshalb hier:
   `core/konten/konto.test.ts` und `core/buchung/historie.test.ts`.
 
 Ausführbar geprüft wird das in `src/architektur.test.ts` (Schichtgrenzen),
-`src/doku.test.ts` (Verweise) und `src/privatsphaere.test.ts` (echte Daten).
+`src/doku.test.ts` (Verweise) und `src/privatsphaere.test.ts` (IBANs echter Banken).
 
 ## Nichts aus dem echten Bestand ins Repo
 
@@ -1217,41 +1364,44 @@ in die Doku außerhalb des Repos.
 Der Muster-Guard findet davon nur die Beträge. Der Rest ist Handarbeit — dieselbe Art wie
 bei Regel 2 und 3 der Testdaten.
 
-### Wie die Wächter eine verschlüsselte Datenbank lesen
+### Der Wert-Abgleich ist weg, und was das kostet
 
-`sqlite3` bekommt eine SQLCipher-Datei nicht auf. Der Wert-Abgleich liest den echten
-Bestand aber zur Laufzeit — er bräche ab, und ein Wächter, der nicht mehr arbeiten kann,
-ist am Ende ein abgeschalteter Wächter. Genau das Gegenteil von dem, wofür die
-Verschlüsselung da ist.
+Bis zum 30.08.2026 gab es einen zweiten Wächter: er las den **echten Bestand** zur Laufzeit
+und suchte dessen Werte im Arbeitsbaum und in den ausgehenden Commit-Texten. Er hat
+gefunden, wofür er gebaut war — eine IBAN in zwei Import-Tests, Kontostände in Kommentaren,
+eine mit der eigenen Miete begründete Toleranz im Monatsausblick.
 
-`scripts/bestandsmerkmale.mjs` entscheidet deshalb **am Dateikopf**, welchen Weg es
-nimmt: unverschlüsselt über `sqlite3`, verschlüsselt über das eigene Werkzeug
-`src-tauri/src/bin/bestandslesen.rs`. Einmal bauen:
+**Er ist ausgebaut, und der Grund ist nicht Bequemlichkeit.** Seit der Bestand verschlüsselt
+ist, kam er nur noch über den **Datenschlüssel** an seine Werte — als Wiederherstellungscode
+im Klartext neben der Datenbank. Ein Wächter, der einen Generalschlüssel verlangt, nimmt der
+Verschlüsselung genau das, wofür sie gebaut wurde. Und fehlte die Datei, war `npm test` rot
+und **jeder** Push blockiert; das traf nicht nur den frischen Klon, sondern auch den
+Rechner, auf dem die Verschlüsselung eingeführt wurde, dort in dem Moment, in dem sie
+griff — und still, denn ein Push, der nicht stattfindet, sieht aus wie ein Tag ohne Push.
+
+Dazu ist seine Voraussetzung entfallen: es liegen **keine Echtdaten im Rohformat** mehr in
+der Entwicklung, und der Spielstand (`npm run seed`) ist eine eigene Umgebung mit
+erfundenen Daten.
+
+**Was damit ungeprüft bleibt, und das ist der ehrliche Teil:** alles, was keiner Form folgt
+— ein Empfängername, ein Verwendungszweck, eine Buchungszahl, ein Kontostand in Prosa. Der
+Muster-Guard kennt Formen, nicht Werte. Wer so etwas benennen kann, trägt es in
+`.privacy-terms` ein (git-ignoriert, Vorlage `.privacy-terms.example`); dort greift der
+Muster-Guard es wieder auf. Der Rest ist Handarbeit — dieselbe Art wie bei der
+Anonymisierung, die ohnehin nie ein Wächter leisten konnte.
+
+**Das Werkzeug `bestandslesen` bleibt** (`src-tauri/src/bin/bestandslesen.rs`). Es ist der
+einzige Weg, den verschlüsselten Bestand von der Kommandozeile zu lesen, und dafür gibt es
+gute Gründe — einen Datenbug nachsehen statt raten. Der Unterschied zu vorher ist
+entscheidend: `~/.moneymanager-schluessel/entwicklung.code` ist jetzt **optional**. Wer sie
+anlegt, tut es bewusst und für eine Sitzung; kein Testlauf und kein Push verlangt sie mehr.
 
 ```bash
 cargo build --manifest-path src-tauri/Cargo.toml --bin bestandslesen
+./src-tauri/target/debug/bestandslesen "$DB" "SELECT …"
 ```
 
-Der Schlüssel kommt aus `~/.moneymanager-schluessel/entwicklung.code` — dem
-**Wiederherstellungscode**, nicht der Passphrase: der Code IST der Datenschlüssel, es
-braucht kein Argon2 und keine Eingabe. Ein Wächter, der interaktiv nach einem Kennwort
-fragt, läuft in keinem Hook.
-
-**Das ist eine bewusste Schwächung und gehört benannt.** Wer diese Datei hat, hat den
-Bestand — die Verschlüsselung schützt dann nur noch gegen jemanden, der die Datenbank
-OHNE das Verzeichnis erwischt: ein Backup, eine Kopie, ein zweiter Account. Dieselbe
-Abwägung wie beim Updater-Signaturschlüssel, der ebenfalls dort liegt. Auf einer
-Maschine, auf der nicht entwickelt wird, gibt es die Datei nicht.
-
-Fehlt das Werkzeug oder der Code, **bricht der Wächter ab** statt durchzuwinken — beides
-geprüft.
-
-### Zwei Wächter, die verschiedene Fehler finden
-
-**Der Wert-Abgleich** (`src/privatsphaere.test.ts`, dazu der `pre-push`-Hook) kennt die
-Daten nicht, sondern liest sie zur Laufzeit aus der echten Datenbank und prüft den
-Arbeitsbaum und die ausgehenden Commit-Texte dagegen. Er findet **deine** Werte, auch in
-anderer Schreibweise — und nur die.
+### Was der Muster-Guard findet
 
 **Der Muster-Guard** (`scripts/privacy-guard.mjs`) kennt die Formen: IBAN, SEPA-Gläubiger-ID,
 Token, E-Mail, Produkt-ID, Beträge in Prosa, verbotene Dateitypen. Er findet auch, was
@@ -1259,7 +1409,10 @@ Token, E-Mail, Produkt-ID, Beträge in Prosa, verbotene Dateitypen. Er findet au
 aus einem FinTS-Mitschnitt gerutscht ist (siehe „Mitgelieferte Skills"). Er läuft in
 `npm test` und an allen drei Hook-Zeitpunkten.
 
-Keiner ersetzt den anderen. Der eine kennt die Werte, der andere die Formen.
+Daneben steht in `src/privatsphaere.test.ts` noch **ein** Testfall, und er ist der einzige
+dort, der ohne Datenbank auskommt: keine IBAN im Repo darf die Bankleitzahl einer echten
+Bank tragen, geprüft gegen die DK-Liste. Er braucht kein Urteil und keinen Schlüssel —
+deshalb hat er den Ausbau überlebt.
 
 Zwei Entscheidungen im Muster-Guard, die man kennen muss:
 
@@ -1269,17 +1422,21 @@ Zwei Entscheidungen im Muster-Guard, die man kennen muss:
   ausserhalb des 9999er-Bereichs geht deshalb durch.
 - **Beträge prüft er nur in PROSA** (Markdown, Commit-Nachrichten), nicht im Code. In einer
   Finanz-App steht in jedem zweiten Test ein Betrag, und ein Muster kann den abgelesenen
-  nicht vom erfundenen trennen; dafür ist der Wert-Abgleich da. In Prosa dreht sich das um:
-  dort steht ein Betrag fast nie als Beispiel, sondern als Beleg.
+  nicht vom erfundenen trennen. Dafür war der Wert-Abgleich da; seit er weg ist, ist ein
+  abgelesener Betrag im CODE ungeprüft — das ist die grösste Lücke, die sein Ausbau
+  hinterlässt, und sie fällt in die Handarbeit. In Prosa dreht sich das um: dort steht ein
+  Betrag fast nie als Beispiel, sondern als Beleg.
 
 Einzelfall freigeben: `privacy-ok` in dieselbe Zeile. Namen und Begriffe, die keinem Muster
 folgen, kommen in `.privacy-terms` (git-ignoriert, Vorlage: `.privacy-terms.example`).
 
-### Was keiner von beiden kann
+### Was er nicht kann
 
-- Beide finden nur den **Originalwert**. Ob ein Ersatz neutral ist, sieht keiner von beiden.
-- Beide brechen ab, wenn sie nicht arbeiten können — fehlende Datenbank, kaputter Guard.
-  Ein Wächter, der nichts sieht, ist schlimmer als keiner: er beruhigt.
+- Er findet nur den **Originalwert**. Ob ein Ersatz neutral ist, sieht er nicht.
+- Er findet nur, was einer **Form** folgt. Namen, Verwendungszwecke und Buchungszahlen
+  gehören in `.privacy-terms`, sonst sieht sie niemand.
+- Er bricht ab, wenn er nicht arbeiten kann — kaputter Guard, fehlende Bankenliste. Ein
+  Wächter, der nichts sieht, ist schlimmer als keiner: er beruhigt.
 - Ein Rewrite ist **nie vollständig** — Forks und alte Commit-SHAs bleiben bei GitHub
   abrufbar. Es zählt nur, dass es gar nicht erst hineingerät.
 
@@ -1333,6 +1490,19 @@ hebt und den Tag als Kommentar dahinterschreibt.
 Der Rust-Wächter läuft als **eigener Job, der nichts baut** — `cargo-deny` liest nur
 `Cargo.lock` und die RustSec-Datenbank. Damit bleibt die Entscheidung bestehen, den
 schweren Tauri-Build aus der CI herauszuhalten.
+
+**Und weil dieser Job nichts baut, sagt er über einen Rust-Vorschlag weniger, als sein
+grüner Haken vermuten lässt.** `app` baut ausschliesslich das Frontend, `lieferkette` liest
+nur den Lockfile — ein Dependabot-PR auf eine Rust-Kiste ist also grün, ohne dass je ein
+Compiler auf ihn gesehen hat. Genau daran ist ein Vorschlag schon aufgelaufen: die
+Versionszeile stimmte, der Aufruf im Code war seit dem Major weg. **Eine Rust-Abhängigkeit
+wird deshalb lokal gebaut, bevor sie hereinkommt** — `cargo build --bins --lib` dauert im warmen
+Cache Sekunden. Das ist keine Nachlässigkeit der CI, sondern der Preis der Entscheidung,
+den schweren Build draussen zu lassen; er ist es weiterhin wert, aber er wird hier bezahlt.
+
+Der Wächter über die Vorschläge selbst ist `src/lieferkette.test.ts`: er hält fest, dass es
+alle drei Ökosysteme gibt und dass **jedes** auf `develop` zielt. Der Fehler entsteht nicht
+beim Ändern der Datei, sondern beim Ergänzen eines vierten Eintrags.
 
 Drei Dinge, die man beim Kalibrieren wissen muss, weil sie sonst zu Dauerrot führen —
 und ein Wächter, der bei jedem Lauf dasselbe meldet, wird abgeschaltet statt gelesen:

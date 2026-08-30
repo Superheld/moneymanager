@@ -14,6 +14,8 @@ import {
   analyseBuchungen,
   analyseFenster,
   analyseFensterTaggenau,
+  analyseAusblick,
+  analyseBefunde,
   analyseGruppen,
   analyseVerlauf,
   type Analysebasis,
@@ -25,6 +27,8 @@ import { analyse, depots } from "../../dienste";
 import { Button, Card, CoverageTrack, DataTable, KPIStat, Pill } from "../bausteine";
 import { AUFKLAPP_ZEILEN_BREIT, AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
+import { AusblickKarte } from "./AusblickKarte";
+import { BefundeBereich } from "./BefundeBereich";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { DepotAnsicht } from "./DepotAnsicht";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
@@ -258,6 +262,21 @@ export function AnalyseScreen() {
     return { label: idx != null ? verlauf[idx].label : null, items: analyseAufschluesselung(basis, bvon, bbis) };
   }, [aktivMonat, verlauf, basis, von, bis]);
 
+  // Die Befunde hängen am selben Fenster wie alles darüber — und werden in EINEM Zug
+  // gerechnet, damit zwei Zahlen auf einem Bildschirm nicht verschiedene Mengen meinen.
+  const befunde = useMemo(() => (basis ? analyseBefunde(basis, von, bis) : null), [basis, von, bis]);
+
+  /**
+   * Der Blick nach vorn hängt NICHT am gewählten Zeitraum, sondern steht fest bei sechs
+   * und sechs. Er beantwortet eine andere Frage als die Auswertung darüber: die
+   * Projektion wird nicht besser, wenn man sie über zwei Jahre zieht — sie wird nur
+   * unsicherer, und die letzten Monate darin sind dann Behauptung statt Vorschau.
+   */
+  const ausblick = useMemo(
+    () => (basis ? analyseAusblick(basis, heute, 6, 6) : []),
+    [basis, heute],
+  );
+
   const ist = basis?.buchungen ?? [];
   const kategorien = basis?.kategorien ?? [];
 
@@ -366,7 +385,7 @@ export function AnalyseScreen() {
                   </td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 45 ? zweck.slice(0, 45) + "…" : zweck}</td>
                   <td style={{ ...detailTd, color: "var(--ink-3)" }}>{z.kontoName || "—"}</td>
-                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(z.buchung.betrag) }}>{geld.format(z.buchung.betrag, { mitVorzeichen: true })}</td>
+                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</td>
                 </tr>
               );
             })}
@@ -527,6 +546,22 @@ export function AnalyseScreen() {
               {aufschluesselung.items.length === 0 && <div className="muted">{t("historie.katLeer")}</div>}
               <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)", marginTop: "var(--sp-2)" }}>{t("historie.katKlickHinweis")}</div>
             </Card>
+          )}
+
+          {/* Der Blick nach vorn steht direkt unter dem Verlauf: es ist derselbe Saldo,
+              nur weitergedacht. Zwischen beide etwas zu setzen hiesse, die Linie zu
+              zerreissen, die sie verbindet. */}
+          <AusblickKarte punkte={ausblick} />
+
+          {/* Die Befunde stehen NACH den Kategorien und vor den Depots: sie setzen
+              voraus, dass man gesehen hat, wie viel wohin ging, und beantworten die
+              nächste Frage — ob das so tragfähig ist. */}
+          {befunde && basis && (
+            <BefundeBereich
+              befunde={befunde}
+              kontoNamen={basis.kontoNamen}
+              onBuchung={(b) => setDetail(b)}
+            />
           )}
 
           {/* Depots zuletzt: sie beantworten eine eigene Frage und mischen sich in die

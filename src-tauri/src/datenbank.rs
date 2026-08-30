@@ -22,7 +22,7 @@ use std::sync::Arc;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteRow, SqliteTypeInfo};
-use sqlx::{Column, Row, SqlitePool, TypeInfo, ValueRef};
+use sqlx::{AssertSqlSafe, Column, Row, SqlitePool, TypeInfo, ValueRef};
 use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Manager, State};
@@ -152,10 +152,11 @@ pub async fn pool_mit_schluessel(pfad: &Path, pragma: &str) -> Result<SqlitePool
 }
 
 /// Ein NUR LESENDER Pool auf eine verschluesselte Datei — fuer das Werkzeug
-/// `bestandslesen`, das die Privatsphaere-Waechter speist.
+/// `bestandslesen`, mit dem sich der verschluesselte Bestand von der Kommandozeile lesen
+/// laesst (Rezept in CLAUDE.local.md).
 ///
-/// `query_only` steht hier und nicht in den Argumenten des Werkzeugs: was ein Waechter
-/// darf, gehoert nicht in die Hand dessen, der ihn aufruft.
+/// `query_only` steht hier und nicht in den Argumenten des Werkzeugs: dass es nur liest,
+/// gehoert nicht in die Hand dessen, der es aufruft.
 pub async fn pool_lesend(pfad: &Path, pragma: &str) -> Result<SqlitePool, sqlx::Error> {
     let opts = SqliteConnectOptions::new()
         .filename(pfad)
@@ -222,9 +223,9 @@ pub async fn datenbank_ist_offen(db: State<'_, Datenbank>) -> Result<bool, Strin
 }
 
 fn binden<'q>(
-    mut q: sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'q>>,
+    mut q: sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments>,
     werte: &'q [JsonValue],
-) -> sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments<'q>> {
+) -> sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments> {
     for wert in werte {
         q = match wert {
             JsonValue::Null => q.bind(None::<String>),
@@ -286,6 +287,20 @@ fn nach_typ(zeile: &SqliteRow, i: usize, typ: &SqliteTypeInfo) -> JsonValue {
     }
 }
 
+/// `AssertSqlSafe` sagt hier nicht „dieses SQL ist harmlos", sondern „die Pruefung liegt
+/// nicht an dieser Stelle" — und der Unterschied ist wichtig genug fuer einen Absatz.
+///
+/// Seit sqlx 0.9 nimmt `query()` nur noch `&'static str`; alles Zusammengesetzte muss
+/// ausdruecklich zugesichert werden. Das ist ein guter Zwang, denn er zwingt zu der Frage,
+/// wer den String eigentlich baut. Die Antwort hier: die Repositories in
+/// `adapters/persistence`, also unser eigener Code. **Werte aus dem Bestand oder aus einer
+/// Eingabe kommen nie im String an, sondern ausschliesslich ueber `werte` und `bind`** —
+/// dafuer gibt es `binden` gleich darunter.
+///
+/// Was diese Naht NICHT leistet, steht schon in der CLAUDE.md unter „Was die CSP nicht
+/// leistet": fremder Code im Webview kann hier beliebiges SQL absetzen. Eine Pruefung an
+/// dieser Stelle wuerde daran nichts aendern — wer den Webview hat, hat den Bestand. Die
+/// Zusicherung ist deshalb ehrlich und nicht bequem.
 #[tauri::command]
 pub async fn db_select(
     sql: String,
@@ -293,7 +308,7 @@ pub async fn db_select(
     db: State<'_, Datenbank>,
 ) -> Result<Vec<JsonValue>, String> {
     let pool = db.pool().await?;
-    let zeilen = binden(sqlx::query(&sql), &werte)
+    let zeilen = binden(sqlx::query(AssertSqlSafe(sql)), &werte)
         .fetch_all(&pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -307,7 +322,7 @@ pub async fn db_execute(
     db: State<'_, Datenbank>,
 ) -> Result<Wirkung, String> {
     let pool = db.pool().await?;
-    let ergebnis = binden(sqlx::query(&sql), &werte)
+    let ergebnis = binden(sqlx::query(AssertSqlSafe(sql)), &werte)
         .execute(&pool)
         .await
         .map_err(|e| e.to_string())?;
@@ -398,6 +413,85 @@ mod tests {
         assert_eq!(json["text"], JsonValue::from("abc"));
         assert_eq!(json["quote"], JsonValue::from(0.5));
         assert_eq!(json["leer"], JsonValue::Null);
+        pool.close().await;
+    }
+
+    /// Der Hinweg — `integer_bleiben_integer` prueft nur den Rueckweg.
+    ///
+    /// `binden` ist die Stelle, an der JEDER Wert der Anwendung in die Datenbank geht:
+    /// `db_execute` und `db_select` reichen beide durch sie hindurch. Sie stand lange
+    /// nur unter dem Schutz des Uebersetzers, und das reichte, solange sich an ihr
+    /// nichts aenderte. Mit sqlx 0.9 hat sie sich geaendert (`SqliteArguments` ohne
+    /// Lifetime, dazu `AssertSqlSafe` um das zusammengesetzte SQL) — und eine Bindung,
+    /// die den falschen Typ waehlt, uebersetzt weiterhin klaglos.
+    ///
+    /// **Zwei der Spalten sind so gewaehlt, dass der Fehler ueberhaupt sichtbar wird —
+    /// gemessen, nicht ueberlegt.** Der erste Anlauf band einen Cent-Betrag in eine
+    /// INTEGER-Spalte und blieb gruen, obwohl `binden` versuchsweise auf `f64`
+    /// umgestellt war: SQLite ist dynamisch typisiert, und die AFFINITAET der Spalte
+    /// macht aus einem ganzzahligen REAL wieder ein INTEGER. Der Test prueft dann die
+    /// Reparatur der Datenbank statt der eigenen Naht.
+    ///
+    /// Deshalb steht hier beides: `roh` OHNE Typangabe (BLOB-Affinitaet, SQLite
+    /// konvertiert nichts) und `gross` mit einem Wert jenseits von 2^53, den ein `f64`
+    /// nicht mehr genau traegt. An dem einen faellt die falsche SORTE auf, an dem
+    /// anderen der VERLUST.
+    #[tokio::test]
+    async fn binden_bringt_jede_json_sorte_unveraendert_hinein() {
+        let datei = pfad("binden");
+        let pool = offen(&datei, None).await;
+        pool.execute(
+            "CREATE TABLE t (cent INTEGER, wort TEXT, quote REAL, ja INTEGER, leer TEXT, \
+             liste TEXT, roh, gross INTEGER)",
+        )
+        .await
+        .expect("tabelle");
+
+        // 2^53 + 1 — die kleinste ganze Zahl, die ein f64 nicht mehr von ihrem Nachbarn
+        // unterscheiden kann. Als Betrag unrealistisch, als Zeuge genau richtig.
+        const JENSEITS_VON_F64: i64 = 9_007_199_254_740_993;
+
+        let werte = vec![
+            JsonValue::from(-123_456_789i64),
+            JsonValue::from("Rueckerstattung"),
+            JsonValue::from(0.5f64),
+            JsonValue::from(true),
+            JsonValue::Null,
+            serde_json::json!(["a", "b"]),
+            JsonValue::from(-42i64),
+            JsonValue::from(JENSEITS_VON_F64),
+        ];
+        let sql = String::from("INSERT INTO t VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        binden(sqlx::query(AssertSqlSafe(sql)), &werte)
+            .execute(&pool)
+            .await
+            .expect("insert ueber binden");
+
+        let zeilen = sqlx::query("SELECT * FROM t").fetch_all(&pool).await.expect("select");
+        let json = zeile_zu_json(&zeilen[0]);
+
+        assert_eq!(json["cent"], JsonValue::from(-123_456_789i64));
+        assert_eq!(json["wort"], JsonValue::from("Rueckerstattung"));
+        assert_eq!(json["quote"], JsonValue::from(0.5));
+        // Ohne Affinitaet gibt es nichts, was eine falsche Bindung wieder geradezieht:
+        // ein als REAL gebundener Wert kaeme hier als REAL zurueck.
+        assert_eq!(
+            json["roh"],
+            JsonValue::from(-42i64),
+            "Eine Ganzzahl ist als Fliesskomma durch die Naht gegangen."
+        );
+        assert!(json["roh"].is_i64());
+        // Und hier waere es nicht nur die falsche Sorte, sondern ein anderer Wert.
+        assert_eq!(
+            json["gross"],
+            JsonValue::from(JENSEITS_VON_F64),
+            "Der Wert hat auf dem Weg durch die Naht an Genauigkeit verloren."
+        );
+        // SQLite kennt kein BOOLEAN; `true` wird zur 1 und kommt als Ganzzahl zurueck.
+        assert_eq!(json["ja"], JsonValue::from(1i64));
+        assert_eq!(json["leer"], JsonValue::Null);
+        // Arrays und Objekte gehen als JSON-Text hinein — dieselbe Wahl wie im Plugin.
+        assert_eq!(json["liste"], JsonValue::from(r#"["a","b"]"#));
         pool.close().await;
     }
 

@@ -6,6 +6,7 @@
 // (Import-Kontext), nicht an der `IstBuchung` — verbunden über `umsatz.istbuchungId`.
 // Und ob es zu einem Kandidaten längst einen Vertrag gibt, weiß erst das Repository.
 
+import { ignorierenVermerken, ignorierteLesen } from "../einstellungen";
 import { anbieterSchluessel, vertragskandidaten } from "../../core";
 import type { Vertragskandidat } from "../../core";
 import type {
@@ -33,24 +34,14 @@ export interface VorschlagsOptionen {
 const SCHLUESSEL_IGNORIERT = "vertragsvorschlag.ignoriert";
 
 export async function ignorierteSchluessel(repo: EinstellungenRepository): Promise<Set<string>> {
-  const roh = (await repo.lesen())[SCHLUESSEL_IGNORIERT];
-  if (!roh) return new Set();
-  try {
-    const gelesen: unknown = JSON.parse(roh);
-    // Defensiv: ein kaputter Eintrag darf die Vorschläge nicht ausfallen lassen.
-    return new Set(Array.isArray(gelesen) ? gelesen.filter((x): x is string => typeof x === "string") : []);
-  } catch {
-    return new Set();
-  }
+  return ignorierteLesen(repo, SCHLUESSEL_IGNORIERT);
 }
 
 export async function vorschlagIgnorieren(
   repo: EinstellungenRepository,
   schluessel: string,
 ): Promise<void> {
-  const menge = await ignorierteSchluessel(repo);
-  menge.add(schluessel);
-  await repo.schreiben(SCHLUESSEL_IGNORIERT, JSON.stringify([...menge]));
+  await ignorierenVermerken(repo, SCHLUESSEL_IGNORIERT, schluessel);
 }
 
 /** Alle weggeklickten Vorschläge wieder zeigen. */

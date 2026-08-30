@@ -7,6 +7,7 @@
 // Wertbetrachtung, keine Rendite. Zukäufe und Entnahmen im Zeitraum stecken mit drin und
 // sind aus den Beständen allein nicht herauszurechnen.
 
+import { useProzent } from "../bausteine/einstellungenKontext";
 import { useTranslation } from "react-i18next";
 import { depotEntwicklung, type Depotsicht, type Positionszeile } from "../../../application";
 import { Card, DataTable } from "../bausteine";
@@ -21,6 +22,7 @@ interface Props {
 
 export function DepotAnsicht({ sicht, von, bis }: Props) {
   const { t } = useTranslation();
+  const prozent = useProzent();
   const geld = useGeld();
   const entwicklung = depotEntwicklung(sicht, von, bis);
 
@@ -78,7 +80,7 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
             {geld.formatMitSymbol(e.veraenderung)}
             {e.anteil != null && (
               <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-2)" }}>
-                {t("depot.anteil", { prozent: (e.anteil * 100).toFixed(1) })}
+                {prozent(e.anteil, 1)}
               </span>
             )}
           </span>

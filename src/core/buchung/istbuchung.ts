@@ -1,7 +1,21 @@
-// Ist-Buchung — die provisorische „Published Language" des Ist-Schritts (ADR-0002).
-// Hält FAKTEN (was tatsächlich geflossen ist), getrennt von der Plan-Schicht.
-// Bewusst NICHT das volle A5-Buchungsformat: minimal, vorläufig, später per ACL auf
-// das echte Buchungspackage gemappt. Betrag vorzeichenbehaftet (negativ = Abfluss).
+// Ist-Buchung — hält FAKTEN (was tatsächlich geflossen ist), getrennt von der
+// Plan-Schicht. Betrag vorzeichenbehaftet (negativ = Abfluss).
+//
+// **Zum Stand dieses Typs, weil der Kommentar hier lange etwas anderes sagte.** Er
+// bezeichnete sich als „provisorische Published Language" (ADR-0002), die „später per
+// ACL auf das echte Buchungspackage" gemappt wird — ein volles A5-Buchungsformat.
+//
+// Im Repo gibt es davon nichts: kein Buchungspackage, keinen ACL, keine Stelle, die
+// darauf hinarbeitet. Die Begriffe kommen ausser hier nirgends vor. `IstBuchung` ist
+// seit Monaten der einzige und gelebte Buchungstyp — alles, was mit Geldbewegungen
+// rechnet, rechnet mit ihm.
+//
+// Das ist keine Entscheidung GEGEN das Format, sondern eine Feststellung: wer es baut,
+// baut es von vorn, und dieser Typ ist dann sein Ausgangspunkt und nicht sein Platzhalter.
+// Solange das nicht passiert, gilt er als das, was er ist. Der Unterschied ist praktisch
+// — an einem Provisorium baut man anders als an einem Fundament, und was hier fehlt
+// (Empfänger, Verwendungszweck: siehe `core/buchung/zahlungsspur`), fehlt einem
+// Fundament zu Unrecht.
 
 import type { Cent } from "../basis/geld";
 import type { Charakter } from "../basis/zahlungsregel";
@@ -9,12 +23,18 @@ import { istLiquide, type Zahlungskonto } from "../konten/konto";
 
 /**
  * Herkunft einer Ist-Buchung:
- *  • „bezahlt-markiert" — aus einem Plan-Posten 1:1 bestätigt (trägt planRef).
- *  • „manuell"         — frei erfasst. Bei Bar die Dauerquelle (kein Import möglich);
- *                        bei Bankkonten vorläufig, bis der Import sie abgleicht (ADR-0002).
- *  • „import"          — aus einem Bankimport (später).
+ *  • „manuell" — frei erfasst. Bei Bar die Dauerquelle (kein Import möglich);
+ *                bei Bankkonten vorläufig, bis der Import sie abgleicht (ADR-0002).
+ *  • „import"  — aus einem Bankimport.
+ *
+ * Ein dritter Wert `bezahlt-markiert` stand hier bis 2026-08-29, für eine Buchung, die
+ * einen Plan-Posten per Häkchen bestätigt. Diesen Weg gab es in der Oberfläche nie: kein
+ * Use-Case hat den Wert je geschrieben, und keine Buchung im Bestand trug ihn. Was von
+ * ihm blieb, war eine Rangstufe im Monatsausblick, die nie griff, und ein Feld, das jede
+ * Auswertung mitprüfen musste. Wer das Häkchen baut, baut beides zusammen — sonst
+ * entsteht wieder ein Halbteil, das aussieht, als sei es angeschlossen.
  */
-export type IstQuelle = "bezahlt-markiert" | "manuell" | "import";
+export type IstQuelle = "manuell" | "import";
 
 /**
  * Wer die KATEGORIE dieser Buchung gesetzt hat — und damit, wer sie ändern darf.
@@ -28,12 +48,30 @@ export type IstQuelle = "bezahlt-markiert" | "manuell" | "import";
  * schreibt die Automatik und darf sie jederzeit überschreiben, `manuell` rührt sie nie
  * an. Ohne diese Unterscheidung könnte ein rückwirkender Lauf eine Handentscheidung
  * nicht von seinem eigenen früheren Treffer unterscheiden.
+ *
+ * **An einer Stelle sind die beiden aber NICHT dieselbe Bauweise, und das ist Absicht.**
+ * Beim Vertrag trägt die Herkunft eine dritte Aussage: gesetzt bei leerer `vertrag_id`
+ * heisst „gehört AUSDRÜCKLICH zu keinem Vertrag" — eine Handentscheidung, die bleiben
+ * muss, sonst käme ein korrigierter Fehlgriff beim nächsten Abgleich zurück.
+ *
+ * Für die Kategorie gibt es diese dritte Aussage nicht, und sie fehlt nicht: „gehört zu
+ * keiner Kategorie" ist keine Entscheidung, die jemand trifft, sondern der Zustand vor
+ * jeder Entscheidung — die Zeile liegt dann in der Review-Inbox und wartet. Beim Vertrag
+ * ist das anders, weil die meisten Zahlungen zu Recht zu keinem gehören: ohne die dritte
+ * Aussage liesse sich „schon geprüft, gehört zu keinem" nicht von „noch nie angesehen"
+ * unterscheiden, und die Automatik liefe ewig über dieselben Zeilen.
+ *
+ * Wer die beiden angleichen will, muss zuerst diese Frage beantworten — nicht die nach
+ * dem Feld.
  */
 export type Kategorieherkunft = "automatisch" | "manuell";
 
 /**
- * Verweis auf den geplanten Posten, aus dem die Ist-Buchung entstand (1:1-Matching).
- * `quelleId` = Zahlungsregel-ID, `faelligkeit` = die projizierte Fälligkeit (ISO).
+ * Verweis auf einen geplanten Posten: `quelleId` = Zahlungsregel-ID, `faelligkeit` = die
+ * projizierte Fälligkeit (ISO).
+ *
+ * Er identifiziert eine PROJIZIERTE Zeile (Kontoregister, kontoübergreifende Vorschau) —
+ * nicht mehr eine Ist-Buchung, die einen Plan-Posten belegt. Siehe `IstQuelle`.
  */
 export interface PlanRef {
   readonly quelleId: string;
@@ -128,15 +166,19 @@ export interface IstBuchung {
   readonly transferId?: string;
   /** Das andere Konto bei einer Umbuchung (zur Anzeige der Richtung). */
   readonly gegenkontoId?: string;
-  /** Gesetzt bei „bezahlt-markiert"; ermöglicht 1:1-Abgleich mit dem Plan. */
-  readonly planRef?: PlanRef;
   /**
    * Aufteilung auf mehrere Kategorien (S-7). Gesetzt ⇒ `kategorieId` ist leer und die
    * Teile sind die Wahrheit; Σ Teile = `betrag`. Der Ledger-Betrag bleibt unberührt —
    * Saldo, Register und Netto-Null rechnen weiter mit der EINEN Zeile.
    */
   readonly aufteilungen?: readonly Aufteilung[];
-  /** Roh-Hash der Importzeile (Dedup gegen Bankimport, später). */
+  /**
+   * Roh-Hash der Importzeile — der quellenagnostische Dedup-Schlüssel.
+   *
+   * Er trägt die gesamte Dublettenerkennung (Datei wie Bankabruf) und ist ausserdem der
+   * Weg zurück zum Beleg. Der Kommentar hier sagte bis 2026-08-29 „später"; das war seit
+   * dem Bankabruf überholt und las sich wie eine unfertige Stelle.
+   */
   readonly rohHash?: string;
   /**
    * „Das hier sollte ich mir ansehen."
@@ -153,31 +195,6 @@ export interface IstBuchung {
    * Fehlend zählt als „nicht vorgemerkt" — der Bestand vor der Einführung ist gesehen.
    */
   readonly zuPruefen?: boolean;
-}
-
-/** Stabiler Schlüssel eines Plan-Postens (Quelle + Fälligkeit) für 1:1-Matching. */
-export function planRefKey(quelleId: string, faelligkeit: string): string {
-  return `${quelleId}@${faelligkeit}`;
-}
-
-/** Menge aller bereits per Ist belegten Plan-Posten (als Schlüssel). */
-export function bezahlteSchluessel(buchungen: IstBuchung[]): Set<string> {
-  const s = new Set<string>();
-  for (const b of buchungen) {
-    if (b.planRef) s.add(planRefKey(b.planRef.quelleId, b.planRef.faelligkeit));
-  }
-  return s;
-}
-
-/** Findet die Ist-Buchung zu einem Plan-Posten, falls vorhanden. */
-export function findeIstZuPlan(
-  buchungen: IstBuchung[],
-  quelleId: string,
-  faelligkeit: string,
-): IstBuchung | undefined {
-  return buchungen.find(
-    (b) => b.planRef && b.planRef.quelleId === quelleId && b.planRef.faelligkeit === faelligkeit,
-  );
 }
 
 /** Summe der Ist-Buchungen eines Kontos (vorzeichenbehaftet). */

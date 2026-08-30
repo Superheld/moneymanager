@@ -23,7 +23,8 @@
 // Reine Funktionen, kein IO. Was daraus gespeichert wird, entscheidet die
 // Anwendungsschicht (`application/vertragszuordnung`).
 
-import { anbieterSchluessel, type Zahlungsspur } from "./vertragErkennung";
+import { anbieterSchluessel } from "../basis/gegenpartei";
+import type { Zahlungsspur } from "../buchung/zahlungsspur";
 import { musterTrifft } from "../basis/muster";
 import type { Cent } from "../basis/geld";
 

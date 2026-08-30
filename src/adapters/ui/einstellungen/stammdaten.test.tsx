@@ -71,6 +71,29 @@ describe("EinstellungenScreen — Stammdaten", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/Lebensmittel/));
   });
 
+  it("zeigt eine Kategorie auf der DRITTEN Ebene", async () => {
+    // **Der Fehler, den das verhindert, hat Daten unsichtbar gemacht.** Gezeichnet wurden
+    // Wurzeln und deren direkte Kinder; ein Enkel fiel durch beide Raster — keine Wurzel
+    // (sein Elternteil existiert) und kein Kind einer Wurzel. Er lag in der Datenbank,
+    // ohne dass man ihn sehen, bearbeiten oder löschen konnte, und die Maske bot sein
+    // Elternteil weiterhin zur Auswahl an: wer eine Kategorie dorthin verschob, sah sie
+    // nie wieder.
+    for (const k of [
+      { id: "kw", name: "Wohnen", defaultCharakter: "Aufwand" as const },
+      { id: "ke", name: "Einrichtung", elternId: "kw", defaultCharakter: "Aufwand" as const },
+      { id: "ka", name: "Anschaffungen", elternId: "ke", defaultCharakter: "Aufwand" as const },
+    ]) {
+      await sqliteKategorieRepository.speichern(k);
+    }
+
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await registerWaehlen(nutzer, /^Kategorien$/);
+
+    await waitFor(() => expect(document.body.textContent).toMatch(/Einrichtung/));
+    expect(document.body.textContent).toMatch(/Anschaffungen/);
+  });
+
   it("zeigt die Konten an ihrem eigenen Punkt, nicht mehr in den Einstellungen", async () => {
     await sqliteZahlungskontoRepository.speichern({
       id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 100000,

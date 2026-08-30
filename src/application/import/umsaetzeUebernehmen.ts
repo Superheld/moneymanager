@@ -33,6 +33,20 @@ export interface UebernahmeEingabe {
   readonly rohUmsaetze: readonly RohUmsatz[];
   readonly konten: readonly UebernahmeKonto[];
   /**
+   * Fremder Kategoriename → unsere Kategorie-Id, für DIESEN Lauf.
+   *
+   * Vorbelegt aus der Übersetzung des Adapters, geändert in der Import-Ansicht. Sie steht
+   * hier und nicht an den Rohzeilen, weil sie kein Teil des Belegs ist: die Datei sagt
+   * „Restaurants", was daraus wird, entscheiden wir. Dieselbe Trennung wie zwischen
+   * `umsatz_roh` und `umsatz_verarbeitung`.
+   *
+   * **Sie wird nicht gespeichert.** Beim nächsten Import steht wieder die Vorbelegung da.
+   * Das ist der bewusst kleine Schritt: sichtbar und änderbar zuerst, gemerkt später —
+   * dafür braucht es eine eigene Tabelle, denn ein fremdes Vokabular gehört zur QUELLE
+   * und nicht zum Katalog.
+   */
+  readonly fremdkategorien?: Readonly<Record<string, string>>;
+  /**
    * Woher der Lauf kam — nur ein ABRUF weiss das.
    *
    * Steht am Lauf und wird nicht aus den Umsätzen hergeleitet: gerade die Läufe ohne
@@ -152,11 +166,18 @@ async function uebernahmeIntern(
   const kategorien = await kategorieRepo.alle();
   const kontext: Vorschlagskontext = {
     ...deps.kategorisierung,
-    katalogNachName: katalogNachName(kategorien),
     kategorieNachId: katalogNachId(kategorien),
+    kategorieNachName: katalogNachName(kategorien),
   };
   const bestand = await umsatzRepo.bestandsSchluessel();
   const laufId = id();
+
+  // Die Zuordnung aus der Import-Ansicht. Getrimmt wird hier UND beim Zählen in
+  // `fremdkategorienInDatei` — sonst zeigt die Ansicht einen Namen an, der beim
+  // Übernehmen an einem Leerzeichen vorbeigreift.
+  const gewaehlt = eingabe.fremdkategorien ?? {};
+  const zugeordnet = (fremd: string | undefined) =>
+    fremd ? gewaehlt[fremd.trim()] : undefined;
 
   // 3. Kandidaten bauen (Konto auflösen, Hash, Vorschlag). Ohne Konto → übersprungen.
   interface Kandidat {
@@ -256,7 +277,11 @@ async function uebernahmeIntern(
     rohHash: k.rohHash,
     nativeId: k.nativeId,
     status: "neu",
-    vorschlag: vorschlagFuer(k.roh, kontext, k.zahlungskontoId),
+    vorschlag: vorschlagFuer(
+      { ...k.roh, kategorieVorschlagId: zugeordnet(k.roh.kategorieHinweis) },
+      kontext,
+      k.zahlungskontoId,
+    ),
   }));
 
   // 7. Persistieren: Lauf-Protokoll, Ergänzungen, neue Umsätze.

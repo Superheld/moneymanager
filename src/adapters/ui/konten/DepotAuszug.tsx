@@ -9,6 +9,7 @@
 // gesagt hat. Der Verlauf gehört nicht hierher, sondern in die Analyse — dieselbe Grenze
 // wie überall.
 
+import { useProzent } from "../bausteine/einstellungenKontext";
 import { useTranslation } from "react-i18next";
 import type { Depotsicht, Positionszeile, Zahlungskonto } from "../../../application";
 import { Card, DataTable, Pill } from "../bausteine";
@@ -16,6 +17,7 @@ import { useGeld } from "../bausteine/einstellungenKontext";
 
 export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Depotsicht }) {
   const { t } = useTranslation();
+  const prozent = useProzent();
   const geld = useGeld();
 
   const spalten = [
@@ -68,7 +70,7 @@ export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Dep
             {geld.formatMitSymbol(e.veraenderung)}
             {e.anteil != null && (
               <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-2)" }}>
-                {t("depot.anteil", { prozent: (e.anteil * 100).toFixed(1) })}
+                {prozent(e.anteil, 1)}
               </span>
             )}
           </span>

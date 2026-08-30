@@ -1,4 +1,4 @@
-// Einstellungen — Sprache & Währung, Personen, Kategorien, Festlegungen. Anlegen UND
+// Einstellungen — Sprache & Währung, Personen, Kategorien. Anlegen UND
 // Bearbeiten je im Modal (gleiche Maske, vorbefüllt). Reload-fest über die SQLite-Repos.
 //
 // Zwei Bereiche sind hier ausgezogen: die Kategorie-Erkennung nach „Training" und die
@@ -6,7 +6,7 @@
 // hat einen Stand, eine Bankverbindung und bald einen Abruf auf Knopfdruck.
 
 import { Datumsfeld } from "../bausteine/Datumsfeld";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   REGIONEN,
@@ -30,8 +30,9 @@ import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Bereich } from "../bausteine/Bereich";
-import { FestlegungenCard } from "../training/FestlegungenCard";
 import { VerschluesselungCard } from "../zugang/VerschluesselungCard";
+import { ExportCard } from "./ExportCard";
+import { BestandsexportCard } from "./BestandsexportCard";
 import { Modal } from "../bausteine/Modal";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import {
@@ -45,6 +46,10 @@ const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand
 
 export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
   const { t } = useTranslation();
+  // Nur zum Lesen: das Export-Register gibt es erst, wenn das Experiment an ist. Der
+  // Hook liest aus dem Kontext, kostet also nichts, obwohl ihn die Experimente-Karte
+  // weiter unten ebenfalls zieht.
+  const { experimente } = useExperimentSchalter();
   const [personen, setPersonen] = useState<Person[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
 
@@ -80,12 +85,6 @@ export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
           inhalt: () => <KategorienCard kategorien={kategorien} onChange={laden} />,
         },
         {
-          id: "festlegungen",
-          label: t("einstellungen.festlegung.titel"),
-          untertitel: t("einstellungen.festlegung.untertitel"),
-          inhalt: () => <FestlegungenCard kategorien={kategorien} />,
-        },
-        {
           id: "aktualisierung",
           label: t("einstellungen.aktualisierung.titel"),
           untertitel: t("einstellungen.aktualisierung.untertitel"),
@@ -103,6 +102,24 @@ export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
           untertitel: t("einstellungen.experiment.untertitel"),
           inhalt: () => <ExperimenteCard />,
         },
+        // Das Register erscheint erst, wenn das Experiment an ist — ein Reiter, der
+        // seinen Inhalt nur mit einem Hinweis „erst einschalten" fuellt, ist ein
+        // leeres Versprechen. Der Schalter darueber ist der Weg dorthin.
+        ...(experimente.export
+          ? [
+              {
+                id: "export",
+                label: t("einstellungen.export.titel"),
+                untertitel: t("einstellungen.export.untertitel"),
+                inhalt: () => (
+                  <>
+                    <ExportCard />
+                    <BestandsexportCard />
+                  </>
+                ),
+              },
+            ]
+          : []),
       ]}
     />
   );
@@ -150,6 +167,12 @@ function ExperimenteCard() {
           text={t("einstellungen.experiment.hanseaticText")}
           an={experimente.hanseatic}
           aufSchalten={(an) => experimentSetzen("hanseatic", an)}
+        />
+        <SchalterZeile
+          titel={t("einstellungen.experiment.exportTitel")}
+          text={t("einstellungen.experiment.exportText")}
+          an={experimente.export}
+          aufSchalten={(an) => experimentSetzen("export", an)}
         />
       </div>
     </Card>
@@ -366,9 +389,27 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
     }
   }
 
-  function zeile(k: Kategorie, haupt: boolean) {
+  /**
+   * Eine Zeile samt allem, was darunter hängt.
+   *
+   * **Rekursiv, und das war es bis 2026-08-30 nicht.** Gezeichnet wurden Wurzeln und
+   * deren direkte Kinder, sonst nichts. Ein Enkel fiel durch beide Raster — er ist keine
+   * Wurzel (sein Elternteil existiert) und kein Kind einer Wurzel. Er lag damit in der
+   * Datenbank, ohne dass man ihn sehen, bearbeiten oder löschen konnte, und die Maske
+   * bot ihn weiterhin als Elternteil an: wer eine Kategorie dorthin verschob, sah sie
+   * nie wieder.
+   *
+   * Der Kern kennt diese Grenze nicht — eine Kategorie trägt eine `elternId`, damit
+   * beliebige Tiefe. Die Beschränkung sass allein in dieser Schleife.
+   */
+  function zeile(k: Kategorie, ebene: number) {
+    const haupt = ebene === 0;
     return (
-      <div key={k.id} className={`katrow ${haupt ? "katmain" : "katchild"}`}>
+      <div
+        key={k.id}
+        className={`katrow ${haupt ? "katmain" : "katchild"}`}
+        style={haupt ? undefined : ({ "--kat-ebene": ebene } as CSSProperties)}
+      >
         <span className="nm">
           {k.name} <Pill variant={CHARAKTER_PILL[k.defaultCharakter]}>{t(`charakter.${k.defaultCharakter}`)}</Pill>
         </span>
@@ -387,6 +428,11 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
     );
   }
 
+  /** Die Zeile und ihre Nachfahren — als flache Folge, die Tiefe steckt in der Einrückung. */
+  function zweig(k: Kategorie, ebene: number): ReactNode[] {
+    return [zeile(k, ebene), ...kinderVon(k.id).flatMap((c) => zweig(c, ebene + 1))];
+  }
+
   return (
     <Card
       action={
@@ -402,8 +448,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
         <div>
           {wurzeln.map((w) => (
             <div key={w.id} className="katgroup">
-              {zeile(w, true)}
-              {kinderVon(w.id).map((c) => zeile(c, false))}
+              {zweig(w, 0)}
             </div>
           ))}
         </div>

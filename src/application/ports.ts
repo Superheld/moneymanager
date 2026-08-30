@@ -11,7 +11,7 @@ import type {
   IstBuchung,
   Journaleintrag,
   Kategorie,
-  Kategoriefestlegung,
+  Kontogruppe,
   Merkmalsausschluss,
   Merkmalsherkunft,
   Modell,
@@ -42,6 +42,13 @@ export interface PersonRepository {
 export interface ZahlungskontoRepository {
   alle(): Promise<Zahlungskonto[]>;
   speichern(konto: Zahlungskonto): Promise<void>;
+  loeschen(id: string): Promise<void>;
+}
+
+export interface KontogruppeRepository {
+  alle(): Promise<Kontogruppe[]>;
+  /** Legt an oder ersetzt — die Mitgliederliste der uebergebenen Gruppe ist der Stand. */
+  speichern(gruppe: Kontogruppe): Promise<void>;
   loeschen(id: string): Promise<void>;
 }
 
@@ -79,17 +86,6 @@ export interface VertragszuordnungRepository {
   loeschen(istbuchungId: string): Promise<void>;
 }
 
-/**
- * Die Kategorie-Festlegungen — „immer bei diesem Empfänger". Der Schlüssel ist das
- * Muster: ein zweites Festlegen auf denselben Text ersetzt die alte Aussage, statt eine
- * zweite danebenzustellen.
- */
-export interface KategoriefestlegungRepository {
-  alle(): Promise<Kategoriefestlegung[]>;
-  speichern(festlegung: Kategoriefestlegung): Promise<void>;
-  loeschen(muster: string): Promise<void>;
-}
-
 export interface BudgetRepository {
   alle(): Promise<Budget[]>;
   /** Rührt `betraege` NICHT an — die Reihe hat ihren eigenen Weg. */
@@ -107,8 +103,13 @@ export interface InventarRepository {
 }
 
 /**
- * Ledger-Port (ADR-0002) — Zugang zum app-seitigen Ist-Journal. Hinter DIESEM Port
- * docken später das echte Buchungspackage und der Bankimport an (austauschbar).
+ * Ledger-Port (ADR-0002) — Zugang zum app-seitigen Ist-Journal.
+ *
+ * Hier stand, dass „später das echte Buchungspackage und der Bankimport" andocken. Der
+ * Bankimport tut es längst (`adapters/fints`, `adapters/import`); das Buchungspackage
+ * gibt es im Repo nicht, siehe `core/buchung/istbuchung`. Ein Port, dessen Zweck in der
+ * Zukunft steht, lädt dazu ein, an ihm vorbeizubauen — er trägt heute den ganzen
+ * Schreibverkehr auf Buchungen und ist die einzige Stelle, die ins Journal schreibt.
  */
 export interface LedgerPort {
   alle(): Promise<IstBuchung[]>;
@@ -195,8 +196,11 @@ export interface MerkmalskonfigurationRepository {
 }
 
 /**
- * Import-Repositories (TAKTIK-IMPORT §5). Der Entwurfs-Stapel: Umsätze überleben den
- * Lauf, werden in der Review-Inbox bearbeitet und erst beim Verbuchen zu Ist-Buchungen.
+ * Import-Repositories. Der Entwurfs-Stapel: Umsätze überleben den Lauf, werden in der
+ * Review-Inbox bearbeitet und erst beim Verbuchen zu Ist-Buchungen.
+ *
+ * (Der Verweis auf „TAKTIK-IMPORT §5" stand hier und zeigte auf ein Dokument ausserhalb
+ * des Repos — in einem Klon nicht auffindbar und damit keine Auskunft.)
  */
 export interface ImportLaufRepository {
   alle(): Promise<ImportLauf[]>;

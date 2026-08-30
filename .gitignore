@@ -61,3 +61,6 @@ CLAUDE.local.md
 
 # Worktrees sind eigene Arbeitskopien mit eigenem Stand — nie Teil eines Commits.
 .claude/worktrees/
+
+# Die fachliche Doku wird ausserhalb des Repos gefuehrt; was hier liegt, sind Notizen.
+docs/

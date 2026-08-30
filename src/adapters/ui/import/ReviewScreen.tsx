@@ -23,13 +23,14 @@ import {
   type Zahlungskonto,
 } from "../../../application";
 import {
-  festlegungAnwenden,
   importLaeufe,
   kategorisierung,
   offeneUmsaetze,
   stammdaten,
   umsaetze as alleUmsaetze,
   umsaetzeBuchen,
+  umsaetzeSammelKategorisieren,
+  umsaetzeSammelVerwerfen,
   umsatzSpeichern,
 } from "../../dienste";
 import {
@@ -41,7 +42,6 @@ import {
   type VerbuchenErgebnis,
   type Vorschlagskontext,
 } from "../../../application/import";
-import { festlegungAngebot } from "../../../application/kategorien/kategoriefestlegungen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { Button, Card, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -73,7 +73,9 @@ function Herkunft({ umsatz, kontext }: { umsatz: Umsatz; kontext: Vorschlagskont
   return (
     <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
       <span title={t(`review.herkunftTitel.${quelle}`)}>
-        <Pill variant={quelle === "manuell" || quelle === "festlegung" ? "plan" : quelle === "ki" ? "neutral" : "ok"}>
+        {/* „ok" fuer alles, was auf einer ANGABE beruht (Umbuchung, Vertrag, Datei),
+            „neutral" fuer die Schaetzung des Modells, „plan" fuer die eigene Hand. */}
+        <Pill variant={quelle === "manuell" ? "plan" : quelle === "ki" ? "neutral" : "ok"}>
           {t(`review.herkunft.${quelle}`)}
         </Pill>
       </span>
@@ -115,11 +117,6 @@ export function ReviewScreen() {
   // Import gespeichert — sie hängt am aktuellen Modell, und ein gespeicherter Satz von
   // vorgestern erklärte einen Vorschlag, den es so nicht mehr gäbe.
   const [kontext, setKontext] = useState<Vorschlagskontext | null>(null);
-  // Das Angebot „immer bei diesem Empfänger" — es steht an GENAU EINER Zeile, nämlich der
-  // zuletzt korrigierten. Eine Festlegung soll aus einer bewussten Handlung entstehen;
-  // ein Knopf an jeder Zeile wäre eine Einladung, die Liste zuzumüllen.
-  const [angebot, setAngebot] = useState<{ umsatzId: string; muster: string; kategorieId: string } | null>(null);
-  const [festgelegt, setFestgelegt] = useState<{ muster: string; weitere: number } | null>(null);
   /** Zweite Frage vor dem Sammel-Verwerfen — es betrifft alles, was gerade sichtbar ist. */
   const [verwerfenGefragt, setVerwerfenGefragt] = useState(false);
   /**
@@ -135,6 +132,17 @@ export function ReviewScreen() {
   const [abrufLaeufe, setAbrufLaeufe] = useState<ReadonlySet<string>>(new Set());
   /** Der Weggelegt-Bereich ist zugeklappt: er ist der Rückweg, nicht der Alltag. */
   const [zeigeWeggelegt, setZeigeWeggelegt] = useState(false);
+  /**
+   * Die Sammelbearbeitung — ein Modus, kein Dauerzustand.
+   *
+   * Dieselbe Entscheidung wie im Kontoauszug: ohne Schalter trüge jede Zeile für immer
+   * ein Kästchen, das man in neun von zehn Sitzungen nicht braucht. Und die Inbox ist
+   * die Ansicht, in der man ZEILENWEISE arbeitet — der Stapelweg steht daneben, nicht
+   * davor.
+   */
+  const [auswahlModus, setAuswahlModus] = useState(false);
+  const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
+  const [sammelKategorie, setSammelKategorie] = useState("");
 
   async function laden() {
     try {
@@ -218,6 +226,91 @@ export function ReviewScreen() {
     }
   }
 
+  /**
+   * Alles-Markieren meint das GEFILTERTE, nicht die sichtbare Seite.
+   *
+   * Wer nach einem Empfänger sucht und dann alles markiert, meint alle Treffer — nicht
+   * die ersten hundert davon. Dieselbe Regel wie im Kontoauszug.
+   */
+  const alleIds = useMemo(() => gefiltert.map((u) => u.id), [gefiltert]);
+  const alleGewaehlt = alleIds.length > 0 && alleIds.every((id) => auswahl.has(id));
+
+  /**
+   * Was nicht mehr sichtbar ist, ist nicht mehr gewählt.
+   *
+   * Ohne das trüge man eine unsichtbare Auswahl durch Filterwechsel und Seiten mit sich
+   * herum — und ein Sammel-Weglegen träfe dann Zeilen, die niemand vor Augen hatte. Der
+   * Preis ist, dass ein Filterwechsel die Auswahl kostet; das ist der richtige Preis.
+   */
+  useEffect(() => {
+    setAuswahl((bisher) => {
+      if (bisher.size === 0) return bisher;
+      const sichtbar = new Set(alleIds);
+      const naechste = new Set([...bisher].filter((id) => sichtbar.has(id)));
+      return naechste.size === bisher.size ? bisher : naechste;
+    });
+  }, [alleIds]);
+
+  const gewaehlteUmsaetze = useMemo(
+    () => umsaetze.filter((u) => auswahl.has(u.id)),
+    [umsaetze, auswahl],
+  );
+  /** Was der Sammelweg nicht anfasst — die Zahl gehört VOR die Aktion, nicht danach. */
+  const gewaehlteUmbuchungen = gewaehlteUmsaetze.filter(
+    (u) => u.vorschlag?.quelle === "umbuchung",
+  ).length;
+
+  function auswahlUmschalten(id: string) {
+    setAuswahl((bisher) => {
+      const neu = new Set(bisher);
+      if (neu.has(id)) neu.delete(id);
+      else neu.add(id);
+      return neu;
+    });
+  }
+
+  /**
+   * Die Kategorie für alle markierten Zeilen.
+   *
+   * Die leere Wahl heisst hier „Kategorie weg" und nicht „nicht anfassen" — anders als im
+   * Sammeldialog des Kontoauszugs, wo ein leeres Feld beides bedeuten könnte und deshalb
+   * einen eigenen Schalter braucht. Hier ist die Wahl selbst die Handlung: wer nichts
+   * ändern will, klickt nicht.
+   */
+  async function sammelKategorieGesetzt(kategorieId: string) {
+    setSammelKategorie(kategorieId);
+    setBusy(true);
+    setFehler(null);
+    try {
+      await umsaetzeSammelKategorisieren(
+        gewaehlteUmsaetze,
+        kategorieId ? katById.get(kategorieId) : undefined,
+      );
+      await laden();
+      setAuswahl(new Set());
+      setSammelKategorie("");
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Die markierten Zeilen weglegen. Ohne zweite Frage — weggelegt ist nicht gelöscht. */
+  async function sammelVerwerfen() {
+    setBusy(true);
+    setFehler(null);
+    try {
+      await umsaetzeSammelVerwerfen(gewaehlteUmsaetze);
+      await laden();
+      setAuswahl(new Set());
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const seitenAnzahl = Math.max(1, Math.ceil(gefiltert.length / SEITE_GROESSE));
   const aktuelleSeite = Math.min(seite, seitenAnzahl - 1);
   const zeilen = gefiltert.slice(aktuelleSeite * SEITE_GROESSE, (aktuelleSeite + 1) * SEITE_GROESSE);
@@ -236,39 +329,12 @@ export function ReviewScreen() {
     try {
       await umsatzSpeichern(final);
       setUmsaetze((prev) => prev.map((x) => (x.id === u.id ? final : x)));
-      setFestgelegt(null);
-      const muster = kategorieId ? festlegungAngebot(kontext?.festlegungen ?? [], u.gegenpartei, kategorieId) : null;
-      setAngebot(muster ? { umsatzId: u.id, muster, kategorieId } : null);
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
     }
   }
 
-  /**
-   * Das Angebot annehmen: die Festlegung entsteht — und die übrigen OFFENEN Zeilen
-   * desselben Empfängers ziehen mit.
-   *
-   * Das Mitziehen ist der Punkt. Wer bei einer von dreizehn Zahlungen an denselben
-   * Empfänger „immer so" sagt und danach zwölf falsche Zeilen stehen sieht, hat die Zusage
-   * nicht eingelöst bekommen. Verbuchte Zahlungen bleiben unberührt — die holt der
-   * rückwirkende Abgleich, mit Vorschau.
-   *
-   * Unangetastet bleiben Zeilen, an denen jemand von Hand entschieden hat, und
-   * Umbuchungen: beides sind Aussagen, die eine Festlegung nicht überstimmen darf.
-   */
-  async function angebotAnnehmen() {
-    if (!angebot) return;
-    const kat = katById.get(angebot.kategorieId);
-    if (!kat) return;
-    try {
-      const weitere = await festlegungAnwenden(angebot.muster, kat, umsaetze, angebot.umsatzId);
-      setAngebot(null);
-      setFestgelegt({ muster: angebot.muster, weitere });
-      await laden();
-    } catch (e) {
-      setFehler(e instanceof Error ? e.message : String(e));
-    }
-  }
+
 
   /**
    * Eine Zeile aus dem Stapel nehmen, ohne sie zu buchen.
@@ -341,13 +407,6 @@ export function ReviewScreen() {
           title={t("review.offenInfo", { offen, fertig })}
           action={
             <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center", flexWrap: "wrap" }}>
-              {festgelegt && (
-                <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)" }}>
-                  {festgelegt.weitere > 0
-                    ? t("review.festlegung.gesetztWeitere", { muster: festgelegt.muster, anzahl: festgelegt.weitere })
-                    : t("review.festlegung.gesetzt", { muster: festgelegt.muster })}
-                </span>
-              )}
               {verb && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)" }}>{t("review.verbuchtErgebnis", { verbucht: verb.verbucht, umbuchungen: verb.umbuchungen, uebersprungen: verb.uebersprungen })}</span>}
               <Button variant="primary" onClick={busy || fertig === 0 ? undefined : verbuchen} style={busy || fertig === 0 ? { opacity: 0.5, cursor: busy ? "wait" : "not-allowed" } : undefined}>
                 {busy ? t("review.verbuchenBusy") : t("review.verbuchen", { n: fertig })}
@@ -402,11 +461,60 @@ export function ReviewScreen() {
               style={{ ...select, flex: "1 1 200px", minWidth: 160 }}
             />
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-xs)", color: "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap", alignSelf: "center" }}>
+              <input
+                type="checkbox"
+                checked={auswahlModus}
+                onChange={(e) => { setAuswahlModus(e.target.checked); if (!e.target.checked) setAuswahl(new Set()); }}
+                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+              />
+              {t("review.sammel.modus")}
+            </label>
           </div>
+
+          {/* Die Aktionsleiste erscheint erst, wenn etwas markiert ist. Vorher gäbe es
+              nichts zu tun, und ein grauer Knopf ist eine Frage ohne Antwort. */}
+          {auswahlModus && auswahl.size > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)", padding: "8px 12px", borderRadius: "var(--r-md)", background: "var(--accent-wash)" }}>
+              <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-bold)", color: "var(--accent-deep)" }}>
+                {t("review.sammel.gewaehlt", { n: auswahl.size })}
+              </span>
+              <CategoryPicker
+                kompakt
+                kategorien={kategorien}
+                value={sammelKategorie}
+                onChange={(id) => void sammelKategorieGesetzt(id)}
+                placeholder={t("review.sammel.kategorieSetzen")}
+                ariaLabel={t("review.sammel.kategorieSetzen")}
+              />
+              <button className="linkbtn" style={{ color: "var(--warn-deep)" }} onClick={busy ? undefined : () => void sammelVerwerfen()}>
+                {t("review.sammel.weglegen", { n: auswahl.size })}
+              </button>
+              <button className="linkbtn" onClick={() => setAuswahl(new Set())}>{t("review.sammel.aufheben")}</button>
+              {/* Was der Sammelweg auslässt, steht VOR der Aktion da — nicht als
+                  Ergebnismeldung hinterher. */}
+              {gewaehlteUmbuchungen > 0 && (
+                <span className="muted" style={{ fontSize: "var(--fs-2xs)" }}>
+                  {t("review.sammel.umbuchungHinweis", { n: gewaehlteUmbuchungen })}
+                </span>
+              )}
+            </div>
+          )}
 
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
             <thead>
               <tr>
+                {auswahlModus && (
+                  <th style={{ ...th, width: 32 }}>
+                    <input
+                      type="checkbox"
+                      checked={alleGewaehlt}
+                      aria-label={t("review.sammel.alleWaehlen")}
+                      onChange={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
+                      style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                    />
+                  </th>
+                )}
                 <th style={th}>{t("review.spalteDatum")}</th>
                 <th style={th}>{t("review.spalteKonto")}</th>
                 <th style={th}>{t("review.spalteGegenpartei")}</th>
@@ -418,6 +526,17 @@ export function ReviewScreen() {
             <tbody>
               {zeilen.map((u) => (
                 <tr key={u.id}>
+                  {auswahlModus && (
+                    <td style={td}>
+                      <input
+                        type="checkbox"
+                        checked={auswahl.has(u.id)}
+                        aria-label={t("review.sammel.zeileWaehlen")}
+                        onChange={() => auswahlUmschalten(u.id)}
+                        style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                      />
+                    </td>
+                  )}
                   <td style={td}>{ddmmyyyy(u.buchungstag)}</td>
                   <td style={{ ...td, color: "var(--ink-3)" }}>{kontoName.get(u.zahlungskontoId) ?? "—"}</td>
                   <td style={td}>
@@ -450,13 +569,6 @@ export function ReviewScreen() {
                       <CategoryPicker kategorien={kategorien} value={u.vorschlag?.kategorieId ?? ""} onChange={(id) => kategorieGesetzt(u, id)} />
                     )}
                     {u.vorschlag && <Herkunft umsatz={u} kontext={kontext} />}
-                    {angebot?.umsatzId === u.id && (
-                      <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap", fontSize: "var(--fs-2xs)" }}>
-                        <span className="muted">{t("review.festlegung.frage", { muster: angebot.muster })}</span>
-                        <button className="linkbtn" onClick={angebotAnnehmen}>{t("review.festlegung.ja")}</button>
-                        <button className="linkbtn" onClick={() => setAngebot(null)}>{t("review.festlegung.nein")}</button>
-                      </div>
-                    )}
                   </td>
                   <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
                     <IconButton

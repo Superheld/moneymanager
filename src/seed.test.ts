@@ -19,6 +19,7 @@ import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { MIGRATIONS } from "./adapters/persistence/migrations";
 import { seedEinspielen } from "./testwerkzeug/seedDaten";
+import { standardkategorienFlach } from "./application/kategorien/standardkategorien";
 
 /**
  * Ein FESTER Stichtag. Mit `new Date()` pruefte der Test am Monatsersten etwas anderes
@@ -59,6 +60,43 @@ describe("Spielstand", () => {
     expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
   });
 
+  it("legt genau die Kategorien der Vorlage an — keine eigenen", () => {
+    // **Der Fehler, den es hier zu verhindern gilt, ist einmal passiert.** Der Seed fuehrte
+    // eine EIGENE Kategorienliste, und sie hiess dieselben Dinge anders als die Vorlage:
+    // `Mobilitaet` ohne Umlaut, `Miete` statt `Miete & Nebenkosten`. `standardkategorienAnlegen`
+    // gleicht ueber den Namen ab, fand sieben davon nicht wieder und legte sie ein zweites
+    // Mal an — der Spielstand hatte danach Dubletten, und man sah ihm nicht an, woher sie
+    // kamen.
+    //
+    // Der Test prueft deshalb GLEICHHEIT und nicht Teilmenge: eine Kategorie im Seed, die
+    // die Vorlage nicht kennt, ist genau der Anfang, mit dem es letztes Mal losging.
+    const db = mitSeed();
+    const [zeilen] = db.exec("SELECT id, name FROM kategorie ORDER BY id");
+    const imSeed = (zeilen?.values ?? []).map((z) => `${String(z[0])} ${String(z[1])}`);
+    const inDerVorlage = standardkategorienFlach()
+      .map((k) => `${k.id} ${k.name}`)
+      .sort();
+    expect(imSeed.sort()).toEqual(inDerVorlage);
+  });
+
+  it("haengt jede Buchung, jedes Budget und jeden Vertrag an eine Kategorie, die es gibt", () => {
+    // `foreign_key_check` oben faengt das ebenfalls — aber erst als anonyme Verletzung.
+    // Hier faellt der NAME, und beim Umbenennen einer Vorlagen-Kategorie ist das der
+    // Unterschied zwischen „irgendwo ein Verweis kaputt" und „diese Zeile hier".
+    const db = mitSeed();
+    const bekannt = new Set(standardkategorienFlach().map((k) => k.id));
+    for (const tabelle of ["ist_buchung", "budget", "vertrag", "inventargegenstand"]) {
+      const [zeilen] = db.exec(
+        `SELECT DISTINCT kategorie_id FROM ${tabelle} WHERE kategorie_id IS NOT NULL`,
+      );
+      for (const [id] of zeilen?.values ?? []) {
+        expect(bekannt.has(String(id)), `${tabelle} zeigt auf die unbekannte Kategorie ${id}`).toBe(
+          true,
+        );
+      }
+    }
+  });
+
   it("fuellt jeden Bereich, den die App anzeigt", () => {
     const db = mitSeed();
     // Ein leerer Bereich ist kein Spielstand: die Zahlen sind Untergrenzen, keine
@@ -79,11 +117,26 @@ describe("Spielstand", () => {
       ["umsatz_roh", 6],
       ["umsatz_verarbeitung", 6],
       ["kontostand_anker", 4],
+      ["kontogruppe", 2],
+      ["kontogruppe_konto", 4],
     ] as const) {
       expect(zahl(db, `SELECT COUNT(*) FROM ${tabelle}`), tabelle).toBeGreaterThanOrEqual(
         mindestens,
       );
     }
+  });
+
+  // Der Fall, den eine feste Kontoklasse nicht abbilden kann und fuer den es Gruppen
+  // gibt: dasselbe Konto liegt in mehr als einer.
+  it("legt ein Konto in zwei Gruppen", () => {
+    const db = mitSeed();
+    expect(
+      zahl(
+        db,
+        "SELECT COUNT(*) FROM (SELECT konto_id FROM kontogruppe_konto " +
+          "GROUP BY konto_id HAVING COUNT(*) > 1)",
+      ),
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it("haelt die Invariante der Aufteilung: Summe der Teile = Betrag der Buchung", () => {
@@ -143,6 +196,44 @@ describe("Spielstand", () => {
       .toBeGreaterThanOrEqual(2);
   });
 
+  it("traegt genug Material fuer ein messbares Training — und Woerter, die streuen", () => {
+    const db = mitSeed();
+    // Empfaenger und Verwendungszweck stehen am BELEG, nicht an der Buchung. Ein
+    // Spielstand, dessen Alltagszahlungen nur eine `notiz` tragen, ist fuer die
+    // Kategorie-Erkennung leer — genau das war er bis 2026-08-29, und es fiel nicht auf,
+    // weil jede andere Ansicht die Notiz zeigt.
+    const mitText = zahl(
+      db,
+      `SELECT COUNT(*) FROM ist_buchung b
+       JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+       JOIN umsatz_roh r ON r.id = v.umsatz_id
+       WHERE b.kategorie_id IS NOT NULL AND b.charakter <> 'Umschichtung'
+         AND (LENGTH(r.gegenpartei) > 0 OR LENGTH(r.verwendungszweck) > 0)`,
+    );
+    // Ueber `MESSBAR_AB` (50), sonst trainiert die App ohne Trefferquote.
+    expect(mitText).toBeGreaterThan(150);
+
+    // Und es muss Zeilen OHNE Beleg geben: von Hand erfasst, damit „ohne Text" als
+    // Ausschlussgrund im Spielstand ueberhaupt vorkommt.
+    expect(zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE quelle = 'manuell'")).toBeGreaterThan(0);
+
+    // Ein Empfaengerwort, das in MEHREREN Kategorien steht. Ohne so eines traegt jedes
+    // Wort seine Kategorie eindeutig, und Trennschaerfe und Trennkraft — die beiden
+    // Zahlen, die der Trainingsbereich gegeneinander stellt — saehen ueberall gleich
+    // gut aus.
+    const streuend = zahl(
+      db,
+      `SELECT COUNT(*) FROM (
+         SELECT r.gegenpartei FROM ist_buchung b
+         JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+         JOIN umsatz_roh r ON r.id = v.umsatz_id
+         WHERE b.kategorie_id IS NOT NULL
+         GROUP BY r.gegenpartei HAVING COUNT(DISTINCT b.kategorie_id) > 1
+       )`,
+    );
+    expect(streuend).toBeGreaterThan(0);
+  });
+
   it("enthaelt jeden Umsatz-Status", () => {
     const db = mitSeed();
     // „neu", „verbucht", „duplikat", „verworfen" — Weggelegtes bleibt sichtbar, und beim
@@ -172,6 +263,45 @@ describe("Spielstand", () => {
          WHERE b.roh_hash IS NOT NULL AND b.roh_hash <> r.roh_hash`,
       ),
     ).toBe(0);
+  });
+
+  /**
+   * Ein Umbuchungs-Bein ohne Gegenstueck. Es darf KEINE Umschichtung sein: liegt das
+   * Gegenkonto nicht im Bestand, hat das Geld den erfassten Bereich verlassen, und eine
+   * Umschichtung zaehlte in kein Budget und in keine Ausgabe — das Geld waere weg und
+   * fehlte nirgends.
+   */
+  it("enthaelt ein ungepaartes Umbuchungs-Bein, und zwar als Aufwand", () => {
+    const db = mitSeed();
+    const zeilen = db.exec(
+      `SELECT b.charakter, b.kategorie_id, b.transfer_id
+         FROM ist_buchung b
+         JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+         JOIN umsatz_roh r ON r.id = v.umsatz_id
+        WHERE r.roh_hash = 'hash-halbe-umbuchung'`,
+    );
+    expect(zeilen).toHaveLength(1);
+    const [charakter, kategorie, transfer] = zeilen[0].values[0];
+    expect(charakter).toBe("Aufwand");
+    expect(kategorie).toBeNull();
+    expect(transfer).toBeNull();
+  });
+
+  /**
+   * `endempfaenger` steht NEBEN `gegenpartei`, nicht statt dessen: dort bleibt der
+   * Zahlungsdienstleister, und wer die Zahlung wirklich bekommt, ist eine eigene Angabe.
+   * Fuer die Kategorie-Erkennung ist der Unterschied erheblich — der Dienstleister ist
+   * bei jedem Haendler derselbe.
+   */
+  it("enthaelt eine Zahlung ueber einen Dienstleister, mit Endempfaenger daneben", () => {
+    const db = mitSeed();
+    const zeilen = db.exec(
+      "SELECT gegenpartei, endempfaenger FROM umsatz_roh WHERE roh_hash = 'hash-dienstleister'",
+    );
+    expect(zeilen).toHaveLength(1);
+    const [partei, endempfaenger] = zeilen[0].values[0];
+    expect(String(endempfaenger).length).toBeGreaterThan(0);
+    expect(endempfaenger).not.toBe(partei);
   });
 
   it("legt echte Zwillinge an, nicht angeschriebene Verdachte", () => {

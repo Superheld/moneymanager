@@ -6,6 +6,7 @@ import {
   katalogNachName,
   vorschlagFuer,
   vorschlagsbefundFuer,
+  type Vorschlagseingabe,
   type Vorschlagskontext,
 } from "./vorschlag";
 
@@ -17,7 +18,6 @@ const kategorien: Kategorie[] = [
 
 /** Nur der Katalog — der Zustand vor jeder weiteren Quelle. */
 const nurKatalog: Vorschlagskontext = {
-  katalogNachName: katalogNachName(kategorien),
   kategorieNachId: katalogNachId(kategorien),
 };
 
@@ -34,26 +34,21 @@ function roh(over: Partial<RohUmsatz> = {}): RohUmsatz {
   };
 }
 
-describe("Umbuchung und Remapping (Grundverhalten)", () => {
-  it("labelt Umbuchungen als Umschichtung, nicht nach FG-Hinweis", () => {
-    const v = vorschlagFuer(roh({ istUmbuchung: true, kategorieHinweis: "Restaurants" }), nurKatalog);
+/**
+ * Wie `roh`, aber als EINGABE der Kette.
+ *
+ * Der Unterschied ist der Punkt: `kategorieVorschlagId` steht nicht am RohUmsatz. Die
+ * Wahl aus der Import-Ansicht ist kein Teil des Belegs — sie kommt als Eingabe des
+ * Übernehmens dazu, so wie die Kontozuordnung auch.
+ */
+function eingabe(over: Partial<Vorschlagseingabe> = {}): Vorschlagseingabe {
+  return { ...roh(), ...over };
+}
+
+describe("Umbuchung (Grundverhalten)", () => {
+  it("labelt Umbuchungen als Umschichtung, ohne konkrete Kategorie", () => {
+    const v = vorschlagFuer(roh({ istUmbuchung: true }), nurKatalog);
     expect(v).toEqual({ charakter: "Umschichtung", quelle: "umbuchung" });
-  });
-
-  it("mappt den FG-Hinweis auf unsere Kategorie inkl. Charakter", () => {
-    const v = vorschlagFuer(roh({ kategorieHinweis: "Lebensmittel" }), nurKatalog);
-    expect(v).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "remapping" });
-  });
-
-  it("nimmt den Charakter aus der Zielkategorie (Sparen → Umschichtung)", () => {
-    const v = vorschlagFuer(roh({ kategorieHinweis: "Kapitalanlage" }), nurKatalog);
-    expect(v).toEqual({ kategorieId: "k-sp", charakter: "Umschichtung", quelle: "remapping" });
-  });
-
-  it("liefert undefined, wenn der Hinweis unbekannt ist oder die Kategorie fehlt", () => {
-    expect(vorschlagFuer(roh({ kategorieHinweis: "Gibtsnicht" }), nurKatalog)).toBeUndefined();
-    // bekannter Hinweis, aber Zielkategorie nicht im Katalog des Nutzers:
-    expect(vorschlagFuer(roh({ kategorieHinweis: "Tanken" }), nurKatalog)).toBeUndefined();
   });
 
   it("ohne jede Quelle und ohne Hinweis bleibt die Zeile unkategorisiert", () => {
@@ -100,15 +95,6 @@ describe("Vertrag", () => {
     expect(vorschlagFuer(roh({ gegenpartei: "Kesselmann International BV", betrag: -999 }), kontext)).toBeUndefined();
   });
 
-  it("schlägt den Vertrag VOR das Remapping", () => {
-    // Eine getroffene Zuordnung ist stärker als eine Fremdklassifikation.
-    const v = vorschlagFuer(
-      roh({ gegenpartei: "Kesselmann International BV", betrag: -999, kategorieHinweis: "Lebensmittel" }),
-      mitVertrag(),
-    );
-    expect(v?.kategorieId).toBe("k-abo");
-  });
-
   it("die Umbuchung schlägt auch den Vertrag", () => {
     const v = vorschlagFuer(
       roh({ gegenpartei: "Kesselmann International BV", betrag: -999, istUmbuchung: true }),
@@ -118,58 +104,98 @@ describe("Vertrag", () => {
   });
 });
 
-describe("Festlegung", () => {
-  /** „Zahlungen an Kesselmann sind immer Abos & Streaming." */
-  function mitFestlegung(): Vorschlagskontext {
-    return {
-      ...nurKatalog,
-      festlegungen: [{ muster: "kesselmann international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" }],
-    };
-  }
+describe("Was die Quelle mitbrachte", () => {
+  /** Der Katalog samt Namenskarte — ohne die entfällt die Stufe. */
+  const mitNamen: Vorschlagskontext = {
+    ...nurKatalog,
+    kategorieNachName: katalogNachName(kategorien),
+  };
 
-  it("setzt die festgelegte Kategorie", () => {
-    const v = vorschlagFuer(roh({ gegenpartei: "KESSELMANN INTERNATIONAL BV", betrag: -4200 }), mitFestlegung());
-    expect(v).toEqual({ kategorieId: "k-abo", charakter: "Aufwand", quelle: "festlegung" });
+  it("nimmt die übersetzte Kategorie der Quelldatei", () => {
+    const v = vorschlagFuer(roh({ kategorieVorschlag: "Abos & Streaming" }), mitNamen);
+    expect(v).toEqual({ kategorieId: "k-abo", charakter: "Aufwand", quelle: "fremdkategorie" });
   });
 
-  it("nennt das Muster im Befund", () => {
-    const b = vorschlagsbefundFuer(roh({ gegenpartei: "KESSELMANN INTERNATIONAL BV" }), mitFestlegung());
-    expect(b.festlegung).toBe("kesselmann international");
+  it("übernimmt dabei den Charakter aus dem KATALOG, nicht aus der Quelle", () => {
+    // Die Quelle liefert einen Namen, sonst nichts. Was diese Kategorie fachlich ist,
+    // steht im eigenen Baum — sonst käme eine Umschichtung als Aufwand herein.
+    const v = vorschlagFuer(roh({ kategorieVorschlag: "Sparen & Anlegen" }), mitNamen);
+    expect(v?.charakter).toBe("Umschichtung");
   });
 
-  it("kennt keine Betragsspanne — eine Kategorie ist eine Klasse, kein Vertrag", () => {
-    // Genau der Unterschied zur Vertragserkennung: dort hielte die Spanne diese Zahlung
-    // draußen. Lebensmittel kosten mal 8 € und mal 190 €.
-    const v = vorschlagFuer(roh({ gegenpartei: "Kesselmann International BV", betrag: -190_00 }), mitFestlegung());
+  it("greift nicht, wenn es die Kategorie im Katalog nicht gibt", () => {
+    // Der Nutzer darf umbenennen und löschen. Dann trägt diese Stufe eben nichts bei —
+    // und legt vor allem keine Id ins Leere.
+    expect(vorschlagFuer(roh({ kategorieVorschlag: "Gibt es hier nicht" }), mitNamen)).toBeUndefined();
+  });
+
+  it("greift nicht ohne Namenskarte", () => {
+    // Aufrufer ohne Import müssen sie nicht bauen; dann entfällt die Stufe still.
+    expect(vorschlagFuer(roh({ kategorieVorschlag: "Abos & Streaming" }), nurKatalog)).toBeUndefined();
+  });
+
+  it("lässt die gewählte Id die eingebaute Übersetzung schlagen", () => {
+    // Der Punkt der ganzen Stufe: was in der Import-Ansicht steht, gilt. Die Tabelle des
+    // Adapters kennt diesen Katalog nicht, der Mensch davor schon.
+    const v = vorschlagFuer(
+      eingabe({ kategorieVorschlag: "Abos & Streaming", kategorieVorschlagId: "k-le" }),
+      mitNamen,
+    );
+    expect(v).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "fremdkategorie" });
+  });
+
+  it("nimmt die gewählte Id auch ohne Namenskarte", () => {
+    // Eine Id braucht keine Auflösung über Namen — genau deshalb ist sie eine Id.
+    expect(vorschlagFuer(eingabe({ kategorieVorschlagId: "k-abo" }), nurKatalog)?.kategorieId).toBe(
+      "k-abo",
+    );
+  });
+
+  it("fällt auf die Übersetzung zurück, wenn die gewählte Kategorie weg ist", () => {
+    // Zwischen dem Wählen und dem Übernehmen kann jemand die Kategorie gelöscht haben.
+    // Dann trägt die Wahl nichts mehr bei — aber sie darf die Stufe nicht mit sich
+    // reissen, sonst wäre ein Klick schlechter als kein Klick.
+    const v = vorschlagFuer(
+      eingabe({ kategorieVorschlag: "Abos & Streaming", kategorieVorschlagId: "weg" }),
+      mitNamen,
+    );
     expect(v?.kategorieId).toBe("k-abo");
   });
 
-  it("schlägt den Vertrag", () => {
+  it("steht HINTER dem Vertrag", () => {
+    // Ein Vertrag ist eine Zuordnung, die jemand in DIESEM Bestand getroffen hat. Die
+    // Kategorie einer fremden App kommt aus einem anderen Zusammenhang.
     const kontext: Vorschlagskontext = {
-      ...mitFestlegung(),
-      erkennungen: [standardErkennung("v1", "Kesselmann International", 999)],
-      vertragsKategorie: new Map([["v1", "k-le"]]),
+      ...mitNamen,
+      erkennungen: [standardErkennung("v1", "REWE Markt", 1234)],
+      vertragsKategorie: new Map([["v1", "k-abo"]]),
     };
-    expect(vorschlagFuer(roh({ gegenpartei: "Kesselmann International BV", betrag: -999 }), kontext)?.kategorieId).toBe("k-abo");
+    expect(vorschlagFuer(roh({ kategorieVorschlag: "Lebensmittel" }), kontext)?.quelle).toBe("regel");
   });
 
-  it("die Umbuchung schlägt auch die Festlegung", () => {
-    // Eigenes Geld, das das Konto wechselt, gehört in keine Ausgabenkategorie — auch
-    // dann nicht, wenn für den Empfänger etwas festgelegt ist.
-    const v = vorschlagFuer(roh({ gegenpartei: "Kesselmann International BV", istUmbuchung: true }), mitFestlegung());
-    expect(v).toEqual({ charakter: "Umschichtung", quelle: "umbuchung" });
-  });
-
-  it("greift nicht bei einem anderen Empfänger", () => {
-    expect(vorschlagFuer(roh({ gegenpartei: "REWE Markt" }), mitFestlegung())).toBeUndefined();
-  });
-
-  it("eine Festlegung auf eine gelöschte Kategorie fällt durch", () => {
+  it("steht VOR dem Modell", () => {
+    // **Der Rang, an dem alles hängt.** Das Modell legt sich immer fest; stünde diese
+    // Stufe dahinter, käme sie nie zum Zug — und der Import könnte die Kategorien, die in
+    // der Datei stehen, gleich wegwerfen.
     const kontext: Vorschlagskontext = {
-      ...nurKatalog,
-      festlegungen: [{ muster: "rewe", kategorieId: "geloescht", angelegtAm: "2026-08-17T10:00:00.000Z" }],
+      ...mitNamen,
+      modell: trainieren([
+        { merkmale: ["emp=rewe markt", "vwz:einkauf", "vz:-"], kategorieId: "k-le" },
+      ]),
     };
-    expect(vorschlagFuer(roh({ gegenpartei: "REWE Markt", kategorieHinweis: "Lebensmittel" }), kontext)?.quelle).toBe("remapping");
+    const v = vorschlagFuer(roh({ kategorieVorschlag: "Abos & Streaming" }), kontext);
+    expect(v?.quelle).toBe("fremdkategorie");
+    expect(v?.kategorieId).toBe("k-abo");
+  });
+
+  it("lässt das Modell ran, wo die Quelle nichts mitbrachte", () => {
+    const kontext: Vorschlagskontext = {
+      ...mitNamen,
+      modell: trainieren([
+        { merkmale: ["emp=rewe markt", "vwz:einkauf", "vz:-"], kategorieId: "k-le" },
+      ]),
+    };
+    expect(vorschlagFuer(roh(), kontext)?.quelle).toBe("ki");
   });
 });
 
@@ -195,13 +221,6 @@ describe("Modell", () => {
     expect(b.sicherheit).toBeGreaterThan(0);
   });
 
-  it("steht VOR dem Remapping", () => {
-    // Ein Modell auf dem eigenen Kategoriebaum schlägt eine Fremdklassifikation.
-    const v = vorschlagFuer(roh({ kategorieHinweis: "Kapitalanlage" }), mitModell());
-    expect(v?.quelle).toBe("ki");
-    expect(v?.kategorieId).toBe("k-le");
-  });
-
   it("steht HINTER dem Vertrag", () => {
     const kontext: Vorschlagskontext = {
       ...mitModell(),
@@ -215,11 +234,6 @@ describe("Modell", () => {
     // Sonst bekäme jede textlose Zahlung dieselbe Kategorie — und zwar die häufigste.
     const v = vorschlagFuer(roh({ gegenpartei: "", verwendungszweck: "" }), mitModell());
     expect(v).toBeUndefined();
-  });
-
-  it("fällt aufs Remapping zurück, wenn kein Modell da ist", () => {
-    const v = vorschlagFuer(roh({ kategorieHinweis: "Lebensmittel" }), nurKatalog);
-    expect(v?.quelle).toBe("remapping");
   });
 
   it("schlägt keine Kategorie vor, die es im Katalog nicht mehr gibt", () => {

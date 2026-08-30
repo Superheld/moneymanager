@@ -1,31 +1,45 @@
-// Die automatische Kategorisierung in den Einstellungen — vier Karten entlang des
-// Ablaufs, den ein Training tatsächlich hat: Daten sichten, Merkmale wählen, Ausschlüsse
-// pflegen, trainieren und prüfen.
+// Die automatische Kategorisierung — vier Karten entlang des Ablaufs, den ein Training
+// tatsächlich hat: Daten sichten, Wörter beurteilen, trainieren und prüfen, Bestand
+// abgleichen.
 //
 // Vier statt einer, weil das die Reihenfolge ist, in der man die Fragen stellt. Eine
 // einzige Karte mit allem drin zeigte das Ergebnis oben und seine Grundlage unten — also
 // rückwärts — und war so lang, dass man den Anfang nicht mehr sah.
 //
-// Geladen wird gemeinsam und erst beim ersten Aufklappen einer der vier: die Auswertung
-// zieht den gesamten Ledger und rechnet die Merkmale darüber. Viermal getrennt zu laden
-// wäre dieselbe Arbeit vierfach.
+// **Es waren einmal fünf.** „Merkmale" und „Ausschlüsse" lagen getrennt, und das war der
+// Schnitt an der falschen Stelle: dieselben Wörter, zweimal gezeigt, mit verschiedenen
+// Spalten — wer eines abwählte, sah es hier verschwinden und musste es dort
+// wiederfinden. Sie sind zu „Wörter" verschmolzen, und ein Ausschluss wechselt jetzt den
+// Zustand einer Zeile, statt sie an einen anderen Ort zu verschieben.
+//
+// Geladen wird gemeinsam und erst beim Betreten des Bereichs: die Auswertung zieht den
+// gesamten Ledger und rechnet die Merkmale darüber. Je Karte getrennt zu laden wäre
+// dieselbe Arbeit mehrfach.
 
+import { useProzent } from "../bausteine/einstellungenKontext";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   MERKMALSHERKUENFTE,
+  kategorieprofile,
   verwechslungsmatrix,
+  wortVon,
   type Bewertung,
   type Kategorie,
+  type Kategorieprofil,
   type Matrixzeile,
   type Merkmalsherkunft,
-  type Verwurfsgrund,
 } from "../../../application";
 import {
   type Ausschlussgrund,
   type Materialbefund,
-  type Merkmalswert,
 } from "../../../application/kategorien/trainingsmaterial";
+import {
+  bestandszahlen,
+  merkmalsbestand,
+  type Wortzeile,
+  type Wortzustand,
+} from "../../../application/kategorien/merkmalsbestand";
 import {
   type Modellzustand,
 } from "../../../application/kategorien/klassifikatorTraining";
@@ -44,6 +58,7 @@ import {
   modellStand,
   modellTrainieren,
   trainingsdaten,
+  grundausstattungZurueck,
   wortFreigeben,
   wortSperren,
 } from "../../dienste";
@@ -63,6 +78,7 @@ interface Daten {
 
 export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }) {
   const { t } = useTranslation();
+  const prozent = useProzent();
   const { locale } = useGeld();
   const [daten, setDaten] = useState<Daten | null>(null);
   const [angefordert, setAngefordert] = useState(false);
@@ -188,7 +204,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
     daten,
     kategorieName,
     zahl: (n: number) => n.toLocaleString(locale),
-    prozent: (x: number) => `${(x * 100).toLocaleString(locale, { maximumFractionDigits: 1 })} %`,
+    prozent: (x: number) => prozent(x, 1),
   };
 
   return (
@@ -207,13 +223,13 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
           ),
         },
         {
-          id: "merkmale",
-          label: t("einstellungen.lernmaterial.merkmaleTitel"),
-          untertitel: t("einstellungen.lernmaterial.merkmaleUntertitel"),
+          id: "woerter",
+          label: t("einstellungen.lernmaterial.woerterTitel"),
+          untertitel: t("einstellungen.lernmaterial.woerterUntertitel"),
           inhalt: () => (
             <Card>
               {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
-              <MerkmaleInhalt
+              <WoerterInhalt
                 {...hilfe}
                 wirkung={wirkung}
                 misst={laeuft === "wirkung"}
@@ -222,23 +238,8 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
                 aufAusschliessen={(wort, herkuenfte) =>
                   nachAenderung(wortSperren(wort, herkuenfte))
                 }
-              />
-            </Card>
-          ),
-        },
-        {
-          id: "ausschluesse",
-          label: t("einstellungen.lernmaterial.ausschluesseTitel"),
-          untertitel: t("einstellungen.lernmaterial.ausschluesseUntertitel"),
-          inhalt: () => (
-            <Card>
-              {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
-              <AusschluesseInhalt
-                {...hilfe}
-                aufAusschliessen={(wort, herkuenfte) =>
-                  nachAenderung(wortSperren(wort, herkuenfte))
-                }
                 aufZulassen={(wort) => nachAenderung(wortFreigeben(wort))}
+                aufGrundausstattung={() => nachAenderung(grundausstattungZurueck())}
               />
             </Card>
           ),
@@ -492,26 +493,106 @@ function DatenInhalt({ t, daten, kategorieName, zahl }: Hilfe) {
   );
 }
 
-// ---------------------------------------------------------------------- 2 · Merkmale
+// ------------------------------------------------------------------- 2 · Wörter
 
-function MerkmaleInhalt({
-  t, daten, kategorieName, zahl, prozent, wirkung, misst, aufWirkung, aufSchalten, aufAusschliessen,
+/**
+ * Der Wortbestand — eine Liste statt zweier Karten.
+ *
+ * Vorher standen die häufigsten Merkmale auf der einen und die Ausschlüsse auf der
+ * anderen. Wer ein Wort abwählte, sah es hier verschwinden und musste es dort
+ * wiederfinden: andere Karte, andere Sortierung, andere Spalten — und ohne die Zahlen,
+ * an denen er es gerade beurteilt hatte. Jetzt wechselt die Zeile ihren Zustand und
+ * bleibt, wo sie ist.
+ *
+ * Die Kappung bei fünfundzwanzig ist mit derselben Bewegung weg. Sie war der Grund, aus
+ * dem sich nur ein Bruchteil überhaupt bearbeiten liess — und ein Werkzeug, das nur die
+ * Spitze zeigt, führt zur Pflege der Spitze.
+ */
+function WoerterInhalt({
+  t, daten, kategorieName, zahl, prozent, wirkung, misst,
+  aufWirkung, aufSchalten, aufAusschliessen, aufZulassen, aufGrundausstattung,
 }: Hilfe & {
   wirkung: { basis: number; wirkungen: Wirkung[] } | null;
   misst: boolean;
   aufWirkung: () => void;
   aufSchalten: (h: Merkmalsherkunft, aktiv: boolean) => void;
   aufAusschliessen: (wort: string, herkuenfte?: readonly Merkmalsherkunft[]) => void;
+  aufZulassen: (wort: string) => void;
+  aufGrundausstattung: () => void;
 }) {
+  const feinerProzent = useProzent();
+  const [suche, setSuche] = useState("");
+  const [zustandFilter, setZustandFilter] = useState<Wortzustand | "">("");
+  const [herkunftFilter, setHerkunftFilter] = useState<Merkmalsherkunft | "">("");
+  const [gewaehlt, setGewaehlt] = useState<string | null>(null);
+  /**
+   * Ob die mitgelieferte Grundausstattung mit in der Liste steht. Voreinstellung: NEIN.
+   *
+   * Über hundert Stoppwörter, die niemand gesetzt hat, füllen sonst jede Seite und
+   * schieben die eigenen Entscheidungen nach hinten — genau das machte den Eindruck, ein
+   * frisch gesperrtes Wort sei „verschwunden". Sichtbar bleiben sie trotzdem auf Wunsch:
+   * ein Eintrag, den man nicht sieht, ist einer, den man nie wieder aufräumt.
+   */
+  const [mitStandard, setMitStandard] = useState(false);
+  const [neu, setNeu] = useState("");
+  const [nurIn, setNurIn] = useState<Merkmalsherkunft | "">("");
+
+  const alle = useMemo(
+    () => (daten ? merkmalsbestand(daten.material, daten.ausschluesse) : []),
+    [daten],
+  );
+  const zahlen = useMemo(() => bestandszahlen(alle), [alle]);
+
+  // Die Wolken kommen aus dem MODELL, nicht aus der Häufigkeitsverteilung: die sagt, wo
+  // ein Wort vorkam, das Gewicht sagt, was die Erkennung daraus gemacht hat. Ohne
+  // trainiertes Modell gibt es sie deshalb nicht — und das ist ehrlicher als eine Wolke
+  // aus Häufigkeiten, die aussähe wie eine Auskunft über die Erkennung.
+  const profile = useMemo(
+    () => (daten?.zustand.stand ? kategorieprofile(daten.zustand.stand.modell) : []),
+    [daten],
+  );
+
+  const sichtbar = useMemo(() => {
+    const suchbegriff = suche.trim().toLowerCase();
+    return alle.filter(
+      (z) =>
+        // Ein mitgeliefertes Wort, das im Bestand VORKOMMT, bleibt immer sichtbar: es
+        // wirkt auf die eigenen Daten, und das ist eine Entscheidung wie jede andere.
+        // Ausgeblendet wird nur, was nichts tut — der grosse Rest der Grundausstattung.
+        (mitStandard || z.quelle !== "standard" || z.belege > 0) &&
+        (!zustandFilter || z.zustand === zustandFilter) &&
+        (!herkunftFilter || z.herkunft === herkunftFilter) &&
+        (!suchbegriff || z.anzeige.includes(suchbegriff) || z.wort.includes(suchbegriff)),
+    );
+  }, [alle, suche, zustandFilter, herkunftFilter, mitStandard]);
+
+  // Bezugsgröße für den Balken: das Maximum der GEZEIGTEN Zeilen, nicht des Bestands.
+  // Wer auf eine Herkunft filtert, will die dort vergleichen — an einem bestandsweiten
+  // Maximum lägen alle Balken beieinander und die Spalte sagte nichts mehr.
+  const maxTrennkraft = useMemo(
+    () => sichtbar.reduce((m, z) => Math.max(m, z.trennkraft), 0),
+    [sichtbar],
+  );
+
+  const zeile = gewaehlt ? sichtbar.find((z) => z.schluessel === gewaehlt) ?? null : null;
+
   if (!daten) return <div className="muted">…</div>;
   const aktiv = new Set(daten.herkuenfte);
   const wirkungJe = new Map(wirkung?.wirkungen.map((w) => [w.herkunft, w]));
 
-  /** Wie viele Merkmale je Herkunft — aus der Namensraum-Statistik ist das nicht
-   *  ableitbar, weil `emp=` und `emp:` denselben Namensraum teilen. */
-  const anzahlJe = new Map<Merkmalsherkunft, number>();
-  for (const m of daten.material.vokabular.haeufigste) {
-    if (m.herkunft) anzahlJe.set(m.herkunft, (anzahlJe.get(m.herkunft) ?? 0) + 1);
+  function hinzufuegen() {
+    const wort = neu.trim();
+    if (!wort) return;
+    aufAusschliessen(wort, nurIn ? [nurIn] : undefined);
+    setNeu("");
+    // Und die Liste springt darauf. Ein Wort, das im Bestand nicht vorkommt, sortiert
+    // ans Ende — es wäre eingetragen und nirgends zu sehen. Genau dieser Bruch war der
+    // Grund, aus dem der frühere Ausschluss „verschwunden" wirkte: nicht weil er fehlte,
+    // sondern weil ihn niemand fand.
+    setSuche(wort.toLowerCase());
+    setZustandFilter("");
+    setHerkunftFilter("");
+    setMitStandard(true);
   }
 
   return (
@@ -571,235 +652,480 @@ function MerkmaleInhalt({
         )}
       </Abschnitt>
 
-      {daten.material.vokabular.haeufigste.length > 0 && (
-        <Abschnitt titel={t("einstellungen.lernmaterial.haeufigsteTitel")}>
-          <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
-            {t("einstellungen.lernmaterial.trennschaerfeHinweis")}
-          </div>
-          <MerkmalsTabelle
-            t={t}
-            merkmale={daten.material.vokabular.haeufigste}
-            kategorieName={kategorieName}
-            zahl={zahl}
-            prozent={prozent}
-            aufAusschliessen={aufAusschliessen}
+      <Abschnitt titel={t("einstellungen.lernmaterial.bestandTitel")}>
+        <div style={{ display: "flex", gap: "var(--sp-6)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
+          <KPIStat
+            size="tile"
+            label={t("einstellungen.lernmaterial.zustand.genutzt")}
+            value={zahl(zahlen.genutzt)}
+            meta={t("einstellungen.lernmaterial.zustandMeta.genutzt")}
           />
-        </Abschnitt>
-      )}
-    </>
-  );
-}
-
-function MerkmalsTabelle({
-  t, merkmale, kategorieName, zahl, prozent, aufAusschliessen,
-}: {
-  t: Hilfe["t"];
-  merkmale: readonly Merkmalswert[];
-  kategorieName: Map<string, string>;
-  zahl: (n: number) => string;
-  prozent: (x: number) => string;
-  aufAusschliessen: (wort: string, herkuenfte?: readonly Merkmalsherkunft[]) => void;
-}) {
-  /** Das nackte Wort ohne Präfix — nur das steht in der Ausschlussliste. */
-  const wortVon = (merkmal: string) => merkmal.slice(merkmal.search(/[=:]/) + 1);
-
-  return (
-    <DataTable
-      sortable
-      columns={[
-        { key: "merkmal", label: t("einstellungen.lernmaterial.spalteMerkmal") },
-        {
-          key: "belege",
-          label: t("einstellungen.lernmaterial.spalteAnzahl"),
-          align: "right",
-          render: (r) => zahl(r.belege),
-        },
-        {
-          key: "kategorien",
-          label: t("einstellungen.lernmaterial.spalteKategorien"),
-          align: "right",
-          render: (r) => zahl(r.kategorien),
-        },
-        {
-          key: "konzentration",
-          label: t("einstellungen.lernmaterial.trennschaerfe"),
-          align: "right",
-          render: (r) => (
-            <span style={{ color: r.konzentration >= 0.8 ? "var(--ok-deep)" : r.konzentration < 0.5 ? "var(--warn-deep)" : undefined }}>
-              {prozent(r.konzentration)}
-            </span>
-          ),
-        },
-        {
-          key: "haeufigsteKategorieId",
-          label: t("einstellungen.lernmaterial.spalteFuer"),
-          render: (r) => kategorieName.get(r.haeufigsteKategorieId) ?? r.haeufigsteKategorieId,
-        },
-        {
-          key: "_x",
-          label: "",
-          align: "right",
-          sortable: false,
-          render: (r) => (
-            <button
-              className="linkbtn"
-              onClick={() => aufAusschliessen(wortVon(r.merkmal), r.herkunft ? [r.herkunft] : undefined)}
-              title={t("einstellungen.lernmaterial.nurIn")}
-            >
-              {t("einstellungen.lernmaterial.ausschliessen")}
-            </button>
-          ),
-        },
-      ]}
-      rows={merkmale.map((m) => ({ ...m }))}
-    />
-  );
-}
-
-// ------------------------------------------------------------------- 3 · Ausschlüsse
-
-function AusschluesseInhalt({
-  t, daten, zahl, aufAusschliessen, aufZulassen,
-}: Hilfe & {
-  aufAusschliessen: (wort: string, herkuenfte?: readonly Merkmalsherkunft[]) => void;
-  aufZulassen: (wort: string) => void;
-}) {
-  const [neu, setNeu] = useState("");
-  const [nurIn, setNurIn] = useState<Merkmalsherkunft | "">("");
-  if (!daten) return <div className="muted">…</div>;
-
-  const verwurf = (Object.entries(daten.material.vokabular.verworfen) as [Verwurfsgrund, number][])
-    .filter(([, n]) => n > 0)
-    .sort((a, b) => b[1] - a[1]);
-
-  function hinzufuegen() {
-    const wort = neu.trim();
-    if (!wort) return;
-    aufAusschliessen(wort, nurIn ? [nurIn] : undefined);
-    setNeu("");
-  }
-
-  return (
-    <>
-      <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-end", flexWrap: "wrap" }}>
-        <FormField label={t("einstellungen.lernmaterial.neuesWort")}>
-          <input
-            className="field"
-            value={neu}
-            onChange={(e) => setNeu(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && hinzufuegen()}
-            placeholder={t("einstellungen.lernmaterial.neuesWortPlatzhalter")}
+          <KPIStat
+            size="tile"
+            label={t("einstellungen.lernmaterial.zustand.gesperrt")}
+            value={zahl(zahlen.gesperrt)}
+            meta={t("einstellungen.lernmaterial.zustandMeta.gesperrt")}
           />
-        </FormField>
-        <FormField label={t("einstellungen.lernmaterial.nurIn")}>
-          <Auswahl
-            ariaLabel={t("einstellungen.lernmaterial.nurIn")}
-            wert={nurIn}
-            aufAenderung={(v) => setNurIn(v as Merkmalsherkunft | "")}
-            optionen={[
-              { wert: "", text: t("einstellungen.lernmaterial.ueberall") },
-              ...MERKMALSHERKUENFTE.map((h) => ({ wert: h, text: t(`einstellungen.lernmaterial.herkunft.${h}`) })),
-            ]}
+          <KPIStat
+            size="tile"
+            label={t("einstellungen.lernmaterial.zustand.strukturell")}
+            value={zahl(zahlen.strukturell)}
+            meta={t("einstellungen.lernmaterial.zustandMeta.strukturell")}
           />
-        </FormField>
-        <Button variant="primary" plus onClick={hinzufuegen}>
-          {t("einstellungen.lernmaterial.ausschliessen")}
-        </Button>
-      </div>
+        </div>
 
-      {verwurf.length > 0 && (
-        <Abschnitt titel={t("einstellungen.lernmaterial.verworfenTitel")}>
-          <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
-            {verwurf.map(([grund, n]) => (
-              <Pill key={grund}>
-                {t(`einstellungen.lernmaterial.verwurf.${grund}`)} · {zahl(n)}
-              </Pill>
-            ))}
-          </div>
-          {daten.material.vokabular.haeufigsteVerworfen.length > 0 && (
+        <div className="muted" style={{ marginBottom: "var(--sp-2)" }}>
+          {t("einstellungen.lernmaterial.bestandHinweis")}
+        </div>
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
+          {t("einstellungen.lernmaterial.masseHinweis")}
+        </div>
+
+        <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-end", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
+          <FormField label={t("einstellungen.lernmaterial.suche")}>
+            <input
+              className="field"
+              value={suche}
+              onChange={(e) => setSuche(e.target.value)}
+              placeholder={t("einstellungen.lernmaterial.suchePlatzhalter")}
+            />
+          </FormField>
+          <FormField label={t("einstellungen.lernmaterial.spalteZustand")}>
+            <Auswahl
+              ariaLabel={t("einstellungen.lernmaterial.spalteZustand")}
+              wert={zustandFilter}
+              aufAenderung={(v) => setZustandFilter(v as Wortzustand | "")}
+              optionen={[
+                { wert: "", text: t("einstellungen.lernmaterial.filterAlle") },
+                ...(["genutzt", "gesperrt", "strukturell"] as const).map((z) => ({
+                  wert: z,
+                  text: t(`einstellungen.lernmaterial.zustand.${z}`),
+                })),
+              ]}
+            />
+          </FormField>
+          <FormField label={t("einstellungen.lernmaterial.spalteGeltung")}>
+            <Auswahl
+              ariaLabel={t("einstellungen.lernmaterial.spalteGeltung")}
+              wert={herkunftFilter}
+              aufAenderung={(v) => setHerkunftFilter(v as Merkmalsherkunft | "")}
+              optionen={[
+                { wert: "", text: t("einstellungen.lernmaterial.filterAlle") },
+                ...MERKMALSHERKUENFTE.map((h) => ({
+                  wert: h,
+                  text: t(`einstellungen.lernmaterial.herkunft.${h}`),
+                })),
+              ]}
+            />
+          </FormField>
+          <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", paddingBottom: "var(--sp-2)", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={mitStandard}
+              onChange={(e) => setMitStandard(e.target.checked)}
+            />
+            <span>{t("einstellungen.lernmaterial.mitStandard")}</span>
+          </label>
+          <span className="muted" style={{ paddingBottom: "var(--sp-2)" }}>
+            {t("einstellungen.lernmaterial.bestandZahl", {
+              gezeigt: zahl(sichtbar.length),
+              gesamt: zahl(alle.length),
+            })}
+          </span>
+        </div>
+
+        {sichtbar.length === 0 ? (
+          <div className="muted">{t("einstellungen.lernmaterial.keineTreffer")}</div>
+        ) : (
+          <div style={{ overflowX: "auto", maxWidth: "100%" }}>
             <DataTable
+              sortable
+              pageSize={20}
+              onRowClick={(r) => setGewaehlt(r.schluessel === gewaehlt ? null : r.schluessel)}
+              istAktiv={(r) => r.schluessel === gewaehlt}
               columns={[
-                { key: "wort", label: t("einstellungen.lernmaterial.spalteWort") },
                 {
-                  key: "herkunft",
-                  label: t("einstellungen.lernmaterial.spalteGeltung"),
-                  render: (r) => t(`einstellungen.lernmaterial.herkunft.${r.herkunft}`),
+                  key: "anzeige",
+                  label: t("einstellungen.lernmaterial.spalteWort"),
+                  // Die Herkunft steht als grauer Zusatz DANEBEN statt in einer eigenen
+                  // Spalte: sie ist kurz, gehört zum Wort, und die Liste hatte zehn
+                  // Spalten — zu viele, um eine Zeile noch auf einen Blick zu lesen.
+                  // Sortieren muss man danach nicht, dafür gibt es den Filter.
+                  //
+                  // Weicht die Listenform ab, gehört auch sie daneben: an ihr hängt das
+                  // Sperren, und ohne sie ist nicht zu sehen, warum ein Ausschluss auf
+                  // ein Wort wirkt, das anders geschrieben dasteht.
+                  render: (r) => (
+                    <span>
+                      {r.anzeige}
+                      {r.wort !== r.anzeige && <span className="muted"> → {r.wort}</span>}
+                      {r.herkunft && (
+                        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                          {" "}· {t(`einstellungen.lernmaterial.herkunft.${r.herkunft}`)}
+                        </span>
+                      )}
+                    </span>
+                  ),
                 },
                 {
-                  key: "grund",
-                  label: t("einstellungen.lernmaterial.spalteGrund"),
-                  render: (r) => t(`einstellungen.lernmaterial.verwurf.${r.grund}`),
+                  key: "zustand",
+                  label: t("einstellungen.lernmaterial.spalteZustand"),
+                  render: (r) => (
+                    <span style={{ display: "inline-flex", gap: 4, flexWrap: "wrap" }}>
+                      <Pill variant={r.zustand === "genutzt" ? "ok" : r.zustand === "gesperrt" ? "warn" : "neutral"}>
+                        {t(`einstellungen.lernmaterial.zustand.${r.zustand}`)}
+                      </Pill>
+                      {/* Woher der Ausschluss kommt, steht nur bei gesperrten Zeilen —
+                          bei allen anderen wäre die Spalte eine leere Behauptung. Die
+                          mitgelieferten sind eine Grundausstattung und dürfen weg; das
+                          sieht man ihnen nur an, wenn es danebensteht. */}
+                      {r.quelle && (
+                        <Pill variant={r.quelle === "manuell" ? "plan" : "neutral"}>
+                          {t(`einstellungen.lernmaterial.quelle${r.quelle === "manuell" ? "Manuell" : "Standard"}`)}
+                        </Pill>
+                      )}
+                    </span>
+                  ),
                 },
                 {
-                  key: "anzahl",
+                  key: "belege",
                   label: t("einstellungen.lernmaterial.spalteAnzahl"),
                   align: "right",
-                  render: (r) => zahl(r.anzahl),
+                  render: (r) => zahl(r.belege),
+                },
+                {
+                  key: "kategorien",
+                  label: t("einstellungen.lernmaterial.spalteKategorien"),
+                  align: "right",
+                  render: (r) => (r.kategorien ? zahl(r.kategorien) : "—"),
+                },
+                {
+                  key: "trennkraft",
+                  label: t("einstellungen.lernmaterial.spalteTrennkraft"),
+                  align: "right",
+                  render: (r) =>
+                    r.belege && r.kategorien ? (
+                      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 2 }}>
+                        <span>{feinerProzent(r.trennkraft, 2)}</span>
+                        {/* Der Balken misst gegen die stärkste GEZEIGTE Zeile: die
+                            absoluten Werte sind klein, die Reihenfolge ist die Aussage. */}
+                        <span style={{ display: "block", width: 48, height: 3, background: "var(--surface-2)" }}>
+                          <span
+                            style={{
+                              display: "block",
+                              height: 3,
+                              width: `${maxTrennkraft > 0 ? Math.round((r.trennkraft / maxTrennkraft) * 100) : 0}%`,
+                              background: "var(--ok-deep)",
+                            }}
+                          />
+                        </span>
+                      </span>
+                    ) : (
+                      "—"
+                    ),
+                },
+                {
+                  key: "haeufigsteKategorieId",
+                  label: t("einstellungen.lernmaterial.spalteFuer"),
+                  render: (r) =>
+                    r.haeufigsteKategorieId
+                      ? kategorieName.get(r.haeufigsteKategorieId) ?? r.haeufigsteKategorieId
+                      : "—",
                 },
                 {
                   key: "_x",
                   label: "",
                   align: "right",
+                  sortable: false,
                   render: (r) =>
-                    r.grund === "ausgeschlossen" ? (
-                      <button className="linkbtn" onClick={() => aufZulassen(r.wort)}>
+                    r.zustand === "gesperrt" ? (
+                      <button className="linkbtn" onClick={(e) => { e.stopPropagation(); aufZulassen(r.wort); }}>
                         {t("einstellungen.lernmaterial.zulassen")}
                       </button>
+                    ) : r.zustand === "genutzt" ? (
+                      <button
+                        className="linkbtn"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          aufAusschliessen(r.wort, r.herkunft ? [r.herkunft] : undefined);
+                        }}
+                      >
+                        {t("einstellungen.lernmaterial.ausschliessen")}
+                      </button>
                     ) : (
-                      // Strukturell verworfen (Nummer, Platzhalter, zu kurz) — dafür gibt
-                      // es keinen Listeneintrag, den man entfernen könnte.
+                      // Strukturell aussortiert — dafür gibt es keinen Listeneintrag,
+                      // den man entfernen könnte.
                       <span className="muted">—</span>
                     ),
                 },
               ]}
-              rows={daten.material.vokabular.haeufigsteVerworfen.map((v) => ({ ...v }))}
+              rows={sichtbar.map((z) => ({ ...z }))}
             />
-          )}
-        </Abschnitt>
-      )}
+          </div>
+        )}
 
-      <Abschnitt titel={t("einstellungen.lernmaterial.listeTitel", { anzahl: daten.ausschluesse.length })}>
+        {zeile && <Wortdetail zeile={zeile} t={t} kategorieName={kategorieName} zahl={zahl} prozent={prozent} />}
+      </Abschnitt>
+
+      <Abschnitt titel={t("einstellungen.lernmaterial.wolkenTitel")}>
         <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
-          {t("einstellungen.lernmaterial.listeHinweis")}
+          {profile.length === 0
+            ? t("einstellungen.lernmaterial.wolkenOhneModell")
+            : t("einstellungen.lernmaterial.wolkenHinweis")}
         </div>
-        <DataTable
-          sortable
-          pageSize={25}
-          columns={[
-            { key: "wort", label: t("einstellungen.lernmaterial.spalteWort") },
-            {
-              key: "geltung",
-              label: t("einstellungen.lernmaterial.spalteGeltung"),
-              render: (r) =>
-                r.herkuenfte?.length
-                  ? r.herkuenfte.map((h: Merkmalsherkunft) => t(`einstellungen.lernmaterial.herkunft.${h}`)).join(", ")
-                  : t("einstellungen.lernmaterial.ueberall"),
-            },
-            {
-              key: "quelle",
-              label: t("einstellungen.lernmaterial.spalteWoher"),
-              render: (r) => (
-                <Pill variant={r.quelle === "manuell" ? "plan" : "neutral"}>
-                  {t(`einstellungen.lernmaterial.quelle${r.quelle === "manuell" ? "Manuell" : "Standard"}`)}
-                </Pill>
-              ),
-            },
-            {
-              key: "_x",
-              label: "",
-              align: "right",
-              sortable: false,
-              render: (r) => (
-                <button className="linkbtn" onClick={() => aufZulassen(r.wort)}>
-                  {t("einstellungen.lernmaterial.zulassen")}
-                </button>
-              ),
-            },
-          ]}
-          rows={daten.ausschluesse.map((a) => ({ ...a }))}
-        />
+        {profile.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              gap: "var(--sp-4)",
+            }}
+          >
+            {profile.map((p) => (
+              <Wortwolke
+                key={p.kategorieId}
+                profil={p}
+                name={kategorieName.get(p.kategorieId) ?? p.kategorieId}
+                leer={t("einstellungen.lernmaterial.wolkeLeer")}
+                aufWort={(merkmal) => {
+                  // Der Weg zurück in die Liste: dort steht, was das Wort im Bestand
+                  // anrichtet. Wolke und Liste zeigen dasselbe Wort von zwei Seiten —
+                  // ohne diesen Sprung wären es wieder zwei getrennte Werkzeuge.
+                  setSuche(wortVon(merkmal));
+                  setZustandFilter("");
+                  setHerkunftFilter("");
+                  setMitStandard(true);
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </Abschnitt>
+
+      <Abschnitt titel={t("einstellungen.lernmaterial.neuesWort")}>
+        <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+          {t("einstellungen.lernmaterial.neuesWortHinweis")}
+        </div>
+        <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-end", flexWrap: "wrap" }}>
+          <FormField label={t("einstellungen.lernmaterial.neuesWort")}>
+            <input
+              className="field"
+              value={neu}
+              onChange={(e) => setNeu(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && hinzufuegen()}
+              placeholder={t("einstellungen.lernmaterial.neuesWortPlatzhalter")}
+            />
+          </FormField>
+          <FormField label={t("einstellungen.lernmaterial.nurIn")}>
+            <Auswahl
+              ariaLabel={t("einstellungen.lernmaterial.nurIn")}
+              wert={nurIn}
+              aufAenderung={(v) => setNurIn(v as Merkmalsherkunft | "")}
+              optionen={[
+                { wert: "", text: t("einstellungen.lernmaterial.ueberall") },
+                ...MERKMALSHERKUENFTE.map((h) => ({ wert: h, text: t(`einstellungen.lernmaterial.herkunft.${h}`) })),
+              ]}
+            />
+          </FormField>
+          {/* Eigenes Wort statt „ausschließen": derselbe Text stünde sonst zweimal
+              auf der Seite — hier für das Feld daneben, in jeder Tabellenzeile für die
+              Zeile. Zwei Knöpfe mit einem Namen, die Verschiedenes nehmen. */}
+          <Button variant="primary" plus onClick={hinzufuegen}>
+            {t("einstellungen.lernmaterial.wortSperren")}
+          </Button>
+          {/* Der Weg zurück. Ohne ihn ist das Löschen eines mitgelieferten Wortes
+              endgültig, und dann räumt niemand darin auf — was den Sinn des Löschens
+              aufhebt. Er legt nur an, was fehlt: eigene Einträge bleiben eigene. */}
+          <Button onClick={aufGrundausstattung}>
+            {t("einstellungen.lernmaterial.grundausstattung")}
+          </Button>
+        </div>
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
+          {t("einstellungen.lernmaterial.grundausstattungHinweis")}
+        </div>
       </Abschnitt>
     </>
+  );
+}
+
+/**
+ * Eine Kategorie und die Wörter, die sie auszeichnen — Schriftgröße nach Stärke.
+ *
+ * Eine Wolke und keine Tabelle, weil die Frage eine andere ist: nicht „welchen Wert hat
+ * dieses Wort", sondern „woran erkennt die Erkennung diesen Bucket". Darauf antwortet ein
+ * Bild schneller als eine Spalte, und der Vergleich zwischen zwei Kategorien wird zum
+ * Nebeneinanderlegen zweier Karten.
+ *
+ * Die Größe misst gegen die stärkste Stelle DIESER Karte, nicht gegen alle: sonst hätte
+ * eine Kategorie mit klaren Kennzeichen lauter grosse Wörter und eine mit lauter
+ * schwachen gar keine lesbaren — und genau die zweite ist die interessante.
+ */
+function Wortwolke({
+  profil, name, leer, aufWort,
+}: {
+  profil: Kategorieprofil;
+  name: string;
+  leer: string;
+  aufWort: (merkmal: string) => void;
+}) {
+  const max = profil.kennzeichen[0]?.staerke ?? 0;
+  /** 0,8 rem bis 1,8 rem — darunter unlesbar, darüber sprengt ein Wort die Karte. */
+  const groesse = (staerke: number) => 0.8 + (max > 0 ? staerke / max : 0) * 1;
+
+  return (
+    <div
+      style={{
+        border: "1px solid var(--line)",
+        borderRadius: "var(--radius-2, 6px)",
+        padding: "var(--sp-3)",
+      }}
+    >
+      <div style={{ fontWeight: "var(--fw-bold)", marginBottom: "var(--sp-2)" }}>{name}</div>
+      {profil.kennzeichen.length === 0 ? (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{leer}</div>
+      ) : (
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-2)", alignItems: "baseline" }}>
+          {profil.kennzeichen.map((k) => (
+            <button
+              key={k.merkmal}
+              className="linkbtn"
+              onClick={() => aufWort(k.merkmal)}
+              title={`${k.merkmal} · ${k.staerke.toFixed(2)}`}
+              style={{
+                fontSize: `${groesse(k.staerke).toFixed(2)}rem`,
+                lineHeight: 1.2,
+                // Das stärkste Drittel dunkler: die Reihenfolge steht schon in der Größe,
+                // aber bei eng beieinanderliegenden Stärken sieht man sie dort kaum.
+                color: k.staerke > max * 0.66 ? "var(--ink-1)" : undefined,
+                fontWeight: k.staerke > max * 0.66 ? "var(--fw-semi)" : undefined,
+              }}
+            >
+              {wortVon(k.merkmal)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Was hinter einer Zeile steht: die vollständige Verteilung über die Kategorien.
+ *
+ * Sie ist der Grund, aus dem man eine solche Liste überhaupt aufmacht — „in welchen
+ * Kategorien steckt dieses Wort und wie oft". Als Spalte ginge sie nicht: sie ist
+ * unterschiedlich lang, und gekappt beantwortet sie genau die Frage nicht, für die man
+ * hinsieht.
+ */
+function Wortdetail({
+  zeile, t, kategorieName, zahl, prozent,
+}: {
+  zeile: Wortzeile;
+  t: Hilfe["t"];
+  kategorieName: Map<string, string>;
+  zahl: (n: number) => string;
+  prozent: (x: number) => string;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: "var(--sp-4)",
+        padding: "var(--sp-3)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--radius-2, 6px)",
+        background: "var(--surface-2)",
+      }}
+    >
+      <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
+        <span style={{ fontWeight: "var(--fw-bold)" }}>{zeile.anzeige}</span>
+        {zeile.herkunft && (
+          <span className="muted">{t(`einstellungen.lernmaterial.herkunft.${zeile.herkunft}`)}</span>
+        )}
+        <Pill variant={zeile.zustand === "genutzt" ? "ok" : zeile.zustand === "gesperrt" ? "warn" : "neutral"}>
+          {t(`einstellungen.lernmaterial.zustand.${zeile.zustand}`)}
+        </Pill>
+        {zeile.quelle && (
+          <Pill variant={zeile.quelle === "manuell" ? "plan" : "neutral"}>
+            {t(`einstellungen.lernmaterial.quelle${zeile.quelle === "manuell" ? "Manuell" : "Standard"}`)}
+          </Pill>
+        )}
+        {zeile.geltung !== undefined && (
+          <span className="muted">
+            {zeile.geltung?.length
+              ? zeile.geltung.map((h) => t(`einstellungen.lernmaterial.herkunft.${h}`)).join(", ")
+              : t("einstellungen.lernmaterial.ueberall")}
+          </span>
+        )}
+      </div>
+
+      {zeile.grund && (
+        <div className="muted" style={{ marginTop: "var(--sp-2)" }}>
+          {t(`einstellungen.lernmaterial.verwurf.${zeile.grund}`)} · {t("einstellungen.lernmaterial.strukturellHinweis")}
+        </div>
+      )}
+
+      {/* Die zwei Maße, die aus der Tabelle gefallen sind. Sie gehören hierher und nicht
+          in eine Spalte: gebraucht werden sie, wenn man EINE Zeile beurteilt, nicht beim
+          Überfliegen — und zehn Spalten liest niemand mehr auf einen Blick. */}
+      {zeile.belege > 0 && zeile.kategorien > 0 && (
+        <div style={{ display: "flex", gap: "var(--sp-5)", flexWrap: "wrap", marginTop: "var(--sp-3)" }}>
+          <span>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              {t("einstellungen.lernmaterial.spalteDeckung")}
+            </span>{" "}
+            <span style={{ fontVariantNumeric: "tabular-nums" }}>{prozent(zeile.deckung)}</span>
+          </span>
+          <span>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              {t("einstellungen.lernmaterial.trennschaerfe")}
+            </span>{" "}
+            <span
+              style={{
+                fontVariantNumeric: "tabular-nums",
+                color: zeile.konzentration >= 0.8 ? "var(--ok-deep)" : zeile.konzentration < 0.5 ? "var(--warn-deep)" : undefined,
+              }}
+            >
+              {prozent(zeile.konzentration)}
+            </span>
+          </span>
+        </div>
+      )}
+
+      {zeile.verteilung.length === 0 ? (
+        <div className="muted" style={{ marginTop: "var(--sp-3)" }}>
+          {t("einstellungen.lernmaterial.ohneBelege")}
+        </div>
+      ) : (
+        <div style={{ marginTop: "var(--sp-3)" }}>
+          <div style={{ fontWeight: "var(--fw-bold)", marginBottom: "var(--sp-2)" }}>
+            {t("einstellungen.lernmaterial.verteilungTitel", { anzahl: zahl(zeile.kategorien) })}
+          </div>
+          <div style={{ display: "grid", gap: 3 }}>
+            {zeile.verteilung.map((v) => (
+              <div key={v.kategorieId} style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center" }}>
+                <span style={{ fontVariantNumeric: "tabular-nums", minWidth: "5ch", textAlign: "right" }}>
+                  {zahl(v.anzahl)}
+                </span>
+                <span style={{ display: "block", width: 120, height: 6, background: "var(--surface)" }}>
+                  <span
+                    style={{
+                      display: "block",
+                      height: 6,
+                      width: `${Math.round((v.anzahl / zeile.belege) * 100)}%`,
+                      background: "var(--ok-deep)",
+                    }}
+                  />
+                </span>
+                <span>{kategorieName.get(v.kategorieId) ?? v.kategorieId}</span>
+                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {prozent(v.anzahl / zeile.belege)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 

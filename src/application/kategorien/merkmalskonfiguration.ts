@@ -21,7 +21,6 @@ import {
   merkmalsbefund,
   trainieren,
   type Beispiel,
-  type Cent,
   type Klassifikation,
   type Merkmalsherkunft,
   type Merkmalskonfiguration,
@@ -110,6 +109,32 @@ export async function wortAusschliessen(
     herkuenfte: herkuenfte?.length ? [...herkuenfte] : undefined,
     quelle: "manuell",
   });
+}
+
+/**
+ * Legt die mitgelieferte Grundausstattung neu an — ohne anzufassen, was schon dasteht.
+ *
+ * Sie ist loeschbar, und das soll sie sein: jeder Eintrag ist eine Behauptung darueber,
+ * was nichts bedeutet, und die kann falsch sein. Nur war der Weg bisher einbahnig — wer
+ * `sepa` einmal zugelassen hatte, bekam es nie wieder, ausser ueber Tippen. Ein Schalter,
+ * der etwas wegnimmt, braucht einen, der es zurueckholt; sonst raeumt niemand auf.
+ *
+ * `ausschlussSetzen` waere hier falsch: es ist ein Upsert und wuerde die QUELLE
+ * mitschreiben — ein Wort, das der Nutzer selbst gesetzt hat und das zufaellig auch in
+ * der Grundausstattung steht, faellt damit auf „mitgeliefert" zurueck und verschwindet
+ * beim naechsten Ausblenden aus seiner Liste. Deshalb wird nur angelegt, was fehlt.
+ */
+export async function grundausstattungHerstellen(
+  repo: MerkmalskonfigurationRepository,
+): Promise<number> {
+  const vorhanden = new Set((await repo.ausschluesseLesen()).map((a) => a.wort));
+  let neu = 0;
+  for (const a of STANDARD_KONFIGURATION.ausschluesse) {
+    if (vorhanden.has(a.wort)) continue;
+    await repo.ausschlussSetzen({ ...a, quelle: "standard" });
+    neu++;
+  }
+  return neu;
 }
 
 /** Nimmt ein Wort wieder ins Training auf. */
@@ -209,7 +234,7 @@ export async function merkmalsansicht(
     readonly klassifikatorRepo: KlassifikatorRepository;
     readonly merkmalRepo: MerkmalskonfigurationRepository;
   },
-  quelle: { gegenpartei: string; verwendungszweck: string; glaeubigerId?: string; betrag: Cent },
+  quelle: { gegenpartei: string; verwendungszweck: string },
 ): Promise<Merkmalsansicht> {
   const konf = await konfigurationLaden(deps.merkmalRepo);
   const befund = merkmalsbefund(quelle, konf.konfiguration);
@@ -220,9 +245,11 @@ export async function merkmalsansicht(
     deps.klassifikatorRepo.laden(),
   ]);
 
-  // Die Bestenliste deckt nur die häufigsten Merkmale ab; für ein seltenes Merkmal dieser
-  // Buchung gibt es dort keinen Eintrag — dann steht „kommt nur hier vor".
-  const statistik = new Map(material.vokabular.haeufigste.map((m) => [m.merkmal, m]));
+  // Vollständig, seit das Vokabular nicht mehr gekappt wird: ein Eintrag fehlt jetzt nur
+  // noch, wenn das Merkmal im LERNMATERIAL nicht vorkommt — etwa weil es allein in dieser
+  // Buchung steht und die keine Kategorie trägt. Vorher fehlte er auch dann, wenn das
+  // Merkmal bloss nicht zu den häufigsten gehörte, und beides sah gleich aus.
+  const statistik = new Map(material.vokabular.merkmale.map((m) => [m.merkmal, m]));
 
   return {
     verwendet: befund.merkmale.map((merkmal) => ({ merkmal, wert: statistik.get(merkmal) })),

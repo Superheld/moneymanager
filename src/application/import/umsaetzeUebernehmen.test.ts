@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { trainieren, type Kategorie, type Zahlungskonto } from "../../core";
+import { standardErkennung, trainieren, type Kategorie, type Zahlungskonto } from "../../core";
 import type {
   ImportLaufRepository,
   KategorieRepository,
@@ -87,7 +87,7 @@ describe("umsaetzeUebernehmen", () => {
         dateiname: "export.csv",
         zeitpunkt: "2026-06-21T10:00:00Z",
         rohUmsaetze: [
-          roh({ kontoIban: "DE111", kategorieHinweis: "Lebensmittel", nativeId: "n1" }),
+          roh({ kontoIban: "DE111", nativeId: "n1" }),
           roh({ kontoIban: "DE111", istUmbuchung: true, gegenpartei: "Eigen", nativeId: "n2" }),
         ],
         konten: [{ quelleKey: "DE111", neu: { bezeichnung: "Giro", typ: "Giro", iban: "DE111" } }],
@@ -100,12 +100,43 @@ describe("umsaetzeUebernehmen", () => {
     expect(umsaetze).toHaveLength(2);
     expect(umsaetze.every((u) => u.zahlungskontoId === konten[0].id)).toBe(true);
 
+    // Ohne Quelle in der Kette bleibt die Zeile offen und landet in der Review-Inbox.
     const normal = umsaetze.find((u) => u.nativeId === "n1")!;
-    expect(normal.vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "remapping" });
+    expect(normal.vorschlag).toBeUndefined();
     const umbuchung = umsaetze.find((u) => u.nativeId === "n2")!;
     expect(umbuchung.vorschlag).toEqual({ charakter: "Umschichtung", quelle: "umbuchung" });
 
     expect(laeufe[0]).toMatchObject({ quelle: "finanzguru", eingelesen: 2, neu: 2, duplikate: 0 });
+  });
+
+  it("nimmt die Zuordnung der fremden Kategorien aus der Import-Ansicht", async () => {
+    // **Die Naht, die das Sichtbarmachen erst wirksam macht.** Die Ansicht zeigt, was aus
+    // „Restaurants" wird, und lässt es ändern; hier muss diese Wahl ankommen. Sie greift
+    // über den ROHEN Namen der Quelle, nicht über die Übersetzung — die kann fehlen oder
+    // auf etwas zeigen, das es hier nicht gibt.
+    const { deps, umsaetze } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "finanzguru",
+        zeitpunkt: "2026-06-21T10:00:00Z",
+        rohUmsaetze: [
+          roh({ kontoIban: "DE111", nativeId: "n1", kategorieHinweis: " Restaurants " }),
+          roh({ kontoIban: "DE111", nativeId: "n2", kategorieHinweis: "Nichts davon" }),
+        ],
+        konten: [{ quelleKey: "DE111", neu: { bezeichnung: "Giro", typ: "Giro", iban: "DE111" } }],
+        fremdkategorien: { Restaurants: "k-le" },
+      },
+      deps,
+    );
+
+    // Getrimmt, sonst greift eine Zuordnung aus der Ansicht am Leerzeichen vorbei.
+    expect(umsaetze.find((u) => u.nativeId === "n1")!.vorschlag).toEqual({
+      kategorieId: "k-le",
+      charakter: "Aufwand",
+      quelle: "fremdkategorie",
+    });
+    // Was nicht zugeordnet wurde, bleibt offen — „nicht zuordnen" ist eine gültige Antwort.
+    expect(umsaetze.find((u) => u.nativeId === "n2")!.vorschlag).toBeUndefined();
   });
 
   it("dedupliziert gegen den Bestand beim zweiten Lauf (nichts doppelt gespeichert)", async () => {
@@ -142,7 +173,6 @@ describe("Kategorisierungs-Kette beim Import", () => {
   /** Ein Modell, das REWE kennt — ohne dass die Datei eine Kategorie mitliefert. */
   function mitModell(): Vorschlagskontext {
     return {
-      katalogNachName: new Map(),
       kategorieNachId: new Map([["k-le", { id: "k-le", name: "Lebensmittel", defaultCharakter: "Aufwand" as const }]]),
       modell: trainieren([
         { merkmale: ["emp=rewe markt", "vwz:einkauf", "vz:-"], kategorieId: "k-le" },
@@ -166,34 +196,42 @@ describe("Kategorisierungs-Kette beim Import", () => {
     expect(umsaetze[0].vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "ki" });
   });
 
-  it("ohne Kontext bleibt es beim alten Verhalten", async () => {
+  it("ohne Kontext bleibt die Zeile unkategorisiert", async () => {
     const { deps, umsaetze } = fakes();
     await umsaetzeUebernehmen(
       {
         quelle: "bank", zeitpunkt: "2026-08-17T10:00:00.000Z",
-        rohUmsaetze: [roh({ gegenpartei: "REWE Markt", kategorieHinweis: "Lebensmittel", kontoIban: "DE1" })],
+        rohUmsaetze: [roh({ gegenpartei: "REWE Markt", kontoIban: "DE1" })],
         konten: [{ quelleKey: quelleKeyFuer("DE1"), neu: { bezeichnung: "Giro", typ: "Giro" } }],
       },
       deps,
     );
 
-    expect(umsaetze[0].vorschlag?.quelle).toBe("remapping");
+    expect(umsaetze[0].vorschlag).toBeUndefined();
   });
 
   it("der Katalog kommt IMMER frisch aus dem Repository", async () => {
-    // Ein mitgereichter Kontext könnte einen älteren Kategorie-Stand tragen; das
-    // Remapping muss trotzdem gegen den aktuellen Katalog auflösen.
+    // Ein mitgereichter Kontext könnte einen älteren Kategorie-Stand tragen — hier einen
+    // LEEREN. Die Vertragsregel nennt nur eine Kategorie-Id; ihren Charakter kann nur der
+    // Katalog liefern. Löst sie auf, kam er frisch aus dem Repository.
     const { deps, umsaetze } = fakes();
     await umsaetzeUebernehmen(
       {
         quelle: "bank", zeitpunkt: "2026-08-17T10:00:00.000Z",
-        rohUmsaetze: [roh({ gegenpartei: "Irgendwer", kategorieHinweis: "Lebensmittel", kontoIban: "DE1" })],
+        rohUmsaetze: [roh({ gegenpartei: "Irgendwer", kontoIban: "DE1" })],
         konten: [{ quelleKey: quelleKeyFuer("DE1"), neu: { bezeichnung: "Giro", typ: "Giro" } }],
       },
-      { ...deps, kategorisierung: { katalogNachName: new Map(), kategorieNachId: new Map() } },
+      {
+        ...deps,
+        kategorisierung: {
+          kategorieNachId: new Map(),
+          erkennungen: [standardErkennung("v1", "Irgendwer", 655)],
+          vertragsKategorie: new Map([["v1", "k-le"]]),
+        },
+      },
     );
 
-    expect(umsaetze[0].vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "remapping" });
+    expect(umsaetze[0].vorschlag).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "regel" });
   });
 });
 

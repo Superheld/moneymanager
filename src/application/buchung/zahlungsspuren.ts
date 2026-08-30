@@ -1,27 +1,30 @@
-// Zahlungsspuren — der gebuchte Bestand in der Form, in der der Kern über Verträge
-// nachdenkt (`core/vertragErkennung#Zahlungsspur`).
+// Zahlungsspuren — der gebuchte Bestand in der Form, in der Vertragserkennung und
+// Kategorisierung über ihn nachdenken (`core/vertragErkennung#Zahlungsspur`).
 //
-// Warum eine eigene Stelle: Empfänger und Gläubiger-ID stehen am `Umsatz`
-// (Import-Kontext), Betrag und Datum an der `IstBuchung` — verbunden über
-// `umsatz.istbuchungId`. Dieses Zusammenführen brauchen inzwischen zwei Wege (die
-// Vorschläge und der Zuordnungs-Abgleich), und es zweimal zu schreiben hieße, zwei
-// Antworten auf dieselbe Frage zu haben.
+// Warum es diese Stelle gibt: Empfänger, Verwendungszweck und Gläubiger-ID stehen am
+// `Umsatz` (Import-Kontext), Betrag und Datum an der `IstBuchung` — verbunden über
+// `umsatz.istbuchungId`. Dieses Zusammenführen brauchen inzwischen mehrere Wege, und es
+// mehrfach zu schreiben hieße, mehrere Antworten auf dieselbe Frage zu haben. Genau das
+// war bis 2026-08-29 der Fall: `budgets/budgetvorschlaege` trug eine zweite, ÄRMERE
+// Kopie desselben Joins (ohne Verwendungszweck, Herkunft, Aufteilung und Konto).
+//
+// **Laden und Zusammenführen sind getrennt**, und daran hing die Auflösung dieser
+// Dublette: wer die Buchungen ohnehin schon geladen hat, ruft `spurenAus` auf und lädt
+// sie nicht ein zweites Mal. Nur wer nichts hat, nimmt `zahlungsspuren`. Ohne die
+// Trennung hätte der zweite Weg entweder doppelt geladen oder seinen eigenen Join
+// behalten — und der erste Preis wird gezahlt, der zweite bleibt.
 
-import { istGeteilt, type Zahlungsspur } from "../../core";
+import { istGeteilt, type IstBuchung, type Zahlungsspur } from "../../core";
+import type { Umsatz } from "../import/umsatz";
+import { belegZuBuchung } from "./belegZuBuchung";
 import type { LedgerPort, UmsatzRepository } from "../ports";
 
-export async function zahlungsspuren(
-  ledger: LedgerPort,
-  umsatzRepo: UmsatzRepository,
-): Promise<Zahlungsspur[]> {
-  const [buchungen, umsaetze] = await Promise.all([ledger.alle(), umsatzRepo.alle()]);
-
-  // Ein Umsatz je Buchung; bei mehreren gewinnt der erste — Empfänger und Gläubiger-ID
-  // sind bei allen dieselben, sie stammen aus derselben Quellzeile.
-  const umsatzZuBuchung = new Map<string, (typeof umsaetze)[number]>();
-  for (const u of umsaetze) {
-    if (u.istbuchungId && !umsatzZuBuchung.has(u.istbuchungId)) umsatzZuBuchung.set(u.istbuchungId, u);
-  }
+/** Die Spuren aus bereits geladenen Buchungen und Umsätzen — rein, kein IO. */
+export function spurenAus(
+  buchungen: readonly IstBuchung[],
+  umsaetze: readonly Umsatz[],
+): Zahlungsspur[] {
+  const umsatzZuBuchung = belegZuBuchung(umsaetze);
 
   return buchungen.map((b) => {
     const u = umsatzZuBuchung.get(b.id);
@@ -39,4 +42,13 @@ export async function zahlungsspuren(
       charakter: b.charakter,
     };
   });
+}
+
+/** Dieselben Spuren, aber der Weg lädt sich seine Zutaten selbst. */
+export async function zahlungsspuren(
+  ledger: LedgerPort,
+  umsatzRepo: UmsatzRepository,
+): Promise<Zahlungsspur[]> {
+  const [buchungen, umsaetze] = await Promise.all([ledger.alle(), umsatzRepo.alle()]);
+  return spurenAus(buchungen, umsaetze);
 }

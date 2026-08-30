@@ -17,7 +17,7 @@
 
 use serde::Deserialize;
 use serde_json::Value as JsonValue;
-use sqlx::{Executor, Sqlite, Transaction};
+use sqlx::{AssertSqlSafe, Executor, Sqlite, Transaction};
 use tauri::State;
 use crate::datenbank::Datenbank;
 
@@ -35,9 +35,9 @@ pub struct Anweisung {
 /// Fliesskomma unnötig — und er ist genau die Sorte Detail, die irgendwann einen Cent
 /// verschiebt, ohne dass jemand die Stelle wiederfindet.
 fn binden<'q>(
-    mut query: sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments<'q>>,
+    mut query: sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments>,
     werte: &'q [JsonValue],
-) -> sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments<'q>> {
+) -> sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments> {
     for wert in werte {
         query = match wert {
             JsonValue::Null => query.bind(None::<String>),
@@ -63,7 +63,7 @@ async fn ausfuehren(
 ) -> Result<u64, sqlx::Error> {
     let mut betroffen = 0u64;
     for a in anweisungen {
-        let query = binden(sqlx::query(&a.sql), &a.werte);
+        let query = binden(sqlx::query(AssertSqlSafe(a.sql.as_str())), &a.werte);
         betroffen += tx.execute(query).await?.rows_affected();
     }
     Ok(betroffen)
@@ -138,7 +138,7 @@ pub async fn schema_umbau(
     let ergebnis = async {
         let mut betroffen = 0u64;
         for a in &anweisungen {
-            let query = binden(sqlx::query(&a.sql), &a.werte);
+            let query = binden(sqlx::query(AssertSqlSafe(a.sql.as_str())), &a.werte);
             betroffen += conn.execute(query).await?.rows_affected();
         }
         Ok::<_, sqlx::Error>(betroffen)

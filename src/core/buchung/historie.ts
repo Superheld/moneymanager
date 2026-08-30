@@ -234,12 +234,34 @@ export function nachHauptgruppe(
 
 /**
  * Interne Umbuchung (Geld zwischen eigenen Konten) — gehört NICHT in eine Ausgaben-/
- * Einnahmen-Auswertung. Erkennung: verknüpftes Transfer-Bein (transferId) ODER
- * Umschichtung ohne Kategorie (so importieren wir Umbuchungen). Gesparte „Umschichtung MIT
- * Kategorie" (z. B. Sparen & Anlegen) bleibt erhalten.
+ * Einnahmen-Auswertung.
+ *
+ * **Erkennung ist allein die `transferId`**, also ein verknüpftes Gegenbein. Das ist
+ * keine technische Abkürzung, sondern die Fachlichkeit: eine Umbuchung ohne Gegenbuchung
+ * gibt es nicht. Liegt das Gegenkonto nicht im Bestand, hat das Geld den erfassten
+ * Bereich verlassen — und das ist ein Abfluss, keine Verschiebung.
+ *
+ * Bis 2026-08-29 gab es einen zweiten Weg: „Umschichtung ohne Kategorie". Er fing
+ * einseitige Umschichtungen, die der Import damals noch erzeugte. Beides ist weg — der
+ * Import erzeugt sie nicht mehr (`application/import/umsatzVerbuchen`, Schritt 2), und
+ * Migration 63 hat die vorhandenen auf ihre Richtung umgestellt.
+ *
+ * Was der zweite Weg nebenbei kostete: er unterschied „ungepaart" von „gewollt" allein an
+ * der Kategorie. Damit war jede Umschichtung, der jemand eine Kategorie gab, plötzlich
+ * eine Ausgabe — und jede, der er sie wegnahm, verschwand aus der Auswertung. Eine
+ * Zuordnung, die über Sichtbarkeit entscheidet, ist zwei Dinge zugleich.
+ *
+ * Eine „Umschichtung MIT Kategorie" (Sparen & Anlegen) fällt weiterhin nur dann heraus,
+ * wenn sie ein Gegenbein hat — sonst ist sie eine Zahlung wie jede andere.
+ *
+ * **Was das NICHT leistet, und das ist die offene Stelle:** ob eine Umbuchung intern ist,
+ * hängt vom betrachteten Kontokreis ab. Innerhalb einer Kontogruppe kann dieselbe Zahlung
+ * ein Transfer sein und aus Sicht der Gruppe ein Abfluss. Diese Funktion kennt den Kreis
+ * nicht — sie beantwortet nur „ist es ein Transfer zwischen zwei erfassten Konten". Wer
+ * gruppenweise auswertet, muss zusätzlich prüfen, ob BEIDE Beine im Kreis liegen.
  */
 export function istInterneUmbuchung(b: IstBuchung): boolean {
-  return b.transferId != null || (b.charakter === "Umschichtung" && !b.kategorieId);
+  return b.transferId != null;
 }
 
 /**

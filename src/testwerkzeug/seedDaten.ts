@@ -17,13 +17,23 @@
 //
 // Diese Datei ist Werkzeug und aus der Coverage ausgenommen.
 
+import { standardkategorienFlach } from "../application/kategorien/standardkategorien";
+
 /** Was der Seed von einer Datenbank braucht — bewusst weniger als sql.js bietet. */
 export interface SeedDb {
   run(sql: string, werte?: (string | number | null)[]): unknown;
 }
 
-/** Wie viele Monate zurueck der Spielstand reicht. */
-export const MONATE = 8;
+/**
+ * Wie viele Monate zurueck der Spielstand reicht.
+ *
+ * Achtzehn und nicht mehr acht, seit die Alltagszahlungen Belege tragen: erst damit gibt
+ * es genug Beispiele, um ein Modell zu trainieren UND es an zurueckgehaltenen Zeilen zu
+ * MESSEN (`MESSBAR_AB`). Mit acht Monaten lag der Bestand knapp ueber der Schwelle, und
+ * eine Trefferquote aus einer Handvoll Pruefzeilen sagt mehr ueber den Zufall der
+ * Aufteilung als ueber das Modell.
+ */
+export const MONATE = 18;
 
 /** Gesaeter Zufall (mulberry32) — wiederholbar, siehe Kopf. */
 function wuerfel(saat: number): () => number {
@@ -77,12 +87,27 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   const setzen = (sql: string, werte?: (string | number | null)[]) => db.run(sql, werte);
 
   // Sektorneutrale Fantasienamen: keiner laesst auf seine Kategorie schliessen.
+  //
+  // **Zwei Bauteile je Name, und beide haben eine Aufgabe.** Der Nachname ist einmalig und
+  // damit ein SCHARFES Merkmal — er entscheidet seine Kategorie praktisch allein. Der
+  // Zusatz („Sued", „Filiale", „Handel") kommt bewusst in mehreren Bereichen vor und
+  // STREUT: er trennt nichts, sieht aber aus wie ein brauchbares Wort.
+  //
+  // Ohne diese zweite Sorte zeigt der Trainingsbereich nichts. Trennschaerfe und
+  // Trennkraft unterscheiden sich erst, wo es beides gibt — ein Spielstand, in dem jedes
+  // Wort seine Kategorie eindeutig bestimmt, laesst jede Kennzahl gleich gut aussehen und
+  // beantwortet damit keine einzige Frage, fuer die die Zahlen da sind.
+  //
+  // Und mehrwortig muessen sie sein, weil `merkmalsbefund` bei einem EINwortigen Namen gar
+  // kein `emp:`-Token anlegt (es waere eine Kopie des ganzen Namens). Der Spielstand
+  // enthielt bis 2026-08-29 ausschliesslich einwortige — die halbe Merkmalsquelle war
+  // darin also nie zu sehen.
   const GEGENPARTEIEN = {
-    lebensmittel: ["Kesselmann", "Aukamp", "Rinsche", "Belvo"],
-    freizeit: ["Trentmoor", "Oemke", "Sindler"],
-    mobilitaet: ["Varnhold", "Petrell"],
-    gesundheit: ["Lauterbek", "Norhast"],
-    anschaffung: ["Dessloch", "Weimbrand"],
+    lebensmittel: ["Kesselmann Sued", "Aukamp Filiale", "Rinsche Markt", "Belvo Zentrum", "Talmer Markt"],
+    freizeit: ["Trentmoor Studio", "Oemke Zentrum", "Sindler Handel", "Volkart Buehne"],
+    mobilitaet: ["Varnhold Station", "Petrell Filiale", "Nordwig Verkehr"],
+    gesundheit: ["Lauterbek Praxis", "Norhast Sued", "Ehlbeck Handel"],
+    anschaffung: ["Dessloch Handel", "Weimbrand Versand", "Rautgund Sued"],
   };
 
   /**
@@ -103,6 +128,26 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   };
 
   /**
+   * Was eine Bank sonst noch in den Verwendungszweck schreibt.
+   *
+   * Ohne diesen Anteil ist der Spielstand zu sauber, um die Filter zu zeigen: die
+   * Stoppwortliste haette nichts zu tun, die Ziffernregel nichts zu greifen, und die
+   * abgeschnittenen Randziffern — der Fall, an dem das Zuruecknehmen eines Ausschlusses
+   * einmal ins Leere lief — kaemen ueberhaupt nicht vor.
+   *
+   * `Bankkarte2026` ist genau dieser Fall: das Wort traegt eine angeklebte Jahreszahl, das
+   * Token heisst `bankkarte`, und in der Liste stehen beide Formen nebeneinander.
+   */
+  const BANKTEXTE = [
+    "",
+    "Kartenzahlung Bankkarte2026",
+    "SEPA Basislastschrift Mandat",
+    "Referenz 88213 Kartenzahlung",
+    "Bankkarte2026",
+    "Beleg 4711",
+  ];
+
+  /**
    * Eine Bezeichnung fuer eine Alltagsbuchung — ERZEUGT, nicht abgeschrieben.
    *
    * Bis 2026-08-25 schrieb der Spielstand ueberhaupt keine `notiz`, und der Auszug zeigte
@@ -114,8 +159,13 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
    * denselben Bestand — ein Screenshot von gestern zeigt dieselben Zeilen wie einer von
    * heute, Bezeichnungen eingeschlossen.
    */
-  const bezeichnung = (bereich: keyof typeof GEGENPARTEIEN): string =>
-    `${einesVon(GEGENPARTEIEN[bereich])} ${einesVon(ANLAESSE[bereich])}`;
+  const bezeichnung = (bereich: keyof typeof GEGENPARTEIEN): { partei: string; zweck: string } => {
+    const banktext = einesVon(BANKTEXTE);
+    return {
+      partei: einesVon(GEGENPARTEIEN[bereich]),
+      zweck: `${einesVon(ANLAESSE[bereich])}${banktext ? ` ${banktext}` : ""}`,
+    };
+  };
 
   // ------------------------------------------------------------ Stammdaten
 
@@ -144,30 +194,38 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     );
   }
 
-  // Der Baum: Oberkategorie, darunter das Feine. `default_charakter` entscheidet, wohin
-  // eine Buchung ohne eigene Angabe faellt.
-  const kategorien = [
-    { id: "kat-wohnen", name: "Wohnen", eltern: null, charakter: "Aufwand" },
-    { id: "kat-miete", name: "Miete", eltern: "kat-wohnen", charakter: "Aufwand" },
-    { id: "kat-energie", name: "Energie", eltern: "kat-wohnen", charakter: "Aufwand" },
-    { id: "kat-internet", name: "Internet und Telefon", eltern: "kat-wohnen", charakter: "Aufwand" },
-    { id: "kat-lebensmittel", name: "Lebensmittel", eltern: null, charakter: "Aufwand" },
-    { id: "kat-mobilitaet", name: "Mobilitaet", eltern: null, charakter: "Aufwand" },
-    { id: "kat-versicherung", name: "Versicherungen", eltern: null, charakter: "Aufwand" },
-    { id: "kat-gesundheit", name: "Gesundheit", eltern: null, charakter: "Aufwand" },
-    { id: "kat-freizeit", name: "Freizeit", eltern: null, charakter: "Aufwand" },
-    { id: "kat-anschaffung", name: "Anschaffungen", eltern: null, charakter: "Aufwand" },
-    { id: "kat-steuern", name: "Steuern und Abgaben", eltern: null, charakter: "Aufwand" },
-    { id: "kat-gehalt", name: "Gehalt", eltern: null, charakter: "Ertrag" },
-    { id: "kat-sonstige-ertrag", name: "Sonstige Einnahmen", eltern: null, charakter: "Ertrag" },
-    { id: "kat-uebertrag", name: "Uebertrag", eltern: null, charakter: "Umschichtung" },
+  // Zwei Gruppen, und die zweite ist der Fall, den eine feste Klasse nicht abbilden
+  // kann: dasselbe Konto liegt in beiden. Genau dafuer gibt es Gruppen NEBEN der Klasse.
+  const gruppen = [
+    { id: "gruppe-alltag", bezeichnung: "Lebenshaltung", konten: ["konto-giro", "konto-bar"] },
+    { id: "gruppe-urlaub", bezeichnung: "Urlaubskasse", konten: ["konto-bar", "konto-tagesgeld"] },
   ];
-  for (const k of kategorien) {
+  for (const g of gruppen) {
+    setzen("INSERT INTO kontogruppe (id, bezeichnung) VALUES (?, ?)", [g.id, g.bezeichnung]);
+    for (const kontoId of g.konten) {
+      setzen("INSERT INTO kontogruppe_konto (gruppe_id, konto_id) VALUES (?, ?)", [g.id, kontoId]);
+    }
+  }
+
+  // **Die Kategorien kommen aus der VORLAGE, nicht aus einer eigenen Liste.**
+  //
+  // Bis 2026-08-30 standen hier vierzehn selbst gepflegte Eintraege, und sie hiessen
+  // anders als die Vorlage dieselben Dinge nennt: `Mobilitaet` ohne Umlaut, `Miete` statt
+  // `Miete & Nebenkosten`, `Energie` statt `Strom & Gas`, `Freizeit` statt `Freizeit & Hobby`.
+  // `standardkategorienAnlegen` gleicht ueber den NAMEN ab — sieben der vierzehn fanden
+  // keinen Partner, und wer nach einem `npm run seed` in der App auf
+  // „Standardkategorien laden" drueckte, bekam sie ein zweites Mal. Zwei Listen fuer
+  // dieselbe Sache driften auseinander, und diese beiden haben es getan.
+  //
+  // Jetzt gibt es nur noch eine Liste. Der Spielstand sieht damit aus wie ein frisch
+  // eingerichteter Bestand statt wie ein Sonderfall, und die Vorlage laeuft bei jedem
+  // `npm test` durch `seed.test.ts` mit.
+  for (const k of standardkategorienFlach()) {
     setzen("INSERT INTO kategorie (id, name, eltern_id, default_charakter) VALUES (?, ?, ?, ?)", [
       k.id,
       k.name,
-      k.eltern,
-      k.charakter,
+      k.elternId ?? null,
+      k.defaultCharakter,
     ]);
   }
 
@@ -188,13 +246,13 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     },
     {
       id: "budget-freizeit",
-      kategorie: "kat-freizeit",
+      kategorie: "kat-freizeit-hobby",
       art: "monatlich",
       betraege: [{ ab: monat(-MONATE), betrag: 18000 }],
     },
     {
       id: "budget-anschaffung",
-      kategorie: "kat-anschaffung",
+      kategorie: "kat-anschaffungen",
       art: "aufbauend",
       betraege: [{ ab: monat(-MONATE), betrag: 15000 }],
     },
@@ -219,8 +277,8 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // ------------------------------------------------------------ Vertraege und Inventar
 
   const vertraege = [
-    { id: "vertrag-internet", anbieter: "Halvern", kategorie: "kat-internet", betrag: -4500 },
-    { id: "vertrag-versicherung", anbieter: "Mordhorst", kategorie: "kat-versicherung", betrag: -8900 },
+    { id: "vertrag-internet", anbieter: "Halvern", kategorie: "kat-internet-telefon", betrag: -4500 },
+    { id: "vertrag-versicherung", anbieter: "Mordhorst", kategorie: "kat-versicherungen", betrag: -8900 },
   ];
   for (const v of vertraege) {
     setzen(
@@ -243,7 +301,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   for (const i of inventar) {
     setzen(
       "INSERT INTO inventargegenstand (id, bezeichnung, wiederbeschaffung, nutzungsdauer_monate, anschaffung, kategorie_id, konto_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [i.id, i.bezeichnung, i.wert, i.monate, tagIn(-MONATE - 12, 10), "kat-anschaffung", "konto-tagesgeld"],
+      [i.id, i.bezeichnung, i.wert, i.monate, tagIn(-MONATE - 12, 10), "kat-anschaffungen", "konto-tagesgeld"],
     );
   }
 
@@ -354,7 +412,20 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   }[] = [];
 
   /** Die letzten drei Monate kommen aus dem Abruf, alles davor ist Handarbeit. */
-  const AUS_ABRUF_AB = 2;
+  /**
+   * Ab welchem Monatsversatz die Zeilen aus dem Abruf stammen — und damit einen BELEG
+   * haben.
+   *
+   * Vorher stand hier 2, also nur die drei juengsten Monate, und das machte den
+   * Spielstand fuer die Kategorie-Erkennung unbrauchbar: Empfaenger und Verwendungszweck
+   * stehen an `umsatz_roh`, nicht an der Buchung. Alles ohne Beleg faellt im
+   * Trainingsmaterial unter „ohne Text" — es blieben eine Handvoll Zeilen mit immer
+   * denselben fuenf Empfaengern.
+   *
+   * Die aeltesten zwei Monate bleiben absichtlich von Hand erfasst: der Fall gehoert in
+   * den Bestand, und er ist der Grund, warum „ohne Text" ueberhaupt gezaehlt wird.
+   */
+  const AUS_ABRUF_AB = MONATE - 2;
 
   for (let m = MONATE; m >= 0; m--) {
     const gesynct = m <= AUS_ABRUF_AB;
@@ -389,48 +460,74 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
 
     // Wiederkehrendes — das Geruest, an dem der Monatsverlauf haengt
     fest(28, 315000, "konto-giro", "kat-gehalt", "Ertrag", "Auszahlung", "Bezuege");
-    fest(1, -98000, "konto-giro", "kat-miete", "Aufwand", "Steenbeck", "Monatsmiete");
-    fest(5, -4500, "konto-giro", "kat-internet", "Aufwand", "Halvern", "Grundgebuehr", "vertrag-internet");
-    fest(15, -8900, "konto-giro", "kat-versicherung", "Aufwand", "Mordhorst", "Beitrag", "vertrag-versicherung");
+    fest(1, -98000, "konto-giro", "kat-miete-nebenkosten", "Aufwand", "Steenbeck", "Monatsmiete");
+    fest(5, -4500, "konto-giro", "kat-internet-telefon", "Aufwand", "Halvern", "Grundgebuehr", "vertrag-internet");
+    fest(15, -8900, "konto-giro", "kat-versicherungen", "Aufwand", "Mordhorst", "Beitrag", "vertrag-versicherung");
     fest(8, -zahlZwischen(6000, 11000), "konto-giro", "kat-energie", "Aufwand", "Wendlandt", "Abschlag");
     // Eine Umschichtung hat ZWEI Seiten — sonst zeigt der Verlauf einen Stand, den es nie gab.
-    buchung(tagIn(-m, 2), -30000, "konto-giro", "kat-uebertrag", "Umschichtung", {
+    buchung(tagIn(-m, 2), -30000, "konto-giro", "kat-sparen-anlegen", "Umschichtung", {
       notiz: "Uebertrag zur Ruecklage",
     });
-    buchung(tagIn(-m, 2), 30000, "konto-tagesgeld", "kat-uebertrag", "Umschichtung", {
+    buchung(tagIn(-m, 2), 30000, "konto-tagesgeld", "kat-sparen-anlegen", "Umschichtung", {
       notiz: "Uebertrag vom Girokonto",
     });
 
+    /**
+     * Eine Alltagszahlung — MIT Beleg, sobald der Monat aus dem Abruf stammt.
+     *
+     * Der Unterschied zu `buchung()` ist genau der: Empfaenger und Verwendungszweck
+     * landen ueber `ausSync` in `umsatz_roh`. Vorher trugen diese Zeilen nur eine
+     * `notiz`, und `spurenAus` liest die nicht — sie waren im Trainingsmaterial
+     * unsichtbar, obwohl sie die grosse Mehrheit des Bestands ausmachen.
+     */
+    const alltag = (
+      bereich: keyof typeof GEGENPARTEIEN,
+      tag: number,
+      betrag: number,
+      kontoId: string,
+      kategorieId: string,
+    ) => {
+      const { partei, zweck } = bezeichnung(bereich);
+      const datum = tagIn(-m, tag);
+      const hash = `hash-alltag-${m}-${ausSync.length}`;
+      const id = buchung(datum, betrag, kontoId, kategorieId, "Aufwand", {
+        notiz: `${partei} ${zweck}`,
+        quelle: gesynct ? "import" : "manuell",
+        rohHash: gesynct ? hash : undefined,
+        kategorieHerkunft: gesynct ? "automatisch" : "manuell",
+      });
+      if (gesynct) {
+        ausSync.push({ buchungId: id, hash, datum, betrag, partei, zweck, kontoId, monatsversatz: m });
+      }
+    };
+
     // Alltag — streut, damit die Budgets mal passen und mal nicht
     for (let i = 0; i < zahlZwischen(6, 10); i++) {
-      buchung(
-        tagIn(-m, zahlZwischen(2, 27)),
+      alltag(
+        "lebensmittel",
+        zahlZwischen(2, 27),
         -zahlZwischen(1800, 9500),
         einesVon(["konto-giro", "konto-bar", "konto-kk"]),
         "kat-lebensmittel",
-        "Aufwand",
-        { notiz: bezeichnung("lebensmittel") },
       );
     }
     for (let i = 0; i < zahlZwischen(1, 4); i++) {
-      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(1200, 7800), "konto-kk", "kat-freizeit", "Aufwand", {
-        notiz: bezeichnung("freizeit"),
-      });
+      alltag("freizeit", zahlZwischen(3, 26), -zahlZwischen(1200, 7800), "konto-kk", "kat-freizeit-hobby");
     }
     for (let i = 0; i < zahlZwischen(1, 3); i++) {
-      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(900, 5400), "konto-giro", "kat-mobilitaet", "Aufwand", {
-        notiz: bezeichnung("mobilitaet"),
-      });
+      alltag("mobilitaet", zahlZwischen(3, 26), -zahlZwischen(900, 5400), "konto-giro", "kat-mobilitaet");
     }
     if (zufall() < 0.45) {
-      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(2500, 18000), "konto-giro", "kat-gesundheit", "Aufwand", {
-        notiz: bezeichnung("gesundheit"),
-      });
+      alltag("gesundheit", zahlZwischen(5, 24), -zahlZwischen(2500, 18000), "konto-giro", "kat-gesundheit");
     }
     if (zufall() < 0.3) {
-      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(8000, 42000), "konto-tagesgeld", "kat-anschaffung", "Aufwand", {
-        notiz: bezeichnung("anschaffung"),
-      });
+      alltag("anschaffung", zahlZwischen(5, 24), -zahlZwischen(8000, 42000), "konto-tagesgeld", "kat-anschaffungen");
+    }
+    // Ein Anbieter, der in ZWEI Kategorien auftaucht — der Fall, an dem sich Trennschaerfe
+    // und Trennkraft ueberhaupt erst unterscheiden lassen. Ohne ihn traegt jedes Wort
+    // seine Kategorie eindeutig, und beide Kennzahlen saehen ueberall gleich gut aus.
+    if (zufall() < 0.5) {
+      alltag("lebensmittel", zahlZwischen(4, 25), -zahlZwischen(1500, 6000), "konto-kk", "kat-anschaffungen");
     }
   }
 
@@ -457,7 +554,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   );
   setzen(
     "INSERT INTO ist_buchung_aufteilung (id, istbuchung_id, kategorie_id, betrag, notiz) VALUES (?, ?, ?, ?, ?)",
-    ["teil-2", geteilt, "kat-anschaffung", -4500, null],
+    ["teil-2", geteilt, "kat-anschaffungen", -4500, null],
   );
 
   // Drei Buchungen, die noch angesehen werden muessen. `zu_pruefen` setzt die Durchsicht,
@@ -468,10 +565,10 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     "hash-pruef-1": buchung(tagIn(0, 3), -8790, "konto-giro", null, "Aufwand", {
       quelle: "import", rohHash: "hash-pruef-1", zuPruefen: true, kategorieHerkunft: "automatisch",
     }),
-    "hash-pruef-2": buchung(tagIn(0, 6), -16820, "konto-kk", "kat-anschaffung", "Aufwand", {
+    "hash-pruef-2": buchung(tagIn(0, 6), -16820, "konto-kk", "kat-anschaffungen", "Aufwand", {
       quelle: "import", rohHash: "hash-pruef-2", zuPruefen: true, kategorieHerkunft: "automatisch",
     }),
-    "hash-pruef-3": buchung(tagIn(-1, 24), 9900, "konto-giro", "kat-sonstige-ertrag", "Ertrag", {
+    "hash-pruef-3": buchung(tagIn(-1, 24), 9900, "konto-giro", "kat-sonstige-einnahmen", "Ertrag", {
       quelle: "import", rohHash: "hash-pruef-3", zuPruefen: true, kategorieHerkunft: "automatisch",
     }),
   };
@@ -480,7 +577,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // AUSDRUECKLICH zu keinem Vertrag gehoert. `vertrag_id` leer, Herkunft gesetzt — ohne
   // die Herkunft holte der naechste Abgleich sie zurueck, und die Handkorrektur waere
   // jedes Mal aufs Neue zu machen.
-  buchung(tagIn(-1, 9), -4500, "konto-giro", "kat-internet", "Aufwand", {
+  buchung(tagIn(-1, 9), -4500, "konto-giro", "kat-internet-telefon", "Aufwand", {
     notiz: "Einmalige Zusatzleistung",
     vertragId: null, vertragHerkunft: "manuell",
   });
@@ -490,30 +587,17 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // Zahlungsregeln tragen den Monatsausblick. Ohne sie zeigt die Uebersicht zwar Ist-Zahlen,
   // aber keine Vorschau — und der halbe Zweck des Bereichs bliebe unsichtbar.
   for (const r of [
-    { id: "regel-miete", bez: "Miete", betrag: -98000, rhythmus: "monatlich", tag: 1, kat: "kat-miete", charakter: "Aufwand", vertrag: null },
+    { id: "regel-miete", bez: "Miete", betrag: -98000, rhythmus: "monatlich", tag: 1, kat: "kat-miete-nebenkosten", charakter: "Aufwand", vertrag: null },
     { id: "regel-gehalt", bez: "Bezuege", betrag: 315000, rhythmus: "monatlich", tag: 28, kat: "kat-gehalt", charakter: "Ertrag", vertrag: null },
-    { id: "regel-internet", bez: "Internet", betrag: -4500, rhythmus: "monatlich", tag: 5, kat: "kat-internet", charakter: "Aufwand", vertrag: "vertrag-internet" },
-    { id: "regel-versicherung", bez: "Versicherung", betrag: -8900, rhythmus: "monatlich", tag: 15, kat: "kat-versicherung", charakter: "Aufwand", vertrag: "vertrag-versicherung" },
+    { id: "regel-internet", bez: "Internet", betrag: -4500, rhythmus: "monatlich", tag: 5, kat: "kat-internet-telefon", charakter: "Aufwand", vertrag: "vertrag-internet" },
+    { id: "regel-versicherung", bez: "Versicherung", betrag: -8900, rhythmus: "monatlich", tag: 15, kat: "kat-versicherungen", charakter: "Aufwand", vertrag: "vertrag-versicherung" },
     // Eine nicht-monatliche, damit die Projektionsarithmetik im Spielstand vorkommt.
-    { id: "regel-beitrag", bez: "Jahresbeitrag", betrag: -24000, rhythmus: "jaehrlich", tag: 20, kat: "kat-freizeit", charakter: "Aufwand", vertrag: null },
+    { id: "regel-beitrag", bez: "Jahresbeitrag", betrag: -24000, rhythmus: "jaehrlich", tag: 20, kat: "kat-freizeit-hobby", charakter: "Aufwand", vertrag: null },
   ]) {
     setzen(
       "INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id, vertrag_id) " +
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [r.id, r.bez, r.betrag, r.rhythmus, tagIn(-MONATE, r.tag), r.charakter, "konto-giro", r.kat, r.vertrag],
-    );
-  }
-
-  // Festlegungen: was jemand der Erkennung von Hand beigebracht hat. Sie schlagen jede
-  // Automatik, und der Trainingsbereich zeigt genau sie.
-  for (const f of [
-    { muster: "steenbeck", kat: "kat-miete" },
-    { muster: "wendlandt", kat: "kat-energie" },
-    { muster: "halvern", kat: "kat-internet" },
-  ]) {
-    setzen(
-      "INSERT INTO kategorie_festlegung (muster, kategorie_id, angelegt_am) VALUES (?, ?, ?)",
-      [f.muster, f.kat, JETZT],
     );
   }
 
@@ -544,6 +628,16 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // weiter unten — nicht aus einem doppelten Klick, sondern aus zwei Wegen zum selben Geld.
   const LAUF_FG = "lauf-fg-1";
   const LAUF_SYNC = ["lauf-fints-0", "lauf-fints-1", "lauf-fints-2"]; // Index = Monatsversatz
+  /**
+   * Der ERSTE Abruf, der die Historie auf einmal geholt hat — alles aelter als die drei
+   * monatlichen Laeufe haengt daran.
+   *
+   * Vorher fiel das ueber `?? LAUF_SYNC[0]` auf den JUENGSTEN Lauf zurueck: eine Zeile von
+   * vor einem Jahr stand dann in einem Abruf von diesem Monat. Das ist nicht bloss
+   * unsauber, es ist die Frage, die der Import-Verlauf beantworten soll — „was hat dieser
+   * Abruf gebracht" — mit einer falschen Antwort.
+   */
+  const LAUF_ERST = "lauf-fints-erst";
   const LAUF_KK = "lauf-kk-1";
 
   const laufAnlegen = (
@@ -571,6 +665,16 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       "zugang-giro",
     ),
   );
+  // Und der Erstabruf, datiert auf den Beginn der Bankanbindung.
+  laufAnlegen(
+    LAUF_ERST,
+    "fints",
+    new Date(stichtag.getFullYear(), stichtag.getMonth() - AUS_ABRUF_AB, 28).toISOString(),
+    null,
+    "konto-giro",
+    "camt",
+    "zugang-giro",
+  );
   // Die Kreditkarte liefert MT940 — dasselbe Haus, anderes Format. Wer `umsatzart` oder
   // `buchungsschluessel` auswertet, muss ueber `lauf_id` danach unterscheiden.
   laufAnlegen(LAUF_KK, "fints", JETZT, null, "konto-kk", "mt940", "zugang-giro");
@@ -583,15 +687,17 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     zweck: string; hash: string; status: string; istbuchungId?: string | null;
     vorschlagKategorie?: string | null; vorschlagCharakter?: string | null;
     vorschlagQuelle?: string | null; umsatzart?: string | null; zweckCode?: string | null;
+    /** Nur CAMT: wer die Zahlung wirklich bekommt, wenn ein Dienstleister dazwischensteht. */
+    endempfaenger?: string | null;
   }): string => {
     const id = `umsatz-${String(++umsatzNr).padStart(3, "0")}`;
     setzen(
-      "INSERT INTO umsatz_roh (id, lauf_id, buchungstag, valuta, betrag, waehrung, gegenpartei, gegenpartei_iban, verwendungszweck, roh_hash, umsatzart, zweck_code) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO umsatz_roh (id, lauf_id, buchungstag, valuta, betrag, waehrung, gegenpartei, gegenpartei_iban, verwendungszweck, roh_hash, umsatzart, zweck_code, endempfaenger) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         id, o.laufId, o.datum, o.datum, o.betrag, "EUR", o.partei,
         iban("99999904", 7000000 + umsatzNr), o.zweck, o.hash,
-        o.umsatzart ?? null, o.zweckCode ?? null,
+        o.umsatzart ?? null, o.zweckCode ?? null, o.endempfaenger ?? null,
       ],
     );
     setzen(
@@ -612,7 +718,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // stehen.
   for (const s of ausSync) {
     umsatzAnlegen({
-      laufId: LAUF_SYNC[s.monatsversatz] ?? LAUF_SYNC[0],
+      laufId: LAUF_SYNC[s.monatsversatz] ?? LAUF_ERST,
       kontoId: s.kontoId,
       datum: s.datum,
       betrag: s.betrag,
@@ -642,15 +748,70 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     });
   }
 
+  // ------------------------------------------------------------ Sonderfaelle
+  //
+  // Faelle, die sich nur an echten Daten zeigten und deren Fehlen im Spielstand jedes Mal
+  // bedeutete, dass man zum Pruefen an den echten Bestand musste. Genau das soll nicht
+  // noetig sein: was hier steht, kann jeder nachvollziehen, der das Repo klont.
+
+  // (1) Ein Umbuchungs-Bein OHNE Gegenstueck.
+  //
+  // Der Beleg ist als Umbuchung markiert, aber das Gegenkonto liegt nicht im Bestand —
+  // Geld auf ein Konto ausserhalb des Moneymanagers. Es wird deshalb NICHT als
+  // Umschichtung gebucht, sondern nach seiner Richtung (Abfluss -> Aufwand), und bleibt
+  // ohne Kategorie in der Nacharbeit.
+  //
+  // Bis 2026-08-29 entstand hier eine einseitige Umschichtung, die in kein Budget und in
+  // keine Ausgabe zaehlte: das Geld war weg und fehlte nirgends.
+  const halbeUmbuchung = buchung(tagIn(-1, 9), -25000, "konto-giro", null, "Aufwand", {
+    quelle: "import",
+    rohHash: "hash-halbe-umbuchung",
+    kategorieHerkunft: "automatisch",
+  });
+  umsatzAnlegen({
+    laufId: LAUF_SYNC[1] ?? LAUF_SYNC[0],
+    kontoId: "konto-giro",
+    datum: tagIn(-1, 9),
+    betrag: -25000,
+    partei: "Uebertrag Depotkonto",
+    zweck: "Uebertrag",
+    hash: "hash-halbe-umbuchung",
+    status: "verbucht",
+    istbuchungId: halbeUmbuchung,
+    umsatzart: "Uebertrag",
+  });
+
+  // (2) Ein Zahlungsdienstleister zwischen Konto und Haendler.
+  //
+  // `gegenpartei` nennt den Dienstleister, `endempfaenger` den Haendler dahinter — zwei
+  // verschiedene Angaben, und die zweite liefert nur CAMT. Fuer die Kategorie-Erkennung
+  // ist der Unterschied erheblich: der Dienstleister ist bei JEDEM Haendler derselbe und
+  // taugt deshalb als Merkmal nichts.
+  //
+  // Der Spielstand traegt das Feld, damit sichtbar ist, dass es importiert und (Stand
+  // heute) von niemandem ausgewertet wird.
+  const ueberDienstleister = buchung(tagIn(0, 11), -3990, "konto-giro", "kat-freizeit-hobby", "Aufwand", {
+    quelle: "import",
+    rohHash: "hash-dienstleister",
+    kategorieHerkunft: "automatisch",
+  });
+  umsatzAnlegen({
+    laufId: LAUF_SYNC[0],
+    kontoId: "konto-giro", datum: tagIn(0, 11), betrag: -3990,
+    partei: "Zahlungsdienst Norderwiek", zweck: "Bestellung 4471", hash: "hash-dienstleister",
+    status: "verbucht", istbuchungId: ueberDienstleister,
+    endempfaenger: "Bierbaum Versand", zweckCode: "OTHR",
+  });
+
   // ------------------------------------------------------------ Posteingang
 
   // Offene Zeilen mit VERSCHIEDEN begruendeten Vorschlaegen. Die Quelle des Vorschlags ist
-  // in der Durchsicht sichtbar, und sie soll dort nicht immer dieselbe sein: eine
-  // Festlegung wiegt anders als ein Modelltreffer.
+  // in der Durchsicht sichtbar, und sie soll dort nicht immer dieselbe sein: ein Treffer
+  // ueber die Erkennungsregel eines Vertrags wiegt anders als einer des Modells.
   const posteingang = [
     { partei: einesVon(GEGENPARTEIEN.lebensmittel), betrag: -4230, zweck: "Einkauf", kat: "kat-lebensmittel", quelle: "ki" },
-    { partei: einesVon(GEGENPARTEIEN.freizeit), betrag: -1990, zweck: "Monatsbeitrag", kat: "kat-freizeit", quelle: "ki" },
-    { partei: "Wendlandt", betrag: -7350, zweck: "Abschlag", kat: "kat-energie", quelle: "festlegung" },
+    { partei: einesVon(GEGENPARTEIEN.freizeit), betrag: -1990, zweck: "Monatsbeitrag", kat: "kat-freizeit-hobby", quelle: "ki" },
+    { partei: "Wendlandt", betrag: -7350, zweck: "Abschlag", kat: "kat-energie", quelle: "regel" },
     { partei: einesVon(GEGENPARTEIEN.mobilitaet), betrag: -6750, zweck: "Fahrschein", kat: "kat-mobilitaet", quelle: "regel" },
     { partei: einesVon(GEGENPARTEIEN.gesundheit), betrag: -3120, zweck: "Rechnung", kat: "kat-gesundheit", quelle: "ki" },
     // Ohne Vorschlag: die Automatik hat sich nicht getraut, und das ist eine ehrliche

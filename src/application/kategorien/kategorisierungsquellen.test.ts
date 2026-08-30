@@ -3,7 +3,6 @@ import {
   standardErkennung,
   trainieren,
   type Kategorie,
-  type Kategoriefestlegung,
   type Vertrag,
   type Vertragserkennung,
 } from "../../core";
@@ -11,7 +10,6 @@ import { kategorisierungsquellen } from "./kategorisierungsquellen";
 import { vorschlagFuer } from "../import/vorschlag";
 import type {
   GespeicherterAusschluss,
-  KategoriefestlegungRepository,
   KategorieRepository,
   KlassifikatorRepository,
   MerkmalskonfigurationRepository,
@@ -26,16 +24,12 @@ const KATEGORIEN: Kategorie[] = [
 ];
 
 function repos(over: {
-  festlegungen?: Kategoriefestlegung[];
   vertraege?: Vertrag[];
   erkennungen?: Vertragserkennung[];
   modell?: Modellstand | null;
 } = {}) {
   const ausschluesse: GespeicherterAusschluss[] = [];
   const kategorieRepo = { alle: async () => KATEGORIEN, speichern: async () => {}, loeschen: async () => {} } as KategorieRepository;
-  const festlegungRepo = {
-    alle: async () => over.festlegungen ?? [], speichern: async () => {}, loeschen: async () => {},
-  } as KategoriefestlegungRepository;
   const vertragRepo = { alle: async () => over.vertraege ?? [], speichern: async () => {}, loeschen: async () => {} } as VertragRepository;
   const erkennungRepo = {
     alle: async () => over.erkennungen ?? [], speichern: async () => {}, loeschen: async () => {},
@@ -51,7 +45,7 @@ function repos(over: {
     ausschlussSetzen: async (a) => { ausschluesse.push(a); },
     ausschlussEntfernen: async () => {},
   };
-  return { kategorieRepo, festlegungRepo, vertragRepo, erkennungRepo, klassifikatorRepo, merkmalRepo };
+  return { kategorieRepo, vertragRepo, erkennungRepo, klassifikatorRepo, merkmalRepo };
 }
 
 const ZAHLUNG = {
@@ -62,9 +56,8 @@ const ZAHLUNG = {
 };
 
 describe("Quellen laden", () => {
-  it("liefert beide Kategorie-Indizes", async () => {
+  it("liefert den Kategorie-Index nach Id", async () => {
     const q = await kategorisierungsquellen(repos());
-    expect(q.katalogNachName.get("lebensmittel")?.id).toBe("k-le");
     expect(q.kategorieNachId.get("k-le")?.name).toBe("Lebensmittel");
   });
 
@@ -121,16 +114,7 @@ describe("Quellen laden", () => {
     expect(await r.merkmalRepo.ausschluesseLesen()).not.toHaveLength(0);
   });
 
-  it("nimmt die Festlegungen auf", async () => {
-    const q = await kategorisierungsquellen(
-      repos({ festlegungen: [{ muster: "kesselmann international", kategorieId: "k-abo", angelegtAm: "2026-08-17T10:00:00.000Z" }] }),
-    );
-    expect(vorschlagFuer(ZAHLUNG, q)?.quelle).toBe("festlegung");
-  });
 
-  it("lässt eine leere Festlegungsliste weg", async () => {
-    expect((await kategorisierungsquellen(repos())).festlegungen).toBeUndefined();
-  });
 
   it("kommt ohne die optionalen Repositories aus", async () => {
     // Der Zustand einer frisch aufgesetzten App: nur der Kategorie-Katalog steht.
@@ -138,6 +122,6 @@ describe("Quellen laden", () => {
     const q = await kategorisierungsquellen({ kategorieRepo });
     expect(q.erkennungen).toBeUndefined();
     expect(q.modell).toBeUndefined();
-    expect(q.katalogNachName.size).toBe(2);
+    expect(q.kategorieNachId.size).toBe(2);
   });
 });

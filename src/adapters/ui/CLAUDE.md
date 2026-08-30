@@ -23,11 +23,16 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 `kategorien/` wie in Kern und Anwendung. Die drei bereichsübergreifenden Tests (`screens`,
 `interaktion`, `formulare`) liegen in der Wurzel.
 
-## Geld anzeigen
+## Zahlen anzeigen
 
 **`useGeld()`** — nie eigenes `toFixed`, nie an der Locale-Schicht vorbei. Die Farbe kommt
 aus **`bausteine/geldFarbe.ts`**: Plus grün, Minus `--warn-deep`, Null neutral. Eine Farbregel
 für die ganze App, nicht eine je Screen.
+
+**`useProzent()`** für Anteile (0…1) — dieselbe Regel, derselbe Ort. Sie stand hier lange
+nur für Geld, und direkt daneben formatierten die Depot-Anteile mit `toFixed`: im Deutschen
+„12.5 %" statt „12,5 %". Eine Locale-Regel, die nur für einen Zahlentyp gilt, wird für die
+anderen umgangen. `stellen` ist die Obergrenze, eine glatte Zahl bleibt glatt.
 
 Zeilenaktionen sind Icons über `bausteine/IconButton.tsx` — ihr Text wandert in
 `title`/`aria-label`, statt zu verschwinden.
@@ -112,6 +117,29 @@ trug sie längst als eigenen Inline-Stil und sah als einzige richtig aus.
 Die Regel dahinter ist dieselbe wie bei `Zeilenauswahl`: **die Grösse eines Bedienteils
 folgt dem, wo es steht, nicht dem, was es tut.**
 
+## Ein Knopf neben dem Feld, nicht darunter
+
+`bausteine/Feldzeile` legt ein Feld und den Knopf, der dazugehört, in eine Zeile. Das ist
+keine Kosmetik, sondern eine Aussage: **ein Knopf unter einem einzelnen Feld liest sich als
+Abschluss eines Formulars** — obwohl er nichts abschickt. Neben dem Feld liest er sich als
+das, was er ist: eine zweite Möglichkeit an derselben Stelle. „Wähl einen Vertrag ODER leg
+einen neuen an", „stell die Sperre ODER sperre sofort".
+
+**Die Regel für den Zweifelsfall:** steht über dem Knopf noch ein Feld, das er nicht meint,
+gehört er nach unten — dafür gibt es `.form-actions`. Meint er genau das eine Feld daneben,
+gehört er daneben.
+
+Zwei Dinge stecken in der Klasse, und beide sind der Grund, warum es sie überhaupt braucht:
+
+- **`align-items: flex-end`.** Ein `FormField` setzt die Beschriftung ÜBER das Feld. Mittig
+  ausgerichtet stünde der Knopf auf halber Höhe zwischen Label und Feld, also auf keiner
+  Linie mit irgendetwas.
+- **`min-width: 0` am Feld.** `.field` ist `width: 100%`. In einem Flex-Container heisst
+  das: es nimmt die ganze Zeile, und der Knopf bricht um. Genau das war im `VertragsBlock`
+  der Fall — dort stand `display: flex` längst, und trotzdem lag nichts nebeneinander. **Ein
+  Flex-Container allein reicht nicht, wenn das Kind auf seiner vollen Breite besteht**, und
+  von aussen sieht das aus, als sei das Layout gar nicht gesetzt.
+
 ## Aus einer aufgeklappten Liste in die Buchung
 
 Wo einzelne Buchungen stehen — unter einem Budget (Übersicht, Budget-Verlauf) oder unter
@@ -135,38 +163,33 @@ Zwei Dinge, die beim Einbauen zählen:
 - **Nur was eine Buchung IST.** Ein geplanter Posten ohne `istId` beschreibt, was fällig
   wird — ihn zu öffnen hiesse, einen Dialog auf etwas zu zeigen, das es nicht gibt.
 
-## Der Kontoauszug steht in drei Karten
+## Der Kontoauszug steht in zwei Karten
 
-Kopf, Gebuchtes und Geplantes — das Gebuchte links, das Geplante rechts, im goldenen
-Schnitt zugunsten der Buchungen (`.auszug-spalten` in `app.css`, wo auch steht, warum
-1,618 : 1 und nicht die Hälfte). Untereinander war die geplante Liste erst nach der ganzen
-Buchungstabelle erreichbar, also bei einem Konto mit Historie nach zwei Bildschirmhöhen;
-sie beantwortet aber die Frage „was kommt noch".
+Kopf und Gebuchtes, beide über die ganze Breite. Die zweite liegt NEBEN der ersten und
+nicht darin — keine Karte in einer Karte: die Klammer, die sie sonst umschlösse, stünde
+zweihundert Zeilen weiter oben und wäre im Code nicht zu sehen. Deshalb prüft
+`kartenschachtelung.test.tsx` diesen Fall mit.
 
-**Zwei Karten und nicht eine geteilte.** In einer Karte waren es zwei Tabellen unter einer
-Fläche, und die Überschriften mussten die Trennung allein tragen, die eine Karte von sich
-aus leistet. Sie liegen NEBEN der Kopf-Karte, nicht darin — die Klammer, die sie sonst
-umschlösse, steht zweihundert Zeilen weiter oben und ist im Code nicht zu sehen. Deshalb
-prüft `kartenschachtelung.test.tsx` diesen Fall inzwischen mit.
+**Das Geplante stand hier und steht jetzt in der Übersicht** (`uebersicht/VorschauKarte.tsx`).
+Der Auszug beantwortet „was ist passiert"; eine Liste über die Zukunft daneben beantwortet
+eine andere Frage im selben Bild. Und „was kommt noch auf mich zu" ist keine Frage EINES
+Kontos — wer vier führt, musste vier Auszüge öffnen und zusammenzählen.
 
-Der Stand von heute ist dabei die Unterzeile der Vorschau-Karte geworden und nicht mehr ein
-Trenner zwischen beiden Listen: er ist der Punkt, ab dem die Vorschau rechnet. Zwischen
-zwei Listen stehend beschriftete er beide und keine.
+**Mit ihr ist auch das Raster gegangen.** Die beiden Listen teilten sich den Platz im
+goldenen Schnitt zugunsten der Buchungen (1,618 : 1); als die Vorschau wegzog, blieb das
+Grid mit einer Spalte stehen, und die Buchungstabelle endete bei knapp zwei Dritteln der
+Breite — Platz, den nichts mehr beanspruchte. **Ein Raster überlebt die Karte nicht, die
+es begründet hat**, und ein einspaltiges Grid sieht im Code aus wie Absicht.
 
 **Der Screen ist so breit wie jeder andere** — und alle sind breiter geworden, siehe unten.
 Ein eigener Deckel für diesen einen Bereich war der erste Versuch und fiel sofort auf: eine
 Seite, die breiter aufzieht als alle Nachbarn, sieht nach einem Fehler aus und nicht nach
 einer Entscheidung.
 
-Die Vorschau spart trotzdem, wo es nichts kostet: sie zeigt ihr Datum **ohne Jahr**, weil
-sie höchstens 90 Tage nach vorn reicht und das Jahr dort nichts unterscheidet. Wer ihr eine
-Spalte hinzufügt, rechnet nicht am Deckel nach, sondern am Breakpoint — dort ist es eng,
-nicht bei 1280 px.
-
 ## Was im Konto steht, hat jemand belegt
 
-Die Vorschau neben dem Auszug ZEIGT, was kommt — sie bucht es nicht. Bis 2026-08-25 hing an
-jeder geplanten Zeile ein Kästchen „als bezahlt markieren", und ein Klick legte daraus eine
+Die Vorschau — heute in der Übersicht, damals neben dem Auszug — ZEIGT, was kommt; sie
+bucht es nicht. Bis 2026-08-25 hing an jeder geplanten Zeile ein Kästchen „als bezahlt markieren", und ein Klick legte daraus eine
 Ist-Buchung an (`quelle: "bezahlt-markiert"`). Damit stand im Konto eine Zahlung, die
 niemand belegt hatte: die Bank kannte sie nicht, ein Beleg existierte nicht, und beim
 nächsten Abruf kam die echte Zeile zusätzlich dazu.
@@ -175,10 +198,22 @@ nächsten Abruf kam die echte Zeile zusätzlich dazu.
 Eine Hochrechnung ist kein dritter. Der Use-Case dahinter ist entfernt, geprüft in
 `interaktion.test.tsx`.
 
-Zwei Reste stehen bewusst noch: `IstQuelle` kennt weiterhin `"bezahlt-markiert"` und
-`IstBuchung.planRef` gibt es noch — beides nur zum LESEN, damit ein Bestand mit solchen
-Zeilen sich nicht selbst widerspricht. Erzeugen kann sie nichts mehr; wer sie ganz abräumt,
-fasst dabei das Schema, den Monatsausblick (Status `bezahlt`) und die Projektion mit an.
+**Seit 2026-08-29 sind auch die Reste weg.** `IstQuelle` kannte weiterhin
+`"bezahlt-markiert"`, und `IstBuchung.planRef` gab es noch — beides nur zum Lesen, damit
+ein Bestand mit solchen Zeilen sich nicht selbst widerspricht. Solche Zeilen gab es nie:
+weder im Bestand noch in der Migrationsgeschichte trug eine Buchung den Verweis. Damit
+war der Grund für die Schonung entfallen, und die Reste kosteten mehr als sie trugen —
+allen voran eine Rangstufe im Monatsausblick, die als „eindeutig, schlägt alles"
+dokumentiert war und nie griff.
+
+Abgeräumt wurde genau das, was hier vorhergesagt stand: das Schema (Migration 62 nimmt
+`plan_quelle_id`, `plan_faelligkeit` und ihren Unique-Index), der Monatsausblick (Status
+`bezahlt` samt Pille) und die Projektion (`projiziereRegel` hatte einen Filter `bezahlt`,
+den nur das Kontoregister füllte — mit einer immer leeren Menge).
+
+**Der Typ `PlanRef` ist geblieben**, und der Unterschied ist der Punkt: er identifiziert
+weiterhin eine PROJIZIERTE Zeile im Kontoregister. Was fiel, ist allein die Ist-Seite —
+die Behauptung, eine Buchung könne einen Plan-Posten belegen.
 
 ## Die Seitenleiste klappt ein
 
@@ -252,6 +287,42 @@ gleichbehandelt, beantwortet eine davon falsch:
   gehört hier nicht hin, auch wenn sie zum selben Konto gehört.
 
 Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweite.
+
+## Die Analyse steht in zwei Blöcken
+
+Der obere beantwortet **„wie viel und wohin"** — Kennzahlen, Verlauf (Fluss · Saldo ·
+Tabelle), der **Blick nach vorn** (`AusblickKarte.tsx`) und die Aufschlüsselung nach
+Kategorien. Der untere (`BefundeBereich.tsx`) beantwortet **„und wie tragfähig ist das"**:
+fest gegen frei, Budget-Treue, Ausgaben ohne Budget und ohne Vertrag, Verträge Soll gegen
+Ist, Empfänger, Nutzung der Kategorien, Ausreißer.
+
+**Jeder Befund ist eine eigene Karte, kein Register.** Der erste Versuch legte sie als
+umschaltbare Lupen auf eine Fläche — kürzer, und genau deshalb falsch: was hinter einem
+Reiter liegt, sucht niemand, und ein Befund, den man erst aufklappen muss, ist keiner. Der
+Bereich wird dadurch lang; das ist der Preis, und er ist richtig herum bezahlt. Die
+Seitengrösse der Tabellen ist dafür kleiner (8 statt 25) — sieben Karten, von denen jede
+eine Bildschirmhöhe frisst, schieben einander aus dem Blick.
+
+Drei Dinge, die beim Anbauen zählen:
+
+- **Alle Befunde werden in EINEM Zug gerechnet** (`analyseBefunde`), aus derselben Basis
+  wie die Zahlen darüber. Eine Karte, die sich ihre Buchungen selbst holt, rechnet früher
+  oder später gegen eine andere Menge als ihre Nachbarin — genau der Fehler, gegen den es
+  `analyseLaden` schon gibt.
+- **Eine Ausgabe wird durch Negieren der Summe positiv, nie mit `Math.abs`.** Die Regel
+  steht im Kopf von `core/auswertung.ts`: `Math.abs` je Buchung macht aus „es kam Geld
+  zurück" ein „es wurde noch mehr ausgegeben". Wer eine Spalte ergänzt, übernimmt die
+  Regel mit.
+- **Der Blick nach vorn hängt NICHT am gewählten Zeitraum** — er steht fest bei sechs
+  Monaten zurück und sechs voraus. Eine Projektion wird nicht besser, wenn man sie über
+  zwei Jahre zieht; ihre späten Monate wären Behauptung statt Vorschau. Gezeichnet wird
+  EINE Linie, deren geplanter Teil gestrichelt ist (`SaldoVerlaufChart`, `abIndex`): es
+  ist derselbe Saldo, und zwei Linien behaupteten zwei Grössen.
+
+**Ein Screen-Test, der einen Kategorienamen sucht, muss ihn jetzt in seiner Karte
+suchen.** Derselbe Name steht in der Aufschlüsselung und in den Ranglisten darunter; eine
+Suche über das ganze Dokument findet mehrere Elemente und bricht ab. `screens.test.tsx`
+hat dafür `inAufschluesselung()`.
 
 ## Laden
 

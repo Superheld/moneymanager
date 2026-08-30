@@ -9,6 +9,8 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Card, FormField } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
+import { Feldzeile } from "../bausteine/Feldzeile";
+import { Passwortfeld } from "./Passwortfeld";
 import { MINDESTLAENGE } from "../../../application/zugang";
 import { ZEITSPERRE_STUFEN } from "../../../application/einstellungen";
 import {
@@ -23,6 +25,7 @@ export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) 
 
   const [alte, setAlte] = useState("");
   const [neue, setNeue] = useState("");
+  const [wiederholung, setWiederholung] = useState("");
   const [wechselMeldung, setWechselMeldung] = useState<string | null>(null);
 
   const [codePassphrase, setCodePassphrase] = useState("");
@@ -37,10 +40,21 @@ export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) 
 
   async function wechseln() {
     setWechselMeldung(null);
+    // **Vor dem Aufruf, nicht danach.** Ein Vertipper in der NEUEN Passphrase faellt sonst
+    // nirgends auf: der Wechsel gelingt, die Huelle traegt ab jetzt das Verschriebene, und
+    // gemerkt wird es beim naechsten Entsperren — dann ist der Bestand nur noch ueber den
+    // Wiederherstellungscode zu erreichen. Die Einrichtung im Sperrbildschirm prueft das
+    // seit jeher; hier fehlte es, und hier waere der Schaden groesser gewesen, weil beim
+    // Einrichten noch nichts drinsteht.
+    if (neue !== wiederholung) {
+      setWechselMeldung(t("zugang.stimmtNichtUeberein"));
+      return;
+    }
     const ergebnis = await zugangPassphraseWechseln(alte, neue);
     if (ergebnis.art === "fertig") {
       setAlte("");
       setNeue("");
+      setWiederholung("");
       setWechselMeldung(t("zugang.wechselFertig"));
     } else if (ergebnis.art === "alteFalsch") {
       setWechselMeldung(t("zugang.alteFalsch"));
@@ -74,47 +88,48 @@ export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) 
 
       <Card title={t("zugang.sperreTitel")}>
         <p className="muted">{t("zugang.sperreText")}</p>
-        <FormField label={t("zugang.sperreTitel")}>
-          <Auswahl
-            ariaLabel={t("zugang.sperreTitel")}
-            wert={String(minuten ?? "")}
-            aufAenderung={(v) => {
-              const m = Number(v);
-              setMinuten(m);
-              void zeitsperreSetzen(m);
-            }}
-            optionen={ZEITSPERRE_STUFEN.map((m) => ({
-              wert: String(m),
-              text: m === 0 ? t("zugang.sperreAus") : t("zugang.sperreMinuten", { minuten: m }),
-            }))}
-          />
-        </FormField>
-        {onSperren && <Button onClick={onSperren}>{t("zugang.jetztSperren")}</Button>}
+        {/* Die Stufe stellen und sofort sperren sind zwei Wege an derselben Stelle —
+            der Knopf schliesst hier nichts ab, er ist die zweite Moeglichkeit. Deshalb
+            daneben und nicht darunter. */}
+        <Feldzeile
+          feld={
+            <FormField label={t("zugang.sperreTitel")}>
+              <Auswahl
+                ariaLabel={t("zugang.sperreTitel")}
+                wert={String(minuten ?? "")}
+                aufAenderung={(v) => {
+                  const m = Number(v);
+                  setMinuten(m);
+                  void zeitsperreSetzen(m);
+                }}
+                optionen={ZEITSPERRE_STUFEN.map((m) => ({
+                  wert: String(m),
+                  text: m === 0 ? t("zugang.sperreAus") : t("zugang.sperreMinuten", { minuten: m }),
+                }))}
+              />
+            </FormField>
+          }
+          knopf={onSperren && <Button onClick={onSperren}>{t("zugang.jetztSperren")}</Button>}
+        />
       </Card>
 
       <Card title={t("zugang.wechselnTitel")}>
-        <FormField label={t("zugang.feldAltePassphrase")} required>
-          <input
-            className="field"
-            type="password"
-            value={alte}
-            onChange={(e) => setAlte(e.target.value)}
-            autoComplete="off"
-          />
-        </FormField>
-        <FormField
+        <Passwortfeld
+          label={t("zugang.feldAltePassphrase")}
+          wert={alte}
+          setzen={setAlte}
+        />
+        <Passwortfeld
           label={t("zugang.feldNeuePassphrase")}
           hint={t("zugang.hinweisLaenge", { mindestens: MINDESTLAENGE })}
-          required
-        >
-          <input
-            className="field"
-            type="password"
-            value={neue}
-            onChange={(e) => setNeue(e.target.value)}
-            autoComplete="off"
-          />
-        </FormField>
+          wert={neue}
+          setzen={setNeue}
+        />
+        <Passwortfeld
+          label={t("zugang.feldWiederholung")}
+          wert={wiederholung}
+          setzen={setWiederholung}
+        />
         {wechselMeldung && <p className="muted">{wechselMeldung}</p>}
         <Button variant="primary" onClick={() => void wechseln()}>
           {t("zugang.wechselnKnopf")}
@@ -127,15 +142,11 @@ export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) 
           <pre className="zugang-code">{code}</pre>
         ) : (
           <>
-            <FormField label={t("zugang.feldPassphrase")} required>
-              <input
-                className="field"
-                type="password"
-                value={codePassphrase}
-                onChange={(e) => setCodePassphrase(e.target.value)}
-                autoComplete="off"
-              />
-            </FormField>
+            <Passwortfeld
+              label={t("zugang.feldPassphrase")}
+              wert={codePassphrase}
+              setzen={setCodePassphrase}
+            />
             {codeMeldung && <p className="muted">{codeMeldung}</p>}
             <Button onClick={() => void zeigen()}>{t("zugang.codeAbrufenKnopf")}</Button>
           </>

@@ -15,7 +15,7 @@
 // `src/testwerkzeug/seedDaten.ts` — dort, wo `src/seed.test.ts` sie bei jedem `npm test`
 // gegen die aktuelle Migrationskette faehrt.
 
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
 
@@ -86,11 +86,54 @@ const verzeichnis = dirname(ziel);
 if (!existsSync(verzeichnis)) mkdirSync(verzeichnis, { recursive: true });
 writeFileSync(ziel, Buffer.from(db.export()));
 
+// Den ZUGANG mit abraeumen — sonst ist der frische Spielstand nicht zu oeffnen.
+//
+// Der Seed schreibt ueber sql.js, also im KLARTEXT; verschluesselt wird er erst, wenn die
+// App ihn beim naechsten Start vorfindet und durch die Einrichtung fuehrt. Genau das tut
+// sie aber nur, solange keine Schluesselhuelle danebenliegt: `zugang_stand` meldet
+// „eingerichtet", sobald es eine gibt, und dann verlangt die App eine Passphrase, packt
+// den ALTEN Datenschluessel aus und setzt ihn per PRAGMA auf eine Klartext-Datei. Die
+// Meldung lautet dann „file is not a database" — sie sieht nach kaputtem Bestand aus,
+// nicht nach falschem Schluessel.
+//
+// Mit der Huelle gehen die SICHERUNGEN dieses Spielstands: sie sind mit dem alten
+// Datenschluessel geschrieben und nach dem Neuseeden nicht mehr zu oeffnen. Sie liegen
+// zu lassen hiesse, Dateien aufzuheben, die niemand mehr aufbekommt.
+const zugangsdateien = [];
+const huelle = `${ziel}.schluessel.json`;
+if (existsSync(huelle)) {
+  rmSync(huelle);
+  zugangsdateien.push(basename(huelle));
+}
+for (const anhang of ["-wal", "-shm"]) {
+  if (existsSync(`${ziel}${anhang}`)) {
+    rmSync(`${ziel}${anhang}`);
+    zugangsdateien.push(basename(ziel) + anhang);
+  }
+}
+const sicherungen = join(verzeichnis, "sicherungen");
+if (existsSync(sicherungen)) {
+  const stamm = basename(ziel).replace(/\.db$/, "");
+  for (const name of readdirSync(sicherungen)) {
+    if (name.startsWith(stamm)) {
+      rmSync(join(sicherungen, name));
+      zugangsdateien.push(`sicherungen/${name}`);
+    }
+  }
+}
+
 const zaehle = (tabelle) => db.exec(`SELECT COUNT(*) FROM ${tabelle}`)[0].values[0][0];
 const zaehleWo = (tabelle, wo) => db.exec(`SELECT COUNT(*) FROM ${tabelle} WHERE ${wo}`)[0].values[0][0];
 const status = (s) => zaehleWo("umsatz_verarbeitung", `status = '${s}'`);
 
 console.log(`Spielstand geschrieben: ${ziel}`);
+if (zugangsdateien.length > 0) {
+  console.log(`  Zugang     abgeraeumt: ${zugangsdateien.join(", ")}`);
+}
+console.log(
+  "  Naechster Start richtet den Zugang neu ein: Passphrase frei waehlbar, der " +
+    "Wiederherstellungscode wird dabei einmal angezeigt.",
+);
 console.log(
   `  Bestand    Konten ${zaehle("zahlungskonto")} · Kategorien ${zaehle("kategorie")} · ` +
     `Budgets ${zaehle("budget")} · Vertraege ${zaehle("vertrag")} · ` +
@@ -109,6 +152,5 @@ console.log(
 );
 console.log(
   `  Planung    ${zaehle("zahlungsregel")} Zahlungsregeln · ` +
-    `${zaehle("kategorie_festlegung")} Festlegungen · ` +
     `${zaehle("dubletten_freigabe")} Dubletten-Freigabe(n)`,
 );

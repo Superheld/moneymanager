@@ -62,16 +62,15 @@ export const VERGLEICHSFELDER = [
   "aufteilungen",
   "transferId",
   "gegenkontoId",
-  "planRef",
   "zuPruefen",
 ] as const;
 
 export type Vergleichsfeld = (typeof VERGLEICHSFELDER)[number];
 
 /**
- * Vergleicht EIN Feld. Ueber JSON, weil drei der Felder keine Skalare sind
- * (`aufteilungen`, `planRef`) und ein Vergleich mit `===` dort immer „verschieden"
- * saegte — bei jedem Laden ein neues Objekt.
+ * Vergleicht EIN Feld. Ueber JSON, weil `aufteilungen` kein Skalar ist und ein
+ * Vergleich mit `===` dort immer „verschieden" saegte — bei jedem Laden ein neues
+ * Objekt.
  *
  * `undefined` und `null` gelten als gleich: die Datenbank speichert NULL, das Modell
  * laesst das Feld weg, und beides heisst dasselbe. Ohne diese Gleichsetzung meldete jede

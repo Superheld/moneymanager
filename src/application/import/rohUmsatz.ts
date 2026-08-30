@@ -87,8 +87,22 @@ export interface RohUmsatz {
   readonly quelle: string;
   /** Stabile native ID der Quelle (z. B. Finanzgurus „Buchungs-ID") — exakte Re-Import-Dedup. */
   readonly nativeId?: string;
-  /** Roher Kategorie-Hinweis der Quelle (z. B. FG „Analyse-Unterkategorie") — Input fürs Remapping. */
+  /** Roher Kategorie-Hinweis der Quelle (z. B. FG „Analyse-Unterkategorie") — bleibt am Beleg. */
   readonly kategorieHinweis?: string;
+  /**
+   * Derselbe Hinweis, übersetzt in UNSER Vokabular — ein Kategorie-NAME, keine Id.
+   *
+   * Übersetzt hat ihn der Adapter, denn nur der kennt das Vokabular seiner Quelle
+   * (`adapters/import/finanzguruKategorien.ts`). Die Kategorisierungskette löst den Namen
+   * gegen den Katalog des Nutzers auf und entscheidet über den Rang; sie weiss dabei
+   * nicht, welche Quelle geliefert hat, und das ist der Punkt: ein zweiter Importeur
+   * bringt seine eigene Übersetzung mit, nicht eine zweite Stufe in der Kette.
+   *
+   * **Nicht dasselbe wie `kategorieHinweis`.** Der ist, was die Quelle SAGTE, und bleibt
+   * unverändert am Beleg. Dieser hier ist, was wir daraus gemacht haben — dieselbe
+   * Trennung wie zwischen `umsatz_roh` und `umsatz_verarbeitung`.
+   */
+  readonly kategorieVorschlag?: string;
 }
 
 /**

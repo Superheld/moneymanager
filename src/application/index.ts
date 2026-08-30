@@ -60,10 +60,16 @@ export {
   hauptkategorie,
   // Aus EINER Bewertung abgeleitet, keine Auswahl über den Bestand.
   verwechslungsmatrix,
+  // Liest EIN Modell zeilenweise — reine Umformung seiner eigenen Gewichte, keine
+  // Auswahl über den Bestand.
+  kategorieprofile,
   herkunftVon,
+  // Zerlegen und Zusammensetzen eines Tokens — reine Umformung, keine Auswahl. Die
+  // Oberfläche braucht beides, weil die Ausschlussliste am nackten Wort hängt.
+  wortVon,
+  merkmalName,
   // Eigenschaften EINER Buchung bzw. EINES Empfängernamens.
   istGeteilt,
-  musterVorschlag,
   // Trifft ein Muster diesen Text? Ein Vergleich, keine Auswahl — und die Oberfläche
   // braucht ihn, um zu erkennen, ob ein vorhandenes Muster einen Namen schon abdeckt.
   musterTrifft,
@@ -189,6 +195,10 @@ export {
   type Analysezeile,
   type AnalyseDeps,
   type Zeitraum,
+  analyseBefunde,
+  analyseAusblick,
+  type Befunde,
+  type Verlaufspunkt,
 } from "./analysesichten";
 export {
   depotsLaden,
@@ -210,6 +220,14 @@ export {
   inventarLoeschen,
   type InventarEingabe,
 } from "./inventar/inventarAnlegen";
+export {
+  kontogruppeSpeichern,
+  kontogruppeLoeschen,
+  gruppensichten,
+  type KontogruppeEingabe,
+  type Gruppensicht,
+  type GruppenDeps,
+} from "./konten/gruppen";
 export {
   stammdatenLaden,
   type Stammdaten,
@@ -262,6 +280,26 @@ export {
   type ExperimentId,
   type Experimente,
 } from "./experimente";
+
+export { exportDateiname, type ExportZiel, type Exportart } from "./export";
+export {
+  konfigurationExportieren,
+  inExportform,
+  EXPORT_FASSUNG,
+  type ExportKategorie,
+  type Konfigurationsexport,
+} from "./konfiguration";
+export {
+  bestandExportieren,
+  BESTANDSEXPORT_FASSUNG,
+  type Bestandsexport,
+  type Bestandsquellen,
+  type ExportBuchung,
+  type ExportBeleg,
+  type ExportKonto,
+  type ExportPerson,
+  type ExportVertrag,
+} from "./bestandsexport";
 export {
   uebersichtLaden,
   waehlbareMonate,

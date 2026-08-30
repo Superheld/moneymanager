@@ -17,7 +17,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { TrainingBereich } from "./TrainingBereich";
 import { sqliteMerkmalskonfigurationRepository as merkmalRepo } from "../../persistence/sqliteMerkmalskonfigurationRepository";
 
@@ -72,21 +72,20 @@ function material(n = 40) {
   kategorie("kat-lm", "Lebensmittel");
   kategorie("kat-sprit", "Sprit & Laden");
   for (let i = 0; i < n; i++) {
-    buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "REWE Markt", zweck: "Einkauf Lebensmittel" });
-    buchung({ id: `s${i}`, betrag: -6000, kategorieId: "kat-sprit", gegenpartei: "Shell Station", zweck: "Tanken Diesel" });
+    buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "Kesselmann Markt", zweck: "Einkauf Lebensmittel" });
+    buchung({ id: `s${i}`, betrag: -6000, kategorieId: "kat-sprit", gegenpartei: "Vibora Station", zweck: "Tanken Diesel" });
   }
 }
 
 const KARTEN = {
   daten: /1 · Trainingsdaten/,
-  merkmale: /2 · Merkmale/,
-  ausschluesse: /3 · Ausschlüsse/,
-  modell: /4 · Erkennungsmodell/,
-  abgleich: /5 · Bestand abgleichen/,
+  woerter: /2 · Wörter/,
+  modell: /3 · Erkennungsmodell/,
+  abgleich: /4 · Bestand abgleichen/,
 } as const;
 
 /**
- * Wählt eines der fünf Register und wartet, bis der gemeinsame Ladevorgang durch ist.
+ * Wählt eines der vier Register und wartet, bis der gemeinsame Ladevorgang durch ist.
  * Der läuft beim Betreten des Bereichs; die Register selbst hängen nur den jeweiligen
  * Inhalt in den Baum.
  */
@@ -150,109 +149,247 @@ describe("1 · Trainingsdaten", () => {
   });
 });
 
-describe("2 · Merkmale", () => {
-  it("führt die fünf Quellen mit Klartext-Namen", async () => {
+describe("2 · Wörter — die Quellen", () => {
+  it("führt die Quellen mit Klartext-Namen", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.merkmale);
+    await oeffne(nutzer, KARTEN.woerter);
 
     // `emp=` und `emp:` sind aus dem Präfix nicht zu erraten — sie brauchen Namen.
-    expect(screen.getByText("Empfänger, ganz")).toBeTruthy();
-    expect(screen.getByText("Empfänger, einzelne Wörter")).toBeTruthy();
-    expect(screen.getByText("Vorzeichen")).toBeTruthy();
+    expect(screen.getAllByText("Empfänger, ganz").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Empfänger, einzelne Wörter").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Verwendungszweck").length).toBeGreaterThan(0);
   });
 
   it("schaltet eine Quelle ab und schreibt das in die Datenbank", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.merkmale);
+    await oeffne(nutzer, KARTEN.woerter);
 
-    const schalter = within(karteninhalt(KARTEN.merkmale)).getAllByRole("checkbox");
-    await nutzer.click(schalter[schalter.length - 1]); // Vorzeichen
+    await nutzer.click(
+      within(karteninhalt(KARTEN.woerter)).getByRole("checkbox", { name: /Verwendungszweck/ }),
+    );
 
     await waitFor(async () => {
-      expect(await merkmalRepo.herkuenfteLesen()).not.toContain("vz");
+      expect(await merkmalRepo.herkuenfteLesen()).not.toContain("vwz");
     });
   });
 
-  it("eine abgeschaltete Quelle verschwindet aus dem Vokabular", async () => {
+  it("eine abgeschaltete Quelle verschwindet aus dem Wortbestand", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.merkmale);
-    expect(screen.getByText("vz:-")).toBeTruthy();
+    await oeffne(nutzer, KARTEN.woerter);
 
-    const schalter = within(karteninhalt(KARTEN.merkmale)).getAllByRole("checkbox");
-    await nutzer.click(schalter[schalter.length - 1]);
+    // Über den Herkunftsfilter statt über den Token-Text: die Liste zeigt das WORT und
+    // die Herkunft in getrennten Spalten, ein „vwz:einkauf" steht nirgends mehr.
+    await auswahlWaehlen(nutzer, "gilt", "Verwendungszweck");
+    await waitFor(() =>
+      expect(within(karteninhalt(KARTEN.woerter)).queryByText("Kein Wort passt zu dieser Suche.")).toBeNull(),
+    );
 
-    // Die Karte rechnet nach dem Schalten neu — das Merkmal darf nicht stehen bleiben.
-    await waitFor(() => expect(screen.queryByText("vz:-")).toBeNull());
+    await nutzer.click(
+      within(karteninhalt(KARTEN.woerter)).getByRole("checkbox", { name: /Verwendungszweck/ }),
+    );
+
+    // Die Karte rechnet nach dem Schalten neu — die Merkmale dürfen nicht stehen bleiben.
+    await waitFor(() =>
+      expect(within(karteninhalt(KARTEN.woerter)).getByText("Kein Wort passt zu dieser Suche.")).toBeTruthy(),
+    );
   });
 
-  it("zeigt die Trennschärfe je Merkmal", async () => {
+  it("stellt die vier Maße nebeneinander — zwei in der Liste, zwei am gewählten Wort", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.merkmale);
+    await oeffne(nutzer, KARTEN.woerter);
 
-    // Ohne diese Zahl neben dem Wort wäre das Ausschließen ein Ratespiel.
-    expect(screen.getByText("Trennschärfe")).toBeTruthy();
-    expect(screen.getByText("emp=rewe markt")).toBeTruthy();
+    // Ohne Zahlen neben dem Wort wäre das Ausschließen ein Ratespiel — und die
+    // Trennschärfe allein führt in die Irre, weil sie das Seltene überschätzt.
+    const inhalt = karteninhalt(KARTEN.woerter);
+    expect(within(inhalt).getByText("Belege")).toBeTruthy();
+    expect(within(inhalt).getByText("Trennkraft")).toBeTruthy();
+    expect(within(inhalt).getByText("kesselmann markt")).toBeTruthy();
+
+    // Deckung und Trennschärfe braucht man beim Beurteilen EINER Zeile, nicht beim
+    // Überfliegen — sie stehen deshalb im Detail und nicht in einer zehnten Spalte.
+    await nutzer.click(within(inhalt).getByText("kesselmann markt"));
+    await waitFor(() => {
+      const jetzt = karteninhalt(KARTEN.woerter);
+      expect(within(jetzt).getByText("Deckung")).toBeTruthy();
+      expect(within(jetzt).getByText("Trennschärfe")).toBeTruthy();
+    });
   });
 
-  it("schließt ein Merkmal aus der Tabelle heraus aus — in seiner Quelle", async () => {
+  it("blendet die mitgelieferten Wörter aus, bis man sie anfordert", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.merkmale);
+    await oeffne(nutzer, KARTEN.woerter);
 
-    const zeile = screen.getByText("vwz:einkauf").closest("tr")!;
+    // Über hundert Stoppwörter, die niemand gesetzt hat, füllen sonst jede Seite und
+    // schieben die eigenen Entscheidungen nach hinten.
+    const inhalt = karteninhalt(KARTEN.woerter);
+    await nutzer.type(within(inhalt).getByPlaceholderText("Wort eingeben …"), "einer");
+    await waitFor(() =>
+      expect(within(karteninhalt(KARTEN.woerter)).getByText("Kein Wort passt zu dieser Suche.")).toBeTruthy(),
+    );
+
+    await nutzer.click(within(karteninhalt(KARTEN.woerter)).getByRole("checkbox", { name: /mitgelieferte/ }));
+    await waitFor(() =>
+      expect(within(karteninhalt(KARTEN.woerter)).getByText("einer")).toBeTruthy(),
+    );
+  });
+
+  it("holt eine gelöschte Grundausstattung zurück, ohne Eigenes anzufassen", async () => {
+    material(2);
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    // Ein eigenes Wort setzen, dann ein mitgeliefertes entfernen.
+    const inhalt = karteninhalt(KARTEN.woerter);
+    await nutzer.type(within(inhalt).getByPlaceholderText("z. B. kdn"), "eigenwort");
+    await nutzer.click(within(inhalt).getByRole("button", { name: /Wort sperren/ }));
+    await waitFor(async () =>
+      expect((await merkmalRepo.ausschluesseLesen()).map((a) => a.wort)).toContain("eigenwort"),
+    );
+    await merkmalRepo.ausschlussEntfernen("sepa");
+
+    await nutzer.click(
+      within(karteninhalt(KARTEN.woerter)).getByRole("button", { name: /Grundausstattung/ }),
+    );
+
+    await waitFor(async () => {
+      const liste = await merkmalRepo.ausschluesseLesen();
+      expect(liste.map((a) => a.wort)).toContain("sepa");
+      // Das eigene Wort behält seine Quelle — sonst fiele es beim nächsten Ausblenden
+      // aus der eigenen Liste heraus.
+      expect(liste.find((a) => a.wort === "eigenwort")?.quelle).toBe("manuell");
+    });
+  });
+
+  it("schließt ein Wort aus der Liste heraus aus — in seiner Quelle", async () => {
+    material(2);
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    const zeile = screen.getByText("einkauf").closest("tr")!;
     await nutzer.click(within(zeile).getByRole("button", { name: "ausschließen" }));
 
     await waitFor(async () => {
       const [a] = (await merkmalRepo.ausschluesseLesen()).filter((x) => x.wort === "einkauf");
       expect(a?.herkuenfte).toEqual(["vwz"]);
     });
-    // Und es ist tatsächlich weg, nicht nur eingetragen.
-    await waitFor(() => expect(screen.queryByText("vwz:einkauf")).toBeNull());
+  });
+
+  it("lässt das abgewählte Wort stehen und wechselt seinen Zustand", async () => {
+    material(2);
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    // Der Kern der Umstellung: vorher verschwand das Wort hier und tauchte auf einer
+    // anderen Karte wieder auf — ohne die Zahlen, an denen die Entscheidung gerade hing.
+    const zeile = screen.getByText("einkauf").closest("tr")!;
+    await nutzer.click(within(zeile).getByRole("button", { name: "ausschließen" }));
+
+    await waitFor(() => {
+      const neueZeile = screen.getByText("einkauf").closest("tr")!;
+      expect(within(neueZeile).getByText("gesperrt")).toBeTruthy();
+      expect(within(neueZeile).getByRole("button", { name: "zulassen" })).toBeTruthy();
+    });
+  });
+
+  it("zeigt einem gesperrten Wort weiter an, was es brächte", async () => {
+    material(2);
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    const zeile = screen.getByText("einkauf").closest("tr")!;
+    const belege = within(zeile).getAllByText("2")[0];
+    expect(belege).toBeTruthy();
+    await nutzer.click(within(zeile).getByRole("button", { name: "ausschließen" }));
+
+    // Die Belege bleiben stehen — sonst ist ein Ausschluss nicht mehr zu beurteilen,
+    // ohne ihn erst zurückzunehmen.
+    await waitFor(() => {
+      const neueZeile = screen.getByText("einkauf").closest("tr")!;
+      expect(within(neueZeile).getAllByText("2").length).toBeGreaterThan(0);
+    });
+  });
+
+  it("zeigt auf Klick, in welchen Kategorien ein Wort steckt", async () => {
+    material(2);
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    await nutzer.click(screen.getByText("kesselmann markt"));
+
+    await waitFor(() =>
+      expect(within(karteninhalt(KARTEN.woerter)).getByText(/Verteilung über \d+ Kategorien/)).toBeTruthy(),
+    );
+    expect(within(karteninhalt(KARTEN.woerter)).getAllByText("Lebensmittel").length).toBeGreaterThan(0);
+  });
+
+  it("sucht im ganzen Bestand, nicht nur in den häufigsten", async () => {
+    material(2);
+    // Ein Wort, das genau einmal vorkommt und damit früher nie in die Liste kam.
+    buchung({ id: "sel", betrag: -900, kategorieId: "kat-lm", gegenpartei: "Ohlert", zweck: "Sonderposten" });
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    await nutzer.type(
+      within(karteninhalt(KARTEN.woerter)).getByPlaceholderText("Wort eingeben …"),
+      "sonderposten",
+    );
+
+    await waitFor(() =>
+      expect(within(karteninhalt(KARTEN.woerter)).getByText("sonderposten")).toBeTruthy(),
+    );
   });
 
   it("misst auf Anforderung, was jede Quelle beiträgt", async () => {
     material();
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.merkmale);
+    await oeffne(nutzer, KARTEN.woerter);
 
-    await nutzer.click(within(karteninhalt(KARTEN.merkmale)).getByRole("button", { name: "Wirkung messen" }));
+    await nutzer.click(within(karteninhalt(KARTEN.woerter)).getByRole("button", { name: "Wirkung messen" }));
 
     await waitFor(() => expect(screen.getByText(/Mit allen aktiven Quellen:/)).toBeTruthy(), { timeout: 20000 });
   }, 30000);
 });
 
-describe("3 · Ausschlüsse", () => {
+describe("2 · Wörter — der Bestand", () => {
   it("legt beim ersten Öffnen die mitgelieferte Liste an", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.ausschluesse);
+    await oeffne(nutzer, KARTEN.woerter);
 
     // Die Stoppwörter liegen ab jetzt in der Datenbank — nur so ist eines löschbar.
     const woerter = (await merkmalRepo.ausschluesseLesen()).map((a) => a.wort);
     expect(woerter).toContain("sepa");
-    expect(screen.getByText(/Ausschlussliste \(\d+\)/)).toBeTruthy();
+    // Und sie stehen sichtbar im Bestand, auch die, die hier auf nichts wirken.
+    expect(within(karteninhalt(KARTEN.woerter)).getAllByText("gesperrt").length).toBeGreaterThan(0);
   });
 
   it("nimmt ein Wort über das Formular auf", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.ausschluesse);
+    await oeffne(nutzer, KARTEN.woerter);
 
-    const inhalt = karteninhalt(KARTEN.ausschluesse);
+    const inhalt = karteninhalt(KARTEN.woerter);
     await nutzer.type(within(inhalt).getByPlaceholderText("z. B. kdn"), "einkauf");
-    await nutzer.click(within(inhalt).getAllByRole("button", { name: /ausschließen/ })[0]);
+    await nutzer.click(within(inhalt).getByRole("button", { name: /Wort sperren/ }));
 
     await waitFor(async () => {
       const a = (await merkmalRepo.ausschluesseLesen()).find((x) => x.wort === "einkauf");
@@ -265,14 +402,13 @@ describe("3 · Ausschlüsse", () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.ausschluesse);
+    await oeffne(nutzer, KARTEN.woerter);
 
-    // Ein eigenes Wort statt eines mitgelieferten: die Liste ist alphabetisch sortiert
-    // und paginiert, und welcher Standardeintrag auf Seite eins landet, ist keine
-    // Eigenschaft, an der ein Test hängen sollte.
-    const inhalt = karteninhalt(KARTEN.ausschluesse);
+    // Ein eigenes Wort statt eines mitgelieferten: welcher Standardeintrag auf Seite
+    // eins landet, ist keine Eigenschaft, an der ein Test hängen sollte.
+    const inhalt = karteninhalt(KARTEN.woerter);
     await nutzer.type(within(inhalt).getByPlaceholderText("z. B. kdn"), "aaatestwort");
-    await nutzer.click(within(inhalt).getAllByRole("button", { name: /ausschließen/ })[0]);
+    await nutzer.click(within(inhalt).getByRole("button", { name: /Wort sperren/ }));
     await waitFor(() => expect(screen.getAllByText("aaatestwort").length).toBeGreaterThan(0));
 
     const zeile = screen.getAllByText("aaatestwort")[0].closest("tr")!;
@@ -287,18 +423,64 @@ describe("3 · Ausschlüsse", () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.ausschluesse);
+    await oeffne(nutzer, KARTEN.woerter);
 
-    const inhalt = karteninhalt(KARTEN.ausschluesse);
+    const inhalt = karteninhalt(KARTEN.woerter);
     await nutzer.type(within(inhalt).getByPlaceholderText("z. B. kdn"), "eigenwort");
-    await nutzer.click(within(inhalt).getAllByRole("button", { name: /ausschließen/ })[0]);
+    await nutzer.click(within(inhalt).getByRole("button", { name: /Wort sperren/ }));
 
+    // Nach dem Eintragen steht die Liste auf dem neuen Wort — sonst läge es hinter
+    // hundert mitgelieferten Einträgen und wäre nicht zu sehen.
     await waitFor(() => expect(screen.getAllByText("selbst gesetzt").length).toBeGreaterThan(0));
-    expect(screen.getAllByText("mitgeliefert").length).toBeGreaterThan(0);
+
+    const suchfeld = within(inhalt).getByPlaceholderText("Wort eingeben …");
+    await nutzer.clear(suchfeld);
+    await nutzer.type(suchfeld, "sepa");
+    await waitFor(() =>
+      expect(within(karteninhalt(KARTEN.woerter)).getAllByText("mitgeliefert").length).toBeGreaterThan(0),
+    );
   });
 });
 
-describe("4 · Erkennungsmodell", () => {
+describe("2 · Wörter — was jede Kategorie auszeichnet", () => {
+  it("sagt ohne Modell, dass es nichts abzulesen gibt", async () => {
+    material(2);
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.woerter);
+
+    // Eine Wolke aus blossen Häufigkeiten sähe aus wie eine Auskunft über die Erkennung
+    // und wäre keine — solange nichts trainiert ist, gibt es keine Gewichte.
+    expect(
+      within(karteninhalt(KARTEN.woerter)).getByText(/Noch kein Modell trainiert/),
+    ).toBeTruthy();
+  });
+
+  it("zeigt nach dem Training je Kategorie ihre Wörter — und führt zurück in die Liste", async () => {
+    material();
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.modell);
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+    await waitFor(() => expect(screen.getByText(/Zuletzt trainiert am/)).toBeTruthy());
+
+    await oeffne(nutzer, KARTEN.woerter);
+    const wolken = within(karteninhalt(KARTEN.woerter));
+    await waitFor(() => expect(wolken.getAllByText("Lebensmittel").length).toBeGreaterThan(0));
+
+    // Der Klick auf ein Wort in der Wolke sucht es oben in der Liste — sonst wären es
+    // zwei getrennte Werkzeuge auf derselben Seite.
+    const wort = wolken.getAllByRole("button", { name: "kesselmann markt" })[0];
+    await nutzer.click(wort);
+    await waitFor(() =>
+      expect(
+        (within(karteninhalt(KARTEN.woerter)).getByPlaceholderText("Wort eingeben …") as HTMLInputElement).value,
+      ).toBe("kesselmann markt"),
+    );
+  });
+});
+
+describe("3 · Erkennungsmodell", () => {
   it("sagt vor dem ersten Training, dass noch nichts gelernt ist", async () => {
     material(2);
     const nutzer = userEvent.setup();
@@ -373,7 +555,7 @@ describe("Register", () => {
     await screen.findByRole("tab", { name: KARTEN.daten });
 
     const reiter = screen.getAllByRole("tab");
-    expect(reiter).toHaveLength(5);
+    expect(reiter).toHaveLength(4);
     expect(reiter[0].getAttribute("aria-selected")).toBe("true");
     expect(reiter.slice(1).every((r) => r.getAttribute("aria-selected") === "false")).toBe(true);
     // Inhalt eines anderen Registers steht nicht da.
@@ -388,15 +570,15 @@ describe("Register", () => {
 
     // Das zweite Register ist sofort gefüllt — geladen wird beim Betreten des Bereichs,
     // nicht je Register.
-    await nutzer.click(screen.getByRole("tab", { name: KARTEN.merkmale }));
-    expect(screen.getByText("Empfänger, ganz")).toBeTruthy();
+    await nutzer.click(screen.getByRole("tab", { name: KARTEN.woerter }));
+    expect(screen.getAllByText("Empfänger, ganz").length).toBeGreaterThan(0);
   });
 
   it("wechselt zurück, ohne neu zu laden", async () => {
     material(2);
     const nutzer = userEvent.setup();
     rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.merkmale);
+    await oeffne(nutzer, KARTEN.woerter);
     await nutzer.click(screen.getByRole("tab", { name: KARTEN.daten }));
 
     expect(screen.getByText("Brauchbare Beispiele")).toBeTruthy();
@@ -404,8 +586,13 @@ describe("Register", () => {
   });
 });
 
-describe("5 · Bestand abgleichen", () => {
-  /** Bestand plus eine Festlegung, die etwas anderes sagt als die gebuchte Kategorie. */
+describe("4 · Bestand abgleichen", () => {
+  /**
+   * Bestand plus eine Erkennungsregel, die etwas anderes sagt als die gebuchte Kategorie.
+   *
+   * Das Vehikel ist austauschbar — geprüft wird der ABGLEICH, nicht woher der Vorschlag
+   * kommt. Bis 2026-08-29 stand hier eine Festlegung; die gibt es nicht mehr.
+   */
   function schieflage() {
     kategorie("kat-lm", "Lebensmittel");
     kategorie("kat-dro", "Drogerie");
@@ -413,8 +600,15 @@ describe("5 · Bestand abgleichen", () => {
       buchung({ id: `r${i}`, betrag: -1234, kategorieId: "kat-lm", gegenpartei: "Talmer", zweck: "Einkauf" });
     }
     db.run(
-      `INSERT INTO kategorie_festlegung (muster, kategorie_id, angelegt_am)
-       VALUES ('talmer', 'kat-dro', '2026-08-17T10:00:00.000Z')`,
+      `INSERT INTO vertrag (id, anbieter, beginn, verlaengerung, status, art, kategorie_id)
+       VALUES ('v-talmer', 'Talmer', '2026-01-01', 'automatisch', 'aktiv', 'laufend', 'kat-dro')`,
+    );
+    // `schluessel` traegt JSON mit typisierten Merkmalen — der Spaltenname ist aelter als
+    // ihr Inhalt (siehe sqliteVertragZuordnungRepositories). Klartext ergaebe eine leere
+    // Merkmalsliste, und die Regel traefe nie.
+    db.run(
+      `INSERT INTO vertrag_erkennung (vertrag_id, schluessel, betrag_von, betrag_bis)
+       VALUES ('v-talmer', '[{"art":"empfaenger","muster":"talmer*"}]', 1000, 1500)`,
     );
   }
 

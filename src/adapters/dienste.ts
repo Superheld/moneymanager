@@ -34,20 +34,20 @@ import {
 import type { TanFrager } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
 import { hanseaticAbruf } from "./hanseatic";
-import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
+import { konfigurationLaden, grundausstattungHerstellen, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
 import { trainingsmaterial, type Materialbefund } from "../application/kategorien/trainingsmaterial";
 import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
 import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../application/kategorien/kategorieAbgleich";
-import { festlegungAufheben, festlegungSetzen } from "../application/kategorien/kategoriefestlegungen";
 import type { Merkmalskonfiguration, Merkmalsherkunft } from "../core";
 import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnung";
 import { zahlungsspuren } from "../application/buchung/zahlungsspuren";
 import { kategorisierungsquellen } from "../application/kategorien/kategorisierungsquellen";
-import { festlegungAnwenden as festlegungAnwendenUseCase } from "../application/kategorien/kategoriefestlegungen";
 import { umsaetzeVerbuchen } from "../application/import";
 import type { Kategorie } from "../core";
 import {
+  umsaetzeKategorisieren as umsaetzeKategorisierenUseCase,
   umsaetzeUebernehmen,
+  umsaetzeVerwerfen as umsaetzeVerwerfenUseCase,
   type UebernahmeEingabe,
   type UebernahmeErgebnis,
   type Umsatz,
@@ -56,7 +56,6 @@ import {
   sqliteDublettenfreigabeRepository,
   sqliteImportLaufRepository,
 } from "./persistence/sqliteImportRepositories";
-import { sqliteKategoriefestlegungRepository } from "./persistence/sqliteKategoriefestlegungRepository";
 import { sqliteKontostandsankerRepository } from "./persistence/sqliteKontostandRepository";
 import { sqliteDepotRepository } from "./persistence/sqliteDepotRepository";
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
@@ -76,6 +75,8 @@ import {
   type ExperimentId,
   type Experimente,
 } from "../application/experimente";
+import { konfigurationExportieren } from "../application/konfiguration";
+import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { inventarLaden, type Inventarsicht } from "../application/inventar/inventarsichten";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
@@ -160,11 +161,21 @@ import { sqlitePersonRepository } from "./persistence/sqliteStammdatenRepositori
 import { sqliteBudgetRepository } from "./persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "./persistence/sqliteLedgerRepository";
 import { sqliteKategorieRepository } from "./persistence/sqliteStammdatenRepositories";
+import { tauriExportZiel } from "./persistence/export";
+import { DATEINAME } from "./persistence/datenbankdatei";
 import { sqliteVertragszuordnungRepository } from "./persistence/sqliteVertragZuordnungRepositories";
 import { sqliteZahlungsregelRepository } from "./persistence/sqliteZahlungsregelRepository";
 import { sqliteInventarRepository } from "./persistence/sqliteInventarRepository";
 import { sqliteUmsatzRepository } from "./persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository } from "./persistence/sqliteStammdatenRepositories";
+import { sqliteKontogruppeRepository } from "./persistence/sqliteKontogruppeRepository";
+import {
+  gruppensichten as gruppensichtenUseCase,
+  kontogruppeLoeschen as kontogruppeLoeschenUseCase,
+  kontogruppeSpeichern as kontogruppeSpeichernUseCase,
+  type Gruppensicht,
+  type KontogruppeEingabe,
+} from "../application/konten/gruppen";
 import { sqliteEinstellungenRepository } from "./persistence/sqliteEinstellungenRepository";
 
 const BUDGET_DEPS = {
@@ -238,6 +249,45 @@ export function experimente(): Promise<Experimente> {
 
 export function experimentSetzen(id: ExperimentId, an: boolean): Promise<void> {
   return experimentSchalten(sqliteEinstellungenRepository, id, an);
+}
+
+/**
+ * Schreibt die Konfiguration ins Exportverzeichnis und meldet den Pfad.
+ *
+ * Die Uhr sitzt hier und nicht im Use-Case — derselbe Schnitt wie bei den Sicherungen:
+ * ein Zeitpunkt ist eine Beobachtung der Umwelt.
+ */
+export function konfigurationExport(): Promise<string> {
+  return konfigurationExportieren(
+    sqliteKategorieRepository,
+    tauriExportZiel,
+    new Date(),
+    DATEINAME,
+  );
+}
+
+/**
+ * Schreibt den BESTAND ins Exportverzeichnis und meldet den Pfad.
+ *
+ * Getrennt von `konfigurationExport` und nicht als dessen Parameter: die beiden Dateien
+ * tragen verschiedene Zusicherungen (Ordnung gegen Kontoauszug), und ein Schalter an einem
+ * Knopf machte aus zwei unterscheidbaren Dateien zwei gleich aussehende. Siehe
+ * `application/bestandsexport`.
+ */
+export function bestandExport(): Promise<string> {
+  return bestandExportieren(
+    {
+      ledger: sqliteLedgerRepository,
+      umsaetze: sqliteUmsatzRepository,
+      konten: sqliteZahlungskontoRepository,
+      personen: sqlitePersonRepository,
+      vertraege: sqliteVertragRepository,
+      vertragszuordnungen: sqliteVertragszuordnungRepository,
+    },
+    tauriExportZiel,
+    new Date(),
+    DATEINAME,
+  );
 }
 
 /**
@@ -340,6 +390,24 @@ export function kontoLoeschen(id: string): Promise<void> {
   return sqliteZahlungskontoRepository.loeschen(id);
 }
 
+// --- Kontogruppen ----------------------------------------------------------
+
+/** Die Gruppen mit aufgelösten Mitgliedern — für die Verwaltung. */
+export function kontogruppen(): Promise<Gruppensicht[]> {
+  return gruppensichtenUseCase({
+    gruppeRepo: sqliteKontogruppeRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+  });
+}
+
+export function kontogruppeSpeichern(eingabe: KontogruppeEingabe, id?: string) {
+  return kontogruppeSpeichernUseCase(sqliteKontogruppeRepository, eingabe, id);
+}
+
+export function kontogruppeLoeschen(id: string): Promise<void> {
+  return kontogruppeLoeschenUseCase(sqliteKontogruppeRepository, id);
+}
+
 /** Alle bekannten Umsätze — für die Dublettenprüfung beim Anlegen einer Verbindung. */
 export function umsaetze() {
   return sqliteUmsatzRepository.alle();
@@ -392,6 +460,8 @@ export function analyse(): Promise<Analysebasis> {
     umsatzRepo: sqliteUmsatzRepository,
     zuordnungRepo: sqliteVertragszuordnungRepository,
     vertragRepo: sqliteVertragRepository,
+    budgetRepo: sqliteBudgetRepository,
+    regelRepo: sqliteZahlungsregelRepository,
   });
 }
 
@@ -464,7 +534,7 @@ export function spuren() {
 // --- Import ----------------------------------------------------------------
 
 /**
- * Die Kategorisierungs-Kette: Umbuchung → Festlegung → Vertrag → Modell.
+ * Die Kategorisierungs-Kette: Umbuchung → Vertrag → Modell.
  *
  * Einmal vor einem Lauf geladen, nicht je Zeile — der Bestand ändert sich währenddessen
  * nicht, und ein Import über tausende Zeilen soll nicht tausendmal dasselbe holen.
@@ -472,7 +542,6 @@ export function spuren() {
 export function kategorisierung() {
   return kategorisierungsquellen({
     kategorieRepo: sqliteKategorieRepository,
-    festlegungRepo: sqliteKategoriefestlegungRepository,
     vertragRepo: sqliteVertragRepository,
     erkennungRepo: sqliteVertragserkennungRepository,
     klassifikatorRepo: sqliteKlassifikatorRepository,
@@ -500,21 +569,19 @@ export function umsatzSpeichern(u: Umsatz): Promise<void> {
   return sqliteUmsatzRepository.speichern(u);
 }
 
-export function importLaeufe() {
-  return sqliteImportLaufRepository.alle();
+export function umsaetzeSammelKategorisieren(
+  umsaetze: readonly Umsatz[],
+  kategorie: Kategorie | undefined,
+) {
+  return umsaetzeKategorisierenUseCase(sqliteUmsatzRepository, umsaetze, kategorie);
 }
 
-/** „Immer bei diesem Empfänger" — setzen und sofort auf den offenen Stapel anwenden. */
-export function festlegungAnwenden(
-  muster: string,
-  kategorie: Kategorie,
-  offene: readonly Umsatz[],
-  ausserId: string,
-): Promise<number> {
-  return festlegungAnwendenUseCase(
-    { festlegungRepo: sqliteKategoriefestlegungRepository, umsatzRepo: sqliteUmsatzRepository },
-    muster, kategorie, offene, ausserId,
-  );
+export function umsaetzeSammelVerwerfen(umsaetze: readonly Umsatz[]) {
+  return umsaetzeVerwerfenUseCase(sqliteUmsatzRepository, umsaetze);
+}
+
+export function importLaeufe() {
+  return sqliteImportLaufRepository.alle();
 }
 
 /** Offene Umsätze ins Ledger buchen und die frischen Zahlungen ihren Verträgen zuordnen. */
@@ -582,7 +649,7 @@ export async function bankAbrufen(
     erkennungRepo: sqliteVertragserkennungRepository,
     vertragszuordnungRepo: sqliteVertragszuordnungRepository,
     id: () => crypto.randomUUID(),
-    // Dieselbe Kette wie beim Dateiimport: Umbuchung → Festlegung → Vertrag → Modell.
+    // Dieselbe Kette wie beim Dateiimport: Umbuchung → Vertrag → Modell.
     kategorisierung: await kategorisierung(),
     heute,
     rueckgriffTage,
@@ -599,7 +666,6 @@ export async function bankAbrufen(
 /** Alle Quellen der Kategorisierungs-Kette — dieselben wie beim Import. */
 const KETTE = {
   kategorieRepo: sqliteKategorieRepository,
-  festlegungRepo: sqliteKategoriefestlegungRepository,
   vertragRepo: sqliteVertragRepository,
   erkennungRepo: sqliteVertragserkennungRepository,
   klassifikatorRepo: sqliteKlassifikatorRepository,
@@ -652,6 +718,10 @@ export function wortFreigeben(wort: string) {
   return wortZulassen(sqliteMerkmalskonfigurationRepository, wort);
 }
 
+export function grundausstattungZurueck() {
+  return grundausstattungHerstellen(sqliteMerkmalskonfigurationRepository);
+}
+
 export function kategorieAbgleichVorschau(): Promise<Abgleichsplan> {
   return abgleichVorschau(sqliteLedgerRepository, sqliteUmsatzRepository, KETTE);
 }
@@ -660,23 +730,9 @@ export function kategorieAbgleichAnwenden(plan: Abgleichsplan) {
   return planAnwenden(sqliteLedgerRepository, plan);
 }
 
-// --- Kategorie-Festlegungen ------------------------------------------------
-
-export function festlegungen() {
-  return sqliteKategoriefestlegungRepository.alle();
-}
-
-export function festlegungSpeichern(muster: string, kategorieId: string) {
-  return festlegungSetzen(sqliteKategoriefestlegungRepository, muster, kategorieId);
-}
-
-export function festlegungEntfernen(muster: string) {
-  return festlegungAufheben(sqliteKategoriefestlegungRepository, muster);
-}
-
 /** Was das Modell an EINER Buchung sieht — die Antwort auf „warum diese Kategorie?". */
 export function merkmaleZuBuchung(
-  quelle: { gegenpartei: string; verwendungszweck: string; glaeubigerId?: string; betrag: number },
+  quelle: { gegenpartei: string; verwendungszweck: string },
 ): Promise<Merkmalsansicht> {
   return merkmalsansicht(
     {

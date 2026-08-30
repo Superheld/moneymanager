@@ -10,7 +10,7 @@
 // Wording- oder Design-Durchgang stehen, statt reihenweise rot zu werden.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -61,6 +61,22 @@ async function grunddaten() {
   await sqliteKategorieRepository.speichern({
     id: "kat1", name: "Lebensmittel", defaultCharakter: "Aufwand",
   });
+}
+
+/**
+ * Die Karte „Nach Kategorien" als Suchraum.
+ *
+ * Seit die Analyse einen Befunde-Block hat, steht ein Kategoriename mehrfach im Dokument
+ * — einmal in der Aufschlüsselung, einmal in den Ranglisten darunter. Eine Suche über den
+ * ganzen Screen trifft dann mehrere Elemente und bricht ab. Gesucht wird deshalb IN der
+ * Karte, um die es geht; das bleibt auch dann richtig, wenn weitere Karten dazukommen.
+ */
+async function inAufschluesselung() {
+  const titel = await screen.findByText("Nach Kategorien");
+  // Titel → Titelspalte → Kopfzeile → Karte. `Card` baut den Kopf aus zwei geschachtelten
+  // `div`s; ohne Klasse daran bleibt nur der Weg über die Ebenen.
+  const karte = titel.parentElement?.parentElement?.parentElement as HTMLElement;
+  return within(karte);
 }
 
 describe("KontenScreen", () => {
@@ -350,7 +366,7 @@ describe("AnalyseScreen", () => {
     rendere(<AnalyseScreen />);
 
     // Kategorie aufklappen …
-    await nutzer.click(await screen.findByText(/Lebensmittel/));
+    await nutzer.click((await inAufschluesselung()).getByText(/Lebensmittel/));
     // … dann die Buchung darin.
     await waitFor(() => expect(screen.getAllByTitle(/Buchungsdetails/).length).toBeGreaterThan(0));
     await nutzer.click(screen.getAllByTitle(/Buchungsdetails/)[0]);
@@ -378,11 +394,13 @@ describe("AnalyseScreen", () => {
     await auswahlWaehlen(nutzer, "Gliederung", "Hauptgruppen");
 
     // Jetzt steht die Hauptgruppe da; die Unterkategorie erst nach dem Aufklappen.
-    await waitFor(() => expect(screen.getByText(/Lebenshaltung/)).toBeInTheDocument());
-    expect(screen.queryByText(/Lebensmittel/)).not.toBeInTheDocument();
+    // Gesucht wird IN der Karte: die Ranglisten der Befunde führen dieselben Namen.
+    const karte = await inAufschluesselung();
+    await waitFor(() => expect(karte.getByText(/Lebenshaltung/)).toBeInTheDocument());
+    expect(karte.queryByText(/Lebensmittel/)).not.toBeInTheDocument();
 
-    await nutzer.click(screen.getByText(/Lebenshaltung/));
-    await waitFor(() => expect(screen.getByText(/Lebensmittel/)).toBeInTheDocument());
+    await nutzer.click(karte.getByText(/Lebenshaltung/));
+    await waitFor(() => expect(karte.getByText(/Lebensmittel/)).toBeInTheDocument());
   });
 });
 
@@ -434,14 +452,14 @@ describe("ReviewScreen", () => {
       id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
       betrag: -2599, waehrung: "EUR", gegenpartei: "Buchhandlung Beispiel",
       verwendungszweck: "Fachbuch", rohHash: "h1", status: "neu",
-      vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "remapping" },
+      vorschlag: { kategorieId: "kat1", charakter: "Aufwand", quelle: "ki" },
     });
 
     rendere(<ReviewScreen />);
 
-    // Ohne die Herkunft ist einem Vorschlag nicht anzusehen, ob ihn ein Vertrag, ein
-    // Modell oder die Importdatei gesetzt hat — und damit nicht, wie sehr man ihm traut.
-    await waitFor(() => expect(screen.getAllByText("Import").length).toBeGreaterThan(0));
+    // Ohne die Herkunft ist einem Vorschlag nicht anzusehen, ob ihn ein Vertrag, eine
+    // Festlegung oder das Modell gesetzt hat — und damit nicht, wie sehr man ihm traut.
+    await waitFor(() => expect(screen.getAllByText("Erkennung").length).toBeGreaterThan(0));
   });
 
   it("begründet einen Vorschlag des Modells mit seinen Belegen", async () => {

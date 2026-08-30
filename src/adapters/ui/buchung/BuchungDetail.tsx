@@ -30,7 +30,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   istGeteilt,
-  musterVorschlag,
   type Buchungshistorie,
   type Charakter,
   type IstBuchung,
@@ -38,7 +37,6 @@ import {
   type Vertrag,
   type Vertragszuordnung,
   type Zahlungskonto,
-  type Zahlungsregel,
 } from "../../../application";
 import {
   alsDuplikat,
@@ -69,7 +67,6 @@ import {
   buchungZuruecksetzen,
   dublettenFreigabeAufheben,
   dublettenFreigeben,
-  festlegungSpeichern,
   gegenbeinErzeugen,
   paarungLoesen,
   splitAufheben,
@@ -189,7 +186,6 @@ interface FormularProps {
   /** Der Beleg, falls die Buchung aus einem Import stammt. */
   umsatz?: Umsatz;
   importLauf?: ImportLauf;
-  regel?: Zahlungsregel;
   /** Das andere Bein, wenn die Buchung Teil einer Umbuchung ist. */
   gegenbuchung?: IstBuchung;
   /** Der frisch gelesene Stand — der Prüfmarker wirkt sofort, nicht erst beim Speichern. */
@@ -236,7 +232,6 @@ function BuchungFormular({
   kategorieName,
   umsatz,
   importLauf,
-  regel,
   gegenbuchung,
   dublette,
   onZwillingOeffnen,
@@ -337,15 +332,9 @@ function BuchungFormular({
   const [notiz, setNotiz] = useState(buchung?.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  // „Immer bei diesem Empfänger" — nur angeboten, wenn die Kategorie hier gerade
-  // GEÄNDERT wird. Ein dauerhaft sichtbarer Haken wäre eine Einladung, beim Durchsehen
-  // nebenbei Regeln anzulegen; die Festlegung soll aus einer Korrektur entstehen.
-  const [immer, setImmer] = useState(false);
   const gepaart = !!buchung?.transferId;
   const loeschfrage = useLoeschfrage();
   const geteilt = !!buchung && istGeteilt(buchung);
-  const musterAngebot = musterVorschlag(umsatz?.gegenpartei ?? "");
-  const kategorieGeaendert = kategorieId !== (buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
   const konto = konten.find((k) => k.id === kontoId);
   /**
    * Auf einem Konto mit Bankverbindung sind Datum und Betrag Tatsachen, keine Eingabe.
@@ -509,11 +498,6 @@ function BuchungFormular({
         // verglichen gegen den falschen Bestand.
         if (umsatz && kontoId !== umsatz.zahlungskontoId) {
           await umsatzSpeichern({ ...umsatz, zahlungskontoId: kontoId });
-        }
-        // Die Festlegung entsteht NACH der Buchung: schlüge das Speichern fehl, stünde
-        // sonst eine Regel für eine Änderung, die es nicht gibt.
-        if (immer && kategorieId && musterAngebot) {
-          await festlegungSpeichern(musterAngebot, kategorieId);
         }
       }
       onSaved();
@@ -854,15 +838,6 @@ function BuchungFormular({
               <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
                 <CategoryPicker kategorien={kategorien} value={kategorieId} onChange={kategorieSetzen} />
               </FormField>
-              {kategorieGeaendert && kategorieId && musterAngebot && !istEntwurf && (
-                <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", marginTop: 6, fontSize: "var(--fs-xs)" }}>
-                  <input type="checkbox" aria-label={t("konten.festlegung.immerLabel")} checked={immer} onChange={(e) => setImmer(e.target.checked)} />
-                  <span>
-                    {t("konten.festlegung.immer", { muster: musterAngebot })}
-                    <span className="muted" style={{ display: "block" }}>{t("konten.festlegung.hinweis")}</span>
-                  </span>
-                </label>
-              )}
               {/* Aufteilen setzt eine gespeicherte Buchung voraus — es verteilt deren
                   Betrag, und der ist vorher noch nicht gebucht. */}
               {buchung && (
@@ -981,7 +956,6 @@ function BuchungFormular({
         entwurf={entwurf}
         umsatz={kopfUmsatz}
         importLauf={importLauf}
-        regel={regel}
       />
 
       {/* Was hier NICHT geht und warum — statt Knöpfen, die ins Leere greifen. */}
@@ -1079,7 +1053,6 @@ export function BuchungDetail(props: {
 
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
-  const [regeln, setRegeln] = useState<Zahlungsregel[]>([]);
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [laeufe, setLaeufe] = useState<ImportLauf[]>([]);
   const [alle, setAlle] = useState<IstBuchung[]>([]);
@@ -1093,7 +1066,7 @@ export function BuchungDetail(props: {
 
   async function laden() {
     const d = await buchungsdetail();
-    setKonten([...d.konten]); setKategorien([...d.kategorien]); setRegeln([...d.regeln]);
+    setKonten([...d.konten]); setKategorien([...d.kategorien]);
     setUmsaetze([...d.umsaetze]); setLaeufe([...d.laeufe]); setAlle([...d.buchungen]);
     setVertraege([...d.vertraege]); setZuordnungen([...d.zuordnungen]);
     setDublettenverdacht(d.dublettenverdacht); setFreigegeben(d.freigegeben); setFreigaben(d.freigaben);
@@ -1295,7 +1268,6 @@ export function BuchungDetail(props: {
       kategorieName={kategorieName}
       umsatz={umsatz}
       importLauf={(() => { const q = aktuellerEntwurf ?? umsatz; return q ? laeufe.find((l) => l.id === q.laufId) : undefined; })()}
-      regel={aktuelle?.planRef ? regeln.find((r) => r.id === aktuelle.planRef!.quelleId) : undefined}
       gegenbuchung={gegenbuchung}
       dublette={dublette}
       onZwillingOeffnen={zwillingBuchung ? () => setAktuelle(zwillingBuchung) : undefined}

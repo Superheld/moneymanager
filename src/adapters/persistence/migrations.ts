@@ -1732,4 +1732,98 @@ export const MIGRATIONS: Migration[] = [
            AND NOT EXISTS (SELECT 1 FROM umsatz_verarbeitung x  WHERE x.vorschlag_kategorie_id = kategorie.id)`,
     ],
   },
+  {
+    version: 61, // Frei benannte Kontogruppen
+    sql: [
+      // Eine Gruppe ist eine SICHT, keine Rechenregel — sie steht deshalb NEBEN der
+      // Kontoklasse und ersetzt sie nicht: die Klasse entscheidet, ob ein Saldo zu den
+      // liquiden Mitteln zaehlt (genau eine je Konto), eine Gruppe buendelt nur, was man
+      // zusammen ansehen will (beliebig viele je Konto).
+      `CREATE TABLE IF NOT EXISTS kontogruppe (
+         id TEXT PRIMARY KEY,
+         bezeichnung TEXT NOT NULL
+       )`,
+      // Eigene Tabelle statt einer JSON-Spalte wie bei `zahlungskonto.inhaber_ids`, und
+      // der Grund ist der Fremdschluessel: ein geloeschtes Konto raeumt seine
+      // Mitgliedschaften mit ab. In einer JSON-Liste bliebe seine Id stehen, und ein
+      // verwaister Verweis in einem Textfeld faellt niemandem auf — bis eine Gruppe
+      // Konten zaehlt, die es nicht mehr gibt.
+      `CREATE TABLE IF NOT EXISTS kontogruppe_konto (
+         gruppe_id TEXT NOT NULL REFERENCES kontogruppe(id) ON DELETE CASCADE,
+         konto_id  TEXT NOT NULL REFERENCES zahlungskonto(id) ON DELETE CASCADE,
+         PRIMARY KEY (gruppe_id, konto_id)
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_kontogruppe_konto ON kontogruppe_konto(konto_id)`,
+    ],
+  },
+  {
+    version: 62, // Der Plan-Bezug an der Ist-Buchung faellt — es gab ihn nie
+    sql: [
+      // `plan_quelle_id`/`plan_faelligkeit` sollten eine Buchung tragen, die einen
+      // Plan-Posten per Haekchen bestaetigt. Das Haekchen wurde nie gebaut: kein
+      // Use-Case hat die Spalten je beschrieben, und im Bestand ist keine einzige Zeile
+      // gesetzt (geprueft vor dem Abraeumen, wie das Alpha-Stadium es verlangt).
+      //
+      // Was bleibt, ist der Typ `PlanRef` im Kern — er identifiziert weiterhin eine
+      // PROJIZIERTE Zeile im Kontoregister. Nur die Ist-Seite faellt.
+      //
+      // Der Index zuerst: er steht auf beiden Spalten, und SQLite laesst eine Spalte
+      // nicht fallen, solange ein Index sie braucht.
+      `DROP INDEX IF EXISTS ux_ist_planref`,
+      `ALTER TABLE ist_buchung DROP COLUMN plan_quelle_id`,
+      `ALTER TABLE ist_buchung DROP COLUMN plan_faelligkeit`,
+    ],
+  },
+  {
+    version: 63, // Halbe Umbuchungen sind keine — sie bekommen ihre Richtung zurueck
+    sql: [
+      // Eine Umbuchung ohne Gegenbuchung gibt es nicht: liegt das Gegenkonto nicht im
+      // Bestand, hat das Geld den erfassten Bereich verlassen. Der Import erzeugte solche
+      // Zeilen bis 2026-08-29 als einseitige Umschichtung, und die zaehlte in kein Budget
+      // und in keine Ausgabe — das Geld war weg und fehlte nirgends.
+      //
+      // Sie werden NICHT geloescht: die Zahlung hat stattgefunden, ihr Betrag steht im
+      // Saldo. Was faellt, ist nur die Behauptung, sie sei eine Verschiebung gewesen.
+      //
+      // Die Kategorie bleibt leer — welche Ausgabe es war, weiss nur der Mensch. Die
+      // Zeilen sind danach ueber den Kategorie-Abgleich oder von Hand zu fuellen.
+      //
+      // Vier Bedingungen, und jede haelt einen Fall heraus, der bleiben muss:
+      //   transfer_id IS NULL      — ein echtes Paar bleibt ein Paar
+      //   kategorie_id IS NULL     — "Sparen & Anlegen" ist eine gewollte Umschichtung
+      //   keine Aufteilung         — dort stehen die Kategorien in einer eigenen Tabelle,
+      //                              kategorie_id ist dann leer OHNE unkategorisiert zu sein
+      //   betrag <> 0              — waere keine Buchung; kann per Invariante nicht sein
+      //
+      // Wiederholbar: nach dem ersten Lauf trifft WHERE nichts mehr.
+      `UPDATE ist_buchung
+          SET charakter = CASE WHEN betrag < 0 THEN 'Aufwand' ELSE 'Ertrag' END
+        WHERE charakter = 'Umschichtung'
+          AND transfer_id IS NULL
+          AND kategorie_id IS NULL
+          AND betrag <> 0
+          AND NOT EXISTS (
+                SELECT 1 FROM ist_buchung_aufteilung a WHERE a.istbuchung_id = ist_buchung.id
+              )`,
+    ],
+  },
+  {
+    version: 64, // Die Kategorie-Festlegung faellt weg
+    sql: [
+      // „Immer bei diesem Empfaenger" war eine eigene Ebene ueber der Erkennung, direkt
+      // vor dem Vertrag. Sie war kein Schutz — eine Handkorrektur ist ueber
+      // `kategorie_herkunft` ohnehin sicher —, sondern eine VERALLGEMEINERUNG: sie trug
+      // eine Korrektur auf andere und kuenftige Zahlungen desselben Empfaengers.
+      //
+      // Genau das soll das Modell leisten, und zwar ueber alle Merkmale statt ueber den
+      // Empfaenger allein. Mit einem mitgelieferten Modell gibt es keinen Grund mehr,
+      // daneben eine zweite, schwaechere Verallgemeinerung zu pflegen.
+      //
+      // Hier wird ausnahmsweise NICHT geprueft, ob das Ziel leer ist: die Tabelle traegt
+      // Bedienentscheidungen, keine Zahlungen. Was verlorengeht, ist die Zuordnung selbst
+      // — und die steht an jeder betroffenen Buchung weiterhin in `kategorie_id`, dort
+      // von der Festlegung hineingeschrieben. Kein Betrag und kein Beleg haengt daran.
+      `DROP TABLE IF EXISTS kategorie_festlegung`,
+    ],
+  },
 ];

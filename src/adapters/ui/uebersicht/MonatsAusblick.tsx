@@ -289,7 +289,7 @@ function PlanPosten({
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const erledigt = posten.status === "bezahlt" || posten.status === "gebucht";
+  const erledigt = posten.status === "gebucht";
   /**
    * Ein ungeplanter Posten ist genau EINE Buchung — die trägt aber selbst keinen Namen.
    * Dieselbe Reihenfolge wie im Konto-Register: eigene Notiz vor Empfänger aus dem
@@ -325,7 +325,6 @@ function PlanPosten({
         {kategorie && kategorie !== name && (
           <span style={{ color: "var(--ink-3)", fontSize: "11.5px", flex: "0 0 auto" }}>{kategorie}</span>
         )}
-        {posten.status === "bezahlt" && <Pill variant="ok" style={{ marginLeft: 0 }}>{t("ausblick.statusBezahlt")}</Pill>}
       </span>
       {zweiSpalten && (
         <span className="num" style={{ textAlign: "right", color: erledigt ? "var(--ink)" : "var(--ink-3)" }}>

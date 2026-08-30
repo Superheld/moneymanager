@@ -32,7 +32,7 @@ import { geglaetteterMonatsabfluss, budgetBuchungen, type Budget, type BudgetSic
 import { istInterneUmbuchung } from "./buchung/historie";
 import { monatsRuecklageGesamt, type Inventargegenstand } from "./inventar/inventar";
 import type { Kategorie } from "./kategorien/kategorie";
-import { findeIstZuPlan, kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
+import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
 import { projiziereRegel, type Planbuchung } from "./buchung/projektion";
 import type { Zahlungsregel } from "./basis/zahlungsregel";
 
@@ -47,12 +47,15 @@ export type AusblickZeileId =
 
 /**
  * Wie belegt ein Posten ist:
- *  • `bezahlt`  — per Häkchen bestätigt (planRef, 1:1 und eindeutig)
  *  • `gebucht`  — über Kategorie + Betragsnähe einer Ist-Buchung zugeordnet
  *  • `offen`    — geplant, aber (noch) nichts gebucht
  *  • `ohnePlan` — gebucht, aber kein Plan-Posten dahinter (Sammelzeilen)
+ *
+ * Ein vierter Wert `bezahlt` stand hier für einen Posten, den jemand per Häkchen
+ * bestätigt hat. Das Häkchen gab es nie (siehe `IstQuelle`), und damit war die Stufe
+ * unerreichbar: die Zuordnung lief immer über Kategorie und Betrag.
  */
-export type PostenStatus = "bezahlt" | "gebucht" | "offen" | "ohnePlan";
+export type PostenStatus = "gebucht" | "offen" | "ohnePlan";
 
 export interface AusblickPosten {
   /** Stabil innerhalb eines Monats (Regel-ID + Fälligkeit, Budget-ID, oder Sammelschlüssel). */
@@ -150,7 +153,7 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
     ? []
     : e.ist.filter((b) => b.datum >= von && b.datum < bis && !istInterneUmbuchung(b));
 
-  const zugeordnet = ordneZu(planPosten, istImMonat, regelById, e.ist);
+  const zugeordnet = ordneZu(planPosten, istImMonat, regelById);
   const verbraucht = new Set([...zugeordnet.values()].map((b) => b.id));
 
   const einnahmen = zeileAusRegeln("einnahmen", planPosten, zugeordnet, "Ertrag");
@@ -224,13 +227,15 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
 }
 
 /**
- * Ordnet jedem Plan-Posten höchstens eine Ist-Buchung zu. Zwei Wege, in dieser Reihenfolge:
- *  1. `planRef` — der Posten wurde per Häkchen bestätigt. Eindeutig, schlägt alles.
- *  2. Kategorie der Regel + Betrag innerhalb der Toleranz, bester Treffer zuerst.
+ * Ordnet jedem Plan-Posten höchstens eine Ist-Buchung zu: über die Kategorie der Regel
+ * und den Betrag innerhalb der Toleranz, bester Treffer zuerst.
  *
- * Warum überhaupt Weg 2: auf echten Daten trägt Weg 1 nichts — von 5207 Ist-Buchungen
- * hatte keine einzige eine `planRef`, weil alles über den Bankimport kommt und niemand
- * Häkchen setzt. Ohne die Betragszuordnung stünde die Ist-Spalte dauerhaft auf 0.
+ * Davor stand eine zweite, höhere Stufe: eine Buchung, die den Posten per Häkchen
+ * bestätigt (`planRef`). Sie hat nie getragen — das Häkchen gibt es in der Oberfläche
+ * nicht, keine Buchung im Bestand trug den Verweis, und die Betragszuordnung musste
+ * ohnehin jeden Fall allein bedienen. Eine Rangstufe, die nie greift, ist schlimmer als
+ * keine: sie liest sich wie die verlässliche Antwort, während die ganze Arbeit darunter
+ * passiert.
  *
  * Jede Ist-Buchung wird höchstens einmal vergeben; die beste (kleinste relative
  * Abweichung) gewinnt, damit zwei gleichartige Posten nicht die falsche Zahlung greifen.
@@ -239,18 +244,9 @@ function ordneZu(
   planPosten: readonly { p: Planbuchung; regel: Zahlungsregel }[],
   istImMonat: readonly IstBuchung[],
   regelById: ReadonlyMap<string, Zahlungsregel>,
-  allesIst: readonly IstBuchung[],
 ): Map<string, IstBuchung> {
   const treffer = new Map<string, IstBuchung>();
   const vergeben = new Set<string>();
-
-  for (const { p } of planPosten) {
-    const belegt = findeIstZuPlan([...allesIst], p.regelId, p.datum);
-    if (belegt) {
-      treffer.set(schluesselVon(p), belegt);
-      vergeben.add(belegt.id);
-    }
-  }
 
   // Alle offenen Paarungen bewerten und die besten zuerst vergeben — sonst hinge das
   // Ergebnis an der Reihenfolge der Regeln statt an der Passgenauigkeit.
@@ -297,7 +293,7 @@ function zeileAusRegeln(
         datum: p.datum,
         plan: p.betrag,
         ist: treffer ? treffer.betrag : null,
-        status: !treffer ? "offen" : treffer.planRef ? "bezahlt" : "gebucht",
+        status: treffer ? "gebucht" : "offen",
       };
     })
     .sort((a, b) => (a.datum ?? "").localeCompare(b.datum ?? ""));
