@@ -45,7 +45,9 @@ import { kategorisierungsquellen } from "../application/kategorien/kategorisieru
 import { umsaetzeVerbuchen } from "../application/import";
 import type { Kategorie } from "../core";
 import {
+  umsaetzeKategorisieren as umsaetzeKategorisierenUseCase,
   umsaetzeUebernehmen,
+  umsaetzeVerwerfen as umsaetzeVerwerfenUseCase,
   type UebernahmeEingabe,
   type UebernahmeErgebnis,
   type Umsatz,
@@ -540,6 +542,17 @@ export function offeneUmsaetze(): Promise<Umsatz[]> {
 
 export function umsatzSpeichern(u: Umsatz): Promise<void> {
   return sqliteUmsatzRepository.speichern(u);
+}
+
+export function umsaetzeSammelKategorisieren(
+  umsaetze: readonly Umsatz[],
+  kategorie: Kategorie | undefined,
+) {
+  return umsaetzeKategorisierenUseCase(sqliteUmsatzRepository, umsaetze, kategorie);
+}
+
+export function umsaetzeSammelVerwerfen(umsaetze: readonly Umsatz[]) {
+  return umsaetzeVerwerfenUseCase(sqliteUmsatzRepository, umsaetze);
 }
 
 export function importLaeufe() {
