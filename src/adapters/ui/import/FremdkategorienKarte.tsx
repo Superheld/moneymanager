@@ -14,7 +14,15 @@
 // **Die Wahl gilt für diesen Import.** Gemerkt wird sie nicht — dafür bräuchte es eine
 // eigene Tabelle, denn ein fremdes Vokabular gehört zur QUELLE und nicht zum Katalog.
 // Das ist der bewusst kleine Schritt: sichtbar und änderbar zuerst.
+//
+// **Zugeklappt, aber nicht stumm.** Im Regelfall stimmt die Zuordnung, und dann ist eine
+// aufgeschlagene Tabelle über zwanzig Zeilen im Weg. Was nicht zugeklappt werden darf,
+// ist der Fall, für den es die Karte gibt: eine Zuordnung, die ins Leere zeigt. Die Zahl
+// dazu steht deshalb IN der Kopfzeile — wer nichts aufklappt, erfährt trotzdem, dass es
+// etwas zu entscheiden gibt. Eine Karte, die zugeklappt schweigt, wäre keine Karte,
+// sondern ein Versteck.
 
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Fremdkategorienbefund } from "../../../application/import";
 import type { Kategorie } from "../../../application";
@@ -45,14 +53,37 @@ export function FremdkategorienKarte({
   aufAenderung: (fremdName: string, kategorieId: string) => void;
 }) {
   const { t } = useTranslation();
+  // Aufgeklappt startet die Karte, sobald eine Zuordnung ins Leere zeigt — dann ist sie
+  // nicht Beiwerk, sondern die offene Frage der Seite.
+  const offeneZiele = befund.zeilen.filter(
+    (z) => z.uebersetzung !== undefined && z.kategorieId === undefined,
+  ).length;
+  const [offen, setOffen] = useState(offeneZiele > 0);
   if (befund.zeilen.length === 0) return null;
 
   return (
     <Card
       style={{ marginTop: "var(--sp-4)" }}
-      title={t("import.fremd.titel")}
-      subtitle={t("import.fremd.untertitel")}
+      title={
+        <button
+          className="linkbtn"
+          aria-expanded={offen}
+          onClick={() => setOffen((x) => !x)}
+          style={{ font: "inherit", color: "inherit" }}
+        >
+          {offen ? "▾" : "▸"} {t("import.fremd.titel")}
+        </button>
+      }
+      subtitle={
+        offen
+          ? t("import.fremd.untertitel")
+          : offeneZiele > 0
+            ? t("import.fremd.kurzOffen", { n: befund.zeilen.length, offen: offeneZiele })
+            : t("import.fremd.kurz", { n: befund.zeilen.length })
+      }
     >
+      {offen && (
+      <>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
         <thead>
           <tr>
@@ -105,6 +136,8 @@ export function FremdkategorienKarte({
       <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: "var(--sp-3)" }}>
         {t("import.fremd.rest", { ohne: befund.ohneAngabe, um: befund.umbuchungen })}
       </div>
+      </>
+      )}
     </Card>
   );
 }

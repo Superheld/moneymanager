@@ -47,9 +47,9 @@ const KOPF = [
 /** Excel-Seriennummer des 05.01.2026. */
 const T_2026_01_05 = "46027";
 
-function reihe(o: { tag: string; betrag: string; gegenpartei: string; zweck?: string; id?: string; unterkategorie?: string }) {
+function reihe(o: { tag: string; betrag: string; gegenpartei: string; zweck?: string; id?: string; unterkategorie?: string; iban?: string; kontoName?: string }) {
   return [
-    o.tag, "DE93999999990000000001", "Girokonto", o.betrag, "63.09", "EUR",
+    o.tag, o.iban ?? "DE93999999990000000001", o.kontoName ?? "Girokonto", o.betrag, "63.09", "EUR",
     o.gegenpartei, "", o.zweck ?? "", "", "", "",
     "Essen & Trinken", o.unterkategorie ?? "Lebensmittel", "nein", "", "", "nein", "nein", "Kartenzahlung",
     "Ausgaben", "2026-01", "2026-01", "2026-Q1", "2026", o.id ?? "", "", "",
@@ -188,6 +188,75 @@ describe("ImportScreen", () => {
   });
 });
 
+describe("Welche Konten mitkommen", () => {
+  /** Zwei Quellkonten in einer Datei — der Fall, um den es geht. */
+  function zweiKonten() {
+    return csv(
+      reihe({ tag: T_2026_01_05, betrag: "-25.99", gegenpartei: "Kesselmann", id: "fg-a" }),
+      reihe({
+        tag: T_2026_01_05, betrag: "-9.99", gegenpartei: "Vibora", id: "fg-b",
+        iban: "DE18999999990000000002", kontoName: "Zweitkonto",
+      }),
+    );
+  }
+
+  it("importiert nur die Konten, die angehakt sind", async () => {
+    // **Der Fund, der hier nicht passieren darf:** eine Abwahl, die nur die Anzeige
+    // ändert und trotzdem alles schreibt.
+    const nutzer = userEvent.setup();
+    rendere(<ImportScreen />);
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy());
+    await dateiWaehlen(nutzer, zweiKonten());
+
+    await nutzer.click(await screen.findByLabelText(i18n.t("import.kontoImportieren", { name: "Zweitkonto" })));
+
+    const uebernehmen = screen
+      .queryAllByRole("button")
+      .find((b) => /übernehmen|importieren/i.test(b.textContent ?? ""));
+    await nutzer.click(uebernehmen!);
+
+    await waitFor(async () => {
+      const alle = await sqliteUmsatzRepository.alle();
+      expect(alle.map((u) => u.nativeId)).toEqual(["fg-a"]);
+    });
+  });
+
+  it("legt für ein abgewähltes Konto auch kein Konto an", async () => {
+    // Sonst stünde in der Verwaltung ein leeres Konto, das niemand bestellt hat.
+    const nutzer = userEvent.setup();
+    rendere(<ImportScreen />);
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy());
+    await dateiWaehlen(nutzer, zweiKonten());
+
+    await nutzer.click(await screen.findByLabelText(i18n.t("import.kontoImportieren", { name: "Zweitkonto" })));
+    const uebernehmen = screen
+      .queryAllByRole("button")
+      .find((b) => /übernehmen|importieren/i.test(b.textContent ?? ""));
+    await nutzer.click(uebernehmen!);
+
+    await waitFor(async () => {
+      const konten = await sqliteZahlungskontoRepository.alle();
+      expect(konten.map((k) => k.bezeichnung)).toEqual(["Girokonto"]);
+    });
+  });
+
+  it("zählt die Vorschau auf das herunter, was mitkommt", async () => {
+    // Eine Abwahl, bei der die Vorschau weiter alles zählt, wäre eine Zahl, die
+    // niemandes Frage beantwortet.
+    const nutzer = userEvent.setup();
+    rendere(<ImportScreen />);
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy());
+    await dateiWaehlen(nutzer, zweiKonten());
+
+    await screen.findByText("Vibora");
+    await nutzer.click(await screen.findByLabelText(i18n.t("import.kontoImportieren", { name: "Zweitkonto" })));
+
+    await waitFor(() => expect(screen.queryByText("Vibora")).not.toBeInTheDocument());
+    // Die Zeile des Kontos bleibt stehen — sonst gäbe es keinen Weg zurück.
+    expect(screen.getByText(i18n.t("import.kontoUebersprungen", { n: 1 }))).toBeTruthy();
+  });
+});
+
 describe("Die Kategorien der Datei", () => {
   it("zeigt die fremden Kategorien mit ihrer Anzahl, bevor übernommen wird", async () => {
     // **Der Kern des Ganzen.** Die Übersetzung entschied bis hierher unsichtbar mit,
@@ -209,14 +278,40 @@ describe("Die Kategorien der Datei", () => {
       ),
     );
 
-    await waitFor(() =>
-      expect(screen.getByText(i18n.t("import.fremd.titel"))).toBeTruthy(),
-    );
+    // Zugeklappt, weil alles zugeordnet ist — die Kopfzeile sagt es trotzdem.
+    const kopf = await screen.findByRole("button", {
+      name: new RegExp(i18n.t("import.fremd.titel")),
+    });
+    expect(screen.getByText(i18n.t("import.fremd.kurz", { n: 1 }))).toBeTruthy();
+
+    await nutzer.click(kopf);
+
     // Der fremde Name steht da, und daneben die Wahl mit der aufgelösten Kategorie.
     const wahl = await screen.findByLabelText(
       i18n.t("import.fremd.zielFuer", { name: "Lebensmittel" }),
     );
     expect(wahl.textContent).toMatch(/Lebensmittel/);
+  });
+
+  it("klappt von selbst auf, wenn eine Zuordnung ins Leere zeigt", async () => {
+    // Der Fall, für den es die Karte gibt, darf nicht hinter einem Klick liegen.
+    await sqliteKategorieRepository.speichern({
+      id: "k-le", name: "Lebensmittel", defaultCharakter: "Aufwand",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<ImportScreen />);
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy());
+    await dateiWaehlen(
+      nutzer,
+      csv(reihe({
+        tag: T_2026_01_05, betrag: "-9.99", gegenpartei: "Ohlert", id: "fg-9",
+        unterkategorie: "Restaurants",
+      })),
+    );
+
+    expect(
+      await screen.findByLabelText(i18n.t("import.fremd.zielFuer", { name: "Restaurants" })),
+    ).toBeTruthy();
   });
 
   it("benennt das Ziel, das dieser Bestand nicht kennt, statt es zu verschlucken", async () => {
