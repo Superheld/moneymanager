@@ -19,7 +19,11 @@ import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/h
 import { xlsxAusZeilen } from "../../../testwerkzeug/xlsxBauen";
 import { ImportScreen } from "./ImportScreen";
 import { sqliteUmsatzRepository } from "../../persistence/sqliteImportRepositories";
-import { sqliteZahlungskontoRepository } from "../../persistence/sqliteStammdatenRepositories";
+import {
+  sqliteKategorieRepository,
+  sqliteZahlungskontoRepository,
+} from "../../persistence/sqliteStammdatenRepositories";
+import i18n from "../../../i18n/i18n";
 
 let db: Database;
 
@@ -43,11 +47,11 @@ const KOPF = [
 /** Excel-Seriennummer des 05.01.2026. */
 const T_2026_01_05 = "46027";
 
-function reihe(o: { tag: string; betrag: string; gegenpartei: string; zweck?: string; id?: string }) {
+function reihe(o: { tag: string; betrag: string; gegenpartei: string; zweck?: string; id?: string; unterkategorie?: string }) {
   return [
     o.tag, "DE93999999990000000001", "Girokonto", o.betrag, "63.09", "EUR",
     o.gegenpartei, "", o.zweck ?? "", "", "", "",
-    "Essen & Trinken", "Lebensmittel", "nein", "", "", "nein", "nein", "Kartenzahlung",
+    "Essen & Trinken", o.unterkategorie ?? "Lebensmittel", "nein", "", "", "nein", "nein", "Kartenzahlung",
     "Ausgaben", "2026-01", "2026-01", "2026-Q1", "2026", o.id ?? "", "", "",
   ];
 }
@@ -181,5 +185,66 @@ describe("ImportScreen", () => {
       const umsaetze = await sqliteUmsatzRepository.alle();
       expect(umsaetze.filter((u) => u.nativeId === "fg-1")).toHaveLength(1);
     });
+  });
+});
+
+describe("Die Kategorien der Datei", () => {
+  it("zeigt die fremden Kategorien mit ihrer Anzahl, bevor übernommen wird", async () => {
+    // **Der Kern des Ganzen.** Die Übersetzung entschied bis hierher unsichtbar mit,
+    // unter welcher Kategorie hunderte Zeilen ankommen. Sie muss vor dem Übernehmen
+    // dastehen, nicht danach in der Durchsicht.
+    await sqliteKategorieRepository.speichern({
+      id: "k-le", name: "Lebensmittel", defaultCharakter: "Aufwand",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<ImportScreen />);
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy());
+
+    await dateiWaehlen(
+      nutzer,
+      csv(
+        reihe({ tag: T_2026_01_05, betrag: "-25.99", gegenpartei: "Kesselmann", id: "fg-1" }),
+        reihe({ tag: T_2026_01_05, betrag: "-9.99", gegenpartei: "Vibora", id: "fg-2" }),
+      ),
+    );
+
+    await waitFor(() =>
+      expect(screen.getByText(i18n.t("import.fremd.titel"))).toBeTruthy(),
+    );
+    // Der fremde Name steht da, und daneben die Wahl mit der aufgelösten Kategorie.
+    const wahl = await screen.findByLabelText(
+      i18n.t("import.fremd.zielFuer", { name: "Lebensmittel" }),
+    );
+    expect(wahl.textContent).toMatch(/Lebensmittel/);
+  });
+
+  it("benennt das Ziel, das dieser Bestand nicht kennt, statt es zu verschlucken", async () => {
+    // Die Annahme, die nicht trägt: die eingebaute Tabelle passt zum Katalog. Wer eigene
+    // Kategorien führt, hat „Auswärts essen" womöglich nie angelegt — vorher fiel die
+    // Zeile wortlos ans Modell, jetzt steht der gemeinte Name da.
+    await sqliteKategorieRepository.speichern({
+      id: "k-le", name: "Lebensmittel", defaultCharakter: "Aufwand",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<ImportScreen />);
+    await waitFor(() => expect(document.querySelector('input[type="file"]')).toBeTruthy());
+
+    await dateiWaehlen(
+      nutzer,
+      csv(
+        reihe({
+          tag: T_2026_01_05, betrag: "-25.99", gegenpartei: "Ohlert", id: "fg-1",
+          unterkategorie: "Restaurants",
+        }),
+      ),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.getByText(i18n.t("import.fremd.zielFehlt", { name: "Auswärts essen" })),
+      ).toBeTruthy(),
+    );
   });
 });

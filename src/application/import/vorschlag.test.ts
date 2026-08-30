@@ -6,6 +6,7 @@ import {
   katalogNachName,
   vorschlagFuer,
   vorschlagsbefundFuer,
+  type Vorschlagseingabe,
   type Vorschlagskontext,
 } from "./vorschlag";
 
@@ -31,6 +32,17 @@ function roh(over: Partial<RohUmsatz> = {}): RohUmsatz {
     istUmbuchung: false,
     ...over,
   };
+}
+
+/**
+ * Wie `roh`, aber als EINGABE der Kette.
+ *
+ * Der Unterschied ist der Punkt: `kategorieVorschlagId` steht nicht am RohUmsatz. Die
+ * Wahl aus der Import-Ansicht ist kein Teil des Belegs — sie kommt als Eingabe des
+ * Übernehmens dazu, so wie die Kontozuordnung auch.
+ */
+function eingabe(over: Partial<Vorschlagseingabe> = {}): Vorschlagseingabe {
+  return { ...roh(), ...over };
 }
 
 describe("Umbuchung (Grundverhalten)", () => {
@@ -120,6 +132,34 @@ describe("Was die Quelle mitbrachte", () => {
   it("greift nicht ohne Namenskarte", () => {
     // Aufrufer ohne Import müssen sie nicht bauen; dann entfällt die Stufe still.
     expect(vorschlagFuer(roh({ kategorieVorschlag: "Abos & Streaming" }), nurKatalog)).toBeUndefined();
+  });
+
+  it("lässt die gewählte Id die eingebaute Übersetzung schlagen", () => {
+    // Der Punkt der ganzen Stufe: was in der Import-Ansicht steht, gilt. Die Tabelle des
+    // Adapters kennt diesen Katalog nicht, der Mensch davor schon.
+    const v = vorschlagFuer(
+      eingabe({ kategorieVorschlag: "Abos & Streaming", kategorieVorschlagId: "k-le" }),
+      mitNamen,
+    );
+    expect(v).toEqual({ kategorieId: "k-le", charakter: "Aufwand", quelle: "fremdkategorie" });
+  });
+
+  it("nimmt die gewählte Id auch ohne Namenskarte", () => {
+    // Eine Id braucht keine Auflösung über Namen — genau deshalb ist sie eine Id.
+    expect(vorschlagFuer(eingabe({ kategorieVorschlagId: "k-abo" }), nurKatalog)?.kategorieId).toBe(
+      "k-abo",
+    );
+  });
+
+  it("fällt auf die Übersetzung zurück, wenn die gewählte Kategorie weg ist", () => {
+    // Zwischen dem Wählen und dem Übernehmen kann jemand die Kategorie gelöscht haben.
+    // Dann trägt die Wahl nichts mehr bei — aber sie darf die Stufe nicht mit sich
+    // reissen, sonst wäre ein Klick schlechter als kein Klick.
+    const v = vorschlagFuer(
+      eingabe({ kategorieVorschlag: "Abos & Streaming", kategorieVorschlagId: "weg" }),
+      mitNamen,
+    );
+    expect(v?.kategorieId).toBe("k-abo");
   });
 
   it("steht HINTER dem Vertrag", () => {

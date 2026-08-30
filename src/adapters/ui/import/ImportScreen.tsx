@@ -5,11 +5,14 @@
 
 import { useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KONTOTYPEN, type Kontotyp, type Zahlungskonto } from "../../../application";
+import { KONTOTYPEN, type Kategorie, type Kontotyp, type Zahlungskonto } from "../../../application";
 import { importUebernehmen, stammdaten } from "../../dienste";
 import {
+  fremdkategorienInDatei,
   kontoMatchVorschlag,
+  vorbelegteZuordnung,
   waehleAdapter,
+  type Fremdkategorienbefund,
   type ImportErgebnis,
   type KontoMatch,
   type UebernahmeErgebnis,
@@ -19,6 +22,7 @@ import {
 import "../../import/finanzguruAdapter";
 import { Button, Card, DataTable } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
+import { FremdkategorienKarte } from "./FremdkategorienKarte";
 import { useGeld } from "../bausteine/einstellungenKontext";
 
 const VORSCHAU_MAX = 500;
@@ -51,6 +55,9 @@ export function ImportScreen() {
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [uErgebnis, setUErgebnis] = useState<UebernahmeErgebnis | null>(null);
+  const [kategorien, setKategorien] = useState<Kategorie[]>([]);
+  const [fremdbefund, setFremdbefund] = useState<Fremdkategorienbefund | null>(null);
+  const [zuordnung, setZuordnung] = useState<Record<string, string>>({});
 
   async function dateiGewaehlt(e: React.ChangeEvent<HTMLInputElement>) {
     const datei = e.target.files?.[0];
@@ -72,12 +79,22 @@ export function ImportScreen() {
     setErgebnis(erg);
 
     let konten: Zahlungskonto[] = [];
+    let kats: Kategorie[] = [];
     try {
-      konten = [...(await stammdaten()).konten];
+      const daten = await stammdaten();
+      konten = [...daten.konten];
+      kats = [...daten.kategorien];
     } catch {
       konten = []; // reiner Browser-Modus ohne SQLite
     }
     setBestehende(konten);
+    setKategorien(kats);
+
+    // Die Zuordnung der fremden Kategorien wird VORBELEGT, nicht gesetzt: was die
+    // Übersetzung des Adapters vorschlägt, steht da und lässt sich ändern.
+    const befund = fremdkategorienInDatei(erg.umsaetze, kats);
+    setFremdbefund(befund);
+    setZuordnung(vorbelegteZuordnung(befund));
     const ms = kontoMatchVorschlag(erg.umsaetze, konten);
     setMatches(ms);
     const z: Record<string, Ziel> = {};
@@ -124,6 +141,7 @@ export function ImportScreen() {
         zeitpunkt: new Date().toISOString(),
         rohUmsaetze: ergebnis.umsaetze,
         konten,
+        fremdkategorien: zuordnung,
       });
       setUErgebnis(r);
     } catch (e) {
@@ -238,6 +256,24 @@ export function ImportScreen() {
           {uErgebnis && <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: "var(--sp-2)" }}>{t("import.uebernahmeHinweis")}</div>}
           {fehler && <div style={{ fontSize: "var(--fs-xs)", color: "var(--danger, #c0392b)", marginTop: "var(--sp-2)" }}>{t("import.fehlerDb")} ({fehler})</div>}
         </Card>
+      )}
+
+      {ergebnis && fremdbefund && (
+        <FremdkategorienKarte
+          befund={fremdbefund}
+          kategorien={kategorien}
+          zuordnung={zuordnung}
+          aufAenderung={(fremd, id) =>
+            setZuordnung((prev) => {
+              // Eine leere Wahl heisst „nicht zuordnen" — der Eintrag fällt raus, statt
+              // mit leerem Wert stehenzubleiben und beim Auflösen ins Leere zu greifen.
+              const naechste = { ...prev };
+              if (id) naechste[fremd] = id;
+              else delete naechste[fremd];
+              return naechste;
+            })
+          }
+        />
       )}
 
       {ergebnis && (

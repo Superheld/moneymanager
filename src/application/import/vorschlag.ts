@@ -11,7 +11,8 @@
 //   3. **Quelle** — die Importdatei brachte eine Kategorie mit, und ihr Adapter konnte
 //      sie übersetzen. Eine Angabe, keine Schätzung: dort steht, wie jemand diese Zahlung
 //      einsortiert HAT. Vor dem Modell, weil das sich immer festlegt und diese Stufe
-//      dahinter nie zum Zug käme.
+//      dahinter nie zum Zug käme. Innerhalb der Stufe gewinnt die Zuordnung, die beim
+//      Import gewählt wurde, über die eingebaute Übersetzung.
 //   4. **Modell** — der trainierte Klassifikator. Er legt sich immer fest.
 //
 // Trifft nichts, bleibt der Umsatz unkategorisiert und landet in der Review-Inbox.
@@ -77,6 +78,17 @@ export interface Vorschlagseingabe {
    * vom Adapter. Fehlt bei allem, was nicht aus einer Datei mit Kategorien kommt.
    */
   readonly kategorieVorschlag?: string;
+  /**
+   * Dieselbe Stufe, aber als Id — die Zuordnung, die beim Import jemand VOR AUGEN hatte.
+   *
+   * **Warum eine Id und nicht wieder ein Name.** Die Übersetzung des Adapters muss mit
+   * Namen arbeiten: sie kennt den Katalog dieses Bestands nicht, und ein Name ist das
+   * Einzige, worauf sie zeigen kann. Bei gleichnamigen Kategorien nimmt die Auflösung
+   * dann die erste — hinnehmbar für eine Schätzung, nicht für eine Wahl. Wer im Import
+   * eine bestimmte Kategorie angeklickt hat, hat GENAU diese gemeint, auch wenn eine
+   * zweite gleich heisst.
+   */
+  readonly kategorieVorschlagId?: string;
 }
 
 /** Alles, woraus ein Vorschlag entstehen kann. Jeder Teil ist optional. */
@@ -176,6 +188,13 @@ export function vorschlagsbefundFuer(
   // DIESEM Bestand getroffen hat. Die Kategorie einer fremden App ist eine aus einem
   // anderen Kontext — näher dran als eine Schätzung, weiter weg als die eigene
   // Entscheidung.
+  // Zuerst die Wahl des Menschen: die Import-Ansicht zeigt, was die Übersetzung vorhat,
+  // und lässt es ändern. Was dort steht, schlägt die eingebaute Tabelle — sie kennt
+  // diesen Katalog nicht, er schon.
+  if (roh.kategorieVorschlagId) {
+    const vorschlag = auf(roh.kategorieVorschlagId, "fremdkategorie", kontext);
+    if (vorschlag) return { vorschlag };
+  }
   if (roh.kategorieVorschlag && kontext.kategorieNachName?.size) {
     const kat = kontext.kategorieNachName.get(roh.kategorieVorschlag);
     if (kat) {
