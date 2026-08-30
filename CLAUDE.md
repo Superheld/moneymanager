@@ -1034,14 +1034,17 @@ Vier Entscheidungen darin, die man nicht anfassen sollte, ohne den Grund zu kenn
   alle Plattformen zusammen, und tauri-action baut sie als READ-MODIFY-WRITE: es lädt die
   vorhandene vom Release, übernimmt ihre `platforms` und schreibt die eigene dazu
   (nachgesehen im Quelltext von tauri-action, Datei upload-version-json.ts, beim
-  gepinnten SHA). Zwei Jobs, die
+  gepinnten SHA — auch nach dem Sprung auf 1.0.0 noch). Zwei Jobs, die
   gleichzeitig lesen, sehen denselben Stand — der zweite überschreibt den Eintrag des
   ersten. Der Fehlschlag ist **still**: die verlorene Plattform bekommt vom Updater
   „nichts Neues" statt eines Fehlers.
-- **Der Release-Text kommt vom ERSTEN Job.** tauri-action setzt Titel und Text nur beim
-  ANLEGEN des Releases; wer es vorfindet, lässt beides unberührt. Deshalb steht macOS in
-  der Matrix oben. Alle drei Jobs rechnen denselben Text aus, das Ergebnis hängt also
-  nicht daran — aber die Reihenfolge ist trotzdem kein Zufall.
+- **Der Release-Text kommt vom ersten Job — und seit tauri-action 1.0.0 auch von jedem
+  weiteren.** Bis v0 setzte die Action Titel und Text nur beim ANLEGEN des Releases und
+  liess ein vorgefundenes unberührt; jetzt schreibt jeder Job beides neu. Am Ergebnis
+  ändert das nichts, weil alle drei Läufer denselben Text ausrechnen. Es ändert die
+  **Fehlerform**: scherte früher ein Läufer aus, gewann trotzdem der erste Job, heute
+  gewinnt der letzte. Deshalb steht macOS weiterhin oben, und deshalb ist `shell: bash`
+  am Textschritt wichtiger geworden als vorher.
 - **`shell: bash` am Textschritt.** Ohne ihn nimmt GitHub auf Windows PowerShell, und das
   Skript stirbt an der ersten Zeile. Ein Schritt, der auf zwei von drei Läufern
   funktioniert, fällt erst im Release auf.
