@@ -29,6 +29,8 @@ import {
   stammdaten,
   umsaetze as alleUmsaetze,
   umsaetzeBuchen,
+  umsaetzeSammelKategorisieren,
+  umsaetzeSammelVerwerfen,
   umsatzSpeichern,
 } from "../../dienste";
 import {
@@ -130,6 +132,17 @@ export function ReviewScreen() {
   const [abrufLaeufe, setAbrufLaeufe] = useState<ReadonlySet<string>>(new Set());
   /** Der Weggelegt-Bereich ist zugeklappt: er ist der Rückweg, nicht der Alltag. */
   const [zeigeWeggelegt, setZeigeWeggelegt] = useState(false);
+  /**
+   * Die Sammelbearbeitung — ein Modus, kein Dauerzustand.
+   *
+   * Dieselbe Entscheidung wie im Kontoauszug: ohne Schalter trüge jede Zeile für immer
+   * ein Kästchen, das man in neun von zehn Sitzungen nicht braucht. Und die Inbox ist
+   * die Ansicht, in der man ZEILENWEISE arbeitet — der Stapelweg steht daneben, nicht
+   * davor.
+   */
+  const [auswahlModus, setAuswahlModus] = useState(false);
+  const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
+  const [sammelKategorie, setSammelKategorie] = useState("");
 
   async function laden() {
     try {
@@ -210,6 +223,91 @@ export function ReviewScreen() {
       await laden();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
+    }
+  }
+
+  /**
+   * Alles-Markieren meint das GEFILTERTE, nicht die sichtbare Seite.
+   *
+   * Wer nach einem Empfänger sucht und dann alles markiert, meint alle Treffer — nicht
+   * die ersten hundert davon. Dieselbe Regel wie im Kontoauszug.
+   */
+  const alleIds = useMemo(() => gefiltert.map((u) => u.id), [gefiltert]);
+  const alleGewaehlt = alleIds.length > 0 && alleIds.every((id) => auswahl.has(id));
+
+  /**
+   * Was nicht mehr sichtbar ist, ist nicht mehr gewählt.
+   *
+   * Ohne das trüge man eine unsichtbare Auswahl durch Filterwechsel und Seiten mit sich
+   * herum — und ein Sammel-Weglegen träfe dann Zeilen, die niemand vor Augen hatte. Der
+   * Preis ist, dass ein Filterwechsel die Auswahl kostet; das ist der richtige Preis.
+   */
+  useEffect(() => {
+    setAuswahl((bisher) => {
+      if (bisher.size === 0) return bisher;
+      const sichtbar = new Set(alleIds);
+      const naechste = new Set([...bisher].filter((id) => sichtbar.has(id)));
+      return naechste.size === bisher.size ? bisher : naechste;
+    });
+  }, [alleIds]);
+
+  const gewaehlteUmsaetze = useMemo(
+    () => umsaetze.filter((u) => auswahl.has(u.id)),
+    [umsaetze, auswahl],
+  );
+  /** Was der Sammelweg nicht anfasst — die Zahl gehört VOR die Aktion, nicht danach. */
+  const gewaehlteUmbuchungen = gewaehlteUmsaetze.filter(
+    (u) => u.vorschlag?.quelle === "umbuchung",
+  ).length;
+
+  function auswahlUmschalten(id: string) {
+    setAuswahl((bisher) => {
+      const neu = new Set(bisher);
+      if (neu.has(id)) neu.delete(id);
+      else neu.add(id);
+      return neu;
+    });
+  }
+
+  /**
+   * Die Kategorie für alle markierten Zeilen.
+   *
+   * Die leere Wahl heisst hier „Kategorie weg" und nicht „nicht anfassen" — anders als im
+   * Sammeldialog des Kontoauszugs, wo ein leeres Feld beides bedeuten könnte und deshalb
+   * einen eigenen Schalter braucht. Hier ist die Wahl selbst die Handlung: wer nichts
+   * ändern will, klickt nicht.
+   */
+  async function sammelKategorieGesetzt(kategorieId: string) {
+    setSammelKategorie(kategorieId);
+    setBusy(true);
+    setFehler(null);
+    try {
+      await umsaetzeSammelKategorisieren(
+        gewaehlteUmsaetze,
+        kategorieId ? katById.get(kategorieId) : undefined,
+      );
+      await laden();
+      setAuswahl(new Set());
+      setSammelKategorie("");
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Die markierten Zeilen weglegen. Ohne zweite Frage — weggelegt ist nicht gelöscht. */
+  async function sammelVerwerfen() {
+    setBusy(true);
+    setFehler(null);
+    try {
+      await umsaetzeSammelVerwerfen(gewaehlteUmsaetze);
+      await laden();
+      setAuswahl(new Set());
+    } catch (e) {
+      setFehler(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -363,11 +461,60 @@ export function ReviewScreen() {
               style={{ ...select, flex: "1 1 200px", minWidth: 160 }}
             />
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
+            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-xs)", color: "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap", alignSelf: "center" }}>
+              <input
+                type="checkbox"
+                checked={auswahlModus}
+                onChange={(e) => { setAuswahlModus(e.target.checked); if (!e.target.checked) setAuswahl(new Set()); }}
+                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+              />
+              {t("review.sammel.modus")}
+            </label>
           </div>
+
+          {/* Die Aktionsleiste erscheint erst, wenn etwas markiert ist. Vorher gäbe es
+              nichts zu tun, und ein grauer Knopf ist eine Frage ohne Antwort. */}
+          {auswahlModus && auswahl.size > 0 && (
+            <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)", padding: "8px 12px", borderRadius: "var(--r-md)", background: "var(--accent-wash)" }}>
+              <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-bold)", color: "var(--accent-deep)" }}>
+                {t("review.sammel.gewaehlt", { n: auswahl.size })}
+              </span>
+              <CategoryPicker
+                kompakt
+                kategorien={kategorien}
+                value={sammelKategorie}
+                onChange={(id) => void sammelKategorieGesetzt(id)}
+                placeholder={t("review.sammel.kategorieSetzen")}
+                ariaLabel={t("review.sammel.kategorieSetzen")}
+              />
+              <button className="linkbtn" style={{ color: "var(--warn-deep)" }} onClick={busy ? undefined : () => void sammelVerwerfen()}>
+                {t("review.sammel.weglegen", { n: auswahl.size })}
+              </button>
+              <button className="linkbtn" onClick={() => setAuswahl(new Set())}>{t("review.sammel.aufheben")}</button>
+              {/* Was der Sammelweg auslässt, steht VOR der Aktion da — nicht als
+                  Ergebnismeldung hinterher. */}
+              {gewaehlteUmbuchungen > 0 && (
+                <span className="muted" style={{ fontSize: "var(--fs-2xs)" }}>
+                  {t("review.sammel.umbuchungHinweis", { n: gewaehlteUmbuchungen })}
+                </span>
+              )}
+            </div>
+          )}
 
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
             <thead>
               <tr>
+                {auswahlModus && (
+                  <th style={{ ...th, width: 32 }}>
+                    <input
+                      type="checkbox"
+                      checked={alleGewaehlt}
+                      aria-label={t("review.sammel.alleWaehlen")}
+                      onChange={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
+                      style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                    />
+                  </th>
+                )}
                 <th style={th}>{t("review.spalteDatum")}</th>
                 <th style={th}>{t("review.spalteKonto")}</th>
                 <th style={th}>{t("review.spalteGegenpartei")}</th>
@@ -379,6 +526,17 @@ export function ReviewScreen() {
             <tbody>
               {zeilen.map((u) => (
                 <tr key={u.id}>
+                  {auswahlModus && (
+                    <td style={td}>
+                      <input
+                        type="checkbox"
+                        checked={auswahl.has(u.id)}
+                        aria-label={t("review.sammel.zeileWaehlen")}
+                        onChange={() => auswahlUmschalten(u.id)}
+                        style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                      />
+                    </td>
+                  )}
                   <td style={td}>{ddmmyyyy(u.buchungstag)}</td>
                   <td style={{ ...td, color: "var(--ink-3)" }}>{kontoName.get(u.zahlungskontoId) ?? "—"}</td>
                   <td style={td}>
