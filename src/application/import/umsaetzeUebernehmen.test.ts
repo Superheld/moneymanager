@@ -109,6 +109,36 @@ describe("umsaetzeUebernehmen", () => {
     expect(laeufe[0]).toMatchObject({ quelle: "finanzguru", eingelesen: 2, neu: 2, duplikate: 0 });
   });
 
+  it("nimmt die Zuordnung der fremden Kategorien aus der Import-Ansicht", async () => {
+    // **Die Naht, die das Sichtbarmachen erst wirksam macht.** Die Ansicht zeigt, was aus
+    // „Restaurants" wird, und lässt es ändern; hier muss diese Wahl ankommen. Sie greift
+    // über den ROHEN Namen der Quelle, nicht über die Übersetzung — die kann fehlen oder
+    // auf etwas zeigen, das es hier nicht gibt.
+    const { deps, umsaetze } = fakes();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "finanzguru",
+        zeitpunkt: "2026-06-21T10:00:00Z",
+        rohUmsaetze: [
+          roh({ kontoIban: "DE111", nativeId: "n1", kategorieHinweis: " Restaurants " }),
+          roh({ kontoIban: "DE111", nativeId: "n2", kategorieHinweis: "Nichts davon" }),
+        ],
+        konten: [{ quelleKey: "DE111", neu: { bezeichnung: "Giro", typ: "Giro", iban: "DE111" } }],
+        fremdkategorien: { Restaurants: "k-le" },
+      },
+      deps,
+    );
+
+    // Getrimmt, sonst greift eine Zuordnung aus der Ansicht am Leerzeichen vorbei.
+    expect(umsaetze.find((u) => u.nativeId === "n1")!.vorschlag).toEqual({
+      kategorieId: "k-le",
+      charakter: "Aufwand",
+      quelle: "fremdkategorie",
+    });
+    // Was nicht zugeordnet wurde, bleibt offen — „nicht zuordnen" ist eine gültige Antwort.
+    expect(umsaetze.find((u) => u.nativeId === "n2")!.vorschlag).toBeUndefined();
+  });
+
   it("dedupliziert gegen den Bestand beim zweiten Lauf (nichts doppelt gespeichert)", async () => {
     const { deps, umsaetze } = fakes();
     const eingabe = {
