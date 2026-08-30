@@ -15,7 +15,7 @@
 #[cfg(test)]
 mod tests {
     use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions};
-    use sqlx::{Executor, SqlitePool};
+    use sqlx::{AssertSqlSafe, Executor, SqlitePool};
     use std::path::PathBuf;
 
     /// Ein eigener Pfad je Testfall — die Tests laufen nebenlaeufig.
@@ -41,7 +41,9 @@ mod tests {
         let pool = SqlitePoolOptions::new().max_connections(1).connect_with(opts).await?;
         if let Some(k) = pragma {
             // Eingesetzt statt gebunden: `PRAGMA` nimmt keine Platzhalter.
-            pool.execute(format!("PRAGMA key = {k}").as_str()).await?;
+            sqlx::query(AssertSqlSafe(format!("PRAGMA key = {k}")))
+                .execute(&pool)
+                .await?;
         }
         Ok(pool)
     }
@@ -262,7 +264,8 @@ mod tests {
             .await
             .expect("pool");
 
-        pool.execute(format!("PRAGMA key = {}", dk.als_pragma()).as_str())
+        sqlx::query(AssertSqlSafe(format!("PRAGMA key = {}", dk.als_pragma())))
+            .execute(&pool)
             .await
             .expect("key auf irgendeiner Verbindung");
 
