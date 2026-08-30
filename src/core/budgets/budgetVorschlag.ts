@@ -6,8 +6,8 @@
 // Verhalten: „diesen Monat noch 120 € für Auswärts essen". Eine Kategorie, die
 // vollständig aus Verträgen besteht (Miete, Versicherungen, Kredite), lässt sich
 // nicht steuern — dort wäre ein Budget nur eine Zahl, die man jeden Monat exakt
-// trifft und aus der man nichts lernt. Auf echten Daten traf das drei von sieben
-// Hauptkategorien: Wohnen, Finanzen und Sonstiges sind zu 100 % vertraglich gebunden.
+// trifft und aus der man nichts lernt. Am echten Bestand betraf das einen erheblichen
+// Teil der Hauptkategorien, und nicht die Ausnahme.
 //
 // Deshalb: Vorschlag = Median der Monatssummen MINUS der vertraglich gebundene Teil,
 // und nur, wenn davon genug übrig bleibt.
