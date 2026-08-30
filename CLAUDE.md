@@ -847,10 +847,18 @@ Mechanismus, Workflow und Releases stehen. Offen ist:
 - **Das Apple-Zertifikat** und die sechs Secrets dazu. Ohne sie wird unsigniert
   ausgeliefert, und das Release sagt es (siehe unten). Die drei anderen Secrets liegen:
   `TAURI_SIGNING_PRIVATE_KEY`, dessen Passwort und `FINTS_PRODUKT_ID`.
-- **Ob Linux und Windows wirklich bauen.** Der Workflow baut sie seit dem 28.08.2026, aber
-  es hat vorher nie jemand versucht — die CI baut Rust absichtlich nicht. Der wahrscheinlichste
-  Stolperstein ist Windows: SQLCipher zieht OpenSSL mit
-  (`bundled-sqlcipher-vendored-openssl`), und dessen Bauweg braucht dort Perl und NASM.
+- **Windows.** Linux baut — das AppImage hängt seit 0.24.0 an jedem Release. Windows nicht,
+  und der Stolperstein lag vor dem, den wir erwartet hatten: **der Job stirbt an den TESTS,
+  bevor überhaupt ein Compiler läuft.** Die vermutete Hürde (SQLCipher zieht OpenSSL mit,
+  dessen Bauweg dort Perl und NASM braucht) ist damit weiterhin ungeprüft — sie liegt hinter
+  einer Tür, die noch nie aufging.
+
+  Das ist der allgemeine Teil daran: **ein plattformübergreifender Testlauf prüft auch die
+  Tests auf Plattformunterschiede**, und die haben welche. Der erste Fund war ein URL-Pfad,
+  der als Dateipfad benutzt wurde (`new URL(…).pathname` — auf Windows steht der
+  Laufwerksbuchstabe hinter einem Schrägstrich); behoben, aber es ist unwahrscheinlich, dass
+  er der einzige war. Wer Windows zum Laufen bringen will, rechnet mit einer Kette solcher
+  Funde und nicht mit einem.
 
 **Was in einem veröffentlichten Archiv steckt** und was nicht, weil die Frage naheliegt:
 keine Zugangsdaten, keine Kontodaten, kein Datenbestand — die Datenbank liegt im
