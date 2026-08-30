@@ -436,6 +436,10 @@ Vier Entscheidungen, die man kennen muss:
   Webview, der irgendwohin schreiben darf, ist einer, der überall hinschreiben kann.
 - **Der Pfad wird angezeigt.** Ins App-Datenverzeichnis findet niemand von selbst; ein
   „fertig" ohne Ort schickt den Nutzer suchen.
+- **Der Dateiname trägt den Bestand** (`konfiguration-moneymanager-dev-<tag>.json`). Echter
+  Bestand und Spielstand liegen in zwei Dateien, aber im SELBEN Datenverzeichnis — der
+  Identifier trennt sie nicht. Ohne die Kennung überschriebe ein Export aus der
+  installierten App den des Spielstands wortlos, und von aussen sähen beide gleich aus.
 - **Eltern stehen vor ihren Kindern.** Wer die Liste von oben nach unten einliest, findet
   jede Elternkategorie bereits angelegt vor. Nach Namen sortiert müsste ein Importeur
   zweimal laufen.

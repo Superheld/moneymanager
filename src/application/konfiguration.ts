@@ -84,9 +84,21 @@ export function inExportform(kategorien: readonly Kategorie[]): ExportKategorie[
   return ergebnis;
 }
 
-/** Der Dateiname zu einem Tag. Ein Export je Tag, der neuere ersetzt den älteren. */
-export function exportDateiname(erzeugt: Date): string {
-  return `konfiguration-${erzeugt.toISOString().slice(0, 10)}.json`;
+/**
+ * Der Dateiname zu einem Tag und einem Bestand.
+ *
+ * **Die Bestandskennung ist nicht Zierrat.** Der echte Bestand und der Spielstand liegen
+ * in zwei Dateien, aber im SELBEN App-Datenverzeichnis — der Identifier trennt sie nicht
+ * (siehe `datenbankdatei.ts`). Ohne Kennung schreiben beide Apps denselben Namen, und ein
+ * Export aus der installierten App überschriebe den des Spielstands wortlos. Die beiden
+ * sehen von aussen gleich aus; welcher gemeint war, wüsste danach niemand mehr.
+ *
+ * Ein Export je Tag und Bestand, der neuere ersetzt den älteren. Bei einer Momentaufnahme
+ * ist das richtig — anders als bei den Sicherungen, wo der ALTE Stand der wertvolle ist.
+ */
+export function exportDateiname(erzeugt: Date, bestand: string): string {
+  const kennung = bestand.replace(/\.db$/, "");
+  return `konfiguration-${kennung}-${erzeugt.toISOString().slice(0, 10)}.json`;
 }
 
 /**
@@ -99,11 +111,15 @@ export async function konfigurationExportieren(
   repo: KategorieRepository,
   ziel: ExportZiel,
   erzeugt: Date,
+  bestand: string,
 ): Promise<string> {
   const inhalt: Konfigurationsexport = {
     fassung: EXPORT_FASSUNG,
     erzeugt: erzeugt.toISOString(),
     kategorien: inExportform(await repo.alle()),
   };
-  return ziel.schreiben(exportDateiname(erzeugt), JSON.stringify(inhalt, null, 2) + "\n");
+  return ziel.schreiben(
+    exportDateiname(erzeugt, bestand),
+    JSON.stringify(inhalt, null, 2) + "\n",
+  );
 }

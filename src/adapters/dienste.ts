@@ -159,6 +159,7 @@ import { sqliteBudgetRepository } from "./persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "./persistence/sqliteLedgerRepository";
 import { sqliteKategorieRepository } from "./persistence/sqliteStammdatenRepositories";
 import { tauriExportZiel } from "./persistence/export";
+import { DATEINAME } from "./persistence/datenbankdatei";
 import { sqliteVertragszuordnungRepository } from "./persistence/sqliteVertragZuordnungRepositories";
 import { sqliteZahlungsregelRepository } from "./persistence/sqliteZahlungsregelRepository";
 import { sqliteInventarRepository } from "./persistence/sqliteInventarRepository";
@@ -254,7 +255,12 @@ export function experimentSetzen(id: ExperimentId, an: boolean): Promise<void> {
  * ein Zeitpunkt ist eine Beobachtung der Umwelt.
  */
 export function konfigurationExport(): Promise<string> {
-  return konfigurationExportieren(sqliteKategorieRepository, tauriExportZiel, new Date());
+  return konfigurationExportieren(
+    sqliteKategorieRepository,
+    tauriExportZiel,
+    new Date(),
+    DATEINAME,
+  );
 }
 
 /**

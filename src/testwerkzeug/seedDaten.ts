@@ -17,6 +17,8 @@
 //
 // Diese Datei ist Werkzeug und aus der Coverage ausgenommen.
 
+import { standardkategorienFlach } from "../application/kategorien/standardkategorien";
+
 /** Was der Seed von einer Datenbank braucht — bewusst weniger als sql.js bietet. */
 export interface SeedDb {
   run(sql: string, werte?: (string | number | null)[]): unknown;
@@ -157,30 +159,25 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     }
   }
 
-  // Der Baum: Oberkategorie, darunter das Feine. `default_charakter` entscheidet, wohin
-  // eine Buchung ohne eigene Angabe faellt.
-  const kategorien = [
-    { id: "kat-wohnen", name: "Wohnen", eltern: null, charakter: "Aufwand" },
-    { id: "kat-miete", name: "Miete", eltern: "kat-wohnen", charakter: "Aufwand" },
-    { id: "kat-energie", name: "Energie", eltern: "kat-wohnen", charakter: "Aufwand" },
-    { id: "kat-internet", name: "Internet und Telefon", eltern: "kat-wohnen", charakter: "Aufwand" },
-    { id: "kat-lebensmittel", name: "Lebensmittel", eltern: null, charakter: "Aufwand" },
-    { id: "kat-mobilitaet", name: "Mobilitaet", eltern: null, charakter: "Aufwand" },
-    { id: "kat-versicherung", name: "Versicherungen", eltern: null, charakter: "Aufwand" },
-    { id: "kat-gesundheit", name: "Gesundheit", eltern: null, charakter: "Aufwand" },
-    { id: "kat-freizeit", name: "Freizeit", eltern: null, charakter: "Aufwand" },
-    { id: "kat-anschaffung", name: "Anschaffungen", eltern: null, charakter: "Aufwand" },
-    { id: "kat-steuern", name: "Steuern und Abgaben", eltern: null, charakter: "Aufwand" },
-    { id: "kat-gehalt", name: "Gehalt", eltern: null, charakter: "Ertrag" },
-    { id: "kat-sonstige-ertrag", name: "Sonstige Einnahmen", eltern: null, charakter: "Ertrag" },
-    { id: "kat-uebertrag", name: "Uebertrag", eltern: null, charakter: "Umschichtung" },
-  ];
-  for (const k of kategorien) {
+  // **Die Kategorien kommen aus der VORLAGE, nicht aus einer eigenen Liste.**
+  //
+  // Bis 2026-08-30 standen hier vierzehn selbst gepflegte Eintraege, und sie hiessen
+  // anders als die Vorlage dieselben Dinge nennt: `Mobilitaet` ohne Umlaut, `Miete` statt
+  // `Miete / Rate`, `Energie` statt `Strom & Gas`, `Freizeit` statt `Freizeit & Hobby`.
+  // `standardkategorienAnlegen` gleicht ueber den NAMEN ab — sieben der vierzehn fanden
+  // keinen Partner, und wer nach einem `npm run seed` in der App auf
+  // „Standardkategorien laden" drueckte, bekam sie ein zweites Mal. Zwei Listen fuer
+  // dieselbe Sache driften auseinander, und diese beiden haben es getan.
+  //
+  // Jetzt gibt es nur noch eine Liste. Der Spielstand sieht damit aus wie ein frisch
+  // eingerichteter Bestand statt wie ein Sonderfall, und die Vorlage laeuft bei jedem
+  // `npm test` durch `seed.test.ts` mit.
+  for (const k of standardkategorienFlach()) {
     setzen("INSERT INTO kategorie (id, name, eltern_id, default_charakter) VALUES (?, ?, ?, ?)", [
       k.id,
       k.name,
-      k.eltern,
-      k.charakter,
+      k.elternId ?? null,
+      k.defaultCharakter,
     ]);
   }
 
@@ -201,13 +198,13 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     },
     {
       id: "budget-freizeit",
-      kategorie: "kat-freizeit",
+      kategorie: "kat-freizeit-hobby",
       art: "monatlich",
       betraege: [{ ab: monat(-MONATE), betrag: 18000 }],
     },
     {
       id: "budget-anschaffung",
-      kategorie: "kat-anschaffung",
+      kategorie: "kat-anschaffungen",
       art: "aufbauend",
       betraege: [{ ab: monat(-MONATE), betrag: 15000 }],
     },
@@ -232,8 +229,8 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // ------------------------------------------------------------ Vertraege und Inventar
 
   const vertraege = [
-    { id: "vertrag-internet", anbieter: "Halvern", kategorie: "kat-internet", betrag: -4500 },
-    { id: "vertrag-versicherung", anbieter: "Mordhorst", kategorie: "kat-versicherung", betrag: -8900 },
+    { id: "vertrag-internet", anbieter: "Halvern", kategorie: "kat-internet-telefon", betrag: -4500 },
+    { id: "vertrag-versicherung", anbieter: "Mordhorst", kategorie: "kat-versicherungen", betrag: -8900 },
   ];
   for (const v of vertraege) {
     setzen(
@@ -256,7 +253,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   for (const i of inventar) {
     setzen(
       "INSERT INTO inventargegenstand (id, bezeichnung, wiederbeschaffung, nutzungsdauer_monate, anschaffung, kategorie_id, konto_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [i.id, i.bezeichnung, i.wert, i.monate, tagIn(-MONATE - 12, 10), "kat-anschaffung", "konto-tagesgeld"],
+      [i.id, i.bezeichnung, i.wert, i.monate, tagIn(-MONATE - 12, 10), "kat-anschaffungen", "konto-tagesgeld"],
     );
   }
 
@@ -403,14 +400,14 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     // Wiederkehrendes — das Geruest, an dem der Monatsverlauf haengt
     fest(28, 315000, "konto-giro", "kat-gehalt", "Ertrag", "Auszahlung", "Bezuege");
     fest(1, -98000, "konto-giro", "kat-miete", "Aufwand", "Steenbeck", "Monatsmiete");
-    fest(5, -4500, "konto-giro", "kat-internet", "Aufwand", "Halvern", "Grundgebuehr", "vertrag-internet");
-    fest(15, -8900, "konto-giro", "kat-versicherung", "Aufwand", "Mordhorst", "Beitrag", "vertrag-versicherung");
+    fest(5, -4500, "konto-giro", "kat-internet-telefon", "Aufwand", "Halvern", "Grundgebuehr", "vertrag-internet");
+    fest(15, -8900, "konto-giro", "kat-versicherungen", "Aufwand", "Mordhorst", "Beitrag", "vertrag-versicherung");
     fest(8, -zahlZwischen(6000, 11000), "konto-giro", "kat-energie", "Aufwand", "Wendlandt", "Abschlag");
     // Eine Umschichtung hat ZWEI Seiten — sonst zeigt der Verlauf einen Stand, den es nie gab.
-    buchung(tagIn(-m, 2), -30000, "konto-giro", "kat-uebertrag", "Umschichtung", {
+    buchung(tagIn(-m, 2), -30000, "konto-giro", "kat-sparen-anlegen", "Umschichtung", {
       notiz: "Uebertrag zur Ruecklage",
     });
-    buchung(tagIn(-m, 2), 30000, "konto-tagesgeld", "kat-uebertrag", "Umschichtung", {
+    buchung(tagIn(-m, 2), 30000, "konto-tagesgeld", "kat-sparen-anlegen", "Umschichtung", {
       notiz: "Uebertrag vom Girokonto",
     });
 
@@ -426,7 +423,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       );
     }
     for (let i = 0; i < zahlZwischen(1, 4); i++) {
-      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(1200, 7800), "konto-kk", "kat-freizeit", "Aufwand", {
+      buchung(tagIn(-m, zahlZwischen(3, 26)), -zahlZwischen(1200, 7800), "konto-kk", "kat-freizeit-hobby", "Aufwand", {
         notiz: bezeichnung("freizeit"),
       });
     }
@@ -441,7 +438,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       });
     }
     if (zufall() < 0.3) {
-      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(8000, 42000), "konto-tagesgeld", "kat-anschaffung", "Aufwand", {
+      buchung(tagIn(-m, zahlZwischen(5, 24)), -zahlZwischen(8000, 42000), "konto-tagesgeld", "kat-anschaffungen", "Aufwand", {
         notiz: bezeichnung("anschaffung"),
       });
     }
@@ -470,7 +467,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   );
   setzen(
     "INSERT INTO ist_buchung_aufteilung (id, istbuchung_id, kategorie_id, betrag, notiz) VALUES (?, ?, ?, ?, ?)",
-    ["teil-2", geteilt, "kat-anschaffung", -4500, null],
+    ["teil-2", geteilt, "kat-anschaffungen", -4500, null],
   );
 
   // Drei Buchungen, die noch angesehen werden muessen. `zu_pruefen` setzt die Durchsicht,
@@ -481,10 +478,10 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     "hash-pruef-1": buchung(tagIn(0, 3), -8790, "konto-giro", null, "Aufwand", {
       quelle: "import", rohHash: "hash-pruef-1", zuPruefen: true, kategorieHerkunft: "automatisch",
     }),
-    "hash-pruef-2": buchung(tagIn(0, 6), -16820, "konto-kk", "kat-anschaffung", "Aufwand", {
+    "hash-pruef-2": buchung(tagIn(0, 6), -16820, "konto-kk", "kat-anschaffungen", "Aufwand", {
       quelle: "import", rohHash: "hash-pruef-2", zuPruefen: true, kategorieHerkunft: "automatisch",
     }),
-    "hash-pruef-3": buchung(tagIn(-1, 24), 9900, "konto-giro", "kat-sonstige-ertrag", "Ertrag", {
+    "hash-pruef-3": buchung(tagIn(-1, 24), 9900, "konto-giro", "kat-sonstige-einnahmen", "Ertrag", {
       quelle: "import", rohHash: "hash-pruef-3", zuPruefen: true, kategorieHerkunft: "automatisch",
     }),
   };
@@ -493,7 +490,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // AUSDRUECKLICH zu keinem Vertrag gehoert. `vertrag_id` leer, Herkunft gesetzt — ohne
   // die Herkunft holte der naechste Abgleich sie zurueck, und die Handkorrektur waere
   // jedes Mal aufs Neue zu machen.
-  buchung(tagIn(-1, 9), -4500, "konto-giro", "kat-internet", "Aufwand", {
+  buchung(tagIn(-1, 9), -4500, "konto-giro", "kat-internet-telefon", "Aufwand", {
     notiz: "Einmalige Zusatzleistung",
     vertragId: null, vertragHerkunft: "manuell",
   });
@@ -505,10 +502,10 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   for (const r of [
     { id: "regel-miete", bez: "Miete", betrag: -98000, rhythmus: "monatlich", tag: 1, kat: "kat-miete", charakter: "Aufwand", vertrag: null },
     { id: "regel-gehalt", bez: "Bezuege", betrag: 315000, rhythmus: "monatlich", tag: 28, kat: "kat-gehalt", charakter: "Ertrag", vertrag: null },
-    { id: "regel-internet", bez: "Internet", betrag: -4500, rhythmus: "monatlich", tag: 5, kat: "kat-internet", charakter: "Aufwand", vertrag: "vertrag-internet" },
-    { id: "regel-versicherung", bez: "Versicherung", betrag: -8900, rhythmus: "monatlich", tag: 15, kat: "kat-versicherung", charakter: "Aufwand", vertrag: "vertrag-versicherung" },
+    { id: "regel-internet", bez: "Internet", betrag: -4500, rhythmus: "monatlich", tag: 5, kat: "kat-internet-telefon", charakter: "Aufwand", vertrag: "vertrag-internet" },
+    { id: "regel-versicherung", bez: "Versicherung", betrag: -8900, rhythmus: "monatlich", tag: 15, kat: "kat-versicherungen", charakter: "Aufwand", vertrag: "vertrag-versicherung" },
     // Eine nicht-monatliche, damit die Projektionsarithmetik im Spielstand vorkommt.
-    { id: "regel-beitrag", bez: "Jahresbeitrag", betrag: -24000, rhythmus: "jaehrlich", tag: 20, kat: "kat-freizeit", charakter: "Aufwand", vertrag: null },
+    { id: "regel-beitrag", bez: "Jahresbeitrag", betrag: -24000, rhythmus: "jaehrlich", tag: 20, kat: "kat-freizeit-hobby", charakter: "Aufwand", vertrag: null },
   ]) {
     setzen(
       "INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id, vertrag_id) " +
@@ -686,7 +683,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   //
   // Der Spielstand traegt das Feld, damit sichtbar ist, dass es importiert und (Stand
   // heute) von niemandem ausgewertet wird.
-  const ueberDienstleister = buchung(tagIn(0, 11), -3990, "konto-giro", "kat-freizeit", "Aufwand", {
+  const ueberDienstleister = buchung(tagIn(0, 11), -3990, "konto-giro", "kat-freizeit-hobby", "Aufwand", {
     quelle: "import",
     rohHash: "hash-dienstleister",
     kategorieHerkunft: "automatisch",
@@ -706,7 +703,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // ueber die Erkennungsregel eines Vertrags wiegt anders als einer des Modells.
   const posteingang = [
     { partei: einesVon(GEGENPARTEIEN.lebensmittel), betrag: -4230, zweck: "Einkauf", kat: "kat-lebensmittel", quelle: "ki" },
-    { partei: einesVon(GEGENPARTEIEN.freizeit), betrag: -1990, zweck: "Monatsbeitrag", kat: "kat-freizeit", quelle: "ki" },
+    { partei: einesVon(GEGENPARTEIEN.freizeit), betrag: -1990, zweck: "Monatsbeitrag", kat: "kat-freizeit-hobby", quelle: "ki" },
     { partei: "Wendlandt", betrag: -7350, zweck: "Abschlag", kat: "kat-energie", quelle: "regel" },
     { partei: einesVon(GEGENPARTEIEN.mobilitaet), betrag: -6750, zweck: "Fahrschein", kat: "kat-mobilitaet", quelle: "regel" },
     { partei: einesVon(GEGENPARTEIEN.gesundheit), betrag: -3120, zweck: "Rechnung", kat: "kat-gesundheit", quelle: "ki" },

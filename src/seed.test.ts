@@ -19,6 +19,7 @@ import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { MIGRATIONS } from "./adapters/persistence/migrations";
 import { seedEinspielen } from "./testwerkzeug/seedDaten";
+import { standardkategorienFlach } from "./application/kategorien/standardkategorien";
 
 /**
  * Ein FESTER Stichtag. Mit `new Date()` pruefte der Test am Monatsersten etwas anderes
@@ -57,6 +58,43 @@ describe("Spielstand", () => {
     // Genau diese Asymmetrie ist der Grund, warum so etwas sonst erst in der App auffaellt
     // (siehe `adapters/persistence/CLAUDE.md`).
     expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
+  });
+
+  it("legt genau die Kategorien der Vorlage an — keine eigenen", () => {
+    // **Der Fehler, den es hier zu verhindern gilt, ist einmal passiert.** Der Seed fuehrte
+    // eine EIGENE Kategorienliste, und sie hiess dieselben Dinge anders als die Vorlage:
+    // `Mobilitaet` ohne Umlaut, `Miete` statt `Miete / Rate`. `standardkategorienAnlegen`
+    // gleicht ueber den Namen ab, fand sieben davon nicht wieder und legte sie ein zweites
+    // Mal an — der Spielstand hatte danach Dubletten, und man sah ihm nicht an, woher sie
+    // kamen.
+    //
+    // Der Test prueft deshalb GLEICHHEIT und nicht Teilmenge: eine Kategorie im Seed, die
+    // die Vorlage nicht kennt, ist genau der Anfang, mit dem es letztes Mal losging.
+    const db = mitSeed();
+    const [zeilen] = db.exec("SELECT id, name FROM kategorie ORDER BY id");
+    const imSeed = (zeilen?.values ?? []).map((z) => `${String(z[0])} ${String(z[1])}`);
+    const inDerVorlage = standardkategorienFlach()
+      .map((k) => `${k.id} ${k.name}`)
+      .sort();
+    expect(imSeed.sort()).toEqual(inDerVorlage);
+  });
+
+  it("haengt jede Buchung, jedes Budget und jeden Vertrag an eine Kategorie, die es gibt", () => {
+    // `foreign_key_check` oben faengt das ebenfalls — aber erst als anonyme Verletzung.
+    // Hier faellt der NAME, und beim Umbenennen einer Vorlagen-Kategorie ist das der
+    // Unterschied zwischen „irgendwo ein Verweis kaputt" und „diese Zeile hier".
+    const db = mitSeed();
+    const bekannt = new Set(standardkategorienFlach().map((k) => k.id));
+    for (const tabelle of ["ist_buchung", "budget", "vertrag", "inventargegenstand"]) {
+      const [zeilen] = db.exec(
+        `SELECT DISTINCT kategorie_id FROM ${tabelle} WHERE kategorie_id IS NOT NULL`,
+      );
+      for (const [id] of zeilen?.values ?? []) {
+        expect(bekannt.has(String(id)), `${tabelle} zeigt auf die unbekannte Kategorie ${id}`).toBe(
+          true,
+        );
+      }
+    }
   });
 
   it("fuellt jeden Bereich, den die App anzeigt", () => {

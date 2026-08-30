@@ -16,7 +16,23 @@ function memRepo(initial: Kategorie[] = []): KategorieRepository {
   };
 }
 
-const ERWARTET = STANDARDKATEGORIEN.reduce((n, g) => n + 1 + g.kinder.length, 0);
+/**
+ * Alle Namen im Baum, ueber BELIEBIG viele Ebenen.
+ *
+ * Vorher stand hier `1 + g.kinder.length` — die Annahme, die Vorlage sei zweistufig. Sie
+ * stimmte, bis sie es nicht mehr tat, und der Fehlschlag war eine Zahl, die um eins
+ * danebenlag. Beim Erstattungs-Waechter darunter waere er schlimmer gewesen: der haette
+ * eine Kategorie auf der dritten Ebene schlicht nicht gesehen und trotzdem gruen gemeldet.
+ */
+function alleNamen(eintraege: readonly unknown[]): string[] {
+  return eintraege.flatMap((e) => {
+    if (typeof e === "string") return [e];
+    const k = e as { name: string; kinder?: readonly unknown[] };
+    return [k.name, ...(k.kinder ? alleNamen(k.kinder) : [])];
+  });
+}
+
+const ERWARTET = alleNamen(STANDARDKATEGORIEN).length;
 
 describe("Standardkategorien-Seed/Backfill", () => {
   /**
@@ -28,11 +44,7 @@ describe("Standardkategorien-Seed/Backfill", () => {
    * Handgriff ist — die Liste sieht ohne sie unvollstaendig aus.
    */
   it("kennt keine Kategorie fuer Erstattungen", () => {
-    const alle = STANDARDKATEGORIEN.flatMap((g) => [
-      g.name,
-      ...g.kinder.map((k) => (typeof k === "string" ? k : k.name)),
-    ]);
-    expect(alle.filter((n) => /rstattung/.test(n))).toEqual([]);
+    expect(alleNamen(STANDARDKATEGORIEN).filter((n) => /rstattung/.test(n))).toEqual([]);
   });
 
   it("legt auf leerer DB alle Standardkategorien an", async () => {
