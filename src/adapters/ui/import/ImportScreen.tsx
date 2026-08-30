@@ -3,16 +3,16 @@
 // Kategorien + Verbuchen kommt als Review-Inbox (Slice 4). Alles Geld über useGeld(),
 // alle Strings über t(). Persistenz nur in der Desktop-App (tauri dev).
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { KONTOTYPEN, type Kategorie, type Kontotyp, type Zahlungskonto } from "../../../application";
 import { importUebernehmen, stammdaten } from "../../dienste";
 import {
   fremdkategorienInDatei,
   kontoMatchVorschlag,
+  quelleKeyFuer,
   vorbelegteZuordnung,
   waehleAdapter,
-  type Fremdkategorienbefund,
   type ImportErgebnis,
   type KontoMatch,
   type UebernahmeErgebnis,
@@ -56,8 +56,15 @@ export function ImportScreen() {
   const [fehler, setFehler] = useState<string | null>(null);
   const [uErgebnis, setUErgebnis] = useState<UebernahmeErgebnis | null>(null);
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
-  const [fremdbefund, setFremdbefund] = useState<Fremdkategorienbefund | null>(null);
   const [zuordnung, setZuordnung] = useState<Record<string, string>>({});
+  /**
+   * Quell-Konten, die NICHT mitkommen sollen.
+   *
+   * Als Ausschlussliste und nicht als Einschlussliste: die Vorgabe ist „alles", und was
+   * abgewählt wurde, ist die Ausnahme. Andersherum müsste beim Einlesen erst eine Liste
+   * gefüllt werden, und ein Fehler darin sähe aus wie eine leere Datei.
+   */
+  const [ausgeschlossen, setAusgeschlossen] = useState<Set<string>>(new Set());
 
   async function dateiGewaehlt(e: React.ChangeEvent<HTMLInputElement>) {
     const datei = e.target.files?.[0];
@@ -92,9 +99,13 @@ export function ImportScreen() {
 
     // Die Zuordnung der fremden Kategorien wird VORBELEGT, nicht gesetzt: was die
     // Übersetzung des Adapters vorschlägt, steht da und lässt sich ändern.
-    const befund = fremdkategorienInDatei(erg.umsaetze, kats);
-    setFremdbefund(befund);
-    setZuordnung(vorbelegteZuordnung(befund));
+    //
+    // Vorbelegt wird über die GANZE Datei, nicht über die später gewählten Konten: ein
+    // Eintrag zu einem Namen, der gerade nicht vorkommt, schadet nichts (nachgeschlagen
+    // wird beim Übernehmen), und so überlebt eine getroffene Wahl das Ab- und
+    // Wiederanwählen eines Kontos.
+    setZuordnung(vorbelegteZuordnung(fremdkategorienInDatei(erg.umsaetze, kats)));
+    setAusgeschlossen(new Set());
     const ms = kontoMatchVorschlag(erg.umsaetze, konten);
     setMatches(ms);
     const z: Record<string, Ziel> = {};
@@ -129,17 +140,21 @@ export function ImportScreen() {
     setBusy(true);
     setFehler(null);
     try {
-      const konten: UebernahmeKonto[] = matches.map((m) => {
-        const z = ziele[m.quelleKey];
-        return z.modus === "existing" && z.kontoId
-          ? { quelleKey: m.quelleKey, kontoId: z.kontoId }
-          : { quelleKey: m.quelleKey, neu: { bezeichnung: z.bezeichnung, typ: z.typ, iban: z.iban } };
-      });
+      // Ein abgewähltes Konto kommt gar nicht erst in die Auflösung. Es hier zu lassen
+      // und nur die Zeilen wegzufiltern hiesse, ein Konto anzulegen, in dem nichts steht.
+      const konten: UebernahmeKonto[] = matches
+        .filter((m) => !ausgeschlossen.has(m.quelleKey))
+        .map((m) => {
+          const z = ziele[m.quelleKey];
+          return z.modus === "existing" && z.kontoId
+            ? { quelleKey: m.quelleKey, kontoId: z.kontoId }
+            : { quelleKey: m.quelleKey, neu: { bezeichnung: z.bezeichnung, typ: z.typ, iban: z.iban } };
+        });
       const r = await importUebernehmen({
         quelle: ergebnis.quelle,
         dateiname: dateiname ?? undefined,
         zeitpunkt: new Date().toISOString(),
-        rohUmsaetze: ergebnis.umsaetze,
+        rohUmsaetze: beruecksichtigt,
         konten,
         fremdkategorien: zuordnung,
       });
@@ -151,8 +166,30 @@ export function ImportScreen() {
     }
   }
 
-  const konten = ergebnis ? new Set(ergebnis.umsaetze.map((u) => u.kontoIban)).size : 0;
-  const vorschau = ergebnis ? ergebnis.umsaetze.slice(0, VORSCHAU_MAX) : [];
+  /**
+   * Die Zeilen der abgewählten Konten fallen ÜBERALL heraus — Vorschau, Zuordnung,
+   * Übernahme.
+   *
+   * Das ist der Punkt, an dem eine Auswahl ehrlich wird: eine Abwahl, die nur beim
+   * Schreiben greift, während die Vorschau weiter alles zählt, ist eine Zahl, die
+   * niemandes Frage beantwortet.
+   */
+  const beruecksichtigt = useMemo(
+    () =>
+      (ergebnis?.umsaetze ?? []).filter(
+        (u) => !ausgeschlossen.has(quelleKeyFuer(u.kontoIban)),
+      ),
+    [ergebnis, ausgeschlossen],
+  );
+
+  const fremdbefund = useMemo(
+    () => (ergebnis ? fremdkategorienInDatei(beruecksichtigt, kategorien) : null),
+    [ergebnis, beruecksichtigt, kategorien],
+  );
+
+  const katName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
+  const konten = new Set(beruecksichtigt.map((u) => u.kontoIban)).size;
+  const vorschau = beruecksichtigt.slice(0, VORSCHAU_MAX);
   const eingabeStil = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "13px", fontFamily: "var(--font-ui)" } as const;
 
   return (
@@ -186,6 +223,19 @@ export function ImportScreen() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
             <thead>
               <tr>
+                <th style={{ width: 32, padding: "8px 10px", borderBottom: "1px solid var(--line)" }}>
+                  <input
+                    type="checkbox"
+                    checked={matches.some((m) => !ausgeschlossen.has(m.quelleKey))}
+                    aria-label={t("import.alleKontenImportieren")}
+                    onChange={(e) =>
+                      setAusgeschlossen(
+                        e.target.checked ? new Set() : new Set(matches.map((m) => m.quelleKey)),
+                      )
+                    }
+                    style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                  />
+                </th>
                 <th style={{ textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" }}>{t("import.spalteQuelle")}</th>
                 <th style={{ textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" }}>{t("import.spalteZiel")}</th>
               </tr>
@@ -194,13 +244,37 @@ export function ImportScreen() {
               {matches.map((m) => {
                 const z = ziele[m.quelleKey];
                 if (!z) return null;
+                const dabei = !ausgeschlossen.has(m.quelleKey);
                 return (
                   <tr key={m.quelleKey}>
                     <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", verticalAlign: "top" }}>
-                      <div style={{ fontWeight: "var(--fw-bold)", color: "var(--ink)" }}>{m.quelleName ?? m.quelleKey}</div>
-                      <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)" }}>{t("import.buchungenAnzahl", { n: m.anzahl })}</div>
+                      <input
+                        type="checkbox"
+                        checked={dabei}
+                        aria-label={t("import.kontoImportieren", { name: m.quelleName ?? m.quelleKey })}
+                        onChange={() =>
+                          setAusgeschlossen((bisher) => {
+                            const neu = new Set(bisher);
+                            if (neu.has(m.quelleKey)) neu.delete(m.quelleKey);
+                            else neu.add(m.quelleKey);
+                            return neu;
+                          })
+                        }
+                        style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                      />
                     </td>
-                    <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)" }}>
+                    {/* Die abgewählte Zeile bleibt STEHEN und wird nur blass. Sie zu
+                        verstecken nähme den Weg zurück und liesse die Datei kleiner
+                        aussehen, als sie ist. */}
+                    <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", verticalAlign: "top", opacity: dabei ? 1 : 0.45 }}>
+                      <div style={{ fontWeight: "var(--fw-bold)", color: "var(--ink)" }}>{m.quelleName ?? m.quelleKey}</div>
+                      <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)" }}>
+                        {dabei
+                          ? t("import.buchungenAnzahl", { n: m.anzahl })
+                          : t("import.kontoUebersprungen", { n: m.anzahl })}
+                      </div>
+                    </td>
+                    <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", opacity: dabei ? 1 : 0.45, pointerEvents: dabei ? "auto" : "none" }}>
                       <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "center" }}>
                         <span style={{ minWidth: 170 }}>
                           <Auswahl
@@ -242,8 +316,8 @@ export function ImportScreen() {
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginTop: "var(--sp-4)", flexWrap: "wrap" }}>
             <Button
               variant="primary"
-              onClick={busy || uErgebnis ? undefined : uebernehmen}
-              style={busy || uErgebnis ? { opacity: 0.5, cursor: busy ? "wait" : "not-allowed" } : undefined}
+              onClick={busy || uErgebnis || beruecksichtigt.length === 0 ? undefined : uebernehmen}
+              style={busy || uErgebnis || beruecksichtigt.length === 0 ? { opacity: 0.5, cursor: busy ? "wait" : "not-allowed" } : undefined}
             >
               {busy ? t("import.uebernehmenBusy") : t("import.uebernehmen")}
             </Button>
@@ -277,20 +351,40 @@ export function ImportScreen() {
       )}
 
       {ergebnis && (
-        <Card style={{ marginTop: "var(--sp-4)" }} title={t("import.vorschauTitel")} subtitle={t("import.erkannt", { n: ergebnis.umsaetze.length, quelle: ergebnis.quelle, konten })}>
+        <Card style={{ marginTop: "var(--sp-4)" }} title={t("import.vorschauTitel")} subtitle={t("import.erkannt", { n: beruecksichtigt.length, quelle: ergebnis.quelle, konten })}>
           <DataTable
             columns={[
               { key: "buchungstag", label: t("import.spalteDatum"), render: (u: RU) => ddmmyyyy(u.buchungstag) },
               { key: "betrag", label: `${t("import.spalteBetrag")} ${geld.symbol}`, align: "right", render: (u: RU) => geld.format(u.betrag, { mitVorzeichen: true }) },
               { key: "gegenpartei", label: t("import.spalteGegenpartei") },
               { key: "verwendungszweck", label: t("import.spalteZweck"), render: (u: RU) => (u.verwendungszweck.length > 60 ? u.verwendungszweck.slice(0, 60) + "…" : u.verwendungszweck) },
-              { key: "kategorieHinweis", label: t("import.spalteKategorie"), render: (u: RU) => (u.istUmbuchung ? "↔ Umbuchung" : u.kategorieHinweis ?? "—") },
+              {
+                key: "kategorieHinweis",
+                label: t("import.spalteKategorie"),
+                // **Was die Datei sagte UND was daraus wird.** Nur den Hinweis zu zeigen
+                // beantwortete die halbe Frage: er ist fremdes Vokabular, und ob er hier
+                // ankommt, stand nirgends. Jetzt zieht die Zuordnung der Karte darüber
+                // bis in die Zeile durch — wer dort etwas umstellt, sieht es hier.
+                render: (u: RU) => {
+                  if (u.istUmbuchung) return "↔ Umbuchung";
+                  const fremd = u.kategorieHinweis?.trim();
+                  if (!fremd) return "—";
+                  const ziel = zuordnung[fremd];
+                  const name = ziel ? katName.get(ziel) : undefined;
+                  return (
+                    <span>
+                      <span style={{ color: "var(--ink-3)" }}>{fremd}</span>
+                      {name ? <> → {name}</> : <span style={{ color: "var(--ink-3)" }}> → —</span>}
+                    </span>
+                  );
+                },
+              },
             ]}
             rows={vorschau}
           />
-          {ergebnis.umsaetze.length > VORSCHAU_MAX && (
+          {beruecksichtigt.length > VORSCHAU_MAX && (
             <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: "var(--sp-3)" }}>
-              {t("import.zeigeAuszug", { zeige: VORSCHAU_MAX, gesamt: ergebnis.umsaetze.length })}
+              {t("import.zeigeAuszug", { zeige: VORSCHAU_MAX, gesamt: beruecksichtigt.length })}
             </div>
           )}
         </Card>
