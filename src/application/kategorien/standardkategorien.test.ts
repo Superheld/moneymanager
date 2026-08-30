@@ -16,9 +16,12 @@ describe("kategorieSlug", () => {
   });
 
   it("macht aus Sonderzeichen einen einzelnen Trennstrich", () => {
+    expect(kategorieSlug("Abos & Streaming")).toBe("kat-abos-streaming");
+    expect(kategorieSlug("Miete & Nebenkosten")).toBe("kat-miete-nebenkosten");
+    // Klammern und Schrägstrich stehen in der Vorlage von heute nicht mehr — geprüft
+    // werden sie trotzdem, denn die Vorlage ist umbenennbar und die Funktion nicht.
     expect(kategorieSlug("Kfz (Steuer & Wartung)")).toBe("kat-kfz-steuer-wartung");
     expect(kategorieSlug("Miete / Rate")).toBe("kat-miete-rate");
-    expect(kategorieSlug("Abos & Streaming")).toBe("kat-abos-streaming");
   });
 });
 
@@ -61,7 +64,7 @@ describe("standardkategorienFlach", () => {
   it("erbt den Charakter vom Elternteil, wo keiner dransteht", () => {
     const flach = standardkategorienFlach();
     const wohnen = flach.find((k) => k.name === "Wohnen");
-    const miete = flach.find((k) => k.name === "Miete / Rate");
+    const miete = flach.find((k) => k.name === "Miete & Nebenkosten");
     expect(miete?.defaultCharakter).toBe(wohnen?.defaultCharakter);
 
     // Und wo einer dransteht, gewinnt er: Sparen ist eine Umschichtung in einer

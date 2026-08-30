@@ -47,11 +47,11 @@ export const STANDARDKATEGORIEN: Gruppe[] = [
   { name: "Gesundheit", charakter: "Aufwand", kinder: ["Arzt & Apotheke", "Krankenversicherung", "Therapie"] },
   { name: "Konsum & Lifestyle", charakter: "Aufwand", kinder: ["Abos & Streaming", "Elektronik", "Geschenke", "Kleidung & Mode", "Körperpflege & Wellness"] },
   { name: "Lebenshaltung", charakter: "Aufwand", kinder: ["Auswärts essen", "Drogerie", "Genussmittel", "Haushalt", "Lebensmittel", "Lieferservice"] },
-  { name: "Mobilität", charakter: "Aufwand", kinder: ["Fahrrad", "Kfz (Steuer & Wartung)", "KFZ-Wartung", "ÖPNV & Tickets", "Sprit & Laden"] },
+  { name: "Mobilität", charakter: "Aufwand", kinder: ["Fahrrad", "KFZ-Wartung", "ÖPNV & Tickets", "Sprit & Laden"] },
   { name: "Sonstiges", charakter: "Aufwand", kinder: [] },
   { name: "Versicherungen", charakter: "Aufwand", kinder: ["Berufsunfähigkeit", "Haftpflicht", "Hausrat", "KFZ-Versicherung", "Krankenzusatz", "Rechtsschutz", "Weitere Versicherungen"] },
   { name: "Vorsorge", charakter: "Umschichtung", kinder: ["Altersvorsorge", "Private Rente"] },
-  { name: "Wohnen", charakter: "Aufwand", kinder: [{ name: "Einrichtung & Geräte", kinder: ["Anschaffungen"] }, "Energie", "Instandhaltung", "Internet & Telefon", "Miete", "Miete / Rate", "Nebenkosten", "Rundfunkbeitrag", "Strom & Gas"] },
+  { name: "Wohnen", charakter: "Aufwand", kinder: [{ name: "Einrichtung & Geräte", kinder: ["Anschaffungen"] }, "Energie", "Instandhaltung", "Internet & Telefon", "Miete & Nebenkosten", "Rundfunkbeitrag", "Strom & Gas"] },
 ];
 
 /**
@@ -59,7 +59,7 @@ export const STANDARDKATEGORIEN: Gruppe[] = [
  *
  * **Gebraucht wird das vom Spielstand** (`npm run seed`), und der Grund ist der Fehler,
  * den es beheben soll: der Seed führte bis 2026-08-30 eine eigene Kategorienliste mit
- * eigenen Namen — `Mobilitaet` ohne Umlaut, `Miete` statt `Miete / Rate`, `Energie` statt
+ * eigenen Namen — `Mobilitaet` ohne Umlaut, `Miete` statt `Miete & Nebenkosten`, `Energie` statt
  * `Strom & Gas`. `standardkategorienAnlegen` gleicht über den NAMEN ab; sieben der
  * vierzehn fanden deshalb keinen Partner, und wer nach dem Seed „Standardkategorien
  * laden" drückte, bekam sie doppelt. Zwei Listen für dieselbe Sache driften, und diese

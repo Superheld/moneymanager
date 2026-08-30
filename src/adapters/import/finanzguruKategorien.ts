@@ -71,18 +71,21 @@ const FG_KATEGORIEN: Readonly<Record<string, string>> = {
   Mieteinnahmen: "Nebeneinkünfte",
   // Mobilität
   Tanken: "Sprit & Laden",
-  Auto: "Kfz (Steuer & Wartung)",
-  Wartung: "Kfz (Steuer & Wartung)",
+  Auto: "KFZ-Wartung",
+  Wartung: "KFZ-Wartung",
   Fahrrad: "Fahrrad",
   "Bus & Bahn": "ÖPNV & Tickets",
   "Sharing / Gemietet": "ÖPNV & Tickets",
   // Wohnen
   Strom: "Strom & Gas",
-  Miete: "Miete / Rate",
+  Miete: "Miete & Nebenkosten",
   Rundfunkgebuehren: "Rundfunkbeitrag",
   Einrichtung: "Einrichtung & Geräte",
   "Bauen / Renovieren": "Instandhaltung",
-  "Sonstiges Wohnen": "Nebenkosten",
+  // Ein Sammelposten der Quelle trifft am ehrlichsten die GRUPPE. Vorher zeigte er auf
+  // „Nebenkosten"; seit die in „Miete & Nebenkosten" aufgegangen ist, wäre das eine
+  // Behauptung über die Miete, die in der Datei nicht steht.
+  "Sonstiges Wohnen": "Wohnen",
   // Finanzen
   Kredit: "Kredite & Zinsen",
   Steuern: "Steuern",
