@@ -369,6 +369,39 @@ select.field.tabellenfilter {
   padding-right: 9px;
 }
 
+/* ============================================================
+   FELDZEILE — ein Feld und der Knopf, der dazugehoert, NEBENEINANDER.
+
+   Ein Knopf unter einem einzelnen Feld sieht aus, als schloesse er ein Formular ab.
+   Steht er neben dem Feld, liest er sich als das, was er ist: eine zweite Moeglichkeit
+   an derselben Stelle — „waehl einen Vertrag ODER leg einen neuen an".
+
+   Zwei Dinge daran sind der eigentliche Inhalt dieser Klasse, und beide fehlten:
+
+   `align-items: flex-end`, weil ein `FormField` die BESCHRIFTUNG ueber das Feld setzt.
+   Mittig ausgerichtet stuende der Knopf auf halber Hoehe zwischen Label und Feld und
+   damit auf keiner Linie mit irgendetwas.
+
+   Und `min-width: 0` am Feld. `.field` ist `width: 100%` — in einem Flex-Container
+   heisst das: es nimmt die ganze Zeile, und der Knopf wird umgebrochen. Genau das ist
+   im Vertragsblock passiert, wo `display: flex` laengst dastand und trotzdem nichts
+   nebeneinander lag. Ein Flex-Container allein reicht nicht, wenn das Kind auf seiner
+   vollen Breite besteht.
+   ============================================================ */
+.feldzeile {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-3);
+  flex-wrap: wrap;
+}
+.feldzeile > .feldzeile-feld {
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+.feldzeile > .feldzeile-knopf {
+  flex: 0 0 auto;
+}
+
 .form-actions {
   margin-top: var(--sp-4);
   display: flex;

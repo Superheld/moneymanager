@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Card, FormField } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
+import { Feldzeile } from "../bausteine/Feldzeile";
 import { Passwortfeld } from "./Passwortfeld";
 import { MINDESTLAENGE } from "../../../application/zugang";
 import { ZEITSPERRE_STUFEN } from "../../../application/einstellungen";
@@ -87,22 +88,29 @@ export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) 
 
       <Card title={t("zugang.sperreTitel")}>
         <p className="muted">{t("zugang.sperreText")}</p>
-        <FormField label={t("zugang.sperreTitel")}>
-          <Auswahl
-            ariaLabel={t("zugang.sperreTitel")}
-            wert={String(minuten ?? "")}
-            aufAenderung={(v) => {
-              const m = Number(v);
-              setMinuten(m);
-              void zeitsperreSetzen(m);
-            }}
-            optionen={ZEITSPERRE_STUFEN.map((m) => ({
-              wert: String(m),
-              text: m === 0 ? t("zugang.sperreAus") : t("zugang.sperreMinuten", { minuten: m }),
-            }))}
-          />
-        </FormField>
-        {onSperren && <Button onClick={onSperren}>{t("zugang.jetztSperren")}</Button>}
+        {/* Die Stufe stellen und sofort sperren sind zwei Wege an derselben Stelle —
+            der Knopf schliesst hier nichts ab, er ist die zweite Moeglichkeit. Deshalb
+            daneben und nicht darunter. */}
+        <Feldzeile
+          feld={
+            <FormField label={t("zugang.sperreTitel")}>
+              <Auswahl
+                ariaLabel={t("zugang.sperreTitel")}
+                wert={String(minuten ?? "")}
+                aufAenderung={(v) => {
+                  const m = Number(v);
+                  setMinuten(m);
+                  void zeitsperreSetzen(m);
+                }}
+                optionen={ZEITSPERRE_STUFEN.map((m) => ({
+                  wert: String(m),
+                  text: m === 0 ? t("zugang.sperreAus") : t("zugang.sperreMinuten", { minuten: m }),
+                }))}
+              />
+            </FormField>
+          }
+          knopf={onSperren && <Button onClick={onSperren}>{t("zugang.jetztSperren")}</Button>}
+        />
       </Card>
 
       <Card title={t("zugang.wechselnTitel")}>
