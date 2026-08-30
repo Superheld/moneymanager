@@ -3,6 +3,165 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.25.0] — 2026-08-30
+
+Die Runde, in der der Import aufhört, im Verborgenen zu entscheiden. Was aus einer Datei
+wird, steht jetzt vorher da — welche Konten mitkommen, unter welcher Kategorie die fremden
+Namen ankommen, was aus einer Zeile wird. Daneben bekommt die Kategorie-Erkennung eine
+Werkbank statt zweier halber Listen, und es gibt zwei Exporte mit zwei verschiedenen
+Zusicherungen.
+
+### Neu
+
+**Welche Konten mitkommen, entscheidet man an der Kontenauswahl.** Eine Importdatei trägt
+alle Konten, die die Quelle führt; bisher kam alles oder nichts. Jede Quellzeile hat jetzt
+ein Kästchen — zwei Fragen, zwei Bedienteile: die Klappliste beantwortet „welches Konto",
+das Kästchen „überhaupt". Die Abwahl greift überall, nicht erst beim Schreiben: Vorschau,
+Zuordnungskarte und Übernahme rechnen mit derselben Menge, und ein abgewähltes Konto wird
+gar nicht erst angelegt. Die Zeile bleibt dabei stehen und wird nur blass — sie zu
+verstecken nähme den Weg zurück und liesse die Datei kleiner aussehen, als sie ist.
+
+**Die Kategorien der Datei stehen da, bevor übernommen wird.** Die Übersetzung des Adapters
+entschied unsichtbar mit, unter welcher Kategorie hunderte Zeilen ankommen; ein Ziel, das
+dieser Bestand nicht kennt, fiel wortlos ans Modell zurück — ein Fehlschlag ohne
+Fehlermeldung. Zwischen Kontenzuordnung und Vorschau steht jetzt eine Karte mit den fremden
+Namen **dieser** Datei, wie oft sie vorkommen, worauf sie hinauslaufen, und einem Klick, um
+es zu ändern. Und die Vorschau zeigt, was aus einer Zeile **wird**, nicht nur, was die Datei
+sagte.
+
+**Mehrere Zeilen auf einmal — in der Inbox.** Denselben Weg, den der Kontoauszug seit
+längerem hat, gibt es jetzt vor dem Verbuchen: ein Schalter, Kästchen an den Zeilen, eine
+Leiste mit Kategorie und Weglegen. Der Ort ist die Entscheidung — im Auszug sind es
+Buchungen, die Salden bewegt haben, hier sind es Entwürfe, die noch keine sind. Umbuchungen
+bleiben aussen vor, und die Zahl steht vor der Aktion in der Leiste; Alles-Markieren meint
+die Treffer, nicht die Seite.
+
+**Ein Wortbestand statt dreier Listen an zwei Orten.** Der Trainingsbereich zeigte die
+häufigsten Merkmale auf einer Karte und die Ausschlussliste auf einer anderen — wer ein Wort
+abwählte, sah es hier verschwinden und musste es dort wiederfinden, ohne die Zahlen, an
+denen die Entscheidung gerade hing. Jetzt steht jedes Wort genau einmal in einer Liste, mit
+seinem Zustand, durchsuchbar und filterbar. Dazu zwei neue Masszahlen, weil die vorhandene
+Trennschärfe das Seltene überschätzt: **Deckung** (der Anteil aller Beispiele) und
+**Trennkraft** (wie viel Unsicherheit über die Kategorie ein Wort wegräumt).
+
+**Jede Kategorie zeigt ihre Wörter.** Eine Wolke je Kategorie, Schriftgrösse nach Gewicht,
+gelesen aus dem Modell selbst — bei einem linearen Modell ist das keine nachgebaute
+Erklärung, sondern die Rechnung. Zentriert über die Kategorien, sonst stünde ein Wort wie
+„kartenzahlung" in jeder Wolke gross da: Kennzeichen von allem, also von nichts. Ohne
+trainiertes Modell gibt es die Wolken nicht — eine aus blossen Häufigkeiten sähe aus wie
+eine Auskunft über die Erkennung und wäre keine.
+
+**Die mitgelieferte Grundausstattung tritt zurück.** Über hundert Stoppwörter, die niemand
+gesetzt hat, füllten jede Seite und schoben die eigenen Entscheidungen nach hinten. Sie sind
+ausgeblendet, ausser sie kommen in den eigenen Daten vor; ein Kästchen holt den Rest dazu.
+Dazu ein Weg zurück, der anlegt was fehlt, ohne eigene Einträge anzufassen — ohne ihn war
+das Löschen eines mitgelieferten Wortes endgültig.
+
+**Zwei Exporte, zwei Zusicherungen** (Einstellungen → Export, hinter dem
+Experimente-Schalter). Die **Konfiguration** sagt, wie der Haushalt ordnet — Kategorien mit
+Baum und Charakter —, und darf deshalb weitergegeben werden. Der **Bestand** sagt, was in
+ihm passiert ist — Buchungen samt Bankzeile, Konten, Verträge, Personen — und ist ein
+Kontoauszug. Zwei Dateien mit zwei Namen, denn der Dateiname ist die einzige Stelle, an der
+man einer Exportdatei ihre Zusicherung von aussen ansieht. Beide Seiten stehen als
+ausführbare Zusicherung da: der eine Test prüft, dass in der einen kein Feld eine Buchung
+beschreibt, der andere, dass in der anderen genau das drinsteht.
+
+**Eine Kategorienliste statt zweier.** Der Spielstand führte seine eigene und nannte
+dieselben Dinge anders als die Vorlage; wer nach einem Seed „Standardkategorien laden"
+drückte, bekam die Hälfte ein zweites Mal. Jetzt gibt es eine Liste — der aufgeräumte Stand,
+mit einer dritten Ebene, die die Vorlage bisher nicht konnte.
+
+**Was die Quelle einsortiert hat, wird wieder benutzt — beim Adapter.** Die Übersetzung
+fremder Unterkategorien in unsere gab es schon einmal; sie lag damals in der zentralen
+Vorschlagskette, und damit trug die Anwendungsschicht das Vokabular einer Quelle. Jetzt
+bringt jeder Importeur seine eigene mit, und die Kette entscheidet nur noch über den Rang:
+hinter dem Vertrag, vor dem Modell.
+
+### Geändert
+
+**Die Kategorie-Festlegung fällt weg.** „Immer bei diesem Empfänger" war eine eigene Ebene
+über der Erkennung. Sie war kein Schutz — eine Handkorrektur ist über die Herkunft ohnehin
+sicher —, sondern eine Verallgemeinerung: sie trug eine Korrektur auf künftige Zahlungen
+desselben Empfängers. Genau das soll das Modell leisten, über alle Merkmale statt über den
+Empfänger allein. Die Kette hat jetzt drei Stufen: Umbuchung → Vertrag → Modell. Was daran
+hängt, steht im Code: eine Korrektur wirkt erst nach dem nächsten Training auf ähnliche
+Zahlungen.
+
+**Vorzeichen und Gläubiger-ID sind keine Merkmalsquellen mehr.** Beide waren in einer Liste
+von Wörtern ein Fremdkörper — ein „+" ist kein Wort, eine Gläubiger-ID ist ein Bezeichner —
+und standen dort als Zeilen, die niemand beurteilen konnte. Die Extraktion liest damit nur
+noch Text.
+
+**Der Spielstand trägt Trainingsmaterial.** Die Alltagszahlungen hatten keinen Beleg, nur
+eine Notiz — im Trainingsmaterial fielen sie damit unter „ohne Text". Sie laufen jetzt über
+einen Helfer, der einen Beleg anlegt, der Zeitraum ist länger, und die Empfängernamen
+streuen über Bereiche hinweg. Ohne streuende Wörter trägt jedes Wort seine Kategorie
+eindeutig, und dann sehen Trennschärfe und Trennkraft überall gleich gut aus.
+
+**Prozent wird formatiert wie Geld — an einer Stelle.** Sieben Anzeigen, vier Varianten;
+zwei davon nicht nur uneinheitlich, sondern falsch, weil `toFixed` die Locale nicht kennt
+und die Depot-Anteile im Deutschen mit Punkt dastanden.
+
+### Behoben
+
+**Eine Umbuchung ohne Gegenbuchung gibt es nicht.** Ein Umbuchungs-Bein ohne gefundenes
+Gegenstück wurde als einseitige Umschichtung gebucht — und eine Umschichtung zählt in kein
+Budget und in keine Ausgabe. Das Geld war weg, der Bestand sah es nicht; ausgerechnet der
+Fall, in dem etwas nach draussen fliesst, war der unsichtbare. Jetzt entscheidet die
+Richtung, die Kategorie bleibt leer, und die Zeile wartet in der Inbox. Eine Migration zieht
+den Altbestand nach: halbe Umschichtungen bekommen ihre Richtung zurück, die Zeilen bleiben
+stehen — die Zahlung hat stattgefunden, was fällt, ist die Behauptung, sie sei eine
+Verschiebung gewesen.
+
+**Die Kategorie entscheidet nicht mehr über die Sichtbarkeit.** Der zweite Erkennungsweg für
+Umbuchungen las „Umschichtung ohne Kategorie" — wer einer Umschichtung eine Kategorie gab,
+machte sie damit zur Ausgabe, wer sie wegnahm, liess sie verschwinden. Übrig bleibt die
+Fachlichkeit selbst: eine Umbuchung ist ein Transfer zwischen zwei erfassten Konten,
+erkennbar an der Verknüpfung.
+
+**Der Kategorienbaum zeigt alle Ebenen, nicht zwei.** Gezeichnet wurden Wurzeln und deren
+direkte Kinder; ein Enkel fiel durch beide Raster und lag damit in der Datenbank, ohne dass
+man ihn sehen, bearbeiten oder löschen konnte — während die Maske sein Elternteil weiter zur
+Auswahl anbot. Der Kern kannte diese Grenze nie, sie sass allein in der Schleife, die den
+Baum zeichnet.
+
+**Ein Vertipper beim Passphrasenwechsel sperrt nicht mehr aus.** Der Wechsel hatte nur zwei
+Felder, alt und neu. Wer sich in der neuen vertippt, merkt davon nichts — der Wechsel
+gelingt, und auffallen würde es beim nächsten Entsperren. Geprüft wird jetzt gegen ein
+Wiederholungsfeld, und zwar vor dem Aufruf: ein Wechsel, der durchläuft und danach meldet,
+hat die Hülle schon geschrieben.
+
+**Der Seed räumt den Zugang mit ab.** Ein frisch geschriebener Spielstand war nicht zu
+öffnen: die alte Schlüsselhülle blieb liegen, die App verlangte eine Passphrase und setzte
+den alten Schlüssel auf eine Klartext-Datei. Die Meldung sah nach kaputtem Bestand aus statt
+nach falschem Schlüssel.
+
+**Ein Knopf steht neben dem Feld, nicht darunter.** Unter einem einzelnen Feld liest er sich
+als Abschluss eines Formulars, obwohl er nichts abschickt; daneben liest er sich als das,
+was er ist — eine zweite Möglichkeit an derselben Stelle.
+
+**`bestandslesen` übersetzt wieder.** Der Sprung auf sqlx 0.9 hat das Werkzeug ausgelassen,
+und gemerkt hat es niemand: `cargo build --lib`, die Rust-Tests und die CI sehen allesamt an
+`src/bin/` vorbei.
+
+### Innen
+
+**Der Wert-Abgleich fällt weg.** Der Wächter las den echten Bestand zur Laufzeit und suchte
+dessen Werte im Arbeitsbaum — seit der Bestand verschlüsselt ist, kam er dafür nur noch über
+den Datenschlüssel im Klartext neben der Datenbank. Ein Wächter, der einen Generalschlüssel
+verlangt, nimmt der Verschlüsselung genau das, wofür sie gebaut wurde; und fehlte die Datei,
+war jeder Push blockiert — still, denn ein Push, der nicht stattfindet, sieht aus wie ein Tag
+ohne Push. Was ungeprüft bleibt, steht jetzt ausdrücklich da statt in einer Fussnote.
+
+**Dependabot schlägt nach `develop` vor, nicht nach `main`.** Ohne Angabe nimmt es den
+Standardbranch — hier den einzigen, auf dem nicht gearbeitet wird. Der Hook, der das
+abfinge, sitzt auf einer Maschine, und ein Merge auf GitHub passiert dort nicht.
+
+**Abhängigkeiten gehoben:** rand 0.10, sqlx 0.9, tauri-action 1.0.0, checkout und
+setup-node auf v7, dazu acht kleine Hebungen auf beiden Seiten. Drei davon brauchten
+Nacharbeit im Code — ein Rust-Vorschlag ist in dieser CI grün, ohne dass je ein Compiler auf
+ihn gesehen hat.
+
 ## [0.24.0] — 2026-08-28
 
 Dieselbe App auf drei Plattformen. Am Programm ändert sich nichts — nur daran, wer es
