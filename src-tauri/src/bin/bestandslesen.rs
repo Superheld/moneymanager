@@ -27,7 +27,7 @@ use std::path::PathBuf;
 
 use moneymanager_lib::datenbank::pool_lesend;
 use moneymanager_lib::schluessel::Datenschluessel;
-use sqlx::{Column, Row, TypeInfo};
+use sqlx::{AssertSqlSafe, Column, Row, TypeInfo};
 
 fn codedatei() -> PathBuf {
     if let Ok(p) = std::env::var("MONEYMANAGER_CODE_DATEI") {
@@ -74,7 +74,7 @@ async fn main() {
         }
     };
 
-    let zeilen = match sqlx::query(&sql).fetch_all(&pool).await {
+    let zeilen = match sqlx::query(AssertSqlSafe(sql)).fetch_all(&pool).await {
         Ok(z) => z,
         Err(e) => {
             eprintln!("{e}");
