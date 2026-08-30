@@ -12,7 +12,7 @@ import type {
   UmsatzRepository,
   ZahlungskontoRepository,
 } from "../ports";
-import { katalogNachId, vorschlagFuer, type Vorschlagskontext } from "./vorschlag";
+import { katalogNachId, katalogNachName, vorschlagFuer, type Vorschlagskontext } from "./vorschlag";
 import { quelleKeyFuer } from "./kontoMatch";
 import { klassifiziere, rohHash } from "./rohHash";
 import { ordneZu } from "./dublette";
@@ -153,6 +153,7 @@ async function uebernahmeIntern(
   const kontext: Vorschlagskontext = {
     ...deps.kategorisierung,
     kategorieNachId: katalogNachId(kategorien),
+    kategorieNachName: katalogNachName(kategorien),
   };
   const bestand = await umsatzRepo.bestandsSchluessel();
   const laufId = id();

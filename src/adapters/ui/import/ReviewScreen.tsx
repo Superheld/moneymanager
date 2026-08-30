@@ -71,6 +71,8 @@ function Herkunft({ umsatz, kontext }: { umsatz: Umsatz; kontext: Vorschlagskont
   return (
     <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
       <span title={t(`review.herkunftTitel.${quelle}`)}>
+        {/* „ok" fuer alles, was auf einer ANGABE beruht (Umbuchung, Vertrag, Datei),
+            „neutral" fuer die Schaetzung des Modells, „plan" fuer die eigene Hand. */}
         <Pill variant={quelle === "manuell" ? "plan" : quelle === "ki" ? "neutral" : "ok"}>
           {t(`review.herkunft.${quelle}`)}
         </Pill>

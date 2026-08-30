@@ -288,12 +288,17 @@ const de = {
     herkunft: {
       umbuchung: "Umbuchung",
       regel: "Vertrag",
+      fremdkategorie: "aus der Datei",
       ki: "Erkennung",
       manuell: "von Hand",
     },
     herkunftTitel: {
       umbuchung: "Die Quelle hat die Zahlung als Umbuchung markiert.",
       regel: "Die Zahlung passt auf die Erkennungsregel eines Vertrags — sie erbt dessen Kategorie.",
+      fremdkategorie:
+        "Die importierte Datei brachte eine Kategorie mit, und sie liess sich auf deinen " +
+        "Baum übertragen. Eine Angabe aus einer anderen App — näher dran als eine " +
+        "Schätzung, aber aus einem anderen Zusammenhang.",
       ki: "Das trainierte Modell hat entschieden.",
       manuell: "Hier hat jemand von Hand entschieden.",
     },
@@ -2048,12 +2053,16 @@ const en: typeof de = {
     herkunft: {
       umbuchung: "Transfer",
       regel: "Contract",
+      fremdkategorie: "from the file",
       ki: "Recognition",
       manuell: "by hand",
     },
     herkunftTitel: {
       umbuchung: "The source marked this payment as a transfer.",
       regel: "The payment matches a contract's recognition rule — it inherits that category.",
+      fremdkategorie:
+        "The imported file carried a category, and it could be mapped onto your tree. " +
+        "A statement from another app — closer than a guess, but from a different context.",
       ki: "The trained model decided.",
       manuell: "Someone decided this by hand.",
     },
