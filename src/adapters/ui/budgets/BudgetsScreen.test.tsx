@@ -224,6 +224,34 @@ describe("BudgetsScreen — Vorschläge", () => {
     expect(document.body.textContent).not.toMatch(/Aus deinen Ausgaben abgeleitet/);
   });
 
+  /**
+   * Die Reihenfolge ist eine Aussage und keine Formsache: die eigenen Budgets zuerst, der
+   * Vorschlag als Nachtrag. Stünde er oben, schöbe er sich bei jedem Besuch vor das,
+   * weswegen man den Bereich geöffnet hat — und je mehr Kategorien sich bewegen, desto
+   * weiter rutschte das Eigentliche nach unten.
+   *
+   * Geprüft an der DOM-Reihenfolge und nicht am Aussehen: eine Karte, die per CSS
+   * woandershin gerückt wird, liest ein Screenreader trotzdem in dieser Folge.
+   */
+  it("stellt die eigene Budgetliste vor die Vorschläge", async () => {
+    await stammdaten();
+    await einkaufsreihe("e", "essen", 43700, "Nordhoff");
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "miete", kontoId: "k1",
+      betraege: [{ abMonat: monat(6), betrag: 40000 }], art: "monatlich", start: `${monat(6)}-01`,
+    });
+
+    rendere(<BudgetsScreen />);
+    await screen.findByText("Lebenshaltung");
+
+    const text = document.body.textContent ?? "";
+    const liste = text.indexOf("Deine Budgets");
+    const vorschlaege = text.indexOf("Aus deinen Ausgaben abgeleitet");
+    expect(liste, "Überschrift der Budgetliste steht im Text").toBeGreaterThanOrEqual(0);
+    expect(vorschlaege, "Überschrift der Vorschläge steht im Text").toBeGreaterThanOrEqual(0);
+    expect(liste).toBeLessThan(vorschlaege);
+  });
+
   it("schlägt eine Hauptkategorie mit ihrem üblichen Monatsbetrag vor", async () => {
     await stammdaten();
     await einkaufsreihe("e", "essen", 43700, "Nordhoff");

@@ -273,75 +273,6 @@ export function BudgetsScreen() {
         </div>
       )}
 
-      {vorschlaege.length > 0 && (
-        <Card
-          title={t("budgets.vorschlaegeTitel")}
-          subtitle={t("budgets.vorschlaegeUntertitel", { count: vorschlaege.length })}
-        >
-          <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
-            {t("budgets.vorschlaegeHinweis")}
-          </p>
-          <DataTable
-            sortable
-            pageSize={10}
-            columns={[
-              { key: "kategorie", label: t("budgets.spalteKategorie"), render: (v: Budgetvorschlag) => v.name },
-              {
-                key: "median",
-                label: `${t("budgets.spalteBisher")} ${geld.symbol}`,
-                align: "right",
-                sortValue: (v: Budgetvorschlag) => v.medianProMonat,
-                render: (v: Budgetvorschlag) => geld.format(v.medianProMonat),
-              },
-              {
-                // Was der Vertrag abbucht, steuert kein Budget — deshalb steht der Abzug
-                // in der Tabelle und nicht nur im Ergebnis.
-                key: "vertrag",
-                label: `${t("budgets.spalteVertraglich")} ${geld.symbol}`,
-                align: "right",
-                sortValue: (v: Budgetvorschlag) => v.vertragsanteil,
-                render: (v: Budgetvorschlag) => (v.vertragsanteil > 0 ? geld.format(-v.vertragsanteil) : "—"),
-              },
-              {
-                key: "vorschlag",
-                label: `${t("budgets.spalteVorschlag")} ${geld.symbol}`,
-                align: "right",
-                sortValue: (v: Budgetvorschlag) => v.vorschlag,
-                render: (v: Budgetvorschlag) => <b>{geld.format(v.vorschlag)}</b>,
-              },
-              {
-                // Sagt, wie oft der Rahmen reißen wird: ×1 = jeden Monat gleich,
-                // ×23 = ein einzelner Monat war das Dreiundzwanzigfache.
-                key: "schwankung",
-                label: t("budgets.spalteSchwankung"),
-                align: "right",
-                sortValue: (v: Budgetvorschlag) => v.schwankung,
-                render: (v: Budgetvorschlag) =>
-                  v.schwankung <= 2 ? (
-                    <Pill variant="ok">{t("budgets.stabil")}</Pill>
-                  ) : (
-                    <Pill variant="warn">{t("budgets.schwankend", { faktor: v.schwankung })}</Pill>
-                  ),
-              },
-              { key: "monate", label: t("budgets.spalteMonate"), align: "right", render: (v: Budgetvorschlag) => String(v.monate) },
-              {
-                key: "_a",
-                label: "",
-                align: "right",
-                sortable: false,
-                render: (v: Budgetvorschlag) => (
-                  <IconLeiste>
-                    <IconButton icon="uebernehmen" label={t("budgets.vorschlagUebernehmen")} onClick={() => vorschlagUebernehmen(v)} />
-                    <IconButton icon="verwerfen" label={t("budgets.vorschlagVerwerfen")} onClick={() => void vorschlagVerwerfen(v)} />
-                  </IconLeiste>
-                ),
-              },
-            ]}
-            rows={[...vorschlaege]}
-          />
-        </Card>
-      )}
-
       <Card title={t("budgets.abschnittListe")} subtitle={t("budgets.abschnittListeHinweis")}>
         {zeilen.length === 0 ? (
           <div className="muted">{t("budgets.leer")}</div>
@@ -510,6 +441,87 @@ export function BudgetsScreen() {
           onBuchung={setDetail}
         />
         </div>
+      )}
+
+      {/*
+        Die Vorschläge stehen UNTER der Liste, nicht darüber.
+
+        Sie sind kein Einstieg, sondern ein Nachtrag: wer den Bereich öffnet, will
+        sehen, was er sich vorgenommen hat, und nicht zuerst, was die App ihm
+        vorschlägt. Über der Liste schob sich der Vorschlag bei jedem Besuch vor die
+        eigenen Zahlen — und je mehr Kategorien sich bewegen, desto weiter rutschte
+        das Eigentliche nach unten.
+
+        Auch unter dem Verlauf und nicht zwischen ihm und der Liste: der Verlauf
+        gehört an die Zeile, die ihn aufgeklappt hat (siehe dort).
+      */}
+      {vorschlaege.length > 0 && (
+        <Card
+          title={t("budgets.vorschlaegeTitel")}
+          subtitle={t("budgets.vorschlaegeUntertitel", { count: vorschlaege.length })}
+        >
+          <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
+            {t("budgets.vorschlaegeHinweis")}
+          </p>
+          <DataTable
+            sortable
+            pageSize={10}
+            columns={[
+              { key: "kategorie", label: t("budgets.spalteKategorie"), render: (v: Budgetvorschlag) => v.name },
+              {
+                key: "median",
+                label: `${t("budgets.spalteBisher")} ${geld.symbol}`,
+                align: "right",
+                sortValue: (v: Budgetvorschlag) => v.medianProMonat,
+                render: (v: Budgetvorschlag) => geld.format(v.medianProMonat),
+              },
+              {
+                // Was der Vertrag abbucht, steuert kein Budget — deshalb steht der Abzug
+                // in der Tabelle und nicht nur im Ergebnis.
+                key: "vertrag",
+                label: `${t("budgets.spalteVertraglich")} ${geld.symbol}`,
+                align: "right",
+                sortValue: (v: Budgetvorschlag) => v.vertragsanteil,
+                render: (v: Budgetvorschlag) => (v.vertragsanteil > 0 ? geld.format(-v.vertragsanteil) : "—"),
+              },
+              {
+                key: "vorschlag",
+                label: `${t("budgets.spalteVorschlag")} ${geld.symbol}`,
+                align: "right",
+                sortValue: (v: Budgetvorschlag) => v.vorschlag,
+                render: (v: Budgetvorschlag) => <b>{geld.format(v.vorschlag)}</b>,
+              },
+              {
+                // Sagt, wie oft der Rahmen reißen wird: ×1 = jeden Monat gleich,
+                // ×23 = ein einzelner Monat war das Dreiundzwanzigfache.
+                key: "schwankung",
+                label: t("budgets.spalteSchwankung"),
+                align: "right",
+                sortValue: (v: Budgetvorschlag) => v.schwankung,
+                render: (v: Budgetvorschlag) =>
+                  v.schwankung <= 2 ? (
+                    <Pill variant="ok">{t("budgets.stabil")}</Pill>
+                  ) : (
+                    <Pill variant="warn">{t("budgets.schwankend", { faktor: v.schwankung })}</Pill>
+                  ),
+              },
+              { key: "monate", label: t("budgets.spalteMonate"), align: "right", render: (v: Budgetvorschlag) => String(v.monate) },
+              {
+                key: "_a",
+                label: "",
+                align: "right",
+                sortable: false,
+                render: (v: Budgetvorschlag) => (
+                  <IconLeiste>
+                    <IconButton icon="uebernehmen" label={t("budgets.vorschlagUebernehmen")} onClick={() => vorschlagUebernehmen(v)} />
+                    <IconButton icon="verwerfen" label={t("budgets.vorschlagVerwerfen")} onClick={() => void vorschlagVerwerfen(v)} />
+                  </IconLeiste>
+                ),
+              },
+            ]}
+            rows={[...vorschlaege]}
+          />
+        </Card>
       )}
 
       {offen && (
