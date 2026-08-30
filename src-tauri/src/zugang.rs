@@ -12,7 +12,7 @@
 use std::path::{Path, PathBuf};
 
 use serde::Serialize;
-use sqlx::{Executor, Row};
+use sqlx::{AssertSqlSafe, Executor, Row};
 use tauri::{AppHandle, Manager, State};
 
 use crate::datenbank::{Datenbank, Oeffnung};
@@ -168,7 +168,10 @@ async fn ueberfuehren(pfad: &Path, dk: &Datenschluessel) -> Result<(), String> {
         neu.to_string_lossy().replace('\'', "''"),
         dk.als_pragma()
     );
-    conn.execute(anhaengen.as_str()).await.map_err(|e| e.to_string())?;
+    sqlx::query(AssertSqlSafe(anhaengen))
+        .execute(&mut *conn)
+        .await
+        .map_err(|e| e.to_string())?;
     let ergebnis = sqlx::query("SELECT sqlcipher_export('verschluesselt')")
         .fetch_optional(&mut *conn)
         .await;
