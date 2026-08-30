@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aufteilen, bewerten, klassifizieren, trainieren, verwechslungsmatrix, type Beispiel } from "./modell";
+import { aufteilen, bewerten, kategorieprofile, klassifizieren, trainieren, type Beispiel, verwechslungsmatrix } from "./modell";
 
 /** Ein kleines, klar trennbares Problem — die Aussagen sollen am Verhalten hängen. */
 function daten(): Beispiel[] {
@@ -267,5 +267,38 @@ describe("Verwechslungsmatrix", () => {
       const summe = [...z.zellen.values()].reduce((s, n) => s + n, 0);
       expect(summe).toBe(z.gesamt);
     }
+  });
+});
+
+describe("Was eine Kategorie auszeichnet", () => {
+  /** Zwei klar getrennte Kategorien, dazu ein Wort, das in beiden steht. */
+  function gemischt() {
+    const b: Beispiel[] = [];
+    for (let i = 0; i < 20; i++) {
+      b.push({ merkmale: ["emp=talmer", "vwz:einkauf", "vwz:kartenzahlung"], kategorieId: "lebensmittel" });
+      b.push({ merkmale: ["emp=nordwig", "vwz:fahrschein", "vwz:kartenzahlung"], kategorieId: "mobilitaet" });
+    }
+    return trainieren(b);
+  }
+
+  it("nennt je Kategorie die Merkmale, die für sie sprechen", () => {
+    const profile = kategorieprofile(gemischt());
+    const lm = profile.find((p) => p.kategorieId === "lebensmittel")!;
+    expect(lm.kennzeichen[0].merkmal).toMatch(/talmer|einkauf/);
+    expect(lm.kennzeichen.map((k) => k.merkmal)).not.toContain("emp=nordwig");
+  });
+
+  it("drückt ein Wort weg, das in jeder Kategorie steht", () => {
+    // „kartenzahlung" kommt in beiden Kategorien gleich oft vor. Ohne die Zentrierung
+    // stünde es in JEDER Wolke gross da — als Kennzeichen von allem, also von nichts.
+    const profile = kategorieprofile(gemischt());
+    for (const p of profile) {
+      const platz = p.kennzeichen.findIndex((k) => k.merkmal === "vwz:kartenzahlung");
+      expect(platz === -1 || platz > 1).toBe(true);
+    }
+  });
+
+  it("liefert für ein leeres Modell nichts, statt zu werfen", () => {
+    expect(kategorieprofile(trainieren([]))).toEqual([]);
   });
 });

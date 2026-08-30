@@ -34,7 +34,7 @@ import {
 import type { TanFrager } from "../application/fints/abrufPort";
 import { fintsAbruf } from "./fints";
 import { hanseaticAbruf } from "./hanseatic";
-import { konfigurationLaden, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
+import { konfigurationLaden, grundausstattungHerstellen, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
 import { trainingsmaterial, type Materialbefund } from "../application/kategorien/trainingsmaterial";
 import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
 import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../application/kategorien/kategorieAbgleich";
@@ -718,6 +718,10 @@ export function wortFreigeben(wort: string) {
   return wortZulassen(sqliteMerkmalskonfigurationRepository, wort);
 }
 
+export function grundausstattungZurueck() {
+  return grundausstattungHerstellen(sqliteMerkmalskonfigurationRepository);
+}
+
 export function kategorieAbgleichVorschau(): Promise<Abgleichsplan> {
   return abgleichVorschau(sqliteLedgerRepository, sqliteUmsatzRepository, KETTE);
 }
@@ -728,7 +732,7 @@ export function kategorieAbgleichAnwenden(plan: Abgleichsplan) {
 
 /** Was das Modell an EINER Buchung sieht — die Antwort auf „warum diese Kategorie?". */
 export function merkmaleZuBuchung(
-  quelle: { gegenpartei: string; verwendungszweck: string; glaeubigerId?: string; betrag: number },
+  quelle: { gegenpartei: string; verwendungszweck: string },
 ): Promise<Merkmalsansicht> {
   return merkmalsansicht(
     {

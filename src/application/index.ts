@@ -60,7 +60,14 @@ export {
   hauptkategorie,
   // Aus EINER Bewertung abgeleitet, keine Auswahl über den Bestand.
   verwechslungsmatrix,
+  // Liest EIN Modell zeilenweise — reine Umformung seiner eigenen Gewichte, keine
+  // Auswahl über den Bestand.
+  kategorieprofile,
   herkunftVon,
+  // Zerlegen und Zusammensetzen eines Tokens — reine Umformung, keine Auswahl. Die
+  // Oberfläche braucht beides, weil die Ausschlussliste am nackten Wort hängt.
+  wortVon,
+  merkmalName,
   // Eigenschaften EINER Buchung bzw. EINES Empfängernamens.
   istGeteilt,
   // Trifft ein Muster diesen Text? Ein Vergleich, keine Auswahl — und die Oberfläche

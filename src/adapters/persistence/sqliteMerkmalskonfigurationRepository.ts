@@ -4,7 +4,7 @@
 // und liegen in der Key/Value-Tabelle `einstellung` (genau ihr Zweck), die Ausschlussliste
 // ist ein wachsender Datenbestand und hat eine eigene Tabelle mit einer Zeile je Wort.
 
-import type { Merkmalsherkunft } from "../../core";
+import { MERKMALSHERKUENFTE, type Merkmalsherkunft } from "../../core";
 import type {
   GespeicherterAusschluss,
   MerkmalskonfigurationRepository,
@@ -32,7 +32,14 @@ export const sqliteMerkmalskonfigurationRepository: MerkmalskonfigurationReposit
     // dagegen eine Aussage: jemand hat alle Herkünfte abgeschaltet. Beides zu verwechseln
     // hieße, eine bewusste Entscheidung beim nächsten Start zu überschreiben.
     if (wert === undefined) return null;
-    return wert ? (wert.split(",") as Merkmalsherkunft[]) : [];
+    if (!wert) return [];
+    // Gefiltert, weil hier Werte stehen können, die es nicht mehr gibt: `gid` und `vz`
+    // sind 2026-08-29 gefallen, ihr Eintrag in der Einstellung nicht. Der Rückgabetyp
+    // behauptet gültige Herkünfte — dann muss diese Stelle sie auch liefern, statt eine
+    // tote Zeichenkette weiterzureichen, die sich erst weit oben als Nichts entpuppt.
+    // Eine Migration braucht es dafür nicht: der Wert heilt sich beim nächsten Schalten.
+    const gueltig = new Set<string>(MERKMALSHERKUENFTE);
+    return wert.split(",").filter((h) => gueltig.has(h)) as Merkmalsherkunft[];
   },
 
   async herkuenfteSetzen(herkuenfte) {

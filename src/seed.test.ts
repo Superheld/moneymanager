@@ -196,6 +196,44 @@ describe("Spielstand", () => {
       .toBeGreaterThanOrEqual(2);
   });
 
+  it("traegt genug Material fuer ein messbares Training — und Woerter, die streuen", () => {
+    const db = mitSeed();
+    // Empfaenger und Verwendungszweck stehen am BELEG, nicht an der Buchung. Ein
+    // Spielstand, dessen Alltagszahlungen nur eine `notiz` tragen, ist fuer die
+    // Kategorie-Erkennung leer — genau das war er bis 2026-08-29, und es fiel nicht auf,
+    // weil jede andere Ansicht die Notiz zeigt.
+    const mitText = zahl(
+      db,
+      `SELECT COUNT(*) FROM ist_buchung b
+       JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+       JOIN umsatz_roh r ON r.id = v.umsatz_id
+       WHERE b.kategorie_id IS NOT NULL AND b.charakter <> 'Umschichtung'
+         AND (LENGTH(r.gegenpartei) > 0 OR LENGTH(r.verwendungszweck) > 0)`,
+    );
+    // Ueber `MESSBAR_AB` (50), sonst trainiert die App ohne Trefferquote.
+    expect(mitText).toBeGreaterThan(150);
+
+    // Und es muss Zeilen OHNE Beleg geben: von Hand erfasst, damit „ohne Text" als
+    // Ausschlussgrund im Spielstand ueberhaupt vorkommt.
+    expect(zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE quelle = 'manuell'")).toBeGreaterThan(0);
+
+    // Ein Empfaengerwort, das in MEHREREN Kategorien steht. Ohne so eines traegt jedes
+    // Wort seine Kategorie eindeutig, und Trennschaerfe und Trennkraft — die beiden
+    // Zahlen, die der Trainingsbereich gegeneinander stellt — saehen ueberall gleich
+    // gut aus.
+    const streuend = zahl(
+      db,
+      `SELECT COUNT(*) FROM (
+         SELECT r.gegenpartei FROM ist_buchung b
+         JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+         JOIN umsatz_roh r ON r.id = v.umsatz_id
+         WHERE b.kategorie_id IS NOT NULL
+         GROUP BY r.gegenpartei HAVING COUNT(DISTINCT b.kategorie_id) > 1
+       )`,
+    );
+    expect(streuend).toBeGreaterThan(0);
+  });
+
   it("enthaelt jeden Umsatz-Status", () => {
     const db = mitSeed();
     // „neu", „verbucht", „duplikat", „verworfen" — Weggelegtes bleibt sichtbar, und beim

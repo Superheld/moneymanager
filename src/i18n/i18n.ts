@@ -1453,7 +1453,7 @@ const de = {
       feldCharakter: "Default-Charakter",
     },
     abgleich: {
-      titel: "5 · Bestand abgleichen",
+      titel: "4 · Bestand abgleichen",
       untertitel: "Vorhandene Buchungen mit dem aktuellen Stand der Erkennung durchrechnen",
       hinweis:
         "Alles Bisherige wirkt nur nach vorn: ein frisch trainiertes Modell, eine neue Festlegung, eine Kategorie am Vertrag lassen die schon gebuchten Zahlungen unberührt. Der Abgleich rechnet sie neu — und zeigt zuerst, was er ändern würde. Geschrieben wird erst auf Bestätigung.",
@@ -1525,28 +1525,61 @@ const de = {
       spalteKategorie: "Kategorie",
       spalteTrefferquote: "Trefferquote",
       spaltePruefungen: "Geprüft",
-      // --- Vier Karten entlang des Trainingsablaufs ---
+      // --- Die Karten entlang des Trainingsablaufs ---
       datenTitel: "1 · Trainingsdaten",
       datenUntertitel: "Was an gebuchten Zahlungen zum Lernen taugt",
-      merkmaleTitel: "2 · Merkmale",
-      merkmaleUntertitel: "Welche Felder in die Erkennung eingehen",
-      ausschluesseTitel: "3 · Ausschlüsse",
-      ausschluesseUntertitel: "Wörter, die nicht mitgelernt werden",
-      modellKarteTitel: "4 · Erkennungsmodell",
+      woerterTitel: "2 · Wörter",
+      woerterUntertitel: "Was die Erkennung liest — und was sie nicht liest",
+      wolkenTitel: "Was jede Kategorie auszeichnet",
+      wolkenHinweis:
+        "Die Wörter, an denen die Erkennung eine Kategorie festmacht — je größer, desto stärker. Sie kommen aus dem trainierten Modell und nicht aus der Häufigkeit: die sagt, wo ein Wort vorkam, das Gewicht sagt, was die Erkennung daraus gemacht hat. Ein Klick sucht das Wort oben in der Liste.",
+      wolkenOhneModell:
+        "Noch kein Modell trainiert — bis dahin gibt es keine Gewichte, an denen sich ablesen ließe, woran die Erkennung eine Kategorie festmacht.",
+      wolkeLeer: "Kein Wort spricht deutlich für diese Kategorie.",
+      mitStandard: "mitgelieferte zeigen",
+      grundausstattung: "Grundausstattung wiederherstellen",
+      grundausstattungHinweis:
+        "Die mitgelieferten Wörter stehen normalerweise nicht in der Liste — es sind über hundert, die niemand gesetzt hat, und sie schieben die eigenen Entscheidungen nach hinten. Sichtbar sind sie trotzdem, sobald sie in deinen Daten vorkommen. Gelöschte holt dieser Knopf zurück, ohne eigene Einträge anzufassen.",
+      // --- Der Wortbestand: eine Liste über alles, was die Erkennung an Wörtern kennt ---
+      bestandTitel: "Wortbestand",
+      bestandHinweis:
+        "Jedes Wort steht genau einmal hier — im Training, gesperrt oder an einer festen Regel aussortiert. Ein Klick auf die Zeile zeigt, in welchen Kategorien es steckt.",
+      masseHinweis:
+        "Belege ist das absolute Vorkommen, Deckung der Anteil aller Beispiele. Die Trennschärfe misst, wie stark sich die Belege auf eine Kategorie konzentrieren — sie überschätzt das Seltene, denn ein Wort mit zwei Belegen steht schnell bei 100 %. Die Trennkraft nimmt beides zusammen: wie viel Unsicherheit über die Kategorie dieses Wort tatsächlich wegräumt. Nach ihr zu sortieren lohnt sich.",
+      bestandZahl: "{{gezeigt}} von {{gesamt}}",
+      zustand: {
+        genutzt: "im Training",
+        gesperrt: "gesperrt",
+        strukturell: "aussortiert",
+      },
+      zustandMeta: {
+        genutzt: "Wörter, auf denen das Modell rechnet",
+        gesperrt: "stehen auf der Ausschlussliste",
+        strukturell: "an einer festen Regel gefallen — Nummern, Platzhalter, zu kurz",
+      },
+      spalteZustand: "Zustand",
+      spalteDeckung: "Deckung",
+      spalteTrennkraft: "Trennkraft",
+      suche: "suchen",
+      suchePlatzhalter: "Wort eingeben …",
+      filterAlle: "alle",
+      keineTreffer: "Kein Wort passt zu dieser Suche.",
+      verteilungTitel: "Verteilung über {{anzahl}} Kategorien",
+      ohneBelege: "Kommt im Lernmaterial nicht vor — der Ausschluss wirkt hier auf nichts.",
+      strukturellHinweis: "dafür gibt es keinen Listeneintrag, den man entfernen könnte",
+      neuesWortHinweis:
+        "Für ein Wort, das in den Daten noch nicht vorkommt. Was schon dasteht, sperrst du besser in der Liste darüber — dort steht daneben, was es kostet.",
+      modellKarteTitel: "3 · Erkennungsmodell",
       modellKarteUntertitel: "Trainieren und das Ergebnis prüfen",
       herkunft: {
         empGanz: "Empfänger, ganz",
         empWort: "Empfänger, einzelne Wörter",
         vwz: "Verwendungszweck",
-        gid: "Gläubiger-ID",
-        vz: "Vorzeichen",
       },
       herkunftHinweis: {
         empGanz: "Der ganze normalisierte Name als ein Merkmal — trifft Wiederkehrer scharf.",
         empWort: "Die Einzelwörter des Namens — sie greifen auch bei fremden Anbietern.",
         vwz: "Die Wörter des Verwendungszwecks. Bei Kartenzahlungen oft die einzige Stelle, an der steht, worum es ging.",
-        gid: "Die SEPA-Gläubiger-ID, sofern die Bank sie liefert.",
-        vz: "Nur ob Zufluss oder Abfluss — nicht die Höhe.",
       },
       herkunftAnzahl: "{{anzahl}} Merkmale",
       herkunftAus: "abgeschaltet",
@@ -1566,6 +1599,7 @@ const de = {
       ausschliessen: "ausschließen",
       zulassen: "zulassen",
       neuesWort: "Wort ausschließen",
+      wortSperren: "Wort sperren",
       neuesWortPlatzhalter: "z. B. kdn",
       nurIn: "nur in",
       ueberall: "überall",
@@ -1585,8 +1619,6 @@ const de = {
       namensraum: {
         emp: "Empfänger",
         vwz: "Verwendungszweck",
-        gid: "Gläubiger-ID",
-        vz: "Vorzeichen",
       },
       spalteMerkmal: "Merkmal",
       spalteAnzahl: "Belege",
@@ -1598,7 +1630,7 @@ const de = {
       verwurf: {
         zuKurz: "zu kurz",
         ziffern: "Nummer",
-        stoppwort: "Stoppwort",
+        ausgeschlossen: "gesperrt",
         platzhalter: "Platzhalter",
       },
       stoppwoerterTitel: "Feste Stoppwortliste ({{anzahl}})",
@@ -3222,7 +3254,7 @@ const en: typeof de = {
       feldCharakter: "Default character",
     },
     abgleich: {
-      titel: "5 · Reconcile existing bookings",
+      titel: "4 · Reconcile existing bookings",
       untertitel: "Re-run existing bookings against the current state of the recognition",
       hinweis:
         "Everything so far only works going forward: a freshly trained model, a new pin, a category on a contract leave already-booked payments untouched. The reconciliation recomputes them — and shows what it would change first. Nothing is written until you confirm.",
@@ -3296,25 +3328,58 @@ const en: typeof de = {
       spaltePruefungen: "Evaluated",
       datenTitel: "1 · Training data",
       datenUntertitel: "What booked payments are usable for learning",
-      merkmaleTitel: "2 · Features",
-      merkmaleUntertitel: "Which fields feed into recognition",
-      ausschluesseTitel: "3 · Exclusions",
-      ausschluesseUntertitel: "Words that are not learned",
-      modellKarteTitel: "4 · Recognition model",
+      woerterTitel: "2 · Words",
+      woerterUntertitel: "What the recognition reads — and what it does not",
+      wolkenTitel: "What marks each category",
+      wolkenHinweis:
+        "The words the recognition pins a category on — the larger, the stronger. They come from the trained model, not from frequency: frequency says where a word occurred, the weight says what the recognition made of it. Click one to find it in the list above.",
+      wolkenOhneModell:
+        "No model trained yet — until then there are no weights to read off what the recognition pins a category on.",
+      wolkeLeer: "No word speaks clearly for this category.",
+      mitStandard: "show bundled",
+      grundausstattung: "Restore default list",
+      grundausstattungHinweis:
+        "The bundled words are normally not listed — there are over a hundred nobody chose, and they push your own decisions out of sight. They do show up once they occur in your data. This button brings deleted ones back without touching your own entries.",
+      // --- The word inventory: one list for everything the recognition knows ---
+      bestandTitel: "Word inventory",
+      bestandHinweis:
+        "Every word appears exactly once here — in training, blocked, or dropped by a fixed rule. Click a row to see which categories it sits in.",
+      masseHinweis:
+        "Occurrences is the absolute count, coverage the share of all examples. Discriminance measures how strongly the occurrences concentrate in one category — it overrates the rare, since a word with two occurrences easily reaches 100 %. Separating power combines both: how much uncertainty about the category this word actually removes. That is the column worth sorting by.",
+      bestandZahl: "{{gezeigt}} of {{gesamt}}",
+      zustand: {
+        genutzt: "in training",
+        gesperrt: "blocked",
+        strukturell: "dropped",
+      },
+      zustandMeta: {
+        genutzt: "words the model computes on",
+        gesperrt: "on the exclusion list",
+        strukturell: "dropped by a fixed rule — numbers, placeholders, too short",
+      },
+      spalteZustand: "State",
+      spalteDeckung: "Coverage",
+      spalteTrennkraft: "Separating power",
+      suche: "search",
+      suchePlatzhalter: "type a word …",
+      filterAlle: "all",
+      keineTreffer: "No word matches this search.",
+      verteilungTitel: "Spread across {{anzahl}} categories",
+      ohneBelege: "Does not occur in the learning material — this exclusion affects nothing.",
+      strukturellHinweis: "there is no list entry to remove for this",
+      neuesWortHinweis:
+        "For a word that does not appear in the data yet. Anything already listed above is better blocked there — the numbers next to it say what it costs.",
+      modellKarteTitel: "3 · Recognition model",
       modellKarteUntertitel: "Train and check the result",
       herkunft: {
         empGanz: "Payee, whole",
         empWort: "Payee, single words",
         vwz: "Reference text",
-        gid: "Creditor ID",
-        vz: "Sign",
       },
       herkunftHinweis: {
         empGanz: "The whole normalised name as one feature — sharp on recurring payees.",
         empWort: "The single words of the name — they also catch unfamiliar payees.",
         vwz: "The words of the reference text. On card payments often the only place stating what it was.",
-        gid: "The SEPA creditor ID, where the bank supplies it.",
-        vz: "Only inflow or outflow — not the amount.",
       },
       herkunftAnzahl: "{{anzahl}} features",
       herkunftAus: "off",
@@ -3334,6 +3399,7 @@ const en: typeof de = {
       ausschliessen: "exclude",
       zulassen: "allow",
       neuesWort: "Exclude word",
+      wortSperren: "Block word",
       neuesWortPlatzhalter: "e.g. kdn",
       nurIn: "only in",
       ueberall: "everywhere",
@@ -3353,8 +3419,6 @@ const en: typeof de = {
       namensraum: {
         emp: "Payee",
         vwz: "Reference text",
-        gid: "Creditor ID",
-        vz: "Sign",
       },
       spalteMerkmal: "Feature",
       spalteAnzahl: "Occurrences",
@@ -3366,7 +3430,7 @@ const en: typeof de = {
       verwurf: {
         zuKurz: "too short",
         ziffern: "number",
-        stoppwort: "stop word",
+        ausgeschlossen: "blocked",
         platzhalter: "placeholder",
       },
       stoppwoerterTitel: "Fixed stop word list ({{anzahl}})",

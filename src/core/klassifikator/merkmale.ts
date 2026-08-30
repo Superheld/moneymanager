@@ -18,16 +18,22 @@
 //   • `vwz:…`  Wörter aus dem Verwendungszweck. Bei Kartenzahlungen oft die einzige
 //              Stelle, an der überhaupt steht, worum es ging — aber auch das
 //              schmutzigste Feld (siehe STRUKTURFILTER).
-//   • `gid:…`  die SEPA-Gläubiger-ID. Nur bei Lastschrift dabei (auf echten Daten 8 %),
-//              dann aber ein sehr scharfes Signal. Kostet ein Token und wird ignoriert,
-//              wo sie fehlt.
 //
-// Dazu das VORZEICHEN als eigenes Token — mit einer Einschränkung, die gemessen ist:
-// es trägt nichts. Am echten Bestand (2026-08-17) kostete sein Weglassen 0,00 Punkte,
-// dasselbe gilt für die Gläubiger-ID. Die Vermutung, ohne Vorzeichen werde eine
-// Supermarkt-Gutschrift zur Lebensmittelausgabe, hat sich nicht bestätigt. Beide bleiben
-// abschaltbar statt gelöscht: die Zahlen gelten für DIESEN Bestand, und die Herkünfte
-// sind ohnehin einzeln steuerbar.
+// **Zwei Quellen sind 2026-08-29 gefallen: das VORZEICHEN und die GLÄUBIGER-ID.** Beide
+// kosteten am echten Bestand 0,00 Punkte, und beide waren in einer Liste von WÖRTERN ein
+// Fremdkörper — ein `+` ist kein Wort, eine Gläubiger-ID ist ein Bezeichner. Sie standen
+// dort als Zeilen, die niemand beurteilen konnte.
+//
+// Der Einwand dagegen gehört dazu, damit ihn niemand neu erfinden muss: dass ein Merkmal
+// beim WEGLASSEN nichts kostet, heisst nicht, dass es nichts tut. Die Gläubiger-ID hängt
+// nur an Lastschriften; wo sie steht, ist sie scharf, und über den ganzen Bestand
+// gemittelt verschwindet das. Die Entscheidung war trotzdem, sie zu nehmen — eine
+// abschaltbare Quelle, die man nicht beurteilen kann, ist ein Schalter ohne Grundlage.
+//
+// Damit liest die Extraktion nur noch TEXT. `Merkmalsquelle` hat deshalb weder Betrag
+// noch Gläubiger-ID mehr: beide waren ausschliesslich für diese zwei Quellen da, und ein
+// Feld, das durch die Kette gereicht und nirgends gelesen wird, sieht beim nächsten
+// Anfassen aus wie eine vergessene Auswertung.
 //
 // Getrennte Namensräume, weil sonst ein Wort aus dem Verwendungszweck ein Empfänger-Token
 // überstimmen kann und in der Begründung nicht mehr zu sehen ist, woher der Treffer kam.
@@ -40,30 +46,26 @@
 // „karte" sieht nach Müll aus und trifft dreistellig oft zu 100 % dieselbe Kategorie,
 // während ein sauber lesbares Wort daneben über ein Dutzend Kategorien streut.
 
-import type { Cent } from "../basis/geld";
 import { anbieterSchluessel } from "../basis/gegenpartei";
 
 /** Was von einer Zahlung in die Extraktion geht. Bewusst flach — kein Aggregat. */
 export interface Merkmalsquelle {
   readonly gegenpartei: string;
   readonly verwendungszweck: string;
-  readonly glaeubigerId?: string;
-  /** Vorzeichenbehaftet; nur das Vorzeichen wird verwendet, nicht die Höhe. */
-  readonly betrag: Cent;
 }
 
 /**
  * Woher ein Merkmal stammt — feiner als der Namensraum, weil `emp=` (ganzer Name) und
  * `emp:` (Einzelwörter) verschieden wirken und getrennt schaltbar sein müssen.
  */
-export type Merkmalsherkunft = "empGanz" | "empWort" | "vwz" | "gid" | "vz";
+export type Merkmalsherkunft = "empGanz" | "empWort" | "vwz";
 
 /** Alle Herkünfte in der Reihenfolge, in der sie in der Oberfläche stehen. */
-export const MERKMALSHERKUENFTE: readonly Merkmalsherkunft[] = ["empGanz", "empWort", "vwz", "gid", "vz"];
+export const MERKMALSHERKUENFTE: readonly Merkmalsherkunft[] = ["empGanz", "empWort", "vwz"];
 
 /** Präfix je Herkunft — die Trennung im Token selbst. */
 const PRAEFIX: Record<Merkmalsherkunft, string> = {
-  empGanz: "emp=", empWort: "emp:", vwz: "vwz:", gid: "gid:", vz: "vz:",
+  empGanz: "emp=", empWort: "emp:", vwz: "vwz:",
 };
 
 /** Die Herkunft eines fertigen Tokens, oder null bei unbekanntem Präfix. */
@@ -115,6 +117,16 @@ export interface VerworfenesWort {
   readonly grund: Verwurfsgrund;
   /** Aus welchem Feld das Wort stammt — nötig, um es gezielt dort auszuschließen. */
   readonly herkunft: Merkmalsherkunft;
+  /**
+   * Die BEREINIGTE Form, unter der das Wort auf der Ausschlussliste steht — nur bei
+   * `grund === "ausgeschlossen"` gesetzt, denn nur dort gibt es einen Listeneintrag.
+   *
+   * Sie kann von `wort` abweichen, und daran hing ein Fehler: `wort` ist immer das
+   * Original aus dem Kontoauszug (`debitkarte2025`), die Liste enthält aber das Token
+   * (`debitkarte`). Ein „Zulassen" auf das Original löschte eine Zeile, die es nicht
+   * gibt — kein Fehler, keine Wirkung. Wer den Eintrag anfassen will, braucht diese Form.
+   */
+  readonly listenform?: string;
 }
 
 export interface Merkmalsbefund {
@@ -332,7 +344,7 @@ export function merkmalsbefund(
       return;
     }
     if (ausgeschlossen(r.token, herkunft)) {
-      verworfen.push({ wort, grund: "ausgeschlossen", herkunft });
+      verworfen.push({ wort, grund: "ausgeschlossen", herkunft, listenform: r.token });
       return;
     }
     hinzu(`${PRAEFIX[herkunft]}${r.token}`);
@@ -363,13 +375,6 @@ export function merkmalsbefund(
 
   for (const w of zerlegen(q.verwendungszweck)) wortHinzu(w, "vwz");
 
-  const gid = q.glaeubigerId?.trim().toUpperCase();
-  if (gid && aktiv.has("gid") && !ausgeschlossen(gid.toLowerCase(), "gid")) hinzu(`gid:${gid}`);
-
-  // Kein Token bei Betrag 0: eine Null hat keine Richtung, und „ist weder Zu- noch
-  // Abfluss" ist eine Aussage, die kein Beispiel im Bestand stützt.
-  if (q.betrag !== 0 && aktiv.has("vz")) hinzu(q.betrag < 0 ? "vz:-" : "vz:+");
-
   return { merkmale, verworfen };
 }
 
@@ -379,6 +384,29 @@ export function merkmaleFuer(
   konfiguration: Merkmalskonfiguration = STANDARD_KONFIGURATION,
 ): string[] {
   return [...merkmalsbefund(q, konfiguration).merkmale];
+}
+
+/**
+ * Setzt ein Token aus Herkunft und Wort zusammen — die Umkehrung von `wortVon`.
+ *
+ * Gebraucht, wo ein Wort BEKANNT ist und sein Token erst gebildet werden muss: bei einem
+ * ausgeschlossenen Wort etwa, das im Vokabular gerade nicht steht und trotzdem an
+ * derselben Statistik gemessen werden soll wie eines, das drin ist.
+ */
+export function merkmalName(herkunft: Merkmalsherkunft, wort: string): string {
+  return `${PRAEFIX[herkunft]}${wort}`;
+}
+
+/**
+ * Das nackte Wort eines Tokens — die Form, unter der es auf der Ausschlussliste steht.
+ *
+ * Eine Funktion und keine drei Zeichen im Aufrufer, weil genau diese Zerlegung an drei
+ * Stellen der Oberfläche nachgebaut war und die Ausschlussliste an ihrem Ergebnis hängt:
+ * eine Abweichung davon trifft keine Zeile und meldet trotzdem Erfolg.
+ */
+export function wortVon(merkmal: string): string {
+  const i = merkmal.search(/[=:]/);
+  return i < 0 ? merkmal : merkmal.slice(i + 1);
 }
 
 /** Der Namensraum eines Tokens (`emp`, `vwz`, `gid`, `vz`) — für Anzeige und Gruppierung. */
