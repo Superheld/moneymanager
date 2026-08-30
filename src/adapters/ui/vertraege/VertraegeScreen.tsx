@@ -321,7 +321,13 @@ export function VertraegeScreen() {
             ton="gefahr"
             label={t("vertraege.loeschen")}
             onClick={() => loeschfrage.stellen({
-              name: v.vertrag.anbieter,
+              // `v` IST der Vertrag, nicht die Zeile um ihn herum: die Tabelle bekommt
+              // `vertraege` (= `zeilen.map(z => z.vertrag)`), und alles daneben schlägt
+              // über `v.id` in `zeileZu` nach. Hier stand `v.vertrag.anbieter` — der
+              // Zugriff warf beim Klick, der Bestätigungsdialog ging nie auf, und das
+              // Löschen sah aus wie ein Knopf ohne Wirkung. `render: (row: any)` in
+              // `DataTable.d.ts` hält den Typecheck davon fern; deshalb der Test unten.
+              name: v.anbieter,
               // Die Kaskade ist hier echt und nicht klein: vertragLoeschen nimmt die
               // Zahlungsregel, die Erkennungsregel und JEDE Zuordnung mit — auch die von
               // Hand gesetzten. Wer das nicht weiss, verliert Handarbeit.

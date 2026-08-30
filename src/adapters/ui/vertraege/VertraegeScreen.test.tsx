@@ -747,3 +747,38 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
     await waitFor(() => expect(document.body.textContent ?? "").toMatch(/greift noch auf keine/i));
   });
 });
+
+/**
+ * Löschen — der Weg vom Knopf bis in die Tabelle.
+ *
+ * Er stand einmal still: die Spalte griff auf `v.vertrag.anbieter` zu, obwohl die
+ * Tabelle mit `Vertrag` gefüttert wird und nicht mit `Vertragszeile`. Der Zugriff warf
+ * beim KLICK — der Bestätigungsdialog ging nie auf, und der Knopf sah aus wie einer ohne
+ * Wirkung. Kein Typecheck konnte das sehen (`render: (row: any)` in `DataTable.d.ts`),
+ * und kein Test lief bis zum Klick. Deshalb dieser hier.
+ */
+describe("VertraegeScreen — Löschen", () => {
+  it("löscht einen Vertrag über den Knopf in der Zeile", async () => {
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Ohlert Seewinkel", beginn: "2026-01-01",
+      verlaengerung: "keine", status: "aktiv",
+    });
+
+    rendere(<VertraegeScreen />);
+    await screen.findByRole("button", { name: /Ohlert Seewinkel/ });
+
+    await userEvent.click(screen.getAllByRole("button", { name: /^löschen$/i })[0]);
+
+    // Die Rückfrage muss überhaupt aufgehen — genau das tat sie nicht — und sie trägt
+    // den Anbieternamen: er kommt aus dem Feld, das den Fehler trug.
+    const bestaetigen = await screen.findByRole("button", { name: /endgültig löschen/i });
+    expect(document.body.textContent ?? "").toMatch(/Ohlert Seewinkel“ wird gelöscht/);
+
+    await userEvent.click(bestaetigen);
+
+    await waitFor(async () => expect(await sqliteVertragRepository.alle()).toHaveLength(0));
+  });
+});
