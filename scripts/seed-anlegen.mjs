@@ -18,8 +18,9 @@
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const WURZEL = new URL("..", import.meta.url).pathname;
+const WURZEL = fileURLToPath(new URL("..", import.meta.url));
 
 const geladen = await Promise.all([
   import("../src/adapters/persistence/migrations.ts"),
