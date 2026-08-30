@@ -61,7 +61,7 @@ libsqlite3-sys = { version = "0.30.1", features = ["bundled-sqlcipher-vendored-o
 # zeroize:           wischt Schluessel aus dem Speicher, statt sie liegen zu lassen
 # data-encoding:     Base32 fuer den Wiederherstellungscode, Base64 fuer die Huelle
 argon2 = "0.5"
-chacha20poly1305 = "0.10"
+chacha20poly1305 = "0.11"
 rand = "0.10"
 zeroize = { version = "1", features = ["derive"] }
 data-encoding = "2"
