@@ -117,6 +117,29 @@ trug sie längst als eigenen Inline-Stil und sah als einzige richtig aus.
 Die Regel dahinter ist dieselbe wie bei `Zeilenauswahl`: **die Grösse eines Bedienteils
 folgt dem, wo es steht, nicht dem, was es tut.**
 
+## Ein Knopf neben dem Feld, nicht darunter
+
+`bausteine/Feldzeile` legt ein Feld und den Knopf, der dazugehört, in eine Zeile. Das ist
+keine Kosmetik, sondern eine Aussage: **ein Knopf unter einem einzelnen Feld liest sich als
+Abschluss eines Formulars** — obwohl er nichts abschickt. Neben dem Feld liest er sich als
+das, was er ist: eine zweite Möglichkeit an derselben Stelle. „Wähl einen Vertrag ODER leg
+einen neuen an", „stell die Sperre ODER sperre sofort".
+
+**Die Regel für den Zweifelsfall:** steht über dem Knopf noch ein Feld, das er nicht meint,
+gehört er nach unten — dafür gibt es `.form-actions`. Meint er genau das eine Feld daneben,
+gehört er daneben.
+
+Zwei Dinge stecken in der Klasse, und beide sind der Grund, warum es sie überhaupt braucht:
+
+- **`align-items: flex-end`.** Ein `FormField` setzt die Beschriftung ÜBER das Feld. Mittig
+  ausgerichtet stünde der Knopf auf halber Höhe zwischen Label und Feld, also auf keiner
+  Linie mit irgendetwas.
+- **`min-width: 0` am Feld.** `.field` ist `width: 100%`. In einem Flex-Container heisst
+  das: es nimmt die ganze Zeile, und der Knopf bricht um. Genau das war im `VertragsBlock`
+  der Fall — dort stand `display: flex` längst, und trotzdem lag nichts nebeneinander. **Ein
+  Flex-Container allein reicht nicht, wenn das Kind auf seiner vollen Breite besteht**, und
+  von aussen sieht das aus, als sei das Layout gar nicht gesetzt.
+
 ## Aus einer aufgeklappten Liste in die Buchung
 
 Wo einzelne Buchungen stehen — unter einem Budget (Übersicht, Budget-Verlauf) oder unter
