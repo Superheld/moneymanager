@@ -415,6 +415,85 @@ mod tests {
         pool.close().await;
     }
 
+    /// Der Hinweg — `integer_bleiben_integer` prueft nur den Rueckweg.
+    ///
+    /// `binden` ist die Stelle, an der JEDER Wert der Anwendung in die Datenbank geht:
+    /// `db_execute` und `db_select` reichen beide durch sie hindurch. Sie stand lange
+    /// nur unter dem Schutz des Uebersetzers, und das reichte, solange sich an ihr
+    /// nichts aenderte. Mit sqlx 0.9 hat sie sich geaendert (`SqliteArguments` ohne
+    /// Lifetime, dazu `AssertSqlSafe` um das zusammengesetzte SQL) — und eine Bindung,
+    /// die den falschen Typ waehlt, uebersetzt weiterhin klaglos.
+    ///
+    /// **Zwei der Spalten sind so gewaehlt, dass der Fehler ueberhaupt sichtbar wird —
+    /// gemessen, nicht ueberlegt.** Der erste Anlauf band einen Cent-Betrag in eine
+    /// INTEGER-Spalte und blieb gruen, obwohl `binden` versuchsweise auf `f64`
+    /// umgestellt war: SQLite ist dynamisch typisiert, und die AFFINITAET der Spalte
+    /// macht aus einem ganzzahligen REAL wieder ein INTEGER. Der Test prueft dann die
+    /// Reparatur der Datenbank statt der eigenen Naht.
+    ///
+    /// Deshalb steht hier beides: `roh` OHNE Typangabe (BLOB-Affinitaet, SQLite
+    /// konvertiert nichts) und `gross` mit einem Wert jenseits von 2^53, den ein `f64`
+    /// nicht mehr genau traegt. An dem einen faellt die falsche SORTE auf, an dem
+    /// anderen der VERLUST.
+    #[tokio::test]
+    async fn binden_bringt_jede_json_sorte_unveraendert_hinein() {
+        let datei = pfad("binden");
+        let pool = offen(&datei, None).await;
+        pool.execute(
+            "CREATE TABLE t (cent INTEGER, wort TEXT, quote REAL, ja INTEGER, leer TEXT, \
+             liste TEXT, roh, gross INTEGER)",
+        )
+        .await
+        .expect("tabelle");
+
+        // 2^53 + 1 — die kleinste ganze Zahl, die ein f64 nicht mehr von ihrem Nachbarn
+        // unterscheiden kann. Als Betrag unrealistisch, als Zeuge genau richtig.
+        const JENSEITS_VON_F64: i64 = 9_007_199_254_740_993;
+
+        let werte = vec![
+            JsonValue::from(-123_456_789i64),
+            JsonValue::from("Rueckerstattung"),
+            JsonValue::from(0.5f64),
+            JsonValue::from(true),
+            JsonValue::Null,
+            serde_json::json!(["a", "b"]),
+            JsonValue::from(-42i64),
+            JsonValue::from(JENSEITS_VON_F64),
+        ];
+        let sql = String::from("INSERT INTO t VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        binden(sqlx::query(AssertSqlSafe(sql)), &werte)
+            .execute(&pool)
+            .await
+            .expect("insert ueber binden");
+
+        let zeilen = sqlx::query("SELECT * FROM t").fetch_all(&pool).await.expect("select");
+        let json = zeile_zu_json(&zeilen[0]);
+
+        assert_eq!(json["cent"], JsonValue::from(-123_456_789i64));
+        assert_eq!(json["wort"], JsonValue::from("Rueckerstattung"));
+        assert_eq!(json["quote"], JsonValue::from(0.5));
+        // Ohne Affinitaet gibt es nichts, was eine falsche Bindung wieder geradezieht:
+        // ein als REAL gebundener Wert kaeme hier als REAL zurueck.
+        assert_eq!(
+            json["roh"],
+            JsonValue::from(-42i64),
+            "Eine Ganzzahl ist als Fliesskomma durch die Naht gegangen."
+        );
+        assert!(json["roh"].is_i64());
+        // Und hier waere es nicht nur die falsche Sorte, sondern ein anderer Wert.
+        assert_eq!(
+            json["gross"],
+            JsonValue::from(JENSEITS_VON_F64),
+            "Der Wert hat auf dem Weg durch die Naht an Genauigkeit verloren."
+        );
+        // SQLite kennt kein BOOLEAN; `true` wird zur 1 und kommt als Ganzzahl zurueck.
+        assert_eq!(json["ja"], JsonValue::from(1i64));
+        assert_eq!(json["leer"], JsonValue::Null);
+        // Arrays und Objekte gehen als JSON-Text hinein — dieselbe Wahl wie im Plugin.
+        assert_eq!(json["liste"], JsonValue::from(r#"["a","b"]"#));
+        pool.close().await;
+    }
+
     #[tokio::test]
     async fn ein_falscher_schluessel_faellt_beim_pruefzugriff_auf() {
         use crate::schluessel::Datenschluessel;
