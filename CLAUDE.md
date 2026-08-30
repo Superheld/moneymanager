@@ -594,6 +594,13 @@ direkten Commit auf `develop` oder `main` ab, `prepare-commit-msg` lässt nach `
 einen Merge aus `develop` zu. Merges per `--no-ff` laufen normal durch — Git ruft für sie
 einen anderen Hook. Im Notfall: `--no-verify`.
 
+**Ausser bei einem Merge mit Konflikten**, und das ist die Stelle, an der man es nicht
+erwartet: der lässt sich nicht automatisch abschliessen, jemand tippt danach `git commit` —
+und den ruft Git über `pre-commit`. Der Branch-Wächter sieht einen Commit auf `develop` und
+weist ab, obwohl `MERGE_HEAD` daneben liegt. Der Weg ist `--no-verify`, nicht ein Umbau des
+Merges: der Muster-Guard ist über dieselben vorgemerkten Änderungen bereits gelaufen, und
+was er meldet, meldet er vor dieser Sperre.
+
 **Beide Hooks sitzen auf dieser Maschine, und darin liegt ihre Grenze.** Ein Merge, der auf
 GitHub passiert, fragt keinen von ihnen — der Wachposten fällt lautlos genau dort aus, wo
 niemand ihn vermisst. Deshalb zielt auch **Dependabot auf `develop`** (`target-branch` in
