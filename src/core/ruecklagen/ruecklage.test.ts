@@ -1,5 +1,5 @@
-// Inventar-Rücklage: die Rechnung (Wiederbeschaffung ÷ Nutzungsdauer) und ihr Abgleich
-// gegen echte Kontostände. Reine Funktionen, keine Uhr, kein IO.
+// Rücklage: die Rechnung (Ziel ÷ Frist, sonst die freie Rate) und ihr Abgleich gegen
+// echte Kontostände. Reine Funktionen, keine Uhr, kein IO.
 
 import { describe, expect, it } from "vitest";
 import { euroZuCent } from "../basis/geld";
@@ -8,58 +8,61 @@ import {
   monatsRuecklageGesamt,
   ruecklagenDeckung,
   sollRuecklage,
-  type Inventargegenstand,
-} from "./inventar";
+  hatZiel,
+  mindestRuecklage,
+  zielwertGesamt,
+  type Ruecklage,
+} from "./ruecklage";
 
-const auto: Inventargegenstand = {
+const auto: Ruecklage = {
   id: "auto",
   bezeichnung: "Auto",
-  wiederbeschaffung: euroZuCent(12000),
-  nutzungsdauerMonate: 100,
-  anschaffung: "2026-01-01",
+  ziel: euroZuCent(12000),
+  fristMonate: 100,
+  beginn: "2026-01-01",
 };
-const laptop: Inventargegenstand = {
+const laptop: Ruecklage = {
   id: "laptop",
   bezeichnung: "Laptop",
-  wiederbeschaffung: euroZuCent(1200),
-  nutzungsdauerMonate: 48,
-  anschaffung: "2026-01-01",
+  ziel: euroZuCent(1200),
+  fristMonate: 48,
+  beginn: "2026-01-01",
 };
 
 describe("monatsRuecklage", () => {
-  it("teilt Wiederbeschaffung durch Nutzungsdauer", () => {
+  it("teilt das Ziel durch die Frist", () => {
     expect(monatsRuecklage(auto)).toBe(euroZuCent(120));
     expect(monatsRuecklage(laptop)).toBe(2500); // 120000 / 48
   });
 
-  it("summiert über alle Gegenstände", () => {
+  it("summiert über alle Rücklagen", () => {
     expect(monatsRuecklageGesamt([auto, laptop])).toBe(euroZuCent(120) + 2500);
     expect(monatsRuecklageGesamt([])).toBe(0);
   });
 
-  it("bleibt bei Nutzungsdauer 0 endlich statt Infinity zu werden", () => {
-    expect(monatsRuecklage({ ...auto, nutzungsdauerMonate: 0 })).toBe(0);
+  it("bleibt bei Frist 0 endlich statt Infinity zu werden", () => {
+    expect(monatsRuecklage({ ...auto, fristMonate: 0 })).toBe(0);
   });
 });
 
 describe("sollRuecklage", () => {
-  it("wächst linear ab der Anschaffung", () => {
+  it("wächst linear ab dem Beginn", () => {
     expect(sollRuecklage(auto, "2026-01-01")).toBe(0);
     expect(sollRuecklage(auto, "2026-07-01")).toBe(euroZuCent(720)); // 6 × 120
   });
 
-  it("wird auf die Wiederbeschaffung gedeckelt", () => {
+  it("wird auf das Ziel gedeckelt", () => {
     expect(sollRuecklage(auto, "2200-01-01")).toBe(euroZuCent(12000));
   });
 
-  it("ist vor der Anschaffung 0", () => {
+  it("ist vor dem Beginn 0", () => {
     expect(sollRuecklage(auto, "2025-06-01")).toBe(0);
   });
 
   // Anteilig aus dem Ziel gerechnet, nicht als (gerundete Rate × Monate) — sonst fehlte
   // am Ende ein Rundungsrest, und die fachliche Zusage bräche.
-  it("erreicht das Ziel am Ende der Nutzungsdauer exakt, auch bei krummer Teilung", () => {
-    const krumm: Inventargegenstand = { ...auto, wiederbeschaffung: 1000, nutzungsdauerMonate: 3 };
+  it("erreicht das Ziel am Ende der Frist exakt, auch bei krummer Teilung", () => {
+    const krumm: Ruecklage = { ...auto, ziel: 1000, fristMonate: 3 };
     expect(monatsRuecklage(krumm)).toBe(333); // gerundet
     expect(sollRuecklage(krumm, "2026-04-01")).toBe(1000); // trotzdem voll
   });
@@ -117,13 +120,70 @@ describe("ruecklagenDeckung", () => {
     expect(d.grad).toBe(0);
   });
 
-  // Der Nenner zählt NUR die Gegenstände mit Konto — sonst drückte ein Gegenstand ohne
-  // Zuordnung den Deckungsgrad der anderen, obwohl über ihn gar nichts bekannt ist.
-  it("rechnet den Grad nur über die Gegenstände mit Konto", () => {
+  // Der Nenner zählt NUR die Rücklagen mit Konto — sonst drückte eine Rücklage ohne
+  // Zuordnung den Deckungsgrad der anderen, obwohl über sie gar nichts bekannt ist.
+  it("rechnet den Grad nur über die Rücklagen mit Konto", () => {
     const items = [{ ...auto, kontoId: "k1" }, laptop];
     const d = ruecklagenDeckung(items, "2026-07-01", stand({ k1: euroZuCent(720) }));
     expect(d.soll).toBe(euroZuCent(870));
     expect(d.sollMitKonto).toBe(euroZuCent(720));
     expect(d.grad).toBe(100);
+  });
+});
+
+/**
+ * Die freie Rücklage — der Fall, für den das frühere Inventar keinen Platz hatte. Sie
+ * hat kein Ziel, keine Frist und keinen Deckel; ihre Rate steht direkt da.
+ */
+describe("Rücklage ohne Ziel", () => {
+  const urlaub: Ruecklage = {
+    id: "urlaub",
+    bezeichnung: "Urlaub",
+    rate: euroZuCent(50),
+    beginn: "2026-01-01",
+  };
+
+  it("nimmt die eingetragene Rate", () => {
+    expect(hatZiel(urlaub)).toBe(false);
+    expect(monatsRuecklage(urlaub)).toBe(euroZuCent(50));
+  });
+
+  it("wächst weiter, statt irgendwo anzuschlagen", () => {
+    expect(sollRuecklage(urlaub, "2026-07-01")).toBe(euroZuCent(300));
+    // Zehn Jahre später sind es zehn Jahre — es gibt nichts, wogegen zu deckeln wäre.
+    expect(sollRuecklage(urlaub, "2036-01-01")).toBe(euroZuCent(6000));
+  });
+
+  it("zählt nicht in den Zielwert", () => {
+    // Sonst mischte die Summe „was soll einmal dasein" mit „was ist bis jetzt fällig".
+    expect(zielwertGesamt([auto, urlaub])).toBe(euroZuCent(12000));
+  });
+
+  it("wird beim Abgleich behandelt wie jede andere", () => {
+    const items = [{ ...urlaub, kontoId: "k1" }];
+    const d = ruecklagenDeckung(items, "2026-07-01", new Map([["k1", euroZuCent(150)]]));
+    expect(d.soll).toBe(euroZuCent(300));
+    expect(d.grad).toBe(50);
+  });
+
+  it("zählt ohne Rate als 0 und reißt keine Summe auf", () => {
+    const leer: Ruecklage = { id: "x", bezeichnung: "x", beginn: "2026-01-01" };
+    expect(monatsRuecklage(leer)).toBe(0);
+    expect(sollRuecklage(leer, "2030-01-01")).toBe(0);
+  });
+});
+
+/** Reine Information: die Faustformel für den Notgroschen. */
+describe("mindestRuecklage", () => {
+  it("nimmt drei Monatseinnahmen", () => {
+    expect(mindestRuecklage(euroZuCent(3000))).toBe(euroZuCent(9000));
+  });
+
+  it("lässt den Faktor offen — die Formel ist eine Faustregel, keine Herleitung", () => {
+    expect(mindestRuecklage(euroZuCent(3000), 6)).toBe(euroZuCent(18000));
+  });
+
+  it("wird bei Einnahmen von 0 nicht negativ", () => {
+    expect(mindestRuecklage(-5000)).toBe(0);
   });
 });

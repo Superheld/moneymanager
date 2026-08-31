@@ -167,6 +167,19 @@ export interface IstBuchung {
   /** Das andere Konto bei einer Umbuchung (zur Anzeige der Richtung). */
   readonly gegenkontoId?: string;
   /**
+   * Zählt diese Buchung gegen ein Budget? Fehlend heißt JA.
+   *
+   * Die Ausnahme gibt es für die eine teure Anschaffung, für die jahrelang zurückgelegt
+   * wurde: sie ist eine echte Ausgabe, aber keine, an der sich ein Monatsbudget messen
+   * lassen müsste — sie würde jedes sprengen, und der überzogene Rahmen sagte danach
+   * nichts mehr über das Verhalten aus, das er steuern soll.
+   *
+   * Gesetzt wird sie von Hand oder beim Ausbuchen einer Rücklage. Sie beschreibt damit
+   * — wie `marker` — keine Tatsache über die Zahlung, sondern eine Entscheidung darüber,
+   * wie sie ausgewertet wird. Deshalb leitet sie niemand aus den Daten ab.
+   */
+  readonly budgetrelevant?: boolean;
+  /**
    * Aufteilung auf mehrere Kategorien (S-7). Gesetzt ⇒ `kategorieId` ist leer und die
    * Teile sind die Wahrheit; Σ Teile = `betrag`. Der Ledger-Betrag bleibt unberührt —
    * Saldo, Register und Netto-Null rechnen weiter mit der EINEN Zeile.

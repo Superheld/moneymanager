@@ -26,7 +26,7 @@ import { budgetstaende, vertragsBuchungenLaden, type Budgetstand } from "./budge
 import type { BudgetSicht } from "../core";
 import type {
   BudgetRepository,
-  InventarRepository,
+  RuecklagenRepository,
   KategorieRepository,
   LedgerPort,
   UmsatzRepository,
@@ -43,7 +43,7 @@ export interface UebersichtDeps {
   readonly kategorieRepo: KategorieRepository;
   readonly regelRepo: ZahlungsregelRepository;
   readonly budgetRepo: BudgetRepository;
-  readonly inventarRepo: InventarRepository;
+  readonly ruecklagenRepo: RuecklagenRepository;
   readonly umsatzRepo: UmsatzRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly kontoRepo: ZahlungskontoRepository;
@@ -63,7 +63,7 @@ export interface Uebersichtsdaten {
   /** Wählbare Monate für die Budgetliste, neuester zuerst („YYYY-MM"). */
   readonly monate: readonly string[];
   /**
-   * Gibt es überhaupt Plandaten (Verträge, Budgets, Inventar)? Ohne sie zeigten die drei
+   * Gibt es überhaupt Plandaten (Verträge, Budgets, Rücklagen)? Ohne sie zeigten die drei
    * Karten Nullen, und das liest sich wie ein Datenfehler statt wie ein leerer Plan.
    */
   readonly hatPlandaten: boolean;
@@ -98,13 +98,13 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, inventar, umsaetze, vertragsBuchungen, konten] =
+  const [buchungen, kategorien, regeln, budgets, ruecklagen, umsaetze, vertragsBuchungen, konten] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
       deps.regelRepo.alle(),
       deps.budgetRepo.alle(),
-      deps.inventarRepo.alle(),
+      deps.ruecklagenRepo.alle(),
       deps.umsatzRepo.alle(),
       vertragsBuchungenLaden(deps.zuordnungRepo),
       deps.kontoRepo.alle(),
@@ -115,14 +115,14 @@ export async function uebersichtLaden(
 
   return {
     ausblicke: monatsAusblicke({
-      regeln, budgets, inventar, ist: buchungen, kategorien, vertragsBuchungen, heute,
+      regeln, budgets, ruecklagen, ist: buchungen, kategorien, vertragsBuchungen, heute,
     }),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,
     kategorieNamen: new Map(kategorien.map((k: Kategorie) => [k.id, k.name])),
     empfaenger: empfaengerJeBuchung(umsaetze),
     monate: waehlbareMonate(fruehesterMonat(buchungen) ?? heute, dieserMonat),
-    hatPlandaten: regeln.length > 0 || budgets.length > 0 || inventar.length > 0,
+    hatPlandaten: regeln.length > 0 || budgets.length > 0 || ruecklagen.length > 0,
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
   };

@@ -85,7 +85,7 @@ describe("Spielstand", () => {
     // Unterschied zwischen „irgendwo ein Verweis kaputt" und „diese Zeile hier".
     const db = mitSeed();
     const bekannt = new Set(standardkategorienFlach().map((k) => k.id));
-    for (const tabelle of ["ist_buchung", "budget", "vertrag", "inventargegenstand"]) {
+    for (const tabelle of ["ist_buchung", "budget", "vertrag", "ruecklage"]) {
       const [zeilen] = db.exec(
         `SELECT DISTINCT kategorie_id FROM ${tabelle} WHERE kategorie_id IS NOT NULL`,
       );
@@ -111,7 +111,7 @@ describe("Spielstand", () => {
       ["ist_buchung_aufteilung", 2],
       ["vertrag", 2],
       ["vertrag_erkennung", 2],
-      ["inventargegenstand", 3],
+      ["ruecklage", 4],
       ["depotwert", 5],
       ["depotposition", 2],
       ["umsatz_roh", 6],

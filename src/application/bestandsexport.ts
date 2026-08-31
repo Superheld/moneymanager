@@ -33,7 +33,7 @@
 //
 // **Was NICHT drin ist**, damit niemand danach sucht: unverbuchte Zeilen (Inbox,
 // verworfen) — exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso
-// Budgets, Inventar, Depots, Kontogruppen und das Journal: sie hängen nicht an einer
+// Budgets, Rücklagen, Depots, Kontogruppen und das Journal: sie hängen nicht an einer
 // Buchung, und keiner der beiden Zwecke braucht sie heute.
 
 import type { Aufteilung, IstBuchung, Person, Vertrag, Zahlungskonto } from "../core";

@@ -52,10 +52,13 @@ export {
   addMonate,
   monateZwischen,
   // Abgeleitete Eigenschaften EINES Objekts. Die Grenze läuft hier an der Frage, ob
-  // etwas über eine SAMMLUNG geht: `monatsRuecklage(gegenstand)` ist Wiederbeschaffung
-  // durch Nutzungsdauer und kann gar nichts auswählen. `ruecklagenDeckung(alle, …)`
-  // dagegen verteilt Kontostände über alle Gegenstände — das ist eine Sicht.
+  // etwas über eine SAMMLUNG geht: `monatsRuecklage(ruecklage)` ist Ziel durch Frist und
+  // kann gar nichts auswählen. `ruecklagenDeckung(alle, …)` dagegen verteilt
+  // Kontostände über alle Rücklagen — das ist eine Sicht.
   monatsRuecklage,
+  // Welche der beiden Formen eine Rücklage hat. Eine Auskunft über EIN Objekt, und die
+  // Oberfläche braucht sie: an ihr hängt, welche Felder die Maske zeigt.
+  hatZiel,
   // Baum-Auskünfte über die Kategorien: sie ordnen ein, sie wählen nicht aus.
   hauptkategorie,
   // Aus EINER Bewertung abgeleitet, keine Auswahl über den Bestand.
@@ -209,17 +212,18 @@ export {
   type DepotDeps,
 } from "./depot/depotsichten";
 export {
-  inventarLaden,
-  type Inventarsicht,
-  type InventarDeps,
-} from "./inventar/inventarsichten";
+  ruecklagenLaden,
+  type Buchungswahl,
+  type Ruecklagensicht,
+  type RuecklagenDeps,
+} from "./ruecklagen/ruecklagensichten";
 export {
-  inventarAnlegen,
-  inventarAktualisieren,
-  inventarErsetzt,
-  inventarLoeschen,
-  type InventarEingabe,
-} from "./inventar/inventarAnlegen";
+  ruecklageAnlegen,
+  ruecklageAktualisieren,
+  ruecklageAusbuchen,
+  ruecklageLoeschen,
+  type RuecklagenEingabe,
+} from "./ruecklagen/ruecklagenPflege";
 export {
   kontogruppeSpeichern,
   kontogruppeLoeschen,

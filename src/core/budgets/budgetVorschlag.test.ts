@@ -197,6 +197,16 @@ describe("budgetvorschlaege", () => {
     expect(budgetvorschlaege(fremd, KATEGORIEN, "2026-08")).toEqual([]);
   });
 
+  // Sonst schlüge er einen Rahmen vor, gegen den die Buchung anschliessend nicht zählt.
+  it("übergeht eine Buchung, die von der Budgetbewertung ausgenommen ist", () => {
+    const mitAusnahme = monatlich({ praefix: "a", kategorieId: "essen", betrag: 40000 }).map(
+      (b, i) => (i === 0 ? { ...b, budgetrelevant: false } : b),
+    );
+    const v = budgetvorschlaege(mitAusnahme, KATEGORIEN, "2026-08");
+    // Elf statt zwölf Monate — der ausgenommene zählt nirgends mit.
+    expect(v[0].monate).toBe(11);
+  });
+
   it("nennt bei jedem Vorschlag die Art", () => {
     const v = budgetvorschlaege(HINTERGRUND, KATEGORIEN, "2026-08");
     expect(v[0].art).toBe("monatlich");

@@ -7,7 +7,7 @@ import { KontenVerwaltungScreen } from "./adapters/ui/konten/KontenVerwaltungScr
 import { EinstellungenScreen } from "./adapters/ui/einstellungen/EinstellungenScreen";
 import { VertraegeScreen } from "./adapters/ui/vertraege/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/budgets/BudgetsScreen";
-import { InventarScreen } from "./adapters/ui/inventar/InventarScreen";
+import { RuecklagenScreen } from "./adapters/ui/ruecklagen/RuecklagenScreen";
 import { ImportBereich } from "./adapters/ui/import/ImportBereich";
 import { TrainingBereich } from "./adapters/ui/training/TrainingBereich";
 import { appBootstrap } from "./application/bootstrap";
@@ -116,7 +116,7 @@ export default function App() {
         {screen === "uebersicht" && <UebersichtScreen />}
         {screen === "analyse" && <AnalyseScreen />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
-        {screen === "inventar" && <InventarScreen />}
+        {screen === "ruecklagen" && <RuecklagenScreen />}
         {screen === "budgets" && <BudgetsScreen />}
         {screen === "vertraege" && <VertraegeScreen />}
         {screen === "kontenverwaltung" && <KontenVerwaltungScreen />}

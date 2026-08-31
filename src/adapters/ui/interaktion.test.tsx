@@ -20,10 +20,10 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
 import { AppShell } from "./bausteine/AppShell";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
-import { InventarScreen } from "./inventar/InventarScreen";
+import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
 import { KontenScreen } from "./konten/KontenScreen";
 import { VertraegeScreen } from "./vertraege/VertraegeScreen";
-import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
+import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import {
   sqliteDublettenfreigabeRepository,
@@ -182,41 +182,37 @@ describe("Vertrag anlegen", () => {
   });
 });
 
-describe("Inventar anlegen", () => {
-  it("legt einen Gegenstand an", async () => {
+describe("Rücklage anlegen", () => {
+  it("legt eine Rücklage an", async () => {
     const nutzer = userEvent.setup();
-    rendere(<InventarScreen />);
+    rendere(<RuecklagenScreen />);
 
     const knoepfe = await screen.findAllByRole("button");
-    const neu = knoepfe.find((b) => /anlegen|neu|gegenstand|erfassen/i.test(b.textContent ?? ""));
+    const neu = knoepfe.find((b) => /anlegen|neu|rücklage|erfassen/i.test(b.textContent ?? ""));
     if (neu) await nutzer.click(neu);
 
-    const textfelder = screen.queryAllByRole("textbox");
-    if (textfelder.length > 0) await nutzer.type(textfelder[0], "Testgerät");
-    for (const feld of screen.queryAllByRole("spinbutton")) {
-      await nutzer.clear(feld);
-      await nutzer.type(feld, "12");
-    }
+    await nutzer.type(await screen.findByLabelText(/^Wofür/), "Testgerät");
+    await nutzer.type(await screen.findByLabelText(/^Ziel/), "120");
+    await nutzer.type(await screen.findByLabelText(/^Frist/), "12");
 
     const alleSpeichern = screen.queryAllByRole("button", { name: /speichern|anlegen/i });
     const speichern = alleSpeichern[alleSpeichern.length - 1];
     if (speichern) await nutzer.click(speichern);
 
     await waitFor(async () => {
-      const gegenstaende = await sqliteInventarRepository.alle();
-      const meldung = /muss|bitte|ungültig|fehlt/i.test(document.body.textContent ?? "");
-      expect(gegenstaende.length > 0 || meldung).toBe(true);
+      const [r] = await sqliteRuecklagenRepository.alle();
+      expect(r?.bezeichnung).toBe("Testgerät");
     });
   });
 
-  it("zeigt Gegenstand, Monatsrücklage und Wiederbeschaffung", async () => {
-    await sqliteInventarRepository.speichern({
-      id: "g1", bezeichnung: "Trockner", anschaffung: "2024-01-01",
-      wiederbeschaffung: 50000, nutzungsdauerMonate: 100,
+  it("zeigt Bezeichnung, Monatsrate und Ziel", async () => {
+    await sqliteRuecklagenRepository.speichern({
+      id: "g1", bezeichnung: "Trockner", beginn: "2024-01-01",
+      ziel: 50000, fristMonate: 100,
     });
-    rendere(<InventarScreen />);
+    rendere(<RuecklagenScreen />);
     expect((await screen.findAllByText(/Trockner/)).length).toBeGreaterThan(0);
-    // 500,00 Wiederbeschaffung bzw. 5,00 Monatsrücklage müssen auftauchen.
+    // 500,00 Ziel bzw. 5,00 Monatsrate müssen auftauchen.
     await waitFor(() => expect(document.body.textContent).toMatch(/500,00|5,00/));
   });
 
@@ -226,11 +222,11 @@ describe("Inventar anlegen", () => {
     await sqliteZahlungskontoRepository.speichern({
       id: "k-rueck", bezeichnung: "Rücklagenkonto", typ: "Giro", klasse: "liquide", saldo: 13800, inhaberIds: [],
     });
-    await sqliteInventarRepository.speichern({
-      id: "g1", bezeichnung: "Trockner", anschaffung: "2024-01-01",
-      wiederbeschaffung: 50000, nutzungsdauerMonate: 100, kontoId: "k-rueck",
+    await sqliteRuecklagenRepository.speichern({
+      id: "g1", bezeichnung: "Trockner", beginn: "2024-01-01",
+      ziel: 50000, fristMonate: 100, kontoId: "k-rueck",
     });
-    rendere(<InventarScreen />);
+    rendere(<RuecklagenScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Rücklagenkonto/));
     // Auf dem Konto liegen 138,00 — die müssen als tatsächlich gedeckter Teil auftauchen.
     await waitFor(() => expect(document.body.textContent).toMatch(/138,00/));

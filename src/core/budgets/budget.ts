@@ -375,6 +375,9 @@ export function budgetBuchungen(
     if (b.datum < von || b.datum >= bis) continue;
     // Vertragsraten sind anderswo geplant und stehen im Ausblick in ihrer eigenen Zeile.
     if (vertragsBuchungen.has(b.id)) continue;
+    // Und die eine teure Anschaffung, für die zurückgelegt wurde, ist ausgenommen: sie
+    // spränge jeden Monatsrahmen, und danach sagte der nichts mehr aus.
+    if (b.budgetrelevant === false) continue;
     // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung (S-7) belastet
     // dieses Budget nur mit IHREM Teil, nicht mit dem vollen Betrag — und nicht gar nicht.
     kategorieAnteile(b).forEach((a, i) => {

@@ -19,7 +19,7 @@ export * from "./vertraege/vertragZuordnung";
 export * from "./budgets/budget";
 export * from "./budgets/budgetverlauf";
 export * from "./budgets/budgetVorschlag";
-export * from "./inventar/inventar";
+export * from "./ruecklagen/ruecklage";
 export * from "./depot/depot";
 export * from "./buchung/istbuchung";
 export * from "./konten/gruppe";

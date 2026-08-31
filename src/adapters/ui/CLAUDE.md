@@ -236,7 +236,7 @@ Zwei Fallen, beide schon einmal zugeschnappt:
 
 `.screen` deckelt bei **1280 px**, nicht mehr bei 1040. Der alte Wert war der klassische
 Lesedeckel und hier am falschen Inhalt gemessen: diese App liest man nicht, man sucht darin.
-Konten, Analyse, Verträge, Inventar, Import und die Verwaltung führen alle mit einer
+Konten, Analyse, Verträge, Rücklagen, Import und die Verwaltung führen alle mit einer
 Tabelle, und jede davon war schmaler, als sie sein musste.
 
 **Formulare halten das aus, ohne Zutun.** Genau das war der Einwand gegen mehr Breite — ein

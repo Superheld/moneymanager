@@ -78,7 +78,7 @@ import {
 import { konfigurationExportieren } from "../application/konfiguration";
 import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
-import { inventarLaden, type Inventarsicht } from "../application/inventar/inventarsichten";
+import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
@@ -136,12 +136,13 @@ import {
   vertragsAbgleichDeps,
 } from "./persistence/sqliteVertragZuordnungRepositories";
 import {
-  inventarAktualisieren as inventarAktualisierenUseCase,
-  inventarAnlegen as inventarAnlegenUseCase,
-  inventarErsetzt as inventarErsetztUseCase,
-  inventarLoeschen as inventarLoeschenUseCase,
-  type InventarEingabe,
-} from "../application/inventar/inventarAnlegen";
+  ruecklageAktualisieren as ruecklageAktualisierenUseCase,
+  ruecklageAnlegen as ruecklageAnlegenUseCase,
+  ruecklageAusbuchen as ruecklageAusbuchenUseCase,
+  ruecklageLoeschen as ruecklageLoeschenUseCase,
+  type AusbuchenEingabe,
+  type RuecklagenEingabe,
+} from "../application/ruecklagen/ruecklagenPflege";
 import {
   kategorieAnlegen as kategorieAnlegenUseCase,
   kontoAnlegen as kontoAnlegenUseCase,
@@ -165,7 +166,7 @@ import { tauriExportZiel } from "./persistence/export";
 import { DATEINAME } from "./persistence/datenbankdatei";
 import { sqliteVertragszuordnungRepository } from "./persistence/sqliteVertragZuordnungRepositories";
 import { sqliteZahlungsregelRepository } from "./persistence/sqliteZahlungsregelRepository";
-import { sqliteInventarRepository } from "./persistence/sqliteInventarRepository";
+import { sqliteRuecklagenRepository } from "./persistence/sqliteRuecklagenRepository";
 import { sqliteUmsatzRepository } from "./persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository } from "./persistence/sqliteStammdatenRepositories";
 import { sqliteKontogruppeRepository } from "./persistence/sqliteKontogruppeRepository";
@@ -196,7 +197,7 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
     {
       ...BUDGET_DEPS,
       regelRepo: sqliteZahlungsregelRepository,
-      inventarRepo: sqliteInventarRepository,
+      ruecklagenRepo: sqliteRuecklagenRepository,
       umsatzRepo: sqliteUmsatzRepository,
       kontoRepo: sqliteZahlungskontoRepository,
     },
@@ -423,32 +424,38 @@ export function depots(): Promise<Depotdaten> {
   return depotsLaden({ depotRepo: sqliteDepotRepository });
 }
 
-// --- Inventar --------------------------------------------------------------
+// --- Rücklagen -------------------------------------------------------------
 
-const INVENTAR_DEPS = {
-  inventarRepo: sqliteInventarRepository,
+const RUECKLAGEN_DEPS = {
+  ruecklagenRepo: sqliteRuecklagenRepository,
   ledger: sqliteLedgerRepository,
   kontoRepo: sqliteZahlungskontoRepository,
+  regelRepo: sqliteZahlungsregelRepository,
+  vertragRepo: sqliteVertragRepository,
+  umsatzRepo: sqliteUmsatzRepository,
 };
 
-export function inventar(heute: string): Promise<Inventarsicht> {
-  return inventarLaden(INVENTAR_DEPS, heute);
+export function ruecklagen(heute: string): Promise<Ruecklagensicht> {
+  return ruecklagenLaden(RUECKLAGEN_DEPS, heute);
 }
 
-export function inventarAnlegen(eingabe: InventarEingabe) {
-  return inventarAnlegenUseCase(sqliteInventarRepository, eingabe);
+export function ruecklageAnlegen(eingabe: RuecklagenEingabe) {
+  return ruecklageAnlegenUseCase(sqliteRuecklagenRepository, eingabe);
 }
 
-export function inventarAktualisieren(id: string, eingabe: InventarEingabe) {
-  return inventarAktualisierenUseCase(sqliteInventarRepository, id, eingabe);
+export function ruecklageAktualisieren(id: string, eingabe: RuecklagenEingabe) {
+  return ruecklageAktualisierenUseCase(sqliteRuecklagenRepository, id, eingabe);
 }
 
-export function inventarErsetzt(g: Parameters<typeof inventarErsetztUseCase>[1], datum: string, wert?: number) {
-  return inventarErsetztUseCase(sqliteInventarRepository, g, datum, wert);
+export function ruecklageAusbuchen(
+  r: Parameters<typeof ruecklageAusbuchenUseCase>[2],
+  eingabe: AusbuchenEingabe,
+) {
+  return ruecklageAusbuchenUseCase(sqliteRuecklagenRepository, sqliteLedgerRepository, r, eingabe);
 }
 
-export function inventarLoeschen(id: string) {
-  return inventarLoeschenUseCase(sqliteInventarRepository, id);
+export function ruecklageLoeschen(id: string) {
+  return ruecklageLoeschenUseCase(sqliteRuecklagenRepository, id);
 }
 
 /** Die Datengrundlage des Analyse-Bereichs — einmal geladen, danach rein gerechnet. */

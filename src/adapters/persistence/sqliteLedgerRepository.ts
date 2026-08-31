@@ -27,6 +27,7 @@ interface Zeile {
   gegenkonto_id: string | null;
   roh_hash: string | null;
   zu_pruefen: number | null;
+  budgetrelevant: number | null;
 }
 
 
@@ -80,6 +81,7 @@ function standAus(b: IstBuchung, vorher: Stand | null): Stand {
     gegenkonto_id: b.gegenkontoId ?? null,
     roh_hash: b.rohHash ?? null,
     zu_pruefen: b.zuPruefen ? 1 : 0,
+    budgetrelevant: b.budgetrelevant === false ? 0 : 1,
     vertrag_id: vorher?.vertrag_id ?? null,
     vertrag_herkunft: vorher?.vertrag_herkunft ?? null,
     aufteilungen: (b.aufteilungen ?? []).map((a) => ({
@@ -150,7 +152,8 @@ export const sqliteLedgerRepository: LedgerPort = {
     const [zeilen, teile] = await Promise.all([
       db.select<Zeile[]>(
         `SELECT id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter,
-                quelle, notiz, transfer_id, gegenkonto_id, roh_hash, zu_pruefen
+                quelle, notiz, transfer_id, gegenkonto_id, roh_hash, zu_pruefen,
+                budgetrelevant
            FROM ist_buchung ORDER BY datum`,
       ),
       db.select<AufteilungZeile[]>(
@@ -185,6 +188,10 @@ export const sqliteLedgerRepository: LedgerPort = {
         // wie undefined, macht aber jeden Objektvergleich in Tests und jeden Diff
         // unnötig laut.
         zuPruefen: z.zu_pruefen ? true : undefined,
+        // Dieselbe Zurückhaltung wie darüber, nur andersherum: die Spalte steht auf 1,
+        // solange niemand etwas anderes gesagt hat, und `budgetrelevant: true` an jeder
+        // Buchung wäre dasselbe wie undefined — nur lauter.
+        budgetrelevant: z.budgetrelevant === 0 ? false : undefined,
       }),
     );
   },
@@ -197,14 +204,15 @@ export const sqliteLedgerRepository: LedgerPort = {
       ...journalAnweisung(b.id, vorher, nachher),
       {
         sql: `INSERT INTO ist_buchung
-         (id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter, quelle, notiz, transfer_id, gegenkonto_id, roh_hash, zu_pruefen)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         (id, datum, betrag, konto_id, kategorie_id, kategorie_herkunft, charakter, quelle, notiz, transfer_id, gegenkonto_id, roh_hash, zu_pruefen, budgetrelevant)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
        ON CONFLICT(id) DO UPDATE SET datum = excluded.datum, betrag = excluded.betrag,
          konto_id = excluded.konto_id, kategorie_id = excluded.kategorie_id,
          kategorie_herkunft = excluded.kategorie_herkunft,
          charakter = excluded.charakter, quelle = excluded.quelle, notiz = excluded.notiz,
          transfer_id = excluded.transfer_id, gegenkonto_id = excluded.gegenkonto_id,
-         roh_hash = excluded.roh_hash, zu_pruefen = excluded.zu_pruefen`,
+         roh_hash = excluded.roh_hash, zu_pruefen = excluded.zu_pruefen,
+         budgetrelevant = excluded.budgetrelevant`,
         werte: [
           b.id, b.datum, b.betrag, b.kontoId, b.kategorieId ?? null,
           // Die Spalte ist NOT NULL: ein fehlendes Feld heißt „automatisch" (siehe
@@ -213,6 +221,7 @@ export const sqliteLedgerRepository: LedgerPort = {
           b.charakter, b.quelle, b.notiz ?? null, b.transferId ?? null, b.gegenkontoId ?? null,
           b.rohHash ?? null,
           b.zuPruefen ? 1 : 0,
+          b.budgetrelevant === false ? 0 : 1,
         ],
       },
       // Aufteilungen: ersetzen statt abgleichen. Sie sind Value Objects ohne eigene

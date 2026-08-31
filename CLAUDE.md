@@ -24,7 +24,7 @@ Zuordnung zur Komponente in `App.tsx`:
 | Konten | `KontenScreen` | Auszug je Konto: suchen, filtern, bearbeiten, paaren |
 | Budgets | `BudgetsScreen` | monatlich (Rest verfällt) oder aufbauend (Rest bleibt), verschachtelbar |
 | Analyse | `AnalyseScreen` | alles, was einen ZEITRAUM auswertet |
-| Inventar | `InventarScreen` | Wiederbeschaffung ÷ Nutzungsdauer = monatliche Rücklage |
+| Rücklagen | `RuecklagenScreen` | Ziel ÷ Frist = monatliche Rate, oder eine freie Rate |
 | Verträge | `VertraegeScreen` | Wiederkehrendes mit eigener Erkennungsregel |
 
 **Verwaltung** — woher die Daten kommen und wie sie sortiert werden:
@@ -70,13 +70,13 @@ Die Schicht steht oben, der Fachbereich darunter — dieselben Namen über alle 
 damit ein Thema an drei Stellen gleich heißt:
 
 ```
-core/         basis buchung konten budgets vertraege kategorien inventar depot
+core/         basis buchung konten budgets vertraege kategorien ruecklagen depot
               stammdaten klassifikator          + index, monatsausblick, auswertung
-application/  buchung konten budgets vertraege kategorien inventar depot dubletten
+application/  buchung konten budgets vertraege kategorien ruecklagen depot dubletten
               stammdaten import fints           + index, ports, bootstrap,
                                                   uebersicht, analysesichten, einstellungen
 adapters/ui/  bausteine buchung konten budgets vertraege kategorien(training)
-              inventar analyse uebersicht import einstellungen
+              ruecklagen analyse uebersicht import einstellungen
 ```
 
 Drei Regeln, wohin eine neue Datei gehört:
@@ -107,7 +107,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-28 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+29 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
@@ -119,7 +119,7 @@ ist sie:
   `kontogruppe` + `kontogruppe_konto` (frei benannte Gruppen, siehe unten)
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` + `budget_betrag` (die
   Reihe seiner Beträge, siehe unten) · `vertrag` ·
-  `vertrag_erkennung` · `zahlungsregel` · `inventargegenstand`
+  `vertrag_erkennung` · `zahlungsregel` · `ruecklage` + `ruecklage_ausbuchung` (siehe unten)
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
 - **Bank:** `bankzugang` (samt Bankfähigkeitsprofil) · `bankkonto_zuordnung`
 - **Besitzen:** `depot` · `depotwert` (Reihe der Stichtagswerte) · `depotposition` —
@@ -256,6 +256,58 @@ Rückfluss tragen KANN, macht das Wegwerfen des Vorzeichens aus „es kam Geld z
 „es wurde genau so viel ausgegeben". Der Unterschied zum Absatz davor: dort steht ein Wort
 daneben, das mitwandert; hier steht nur die Zahl. Ein Balken darf bei 0 anschlagen
 (`Math.max(0, …)`), die Zahl daneben behält ihr Vorzeichen.
+
+#### Eine Rücklage hat eine von zwei Formen — nie beide
+
+Bis zum 31.08.2026 hiess das **Inventar** und meinte einen GEGENSTAND: Wiederbeschaffung ÷
+Nutzungsdauer, beides Pflicht. Die Rechnung ist geblieben, die Behauptung ist weg, dass am
+anderen Ende ein Ding steht — man legt auch für einen Urlaub zurück, und der hat keinen
+Wiederbeschaffungswert.
+
+| Form | Felder | Rate | Deckel | nach dem Ausbuchen |
+|---|---|---|---|---|
+| mit Ziel | `ziel` + `frist_monate` | Ziel ÷ Frist | das Ziel | **fängt von vorn an** |
+| frei | `rate` | wie eingetragen | keiner | **erledigt** |
+
+**Die Form entscheidet, was nach dem Ausbuchen passiert**, und deshalb gibt es kein Feld
+`wiederkehrend`: es könnte der Form widersprechen, und dann entschiede die Reihenfolge im
+Code. Was einmal ersetzt werden musste, muss es wieder — die Waschmaschine ist nicht die
+letzte. Der Urlaub war einmal.
+
+Durchgesetzt wird das an der Anwendungsgrenze (`ruecklagenPflege`), nicht im Schema: alle
+drei Spalten sind nullable, weil SQLite ein „genau eines von beiden" nicht ausdrücken kann,
+ohne dass die Migration zur Fingerübung wird.
+
+**Das Ausbuchen ist eine AUFZEICHNUNG und kein Zustand.** Der Zustand steht an der Rücklage
+selbst (`beginn`) beziehungsweise darin, dass es sie nicht mehr gibt;
+`ruecklage_ausbuchung` hält fest, WOFÜR sie draufging. Der Fremdschlüssel auf `ist_buchung`
+steht deshalb auf `SET NULL` und nicht auf `CASCADE` — dieselbe Überlegung wie beim
+`buchung_journal`, nur eine Nummer kleiner.
+
+**Gebucht wird beim Ausbuchen nichts.** Der Kauf ist eine ganz normale Ausgabe vom Konto,
+und weil die Deckung gegen den REALEN Kontostand rechnet, fällt sie durch die Abbuchung von
+selbst. Eine zweite, kalkulatorische Buchung zeigte dieselbe Bewegung doppelt.
+
+#### `budgetrelevant` — die eine Ausgabe, die kein Budget messen soll
+
+Eine Spalte an `ist_buchung`, Vorgabe 1. Sie beschreibt — wie `zu_pruefen` — keine Tatsache
+über die Zahlung, sondern eine Entscheidung darüber, wie sie ausgewertet wird; niemand
+leitet sie aus den Daten ab.
+
+Der Fall ist die teure Anschaffung, für die jahrelang zurückgelegt wurde. Sie ist eine echte
+Ausgabe, aber keine, an der sich ein Monatsrahmen messen lassen müsste: sie spränge jeden,
+und der überzogene Rahmen sagte danach nichts mehr über das Verhalten aus, das er steuern
+soll. Gesetzt wird sie beim **Ausbuchen einer Rücklage** (die Verknüpfung leistet beides)
+oder von Hand.
+
+**Positiv benannt und mit Vorgabe 1**, beides mit Grund: ein `nicht_budgetrelevant` wäre
+beim Lesen eine doppelte Verneinung und fiele in einem `WHERE` irgendwann falsch aus; und
+ein fehlender Wert muss JA heissen, sonst fiele mit der Einführung der Spalte der ganze
+Altbestand aus jedem Budget und die Rahmen sähen über Nacht grosszügig aus.
+
+Wer sie auswertet, muss sie an **beiden** Stellen auswerten: im Verbrauch
+(`budgetBuchungen`) und im Vorschlag (`budgetvorschlaege`). Nur im Verbrauch hiesse, einen
+Rahmen vorzuschlagen, gegen den die Buchung anschliessend nicht zählt.
 
 #### Der Budgetbetrag ist eine Reihe, kein Wert
 
@@ -486,7 +538,7 @@ wiederfindet.
 
 Was NICHT drin ist, damit niemand danach sucht: unverbuchte Zeilen (Inbox, verworfen) —
 exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso Budgets,
-Inventar, Depots, Kontogruppen und das Journal: sie hängen nicht an einer Buchung.
+Rücklagen, Depots, Kontogruppen und das Journal: sie hängen nicht an einer Buchung.
 
 **Die Datei liegt im KLARTEXT, der Bestand daneben nicht.** Seit 2026-08-27 ist die
 Datenbank verschlüsselt und ihre Sicherungen sind es mit; ein Bestandsexport legt eine

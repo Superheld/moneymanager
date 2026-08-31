@@ -4,10 +4,11 @@
 import type {
   Budget,
   Budgetbetrag,
+  Cent,
   Depot,
   Depotposition,
   Depotwert,
-  Inventargegenstand,
+  Ruecklage,
   IstBuchung,
   Journaleintrag,
   Kategorie,
@@ -96,10 +97,31 @@ export interface BudgetRepository {
   loeschen(id: string): Promise<void>;
 }
 
-export interface InventarRepository {
-  alle(): Promise<Inventargegenstand[]>;
-  speichern(gegenstand: Inventargegenstand): Promise<void>;
+/**
+ * Eine Ausbuchung: die Rücklage ist gebraucht worden.
+ *
+ * Sie ist eine AUFZEICHNUNG und kein Zustand — der Zustand steht an der Rücklage selbst
+ * (`beginn`) beziehungsweise darin, dass es sie nicht mehr gibt. Deshalb trägt sie
+ * bewusst keinen Fremdschlüssel auf `ist_buchung`, der sie mitrisse: welche Buchung es
+ * war, soll auch dann noch dastehen, wenn die Buchung längst gelöscht ist.
+ */
+export interface RuecklagenAusbuchung {
+  readonly id: string;
+  readonly ruecklageId: string;
+  readonly datum: string;
+  /** Was tatsächlich ausgegeben wurde. */
+  readonly betrag: Cent;
+  /** Die Buchung, mit der ausgegeben wurde — sie zählt danach in kein Budget. */
+  readonly istbuchungId?: string;
+  readonly notiz?: string;
+}
+
+export interface RuecklagenRepository {
+  alle(): Promise<Ruecklage[]>;
+  speichern(ruecklage: Ruecklage): Promise<void>;
   loeschen(id: string): Promise<void>;
+  ausbuchungSpeichern(a: RuecklagenAusbuchung): Promise<void>;
+  ausbuchungen(): Promise<RuecklagenAusbuchung[]>;
 }
 
 /**

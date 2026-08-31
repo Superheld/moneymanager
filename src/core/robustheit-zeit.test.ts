@@ -6,7 +6,7 @@
 import { describe, it, expect } from "vitest";
 import { addMonate, addTage, ord, parseIso, tageBis, toIso } from "./basis/datum";
 import { projiziereRegel } from "./buchung/projektion";
-import { monatsRuecklage, sollRuecklage, type Inventargegenstand } from "./inventar/inventar";
+import { monatsRuecklage, sollRuecklage, type Ruecklage } from "./ruecklagen/ruecklage";
 import { kuendigungsterminNaht, naechsterKuendigungstermin, type Vertrag } from "./vertraege/vertrag";
 import type { Zahlungsregel } from "./basis/zahlungsregel";
 
@@ -134,7 +134,7 @@ describe("ROT 2 — Dezimale/ungültige Laufzeit-Eingaben erzeugen kaputte Datum
   // Pfad: VertraegeScreen.tsx:296 ist ein FREITEXT-Feld (inputMode="numeric" ist nur ein
   //   Tastatur-Hinweis, keine Validierung), VertraegeScreen.tsx:149 macht `Number(...)`,
   //   und vertragAnlegen.ts validiert die Monatsfelder überhaupt nicht — anders als
-  //   inventarAnlegen.ts, das `Math.round` erzwingt.
+  //   ruecklageAnlegen.ts, das `Math.round` erzwingt.
   //
   // Erwartet: entweder ein FachlicherFehler oder ein gerundeter, gültiger Termin.
   // Tatsächlich: endeDatum = "2026-2.5-15" (kein Datum), weil addMonate mit einem
@@ -272,19 +272,19 @@ describe("ROT 6 — ungültiges Fensterdatum erzeugt „undefined aN“ statt ei
 });
 
 describe("ROT 7 — Zeitraum 0 erzeugt Infinity/NaN statt eines Fehlers", () => {
-  // Erreichbarkeit: inventarAnlegen.ts validiert > 0, aber das Repository fängt mit
+  // Erreichbarkeit: ruecklageAnlegen.ts validiert > 0, aber das Repository fängt mit
   //   `?? 1` nur NULL ab — eine 0 in der Spalte passiert. Der Kern selbst ist nicht
   //   defensiv. (Dieselbe Falle stand bis 2026-08-19 am Topf; die Töpfe sind entfallen.)
   // Erwartet: Fehler oder 0. Tatsächlich (vor dem Fix): rate = Infinity, und
   //   Infinity * 0 Monate = NaN → jeder Stand am Starttag ist NaN.
   // Warum falsch: NaN wandert ungebremst in Liste und Deckungsrechnung; die UI zeigt
   //   „NaN" und jede Weiterrechnung ist ab da vergiftet.
-  const g: Inventargegenstand = {
+  const g: Ruecklage = {
     id: "g1",
     bezeichnung: "Kaputt",
-    wiederbeschaffung: 120000,
-    nutzungsdauerMonate: 0,
-    anschaffung: "2026-01-01",
+    ziel: 120000,
+    fristMonate: 0,
+    beginn: "2026-01-01",
   };
 
   it("monatsRuecklage bleibt endlich", () => {

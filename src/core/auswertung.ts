@@ -568,7 +568,7 @@ export function vertragstreue(
  * | `ruecklagen` | **nein** | kalkulatorisch — sie werden NIE gebucht |
  * | `umschichtung` | **nein** | wechselt das Konto, verlässt den Bestand nicht |
  *
- * Die Rücklage aus dem Inventar ist die wichtigere der beiden Ausnahmen: sie sagt, was
+ * Die Rücklagenrate ist die wichtigere der beiden Ausnahmen: sie sagt, was
  * man zurücklegen SOLLTE, und kein Euro davon verlässt das Konto. Sie in eine
  * Saldo-Vorschau zu nehmen hiesse, jeden Monat eine Abbuchung zu erfinden, die nie
  * kommt — der vorhergesagte Stand liefe immer weiter unter den echten.

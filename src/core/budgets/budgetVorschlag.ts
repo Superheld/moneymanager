@@ -165,6 +165,9 @@ export function budgetvorschlaege(
   for (const b of buchungen) {
     // Nur Aufwand: Umschichtungen sind kein Verbrauch, Erträge erst recht nicht.
     if (b.charakter !== "Aufwand") continue;
+    // Von Hand aus der Budgetbewertung genommen — dann auch aus dem Vorschlag: sonst
+    // schlüge er einen Rahmen vor, gegen den die Buchung anschliessend nicht zählt.
+    if (b.budgetrelevant === false) continue;
     if (!fenster.has(monatVon(b.datum))) continue;
     beobachtet.add(monatVon(b.datum));
 
