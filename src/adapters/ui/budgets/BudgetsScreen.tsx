@@ -216,6 +216,10 @@ export function BudgetsScreen() {
   function vorschlagUebernehmen(v: Budgetvorschlag) {
     neu();
     setKategorieId(v.kategorieId);
+    // Die Art gehört zum Vorschlag: bei einer Kategorie, in der zweimal im Jahr etwas
+    // passiert, wäre ein monatlicher Rahmen die falsche Zusage. `neu()` setzt sie
+    // zurück, deshalb hier danach.
+    setArt(v.art);
     setBetragText(String(minorZuMajor(v.vorschlag, geld.waehrung)));
   }
 
@@ -469,11 +473,23 @@ export function BudgetsScreen() {
             columns={[
               { key: "kategorie", label: t("budgets.spalteKategorie"), render: (v: Budgetvorschlag) => v.name },
               {
+                // Die Art steht VOR den Zahlen, weil sie sie deutet: dieselben 100 €
+                // heißen einmal „jeden Monat neu" und einmal „sammelt sich an".
+                key: "art",
+                label: t("budgets.spalteArt"),
+                sortValue: (v: Budgetvorschlag) => v.art,
+                render: (v: Budgetvorschlag) => (
+                  <Pill variant={v.art === "aufbauend" ? "um" : "neutral"}>
+                    {t(`budgets.art.${v.art}`)}
+                  </Pill>
+                ),
+              },
+              {
                 key: "median",
                 label: `${t("budgets.spalteBisher")} ${geld.symbol}`,
                 align: "right",
-                sortValue: (v: Budgetvorschlag) => v.medianProMonat,
-                render: (v: Budgetvorschlag) => geld.format(v.medianProMonat),
+                sortValue: (v: Budgetvorschlag) => v.proMonat,
+                render: (v: Budgetvorschlag) => geld.format(v.proMonat),
               },
               {
                 // Was der Vertrag abbucht, steuert kein Budget — deshalb steht der Abzug
@@ -499,7 +515,12 @@ export function BudgetsScreen() {
                 align: "right",
                 sortValue: (v: Budgetvorschlag) => v.schwankung,
                 render: (v: Budgetvorschlag) =>
-                  v.schwankung <= 2 ? (
+                  // Beim aufbauenden Budget sagt die Schwankung nichts: dort ist der
+                  // eine teure Monat der Zweck und nicht der Ausreißer. Eine
+                  // Warnpille stünde da als Warnung vor dem Erwarteten.
+                  v.art === "aufbauend" ? (
+                    <span className="muted">—</span>
+                  ) : v.schwankung <= 2 ? (
                     <Pill variant="ok">{t("budgets.stabil")}</Pill>
                   ) : (
                     <Pill variant="warn">{t("budgets.schwankend", { faktor: v.schwankung })}</Pill>
