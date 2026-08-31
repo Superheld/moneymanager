@@ -68,3 +68,20 @@ describe("experimentSchalten", () => {
     expect(repo.daten["locale"]).toBe("de-CH");
   });
 });
+
+/**
+ * Das Training ist seit 2026-08-31 ein Experiment: eine Werkbank, kein fertiger Bereich.
+ * Der Wächter steht hier, weil die Voreinstellung die einzige ist, die ohne Zutun des
+ * Benutzers gilt — und sie muss die vorsichtige sein.
+ */
+describe("Das Training als Experiment", () => {
+  it("ist ohne Zutun aus", async () => {
+    expect((await experimenteLaden(memRepo())).training).toBe(false);
+  });
+
+  it("lässt sich zuschalten", async () => {
+    const repo = memRepo();
+    await experimentSchalten(repo, "training", true);
+    expect((await experimenteLaden(repo)).training).toBe(true);
+  });
+});

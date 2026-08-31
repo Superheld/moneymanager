@@ -220,7 +220,8 @@ export function materialBefund(
     }
 
     const befund = merkmalsbefund(
-      { gegenpartei: s.gegenpartei, verwendungszweck: s.verwendungszweck ?? "" },
+      // Der Betrag geht mit — ob er ein Merkmal WIRD, entscheidet die Konfiguration.
+      { gegenpartei: s.gegenpartei, verwendungszweck: s.verwendungszweck ?? "", betrag: s.betrag },
       konfiguration,
     );
 

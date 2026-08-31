@@ -21,6 +21,15 @@
 export interface Beispiel {
   readonly merkmale: readonly string[];
   readonly kategorieId: string;
+  /**
+   * Woher das Beispiel stammt — für das Training bedeutungslos, für die Bewertung nicht.
+   *
+   * Ohne sie ist ein Fehltreffer eine Zeile in einer Statistik: „diese Kategorie wurde
+   * siebenmal für jene gehalten". Mit ihr lässt sich fragen, WELCHE sieben — und erst
+   * daran sieht man, ob ein Merkmal fehlt oder ob zwei Kategorien fachlich gar nicht zu
+   * trennen sind. Optional, damit ein konstruiertes Beispiel im Test ohne sie auskommt.
+   */
+  readonly id?: string;
 }
 
 export interface Modell {
@@ -322,6 +331,26 @@ export interface Verwechslung {
   readonly anzahl: number;
 }
 
+/**
+ * Ein einzelner Fehlgriff — mit allem, was nötig ist, um ihn nachzuvollziehen.
+ *
+ * Der Grund, warum die Merkmale mitkommen und nicht nur die beiden Kategorien: eine
+ * Verwechslung ist erst dann etwas, woraus man lernt, wenn man die Zeile daneben sieht.
+ * Steht dort ein Empfänger, der für beide Kategorien vorkommt, fehlt ein Merkmal; steht
+ * dort nichts Unterscheidendes, sind die Kategorien fachlich nicht zu trennen. Das sind
+ * zwei völlig verschiedene Antworten, und die Statistik allein gibt keine davon her.
+ */
+export interface Fehltreffer {
+  /** `Beispiel.id` — fehlt, wenn das Beispiel keine trug. */
+  readonly id?: string;
+  readonly tatsaechlich: string;
+  readonly vorhergesagt: string;
+  readonly merkmale: readonly string[];
+  /** Was am stärksten für die FALSCHE Kategorie sprach. */
+  readonly beitraege: readonly Beitrag[];
+  readonly sicherheit: number;
+}
+
 export interface Bewertung {
   /** Anteil richtig zugeordneter Beispiele (0…1). */
   readonly genauigkeit: number;
@@ -334,19 +363,27 @@ export interface Bewertung {
    *
    * `jeKategorie` trägt Diagonale und Zeilensumme (richtig von gesamt), `verwechslungen`
    * alle übrigen belegten Zellen — zusammen ist das die vollständige Matrix. Sie als
-   * dichtes Feld zu führen hieße bei 49 Kategorien 2401 Zellen, von denen rund 98 %
-   * null sind; und die Frage, die man an so eine Matrix stellt, ist ohnehin „was wird
-   * womit verwechselt", nicht „wie viele Nullen gibt es".
+   * dichtes Feld zu führen hiesse, die Zahl der Kategorien zu quadrieren, und der
+   * allergrösste Teil davon wäre null; und die Frage, die man an so eine Matrix stellt,
+   * ist ohnehin „was wird womit verwechselt", nicht „wie viele Nullen gibt es".
    *
    * Absteigend nach Häufigkeit, bei Gleichstand alphabetisch — stabil zwischen Läufen.
    */
   readonly verwechslungen: readonly Verwechslung[];
+  /**
+   * Die einzelnen Fehlgriffe, in der Reihenfolge der Prüfmenge.
+   *
+   * `verwechslungen` ZÄHLT sie, `fehltreffer` NENNT sie. Beides steht da, weil die eine
+   * Form die Frage „wo ist es am schlimmsten" beantwortet und die andere „warum".
+   */
+  readonly fehltreffer: readonly Fehltreffer[];
 }
 
 /** Misst das Modell an Beispielen, die es nicht gesehen hat. */
 export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewertung {
   const je = new Map<string, { richtig: number; gesamt: number }>();
   const paare = new Map<string, Verwechslung>();
+  const fehltreffer: Fehltreffer[] = [];
   let richtig = 0;
 
   for (const b of beispiele) {
@@ -368,6 +405,14 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
         vorhergesagt: k.kategorieId,
         anzahl: (vorhanden?.anzahl ?? 0) + 1,
       });
+      fehltreffer.push({
+        id: b.id,
+        tatsaechlich: b.kategorieId,
+        vorhergesagt: k.kategorieId,
+        merkmale: b.merkmale,
+        beitraege: k.beitraege,
+        sicherheit: k.sicherheit,
+      });
     }
   }
 
@@ -384,7 +429,40 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
         a.tatsaechlich.localeCompare(b.tatsaechlich) ||
         a.vorhergesagt.localeCompare(b.vorhergesagt),
     ),
+    fehltreffer,
   };
+}
+
+/**
+ * Die Vergleichslinie: was das dümmste denkbare Modell träfe.
+ *
+ * Es rät immer dieselbe Kategorie — die im Trainingsmaterial häufigste — und lernt
+ * nichts. Gemessen wird es an derselben Prüfmenge wie das echte Modell.
+ *
+ * WARUM DAS DIE WICHTIGSTE ZAHL NEBEN DER GENAUIGKEIT IST: eine Trefferquote sagt für
+ * sich genommen nichts. In einem Haushalt, in dem eine Kategorie ein Viertel aller
+ * Zahlungen ausmacht, trifft blindes Raten schon ein Viertel; bei gleichmässig
+ * verteilten Kategorien fast nichts. Erst der ABSTAND zwischen beiden Zahlen ist eine
+ * Aussage über das Modell — und erst mit ihm lässt sich sagen, ob eine Änderung etwas
+ * gebracht hat.
+ *
+ * `null`, wenn es nichts zu raten gibt (leere Mengen). Eine 0 zu liefern wäre eine
+ * Behauptung über ein Modell, das nie gerechnet hat.
+ */
+export function grundlinie(
+  training: readonly Beispiel[],
+  pruefung: readonly Beispiel[],
+): { kategorieId: string; genauigkeit: number } | null {
+  if (training.length === 0 || pruefung.length === 0) return null;
+
+  const haeufigkeit = new Map<string, number>();
+  for (const b of training) haeufigkeit.set(b.kategorieId, (haeufigkeit.get(b.kategorieId) ?? 0) + 1);
+  // Bei Gleichstand alphabetisch — sonst hinge die Vergleichslinie an der Reihenfolge
+  // der Beispiele und wäre zwischen zwei Läufen verschieden.
+  const [kategorieId] = [...haeufigkeit].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
+
+  const richtig = pruefung.filter((b) => b.kategorieId === kategorieId).length;
+  return { kategorieId, genauigkeit: richtig / pruefung.length };
 }
 
 /** Eine Zeile der Verwechslungsmatrix: eine tatsächliche Kategorie und wohin sie ging. */
@@ -402,9 +480,8 @@ export interface Matrixzeile {
  * Baut aus einer Bewertung die Verwechslungsmatrix — beschränkt auf die Kategorien, die
  * an mindestens einem Fehler beteiligt sind (als tatsächliche oder als vorhergesagte).
  *
- * Warum beschränkt: Auf echten Daten standen 43 Kategorien in der Prüfmenge, aber nur 25
- * kamen in einem Fehler vor. Die vollen 43×43 wären 1849 Zellen, von denen 50 belegt
- * sind — die restlichen Zeilen bestünden aus ihrer Diagonale und sonst nichts. Sie
+ * Warum beschränkt: an einem Fehler ist regelmässig nur ein Teil der Kategorien
+ * beteiligt. Die übrigen Zeilen bestünden aus ihrer Diagonale und sonst nichts — sie
  * fügen der Frage „was wird womit verwechselt" nichts hinzu und machen die Matrix so
  * breit, dass man sie nicht mehr überblickt.
  *
