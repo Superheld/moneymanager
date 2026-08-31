@@ -174,6 +174,12 @@ function ExperimenteCard() {
           an={experimente.export}
           aufSchalten={(an) => experimentSetzen("export", an)}
         />
+        <SchalterZeile
+          titel={t("einstellungen.experiment.trainingTitel")}
+          text={t("einstellungen.experiment.trainingText")}
+          an={experimente.training}
+          aufSchalten={(an) => experimentSetzen("training", an)}
+        />
       </div>
     </Card>
   );

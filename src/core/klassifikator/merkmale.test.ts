@@ -121,11 +121,16 @@ describe("Verwendungszweck", () => {
 });
 
 describe("Was NICHT mehr in den Vektor geht", () => {
-  it("kennt nur noch die drei Textquellen", () => {
-    // Vorzeichen und Gläubiger-ID sind 2026-08-29 gefallen. Der Wächter steht hier,
-    // weil ihr Wiederkommen sonst unbemerkt bliebe: sie tauchten als Zeilen in einer
-    // Liste von WÖRTERN auf, und ein `+` ist keins.
-    expect(MERKMALSHERKUENFTE).toEqual(["empGanz", "empWort", "vwz"]);
+  it("kennt die drei Textquellen und den Betrag", () => {
+    // Das rohe VORZEICHEN und die Gläubiger-ID sind 2026-08-29 gefallen. Der Wächter
+    // steht hier, weil ihr Wiederkommen sonst unbemerkt bliebe: sie tauchten als Zeilen
+    // in einer Liste von WÖRTERN auf, und ein `+` ist keins.
+    //
+    // `betrag` kam 2026-08-31 dazu und ist etwas anderes als das damals gefallene
+    // Vorzeichen: er trägt eine GRÖSSENORDNUNG, also eine Klasse, die sich wiederholt —
+    // das Vorzeichen allein war ein Vektor aus einem einzigen Wert und lieferte für jede
+    // textlose Zeile dieselbe Kategorie.
+    expect(MERKMALSHERKUENFTE).toEqual(["empGanz", "empWort", "vwz", "betrag"]);
   });
 
   it("legt aus einer Zahlung ohne Text gar kein Merkmal an", () => {
@@ -247,8 +252,10 @@ describe("Steuerung über die Konfiguration", () => {
     expect(merkmaleFuer(quelle({ verwendungszweck: "Einkauf" }), { herkuenfte: [], ausschluesse: [] })).toEqual([]);
   });
 
-  it("die Grundausstattung hat alle Herkünfte und die mitgelieferten Stoppwörter", () => {
-    expect(STANDARD_KONFIGURATION.herkuenfte).toEqual(MERKMALSHERKUENFTE);
+  // Ausdrücklich NICHT alle: ein neues Merkmal, das sich selbst einschaltet, ändert
+  // jedes bestehende Modell, ohne dass jemand es gemessen hat.
+  it("hat in der Grundausstattung die Textquellen, aber nicht den Betrag", () => {
+    expect(STANDARD_KONFIGURATION.herkuenfte).toEqual(["empGanz", "empWort", "vwz"]);
     expect(STANDARD_KONFIGURATION.ausschluesse.length).toBe(STOPPWOERTER.size);
     expect(STANDARD_KONFIGURATION.ausschluesse.every((a) => !a.herkuenfte)).toBe(true);
   });
@@ -261,5 +268,56 @@ describe("Steuerung über die Konfiguration", () => {
     expect(herkunftVon("gid:DE98")).toBeNull();
     expect(herkunftVon("vz:-")).toBeNull();
     expect(herkunftVon("ohnepraefix")).toBeNull();
+  });
+});
+
+/**
+ * Der Betrag als Merkmal — Grössenordnung, nicht Wert.
+ *
+ * Der genaue Betrag wäre ein Token, das genau einmal vorkommt: das Modell lernt nichts
+ * daraus und das Vokabular wüchse um eine Zeile je Zahlung.
+ */
+describe("Der Betrag als Merkmal", () => {
+  const mit = { herkuenfte: MERKMALSHERKUENFTE, ausschluesse: [] };
+
+  it("liefert nichts, solange die Herkunft nicht eingeschaltet ist", () => {
+    expect(merkmaleFuer({ gegenpartei: "Ohlert", verwendungszweck: "", betrag: -1234 })).toEqual([
+      "emp=ohlert",
+    ]);
+  });
+
+  it("fasst zu Grössenordnungen zusammen", () => {
+    const von = (betrag: number) =>
+      merkmaleFuer({ gegenpartei: "", verwendungszweck: "", betrag }, mit)[0];
+    expect(von(-500)).toBe("bet:ab-u10");
+    expect(von(-1000)).toBe("bet:ab-u50");
+    expect(von(-4999)).toBe("bet:ab-u50");
+    expect(von(-20000)).toBe("bet:ab-u1000");
+    expect(von(-500000)).toBe("bet:ab-gross");
+  });
+
+  // Sonst fielen eine Rückerstattung und ein Einkauf derselben Höhe in dasselbe Token,
+  // obwohl sie fachlich das Gegenteil voneinander sind.
+  it("trennt Abfluss und Zufluss", () => {
+    const von = (betrag: number) =>
+      merkmaleFuer({ gegenpartei: "", verwendungszweck: "", betrag }, mit)[0];
+    expect(von(-2000)).toBe("bet:ab-u50");
+    expect(von(2000)).toBe("bet:zu-u50");
+  });
+
+  it("liefert ohne Betrag und bei 0 nichts", () => {
+    expect(merkmaleFuer({ gegenpartei: "", verwendungszweck: "" }, mit)).toEqual([]);
+    expect(merkmaleFuer({ gegenpartei: "", verwendungszweck: "", betrag: 0 }, mit)).toEqual([]);
+  });
+
+  // Er geht an den WORTfiltern vorbei (er ist kein Wort), aber nicht an der
+  // Ausschlussliste: was dort steht, bleibt draussen.
+  it("lässt sich ausschliessen wie jedes andere Token", () => {
+    const ohne = { herkuenfte: MERKMALSHERKUENFTE, ausschluesse: [{ wort: "ab-u50" }] };
+    expect(merkmaleFuer({ gegenpartei: "", verwendungszweck: "", betrag: -2000 }, ohne)).toEqual([]);
+  });
+
+  it("kennt seine Herkunft am Präfix", () => {
+    expect(herkunftVon("bet:ab-u50")).toBe("betrag");
   });
 });

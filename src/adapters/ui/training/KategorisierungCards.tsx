@@ -17,16 +17,21 @@
 // dieselbe Arbeit mehrfach.
 
 import { useProzent } from "../bausteine/einstellungenKontext";
+
+/**
+ * Was blindes Raten träfe. Der Typ steht hier und nicht im Kern als eigener Name: er ist
+ * die Rückgabe EINER Funktion, und ein Alias dafür wäre ein Wort mehr ohne Aussage.
+ */
+type Grundlinie = { kategorieId: string; genauigkeit: number };
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   MERKMALSHERKUENFTE,
-  kategorieprofile,
   verwechslungsmatrix,
   wortVon,
   type Bewertung,
+  type Fehltreffer,
   type Kategorie,
-  type Kategorieprofil,
   type Matrixzeile,
   type Merkmalsherkunft,
 } from "../../../application";
@@ -88,6 +93,8 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
   const [plan, setPlan] = useState<Abgleichsplan | null>(null);
   const [angewendet, setAngewendet] = useState<number | null>(null);
   const [bewertung, setBewertung] = useState<Bewertung | null>(null);
+  /** Was blindes Raten träfe — ohne sie sagt die Genauigkeit daneben nichts. */
+  const [grundlinie, setGrundlinie] = useState<Grundlinie | null>(null);
   const [wirkung, setWirkung] = useState<{ basis: number; wirkungen: Wirkung[] } | null>(null);
   const [listenGeaendert, setListenGeaendert] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -145,6 +152,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
     try {
       const r = await modellTrainieren({ herkuenfte: daten.herkuenfte, ausschluesse: daten.ausschluesse });
       setBewertung(r.bewertung ?? null);
+      setGrundlinie(r.grundlinie ?? null);
       setListenGeaendert(false);
       await laden();
     } catch (e) {
@@ -254,6 +262,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
               <ModellInhalt
                 {...hilfe}
                 bewertung={bewertung}
+                grundlinie={grundlinie}
                 trainiert={laeuft === "training"}
                 listenGeaendert={listenGeaendert}
                 aufTraining={trainingStarten}
@@ -542,15 +551,6 @@ function WoerterInhalt({
     [daten],
   );
   const zahlen = useMemo(() => bestandszahlen(alle), [alle]);
-
-  // Die Wolken kommen aus dem MODELL, nicht aus der Häufigkeitsverteilung: die sagt, wo
-  // ein Wort vorkam, das Gewicht sagt, was die Erkennung daraus gemacht hat. Ohne
-  // trainiertes Modell gibt es sie deshalb nicht — und das ist ehrlicher als eine Wolke
-  // aus Häufigkeiten, die aussähe wie eine Auskunft über die Erkennung.
-  const profile = useMemo(
-    () => (daten?.zustand.stand ? kategorieprofile(daten.zustand.stand.modell) : []),
-    [daten],
-  );
 
   const sichtbar = useMemo(() => {
     const suchbegriff = suche.trim().toLowerCase();
@@ -867,41 +867,6 @@ function WoerterInhalt({
         {zeile && <Wortdetail zeile={zeile} t={t} kategorieName={kategorieName} zahl={zahl} prozent={prozent} />}
       </Abschnitt>
 
-      <Abschnitt titel={t("einstellungen.lernmaterial.wolkenTitel")}>
-        <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
-          {profile.length === 0
-            ? t("einstellungen.lernmaterial.wolkenOhneModell")
-            : t("einstellungen.lernmaterial.wolkenHinweis")}
-        </div>
-        {profile.length > 0 && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
-              gap: "var(--sp-4)",
-            }}
-          >
-            {profile.map((p) => (
-              <Wortwolke
-                key={p.kategorieId}
-                profil={p}
-                name={kategorieName.get(p.kategorieId) ?? p.kategorieId}
-                leer={t("einstellungen.lernmaterial.wolkeLeer")}
-                aufWort={(merkmal) => {
-                  // Der Weg zurück in die Liste: dort steht, was das Wort im Bestand
-                  // anrichtet. Wolke und Liste zeigen dasselbe Wort von zwei Seiten —
-                  // ohne diesen Sprung wären es wieder zwei getrennte Werkzeuge.
-                  setSuche(wortVon(merkmal));
-                  setZustandFilter("");
-                  setHerkunftFilter("");
-                  setMitStandard(true);
-                }}
-              />
-            ))}
-          </div>
-        )}
-      </Abschnitt>
-
       <Abschnitt titel={t("einstellungen.lernmaterial.neuesWort")}>
         <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
           {t("einstellungen.lernmaterial.neuesWortHinweis")}
@@ -945,67 +910,6 @@ function WoerterInhalt({
         </div>
       </Abschnitt>
     </>
-  );
-}
-
-/**
- * Eine Kategorie und die Wörter, die sie auszeichnen — Schriftgröße nach Stärke.
- *
- * Eine Wolke und keine Tabelle, weil die Frage eine andere ist: nicht „welchen Wert hat
- * dieses Wort", sondern „woran erkennt die Erkennung diesen Bucket". Darauf antwortet ein
- * Bild schneller als eine Spalte, und der Vergleich zwischen zwei Kategorien wird zum
- * Nebeneinanderlegen zweier Karten.
- *
- * Die Größe misst gegen die stärkste Stelle DIESER Karte, nicht gegen alle: sonst hätte
- * eine Kategorie mit klaren Kennzeichen lauter grosse Wörter und eine mit lauter
- * schwachen gar keine lesbaren — und genau die zweite ist die interessante.
- */
-function Wortwolke({
-  profil, name, leer, aufWort,
-}: {
-  profil: Kategorieprofil;
-  name: string;
-  leer: string;
-  aufWort: (merkmal: string) => void;
-}) {
-  const max = profil.kennzeichen[0]?.staerke ?? 0;
-  /** 0,8 rem bis 1,8 rem — darunter unlesbar, darüber sprengt ein Wort die Karte. */
-  const groesse = (staerke: number) => 0.8 + (max > 0 ? staerke / max : 0) * 1;
-
-  return (
-    <div
-      style={{
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius-2, 6px)",
-        padding: "var(--sp-3)",
-      }}
-    >
-      <div style={{ fontWeight: "var(--fw-bold)", marginBottom: "var(--sp-2)" }}>{name}</div>
-      {profil.kennzeichen.length === 0 ? (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{leer}</div>
-      ) : (
-        <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-2)", alignItems: "baseline" }}>
-          {profil.kennzeichen.map((k) => (
-            <button
-              key={k.merkmal}
-              className="linkbtn"
-              onClick={() => aufWort(k.merkmal)}
-              title={`${k.merkmal} · ${k.staerke.toFixed(2)}`}
-              style={{
-                fontSize: `${groesse(k.staerke).toFixed(2)}rem`,
-                lineHeight: 1.2,
-                // Das stärkste Drittel dunkler: die Reihenfolge steht schon in der Größe,
-                // aber bei eng beieinanderliegenden Stärken sieht man sie dort kaum.
-                color: k.staerke > max * 0.66 ? "var(--ink-1)" : undefined,
-                fontWeight: k.staerke > max * 0.66 ? "var(--fw-semi)" : undefined,
-              }}
-            >
-              {wortVon(k.merkmal)}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }
 
@@ -1132,14 +1036,20 @@ function Wortdetail({
 // -------------------------------------------------------------- 4 · Erkennungsmodell
 
 function ModellInhalt({
-  t, daten, kategorieName, zahl, prozent, bewertung, trainiert, listenGeaendert, aufTraining,
+  t, daten, kategorieName, zahl, prozent, bewertung, grundlinie, trainiert, listenGeaendert, aufTraining,
 }: Hilfe & {
   bewertung: Bewertung | null;
+  grundlinie: Grundlinie | null;
   trainiert: boolean;
   listenGeaendert: boolean;
   aufTraining: () => void;
 }) {
   const { locale } = useGeld();
+  /** Welches Verwechslungspaar aufgeklappt ist — `null` heisst keins. */
+  const [offenesPaar, setOffenesPaar] = useState<{
+    tatsaechlich: string;
+    vorhergesagt: string;
+  } | null>(null);
   if (!daten) return <div className="muted">…</div>;
   const stand = daten.zustand.stand;
   const matrix = bewertung
@@ -1163,7 +1073,13 @@ function ModellInhalt({
         </div>
       ) : (
         <>
-          <div style={{ marginTop: "var(--sp-4)" }}>
+          {/* Die Vergleichslinie steht NEBEN der Genauigkeit und nicht in einer
+              Fussnote: für sich genommen sagt eine Trefferquote nichts. In einem
+              Haushalt, in dem eine Kategorie ein Viertel aller Zahlungen ausmacht,
+              trifft blindes Raten schon ein Viertel. Erst der Abstand ist eine
+              Aussage — und erst mit ihm lässt sich sagen, ob eine Änderung etwas
+              gebracht hat. */}
+          <div className="kpis" style={{ marginTop: "var(--sp-4)" }}>
             <KPIStat
               size="tile"
               label={t("einstellungen.lernmaterial.genauigkeit")}
@@ -1181,6 +1097,27 @@ function ModellInhalt({
               }
               tone={stand.genauigkeit !== undefined && stand.genauigkeit >= 0.85 ? "ok" : "default"}
             />
+            {grundlinie && stand.genauigkeit !== undefined && (
+              <KPIStat
+                size="tile"
+                label={t("einstellungen.lernmaterial.grundlinie")}
+                value={prozent(grundlinie.genauigkeit)}
+                meta={t("einstellungen.lernmaterial.grundlinieMeta", {
+                  kategorie: kategorieName.get(grundlinie.kategorieId) ?? grundlinie.kategorieId,
+                })}
+              />
+            )}
+            {grundlinie && stand.genauigkeit !== undefined && (
+              <KPIStat
+                size="tile"
+                label={t("einstellungen.lernmaterial.vorsprung")}
+                value={prozent(stand.genauigkeit - grundlinie.genauigkeit)}
+                meta={t("einstellungen.lernmaterial.vorsprungMeta")}
+                // Unter der Vergleichslinie ist das Modell schlechter als Raten. Das
+                // passiert und ist die wichtigste Meldung, die es geben kann.
+                tone={stand.genauigkeit <= grundlinie.genauigkeit ? "warn" : "ok"}
+              />
+            )}
           </div>
           <div className="muted" style={{ marginTop: "var(--sp-3)" }}>
             {t("einstellungen.lernmaterial.trainiertAm", {
@@ -1223,6 +1160,12 @@ function ModellInhalt({
                 <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
                   {t("einstellungen.lernmaterial.paareHinweis")}
                 </div>
+                {/* Der Klick auf ein Paar öffnet die einzelnen Zeilen dahinter.
+                    Die Zahl allein sagt, WO es klemmt; erst die Zeilen sagen, WARUM:
+                    steht dort ein Empfänger, der für beide Kategorien vorkommt, fehlt
+                    ein Merkmal — steht dort nichts Unterscheidendes, sind die beiden
+                    Kategorien fachlich nicht zu trennen. Zwei völlig verschiedene
+                    Antworten, und die Statistik gibt keine davon her. */}
                 <DataTable
                   columns={[
                     {
@@ -1239,7 +1182,30 @@ function ModellInhalt({
                     },
                   ]}
                   rows={bewertung.verwechslungen.slice(0, 15).map((v) => ({ ...v }))}
+                  onRowClick={(r) =>
+                    setOffenesPaar((cur) =>
+                      cur?.tatsaechlich === r.tatsaechlich && cur?.vorhergesagt === r.vorhergesagt
+                        ? null
+                        : { tatsaechlich: r.tatsaechlich, vorhergesagt: r.vorhergesagt },
+                    )
+                  }
+                  istAktiv={(r) =>
+                    offenesPaar?.tatsaechlich === r.tatsaechlich &&
+                    offenesPaar?.vorhergesagt === r.vorhergesagt
+                  }
                 />
+                {offenesPaar && (
+                  <Fehlgriffe
+                    t={t}
+                    treffer={bewertung.fehltreffer.filter(
+                      (f) =>
+                        f.tatsaechlich === offenesPaar.tatsaechlich &&
+                        f.vorhergesagt === offenesPaar.vorhergesagt,
+                    )}
+                    kategorieName={kategorieName}
+                    prozent={prozent}
+                  />
+                )}
               </Abschnitt>
             </>
           )}
@@ -1250,6 +1216,64 @@ function ModellInhalt({
 }
 
 // ------------------------------------------------------------------------ Bausteine
+
+/**
+ * Die einzelnen Zeilen hinter einem Verwechslungspaar — mit ihren Merkmalen.
+ *
+ * NEBEN der Tabelle und nicht in einer eigenen Karte: es ist das Aufklappen einer Zeile,
+ * kein zweiter Gegenstand (siehe `ui/CLAUDE.md`, „keine Karte IN einer Karte").
+ *
+ * Gezeigt werden die Merkmale, die für die FALSCHE Kategorie sprachen — nicht alle. Alle
+ * zu zeigen hiesse, die interessanten drei zwischen dreissig zu verstecken; und die
+ * Frage, mit der man hier hinsieht, ist „woran lag es", nicht „was stand alles drin".
+ * Der ganze Vektor steht darunter in Grau, für den Fall, dass die Antwort das FEHLEN
+ * eines Merkmals ist.
+ */
+function Fehlgriffe({
+  t,
+  treffer,
+  kategorieName,
+  prozent,
+}: {
+  t: Hilfe["t"];
+  treffer: readonly Fehltreffer[];
+  kategorieName: ReadonlyMap<string, string>;
+  prozent: (n: number) => string;
+}) {
+  if (treffer.length === 0) {
+    return <div className="muted" style={{ marginTop: "var(--sp-3)" }}>{t("einstellungen.lernmaterial.fehlgriffeLeer")}</div>;
+  }
+  return (
+    <div style={{ marginTop: "var(--sp-3)", display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+      <div className="muted">{t("einstellungen.lernmaterial.fehlgriffeHinweis")}</div>
+      {treffer.map((f, i) => (
+        <div
+          key={f.id ?? i}
+          style={{ borderLeft: "2px solid var(--line)", paddingLeft: "var(--sp-3)" }}
+        >
+          <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
+            <span style={{ fontWeight: "var(--fw-bold)" }}>
+              {kategorieName.get(f.vorhergesagt) ?? f.vorhergesagt}
+            </span>
+            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              {t("einstellungen.lernmaterial.fehlgriffSicherheit", { wert: prozent(f.sicherheit) })}
+            </span>
+          </div>
+          <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", marginTop: 4 }}>
+            {f.beitraege.map((b) => (
+              <Pill key={b.merkmal} variant={b.gewicht >= 0 ? "warn" : "neutral"}>
+                {wortVon(b.merkmal)}
+              </Pill>
+            ))}
+          </div>
+          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+            {f.merkmale.map(wortVon).join(" · ")}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
 
 /** Überschrift plus Inhalt, optional mit einem Knopf rechts daneben. */
 function Abschnitt({ titel, neben, children }: { titel: string; neben?: ReactNode; children: ReactNode }) {

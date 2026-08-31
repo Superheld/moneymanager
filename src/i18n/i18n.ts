@@ -1392,6 +1392,9 @@ const de = {
         "FinTS an; der Abruf geht deshalb über dieselbe Schnittstelle wie ihre " +
         "Weboberfläche — nur lesend. Die Einrichtung verlangt einen einmaligen " +
         "Mitschnitt der eigenen Anmeldung.",
+      trainingTitel: "Training des Erkennungsmodells",
+      trainingText:
+        "Blendet den Bereich „Training\" ein. Er ist eine Werkbank und kein fertiger Bereich: dort greifst du in die Merkmale ein, trainierst neu und misst, was es gebracht hat. Ausgeliefert wird ein fertiges Modell — die Erkennung läuft auch ohne diesen Schalter.",
       exportTitel: "Konfiguration exportieren",
       exportText:
         "Schreibt die Ordnung des Haushalts als JSON-Datei — heute die Kategorien, " +
@@ -1547,6 +1550,14 @@ const de = {
       trainieren: "Training starten",
       trainiertGerade: "Training läuft …",
       genauigkeit: "Trefferquote",
+      grundlinie: "Blindes Raten",
+      grundlinieMeta: "immer „{{kategorie}}\" — die häufigste Kategorie",
+      vorsprung: "Vorsprung",
+      vorsprungMeta: "so viel besser als Raten. Darunter lernt das Modell nichts.",
+      fehlgriffeHinweis:
+        "Die einzelnen Zeilen dahinter. Die Pillen sind die Merkmale, die für die FALSCHE Kategorie sprachen; darunter steht der ganze Merkmalsvektor — manchmal ist die Antwort, dass darin nichts Unterscheidendes steht.",
+      fehlgriffeLeer: "Zu diesem Paar liegen keine Einzelzeilen vor.",
+      fehlgriffSicherheit: "Sicherheit {{wert}}",
       genauigkeitMeta: "an {{gesamt}} zurückgehaltenen Zahlungen gemessen",
       genauigkeitUnbekannt: "nicht gemessen",
       genauigkeitUnbekanntMeta: "zu wenige Beispiele für eine belastbare Messung",
@@ -1574,12 +1585,6 @@ const de = {
       datenUntertitel: "Was an gebuchten Zahlungen zum Lernen taugt",
       woerterTitel: "2 · Wörter",
       woerterUntertitel: "Was die Erkennung liest — und was sie nicht liest",
-      wolkenTitel: "Was jede Kategorie auszeichnet",
-      wolkenHinweis:
-        "Die Wörter, an denen die Erkennung eine Kategorie festmacht — je größer, desto stärker. Sie kommen aus dem trainierten Modell und nicht aus der Häufigkeit: die sagt, wo ein Wort vorkam, das Gewicht sagt, was die Erkennung daraus gemacht hat. Ein Klick sucht das Wort oben in der Liste.",
-      wolkenOhneModell:
-        "Noch kein Modell trainiert — bis dahin gibt es keine Gewichte, an denen sich ablesen ließe, woran die Erkennung eine Kategorie festmacht.",
-      wolkeLeer: "Kein Wort spricht deutlich für diese Kategorie.",
       mitStandard: "mitgelieferte zeigen",
       grundausstattung: "Grundausstattung wiederherstellen",
       grundausstattungHinweis:
@@ -1619,11 +1624,13 @@ const de = {
         empGanz: "Empfänger, ganz",
         empWort: "Empfänger, einzelne Wörter",
         vwz: "Verwendungszweck",
+        betrag: "Betrag (Größenordnung)",
       },
       herkunftHinweis: {
         empGanz: "Der ganze normalisierte Name als ein Merkmal — trifft Wiederkehrer scharf.",
         empWort: "Die Einzelwörter des Namens — sie greifen auch bei fremden Anbietern.",
         vwz: "Die Wörter des Verwendungszwecks. Bei Kartenzahlungen oft die einzige Stelle, an der steht, worum es ging.",
+        betrag: "Richtung und Größenordnung, nicht der Wert — „unter 10\" trennt den Bäcker vom Möbelhaus. Ab Werk aus: schalt ihn zu, trainiere neu und sieh am Vorsprung nach, ob es etwas gebracht hat.",
       },
       herkunftAnzahl: "{{anzahl}} Merkmale",
       herkunftAus: "abgeschaltet",
@@ -3245,6 +3252,9 @@ const en: typeof de = {
         "Fetch accounts, balances and transactions from Hanseatic Bank. The bank offers " +
         "no FinTS access, so the retrieval uses the same interface as its web front end " +
         "— read-only. Setup requires a one-time capture of your own login.",
+      trainingTitel: "Training the recognition model",
+      trainingText:
+        "Shows the „Training\" area. It is a workbench, not a finished area: there you change which features are used, retrain and measure what it gained. A ready-made model ships with the app — recognition works without this switch.",
       exportTitel: "Export configuration",
       exportText:
         "Writes how the household is organised as a JSON file — categories today, later " +
@@ -3399,6 +3409,14 @@ const en: typeof de = {
       trainieren: "Start training",
       trainiertGerade: "Training …",
       genauigkeit: "Hit rate",
+      grundlinie: "Blind guessing",
+      grundlinieMeta: "always „{{kategorie}}\" — the most frequent category",
+      vorsprung: "Lead",
+      vorsprungMeta: "this much better than guessing. Below it, the model learns nothing.",
+      fehlgriffeHinweis:
+        "The individual rows behind it. The pills are the features that spoke for the WRONG category; below them the full feature vector — sometimes the answer is that it holds nothing distinguishing.",
+      fehlgriffeLeer: "No individual rows available for this pair.",
+      fehlgriffSicherheit: "confidence {{wert}}",
       genauigkeitMeta: "measured on {{gesamt}} held-back payments",
       genauigkeitUnbekannt: "not measured",
       genauigkeitUnbekanntMeta: "too few examples for a meaningful measurement",
@@ -3425,12 +3443,6 @@ const en: typeof de = {
       datenUntertitel: "What booked payments are usable for learning",
       woerterTitel: "2 · Words",
       woerterUntertitel: "What the recognition reads — and what it does not",
-      wolkenTitel: "What marks each category",
-      wolkenHinweis:
-        "The words the recognition pins a category on — the larger, the stronger. They come from the trained model, not from frequency: frequency says where a word occurred, the weight says what the recognition made of it. Click one to find it in the list above.",
-      wolkenOhneModell:
-        "No model trained yet — until then there are no weights to read off what the recognition pins a category on.",
-      wolkeLeer: "No word speaks clearly for this category.",
       mitStandard: "show bundled",
       grundausstattung: "Restore default list",
       grundausstattungHinweis:
@@ -3470,11 +3482,13 @@ const en: typeof de = {
         empGanz: "Payee, whole",
         empWort: "Payee, single words",
         vwz: "Reference text",
+        betrag: "Amount (magnitude)",
       },
       herkunftHinweis: {
         empGanz: "The whole normalised name as one feature — sharp on recurring payees.",
         empWort: "The single words of the name — they also catch unfamiliar payees.",
         vwz: "The words of the reference text. On card payments often the only place stating what it was.",
+        betrag: "Direction and magnitude, not the value — „under 10\" separates the bakery from the furniture store. Off by default: switch it on, retrain and check the lead to see whether it helped.",
       },
       herkunftAnzahl: "{{anzahl}} features",
       herkunftAus: "off",

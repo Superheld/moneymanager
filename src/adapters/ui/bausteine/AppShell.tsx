@@ -62,10 +62,19 @@ export function AppShell({
   current,
   onNavigate,
   children,
+  versteckt,
 }: {
   current: ScreenId;
   onNavigate: (id: ScreenId) => void;
   children: ReactNode;
+  /**
+   * Bereiche, die gerade nicht in der Navigation stehen.
+   *
+   * Sie werden AUSGEBLENDET und nicht ausgegraut: ein Eintrag, den man sieht und nicht
+   * anklicken kann, wirft eine Frage auf, die die Navigation nicht beantworten kann.
+   * Wo der Schalter dafür sitzt, sagt der Ort, an dem er sitzt.
+   */
+  versteckt?: readonly ScreenId[];
 }) {
   const { t } = useTranslation();
   return (
@@ -83,7 +92,9 @@ export function AppShell({
           <div key={g.titelKey}>
             <span className="nlbl">{t(g.titelKey)}</span>
             <nav className="nav">
-              {g.eintraege.map((e) => {
+              {g.eintraege
+                .filter((e) => !e.id || !versteckt?.includes(e.id))
+                .map((e) => {
                 const aktiv = e.id === current;
                 const klickbar = !!e.id;
                 return (

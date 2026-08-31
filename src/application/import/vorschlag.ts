@@ -205,7 +205,10 @@ export function vorschlagsbefundFuer(
   // 4. Modell.
   if (kontext.modell) {
     const befund = merkmalsbefund(
-      { gegenpartei: roh.gegenpartei, verwendungszweck: roh.verwendungszweck },
+      // Der Betrag muss auch hier mit: sonst sähe die Zahlung beim VORSCHLAGEN anders
+      // aus als beim TRAINIEREN, und das Modell bekäme einen Vektor, den es so nie
+      // gelernt hat. Ob er ein Merkmal wird, entscheidet dieselbe Konfiguration.
+      { gegenpartei: roh.gegenpartei, verwendungszweck: roh.verwendungszweck, betrag: roh.betrag },
       kontext.merkmale,
     );
     // Ein leerer Vektor trägt keine Entscheidung — dann käme für jede textlose Zahlung

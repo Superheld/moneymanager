@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { MERKMALSHERKUENFTE, STANDARD_KONFIGURATION, type IstBuchung, type Merkmalsherkunft } from "../../core";
+import { STANDARD_KONFIGURATION, type IstBuchung, type Merkmalsherkunft } from "../../core";
 import type {
   GespeicherterAusschluss,
   LedgerPort,
@@ -34,7 +34,10 @@ describe("Konfiguration laden", () => {
     const r = repo();
     const stand = await konfigurationLaden(r);
 
-    expect(stand.konfiguration.herkuenfte).toEqual(MERKMALSHERKUENFTE);
+    // Die Grundausstattung ist NICHT „alles": `betrag` ist ab Werk aus (siehe
+    // `STANDARD_KONFIGURATION`), damit ein neues Merkmal kein bestehendes Modell
+    // ungefragt verändert.
+    expect(stand.konfiguration.herkuenfte).toEqual(STANDARD_KONFIGURATION.herkuenfte);
     expect(stand.ausschluesse.length).toBe(STANDARD_KONFIGURATION.ausschluesse.length);
     // Die mitgelieferten Wörter liegen ab jetzt in der Datenbank — nur so ist ein
     // einzelnes davon löschbar.
@@ -55,7 +58,9 @@ describe("Konfiguration laden", () => {
 
   it("ohne gesetzte Herkünfte gilt der Standard", async () => {
     const r = repo();
-    expect((await konfigurationLaden(r)).konfiguration.herkuenfte).toEqual(MERKMALSHERKUENFTE);
+    expect((await konfigurationLaden(r)).konfiguration.herkuenfte).toEqual(
+      STANDARD_KONFIGURATION.herkuenfte,
+    );
   });
 
   it("alle Herkünfte abgeschaltet ist eine Aussage, kein fehlender Wert", async () => {
@@ -85,7 +90,7 @@ describe("Herkünfte schalten", () => {
     const neu = await herkunftSchalten(r, "empGanz", true);
 
     // Sonst springt die Anzeige, je nachdem in welcher Folge geklickt wurde.
-    expect(neu).toEqual(MERKMALSHERKUENFTE);
+    expect(neu).toEqual(STANDARD_KONFIGURATION.herkuenfte);
   });
 
   it("zweimal abschalten ändert nichts", async () => {
@@ -173,8 +178,10 @@ describe("Wirkungsmessung", () => {
 
     expect(ergebnis).not.toBeNull();
     expect(ergebnis!.basis).toBeGreaterThan(0.9);
+    // Gemessen wird, was EINGESCHALTET ist — eine abgeschaltete Herkunft kostet nichts,
+    // ihr Weglassen wäre keine Änderung.
     expect(ergebnis!.wirkungen.map((w) => w.herkunft)).toEqual(
-      expect.arrayContaining([...MERKMALSHERKUENFTE]),
+      expect.arrayContaining([...STANDARD_KONFIGURATION.herkuenfte]),
     );
   });
 
