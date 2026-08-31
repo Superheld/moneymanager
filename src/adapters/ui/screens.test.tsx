@@ -36,6 +36,7 @@ import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteDepotRepository } from "../persistence/sqliteDepotRepository";
 import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
+import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import {
   sqliteKategorieRepository,
@@ -176,6 +177,12 @@ describe("RuecklagenScreen", () => {
 });
 
 describe("UebersichtScreen", () => {
+  /** Heute als ISO — die Screens lesen die Uhr selbst, ein festes Datum wäre morgen falsch. */
+  function heuteIso(): string {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  }
+
   /** Der Monatsschlüssel `zurueck` Monate vor heute. */
   function monat(zurueck: number): string {
     const n = new Date();
@@ -186,6 +193,82 @@ describe("UebersichtScreen", () => {
   it("rendert im Leerzustand", async () => {
     rendere(<UebersichtScreen />);
     await waitFor(() => expect(document.body.textContent).toBeTruthy());
+  });
+
+  /**
+   * Die drei Monatskarten rechnen nur über die LIQUIDEN Konten. Vorher filterten sie nach
+   * gar keinem — was auf einem Rücklagenkonto passierte, stand mit in „so sieht der
+   * Monat aus", obwohl es dort gerade nicht zur Verfügung steht.
+   */
+  it("lässt Buchungen auf Rücklagenkonten aus den Monatskarten heraus", async () => {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k-rueck", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "ruecklage",
+      inhaberIds: [], saldo: 0,
+    });
+    // Ein Budget auf dem Girokonto, damit die Karten überhaupt rechnen.
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "kat1", kontoId: "k1", betraege: [{ abMonat: monat(6), betrag: 100000 }],
+      art: "monatlich", start: `${monat(6)}-01`,
+    });
+    // Zwei Ausgaben DERSELBEN Kategorie, eine je Konto. Nur die vom Girokonto darf zählen.
+    await sqliteLedgerRepository.speichern({
+      id: "liquide", datum: `${monat(0)}-05`, betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "zurueckgelegt", datum: `${monat(0)}-05`, betrag: -67891, kontoId: "k-rueck",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+
+    rendere(<UebersichtScreen />);
+    // Die Monatskarte zeigt den Verbrauch vom Girokonto …
+    await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
+    // … und nicht die Summe beider Konten. Genau die stünde da ohne den Filter.
+    expect(document.body.textContent).not.toMatch(/802,36/);
+    // Die Budgetliste rechnet aus DERSELBEN Sicht: 1.000,00 − 123,45 bleiben übrig.
+    // Ungefiltert stünden hier 197,64, und das Budget sähe fast erschöpft aus.
+    await waitFor(() => expect(document.body.textContent).toMatch(/876,55/));
+  });
+
+  /** Was insgesamt da ist, steht daneben — nach Klasse, nicht nach Gruppe. */
+  it("zeigt die Stände je Kontoklasse", async () => {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k-rueck", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "ruecklage",
+      inhaberIds: [], saldo: 111100,
+    });
+    rendere(<UebersichtScreen />);
+    await screen.findByText("Was da ist");
+    await waitFor(() => expect(document.body.textContent).toMatch(/1\.111,00/));
+    // Und die Summe über beide Klassen.
+    expect(document.body.textContent).toMatch(/3\.611,00/);
+  });
+
+  /**
+   * Die einzige Karte, die AUFFORDERT statt zu berichten — und die einzige, die
+   * verschwindet, wenn es nichts zu sagen gibt. Eine dauerhafte Zeile „alles in Ordnung"
+   * wäre nach zwei Wochen unsichtbar, und dann fiele auch die Warnung nicht mehr auf.
+   */
+  it("schweigt, solange kein Konto ins Minus läuft", async () => {
+    await grunddaten();
+    rendere(<UebersichtScreen />);
+    await waitFor(() => expect(document.body.textContent).toBeTruthy());
+    expect(document.body.textContent).not.toMatch(/Da ist etwas zu tun/);
+  });
+
+  it("meldet ein Konto, das an einem festen Termin ins Minus läuft", async () => {
+    await grunddaten(); // Girokonto mit 2.500,00
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r1", bezeichnung: "Grosse Rate", betrag: -400000, rhythmus: "monatlich",
+      startdatum: heuteIso(), charakter: "Aufwand", kontoId: "k1",
+    });
+
+    rendere(<UebersichtScreen />);
+    await screen.findByText("Da ist etwas zu tun");
+    // „sicher": schon der Termin allein reicht — daran ändert Sparsamkeit nichts.
+    await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
+    expect(document.body.textContent).toMatch(/sicher/);
   });
 
   it("zeigt den Depotwert, nicht den Kontostand des Depot-Kontos", async () => {

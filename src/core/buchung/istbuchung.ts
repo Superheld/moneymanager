@@ -19,7 +19,7 @@
 
 import type { Cent } from "../basis/geld";
 import type { Charakter } from "../basis/zahlungsregel";
-import { istLiquide, type Zahlungskonto } from "../konten/konto";
+import { istLiquide, KONTOKLASSEN, type Kontoklasse, type Zahlungskonto } from "../konten/konto";
 
 /**
  * Herkunft einer Ist-Buchung:
@@ -233,4 +233,36 @@ export function realerKontostand(konto: Zahlungskonto, buchungen: IstBuchung[]):
  */
 export function liquideMittelReal(konten: Zahlungskonto[], buchungen: IstBuchung[]): Cent {
   return konten.filter(istLiquide).reduce((s, k) => s + realerKontostand(k, buchungen), 0);
+}
+
+/** Was auf den Konten EINER Klasse liegt, samt der Konten selbst. */
+export interface Klassenstand {
+  readonly klasse: Kontoklasse;
+  readonly stand: Cent;
+  readonly konten: readonly Zahlungskonto[];
+}
+
+/**
+ * Die realen Stände, gruppiert nach Kontoklasse — die drei Perspektiven auf das Vermögen.
+ *
+ * Nach KLASSE und nicht nach Gruppe: die Klasse ist die Rechenregel (jedes Konto hat
+ * genau eine, die drei Summen addieren sich zum Ganzen), die Gruppe ist eine Sicht, in
+ * der dasselbe Konto mehrfach liegen darf. Über Gruppen summiert ergäbe „das Vermögen"
+ * eine Zahl, die grösser ist als alles Vorhandene.
+ *
+ * Klassen ohne Konto fallen heraus: eine Zeile „Vorsorge 0,00" liest sich wie ein
+ * Fehlbestand, obwohl sie nur heisst, dass es diese Sorte Konto hier nicht gibt.
+ */
+export function staendeJeKlasse(
+  konten: readonly Zahlungskonto[],
+  buchungen: readonly IstBuchung[],
+): Klassenstand[] {
+  return KONTOKLASSEN.map((klasse) => {
+    const eigene = konten.filter((k) => k.klasse === klasse);
+    return {
+      klasse,
+      konten: eigene,
+      stand: eigene.reduce((s, k) => s + realerKontostand(k, [...buchungen]), 0),
+    };
+  }).filter((z) => z.konten.length > 0);
 }
