@@ -358,6 +358,13 @@ Drei Dinge, die dabei Entscheidungen sind und keine Rechenschritte:
 Und die Grenze der Auskunft, die in der Karte danebensteht: **was nicht gemeldet wird, ist
 nicht „geprüft und in Ordnung", sondern „läuft im gerechneten Fenster nicht ins Minus".**
 
+**Neben jeder gemeldeten Zeile steht der Verlauf als kleine Linie** — durchgezogen die
+festen Termine, gestrichelt das Erwartete, dazu eine Nulllinie. Sie beantwortet, was die
+Zahl daneben nicht kann: WIE KNAPP und WIE LANGE. „Am 14. im Minus" und „ab dem 14. drei
+Tage knapp darunter, danach wieder im Plus" sind zwei verschiedene Lagen, und nur die eine
+verlangt, dass man etwas tut. Deshalb gibt `liquiditaetsvorschau` den ganzen Tagesverlauf
+heraus und nicht nur den Befund.
+
 #### Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
 
 Ein gewöhnlicher Vertrag hängt an einem Namen: `vertrag_erkennung` normalisiert die
