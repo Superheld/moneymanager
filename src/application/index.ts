@@ -87,6 +87,9 @@ export {
   RHYTHMUS_MONATE,
   // Fehler mit fachlichem Schlüssel — die UI übersetzt ihn
   FachlicherFehler,
+  // Datum X Tage ab heute — eine Rechnung über zwei Zahlen, keine Auswahl. Die
+  // Oberfläche braucht es, um das Fenster zu beschriften, das sie gerade zeigt.
+  fensterEnde,
 } from "../core";
 
 // ---------------------------------------------------------------------------

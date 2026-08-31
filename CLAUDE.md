@@ -41,6 +41,26 @@ Zuordnung zur Komponente in `App.tsx`:
 Depot ist das jüngste Beispiel: sein Stand steht in der Übersicht, sein Verlauf in der
 Analyse, aus derselben Wertreihe.
 
+**Die Übersicht rechnet seit 2026-08-31 über die LIQUIDEN Konten** — Monatskarten und
+Budgetliste aus derselben gefilterten Sicht. Was auf Rücklagen- und Vorsorgekonten
+passiert, ist zurückgelegt und steht für den Monat nicht zur Verfügung; es stand vorher
+mit in „so stehe ich gerade da". Der Preis ist eine Aussage, die man kennen muss:
+**dasselbe Budget kann in der Übersicht einen kleineren Verbrauch zeigen als im Bereich
+Budgets** — dort steht der ganze Rahmen, hier nur, was aus den verfügbaren Mitteln davon
+gegangen ist. Der Untertitel der Übersicht sagt es mit.
+
+Zwei Karten hängen daran und beantworten je eine eigene Frage:
+
+- **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE Konten. Nach Klasse und
+  nicht nach Gruppe: die Klasse ist die Rechenregel und jedes Konto hat genau eine, die
+  Summen addieren sich also zum Ganzen. Über Gruppen summiert ergäbe „das Vermögen" mehr,
+  als vorhanden ist (dasselbe Konto darf in mehreren liegen). Was man mit Gruppen ansehen
+  will, gehört in die Analyse.
+- **„Da ist etwas zu tun"** — Konten, die im Vorschaufenster ins Minus laufen. Sie steht
+  ganz oben und ist die einzige Karte, die VERSCHWINDET, wenn nichts anliegt: eine
+  dauerhafte Zeile „alles in Ordnung" wäre nach zwei Wochen unsichtbar, und dann fiele
+  auch die Warnung nicht mehr auf.
+
 ### Die Schichten
 
 ```
@@ -308,6 +328,35 @@ Altbestand aus jedem Budget und die Rahmen sähen über Nacht grosszügig aus.
 Wer sie auswertet, muss sie an **beiden** Stellen auswerten: im Verbrauch
 (`budgetBuchungen`) und im Vorschlag (`budgetvorschlaege`). Nur im Verbrauch hiesse, einen
 Rahmen vorzuschlagen, gegen den die Buchung anschliessend nicht zählt.
+
+#### Die Liquiditätsvorschau zieht ZWEI Linien
+
+`core/konten/liquiditaet.ts` rechnet je Konto den Stand über die nächsten Tage vor — und
+zwar zweimal, weil die beiden Linien Verschiedenes bedeuten:
+
+| | enthält | heisst |
+|---|---|---|
+| **fest** | nur datierte Verpflichtungen (Vertragsraten, geplante Umbuchungen) | ein SICHERES Minus — daran ändert Sparsamkeit nichts |
+| **erwartet** | dazu den Budgetrest, gleichmässig über die Tage verteilt | erst mit dem üblichen Verbrauch; hier hat man noch die Wahl |
+
+Nur die feste warnte zu spät (die meisten Engpässe entstehen aus dem Alltagsverbrauch),
+nur die erwartete zu oft — und eine Warnung, die jeden Monat einmal aufleuchtet und sich
+von selbst erledigt, liest nach dem dritten Mal niemand mehr.
+
+Drei Dinge, die dabei Entscheidungen sind und keine Rechenschritte:
+
+- **Ein Budget ist keine Fälligkeit.** Es sagt „höchstens 400 im Monat", nicht „am 14.
+  gehen 400 ab". Gleichmässig zu verteilen ist die neutrale Annahme — nicht die
+  schlimmste (alles am Monatsanfang), nicht die beste (alles am Ende). Im laufenden Monat
+  zählt nur der noch offene REST: was schon ausgegeben wurde, steht bereits im Kontostand.
+- **Ein aufbauendes Budget zählt nicht mit.** Seine Rate wird nicht ausgegeben, sie bleibt
+  liegen — sie mitzurechnen hiesse, Geld abfliessen zu lassen, das auf dem Konto bleibt.
+- **Eine geplante Umbuchung wirkt auf BEIDEN Konten**, als Abfluss und als Zufluss. Nur
+  die eine Seite zu rechnen liesse ausgerechnet das Rücklagenkonto nach Handlungsbedarf
+  aussehen, auf das gerade eingezahlt wird.
+
+Und die Grenze der Auskunft, die in der Karte danebensteht: **was nicht gemeldet wird, ist
+nicht „geprüft und in Ordnung", sondern „läuft im gerechneten Fenster nicht ins Minus".**
 
 #### Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
 

@@ -16,9 +16,15 @@
 import { empfaengerJeBuchung } from "./buchung/belegZuBuchung";
 import {
   fruehesterMonat,
+  handlungsbedarf,
+  istLiquide,
+  liquiditaetsvorschau,
   monatsAusblicke,
+  staendeJeKlasse,
   vorschauAlleKonten,
   type Kategorie,
+  type Klassenstand,
+  type Kontovorschau,
   type MonatsAusblick,
   type Vorschauzeile,
 } from "../core";
@@ -83,6 +89,21 @@ export interface Uebersichtsdaten {
   readonly vorschau: readonly Vorschauzeile[];
   /** Konto-ID → Bezeichnung. Die Vorschau gibt IDs heraus, die Oberfläche zeigt Namen. */
   readonly kontoNamen: ReadonlyMap<string, string>;
+  /**
+   * Die realen Stände je Kontoklasse — die drei Perspektiven auf das Vermögen.
+   *
+   * Sie stehen UNTER den Monatskarten, weil die etwas anderes beantworten: die Karten
+   * sagen, wie der laufende Monat aussieht, diese Liste sagt, was insgesamt da ist.
+   */
+  readonly klassen: readonly Klassenstand[];
+  /**
+   * Konten, die im Vorschaufenster ins Minus laufen — schärfster Fall zuerst.
+   *
+   * Leer heisst NICHT „alles geprüft und in Ordnung", sondern „läuft im gerechneten
+   * Fenster nicht ins Minus". Der Unterschied zählt, sobald jemand die Liste als
+   * Freigabe liest.
+   */
+  readonly bedarf: readonly Kontovorschau[];
 }
 
 /**
@@ -110,21 +131,75 @@ export async function uebersichtLaden(
       deps.kontoRepo.alle(),
     ]);
 
-  const sicht: BudgetSicht = { buchungen, kategorien, budgets, vertragsBuchungen };
+  /**
+   * DIE GANZE ÜBERSICHT RECHNET ÜBER DIE LIQUIDEN KONTEN.
+   *
+   * Vorher filterte sie nach gar keinem Konto, und damit stand in „so stehe ich gerade
+   * da" auch, was auf Rücklagen- und Vorsorgekonten passierte — Zinsen, Gebühren, ein
+   * Verkauf. Das ist eine andere Frage: was dort liegt, ist zurückgelegt und steht für
+   * den Monat nicht zur Verfügung.
+   *
+   * Gefiltert wird auf ALLEN Seiten mit derselben Liste: Buchungen, Zahlungsregeln,
+   * Budgets — und dieselbe gefilterte Sicht trägt auch die Budgetliste darunter. Nur
+   * eine Seite zu filtern war genau der Fehler, gegen den diese Datei überhaupt
+   * angelegt wurde (siehe Kopf): dasselbe Budget stand dann im selben Bild einmal ohne
+   * Verbrauch und einmal weit über seinem Rahmen.
+   *
+   * Der Preis ist eine Aussage, die man kennen muss: **dasselbe Budget kann hier einen
+   * kleineren Verbrauch zeigen als im Bereich Budgets.** Dort steht der ganze Rahmen,
+   * hier nur, was aus den verfügbaren Mitteln davon gegangen ist. Das ist gewollt — die
+   * beiden Bereiche beantworten verschiedene Fragen —, und deshalb sagt es der
+   * Untertitel der Übersicht mit.
+   *
+   * Eine Zahlungsregel OHNE Konto bleibt drin: sie lässt sich keiner Klasse zuordnen,
+   * und sie stillschweigend fallen zu lassen hiesse, einen Plan verschwinden zu lassen,
+   * den jemand erfasst hat.
+   */
+  const liquideIds = new Set(konten.filter(istLiquide).map((k) => k.id));
+  const nichtLiquide = new Set(konten.filter((k) => !istLiquide(k)).map((k) => k.id));
+  const liquideBuchungen = buchungen.filter((b) => liquideIds.has(b.kontoId));
+  const liquideBudgets = budgets.filter((b) => liquideIds.has(b.kontoId));
+
+  const sicht: BudgetSicht = {
+    buchungen: liquideBuchungen,
+    kategorien,
+    budgets: liquideBudgets,
+    vertragsBuchungen,
+  };
   const dieserMonat = heute.slice(0, 7);
 
   return {
     ausblicke: monatsAusblicke({
-      regeln, budgets, ruecklagen, ist: buchungen, kategorien, vertragsBuchungen, heute,
+      regeln: regeln.filter((r) => !r.kontoId || !nichtLiquide.has(r.kontoId)),
+      budgets: liquideBudgets,
+      ruecklagen,
+      ist: liquideBuchungen,
+      kategorien,
+      vertragsBuchungen,
+      heute,
     }),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,
     kategorieNamen: new Map(kategorien.map((k: Kategorie) => [k.id, k.name])),
     empfaenger: empfaengerJeBuchung(umsaetze),
-    monate: waehlbareMonate(fruehesterMonat(buchungen) ?? heute, dieserMonat),
+    monate: waehlbareMonate(fruehesterMonat(liquideBuchungen) ?? heute, dieserMonat),
     hatPlandaten: regeln.length > 0 || budgets.length > 0 || ruecklagen.length > 0,
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
+    klassen: staendeJeKlasse(konten, buchungen),
+    // Die Vorschau rechnet über ALLE Konten, nicht nur die liquiden: gefragt ist, ob
+    // ein EINZELNES Konto ins Minus läuft, und das kann jedes. Sie bekommt deshalb auch
+    // die ungefilterten Buchungen und Budgets.
+    bedarf: handlungsbedarf(
+      liquiditaetsvorschau({
+        konten,
+        buchungen,
+        regeln,
+        budgetsicht: { buchungen, kategorien, budgets, vertragsBuchungen },
+        heute,
+        tage: VORSCHAU_TAGE,
+      }),
+    ),
   };
 }
 
