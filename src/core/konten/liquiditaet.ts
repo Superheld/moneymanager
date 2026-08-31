@@ -43,6 +43,20 @@ export interface Verlaufsbefund {
   readonly minusAb?: string;
 }
 
+/**
+ * Ein Tag der Vorschau, mit beiden Linien.
+ *
+ * Heisst `Vorschaupunkt` und nicht `Verlaufspunkt`: den gibt es in `analysesichten`
+ * schon, für etwas anderes. Zwei gleich benannte Typen mit verschiedenen Feldern sind
+ * in einer Fassade, die beides durchreicht, eine Falle — und der Compiler meldet sie
+ * erst am dritten Aufrufer.
+ */
+export interface Vorschaupunkt {
+  readonly datum: string;
+  readonly fest: Cent;
+  readonly erwartet: Cent;
+}
+
 export interface Kontovorschau {
   readonly kontoId: string;
   /** Der reale Stand heute — Ausgangspunkt beider Linien. */
@@ -51,6 +65,14 @@ export interface Kontovorschau {
   readonly fest: Verlaufsbefund;
   /** Zusätzlich der anteilige Budgetrest. */
   readonly erwartet: Verlaufsbefund;
+  /**
+   * Der ganze Verlauf, Tag für Tag — für die Linie in der Oberfläche.
+   *
+   * Der Befund sagt, DASS und WANN es eng wird; die Linie sagt, wie knapp und wie lange.
+   * Das ist der Unterschied zwischen „am 14. im Minus" und „ab dem 14. drei Tage lang
+   * knapp darunter, danach wieder im Plus" — und daran hängt, ob man etwas tun muss.
+   */
+  readonly verlauf: readonly Vorschaupunkt[];
 }
 
 export interface LiquiditaetsEingabe {
@@ -205,6 +227,11 @@ export function liquiditaetsvorschau(e: LiquiditaetsEingabe): Kontovorschau[] {
       start,
       fest: befund(festeReihe),
       erwartet: befund(erwarteteReihe),
+      verlauf: festeReihe.map((p, i) => ({
+        datum: p.datum,
+        fest: p.betrag,
+        erwartet: erwarteteReihe[i]?.betrag ?? p.betrag,
+      })),
     };
   });
 }

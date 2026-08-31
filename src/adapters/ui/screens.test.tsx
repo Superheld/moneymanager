@@ -265,10 +265,14 @@ describe("UebersichtScreen", () => {
     });
 
     rendere(<UebersichtScreen />);
-    await screen.findByText("Da ist etwas zu tun");
+    const titel = await screen.findByText("Da ist etwas zu tun");
     // „sicher": schon der Termin allein reicht — daran ändert Sparsamkeit nichts.
     await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
     expect(document.body.textContent).toMatch(/sicher/);
+    // Und der Verlauf als Linie: sie sagt, WIE KNAPP und WIE LANGE — das kann die Zahl
+    // daneben nicht. Zwei Pfade (fest und erwartet) plus die Nulllinie.
+    const karte = titel.parentElement?.parentElement?.parentElement as HTMLElement;
+    await waitFor(() => expect(karte.querySelectorAll("svg path")).toHaveLength(2));
   });
 
   it("zeigt den Depotwert, nicht den Kontostand des Depot-Kontos", async () => {
