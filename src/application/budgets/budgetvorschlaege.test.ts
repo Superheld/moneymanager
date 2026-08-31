@@ -87,7 +87,7 @@ describe("budgetvorschlaegeLaden", () => {
     const v = await budgetvorschlaegeLaden(f.ledger, f.umsatzRepo, f.kategorieRepo, f.budgetRepo, BIS, HEUTE);
     expect(v).toHaveLength(1);
     expect(v[0].name).toBe("Lebenshaltung");
-    expect(v[0].medianProMonat).toBe(43700);
+    expect(v[0].proMonat).toBe(43700);
     expect(v[0].vertragsanteil).toBe(0);
     expect(v[0].vorschlag).toBe(44000);
   });

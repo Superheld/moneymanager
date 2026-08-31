@@ -218,6 +218,32 @@ describe("BudgetsScreen — Vorschläge", () => {
     await sqliteKategorieRepository.speichern({ id: "miete", name: "Miete", elternId: "wohnen", defaultCharakter: "Aufwand" });
   }
 
+  /**
+   * Der Fall, der vorher ganz herausfiel: zweimal im Jahr etwas Großes. Er kam nicht
+   * als schlechter Vorschlag heraus, sondern gar nicht — zu wenige Monate mit
+   * Ausgaben für einen belastbaren Median.
+   */
+  it("schlägt für seltene große Ausgaben ein aufbauendes Budget vor", async () => {
+    await stammdaten();
+    await einkaufsreihe("e", "essen", 43700, "Nordhoff");
+    await erfassen("r-1", `${monat(10)}-08`, 60000, "miete", "Bergblick");
+    await erfassen("r-2", `${monat(4)}-08`, 60000, "miete", "Bergblick");
+
+    rendere(<BudgetsScreen />);
+    await screen.findByText("Aus deinen Ausgaben abgeleitet");
+    const zeile = (await screen.findByText("Wohnen")).closest("tr");
+    expect(zeile?.textContent).toMatch(/aufbauend/);
+    // Die Schwankung sagt beim aufbauenden Budget nichts — der eine teure Monat ist
+    // dort der Zweck. Eine Warnpille stünde als Warnung vor dem Erwarteten da.
+    expect(zeile?.textContent).not.toMatch(/schwankend|stabil/i);
+
+    // Und die Art wandert in die Maske mit: ein monatlicher Rahmen wäre hier die
+    // falsche Zusage, und niemand würde ihn im Dialog von Hand umstellen.
+    await userEvent.click(zeile!.querySelector("button[aria-label*='bernehmen']")!);
+    const artFeld = await screen.findByRole("combobox", { name: /Art/i });
+    expect(artFeld.textContent).toMatch(/aufbauend/i);
+  });
+
   it("zeigt ohne Buchungen keine Vorschlagskarte", async () => {
     rendere(<BudgetsScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Noch keine Budgets/));
