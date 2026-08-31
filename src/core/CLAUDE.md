@@ -10,7 +10,7 @@ macht jeden Test von der Laufzeit abhängig. Zeitpunkte kommen als Parameter her
 
 `basis/` hält die Primitive, die quer durch alles gehen: `geld`, `waehrung`, `datum`,
 `zahlungsregel`, `muster`, `fehler`, `region`. Alles Fachliche liegt in seinem Bereich
-(`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`, `inventar/`,
+(`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`, `ruecklagen/`,
 `stammdaten/`). In der Wurzel bleibt nur, was über Bereiche hinweg rechnet
 (`monatsausblick.ts`) und die Fassade `index.ts`.
 

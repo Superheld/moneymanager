@@ -19,9 +19,9 @@ vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 import { auswahlWaehlen, frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../testwerkzeug/harness";
 import { EinstellungenScreen } from "./einstellungen/EinstellungenScreen";
 import { KontenVerwaltungScreen } from "./konten/KontenVerwaltungScreen";
-import { InventarScreen } from "./inventar/InventarScreen";
+import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
 import { BudgetsScreen } from "./budgets/BudgetsScreen";
-import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
+import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import {
   sqliteKategorieRepository,
@@ -115,27 +115,62 @@ describe("Budgets — Formularpfade", () => {
   });
 });
 
-describe("Inventar — Formularpfade", () => {
-  it("legt einen Gegenstand mit vollständigem Formular an", async () => {
+describe("Rücklagen — Formularpfade", () => {
+  // Die Felder werden ÜBER IHR LABEL gefüllt und nicht der Reihe nach: seit die Maske
+  // zwei Formen kennt, hängt es von der Auswahl ab, welche Felder überhaupt dastehen —
+  // ein Füller, der über alle Textfelder läuft, schriebe den Namen ins Zielfeld.
+  it("legt eine Rücklage mit vollständigem Formular an", async () => {
     const nutzer = userEvent.setup();
-    rendere(<InventarScreen />);
-    await klicke(nutzer, /anlegen|neu|gegenstand|erfassen/i);
-    await formularFuellen(nutzer, "Geschirrspüler", "120");
+    rendere(<RuecklagenScreen />);
+    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben).
+    await screen.findByRole("button", { name: /rücklage/i });
+    await klicke(nutzer, /anlegen|neu|rücklage|erfassen/i);
+
+    await nutzer.type(await screen.findByLabelText(/^Wofür/), "Geschirrspüler");
+    await nutzer.type(await screen.findByLabelText(/^Ziel/), "600");
+    await nutzer.type(await screen.findByLabelText(/^Frist/), "120");
     await klicke(nutzer, /speichern|anlegen/i);
 
     await waitFor(async () => {
-      const gegenstaende = await sqliteInventarRepository.alle();
-      const meldung = /muss|bitte|fehlt|ungültig/i.test(document.body.textContent ?? "");
-      expect(gegenstaende.length > 0 || meldung).toBe(true);
+      const [r] = await sqliteRuecklagenRepository.alle();
+      expect(r?.bezeichnung).toBe("Geschirrspüler");
+      expect(r?.ziel).toBe(60000);
+      expect(r?.fristMonate).toBe(120);
     });
   });
 
-  it("zeigt Restwert und Ansparrate eines Gegenstands", async () => {
-    await sqliteInventarRepository.speichern({
-      id: "g1", bezeichnung: "Kühlschrank", anschaffung: "2024-01-01",
-      wiederbeschaffung: 120000, nutzungsdauerMonate: 120,
+  /**
+   * Die zweite Form. Sie ist der Grund, warum aus dem Inventar Rücklagen wurden — und
+   * die Maske muss auf sie umschalten, sonst gibt es sie zwar im Modell und nirgends
+   * sonst.
+   */
+  it("legt eine Rücklage ohne Ziel an, nur mit Rate", async () => {
+    const nutzer = userEvent.setup();
+    rendere(<RuecklagenScreen />);
+    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben).
+    await screen.findByRole("button", { name: /rücklage/i });
+    await klicke(nutzer, /anlegen|neu|rücklage|erfassen/i);
+
+    await nutzer.type(await screen.findByLabelText(/^Wofür/), "Urlaubskasse");
+    await auswahlWaehlen(nutzer, /^Form/, /freie Rate/);
+    // Ziel und Frist sind jetzt weg — nicht nur leer.
+    expect(screen.queryByLabelText(/^Ziel/)).toBeNull();
+    await nutzer.type(await screen.findByLabelText(/^Rate im Monat/), "150");
+    await klicke(nutzer, /speichern|anlegen/i);
+
+    await waitFor(async () => {
+      const [r] = await sqliteRuecklagenRepository.alle();
+      expect(r?.rate).toBe(15000);
+      expect(r?.ziel).toBeUndefined();
     });
-    rendere(<InventarScreen />);
+  });
+
+  it("zeigt Soll-Stand und Monatsrate einer Rücklage", async () => {
+    await sqliteRuecklagenRepository.speichern({
+      id: "g1", bezeichnung: "Kühlschrank", beginn: "2024-01-01",
+      ziel: 120000, fristMonate: 120,
+    });
+    rendere(<RuecklagenScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Kühlschrank/));
     // 120000 auf 120 Monate → 10,00 pro Monat.
     expect(document.body.textContent).toMatch(/10,00|1\.200,00/);

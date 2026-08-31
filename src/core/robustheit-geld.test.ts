@@ -36,7 +36,7 @@ import {
   sollRuecklage,
   type Budget,
   type Cent,
-  type Inventargegenstand,
+  type Ruecklage,
   type IstBuchung,
   type Zahlungskonto,
 } from ".";
@@ -45,7 +45,8 @@ import { geldFormatierenMitSymbol } from "./basis/geld";
 import { buchungErfassen } from "../application/buchung/buchungErfassen";
 import { umbuchungErfassen } from "../application/buchung/umbuchungErfassen";
 import { budgetAnlegen } from "../application/budgets/budgetAnlegen";
-import { inventarAnlegen } from "../application/inventar/inventarAnlegen";
+import { ruecklageAnlegen } from "../application/ruecklagen/ruecklagenPflege";
+import type { RuecklagenRepository } from "../application/ports";
 import type { BudgetRepository, LedgerPort } from "../application/ports";
 
 const EUR = STANDARD_WAEHRUNG;
@@ -294,40 +295,41 @@ describe("Use-Cases — Integer-Cent-Invariante", () => {
 // 4. Validierung vor Rundung, und ob sich Anteile wieder zum Ganzen summieren
 //
 // Die Topf-Hälfte dieses Abschnitts ist mit den Töpfen entfallen (2026-08-19). Was
-// bleibt, ist derselbe Fehlertyp am Inventar — dort rechnet die Rücklage weiter.
+// bleibt, ist derselbe Fehlertyp an den Rücklagen — dort rechnet die Rate weiter.
 // ══════════════════════════════════════════════════════════════════════════════
 
-describe("Inventar — Validierung vor Rundung", () => {
+describe("Rücklagen — Validierung vor Rundung", () => {
   // [BEHOBEN] Fund 6 — `> 0` wird VOR dem Runden geprüft, gerundet wird danach auf 0.
-  // Erwartet: nutzungsdauerMonate 0.4 wird abgelehnt. Tatsächlich (damals): die Prüfung
+  // Erwartet: eine Frist von 0.4 Monaten wird abgelehnt. Tatsächlich (damals): die Prüfung
   //   ließ 0.4 durch, `Math.round(0.4)` machte 0 daraus, und das Aggregat lag dauerhaft
   //   kaputt in der DB — jede Rate daraus wurde Infinity, jeder Sollstand NaN.
   // GRÜN seit dem Fix: gerundet wird VOR der Prüfung.
-  it("nutzungsdauerMonate 0.4 wird abgelehnt statt zu 0 gerundet", async () => {
-    const gespeichert: Inventargegenstand[] = [];
-    const repo = {
+  it("eine Frist von 0.4 Monaten wird abgelehnt statt zu 0 gerundet", async () => {
+    const gespeichert: Ruecklage[] = [];
+    const repo: RuecklagenRepository = {
       alle: async () => gespeichert,
-      speichern: async (g: Inventargegenstand) => { gespeichert.push(g); },
+      speichern: async (g: Ruecklage) => { gespeichert.push(g); },
       loeschen: async () => {},
+      ausbuchungSpeichern: async () => {},
+      ausbuchungen: async () => [],
     };
-    await expect(inventarAnlegen(repo, {
-      bezeichnung: "Kaputt", wiederbeschaffung: 120000,
-      nutzungsdauerMonate: 0.4, anschaffung: "2026-06-01",
-    })).rejects.toThrow("nutzungsdauer.groesserNull");
+    await expect(ruecklageAnlegen(repo, {
+      bezeichnung: "Kaputt", ziel: 120000,
+      fristMonate: 0.4, beginn: "2026-06-01",
+    })).rejects.toThrow("frist.groesserNull");
     expect(gespeichert).toHaveLength(0);
   });
 
-  // [BEHOBEN] Fund 7 — die Rate erreicht das Ziel am Ende der Nutzungsdauer nicht.
-  // Erwartet: nach genau `nutzungsdauerMonate` Monaten ist der Sollstand == Zielwert.
-  //   Das ist die fachliche Zusage der Inventar-Rücklage: am Ende ist die
-  //   Wiederbeschaffung beisammen.
+  // [BEHOBEN] Fund 7 — die Rate erreicht das Ziel am Ende der Frist nicht.
+  // Erwartet: nach genau `fristMonate` Monaten ist der Sollstand == Zielwert.
+  //   Das ist die fachliche Zusage der Rücklage: am Ende ist das Ziel beisammen.
   // Tatsächlich (damals): 1000 Cent / 3 Monate → Math.round(333,33) = 333 → nach drei
   //   Monaten 999. Der Restcent wurde nirgends verteilt, und die Abweichung wuchs mit
   //   der Zahl der Perioden.
-  it("Inventar-Rücklage erreicht das Ziel am Ende der Nutzungsdauer exakt", () => {
-    const g: Inventargegenstand = {
-      id: "g", bezeichnung: "Krumm", wiederbeschaffung: 1000,
-      nutzungsdauerMonate: 3, anschaffung: "2026-01-01",
+  it("die Rücklage erreicht ihr Ziel am Ende der Frist exakt", () => {
+    const g: Ruecklage = {
+      id: "g", bezeichnung: "Krumm", ziel: 1000,
+      fristMonate: 3, beginn: "2026-01-01",
     };
     expect(sollRuecklage(g, "2026-04-01")).toBe(1000);
   });

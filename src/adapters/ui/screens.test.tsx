@@ -26,7 +26,7 @@ import { EinstellungenScreen } from "./einstellungen/EinstellungenScreen";
 import { AnalyseScreen } from "./analyse/AnalyseScreen";
 import { UebersichtScreen } from "./uebersicht/UebersichtScreen";
 import { ImportScreen } from "./import/ImportScreen";
-import { InventarScreen } from "./inventar/InventarScreen";
+import { RuecklagenScreen } from "./ruecklagen/RuecklagenScreen";
 import { KontenScreen } from "./konten/KontenScreen";
 import { ReviewScreen } from "./import/ReviewScreen";
 import { sqliteKlassifikatorRepository } from "../persistence/sqliteKlassifikatorRepository";
@@ -34,7 +34,7 @@ import { trainieren } from "../../core";
 import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteDepotRepository } from "../persistence/sqliteDepotRepository";
-import { sqliteInventarRepository } from "../persistence/sqliteInventarRepository";
+import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import {
@@ -159,18 +159,18 @@ describe("VertraegeScreen", () => {
   });
 });
 
-describe("InventarScreen", () => {
+describe("RuecklagenScreen", () => {
   it("rendert im Leerzustand", async () => {
-    rendere(<InventarScreen />);
+    rendere(<RuecklagenScreen />);
     await waitFor(() => expect(document.body.textContent).toBeTruthy());
   });
 
   it("zeigt einen Gegenstand mit Bezeichnung", async () => {
-    await sqliteInventarRepository.speichern({
-      id: "g1", bezeichnung: "Waschmaschine", anschaffung: "2024-01-01",
-      wiederbeschaffung: 60000, nutzungsdauerMonate: 120,
+    await sqliteRuecklagenRepository.speichern({
+      id: "g1", bezeichnung: "Waschmaschine", beginn: "2024-01-01",
+      ziel: 60000, fristMonate: 120,
     });
-    rendere(<InventarScreen />);
+    rendere(<RuecklagenScreen />);
     expect(await screen.findByText(/Waschmaschine/)).toBeInTheDocument();
   });
 });

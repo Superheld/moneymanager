@@ -290,7 +290,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     }
   }
 
-  // ------------------------------------------------------------ Vertraege und Inventar
+  // ---------------------------------------------------------- Vertraege und Ruecklagen
 
   const vertraege = [
     { id: "vertrag-internet", anbieter: "Halvern", kategorie: "kat-internet-telefon", betrag: -4500 },
@@ -308,16 +308,19 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     );
   }
 
-  // Wiederbeschaffung geteilt durch Nutzungsdauer ergibt die monatliche Ruecklage.
-  const inventar = [
-    { id: "inv-1", bezeichnung: "Waschmaschine", wert: 68000, monate: 120 },
-    { id: "inv-2", bezeichnung: "Notebook", wert: 145000, monate: 60 },
-    { id: "inv-3", bezeichnung: "Fahrrad", wert: 92000, monate: 96 },
+  // Beide Formen einer Ruecklage stehen im Spielstand, und das ist Absicht: die eine
+  // rechnet sich aus Ziel und Frist, die andere traegt ihre Rate direkt. Wer nur die
+  // erste vorfindet, sieht der Oberflaeche nicht an, dass es die zweite gibt.
+  const ruecklagen = [
+    { id: "rue-1", bezeichnung: "Waschmaschine", ziel: 68000, frist: 120, rate: null },
+    { id: "rue-2", bezeichnung: "Notebook", ziel: 145000, frist: 60, rate: null },
+    { id: "rue-3", bezeichnung: "Fahrrad", ziel: 92000, frist: 96, rate: null },
+    { id: "rue-4", bezeichnung: "Urlaubskasse", ziel: null, frist: null, rate: 15000 },
   ];
-  for (const i of inventar) {
+  for (const r of ruecklagen) {
     setzen(
-      "INSERT INTO inventargegenstand (id, bezeichnung, wiederbeschaffung, nutzungsdauer_monate, anschaffung, kategorie_id, konto_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [i.id, i.bezeichnung, i.wert, i.monate, tagIn(-MONATE - 12, 10), "kat-anschaffungen", "konto-tagesgeld"],
+      "INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [r.id, r.bezeichnung, r.ziel, r.frist, r.rate, tagIn(-MONATE - 12, 10), "kat-anschaffungen", "konto-tagesgeld"],
     );
   }
 

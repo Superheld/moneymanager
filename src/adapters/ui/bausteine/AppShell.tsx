@@ -12,7 +12,7 @@ export type ScreenId =
   | "uebersicht"
   | "analyse"
   | "konten"
-  | "inventar"
+  | "ruecklagen"
   | "budgets"
   | "vertraege"
   | "kontenverwaltung"
@@ -43,7 +43,7 @@ const GRUPPEN: NavGroup[] = [
       { id: "konten", labelKey: "shell.navKonten" },
       { id: "budgets", labelKey: "shell.navBudgets" },
       { id: "analyse", labelKey: "shell.navAnalyse" },
-      { id: "inventar", labelKey: "shell.navInventar" },
+      { id: "ruecklagen", labelKey: "shell.navRuecklagen" },
       { id: "vertraege", labelKey: "shell.navVertraege" },
     ],
   },

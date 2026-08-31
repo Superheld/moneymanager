@@ -138,7 +138,7 @@ console.log(
 console.log(
   `  Bestand    Konten ${zaehle("zahlungskonto")} · Kategorien ${zaehle("kategorie")} · ` +
     `Budgets ${zaehle("budget")} · Vertraege ${zaehle("vertrag")} · ` +
-    `Inventar ${zaehle("inventargegenstand")} · Depotwerte ${zaehle("depotwert")}`,
+    `Ruecklagen ${zaehle("ruecklage")} · Depotwerte ${zaehle("depotwert")}`,
 );
 console.log(
   `  Buchungen  ${zaehle("ist_buchung")} gesamt · ${zaehleWo("ist_buchung", "quelle = 'import'")} aus dem Abruf · ` +

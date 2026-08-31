@@ -179,6 +179,27 @@ describe("budgetVerbrauch", () => {
     expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(0);
   });
 
+  /**
+   * Die Ausnahme von Hand. Sie gibt es für die eine teure Anschaffung, für die
+   * jahrelang zurückgelegt wurde — sie ist eine echte Ausgabe, aber keine, an der sich
+   * ein Monatsrahmen messen lassen müsste. Gesetzt wird sie beim Ausbuchen einer
+   * Rücklage oder von Hand.
+   */
+  it("überspringt eine Buchung, die von der Budgetbewertung ausgenommen ist", () => {
+    const ist = [
+      b({ id: "1", betrag: euroZuCent(-50) }),
+      b({ id: "2", betrag: euroZuCent(-1200), budgetrelevant: false }),
+    ];
+    expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(euroZuCent(50));
+  });
+
+  // Fehlend heisst JA. Sonst fiele mit der Einführung der Spalte der ganze Altbestand
+  // aus jedem Budget, und die Rahmen sähen über Nacht grosszügig aus.
+  it("zählt eine Buchung ohne die Angabe ganz normal mit", () => {
+    const ist = [b({ id: "1", betrag: euroZuCent(-50), budgetrelevant: undefined })];
+    expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(euroZuCent(50));
+  });
+
   it("legt dieselbe Auswahl als Einzelposten offen — Summe = Verbrauch", () => {
     // Die Oberfläche zeigt beim Aufklappen genau diese Liste. Weil `budgetVerbrauch`
     // nur noch ihre Summe ist, können Balken und Liste nicht auseinanderlaufen.

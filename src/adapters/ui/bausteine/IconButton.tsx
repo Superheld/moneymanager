@@ -31,7 +31,7 @@ export type IconName =
   | "konten"
   | "budgets"
   | "analyse"
-  | "inventar"
+  | "ruecklagen"
   | "vertraege"
   | "kontenverwaltung"
   | "import"
@@ -71,7 +71,7 @@ const PFADE: Record<IconName, ReactElement> = {
   // Verlaufslinie.
   analyse: <><path d="M4 18l5-6 4 3 7-8" /><path d="M4 4v16h16" /></>,
   // Kiste in Schraegsicht.
-  inventar: <><path d="M3 8l9-4 9 4v8l-9 4-9-4V8Z" /><path d="M3 8l9 4 9-4" /><path d="M12 12v8" /></>,
+  ruecklagen: <><path d="M3 8l9-4 9 4v8l-9 4-9-4V8Z" /><path d="M3 8l9 4 9-4" /><path d="M12 12v8" /></>,
   // Blatt mit umgeknickter Ecke.
   vertraege: <><path d="M6 3h8l4 4v14H6z" /><path d="M14 3v4h4" /><path d="M9 12h6M9 16h6" /></>,
   // Gebaeude mit Saeulen.

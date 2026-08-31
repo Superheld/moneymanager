@@ -2,7 +2,7 @@
 // verschwindet.
 //
 // Bis 2026-08-27 löschte ein Klick auf den Mülleimer SOFORT: Konto, Kategorie, Person,
-// Budget, Budget-Version, Inventargegenstand, Vertrag, Bankzugang. Kein Zwischenschritt,
+// Budget, Budget-Version, Rücklage, Vertrag, Bankzugang. Kein Zwischenschritt,
 // kein Rückweg — und die Knöpfe sitzen in Tabellenzeilen, also genau dort, wo man mit der
 // Maus unterwegs ist, um etwas anderes zu tun.
 //
