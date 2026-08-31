@@ -230,6 +230,7 @@ export function VertraegeScreen() {
               {v.anbieter}
             </Zeilenlink>
             {v.art === "dauervertrag" && <Pill variant="neutral">{t("vertraege.artKurz.dauervertrag")}</Pill>}
+            {v.art === "umbuchung" && <Pill variant="um">{t("vertraege.artKurz.umbuchung")}</Pill>}
           </span>
         ),
       },

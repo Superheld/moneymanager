@@ -39,6 +39,7 @@ export function spurenAus(
       kategorieHerkunft: b.kategorieHerkunft,
       geteilt: istGeteilt(b),
       kontoId: b.kontoId,
+      gegenkontoId: b.gegenkontoId,
       charakter: b.charakter,
     };
   });

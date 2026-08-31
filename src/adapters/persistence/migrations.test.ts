@@ -152,7 +152,8 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     expect(spalten(db, "zahlungskonto")).toContain("kontostand");
     // v2/v3
     expect(spalten(db, "zahlungsregel")).toEqual(
-      expect.arrayContaining(["konto_id", "kategorie_id", "vertrag_id"]),
+      // gegenkonto_id: v66 — macht aus der Regel eine geplante Umbuchung
+      expect.arrayContaining(["konto_id", "gegenkonto_id", "kategorie_id", "vertrag_id"]),
     );
     // v17, seit v65 an `ruecklage`
     expect(spalten(db, "ruecklage")).toEqual(

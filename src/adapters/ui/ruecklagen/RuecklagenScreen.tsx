@@ -20,6 +20,7 @@ import {
   monatsRuecklage,
   type Ruecklage,
   type RuecklagenDeckung,
+  type Ruecklagenfluss,
   type Ruecklagensicht,
 } from "../../../application";
 import {
@@ -43,6 +44,7 @@ import { useLoeschfrage } from "../bausteine/Loeschfrage";
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
 const LEERE_DECKUNG: RuecklagenDeckung = { posten: [], soll: 0, sollMitKonto: 0, tatsaechlich: 0, grad: 100 };
 const LEERE_LISTE: readonly never[] = [];
+const LEERER_FLUSS: Ruecklagenfluss = { bedarf: 0, plan: 0, ist: 0, posten: [] };
 
 /** Die beiden Formen einer Rücklage — die Wahl im Dialog, nicht im Datenmodell. */
 type Form = "ziel" | "rate";
@@ -96,6 +98,7 @@ export function RuecklagenScreen() {
   const zielwert = sicht?.zielwert ?? 0;
   const mindest = sicht?.mindest ?? 0;
   const buchungswahl = sicht?.buchungswahl ?? LEERE_LISTE;
+  const fluss = sicht?.fluss ?? LEERER_FLUSS;
 
   function neu() {
     setEditId(null);
@@ -189,6 +192,38 @@ export function RuecklagenScreen() {
           <KPIStat size="chip" label={t("ruecklagen.kpiTatsaechlich")} value={geld.format(deckung.tatsaechlich)} unit={geld.symbol} tone="ok" />
           <KPIStat size="chip" label={t("ruecklagen.kpiDeckung")} value={String(deckung.grad)} unit="%" tone={deckung.grad < 50 ? "warn" : "default"} />
         </div>
+      )}
+
+      {/* Drei Zahlen, nicht eine — und das ist der ganze Nutzen dieser Karte:
+          BEDARF verlangt die Rechnung, PLAN hast du eingerichtet, IST ist geflossen.
+          Bedarf über Plan heisst „du legst zu wenig zurück"; Plan über Ist heisst „die
+          Überweisung ist ausgefallen". Eine Zahl allein könnte keine der beiden Aussagen
+          treffen. */}
+      {(fluss.bedarf > 0 || fluss.plan > 0 || fluss.ist !== 0) && (
+        <Card title={t("ruecklagen.flussTitel")} subtitle={t("ruecklagen.flussUntertitel")}>
+          <div className="kpis">
+            <KPIStat size="chip" label={t("ruecklagen.flussBedarf")} value={geld.format(fluss.bedarf)} unit={geld.symbol} />
+            <KPIStat
+              size="chip"
+              label={t("ruecklagen.flussPlan")}
+              value={geld.format(fluss.plan)}
+              unit={geld.symbol}
+              tone={fluss.plan < fluss.bedarf ? "warn" : "default"}
+            />
+            <KPIStat
+              size="chip"
+              label={t("ruecklagen.flussIst")}
+              value={geld.format(fluss.ist)}
+              unit={geld.symbol}
+              tone={fluss.ist >= fluss.plan && fluss.plan > 0 ? "ok" : "default"}
+            />
+          </div>
+          {fluss.plan === 0 && fluss.bedarf > 0 && (
+            <div className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-2)" }}>
+              {t("ruecklagen.flussOhnePlan")}
+            </div>
+          )}
+        </Card>
       )}
 
       {/* Die Faustformel steht für sich und nicht bei den Kennzahlen darüber: die messen

@@ -401,3 +401,52 @@ describe("spannenVorschlag", () => {
     expect(spannenVorschlag(e, spuren)).toEqual({ von: 2000, bis: 2300 });
   });
 });
+
+/**
+ * Der Umbuchungsvertrag im Abgleich. Er hat keine Erkennungsregel und kann keine haben:
+ * bei einer Zahlung zwischen zwei eigenen Konten steht beim Empfänger je nach Bank die
+ * eigene IBAN, der eigene Name oder nichts.
+ */
+describe("zuordnungAbgleich — Umbuchungsverträge", () => {
+  const sparregel = {
+    id: "r-spar",
+    bezeichnung: "Sparrate",
+    betrag: -20000,
+    rhythmus: "monatlich" as const,
+    startdatum: "2026-01-01",
+    charakter: "Umschichtung" as const,
+    kontoId: "giro",
+    gegenkontoId: "tagesgeld",
+    vertragId: "v-spar",
+  };
+  const umschichtung: Zahlungsspur = {
+    id: "b-spar",
+    datum: "2026-06-01",
+    betrag: -20000,
+    gegenpartei: "",
+    verwendungszweck: "",
+    kontoId: "giro",
+    gegenkontoId: "tagesgeld",
+    charakter: "Umschichtung",
+  };
+
+  it("ordnet die Umschichtung ihrem Vertrag zu", () => {
+    const { setzen } = zuordnungAbgleich([], [umschichtung], [], [sparregel]);
+    expect(setzen).toEqual([
+      { istbuchungId: "b-spar", vertragId: "v-spar", herkunft: "automatisch" },
+    ]);
+  });
+
+  // Ohne den Parameter verhält sich der Abgleich wie vorher — das ist die Zusage, unter
+  // der jeder bestehende Aufrufer unverändert bleiben durfte.
+  it("lässt sie ohne Umbuchungsregeln unangetastet", () => {
+    expect(zuordnungAbgleich([], [umschichtung], []).setzen).toEqual([]);
+  });
+
+  it("rührt eine Handentscheidung nicht an", () => {
+    const bestand = [{ istbuchungId: "b-spar", vertragId: null, herkunft: "manuell" as const }];
+    const { setzen, entfernen } = zuordnungAbgleich([], [umschichtung], bestand, [sparregel]);
+    expect(setzen).toEqual([]);
+    expect(entfernen).toEqual([]);
+  });
+});

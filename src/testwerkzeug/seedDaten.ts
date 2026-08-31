@@ -308,6 +308,16 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     );
   }
 
+  // Der Umbuchungsvertrag — eine Abmachung mit sich selbst. Er bekommt bewusst KEINE
+  // Erkennungsregel: bei einer Zahlung zwischen zwei eigenen Konten steht beim
+  // Empfaenger je nach Bank die eigene IBAN, der eigene Name oder nichts. Erkannt wird
+  // er am Weg, und der steht an seiner Zahlungsregel (`gegenkonto_id`).
+  setzen(
+    "INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, kategorie_id, art) " +
+      "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+    ["vertrag-sparrate", "Sparrate aufs Tagesgeld", null, "person-1", tagIn(-MONATE, 2), "automatisch", 12, null, "aktiv", "kat-sparen-anlegen", "umbuchung"],
+  );
+
   // Beide Formen einer Ruecklage stehen im Spielstand, und das ist Absicht: die eine
   // rechnet sich aus Ziel und Frist, die andere traegt ihre Rate direkt. Wer nur die
   // erste vorfindet, sieht der Oberflaeche nicht an, dass es die zweite gibt.
@@ -382,6 +392,9 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       kategorieHerkunft?: string;
       vertragId?: string | null;
       vertragHerkunft?: string | null;
+      /** Die beiden Beine einer Umbuchung — gepaart ueber `transferId`. */
+      transferId?: string;
+      gegenkontoId?: string;
       /**
        * Die Bezeichnung der Zeile. Leer lassen darf sie nur, wer einen BELEG dazu anlegt:
        * dann zeigt der Auszug den Empfaenger von dort. Alles andere stuende sonst ohne
@@ -392,8 +405,8 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   ): string => {
     const id = `buchung-${String(++lfd).padStart(4, "0")}`;
     setzen(
-      "INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle, kategorie_herkunft, zu_pruefen, roh_hash, vertrag_id, vertrag_herkunft, notiz) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      "INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle, kategorie_herkunft, zu_pruefen, roh_hash, vertrag_id, vertrag_herkunft, notiz, transfer_id, gegenkonto_id) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
         id,
         datum,
@@ -408,6 +421,8 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
         extra.vertragId ?? null,
         extra.vertragHerkunft ?? null,
         extra.notiz ?? null,
+        extra.transferId ?? null,
+        extra.gegenkontoId ?? null,
       ],
     );
     return id;
@@ -484,11 +499,21 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     fest(15, -8900, "konto-giro", "kat-versicherungen", "Aufwand", "Mordhorst", "Beitrag", "vertrag-versicherung");
     fest(8, -zahlZwischen(6000, 11000), "konto-giro", "kat-energie", "Aufwand", "Wendlandt", "Abschlag");
     // Eine Umschichtung hat ZWEI Seiten — sonst zeigt der Verlauf einen Stand, den es nie gab.
+    //
+    // Beide Beine tragen `transfer_id` und `gegenkonto_id`. Ohne die sieht der
+    // Ruecklagenfluss nichts: er erkennt eine Ruecklagenzahlung am WEG (von einem
+    // liquiden auf ein Ruecklagenkonto) und nicht am Empfaenger — und ohne Gegenkonto
+    // gibt es keinen Weg.
+    const uebertrag = `transfer-${m}`;
     buchung(tagIn(-m, 2), -30000, "konto-giro", "kat-sparen-anlegen", "Umschichtung", {
       notiz: "Uebertrag zur Ruecklage",
+      transferId: uebertrag,
+      gegenkontoId: "konto-tagesgeld",
     });
     buchung(tagIn(-m, 2), 30000, "konto-tagesgeld", "kat-sparen-anlegen", "Umschichtung", {
       notiz: "Uebertrag vom Girokonto",
+      transferId: uebertrag,
+      gegenkontoId: "konto-giro",
     });
 
     /**
@@ -612,11 +637,14 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     { id: "regel-versicherung", bez: "Versicherung", betrag: -8900, rhythmus: "monatlich", tag: 15, kat: "kat-versicherungen", charakter: "Aufwand", vertrag: "vertrag-versicherung" },
     // Eine nicht-monatliche, damit die Projektionsarithmetik im Spielstand vorkommt.
     { id: "regel-beitrag", bez: "Jahresbeitrag", betrag: -24000, rhythmus: "jaehrlich", tag: 20, kat: "kat-freizeit-hobby", charakter: "Aufwand", vertrag: null },
+    // Der Umbuchungsvertrag: die monatliche Sparrate aufs Tagesgeldkonto. Er ist die
+    // Plan-Seite dessen, was die beiden Umschichtungsbeine oben als Ist zeigen.
+    { id: "regel-sparrate", bez: "Sparrate", betrag: -30000, rhythmus: "monatlich", tag: 2, kat: "kat-sparen-anlegen", charakter: "Umschichtung", vertrag: "vertrag-sparrate", ziel: "konto-tagesgeld" },
   ]) {
     setzen(
-      "INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id, vertrag_id) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [r.id, r.bez, r.betrag, r.rhythmus, tagIn(-MONATE, r.tag), r.charakter, "konto-giro", r.kat, r.vertrag],
+      "INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, gegenkonto_id, kategorie_id, vertrag_id) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [r.id, r.bez, r.betrag, r.rhythmus, tagIn(-MONATE, r.tag), r.charakter, "konto-giro", ("ziel" in r ? r.ziel : null) ?? null, r.kat, r.vertrag],
     );
   }
 

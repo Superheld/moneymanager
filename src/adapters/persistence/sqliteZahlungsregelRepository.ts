@@ -13,6 +13,7 @@ interface Zeile {
   startdatum: string;
   charakter: string;
   konto_id: string | null;
+  gegenkonto_id: string | null;
   kategorie_id: string | null;
   vertrag_id: string | null;
 }
@@ -26,6 +27,7 @@ function zuRegel(z: Zeile): Zahlungsregel {
     startdatum: z.startdatum,
     charakter: z.charakter as Charakter,
     kontoId: z.konto_id ?? undefined,
+    gegenkontoId: z.gegenkonto_id ?? undefined,
     kategorieId: z.kategorie_id ?? undefined,
     vertragId: z.vertrag_id ?? undefined,
   };
@@ -35,7 +37,7 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<Zeile[]>(
-      `SELECT id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id, vertrag_id
+      `SELECT id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, gegenkonto_id, kategorie_id, vertrag_id
        FROM zahlungsregel ORDER BY startdatum`,
     );
     return zeilen.map(zuRegel);
@@ -44,8 +46,8 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
   async speichern(regel) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, kategorie_id, vertrag_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      `INSERT INTO zahlungsregel (id, bezeichnung, betrag, rhythmus, startdatum, charakter, konto_id, gegenkonto_id, kategorie_id, vertrag_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT(id) DO UPDATE SET
          bezeichnung  = excluded.bezeichnung,
          betrag       = excluded.betrag,
@@ -53,6 +55,7 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
          startdatum   = excluded.startdatum,
          charakter    = excluded.charakter,
          konto_id     = excluded.konto_id,
+         gegenkonto_id = excluded.gegenkonto_id,
          kategorie_id = excluded.kategorie_id,
          vertrag_id   = excluded.vertrag_id`,
       [
@@ -63,6 +66,7 @@ export const sqliteZahlungsregelRepository: ZahlungsregelRepository = {
         regel.startdatum,
         regel.charakter,
         regel.kontoId ?? null,
+        regel.gegenkontoId ?? null,
         regel.kategorieId ?? null,
         regel.vertragId ?? null,
       ],
