@@ -37,6 +37,18 @@ export interface Zahlungsregel {
   readonly charakter: Charakter;
   /** Referenz auf ein Zahlungskonto (Stammdaten), ab P1. Optional. */
   readonly kontoId?: string;
+  /**
+   * Das ZIELKONTO einer geplanten Umbuchung — gesetzt macht die Regel aus einer Zahlung
+   * eine Verschiebung zwischen zwei eigenen Konten.
+   *
+   * Es steht an der REGEL und nicht am Vertrag, weil die Regel die Zahlung beschreibt
+   * und der Vertrag die Vereinbarung darüber. Derselbe Grund, aus dem `kontoId` hier
+   * steht und nicht dort.
+   *
+   * Sinnvoll nur mit `charakter: "Umschichtung"`: bei Aufwand oder Ertrag verlässt das
+   * Geld den erfassten Bereich, und ein Gegenkonto behauptete etwas anderes.
+   */
+  readonly gegenkontoId?: string;
   /** Referenz auf eine Kategorie (Stammdaten), ab P1. Optional. */
   readonly kategorieId?: string;
   /** Herkunft: aus diesem Vertrag abgeleitet (P2). Optional. */

@@ -309,6 +309,57 @@ Wer sie auswertet, muss sie an **beiden** Stellen auswerten: im Verbrauch
 (`budgetBuchungen`) und im Vorschlag (`budgetvorschlaege`). Nur im Verbrauch hiesse, einen
 Rahmen vorzuschlagen, gegen den die Buchung anschliessend nicht zählt.
 
+#### Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
+
+Ein gewöhnlicher Vertrag hängt an einem Namen: `vertrag_erkennung` normalisiert die
+Gegenpartei und vergleicht mit Unschärfe. Bei einer Verschiebung zwischen zwei eigenen
+Konten gibt es diesen Schlüssel nicht — dort steht je nach Bank die eigene IBAN, der
+eigene Name oder gar nichts, und aus dem Verwendungszweck etwas zu raten hiesse, sich auf
+einen Text zu verlassen, den niemand füllen muss.
+
+Deshalb trägt die **Zahlungsregel** ein `gegenkonto_id`, und `umbuchungErkennung` prüft
+strukturell: gleicher Weg (Konto → Gegenkonto), Charakter `Umschichtung`, abgehendes Bein.
+Das ist eine harte Übereinstimmung und keine Ähnlichkeit.
+
+Drei Entscheidungen darin, die man kennen muss:
+
+- **Der Betrag entscheidet NICHT über die Passung**, sondern nur darüber, WELCHE Regel es
+  ist, wenn mehrere denselben Weg beschreiben. Wer seine Sparrate erhöht und die Regel
+  nicht nachzieht, soll eine erkannte Umbuchung mit Abweichung sehen — mit einer
+  Betragsschwelle wäre sie stattdessen gar nicht erkannt, und die Zeile stünde als „offen"
+  da, während daneben eine unerklärte Umschichtung liegt.
+- **Nur das abgehende Bein** bekommt die Zuordnung. Beide zuzuordnen hübe die Ist-Summe
+  des Vertrags auf: einmal −200, einmal +200, obwohl 200 geflossen sind.
+- **`gegenkonto_id` steht an der REGEL, nicht am Vertrag.** Die Regel beschreibt die
+  Zahlung, der Vertrag die Vereinbarung darüber — derselbe Grund, aus dem `konto_id` dort
+  steht. Sinnvoll ist es nur mit `charakter = 'Umschichtung'`; erzwungen wird das an der
+  Anwendungsgrenze, weil SQLite eine Bedingung über zwei Spalten nur mit einem CHECK
+  ausdrücken kann und ein CHECK an einer bestehenden Tabelle einen Umbau kostet.
+
+Die Vertragsart `umbuchung` hängt daran und trägt eine Folge: **keine
+Kündigungswarnung.** Eine Abmachung mit sich selbst kündigt man, indem man sie löscht.
+
+#### Der Rücklagenfluss ist DREI Zahlen, nicht eine
+
+`core/ruecklagen/fluss.ts` beantwortet „was wird zurückgelegt" mit drei Werten, und keiner
+davon ersetzt einen anderen:
+
+| | woher | sagt |
+|---|---|---|
+| **Bedarf** | Σ Monatsraten der Rücklagen | was die Rechnung verlangt |
+| **Plan** | Σ Umbuchungsregeln auf Rücklagenkonten | was du eingerichtet hast |
+| **Ist** | gebuchte Umschichtungen im Fenster | was tatsächlich geflossen ist |
+
+Bedarf über Plan heisst: du legst zu wenig zurück, die Deckung wird schlechter, ohne dass
+irgendwo etwas schiefgeht. Plan über Ist heisst: die Überweisung ist ausgefallen. Eine
+Zahl allein könnte keine dieser Aussagen treffen.
+
+**Wohin gerechnet wird, entscheidet die KONTOKLASSE**, nicht die Gruppe: ein Zufluss auf
+`ruecklage` oder `vorsorge` ist zurückgelegt, auf ein liquides nur umgeschichtet. Bedarf
+und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
+Zeitraum. Wer sie über mehrere Monate vergleicht, muss die ersten beiden hochrechnen — das
+im Kern zu tun hiesse zu raten, wie viele Monate gemeint sind.
+
 #### Der Budgetbetrag ist eine Reihe, kein Wert
 
 `budget_betrag` hält je Budget die Beträge mit dem **Monat, ab dem sie gelten**. Ein Budget

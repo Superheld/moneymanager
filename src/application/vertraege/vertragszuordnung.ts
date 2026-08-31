@@ -12,7 +12,13 @@
 //     dem Anlegen gebucht wurde, seine Zuordnung, und der Bestand bliebe für immer blind.
 //   • Er ist idempotent und schreibt nur Deltas, kostet also nichts, wenn nichts zu tun ist.
 
-import { standardErkennung, zuordnungAbgleich, type Cent, type Vertragszuordnung } from "../../core";
+import {
+  istUmbuchungsregel,
+  standardErkennung,
+  zuordnungAbgleich,
+  type Cent,
+  type Vertragszuordnung,
+} from "../../core";
 import type {
   LedgerPort,
   UmsatzRepository,
@@ -28,6 +34,14 @@ export interface AbgleichDeps {
   readonly umsatzRepo: UmsatzRepository;
   readonly erkennungRepo: VertragserkennungRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
+  /**
+   * Die Zahlungsregeln — gebraucht für die Umbuchungsverträge, die an keinem Empfänger
+   * hängen und deshalb keine Erkennungsregel haben können.
+   *
+   * Optional, damit ein Aufrufer ohne Umbuchungsverträge nichts laden muss, was er nicht
+   * braucht. Fehlt es, fällt genau dieser Zweig weg — alles andere gleicht wie bisher ab.
+   */
+  readonly regelRepo?: ZahlungsregelRepository;
 }
 
 export interface AbgleichErgebnis {
@@ -42,13 +56,19 @@ export interface AbgleichErgebnis {
  * Manuelle Zuordnungen bleiben unangetastet (siehe `zuordnungAbgleich`).
  */
 export async function zuordnungenAbgleichen(deps: AbgleichDeps): Promise<AbgleichErgebnis> {
-  const [spuren, erkennungen, bestand] = await Promise.all([
+  const [spuren, erkennungen, bestand, regeln] = await Promise.all([
     zahlungsspuren(deps.ledger, deps.umsatzRepo),
     deps.erkennungRepo.alle(),
     deps.zuordnungRepo.alle(),
+    deps.regelRepo?.alle() ?? Promise.resolve([]),
   ]);
 
-  const { setzen, entfernen } = zuordnungAbgleich(erkennungen, spuren, bestand);
+  const { setzen, entfernen } = zuordnungAbgleich(
+    erkennungen,
+    spuren,
+    bestand,
+    regeln.filter(istUmbuchungsregel),
+  );
   for (const z of setzen) await deps.zuordnungRepo.speichern(z);
   for (const id of entfernen) await deps.zuordnungRepo.loeschen(id);
   return { gesetzt: setzen.length, entfernt: entfernen.length };

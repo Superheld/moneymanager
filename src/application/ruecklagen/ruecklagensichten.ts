@@ -11,10 +11,12 @@ import {
   monatsRuecklageGesamt,
   realerKontostand,
   ruecklagenDeckung,
+  ruecklagenfluss,
   zielwertGesamt,
   type Cent,
   type Ruecklage,
   type RuecklagenDeckung,
+  type Ruecklagenfluss,
   type Zahlungskonto,
 } from "../../core";
 import type {
@@ -73,6 +75,8 @@ export interface Ruecklagensicht {
   readonly ausbuchungen: readonly RuecklagenAusbuchung[];
   /** Abflüsse, die sich beim Ausbuchen verknüpfen lassen — jüngste zuerst. */
   readonly buchungswahl: readonly Buchungswahl[];
+  /** Was von den liquiden Mitteln in die Rücklagen wandert — Bedarf, Plan und Ist. */
+  readonly fluss: Ruecklagenfluss;
 }
 
 /**
@@ -113,6 +117,13 @@ const RHYTHMUS_IN_MONATEN: Record<string, number> = {
   jaehrlich: 12,
 };
 
+/** Erster Tag des Folgemonats — die obere, ausschliessende Grenze des laufenden Monats. */
+function monatDanach(heute: string): string {
+  const [j, m] = heute.split("-").map(Number);
+  const gesamt = j * 12 + m; // m ist 1-basiert, also schon der Folgemonat
+  return `${String(Math.floor(gesamt / 12)).padStart(4, "0")}-${String((gesamt % 12) + 1).padStart(2, "0")}-01`;
+}
+
 export async function ruecklagenLaden(
   deps: RuecklagenDeps,
   heute: string,
@@ -145,6 +156,16 @@ export async function ruecklagenLaden(
     mindest: mindestRuecklage(einnahmen),
     vertragseinnahmen: einnahmen,
     ausbuchungen: [...ausbuchungen].sort((a, b) => b.datum.localeCompare(a.datum)),
+    // Das Ist über den LAUFENDEN Monat, weil Bedarf und Plan Monatsgrössen sind. Ein
+    // Fenster über den ganzen Bestand daneben verglichen Jahre mit einem Monat.
+    fluss: ruecklagenfluss(
+      buchungen,
+      konten,
+      ruecklagen,
+      regeln,
+      `${heute.slice(0, 7)}-01`,
+      monatDanach(heute),
+    ),
     buchungswahl: spurenAus(buchungen, umsaetze)
       // Nur Abflüsse: eine Rücklage wird ausgegeben, nicht eingenommen.
       .filter((sp) => sp.betrag < 0)

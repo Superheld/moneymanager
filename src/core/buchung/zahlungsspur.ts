@@ -54,6 +54,12 @@ export interface Zahlungsspur {
    */
   readonly kategorieHerkunft?: "automatisch" | "manuell";
   /**
+   * Das andere Konto einer Umbuchung. Nur damit lässt sich eine geplante Verschiebung
+   * wiedererkennen: bei einer Buchung zwischen zwei eigenen Konten sagt der Empfänger
+   * nichts — dort steht je nach Bank die eigene IBAN, der eigene Name oder nichts.
+   */
+  readonly gegenkontoId?: string;
+  /**
    * Trägt die Buchung eine Aufteilung? Dann hat sie mehrere Kategorien und taugt weder
    * als Trainingsbeispiel noch als Ziel eines automatischen Laufs.
    */

@@ -436,3 +436,41 @@ describe("Spielstand", () => {
     for (const wert of werte) expect(wert.slice(4, 10), wert).toBe("999999");
   });
 });
+
+/**
+ * Der Umbuchungsvertrag im Spielstand. Er ist der einzige Vertrag ohne Erkennungsregel,
+ * und genau daran haengt, dass die Zuordnung ueber den WEG laeuft — ohne Gegenkonto an
+ * beiden Seiten sieht weder der Abgleich noch der Ruecklagenfluss etwas.
+ */
+describe("Spielstand — Umbuchungsvertrag", () => {
+  it("verbindet Regel und gebuchte Beine ueber dasselbe Kontopaar", () => {
+    const db = mitSeed();
+    const [regel] = db.exec(
+      "SELECT konto_id, gegenkonto_id, charakter, vertrag_id FROM zahlungsregel WHERE gegenkonto_id IS NOT NULL",
+    );
+    expect(regel?.values).toHaveLength(1);
+    const [kontoId, gegenkontoId, charakter, vertragId] = regel!.values[0];
+    expect(charakter).toBe("Umschichtung");
+    expect(vertragId).toBe("vertrag-sparrate");
+
+    const [beine] = db.exec(
+      `SELECT COUNT(*) FROM ist_buchung
+        WHERE charakter = 'Umschichtung' AND betrag < 0
+          AND konto_id = '${kontoId}' AND gegenkonto_id = '${gegenkontoId}'`,
+    );
+    expect(Number(beine!.values[0][0])).toBeGreaterThan(0);
+  });
+
+  it("paart beide Beine jeder Umbuchung", () => {
+    const db = mitSeed();
+    // Eine transfer_id ohne Gegenstueck waere eine halbe Umbuchung — der Verlauf zeigte
+    // dann einen Stand, den es nie gab.
+    const [ungepaart] = db.exec(
+      `SELECT COUNT(*) FROM (
+         SELECT transfer_id FROM ist_buchung WHERE transfer_id IS NOT NULL
+          GROUP BY transfer_id HAVING COUNT(*) <> 2
+       )`,
+    );
+    expect(Number(ungepaart!.values[0][0])).toBe(0);
+  });
+});

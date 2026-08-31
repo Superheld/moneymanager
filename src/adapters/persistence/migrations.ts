@@ -1883,4 +1883,19 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE ist_buchung ADD COLUMN budgetrelevant INTEGER NOT NULL DEFAULT 1`,
     ],
   },
+  {
+    version: 66, // Umbuchungsvertraege: eine Zahlungsregel bekommt ein Zielkonto
+    sql: [
+      // Mit Gegenkonto beschreibt die Regel keine Zahlung nach draussen mehr, sondern
+      // eine Verschiebung zwischen zwei eigenen Konten. Sinnvoll nur zusammen mit
+      // `charakter = 'Umschichtung'`; erzwungen wird das an der Anwendungsgrenze, weil
+      // SQLite eine Bedingung ueber zwei Spalten nur mit einem CHECK ausdruecken kann
+      // und ein CHECK an einer bestehenden Tabelle einen Umbau kostet.
+      //
+      // Es steht an der REGEL und nicht am Vertrag: die Regel beschreibt die Zahlung,
+      // der Vertrag die Vereinbarung darueber. Derselbe Grund, aus dem `konto_id` dort
+      // steht.
+      `ALTER TABLE zahlungsregel ADD COLUMN gegenkonto_id TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL`,
+    ],
+  },
 ];

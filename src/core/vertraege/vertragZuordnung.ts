@@ -27,6 +27,8 @@ import { anbieterSchluessel } from "../basis/gegenpartei";
 import type { Zahlungsspur } from "../buchung/zahlungsspur";
 import { musterTrifft } from "../basis/muster";
 import type { Cent } from "../basis/geld";
+import type { Zahlungsregel } from "../basis/zahlungsregel";
+import { umbuchungsregelFuer } from "./umbuchungErkennung";
 
 /**
  * Woran EIN Merkmal ansetzt. Die Arten sind nicht austauschbar und sollen es auch nicht
@@ -353,6 +355,15 @@ export function zuordnungAbgleich(
   erkennungen: readonly Vertragserkennung[],
   spuren: readonly Zahlungsspur[],
   bestand: readonly Vertragszuordnung[],
+  /**
+   * Die Umbuchungsregeln — Verträge mit sich selbst, die an keinem Empfänger hängen.
+   *
+   * Sie stehen als eigener Parameter da und nicht als weitere `Vertragserkennung`, weil
+   * sie nach einer anderen Frage gehen: die Erkennung vergleicht NAMEN mit Unschärfe,
+   * eine Umbuchung wird am WEG erkannt und trifft hart. Beides in eine Regelform zu
+   * pressen hiesse, eine der beiden Fragen zu verbiegen.
+   */
+  umbuchungsregeln: readonly Zahlungsregel[] = [],
 ): Zuordnungsabgleich {
   const bisher = new Map(bestand.map((z) => [z.istbuchungId, z]));
   const setzen: Vertragszuordnung[] = [];
@@ -362,7 +373,12 @@ export function zuordnungAbgleich(
     const alt = bisher.get(s.id);
     if (alt?.herkunft === "manuell") continue;
 
-    const vertragId = vertragFuer(erkennungen, s);
+    // Erst der Empfänger, dann der Weg. Die Reihenfolge zählt nur theoretisch — eine
+    // Umschichtung trägt keinen Empfänger, an dem eine Erkennung greifen könnte —, aber
+    // sie ist die richtige: eine erfasste Erkennungsregel ist eine Aussage über DIESE
+    // Zahlung, die Umbuchungsregel eine über alle auf demselben Weg.
+    const vertragId =
+      vertragFuer(erkennungen, s) ?? umbuchungsregelFuer(umbuchungsregeln, s)?.vertragId ?? null;
     if (vertragId === null) {
       if (alt) entfernen.push(s.id);
       continue;

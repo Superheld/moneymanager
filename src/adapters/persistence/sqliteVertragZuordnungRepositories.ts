@@ -25,6 +25,7 @@ import type {
 import type { AbgleichDeps } from "../../application/vertraege/vertragszuordnung";
 import { getDb } from "./db";
 import { sqliteLedgerRepository } from "./sqliteLedgerRepository";
+import { sqliteZahlungsregelRepository } from "./sqliteZahlungsregelRepository";
 import { sqliteUmsatzRepository } from "./sqliteImportRepositories";
 
 interface ErkennungZeile {
@@ -190,15 +191,20 @@ export const sqliteVertragszuordnungRepository: VertragszuordnungRepository = {
 };
 
 /**
- * Die vier Repositories, die der Zuordnungs-Abgleich braucht, einmal verdrahtet.
+ * Die Repositories, die der Zuordnungs-Abgleich braucht, einmal verdrahtet.
  *
  * Der Abgleich wird von mehreren Stellen ausgelöst (Vertrag gespeichert, Vertrag
  * gelöscht, Import verbucht, Handentscheidung zurückgenommen) — jede von ihnen dieselbe
- * Vierergruppe zusammenstellen zu lassen, wäre vier Gelegenheiten, eine zu vertauschen.
+ * Gruppe zusammenstellen zu lassen, wäre ebenso viele Gelegenheiten, eine zu vertauschen.
+ *
+ * Die Zahlungsregeln kamen 2026-08-31 dazu: ein Umbuchungsvertrag hängt an keinem
+ * Empfänger und kann deshalb keine Erkennungsregel haben — er wird am WEG erkannt, und
+ * der steht an seiner Zahlungsregel.
  */
 export const vertragsAbgleichDeps: AbgleichDeps = {
   ledger: sqliteLedgerRepository,
   umsatzRepo: sqliteUmsatzRepository,
   erkennungRepo: sqliteVertragserkennungRepository,
   zuordnungRepo: sqliteVertragszuordnungRepository,
+  regelRepo: sqliteZahlungsregelRepository,
 };
