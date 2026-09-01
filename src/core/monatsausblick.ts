@@ -30,7 +30,6 @@ import { addMonate, parseIso, toIso } from "./basis/datum";
 import type { Cent } from "./basis/geld";
 import { geglaetteterMonatsabfluss, budgetBuchungen, type Budget, type BudgetSicht } from "./budgets/budget";
 import { istInterneUmbuchung } from "./buchung/historie";
-import { monatsRuecklageGesamt, type Ruecklage } from "./ruecklagen/ruecklage";
 import type { Kategorie } from "./kategorien/kategorie";
 import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
 import { projiziereRegel, type Planbuchung } from "./buchung/projektion";
@@ -41,7 +40,6 @@ export type AusblickZeileId =
   | "einnahmen"
   | "vertraege"
   | "budgets"
-  | "ruecklagen"
   | "umschichtung"
   | "sonstiges";
 
@@ -119,8 +117,6 @@ const BETRAGS_TOLERANZ = 0.15;
 export interface MonatsAusblickEingabe {
   readonly regeln: readonly Zahlungsregel[];
   readonly budgets: readonly Budget[];
-  /** Die Rücklagen — Quelle der monatlichen Rate (kalkulatorisch, nie gebucht). */
-  readonly ruecklagen?: readonly Ruecklage[];
   readonly ist: readonly IstBuchung[];
   readonly kategorien: readonly Kategorie[];
   /**
@@ -198,8 +194,6 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
     vertraege,
     budgetZeile,
   ];
-  const ruecklagen = ruecklagenZeile(e.ruecklagen ?? [], zukunft);
-  if (ruecklagen) zeilen.push(ruecklagen);
   if (umschichtung.plan !== 0 || weitereUmschichtung.length > 0) {
     zeilen.push(mitEinzelposten(umschichtung, weitereUmschichtung));
   }
@@ -352,23 +346,6 @@ function budgetsZeile(
     },
     getragen,
   };
-}
-
-/**
- * Die monatliche Rücklagenrate als EINE Zeile, ohne Posten: die Aufschlüsselung steht
- * im Bereich Rücklagen, und drei aufklappbare Karten nebeneinander vertragen keine
- * vierte Ebene. Ohne Rücklagen entfällt die Zeile ganz, statt eine Null zu zeigen.
- *
- * Plan und Ist tragen denselben Betrag — die Rücklage wird nicht gebucht (siehe Kopf).
- */
-function ruecklagenZeile(
-  ruecklagen: readonly Ruecklage[],
-  zukunft: boolean,
-): AusblickZeile | null {
-  const rate = monatsRuecklageGesamt(ruecklagen);
-  if (rate === 0) return null;
-  const plan = -rate; // Abfluss aus Sicht des verfügbaren Geldes
-  return { id: "ruecklagen", plan, ist: zukunft ? null : plan, posten: [] };
 }
 
 /** Hängt die ungeplanten Buchungen einer Zeile als eigene Posten an. */

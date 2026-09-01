@@ -197,7 +197,6 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
     {
       ...BUDGET_DEPS,
       regelRepo: sqliteZahlungsregelRepository,
-      ruecklagenRepo: sqliteRuecklagenRepository,
       umsatzRepo: sqliteUmsatzRepository,
       kontoRepo: sqliteZahlungskontoRepository,
     },

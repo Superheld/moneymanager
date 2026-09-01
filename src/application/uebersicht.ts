@@ -32,7 +32,6 @@ import { budgetstaende, vertragsBuchungenLaden, type Budgetstand } from "./budge
 import type { BudgetSicht } from "../core";
 import type {
   BudgetRepository,
-  RuecklagenRepository,
   KategorieRepository,
   LedgerPort,
   UmsatzRepository,
@@ -49,7 +48,6 @@ export interface UebersichtDeps {
   readonly kategorieRepo: KategorieRepository;
   readonly regelRepo: ZahlungsregelRepository;
   readonly budgetRepo: BudgetRepository;
-  readonly ruecklagenRepo: RuecklagenRepository;
   readonly umsatzRepo: UmsatzRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly kontoRepo: ZahlungskontoRepository;
@@ -69,8 +67,12 @@ export interface Uebersichtsdaten {
   /** Wählbare Monate für die Budgetliste, neuester zuerst („YYYY-MM"). */
   readonly monate: readonly string[];
   /**
-   * Gibt es überhaupt Plandaten (Verträge, Budgets, Rücklagen)? Ohne sie zeigten die drei
-   * Karten Nullen, und das liest sich wie ein Datenfehler statt wie ein leerer Plan.
+   * Gibt es überhaupt Plandaten (Verträge, Budgets)? Ohne sie zeigten die drei Karten
+   * Nullen, und das liest sich wie ein Datenfehler statt wie ein leerer Plan.
+   *
+   * Die Rücklagen zählen seit 2026-09-01 NICHT mehr mit: sie haben im Ausblick keine
+   * Zeile mehr (siehe `core/monatsausblick`), und was zu keiner Zeile führt, darf auch
+   * nicht darüber entscheiden, ob die Karten überhaupt erscheinen.
    */
   readonly hatPlandaten: boolean;
   /**
@@ -119,13 +121,12 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, ruecklagen, umsaetze, vertragsBuchungen, konten] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
       deps.regelRepo.alle(),
       deps.budgetRepo.alle(),
-      deps.ruecklagenRepo.alle(),
       deps.umsatzRepo.alle(),
       vertragsBuchungenLaden(deps.zuordnungRepo),
       deps.kontoRepo.alle(),
@@ -172,7 +173,6 @@ export async function uebersichtLaden(
     ausblicke: monatsAusblicke({
       regeln: regeln.filter((r) => !r.kontoId || !nichtLiquide.has(r.kontoId)),
       budgets: liquideBudgets,
-      ruecklagen,
       ist: liquideBuchungen,
       kategorien,
       vertragsBuchungen,
@@ -183,7 +183,7 @@ export async function uebersichtLaden(
     kategorieNamen: new Map(kategorien.map((k: Kategorie) => [k.id, k.name])),
     empfaenger: empfaengerJeBuchung(umsaetze),
     monate: waehlbareMonate(fruehesterMonat(liquideBuchungen) ?? heute, dieserMonat),
-    hatPlandaten: regeln.length > 0 || budgets.length > 0 || ruecklagen.length > 0,
+    hatPlandaten: regeln.length > 0 || budgets.length > 0,
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     klassen: staendeJeKlasse(konten, buchungen),
