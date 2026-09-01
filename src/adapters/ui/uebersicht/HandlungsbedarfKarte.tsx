@@ -13,7 +13,7 @@
 //   ERWARTET  erst mit dem üblichen Verbrauch. Wer weniger ausgibt, kommt hin.
 
 import { useTranslation } from "react-i18next";
-import type { Kontovorschau, Vorschaupunkt } from "../../../application";
+import type { Kontovorschau } from "../../../application";
 import { Card, Pill } from "../bausteine";
 import { useGeld } from "../bausteine/einstellungenKontext";
 
@@ -60,11 +60,6 @@ export function HandlungsbedarfKarte({
                   </span>
                 </span>
               </div>
-              {/* Die Linie beantwortet, was die Zahl daneben nicht kann: WIE KNAPP und
-                  WIE LANGE. „Am 14. im Minus" und „ab dem 14. drei Tage knapp darunter,
-                  danach wieder im Plus" sind zwei verschiedene Lagen, und nur die eine
-                  verlangt, dass man etwas tut. */}
-              <Vorschaulinie punkte={v.verlauf} />
             </div>
           );
         })}
@@ -76,46 +71,3 @@ export function HandlungsbedarfKarte({
   );
 }
 
-/**
- * Der Verlauf als kleine Linie — durchgezogen die festen Termine, gestrichelt die
- * erwartete Lage mit dem üblichen Verbrauch.
- *
- * Keine Achsen, keine Beschriftung: sie steht neben einer Zeile, die den Tag und den
- * Betrag schon nennt, und soll die FORM zeigen, nicht Werte ablesbar machen. Eine
- * Nulllinie gibt es trotzdem — ohne sie liesse sich nicht sehen, was hier die ganze
- * Frage ist.
- *
- * Gestrichelt für das Erwartete, wie überall im Projekt für Geplantes (`Pill`-Variante
- * `plan`): der Unterschied zwischen Termin und Annahme soll man sehen, ohne die Legende
- * zu lesen.
- */
-function Vorschaulinie({ punkte }: { punkte: readonly Vorschaupunkt[] }) {
-  if (punkte.length < 2) return null;
-
-  const breite = 600;
-  const hoehe = 60;
-  const werte = punkte.flatMap((p) => [p.fest, p.erwartet]);
-  // Die Null gehört IMMER in die Spanne — sonst läge die Nulllinie ausserhalb des Bildes
-  // und die Kurve schwebte ohne Bezug.
-  const max = Math.max(...werte, 0);
-  const min = Math.min(...werte, 0);
-  const spanne = max - min || 1;
-
-  const x = (i: number) => (i * breite) / (punkte.length - 1);
-  const y = (v: number) => ((max - v) * hoehe) / spanne;
-  const pfad = (nimm: (p: Vorschaupunkt) => number) =>
-    punkte.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)} ${y(nimm(p)).toFixed(1)}`).join(" ");
-
-  return (
-    <svg
-      viewBox={`0 0 ${breite} ${hoehe}`}
-      preserveAspectRatio="none"
-      style={{ width: "100%", height: 48, marginTop: 6, display: "block" }}
-      aria-hidden="true"
-    >
-      <line x1="0" y1={y(0)} x2={breite} y2={y(0)} stroke="var(--line)" strokeWidth="2" />
-      <path d={pfad((p) => p.erwartet)} fill="none" stroke="var(--ink-3)" strokeWidth="2" strokeDasharray="6 5" />
-      <path d={pfad((p) => p.fest)} fill="none" stroke="var(--warn-deep)" strokeWidth="2.5" />
-    </svg>
-  );
-}

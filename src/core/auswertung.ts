@@ -565,13 +565,13 @@ export function vertragstreue(
  * | `vertraege` | ja | Geld geht weg |
  * | `budgets` | ja | Geld geht weg |
  * | `sonstiges` | ja | Geld geht weg |
- * | `ruecklagen` | **nein** | kalkulatorisch — sie werden NIE gebucht |
  * | `umschichtung` | **nein** | wechselt das Konto, verlässt den Bestand nicht |
  *
- * Die Rücklagenrate ist die wichtigere der beiden Ausnahmen: sie sagt, was
- * man zurücklegen SOLLTE, und kein Euro davon verlässt das Konto. Sie in eine
- * Saldo-Vorschau zu nehmen hiesse, jeden Monat eine Abbuchung zu erfinden, die nie
- * kommt — der vorhergesagte Stand liefe immer weiter unter den echten.
+ * Die Umschichtung ist die einzige Ausnahme, seit die Rücklagenzeile weg ist (2026-09-01,
+ * siehe `monatsausblick`). Sie wechselt das Konto und verlässt den Bestand nicht; sie in
+ * eine Saldo-Vorschau über ALLE Konten zu nehmen hiesse, jeden Monat eine Abbuchung zu
+ * erfinden, die es so nicht gibt — der vorhergesagte Stand liefe immer weiter unter den
+ * echten.
  */
 export const SALDOWIRKSAME_ZEILEN = ["einnahmen", "vertraege", "budgets", "sonstiges"] as const;
 

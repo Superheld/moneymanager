@@ -195,36 +195,16 @@ describe("MonatsAusblick", () => {
     expect(screen.queryByText("August 2026")).not.toBeInTheDocument();
   });
 
-  // Die Rücklage ist reine Rechnung: sie steht in beiden Spalten mit demselben Betrag und
-  // senkt „Bleibt" auch im laufenden Monat, obwohl nichts gebucht wurde.
-  it("zieht die Rücklagenrate als eigene Zeile ab", async () => {
-    rendere(<MonatsAusblick {...props({ ruecklagen: RUECKLAGEN })} />);
-    const september = await karte("September 2026");
-    expect(within(september).getByText("Rücklagen")).toBeInTheDocument();
-    expect(within(september).getByText("−120,00")).toBeInTheDocument();
-    // Ohne Rücklage blieben +1.840,00 — mit ihr 120,00 weniger.
-    expect(within(september).getByText("+1.720,00 €")).toBeInTheDocument();
-  });
-
-  it("senkt auch das Gebuchte des laufenden Monats um die Rücklage", async () => {
-    rendere(<MonatsAusblick {...props({ ruecklagen: RUECKLAGEN })} />);
-    const august = await karte("August 2026");
-    // −588,00 gebucht − 120,00 Rücklage.
-    expect(within(august).getByText("−708,00 €")).toBeInTheDocument();
-  });
-
-  it("lässt die Zeile weg, wenn es keine Rücklagen gibt", async () => {
+  /**
+   * Die Rücklagen hatten bis 2026-09-01 eine eigene Zeile: die kalkulatorische Monatsrate,
+   * in Plan und Ist mit demselben Betrag. Sie ist weg, weil Rücklagen sich seit den
+   * Umbuchungsverträgen PLANEN lassen — die geplante Umbuchung steht in der Zeile
+   * „Sparen & Vorsorge", und beides nebeneinander zählte dasselbe Zurücklegen zweimal.
+   */
+  it("zeigt keine Rücklagenzeile mehr", async () => {
     rendere(<MonatsAusblick {...props()} />);
     await screen.findByText("August 2026");
     expect(screen.queryByText("Rücklagen")).not.toBeInTheDocument();
-  });
-
-  // Einzeilig: die Aufschlüsselung steht im Bereich Rücklagen, nicht hier.
-  it("ist nicht aufklappbar", async () => {
-    rendere(<MonatsAusblick {...props({ ruecklagen: RUECKLAGEN })} />);
-    const august = await karte("August 2026");
-    const zeile = within(august).getByText("Rücklagen").closest("[role]");
-    expect(zeile).toBeNull();
   });
 
   it("schweigt über fehlende Einnahmen, sobald ein Ertrags-Vertrag existiert", async () => {
@@ -258,8 +238,9 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     const nutzer = userEvent.setup();
     await nutzer.click(screen.getAllByText("Verträge")[0]);
     expect(screen.getAllByText("Vermieter").length).toBeGreaterThan(0);
-    // Die Rücklagen kommen über ihr eigenes Repository — die Zeile steht in allen drei Karten.
-    expect(screen.getAllByText("Rücklagen")).toHaveLength(3);
+    // Und keine Rücklagenzeile: die Rücklagen werden seit 2026-09-01 geplant statt
+    // gerechnet, und die geplante Umbuchung steht unter „Sparen & Vorsorge".
+    expect(screen.queryByText("Rücklagen")).not.toBeInTheDocument();
   });
 
   it("klappt ein Budget der Liste auf und zeigt seine Buchungen", async () => {

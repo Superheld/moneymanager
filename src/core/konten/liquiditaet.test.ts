@@ -172,11 +172,9 @@ describe("liquiditaetsvorschau — die erwartete Linie", () => {
 });
 
 describe("handlungsbedarf", () => {
-  // `verlauf` bleibt hier leer: `handlungsbedarf` sortiert und filtert nur, es liest die
-  // Linie nicht. Sie mit zu erfinden hiesse, den Test an etwas zu binden, das er nicht prüft.
-  const ok = { kontoId: "a", start: 0, fest: { tiefstand: 100, tiefstandAm: HEUTE }, erwartet: { tiefstand: 50, tiefstandAm: HEUTE } , verlauf: [] };
-  const weich = { kontoId: "b", start: 0, fest: { tiefstand: 100, tiefstandAm: HEUTE }, erwartet: { tiefstand: -10, tiefstandAm: "2026-06-20", minusAb: "2026-06-20" } , verlauf: [] };
-  const hart = { kontoId: "c", start: 0, fest: { tiefstand: -50, tiefstandAm: "2026-06-25", minusAb: "2026-06-25" }, erwartet: { tiefstand: -80, tiefstandAm: "2026-06-25", minusAb: "2026-06-25" } , verlauf: [] };
+  const ok = { kontoId: "a", start: 0, fest: { tiefstand: 100, tiefstandAm: HEUTE }, erwartet: { tiefstand: 50, tiefstandAm: HEUTE }  };
+  const weich = { kontoId: "b", start: 0, fest: { tiefstand: 100, tiefstandAm: HEUTE }, erwartet: { tiefstand: -10, tiefstandAm: "2026-06-20", minusAb: "2026-06-20" }  };
+  const hart = { kontoId: "c", start: 0, fest: { tiefstand: -50, tiefstandAm: "2026-06-25", minusAb: "2026-06-25" }, erwartet: { tiefstand: -80, tiefstandAm: "2026-06-25", minusAb: "2026-06-25" }  };
 
   it("nennt nur Konten, die ins Minus laufen", () => {
     expect(handlungsbedarf([ok, weich]).map((v) => v.kontoId)).toEqual(["b"]);

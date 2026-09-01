@@ -61,6 +61,14 @@ Zwei Karten hängen daran und beantworten je eine eigene Frage:
   dauerhafte Zeile „alles in Ordnung" wäre nach zwei Wochen unsichtbar, und dann fiele
   auch die Warnung nicht mehr auf.
 
+**Die Rücklagen haben in den Monatskarten seit 2026-09-01 keine Zeile mehr.** Sie stand
+dort als kalkulatorische Monatsrate, in Plan und Ist mit demselben Betrag. Seit sich
+Rücklagen über einen **Umbuchungsvertrag planen** lassen, steht dasselbe Zurücklegen schon
+als geplante Umschichtung in der Zeile „Sparen & Vorsorge" — beides nebeneinander zählte
+es zweimal. Die Rechnung selbst gibt es weiter, im Bereich Rücklagen als *Bedarf* neben
+Plan und Ist. Aus demselben Grund zählen Rücklagen nicht mehr zu `hatPlandaten`: was zu
+keiner Zeile führt, darf nicht darüber entscheiden, ob die Karten überhaupt erscheinen.
+
 ### Die Schichten
 
 ```
@@ -358,12 +366,10 @@ Drei Dinge, die dabei Entscheidungen sind und keine Rechenschritte:
 Und die Grenze der Auskunft, die in der Karte danebensteht: **was nicht gemeldet wird, ist
 nicht „geprüft und in Ordnung", sondern „läuft im gerechneten Fenster nicht ins Minus".**
 
-**Neben jeder gemeldeten Zeile steht der Verlauf als kleine Linie** — durchgezogen die
-festen Termine, gestrichelt das Erwartete, dazu eine Nulllinie. Sie beantwortet, was die
-Zahl daneben nicht kann: WIE KNAPP und WIE LANGE. „Am 14. im Minus" und „ab dem 14. drei
-Tage knapp darunter, danach wieder im Plus" sind zwei verschiedene Lagen, und nur die eine
-verlangt, dass man etwas tut. Deshalb gibt `liquiditaetsvorschau` den ganzen Tagesverlauf
-heraus und nicht nur den Befund.
+Eine kleine Verlaufslinie stand hier vom 31.08. bis zum 01.09. daneben — sie ist wieder
+weg: über den Tiefstand und den Tag hinaus, die schon in der Zeile stehen, verriet sie
+nichts. Deshalb gibt `liquiditaetsvorschau` auch nur den BEFUND heraus und nicht den
+Tagesverlauf: was niemand anzeigt, muss auch niemand mitschleppen.
 
 #### Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
 
