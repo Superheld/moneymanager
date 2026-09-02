@@ -215,22 +215,75 @@ den nur das Kontoregister füllte — mit einer immer leeren Menge).
 weiterhin eine PROJIZIERTE Zeile im Kontoregister. Was fiel, ist allein die Ist-Seite —
 die Behauptung, eine Buchung könne einen Plan-Posten belegen.
 
-## Die Seitenleiste klappt ein
+## Mobile first — und was das heute schon heisst
 
-Unter 1100 px Fensterbreite schrumpft sie auf 68 px und zeigt nur noch Icons. Das steuert
-allein CSS (`app.css`, Abschnitt „Schmales Fenster") — kein Zustand, kein Schalter.
+Seit 2026-09-02 ist die Oberfläche darauf ausgelegt, auf einem **Handy** zu laufen. Was
+das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
 
-Der Mechanismus ist eine einzige Klasse: **was `.lbl` trägt, verschwindet dort.** Wer der
-Shell etwas hinzufügt, kapselt die Beschriftung entsprechend und hängt den Namen zusätzlich
-an `title` — schmal ist das Icon alles, was bleibt.
+- **Die Shell ist umgestellt.** In `app.css` steht die schmale Form ohne Medienabfrage da,
+  die breiten kommen per `min-width` dazu. Dasselbe gilt für `.main`, `.field` und
+  `.form-grid`.
+- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
+  (`ausblick-karten`) oder tragen sich über `auto-fit` selbst (`karten-paar`, `kpis`). Sie
+  funktionieren schmal, aber sie sind nicht dafür entworfen — eine Tabelle scrollt dort
+  waagerecht, ein Registerband ebenso. Das ist der Stand, und die Neuaufteilung kommt
+  danach.
 
-Zwei Fallen, beide schon einmal zugeschnappt:
+Vier Dinge, die bei jedem neuen Stück ab jetzt gelten und die man schmal nicht nachholen
+kann:
 
-- **Der Aktualisierungsknopf ist selbst ein `div` in der Fusszeile.** Eine pauschale Regel
-  `.side .foot > div { display: none }` nimmt ihn mit, und dann fehlt bei schmalem Fenster
-  der einzige Hinweis auf ein Update. Die Ausnahme steht wörtlich im CSS.
-- **Auskunft darf weichen, eine Handlung nicht.** Version und Stadium fallen schmal weg,
-  der Knopf bleibt. Das ist die Regel, nach der man im Zweifel entscheidet.
+- **Kein Raster ohne `min-width: 0`.** Ein Rasterkind wächst per Vorgabe mit seinem Inhalt;
+  eine breite Tabelle zieht dann die ganze Seite auf, und der Scrollrahmen der `DataTable`
+  kommt nie zum Zug.
+- **44 px Trefferfläche** für alles, was ein Finger treffen muss.
+- **Ein Eingabefeld unter 16 px lässt iOS Safari die Seite ZOOMEN**, sobald es den Fokus
+  bekommt — und zurück zoomt sie nicht. `.field` ist deshalb schmal 16 px und erst ab
+  700 px wieder 13,5.
+- **Ränder über `env(safe-area-inset-*)`**, nicht als feste Zahl. Voraussetzung dafür ist
+  `viewport-fit=cover` in `index.html`; ohne die Angabe meldet `env()` überall Null.
+
+## Die Navigation in drei Stufen
+
+| Breite | Form |
+|---|---|
+| bis 699 px | **Schublade** — links ausserhalb des Bildes, eine Kopfleiste mit Griff holt sie herein. Beschriftungen vollständig. |
+| ab 700 px | feste Spalte im Raster, 68 px, **nur Icons** |
+| ab 1100 px | dieselbe Spalte mit 248 px und Beschriftung |
+
+Der Mechanismus der mittleren Stufe ist unverändert eine einzige Klasse: **was `.lbl`
+trägt, verschwindet dort.** Wer der Shell etwas hinzufügt, kapselt die Beschriftung
+entsprechend und hängt den Namen zusätzlich an `title` — schmal ist das Icon alles, was
+bleibt.
+
+**Die mittlere Stufe steht als BEREICH da** (`min-width` und `max-width` zusammen) und
+nicht als Kette aus Setzen und Zurücknehmen. Sie ist weder der schmale noch der breite
+Fall, sondern ein eigener dazwischen; sie aus dem einen zu setzen und im anderen sieben
+Regeln lang wieder abzuräumen wäre kürzer zu schreiben und beim nächsten Anbau die Stelle,
+an der man eine Rücknahme vergisst.
+
+**Die Schublade hat einen Zustand, und das ist ein Bruch mit der alten Begründung.** Hier
+stand lange: „Ohne JavaScript und ohne Schalter — die Fensterbreite ist die Frage, die CSS
+selbst beantwortet." Das gilt für die Einklapp-Stufe weiterhin. „Ist die Schublade offen?"
+ist keine solche Frage: sie hängt an einer Handlung. Ein reines CSS-Konstrukt (Checkbox
+plus `:checked`) hätte den Zustand nur versteckt.
+
+Drei Wege schliessen sie, und alle drei sind nötig — geprüft in
+`bausteine/AppShell.test.tsx`:
+
+- **Ein gewählter Bereich.** Der wichtigste: ohne ihn steht die Schublade nach dem Wechsel
+  über dem Bereich, den sie gerade geöffnet hat, und der Erfolg der Handlung ist unsichtbar.
+- **Escape** — aber nur, wenn kein Dialog die Taste schon verbraucht hat.
+- **Der Scrim und der Knopf in der Schublade.** Beides, nicht eines: die Schublade nimmt
+  fast die ganze Breite, und der Streifen daneben liest sich nicht als Bedienteil.
+
+`visibility` fährt bei beiden mit der Überblendung mit. Das ist kein Zierrat — allein über
+`transform` bliebe die geschlossene Leiste mit der Tabulatortaste erreichbar, und allein
+über `opacity` läge ein unsichtbares Tuch über der ganzen App.
+
+**Zwei Fallen der Fusszeile bleiben wörtlich bestehen:** `.aktualisierung` ist selbst ein
+`div` und wäre von einem pauschalen `.foot > div` mit ausgeblendet — dann fehlte bei
+schmalem Fenster der einzige Hinweis auf ein Update. Und die Regel dahinter gilt allgemein:
+**Auskunft darf weichen, eine Handlung nicht.**
 
 ## Wie breit eine Seite wird
 

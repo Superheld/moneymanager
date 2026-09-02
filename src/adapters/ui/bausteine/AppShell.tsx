@@ -1,8 +1,20 @@
-// App-Shell — Sidebar + Inhaltsfläche im Design-System-Stil. Minimale Navigation
-// per State (kein Router-Dep, solange es wenige Screens sind). Aktive Screens sind
-// klickbar; spätere Bereiche (BAUPLAN P2+) sind als deaktiviert sichtbar.
+// App-Shell — Navigation und Inhaltsfläche. Minimale Navigation per State (kein
+// Router-Dep, solange es wenige Screens sind). Aktive Screens sind klickbar; spätere
+// Bereiche (BAUPLAN P2+) sind als deaktiviert sichtbar.
+//
+// **Seit 2026-09-02 mobile first.** Die Grundform ist die schmale: eine Kopfleiste mit
+// einem Griff, und die Navigation liegt als Schublade links AUSSERHALB des Bildes. Erst
+// ab 700 px rückt sie als feste Spalte ins Raster (siehe app.css, „Die Navigation in drei
+// Stufen").
+//
+// **Damit hat die Shell zum ersten Mal einen Zustand**, und das ist ein Bruch mit der
+// Begründung, die hier lange stand: die Einklapp-Stufe kommt ohne JavaScript aus, weil
+// die Fensterbreite eine Frage ist, die CSS selbst beantwortet. „Ist die Schublade
+// offen?" ist keine solche Frage — sie hängt an einer Handlung, nicht an einer Breite.
+// Ein reines CSS-Konstrukt dafür (Checkbox plus `:checked`) hätte den Zustand nur
+// versteckt und wäre für Tastatur und Screenreader eine Kaschierung geblieben.
 
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { APP_STADIUM, APP_VERSION } from "../../../version";
 import { AktualisierungKnopf } from "./AktualisierungKnopf";
@@ -58,6 +70,19 @@ const GRUPPEN: NavGroup[] = [
   },
 ];
 
+/**
+ * Der Beschriftungsschlüssel eines Bereichs — aus derselben Tabelle, aus der die
+ * Navigation lebt. Eine zweite Zuordnung „ScreenId → Titel" wäre eine Stelle mehr, die
+ * beim nächsten Bereich vergessen wird; genau darum heissen auch die Icons wie die
+ * `ScreenId`.
+ */
+function labelKeyVon(id: ScreenId): string {
+  for (const g of GRUPPEN) {
+    for (const e of g.eintraege) if (e.id === id) return e.labelKey;
+  }
+  return "shell.navUebersicht";
+}
+
 export function AppShell({
   current,
   onNavigate,
@@ -77,15 +102,69 @@ export function AppShell({
   versteckt?: readonly ScreenId[];
 }) {
   const { t } = useTranslation();
+  const [offen, setOffen] = useState(false);
+  const griff = useRef<HTMLButtonElement>(null);
+
+  // Escape schliesst die Schublade — aber nur sie: liegt ein Modal darüber, hat der
+  // oberste Dialog die Taste schon verbraucht (siehe `Modal`, `defaultPrevented`).
+  useEffect(() => {
+    if (!offen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !e.defaultPrevented) setOffen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [offen]);
+
+  /**
+   * Ein Klick auf einen Eintrag schliesst mit.
+   *
+   * Ohne das bliebe auf dem Handy die Schublade über dem Bereich stehen, den sie gerade
+   * geöffnet hat — der Erfolg der Handlung wäre unsichtbar. Der Fokus geht dabei zurück
+   * auf den Griff: er ist das Element, das nach dem Schliessen sichtbar an derselben
+   * Stelle steht.
+   */
+  const schliessen = () => {
+    setOffen(false);
+    griff.current?.focus();
+  };
+
   return (
     <div className="app">
-      <aside className="side">
+      {/* Nur schmal sichtbar. Sie trägt den Griff und den Namen des Bereichs — auf einem
+          Handy ist die Marke nicht die Auskunft, die man beim Blick nach oben braucht. */}
+      <header className="topbar">
+        <button
+          ref={griff}
+          type="button"
+          className="topbar-griff"
+          aria-label={t("shell.menueOeffnen")}
+          aria-expanded={offen}
+          aria-controls="hauptnavigation"
+          onClick={() => setOffen(true)}
+        >
+          <Icon name="menue" groesse={20} />
+        </button>
+        <span className="topbar-titel">{t(labelKeyVon(current))}</span>
+      </header>
+
+      {/* Die Fläche neben der offenen Schublade. Sie schliesst beim Antippen und ist
+          zugleich das, was die Schublade als „darüberliegend" lesbar macht. */}
+      <div className="side-scrim" data-offen={offen} onClick={schliessen} aria-hidden />
+
+      <aside className="side" id="hauptnavigation" data-offen={offen}>
         <div className="brand">
           <div className="mk">M</div>
           <div className="lbl">
             <div className="nm">Moneymanager</div>
             <div className="sub">{t("shell.brandSub")}</div>
           </div>
+          {/* Ein sichtbarer Weg zurück. Der Scrim allein reicht auf einem Handy nicht:
+              die Schublade nimmt fast die ganze Breite, und die Fläche daneben ist ein
+              Streifen, den man nicht als Bedienteil liest. */}
+          <button type="button" className="side-zu" aria-label={t("shell.menueSchliessen")} onClick={schliessen}>
+            <Icon name="verwerfen" groesse={18} />
+          </button>
         </div>
 
         {GRUPPEN.map((g) => (
@@ -105,7 +184,14 @@ export function AppShell({
                     // Eintraegen: schmal eingeklappt ist das Icon alles, was bleibt,
                     // und ein Icon ohne Namen ist ein Raetsel.
                     title={klickbar ? t(e.labelKey) : t("shell.spaeterePhase")}
-                    onClick={klickbar ? () => onNavigate(e.id!) : undefined}
+                    onClick={
+                      klickbar
+                        ? () => {
+                            onNavigate(e.id!);
+                            setOffen(false);
+                          }
+                        : undefined
+                    }
                   >
                     {e.id ? <Icon name={e.id} groesse={17} /> : <span className="dot" />}
                     <span className="lbl">{t(e.labelKey)}</span>

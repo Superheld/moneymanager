@@ -24,6 +24,11 @@ export type IconName =
   | "uebernehmen"
   | "verwerfen"
   | "oeffnen"
+  // Der Griff zur Navigation — er steht in der Kopfleiste und nicht in der Liste, und
+  // deshalb ist die Aehnlichkeit zu `einstellungen` (Schieberegler: dieselben drei
+  // Striche, mit Griffen darauf) keine Verwechslungsgefahr: die beiden stehen nie
+  // nebeneinander.
+  | "menue"
   // Die Navigation. Sie heissen wie die `ScreenId`, damit die Sidebar sie ohne
   // Umsetzungstabelle nachschlagen kann — eine Tabelle mehr waere eine Stelle mehr,
   // die beim naechsten Bereich vergessen wird.
@@ -56,6 +61,8 @@ const PFADE: Record<IconName, ReactElement> = {
   verwerfen: <><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>,
   // Pfeil nach rechts in ein Fenster
   oeffnen: <><path d="M14 4h6v6" /><path d="M20 4l-8 8" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>,
+  // Drei Striche.
+  menue: <path d="M4 7h16M4 12h16M4 17h16" />,
 
   // --- Navigation ---
   // Vier Kacheln — der Blick auf alles auf einmal.
