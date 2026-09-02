@@ -95,10 +95,29 @@ Sie liegen als `*.test.ts` **neben dem Code**, es gibt keinen Testordner —
 ### Kein E2E — und was stattdessen trägt
 
 `tauri-driver` gibt es für Linux und Windows, **nicht für macOS** (WKWebView bietet keinen
-WebDriver). Playwright gegen `npm run dev` bringt nichts: die Webview allein hat kein
-SQLite-Plugin und damit keine Daten. Es tragen zwei Ersatzwege: die jsdom-Tests laufen von
-der Oberfläche bis ins Schema, und App-Code-Pfade lassen sich headless gegen eine Lesekopie
-der echten Datenbank fahren (Rezept in `CLAUDE.local.md`).
+WebDriver). Es tragen drei Ersatzwege: die jsdom-Tests laufen von der Oberfläche bis ins
+Schema, App-Code-Pfade lassen sich headless gegen eine Lesekopie der echten Datenbank
+fahren (Rezept in `CLAUDE.local.md`), und die Oberfläche lässt sich in einem gewöhnlichen
+Browser ansehen.
+
+### `npm run vorschau` — die App im Browser
+
+`npm run dev` allein half dafür nicht: ohne die Tauri-Shell scheitert der allererste
+Aufruf (`zugang_stand`), die App bleibt im Zustand „lädt" und rendert `null` — eine
+**weisse Seite** ohne Meldung. `src/testwerkzeug/browservorschau.ts` legt deshalb eine
+Attrappe der Tauri-Naht (`window.__TAURI_INTERNALS__`) und beantwortet die Kommandos aus
+einer sql.js-Datenbank im Speicher, gefüllt mit demselben Spielstand wie `npm run seed`.
+
+`--host` gehört zum Befehl: der Zweck ist, die Oberfläche vom **Handy** aus über das eigene
+Netz aufzurufen. Kein Produktivcode wird dafür angefasst — `invoke` fragt genau dieses eine
+Objekt —, und `main.tsx` lädt die Attrappe dynamisch unter `import.meta.env.DEV`; im
+gebauten Bundle steckt weder sql.js noch der Spielstand.
+
+**Drei Grenzen, bevor man einem Befund hier glaubt:** alles liegt im Speicher (ein
+Neuladen setzt zurück), Fremdschlüssel sind aus — dieselbe blinde Stelle wie in den Tests
+—, und Verschlüsselung, Sicherungen, Bankabruf, Export und Update gibt es nicht. Ein
+Kommando, das die Attrappe nicht kennt, **wirft mit seinem Namen** statt still `undefined`
+zu liefern; sonst suchte man den Fehler im Screen.
 
 # Testdaten — erfunden, anonym, je Testfall eigen
 
