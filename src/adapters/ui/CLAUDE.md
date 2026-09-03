@@ -242,6 +242,21 @@ kann:
 - **Ränder über `env(safe-area-inset-*)`**, nicht als feste Zahl. Voraussetzung dafür ist
   `viewport-fit=cover` in `index.html`; ohne die Angabe meldet `env()` überall Null.
 
+### Das Fenster muss schmal werden duerfen
+
+`minWidth` in `src-tauri/tauri.conf.json` stand auf **920** — oberhalb der Schwelle, ab
+der die Schublade greift. Die Folge war nicht kosmetisch: die schmale Form liess sich in
+der App **gar nicht ansehen**, das Fenster ging nicht so weit zu. Sie ist jetzt 360 (die
+schmalsten Telefone), die Hoehe 480.
+
+Der alte Wert war richtig, solange die Oberflaeche unter 920 auseinanderfiel; er ist
+falsch, seit sie es nicht mehr tut. **Eine App, die mobile first sein soll und deren
+eigenes Fenster sich weigert, schmal zu werden, widerspricht sich** — und der
+Widerspruch faellt niemandem auf, weil man das Fenster einfach nicht kleiner zieht.
+
+Der Wert steckt im Bundle, nicht in der laufenden App: nach dem Aendern muss
+`npm run tauri dev` einmal neu bauen.
+
 ## Die Navigation in drei Stufen
 
 | Breite | Form |
