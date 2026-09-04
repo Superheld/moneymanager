@@ -12,6 +12,17 @@ export interface DataColumn<T = unknown> {
   sortable?: boolean;
   /** Begrenzt die Spaltenbreite; längerer Inhalt wird abgeschnitten statt umzubrechen. */
   maxWidth?: number | string;
+  /**
+   * Die Rolle dieser Spalte in der SCHMALEN Form (unter 700 px, siehe `useSchmal`):
+   * `titel` erste Zeile links, `wert` die Zahl rechts, `zweitzeile` gedämpft darunter.
+   *
+   * **Sobald EINE Spalte der Tabelle das setzt, gilt nur noch das Gesetzte** — jede
+   * Spalte ohne Angabe fällt dann schmal weg. Das ist die Stelle, an der aufgeräumt
+   * wird. Sagt keine Spalte etwas, verschiebt die Vorgabe stattdessen alles
+   * (erste Spalte = Titel, erste rechtsbündige = Wert, Rest in die zweite Zeile) und
+   * wirft nichts weg.
+   */
+  schmal?: 'titel' | 'wert' | 'zweitzeile';
 }
 export interface DataTableProps<T> {
   columns: readonly DataColumn<T>[];

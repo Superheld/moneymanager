@@ -209,6 +209,57 @@ Vorlesehilfe gar nichts, eines mit `href="#"` ein Versprechen, das die App nicht
 **`titel` ist Pflicht** und ein ganzer Satz. „Girokonto" allein sagt einer Vorlesehilfe
 nicht, dass hier etwas passiert, und dem Sehenden nicht, was.
 
+## `useSchmal` — die einzige Layout-Frage in JavaScript
+
+Sonst gilt: die Fensterbreite ist eine Frage, die CSS selbst beantwortet, und in `app.css`
+steht die schmale Form ohne Abfrage da. Das reicht, solange sich nur das AUSSEHEN ändert.
+
+Es reicht nicht, wo sich das **Markup** ändert. `DataTable` wird unter 700 px aus einer
+Tabelle mit sechs Spalten eine mit zwei, in der die übrigen Werte als zweite Zeile unter
+dem Namen stehen. **Zellen zusammenzulegen kann CSS nicht** — es kann sie nur verstecken,
+und das hiesse, ihren Inhalt wegzuwerfen statt ihn zu verschieben.
+
+Zwei Dinge, die man beim Benutzen wissen muss:
+
+- **Ohne `matchMedia` gilt BREIT.** jsdom bringt es nicht mit; ohne diesen Ausweg fiele
+  jeder Screen-Test um, und mit einer Meldung, die nach der Komponente aussieht statt nach
+  der Umgebung. Wer die schmale Form prüfen will, stellt `window.matchMedia` selbst —
+  `DataTable.test.tsx` zeigt wie.
+- **Die Schwelle steht zweimal da**, hier und in `app.css`. Eine Medienabfrage kann keine
+  CSS-Variable lesen (Spezifikation, kein Rückstand der Browser). Wer sie hebt, hebt sie an
+  beiden Stellen.
+
+Es ist `useSyncExternalStore` und nicht `useState` plus Effekt: der ERSTE Render muss schon
+stimmen, sonst zeichnet ein Telefon einmal die breite Tabelle und ersetzt sie im nächsten
+Bild.
+
+## `DataTable` schmal: zwei Spalten, und die Vorgabe wirft nichts weg
+
+Auf einem Telefon war der Scrollrahmen bisher die ganze Antwort: man sah die ersten Spalten
+und musste seitwärts schieben, um an den Betrag zu kommen — also an das, wofür man
+hingesehen hat. Schmal fällt die Tabelle deshalb auf zwei Spalten zusammen: links der
+Bezeichner mit den verschobenen Werten gedämpft darunter, rechts die eine Zahl.
+
+**Es bleibt eine Tabelle und wird keine Kartenliste.** Die Zahl steht in jeder Zeile an
+derselben Stelle, und damit bleibt das Einzige erhalten, wofür eine Tabelle da ist: eine
+Spalte hinunterlesen, ohne sie zu suchen. Aus demselben Grund bleiben die beiden
+Spaltenköpfe stehen — mit ihnen ginge sonst auch die Sortierung, und die zeigt weiterhin
+auf die ursprüngliche Spalte, nicht auf die zweite von zwei.
+
+**Die Vorgabe verschiebt, sie streicht nicht.** Ohne Angabe wird die erste Spalte zum
+Titel, die erste rechtsbündige zum Wert, und alles Übrige wandert in die zweite Zeile. Das
+sieht unaufgeräumt aus und ist Absicht: eine Spalte still fallen zu lassen wäre in einer
+Finanz-App eine gekürzte Auskunft, die niemand entschieden hat — und über zwanzig Tabellen
+tragen (noch) keine Angabe.
+
+**Aufgeräumt wird je Tabelle, über `column.schmal`** (`titel` · `wert` · `zweitzeile`).
+Sobald EINE Spalte das setzt, gilt nur noch das Gesetzte und der Rest fällt weg. Der
+Mechanismus ermöglicht das Wegräumen, er nimmt es nicht vorweg.
+
+Eine Zahl steckt darin, die man kennen muss: schmal liegt **`table-layout: fixed`** an und
+die Wertspalte ist auf `12ch` festgelegt. Ohne beides zöge ein langer Name die Tabelle
+wieder aus dem Bild — genau das Übel, gegen das die schmale Form gebaut ist.
+
 ## Zwei Fallen, die man kennen muss
 
 **`DataTable` ist die App-Fassung**, nicht die des Design-Systems: sie trägt Sortierung,
