@@ -89,7 +89,7 @@ describe("DepotKarte (Übersicht)", () => {
     // Ohne Datum ist ein Depotwert eine Behauptung ohne Zeitbezug — und je länger der
     // letzte Abruf her ist, desto weniger sagt er über heute.
     await zeige(<DepotKarte daten={daten} />);
-    expect(screen.getByText(/Stand 2026-08-20/)).toBeInTheDocument();
+    expect(screen.getByText(/Stand 20\.08\.2026/)).toBeInTheDocument();
   });
 
   it("sagt ausdrücklich, dass das nicht zu den liquiden Mitteln zählt", async () => {
@@ -99,7 +99,7 @@ describe("DepotKarte (Übersicht)", () => {
 
   it("zeigt die Veränderung zum vorletzten Stand", async () => {
     await zeige(<DepotKarte daten={daten} />);
-    expect(screen.getByText(/seit 2026-06-30/)).toBeInTheDocument();
+    expect(screen.getByText(/seit 30\.06\.2026/)).toBeInTheDocument();
   });
 
   it("listet die Positionen mit ihrem Wert", async () => {
@@ -173,7 +173,7 @@ describe("DepotAuszug (Konto)", () => {
 
   it("nennt den Stichtag zur Zahl", async () => {
     await zeige(<DepotAuszug konto={konto} sicht={sicht} />);
-    expect(screen.getByText(/2026-08-20/)).toBeInTheDocument();
+    expect(screen.getByText(/20\.08\.2026/)).toBeInTheDocument();
   });
 
   it("erklärt, warum hier keine Buchungen stehen", async () => {

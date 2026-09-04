@@ -7,7 +7,7 @@
 // Wertbetrachtung, keine Rendite. Zukäufe und Entnahmen im Zeitraum stecken mit drin und
 // sind aus den Beständen allein nicht herauszurechnen.
 
-import { useProzent } from "../bausteine/einstellungenKontext";
+import { useDatum, useProzent } from "../bausteine/einstellungenKontext";
 import { useTranslation } from "react-i18next";
 import { depotEntwicklung, type Depotsicht, type Positionszeile } from "../../../application";
 import { Card, DataTable } from "../bausteine";
@@ -24,6 +24,7 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
   const { t } = useTranslation();
   const prozent = useProzent();
   const geld = useGeld();
+  const datum = useDatum();
   const entwicklung = depotEntwicklung(sicht, von, bis);
 
   // Nur die Punkte im Zeitraum: ein Verlauf, der die ganze Reihe zeigt, beantwortet eine
@@ -97,15 +98,17 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
         entwicklung.veraenderung != null
           ? t("depot.entwicklung", {
               betrag: geld.formatMitSymbol(entwicklung.veraenderung),
-              von: entwicklung.von?.stichtag ?? von,
-              bis: entwicklung.bis?.stichtag ?? bis,
+              von: datum.mitJahr(entwicklung.von?.stichtag ?? von),
+              bis: datum.mitJahr(entwicklung.bis?.stichtag ?? bis),
             })
           : t("depot.entwicklungFehlt")
       }
     >
       {punkte.length > 1 && (
         <SaldoVerlaufChart
-          labels={punkte.map((w) => w.stichtag)}
+          // Fertig beschriftet: der Chart nimmt Zeichenketten und weiss nicht, dass es
+          // Daten sind — vorher stand das rohe ISO-Datum an der Achse.
+          labels={punkte.map((w) => datum.kurz(w.stichtag))}
           werte={punkte.map((w) => w.gesamtwert)}
           legende={t("depot.verlaufLegende")}
         />
@@ -119,7 +122,7 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
       {sicht.positionen.length > 0 && (
         <div style={{ marginTop: "var(--sp-4)" }}>
           <div className="nlbl">
-            {t("depot.positionenTitel", { datum: sicht.aktuell?.stichtag ?? "—" })}
+            {t("depot.positionenTitel", { datum: sicht.aktuell ? datum.mitJahr(sicht.aktuell.stichtag) : "—" })}
           </div>
           <DataTable columns={spalten} rows={[...sicht.positionen]} />
         </div>

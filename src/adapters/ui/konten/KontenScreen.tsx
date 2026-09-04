@@ -262,7 +262,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
   return (
     <div className="screen">
-      <PageHead title={t("konten.titel")} subtitle={t("konten.untertitel")} />
+      {/* Ohne Untertitel, und das ist eine Entscheidung: „Kontostände, gebuchte und
+          voraussichtliche Buchungen je Konto" sagte genau das, was man sieht. Was hier
+          eine AUSSAGE trägt, steht an der Karte, wo es hingehört — „Anfangsbestand +
+          bestätigte Ist-Buchungen = realer Stand". */}
+      <PageHead title={t("konten.titel")} />
 
       <Card
         title={t("konten.deineKonten")}
@@ -313,7 +317,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   z.depot ? (
                     <span
                       style={{ fontWeight: "var(--fw-bold)" }}
-                      title={t("depot.standErklaerung", { datum: z.depot.aktuell?.stichtag ?? "—" })}
+                      title={t("depot.standErklaerung", { datum: z.depot.aktuell ? datum.mitJahr(z.depot.aktuell.stichtag) : "—" })}
                     >
                       {z.depot.aktuell ? geld.format(z.depot.aktuell.gesamtwert) : "—"}
                       <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-1)" }}>

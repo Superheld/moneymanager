@@ -16,6 +16,7 @@ import { useTranslation } from "react-i18next";
 import type { Kontovorschau } from "../../../application";
 import { Card, Pill } from "../bausteine";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
+import { useSchmal } from "../bausteine/useSchmal";
 
 export function HandlungsbedarfKarte({
   bedarf,
@@ -29,6 +30,7 @@ export function HandlungsbedarfKarte({
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  const schmal = useSchmal();
   // Bis hierher stand das ISO-Datum ROH in der Karte („ab 2026-09-02"). Es ist der
   // Stand der Datenbank, nicht der einer Oberflaeche — und in einer englischen Fassung
   // haette auch eine deutsche Reihenfolge dort nichts zu suchen.
@@ -68,6 +70,29 @@ export function HandlungsbedarfKarte({
           );
         })}
       </div>
+      {/* ZWEI Raenge, zwei Absaetze — bis zum 04.09.2026 standen sie in EINEM.
+          Die Legende ERKLAERT die beiden Pillen: sie hilft beim ersten Mal und ist beim
+          zehnten Ballast, also darf sie schmal einklappen. Der Hinweis darunter
+          EINSCHRAENKT, was die Karte ueberhaupt behauptet — er bleibt auf jeder Breite
+          offen stehen. Solange beides ein Absatz war, haette jedes Wegraeumen der
+          Erklaerung die Einschraenkung mitgenommen, und die leere Karte laese sich als
+          Freigabe. */}
+      {schmal ? (
+        <details style={{ marginTop: "var(--sp-2)" }}>
+          {/* Die Frage steht ausgeschrieben da. Das ist der Unterschied zu einem Reiter,
+              hinter dem niemand etwas sucht: hier sagt der Deckel, was darunter liegt. */}
+          <summary className="muted" style={{ fontSize: "var(--fs-small)", cursor: "pointer" }}>
+            {t("uebersicht.bedarfLegendeFrage")}
+          </summary>
+          <p className="muted" style={{ fontSize: "var(--fs-small)", marginBottom: 0 }}>
+            {t("uebersicht.bedarfLegende")}
+          </p>
+        </details>
+      ) : (
+        <p className="muted" style={{ fontSize: "var(--fs-small)", marginBottom: 0 }}>
+          {t("uebersicht.bedarfLegende")}
+        </p>
+      )}
       <p className="muted" style={{ fontSize: "var(--fs-small)", marginBottom: 0 }}>
         {t("uebersicht.bedarfHinweis")}
       </p>

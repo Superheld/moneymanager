@@ -361,6 +361,44 @@ Die Regel steht ausnahmsweise als `max-width` und nicht als Grundform: die sicht
 aus der versteckten zurückzuholen kostet sieben Rücknahmen, und genau davor warnt die Regel
 zur Icon-Stufe.
 
+## Drei Ränge für jeden Text neben einer Zahl
+
+Schmal muss Text weichen, und „welcher" ist keine Geschmacksfrage. Das Kriterium ist, was
+der Text TUT:
+
+| Rang | er tut | schmal |
+|---|---|---|
+| **Einschränkung** | ändert, was die Zahl daneben bedeutet | bleibt offen stehen — nie hinter einem Deckel |
+| **Erklärung** | hilft beim ersten Mal, ist beim zehnten Ballast | darf einklappen, hinter eine ausgeschriebene Frage |
+| **Nacherzählung** | sagt, was man ohnehin sieht | weg — auf JEDER Breite |
+
+Die Ränge sind an den drei Fällen gemessen, an denen sie zuerst angewendet wurden:
+
+- **Einschränkung:** der Untertitel der Übersicht endet auf „über die verfügbaren Konten",
+  und das ist der Grund, warum dasselbe Budget hier weniger Verbrauch zeigt als im Bereich
+  Budgets. Ebenso „die Karten oben rechnen nur über die verfügbaren" an der Karte
+  *Was da ist*. Fällt so ein Satz weg, lügt die Zahl daneben — und zwar dort, wo man am
+  flüchtigsten hinsieht.
+- **Nacherzählung:** der Untertitel des Kontenbereichs lautete „Kontostände, gebuchte und
+  voraussichtliche Buchungen je Konto" und beschrieb genau das, was auf dem Bildschirm
+  steht. Er ist **ganz** weg, nicht nur schmal: was breit nichts trug, trägt schmal
+  erst recht nichts. Die Aussage, die dieser Bereich wirklich macht, steht an der Karte,
+  wo sie hingehört — „Anfangsbestand + bestätigte Ist-Buchungen = realer Stand".
+
+**Der lehrreichste Fall war der dritte, und er ist der Grund für das Kriterium überhaupt:**
+unter der Karte *Da ist etwas zu tun* standen beide Ränge in EINEM Absatz — erst was
+„sicher" und „erwartet" bedeuten (Erklärung), dann „was hier NICHT steht, läuft im
+gerechneten Fenster nicht ins Minus" (Einschränkung). Solange das ein Absatz ist, nimmt
+jedes Wegräumen der Erklärung die Einschränkung mit, **und die leere Karte liest sich
+danach als Freigabe**. Der Absatz ist deshalb geteilt, bevor überhaupt etwas eingeklappt
+wurde. Festgehalten in `uebersicht/handlungsbedarf.test.tsx`.
+
+**Warum Einklappen hier kein Rückfall in den Reiter-Fehler ist:** in der Analyse steht der
+Befund, dass niemand sucht, was hinter einem Reiter liegt — ein Reiter sagt nicht, was
+darunter ist. Ein `<summary>`, auf dem die Frage ausgeschrieben steht („Was heißen
+‚sicher' und ‚erwartet'?"), sagt es. Und eingeklappt wird nur **Meta über den Inhalt**,
+nie der Inhalt selbst.
+
 ## Wie breit eine Seite wird
 
 `.screen` deckelt bei **1280 px**, nicht mehr bei 1040. Der alte Wert war der klassische

@@ -16,7 +16,7 @@
 import { useTranslation } from "react-i18next";
 import type { Depotdaten, Depotsicht } from "../../../application";
 import { Card } from "../bausteine";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 
 /** Die Veränderung zum vorletzten Stichtag — die kürzeste Aussage über eine Richtung. */
 function seitLetztemStand(sicht: Depotsicht): { betrag: number; von: string } | undefined {
@@ -30,6 +30,7 @@ function seitLetztemStand(sicht: Depotsicht): { betrag: number; von: string } | 
 export function DepotKarte({ daten }: { daten: Depotdaten }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
 
   // Ohne Depot keine Karte: eine leere Karte mit einer Null liest sich wie ein Fehler.
   if (!daten.hatDepots) return null;
@@ -60,7 +61,7 @@ export function DepotKarte({ daten }: { daten: Depotdaten }) {
                 {s.depot.bezeichnung}
                 {s.aktuell && (
                   <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-2)" }}>
-                    {t("depot.stand", { datum: s.aktuell.stichtag })}
+                    {t("depot.stand", { datum: datum.mitJahr(s.aktuell.stichtag) })}
                   </span>
                 )}
               </span>
@@ -71,7 +72,7 @@ export function DepotKarte({ daten }: { daten: Depotdaten }) {
                     className="muted"
                     style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-2)" }}
                   >
-                    {t("depot.seit", { datum: delta.von, betrag: geld.formatMitSymbol(delta.betrag) })}
+                    {t("depot.seit", { datum: datum.mitJahr(delta.von), betrag: geld.formatMitSymbol(delta.betrag) })}
                   </span>
                 )}
               </span>

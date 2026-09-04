@@ -9,7 +9,7 @@
 // gesagt hat. Der Verlauf gehört nicht hierher, sondern in die Analyse — dieselbe Grenze
 // wie überall.
 
-import { useProzent } from "../bausteine/einstellungenKontext";
+import { useDatum, useProzent } from "../bausteine/einstellungenKontext";
 import { useTranslation } from "react-i18next";
 import type { Depotsicht, Positionszeile, Zahlungskonto } from "../../../application";
 import { Card, DataTable, Pill } from "../bausteine";
@@ -19,6 +19,7 @@ export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Dep
   const { t } = useTranslation();
   const prozent = useProzent();
   const geld = useGeld();
+  const datum = useDatum();
 
   const spalten = [
     {
@@ -116,7 +117,7 @@ export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Dep
             Datum ist eine Behauptung ohne Zeitbezug. */}
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
           {sicht.aktuell
-            ? t("depot.standErklaerung", { datum: sicht.aktuell.stichtag })
+            ? t("depot.standErklaerung", { datum: datum.mitJahr(sicht.aktuell.stichtag) })
             : t("depot.nieAbgerufen")}
         </div>
       </div>
