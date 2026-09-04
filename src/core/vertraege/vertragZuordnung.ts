@@ -251,6 +251,43 @@ export function erkennungsDiagnose(
 }
 
 /**
+ * Was traegt JEDES EINZELNE Merkmal bei?
+ *
+ * Die Diagnose oben sagt, an welcher STUFE die Kette abreisst. Sie kann aber nicht sagen,
+ * welches der Merkmale die Arbeit macht und welches nur danebensteht — und das ist der
+ * haeufigste stille Fehler in einer Regel: sie traegt zwei Merkmale, eins davon hat noch
+ * nie getroffen, und wenn die Quelle das Feld des anderen eines Tages nicht mehr liefert,
+ * faellt der Vertrag ohne Vorwarnung aus. Genau so ist es passiert, als ein Abruf das
+ * Format wechselte und die Glaeubiger-ID nicht mehr mitkam: die Regel trug daneben einen
+ * Empfaengernamen, der nie gepasst hatte, und niemand konnte das sehen.
+ *
+ * Gezaehlt wird jedes Merkmal ALLEIN und ohne die Einschraenkungen dahinter (Betrag,
+ * Zeitraum, Konto). Die Frage lautet „findet dieses Merkmal ueberhaupt etwas", nicht
+ * „wieviel bleibt am Ende uebrig" — was die Einschraenkungen wegnehmen, sagt die Diagnose.
+ * Deshalb ist die Summe der Zahlen hier auch NICHT die Trefferzahl: Merkmale sind
+ * ODER-verknuepft, dieselbe Zahlung kann von mehreren getroffen werden.
+ *
+ * Nimmt die Merkmale und nicht die ganze Regel: in der Maske werden sie bearbeitet,
+ * bevor daraus eine Regel wird.
+ */
+export interface Merkmalstreffer {
+  readonly merkmal: Erkennungsmerkmal;
+  /** Zahlungen, die dieses Merkmal fuer sich genommen trifft. */
+  readonly trifft: number;
+}
+
+export function merkmalsTreffer(
+  merkmale: readonly Erkennungsmerkmal[],
+  spuren: readonly Zahlungsspur[],
+): Merkmalstreffer[] {
+  const grund = spuren.filter((s) => s.charakter !== "Umschichtung");
+  return merkmale.map((m) => ({
+    merkmal: m,
+    trifft: grund.filter((s) => merkmalTrifft(m, s)).length,
+  }));
+}
+
+/**
  * Welche Spanne würde ALLE Zahlungen fassen, die die Merkmale treffen?
  *
  * Der Grund, warum es das gibt: die Betragsspanne ist die Stufe, an der eine Regel am

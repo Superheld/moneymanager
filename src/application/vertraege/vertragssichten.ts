@@ -12,6 +12,7 @@
 
 import {
   erkennungsDiagnose,
+  merkmalsTreffer,
   kuendigungsterminNaht,
   naechsteFaelligkeit,
   naechsterKuendigungstermin,
@@ -27,6 +28,7 @@ import {
   type Person,
   type Vertrag,
   type Erkennungsdiagnose,
+  type Merkmalstreffer,
   type Vertragserkennung,
   type Vertragskandidat,
   type Zahlungsspur,
@@ -207,6 +209,15 @@ export interface Erkennungsprobe {
   readonly treffer: readonly Zahlungsspur[];
   readonly diagnose: Erkennungsdiagnose | null;
   /**
+   * Je Merkmal, was es FUER SICH trifft — in der Reihenfolge, in der die Merkmale stehen.
+   *
+   * Gehoert in dieselbe Funktion wie Treffer und Diagnose, aus demselben Grund: es sind
+   * drei Antworten auf dieselbe Frage („woran haengt diese Regel"), und wer sie getrennt
+   * holt, holt sie irgendwann gegen verschiedene Staende. Anders als die Diagnose zaehlt
+   * das hier OHNE Betrag, Zeitraum und Konto — siehe `merkmalsTreffer` im Kern.
+   */
+  readonly proMerkmal: readonly Merkmalstreffer[];
+  /**
    * Welche Betragsspanne alle Zahlungen fassen würde, die die Merkmale treffen.
    *
    * Nur gesetzt, wenn die vorhandene Spanne tatsächlich etwas wegnimmt — sonst böte die
@@ -220,7 +231,7 @@ export function erkennungProbieren(
   regel: Vertragserkennung | null,
   spuren: readonly Zahlungsspur[],
 ): Erkennungsprobe {
-  if (!regel || regel.merkmale.length === 0) return { treffer: [], diagnose: null };
+  if (!regel || regel.merkmale.length === 0) return { treffer: [], diagnose: null, proMerkmal: [] };
   const diagnose = erkennungsDiagnose(regel, spuren);
   // Nur vorschlagen, wenn die Betragsstufe wirklich etwas wegnimmt. Bei einer Regel, die
   // ohnehin alles durchlässt, wäre der Vorschlag eine Antwort auf eine ungestellte Frage.
@@ -233,5 +244,6 @@ export function erkennungProbieren(
       .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0)),
     diagnose,
     spanne,
+    proMerkmal: merkmalsTreffer(regel.merkmale, spuren),
   };
 }

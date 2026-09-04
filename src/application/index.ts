@@ -84,6 +84,8 @@ export {
   // beim Anlegen sinnvoll voreingestellt ist. Ändern kann der Nutzer es immer.
   klasseVorschlag,
   MERKMALSHERKUENFTE,
+  // Die drei Merkmalsarten einer Erkennungsregel — die Maske bietet sie je Zeile an.
+  MERKMALSARTEN,
   RHYTHMUS_MONATE,
   // Fehler mit fachlichem Schlüssel — die UI übersetzt ihn
   FachlicherFehler,
