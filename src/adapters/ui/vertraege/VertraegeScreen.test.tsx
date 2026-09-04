@@ -467,6 +467,24 @@ describe("VertraegeScreen — Vorschläge", () => {
    * Weg zurück führt über das Nachsteuern der Obergrenze — geprüft am Bestand vorher und
    * nachher, nicht an der Anzeige.
    */
+  /**
+   * Den Bearbeiten-Dialog oeffnen und den Erkennungs-Abschnitt aufklappen.
+   *
+   * Die Erkennung stand bis 2026-09-04 hinter einem eigenen Icon in der Vertragszeile
+   * und hatte ihren eigenen Speichern-Knopf. Sie ist jetzt ein Abschnitt IM
+   * Bearbeiten-Dialog — eingeklappt, weil beim Bearbeiten meist Betrag oder Kategorie
+   * gemeint sind und die Erkennung gezielt gesucht wird.
+   */
+  async function erkennungOeffnen(nutzer: ReturnType<typeof userEvent.setup>) {
+    await nutzer.click(await screen.findByRole("button", { name: /bearbeiten/i }));
+    await nutzer.click(await screen.findByRole("button", { name: /^erkennung/i }));
+  }
+
+  /** Die Musterfelder der Merkmalsliste, in der Reihenfolge der Zeilen. */
+  function musterFelder() {
+    return screen.getAllByRole("textbox", { name: /^muster$/i });
+  }
+
   it("nimmt nach dem Weiten der Betragsspanne die teureren Zahlungen mit auf", async () => {
     await konto();
     await monatsreihe("a", "Vibora GmbH", 1650, 12);
@@ -488,6 +506,14 @@ describe("VertraegeScreen — Vorschläge", () => {
       id: "v1", anbieter: "Vibora GmbH", beginn: "2024-01-01",
       verlaengerung: "automatisch", status: "aktiv",
     });
+    // Der Vertrag braucht seine Zahlungsregel, seit die Erkennung IM Bearbeiten-Dialog
+    // steht: gespeichert wird beides zusammen, und `vertragAktualisieren` verlangt einen
+    // Betrag ueber null. Ein Vertrag ohne Regel entsteht nur hier im Test — beide
+    // Use-Cases legen immer eine an.
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-v1", bezeichnung: "Vibora GmbH", betrag: -1650, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
+    });
     await sqliteVertragserkennungRepository.speichern(standardErkennung("v1", "Vibora GmbH", 1650));
     await zuordnungenAbgleichen(vertragsAbgleichDeps);
     expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(12);
@@ -495,7 +521,7 @@ describe("VertraegeScreen — Vorschläge", () => {
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
     await screen.findByText("Vibora GmbH");
-    await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
+    await erkennungOeffnen(nutzer);
 
     const obergrenze = await screen.findByRole("textbox", { name: /betrag bis/i });
     await nutzer.clear(obergrenze);
@@ -530,11 +556,11 @@ describe("VertraegeScreen — Vorschläge", () => {
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
     await screen.findByText("Ohlert");
-    await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
+    await erkennungOeffnen(nutzer);
 
-    // Das Feld trägt die Vorbelegung mit Stern …
-    const empfaenger = await screen.findByRole("textbox", { name: /^empfänger$/i });
-    expect(empfaenger).toHaveValue("ohlert*");
+    // Die eine Zeile trägt die Vorbelegung mit Stern …
+    await waitFor(() => expect(musterFelder()).toHaveLength(1));
+    expect(musterFelder()[0]).toHaveValue("ohlert*");
     // … und deshalb gibt es nichts zu ergänzen.
     expect(screen.queryByRole("button", { name: /als Empfänger aufnehmen/i })).toBeNull();
   });
@@ -555,11 +581,14 @@ describe("VertraegeScreen — Vorschläge", () => {
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
     await screen.findByText("Ohlert");
-    await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
+    await erkennungOeffnen(nutzer);
 
     const angebot = await screen.findByRole("button", { name: /als Empfänger aufnehmen/i });
     await nutzer.click(angebot);
-    expect(await screen.findByRole("textbox", { name: /^empfänger$/i })).toHaveValue("vibora\nohlert*");
+    // Eine ZWEITE Zeile, nicht eine zweite Zeile im selben Feld: die Merkmale sind eine
+    // Liste, und jedes trägt seine eigene Art und seine eigene Trefferzahl.
+    await waitFor(() => expect(musterFelder()).toHaveLength(2));
+    expect(musterFelder()[1]).toHaveValue("ohlert*");
   });
 
   /**
@@ -580,6 +609,14 @@ describe("VertraegeScreen — Vorschläge", () => {
     // von sich aus einen anhängt. Gebraucht wird hier die enge Ausgangslage, damit die
     // Änderung durch die Maske überhaupt etwas bewegt; wäre sie aus der Vorbelegung
     // geborgt, prüfte der Test ab dem nächsten Wechsel der Vorbelegung nichts mehr.
+    // Der Vertrag braucht seine Zahlungsregel, seit die Erkennung IM Bearbeiten-Dialog
+    // steht: gespeichert wird beides zusammen, und `vertragAktualisieren` verlangt einen
+    // Betrag ueber null. Ein Vertrag ohne Regel entsteht nur hier im Test — beide
+    // Use-Cases legen immer eine an.
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-v1", bezeichnung: "Petrossen Bonn", betrag: -5000, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
+    });
     await sqliteVertragserkennungRepository.speichern({
       ...standardErkennung("v1", "Petrossen Bonn", 5000),
       merkmale: [{ art: "empfaenger", muster: "petrossen bonn" }],
@@ -591,11 +628,11 @@ describe("VertraegeScreen — Vorschläge", () => {
     const nutzer = userEvent.setup();
     rendere(<VertraegeScreen />);
     await screen.findByText("Petrossen Bonn");
-    await nutzer.click(await screen.findByRole("button", { name: /erkennung/i }));
+    await erkennungOeffnen(nutzer);
 
-    const empfaenger = await screen.findByRole("textbox", { name: /^empfänger$/i });
-    await nutzer.clear(empfaenger);
-    await nutzer.type(empfaenger, "petrossen bonn*");
+    const [muster] = musterFelder();
+    await nutzer.clear(muster);
+    await nutzer.type(muster, "petrossen bonn*");
 
     const speichern = screen.getAllByRole("button", { name: /speichern/i });
     await nutzer.click(speichern[speichern.length - 1]);
@@ -606,6 +643,80 @@ describe("VertraegeScreen — Vorschläge", () => {
     // Und das Merkmal steht als Empfänger in der Regel, nicht als Gläubiger-ID.
     const [regel] = await sqliteVertragserkennungRepository.alle();
     expect(regel.merkmale).toEqual([{ art: "empfaenger", muster: "petrossen bonn*" }]);
+  });
+
+  /**
+   * Ein Vertrag, dessen Regel ZWEI Merkmale traegt, von denen nur eines je gearbeitet
+   * hat: der Empfaenger im Auszug heisst anders als der Vertrag, die Zuordnung haengt
+   * allein an der Glaeubiger-ID. Genau dieser Zustand hat einen echten Vertrag ohne
+   * Meldung ausfallen lassen, als ein Abruf das Format wechselte und die ID nicht mehr
+   * mitkam — und an der alten Maske war er nicht zu sehen: zwei Muster untereinander,
+   * beide sahen gleich gueltig aus.
+   */
+  async function vertragMitTotemMerkmal() {
+    await konto();
+    for (let i = 0; i < 3; i++) {
+      const id = `o2-${i}`;
+      const datum = tagVor(i * 30);
+      await sqliteLedgerRepository.speichern({
+        id, datum, betrag: -4678, kontoId: "k1", charakter: "Aufwand", quelle: "import",
+      });
+      await sqliteUmsatzRepository.anlegen({
+        id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
+        betrag: -4678, waehrung: "EUR", gegenpartei: "MOBILFUNK GMBH",
+        glaeubigerId: "DE99ZZZ00000000001", verwendungszweck: "",
+        rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
+      });
+    }
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Zweitfunk", beginn: "2024-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-v1", bezeichnung: "Zweitfunk", betrag: -4678, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
+    });
+    await sqliteVertragserkennungRepository.speichern({
+      vertragId: "v1",
+      merkmale: [
+        { art: "empfaenger", muster: "zweitfunk*" },
+        { art: "glaeubigerId", muster: "DE99ZZZ00000000001" },
+      ],
+    });
+  }
+
+  it("sagt an jeder Zeile, welches Merkmal noch nie getroffen hat", async () => {
+    await vertragMitTotemMerkmal();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Zweitfunk");
+    await erkennungOeffnen(nutzer);
+
+    await waitFor(() => expect(musterFelder()).toHaveLength(2));
+    // Der Empfaengername findet nichts — die Regel haengt allein an der ID.
+    expect(await screen.findByText(/trifft nie/i)).toBeInTheDocument();
+    expect(screen.getByText("3×")).toBeInTheDocument();
+  });
+
+  it("entfernt ein Merkmal und speichert die Regel ohne es", async () => {
+    await vertragMitTotemMerkmal();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Zweitfunk");
+    await erkennungOeffnen(nutzer);
+
+    await waitFor(() => expect(musterFelder()).toHaveLength(2));
+    const [entfernen] = screen.getAllByRole("button", { name: /merkmal entfernen/i });
+    await nutzer.click(entfernen);
+    await waitFor(() => expect(musterFelder()).toHaveLength(1));
+
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const [regel] = await sqliteVertragserkennungRepository.alle();
+      expect(regel.merkmale).toEqual([{ art: "glaeubigerId", muster: "DE99ZZZ00000000001" }]);
+    });
   });
 
   /**

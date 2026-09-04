@@ -1794,19 +1794,33 @@ const de = {
     zusammenKuendigungsfrist: "Frist {{monate}} Monate",
     zusammenKeineVerlaengerung: "keine Verlängerung",
     regel: {
-      zweck: "Verwendungszweck",
-      zweckHinweis: "Bleibt normalerweise leer — ein Vertrag hängt am Empfänger. Nützlich, wenn der Empfänger nichts hergibt: eine Dauerüberweisung an eine Privatperson, bei der nur der Zweck sagt, worum es geht. Ein Muster je Zeile, * als Platzhalter.",
       spanneAnpassen: "Betragsspanne auf {{von}} bis {{bis}} setzen — dann fallen keine Zahlungen mehr durch",
-      aktion: "Erkennung",
-      titel: "Woran wird dieser Vertrag erkannt?",
+      abschnitt: "Erkennung",
+      umbuchungHinweis:
+        "Ein Umbuchungsvertrag wird am WEG erkannt — Konto → Zielkonto, mit Charakter Umschichtung —, nicht am Empfänger. Bei einer Zahlung zwischen zwei eigenen Konten steht dort je nach Bank die eigene IBAN, der eigene Name oder gar nichts. Deshalb gibt es hier keine Merkmale einzustellen.",
+      zusammen: "Merkmale: {{merkmale}} · Treffer: {{count}}",
+      merkmale: "Merkmale",
+      merkmaleHinweis:
+        "Mindestens eines muss passen — sie sind ODER-verknüpft. Groß-/Kleinschreibung egal, * ist der Platzhalter. Ein Muster muss den GANZEN Wert abdecken: „*ard*“ trifft „Südwestrundfunk ARD ZDF“, „ard“ allein nur einen Empfänger, der genau so heißt. Die Zahl je Zeile sagt, wie viele Zahlungen dieses Muster für sich allein trifft.",
+      merkmalArt: "Art des Merkmals",
+      merkmalMuster: "Muster",
+      art: {
+        empfaenger: "Empfänger",
+        glaeubigerId: "Gläubiger-ID",
+        verwendungszweck: "Verwendungszweck",
+      },
+      merkmalHinzufuegen: "Merkmal hinzufügen",
+      merkmalEntfernen: "Merkmal entfernen",
+      merkmalTrifft: "{{count}}×",
+      merkmalTrifftNie: "trifft nie",
+      merkmalTrifftNieHinweis:
+        "Dieses Muster hat in keiner Zahlung gepasst. Die Regel hängt damit allein an den übrigen Merkmalen — fällt deren Feld einmal aus, greift der Vertrag ohne Meldung nicht mehr.",
+      ohneMerkmale: "Kein Merkmal — so ordnet die Regel nichts zu.",
+      musterPlatzhalter: "z. B. name*",
+      entstehtBeimSpeichern:
+        "Die Erkennung entsteht beim Speichern aus Anbieter und Betrag. Danach steht sie hier und lässt sich nachsteuern.",
       hinweis:
         "Nach diesen Regeln ordnet die App gebuchte Zahlungen diesem Vertrag zu — auch die, die erst noch kommen. Was du hier änderst, wirkt sofort auf den ganzen Bestand. Von Hand gesetzte Zuordnungen bleiben davon unberührt.",
-      empfaenger: "Empfänger",
-      empfaengerHinweis:
-        "Ein Muster je Zeile. Groß-/Kleinschreibung egal; verglichen wird mit dem Namen aus dem Auszug UND seiner vereinfachten Form (ohne Rechtsform und Satzzeichen). Das Muster muss den GANZEN Namen abdecken — deshalb braucht ein Wort mitten im Namen Sterne auf beiden Seiten: „*ard*“ trifft „Südwestrundfunk ARD ZDF“, „ard“ allein nur einen Empfänger, der genau so heißt.",
-      glaeubiger: "SEPA-Gläubiger-ID",
-      glaeubigerHinweis:
-        "Eine ID je Zeile. Nur bei Lastschrift vorhanden, dafür eindeutig — sie schlägt bei mehreren Treffern den Empfängernamen. * ist auch hier erlaubt.",
       nameHinzufuegen: "„{{name}}“ als Empfänger aufnehmen",
       betragVon: "Betrag ab",
       betragBis: "Betrag bis",
@@ -3655,19 +3669,33 @@ const en: typeof de = {
     zusammenKuendigungsfrist: "notice {{monate}} months",
     zusammenKeineVerlaengerung: "no renewal",
     regel: {
-      zweck: "Payment reference",
-      zweckHinweis: "Usually stays empty — a contract hangs off the payee. Useful when the payee says nothing: a standing order to a private person where only the reference tells you what it is. One pattern per line, * as wildcard.",
       spanneAnpassen: "Set the amount range to {{von}} – {{bis}} so no payments fall through",
-      aktion: "Matching",
-      titel: "How is this contract matched?",
+      abschnitt: "Matching",
+      umbuchungHinweis:
+        "An internal transfer contract is matched by its ROUTE — account → target account, character Umschichtung — not by the payee. On a transfer between two of your own accounts the payee field holds your own IBAN, your own name or nothing at all, depending on the bank. There are therefore no features to set here.",
+      zusammen: "Features: {{merkmale}} · Matches: {{count}}",
+      merkmale: "Features",
+      merkmaleHinweis:
+        "At least one has to match — they are OR-linked. Case-insensitive, * is the wildcard. A pattern must cover the WHOLE value: \"*ard*\" matches \"Suedwestrundfunk ARD ZDF\", while \"ard\" alone only matches a payee called exactly that. The number on each row says how many payments that pattern matches on its own.",
+      merkmalArt: "Feature type",
+      merkmalMuster: "Pattern",
+      art: {
+        empfaenger: "Payee",
+        glaeubigerId: "Creditor ID",
+        verwendungszweck: "Payment reference",
+      },
+      merkmalHinzufuegen: "Add feature",
+      merkmalEntfernen: "Remove feature",
+      merkmalTrifft: "{{count}}×",
+      merkmalTrifftNie: "never matches",
+      merkmalTrifftNieHinweis:
+        "This pattern has not matched a single payment. The rule therefore rests on the remaining features alone — if their field ever stops arriving, the contract silently stops matching.",
+      ohneMerkmale: "No feature — the rule links nothing.",
+      musterPlatzhalter: "e.g. name*",
+      entstehtBeimSpeichern:
+        "Matching is created on save, from the provider name and the amount. After that it appears here and can be adjusted.",
       hinweis:
         "These rules decide which posted payments are linked to this contract — including future ones. Changes take effect immediately across the whole ledger. Links you set by hand are left alone.",
-      empfaenger: "Payee",
-      empfaengerHinweis:
-        "One pattern per line. Case-insensitive; matched against the name as it appears on the statement AND its simplified form (no legal form or punctuation). The pattern must cover the WHOLE name — a word in the middle therefore needs stars on both sides: \"*ard*\" matches \"Suedwestrundfunk ARD ZDF\", while \"ard\" alone only matches a payee called exactly that.",
-      glaeubiger: "SEPA creditor ID",
-      glaeubigerHinweis:
-        "One ID per line. Only present on direct debits, but unambiguous — it beats the payee name when several rules match. * works here too.",
       nameHinzufuegen: "Add \"{{name}}\" as a payee",
       betragVon: "Amount from",
       betragBis: "Amount to",

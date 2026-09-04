@@ -8,6 +8,7 @@
 import { describe, expect, it } from "vitest";
 import {
   erkennungsDiagnose,
+  merkmalsTreffer,
   istMerkmalsart,
   MERKMALSARTEN,
   passtZu,
@@ -262,6 +263,67 @@ describe("zuordnungAbgleich", () => {
     const { setzen, entfernen } = zuordnungAbgleich([vibora], spuren, bestand);
     expect(setzen).toEqual([]);
     expect(entfernen).toEqual([]);
+  });
+});
+
+describe("merkmalsTreffer", () => {
+  /**
+   * Der Fall, aus dem diese Funktion entstanden ist: eine Regel traegt zwei Merkmale,
+   * und nur eines von beiden arbeitet. Der Empfaengername im Auszug lautet
+   * „TELEFONICA…", der Vertrag heisst „O2" — das Namensmuster hat NIE getroffen, die
+   * Zuordnung hing immer allein an der Glaeubiger-ID. Faellt die aus (anderes
+   * Abrufformat, anderer Beleg), hoert der Vertrag ohne jede Meldung auf zu greifen,
+   * und an der Regel war das nicht zu sehen: zwei Muster, beide sahen gueltig aus.
+   */
+  const spuren: Zahlungsspur[] = [
+    { id: "1", datum: "2026-06-27", betrag: -4678, gegenpartei: "MOBILFUNK GMBH", glaeubigerId: "DE99ZZZ00000000001", charakter: "Aufwand", kontoId: "giro" },
+    { id: "2", datum: "2026-07-27", betrag: -4678, gegenpartei: "MOBILFUNK GMBH", glaeubigerId: "DE99ZZZ00000000001", charakter: "Aufwand", kontoId: "giro" },
+    { id: "3", datum: "2026-07-01", betrag: -9000, gegenpartei: "Tagesgeldkonto", charakter: "Umschichtung", kontoId: "giro" },
+  ];
+
+  it("zeigt je Merkmal, was es fuer sich allein trifft", () => {
+    const treffer = merkmalsTreffer(
+      [
+        { art: "empfaenger", muster: "o2*" },
+        { art: "glaeubigerId", muster: "DE99ZZZ00000000001" },
+      ],
+      spuren,
+    );
+    // Das Namensmuster ist eine Null — genau die Auskunft, die vorher niemand hatte.
+    expect(treffer[0].trifft).toBe(0);
+    expect(treffer[1].trifft).toBe(2);
+  });
+
+  it("laesst Umschichtungen aussen vor — dieselbe Grundmenge wie die Diagnose", () => {
+    const [treffer] = merkmalsTreffer([{ art: "empfaenger", muster: "*" }], spuren);
+    expect(treffer.trifft).toBe(2);
+  });
+
+  /**
+   * Die Zahlen sind KEINE Aufteilung der Treffer: Merkmale sind ODER-verknuepft,
+   * dieselbe Zahlung kann von mehreren getroffen werden. Wer sie summiert, zaehlt
+   * doppelt — deshalb steht die Trefferzahl der Regel getrennt daneben.
+   */
+  it("zaehlt dieselbe Zahlung bei jedem Merkmal, das sie trifft", () => {
+    const treffer = merkmalsTreffer(
+      [
+        { art: "empfaenger", muster: "mobilfunk*" },
+        { art: "glaeubigerId", muster: "DE99ZZZ00000000001" },
+      ],
+      spuren,
+    );
+    expect(treffer.map((x) => x.trifft)).toEqual([2, 2]);
+  });
+
+  it("gibt die Merkmale in der Reihenfolge zurueck, in der sie stehen", () => {
+    const treffer = merkmalsTreffer(
+      [
+        { art: "glaeubigerId", muster: "DE99ZZZ00000000001" },
+        { art: "empfaenger", muster: "o2*" },
+      ],
+      spuren,
+    );
+    expect(treffer.map((x) => x.merkmal.art)).toEqual(["glaeubigerId", "empfaenger"]);
   });
 });
 
