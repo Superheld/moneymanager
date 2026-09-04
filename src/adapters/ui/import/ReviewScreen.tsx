@@ -46,7 +46,7 @@ import { BuchungDetail } from "../buchung/BuchungDetail";
 import { Button, Card, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
 
@@ -93,14 +93,10 @@ function Herkunft({ umsatz, kontext }: { umsatz: Umsatz; kontext: Vorschlagskont
   );
 }
 
-function ddmmyyyy(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
-}
-
 export function ReviewScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
 
   const [umsaetze, setUmsaetze] = useState<Umsatz[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
@@ -537,7 +533,7 @@ export function ReviewScreen() {
                       />
                     </td>
                   )}
-                  <td style={td}>{ddmmyyyy(u.buchungstag)}</td>
+                  <td style={td}>{datum.mitJahr(u.buchungstag)}</td>
                   <td style={{ ...td, color: "var(--ink-3)" }}>{kontoName.get(u.zahlungskontoId) ?? "—"}</td>
                   <td style={td}>
                     <div style={{ fontWeight: "var(--fw-bold)" }}>{u.gegenpartei}</div>
@@ -613,7 +609,7 @@ export function ReviewScreen() {
                 <tbody>
                   {weggelegte.map((u) => (
                     <tr key={u.id}>
-                      <td style={td}>{ddmmyyyy(u.buchungstag)}</td>
+                      <td style={td}>{datum.mitJahr(u.buchungstag)}</td>
                       <td style={{ ...td, color: "var(--ink-3)" }}>{kontoName.get(u.zahlungskontoId) ?? "—"}</td>
                       <td style={td}>{u.gegenpartei}</td>
                       <td style={{ ...td, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(u.betrag) }}>

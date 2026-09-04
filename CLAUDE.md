@@ -837,7 +837,8 @@ Ausweg lässt, wird abgeschaltet statt umgangen, und dann ist er ganz weg.
 
 ```bash
 npm run tauri dev   # Desktop-Fenster
-npm run dev         # nur Frontend (Webview ohne SQLite-Plugin — hat keine Daten)
+npm run dev         # nur Frontend (ohne Tauri-Naht: weisse Seite, siehe `vorschau`)
+npm run vorschau    # dasselbe MIT Attrappe und Spielstand, im Netz — fuer den Blick aufs Handy
 npm test            # Vitest: Kern, Use-Cases, Repositories, UI, Schichtgrenzen
 npm run test:rust   # die wenigen Rust-Tests der Shell (Dateirechte) — laufen NICHT in `npm test`
 npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 %)

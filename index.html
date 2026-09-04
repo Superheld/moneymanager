@@ -2,7 +2,10 @@
 <html lang="de">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- `viewport-fit=cover` ist die Voraussetzung dafuer, dass `env(safe-area-inset-*)`
+         in app.css ueberhaupt einen Wert meldet: ohne sie endet die Seite vor der
+         Einkerbung, und die Kopfleiste laege trotzdem unter der Uhr. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Moneymanager</title>
   </head>
 

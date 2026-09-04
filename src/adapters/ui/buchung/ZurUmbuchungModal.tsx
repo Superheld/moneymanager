@@ -12,9 +12,8 @@ import { buchungenPaaren, gegenbeinErzeugen } from "../../dienste";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Button } from "../bausteine";
 import { Modal } from "../bausteine/Modal";
-import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
+import { fehlerNachricht, useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
-import { ddmm } from "./ddmm";
 
 /**
  * S-1 — macht aus einer bestehenden Buchung eine Umbuchung. EIN Dialog für beide Fälle:
@@ -25,6 +24,7 @@ import { ddmm } from "./ddmm";
 export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen, kontoName, umsatzByIst, onClose, onSaved }: { buchung: IstBuchung; konten: Zahlungskonto[]; onlineKonten: ReadonlySet<string>; alleBuchungen: IstBuchung[]; kontoName: Map<string, string>; umsatzByIst: Map<string, Umsatz>; onClose: () => void; onSaved: () => void }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
   const kandidaten = useMemo(() => paarungsKandidaten(alleBuchungen, buchung), [alleBuchungen, buchung]);
   // Erzeugt wird nur auf Konten ohne Bankverbindung — siehe `gegenbeinErzeugen`. Die
   // Gegenbuchungen darüber sind davon nicht betroffen: die existieren schon.
@@ -73,7 +73,7 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
       {/* Die Buchung, um die es geht */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", marginBottom: "var(--sp-4)" }}>
         <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
-          {ddmm(buchung.datum)} · {kandidatLabel(buchung) || kontoName.get(buchung.kontoId) || ""}
+          {datum.ohneJahr(buchung.datum)} · {kandidatLabel(buchung) || kontoName.get(buchung.kontoId) || ""}
         </span>
         <span className="num" style={{ fontWeight: 700, color: geldFarbe(buchung.betrag) }}>
           {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
@@ -89,7 +89,7 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
         kandidaten.map((k) => (
           <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
             <input type="radio" name="gegenbein" value={k.id} checked={wahl === k.id} onChange={() => setWahl(k.id)} style={{ accentColor: "var(--accent-deep)" }} />
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(k.datum)}</span>
+            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datum.ohneJahr(k.datum)}</span>
             <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
               {kontoName.get(k.kontoId) ?? "?"}
               {kandidatLabel(k) && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{kandidatLabel(k)}</span>}

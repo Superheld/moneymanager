@@ -23,20 +23,147 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* ============================================================
+   Die Navigation in drei Stufen — mobile first.
+
+   Die GRUNDFORM ist die schmale, und das ist seit 2026-09-02 wörtlich zu nehmen: was
+   ohne Medienabfrage dasteht, gilt auf dem Handy. Die beiden breiteren Stufen kommen
+   per `min-width` dazu.
+
+     bis 699 px   Schublade — die Leiste liegt links AUSSERHALB des Bildes, eine
+                  Kopfleiste mit Griff holt sie herein. Beschriftungen sind hier
+                  vollständig da: eine Schublade hat Platz, ein Streifen nicht.
+     ab 700 px    feste Spalte im Raster, 68 px, nur Icons.
+     ab 1100 px   dieselbe Spalte mit 248 px und Beschriftung.
+
+   **Die mittlere Stufe steht als BEREICH da** (`min-width` und `max-width` zusammen) und
+   nicht als Kette aus Setzen und Zurücknehmen. Der Icon-Streifen ist weder der schmale
+   noch der breite Fall, sondern ein eigener dazwischen; ihn aus dem einen zu setzen und
+   im anderen sieben Regeln lang wieder abzuräumen wäre kürzer zu schreiben und beim
+   nächsten Anbau die Stelle, an der man eine Rücknahme vergisst.
+
+   Warum es die mittlere Stufe überhaupt gibt: 248 px sind bei einem breiten Fenster ein
+   Viertel und bei einem schmalen ein Drittel. Eingeklappt bleibt die Navigation
+   vollständig erreichbar — sie kostet nur keinen Platz mehr, den der Inhalt braucht.
+   ============================================================ */
 .app {
   display: grid;
-  grid-template-columns: 248px 1fr;
+  grid-template-columns: 1fr;
+  /* Kopfleiste, darunter der Inhalt. Ab 700 px wird daraus wieder eine einzige Zeile. */
+  grid-template-rows: auto 1fr;
+  /* `dvh` statt `vh`: auf einem Handy zählt `vh` die Adressleiste mit, und die Seite
+     ist dann höher als das, was man sieht — die letzte Zeile liegt unter dem Rand.
+     `vh` bleibt als Rückfall für Browser ohne `dvh` davor stehen. */
   height: 100vh;
+  height: 100dvh;
+}
+
+/* --- Die Kopfleiste: nur schmal, und dort das Einzige, was immer sichtbar ist --- */
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  /* Die Einkerbung oben (Notch, Statusleiste) gehört zur Polsterung, nicht zum Inhalt.
+     Ohne `env()` liegt der Griff unter der Uhr. */
+  padding-top: calc(var(--sp-2) + env(safe-area-inset-top));
+  padding-bottom: var(--sp-2);
+  padding-left: calc(var(--sp-3) + env(safe-area-inset-left));
+  padding-right: calc(var(--sp-3) + env(safe-area-inset-right));
+}
+/* 44 px sind die Trefferfläche, die ein Finger braucht — das Icon darin ist 20.
+   Der negative Rand zieht das ICON auf die Fluchtlinie des Inhalts, ohne die Fläche
+   zu beschneiden. */
+.topbar-griff {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-left: -10px;
+  border: none;
+  background: none;
+  color: var(--ink-2);
+  border-radius: var(--r-md);
+  cursor: pointer;
+}
+.topbar-griff:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.topbar-titel {
+  font-weight: var(--fw-bold);
+  letter-spacing: var(--ls-h);
+}
+
+/* --- Die Fläche neben der offenen Schublade ---
+   Sie schliesst beim Antippen und macht die Schublade als „darüberliegend" lesbar.
+   `visibility` wird mit überblendet, damit die geschlossene Fläche keine Klicks mehr
+   abfängt — allein über `opacity` läge ein unsichtbares Tuch über der ganzen App. */
+.side-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: oklch(0.3 0.02 60 / 0.34);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.22s ease, visibility 0.22s;
+}
+.side-scrim[data-offen="true"] {
+  opacity: 1;
+  visibility: visible;
 }
 
 /* --- Sidebar --- */
 .side {
   background: var(--surface);
   border-right: 1px solid var(--line);
-  padding: var(--sp-6) var(--sp-5);
+  padding: var(--sp-5);
+  padding-bottom: calc(var(--sp-5) + env(safe-area-inset-bottom));
   display: flex;
   flex-direction: column;
   gap: var(--sp-5);
+
+  /* Schmal ist sie eine Schublade: aus dem Fluss heraus, links neben dem Bild geparkt.
+     `visibility` fährt mit — sonst bliebe die geschlossene Leiste mit der Tabulatortaste
+     erreichbar, und man tabbte in etwas hinein, das niemand sieht. Sie wechselt erst am
+     ENDE der Überblendung (so interpoliert CSS sie), die Leiste fährt also sichtbar
+     hinaus statt zu verschwinden. */
+  position: fixed;
+  inset: 0 auto 0 0;
+  z-index: 41;
+  width: min(300px, 86vw);
+  overflow-y: auto;
+  transform: translateX(-100%);
+  visibility: hidden;
+  box-shadow: var(--shadow-pop);
+  transition: transform 0.22s ease, visibility 0.22s;
+}
+.side[data-offen="true"] {
+  transform: none;
+  visibility: visible;
+}
+@media (prefers-reduced-motion: reduce) {
+  .side,
+  .side-scrim {
+    transition: none;
+  }
+}
+
+/* Der sichtbare Weg zurück. Der Scrim allein reicht nicht: die Schublade nimmt fast die
+   ganze Breite, und der Streifen daneben liest sich nicht als Bedienteil. */
+.side-zu {
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  color: var(--ink-3);
+  cursor: pointer;
 }
 
 .brand {
@@ -82,6 +209,9 @@ body {
   align-items: center;
   gap: var(--sp-3);
   padding: 9px 11px;
+  /* Schmal ist das eine Zeile, die ein Finger treffen muss. Beide breiteren Stufen
+     nehmen es zurueck: dort zeigt eine Maus. */
+  min-height: 44px;
   border-radius: var(--r-md);
   font-size: var(--fs-sm);
   font-weight: var(--fw-semi);
@@ -171,7 +301,19 @@ body {
 /* --- Main --- */
 .main {
   overflow: auto;
-  padding: var(--pad-screen);
+  /* Schmal knapp, ab 700 px die Bildschirmrinne: 40 px links und rechts sind auf einem
+     Handy ein Fuenftel der Breite. */
+  padding: var(--sp-4);
+  padding-bottom: calc(var(--sp-4) + env(safe-area-inset-bottom));
+  /* Ein Rasterkind waechst per Vorgabe mit seinem Inhalt (`min-width: auto`). Eine
+     breite Tabelle zieht sonst die ganze Spalte auf und mit ihr die Seite — der
+     Scrollrahmen der `DataTable` kaeme nie zum Zug. */
+  min-width: 0;
+}
+@media (min-width: 700px) {
+  .main {
+    padding: var(--pad-screen);
+  }
 }
 /* Die Inhaltsbreite.
  *
@@ -214,6 +356,36 @@ body {
   letter-spacing: var(--ls-tight);
   margin: 0;
 }
+
+/* Schmal steht der Bereichsname schon in der Kopfleiste — zwei Zentimeter darueber.
+ *
+ * Auf 400 px sind zwei Ueberschriften desselben Wortes die ersten hundert Pixel der
+ * Seite, und die Kopfleiste ist die bessere von beiden: sie bleibt stehen, waehrend
+ * `.main` scrollt, und beantwortet „wo bin ich" auch weiter unten. Die `h1` beantwortet
+ * sie nur ganz oben.
+ *
+ * Sie wird deshalb nur fuer AUGEN entfernt und bleibt fuer Vorlesehilfen stehen: eine
+ * Seite ohne `h1` haette keine Gliederung mehr, und die Kopfleiste traegt einen `span`,
+ * keine Ueberschrift. Der Untertitel bleibt sichtbar — er traegt an mehreren Stellen die
+ * Einschraenkung, die die Zahlen darunter ehrlich haelt.
+ *
+ * Und WARUM hier ausnahmsweise `max-width` steht, wo sonst die schmale Form die Grundform
+ * ist: die sichtbare `h1` aus der versteckten zurueckzuholen kostet sieben Ruecknahmen
+ * (position, width, height, margin, overflow, clip-path, white-space). Genau davor warnt
+ * die Regel zur Icon-Stufe — eine Kette aus Setzen und Zuruecknehmen ist die Stelle, an
+ * der man beim naechsten Anbau eine Ruecknahme vergisst. */
+@media (max-width: 699.98px) {
+  .phead h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 .phead .psub {
   color: var(--ink-3);
   font-size: var(--fs-sm);
@@ -233,10 +405,19 @@ body {
   border: 1px solid var(--line);
   border-radius: var(--r-sm);
   padding: 10px 12px;
-  font-size: 13.5px;
+  /* 16 px sind hier keine Geschmacksfrage: iOS Safari ZOOMT die Seite, sobald ein Feld
+     mit kleinerer Schrift den Fokus bekommt, und zoomt danach nicht von selbst zurueck.
+     Aus einem angetippten Feld wird so ein verschobenes Bild. Ab 700 px gilt wieder
+     der Formularschriftgrad des Designs. */
+  font-size: 16px;
   font-family: var(--font-ui);
   color: var(--ink);
   background: var(--surface);
+}
+@media (min-width: 700px) {
+  .field {
+    font-size: 13.5px;
+  }
 }
 .field:focus {
   outline: none;
@@ -253,10 +434,17 @@ select.field {
   background-repeat: no-repeat;
   background-position: right 12px center;
 }
+/* Schmal EINE Spalte: zwei Felder nebeneinander auf einem Handy sind zwei Felder, in
+   die nichts hineinpasst. Ab 700 px die zwei Spalten, auf die die Masken gebaut sind. */
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
   gap: var(--sp-4);
+}
+@media (min-width: 700px) {
+  .form-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 /*
  * Zwei Karten nebeneinander, die auch allein bestehen.
@@ -574,23 +762,57 @@ select.field.tabellenfilter {
 }
 
 /* ============================================================
-   Schmales Fenster — die Seitenleiste klappt auf ihre Icons zusammen.
+   Stufe 2 — ab 700 px steht die Leiste wieder im Raster.
 
-   Warum ueberhaupt: 248 px sind bei einem breiten Fenster ein Viertel und bei einem
-   schmalen ein Drittel. Der Inhalt bekam den Rest, und Text brach an Stellen um, an
-   denen er nicht umbrechen muesste. Eingeklappt bleibt die Navigation vollstaendig
-   erreichbar — sie kostet nur keinen Platz mehr, den der Inhalt braucht.
-
-   Ohne JavaScript und ohne Schalter: die Fensterbreite ist die Frage, die hier
-   beantwortet wird, und die beantwortet CSS von selbst. Ein Schalter waere ein
-   Zustand mehr, den jemand pflegen und speichern muss.
+   Aus der Schublade wird eine Spalte: die Kopfleiste faellt weg, der Scrim auch, und
+   alles, was die Schublade ausmacht (fixierte Lage, Schatten, Ueberblendung), wird hier
+   zurueckgenommen. Es ist die einzige Stelle, an der zurueckgenommen wird — und sie
+   nimmt genau die sechs Eigenschaften zurueck, die drei Absaetze weiter oben gesetzt
+   sind.
 
    Der NAME haengt am `title` jedes Eintrags (siehe AppShell) — ein Icon ohne Namen
    ist ein Raetsel, und geraten wird in einer Finanz-App ungern.
-   ============================================================ */
-@media (max-width: 1100px) {
-  .app { grid-template-columns: 68px 1fr; }
 
+   DIESE SCHWELLE STEHT ZWEIMAL DA: hier und als `SCHMAL_ABFRAGE` in
+   `ui/bausteine/useSchmal.ts`, wo die DataTable sie braucht, um schmal ein anderes
+   MARKUP zu bauen (zwei Spalten statt sechs). Eine Medienabfrage kann keine
+   CSS-Variable lesen — das ist die Spezifikation, nicht ein Rueckstand der Browser.
+   Wer sie hebt, hebt sie an beiden Stellen.
+   ============================================================ */
+@media (min-width: 700px) {
+  .app {
+    grid-template-columns: 68px 1fr;
+    grid-template-rows: 1fr;
+  }
+
+  .topbar,
+  .side-scrim,
+  .side-zu { display: none; }
+
+  .side {
+    position: static;
+    width: auto;
+    transform: none;
+    visibility: visible;
+    box-shadow: none;
+    transition: none;
+    z-index: auto;
+    overflow-y: auto;
+  }
+
+  /* Zeigergroesse statt Fingergroesse. */
+  .nav a { min-height: 0; }
+}
+
+/* ============================================================
+   Stufe 2a — der Icon-Streifen, 700 bis 1099 px.
+
+   Ein eigener BEREICH und kein Anhaengsel: der Streifen ist weder der schmale noch der
+   breite Fall. Der Mechanismus ist eine einzige Klasse — **was `.lbl` traegt,
+   verschwindet hier.** Wer der Shell etwas hinzufuegt, kapselt die Beschriftung
+   entsprechend und haengt den Namen zusaetzlich an `title`.
+   ============================================================ */
+@media (min-width: 700px) and (max-width: 1099.98px) {
   .side {
     padding: var(--sp-5) 9px;
     align-items: center;
@@ -624,10 +846,19 @@ select.field.tabellenfilter {
   /* In der Fusszeile bleibt der Aktualisierungsknopf, der Rest ist Text.
      Die Ausnahme ist woertlich zu nehmen: `.aktualisierung` ist selbst ein `div` und
      waere von einem pauschalen `.foot > div` mit ausgeblendet worden — der Knopf haette
-     bei schmalem Fenster gefehlt, und ein Update, von dem niemand erfaehrt, ist keines. */
+     bei schmalem Fenster gefehlt, und ein Update, von dem niemand erfaehrt, ist keines.
+     **Auskunft darf weichen, eine Handlung nicht.** */
   .side .foot > div:not(.aktualisierung) { display: none; }
   .side .foot { text-align: center; }
   .aktualisierungbtn { justify-content: center; }
+}
+
+/* ============================================================
+   Stufe 3 — ab 1100 px die volle Leiste.
+   ============================================================ */
+@media (min-width: 1100px) {
+  .app { grid-template-columns: 248px 1fr; }
+  .side { padding: var(--sp-6) var(--sp-5); }
 }
 
 /* ============================================================

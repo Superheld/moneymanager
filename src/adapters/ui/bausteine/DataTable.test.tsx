@@ -4,7 +4,7 @@
 // Beides hängt zusammen: bei tausenden Buchungen blättert man viel, und eine Zeile, die
 // je nach Inhalt zweizeilig wird, verschiebt den Seitenschalter unter dem Mauszeiger.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { DataTable } from ".";
@@ -127,5 +127,101 @@ describe("DataTable — Zeilenhöhe und Breite", () => {
     const rahmen = container.querySelector("table")!.parentElement as HTMLElement;
     expect(rahmen.style.overflowX).toBe("auto");
     expect(rahmen.style.maxWidth).toBe("100%");
+  });
+});
+
+/**
+ * Die schmale Form. `matchMedia` gibt es in jsdom nicht — ohne die Attrappe unten gilt
+ * ueberall BREIT, und genau darauf verlassen sich die Tests oben und alle Screen-Tests.
+ */
+describe("DataTable — schmal", () => {
+  const spaltenBreit = [
+    { key: "name", label: "Name" },
+    { key: "datum", label: "Datum" },
+    { key: "konto", label: "Konto" },
+    { key: "betrag", label: "Betrag", align: "right" as const },
+  ];
+  const daten = [
+    { name: "Stadtwerke", datum: "12.08.2026", konto: "Giro", betrag: "−84,20 €" },
+    { name: "Buchladen", datum: "03.08.2026", konto: "Giro", betrag: "−12,90 €" },
+  ];
+
+  function schmalStellen(an: boolean) {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: (media: string) => ({
+        matches: an, media, onchange: null,
+        addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false,
+        addListener() {}, removeListener() {},
+      }),
+    });
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(window, "matchMedia");
+  });
+
+  it("faellt auf zwei Spalten zusammen", () => {
+    schmalStellen(true);
+    const { container } = render(<DataTable columns={spaltenBreit} rows={daten} />);
+    expect(container.querySelectorAll("thead th")).toHaveLength(2);
+    expect(container.querySelectorAll("tbody tr")[0].querySelectorAll("td")).toHaveLength(2);
+  });
+
+  /**
+   * Der wichtigste Fall: ohne Angabe wird nichts weggeworfen, nur verschoben. Eine
+   * Spalte still fallen zu lassen waere in einer Finanz-App eine gekuerzte Auskunft,
+   * die niemand entschieden hat — und alle uebrigen Tabellen der App tragen (noch)
+   * keine Angabe.
+   */
+  it("verschiebt ohne Angabe alles Uebrige in die zweite Zeile, statt es zu streichen", () => {
+    schmalStellen(true);
+    const { container } = render(<DataTable columns={spaltenBreit} rows={daten} />);
+    const erste = container.querySelectorAll("tbody tr")[0];
+    const zellen = erste.querySelectorAll("td");
+    expect(zellen[0].textContent).toContain("Stadtwerke");
+    expect(zellen[0].textContent).toContain("12.08.2026");
+    expect(zellen[0].textContent).toContain("Giro");
+    expect(zellen[1].textContent).toContain("−84,20 €");
+  });
+
+  /** Sobald EINE Spalte etwas sagt, gilt nur noch das Gesagte — hier faellt „Konto" weg. */
+  it("nimmt bei ausdruecklicher Angabe nur die genannten Spalten mit", () => {
+    schmalStellen(true);
+    const spalten = [
+      { key: "name", label: "Name", schmal: "titel" as const },
+      { key: "datum", label: "Datum", schmal: "zweitzeile" as const },
+      { key: "konto", label: "Konto" },
+      { key: "betrag", label: "Betrag", align: "right" as const, schmal: "wert" as const },
+    ];
+    const { container } = render(<DataTable columns={spalten} rows={daten} />);
+    const zellen = container.querySelectorAll("tbody tr")[0].querySelectorAll("td");
+    expect(zellen[0].textContent).toContain("12.08.2026");
+    expect(zellen[0].textContent).not.toContain("Giro");
+    expect(zellen[1].textContent).toContain("−84,20 €");
+  });
+
+  /**
+   * Die Koepfe bleiben stehen, und daran haengt mehr als Auskunft: mit ihnen bliebe
+   * sonst auch die Sortierung. Der Klick muss weiterhin auf die URSPRUENGLICHE Spalte
+   * zeigen — schmal ist „Betrag" die zweite von zwei, in `columns` aber die vierte.
+   */
+  it("sortiert schmal weiter nach der richtigen Spalte", async () => {
+    schmalStellen(true);
+    const nutzer = userEvent.setup();
+    const { container } = render(<DataTable columns={spaltenBreit} rows={daten} sortable />);
+    const wertspalte = () =>
+      Array.from(container.querySelectorAll("tbody tr")).map((tr) => tr.querySelectorAll("td")[1].textContent);
+
+    expect(wertspalte()).toEqual(["−84,20 €", "−12,90 €"]);
+    await nutzer.click(screen.getByText(/Betrag/));
+    expect(wertspalte()).toEqual(["−12,90 €", "−84,20 €"]);
+  });
+
+  it("laesst die breite Form unberuehrt", () => {
+    schmalStellen(false);
+    const { container } = render(<DataTable columns={spaltenBreit} rows={daten} />);
+    expect(container.querySelectorAll("thead th")).toHaveLength(4);
   });
 });
