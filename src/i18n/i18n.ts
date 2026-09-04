@@ -538,8 +538,11 @@ const de = {
     bedarfSicher: "sicher",
     bedarfErwartet: "erwartet",
     bedarfAb: "ab {{datum}}",
+    bedarfLegendeFrage: "Was heißen „sicher\" und „erwartet\"?",
+    bedarfLegende:
+      "„Sicher\" heißt: schon die festen Termine reichen dafür — daran ändert Sparsamkeit nichts. „Erwartet\" heißt: erst zusammen mit dem üblichen Verbrauch, gleichmäßig über die Tage verteilt.",
     bedarfHinweis:
-      "„Sicher\" heißt: schon die festen Termine reichen dafür — daran ändert Sparsamkeit nichts. „Erwartet\" heißt: erst zusammen mit dem üblichen Verbrauch, gleichmäßig über die Tage verteilt. Was hier NICHT steht, läuft im gerechneten Fenster nicht ins Minus — geprüft ist damit nicht mehr.",
+      "Was hier NICHT steht, läuft im gerechneten Fenster nicht ins Minus — geprüft ist damit nicht mehr.",
     vermoegenTitel: "Was da ist",
     vermoegenUntertitel: "Alle Konten nach Klasse — die Karten oben rechnen nur über die verfügbaren",
     vermoegenKonten: "{{count}} Konten",
@@ -878,7 +881,6 @@ const de = {
       zulassen: "zulassen",
     },
     titel: "Konten",
-    untertitel: "Kontostände, gebuchte und voraussichtliche Buchungen je Konto",
     verwaltungTitel: "Konten verwalten",
     neue: {
       ohneGegenpartei: "ohne Empfänger",
@@ -2433,8 +2435,11 @@ const en: typeof de = {
     bedarfSicher: "certain",
     bedarfErwartet: "expected",
     bedarfAb: "from {{datum}}",
+    bedarfLegendeFrage: "What do „certain\" and „expected\" mean?",
+    bedarfLegende:
+      "„Certain\" means the dated commitments alone are enough — spending less will not help. „Expected\" means only together with the usual spending, spread evenly across the days.",
     bedarfHinweis:
-      "„Certain\" means the dated commitments alone are enough — spending less will not help. „Expected\" means only together with the usual spending, spread evenly across the days. What is NOT listed here does not go negative within the window computed — that is all that has been checked.",
+      "What is NOT listed here does not go negative within the window computed — that is all that has been checked.",
     vermoegenTitel: "What you have",
     vermoegenUntertitel: "All accounts by class — the cards above cover only the available ones",
     vermoegenKonten: "{{count}} accounts",
@@ -2769,7 +2774,6 @@ const en: typeof de = {
       zulassen: "allow",
     },
     titel: "Accounts",
-    untertitel: "Balances, booked and expected entries per account",
     verwaltungTitel: "Manage accounts",
     neue: {
       ohneGegenpartei: "no payee",
