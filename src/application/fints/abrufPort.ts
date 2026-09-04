@@ -295,24 +295,22 @@ export interface Auszugsstand {
 /**
  * Wie das Umsatzformat für einen Abruf bestimmt wird.
  *
- * Zwei Dinge, die man leicht verwechselt, und der Unterschied entscheidet über das
- * Ergebnis:
+ * **Bis 2026-09-04 stand hier ein zweites Feld** (`zuletzt`), und dahinter zwei Versuche:
+ * erst CAMT, bei leerem Ergebnis MT940. Beides war ein Umweg um einen Fehler der
+ * Bibliothek, den der Fork behoben hat — und seit `getAccountStatements` bei einem
+ * Parsefehler WIRFT, statt leer zurückzukommen, ist ein leeres Ergebnis wieder das, was
+ * es sein sollte: kein Umsatz im Zeitraum. Ein zweiter Versuch darauf fände nichts.
  *
- *  • **`zuletzt`** ist ein GEDÄCHTNIS — was für dieses Konto beim letzten Mal getragen
- *    hat. Es entscheidet nur die REIHENFOLGE der beiden Versuche, nie das Ergebnis:
- *    bleibt der erste leer, läuft der zweite. Damit spart ein Konto, das nur über MT940
- *    geht, die vergebliche CAMT-Runde — und ein Institut, das CAMT nachrüstet, kommt
- *    trotzdem wieder darauf, statt für immer auf dem alten Weg zu bleiben.
+ * Ohne Festlegung entscheidet jetzt, was die Bank kann (`HKCAZ` im Fähigkeitsprofil).
+ * Das Gedächtnis ist ausdrücklich NICHT an seine Stelle getreten: es steht bei jedem
+ * Konto auf „MT940", das den alten Fehler hatte — dürfte es wählen, blieben genau die
+ * Konten für immer dort, die der Fork gerade repariert.
  *
- *  • **`wahl`** ist eine FESTLEGUNG und schliesst den anderen Weg aus. Sie wird
- *    gebraucht, weil das Gedächtnis genau dann nicht greift, wenn man es am nötigsten
- *    hätte: liefert der erste Versuch etwas — und sei es eine von der Bank gedeckelte
- *    Teilmenge —, gilt er als erfolgreich, und der zweite läuft nie. Wer den anderen Weg
- *    sehen will, muss den ersten ausschliessen können.
+ * **`wahl`** bleibt, und sie ist eine FESTLEGUNG: wer ein Format wählt, will dessen
+ * Ergebnis sehen — auch das leere, und auch gegen die Auskunft der Bank.
  */
 export interface Formatvorgabe {
   readonly wahl?: "automatisch" | "CAMT" | "MT940";
-  readonly zuletzt?: string;
 }
 
 /** Ergebnis eines Umsatzabrufs: das kanonische Import-Ergebnis plus, was die Bank dazu sagte. */

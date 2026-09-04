@@ -420,10 +420,15 @@ describe("abrufAusfuehren", () => {
     expect(anfragen[0].von).toBe("2026-05-20");
   });
 
-  it("gibt das zuletzt getragene Format als Reihenfolge mit", async () => {
-    // Wo MT940 zuletzt getragen hat, spart das die ergebnislose CAMT-Runde. Es ist eine
-    // Reihenfolge, keine Festlegung — der Adapter versucht den anderen Weg trotzdem,
-    // wenn der erste leer bleibt.
+  /**
+   * Das Gedaechtnis wird NICHT mehr mitgegeben.
+   *
+   * Es stand bei jedem Konto auf „MT940", das den alten CAMT-Fehler hatte — duerfte es
+   * die Wahl tragen, blieben genau die Konten fuer immer dort, die der Fork repariert
+   * hat, und bekaemen die Glaeubiger-ID nie zu sehen. Fortgeschrieben wird es weiter
+   * (siehe der Test darunter), aber als Aufzeichnung.
+   */
+  it("gibt das zuletzt getragene Format NICHT als Vorgabe mit", async () => {
     const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
     const f = fakes([
       {
@@ -436,18 +441,7 @@ describe("abrufAusfuehren", () => {
     ]);
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    expect(anfragen[0].bevorzugt?.zuletzt).toBe("MT940");
-    // Und ohne Festlegung — das Gedächtnis dreht nur die Reihenfolge.
-    expect(anfragen[0].bevorzugt?.wahl).toBeUndefined();
-  });
-
-  it("fragt ohne Gedächtnis ohne Vorgabe", async () => {
-    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
-    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
-
-    expect(anfragen[0].bevorzugt?.zuletzt).toBeUndefined();
-    expect(anfragen[0].bevorzugt?.wahl).toBeUndefined();
+    expect(anfragen[0].bevorzugt).toEqual({ wahl: undefined });
   });
 
   it("schreibt das getragene Format fort", async () => {
@@ -573,8 +567,9 @@ describe("Formatwahl", () => {
 
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    // Beides kommt an: die Wahl entscheidet, das Gedächtnis bleibt als Information.
-    expect(anfragen[0].bevorzugt).toEqual({ wahl: "MT940", zuletzt: "CAMT" });
+    // Nur die Wahl kommt an. Das Gedächtnis wird zwar weiter fortgeschrieben, aber es
+    // ist keine Eingabe mehr — siehe `Formatvorgabe`.
+    expect(anfragen[0].bevorzugt).toEqual({ wahl: "MT940" });
   });
 
   it("gibt „automatisch“ weiter wie keine Wahl", async () => {
