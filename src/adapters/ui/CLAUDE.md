@@ -300,6 +300,28 @@ Drei Wege schliessen sie, und alle drei sind nötig — geprüft in
 schmalem Fenster der einzige Hinweis auf ein Update. Und die Regel dahinter gilt allgemein:
 **Auskunft darf weichen, eine Handlung nicht.**
 
+## Schmal steht der Bereichsname nur einmal
+
+Die Kopfleiste nennt den Bereich, und `PageHead` tat es zwei Zentimeter darunter noch
+einmal — auf 400 px waren das zwei Überschriften desselben Wortes in den ersten hundert
+Pixeln. Die `h1` ist deshalb schmal nur noch für Vorlesehilfen da.
+
+**Die Kopfleiste ist die bessere von beiden**, und das ist gemessen: `.main` ist der
+Scrollbereich, die Leiste bleibt bei `top: 0` stehen. Sie beantwortet „wo bin ich" auch
+weiter unten, die `h1` nur ganz oben.
+
+Zwei Dinge, die daran hängen:
+
+- **Sie verschwindet nur für Augen**, nicht aus dem Dokument. Eine Seite ohne `h1` hätte
+  keine Gliederung mehr, und die Kopfleiste trägt einen `span`, keine Überschrift.
+- **Der Untertitel bleibt sichtbar.** Er trägt an mehreren Stellen die Einschränkung, die
+  die Zahlen darunter ehrlich hält — „über die verfügbaren Konten" ist der Grund, warum
+  dasselbe Budget hier weniger Verbrauch zeigt als im Bereich Budgets.
+
+Die Regel steht ausnahmsweise als `max-width` und nicht als Grundform: die sichtbare `h1`
+aus der versteckten zurückzuholen kostet sieben Rücknahmen, und genau davor warnt die Regel
+zur Icon-Stufe.
+
 ## Wie breit eine Seite wird
 
 `.screen` deckelt bei **1280 px**, nicht mehr bei 1040. Der alte Wert war der klassische

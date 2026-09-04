@@ -356,6 +356,36 @@ body {
   letter-spacing: var(--ls-tight);
   margin: 0;
 }
+
+/* Schmal steht der Bereichsname schon in der Kopfleiste — zwei Zentimeter darueber.
+ *
+ * Auf 400 px sind zwei Ueberschriften desselben Wortes die ersten hundert Pixel der
+ * Seite, und die Kopfleiste ist die bessere von beiden: sie bleibt stehen, waehrend
+ * `.main` scrollt, und beantwortet „wo bin ich" auch weiter unten. Die `h1` beantwortet
+ * sie nur ganz oben.
+ *
+ * Sie wird deshalb nur fuer AUGEN entfernt und bleibt fuer Vorlesehilfen stehen: eine
+ * Seite ohne `h1` haette keine Gliederung mehr, und die Kopfleiste traegt einen `span`,
+ * keine Ueberschrift. Der Untertitel bleibt sichtbar — er traegt an mehreren Stellen die
+ * Einschraenkung, die die Zahlen darunter ehrlich haelt.
+ *
+ * Und WARUM hier ausnahmsweise `max-width` steht, wo sonst die schmale Form die Grundform
+ * ist: die sichtbare `h1` aus der versteckten zurueckzuholen kostet sieben Ruecknahmen
+ * (position, width, height, margin, overflow, clip-path, white-space). Genau davor warnt
+ * die Regel zur Icon-Stufe — eine Kette aus Setzen und Zuruecknehmen ist die Stelle, an
+ * der man beim naechsten Anbau eine Ruecknahme vergisst. */
+@media (max-width: 699.98px) {
+  .phead h1 {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
 .phead .psub {
   color: var(--ink-3);
   font-size: var(--fs-sm);
