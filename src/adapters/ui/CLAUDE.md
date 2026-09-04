@@ -97,9 +97,48 @@ seine Daten hereinbekommt und Entscheidungen zurückmeldet. Der Rest gehört zum
 und bleibt dort, auch wenn die Funktion damit die grösste im Bereich ist.
 
 Keins davon ist ein `bausteine/`-Kandidat: alle werden von genau einem Screen benutzt
-(siehe `bausteine/CLAUDE.md`). `buchung/ddmm.ts` ist die Ausnahme von der Ausnahme — vier Zeilen,
-drei Nutzer im selben Bereich, und kein natürlicher Besitzer; über `BuchungDetail` zu
-importieren hätte einen Ring gebaut.
+(siehe `bausteine/CLAUDE.md`).
+
+Eine eigene Datei nur für „Tag und Monat" stand hier lange als **Ausnahme von der
+Ausnahme** — vier Zeilen, drei Nutzer im selben Bereich, kein natürlicher Besitzer, und
+über `BuchungDetail` zu importieren hätte einen Ring gebaut. **Sie ist weg**, und der Grund
+ist nicht, dass die Begründung falsch war, sondern dass sie zu klein gedacht war: dieselben
+vier Zeilen standen in acht weiteren Varianten quer durch die Oberfläche, jede für sich
+plausibel. Was sie ersetzt, ist `useDatum()` — siehe unten.
+
+## Ein Datum formatiert `useDatum()`, nichts sonst
+
+Dieselbe Regel wie bei `useGeld` und `useProzent`, und der Befund war der grösste von
+dreien: die Formatierung stand an **neun** Stellen in vier Varianten — `datumKurz` zweimal
+mit verschiedener Bedeutung, `datumLang` und `ddmmyyyy` je zweimal wortgleich kopiert,
+dazu `ddmm`, `datumOhneJahr` und einmal inline in der Analyse. Zwei weitere Stellen gaben
+das ISO-Datum **roh** in die Oberfläche.
+
+**Und alle neun schrieben die deutsche Reihenfolge fest.** In einer englischen Oberfläche
+stand damit `28.09.2026`, wo `9/28/2026` hingehört. Das ist nicht dieselbe Unsauberkeit wie
+ein falsches Dezimalzeichen, sondern schlimmer: `05.03.` und `03/05/` sind dieselben Ziffern
+mit anderer Bedeutung. Ausgerechnet `Datumsfeld` las die Reihenfolge längst aus `Intl` — die
+Anzeige daneben tat es nicht.
+
+Drei Formen, und die Wahl gehört dem Aufrufer:
+
+| | zeigt (de) | wofür |
+|---|---|---|
+| `mitJahr` | `28.09.2026` | eine Zeile ohne Zusammenhang, aus dem sich das Jahr ergäbe |
+| `kurz` | `28.09.26` | Listen, in denen das Jahr zählt und die Spalte schmal ist |
+| `ohneJahr` | `28.09.` | Fenster von höchstens ein paar Monaten |
+
+**`ohneJahr` ist kein Sparformat, sondern eine Aussage:** wer es nimmt, behauptet, dass das
+Jahr aus dem Zusammenhang folgt. Im Kontoauszug tut es das nicht — dort stehen alle
+Buchungen eines Kontos, nicht nur die des laufenden Jahres —, und deshalb steht dort
+`mitJahr`.
+
+Gerechnet wird in UTC (`Date.UTC` plus `timeZone: "UTC"`), wie im `Datumsfeld`: ein
+ISO-Datum ist ein Kalendertag und keine Zeitangabe. Ohne die feste Zone zieht ein Rechner
+westlich von Greenwich jeden Tag um einen zurück.
+
+Für Helfer ausserhalb einer Komponente gibt es den Typ `Datum`, genau wie `Geld` — der
+`JournalBlock` reicht ihn in seiner `Lesehilfe` durch.
 
 ## Tabellenfilter sind kleiner als Formularfelder
 

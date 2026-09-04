@@ -34,7 +34,7 @@ import { DepotAnsicht } from "./DepotAnsicht";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { Auswahl } from "../bausteine/Auswahl";
 import { PageHead } from "../bausteine/PageHead";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 
 import type { KategorieSumme } from "../../../application";
@@ -199,6 +199,7 @@ function toIsoHeute(): string {
 export function AnalyseScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
   const [basis, setBasis] = useState<Analysebasis | null>(null);
   const [zeitraum, setZeitraum] = useState<Zeitraum>("12");
   const [aktivMonat, setAktivMonat] = useState<number | null>(null);
@@ -365,7 +366,7 @@ export function AnalyseScreen() {
                 // Liste probiert niemand jede Zeile durch. Dieselbe Klasse tragen die
                 // Buchungszeilen in der Uebersicht — was gleich funktioniert, sieht gleich aus.
                 <tr key={z.buchung.id} className="buchungszeile" onClick={() => setDetail(z.buchung)} title={t("historie.detailOeffnen")}>
-                  <td style={detailTd}>{z.buchung.datum.split("-").reverse().join(".")}</td>
+                  <td style={detailTd}>{datum.mitJahr(z.buchung.datum)}</td>
                   <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>
                     <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

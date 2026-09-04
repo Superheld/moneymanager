@@ -15,15 +15,15 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Buchungshistorie, IstBuchung, Journaleintrag, Vergleichsfeld } from "../../../application";
-import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
+import { fehlerNachricht, useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { Button } from "../bausteine/Button";
-import { ddmm } from "./ddmm";
 
 /** Womit sich ein Feldwert lesbar machen laesst — Namen und Geldformat kennt nur die UI. */
 interface Lesehilfe {
   readonly kontoName: Map<string, string>;
   readonly kategorieName: Map<string, string>;
   readonly geld: ReturnType<typeof useGeld>;
+  readonly datum: ReturnType<typeof useDatum>;
   readonly t: (schluessel: string, werte?: Record<string, unknown>) => string;
 }
 
@@ -38,7 +38,7 @@ function feldWert(b: IstBuchung, feld: Vergleichsfeld, h: Lesehilfe): string {
   const leer = "—";
   switch (feld) {
     case "datum":
-      return ddmm(b.datum);
+      return h.datum.ohneJahr(b.datum);
     case "betrag":
       return h.geld.formatMitSymbol(b.betrag, { mitVorzeichen: true });
     case "kontoId":
@@ -87,13 +87,14 @@ export function JournalBlock({
 }) {
   const { t, i18n } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
   const [offen, setOffen] = useState(false);
   const [fragt, setFragt] = useState(false);
   const [laeuft, setLaeuft] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
 
   if (!historie) return null;
-  const hilfe: Lesehilfe = { kontoName, kategorieName, geld, t };
+  const hilfe: Lesehilfe = { kontoName, kategorieName, geld, datum, t };
 
   async function zuruecksetzen() {
     setLaeuft(true);

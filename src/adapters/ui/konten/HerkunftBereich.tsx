@@ -21,20 +21,10 @@ import { Card, Pill } from "../bausteine";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { DataTable } from "../bausteine/DataTable";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 
 type Statusfilter = "alle" | "verbucht" | "weggelegt" | "offen";
-
-/** „2026-08-11T09:00:00.000Z" → „11.08.2026" — der Import trägt sein Datum voll aus. */
-function datumLang(iso: string): string {
-  return iso.slice(0, 10).split("-").reverse().join(".");
-}
-
-function datumKurz(iso: string): string {
-  const [j, m, d] = iso.split("-");
-  return `${d}.${m}.${j.slice(2)}`;
-}
 
 /**
  * Was für ein Konto hereinkam — in zwei Lesarten, und der Unterschied ist der Punkt.
@@ -67,6 +57,9 @@ export function HerkunftBereich({
   const [laufId, setLaufId] = useState<string | null>(null);
   const { t } = useTranslation();
   const geld = useGeld();
+  // Der Lauf trägt sein Datum voll aus (`mitJahr`), die Zeile darunter mit
+  // zweistelligem Jahr — dort ist die Spalte schmal und der Lauf steht daneben.
+  const datum = useDatum();
   const [konten, setKonten] = useState<readonly Kontoherkunft[]>([]);
   // Von aussen vorgewaehlt, wenn jemand aus der Kontenliste hierher gesprungen ist.
   // Danach fuehrt der Bereich seine Auswahl selbst weiter — wer hier ankommt, will sich
@@ -150,9 +143,9 @@ export function HerkunftBereich({
                     render: (l: Laufbefund) => (
                       <Zeilenlink
                         onKlick={() => setLaufId(laufId === l.lauf.id ? null : l.lauf.id)}
-                        titel={t("konten.herkunft.zeigeLauf", { datum: datumLang(l.lauf.zeitpunkt) })}
+                        titel={t("konten.herkunft.zeigeLauf", { datum: datum.mitJahr(l.lauf.zeitpunkt) })}
                       >
-                        {datumLang(l.lauf.zeitpunkt)}
+                        {datum.mitJahr(l.lauf.zeitpunkt)}
                       </Zeilenlink>
                     ),
                   },
@@ -245,7 +238,7 @@ export function HerkunftBereich({
             ) : (
               <DataTable
                 columns={[
-                  { key: "datum", label: t("konten.spalteDatum"), render: (z) => datumKurz(z.umsatz.buchungstag) },
+                  { key: "datum", label: t("konten.spalteDatum"), render: (z) => datum.kurz(z.umsatz.buchungstag) },
                   {
                     key: "bez", label: t("konten.spalteBeschreibung"), maxWidth: 280,
                     render: (z) => z.umsatz.gegenpartei || z.umsatz.verwendungszweck || "—",
