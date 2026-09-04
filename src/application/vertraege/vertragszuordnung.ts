@@ -204,6 +204,14 @@ export async function erkennungenNachziehen(
   let angelegt = 0;
   for (const v of vertraege) {
     if (hat.has(v.id)) continue;
+    // Ein UMBUCHUNGSVERTRAG bekommt keine. Er wird am WEG erkannt (Konto → Gegenkonto an
+    // seiner Zahlungsregel, siehe `umbuchungErkennung`), nicht am Empfaenger: bei einer
+    // Zahlung zwischen zwei eigenen Konten steht dort je nach Bank die eigene IBAN, der
+    // eigene Name oder gar nichts. Die Standardregel aus dem Anbieternamen kann dort also
+    // nie treffen — sie waere eine Regel, die per Konstruktion nichts tut, und seit die
+    // Maske je Merkmal „trifft nie" meldet, sieht man sie auch noch: eine Warnung an
+    // einer Einstellung, die voellig richtig ist.
+    if (v.art === "umbuchung") continue;
     // Ohne Zahlungsregel gibt es keinen Betrag — dann eben eine Regel ohne Spanne.
     await erkennungRepo.speichern(standardErkennung(v.id, v.anbieter, betragVon.get(v.id) ?? 0));
     angelegt++;

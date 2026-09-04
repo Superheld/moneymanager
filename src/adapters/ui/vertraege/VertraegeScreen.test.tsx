@@ -462,6 +462,37 @@ describe("VertraegeScreen — Vorschläge", () => {
   });
 
   /**
+   * Die Gegenprobe: ein UMBUCHUNGSVERTRAG bekommt keine nachgezogene Regel.
+   *
+   * Er wird am Weg erkannt (Konto → Gegenkonto an seiner Zahlungsregel), nicht am
+   * Empfaenger — bei einer Zahlung zwischen zwei eigenen Konten steht dort je nach Bank
+   * die eigene IBAN, der eigene Name oder gar nichts. Eine Standardregel aus dem
+   * Anbieternamen kann dort per Konstruktion nie treffen. Sie war trotzdem da, und seit
+   * die Maske je Merkmal „trifft nie" meldet, warnte sie an einer Einstellung, die
+   * voellig richtig ist.
+   */
+  it("zieht für einen Umbuchungsvertrag KEINE Erkennungsregel nach", async () => {
+    await konto();
+    await sqliteVertragRepository.speichern({
+      id: "um", anbieter: "Sparrate aufs Tagesgeld", beginn: "2025-01-01",
+      verlaengerung: "automatisch", status: "aktiv", art: "umbuchung",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-um", bezeichnung: "Sparrate aufs Tagesgeld", betrag: -20000, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Umschichtung", kontoId: "k1", gegenkontoId: "k2",
+      vertragId: "um",
+    });
+
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Sparrate aufs Tagesgeld");
+
+    // Kein „irgendwann kommt sie doch": nach dem Laden ist der Nachzug gelaufen.
+    await waitFor(async () => {
+      expect(await sqliteVertragserkennungRepository.alle()).toHaveLength(0);
+    });
+  });
+
+  /**
    * Der Fall, für den die Regel überhaupt bearbeitbar ist: der Preis ist gestiegen, die
    * neuen Zahlungen fallen aus der Betragsspanne und werden nicht mehr zugeordnet. Der
    * Weg zurück führt über das Nachsteuern der Obergrenze — geprüft am Bestand vorher und
