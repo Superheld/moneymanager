@@ -3,6 +3,142 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.26.0] — 2026-09-04
+
+Die Runde, in der die App aufs Telefon geht — und in der das Zurücklegen aufhört, ein
+Gegenstand zu sein. Dazu ein Vertrag, den man mit sich selbst schliesst, eine Übersicht,
+die nur noch über das rechnet, worüber man verfügen kann, und eine Warnung, bevor ein
+Konto ins Minus läuft.
+
+### Neu
+
+**Die App läuft auf einem Handy.** Die Oberfläche ist auf schmal ausgelegt und wird nach
+oben breiter, nicht umgekehrt. Die Seitenleiste liegt unter 700 px als **Schublade** links
+ausserhalb des Bildes; eine Kopfleiste mit Griff holt sie herein und nennt daneben den
+Bereich, in dem man steht. Drei Wege schliessen sie wieder: ein gewählter Bereich, Escape,
+und der Knopf in der Schublade selbst.
+
+**Tabellen werden schmal zu zwei Spalten** — links der Bezeichner mit den verschobenen
+Werten gedämpft darunter, rechts die eine Zahl. Es bleibt eine Tabelle und wird keine
+Kartenliste: die Zahl steht in jeder Zeile an derselben Stelle, und die Spaltenköpfe bleiben
+stehen, damit auch die Sortierung bleibt. Vorher sah man auf einem Telefon die ersten
+Spalten und musste seitwärts schieben, um an den Betrag zu kommen.
+
+**Dialoge füllen schmal den Bildschirm, und „Speichern" bleibt sichtbar.** Sie sind dort in
+drei Teile geteilt, von denen nur der mittlere scrollt. Vorher lag der Knopf unter dem
+Bildrand, ohne dass man es sieht — ein Dialog ist ein eigener Scrollbereich, der Rest der
+Seite steht still.
+
+**Das Fenster darf schmal werden.** Die Mindestbreite war 920 px und lag damit oberhalb der
+Schwelle, ab der die Schublade greift: die schmale Form liess sich in der App gar nicht
+ansehen. Sie ist jetzt 360.
+
+**Aus dem Inventar werden Rücklagen.** Der Gegenstand war zu eng gefasst — man legt auch
+für einen Urlaub zurück, und der hat weder Wiederbeschaffungswert noch Nutzungsdauer; in
+der alten Maske musste man dafür Zahlen erfinden. Es gibt jetzt **zwei Formen**, von denen
+genau eine ausgefüllt wird: mit **Ziel und Frist** (die Rate rechnet sich, der Soll-Stand
+ist gedeckelt, es gibt einen Fortschritt — und nach dem Ausbuchen fängt sie von vorn an)
+oder mit **freier Rate** (kein Ziel, kein Deckel, und nach dem Ausbuchen ist sie erledigt).
+Die Form entscheidet damit, was nach dem Ausbuchen passiert: was einmal ersetzt werden
+musste, muss es wieder — der Urlaub war einmal.
+
+**Umbuchungsverträge — ein Vertrag mit sich selbst.** „Jeden Monat 300 aufs
+Tagesgeldkonto" steht als Plan im Monatsausblick **und** wird an den gebuchten Zeilen
+wiedererkannt. Erkannt wird er am **Weg**, nicht am Empfänger: bei einer Zahlung zwischen
+zwei eigenen Konten steht dort je nach Bank die eigene IBAN, der eigene Name oder nichts,
+und aus dem Verwendungszweck etwas zu raten hiesse, sich auf einen Text zu verlassen, den
+niemand füllen muss. Geprüft wird stattdessen strukturell: gleicher Weg, Charakter
+Umschichtung, abgehendes Bein. Der Betrag entscheidet dabei nicht über die Passung, sondern
+nur darüber, welche Regel es ist, wenn mehrere denselben Weg beschreiben — wer seine
+Sparrate erhöht und die Regel nicht nachzieht, soll eine erkannte Umbuchung mit Abweichung
+sehen statt einer Zeile, die als „offen" dasteht.
+
+**Eine Warnung, bevor ein Konto ins Minus läuft.** Die Übersicht führt mit der Karte
+*Da ist etwas zu tun*, und sie erscheint nur, wenn etwas anliegt — eine dauerhafte Zeile
+„alles in Ordnung" wäre nach zwei Wochen unsichtbar, und dann fiele auch die Warnung nicht
+mehr auf. Gerechnet werden **zwei Linien**: die feste aus datierten Verpflichtungen (ein
+sicheres Minus, daran ändert Sparsamkeit nichts) und die erwartete, die den Budgetrest
+gleichmässig über die Tage verteilt. Nur die feste warnte zu spät, nur die erwartete zu oft.
+
+**Die Karte „Was da ist"** zeigt die realen Stände je Kontoklasse, über alle Konten — nach
+Klasse und nicht nach Gruppe, weil jedes Konto genau eine Klasse hat und die Summen sich
+damit zum Ganzen addieren.
+
+**Seltene grosse Ausgaben bekommen einen aufbauenden Budgetvorschlag.** Eine Kategorie, in
+der zweimal im Jahr etwas Grosses passiert, fiel aus der Vorschlagskarte bisher ganz
+heraus. Dieselbe Schwelle trennt jetzt die beiden Arten, statt die eine zu verschlucken: ab
+sechs belegten Monaten monatlich über den Median, darunter aufbauend über den Durchschnitt
+aller beobachteten Monate.
+
+**Das Training misst etwas, woraus sich etwas ablesen lässt.** Neben der Genauigkeit steht
+jetzt die **Vergleichslinie** — was das dümmste denkbare Modell träfe, immer die häufigste
+Kategorie — und daneben der **Vorsprung**. Eine Trefferquote allein ist keine Aussage: in
+einem Haushalt, in dem eine Kategorie ein Viertel aller Zahlungen ausmacht, trifft blindes
+Raten schon ein Viertel. Und aus der Verwechslungsstatistik führt ein Klick in die
+einzelnen Zeilen — die Zahl sagt, wo es klemmt, erst die Zeilen sagen, warum.
+
+### Geändert
+
+**Die Übersicht rechnet über die verfügbaren Konten.** Vorher filterte sie nach gar keinem:
+in „so stehe ich gerade da" stand damit auch, was auf Rücklagen- und Vorsorgekonten
+passierte. Was dort liegt, ist zurückgelegt und steht für den Monat nicht zur Verfügung.
+Gefiltert wird auf allen Seiten mit derselben Liste — Buchungen, Zahlungsregeln, Budgets.
+**Der Preis ist eine Aussage, die man kennen muss:** dasselbe Budget kann in der Übersicht
+einen kleineren Verbrauch zeigen als im Bereich Budgets. Der Untertitel sagt es mit.
+
+**Die Rücklagen haben in den Monatskarten keine eigene Zeile mehr.** Sie stand dort als
+kalkulatorische Monatsrate; seit sich Rücklagen über einen Umbuchungsvertrag planen lassen,
+steht dasselbe Zurücklegen schon als geplante Umschichtung in „Sparen & Vorsorge" — beides
+nebeneinander zählte es zweimal. Die Rechnung selbst gibt es weiter, im Bereich Rücklagen
+als *Bedarf* neben Plan und Ist.
+
+**Die Budgetvorschläge stehen unter der Liste.** Sie sind kein Einstieg, sondern ein
+Nachtrag: wer den Bereich öffnet, will sehen, was er sich vorgenommen hat.
+
+**Ein Datum steht in der Schreibweise des Nutzers.** Es wurde an neun Stellen in vier
+Varianten formatiert, alle mit fest eingebauter deutscher Reihenfolge — in einer englischen
+Oberfläche stand damit `28.09.2026`, wo `9/28/2026` hingehört. An fünf weiteren Stellen
+stand das rohe Datum aus der Datenbank auf dem Bildschirm.
+
+**Schmal steht der Bereichsname nur noch einmal.** Die Kopfleiste nennt ihn und bleibt beim
+Scrollen stehen; die Überschrift darunter ist für Augen entfernt und für Vorlesehilfen da.
+
+**Ein Text neben einer Zahl hat jetzt einen Rang.** Was die Zahl EINSCHRÄNKT, bleibt auf
+jeder Breite offen stehen; was sie ERKLÄRT, darf schmal hinter eine ausgeschriebene Frage
+einklappen; was nur NACHERZÄHLT, was man ohnehin sieht, fällt ganz weg — so wie der
+Untertitel des Kontenbereichs. Unter der Warnkarte standen beide ersten Ränge bis dahin in
+einem Absatz: jedes Wegräumen der Erklärung hätte die Einschränkung mitgenommen, und die
+leere Karte liest sich danach als Freigabe.
+
+**Der Release-Text erklärt nicht mehr, wie man Gatekeeper aushebelt.** Der Zustand wird
+weiterhin benannt — was macOS melden wird und dass ein frischer Download deshalb kein
+empfohlener Weg ist. Die Anleitung dazu wiegt weniger als das, was eine öffentliche Seite
+einübt: „Quarantäne-Merkmal abräumen, wenn eine App als beschädigt gemeldet wird" ist als
+Gewohnheit genau der Griff, mit dem sich jemand das nächste Mal etwas anderes einfängt.
+
+### Behoben
+
+- **Der Löschen-Knopf bei den Verträgen fasste ins Leere.** Er warf beim Klick und sah
+  deshalb aus wie einer ohne Wirkung. Die Ursache lag tiefer: die Spaltendefinitionen der
+  Tabellen waren für den Typecheck blind, jede Spalte in jeder Tabelle der App.
+- **Ein Budget ohne Startdatum nahm den ganzen Bereich mit** — statt einer Zeile, die sich
+  nicht öffnen lässt, blieb der Bereich leer.
+- **Die Budgets im Spielstand liessen sich nicht bearbeiten.**
+- **Pfade auf Windows:** ein URL-Pfad wurde als Dateipfad benutzt, und dort steht der
+  Laufwerksbuchstabe hinter einem Schrägstrich.
+
+### Innen
+
+- **`npm run vorschau`** zeigt die App im Browser und im Netz — mit Attrappe der
+  Tauri-Naht und dem Spielstand im Speicher. Ohne sie war die schmale Form auf einem echten
+  Telefon nicht anzusehen: ohne Shell rendert die App eine weisse Seite.
+- **`useSchmal`** ist die einzige Layout-Frage, die in JavaScript gestellt wird. Die Regel
+  bleibt CSS, solange sich nur das Aussehen ändert; hier ändert sich das Markup, und Zellen
+  zusammenzulegen kann CSS nicht.
+- **`useDatum()`** neben `useGeld()` und `useProzent()` — dieselbe Regel, derselbe Ort.
+- **Die Spaltendefinitionen der Tabellen tragen jetzt ihren Zeilentyp** (`DataColumn<T>`).
+  15 von 16 Dateien blieben dabei unverändert: TypeScript leitet den Typ aus den Zeilen ab.
+
 ## [0.25.0] — 2026-08-30
 
 Die Runde, in der der Import aufhört, im Verborgenen zu entscheiden. Was aus einer Datei
