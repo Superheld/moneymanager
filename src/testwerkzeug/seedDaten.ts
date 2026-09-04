@@ -302,9 +302,28 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [v.id, v.anbieter, null, "person-1", tagIn(-MONATE, 1), "automatisch", 12, 3, "aktiv", v.kategorie, "abo"],
     );
+    // Zwei Dinge daran waren falsch, und beide sind still gescheitert — die Regeln des
+    // Spielstands haben nie eine einzige Zahlung getroffen:
+    //
+    //  • `schluessel` ist eine JSON-SPALTE. Ein blosser Name ist kein gueltiges JSON,
+    //    `parseMerkmale` faellt in seinen catch und liefert eine leere Liste. Die Regel
+    //    stand da und trug nichts.
+    //  • Die Betragsspanne wird gegen den BETRAG OHNE VORZEICHEN geprueft (`passtZu`
+    //    rechnet mit `Math.abs`). Aus einem Aufwand abgeleitet war sie negativ, und
+    //    damit lag jede Zahlung ueber der Obergrenze.
+    //
+    // Der Stern am Namen ist derselbe, den `standardErkennung` anhaengt: Empfaengerfelder
+    // tragen Produktnamen, Rechnungs- und Ortsangaben hinter dem Anbieter.
+    const hoehe = Math.abs(v.betrag);
     setzen(
       "INSERT INTO vertrag_erkennung (vertrag_id, schluessel, betrag_von, betrag_bis, konto_id) VALUES (?, ?, ?, ?, ?)",
-      [v.id, v.anbieter.toLowerCase(), v.betrag - 500, v.betrag + 500, "konto-giro"],
+      [
+        v.id,
+        JSON.stringify([{ art: "empfaenger", muster: `${v.anbieter.toLowerCase()}*` }]),
+        hoehe - 500,
+        hoehe + 500,
+        "konto-giro",
+      ],
     );
   }
 
