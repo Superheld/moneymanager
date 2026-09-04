@@ -51,6 +51,12 @@ export interface VertragEingabe {
   charakter: Charakter;
   kategorieId?: string;
   kontoId?: string;
+  /**
+   * Zielkonto einer geplanten Umbuchung. Gesetzt macht die Regel aus der Zahlung eine
+   * Verschiebung zwischen zwei eigenen Konten — nur sinnvoll mit `charakter:
+   * "Umschichtung"`, und nur dann wird es übernommen.
+   */
+  gegenkontoId?: string;
   /** Erste Fälligkeit der Zahlung; Standard = Vertragsbeginn. */
   ersteZahlung?: string;
   /**
@@ -105,6 +111,10 @@ export async function vertragAnlegen(
     startdatum: eingabe.ersteZahlung || eingabe.beginn,
     charakter: eingabe.charakter,
     kontoId: eingabe.kontoId || undefined,
+    // Nur bei einer Umschichtung. Bei Aufwand oder Ertrag verlässt das Geld den
+    // erfassten Bereich, und ein Gegenkonto behauptete etwas anderes — die Erkennung
+    // suchte dann nach einem zweiten Bein, das es nie geben wird.
+    gegenkontoId: eingabe.charakter === "Umschichtung" ? eingabe.gegenkontoId || undefined : undefined,
     kategorieId: eingabe.kategorieId || undefined,
     vertragId: vertrag.id,
   };
@@ -166,6 +176,7 @@ export async function vertragAktualisieren(
     startdatum: eingabe.ersteZahlung || eingabe.beginn,
     charakter: eingabe.charakter,
     kontoId: eingabe.kontoId || undefined,
+    gegenkontoId: eingabe.charakter === "Umschichtung" ? eingabe.gegenkontoId || undefined : undefined,
     kategorieId: eingabe.kategorieId || undefined,
     vertragId,
   };

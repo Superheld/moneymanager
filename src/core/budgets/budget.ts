@@ -119,10 +119,26 @@ export function betragImMonat(budget: Budget, monat: string): Cent {
  * Beim Aufbauenden zusätzlich durch `start` begrenzt: dort ist der Start der Anker, ab dem
  * gesammelt wird, und eine Betragsversion davor wäre eine Zuführung in ein Budget, das
  * noch nicht sammelt.
+ *
+ * **`start` wird hier nicht vorausgesetzt, obwohl der Typ es zusagt.** Die Spalte
+ * `budget.start` ist nullable, und das Repository reicht sie unverändert durch — der Typ
+ * sagt `string`, die Datenbank kann NULL liefern. Über die App entsteht das nicht
+ * (`budgetAnlegen` schreibt immer eines, und die Migration hat die Altbestände gefüllt);
+ * über eine von Hand geänderte Datei schon.
+ *
+ * Der Unterschied ist die Schadensgröße, und deshalb steht die Absicherung hier: ohne sie
+ * warf `.slice` schon beim LADEN, und weil `budgetstaende` über alle Budgets läuft, riss
+ * ein einziges kaputtes den ganzen Budgets-Screen mit — leere Seite, keine Meldung, kein
+ * Hinweis welches. Mit ihr verhält sich genau dieses eine Budget wie eines ohne
+ * Sammelanker, und die anderen rechnen weiter.
+ *
+ * Erfunden wird dabei nichts: ein fehlender Start wird zum leeren Monat, und der gewinnt
+ * den Vergleich unten nie. Ein aufbauendes Budget ohne Anker zählt damit ab seiner ersten
+ * Betragsversion — das ist die einzige Aussage über seinen Beginn, die dann noch dasteht.
  */
 export function ersterBudgetmonat(budget: Budget): string {
-  const erste = budget.betraege[0]?.abMonat ?? budget.start.slice(0, 7);
-  const startMonat = budget.start.slice(0, 7);
+  const startMonat = (budget.start ?? "").slice(0, 7);
+  const erste = budget.betraege[0]?.abMonat ?? startMonat;
   return budget.art === "aufbauend" && startMonat > erste ? startMonat : erste;
 }
 
@@ -359,6 +375,9 @@ export function budgetBuchungen(
     if (b.datum < von || b.datum >= bis) continue;
     // Vertragsraten sind anderswo geplant und stehen im Ausblick in ihrer eigenen Zeile.
     if (vertragsBuchungen.has(b.id)) continue;
+    // Und die eine teure Anschaffung, für die zurückgelegt wurde, ist ausgenommen: sie
+    // spränge jeden Monatsrahmen, und danach sagte der nichts mehr aus.
+    if (b.budgetrelevant === false) continue;
     // Über die Anteile, nicht über b.kategorieId: eine geteilte Buchung (S-7) belastet
     // dieses Budget nur mit IHREM Teil, nicht mit dem vollen Betrag — und nicht gar nicht.
     kategorieAnteile(b).forEach((a, i) => {

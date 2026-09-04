@@ -442,44 +442,6 @@ describe("2 · Wörter — der Bestand", () => {
   });
 });
 
-describe("2 · Wörter — was jede Kategorie auszeichnet", () => {
-  it("sagt ohne Modell, dass es nichts abzulesen gibt", async () => {
-    material(2);
-    const nutzer = userEvent.setup();
-    rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.woerter);
-
-    // Eine Wolke aus blossen Häufigkeiten sähe aus wie eine Auskunft über die Erkennung
-    // und wäre keine — solange nichts trainiert ist, gibt es keine Gewichte.
-    expect(
-      within(karteninhalt(KARTEN.woerter)).getByText(/Noch kein Modell trainiert/),
-    ).toBeTruthy();
-  });
-
-  it("zeigt nach dem Training je Kategorie ihre Wörter — und führt zurück in die Liste", async () => {
-    material();
-    const nutzer = userEvent.setup();
-    rendere(<TrainingBereich />);
-    await oeffne(nutzer, KARTEN.modell);
-    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
-    await waitFor(() => expect(screen.getByText(/Zuletzt trainiert am/)).toBeTruthy());
-
-    await oeffne(nutzer, KARTEN.woerter);
-    const wolken = within(karteninhalt(KARTEN.woerter));
-    await waitFor(() => expect(wolken.getAllByText("Lebensmittel").length).toBeGreaterThan(0));
-
-    // Der Klick auf ein Wort in der Wolke sucht es oben in der Liste — sonst wären es
-    // zwei getrennte Werkzeuge auf derselben Seite.
-    const wort = wolken.getAllByRole("button", { name: "kesselmann markt" })[0];
-    await nutzer.click(wort);
-    await waitFor(() =>
-      expect(
-        (within(karteninhalt(KARTEN.woerter)).getByPlaceholderText("Wort eingeben …") as HTMLInputElement).value,
-      ).toBe("kesselmann markt"),
-    );
-  });
-});
-
 describe("3 · Erkennungsmodell", () => {
   it("sagt vor dem ersten Training, dass noch nichts gelernt ist", async () => {
     material(2);
@@ -499,6 +461,59 @@ describe("3 · Erkennungsmodell", () => {
 
     await waitFor(() => expect(screen.getByText("100 %")).toBeTruthy());
     expect(screen.getByText(/Zuletzt trainiert am .*, aus 80 Beispielen/)).toBeTruthy();
+  });
+
+  /**
+   * Die Vergleichslinie. Ohne sie sagt eine Trefferquote nichts: das Material hier ist
+   * hälftig verteilt, blindes Raten träfe also die Hälfte — und genau das muss dastehen,
+   * damit „100 %" daneben überhaupt eine Aussage ist.
+   */
+  it("stellt neben die Trefferquote, was blindes Raten träfe", async () => {
+    material();
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.modell);
+
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+
+    await waitFor(() => expect(screen.getByText("Blindes Raten")).toBeTruthy());
+    // Und WAS geraten würde: die im Trainingsmaterial häufigste Kategorie. Die Zahl
+    // selbst haengt an der Aufteilung und ist deshalb keine Zusicherung — der Name ist
+    // die Aussage.
+    expect(screen.getByText(/immer „Lebensmittel"/)).toBeTruthy();
+    // Und der Abstand, aus dem man liest, ob das Modell überhaupt etwas gelernt hat.
+    expect(screen.getByText("Vorsprung")).toBeTruthy();
+  });
+
+  /**
+   * Aus der Verwechslungsstatistik in die einzelnen Zeilen. Die Zahl sagt, WO es klemmt;
+   * erst die Zeilen sagen, WARUM — steht dort ein Empfänger, der für beide Kategorien
+   * vorkommt, fehlt ein Merkmal; steht dort nichts Unterscheidendes, sind die beiden
+   * Kategorien fachlich nicht zu trennen.
+   */
+  it("führt von einem Verwechslungspaar auf die betroffenen Zeilen", async () => {
+    // Zwei Kategorien mit DEMSELBEN Empfänger — das muss danebengehen, und genau dieser
+    // Fall ist der, den man sich ansehen will.
+    kategorie("kat-a", "Alpha");
+    kategorie("kat-b", "Beta");
+    for (let i = 0; i < 40; i++) {
+      buchung({ id: `a${i}`, betrag: -1000, kategorieId: "kat-a", gegenpartei: "Ohlert Seewinkel", zweck: "Zahlung" });
+      buchung({ id: `b${i}`, betrag: -1000, kategorieId: "kat-b", gegenpartei: "Ohlert Seewinkel", zweck: "Zahlung" });
+    }
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.modell);
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+
+    // Erst die Statistik …
+    const paar = await screen.findByText(/Alpha → Beta|Beta → Alpha/);
+    expect(screen.queryByText(/Die einzelnen Zeilen dahinter/)).toBeNull();
+
+    // … dann die Zeilen dahinter.
+    await nutzer.click(paar);
+    await waitFor(() => expect(screen.getByText(/Die einzelnen Zeilen dahinter/)).toBeTruthy());
+    // Das Merkmal, das für die falsche Kategorie sprach, steht als Pille dabei.
+    expect(screen.getAllByText(/ohlert seewinkel/).length).toBeGreaterThan(0);
   });
 
   it("misst nicht, wenn zu wenige Beispiele da sind", async () => {

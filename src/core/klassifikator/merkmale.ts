@@ -52,21 +52,69 @@ import { anbieterSchluessel } from "../basis/gegenpartei";
 export interface Merkmalsquelle {
   readonly gegenpartei: string;
   readonly verwendungszweck: string;
+  /**
+   * Der Betrag in Minor Units, vorzeichenbehaftet. Optional: ohne ihn liefert die
+   * Herkunft `betrag` nichts, alles andere bleibt unberührt.
+   */
+  readonly betrag?: number;
 }
 
 /**
  * Woher ein Merkmal stammt — feiner als der Namensraum, weil `emp=` (ganzer Name) und
  * `emp:` (Einzelwörter) verschieden wirken und getrennt schaltbar sein müssen.
  */
-export type Merkmalsherkunft = "empGanz" | "empWort" | "vwz";
+export type Merkmalsherkunft = "empGanz" | "empWort" | "vwz" | "betrag";
 
 /** Alle Herkünfte in der Reihenfolge, in der sie in der Oberfläche stehen. */
-export const MERKMALSHERKUENFTE: readonly Merkmalsherkunft[] = ["empGanz", "empWort", "vwz"];
+export const MERKMALSHERKUENFTE: readonly Merkmalsherkunft[] = [
+  "empGanz",
+  "empWort",
+  "vwz",
+  "betrag",
+];
 
 /** Präfix je Herkunft — die Trennung im Token selbst. */
 const PRAEFIX: Record<Merkmalsherkunft, string> = {
-  empGanz: "emp=", empWort: "emp:", vwz: "vwz:",
+  empGanz: "emp=", empWort: "emp:", vwz: "vwz:", betrag: "bet:",
 };
+
+/**
+ * Die Grössenordnungen, in die ein Betrag fällt — Obergrenzen in Minor Units.
+ *
+ * GRÖSSENORDNUNG UND NICHT WERT, und das ist der ganze Punkt. Der genaue Betrag wäre für
+ * ein Bag-of-Words-Modell ein Token, das genau einmal vorkommt: es lernt nichts daraus
+ * und bläht das Vokabular um eine Zeile je Zahlung auf. Was trägt, ist die Klasse —
+ * „unter zehn" trennt den Bäcker vom Möbelhaus, und das ist eine Aussage, die sich
+ * wiederholt.
+ *
+ * Die Stufen wachsen grob logarithmisch: im Kleinen liegen viele Zahlungen dicht
+ * beieinander, im Grossen wenige weit auseinander. Gleich breite Stufen hätten unten
+ * eine einzige überfüllte Klasse und oben lauter leere.
+ */
+const GROESSENORDNUNGEN: readonly { readonly bis: number; readonly name: string }[] = [
+  { bis: 1000, name: "u10" },
+  { bis: 5000, name: "u50" },
+  { bis: 20000, name: "u200" },
+  { bis: 100000, name: "u1000" },
+  { bis: Number.POSITIVE_INFINITY, name: "gross" },
+];
+
+/**
+ * Der Betrag als Merkmal: Richtung und Grössenordnung, sonst nichts.
+ *
+ * Die RICHTUNG kommt mit, weil sie trennt, was die Grössenordnung allein
+ * zusammenwirft: eine Rückerstattung über 200 und ein Einkauf über 200 fallen sonst in
+ * dasselbe Token, obwohl sie fachlich das Gegenteil voneinander sind.
+ *
+ * Ein Betrag von 0 liefert nichts — es gibt keine Buchung darüber (`betrag.nichtNull`),
+ * und ein Token dafür wäre eine Klasse ohne Mitglieder.
+ */
+function betragsMerkmal(betrag: number): string | null {
+  if (!Number.isFinite(betrag) || betrag === 0) return null;
+  const hoehe = Math.abs(betrag);
+  const stufe = GROESSENORDNUNGEN.find((g) => hoehe < g.bis) ?? GROESSENORDNUNGEN[GROESSENORDNUNGEN.length - 1];
+  return `${betrag < 0 ? "ab" : "zu"}-${stufe.name}`;
+}
 
 /** Die Herkunft eines fertigen Tokens, oder null bei unbekanntem Präfix. */
 export function herkunftVon(merkmal: string): Merkmalsherkunft | null {
@@ -271,8 +319,16 @@ function pruefe(wort: string): { token: string } | { grund: Verwurfsgrund } {
  * wäre ein stiller Verhaltenswechsel, und die Zahlen gelten für EINEN Bestand. Die
  * Oberfläche zeigt die gemessene Wirkung je Herkunft; die Entscheidung trifft der Nutzer.
  */
+/**
+ * Die Grundeinstellung — ausdrücklich NICHT „alle Herkünfte".
+ *
+ * `betrag` ist bewusst aus: er kam 2026-08-31 dazu, und ein neues Merkmal, das sich
+ * selbst einschaltet, ändert jedes bestehende Modell, ohne dass jemand es gemessen hat.
+ * Er lässt sich in der Oberfläche zuschalten, und daneben steht die Vergleichslinie —
+ * damit ist die Frage „bringt das etwas?" beantwortbar statt Geschmackssache.
+ */
 export const STANDARD_KONFIGURATION: Merkmalskonfiguration = {
-  herkuenfte: MERKMALSHERKUENFTE,
+  herkuenfte: ["empGanz", "empWort", "vwz"],
   ausschluesse: [...STOPPWOERTER].sort().map((wort) => ({ wort })),
 };
 
@@ -374,6 +430,14 @@ export function merkmalsbefund(
   }
 
   for (const w of zerlegen(q.verwendungszweck)) wortHinzu(w, "vwz");
+
+  // Der Betrag geht an den Wortfiltern VORBEI: er ist kein Wort, und `pruefe` würde ihn
+  // als „zu kurz" oder „nur Ziffern" verwerfen. Ausschliessen lässt er sich trotzdem —
+  // über die Listenform, wie jedes andere Token auch.
+  if (aktiv.has("betrag") && q.betrag != null) {
+    const stufe = betragsMerkmal(q.betrag);
+    if (stufe && !ausgeschlossen(stufe, "betrag")) hinzu(`bet:${stufe}`);
+  }
 
   return { merkmale, verworfen };
 }

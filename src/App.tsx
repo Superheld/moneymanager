@@ -7,7 +7,7 @@ import { KontenVerwaltungScreen } from "./adapters/ui/konten/KontenVerwaltungScr
 import { EinstellungenScreen } from "./adapters/ui/einstellungen/EinstellungenScreen";
 import { VertraegeScreen } from "./adapters/ui/vertraege/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/budgets/BudgetsScreen";
-import { InventarScreen } from "./adapters/ui/inventar/InventarScreen";
+import { RuecklagenScreen } from "./adapters/ui/ruecklagen/RuecklagenScreen";
 import { ImportBereich } from "./adapters/ui/import/ImportBereich";
 import { TrainingBereich } from "./adapters/ui/training/TrainingBereich";
 import { appBootstrap } from "./application/bootstrap";
@@ -16,6 +16,7 @@ import { EinstellungenProvider } from "./adapters/ui/bausteine/EinstellungenProv
 import { Sperrbildschirm } from "./adapters/ui/zugang/Sperrbildschirm";
 import { useZeitsperre } from "./adapters/ui/zugang/useZeitsperre";
 import {
+  experimente as experimenteStand,
   zeitsperre,
   zugangEinrichten,
   zugangEntsperren,
@@ -23,6 +24,7 @@ import {
   zugangsstand,
   zugangSperren,
 } from "./adapters/dienste";
+import { EXPERIMENTE_AUS, type Experimente } from "./application";
 import "./adapters/ui/zugang/zugang.css";
 
 /**
@@ -43,6 +45,14 @@ export default function App() {
   >({ art: "laedt" });
   const [bereit, setBereit] = useState(false);
   const [minuten, setMinuten] = useState(0);
+  /**
+   * Der Stand der Experimente. Er entscheidet, welche Bereiche in der Navigation stehen.
+   *
+   * Ausgangswert ist „alles aus" — dieselbe vorsichtige Voreinstellung wie im Kern. Ein
+   * Bereich, der beim Laden kurz auftaucht und dann verschwindet, sähe nach einem Fehler
+   * aus.
+   */
+  const [experimente, setExperimente] = useState<Experimente>(EXPERIMENTE_AUS);
 
   const standHolen = useCallback(async () => {
     const s = await zugangsstand();
@@ -62,9 +72,13 @@ export default function App() {
     let abgebrochen = false;
     void (async () => {
       await appBootstrap(sqliteKategorieRepository).catch(() => {});
-      const m = await zeitsperre().catch(() => 0);
+      const [m, e] = await Promise.all([
+        zeitsperre().catch(() => 0),
+        experimenteStand().catch(() => EXPERIMENTE_AUS),
+      ]);
       if (!abgebrochen) {
         setMinuten(m);
+        setExperimente(e);
         setBereit(true);
       }
     })();
@@ -112,11 +126,19 @@ export default function App() {
 
   return (
     <EinstellungenProvider>
-      <AppShell current={screen} onNavigate={setScreen}>
+      {/* Das Training ist ein EXPERIMENT (Wunsch 2026-08-31): es ist eine Werkbank,
+          kein fertiger Bereich — man greift dort in die Merkmale ein, misst Varianten
+          und trainiert neu. Ausgeliefert wird ein fertiges Modell; wer es selbst
+          anfassen will, schaltet den Bereich in den Einstellungen zu. */}
+      <AppShell
+        current={screen}
+        onNavigate={setScreen}
+        versteckt={experimente.training ? [] : ["training"]}
+      >
         {screen === "uebersicht" && <UebersichtScreen />}
         {screen === "analyse" && <AnalyseScreen />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
-        {screen === "inventar" && <InventarScreen />}
+        {screen === "ruecklagen" && <RuecklagenScreen />}
         {screen === "budgets" && <BudgetsScreen />}
         {screen === "vertraege" && <VertraegeScreen />}
         {screen === "kontenverwaltung" && <KontenVerwaltungScreen />}

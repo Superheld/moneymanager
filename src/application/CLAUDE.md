@@ -35,7 +35,7 @@ die Stelle, an der geprüft wird:
 ## Gliederung
 
 Bereiche wie im Kern (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`,
-`inventar/`, `dubletten/`, `stammdaten/`) plus die eigenen Kontexte `import/` und `fints/`.
+`ruecklagen/`, `dubletten/`, `stammdaten/`) plus die eigenen Kontexte `import/` und `fints/`.
 
 In der Wurzel bleibt, was keinem Bereich gehört: `index.ts` (Fassade zur UI), `ports.ts`
 (die Interfaces, von 76 Stellen benutzt), `bootstrap.ts`, `einstellungen.ts` und die

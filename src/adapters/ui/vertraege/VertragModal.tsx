@@ -60,6 +60,12 @@ export interface VertragFormular {
   kategorieId: string;
   kontoId: string;
   /**
+   * Zielkonto einer Umbuchung. Steht nur zur Wahl, wenn der Charakter „Umschichtung"
+   * ist — bei Aufwand oder Ertrag verlässt das Geld den erfassten Bereich, und ein
+   * Zielkonto behauptete etwas anderes.
+   */
+  gegenkontoId: string;
+  /**
    * SEPA-Gläubiger-ID aus einem übernommenen Vorschlag. Kein Eingabefeld — sie wird
    * durchgereicht, nicht getippt. Sie landet in der Erkennungsregel des Vertrags, wo sie
    * der präziseste Schlüssel ist, den es gibt (siehe core/vertragZuordnung).
@@ -84,6 +90,7 @@ export function leeresFormular(heute: string): VertragFormular {
     charakter: "Aufwand",
     kategorieId: "",
     kontoId: "",
+    gegenkontoId: "",
     glaeubigerId: "",
   };
 }
@@ -110,6 +117,7 @@ export function formularAusVertrag(v: Vertrag, r: Zahlungsregel | undefined, gel
     charakter: r?.charakter ?? "Aufwand",
     kategorieId: r?.kategorieId ?? "",
     kontoId: r?.kontoId ?? "",
+    gegenkontoId: r?.gegenkontoId ?? "",
     // Beim Bearbeiten steht die Erkennungsregel nicht zur Debatte — sie hat ihre eigene
     // Maske und darf hier nicht überschrieben werden.
     glaeubigerId: "",
@@ -276,6 +284,18 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
     setF((v) => ({ ...v, [feld]: wert }));
   }
 
+  /**
+   * Die Art „Umbuchung" zieht den Charakter mit.
+   *
+   * Sonst gäbe es den Zustand „Umbuchungsvertrag mit Charakter Aufwand" — eine
+   * Vereinbarung, die sagt, das Geld verlasse den erfassten Bereich, und zugleich, es
+   * bleibe darin. Das Zielkonto erschiene dann nicht, und der Vertrag bliebe stumm ein
+   * gewöhnlicher.
+   */
+  function artWaehlen(art: Vertragsart) {
+    setF((v) => ({ ...v, art, charakter: art === "umbuchung" ? "Umschichtung" : v.charakter }));
+  }
+
   /** Kategorie wählen belegt den Charakter mit — er folgt fast immer der Kategorie. */
   function kategorieWaehlen(id: string) {
     const k = kategorien.find((x) => x.id === id);
@@ -299,6 +319,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
       charakter: f.charakter,
       kategorieId: f.kategorieId || undefined,
       kontoId: f.kontoId || undefined,
+      gegenkontoId: f.gegenkontoId || undefined,
       glaeubigerId: f.glaeubigerId || undefined,
     };
     try {
@@ -376,6 +397,24 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
               optionen={CHARAKTERE.map((c) => ({ wert: c, text: t(`charakter.${c}`) }))}
             />
           </FormField>
+          {/* Das Zielkonto erscheint nur bei einer Umschichtung — und genau daran wird
+              ein Umbuchungsvertrag später wiedererkannt: nicht am Empfänger (bei einer
+              Zahlung zwischen zwei eigenen Konten steht dort je nach Bank die eigene
+              IBAN, der eigene Name oder nichts), sondern am WEG. Ohne Zielkonto bleibt
+              die Regel ein Plan ohne Ist. */}
+          {f.charakter === "Umschichtung" && (
+            <FormField label={t("vertraege.feldZielkonto")} hint={t("vertraege.feldZielkontoHinweis")}>
+              <Auswahl
+                ariaLabel={t("vertraege.feldZielkonto")}
+                wert={f.gegenkontoId}
+                aufAenderung={(v) => setze("gegenkontoId", v)}
+                optionen={[
+                  { wert: "", text: "—" },
+                  ...konten.filter((k) => k.id !== f.kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung })),
+                ]}
+              />
+            </FormField>
+          )}
         </div>
       </Abschnitt>
 
@@ -395,10 +434,11 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
             <Auswahl
               ariaLabel={t("vertraege.feldArt")}
               wert={f.art}
-              aufAenderung={(v) => setze("art", v as Vertragsart)}
+              aufAenderung={(v) => artWaehlen(v as Vertragsart)}
               optionen={[
                 { wert: "abo", text: t("vertraege.art.abo") },
                 { wert: "dauervertrag", text: t("vertraege.art.dauervertrag") },
+                { wert: "umbuchung", text: t("vertraege.art.umbuchung") },
               ]}
             />
           </FormField>

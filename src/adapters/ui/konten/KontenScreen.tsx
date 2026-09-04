@@ -36,7 +36,7 @@ import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { Modal } from "../bausteine/Modal";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton } from "../bausteine/IconButton";
-import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
@@ -54,19 +54,12 @@ function heuteIso(): string {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 }
-/**
- * Datum einer Registerzeile — MIT Jahr. Ohne es liest sich eine Liste, die über den
- * Jahreswechsel reicht, als wäre alles aus demselben Jahr; im Register stehen aber alle
- * Buchungen eines Kontos, nicht nur die des laufenden Jahres.
- */
-function datumKurz(iso: string): string {
-  const [j, m, d] = iso.split("-");
-  return `${d}.${m}.${j}`;
-}
-
 export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => void }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  // MIT Jahr. Ohne es liest sich eine Liste, die über den Jahreswechsel reicht, als wäre
+  // alles aus demselben Jahr; im Register stehen alle Buchungen eines Kontos.
+  const datum = useDatum();
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Kontensicht | null>(null);
   const [aktivId, setAktivId] = useState("");
@@ -269,7 +262,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
   return (
     <div className="screen">
-      <PageHead title={t("konten.titel")} subtitle={t("konten.untertitel")} />
+      {/* Ohne Untertitel, und das ist eine Entscheidung: „Kontostände, gebuchte und
+          voraussichtliche Buchungen je Konto" sagte genau das, was man sieht. Was hier
+          eine AUSSAGE trägt, steht an der Karte, wo es hingehört — „Anfangsbestand +
+          bestätigte Ist-Buchungen = realer Stand". */}
+      <PageHead title={t("konten.titel")} />
 
       <Card
         title={t("konten.deineKonten")}
@@ -320,7 +317,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   z.depot ? (
                     <span
                       style={{ fontWeight: "var(--fw-bold)" }}
-                      title={t("depot.standErklaerung", { datum: z.depot.aktuell?.stichtag ?? "—" })}
+                      title={t("depot.standErklaerung", { datum: z.depot.aktuell ? datum.mitJahr(z.depot.aktuell.stichtag) : "—" })}
                     >
                       {z.depot.aktuell ? geld.format(z.depot.aktuell.gesamtwert) : "—"}
                       <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-1)" }}>
@@ -567,7 +564,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                         ) : null,
                     }]
                   : []),
-                { key: "datum", label: t("konten.spalteDatum"), render: (r) => datumKurz(r.zeile.datum) },
+                { key: "datum", label: t("konten.spalteDatum"), render: (r) => datum.mitJahr(r.zeile.datum) },
                 {
                   // Nicht umbrechen (flexWrap): eine zweizeilige Zeile schiebt den
                   // Seitenschalter darunter je nach Seiteninhalt nach oben oder unten,

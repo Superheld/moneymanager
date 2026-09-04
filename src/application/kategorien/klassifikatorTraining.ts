@@ -14,6 +14,7 @@
 import {
   aufteilen,
   bewerten,
+  grundlinie,
   trainieren,
   type Beispiel,
   type Bewertung,
@@ -38,6 +39,15 @@ export interface TrainingsErgebnis {
   readonly material: Materialbefund;
   /** Messung an zurückgehaltenen Beispielen; fehlt bei zu wenig Material. */
   readonly bewertung?: Bewertung;
+  /**
+   * Was das dümmste denkbare Modell auf derselben Prüfmenge träfe — immer die häufigste
+   * Kategorie raten.
+   *
+   * Sie steht neben der Genauigkeit, weil die für sich genommen nichts sagt: erst der
+   * Abstand zwischen beiden ist eine Aussage über das Modell. Fehlt aus demselben Grund
+   * wie `bewertung` — ohne Prüfmenge gibt es nichts zu vergleichen.
+   */
+  readonly grundlinie?: { kategorieId: string; genauigkeit: number };
 }
 
 export interface TrainingsDeps {
@@ -66,15 +76,22 @@ export interface TrainingsDeps {
  */
 export async function klassifikatorTrainieren(deps: TrainingsDeps): Promise<TrainingsErgebnis> {
   const material = await trainingsmaterial(deps.ledger, deps.umsatzRepo, deps.konfiguration);
+  // Die Buchungs-ID wandert mit: fürs Training bedeutungslos, für die Bewertung der
+  // Unterschied zwischen „siebenmal verwechselt" und „diese sieben Zeilen".
   const beispiele: Beispiel[] = material.beispiele.map((b) => ({
     merkmale: b.merkmale,
     kategorieId: b.kategorieId,
+    id: b.istbuchungId,
   }));
 
   let bewertung: Bewertung | undefined;
+  let linie: { kategorieId: string; genauigkeit: number } | undefined;
   if (beispiele.length >= MESSBAR_AB) {
     const { training, pruefung } = aufteilen(beispiele, PRUEFANTEIL);
     bewertung = bewerten(trainieren(training), pruefung);
+    // Auf DERSELBEN Aufteilung — eine Vergleichslinie, die an anderen Beispielen
+    // gemessen wird, vergleicht nichts.
+    linie = grundlinie(training, pruefung) ?? undefined;
   }
 
   const stand: Modellstand = {
@@ -84,7 +101,7 @@ export async function klassifikatorTrainieren(deps: TrainingsDeps): Promise<Trai
   };
   await deps.klassifikatorRepo.speichern(stand);
 
-  return { stand, material, bewertung };
+  return { stand, material, bewertung, grundlinie: linie };
 }
 
 export interface Modellzustand {

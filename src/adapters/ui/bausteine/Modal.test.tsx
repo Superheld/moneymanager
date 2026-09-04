@@ -3,7 +3,7 @@
 // nur an einem VERSCHACHTELTEN Aufbau sichtbar werden. Ein einzelner Dialog auf leerer
 // Seite verhält sich in beiden Fällen richtig; deshalb hat es lange niemand gemerkt.
 
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "../../../i18n/i18n";
@@ -73,5 +73,65 @@ describe("Modal", () => {
     await nutzer.keyboard("{Escape}");
 
     expect(geschlossen).toEqual(["aussen"]);
+  });
+});
+
+/**
+ * Schmal fuellt der Dialog den Bildschirm und wird zu drei Teilen, von denen nur der
+ * mittlere scrollt. Das ist keine Kosmetik: breit lag „Speichern" auf einem Telefon
+ * unter dem Bildrand, und zwar ohne dass man es sieht — der Dialog ist ein eigener
+ * Scrollbereich, der Rest der Seite steht still.
+ *
+ * `matchMedia` gibt es in jsdom nicht; ohne die Attrappe gilt breit (siehe `useSchmal`).
+ */
+describe("Dialog — schmal", () => {
+  function schmalStellen(an: boolean) {
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      configurable: true,
+      value: (media: string) => ({
+        matches: an, media, onchange: null,
+        addEventListener() {}, removeEventListener() {}, dispatchEvent: () => false,
+        addListener() {}, removeListener() {},
+      }),
+    });
+  }
+
+  afterEach(() => {
+    Reflect.deleteProperty(window, "matchMedia");
+  });
+
+  function teile() {
+    const kasten = screen.getByRole("dialog").firstElementChild!.firstElementChild as HTMLElement;
+    const kinder = Array.from(kasten.children) as HTMLElement[];
+    return { kasten, kopf: kinder[0], inhalt: kinder[1], fuss: kinder[2] };
+  }
+
+  it("laesst schmal nur den Inhalt scrollen — die Fusszeile bleibt stehen", () => {
+    schmalStellen(true);
+    render(<Modal title="Buchung" onClose={() => {}} footer={<button>Speichern</button>}>Feld</Modal>);
+    const { inhalt, fuss } = teile();
+    expect(inhalt.style.overflowY).toBe("auto");
+    expect(inhalt.style.flex).toBe("1 1 auto");
+    // Ein Flex-Kind besteht sonst auf seiner Inhaltshoehe und schiebt die Fusszeile hinaus.
+    expect(inhalt.style.minHeight).toBe("0px");
+    expect(fuss.style.flex).toBe("0 0 auto");
+    expect(screen.getByText("Speichern")).toBeInTheDocument();
+  });
+
+  it("nimmt schmal den Deckel und die Luft darum weg", () => {
+    schmalStellen(true);
+    render(<Modal title="Buchung" onClose={() => {}}>Feld</Modal>);
+    const layer = screen.getByRole("dialog").firstElementChild as HTMLElement;
+    expect(layer.style.padding).toBe("0px");
+    expect(teile().kasten.style.maxWidth).toBe("none");
+  });
+
+  it("laesst die breite Form unberuehrt", () => {
+    schmalStellen(false);
+    render(<Modal title="Buchung" onClose={() => {}} footer={<button>Speichern</button>}>Feld</Modal>);
+    const layer = screen.getByRole("dialog").firstElementChild as HTMLElement;
+    expect(layer.style.padding).toBe("48px 20px");
+    expect(teile().kasten.style.maxWidth).toBe("680px");
   });
 });

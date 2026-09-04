@@ -27,10 +27,10 @@ import type { EinstellungenRepository } from "./ports";
  * Die Kennungen aller Experimente. Ein neues Experiment ist ein Wert mehr — und der
  * Typ zwingt dazu, es unten in `EXPERIMENTE_AUS` mitzuführen.
  */
-export type ExperimentId = "hanseatic" | "export";
+export type ExperimentId = "hanseatic" | "export" | "training";
 
 /** Alle Kennungen, für Schleifen über den Bestand. */
-export const EXPERIMENTE: readonly ExperimentId[] = ["hanseatic", "export"];
+export const EXPERIMENTE: readonly ExperimentId[] = ["hanseatic", "export", "training"];
 
 /** Welche Experimente eingeschaltet sind. */
 export type Experimente = Readonly<Record<ExperimentId, boolean>>;
@@ -42,7 +42,7 @@ export type Experimente = Readonly<Record<ExperimentId, boolean>>;
  * gelesen werden kann. Ein Experiment schaltet sich nie von selbst ein — die Voreinstellung
  * ist die einzige, die ohne Zutun des Benutzers gilt, und sie muss die vorsichtige sein.
  */
-export const EXPERIMENTE_AUS: Experimente = { hanseatic: false, export: false };
+export const EXPERIMENTE_AUS: Experimente = { hanseatic: false, export: false, training: false };
 
 const PRAEFIX = "experiment.";
 

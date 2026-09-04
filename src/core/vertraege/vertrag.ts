@@ -24,7 +24,17 @@ export type Vertragsstatus = "aktiv" | "gekuendigt" | "beendet";
  * Die Frist bleibt in BEIDEN Fällen sichtbar: bei einem Mietvertrag ist sie eine
  * nützliche Auskunft, nur eben keine Aufforderung.
  */
-export type Vertragsart = "abo" | "dauervertrag";
+/**
+ * Was für eine Vereinbarung das ist.
+ *
+ * `umbuchung` ist der Sonderfall: kein Vertrag mit jemand anderem, sondern eine
+ * Abmachung mit sich selbst — „jeden Monat 200 aufs Tagesgeldkonto". Sie steht hier und
+ * nicht in einem eigenen Aggregat, weil sie alles teilt, was einen Vertrag ausmacht:
+ * einen Rhythmus, einen Betrag, einen Plan im Monatsausblick und die Frage, ob sie
+ * eingehalten wurde. Was sie NICHT teilt, ist die Erkennung — siehe
+ * `umbuchungErkennung`.
+ */
+export type Vertragsart = "abo" | "dauervertrag" | "umbuchung";
 
 export interface Vertrag {
   readonly id: string;
@@ -137,7 +147,9 @@ export function ruecklagenbedarf(regeln: readonly Zahlungsregel[]): number {
 export function kuendigungsterminNaht(v: Vertrag, heute: string, warnTage = 45): boolean {
   // Ein Dauervertrag wird nicht „bald kündbar" — die Warnung gehört den Abos. Der Termin
   // selbst bleibt abrufbar (naechsterKuendigungstermin), er ist nur keine Aufforderung.
-  if (v.art === "dauervertrag") return false;
+  // Eine Umbuchung erst recht nicht: sie ist eine Abmachung mit sich selbst, und die
+  // kündigt man, indem man sie löscht.
+  if (v.art === "dauervertrag" || v.art === "umbuchung") return false;
   const t = naechsterKuendigungstermin(v, heute);
   if (!t) return false;
   const diff = tageBis(heute, t.kuendigenBis);

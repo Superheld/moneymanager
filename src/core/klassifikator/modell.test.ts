@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { aufteilen, bewerten, kategorieprofile, klassifizieren, trainieren, type Beispiel, verwechslungsmatrix } from "./modell";
+import { aufteilen, bewerten, grundlinie, kategorieprofile, klassifizieren, trainieren, type Beispiel, verwechslungsmatrix } from "./modell";
 
 /** Ein kleines, klar trennbares Problem — die Aussagen sollen am Verhalten hängen. */
 function daten(): Beispiel[] {
@@ -300,5 +300,89 @@ describe("Was eine Kategorie auszeichnet", () => {
 
   it("liefert für ein leeres Modell nichts, statt zu werfen", () => {
     expect(kategorieprofile(trainieren([]))).toEqual([]);
+  });
+});
+
+/**
+ * Die Vergleichslinie. Ohne sie sagt eine Trefferquote nichts: bei einer dominanten
+ * Kategorie trifft schon blindes Raten viel, bei gleichmässiger Verteilung fast nichts.
+ */
+describe("grundlinie", () => {
+  const b = (kategorieId: string): Beispiel => ({ merkmale: ["x"], kategorieId });
+
+  it("rät die im Training häufigste Kategorie", () => {
+    const training = [b("essen"), b("essen"), b("essen"), b("freizeit")];
+    const pruefung = [b("essen"), b("freizeit")];
+    expect(grundlinie(training, pruefung)).toEqual({ kategorieId: "essen", genauigkeit: 0.5 });
+  });
+
+  it("misst an der PRÜFmenge, nicht am Training", () => {
+    // Im Training dominiert „essen", in der Prüfmenge kommt es gar nicht vor. Eine
+    // Vergleichslinie, die sich am Training misst, sähe hier grossartig aus.
+    const training = [b("essen"), b("essen"), b("essen"), b("freizeit")];
+    const pruefung = [b("freizeit"), b("freizeit")];
+    expect(grundlinie(training, pruefung)?.genauigkeit).toBe(0);
+  });
+
+  // Sonst hinge sie an der Reihenfolge der Beispiele und wäre zwischen zwei Läufen
+  // verschieden — bei einer Zahl, an der man Änderungen misst, wäre das fatal.
+  it("entscheidet Gleichstand alphabetisch", () => {
+    const training = [b("beta"), b("alpha")];
+    expect(grundlinie(training, [b("alpha")])?.kategorieId).toBe("alpha");
+  });
+
+  it("liefert null statt einer erfundenen Null", () => {
+    expect(grundlinie([], [b("essen")])).toBeNull();
+    expect(grundlinie([b("essen")], [])).toBeNull();
+  });
+});
+
+/**
+ * Die einzelnen Fehlgriffe. `verwechslungen` zählt sie, `fehltreffer` nennt sie — und
+ * erst daran sieht man, ob ein Merkmal fehlt oder zwei Kategorien nicht zu trennen sind.
+ */
+describe("bewerten — Fehltreffer", () => {
+  it("nennt die betroffene Buchung samt ihren Merkmalen", () => {
+    const modell = trainieren([
+      { merkmale: ["emp:kesselmann"], kategorieId: "essen" },
+      { merkmale: ["emp:kesselmann"], kategorieId: "essen" },
+      { merkmale: ["emp:vibora"], kategorieId: "freizeit" },
+    ]);
+    // Dieselben Merkmale, andere Kategorie: das MUSS danebengehen — und genau dieser
+    // Fall ist der, den man sich ansehen will.
+    const b = bewerten(modell, [
+      { merkmale: ["emp:kesselmann"], kategorieId: "freizeit", id: "buchung-1" },
+    ]);
+
+    expect(b.fehltreffer).toHaveLength(1);
+    expect(b.fehltreffer[0].id).toBe("buchung-1");
+    expect(b.fehltreffer[0].tatsaechlich).toBe("freizeit");
+    expect(b.fehltreffer[0].vorhergesagt).toBe("essen");
+    expect(b.fehltreffer[0].merkmale).toEqual(["emp:kesselmann"]);
+    // Und WORAN es lag: das Merkmal, das für die falsche Kategorie sprach.
+    expect(b.fehltreffer[0].beitraege.map((x) => x.merkmal)).toContain("emp:kesselmann");
+  });
+
+  it("hält Treffer heraus", () => {
+    const modell = trainieren([
+      { merkmale: ["emp:kesselmann"], kategorieId: "essen" },
+      { merkmale: ["emp:vibora"], kategorieId: "freizeit" },
+    ]);
+    const b = bewerten(modell, [{ merkmale: ["emp:kesselmann"], kategorieId: "essen", id: "b1" }]);
+    expect(b.fehltreffer).toEqual([]);
+  });
+
+  it("summiert sich zu den Verwechslungen auf", () => {
+    const modell = trainieren([
+      { merkmale: ["a"], kategorieId: "essen" },
+      { merkmale: ["a"], kategorieId: "essen" },
+      { merkmale: ["b"], kategorieId: "freizeit" },
+    ]);
+    const b = bewerten(modell, [
+      { merkmale: ["a"], kategorieId: "freizeit", id: "1" },
+      { merkmale: ["a"], kategorieId: "freizeit", id: "2" },
+    ]);
+    expect(b.fehltreffer).toHaveLength(2);
+    expect(b.verwechslungen.reduce((s, v) => s + v.anzahl, 0)).toBe(b.fehltreffer.length);
   });
 });

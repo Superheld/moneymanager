@@ -9,7 +9,21 @@
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import i18n, { SPRACHEN } from "./i18n";
+
+/**
+ * Ein Pfad relativ zu dieser Datei — als BETRIEBSSYSTEM-Pfad, nicht als URL-Pfad.
+ *
+ * `new URL(...).pathname` sieht auf macOS und Linux richtig aus und ist es auf Windows
+ * nicht: dort steht der Laufwerksbuchstabe hinter einem fuehrenden Schraegstrich
+ * (`/D:/a/...`), und `readdirSync` haengt das an das aktuelle Laufwerk — aus dem Pfad
+ * wird `D:\D:\a\...`. Genau daran ist der Windows-Lauf des Releases 0.24.0
+ * gescheitert, und zwar an den TESTS, bevor ueberhaupt gebaut wurde.
+ */
+function pfad(relativ: string): string {
+  return fileURLToPath(new URL(relativ, import.meta.url));
+}
 
 type Baum = Record<string, unknown>;
 
@@ -104,7 +118,7 @@ describe("Übersetzungs-Bundles", () => {
  * vor; die sind aus dem Quelltext nicht auflösbar.
  */
 describe("Schlüssel im Code", () => {
-  const WURZEL = new URL("..", import.meta.url).pathname;
+  const WURZEL = pfad("..");
 
   function quelldateien(verzeichnis: string): string[] {
     return readdirSync(verzeichnis, { withFileTypes: true }).flatMap((e) => {
@@ -153,7 +167,7 @@ describe("Schlüssel im Code", () => {
  * `geld.format(0)` formatiert, weil das Dezimaltrennzeichen an der Locale hängt.
  */
 describe("Sichtbare Texte in Komponenten", () => {
-  const UI = new URL("../adapters/ui", import.meta.url).pathname;
+  const UI = pfad("../adapters/ui");
   const SICHTBAR = /\b(placeholder|title|aria-label|alt)\s*=\s*"([^"]*)"/g;
   /** Sprachfrei und deshalb erlaubt: reine Ganzzahlen. */
   const SPRACHFREI = /^\d+$/;
@@ -188,7 +202,7 @@ describe("Sichtbare Texte in Komponenten", () => {
  */
 describe("Fast Refresh", () => {
   it("lässt den EinstellungenProvider nur seine Komponente exportieren", () => {
-    const datei = new URL("../adapters/ui/bausteine/EinstellungenProvider.tsx", import.meta.url).pathname;
+    const datei = pfad("../adapters/ui/bausteine/EinstellungenProvider.tsx");
     const exporte = [...readFileSync(datei, "utf8").matchAll(/^export\s+(?:async\s+)?(?:function|const)\s+(\w+)/gm)]
       .map((m) => m[1]);
     const keineKomponente = exporte.filter((n) => !/^[A-Z]/.test(n));

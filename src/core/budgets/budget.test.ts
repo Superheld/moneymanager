@@ -9,6 +9,7 @@ import {
   budgetVerbrauch,
   effektiverMonatsbetrag,
   elternBudget,
+  ersterBudgetmonat,
   geglaetteterMonatsabfluss,
   kindBudgets,
   monatsFenster,
@@ -178,6 +179,27 @@ describe("budgetVerbrauch", () => {
     expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(0);
   });
 
+  /**
+   * Die Ausnahme von Hand. Sie gibt es für die eine teure Anschaffung, für die
+   * jahrelang zurückgelegt wurde — sie ist eine echte Ausgabe, aber keine, an der sich
+   * ein Monatsrahmen messen lassen müsste. Gesetzt wird sie beim Ausbuchen einer
+   * Rücklage oder von Hand.
+   */
+  it("überspringt eine Buchung, die von der Budgetbewertung ausgenommen ist", () => {
+    const ist = [
+      b({ id: "1", betrag: euroZuCent(-50) }),
+      b({ id: "2", betrag: euroZuCent(-1200), budgetrelevant: false }),
+    ];
+    expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(euroZuCent(50));
+  });
+
+  // Fehlend heisst JA. Sonst fiele mit der Einführung der Spalte der ganze Altbestand
+  // aus jedem Budget, und die Rahmen sähen über Nacht grosszügig aus.
+  it("zählt eine Buchung ohne die Angabe ganz normal mit", () => {
+    const ist = [b({ id: "1", betrag: euroZuCent(-50), budgetrelevant: undefined })];
+    expect(budgetVerbrauch(sicht(ist, [dach]), dach, von, bis)).toBe(euroZuCent(50));
+  });
+
   it("legt dieselbe Auswahl als Einzelposten offen — Summe = Verbrauch", () => {
     // Die Oberfläche zeigt beim Aufklappen genau diese Liste. Weil `budgetVerbrauch`
     // nur noch ihre Summe ist, können Balken und Liste nicht auseinanderlaufen.
@@ -294,5 +316,37 @@ describe("budgetStand", () => {
   it("meldet einen negativen Rest, wenn mehr ausgegeben wurde als da war", () => {
     const b = budget({ kategorieId: "urlaub", betragProMonat: euroZuCent(10) });
     expect(budgetStand(sicht(ist, [b]), b, "2026-03-15").rest).toBe(euroZuCent(-10));
+  });
+});
+
+/**
+ * Ein Budget ohne `start` kann die App nicht erzeugen — die Spalte ist aber nullable, und
+ * das Repository reicht sie unveraendert durch. Bis hierher warf `.slice` dann schon beim
+ * LADEN, und weil `budgetstaende` ueber alle Budgets laeuft, nahm ein einziges kaputtes
+ * den ganzen Screen mit: leere Seite, keine Meldung, kein Hinweis welches.
+ *
+ * Der Test steht im Kern und nicht in der UI, weil die Absicherung dort sitzt — und weil
+ * er sonst genau das braeuchte, was er verhindern soll: einen kaputten Bestand.
+ */
+describe("Budget ohne Startdatum", () => {
+  /** Der Zustand, den der Typ ausschliesst und die Datenbank hergibt. */
+  const ohneStart = (art: Budget["art"], betraege: Budget["betraege"]): Budget =>
+    ({ id: "b", kategorieId: "k", kontoId: "giro", art, betraege, start: null } as unknown as Budget);
+
+  it("faellt auf die erste Betragsversion zurueck, statt zu werfen", () => {
+    const b = ohneStart("monatlich", [{ abMonat: "2026-03", betrag: euroZuCent(100) }]);
+    expect(ersterBudgetmonat(b)).toBe("2026-03");
+  });
+
+  it("nimmt auch beim Aufbauenden die erste Version — der Anker ist ja weg", () => {
+    const b = ohneStart("aufbauend", [{ abMonat: "2026-03", betrag: euroZuCent(100) }]);
+    expect(ersterBudgetmonat(b)).toBe("2026-03");
+  });
+
+  it("rechnet weiter, statt den ganzen Bereich mitzunehmen", () => {
+    const b = ohneStart("monatlich", [{ abMonat: "2026-01", betrag: euroZuCent(400) }]);
+    const stand = budgetStand(sicht([], [b]), b, "2026-03-15");
+    expect(stand.rahmen).toBe(euroZuCent(400));
+    expect(stand.rest).toBe(euroZuCent(400));
   });
 });

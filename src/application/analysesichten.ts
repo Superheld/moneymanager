@@ -372,7 +372,7 @@ export interface Verlaufspunkt {
  * Sprung, den niemand erklären kann.
  *
  * Was ein Planmonat zum Saldo beiträgt, entscheidet `planWirkung` — Rücklagen und
- * Umschichtungen bleiben draussen (siehe dort). Die Rücklagen aus dem Inventar werden
+ * Umschichtungen bleiben draussen (siehe dort). Die Rücklagen werden
  * hier deshalb gar nicht erst geladen.
  */
 export function analyseAusblick(

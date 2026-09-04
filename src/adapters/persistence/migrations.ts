@@ -1826,4 +1826,76 @@ export const MIGRATIONS: Migration[] = [
       `DROP TABLE IF EXISTS kategorie_festlegung`,
     ],
   },
+  {
+    version: 65, // Aus dem Inventar werden Ruecklagen
+    sql: [
+      // Der Gegenstand war zu eng. Man legt auch fuer einen Urlaub zurueck, und der hat
+      // keinen Wiederbeschaffungswert und keine Nutzungsdauer. Deshalb sind ZIEL und
+      // FRIST jetzt optional, und daneben steht eine freie RATE. Genau eine der beiden
+      // Formen ist ausgefuellt; die Anwendungsschicht setzt das durch.
+      //
+      // Die Unterscheidung traegt mehr als die Anzeige: an ihr haengt, was nach dem
+      // Ausbuchen passiert — mit Ziel faengt die Ruecklage von vorn an, ohne Ziel ist
+      // sie erledigt. Ein eigenes Feld „wiederkehrend" waere daneben eine zweite
+      // Wahrheit, die der ersten widersprechen kann.
+      `CREATE TABLE IF NOT EXISTS ruecklage (
+         id           TEXT PRIMARY KEY,
+         bezeichnung  TEXT NOT NULL,
+         ziel         INTEGER,
+         frist_monate INTEGER,
+         rate         INTEGER,
+         beginn       TEXT NOT NULL,
+         kategorie_id TEXT REFERENCES kategorie(id) ON DELETE SET NULL,
+         konto_id     TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL
+       )`,
+      // Jeder bisherige Gegenstand hatte Ziel und Frist — er wandert unveraendert
+      // herueber und verhaelt sich danach genauso wie vorher.
+      `-- @wennTabelle inventargegenstand
+       INSERT OR IGNORE INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id)
+         SELECT id, bezeichnung, wiederbeschaffung, nutzungsdauer_monate, NULL,
+                anschaffung, kategorie_id, konto_id FROM inventargegenstand`,
+      `DROP TABLE IF EXISTS inventargegenstand`,
+
+      // Das Ausbuchen ist eine AUFZEICHNUNG und kein Zustand: der Zustand steht an der
+      // Ruecklage (`beginn`) beziehungsweise darin, dass es sie nicht mehr gibt.
+      //
+      // Auf `ist_buchung` steht deshalb bewusst SET NULL und nicht CASCADE: welche
+      // Buchung es war, soll auch dann noch dastehen, wenn die Buchung geloescht wird —
+      // dieselbe Ueberlegung wie beim `buchung_journal`, nur eine Nummer kleiner.
+      `CREATE TABLE IF NOT EXISTS ruecklage_ausbuchung (
+         id            TEXT PRIMARY KEY,
+         ruecklage_id  TEXT NOT NULL REFERENCES ruecklage(id) ON DELETE CASCADE,
+         datum         TEXT NOT NULL,
+         betrag        INTEGER NOT NULL,
+         istbuchung_id TEXT REFERENCES ist_buchung(id) ON DELETE SET NULL,
+         notiz         TEXT
+       )`,
+      `CREATE INDEX IF NOT EXISTS ix_ruecklage_ausbuchung
+         ON ruecklage_ausbuchung(ruecklage_id, datum)`,
+
+      // Die Ausnahme von der Budgetbewertung. Eine Neuanschaffung, fuer die jahrelang
+      // zurueckgelegt wurde, ist keine Ausgabe, an der sich ein Monatsbudget messen
+      // lassen muesste — sie wuerde jedes sprengen.
+      //
+      // POSITIV benannt und mit Vorgabe 1: eine Buchung ist budgetrelevant, solange
+      // niemand etwas anderes sagt. Ein `nicht_budgetrelevant` waere beim Lesen eine
+      // doppelte Verneinung, und die faellt in einem `WHERE` irgendwann falsch aus.
+      `ALTER TABLE ist_buchung ADD COLUMN budgetrelevant INTEGER NOT NULL DEFAULT 1`,
+    ],
+  },
+  {
+    version: 66, // Umbuchungsvertraege: eine Zahlungsregel bekommt ein Zielkonto
+    sql: [
+      // Mit Gegenkonto beschreibt die Regel keine Zahlung nach draussen mehr, sondern
+      // eine Verschiebung zwischen zwei eigenen Konten. Sinnvoll nur zusammen mit
+      // `charakter = 'Umschichtung'`; erzwungen wird das an der Anwendungsgrenze, weil
+      // SQLite eine Bedingung ueber zwei Spalten nur mit einem CHECK ausdruecken kann
+      // und ein CHECK an einer bestehenden Tabelle einen Umbau kostet.
+      //
+      // Es steht an der REGEL und nicht am Vertrag: die Regel beschreibt die Zahlung,
+      // der Vertrag die Vereinbarung darueber. Derselbe Grund, aus dem `konto_id` dort
+      // steht.
+      `ALTER TABLE zahlungsregel ADD COLUMN gegenkonto_id TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL`,
+    ],
+  },
 ];

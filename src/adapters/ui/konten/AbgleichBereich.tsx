@@ -15,25 +15,16 @@ import { useTranslation } from "react-i18next";
 import type { Abgleichzeile } from "../../../application";
 import { abgleich as abgleichLaden } from "../../dienste";
 import { Card, Pill } from "../bausteine";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { AbgleichModal, KassensturzModal } from "./KontostandModal";
-
-/**
- * „2026-08-22" → „22.08.2026" — MIT Jahr.
- *
- * Anders als im Register, wo die Kurzform genügt: hier stehen Stichtage nebeneinander,
- * die Jahre auseinanderliegen können, und ein Fenster „vom 31.12. bis zum 02.01." wäre
- * ohne Jahr nicht zu lesen.
- */
-function datumLang(iso: string): string {
-  const [j, m, d] = iso.split("-");
-  return `${d}.${m}.${j}`;
-}
 
 export function AbgleichBereich() {
   const { t } = useTranslation();
   const geld = useGeld();
+  // MIT Jahr: hier stehen Stichtage nebeneinander, die Jahre auseinanderliegen können,
+  // und ein Fenster „vom 31.12. bis zum 02.01." wäre ohne Jahr nicht zu lesen.
+  const datum = useDatum();
   const [zeilen, setZeilen] = useState<readonly Abgleichzeile[]>([]);
   const [offen, setOffen] = useState<string | null>(null);
   const [abgleichFuer, setAbgleichFuer] = useState<Abgleichzeile | null>(null);
@@ -103,7 +94,7 @@ export function AbgleichBereich() {
               <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
                 {t(z.juengster.herkunft === "bank" ? "konten.abgleich.bankSagt" : "konten.anker.gezaehlt", {
                   betrag: geld.formatMitSymbol(z.juengster.betrag),
-                  datum: datumLang(z.juengster.datum),
+                  datum: datum.mitJahr(z.juengster.datum),
                 })}
               </div>
             )}
@@ -126,7 +117,7 @@ export function AbgleichBereich() {
                       {[...z.punkte].reverse().map((p) => (
                         <tr key={`${p.anker.datum}-${p.anker.herkunft}`}>
                           <td style={{ padding: "3px 0" }}>
-                            {datumLang(p.anker.datum)}{" "}
+                            {datum.mitJahr(p.anker.datum)}{" "}
                             <span className="muted" style={{ fontSize: "var(--fs-2xs)" }}>
                               {t(p.anker.herkunft === "bank" ? "konten.abgleichBereich.vonBank" : "konten.abgleichBereich.gezaehlt")}
                             </span>
@@ -157,8 +148,8 @@ export function AbgleichBereich() {
                       <div key={`${f.von}-${f.bis}`} className="muted">
                         {t("konten.anker.luecke", {
                           betrag: geld.formatMitSymbol(f.betrag, { mitVorzeichen: true }),
-                          von: datumLang(f.von),
-                          bis: datumLang(f.bis),
+                          von: datum.mitJahr(f.von),
+                          bis: datum.mitJahr(f.bis),
                         })}
                       </div>
                     ))}

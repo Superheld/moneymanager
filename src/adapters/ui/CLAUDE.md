@@ -97,9 +97,48 @@ seine Daten hereinbekommt und Entscheidungen zurückmeldet. Der Rest gehört zum
 und bleibt dort, auch wenn die Funktion damit die grösste im Bereich ist.
 
 Keins davon ist ein `bausteine/`-Kandidat: alle werden von genau einem Screen benutzt
-(siehe `bausteine/CLAUDE.md`). `buchung/ddmm.ts` ist die Ausnahme von der Ausnahme — vier Zeilen,
-drei Nutzer im selben Bereich, und kein natürlicher Besitzer; über `BuchungDetail` zu
-importieren hätte einen Ring gebaut.
+(siehe `bausteine/CLAUDE.md`).
+
+Eine eigene Datei nur für „Tag und Monat" stand hier lange als **Ausnahme von der
+Ausnahme** — vier Zeilen, drei Nutzer im selben Bereich, kein natürlicher Besitzer, und
+über `BuchungDetail` zu importieren hätte einen Ring gebaut. **Sie ist weg**, und der Grund
+ist nicht, dass die Begründung falsch war, sondern dass sie zu klein gedacht war: dieselben
+vier Zeilen standen in acht weiteren Varianten quer durch die Oberfläche, jede für sich
+plausibel. Was sie ersetzt, ist `useDatum()` — siehe unten.
+
+## Ein Datum formatiert `useDatum()`, nichts sonst
+
+Dieselbe Regel wie bei `useGeld` und `useProzent`, und der Befund war der grösste von
+dreien: die Formatierung stand an **neun** Stellen in vier Varianten — `datumKurz` zweimal
+mit verschiedener Bedeutung, `datumLang` und `ddmmyyyy` je zweimal wortgleich kopiert,
+dazu `ddmm`, `datumOhneJahr` und einmal inline in der Analyse. Zwei weitere Stellen gaben
+das ISO-Datum **roh** in die Oberfläche.
+
+**Und alle neun schrieben die deutsche Reihenfolge fest.** In einer englischen Oberfläche
+stand damit `28.09.2026`, wo `9/28/2026` hingehört. Das ist nicht dieselbe Unsauberkeit wie
+ein falsches Dezimalzeichen, sondern schlimmer: `05.03.` und `03/05/` sind dieselben Ziffern
+mit anderer Bedeutung. Ausgerechnet `Datumsfeld` las die Reihenfolge längst aus `Intl` — die
+Anzeige daneben tat es nicht.
+
+Drei Formen, und die Wahl gehört dem Aufrufer:
+
+| | zeigt (de) | wofür |
+|---|---|---|
+| `mitJahr` | `28.09.2026` | eine Zeile ohne Zusammenhang, aus dem sich das Jahr ergäbe |
+| `kurz` | `28.09.26` | Listen, in denen das Jahr zählt und die Spalte schmal ist |
+| `ohneJahr` | `28.09.` | Fenster von höchstens ein paar Monaten |
+
+**`ohneJahr` ist kein Sparformat, sondern eine Aussage:** wer es nimmt, behauptet, dass das
+Jahr aus dem Zusammenhang folgt. Im Kontoauszug tut es das nicht — dort stehen alle
+Buchungen eines Kontos, nicht nur die des laufenden Jahres —, und deshalb steht dort
+`mitJahr`.
+
+Gerechnet wird in UTC (`Date.UTC` plus `timeZone: "UTC"`), wie im `Datumsfeld`: ein
+ISO-Datum ist ein Kalendertag und keine Zeitangabe. Ohne die feste Zone zieht ein Rechner
+westlich von Greenwich jeden Tag um einen zurück.
+
+Für Helfer ausserhalb einer Komponente gibt es den Typ `Datum`, genau wie `Geld` — der
+`JournalBlock` reicht ihn in seiner `Lesehilfe` durch.
 
 ## Tabellenfilter sind kleiner als Formularfelder
 
@@ -215,28 +254,156 @@ den nur das Kontoregister füllte — mit einer immer leeren Menge).
 weiterhin eine PROJIZIERTE Zeile im Kontoregister. Was fiel, ist allein die Ist-Seite —
 die Behauptung, eine Buchung könne einen Plan-Posten belegen.
 
-## Die Seitenleiste klappt ein
+## Mobile first — und was das heute schon heisst
 
-Unter 1100 px Fensterbreite schrumpft sie auf 68 px und zeigt nur noch Icons. Das steuert
-allein CSS (`app.css`, Abschnitt „Schmales Fenster") — kein Zustand, kein Schalter.
+Seit 2026-09-02 ist die Oberfläche darauf ausgelegt, auf einem **Handy** zu laufen. Was
+das bedeutet, ist enger als es klingt, und die Grenze gehört benannt:
 
-Der Mechanismus ist eine einzige Klasse: **was `.lbl` trägt, verschwindet dort.** Wer der
-Shell etwas hinzufügt, kapselt die Beschriftung entsprechend und hängt den Namen zusätzlich
-an `title` — schmal ist das Icon alles, was bleibt.
+- **Die Shell ist umgestellt.** In `app.css` steht die schmale Form ohne Medienabfrage da,
+  die breiten kommen per `min-width` dazu. Dasselbe gilt für `.main`, `.field` und
+  `.form-grid`.
+- **Die BEREICHE sind es nicht.** Ihre Raster stehen weiter als `max-width`-Abfragen
+  (`ausblick-karten`) oder tragen sich über `auto-fit` selbst (`karten-paar`, `kpis`). Sie
+  funktionieren schmal, aber sie sind nicht dafür entworfen — eine Tabelle scrollt dort
+  waagerecht, ein Registerband ebenso. Das ist der Stand, und die Neuaufteilung kommt
+  danach.
 
-Zwei Fallen, beide schon einmal zugeschnappt:
+Vier Dinge, die bei jedem neuen Stück ab jetzt gelten und die man schmal nicht nachholen
+kann:
 
-- **Der Aktualisierungsknopf ist selbst ein `div` in der Fusszeile.** Eine pauschale Regel
-  `.side .foot > div { display: none }` nimmt ihn mit, und dann fehlt bei schmalem Fenster
-  der einzige Hinweis auf ein Update. Die Ausnahme steht wörtlich im CSS.
-- **Auskunft darf weichen, eine Handlung nicht.** Version und Stadium fallen schmal weg,
-  der Knopf bleibt. Das ist die Regel, nach der man im Zweifel entscheidet.
+- **Kein Raster ohne `min-width: 0`.** Ein Rasterkind wächst per Vorgabe mit seinem Inhalt;
+  eine breite Tabelle zieht dann die ganze Seite auf, und der Scrollrahmen der `DataTable`
+  kommt nie zum Zug.
+- **44 px Trefferfläche** für alles, was ein Finger treffen muss.
+- **Ein Eingabefeld unter 16 px lässt iOS Safari die Seite ZOOMEN**, sobald es den Fokus
+  bekommt — und zurück zoomt sie nicht. `.field` ist deshalb schmal 16 px und erst ab
+  700 px wieder 13,5.
+- **Ränder über `env(safe-area-inset-*)`**, nicht als feste Zahl. Voraussetzung dafür ist
+  `viewport-fit=cover` in `index.html`; ohne die Angabe meldet `env()` überall Null.
+
+### Das Fenster muss schmal werden duerfen
+
+`minWidth` in `src-tauri/tauri.conf.json` stand auf **920** — oberhalb der Schwelle, ab
+der die Schublade greift. Die Folge war nicht kosmetisch: die schmale Form liess sich in
+der App **gar nicht ansehen**, das Fenster ging nicht so weit zu. Sie ist jetzt 360 (die
+schmalsten Telefone), die Hoehe 480.
+
+Der alte Wert war richtig, solange die Oberflaeche unter 920 auseinanderfiel; er ist
+falsch, seit sie es nicht mehr tut. **Eine App, die mobile first sein soll und deren
+eigenes Fenster sich weigert, schmal zu werden, widerspricht sich** — und der
+Widerspruch faellt niemandem auf, weil man das Fenster einfach nicht kleiner zieht.
+
+Der Wert steckt im Bundle, nicht in der laufenden App: nach dem Aendern muss
+`npm run tauri dev` einmal neu bauen.
+
+## Die Navigation in drei Stufen
+
+| Breite | Form |
+|---|---|
+| bis 699 px | **Schublade** — links ausserhalb des Bildes, eine Kopfleiste mit Griff holt sie herein. Beschriftungen vollständig. |
+| ab 700 px | feste Spalte im Raster, 68 px, **nur Icons** |
+| ab 1100 px | dieselbe Spalte mit 248 px und Beschriftung |
+
+Der Mechanismus der mittleren Stufe ist unverändert eine einzige Klasse: **was `.lbl`
+trägt, verschwindet dort.** Wer der Shell etwas hinzufügt, kapselt die Beschriftung
+entsprechend und hängt den Namen zusätzlich an `title` — schmal ist das Icon alles, was
+bleibt.
+
+**Die mittlere Stufe steht als BEREICH da** (`min-width` und `max-width` zusammen) und
+nicht als Kette aus Setzen und Zurücknehmen. Sie ist weder der schmale noch der breite
+Fall, sondern ein eigener dazwischen; sie aus dem einen zu setzen und im anderen sieben
+Regeln lang wieder abzuräumen wäre kürzer zu schreiben und beim nächsten Anbau die Stelle,
+an der man eine Rücknahme vergisst.
+
+**Die Schublade hat einen Zustand, und das ist ein Bruch mit der alten Begründung.** Hier
+stand lange: „Ohne JavaScript und ohne Schalter — die Fensterbreite ist die Frage, die CSS
+selbst beantwortet." Das gilt für die Einklapp-Stufe weiterhin. „Ist die Schublade offen?"
+ist keine solche Frage: sie hängt an einer Handlung. Ein reines CSS-Konstrukt (Checkbox
+plus `:checked`) hätte den Zustand nur versteckt.
+
+Drei Wege schliessen sie, und alle drei sind nötig — geprüft in
+`bausteine/AppShell.test.tsx`:
+
+- **Ein gewählter Bereich.** Der wichtigste: ohne ihn steht die Schublade nach dem Wechsel
+  über dem Bereich, den sie gerade geöffnet hat, und der Erfolg der Handlung ist unsichtbar.
+- **Escape** — aber nur, wenn kein Dialog die Taste schon verbraucht hat.
+- **Der Scrim und der Knopf in der Schublade.** Beides, nicht eines: die Schublade nimmt
+  fast die ganze Breite, und der Streifen daneben liest sich nicht als Bedienteil.
+
+`visibility` fährt bei beiden mit der Überblendung mit. Das ist kein Zierrat — allein über
+`transform` bliebe die geschlossene Leiste mit der Tabulatortaste erreichbar, und allein
+über `opacity` läge ein unsichtbares Tuch über der ganzen App.
+
+**Zwei Fallen der Fusszeile bleiben wörtlich bestehen:** `.aktualisierung` ist selbst ein
+`div` und wäre von einem pauschalen `.foot > div` mit ausgeblendet — dann fehlte bei
+schmalem Fenster der einzige Hinweis auf ein Update. Und die Regel dahinter gilt allgemein:
+**Auskunft darf weichen, eine Handlung nicht.**
+
+## Schmal steht der Bereichsname nur einmal
+
+Die Kopfleiste nennt den Bereich, und `PageHead` tat es zwei Zentimeter darunter noch
+einmal — auf 400 px waren das zwei Überschriften desselben Wortes in den ersten hundert
+Pixeln. Die `h1` ist deshalb schmal nur noch für Vorlesehilfen da.
+
+**Die Kopfleiste ist die bessere von beiden**, und das ist gemessen: `.main` ist der
+Scrollbereich, die Leiste bleibt bei `top: 0` stehen. Sie beantwortet „wo bin ich" auch
+weiter unten, die `h1` nur ganz oben.
+
+Zwei Dinge, die daran hängen:
+
+- **Sie verschwindet nur für Augen**, nicht aus dem Dokument. Eine Seite ohne `h1` hätte
+  keine Gliederung mehr, und die Kopfleiste trägt einen `span`, keine Überschrift.
+- **Der Untertitel bleibt sichtbar.** Er trägt an mehreren Stellen die Einschränkung, die
+  die Zahlen darunter ehrlich hält — „über die verfügbaren Konten" ist der Grund, warum
+  dasselbe Budget hier weniger Verbrauch zeigt als im Bereich Budgets.
+
+Die Regel steht ausnahmsweise als `max-width` und nicht als Grundform: die sichtbare `h1`
+aus der versteckten zurückzuholen kostet sieben Rücknahmen, und genau davor warnt die Regel
+zur Icon-Stufe.
+
+## Drei Ränge für jeden Text neben einer Zahl
+
+Schmal muss Text weichen, und „welcher" ist keine Geschmacksfrage. Das Kriterium ist, was
+der Text TUT:
+
+| Rang | er tut | schmal |
+|---|---|---|
+| **Einschränkung** | ändert, was die Zahl daneben bedeutet | bleibt offen stehen — nie hinter einem Deckel |
+| **Erklärung** | hilft beim ersten Mal, ist beim zehnten Ballast | darf einklappen, hinter eine ausgeschriebene Frage |
+| **Nacherzählung** | sagt, was man ohnehin sieht | weg — auf JEDER Breite |
+
+Die Ränge sind an den drei Fällen gemessen, an denen sie zuerst angewendet wurden:
+
+- **Einschränkung:** der Untertitel der Übersicht endet auf „über die verfügbaren Konten",
+  und das ist der Grund, warum dasselbe Budget hier weniger Verbrauch zeigt als im Bereich
+  Budgets. Ebenso „die Karten oben rechnen nur über die verfügbaren" an der Karte
+  *Was da ist*. Fällt so ein Satz weg, lügt die Zahl daneben — und zwar dort, wo man am
+  flüchtigsten hinsieht.
+- **Nacherzählung:** der Untertitel des Kontenbereichs lautete „Kontostände, gebuchte und
+  voraussichtliche Buchungen je Konto" und beschrieb genau das, was auf dem Bildschirm
+  steht. Er ist **ganz** weg, nicht nur schmal: was breit nichts trug, trägt schmal
+  erst recht nichts. Die Aussage, die dieser Bereich wirklich macht, steht an der Karte,
+  wo sie hingehört — „Anfangsbestand + bestätigte Ist-Buchungen = realer Stand".
+
+**Der lehrreichste Fall war der dritte, und er ist der Grund für das Kriterium überhaupt:**
+unter der Karte *Da ist etwas zu tun* standen beide Ränge in EINEM Absatz — erst was
+„sicher" und „erwartet" bedeuten (Erklärung), dann „was hier NICHT steht, läuft im
+gerechneten Fenster nicht ins Minus" (Einschränkung). Solange das ein Absatz ist, nimmt
+jedes Wegräumen der Erklärung die Einschränkung mit, **und die leere Karte liest sich
+danach als Freigabe**. Der Absatz ist deshalb geteilt, bevor überhaupt etwas eingeklappt
+wurde. Festgehalten in `uebersicht/handlungsbedarf.test.tsx`.
+
+**Warum Einklappen hier kein Rückfall in den Reiter-Fehler ist:** in der Analyse steht der
+Befund, dass niemand sucht, was hinter einem Reiter liegt — ein Reiter sagt nicht, was
+darunter ist. Ein `<summary>`, auf dem die Frage ausgeschrieben steht („Was heißen
+‚sicher' und ‚erwartet'?"), sagt es. Und eingeklappt wird nur **Meta über den Inhalt**,
+nie der Inhalt selbst.
 
 ## Wie breit eine Seite wird
 
 `.screen` deckelt bei **1280 px**, nicht mehr bei 1040. Der alte Wert war der klassische
 Lesedeckel und hier am falschen Inhalt gemessen: diese App liest man nicht, man sucht darin.
-Konten, Analyse, Verträge, Inventar, Import und die Verwaltung führen alle mit einer
+Konten, Analyse, Verträge, Rücklagen, Import und die Verwaltung führen alle mit einer
 Tabelle, und jede davon war schmaler, als sie sein musste.
 
 **Formulare halten das aus, ohne Zutun.** Genau das war der Einwand gegen mehr Breite — ein

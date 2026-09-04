@@ -85,7 +85,7 @@ describe("Spielstand", () => {
     // Unterschied zwischen „irgendwo ein Verweis kaputt" und „diese Zeile hier".
     const db = mitSeed();
     const bekannt = new Set(standardkategorienFlach().map((k) => k.id));
-    for (const tabelle of ["ist_buchung", "budget", "vertrag", "inventargegenstand"]) {
+    for (const tabelle of ["ist_buchung", "budget", "vertrag", "ruecklage"]) {
       const [zeilen] = db.exec(
         `SELECT DISTINCT kategorie_id FROM ${tabelle} WHERE kategorie_id IS NOT NULL`,
       );
@@ -111,7 +111,7 @@ describe("Spielstand", () => {
       ["ist_buchung_aufteilung", 2],
       ["vertrag", 2],
       ["vertrag_erkennung", 2],
-      ["inventargegenstand", 3],
+      ["ruecklage", 4],
       ["depotwert", 5],
       ["depotposition", 2],
       ["umsatz_roh", 6],
@@ -122,6 +122,41 @@ describe("Spielstand", () => {
     ] as const) {
       expect(zahl(db, `SELECT COUNT(*) FROM ${tabelle}`), tabelle).toBeGreaterThanOrEqual(
         mindestens,
+      );
+    }
+  });
+
+  /**
+   * Der Spielstand muss die Maske ueberstehen, nicht nur das Schema.
+   *
+   * Das Schema ist hier viel toleranter als die App: `budget.start` ist `TEXT` und nimmt
+   * jede Zeichenkette, `konto_id` ist nullable. `budgetAnlegen` verlangt aber ein DATUM
+   * (`YYYY-MM-DD`) und ein Konto — und beides prueft es beim SPEICHERN, also erst dann,
+   * wenn jemand ein bestehendes Budget bearbeiten will.
+   *
+   * Genau da klaffte es: der Seed schrieb einen Monat (`YYYY-MM`) und kein Konto. Jedes
+   * Budget im Spielstand liess sich anzeigen und keines aendern; die Meldung lautete
+   * „Startdatum angeben", und beim monatlichen Budget zeigt die Maske das Startdatum
+   * nicht einmal an. `foreign_key_check` und die INSERTs sahen davon nichts.
+   *
+   * Deshalb prueft dieser Test die FORM gegen die Regeln der Anwendungsschicht, nicht
+   * gegen die der Tabelle.
+   */
+  it("schreibt Budgets, die sich in der Maske auch bearbeiten lassen", () => {
+    const db = mitSeed();
+    const [zeilen] = db.exec("SELECT id, start, konto_id FROM budget");
+    expect(zeilen?.values.length ?? 0).toBeGreaterThan(0);
+    for (const [id, start, kontoId] of zeilen?.values ?? []) {
+      expect(String(start), `budget ${id}: start ist ein Datum, kein Monat`).toMatch(
+        /^\d{4}-\d{2}-\d{2}$/,
+      );
+      expect(kontoId, `budget ${id}: ohne Konto ist es eine Zahl ohne Deckung`).not.toBeNull();
+    }
+
+    const [versionen] = db.exec("SELECT budget_id, ab_monat FROM budget_betrag");
+    for (const [budgetId, abMonat] of versionen?.values ?? []) {
+      expect(String(abMonat), `budget_betrag ${budgetId}: ab_monat ist ein Monat`).toMatch(
+        /^\d{4}-\d{2}$/,
       );
     }
   });
@@ -399,5 +434,43 @@ describe("Spielstand", () => {
     const werte = ibans.length ? ibans[0].values.map((z) => String(z[0])) : [];
     expect(werte.length).toBeGreaterThan(0);
     for (const wert of werte) expect(wert.slice(4, 10), wert).toBe("999999");
+  });
+});
+
+/**
+ * Der Umbuchungsvertrag im Spielstand. Er ist der einzige Vertrag ohne Erkennungsregel,
+ * und genau daran haengt, dass die Zuordnung ueber den WEG laeuft — ohne Gegenkonto an
+ * beiden Seiten sieht weder der Abgleich noch der Ruecklagenfluss etwas.
+ */
+describe("Spielstand — Umbuchungsvertrag", () => {
+  it("verbindet Regel und gebuchte Beine ueber dasselbe Kontopaar", () => {
+    const db = mitSeed();
+    const [regel] = db.exec(
+      "SELECT konto_id, gegenkonto_id, charakter, vertrag_id FROM zahlungsregel WHERE gegenkonto_id IS NOT NULL",
+    );
+    expect(regel?.values).toHaveLength(1);
+    const [kontoId, gegenkontoId, charakter, vertragId] = regel!.values[0];
+    expect(charakter).toBe("Umschichtung");
+    expect(vertragId).toBe("vertrag-sparrate");
+
+    const [beine] = db.exec(
+      `SELECT COUNT(*) FROM ist_buchung
+        WHERE charakter = 'Umschichtung' AND betrag < 0
+          AND konto_id = '${kontoId}' AND gegenkonto_id = '${gegenkontoId}'`,
+    );
+    expect(Number(beine!.values[0][0])).toBeGreaterThan(0);
+  });
+
+  it("paart beide Beine jeder Umbuchung", () => {
+    const db = mitSeed();
+    // Eine transfer_id ohne Gegenstueck waere eine halbe Umbuchung — der Verlauf zeigte
+    // dann einen Stand, den es nie gab.
+    const [ungepaart] = db.exec(
+      `SELECT COUNT(*) FROM (
+         SELECT transfer_id FROM ist_buchung WHERE transfer_id IS NOT NULL
+          GROUP BY transfer_id HAVING COUNT(*) <> 2
+       )`,
+    );
+    expect(Number(ungepaart!.values[0][0])).toBe(0);
   });
 });

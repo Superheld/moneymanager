@@ -23,7 +23,7 @@ import "../../import/finanzguruAdapter";
 import { Button, Card, DataTable } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { FremdkategorienKarte } from "./FremdkategorienKarte";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 
 const VORSCHAU_MAX = 500;
 type RU = ImportErgebnis["umsaetze"][number];
@@ -36,14 +36,10 @@ interface Ziel {
   iban?: string;
 }
 
-function ddmmyyyy(iso: string): string {
-  const [y, m, d] = iso.split("-");
-  return `${d}.${m}.${y}`;
-}
-
 export function ImportScreen() {
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [ergebnis, setErgebnis] = useState<ImportErgebnis | null>(null);
@@ -354,7 +350,7 @@ export function ImportScreen() {
         <Card style={{ marginTop: "var(--sp-4)" }} title={t("import.vorschauTitel")} subtitle={t("import.erkannt", { n: beruecksichtigt.length, quelle: ergebnis.quelle, konten })}>
           <DataTable
             columns={[
-              { key: "buchungstag", label: t("import.spalteDatum"), render: (u: RU) => ddmmyyyy(u.buchungstag) },
+              { key: "buchungstag", label: t("import.spalteDatum"), render: (u: RU) => datum.mitJahr(u.buchungstag) },
               { key: "betrag", label: `${t("import.spalteBetrag")} ${geld.symbol}`, align: "right", render: (u: RU) => geld.format(u.betrag, { mitVorzeichen: true }) },
               { key: "gegenpartei", label: t("import.spalteGegenpartei") },
               { key: "verwendungszweck", label: t("import.spalteZweck"), render: (u: RU) => (u.verwendungszweck.length > 60 ? u.verwendungszweck.slice(0, 60) + "…" : u.verwendungszweck) },

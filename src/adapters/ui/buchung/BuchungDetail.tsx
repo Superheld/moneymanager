@@ -86,9 +86,8 @@ import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { MerkmaleBlock } from "../training/MerkmaleBlock";
 import { Modal } from "../bausteine/Modal";
-import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
-import { ddmm } from "./ddmm";
 import { BuchungsHerkunft } from "./BuchungsHerkunft";
 import { JournalBlock } from "./JournalBlock";
 import {
@@ -255,6 +254,8 @@ function BuchungFormular({
 }: FormularProps) {
   const { t } = useTranslation();
   const geld = useGeld();
+  // `datumAnzeige` und nicht `datum`: so heisst in dieser Maske schon das FELD.
+  const datumAnzeige = useDatum();
   const istEntwurf = !!entwurf;
   const istNeu = !buchung && !entwurf;
   const [kontoId, setKontoId] = useState(buchung?.kontoId ?? entwurf?.zahlungskontoId ?? vorgabe.kontoId);
@@ -609,7 +610,7 @@ function BuchungFormular({
               {kopfUmsatz?.gegenpartei || buchung?.notiz || kontoName.get(kontoId) || ""}
             </span>
             <span className="muted" style={{ display: "block", fontSize: "var(--fs-xs)", marginTop: 4 }}>
-              {ddmm(buchung?.datum ?? entwurf!.buchungstag)} · {kontoName.get(kontoId) ?? "?"}
+              {datumAnzeige.ohneJahr(buchung?.datum ?? entwurf!.buchungstag)} · {kontoName.get(kontoId) ?? "?"}
             </span>
           </span>
           <span className="num" style={{ fontSize: "var(--fs-h2, var(--fs-h3))", fontWeight: "var(--fw-black)", color: geldFarbe(buchung?.betrag ?? entwurf!.betrag) }}>
@@ -750,7 +751,7 @@ function BuchungFormular({
               {entwurfKandidaten.map((k) => (
                 <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
                   <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === `e:${k.id}`} onChange={() => setGegenwahl(`e:${k.id}`)} style={{ accentColor: "var(--accent-deep)" }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(k.buchungstag)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.buchungstag)}</span>
                   <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
                     {kontoName.get(k.zahlungskontoId) ?? "?"}
                     <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.neu")}</span>
@@ -762,7 +763,7 @@ function BuchungFormular({
               {buchungKandidaten.map((k) => (
                 <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
                   <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === `b:${k.id}`} onChange={() => setGegenwahl(`b:${k.id}`)} style={{ accentColor: "var(--accent-deep)" }} />
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(k.datum)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.datum)}</span>
                   <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
                     {kontoName.get(k.kontoId) ?? "?"}
                     <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.verbucht")}</span>
@@ -878,7 +879,7 @@ function BuchungFormular({
                   onClick={() => onGegenbuchung(gegenbuchung)}
                   style={{ display: "flex", width: "100%", alignItems: "center", gap: 10, marginTop: 8, padding: "8px 10px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", textAlign: "left" }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{ddmm(gegenbuchung.datum)}</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(gegenbuchung.datum)}</span>
                   <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
                     {t("konten.paarung.gegenbuchung")} · {kontoName.get(gegenbuchung.kontoId) ?? "?"}
                   </span>

@@ -24,7 +24,7 @@ Zuordnung zur Komponente in `App.tsx`:
 | Konten | `KontenScreen` | Auszug je Konto: suchen, filtern, bearbeiten, paaren |
 | Budgets | `BudgetsScreen` | monatlich (Rest verfällt) oder aufbauend (Rest bleibt), verschachtelbar |
 | Analyse | `AnalyseScreen` | alles, was einen ZEITRAUM auswertet |
-| Inventar | `InventarScreen` | Wiederbeschaffung ÷ Nutzungsdauer = monatliche Rücklage |
+| Rücklagen | `RuecklagenScreen` | Ziel ÷ Frist = monatliche Rate, oder eine freie Rate |
 | Verträge | `VertraegeScreen` | Wiederkehrendes mit eigener Erkennungsregel |
 
 **Verwaltung** — woher die Daten kommen und wie sie sortiert werden:
@@ -33,13 +33,41 @@ Zuordnung zur Komponente in `App.tsx`:
 |---|---|---|
 | Konten verwalten | `KontenVerwaltungScreen` | Konten anlegen, Abgleich, Bankzugänge (`BankzugaengeScreen`) |
 | Import | `ImportScreen` | Dateiimport → Inbox (`ReviewScreen`) → verbuchen |
-| Training | `TrainingBereich` | die Karten der Kategorie-Erkennung (`KategorisierungCards`) |
+| Training | `TrainingBereich` | die Karten der Kategorie-Erkennung (`KategorisierungCards`) — **Experiment**, siehe unten |
 | Einstellungen | `EinstellungenScreen` | Stammdaten und Voreinstellungen |
 
 Übersicht beantwortet „wie stehe ich **gerade** da", Analyse „wie war es über einen
 **Zeitraum**" — diese Grenze ist beabsichtigt und entscheidet, wo Neues hingehört. Das
 Depot ist das jüngste Beispiel: sein Stand steht in der Übersicht, sein Verlauf in der
 Analyse, aus derselben Wertreihe.
+
+**Die Übersicht rechnet seit 2026-08-31 über die LIQUIDEN Konten** — Monatskarten und
+Budgetliste aus derselben gefilterten Sicht. Was auf Rücklagen- und Vorsorgekonten
+passiert, ist zurückgelegt und steht für den Monat nicht zur Verfügung; es stand vorher
+mit in „so stehe ich gerade da". Der Preis ist eine Aussage, die man kennen muss:
+**dasselbe Budget kann in der Übersicht einen kleineren Verbrauch zeigen als im Bereich
+Budgets** — dort steht der ganze Rahmen, hier nur, was aus den verfügbaren Mitteln davon
+gegangen ist. Der Untertitel der Übersicht sagt es mit.
+
+Zwei Karten hängen daran und beantworten je eine eigene Frage:
+
+- **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE Konten. Nach Klasse und
+  nicht nach Gruppe: die Klasse ist die Rechenregel und jedes Konto hat genau eine, die
+  Summen addieren sich also zum Ganzen. Über Gruppen summiert ergäbe „das Vermögen" mehr,
+  als vorhanden ist (dasselbe Konto darf in mehreren liegen). Was man mit Gruppen ansehen
+  will, gehört in die Analyse.
+- **„Da ist etwas zu tun"** — Konten, die im Vorschaufenster ins Minus laufen. Sie steht
+  ganz oben und ist die einzige Karte, die VERSCHWINDET, wenn nichts anliegt: eine
+  dauerhafte Zeile „alles in Ordnung" wäre nach zwei Wochen unsichtbar, und dann fiele
+  auch die Warnung nicht mehr auf.
+
+**Die Rücklagen haben in den Monatskarten seit 2026-09-01 keine Zeile mehr.** Sie stand
+dort als kalkulatorische Monatsrate, in Plan und Ist mit demselben Betrag. Seit sich
+Rücklagen über einen **Umbuchungsvertrag planen** lassen, steht dasselbe Zurücklegen schon
+als geplante Umschichtung in der Zeile „Sparen & Vorsorge" — beides nebeneinander zählte
+es zweimal. Die Rechnung selbst gibt es weiter, im Bereich Rücklagen als *Bedarf* neben
+Plan und Ist. Aus demselben Grund zählen Rücklagen nicht mehr zu `hatPlandaten`: was zu
+keiner Zeile führt, darf nicht darüber entscheiden, ob die Karten überhaupt erscheinen.
 
 ### Die Schichten
 
@@ -70,13 +98,13 @@ Die Schicht steht oben, der Fachbereich darunter — dieselben Namen über alle 
 damit ein Thema an drei Stellen gleich heißt:
 
 ```
-core/         basis buchung konten budgets vertraege kategorien inventar depot
+core/         basis buchung konten budgets vertraege kategorien ruecklagen depot
               stammdaten klassifikator          + index, monatsausblick, auswertung
-application/  buchung konten budgets vertraege kategorien inventar depot dubletten
+application/  buchung konten budgets vertraege kategorien ruecklagen depot dubletten
               stammdaten import fints           + index, ports, bootstrap,
                                                   uebersicht, analysesichten, einstellungen
 adapters/ui/  bausteine buchung konten budgets vertraege kategorien(training)
-              inventar analyse uebersicht import einstellungen
+              ruecklagen analyse uebersicht import einstellungen
 ```
 
 Drei Regeln, wohin eine neue Datei gehört:
@@ -107,7 +135,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-28 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+29 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
@@ -119,7 +147,7 @@ ist sie:
   `kontogruppe` + `kontogruppe_konto` (frei benannte Gruppen, siehe unten)
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` + `budget_betrag` (die
   Reihe seiner Beträge, siehe unten) · `vertrag` ·
-  `vertrag_erkennung` · `zahlungsregel` · `inventargegenstand`
+  `vertrag_erkennung` · `zahlungsregel` · `ruecklage` + `ruecklage_ausbuchung` (siehe unten)
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
 - **Bank:** `bankzugang` (samt Bankfähigkeitsprofil) · `bankkonto_zuordnung`
 - **Besitzen:** `depot` · `depotwert` (Reihe der Stichtagswerte) · `depotposition` —
@@ -256,6 +284,143 @@ Rückfluss tragen KANN, macht das Wegwerfen des Vorzeichens aus „es kam Geld z
 „es wurde genau so viel ausgegeben". Der Unterschied zum Absatz davor: dort steht ein Wort
 daneben, das mitwandert; hier steht nur die Zahl. Ein Balken darf bei 0 anschlagen
 (`Math.max(0, …)`), die Zahl daneben behält ihr Vorzeichen.
+
+#### Eine Rücklage hat eine von zwei Formen — nie beide
+
+Bis zum 31.08.2026 hiess das **Inventar** und meinte einen GEGENSTAND: Wiederbeschaffung ÷
+Nutzungsdauer, beides Pflicht. Die Rechnung ist geblieben, die Behauptung ist weg, dass am
+anderen Ende ein Ding steht — man legt auch für einen Urlaub zurück, und der hat keinen
+Wiederbeschaffungswert.
+
+| Form | Felder | Rate | Deckel | nach dem Ausbuchen |
+|---|---|---|---|---|
+| mit Ziel | `ziel` + `frist_monate` | Ziel ÷ Frist | das Ziel | **fängt von vorn an** |
+| frei | `rate` | wie eingetragen | keiner | **erledigt** |
+
+**Die Form entscheidet, was nach dem Ausbuchen passiert**, und deshalb gibt es kein Feld
+`wiederkehrend`: es könnte der Form widersprechen, und dann entschiede die Reihenfolge im
+Code. Was einmal ersetzt werden musste, muss es wieder — die Waschmaschine ist nicht die
+letzte. Der Urlaub war einmal.
+
+Durchgesetzt wird das an der Anwendungsgrenze (`ruecklagenPflege`), nicht im Schema: alle
+drei Spalten sind nullable, weil SQLite ein „genau eines von beiden" nicht ausdrücken kann,
+ohne dass die Migration zur Fingerübung wird.
+
+**Das Ausbuchen ist eine AUFZEICHNUNG und kein Zustand.** Der Zustand steht an der Rücklage
+selbst (`beginn`) beziehungsweise darin, dass es sie nicht mehr gibt;
+`ruecklage_ausbuchung` hält fest, WOFÜR sie draufging. Der Fremdschlüssel auf `ist_buchung`
+steht deshalb auf `SET NULL` und nicht auf `CASCADE` — dieselbe Überlegung wie beim
+`buchung_journal`, nur eine Nummer kleiner.
+
+**Gebucht wird beim Ausbuchen nichts.** Der Kauf ist eine ganz normale Ausgabe vom Konto,
+und weil die Deckung gegen den REALEN Kontostand rechnet, fällt sie durch die Abbuchung von
+selbst. Eine zweite, kalkulatorische Buchung zeigte dieselbe Bewegung doppelt.
+
+#### `budgetrelevant` — die eine Ausgabe, die kein Budget messen soll
+
+Eine Spalte an `ist_buchung`, Vorgabe 1. Sie beschreibt — wie `zu_pruefen` — keine Tatsache
+über die Zahlung, sondern eine Entscheidung darüber, wie sie ausgewertet wird; niemand
+leitet sie aus den Daten ab.
+
+Der Fall ist die teure Anschaffung, für die jahrelang zurückgelegt wurde. Sie ist eine echte
+Ausgabe, aber keine, an der sich ein Monatsrahmen messen lassen müsste: sie spränge jeden,
+und der überzogene Rahmen sagte danach nichts mehr über das Verhalten aus, das er steuern
+soll. Gesetzt wird sie beim **Ausbuchen einer Rücklage** (die Verknüpfung leistet beides)
+oder von Hand.
+
+**Positiv benannt und mit Vorgabe 1**, beides mit Grund: ein `nicht_budgetrelevant` wäre
+beim Lesen eine doppelte Verneinung und fiele in einem `WHERE` irgendwann falsch aus; und
+ein fehlender Wert muss JA heissen, sonst fiele mit der Einführung der Spalte der ganze
+Altbestand aus jedem Budget und die Rahmen sähen über Nacht grosszügig aus.
+
+Wer sie auswertet, muss sie an **beiden** Stellen auswerten: im Verbrauch
+(`budgetBuchungen`) und im Vorschlag (`budgetvorschlaege`). Nur im Verbrauch hiesse, einen
+Rahmen vorzuschlagen, gegen den die Buchung anschliessend nicht zählt.
+
+#### Die Liquiditätsvorschau zieht ZWEI Linien
+
+`core/konten/liquiditaet.ts` rechnet je Konto den Stand über die nächsten Tage vor — und
+zwar zweimal, weil die beiden Linien Verschiedenes bedeuten:
+
+| | enthält | heisst |
+|---|---|---|
+| **fest** | nur datierte Verpflichtungen (Vertragsraten, geplante Umbuchungen) | ein SICHERES Minus — daran ändert Sparsamkeit nichts |
+| **erwartet** | dazu den Budgetrest, gleichmässig über die Tage verteilt | erst mit dem üblichen Verbrauch; hier hat man noch die Wahl |
+
+Nur die feste warnte zu spät (die meisten Engpässe entstehen aus dem Alltagsverbrauch),
+nur die erwartete zu oft — und eine Warnung, die jeden Monat einmal aufleuchtet und sich
+von selbst erledigt, liest nach dem dritten Mal niemand mehr.
+
+Drei Dinge, die dabei Entscheidungen sind und keine Rechenschritte:
+
+- **Ein Budget ist keine Fälligkeit.** Es sagt „höchstens 400 im Monat", nicht „am 14.
+  gehen 400 ab". Gleichmässig zu verteilen ist die neutrale Annahme — nicht die
+  schlimmste (alles am Monatsanfang), nicht die beste (alles am Ende). Im laufenden Monat
+  zählt nur der noch offene REST: was schon ausgegeben wurde, steht bereits im Kontostand.
+- **Ein aufbauendes Budget zählt nicht mit.** Seine Rate wird nicht ausgegeben, sie bleibt
+  liegen — sie mitzurechnen hiesse, Geld abfliessen zu lassen, das auf dem Konto bleibt.
+- **Eine geplante Umbuchung wirkt auf BEIDEN Konten**, als Abfluss und als Zufluss. Nur
+  die eine Seite zu rechnen liesse ausgerechnet das Rücklagenkonto nach Handlungsbedarf
+  aussehen, auf das gerade eingezahlt wird.
+
+Und die Grenze der Auskunft, die in der Karte danebensteht: **was nicht gemeldet wird, ist
+nicht „geprüft und in Ordnung", sondern „läuft im gerechneten Fenster nicht ins Minus".**
+
+Eine kleine Verlaufslinie stand hier vom 31.08. bis zum 01.09. daneben — sie ist wieder
+weg: über den Tiefstand und den Tag hinaus, die schon in der Zeile stehen, verriet sie
+nichts. Deshalb gibt `liquiditaetsvorschau` auch nur den BEFUND heraus und nicht den
+Tagesverlauf: was niemand anzeigt, muss auch niemand mitschleppen.
+
+#### Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
+
+Ein gewöhnlicher Vertrag hängt an einem Namen: `vertrag_erkennung` normalisiert die
+Gegenpartei und vergleicht mit Unschärfe. Bei einer Verschiebung zwischen zwei eigenen
+Konten gibt es diesen Schlüssel nicht — dort steht je nach Bank die eigene IBAN, der
+eigene Name oder gar nichts, und aus dem Verwendungszweck etwas zu raten hiesse, sich auf
+einen Text zu verlassen, den niemand füllen muss.
+
+Deshalb trägt die **Zahlungsregel** ein `gegenkonto_id`, und `umbuchungErkennung` prüft
+strukturell: gleicher Weg (Konto → Gegenkonto), Charakter `Umschichtung`, abgehendes Bein.
+Das ist eine harte Übereinstimmung und keine Ähnlichkeit.
+
+Drei Entscheidungen darin, die man kennen muss:
+
+- **Der Betrag entscheidet NICHT über die Passung**, sondern nur darüber, WELCHE Regel es
+  ist, wenn mehrere denselben Weg beschreiben. Wer seine Sparrate erhöht und die Regel
+  nicht nachzieht, soll eine erkannte Umbuchung mit Abweichung sehen — mit einer
+  Betragsschwelle wäre sie stattdessen gar nicht erkannt, und die Zeile stünde als „offen"
+  da, während daneben eine unerklärte Umschichtung liegt.
+- **Nur das abgehende Bein** bekommt die Zuordnung. Beide zuzuordnen hübe die Ist-Summe
+  des Vertrags auf: einmal −200, einmal +200, obwohl 200 geflossen sind.
+- **`gegenkonto_id` steht an der REGEL, nicht am Vertrag.** Die Regel beschreibt die
+  Zahlung, der Vertrag die Vereinbarung darüber — derselbe Grund, aus dem `konto_id` dort
+  steht. Sinnvoll ist es nur mit `charakter = 'Umschichtung'`; erzwungen wird das an der
+  Anwendungsgrenze, weil SQLite eine Bedingung über zwei Spalten nur mit einem CHECK
+  ausdrücken kann und ein CHECK an einer bestehenden Tabelle einen Umbau kostet.
+
+Die Vertragsart `umbuchung` hängt daran und trägt eine Folge: **keine
+Kündigungswarnung.** Eine Abmachung mit sich selbst kündigt man, indem man sie löscht.
+
+#### Der Rücklagenfluss ist DREI Zahlen, nicht eine
+
+`core/ruecklagen/fluss.ts` beantwortet „was wird zurückgelegt" mit drei Werten, und keiner
+davon ersetzt einen anderen:
+
+| | woher | sagt |
+|---|---|---|
+| **Bedarf** | Σ Monatsraten der Rücklagen | was die Rechnung verlangt |
+| **Plan** | Σ Umbuchungsregeln auf Rücklagenkonten | was du eingerichtet hast |
+| **Ist** | gebuchte Umschichtungen im Fenster | was tatsächlich geflossen ist |
+
+Bedarf über Plan heisst: du legst zu wenig zurück, die Deckung wird schlechter, ohne dass
+irgendwo etwas schiefgeht. Plan über Ist heisst: die Überweisung ist ausgefallen. Eine
+Zahl allein könnte keine dieser Aussagen treffen.
+
+**Wohin gerechnet wird, entscheidet die KONTOKLASSE**, nicht die Gruppe: ein Zufluss auf
+`ruecklage` oder `vorsorge` ist zurückgelegt, auf ein liquides nur umgeschichtet. Bedarf
+und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
+Zeitraum. Wer sie über mehrere Monate vergleicht, muss die ersten beiden hochrechnen — das
+im Kern zu tun hiesse zu raten, wie viele Monate gemeint sind.
 
 #### Der Budgetbetrag ist eine Reihe, kein Wert
 
@@ -486,7 +651,7 @@ wiederfindet.
 
 Was NICHT drin ist, damit niemand danach sucht: unverbuchte Zeilen (Inbox, verworfen) —
 exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso Budgets,
-Inventar, Depots, Kontogruppen und das Journal: sie hängen nicht an einer Buchung.
+Rücklagen, Depots, Kontogruppen und das Journal: sie hängen nicht an einer Buchung.
 
 **Die Datei liegt im KLARTEXT, der Bestand daneben nicht.** Seit 2026-08-27 ist die
 Datenbank verschlüsselt und ihre Sicherungen sind es mit; ein Bestandsexport legt eine
@@ -563,6 +728,46 @@ entstand der Bestand mit `-rw-r--r--` und war für jeden Nutzer des Rechners les
 weder das eine noch das andere — dort deckt die Rechteverwaltung des Nutzerprofils den
 Fall ab.
 
+### Das Training ist eine Werkbank, kein Bereich
+
+Seit 2026-08-31 hinter `experiment.training` und deshalb ab Werk **nicht in der
+Navigation**. Die Erkennung läuft trotzdem: ausgeliefert wird ein fertiges Modell, und
+wer nur seine Zahlungen kategorisiert haben will, hat mit dem Bereich nichts zu tun. Wer
+ihn einschaltet, greift in die Merkmale ein, trainiert neu und misst.
+
+**Und „messen" heisst seither drei Dinge**, nicht mehr nur eine Trefferquote:
+
+| | sagt |
+|---|---|
+| Genauigkeit | wie oft das Modell richtig lag |
+| **Vergleichslinie** | wie oft blindes Raten richtig läge — immer die häufigste Kategorie |
+| **Vorsprung** | der Abstand, und damit das Einzige, woran sich eine Änderung messen lässt |
+
+Die Vergleichslinie ist der wichtigste Zusatz, und der Grund ist nicht Ordnungsliebe: eine
+Trefferquote sagt für sich genommen nichts. In einem Haushalt, in dem eine Kategorie ein
+Viertel aller Zahlungen ausmacht, trifft blindes Raten schon ein Viertel; bei
+gleichmässiger Verteilung fast nichts. Ohne den Abstand liesse sich nicht sagen, ob eine
+Variante besser ist als die davor — und genau daran hing, dass „verschiedene Varianten
+ausprobieren" bis dahin nicht weiterführte.
+
+**Aus der Verwechslungsstatistik führt jetzt ein Weg in die einzelnen Zeilen.** Die Zahl
+sagt, WO es klemmt; erst die Zeilen sagen, WARUM — steht dort ein Empfänger, der für
+beide Kategorien vorkommt, fehlt ein Merkmal; steht dort nichts Unterscheidendes, sind
+die Kategorien fachlich nicht zu trennen. Das sind zwei völlig verschiedene Antworten,
+und die Statistik gibt keine davon her. Dafür trägt `Beispiel` eine optionale `id`, die
+das Training nicht braucht und die Bewertung sehr wohl.
+
+**Der BETRAG ist als Merkmal zuschaltbar** (`Merkmalsherkunft: "betrag"`), ab Werk aus.
+Er liefert Richtung und **Grössenordnung**, nicht den Wert: ein genauer Betrag wäre ein
+Token, das genau einmal vorkommt — das Modell lernt nichts daraus, und das Vokabular
+wüchse um eine Zeile je Zahlung. Aus ist er, weil ein neues Merkmal, das sich selbst
+einschaltet, jedes bestehende Modell ändert, ohne dass jemand es gemessen hat; mit der
+Vergleichslinie daneben ist „bringt das etwas?" jetzt beantwortbar statt Geschmackssache.
+
+**Die Wortwolken sind weg.** Sie zeigten je Kategorie ihre stärksten Merkmale als Bild —
+hübsch und ohne Handlung: was man daraus ablas, stand daneben schon in der Wortliste, und
+was man wissen wollte (welche Zeilen gehen schief) stand nirgends.
+
 ## Stadium: Alpha
 
 Die App ist **nicht veröffentlicht**. Es gibt genau einen Datenbestand — den lokalen —, und
@@ -593,6 +798,13 @@ Vor jedem Merge nach `develop`: `npm run typecheck` und `npm test` grün.
 direkten Commit auf `develop` oder `main` ab, `prepare-commit-msg` lässt nach `main` nur
 einen Merge aus `develop` zu. Merges per `--no-ff` laufen normal durch — Git ruft für sie
 einen anderen Hook. Im Notfall: `--no-verify`.
+
+**Ausser bei einem Merge mit Konflikten**, und das ist die Stelle, an der man es nicht
+erwartet: der lässt sich nicht automatisch abschliessen, jemand tippt danach `git commit` —
+und den ruft Git über `pre-commit`. Der Branch-Wächter sieht einen Commit auf `develop` und
+weist ab, obwohl `MERGE_HEAD` daneben liegt. Der Weg ist `--no-verify`, nicht ein Umbau des
+Merges: der Muster-Guard ist über dieselben vorgemerkten Änderungen bereits gelaufen, und
+was er meldet, meldet er vor dieser Sperre.
 
 **Beide Hooks sitzen auf dieser Maschine, und darin liegt ihre Grenze.** Ein Merge, der auf
 GitHub passiert, fragt keinen von ihnen — der Wachposten fällt lautlos genau dort aus, wo
@@ -625,7 +837,8 @@ Ausweg lässt, wird abgeschaltet statt umgangen, und dann ist er ganz weg.
 
 ```bash
 npm run tauri dev   # Desktop-Fenster
-npm run dev         # nur Frontend (Webview ohne SQLite-Plugin — hat keine Daten)
+npm run dev         # nur Frontend (ohne Tauri-Naht: weisse Seite, siehe `vorschau`)
+npm run vorschau    # dasselbe MIT Attrappe und Spielstand, im Netz — fuer den Blick aufs Handy
 npm test            # Vitest: Kern, Use-Cases, Repositories, UI, Schichtgrenzen
 npm run test:rust   # die wenigen Rust-Tests der Shell (Dateirechte) — laufen NICHT in `npm test`
 npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 %)
@@ -840,10 +1053,18 @@ Mechanismus, Workflow und Releases stehen. Offen ist:
 - **Das Apple-Zertifikat** und die sechs Secrets dazu. Ohne sie wird unsigniert
   ausgeliefert, und das Release sagt es (siehe unten). Die drei anderen Secrets liegen:
   `TAURI_SIGNING_PRIVATE_KEY`, dessen Passwort und `FINTS_PRODUKT_ID`.
-- **Ob Linux und Windows wirklich bauen.** Der Workflow baut sie seit dem 28.08.2026, aber
-  es hat vorher nie jemand versucht — die CI baut Rust absichtlich nicht. Der wahrscheinlichste
-  Stolperstein ist Windows: SQLCipher zieht OpenSSL mit
-  (`bundled-sqlcipher-vendored-openssl`), und dessen Bauweg braucht dort Perl und NASM.
+- **Windows.** Linux baut — das AppImage hängt seit 0.24.0 an jedem Release. Windows nicht,
+  und der Stolperstein lag vor dem, den wir erwartet hatten: **der Job stirbt an den TESTS,
+  bevor überhaupt ein Compiler läuft.** Die vermutete Hürde (SQLCipher zieht OpenSSL mit,
+  dessen Bauweg dort Perl und NASM braucht) ist damit weiterhin ungeprüft — sie liegt hinter
+  einer Tür, die noch nie aufging.
+
+  Das ist der allgemeine Teil daran: **ein plattformübergreifender Testlauf prüft auch die
+  Tests auf Plattformunterschiede**, und die haben welche. Der erste Fund war ein URL-Pfad,
+  der als Dateipfad benutzt wurde (`new URL(…).pathname` — auf Windows steht der
+  Laufwerksbuchstabe hinter einem Schrägstrich); behoben, aber es ist unwahrscheinlich, dass
+  er der einzige war. Wer Windows zum Laufen bringen will, rechnet mit einer Kette solcher
+  Funde und nicht mit einem.
 
 **Was in einem veröffentlichten Archiv steckt** und was nicht, weil die Frage naheliegt:
 keine Zugangsdaten, keine Kontodaten, kein Datenbestand — die Datenbank liegt im
@@ -1108,7 +1329,7 @@ sondern baut daraus den Text:
 | Secrets da | Release-Text |
 |---|---|
 | ja | „Signiert und notarisiert." |
-| nein | was macOS melden wird, die `xattr`-Zeile, und dass ein installierter Moneymanager sie nicht braucht |
+| nein | was macOS melden wird, dass ein frischer Download deshalb kein empfohlener Weg ist, und dass ein installierter Moneymanager davon unberührt bleibt |
 
 Der Schaden, um den es wirklich geht, ist nicht das unsignierte Bundle — es ist ein
 unsigniertes Bundle unter der Zeile „Signiert und notarisiert". Ein Release, dem man
@@ -1116,10 +1337,25 @@ ansieht, dass es unsigniert ist, ist ehrlich; ein Literal im Workflow wäre gena
 falsch, wenn es darauf ankommt. Deshalb ist `releaseBody` kein fester Text mehr, sondern
 die Ausgabe des Schritts.
 
-**Die `xattr`-Anleitung ist damit zurück, aber nur im unsignierten Zweig.** Sie wegzulassen
-macht das Bundle nicht sicherer; es macht den Fehlschlag unerklärlich — macOS meldet
-„beschädigt", und wer die App nicht selbst gebaut hat, hat keine Handhabe. Sobald das
-Zertifikat da ist, verschwindet sie von selbst, ohne dass jemand daran denken muss.
+**Was der unsignierte Zweig NICHT mehr enthält, ist die `xattr`-Anleitung.** Sie stand dort
+bis zum 30.08.2026, und die Begründung dafür war richtig: ohne sie ist der Fehlschlag
+unerklärlich — macOS meldet „beschädigt", und wer die App nicht selbst gebaut hat, hat keine
+Handhabe. Sie wiegt trotzdem weniger als das, was eine öffentliche Seite **einübt**.
+„Quarantäne-Merkmal abräumen, wenn eine App als beschädigt gemeldet wird" ist als Gewohnheit
+genau der Griff, mit dem sich jemand das nächste Mal etwas anderes einfängt — und die
+Anleitung dazu stünde bei uns. Der Zustand wird weiterhin **benannt**, nur nicht mehr
+umgangen; wer ihn beheben will, hat einen Weg, und das ist das Zertifikat.
+
+`src/auslieferung.test.ts` hält beides fest: dass der unsignierte Zweig den Zustand nennt,
+und dass **im ganzen Workflow** kein Weg an Gatekeeper vorbei steht. Über den ganzen
+Workflow und nicht nur über den Textschritt, weil der Weg zurück sonst eine Zeile weiter
+oben läge, wo niemand hinsieht.
+
+**Für den LOKALEN Bau bleibt die Zeile stehen** (`scripts/installieren.sh`, die
+Updater-Probe weiter oben). Das ist kein Widerspruch, sondern der Unterschied, um den es
+geht: wer auf der eigenen Maschine baut, räumt die Quarantäne von etwas ab, das er selbst
+gerade erzeugt hat. Ein Release-Text richtet sich an jemanden, der eine fremde Datei
+heruntergeladen hat.
 
 ### Drei Plattformen aus einem Workflow
 

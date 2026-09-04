@@ -26,7 +26,7 @@ vi.mock("./db", () => ({
 
 import { sqliteBudgetRepository as budgetRepository } from "./sqliteBudgetRepository";
 import { sqliteEinstellungenRepository as einstellungenRepository } from "./sqliteEinstellungenRepository";
-import { sqliteInventarRepository as inventarRepository } from "./sqliteInventarRepository";
+import { sqliteRuecklagenRepository as ruecklagenRepository } from "./sqliteRuecklagenRepository";
 import { sqliteLedgerRepository as ledgerRepository } from "./sqliteLedgerRepository";
 import { sqliteKlassifikatorRepository as klassifikatorRepository } from "./sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository as merkmalRepository } from "./sqliteMerkmalskonfigurationRepository";
@@ -365,36 +365,61 @@ describe("Vertrag- und Zahlungsregel-Repository", () => {
   });
 });
 
-describe("Inventar-Repository", () => {
-  it("speichert einen Inventargegenstand samt Rücklagenkonto", async () => {
-    await inventarRepository.speichern({
-      id: "g1", bezeichnung: "Waschmaschine", anschaffung: "2024-01-01",
-      wiederbeschaffung: 60000, nutzungsdauerMonate: 120, kontoId: "k-tagesgeld",
+describe("Rücklagen-Repository", () => {
+  it("speichert eine Rücklage samt Rücklagenkonto", async () => {
+    await ruecklagenRepository.speichern({
+      id: "g1", bezeichnung: "Waschmaschine", beginn: "2024-01-01",
+      ziel: 60000, fristMonate: 120, kontoId: "k-tagesgeld",
     });
-    const [g] = await inventarRepository.alle();
+    const [g] = await ruecklagenRepository.alle();
     expect(g.bezeichnung).toBe("Waschmaschine");
-    expect(g.wiederbeschaffung).toBe(60000);
-    expect(g.nutzungsdauerMonate).toBe(120);
-    expect(g.anschaffung).toBe("2024-01-01");
+    expect(g.ziel).toBe(60000);
+    expect(g.fristMonate).toBe(120);
+    expect(g.beginn).toBe("2024-01-01");
     expect(g.kontoId).toBe("k-tagesgeld");
   });
 
   it("liefert ohne Zuordnung undefined statt eines leeren Strings", async () => {
-    await inventarRepository.speichern({
-      id: "g1", bezeichnung: "Ohne Konto", anschaffung: "2024-01-01",
-      wiederbeschaffung: 100, nutzungsdauerMonate: 12,
+    await ruecklagenRepository.speichern({
+      id: "g1", bezeichnung: "Ohne Konto", beginn: "2024-01-01",
+      ziel: 100, fristMonate: 12,
     });
-    const [g] = await inventarRepository.alle();
+    const [g] = await ruecklagenRepository.alle();
     expect(g.kontoId).toBeUndefined();
   });
 
-  it("löscht einen Gegenstand", async () => {
-    await inventarRepository.speichern({
-      id: "g1", bezeichnung: "X", anschaffung: "2024-01-01",
-      wiederbeschaffung: 100, nutzungsdauerMonate: 12,
+  it("löscht eine Rücklage", async () => {
+    await ruecklagenRepository.speichern({
+      id: "g1", bezeichnung: "X", beginn: "2024-01-01",
+      ziel: 100, fristMonate: 12,
     });
-    await inventarRepository.loeschen("g1");
-    expect(await inventarRepository.alle()).toHaveLength(0);
+    await ruecklagenRepository.loeschen("g1");
+    expect(await ruecklagenRepository.alle()).toHaveLength(0);
+  });
+
+  // Die freie Form. Ihre drei Spalten stehen auf NULL, und das muss durch das Mapping
+  // hindurch als `undefined` ankommen — nicht als 0, sonst hätte sie ein Ziel von 0 und
+  // `hatZiel` fiele auf die falsche Seite.
+  it("speichert eine Rücklage ohne Ziel, nur mit Rate", async () => {
+    await ruecklagenRepository.speichern({
+      id: "g2", bezeichnung: "Urlaubskasse", beginn: "2024-01-01", rate: 5000,
+    });
+    const [g] = await ruecklagenRepository.alle();
+    expect(g.rate).toBe(5000);
+    expect(g.ziel).toBeUndefined();
+    expect(g.fristMonate).toBeUndefined();
+  });
+
+  it("hält Ausbuchungen samt Buchungsverknüpfung fest", async () => {
+    await ruecklagenRepository.speichern({
+      id: "g1", bezeichnung: "Waschmaschine", beginn: "2024-01-01", ziel: 60000, fristMonate: 120,
+    });
+    await ruecklagenRepository.ausbuchungSpeichern({
+      id: "a1", ruecklageId: "g1", datum: "2026-05-04", betrag: 62000, istbuchungId: "b1",
+    });
+    const [a] = await ruecklagenRepository.ausbuchungen();
+    expect(a.betrag).toBe(62000);
+    expect(a.istbuchungId).toBe("b1");
   });
 });
 

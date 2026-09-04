@@ -85,13 +85,15 @@ const ERWARTETE_TABELLEN = [
   "budget_betrag",
   "depot", "depotposition", "depotwert", // v38 — Depots: Beobachtungen statt Buchungen
   "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
-  "einstellung", "import_lauf", "inventargegenstand", "ist_buchung",
+  "einstellung", "import_lauf", "ist_buchung",
   "ist_buchung_aufteilung", "kategorie", "klassifikator_modell",
   // v61 — frei benannte Gruppen von Konten; eine Sicht, keine Rechenregel
   "kontogruppe", "kontogruppe_konto",
   "kontostand_anker", // v35 — was an einem Stichtag wirklich auf dem Konto lag
   "merkmal_ausschluss",
   "person",
+  // v65 — aus dem Inventar wurden Rücklagen: Ziel und Frist optional, freie Rate
+  "ruecklage", "ruecklage_ausbuchung",
   // v44 — der Beleg und was wir daraus gemacht haben, getrennt nach Lebenszyklus
   "umsatz_roh", "umsatz_verarbeitung",
   // v47 — die Zuordnung steht jetzt an der Buchung, `vertrag_zuordnung` ist weg
@@ -150,10 +152,13 @@ describe("Migrationen — frische Anwendung der ganzen Kette", () => {
     expect(spalten(db, "zahlungskonto")).toContain("kontostand");
     // v2/v3
     expect(spalten(db, "zahlungsregel")).toEqual(
-      expect.arrayContaining(["konto_id", "kategorie_id", "vertrag_id"]),
+      // gegenkonto_id: v66 — macht aus der Regel eine geplante Umbuchung
+      expect.arrayContaining(["konto_id", "gegenkonto_id", "kategorie_id", "vertrag_id"]),
     );
-    // v17
-    expect(spalten(db, "inventargegenstand")).toContain("konto_id");
+    // v17, seit v65 an `ruecklage`
+    expect(spalten(db, "ruecklage")).toEqual(
+      expect.arrayContaining(["konto_id", "ziel", "frist_monate", "rate", "beginn"]),
+    );
     // v23 — der Vertrag trägt die Kategorie, an der die Kategorisierungs-Kette hängt
     expect(spalten(db, "vertrag")).toContain("kategorie_id");
     // v9/v10/v11/v13

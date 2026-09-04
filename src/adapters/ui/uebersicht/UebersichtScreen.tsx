@@ -31,7 +31,9 @@ import { useTranslation } from "react-i18next";
 import {
   budgetPostenZu,
   budgetstaende,
+  fensterEnde,
   toIso,
+  VORSCHAU_TAGE,
   type Depotdaten,
   type IstBuchung,
   type Uebersichtsdaten,
@@ -46,6 +48,8 @@ import { DepotKarte } from "./DepotKarte";
 import { MonatsAusblick } from "./MonatsAusblick";
 import { VorschauKarte } from "./VorschauKarte";
 import { PageHead } from "../bausteine/PageHead";
+import { HandlungsbedarfKarte } from "./HandlungsbedarfKarte";
+import { VermoegenKarte } from "./VermoegenKarte";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
 
@@ -120,6 +124,17 @@ export function UebersichtScreen() {
 
       {fehler && <Card style={{ borderColor: "var(--warn)" }}>{t("uebersicht.fehlerDb")} ({fehler})</Card>}
 
+      {/* Ganz oben und nur, wenn es etwas zu sagen gibt: alles darunter berichtet, das
+          hier fordert auf. Eine dauerhafte Zeile „alles in Ordnung" wäre nach zwei
+          Wochen unsichtbar, und dann fiele auch die Warnung nicht mehr auf. */}
+      {daten && (
+        <HandlungsbedarfKarte
+          bedarf={daten.bedarf}
+          kontoNamen={daten.kontoNamen}
+          bisTag={fensterEnde(heute, VORSCHAU_TAGE)}
+        />
+      )}
+
       {daten && (
         <MonatsAusblick
           ausblicke={daten.ausblicke}
@@ -136,6 +151,11 @@ export function UebersichtScreen() {
           }}
         />
       )}
+
+      {/* Was insgesamt da ist, aufgeteilt in die drei Klassen. Unter den Monatskarten,
+          weil die eine andere Frage beantworten: sie rechnen nur über die liquiden
+          Konten („wie geht dieser Monat aus"), diese Liste über alle („was ist da"). */}
+      {daten && <VermoegenKarte klassen={daten.klassen} />}
 
       {/* Was noch kommt — zwischen den Monatskarten und den Budgets, weil es genau
           dazwischen gehört: die Karten sagen, wie der Monat ausgeht, die Budgets, was in

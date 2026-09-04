@@ -17,7 +17,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { VertraegeScreen } from "./VertraegeScreen";
 import { sqliteVertragRepository } from "../../persistence/sqliteVertragRepository";
 import {
@@ -745,5 +745,107 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: /Ohlert Seewinkel/ }));
     await waitFor(() => expect(document.body.textContent ?? "").toMatch(/greift noch auf keine/i));
+  });
+});
+
+/**
+ * Löschen — der Weg vom Knopf bis in die Tabelle.
+ *
+ * Er stand einmal still: die Spalte griff auf `v.vertrag.anbieter` zu, obwohl die
+ * Tabelle mit `Vertrag` gefüttert wird und nicht mit `Vertragszeile`. Der Zugriff warf
+ * beim KLICK — der Bestätigungsdialog ging nie auf, und der Knopf sah aus wie einer ohne
+ * Wirkung. Kein Typecheck konnte das sehen (`render: (row: any)` in `DataTable.d.ts`),
+ * und kein Test lief bis zum Klick. Deshalb dieser hier.
+ */
+describe("VertraegeScreen — Löschen", () => {
+  it("löscht einen Vertrag über den Knopf in der Zeile", async () => {
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Ohlert Seewinkel", beginn: "2026-01-01",
+      verlaengerung: "keine", status: "aktiv",
+    });
+
+    rendere(<VertraegeScreen />);
+    await screen.findByRole("button", { name: /Ohlert Seewinkel/ });
+
+    await userEvent.click(screen.getAllByRole("button", { name: /^löschen$/i })[0]);
+
+    // Die Rückfrage muss überhaupt aufgehen — genau das tat sie nicht — und sie trägt
+    // den Anbieternamen: er kommt aus dem Feld, das den Fehler trug.
+    const bestaetigen = await screen.findByRole("button", { name: /endgültig löschen/i });
+    expect(document.body.textContent ?? "").toMatch(/Ohlert Seewinkel“ wird gelöscht/);
+
+    await userEvent.click(bestaetigen);
+
+    await waitFor(async () => expect(await sqliteVertragRepository.alle()).toHaveLength(0));
+  });
+});
+
+/**
+ * Der Umbuchungsvertrag — der Weg von der Maske bis in die Zuordnung.
+ *
+ * Er ist der einzige Vertrag, der an keinem Empfänger hängt: bei einer Zahlung zwischen
+ * zwei eigenen Konten steht dort je nach Bank die eigene IBAN, der eigene Name oder
+ * nichts. Erkannt wird er am WEG, und dieser Test läuft genau die Kette ab, die daran
+ * hängt — Maske, Zahlungsregel, Abgleich.
+ */
+describe("VertraegeScreen — Umbuchungsvertrag", () => {
+  async function konten() {
+    await sqliteZahlungskontoRepository.speichern({
+      id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteZahlungskontoRepository.speichern({
+      id: "tagesgeld", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 0,
+    });
+  }
+
+  it("zeigt das Zielkonto erst bei einer Umschichtung", async () => {
+    await konten();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await nutzer.click(await screen.findByRole("button", { name: /vertrag/i }));
+
+    // Bei Aufwand gibt es kein Zielkonto — dort verlässt das Geld den erfassten Bereich.
+    expect(screen.queryByRole("combobox", { name: /Zielkonto/i })).toBeNull();
+
+    await auswahlWaehlen(nutzer, /^Charakter/i, /Sparen & Vorsorge/i);
+    expect(await screen.findByRole("combobox", { name: /Zielkonto/i })).toBeTruthy();
+  });
+
+  it("speichert den Weg an der Zahlungsregel und ordnet die Umschichtung zu", async () => {
+    await konten();
+    // Die gebuchte Umbuchung liegt schon im Bestand — der Vertrag muss RÜCKWIRKEND greifen.
+    await sqliteLedgerRepository.speichern({
+      id: "ab", datum: "2026-06-02", betrag: -30000, kontoId: "giro", gegenkontoId: "tagesgeld",
+      transferId: "t1", charakter: "Umschichtung", quelle: "import",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "zu", datum: "2026-06-02", betrag: 30000, kontoId: "tagesgeld", gegenkontoId: "giro",
+      transferId: "t1", charakter: "Umschichtung", quelle: "import",
+    });
+
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await nutzer.click(await screen.findByRole("button", { name: /vertrag/i }));
+    await nutzer.type(await screen.findByLabelText(/^Anbieter/i), "Sparrate");
+    await nutzer.type(await screen.findByLabelText(/^Betrag/i), "300");
+    await auswahlWaehlen(nutzer, /^Charakter/i, /Sparen & Vorsorge/i);
+    await auswahlWaehlen(nutzer, /^Konto/i, /Girokonto/);
+    await auswahlWaehlen(nutzer, /^Zielkonto/i, /Tagesgeldkonto/);
+    await nutzer.click(screen.getByRole("button", { name: /^speichern$/i }));
+
+    await waitFor(async () => {
+      const [r] = await sqliteZahlungsregelRepository.alle();
+      expect(r?.gegenkontoId).toBe("tagesgeld");
+    });
+
+    // Und der Abgleich findet das ABGEHENDE Bein — nur das, sonst hübe sich die
+    // Ist-Summe des Vertrags selbst auf.
+    await waitFor(async () => {
+      const zuordnungen = await sqliteVertragszuordnungRepository.alle();
+      expect(zuordnungen.map((z) => z.istbuchungId)).toEqual(["ab"]);
+    });
   });
 });

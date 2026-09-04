@@ -150,7 +150,10 @@ describe("BudgetsScreen", () => {
       const gespeichert = await sqliteBudgetRepository.alle();
       expect(gespeichert).toHaveLength(1);
       expect(gespeichert[0].art).toBe("aufbauend");
-      expect(gespeichert[0].betraege).toEqual([{ abMonat: "2026-08", betrag: 10000 }]);
+      // `monatVersetzt(0)` und kein fester Monat: der Screen liest die Uhr selbst
+      // (`heuteIso`), und ein hartkodierter Monat prueft ab dem naechsten Ersten etwas
+      // anderes, als er soll — er wird rot, ohne dass sich etwas geaendert haette.
+      expect(gespeichert[0].betraege).toEqual([{ abMonat: monatVersetzt(0), betrag: 10000 }]);
     });
   });
 
@@ -215,10 +218,64 @@ describe("BudgetsScreen — Vorschläge", () => {
     await sqliteKategorieRepository.speichern({ id: "miete", name: "Miete", elternId: "wohnen", defaultCharakter: "Aufwand" });
   }
 
+  /**
+   * Der Fall, der vorher ganz herausfiel: zweimal im Jahr etwas Großes. Er kam nicht
+   * als schlechter Vorschlag heraus, sondern gar nicht — zu wenige Monate mit
+   * Ausgaben für einen belastbaren Median.
+   */
+  it("schlägt für seltene große Ausgaben ein aufbauendes Budget vor", async () => {
+    await stammdaten();
+    await einkaufsreihe("e", "essen", 43700, "Nordhoff");
+    await erfassen("r-1", `${monat(10)}-08`, 60000, "miete", "Bergblick");
+    await erfassen("r-2", `${monat(4)}-08`, 60000, "miete", "Bergblick");
+
+    rendere(<BudgetsScreen />);
+    await screen.findByText("Aus deinen Ausgaben abgeleitet");
+    const zeile = (await screen.findByText("Wohnen")).closest("tr");
+    expect(zeile?.textContent).toMatch(/aufbauend/);
+    // Die Schwankung sagt beim aufbauenden Budget nichts — der eine teure Monat ist
+    // dort der Zweck. Eine Warnpille stünde als Warnung vor dem Erwarteten da.
+    expect(zeile?.textContent).not.toMatch(/schwankend|stabil/i);
+
+    // Und die Art wandert in die Maske mit: ein monatlicher Rahmen wäre hier die
+    // falsche Zusage, und niemand würde ihn im Dialog von Hand umstellen.
+    await userEvent.click(zeile!.querySelector("button[aria-label*='bernehmen']")!);
+    const artFeld = await screen.findByRole("combobox", { name: /Art/i });
+    expect(artFeld.textContent).toMatch(/aufbauend/i);
+  });
+
   it("zeigt ohne Buchungen keine Vorschlagskarte", async () => {
     rendere(<BudgetsScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Noch keine Budgets/));
     expect(document.body.textContent).not.toMatch(/Aus deinen Ausgaben abgeleitet/);
+  });
+
+  /**
+   * Die Reihenfolge ist eine Aussage und keine Formsache: die eigenen Budgets zuerst, der
+   * Vorschlag als Nachtrag. Stünde er oben, schöbe er sich bei jedem Besuch vor das,
+   * weswegen man den Bereich geöffnet hat — und je mehr Kategorien sich bewegen, desto
+   * weiter rutschte das Eigentliche nach unten.
+   *
+   * Geprüft an der DOM-Reihenfolge und nicht am Aussehen: eine Karte, die per CSS
+   * woandershin gerückt wird, liest ein Screenreader trotzdem in dieser Folge.
+   */
+  it("stellt die eigene Budgetliste vor die Vorschläge", async () => {
+    await stammdaten();
+    await einkaufsreihe("e", "essen", 43700, "Nordhoff");
+    await sqliteBudgetRepository.speichern({
+      id: "b1", kategorieId: "miete", kontoId: "k1",
+      betraege: [{ abMonat: monat(6), betrag: 40000 }], art: "monatlich", start: `${monat(6)}-01`,
+    });
+
+    rendere(<BudgetsScreen />);
+    await screen.findByText("Lebenshaltung");
+
+    const text = document.body.textContent ?? "";
+    const liste = text.indexOf("Deine Budgets");
+    const vorschlaege = text.indexOf("Aus deinen Ausgaben abgeleitet");
+    expect(liste, "Überschrift der Budgetliste steht im Text").toBeGreaterThanOrEqual(0);
+    expect(vorschlaege, "Überschrift der Vorschläge steht im Text").toBeGreaterThanOrEqual(0);
+    expect(liste).toBeLessThan(vorschlaege);
   });
 
   it("schlägt eine Hauptkategorie mit ihrem üblichen Monatsbetrag vor", async () => {

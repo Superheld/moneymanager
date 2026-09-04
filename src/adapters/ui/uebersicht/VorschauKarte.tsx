@@ -18,15 +18,10 @@ import { VORSCHAU_TAGE, type Vorschauzeile } from "../../../application";
 import { Card, DataTable, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { geldFarbe } from "../bausteine/geldFarbe";
-import { useCharakterLabel, useGeld } from "../bausteine/einstellungenKontext";
+import { useCharakterLabel, useDatum, useGeld } from "../bausteine/einstellungenKontext";
 
 /** Dieselben Stufen wie im Kontoauszug zuvor — die letzte ist `VORSCHAU_TAGE`. */
 const TAGE_OPTIONEN = [14, 30, 60, VORSCHAU_TAGE];
-
-/** Tag und Monat ohne Jahr: die Vorschau reicht höchstens 90 Tage, das Jahr unterscheidet nichts. */
-function datumOhneJahr(iso: string): string {
-  return `${iso.slice(8, 10)}.${iso.slice(5, 7)}.`;
-}
 
 interface Props {
   zeilen: readonly Vorschauzeile[];
@@ -36,6 +31,8 @@ interface Props {
 export function VorschauKarte({ zeilen, kontoNamen }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
+  // Ohne Jahr: die Vorschau reicht höchstens 90 Tage, das Jahr unterscheidet nichts.
+  const datum = useDatum();
   const charakterLabel = useCharakterLabel();
   const [tage, setTage] = useState(30);
   const [konto, setKonto] = useState("");
@@ -109,7 +106,7 @@ export function VorschauKarte({ zeilen, kontoNamen }: Props) {
               {
                 key: "datum",
                 label: t("uebersicht.vorschauSpalteDatum"),
-                render: (z: Vorschauzeile) => datumOhneJahr(z.datum),
+                render: (z: Vorschauzeile) => datum.ohneJahr(z.datum),
               },
               // Die Spalte, wegen der es diese Karte gibt. Sie fällt weg, sobald auf ein
               // Konto gefiltert ist: dann steht in jeder Zeile dasselbe, und die Angabe
