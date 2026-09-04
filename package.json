@@ -49,7 +49,7 @@
     "@types/react": "^19.1.8",
     "@types/react-dom": "^19.2.5",
     "@types/sql.js": "^1.4.11",
-    "@vitejs/plugin-react": "^6.0.5",
+    "@vitejs/plugin-react": "^6.1.0",
     "@vitest/coverage-v8": "^4.1.10",
     "jsdom": "^30.0.1",
     "sql.js": "^1.14.1",
