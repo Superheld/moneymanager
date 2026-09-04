@@ -134,6 +134,72 @@ export function useProzent(): (anteil: number, stellen?: number) => string {
   );
 }
 
+/**
+ * Ein Datum aus der Datenbank (ISO) in der Schreibweise des Nutzers.
+ *
+ * Es gibt das aus demselben Grund wie `useProzent`, nur ist der Befund groesser: die
+ * Formatierung stand an neun Stellen in vier Varianten — `datumKurz` (zweimal, mit
+ * verschiedener Bedeutung), `datumLang` (zweimal, wortgleich kopiert), `ddmmyyyy`
+ * (zweimal, wortgleich kopiert), `ddmm`, `datumOhneJahr` und einmal inline in der Analyse.
+ * Dazu zwei Stellen, die das ISO-Datum ROH in die Oberflaeche gaben (die Karte
+ * „Da ist etwas zu tun").
+ *
+ * **Und alle neun schrieben die deutsche Reihenfolge fest.** In einer englischen
+ * Oberflaeche stand damit `28.09.2026`, wo `9/28/2026` hingehoert — dieselbe Falle wie bei
+ * `toFixed`, nur eine Ebene sichtbarer: `05.03.` und `03/05/` sind dieselben Ziffern mit
+ * anderer Bedeutung. `Datumsfeld` las die Reihenfolge laengst aus `Intl`; die Anzeige
+ * daneben tat es nicht.
+ *
+ * Drei Formen, weil es drei Fragen gibt, und die Wahl gehoert dem Aufrufer:
+ *
+ * | | zeigt | wofuer |
+ * |---|---|---|
+ * | `mitJahr` | `28.09.2026` | eine Zeile ohne Zusammenhang, aus dem sich das Jahr ergaebe |
+ * | `kurz` | `28.09.26` | Listen, in denen das Jahr zaehlt, aber die Spalte schmal ist |
+ * | `ohneJahr` | `28.09.` | Fenster von hoechstens ein paar Monaten |
+ *
+ * **`ohneJahr` ist kein Sparformat, sondern eine Aussage:** wer es nimmt, behauptet, dass
+ * das Jahr aus dem Zusammenhang folgt. In einem Kontoauszug ueber den Jahreswechsel tut es
+ * das nicht, und dort steht deshalb `mitJahr`.
+ *
+ * Gerechnet wird in UTC (`Date.UTC` plus `timeZone: "UTC"`), wie im `Datumsfeld`: ein
+ * ISO-Datum ist ein KALENDERTAG und keine Zeitangabe. Ohne die feste Zone zieht ein
+ * Rechner westlich von Greenwich jeden Tag um einen zurueck.
+ *
+ * Ein Zeitstempel (`2026-08-11T09:00:00.000Z`) wird angenommen und auf seinen Tag
+ * gekuerzt; was sich nicht als Datum lesen laesst, kommt unveraendert zurueck — eine
+ * Anzeige ist kein Ort, an dem eine kaputte Zeile den Bildschirm leeren darf.
+ */
+export function useDatum(): {
+  mitJahr: (iso: string) => string;
+  kurz: (iso: string) => string;
+  ohneJahr: (iso: string) => string;
+} {
+  const { locale } = useEinstellungen();
+  return useMemo(() => {
+    const formatierer = (jahr?: "numeric" | "2-digit") =>
+      new Intl.DateTimeFormat(locale, { timeZone: "UTC", day: "2-digit", month: "2-digit", ...(jahr ? { year: jahr } : {}) });
+    const voll = formatierer("numeric");
+    const zweistellig = formatierer("2-digit");
+    const ohne = formatierer();
+
+    const anwenden = (f: Intl.DateTimeFormat) => (iso: string) => {
+      const [j, m, d] = String(iso).slice(0, 10).split("-").map(Number);
+      if (!j || !m || !d) return iso;
+      return f.format(new Date(Date.UTC(j, m - 1, d)));
+    };
+
+    return { mitJahr: anwenden(voll), kurz: anwenden(zweistellig), ohneJahr: anwenden(ohne) };
+  }, [locale]);
+}
+
+/**
+ * Was `useDatum` liefert — aus demselben Grund exportiert wie `Geld`: damit Helfer
+ * ausserhalb einer Komponente das Datums-Werkzeug annehmen koennen, statt die Locale
+ * einzeln durchzureichen.
+ */
+export type Datum = ReturnType<typeof useDatum>;
+
 /** Enum-Label-Schicht: Charakter (gespeicherter Code) → übersetztes Anzeige-Label. */
 export function useCharakterLabel(): (c: Charakter) => string {
   const { t } = useTranslation();

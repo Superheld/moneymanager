@@ -11,10 +11,9 @@ import { useTranslation } from "react-i18next";
 import type { Dublettenverdacht } from "../../../application";
 import type { Umsatz } from "../../../application/import";
 import { Pill } from "../bausteine";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
-import { ddmm } from "./ddmm";
 
 /** Was die Dublettenprüfung zu dieser Buchung sagt — samt der Zeile, die sie meint. */
 export interface Dublettenbefund {
@@ -50,6 +49,7 @@ export function DublettenBlock({
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
   const { verdacht, zwilling } = befund;
   const sicher = verdacht.urteil === "identisch";
 
@@ -58,7 +58,7 @@ export function DublettenBlock({
       <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
         <Pill variant="warn">{t(sicher ? "konten.neue.dubletteSicher" : "konten.neue.dublette")}</Pill>
         <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
-          {ddmm(zwilling.buchungstag)} · {zwilling.gegenpartei || t("konten.neue.ohneGegenpartei")}
+          {datum.ohneJahr(zwilling.buchungstag)} · {zwilling.gegenpartei || t("konten.neue.ohneGegenpartei")}
         </span>
         <span className="num" style={{ fontWeight: 700, color: geldFarbe(zwilling.betrag) }}>{geld.formatMitSymbol(zwilling.betrag, { mitVorzeichen: true })}</span>
         <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>

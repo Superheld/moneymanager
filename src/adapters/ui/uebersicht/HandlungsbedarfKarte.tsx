@@ -15,7 +15,7 @@
 import { useTranslation } from "react-i18next";
 import type { Kontovorschau } from "../../../application";
 import { Card, Pill } from "../bausteine";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 
 export function HandlungsbedarfKarte({
   bedarf,
@@ -29,12 +29,16 @@ export function HandlungsbedarfKarte({
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  // Bis hierher stand das ISO-Datum ROH in der Karte („ab 2026-09-02"). Es ist der
+  // Stand der Datenbank, nicht der einer Oberflaeche — und in einer englischen Fassung
+  // haette auch eine deutsche Reihenfolge dort nichts zu suchen.
+  const datum = useDatum();
   if (bedarf.length === 0) return null;
 
   return (
     <Card
       title={t("uebersicht.bedarfTitel")}
-      subtitle={t("uebersicht.bedarfUntertitel", { bis: bisTag })}
+      subtitle={t("uebersicht.bedarfUntertitel", { bis: datum.mitJahr(bisTag) })}
       style={{ borderColor: "var(--warn)" }}
     >
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
@@ -54,7 +58,7 @@ export function HandlungsbedarfKarte({
                   </Pill>
                 </span>
                 <span className="muted">
-                  {t("uebersicht.bedarfAb", { datum: ab })} ·{" "}
+                  {t("uebersicht.bedarfAb", { datum: datum.mitJahr(ab) })} ·{" "}
                   <span style={{ color: "var(--warn-deep)" }}>
                     {geld.format(tiefstand)} {geld.symbol}
                   </span>
