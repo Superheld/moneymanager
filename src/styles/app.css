@@ -742,6 +742,12 @@ select.field.tabellenfilter {
 
    Der NAME haengt am `title` jedes Eintrags (siehe AppShell) — ein Icon ohne Namen
    ist ein Raetsel, und geraten wird in einer Finanz-App ungern.
+
+   DIESE SCHWELLE STEHT ZWEIMAL DA: hier und als `SCHMAL_ABFRAGE` in
+   `ui/bausteine/useSchmal.ts`, wo die DataTable sie braucht, um schmal ein anderes
+   MARKUP zu bauen (zwei Spalten statt sechs). Eine Medienabfrage kann keine
+   CSS-Variable lesen — das ist die Spezifikation, nicht ein Rueckstand der Browser.
+   Wer sie hebt, hebt sie an beiden Stellen.
    ============================================================ */
 @media (min-width: 700px) {
   .app {
