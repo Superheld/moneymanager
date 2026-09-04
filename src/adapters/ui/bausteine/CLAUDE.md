@@ -260,6 +260,30 @@ Eine Zahl steckt darin, die man kennen muss: schmal liegt **`table-layout: fixed
 die Wertspalte ist auf `12ch` festgelegt. Ohne beides zöge ein langer Name die Tabelle
 wieder aus dem Bild — genau das Übel, gegen das die schmale Form gebaut ist.
 
+## `Dialog` schmal: ueber die ganze Hoehe, Fusszeile bleibt stehen
+
+Breit ist er eine 680er Box mit 48 px Luft darueber. Auf einem Telefon hiess das:
+Formular ausfüllen, scrollen, „Speichern" suchen — und der Knopf lag unter dem Bildrand,
+**ohne dass man das sieht**: der Dialog ist ein eigener Scrollbereich, der Rest der Seite
+steht still, es gibt also kein Anzeichen, dass da noch etwas kommt.
+
+Schmal füllt er deshalb den Bildschirm und wird zu drei Teilen, von denen nur der mittlere
+scrollt: Kopf, Inhalt, Fusszeile. Damit ist die Handlung immer sichtbar — dieselbe Regel
+wie beim Update-Knopf in der Seitenleiste: **Auskunft darf weichen, eine Handlung nicht.**
+
+Zwei Dinge, die man beim Anfassen wissen muss:
+
+- **`position: sticky` an der Fusszeile ist hier der falsche Weg**, obwohl er kürzer wäre.
+  Die Box trägt `overflow: hidden` für ihre runden Ecken und ist damit selbst ein
+  Scrollbereich, in dem nichts scrollt; das Sticky hätte keine Wirkung, und man sähe es ihm
+  nicht an. Drei Teile mit einem scrollenden Mittelstück sagen, was gemeint ist.
+- **`minHeight: 0` am Inhalt ist Pflicht.** Ein Flex-Kind besteht sonst auf seiner
+  Inhaltshöhe und schiebt die Fusszeile aus dem Bild — genau der Fehler, der behoben werden
+  sollte, nur eine Ebene tiefer.
+
+Die Ränder folgen `env(safe-area-inset-*)`: schmal liegt der Dialog unter der Kerbe und
+über der Wischleiste, und beide sind je nach Gerät verschieden hoch.
+
 ## Zwei Fallen, die man kennen muss
 
 **`DataTable` ist die App-Fassung**, nicht die des Design-Systems: sie trägt Sortierung,
