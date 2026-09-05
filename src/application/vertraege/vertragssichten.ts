@@ -120,7 +120,7 @@ export async function vertraegeLaden(
   deps: VertragsichtDeps,
   heute: string,
 ): Promise<Vertragssicht> {
-  await erkennungenNachziehen(deps.vertragRepo, deps.regelRepo, deps.erkennungRepo);
+  await erkennungenNachziehen(deps.vertragRepo, deps.regelRepo, deps.erkennungRepo, deps.abgleich);
   await zuordnungenAbgleichen(deps.abgleich);
 
   const [vertraege, regeln, personen, kategorien, zuordnungen, buchungen, ignoriert] =
