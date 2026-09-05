@@ -11,7 +11,9 @@
 // Bestand blind bleibt, bis jemand einen Vertrag anfasst.
 
 import {
+  beleglageFuer,
   erkennungsDiagnose,
+  merkmaleAbleiten,
   merkmalsTreffer,
   kuendigungsterminNaht,
   naechsteFaelligkeit,
@@ -28,9 +30,11 @@ import {
   type Person,
   type Vertrag,
   type Erkennungsdiagnose,
+  type Merkmalskandidat,
   type Merkmalstreffer,
   type Vertragserkennung,
   type Vertragskandidat,
+  type Vertragszuordnung,
   type Zahlungsspur,
   type Zahlungsregel,
 } from "../../core";
@@ -245,5 +249,45 @@ export function erkennungProbieren(
     diagnose,
     spanne,
     proMerkmal: merkmalsTreffer(regel.merkmale, spuren),
+  };
+}
+
+/**
+ * Was in die Merkmalsliste eines Vertrags gehoerte, aus seinen von Hand zugeordneten
+ * Zahlungen abgeleitet.
+ *
+ * Die Gegenrichtung zu `erkennungProbieren`: dort wird eine getippte Regel gemessen, hier
+ * kommt aus den Belegen ein Vorschlag. Beide rechnen ueber DENSELBEN Spuren und mit
+ * derselben Messung — sonst stuende neben einem Vorschlag eine Trefferzahl, die nach dem
+ * Uebernehmen eine andere waere.
+ *
+ * Rein und ohne IO: die Spuren hat der Aufrufer ohnehin schon (die Vorschau braucht sie),
+ * und die Zuordnungen sind eine Liste, kein Join. Ein eigener Ladeweg hier hiesse, den
+ * Vorschlag gegen einen anderen Stand zu rechnen als die Vorschau daneben.
+ */
+export interface Merkmalsvorschlag {
+  /**
+   * Wie viele Zahlungen von Hand diesem Vertrag zugeordnet sind.
+   *
+   * Steht daneben, weil `decktAb` allein nichts sagt: „deckt 3" ist bei vier Belegen fast
+   * alles und bei dreissig fast nichts. Und die Null unterscheidet die beiden Faelle, die
+   * in der Oberflaeche sonst gleich aussaehen — „noch nichts zugeordnet" ist eine
+   * Anleitung, „nichts Gemeinsames gefunden" ein Befund.
+   */
+  readonly belege: number;
+  readonly kandidaten: readonly Merkmalskandidat[];
+}
+
+export function merkmaleVorschlagen(
+  vertragId: string,
+  spuren: readonly Zahlungsspur[],
+  zuordnungen: readonly Vertragszuordnung[],
+): Merkmalsvorschlag {
+  const beleglage = beleglageFuer(vertragId, zuordnungen);
+  return {
+    // Ueber die SPUREN gezaehlt und nicht ueber die Menge: eine Zuordnung kann auf eine
+    // Buchung zeigen, die es nicht mehr gibt, und die traegt zu keinem Vorschlag bei.
+    belege: spuren.filter((s) => beleglage.dazu.has(s.id)).length,
+    kandidaten: merkmaleAbleiten(spuren, beleglage),
   };
 }

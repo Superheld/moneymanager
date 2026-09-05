@@ -7,7 +7,8 @@
 // stehen die Faelle zu Ziffern und zum Verwendungszweck unten und nicht am Rand.
 
 import { describe, expect, it } from "vitest";
-import { merkmaleAbleiten, type Beleglage } from "./merkmalsableitung";
+import { beleglageFuer, merkmaleAbleiten, type Beleglage } from "./merkmalsableitung";
+import type { Vertragszuordnung } from "./vertragZuordnung";
 import type { Zahlungsspur } from "../buchung/zahlungsspur";
 
 function spur(teil: Partial<Zahlungsspur> = {}): Zahlungsspur {
@@ -181,5 +182,40 @@ describe("merkmaleAbleiten", () => {
     expect(muster(merkmaleAbleiten([...spuren].reverse(), belege))).toEqual(
       muster(merkmaleAbleiten(spuren, belege)),
     );
+  });
+});
+
+describe("beleglageFuer", () => {
+  const zuordnungen: Vertragszuordnung[] = [
+    { istbuchungId: "b1", vertragId: "v1", herkunft: "manuell" },
+    { istbuchungId: "b2", vertragId: "v1", herkunft: "automatisch" },
+    { istbuchungId: "n1", vertragId: null, herkunft: "manuell" },
+    { istbuchungId: "n2", vertragId: null, herkunft: "automatisch" },
+    { istbuchungId: "f1", vertragId: "v2", herkunft: "manuell" },
+  ];
+
+  it("nimmt nur Handzuordnungen als Beleg — sonst belegt die Regel sich selbst", () => {
+    // `b2` haengt an demselben Vertrag, aber die Automatik hat es gesetzt. Als Beleg
+    // waere es das Ergebnis der Regel, das die Regel begruendet.
+    const lage = beleglageFuer("v1", zuordnungen);
+    expect([...lage.dazu]).toEqual(["b1"]);
+  });
+
+  it("nimmt nur ein Nein von Hand als Gegenbeleg", () => {
+    const lage = beleglageFuer("v1", zuordnungen);
+    expect([...lage.nichtDazu]).toEqual(["n1"]);
+  });
+
+  it("laesst eine Zuordnung zu einem ANDEREN Vertrag unbeschriftet", () => {
+    // Sie ist ein starkes Indiz gegen v1 und trotzdem kein Nein zu v1 — und ein Indiz
+    // gehoert nicht in eine Gruppe, die „von Hand gesagt" heisst.
+    const lage = beleglageFuer("v1", zuordnungen);
+    expect(lage.dazu.has("f1")).toBe(false);
+    expect(lage.nichtDazu.has("f1")).toBe(false);
+  });
+
+  it("gilt fuer jeden Vertrag: dasselbe Nein zaehlt auch beim naechsten", () => {
+    expect([...beleglageFuer("v2", zuordnungen).nichtDazu]).toEqual(["n1"]);
+    expect([...beleglageFuer("v2", zuordnungen).dazu]).toEqual(["f1"]);
   });
 });

@@ -1816,6 +1816,14 @@ const de = {
       merkmalTrifftNieHinweis:
         "Dieses Muster hat in keiner Zahlung gepasst. Die Regel hängt damit allein an den übrigen Merkmalen — fällt deren Feld einmal aus, greift der Vertrag ohne Meldung nicht mehr.",
       ohneMerkmale: "Kein Merkmal — so ordnet die Regel nichts zu.",
+      vorschlaege: "Aus {{n}} von Hand zugeordneten Buchungen abgeleitet",
+      vorschlaegeOhneBelege:
+        "Noch keine Buchung von Hand diesem Vertrag zugeordnet. Sobald du im Kontoauszug welche zuordnest, entstehen hier Vorschläge.",
+      vorschlaegeAlleDrin: "Was sich ableiten lässt, steht schon in der Liste.",
+      vorschlagZahlen: "deckt {{deckt}}/{{belege}} · sonst {{sonst}}",
+      vorschlagUebernehmen: "übernehmen",
+      vorschlaegeZurueckgehalten:
+        "{{n}} weitere nicht angeboten: sie treffen eine Buchung, die du ausdrücklich keinem Vertrag zugeordnet hast.",
       musterPlatzhalter: "z. B. name*",
       entstehtBeimSpeichern:
         "Die Erkennung entsteht beim Speichern aus Anbieter und Betrag. Danach steht sie hier und lässt sich nachsteuern.",
@@ -3691,6 +3699,14 @@ const en: typeof de = {
       merkmalTrifftNieHinweis:
         "This pattern has not matched a single payment. The rule therefore rests on the remaining features alone — if their field ever stops arriving, the contract silently stops matching.",
       ohneMerkmale: "No feature — the rule links nothing.",
+      vorschlaege: "Derived from {{n}} payments linked by hand",
+      vorschlaegeOhneBelege:
+        "No payment linked to this contract by hand yet. Link some in the account statement and suggestions will appear here.",
+      vorschlaegeAlleDrin: "Everything derivable is already in the list.",
+      vorschlagZahlen: "covers {{deckt}}/{{belege}} · else {{sonst}}",
+      vorschlagUebernehmen: "adopt",
+      vorschlaegeZurueckgehalten:
+        "{{n}} more not offered: they match a payment you explicitly linked to no contract.",
       musterPlatzhalter: "e.g. name*",
       entstehtBeimSpeichern:
         "Matching is created on save, from the provider name and the amount. After that it appears here and can be adjusted.",

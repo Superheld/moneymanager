@@ -529,6 +529,17 @@ export function vertragserkennungSpeichern(regel: Parameters<typeof sqliteVertra
 }
 
 /**
+ * Die gespeicherten Zuordnungen Buchung → Vertrag, samt Herkunft.
+ *
+ * Die Herkunft ist der Grund, warum die Oberfläche sie überhaupt sieht: aus ihr entsteht
+ * die Beleglage für einen Merkmalsvorschlag, und dort zählt ausschliesslich, was von Hand
+ * gesetzt wurde.
+ */
+export function vertragszuordnungen() {
+  return sqliteVertragszuordnungRepository.alle();
+}
+
+/**
  * Die Zahlungsspuren des ganzen Bestands: Buchung plus das, was am Umsatz hängt
  * (Empfänger, Gläubiger-ID). Grundlage jeder Erkennungsprobe.
  */

@@ -41,6 +41,7 @@ import {
   type Erkennungsmerkmal,
   type Erkennungsprobe,
   type Merkmalsart,
+  type Merkmalsvorschlag,
   type Vertragserkennung,
   type Waehrung,
   type Zahlungskonto,
@@ -53,6 +54,9 @@ import { useGeld } from "../bausteine/einstellungenKontext";
 
 /** Wie viele Treffer die Vorschau einzeln auflistet — der Rest wird gezaehlt. */
 const VORSCHAU_ZEILEN = 8;
+
+/** Wie viele Vorschlaege angeboten werden. Die Liste ist sortiert — der Rest ist Rest. */
+const VORSCHLAG_ZEILEN = 6;
 
 /**
  * Der Formularzustand der Erkennung. Betraege als TEXT, wie ueberall: solange getippt
@@ -118,6 +122,7 @@ export function ErkennungsBereich({
   f,
   aufAenderung,
   probe,
+  vorschlag,
 }: {
   /** Der Anbietername aus der LAUFENDEN Maske — wer ihn gerade aendert, soll den neuen
       angeboten bekommen und nicht den gespeicherten. */
@@ -126,6 +131,11 @@ export function ErkennungsBereich({
   f: ErkennungFormular;
   aufAenderung: (f: ErkennungFormular) => void;
   probe: Erkennungsprobe;
+  /**
+   * Was die von Hand zugeordneten Buchungen hergeben. `null` beim Anlegen — dann gibt es
+   * noch keinen Vertrag, dem etwas zugeordnet sein koennte.
+   */
+  vorschlag: Merkmalsvorschlag | null;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -156,6 +166,29 @@ export function ErkennungsBereich({
   const nameFehlt =
     !!nameSchluessel &&
     !f.merkmale.some((m) => m.art === "empfaenger" && musterTrifft(m.muster.trim(), nameSchluessel));
+
+  /**
+   * Vorschlaege, die noch nicht in der Liste stehen — verglichen ueber Art UND Muster.
+   *
+   * Gekuerzt, weil die Ableitung beim Verwendungszweck durchaus ein Dutzend Woerter
+   * findet: die Liste ist sortiert, und was danach kommt, ist der Rest. Ein Kandidat mit
+   * Widerspruch faellt ganz heraus — er ist fuer mindestens einen Beleg nachweislich
+   * falsch, und ihn anzubieten hiesse, einen Fehler zum Angebot zu machen.
+   */
+  const offeneVorschlaege = useMemo(() => {
+    if (!vorschlag) return [];
+    const drin = new Set(f.merkmale.map((m) => `${m.art} ${m.muster.trim()}`));
+    return vorschlag.kandidaten
+      .filter((k) => k.widerspricht === 0 && !drin.has(`${k.merkmal.art} ${k.merkmal.muster}`))
+      .slice(0, VORSCHLAG_ZEILEN);
+  }, [vorschlag, f.merkmale]);
+
+  /**
+   * Wie viele zurueckgehalten wurden. Sie werden GEZAEHLT und nicht verschwiegen: dass
+   * die Ableitung etwas gefunden hat, das einem Hand-Nein widerspricht, ist selbst eine
+   * Auskunft — meist heisst sie, dass zwei Vertraege denselben Empfaenger haben.
+   */
+  const zurueckgehalten = vorschlag?.kandidaten.filter((k) => k.widerspricht > 0).length ?? 0;
 
   /** Die Stufe, die am meisten weggenommen hat — nur wenn es ueberhaupt eine gibt. */
   const engstelle = useMemo(() => {
@@ -253,6 +286,62 @@ export function ErkennungsBereich({
               </button>
             )}
           </div>
+
+          {/* Die Gegenrichtung: nicht „was trifft mein Muster", sondern „was haben die
+              zugeordneten Buchungen gemeinsam". Sie steht UNTER der Liste und nicht
+              daneben, weil sie eine Zutat zu ihr ist und kein zweiter Weg. */}
+          {vorschlag && (
+            <div style={{ marginTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)", paddingTop: "var(--sp-2)" }}>
+              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 6 }}>
+                {t("vertraege.regel.vorschlaege", { n: vorschlag.belege })}
+              </div>
+              {vorschlag.belege === 0 && (
+                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {t("vertraege.regel.vorschlaegeOhneBelege")}
+                </div>
+              )}
+              {vorschlag.belege > 0 && offeneVorschlaege.length === 0 && (
+                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {t("vertraege.regel.vorschlaegeAlleDrin")}
+                </div>
+              )}
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {offeneVorschlaege.map((k) => (
+                  <div key={`${k.merkmal.art} ${k.merkmal.muster}`}
+                       style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                    <span className="muted" style={{ fontSize: "var(--fs-xs)", flex: "0 0 auto" }}>
+                      {t(`vertraege.regel.art.${k.merkmal.art}`)}
+                    </span>
+                    <code style={{ fontSize: 13, flex: "1 1 160px", minWidth: 0, overflowWrap: "anywhere" }}>
+                      {k.merkmal.muster}
+                    </code>
+                    {/* Drei Zahlen und keine Punktzahl: was sie gegeneinander wiegen,
+                        haengt am Fall — siehe `merkmalsableitung` im Kern. */}
+                    <Pill variant="neutral">
+                      {t("vertraege.regel.vorschlagZahlen", {
+                        deckt: k.decktAb,
+                        belege: vorschlag.belege,
+                        widerspricht: k.widerspricht,
+                        sonst: k.unbeschriftet,
+                      })}
+                    </Pill>
+                    <button
+                      className="linkbtn"
+                      style={{ padding: 0, flex: "0 0 auto" }}
+                      onClick={() => setze("merkmale", [...f.merkmale, { art: k.merkmal.art, muster: k.merkmal.muster }])}
+                    >
+                      {t("vertraege.regel.vorschlagUebernehmen")}
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {zurueckgehalten > 0 && (
+                <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+                  {t("vertraege.regel.vorschlaegeZurueckgehalten", { n: zurueckgehalten })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </FormField>
 

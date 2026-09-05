@@ -17,6 +17,7 @@ export * from "./buchung/zahlungsspur";
 export * from "./vertraege/vertragErkennung";
 export * from "./vertraege/vertragZuordnung";
 export * from "./vertraege/umbuchungErkennung";
+export * from "./vertraege/merkmalsableitung";
 export * from "./budgets/budget";
 export * from "./budgets/budgetverlauf";
 export * from "./budgets/budgetVorschlag";

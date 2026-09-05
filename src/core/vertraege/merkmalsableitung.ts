@@ -64,6 +64,7 @@ import {
   MERKMALSARTEN,
   merkmalsTreffer,
   type Erkennungsmerkmal,
+  type Vertragszuordnung,
 } from "./vertragZuordnung";
 
 /**
@@ -262,4 +263,33 @@ function zweckwoerter(zweck: string): string[] {
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
     .filter((w) => w.length >= ZWECK_MINDESTLAENGE && !/\d/.test(w));
+}
+
+/**
+ * Die Beleglage eines Vertrags aus den gespeicherten Zuordnungen.
+ *
+ * **Nur `herkunft === "manuell"`** — der Kreis aus dem Kopf dieser Datei wird genau hier
+ * verhindert, an der einzigen Stelle, an der jemand versucht sein koennte, „alle
+ * Buchungen des Vertrags" zu schreiben.
+ *
+ * Die zweite Gruppe faellt dabei von selbst an: eine Zuordnung von Hand mit
+ * `vertragId === null` ist die Aussage „gehoert ausdruecklich zu keinem Vertrag". Sie
+ * gilt fuer JEDEN Vertrag als Nein, nicht nur fuer diesen — deshalb steht dort keine
+ * Vertragspruefung. Eine Zuordnung von Hand zu einem ANDEREN Vertrag bleibt dagegen
+ * unbeschriftet: dass eine Zahlung zu Vertrag B gehoert, ist ein starkes Indiz gegen A,
+ * aber kein Nein zu A — und ein Indiz gehoert nicht in eine Gruppe, die „von Hand
+ * gesagt" heisst.
+ */
+export function beleglageFuer(
+  vertragId: string,
+  zuordnungen: readonly Vertragszuordnung[],
+): Beleglage {
+  const dazu = new Set<string>();
+  const nichtDazu = new Set<string>();
+  for (const z of zuordnungen) {
+    if (z.herkunft !== "manuell") continue;
+    if (z.vertragId === vertragId) dazu.add(z.istbuchungId);
+    else if (z.vertragId === null) nichtDazu.add(z.istbuchungId);
+  }
+  return { dazu, nichtDazu };
 }

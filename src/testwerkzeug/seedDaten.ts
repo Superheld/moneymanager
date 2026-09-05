@@ -492,6 +492,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       partei: string,
       zweck: string,
       vertragId?: string,
+      vonHand = false,
     ) => {
       const datum = tagIn(-m, tag);
       const hash = `hash-sync-${m}-${partei.toLowerCase()}`;
@@ -503,7 +504,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
         rohHash: gesynct ? hash : undefined,
         kategorieHerkunft: gesynct ? "automatisch" : "manuell",
         vertragId: vertragId ?? null,
-        vertragHerkunft: vertragId ? "automatisch" : null,
+        vertragHerkunft: vertragId ? (vonHand ? "manuell" : "automatisch") : null,
       });
       if (gesynct) {
         ausSync.push({ buchungId: id, hash, datum, betrag, partei, zweck, kontoId, monatsversatz: m });
@@ -515,7 +516,18 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     fest(28, 315000, "konto-giro", "kat-gehalt", "Ertrag", "Auszahlung", "Bezuege");
     fest(1, -98000, "konto-giro", "kat-miete-nebenkosten", "Aufwand", "Steenbeck", "Monatsmiete");
     fest(5, -4500, "konto-giro", "kat-internet-telefon", "Aufwand", "Halvern", "Grundgebuehr", "vertrag-internet");
-    fest(15, -8900, "konto-giro", "kat-versicherungen", "Aufwand", "Mordhorst", "Beitrag", "vertrag-versicherung");
+    // Der Vertrag, an dem die MERKMALSABLEITUNG etwas zu tun bekommt. Zwei Dinge daran
+    // sind Absicht und beide fehlten dem Spielstand bisher:
+    //
+    //  • Das Empfaengerfeld traegt wechselnde Kennungen, wie es Banken liefern. Kein
+    //    einzelner Name deckt damit alle Zahlungen ab — erst ihr gemeinsamer Wortanfang
+    //    tut es, und genau das ist der Fall, den man von Hand nicht sieht.
+    //  • Ein Teil der Zahlungen ist VON HAND zugeordnet. Ohne solche Belege haette die
+    //    Ableitung nichts, woraus sie schliessen koennte, und der Abschnitt im
+    //    Vertragsdialog bliebe im ganzen Spielstand leer.
+    fest(15, -8900, "konto-giro", "kat-versicherungen", "Aufwand",
+      m % 2 === 0 ? "Mordhorst KD-4711" : "Mordhorst RE-8823",
+      "Beitrag", "vertrag-versicherung", m % 3 === 0);
     fest(8, -zahlZwischen(6000, 11000), "konto-giro", "kat-energie", "Aufwand", "Wendlandt", "Abschlag");
     // Eine Umschichtung hat ZWEI Seiten — sonst zeigt der Verlauf einen Stand, den es nie gab.
     //
