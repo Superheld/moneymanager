@@ -7,11 +7,19 @@
 //  2. Datumsfelder sind `Date`-Objekte auf LOKALER Mitternacht — in Mitteleuropa also
 //     `…T22:00:00.000Z`. Ein naives `toISOString().slice(0,10)` liefert den VORTAG, bei
 //     jeder Buchung, lautlos, und verschiebt damit jede Monatsgrenze mit.
-//  3. Mehrere typisierte Felder (`remoteIdentifier`, `mandateReference`, `e2eReference`,
-//     `bookingText`) bleiben LEER. Der Inhalt steckt im `purpose`-Freitext, in der
-//     Schreibweise des Instituts. Das Herausparsen ist bankspezifisch und liegt deshalb
-//     hinter einer eigenen Naht (`klartextAnreicherung`): greift es nicht, fehlen
-//     Zusatzfelder — die Übersetzung läuft trotzdem durch.
+//  3. Welche typisierten Felder befüllt sind, hängt am FORMAT — und das hat sich am
+//     2026-09-04 geändert. Bis dahin stand hier „bleiben LEER", und für CAMT stimmte das:
+//     der Parser der Bibliothek las aus `Refs` nur `EndToEndId` und `MndtId`, die
+//     Gläubiger-ID holte er nirgends ab. Bei MT940 stimmte es nie — dort werden `CRED+`
+//     und `DEBT+` aus dem Verwendungszweck gelesen, seit jeher.
+//
+//     Seit dem Fork-Stand 27de365 liest auch der CAMT-Parser sie (`RltdPties.Cdtr` bzw.
+//     `.Dbtr`). `bookingText` bleibt bei CAMT weiterhin leer.
+//
+//     Der eigene Parser (`klartextAnreicherung`) bleibt trotzdem: er fängt die
+//     ausgeschriebene Schreibweise mancher Institute („GLÄUBIGER-ID:" im Freitext), die
+//     keine SEPA-Tags trägt. Die typisierten Felder haben Vorrang — die Angabe der
+//     Bibliothek ist die verlässlichere.
 
 import { ibanGueltig, istCent, majorZuMinor, waehrungNachCode, type Cent, type Waehrung } from "../../core";
 import type { RohUmsatz } from "../../application/import";
@@ -70,12 +78,15 @@ export interface Auszugsstand {
  * lückenlosen Auszügen ist der Anfang des einen der Schluss des vorigen — die Dopplung
  * kostet nichts, weil ein Anker über (Konto, Datum, Herkunft) eindeutig ist.
  *
- * **Der Anfangssaldo wird nur genommen, wenn er VOR dem Schluss liegt.** Das ist keine
- * Kosmetik, sondern Schutz vor einem erfundenen Wert: der CAMT-Parser der Bibliothek legt
- * einen Anfangssaldo von NULL an, wenn die Bank keinen mitschickt, und zwar mit dem Datum
- * des Schlusssaldos („If missing opening balance, create a zero balance for the same date
- * as closing"). Ungeprüft übernommen wäre das ein Anker „an diesem Tag lag nichts auf dem
- * Konto" — und der meldet die gesamte Kontodeckung als Fehlbetrag.
+ * **Der Anfangssaldo wird nur genommen, wenn er VOR dem Schluss liegt.** Der Anlass ist
+ * seit 2026-09-04 weg: der CAMT-Parser legte einen Anfangssaldo von NULL an, wenn die Bank
+ * keinen mitschickte, mit dem Datum des Schlusssaldos — ungeprüft übernommen ein Anker „an
+ * diesem Tag lag nichts auf dem Konto", der die gesamte Kontodeckung als Fehlbetrag
+ * meldet. Der Fork erfindet nichts mehr, beide Salden sind jetzt schlicht optional.
+ *
+ * Die Prüfung bleibt trotzdem, und nicht aus Vorsicht: ein Anfangssaldo am SELBEN Tag wie
+ * der Schluss sagt so oder so nichts — er ist entweder erfunden oder er wiederholt den
+ * Schluss. Sie war nie nur die Abwehr gegen diesen einen Fehler.
  *
  * Ein Anfangssaldo, der auf denselben Tag fällt wie der Schluss, sagt ohnehin nichts: er
  * ist entweder erfunden oder er wiederholt den Schluss.
