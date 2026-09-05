@@ -55,7 +55,7 @@ import type {
  * Zwei Dateien, die sich unabhängig entwickeln, teilen keine Versionsnummer: sonst steigt
  * die eine, weil sich an der anderen etwas geändert hat, und `fassung` sagt nichts mehr.
  */
-export const BESTANDSEXPORT_FASSUNG = 3;
+export const BESTANDSEXPORT_FASSUNG = 4;
 
 /** Ein Konto, wie es in der Datei steht. Mit IBAN und Saldo — daher die Warnung oben. */
 export interface ExportKonto {
@@ -124,6 +124,25 @@ export interface ExportBeleg {
    * haelt ihn fuer eine Luecke in den Daten.
    */
   readonly sammelposten: readonly ExportSammelposten[] | null;
+  /** `BOOK` / `PDNG` / `INFO` — ob die BANK gebucht hat, nicht unser Verarbeitungsstand. */
+  readonly buchungsstand: string | null;
+  /** Ob die Zeile eine frühere aufhebt. Ein Storno sieht sonst aus wie eine Gegenbuchung. */
+  readonly istStorno: boolean | null;
+  /**
+   * Was tatsächlich bezahlt wurde, bevor die Bank umgerechnet hat — Betrag in Minor
+   * Units, Währung, Kurs. Ohne diese drei steht bei einem Einkauf in fremder Währung nur
+   * der Eurobetrag, und für eine Auswertung ist die Zahlung dann nicht mehr das, was sie
+   * war.
+   */
+  readonly originalBetrag: number | null;
+  readonly originalWaehrung: string | null;
+  readonly wechselkurs: number | null;
+  /** Was die Bank für die Buchung genommen hat, wo sie es getrennt ausweist. */
+  readonly gebuehrBetrag: number | null;
+  readonly gebuehrWaehrung: string | null;
+  /** Warum eine Zahlung zurückkam — Code (`AC04`, `MD01` …) und der Text der Bank. */
+  readonly ruecklaufCode: string | null;
+  readonly ruecklaufText: string | null;
   readonly waehrung: string;
   readonly valuta: string | null;
   /** Aus welchem Abruf die Zeile kam. Trägt das Format und damit die Deutung der zwei Felder darüber. */
@@ -228,6 +247,15 @@ function belegForm(u: Umsatz): ExportBeleg {
             strukturierteReferenz: leer(p.strukturierteReferenz),
           }))
         : null,
+    buchungsstand: leer(u.buchungsstand),
+    istStorno: u.istStorno ?? null,
+    originalBetrag: u.originalBetrag ?? null,
+    originalWaehrung: leer(u.originalWaehrung),
+    wechselkurs: u.wechselkurs ?? null,
+    gebuehrBetrag: u.gebuehrBetrag ?? null,
+    gebuehrWaehrung: leer(u.gebuehrWaehrung),
+    ruecklaufCode: leer(u.ruecklaufCode),
+    ruecklaufText: leer(u.ruecklaufText),
     waehrung: u.waehrung,
     valuta: leer(u.valuta),
     laufId: u.laufId,

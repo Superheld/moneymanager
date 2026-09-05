@@ -429,6 +429,86 @@ export interface FintsBuchung {
   readonly creditorReference?: string;
   /** Die Zahlungen hinter einer Sammelbuchung — nur gesetzt, wo es MEHRERE sind. Nur CAMT. */
   readonly details?: readonly FintsSammelposten[];
+  /** `BOOK` / `PDNG` / `INFO` — ob die Bank gebucht hat (`Sts`). Nur CAMT. */
+  readonly status?: string;
+  /** Ob die Zeile eine frühere aufhebt (`RvslInd`). Nur CAMT. */
+  readonly isReversal?: boolean;
+  /** Was die Bank für die Buchung genommen hat (`Chrgs`). Nur CAMT. */
+  readonly charges?: FintsGeld;
+  /** Der Betrag vor der Umrechnung (`AmtDtls.InstdAmt`) und sein Kurs. Nur CAMT. */
+  readonly originalAmount?: FintsGeld;
+  readonly exchangeRate?: number;
+  /** Warum eine Zahlung zurückkam (`RtrInf`). Nur CAMT. */
+  readonly returnReason?: { readonly code?: string; readonly text?: string };
+  /** MT940 die Kundenreferenz aus `:61:`, CAMT die E2E-Referenz. */
+  readonly customerReference?: string;
+
+  // ── Ab hier: was ohne eigene Aussage in `bankfelder` wandert ────────────────────────
+  /** SWIFT-Buchungsart (MT940 `:61:`), etwa `NTRF`, `NMSC`. */
+  readonly transactionType?: string;
+  /** Soll/Haben-Kennzeichen der Buchung. */
+  readonly fundsCode?: string;
+  /** Primanotennummer (MT940 `?10`). */
+  readonly primeNotesNr?: string;
+  /** Auftraggeberkennung (MT940 `?30`-Umfeld). */
+  readonly client?: string;
+  /** Textschlüsselergänzung (MT940). */
+  readonly textKeyExtension?: string;
+  /** Bezugsreferenz des Auszugs. */
+  readonly relatedReference?: string;
+  /** Der Kopf einer Sammelbuchung (`NtryDtls.Btch`) — wie viele Zahlungen darin stecken. */
+  readonly batch?: {
+    readonly messageId?: string;
+    readonly paymentInformationId?: string;
+    readonly numberOfTransactions?: number;
+  };
+}
+
+/** Ein Geldbetrag, wie die Bibliothek ihn liefert: Euro als Fliesskomma plus Währung. */
+export interface FintsGeld {
+  readonly value: number;
+  readonly currency?: string;
+}
+
+/**
+ * Ein Nebenbetrag der Bank in Minor Units — oder `undefined`, wenn er sich nicht sicher
+ * umrechnen lässt.
+ *
+ * **Wirft nicht.** Gebühr und Originalbetrag stehen NEBEN dem Betrag der Buchung, und der
+ * kommt von der Bank und stimmt. Eine unbrauchbare Nebenangabe darf die Zeile nicht
+ * mitnehmen — dieselbe Abwägung wie bei den Sammelposten.
+ */
+function nebenbetrag(geld: FintsGeld | undefined, konto: Waehrung): { betrag?: Cent; waehrung?: string } {
+  if (!geld) return {};
+  const waehrung = geld.currency ? waehrungNachCode(geld.currency) : konto;
+  try {
+    return { betrag: bankbetragZuCent(geld.value, waehrung), waehrung: waehrung.code };
+  } catch {
+    return { waehrung: waehrung.code };
+  }
+}
+
+/**
+ * Was die Bank sonst noch sagte — die Felder ohne eigene Aussage, unter ihren Namen aus
+ * der Bibliothek.
+ *
+ * Leere und fehlende Werte fallen weg: ein Feld, das nichts trägt, ist keine Angabe, und
+ * ein Objekt voller `undefined` wäre beim Nachsehen schlechter als keines.
+ */
+function bankfelderAus(b: FintsBuchung): Record<string, unknown> | undefined {
+  const raus: Record<string, unknown> = {};
+  const text = (wert: string | undefined) => wert?.trim() || undefined;
+  const eintraege: [string, unknown][] = [
+    ["transactionType", text(b.transactionType)],
+    ["fundsCode", text(b.fundsCode)],
+    ["primeNotesNr", text(b.primeNotesNr)],
+    ["client", text(b.client)],
+    ["textKeyExtension", text(b.textKeyExtension)],
+    ["relatedReference", text(b.relatedReference)],
+    ["batch", b.batch && Object.values(b.batch).some((v) => v !== undefined) ? b.batch : undefined],
+  ];
+  for (const [name, wert] of eintraege) if (wert !== undefined) raus[name] = wert;
+  return Object.keys(raus).length > 0 ? raus : undefined;
 }
 
 /** Eine Zahlung aus `Transaction.details` (lib-fints), im Ausschnitt, den wir lesen. */
@@ -510,6 +590,8 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
   // in MT940 die nationale Kontonummer aus `?31`. Beides landet in derselben Eigenschaft,
   // und keine Angabe sagt, welches von beiden. Deshalb die Prüfung — der Konto-Match und
   // `rohHash` normalisieren IBANs, eine Kontonummer würde dort stillschweigend zu Müll.
+  const original = nebenbetrag(b.originalAmount, waehrung);
+  const gebuehr = nebenbetrag(b.charges, waehrung);
   const gegenIban =
     b.remoteIban && ibanGueltig(b.remoteIban)
       ? b.remoteIban
@@ -577,6 +659,22 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
       b.details && b.details.length > 0
         ? b.details.map((d) => zuSammelposten(d, waehrung))
         : undefined,
+    // Was die Bank ueber die Zahlung SAGT, jenseits von Betrag und Text. Nichts davon
+    // wertet heute etwas aus; es kommt mit, weil ein Institut Umsaetze nur begrenzt
+    // vorhaelt und die Angabe danach nirgends mehr steht.
+    buchungsstand: b.status?.trim() || undefined,
+    istStorno: b.isReversal,
+    originalBetrag: original.betrag,
+    originalWaehrung: original.betrag === undefined ? undefined : original.waehrung,
+    wechselkurs: Number.isFinite(b.exchangeRate) ? b.exchangeRate : undefined,
+    gebuehrBetrag: gebuehr.betrag,
+    gebuehrWaehrung: gebuehr.betrag === undefined ? undefined : gebuehr.waehrung,
+    ruecklaufCode: b.returnReason?.code?.trim() || undefined,
+    ruecklaufText: b.returnReason?.text?.trim() || undefined,
+    // FORMATABHAENGIG: MT940 die Kundenreferenz aus `:61:` (dort haeufig `NONREF`),
+    // CAMT die E2E-Referenz. Deutbar allein ueber das Format am Lauf.
+    kundenreferenz: b.customerReference?.trim() || undefined,
+    bankfelder: bankfelderAus(b),
     bankreferenz: a.bankreferenz,
     istUmbuchung: false,
     quelle: FINTS_QUELLE,

@@ -517,6 +517,48 @@ describe("Import-Repositories", () => {
     expect(u.sammelposten?.[1].verwendungszweck).toBeUndefined();
   });
 
+  /**
+   * Elf weitere Spalten aus Migration 69, und dieselbe Gefahr wie bei den vier davor: ein
+   * verrutschtes `$` vertauscht zwei Werte, und weil heute niemand sie liest, faellt das
+   * erst auf, wenn Jahre spaeter jemand eine Auswertung darauf baut.
+   */
+  it("haelt alles, was die Bank sonst noch sagt, ueber die Rundreise", async () => {
+    await umsatzRepository.anlegen(
+      umsatz({
+        buchungsstand: "PDNG",
+        istStorno: true,
+        originalBetrag: -2499,
+        originalWaehrung: "USD",
+        wechselkurs: 1.0842,
+        gebuehrBetrag: -175,
+        gebuehrWaehrung: "EUR",
+        ruecklaufCode: "AC04",
+        ruecklaufText: "Konto aufgeloest",
+        kundenreferenz: "NONREF",
+        bankfelder: { transactionType: "NTRF", batch: { numberOfTransactions: 3 } },
+      }),
+    );
+    const [u] = await umsatzRepository.alle();
+    expect(u.buchungsstand).toBe("PDNG");
+    expect(u.istStorno).toBe(true);
+    expect([u.originalBetrag, u.originalWaehrung, u.wechselkurs]).toEqual([-2499, "USD", 1.0842]);
+    expect([u.gebuehrBetrag, u.gebuehrWaehrung]).toEqual([-175, "EUR"]);
+    expect([u.ruecklaufCode, u.ruecklaufText]).toEqual(["AC04", "Konto aufgeloest"]);
+    expect(u.kundenreferenz).toBe("NONREF");
+    expect(u.bankfelder).toEqual({ transactionType: "NTRF", batch: { numberOfTransactions: 3 } });
+  });
+
+  it("haelt „kein Storno\" und „nicht gesagt\" auseinander", async () => {
+    // SQLite kennt kein Boolean. Ohne die Unterscheidung waere jede Zeile, ueber die die
+    // Bank nichts gesagt hat, ein ausdrueckliches „kein Storno" — und das ist eine
+    // Behauptung, die niemand aufgestellt hat.
+    await umsatzRepository.anlegen(umsatz({ id: "u1", istStorno: false }));
+    await umsatzRepository.anlegen(umsatz({ id: "u2", rohHash: "h2" }));
+    const alle = await umsatzRepository.alle();
+    expect(alle.find((u) => u.id === "u1")?.istStorno).toBe(false);
+    expect(alle.find((u) => u.id === "u2")?.istStorno).toBeUndefined();
+  });
+
   it("macht aus keinen Sammelposten undefined und nicht eine leere Liste", async () => {
     // Sonst waeren „keine Sammelbuchung" und „eine Sammelbuchung ohne Zahlungen darin"
     // dieselbe Zelle. Das zweite gibt es nicht.

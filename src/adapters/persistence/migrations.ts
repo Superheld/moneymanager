@@ -1958,4 +1958,66 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE umsatz_roh ADD COLUMN sammelposten TEXT`,
     ],
   },
+  {
+    version: 69, // Alles, was die Bank zu einer Zahlung sonst noch sagt
+    sql: [
+      // NAH AN DER BIBLIOTHEK. Bis hierher uebersetzten wir eine Auswahl der Felder von
+      // `Transaction`; der Rest fiel beim Abruf auf den Boden. Was ein Institut nur
+      // begrenzt vorhaelt, ist danach nicht nachzuholen — deshalb kommt jetzt mit, was
+      // ankommt, auch wo es heute nichts auswertet.
+      //
+      // Die Grenze zwischen eigener Spalte und Sammelfeld ist die AUSSAGE: was ueber die
+      // Zahlung etwas sagt, bekommt einen Namen; reine Protokollfelder ohne eigene
+      // Aussage wandern nach `bankfelder` und sind dort benannt, statt zu fehlen.
+
+      // Ob die Bank die Zeile GEBUCHT hat: `BOOK`, `PDNG` (nur vorgemerkt), `INFO`
+      // (wird nicht gebucht). Nur CAMT. Eine vorgemerkte Zahlung ist keine gebuchte —
+      // wer sie mitzaehlt, ueberschaetzt den Stand.
+      //
+      // `buchungsstand` und NICHT `status`: den Namen traegt schon der
+      // Verarbeitungsstand in `umsatz_verarbeitung` (neu / verbucht / verworfen), und
+      // das ist eine voellig andere Aussage — die eine kommt von der Bank, die andere
+      // von uns. Im SELECT ueber beide Tabellen staenden sie sonst als `r.status` und
+      // `v.status` nebeneinander, und ein vertauschtes Mapping faellt dort nicht auf.
+      `ALTER TABLE umsatz_roh ADD COLUMN buchungsstand TEXT`,
+
+      // Ob die Zeile eine fruehere aufhebt (`RvslInd`). Nur CAMT. Ein Storno sieht sonst
+      // aus wie eine gewoehnliche Gegenbuchung.
+      `ALTER TABLE umsatz_roh ADD COLUMN ist_storno INTEGER`,
+
+      // Der Betrag VOR der Umrechnung und der Kurs dazu (`AmtDtls.InstdAmt`,
+      // `CcyXchg.XchgRate`). Nur CAMT. Ohne sie steht bei einem Auslandseinkauf nur der
+      // Eurobetrag, und was tatsaechlich bezahlt wurde, ist nicht mehr feststellbar.
+      //
+      // Der Betrag in MINOR UNITS wie ueberall, der Kurs als Fliesskommazahl: ein Kurs
+      // ist kein Geld. Ihn auf Cent zu runden naehme ihm die Nachkommastellen, auf die
+      // es bei ihm ankommt.
+      `ALTER TABLE umsatz_roh ADD COLUMN original_betrag INTEGER`,
+      `ALTER TABLE umsatz_roh ADD COLUMN original_waehrung TEXT`,
+      `ALTER TABLE umsatz_roh ADD COLUMN wechselkurs REAL`,
+
+      // Was die Bank fuer die Buchung genommen hat (`Chrgs`), wo sie es getrennt
+      // ausweist. Nur CAMT.
+      `ALTER TABLE umsatz_roh ADD COLUMN gebuehr_betrag INTEGER`,
+      `ALTER TABLE umsatz_roh ADD COLUMN gebuehr_waehrung TEXT`,
+
+      // Warum eine Zahlung zurueckkam — Code (`AC04`, `MD01` …) und der Text der Bank
+      // (`RtrInf`). Nur CAMT. Eine Rueckgabe ohne Grund ist eine Zahlung, die man nicht
+      // erklaeren kann.
+      `ALTER TABLE umsatz_roh ADD COLUMN ruecklauf_code TEXT`,
+      `ALTER TABLE umsatz_roh ADD COLUMN ruecklauf_text TEXT`,
+
+      // FORMATABHAENGIG wie `umsatzart` und `buchungsschluessel`: MT940 traegt hier die
+      // Kundenreferenz aus `:61:`, CAMT die E2E-Referenz. Deutbar ueber das Format am
+      // Lauf, und deshalb neben `e2e_referenz` und nicht darin.
+      `ALTER TABLE umsatz_roh ADD COLUMN kundenreferenz TEXT`,
+
+      // WAS SONST NOCH KAM. Die Felder ohne eigene Aussage — Primanotennummer,
+      // Textschluesselergaenzung, Auftraggeberkennung, SWIFT-Buchungsart, der Kopf einer
+      // Sammelbuchung. Als JSON unter den Namen der Bibliothek, damit beim naechsten
+      // Stand nichts wieder auf den Boden faellt, nur weil hier keine Spalte dafuer
+      // steht. Wer eines davon braucht, holt es heraus und gibt ihm eine.
+      `ALTER TABLE umsatz_roh ADD COLUMN bankfelder TEXT`,
+    ],
+  },
 ];

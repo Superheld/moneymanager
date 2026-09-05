@@ -175,6 +175,44 @@ describe("buchungenInExportform", () => {
     expect(posten?.[1].verwendungszweck).toBeNull();
   });
 
+  it("nimmt mit, was die Zahlung zu dem macht, was sie war", async () => {
+    // Der Fremdwaehrungsbetrag ist der wichtigste davon: ohne ihn steht in der Datei nur
+    // der Eurobetrag, und fuer eine Auswertung ist die Zahlung dann nicht mehr die, die
+    // stattgefunden hat.
+    const daten = await exportieren({
+      buchungen: [buchung({ id: "b-1", datum: "2026-03-04" })],
+      umsaetze: [
+        beleg({
+          id: "u-1",
+          istbuchungId: "b-1",
+          buchungsstand: "BOOK",
+          istStorno: false,
+          originalBetrag: -2499,
+          originalWaehrung: "USD",
+          wechselkurs: 1.0842,
+          gebuehrBetrag: -175,
+          gebuehrWaehrung: "EUR",
+          ruecklaufCode: "AC04",
+          ruecklaufText: "Konto aufgeloest",
+          // Das Sammelfeld bleibt draussen: sein Inhalt ist per Definition das, wofuer
+          // sich keine Aussage benennen liess. Zeigt sich, dass etwas darin zaehlt,
+          // bekommt es eine Spalte und kommt dann mit.
+          bankfelder: { transactionType: "NTRF" },
+          kundenreferenz: "NONREF",
+        }),
+      ],
+    });
+
+    const b = daten.buchungen[0].beleg;
+    expect(b?.buchungsstand).toBe("BOOK");
+    expect(b?.istStorno).toBe(false);
+    expect([b?.originalBetrag, b?.originalWaehrung, b?.wechselkurs]).toEqual([-2499, "USD", 1.0842]);
+    expect([b?.gebuehrBetrag, b?.gebuehrWaehrung]).toEqual([-175, "EUR"]);
+    expect([b?.ruecklaufCode, b?.ruecklaufText]).toEqual(["AC04", "Konto aufgeloest"]);
+    expect(JSON.stringify(b)).not.toContain("NTRF");
+    expect(JSON.stringify(b)).not.toContain("NONREF");
+  });
+
   it("schreibt ohne Sammelbuchung ein null und keine leere Liste", async () => {
     const daten = await exportieren({
       buchungen: [buchung({ id: "b-1", datum: "2026-03-04" })],
