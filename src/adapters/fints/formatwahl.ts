@@ -22,11 +22,10 @@
 //
 // ## Warum die Faehigkeit gefragt wird und nicht das Gedaechtnis
 //
-// An seiner Stelle steht die Faehigkeit: ist `HKCAZ` fuer DIESES KONTO freigegeben, wird
-// CAMT geholt, sonst MT940. Das ist eine Auskunft statt eines Ausprobierens, und sie
-// steht ohnehin schon im Bankfaehigkeitsprofil. Warum je Konto und nicht je Bank, steht
-// bei `kontoKannCamt` — es ist der Unterschied zwischen einem richtigen und einem
-// falschen Etikett am Lauf.
+// An seiner Stelle steht die Faehigkeit: was die Bank fuer DIESES KONTO anbietet, sagt
+// sie selbst (`getSupportedStatementFormats`). Das ist eine Auskunft statt eines
+// Ausprobierens. Warum je Konto und nicht je Bank, steht bei `formatWaehlen` — es ist
+// der Unterschied zwischen einem richtigen und einem falschen Etikett am Lauf.
 //
 // Das frueher mitgefuehrte Gedaechtnis (`zuletzt`) entscheidet ausdruecklich NICHT mehr
 // mit, und das ist wichtiger als es klingt: es steht bei jedem Konto auf „MT940", das
@@ -35,45 +34,60 @@
 // sehen, wegen derer aktualisiert wurde. Das Feld wird weiter FORTGESCHRIEBEN; es ist
 // jetzt eine Aufzeichnung, was getragen hat, und keine Eingabe mehr.
 
-import type { Bankprofil, Formatvorgabe } from "../../application/fints/abrufPort";
+import type { Formatvorgabe } from "../../application/fints/abrufPort";
+
+/** Die beiden Formate, in denen eine Bank Umsaetze herausgibt. */
+export type Umsatzformat = "CAMT" | "MT940";
 
 /**
- * Ob fuer DIESES Konto CAMT herausgegeben wird.
+ * Das Format fuer diesen Abruf — aus dem, was das KONTO anbietet.
  *
- * ## Die Faehigkeit haengt am KONTO, nicht an der Bank
+ * ## Die Faehigkeit haengt am Konto, nicht an der Bank
  *
- * Bis 2026-09-05 wurde `profil.vorfaelle` gefragt — die Vorfaelle, die das INSTITUT
- * kennt. Das ist eine andere Aussage: eine Bank kann `HKCAZ` beherrschen und es trotzdem
- * nur fuer einen Teil ihrer Konten freigeben. Bei einem Tagesgeld- oder
- * Verrechnungskonto im selben Zugang ist genau das der Fall.
+ * Bis 2026-09-05 wurde `profil.vorfaelle` gefragt, also die Vorfaelle des INSTITUTS.
+ * Eine Bank kann `HKCAZ` beherrschen und es trotzdem nur fuer einen Teil ihrer Konten
+ * freigeben; bei einem Tagesgeld- oder Verrechnungskonto im selben Zugang ist genau das
+ * der Fall. Die Bibliothek entschied dieselbe Frage am Konto und fiel still auf MT940
+ * zurueck — der Abruf lieferte also, was das Konto hergibt, aber an den Lauf wurde
+ * „CAMT" geschrieben. `umsatzart` und `buchungsschluessel` tragen je nach Format
+ * verschiedene Vokabulare und sind allein ueber dieses Etikett deutbar; ein falsches
+ * macht sie unlesbar, ohne dass irgendwo ein Fehler auftaucht.
  *
- * Der Schaden daran war nicht der falsche Abruf, denn `getAccountStatements` prueft
- * seinerseits das Konto und holt dann eben MT940. Der Schaden war das ETIKETT: wir
- * schrieben „CAMT" an den Lauf, waehrend MT940 durchlief — und `umsatzart` und
- * `buchungsschluessel` tragen je nach Format verschiedene Vokabulare, deutbar allein
- * ueber diese Angabe. Ein falsches Etikett macht sie unlesbar, ohne dass irgendwo ein
- * Fehler auftaucht: im Bestand stehen Zeilen mit dem numerischen Geschaeftsvorfallcode
- * aus MT940 unter einem CAMT-Lauf.
+ * Seit dem Bibliotheks-Stand f943818 ist der stille Rueckfall weg: das Format wird
+ * ausdruecklich angefordert, und ein Konto, das es nicht anbietet, fuehrt zu einem Wurf
+ * statt zu einem anderen Format. Gefragt wird deshalb, WAS ANGEBOTEN IST
+ * (`getSupportedStatementFormats`) — eine Auskunft der Bibliothek statt einer Bedingung,
+ * die wir daneben noch einmal nachbauen. Dass zwei Seiten dieselbe Frage verschieden
+ * beantworten, war der Fehler.
  *
- * Gespiegelt wird deshalb genau die Bedingung der Bibliothek
- * (`isAccountTransactionSupported`: steht `HKCAZ` in den freigegebenen Vorfaellen DIESES
- * Kontos). Dass zwei Seiten dieselbe Frage verschieden beantworten, ist der Fehler —
- * nicht die Antwort der einen.
+ * ## Eine Festlegung schlaegt alles — bis auf das, was es nicht gibt
+ *
+ * `wahl` ist eine Entscheidung des Nutzers: wer ein Format waehlt, will dessen Ergebnis
+ * sehen, auch das leere. Ist es fuer dieses Konto aber gar nicht im Angebot, wird hier
+ * geworfen und nicht dort — VOR dem Bankverkehr, auf Deutsch, und mit dem Konto im Text.
+ * Die Bibliothek wuerfe sonst dasselbe eine Ebene tiefer, wo unser Fehlerpfad daraus ein
+ * „liess sich nicht lesen" machte: es liess sich nicht ANFORDERN, und das ist ein
+ * anderer Satz.
  */
-export function kontoKannCamt(profil: Bankprofil, kontoSchluessel: string): boolean {
-  return (profil.kontoVorfaelle[kontoSchluessel] ?? []).includes("HKCAZ");
-}
-
-/**
- * Das Format fuer diesen Abruf.
- *
- * `wahl` ist eine FESTLEGUNG des Nutzers und schlaegt alles: wer ein Format waehlt, will
- * dessen Ergebnis sehen — auch das leere. Ohne Festlegung entscheidet, was das KONTO
- * kann (`kontoKannCamt`).
- */
-export function formatWaehlen(vorgabe: Formatvorgabe | undefined, kannCamt: boolean): "CAMT" | "MT940" {
+export function formatWaehlen(
+  vorgabe: Formatvorgabe | undefined,
+  angeboten: readonly Umsatzformat[],
+  kontoBezeichnung?: string,
+): Umsatzformat {
   const wahl = vorgabe?.wahl ?? "automatisch";
-  if (wahl === "CAMT") return "CAMT";
-  if (wahl === "MT940") return "MT940";
-  return kannCamt ? "CAMT" : "MT940";
+  const konto = kontoBezeichnung ? ` fuer „${kontoBezeichnung}"` : "";
+
+  if (angeboten.length === 0) {
+    throw new Error(`Die Bank gibt${konto} keine Umsaetze heraus — weder als CAMT noch als MT940.`);
+  }
+  if (wahl !== "automatisch") {
+    if (!angeboten.includes(wahl)) {
+      throw new Error(
+        `Die Bank bietet${konto} nur ${angeboten.join(" und ")} an; ${wahl} ist nicht abrufbar. ` +
+          `Die Festlegung steht bei den Bankzugaengen.`,
+      );
+    }
+    return wahl;
+  }
+  return angeboten.includes("CAMT") ? "CAMT" : "MT940";
 }
