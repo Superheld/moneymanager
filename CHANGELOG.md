@@ -3,6 +3,170 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.27.0] — 2026-09-06
+
+Die Runde am Bankabruf. Er holt jetzt, was die Bank kennt und noch nicht gebucht hat,
+nimmt alles mit, was sie zu einer Zahlung sagt, und sagt selbst, welches Format er
+bekommen hat — statt es zu behaupten. Dazu vier Funde aus der Bibliothek, von denen zwei
+still Daten verloren haben.
+
+### Neu
+
+**Vorgemerkte Zahlungen.** Was die Bank kennt und noch nicht gebucht hat — die
+Kartenzahlung von gestern Abend, die Lastschrift von morgen früh — steht jetzt im
+Kontoauszug als eigener Block über den gebuchten Zeilen. Es kostet keinen zusätzlichen
+Abruf: die Angaben lagen die ganze Zeit im zweiten Feld derselben Antwort und wurden
+weggeworfen.
+
+Sie sind ausdrücklich **keine Buchungen**: eine Vormerkung wird in ein bis drei Tagen zu
+einer, mit möglicherweise anderem Betrag, oder sie fällt weg. Im Ledger stünde dieselbe
+Zahlung danach zweimal, und der Dublettenfinder hätte nichts, woran er sie erkennt — keine
+stabile Kennung, ein veränderlicher Betrag, und bei manchen Instituten nicht einmal ein
+Datum. Sie liegen deshalb in einer eigenen Tabelle, in derselben Kategorie wie ein
+Kontostands-Anker: eine Beobachtung. Der Bestand eines Kontos wird bei jedem Abruf
+vollständig **ersetzt** — was die Bank nicht mehr meldet, gibt es nicht mehr.
+
+**Und sie wirken in der Liquiditätsvorschau.** Eine Vormerkung ist sicherer als jede
+Vertragsrate: sie ist bereits geschehen, nur noch nicht verbucht. Der reale Kontostand
+rechnet über Buchungen und sieht sie nicht — ohne sie begann die Vorschau also mit Geld,
+über das niemand mehr verfügt. Dasselbe meint die Bank, wenn sie neben den Saldo einen
+„verfügbaren Betrag" stellt. Was die Bank ausdrücklich **nicht** buchen wird, zählt dabei
+nicht mit, wird aber angezeigt: es erklärt, was man im Online-Banking sieht.
+
+**Die Erkennungsregel steht im Vertragsdialog**, und jede Zeile sagt, was sie trifft. Wer
+wissen wollte, warum eine Zahlung zu einem Vertrag gehört (oder nicht), musste es bisher
+raten.
+
+**Der Dialog schlägt Merkmale aus den Handzuordnungen vor.** Aus den Zahlungen, die
+jemand von Hand zugeordnet hat, entstehen Kandidaten für die Merkmalsliste — dieselbe
+Messung wie die Vorschau, nur andersherum gelesen. Beleg ist dabei ausschliesslich eine
+Zuordnung von Hand: eine Buchung, die die Regel selbst zugeordnet hat, ist ihr Ergebnis,
+und sie als Beleg zu nehmen wäre ein Kreis, der langsam driftet. Bewertet wird mit **drei
+Zahlen** statt einer Punktzahl — deckt Belege ab, widerspricht einem Nein, trifft sonst
+noch etwas: eine Verrechnung daraus wäre geraten und sähe als Zahl aus wie eine Messung.
+
+**Verträge lassen sich im Kontoauszug sammelweise zuordnen.** Mehrere Zeilen wählen, einem
+Vertrag zuschlagen — oder ausdrücklich keinem. Das „keinem" ist dabei eine Aussage und
+kein Löschen: ohne sie käme ein von Hand korrigierter Fehlgriff der Automatik beim nächsten
+Abgleich zurück.
+
+**Was die Bank je Konto freigibt**, steht in der Profilkarte. Die Tabelle darüber sagt,
+was das Institut kann — und das ist eine andere Frage: eine Bank kann Depotaufstellungen
+beherrschen und sie nur für ein einziges Konto freigeben. Genau an dieser Grenze entstanden
+Widersprüche, die vorher niemand auflösen konnte.
+
+**Alles, was die Bank zu einer Zahlung sagt, wird aufgehoben** — auch wo es heute nichts
+auswertet: der Buchungsstand (gebucht, vorgemerkt, nur zur Information), ob eine Zeile eine
+frühere aufhebt, der Betrag vor der Umrechnung samt Kurs, Gebühren, der Grund einer
+Rückgabe, die Zahlungen hinter einer Sammelbuchung und vier weitere Referenzen. Der Grund
+ist keine Sammelwut: ein Institut hält Umsätze nur eine begrenzte Zeit vor. Was heute nicht
+abgeholt wird, ist für die Vergangenheit nicht nachzuholen, während eine Spalte, die
+dasteht und wartet, nichts kostet.
+
+### Geändert
+
+**Das Umsatzformat wird am KONTO entschieden und ausdrücklich angefordert.** Vorher wurde
+gefragt, was die Bank kann — eine andere Aussage: sie kann ein Format beherrschen und es
+nur für einen Teil ihrer Konten freigeben. Die Bibliothek entschied dieselbe Frage am Konto
+und fiel still auf das andere Format zurück; an den Lauf schrieben wir trotzdem das
+gewünschte. Weil zwei Felder je nach Format verschiedene Vokabulare tragen und allein über
+dieses Etikett deutbar sind, machte das falsche Etikett sie unlesbar — ohne dass irgendwo
+ein Fehler auftauchte.
+
+Jetzt wird gefragt, was das Konto anbietet, das Format ausdrücklich angefordert, und was am
+Lauf steht, kommt aus der **Antwort** statt aus unserer Anforderung. Eine Festlegung auf ein
+Format, das ein Konto nicht anbietet, wird abgewiesen — auf Deutsch, mit dem Konto im Text,
+und bevor eine Verbindung aufgebaut wird.
+
+**Die DK-Bankenliste ist aufgefrischt.** Sie stand auf einem Stand vom Mai; die neuere
+Ausgabe lag unbearbeitet daneben. Der Erzeugungsschritt nimmt jetzt die jüngste Quelle
+statt der erstbesten und schreibt dazu, woraus er erzeugt hat — mit zwei Listen im Ordner
+war das vorher ein Zufallsgriff, der einen frischen Stand still durch einen älteren
+ersetzen konnte.
+
+**Die Kontenliste beim Einrichten zeigt den Kontoschlüssel.** Eine Bank vergibt denselben
+Produktnamen durchaus zweimal — ein Depot und sein Verrechnungskonto etwa —, und weil ein
+Depot typischerweise keine IBAN hat, standen dort zwei Zeilen, die wie ein Anzeigefehler
+aussahen.
+
+### Behoben
+
+**Ein Verwendungszweck mit Doppelpunkt an der Umbruchstelle kostete den Rest der Zeile.**
+MT940 bricht Text nach fester Länge um, ohne auf den Inhalt zu sehen; fiel der Umbruch
+hinter einen Doppelpunkt, hielt der Parser die Folgezeile für ein neues Feld — und alles
+danach war weg: der Rest des Zwecks und jedes noch nicht gelesene Unterfeld, der
+Empfängername darunter. Ohne Fehlermeldung.
+
+**Ein Abruf über mehr als 90 Tage lieferte womöglich nur einen Teil der Buchungen — als
+vollständigen Erfolg.** Jenseits dieser Grenze kommt die Antwort der Bank auf der
+TAN-Nachricht, und deren „es folgen weitere Daten" wurde überhört. Für einen fortlaufenden
+Abruf ist das der teuerste Fehler überhaupt: der Zeiger rückt vor, und der ungeholte Rest
+wird für immer übersprungen.
+
+**Eine Sammelbuchung verlor jede Einzelangabe.** Bucht eine Bank mehrere Zahlungen als
+einen Posten, liefert sie die Einzelzahlungen als Liste — und jeder Zugriff darauf kam
+leer zurück. Name, Referenz und Text jeder Zahlung darin gingen verloren, während dieselben
+Zugriffe bei einer einzelnen funktionierten. Sie werden jetzt einzeln gelesen und
+weggeschrieben.
+
+**Ein Konto ohne Saldo hiess plötzlich „kann kein Depot".** Die drei Fähigkeitsfragen —
+Saldo, Umsätze, Bestände — standen in einem gemeinsamen Versuch: warf die erste, blieben
+die beiden anderen auf „kann nicht", ohne je gestellt worden zu sein. Und ohne Saldoabruf
+entsteht kein Kontostands-Anker, das Konto steht also auf null. Ein Fehler an einer Stelle,
+drei falsche Aussagen. Jede Frage hat jetzt ihren eigenen Versuch, und der Hinweis am Konto
+unterscheidet „die Bank gibt nichts frei" von „es liess sich nicht klären".
+
+**Ein Depotkonto ohne Bestand verschwand still.** Es stand in der Kontenliste und tauchte
+im Ergebnis nicht mehr auf — ohne dass irgendwo stand, warum. Es ist kein Fehler (ein
+Verrechnungskonto kann Depotabrufe mitführen, ohne je einen Bestand zu haben), aber eine
+Auskunft, die dastehen muss.
+
+**Zwei Bankangaben kamen aus einer zweiten Quelle nie an.** Der SEPA-Verwendungszweckcode
+und der Empfänger hinter einem Zahlungsdienstleister standen im Datenmodell und im
+Schreibweg — nur die Liste, die entscheidet, ob überhaupt geschrieben wird, führte sie
+nicht. Eine Zeile aus einem Dateiimport, die später per Bankabruf wiedererkannt wurde,
+blieb ohne beide.
+
+**Eine nachgezogene Vertragsregel bekam die Gläubiger-ID nicht mit.** Sie steht am Beleg,
+und die Selbstheilung, die fehlende Regeln nachträgt, sah nur Verträge und Zahlungsregeln —
+also trug jede so entstandene Regel allein ein Namensmerkmal, obwohl an den zugeordneten
+Zahlungen der präzisere Schlüssel stand.
+
+**Ein vorgemerkter Eintrag ohne Datum kippte den Abruf.** Manche Institute melden ihre
+Vormerkungen ganz ohne Datum — kein Buchungstag, keine Wertstellung, keines an der Zahlung
+dahinter. Das ist kein Fehler, sondern eine Vormerkung ohne Termin.
+
+**Eine IBAN im nationalen Kontofeld wird als solche erkannt.** Manche Banken senden sie
+dort statt der Kontonummer und nennen sie nie im dafür vorgesehenen Feld.
+
+**Ein Datum mit Zeitzonenangabe wird als der Kalendertag gelesen, den es nennt** — nicht
+als der davor.
+
+**Die Konsole ist wieder ruhig.** Zwei Bausteine mischten Kurz- und Langform derselben
+CSS-Eigenschaft; beim Wechsel einer Variante meldete React das bei jedem Neuzeichnen, und
+die Meldung deckte alles andere zu.
+
+### Innen
+
+**Vier Migrationen** (67–70): die neuen Bankangaben, die Zahlungen hinter einer
+Sammelbuchung als JSON-Textspalte, und die Tabelle für Vormerkungen. Geprüft nicht nur
+gegen eine frische Datenbank, sondern über eine Kopie eines echten Bestands — mit
+eingeschalteten Fremdschlüsseln, was der Testlauf gegen die In-Memory-Datenbank nicht
+leisten kann.
+
+**Der Bestandsexport steht auf Fassung 4** und nimmt mit, was eine Aussage über die Zahlung
+trägt — die Sammelposten eingeschlossen: ohne sie stünde dort ein Betrag ohne jeden
+Empfänger, und wer die Datei auswertet, hielte das für eine Lücke in den Daten.
+
+**Das Werkzeug zum Lesen des verschlüsselten Bestands** behandelt eine leere Codedatei jetzt
+wie eine fehlende. Vorher rutschte sie am hilfreichen Zweig vorbei und meldete „ergibt
+keinen Schlüssel" — was nach einem falschen Code klingt statt nach einem fehlenden.
+
+**Vier Funde aus dem Arbeiten** stehen jetzt in der Doku statt nur im Gedächtnis: dass ein
+Patch in den Abhängigkeiten die laufende App nicht erreicht, dass Abhängigkeiten keinem
+Branch gehören, dass ein Abrufbefund in das eine und nicht in das andere Feld gehört, und
+dass die Sprachversion neuere Array-Methoden nicht kennt.
+
 ## [0.26.0] — 2026-09-04
 
 Die Runde, in der die App aufs Telefon geht — und in der das Zurücklegen aufhört, ein
