@@ -26,7 +26,7 @@ import { FinTSClient, FinTSConfig } from "lib-fints";
 import { waehrungNachCode } from "../../core";
 import type { BankAccount, BankingInformation, ClientResponse, Statement } from "lib-fints";
 import type { Formatvorgabe } from "../../application/fints/abrufPort";
-import { formatWaehlen } from "./formatwahl";
+import { formatWaehlen, kontoKannCamt } from "./formatwahl";
 import type {
   AbrufErgebnis,
   Abrufadapter,
@@ -351,12 +351,17 @@ class FintsSitzung implements Abrufsitzung {
     // Ergebnis wieder das, was es sein sollte — kein Umsatz im Zeitraum —, und ein
     // zweiter Versuch darauf hätte nichts mehr zu finden.
     //
-    // An seine Stelle tritt eine Auskunft: kann die Bank `HKCAZ`, wird CAMT geholt.
-    // Sie steht im Fähigkeitsprofil, das die Sitzung ohnehin schon erhoben hat — die
-    // vergebliche erste Runde bei einer Bank ohne CAMT entfällt damit ganz, statt bei
-    // jedem Abruf einmal zu laufen.
-    const kannCamt = this.profil.vorfaelle.some((v) => v.segment === "HKCAZ");
-    const gelaufen = formatWaehlen(format, kannCamt);
+    // An seine Stelle tritt eine Auskunft: ist `HKCAZ` für DIESES KONTO freigegeben, wird
+    // CAMT geholt. Sie steht im Fähigkeitsprofil, das die Sitzung ohnehin schon erhoben
+    // hat — die vergebliche erste Runde bei einem Konto ohne CAMT entfällt damit ganz,
+    // statt bei jedem Abruf einmal zu laufen.
+    //
+    // JE KONTO und nicht je Bank, und das ist keine Feinheit: `getAccountStatements`
+    // entscheidet seinerseits am Konto und fällt still auf MT940 zurück. Wer hier die
+    // Bank fragt, bekommt für ein Konto ohne HKCAZ ein CAMT-Etikett auf MT940-Inhalt —
+    // und `umsatzart` und `buchungsschluessel` sind allein über dieses Etikett deutbar.
+    // Die Begründung steht ausführlich bei `kontoKannCamt`.
+    const gelaufen = formatWaehlen(format, kontoKannCamt(this.profil, konto.schluessel));
     const camt = gelaufen === "CAMT";
 
     let antwort;
