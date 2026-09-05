@@ -163,6 +163,41 @@ describe("zuRohUmsatz", () => {
     expect(u.nativeId).toBeUndefined();
   });
 
+  it("uebersetzt die Zahlungen hinter einer Sammelbuchung", () => {
+    // Die Buchung traegt die Summe und keine Gegenpartei — es gibt nicht eine. Was sie
+    // enthielt, steht nur hier, und nach der Speicherfrist der Bank nirgends mehr.
+    const u = zuRohUmsatz(
+      buchung({
+        remoteName: undefined,
+        amount: -1250,
+        details: [
+          { amount: { value: -450, currency: "EUR" }, remoteName: "Kesselmann", purpose: "Abschlag" },
+          { amount: { value: -800 }, remoteName: "Ohlert", purposeCode: "SALA" },
+        ],
+      }),
+      { waehrung: "EUR" },
+    );
+    expect(u.sammelposten).toHaveLength(2);
+    expect(u.sammelposten?.[0]).toMatchObject({ betrag: -45000, gegenpartei: "Kesselmann" });
+    // Ohne eigene Waehrung gilt die des Kontos.
+    expect(u.sammelposten?.[1]).toMatchObject({ betrag: -80000, zweckCode: "SALA" });
+  });
+
+  it("laesst einen unbrauchbaren Postenbetrag den Posten stehen, statt die Zeile zu kippen", () => {
+    // Die Posten sind Beiwerk: der Betrag der BUCHUNG kommt von der Bank und stimmt.
+    // Wer daran wirft, verliert eine richtige Buchung wegen einer Nebenangabe.
+    const u = zuRohUmsatz(
+      buchung({ details: [{ amount: { value: Number.NaN }, remoteName: "Vibora" }] }),
+      {},
+    );
+    expect(u.sammelposten?.[0].betrag).toBeUndefined();
+    expect(u.sammelposten?.[0].gegenpartei).toBe("Vibora");
+  });
+
+  it("macht aus einer leeren Detailliste keinen Sammelposten", () => {
+    expect(zuRohUmsatz(buchung({ details: [] }), {}).sammelposten).toBeUndefined();
+  });
+
   it("lässt nativeId leer — FinTS liefert hier keine stabile Buchungs-ID", () => {
     // customerReference ist durchgehend NONREF, bankReference („POS 54") ein Zähler über
     // das abgefragte Fenster. Eine instabile ID wäre schlimmer als keine: die Dedup würde

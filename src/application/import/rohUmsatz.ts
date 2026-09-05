@@ -8,6 +8,32 @@
 
 import type { Cent } from "../../core";
 
+/**
+ * Eine der Zahlungen hinter einer Sammelbuchung.
+ *
+ * Eine Bank bucht mehrere Zahlungen als EINEN Posten — mehrere gleichzeitig freigegebene
+ * Ueberweisungen etwa — und listet die Einzelzahlungen darunter auf. Die Buchung traegt
+ * dann die Summe und KEINE Gegenpartei: es gibt nicht eine, und eine davon
+ * herauszugreifen waere eine Behauptung.
+ *
+ * Alle Felder sind optional, weil die Bank je Posten liefert, was sie hat. Sie tragen
+ * dieselben Namen wie am `RohUmsatz` selbst — dieselbe Sache, eine Ebene tiefer.
+ */
+export interface RohSammelposten {
+  /** Minor Units, vorzeichenbehaftet wie am Umsatz. Fehlt, wo die Bank nur die Summe nennt. */
+  readonly betrag?: Cent;
+  readonly gegenpartei?: string;
+  readonly gegenparteiIban?: string;
+  readonly endempfaenger?: string;
+  readonly verwendungszweck?: string;
+  readonly zweckCode?: string;
+  readonly glaeubigerId?: string;
+  readonly mandatsreferenz?: string;
+  readonly e2eReferenz?: string;
+  readonly transaktionsId?: string;
+  readonly strukturierteReferenz?: string;
+}
+
 export interface RohUmsatz {
   /** Buchungstag als ISO „YYYY-MM-DD". */
   readonly buchungstag: string;
@@ -117,6 +143,18 @@ export interface RohUmsatz {
    * benennt.
    */
   readonly strukturierteReferenz?: string;
+  /**
+   * Die Zahlungen hinter einer Sammelbuchung — eine je Zahlung. Nur CAMT.
+   *
+   * Steht nur, wo es MEHRERE sind. Bei einer einzelnen stehen ihre Angaben am Umsatz
+   * selbst, wie immer; erst bei mehreren gibt es keine eine Gegenpartei mehr, und dann
+   * bleiben `gegenpartei` und die Referenzfelder oben leer und die Zahlungen hier.
+   *
+   * Heute wertet das NICHTS aus. Es wird trotzdem geschrieben, aus demselben Grund wie
+   * die vier Felder darueber: ein Institut haelt Umsaetze nur begrenzt vor, und was eine
+   * Sammelbuchung enthielt, steht danach nirgends mehr.
+   */
+  readonly sammelposten?: readonly RohSammelposten[];
   /** Interne Umbuchung zwischen eigenen Konten (von der Quelle markiert) → Umschichtung. */
   readonly istUmbuchung: boolean;
 

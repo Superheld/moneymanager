@@ -1937,4 +1937,25 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE umsatz_roh ADD COLUMN strukturierte_referenz TEXT`,
     ],
   },
+  {
+    version: 68, // Die Einzelzahlungen hinter einer Sammelbuchung
+    sql: [
+      // Eine Bank bucht mehrere Zahlungen als EINEN Posten — mehrere gleichzeitig
+      // freigegebene Ueberweisungen etwa — und listet die Einzelzahlungen darunter auf.
+      // Die Zeile traegt dann die Summe und KEINE Gegenpartei, denn es gibt nicht eine.
+      // Bis zum Bibliotheks-Stand b0d0e4e ging dabei jede Einzelangabe verloren; jetzt
+      // kommt sie an und faende hier sonst keinen Platz.
+      //
+      // JSON-TEXTSPALTE und keine eigene Tabelle, und das ist die konservative Wahl:
+      // niemand wertet die Posten aus, also gibt es auch keine Abfrage, fuer die eine
+      // Tabelle sich lohnte — und welche Schluessel eine solche Tabelle braechte, liesse
+      // sich heute nur raten. Verlustfrei weggeschrieben laesst sich spaeter jederzeit
+      // normalisieren; nicht abgeholt ist fuer die Vergangenheit verloren. Dasselbe
+      // Muster wie `zahlungskonto.inhaber_ids` und die Vertragsmerkmale.
+      //
+      // Sie steht am BELEG und nicht am Verarbeitungsstand: was die Bank an Zahlungen
+      // hinter einem Posten meldet, ist ihre Angabe und aendert sich nie.
+      `ALTER TABLE umsatz_roh ADD COLUMN sammelposten TEXT`,
+    ],
+  },
 ];

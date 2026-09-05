@@ -12,7 +12,7 @@
 // dafür wäre eine zweite Aussage über dasselbe (ist ein Vorschlag da oder nicht).
 
 import { FachlicherFehler, type Cent, type Charakter } from "../../core";
-import type { RohUmsatz } from "./rohUmsatz";
+import type { RohSammelposten, RohUmsatz } from "./rohUmsatz";
 
 export type UmsatzStatus = "neu" | "verbucht" | "duplikat" | "verworfen";
 
@@ -74,6 +74,8 @@ export interface Umsatz {
   readonly transaktionsId?: string;
   /** `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz eines Vorgangs (ISO 11649). */
   readonly strukturierteReferenz?: string;
+  /** Die Zahlungen hinter einer Sammelbuchung, wo es mehrere sind. Siehe `RohUmsatz`. */
+  readonly sammelposten?: readonly RohSammelposten[];
   /** Quellen-agnostischer Dedup-Schlüssel (siehe rohHash). */
   readonly rohHash: string;
   /** Stabile native ID der Quelle (Finanzguru Buchungs-ID) — exakte Re-Import-Dedup. */
@@ -122,6 +124,7 @@ export function ergaenze(u: Umsatz, roh: RohUmsatz): Umsatz | null {
     bankBuchungscode: u.bankBuchungscode ?? roh.bankBuchungscode,
     transaktionsId: u.transaktionsId ?? roh.transaktionsId,
     strukturierteReferenz: u.strukturierteReferenz ?? roh.strukturierteReferenz,
+    sammelposten: u.sammelposten ?? roh.sammelposten,
     // Die native ID der ANDEREN Quelle nur setzen, wenn noch keine dasteht: sie ist der
     // Schlüssel für den Reimport genau dieser Quelle.
     nativeId: u.nativeId ?? roh.nativeId,
@@ -131,6 +134,7 @@ export function ergaenze(u: Umsatz, roh: RohUmsatz): Umsatz | null {
     "e2eReferenz", "umsatzart", "buchungsschluessel", "bankreferenz", "nativeId",
     "zweckCode", "endempfaenger",
     "eintragReferenz", "bankBuchungscode", "transaktionsId", "strukturierteReferenz",
+    "sammelposten",
   ];
   return felder.some((f) => ergaenzt[f] !== u[f]) ? ergaenzt : null;
 }

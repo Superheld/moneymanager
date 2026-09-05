@@ -499,6 +499,33 @@ describe("Import-Repositories", () => {
     expect(u.strukturierteReferenz).toBe("RF18539007547034");
   });
 
+  it("haelt die Sammelposten ueber die Rundreise — als JSON-Text", async () => {
+    await umsatzRepository.anlegen(
+      umsatz({
+        gegenpartei: "",
+        betrag: -125000,
+        sammelposten: [
+          { betrag: -45000, gegenpartei: "Kesselmann", verwendungszweck: "Abschlag" },
+          { betrag: -80000, gegenpartei: "Ohlert" },
+        ],
+      }),
+    );
+    const [u] = await umsatzRepository.alle();
+    expect(u.sammelposten).toHaveLength(2);
+    expect(u.sammelposten?.[0].gegenpartei).toBe("Kesselmann");
+    expect(u.sammelposten?.[0].betrag).toBe(-45000);
+    expect(u.sammelposten?.[1].verwendungszweck).toBeUndefined();
+  });
+
+  it("macht aus keinen Sammelposten undefined und nicht eine leere Liste", async () => {
+    // Sonst waeren „keine Sammelbuchung" und „eine Sammelbuchung ohne Zahlungen darin"
+    // dieselbe Zelle. Das zweite gibt es nicht.
+    await umsatzRepository.anlegen(umsatz({ id: "u1", sammelposten: [] }));
+    await umsatzRepository.anlegen(umsatz({ id: "u2", rohHash: "h2" }));
+    const alle = await umsatzRepository.alle();
+    expect(alle.every((u) => u.sammelposten === undefined)).toBe(true);
+  });
+
   it("traegt fehlende Angaben nach, ohne vorhandene anzufassen", async () => {
     await umsatzRepository.anlegen(umsatz({ bankBuchungscode: "NTRF+117" }));
     await umsatzRepository.ergaenzen(
