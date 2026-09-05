@@ -12,6 +12,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   erkennungProbieren,
+  merkmaleVorschlagen,
   minorZuMajor,
   type Charakter,
   type Kategorie,
@@ -23,10 +24,12 @@ import {
   type Vertragskandidat,
   type Zahlungskonto,
   type Zahlungsregel,
+  type Vertragszuordnung,
   type Zahlungsspur,
 } from "../../../application";
 import {
   spuren as spurenLaden,
+  vertragszuordnungen,
   stammdaten,
   vertragAktualisieren,
   vertragAnlegen,
@@ -274,6 +277,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
    */
   const [erkennung, setErkennung] = useState<ErkennungFormular | null>(null);
   const [spuren, setSpuren] = useState<Zahlungsspur[]>([]);
+  const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
 
   useEffect(() => {
     // Zusammen laden und zusammen setzen — gestaffelte setState lassen die Auswahllisten
@@ -302,9 +306,14 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
   useEffect(() => {
     if (!editId) return;
     (async () => {
-      const [regeln, sp] = await Promise.all([vertragserkennungen(), spurenLaden()]);
+      const [regeln, sp, zu] = await Promise.all([
+        vertragserkennungen(),
+        spurenLaden(),
+        vertragszuordnungen(),
+      ]);
       setErkennung(erkennungAusRegel(regeln.find((e) => e.vertragId === editId), geld.waehrung));
       setSpuren(sp);
+      setZuordnungen(zu);
     })();
   }, [editId]);
 
@@ -314,6 +323,16 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
     [editId, erkennung, geld],
   );
   const probe = useMemo(() => erkennungProbieren(regel, spuren), [regel, spuren]);
+
+  /**
+   * Der Vorschlag aus den Handzuordnungen — dieselben Spuren wie die Vorschau daneben,
+   * damit neben einem Vorschlag keine Trefferzahl steht, die nach dem Uebernehmen eine
+   * andere waere.
+   */
+  const vorschlag = useMemo(
+    () => (editId ? merkmaleVorschlagen(editId, spuren, zuordnungen) : null),
+    [editId, spuren, zuordnungen],
+  );
 
   /**
    * Was in den Konditionen steht, in einer Zeile — die Beschriftung des zugeklappten
@@ -508,6 +527,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
             f={erkennung}
             aufAenderung={setErkennung}
             probe={probe}
+            vorschlag={vorschlag}
           />
         </Abschnitt>
       )}

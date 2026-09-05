@@ -285,6 +285,31 @@ describe("Spielstand", () => {
    * zweite Nachbildung der Regel waere genau die Stelle, an der derselbe Denkfehler ein
    * zweites Mal Platz haette.
    */
+  it("hat Handzuordnungen, aus denen sich Merkmale ableiten lassen", () => {
+    // Ohne sie bliebe der Vorschlagsblock im Vertragsdialog im ganzen Spielstand leer,
+    // und man haette nur an echten Daten etwas zu sehen. Geprueft wird beides, was die
+    // Ableitung braucht: Belege UND wechselnde Empfaengerfelder — bei durchweg gleichem
+    // Namen faende sie nichts, was `standardErkennung` nicht ohnehin schon schreibt.
+    const db = mitSeed();
+    const [zeilen] = db.exec(
+      `SELECT b.vertrag_id, r.gegenpartei
+       FROM ist_buchung b
+       JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+       JOIN umsatz_roh r ON r.id = v.umsatz_id
+       WHERE b.vertrag_herkunft = 'manuell' AND b.vertrag_id IS NOT NULL`,
+    );
+    const werte = zeilen?.values ?? [];
+    expect(werte.length).toBeGreaterThan(1);
+
+    const proVertrag = new Map<string, Set<string>>();
+    for (const [vertragId, partei] of werte) {
+      const menge = proVertrag.get(String(vertragId)) ?? new Set<string>();
+      menge.add(String(partei ?? ""));
+      proVertrag.set(String(vertragId), menge);
+    }
+    expect([...proVertrag.values()].some((namen) => namen.size > 1)).toBe(true);
+  });
+
   it("schreibt Erkennungsregeln, die im Bestand auch etwas finden", () => {
     const db = mitSeed();
     const [regeln] = db.exec(

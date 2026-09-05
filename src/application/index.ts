@@ -130,6 +130,8 @@ export {
   type VertragsichtDeps,
   erkennungProbieren,
   type Erkennungsprobe,
+  merkmaleVorschlagen,
+  type Merkmalsvorschlag,
 } from "./vertraege/vertragssichten";
 export {
   vertragAnlegen,
