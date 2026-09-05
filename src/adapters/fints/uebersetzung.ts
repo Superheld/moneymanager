@@ -385,8 +385,17 @@ export function klartextAnreicherung(purpose: string | undefined): Anreicherung 
 
 /** Der Ausschnitt von `Transaction` (lib-fints), auf den die Übersetzung angewiesen ist. */
 export interface FintsBuchung {
-  readonly valueDate: Date;
-  readonly entryDate: Date;
+  /**
+   * BEIDE Daten sind seit dem CAMT-Ausbau der Bibliothek optional, und zwar für genau
+   * einen Fall: eine noch nicht gebuchte CAMT-Zeile, der die Bank überhaupt kein Datum
+   * mitgibt (bei comdirect gemessen). Solche Zeilen stehen im ZWEITEN Feld der Antwort
+   * (`notedStatements`), das wir nicht lesen — hier kommt also keine an. Die Schnittstelle
+   * bildet die Bibliothek trotzdem ehrlich ab: eine Kopie, die mehr zusichert als das
+   * Original, verschweigt beim nächsten Bump genau die Änderung, wegen der es sie gibt.
+   */
+  readonly valueDate?: Date;
+  /** Siehe {@link valueDate}. */
+  readonly entryDate?: Date;
   readonly amount: number;
   readonly purpose?: string;
   readonly remoteName?: string;
@@ -447,9 +456,14 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
       : b.remoteAccountNumber && ibanGueltig(b.remoteAccountNumber)
         ? b.remoteAccountNumber
         : undefined;
+  // Ein Buchungstag ist Pflicht, eine Valuta nicht — und das ist keine Bequemlichkeit,
+  // sondern der Unterschied zwischen den beiden Feldern in `RohUmsatz`. Ohne Buchungstag
+  // lässt sich die Zeile nicht bilden; der Wurf landet in der Schleife des Adapters und
+  // wird zur Warnung „Buchung übersprungen", statt den ganzen Abruf zu kippen.
+  if (!b.entryDate) throw new Error("Die Bank hat zu dieser Buchung keinen Buchungstag geliefert");
   return {
     buchungstag: isoDatum(b.entryDate),
-    valuta: isoDatum(b.valueDate),
+    valuta: b.valueDate ? isoDatum(b.valueDate) : undefined,
     betrag: bankbetragZuCent(b.amount, waehrung),
     waehrung: waehrung.code,
     gegenpartei: (b.remoteName ?? "").trim(),
