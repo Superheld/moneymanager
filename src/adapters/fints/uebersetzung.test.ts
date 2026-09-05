@@ -198,6 +198,50 @@ describe("zuRohUmsatz", () => {
     expect(zuRohUmsatz(buchung({ details: [] }), {}).sammelposten).toBeUndefined();
   });
 
+  it("uebernimmt, was die Bank ueber die Zahlung sonst noch sagt", () => {
+    const u = zuRohUmsatz(
+      buchung({
+        status: "PDNG",
+        isReversal: true,
+        originalAmount: { value: -24.99, currency: "USD" },
+        exchangeRate: 1.0842,
+        charges: { value: -1.75, currency: "EUR" },
+        returnReason: { code: "AC04", text: "Konto aufgeloest" },
+        customerReference: "NONREF",
+      }),
+      { waehrung: "EUR" },
+    );
+    expect(u.buchungsstand).toBe("PDNG");
+    expect(u.istStorno).toBe(true);
+    expect([u.originalBetrag, u.originalWaehrung, u.wechselkurs]).toEqual([-2499, "USD", 1.0842]);
+    expect([u.gebuehrBetrag, u.gebuehrWaehrung]).toEqual([-175, "EUR"]);
+    expect([u.ruecklaufCode, u.ruecklaufText]).toEqual(["AC04", "Konto aufgeloest"]);
+    expect(u.kundenreferenz).toBe("NONREF");
+  });
+
+  it("sammelt die Felder ohne eigene Aussage unter ihren Namen aus der Bibliothek", () => {
+    // Der Zweck ist, dass beim naechsten Stand der Bibliothek nichts auf den Boden
+    // faellt, bloss weil hier keine Spalte dafuer steht.
+    const u = zuRohUmsatz(
+      buchung({ transactionType: "NTRF", primeNotesNr: "  ", batch: { numberOfTransactions: 3 } }),
+      {},
+    );
+    expect(u.bankfelder).toEqual({ transactionType: "NTRF", batch: { numberOfTransactions: 3 } });
+    // Ein leeres Feld ist keine Angabe und steht deshalb nicht drin.
+    expect(u.bankfelder).not.toHaveProperty("primeNotesNr");
+  });
+
+  it("laesst ein leeres Sammelfeld ganz weg", () => {
+    expect(zuRohUmsatz(buchung(), {}).bankfelder).toBeUndefined();
+  });
+
+  it("laesst einen unbrauchbaren Nebenbetrag die Zeile nicht kippen", () => {
+    // Gebuehr und Originalbetrag stehen NEBEN dem Betrag der Buchung, und der stimmt.
+    const u = zuRohUmsatz(buchung({ charges: { value: Number.NaN, currency: "EUR" } }), {});
+    expect(u.gebuehrBetrag).toBeUndefined();
+    expect(u.betrag).toBe(-4990);
+  });
+
   it("lässt nativeId leer — FinTS liefert hier keine stabile Buchungs-ID", () => {
     // customerReference ist durchgehend NONREF, bankReference („POS 54") ein Zähler über
     // das abgefragte Fenster. Eine instabile ID wäre schlimmer als keine: die Dedup würde

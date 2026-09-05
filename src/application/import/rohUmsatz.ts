@@ -155,6 +155,65 @@ export interface RohUmsatz {
    * Sammelbuchung enthielt, steht danach nirgends mehr.
    */
   readonly sammelposten?: readonly RohSammelposten[];
+  /**
+   * Ob die Bank die Zeile GEBUCHT hat: `BOOK`, `PDNG` (nur vorgemerkt) oder `INFO`
+   * (wird nicht gebucht). Nur CAMT.
+   *
+   * Eine vorgemerkte Zahlung ist keine gebuchte — sie kann sich noch ändern oder ganz
+   * wegfallen. Wer sie mitzählt, überschätzt den Stand. Heute holen wir nur gebuchte
+   * Auszüge, das Feld steht also fast immer auf `BOOK`; es kommt mit, damit die
+   * Unterscheidung überhaupt möglich ist, sobald wir die Vormerkungen lesen.
+   *
+   * **Nicht `status`**: den Namen trägt schon der Verarbeitungsstand des Umsatzes
+   * (neu / verbucht / verworfen). Der kommt von uns, dieser von der Bank.
+   */
+  readonly buchungsstand?: string;
+  /**
+   * Ob diese Zeile eine frühere aufhebt (`RvslInd`). Nur CAMT.
+   *
+   * Ein Storno sieht sonst aus wie eine gewöhnliche Gegenbuchung — gleicher Betrag,
+   * andere Richtung — und wird als eigener Vorgang gezählt.
+   */
+  readonly istStorno?: boolean;
+  /**
+   * Der Betrag VOR der Umrechnung und der Kurs dazu. Nur CAMT (`AmtDtls.InstdAmt`,
+   * `CcyXchg.XchgRate`).
+   *
+   * Ohne sie steht bei einem Einkauf in fremder Währung nur der Eurobetrag, und was
+   * tatsächlich bezahlt wurde, ist nicht mehr feststellbar. Der Betrag in Minor Units
+   * wie überall; der Kurs als Fliesskommazahl, weil ein Kurs kein Geld ist — auf Cent
+   * gerundet verlöre er die Stellen, auf die es bei ihm ankommt.
+   */
+  readonly originalBetrag?: Cent;
+  readonly originalWaehrung?: string;
+  readonly wechselkurs?: number;
+  /** Was die Bank für diese Buchung genommen hat (`Chrgs`), wo sie es ausweist. Nur CAMT. */
+  readonly gebuehrBetrag?: Cent;
+  readonly gebuehrWaehrung?: string;
+  /**
+   * Warum eine Zahlung zurückkam — Code (`AC04`, `MD01` …) und der Text der Bank
+   * (`RtrInf`). Nur CAMT. Eine Rückgabe ohne Grund ist eine Zahlung, die niemand
+   * erklären kann.
+   */
+  readonly ruecklaufCode?: string;
+  readonly ruecklaufText?: string;
+  /**
+   * FORMATABHÄNGIG, wie `umsatzart` und `buchungsschluessel`: MT940 trägt hier die
+   * Kundenreferenz aus `:61:`, CAMT die E2E-Referenz. Deutbar allein über das Format am
+   * Lauf — und deshalb ein eigenes Feld neben `e2eReferenz` und nicht darin.
+   */
+  readonly kundenreferenz?: string;
+  /**
+   * Was die Bank sonst noch gesagt hat, unter den Namen der Bibliothek.
+   *
+   * Die Felder ohne eigene Aussage: Primanotennummer, Textschlüsselergänzung,
+   * Auftraggeberkennung, die SWIFT-Buchungsart, der Kopf einer Sammelbuchung. Sie
+   * bekommen keine eigene Spalte, weil niemand nach ihnen fragt — sie stehen hier,
+   * damit beim nächsten Stand der Bibliothek nichts wieder auf den Boden fällt, bloss
+   * weil keine Spalte dafür da ist. Wer eines davon braucht, holt es heraus und gibt
+   * ihm eine.
+   */
+  readonly bankfelder?: Readonly<Record<string, unknown>>;
   /** Interne Umbuchung zwischen eigenen Konten (von der Quelle markiert) → Umschichtung. */
   readonly istUmbuchung: boolean;
 

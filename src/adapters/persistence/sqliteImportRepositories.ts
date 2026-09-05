@@ -115,6 +115,17 @@ interface UmsatzZeile {
   transaktions_id: string | null;
   strukturierte_referenz: string | null;
   sammelposten: string | null;
+  buchungsstand: string | null;
+  ist_storno: number | null;
+  original_betrag: number | null;
+  original_waehrung: string | null;
+  wechselkurs: number | null;
+  gebuehr_betrag: number | null;
+  gebuehr_waehrung: string | null;
+  ruecklauf_code: string | null;
+  ruecklauf_text: string | null;
+  kundenreferenz: string | null;
+  bankfelder: string | null;
   roh_hash: string;
   native_id: string | null;
   status: string | null;
@@ -151,6 +162,23 @@ function sammelpostenAus(text: string | null): readonly RohSammelposten[] | unde
   }
 }
 
+/** Dieselbe Behandlung wie bei den Sammelposten: leer wird `null`, kaputt wird `undefined`. */
+function bankfelderAls(felder: Readonly<Record<string, unknown>> | undefined): string | null {
+  return felder && Object.keys(felder).length > 0 ? JSON.stringify(felder) : null;
+}
+
+function bankfelderAus(text: string | null): Readonly<Record<string, unknown>> | undefined {
+  if (!text) return undefined;
+  try {
+    const gelesen = JSON.parse(text);
+    return gelesen && typeof gelesen === "object" && !Array.isArray(gelesen)
+      ? (gelesen as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function zuUmsatz(z: UmsatzZeile): Umsatz {
   return {
     id: z.id,
@@ -176,6 +204,18 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
     transaktionsId: z.transaktions_id ?? undefined,
     strukturierteReferenz: z.strukturierte_referenz ?? undefined,
     sammelposten: sammelpostenAus(z.sammelposten),
+    buchungsstand: z.buchungsstand ?? undefined,
+    // 0/1 in SQLite, ein Boolean nach oben — und `null` bleibt „nicht gesagt".
+    istStorno: z.ist_storno === null ? undefined : z.ist_storno !== 0,
+    originalBetrag: z.original_betrag ?? undefined,
+    originalWaehrung: z.original_waehrung ?? undefined,
+    wechselkurs: z.wechselkurs ?? undefined,
+    gebuehrBetrag: z.gebuehr_betrag ?? undefined,
+    gebuehrWaehrung: z.gebuehr_waehrung ?? undefined,
+    ruecklaufCode: z.ruecklauf_code ?? undefined,
+    ruecklaufText: z.ruecklauf_text ?? undefined,
+    kundenreferenz: z.kundenreferenz ?? undefined,
+    bankfelder: bankfelderAus(z.bankfelder),
     rohHash: z.roh_hash,
     nativeId: z.native_id ?? undefined,
     // Ohne Verarbeitungszeile ist die Zeile unangetastet — also „neu".
@@ -203,7 +243,10 @@ const SELECT = `SELECT r.id, r.lauf_id, v.zahlungskonto_id, r.buchungstag, r.val
        r.mandatsreferenz, r.e2e_referenz, r.umsatzart, r.buchungsschluessel,
        r.zweck_code, r.endempfaenger, r.bank_referenz,
        r.eintrag_referenz, r.bank_buchungscode, r.transaktions_id, r.strukturierte_referenz,
-       r.sammelposten,
+       r.sammelposten, r.buchungsstand, r.ist_storno,
+       r.original_betrag, r.original_waehrung, r.wechselkurs,
+       r.gebuehr_betrag, r.gebuehr_waehrung, r.ruecklauf_code, r.ruecklauf_text,
+       r.kundenreferenz, r.bankfelder,
        r.roh_hash, r.native_id,
        v.status, v.vorschlag_kategorie_id, v.vorschlag_charakter, v.vorschlag_quelle,
        v.istbuchung_id
@@ -228,8 +271,12 @@ function rohAnweisung(u: Umsatz): Anweisung {
         gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz, e2e_referenz,
         umsatzart, buchungsschluessel, zweck_code, endempfaenger, bank_referenz,
         eintrag_referenz, bank_buchungscode, transaktions_id, strukturierte_referenz,
-        sammelposten, roh_hash, native_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
+        sammelposten, buchungsstand, ist_storno, original_betrag, original_waehrung,
+        wechselkurs, gebuehr_betrag, gebuehr_waehrung, ruecklauf_code, ruecklauf_text,
+        kundenreferenz, bankfelder,
+        roh_hash, native_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
+             $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35)
      ON CONFLICT(id) DO NOTHING`,
     werte: [
       u.id, u.laufId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
@@ -240,6 +287,11 @@ function rohAnweisung(u: Umsatz): Anweisung {
       u.eintragReferenz ?? null, u.bankBuchungscode ?? null, u.transaktionsId ?? null,
       u.strukturierteReferenz ?? null,
       sammelpostenAls(u.sammelposten),
+      u.buchungsstand ?? null, u.istStorno === undefined ? null : u.istStorno ? 1 : 0,
+      u.originalBetrag ?? null, u.originalWaehrung ?? null, u.wechselkurs ?? null,
+      u.gebuehrBetrag ?? null, u.gebuehrWaehrung ?? null,
+      u.ruecklaufCode ?? null, u.ruecklaufText ?? null,
+      u.kundenreferenz ?? null, bankfelderAls(u.bankfelder),
       u.rohHash, u.nativeId ?? null,
     ],
   };
@@ -331,7 +383,18 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
          bank_buchungscode = COALESCE(bank_buchungscode, $14),
          transaktions_id = COALESCE(transaktions_id, $15),
          strukturierte_referenz = COALESCE(strukturierte_referenz, $16),
-         sammelposten = COALESCE(sammelposten, $17)
+         sammelposten = COALESCE(sammelposten, $17),
+         buchungsstand = COALESCE(buchungsstand, $18),
+         ist_storno = COALESCE(ist_storno, $19),
+         original_betrag = COALESCE(original_betrag, $20),
+         original_waehrung = COALESCE(original_waehrung, $21),
+         wechselkurs = COALESCE(wechselkurs, $22),
+         gebuehr_betrag = COALESCE(gebuehr_betrag, $23),
+         gebuehr_waehrung = COALESCE(gebuehr_waehrung, $24),
+         ruecklauf_code = COALESCE(ruecklauf_code, $25),
+         ruecklauf_text = COALESCE(ruecklauf_text, $26),
+         kundenreferenz = COALESCE(kundenreferenz, $27),
+         bankfelder = COALESCE(bankfelder, $28)
        WHERE id = $1`,
       [
         u.id, u.valuta ?? null, u.glaeubigerId ?? null, u.gegenparteiIban ?? null,
@@ -340,6 +403,11 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
         u.zweckCode ?? null, u.endempfaenger ?? null,
         u.eintragReferenz ?? null, u.bankBuchungscode ?? null, u.transaktionsId ?? null,
         u.strukturierteReferenz ?? null, sammelpostenAls(u.sammelposten),
+        u.buchungsstand ?? null, u.istStorno === undefined ? null : u.istStorno ? 1 : 0,
+        u.originalBetrag ?? null, u.originalWaehrung ?? null, u.wechselkurs ?? null,
+        u.gebuehrBetrag ?? null, u.gebuehrWaehrung ?? null,
+        u.ruecklaufCode ?? null, u.ruecklaufText ?? null,
+        u.kundenreferenz ?? null, bankfelderAls(u.bankfelder),
       ],
     );
   },
