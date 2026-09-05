@@ -33,7 +33,7 @@
     "buffer": "^6.0.3",
     "fflate": "^0.8.3",
     "i18next": "^26.4.0",
-    "lib-fints": "git+https://github.com/Superheld/lib-fints.git#b0d0e4e7ab2abf818a1b70d2b8914f19f1feca46",
+    "lib-fints": "git+https://github.com/Superheld/lib-fints.git#f9438181c56bf6971ed9d48c028785dfc7d1c545",
     "papaparse": "^5.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

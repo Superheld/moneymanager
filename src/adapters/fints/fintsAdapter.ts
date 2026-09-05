@@ -26,7 +26,7 @@ import { FinTSClient, FinTSConfig } from "lib-fints";
 import { waehrungNachCode } from "../../core";
 import type { BankAccount, BankingInformation, ClientResponse, Statement } from "lib-fints";
 import type { Formatvorgabe } from "../../application/fints/abrufPort";
-import { formatWaehlen, kontoKannCamt } from "./formatwahl";
+import { formatWaehlen } from "./formatwahl";
 import type {
   AbrufErgebnis,
   Abrufadapter,
@@ -351,22 +351,25 @@ class FintsSitzung implements Abrufsitzung {
     // Ergebnis wieder das, was es sein sollte — kein Umsatz im Zeitraum —, und ein
     // zweiter Versuch darauf hätte nichts mehr zu finden.
     //
-    // An seine Stelle tritt eine Auskunft: ist `HKCAZ` für DIESES KONTO freigegeben, wird
-    // CAMT geholt. Sie steht im Fähigkeitsprofil, das die Sitzung ohnehin schon erhoben
-    // hat — die vergebliche erste Runde bei einem Konto ohne CAMT entfällt damit ganz,
-    // statt bei jedem Abruf einmal zu laufen.
+    // An seine Stelle tritt eine Auskunft, und zwar die der Bibliothek selbst: welche
+    // Formate DIESES KONTO anbietet. Die vergebliche erste Runde bei einem Konto ohne
+    // CAMT entfällt damit ganz, statt bei jedem Abruf einmal zu laufen.
     //
-    // JE KONTO und nicht je Bank, und das ist keine Feinheit: `getAccountStatements`
-    // entscheidet seinerseits am Konto und fällt still auf MT940 zurück. Wer hier die
-    // Bank fragt, bekommt für ein Konto ohne HKCAZ ein CAMT-Etikett auf MT940-Inhalt —
-    // und `umsatzart` und `buchungsschluessel` sind allein über dieses Etikett deutbar.
-    // Die Begründung steht ausführlich bei `kontoKannCamt`.
-    const gelaufen = formatWaehlen(format, kontoKannCamt(this.profil, konto.schluessel));
-    const camt = gelaufen === "CAMT";
+    // JE KONTO und nicht je Bank, und das ist keine Feinheit: eine Bank kann CAMT
+    // beherrschen und es nur für einen Teil ihrer Konten freigeben. Bis 2026-09-05 fiel
+    // `getAccountStatements` in diesem Fall still auf MT940 zurück, während wir „CAMT"
+    // an den Lauf schrieben — und `umsatzart` und `buchungsschluessel` sind allein über
+    // dieses Etikett deutbar. Die Begründung steht ausführlich bei `formatWaehlen`.
+    const bankkonto = this.bankkonto(konto);
+    const gelaufen = formatWaehlen(
+      format,
+      this.client.getSupportedStatementFormats(bankkonto),
+      konto.bezeichnung,
+    );
 
     let antwort;
     try {
-      antwort = await this.client.getAccountStatements(this.bankkonto(konto), von, bis, camt);
+      antwort = await this.client.getAccountStatements(bankkonto, von, bis, gelaufen);
       antwort = await mitTan(antwort, (r, t) => this.client.getAccountStatementsWithTan(r, t), this.frageTan, this.decoupled);
     } catch (e) {
       // **Ein Fehler heisst „nicht abgeholt", nicht „keine Umsätze".** Der Unterschied
@@ -421,7 +424,13 @@ class FintsSitzung implements Abrufsitzung {
 
     return {
       ergebnis: { quelle: FINTS_QUELLE, umsaetze, warnungen },
-      format: gelaufen,
+      // Was am Lauf steht, sagt die ANTWORT und nicht unsere Anforderung: gesetzt hat es
+      // die Interaktion, die tatsächlich geparst hat. Seit f943818 fällt die Bibliothek
+      // nicht mehr still auf ein anderes Format zurück, beide wären heute also gleich —
+      // aber genau diese Gleichheit war schon einmal eine Annahme, und sie stimmte nicht.
+      // Fehlt die Angabe, bleibt das Angeforderte: es gibt keinen Weg, auf dem etwas
+      // anderes gelaufen sein könnte, ohne dass der Abruf vorher geworfen hätte.
+      format: antwort.format ?? gelaufen,
       hinweise,
       auszugsSalden: auszugsStaende(auszuege, warnungen),
     };
