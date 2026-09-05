@@ -130,6 +130,17 @@ describe("zuRohUmsatz", () => {
     expect(u.quelle).toBe("fints");
   });
 
+  it("kommt ohne Valuta aus, aber nicht ohne Buchungstag", () => {
+    // Seit dem CAMT-Ausbau der Bibliothek sind beide Daten optional — für eine noch nicht
+    // gebuchte Zeile, der die Bank gar kein Datum mitgibt. Die stehen in `notedStatements`,
+    // das wir nicht lesen; kommt trotzdem eine an, entscheidet die Form von `RohUmsatz`:
+    // `valuta` ist optional und bleibt dann leer, `buchungstag` ist Pflicht und wirft.
+    // Der Wurf ist der Punkt — die Schleife im Adapter macht daraus eine Warnung zu DIESER
+    // Zeile, ein erfundenes Datum stünde dagegen für immer unauffällig im Bestand.
+    expect(zuRohUmsatz(buchung({ valueDate: undefined }), {}).valuta).toBeUndefined();
+    expect(() => zuRohUmsatz(buchung({ entryDate: undefined }), {})).toThrow(/Buchungstag/);
+  });
+
   it("lässt nativeId leer — FinTS liefert hier keine stabile Buchungs-ID", () => {
     // customerReference ist durchgehend NONREF, bankReference („POS 54") ein Zähler über
     // das abgefragte Fenster. Eine instabile ID wäre schlimmer als keine: die Dedup würde
