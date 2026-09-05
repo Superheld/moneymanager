@@ -154,21 +154,69 @@ async function mitTan<T extends ClientResponse>(
  * Unterkontomerkmal. Damit ist jedes gemeldete Konto erreichbar, und die Sperre ist
  * ersatzlos entfallen.
  */
-function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Bankkonto[] {
+/**
+ * Der Ausschnitt des Clients, den die Aufbereitung braucht — die drei Fähigkeitsfragen.
+ *
+ * Ein eigener Typ, damit ein Test sie beantworten (und werfen lassen) kann, ohne einen
+ * ganzen `FinTSClient` zu bauen. Genau daran hängt die Zusicherung unten: dass ein Wurf
+ * bei einer Frage die beiden anderen nicht mitnimmt.
+ */
+export interface FintsFaehigkeiten {
+  canGetAccountBalance(konto: BankAccount): boolean;
+  canGetAccountStatements(konto: BankAccount): boolean;
+  canGetPortfolio(konto: BankAccount): boolean;
+}
+
+/**
+ * Eine Fähigkeitsfrage stellen und einen Wurf FESTHALTEN, statt ihn zu „kann nicht" zu
+ * machen.
+ *
+ * Werfen kann sie: die Bibliothek löst das Konto gegen die frische Kontenliste auf, und
+ * einen Schlüssel, den die Bank nicht mehr meldet, quittiert sie mit einer Ausnahme —
+ * das ist die richtige Auskunft, aber eben eine ANDERE als „diese Fähigkeit fehlt".
+ */
+function fragen(was: string, frage: () => boolean, fehler: string[]): boolean {
+  try {
+    return frage();
+  } catch (e) {
+    fehler.push(`${was}: ${e instanceof Error ? e.message : String(e)}`);
+    return false;
+  }
+}
+
+/** Der Klartext am Konto — siehe die Begründung an der Aufrufstelle. */
+function hinweisZu(
+  bezeichnung: string,
+  fehler: readonly string[],
+  kannSaldo: boolean,
+  kannUmsaetze: boolean,
+  kannDepot: boolean,
+): string | undefined {
+  if (fehler.length > 0) {
+    return `Für „${bezeichnung}" liess sich nicht klären, was die Bank freigibt: ${fehler.join(" · ")}`;
+  }
+  if (!kannUmsaetze && !kannSaldo && !kannDepot) {
+    return `Die Bank gibt für „${bezeichnung}" nichts frei — weder Saldo noch Umsätze noch Bestände.`;
+  }
+  return undefined;
+}
+
+export function kontenAufbereiten(client: FintsFaehigkeiten, roh: readonly BankAccount[]): Bankkonto[] {
   return roh.map((k) => {
     // Mit dem Konto fragen, nicht mit seiner Nummer: eine geteilte Nummer lässt
     // `getBankAccount` jetzt werfen, statt zu raten — und die Antwort auf „kann dieses
     // Konto Umsätze" wäre sonst die des Nachbarkontos.
-    let kannSaldo = false;
-    let kannUmsaetze = false;
-    let kannDepot = false;
-    try {
-      kannSaldo = client.canGetAccountBalance(k);
-      kannUmsaetze = client.canGetAccountStatements(k);
-      kannDepot = client.canGetPortfolio(k);
-    } catch {
-      // Kennt die Bank das Konto in der UPD nicht mehr, ist die Antwort schlicht „kann nicht".
-    }
+    //
+    // JEDE FRAGE FÜR SICH, und das ist keine Formsache. Bis 2026-09-05 standen alle drei
+    // in EINEM `try`: warf die erste, blieben die beiden anderen auf `false`, ohne je
+    // gestellt worden zu sein. Aus einem Wurf beim Saldo wurde damit lautlos „dieses
+    // Konto kann kein Depot" — und ohne `kannSaldo` fragt der Abruf keinen Saldo ab,
+    // ohne Saldo entsteht kein Kontostands-Anker, und das Konto steht auf null. Ein
+    // Fehler an einer Stelle wurde so zu einer falschen AUSSAGE über zwei andere.
+    const fehler: string[] = [];
+    const kannSaldo = fragen("Saldo", () => client.canGetAccountBalance(k), fehler);
+    const kannUmsaetze = fragen("Umsätze", () => client.canGetAccountStatements(k), fehler);
+    const kannDepot = fragen("Bestände", () => client.canGetPortfolio(k), fehler);
     return {
       nummer: k.accountNumber,
       unterkonto: k.subAccountId,
@@ -182,9 +230,12 @@ function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Ba
       kannSaldo,
       kannUmsaetze,
       kannDepot,
-      hinweis: !kannUmsaetze && !kannSaldo && !kannDepot
-        ? `Die Bank gibt für „${k.product?.trim() || k.accountNumber}" nichts frei — weder Saldo noch Umsätze noch Bestände.`
-        : undefined,
+      // ZWEI VERSCHIEDENE AUSSAGEN, und sie auseinanderzuhalten ist der ganze Zweck des
+      // Hinweises: „die Bank gibt nichts frei" ist eine Auskunft der Bank, „wir konnten
+      // nicht fragen" ist ein Befund über uns. Beide sahen bis 2026-09-05 gleich aus —
+      // als stillschweigendes `false`, und wer daraufhin die Bank verdächtigte, suchte
+      // an der falschen Stelle.
+      hinweis: hinweisZu(k.product?.trim() || k.accountNumber, fehler, kannSaldo, kannUmsaetze, kannDepot),
     };
   });
 }

@@ -162,6 +162,12 @@ const de = {
     profilOhneVorfaelle:
       "Diese Bank meldet keine Geschäftsvorfälle — sie nimmt am FinTS-Verfahren nicht " +
       "teil. Was mit ihren Konten möglich ist, steht an den Konten selbst.",
+    profilJeKonto: "Was die Bank je Konto freigibt",
+    profilJeKontoHinweis:
+      "Eine Bank kann einen Vorgang beherrschen und ihn trotzdem nur für einen Teil ihrer " +
+      "Konten freigeben. Was oben steht, sagt deshalb noch nicht, was für ein einzelnes " +
+      "Konto gilt — hier steht es.",
+    profilKontoOhneVorfaelle: "Für dieses Konto nennt die Bank keinen Vorgang.",
     feldWeg: "Zugangsweg",
     feldWegHinweis: "Wie diese Bank erreicht wird",
     wegFints: "FinTS (Standard)",
@@ -2098,6 +2104,12 @@ const en: typeof de = {
     profilOhneVorfaelle:
       "This bank reports no business transactions — it does not take part in FinTS. " +
       "What its accounts support is shown on the accounts themselves.",
+    profilJeKonto: "What the bank allows per account",
+    profilJeKontoHinweis:
+      "A bank can support a transaction and still allow it for only some of its accounts. " +
+      "What is listed above therefore does not yet say what holds for a single account — " +
+      "that is here.",
+    profilKontoOhneVorfaelle: "The bank names no transaction for this account.",
     feldWeg: "Access method",
     feldWegHinweis: "How this bank is reached",
     wegFints: "FinTS (standard)",
