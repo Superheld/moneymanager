@@ -10,7 +10,7 @@
 // fällt er auf MT940 zurück", „kann diese Bank überhaupt Depots".
 
 import { useTranslation } from "react-i18next";
-import type { Bankprofil, Bankzugang, Vorfallprofil } from "../../../application";
+import type { Bankkonto, Bankprofil, Bankzugang, Vorfallprofil } from "../../../application";
 import { Button, Card, DataTable, Pill } from "../bausteine";
 
 interface Props {
@@ -19,6 +19,12 @@ interface Props {
   /** Gewähltes TAN-Verfahren übernehmen. Fehlt es, wird nur angezeigt. */
   onTanVerfahren?: (id: number) => void;
   gespeichert?: boolean;
+  /**
+   * Die Konten dieser Anmeldung, für die Namen in der Aufstellung je Konto. Fehlen sie
+   * (die Karte steht auch ohne frische Anmeldung), bleibt der Schlüssel stehen — die
+   * Auskunft ist dann sperriger, aber sie fehlt nicht.
+   */
+  konten?: readonly Bankkonto[];
 }
 
 /** Was ein Vorfall an Zusatzmerkmalen mitbringt — nur, was die Bank wirklich gesagt hat. */
@@ -42,7 +48,7 @@ function kurzform(format: string): string {
   return teile[teile.length - 1] || format;
 }
 
-export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert }: Props) {
+export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert, konten }: Props) {
   const { t } = useTranslation();
 
   const spalten = [
@@ -97,6 +103,34 @@ export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert }:
         <div className="muted">{t("bankabruf.profilOhneVorfaelle")}</div>
       ) : (
         <DataTable columns={spalten} rows={[...profil.vorfaelle]} />
+      )}
+
+      {/* WAS DIE BANK JE KONTO FREIGIBT.
+          Die Tabelle darüber beantwortet „was kann diese Bank", und das ist eine andere
+          Frage als „was kann dieses Konto": ein Institut kann `HKWPD` beherrschen und es
+          nur für das Depot freigeben, `HKSAL` nur für einen Teil seiner Konten. Genau an
+          dieser Grenze entstehen die Widersprüche, die sonst niemand auflösen kann — ein
+          Depot, das laut Bank abrufbar ist und in der Kontenliste als nicht abrufbar
+          steht. Erhoben wurde diese Liste von Anfang an; sie stand nur nirgends. */}
+      {Object.keys(profil.kontoVorfaelle).length > 0 && (
+        <div style={{ marginTop: "var(--sp-4)" }}>
+          <div className="nlbl">{t("bankabruf.profilJeKonto")}</div>
+          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-2)" }}>
+            {t("bankabruf.profilJeKontoHinweis")}
+          </div>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {Object.entries(profil.kontoVorfaelle).map(([schluessel, segmente]) => (
+              <li key={schluessel} style={{ padding: "var(--sp-1) 0" }}>
+                <div>{konten?.find((k) => k.schluessel === schluessel)?.bezeichnung ?? schluessel}</div>
+                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {segmente.length > 0
+                    ? [...segmente].sort().join(" · ")
+                    : t("bankabruf.profilKontoOhneVorfaelle")}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
 
       {profil.nationaleFelderErlaubt === false && (

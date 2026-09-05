@@ -471,6 +471,7 @@ export function BankzugaengeScreen({
           <Bankprofilkarte
             zugang={zugangDerKarte}
             profil={profil}
+            konten={pruefung?.zugangId === zugangDerKarte.id ? pruefung.konten : undefined}
             gespeichert={tanGespeichert}
             onTanVerfahren={(id) => void tanVerfahrenWaehlen(zugangDerKarte, id)}
           />
