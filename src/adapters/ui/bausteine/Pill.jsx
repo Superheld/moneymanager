@@ -11,7 +11,15 @@ export function Pill({ variant = 'neutral', children, style }) {
     fontWeight: 'var(--fw-bold)',
     padding: '2px 10px',
     borderRadius: 'var(--r-pill)',
-    border: '1px solid var(--line)',
+    // EINZELWERTE statt der Kurzform `border`, und das ist keine Stilfrage.
+    // Die Varianten unten setzen `borderColor` (`plan` zusaetzlich `borderStyle`).
+    // Wechselt eine Pille zur Variante `neutral` zurueck, entfernt React die
+    // Langform, waehrend die Kurzform stehenbleibt — und meldet das bei jedem
+    // Rerender als „Removing a style property ... when a conflicting property is
+    // set". Mit drei Einzelwerten gibt es keine Kurzform, die kollidieren koennte.
+    borderWidth: '1px',
+    borderStyle: 'solid',
+    borderColor: 'var(--line)',
     color: 'var(--ink-3)',
     whiteSpace: 'nowrap',
     lineHeight: 1.5,
