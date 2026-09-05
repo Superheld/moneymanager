@@ -56,6 +56,36 @@ describe("liquiditaetsvorschau — die feste Linie", () => {
     expect(v.fest.minusAb).toBeUndefined();
   });
 
+  /**
+   * Eine Vormerkung ist SICHERER als jede Vertragsrate: sie ist bereits geschehen und
+   * nur noch nicht verbucht. `realerKontostand` sieht sie nicht — er rechnet ueber
+   * Buchungen —, und deshalb begaenne die Reihe ohne sie mit Geld, ueber das niemand
+   * mehr verfuegt. Dasselbe meint die Bank mit „verfuegbarer Betrag" neben dem Saldo.
+   */
+  it("beginnt beim Stand ABZUEGLICH dessen, was die Bank schon kennt", () => {
+    const vorgemerkt = {
+      id: "vm1", zahlungskontoId: "giro", betrag: -15000, waehrung: "EUR",
+      gegenpartei: "Kesselmann", verwendungszweck: "", erfasstAm: HEUTE,
+    };
+    const [v] = liquiditaetsvorschau({
+      konten: [konto()], buchungen: [], regeln: [], heute: HEUTE, tage: 30,
+      vormerkungen: [vorgemerkt],
+    });
+    expect(v.start).toBe(85000);
+  });
+
+  it("laesst die Vormerkung eines ANDEREN Kontos in Ruhe", () => {
+    const fremd = {
+      id: "vm1", zahlungskontoId: "anderes", betrag: -15000, waehrung: "EUR",
+      gegenpartei: "Kesselmann", verwendungszweck: "", erfasstAm: HEUTE,
+    };
+    const [v] = liquiditaetsvorschau({
+      konten: [konto()], buchungen: [], regeln: [], heute: HEUTE, tage: 30,
+      vormerkungen: [fremd],
+    });
+    expect(v.start).toBe(100000);
+  });
+
   it("zieht die fällige Vertragsrate am richtigen Tag ab", () => {
     const [v] = liquiditaetsvorschau({
       konten: [konto()], buchungen: [], regeln: [regel()], heute: HEUTE, tage: 30,

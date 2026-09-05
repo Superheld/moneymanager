@@ -35,6 +35,7 @@
 import type {
   DepotRepository,
   ImportLaufRepository, KategorieRepository, KontostandsankerRepository, LedgerPort,
+  VormerkungRepository,
   UmsatzRepository, VertragserkennungRepository, VertragszuordnungRepository,
   ZahlungskontoRepository,
 } from "../ports";
@@ -45,7 +46,8 @@ import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
 import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
 import { bankAnker } from "../../core";
-import type { Abrufadapter, Auszugsstand, Bankprofil, Bankzugang, TanFrager } from "./abrufPort";
+import type { Abrufadapter, Auszugsstand, Bankprofil, Bankzugang, TanFrager, Vormerkungszeile,
+} from "./abrufPort";
 import { abruffenster, erstabrufTage } from "./bankprofil";
 import type { Kontozuordnung, KontozuordnungRepository } from "./bankzugangPort";
 import type { BankzugangRepository } from "./bankzugangPort";
@@ -123,6 +125,11 @@ export interface AbrufDeps {
   readonly ledgerRepo: LedgerPort;
   /** Die Kontostands-Anker — jeder Abruf legt einen dazu, sofern die Bank einen Saldo gibt. */
   readonly ankerRepo: KontostandsankerRepository;
+  /**
+   * Die Vormerkungen — optional, weil ein Abruf ohne sie vollstaendig bleibt: sie sind
+   * eine Zugabe der Antwort, kein Teil des Auftrags.
+   */
+  readonly vormerkungRepo?: VormerkungRepository;
   /**
    * Erkennung und Zuordnung der Verträge — der Abruf gleicht am Ende ab.
    *
@@ -306,6 +313,36 @@ export async function abrufAusfuehren(
     }
 
     /**
+     * Die Vormerkungen des Kontos ERSETZEN — nicht ergänzen.
+     *
+     * Was die Bank nicht mehr meldet, gibt es nicht mehr: eine Vormerkung wird gebucht
+     * oder sie fällt weg, und beides erfährt man nur daran, dass sie im nächsten Abruf
+     * fehlt. Fortzuschreiben hiesse, eine Liste zu führen, die nur wächst und deren
+     * Einträge nie enden.
+     *
+     * Auch eine LEERE Liste wird geschrieben, und das ist der Fall, den man leicht
+     * wegoptimiert: „keine Vormerkungen mehr" ist die Aussage, wegen der man hinsieht.
+     * Ohne sie stünden die alten für immer da.
+     *
+     * Läuft nur nach einem geglückten Abruf: nach einem Fehler wüssten wir nicht, ob die
+     * Bank keine meldet oder ob wir nicht gefragt haben — und die alten wegzuwerfen wäre
+     * dann eine Behauptung.
+     */
+    async function vormerkungenFesthalten(gemeldet: readonly Vormerkungszeile[]) {
+      if (!deps.vormerkungRepo) return;
+      const erfasstAm = new Date().toISOString();
+      await deps.vormerkungRepo.ersetzen(
+        z.zahlungskontoId,
+        gemeldet.map((v) => ({
+          ...v,
+          id: crypto.randomUUID(),
+          zahlungskontoId: z.zahlungskontoId,
+          erfasstAm,
+        })),
+      );
+    }
+
+    /**
      * Die Stände aus den AUSZÜGEN als Anker festhalten — die eigentliche Ausbeute.
      *
      * Der Saldo oben kommt aus einer eigenen Abfrage (`HKSAL`), die nicht jede Bank
@@ -388,6 +425,7 @@ export async function abrufAusfuehren(
       }
 
       await ankerFesthalten();
+      await vormerkungenFesthalten(abruf.vormerkungen);
       // Das getragene Format mit fortschreiben. Es ist seit 2026-09-04 eine
       // AUFZEICHNUNG und keine Eingabe mehr: die Formatwahl fragt die Bank, nicht das
       // Gedächtnis (siehe `Formatvorgabe`). Aufgehoben wird es, weil es sagt, worüber

@@ -15,6 +15,7 @@ import {
   klartextAnreicherung,
   isoDatum,
   zuRohUmsatz,
+  zuVormerkung,
   type FintsBuchung,
 } from "./uebersetzung";
 
@@ -240,6 +241,28 @@ describe("zuRohUmsatz", () => {
     const u = zuRohUmsatz(buchung({ charges: { value: Number.NaN, currency: "EUR" } }), {});
     expect(u.gebuehrBetrag).toBeUndefined();
     expect(u.betrag).toBe(-4990);
+  });
+
+  it("uebersetzt eine Vormerkung — und laesst sie ohne Datum durch", () => {
+    // GENAU DIESER FALL ist der Grund, warum die Bibliothek beide Datumsfelder optional
+    // gemacht hat. Bei einer Buchung waere ein fehlendes Datum ein Grund, die Zeile
+    // abzuweisen; bei einer Vormerkung ist es eine ohne Termin — und die ist mehr wert
+    // als keine.
+    const ohne = zuVormerkung(
+      buchung({ entryDate: undefined, valueDate: undefined, status: "PDNG" }),
+      "EUR",
+    );
+    expect(ohne.datum).toBeUndefined();
+    expect(ohne.betrag).toBe(-4990);
+    expect(ohne.buchungsstand).toBe("PDNG");
+    expect(ohne.gegenpartei).toBe("Stromwerke Nord");
+
+    // Mit Datum gewinnt der Buchungstag, wie bei einer Buchung auch.
+    expect(zuVormerkung(buchung(), "EUR").datum).toBe("2026-08-04");
+  });
+
+  it("nimmt die Valuta, wenn nur sie dasteht", () => {
+    expect(zuVormerkung(buchung({ entryDate: undefined }), "EUR").datum).toBe("2026-08-03");
   });
 
   it("lässt nativeId leer — FinTS liefert hier keine stabile Buchungs-ID", () => {

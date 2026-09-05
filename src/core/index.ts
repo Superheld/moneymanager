@@ -28,6 +28,7 @@ export * from "./buchung/istbuchung";
 export * from "./konten/gruppe";
 export * from "./konten/kontoregister";
 export * from "./konten/liquiditaet";
+export * from "./konten/vormerkung";
 export * from "./konten/kontostand";
 export * from "./buchung/historie";
 export * from "./buchung/journal";

@@ -2020,4 +2020,37 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE umsatz_roh ADD COLUMN bankfelder TEXT`,
     ],
   },
+  {
+    version: 70, // Vormerkungen: was die Bank kennt und noch nicht gebucht hat
+    sql: [
+      // EINE EIGENE TABELLE und keine Zeile in `umsatz_roh`, und das ist der ganze Punkt:
+      // eine Vormerkung ist keine Zahlung, sondern eine BEOBACHTUNG mit Verfallsdatum —
+      // dieselbe Kategorie wie `kontostand_anker` und `depotwert`. In ein bis drei Tagen
+      // wird sie zu einer Buchung, moeglicherweise mit anderem Betrag, moeglicherweise
+      // gar nicht. Im Ledger stuende dieselbe Zahlung danach zweimal, und der
+      // Dublettenfinder haette nichts, woran er sie erkennt: keine stabile Kennung, ein
+      // Betrag, der sich noch aendern darf, und bei manchen Instituten nicht einmal ein
+      // Datum.
+      //
+      // `datum` ist deshalb NULLABLE. Eine noch nicht gebuchte CAMT-Zeile kann ganz ohne
+      // Datum kommen; das ist kein Fehler, sondern eine Vormerkung ohne Termin.
+      //
+      // CASCADE auf das Konto: ohne Konto sagt sie nichts. Anders als beim Journal gibt
+      // es hier nichts zu ueberleben — der naechste Abruf schriebe sie ohnehin neu.
+      `CREATE TABLE IF NOT EXISTS vormerkung (
+         id               TEXT PRIMARY KEY,
+         zahlungskonto_id TEXT NOT NULL REFERENCES zahlungskonto(id) ON DELETE CASCADE,
+         datum            TEXT,
+         betrag           INTEGER NOT NULL,
+         waehrung         TEXT    NOT NULL,
+         gegenpartei      TEXT    NOT NULL DEFAULT '',
+         verwendungszweck TEXT    NOT NULL DEFAULT '',
+         buchungsstand    TEXT,
+         erfasst_am       TEXT    NOT NULL
+       )`,
+      // Gelesen wird immer je Konto — der Bestand eines Kontos wird bei jedem Abruf
+      // vollstaendig ersetzt.
+      `CREATE INDEX IF NOT EXISTS ix_vormerkung_konto ON vormerkung(zahlungskonto_id)`,
+    ],
+  },
 ];

@@ -5,7 +5,14 @@
 
 import { describe, expect, it } from "vitest";
 import type { Zahlungskonto } from "../../core";
-import type { Abrufadapter, Abrufsitzung, Bankkonto, Bankzugang, Formatvorgabe } from "./abrufPort";
+import type {
+  Abrufadapter,
+  Abrufsitzung,
+  Bankkonto,
+  Bankzugang,
+  Formatvorgabe,
+  Vormerkungszeile,
+} from "./abrufPort";
 import type { Kontozuordnung } from "./bankzugangPort";
 import type { Bankprofil } from "./abrufPort";
 import { ERSTABRUF_TAGE, RUECKGRIFF_TAGE, abrufAusfuehren, abrufZeitraum } from "./abrufAusfuehren";
@@ -65,6 +72,7 @@ function fakeAdapter(opt: {
   saldoWirft?: boolean;
   /** Die Stände, die in den gelieferten Auszügen stehen. */
   auszugsSalden?: { datum: string; betrag: number }[];
+  vormerkungen?: Vormerkungszeile[];
   profil?: Bankprofil;
 }) {
   const anfragen: { schluessel: string; von: string; bis: string; bevorzugt?: Formatvorgabe }[] = [];
@@ -90,6 +98,7 @@ function fakeAdapter(opt: {
         // Was die Bank im Auszug mitschickt: Stand davor und Stand danach. Über den
         // Testschalter, damit auch der Fall „Format liefert keine" geprüft werden kann.
         auszugsSalden: opt.auszugsSalden ?? [],
+        vormerkungen: opt.vormerkungen ?? [],
         ergebnis: {
           quelle: "fints",
           warnungen: [],
