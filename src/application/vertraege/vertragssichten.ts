@@ -12,6 +12,7 @@
 
 import {
   beleglageFuer,
+  belegspuren,
   erkennungsDiagnose,
   merkmaleAbleiten,
   merkmalsTreffer,
@@ -285,9 +286,11 @@ export function merkmaleVorschlagen(
 ): Merkmalsvorschlag {
   const beleglage = beleglageFuer(vertragId, zuordnungen);
   return {
-    // Ueber die SPUREN gezaehlt und nicht ueber die Menge: eine Zuordnung kann auf eine
-    // Buchung zeigen, die es nicht mehr gibt, und die traegt zu keinem Vorschlag bei.
-    belege: spuren.filter((s) => beleglage.dazu.has(s.id)).length,
+    // Ueber `belegspuren` und nicht ueber die Menge: eine Zuordnung kann auf eine Buchung
+    // zeigen, die es nicht mehr gibt, und eine Umschichtung kann kein Kandidat decken.
+    // Derselbe Zaehler wie in der Ableitung — sonst stuende ein Nenner da, den niemand
+    // erreicht.
+    belege: belegspuren(spuren, beleglage).length,
     kandidaten: merkmaleAbleiten(spuren, beleglage),
   };
 }

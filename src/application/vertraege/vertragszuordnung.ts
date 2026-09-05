@@ -146,6 +146,50 @@ export async function zuordnungVonHand(
 }
 
 /**
+ * Wohin eine Sammelzuordnung zeigt.
+ *
+ * Drei Werte und nicht zwei, weil es drei Zustände gibt (siehe CLAUDE.md, „Zuordnungen
+ * stehen an der Buchung"): einem Vertrag zugeordnet, ausdrücklich KEINEM zugeordnet, und
+ * noch nie entschieden. Der mittlere ist kein fehlender Wert — er ist die Aussage, ohne
+ * die ein korrigierter Fehlgriff der Automatik beim nächsten Abgleich zurückkäme.
+ *
+ * Als getaggte Auswahl und nicht als `string | null | undefined`: dort meint `null`
+ * bereits „keiner", und ein zweites Nichts danebenzustellen ist die Sorte Unterscheidung,
+ * die beim Lesen kippt.
+ */
+export type Sammelziel =
+  | { readonly art: "vertrag"; readonly vertragId: string }
+  | { readonly art: "keiner" }
+  | { readonly art: "automatik" };
+
+/**
+ * Dieselbe Entscheidung für viele Buchungen auf einmal.
+ *
+ * Sie liegt hier und nicht in der Oberfläche, obwohl es eine Schleife ist: was für eine
+ * Buchung gilt, gilt für dreissig — aber WELCHE der drei Aussagen ein Ziel bedeutet, ist
+ * eine Entscheidung, und die gehört hinter einen Use-Case. In der Oberfläche stünde sie
+ * beim nächsten Aufrufer neu erfunden da.
+ *
+ * Kein Abgleich hinterher: eine Handzuordnung rührt `zuordnungenAbgleichen` ohnehin nicht
+ * an, und `automatik` wirkt erst beim nächsten Lauf — genau das ist ihre Bedeutung.
+ */
+export async function zuordnungenVonHand(
+  repo: VertragszuordnungRepository,
+  istbuchungIds: readonly string[],
+  ziel: Sammelziel,
+): Promise<number> {
+  for (const id of istbuchungIds) {
+    if (ziel.art === "automatik") await repo.loeschen(id);
+    else await repo.speichern({
+      istbuchungId: id,
+      vertragId: ziel.art === "vertrag" ? ziel.vertragId : null,
+      herkunft: "manuell",
+    });
+  }
+  return istbuchungIds.length;
+}
+
+/**
  * Die Handentscheidung zurücknehmen: der Eintrag verschwindet, und beim nächsten
  * Abgleich entscheidet wieder die Regel. Der Rückweg, ohne den „manuell" eine
  * Einbahnstraße wäre.
