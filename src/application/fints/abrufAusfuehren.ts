@@ -335,13 +335,9 @@ export async function abrufAusfuehren(
     }
 
     try {
-      // Das zuletzt getragene Format als Reihenfolge mitgeben — nicht als Festlegung.
-      // Das zuletzt getragene Format als Reihenfolge, die Wahl des Nutzers als Festlegung
-      // — der Adapter hält die beiden auseinander (siehe `Formatvorgabe`).
-      const abruf = await sitzung.umsaetze(bankkonto, von, deps.heute, {
-        wahl: z.formatwahl,
-        zuletzt: z.letztesFormat,
-      });
+      // Nur noch die WAHL des Nutzers. Das zuletzt getragene Format wird weiter
+      // fortgeschrieben, entscheidet aber nichts mehr — siehe `Formatvorgabe`.
+      const abruf = await sitzung.umsaetze(bankkonto, von, deps.heute, { wahl: z.formatwahl });
       await auszugsSaldenFesthalten(abruf.auszugsSalden);
 
       // Das Ziel steht fest — es kommt aus der Zuordnung, nicht aus einem Konto-Match
@@ -392,8 +388,11 @@ export async function abrufAusfuehren(
       }
 
       await ankerFesthalten();
-      // Das getragene Format mit fortschreiben: hat CAMT hier nicht getragen, ist die
-      // erste Runde beim nächsten Mal absehbar vergeblich.
+      // Das getragene Format mit fortschreiben. Es ist seit 2026-09-04 eine
+      // AUFZEICHNUNG und keine Eingabe mehr: die Formatwahl fragt die Bank, nicht das
+      // Gedächtnis (siehe `Formatvorgabe`). Aufgehoben wird es, weil es sagt, worüber
+      // ein Bestand hereingekommen ist — und davon hängt ab, wie `umsatzart` und
+      // `buchungsschluessel` zu deuten sind.
       await deps.zuordnungRepo.speichern({
         ...z,
         letzterAbrufBis: deps.heute,
