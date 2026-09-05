@@ -1,13 +1,19 @@
 // Nachschlagen in der DK-Bankenliste: BLZ oder Name → FinTS-Endpunkt.
 //
 // Die Liste liegt NICHT im Quelltext, sondern wird lokal aus der DK-CSV erzeugt
-// (`npm run bankenliste`) und landet als `public/bankenliste.json` im Bundle. Beides ist
-// gitignoriert: die Deutsche Kreditwirtschaft verteilt die Liste an registrierte
-// Hersteller, nicht öffentlich.
+// (`npm run bankenliste`) und landet als `public/bankenliste.json` im Bundle.
 //
-// Deshalb wird sie zur LAUFZEIT geholt und nicht importiert: fehlt die Datei, gibt es
-// keine Auswahl und die FinTS-Adresse wird von Hand eingetragen — die App läuft trotzdem.
-// Ein statischer Import würde stattdessen den Build abbrechen.
+// WAS DRAUSSEN BLEIBT UND WAS NICHT: die CSV der Deutschen Kreditwirtschaft ist
+// gitignoriert — sie wird an registrierte Hersteller verteilt, nicht öffentlich. Die
+// daraus ERZEUGTE Datei liegt dagegen im Repo, und das ist eine Entscheidung und kein
+// Versehen: darin stehen Bankleitzahl, Institut, Ort und der öffentliche FinTS-Endpunkt,
+// nichts Nutzerbezogenes und nichts aus der CSV, was darüber hinausginge. Die Begründung
+// steht bei den Regeln dazu in `.gitignore`.
+//
+// Sie wird trotzdem zur LAUFZEIT geholt und nicht importiert: fehlt die Datei — im
+// Klon eines Forks etwa, der sie herausnimmt —, gibt es keine Auswahl und die
+// FinTS-Adresse wird von Hand eingetragen. Die App läuft weiter. Ein statischer Import
+// würde stattdessen den Build abbrechen.
 
 export interface Bankeintrag {
   readonly blz: string;

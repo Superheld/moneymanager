@@ -1,17 +1,21 @@
 // Erzeugt aus der DK-Bankenliste die schlanke Nachschlagetabelle, die der Bankabruf
 // braucht: BLZ → Institut, Ort, FinTS-PIN/TAN-Endpunkt.
 //
-// WARUM ALS SCHRITT UND NICHT ALS DATEI IM REPO: Die Liste wird von der Deutschen
+// WARUM ALS SCHRITT UND NICHT ALS DATEI IM REPO: Die CSV wird von der Deutschen
 // Kreditwirtschaft an registrierte Hersteller verteilt und ist nicht öffentlich. Sie hat
-// in einem öffentlichen Repo nichts verloren — die Quelle nicht und das Erzeugnis auch
-// nicht. Beides ist in .gitignore. Wer die App aus dem Quelltext baut, ohne die Liste zu
-// haben, bekommt schlicht keine Auswahl und trägt die FinTS-Adresse von Hand ein.
+// in einem öffentlichen Repo nichts verloren und ist deshalb gitignoriert.
+//
+// DAS ERZEUGNIS DAGEGEN LIEGT IM REPO — public/bankenliste.json und die Host-Liste der
+// Capability. Das ist eine Entscheidung: darin steht, was die Bank ohnehin öffentlich
+// nennt (Bankleitzahl, Institut, Ort, FinTS-Endpunkt), und nichts Nutzerbezogenes. Die
+// Regel samt Begründung steht in .gitignore. Wer die Dateien in einem Fork herausnimmt,
+// bekommt schlicht keine Auswahl und trägt die FinTS-Adresse von Hand ein.
 //
 //   node scripts/bankenliste-erzeugen.mjs [pfad/zur/liste.csv]
 //
 // Ohne Argument wird die erste CSV im lokalen Doku-Ordner genommen.
 
-import { readFileSync, writeFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,12 +24,22 @@ const STANDARD_ORDNER = join(wurzel, "Moneymanager", "xx-import-quellen");
 const ZIEL = join(wurzel, "public", "bankenliste.json");
 const ZIEL_CAPABILITY = join(wurzel, "src-tauri", "capabilities", "fints-banken.json");
 
+// Ohne Argument: die JUENGSTE CSV im Doku-Ordner, nicht die erste.
+//
+// Dort liegt mit der Zeit mehr als eine — eine neue Liste ersetzt die alte nicht,
+// sondern legt sich daneben. `readdirSync().find()` nahm, was das Dateisystem zuerst
+// nannte, und das ist keine Auswahl, sondern ein Zufall: ein Lauf ohne Argument konnte
+// die frische Liste still durch einen aelteren Stand ersetzen, und man saehe es der
+// erzeugten Datei nicht an. Nach Aenderungszeit ist die Absicht.
 function quelleFinden() {
   const arg = process.argv[2];
   if (arg) return arg;
   if (!existsSync(STANDARD_ORDNER)) return null;
-  const csv = readdirSync(STANDARD_ORDNER).find((d) => d.toLowerCase().endsWith(".csv"));
-  return csv ? join(STANDARD_ORDNER, csv) : null;
+  const csvs = readdirSync(STANDARD_ORDNER)
+    .filter((d) => d.toLowerCase().endsWith(".csv"))
+    .map((d) => join(STANDARD_ORDNER, d))
+    .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
+  return csvs[0] ?? null;
 }
 
 const quelle = quelleFinden();
@@ -33,6 +47,7 @@ if (!quelle) {
   console.error("Keine Bankenliste gefunden. Pfad zur CSV als Argument angeben.");
   process.exit(1);
 }
+console.log(`Quelle: ${quelle}`);
 
 // Die Datei kommt in Latin-1 mit CRLF und Semikolon als Trenner. Eine Zeile je Institut
 // UND Ort — dieselbe BLZ steht mehrfach drin.
