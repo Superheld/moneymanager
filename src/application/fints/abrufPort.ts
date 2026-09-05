@@ -326,6 +326,27 @@ export interface AbrufErgebnis {
    * verlassen, dass welche dabei sind, aber er verliert auch nichts, wenn keine kommen.
    */
   readonly auszugsSalden: readonly Auszugsstand[];
+  /**
+   * Was die Bank kennt und noch nicht gebucht hat — sie stehen im ZWEITEN Feld derselben
+   * Antwort und kosten keinen eigenen Abruf.
+   *
+   * Ohne `zahlungskontoId`: die Zuordnung zu unserem Konto trifft der Aufrufer, genau
+   * wie bei den Umsaetzen. Leer heisst „keine gemeldet"; ob die Bank ueberhaupt welche
+   * schickt, ist institutsabhaengig und bei MT940 selten.
+   */
+  readonly vormerkungen: readonly Vormerkungszeile[];
+}
+
+/** Eine gemeldete Vormerkung, noch ohne unser Konto und ohne Kennung. */
+export interface Vormerkungszeile {
+  /** Der Tag, den die Bank nennt — sie darf keinen nennen. */
+  readonly datum?: string;
+  readonly betrag: number;
+  readonly waehrung: string;
+  readonly gegenpartei: string;
+  readonly verwendungszweck: string;
+  /** `PDNG` oder `INFO`. */
+  readonly buchungsstand?: string;
 }
 
 /**

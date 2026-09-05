@@ -38,6 +38,7 @@ import type {
   Depotposition,
   Saldo,
   TanFrager,
+  Vormerkungszeile,
 } from "../../application/fints/abrufPort";
 import { profilErheben } from "./bankprofil";
 import { bankEndpunktFreigeben } from "./transport";
@@ -48,6 +49,7 @@ import {
   auszugsProben,
   auszugsStaende,
   isoDatum,
+  zuVormerkung,
   zuDepotposition,
   zuRohUmsatz,
 } from "./uebersetzung";
@@ -456,6 +458,30 @@ class FintsSitzung implements Abrufsitzung {
       }
     }
 
+    // VORMERKUNGEN — das zweite Feld derselben Antwort, ohne eigenen Abruf.
+    //
+    // Sie kommen mit, seit die Bibliothek sie liest, und wurden bis 2026-09-05 weggeworfen.
+    // Eine Vormerkung ist keine Buchung: sie wird in Tagen zu einer, mit möglicherweise
+    // anderem Betrag, oder sie verschwindet. Deshalb geht sie nicht durch `zuRohUmsatz`,
+    // sondern in eine eigene Form — dieselbe Trennung wie zwischen Beleg und Beobachtung.
+    //
+    // Ein Fehler beim Lesen wird jetzt GEMELDET. Solange wir sie wegwarfen, wäre er Lärm
+    // ohne Handlung gewesen; jetzt fehlt dem Nutzer etwas, das er sonst sieht.
+    if (antwort.notedStatementsError) {
+      warnungen.push(
+        `Die Vormerkungen liessen sich nicht lesen: ${antwort.notedStatementsError.message}`,
+      );
+    }
+    const vormerkungen: Vormerkungszeile[] = [];
+    for (const buchung of alleBuchungen(antwort.notedStatements ?? [])) {
+      try {
+        vormerkungen.push(zuVormerkung(buchung, konto.waehrung));
+      } catch (e) {
+        // Wie bei den Buchungen: eine kaputte Zeile kippt nicht den Rest.
+        warnungen.push(`Vormerkung übersprungen: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
     // Die Summenprobe: stimmen die Buchungen mit dem, was die Salden des Auszugs
     // behaupten? Sie steht hier und nicht in der Anwendungsschicht, weil sie die
     // Auszugsstruktur der Bank braucht — die endet an dieser Naht. Was danach kommt, sind
@@ -484,6 +510,7 @@ class FintsSitzung implements Abrufsitzung {
       format: antwort.format ?? gelaufen,
       hinweise,
       auszugsSalden: auszugsStaende(auszuege, warnungen),
+      vormerkungen,
     };
   }
 }

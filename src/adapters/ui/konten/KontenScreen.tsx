@@ -27,6 +27,7 @@ import {
 } from "../../dienste";
 import type { ScreenId } from "../bausteine/AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
+import { VormerkungsBlock } from "./VormerkungsBlock";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVergleich";
 import { SammelDialog } from "../buchung/SammelDialog";
@@ -460,6 +461,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           Raster mit einer Spalte stehen, und die Tabelle mit ihren sieben Spalten und dem
           Seitenschalter endete bei knapp zwei Dritteln — Platz, den nichts mehr
           beanspruchte. Ein Raster überlebt die Karte nicht, die es begründet hat. */}
+      {/* VORGEMERKT steht ÜBER dem Gebuchten, und die Reihenfolge ist die Aussage: was
+          die Bank noch nicht gebucht hat, ist das Naechste, was passiert. Unter der
+          Liste stuende es wie ein Nachtrag. */}
+      {aktiv && sicht && !aktivZeile?.depot && (
+        <VormerkungsBlock vormerkungen={sicht.vormerkungen.get(aktiv.id) ?? []} />
+      )}
+
       {aktiv && register && !aktivZeile?.depot && (
         <Card title={t("konten.gebuchtTitel")}>
           {/* Filterleiste: Suche · Art (segmented) · Kategorie · Treffer */}

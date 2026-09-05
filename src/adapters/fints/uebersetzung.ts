@@ -23,6 +23,7 @@
 
 import { ibanGueltig, istCent, majorZuMinor, waehrungNachCode, type Cent, type Waehrung } from "../../core";
 import type { RohSammelposten, RohUmsatz } from "../../application/import";
+import type { Vormerkungszeile } from "../../application/fints/abrufPort";
 
 export const FINTS_QUELLE = "fints";
 
@@ -578,6 +579,35 @@ export interface KontoKontext {
  * `istUmbuchung` bleibt false: FinTS weiß nichts über die anderen Konten des Nutzers.
  * Die Umbuchungs-Paarung ist Sache der bestehenden Erkennung eine Schicht höher.
  */
+/**
+ * Eine gemeldete Vormerkung → die Form, in der die Anwendung sie annimmt.
+ *
+ * **Ein eigener Weg neben `zuRohUmsatz`, und das ist Absicht.** Eine Vormerkung ist keine
+ * Zahlung, sondern eine Beobachtung mit Verfallsdatum; sie durch dieselbe Übersetzung zu
+ * schicken hiesse, sie mit allem auszustatten, was eine Buchung braucht — Dedup-Schlüssel,
+ * Kontozuordnung, Kategorievorschlag — und nichts davon ergibt für sie einen Sinn. Was
+ * hier ankommt, ist das, was man anzeigen und rechnen kann.
+ *
+ * **`entryDate` darf fehlen und wirft hier NICHT.** Genau das ist der Fall, für den die
+ * Bibliothek beide Datumsfelder optional gemacht hat: eine noch nicht gebuchte CAMT-Zeile
+ * kann ganz ohne Datum kommen. Bei einer Buchung wäre das ein Grund, die Zeile
+ * abzuweisen; bei einer Vormerkung ist es eine ohne Termin, und die ist mehr wert als
+ * keine.
+ */
+export function zuVormerkung(b: FintsBuchung, kontoWaehrung?: string): Vormerkungszeile {
+  const waehrung = waehrungNachCode(kontoWaehrung ?? "EUR");
+  const a = klartextAnreicherung(b.purpose);
+  const tag = b.entryDate ?? b.valueDate;
+  return {
+    datum: tag ? isoDatum(tag) : undefined,
+    betrag: bankbetragZuCent(b.amount, waehrung),
+    waehrung: waehrung.code,
+    gegenpartei: (b.remoteName ?? "").trim(),
+    verwendungszweck: a.zweck,
+    buchungsstand: b.status?.trim() || undefined,
+  };
+}
+
 export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
   const a = klartextAnreicherung(b.purpose);
   const waehrung = waehrungNachCode(konto.waehrung ?? "EUR");

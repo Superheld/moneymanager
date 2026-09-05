@@ -92,6 +92,9 @@ export {
   // Datum X Tage ab heute — eine Rechnung über zwei Zahlen, keine Auswahl. Die
   // Oberfläche braucht es, um das Fenster zu beschriften, das sie gerade zeigt.
   fensterEnde,
+  // Die Summe der Vormerkungen und ihre Zahl — die Anzeige braucht dieselbe Rechnung
+  // wie die Vorschau, und zwei Additionen an zwei Orten laufen auseinander.
+  vormerkungslast,
 } from "../core";
 
 // ---------------------------------------------------------------------------

@@ -1163,6 +1163,19 @@ const de = {
     keineGeplanten: "Keine geplanten Buchungen in den nächsten {{tage}} Tagen für dieses Konto.",
     geplantTitel: "Geplant",
     gebuchtTitel: "Gebucht",
+    vormerkungen: {
+      titel: "Vorgemerkt",
+      untertitel:
+        "{{anzahl}} Zahlungen über {{betrag}}, die die Bank kennt und noch nicht gebucht hat. " +
+        "Sie sind in der Vorschau schon abgezogen.",
+      ohneDatum: "ohne Termin",
+      ohneGegenpartei: "ohne Empfänger",
+      nurInfo: "wird nicht gebucht",
+      hinweis:
+        "Vorgemerkte Zahlungen werden in ein bis drei Tagen zu Buchungen — mit " +
+        "möglicherweise anderem Betrag — oder fallen weg. Sie lassen sich nicht bearbeiten " +
+        "und stehen in keiner Auswertung; der Stand hier ist der des letzten Abrufs.",
+    },
     zeitraumWaehlen: "Wie weit die Vorschau reicht",
     speichern: "Speichern",
     abbrechen: "Abbrechen",
@@ -3079,6 +3092,19 @@ const en: typeof de = {
     keineGeplanten: "No planned entries in the next {{tage}} days for this account.",
     geplantTitel: "Planned",
     gebuchtTitel: "Booked",
+    vormerkungen: {
+      titel: "Pending",
+      untertitel:
+        "{{anzahl}} payments totalling {{betrag}} that the bank knows about but has not " +
+        "booked yet. They are already deducted in the forecast.",
+      ohneDatum: "no date",
+      ohneGegenpartei: "no counterparty",
+      nurInfo: "will not be booked",
+      hinweis:
+        "Pending payments become bookings within one to three days — possibly for a " +
+        "different amount — or they fall away. They cannot be edited and appear in no " +
+        "analysis; what is shown is the state of the last fetch.",
+    },
     zeitraumWaehlen: "How far the preview looks ahead",
     speichern: "Save",
     abbrechen: "Cancel",

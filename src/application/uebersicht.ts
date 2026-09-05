@@ -29,7 +29,7 @@ import {
   type Vorschauzeile,
 } from "../core";
 import { budgetstaende, vertragsBuchungenLaden, type Budgetstand } from "./budgets/budgetsichten";
-import type { BudgetSicht } from "../core";
+import type { BudgetSicht, Vormerkung } from "../core";
 import type {
   BudgetRepository,
   KategorieRepository,
@@ -38,6 +38,8 @@ import type {
   VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
+
+  VormerkungRepository,
 } from "./ports";
 
 /** Wie viele Monate der Rückblick der Budgetliste höchstens anbietet. */
@@ -51,6 +53,11 @@ export interface UebersichtDeps {
   readonly umsatzRepo: UmsatzRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly kontoRepo: ZahlungskontoRepository;
+  /**
+   * Die Vormerkungen — optional, weil die Übersicht ohne sie vollständig bleibt: sie
+   * verschieben nur den Startpunkt der Vorschau um das, was schon feststeht.
+   */
+  readonly vormerkungRepo?: VormerkungRepository;
 }
 
 export interface Uebersichtsdaten {
@@ -121,7 +128,7 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten, vormerkungen] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -130,6 +137,7 @@ export async function uebersichtLaden(
       deps.umsatzRepo.alle(),
       vertragsBuchungenLaden(deps.zuordnungRepo),
       deps.kontoRepo.alle(),
+      deps.vormerkungRepo?.alle() ?? Promise.resolve<Vormerkung[]>([]),
     ]);
 
   /**
@@ -196,6 +204,10 @@ export async function uebersichtLaden(
         buchungen,
         regeln,
         budgetsicht: { buchungen, kategorien, budgets, vertragsBuchungen },
+        // Was die Bank schon kennt, ist vom Stand faktisch weg — auch wenn es noch in
+        // keinem Auszug steht. Ohne die Vormerkungen begänne die Vorschau mit Geld, über
+        // das niemand mehr verfügt.
+        vormerkungen,
         heute,
         tage: VORSCHAU_TAGE,
       }),

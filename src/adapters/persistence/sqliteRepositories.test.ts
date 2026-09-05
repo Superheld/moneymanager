@@ -43,6 +43,7 @@ import {
   sqliteZahlungskontoRepository as zahlungskontoRepository,
 } from "./sqliteStammdatenRepositories";
 import { sqliteKontostandsankerRepository as ankerRepository } from "./sqliteKontostandRepository";
+import { sqliteVormerkungRepository as vormerkungRepository } from "./sqliteVormerkungRepository";
 import { sqliteDepotRepository as depotRepository } from "./sqliteDepotRepository";
 import {
   sqliteDublettenfreigabeRepository as freigabeRepository,
@@ -435,6 +436,58 @@ describe("Einstellungen-Repository", () => {
     await einstellungenRepository.schreiben("locale", "en-US");
     await einstellungenRepository.schreiben("waehrung", "USD");
     expect(await einstellungenRepository.lesen()).toEqual({ locale: "en-US", waehrung: "USD" });
+  });
+});
+
+describe("Vormerkungen", () => {
+  const vormerkung = (over: Record<string, unknown> = {}) => ({
+    id: "vm1", zahlungskontoId: "k1", betrag: -2500, waehrung: "EUR",
+    gegenpartei: "Kesselmann", verwendungszweck: "Kartenzahlung",
+    erfasstAm: "2026-09-05T20:00:00.000Z", ...over,
+  });
+
+  it("haelt eine Vormerkung ueber die Rundreise — auch ohne Datum", () => {
+    // Eine noch nicht gebuchte CAMT-Zeile kann ganz ohne Datum kommen. Das ist kein
+    // Fehler, sondern eine Vormerkung ohne Termin, und die Spalte ist deshalb nullable.
+    return vormerkungRepository
+      .ersetzen("k1", [vormerkung(), vormerkung({ id: "vm2", datum: "2026-09-06" })])
+      .then(() => vormerkungRepository.alle())
+      .then((alle) => {
+        expect(alle).toHaveLength(2);
+        // Ohne Datum zuerst: was die Bank ohne Termin meldet, ist das Naechste.
+        expect(alle[0].id).toBe("vm1");
+        expect(alle[0].datum).toBeUndefined();
+        expect(alle[0].gegenpartei).toBe("Kesselmann");
+        expect(alle[1].datum).toBe("2026-09-06");
+      });
+  });
+
+  /**
+   * Die einzige Schreiboperation, und sie ist der ganze Umgang mit Vormerkungen: was die
+   * Bank nicht mehr meldet, gibt es nicht mehr. Fortzuschreiben ergaebe eine Liste, die
+   * nur waechst und deren Eintraege nie enden.
+   */
+  it("ersetzt den Bestand eines Kontos vollstaendig", async () => {
+    await vormerkungRepository.ersetzen("k1", [vormerkung(), vormerkung({ id: "vm2" })]);
+    await vormerkungRepository.ersetzen("k1", [vormerkung({ id: "vm3", betrag: -900 })]);
+
+    const alle = await vormerkungRepository.alle();
+    expect(alle.map((v) => v.id)).toEqual(["vm3"]);
+  });
+
+  it("schreibt auch eine LEERE Liste — „nichts mehr offen\" ist eine Aussage", async () => {
+    await vormerkungRepository.ersetzen("k1", [vormerkung()]);
+    await vormerkungRepository.ersetzen("k1", []);
+    expect(await vormerkungRepository.alle()).toEqual([]);
+  });
+
+  it("laesst die Vormerkungen der anderen Konten stehen", async () => {
+    await vormerkungRepository.ersetzen("k1", [vormerkung()]);
+    await vormerkungRepository.ersetzen("k2", [vormerkung({ id: "vm9", zahlungskontoId: "k2" })]);
+    await vormerkungRepository.ersetzen("k1", []);
+
+    const alle = await vormerkungRepository.alle();
+    expect(alle.map((v) => v.id)).toEqual(["vm9"]);
   });
 });
 

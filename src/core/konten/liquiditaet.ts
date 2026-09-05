@@ -28,6 +28,7 @@
 
 import { addTage, ord, parseIso, tageImMonat, toIso } from "../basis/datum";
 import type { Cent } from "../basis/geld";
+import { vormerkungslast, type Vormerkung } from "./vormerkung";
 import { realerKontostand, type IstBuchung } from "../buchung/istbuchung";
 import { projiziereRegel } from "../buchung/projektion";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
@@ -59,6 +60,16 @@ export interface LiquiditaetsEingabe {
   readonly regeln: readonly Zahlungsregel[];
   /** Für den Budgetanteil der erwarteten Linie. Ohne sie sind beide Linien gleich. */
   readonly budgetsicht?: BudgetSicht;
+  /**
+   * Was die Bank kennt und noch nicht gebucht hat. Fließt in BEIDE Linien ein, und zwar
+   * in die feste zuerst.
+   *
+   * Eine Vormerkung ist sicherer als jede Vertragsrate: sie ist bereits geschehen, nur
+   * noch nicht verbucht. `realerKontostand` sieht sie nicht — er rechnet über Buchungen
+   * —, und deshalb steht ohne sie am Anfang der Reihe Geld, das faktisch weg ist.
+   * Dasselbe meint die Bank, wenn sie neben den Saldo einen „verfügbaren Betrag" stellt.
+   */
+  readonly vormerkungen?: readonly Vormerkung[];
   readonly heute: string;
   /** Wie weit vorausgerechnet wird. */
   readonly tage: number;
@@ -174,7 +185,14 @@ export function liquiditaetsvorschau(e: LiquiditaetsEingabe): Kontovorschau[] {
   const bis = toIso(addTage(parseIso(e.heute), e.tage));
 
   return e.konten.map((konto): Kontovorschau => {
-    const start = realerKontostand(konto, [...e.buchungen]);
+    // Der reale Stand MINUS dessen, was schon feststeht und noch nicht gebucht ist. Eine
+    // Vormerkung ohne Datum wirkt ab sofort — was die Bank bereits kennt, ist näher als
+    // alles Datierte —, und eine mit Datum ebenso: sie wird in Tagen gebucht, und den
+    // Tag genau zu treffen wäre eine Genauigkeit, die die Angabe nicht hergibt.
+    const offen = vormerkungslast(
+      (e.vormerkungen ?? []).filter((v) => v.zahlungskontoId === konto.id),
+    );
+    const start = realerKontostand(konto, [...e.buchungen]) + offen.betrag;
     const ereignisse = feste(konto.id, e.regeln, e.heute, monate).filter(
       (x) => x.datum >= e.heute && x.datum <= bis,
     );

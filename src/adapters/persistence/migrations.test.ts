@@ -98,6 +98,9 @@ const ERWARTETE_TABELLEN = [
   "umsatz_roh", "umsatz_verarbeitung",
   // v47 — die Zuordnung steht jetzt an der Buchung, `vertrag_zuordnung` ist weg
   "vertrag", "vertrag_erkennung",
+  // v70 — was die Bank kennt und noch nicht gebucht hat: eine Beobachtung mit
+  // Verfallsdatum, deshalb neben `kontostand_anker` und nicht in `umsatz_roh`
+  "vormerkung",
   "zahlungskonto", "zahlungsregel",
 ];
 

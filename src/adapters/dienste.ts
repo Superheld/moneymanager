@@ -57,6 +57,7 @@ import {
   sqliteImportLaufRepository,
 } from "./persistence/sqliteImportRepositories";
 import { sqliteKontostandsankerRepository } from "./persistence/sqliteKontostandRepository";
+import { sqliteVormerkungRepository } from "./persistence/sqliteVormerkungRepository";
 import { sqliteDepotRepository } from "./persistence/sqliteDepotRepository";
 import { sqliteKlassifikatorRepository } from "./persistence/sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkmalskonfigurationRepository";
@@ -204,6 +205,9 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
       regelRepo: sqliteZahlungsregelRepository,
       umsatzRepo: sqliteUmsatzRepository,
       kontoRepo: sqliteZahlungskontoRepository,
+      // Was die Bank schon kennt, ist vom Stand faktisch weg — die Vorschau beginnt
+      // sonst mit Geld, über das niemand mehr verfügt.
+      vormerkungRepo: sqliteVormerkungRepository,
     },
     heute,
   );
@@ -671,6 +675,10 @@ export async function bankAbrufen(
     kategorieRepo: sqliteKategorieRepository,
     ledgerRepo: sqliteLedgerRepository,
     ankerRepo: sqliteKontostandsankerRepository,
+    // Die Vormerkungen stehen im zweiten Feld derselben Antwort und kosten keinen eigenen
+    // Abruf. Sie werden je Konto ERSETZT, nicht ergänzt — was die Bank nicht mehr meldet,
+    // gibt es nicht mehr.
+    vormerkungRepo: sqliteVormerkungRepository,
     // Depots werden mitgeholt: sie hängen an keiner Kontozuordnung, weil sie keine Konten
     // sind — jedes, das die Bank freigibt, kommt als Beobachtung in die Wertreihe.
     depotRepo: sqliteDepotRepository,
@@ -792,6 +800,8 @@ export function konten(): Promise<Kontensicht> {
     laufRepo: sqliteImportLaufRepository,
     freigabeRepo: sqliteDublettenfreigabeRepository,
     ankerRepo: sqliteKontostandsankerRepository,
+    // Damit der Auszug zeigt, was die Bank schon kennt und noch nicht gebucht hat.
+    vormerkungRepo: sqliteVormerkungRepository,
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
     // Damit ein Depot-Konto seinen Bestand zeigt statt einer leeren Buchungsliste.
     depotRepo: sqliteDepotRepository,
