@@ -712,6 +712,10 @@ Es gibt deshalb genau **drei** Wege nach draussen, und zwei davon setzen ein Zut
 
 Die dritte Zeile ist leer, und das wird von `src/absicherung.test.ts` durchgesetzt.
 
+**Ein Befund zum Abruf gehört in `ergebnis.warnungen`, nicht in `hinweise`.** Beide stehen
+an `AbrufErgebnis`, aber `abrufAusfuehren` liest nur die erste (sie landet im
+`AbrufBefund`); die zweite fällt dort ohne Meldung auf den Boden.
+
 **Bis 2026-08-25 stimmte das nicht.** Die Schrift kam über ein `@import` von einem
 Schriften-Dienst — ein Netzzugriff bei jedem Start, bei dem der Betreiber IP und Zeitpunkt
 sieht. Die Behauptung weiter unten, die Update-Prüfung sei der erste ungefragte
@@ -1784,8 +1788,18 @@ und ein Wächter, der bei jedem Lauf dasselbe meldet, wird abgeschaltet statt ge
 Ref bedeutet, dass ein `npm update` stillschweigend fremden Code einzieht; der Lockfile
 allein schützt nur, solange niemand ihn erneuert.
 
+Die Kehrseite des Pins: **`node_modules` gehört keinem Branch.** Wer von `develop`
+abzweigt, während ein neuerer Lib-Stand installiert ist, bekommt rote Typfehler in
+Dateien, die er nie angefasst hat. Das ist kein Fund, sondern die Divergenz — entweder den
+Lib-Branch mergen oder `npm ci`.
+
 ## Build-Stolpersteine
 
+- **Ein Patch in `node_modules/<paket>/dist` erreicht die laufende App NICHT.** Vite
+  serviert `node_modules/.vite/deps/<paket>.js` mit `immutable`-Caching und bündelt nur
+  neu, wenn sich Lockfile oder Config ändern — nicht bei geändertem Paketinhalt. Wer eine
+  Abhängigkeit zur Diagnose markiert: `rm -rf node_modules/.vite`, dann neu starten.
+  Gemessen an `lib-fints`; der WebView nimmt sonst wortlos seine alte Kopie.
 - **Der erste Rust-Build nach einem frischen Klon dauert länger als früher.** Seit
   SQLCipher im Baum ist (`libsqlite3-sys` mit `bundled-sqlcipher-vendored-openssl`), wird
   OpenSSL mitgebaut. Danach liegt es im Cache und die Sache ist erledigt. `-vendored-`
