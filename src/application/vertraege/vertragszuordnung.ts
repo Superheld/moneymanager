@@ -220,6 +220,54 @@ export async function erkennungSicherstellen(
 }
 
 /**
+ * Woher die Gläubiger-ID für eine nachgezogene Regel kommt.
+ *
+ * Sie steht am BELEG, nicht am Vertrag — `erkennungenNachziehen` sah bis 2026-09-05 nur
+ * Verträge, Zahlungsregeln und Erkennungen und konnte sie deshalb gar nicht kennen. Jede
+ * so entstandene Regel trug allein ein Namensmerkmal, obwohl an den zugeordneten
+ * Zahlungen der präzisere Schlüssel stand.
+ *
+ * Optional, weil ein Aufrufer ohne diese Repositories weiterhin auskommen soll —
+ * dieselbe Überlegung wie bei `regelRepo` in `AbgleichDeps`. Fehlt sie, entsteht die
+ * Regel wie bisher aus Name und Betrag.
+ */
+export interface BelegQuelle {
+  readonly ledger: LedgerPort;
+  readonly umsatzRepo: UmsatzRepository;
+  readonly zuordnungRepo: VertragszuordnungRepository;
+}
+
+/**
+ * Je Vertrag die Gläubiger-ID seiner von Hand zugeordneten Zahlungen.
+ *
+ * **Nur `manuell`**, und das ist dieselbe Regel wie bei der Merkmalsableitung: eine
+ * Zuordnung, die eine Regel selbst getroffen hat, ist deren Ergebnis und taugt nicht als
+ * Beleg für sie. Hier gäbe es zwar noch keine Regel, die den Kreis schliessen könnte —
+ * aber die Ausnahme wäre genau die Zeile, die beim nächsten Umbau stehenbleibt.
+ *
+ * Die ERSTE gefundene gewinnt. Mehrere verschiedene IDs an einem Vertrag hiessen, dass
+ * dort zwei Einzieher zusammenliegen; welcher gemeint ist, kann diese Funktion nicht
+ * entscheiden, und eine geratene Wahl wäre schlechter als der Name allein.
+ */
+async function glaeubigerIdJeVertrag(belege?: BelegQuelle): Promise<Map<string, string>> {
+  const raus = new Map<string, string>();
+  if (!belege) return raus;
+  const [spuren, zuordnungen] = await Promise.all([
+    zahlungsspuren(belege.ledger, belege.umsatzRepo),
+    belege.zuordnungRepo.alle(),
+  ]);
+  const idVon = new Map(spuren.map((s) => [s.id, s.glaeubigerId]));
+  for (const z of zuordnungen) {
+    // `vertragId` leer bei gesetzter Herkunft heisst „gehoert ausdruecklich zu KEINEM
+    // Vertrag" — ein Nein von Hand. Es traegt zu keiner Regel etwas bei.
+    if (z.herkunft !== "manuell" || !z.vertragId || raus.has(z.vertragId)) continue;
+    const id = idVon.get(z.istbuchungId)?.trim();
+    if (id) raus.set(z.vertragId, id);
+  }
+  return raus;
+}
+
+/**
  * Zieht fehlende Erkennungsregeln nach: jeder Vertrag ohne Regel bekommt die
  * Standardregel aus seinem Anbieternamen und dem Betrag seiner Zahlungsregel.
  *
@@ -235,11 +283,13 @@ export async function erkennungenNachziehen(
   vertragRepo: VertragRepository,
   regelRepo: ZahlungsregelRepository,
   erkennungRepo: VertragserkennungRepository,
+  belege?: BelegQuelle,
 ): Promise<number> {
-  const [vertraege, regeln, erkennungen] = await Promise.all([
+  const [vertraege, regeln, erkennungen, glaeubigerIds] = await Promise.all([
     vertragRepo.alle(),
     regelRepo.alle(),
     erkennungRepo.alle(),
+    glaeubigerIdJeVertrag(belege),
   ]);
   const hat = new Set(erkennungen.map((e) => e.vertragId));
   const betragVon = new Map<string, Cent>();
@@ -257,7 +307,9 @@ export async function erkennungenNachziehen(
     // einer Einstellung, die voellig richtig ist.
     if (v.art === "umbuchung") continue;
     // Ohne Zahlungsregel gibt es keinen Betrag — dann eben eine Regel ohne Spanne.
-    await erkennungRepo.speichern(standardErkennung(v.id, v.anbieter, betragVon.get(v.id) ?? 0));
+    await erkennungRepo.speichern(
+      standardErkennung(v.id, v.anbieter, betragVon.get(v.id) ?? 0, glaeubigerIds.get(v.id)),
+    );
     angelegt++;
   }
   return angelegt;
