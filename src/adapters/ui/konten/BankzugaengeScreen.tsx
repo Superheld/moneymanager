@@ -206,7 +206,22 @@ export function BankzugaengeScreen({
   }
 
   const kontenSpalten = [
-    { key: "bezeichnung", label: t("bankabruf.spalteKonto") },
+    {
+      key: "bezeichnung",
+      label: t("bankabruf.spalteKonto"),
+      // DER SCHLUESSEL GEHOERT DAZU, und das ist keine Zierde. Die Bezeichnung kommt aus
+      // `product`, und eine Bank vergibt denselben Produktnamen durchaus zweimal — ein
+      // Depot und sein Verrechnungskonto etwa, die sich nur im Unterkontomerkmal
+      // unterscheiden. Daneben steht dann zweimal „—", weil ein Depot keine IBAN hat, und
+      // in der Liste stehen zwei Zeilen, die aussehen wie ein Anzeigefehler. Erst der
+      // Schluessel sagt, dass es zwei verschiedene Konten der Bank sind — und welche.
+      render: (r: KontoZeile) => (
+        <span>
+          <div>{r.bezeichnung}</div>
+          <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{r.schluessel}</div>
+        </span>
+      ),
+    },
     { key: "iban", label: t("bankabruf.spalteIban"), render: (r: KontoZeile) => r.iban ?? "—" },
     { key: "inhaber", label: t("bankabruf.spalteInhaber"), render: (r: KontoZeile) => r.inhaber ?? "—" },
     {

@@ -242,6 +242,8 @@ const de = {
     bezeichnung: "Depot",
     abrufZeile: "{{n}} Positionen · Gesamtwert {{wert}}",
     abrufOhneWert: "{{n}} Positionen · die Bank nennt keinen Gesamtwert",
+    abrufOhneBestand:
+      "Die Bank gibt für dieses Konto Bestände frei, meldet aber keinen — es führt kein Depot.",
     uebersichtTitel: "Depots",
     uebersichtHinweis:
       "Nicht in den liquiden Mitteln enthalten — ein Depotwert schwankt täglich und ist nicht verfügbar.",
@@ -2197,6 +2199,8 @@ const en: typeof de = {
     bezeichnung: "Portfolio",
     abrufZeile: "{{n}} holdings · total value {{wert}}",
     abrufOhneWert: "{{n}} holdings · the bank states no total value",
+    abrufOhneBestand:
+      "The bank allows holdings for this account but reports none — it holds no portfolio.",
     uebersichtTitel: "Portfolios",
     uebersichtHinweis:
       "Not part of liquid funds — a portfolio value moves daily and is not available to spend.",

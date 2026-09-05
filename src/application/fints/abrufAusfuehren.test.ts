@@ -14,6 +14,7 @@ import type {
   Vormerkungszeile,
 } from "./abrufPort";
 import type { Kontozuordnung } from "./bankzugangPort";
+import type { DepotRepository } from "../ports";
 import type { Bankprofil } from "./abrufPort";
 import { ERSTABRUF_TAGE, RUECKGRIFF_TAGE, abrufAusfuehren, abrufZeitraum } from "./abrufAusfuehren";
 
@@ -460,6 +461,50 @@ describe("abrufAusfuehren", () => {
 
     // Der Fake antwortet mit MT940 — beim nächsten Lauf steht das als Reihenfolge bereit.
     expect(f.gespeicherteZuordnungen[0].letztesFormat).toBe("MT940");
+  });
+
+  /**
+   * Ein Konto, fuer das die Bank Bestaende freigibt und keinen meldet, fiel bis
+   * 2026-09-05 still unter den Tisch — ein `continue`, kein Befund. In der Kontenliste
+   * standen dann zwei Konten, die beide ein Depot fuehren koennen, und danach EIN
+   * uebernommenes Depot, ohne dass irgendwo stand, was mit dem anderen war.
+   *
+   * Es ist kein Fehler: ein Verrechnungskonto kann `HKWPD` mitfuehren, ohne je einen
+   * Bestand zu haben. Nur eben eine Auskunft, die dastehen muss.
+   */
+  it("nennt ein Konto ohne Bestand, statt es wegzulassen", async () => {
+    const depotkonto = bankkonto({
+      nummer: "9876543210", unterkonto: "Depot", schluessel: "9876543210|Depot",
+      bezeichnung: "Wertpapierdepot", kannDepot: true, kannUmsaetze: false, kannSaldo: false,
+    });
+    const { adapter } = fakeAdapter({ konten: [depotkonto] });
+    const f = fakes([]);
+
+    const ergebnis = await abrufAusfuehren(zugang, "1234", async () => undefined, {
+      adapter,
+      ...f.deps,
+      // Wird nie gerufen: ohne Bestand gibt es nichts zu uebernehmen. Es muss nur da sein,
+      // damit die Schleife ueberhaupt laeuft.
+      depotRepo: {
+        alle: async () => [],
+        speichern: async () => {},
+        loeschen: async () => {},
+        werte: async () => [],
+        wertSpeichern: async () => {},
+        positionen: async () => [],
+        positionenErsetzen: async () => {},
+      } as unknown as DepotRepository,
+    });
+
+    expect(ergebnis.depots).toHaveLength(1);
+    expect(ergebnis.depots[0]).toMatchObject({
+      schluessel: "9876543210|Depot",
+      bezeichnung: "Wertpapierdepot",
+      ohneBestand: true,
+    });
+    // Kein Fehler — die Bank hat geantwortet, sie hatte nur nichts zu melden.
+    expect(ergebnis.depots[0].fehler).toBeUndefined();
+    expect(ergebnis.depots[0].uebernahme).toBeUndefined();
   });
 
   it("tut nichts, wenn dem Zugang kein Konto zugeordnet ist", async () => {
