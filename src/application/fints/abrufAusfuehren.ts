@@ -108,6 +108,18 @@ export interface DepotBefund {
   readonly bezeichnung: string;
   readonly uebernahme?: DepotUebernahme;
   readonly fehler?: string;
+  /**
+   * Die Bank gibt für dieses Konto Bestände frei und hat trotzdem keinen gemeldet.
+   *
+   * Bis 2026-09-05 fiel dieser Fall still unter den Tisch: ein `continue` in der
+   * Schleife, kein Befund, keine Meldung. In der Kontenliste standen dann zwei Konten,
+   * die beide Depots führen können, und danach EIN übernommenes Depot — ohne dass
+   * irgendwo stand, was mit dem anderen war. Genau die Frage, die man sich dann stellt.
+   *
+   * Es ist kein Fehler: ein Verrechnungskonto zu einem Depot kann `HKWPD` mitführen, ohne
+   * je einen Bestand zu haben. Nur eben eine Auskunft, die dastehen muss.
+   */
+  readonly ohneBestand?: boolean;
 }
 
 export interface AbrufDeps {
@@ -472,7 +484,17 @@ export async function abrufAusfuehren(
     for (const bankkonto of sitzung.konten.filter((k) => k.kannDepot)) {
       try {
         const bestand = await sitzung.depot(bankkonto);
-        if (!bestand) continue;
+        if (!bestand) {
+          // NICHT still überspringen. Die Bank gibt Bestände für dieses Konto frei und
+          // meldet keinen — das ist eine Auskunft und kein Nichts, und ohne sie fehlt in
+          // der Liste ein Konto, das man gerade noch gesehen hat.
+          depots.push({
+            schluessel: bankkonto.schluessel,
+            bezeichnung: bankkonto.bezeichnung,
+            ohneBestand: true,
+          });
+          continue;
+        }
         const uebernahme = await depotUebernehmen(zugang.id, bankkonto, bestand, {
           depotRepo: deps.depotRepo,
           id: deps.id,

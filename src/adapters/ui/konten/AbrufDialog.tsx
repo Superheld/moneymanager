@@ -249,6 +249,11 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
                 <div>
                   {d.fehler ? (
                     <span className="err">{d.fehler}</span>
+                  ) : d.ohneBestand ? (
+                    // Kein Fehler, sondern eine Auskunft: die Bank gibt Bestände für
+                    // dieses Konto frei und meldet keinen. Ohne die Zeile fehlte hier ein
+                    // Konto, das man in der Liste gerade noch gesehen hat.
+                    <span className="muted">{t("depot.abrufOhneBestand")}</span>
                   ) : d.uebernahme?.ohneGesamtwert ? (
                     t("depot.abrufOhneWert", { n: d.uebernahme.positionen })
                   ) : (
