@@ -63,6 +63,17 @@ export interface Umsatz {
   readonly endempfaenger?: string;
   /** Institutseigene Referenz aus dem Freitext — Diagnose, ausdrücklich kein Schlüssel. */
   readonly bankreferenz?: string;
+  // Vier CAMT-Angaben, die heute NICHTS auswertet. Sie stehen hier, weil ein Institut
+  // Umsätze nur begrenzt vorhält: was nicht abgeholt wird, ist für die Vergangenheit
+  // nicht nachzuholen. Die Begründung je Feld steht an `RohUmsatz`.
+  /** `NtryRef` — die Referenz der Bank für den Eintrag, neben `bankreferenz`. Nur CAMT. */
+  readonly eintragReferenz?: string;
+  /** `BkTxCd.Prtry.Cd` — SWIFT-Typ und Geschäftsvorfallcode, das CAMT-Gegenstück zu `buchungsschluessel`. */
+  readonly bankBuchungscode?: string;
+  /** `Refs.TxId` — die Transaktionskennung der Bank. Kein Dedup-Schlüssel, siehe `RohUmsatz`. */
+  readonly transaktionsId?: string;
+  /** `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz eines Vorgangs (ISO 11649). */
+  readonly strukturierteReferenz?: string;
   /** Quellen-agnostischer Dedup-Schlüssel (siehe rohHash). */
   readonly rohHash: string;
   /** Stabile native ID der Quelle (Finanzguru Buchungs-ID) — exakte Re-Import-Dedup. */
@@ -100,7 +111,17 @@ export function ergaenze(u: Umsatz, roh: RohUmsatz): Umsatz | null {
     e2eReferenz: u.e2eReferenz ?? roh.e2eReferenz,
     umsatzart: u.umsatzart ?? roh.umsatzart,
     buchungsschluessel: u.buchungsschluessel ?? roh.buchungsschluessel,
+    // Die beiden standen schon in `Umsatz` und im UPDATE des Repositories, hier aber
+    // nicht — und weil DIESE Liste entscheidet, ob überhaupt geschrieben wird, kamen sie
+    // aus einer zweiten Quelle nie an. Eine Zeile aus einem Dateiimport, die später per
+    // CAMT wiedererkannt wird, blieb ohne beide.
+    zweckCode: u.zweckCode ?? roh.zweckCode,
+    endempfaenger: u.endempfaenger ?? roh.endempfaenger,
     bankreferenz: u.bankreferenz ?? roh.bankreferenz,
+    eintragReferenz: u.eintragReferenz ?? roh.eintragReferenz,
+    bankBuchungscode: u.bankBuchungscode ?? roh.bankBuchungscode,
+    transaktionsId: u.transaktionsId ?? roh.transaktionsId,
+    strukturierteReferenz: u.strukturierteReferenz ?? roh.strukturierteReferenz,
     // Die native ID der ANDEREN Quelle nur setzen, wenn noch keine dasteht: sie ist der
     // Schlüssel für den Reimport genau dieser Quelle.
     nativeId: u.nativeId ?? roh.nativeId,
@@ -108,6 +129,8 @@ export function ergaenze(u: Umsatz, roh: RohUmsatz): Umsatz | null {
   const felder: (keyof Umsatz)[] = [
     "valuta", "glaeubigerId", "gegenparteiIban", "mandatsreferenz",
     "e2eReferenz", "umsatzart", "buchungsschluessel", "bankreferenz", "nativeId",
+    "zweckCode", "endempfaenger",
+    "eintragReferenz", "bankBuchungscode", "transaktionsId", "strukturierteReferenz",
   ];
   return felder.some((f) => ergaenzt[f] !== u[f]) ? ergaenzt : null;
 }

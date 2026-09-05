@@ -79,6 +79,44 @@ export interface RohUmsatz {
    * wird, statt sie zu raten.
    */
   readonly bankreferenz?: string;
+  /**
+   * `NtryRef` — die Referenz, die die Bank dem EINTRAG gibt. Nur CAMT.
+   *
+   * Steht neben `bankreferenz` (`AcctSvcrRef`) und ist nicht dasselbe: die eine
+   * bezeichnet den Auszugsposten, die andere den Vorgang beim Institut. Welche von
+   * beiden sich über mehrere Abrufe hält, ist dieselbe offene Frage wie dort — und sie
+   * lässt sich nur beantworten, wenn beide dastehen.
+   */
+  readonly eintragReferenz?: string;
+  /**
+   * `BkTxCd.Prtry.Cd` — der Code, den die Bank selbst vergibt. Nur CAMT.
+   *
+   * Deutsche Institute setzen dort den SWIFT-Typ und den Geschäftsvorfallcode zusammen.
+   * Damit ist es das CAMT-Gegenstück zum numerischen `buchungsschluessel` aus MT940
+   * `:61:` — und der Weg zu einer Abbildung zwischen den beiden Vokabularen, die sich
+   * bisher nur raten liesse. Bewusst NICHT in `buchungsschluessel` hinein: dort stehen
+   * schon zwei, ein drittes machte die Spalte endgültig undeutbar.
+   */
+  readonly bankBuchungscode?: string;
+  /**
+   * `Refs.TxId` — die Transaktionskennung der Bank. Nur CAMT.
+   *
+   * Ausdrücklich NICHT `nativeId`: was dort steht, trägt die Dedup beim Reimport, und
+   * eine Kennung, die sich beim nächsten Abruf ändert, würde echte Buchungen verwerfen.
+   * Ob diese stabil ist, weiss heute niemand — sie wird gesammelt, damit die Frage am
+   * Bestand beantwortbar wird, und bis dahin nicht benutzt.
+   */
+  readonly transaktionsId?: string;
+  /**
+   * `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz, mit der ein Zahler eine
+   * Rechnung benennt (ISO 11649, die `RF…`-Form). Nur CAMT.
+   *
+   * Nicht zu verwechseln mit `glaeubigerId`: die bezeichnet den GLÄUBIGER, diese den
+   * VORGANG. Wo sie steht, hat der Zahler statt Freitext eine Referenz gesetzt — der
+   * Verwendungszweck ist dann oft leer, und diese Zeile ist alles, was den Vorgang
+   * benennt.
+   */
+  readonly strukturierteReferenz?: string;
   /** Interne Umbuchung zwischen eigenen Konten (von der Quelle markiert) → Umschichtung. */
   readonly istUmbuchung: boolean;
 

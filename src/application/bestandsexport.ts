@@ -55,7 +55,7 @@ import type {
  * Zwei Dateien, die sich unabhängig entwickeln, teilen keine Versionsnummer: sonst steigt
  * die eine, weil sich an der anderen etwas geändert hat, und `fassung` sagt nichts mehr.
  */
-export const BESTANDSEXPORT_FASSUNG = 1;
+export const BESTANDSEXPORT_FASSUNG = 2;
 
 /** Ein Konto, wie es in der Datei steht. Mit IBAN und Saldo — daher die Warnung oben. */
 export interface ExportKonto {
@@ -104,6 +104,19 @@ export interface ExportBeleg {
   /** Etikett bzw. Freitext je nach Format — deutbar nur über `laufId`, siehe CLAUDE.md. */
   readonly umsatzart: string | null;
   readonly buchungsschluessel: string | null;
+  /**
+   * `BkTxCd.Prtry.Cd` — SWIFT-Typ und Geschäftsvorfallcode in einem, nur CAMT. Das
+   * CAMT-Gegenstück zu `buchungsschluessel` darüber, und deshalb daneben: erst beide
+   * zusammen erlauben es, die zwei Vokabulare aufeinander abzubilden.
+   */
+  readonly bankBuchungscode: string | null;
+  /**
+   * `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz eines Vorgangs (ISO 11649),
+   * nur CAMT. Sie steht dort, wo der Zahler statt Freitext eine Referenz gesetzt hat, und
+   * ist dann oft das Einzige, was den Vorgang benennt — für eine Auswertung, die am
+   * Verwendungszweck hängt, genau die interessante Zeile.
+   */
+  readonly strukturierteReferenz: string | null;
   readonly waehrung: string;
   readonly valuta: string | null;
   /** Aus welchem Abruf die Zeile kam. Trägt das Format und damit die Deutung der zwei Felder darüber. */
@@ -178,6 +191,8 @@ function belegForm(u: Umsatz): ExportBeleg {
     zweckCode: leer(u.zweckCode),
     umsatzart: leer(u.umsatzart),
     buchungsschluessel: leer(u.buchungsschluessel),
+    bankBuchungscode: leer(u.bankBuchungscode),
+    strukturierteReferenz: leer(u.strukturierteReferenz),
     waehrung: u.waehrung,
     valuta: leer(u.valuta),
     laufId: u.laufId,

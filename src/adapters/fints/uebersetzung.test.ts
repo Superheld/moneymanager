@@ -141,6 +141,28 @@ describe("zuRohUmsatz", () => {
     expect(() => zuRohUmsatz(buchung({ entryDate: undefined }), {})).toThrow(/Buchungstag/);
   });
 
+  it("reicht die vier CAMT-Angaben durch, die heute niemand auswertet", () => {
+    // Sie kommen mit, WEIL sie später nicht mehr zu holen sind: ein Institut hält Umsätze
+    // begrenzt vor. Der Test steht hier, damit sie nicht beim nächsten Umbau der
+    // Übersetzung still herausfallen — auffallen würde es sonst nirgends.
+    const u = zuRohUmsatz(
+      buchung({
+        entryReference: "NTRY-4711",
+        proprietaryCode: "NTRF+117",
+        transactionId: "TX-2026-0042",
+        creditorReference: "RF18539007547034",
+      }),
+      {},
+    );
+    expect(u.eintragReferenz).toBe("NTRY-4711");
+    expect(u.bankBuchungscode).toBe("NTRF+117");
+    expect(u.transaktionsId).toBe("TX-2026-0042");
+    expect(u.strukturierteReferenz).toBe("RF18539007547034");
+    // Und die Transaktionskennung geht ausdrücklich NICHT als native ID durch: dort
+    // trüge sie die Dedup, und ob sie über zwei Abrufe stabil ist, weiss niemand.
+    expect(u.nativeId).toBeUndefined();
+  });
+
   it("lässt nativeId leer — FinTS liefert hier keine stabile Buchungs-ID", () => {
     // customerReference ist durchgehend NONREF, bankReference („POS 54") ein Zähler über
     // das abgefragte Fenster. Eine instabile ID wäre schlimmer als keine: die Dedup würde

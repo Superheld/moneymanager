@@ -119,6 +119,36 @@ describe("buchungenInExportform", () => {
     expect(b.beleg?.endempfaenger).toBe("Vibora");
   });
 
+  it("nimmt die zwei CAMT-Angaben mit, die eine Aussage ueber die Zahlung tragen", async () => {
+    // Der Zweck der Datei ist Auswertung, und dort kostet ein weggelassenes Feld einen
+    // ganzen Zyklus. Diese beiden tragen eine Aussage: der eine Code ordnet die Zahlung
+    // ein (das CAMT-Gegenstueck zum Buchungsschluessel daneben), die Referenz benennt den
+    // Vorgang dort, wo der Verwendungszweck leer bleibt.
+    //
+    // Die zwei anderen aus Migration 67 — Eintragsreferenz und Transaktionskennung —
+    // bleiben draussen, aus demselben Grund wie `bankreferenz` und `nativeId`: sie sind
+    // Schluessel und sagen ueber die Zahlung nichts.
+    const daten = await exportieren({
+      buchungen: [buchung({ id: "b-1", datum: "2026-03-04" })],
+      umsaetze: [
+        beleg({
+          id: "u-1",
+          istbuchungId: "b-1",
+          bankBuchungscode: "NTRF+117",
+          strukturierteReferenz: "RF18539007547034",
+          eintragReferenz: "NTRY-4711",
+          transaktionsId: "TX-2026-0042",
+        }),
+      ],
+    });
+
+    const [b] = daten.buchungen;
+    expect(b.beleg?.bankBuchungscode).toBe("NTRF+117");
+    expect(b.beleg?.strukturierteReferenz).toBe("RF18539007547034");
+    expect(JSON.stringify(b.beleg)).not.toContain("NTRY-4711");
+    expect(JSON.stringify(b.beleg)).not.toContain("TX-2026-0042");
+  });
+
   it("macht aus einer Buchung ohne Beleg kein Loch, sondern ein null", () => {
     // Eine von Hand erfasste Buchung hat keinen Beleg, und das ist eine Aussage. Ein
     // fehlendes Feld sähe aus wie ein vergessenes.
