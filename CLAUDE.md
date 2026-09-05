@@ -466,6 +466,34 @@ korrigierter Fehlgriff der Automatik beim nächsten Abgleich zurück. Wer `vertr
 zurücksetzt, muss `vertrag_herkunft` mit zurücksetzen — sonst bleibt die Buchung für die
 Automatik gesperrt.
 
+#### Aus denselben drei Zuständen wird die Regel abgeleitet
+
+Seit 2026-09-05 liest die Erkennung die Tabelle oben auch RÜCKWÄRTS: aus den zugeordneten
+Zahlungen entstehen Vorschläge für die Merkmalsliste (`core/vertraege/merkmalsableitung.ts`,
+sichtbar im Erkennungsabschnitt des Vertragsdialogs). Das ist dieselbe Messung wie die
+Vorschau, nur andersherum — Kandidaten bilden und durch `merkmalsTreffer` schicken.
+
+**Beleg ist ausschliesslich `herkunft = 'manuell'`.** Eine Buchung, die die Regel selbst
+zugeordnet hat, ist ihr Ergebnis; sie als Beleg zu nehmen ist ein Kreis, und der driftet
+langsam: die Regel greift einmal zu weit, der Fehlgriff wird Beleg, das Muster wird
+breiter. Die Trennung steht im Schema und geht nur verloren, wenn jemand „alle Buchungen
+des Vertrags" schreibt — die naheliegende Formulierung.
+
+Die dritte Zeile der Tabelle ist dabei mehr wert als sie aussieht: ein Nein von Hand ist
+die einzige Stelle im Bestand, an der „gehört nicht dazu" WIRKLICH dasteht. Überall sonst
+heisst „kein Vertrag" entweder das oder „ist noch niemandem aufgefallen", und man sieht der
+Zeile nicht an, welches. Ein Vorschlag, der ein solches Nein trifft, ist für mindestens
+einen Fall nachweislich falsch und wird deshalb nicht angeboten.
+
+**Bewertet wird mit DREI Zahlen und keiner Punktzahl** — deckt Belege ab, widerspricht
+einem Nein, trifft sonst noch etwas. Eine Verrechnung daraus wäre geraten und sähe als Zahl
+aus wie eine Messung; was die drei gegeneinander wiegen, hängt am Fall.
+
+**Eine Umschichtung zählt nirgends mit.** `passtZu` lässt sie aus, ihr Empfängerfeld trägt
+je nach Bank die eigene IBAN, den eigenen Namen oder nichts. Zuordnen darf man sie (ein
+Umbuchungsvertrag ist genau das), als Beleg wäre sie ein Nenner, den kein Kandidat je
+erreicht. Durchgesetzt an einer Stelle: `belegspuren`.
+
 ### Einstieg
 
 1. Diese Datei — vor allem *Invarianten, die beißen*.
