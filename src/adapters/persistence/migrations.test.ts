@@ -911,7 +911,7 @@ describe("Migration 50 — der Rest der Verweise", () => {
     const OHNE_SCHLUESSEL_MIT_GRUND = new Set([
       // Keine Verweise auf unsere Tabellen, sondern Kennungen der Bank bzw. der Quelle.
       "bankzugang.kunden_id", "bankzugang.tan_verfahren_id",
-      "umsatz_roh.glaeubiger_id", "umsatz_roh.native_id",
+      "umsatz_roh.glaeubiger_id", "umsatz_roh.native_id", "umsatz_roh.transaktions_id",
       // Gemeinsame Marke der beiden Beine einer Umbuchung, kein Verweis auf eine Zeile.
       "ist_buchung.transfer_id",
       // JSON-Liste, kein Einzelverweis.

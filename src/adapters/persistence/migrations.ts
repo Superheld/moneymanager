@@ -1898,4 +1898,43 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE zahlungsregel ADD COLUMN gegenkonto_id TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL`,
     ],
   },
+  {
+    version: 67, // Vier CAMT-Angaben, die bislang beim Abruf auf den Boden fielen
+    sql: [
+      // Alle vier stehen im CAMT-Dokument und wurden bis zum Bibliotheks-Stand b0d0e4e
+      // gar nicht ausgelesen. Sie kommen jetzt mit, obwohl heute NICHTS sie auswertet —
+      // und das ist der Punkt: ein Institut haelt Umsaetze nur eine begrenzte Zeit vor.
+      // Was heute nicht abgeholt wird, ist fuer die Vergangenheit nicht nachzuholen,
+      // waehrend eine Spalte, die dasteht und wartet, nichts kostet. Dieselbe
+      // Ueberlegung wie bei der Jahresstufe der Sicherungen.
+      //
+      // Jede bekommt eine EIGENE Spalte statt in eine passende bestehende zu wandern.
+      // Der naheliegende Griff waere `bank_buchungscode` in `buchungsschluessel` — dort
+      // stehen schon zwei Vokabulare (MT940 numerisch, CAMT alphabetisch), ein drittes
+      // machte die Spalte endgueltig undeutbar.
+
+      // `BkTxCd.Prtry.Cd` — der Code, den die Bank selbst vergibt. Deutsche Institute
+      // setzen dort SWIFT-Typ und Geschaeftsvorfallcode zusammen. Damit ist es das
+      // CAMT-Gegenstueck zum numerischen Schluessel aus MT940 `:61:`, und der Weg zu
+      // einer Abbildung zwischen beiden Vokabularen, die bisher nur zu raten waere.
+      `ALTER TABLE umsatz_roh ADD COLUMN bank_buchungscode TEXT`,
+
+      // `NtryRef` — die Referenz, die die Bank dem EINTRAG gibt. Steht neben
+      // `bank_referenz` (`AcctSvcrRef`) und ist nicht dasselbe: die eine bezeichnet den
+      // Auszugsposten, die andere den Vorgang beim Institut.
+      `ALTER TABLE umsatz_roh ADD COLUMN eintrag_referenz TEXT`,
+
+      // `Refs.TxId` — die Transaktionskennung der Bank. Sie geht ausdruecklich NICHT in
+      // `native_id`: was dort steht, traegt die Dedup beim Reimport, und eine Kennung,
+      // die sich beim naechsten Abruf aendert, wuerde echte Buchungen verwerfen. Ob
+      // diese hier stabil ist, weiss heute niemand. Sie wird deshalb gesammelt und
+      // beobachtet, nicht benutzt.
+      `ALTER TABLE umsatz_roh ADD COLUMN transaktions_id TEXT`,
+
+      // `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz, mit der ein Zahler
+      // eine Rechnung benennt (ISO 11649, die `RF…`-Form). Nicht zu verwechseln mit
+      // `glaeubiger_id`: die bezeichnet den Glaeubiger, diese den Vorgang.
+      `ALTER TABLE umsatz_roh ADD COLUMN strukturierte_referenz TEXT`,
+    ],
+  },
 ];

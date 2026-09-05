@@ -477,6 +477,45 @@ describe("Import-Repositories", () => {
     expect(await umsatzRepository.alle()).toHaveLength(0);
   });
 
+  /**
+   * Die vier CAMT-Angaben aus Migration 67 gehen durch vier Stellen, an denen ein Fehler
+   * nicht knallt, sondern still das Falsche tut: Spaltenliste, Platzhalter-Nummern,
+   * Werteliste, SELECT. Ein verrutschtes `$` vertauscht zwei Werte und faellt nirgends
+   * auf — die Felder sind alle vom selben Typ und heute liest sie niemand.
+   */
+  it("haelt die vier CAMT-Angaben ueber die Rundreise", async () => {
+    await umsatzRepository.anlegen(
+      umsatz({
+        eintragReferenz: "NTRY-4711",
+        bankBuchungscode: "NTRF+117",
+        transaktionsId: "TX-2026-0042",
+        strukturierteReferenz: "RF18539007547034",
+      }),
+    );
+    const [u] = await umsatzRepository.alle();
+    expect(u.eintragReferenz).toBe("NTRY-4711");
+    expect(u.bankBuchungscode).toBe("NTRF+117");
+    expect(u.transaktionsId).toBe("TX-2026-0042");
+    expect(u.strukturierteReferenz).toBe("RF18539007547034");
+  });
+
+  it("traegt fehlende Angaben nach, ohne vorhandene anzufassen", async () => {
+    await umsatzRepository.anlegen(umsatz({ bankBuchungscode: "NTRF+117" }));
+    await umsatzRepository.ergaenzen(
+      umsatz({
+        bankBuchungscode: "ANDERS+999",
+        strukturierteReferenz: "RF18539007547034",
+        zweckCode: "SALA",
+      }),
+    );
+    const [u] = await umsatzRepository.alle();
+    // Die erste Quelle behaelt recht — sie hat die Zeile erzeugt.
+    expect(u.bankBuchungscode).toBe("NTRF+117");
+    // Was fehlte, kommt dazu.
+    expect(u.strukturierteReferenz).toBe("RF18539007547034");
+    expect(u.zweckCode).toBe("SALA");
+  });
+
   it("hält Vorschlag und Ist-Buchungs-Verknüpfung über die Rundreise", async () => {
     await umsatzRepository.anlegen(
       umsatz({

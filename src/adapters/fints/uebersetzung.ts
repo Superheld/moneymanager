@@ -419,6 +419,14 @@ export interface FintsBuchung {
   readonly purposeCode?: string;
   /** Der Empfänger hinter einem Zahlungsdienstleister — nur CAMT. */
   readonly ultimateParty?: string;
+  /** `NtryRef` — die Referenz der Bank für den Eintrag, neben `bankReference`. Nur CAMT. */
+  readonly entryReference?: string;
+  /** `BkTxCd.Prtry.Cd` — SWIFT-Typ und Geschäftsvorfallcode in einem. Nur CAMT. */
+  readonly proprietaryCode?: string;
+  /** `Refs.TxId` — die Transaktionskennung der Bank. Nur CAMT. */
+  readonly transactionId?: string;
+  /** `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz (ISO 11649). Nur CAMT. */
+  readonly creditorReference?: string;
 }
 
 export interface KontoKontext {
@@ -500,6 +508,15 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
     // eine ehrliche Lücke und kein Grund, etwas zu erfinden.
     zweckCode: b.purposeCode?.trim() || undefined,
     endempfaenger: b.ultimateParty?.trim() || undefined,
+    // VIER ANGABEN, DIE HEUTE NICHTS AUSWERTET, und die trotzdem mitkommen. Der Grund
+    // ist nicht Sammelwut: ein Institut hält Umsätze nur eine begrenzte Zeit vor. Was
+    // jetzt nicht abgeholt wird, ist für die Vergangenheit nicht nachzuholen, während
+    // eine Spalte, die wartet, nichts kostet — dieselbe Überlegung wie bei der
+    // Jahresstufe der Sicherungen. Wofür jede gut sein könnte, steht an `RohUmsatz`.
+    eintragReferenz: b.entryReference?.trim() || undefined,
+    bankBuchungscode: b.proprietaryCode?.trim() || undefined,
+    transaktionsId: b.transactionId?.trim() || undefined,
+    strukturierteReferenz: b.creditorReference?.trim() || undefined,
     bankreferenz: a.bankreferenz,
     istUmbuchung: false,
     quelle: FINTS_QUELLE,
