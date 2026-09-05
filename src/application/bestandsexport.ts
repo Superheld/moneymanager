@@ -55,7 +55,7 @@ import type {
  * Zwei Dateien, die sich unabhängig entwickeln, teilen keine Versionsnummer: sonst steigt
  * die eine, weil sich an der anderen etwas geändert hat, und `fassung` sagt nichts mehr.
  */
-export const BESTANDSEXPORT_FASSUNG = 2;
+export const BESTANDSEXPORT_FASSUNG = 3;
 
 /** Ein Konto, wie es in der Datei steht. Mit IBAN und Saldo — daher die Warnung oben. */
 export interface ExportKonto {
@@ -117,10 +117,31 @@ export interface ExportBeleg {
    * Verwendungszweck hängt, genau die interessante Zeile.
    */
   readonly strukturierteReferenz: string | null;
+  /**
+   * Die Zahlungen hinter einer Sammelbuchung, wo die Bank mehrere gemeldet hat — sonst
+   * `null`. Fuer eine Auswertung sind das die einzigen Zeilen, bei denen der Empfaenger
+   * NICHT oben steht; wer sie weglaesst, sieht einen Posten ohne jede Zuordnung und
+   * haelt ihn fuer eine Luecke in den Daten.
+   */
+  readonly sammelposten: readonly ExportSammelposten[] | null;
   readonly waehrung: string;
   readonly valuta: string | null;
   /** Aus welchem Abruf die Zeile kam. Trägt das Format und damit die Deutung der zwei Felder darüber. */
   readonly laufId: string;
+}
+
+/** Eine Zahlung aus einer Sammelbuchung, wie sie in der Datei steht. */
+export interface ExportSammelposten {
+  /** Cent, vorzeichenbehaftet — oder `null`, wo die Bank nur die Summe genannt hat. */
+  readonly betrag: number | null;
+  readonly gegenpartei: string | null;
+  readonly gegenparteiIban: string | null;
+  readonly endempfaenger: string | null;
+  readonly verwendungszweck: string | null;
+  readonly zweckCode: string | null;
+  readonly glaeubigerId: string | null;
+  readonly mandatsreferenz: string | null;
+  readonly strukturierteReferenz: string | null;
 }
 
 /** Eine Buchung mit allem, was an ihr hängt. */
@@ -193,6 +214,20 @@ function belegForm(u: Umsatz): ExportBeleg {
     buchungsschluessel: leer(u.buchungsschluessel),
     bankBuchungscode: leer(u.bankBuchungscode),
     strukturierteReferenz: leer(u.strukturierteReferenz),
+    sammelposten:
+      u.sammelposten && u.sammelposten.length > 0
+        ? u.sammelposten.map((p) => ({
+            betrag: p.betrag ?? null,
+            gegenpartei: leer(p.gegenpartei),
+            gegenparteiIban: leer(p.gegenparteiIban),
+            endempfaenger: leer(p.endempfaenger),
+            verwendungszweck: leer(p.verwendungszweck),
+            zweckCode: leer(p.zweckCode),
+            glaeubigerId: leer(p.glaeubigerId),
+            mandatsreferenz: leer(p.mandatsreferenz),
+            strukturierteReferenz: leer(p.strukturierteReferenz),
+          }))
+        : null,
     waehrung: u.waehrung,
     valuta: leer(u.valuta),
     laufId: u.laufId,

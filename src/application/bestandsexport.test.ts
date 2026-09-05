@@ -149,6 +149,40 @@ describe("buchungenInExportform", () => {
     expect(JSON.stringify(b.beleg)).not.toContain("TX-2026-0042");
   });
 
+  it("nimmt die Zahlungen hinter einer Sammelbuchung mit", async () => {
+    // Ohne sie steht in der Datei ein Posten mit einer Summe und ohne jeden Empfaenger,
+    // und wer sie auswertet, haelt das fuer eine Luecke in den Daten statt fuer eine
+    // Sammelbuchung.
+    const daten = await exportieren({
+      buchungen: [buchung({ id: "b-1", datum: "2026-03-04" })],
+      umsaetze: [
+        beleg({
+          id: "u-1",
+          istbuchungId: "b-1",
+          gegenpartei: "",
+          sammelposten: [
+            { betrag: -45000, gegenpartei: "Kesselmann", verwendungszweck: "Abschlag" },
+            { betrag: -80000, gegenpartei: "Ohlert" },
+          ],
+        }),
+      ],
+    });
+
+    const posten = daten.buchungen[0].beleg?.sammelposten;
+    expect(posten).toHaveLength(2);
+    expect(posten?.[0].gegenpartei).toBe("Kesselmann");
+    // Was die Bank nicht sagte, steht als null da und nicht als fehlendes Feld.
+    expect(posten?.[1].verwendungszweck).toBeNull();
+  });
+
+  it("schreibt ohne Sammelbuchung ein null und keine leere Liste", async () => {
+    const daten = await exportieren({
+      buchungen: [buchung({ id: "b-1", datum: "2026-03-04" })],
+      umsaetze: [beleg({ id: "u-1", istbuchungId: "b-1" })],
+    });
+    expect(daten.buchungen[0].beleg?.sammelposten).toBeNull();
+  });
+
   it("macht aus einer Buchung ohne Beleg kein Loch, sondern ein null", () => {
     // Eine von Hand erfasste Buchung hat keinen Beleg, und das ist eine Aussage. Ein
     // fehlendes Feld sähe aus wie ein vergessenes.

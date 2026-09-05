@@ -22,7 +22,7 @@
 //     Bibliothek ist die verlässlichere.
 
 import { ibanGueltig, istCent, majorZuMinor, waehrungNachCode, type Cent, type Waehrung } from "../../core";
-import type { RohUmsatz } from "../../application/import";
+import type { RohSammelposten, RohUmsatz } from "../../application/import";
 
 export const FINTS_QUELLE = "fints";
 
@@ -427,6 +427,58 @@ export interface FintsBuchung {
   readonly transactionId?: string;
   /** `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz (ISO 11649). Nur CAMT. */
   readonly creditorReference?: string;
+  /** Die Zahlungen hinter einer Sammelbuchung — nur gesetzt, wo es MEHRERE sind. Nur CAMT. */
+  readonly details?: readonly FintsSammelposten[];
+}
+
+/** Eine Zahlung aus `Transaction.details` (lib-fints), im Ausschnitt, den wir lesen. */
+export interface FintsSammelposten {
+  /** Vorzeichenbehaftet wie der Betrag der Buchung; fehlt, wo die Bank nur die Summe nennt. */
+  readonly amount?: { readonly value: number; readonly currency?: string };
+  readonly remoteName?: string;
+  readonly remoteIban?: string;
+  readonly remoteIdentifier?: string;
+  readonly ultimateParty?: string;
+  readonly purpose?: string;
+  readonly purposeCode?: string;
+  readonly mandateReference?: string;
+  readonly e2eReference?: string;
+  readonly transactionId?: string;
+  readonly creditorReference?: string;
+}
+
+/**
+ * Eine Zahlung hinter einer Sammelbuchung → `RohSammelposten`.
+ *
+ * **Ein unbrauchbarer Betrag laesst den Posten ohne Betrag stehen, statt zu werfen.** Die
+ * Posten sind Beiwerk: der Betrag der BUCHUNG kommt von der Bank und stimmt, und eine
+ * Nebenangabe darf die Zeile nicht mitnehmen. Was am Posten trotzdem dasteht — Empfaenger,
+ * Zweck, Referenzen — ist dann immer noch mehr als nichts.
+ */
+function zuSammelposten(d: FintsSammelposten, kontoWaehrung: Waehrung): RohSammelposten {
+  const waehrung = d.amount?.currency ? waehrungNachCode(d.amount.currency) : kontoWaehrung;
+  let betrag: Cent | undefined;
+  if (d.amount) {
+    try {
+      betrag = bankbetragZuCent(d.amount.value, waehrung);
+    } catch {
+      betrag = undefined;
+    }
+  }
+  return {
+    betrag,
+    gegenpartei: d.remoteName?.trim() || undefined,
+    gegenparteiIban:
+      d.remoteIban && ibanGueltig(d.remoteIban) ? d.remoteIban : undefined,
+    endempfaenger: d.ultimateParty?.trim() || undefined,
+    verwendungszweck: d.purpose?.trim() || undefined,
+    zweckCode: d.purposeCode?.trim() || undefined,
+    glaeubigerId: d.remoteIdentifier?.trim() || undefined,
+    mandatsreferenz: d.mandateReference?.trim() || undefined,
+    e2eReferenz: d.e2eReference?.trim() || undefined,
+    transaktionsId: d.transactionId?.trim() || undefined,
+    strukturierteReferenz: d.creditorReference?.trim() || undefined,
+  };
 }
 
 export interface KontoKontext {
@@ -517,6 +569,14 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
     bankBuchungscode: b.proprietaryCode?.trim() || undefined,
     transaktionsId: b.transactionId?.trim() || undefined,
     strukturierteReferenz: b.creditorReference?.trim() || undefined,
+    // Die Zahlungen hinter einer Sammelbuchung. Sie stehen nur da, wo es MEHRERE sind —
+    // bei einer einzelnen tragen die Felder oben ihre Angaben, wie immer. Eine leere
+    // Liste wird zu `undefined`: „kein Sammelposten" und „eine Sammelbuchung ohne
+    // Zahlungen darin" sind nicht dasselbe, und das zweite gibt es nicht.
+    sammelposten:
+      b.details && b.details.length > 0
+        ? b.details.map((d) => zuSammelposten(d, waehrung))
+        : undefined,
     bankreferenz: a.bankreferenz,
     istUmbuchung: false,
     quelle: FINTS_QUELLE,

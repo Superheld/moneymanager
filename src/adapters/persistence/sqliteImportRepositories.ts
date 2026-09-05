@@ -18,7 +18,13 @@ import type {
   UmsatzRepository,
 } from "../../application/ports";
 import type { Dublettenfreigabe } from "../../application/dubletten/dublettensicht";
-import type { ImportLauf, Umsatz, UmsatzStatus, VorschlagQuelle } from "../../application/import";
+import type {
+  ImportLauf,
+  RohSammelposten,
+  Umsatz,
+  UmsatzStatus,
+  VorschlagQuelle,
+} from "../../application/import";
 import { getDb } from "./db";
 import { inTransaktion, type Anweisung } from "./transaktion";
 
@@ -108,6 +114,7 @@ interface UmsatzZeile {
   bank_buchungscode: string | null;
   transaktions_id: string | null;
   strukturierte_referenz: string | null;
+  sammelposten: string | null;
   roh_hash: string;
   native_id: string | null;
   status: string | null;
@@ -115,6 +122,33 @@ interface UmsatzZeile {
   vorschlag_charakter: string | null;
   vorschlag_quelle: string | null;
   istbuchung_id: string | null;
+}
+
+/**
+ * Die Sammelposten als JSON-Text — dasselbe Muster wie `inhaber_ids` beim Konto und die
+ * Merkmale einer Vertragsregel.
+ *
+ * Eine LEERE Liste wird zu `null` und nicht zu `"[]"`: „keine Sammelposten" und „eine
+ * Sammelbuchung ohne Zahlungen darin" wären sonst dieselbe Zelle, und die zweite gibt es
+ * nicht.
+ */
+function sammelpostenAls(posten: readonly RohSammelposten[] | undefined): string | null {
+  return posten && posten.length > 0 ? JSON.stringify(posten) : null;
+}
+
+/**
+ * Und zurück. Kaputtes JSON ergibt `undefined` statt eines Wurfs: die Posten sind Beiwerk,
+ * und eine unlesbare Nebenangabe darf die Buchung nicht mitnehmen — der Betrag, das Datum
+ * und die Kategorie daran stimmen ja.
+ */
+function sammelpostenAus(text: string | null): readonly RohSammelposten[] | undefined {
+  if (!text) return undefined;
+  try {
+    const gelesen = JSON.parse(text);
+    return Array.isArray(gelesen) && gelesen.length > 0 ? (gelesen as RohSammelposten[]) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function zuUmsatz(z: UmsatzZeile): Umsatz {
@@ -141,6 +175,7 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
     bankBuchungscode: z.bank_buchungscode ?? undefined,
     transaktionsId: z.transaktions_id ?? undefined,
     strukturierteReferenz: z.strukturierte_referenz ?? undefined,
+    sammelposten: sammelpostenAus(z.sammelposten),
     rohHash: z.roh_hash,
     nativeId: z.native_id ?? undefined,
     // Ohne Verarbeitungszeile ist die Zeile unangetastet — also „neu".
@@ -168,6 +203,7 @@ const SELECT = `SELECT r.id, r.lauf_id, v.zahlungskonto_id, r.buchungstag, r.val
        r.mandatsreferenz, r.e2e_referenz, r.umsatzart, r.buchungsschluessel,
        r.zweck_code, r.endempfaenger, r.bank_referenz,
        r.eintrag_referenz, r.bank_buchungscode, r.transaktions_id, r.strukturierte_referenz,
+       r.sammelposten,
        r.roh_hash, r.native_id,
        v.status, v.vorschlag_kategorie_id, v.vorschlag_charakter, v.vorschlag_quelle,
        v.istbuchung_id
@@ -192,8 +228,8 @@ function rohAnweisung(u: Umsatz): Anweisung {
         gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz, e2e_referenz,
         umsatzart, buchungsschluessel, zweck_code, endempfaenger, bank_referenz,
         eintrag_referenz, bank_buchungscode, transaktions_id, strukturierte_referenz,
-        roh_hash, native_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+        sammelposten, roh_hash, native_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24)
      ON CONFLICT(id) DO NOTHING`,
     werte: [
       u.id, u.laufId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
@@ -203,6 +239,7 @@ function rohAnweisung(u: Umsatz): Anweisung {
       u.bankreferenz ?? null,
       u.eintragReferenz ?? null, u.bankBuchungscode ?? null, u.transaktionsId ?? null,
       u.strukturierteReferenz ?? null,
+      sammelpostenAls(u.sammelposten),
       u.rohHash, u.nativeId ?? null,
     ],
   };
@@ -293,7 +330,8 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
          eintrag_referenz = COALESCE(eintrag_referenz, $13),
          bank_buchungscode = COALESCE(bank_buchungscode, $14),
          transaktions_id = COALESCE(transaktions_id, $15),
-         strukturierte_referenz = COALESCE(strukturierte_referenz, $16)
+         strukturierte_referenz = COALESCE(strukturierte_referenz, $16),
+         sammelposten = COALESCE(sammelposten, $17)
        WHERE id = $1`,
       [
         u.id, u.valuta ?? null, u.glaeubigerId ?? null, u.gegenparteiIban ?? null,
@@ -301,7 +339,7 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
         u.buchungsschluessel ?? null, u.bankreferenz ?? null, u.nativeId ?? null,
         u.zweckCode ?? null, u.endempfaenger ?? null,
         u.eintragReferenz ?? null, u.bankBuchungscode ?? null, u.transaktionsId ?? null,
-        u.strukturierteReferenz ?? null,
+        u.strukturierteReferenz ?? null, sammelpostenAls(u.sammelposten),
       ],
     );
   },
