@@ -148,7 +148,12 @@ export {
   type Rueckwegstand,
 } from "./buchung/buchungshistorie";
 export { pruefmarkerSetzen } from "./buchung/pruefmarker";
-export { zuordnungenAbgleichen, zuordnungVonHand, vertragsnamenLaden } from "./vertraege/vertragszuordnung";
+export {
+  zuordnungenAbgleichen,
+  zuordnungVonHand,
+  vertragsnamenLaden,
+  type Sammelziel,
+} from "./vertraege/vertragszuordnung";
 export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertraege/vertragsvorschlaege";
 export {
   herkunftLaden,

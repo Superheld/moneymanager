@@ -115,7 +115,12 @@ import {
   gegenbeinErzeugen as gegenbeinErzeugenUseCase,
   umbuchungsBeinBearbeiten as umbuchungsBeinBearbeitenUseCase,
 } from "../application/buchung/umbuchungAusBuchung";
-import { zuordnungVonHand as zuordnungVonHandUseCase, zuordnungZuruecksetzen as zuordnungZuruecksetzenUseCase } from "../application/vertraege/vertragszuordnung";
+import {
+  zuordnungVonHand as zuordnungVonHandUseCase,
+  zuordnungenVonHand as zuordnungenVonHandUseCase,
+  zuordnungZuruecksetzen as zuordnungZuruecksetzenUseCase,
+  type Sammelziel,
+} from "../application/vertraege/vertragszuordnung";
 import { umbuchungErfassen as umbuchungErfassenUseCase } from "../application/buchung/umbuchungErfassen";
 import {
   buchungenLoeschen as buchungenLoeschenUseCase,
@@ -517,6 +522,17 @@ export function vertragsvorschlagIgnorieren(schluessel: string) {
 /** Erkennungen und Zuordnungen neu rechnen — nach jeder Änderung an einem Vertrag. */
 export function vertragszuordnungenAbgleichen() {
   return zuordnungenAbgleichen(vertragsAbgleichDeps);
+}
+
+/**
+ * Die Verträge als blosse Liste — für Auswahlfelder.
+ *
+ * Nicht `vertraege(heute)`: das ist die ganze Sicht mit Kennzahlen, Fälligkeiten und
+ * Kündigungsterminen. Wer nur Namen in ein Auswahlfeld schreiben will, soll dafür nicht
+ * den halben Bereich rechnen lassen.
+ */
+export function vertragsliste() {
+  return sqliteVertragRepository.alle();
 }
 
 /** Alle Erkennungsregeln — je Vertrag eine. */
@@ -943,6 +959,11 @@ export function umbuchungsBeinBearbeiten(buchung: IstBuchung, eingabe: Parameter
 
 export function vertragZuordnenVonHand(istbuchungId: string, vertragId: string | null) {
   return zuordnungVonHandUseCase(sqliteVertragszuordnungRepository, istbuchungId, vertragId);
+}
+
+/** Dieselbe Entscheidung für viele Buchungen — der zweite Weg ins Belegset. */
+export function vertraegeSammelZuordnen(istbuchungIds: readonly string[], ziel: Sammelziel) {
+  return zuordnungenVonHandUseCase(sqliteVertragszuordnungRepository, istbuchungIds, ziel);
 }
 
 export function vertragZuordnungZuruecksetzen(istbuchungId: string) {

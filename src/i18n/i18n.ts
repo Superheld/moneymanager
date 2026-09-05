@@ -1094,6 +1094,16 @@ const de = {
       untertitel: "zusammen {{summe}}",
       kategorieSetzen: "Kategorie setzen",
       kategorieLeeren: "Ohne Auswahl wird die Kategorie entfernt.",
+      vertragSetzen: "Vertrag für alle",
+      vertragAutomatik: "die Automatik entscheiden lassen",
+      vertragKeiner: "gehört zu keinem Vertrag",
+      vertragHinweis: {
+        automatik: "Die Handentscheidung wird zurückgenommen — beim nächsten Abgleich entscheidet wieder die Erkennungsregel.",
+        keiner: "Bleibt so, auch wenn eine Regel darauf passt. Und zählt als Gegenbeispiel, wenn du Merkmale ableiten lässt.",
+        vertrag: "Von Hand gesetzt: bleibt stehen, egal was die Erkennung sagt — und wird zum Beleg, aus dem sich Merkmale ableiten lassen.",
+      },
+      vertragUmschichtungHinweis:
+        "{{n}} davon sind Umschichtungen. Zuordnen geht, aber für die Merkmalsableitung tragen sie nichts bei — zwischen eigenen Konten steht kein Empfänger.",
       bezeichnungSetzen: "Bezeichnung setzen",
       bezeichnungHinweis: "steht in der Liste anstelle des Empfängers aus dem Import",
       bezeichnungPlatzhalter: "z. B. Urlaub Norwegen",
@@ -3007,6 +3017,16 @@ const en: typeof de = {
       untertitel: "{{summe}} in total",
       kategorieSetzen: "Set category",
       kategorieLeeren: "With nothing chosen the category is removed.",
+      vertragSetzen: "Contract for all",
+      vertragAutomatik: "let matching decide",
+      vertragKeiner: "belongs to no contract",
+      vertragHinweis: {
+        automatik: "The manual decision is withdrawn — the matching rule decides again on the next run.",
+        keiner: "Stays this way even if a rule matches. And counts as a counter-example when deriving features.",
+        vertrag: "Set by hand: stays put whatever matching says — and becomes evidence features can be derived from.",
+      },
+      vertragUmschichtungHinweis:
+        "{{n}} of these are transfers. Linking works, but they contribute nothing to feature derivation — there is no payee between your own accounts.",
       bezeichnungSetzen: "Set label",
       bezeichnungHinweis: "shown in the list instead of the imported payee",
       bezeichnungPlatzhalter: "e.g. Norway holiday",

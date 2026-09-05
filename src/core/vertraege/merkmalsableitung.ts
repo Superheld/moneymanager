@@ -123,7 +123,7 @@ export function merkmaleAbleiten(
   spuren: readonly Zahlungsspur[],
   belege: Beleglage,
 ): Merkmalskandidat[] {
-  const dazu = spuren.filter((s) => belege.dazu.has(s.id));
+  const dazu = belegspuren(spuren, belege);
   if (dazu.length === 0) return [];
 
   const kandidaten = kandidatenBilden(dazu);
@@ -215,6 +215,25 @@ function kandidatenBilden(belege: readonly Zahlungsspur[]): Erkennungsmerkmal[] 
   }
 
   return raus;
+}
+
+/**
+ * Die Belege, die ueberhaupt etwas hergeben koennen.
+ *
+ * **Ohne Umschichtungen**, und das ist kein Detail: `merkmalsTreffer` laesst sie aus
+ * (eine Verschiebung zwischen eigenen Konten ist nie eine Vertragszahlung), ihr
+ * Empfaengerfeld traegt je nach Bank die eigene IBAN, den eigenen Namen oder nichts. Als
+ * Beleg mitgezaehlt waere sie ein Nenner, den kein Kandidat je erreichen kann — „deckt 3
+ * von 4" bei drei brauchbaren Belegen, und die fehlende vierte findet niemand.
+ *
+ * Sie steht hier und nicht in der Anwendungsschicht, damit Zaehler und Ableitung
+ * dieselbe Menge meinen. Getrennt gerechnet waeren es zwei Antworten auf dieselbe Frage.
+ */
+export function belegspuren(
+  spuren: readonly Zahlungsspur[],
+  belege: Beleglage,
+): Zahlungsspur[] {
+  return spuren.filter((s) => belege.dazu.has(s.id) && s.charakter !== "Umschichtung");
 }
 
 /** Nicht-leere Werte, jeder einmal, in der Reihenfolge des ersten Vorkommens. */

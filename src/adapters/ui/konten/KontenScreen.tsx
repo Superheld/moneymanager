@@ -15,6 +15,7 @@ import {
   type IstBuchung,
   type Kontensicht,
   type Registerzeile,
+  type Vertrag,
   type Zahlungskonto,
 } from "../../../application";
 import {
@@ -22,6 +23,7 @@ import {
   konten as kontenLaden,
   pruefmarkerSetzen,
   umbuchungErfassen,
+  vertragsliste,
 } from "../../dienste";
 import type { ScreenId } from "../bausteine/AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
@@ -85,6 +87,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [auswahlModus, setAuswahlModus] = useState(false);
   const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
   const [sammelOffen, setSammelOffen] = useState(false);
+  const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [abruf, setAbruf] = useState(false);
   /** Der Abgleich des Anfangsbestands — ein Eingriff, deshalb mit Vorschau. */
   const [fehler, setFehler] = useState<string | null>(null);
@@ -94,8 +97,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   // käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte für einen Render
   // „Buchung" statt „Nordhoff".
   async function laden() {
-    const s = await kontenLaden();
+    // Zusammen laden: die Vertragsliste steht in der Sammelbearbeitung neben den
+    // Kategorien, und gestaffelt gesetzt waere ihr Auswahlfeld beim ersten Render leer.
+    const [s, v] = await Promise.all([kontenLaden(), vertragsliste()]);
     setSicht(s);
+    setVertraege([...v]);
     setAktivId((id) => id || s.zeilen[0]?.konto.id || "");
   }
   useEffect(() => {
@@ -751,6 +757,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         <SammelDialog
           buchungen={gewaehlteBuchungen}
           kategorien={[...kategorien]}
+          vertraege={vertraege}
           gesperrteIds={ausBankabruf}
           onClose={() => setSammelOffen(false)}
           onGeaendert={async () => { setAuswahl(new Set()); await laden(); }}
