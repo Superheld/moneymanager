@@ -8,9 +8,11 @@
 // Buchungsdialog: ein Modal geht selten auf, und die Alternative wäre, jeden Aufrufer
 // mit Daten zu belasten, die nur diese Maske braucht.
 
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  erkennungProbieren,
+  merkmaleVorschlagen,
   minorZuMajor,
   type Charakter,
   type Kategorie,
@@ -22,13 +24,25 @@ import {
   type Vertragskandidat,
   type Zahlungskonto,
   type Zahlungsregel,
+  type Vertragszuordnung,
+  type Zahlungsspur,
 } from "../../../application";
 import {
+  spuren as spurenLaden,
+  vertragszuordnungen,
   stammdaten,
   vertragAktualisieren,
   vertragAnlegen,
+  vertragserkennungen,
+  vertragserkennungSpeichern,
   vertragszuordnungenAbgleichen,
 } from "../../dienste";
+import {
+  ErkennungsBereich,
+  erkennungAusRegel,
+  regelAusErkennung,
+  type ErkennungFormular,
+} from "./ErkennungsBereich";
 import { Button, FormField } from "../bausteine";
 import { Modal } from "../bausteine/Modal";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -254,6 +268,16 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [fehler, setFehler] = useState<string | null>(null);
+  /**
+   * Die Erkennung — `null`, solange sie nicht geladen ist, und beim ANLEGEN dauerhaft.
+   *
+   * Der Unterschied traegt: gespeichert wird sie nur, wenn hier etwas steht. Sonst
+   * schriebe ein Dialog, der die Regel nie zu sehen bekam, eine leere Regel zurueck und
+   * schaltete die Erkennung des Vertrags stillschweigend ab.
+   */
+  const [erkennung, setErkennung] = useState<ErkennungFormular | null>(null);
+  const [spuren, setSpuren] = useState<Zahlungsspur[]>([]);
+  const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
 
   useEffect(() => {
     // Zusammen laden und zusammen setzen — gestaffelte setState lassen die Auswahllisten
@@ -266,6 +290,49 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
       setKonten(ko);
     })();
   }, []);
+
+  /**
+   * Die Erkennung und die Zahlungsspuren — nur beim BEARBEITEN.
+   *
+   * Ein Vertrag, den es noch nicht gibt, hat weder eine Regel noch eine Id, an der eine
+   * haengen koennte; eine Vorschau haette nichts zu zeigen und die Merkmalsliste keinen
+   * Ort. `vertragAnlegen` legt die Standardregel beim Speichern an — danach steht der
+   * Abschnitt da, mit allem drin.
+   *
+   * Die Spuren kommen hierher und nicht in den Abschnitt, weil die zugeklappte Zeile die
+   * Trefferzahl mitnennt: sonst muesste man aufklappen, um zu sehen, ob es etwas zu
+   * sehen gibt — derselbe Grund, aus dem die Konditionen ihre Zusammenfassung tragen.
+   */
+  useEffect(() => {
+    if (!editId) return;
+    (async () => {
+      const [regeln, sp, zu] = await Promise.all([
+        vertragserkennungen(),
+        spurenLaden(),
+        vertragszuordnungen(),
+      ]);
+      setErkennung(erkennungAusRegel(regeln.find((e) => e.vertragId === editId), geld.waehrung));
+      setSpuren(sp);
+      setZuordnungen(zu);
+    })();
+  }, [editId]);
+
+  /** Regel aus der Maske und was sie trifft — beides brauchen Kopfzeile und Abschnitt. */
+  const regel = useMemo(
+    () => (editId && erkennung ? regelAusErkennung(editId, erkennung, geld.parse) : null),
+    [editId, erkennung, geld],
+  );
+  const probe = useMemo(() => erkennungProbieren(regel, spuren), [regel, spuren]);
+
+  /**
+   * Der Vorschlag aus den Handzuordnungen — dieselben Spuren wie die Vorschau daneben,
+   * damit neben einem Vorschlag keine Trefferzahl steht, die nach dem Uebernehmen eine
+   * andere waere.
+   */
+  const vorschlag = useMemo(
+    () => (editId ? merkmaleVorschlagen(editId, spuren, zuordnungen) : null),
+    [editId, spuren, zuordnungen],
+  );
 
   /**
    * Was in den Konditionen steht, in einer Zeile — die Beschriftung des zugeklappten
@@ -325,6 +392,11 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
     try {
       if (editId) await vertragAktualisieren(editId, eingabe);
       else await vertragAnlegen(eingabe);
+      // Die Erkennung NACH dem Vertrag: `vertragAnlegen` legt fuer einen Vertrag ohne
+      // Regel die Standardregel an, und die soll nicht die gerade bearbeitete
+      // ueberschreiben. Beim Anlegen ist `regel` null — dann bleibt es bei der
+      // Standardregel, die dort entsteht.
+      if (regel) await vertragserkennungSpeichern(regel);
       // Der frisch erfasste Vertrag muss RÜCKWIRKEND greifen: seine Zahlungen liegen
       // längst im Bestand. Ohne diesen Lauf trüge nur, was danach gebucht wird, seine
       // Zuordnung — und der Vertrag stünde in der Liste, ohne je eine Buchung zu kennen.
@@ -417,6 +489,53 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
           )}
         </div>
       </Abschnitt>
+
+      {/* Die Erkennung — beim BEARBEITEN als eigener Abschnitt, beim Anlegen nur als
+          Satz. Sie steht direkt hinter der Zahlung, weil sie an ihr haengt: wer den
+          Betrag aendert, muss die Betragsspanne im selben Atemzug sehen koennen, sonst
+          faellt der Vertrag nach dem Speichern aus seiner eigenen Regel.
+
+          Bis hierher lag das hinter einem eigenen Knopf in der Vertragsliste — an einem
+          Ort, an dem niemand nach den Eigenschaften eines Vertrags sucht, und mit einem
+          zweiten Speichern-Knopf, der eine zweite Gelegenheit war, das eine zu sichern
+          und das andere zu verwerfen.
+
+          Bei einem UMBUCHUNGSVERTRAG steht statt des Abschnitts ein Satz. Er wird nicht
+          an Merkmalen erkannt, sondern am WEG (Konto → Gegenkonto, siehe
+          `umbuchungErkennung`) — eine Merkmalsliste waere dort nicht bloss nutzlos,
+          sondern eine Falle: `erkennungSicherstellen` legt auch ihm die Standardregel
+          aus dem Anbieternamen an, die nie trifft, und die Zeile meldete dann „trifft
+          nie" an einer Einstellung, die voellig richtig ist. Wer das „behebt", tippt
+          Muster ein, die nie greifen koennen. */}
+      {editId && f.art === "umbuchung" && (
+        <p className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-3) 0 0" }}>
+          {t("vertraege.regel.umbuchungHinweis")}
+        </p>
+      )}
+      {editId && erkennung && f.art !== "umbuchung" && (
+        <Abschnitt
+          titel={t("vertraege.regel.abschnitt")}
+          hinweis={t("vertraege.regel.zusammen", {
+            merkmale: regel?.merkmale.length ?? 0,
+            count: probe.treffer.length,
+          })}
+          einklappbar
+        >
+          <ErkennungsBereich
+            anbieter={f.anbieter}
+            konten={konten}
+            f={erkennung}
+            aufAenderung={setErkennung}
+            probe={probe}
+            vorschlag={vorschlag}
+          />
+        </Abschnitt>
+      )}
+      {!editId && (
+        <p className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-3) 0 0" }}>
+          {t("vertraege.regel.entstehtBeimSpeichern")}
+        </p>
+      )}
 
       {/* Konditionen zugeklappt: beim Anlegen sind sie fast immer leer, beim Bearbeiten
           geht es meist um Betrag oder Kategorie. Damit nichts unsichtbar wird, was

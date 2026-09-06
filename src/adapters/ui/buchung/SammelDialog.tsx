@@ -7,22 +7,32 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { IstBuchung, Kategorie } from "../../../application";
-import { buchungenLoeschen, buchungenSammelbearbeiten } from "../../dienste";
+import type { IstBuchung, Kategorie, Sammelziel, Vertrag } from "../../../application";
+import { buchungenLoeschen, buchungenSammelbearbeiten, vertraegeSammelZuordnen } from "../../dienste";
 import { Button, FormField, Pill } from "../bausteine";
+import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 
+/** Die Auswahl der Maske → das Ziel des Use-Case. Zwei Sonderwerte, sonst eine Vertrags-Id. */
+function sammelziel(wahl: string): Sammelziel {
+  if (wahl === "__automatik") return { art: "automatik" };
+  if (wahl === "__keiner") return { art: "keiner" };
+  return { art: "vertrag", vertragId: wahl };
+}
+
 export function SammelDialog({
   buchungen,
   kategorien,
+  vertraege,
   gesperrteIds,
   onClose,
   onGeaendert,
 }: {
   buchungen: IstBuchung[];
   kategorien: Kategorie[];
+  vertraege: readonly Vertrag[];
   /** IDs der Buchungen, die aus einem Bankabruf stammen — die werden nicht gelöscht. */
   gesperrteIds: ReadonlySet<string>;
   onClose: () => void;
@@ -34,6 +44,11 @@ export function SammelDialog({
   const [kategorieId, setKategorieId] = useState("");
   const [notizAn, setNotizAn] = useState(false);
   const [notiz, setNotiz] = useState("");
+  // Die Vertragswahl hat DREI Ziele und nicht zwei — „keiner" ist eine Aussage, nicht ein
+  // fehlender Wert (siehe `Sammelziel`). Der Anfangswert ist deshalb die Automatik: das
+  // ist der Zustand, aus dem heraus man entscheidet.
+  const [vertragAn, setVertragAn] = useState(false);
+  const [vertragWahl, setVertragWahl] = useState("__automatik");
   const [loeschenGefragt, setLoeschenGefragt] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -41,6 +56,17 @@ export function SammelDialog({
   const summe = buchungen.reduce((s, b) => s + b.betrag, 0);
   const gesperrt = buchungen.filter((b) => gesperrteIds.has(b.id)).length;
   const umbuchungen = buchungen.filter((b) => b.transferId).length;
+  const zielArt = sammelziel(vertragWahl).art;
+  /**
+   * Umschichtungen unter den Gewaehlten — sie zaehlen als Beleg NICHT.
+   *
+   * Eine Verschiebung zwischen eigenen Konten ist keine Vertragszahlung (`passtZu` laesst
+   * sie aus), und ihr Empfaengerfeld traegt je nach Bank die eigene IBAN, den eigenen
+   * Namen oder nichts. Zuordnen darf man sie trotzdem — bei einem Umbuchungsvertrag ist
+   * genau das der Fall. Nur eine Ableitung gewinnt daraus nichts, und das gehoert
+   * vorher gesagt und nicht hinterher gerechnet.
+   */
+  const umschichtungen = buchungen.filter((b) => b.charakter === "Umschichtung").length;
 
   async function speichern() {
     setFehler(null);
@@ -54,6 +80,9 @@ export function SammelDialog({
         },
         kategorien,
       );
+      if (vertragAn) {
+        await vertraegeSammelZuordnen(buchungen.map((b) => b.id), sammelziel(vertragWahl));
+      }
       await onGeaendert();
       onClose();
     } catch (e) {
@@ -167,11 +196,43 @@ export function SammelDialog({
                 placeholder={t("konten.sammel.bezeichnungPlatzhalter")}
               />
             </FormField>
+
+            {/* Die Vertragszuordnung. Sie geht NICHT über `buchungenSammelbearbeiten`,
+                sondern über einen eigenen Use-Case: sie schreibt in eine andere Tabelle
+                und trägt eine Herkunft, die der nächste Abgleich respektieren muss. */}
+            <FormField
+              label={
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={vertragAn}
+                    aria-label={t("konten.sammel.vertragSetzen")}
+                    onChange={(e) => setVertragAn(e.target.checked)}
+                    style={{ accentColor: "var(--accent-deep)" }}
+                  />
+                  {t("konten.sammel.vertragSetzen")}
+                </span>
+              }
+              hint={vertragAn ? t(`konten.sammel.vertragHinweis.${zielArt}`) : undefined}
+            >
+              <span style={{ opacity: vertragAn ? 1 : 0.45, pointerEvents: vertragAn ? "auto" : "none" }}>
+                <Auswahl
+                  ariaLabel={t("konten.sammel.vertragSetzen")}
+                  wert={vertragWahl}
+                  aufAenderung={setVertragWahl}
+                  optionen={[
+                    { wert: "__automatik", text: t("konten.sammel.vertragAutomatik") },
+                    { wert: "__keiner", text: t("konten.sammel.vertragKeiner") },
+                    ...vertraege.map((v) => ({ wert: v.id, text: v.anbieter })),
+                  ]}
+                />
+              </span>
+            </FormField>
           </div>
 
           {/* Was an dieser Auswahl NICHT geht, steht vorher da — nicht als Fehlermeldung
               danach. */}
-          {(umbuchungen > 0 || gesperrt > 0) && (
+          {(umbuchungen > 0 || gesperrt > 0 || (vertragAn && umschichtungen > 0)) && (
             <div style={{ marginTop: "var(--sp-4)", display: "flex", flexDirection: "column", gap: 6 }}>
               {umbuchungen > 0 && (
                 <span className="muted" style={{ fontSize: "var(--fs-xs)", display: "inline-flex", alignItems: "center", gap: 8 }}>
@@ -182,6 +243,11 @@ export function SammelDialog({
               {gesperrt > 0 && (
                 <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
                   {t("konten.sammel.onlineHinweis", { n: gesperrt })}
+                </span>
+              )}
+              {vertragAn && zielArt === "vertrag" && umschichtungen > 0 && (
+                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {t("konten.sammel.vertragUmschichtungHinweis", { n: umschichtungen })}
                 </span>
               )}
             </div>

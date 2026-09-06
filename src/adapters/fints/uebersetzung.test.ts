@@ -15,6 +15,7 @@ import {
   klartextAnreicherung,
   isoDatum,
   zuRohUmsatz,
+  zuVormerkung,
   type FintsBuchung,
 } from "./uebersetzung";
 
@@ -128,6 +129,140 @@ describe("zuRohUmsatz", () => {
     expect(u.kontoIban).toBe("DE31999999980000000002");
     expect(u.kontoName).toBe("Girokonto");
     expect(u.quelle).toBe("fints");
+  });
+
+  it("kommt ohne Valuta aus, aber nicht ohne Buchungstag", () => {
+    // Seit dem CAMT-Ausbau der Bibliothek sind beide Daten optional — für eine noch nicht
+    // gebuchte Zeile, der die Bank gar kein Datum mitgibt. Die stehen in `notedStatements`,
+    // das wir nicht lesen; kommt trotzdem eine an, entscheidet die Form von `RohUmsatz`:
+    // `valuta` ist optional und bleibt dann leer, `buchungstag` ist Pflicht und wirft.
+    // Der Wurf ist der Punkt — die Schleife im Adapter macht daraus eine Warnung zu DIESER
+    // Zeile, ein erfundenes Datum stünde dagegen für immer unauffällig im Bestand.
+    expect(zuRohUmsatz(buchung({ valueDate: undefined }), {}).valuta).toBeUndefined();
+    expect(() => zuRohUmsatz(buchung({ entryDate: undefined }), {})).toThrow(/Buchungstag/);
+  });
+
+  it("reicht die vier CAMT-Angaben durch, die heute niemand auswertet", () => {
+    // Sie kommen mit, WEIL sie später nicht mehr zu holen sind: ein Institut hält Umsätze
+    // begrenzt vor. Der Test steht hier, damit sie nicht beim nächsten Umbau der
+    // Übersetzung still herausfallen — auffallen würde es sonst nirgends.
+    const u = zuRohUmsatz(
+      buchung({
+        entryReference: "NTRY-4711",
+        proprietaryCode: "NTRF+117",
+        transactionId: "TX-2026-0042",
+        creditorReference: "RF18539007547034",
+      }),
+      {},
+    );
+    expect(u.eintragReferenz).toBe("NTRY-4711");
+    expect(u.bankBuchungscode).toBe("NTRF+117");
+    expect(u.transaktionsId).toBe("TX-2026-0042");
+    expect(u.strukturierteReferenz).toBe("RF18539007547034");
+    // Und die Transaktionskennung geht ausdrücklich NICHT als native ID durch: dort
+    // trüge sie die Dedup, und ob sie über zwei Abrufe stabil ist, weiss niemand.
+    expect(u.nativeId).toBeUndefined();
+  });
+
+  it("uebersetzt die Zahlungen hinter einer Sammelbuchung", () => {
+    // Die Buchung traegt die Summe und keine Gegenpartei — es gibt nicht eine. Was sie
+    // enthielt, steht nur hier, und nach der Speicherfrist der Bank nirgends mehr.
+    const u = zuRohUmsatz(
+      buchung({
+        remoteName: undefined,
+        amount: -1250,
+        details: [
+          { amount: { value: -450, currency: "EUR" }, remoteName: "Kesselmann", purpose: "Abschlag" },
+          { amount: { value: -800 }, remoteName: "Ohlert", purposeCode: "SALA" },
+        ],
+      }),
+      { waehrung: "EUR" },
+    );
+    expect(u.sammelposten).toHaveLength(2);
+    expect(u.sammelposten?.[0]).toMatchObject({ betrag: -45000, gegenpartei: "Kesselmann" });
+    // Ohne eigene Waehrung gilt die des Kontos.
+    expect(u.sammelposten?.[1]).toMatchObject({ betrag: -80000, zweckCode: "SALA" });
+  });
+
+  it("laesst einen unbrauchbaren Postenbetrag den Posten stehen, statt die Zeile zu kippen", () => {
+    // Die Posten sind Beiwerk: der Betrag der BUCHUNG kommt von der Bank und stimmt.
+    // Wer daran wirft, verliert eine richtige Buchung wegen einer Nebenangabe.
+    const u = zuRohUmsatz(
+      buchung({ details: [{ amount: { value: Number.NaN }, remoteName: "Vibora" }] }),
+      {},
+    );
+    expect(u.sammelposten?.[0].betrag).toBeUndefined();
+    expect(u.sammelposten?.[0].gegenpartei).toBe("Vibora");
+  });
+
+  it("macht aus einer leeren Detailliste keinen Sammelposten", () => {
+    expect(zuRohUmsatz(buchung({ details: [] }), {}).sammelposten).toBeUndefined();
+  });
+
+  it("uebernimmt, was die Bank ueber die Zahlung sonst noch sagt", () => {
+    const u = zuRohUmsatz(
+      buchung({
+        status: "PDNG",
+        isReversal: true,
+        originalAmount: { value: -24.99, currency: "USD" },
+        exchangeRate: 1.0842,
+        charges: { value: -1.75, currency: "EUR" },
+        returnReason: { code: "AC04", text: "Konto aufgeloest" },
+        customerReference: "NONREF",
+      }),
+      { waehrung: "EUR" },
+    );
+    expect(u.buchungsstand).toBe("PDNG");
+    expect(u.istStorno).toBe(true);
+    expect([u.originalBetrag, u.originalWaehrung, u.wechselkurs]).toEqual([-2499, "USD", 1.0842]);
+    expect([u.gebuehrBetrag, u.gebuehrWaehrung]).toEqual([-175, "EUR"]);
+    expect([u.ruecklaufCode, u.ruecklaufText]).toEqual(["AC04", "Konto aufgeloest"]);
+    expect(u.kundenreferenz).toBe("NONREF");
+  });
+
+  it("sammelt die Felder ohne eigene Aussage unter ihren Namen aus der Bibliothek", () => {
+    // Der Zweck ist, dass beim naechsten Stand der Bibliothek nichts auf den Boden
+    // faellt, bloss weil hier keine Spalte dafuer steht.
+    const u = zuRohUmsatz(
+      buchung({ transactionType: "NTRF", primeNotesNr: "  ", batch: { numberOfTransactions: 3 } }),
+      {},
+    );
+    expect(u.bankfelder).toEqual({ transactionType: "NTRF", batch: { numberOfTransactions: 3 } });
+    // Ein leeres Feld ist keine Angabe und steht deshalb nicht drin.
+    expect(u.bankfelder).not.toHaveProperty("primeNotesNr");
+  });
+
+  it("laesst ein leeres Sammelfeld ganz weg", () => {
+    expect(zuRohUmsatz(buchung(), {}).bankfelder).toBeUndefined();
+  });
+
+  it("laesst einen unbrauchbaren Nebenbetrag die Zeile nicht kippen", () => {
+    // Gebuehr und Originalbetrag stehen NEBEN dem Betrag der Buchung, und der stimmt.
+    const u = zuRohUmsatz(buchung({ charges: { value: Number.NaN, currency: "EUR" } }), {});
+    expect(u.gebuehrBetrag).toBeUndefined();
+    expect(u.betrag).toBe(-4990);
+  });
+
+  it("uebersetzt eine Vormerkung — und laesst sie ohne Datum durch", () => {
+    // GENAU DIESER FALL ist der Grund, warum die Bibliothek beide Datumsfelder optional
+    // gemacht hat. Bei einer Buchung waere ein fehlendes Datum ein Grund, die Zeile
+    // abzuweisen; bei einer Vormerkung ist es eine ohne Termin — und die ist mehr wert
+    // als keine.
+    const ohne = zuVormerkung(
+      buchung({ entryDate: undefined, valueDate: undefined, status: "PDNG" }),
+      "EUR",
+    );
+    expect(ohne.datum).toBeUndefined();
+    expect(ohne.betrag).toBe(-4990);
+    expect(ohne.buchungsstand).toBe("PDNG");
+    expect(ohne.gegenpartei).toBe("Stromwerke Nord");
+
+    // Mit Datum gewinnt der Buchungstag, wie bei einer Buchung auch.
+    expect(zuVormerkung(buchung(), "EUR").datum).toBe("2026-08-04");
+  });
+
+  it("nimmt die Valuta, wenn nur sie dasteht", () => {
+    expect(zuVormerkung(buchung({ entryDate: undefined }), "EUR").datum).toBe("2026-08-03");
   });
 
   it("lässt nativeId leer — FinTS liefert hier keine stabile Buchungs-ID", () => {

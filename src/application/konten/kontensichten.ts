@@ -29,6 +29,7 @@ import {
   type Abweichungsfenster,
   type Kontostandsanker,
   type Zahlungsregel,
+  type Vormerkung,
 } from "../../core";
 import { ABRUF_QUELLEN, type ImportLauf, type Umsatz } from "../import";
 import {
@@ -52,6 +53,7 @@ import type {
   VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
+  VormerkungRepository,
 } from "../ports";
 
 // Der Verdacht selbst steht in `dublettensicht` — die Regel gilt für alle Anzeigen
@@ -92,6 +94,8 @@ export interface KontenDeps {
    * jung (seit 2026-08-23), und ohne sie müsste man Zeilen aufmachen, um zu erfahren,
    * dass nichts drinsteht.
    */
+  /** Optional — ohne ihn bleibt der Auszug vollständig, nur ohne den Block darüber. */
+  readonly vormerkungRepo?: VormerkungRepository;
   readonly journalRepo?: JournalRepository;
 }
 
@@ -197,10 +201,20 @@ export interface Kontensicht {
    * geändert" etwas anderes sagt als „einmal angelegt".
    */
   readonly journalAnzahl: ReadonlyMap<string, number>;
+  /**
+   * Konto-ID → was die Bank kennt und noch nicht gebucht hat.
+   *
+   * Sie stehen ÜBER den Buchungen und nicht darin: eine Vormerkung ist keine Zahlung,
+   * sondern eine Beobachtung mit Verfallsdatum — in ein bis drei Tagen ist sie eine
+   * Buchung, oder sie ist weg. Sie hier mitzuführen ist die Voraussetzung dafür, dass
+   * jemand die Zahl in der Liquiditätsvorschau nachvollziehen kann; eine Zahl, deren
+   * Herkunft man nicht sieht, ist in einer Finanz-App schlimmer als eine fehlende.
+   */
+  readonly vormerkungen: ReadonlyMap<string, readonly Vormerkung[]>;
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen, journalAnzahl] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen, journalAnzahl, alleVormerkungen] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -214,7 +228,17 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.depotRepo ? depotsLaden({ depotRepo: deps.depotRepo }) : Promise.resolve(null),
       vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
       deps.journalRepo?.anzahlen() ?? Promise.resolve(new Map<string, number>()),
+      deps.vormerkungRepo?.alle() ?? Promise.resolve<Vormerkung[]>([]),
     ]);
+
+  // Je Konto gebündelt — die Liste kommt flach aus der Datenbank, gelesen wird sie je
+  // Auszug.
+  const vormerkungen = new Map<string, Vormerkung[]>();
+  for (const v of alleVormerkungen) {
+    const liste = vormerkungen.get(v.zahlungskontoId);
+    if (liste) liste.push(v);
+    else vormerkungen.set(v.zahlungskontoId, [v]);
+  }
 
   const abrufLaeufe = new Set(laeufe.filter((l) => ABRUF_QUELLEN.has(l.quelle)).map((l) => l.id));
 
@@ -262,6 +286,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     freigegeben,
     vertragsnamen,
     journalAnzahl,
+    vormerkungen,
   };
 }
 

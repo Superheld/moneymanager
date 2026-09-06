@@ -1898,4 +1898,159 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE zahlungsregel ADD COLUMN gegenkonto_id TEXT REFERENCES zahlungskonto(id) ON DELETE SET NULL`,
     ],
   },
+  {
+    version: 67, // Vier CAMT-Angaben, die bislang beim Abruf auf den Boden fielen
+    sql: [
+      // Alle vier stehen im CAMT-Dokument und wurden bis zum Bibliotheks-Stand b0d0e4e
+      // gar nicht ausgelesen. Sie kommen jetzt mit, obwohl heute NICHTS sie auswertet —
+      // und das ist der Punkt: ein Institut haelt Umsaetze nur eine begrenzte Zeit vor.
+      // Was heute nicht abgeholt wird, ist fuer die Vergangenheit nicht nachzuholen,
+      // waehrend eine Spalte, die dasteht und wartet, nichts kostet. Dieselbe
+      // Ueberlegung wie bei der Jahresstufe der Sicherungen.
+      //
+      // Jede bekommt eine EIGENE Spalte statt in eine passende bestehende zu wandern.
+      // Der naheliegende Griff waere `bank_buchungscode` in `buchungsschluessel` — dort
+      // stehen schon zwei Vokabulare (MT940 numerisch, CAMT alphabetisch), ein drittes
+      // machte die Spalte endgueltig undeutbar.
+
+      // `BkTxCd.Prtry.Cd` — der Code, den die Bank selbst vergibt. Deutsche Institute
+      // setzen dort SWIFT-Typ und Geschaeftsvorfallcode zusammen. Damit ist es das
+      // CAMT-Gegenstueck zum numerischen Schluessel aus MT940 `:61:`, und der Weg zu
+      // einer Abbildung zwischen beiden Vokabularen, die bisher nur zu raten waere.
+      `ALTER TABLE umsatz_roh ADD COLUMN bank_buchungscode TEXT`,
+
+      // `NtryRef` — die Referenz, die die Bank dem EINTRAG gibt. Steht neben
+      // `bank_referenz` (`AcctSvcrRef`) und ist nicht dasselbe: die eine bezeichnet den
+      // Auszugsposten, die andere den Vorgang beim Institut.
+      `ALTER TABLE umsatz_roh ADD COLUMN eintrag_referenz TEXT`,
+
+      // `Refs.TxId` — die Transaktionskennung der Bank. Sie geht ausdruecklich NICHT in
+      // `native_id`: was dort steht, traegt die Dedup beim Reimport, und eine Kennung,
+      // die sich beim naechsten Abruf aendert, wuerde echte Buchungen verwerfen. Ob
+      // diese hier stabil ist, weiss heute niemand. Sie wird deshalb gesammelt und
+      // beobachtet, nicht benutzt.
+      `ALTER TABLE umsatz_roh ADD COLUMN transaktions_id TEXT`,
+
+      // `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz, mit der ein Zahler
+      // eine Rechnung benennt (ISO 11649, die `RF…`-Form). Nicht zu verwechseln mit
+      // `glaeubiger_id`: die bezeichnet den Glaeubiger, diese den Vorgang.
+      `ALTER TABLE umsatz_roh ADD COLUMN strukturierte_referenz TEXT`,
+    ],
+  },
+  {
+    version: 68, // Die Einzelzahlungen hinter einer Sammelbuchung
+    sql: [
+      // Eine Bank bucht mehrere Zahlungen als EINEN Posten — mehrere gleichzeitig
+      // freigegebene Ueberweisungen etwa — und listet die Einzelzahlungen darunter auf.
+      // Die Zeile traegt dann die Summe und KEINE Gegenpartei, denn es gibt nicht eine.
+      // Bis zum Bibliotheks-Stand b0d0e4e ging dabei jede Einzelangabe verloren; jetzt
+      // kommt sie an und faende hier sonst keinen Platz.
+      //
+      // JSON-TEXTSPALTE und keine eigene Tabelle, und das ist die konservative Wahl:
+      // niemand wertet die Posten aus, also gibt es auch keine Abfrage, fuer die eine
+      // Tabelle sich lohnte — und welche Schluessel eine solche Tabelle braechte, liesse
+      // sich heute nur raten. Verlustfrei weggeschrieben laesst sich spaeter jederzeit
+      // normalisieren; nicht abgeholt ist fuer die Vergangenheit verloren. Dasselbe
+      // Muster wie `zahlungskonto.inhaber_ids` und die Vertragsmerkmale.
+      //
+      // Sie steht am BELEG und nicht am Verarbeitungsstand: was die Bank an Zahlungen
+      // hinter einem Posten meldet, ist ihre Angabe und aendert sich nie.
+      `ALTER TABLE umsatz_roh ADD COLUMN sammelposten TEXT`,
+    ],
+  },
+  {
+    version: 69, // Alles, was die Bank zu einer Zahlung sonst noch sagt
+    sql: [
+      // NAH AN DER BIBLIOTHEK. Bis hierher uebersetzten wir eine Auswahl der Felder von
+      // `Transaction`; der Rest fiel beim Abruf auf den Boden. Was ein Institut nur
+      // begrenzt vorhaelt, ist danach nicht nachzuholen — deshalb kommt jetzt mit, was
+      // ankommt, auch wo es heute nichts auswertet.
+      //
+      // Die Grenze zwischen eigener Spalte und Sammelfeld ist die AUSSAGE: was ueber die
+      // Zahlung etwas sagt, bekommt einen Namen; reine Protokollfelder ohne eigene
+      // Aussage wandern nach `bankfelder` und sind dort benannt, statt zu fehlen.
+
+      // Ob die Bank die Zeile GEBUCHT hat: `BOOK`, `PDNG` (nur vorgemerkt), `INFO`
+      // (wird nicht gebucht). Nur CAMT. Eine vorgemerkte Zahlung ist keine gebuchte —
+      // wer sie mitzaehlt, ueberschaetzt den Stand.
+      //
+      // `buchungsstand` und NICHT `status`: den Namen traegt schon der
+      // Verarbeitungsstand in `umsatz_verarbeitung` (neu / verbucht / verworfen), und
+      // das ist eine voellig andere Aussage — die eine kommt von der Bank, die andere
+      // von uns. Im SELECT ueber beide Tabellen staenden sie sonst als `r.status` und
+      // `v.status` nebeneinander, und ein vertauschtes Mapping faellt dort nicht auf.
+      `ALTER TABLE umsatz_roh ADD COLUMN buchungsstand TEXT`,
+
+      // Ob die Zeile eine fruehere aufhebt (`RvslInd`). Nur CAMT. Ein Storno sieht sonst
+      // aus wie eine gewoehnliche Gegenbuchung.
+      `ALTER TABLE umsatz_roh ADD COLUMN ist_storno INTEGER`,
+
+      // Der Betrag VOR der Umrechnung und der Kurs dazu (`AmtDtls.InstdAmt`,
+      // `CcyXchg.XchgRate`). Nur CAMT. Ohne sie steht bei einem Auslandseinkauf nur der
+      // Eurobetrag, und was tatsaechlich bezahlt wurde, ist nicht mehr feststellbar.
+      //
+      // Der Betrag in MINOR UNITS wie ueberall, der Kurs als Fliesskommazahl: ein Kurs
+      // ist kein Geld. Ihn auf Cent zu runden naehme ihm die Nachkommastellen, auf die
+      // es bei ihm ankommt.
+      `ALTER TABLE umsatz_roh ADD COLUMN original_betrag INTEGER`,
+      `ALTER TABLE umsatz_roh ADD COLUMN original_waehrung TEXT`,
+      `ALTER TABLE umsatz_roh ADD COLUMN wechselkurs REAL`,
+
+      // Was die Bank fuer die Buchung genommen hat (`Chrgs`), wo sie es getrennt
+      // ausweist. Nur CAMT.
+      `ALTER TABLE umsatz_roh ADD COLUMN gebuehr_betrag INTEGER`,
+      `ALTER TABLE umsatz_roh ADD COLUMN gebuehr_waehrung TEXT`,
+
+      // Warum eine Zahlung zurueckkam — Code (`AC04`, `MD01` …) und der Text der Bank
+      // (`RtrInf`). Nur CAMT. Eine Rueckgabe ohne Grund ist eine Zahlung, die man nicht
+      // erklaeren kann.
+      `ALTER TABLE umsatz_roh ADD COLUMN ruecklauf_code TEXT`,
+      `ALTER TABLE umsatz_roh ADD COLUMN ruecklauf_text TEXT`,
+
+      // FORMATABHAENGIG wie `umsatzart` und `buchungsschluessel`: MT940 traegt hier die
+      // Kundenreferenz aus `:61:`, CAMT die E2E-Referenz. Deutbar ueber das Format am
+      // Lauf, und deshalb neben `e2e_referenz` und nicht darin.
+      `ALTER TABLE umsatz_roh ADD COLUMN kundenreferenz TEXT`,
+
+      // WAS SONST NOCH KAM. Die Felder ohne eigene Aussage — Primanotennummer,
+      // Textschluesselergaenzung, Auftraggeberkennung, SWIFT-Buchungsart, der Kopf einer
+      // Sammelbuchung. Als JSON unter den Namen der Bibliothek, damit beim naechsten
+      // Stand nichts wieder auf den Boden faellt, nur weil hier keine Spalte dafuer
+      // steht. Wer eines davon braucht, holt es heraus und gibt ihm eine.
+      `ALTER TABLE umsatz_roh ADD COLUMN bankfelder TEXT`,
+    ],
+  },
+  {
+    version: 70, // Vormerkungen: was die Bank kennt und noch nicht gebucht hat
+    sql: [
+      // EINE EIGENE TABELLE und keine Zeile in `umsatz_roh`, und das ist der ganze Punkt:
+      // eine Vormerkung ist keine Zahlung, sondern eine BEOBACHTUNG mit Verfallsdatum —
+      // dieselbe Kategorie wie `kontostand_anker` und `depotwert`. In ein bis drei Tagen
+      // wird sie zu einer Buchung, moeglicherweise mit anderem Betrag, moeglicherweise
+      // gar nicht. Im Ledger stuende dieselbe Zahlung danach zweimal, und der
+      // Dublettenfinder haette nichts, woran er sie erkennt: keine stabile Kennung, ein
+      // Betrag, der sich noch aendern darf, und bei manchen Instituten nicht einmal ein
+      // Datum.
+      //
+      // `datum` ist deshalb NULLABLE. Eine noch nicht gebuchte CAMT-Zeile kann ganz ohne
+      // Datum kommen; das ist kein Fehler, sondern eine Vormerkung ohne Termin.
+      //
+      // CASCADE auf das Konto: ohne Konto sagt sie nichts. Anders als beim Journal gibt
+      // es hier nichts zu ueberleben — der naechste Abruf schriebe sie ohnehin neu.
+      `CREATE TABLE IF NOT EXISTS vormerkung (
+         id               TEXT PRIMARY KEY,
+         zahlungskonto_id TEXT NOT NULL REFERENCES zahlungskonto(id) ON DELETE CASCADE,
+         datum            TEXT,
+         betrag           INTEGER NOT NULL,
+         waehrung         TEXT    NOT NULL,
+         gegenpartei      TEXT    NOT NULL DEFAULT '',
+         verwendungszweck TEXT    NOT NULL DEFAULT '',
+         buchungsstand    TEXT,
+         erfasst_am       TEXT    NOT NULL
+       )`,
+      // Gelesen wird immer je Konto — der Bestand eines Kontos wird bei jedem Abruf
+      // vollstaendig ersetzt.
+      `CREATE INDEX IF NOT EXISTS ix_vormerkung_konto ON vormerkung(zahlungskonto_id)`,
+    ],
+  },
 ];

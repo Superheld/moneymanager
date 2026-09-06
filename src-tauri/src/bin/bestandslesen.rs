@@ -46,9 +46,17 @@ async fn main() {
     };
 
     let datei = codedatei();
-    let Ok(code) = std::fs::read_to_string(&datei) else {
+    // LEER ZAEHLT WIE FEHLEND. Eine Datei, die es nicht gibt, und eine, in der nichts
+    // steht, sind fuer den Aufrufer dasselbe: der Code ist nicht da. Vorher fiel der
+    // leere Fall durch bis zur Schluesselableitung und kam als „ergibt keinen
+    // Schluessel" heraus — das klingt nach einem FALSCHEN Code und schickt einen zur
+    // App, um einen neuen zu holen, obwohl die Anleitung dafuer eine Zeile weiter oben
+    // steht. Und leer ist der wahrscheinlichere Zustand: genau das hinterlaesst ein
+    // Aufraeumen per `>` oder ein abgebrochenes Schreiben.
+    let code = std::fs::read_to_string(&datei).unwrap_or_default();
+    if code.trim().is_empty() {
         eprintln!(
-            "Kein Wiederherstellungscode unter {}.\n\
+            "Kein brauchbarer Wiederherstellungscode unter {}.\n\
              Der Bestand ist verschluesselt und laesst sich ohne ihn nicht pruefen.\n\
              Code aus der App holen (Einstellungen -> Verschluesselung) und dort ablegen:\n\
              \x20 mkdir -p ~/.moneymanager-schluessel && chmod 700 ~/.moneymanager-schluessel\n\
@@ -59,7 +67,7 @@ async fn main() {
             datei.display()
         );
         std::process::exit(3);
-    };
+    }
 
     let Ok(dk) = Datenschluessel::aus_wiederherstellungscode(code.trim()) else {
         eprintln!("Der Code in {} ergibt keinen Schluessel.", datei.display());

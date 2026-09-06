@@ -1,7 +1,7 @@
 {
   "name": "moneymanager",
   "private": true,
-  "version": "0.26.0",
+  "version": "0.27.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -33,7 +33,7 @@
     "buffer": "^6.0.3",
     "fflate": "^0.8.3",
     "i18next": "^26.4.0",
-    "lib-fints": "git+https://github.com/Superheld/lib-fints.git#3a1015fd239246d3e043ce5fdd9a9020b11b3558",
+    "lib-fints": "git+https://github.com/Superheld/lib-fints.git#8a54aa14f7dd5ee98fb8d58a1088e5f1082187f2",
     "papaparse": "^5.5.4",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

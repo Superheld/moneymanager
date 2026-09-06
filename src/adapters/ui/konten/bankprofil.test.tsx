@@ -73,6 +73,64 @@ function zeile(name: string) {
   return screen.getByText(name).closest("tr") as HTMLElement;
 }
 
+describe("Bankprofilkarte — was je Konto freigegeben ist", () => {
+  /**
+   * Der Fall, der die Anzeige noetig gemacht hat: die Bank BEHERRSCHT HKWPD (es steht in
+   * der Tabelle darueber), gibt es aber nur fuer das Depot frei. In der Kontenliste stand
+   * daraufhin „nicht abrufbar" am Verrechnungskonto und niemand konnte sehen, warum —
+   * die eine Tabelle beantwortete „was kann die Bank", die Frage war aber „was kann
+   * dieses Konto".
+   */
+  const jeKonto: Bankprofil = {
+    ...profil,
+    kontoVorfaelle: {
+      "300123/00": ["HKSAL", "HKKAZ", "HKCAZ"],
+      "300123/01": ["HKWPD"],
+      "300124/00": [],
+    },
+  };
+
+  it("zeigt je Konto, welche Vorgaenge die Bank freigibt", async () => {
+    await zeige(<Bankprofilkarte zugang={zugang} profil={jeKonto} />);
+    expect(screen.getByText("HKCAZ · HKKAZ · HKSAL")).toBeInTheDocument();
+    // HKWPD steht jetzt ZWEIMAL, und das ist der Punkt: einmal oben als Vorgang, den die
+    // Bank beherrscht, einmal hier als der, den sie fuer genau ein Konto freigibt. Der
+    // Unterschied zwischen beiden war bis hierher unsichtbar.
+    expect(screen.getAllByText("HKWPD")).toHaveLength(2);
+  });
+
+  it("nennt ein Konto ohne Vorgaenge als solches, statt es wegzulassen", async () => {
+    // Eine leere Zeile saehe aus wie ein Anzeigefehler. „Die Bank nennt keinen Vorgang"
+    // ist dagegen die Auskunft, die den Widerspruch aufloest.
+    await zeige(<Bankprofilkarte zugang={zugang} profil={jeKonto} />);
+    expect(screen.getByText("Für dieses Konto nennt die Bank keinen Vorgang.")).toBeInTheDocument();
+  });
+
+  it("setzt die Kontobezeichnung ein, wo sie vorliegt — sonst bleibt der Schluessel", async () => {
+    await zeige(
+      <Bankprofilkarte
+        zugang={zugang}
+        profil={jeKonto}
+        konten={[
+          {
+            nummer: "300123", unterkonto: "01", schluessel: "300123/01",
+            bezeichnung: "Wertpapierdepot", kannSaldo: false, kannUmsaetze: false, kannDepot: true,
+          },
+        ]}
+      />,
+    );
+    expect(screen.getByText("Wertpapierdepot")).toBeInTheDocument();
+    // Das Konto ohne uebergebene Bezeichnung behaelt seinen Schluessel — sperriger,
+    // aber vorhanden.
+    expect(screen.getByText("300123/00")).toBeInTheDocument();
+  });
+
+  it("laesst den Abschnitt ganz weg, wenn die Bank nichts je Konto meldet", async () => {
+    await zeige(<Bankprofilkarte zugang={zugang} profil={profil} />);
+    expect(screen.queryByText("Was die Bank je Konto freigibt")).not.toBeInTheDocument();
+  });
+});
+
 describe("Bankprofilkarte", () => {
   it("nennt jeden Vorgang im Klartext und behält das Segment als Beleg", async () => {
     // „HKCAZ" liest sich ohne Klartext wie eine Fehlermeldung; ohne das Kürzel wiederum

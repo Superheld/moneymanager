@@ -47,6 +47,8 @@ Die Rolle übernehmen bis dahin drei andere:
 
 - **Der Compiler.** `strict`, `noUnusedLocals`, `noUnusedParameters`,
   `noFallthroughCasesInSwitch` sind an. `npm run typecheck` muss grün sein.
+  `lib` steht auf ES2020 — `Array.prototype.at`, `findLast` und Verwandte gibt es hier
+  nicht. Ein Testlauf verschweigt das (Vitest transpiliert ohne Typprüfung), `tsc` nicht.
 - **Tests als Wächter.** `architektur.test.ts` (Schichtgrenzen), `doku.test.ts`
   (Verweise in der Doku), `privatsphaere.test.ts` (keine IBAN einer echten Bank), der i18n-Test
   (de/en-Parität). Eine Regel, die zählt, wird ausführbar gemacht statt aufgeschrieben.

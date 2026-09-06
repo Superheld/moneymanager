@@ -15,6 +15,7 @@ import {
   type IstBuchung,
   type Kontensicht,
   type Registerzeile,
+  type Vertrag,
   type Zahlungskonto,
 } from "../../../application";
 import {
@@ -22,9 +23,11 @@ import {
   konten as kontenLaden,
   pruefmarkerSetzen,
   umbuchungErfassen,
+  vertragsliste,
 } from "../../dienste";
 import type { ScreenId } from "../bausteine/AppShell";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
+import { VormerkungsBlock } from "./VormerkungsBlock";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVergleich";
 import { SammelDialog } from "../buchung/SammelDialog";
@@ -85,6 +88,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [auswahlModus, setAuswahlModus] = useState(false);
   const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
   const [sammelOffen, setSammelOffen] = useState(false);
+  const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [abruf, setAbruf] = useState(false);
   /** Der Abgleich des Anfangsbestands — ein Eingriff, deshalb mit Vorschau. */
   const [fehler, setFehler] = useState<string | null>(null);
@@ -94,8 +98,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   // käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte für einen Render
   // „Buchung" statt „Nordhoff".
   async function laden() {
-    const s = await kontenLaden();
+    // Zusammen laden: die Vertragsliste steht in der Sammelbearbeitung neben den
+    // Kategorien, und gestaffelt gesetzt waere ihr Auswahlfeld beim ersten Render leer.
+    const [s, v] = await Promise.all([kontenLaden(), vertragsliste()]);
     setSicht(s);
+    setVertraege([...v]);
     setAktivId((id) => id || s.zeilen[0]?.konto.id || "");
   }
   useEffect(() => {
@@ -454,6 +461,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           Raster mit einer Spalte stehen, und die Tabelle mit ihren sieben Spalten und dem
           Seitenschalter endete bei knapp zwei Dritteln — Platz, den nichts mehr
           beanspruchte. Ein Raster überlebt die Karte nicht, die es begründet hat. */}
+      {/* VORGEMERKT steht ÜBER dem Gebuchten, und die Reihenfolge ist die Aussage: was
+          die Bank noch nicht gebucht hat, ist das Naechste, was passiert. Unter der
+          Liste stuende es wie ein Nachtrag. */}
+      {aktiv && sicht && !aktivZeile?.depot && (
+        <VormerkungsBlock vormerkungen={sicht.vormerkungen.get(aktiv.id) ?? []} />
+      )}
+
       {aktiv && register && !aktivZeile?.depot && (
         <Card title={t("konten.gebuchtTitel")}>
           {/* Filterleiste: Suche · Art (segmented) · Kategorie · Treffer */}
@@ -751,6 +765,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         <SammelDialog
           buchungen={gewaehlteBuchungen}
           kategorien={[...kategorien]}
+          vertraege={vertraege}
           gesperrteIds={ausBankabruf}
           onClose={() => setSammelOffen(false)}
           onGeaendert={async () => { setAuswahl(new Set()); await laden(); }}

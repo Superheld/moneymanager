@@ -24,6 +24,7 @@ import type {
   Zahlungsregel,
   Ankerherkunft,
   Kontostandsanker,
+  Vormerkung,
 } from "../core";
 import type { ImportLauf, Umsatz } from "./import";
 import type { Dublettenfreigabe } from "./dubletten/dublettensicht";
@@ -237,6 +238,21 @@ export interface ImportLaufRepository {
  * Euro", zwei sagen „zwischen dem 31.07. und dem 31.08.". Das ist der Unterschied
  * zwischen einer Zahl und einer brauchbaren Auskunft.
  */
+/**
+ * Die Vormerkungen — und die einzige Schreiboperation ist ein ERSETZEN je Konto.
+ *
+ * Es gibt bewusst kein `speichern` fuer eine einzelne: was die Bank nicht mehr meldet,
+ * gibt es nicht mehr, und eine Vormerkung einzeln nachzutragen liesse offen, was mit den
+ * uebrigen ist. Der Bestand eines Kontos ist immer der Stand des letzten Abrufs — das
+ * ist die einzige Aussage, die er treffen kann, und die Schnittstelle laesst keine
+ * andere zu.
+ */
+export interface VormerkungRepository {
+  alle(): Promise<Vormerkung[]>;
+  /** Wirft die Vormerkungen dieses Kontos weg und legt die uebergebenen hin. */
+  ersetzen(zahlungskontoId: string, vormerkungen: readonly Vormerkung[]): Promise<void>;
+}
+
 export interface KontostandsankerRepository {
   alle(): Promise<Kontostandsanker[]>;
   speichern(anker: Kontostandsanker): Promise<void>;

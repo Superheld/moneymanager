@@ -12,7 +12,7 @@
 // dafür wäre eine zweite Aussage über dasselbe (ist ein Vorschlag da oder nicht).
 
 import { FachlicherFehler, type Cent, type Charakter } from "../../core";
-import type { RohUmsatz } from "./rohUmsatz";
+import type { RohSammelposten, RohUmsatz } from "./rohUmsatz";
 
 export type UmsatzStatus = "neu" | "verbucht" | "duplikat" | "verworfen";
 
@@ -63,6 +63,40 @@ export interface Umsatz {
   readonly endempfaenger?: string;
   /** Institutseigene Referenz aus dem Freitext — Diagnose, ausdrücklich kein Schlüssel. */
   readonly bankreferenz?: string;
+  // Vier CAMT-Angaben, die heute NICHTS auswertet. Sie stehen hier, weil ein Institut
+  // Umsätze nur begrenzt vorhält: was nicht abgeholt wird, ist für die Vergangenheit
+  // nicht nachzuholen. Die Begründung je Feld steht an `RohUmsatz`.
+  /** `NtryRef` — die Referenz der Bank für den Eintrag, neben `bankreferenz`. Nur CAMT. */
+  readonly eintragReferenz?: string;
+  /** `BkTxCd.Prtry.Cd` — SWIFT-Typ und Geschäftsvorfallcode, das CAMT-Gegenstück zu `buchungsschluessel`. */
+  readonly bankBuchungscode?: string;
+  /** `Refs.TxId` — die Transaktionskennung der Bank. Kein Dedup-Schlüssel, siehe `RohUmsatz`. */
+  readonly transaktionsId?: string;
+  /** `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz eines Vorgangs (ISO 11649). */
+  readonly strukturierteReferenz?: string;
+  /** Die Zahlungen hinter einer Sammelbuchung, wo es mehrere sind. Siehe `RohUmsatz`. */
+  readonly sammelposten?: readonly RohSammelposten[];
+  /**
+   * `BOOK` / `PDNG` / `INFO` — ob die BANK gebucht hat. Nur CAMT. Nicht zu verwechseln
+   * mit `status` weiter unten: der ist unser Verarbeitungsstand. Siehe `RohUmsatz`.
+   */
+  readonly buchungsstand?: string;
+  /** Ob die Zeile eine frühere aufhebt. Nur CAMT. */
+  readonly istStorno?: boolean;
+  /** Betrag vor der Umrechnung und der Kurs dazu — bei Zahlungen in fremder Währung. */
+  readonly originalBetrag?: Cent;
+  readonly originalWaehrung?: string;
+  readonly wechselkurs?: number;
+  /** Was die Bank für die Buchung genommen hat, wo sie es getrennt ausweist. */
+  readonly gebuehrBetrag?: Cent;
+  readonly gebuehrWaehrung?: string;
+  /** Warum eine Zahlung zurückkam — Code und Text der Bank. */
+  readonly ruecklaufCode?: string;
+  readonly ruecklaufText?: string;
+  /** MT940 die Kundenreferenz aus `:61:`, CAMT die E2E-Referenz — formatabhängig. */
+  readonly kundenreferenz?: string;
+  /** Was die Bank sonst noch sagte, unter den Namen der Bibliothek. Siehe `RohUmsatz`. */
+  readonly bankfelder?: Readonly<Record<string, unknown>>;
   /** Quellen-agnostischer Dedup-Schlüssel (siehe rohHash). */
   readonly rohHash: string;
   /** Stabile native ID der Quelle (Finanzguru Buchungs-ID) — exakte Re-Import-Dedup. */
@@ -100,7 +134,29 @@ export function ergaenze(u: Umsatz, roh: RohUmsatz): Umsatz | null {
     e2eReferenz: u.e2eReferenz ?? roh.e2eReferenz,
     umsatzart: u.umsatzart ?? roh.umsatzart,
     buchungsschluessel: u.buchungsschluessel ?? roh.buchungsschluessel,
+    // Die beiden standen schon in `Umsatz` und im UPDATE des Repositories, hier aber
+    // nicht — und weil DIESE Liste entscheidet, ob überhaupt geschrieben wird, kamen sie
+    // aus einer zweiten Quelle nie an. Eine Zeile aus einem Dateiimport, die später per
+    // CAMT wiedererkannt wird, blieb ohne beide.
+    zweckCode: u.zweckCode ?? roh.zweckCode,
+    endempfaenger: u.endempfaenger ?? roh.endempfaenger,
     bankreferenz: u.bankreferenz ?? roh.bankreferenz,
+    eintragReferenz: u.eintragReferenz ?? roh.eintragReferenz,
+    bankBuchungscode: u.bankBuchungscode ?? roh.bankBuchungscode,
+    transaktionsId: u.transaktionsId ?? roh.transaktionsId,
+    strukturierteReferenz: u.strukturierteReferenz ?? roh.strukturierteReferenz,
+    sammelposten: u.sammelposten ?? roh.sammelposten,
+    buchungsstand: u.buchungsstand ?? roh.buchungsstand,
+    istStorno: u.istStorno ?? roh.istStorno,
+    originalBetrag: u.originalBetrag ?? roh.originalBetrag,
+    originalWaehrung: u.originalWaehrung ?? roh.originalWaehrung,
+    wechselkurs: u.wechselkurs ?? roh.wechselkurs,
+    gebuehrBetrag: u.gebuehrBetrag ?? roh.gebuehrBetrag,
+    gebuehrWaehrung: u.gebuehrWaehrung ?? roh.gebuehrWaehrung,
+    ruecklaufCode: u.ruecklaufCode ?? roh.ruecklaufCode,
+    ruecklaufText: u.ruecklaufText ?? roh.ruecklaufText,
+    kundenreferenz: u.kundenreferenz ?? roh.kundenreferenz,
+    bankfelder: u.bankfelder ?? roh.bankfelder,
     // Die native ID der ANDEREN Quelle nur setzen, wenn noch keine dasteht: sie ist der
     // Schlüssel für den Reimport genau dieser Quelle.
     nativeId: u.nativeId ?? roh.nativeId,
@@ -108,6 +164,10 @@ export function ergaenze(u: Umsatz, roh: RohUmsatz): Umsatz | null {
   const felder: (keyof Umsatz)[] = [
     "valuta", "glaeubigerId", "gegenparteiIban", "mandatsreferenz",
     "e2eReferenz", "umsatzart", "buchungsschluessel", "bankreferenz", "nativeId",
+    "zweckCode", "endempfaenger",
+    "eintragReferenz", "bankBuchungscode", "transaktionsId", "strukturierteReferenz",
+    "sammelposten",
+    "buchungsstand", "istStorno", "originalBetrag", "originalWaehrung", "wechselkurs", "gebuehrBetrag", "gebuehrWaehrung", "ruecklaufCode", "ruecklaufText", "kundenreferenz", "bankfelder",
   ];
   return felder.some((f) => ergaenzt[f] !== u[f]) ? ergaenzt : null;
 }

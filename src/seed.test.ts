@@ -20,6 +20,8 @@ import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { MIGRATIONS } from "./adapters/persistence/migrations";
 import { seedEinspielen } from "./testwerkzeug/seedDaten";
 import { standardkategorienFlach } from "./application/kategorien/standardkategorien";
+import { passtZu } from "./core";
+import type { Zahlungsspur } from "./core";
 
 /**
  * Ein FESTER Stichtag. Mit `new Date()` pruefte der Test am Monatsersten etwas anderes
@@ -267,6 +269,93 @@ describe("Spielstand", () => {
        )`,
     );
     expect(streuend).toBeGreaterThan(0);
+  });
+
+  /**
+   * Die Erkennungsregeln des Spielstands muessen auch wirklich TREFFEN.
+   *
+   * Sie taten es nie, und niemand hat es gesehen — der Waechter prueft bis hierher, dass
+   * Zeilen entstehen, nicht dass sie etwas bewirken. Zwei Fehler auf einmal:
+   * `schluessel` ist eine JSON-Spalte und trug einen blossen Namen (der Leser faellt in
+   * seinen catch und liefert eine leere Merkmalsliste), und die Betragsspanne war aus
+   * einem Aufwand abgeleitet und damit negativ, waehrend `passtZu` gegen den Betrag OHNE
+   * Vorzeichen prueft.
+   *
+   * Geprueft wird deshalb mit `passtZu` selbst und nicht mit nachgebautem SQL: eine
+   * zweite Nachbildung der Regel waere genau die Stelle, an der derselbe Denkfehler ein
+   * zweites Mal Platz haette.
+   */
+  it("hat Handzuordnungen, aus denen sich Merkmale ableiten lassen", () => {
+    // Ohne sie bliebe der Vorschlagsblock im Vertragsdialog im ganzen Spielstand leer,
+    // und man haette nur an echten Daten etwas zu sehen. Geprueft wird beides, was die
+    // Ableitung braucht: Belege UND wechselnde Empfaengerfelder — bei durchweg gleichem
+    // Namen faende sie nichts, was `standardErkennung` nicht ohnehin schon schreibt.
+    const db = mitSeed();
+    const [zeilen] = db.exec(
+      `SELECT b.vertrag_id, r.gegenpartei
+       FROM ist_buchung b
+       JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+       JOIN umsatz_roh r ON r.id = v.umsatz_id
+       WHERE b.vertrag_herkunft = 'manuell' AND b.vertrag_id IS NOT NULL`,
+    );
+    const werte = zeilen?.values ?? [];
+    expect(werte.length).toBeGreaterThan(1);
+
+    const proVertrag = new Map<string, Set<string>>();
+    for (const [vertragId, partei] of werte) {
+      const menge = proVertrag.get(String(vertragId)) ?? new Set<string>();
+      menge.add(String(partei ?? ""));
+      proVertrag.set(String(vertragId), menge);
+    }
+    expect([...proVertrag.values()].some((namen) => namen.size > 1)).toBe(true);
+  });
+
+  it("schreibt Erkennungsregeln, die im Bestand auch etwas finden", () => {
+    const db = mitSeed();
+    const [regeln] = db.exec(
+      "SELECT vertrag_id, schluessel, betrag_von, betrag_bis, konto_id FROM vertrag_erkennung",
+    );
+    expect(regeln?.values.length ?? 0).toBeGreaterThan(0);
+
+    const [zeilen] = db.exec(
+      `SELECT b.id, b.datum, b.betrag, b.konto_id, b.charakter, r.gegenpartei, r.verwendungszweck, r.glaeubiger_id
+       FROM ist_buchung b
+       JOIN umsatz_verarbeitung v ON v.istbuchung_id = b.id
+       JOIN umsatz_roh r ON r.id = v.umsatz_id`,
+    );
+    const spuren: Zahlungsspur[] = (zeilen?.values ?? []).map((z) => ({
+      id: String(z[0]),
+      datum: String(z[1]),
+      betrag: Number(z[2]),
+      kontoId: String(z[3]),
+      charakter: String(z[4]) as Zahlungsspur["charakter"],
+      gegenpartei: String(z[5] ?? ""),
+      verwendungszweck: String(z[6] ?? ""),
+      glaeubigerId: z[7] == null ? undefined : String(z[7]),
+    }));
+
+    for (const [vertragId, schluessel, von, bis, kontoId] of regeln?.values ?? []) {
+      const merkmale = JSON.parse(String(schluessel));
+      // Das aktuelle Format, nicht das Altformat aus Migration 19: der Spielstand wird
+      // neu geschrieben und hat keinen Altbestand zu tragen.
+      expect(merkmale, `${vertragId}: Merkmale als typisierte Liste`).not.toHaveLength(0);
+      for (const m of merkmale) expect(m).toHaveProperty("art");
+      // Die Spanne misst eine HOEHE — ein negativer Wert schliesst alles aus.
+      if (von != null) expect(Number(von), `${vertragId}: betrag_von ist eine Hoehe`).toBeGreaterThan(0);
+      if (bis != null) expect(Number(bis), `${vertragId}: betrag_bis ist eine Hoehe`).toBeGreaterThan(0);
+
+      const regel = {
+        vertragId: String(vertragId),
+        merkmale,
+        betragVon: von == null ? undefined : Number(von),
+        betragBis: bis == null ? undefined : Number(bis),
+        kontoId: kontoId == null ? undefined : String(kontoId),
+      };
+      expect(
+        spuren.filter((sp) => passtZu(regel, sp)).length,
+        `${vertragId}: die Regel trifft keine einzige Zahlung`,
+      ).toBeGreaterThan(0);
+    }
   });
 
   it("enthaelt jeden Umsatz-Status", () => {

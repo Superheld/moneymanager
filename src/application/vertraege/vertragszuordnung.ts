@@ -146,6 +146,50 @@ export async function zuordnungVonHand(
 }
 
 /**
+ * Wohin eine Sammelzuordnung zeigt.
+ *
+ * Drei Werte und nicht zwei, weil es drei Zustände gibt (siehe CLAUDE.md, „Zuordnungen
+ * stehen an der Buchung"): einem Vertrag zugeordnet, ausdrücklich KEINEM zugeordnet, und
+ * noch nie entschieden. Der mittlere ist kein fehlender Wert — er ist die Aussage, ohne
+ * die ein korrigierter Fehlgriff der Automatik beim nächsten Abgleich zurückkäme.
+ *
+ * Als getaggte Auswahl und nicht als `string | null | undefined`: dort meint `null`
+ * bereits „keiner", und ein zweites Nichts danebenzustellen ist die Sorte Unterscheidung,
+ * die beim Lesen kippt.
+ */
+export type Sammelziel =
+  | { readonly art: "vertrag"; readonly vertragId: string }
+  | { readonly art: "keiner" }
+  | { readonly art: "automatik" };
+
+/**
+ * Dieselbe Entscheidung für viele Buchungen auf einmal.
+ *
+ * Sie liegt hier und nicht in der Oberfläche, obwohl es eine Schleife ist: was für eine
+ * Buchung gilt, gilt für dreissig — aber WELCHE der drei Aussagen ein Ziel bedeutet, ist
+ * eine Entscheidung, und die gehört hinter einen Use-Case. In der Oberfläche stünde sie
+ * beim nächsten Aufrufer neu erfunden da.
+ *
+ * Kein Abgleich hinterher: eine Handzuordnung rührt `zuordnungenAbgleichen` ohnehin nicht
+ * an, und `automatik` wirkt erst beim nächsten Lauf — genau das ist ihre Bedeutung.
+ */
+export async function zuordnungenVonHand(
+  repo: VertragszuordnungRepository,
+  istbuchungIds: readonly string[],
+  ziel: Sammelziel,
+): Promise<number> {
+  for (const id of istbuchungIds) {
+    if (ziel.art === "automatik") await repo.loeschen(id);
+    else await repo.speichern({
+      istbuchungId: id,
+      vertragId: ziel.art === "vertrag" ? ziel.vertragId : null,
+      herkunft: "manuell",
+    });
+  }
+  return istbuchungIds.length;
+}
+
+/**
  * Die Handentscheidung zurücknehmen: der Eintrag verschwindet, und beim nächsten
  * Abgleich entscheidet wieder die Regel. Der Rückweg, ohne den „manuell" eine
  * Einbahnstraße wäre.
@@ -176,6 +220,54 @@ export async function erkennungSicherstellen(
 }
 
 /**
+ * Woher die Gläubiger-ID für eine nachgezogene Regel kommt.
+ *
+ * Sie steht am BELEG, nicht am Vertrag — `erkennungenNachziehen` sah bis 2026-09-05 nur
+ * Verträge, Zahlungsregeln und Erkennungen und konnte sie deshalb gar nicht kennen. Jede
+ * so entstandene Regel trug allein ein Namensmerkmal, obwohl an den zugeordneten
+ * Zahlungen der präzisere Schlüssel stand.
+ *
+ * Optional, weil ein Aufrufer ohne diese Repositories weiterhin auskommen soll —
+ * dieselbe Überlegung wie bei `regelRepo` in `AbgleichDeps`. Fehlt sie, entsteht die
+ * Regel wie bisher aus Name und Betrag.
+ */
+export interface BelegQuelle {
+  readonly ledger: LedgerPort;
+  readonly umsatzRepo: UmsatzRepository;
+  readonly zuordnungRepo: VertragszuordnungRepository;
+}
+
+/**
+ * Je Vertrag die Gläubiger-ID seiner von Hand zugeordneten Zahlungen.
+ *
+ * **Nur `manuell`**, und das ist dieselbe Regel wie bei der Merkmalsableitung: eine
+ * Zuordnung, die eine Regel selbst getroffen hat, ist deren Ergebnis und taugt nicht als
+ * Beleg für sie. Hier gäbe es zwar noch keine Regel, die den Kreis schliessen könnte —
+ * aber die Ausnahme wäre genau die Zeile, die beim nächsten Umbau stehenbleibt.
+ *
+ * Die ERSTE gefundene gewinnt. Mehrere verschiedene IDs an einem Vertrag hiessen, dass
+ * dort zwei Einzieher zusammenliegen; welcher gemeint ist, kann diese Funktion nicht
+ * entscheiden, und eine geratene Wahl wäre schlechter als der Name allein.
+ */
+async function glaeubigerIdJeVertrag(belege?: BelegQuelle): Promise<Map<string, string>> {
+  const raus = new Map<string, string>();
+  if (!belege) return raus;
+  const [spuren, zuordnungen] = await Promise.all([
+    zahlungsspuren(belege.ledger, belege.umsatzRepo),
+    belege.zuordnungRepo.alle(),
+  ]);
+  const idVon = new Map(spuren.map((s) => [s.id, s.glaeubigerId]));
+  for (const z of zuordnungen) {
+    // `vertragId` leer bei gesetzter Herkunft heisst „gehoert ausdruecklich zu KEINEM
+    // Vertrag" — ein Nein von Hand. Es traegt zu keiner Regel etwas bei.
+    if (z.herkunft !== "manuell" || !z.vertragId || raus.has(z.vertragId)) continue;
+    const id = idVon.get(z.istbuchungId)?.trim();
+    if (id) raus.set(z.vertragId, id);
+  }
+  return raus;
+}
+
+/**
  * Zieht fehlende Erkennungsregeln nach: jeder Vertrag ohne Regel bekommt die
  * Standardregel aus seinem Anbieternamen und dem Betrag seiner Zahlungsregel.
  *
@@ -191,11 +283,13 @@ export async function erkennungenNachziehen(
   vertragRepo: VertragRepository,
   regelRepo: ZahlungsregelRepository,
   erkennungRepo: VertragserkennungRepository,
+  belege?: BelegQuelle,
 ): Promise<number> {
-  const [vertraege, regeln, erkennungen] = await Promise.all([
+  const [vertraege, regeln, erkennungen, glaeubigerIds] = await Promise.all([
     vertragRepo.alle(),
     regelRepo.alle(),
     erkennungRepo.alle(),
+    glaeubigerIdJeVertrag(belege),
   ]);
   const hat = new Set(erkennungen.map((e) => e.vertragId));
   const betragVon = new Map<string, Cent>();
@@ -204,8 +298,18 @@ export async function erkennungenNachziehen(
   let angelegt = 0;
   for (const v of vertraege) {
     if (hat.has(v.id)) continue;
+    // Ein UMBUCHUNGSVERTRAG bekommt keine. Er wird am WEG erkannt (Konto → Gegenkonto an
+    // seiner Zahlungsregel, siehe `umbuchungErkennung`), nicht am Empfaenger: bei einer
+    // Zahlung zwischen zwei eigenen Konten steht dort je nach Bank die eigene IBAN, der
+    // eigene Name oder gar nichts. Die Standardregel aus dem Anbieternamen kann dort also
+    // nie treffen — sie waere eine Regel, die per Konstruktion nichts tut, und seit die
+    // Maske je Merkmal „trifft nie" meldet, sieht man sie auch noch: eine Warnung an
+    // einer Einstellung, die voellig richtig ist.
+    if (v.art === "umbuchung") continue;
     // Ohne Zahlungsregel gibt es keinen Betrag — dann eben eine Regel ohne Spanne.
-    await erkennungRepo.speichern(standardErkennung(v.id, v.anbieter, betragVon.get(v.id) ?? 0));
+    await erkennungRepo.speichern(
+      standardErkennung(v.id, v.anbieter, betragVon.get(v.id) ?? 0, glaeubigerIds.get(v.id)),
+    );
     angelegt++;
   }
   return angelegt;

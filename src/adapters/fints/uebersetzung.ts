@@ -7,14 +7,23 @@
 //  2. Datumsfelder sind `Date`-Objekte auf LOKALER Mitternacht — in Mitteleuropa also
 //     `…T22:00:00.000Z`. Ein naives `toISOString().slice(0,10)` liefert den VORTAG, bei
 //     jeder Buchung, lautlos, und verschiebt damit jede Monatsgrenze mit.
-//  3. Mehrere typisierte Felder (`remoteIdentifier`, `mandateReference`, `e2eReference`,
-//     `bookingText`) bleiben LEER. Der Inhalt steckt im `purpose`-Freitext, in der
-//     Schreibweise des Instituts. Das Herausparsen ist bankspezifisch und liegt deshalb
-//     hinter einer eigenen Naht (`klartextAnreicherung`): greift es nicht, fehlen
-//     Zusatzfelder — die Übersetzung läuft trotzdem durch.
+//  3. Welche typisierten Felder befüllt sind, hängt am FORMAT — und das hat sich am
+//     2026-09-04 geändert. Bis dahin stand hier „bleiben LEER", und für CAMT stimmte das:
+//     der Parser der Bibliothek las aus `Refs` nur `EndToEndId` und `MndtId`, die
+//     Gläubiger-ID holte er nirgends ab. Bei MT940 stimmte es nie — dort werden `CRED+`
+//     und `DEBT+` aus dem Verwendungszweck gelesen, seit jeher.
+//
+//     Seit dem Fork-Stand 27de365 liest auch der CAMT-Parser sie (`RltdPties.Cdtr` bzw.
+//     `.Dbtr`). `bookingText` bleibt bei CAMT weiterhin leer.
+//
+//     Der eigene Parser (`klartextAnreicherung`) bleibt trotzdem: er fängt die
+//     ausgeschriebene Schreibweise mancher Institute („GLÄUBIGER-ID:" im Freitext), die
+//     keine SEPA-Tags trägt. Die typisierten Felder haben Vorrang — die Angabe der
+//     Bibliothek ist die verlässlichere.
 
 import { ibanGueltig, istCent, majorZuMinor, waehrungNachCode, type Cent, type Waehrung } from "../../core";
-import type { RohUmsatz } from "../../application/import";
+import type { RohSammelposten, RohUmsatz } from "../../application/import";
+import type { Vormerkungszeile } from "../../application/fints/abrufPort";
 
 export const FINTS_QUELLE = "fints";
 
@@ -70,12 +79,15 @@ export interface Auszugsstand {
  * lückenlosen Auszügen ist der Anfang des einen der Schluss des vorigen — die Dopplung
  * kostet nichts, weil ein Anker über (Konto, Datum, Herkunft) eindeutig ist.
  *
- * **Der Anfangssaldo wird nur genommen, wenn er VOR dem Schluss liegt.** Das ist keine
- * Kosmetik, sondern Schutz vor einem erfundenen Wert: der CAMT-Parser der Bibliothek legt
- * einen Anfangssaldo von NULL an, wenn die Bank keinen mitschickt, und zwar mit dem Datum
- * des Schlusssaldos („If missing opening balance, create a zero balance for the same date
- * as closing"). Ungeprüft übernommen wäre das ein Anker „an diesem Tag lag nichts auf dem
- * Konto" — und der meldet die gesamte Kontodeckung als Fehlbetrag.
+ * **Der Anfangssaldo wird nur genommen, wenn er VOR dem Schluss liegt.** Der Anlass ist
+ * seit 2026-09-04 weg: der CAMT-Parser legte einen Anfangssaldo von NULL an, wenn die Bank
+ * keinen mitschickte, mit dem Datum des Schlusssaldos — ungeprüft übernommen ein Anker „an
+ * diesem Tag lag nichts auf dem Konto", der die gesamte Kontodeckung als Fehlbetrag
+ * meldet. Der Fork erfindet nichts mehr, beide Salden sind jetzt schlicht optional.
+ *
+ * Die Prüfung bleibt trotzdem, und nicht aus Vorsicht: ein Anfangssaldo am SELBEN Tag wie
+ * der Schluss sagt so oder so nichts — er ist entweder erfunden oder er wiederholt den
+ * Schluss. Sie war nie nur die Abwehr gegen diesen einen Fehler.
  *
  * Ein Anfangssaldo, der auf denselben Tag fällt wie der Schluss, sagt ohnehin nichts: er
  * ist entweder erfunden oder er wiederholt den Schluss.
@@ -374,8 +386,17 @@ export function klartextAnreicherung(purpose: string | undefined): Anreicherung 
 
 /** Der Ausschnitt von `Transaction` (lib-fints), auf den die Übersetzung angewiesen ist. */
 export interface FintsBuchung {
-  readonly valueDate: Date;
-  readonly entryDate: Date;
+  /**
+   * BEIDE Daten sind seit dem CAMT-Ausbau der Bibliothek optional, und zwar für genau
+   * einen Fall: eine noch nicht gebuchte CAMT-Zeile, der die Bank überhaupt kein Datum
+   * mitgibt (bei comdirect gemessen). Solche Zeilen stehen im ZWEITEN Feld der Antwort
+   * (`notedStatements`), das wir nicht lesen — hier kommt also keine an. Die Schnittstelle
+   * bildet die Bibliothek trotzdem ehrlich ab: eine Kopie, die mehr zusichert als das
+   * Original, verschweigt beim nächsten Bump genau die Änderung, wegen der es sie gibt.
+   */
+  readonly valueDate?: Date;
+  /** Siehe {@link valueDate}. */
+  readonly entryDate?: Date;
   readonly amount: number;
   readonly purpose?: string;
   readonly remoteName?: string;
@@ -399,6 +420,146 @@ export interface FintsBuchung {
   readonly purposeCode?: string;
   /** Der Empfänger hinter einem Zahlungsdienstleister — nur CAMT. */
   readonly ultimateParty?: string;
+  /** `NtryRef` — die Referenz der Bank für den Eintrag, neben `bankReference`. Nur CAMT. */
+  readonly entryReference?: string;
+  /** `BkTxCd.Prtry.Cd` — SWIFT-Typ und Geschäftsvorfallcode in einem. Nur CAMT. */
+  readonly proprietaryCode?: string;
+  /** `Refs.TxId` — die Transaktionskennung der Bank. Nur CAMT. */
+  readonly transactionId?: string;
+  /** `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz (ISO 11649). Nur CAMT. */
+  readonly creditorReference?: string;
+  /** Die Zahlungen hinter einer Sammelbuchung — nur gesetzt, wo es MEHRERE sind. Nur CAMT. */
+  readonly details?: readonly FintsSammelposten[];
+  /** `BOOK` / `PDNG` / `INFO` — ob die Bank gebucht hat (`Sts`). Nur CAMT. */
+  readonly status?: string;
+  /** Ob die Zeile eine frühere aufhebt (`RvslInd`). Nur CAMT. */
+  readonly isReversal?: boolean;
+  /** Was die Bank für die Buchung genommen hat (`Chrgs`). Nur CAMT. */
+  readonly charges?: FintsGeld;
+  /** Der Betrag vor der Umrechnung (`AmtDtls.InstdAmt`) und sein Kurs. Nur CAMT. */
+  readonly originalAmount?: FintsGeld;
+  readonly exchangeRate?: number;
+  /** Warum eine Zahlung zurückkam (`RtrInf`). Nur CAMT. */
+  readonly returnReason?: { readonly code?: string; readonly text?: string };
+  /** MT940 die Kundenreferenz aus `:61:`, CAMT die E2E-Referenz. */
+  readonly customerReference?: string;
+
+  // ── Ab hier: was ohne eigene Aussage in `bankfelder` wandert ────────────────────────
+  /** SWIFT-Buchungsart (MT940 `:61:`), etwa `NTRF`, `NMSC`. */
+  readonly transactionType?: string;
+  /** Soll/Haben-Kennzeichen der Buchung. */
+  readonly fundsCode?: string;
+  /** Primanotennummer (MT940 `?10`). */
+  readonly primeNotesNr?: string;
+  /** Auftraggeberkennung (MT940 `?30`-Umfeld). */
+  readonly client?: string;
+  /** Textschlüsselergänzung (MT940). */
+  readonly textKeyExtension?: string;
+  /** Bezugsreferenz des Auszugs. */
+  readonly relatedReference?: string;
+  /** Der Kopf einer Sammelbuchung (`NtryDtls.Btch`) — wie viele Zahlungen darin stecken. */
+  readonly batch?: {
+    readonly messageId?: string;
+    readonly paymentInformationId?: string;
+    readonly numberOfTransactions?: number;
+  };
+}
+
+/** Ein Geldbetrag, wie die Bibliothek ihn liefert: Euro als Fliesskomma plus Währung. */
+export interface FintsGeld {
+  readonly value: number;
+  readonly currency?: string;
+}
+
+/**
+ * Ein Nebenbetrag der Bank in Minor Units — oder `undefined`, wenn er sich nicht sicher
+ * umrechnen lässt.
+ *
+ * **Wirft nicht.** Gebühr und Originalbetrag stehen NEBEN dem Betrag der Buchung, und der
+ * kommt von der Bank und stimmt. Eine unbrauchbare Nebenangabe darf die Zeile nicht
+ * mitnehmen — dieselbe Abwägung wie bei den Sammelposten.
+ */
+function nebenbetrag(geld: FintsGeld | undefined, konto: Waehrung): { betrag?: Cent; waehrung?: string } {
+  if (!geld) return {};
+  const waehrung = geld.currency ? waehrungNachCode(geld.currency) : konto;
+  try {
+    return { betrag: bankbetragZuCent(geld.value, waehrung), waehrung: waehrung.code };
+  } catch {
+    return { waehrung: waehrung.code };
+  }
+}
+
+/**
+ * Was die Bank sonst noch sagte — die Felder ohne eigene Aussage, unter ihren Namen aus
+ * der Bibliothek.
+ *
+ * Leere und fehlende Werte fallen weg: ein Feld, das nichts trägt, ist keine Angabe, und
+ * ein Objekt voller `undefined` wäre beim Nachsehen schlechter als keines.
+ */
+function bankfelderAus(b: FintsBuchung): Record<string, unknown> | undefined {
+  const raus: Record<string, unknown> = {};
+  const text = (wert: string | undefined) => wert?.trim() || undefined;
+  const eintraege: [string, unknown][] = [
+    ["transactionType", text(b.transactionType)],
+    ["fundsCode", text(b.fundsCode)],
+    ["primeNotesNr", text(b.primeNotesNr)],
+    ["client", text(b.client)],
+    ["textKeyExtension", text(b.textKeyExtension)],
+    ["relatedReference", text(b.relatedReference)],
+    ["batch", b.batch && Object.values(b.batch).some((v) => v !== undefined) ? b.batch : undefined],
+  ];
+  for (const [name, wert] of eintraege) if (wert !== undefined) raus[name] = wert;
+  return Object.keys(raus).length > 0 ? raus : undefined;
+}
+
+/** Eine Zahlung aus `Transaction.details` (lib-fints), im Ausschnitt, den wir lesen. */
+export interface FintsSammelposten {
+  /** Vorzeichenbehaftet wie der Betrag der Buchung; fehlt, wo die Bank nur die Summe nennt. */
+  readonly amount?: { readonly value: number; readonly currency?: string };
+  readonly remoteName?: string;
+  readonly remoteIban?: string;
+  readonly remoteIdentifier?: string;
+  readonly ultimateParty?: string;
+  readonly purpose?: string;
+  readonly purposeCode?: string;
+  readonly mandateReference?: string;
+  readonly e2eReference?: string;
+  readonly transactionId?: string;
+  readonly creditorReference?: string;
+}
+
+/**
+ * Eine Zahlung hinter einer Sammelbuchung → `RohSammelposten`.
+ *
+ * **Ein unbrauchbarer Betrag laesst den Posten ohne Betrag stehen, statt zu werfen.** Die
+ * Posten sind Beiwerk: der Betrag der BUCHUNG kommt von der Bank und stimmt, und eine
+ * Nebenangabe darf die Zeile nicht mitnehmen. Was am Posten trotzdem dasteht — Empfaenger,
+ * Zweck, Referenzen — ist dann immer noch mehr als nichts.
+ */
+function zuSammelposten(d: FintsSammelposten, kontoWaehrung: Waehrung): RohSammelposten {
+  const waehrung = d.amount?.currency ? waehrungNachCode(d.amount.currency) : kontoWaehrung;
+  let betrag: Cent | undefined;
+  if (d.amount) {
+    try {
+      betrag = bankbetragZuCent(d.amount.value, waehrung);
+    } catch {
+      betrag = undefined;
+    }
+  }
+  return {
+    betrag,
+    gegenpartei: d.remoteName?.trim() || undefined,
+    gegenparteiIban:
+      d.remoteIban && ibanGueltig(d.remoteIban) ? d.remoteIban : undefined,
+    endempfaenger: d.ultimateParty?.trim() || undefined,
+    verwendungszweck: d.purpose?.trim() || undefined,
+    zweckCode: d.purposeCode?.trim() || undefined,
+    glaeubigerId: d.remoteIdentifier?.trim() || undefined,
+    mandatsreferenz: d.mandateReference?.trim() || undefined,
+    e2eReferenz: d.e2eReference?.trim() || undefined,
+    transaktionsId: d.transactionId?.trim() || undefined,
+    strukturierteReferenz: d.creditorReference?.trim() || undefined,
+  };
 }
 
 export interface KontoKontext {
@@ -418,6 +579,35 @@ export interface KontoKontext {
  * `istUmbuchung` bleibt false: FinTS weiß nichts über die anderen Konten des Nutzers.
  * Die Umbuchungs-Paarung ist Sache der bestehenden Erkennung eine Schicht höher.
  */
+/**
+ * Eine gemeldete Vormerkung → die Form, in der die Anwendung sie annimmt.
+ *
+ * **Ein eigener Weg neben `zuRohUmsatz`, und das ist Absicht.** Eine Vormerkung ist keine
+ * Zahlung, sondern eine Beobachtung mit Verfallsdatum; sie durch dieselbe Übersetzung zu
+ * schicken hiesse, sie mit allem auszustatten, was eine Buchung braucht — Dedup-Schlüssel,
+ * Kontozuordnung, Kategorievorschlag — und nichts davon ergibt für sie einen Sinn. Was
+ * hier ankommt, ist das, was man anzeigen und rechnen kann.
+ *
+ * **`entryDate` darf fehlen und wirft hier NICHT.** Genau das ist der Fall, für den die
+ * Bibliothek beide Datumsfelder optional gemacht hat: eine noch nicht gebuchte CAMT-Zeile
+ * kann ganz ohne Datum kommen. Bei einer Buchung wäre das ein Grund, die Zeile
+ * abzuweisen; bei einer Vormerkung ist es eine ohne Termin, und die ist mehr wert als
+ * keine.
+ */
+export function zuVormerkung(b: FintsBuchung, kontoWaehrung?: string): Vormerkungszeile {
+  const waehrung = waehrungNachCode(kontoWaehrung ?? "EUR");
+  const a = klartextAnreicherung(b.purpose);
+  const tag = b.entryDate ?? b.valueDate;
+  return {
+    datum: tag ? isoDatum(tag) : undefined,
+    betrag: bankbetragZuCent(b.amount, waehrung),
+    waehrung: waehrung.code,
+    gegenpartei: (b.remoteName ?? "").trim(),
+    verwendungszweck: a.zweck,
+    buchungsstand: b.status?.trim() || undefined,
+  };
+}
+
 export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
   const a = klartextAnreicherung(b.purpose);
   const waehrung = waehrungNachCode(konto.waehrung ?? "EUR");
@@ -430,15 +620,22 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
   // in MT940 die nationale Kontonummer aus `?31`. Beides landet in derselben Eigenschaft,
   // und keine Angabe sagt, welches von beiden. Deshalb die Prüfung — der Konto-Match und
   // `rohHash` normalisieren IBANs, eine Kontonummer würde dort stillschweigend zu Müll.
+  const original = nebenbetrag(b.originalAmount, waehrung);
+  const gebuehr = nebenbetrag(b.charges, waehrung);
   const gegenIban =
     b.remoteIban && ibanGueltig(b.remoteIban)
       ? b.remoteIban
       : b.remoteAccountNumber && ibanGueltig(b.remoteAccountNumber)
         ? b.remoteAccountNumber
         : undefined;
+  // Ein Buchungstag ist Pflicht, eine Valuta nicht — und das ist keine Bequemlichkeit,
+  // sondern der Unterschied zwischen den beiden Feldern in `RohUmsatz`. Ohne Buchungstag
+  // lässt sich die Zeile nicht bilden; der Wurf landet in der Schleife des Adapters und
+  // wird zur Warnung „Buchung übersprungen", statt den ganzen Abruf zu kippen.
+  if (!b.entryDate) throw new Error("Die Bank hat zu dieser Buchung keinen Buchungstag geliefert");
   return {
     buchungstag: isoDatum(b.entryDate),
-    valuta: isoDatum(b.valueDate),
+    valuta: b.valueDate ? isoDatum(b.valueDate) : undefined,
     betrag: bankbetragZuCent(b.amount, waehrung),
     waehrung: waehrung.code,
     gegenpartei: (b.remoteName ?? "").trim(),
@@ -475,6 +672,39 @@ export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
     // eine ehrliche Lücke und kein Grund, etwas zu erfinden.
     zweckCode: b.purposeCode?.trim() || undefined,
     endempfaenger: b.ultimateParty?.trim() || undefined,
+    // VIER ANGABEN, DIE HEUTE NICHTS AUSWERTET, und die trotzdem mitkommen. Der Grund
+    // ist nicht Sammelwut: ein Institut hält Umsätze nur eine begrenzte Zeit vor. Was
+    // jetzt nicht abgeholt wird, ist für die Vergangenheit nicht nachzuholen, während
+    // eine Spalte, die wartet, nichts kostet — dieselbe Überlegung wie bei der
+    // Jahresstufe der Sicherungen. Wofür jede gut sein könnte, steht an `RohUmsatz`.
+    eintragReferenz: b.entryReference?.trim() || undefined,
+    bankBuchungscode: b.proprietaryCode?.trim() || undefined,
+    transaktionsId: b.transactionId?.trim() || undefined,
+    strukturierteReferenz: b.creditorReference?.trim() || undefined,
+    // Die Zahlungen hinter einer Sammelbuchung. Sie stehen nur da, wo es MEHRERE sind —
+    // bei einer einzelnen tragen die Felder oben ihre Angaben, wie immer. Eine leere
+    // Liste wird zu `undefined`: „kein Sammelposten" und „eine Sammelbuchung ohne
+    // Zahlungen darin" sind nicht dasselbe, und das zweite gibt es nicht.
+    sammelposten:
+      b.details && b.details.length > 0
+        ? b.details.map((d) => zuSammelposten(d, waehrung))
+        : undefined,
+    // Was die Bank ueber die Zahlung SAGT, jenseits von Betrag und Text. Nichts davon
+    // wertet heute etwas aus; es kommt mit, weil ein Institut Umsaetze nur begrenzt
+    // vorhaelt und die Angabe danach nirgends mehr steht.
+    buchungsstand: b.status?.trim() || undefined,
+    istStorno: b.isReversal,
+    originalBetrag: original.betrag,
+    originalWaehrung: original.betrag === undefined ? undefined : original.waehrung,
+    wechselkurs: Number.isFinite(b.exchangeRate) ? b.exchangeRate : undefined,
+    gebuehrBetrag: gebuehr.betrag,
+    gebuehrWaehrung: gebuehr.betrag === undefined ? undefined : gebuehr.waehrung,
+    ruecklaufCode: b.returnReason?.code?.trim() || undefined,
+    ruecklaufText: b.returnReason?.text?.trim() || undefined,
+    // FORMATABHAENGIG: MT940 die Kundenreferenz aus `:61:` (dort haeufig `NONREF`),
+    // CAMT die E2E-Referenz. Deutbar allein ueber das Format am Lauf.
+    kundenreferenz: b.customerReference?.trim() || undefined,
+    bankfelder: bankfelderAus(b),
     bankreferenz: a.bankreferenz,
     istUmbuchung: false,
     quelle: FINTS_QUELLE,

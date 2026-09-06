@@ -98,6 +98,9 @@ const ERWARTETE_TABELLEN = [
   "umsatz_roh", "umsatz_verarbeitung",
   // v47 — die Zuordnung steht jetzt an der Buchung, `vertrag_zuordnung` ist weg
   "vertrag", "vertrag_erkennung",
+  // v70 — was die Bank kennt und noch nicht gebucht hat: eine Beobachtung mit
+  // Verfallsdatum, deshalb neben `kontostand_anker` und nicht in `umsatz_roh`
+  "vormerkung",
   "zahlungskonto", "zahlungsregel",
 ];
 
@@ -911,7 +914,7 @@ describe("Migration 50 — der Rest der Verweise", () => {
     const OHNE_SCHLUESSEL_MIT_GRUND = new Set([
       // Keine Verweise auf unsere Tabellen, sondern Kennungen der Bank bzw. der Quelle.
       "bankzugang.kunden_id", "bankzugang.tan_verfahren_id",
-      "umsatz_roh.glaeubiger_id", "umsatz_roh.native_id",
+      "umsatz_roh.glaeubiger_id", "umsatz_roh.native_id", "umsatz_roh.transaktions_id",
       // Gemeinsame Marke der beiden Beine einer Umbuchung, kein Verweis auf eine Zeile.
       "ist_buchung.transfer_id",
       // JSON-Liste, kein Einzelverweis.

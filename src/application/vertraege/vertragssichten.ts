@@ -11,7 +11,11 @@
 // Bestand blind bleibt, bis jemand einen Vertrag anfasst.
 
 import {
+  beleglageFuer,
+  belegspuren,
   erkennungsDiagnose,
+  merkmaleAbleiten,
+  merkmalsTreffer,
   kuendigungsterminNaht,
   naechsteFaelligkeit,
   naechsterKuendigungstermin,
@@ -27,8 +31,11 @@ import {
   type Person,
   type Vertrag,
   type Erkennungsdiagnose,
+  type Merkmalskandidat,
+  type Merkmalstreffer,
   type Vertragserkennung,
   type Vertragskandidat,
+  type Vertragszuordnung,
   type Zahlungsspur,
   type Zahlungsregel,
 } from "../../core";
@@ -113,7 +120,7 @@ export async function vertraegeLaden(
   deps: VertragsichtDeps,
   heute: string,
 ): Promise<Vertragssicht> {
-  await erkennungenNachziehen(deps.vertragRepo, deps.regelRepo, deps.erkennungRepo);
+  await erkennungenNachziehen(deps.vertragRepo, deps.regelRepo, deps.erkennungRepo, deps.abgleich);
   await zuordnungenAbgleichen(deps.abgleich);
 
   const [vertraege, regeln, personen, kategorien, zuordnungen, buchungen, ignoriert] =
@@ -207,6 +214,15 @@ export interface Erkennungsprobe {
   readonly treffer: readonly Zahlungsspur[];
   readonly diagnose: Erkennungsdiagnose | null;
   /**
+   * Je Merkmal, was es FUER SICH trifft — in der Reihenfolge, in der die Merkmale stehen.
+   *
+   * Gehoert in dieselbe Funktion wie Treffer und Diagnose, aus demselben Grund: es sind
+   * drei Antworten auf dieselbe Frage („woran haengt diese Regel"), und wer sie getrennt
+   * holt, holt sie irgendwann gegen verschiedene Staende. Anders als die Diagnose zaehlt
+   * das hier OHNE Betrag, Zeitraum und Konto — siehe `merkmalsTreffer` im Kern.
+   */
+  readonly proMerkmal: readonly Merkmalstreffer[];
+  /**
    * Welche Betragsspanne alle Zahlungen fassen würde, die die Merkmale treffen.
    *
    * Nur gesetzt, wenn die vorhandene Spanne tatsächlich etwas wegnimmt — sonst böte die
@@ -220,7 +236,7 @@ export function erkennungProbieren(
   regel: Vertragserkennung | null,
   spuren: readonly Zahlungsspur[],
 ): Erkennungsprobe {
-  if (!regel || regel.merkmale.length === 0) return { treffer: [], diagnose: null };
+  if (!regel || regel.merkmale.length === 0) return { treffer: [], diagnose: null, proMerkmal: [] };
   const diagnose = erkennungsDiagnose(regel, spuren);
   // Nur vorschlagen, wenn die Betragsstufe wirklich etwas wegnimmt. Bei einer Regel, die
   // ohnehin alles durchlässt, wäre der Vorschlag eine Antwort auf eine ungestellte Frage.
@@ -233,5 +249,48 @@ export function erkennungProbieren(
       .sort((a, b) => (a.datum < b.datum ? 1 : a.datum > b.datum ? -1 : 0)),
     diagnose,
     spanne,
+    proMerkmal: merkmalsTreffer(regel.merkmale, spuren),
+  };
+}
+
+/**
+ * Was in die Merkmalsliste eines Vertrags gehoerte, aus seinen von Hand zugeordneten
+ * Zahlungen abgeleitet.
+ *
+ * Die Gegenrichtung zu `erkennungProbieren`: dort wird eine getippte Regel gemessen, hier
+ * kommt aus den Belegen ein Vorschlag. Beide rechnen ueber DENSELBEN Spuren und mit
+ * derselben Messung — sonst stuende neben einem Vorschlag eine Trefferzahl, die nach dem
+ * Uebernehmen eine andere waere.
+ *
+ * Rein und ohne IO: die Spuren hat der Aufrufer ohnehin schon (die Vorschau braucht sie),
+ * und die Zuordnungen sind eine Liste, kein Join. Ein eigener Ladeweg hier hiesse, den
+ * Vorschlag gegen einen anderen Stand zu rechnen als die Vorschau daneben.
+ */
+export interface Merkmalsvorschlag {
+  /**
+   * Wie viele Zahlungen von Hand diesem Vertrag zugeordnet sind.
+   *
+   * Steht daneben, weil `decktAb` allein nichts sagt: „deckt 3" ist bei vier Belegen fast
+   * alles und bei dreissig fast nichts. Und die Null unterscheidet die beiden Faelle, die
+   * in der Oberflaeche sonst gleich aussaehen — „noch nichts zugeordnet" ist eine
+   * Anleitung, „nichts Gemeinsames gefunden" ein Befund.
+   */
+  readonly belege: number;
+  readonly kandidaten: readonly Merkmalskandidat[];
+}
+
+export function merkmaleVorschlagen(
+  vertragId: string,
+  spuren: readonly Zahlungsspur[],
+  zuordnungen: readonly Vertragszuordnung[],
+): Merkmalsvorschlag {
+  const beleglage = beleglageFuer(vertragId, zuordnungen);
+  return {
+    // Ueber `belegspuren` und nicht ueber die Menge: eine Zuordnung kann auf eine Buchung
+    // zeigen, die es nicht mehr gibt, und eine Umschichtung kann kein Kandidat decken.
+    // Derselbe Zaehler wie in der Ableitung — sonst stuende ein Nenner da, den niemand
+    // erreicht.
+    belege: belegspuren(spuren, beleglage).length,
+    kandidaten: merkmaleAbleiten(spuren, beleglage),
   };
 }

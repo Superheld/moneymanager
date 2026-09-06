@@ -135,7 +135,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-29 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+30 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie:
 
@@ -143,7 +143,8 @@ ist sie:
   (was mit einer Buchung geschah) · `umsatz_roh` +
   `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ
   UND Klasse, siehe unten) ·
-  `kontostand_anker` · `import_lauf` · `dubletten_freigabe` ·
+  `kontostand_anker` · `vormerkung` (was die Bank kennt und noch nicht gebucht hat,
+  siehe unten) · `import_lauf` · `dubletten_freigabe` ·
   `kontogruppe` + `kontogruppe_konto` (frei benannte Gruppen, siehe unten)
 - **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` + `budget_betrag` (die
   Reihe seiner Beträge, siehe unten) · `vertrag` ·
@@ -401,6 +402,42 @@ Drei Entscheidungen darin, die man kennen muss:
 Die Vertragsart `umbuchung` hängt daran und trägt eine Folge: **keine
 Kündigungswarnung.** Eine Abmachung mit sich selbst kündigt man, indem man sie löscht.
 
+#### Eine Vormerkung ist eine Beobachtung, keine Buchung
+
+Seit 2026-09-05 liest der Abruf das ZWEITE Feld der Antwort mit: die Zahlungen, die die
+Bank kennt und noch nicht gebucht hat. Sie kommen ohne eigenen Abruf, ohne TAN und ohne
+Wartezeit — sie standen die ganze Zeit in derselben Antwort und wurden weggeworfen.
+
+**Sie landen in `vormerkung` und nicht in `umsatz_roh`**, und das ist der ganze Punkt.
+Eine Vormerkung wird in ein bis drei Tagen zu einer Buchung — mit möglicherweise anderem
+Betrag — oder sie fällt weg. Im Ledger stünde dieselbe Zahlung danach zweimal, und der
+Dublettenfinder hätte nichts, woran er sie erkennt: keine stabile Kennung, ein Betrag,
+der sich noch ändern darf, und bei manchen Instituten **nicht einmal ein Datum**
+(`datum` ist deshalb nullable). Sie gehört in dieselbe Kategorie wie `kontostand_anker`
+und `depotwert`: eine Beobachtung zu einem Zeitpunkt.
+
+**Der Bestand wird je Konto ERSETZT, nicht fortgeschrieben.** Was die Bank nicht mehr
+meldet, gibt es nicht mehr — das ist die einzige Aussage, die diese Tabelle treffen kann,
+und `VormerkungRepository` lässt bewusst keine andere zu: es gibt kein `speichern` für
+eine einzelne. Auch eine LEERE Liste wird geschrieben; „nichts mehr offen" ist der Fall,
+wegen dem man hinsieht. Nach einem gescheiterten Abruf passiert dagegen nichts: dann
+wüsste niemand, ob die Bank keine meldet oder ob wir nicht gefragt haben.
+
+Zwei Stellen rechnen und zeigen sie:
+
+- **Die Liquiditätsvorschau** zieht sie vom Startwert ab, in BEIDEN Linien. Eine
+  Vormerkung ist sicherer als jede Vertragsrate — sie ist bereits geschehen, nur noch
+  nicht verbucht —, und `realerKontostand` sieht sie nicht. Dasselbe meint die Bank, wenn
+  sie neben den Saldo einen „verfügbaren Betrag" stellt.
+- **Der Kontoauszug** zeigt sie als abgesetzten Block ÜBER dem Gebuchten
+  (`ui/konten/VormerkungsBlock.tsx`). Sie nur wirken zu lassen war der verworfene Weg:
+  bei der ersten Abweichung stünde eine Zahl da, deren Herkunft niemand sieht, und in
+  einer Finanz-App ist das schlimmer als eine fehlende Zahl.
+
+**`INFO` zählt nicht mit.** Die Bank sagt damit, dass sie diese Zeile nicht buchen wird;
+sie mitzurechnen zöge Geld ab, das nie abgeht. Angezeigt wird sie trotzdem — sie erklärt,
+was man im Online-Banking sieht.
+
 #### Der Rücklagenfluss ist DREI Zahlen, nicht eine
 
 `core/ruecklagen/fluss.ts` beantwortet „was wird zurückgelegt" mit drei Werten, und keiner
@@ -465,6 +502,34 @@ Die mittlere Zeile ist der Grund, warum es die Spalte gibt: ohne sie käme ein v
 korrigierter Fehlgriff der Automatik beim nächsten Abgleich zurück. Wer `vertrag_id`
 zurücksetzt, muss `vertrag_herkunft` mit zurücksetzen — sonst bleibt die Buchung für die
 Automatik gesperrt.
+
+#### Aus denselben drei Zuständen wird die Regel abgeleitet
+
+Seit 2026-09-05 liest die Erkennung die Tabelle oben auch RÜCKWÄRTS: aus den zugeordneten
+Zahlungen entstehen Vorschläge für die Merkmalsliste (`core/vertraege/merkmalsableitung.ts`,
+sichtbar im Erkennungsabschnitt des Vertragsdialogs). Das ist dieselbe Messung wie die
+Vorschau, nur andersherum — Kandidaten bilden und durch `merkmalsTreffer` schicken.
+
+**Beleg ist ausschliesslich `herkunft = 'manuell'`.** Eine Buchung, die die Regel selbst
+zugeordnet hat, ist ihr Ergebnis; sie als Beleg zu nehmen ist ein Kreis, und der driftet
+langsam: die Regel greift einmal zu weit, der Fehlgriff wird Beleg, das Muster wird
+breiter. Die Trennung steht im Schema und geht nur verloren, wenn jemand „alle Buchungen
+des Vertrags" schreibt — die naheliegende Formulierung.
+
+Die dritte Zeile der Tabelle ist dabei mehr wert als sie aussieht: ein Nein von Hand ist
+die einzige Stelle im Bestand, an der „gehört nicht dazu" WIRKLICH dasteht. Überall sonst
+heisst „kein Vertrag" entweder das oder „ist noch niemandem aufgefallen", und man sieht der
+Zeile nicht an, welches. Ein Vorschlag, der ein solches Nein trifft, ist für mindestens
+einen Fall nachweislich falsch und wird deshalb nicht angeboten.
+
+**Bewertet wird mit DREI Zahlen und keiner Punktzahl** — deckt Belege ab, widerspricht
+einem Nein, trifft sonst noch etwas. Eine Verrechnung daraus wäre geraten und sähe als Zahl
+aus wie eine Messung; was die drei gegeneinander wiegen, hängt am Fall.
+
+**Eine Umschichtung zählt nirgends mit.** `passtZu` lässt sie aus, ihr Empfängerfeld trägt
+je nach Bank die eigene IBAN, den eigenen Namen oder nichts. Zuordnen darf man sie (ein
+Umbuchungsvertrag ist genau das), als Beleg wäre sie ein Nenner, den kein Kandidat je
+erreicht. Durchgesetzt an einer Stelle: `belegspuren`.
 
 ### Einstieg
 
@@ -683,6 +748,10 @@ Es gibt deshalb genau **drei** Wege nach draussen, und zwei davon setzen ein Zut
 | sonst | — | — |
 
 Die dritte Zeile ist leer, und das wird von `src/absicherung.test.ts` durchgesetzt.
+
+**Ein Befund zum Abruf gehört in `ergebnis.warnungen`, nicht in `hinweise`.** Beide stehen
+an `AbrufErgebnis`, aber `abrufAusfuehren` liest nur die erste (sie landet im
+`AbrufBefund`); die zweite fällt dort ohne Meldung auf den Boden.
 
 **Bis 2026-08-25 stimmte das nicht.** Die Schrift kam über ein `@import` von einem
 Schriften-Dienst — ein Netzzugriff bei jedem Start, bei dem der Betreiber IP und Zeitpunkt
@@ -1756,8 +1825,18 @@ und ein Wächter, der bei jedem Lauf dasselbe meldet, wird abgeschaltet statt ge
 Ref bedeutet, dass ein `npm update` stillschweigend fremden Code einzieht; der Lockfile
 allein schützt nur, solange niemand ihn erneuert.
 
+Die Kehrseite des Pins: **`node_modules` gehört keinem Branch.** Wer von `develop`
+abzweigt, während ein neuerer Lib-Stand installiert ist, bekommt rote Typfehler in
+Dateien, die er nie angefasst hat. Das ist kein Fund, sondern die Divergenz — entweder den
+Lib-Branch mergen oder `npm ci`.
+
 ## Build-Stolpersteine
 
+- **Ein Patch in `node_modules/<paket>/dist` erreicht die laufende App NICHT.** Vite
+  serviert `node_modules/.vite/deps/<paket>.js` mit `immutable`-Caching und bündelt nur
+  neu, wenn sich Lockfile oder Config ändern — nicht bei geändertem Paketinhalt. Wer eine
+  Abhängigkeit zur Diagnose markiert: `rm -rf node_modules/.vite`, dann neu starten.
+  Gemessen an `lib-fints`; der WebView nimmt sonst wortlos seine alte Kopie.
 - **Der erste Rust-Build nach einem frischen Klon dauert länger als früher.** Seit
   SQLCipher im Baum ist (`libsqlite3-sys` mit `bundled-sqlcipher-vendored-openssl`), wird
   OpenSSL mitgebaut. Danach liegt es im Cache und die Sache ist erledigt. `-vendored-`

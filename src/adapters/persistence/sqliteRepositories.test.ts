@@ -43,6 +43,7 @@ import {
   sqliteZahlungskontoRepository as zahlungskontoRepository,
 } from "./sqliteStammdatenRepositories";
 import { sqliteKontostandsankerRepository as ankerRepository } from "./sqliteKontostandRepository";
+import { sqliteVormerkungRepository as vormerkungRepository } from "./sqliteVormerkungRepository";
 import { sqliteDepotRepository as depotRepository } from "./sqliteDepotRepository";
 import {
   sqliteDublettenfreigabeRepository as freigabeRepository,
@@ -438,6 +439,58 @@ describe("Einstellungen-Repository", () => {
   });
 });
 
+describe("Vormerkungen", () => {
+  const vormerkung = (over: Record<string, unknown> = {}) => ({
+    id: "vm1", zahlungskontoId: "k1", betrag: -2500, waehrung: "EUR",
+    gegenpartei: "Kesselmann", verwendungszweck: "Kartenzahlung",
+    erfasstAm: "2026-09-05T20:00:00.000Z", ...over,
+  });
+
+  it("haelt eine Vormerkung ueber die Rundreise — auch ohne Datum", () => {
+    // Eine noch nicht gebuchte CAMT-Zeile kann ganz ohne Datum kommen. Das ist kein
+    // Fehler, sondern eine Vormerkung ohne Termin, und die Spalte ist deshalb nullable.
+    return vormerkungRepository
+      .ersetzen("k1", [vormerkung(), vormerkung({ id: "vm2", datum: "2026-09-06" })])
+      .then(() => vormerkungRepository.alle())
+      .then((alle) => {
+        expect(alle).toHaveLength(2);
+        // Ohne Datum zuerst: was die Bank ohne Termin meldet, ist das Naechste.
+        expect(alle[0].id).toBe("vm1");
+        expect(alle[0].datum).toBeUndefined();
+        expect(alle[0].gegenpartei).toBe("Kesselmann");
+        expect(alle[1].datum).toBe("2026-09-06");
+      });
+  });
+
+  /**
+   * Die einzige Schreiboperation, und sie ist der ganze Umgang mit Vormerkungen: was die
+   * Bank nicht mehr meldet, gibt es nicht mehr. Fortzuschreiben ergaebe eine Liste, die
+   * nur waechst und deren Eintraege nie enden.
+   */
+  it("ersetzt den Bestand eines Kontos vollstaendig", async () => {
+    await vormerkungRepository.ersetzen("k1", [vormerkung(), vormerkung({ id: "vm2" })]);
+    await vormerkungRepository.ersetzen("k1", [vormerkung({ id: "vm3", betrag: -900 })]);
+
+    const alle = await vormerkungRepository.alle();
+    expect(alle.map((v) => v.id)).toEqual(["vm3"]);
+  });
+
+  it("schreibt auch eine LEERE Liste — „nichts mehr offen\" ist eine Aussage", async () => {
+    await vormerkungRepository.ersetzen("k1", [vormerkung()]);
+    await vormerkungRepository.ersetzen("k1", []);
+    expect(await vormerkungRepository.alle()).toEqual([]);
+  });
+
+  it("laesst die Vormerkungen der anderen Konten stehen", async () => {
+    await vormerkungRepository.ersetzen("k1", [vormerkung()]);
+    await vormerkungRepository.ersetzen("k2", [vormerkung({ id: "vm9", zahlungskontoId: "k2" })]);
+    await vormerkungRepository.ersetzen("k1", []);
+
+    const alle = await vormerkungRepository.alle();
+    expect(alle.map((v) => v.id)).toEqual(["vm9"]);
+  });
+});
+
 describe("Import-Repositories", () => {
   const umsatz = (over: Record<string, unknown> = {}) => ({
     id: "u1", laufId: "l1", zahlungskontoId: "k1", buchungstag: "2026-01-05",
@@ -475,6 +528,114 @@ describe("Import-Repositories", () => {
     await umsatzRepository.anlegen(umsatz());
     await umsatzRepository.loeschen("u1");
     expect(await umsatzRepository.alle()).toHaveLength(0);
+  });
+
+  /**
+   * Die vier CAMT-Angaben aus Migration 67 gehen durch vier Stellen, an denen ein Fehler
+   * nicht knallt, sondern still das Falsche tut: Spaltenliste, Platzhalter-Nummern,
+   * Werteliste, SELECT. Ein verrutschtes `$` vertauscht zwei Werte und faellt nirgends
+   * auf — die Felder sind alle vom selben Typ und heute liest sie niemand.
+   */
+  it("haelt die vier CAMT-Angaben ueber die Rundreise", async () => {
+    await umsatzRepository.anlegen(
+      umsatz({
+        eintragReferenz: "NTRY-4711",
+        bankBuchungscode: "NTRF+117",
+        transaktionsId: "TX-2026-0042",
+        strukturierteReferenz: "RF18539007547034",
+      }),
+    );
+    const [u] = await umsatzRepository.alle();
+    expect(u.eintragReferenz).toBe("NTRY-4711");
+    expect(u.bankBuchungscode).toBe("NTRF+117");
+    expect(u.transaktionsId).toBe("TX-2026-0042");
+    expect(u.strukturierteReferenz).toBe("RF18539007547034");
+  });
+
+  it("haelt die Sammelposten ueber die Rundreise — als JSON-Text", async () => {
+    await umsatzRepository.anlegen(
+      umsatz({
+        gegenpartei: "",
+        betrag: -125000,
+        sammelposten: [
+          { betrag: -45000, gegenpartei: "Kesselmann", verwendungszweck: "Abschlag" },
+          { betrag: -80000, gegenpartei: "Ohlert" },
+        ],
+      }),
+    );
+    const [u] = await umsatzRepository.alle();
+    expect(u.sammelposten).toHaveLength(2);
+    expect(u.sammelposten?.[0].gegenpartei).toBe("Kesselmann");
+    expect(u.sammelposten?.[0].betrag).toBe(-45000);
+    expect(u.sammelposten?.[1].verwendungszweck).toBeUndefined();
+  });
+
+  /**
+   * Elf weitere Spalten aus Migration 69, und dieselbe Gefahr wie bei den vier davor: ein
+   * verrutschtes `$` vertauscht zwei Werte, und weil heute niemand sie liest, faellt das
+   * erst auf, wenn Jahre spaeter jemand eine Auswertung darauf baut.
+   */
+  it("haelt alles, was die Bank sonst noch sagt, ueber die Rundreise", async () => {
+    await umsatzRepository.anlegen(
+      umsatz({
+        buchungsstand: "PDNG",
+        istStorno: true,
+        originalBetrag: -2499,
+        originalWaehrung: "USD",
+        wechselkurs: 1.0842,
+        gebuehrBetrag: -175,
+        gebuehrWaehrung: "EUR",
+        ruecklaufCode: "AC04",
+        ruecklaufText: "Konto aufgeloest",
+        kundenreferenz: "NONREF",
+        bankfelder: { transactionType: "NTRF", batch: { numberOfTransactions: 3 } },
+      }),
+    );
+    const [u] = await umsatzRepository.alle();
+    expect(u.buchungsstand).toBe("PDNG");
+    expect(u.istStorno).toBe(true);
+    expect([u.originalBetrag, u.originalWaehrung, u.wechselkurs]).toEqual([-2499, "USD", 1.0842]);
+    expect([u.gebuehrBetrag, u.gebuehrWaehrung]).toEqual([-175, "EUR"]);
+    expect([u.ruecklaufCode, u.ruecklaufText]).toEqual(["AC04", "Konto aufgeloest"]);
+    expect(u.kundenreferenz).toBe("NONREF");
+    expect(u.bankfelder).toEqual({ transactionType: "NTRF", batch: { numberOfTransactions: 3 } });
+  });
+
+  it("haelt „kein Storno\" und „nicht gesagt\" auseinander", async () => {
+    // SQLite kennt kein Boolean. Ohne die Unterscheidung waere jede Zeile, ueber die die
+    // Bank nichts gesagt hat, ein ausdrueckliches „kein Storno" — und das ist eine
+    // Behauptung, die niemand aufgestellt hat.
+    await umsatzRepository.anlegen(umsatz({ id: "u1", istStorno: false }));
+    await umsatzRepository.anlegen(umsatz({ id: "u2", rohHash: "h2" }));
+    const alle = await umsatzRepository.alle();
+    expect(alle.find((u) => u.id === "u1")?.istStorno).toBe(false);
+    expect(alle.find((u) => u.id === "u2")?.istStorno).toBeUndefined();
+  });
+
+  it("macht aus keinen Sammelposten undefined und nicht eine leere Liste", async () => {
+    // Sonst waeren „keine Sammelbuchung" und „eine Sammelbuchung ohne Zahlungen darin"
+    // dieselbe Zelle. Das zweite gibt es nicht.
+    await umsatzRepository.anlegen(umsatz({ id: "u1", sammelposten: [] }));
+    await umsatzRepository.anlegen(umsatz({ id: "u2", rohHash: "h2" }));
+    const alle = await umsatzRepository.alle();
+    expect(alle.every((u) => u.sammelposten === undefined)).toBe(true);
+  });
+
+  it("traegt fehlende Angaben nach, ohne vorhandene anzufassen", async () => {
+    await umsatzRepository.anlegen(umsatz({ bankBuchungscode: "NTRF+117" }));
+    await umsatzRepository.ergaenzen(
+      umsatz({
+        bankBuchungscode: "ANDERS+999",
+        strukturierteReferenz: "RF18539007547034",
+        zweckCode: "SALA",
+      }),
+    );
+    const [u] = await umsatzRepository.alle();
+    // Die erste Quelle behaelt recht — sie hat die Zeile erzeugt.
+    expect(u.bankBuchungscode).toBe("NTRF+117");
+    // Was fehlte, kommt dazu.
+    expect(u.strukturierteReferenz).toBe("RF18539007547034");
+    expect(u.zweckCode).toBe("SALA");
   });
 
   it("hält Vorschlag und Ist-Buchungs-Verknüpfung über die Rundreise", async () => {

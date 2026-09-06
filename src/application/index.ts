@@ -84,12 +84,17 @@ export {
   // beim Anlegen sinnvoll voreingestellt ist. Ändern kann der Nutzer es immer.
   klasseVorschlag,
   MERKMALSHERKUENFTE,
+  // Die drei Merkmalsarten einer Erkennungsregel — die Maske bietet sie je Zeile an.
+  MERKMALSARTEN,
   RHYTHMUS_MONATE,
   // Fehler mit fachlichem Schlüssel — die UI übersetzt ihn
   FachlicherFehler,
   // Datum X Tage ab heute — eine Rechnung über zwei Zahlen, keine Auswahl. Die
   // Oberfläche braucht es, um das Fenster zu beschriften, das sie gerade zeigt.
   fensterEnde,
+  // Die Summe der Vormerkungen und ihre Zahl — die Anzeige braucht dieselbe Rechnung
+  // wie die Vorschau, und zwei Additionen an zwei Orten laufen auseinander.
+  vormerkungslast,
 } from "../core";
 
 // ---------------------------------------------------------------------------
@@ -128,6 +133,8 @@ export {
   type VertragsichtDeps,
   erkennungProbieren,
   type Erkennungsprobe,
+  merkmaleVorschlagen,
+  type Merkmalsvorschlag,
 } from "./vertraege/vertragssichten";
 export {
   vertragAnlegen,
@@ -144,7 +151,12 @@ export {
   type Rueckwegstand,
 } from "./buchung/buchungshistorie";
 export { pruefmarkerSetzen } from "./buchung/pruefmarker";
-export { zuordnungenAbgleichen, zuordnungVonHand, vertragsnamenLaden } from "./vertraege/vertragszuordnung";
+export {
+  zuordnungenAbgleichen,
+  zuordnungVonHand,
+  vertragsnamenLaden,
+  type Sammelziel,
+} from "./vertraege/vertragszuordnung";
 export { vorschlagIgnorieren as vertragsvorschlagIgnorieren } from "./vertraege/vertragsvorschlaege";
 export {
   herkunftLaden,

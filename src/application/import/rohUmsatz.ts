@@ -8,6 +8,32 @@
 
 import type { Cent } from "../../core";
 
+/**
+ * Eine der Zahlungen hinter einer Sammelbuchung.
+ *
+ * Eine Bank bucht mehrere Zahlungen als EINEN Posten — mehrere gleichzeitig freigegebene
+ * Ueberweisungen etwa — und listet die Einzelzahlungen darunter auf. Die Buchung traegt
+ * dann die Summe und KEINE Gegenpartei: es gibt nicht eine, und eine davon
+ * herauszugreifen waere eine Behauptung.
+ *
+ * Alle Felder sind optional, weil die Bank je Posten liefert, was sie hat. Sie tragen
+ * dieselben Namen wie am `RohUmsatz` selbst — dieselbe Sache, eine Ebene tiefer.
+ */
+export interface RohSammelposten {
+  /** Minor Units, vorzeichenbehaftet wie am Umsatz. Fehlt, wo die Bank nur die Summe nennt. */
+  readonly betrag?: Cent;
+  readonly gegenpartei?: string;
+  readonly gegenparteiIban?: string;
+  readonly endempfaenger?: string;
+  readonly verwendungszweck?: string;
+  readonly zweckCode?: string;
+  readonly glaeubigerId?: string;
+  readonly mandatsreferenz?: string;
+  readonly e2eReferenz?: string;
+  readonly transaktionsId?: string;
+  readonly strukturierteReferenz?: string;
+}
+
 export interface RohUmsatz {
   /** Buchungstag als ISO „YYYY-MM-DD". */
   readonly buchungstag: string;
@@ -79,6 +105,115 @@ export interface RohUmsatz {
    * wird, statt sie zu raten.
    */
   readonly bankreferenz?: string;
+  /**
+   * `NtryRef` — die Referenz, die die Bank dem EINTRAG gibt. Nur CAMT.
+   *
+   * Steht neben `bankreferenz` (`AcctSvcrRef`) und ist nicht dasselbe: die eine
+   * bezeichnet den Auszugsposten, die andere den Vorgang beim Institut. Welche von
+   * beiden sich über mehrere Abrufe hält, ist dieselbe offene Frage wie dort — und sie
+   * lässt sich nur beantworten, wenn beide dastehen.
+   */
+  readonly eintragReferenz?: string;
+  /**
+   * `BkTxCd.Prtry.Cd` — der Code, den die Bank selbst vergibt. Nur CAMT.
+   *
+   * Deutsche Institute setzen dort den SWIFT-Typ und den Geschäftsvorfallcode zusammen.
+   * Damit ist es das CAMT-Gegenstück zum numerischen `buchungsschluessel` aus MT940
+   * `:61:` — und der Weg zu einer Abbildung zwischen den beiden Vokabularen, die sich
+   * bisher nur raten liesse. Bewusst NICHT in `buchungsschluessel` hinein: dort stehen
+   * schon zwei, ein drittes machte die Spalte endgültig undeutbar.
+   */
+  readonly bankBuchungscode?: string;
+  /**
+   * `Refs.TxId` — die Transaktionskennung der Bank. Nur CAMT.
+   *
+   * Ausdrücklich NICHT `nativeId`: was dort steht, trägt die Dedup beim Reimport, und
+   * eine Kennung, die sich beim nächsten Abruf ändert, würde echte Buchungen verwerfen.
+   * Ob diese stabil ist, weiss heute niemand — sie wird gesammelt, damit die Frage am
+   * Bestand beantwortbar wird, und bis dahin nicht benutzt.
+   */
+  readonly transaktionsId?: string;
+  /**
+   * `RmtInf.Strd.CdtrRefInf.Ref` — die strukturierte Referenz, mit der ein Zahler eine
+   * Rechnung benennt (ISO 11649, die `RF…`-Form). Nur CAMT.
+   *
+   * Nicht zu verwechseln mit `glaeubigerId`: die bezeichnet den GLÄUBIGER, diese den
+   * VORGANG. Wo sie steht, hat der Zahler statt Freitext eine Referenz gesetzt — der
+   * Verwendungszweck ist dann oft leer, und diese Zeile ist alles, was den Vorgang
+   * benennt.
+   */
+  readonly strukturierteReferenz?: string;
+  /**
+   * Die Zahlungen hinter einer Sammelbuchung — eine je Zahlung. Nur CAMT.
+   *
+   * Steht nur, wo es MEHRERE sind. Bei einer einzelnen stehen ihre Angaben am Umsatz
+   * selbst, wie immer; erst bei mehreren gibt es keine eine Gegenpartei mehr, und dann
+   * bleiben `gegenpartei` und die Referenzfelder oben leer und die Zahlungen hier.
+   *
+   * Heute wertet das NICHTS aus. Es wird trotzdem geschrieben, aus demselben Grund wie
+   * die vier Felder darueber: ein Institut haelt Umsaetze nur begrenzt vor, und was eine
+   * Sammelbuchung enthielt, steht danach nirgends mehr.
+   */
+  readonly sammelposten?: readonly RohSammelposten[];
+  /**
+   * Ob die Bank die Zeile GEBUCHT hat: `BOOK`, `PDNG` (nur vorgemerkt) oder `INFO`
+   * (wird nicht gebucht). Nur CAMT.
+   *
+   * Eine vorgemerkte Zahlung ist keine gebuchte — sie kann sich noch ändern oder ganz
+   * wegfallen. Wer sie mitzählt, überschätzt den Stand. Heute holen wir nur gebuchte
+   * Auszüge, das Feld steht also fast immer auf `BOOK`; es kommt mit, damit die
+   * Unterscheidung überhaupt möglich ist, sobald wir die Vormerkungen lesen.
+   *
+   * **Nicht `status`**: den Namen trägt schon der Verarbeitungsstand des Umsatzes
+   * (neu / verbucht / verworfen). Der kommt von uns, dieser von der Bank.
+   */
+  readonly buchungsstand?: string;
+  /**
+   * Ob diese Zeile eine frühere aufhebt (`RvslInd`). Nur CAMT.
+   *
+   * Ein Storno sieht sonst aus wie eine gewöhnliche Gegenbuchung — gleicher Betrag,
+   * andere Richtung — und wird als eigener Vorgang gezählt.
+   */
+  readonly istStorno?: boolean;
+  /**
+   * Der Betrag VOR der Umrechnung und der Kurs dazu. Nur CAMT (`AmtDtls.InstdAmt`,
+   * `CcyXchg.XchgRate`).
+   *
+   * Ohne sie steht bei einem Einkauf in fremder Währung nur der Eurobetrag, und was
+   * tatsächlich bezahlt wurde, ist nicht mehr feststellbar. Der Betrag in Minor Units
+   * wie überall; der Kurs als Fliesskommazahl, weil ein Kurs kein Geld ist — auf Cent
+   * gerundet verlöre er die Stellen, auf die es bei ihm ankommt.
+   */
+  readonly originalBetrag?: Cent;
+  readonly originalWaehrung?: string;
+  readonly wechselkurs?: number;
+  /** Was die Bank für diese Buchung genommen hat (`Chrgs`), wo sie es ausweist. Nur CAMT. */
+  readonly gebuehrBetrag?: Cent;
+  readonly gebuehrWaehrung?: string;
+  /**
+   * Warum eine Zahlung zurückkam — Code (`AC04`, `MD01` …) und der Text der Bank
+   * (`RtrInf`). Nur CAMT. Eine Rückgabe ohne Grund ist eine Zahlung, die niemand
+   * erklären kann.
+   */
+  readonly ruecklaufCode?: string;
+  readonly ruecklaufText?: string;
+  /**
+   * FORMATABHÄNGIG, wie `umsatzart` und `buchungsschluessel`: MT940 trägt hier die
+   * Kundenreferenz aus `:61:`, CAMT die E2E-Referenz. Deutbar allein über das Format am
+   * Lauf — und deshalb ein eigenes Feld neben `e2eReferenz` und nicht darin.
+   */
+  readonly kundenreferenz?: string;
+  /**
+   * Was die Bank sonst noch gesagt hat, unter den Namen der Bibliothek.
+   *
+   * Die Felder ohne eigene Aussage: Primanotennummer, Textschlüsselergänzung,
+   * Auftraggeberkennung, die SWIFT-Buchungsart, der Kopf einer Sammelbuchung. Sie
+   * bekommen keine eigene Spalte, weil niemand nach ihnen fragt — sie stehen hier,
+   * damit beim nächsten Stand der Bibliothek nichts wieder auf den Boden fällt, bloss
+   * weil keine Spalte dafür da ist. Wer eines davon braucht, holt es heraus und gibt
+   * ihm eine.
+   */
+  readonly bankfelder?: Readonly<Record<string, unknown>>;
   /** Interne Umbuchung zwischen eigenen Konten (von der Quelle markiert) → Umschichtung. */
   readonly istUmbuchung: boolean;
 

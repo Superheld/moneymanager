@@ -18,7 +18,13 @@ import type {
   UmsatzRepository,
 } from "../../application/ports";
 import type { Dublettenfreigabe } from "../../application/dubletten/dublettensicht";
-import type { ImportLauf, Umsatz, UmsatzStatus, VorschlagQuelle } from "../../application/import";
+import type {
+  ImportLauf,
+  RohSammelposten,
+  Umsatz,
+  UmsatzStatus,
+  VorschlagQuelle,
+} from "../../application/import";
 import { getDb } from "./db";
 import { inTransaktion, type Anweisung } from "./transaktion";
 
@@ -104,6 +110,22 @@ interface UmsatzZeile {
   zweck_code: string | null;
   endempfaenger: string | null;
   bank_referenz: string | null;
+  eintrag_referenz: string | null;
+  bank_buchungscode: string | null;
+  transaktions_id: string | null;
+  strukturierte_referenz: string | null;
+  sammelposten: string | null;
+  buchungsstand: string | null;
+  ist_storno: number | null;
+  original_betrag: number | null;
+  original_waehrung: string | null;
+  wechselkurs: number | null;
+  gebuehr_betrag: number | null;
+  gebuehr_waehrung: string | null;
+  ruecklauf_code: string | null;
+  ruecklauf_text: string | null;
+  kundenreferenz: string | null;
+  bankfelder: string | null;
   roh_hash: string;
   native_id: string | null;
   status: string | null;
@@ -111,6 +133,50 @@ interface UmsatzZeile {
   vorschlag_charakter: string | null;
   vorschlag_quelle: string | null;
   istbuchung_id: string | null;
+}
+
+/**
+ * Die Sammelposten als JSON-Text — dasselbe Muster wie `inhaber_ids` beim Konto und die
+ * Merkmale einer Vertragsregel.
+ *
+ * Eine LEERE Liste wird zu `null` und nicht zu `"[]"`: „keine Sammelposten" und „eine
+ * Sammelbuchung ohne Zahlungen darin" wären sonst dieselbe Zelle, und die zweite gibt es
+ * nicht.
+ */
+function sammelpostenAls(posten: readonly RohSammelposten[] | undefined): string | null {
+  return posten && posten.length > 0 ? JSON.stringify(posten) : null;
+}
+
+/**
+ * Und zurück. Kaputtes JSON ergibt `undefined` statt eines Wurfs: die Posten sind Beiwerk,
+ * und eine unlesbare Nebenangabe darf die Buchung nicht mitnehmen — der Betrag, das Datum
+ * und die Kategorie daran stimmen ja.
+ */
+function sammelpostenAus(text: string | null): readonly RohSammelposten[] | undefined {
+  if (!text) return undefined;
+  try {
+    const gelesen = JSON.parse(text);
+    return Array.isArray(gelesen) && gelesen.length > 0 ? (gelesen as RohSammelposten[]) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** Dieselbe Behandlung wie bei den Sammelposten: leer wird `null`, kaputt wird `undefined`. */
+function bankfelderAls(felder: Readonly<Record<string, unknown>> | undefined): string | null {
+  return felder && Object.keys(felder).length > 0 ? JSON.stringify(felder) : null;
+}
+
+function bankfelderAus(text: string | null): Readonly<Record<string, unknown>> | undefined {
+  if (!text) return undefined;
+  try {
+    const gelesen = JSON.parse(text);
+    return gelesen && typeof gelesen === "object" && !Array.isArray(gelesen)
+      ? (gelesen as Record<string, unknown>)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function zuUmsatz(z: UmsatzZeile): Umsatz {
@@ -133,6 +199,23 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
     zweckCode: z.zweck_code ?? undefined,
     endempfaenger: z.endempfaenger ?? undefined,
     bankreferenz: z.bank_referenz ?? undefined,
+    eintragReferenz: z.eintrag_referenz ?? undefined,
+    bankBuchungscode: z.bank_buchungscode ?? undefined,
+    transaktionsId: z.transaktions_id ?? undefined,
+    strukturierteReferenz: z.strukturierte_referenz ?? undefined,
+    sammelposten: sammelpostenAus(z.sammelposten),
+    buchungsstand: z.buchungsstand ?? undefined,
+    // 0/1 in SQLite, ein Boolean nach oben — und `null` bleibt „nicht gesagt".
+    istStorno: z.ist_storno === null ? undefined : z.ist_storno !== 0,
+    originalBetrag: z.original_betrag ?? undefined,
+    originalWaehrung: z.original_waehrung ?? undefined,
+    wechselkurs: z.wechselkurs ?? undefined,
+    gebuehrBetrag: z.gebuehr_betrag ?? undefined,
+    gebuehrWaehrung: z.gebuehr_waehrung ?? undefined,
+    ruecklaufCode: z.ruecklauf_code ?? undefined,
+    ruecklaufText: z.ruecklauf_text ?? undefined,
+    kundenreferenz: z.kundenreferenz ?? undefined,
+    bankfelder: bankfelderAus(z.bankfelder),
     rohHash: z.roh_hash,
     nativeId: z.native_id ?? undefined,
     // Ohne Verarbeitungszeile ist die Zeile unangetastet — also „neu".
@@ -159,6 +242,11 @@ const SELECT = `SELECT r.id, r.lauf_id, v.zahlungskonto_id, r.buchungstag, r.val
        r.waehrung, r.gegenpartei, r.verwendungszweck, r.glaeubiger_id, r.gegenpartei_iban,
        r.mandatsreferenz, r.e2e_referenz, r.umsatzart, r.buchungsschluessel,
        r.zweck_code, r.endempfaenger, r.bank_referenz,
+       r.eintrag_referenz, r.bank_buchungscode, r.transaktions_id, r.strukturierte_referenz,
+       r.sammelposten, r.buchungsstand, r.ist_storno,
+       r.original_betrag, r.original_waehrung, r.wechselkurs,
+       r.gebuehr_betrag, r.gebuehr_waehrung, r.ruecklauf_code, r.ruecklauf_text,
+       r.kundenreferenz, r.bankfelder,
        r.roh_hash, r.native_id,
        v.status, v.vorschlag_kategorie_id, v.vorschlag_charakter, v.vorschlag_quelle,
        v.istbuchung_id
@@ -182,15 +270,29 @@ function rohAnweisung(u: Umsatz): Anweisung {
        (id, lauf_id, buchungstag, valuta, betrag, waehrung, gegenpartei,
         gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz, e2e_referenz,
         umsatzart, buchungsschluessel, zweck_code, endempfaenger, bank_referenz,
+        eintrag_referenz, bank_buchungscode, transaktions_id, strukturierte_referenz,
+        sammelposten, buchungsstand, ist_storno, original_betrag, original_waehrung,
+        wechselkurs, gebuehr_betrag, gebuehr_waehrung, ruecklauf_code, ruecklauf_text,
+        kundenreferenz, bankfelder,
         roh_hash, native_id)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
+             $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35)
      ON CONFLICT(id) DO NOTHING`,
     werte: [
       u.id, u.laufId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
       u.gegenpartei, u.gegenparteiIban ?? null, u.verwendungszweck, u.glaeubigerId ?? null,
       u.mandatsreferenz ?? null, u.e2eReferenz ?? null, u.umsatzart ?? null,
       u.buchungsschluessel ?? null, u.zweckCode ?? null, u.endempfaenger ?? null,
-      u.bankreferenz ?? null, u.rohHash, u.nativeId ?? null,
+      u.bankreferenz ?? null,
+      u.eintragReferenz ?? null, u.bankBuchungscode ?? null, u.transaktionsId ?? null,
+      u.strukturierteReferenz ?? null,
+      sammelpostenAls(u.sammelposten),
+      u.buchungsstand ?? null, u.istStorno === undefined ? null : u.istStorno ? 1 : 0,
+      u.originalBetrag ?? null, u.originalWaehrung ?? null, u.wechselkurs ?? null,
+      u.gebuehrBetrag ?? null, u.gebuehrWaehrung ?? null,
+      u.ruecklaufCode ?? null, u.ruecklaufText ?? null,
+      u.kundenreferenz ?? null, bankfelderAls(u.bankfelder),
+      u.rohHash, u.nativeId ?? null,
     ],
   };
 }
@@ -276,13 +378,36 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
          e2e_referenz = COALESCE(e2e_referenz, $6), umsatzart = COALESCE(umsatzart, $7),
          buchungsschluessel = COALESCE(buchungsschluessel, $8),
          bank_referenz = COALESCE(bank_referenz, $9), native_id = COALESCE(native_id, $10),
-         zweck_code = COALESCE(zweck_code, $11), endempfaenger = COALESCE(endempfaenger, $12)
+         zweck_code = COALESCE(zweck_code, $11), endempfaenger = COALESCE(endempfaenger, $12),
+         eintrag_referenz = COALESCE(eintrag_referenz, $13),
+         bank_buchungscode = COALESCE(bank_buchungscode, $14),
+         transaktions_id = COALESCE(transaktions_id, $15),
+         strukturierte_referenz = COALESCE(strukturierte_referenz, $16),
+         sammelposten = COALESCE(sammelposten, $17),
+         buchungsstand = COALESCE(buchungsstand, $18),
+         ist_storno = COALESCE(ist_storno, $19),
+         original_betrag = COALESCE(original_betrag, $20),
+         original_waehrung = COALESCE(original_waehrung, $21),
+         wechselkurs = COALESCE(wechselkurs, $22),
+         gebuehr_betrag = COALESCE(gebuehr_betrag, $23),
+         gebuehr_waehrung = COALESCE(gebuehr_waehrung, $24),
+         ruecklauf_code = COALESCE(ruecklauf_code, $25),
+         ruecklauf_text = COALESCE(ruecklauf_text, $26),
+         kundenreferenz = COALESCE(kundenreferenz, $27),
+         bankfelder = COALESCE(bankfelder, $28)
        WHERE id = $1`,
       [
         u.id, u.valuta ?? null, u.glaeubigerId ?? null, u.gegenparteiIban ?? null,
         u.mandatsreferenz ?? null, u.e2eReferenz ?? null, u.umsatzart ?? null,
         u.buchungsschluessel ?? null, u.bankreferenz ?? null, u.nativeId ?? null,
         u.zweckCode ?? null, u.endempfaenger ?? null,
+        u.eintragReferenz ?? null, u.bankBuchungscode ?? null, u.transaktionsId ?? null,
+        u.strukturierteReferenz ?? null, sammelpostenAls(u.sammelposten),
+        u.buchungsstand ?? null, u.istStorno === undefined ? null : u.istStorno ? 1 : 0,
+        u.originalBetrag ?? null, u.originalWaehrung ?? null, u.wechselkurs ?? null,
+        u.gebuehrBetrag ?? null, u.gebuehrWaehrung ?? null,
+        u.ruecklaufCode ?? null, u.ruecklaufText ?? null,
+        u.kundenreferenz ?? null, bankfelderAls(u.bankfelder),
       ],
     );
   },

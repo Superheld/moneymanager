@@ -26,7 +26,7 @@ import { FinTSClient, FinTSConfig } from "lib-fints";
 import { waehrungNachCode } from "../../core";
 import type { BankAccount, BankingInformation, ClientResponse, Statement } from "lib-fints";
 import type { Formatvorgabe } from "../../application/fints/abrufPort";
-import { formatplan } from "./formatwahl";
+import { formatWaehlen } from "./formatwahl";
 import type {
   AbrufErgebnis,
   Abrufadapter,
@@ -38,6 +38,7 @@ import type {
   Depotposition,
   Saldo,
   TanFrager,
+  Vormerkungszeile,
 } from "../../application/fints/abrufPort";
 import { profilErheben } from "./bankprofil";
 import { bankEndpunktFreigeben } from "./transport";
@@ -48,22 +49,32 @@ import {
   auszugsProben,
   auszugsStaende,
   isoDatum,
+  zuVormerkung,
   zuDepotposition,
   zuRohUmsatz,
 } from "./uebersetzung";
 
 /**
- * Datum für eine ANFRAGE bauen.
+ * Datum für eine ANFRAGE bauen — als LOKALER Kalendertag.
  *
- * `lib-fints` ist hier in sich uneinheitlich, und das kostet sonst einen Tag: eingehende
- * Datumsangaben parst der MT940-Parser auf LOKALE Mitternacht, ausgehende kodiert
- * `dataElements/Dat.js` per `toISOString()` — also in UTC. Ein `new Date(2026, 7, 18)`
- * wäre in Mitteleuropa `2026-08-17T22:00Z` und ginge als **17.08.** an die Bank.
- * Deshalb werden Anfragedaten über `Date.UTC` gebaut.
+ * Hier stand bis 2026-09-04 das Gegenteil, und zwar zu Recht: `dataElements/Dat.js`
+ * kodierte ausgehende Daten per `toISOString()`, also in UTC. Ein `new Date(2026, 7, 18)`
+ * war in Mitteleuropa `2026-08-17T22:00Z` und ging als **17.08.** an die Bank — deshalb
+ * wurden sie über `Date.UTC` gebaut.
+ *
+ * Der Fork liest dort jetzt `getFullYear()`/`getMonth()`/`getDate()`, also lokal. Damit
+ * ist die alte Kompensation die falsche Richtung. Sie fiele hier nicht auf — östlich von
+ * Greenwich ergibt `Date.UTC(2026,7,18)` lokal denselben Kalendertag —, westlich davon
+ * schickte sie den Vortag. Ein Fehler, der von der Zeitzone abhängt, ist genau der, den
+ * man nicht findet.
+ *
+ * **12 Uhr und nicht Mitternacht**, aus demselben Grund, aus dem die Bibliothek es tut:
+ * ein Zeitpunkt in der Tagesmitte übersteht jede Sommerzeitumstellung, auch die, die
+ * anderswo um Mitternacht stattfindet.
  */
 function anfrageDatum(iso: string): Date {
   const [j, m, t] = iso.split("-").map(Number);
-  return new Date(Date.UTC(j, m - 1, t));
+  return new Date(j, m - 1, t, 12);
 }
 
 function schluesselVon(k: { accountNumber: string; subAccountId?: string }): string {
@@ -145,21 +156,69 @@ async function mitTan<T extends ClientResponse>(
  * Unterkontomerkmal. Damit ist jedes gemeldete Konto erreichbar, und die Sperre ist
  * ersatzlos entfallen.
  */
-function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Bankkonto[] {
+/**
+ * Der Ausschnitt des Clients, den die Aufbereitung braucht — die drei Fähigkeitsfragen.
+ *
+ * Ein eigener Typ, damit ein Test sie beantworten (und werfen lassen) kann, ohne einen
+ * ganzen `FinTSClient` zu bauen. Genau daran hängt die Zusicherung unten: dass ein Wurf
+ * bei einer Frage die beiden anderen nicht mitnimmt.
+ */
+export interface FintsFaehigkeiten {
+  canGetAccountBalance(konto: BankAccount): boolean;
+  canGetAccountStatements(konto: BankAccount): boolean;
+  canGetPortfolio(konto: BankAccount): boolean;
+}
+
+/**
+ * Eine Fähigkeitsfrage stellen und einen Wurf FESTHALTEN, statt ihn zu „kann nicht" zu
+ * machen.
+ *
+ * Werfen kann sie: die Bibliothek löst das Konto gegen die frische Kontenliste auf, und
+ * einen Schlüssel, den die Bank nicht mehr meldet, quittiert sie mit einer Ausnahme —
+ * das ist die richtige Auskunft, aber eben eine ANDERE als „diese Fähigkeit fehlt".
+ */
+function fragen(was: string, frage: () => boolean, fehler: string[]): boolean {
+  try {
+    return frage();
+  } catch (e) {
+    fehler.push(`${was}: ${e instanceof Error ? e.message : String(e)}`);
+    return false;
+  }
+}
+
+/** Der Klartext am Konto — siehe die Begründung an der Aufrufstelle. */
+function hinweisZu(
+  bezeichnung: string,
+  fehler: readonly string[],
+  kannSaldo: boolean,
+  kannUmsaetze: boolean,
+  kannDepot: boolean,
+): string | undefined {
+  if (fehler.length > 0) {
+    return `Für „${bezeichnung}" liess sich nicht klären, was die Bank freigibt: ${fehler.join(" · ")}`;
+  }
+  if (!kannUmsaetze && !kannSaldo && !kannDepot) {
+    return `Die Bank gibt für „${bezeichnung}" nichts frei — weder Saldo noch Umsätze noch Bestände.`;
+  }
+  return undefined;
+}
+
+export function kontenAufbereiten(client: FintsFaehigkeiten, roh: readonly BankAccount[]): Bankkonto[] {
   return roh.map((k) => {
     // Mit dem Konto fragen, nicht mit seiner Nummer: eine geteilte Nummer lässt
     // `getBankAccount` jetzt werfen, statt zu raten — und die Antwort auf „kann dieses
     // Konto Umsätze" wäre sonst die des Nachbarkontos.
-    let kannSaldo = false;
-    let kannUmsaetze = false;
-    let kannDepot = false;
-    try {
-      kannSaldo = client.canGetAccountBalance(k);
-      kannUmsaetze = client.canGetAccountStatements(k);
-      kannDepot = client.canGetPortfolio(k);
-    } catch {
-      // Kennt die Bank das Konto in der UPD nicht mehr, ist die Antwort schlicht „kann nicht".
-    }
+    //
+    // JEDE FRAGE FÜR SICH, und das ist keine Formsache. Bis 2026-09-05 standen alle drei
+    // in EINEM `try`: warf die erste, blieben die beiden anderen auf `false`, ohne je
+    // gestellt worden zu sein. Aus einem Wurf beim Saldo wurde damit lautlos „dieses
+    // Konto kann kein Depot" — und ohne `kannSaldo` fragt der Abruf keinen Saldo ab,
+    // ohne Saldo entsteht kein Kontostands-Anker, und das Konto steht auf null. Ein
+    // Fehler an einer Stelle wurde so zu einer falschen AUSSAGE über zwei andere.
+    const fehler: string[] = [];
+    const kannSaldo = fragen("Saldo", () => client.canGetAccountBalance(k), fehler);
+    const kannUmsaetze = fragen("Umsätze", () => client.canGetAccountStatements(k), fehler);
+    const kannDepot = fragen("Bestände", () => client.canGetPortfolio(k), fehler);
     return {
       nummer: k.accountNumber,
       unterkonto: k.subAccountId,
@@ -173,9 +232,12 @@ function kontenAufbereiten(client: FinTSClient, roh: readonly BankAccount[]): Ba
       kannSaldo,
       kannUmsaetze,
       kannDepot,
-      hinweis: !kannUmsaetze && !kannSaldo && !kannDepot
-        ? `Die Bank gibt für „${k.product?.trim() || k.accountNumber}" nichts frei — weder Saldo noch Umsätze noch Bestände.`
-        : undefined,
+      // ZWEI VERSCHIEDENE AUSSAGEN, und sie auseinanderzuhalten ist der ganze Zweck des
+      // Hinweises: „die Bank gibt nichts frei" ist eine Auskunft der Bank, „wir konnten
+      // nicht fragen" ist ein Befund über uns. Beide sahen bis 2026-09-05 gleich aus —
+      // als stillschweigendes `false`, und wer daraufhin die Bank verdächtigte, suchte
+      // an der falschen Stelle.
+      hinweis: hinweisZu(k.product?.trim() || k.accountNumber, fehler, kannSaldo, kannUmsaetze, kannDepot),
     };
   });
 }
@@ -332,63 +394,59 @@ class FintsSitzung implements Abrufsitzung {
     // Kein Format hartkodieren: beide Wege werden probiert, die Reihenfolge entscheidet
     // nur, welcher zuerst dran ist.
     //
-    // Vorgabe ist CAMT. Der häufigste Grund, warum das nichts lieferte, ist seit dem Fork
-    // weg: HKCAZ nutzt die internationale Kontoverbindung, und lib-fints füllte darin
-    // IBAN, BIC UND die nationalen Felder zugleich — was mindestens ein Institut mit
-    // `3010 Kontonummer ist ungültig` und einer leeren Liste beantwortete. Der Fork fragt
-    // stattdessen die HISPAS-Parameter der Bank (`nationalAccountAllowed`).
+    // EIN Abruf, kein Ausprobieren mehr.
     //
-    // Der zweite Versuch bleibt trotzdem, aus zwei Gründen: nicht jede Bank erklärt ihre
-    // Ablehnung über HISPAS, und `success` taugt hier nicht als Prüfung — die Bibliothek
-    // setzt es auf `höchster Rückmeldecode < 9000`, und `3010` liegt darunter. Ein leeres
-    // Ergebnis ist der einzige verlässliche Indikator.
+    // Bis 2026-09-04 wurde CAMT versucht und bei leerem Ergebnis MT940 nachgeschoben.
+    // Das war ein Umweg um zwei Fehler der Bibliothek, die der Fork behoben hat: die
+    // internationale Kontoverbindung mit doppelt belegten Feldern (`3010 Kontonummer ist
+    // ungültig` bei leerer Liste), und ein Parsefehler, der als „success, keine Umsätze"
+    // zurückkam. Seit `getAccountStatements` in diesem Fall WIRFT, ist ein leeres
+    // Ergebnis wieder das, was es sein sollte — kein Umsatz im Zeitraum —, und ein
+    // zweiter Versuch darauf hätte nichts mehr zu finden.
     //
-    // `zuletzt` dreht die Reihenfolge um, wo MT940 zuletzt getragen hat. Das spart die
-    // ergebnislose erste Runde — und weil der zweite Versuch bleibt, kommt ein Institut,
-    // das CAMT nachrüstet, von selbst wieder darauf. Ein Gedächtnis, keine Festlegung.
+    // An seine Stelle tritt eine Auskunft, und zwar die der Bibliothek selbst: welche
+    // Formate DIESES KONTO anbietet. Die vergebliche erste Runde bei einem Konto ohne
+    // CAMT entfällt damit ganz, statt bei jedem Abruf einmal zu laufen.
     //
-    // `wahl` dagegen IST eine Festlegung und schliesst den anderen Weg aus. Sie wird
-    // gebraucht, weil das Gedächtnis genau dann nicht greift, wenn man es am nötigsten
-    // hätte: liefert der erste Versuch etwas — und sei es eine von der Bank gedeckelte
-    // Teilmenge —, gilt er als erfolgreich, und der zweite läuft nie.
-    const { zuerstCamt, nurEines } = formatplan(format);
+    // JE KONTO und nicht je Bank, und das ist keine Feinheit: eine Bank kann CAMT
+    // beherrschen und es nur für einen Teil ihrer Konten freigeben. Bis 2026-09-05 fiel
+    // `getAccountStatements` in diesem Fall still auf MT940 zurück, während wir „CAMT"
+    // an den Lauf schrieben — und `umsatzart` und `buchungsschluessel` sind allein über
+    // dieses Etikett deutbar. Die Begründung steht ausführlich bei `formatWaehlen`.
+    const bankkonto = this.bankkonto(konto);
+    const gelaufen = formatWaehlen(
+      format,
+      this.client.getSupportedStatementFormats(bankkonto),
+      konto.bezeichnung,
+    );
 
-    const holen = async (camt: boolean) => {
-      let a = await this.client.getAccountStatements(this.bankkonto(konto), von, bis, camt);
-      a = await mitTan(a, (r, t) => this.client.getAccountStatementsWithTan(r, t), this.frageTan, this.decoupled);
-      hinweise.push(...hinweiseAus(a));
-      return a;
-    };
-
-    const name = (camt: boolean) => (camt ? "CAMT" : "MT940");
-
-    let gelaufen = name(zuerstCamt);
-    let antwort = await holen(zuerstCamt);
-
-    if (!antwort.success || antwort.statements.length === 0) {
-      const abgelehnt = antwort.bankAnswers.find((a) => a.code === 3010);
-      const grund = abgelehnt
-        ? `${gelaufen} wurde abgelehnt (${abgelehnt.code} ${abgelehnt.text})`
-        : `${gelaufen} lieferte nichts`;
-      // Bei einer Festlegung endet es hier: wer ein Format WÄHLT, will das Ergebnis
-      // dieses Formats sehen — auch das leere. Ein stiller Rückfall würde die Frage
-      // beantworten, die niemand gestellt hat.
-      if (nurEines) {
-        hinweise.push(`${grund} — kein zweiter Versuch, das Format ist festgelegt.`);
-      } else {
-        hinweise.push(`${grund} — zweiter Versuch mit ${name(!zuerstCamt)}.`);
-        gelaufen = name(!zuerstCamt);
-        antwort = await holen(!zuerstCamt);
-      }
+    let antwort;
+    try {
+      antwort = await this.client.getAccountStatements(bankkonto, von, bis, gelaufen);
+      antwort = await mitTan(antwort, (r, t) => this.client.getAccountStatementsWithTan(r, t), this.frageTan, this.decoupled);
+    } catch (e) {
+      // **Ein Fehler heisst „nicht abgeholt", nicht „keine Umsätze".** Der Unterschied
+      // entscheidet über den fortlaufenden Abruf: `abrufAusfuehren` schreibt
+      // `letzterAbrufBis` nur im Erfolgsfall fort, und deshalb MUSS das hier ein Wurf
+      // bleiben. Würde daraus eine leere Liste, rückte der Zeiger weiter und der
+      // ungeholte Zeitraum wäre für immer übersprungen — lautlos.
+      const grund = e instanceof Error ? e.message : String(e);
+      throw new Error(`${gelaufen} liess sich nicht lesen: ${grund}`);
     }
+    hinweise.push(...hinweiseAus(antwort));
 
     if (!antwort.success) {
       throw new Error(`Die Bank hat den Abruf abgelehnt: ${hinweise.join(" · ")}`);
     }
 
+    // `statements` ist seit dem Fork OPTIONAL — es fehlt, wenn `success` false ist oder
+    // eine TAN aussteht. Beide Fälle sind oben abgefangen (Wurf bzw. `mitTan`), hier
+    // bleibt nur der dritte: die Bank hat geantwortet und nichts zu melden gehabt.
+    const auszuege = antwort.statements ?? [];
+
     const warnungen: string[] = [];
     const umsaetze = [];
-    for (const buchung of alleBuchungen(antwort.statements)) {
+    for (const buchung of alleBuchungen(auszuege)) {
       try {
         umsaetze.push(
           zuRohUmsatz(buchung, { iban: konto.iban, name: konto.bezeichnung, waehrung: konto.waehrung }),
@@ -397,6 +455,30 @@ class FintsSitzung implements Abrufsitzung {
         // Eine kaputte Zeile kippt nicht den ganzen Abruf — sie wird benannt (dieselbe
         // Regel wie beim Dateiimport).
         warnungen.push(`Buchung übersprungen: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    // VORMERKUNGEN — das zweite Feld derselben Antwort, ohne eigenen Abruf.
+    //
+    // Sie kommen mit, seit die Bibliothek sie liest, und wurden bis 2026-09-05 weggeworfen.
+    // Eine Vormerkung ist keine Buchung: sie wird in Tagen zu einer, mit möglicherweise
+    // anderem Betrag, oder sie verschwindet. Deshalb geht sie nicht durch `zuRohUmsatz`,
+    // sondern in eine eigene Form — dieselbe Trennung wie zwischen Beleg und Beobachtung.
+    //
+    // Ein Fehler beim Lesen wird jetzt GEMELDET. Solange wir sie wegwarfen, wäre er Lärm
+    // ohne Handlung gewesen; jetzt fehlt dem Nutzer etwas, das er sonst sieht.
+    if (antwort.notedStatementsError) {
+      warnungen.push(
+        `Die Vormerkungen liessen sich nicht lesen: ${antwort.notedStatementsError.message}`,
+      );
+    }
+    const vormerkungen: Vormerkungszeile[] = [];
+    for (const buchung of alleBuchungen(antwort.notedStatements ?? [])) {
+      try {
+        vormerkungen.push(zuVormerkung(buchung, konto.waehrung));
+      } catch (e) {
+        // Wie bei den Buchungen: eine kaputte Zeile kippt nicht den Rest.
+        warnungen.push(`Vormerkung übersprungen: ${e instanceof Error ? e.message : String(e)}`);
       }
     }
 
@@ -409,7 +491,7 @@ class FintsSitzung implements Abrufsitzung {
     // was die Probe meldet, ist „hier stimmt etwas nicht" und nicht „welche Zeile" — den
     // Abruf daran scheitern zu lassen nähme dem Nutzer die Daten UND die Möglichkeit,
     // selbst nachzusehen.
-    for (const p of auszugsProben(antwort.statements)) {
+    for (const p of auszugsProben(auszuege)) {
       warnungen.push(
         `Auszug zum ${p.datum}: die Bank meldet eine Veränderung, die ${p.buchungen} gelieferte ` +
           `Buchungen nicht ergeben (Lücke ${p.luecke} in Minor Units). Eine Zeile fehlt, ist doppelt ` +
@@ -419,9 +501,16 @@ class FintsSitzung implements Abrufsitzung {
 
     return {
       ergebnis: { quelle: FINTS_QUELLE, umsaetze, warnungen },
-      format: gelaufen,
+      // Was am Lauf steht, sagt die ANTWORT und nicht unsere Anforderung: gesetzt hat es
+      // die Interaktion, die tatsächlich geparst hat. Seit f943818 fällt die Bibliothek
+      // nicht mehr still auf ein anderes Format zurück, beide wären heute also gleich —
+      // aber genau diese Gleichheit war schon einmal eine Annahme, und sie stimmte nicht.
+      // Fehlt die Angabe, bleibt das Angeforderte: es gibt keinen Weg, auf dem etwas
+      // anderes gelaufen sein könnte, ohne dass der Abruf vorher geworfen hätte.
+      format: antwort.format ?? gelaufen,
       hinweise,
-      auszugsSalden: auszugsStaende(antwort.statements, warnungen),
+      auszugsSalden: auszugsStaende(auszuege, warnungen),
+      vormerkungen,
     };
   }
 }

@@ -411,6 +411,9 @@ class Sitzung implements Abrufsitzung {
       hinweise,
       // Diese Bank liefert keine Auszugsstände — ihre Umsatzantwort trägt keine Salden.
       auszugsSalden: [],
+      // Dieser Weg meldet keine Vormerkungen — die Bank gibt ueber ihre eigene
+      // Schnittstelle nur Gebuchtes heraus. Leer ist hier eine Aussage, kein Platzhalter.
+      vormerkungen: [],
     };
   }
 }

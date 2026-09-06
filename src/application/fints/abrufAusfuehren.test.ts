@@ -5,8 +5,16 @@
 
 import { describe, expect, it } from "vitest";
 import type { Zahlungskonto } from "../../core";
-import type { Abrufadapter, Abrufsitzung, Bankkonto, Bankzugang, Formatvorgabe } from "./abrufPort";
+import type {
+  Abrufadapter,
+  Abrufsitzung,
+  Bankkonto,
+  Bankzugang,
+  Formatvorgabe,
+  Vormerkungszeile,
+} from "./abrufPort";
 import type { Kontozuordnung } from "./bankzugangPort";
+import type { DepotRepository } from "../ports";
 import type { Bankprofil } from "./abrufPort";
 import { ERSTABRUF_TAGE, RUECKGRIFF_TAGE, abrufAusfuehren, abrufZeitraum } from "./abrufAusfuehren";
 
@@ -65,6 +73,7 @@ function fakeAdapter(opt: {
   saldoWirft?: boolean;
   /** Die Stände, die in den gelieferten Auszügen stehen. */
   auszugsSalden?: { datum: string; betrag: number }[];
+  vormerkungen?: Vormerkungszeile[];
   profil?: Bankprofil;
 }) {
   const anfragen: { schluessel: string; von: string; bis: string; bevorzugt?: Formatvorgabe }[] = [];
@@ -90,6 +99,7 @@ function fakeAdapter(opt: {
         // Was die Bank im Auszug mitschickt: Stand davor und Stand danach. Über den
         // Testschalter, damit auch der Fall „Format liefert keine" geprüft werden kann.
         auszugsSalden: opt.auszugsSalden ?? [],
+        vormerkungen: opt.vormerkungen ?? [],
         ergebnis: {
           quelle: "fints",
           warnungen: [],
@@ -420,10 +430,15 @@ describe("abrufAusfuehren", () => {
     expect(anfragen[0].von).toBe("2026-05-20");
   });
 
-  it("gibt das zuletzt getragene Format als Reihenfolge mit", async () => {
-    // Wo MT940 zuletzt getragen hat, spart das die ergebnislose CAMT-Runde. Es ist eine
-    // Reihenfolge, keine Festlegung — der Adapter versucht den anderen Weg trotzdem,
-    // wenn der erste leer bleibt.
+  /**
+   * Das Gedaechtnis wird NICHT mehr mitgegeben.
+   *
+   * Es stand bei jedem Konto auf „MT940", das den alten CAMT-Fehler hatte — duerfte es
+   * die Wahl tragen, blieben genau die Konten fuer immer dort, die der Fork repariert
+   * hat, und bekaemen die Glaeubiger-ID nie zu sehen. Fortgeschrieben wird es weiter
+   * (siehe der Test darunter), aber als Aufzeichnung.
+   */
+  it("gibt das zuletzt getragene Format NICHT als Vorgabe mit", async () => {
     const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
     const f = fakes([
       {
@@ -436,18 +451,7 @@ describe("abrufAusfuehren", () => {
     ]);
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    expect(anfragen[0].bevorzugt?.zuletzt).toBe("MT940");
-    // Und ohne Festlegung — das Gedächtnis dreht nur die Reihenfolge.
-    expect(anfragen[0].bevorzugt?.wahl).toBeUndefined();
-  });
-
-  it("fragt ohne Gedächtnis ohne Vorgabe", async () => {
-    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
-    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }]);
-    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
-
-    expect(anfragen[0].bevorzugt?.zuletzt).toBeUndefined();
-    expect(anfragen[0].bevorzugt?.wahl).toBeUndefined();
+    expect(anfragen[0].bevorzugt).toEqual({ wahl: undefined });
   });
 
   it("schreibt das getragene Format fort", async () => {
@@ -457,6 +461,50 @@ describe("abrufAusfuehren", () => {
 
     // Der Fake antwortet mit MT940 — beim nächsten Lauf steht das als Reihenfolge bereit.
     expect(f.gespeicherteZuordnungen[0].letztesFormat).toBe("MT940");
+  });
+
+  /**
+   * Ein Konto, fuer das die Bank Bestaende freigibt und keinen meldet, fiel bis
+   * 2026-09-05 still unter den Tisch — ein `continue`, kein Befund. In der Kontenliste
+   * standen dann zwei Konten, die beide ein Depot fuehren koennen, und danach EIN
+   * uebernommenes Depot, ohne dass irgendwo stand, was mit dem anderen war.
+   *
+   * Es ist kein Fehler: ein Verrechnungskonto kann `HKWPD` mitfuehren, ohne je einen
+   * Bestand zu haben. Nur eben eine Auskunft, die dastehen muss.
+   */
+  it("nennt ein Konto ohne Bestand, statt es wegzulassen", async () => {
+    const depotkonto = bankkonto({
+      nummer: "9876543210", unterkonto: "Depot", schluessel: "9876543210|Depot",
+      bezeichnung: "Wertpapierdepot", kannDepot: true, kannUmsaetze: false, kannSaldo: false,
+    });
+    const { adapter } = fakeAdapter({ konten: [depotkonto] });
+    const f = fakes([]);
+
+    const ergebnis = await abrufAusfuehren(zugang, "1234", async () => undefined, {
+      adapter,
+      ...f.deps,
+      // Wird nie gerufen: ohne Bestand gibt es nichts zu uebernehmen. Es muss nur da sein,
+      // damit die Schleife ueberhaupt laeuft.
+      depotRepo: {
+        alle: async () => [],
+        speichern: async () => {},
+        loeschen: async () => {},
+        werte: async () => [],
+        wertSpeichern: async () => {},
+        positionen: async () => [],
+        positionenErsetzen: async () => {},
+      } as unknown as DepotRepository,
+    });
+
+    expect(ergebnis.depots).toHaveLength(1);
+    expect(ergebnis.depots[0]).toMatchObject({
+      schluessel: "9876543210|Depot",
+      bezeichnung: "Wertpapierdepot",
+      ohneBestand: true,
+    });
+    // Kein Fehler — die Bank hat geantwortet, sie hatte nur nichts zu melden.
+    expect(ergebnis.depots[0].fehler).toBeUndefined();
+    expect(ergebnis.depots[0].uebernahme).toBeUndefined();
   });
 
   it("tut nichts, wenn dem Zugang kein Konto zugeordnet ist", async () => {
@@ -573,8 +621,9 @@ describe("Formatwahl", () => {
 
     await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
 
-    // Beides kommt an: die Wahl entscheidet, das Gedächtnis bleibt als Information.
-    expect(anfragen[0].bevorzugt).toEqual({ wahl: "MT940", zuletzt: "CAMT" });
+    // Nur die Wahl kommt an. Das Gedächtnis wird zwar weiter fortgeschrieben, aber es
+    // ist keine Eingabe mehr — siehe `Formatvorgabe`.
+    expect(anfragen[0].bevorzugt).toEqual({ wahl: "MT940" });
   });
 
   it("gibt „automatisch“ weiter wie keine Wahl", async () => {

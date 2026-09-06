@@ -119,6 +119,108 @@ describe("buchungenInExportform", () => {
     expect(b.beleg?.endempfaenger).toBe("Vibora");
   });
 
+  it("nimmt die zwei CAMT-Angaben mit, die eine Aussage ueber die Zahlung tragen", async () => {
+    // Der Zweck der Datei ist Auswertung, und dort kostet ein weggelassenes Feld einen
+    // ganzen Zyklus. Diese beiden tragen eine Aussage: der eine Code ordnet die Zahlung
+    // ein (das CAMT-Gegenstueck zum Buchungsschluessel daneben), die Referenz benennt den
+    // Vorgang dort, wo der Verwendungszweck leer bleibt.
+    //
+    // Die zwei anderen aus Migration 67 — Eintragsreferenz und Transaktionskennung —
+    // bleiben draussen, aus demselben Grund wie `bankreferenz` und `nativeId`: sie sind
+    // Schluessel und sagen ueber die Zahlung nichts.
+    const daten = await exportieren({
+      buchungen: [buchung({ id: "b-1", datum: "2026-03-04" })],
+      umsaetze: [
+        beleg({
+          id: "u-1",
+          istbuchungId: "b-1",
+          bankBuchungscode: "NTRF+117",
+          strukturierteReferenz: "RF18539007547034",
+          eintragReferenz: "NTRY-4711",
+          transaktionsId: "TX-2026-0042",
+        }),
+      ],
+    });
+
+    const [b] = daten.buchungen;
+    expect(b.beleg?.bankBuchungscode).toBe("NTRF+117");
+    expect(b.beleg?.strukturierteReferenz).toBe("RF18539007547034");
+    expect(JSON.stringify(b.beleg)).not.toContain("NTRY-4711");
+    expect(JSON.stringify(b.beleg)).not.toContain("TX-2026-0042");
+  });
+
+  it("nimmt die Zahlungen hinter einer Sammelbuchung mit", async () => {
+    // Ohne sie steht in der Datei ein Posten mit einer Summe und ohne jeden Empfaenger,
+    // und wer sie auswertet, haelt das fuer eine Luecke in den Daten statt fuer eine
+    // Sammelbuchung.
+    const daten = await exportieren({
+      buchungen: [buchung({ id: "b-1", datum: "2026-03-04" })],
+      umsaetze: [
+        beleg({
+          id: "u-1",
+          istbuchungId: "b-1",
+          gegenpartei: "",
+          sammelposten: [
+            { betrag: -45000, gegenpartei: "Kesselmann", verwendungszweck: "Abschlag" },
+            { betrag: -80000, gegenpartei: "Ohlert" },
+          ],
+        }),
+      ],
+    });
+
+    const posten = daten.buchungen[0].beleg?.sammelposten;
+    expect(posten).toHaveLength(2);
+    expect(posten?.[0].gegenpartei).toBe("Kesselmann");
+    // Was die Bank nicht sagte, steht als null da und nicht als fehlendes Feld.
+    expect(posten?.[1].verwendungszweck).toBeNull();
+  });
+
+  it("nimmt mit, was die Zahlung zu dem macht, was sie war", async () => {
+    // Der Fremdwaehrungsbetrag ist der wichtigste davon: ohne ihn steht in der Datei nur
+    // der Eurobetrag, und fuer eine Auswertung ist die Zahlung dann nicht mehr die, die
+    // stattgefunden hat.
+    const daten = await exportieren({
+      buchungen: [buchung({ id: "b-1", datum: "2026-03-04" })],
+      umsaetze: [
+        beleg({
+          id: "u-1",
+          istbuchungId: "b-1",
+          buchungsstand: "BOOK",
+          istStorno: false,
+          originalBetrag: -2499,
+          originalWaehrung: "USD",
+          wechselkurs: 1.0842,
+          gebuehrBetrag: -175,
+          gebuehrWaehrung: "EUR",
+          ruecklaufCode: "AC04",
+          ruecklaufText: "Konto aufgeloest",
+          // Das Sammelfeld bleibt draussen: sein Inhalt ist per Definition das, wofuer
+          // sich keine Aussage benennen liess. Zeigt sich, dass etwas darin zaehlt,
+          // bekommt es eine Spalte und kommt dann mit.
+          bankfelder: { transactionType: "NTRF" },
+          kundenreferenz: "NONREF",
+        }),
+      ],
+    });
+
+    const b = daten.buchungen[0].beleg;
+    expect(b?.buchungsstand).toBe("BOOK");
+    expect(b?.istStorno).toBe(false);
+    expect([b?.originalBetrag, b?.originalWaehrung, b?.wechselkurs]).toEqual([-2499, "USD", 1.0842]);
+    expect([b?.gebuehrBetrag, b?.gebuehrWaehrung]).toEqual([-175, "EUR"]);
+    expect([b?.ruecklaufCode, b?.ruecklaufText]).toEqual(["AC04", "Konto aufgeloest"]);
+    expect(JSON.stringify(b)).not.toContain("NTRF");
+    expect(JSON.stringify(b)).not.toContain("NONREF");
+  });
+
+  it("schreibt ohne Sammelbuchung ein null und keine leere Liste", async () => {
+    const daten = await exportieren({
+      buchungen: [buchung({ id: "b-1", datum: "2026-03-04" })],
+      umsaetze: [beleg({ id: "u-1", istbuchungId: "b-1" })],
+    });
+    expect(daten.buchungen[0].beleg?.sammelposten).toBeNull();
+  });
+
   it("macht aus einer Buchung ohne Beleg kein Loch, sondern ein null", () => {
     // Eine von Hand erfasste Buchung hat keinen Beleg, und das ist eine Aussage. Ein
     // fehlendes Feld sähe aus wie ein vergessenes.
