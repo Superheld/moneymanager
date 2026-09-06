@@ -33,12 +33,11 @@ function repo(): UmsatzRepository & { gespeichert: Umsatz[] } {
     speichern: async (u) => { gespeichert.push(u); },
     anlegenViele: async () => {},
     anlegen: async () => {},
-    ergaenzen: async () => {},
+    belegAnhaengen: async () => {},
     alle: async () => [],
     nachLauf: async () => [],
     offene: async () => [],
     loeschen: async () => {},
-    bestandsSchluessel: async () => ({ hashes: [], nativeIds: [] }),
   };
 }
 

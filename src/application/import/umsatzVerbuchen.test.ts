@@ -25,12 +25,11 @@ function fakes() {
     speichern: async (u: Umsatz) => { gespeichert.push(u); },
     anlegenViele: async () => {},
     anlegen: async () => {},
-    ergaenzen: async () => {},
+    belegAnhaengen: async () => {},
     alle: async () => gespeichert,
     nachLauf: async () => [],
     offene: async () => [],
     loeschen: async () => {},
-    bestandsSchluessel: async () => ({ hashes: [], nativeIds: [] }),
   } satisfies UmsatzRepository;
   return { deps: { ledgerRepo, umsatzRepo, id: () => `ist${n++}` }, ledger, gespeichert };
 }

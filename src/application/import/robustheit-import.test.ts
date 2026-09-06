@@ -19,8 +19,9 @@ import type { Kategorie, Zahlungskonto } from "../../core";
 import { tageBis } from "../../core";
 import type { ImportLauf } from "./importLauf";
 import { kontoMatchVorschlag } from "./kontoMatch";
-import { klassifiziere, rohHash } from "./rohHash";
+import { belegSchluessel, neueBelege, rohHash } from "./rohHash";
 import type { RohUmsatz } from "./rohUmsatz";
+import type { Beleg } from "./belege";
 import type { Umsatz } from "./umsatz";
 import { umsaetzeUebernehmen, type UebernahmeDeps, type UebernahmeEingabe } from "./umsaetzeUebernehmen";
 import { paareUmbuchungen } from "./umsatzVerbuchen";
@@ -77,6 +78,21 @@ function umsatz(id: string, betrag: number, kontoId: string, tag = "2026-01-05")
 /** In-Memory-Repos für die Use-Case-Tests (kein IO, keine echte DB). */
 function fakes() {
   const umsaetze: Umsatz[] = [];
+  /**
+   * Wie das echte Repository: eine gespeicherte Zahlung traegt ihren Beleg, und der Beleg
+   * weiss, aus welcher QUELLE er kam. Ohne die Quelle liefe jeder Inhaltsvergleich ins
+   * Leere und ein Reimport saehe wie ein Zugewinn aus.
+   */
+  const mitBeleg = (u: Umsatz): Umsatz => ({
+    ...u,
+    belege: [
+      {
+        ...u,
+        quelle: laeufe.find((l) => l.id === u.laufId)?.quelle ?? "",
+        zeitpunkt: laeufe.find((l) => l.id === u.laufId)?.zeitpunkt ?? "",
+      } as unknown as Beleg,
+    ],
+  });
   const konten: Zahlungskonto[] = [];
   const laeufe: ImportLauf[] = [];
   let n = 0;
@@ -93,20 +109,18 @@ function fakes() {
     } as unknown as UebernahmeDeps["kategorieRepo"],
     umsatzRepo: {
       speichern: async (u: Umsatz) => { umsaetze.push(u); },
-      anlegenViele: async (us: readonly Umsatz[]) => { umsaetze.push(...us); },
-      anlegen: async (u: Umsatz) => { umsaetze.push(u); },
-      ergaenzen: async (u: Umsatz) => {
-        const i = umsaetze.findIndex((x) => x.id === u.id);
-        if (i >= 0) umsaetze[i] = { ...u, ...umsaetze[i] };
+      anlegenViele: async (us: readonly Umsatz[]) => { umsaetze.push(...us.map(mitBeleg)); },
+      anlegen: async (u: Umsatz) => { umsaetze.push(mitBeleg(u)); },
+      belegAnhaengen: async (zahlungId: string, u: Umsatz) => {
+        const i = umsaetze.findIndex((x) => x.id === zahlungId);
+        if (i < 0) return;
+        const belege = [...(umsaetze[i].belege ?? []), ...(mitBeleg(u).belege ?? [])];
+        umsaetze[i] = { ...umsaetze[i], belege };
       },
       alle: async () => umsaetze,
       nachLauf: async () => [],
       offene: async () => umsaetze,
       loeschen: async () => {},
-      bestandsSchluessel: async () => ({
-        hashes: umsaetze.map((u) => u.rohHash),
-        nativeIds: umsaetze.flatMap((u) => (u.nativeId ? [u.nativeId] : [])),
-      }),
     } as UebernahmeDeps["umsatzRepo"],
     laufRepo: {
       alle: async () => laeufe,
@@ -294,9 +308,10 @@ describe("rohHash — Schlüsselstärke", () => {
     const b = roh({ gegenpartei: "Kiosk Meyer", verwendungszweck: "" });
     expect(rohHash(a)).not.toBe(rohHash(b));
 
-    const { neu, duplikate } = klassifiziere(
+    const { neu, bekannt: duplikate } = neueBelege(
       [{ rohHash: rohHash(a) }, { rohHash: rohHash(b) }],
-      { hashes: [], nativeIds: [] },
+      "fints",
+      { belegSchluessel: [] },
     );
     expect(duplikate).toHaveLength(0);
     expect(neu).toHaveLength(2);
@@ -331,14 +346,24 @@ describe("klassifiziere — Quellen-Asymmetrie", () => {
    * WARUM FALSCH: Reihenfolgeabhängige Doppelbuchung. Finanzguru zuerst, Bank-CSV danach →
    *   korrekt dedupliziert; andersherum → jede Buchung doppelt im Ledger.
    */
-  it("erkennt eine bereits ID-los importierte Buchung auch mit native ID als Dublette", () => {
+  it("speichert dieselbe Zeile aus einer ANDEREN Quelle — der Finder ordnet sie zu", () => {
+    // Seit dem 06.09.2026 hat sich die Arbeitsteilung gedreht, und dieser Test hat den
+    // Sinn gewechselt: die Schluesselpruefung wirft nichts mehr weg, sie entscheidet nur,
+    // ob ein Beleg etwas NEUES traegt. Dieselbe Zeile aus einer zweiten Quelle traegt
+    // etwas — sie kennt Felder, die die erste nicht hatte.
+    //
+    // Doppelt im Ledger landet sie deshalb nicht: ein gleicher Roh-Hash heisst gleicher
+    // Buchungstag (er steckt im Hash), gleicher Betrag, gleiche Gegenpartei und gleicher
+    // Zweck. Der Dublettenfinder kommt damit auf „identisch" und haengt den Beleg an die
+    // vorhandene Zahlung, statt eine zweite anzulegen.
     const h = rohHash(roh({ verwendungszweck: "Miete Januar" }));
-    const { neu, duplikate } = klassifiziere(
+    const { neu, bekannt: duplikate } = neueBelege(
       [{ rohHash: h, nativeId: "fg-123" }],
-      { hashes: [h], nativeIds: [] },
+      "finanzguru",
+      { belegSchluessel: [belegSchluessel("fints", h)] },
     );
-    expect(duplikate).toHaveLength(1);
-    expect(neu).toHaveLength(0);
+    expect(duplikate).toHaveLength(0);
+    expect(neu).toHaveLength(1);
   });
 
   /**
@@ -368,10 +393,16 @@ describe("klassifiziere — Quellen-Asymmetrie", () => {
    * Der Test hält bis dahin den IST-Zustand fest, damit die Lücke nicht in Vergessenheit
    * gerät und eine spätere Änderung hier sichtbar wird.
    */
-  it("vergleicht native IDs noch ohne Quellenangabe (offen, siehe Kommentar)", () => {
+  it("verwechselt gleiche native IDs verschiedener Quellen nicht mehr", () => {
+    // ERLEDIGT am 06.09.2026 — der Test hielt bis dahin den Fehlzustand fest.
+    //
+    // Native Ids sind nur INNERHALB ihrer Quelle eindeutig. Eine „1" von Quelle A und
+    // eine „1" von Quelle B sind zwei verschiedene Zahlungen; verglichen wurde aber die
+    // blosse Zeichenkette, und die zweite fiel als Dublette heraus, ohne irgendwo
+    // aufzutauchen. Der Schluessel traegt jetzt die Quelle mit.
     const ausQuelleB = [{ rohHash: "h-neu", nativeId: "1" }];
-    const bestandAusQuelleA = { hashes: ["h-alt"], nativeIds: ["1"], hashesOhneId: [] };
-    expect(klassifiziere(ausQuelleB, bestandAusQuelleA).duplikate).toHaveLength(1);
+    const bestandAusQuelleA = { belegSchluessel: [belegSchluessel("finanzguru", "1")] };
+    expect(neueBelege(ausQuelleB, "fints", bestandAusQuelleA).bekannt).toHaveLength(0);
   });
 });
 

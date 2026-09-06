@@ -14,10 +14,9 @@ function fakes(buchungen: IstBuchung[], umsaetze: Umsatz[]) {
   };
   const umsatzRepo = {
     speichern: async () => {}, anlegen: async () => {}, anlegenViele: async () => {},
-    ergaenzen: async () => {},
+    belegAnhaengen: async () => {},
     alle: async () => umsaetze, nachLauf: async () => [], offene: async () => [],
-    loeschen: async () => {}, bestandsSchluessel: async () => ({ hashes: [], nativeIds: [] }),
-  } satisfies UmsatzRepository;
+    loeschen: async () => {},  } satisfies UmsatzRepository;
   const klassifikatorRepo: KlassifikatorRepository = {
     laden: async () => gespeichert,
     speichern: async (s) => { gespeichert = s; },

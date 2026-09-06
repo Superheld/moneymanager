@@ -177,12 +177,11 @@ function fakes(zuordnungen: Kontozuordnung[]) {
         },
         anlegenViele: async (u: readonly any[]) => void umsaetze.push(...u),
         anlegen: async (u: any) => void umsaetze.push(u),
-        ergaenzen: async () => {},
+        belegAnhaengen: async () => {},
         alle: async () => [...umsaetze],
         nachLauf: async (laufId: string) => umsaetze.filter((u) => u.laufId === laufId),
         offene: async () => umsaetze.filter((u) => u.status === "neu"),
         loeschen: async () => {},
-        bestandsSchluessel: async () => ({ hashes: [], nativeIds: [] }),
       },
       ledgerRepo: {
         alle: async () => [...buchungen],

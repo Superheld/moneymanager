@@ -770,10 +770,13 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   }): string => {
     const id = `umsatz-${String(++umsatzNr).padStart(3, "0")}`;
     setzen(
-      "INSERT INTO umsatz_roh (id, lauf_id, buchungstag, valuta, betrag, waehrung, gegenpartei, gegenpartei_iban, verwendungszweck, roh_hash, umsatzart, zweck_code, endempfaenger) " +
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      // `zahlung_id` gehoert mitgeschrieben: jede Seed-Zeile ist ihre eigene Zahlung.
+      // Die Repositories fangen ein fehlendes zwar ab (COALESCE), aber ein Spielstand,
+      // der die Spalte leer laesst, uebt das Falsche ein.
+      "INSERT INTO umsatz_roh (id, lauf_id, zahlung_id, buchungstag, valuta, betrag, waehrung, gegenpartei, gegenpartei_iban, verwendungszweck, roh_hash, umsatzart, zweck_code, endempfaenger) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
       [
-        id, o.laufId, o.datum, o.datum, o.betrag, "EUR", o.partei,
+        id, o.laufId, id, o.datum, o.datum, o.betrag, "EUR", o.partei,
         iban("99999904", 7000000 + umsatzNr), o.zweck, o.hash,
         o.umsatzart ?? null, o.zweckCode ?? null, o.endempfaenger ?? null,
       ],

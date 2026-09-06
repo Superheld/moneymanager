@@ -54,15 +54,11 @@ function welt() {
       const i = umsaetze.findIndex((x) => x.id === u.id);
       if (i >= 0) umsaetze[i] = u; else umsaetze.push(u);
     },
-    ergaenzen: async () => {},
+    belegAnhaengen: async () => {},
     alle: async () => umsaetze,
     nachLauf: async (id) => umsaetze.filter((u) => u.laufId === id),
     offene: async () => umsaetze.filter((u) => u.status === "neu"),
     loeschen: async () => {},
-    bestandsSchluessel: async () => ({
-      hashes: umsaetze.map((u) => u.rohHash),
-      nativeIds: umsaetze.flatMap((u) => (u.nativeId ? [u.nativeId] : [])),
-    }),
   };
   const laufRepo: ImportLaufRepository = {
     alle: async () => laeufe, speichern: async (l) => { laeufe.push(l); }, loeschen: async () => {},

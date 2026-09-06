@@ -123,9 +123,17 @@ gejoint. Wer sie an der Buchung sucht, findet nichts und baut sich ein zweites F
 **Ein `Umsatz` steht in ZWEI Tabellen und kommt als EIN Objekt zurück.** `umsatz_roh` ist
 der Beleg und nach dem Anlegen unveränderlich, `umsatz_verarbeitung` der Stand. Sichtbar ist
 das nur an den Schreibwegen: `anlegen` schreibt beides (in einer Transaktion), `speichern`
-nur den Stand, `ergaenzen` als einzige Rohdaten — und dort nur Fehlendes, per `COALESCE`.
+nur den Stand, `belegAnhaengen` einen weiteren Beleg — geändert wird ein Beleg nie.
 Wer eine neue Zeile mit `speichern` anlegt, bekommt einen Stand ohne Beleg und findet die
 Zeile nie wieder. Die Begründung der Trennung steht in der Wurzel-`CLAUDE.md`.
+
+**Eine Zahlung kann MEHRERE Belege haben** (`umsatz_roh.zahlung_id`), und der Leseweg führt
+sie zusammen: der JOIN auf `umsatz_verarbeitung` hängt an `COALESCE(r.zahlung_id, r.id)`,
+nicht an `r.id`. Das `COALESCE` ist kein Zierrat — wer eine Rohzeile an den Repositories
+vorbei einfügt (Spielstand, Fixtures), füllt die Spalte leicht nicht, und ohne den Rückfall
+fielen alle solchen Zeilen unter EINEN Schlüssel und würden zu einer einzigen Zahlung.
+Ebenso ist der JOIN auf `import_lauf` ein LEFT und kein INNER: fehlt der Lauf, verschwände
+der Beleg sonst spurlos aus jeder Liste.
 
 **Von der Buchung zum Beleg wird GEJOINT, nicht gesucht.** Der Weg ist
 `umsatz_verarbeitung.istbuchung_id` — indiziert und per Fremdschlüssel abgesichert. Eine

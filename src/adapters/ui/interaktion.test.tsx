@@ -522,9 +522,10 @@ describe("Buchungsdetails", () => {
       expect(umsatz?.istbuchungId).toBeUndefined();
     });
 
-    // Der Roh-Hash bleibt im Bestand: genau er blockt den Reimport beim nächsten Abruf.
-    const schluessel = await sqliteUmsatzRepository.bestandsSchluessel();
-    expect(schluessel.hashes).toContain("h-bank");
+    // Der Beleg bleibt im Bestand: genau ihn findet der Dublettenfinder beim nächsten
+    // Abruf wieder, und deshalb kommt die verworfene Zeile nicht zurück.
+    const bestand = await sqliteUmsatzRepository.alle();
+    expect(bestand.flatMap((u) => u.belege ?? []).some((b) => b.nativeId === "fints-1")).toBe(true);
   });
 
   it("lässt eine Zeile aus einem Dateiimport löschen, auch auf einem Bankkonto", async () => {

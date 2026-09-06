@@ -12,7 +12,8 @@
 // dafür wäre eine zweite Aussage über dasselbe (ist ein Vorschlag da oder nicht).
 
 import { FachlicherFehler, type Cent, type Charakter } from "../../core";
-import type { RohSammelposten, RohUmsatz } from "./rohUmsatz";
+import type { RohSammelposten } from "./rohUmsatz";
+import type { Beleg } from "./belege";
 
 export type UmsatzStatus = "neu" | "verbucht" | "duplikat" | "verworfen";
 
@@ -101,6 +102,17 @@ export interface Umsatz {
   readonly rohHash: string;
   /** Stabile native ID der Quelle (Finanzguru Buchungs-ID) — exakte Re-Import-Dedup. */
   readonly nativeId?: string;
+  /**
+   * Die Belege, aus denen diese Zahlung besteht — mindestens einer.
+   *
+   * Die Felder oben sind das ERGEBNIS ihrer Zusammenfuehrung (`belege.ts`), nicht der
+   * Inhalt einer einzelnen Zeile. Wer wissen will, woher ein Wert stammt, sieht hier
+   * nach: je Beleg stehen Quelle, Format und Lauf daneben.
+   *
+   * Optional, damit ein von Hand gebauter `Umsatz` in Tests nicht jedes Mal eine
+   * Belegliste mitschleppen muss. Aus der Persistenz kommt sie immer.
+   */
+  readonly belege?: readonly Beleg[];
   readonly status: UmsatzStatus;
   readonly vorschlag?: Kategorisierungsvorschlag;
   /** Gesetzt genau dann, wenn status === "verbucht". */
@@ -112,65 +124,17 @@ export interface Umsatz {
   // anderen Quelle etwas dazukommt.
 }
 
-/**
- * Trägt nach, was eine andere Quelle mehr weiß — und nur das.
- *
- * Das ist die Antwort auf „nicht doppeln, wenn dann ergänzen": erkennt der
- * Dublettenfinder eine Buchung wieder, entsteht keine zweite Zeile, sondern die
- * vorhandene bekommt die Felder, die ihr fehlen. Bestehende Werte werden NIE
- * überschrieben — die erste Quelle behält recht, denn sie hat die Zeile erzeugt und
- * alles daran (Vorschlag, Verbuchung, Aufteilungen) hängt an ihr.
- *
- * Gibt `null` zurück, wenn nichts zu ergänzen war; dann muss auch nichts geschrieben
- * werden.
- */
-export function ergaenze(u: Umsatz, roh: RohUmsatz): Umsatz | null {
-  const ergaenzt: Umsatz = {
-    ...u,
-    valuta: u.valuta ?? roh.valuta,
-    glaeubigerId: u.glaeubigerId ?? roh.glaeubigerId,
-    gegenparteiIban: u.gegenparteiIban ?? roh.gegenparteiIban,
-    mandatsreferenz: u.mandatsreferenz ?? roh.mandatsreferenz,
-    e2eReferenz: u.e2eReferenz ?? roh.e2eReferenz,
-    umsatzart: u.umsatzart ?? roh.umsatzart,
-    buchungsschluessel: u.buchungsschluessel ?? roh.buchungsschluessel,
-    // Die beiden standen schon in `Umsatz` und im UPDATE des Repositories, hier aber
-    // nicht — und weil DIESE Liste entscheidet, ob überhaupt geschrieben wird, kamen sie
-    // aus einer zweiten Quelle nie an. Eine Zeile aus einem Dateiimport, die später per
-    // CAMT wiedererkannt wird, blieb ohne beide.
-    zweckCode: u.zweckCode ?? roh.zweckCode,
-    endempfaenger: u.endempfaenger ?? roh.endempfaenger,
-    bankreferenz: u.bankreferenz ?? roh.bankreferenz,
-    eintragReferenz: u.eintragReferenz ?? roh.eintragReferenz,
-    bankBuchungscode: u.bankBuchungscode ?? roh.bankBuchungscode,
-    transaktionsId: u.transaktionsId ?? roh.transaktionsId,
-    strukturierteReferenz: u.strukturierteReferenz ?? roh.strukturierteReferenz,
-    sammelposten: u.sammelposten ?? roh.sammelposten,
-    buchungsstand: u.buchungsstand ?? roh.buchungsstand,
-    istStorno: u.istStorno ?? roh.istStorno,
-    originalBetrag: u.originalBetrag ?? roh.originalBetrag,
-    originalWaehrung: u.originalWaehrung ?? roh.originalWaehrung,
-    wechselkurs: u.wechselkurs ?? roh.wechselkurs,
-    gebuehrBetrag: u.gebuehrBetrag ?? roh.gebuehrBetrag,
-    gebuehrWaehrung: u.gebuehrWaehrung ?? roh.gebuehrWaehrung,
-    ruecklaufCode: u.ruecklaufCode ?? roh.ruecklaufCode,
-    ruecklaufText: u.ruecklaufText ?? roh.ruecklaufText,
-    kundenreferenz: u.kundenreferenz ?? roh.kundenreferenz,
-    bankfelder: u.bankfelder ?? roh.bankfelder,
-    // Die native ID der ANDEREN Quelle nur setzen, wenn noch keine dasteht: sie ist der
-    // Schlüssel für den Reimport genau dieser Quelle.
-    nativeId: u.nativeId ?? roh.nativeId,
-  };
-  const felder: (keyof Umsatz)[] = [
-    "valuta", "glaeubigerId", "gegenparteiIban", "mandatsreferenz",
-    "e2eReferenz", "umsatzart", "buchungsschluessel", "bankreferenz", "nativeId",
-    "zweckCode", "endempfaenger",
-    "eintragReferenz", "bankBuchungscode", "transaktionsId", "strukturierteReferenz",
-    "sammelposten",
-    "buchungsstand", "istStorno", "originalBetrag", "originalWaehrung", "wechselkurs", "gebuehrBetrag", "gebuehrWaehrung", "ruecklaufCode", "ruecklaufText", "kundenreferenz", "bankfelder",
-  ];
-  return felder.some((f) => ergaenzt[f] !== u[f]) ? ergaenzt : null;
-}
+// `ergaenze` stand hier bis zum 06.09.2026 und ist ersatzlos weg.
+//
+// Sie war die Antwort auf „nicht doppeln, wenn dann ergänzen": erkannte der
+// Dublettenfinder eine Buchung wieder, bekam die VORHANDENE Zeile die fehlenden Felder
+// und die eingehende verschwand. Der Preis war hoch und lange unsichtbar — wer erst aus
+// einer Fremdsoftware importierte und danach dieselben Monate bei der Bank abrief, verlor
+// die Bankfassung, und ein Institut hält Umsätze nur begrenzt vor.
+//
+// An ihre Stelle tritt `belege.ts`: die zweite Fassung legt sich als eigener Beleg
+// daneben, und welcher Wert gilt, entscheidet das LESEN. Damit fällt auch die letzte
+// Ausnahme von „ein Beleg ist unveränderlich" weg.
 
 function nurNeu(u: Umsatz, aktion: string): void {
   if (u.status !== "neu") {

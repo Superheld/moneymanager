@@ -215,9 +215,15 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
                   {b.fehler ? (
                     <span className="err">{b.fehler}</span>
                   ) : (
+                    // „ergaenzt" gehoert daneben, sonst liest sich der haeufigste Fall
+                    // wie ein Fehlschlag: wer erst aus einer Datei importiert und danach
+                    // dieselben Monate abruft, sieht sonst „0 neu" und denkt, der Abruf
+                    // habe nichts gebracht. In Wahrheit ist an jede Zahlung die Fassung
+                    // der Bank gekommen.
                     t("konten.abruf.zeile", {
                       eingelesen: b.ergebnis?.eingelesen ?? 0,
                       neu: b.ergebnis?.neu ?? 0,
+                      ergaenzt: b.ergebnis?.ergaenzt ?? 0,
                       duplikate: b.ergebnis?.duplikate ?? 0,
                     })
                   )}
