@@ -319,7 +319,12 @@ export function ImportScreen() {
             </Button>
             {uErgebnis && (
               <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)" }}>
-                {t("import.uebernahmeErgebnis", { neu: uErgebnis.neu, duplikate: uErgebnis.duplikate, konten: uErgebnis.angelegteKonten })}
+                {t("import.uebernahmeErgebnis", {
+                  neu: uErgebnis.neu,
+                  ergaenzt: uErgebnis.ergaenzt,
+                  duplikate: uErgebnis.duplikate,
+                  konten: uErgebnis.angelegteKonten,
+                })}
               </span>
             )}
           </div>

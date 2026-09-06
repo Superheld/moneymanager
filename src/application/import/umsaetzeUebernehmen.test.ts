@@ -11,6 +11,7 @@ import type { RohUmsatz } from "./rohUmsatz";
 import { verwerfen, type Umsatz } from "./umsatz";
 import { umsaetzeUebernehmen, type UebernahmeDeps } from "./umsaetzeUebernehmen";
 import { quelleKeyFuer } from "./kontoMatch";
+import { zusammenfuehren, type Beleg } from "./belege";
 import type { Vorschlagskontext } from "./vorschlag";
 
 function roh(over: Partial<RohUmsatz>): RohUmsatz {
@@ -37,6 +38,13 @@ function fakes() {
     speichern: async () => {},
     loeschen: async () => {},
   };
+  /** Wie das echte Repository: eine gespeicherte Zahlung traegt ihren Beleg. */
+  const mitBeleg = (u: Umsatz): Umsatz => ({ ...u, belege: [alsBeleg(u)] });
+  const alsBeleg = (u: Umsatz): Beleg => {
+    const l = laeufe.find((x) => x.id === u.laufId);
+    return { ...u, quelle: l?.quelle ?? "", format: l?.format, zeitpunkt: l?.zeitpunkt ?? "" };
+  };
+
   const umsatzRepo: UmsatzRepository = {
     speichern: async (u) => {
       // Wie das echte Repository: ON CONFLICT(id) DO UPDATE. Ohne das sähe der
@@ -45,29 +53,22 @@ function fakes() {
       if (i >= 0) umsaetze[i] = u;
       else umsaetze.push(u);
     },
-    anlegenViele: async (us) => { umsaetze.push(...us); },
-    anlegen: async (u) => { umsaetze.push(u); },
-    // Wie das echte Repository: nur FEHLENDE Felder werden nachgetragen, Bestehendes
-    // bleibt stehen. Eine Attrappe, die einfach ersetzt, liesse den Ergaenzen-Fall auch
-    // dann gruen aussehen, wenn er in Wahrheit ueberschreibt.
-    ergaenzen: async (u) => {
-      const i = umsaetze.findIndex((x) => x.id === u.id);
+    // Wie das echte Repository: jede Zahlung traegt ihren Beleg.
+    anlegenViele: async (us) => { umsaetze.push(...us.map(mitBeleg)); },
+    anlegen: async (u) => { umsaetze.push(mitBeleg(u)); },
+    // Wie das echte Repository: der Beleg legt sich DANEBEN, und die Zahlung wird aus
+    // allen ihren Belegen neu zusammengefuehrt. Eine Attrappe, die nur ergaenzt oder nur
+    // ersetzt, liesse den Vorrang der Bank gruen aussehen, ohne dass er greift.
+    belegAnhaengen: async (zahlungId, beleg) => {
+      const i = umsaetze.findIndex((x) => x.id === zahlungId);
       if (i < 0) return;
-      const alt = umsaetze[i] as unknown as Record<string, unknown>;
-      const neu = { ...alt };
-      for (const [k, v] of Object.entries(u as unknown as Record<string, unknown>)) {
-        if (neu[k] === undefined && v !== undefined) neu[k] = v;
-      }
-      umsaetze[i] = neu as unknown as Umsatz;
+      const belege = [...(umsaetze[i].belege ?? [alsBeleg(umsaetze[i])]), alsBeleg(beleg)];
+      umsaetze[i] = { ...umsaetze[i], ...zusammenfuehren(belege, zahlungId), belege };
     },
     alle: async () => umsaetze,
     nachLauf: async (laufId) => umsaetze.filter((u) => u.laufId === laufId),
     offene: async () => umsaetze.filter((u) => u.status === "neu"),
     loeschen: async () => {},
-    bestandsSchluessel: async () => ({
-      hashes: umsaetze.map((u) => u.rohHash),
-      nativeIds: umsaetze.flatMap((u) => (u.nativeId ? [u.nativeId] : [])),
-    }),
   };
   const laufRepo: ImportLaufRepository = {
     alle: async () => laeufe,
@@ -275,9 +276,10 @@ describe("Dublettenfinder beim Übernehmen", () => {
       ...over,
     });
 
-  it("legt eine wiedererkannte Buchung nicht nochmal an, sondern ergänzt sie", async () => {
-    // Der Fall, der am echten Bestand 51 von 60 Zeilen betraf: der Roh-Hash trifft nicht,
-    // weil Finanzguru die Gegenpartei putzt und die Bank sie roh liefert.
+  it("legt eine wiedererkannte Buchung nicht nochmal an, sondern hängt den Beleg an", async () => {
+    // Der Fall, um den es beim ganzen Umbau geht, und am echten Bestand der Normalfall:
+    // der Roh-Hash trifft NICHT, weil eine Fremdsoftware die Gegenpartei putzt und die
+    // Bank sie roh liefert. Erkannt wird die Zahlung trotzdem — vom Finder.
     const f = await bestandAusDatei();
     const vorher = f.umsaetze.length;
 
@@ -291,17 +293,42 @@ describe("Dublettenfinder beim Übernehmen", () => {
       f.deps,
     );
 
+    // Keine zweite Zahlung, aber auch keine verworfene Zeile: der Beleg ist DAZUGEKOMMEN.
     expect(ergebnis.neu).toBe(0);
-    expect(ergebnis.duplikate).toBe(1);
+    expect(ergebnis.duplikate).toBe(0);
     expect(ergebnis.ergaenzt).toBe(1);
     expect(f.umsaetze).toHaveLength(vorher);
+    expect(f.umsaetze[0].belege).toHaveLength(2);
 
-    // Ergänzt wurde, was die Bank mehr weiß …
+    // Was nur die Bank weiß, kommt an …
     expect(f.umsaetze[0].mandatsreferenz).toBe("M-4711");
     expect(f.umsaetze[0].valuta).toBe("2026-08-04");
-    // … und die native ID der ersten Quelle bleibt unangetastet.
+    // … was nur die Datei hat, bleibt stehen (die Bank vergibt keine native Id) …
     expect(f.umsaetze[0].nativeId).toBe("fg-1");
-    expect(f.umsaetze[0].gegenpartei).toBe("Nordhoff");
+    // … und wo BEIDE etwas sagen, gilt die Bank. Das ist die sichtbare Umkehr: vorher
+    // behielt die erste Quelle recht, jetzt gewinnt die, die näher an der Zahlung sitzt.
+    expect(f.umsaetze[0].gegenpartei).toBe("EDK*NORDHOFF NORDHOFF");
+  });
+
+  it("lässt die Fassung der Fremdsoftware dabei erhalten", async () => {
+    // Nichts wird überschrieben — die geputzte Fassung steht weiter an ihrem Beleg. Das
+    // ist der Unterschied zwischen „die Bank gilt" und „die Bank ersetzt": eine spätere
+    // Regel kann die andere Fassung jederzeit wieder vorziehen, ohne dass jemand sie neu
+    // beschaffen müsste.
+    const f = await bestandAusDatei();
+    await umsaetzeUebernehmen(
+      {
+        quelle: "fints",
+        zeitpunkt: "2026-08-18T10:00:00.000Z",
+        rohUmsaetze: [vonDerBank()],
+        konten: [{ quelleKey: "DE31999999980000000002", kontoId: f.konten[0].id }],
+      },
+      f.deps,
+    );
+
+    const parteien = (f.umsaetze[0].belege ?? []).map((b) => b.gegenpartei);
+    expect(parteien).toContain("Nordhoff");
+    expect(parteien).toContain("EDK*NORDHOFF NORDHOFF");
   });
 
   it("legt bei abweichendem Datum an, schreibt aber den Verdacht dazu", async () => {

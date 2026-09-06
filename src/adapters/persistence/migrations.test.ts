@@ -923,6 +923,12 @@ describe("Migration 50 — der Rest der Verweise", () => {
       // Schluessel mit CASCADE raeumte genau den Eintrag weg, der die Loeschung
       // festhaelt; einer mit RESTRICT verboete das Loeschen ganz.
       "buchung_journal.istbuchung_id",
+      // Die ZAHLUNG, zu der ein Beleg gehoert. Sie ist keine eigene Tabelle, sondern die
+      // Id des namengebenden Belegs — ein Fremdschluessel auf `umsatz_roh(id)` waere ein
+      // Selbstverweis, den die erste Zeile jeder Zahlung im Moment ihres INSERTs noch
+      // nicht erfuellen kann. Was ihn ersetzt: `umsatz_verarbeitung.umsatz_id` zeigt auf
+      // dieselbe Id und IST abgesichert, und ohne Verarbeitung gibt es keine Zahlung.
+      "umsatz_roh.zahlung_id",
     ]);
 
     const tabellen = db

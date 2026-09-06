@@ -312,10 +312,14 @@ export interface UmsatzRepository {
   /** Schreibt NUR den Verarbeitungsstand (Status, Vorschlag, Verbuchung, Verdacht). */
   speichern(umsatz: Umsatz): Promise<void>;
   /**
-   * Trägt an einer vorhandenen Zeile nach, was eine zweite Quelle mehr weiss — und nur
-   * das Fehlende. Die einzige Stelle, an der Rohdaten nachträglich wachsen.
+   * Hängt einen weiteren Beleg an eine vorhandene Zahlung.
+   *
+   * Der Nachfolger von `ergaenzen`: statt fehlende Felder in die vorhandene Zeile zu
+   * schreiben und die eingehende wegzuwerfen, legt sich die zweite Fassung DANEBEN — mit
+   * ihrem eigenen Lauf. Welcher Wert gilt, entscheidet erst das Lesen
+   * (`import/belege.ts`). Damit ist ein Beleg ohne Ausnahme unveränderlich.
    */
-  ergaenzen(umsatz: Umsatz): Promise<void>;
+  belegAnhaengen(zahlungId: string, beleg: Umsatz): Promise<void>;
   /** Alle Umsätze (inkl. verbuchte) — z. B. für Detail-Join über istbuchungId. */
   alle(): Promise<Umsatz[]>;
   /** Umsätze eines Laufs. */
@@ -323,15 +327,10 @@ export interface UmsatzRepository {
   /** Noch nicht verbuchte/verworfene Umsätze — die Review-Inbox. */
   offene(): Promise<Umsatz[]>;
   loeschen(id: string): Promise<void>;
-  /**
-   * Vorhandene Dedup-Schlüssel (für die Duplikaterkennung beim nächsten Import).
-   * `hashesOhneId` enthält nur die Hashes der Bestandszeilen OHNE native ID — gegen sie
-   * darf auch ein Kandidat MIT ID über den Hash geprüft werden, ohne dass zwei echte
-   * Buchungen derselben Quelle fälschlich zusammenfallen (siehe rohHash.ts).
-   */
-  bestandsSchluessel(): Promise<{
-    hashes: string[];
-    nativeIds: string[];
-    hashesOhneId?: string[];
-  }>;
+  // KEIN `bestandsSchluessel` mehr. Er lieferte die Dedup-Schlüssel des ganzen Bestands,
+  // und beide Fragen, die er beantwortete, haben seit dem 06.09.2026 bessere Antworten:
+  // ob zwei Zeilen dieselbe Zahlung meinen, entscheidet der Dublettenfinder, und ob ein
+  // Beleg etwas beiträgt, ein Inhaltsvergleich gegen die Belege DIESER Zahlung
+  // (`import/belege.ts`). Ein Schlüssel über fünf Felder konnte das zweite nie: eine
+  // Quelle, die eine Spalte nachliefert, ändert ihn nicht.
 }

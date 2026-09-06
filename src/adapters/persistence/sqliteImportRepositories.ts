@@ -19,12 +19,14 @@ import type {
 } from "../../application/ports";
 import type { Dublettenfreigabe } from "../../application/dubletten/dublettensicht";
 import type {
+  Beleg,
   ImportLauf,
   RohSammelposten,
   Umsatz,
   UmsatzStatus,
   VorschlagQuelle,
 } from "../../application/import";
+import { zusammenfuehren } from "../../application/import";
 import { getDb } from "./db";
 import { inTransaktion, type Anweisung } from "./transaktion";
 
@@ -94,6 +96,11 @@ export const sqliteImportLaufRepository: ImportLaufRepository = {
 interface UmsatzZeile {
   id: string;
   lauf_id: string;
+  zahlung_id: string;
+  /** Aus `import_lauf` — aus Quelle und Format entsteht der Rang des Belegs. */
+  quelle: string | null;
+  format: string | null;
+  zeitpunkt: string | null;
   zahlungskonto_id: string;
   buchungstag: string;
   valuta: string | null;
@@ -179,11 +186,21 @@ function bankfelderAus(text: string | null): Readonly<Record<string, unknown>> |
   }
 }
 
-function zuUmsatz(z: UmsatzZeile): Umsatz {
+/**
+ * Eine Zeile wird ein BELEG, nicht mehr ein Umsatz.
+ *
+ * Der Umsatz entsteht erst aus allen Belegen einer Zahlung (`zuUmsaetze`). Was hier
+ * herauskommt, ist die Fassung EINER Quelle, genau so wie sie geliefert hat.
+ */
+function zuBeleg(z: UmsatzZeile): Beleg {
   return {
     id: z.id,
     laufId: z.lauf_id,
-    zahlungskontoId: z.zahlungskonto_id,
+    // Ohne Lauf: leere Quelle. Sie steht in keinem `ABRUF_QUELLEN`, der Beleg bekommt
+    // damit den schwächsten Rang — sichtbar, aber ohne Vorrang.
+    quelle: z.quelle ?? "",
+    format: z.format ?? undefined,
+    zeitpunkt: z.zeitpunkt ?? "",
     buchungstag: z.buchungstag,
     valuta: z.valuta ?? undefined,
     betrag: z.betrag,
@@ -218,17 +235,39 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
     bankfelder: bankfelderAus(z.bankfelder),
     rohHash: z.roh_hash,
     nativeId: z.native_id ?? undefined,
-    // Ohne Verarbeitungszeile ist die Zeile unangetastet — also „neu".
-    status: (z.status ?? "neu") as UmsatzStatus,
-    vorschlag: z.vorschlag_charakter
+  };
+}
+
+/**
+ * Aus den Belegzeilen werden die Zahlungen — je Zahlung EIN `Umsatz`.
+ *
+ * Die Felder entstehen ueber `zusammenfuehren`; der Verarbeitungsstand kommt aus der
+ * Zeile, die jede Belegzeile derselben Zahlung identisch mitbringt (der JOIN haengt an
+ * `zahlung_id`). Die Reihenfolge der Zahlungen ist die der Abfrage — sortiert wird in
+ * SQL, nicht hier.
+ */
+function zuUmsaetze(zeilen: readonly UmsatzZeile[]): Umsatz[] {
+  const gruppen = new Map<string, { stand: UmsatzZeile; belege: Beleg[] }>();
+  for (const z of zeilen) {
+    const vorhanden = gruppen.get(z.zahlung_id);
+    if (vorhanden) vorhanden.belege.push(zuBeleg(z));
+    else gruppen.set(z.zahlung_id, { stand: z, belege: [zuBeleg(z)] });
+  }
+  return [...gruppen.entries()].map(([zahlungId, { stand, belege }]) => ({
+    ...zusammenfuehren(belege, zahlungId),
+    belege,
+    zahlungskontoId: stand.zahlungskonto_id,
+    // Ohne Verarbeitungszeile ist die Zahlung unangetastet — also „neu".
+    status: (stand.status ?? "neu") as UmsatzStatus,
+    vorschlag: stand.vorschlag_charakter
       ? {
-          kategorieId: z.vorschlag_kategorie_id ?? undefined,
-          charakter: z.vorschlag_charakter as Charakter,
-          quelle: (z.vorschlag_quelle ?? "manuell") as VorschlagQuelle,
+          kategorieId: stand.vorschlag_kategorie_id ?? undefined,
+          charakter: stand.vorschlag_charakter as Charakter,
+          quelle: (stand.vorschlag_quelle ?? "manuell") as VorschlagQuelle,
         }
       : undefined,
-    istbuchungId: z.istbuchung_id ?? undefined,
-  };
+    istbuchungId: stand.istbuchung_id ?? undefined,
+  }));
 }
 
 // Der Umsatz steht in ZWEI Tabellen und kommt als EIN Objekt zurück. Das ist Absicht:
@@ -237,8 +276,27 @@ function zuUmsatz(z: UmsatzZeile): Umsatz {
 //
 // LEFT JOIN, nicht INNER: eine Rohzeile ohne Verarbeitungsstand ist kein Datenfehler,
 // sondern der Zustand direkt nach „auf den Stand der Quelle zurücksetzen". Sie zählt dann
-// als „neu" — siehe `zuUmsatz`.
-const SELECT = `SELECT r.id, r.lauf_id, v.zahlungskonto_id, r.buchungstag, r.valuta, r.betrag,
+// als „neu" — siehe `zuUmsaetze`.
+//
+// Der Verarbeitungs-JOIN hängt seit dem 06.09.2026 an `zahlung_id` statt an `r.id`: eine
+// Zahlung kann mehrere Belege haben, und der Stand gilt für sie alle. Jede Belegzeile
+// bringt ihn deshalb identisch mit; `zuUmsaetze` nimmt ihn einmal.
+//
+// `COALESCE(zahlung_id, id)` ueberall: die Spalte kam mit Migration 71 dazu, und wer eine
+// Rohzeile an den Repositories vorbei einfuegt (Spielstand, Fixtures), fuellt sie leicht
+// nicht. Ohne den Rueckfall fielen alle solchen Zeilen unter EINEN Schluessel zusammen und
+// wuerden zu einer einzigen Zahlung verschmolzen — ein Datenverlust, den man erst bemerkt,
+// wenn eine Liste kuerzer ist als erwartet. Eine Zeile ohne Zahlung ist ihre eigene.
+//
+// Der Lauf kommt dazu, weil aus Quelle und Format der RANG eines Belegs entsteht — und
+// zwar ebenfalls als LEFT JOIN. Ein INNER wäre die schärfere Aussage und die gefährlichere
+// Naht: fehlt der Lauf, verschwände der Beleg SPURLOS aus jeder Liste. Der Fremdschlüssel
+// hält das in der App zwar, aber ein Leseweg, der bei einer Unstimmigkeit still weniger
+// liefert, ist genau die Sorte Fehler, die man erst bemerkt, wenn eine Summe nicht mehr
+// aufgeht. Ohne Lauf bekommt der Beleg den schwächsten Rang und bleibt sichtbar.
+const SELECT = `SELECT r.id, r.lauf_id, COALESCE(r.zahlung_id, r.id) AS zahlung_id,
+       l.quelle, l.format, l.zeitpunkt,
+       v.zahlungskonto_id, r.buchungstag, r.valuta, r.betrag,
        r.waehrung, r.gegenpartei, r.verwendungszweck, r.glaeubiger_id, r.gegenpartei_iban,
        r.mandatsreferenz, r.e2e_referenz, r.umsatzart, r.buchungsschluessel,
        r.zweck_code, r.endempfaenger, r.bank_referenz,
@@ -250,7 +308,9 @@ const SELECT = `SELECT r.id, r.lauf_id, v.zahlungskonto_id, r.buchungstag, r.val
        r.roh_hash, r.native_id,
        v.status, v.vorschlag_kategorie_id, v.vorschlag_charakter, v.vorschlag_quelle,
        v.istbuchung_id
-  FROM umsatz_roh r LEFT JOIN umsatz_verarbeitung v ON v.umsatz_id = r.id`;
+  FROM umsatz_roh r
+       LEFT JOIN umsatz_verarbeitung v ON v.umsatz_id = COALESCE(r.zahlung_id, r.id)
+       LEFT JOIN import_lauf l ON l.id = r.lauf_id`;
 
 /**
  * Wann der Verarbeitungsstand zuletzt angefasst wurde.
@@ -264,10 +324,10 @@ function jetzt(): string {
 }
 
 /** Die Rohzeile — der Beleg. Wird beim Anlegen geschrieben und danach nie wieder. */
-function rohAnweisung(u: Umsatz): Anweisung {
+function rohAnweisung(u: Umsatz, zahlungId: string): Anweisung {
   return {
     sql: `INSERT INTO umsatz_roh
-       (id, lauf_id, buchungstag, valuta, betrag, waehrung, gegenpartei,
+       (id, lauf_id, zahlung_id, buchungstag, valuta, betrag, waehrung, gegenpartei,
         gegenpartei_iban, verwendungszweck, glaeubiger_id, mandatsreferenz, e2e_referenz,
         umsatzart, buchungsschluessel, zweck_code, endempfaenger, bank_referenz,
         eintrag_referenz, bank_buchungscode, transaktions_id, strukturierte_referenz,
@@ -276,10 +336,10 @@ function rohAnweisung(u: Umsatz): Anweisung {
         kundenreferenz, bankfelder,
         roh_hash, native_id)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,
-             $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35)
+             $23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36)
      ON CONFLICT(id) DO NOTHING`,
     werte: [
-      u.id, u.laufId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
+      u.id, u.laufId, zahlungId, u.buchungstag, u.valuta ?? null, u.betrag, u.waehrung,
       u.gegenpartei, u.gegenparteiIban ?? null, u.verwendungszweck, u.glaeubigerId ?? null,
       u.mandatsreferenz ?? null, u.e2eReferenz ?? null, u.umsatzart ?? null,
       u.buchungsschluessel ?? null, u.zweckCode ?? null, u.endempfaenger ?? null,
@@ -335,14 +395,14 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
    */
   async anlegen(u: Umsatz) {
     const db = await getDb();
-    await inTransaktion(db, [rohAnweisung(u), standAnweisung(u, jetzt())]);
+    await inTransaktion(db, [rohAnweisung(u, u.id), standAnweisung(u, jetzt())]);
   },
   async anlegenViele(umsaetze: readonly Umsatz[]) {
     const db = await getDb();
     const zeit = jetzt();
     await inTransaktion(
       db,
-      umsaetze.flatMap((u) => [rohAnweisung(u), standAnweisung(u, zeit)]),
+      umsaetze.flatMap((u) => [rohAnweisung(u, u.id), standAnweisung(u, zeit)]),
     );
   },
   /**
@@ -358,99 +418,58 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
     await db.execute(a.sql, [...(a.werte ?? [])]);
   },
   /**
-   * Die EINZIGE Stelle, an der Rohdaten nachträglich wachsen.
+   * Hängt einen weiteren Beleg an eine vorhandene Zahlung.
    *
-   * Der Fall des Dublettenfinders: eine bekannte Zeile taucht in einer zweiten Quelle
-   * auf, die mehr weiß (Mandatsreferenz, Valuta, Umsatzart …). Statt einer zweiten Zeile
-   * bekommt die vorhandene die fehlenden Felder.
+   * Der Nachfolger von `ergaenzen`, und der Unterschied ist der ganze Punkt: `ergaenzen`
+   * schrieb fehlende Felder in die VORHANDENE Zeile und warf die eingehende weg. Hier
+   * wird nichts angefasst und nichts weggeworfen — die zweite Fassung legt sich daneben,
+   * mit ihrem eigenen Lauf. Welcher Wert gilt, entscheidet erst das Lesen
+   * (`application/import/belege.ts`).
    *
-   * Nur FEHLENDE — `COALESCE(vorhandener Wert, neuer Wert)` lässt Bestehendes stehen. Die
-   * erste Quelle behält recht, denn alles am Umsatz hängt an ihr. Damit bleibt der Beleg
-   * auch hier nur ergänzbar, nicht überschreibbar.
+   * Damit ist der Beleg endlich ohne Ausnahme unveränderlich: die Zusicherung aus dem
+   * GoBD-Abschnitt der CLAUDE.md wird strenger, statt zu bröckeln.
+   *
+   * Der Verarbeitungsstand bleibt unberührt — er gehört der Zahlung, nicht dem Beleg.
+   * Kategorie, Verbuchung und Aufteilungen hängen also weiter an dem, was sie kennen.
    */
-  async ergaenzen(u: Umsatz) {
+  async belegAnhaengen(zahlungId: string, beleg: Umsatz) {
     const db = await getDb();
-    await db.execute(
-      `UPDATE umsatz_roh SET
-         valuta = COALESCE(valuta, $2), glaeubiger_id = COALESCE(glaeubiger_id, $3),
-         gegenpartei_iban = COALESCE(gegenpartei_iban, $4),
-         mandatsreferenz = COALESCE(mandatsreferenz, $5),
-         e2e_referenz = COALESCE(e2e_referenz, $6), umsatzart = COALESCE(umsatzart, $7),
-         buchungsschluessel = COALESCE(buchungsschluessel, $8),
-         bank_referenz = COALESCE(bank_referenz, $9), native_id = COALESCE(native_id, $10),
-         zweck_code = COALESCE(zweck_code, $11), endempfaenger = COALESCE(endempfaenger, $12),
-         eintrag_referenz = COALESCE(eintrag_referenz, $13),
-         bank_buchungscode = COALESCE(bank_buchungscode, $14),
-         transaktions_id = COALESCE(transaktions_id, $15),
-         strukturierte_referenz = COALESCE(strukturierte_referenz, $16),
-         sammelposten = COALESCE(sammelposten, $17),
-         buchungsstand = COALESCE(buchungsstand, $18),
-         ist_storno = COALESCE(ist_storno, $19),
-         original_betrag = COALESCE(original_betrag, $20),
-         original_waehrung = COALESCE(original_waehrung, $21),
-         wechselkurs = COALESCE(wechselkurs, $22),
-         gebuehr_betrag = COALESCE(gebuehr_betrag, $23),
-         gebuehr_waehrung = COALESCE(gebuehr_waehrung, $24),
-         ruecklauf_code = COALESCE(ruecklauf_code, $25),
-         ruecklauf_text = COALESCE(ruecklauf_text, $26),
-         kundenreferenz = COALESCE(kundenreferenz, $27),
-         bankfelder = COALESCE(bankfelder, $28)
-       WHERE id = $1`,
-      [
-        u.id, u.valuta ?? null, u.glaeubigerId ?? null, u.gegenparteiIban ?? null,
-        u.mandatsreferenz ?? null, u.e2eReferenz ?? null, u.umsatzart ?? null,
-        u.buchungsschluessel ?? null, u.bankreferenz ?? null, u.nativeId ?? null,
-        u.zweckCode ?? null, u.endempfaenger ?? null,
-        u.eintragReferenz ?? null, u.bankBuchungscode ?? null, u.transaktionsId ?? null,
-        u.strukturierteReferenz ?? null, sammelpostenAls(u.sammelposten),
-        u.buchungsstand ?? null, u.istStorno === undefined ? null : u.istStorno ? 1 : 0,
-        u.originalBetrag ?? null, u.originalWaehrung ?? null, u.wechselkurs ?? null,
-        u.gebuehrBetrag ?? null, u.gebuehrWaehrung ?? null,
-        u.ruecklaufCode ?? null, u.ruecklaufText ?? null,
-        u.kundenreferenz ?? null, bankfelderAls(u.bankfelder),
-      ],
-    );
+    const a = rohAnweisung(beleg, zahlungId);
+    await db.execute(a.sql, [...(a.werte ?? [])]);
   },
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} ORDER BY r.buchungstag`);
-    return zeilen.map(zuUmsatz);
+    return zuUmsaetze(zeilen);
   },
   async nachLauf(laufId: string) {
     const db = await getDb();
-    const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} WHERE r.lauf_id = $1 ORDER BY r.buchungstag`, [laufId]);
-    return zeilen.map(zuUmsatz);
+    // Über die ZAHLUNGEN des Laufs, nicht über seine Belege: eine Zahlung, an der dieser
+    // Lauf mitgeschrieben hat, gehört vollständig hierher — mit allen ihren Belegen.
+    // Filterte man auf `r.lauf_id`, sähe `zuUmsaetze` nur einen Teil und führte eine
+    // Zahlung zusammen, die es so nie gab.
+    const zeilen = await db.select<UmsatzZeile[]>(
+      `${SELECT} WHERE COALESCE(r.zahlung_id, r.id) IN
+         (SELECT COALESCE(zahlung_id, id) FROM umsatz_roh WHERE lauf_id = $1)
+       ORDER BY r.buchungstag`,
+      [laufId],
+    );
+    return zuUmsaetze(zeilen);
   },
   async offene() {
     const db = await getDb();
-    const zeilen = await db.select<UmsatzZeile[]>(`${SELECT} WHERE COALESCE(v.status, 'neu') = 'neu' ORDER BY r.buchungstag`);
-    return zeilen.map(zuUmsatz);
+    const zeilen = await db.select<UmsatzZeile[]>(
+      `${SELECT} WHERE COALESCE(v.status, 'neu') = 'neu' ORDER BY r.buchungstag`,
+    );
+    return zuUmsaetze(zeilen);
   },
   async loeschen(id: string) {
     const db = await getDb();
-    // Der Verarbeitungsstand geht per ON DELETE CASCADE mit.
-    await db.execute("DELETE FROM umsatz_roh WHERE id = $1", [id]);
-  },
-  async bestandsSchluessel() {
-    const db = await getDb();
-    // Auch die Roh-Hashes verbuchter Ist-Buchungen: umsatzVerbuchen schreibt sie mit,
-    // "damit ein späterer Bankimport gegen die verbuchte Zeile deduppen kann" — gelesen
-    // wurden sie bisher nie. Solange die Umsatz-Zeile existiert, deckt sie den Fall ab;
-    // sobald Umsätze aufgeräumt werden (der Port kann löschen), fiele die Grundlage weg.
-    const h = await db.select<{ roh_hash: string }[]>(
-      `SELECT roh_hash FROM umsatz_roh
-       UNION
-       SELECT roh_hash FROM ist_buchung WHERE roh_hash IS NOT NULL`,
-    );
-    const n = await db.select<{ native_id: string }[]>("SELECT native_id FROM umsatz_roh WHERE native_id IS NOT NULL");
-    const o = await db.select<{ roh_hash: string }[]>(
-      "SELECT roh_hash FROM umsatz_roh WHERE native_id IS NULL",
-    );
-    return {
-      hashes: h.map((r) => r.roh_hash),
-      nativeIds: n.map((r) => r.native_id),
-      hashesOhneId: o.map((r) => r.roh_hash),
-    };
+    // ALLE Belege der Zahlung, nicht nur den namengebenden: eine Zahlung ohne ihren
+    // ersten Beleg wäre eine, deren Herkunft niemand mehr feststellen kann — und der
+    // Verarbeitungsstand hängt per Fremdschlüssel an genau dessen Id.
+    // Der Stand geht per ON DELETE CASCADE mit.
+    await db.execute("DELETE FROM umsatz_roh WHERE COALESCE(zahlung_id, id) = $1", [id]);
   },
 };
 

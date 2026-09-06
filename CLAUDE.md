@@ -169,9 +169,48 @@ Eine Importzeile steht in **zwei** Tabellen, und die Grenze dazwischen ist der
   Kategorievorschlag, erzeugte Buchung, Dublettenverdacht. Ändert sich bei jeder Durchsicht.
 
 Nach oben ist es weiterhin EIN `Umsatz`; die Trennung sieht man nur an den Schreibwegen.
-`anlegen` schreibt beides in einer Transaktion, `speichern` nur den Stand, und `ergaenzen`
-ist die einzige Stelle, die Rohdaten überhaupt noch anfasst — und auch dort nur, was fehlt
-(`COALESCE`), nie was schon dasteht.
+`anlegen` schreibt beides in einer Transaktion, `speichern` nur den Stand, und
+`belegAnhaengen` legt einen weiteren Beleg daneben — **geändert wird ein Beleg nie**.
+
+#### Eine Zahlung hat mehrere Belege
+
+Seit 2026-09-06 ist die Beziehung 1:n: `umsatz_roh.zahlung_id` sagt, zu welcher Zahlung ein
+Beleg gehört, `umsatz_verarbeitung` hängt an der Zahlung. Der Grund war ein stiller
+Datenverlust — wer erst aus einer Fremdsoftware importierte und danach dieselben Monate bei
+der Bank abrief, verlor die Bankfassung: `ergaenzen` trug fehlende Felder in die vorhandene
+Zeile nach und warf die eingehende weg. Ein Institut hält Umsätze nur begrenzt vor, also war
+sie danach nicht wiederzubeschaffen.
+
+**Der Vorrang ist damit vom Schreiben ins LESEN gewandert.** Niemand überschreibt mehr
+etwas; welcher Beleg je Feld gilt, rechnet `application/import/belege.ts` bei jedem Lesen
+neu. Die Rangfolge: Bankabruf CAMT, dann MT940, dann Fremdsoftware — die Bank ist die Quelle
+einer Zahlung, eine Fremdsoftware erzählt sie nach. Bei Gleichrang gewinnt der jüngere Lauf.
+
+Drei Regeln, mehr braucht es nicht:
+
+- **Der erste Wert in der Rangfolge gewinnt.** Ob nur eine Quelle das Feld liefert
+  (`zweckCode`) oder beide es verschieden vollständig tun (`gegenpartei`), ist dieselbe
+  Operation. Eine LÄNGENREGEL für den Verwendungszweck gibt es bewusst nicht: sie ist die
+  naheliegende und die falsche, weil eine Fremdsoftware ihren eigenen Block anhängt und
+  damit oft die längste Fassung hat, ohne die genaueste zu sein.
+- **Die Formatgruppe kommt geschlossen aus EINEM Beleg** — `umsatzart`,
+  `buchungsschluessel`, `bankBuchungscode`. Sie sind nur mit dem Format ihres Laufs deutbar
+  (siehe unten); feldweise gefüllt stünden in einer Zahlung mehrere Vokabulare
+  nebeneinander, ohne dass man ihnen ansieht, welches.
+- **Id, Lauf und Roh-Hash stellt der NAMENGEBENDE Beleg**, nicht der stärkste. Sie sagen,
+  woher die Zahlung stammt, nicht was in ihr steht — wanderten sie mit dem Rang, änderte ein
+  späterer Abruf rückwirkend die Herkunft.
+
+**Gespeichert wird ein Beleg, wenn er etwas Neues trägt** — verglichen wird der INHALT gegen
+die Belege derselben Quelle an dieser Zahlung. Ein Schlüsselvergleich reichte dafür nicht:
+`rohHash` deckt fünf Felder ab und ändert sich nicht, wenn eine Quelle eine Spalte
+NACHLIEFERT. Genau dieser Fall — Tabelle erweitern, Datei erneut einlesen — war der Grund,
+aus dem es das Ergänzen einmal gab.
+
+**Die native Id wird kontoübergreifend nachgeschlagen**, und das ist kein Bruch der
+Kontogrenze: die gilt, wenn zwei VERSCHIEDENE Zahlungen verglichen werden. Hier hat die
+Quelle ihre eigene Zeile benannt, und dieselbe Zeile bleibt dieselbe, auch wenn jemand die
+Kontozuordnung geändert hat.
 
 Zwei Zuordnungen, die man auf der falschen Seite sucht:
 
@@ -561,9 +600,10 @@ niemand später raten muss, was bewusst erfüllt ist und was bewusst nicht.
 
 ### Was die Unveränderbarkeit heute leistet
 
-**Der Beleg ist geschützt.** `umsatz_roh` wird nach dem Anlegen nicht mehr beschrieben; die
-einzige Ausnahme ist `ergaenzen`, und die trägt nur FEHLENDE Felder nach (`COALESCE`), nie
-vorhandene. Was die Bank geliefert hat, steht unverändert da.
+**Der Beleg ist geschützt, und seit 2026-09-06 ohne Ausnahme.** `umsatz_roh` wird nach dem
+Anlegen nicht mehr beschrieben — die frühere Ausnahme `ergaenzen` ist ersatzlos weg, weil
+eine zweite Fassung jetzt als eigener Beleg danebensteht statt in die vorhandene Zeile
+geschrieben zu werden. Was eine Quelle geliefert hat, steht unverändert da.
 
 **Änderungen an Buchungen sind protokolliert.** Jedes Anlegen, Ändern und Löschen schreibt
 einen Eintrag ins `buchung_journal` — mit dem ganzen Zustand vorher und nachher, nicht mit

@@ -14,10 +14,11 @@ import type {
 } from "../ports";
 import { katalogNachId, katalogNachName, vorschlagFuer, type Vorschlagskontext } from "./vorschlag";
 import { quelleKeyFuer } from "./kontoMatch";
-import { klassifiziere, rohHash } from "./rohHash";
+import { neueBelege, rohHash } from "./rohHash";
+import { traegtNeues } from "./belege";
 import { ordneZu } from "./dublette";
 import type { RohUmsatz } from "./rohUmsatz";
-import { ergaenze, type Umsatz } from "./umsatz";
+import type { Umsatz } from "./umsatz";
 
 /** Auflösung eines Quell-Kontos: entweder bestehendes wählen ODER neues anlegen. */
 export interface UebernahmeKonto {
@@ -169,7 +170,6 @@ async function uebernahmeIntern(
     kategorieNachId: katalogNachId(kategorien),
     kategorieNachName: katalogNachName(kategorien),
   };
-  const bestand = await umsatzRepo.bestandsSchluessel();
   const laufId = id();
 
   // Die Zuordnung aus der Import-Ansicht. Getrimmt wird hier UND beim Zählen in
@@ -194,68 +194,37 @@ async function uebernahmeIntern(
       ohneKonto++;
       continue;
     }
-    kandidaten.push({ roh, rohHash: rohHash(roh), nativeId: roh.nativeId, zahlungskontoId });
-  }
-
-  // 4. Der Dublettenfinder gegen den vorhandenen Umsatzbestand — VOR der Schlüsselprüfung.
-  //
-  //    Die Reihenfolge ist keine Kosmetik: liefe die exakte Prüfung zuerst, fiele der
-  //    Reimport derselben Datei sofort als Dublette heraus, und genau dann könnte nichts
-  //    mehr ergänzt werden. Der Finder kennt die Buchungs-ID als oberste Stufe selbst,
-  //    liefert aber zusätzlich die ZEILE, auf die sie zeigt — und die braucht es zum
-  //    Nachtragen.
-  //
-  //    Verglichen wird nur innerhalb desselben Zahlungskontos: die Kontogrenze ist hart
-  //    und spart zugleich den Großteil der Vergleiche.
-  const vorhandeneProKonto = new Map<string, Umsatz[]>();
-  for (const u of await umsatzRepo.alle()) {
-    const liste = vorhandeneProKonto.get(u.zahlungskontoId);
-    if (liste) liste.push(u);
-    else vorhandeneProKonto.set(u.zahlungskontoId, [u]);
-  }
-
-  const gefunden: Kandidat[] = [];
-  const verdacht = new Map<Kandidat, { auf: Umsatz; gruende: readonly string[] }>();
-  const zuErgaenzen: Umsatz[] = [];
-
-  const proKonto = new Map<string, Kandidat[]>();
-  for (const k of kandidaten) {
-    const liste = proKonto.get(k.zahlungskontoId);
-    if (liste) liste.push(k);
-    else proKonto.set(k.zahlungskontoId, [k]);
-  }
-
-  for (const [kontoId, gruppe] of proKonto) {
-    const treffer = ordneZu(
-      gruppe.map((k) => k.roh),
-      vorhandeneProKonto.get(kontoId) ?? [],
-    );
-    treffer.forEach((t, i) => {
-      const k = gruppe[i];
-      if (t.bewertung.urteil === "identisch" && t.bestand) {
-        // Nicht anlegen, sondern die vorhandene Zeile um das ergänzen, was diese Quelle
-        // mehr weiß. Ist nichts zu ergänzen, passiert gar nichts.
-        const ergaenzt = ergaenze(t.bestand, k.roh);
-        if (ergaenzt) zuErgaenzen.push(ergaenzt);
-        return;
-      }
-      if (t.bewertung.urteil === "verdacht" && t.bestand) {
-        verdacht.set(k, { auf: t.bestand, gruende: t.bewertung.gruende });
-      }
-      gefunden.push(k);
+    // Das Konto wird NACHGEREICHT: liefert die Quelle keine IBAN, begänne der Hash sonst
+    // mit einem leeren Kontofeld, und zwei Zeilen verschiedener Konten trügen denselben.
+    kandidaten.push({
+      roh,
+      rohHash: rohHash(roh, zahlungskontoId),
+      nativeId: roh.nativeId,
+      zahlungskontoId,
     });
   }
 
-  // 5. Was der Finder durchgelassen hat, geht noch durch die exakte Schlüsselprüfung.
+  // 4. Wiederholungen INNERHALB dieses Laufs.
   //
-  //    Sie fängt zwei Fälle, die der Finder nicht sehen kann: Roh-Hashes VERBUCHTER
-  //    Ist-Buchungen, zu denen kein offener Umsatz mehr gehört, und Wiederholungen
-  //    INNERHALB derselben Datei — dort wächst der Bestand während des Laufs mit.
-  const { neu: anzulegen, duplikate } = klassifiziere(gefunden, bestand);
+  //    Eine Datei kann dieselbe Zeile zweimal enthalten. Der Finder unten sieht das nicht
+  //    — er vergleicht gegen den BESTAND, und die zweite Zeile fände die erste dort noch
+  //    nicht. Ohne diesen Schritt entstünden aus einem Lauf zwei gleiche Zahlungen.
+  //
+  //    Gegen den Bestand wird hier NICHT geprüft: was schon dasteht, findet der Finder,
+  //    und ob die Zeile dann etwas beiträgt, entscheidet ein Inhaltsvergleich weiter
+  //    unten. Ein Schlüsselvergleich reichte dafür nicht — `rohHash` deckt fünf Felder ab
+  //    und ändert sich nicht, wenn eine Quelle eine Spalte NACHLIEFERT.
+  const { neu: tragenNeues, bekannt: imLaufDoppelt } = neueBelege(kandidaten, eingabe.quelle, {
+    belegSchluessel: [],
+  });
 
-  // 6. Umsätze (Status neu) bauen. Ein Verdacht wird angelegt UND angeschrieben: er ist
-  //    keine Sperre, sondern ein Hinweis für die Durchsicht.
-  const umsaetze: Umsatz[] = anzulegen.map((k) => ({
+  // 5a. Aus einem Kandidaten wird eine Zeile.
+  //
+  //    DIESELBE Abbildung für beide Wege — eine neue Zahlung und ein Beleg, der sich an
+  //    eine vorhandene hängt, tragen genau dieselben Belegfelder. Zwei Abbildungen
+  //    nebeneinander wären die Stelle, an der später ein Feld nur auf einem der beiden
+  //    Wege ankommt, und das fiele erst beim Auswerten auf.
+  const zeileAus = (k: Kandidat): Umsatz => ({
     id: id(),
     laufId,
     zahlungskontoId: k.zahlungskontoId,
@@ -273,10 +242,123 @@ async function uebernahmeIntern(
     zweckCode: k.roh.zweckCode,
     endempfaenger: k.roh.endempfaenger,
     bankreferenz: k.roh.bankreferenz,
+    eintragReferenz: k.roh.eintragReferenz,
+    bankBuchungscode: k.roh.bankBuchungscode,
+    transaktionsId: k.roh.transaktionsId,
+    strukturierteReferenz: k.roh.strukturierteReferenz,
+    sammelposten: k.roh.sammelposten,
+    buchungsstand: k.roh.buchungsstand,
+    istStorno: k.roh.istStorno,
+    originalBetrag: k.roh.originalBetrag,
+    originalWaehrung: k.roh.originalWaehrung,
+    wechselkurs: k.roh.wechselkurs,
+    gebuehrBetrag: k.roh.gebuehrBetrag,
+    gebuehrWaehrung: k.roh.gebuehrWaehrung,
+    ruecklaufCode: k.roh.ruecklaufCode,
+    ruecklaufText: k.roh.ruecklaufText,
+    kundenreferenz: k.roh.kundenreferenz,
+    bankfelder: k.roh.bankfelder,
     verwendungszweck: k.roh.verwendungszweck,
     rohHash: k.rohHash,
     nativeId: k.nativeId,
     status: "neu",
+  });
+
+  // 5b. Der Dublettenfinder gegen den vorhandenen Bestand.
+  //
+  //    Verglichen wird nur innerhalb desselben Zahlungskontos: die Kontogrenze ist hart
+  //    und spart zugleich den Großteil der Vergleiche.
+  //
+  //    Was sich am 06.09.2026 geändert hat, ist die Folge des Urteils `identisch`. Vorher
+  //    wurde die eingehende Zeile WEGGEWORFEN und die vorhandene um ihre fehlenden Felder
+  //    ergänzt; die zweite Fassung war danach nirgends mehr. Jetzt hängt sie als eigener
+  //    Beleg an derselben Zahlung, und welcher Wert gilt, entscheidet das Lesen.
+  const vorhandeneProKonto = new Map<string, Umsatz[]>();
+  for (const u of await umsatzRepo.alle()) {
+    const liste = vorhandeneProKonto.get(u.zahlungskontoId);
+    if (liste) liste.push(u);
+    else vorhandeneProKonto.set(u.zahlungskontoId, [u]);
+  }
+
+  /**
+   * Wo eine Quelle IHRE Zeilen selbst kennzeichnet, brauchen wir keine Heuristik.
+   *
+   * Der Index geht bewusst über ALLE Konten hinweg — und das ist kein Bruch der
+   * Kontogrenze, sondern eine andere Frage. Die Grenze gilt, wenn zwei VERSCHIEDENE
+   * Zahlungen verglichen werden; hier steht fest, dass es dieselbe Zeile derselben Quelle
+   * ist, weil die Quelle sie so benannt hat. Ohne das entstünde bei einer geänderten
+   * Kontozuordnung eine zweite Zahlung aus derselben Dateizeile.
+   */
+  const nachQuellId = new Map<string, Umsatz>();
+  for (const liste of vorhandeneProKonto.values()) {
+    for (const u of liste) {
+      for (const b of u.belege ?? []) {
+        if (b.nativeId) nachQuellId.set(`${b.quelle}\u0000${b.nativeId}`, u);
+      }
+    }
+  }
+
+  const anzulegen: Kandidat[] = [];
+  const anzuhaengen: { zahlungId: string; kandidat: Kandidat }[] = [];
+  /** Belege, die in genau dieser Form schon von dieser Quelle vorliegen. */
+  let unveraendert = 0;
+  const verdacht = new Map<Kandidat, { auf: Umsatz; gruende: readonly string[] }>();
+
+  /** Nimmt einen Beleg an eine bekannte Zahlung — oder zählt ihn als unverändert. */
+  const zuordnen = (zahlung: Umsatz, k: Kandidat) => {
+    if (traegtNeues(zahlung.belege, zeileAus(k), eingabe.quelle)) {
+      anzuhaengen.push({ zahlungId: zahlung.id, kandidat: k });
+    } else {
+      unveraendert++;
+    }
+  };
+
+  const proKonto = new Map<string, Kandidat[]>();
+  for (const k of tragenNeues) {
+    // Zuerst die harte Kennung. Trifft sie, ist der Fall entschieden und der Finder wird
+    // gar nicht erst gefragt.
+    const bekannteZahlung = k.nativeId
+      ? nachQuellId.get(`${eingabe.quelle}\u0000${k.nativeId}`)
+      : undefined;
+    if (bekannteZahlung) {
+      zuordnen(bekannteZahlung, k);
+      continue;
+    }
+    const liste = proKonto.get(k.zahlungskontoId);
+    if (liste) liste.push(k);
+    else proKonto.set(k.zahlungskontoId, [k]);
+  }
+
+  for (const [kontoId, gruppe] of proKonto) {
+    const treffer = ordneZu(
+      gruppe.map((k) => k.roh),
+      vorhandeneProKonto.get(kontoId) ?? [],
+    );
+    treffer.forEach((t, i) => {
+      const k = gruppe[i];
+      if (t.bewertung.urteil === "identisch" && t.bestand) {
+        // Dieselbe Zahlung — aber sagt dieser Beleg etwas, das seine Quelle noch nicht
+        // gesagt hat? Der zehnte Reimport derselben unveränderten Datei lehrt nichts;
+        // dieselbe Datei mit einer nachgetragenen Spalte sehr wohl.
+        //
+        // Verglichen wird in der BELEGFORM und nicht in der Rohform: ein `RohUmsatz`
+        // trägt Felder, die nie an einem Beleg stehen (die Konto-IBAN, den fremden
+        // Kategoriehinweis). Gegen einen Beleg gehalten wäre er immer verschieden, und
+        // die Grenze griffe nie.
+        zuordnen(t.bestand, k);
+        return;
+      }
+      if (t.bewertung.urteil === "verdacht" && t.bestand) {
+        verdacht.set(k, { auf: t.bestand, gruende: t.bewertung.gruende });
+      }
+      anzulegen.push(k);
+    });
+  }
+
+  // 6. Ein Verdacht wird angelegt UND angeschrieben: er ist keine Sperre, sondern ein
+  // Hinweis für die Durchsicht.
+  const umsaetze: Umsatz[] = anzulegen.map((k) => ({
+    ...zeileAus(k),
     vorschlag: vorschlagFuer(
       { ...k.roh, kategorieVorschlagId: zugeordnet(k.roh.kategorieHinweis) },
       kontext,
@@ -284,9 +366,9 @@ async function uebernahmeIntern(
     ),
   }));
 
-  // 7. Persistieren: Lauf-Protokoll, Ergänzungen, neue Umsätze.
+  // 7. Persistieren: Lauf-Protokoll, angehängte Belege, neue Zahlungen.
   //
-  // Der LAUF ZUERST. Jede neue Zeile verweist über `lauf_id` auf ihn, und seit das Schema
+  // Der LAUF ZUERST. Jede Belegzeile verweist über `lauf_id` auf ihn, und seit das Schema
   // Fremdschlüssel trägt, ist die Reihenfolge keine Geschmacksfrage mehr: andersherum
   // zeigen die Zeilen auf einen Lauf, den es noch nicht gibt, und die ganze Übernahme
   // scheitert mit „FOREIGN KEY constraint failed".
@@ -301,19 +383,23 @@ async function uebernahmeIntern(
     dateiname: eingabe.dateiname,
     eingelesen: eingabe.rohUmsaetze.length,
     neu: umsaetze.length,
-    // Als Dublette zählt beides: der exakte Schlüsseltreffer und der Fund des Finders.
-    duplikate: duplikate.length + (kandidaten.length - gefunden.length),
+    // „Schon bekannt" heisst ab jetzt nur noch eines: dieser Beleg lag in dieser Form
+    // schon von dieser Quelle vor. Ein Beleg, der sich an eine vorhandene Zahlung hängt,
+    // zählt NICHT mehr hierher — er trägt etwas bei und steht in `ergaenzt`.
+    duplikate: imLaufDoppelt.length + unveraendert,
     ...eingabe.herkunft,
   });
-  for (const u of zuErgaenzen) await umsatzRepo.ergaenzen(u);
+  for (const { zahlungId, kandidat } of anzuhaengen) {
+    await umsatzRepo.belegAnhaengen(zahlungId, zeileAus(kandidat));
+  }
   await umsatzRepo.anlegenViele(umsaetze);
 
   return {
     laufId,
     eingelesen: eingabe.rohUmsaetze.length,
     neu: umsaetze.length,
-    duplikate: duplikate.length + (kandidaten.length - gefunden.length),
-    ergaenzt: zuErgaenzen.length,
+    duplikate: imLaufDoppelt.length + unveraendert,
+    ergaenzt: anzuhaengen.length,
     verdacht: verdacht.size,
     ohneKonto,
     angelegteKonten,

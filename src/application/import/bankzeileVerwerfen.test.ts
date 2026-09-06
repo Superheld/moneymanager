@@ -42,12 +42,11 @@ function fakes(buchungen: IstBuchung[], umsaetze: Umsatz[]) {
     },
     anlegenViele: async () => {},
     anlegen: async () => {},
-    ergaenzen: async () => {},
+    belegAnhaengen: async () => {},
     alle: async () => bestand,
     nachLauf: async () => [],
     offene: async () => bestand.filter((u) => u.status === "neu"),
     loeschen: async () => {},
-    bestandsSchluessel: async () => ({ hashes: bestand.map((u) => u.rohHash), nativeIds: [] }),
   } satisfies UmsatzRepository;
   return { deps: { ledger: ledgerRepo, umsatzRepo }, ledger, bestand };
 }
@@ -72,8 +71,8 @@ describe("bankzeileVerwerfen", () => {
 
     await bankzeileVerwerfen(f.deps, "i1");
 
-    const schluessel = await f.deps.umsatzRepo.bestandsSchluessel();
-    expect(schluessel.hashes).toContain("h-abruf");
+    const bestand = await f.deps.umsatzRepo.alle();
+    expect(bestand.map((u) => u.rohHash)).toContain("h-abruf");
   });
 
   /**
