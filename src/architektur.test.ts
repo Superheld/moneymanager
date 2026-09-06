@@ -53,7 +53,13 @@ function produktivDateien(verzeichnis = WURZEL): string[] {
 
 /** Die Schicht, in der eine Datei liegt — „core", „application", „adapters/ui" … */
 function schicht(datei: string): string {
-  const teile = relative(WURZEL, datei).split("/");
+  // BEIDE Trenner, und das ist kein Gürtel-und-Hosenträger. `relative` liefert auf
+  // Windows Backslashes; ein `split("/")` ergibt dort genau ein Element, `teile[0]` ist
+  // der ganze Pfad, und keine einzige Datei wird je „core" zugeordnet. Die Tests unten
+  // liefen damit nicht rot, sondern GRÜN über eine leere Menge — der Wächter hätte auf
+  // Windows nichts mehr geprüft und es nicht gesagt. Der Test „sieht überhaupt etwas"
+  // weiter unten ist die zweite Hälfte derselben Absicherung.
+  const teile = relative(WURZEL, datei).split(/[\\/]/);
   if (teile[0] === "adapters") return `adapters/${teile[1]}`;
   return teile[0];
 }
@@ -78,6 +84,21 @@ const DATEIEN = produktivDateien();
 const kurz = (d: string) => relative(WURZEL, d);
 
 describe("Schichtgrenzen", () => {
+  /**
+   * Der Wächter über den Wächter: sieht er überhaupt Dateien?
+   *
+   * Jede Prüfung unten filtert `DATEIEN` auf eine Schicht und meldet die Verstösse darin.
+   * Findet der Filter nichts, ist die Liste leer und der Test grün — er sagt dann „keine
+   * Verstösse", meint aber „nicht hingesehen". Genau das ist auf Windows passiert, weil
+   * `schicht()` den Pfad nicht mehr zerlegen konnte, und niemand hätte es gemerkt.
+   */
+  it("sieht überhaupt etwas — jede geprüfte Schicht trägt Dateien", () => {
+    const leer = ["core", "application", "adapters/ui", "adapters/persistence"].filter(
+      (s) => !DATEIEN.some((d) => schicht(d) === s),
+    );
+    expect(leer, "diese Schichten wurden von keiner Datei getroffen").toEqual([]);
+  });
+
   // Die Grenze, die schon immer hält — und die wichtigste: ein Kern ohne IO ist der
   // Grund, warum die ganze Suite in Sekunden durchläuft.
   it("core importiert nichts nach außen", () => {
