@@ -1406,6 +1406,39 @@ ansieht, dass es unsigniert ist, ist ehrlich; ein Literal im Workflow wäre gena
 falsch, wenn es darauf ankommt. Deshalb ist `releaseBody` kein fester Text mehr, sondern
 die Ausgabe des Schritts.
 
+**Und seit dem 06.09.2026 gilt dasselbe für die PLATTFORMEN.** Der Text nannte macOS,
+Windows und Linux unbedingt — auch in einem Release, an dem nur zwei davon hingen. Genau
+das war bei 0.27.0 der Fall: der Windows-Job stirbt an den Tests, und über einer Datei,
+die nie entstand, stand „**Windows** (`.exe`)". Derselbe Schaden wie ein unsigniertes
+Bundle unter „Signiert und notarisiert", nur eine Spalte weiter.
+
+Ein Matrix-Job kann das nicht wissen — wenn er seinen Text baut, hat noch niemand gebaut.
+Deshalb ist die Zuständigkeit geteilt, und der Text steht jetzt in einem eigenen Skript:
+
+| Wer | Plattformliste | Ergebnis |
+|---|---|---|
+| die Matrix-Jobs | **leer** | nur der allgemeine Teil — knapp und immer wahr |
+| der Job `text` danach | aus `gh release view` | die Abschnitte der Artefakte, die wirklich dranhängen |
+
+Zwei Dinge daran sind Absicht und keine Vorsicht. **`if: always()`** am Nachjob: der
+häufige Fall IST der teilweise Fehlschlag, und mit `needs` allein liefe ausgerechnet dann
+nichts mehr. Und die **Artefaktliste als Quelle** statt der Job-Ergebnisse: sie kann nicht
+lügen, ein grüner Job ohne hochgeladene Datei schon.
+
+Die Fehlerform ist damit die richtige: fällt der Nachjob aus, bleibt der allgemeine Teil
+stehen — unvollständig, aber nicht falsch.
+
+| Stück | Datei |
+|---|---|
+| Der Text, an einer Stelle | `scripts/release-text.sh` |
+| Wer ihn mit welcher Liste ruft | `.github/workflows/release.yml` |
+| Der Wächter, der ihn AUSFÜHRT statt liest | `src/auslieferung.test.ts` |
+
+Der Wächter ist dabei der Teil, der sich gelohnt hat: ein Regex über den Workflow hätte
+den Fund nie gemacht, weil dort alles Richtige stand — nur eben unbedingt. Geprüft wird
+deshalb die Ausgabe des Skripts bei gegebener Eingabe, und der Fall aus 0.27.0 (macOS und
+Linux da, Windows nicht) steht als eigener Testfall.
+
 **Was der unsignierte Zweig NICHT mehr enthält, ist die `xattr`-Anleitung.** Sie stand dort
 bis zum 30.08.2026, und die Begründung dafür war richtig: ohne sie ist der Fehlschlag
 unerklärlich — macOS meldet „beschädigt", und wer die App nicht selbst gebaut hat, hat keine
@@ -1447,13 +1480,13 @@ Vier Entscheidungen darin, die man nicht anfassen sollte, ohne den Grund zu kenn
   gleichzeitig lesen, sehen denselben Stand — der zweite überschreibt den Eintrag des
   ersten. Der Fehlschlag ist **still**: die verlorene Plattform bekommt vom Updater
   „nichts Neues" statt eines Fehlers.
-- **Der Release-Text kommt vom ersten Job — und seit tauri-action 1.0.0 auch von jedem
-  weiteren.** Bis v0 setzte die Action Titel und Text nur beim ANLEGEN des Releases und
-  liess ein vorgefundenes unberührt; jetzt schreibt jeder Job beides neu. Am Ergebnis
-  ändert das nichts, weil alle drei Läufer denselben Text ausrechnen. Es ändert die
-  **Fehlerform**: scherte früher ein Läufer aus, gewann trotzdem der erste Job, heute
-  gewinnt der letzte. Deshalb steht macOS weiterhin oben, und deshalb ist `shell: bash`
-  am Textschritt wichtiger geworden als vorher.
+- **Den Release-Text schreibt zuletzt der Job `text`, nicht die Matrix.** Bis v0 setzte
+  tauri-action Titel und Text nur beim ANLEGEN des Releases und liess ein vorgefundenes
+  unberührt; seit 1.0.0 schreibt jeder Job beides neu. Beide Stände hatten dasselbe
+  Problem: kein Matrix-Job weiss, was am Ende dranhängt. Deshalb liefern sie nur noch den
+  allgemeinen Teil, und der Nachjob schreibt aus den Artefakten (siehe oben). Dass macOS
+  weiterhin oben steht, entscheidet damit nur noch, wer das Release ANLEGT — nicht mehr,
+  was drinsteht.
 - **`shell: bash` am Textschritt.** Ohne ihn nimmt GitHub auf Windows PowerShell, und das
   Skript stirbt an der ersten Zeile. Ein Schritt, der auf zwei von drei Läufern
   funktioniert, fällt erst im Release auf.
