@@ -13,7 +13,18 @@
 import { describe, expect, it } from "vitest";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, join, normalize, resolve } from "node:path";
+// ZWEI Pfad-Module, und die Trennung ist der Grund, warum dieser Waechter auf Windows
+// ueberhaupt laeuft. Alles, was hier verglichen wird, sind REPO-Pfade: `git ls-files`
+// liefert sie mit Schraegstrich, ein Markdown-Link schreibt sie mit Schraegstrich. Wer
+// sie durch das plattformeigene `node:path` schickt, bekommt auf Windows Backslashes
+// zurueck — und vergleicht danach `src\\adapters\\x.ts` mit `src/adapters/x.ts`. Der
+// Waechter meldet dann jeden Verweis als tot, obwohl die Datei danebensteht; genau daran
+// ist der Windows-Job dreier Releases gestorben, bevor je ein Compiler lief.
+//
+// `posix` fuer die Repo-Pfade, das native Modul nur dort, wo wirklich auf die Platte
+// gegriffen wird.
+import { resolve, join as imDateisystem } from "node:path";
+import { dirname, join, normalize } from "node:path/posix";
 
 const WURZEL = resolve(__dirname, "..");
 
@@ -100,8 +111,20 @@ describe("Doku-Verweise", () => {
   });
 
   it.each(markdown)("%s nennt nur Pfade, die im Repo liegen", (datei) => {
-    const inhalt = readFileSync(join(WURZEL, datei), "utf8");
-    const fehlend = genanntePfade(datei, inhalt).filter((pfad) => {
+    const inhalt = readFileSync(imDateisystem(WURZEL, datei), "utf8");
+    const genannt = genanntePfade(datei, inhalt);
+
+    // Die Regression, die dieser Waechter selbst hatte, mit ihrem eigenen Namen. Auf
+    // dieser Maschine kann sie nicht anschlagen — `posix` erzeugt nie einen Backslash.
+    // Auf Windows schon, und dort ist der Unterschied gross: ohne diese Zeile meldet der
+    // Test unten JEDEN Verweis als tot, und man sucht den Fehler in der Doku statt im
+    // Pfad-Modul.
+    expect(
+      genannt.filter((p) => p.includes("\\")),
+      `${datei}: Pfade mit Backslash — hier wurde wieder das plattformeigene node:path benutzt`,
+    ).toEqual([]);
+
+    const fehlend = genannt.filter((pfad) => {
       if (AUSSERHALB.includes(pfad)) return false;
       // Suffix-Vergleich: CLAUDE.md darf `bausteine/CLAUDE.md` kurz nennen, ohne den vollen Pfad
       // zu wiederholen. Der Kandidat muss dabei an einer Verzeichnisgrenze aufsetzen.
