@@ -141,15 +141,34 @@ describe("umsaetzeUebernehmen", () => {
   });
 
   it("dedupliziert gegen den Bestand beim zweiten Lauf (nichts doppelt gespeichert)", async () => {
-    const { deps, umsaetze } = fakes();
-    const eingabe = {
-      quelle: "finanzguru",
-      zeitpunkt: "2026-06-21T10:00:00Z",
-      rohUmsaetze: [roh({ kontoIban: "DE111", nativeId: "n1" })],
-      konten: [{ quelleKey: "DE111", neu: { bezeichnung: "Giro", typ: "Giro" as const, iban: "DE111" } }],
-    };
-    await umsaetzeUebernehmen(eingabe, deps);
-    const zweiter = await umsaetzeUebernehmen(eingabe, deps);
+    const { deps, umsaetze, konten } = fakes();
+    const rohUmsaetze = [roh({ kontoIban: "DE111", nativeId: "n1" })];
+    await umsaetzeUebernehmen(
+      {
+        quelle: "finanzguru",
+        zeitpunkt: "2026-06-21T10:00:00Z",
+        rohUmsaetze,
+        konten: [{ quelleKey: "DE111", neu: { bezeichnung: "Giro", typ: "Giro", iban: "DE111" } }],
+      },
+      deps,
+    );
+
+    // Der zweite Lauf zeigt auf das VORHANDENE Konto, und das ist keine Bequemlichkeit:
+    // genau das tut die Import-Ansicht: `kontoMatchVorschlag` findet ein Konto mit
+    // derselben IBAN und setzt `kontoId` statt eines Anlege-Vorschlags.
+    //
+    // Bis zum 07.09.2026 stand hier zweimal dieselbe Eingabe mit `neu` — der zweite Lauf
+    // legte also ein ZWEITES Konto mit derselben IBAN an, und der Test war trotzdem grün:
+    // die Buchungs-ID wurde damals kontoübergreifend nachgeschlagen und verdeckte das.
+    const zweiter = await umsaetzeUebernehmen(
+      {
+        quelle: "finanzguru",
+        zeitpunkt: "2026-06-21T11:00:00Z",
+        rohUmsaetze,
+        konten: [{ quelleKey: "DE111", kontoId: konten[0].id }],
+      },
+      deps,
+    );
     expect(zweiter).toMatchObject({ neu: 0, duplikate: 1 });
     expect(umsaetze).toHaveLength(1); // nur der erste Lauf
   });
@@ -420,6 +439,52 @@ describe("Dublettenfinder beim Übernehmen", () => {
     expect(ergebnis.neu).toBe(0);
     expect(f.umsaetze).toHaveLength(vorher);
     expect(f.umsaetze[0].mandatsreferenz).toBe("M-4711");
+  });
+
+  it("legt dieselbe Datei auf einem ANDEREN Konto trotzdem an", async () => {
+    // Der Fall, der bis zum 07.09.2026 still nichts tat: dieselbe Quelldatei absichtlich
+    // auf ein zweites, frisch angelegtes Konto einlesen. Jede Zeile fand sich über ihre
+    // Buchungs-ID auf dem ersten Konto wieder, der Beleg trug nichts Neues — und der Lauf
+    // meldete „0 neu, alles Dubletten" auf einem Konto, das leer war.
+    //
+    // Die Kontogrenze gilt jetzt auch für die harte Kennung. Was dabei entsteht — dieselbe
+    // Quellzeile auf zwei Konten — ist kein blinder Fleck, sondern die dritte Frage in
+    // `dubletten/dublettensicht.ts`.
+    const f = await bestandAusDatei();
+    const vorher = f.umsaetze.length;
+    const kontoA = f.umsaetze[0].zahlungskontoId;
+
+    const ergebnis = await umsaetzeUebernehmen(
+      {
+        quelle: "finanzguru",
+        zeitpunkt: "2026-08-18T11:00:00.000Z",
+        rohUmsaetze: [
+          roh({
+            buchungstag: "2026-08-04",
+            betrag: -4990,
+            gegenpartei: "Nordhoff",
+            verwendungszweck: "EDK*NORDHOFF NORDHOFF, MUSTERSTADT DEKarte Nr. 1234 56XX XXXX 7890",
+            kontoIban: "DE31999999980000000002",
+            nativeId: "fg-1",
+          }),
+        ],
+        konten: [
+          {
+            quelleKey: "DE31999999980000000002",
+            neu: { bezeichnung: "Zweitkonto", typ: "Giro", iban: "DE94999999980000000003" },
+          },
+        ],
+      },
+      f.deps,
+    );
+
+    expect(ergebnis.neu).toBe(1);
+    expect(ergebnis.duplikate).toBe(0);
+    expect(f.umsaetze).toHaveLength(vorher + 1);
+    // Und sie liegt auf dem NEUEN Konto, nicht als Beleg am alten.
+    const neue = f.umsaetze[f.umsaetze.length - 1];
+    expect(neue.zahlungskontoId).not.toBe(kontoA);
+    expect(f.umsaetze[0].belege).toHaveLength(1);
   });
 });
 

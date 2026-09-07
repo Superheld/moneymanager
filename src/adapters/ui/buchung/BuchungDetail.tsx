@@ -626,6 +626,11 @@ function BuchungFormular({
         <DublettenBlock
           befund={dublette}
           imLedger={!entwurf}
+          fremdkonto={
+            dublette.verdacht.zwillingKontoId !== kontoId
+              ? (kontoName.get(dublette.verdacht.zwillingKontoId) ?? "?")
+              : undefined
+          }
           onZwillingOeffnen={onZwillingOeffnen}
           onKeinDuplikat={onKeinDuplikat}
         />

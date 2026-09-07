@@ -552,6 +552,12 @@ export function ReviewScreen() {
                           <span className="muted" style={{ fontSize: "var(--fs-2xs)" }}>
                             {t("review.dublette.gruende", { gruende: v.gruende.join(", ") })}
                             {zwilling && ` — ${t(`review.dublette.status.${zwilling.status}`)}`}
+                            {/* Liegt der Zwilling auf einem ANDEREN Konto, ist genau das die
+                                Auskunft: die Zeile ist nicht überflüssig, sie ist schon
+                                einmal woanders zugeordnet. Ohne den Kontonamen sähe die
+                                Meldung aus wie jede andere Dublette. */}
+                            {v.zwillingKontoId !== u.zahlungskontoId &&
+                              ` — ${t("review.dublette.anderesKonto", { konto: kontoName.get(v.zwillingKontoId) ?? "?" })}`}
                           </span>
                         </div>
                       );

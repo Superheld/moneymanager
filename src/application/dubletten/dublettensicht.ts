@@ -6,7 +6,7 @@
 // wurde es an der schmerzhaften Stelle: der Zwilling war längst gelöscht, das Register
 // schwieg, der Dialog mahnte weiter.
 //
-// Es gibt genau ZWEI Fragen, und sie sind wirklich verschieden:
+// Es gibt genau DREI Fragen, und sie sind wirklich verschieden:
 //
 //   • `ledgerVerdacht` — steht dieselbe Zahlung ZWEIMAL IM SALDO? Zählt nur, was verbucht
 //     ist UND dessen Buchung es noch gibt. Ein verworfener Umsatz steht in keinem Saldo.
@@ -15,6 +15,9 @@
 //     weggelegt" ist genau die Auskunft, die man beim Durchsehen braucht. Zwei Formen
 //     derselben Frage: eine Zeile im Dialog, der ganze Stapel in der Inbox — der Stapel
 //     braucht die 1:1-Regel, die einzelne Zeile nicht (siehe `stapelVerdacht`).
+//   • `fremdkontoZwilling` — liegt dieselbe QUELLZEILE auf einem ANDEREN Konto? Seit dem
+//     07.09.2026, und die einzige der drei, die die Kontogrenze überschreitet. Warum sie
+//     eine eigene Frage ist und keine Erweiterung der beiden anderen, steht bei ihr.
 //
 // Sie stehen hier nebeneinander, damit der Unterschied eine Begründung hat statt eines
 // Zufalls. Wer eine weitere Anzeige baut, nimmt eine davon — oder erklärt hier, warum es
@@ -24,7 +27,7 @@
 // die Zeile schreibt, gilt für den Stand von damals, und was später aus einer anderen
 // Quelle dazukam, würde nie nachträglich angeschrieben.
 
-import { ordneZu, paareImBestand, type Bewertung, type Umsatz } from "../import";
+import { belegSchluessel, ordneZu, paareImBestand, PUNKTE_SICHER, type Bewertung, type Umsatz } from "../import";
 
 /**
  * Was die Prüfung zu einer Zeile sagt.
@@ -42,6 +45,15 @@ export interface Dublettenverdacht {
   readonly zwillingUmsatzId: string;
   readonly zwillingIstId?: string;
   readonly zwillingDatum: string;
+  /**
+   * Das Konto des Zwillings — IMMER gesetzt, auch wenn es dasselbe ist.
+   *
+   * Ob daraus ein Hinweis wird, entscheidet die Anzeige durch Vergleich mit dem eigenen
+   * Konto der Zeile. Nur-wenn-es-abweicht zu füllen wäre die kürzere Fassung und die
+   * schlechtere: das Feld hiesse dann „das Konto des Zwillings, ausser wenn nicht", und
+   * am nächsten Randfall liest es jemand als „hat kein Konto".
+   */
+  readonly zwillingKontoId: string;
 }
 
 /**
@@ -92,6 +104,7 @@ export function ledgerVerdacht(
   freigegeben: ReadonlySet<string> = new Set(),
 ): Map<string, Dublettenverdacht> {
   const jeKonto = new Map<string, Umsatz[]>();
+  const verbuchte: Umsatz[] = [];
   for (const u of umsaetze) {
     if (!u.istbuchungId || u.status !== "verbucht") continue;
     // Und die Buchung muss es WIRKLICH noch geben. Ein Umsatz kann „verbucht" heißen und
@@ -99,6 +112,7 @@ export function ledgerVerdacht(
     // ein Verdacht wäre schlicht falsch. Am echten Bestand traf das 32 Zeilen: genau die
     // Dubletten, die schon von Hand entfernt worden waren, wurden weiter angemahnt.
     if (!gebuchteIds.has(u.istbuchungId)) continue;
+    verbuchte.push(u);
     const liste = jeKonto.get(u.zahlungskontoId);
     if (liste) liste.push(u);
     else jeKonto.set(u.zahlungskontoId, [u]);
@@ -126,6 +140,17 @@ export function ledgerVerdacht(
       merke(raus, paar.b.istbuchungId!, paar.a, paar.bewertung);
     }
   }
+
+  // Und ZULETZT der Blick über die Kontogrenze. Zuletzt, weil `merke` den ersten Fund
+  // stehen lässt: liegt dieselbe Zahlung zweimal auf DEMSELBEN Konto, ist das die
+  // dringendere Auskunft — dort stimmt der Saldo des Kontos nicht, hier nur die Summe
+  // darüber. Beides an eine Zeile zu schreiben ginge nicht; `Dublettenverdacht` trägt
+  // genau einen Zwilling, weil eine Zeile in der Liste genau eine Pille trägt.
+  const jeQuellzeile = quellzeilenIndex(verbuchte);
+  for (const u of verbuchte) {
+    const zwilling = fremdkontoZwilling(u, jeQuellzeile, freigegeben);
+    if (zwilling) merke(raus, u.istbuchungId!, zwilling, BEWERTUNG_FREMDKONTO);
+  }
   return raus;
 }
 
@@ -147,7 +172,83 @@ function verdachtAus(bewertung: Bewertung, zwilling: Umsatz): Dublettenverdacht 
     zwillingUmsatzId: zwilling.id,
     zwillingIstId: zwilling.istbuchungId,
     zwillingDatum: zwilling.buchungstag,
+    zwillingKontoId: zwilling.zahlungskontoId,
   };
+}
+
+// ── Die dritte Frage: dieselbe Quellzeile auf zwei Konten ────────────────────────────
+//
+// Warum das eine eigene Frage ist und keine Erweiterung der beiden oben: die zwei rechnen
+// mit ÄHNLICHKEIT, und für die ist die Kontogrenze eine Vorbedingung — zwei gleiche
+// Beträge auf zwei Konten sind nie dieselbe Buchung, und ohne die Grenze fiele die halbe
+// Haushaltskasse zusammen. Diese hier rechnet gar nicht: die Quelle hat ihre eigene Zeile
+// benannt, es ist dieselbe Zeile, Punkt. Ein harter Schlüssel darf über die Grenze sehen,
+// eine Schätzung nicht.
+//
+// Der Anlass steht in `import/umsaetzeUebernehmen.ts`: der Import hat diese Prüfung bis
+// zum 07.09.2026 selbst gemacht und den Fund STILL verschluckt — die Zeile wurde nicht
+// angelegt, und auf dem gemeinten Konto stand nichts. Jetzt legt er sie an, und der Fund
+// wird hier sichtbar. Das ist die Arbeitsteilung, die überall in dieser Datei gilt:
+// **anlegen tut der Import, urteilen tut das Hinsehen.**
+
+/** Was an einem solchen Fund steht — er ist keine Schätzung, deshalb `identisch`. */
+const BEWERTUNG_FREMDKONTO: Bewertung = {
+  urteil: "identisch",
+  punkte: PUNKTE_SICHER,
+  gruende: ["dieselbe Buchungs-ID der Quelle, auf einem anderen Konto"],
+};
+
+/**
+ * Die Schlüssel, unter denen die Quellen einer Zahlung ihre eigenen Zeilen benennen.
+ *
+ * Aus den BELEGEN und nicht aus `Umsatz.nativeId`: dort steht die Kennung des stärksten
+ * Belegs, und zu welcher Quelle sie gehört, sieht man ihr nicht an. Zwei Quellen dürfen
+ * dieselbe Zeichenkette vergeben, ohne dieselbe Zeile zu meinen.
+ *
+ * Eine Zahlung ohne Belege liefert nichts — und das ist die richtige Antwort, nicht eine
+ * fehlende: aus der Persistenz kommt die Belegliste immer, von Hand gebaut (Tests, Seed)
+ * gibt es nichts zu behaupten.
+ */
+function quellzeilen(u: Umsatz): string[] {
+  const raus: string[] = [];
+  for (const b of u.belege ?? []) if (b.nativeId) raus.push(belegSchluessel(b.quelle, b.nativeId));
+  return raus;
+}
+
+/** Quellschlüssel → die Zahlungen, die ihn tragen. Einmal bauen, oft fragen. */
+export function quellzeilenIndex(umsaetze: readonly Umsatz[]): Map<string, Umsatz[]> {
+  const raus = new Map<string, Umsatz[]>();
+  for (const u of umsaetze) {
+    for (const s of quellzeilen(u)) {
+      const liste = raus.get(s);
+      if (liste) liste.push(u);
+      else raus.set(s, [u]);
+    }
+  }
+  return raus;
+}
+
+/**
+ * Dieselbe Quellzeile auf einem ANDEREN Konto — oder nichts.
+ *
+ * Gleiches Konto ist hier kein Treffer, sondern die Zuständigkeit der beiden Fragen oben.
+ * Bei mehreren Kandidaten gewinnt der erste im Index; welcher das ist, hängt an der
+ * Reihenfolge der Eingabe und ist damit beliebig, aber nicht zufällig — dieselbe Liste
+ * ergibt morgen denselben Zwilling.
+ */
+export function fremdkontoZwilling(
+  u: Umsatz,
+  index: ReadonlyMap<string, Umsatz[]>,
+  freigegeben: ReadonlySet<string> = new Set(),
+): Umsatz | undefined {
+  for (const s of quellzeilen(u)) {
+    for (const k of index.get(s) ?? []) {
+      if (k.id === u.id || k.zahlungskontoId === u.zahlungskontoId) continue;
+      if (freigegeben.has(freigabeSchluessel(u.id, k.id))) continue;
+      return k;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -169,8 +270,12 @@ export function entwurfVerdacht(
       !freigegeben.has(freigabeSchluessel(entwurf.id, u.id)),
   );
   const [treffer] = ordneZu([entwurf], bestand);
-  if (!treffer?.bestand || treffer.bewertung.urteil === "verschieden") return undefined;
-  return verdachtAus(treffer.bewertung, treffer.bestand);
+  if (treffer?.bestand && treffer.bewertung.urteil !== "verschieden") {
+    return verdachtAus(treffer.bewertung, treffer.bestand);
+  }
+  // Erst wenn auf dem eigenen Konto nichts liegt, der Blick darüber hinaus.
+  const zwilling = fremdkontoZwilling(entwurf, quellzeilenIndex(umsaetze), freigegeben);
+  return zwilling ? verdachtAus(BEWERTUNG_FREMDKONTO, zwilling) : undefined;
 }
 
 /**
@@ -199,5 +304,13 @@ export function stapelVerdacht(
     if (freigegeben.has(freigabeSchluessel(neue[i].id, treffer.bestand.id))) return;
     raus.set(neue[i].id, verdachtAus(treffer.bewertung, treffer.bestand));
   });
+  // Wieder zuletzt und wieder aus demselben Grund wie in `ledgerVerdacht`: was auf dem
+  // eigenen Konto schon gefunden wurde, bleibt stehen.
+  const jeQuellzeile = quellzeilenIndex(bestand);
+  for (const n of neue) {
+    if (raus.has(n.id)) continue;
+    const zwilling = fremdkontoZwilling(n, jeQuellzeile, freigegeben);
+    if (zwilling) raus.set(n.id, verdachtAus(BEWERTUNG_FREMDKONTO, zwilling));
+  }
   return raus;
 }

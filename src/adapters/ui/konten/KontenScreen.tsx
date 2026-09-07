@@ -651,7 +651,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           type="button"
                           aria-label={t("konten.vergleich.oeffnen")}
                           style={{ flex: "0 0 auto", display: "inline-flex", background: "none", border: 0, padding: 0, cursor: "pointer" }}
-                          title={`${r.dublette.gruende.join(" · ")} · ${t("konten.dubletten.zwilling", { datum: r.dublette.zwillingDatum })} · ${t("konten.vergleich.oeffnen")}`}
+                          title={[
+                            r.dublette.gruende.join(" · "),
+                            t("konten.dubletten.zwilling", { datum: r.dublette.zwillingDatum }),
+                            // Nur wenn der Zwilling woanders liegt — sonst wäre es eine
+                            // Zeile, die bei jeder Dublette dasselbe sagt.
+                            ...(r.buchung && r.dublette.zwillingKontoId !== r.buchung.kontoId
+                              ? [t("konten.dubletten.anderesKonto", { konto: kontoName.get(r.dublette.zwillingKontoId) ?? "?" })]
+                              : []),
+                            t("konten.vergleich.oeffnen"),
+                          ].join(" · ")}
                           onClick={(e) => {
                             // Die Zeile selbst öffnet das Detail — der Vergleich ist eine
                             // eigene Frage und darf sie nicht mitauslösen.

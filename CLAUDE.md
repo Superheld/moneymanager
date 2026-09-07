@@ -207,10 +207,27 @@ die Belege derselben Quelle an dieser Zahlung. Ein Schlüsselvergleich reichte d
 NACHLIEFERT. Genau dieser Fall — Tabelle erweitern, Datei erneut einlesen — war der Grund,
 aus dem es das Ergänzen einmal gab.
 
-**Die native Id wird kontoübergreifend nachgeschlagen**, und das ist kein Bruch der
-Kontogrenze: die gilt, wenn zwei VERSCHIEDENE Zahlungen verglichen werden. Hier hat die
-Quelle ihre eigene Zeile benannt, und dieselbe Zeile bleibt dieselbe, auch wenn jemand die
+**Die Kontogrenze gilt auch für die native Id.** Bis zum 07.09.2026 wurde sie
+kontoübergreifend nachgeschlagen, mit einer Begründung, die für sich stimmte: die Quelle
+hat ihre eigene Zeile benannt, also bleibt dieselbe Zeile dieselbe, auch wenn jemand die
 Kontozuordnung geändert hat.
+
+Sie hielt der anderen Lesart nicht stand, und die ist die häufigere. Wer dieselbe Datei
+absichtlich auf ein ANDERES Konto einliest, bekam nichts: jede Zeile fand sich über ihre
+Buchungs-ID auf dem alten Konto wieder, der Beleg trug nichts Neues, und der Lauf meldete
+„0 neu, alles Dubletten" — auf einem Konto, das gerade erst angelegt und leer war.
+
+Beide Fälle sehen beim Import gleich aus (Kandidat auf Konto X, gefundene Zahlung auf
+Konto Y), aus den Daten sind sie nicht zu trennen. Zu wählen war also nur, **welcher
+Fehler passieren darf** — und die Kontogrenze hat die bessere Fehlerform: ohne sie
+passiert still nichts, mit ihr entsteht eine zweite Zahlung, die man sieht.
+
+Sichtbar macht sie die **dritte Frage** in `application/dubletten/dublettensicht.ts`
+(`fremdkontoZwilling`): dieselbe Quellzeile auf zwei Konten. Sie ist die einzige der drei,
+die über die Kontogrenze sieht, und sie darf es, weil sie **nicht rechnet** — die anderen
+beiden vergleichen mit Unschärfe, und für eine Schätzung ist die Kontogrenze eine
+Vorbedingung. Damit gilt hier dieselbe Arbeitsteilung wie überall: **anlegen tut der
+Import, urteilen tut das Hinsehen.**
 
 Zwei Zuordnungen, die man auf der falschen Seite sucht:
 
