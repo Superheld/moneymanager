@@ -383,6 +383,7 @@ const de = {
       verdacht: "könnte doppelt sein",
       sicher: "steht schon drin",
       gruende: "Gründe: {{gruende}}",
+      anderesKonto: "steht auch auf {{konto}}",
       status: {
         neu: "wartet ebenfalls",
         verbucht: "bereits gebucht",
@@ -1082,6 +1083,7 @@ const de = {
       verdacht: "könnte doppelt sein",
       sicher: "steht schon drin",
       zwilling: "Gegenstück vom {{datum}}",
+      anderesKonto: "steht auch auf {{konto}}",
     },
     alleKategorien: "Alle Kategorien",
     ohneKategorie: "(ohne Kategorie)",
@@ -1340,6 +1342,8 @@ const de = {
         "Geprüft wird gegen alles auf diesem Konto — auch gegen Verworfenes. Beide Zeilen bleiben stehen, bis du eine davon löschst.",
       hinweisLedger:
         "Beide Zeilen stehen im Saldo. Sie bleiben, bis du eine davon löschst — oder hier festhältst, dass es zwei verschiedene Zahlungen sind.",
+      anderesKonto:
+        "Diese Zahlung steht auch auf {{konto}} — dieselbe Zeile aus derselben Quelle, nur einem anderen Konto zugeordnet.",
       keinDuplikat: "Kein Duplikat — nicht mehr melden",
       freigegeben: "Als „kein Duplikat“ festgehalten.",
       freigabeAufheben: "wieder prüfen",
@@ -2340,6 +2344,7 @@ const en: typeof de = {
       verdacht: "may be a duplicate",
       sicher: "already present",
       gruende: "Reasons: {{gruende}}",
+      anderesKonto: "also on {{konto}}",
       status: {
         neu: "also waiting",
         verbucht: "already posted",
@@ -3029,6 +3034,7 @@ const en: typeof de = {
       verdacht: "may be a duplicate",
       sicher: "already posted",
       zwilling: "counterpart from {{datum}}",
+      anderesKonto: "also on {{konto}}",
     },
     alleKategorien: "All categories",
     ohneKategorie: "(uncategorised)",
@@ -3269,6 +3275,8 @@ const en: typeof de = {
         "Checked against everything on this account, discarded rows included. Both entries stay until you delete one of them.",
       hinweisLedger:
         "Both entries count towards the balance. They stay until you delete one of them \u2014 or record here that these are two different payments.",
+      anderesKonto:
+        "This payment is also on {{konto}} \u2014 the same row from the same source, just assigned to a different account.",
       keinDuplikat: "Not a duplicate \u2014 stop flagging",
       freigegeben: "Recorded as \u201cnot a duplicate\u201d.",
       freigabeAufheben: "check again",

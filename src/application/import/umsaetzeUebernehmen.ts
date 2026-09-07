@@ -14,7 +14,7 @@ import type {
 } from "../ports";
 import { katalogNachId, katalogNachName, vorschlagFuer, type Vorschlagskontext } from "./vorschlag";
 import { quelleKeyFuer } from "./kontoMatch";
-import { neueBelege, rohHash } from "./rohHash";
+import { belegSchluessel, neueBelege, rohHash } from "./rohHash";
 import { traegtNeues } from "./belege";
 import { ordneZu } from "./dublette";
 import type { RohUmsatz } from "./rohUmsatz";
@@ -283,17 +283,32 @@ async function uebernahmeIntern(
   /**
    * Wo eine Quelle IHRE Zeilen selbst kennzeichnet, brauchen wir keine Heuristik.
    *
-   * Der Index geht bewusst über ALLE Konten hinweg — und das ist kein Bruch der
-   * Kontogrenze, sondern eine andere Frage. Die Grenze gilt, wenn zwei VERSCHIEDENE
-   * Zahlungen verglichen werden; hier steht fest, dass es dieselbe Zeile derselben Quelle
-   * ist, weil die Quelle sie so benannt hat. Ohne das entstünde bei einer geänderten
-   * Kontozuordnung eine zweite Zahlung aus derselben Dateizeile.
+   * Der Index steht UNTER dem Konto, und damit gilt die Kontogrenze auch hier. Bis zum
+   * 07.09.2026 ging er über alle Konten hinweg, mit einer Begründung, die für sich
+   * stimmte: die Quelle hat ihre eigene Zeile benannt, also ist es dieselbe Zeile, auch
+   * wenn jemand die Kontozuordnung inzwischen geändert hat.
+   *
+   * Sie hielt nur der anderen Lesart nicht stand, und die ist die häufigere: wer
+   * dieselbe Datei absichtlich auf ein ANDERES Konto einliest, bekam nichts. Jede Zeile
+   * fand sich auf dem alten Konto wieder, der Beleg trug nichts Neues, und der Lauf
+   * meldete „0 neu, alles Dubletten" — auf einem Konto, das gerade erst angelegt und
+   * leer war.
+   *
+   * Beide Fälle sehen von hier aus gleich aus: Kandidat auf Konto X, gefundene Zahlung
+   * auf Konto Y. Zu wählen war also nur, welcher Fehler passieren darf — und die
+   * Kontogrenze hat die bessere Fehlerform. Ohne sie passiert STILL nichts; mit ihr
+   * entsteht eine zweite Zahlung, die man sieht: `fremdkontoZwilling` in
+   * `dubletten/dublettensicht.ts` legt genau diesen Fall beim Hinsehen offen.
    */
+  /** Derselbe Belegschlüssel wie überall, nur UNTER seinem Konto. */
+  const quellSchluessel = (kontoId: string, quelle: string, nativeId: string) =>
+    `${kontoId}\u0000${belegSchluessel(quelle, nativeId)}`;
+
   const nachQuellId = new Map<string, Umsatz>();
-  for (const liste of vorhandeneProKonto.values()) {
+  for (const [kontoId, liste] of vorhandeneProKonto) {
     for (const u of liste) {
       for (const b of u.belege ?? []) {
-        if (b.nativeId) nachQuellId.set(`${b.quelle}\u0000${b.nativeId}`, u);
+        if (b.nativeId) nachQuellId.set(quellSchluessel(kontoId, b.quelle, b.nativeId), u);
       }
     }
   }
@@ -318,7 +333,7 @@ async function uebernahmeIntern(
     // Zuerst die harte Kennung. Trifft sie, ist der Fall entschieden und der Finder wird
     // gar nicht erst gefragt.
     const bekannteZahlung = k.nativeId
-      ? nachQuellId.get(`${eingabe.quelle}\u0000${k.nativeId}`)
+      ? nachQuellId.get(quellSchluessel(k.zahlungskontoId, eingabe.quelle, k.nativeId))
       : undefined;
     if (bekannteZahlung) {
       zuordnen(bekannteZahlung, k);
