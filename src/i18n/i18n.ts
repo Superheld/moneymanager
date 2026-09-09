@@ -310,7 +310,7 @@ const de = {
     feldTyp: "Typ",
     uebernehmen: "Übernehmen",
     uebernehmenBusy: "Übernehme …",
-    uebernahmeErgebnis: "Übernommen: {{neu}} neu · {{duplikate}} Duplikate · {{konten}} Konten angelegt",
+    uebernahmeErgebnis: "Übernommen: {{neu}} neu · {{ergaenzt}} Beleg ergänzt · {{duplikate}} schon bekannt · {{konten}} Konten angelegt",
     uebernahmeHinweis: "Als Entwurf gespeichert — Kategorien prüfen und verbuchen folgt im nächsten Schritt.",
     fehlerDb: "Speichern geht nur in der Desktop-App (tauri dev), nicht im reinen Browser-Modus.",
     vorschauTitel: "Vorschau",
@@ -383,6 +383,7 @@ const de = {
       verdacht: "könnte doppelt sein",
       sicher: "steht schon drin",
       gruende: "Gründe: {{gruende}}",
+      anderesKonto: "steht auch auf {{konto}}",
       status: {
         neu: "wartet ebenfalls",
         verbucht: "bereits gebucht",
@@ -1008,7 +1009,7 @@ const de = {
       zeitraumGedeckelt: "Mehr als {{tage}} Tage gibt es bei dieser Bank nicht; geholt wird bis dorthin.",
       zeitraumHinweis:
         "Weiter zurück, wenn ein alter Dateibestand durch die Zeilen der Bank ersetzt werden soll. Was über den Speicherzeitraum der Bank hinausgeht, liefert sie nicht — das ist kein Fehler.",
-      zeile: "{{eingelesen}} geholt · {{neu}} neu · {{duplikate}} schon bekannt",
+      zeile: "{{eingelesen}} geholt · {{neu}} neu · {{ergaenzt}} Beleg ergänzt · {{duplikate}} schon bekannt",
       weiterInInbox:
         "Alles Neue ist gebucht. Was doppelt sein könnte, ist im Auszug markiert — dort steht auch das Gegenstück.",
     },
@@ -1082,6 +1083,7 @@ const de = {
       verdacht: "könnte doppelt sein",
       sicher: "steht schon drin",
       zwilling: "Gegenstück vom {{datum}}",
+      anderesKonto: "steht auch auf {{konto}}",
     },
     alleKategorien: "Alle Kategorien",
     ohneKategorie: "(ohne Kategorie)",
@@ -1292,6 +1294,9 @@ const de = {
       importlaufWert: "{{quelle}} · {{zeitpunkt}}",
       nativeId: "ID der Quelle",
       rohHash: "Dedup-Schlüssel",
+      belege: "Belege",
+      // Der erste ist der, der gerade gilt — er steht vorn und ist hervorgehoben.
+      belegWert: "{{quelle}}{{format}} · {{tag}}",
       ohneImport: "In der App erfasst — kein Import-Kontext vorhanden.",
       kontoGepaart: "fest — erst die Paarung lösen",
       verwerfenBankzeile: "Verwerfen",
@@ -1337,6 +1342,8 @@ const de = {
         "Geprüft wird gegen alles auf diesem Konto — auch gegen Verworfenes. Beide Zeilen bleiben stehen, bis du eine davon löschst.",
       hinweisLedger:
         "Beide Zeilen stehen im Saldo. Sie bleiben, bis du eine davon löschst — oder hier festhältst, dass es zwei verschiedene Zahlungen sind.",
+      anderesKonto:
+        "Diese Zahlung steht auch auf {{konto}} — dieselbe Zeile aus derselben Quelle, nur einem anderen Konto zugeordnet.",
       keinDuplikat: "Kein Duplikat — nicht mehr melden",
       freigegeben: "Als „kein Duplikat“ festgehalten.",
       freigabeAufheben: "wieder prüfen",
@@ -2265,7 +2272,7 @@ const en: typeof de = {
     feldTyp: "Type",
     uebernehmen: "Import",
     uebernehmenBusy: "Importing …",
-    uebernahmeErgebnis: "Imported: {{neu}} new · {{duplikate}} duplicates · {{konten}} accounts created",
+    uebernahmeErgebnis: "Imported: {{neu}} new · {{ergaenzt}} records added · {{duplikate}} already known · {{konten}} accounts created",
     uebernahmeHinweis: "Saved as a draft — reviewing categories and posting comes next.",
     fehlerDb: "Saving only works in the desktop app (tauri dev), not in browser-only mode.",
     vorschauTitel: "Preview",
@@ -2337,6 +2344,7 @@ const en: typeof de = {
       verdacht: "may be a duplicate",
       sicher: "already present",
       gruende: "Reasons: {{gruende}}",
+      anderesKonto: "also on {{konto}}",
       status: {
         neu: "also waiting",
         verbucht: "already posted",
@@ -2954,7 +2962,7 @@ const en: typeof de = {
       zeitraumGedeckelt: "This bank holds no more than {{tage}} days; the retrieval stops there.",
       zeitraumHinweis:
         "Reach further back when an old file-based stock is to be replaced by the bank's own rows. Anything beyond the bank's retention simply does not arrive — that is not an error.",
-      zeile: "{{eingelesen}} fetched · {{neu}} new · {{duplikate}} already known",
+      zeile: "{{eingelesen}} fetched · {{neu}} new · {{ergaenzt}} records added · {{duplikate}} already known",
       weiterInInbox:
         "Everything new has been posted. Anything that might be a duplicate is flagged in the statement, along with its counterpart.",
     },
@@ -3026,6 +3034,7 @@ const en: typeof de = {
       verdacht: "may be a duplicate",
       sicher: "already posted",
       zwilling: "counterpart from {{datum}}",
+      anderesKonto: "also on {{konto}}",
     },
     alleKategorien: "All categories",
     ohneKategorie: "(uncategorised)",
@@ -3219,6 +3228,8 @@ const en: typeof de = {
       importlaufWert: "{{quelle}} · {{zeitpunkt}}",
       nativeId: "Source ID",
       rohHash: "Dedup key",
+      belege: "Records",
+      belegWert: "{{quelle}}{{format}} · {{tag}}",
       ohneImport: "Captured in the app — no import context available.",
       kontoGepaart: "fixed — unpair the transfer first",
       verwerfenBankzeile: "Discard",
@@ -3264,6 +3275,8 @@ const en: typeof de = {
         "Checked against everything on this account, discarded rows included. Both entries stay until you delete one of them.",
       hinweisLedger:
         "Both entries count towards the balance. They stay until you delete one of them \u2014 or record here that these are two different payments.",
+      anderesKonto:
+        "This payment is also on {{konto}} \u2014 the same row from the same source, just assigned to a different account.",
       keinDuplikat: "Not a duplicate \u2014 stop flagging",
       freigegeben: "Recorded as \u201cnot a duplicate\u201d.",
       freigabeAufheben: "check again",

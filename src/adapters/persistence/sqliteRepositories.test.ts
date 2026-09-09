@@ -511,17 +511,25 @@ describe("Import-Repositories", () => {
     expect(ausLauf[0].gegenpartei).toBe("Rewe");
   });
 
-  it("liefert offene Umsätze und den Bestandsschlüssel", async () => {
+  it("liefert offene Umsätze samt ihrer Belege", async () => {
+    // Der Lauf gehoert dazu: erst er sagt, aus welcher QUELLE ein Beleg kam, und die
+    // Quelle ist die eine Haelfte des Schluessels.
+    await importLaufRepository.speichern({
+      id: "l1", quelle: "finanzguru", zeitpunkt: "2026-01-06T10:00:00Z",
+      eingelesen: 2, neu: 2, duplikate: 0,
+    });
     await umsatzRepository.anlegenViele([
       umsatz({ id: "u1", rohHash: "h1", nativeId: "n1" }),
       umsatz({ id: "u2", rohHash: "h2" }),
     ]);
     expect(await umsatzRepository.offene()).toHaveLength(2);
-    const bestand = await umsatzRepository.bestandsSchluessel();
-    expect([...bestand.hashes].sort()).toEqual(["h1", "h2"]);
-    expect([...bestand.nativeIds]).toEqual(["n1"]);
-    // Nur die Zeile ohne native ID zählt als ID-loser Hash.
-    expect([...(bestand.hashesOhneId ?? [])]).toEqual(["h2"]);
+    // Jede Zahlung traegt ihren Beleg, und der Beleg weiss, aus welcher Quelle er kam —
+    // daran haengt sein Rang beim Zusammenfuehren.
+    const alle = await umsatzRepository.alle();
+    expect(alle.flatMap((u) => u.belege ?? []).map((b) => b.quelle)).toEqual([
+      "finanzguru",
+      "finanzguru",
+    ]);
   });
 
   it("löscht einen Umsatz", async () => {
@@ -621,21 +629,35 @@ describe("Import-Repositories", () => {
     expect(alle.every((u) => u.sammelposten === undefined)).toBe(true);
   });
 
-  it("traegt fehlende Angaben nach, ohne vorhandene anzufassen", async () => {
+  it("haengt einen zweiten Beleg an, statt den ersten zu ueberschreiben", async () => {
     await umsatzRepository.anlegen(umsatz({ bankBuchungscode: "NTRF+117" }));
-    await umsatzRepository.ergaenzen(
+    await umsatzRepository.belegAnhaengen(
+      "u1",
       umsatz({
+        id: "u2",
         bankBuchungscode: "ANDERS+999",
         strukturierteReferenz: "RF18539007547034",
         zweckCode: "SALA",
       }),
     );
-    const [u] = await umsatzRepository.alle();
-    // Die erste Quelle behaelt recht — sie hat die Zeile erzeugt.
-    expect(u.bankBuchungscode).toBe("NTRF+117");
-    // Was fehlte, kommt dazu.
-    expect(u.strukturierteReferenz).toBe("RF18539007547034");
-    expect(u.zweckCode).toBe("SALA");
+    const alle = await umsatzRepository.alle();
+    // EINE Zahlung, zwei Belege — nicht zwei Zahlungen.
+    expect(alle).toHaveLength(1);
+    expect(alle[0].belege).toHaveLength(2);
+    // Beide Belege haben hier denselben Lauf und damit denselben Rang; dann entscheidet
+    // die Ordnung, und der erste bleibt vorn. Was FEHLTE, kommt trotzdem dazu.
+    expect(alle[0].bankBuchungscode).toBe("NTRF+117");
+    expect(alle[0].strukturierteReferenz).toBe("RF18539007547034");
+    expect(alle[0].zweckCode).toBe("SALA");
+  });
+
+  it("laesst den ersten Beleg dabei unangetastet", async () => {
+    // Die Zusicherung, um die es geht: `umsatz_roh` wird nach dem Anlegen nicht mehr
+    // beschrieben. Vorher gab es dafuer eine Ausnahme (`ergaenzen`); jetzt gibt es keine.
+    await umsatzRepository.anlegen(umsatz({ bankBuchungscode: "NTRF+117" }));
+    await umsatzRepository.belegAnhaengen("u1", umsatz({ id: "u2", bankBuchungscode: "ANDERS+999" }));
+    const zeilen = db.exec("SELECT bank_buchungscode FROM umsatz_roh WHERE id = 'u1'");
+    expect(zeilen[0].values[0][0]).toBe("NTRF+117");
   });
 
   it("hält Vorschlag und Ist-Buchungs-Verknüpfung über die Rundreise", async () => {
@@ -1197,16 +1219,21 @@ describe("Beleg — die Felder, die nur CAMT liefert", () => {
    */
   it("traegt sie nach, wenn eine zweite Quelle sie kennt", async () => {
     await umsatzRepository.anlegen(umsatz());
-    await umsatzRepository.ergaenzen(umsatz({ zweckCode: "RENT", endempfaenger: "Talmberg Wohnen" }));
+    await umsatzRepository.belegAnhaengen(
+      "u1",
+      umsatz({ id: "u2", zweckCode: "RENT", endempfaenger: "Talmberg Wohnen" }),
+    );
 
     const [u] = await umsatzRepository.alle();
     expect(u.zweckCode).toBe("RENT");
     expect(u.endempfaenger).toBe("Talmberg Wohnen");
   });
 
-  it("ueberschreibt dabei nicht, was schon dasteht", async () => {
+  it("laesst bei gleichem Rang den ersten Beleg vorn", async () => {
+    // Kein Vorrang ohne Grund: stammen beide aus derselben Art Quelle, bleibt es bei dem,
+    // was zuerst dastand. Erst ein hoeherer Rang dreht das um — siehe belege.test.ts.
     await umsatzRepository.anlegen(umsatz({ zweckCode: "SALA" }));
-    await umsatzRepository.ergaenzen(umsatz({ zweckCode: "RENT" }));
+    await umsatzRepository.belegAnhaengen("u1", umsatz({ id: "u2", zweckCode: "RENT" }));
     expect((await umsatzRepository.alle())[0].zweckCode).toBe("SALA");
   });
 });

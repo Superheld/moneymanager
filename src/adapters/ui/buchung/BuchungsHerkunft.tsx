@@ -10,7 +10,8 @@
 import { useTranslation } from "react-i18next";
 import { useState, type ReactNode } from "react";
 import type { IstBuchung } from "../../../application";
-import type { ImportLauf, Umsatz } from "../../../application/import";
+import { nachRang, type ImportLauf, type Umsatz } from "../../../application/import";
+import { Pill } from "../bausteine";
 
 /** Ein Label/Wert-Paar im Herkunfts-Abschnitt. Lange Werte (Hash, Zweck) dürfen umbrechen. */
 function Infozeile({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
@@ -75,6 +76,27 @@ export function BuchungsHerkunft({
               )}
               {umsatz.nativeId && <Infozeile label={t("konten.detail.nativeId")} mono>{umsatz.nativeId}</Infozeile>}
               <Infozeile label={t("konten.detail.rohHash")} mono>{umsatz.rohHash}</Infozeile>
+
+              {/* Die Belege — nur wenn es MEHRERE sind.
+                  Bei einem einzigen sagt die Liste nichts, was nicht schon dasteht: die
+                  Zeilen darüber sind dann genau seine. Erst ab zwei beantwortet sie eine
+                  Frage, die man sonst nirgends stellen kann — welche Quellen zu dieser
+                  Zahlung beigetragen haben, und welche davon gerade gilt. */}
+              {(umsatz.belege?.length ?? 0) > 1 && (
+                <Infozeile label={t("konten.detail.belege")}>
+                  <span style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-2)" }}>
+                    {nachRang(umsatz.belege ?? []).map((b, i) => (
+                      <Pill key={b.id} variant={i === 0 ? "ok" : "neutral"}>
+                        {t("konten.detail.belegWert", {
+                          quelle: b.quelle || "—",
+                          format: b.format ? ` ${b.format}` : "",
+                          tag: b.zeitpunkt.slice(0, 10),
+                        })}
+                      </Pill>
+                    ))}
+                  </span>
+                </Infozeile>
+              )}
             </>
           ) : (
             <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.detail.ohneImport")}</div>

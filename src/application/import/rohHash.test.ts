@@ -1,74 +1,77 @@
 import { describe, expect, it } from "vitest";
-import { klassifiziere, rohHash } from "./rohHash";
+import { belegSchluessel, neueBelege, rohHash } from "./rohHash";
 
-const leererBestand = { hashes: [], nativeIds: [] };
+const zeile = {
+  kontoIban: "DE02999999120000000001",
+  buchungstag: "2026-03-14",
+  betrag: -1990,
+  gegenpartei: "Kesselmann",
+  verwendungszweck: "Rechnung 4",
+};
 
 describe("rohHash", () => {
-  it("ist deterministisch für gleiche fachliche Daten", () => {
-    const a = { kontoIban: "DE12 3456", buchungstag: "2022-01-01", betrag: -655, gegenpartei: "Brandeis", verwendungszweck: "Kasse 1" };
-    const b = { kontoIban: "de123456", buchungstag: "2022-01-01", betrag: -655, gegenpartei: "brandeis", verwendungszweck: "kasse 1" };
-    // IBAN-Normalisierung (Spaces/Case) sowie Zweck- und Gegenpartei-Normalisierung
-    // greifen → gleicher Schlüssel.
-    expect(rohHash(a)).toBe(rohHash(b));
+  it("trennt nach Konto, Tag, Betrag, Gegenpartei und Zweck", () => {
+    const h = rohHash(zeile);
+    expect(rohHash({ ...zeile, betrag: -1991 })).not.toBe(h);
+    expect(rohHash({ ...zeile, buchungstag: "2026-03-15" })).not.toBe(h);
+    expect(rohHash({ ...zeile, gegenpartei: "Ohlert" })).not.toBe(h);
+    expect(rohHash({ ...zeile, verwendungszweck: "Rechnung 5" })).not.toBe(h);
   });
 
-  it("normalisiert Whitespace im Verwendungszweck", () => {
-    const a = rohHash({ buchungstag: "2022-01-01", betrag: -1, gegenpartei: "x", verwendungszweck: "Foo   Bar" });
-    const b = rohHash({ buchungstag: "2022-01-01", betrag: -1, gegenpartei: "x", verwendungszweck: "foo bar" });
-    expect(a).toBe(b);
+  it("liest dieselbe IBAN in jeder Schreibweise gleich", () => {
+    expect(rohHash({ ...zeile, kontoIban: "de02 9999 9912 0000 000001" })).toBe(rohHash(zeile));
   });
 
-  it("unterscheidet bei abweichendem Betrag", () => {
-    const a = rohHash({ buchungstag: "2022-01-01", betrag: -655, gegenpartei: "x", verwendungszweck: "x" });
-    const b = rohHash({ buchungstag: "2022-01-01", betrag: -656, gegenpartei: "x", verwendungszweck: "x" });
-    expect(a).not.toBe(b);
+  /**
+   * Das Loch, das bis zum 06.09.2026 offen stand: ohne IBAN begann der Schlüssel mit
+   * einem LEEREN Kontofeld, und zwei Zeilen verschiedener Konten trugen denselben Hash.
+   * Die Kontogrenze, die überall sonst hart ist, fiel ausgerechnet hier weg.
+   */
+  it("nimmt das Konto der App, wenn die Quelle keine IBAN liefert", () => {
+    const ohne = { ...zeile, kontoIban: undefined };
+    expect(rohHash(ohne, "konto-a")).not.toBe(rohHash(ohne, "konto-b"));
   });
 
-  it("unterscheidet zwei Händler bei leerem Verwendungszweck", () => {
-    // Kartenzahlung: der Zweck ist regelmäßig leer, nur die Gegenpartei trennt.
-    const a = rohHash({ kontoIban: "DE1", buchungstag: "2022-01-01", betrag: -2000, gegenpartei: "Rewe", verwendungszweck: "" });
-    const b = rohHash({ kontoIban: "DE1", buchungstag: "2022-01-01", betrag: -2000, gegenpartei: "Aldi", verwendungszweck: "" });
-    expect(a).not.toBe(b);
-  });
-
-  it("lässt sich nicht durch verschobene Feldgrenzen nachbauen", () => {
-    // Ein Trennzeichen im Referenzkonto darf keinen fremden Schlüssel erzeugen.
-    const a = rohHash({ kontoIban: 'K","2020-01-01', buchungstag: "x", betrag: -5, gegenpartei: "", verwendungszweck: "" });
-    const b = rohHash({ kontoIban: "K", buchungstag: "2020-01-01", betrag: -5, gegenpartei: "", verwendungszweck: "" });
-    expect(a).not.toBe(b);
+  it("lässt einen Hash MIT IBAN unverändert", () => {
+    // Nachgereicht statt eingesetzt: sonst änderten sich alle bestehenden Hashes, und der
+    // nächste Import fände den Bestand nicht wieder.
+    expect(rohHash(zeile, "konto-a")).toBe(rohHash(zeile));
   });
 });
 
-describe("klassifiziere — Duplikaterkennung", () => {
-  it("hält gegen leeren Bestand alles für neu", () => {
-    const k = [{ rohHash: "h1", nativeId: "n1" }, { rohHash: "h2" }];
-    expect(klassifiziere(k, leererBestand).neu).toHaveLength(2);
+describe("neueBelege", () => {
+  const beleg = (rohHash: string, nativeId?: string) => ({ rohHash, nativeId });
+
+  it("lässt denselben Inhalt aus einer ANDEREN Quelle durch", () => {
+    // Der Fall, um den es geht: die Bankfassung einer Zahlung, die schon aus einer
+    // Fremdsoftware im Bestand liegt. Sie trägt mehr, also gehört sie gespeichert.
+    const bestand = { belegSchluessel: [belegSchluessel("finanzguru", "h1")] };
+    expect(neueBelege([beleg("h1")], "fints", bestand).neu).toHaveLength(1);
   });
 
-  it("erkennt Dubletten über die native ID (exakt)", () => {
-    const k = [{ rohHash: "anders", nativeId: "n1" }];
-    const { neu, duplikate } = klassifiziere(k, { hashes: [], nativeIds: ["n1"] });
-    expect(neu).toHaveLength(0);
-    expect(duplikate).toHaveLength(1);
+  it("hält denselben Inhalt aus DERSELBEN Quelle zurück", () => {
+    // Jeder Abruf überlappt bewusst um sieben Tage. Ohne diese Grenze füllte sich die
+    // Tabelle mit bitgleichen Kopien.
+    const bestand = { belegSchluessel: [belegSchluessel("fints", "h1")] };
+    expect(neueBelege([beleg("h1")], "fints", bestand).bekannt).toHaveLength(1);
   });
 
-  it("erkennt Dubletten über den Roh-Hash, wenn keine native ID vorhanden ist (quellenübergreifend)", () => {
-    const k = [{ rohHash: "h1" }];
-    const { duplikate } = klassifiziere(k, { hashes: ["h1"], nativeIds: [] });
-    expect(duplikate).toHaveLength(1);
-  });
-
-  it("behält zwei Buchungen mit gleichem Roh-Hash, aber verschiedenen native IDs (keine Falsch-Dublette)", () => {
-    const k = [{ rohHash: "h1", nativeId: "n1" }, { rohHash: "h1", nativeId: "n2" }];
-    const { neu, duplikate } = klassifiziere(k, leererBestand);
+  it("unterscheidet zwei Zeilen derselben Quelle an ihrer nativen Id", () => {
+    // Zweimal derselbe Kaffee am selben Tag: gleicher Hash, verschiedene Id. Wo die
+    // Quelle Ids vergibt, sind es zwei Zahlungen.
+    const { neu } = neueBelege([beleg("h1", "a"), beleg("h1", "b")], "finanzguru", {
+      belegSchluessel: [],
+    });
     expect(neu).toHaveLength(2);
-    expect(duplikate).toHaveLength(0);
   });
 
-  it("dedupliziert ID-lose Zeilen innerhalb desselben Stapels", () => {
-    const k = [{ rohHash: "h1" }, { rohHash: "h1" }];
-    const { neu, duplikate } = klassifiziere(k, leererBestand);
+  it("zählt den Stapel mit", () => {
+    // Eine Datei kann dieselbe Zeile zweimal enthalten; ohne Mitwachsen entstünden aus
+    // einem Lauf zwei identische Belege.
+    const { neu, bekannt } = neueBelege([beleg("h1"), beleg("h1")], "fints", {
+      belegSchluessel: [],
+    });
     expect(neu).toHaveLength(1);
-    expect(duplikate).toHaveLength(1);
+    expect(bekannt).toHaveLength(1);
   });
 });

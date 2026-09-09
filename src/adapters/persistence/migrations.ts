@@ -2053,4 +2053,30 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_vormerkung_konto ON vormerkung(zahlungskonto_id)`,
     ],
   },
+  {
+    version: 71, // Eine Zahlung, mehrere Belege
+    sql: [
+      // DER SCHNITT, den die 1:1-Bindung bisher verhindert hat.
+      //
+      // Bis hierher war `umsatz_roh` nicht das, was sein Name verspricht: eine erkannte
+      // Dublette wurde GAR NICHT gespeichert — `ergaenzen` trug fehlende Felder in die
+      // vorhandene Zeile nach und die eingehende verschwand. Wer erst aus einer
+      // Fremdsoftware importiert und danach dieselben Monate bei der Bank abruft, verlor
+      // damit die Bankfassung, und zwar unwiederbringlich.
+      //
+      // Mit dieser Spalte tragen mehrere Belege dieselbe Zahlung. Nichts wird mehr
+      // ueberschrieben; welcher Beleg je Feld gilt, wird beim LESEN entschieden
+      // (`application/import/belege.ts`). Damit wird die Zusicherung aus dem
+      // GoBD-Abschnitt sogar strenger als vorher: die Ausnahme `ergaenzen` faellt weg,
+      // ein Beleg ist ab jetzt wirklich unveraenderlich.
+      `ALTER TABLE umsatz_roh ADD COLUMN zahlung_id TEXT`,
+      // Jede bestehende Zeile ist ihre eigene Zahlung — das war bisher die Wahrheit und
+      // bleibt es. Ohne Bedingung waere das Statement nicht wiederholbar (CLAUDE.md:
+      // jedes Statement muss fuer sich wiederholbar sein), und ein zweiter Lauf risse
+      // spaeter zugeordnete Belege wieder auseinander.
+      `UPDATE umsatz_roh SET zahlung_id = id WHERE zahlung_id IS NULL`,
+      // Gelesen wird immer die ganze Gruppe: alle Belege einer Zahlung auf einmal.
+      `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_zahlung ON umsatz_roh (zahlung_id)`,
+    ],
+  },
 ];

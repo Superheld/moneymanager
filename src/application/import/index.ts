@@ -2,6 +2,7 @@
 export * from "./rohUmsatz";
 export * from "./quellenAdapter";
 export * from "./umsatz";
+export * from "./belege";
 export * from "./importLauf";
 export * from "./rohHash";
 export * from "./dublette";

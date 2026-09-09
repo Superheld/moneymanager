@@ -3,6 +3,101 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.28.0] — 2026-09-09
+
+Die Runde am Beleg. Zwei stille Datenverluste im Import — einer, der die Bankfassung einer
+Zahlung wegwarf, und einer, der einen ganzen Lauf ins Leere laufen liess. Beide sahen im
+Betrieb gleich aus: der Lauf meldete „nichts Neues", und das war die richtige Meldung fuer
+den falschen Vorgang.
+
+### Neu
+
+**Eine Zahlung hat jetzt mehrere Belege.** Wer erst aus einer Fremdsoftware importiert und
+danach dieselben Monate bei der Bank abruft, bekam bisher nur eine Fassung: die zweite
+wurde in die vorhandene Zeile hineingeschrieben, soweit dort Felder fehlten, und der Rest
+verschwand. Jetzt legt sich jede weitere Fassung als eigener Beleg daneben, unveraendert
+so, wie ihre Quelle sie geliefert hat.
+
+Welcher Wert dann gilt, entscheidet nicht mehr das Schreiben, sondern das **Lesen** — bei
+jedem Zugriff neu, nach einer Rangfolge, die an einer Stelle steht: Bankabruf CAMT, dann
+MT940, dann Fremdsoftware. Die Bank ist die Quelle einer Zahlung, eine Fremdsoftware
+erzaehlt sie nach; sie normalisiert, kuerzt und laesst weg, was sie nicht braucht. Eine
+Laengenregel fuer den Verwendungszweck gibt es dabei ausdruecklich **nicht**: eine
+Fremdsoftware haengt ihren eigenen Block an und hat damit oft die laengste Fassung, ohne
+die genaueste zu sein.
+
+**Der Buchungsdialog zeigt die Belege**, sobald es mehr als einen gibt — der staerkste
+vorn, mit Quelle, Format und Lauf daneben. Wer wissen will, woher ein Wert stammt, sieht
+dort nach statt zu raten.
+
+**Abruf und Import zaehlen „Beleg ergaenzt" getrennt.** „Schon bekannt" heisst ab jetzt nur
+noch eines: diese Fassung lag in genau dieser Form schon von dieser Quelle vor. Was etwas
+beitraegt, steht in einer eigenen Zahl — vorher fiel beides in denselben Topf, und man sah
+einem Lauf nicht an, ob er etwas gebracht hatte.
+
+**„Steht auch auf «Konto»".** Die Dublettenpruefung beantwortet eine dritte Frage: liegt
+dieselbe Zeile derselben Quelle auf einem ANDEREN Konto? Sie ist die einzige der drei, die
+ueber die Kontogrenze sieht, und sie darf es, weil sie nicht schaetzt — die beiden anderen
+vergleichen mit Unschaerfe, und fuer eine Schaetzung ist die Kontogrenze eine Vorbedingung.
+Der Befund steht in der Inbox, im Kontoauszug und im Buchungsdialog, jeweils mit dem Namen
+des anderen Kontos.
+
+### Behoben
+
+**Der Bankabruf verlor die Fassung der Bank.** Erkannte der Dublettenfinder eine Zahlung
+wieder, wurde die eingehende Zeile weggeworfen und die vorhandene um ihre fehlenden Felder
+ergaenzt. Was die Bank strukturiert liefert und eine Fremdsoftware nicht kennt, war damit
+weg — und ein Institut haelt Umsaetze nur begrenzt vor, also nicht wiederzubeschaffen. Der
+Abruf meldete dabei „0 neu" und sah aus wie ein gewoehnlicher Fehlschlag.
+
+**Dieselbe Datei auf ein anderes Konto einzulesen tat still gar nichts.** Jede Zeile fand
+sich ueber ihre Buchungs-ID auf dem alten Konto wieder, der Beleg trug nichts Neues, und
+der Lauf meldete „0 neu, alles Dubletten" — auf einem Konto, das gerade erst angelegt und
+leer war. Kein Hinweis, kein Weg zurueck. Die Kontogrenze gilt jetzt auch fuer die
+Buchungs-ID der Quelle; was dabei entstehen kann — dieselbe Zeile auf zwei Konten — ist
+kein blinder Fleck mehr, sondern der neue Befund oben.
+
+**Der Release-Text nannte Plattformen, die nicht am Release hingen.** Bei 0.27.0 stand ein
+Abschnitt „Windows (.exe)" ueber einer Datei, die es nicht gab. Derselbe Schaden, gegen den
+der Signierungs-Zweig gebaut wurde, nur eine Spalte weiter: ein Text, der etwas zusichert,
+was das Release nicht haelt. Er wird jetzt aus den tatsaechlich hochgeladenen Artefakten
+gebaut, nicht aus den Job-Ergebnissen — ein gruener Job ohne Datei ist moeglich, eine Datei
+ohne Datei nicht.
+
+**Zwei Waechter konnten auf Windows keine Pfade mehr lesen**, und der zweite Fall war der
+schlimmere: der Doku-Waechter meldete jeden Verweis als tot (laut und falsch, aber
+sichtbar), der Schicht-Waechter dagegen lief GRUEN ueber eine leere Menge. Ein Waechter,
+der nichts sieht, ist schlimmer als keiner — er beruhigt. Dazu kommt deshalb ein Test, der
+die leere Menge selbst zum Fehler macht.
+
+### Geändert
+
+**Ein Beleg wird nach dem Anlegen nicht mehr beschrieben — ohne Ausnahme.** Die Zusicherung
+stand schon da, hatte aber eine: das Ergaenzen. Die faellt ersatzlos weg, und damit wird die
+Unveraenderbarkeit strenger als vorher statt nur anders begruendet.
+
+**Gespeichert wird ein Beleg, wenn er etwas Neues traegt** — verglichen wird der INHALT
+gegen die Belege derselben Quelle an dieser Zahlung. Ein Schluesselvergleich reichte dafuer
+nicht: der Roh-Hash deckt fuenf Felder ab und aendert sich nicht, wenn eine Quelle eine
+Spalte nachliefert. Genau dieser Fall — Tabelle erweitern, Datei erneut einlesen — war der
+Grund, aus dem es das Ergaenzen einmal gab.
+
+### Innen
+
+- **Migration 71**: `umsatz_roh.zahlung_id` — die Beziehung Beleg zu Zahlung wird 1:n.
+  `umsatz_verarbeitung` haengt an der Zahlung, nicht mehr am Beleg.
+- Die Ausschlussliste in `zusammenfuehren` ist **ausfuehrbar** statt nur typisiert: sie
+  kopierte zur Laufzeit alles, was am Objekt stand, und ein ganzer Umsatz als Beleg brachte
+  damit Status und Verbuchung mit.
+- Der JOIN auf `import_lauf` ist ein LEFT und kein INNER — ohne Lauf verschwaende ein Beleg
+  sonst spurlos, statt mit schwaechstem Rang dazustehen.
+- Der Roh-Hash faellt ohne Konto-IBAN auf die Konto-Id zurueck; vorher trugen zwei Zeilen
+  verschiedener Konten denselben. Nachgereicht statt eingesetzt, damit bestehende Hashes
+  unveraendert bleiben.
+- Der Release-Text liegt in `scripts/release-text.sh` und wird vom Waechter **ausgefuehrt**
+  statt gelesen: ein Regex ueber den Workflow haette den Fund nie gemacht, weil dort alles
+  Richtige stand — nur eben unbedingt.
+
 ## [0.27.0] — 2026-09-06
 
 Die Runde am Bankabruf. Er holt jetzt, was die Bank kennt und noch nicht gebucht hat,

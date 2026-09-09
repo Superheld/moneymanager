@@ -9,6 +9,7 @@
 // `--config` dazugemischt wird. Dieser Test hält die Grenze zwischen beiden.
 
 import { describe, expect, it } from "vitest";
+import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -181,13 +182,20 @@ describe("Der Release-Workflow und die Apple-Signierung", () => {
     expect(WORKFLOW, "Die Variablen entstehen nicht über GITHUB_ENV").toContain('>> "$GITHUB_ENV"');
   });
 
-  it("führt beide Fassungen des Release-Texts — die signierte und die ehrliche", () => {
-    // Beide Zweige müssen dastehen, damit der Text den Signierungsstand SAGT statt ihn zu
-    // behaupten — und damit der unsignierte von selbst verschwindet, sobald das Zertifikat
-    // da ist. Bliebe er stehen, behauptete er dann seinerseits etwas Falsches.
-    expect(WORKFLOW, "Der signierte Zweig fehlt").toContain("Signiert und notarisiert.");
-    expect(WORKFLOW, "Der unsignierte Zweig nennt den Zustand nicht").toContain(
-      "Nicht mit einem Apple-Zertifikat signiert",
+  it("schreibt den Text neu, NACHDEM feststeht, was am Release hängt", () => {
+    // Der Fund aus 0.27.0. Der Text entstand in jedem Matrix-Job und nannte alle drei
+    // Plattformen unbedingt — der Windows-Job war da noch nicht gelaufen und ist dann an
+    // den Tests gestorben. Im Release stand ein Abschnitt „**Windows** (`.exe`)" über
+    // einer Datei, die es nicht gab.
+    //
+    // Ein Matrix-Job KANN das nicht wissen; deshalb muss ein Job danach ran. `always()`
+    // ist dabei die Hälfte, auf die es ankommt: der häufige Fall ist der TEILWEISE
+    // Fehlschlag, und mit `needs` allein liefe genau dann nichts mehr.
+    expect(WORKFLOW, "Kein Job schreibt den Text nach der Matrix").toMatch(
+      /needs:\s*bauen[\s\S]{0,80}if:\s*always\(\)/,
+    );
+    expect(WORKFLOW, "Der Text wird nicht aus den Artefakten des Releases gebaut").toContain(
+      "gh release view",
     );
   });
 
@@ -203,5 +211,66 @@ describe("Der Release-Workflow und die Apple-Signierung", () => {
     expect(WORKFLOW, "Der Workflow erklärt wieder, wie man die Quarantäne abräumt").not.toMatch(
       /xattr\s+-[a-z]*d[a-z]*\s|com\.apple\.quarantine/,
     );
+  });
+});
+
+/**
+ * Der Textbau selbst — AUSGEFÜHRT, nicht gelesen.
+ *
+ * Ein Regex über den Workflow hätte den Fund aus 0.27.0 nie gemacht: dort STAND ja
+ * alles Richtige, nur eben unbedingt. Was zählt, ist die Ausgabe bei einer bestimmten
+ * Eingabe, und die lässt sich hier billig herstellen — das Skript ist reines bash ohne
+ * Netz und ohne Zustand.
+ */
+describe("Der Release-Text", () => {
+  const SKRIPT = join(import.meta.dirname, "..", "scripts", "release-text.sh");
+  const text = (signiert: string, plattformen: string) =>
+    execFileSync("bash", [SKRIPT], {
+      encoding: "utf8",
+      env: { ...process.env, SIGNIERT: signiert, PLATTFORMEN: plattformen },
+    });
+
+  it("nennt genau die Plattformen, die man ihm gibt — und keine mehr", () => {
+    // DER FALL AUS 0.27.0: macOS und Linux haben geliefert, Windows nicht.
+    const zwei = text("nein", "macos linux");
+    expect(zwei).toContain("**macOS**");
+    expect(zwei).toContain("**Linux**");
+    expect(zwei, "Windows steht im Text, obwohl kein Windows-Artefakt vorliegt").not.toContain(
+      "**Windows**",
+    );
+  });
+
+  it("behauptet ohne Plattformliste gar keine Plattform", () => {
+    // So ruft die Matrix es auf, und das ist der Sinn: zu diesem Zeitpunkt ist NICHTS
+    // gebaut. Was übrig bleibt, ist knapp und wahr — die Fehlerform, die wir wollen,
+    // falls der Job danach ausfällt.
+    const ohne = text("nein", "");
+    for (const p of ["**macOS**", "**Windows**", "**Linux**"]) {
+      expect(ohne, `${p} steht da, obwohl noch nichts gebaut wurde`).not.toContain(p);
+    }
+    expect(ohne, "Auch der allgemeine Teil fehlt — dann sagt der Text gar nichts").toContain(
+      "Stadium **Alpha**",
+    );
+  });
+
+  it("führt beide Fassungen — die signierte und die ehrliche", () => {
+    // Beide Zweige müssen dastehen, damit der Text den Signierungsstand SAGT statt ihn zu
+    // behaupten — und damit der unsignierte von selbst verschwindet, sobald das Zertifikat
+    // da ist. Bliebe er stehen, behauptete er dann seinerseits etwas Falsches.
+    expect(text("ja", "macos")).toContain("Signiert und notarisiert.");
+    expect(text("nein", "macos")).toContain("Nicht mit einem Apple-Zertifikat signiert");
+    expect(text("ja", "macos")).not.toContain("Nicht mit einem Apple-Zertifikat signiert");
+  });
+
+  it("erklärt auch hier niemandem, wie man Gatekeeper aushebelt", () => {
+    // Dieselbe Regel wie im Workflow, und sie muss mitwandern: der Text ist umgezogen,
+    // die Versuchung nicht. Geprüft wird über alle Zweige, nicht nur den, der gerade
+    // gilt.
+    for (const [s, p] of [
+      ["ja", "macos linux windows"],
+      ["nein", "macos linux windows"],
+    ] as const) {
+      expect(text(s, p)).not.toMatch(/xattr\s+-[a-z]*d[a-z]*\s|com\.apple\.quarantine/);
+    }
   });
 });

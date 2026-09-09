@@ -38,12 +38,21 @@ export interface Dublettenbefund {
 export function DublettenBlock({
   befund,
   imLedger,
+  fremdkonto,
   onZwillingOeffnen,
   onKeinDuplikat,
 }: {
   befund: Dublettenbefund;
   /** Gebuchte Zeile (beide stehen im Saldo) oder noch ein Entwurf? Der Hinweis unterscheidet sich. */
   imLedger: boolean;
+  /**
+   * Der Name des Kontos, auf dem der Zwilling liegt — nur wenn es ein ANDERES ist.
+   *
+   * Der Vergleich passiert beim Aufrufer, weil nur der weiss, welches Konto die Zeile
+   * selbst hat. Hier steht dann entweder ein Name oder nichts, und das ist genau die
+   * Bedingung fuer den Satz darunter.
+   */
+  fremdkonto?: string;
   onZwillingOeffnen?: () => void;
   onKeinDuplikat?: () => void | Promise<void>;
 }) {
@@ -71,6 +80,15 @@ export function DublettenBlock({
       <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
         {t("konten.neue.dubletteHinweis", { gruende: verdacht.gruende.join(", ") })}
       </div>
+      {/* Der Fall, in dem die Zeile NICHT ueberfluessig ist: sie ist schon einmal einem
+          anderen Konto zugeordnet. Steht vor dem allgemeinen Hinweis, weil sie die
+          Auskunft aendert — „beide bleiben stehen, bis du eine loeschst" ist hier die
+          falsche Handlungsempfehlung. */}
+      {fremdkonto && (
+        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+          {t("konten.dublette.anderesKonto", { konto: fremdkonto })}
+        </div>
+      )}
       <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
         {t(imLedger ? "konten.dublette.hinweisLedger" : "konten.dublette.hinweis")}
       </div>

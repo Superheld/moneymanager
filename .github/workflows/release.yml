@@ -193,50 +193,20 @@ jobs:
             } >> "$GITHUB_ENV"
           fi
 
+          # Der Text kommt aus `scripts/release-text.sh`, und hier OHNE Plattformliste.
+          #
+          # Das ist kein Sparen, sondern die Kernaussage: wenn dieser Schritt laeuft, hat
+          # noch niemand gebaut. Ein Job kann also nicht wissen, welche Artefakte am Ende
+          # am Release haengen — und bis zum 06.09.2026 hat er es trotzdem behauptet.
+          # Das Release trug einen Windows-Abschnitt ueber einer Datei, die nie entstand,
+          # weil der Windows-Job an den Tests starb.
+          #
+          # Ohne Liste steht nur der allgemeine Teil da, und der stimmt immer. Den Rest
+          # schreibt der Job `text` unten, wenn alle drei durch sind und man NACHSEHEN
+          # kann statt zu raten.
           {
             echo "body<<TEXTENDE"
-            echo "Lokale Haushalts-Finanz-App, Stadium **Alpha**."
-            echo
-            echo "Der Bestand wird beim ersten Start verschluesselt — die Passphrase wird dabei"
-            echo "gesetzt, und der Wiederherstellungscode gehoert aufgeschrieben."
-            echo
-            echo "**macOS** (\`.dmg\`)"
-            echo
-            if [ "$signiert" = "ja" ]; then
-              echo "Signiert und notarisiert."
-            else
-              # KEINE ANLEITUNG, DIE GATEKEEPER AUSHEBELT — auch nicht fuer die eigene App.
-              #
-              # Bis zum 30.08.2026 stand hier die xattr-Zeile, mit der Begruendung, ihr
-              # Weglassen mache den Fehlschlag unerklaerlich. Der Einwand stimmt und wiegt
-              # trotzdem weniger: ein Release-Text ist eine oeffentliche Seite, und was
-              # dort steht, uebt jemand ein. „Quarantaene-Merkmal abraeumen, wenn eine App
-              # als beschaedigt gemeldet wird" ist als Gewohnheit genau der Griff, mit dem
-              # man sich das naechste Mal etwas anderes einfaengt — und dann steht die
-              # Anleitung dafuer bei uns.
-              #
-              # Der Zustand wird deshalb weiterhin BENANNT, nur nicht mehr umgangen. Wer
-              # ihn beheben will, hat einen Weg: das Zertifikat.
-              echo "Nicht mit einem Apple-Zertifikat signiert: macOS meldet die App beim ersten"
-              echo "Start als „beschaedigt“ und startet sie nicht. Beschaedigt ist sie nicht —"
-              echo "es fehlt die Signatur. Solange das so ist, ist der frische Download auf"
-              echo "macOS kein Weg, den wir empfehlen."
-            fi
-            echo
-            echo "**Windows** (\`.exe\`)"
-            echo
-            echo "Nicht mit einem Authenticode-Zertifikat signiert: SmartScreen meldet einen"
-            echo "unbekannten Herausgeber. Ueber \"Weitere Informationen\" laesst sich der Start"
-            echo "erlauben."
-            echo
-            echo "**Linux** (\`.AppImage\`)"
-            echo
-            echo "Ausfuehrbar machen und starten; eine Signatur braucht es hier nicht. Nur das"
-            echo "AppImage kann sich selbst aktualisieren — ein \`.deb\` koennte das nie, deshalb"
-            echo "gibt es keins."
-            echo
-            echo "Ein bereits installierter Moneymanager aktualisiert sich ohne all das: der"
-            echo "Updater prueft seine eigene Signatur, und die ist unabhaengig davon."
+            SIGNIERT="$signiert" PLATTFORMEN="" bash scripts/release-text.sh
             echo "TEXTENDE"
           } >> "$GITHUB_OUTPUT"
 
@@ -290,3 +260,59 @@ jobs:
           # dem falschen Grund, bis jemand die Vorgabe aendert. Genau die Sorte
           # Fehlschlag, die erst im Release sichtbar wird.
           uploadUpdaterJson: true
+
+  # ── Der Release-Text, nachdem feststeht, was wirklich dranhaengt ────────────────────
+  #
+  # `if: always()` ist hier Pflicht und nicht Vorsicht: der haeufige Fall IST der
+  # teilweise Fehlschlag. Faellt eine Plattform aus, sollen die uebrigen im Text stehen —
+  # mit `needs` allein liefe dieser Job dann gar nicht, und es bliebe der Stand der
+  # Matrix stehen: der allgemeine Teil ohne jede Plattform.
+  #
+  # Geschrieben wird aus `gh release view`, also aus den Dateien, die tatsaechlich am
+  # Release haengen. Keine Annahme darueber, welcher Job gutgegangen ist — die
+  # Artefaktliste ist die einzige Quelle, die nicht luegen kann.
+  text:
+    name: Release-Text nach dem Stand der Artefakte
+    needs: bauen
+    if: always()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Text aus den vorhandenen Artefakten schreiben
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+          ZERTIFIKAT: ${{ secrets.APPLE_CERTIFICATE }}
+          IDENTITAET: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_KENNUNG: ${{ secrets.APPLE_ID }}
+          TEAM: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if [ -n "$ZERTIFIKAT" ] && [ -n "$IDENTITAET" ] && [ -n "$APPLE_KENNUNG" ] && [ -n "$TEAM" ]; then
+            signiert=ja
+          else
+            signiert=nein
+          fi
+
+          dateien=$(gh release view "$TAG" --json assets --jq '.assets[].name')
+          echo "Artefakte am Release:"
+          echo "$dateien" | sed 's/^/  /'
+
+          plattformen=""
+          case "$dateien" in *.dmg*|*.app.tar.gz*) plattformen="$plattformen macos";; esac
+          case "$dateien" in *.AppImage*)          plattformen="$plattformen linux";; esac
+          case "$dateien" in *.exe*|*.msi*)        plattformen="$plattformen windows";; esac
+          echo "Daraus: ${plattformen:-(keine)}"
+
+          # Ohne jede Plattform gibt es nichts zu beschreiben — dann bleibt der Stand der
+          # Matrix stehen, statt ihn durch einen Text zu ersetzen, der nichts sagt.
+          if [ -z "$plattformen" ]; then
+            echo "Keine Artefakte — der Text bleibt, wie er ist."
+            exit 0
+          fi
+
+          SIGNIERT="$signiert" PLATTFORMEN="$plattformen" bash scripts/release-text.sh > text.md
+          gh release edit "$TAG" --notes-file text.md
+          echo "Text geschrieben."

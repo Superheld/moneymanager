@@ -169,9 +169,65 @@ Eine Importzeile steht in **zwei** Tabellen, und die Grenze dazwischen ist der
   Kategorievorschlag, erzeugte Buchung, Dublettenverdacht. Ändert sich bei jeder Durchsicht.
 
 Nach oben ist es weiterhin EIN `Umsatz`; die Trennung sieht man nur an den Schreibwegen.
-`anlegen` schreibt beides in einer Transaktion, `speichern` nur den Stand, und `ergaenzen`
-ist die einzige Stelle, die Rohdaten überhaupt noch anfasst — und auch dort nur, was fehlt
-(`COALESCE`), nie was schon dasteht.
+`anlegen` schreibt beides in einer Transaktion, `speichern` nur den Stand, und
+`belegAnhaengen` legt einen weiteren Beleg daneben — **geändert wird ein Beleg nie**.
+
+#### Eine Zahlung hat mehrere Belege
+
+Seit 2026-09-06 ist die Beziehung 1:n: `umsatz_roh.zahlung_id` sagt, zu welcher Zahlung ein
+Beleg gehört, `umsatz_verarbeitung` hängt an der Zahlung. Der Grund war ein stiller
+Datenverlust — wer erst aus einer Fremdsoftware importierte und danach dieselben Monate bei
+der Bank abrief, verlor die Bankfassung: `ergaenzen` trug fehlende Felder in die vorhandene
+Zeile nach und warf die eingehende weg. Ein Institut hält Umsätze nur begrenzt vor, also war
+sie danach nicht wiederzubeschaffen.
+
+**Der Vorrang ist damit vom Schreiben ins LESEN gewandert.** Niemand überschreibt mehr
+etwas; welcher Beleg je Feld gilt, rechnet `application/import/belege.ts` bei jedem Lesen
+neu. Die Rangfolge: Bankabruf CAMT, dann MT940, dann Fremdsoftware — die Bank ist die Quelle
+einer Zahlung, eine Fremdsoftware erzählt sie nach. Bei Gleichrang gewinnt der jüngere Lauf.
+
+Drei Regeln, mehr braucht es nicht:
+
+- **Der erste Wert in der Rangfolge gewinnt.** Ob nur eine Quelle das Feld liefert
+  (`zweckCode`) oder beide es verschieden vollständig tun (`gegenpartei`), ist dieselbe
+  Operation. Eine LÄNGENREGEL für den Verwendungszweck gibt es bewusst nicht: sie ist die
+  naheliegende und die falsche, weil eine Fremdsoftware ihren eigenen Block anhängt und
+  damit oft die längste Fassung hat, ohne die genaueste zu sein.
+- **Die Formatgruppe kommt geschlossen aus EINEM Beleg** — `umsatzart`,
+  `buchungsschluessel`, `bankBuchungscode`. Sie sind nur mit dem Format ihres Laufs deutbar
+  (siehe unten); feldweise gefüllt stünden in einer Zahlung mehrere Vokabulare
+  nebeneinander, ohne dass man ihnen ansieht, welches.
+- **Id, Lauf und Roh-Hash stellt der NAMENGEBENDE Beleg**, nicht der stärkste. Sie sagen,
+  woher die Zahlung stammt, nicht was in ihr steht — wanderten sie mit dem Rang, änderte ein
+  späterer Abruf rückwirkend die Herkunft.
+
+**Gespeichert wird ein Beleg, wenn er etwas Neues trägt** — verglichen wird der INHALT gegen
+die Belege derselben Quelle an dieser Zahlung. Ein Schlüsselvergleich reichte dafür nicht:
+`rohHash` deckt fünf Felder ab und ändert sich nicht, wenn eine Quelle eine Spalte
+NACHLIEFERT. Genau dieser Fall — Tabelle erweitern, Datei erneut einlesen — war der Grund,
+aus dem es das Ergänzen einmal gab.
+
+**Die Kontogrenze gilt auch für die native Id.** Bis zum 07.09.2026 wurde sie
+kontoübergreifend nachgeschlagen, mit einer Begründung, die für sich stimmte: die Quelle
+hat ihre eigene Zeile benannt, also bleibt dieselbe Zeile dieselbe, auch wenn jemand die
+Kontozuordnung geändert hat.
+
+Sie hielt der anderen Lesart nicht stand, und die ist die häufigere. Wer dieselbe Datei
+absichtlich auf ein ANDERES Konto einliest, bekam nichts: jede Zeile fand sich über ihre
+Buchungs-ID auf dem alten Konto wieder, der Beleg trug nichts Neues, und der Lauf meldete
+„0 neu, alles Dubletten" — auf einem Konto, das gerade erst angelegt und leer war.
+
+Beide Fälle sehen beim Import gleich aus (Kandidat auf Konto X, gefundene Zahlung auf
+Konto Y), aus den Daten sind sie nicht zu trennen. Zu wählen war also nur, **welcher
+Fehler passieren darf** — und die Kontogrenze hat die bessere Fehlerform: ohne sie
+passiert still nichts, mit ihr entsteht eine zweite Zahlung, die man sieht.
+
+Sichtbar macht sie die **dritte Frage** in `application/dubletten/dublettensicht.ts`
+(`fremdkontoZwilling`): dieselbe Quellzeile auf zwei Konten. Sie ist die einzige der drei,
+die über die Kontogrenze sieht, und sie darf es, weil sie **nicht rechnet** — die anderen
+beiden vergleichen mit Unschärfe, und für eine Schätzung ist die Kontogrenze eine
+Vorbedingung. Damit gilt hier dieselbe Arbeitsteilung wie überall: **anlegen tut der
+Import, urteilen tut das Hinsehen.**
 
 Zwei Zuordnungen, die man auf der falschen Seite sucht:
 
@@ -561,9 +617,10 @@ niemand später raten muss, was bewusst erfüllt ist und was bewusst nicht.
 
 ### Was die Unveränderbarkeit heute leistet
 
-**Der Beleg ist geschützt.** `umsatz_roh` wird nach dem Anlegen nicht mehr beschrieben; die
-einzige Ausnahme ist `ergaenzen`, und die trägt nur FEHLENDE Felder nach (`COALESCE`), nie
-vorhandene. Was die Bank geliefert hat, steht unverändert da.
+**Der Beleg ist geschützt, und seit 2026-09-06 ohne Ausnahme.** `umsatz_roh` wird nach dem
+Anlegen nicht mehr beschrieben — die frühere Ausnahme `ergaenzen` ist ersatzlos weg, weil
+eine zweite Fassung jetzt als eigener Beleg danebensteht statt in die vorhandene Zeile
+geschrieben zu werden. Was eine Quelle geliefert hat, steht unverändert da.
 
 **Änderungen an Buchungen sind protokolliert.** Jedes Anlegen, Ändern und Löschen schreibt
 einen Eintrag ins `buchung_journal` — mit dem ganzen Zustand vorher und nachher, nicht mit
@@ -1406,6 +1463,39 @@ ansieht, dass es unsigniert ist, ist ehrlich; ein Literal im Workflow wäre gena
 falsch, wenn es darauf ankommt. Deshalb ist `releaseBody` kein fester Text mehr, sondern
 die Ausgabe des Schritts.
 
+**Und seit dem 06.09.2026 gilt dasselbe für die PLATTFORMEN.** Der Text nannte macOS,
+Windows und Linux unbedingt — auch in einem Release, an dem nur zwei davon hingen. Genau
+das war bei 0.27.0 der Fall: der Windows-Job stirbt an den Tests, und über einer Datei,
+die nie entstand, stand „**Windows** (`.exe`)". Derselbe Schaden wie ein unsigniertes
+Bundle unter „Signiert und notarisiert", nur eine Spalte weiter.
+
+Ein Matrix-Job kann das nicht wissen — wenn er seinen Text baut, hat noch niemand gebaut.
+Deshalb ist die Zuständigkeit geteilt, und der Text steht jetzt in einem eigenen Skript:
+
+| Wer | Plattformliste | Ergebnis |
+|---|---|---|
+| die Matrix-Jobs | **leer** | nur der allgemeine Teil — knapp und immer wahr |
+| der Job `text` danach | aus `gh release view` | die Abschnitte der Artefakte, die wirklich dranhängen |
+
+Zwei Dinge daran sind Absicht und keine Vorsicht. **`if: always()`** am Nachjob: der
+häufige Fall IST der teilweise Fehlschlag, und mit `needs` allein liefe ausgerechnet dann
+nichts mehr. Und die **Artefaktliste als Quelle** statt der Job-Ergebnisse: sie kann nicht
+lügen, ein grüner Job ohne hochgeladene Datei schon.
+
+Die Fehlerform ist damit die richtige: fällt der Nachjob aus, bleibt der allgemeine Teil
+stehen — unvollständig, aber nicht falsch.
+
+| Stück | Datei |
+|---|---|
+| Der Text, an einer Stelle | `scripts/release-text.sh` |
+| Wer ihn mit welcher Liste ruft | `.github/workflows/release.yml` |
+| Der Wächter, der ihn AUSFÜHRT statt liest | `src/auslieferung.test.ts` |
+
+Der Wächter ist dabei der Teil, der sich gelohnt hat: ein Regex über den Workflow hätte
+den Fund nie gemacht, weil dort alles Richtige stand — nur eben unbedingt. Geprüft wird
+deshalb die Ausgabe des Skripts bei gegebener Eingabe, und der Fall aus 0.27.0 (macOS und
+Linux da, Windows nicht) steht als eigener Testfall.
+
 **Was der unsignierte Zweig NICHT mehr enthält, ist die `xattr`-Anleitung.** Sie stand dort
 bis zum 30.08.2026, und die Begründung dafür war richtig: ohne sie ist der Fehlschlag
 unerklärlich — macOS meldet „beschädigt", und wer die App nicht selbst gebaut hat, hat keine
@@ -1447,13 +1537,13 @@ Vier Entscheidungen darin, die man nicht anfassen sollte, ohne den Grund zu kenn
   gleichzeitig lesen, sehen denselben Stand — der zweite überschreibt den Eintrag des
   ersten. Der Fehlschlag ist **still**: die verlorene Plattform bekommt vom Updater
   „nichts Neues" statt eines Fehlers.
-- **Der Release-Text kommt vom ersten Job — und seit tauri-action 1.0.0 auch von jedem
-  weiteren.** Bis v0 setzte die Action Titel und Text nur beim ANLEGEN des Releases und
-  liess ein vorgefundenes unberührt; jetzt schreibt jeder Job beides neu. Am Ergebnis
-  ändert das nichts, weil alle drei Läufer denselben Text ausrechnen. Es ändert die
-  **Fehlerform**: scherte früher ein Läufer aus, gewann trotzdem der erste Job, heute
-  gewinnt der letzte. Deshalb steht macOS weiterhin oben, und deshalb ist `shell: bash`
-  am Textschritt wichtiger geworden als vorher.
+- **Den Release-Text schreibt zuletzt der Job `text`, nicht die Matrix.** Bis v0 setzte
+  tauri-action Titel und Text nur beim ANLEGEN des Releases und liess ein vorgefundenes
+  unberührt; seit 1.0.0 schreibt jeder Job beides neu. Beide Stände hatten dasselbe
+  Problem: kein Matrix-Job weiss, was am Ende dranhängt. Deshalb liefern sie nur noch den
+  allgemeinen Teil, und der Nachjob schreibt aus den Artefakten (siehe oben). Dass macOS
+  weiterhin oben steht, entscheidet damit nur noch, wer das Release ANLEGT — nicht mehr,
+  was drinsteht.
 - **`shell: bash` am Textschritt.** Ohne ihn nimmt GitHub auf Windows PowerShell, und das
   Skript stirbt an der ersten Zeile. Ein Schritt, der auf zwei von drei Läufern
   funktioniert, fällt erst im Release auf.

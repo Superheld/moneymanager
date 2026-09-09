@@ -63,8 +63,13 @@ export const MAX_TAGE = 3;
  * Punkte für einen Treffer, der keine Schätzung ist (gleiche Quell-ID, gleiches
  * SEPA-Mandat). Der Wert liegt bewusst weit über `SCHWELLE_IDENTISCH` — er soll auch
  * dann noch reichen, wenn jemand die Schwellen später anzieht.
+ *
+ * Exportiert, weil es noch einen Befund gibt, der keine Schätzung ist und trotzdem nicht
+ * von hier kommt: derselbe Quellschlüssel auf zwei Konten (`fremdkontoZwilling` in
+ * `dubletten/dublettensicht.ts`). Er braucht die Quelle des Belegs und kann deshalb nicht
+ * über `Vergleichbar` laufen — dieselbe Sicherheit soll er trotzdem ausweisen.
  */
-const PUNKTE_SICHER = 99;
+export const PUNKTE_SICHER = 99;
 
 /** Ab diesem Anteil gemeinsamer Wörter gilt ein Verwendungszweck als überwiegend gleich. */
 const MIN_WORTUEBERLAPPUNG = 0.6;
