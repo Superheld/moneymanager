@@ -1761,7 +1761,11 @@ Komfort für Listen & Tabellen.
 ### Geändert
 - Kategorie-Taxonomie (Standardkategorien) überarbeitet/erweitert.
 
-### Bekannt / offen
+### Bekannt / offen — Stand 0.10.0, inzwischen erledigt
+Der Abschnitt bleibt stehen, weil ein Changelog festhaelt, was damals galt. Er ist keine
+Liste offener Punkte mehr: Splits gibt es (`ist_buchung_aufteilung`), CAMT und FinTS
+laufen ueber den Bankabruf, und die Kategorie-Erkennung ist ein trainiertes Modell.
+
 - Split-Buchungen werden erkannt und gewarnt, aber noch nicht entzerrt (Doppelzählung vor
   produktivem Verbuchen prüfen).
 - Plan/Ist-Auto-Matching, weitere Importquellen (CAMT/FinTS) und KI-Vorschläge stehen aus.

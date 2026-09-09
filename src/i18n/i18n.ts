@@ -1544,7 +1544,7 @@ const de = {
       titel: "4 · Bestand abgleichen",
       untertitel: "Vorhandene Buchungen mit dem aktuellen Stand der Erkennung durchrechnen",
       hinweis:
-        "Alles Bisherige wirkt nur nach vorn: ein frisch trainiertes Modell, eine neue Festlegung, eine Kategorie am Vertrag lassen die schon gebuchten Zahlungen unberührt. Der Abgleich rechnet sie neu — und zeigt zuerst, was er ändern würde. Geschrieben wird erst auf Bestätigung.",
+        "Alles Bisherige wirkt nur nach vorn: ein frisch trainiertes Modell, eine Kategorie am Vertrag, eine neue Erkennungsregel lassen die schon gebuchten Zahlungen unberührt. Der Abgleich rechnet sie neu — und zeigt zuerst, was er ändern würde. Geschrieben wird erst auf Bestätigung.",
       vorschau: "Vorschau rechnen",
       rechnet: "rechne …",
       nichtsZuTun: "Nichts zu ändern — bei {{unveraendert}} Buchungen liefert die Erkennung genau das, was schon dasteht.",
@@ -3465,7 +3465,7 @@ const en: typeof de = {
       titel: "4 · Reconcile existing bookings",
       untertitel: "Re-run existing bookings against the current state of the recognition",
       hinweis:
-        "Everything so far only works going forward: a freshly trained model, a new pin, a category on a contract leave already-booked payments untouched. The reconciliation recomputes them — and shows what it would change first. Nothing is written until you confirm.",
+        "Everything so far only works going forward: a freshly trained model, a category on a contract, a new recognition rule leave already-booked payments untouched. The reconciliation recomputes them — and shows what it would change first. Nothing is written until you confirm.",
       vorschau: "Compute preview",
       rechnet: "computing …",
       nichtsZuTun: "Nothing to change — for {{unveraendert}} bookings the recognition returns exactly what is already there.",

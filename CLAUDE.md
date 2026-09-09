@@ -146,7 +146,7 @@ ist sie:
   `kontostand_anker` · `vormerkung` (was die Bank kennt und noch nicht gebucht hat,
   siehe unten) · `import_lauf` · `dubletten_freigabe` ·
   `kontogruppe` + `kontogruppe_konto` (frei benannte Gruppen, siehe unten)
-- **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` + `budget_betrag` (die
+- **Ordnen:** `kategorie` · `budget` + `budget_betrag` (die
   Reihe seiner Beträge, siehe unten) · `vertrag` ·
   `vertrag_erkennung` · `zahlungsregel` · `ruecklage` + `ruecklage_ausbuchung` (siehe unten)
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
@@ -157,7 +157,19 @@ ist sie:
 
 Gedroppt und nicht wiederzubeleben: `topf`, `szenario`, `szenario_posten` — aufgegangen in
 den Budgets bzw. im Monatsausblick. Ebenso `umsatz`, aufgeteilt in die beiden folgenden,
-und `vertrag_zuordnung`, aufgegangen in zwei Spalten der Buchung (siehe unten).
+und `vertrag_zuordnung`, aufgegangen in zwei Spalten der Buchung (siehe unten). Dazu
+`kategorie_festlegung` (Migration 64): „immer bei diesem Empfänger" war kein Schutz — eine
+Handkorrektur ist über `kategorie_herkunft` ohnehin sicher —, sondern eine
+VERALLGEMEINERUNG, und die soll das Modell leisten, über alle Merkmale statt über den
+Empfänger allein. Die Begründung samt dem, was beim Wiedereinbau zu bedenken wäre, steht
+im Kopf von `application/import/vorschlag.ts`.
+
+**Diese Liste stand bis zum 09.09.2026 selbst falsch da** — `kategorie_festlegung` war seit
+Migration 64 gedroppt und wurde hier weiter als lebend geführt. Das ist genau die
+Verwechslung, gegen die es die Liste gibt, und sie ist die teuerste Art, falsch zu sein:
+die Migrationskette ist append-only und deshalb keine Auskunft, also gibt es keine zweite
+Stelle, an der es auffiele. **Wer eine Tabelle droppt, streicht sie hier UND nennt sie
+unten.**
 
 #### Der Beleg und was wir daraus gemacht haben
 
