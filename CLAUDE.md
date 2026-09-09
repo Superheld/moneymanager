@@ -1384,8 +1384,8 @@ verschwiegen, weil dort die Fremdschlüssel aus sind.
 ### Eine Version ausliefern
 
 1. `develop` ist grün und enthält alles, was mit soll.
-2. Version in `package.json` heben — **eine** Stelle, `tauri.conf.json` und `version.ts`
-   lesen von dort.
+2. Version in `package.json` heben — und **`package-lock.json` mit**. `tauri.conf.json`
+   und `version.ts` lesen wirklich von dort; der Lockfile nicht (siehe unten).
 3. `CHANGELOG.md` schreiben. Keine Zahl aus dem echten Bestand hinein.
 4. Nach `main` mergen (nur aus `develop`, der Hook lässt nichts anderes zu).
 5. Tag setzen und pushen — **das löst `.github/workflows/release.yml` aus**: bauen,
@@ -1397,6 +1397,25 @@ verschwiegen, weil dort die Fremdschlüssel aus sind.
 Für den eigenen Rechner geht es auch ohne Release: `npm run installieren` baut und
 installiert lokal. Beide Wege erzeugen dasselbe Bundle; der Unterschied ist nur, ob es
 jemand anders erreichen kann.
+
+#### Der Lockfile trägt die Version zweimal, und niemand schreibt sie fort
+
+Hier stand bis zum 09.09.2026 „**eine** Stelle", und das war zu kurz gefasst. `package.json`
+ist die Quelle für alles, was zur Bauzeit gelesen wird — aber **`package-lock.json` hält
+seine eigene Kopie**, zweimal: an der Wurzel und in `packages[""]`. Fortgeschrieben wird
+sie nur von `npm version` oder einem `npm install`; wer die Zahl von Hand hebt, hebt sie
+dort nicht mit.
+
+**Deshalb fällt es nicht auf:** `npm ci` prüft die Auflösung der Abhängigkeiten, nicht die
+eigene Versionsnummer des Wurzelpakets. Der Lockfile stand bei 0.27.0 auf 0.26.0, und das
+Release lief durch. Der Schaden ist kein Build, der bricht, sondern eine Zahl, die falsch
+dasteht — und je länger sie stehen bleibt, desto eher glaubt sie jemand, der von aussen
+draufsieht.
+
+**Von Hand heben, nicht mit `npm install --package-lock-only`.** Das rechnet nebenbei
+Auflösungen neu und zieht damit in einen Release-Commit Änderungen an Abhängigkeiten
+hinein, die niemand geprüft hat — genau das, wogegen der Pin und die Wächter der
+Lieferkette stehen. Zwei Zeilen ändern, danach `npm ci --dry-run`.
 
 **Zwei Schalter im Release-Workflow dürfen nicht auf „vorsichtig" stehen**, und beide sind
 verlockend:
