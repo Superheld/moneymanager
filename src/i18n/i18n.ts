@@ -749,6 +749,11 @@ const de = {
     feldBetragHinweis: "was jeden Monat hineingeht",
     feldStart: "Sammelt ab",
     feldStartHinweis: "gerechnet wird ab dem Monatsersten",
+    feldGiltAb: "Gilt ab",
+    feldGiltAbHinweis: {
+      monatlich: "ab diesem Monat zählt der Rahmen — der Tag spielt keine Rolle",
+      aufbauend: "ab diesem Monat zählt der Rahmen und wird gesammelt",
+    },
     modalBearbeiten: "Budget bearbeiten",
     modalUntertitel: "Ein Budget je Kategorie — für Feineres eine Unterkategorie nehmen",
   },
@@ -2717,6 +2722,11 @@ const en: typeof de = {
     feldBetragHinweis: "what goes in every month",
     feldStart: "Accumulates from",
     feldStartHinweis: "counted from the first of the month",
+    feldGiltAb: "Applies from",
+    feldGiltAbHinweis: {
+      monatlich: "the budget counts from this month on — the day is irrelevant",
+      aufbauend: "from this month on the budget counts and accumulates",
+    },
     modalBearbeiten: "Edit budget",
     modalUntertitel: "One budget per category — use a subcategory for anything finer",
   },

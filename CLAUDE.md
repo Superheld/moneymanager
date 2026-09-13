@@ -600,6 +600,22 @@ geplant, und einen Rahmen rückwirkend anzunehmen hiesse, eine Planung zu erfind
 nie gab. Aus demselben Grund summiert `budgetRahmen` beim Aufbauenden über die Monate,
 statt zu multiplizieren.
 
+**Wann die erste Version anfängt, sagt beim Anlegen der Nutzer.** Der Dialog zeigt seit
+2026-09-13 für BEIDE Arten ein Feld „Gilt ab", vorbelegt mit dem laufenden Monat. Vorher
+stand es nur beim Aufbauenden (dort als Sammelanker `start`), und ein monatliches Budget
+begann zwangsläufig im laufenden Monat — wer eines für etwas anlegte, das seit dem Frühjahr
+läuft, sah jeden Monat davor mit Rahmen 0 und in der Auswertung lauter Überziehungen, die
+nie welche waren.
+
+Das widerspricht der 0 oben nicht, sondern schärft sie: **eine Angabe ist keine Annahme.**
+Rückwirkend von selbst zu füllen — etwa ab der ersten Buchung — bliebe verboten; der Monat
+kommt von jemandem, der ihn hinschreibt.
+
+**Ein Feld für beide Arten, nicht zwei.** Beim Aufbauenden setzt derselbe Monat zugleich
+`start`. Zwei Felder für einen Zeitpunkt wären zwei Wahrheiten, und ihre erste Abweichung
+fiele niemandem auf. Beim BEARBEITEN bleibt es der Anker und damit nur beim Aufbauenden
+sichtbar: ab wann ein GEÄNDERTER Betrag gilt, sagt dort die Betragsreihe darüber.
+
 #### Zuordnungen stehen an der Buchung
 
 `kategorie_id` und `vertrag_id` sind **Spalten von `ist_buchung`**, nicht eigene Tabellen.
