@@ -1186,3 +1186,97 @@ describe("VertraegeScreen — die Regel beim Anlegen", () => {
     });
   });
 });
+
+/**
+ * Die Kategorie rückwirkend auf die zugeordneten Zahlungen — der Weg durch die Maske.
+ *
+ * Der Fall aus dem Bestand: die Erkennung ordnet einem frisch erfassten Vertrag seine
+ * Zahlungen von Jahren zurück zu, und die behalten die Kategorie, die sie damals
+ * bekamen. Die Zuordnung sagt „gehört zu diesem Vertrag", die Kategorie daneben
+ * widerspricht ihr.
+ *
+ * Geprüft wird am Ledger und nicht an der Anzeige: die Frage ist, ob geschrieben wurde.
+ */
+describe("VertraegeScreen — Kategorie auf die Zahlungen übertragen", () => {
+  async function vertragMitZahlungen() {
+    await konto();
+    await sqliteKategorieRepository.speichern({
+      id: "kat-alt", name: "Sonstiges", defaultCharakter: "Aufwand",
+    });
+    await sqliteKategorieRepository.speichern({
+      id: "kat-neu", name: "Laufende Kosten", defaultCharakter: "Aufwand",
+    });
+    for (let i = 0; i < 4; i++) {
+      const id = `z-${i}`;
+      const datum = tagVor(i * 30);
+      await sqliteLedgerRepository.speichern({
+        id, datum, betrag: -2900, kontoId: "k1", charakter: "Aufwand", quelle: "import",
+        kategorieId: "kat-alt", kategorieHerkunft: "automatisch",
+      });
+      await sqliteUmsatzRepository.anlegen({
+        id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
+        betrag: -2900, waehrung: "EUR", gegenpartei: "Terhoven Media", verwendungszweck: "",
+        rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
+      });
+    }
+    await sqliteVertragRepository.speichern({
+      id: "v-terhoven", anbieter: "Terhoven Media", beginn: "2025-01-01",
+      verlaengerung: "automatisch", status: "aktiv", kategorieId: "kat-neu",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-terhoven", bezeichnung: "Terhoven Media", betrag: -2900, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1",
+      vertragId: "v-terhoven", kategorieId: "kat-neu",
+    });
+  }
+
+  it("schreibt die Vertragskategorie auf die Zahlungen, wenn der Haken steht", async () => {
+    await vertragMitZahlungen();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Terhoven Media");
+    // Erst wenn der Abgleich gelaufen ist, hängen die Zahlungen am Vertrag.
+    await waitFor(async () =>
+      expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(4),
+    );
+
+    await nutzer.click(await screen.findByRole("button", { name: /bearbeiten/i }));
+    // Die Zeile nennt die ZAHL der zugeordneten Zahlungen — deshalb der Schluessel mit
+    // `count` und nicht der ohne.
+    const haken = await screen.findByRole("checkbox", {
+      name: i18n.t("vertraege.kategorieUebertragenZahl", { count: 4 }),
+    });
+    await nutzer.click(haken);
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const buchungen = await sqliteLedgerRepository.alle();
+      expect(buchungen.every((b) => b.kategorieId === "kat-neu")).toBe(true);
+      // Ohne das holte die Kategorie-Automatik den alten Wert beim nächsten Import zurück.
+      expect(buchungen.every((b) => b.kategorieHerkunft === "manuell")).toBe(true);
+    });
+  });
+
+  it("lässt die Zahlungen OHNE Haken unberührt", async () => {
+    // Die Gegenprobe, und sie ist die wichtigere: der Abgleich läuft bei jedem Öffnen des
+    // Bereichs. Griffe er dabei in die Kategorien, wäre jede Handkorrektur beim nächsten
+    // Hinsehen weg.
+    await vertragMitZahlungen();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Terhoven Media");
+    await waitFor(async () =>
+      expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(4),
+    );
+
+    await nutzer.click(await screen.findByRole("button", { name: /bearbeiten/i }));
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const buchungen = await sqliteLedgerRepository.alle();
+      expect(buchungen.every((b) => b.kategorieId === "kat-alt")).toBe(true);
+    });
+  });
+});

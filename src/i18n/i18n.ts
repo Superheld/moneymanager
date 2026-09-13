@@ -1888,6 +1888,10 @@ const de = {
     feldRhythmus: "Rhythmus",
     feldKategorie: "Kategorie",
     feldKategorieHinweis: "setzt den Charakter vor",
+    kategorieUebertragen: "Kategorie auf die zugeordneten Zahlungen übertragen",
+    kategorieUebertragenZahl: "Kategorie auf die {{count}} zugeordneten Zahlungen übertragen",
+    kategorieUebertragenHinweis:
+      "Rückwirkend, und es überschreibt auch von Hand gesetzte Kategorien. Geteilte Buchungen und Umbuchungs-Beine bleiben stehen. Ohne Haken bleiben die Zahlungen, wie sie sind.",
     feldCharakter: "Charakter",
     feldKonto: "Konto",
     verlaengerung: { automatisch: "automatisch", keine: "keine" },
@@ -3876,6 +3880,10 @@ const en: typeof de = {
     feldRhythmus: "Frequency",
     feldKategorie: "Category",
     feldKategorieHinweis: "presets the character",
+    kategorieUebertragen: "Apply the category to the linked payments",
+    kategorieUebertragenZahl: "Apply the category to the {{count}} linked payments",
+    kategorieUebertragenHinweis:
+      "Retroactive, and it overwrites categories you set by hand too. Split bookings and transfer legs are left alone. Without the tick the payments stay as they are.",
     feldCharakter: "Character",
     feldKonto: "Account",
     verlaengerung: { automatisch: "automatic", keine: "none" },

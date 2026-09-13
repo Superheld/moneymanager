@@ -160,6 +160,11 @@ export {
   type VertragEingabe,
   type VertragErgebnis,
 } from "./vertraege/vertragAnlegen";
+export {
+  vertragskategorieUebertragen,
+  type UebertragungErgebnis,
+  type VertragskategorieDeps,
+} from "./vertraege/vertragskategorie";
 export { zahlungsspuren } from "./buchung/zahlungsspuren";
 export {
   historieLaden,

@@ -39,6 +39,7 @@ import {
   vertragAnlegen,
   vertragserkennungen,
   vertragserkennungSpeichern,
+  vertragskategorieUebertragen,
   vertragszuordnungenAbgleichen,
 } from "../../dienste";
 import {
@@ -292,6 +293,15 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
    * schaltete die Erkennung des Vertrags stillschweigend ab.
    */
   const [erkennung, setErkennung] = useState<ErkennungFormular | null>(null);
+  /**
+   * Soll die Kategorie des Vertrags auf seine zugeordneten Zahlungen geschrieben werden?
+   *
+   * Ein eigener Zustand und KEIN Formularfeld: die Frage gehört nicht zum Vertrag, sondern
+   * zum Speichervorgang. Sie ist bei jedem Öffnen wieder aus — eine Massenänderung an
+   * gebuchten Daten darf nicht in einer Vorbelegung stehen, die jemand beim zweiten Mal
+   * übersieht.
+   */
+  const [kategorieUebertragen, setKategorieUebertragen] = useState(false);
   const [spuren, setSpuren] = useState<Zahlungsspur[]>([]);
   const [zuordnungen, setZuordnungen] = useState<Vertragszuordnung[]>([]);
 
@@ -379,6 +389,20 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
   );
 
   /**
+   * Wie viele Zahlungen dem Vertrag zugeordnet sind — die Zahl an der Übertragen-Zeile.
+   *
+   * Beim Anlegen ist sie 0, weil es die Zuordnungen noch nicht gibt; dann nennt die Zeile
+   * keine Zahl. `probe.treffer.length` stattdessen zu nehmen wäre verlockend und falsch:
+   * die Vorschau sagt, was die Regel TRIFFT, der Abgleich entscheidet mit `besser`, WEM
+   * eine Zahlung am Ende gehört. Eine Zahl, die knapp danebenliegt, ist bei einer
+   * Massenänderung schlechter als keine.
+   */
+  const zugeordneteZahlungen = useMemo(
+    () => (editId ? zuordnungen.filter((z) => z.vertragId === editId).length : 0),
+    [editId, zuordnungen],
+  );
+
+  /**
    * Was in den Konditionen steht, in einer Zeile — die Beschriftung des zugeklappten
    * Abschnitts. Leer, wenn nichts drinsteht; dann greift der Standard-Hinweis.
    */
@@ -453,6 +477,9 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
       // längst im Bestand. Ohne diesen Lauf trüge nur, was danach gebucht wird, seine
       // Zuordnung — und der Vertrag stünde in der Liste, ohne je eine Buchung zu kennen.
       await vertragszuordnungenAbgleichen();
+      // NACH dem Abgleich: vorher gibt es die Zuordnungen nicht, über die der Use-Case
+      // läuft — bei einem frisch angelegten Vertrag wäre es sonst immer ein Leerlauf.
+      if (kategorieUebertragen && f.kategorieId) await vertragskategorieUebertragen(vertragId);
       await onSaved();
     } catch (e) {
       setFehler(fehlerNachricht(t, e));
@@ -540,6 +567,40 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
             </FormField>
           )}
         </div>
+
+        {/* Die Kategorie rückwirkend auf die zugeordneten Zahlungen.
+
+            Sie steht HIER und nicht im Erkennungsabschnitt: es geht um die Kategorie, und
+            die steht drei Felder darüber. Und sie steht nur da, wenn eine Kategorie
+            gewählt ist — ohne sie hiesse „übertragen" leeren, und das ist eine andere
+            Handlung als die, die der Haken anbietet.
+
+            Warum überhaupt ein Haken und nicht von selbst: eine Vertragszuordnung sagt
+            „diese Buchung gehört zu diesem Vertrag". Daraus automatisch die Kategorie
+            umzuschreiben, machte aus dem Abgleich — der bei jedem Öffnen des Bereichs
+            läuft — eine Massenänderung an gebuchten Daten. Wer eine Zahlung bewusst
+            anders einsortiert hat, verlöre das beim nächsten Hinsehen. */}
+        {f.kategorieId && (
+          <div>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+              <input
+                type="checkbox"
+                checked={kategorieUebertragen}
+                onChange={(e) => setKategorieUebertragen(e.target.checked)}
+              />
+              <span style={{ fontSize: "var(--fs-small)" }}>
+                {zugeordneteZahlungen > 0
+                  ? t("vertraege.kategorieUebertragenZahl", { count: zugeordneteZahlungen })
+                  : t("vertraege.kategorieUebertragen")}
+              </span>
+            </label>
+            {kategorieUebertragen && (
+              <p className="muted" style={{ fontSize: "var(--fs-xs)", margin: "6px 0 0 26px", maxWidth: 560 }}>
+                {t("vertraege.kategorieUebertragenHinweis")}
+              </p>
+            )}
+          </div>
+        )}
       </Abschnitt>
 
       {/* Die Erkennung — beim BEARBEITEN als eigener Abschnitt, beim Anlegen nur als

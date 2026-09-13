@@ -135,6 +135,7 @@ import {
   vertragLoeschen as vertragLoeschenUseCase,
   type VertragEingabe,
 } from "../application/vertraege/vertragAnlegen";
+import { vertragskategorieUebertragen as vertragskategorieUebertragenUseCase } from "../application/vertraege/vertragskategorie";
 import { vorschlagIgnorieren as vertragsvorschlagIgnorierenUseCase } from "../application/vertraege/vertragsvorschlaege";
 import { sqliteVertragRepository } from "./persistence/sqliteVertragRepository";
 import {
@@ -568,6 +569,25 @@ export function vertragsvorschlagIgnorieren(schluessel: string) {
 /** Erkennungen und Zuordnungen neu rechnen — nach jeder Änderung an einem Vertrag. */
 export function vertragszuordnungenAbgleichen() {
   return zuordnungenAbgleichen(vertragsAbgleichDeps);
+}
+
+/**
+ * Die Kategorie des Vertrags auf seine zugeordneten Zahlungen schreiben — rückwirkend.
+ *
+ * Läuft NUR, wenn jemand den Haken in der Maske setzt; warum, steht im Kopf des
+ * Use-Cases. Gehört hinter den Abgleich: vorher gibt es die Zuordnungen nicht, die es
+ * auswertet.
+ */
+export function vertragskategorieUebertragen(vertragId: string) {
+  return vertragskategorieUebertragenUseCase(
+    {
+      ledger: sqliteLedgerRepository,
+      zuordnungRepo: sqliteVertragszuordnungRepository,
+      vertragRepo: sqliteVertragRepository,
+      kategorieRepo: sqliteKategorieRepository,
+    },
+    vertragId,
+  );
 }
 
 /**

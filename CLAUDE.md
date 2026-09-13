@@ -652,6 +652,35 @@ seine Abwesenheit der Fehler: man stellt eine Regel auf ein Feld, das die Maske,
 das tut, nirgends anzeigt. Dieselbe Lücke steht noch im Kontoauszug — er **durchsucht** den
 Zweck (`KontenScreen`), zeigt ihn aber nicht.
 
+#### Die Kategorie des Vertrags rückwirkend auf seine Zahlungen
+
+Seit 2026-09-13 gibt es im Vertragsdialog einen Haken dafür
+(`application/vertraege/vertragskategorie.ts`). Der Anlass: die Erkennung ordnet einem
+frisch erfassten Vertrag seine Zahlungen von Jahren zurück zu, und die behalten die
+Kategorie, die sie damals bekamen — die Zuordnung sagt „gehört zu diesem Vertrag", die
+Kategorie daneben widerspricht ihr.
+
+**Es passiert nicht von selbst, und das ist die eigentliche Entscheidung.** Eine
+Vertragszuordnung ist eine Aussage über die ZUGEHÖRIGKEIT; daraus automatisch die Kategorie
+umzuschreiben machte aus `zuordnungenAbgleichen` — das bei jedem Öffnen des Bereichs läuft
+— eine Massenänderung an gebuchten Daten. Wer eine Zahlung bewusst anders einsortiert hat,
+verlöre das beim nächsten Hinsehen.
+
+Drei Dinge, die daran hängen:
+
+- **Mit Haken überschreibt es AUCH Handarbeit.** Das ist kein Versehen, sondern der Anlass:
+  „ich habe das damals falsch einsortiert, der Vertrag weiß es besser". Ein Schutz der
+  Handarbeit wäre hier ein Schutz gegen die Handlung, die gerade ausgelöst wurde. Der Haken
+  ist bei jedem Öffnen wieder aus.
+- **Eine GETEILTE Buchung bleibt stehen.** Bei einer Aufteilung stehen die Kategorien in
+  den Teilen; die Kopfkategorie umzuschreiben ließe die Teile stehen und erzeugte einen
+  Widerspruch, den die Budgetrechnung je nach Weg verschieden auflöst.
+- **Geschrieben wird über `buchungenSammelbearbeiten`**, nicht über eine eigene Schleife:
+  dort steht schon, was zu einer Kategorieänderung gehört — Herkunft auf `manuell` (sonst
+  holt die Kategorie-Automatik den alten Wert zurück), Charakter folgt der Kategorie,
+  Umbuchungs-Bein bleibt unberührt. Damit kommt auch der Journaleintrag mit, den
+  `ledger.speichern` schreibt.
+
 #### Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
 
 Ein gewöhnlicher Vertrag hängt an einem Namen: `vertrag_erkennung` normalisiert die
