@@ -24,6 +24,7 @@ import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
+  waehlbareKonten,
   minorZuMajor,
   type Budgetart,
   type Budgetbereich,
@@ -585,7 +586,7 @@ export function BudgetsScreen() {
                 wert={kontoId}
                 aufAenderung={setKontoId}
                 platzhalter={t("budgets.kontoWaehlen")}
-                optionen={[{ wert: "", text: t("budgets.kontoWaehlen") }, ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
+                optionen={[{ wert: "", text: t("budgets.kontoWaehlen") }, ...waehlbareKonten(konten, kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
               />
             </FormField>
 

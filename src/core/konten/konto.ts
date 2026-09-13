@@ -79,6 +79,27 @@ export function istAktiv(konto: Pick<Zahlungskonto, "aktiv">): boolean {
   return konto.aktiv !== false;
 }
 
+/**
+ * Die Konten, die eine Auswahl anbieten darf — plus das bereits Gewählte.
+ *
+ * Ein stillgelegtes Konto soll man nicht mehr WÄHLEN können; das ist der halbe Sinn der
+ * Stilllegung. Es einfach herauszufiltern ist aber der naheliegende und falsche Weg: eine
+ * Buchung, die auf einem stillgelegten Konto LIEGT, fände ihr eigenes Konto in der Liste
+ * nicht mehr — das Feld stünde leer oder zeigte stillschweigend ein anderes, und beim
+ * nächsten Speichern wäre die Buchung umgezogen. Auf einem Konto, das es nicht mehr gibt,
+ * kann man nichts Neues buchen; was dort schon liegt, muss man trotzdem ansehen und
+ * bearbeiten können.
+ *
+ * Deshalb nimmt diese Funktion beides: die geführten Konten, und dazu genau das eine, das
+ * ohnehin schon dransteht. Die Reihenfolge bleibt, wie sie hereinkam.
+ */
+export function waehlbareKonten(
+  konten: readonly Zahlungskonto[],
+  bereitsGewaehlt?: string,
+): Zahlungskonto[] {
+  return konten.filter((k) => istAktiv(k) || k.id === bereitsGewaehlt);
+}
+
 export interface Zahlungskonto {
   readonly id: string;
   readonly bezeichnung: string;

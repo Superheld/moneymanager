@@ -11,6 +11,7 @@ import {
   KONTOTYPEN,
   istAktiv,
   istLiquide,
+  waehlbareKonten,
   klasseVorschlag,
   liquideMittel,
   type Zahlungskonto,
@@ -104,5 +105,36 @@ describe("Stilllegen", () => {
     // kann ich diesen Monat ausgeben" nicht. Gefiltert wird deshalb DORT, an jeder
     // Aufrufstelle einzeln, nicht in dieser Funktion.
     expect(liquideMittel([konto({ aktiv: false, saldo: 42_00 })])).toBe(42_00);
+  });
+});
+
+describe("waehlbareKonten", () => {
+  it("bietet ein stillgelegtes Konto nicht an", () => {
+    const liste = waehlbareKonten([konto({ id: "a" }), konto({ id: "b", aktiv: false })]);
+    expect(liste.map((k) => k.id)).toEqual(["a"]);
+  });
+
+  it("lässt das bereits Gewählte drin, auch wenn es stillgelegt ist", () => {
+    // **Der Kern der Sache.** Ohne diese Hälfte fände eine Buchung, die auf einem
+    // stillgelegten Konto liegt, ihr eigenes Konto in der Auswahl nicht mehr: das Feld
+    // stünde leer oder zeigte ein anderes — und beim nächsten Speichern wäre die Buchung
+    // umgezogen, ohne dass jemand es wollte.
+    const liste = waehlbareKonten([konto({ id: "a" }), konto({ id: "b", aktiv: false })], "b");
+    expect(liste.map((k) => k.id)).toEqual(["a", "b"]);
+  });
+
+  it("behält die Reihenfolge, in der die Konten hereinkamen", () => {
+    // Die Liste kommt sortiert aus dem Repository; das Gewählte gehört an seinen Platz und
+    // nicht ans Ende, sonst springt es beim Öffnen einer Maske.
+    const liste = waehlbareKonten(
+      [konto({ id: "a", aktiv: false }), konto({ id: "b" }), konto({ id: "c" })],
+      "a",
+    );
+    expect(liste.map((k) => k.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("ohne Vorauswahl bleibt nur das Geführte", () => {
+    const liste = waehlbareKonten([konto({ id: "a", aktiv: false })], undefined);
+    expect(liste).toEqual([]);
   });
 });

@@ -33,7 +33,7 @@ import { realerKontostand, type IstBuchung } from "../buchung/istbuchung";
 import { projiziereRegel } from "../buchung/projektion";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
 import { betragImMonat, budgetStand, type Budget, type BudgetSicht } from "../budgets/budget";
-import type { Zahlungskonto } from "./konto";
+import { istAktiv, type Zahlungskonto } from "./konto";
 
 export interface Verlaufsbefund {
   /** Der niedrigste Stand im Fenster. */
@@ -184,7 +184,15 @@ export function liquiditaetsvorschau(e: LiquiditaetsEingabe): Kontovorschau[] {
   const monate = Math.max(1, Math.ceil(e.tage / 28));
   const bis = toIso(addTage(parseIso(e.heute), e.tage));
 
-  return e.konten.map((konto): Kontovorschau => {
+  // **Stillgelegte Konten kommen hier nicht vor, und der Filter steht bewusst IM Kern.**
+  // `liquideMittel` filtert nicht und lässt die Wahl der Aufrufstelle — diese Funktion
+  // nicht, und der Unterschied ist die Zeitrichtung: ein Bestand lässt sich sinnvoll mit
+  // und ohne stillgelegte Konten bilden („was ist da" gegen „was kann ich ausgeben"), eine
+  // VORAUSSCHAU nicht. Ein Konto, das niemand mehr führt, hat keine nächsten 90 Tage; es
+  // mitzurechnen ergäbe eine Warnung über ein Konto, an dem man nichts mehr tun kann —
+  // und die Karte oben ist die einzige, die verschwindet, wenn nichts anliegt. Sie mit so
+  // einer Zeile dauerhaft sichtbar zu halten nähme ihr genau das, was sie wirksam macht.
+  return e.konten.filter(istAktiv).map((konto): Kontovorschau => {
     // Der reale Stand MINUS dessen, was schon feststeht und noch nicht gebucht ist. Eine
     // Vormerkung ohne Datum wirkt ab sofort — was die Bank bereits kennt, ist näher als
     // alles Datierte —, und eine mit Datum ebenso: sie wird in Tagen gebucht, und den

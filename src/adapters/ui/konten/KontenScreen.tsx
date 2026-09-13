@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  waehlbareKonten,
   istGeteilt,
   registerSicht,
   type Dublettenverdacht,
@@ -831,7 +832,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
             ariaLabel={t("konten.umbuchung.vonKonto")}
             wert={von}
             aufAenderung={setVon}
-            optionen={konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+            optionen={waehlbareKonten(konten).map((k) => ({ wert: k.id, text: k.bezeichnung }))}
           />
         </FormField>
         <FormField label={t("konten.umbuchung.nachKonto")} required>
@@ -839,7 +840,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
             ariaLabel={t("konten.umbuchung.nachKonto")}
             wert={nach}
             aufAenderung={setNach}
-            optionen={konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+            optionen={waehlbareKonten(konten).map((k) => ({ wert: k.id, text: k.bezeichnung }))}
           />
         </FormField>
         <FormField label={t("konten.feldDatum")} required>

@@ -95,6 +95,21 @@ export {
   // Die Summe der Vormerkungen und ihre Zahl — die Anzeige braucht dieselbe Rechnung
   // wie die Vorschau, und zwei Additionen an zwei Orten laufen auseinander.
   vormerkungslast,
+  // Wird dieses Konto noch geführt? Eine Auskunft über EIN Konto, wie `hatZiel`.
+  istAktiv,
+  // **Die Ausnahme in dieser Liste, und sie steht hier mit Begründung.** `waehlbareKonten`
+  // geht über eine SAMMLUNG und wäre nach der Grenze oben eine Sicht. Sie greift nicht auf
+  // den Bestand zu: sie filtert die Liste, die der Screen ohnehin schon in der Hand hält,
+  // und beantwortet keine Frage über die Daten, sondern über ein ANGEBOT — welche Konten
+  // eine Auswahl anbieten darf.
+  //
+  // Hinter einen Use-Case gelegt bräuchte jeder Dialog einen zweiten Ladeaufruf für eine
+  // Liste, die er schon hat. Ausgelassen müsste jeder von neun Dialogen die Regel selbst
+  // hinschreiben — und ihre zweite Hälfte (`|| das schon Gewählte`) ist genau die, die
+  // einer vergisst, worauf eine alte Buchung stillschweigend ihr Konto wechselt. Das ist
+  // dieselbe Sorte Fehler, gegen die die Strenge dieser Datei überhaupt gebaut ist; hier
+  // zeigt sie in die andere Richtung.
+  waehlbareKonten,
 } from "../core";
 
 // ---------------------------------------------------------------------------

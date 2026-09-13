@@ -11,6 +11,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  waehlbareKonten,
   erkennungProbieren,
   merkmaleVorschlagen,
   minorZuMajor,
@@ -455,7 +456,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
               ariaLabel={t("vertraege.feldKonto")}
               wert={f.kontoId}
               aufAenderung={(v) => setze("kontoId", v)}
-              optionen={[{ wert: "", text: "—" }, ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
+              optionen={[{ wert: "", text: "—" }, ...waehlbareKonten(konten, f.kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
             />
           </FormField>
           <FormField label={t("vertraege.feldKategorie")} hint={t("vertraege.feldKategorieHinweis")}>

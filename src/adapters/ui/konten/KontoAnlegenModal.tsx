@@ -17,7 +17,7 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { KONTOTYPEN, type Bankkonto, type Bankzugang, type Kontotyp, type Person, type Zahlungskonto, type Zugangsart } from "../../../application";
+import { KONTOTYPEN, istAktiv, type Bankkonto, type Bankzugang, type Kontotyp, type Person, type Zahlungskonto, type Zugangsart } from "../../../application";
 import { typAusName } from "../../../application/import";
 import { fintsEinsatzbereit } from "../../fints";
 import { HANSEATIC_BASIS_URL } from "../../hanseatic";
@@ -155,8 +155,15 @@ export function KontoAnlegenModal({
       // außen vor — es ließe sich ohnehin nicht abholen.
       const vorschlag: Record<string, Wahl> = {};
       for (const k of sitzung.konten) {
+        // Nur GEFÜHRTE Konten sind ein Ziel. Hier wird eine laufende Verbindung
+        // eingerichtet; sie an ein stillgelegtes Konto zu hängen hiesse, es über den
+        // Abruf wieder mit Leben zu füllen, während es überall sonst als beendet gilt.
+        // Trifft die IBAN nur ein stillgelegtes Konto, fällt der Vorschlag auf „neu" —
+        // sichtbar und änderbar, statt still das Falsche zu verknüpfen.
         const treffer = k.iban
-          ? konten.find((z) => (z.iban ?? "").replace(/\s+/g, "").toUpperCase() === k.iban!.toUpperCase())
+          ? konten
+              .filter(istAktiv)
+              .find((z) => (z.iban ?? "").replace(/\s+/g, "").toUpperCase() === k.iban!.toUpperCase())
           : undefined;
         vorschlag[k.schluessel] = !k.kannUmsaetze
           ? { ziel: "ignorieren" }

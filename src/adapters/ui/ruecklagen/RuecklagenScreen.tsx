@@ -15,6 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
+  waehlbareKonten,
   hatZiel,
   minorZuMajor,
   monatsRuecklage,
@@ -400,7 +401,7 @@ export function RuecklagenScreen() {
                 ariaLabel={t("ruecklagen.feldKonto")}
                 wert={kontoId}
                 aufAenderung={setKontoId}
-                optionen={[{ wert: "", text: t("ruecklagen.kontoKeins") }, ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
+                optionen={[{ wert: "", text: t("ruecklagen.kontoKeins") }, ...waehlbareKonten(konten, kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
               />
             </FormField>
           </div>

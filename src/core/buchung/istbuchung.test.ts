@@ -6,6 +6,7 @@ import {
   kategorieIstHandverlesen,
   liquideMittelReal,
   realerKontostand,
+  staendeJeKlasse,
   type IstBuchung,
 } from "./istbuchung";
 
@@ -69,5 +70,40 @@ describe("kategorieIstHandverlesen — was eine Automatik nicht anfassen darf", 
     // in das ein Vorschlag passen würde.
     expect(geteilt.kategorieHerkunft).toBeUndefined();
     expect(kategorieIstHandverlesen(geteilt)).toBe(true);
+  });
+});
+
+describe("staendeJeKlasse — was da ist", () => {
+  it("zählt ein stillgelegtes Konto mit, unter seiner Klasse", () => {
+    // **Die Rückblick-Hälfte der Regel, und die absichtliche Nicht-Änderung.** Diese Karte
+    // fragt „was existiert", nicht „was kann ich ausgeben" — und das Restgeld auf einer
+    // aufgegebenen Kasse existiert. Es herauszurechnen liesse Vermögen verschwinden, ohne
+    // dass es irgendwo auftauchte: das Konto steht in keiner Auswahl mehr und in keiner
+    // Vorausschau. Die drei Summen dieser Karte müssen sich zum Ganzen addieren.
+    //
+    // Eine eigene Zeile „stillgelegt" war der erste Entwurf und ist verworfen: sie sollte
+    // einen Widerspruch auflösen, den es nicht gibt — die Monatskarten benutzen das Geld
+    // eines stillgelegten liquiden Kontos ja weiter.
+    const staende = staendeJeKlasse(
+      [konto({ id: "k1", saldo: euroZuCent(1000) }), konto({ id: "k2", aktiv: false, saldo: euroZuCent(300) })],
+      [],
+    );
+    const liquide = staende.find((z) => z.klasse === "liquide")!;
+    expect(liquide.stand).toBe(euroZuCent(1300));
+    expect(liquide.konten).toHaveLength(2);
+  });
+});
+
+describe("liquideMittelReal — die Vergangenheit bleibt", () => {
+  it("nimmt Saldo UND Buchungen eines stillgelegten Kontos mit", () => {
+    // Wer ein Konto stilllegt, darf nicht rückwirkend seine Monate leeren. Der Ist-Wert
+    // der Monatskarten hängt an dieser Rechnung; fiele ein stillgelegtes Konto heraus,
+    // verlöre jemand nach einem Bankwechsel den grössten Teil seines Ist der letzten
+    // Monate — Plan bliebe stehen, Ist fiele auf fast null.
+    const summe = liquideMittelReal(
+      [konto({ id: "k1", aktiv: false, saldo: euroZuCent(1000) })],
+      [ist({ kontoId: "k1", betrag: euroZuCent(-200) })],
+    );
+    expect(summe).toBe(euroZuCent(800));
   });
 });
