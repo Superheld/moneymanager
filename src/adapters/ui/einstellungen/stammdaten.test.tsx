@@ -121,6 +121,12 @@ describe("EinstellungenScreen — Stammdaten", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
 
     const stilllegen = await screen.findByLabelText(i18n.t("konten.stilllegen"));
+    // Der Hover-Text ERKLÄRT, der Name benennt. Vorher trug `title` denselben Text wie
+    // `aria-label` und sagte damit über dem Icon nichts Neues; die Trennung ist der Sinn
+    // von `hinweis`, und sie hält nur, solange beide auseinanderliegen.
+    expect(stilllegen.getAttribute("title")).toBe(i18n.t("konten.stilllegenHinweis"));
+    expect(stilllegen.getAttribute("aria-label")).toBe(i18n.t("konten.stilllegen"));
+
     await nutzer.click(stilllegen);
 
     await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("konten.stillgelegt")));
@@ -135,6 +141,58 @@ describe("EinstellungenScreen — Stammdaten", () => {
     await waitFor(async () =>
       expect((await sqliteZahlungskontoRepository.alle())[0].aktiv).toBe(true),
     );
+  });
+
+  it("zeigt den Zustand im Bearbeiten-Dialog und legt von dort still", async () => {
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+    await nutzer.click(await screen.findByLabelText(i18n.t("einstellungen.bearbeiten")));
+
+    // Der Zustand steht da, bevor man ihn ändert.
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("konten.gefuehrt")));
+    expect(document.body.textContent).toMatch(i18n.t("konten.zustandHinweisGefuehrt"));
+
+    await nutzer.click(await screen.findByText(i18n.t("konten.stilllegen")));
+
+    await waitFor(async () =>
+      expect((await sqliteZahlungskontoRepository.alle())[0].aktiv).toBe(false),
+    );
+    // Und der Dialog zeigt den neuen Zustand, statt auf den alten stehenzubleiben.
+    expect(document.body.textContent).toMatch(i18n.t("konten.zustandHinweisStill"));
+  });
+
+  it("macht das Speichern im Dialog ein stillgelegtes Konto NICHT wieder aktiv", async () => {
+    // **Die Falle, gegen die `aktiv` einen eigenen Schreibweg hat — jetzt über die
+    // Oberfläche.** Der Dialog trägt den Zustand nur zur Anzeige; `kontoAnlegen` fasst die
+    // Spalte nicht an. Wer das später zusammenlegt, macht diesen Test rot, und genau dafür
+    // steht er hier: im Repository-Test ist der Fall geprüft, aber der DIALOG ist die
+    // Stelle, an der jemand auf die Idee kommt.
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteZahlungskontoRepository.aktivSetzen("k1", false);
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+    await nutzer.click(await screen.findByLabelText(i18n.t("einstellungen.bearbeiten")));
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("konten.stillgelegt")));
+
+    // Etwas anderes ändern und speichern.
+    const feld = await screen.findByDisplayValue("Alte Kasse");
+    await nutzer.clear(feld);
+    await nutzer.type(feld, "Umbenannt");
+    await nutzer.click(await screen.findByText(i18n.t("einstellungen.speichern")));
+
+    await waitFor(async () =>
+      expect((await sqliteZahlungskontoRepository.alle())[0].bezeichnung).toBe("Umbenannt"),
+    );
+    expect((await sqliteZahlungskontoRepository.alle())[0].aktiv).toBe(false);
   });
 
   it("nennt beim Löschen die Sperre, statt einen Datenbankfehler zu zeigen", async () => {

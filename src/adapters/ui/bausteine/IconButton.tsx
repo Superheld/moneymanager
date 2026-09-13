@@ -128,10 +128,20 @@ export function Icon({ name, groesse = 16 }: { name: IconName; groesse?: number 
  *
  * `ton="gefahr"` färbt erst beim Hovern rot: eine Tabelle voller roter Papierkörbe liest
  * sich, als sei überall etwas kaputt.
+ *
+ * **`hinweis` trennt NAME und ERKLÄRUNG, und das war vorher zusammengelegt.** Der
+ * Hover-Text kam aus `label`, stand also mit einem Wort da, das dasselbe sagt wie das Icon
+ * — bei „Bearbeiten" (Stift) ist das genug, bei einer Aktion, deren Folgen man nicht ansieht,
+ * ist es keine Auskunft. Ohne `hinweis` bleibt alles wie vorher.
+ *
+ * Der NAME bleibt trotzdem `aria-label`: er ist das, was eine Vorlesehilfe in einer Liste von
+ * Aktionen braucht — kurz und gleichförmig. Ein ganzer Satz je Zeile wäre dort unbrauchbar,
+ * und ARIA gewinnt ohnehin gegen `title`, das Verhältnis ist also eindeutig.
  */
 export function IconButton({
   icon,
   label,
+  hinweis,
   onClick,
   ton = "normal",
   disabled,
@@ -139,6 +149,8 @@ export function IconButton({
 }: {
   icon: IconName;
   label: string;
+  /** Was die Aktion bewirkt — erscheint beim Hovern statt des Namens. */
+  hinweis?: string;
   onClick: () => void;
   ton?: "normal" | "gefahr";
   disabled?: boolean;
@@ -148,7 +160,7 @@ export function IconButton({
     <button
       type="button"
       className={ton === "gefahr" ? "iconbtn iconbtn-gefahr" : "iconbtn"}
-      title={label}
+      title={hinweis ?? label}
       aria-label={label}
       disabled={disabled}
       onClick={(e) => { e.stopPropagation(); onClick(); }}
