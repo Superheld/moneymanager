@@ -751,6 +751,124 @@ describe("VertraegeScreen — Vorschläge", () => {
   });
 
   /**
+   * Zwei Policen bei DERSELBEN Versicherung: gleiche Glaeubiger-ID, gleicher Empfaenger.
+   * Unterschieden sind sie nur an der Versicherungsnummer im Verwendungszweck.
+   *
+   * Das ist der Fall, an dem die rein ODER-verknuepfte Merkmalsliste scheiterte: ein
+   * Zweckmuster daneben verengte die Regel nicht, es erweiterte sie — beide Vertraege
+   * trafen beide Zahlungen, und entschieden wurde alphabetisch nach Vertrags-Id.
+   */
+  async function zweiPolicenBeimSelbenEinzieher() {
+    await konto();
+    const gid = "DE99ZZZ00000000007";
+    for (const [nr, praefix] of [["KV-8842", "a"], ["KV-9107", "b"]] as const) {
+      for (let i = 0; i < 3; i++) {
+        const id = `${praefix}-${i}`;
+        const datum = tagVor(i * 30);
+        await sqliteLedgerRepository.speichern({
+          id, datum, betrag: -5500, kontoId: "k1", charakter: "Aufwand", quelle: "import",
+        });
+        await sqliteUmsatzRepository.anlegen({
+          id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
+          betrag: -5500, waehrung: "EUR", gegenpartei: "Ohlert Assekuranz",
+          glaeubigerId: gid, verwendungszweck: `Beitrag ${nr} Jahrespraemie`,
+          rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
+        });
+      }
+    }
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Ohlert Assekuranz", beginn: "2024-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-v1", bezeichnung: "Ohlert Assekuranz", betrag: -5500, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
+    });
+    // Die Standardregel, wie sie beim Anlegen entsteht: Empfaenger und ID, beide offen.
+    await sqliteVertragserkennungRepository.speichern({
+      vertragId: "v1",
+      merkmale: [
+        { art: "empfaenger", muster: "ohlert*" },
+        { art: "glaeubigerId", muster: gid },
+      ],
+    });
+  }
+
+  it("zeigt den Verwendungszweck in der Vorschau", async () => {
+    // Ohne ihn baut man eine Regel auf ein Feld, das die Maske nirgends anzeigt — und
+    // die Versicherungsnummer, die die beiden Policen trennt, steht nur dort.
+    await zweiPolicenBeimSelbenEinzieher();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Ohlert Assekuranz");
+    await erkennungOeffnen(nutzer);
+
+    // Je drei Zahlungen pro Police — gesucht wird deshalb die Menge, nicht das Element.
+    expect(await screen.findAllByText(/Beitrag KV-8842 Jahrespraemie/)).toHaveLength(3);
+    expect(screen.getAllByText(/Beitrag KV-9107 Jahrespraemie/)).toHaveLength(3);
+  });
+
+  it("trennt zwei Policen beim selben Einzieher ueber ein Pflichtmerkmal", async () => {
+    await zweiPolicenBeimSelbenEinzieher();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Ohlert Assekuranz");
+    await erkennungOeffnen(nutzer);
+
+    // Ohne Zutun trifft die Standardregel BEIDE Policen — sechs Zahlungen.
+    await waitFor(() => expect(musterFelder()).toHaveLength(2));
+    expect(await screen.findByText("6 Zahlungen")).toBeInTheDocument();
+
+    // Eine Zeile fuer den Verwendungszweck anlegen und als Pflicht markieren.
+    await nutzer.click(screen.getByRole("button", { name: /merkmal hinzufügen/i }));
+    await waitFor(() => expect(musterFelder()).toHaveLength(3));
+    // `Auswahl` ist kein natives <select> (Base UI) — bedient wird sie mit zwei Klicks.
+    const arten = screen.getAllByRole("combobox", { name: /art des merkmals/i });
+    await nutzer.click(arten[arten.length - 1]);
+    await nutzer.click(await screen.findByRole("option", { name: /verwendungszweck/i }));
+    await nutzer.type(musterFelder()[2], "*KV-8842*");
+    const haken = screen.getAllByRole("checkbox", { name: /muss/i });
+    await nutzer.click(haken[haken.length - 1]);
+
+    // Jetzt muss der Zweck treffen UND einer der beiden offenen (Empfaenger/ID).
+    expect(await screen.findByText("3 Zahlungen")).toBeInTheDocument();
+
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const [regel] = await sqliteVertragserkennungRepository.alle();
+      expect(regel.merkmale).toContainEqual({
+        art: "verwendungszweck", muster: "*KV-8842*", pflicht: true,
+      });
+      // Die beiden offenen bleiben ohne Flag — sie fangen weiter die Schreibweisen ein.
+      expect(regel.merkmale.filter((m) => m.pflicht)).toHaveLength(1);
+    });
+  });
+
+  it("nimmt das Faelligkeitsfenster in die Regel auf", async () => {
+    await zweiPolicenBeimSelbenEinzieher();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Ohlert Assekuranz");
+    await erkennungOeffnen(nutzer);
+    await waitFor(() => expect(musterFelder()).toHaveLength(2));
+
+    await nutzer.type(screen.getByRole("textbox", { name: /^monat von$/i }), "11");
+    await nutzer.type(screen.getByRole("textbox", { name: /^monat bis$/i }), "2");
+
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const [regel] = await sqliteVertragserkennungRepository.alle();
+      // Ueber den Jahreswechsel: von groesser als bis ist gewollt und kein Vertipper.
+      expect(regel.monatVon).toBe(11);
+      expect(regel.monatBis).toBe(2);
+    });
+  });
+
+  /**
    * Einnahmen laufen durch dieselbe Naht wie Ausgaben, nur mit umgekehrtem Vorzeichen.
    * Der Test geht bis in die Regel, weil erst dort sichtbar wird, ob der Charakter das
    * Vorzeichen richtig dreht: ein Gehalt mit negativem Betrag verschöbe die gesamte

@@ -721,6 +721,48 @@ describe("Vertragszuordnung — Persistenz", () => {
     expect(e.betragVon).toBe(990);
   });
 
+  it("hält Pflichtmerkmale und das Fälligkeitsfenster über die Rundreise", async () => {
+    // Beide Wege durch dieselbe Tabelle, aber auf verschiedenen Bahnen: das Pflichtflag
+    // steckt im JSON von `schluessel`, das Fenster in vier eigenen Spalten (Migration 72).
+    await erkennungRepository.speichern({
+      vertragId: "police",
+      merkmale: [
+        { art: "glaeubigerId", muster: "DE39ZZZ09999999123", pflicht: true },
+        { art: "verwendungszweck", muster: "*KV-8842*", pflicht: true },
+        { art: "empfaenger", muster: "ohlert*" },
+      ],
+      monatVon: 11,
+      monatBis: 2,
+      tagVon: 1,
+      tagBis: 5,
+    });
+    const [e] = await erkennungRepository.alle();
+    expect(e.merkmale).toEqual([
+      { art: "glaeubigerId", muster: "DE39ZZZ09999999123", pflicht: true },
+      { art: "verwendungszweck", muster: "*KV-8842*", pflicht: true },
+      // Das offene Merkmal kommt OHNE `pflicht: false` zurück — ein mitgeschlepptes
+      // falsches Flag liesse jede alte Regel beim Speichern um ein Feld wachsen, das
+      // nichts aussagt.
+      { art: "empfaenger", muster: "ohlert*" },
+    ]);
+    expect(e.monatVon).toBe(11);
+    expect(e.monatBis).toBe(2);
+    expect(e.tagVon).toBe(1);
+    expect(e.tagBis).toBe(5);
+  });
+
+  it("liest eine Regel ohne Fenster als kein-Fenster und nicht als Null", async () => {
+    // Der Unterschied entscheidet: `undefined` heisst „egal", eine 0 wäre ein Monat, den
+    // es nicht gibt, und `imFenster` liesse dann nichts mehr durch.
+    await erkennungRepository.speichern({
+      vertragId: "ohne-fenster",
+      merkmale: [{ art: "empfaenger", muster: "kesselmann*" }],
+    });
+    const [e] = await erkennungRepository.alle();
+    expect(e.monatVon).toBeUndefined();
+    expect(e.tagBis).toBeUndefined();
+  });
+
   it("überlebt eine kaputte JSON-Spalte, ohne die Liste ausfallen zu lassen", async () => {
     db.run(`INSERT INTO vertrag_erkennung (vertrag_id, schluessel) VALUES ('kaputt', '{nicht')`);
     const [e] = await erkennungRepository.alle();

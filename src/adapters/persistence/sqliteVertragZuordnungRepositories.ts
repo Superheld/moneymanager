@@ -36,6 +36,10 @@ interface ErkennungZeile {
   gueltig_ab: string | null;
   gueltig_bis: string | null;
   konto_id: string | null;
+  monat_von: number | null;
+  monat_bis: number | null;
+  tag_von: number | null;
+  tag_bis: number | null;
 }
 
 /**
@@ -74,11 +78,18 @@ function parseMerkmale(json: string): Erkennungsmerkmal[] {
       return [{ art: SIEHT_AUS_WIE_GLAEUBIGER_ID.test(wert) ? "glaeubigerId" : "empfaenger", muster: wert }];
     }
     if (eintrag && typeof eintrag === "object") {
-      const { art, muster } = eintrag as { art?: unknown; muster?: unknown };
+      const { art, muster, pflicht } = eintrag as {
+        art?: unknown;
+        muster?: unknown;
+        pflicht?: unknown;
+      };
       // Die Arten kommen aus dem Kern (`istMerkmalsart`) und stehen NICHT hier: eine
       // neue Art wäre sonst gespeichert und beim nächsten Laden stillschweigend weg.
       if (typeof muster === "string" && istMerkmalsart(art)) {
-        return [{ art, muster }];
+        // `pflicht` nur setzen, wenn es WAHR ist. Ein `pflicht: false` mitzuschleppen
+        // hiesse, jede alte Regel beim nächsten Speichern um ein Feld wachsen zu lassen,
+        // das nichts aussagt — und im JSON sähe eine unveränderte Regel dann geändert aus.
+        return [pflicht === true ? { art, muster, pflicht: true } : { art, muster }];
       }
     }
     return [];
@@ -89,7 +100,8 @@ export const sqliteVertragserkennungRepository: VertragserkennungRepository = {
   async alle() {
     const db = await getDb();
     const zeilen = await db.select<ErkennungZeile[]>(
-      `SELECT vertrag_id, schluessel, betrag_von, betrag_bis, gueltig_ab, gueltig_bis, konto_id
+      `SELECT vertrag_id, schluessel, betrag_von, betrag_bis, gueltig_ab, gueltig_bis, konto_id,
+              monat_von, monat_bis, tag_von, tag_bis
        FROM vertrag_erkennung`,
     );
     return zeilen.map((z): Vertragserkennung => ({
@@ -100,18 +112,25 @@ export const sqliteVertragserkennungRepository: VertragserkennungRepository = {
       gueltigAb: z.gueltig_ab ?? undefined,
       gueltigBis: z.gueltig_bis ?? undefined,
       kontoId: z.konto_id ?? undefined,
+      monatVon: z.monat_von ?? undefined,
+      monatBis: z.monat_bis ?? undefined,
+      tagVon: z.tag_von ?? undefined,
+      tagBis: z.tag_bis ?? undefined,
     }));
   },
 
   async speichern(e) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO vertrag_erkennung (vertrag_id, schluessel, betrag_von, betrag_bis, gueltig_ab, gueltig_bis, konto_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7)
+      `INSERT INTO vertrag_erkennung (vertrag_id, schluessel, betrag_von, betrag_bis, gueltig_ab, gueltig_bis, konto_id,
+                                      monat_von, monat_bis, tag_von, tag_bis)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
        ON CONFLICT(vertrag_id) DO UPDATE SET
          schluessel = excluded.schluessel, betrag_von = excluded.betrag_von,
          betrag_bis = excluded.betrag_bis, gueltig_ab = excluded.gueltig_ab,
-         gueltig_bis = excluded.gueltig_bis, konto_id = excluded.konto_id`,
+         gueltig_bis = excluded.gueltig_bis, konto_id = excluded.konto_id,
+         monat_von = excluded.monat_von, monat_bis = excluded.monat_bis,
+         tag_von = excluded.tag_von, tag_bis = excluded.tag_bis`,
       [
         e.vertragId,
         JSON.stringify(e.merkmale),
@@ -120,6 +139,10 @@ export const sqliteVertragserkennungRepository: VertragserkennungRepository = {
         e.gueltigAb ?? null,
         e.gueltigBis ?? null,
         e.kontoId ?? null,
+        e.monatVon ?? null,
+        e.monatBis ?? null,
+        e.tagVon ?? null,
+        e.tagBis ?? null,
       ],
     );
   },
