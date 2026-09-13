@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   KONTOKLASSEN,
   KONTOTYPEN,
+  istAktiv,
   istLiquide,
   klasseVorschlag,
   liquideMittel,
@@ -77,5 +78,31 @@ describe("liquideMittel", () => {
 
   it("ist ohne Konten null", () => {
     expect(liquideMittel([])).toBe(0);
+  });
+});
+
+describe("Stilllegen", () => {
+  it("hält ein Konto ohne Angabe für geführt", () => {
+    // Fehlend heisst JA — sonst fiele mit der Einführung des Feldes der ganze Altbestand
+    // aus jeder Liste, und die App sähe beim ersten Start danach leer aus.
+    expect(istAktiv(konto())).toBe(true);
+  });
+
+  it("erkennt ein stillgelegtes Konto", () => {
+    expect(istAktiv(konto({ aktiv: false }))).toBe(false);
+  });
+
+  it("hält `aktiv: true` für geführt", () => {
+    expect(istAktiv(konto({ aktiv: true }))).toBe(true);
+  });
+
+  it("lässt ein stillgelegtes Konto in den liquiden Mitteln", () => {
+    // **Die Zusicherung, an der der ganze Entwurf hängt.** `liquideMittel` ist eine
+    // RECHENREGEL über die Kontoklasse; die Stilllegung ist eine SICHT auf die Gegenwart.
+    // Wer sie hier einbaut, nimmt jeder Aufrufstelle die Wahl — und die Aufrufstellen
+    // stellen verschiedene Fragen: „was ist da" zählt ein stillgelegtes Konto mit, „was
+    // kann ich diesen Monat ausgeben" nicht. Gefiltert wird deshalb DORT, an jeder
+    // Aufrufstelle einzeln, nicht in dieser Funktion.
+    expect(liquideMittel([konto({ aktiv: false, saldo: 42_00 })])).toBe(42_00);
   });
 });

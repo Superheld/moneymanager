@@ -167,6 +167,7 @@ function fakes(zuordnungen: Kontozuordnung[]) {
       kontoRepo: {
         alle: async () => [konto],
         speichern: async () => {},
+        aktivSetzen: async () => {},
         loeschen: async () => {},
       },
       kategorieRepo: { alle: async () => [], speichern: async () => {}, loeschen: async () => {} },

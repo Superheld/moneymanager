@@ -399,6 +399,23 @@ export function kontoLoeschen(id: string): Promise<void> {
   return sqliteZahlungskontoRepository.loeschen(id);
 }
 
+/**
+ * Legt ein Konto still: es behält alle seine Buchungen und verschwindet nur aus der
+ * Gegenwart — aus der Buchungsmaske, dem Abruf, dem Abgleich und den liquiden Mitteln.
+ *
+ * Ohne Vorbedingung, ausdrücklich: mit Buchungen wie ohne, mit Restgeld wie ohne. Wer ein
+ * Konto nicht mehr führt, soll es wegräumen können, ohne vorher etwas aufräumen zu müssen
+ * — und was noch darauf liegt, bleibt in der Übersicht sichtbar, statt zu verschwinden.
+ */
+export function kontoStilllegen(id: string): Promise<void> {
+  return sqliteZahlungskontoRepository.aktivSetzen(id, false);
+}
+
+/** Nimmt ein stillgelegtes Konto wieder auf. Der Weg zurück, und er kostet nichts. */
+export function kontoWiederaufnehmen(id: string): Promise<void> {
+  return sqliteZahlungskontoRepository.aktivSetzen(id, true);
+}
+
 // --- Kontogruppen ----------------------------------------------------------
 
 /** Die Gruppen mit aufgelösten Mitgliedern — für die Verwaltung. */

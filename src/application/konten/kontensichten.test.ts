@@ -42,7 +42,7 @@ function deps(
   vertraege: { zuordnungen?: Vertragszuordnung[]; vertraege?: Vertrag[] } = {},
 ): KontenDeps {
   return {
-    kontoRepo: { async alle() { return [KONTO]; }, async speichern() {}, async loeschen() {} },
+    kontoRepo: { async alle() { return [KONTO]; }, async speichern() {}, async aktivSetzen() {}, async loeschen() {} },
     ledger: {
       async alle() { return buchungen; },
       async speichern() {}, async loeschen() {},

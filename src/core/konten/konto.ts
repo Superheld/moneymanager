@@ -56,6 +56,29 @@ export function istLiquide(konto: Pick<Zahlungskonto, "klasse">): boolean {
   return konto.klasse === "liquide";
 }
 
+/**
+ * Wird dieses Konto noch geführt?
+ *
+ * Ein stillgelegtes Konto gibt es nicht mehr — aufgelöst bei der Bank, oder eine Kasse,
+ * die niemand mehr führt. Seine Buchungen BLEIBEN, und daran hängt der ganze Sinn: ein
+ * Konto loszuwerden, ohne seine Vergangenheit mitzunehmen.
+ *
+ * **Das hier ist eine Sicht auf die GEGENWART, keine Rechenregel.** Der Unterschied
+ * entscheidet, was diese Funktion beantworten darf und was nicht: Sie sagt, ob man auf das
+ * Konto noch etwas buchen, es noch abrufen, noch abgleichen, noch als Ziel wählen kann —
+ * und ob sein Geld für den nächsten Monat zur Verfügung steht. Sie sagt **nicht**, ob seine
+ * Buchungen in einer Auswertung mitzählen. Wer sie dort einsetzt, schreibt mit einem Klick
+ * in der Verwaltung rückwirkend jeden Monat um, und die Zahlen von letztem Jahr sind
+ * danach andere als vorher.
+ *
+ * Deshalb steht sie hier als FRAGE und nicht als Filter in `liquideMittel`: welche Summe
+ * ein stillgelegtes Konto mitnimmt, entscheidet die Aufrufstelle, weil die Aufrufstellen
+ * verschiedene Fragen stellen. Dieselbe Arbeitsteilung wie bei der Kontoklasse.
+ */
+export function istAktiv(konto: Pick<Zahlungskonto, "aktiv">): boolean {
+  return konto.aktiv !== false;
+}
+
 export interface Zahlungskonto {
   readonly id: string;
   readonly bezeichnung: string;
@@ -69,6 +92,13 @@ export interface Zahlungskonto {
   readonly inhaberIds: string[];
   /** Aktueller Kontostand in Cent (manuell gepflegt; später aus Import). */
   readonly saldo: Cent;
+  /**
+   * Wird das Konto noch geführt? **Fehlend heißt JA** — dieselbe Form wie
+   * `Istbuchung.budgetrelevant`, und aus demselben Grund: ein fehlender Wert muss die
+   * harmlose Aussage sein, sonst fällt ein Konto aus einer Liste, weil jemand ein Feld
+   * nicht gesetzt hat. Gefragt wird deshalb über `istAktiv`, nie über `konto.aktiv` direkt.
+   */
+  readonly aktiv?: boolean;
 }
 
 /**

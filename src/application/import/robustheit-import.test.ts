@@ -100,6 +100,7 @@ function fakes() {
     kontoRepo: {
       alle: async () => konten,
       speichern: async (k: Zahlungskonto) => { konten.push(k); },
+      aktivSetzen: async () => {},
       loeschen: async () => {},
     } as UebernahmeDeps["kontoRepo"],
     kategorieRepo: {
