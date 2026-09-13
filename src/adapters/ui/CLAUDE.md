@@ -55,6 +55,14 @@ Zwei Dinge daran sind Entscheidung und nicht Mechanik:
   zweite Sprache, sondern das Tokenset: die `-deep`-Paare sind die Töne für Schrift auf
   hellem Grund. Dieselbe Aussage, eine Stufe heller.
 
+**Eine Kante bleibt offen, und sie ist bewusst offen:** ein BESTAND ist kein Fluss. „Plus
+ist grün" heisst bei einer Einnahme „Geld kam herein", bei einem Kontosaldo nur „es ist
+Geld da" — und weil das der Normalfall ist, steht an der Saldo-Spalte dauerhaft Grün, also
+genau das, was der Punkt darüber verbietet. Eine dritte Klasse („Bestand: positiv neutral,
+negativ warn") wäre genauer und ist NICHT gebaut: die Grenze zwischen Bestand und Fluss
+zöge jeder anders — ein Budgetrest ist beides, je nachdem wonach man fragt. Wer sie doch
+zieht, zieht sie in `geldFarbe.ts` und nirgends sonst.
+
 **Bewertung gehört weiterhin in die Pille und in die Meta-Zeile.** Dort steht ein WORT,
 und ein Wort wird gelesen — eine grüne Pille „stabil" sagt etwas, eine grüne Zahl sagt nur
 „grün". `Pill variant="ok"` bleibt deshalb erlaubt.
