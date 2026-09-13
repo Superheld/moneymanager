@@ -15,13 +15,14 @@ import {
   minorZuMajor,
   KONTOKLASSEN,
   klasseVorschlag,
+  istAktiv,
   type Kontoklasse,
   type Kontostand,
   type Kontotyp,
   type Person,
   type Zahlungskonto,
 } from "../../../application";
-import { kontoAnlegen, kontoLoeschen } from "../../dienste";
+import { kontoAnlegen, kontoLoeschen, kontoStilllegen, kontoWiederaufnehmen } from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
@@ -148,12 +149,21 @@ export function KontenVerwaltung({
               // Die Zeile selbst bleibt stumm: eine unsichtbare Klickfläche findet
               // niemand, und wer sie zufällig trifft, hat sie nicht gemeint.
               render: (k: Zahlungskonto) => (
-                <Zeilenlink
-                  onKlick={() => setZeilenVon(zeilenVon === k.id ? null : k.id)}
-                  titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
-                >
-                  {k.bezeichnung}
-                </Zeilenlink>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                  <Zeilenlink
+                    onKlick={() => setZeilenVon(zeilenVon === k.id ? null : k.id)}
+                    titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
+                  >
+                    {k.bezeichnung}
+                  </Zeilenlink>
+                  {/* Die Marke steht NEBEN dem Namen und nicht in einer eigenen Spalte:
+                      der Zustand ist selten, eine Spalte dafuer waere in jeder Zeile
+                      leer — und hier liest es sich als das, was es ist, ein Teil der
+                      Identitaet des Kontos. Die Zeile bleibt ansonsten normal lesbar:
+                      ein ausgegrautes Konto saehe nach „nicht benutzbar" aus, und
+                      benutzbar ist es sehr wohl, nur nicht fuer Neues. */}
+                  {!istAktiv(k) && <Pill variant="neutral">{t("konten.stillgelegt")}</Pill>}
+                </span>
               ),
             },
             { key: "typ", label: t("einstellungen.konto.spalteTyp"), render: (k) => t(`einstellungen.konto.typ.${k.typ}`) },
@@ -182,6 +192,29 @@ export function KontenVerwaltung({
                 ]
               : []),
             { key: "_e", label: "", align: "right", render: (k) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} /> },
+            // Stilllegen steht VOR dem Muelleimer und ohne Rueckfrage: es ist der
+            // umkehrbare Weg, und eine Rueckfrage vor etwas, das ein Klick zurueckholt,
+            // erzieht nur dazu, Rueckfragen wegzuklicken. Der Muelleimer daneben behaelt
+            // seine — dort geht wirklich etwas weg.
+            {
+              key: "_s",
+              label: "",
+              align: "right",
+              render: (k: Zahlungskonto) =>
+                istAktiv(k) ? (
+                  <IconButton
+                    icon="stilllegen"
+                    label={t("konten.stilllegen")}
+                    onClick={async () => { await kontoStilllegen(k.id); onChange(); }}
+                  />
+                ) : (
+                  <IconButton
+                    icon="wiederaufnehmen"
+                    label={t("konten.wiederaufnehmen")}
+                    onClick={async () => { await kontoWiederaufnehmen(k.id); onChange(); }}
+                  />
+                ),
+            },
             { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => loeschfrage.stellen({
               name: k.bezeichnung,
               // Ein Konto mit Buchungen laesst der Fremdschluessel gar nicht erst

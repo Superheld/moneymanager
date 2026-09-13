@@ -873,6 +873,11 @@ const de = {
     detailVerwerfenFolgen: "Die Bankzeile wird verworfen. Der Beleg bleibt erhalten, und die Zeile lässt sich aus der Inbox erneut verbuchen — der Abruf holt sie nicht noch einmal.",
     zugangLoeschenFolgen: "Die abgerufenen Buchungen bleiben; sie stehen im Konto und hängen nicht am Zugang. Weg ist der Weg zur Bank — für weitere Abrufe muss der Zugang neu eingerichtet werden.",
     kontoLoeschenFolgen: "Ein Konto mit Buchungen lässt sich nicht löschen — die Buchungen müssten zuerst weg. Ohne Buchungen verschwindet nur das Konto selbst.",
+    stillgelegt: "stillgelegt",
+    stilllegen: "Stilllegen",
+    wiederaufnehmen: "Wieder aufnehmen",
+    stilllegenHinweis: "Das Konto behält alle seine Buchungen und zählt in der Analyse weiter mit. Es verschwindet nur dort, wo es um das Kommende geht: aus der Auswahl beim Buchen, aus der Liquiditätsvorschau und aus dem Bankabruf.",
+    wiederaufnehmenHinweis: "Das Konto kommt zurück in die Auswahl, in die Vorschau und in den Abruf.",
     merkmale: {
       titel: "Was die Erkennung hier sieht",
       laedt: "rechne …",
@@ -2846,6 +2851,11 @@ const en: typeof de = {
     detailVerwerfenFolgen: "The bank line is discarded. The receipt is kept and the line can be posted again from the inbox — the retrieval will not fetch it a second time.",
     zugangLoeschenFolgen: "The retrieved entries stay; they live in the account and do not hang off the access. What goes is the route to the bank — further retrievals need it set up again.",
     kontoLoeschenFolgen: "An account with entries cannot be deleted — the entries would have to go first. Without any, only the account itself disappears.",
+    stillgelegt: "retired",
+    stilllegen: "Retire",
+    wiederaufnehmen: "Reinstate",
+    stilllegenHinweis: "The account keeps all its entries and still counts in the analysis. It only disappears where the future is concerned: from the account picker, from the liquidity forecast and from bank retrieval.",
+    wiederaufnehmenHinweis: "The account returns to the picker, the forecast and the retrieval.",
     merkmale: {
       titel: "What the recognition sees here",
       laedt: "computing …",

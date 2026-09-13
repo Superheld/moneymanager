@@ -14,6 +14,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
+import i18n from "../../../i18n/i18n";
 import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { KontenVerwaltungScreen } from "../konten/KontenVerwaltungScreen";
@@ -101,6 +102,39 @@ describe("EinstellungenScreen — Stammdaten", () => {
 
     rendere(<KontenVerwaltungScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
+  });
+
+  it("legt ein Konto still und nimmt es wieder auf — die Buchungen bleiben", async () => {
+    // Der ganze Weg über die Oberfläche, und die zweite Hälfte ist die wichtige: die
+    // Buchung steht danach noch da. Stilllegen ist eine Sicht auf die Gegenwart, kein
+    // Wegräumen — wer das verwechselt, merkt es erst, wenn ein Jahr fehlt.
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 5000,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "b1", datum: "2026-05-04", betrag: -1200, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell",
+    });
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+
+    const stilllegen = await screen.findByLabelText(i18n.t("konten.stilllegen"));
+    await nutzer.click(stilllegen);
+
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("konten.stillgelegt")));
+    expect((await sqliteZahlungskontoRepository.alle())[0].aktiv).toBe(false);
+    // Die Buchung ist unberührt — und das Konto steht weiter in der Liste.
+    expect(await sqliteLedgerRepository.alle()).toHaveLength(1);
+    expect(document.body.textContent).toMatch(/Alte Kasse/);
+
+    const zurueck = await screen.findByLabelText(i18n.t("konten.wiederaufnehmen"));
+    await nutzer.click(zurueck);
+
+    await waitFor(async () =>
+      expect((await sqliteZahlungskontoRepository.alle())[0].aktiv).toBe(true),
+    );
   });
 
   it("legt eine Person über das Formular an", async () => {
