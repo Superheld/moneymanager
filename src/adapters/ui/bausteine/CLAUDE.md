@@ -1,8 +1,10 @@
 # `bausteine/` — was mehrere Bereiche benutzen
 
 Hier liegt, was nicht einem Bereich gehört: die Shell (`AppShell`, `Bereich`, `PageHead`),
-wiederkehrende Bedienteile (`Modal`, `IconButton`, `CategoryPicker`), die Farbregel für
-Beträge (`geldFarbe`) und der Einstellungs-Kontext (`EinstellungenProvider`,
+wiederkehrende Bedienteile (`Modal`, `IconButton`, `CategoryPicker`), die Farbregel der
+Auswertung (`geldFarbe` — sie deckt seit 2026-09-13 nicht mehr nur Beträge ab, sondern auch
+Kennzahlen und Flächen; Einzelheiten in `../CLAUDE.md` unter „Zahlen anzeigen") und der
+Einstellungs-Kontext (`EinstellungenProvider`,
 `einstellungenKontext`, Quelle von `useGeld`).
 
 **Die Regel dafür ist messbar, nicht Geschmack:** Was aus **zwei oder mehr** Bereichen

@@ -48,7 +48,7 @@ import { PageHead } from "../bausteine/PageHead";
 import { Modal } from "../bausteine/Modal";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { geldFarbe, warnTon } from "../bausteine/geldFarbe";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
@@ -271,7 +271,7 @@ export function BudgetsScreen() {
           <KPIStat size="chip" label={t("budgets.kpiAnzahl")} value={String(zeilen.length)} />
           <KPIStat size="chip" label={t("budgets.kpiProMonat")} value={geld.format(summe.proMonat)} unit={geld.symbol} />
           <KPIStat size="chip" label={t("budgets.kpiVerbraucht")} value={geld.format(summe.verbraucht)} unit={geld.symbol} />
-          <KPIStat size="chip" label={t("budgets.kpiAuslastung")} value={String(summe.auslastung)} unit="%" tone={summe.auslastung > 100 ? "warn" : "default"} />
+          <KPIStat size="chip" label={t("budgets.kpiAuslastung")} value={String(summe.auslastung)} unit="%" tone={warnTon(summe.auslastung > 100)} />
           {summe.ueberzogen > 0 && (
             <KPIStat size="chip" label={t("budgets.kpiUeberzogen")} value={String(summe.ueberzogen)} tone="warn" />
           )}

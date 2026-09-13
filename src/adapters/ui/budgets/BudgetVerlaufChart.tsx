@@ -22,6 +22,7 @@
 import { useTranslation } from "react-i18next";
 import type { Budgetmonat } from "../../../application";
 import { useGeld } from "../bausteine/einstellungenKontext";
+import { flussFarbe, warnFlaeche } from "../bausteine/geldFarbe";
 
 interface Props {
   monate: readonly Budgetmonat[];
@@ -99,7 +100,11 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
                 width={verbrauchBreite}
                 height={verbrauchH}
                 rx="2"
-                fill={ueberzogen ? "var(--warn-deep)" : m.verbraucht < 0 ? "var(--ok)" : "var(--ink)"}
+                /* Eine Fläche nimmt den Flächenton, nicht den Textton (Regel 3 in
+                   `bausteine/geldFarbe`). Der Verbrauch selbst ist eine HÖHE ohne
+                   Richtung und bleibt neutral; amber kommt von der Schwelle, grün vom
+                   Rückfluss — der ist gerichtet. */
+                fill={ueberzogen ? warnFlaeche(true) : m.verbraucht < 0 ? flussFarbe(1) : "var(--ink)"}
                 opacity={ueberzogen ? 0.9 : m.ohnePlan ? 0.3 : 0.78}
               />
               {/* Die Marke sitzt an der LINKEN Kante des Slots: die Änderung gilt AB
@@ -122,7 +127,7 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
       <div style={{ display: "flex", gap: "var(--sp-5)", marginTop: "var(--sp-2)", fontSize: "var(--fs-sm)", color: "var(--ink-2)", flexWrap: "wrap" }}>
         <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.13, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeVerfuegbar")}</span>
         <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.78, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeVerbraucht")}</span>
-        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--warn-deep)", verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeUeberzogen")}</span>
+        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: warnFlaeche(true), verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeUeberzogen")}</span>
         {monate.some((m) => m.ohnePlan) && (
           <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.3, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeOhnePlan")}</span>
         )}

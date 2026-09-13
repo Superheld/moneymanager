@@ -17,6 +17,7 @@ import type { Kontovorschau } from "../../../application";
 import { Card, Pill } from "../bausteine";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { useSchmal } from "../bausteine/useSchmal";
+import { geldFarbe } from "../bausteine/geldFarbe";
 
 export function HandlungsbedarfKarte({
   bedarf,
@@ -61,7 +62,7 @@ export function HandlungsbedarfKarte({
                 </span>
                 <span className="muted">
                   {t("uebersicht.bedarfAb", { datum: datum.mitJahr(ab) })} ·{" "}
-                  <span style={{ color: "var(--warn-deep)" }}>
+                  <span style={{ color: geldFarbe(tiefstand) }}>
                     {geld.format(tiefstand)} {geld.symbol}
                   </span>
                 </span>

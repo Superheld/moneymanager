@@ -9,6 +9,7 @@
 
 import { useTranslation } from "react-i18next";
 import { useGeld } from "../bausteine/einstellungenKontext";
+import { flussFarbe } from "../bausteine/geldFarbe";
 
 interface Props {
   labels: string[];
@@ -63,8 +64,13 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
               {aktivIndex === i && (
                 <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="var(--accent)" opacity="0.1" />
               )}
-              <rect x={cx - bw - 1} y={basis - ein} width={bw} height={ein} rx="2" fill="var(--ok)" />
-              <rect x={cx + 1} y={basis - aus} width={bw} height={aus} rx="2" fill="var(--ink)" opacity="0.78" />
+              {/* Zufluss und Abfluss, beide als Höhe gezeichnet — die Richtung steckt
+                  darin, WELCHER Balken es ist. Also dieselbe Aussage wie bei der Zahl
+                  daneben, in den Flächentönen (`bausteine/geldFarbe`, Regel 3). Der
+                  Abfluss war hier `--ink` und in der Tabelle darunter amber: derselbe
+                  Euro in zwei Farben, je nachdem wo man hinsah. */}
+              <rect x={cx - bw - 1} y={basis - ein} width={bw} height={ein} rx="2" fill={flussFarbe(1)} />
+              <rect x={cx + 1} y={basis - aus} width={bw} height={aus} rx="2" fill={flussFarbe(-1)} />
               {/* transparenter, voll-hoher Slot für leichtes Klicken */}
               {klickbar && <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="transparent" />}
               {i % Math.ceil(n / 12) === 0 && (
@@ -75,8 +81,8 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
         })}
       </svg>
       <div style={{ display: "flex", gap: "var(--sp-5)", marginTop: "var(--sp-2)", fontSize: "var(--fs-sm)", color: "var(--ink-2)" }}>
-        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ok)", verticalAlign: "middle", marginRight: 6 }} />{t("charts.einnahmen")}</span>
-        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.78, verticalAlign: "middle", marginRight: 6 }} />{t("charts.ausgabenInklBudgets")}</span>
+        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: flussFarbe(1), verticalAlign: "middle", marginRight: 6 }} />{t("charts.einnahmen")}</span>
+        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: flussFarbe(-1), verticalAlign: "middle", marginRight: 6 }} />{t("charts.ausgabenInklBudgets")}</span>
       </div>
     </div>
   );
