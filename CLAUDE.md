@@ -457,23 +457,59 @@ Vier Dinge darin, die Entscheidungen sind und keine Rechenschritte:
 ohne dieses Feld: mitgeschrieben holte jedes Umbenennen ein stillgelegtes Konto still zurück
 in die Gegenwart.
 
-##### Zwei Wege, ein Konto wegzubekommen
+##### Ein Konto loswerden — EIN Symbol, ein Dialog
 
-| | was weggeht | wo |
-|---|---|---|
-| **löschen** | nur das Konto — der Fremdschlüssel lässt nichts anderes zu | an jedem Konto |
-| **endgültig löschen** | Buchungen, Belege, Bankverbindung, das Konto | **nur am stillgelegten** |
+In der Zeile steht genau ein Symbol dafür („Auflösen"), und es steht dort in jedem Zustand.
+`ui/konten/KontoAufloesenModal.tsx` bietet an, was gerade möglich ist:
 
-Das „nur am stillgelegten" ist der Kern des Entwurfs und keine Vorsichtsmaßnahme: so ist
-Stilllegen die vorgegebene Antwort und das Zerstörende eine zweite, eigene Handlung.
-Stünden beide am selben Mülleimer, gewänne der kürzere Weg — auch dann, wenn der andere
-gemeint war. Durchgesetzt an der Anwendungsgrenze UND in der Oberfläche; ein Knopf, der
-beim Klick abweist, ist schlechter als keiner.
+| Zustand des Kontos | was der Dialog anbietet |
+|---|---|
+| geführt, etwas hängt dran | **Stilllegen** — und den Satz, dass danach auch „Endgültig löschen" hier steht |
+| geführt, nichts hängt dran | Stilllegen **und Löschen** |
+| stillgelegt | **Wieder aufnehmen** und **Endgültig löschen** |
 
-`kontoloeschung` zählt dafür, was am Konto hängt, und trennt **Sperren** von **Folgen**: die
-drei oben verhindern das Löschen, ein Budget oder eine Rücklage verliert nur einen Verweis.
-Beides in einen Topf zu werfen liesse die Meldung behaupten, man müsse sie erst wegräumen —
-und wer das tut, hat umsonst gearbeitet.
+**Bis 2026-09-13 waren es drei Symbole in der Zeile**, und die erste Fassung des Löschens
+hatte drei Mängel, die erst beim Benutzen auffielen — sie stehen hier, weil jeder davon eine
+Regel hinterlässt:
+
+- **Der Mülleimer war ein Knopf, der fast immer Nein sagt.** Für jedes Konto mit Geschichte
+  konnte er nur ablehnen. Seine Meldung war ehrlich, und das genügt nicht: eine ehrliche
+  Absage ist immer noch eine Absage. **Ein Knopf, dessen Normalfall eine Absage ist, gehört
+  nicht in die Liste** — was möglich ist, entscheidet der Dialog, bevor jemand klickt.
+- **Der Icon-Satz wechselte** je Zustand, drei gegen vier Symbole, das vierte ein zweites
+  rotes neben dem ersten. Was erscheint und verschwindet, lernt niemand; deshalb ist es jetzt
+  dasselbe Symbol, und nur der Dialog dahinter ändert sich.
+- **Der Zusammenhang stand nirgends.** Dass Stilllegen die milde Fassung ist und das
+  endgültige Löschen erst danach auftaucht, musste man durch Ausprobieren finden. Genau das
+  sagt der Dialog jetzt aus — es ist der eigentliche Zugewinn der Umarbeitung.
+
+Die **Abfolge** bleibt und wird nur erklärt: das endgültige Löschen gibt es nur am
+stillgelegten Konto. So ist Stilllegen die vorgegebene Antwort und das Zerstörende eine
+zweite, eigene Handlung; stünden beide gleichberechtigt da, gewänne der kürzere Weg — auch
+dann, wenn der andere gemeint war. Durchgesetzt an der Anwendungsgrenze UND in der
+Oberfläche.
+
+**Ein LEERES Konto darf direkt gehen**, und das ist die eine Ausnahme von der Abfolge: sie
+ist dafür da, eine GESCHICHTE nicht versehentlich wegzuwerfen. Gibt es keine, schützt sie
+nichts und kostet nur einen Umweg — und das ist der häufigste Fall, ein Konto, das aus
+Versehen entstanden ist.
+
+**Der Dialog IST die Rückfrage, es kommt keine zweite.** Er nennt jede Folge, bevor etwas
+passiert, und die zerstörende Handlung trägt ihren Namen auf dem Knopf. Ein „Wirklich
+löschen?" dahinter wäre genau das, wovor `Loeschfrage` in ihrem Kopf warnt: eine Verzögerung
+ohne Information, die man nach dem zweiten Mal wegklickt — und es wäre der zweite Schritt,
+der die Abfolge unübersichtlich gemacht hat. `useLoeschfrage` ist deshalb aus der
+Kontenverwaltung verschwunden.
+
+`kontoloeschung` zählt, was am Konto hängt, und trennt **Sperren** von **Folgen**: die drei
+oben verhindern das Löschen, ein Budget oder eine Rücklage verliert nur einen Verweis. Beides
+in einen Topf zu werfen liesse den Dialog behaupten, man müsse sie erst wegräumen — und wer
+das tut, hat umsonst gearbeitet.
+
+**Stilllegen steht zusätzlich im Bearbeiten-Dialog**, als Zeile „Zustand" neben der
+Verbindung. Der Schalter dort schreibt SOFORT und nicht beim Speichern: `kontoAnlegen` fasst
+`aktiv` nicht an, ein Feld, das erst beim Speichern wirkt, hätte also keinen Weg in den
+Bestand.
 
 Vier Dinge am Löschweg selbst (`adapters/persistence/sqliteKontoentfernen.ts`):
 

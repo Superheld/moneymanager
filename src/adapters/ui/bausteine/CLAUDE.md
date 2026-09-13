@@ -310,6 +310,15 @@ Und der Name bleibt trotzdem `aria-label`: eine Vorlesehilfe liest in einer Zeil
 Aktionen hintereinander, dort ist kurz und gleichförmig richtig. ARIA gewinnt ohnehin gegen
 `title`, das Verhältnis ist also eindeutig und nicht zu verwechseln.
 
+**Ein Knopf, dessen Normalfall eine Absage ist, gehört nicht in eine Zeile.** Gemessen am
+Löschen eines Kontos: der Mülleimer konnte für jedes Konto mit Geschichte nur ablehnen, und
+eine ehrliche Absage ist immer noch eine Absage. Was möglich ist, entscheidet der Dialog,
+bevor jemand klickt — in der Zeile steht dann EIN Symbol, immer dasselbe.
+
+Daran hängt die zweite Hälfte derselben Regel: **ein wechselnder Icon-Satz ist keine
+Auskunft.** Verschiedene Zustände einer Zeile sollen nicht verschieden viele Symbole zeigen;
+was sich unterscheidet, gehört hinter das Symbol, nicht daneben.
+
 **Einen Tooltip-Baustein gibt es nicht**, und das ist bislang Absicht: `title` kostet nichts
 und trägt so weit. Wer einen baut, nimmt Base UI `Tooltip` (Positionierung, Verzögerung,
 Berührung) — und muss dann für JEDEN `IconButton` der App entscheiden, was passiert, denn
