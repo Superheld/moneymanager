@@ -1839,7 +1839,21 @@ const de = {
       zusammen: "Merkmale: {{merkmale}} · Treffer: {{count}}",
       merkmale: "Merkmale",
       merkmaleHinweis:
-        "Mindestens eines muss passen — sie sind ODER-verknüpft. Groß-/Kleinschreibung egal, * ist der Platzhalter. Ein Muster muss den GANZEN Wert abdecken: „*ard*“ trifft „Südwestrundfunk ARD ZDF“, „ard“ allein nur einen Empfänger, der genau so heißt. Die Zahl je Zeile sagt, wie viele Zahlungen dieses Muster für sich allein trifft.",
+        "Von den Merkmalen ohne Häkchen muss mindestens eines passen — sie sind ODER-verknüpft und fangen die Schreibweisen desselben Anbieters ein. Ein Merkmal mit Häkchen „muss“ dagegen MUSS passen: mehrere davon verengen die Regel Stück für Stück. Groß-/Kleinschreibung egal, * ist der Platzhalter. Ein Muster muss den GANZEN Wert abdecken: „*ard*“ trifft „Südwestrundfunk ARD ZDF“, „ard“ allein nur einen Empfänger, der genau so heißt. Die Zahl je Zeile sagt, wie viele Zahlungen dieses Muster für sich allein trifft — bei einem Pflichtmerkmal ist das die Obergrenze für die ganze Regel.",
+      pflicht: "muss",
+      pflichtHinweis:
+        "Dieses Merkmal muss passen, damit die Regel greift. So lassen sich zwei Verträge beim selben Einzieher trennen: Gläubiger-ID und Versicherungsnummer im Verwendungszweck beide als „muss“ — dann zählt nur, was beides erfüllt.",
+      pflichtTrifftNieHinweis:
+        "Dieses Muster hat in keiner Zahlung gepasst — und es ist ein Pflichtmerkmal. Damit trifft die ganze Regel nichts, egal was sonst noch dasteht.",
+      fenster: "Fälligkeitsfenster",
+      fensterHinweis:
+        "Wiederholt sich jedes Jahr bzw. jeden Monat — im Gegensatz zu „erst ab“/„nur bis“, die feste Stichtage sind. Monat 3–3 heißt: nur Buchungen im März, in jedem Jahr. Tag 1–5: nur Buchungen in den ersten fünf Tagen eines Monats. Beide Grenzen müssen dastehen, sonst gilt das Fenster nicht. Von größer als bis heißt über die Grenze hinweg (Monat 11–2 ist November bis Februar).",
+      fensterMonat: "Monat",
+      fensterMonatVon: "Monat von",
+      fensterMonatBis: "Monat bis",
+      fensterTag: "Tag",
+      fensterTagVon: "Tag von",
+      fensterTagBis: "Tag bis",
       merkmalArt: "Art des Merkmals",
       merkmalMuster: "Muster",
       art: {
@@ -1881,6 +1895,7 @@ const de = {
         merkmale: "{{weg}} Zahlungen passen zu keinem Muster.",
         betrag: "Die Betragsspanne nimmt {{weg}} Zahlungen weg, die die Muster treffen — {{uebrig}} bleiben. Spanne leeren oder weiten, wenn das nicht gewollt ist.",
         zeitraum: "Der Zeitraum nimmt {{weg}} Zahlungen weg — {{uebrig}} bleiben.",
+        fenster: "Das Fälligkeitsfenster nimmt {{weg}} Zahlungen weg — {{uebrig}} bleiben. Das ist gewollt, wenn zwei Verträge beim selben Anbieter zu verschiedenen Terminen fällig sind; sonst die Grenzen weiten.",
         konto: "Die Kontowahl nimmt {{weg}} Zahlungen weg — {{uebrig}} bleiben.",
       },
       weitere: "… und {{count}} weitere",
@@ -3759,7 +3774,21 @@ const en: typeof de = {
       zusammen: "Features: {{merkmale}} · Matches: {{count}}",
       merkmale: "Features",
       merkmaleHinweis:
-        "At least one has to match — they are OR-linked. Case-insensitive, * is the wildcard. A pattern must cover the WHOLE value: \"*ard*\" matches \"Suedwestrundfunk ARD ZDF\", while \"ard\" alone only matches a payee called exactly that. The number on each row says how many payments that pattern matches on its own.",
+        "At least one of the unticked features has to match — those are OR-linked and catch the spellings of the same provider. A feature ticked \"required\" MUST match: several of them narrow the rule step by step. Case-insensitive, * is the wildcard. A pattern must cover the WHOLE value: \"*ard*\" matches \"Suedwestrundfunk ARD ZDF\", while \"ard\" alone only matches a payee called exactly that. The number on each row says how many payments that pattern matches on its own — for a required feature that is the ceiling for the whole rule.",
+      pflicht: "required",
+      pflichtHinweis:
+        "This feature must match for the rule to apply. That is how two contracts with the same creditor are told apart: tick both the creditor ID and the policy number in the payment reference — only what satisfies both counts.",
+      pflichtTrifftNieHinweis:
+        "This pattern matched no payment at all — and it is required. The whole rule therefore matches nothing, no matter what else is listed.",
+      fenster: "Due window",
+      fensterHinweis:
+        "Repeats every year or every month — unlike \"from\"/\"until\", which are fixed dates. Month 3–3 means: only transactions in March, in every year. Day 1–5: only transactions in the first five days of a month. Both bounds must be filled in, otherwise the window does not apply. From greater than to means across the boundary (month 11–2 is November through February).",
+      fensterMonat: "Month",
+      fensterMonatVon: "Month from",
+      fensterMonatBis: "Month to",
+      fensterTag: "Day",
+      fensterTagVon: "Day from",
+      fensterTagBis: "Day to",
       merkmalArt: "Feature type",
       merkmalMuster: "Pattern",
       art: {
@@ -3801,6 +3830,7 @@ const en: typeof de = {
         merkmale: "{{weg}} payments match none of the patterns.",
         betrag: "The amount range removes {{weg}} payments that do match the patterns — {{uebrig}} remain. Clear or widen it if that is not intended.",
         zeitraum: "The date range removes {{weg}} payments — {{uebrig}} remain.",
+        fenster: "The due window removes {{weg}} payments — {{uebrig}} remain. That is intended when two contracts with the same provider fall due at different times; otherwise widen the bounds.",
         konto: "The account choice removes {{weg}} payments — {{uebrig}} remain.",
       },
       weitere: "… and {{count}} more",

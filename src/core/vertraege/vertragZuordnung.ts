@@ -73,6 +73,25 @@ export function istMerkmalsart(wert: unknown): wert is Merkmalsart {
 export interface Erkennungsmerkmal {
   readonly art: Merkmalsart;
   readonly muster: string;
+  /**
+   * Muss dieses Merkmal treffen, damit die Regel greift?
+   *
+   * Ohne das Flag sind alle Merkmale ODER-verknuepft, und dafür gibt es einen guten
+   * Grund: derselbe Anbieter steht mal als „Vibora GmbH", mal als „VIBORA KD" im Auszug,
+   * und beide Schreibweisen sollen greifen. Ein globaler Schalter „alles muss treffen"
+   * hätte genau das kaputtgemacht — deshalb sitzt das UND am einzelnen Merkmal.
+   *
+   * **Der Fall, fuer den es das gibt: zwei Verträge beim selben Einzieher.** Zwei
+   * Kfz-Policen derselben Versicherung tragen dieselbe Gläubiger-ID und denselben Namen;
+   * das einzige Unterscheidende ist die Versicherungsnummer im Verwendungszweck. Sie als
+   * weiteres ODER-Merkmal einzutragen half nichts — es verengte die Regel nicht, es
+   * erweiterte sie. Beide Verträge trafen beide Zahlungen, und `besser` entschied das
+   * Gleichstandsduell alphabetisch nach Vertrags-Id: deterministisch falsch.
+   *
+   * Vorgabe ist `undefined` und heisst „optional", damit jede bestehende Regel sich
+   * verhält wie bisher. Wer nichts ankreuzt, merkt von dieser Möglichkeit nichts.
+   */
+  readonly pflicht?: boolean;
 }
 
 /**
@@ -100,6 +119,33 @@ export interface Vertragserkennung {
   readonly gueltigBis?: string;
   /** Nur Buchungen über dieses Zahlungskonto. */
   readonly kontoId?: string;
+  /**
+   * Das FÄLLIGKEITSFENSTER: ein Zeitraum, der sich jedes Jahr bzw. jeden Monat
+   * wiederholt. Zwei Paare, beide fuer sich optional, beide „nicht gesetzt heisst egal".
+   *
+   * Das ist ausdrücklich etwas anderes als `gueltigAb`/`gueltigBis`. Die beiden sind
+   * feste Kalenderdaten und sagen, wie lange es den Vertrag GAB — sie grenzen einen
+   * Vorgänger ab. Das Fenster sagt, wann im Jahr (oder im Monat) er FAELLIG ist, und
+   * gilt in jedem Jahr aufs Neue.
+   *
+   * Zwei Paare und nicht ein kombiniertes „01.03.–10.03.", weil es zwei verschiedene
+   * Fragen sind und ein Vertrag je nach Rhythmus die eine oder die andere braucht: eine
+   * Jahrespolice wird im März fällig (Monat), ein Abo am Monatsanfang (Tag). Ein
+   * einziges Feld hätte die monatliche Form gar nicht ausdruecken können, und ein
+   * Format, das sich selbst auslegt („03-01" ist ein Datum, „01" ein Tag), wäre clever
+   * und beim Lesen nicht mehr zu entscheiden.
+   *
+   * **Beide Paare wickeln um**: `von` größer als `bis` meint den Zeitraum über die
+   * Grenze hinweg — `monatVon: 11, monatBis: 2` ist November bis Februar. Ohne das wäre
+   * jeder Vertrag mit Faelligkeit um den Jahreswechsel nicht abbildbar, und das ist die
+   * Hälfte aller Versicherungen.
+   */
+  /** Monat im Jahr, 1–12, einschließlich. Nur zusammen mit `monatBis` wirksam. */
+  readonly monatVon?: number;
+  readonly monatBis?: number;
+  /** Tag im Monat, 1–31, einschließlich. Nur zusammen mit `tagBis` wirksam. */
+  readonly tagVon?: number;
+  readonly tagBis?: number;
 }
 
 /** Wer die Zuordnung gesetzt hat — und damit, wer sie ändern darf. */
@@ -181,12 +227,67 @@ function merkmalTrifft(m: Erkennungsmerkmal, s: Zahlungsspur): boolean {
   return musterTrifft(muster, roh) || musterTrifft(muster, anbieterSchluessel(roh));
 }
 
+/**
+ * Treffen die MERKMALE einer Regel auf diese Zahlung zu?
+ *
+ * Zwei Klassen nebeneinander, und die Aufteilung ist der ganze Punkt:
+ *
+ *   • **Pflichtmerkmale** müssen ALLE treffen. Sie verengen — jedes weitere macht die
+ *     Regel schärfer.
+ *   • **Die übrigen** sind untereinander ODER-verknüpft, ein Treffer genügt. Sie
+ *     erweitern — sie fangen die Schreibweisen desselben Anbieters ein.
+ *
+ * Gibt es keine Pflichtmerkmale, verhält sich das exakt wie vorher; gibt es nur
+ * Pflichtmerkmale, ist die Regel ein reines UND. **Der Sonderfall ist die zweite Zeile:
+ * hat eine Regel Pflichtmerkmale und sonst keine, darf das nicht an einem leeren `some`
+ * scheitern** — `[].some(…)` ist `false`, und eine Regel aus lauter Pflichtmerkmalen
+ * träfe damit nie etwas. Genau das ist die Regelform, für die das Flag gebaut wurde.
+ */
+function merkmaleTreffen(e: Vertragserkennung, s: Zahlungsspur): boolean {
+  const pflicht = e.merkmale.filter((m) => m.pflicht);
+  const offen = e.merkmale.filter((m) => !m.pflicht);
+  if (!pflicht.every((m) => merkmalTrifft(m, s))) return false;
+  if (offen.length > 0) return offen.some((m) => merkmalTrifft(m, s));
+  // Keine offenen Merkmale: die Pflichten allein entscheiden — sofern es welche gibt.
+  // Eine Regel ganz ohne Merkmale trifft nichts, das war schon immer so.
+  return pflicht.length > 0;
+}
+
+/**
+ * Liegt `wert` im Fenster von `von` bis `bis` (beide einschließlich)?
+ *
+ * **Wickelt um**, wenn `von` größer als `bis` ist: `imFenster(1, 11, 2)` ist wahr, weil
+ * November–Februar den Jahreswechsel überspannt. Ohne das wäre jeder Vertrag mit
+ * Fälligkeit um Silvester nicht abbildbar.
+ *
+ * Beide Grenzen müssen gesetzt sein — ein halbes Fenster gibt es nicht. „ab März" ohne
+ * Ende wäre bei einer Größe, die im Kreis läuft, nicht zu deuten: es hiesse entweder
+ * „März bis Dezember" oder „März bis Februar", und beides ist eine Vermutung.
+ */
+function imFenster(wert: number, von: number | undefined, bis: number | undefined): boolean {
+  if (von === undefined || bis === undefined) return true;
+  return von <= bis ? wert >= von && wert <= bis : wert >= von || wert <= bis;
+}
+
+/**
+ * Liegt die Zahlung im Fälligkeitsfenster der Regel?
+ *
+ * Liest Monat und Tag aus dem ISO-Datum per `slice` statt über `parseIso`: die beiden
+ * Stellen stehen fest, und ein `Date`-Objekt brächte hier nur die Zeitzonenfrage mit,
+ * die es sonst nirgends im Kern gibt.
+ */
+function imFaelligkeitsfenster(e: Vertragserkennung, datum: string): boolean {
+  const monat = Number(datum.slice(5, 7));
+  const tag = Number(datum.slice(8, 10));
+  return imFenster(monat, e.monatVon, e.monatBis) && imFenster(tag, e.tagVon, e.tagBis);
+}
+
 /** Trifft die Erkennungsregel auf diese Zahlung zu? */
 export function passtZu(e: Vertragserkennung, s: Zahlungsspur): boolean {
   // Eine Umschichtung ist nie eine Vertragszahlung — sie wechselt nur das eigene Konto.
   if (s.charakter === "Umschichtung") return false;
 
-  if (!e.merkmale.some((m) => merkmalTrifft(m, s))) return false;
+  if (!merkmaleTreffen(e, s)) return false;
 
   const hoehe = Math.abs(s.betrag);
   if (e.betragVon !== undefined && hoehe < e.betragVon) return false;
@@ -194,6 +295,10 @@ export function passtZu(e: Vertragserkennung, s: Zahlungsspur): boolean {
   // String-Vergleich reicht: ISO-Daten sind in dieser Form sortierbar (siehe core/datum).
   if (e.gueltigAb && s.datum < e.gueltigAb) return false;
   if (e.gueltigBis && s.datum > e.gueltigBis) return false;
+  // Das Fälligkeitsfenster steht NACH dem Zeitraum und vor dem Konto — es ist die
+  // feinere Aussage über dieselbe Größe, und die Diagnose unten zählt in derselben
+  // Reihenfolge, damit ihre Zahlen zu dieser Kette passen.
+  if (!imFaelligkeitsfenster(e, s.datum)) return false;
   if (e.kontoId && s.kontoId !== e.kontoId) return false;
   return true;
 }
@@ -219,6 +324,8 @@ export interface Erkennungsdiagnose {
   readonly nachBetrag: number;
   /** … davon innerhalb des Zeitraums. */
   readonly nachZeitraum: number;
+  /** … davon im Fälligkeitsfenster (Monat/Tag, jahresunabhängig). */
+  readonly nachFenster: number;
   /** … davon auf dem geforderten Konto. Das ist zugleich die Trefferzahl. */
   readonly nachKonto: number;
 }
@@ -228,7 +335,10 @@ export function erkennungsDiagnose(
   spuren: readonly Zahlungsspur[],
 ): Erkennungsdiagnose {
   const grund = spuren.filter((s) => s.charakter !== "Umschichtung");
-  const nachMerkmalen = grund.filter((s) => e.merkmale.some((m) => merkmalTrifft(m, s)));
+  // Dieselbe Merkmalslogik wie in `passtZu` — Pflicht und ODER zusammengenommen. Eine
+  // eigene Zählung hier hiesse, dass die Stufe „nach Merkmalen" etwas anderes meint als
+  // der Filter, dessen Wirkung sie erklären soll.
+  const nachMerkmalen = grund.filter((s) => merkmaleTreffen(e, s));
   const nachBetrag = nachMerkmalen.filter((s) => {
     const hoehe = Math.abs(s.betrag);
     if (e.betragVon !== undefined && hoehe < e.betragVon) return false;
@@ -240,12 +350,14 @@ export function erkennungsDiagnose(
     if (e.gueltigBis && s.datum > e.gueltigBis) return false;
     return true;
   });
-  const nachKonto = nachZeitraum.filter((s) => !e.kontoId || s.kontoId === e.kontoId);
+  const nachFenster = nachZeitraum.filter((s) => imFaelligkeitsfenster(e, s.datum));
+  const nachKonto = nachFenster.filter((s) => !e.kontoId || s.kontoId === e.kontoId);
   return {
     grundmenge: grund.length,
     nachMerkmalen: nachMerkmalen.length,
     nachBetrag: nachBetrag.length,
     nachZeitraum: nachZeitraum.length,
+    nachFenster: nachFenster.length,
     nachKonto: nachKonto.length,
   };
 }
@@ -311,9 +423,13 @@ export function spannenVorschlag(
 ): { von: Cent; bis: Cent } | undefined {
   const passend = spuren.filter((s) => {
     if (s.charakter === "Umschichtung") return false;
-    if (!e.merkmale.some((m) => merkmalTrifft(m, s))) return false;
+    if (!merkmaleTreffen(e, s)) return false;
     if (e.gueltigAb && s.datum < e.gueltigAb) return false;
     if (e.gueltigBis && s.datum > e.gueltigBis) return false;
+    // Das Fälligkeitsfenster bleibt drin, aus demselben Grund wie Zeitraum und Konto: es
+    // ist eine ausdrückliche Eingrenzung, und was jemand ausgeschlossen hat, soll die
+    // Spanne nicht durch die Hintertür wieder hereinholen.
+    if (!imFaelligkeitsfenster(e, s.datum)) return false;
     if (e.kontoId && s.kontoId !== e.kontoId) return false;
     return true;
   });
@@ -339,12 +455,23 @@ export function spannenVorschlag(
  * DETERMINISTISCH und nicht „irgendeiner", damit ein Abgleich zweimal dasselbe Ergebnis
  * liefert und nicht bei jedem Lauf Zuordnungen umspringen:
  *
- *   1. Treffer über die Gläubiger-ID schlägt Treffer über den Namen — die ID
+ *   1. **Mehr Pflichtmerkmale.** Beide Regeln passen ja bereits, ihre Pflichten sind also
+ *      alle erfüllt — wer mehr davon gestellt hat, hat mehr verlangt und mehr bekommen.
+ *      Das ist die stärkste Aussage in dieser Liste und steht deshalb oben: die Stufe
+ *      darunter vergleicht, WOMIT getroffen wurde, diese, WIE VIEL erfüllt sein musste.
+ *   2. Treffer über die Gläubiger-ID schlägt Treffer über den Namen — die ID
  *      identifiziert den Einzieher, der Name ist Text mit Unschärfe.
- *   2. Danach die engere Betragsspanne — wer sich festgelegt hat, meint es genauer.
- *   3. Zuletzt die Vertrags-Id, rein damit das Ergebnis stabil ist.
+ *   3. Danach die engere Betragsspanne — wer sich festgelegt hat, meint es genauer.
+ *   4. Dann ein gesetztes Fälligkeitsfenster gegen keines, aus demselben Grund wie die
+ *      Spanne. Verglichen wird nur GESETZT gegen NICHT GESETZT und nicht die Weite:
+ *      Monats- und Tagesfenster sind zwei verschiedene Größen, und sie gegeneinander
+ *      aufzurechnen ergäbe eine Zahl, die nichts misst.
+ *   5. Zuletzt die Vertrags-Id, rein damit das Ergebnis stabil ist.
  */
 function besser(a: Vertragserkennung, b: Vertragserkennung, s: Zahlungsspur): boolean {
+  const pflichten = (e: Vertragserkennung) => e.merkmale.filter((m) => m.pflicht).length;
+  if (pflichten(a) !== pflichten(b)) return pflichten(a) > pflichten(b);
+
   const ueberId = (e: Vertragserkennung) =>
     e.merkmale.some((m) => m.art === "glaeubigerId" && merkmalTrifft(m, s));
   if (ueberId(a) !== ueberId(b)) return ueberId(a);
@@ -352,6 +479,11 @@ function besser(a: Vertragserkennung, b: Vertragserkennung, s: Zahlungsspur): bo
   const breite = (e: Vertragserkennung) =>
     e.betragVon !== undefined && e.betragBis !== undefined ? e.betragBis - e.betragVon : Infinity;
   if (breite(a) !== breite(b)) return breite(a) < breite(b);
+
+  const hatFenster = (e: Vertragserkennung) =>
+    (e.monatVon !== undefined && e.monatBis !== undefined) ||
+    (e.tagVon !== undefined && e.tagBis !== undefined);
+  if (hatFenster(a) !== hatFenster(b)) return hatFenster(a);
 
   return a.vertragId < b.vertragId;
 }

@@ -512,3 +512,183 @@ describe("zuordnungAbgleich — Umbuchungsverträge", () => {
     expect(entfernen).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Pflichtmerkmale und Fälligkeitsfenster — der Fall „zwei Verträge, ein Einzieher".
+//
+// Er ist der Grund, aus dem es beides gibt, und er lässt sich mit keinem der Mittel
+// davor lösen: zwei Policen bei derselben Versicherung tragen dieselbe Gläubiger-ID und
+// denselben Namen. Vor dem Pflichtflag war die Merkmalsliste rein ODER-verknüpft — ein
+// zusätzliches Zweckmuster verengte die Regel nicht, es erweiterte sie, und beide
+// Verträge trafen beide Zahlungen.
+// ---------------------------------------------------------------------------
+
+describe("Pflichtmerkmale", () => {
+  const gid = "DE39ZZZ09999999123";
+
+  /** Zwei Policen beim selben Einzieher, unterschieden nur am Zweck. */
+  const policeA: Vertragserkennung = {
+    vertragId: "police-a",
+    merkmale: [
+      { art: "glaeubigerId", muster: gid, pflicht: true },
+      { art: "verwendungszweck", muster: "*KV-8842*", pflicht: true },
+    ],
+  };
+  const policeB: Vertragserkennung = {
+    vertragId: "police-b",
+    merkmale: [
+      { art: "glaeubigerId", muster: gid, pflicht: true },
+      { art: "verwendungszweck", muster: "*KV-9107*", pflicht: true },
+    ],
+  };
+
+  const zahlungA = spur({
+    id: "za",
+    gegenpartei: "Ohlert Versicherung",
+    glaeubigerId: gid,
+    verwendungszweck: "Beitrag KV-8842 Jahrespraemie",
+  });
+  const zahlungB = spur({
+    id: "zb",
+    gegenpartei: "Ohlert Versicherung",
+    glaeubigerId: gid,
+    verwendungszweck: "Beitrag KV-9107 Jahrespraemie",
+  });
+
+  it("verlangt ALLE Pflichtmerkmale, nicht nur eines", () => {
+    expect(passtZu(policeA, zahlungA)).toBe(true);
+    // Dieselbe Gläubiger-ID, aber der falsche Zweck: vor dem Flag hätte die ID allein
+    // gereicht und die Regel hätte zugegriffen.
+    expect(passtZu(policeA, zahlungB)).toBe(false);
+    expect(passtZu(policeB, zahlungB)).toBe(true);
+    expect(passtZu(policeB, zahlungA)).toBe(false);
+  });
+
+  it("trennt die beiden Verträge auch im Wettbewerb", () => {
+    // Das ist der eigentliche Test: `vertragFuer` prüft ALLE Regeln und wählt. Vorher kam
+    // hier zweimal derselbe Vertrag heraus — deterministisch, und deterministisch falsch.
+    expect(vertragFuer([policeA, policeB], zahlungA)).toBe("police-a");
+    expect(vertragFuer([policeA, policeB], zahlungB)).toBe("police-b");
+  });
+
+  it("greift eine Regel aus lauter Pflichtmerkmalen überhaupt", () => {
+    // Der Sonderfall, an dem eine naive Umsetzung scheitert: die offenen Merkmale sind
+    // eine leere Liste, und `[].some(…)` ist `false`. Eine reine UND-Regel träfe damit
+    // nie etwas — ausgerechnet die Form, für die das Flag gebaut wurde.
+    expect(policeA.merkmale.every((m) => m.pflicht)).toBe(true);
+    expect(passtZu(policeA, zahlungA)).toBe(true);
+  });
+
+  it("lässt die offenen Merkmale ODER-verknüpft", () => {
+    // Pflicht und offen nebeneinander: die Gläubiger-ID muss, von den Schreibweisen des
+    // Namens genügt eine. Das ist der Grund, warum das UND am Merkmal sitzt und nicht an
+    // der Regel — ein globales „alles muss treffen" hätte genau das unmöglich gemacht.
+    const gemischt: Vertragserkennung = {
+      vertragId: "v-gemischt",
+      merkmale: [
+        { art: "glaeubigerId", muster: gid, pflicht: true },
+        { art: "empfaenger", muster: "ohlert*" },
+        { art: "empfaenger", muster: "kesselmann*" },
+      ],
+    };
+    expect(passtZu(gemischt, zahlungA)).toBe(true);
+    // Name passt, Pflicht-ID fehlt → nichts.
+    expect(passtZu(gemischt, spur({ gegenpartei: "Ohlert Versicherung", glaeubigerId: undefined }))).toBe(false);
+    // ID passt, aber keiner der beiden Namen → die offene Gruppe fällt durch.
+    expect(passtZu(gemischt, spur({ gegenpartei: "Thalberg AG", glaeubigerId: gid }))).toBe(false);
+  });
+
+  it("bleibt ohne Pflichtflag genau wie vorher", () => {
+    // Die Zusicherung für den Bestand: keine gespeicherte Regel ändert ihr Verhalten.
+    const ohne: Vertragserkennung = {
+      vertragId: "v-alt",
+      merkmale: [
+        { art: "glaeubigerId", muster: gid },
+        { art: "verwendungszweck", muster: "*KV-8842*" },
+      ],
+    };
+    expect(passtZu(ohne, zahlungA)).toBe(true);
+    expect(passtZu(ohne, zahlungB)).toBe(true);
+  });
+
+  it("gibt der Regel mit mehr Pflichtmerkmalen den Vorrang", () => {
+    // Eine alte, breite Regel neben einer neu verengten: die verengte gewinnt, und zwar
+    // unabhängig von der Vertrags-Id, an der es sonst alphabetisch entschieden würde.
+    const breit: Vertragserkennung = {
+      vertragId: "aaa-breit",
+      merkmale: [{ art: "glaeubigerId", muster: gid }],
+    };
+    expect(vertragFuer([breit, policeA], zahlungA)).toBe("police-a");
+    expect(vertragFuer([policeA, breit], zahlungA)).toBe("police-a");
+    // Die breite Regel bleibt für alles zuständig, was die enge nicht fasst.
+    expect(vertragFuer([breit, policeA], zahlungB)).toBe("aaa-breit");
+  });
+});
+
+describe("Fälligkeitsfenster", () => {
+  const imMaerz = (teil: Partial<Vertragserkennung> = {}): Vertragserkennung => ({
+    vertragId: "v-fenster",
+    merkmale: [{ art: "empfaenger", muster: "kesselmann*" }],
+    monatVon: 3,
+    monatBis: 3,
+    ...teil,
+  });
+  const zahlung = (datum: string) => spur({ gegenpartei: "Kesselmann Assekuranz", datum });
+
+  it("lässt nur Buchungen im Monat durch — in jedem Jahr", () => {
+    expect(passtZu(imMaerz(), zahlung("2025-03-04"))).toBe(true);
+    expect(passtZu(imMaerz(), zahlung("2026-03-28"))).toBe(true);
+    expect(passtZu(imMaerz(), zahlung("2026-09-04"))).toBe(false);
+  });
+
+  it("wickelt über den Jahreswechsel um", () => {
+    // November bis Februar. Ohne die Umwicklung wäre jeder Vertrag mit Fälligkeit um
+    // Silvester nicht abbildbar — und das ist keine Randlage.
+    const winter = imMaerz({ monatVon: 11, monatBis: 2 });
+    expect(passtZu(winter, zahlung("2025-11-30"))).toBe(true);
+    expect(passtZu(winter, zahlung("2025-12-15"))).toBe(true);
+    expect(passtZu(winter, zahlung("2026-01-02"))).toBe(true);
+    expect(passtZu(winter, zahlung("2026-02-28"))).toBe(true);
+    expect(passtZu(winter, zahlung("2026-03-01"))).toBe(false);
+    expect(passtZu(winter, zahlung("2026-07-01"))).toBe(false);
+  });
+
+  it("filtert unabhängig davon nach dem Tag im Monat", () => {
+    const monatsanfang = imMaerz({ monatVon: undefined, monatBis: undefined, tagVon: 1, tagBis: 5 });
+    expect(passtZu(monatsanfang, zahlung("2026-04-03"))).toBe(true);
+    expect(passtZu(monatsanfang, zahlung("2026-11-01"))).toBe(true);
+    expect(passtZu(monatsanfang, zahlung("2026-04-17"))).toBe(false);
+    // Auch der Tag wickelt: der 28. bis zum 3. überspannt den Monatswechsel.
+    const monatswechsel = imMaerz({ monatVon: undefined, monatBis: undefined, tagVon: 28, tagBis: 3 });
+    expect(passtZu(monatswechsel, zahlung("2026-04-29"))).toBe(true);
+    expect(passtZu(monatswechsel, zahlung("2026-05-02"))).toBe(true);
+    expect(passtZu(monatswechsel, zahlung("2026-05-12"))).toBe(false);
+  });
+
+  it("ignoriert ein halbes Fenster", () => {
+    // Eine Grenze allein ist bei einer Größe, die im Kreis läuft, nicht zu deuten — also
+    // gilt sie nicht, statt eine Auslegung zu erfinden.
+    const halb = imMaerz({ monatVon: 3, monatBis: undefined });
+    expect(passtZu(halb, zahlung("2026-09-04"))).toBe(true);
+  });
+
+  it("trennt zwei Verträge desselben Anbieters am Termin", () => {
+    // Der zweite Weg zum selben Ziel wie die Pflichtmerkmale — hier ohne Zweckmuster,
+    // weil manche Institute im Verwendungszweck gar nichts Unterscheidendes liefern.
+    const fruehjahr = imMaerz({ vertragId: "police-fruehjahr" });
+    const herbst = imMaerz({ vertragId: "police-herbst", monatVon: 9, monatBis: 9 });
+    expect(vertragFuer([fruehjahr, herbst], zahlung("2026-03-04"))).toBe("police-fruehjahr");
+    expect(vertragFuer([fruehjahr, herbst], zahlung("2026-09-04"))).toBe("police-herbst");
+  });
+
+  it("weist die Fensterstufe in der Diagnose aus", () => {
+    // Damit die Vorschau sagen kann, WO die Kette abreisst — sonst sieht man nur null
+    // Treffer und sucht beim Muster.
+    const spuren = [zahlung("2026-03-04"), zahlung("2026-09-04"), zahlung("2026-10-01")];
+    const d = erkennungsDiagnose(imMaerz(), spuren);
+    expect(d.nachMerkmalen).toBe(3);
+    expect(d.nachZeitraum).toBe(3);
+    expect(d.nachFenster).toBe(1);
+    expect(d.nachKonto).toBe(1);
+  });
+});

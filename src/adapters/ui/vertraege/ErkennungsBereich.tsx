@@ -73,6 +73,25 @@ export interface ErkennungFormular {
   gueltigAb: string;
   gueltigBis: string;
   kontoId: string;
+  /** Das Faelligkeitsfenster, als Text wie die Betraege und aus demselben Grund. */
+  monatVonText: string;
+  monatBisText: string;
+  tagVonText: string;
+  tagBisText: string;
+}
+
+/**
+ * Eine Ganzzahl aus einem Feld, oder `undefined`.
+ *
+ * Ausserhalb des Bereichs gibt es `undefined` und keinen Fehler: waehrend des Tippens ist
+ * „3" auf dem Weg zu „31" ein legitimer Zwischenstand, und eine Maske, die dabei rot
+ * aufleuchtet, ist laestiger als eine Eingabe, die erst beim Speichern zaehlt. Was
+ * durchkommt, ist im Bereich; was nicht, ist schlicht kein Fenster.
+ */
+function ganzzahl(text: string, min: number, max: number): number | undefined {
+  const wert = Number(text.trim());
+  if (!Number.isInteger(wert) || wert < min || wert > max) return undefined;
+  return wert;
 }
 
 /** Bestehende Regel → Maske. Fehlt sie, ist die Maske leer statt gar nicht da. */
@@ -88,6 +107,10 @@ export function erkennungAusRegel(
     gueltigAb: e?.gueltigAb ?? "",
     gueltigBis: e?.gueltigBis ?? "",
     kontoId: e?.kontoId ?? "",
+    monatVonText: e?.monatVon === undefined ? "" : String(e.monatVon),
+    monatBisText: e?.monatBis === undefined ? "" : String(e.monatBis),
+    tagVonText: e?.tagVon === undefined ? "" : String(e.tagVon),
+    tagBisText: e?.tagBis === undefined ? "" : String(e.tagBis),
   };
 }
 
@@ -106,14 +129,33 @@ export function regelAusErkennung(
   return {
     vertragId,
     merkmale: f.merkmale
-      .map((m) => ({ art: m.art, muster: m.muster.trim() }))
+      .map((m) => ({ art: m.art, muster: m.muster.trim(), ...(m.pflicht ? { pflicht: true } : {}) }))
       .filter((m) => m.muster.length > 0),
     betragVon: parse(f.betragVonText) ?? undefined,
     betragBis: parse(f.betragBisText) ?? undefined,
     gueltigAb: f.gueltigAb || undefined,
     gueltigBis: f.gueltigBis || undefined,
     kontoId: f.kontoId || undefined,
+    // Ein HALBES Fenster gibt es nicht: der Kern deutet „ab Maerz" ohne Ende nicht, weil
+    // die Groesse im Kreis laeuft. Statt eine Grenze zu erfinden, faellt das halbe
+    // Fenster hier weg — dann steht in der Regel, was die Maske zeigt.
+    ...fensterPaar("monat", f.monatVonText, f.monatBisText, 1, 12),
+    ...fensterPaar("tag", f.tagVonText, f.tagBisText, 1, 31),
   };
+}
+
+/** Ein Fensterpaar, aber nur wenn BEIDE Grenzen dastehen — siehe `regelAusErkennung`. */
+function fensterPaar(
+  feld: "monat" | "tag",
+  vonText: string,
+  bisText: string,
+  min: number,
+  max: number,
+): Partial<Vertragserkennung> {
+  const von = ganzzahl(vonText, min, max);
+  const bis = ganzzahl(bisText, min, max);
+  if (von === undefined || bis === undefined) return {};
+  return feld === "monat" ? { monatVon: von, monatBis: bis } : { tagVon: von, tagBis: bis };
 }
 
 export function ErkennungsBereich({
@@ -198,7 +240,8 @@ export function ErkennungsBereich({
       { schluessel: "merkmale", vorher: d.grundmenge, nachher: d.nachMerkmalen },
       { schluessel: "betrag", vorher: d.nachMerkmalen, nachher: d.nachBetrag },
       { schluessel: "zeitraum", vorher: d.nachBetrag, nachher: d.nachZeitraum },
-      { schluessel: "konto", vorher: d.nachZeitraum, nachher: d.nachKonto },
+      { schluessel: "fenster", vorher: d.nachZeitraum, nachher: d.nachFenster },
+      { schluessel: "konto", vorher: d.nachFenster, nachher: d.nachKonto },
     ].filter((x) => x.vorher > x.nachher);
     if (stufen.length === 0) return null;
     return stufen.reduce((a, b) => (b.vorher - b.nachher > a.vorher - a.nachher ? b : a));
@@ -231,6 +274,22 @@ export function ErkennungsBereich({
             )?.trifft;
             return (
               <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                {/* Das Pflichtkaestchen steht VOR der Art, weil es die Zeile anders liest:
+                    ein Pflichtmerkmal verengt die Regel, ein offenes erweitert sie. Wer
+                    die Liste ueberfliegt, soll das an der linken Kante sehen und nicht
+                    erst am Ende der Zeile. */}
+                <label
+                  style={{ display: "inline-flex", alignItems: "center", gap: 4, flex: "0 0 auto", fontSize: "var(--fs-xs)" }}
+                  title={t("vertraege.regel.pflichtHinweis")}
+                >
+                  <input
+                    type="checkbox"
+                    aria-label={t("vertraege.regel.pflicht")}
+                    checked={!!m.pflicht}
+                    onChange={(e) => merkmalSetzen(i, { pflicht: e.target.checked })}
+                  />
+                  <span className="muted">{t("vertraege.regel.pflicht")}</span>
+                </label>
                 <Auswahl
                   ariaLabel={t("vertraege.regel.merkmalArt")}
                   wert={m.art}
@@ -251,7 +310,17 @@ export function ErkennungsBereich({
                 {m.muster.trim() !== "" && zahl !== undefined && (
                   <span
                     style={{ flex: "0 0 auto" }}
-                    title={zahl === 0 ? t("vertraege.regel.merkmalTrifftNieHinweis") : undefined}
+                    title={
+                      zahl === 0
+                        ? m.pflicht
+                          // Eine Null an einem PFLICHTmerkmal ist kein schlafendes
+                          // Merkmal mehr, sondern das Ende der ganzen Regel: sie muss
+                          // treffen, und sie trifft nie. Derselbe Wert, andere Tragweite
+                          // — also ein anderer Hinweis.
+                          ? t("vertraege.regel.pflichtTrifftNieHinweis")
+                          : t("vertraege.regel.merkmalTrifftNieHinweis")
+                        : undefined
+                    }
                   >
                     <Pill variant={zahl === 0 ? "warn" : "neutral"}>
                       {zahl === 0
@@ -378,6 +447,38 @@ export function ErkennungsBereich({
         </FormField>
       </div>
 
+      {/* Das Faelligkeitsfenster — bewusst UNTER der Gitterreihe und mit eigener
+          Ueberschrift, nicht als zwei weitere Felder daneben. Es steht sonst neben
+          „gueltig ab"/„gueltig bis" und sieht aus wie dasselbe noch einmal, waehrend es
+          das Gegenteil meint: die beiden sind feste Daten und sagen, wie lange es den
+          Vertrag gab, das Fenster wiederholt sich jedes Jahr. */}
+      <div style={{ marginTop: "var(--sp-3)" }}>
+        <FormField label={t("vertraege.regel.fenster")} hint={t("vertraege.regel.fensterHinweis")}>
+          <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("vertraege.regel.fensterMonat")}</span>
+              <input className="field" inputMode="numeric" style={{ width: 64 }}
+                aria-label={t("vertraege.regel.fensterMonatVon")} placeholder="1"
+                value={f.monatVonText} onChange={(e) => setze("monatVonText", e.target.value)} />
+              <span className="muted">–</span>
+              <input className="field" inputMode="numeric" style={{ width: 64 }}
+                aria-label={t("vertraege.regel.fensterMonatBis")} placeholder="12"
+                value={f.monatBisText} onChange={(e) => setze("monatBisText", e.target.value)} />
+            </div>
+            <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("vertraege.regel.fensterTag")}</span>
+              <input className="field" inputMode="numeric" style={{ width: 64 }}
+                aria-label={t("vertraege.regel.fensterTagVon")} placeholder="1"
+                value={f.tagVonText} onChange={(e) => setze("tagVonText", e.target.value)} />
+              <span className="muted">–</span>
+              <input className="field" inputMode="numeric" style={{ width: 64 }}
+                aria-label={t("vertraege.regel.fensterTagBis")} placeholder="31"
+                value={f.tagBisText} onChange={(e) => setze("tagBisText", e.target.value)} />
+            </div>
+          </div>
+        </FormField>
+      </div>
+
       {/* Die Spanne an das anpassen, was tatsaechlich da ist. Die Betragsstufe ist die,
           an der eine Regel am haeufigsten zu viel wegnimmt: `standardErkennung` leitet
           sie aus EINEM Betrag ab, was fuer eine feste Rate stimmt und fuer alles
@@ -422,11 +523,28 @@ export function ErkennungsBereich({
           </div>
         )}
 
+        {/* Der VERWENDUNGSZWECK steht mit in der Zeile, und das ist kein Beiwerk: seit es
+            die Merkmalsart gibt, baut man Regeln auf ihn — und die Maske, in der man das
+            tut, zeigte ihn nirgends. Wer zwei Vertraege beim selben Einzieher trennen
+            will, braucht genau diesen Text, um die Vertragsnummer darin zu finden. Er
+            steht klein unter dem Empfaenger statt in einer eigenen Spalte: er ist lang,
+            und eine Spalte davon waere entweder abgeschnitten oder die ganze Zeile. */}
         {treffer.slice(0, VORSCHAU_ZEILEN).map((s) => (
           <div key={s.id} style={{ display: "flex", gap: "var(--sp-3)", padding: "4px 0", alignItems: "baseline", fontSize: 13, borderBottom: "1px solid var(--line-soft)" }}>
             <span style={{ flex: "0 0 92px", color: "var(--ink-3)" }}>{s.datum}</span>
-            <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {s.gegenpartei || <span className="muted">—</span>}
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {s.gegenpartei || <span className="muted">—</span>}
+              </span>
+              {s.verwendungszweck && (
+                <span
+                  className="muted"
+                  title={s.verwendungszweck}
+                  style={{ display: "block", fontSize: "var(--fs-xs)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                >
+                  {s.verwendungszweck}
+                </span>
+              )}
             </span>
             <span style={{ flex: "0 0 auto", fontWeight: "var(--fw-semi)" }}>{geld.format(s.betrag)}</span>
           </div>

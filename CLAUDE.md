@@ -440,6 +440,57 @@ weg: über den Tiefstand und den Tag hinaus, die schon in der Zeile stehen, verr
 nichts. Deshalb gibt `liquiditaetsvorschau` auch nur den BEFUND heraus und nicht den
 Tagesverlauf: was niemand anzeigt, muss auch niemand mitschleppen.
 
+#### Ein Merkmal kann MUSS sein, und die Regel hat ein Fälligkeitsfenster
+
+Die Merkmale einer `Vertragserkennung` waren bis 2026-09-13 ausnahmslos ODER-verknüpft:
+ein Treffer genügte. Das hat einen guten Grund — derselbe Anbieter steht mal als
+„Vibora GmbH", mal als „VIBORA KD" im Auszug, und beide Schreibweisen sollen greifen.
+
+**Zwei Verträge beim selben Einzieher waren damit nicht zu trennen.** Zwei Kfz-Policen
+derselben Versicherung tragen dieselbe Gläubiger-ID und denselben Namen; unterschieden
+sind sie nur an der Policennummer im Verwendungszweck. Die Merkmalsart dafür gibt es seit
+jeher — sie half trotzdem nicht: als weiteres ODER-Merkmal eingetragen verengte sie die
+Regel nicht, sie **erweiterte** sie. Beide Verträge trafen beide Zahlungen, und
+`besser` entschied das Gleichstandsduell alphabetisch nach Vertrags-Id. Deterministisch,
+und deterministisch falsch.
+
+Zwei Mittel stehen jetzt daneben, und sie beantworten verschiedene Fragen:
+
+- **`pflicht` am einzelnen Merkmal.** Alle Pflichtmerkmale müssen treffen, von den übrigen
+  genügt eines. Das UND sitzt damit am Merkmal und nicht an der Regel: ein globaler
+  Schalter „alles muss treffen" hätte die Schreibweisenliste erschlagen, für die es das
+  ODER überhaupt gibt. Ohne Flag verhält sich jede bestehende Regel unverändert — es steht
+  im JSON von `vertrag_erkennung.schluessel` und brauchte deshalb **keine Migration**.
+- **Das Fälligkeitsfenster** (`monat_von`/`monat_bis`, `tag_von`/`tag_bis`, Migration 72).
+  Es ist ausdrücklich etwas anderes als `gueltig_ab`/`gueltig_bis`: die beiden sind feste
+  Kalenderdaten und sagen, wie lange es den Vertrag GAB, das Fenster wiederholt sich jedes
+  Jahr bzw. jeden Monat. Es trennt dieselben zwei Policen über den Termin — nötig, weil
+  manche Institute im Verwendungszweck gar nichts Unterscheidendes liefern.
+
+Drei Dinge darin, die man kennen muss:
+
+- **Zwei Paare und nicht eines.** Eine Jahrespolice wird im Monat fällig, ein Abo am Tag im
+  Monat. Ein einziges Feld hätte die zweite Form nicht ausdrücken können, und ein Format,
+  das sich selbst auslegt („03-01" ist ein Datum, „01" ein Tag), wäre beim Lesen nicht mehr
+  zu entscheiden.
+- **Beide Paare wickeln um**, `von` größer als `bis` meint über die Grenze hinweg. Ohne das
+  wäre jeder Vertrag mit Fälligkeit um den Jahreswechsel nicht abbildbar.
+- **Ein halbes Fenster gilt nicht.** „ab März" ohne Ende ist bei einer Größe, die im Kreis
+  läuft, nicht zu deuten — es hiesse entweder „März bis Dezember" oder „März bis Februar",
+  und beides wäre eine Vermutung. Fehlt eine Grenze, greift das Fenster gar nicht.
+
+Die Vorrangregel in `besser` hat dafür eine neue erste Stufe bekommen: **mehr erfüllte
+Pflichtmerkmale gewinnt.** Beide Regeln passen an dieser Stelle ja bereits, ihre Pflichten
+sind also alle erfüllt — wer mehr davon gestellt hat, hat mehr verlangt und mehr bekommen.
+Eine alte, breite Regel verliert damit gegen eine neu verengte, ohne dass die Vertrags-Id
+mitredet.
+
+**Und die Vorschau zeigt seither den Verwendungszweck.** Sie tat es nicht, solange man
+Regeln nur auf Empfänger und Gläubiger-ID baute; seit man sie auf den Zweck baut, ist
+seine Abwesenheit der Fehler: man stellt eine Regel auf ein Feld, das die Maske, in der man
+das tut, nirgends anzeigt. Dieselbe Lücke steht noch im Kontoauszug — er **durchsucht** den
+Zweck (`KontenScreen`), zeigt ihn aber nicht.
+
 #### Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
 
 Ein gewöhnlicher Vertrag hängt an einem Namen: `vertrag_erkennung` normalisiert die

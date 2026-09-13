@@ -2079,4 +2079,31 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_zahlung ON umsatz_roh (zahlung_id)`,
     ],
   },
+  {
+    version: 72, // Das Faelligkeitsfenster einer Erkennungsregel
+    sql: [
+      // Vier Spalten fuer zwei Fenster, die sich WIEDERHOLEN — im Gegensatz zu
+      // `gueltig_ab`/`gueltig_bis` daneben, die feste Kalenderdaten sind und sagen, wie
+      // lange es den Vertrag gab.
+      //
+      // Der Fall, der sie erzwungen hat: zwei Kfz-Policen bei derselben Versicherung.
+      // Gleiche Glaeubiger-ID, gleicher Empfaengername — zu unterscheiden sind sie nur an
+      // der Versicherungsnummer im Verwendungszweck und am Faelligkeitstermin. Das erste
+      // leistet das Pflichtflag am Merkmal (es steht im JSON von `schluessel` und brauchte
+      // deshalb keine Spalte), das zweite diese hier.
+      //
+      // Zwei Paare und nicht eines: eine Jahrespolice wird im Monat faellig, ein Abo am
+      // Tag im Monat. Ein einziges Feld haette die zweite Form nicht ausdruecken koennen.
+      // Beide wickeln um (von > bis meint ueber die Grenze hinweg) — das ist Sache des
+      // Kerns, das Schema haelt nur die Zahlen.
+      //
+      // Nullable ohne Vorgabe, weil „nicht gesetzt" hier eine eigene Aussage ist: kein
+      // Fenster heisst „egal", und das ist etwas anderes als ein Fenster, das das ganze
+      // Jahr umfasst. Eine 1..12-Vorgabe haette den Unterschied eingeebnet.
+      `ALTER TABLE vertrag_erkennung ADD COLUMN monat_von INTEGER`,
+      `ALTER TABLE vertrag_erkennung ADD COLUMN monat_bis INTEGER`,
+      `ALTER TABLE vertrag_erkennung ADD COLUMN tag_von INTEGER`,
+      `ALTER TABLE vertrag_erkennung ADD COLUMN tag_bis INTEGER`,
+    ],
+  },
 ];
