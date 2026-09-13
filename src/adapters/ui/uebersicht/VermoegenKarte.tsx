@@ -5,6 +5,10 @@
 // Konten; diese Liste beantwortet „was ist insgesamt da". Zwei Fragen, zwei Orte —
 // zusammengelegt wäre keine von beiden mehr sauber zu beantworten.
 //
+// Ihr Nachbar ist seit 2026-09-13 die Depotkarte, und das ist kein Zufall der Optik:
+// beide zeigen einen STAND zum Stichtag, beide gehen in keine Monatsrechnung ein. Was am
+// Monat hängt (Budgets, Vorschau), steht eine Zeile höher.
+//
 // Nach KLASSE und nicht nach Gruppe: die Klasse ist die Rechenregel (jedes Konto hat
 // genau eine, die Summen addieren sich zum Ganzen), die Gruppe ist eine frei
 // zusammengestellte Sicht, in der dasselbe Konto mehrfach liegen darf. Über Gruppen
