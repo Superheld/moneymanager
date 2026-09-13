@@ -290,3 +290,47 @@ describe("Erkennungsbefund", () => {
 // Funktion. Sie muss dieselbe Regel anwenden, mit der die Vorschlagsliste bereits
 // erfasste Verträge ausblendet — sonst gälte eine Buchung als vertragsgebunden und
 // derselbe Anbieter stünde weiter als Vorschlag daneben.
+
+describe("der gemeinsame Verwendungszweck", () => {
+  /** Eine Reihe mit Zwecken — sonst wie `reihe`. */
+  function mitZweck(name: string, zwecke: string[]): Zahlungsspur[] {
+    return reihe({ name, betrag: 3300, n: zwecke.length, tage: 30 }).map((s, i) => ({
+      ...s,
+      verwendungszweck: zwecke[i],
+    }));
+  }
+
+  it("kürzt den gemeinsamen Anfang auf ein ganzes Wort", () => {
+    // „Beitrag 4711" und „Beitrag 4712" beginnen zeichenweise mit „Beitrag 471" — die
+    // letzte Ziffer ist ein Zufall der Nummernfolge. Als Muster übernommen fiele die
+    // nächste Nummer heraus, ohne dass jemand den Grund sähe.
+    const k = vertragskandidaten(
+      mitZweck("Terhoven", ["Beitrag 4711", "Beitrag 4712", "Beitrag 4713"]),
+      HEUTE,
+    );
+    expect(k[0].befund.zweckAnfang).toBe("Beitrag");
+  });
+
+  it("behält den ganzen Text, wenn alle Zwecke gleich sind", () => {
+    const k = vertragskandidaten(
+      mitZweck("Terhoven", ["Police 88 Rate", "Police 88 Rate", "Police 88 Rate"]),
+      HEUTE,
+    );
+    expect(k[0].befund.zweckAnfang).toBe("Police 88 Rate");
+  });
+
+  it("meldet nichts, sobald eine einzige Zahlung ohne Zweck dabei ist", () => {
+    // Die Lücke ist selbst die Auskunft: auf dieses Feld ist bei diesem Vertrag kein
+    // Verlass, und eine Regel darauf zu bauen bräche beim nächsten Abruf.
+    const k = vertragskandidaten(mitZweck("Terhoven", ["Beitrag 4711", "", "Beitrag 4713"]), HEUTE);
+    expect(k[0].befund.zweckAnfang).toBeUndefined();
+  });
+
+  it("meldet nichts bei einer zufälligen Übereinstimmung von zwei Zeichen", () => {
+    const k = vertragskandidaten(
+      mitZweck("Terhoven", ["Re 4711 Januar", "Re 8820 Februar", "Re 9931 Maerz"]),
+      HEUTE,
+    );
+    expect(k[0].befund.zweckAnfang).toBeUndefined();
+  });
+});

@@ -20,6 +20,7 @@ import { tageBis } from "../basis/datum";
 import type { Rhythmus } from "../basis/zahlungsregel";
 import { anbieterSchluessel } from "../basis/gegenpartei";
 import type { Zahlungsspur } from "../buchung/zahlungsspur";
+import { regelvorlageAus, type Regelvorlage } from "./regelvorlage";
 
 
 /**
@@ -53,6 +54,19 @@ export interface Erkennungsbefund {
   /** Tage seit der letzten Zahlung und die Grenze, ab der der Vertrag als beendet gilt. */
   readonly letzteVorTagen: number;
   readonly beendetAbTagen: number;
+  /**
+   * Womit JEDE Zahlung der Gruppe ihren Verwendungszweck beginnt — oder nichts.
+   *
+   * Reine AUSKUNFT und bewusst kein Merkmal. Der Zweck ist die einzige Stelle, an der zwei
+   * Verträge beim selben Einzieher auseinandergehen (zwei Policen derselben Versicherung),
+   * und bis hierher war er in der Begründung eines Vorschlags nirgends zu sehen: man
+   * entschied über eine Regel, ohne das Feld zu kennen, auf dem sie am ehesten trennen
+   * könnte. Warum daraus trotzdem nicht automatisch ein Merkmal wird, steht bei
+   * `MERKMALSARTEN` — als ODER-Merkmal erweiterte es die Regel, als Pflichtmerkmal bräche
+   * es sie, sobald eine Quelle den Zweck einmal nicht liefert. Beides ist eine
+   * Entscheidung, die jemand treffen muss, nachdem er den Text gesehen hat.
+   */
+  readonly zweckAnfang?: string;
 }
 
 export interface Vertragskandidat {
@@ -94,6 +108,16 @@ export interface Vertragskandidat {
   readonly buchungIds: readonly string[];
   /** Womit dieser Kandidat durch die Prüfungen kam — für die Anzeige „woran erkannt?". */
   readonly befund: Erkennungsbefund;
+  /**
+   * Was die Gruppe über die REGEL des künftigen Vertrags sagt — Betragsgrenzen und
+   * Fälligkeitsfenster, fertig zum Übernehmen (siehe `regelvorlage`).
+   *
+   * Sie steht neben dem Befund und nicht darin, weil die beiden verschiedene Fragen
+   * beantworten: der Befund begründet den VORSCHLAG und wird gelesen, die Vorlage
+   * beliefert die REGEL und wird übernommen. In einem Topf hätte jede Zahl beides sein
+   * müssen, und die erste, die nur eines von beidem kann, hätte die Trennung erzwungen.
+   */
+  readonly vorlage: Regelvorlage;
 }
 
 export interface ErkennungsOptionen {
@@ -302,8 +326,48 @@ function auswerten(
       betraegeGesamt: betraege.length,
       letzteVorTagen,
       beendetAbTagen,
+      zweckAnfang: gemeinsamerZweck(sortiert),
     },
+    vorlage: regelvorlageAus(termine, betraege, rhythmus),
   };
+}
+
+/**
+ * Die Mindestlänge, ab der ein gemeinsamer Zweck-Anfang etwas aussagt.
+ *
+ * Kürzere Übereinstimmungen sind Zufall: „Re" am Anfang zweier Verwendungszwecke bedeutet
+ * nichts, und als Vorschlag angeboten würde es zu einer Regel führen, die zu viel fängt.
+ */
+export const MIN_ZWECK_ANFANG = 4;
+
+/**
+ * Der längste Text, mit dem ALLE Zwecke der Gruppe beginnen — auf ein ganzes Wort gekürzt.
+ *
+ * Das Kürzen ist der Teil, der zählt. Zwei Zwecke „Rechnung 4711" und „Rechnung 4712"
+ * haben den gemeinsamen Anfang „Rechnung 471" — die letzte Ziffer ist ein Zufall der
+ * Nummernfolge und keine Eigenschaft des Vertrags. Als Muster übernommen fiele die erste
+ * Rechnung 4720 heraus, und niemand wüsste warum. Sind alle Zwecke gleich, gibt es nichts
+ * abzuschneiden; dann bleibt der ganze Text stehen.
+ *
+ * Nichts, sobald eine einzige Zahlung ohne Zweck dabei ist: ein Anfang, den nicht alle
+ * teilen, ist keiner — und die Lücke ist selbst die Auskunft, dass auf dieses Feld hier
+ * kein Verlass ist.
+ */
+function gemeinsamerZweck(gruppe: Zahlungsspur[]): string | undefined {
+  const zwecke = gruppe.map((s) => s.verwendungszweck?.trim() ?? "");
+  if (zwecke.length === 0 || zwecke.some((z) => !z)) return undefined;
+
+  let anfang = zwecke[0];
+  for (const z of zwecke) {
+    let i = 0;
+    while (i < anfang.length && i < z.length && anfang[i] === z[i]) i++;
+    anfang = anfang.slice(0, i);
+  }
+  // Nur kürzen, wenn überhaupt etwas dahinter abweicht — sonst wäre der vollständige,
+  // überall gleiche Zweck um sein letztes Wort gebracht.
+  if (zwecke.some((z) => z.length > anfang.length)) anfang = anfang.replace(/\s*\S*$/, "");
+  anfang = anfang.trim();
+  return anfang.length >= MIN_ZWECK_ANFANG ? anfang : undefined;
 }
 
 /**

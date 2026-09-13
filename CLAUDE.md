@@ -607,11 +607,79 @@ sind also alle erfüllt — wer mehr davon gestellt hat, hat mehr verlangt und m
 Eine alte, breite Regel verliert damit gegen eine neu verengte, ohne dass die Vertrags-Id
 mitredet.
 
+**Seit 2026-09-13 belegt ein übernommener Vorschlag das Fenster vor.** Die Lupe am
+Vorschlag misst Termine und Beträge und zeigte sie an; die Regel, die daraus entstand,
+kannte nur Name und Median-Betrag — man las sieben gemessene Werte und bekam zwei davon.
+Übersetzt wird in `core/vertraege/regelvorlage.ts`, und drei Entscheidungen darin sind
+keine Rechenschritte:
+
+- **Der Tag gilt für jeden Takt, der Monat nur für den JÄHRLICHEN.** Ein Fenster ist EIN
+  zusammenhängender Zeitraum; die vier Termine eines quartalsweisen Vertrags liegen über
+  das Jahr verstreut, und das engste Fenster, das sie alle fasst, umspannte zehn Monate.
+  Es stünde da und schränkte nichts ein.
+- **Gerechnet wird auf dem KREIS, nicht auf der Geraden.** Wer am Monatsletzten abbucht,
+  trägt Tage aus beiden Hälften; als Spanne von Kleinstem zu Größtem wäre das „1 bis 31".
+  Gefunden wird das Fenster über die größte Lücke. Was samt Puffer mehr als die Hälfte des
+  Kreises fasst, entsteht gar nicht erst.
+- **Die Betragsspanne wird GEWEITET, nie verengt.** Die abgeleitete Spanne (0,6× bis 1,8×)
+  hält fremde Zahlungen an denselben Empfänger draußen, und das bleibt ihre Aufgabe. Was
+  die Messung beiträgt, ist der umgekehrte Fall: die Nachzahlung, die über 1,8× lag und
+  bisher aus der eigenen Regel fiel. Eine zu enge Spanne ist der teurere der beiden
+  Fehler — was sie wegschneidet, fehlt still, während eine zu weite Spanne eine fremde
+  Zahlung in die Trefferliste des Dialogs holt, wo man sie sieht.
+
+**Der Erkennungsabschnitt steht seither auch beim ANLEGEN.** Vorher erschien er erst beim
+Bearbeiten, mit der Begründung, ein Vertrag ohne Id habe keinen Ort für eine Regel. Das
+stimmt fürs Speichern und nicht fürs Anzeigen — die Vorschau fragt nur, welche Zahlungen
+die Merkmale treffen. Wer einen Vertrag von Hand erfasste, bekam bis dahin eine Regel
+zugeschrieben, ohne sie je zu sehen, und kam erst nach Speichern und erneutem Öffnen an
+sie heran. Die Vorbelegung (`erkennungsentwurf`) folgt dabei den Stammdaten, **solange
+niemand den Abschnitt angefasst hat**: dasselbe Muster wie bei der Richtung im
+Buchungsdialog — die Ableitung gilt bis zur ersten eigenen Wahl, danach nie wieder.
+
+**Der gemeinsame Verwendungszweck steht in der Lupe, wird aber KEIN Merkmal.** Womit alle
+Zahlungen einer Gruppe beginnen, ist die Angabe, an der zwei Verträge beim selben
+Einzieher auseinandergehen — als automatisches Merkmal wäre es trotzdem falsch: ohne
+`pflicht` erweitert es die Regel (genau der Fehler, den das Flag behebt), mit `pflicht`
+bricht sie, sobald eine Quelle den Zweck einmal nicht liefert. Angezeigt wird er deshalb
+als Auskunft, eingetragen wird er von Hand. Dass eine Zahlung ohne Zweck die Auskunft
+ganz entfallen lässt, ist selbst die Aussage: auf dieses Feld ist bei diesem Vertrag kein
+Verlass.
+
 **Und die Vorschau zeigt seither den Verwendungszweck.** Sie tat es nicht, solange man
 Regeln nur auf Empfänger und Gläubiger-ID baute; seit man sie auf den Zweck baut, ist
 seine Abwesenheit der Fehler: man stellt eine Regel auf ein Feld, das die Maske, in der man
 das tut, nirgends anzeigt. Dieselbe Lücke steht noch im Kontoauszug — er **durchsucht** den
 Zweck (`KontenScreen`), zeigt ihn aber nicht.
+
+#### Die Kategorie des Vertrags rückwirkend auf seine Zahlungen
+
+Seit 2026-09-13 gibt es im Vertragsdialog einen Haken dafür
+(`application/vertraege/vertragskategorie.ts`). Der Anlass: die Erkennung ordnet einem
+frisch erfassten Vertrag seine Zahlungen von Jahren zurück zu, und die behalten die
+Kategorie, die sie damals bekamen — die Zuordnung sagt „gehört zu diesem Vertrag", die
+Kategorie daneben widerspricht ihr.
+
+**Es passiert nicht von selbst, und das ist die eigentliche Entscheidung.** Eine
+Vertragszuordnung ist eine Aussage über die ZUGEHÖRIGKEIT; daraus automatisch die Kategorie
+umzuschreiben machte aus `zuordnungenAbgleichen` — das bei jedem Öffnen des Bereichs läuft
+— eine Massenänderung an gebuchten Daten. Wer eine Zahlung bewusst anders einsortiert hat,
+verlöre das beim nächsten Hinsehen.
+
+Drei Dinge, die daran hängen:
+
+- **Mit Haken überschreibt es AUCH Handarbeit.** Das ist kein Versehen, sondern der Anlass:
+  „ich habe das damals falsch einsortiert, der Vertrag weiß es besser". Ein Schutz der
+  Handarbeit wäre hier ein Schutz gegen die Handlung, die gerade ausgelöst wurde. Der Haken
+  ist bei jedem Öffnen wieder aus.
+- **Eine GETEILTE Buchung bleibt stehen.** Bei einer Aufteilung stehen die Kategorien in
+  den Teilen; die Kopfkategorie umzuschreiben ließe die Teile stehen und erzeugte einen
+  Widerspruch, den die Budgetrechnung je nach Weg verschieden auflöst.
+- **Geschrieben wird über `buchungenSammelbearbeiten`**, nicht über eine eigene Schleife:
+  dort steht schon, was zu einer Kategorieänderung gehört — Herkunft auf `manuell` (sonst
+  holt die Kategorie-Automatik den alten Wert zurück), Charakter folgt der Kategorie,
+  Umbuchungs-Bein bleibt unberührt. Damit kommt auch der Journaleintrag mit, den
+  `ledger.speichern` schreibt.
 
 #### Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
 

@@ -12,6 +12,7 @@ import type {
   Vertragsart,
   Vertragsstatus,
   Zahlungsregel,
+  Regelvorlage,
 } from "../../core";
 import type {
   VertragRepository,
@@ -66,6 +67,17 @@ export interface VertragEingabe {
    * Normalisierung mit Unschärfe bleibt.
    */
   glaeubigerId?: string;
+  /**
+   * Was an einer erkannten Zahlungsreihe GEMESSEN wurde — Betragsgrenzen und
+   * Fälligkeitsfenster (siehe `core/regelvorlage`). Kommt aus einem übernommenen
+   * Vorschlag und landet wie die Gläubiger-ID nicht am Vertrag, sondern in seiner
+   * Erkennungsregel.
+   *
+   * Optional, und fehlend heisst „nichts beobachtet": ein von Hand erfasster Vertrag hat
+   * keine Reihe hinter sich, und dann gilt allein, was sich aus seinem Betrag ableiten
+   * lässt. Die Vorlage ERWEITERT damit die Standardregel, sie ersetzt sie nicht.
+   */
+  vorlage?: Regelvorlage;
 }
 
 export interface VertragErgebnis {
@@ -129,6 +141,7 @@ export async function vertragAnlegen(
       anbieter,
       eingabe.betrag,
       eingabe.glaeubigerId,
+      eingabe.vorlage,
     );
   }
   return { vertrag, regel };
@@ -192,6 +205,7 @@ export async function vertragAktualisieren(
       anbieter,
       eingabe.betrag,
       eingabe.glaeubigerId,
+      eingabe.vorlage,
     );
   }
   return { vertrag, regel };

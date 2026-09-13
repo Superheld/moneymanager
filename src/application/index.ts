@@ -147,6 +147,8 @@ export {
   type Vertragskennzahlen,
   type VertragsichtDeps,
   erkennungProbieren,
+  erkennungsentwurf,
+  ENTWURF_VERTRAG_ID,
   type Erkennungsprobe,
   merkmaleVorschlagen,
   type Merkmalsvorschlag,
@@ -158,6 +160,11 @@ export {
   type VertragEingabe,
   type VertragErgebnis,
 } from "./vertraege/vertragAnlegen";
+export {
+  vertragskategorieUebertragen,
+  type UebertragungErgebnis,
+  type VertragskategorieDeps,
+} from "./vertraege/vertragskategorie";
 export { zahlungsspuren } from "./buchung/zahlungsspuren";
 export {
   historieLaden,
