@@ -137,6 +137,66 @@ describe("EinstellungenScreen — Stammdaten", () => {
     );
   });
 
+  it("nennt beim Löschen die Sperre, statt einen Datenbankfehler zu zeigen", async () => {
+    // **Der ursprüngliche Fehler, als Testfall über die ganze Oberfläche.** Vorher stand
+    // hier „error returned from database: (code: 787) FOREIGN KEY constraint failed" — und
+    // der Folgensatz daneben behauptete, es lägen Buchungen im Weg, obwohl es auch ohne eine
+    // einzige gesperrt sein kann.
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "b1", datum: "2026-05-04", betrag: -1200, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell",
+    });
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+    await nutzer.click(await screen.findByLabelText(i18n.t("einstellungen.loeschen")));
+
+    // Die Zahl steht in der Frage, nicht der Fremdschlüssel.
+    await waitFor(() =>
+      expect(document.body.textContent).toMatch(i18n.t("konten.loeschsperreBuchungen", { count: 1 })),
+    );
+    expect(document.body.textContent).not.toMatch(/FOREIGN KEY/);
+  });
+
+  it("löscht ein stillgelegtes Konto endgültig, samt Buchung und Beleg", async () => {
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "b1", datum: "2026-05-04", betrag: -1200, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell",
+    });
+    await sqliteZahlungskontoRepository.aktivSetzen("k1", false);
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+
+    await nutzer.click(await screen.findByLabelText(i18n.t("konten.endgueltigLoeschen")));
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("loeschen.bestaetigen")));
+    await nutzer.click(await screen.findByText(i18n.t("loeschen.bestaetigen")));
+
+    await waitFor(async () => expect(await sqliteZahlungskontoRepository.alle()).toEqual([]));
+    expect(await sqliteLedgerRepository.alle()).toEqual([]);
+  });
+
+  it("bietet das endgültige Löschen an einem GEFÜHRTEN Konto nicht an", async () => {
+    // Die Bedingung ist der Kern des Entwurfs — und sie muss in der Oberfläche stehen, nicht
+    // nur im Use-Case: ein Knopf, der beim Klick abweist, ist schlechter als keiner.
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
+
+    expect(screen.queryByLabelText(i18n.t("konten.endgueltigLoeschen"))).toBeNull();
+  });
+
   it("legt eine Person über das Formular an", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);

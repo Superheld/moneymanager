@@ -263,6 +263,14 @@ export {
   type GruppenDeps,
 } from "./konten/gruppen";
 export {
+  kontoloeschungPruefen,
+  kontoVollstaendigLoeschen,
+  istLoeschbar,
+  type Kontoloeschung,
+  type KontoentfernenPort,
+  type KontoentfernenDeps,
+} from "./konten/kontoentfernen";
+export {
   stammdatenLaden,
   type Stammdaten,
   type StammdatenDeps,
