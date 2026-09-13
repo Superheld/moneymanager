@@ -43,9 +43,17 @@ interface Zeile {
 // sehen, hat kein Protokoll, sondern eine Aufgabe.
 
 /** Der Zustand einer Buchung samt Aufteilungen — so, wie er in der Datenbank steht. */
-type Stand = Record<string, unknown>;
+export type Stand = Record<string, unknown>;
 
-async function standLesen(
+/**
+ * **Exportiert, weil `sqliteKontoentfernen` dasselbe braucht.** Das Journal hat genau einen
+ * Schreibweg, und der soll einer bleiben: wer Buchungen löscht, muss ihren Stand so
+ * festhalten, wie es `loeschen` hier tut — bis auf das letzte Feld und mit derselben
+ * Sortierung, sonst stünden im Protokoll zwei Formen desselben Eintrags und der Vergleich
+ * „hat sich etwas geändert" liefe auseinander. Die Alternative wäre eine zweite, nachgebaute
+ * Fassung, und genau die driftet.
+ */
+export async function standLesen(
   db: Awaited<ReturnType<typeof getDb>>,
   id: string,
 ): Promise<Stand | null> {
@@ -129,7 +137,11 @@ function alsText(stand: Stand): string {
  * Tatsache über das Geld, und ein Protokoll, das jeden Klick festhält, wird zu Rauschen,
  * in dem die echten Änderungen untergehen.
  */
-function journalAnweisung(id: string, vorher: Stand | null, nachher: Stand | null): Anweisung[] {
+export function journalAnweisung(
+  id: string,
+  vorher: Stand | null,
+  nachher: Stand | null,
+): Anweisung[] {
   const a = vorher ? alsText(vorher) : null;
   const b = nachher ? alsText(nachher) : null;
   if (a === b) return [];

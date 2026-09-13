@@ -79,7 +79,7 @@ function quellen(teil: {
   return {
     ledger: { alle: async () => teil.buchungen ?? [], ...nichts } as LedgerPort,
     umsaetze: { alle: async () => teil.umsaetze ?? [] } as UmsatzRepository,
-    konten: { alle: async () => teil.konten ?? [], ...nichts } as ZahlungskontoRepository,
+    konten: { alle: async () => teil.konten ?? [], aktivSetzen: async () => {}, ...nichts } as ZahlungskontoRepository,
     personen: { alle: async () => teil.personen ?? [], ...nichts } as PersonRepository,
     vertraege: { alle: async () => teil.vertraege ?? [], ...nichts } as VertragRepository,
     vertragszuordnungen: {

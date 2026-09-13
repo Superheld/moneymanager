@@ -29,6 +29,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  istAktiv,
+  waehlbareKonten,
   istGeteilt,
   type Buchungshistorie,
   type Charakter,
@@ -370,7 +372,11 @@ function BuchungFormular({
    * gar nicht — beide Seiten meldet die Bank ohnehin, sie stehen als Gegenbuchung in der
    * Liste darüber und werden VERBUNDEN statt erzeugt.
    */
-  const andereKonten = konten.filter((k) => k.id !== kontoId && !onlineKonten.has(k.id));
+  // Ein stillgelegtes Konto kommt nicht in Frage, und hier ohne Ausnahme: es wird ein
+  // NEUES Bein erzeugt, es steht also nichts schon dran, das man stehenlassen müsste.
+  const andereKonten = konten.filter(
+    (k) => k.id !== kontoId && !onlineKonten.has(k.id) && istAktiv(k),
+  );
 
   // ── Gegenbein-Suche im Entwurf ──────────────────────────────────────────────────────
   //
@@ -651,7 +657,7 @@ function BuchungFormular({
             wert={kontoId}
             deaktiviert={gepaart}
             aufAenderung={setKontoId}
-            optionen={konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+            optionen={waehlbareKonten(konten, kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))}
           />
         </FormField>
         {/* Tag und Betrag der Bank sind Tatsachen, keine Eingabe — im Entwurf stehen sie

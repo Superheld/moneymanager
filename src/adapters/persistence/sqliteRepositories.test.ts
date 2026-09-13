@@ -144,6 +144,48 @@ describe("Stammdaten-Repositories", () => {
     expect(k.klasse).toBe("vorsorge");
   });
 
+  it("führt ein neu gespeichertes Konto als aktiv", async () => {
+    // Die Spaltenvorgabe, von oben gelesen. `speichern` schickt das Feld gar nicht mit —
+    // ein neues Konto muss trotzdem geführt dastehen, sonst wäre jedes angelegte Konto
+    // sofort stillgelegt.
+    await zahlungskontoRepository.speichern({
+      id: "ka", bezeichnung: "Neu", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    const k = (await zahlungskontoRepository.alle()).find((x) => x.id === "ka")!;
+    expect(k.aktiv).toBe(true);
+  });
+
+  it("legt still und nimmt wieder auf", async () => {
+    await zahlungskontoRepository.speichern({
+      id: "kb", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await zahlungskontoRepository.aktivSetzen("kb", false);
+    const still = (await zahlungskontoRepository.alle()).find((x) => x.id === "kb")!;
+    expect(still.aktiv).toBe(false);
+
+    await zahlungskontoRepository.aktivSetzen("kb", true);
+    const wieder = (await zahlungskontoRepository.alle()).find((x) => x.id === "kb")!;
+    expect(wieder.aktiv).toBe(true);
+  });
+
+  it("macht ein stillgelegtes Konto durch Bearbeiten NICHT wieder aktiv", async () => {
+    // Der Fall, wegen dem `aktiv` einen eigenen Schreibweg hat. `kontoAnlegen` dient auch
+    // dem BEARBEITEN (mit `id`, über das ON CONFLICT) und baut ein Konto ohne dieses Feld;
+    // stünde `aktiv` in der UPDATE-Klausel, holte jedes Umbenennen das Konto still zurück
+    // in die Gegenwart — und niemand sähe der Aufrufstelle an, dass es passiert.
+    await zahlungskontoRepository.speichern({
+      id: "kc", bezeichnung: "Alt", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await zahlungskontoRepository.aktivSetzen("kc", false);
+    await zahlungskontoRepository.speichern({
+      id: "kc", bezeichnung: "Umbenannt", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 500,
+    });
+    const k = (await zahlungskontoRepository.alle()).find((x) => x.id === "kc")!;
+    expect(k.bezeichnung).toBe("Umbenannt");
+    expect(k.saldo).toBe(500);
+    expect(k.aktiv).toBe(false);
+  });
+
   it("speichert eine Kategorie mit Elternbezug", async () => {
     await kategorieRepository.speichern({
       id: "k-eltern",

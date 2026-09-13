@@ -9,7 +9,9 @@ import { describe, expect, it } from "vitest";
 import {
   KONTOKLASSEN,
   KONTOTYPEN,
+  istAktiv,
   istLiquide,
+  waehlbareKonten,
   klasseVorschlag,
   liquideMittel,
   type Zahlungskonto,
@@ -77,5 +79,62 @@ describe("liquideMittel", () => {
 
   it("ist ohne Konten null", () => {
     expect(liquideMittel([])).toBe(0);
+  });
+});
+
+describe("Stilllegen", () => {
+  it("hält ein Konto ohne Angabe für geführt", () => {
+    // Fehlend heisst JA — sonst fiele mit der Einführung des Feldes der ganze Altbestand
+    // aus jeder Liste, und die App sähe beim ersten Start danach leer aus.
+    expect(istAktiv(konto())).toBe(true);
+  });
+
+  it("erkennt ein stillgelegtes Konto", () => {
+    expect(istAktiv(konto({ aktiv: false }))).toBe(false);
+  });
+
+  it("hält `aktiv: true` für geführt", () => {
+    expect(istAktiv(konto({ aktiv: true }))).toBe(true);
+  });
+
+  it("lässt ein stillgelegtes Konto in den liquiden Mitteln", () => {
+    // **Die Zusicherung, an der der ganze Entwurf hängt.** `liquideMittel` ist eine
+    // RECHENREGEL über die Kontoklasse; die Stilllegung ist eine SICHT auf die Gegenwart.
+    // Wer sie hier einbaut, nimmt jeder Aufrufstelle die Wahl — und die Aufrufstellen
+    // stellen verschiedene Fragen: „was ist da" zählt ein stillgelegtes Konto mit, „was
+    // kann ich diesen Monat ausgeben" nicht. Gefiltert wird deshalb DORT, an jeder
+    // Aufrufstelle einzeln, nicht in dieser Funktion.
+    expect(liquideMittel([konto({ aktiv: false, saldo: 42_00 })])).toBe(42_00);
+  });
+});
+
+describe("waehlbareKonten", () => {
+  it("bietet ein stillgelegtes Konto nicht an", () => {
+    const liste = waehlbareKonten([konto({ id: "a" }), konto({ id: "b", aktiv: false })]);
+    expect(liste.map((k) => k.id)).toEqual(["a"]);
+  });
+
+  it("lässt das bereits Gewählte drin, auch wenn es stillgelegt ist", () => {
+    // **Der Kern der Sache.** Ohne diese Hälfte fände eine Buchung, die auf einem
+    // stillgelegten Konto liegt, ihr eigenes Konto in der Auswahl nicht mehr: das Feld
+    // stünde leer oder zeigte ein anderes — und beim nächsten Speichern wäre die Buchung
+    // umgezogen, ohne dass jemand es wollte.
+    const liste = waehlbareKonten([konto({ id: "a" }), konto({ id: "b", aktiv: false })], "b");
+    expect(liste.map((k) => k.id)).toEqual(["a", "b"]);
+  });
+
+  it("behält die Reihenfolge, in der die Konten hereinkamen", () => {
+    // Die Liste kommt sortiert aus dem Repository; das Gewählte gehört an seinen Platz und
+    // nicht ans Ende, sonst springt es beim Öffnen einer Maske.
+    const liste = waehlbareKonten(
+      [konto({ id: "a", aktiv: false }), konto({ id: "b" }), konto({ id: "c" })],
+      "a",
+    );
+    expect(liste.map((k) => k.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("ohne Vorauswahl bleibt nur das Geführte", () => {
+    const liste = waehlbareKonten([konto({ id: "a", aktiv: false })], undefined);
+    expect(liste).toEqual([]);
   });
 });

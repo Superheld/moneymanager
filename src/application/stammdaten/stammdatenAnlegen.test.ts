@@ -9,7 +9,10 @@ function memPerson(): PersonRepository & { daten: Person[] } {
 }
 function memKonto(): ZahlungskontoRepository & { daten: Zahlungskonto[] } {
   const daten: Zahlungskonto[] = [];
-  return { daten, async alle() { return [...daten]; }, async speichern(k) { const i = daten.findIndex((x) => x.id === k.id); if (i >= 0) daten[i] = k; else daten.push(k); }, async loeschen(id) { const i = daten.findIndex((x) => x.id === id); if (i >= 0) daten.splice(i, 1); } };
+  // `speichern` laesst `aktiv` stehen und `aktivSetzen` aendert NUR das — genau wie der
+  // SQLite-Weg. Eine Attrappe, die beides vermischte, liesse den Fall durchgehen, gegen
+  // den die Trennung gebaut ist (Bearbeiten macht ein stillgelegtes Konto wieder aktiv).
+  return { daten, async alle() { return [...daten]; }, async speichern(k) { const i = daten.findIndex((x) => x.id === k.id); if (i >= 0) daten[i] = { ...k, aktiv: daten[i].aktiv }; else daten.push(k); }, async aktivSetzen(id, aktiv) { const i = daten.findIndex((x) => x.id === id); if (i >= 0) daten[i] = { ...daten[i], aktiv }; }, async loeschen(id) { const i = daten.findIndex((x) => x.id === id); if (i >= 0) daten.splice(i, 1); } };
 }
 function memKategorie(): KategorieRepository & { daten: Kategorie[] } {
   const daten: Kategorie[] = [];

@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { IstBuchung, Zahlungskonto } from "../../../application";
+import { istAktiv, type IstBuchung, type Zahlungskonto } from "../../../application";
 import type { Umsatz } from "../../../application/import";
 import { paarungsKandidaten, MAX_VORSCHLAG_TAGE } from "../../../application/buchung/umbuchungAusBuchung";
 import { buchungenPaaren, gegenbeinErzeugen } from "../../dienste";
@@ -28,7 +28,11 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
   const kandidaten = useMemo(() => paarungsKandidaten(alleBuchungen, buchung), [alleBuchungen, buchung]);
   // Erzeugt wird nur auf Konten ohne Bankverbindung — siehe `gegenbeinErzeugen`. Die
   // Gegenbuchungen darüber sind davon nicht betroffen: die existieren schon.
-  const andereKonten = konten.filter((k) => k.id !== buchung.kontoId && !onlineKonten.has(k.id));
+  // Wie im Buchungsdialog: hier wird ein Gegenbein ERZEUGT, also kommt kein stillgelegtes
+  // Konto in Frage — es steht nichts schon dran, das man stehenlassen müsste.
+  const andereKonten = konten.filter(
+    (k) => k.id !== buchung.kontoId && !onlineKonten.has(k.id) && istAktiv(k),
+  );
   // Vorauswahl: der beste Kandidat, sonst der Weg über ein neu erzeugtes Gegenbein — den
   // aber nur, wenn es überhaupt ein Konto gibt, auf dem erzeugt werden darf.
   const [wahl, setWahl] = useState<string>(kandidaten[0]?.id ?? (andereKonten.length > 0 ? "__neu" : ""));

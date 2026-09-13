@@ -70,7 +70,14 @@ const de = {
     },
     startdatum: { ungueltig: "Bitte ein gültiges Startdatum angeben." },
     name: { fehlt: "Bitte einen Namen angeben." },
-    konto: { waehlen: "Bitte ein Konto wählen." },
+    konto: {
+      waehlen: "Bitte ein Konto wählen.",
+      fehlt: "Dieses Konto gibt es nicht mehr.",
+      // Kein reiner Fehlertext, sondern der Hinweis auf den Weg: das endgültige Löschen
+      // steht nur an einem stillgelegten Konto, und wer hier landet, hat den ersten
+      // Schritt übersprungen.
+      nichtStillgelegt: "Das Konto wird noch geführt. Endgültig löschen lässt sich nur ein stillgelegtes — leg es erst still.",
+    },
     sammel: { nichtsGewaehlt: "Bitte wählen, was geändert werden soll." },
     datum: { ungueltig: "Bitte ein gültiges Datum angeben." },
     konten: {
@@ -873,6 +880,43 @@ const de = {
     detailVerwerfenFolgen: "Die Bankzeile wird verworfen. Der Beleg bleibt erhalten, und die Zeile lässt sich aus der Inbox erneut verbuchen — der Abruf holt sie nicht noch einmal.",
     zugangLoeschenFolgen: "Die abgerufenen Buchungen bleiben; sie stehen im Konto und hängen nicht am Zugang. Weg ist der Weg zur Bank — für weitere Abrufe muss der Zugang neu eingerichtet werden.",
     kontoLoeschenFolgen: "Ein Konto mit Buchungen lässt sich nicht löschen — die Buchungen müssten zuerst weg. Ohne Buchungen verschwindet nur das Konto selbst.",
+    stillgelegt: "stillgelegt",
+    // Der Mülleimer: was sperrt, beim Namen genannt statt als SQLite-Code. Die Zahlen
+    // kommen aus `kontoloeschung`, und die Teile werden nur aufgenommen, wenn sie zählen —
+    // „0 Buchungen" in einer Begründung liest sich wie ein Fehler im Programm.
+    //
+    // **Die ersten Schlüssel im Bestand mit `_one`/`_other`.** Das ist i18next-Standard und
+    // keine Erfindung; gebraucht wird es hier, weil diese Teile in ganzen Sätzen stehen, in
+    // denen „1 Buchungen" sichtbar falsch ist — anders als bei einem knappen Etikett wie
+    // `vermoegenKonten`. Der i18n-Test vergleicht Blattpfade, beide Formen stehen in beiden
+    // Bundles, die Parität hält also von selbst.
+    loeschsperreBuchungen_one: "eine Buchung",
+    loeschsperreBuchungen_other: "{{count}} Buchungen",
+    loeschsperreBelege_one: "eine importierte Zahlung",
+    loeschsperreBelege_other: "{{count}} importierte Zahlungen",
+    loeschsperreBankverbindung: "eine Bankverbindung",
+    loeschsperre: "Das Konto lässt sich nicht löschen: daran hängen {{was}}. Wer es nicht mehr führt, legt es still — dann bleiben die Buchungen erhalten und das Konto verschwindet aus allem Kommenden. Alles zusammen entfernen geht danach über „Endgültig löschen“.",
+    loeschbar: "An diesem Konto hängt nichts. Es verschwindet, sonst ändert sich nichts.",
+    loeschbarKurz: "das Konto selbst",
+    und: "und",
+    endgueltigLoeschen: "Endgültig löschen",
+    endgueltigFolgen: "Weg sind: {{was}}. Die Buchungen stehen danach in keiner Auswertung mehr; ihr Inhalt bleibt im Journal, die Belege der Bank nicht — sie sind die einzige Stelle, an der diese Zahlungen im Wortlaut der Quelle stehen.",
+    endgueltigFolgenLos: "Ausserdem verlieren ihren Bezug auf dieses Konto: {{was}}. Sie bleiben bestehen und gelten danach ohne Kontoeinschränkung.",
+    endgueltigPaare_one: "Eine Umbuchung auf einem anderen Konto verliert ihre Paarung — die Gegenbuchung selbst bleibt.",
+    endgueltigPaare_other: "{{count}} Umbuchungen auf anderen Konten verlieren ihre Paarung — die Gegenbuchungen selbst bleiben.",
+    endgueltigSicherung: "Die Tagessicherung von heute enthält das Konto noch.",
+    folgenBudgets_one: "ein Budget",
+    folgenBudgets_other: "{{count}} Budgets",
+    folgenRuecklagen_one: "eine Rücklage",
+    folgenRuecklagen_other: "{{count}} Rücklagen",
+    folgenRegeln_one: "eine Zahlungsregel",
+    folgenRegeln_other: "{{count}} Zahlungsregeln",
+    folgenErkennung_one: "eine Erkennungsregel",
+    folgenErkennung_other: "{{count}} Erkennungsregeln",
+    stilllegen: "Stilllegen",
+    wiederaufnehmen: "Wieder aufnehmen",
+    stilllegenHinweis: "Das Konto behält alle seine Buchungen und zählt in der Analyse weiter mit. Es verschwindet nur dort, wo es um das Kommende geht: aus der Auswahl beim Buchen, aus der Liquiditätsvorschau und aus dem Bankabruf.",
+    wiederaufnehmenHinweis: "Das Konto kommt zurück in die Auswahl, in die Vorschau und in den Abruf.",
     merkmale: {
       titel: "Was die Erkennung hier sieht",
       laedt: "rechne …",
@@ -2055,7 +2099,11 @@ const en: typeof de = {
     },
     startdatum: { ungueltig: "Please enter a valid start date." },
     name: { fehlt: "Please enter a name." },
-    konto: { waehlen: "Please select an account." },
+    konto: {
+      waehlen: "Please select an account.",
+      fehlt: "This account no longer exists.",
+      nichtStillgelegt: "This account is still kept. Only a retired account can be deleted permanently — retire it first.",
+    },
     sammel: { nichtsGewaehlt: "Please choose what should change." },
     datum: { ungueltig: "Please enter a valid date." },
     konten: {
@@ -2846,6 +2894,34 @@ const en: typeof de = {
     detailVerwerfenFolgen: "The bank line is discarded. The receipt is kept and the line can be posted again from the inbox — the retrieval will not fetch it a second time.",
     zugangLoeschenFolgen: "The retrieved entries stay; they live in the account and do not hang off the access. What goes is the route to the bank — further retrievals need it set up again.",
     kontoLoeschenFolgen: "An account with entries cannot be deleted — the entries would have to go first. Without any, only the account itself disappears.",
+    stillgelegt: "retired",
+    loeschsperreBuchungen_one: "one entry",
+    loeschsperreBuchungen_other: "{{count}} entries",
+    loeschsperreBelege_one: "one imported payment",
+    loeschsperreBelege_other: "{{count}} imported payments",
+    loeschsperreBankverbindung: "a bank connection",
+    loeschsperre: "This account cannot be deleted: {{was}} still belong to it. If you no longer keep it, retire it — the entries stay and the account disappears from everything ahead. Removing it all is then available via “Delete permanently”.",
+    loeschbar: "Nothing belongs to this account. It disappears, nothing else changes.",
+    loeschbarKurz: "the account itself",
+    und: "and",
+    endgueltigLoeschen: "Delete permanently",
+    endgueltigFolgen: "Gone: {{was}}. The entries will no longer appear in any analysis; their content stays in the journal, the bank receipts do not — they are the only place where these payments exist in the words of their source.",
+    endgueltigFolgenLos: "These also lose their reference to this account: {{was}}. They remain and then apply without an account restriction.",
+    endgueltigPaare_one: "One transfer on another account loses its pairing — the counter entry itself stays.",
+    endgueltigPaare_other: "{{count}} transfers on other accounts lose their pairing — the counter entries themselves stay.",
+    endgueltigSicherung: "Today's daily backup still contains the account.",
+    folgenBudgets_one: "one budget",
+    folgenBudgets_other: "{{count}} budgets",
+    folgenRuecklagen_one: "one reserve",
+    folgenRuecklagen_other: "{{count}} reserves",
+    folgenRegeln_one: "one payment rule",
+    folgenRegeln_other: "{{count}} payment rules",
+    folgenErkennung_one: "one recognition rule",
+    folgenErkennung_other: "{{count}} recognition rules",
+    stilllegen: "Retire",
+    wiederaufnehmen: "Reinstate",
+    stilllegenHinweis: "The account keeps all its entries and still counts in the analysis. It only disappears where the future is concerned: from the account picker, from the liquidity forecast and from bank retrieval.",
+    wiederaufnehmenHinweis: "The account returns to the picker, the forecast and the retrieval.",
     merkmale: {
       titel: "What the recognition sees here",
       laedt: "computing …",

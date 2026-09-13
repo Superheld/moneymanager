@@ -2106,4 +2106,37 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE vertrag_erkennung ADD COLUMN tag_bis INTEGER`,
     ],
   },
+  {
+    version: 73, // Ein Konto stilllegen, statt es loeschen zu muessen
+    sql: [
+      // Ein Konto, in das je importiert wurde, war ueber die Oberflaeche nie wieder
+      // loeschbar: `umsatz_verarbeitung.zahlungskonto_id` steht auf NO ACTION und haengt
+      // an JEDER importierten Zahlung — auch an den verbuchten und den verworfenen. Die
+      // Buchungen zu loeschen befreit es nicht (der Verweis darauf steht auf SET NULL),
+      // und einen Weg, eine Importzeile zu loeschen, gab es im ganzen Programm nicht.
+      //
+      // Der Ausweg ist in den meisten Faellen aber gar nicht das Loeschen: ein Konto, das
+      // es nicht mehr gibt, soll seine Buchungen BEHALTEN und nur aufhoeren, ueberall
+      // mitzukommen. Genau das ist diese Spalte.
+      //
+      // **Sie ist eine Sicht auf die GEGENWART und keine Rechenregel.** Sie entscheidet,
+      // was man noch tun kann und was die Gegenwart zeigt — nie eine Zahl ueber die
+      // Vergangenheit. Die Analyse zaehlt die Buchungen eines stillgelegten Kontos
+      // unveraendert weiter; sonst schriebe ein Klick in der Verwaltung rueckwirkend
+      // jeden Monat um. Welche Summe sie mitnimmt, entscheidet deshalb jede Aufrufstelle
+      // selbst, nicht diese Spalte — dieselbe Arbeitsteilung wie bei der Kontoklasse.
+      //
+      // **Positiv benannt und Vorgabe 1**, beides aus demselben Grund wie bei
+      // `budgetrelevant`: ein `stillgelegt` waere in einem WHERE eine doppelte Verneinung,
+      // und ein fehlender Wert muss JA heissen — sonst faellt mit der Einfuehrung der
+      // Spalte der ganze Altbestand aus jeder Liste und die App sieht leer aus.
+      //
+      // Ein DATUM waere die andere Form gewesen und ist verworfen: es sieht aus wie eine
+      // Rechengroesse („seit wann zaehlt es nicht mehr mit") und verlangte damit von jeder
+      // Auswertung eine Stichtagsentscheidung, die keine Auswertung hier braucht. Wer den
+      // Zeitpunkt wirklich einmal braucht, findet ihn ohnehin nicht hier, sondern an der
+      // letzten Buchung.
+      `ALTER TABLE zahlungskonto ADD COLUMN aktiv INTEGER NOT NULL DEFAULT 1`,
+    ],
+  },
 ];

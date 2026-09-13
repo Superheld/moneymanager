@@ -117,6 +117,22 @@ describe("Übersetzungs-Bundles", () => {
  * Zusammengesetzte Schlüssel (Template-Literale wie `konten.typ.${typ}`) bleiben außen
  * vor; die sind aus dem Quelltext nicht auflösbar.
  */
+/**
+ * Löst i18next diesen Schlüssel auf?
+ *
+ * `exists` allein reicht dafür nicht, und das hat dieser Test am 13.09.2026 selbst gezeigt:
+ * bei einem PLURAL steht der Text nicht unter dem Schlüssel, sondern unter `…_one` und
+ * `…_other`. `t("x", { count })` findet ihn, `exists("x")` nicht — der Wächter meldete
+ * also einen fehlenden Schlüssel, der tatsächlich dastand.
+ *
+ * Geprüft wird deshalb beides. Dass `_other` genügt, ist kein Kompromiss: i18next verlangt
+ * für jede Sprache mindestens diese Form, und ob auch `_one` da ist, prüft der Paritätstest
+ * oben von selbst — er vergleicht Blattpfade, und eine fehlende Form ist ein fehlender Pfad.
+ */
+function aufloesbar(schluessel: string): boolean {
+  return i18n.exists(schluessel) || i18n.exists(`${schluessel}_other`);
+}
+
 describe("Schlüssel im Code", () => {
   const WURZEL = pfad("..");
 
@@ -148,7 +164,7 @@ describe("Schlüssel im Code", () => {
     expect(fundstellen.size).toBeGreaterThan(100);
 
     const fehlend = [...fundstellen.entries()]
-      .filter(([schluessel]) => !i18n.exists(schluessel))
+      .filter(([schluessel]) => !aufloesbar(schluessel))
       .map(([schluessel, orte]) => `${schluessel} (${orte.join(", ")})`);
     expect(fehlend).toEqual([]);
   });

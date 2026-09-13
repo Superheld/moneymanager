@@ -130,7 +130,8 @@ function fakeAdapter(opt: {
 }
 
 /** Repos als einfache Halter — es geht um den Ablauf, nicht um SQL. */
-function fakes(zuordnungen: Kontozuordnung[]) {
+function fakes(zuordnungen: Kontozuordnung[], kontoUeber: Partial<Zahlungskonto> = {}) {
+  const dasKonto: Zahlungskonto = { ...konto, ...kontoUeber };
   const gespeicherteZuordnungen: Kontozuordnung[] = [...zuordnungen];
   const zugaenge: Bankzugang[] = [];
   // Die Umsätze müssen sich merken lassen: der Abruf verbucht selbst und liest dafür
@@ -165,8 +166,9 @@ function fakes(zuordnungen: Kontozuordnung[]) {
         loeschen: async () => {},
       },
       kontoRepo: {
-        alle: async () => [konto],
+        alle: async () => [dasKonto],
         speichern: async () => {},
+        aktivSetzen: async () => {},
         loeschen: async () => {},
       },
       kategorieRepo: { alle: async () => [], speichern: async () => {}, loeschen: async () => {} },
@@ -360,6 +362,27 @@ describe("abrufAusfuehren", () => {
 
     expect(anfragen).toEqual([]);
     expect(befunde[0].fehler).toMatch(/meldet das zugeordnete Konto/);
+  });
+
+  it("ruft ein stillgelegtes Konto nicht ab und sagt warum", async () => {
+    // Der dritte Befund neben „die Bank meldet es nicht mehr" und „unser Konto gibt es
+    // nicht mehr" — und der einzige, den der Nutzer selbst herbeigeführt hat.
+    //
+    // MIT Befund und nicht still: die Zuordnung steht weiter in den Bankzugängen, und ein
+    // Abruf, der eines der dort aufgeführten Konten wortlos auslässt, sieht nach einem
+    // Fehler aus, den man an der falschen Stelle sucht.
+    const { adapter, anfragen } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([{ zugangId: "z1", schluessel: "9876543210|Girokonto", zahlungskontoId: "k1" }], {
+      aktiv: false,
+    });
+
+    const befunde = (await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps })).konten;
+
+    expect(anfragen).toEqual([]);
+    expect(befunde[0].fehler).toMatch(/stillgelegt/);
+    // Und nichts angelegt: keine Umsätze, kein Anker, kein Lauf.
+    expect(f.umsaetze).toEqual([]);
+    expect(f.anker).toEqual([]);
   });
 
   it("sichert die Bankparameter, auch wenn kein Konto durchgeht", async () => {

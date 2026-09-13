@@ -10,18 +10,29 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
+import type { TFunction } from "i18next";
 import {
   KONTOTYPEN,
   minorZuMajor,
   KONTOKLASSEN,
   klasseVorschlag,
+  istAktiv,
+  istLoeschbar,
+  type Kontoloeschung,
   type Kontoklasse,
   type Kontostand,
   type Kontotyp,
   type Person,
   type Zahlungskonto,
 } from "../../../application";
-import { kontoAnlegen, kontoLoeschen } from "../../dienste";
+import {
+  kontoAnlegen,
+  kontoLoeschen,
+  kontoloeschung,
+  kontoStilllegen,
+  kontoVollstaendigLoeschen,
+  kontoWiederaufnehmen,
+} from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
@@ -32,6 +43,39 @@ import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
+
+/**
+ * Die Sperren als Aufzählung — „3 Buchungen, 214 importierte Zahlungen und eine
+ * Bankverbindung".
+ *
+ * **Nur was zählt, kommt hinein.** Ein „0 Buchungen" in einer Begründung liest sich wie ein
+ * Fehler im Programm, und es verlängert einen Satz, der ohnehin schon erklärt, was der
+ * Nutzer nicht tun kann. Deshalb wird gefiltert und nicht formatiert.
+ */
+function teileText(t: TFunction, teile: readonly (string | null)[]): string {
+  const da = teile.filter((x): x is string => x !== null);
+  if (da.length <= 1) return da[0] ?? "";
+  return `${da.slice(0, -1).join(", ")} ${t("konten.und")} ${da[da.length - 1]}`;
+}
+
+/** Was das Löschen SPERRT. */
+function sperrenText(t: TFunction, l: Kontoloeschung): string {
+  return teileText(t, [
+    l.buchungen > 0 ? t("konten.loeschsperreBuchungen", { count: l.buchungen }) : null,
+    l.belege > 0 ? t("konten.loeschsperreBelege", { count: l.belege }) : null,
+    l.bankverbindung ? t("konten.loeschsperreBankverbindung") : null,
+  ]);
+}
+
+/** Was seinen Bezug auf das Konto VERLIERT, ohne zu verschwinden. */
+function folgenText(t: TFunction, l: Kontoloeschung): string {
+  return teileText(t, [
+    l.budgets > 0 ? t("konten.folgenBudgets", { count: l.budgets }) : null,
+    l.ruecklagen > 0 ? t("konten.folgenRuecklagen", { count: l.ruecklagen }) : null,
+    l.regeln > 0 ? t("konten.folgenRegeln", { count: l.regeln }) : null,
+    l.erkennungsregeln > 0 ? t("konten.folgenErkennung", { count: l.erkennungsregeln }) : null,
+  ]);
+}
 
 /** Woran ein Konto hängt: welcher Zugang, welches Bankkonto, bis wann geholt. */
 export interface KontoVerbindung {
@@ -148,12 +192,21 @@ export function KontenVerwaltung({
               // Die Zeile selbst bleibt stumm: eine unsichtbare Klickfläche findet
               // niemand, und wer sie zufällig trifft, hat sie nicht gemeint.
               render: (k: Zahlungskonto) => (
-                <Zeilenlink
-                  onKlick={() => setZeilenVon(zeilenVon === k.id ? null : k.id)}
-                  titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
-                >
-                  {k.bezeichnung}
-                </Zeilenlink>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                  <Zeilenlink
+                    onKlick={() => setZeilenVon(zeilenVon === k.id ? null : k.id)}
+                    titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
+                  >
+                    {k.bezeichnung}
+                  </Zeilenlink>
+                  {/* Die Marke steht NEBEN dem Namen und nicht in einer eigenen Spalte:
+                      der Zustand ist selten, eine Spalte dafuer waere in jeder Zeile
+                      leer — und hier liest es sich als das, was es ist, ein Teil der
+                      Identitaet des Kontos. Die Zeile bleibt ansonsten normal lesbar:
+                      ein ausgegrautes Konto saehe nach „nicht benutzbar" aus, und
+                      benutzbar ist es sehr wohl, nur nicht fuer Neues. */}
+                  {!istAktiv(k) && <Pill variant="neutral">{t("konten.stillgelegt")}</Pill>}
+                </span>
               ),
             },
             { key: "typ", label: t("einstellungen.konto.spalteTyp"), render: (k) => t(`einstellungen.konto.typ.${k.typ}`) },
@@ -182,13 +235,84 @@ export function KontenVerwaltung({
                 ]
               : []),
             { key: "_e", label: "", align: "right", render: (k) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} /> },
-            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => loeschfrage.stellen({
-              name: k.bezeichnung,
-              // Ein Konto mit Buchungen laesst der Fremdschluessel gar nicht erst
-              // loeschen — der Dialog bleibt dann stehen und zeigt, woran es lag.
-              folgen: t("konten.kontoLoeschenFolgen"),
-              ausfuehren: async () => { await kontoLoeschen(k.id); onChange(); },
-            })} /> },
+            // Stilllegen steht VOR dem Muelleimer und ohne Rueckfrage: es ist der
+            // umkehrbare Weg, und eine Rueckfrage vor etwas, das ein Klick zurueckholt,
+            // erzieht nur dazu, Rueckfragen wegzuklicken. Der Muelleimer daneben behaelt
+            // seine — dort geht wirklich etwas weg.
+            {
+              key: "_s",
+              label: "",
+              align: "right",
+              render: (k: Zahlungskonto) =>
+                istAktiv(k) ? (
+                  <IconButton
+                    icon="stilllegen"
+                    label={t("konten.stilllegen")}
+                    onClick={async () => { await kontoStilllegen(k.id); onChange(); }}
+                  />
+                ) : (
+                  <IconButton
+                    icon="wiederaufnehmen"
+                    label={t("konten.wiederaufnehmen")}
+                    onClick={async () => { await kontoWiederaufnehmen(k.id); onChange(); }}
+                  />
+                ),
+            },
+            // Der Muelleimer raeumt ein LEERES Konto weg. Er zaehlt vorher, was daran
+            // haengt, und nennt es beim Namen — bis zum 13.09.2026 stand hier eine
+            // Vermutung („ein Konto mit Buchungen laesst sich nicht loeschen"), die in
+            // zwei Richtungen falsch war: gesperrt wird auch ohne eine einzige Buchung
+            // (eine Importzeile, eine Bankverbindung), und was ohne sie mitgeht, ist mehr
+            // als „nur das Konto selbst". Was ankam, war „FOREIGN KEY constraint failed".
+            //
+            // Gezaehlt wird beim Oeffnen der Frage und nicht beim Laden der Liste: es sind
+            // acht Abfragen je Konto, und eine Liste mit zehn Konten fuehrte achtzig davon
+            // aus, um einen Satz zu zeigen, den fast niemand aufschlaegt.
+            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={async () => {
+              const l = await kontoloeschung(k.id);
+              loeschfrage.stellen({
+                name: k.bezeichnung,
+                folgen: istLoeschbar(l)
+                  ? t("konten.loeschbar")
+                  : t("konten.loeschsperre", { was: sperrenText(t, l) }),
+                ausfuehren: async () => { await kontoLoeschen(k.id); onChange(); },
+              });
+            }} /> },
+            // Der zweite Weg, und er steht NUR am stillgelegten Konto. Nicht aus
+            // Vorsicht: so ist Stilllegen die vorgegebene Antwort und das Zerstoerende
+            // eine zweite, eigene Handlung. Stuenden beide am selben Muelleimer, gewaenne
+            // der kuerzere Weg — auch dann, wenn der andere gemeint war.
+            {
+              key: "_xx",
+              label: "",
+              align: "right",
+              render: (k: Zahlungskonto) =>
+                istAktiv(k) ? null : (
+                  <IconButton
+                    icon="verwerfen"
+                    ton="gefahr"
+                    label={t("konten.endgueltigLoeschen")}
+                    onClick={async () => {
+                      const l = await kontoloeschung(k.id);
+                      const folgen = folgenText(t, l);
+                      loeschfrage.stellen({
+                        name: k.bezeichnung,
+                        folgen: [
+                          t("konten.endgueltigFolgen", { was: sperrenText(t, l) || t("konten.loeschbarKurz") }),
+                          l.umbuchungspaare > 0
+                            ? t("konten.endgueltigPaare", { count: l.umbuchungspaare })
+                            : null,
+                          folgen ? t("konten.endgueltigFolgenLos", { was: folgen }) : null,
+                          t("konten.endgueltigSicherung"),
+                        ]
+                          .filter(Boolean)
+                          .join(" "),
+                        ausfuehren: async () => { await kontoVollstaendigLoeschen(k.id); onChange(); },
+                      });
+                    }}
+                  />
+                ),
+            },
           ]}
           rows={konten}
         />

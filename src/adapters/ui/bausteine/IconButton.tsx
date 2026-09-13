@@ -24,6 +24,14 @@ export type IconName =
   | "uebernehmen"
   | "verwerfen"
   | "oeffnen"
+  // Ein PAAR, und sie gehoeren zusammen gelesen: stilllegen legt ein Konto in die Kiste,
+  // wiederaufnehmen holt es zurueck. Absichtlich NICHT `loeschen` aehnlich (Mülleimer) —
+  // die beiden stehen in derselben Zeile nebeneinander, und das Stilllegen ist der
+  // harmlose, umkehrbare Weg. Die Rundpfeil-Form fuer das Zurueckholen ist die
+  // gaengige; sie steht hier nie neben dem Journal-Rueckweg, also gibt es keine
+  // Verwechslung mit „zuruecksetzen".
+  | "stilllegen"
+  | "wiederaufnehmen"
   // Der Griff zur Navigation — er steht in der Kopfleiste und nicht in der Liste, und
   // deshalb ist die Aehnlichkeit zu `einstellungen` (Schieberegler: dieselben drei
   // Striche, mit Griffen darauf) keine Verwechslungsgefahr: die beiden stehen nie
@@ -61,6 +69,10 @@ const PFADE: Record<IconName, ReactElement> = {
   verwerfen: <><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>,
   // Pfeil nach rechts in ein Fenster
   oeffnen: <><path d="M14 4h6v6" /><path d="M20 4l-8 8" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>,
+  // Kiste mit Deckel — was hineingelegt ist, bleibt vollstaendig da.
+  stilllegen: <><path d="M3 6h18v4H3z" /><path d="M5 10v9h14v-9" /><path d="M10 14h4" /></>,
+  // Rundpfeil zurueck.
+  wiederaufnehmen: <><path d="M4 12a8 8 0 1 0 8-8" /><path d="M4 5v7h7" /></>,
   // Drei Striche.
   menue: <path d="M4 7h16M4 12h16M4 17h16" />,
 

@@ -157,6 +157,12 @@ import {
   type KontoEingabe,
   type PersonEingabe,
 } from "../application/stammdaten/stammdatenAnlegen";
+import {
+  kontoloeschungPruefen as kontoloeschungPruefenUseCase,
+  kontoVollstaendigLoeschen as kontoVollstaendigLoeschenUseCase,
+  type Kontoloeschung,
+} from "../application/konten/kontoentfernen";
+import { sqliteKontoentfernen } from "./persistence/sqliteKontoentfernen";
 import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/kategorien/standardkategorien";
 import type { Abrufadapter, Bankzugang, Zugangsart } from "../application/fints/abrufPort";
 import type { Kontozuordnung } from "../application/fints/bankzugangPort";
@@ -397,6 +403,42 @@ export function kategorieLoeschen(id: string): Promise<void> {
 
 export function kontoLoeschen(id: string): Promise<void> {
   return sqliteZahlungskontoRepository.loeschen(id);
+}
+
+/**
+ * Legt ein Konto still: es behält alle seine Buchungen und verschwindet nur aus der
+ * Gegenwart — aus der Buchungsmaske, dem Abruf, dem Abgleich und den liquiden Mitteln.
+ *
+ * Ohne Vorbedingung, ausdrücklich: mit Buchungen wie ohne, mit Restgeld wie ohne. Wer ein
+ * Konto nicht mehr führt, soll es wegräumen können, ohne vorher etwas aufräumen zu müssen
+ * — und was noch darauf liegt, bleibt in der Übersicht sichtbar, statt zu verschwinden.
+ */
+export function kontoStilllegen(id: string): Promise<void> {
+  return sqliteZahlungskontoRepository.aktivSetzen(id, false);
+}
+
+/** Nimmt ein stillgelegtes Konto wieder auf. Der Weg zurück, und er kostet nichts. */
+export function kontoWiederaufnehmen(id: string): Promise<void> {
+  return sqliteZahlungskontoRepository.aktivSetzen(id, true);
+}
+
+/** Was an dem Konto hängt — für die Rückfrage und für die Meldung, wenn es nicht geht. */
+export function kontoloeschung(id: string): Promise<Kontoloeschung> {
+  return kontoloeschungPruefenUseCase(sqliteKontoentfernen, id);
+}
+
+/**
+ * Löscht das Konto samt Buchungen, Belegen und Bankverbindung — nur ein stillgelegtes.
+ *
+ * Neben `kontoLoeschen`, nicht statt dessen: das eine räumt ein leeres Konto weg, das
+ * andere nimmt alles mit. Ein Knopf, der je nach Lage das eine oder das andere tut, wäre
+ * einer, dem man nicht ansieht, welches.
+ */
+export function kontoVollstaendigLoeschen(id: string): Promise<void> {
+  return kontoVollstaendigLoeschenUseCase(
+    { kontoRepo: sqliteZahlungskontoRepository, port: sqliteKontoentfernen },
+    id,
+  );
 }
 
 // --- Kontogruppen ----------------------------------------------------------

@@ -53,6 +53,7 @@ const kontoRepo: ZahlungskontoRepository = {
     return [GIRO, BAR, TAGESGELD];
   },
   async speichern() {},
+  async aktivSetzen() {},
   async loeschen() {},
 };
 

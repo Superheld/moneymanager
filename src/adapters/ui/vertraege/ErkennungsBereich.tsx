@@ -34,6 +34,7 @@
 import { useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  waehlbareKonten,
   anbieterSchluessel,
   musterTrifft,
   minorZuMajor,
@@ -441,7 +442,7 @@ export function ErkennungsBereich({
             aufAenderung={(v) => setze("kontoId", v)}
             optionen={[
               { wert: "", text: t("vertraege.regel.alleKonten") },
-              ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung })),
+              ...waehlbareKonten(konten, f.kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung })),
             ]}
           />
         </FormField>
