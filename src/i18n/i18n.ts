@@ -1941,8 +1941,6 @@ const de = {
       vorschlaegeZurueckgehalten:
         "{{n}} weitere nicht angeboten: sie treffen eine Buchung, die du ausdrücklich keinem Vertrag zugeordnet hast.",
       musterPlatzhalter: "z. B. name*",
-      entstehtBeimSpeichern:
-        "Die Erkennung entsteht beim Speichern aus Anbieter und Betrag. Danach steht sie hier und lässt sich nachsteuern.",
       hinweis:
         "Nach diesen Regeln ordnet die App gebuchte Zahlungen diesem Vertrag zu — auch die, die erst noch kommen. Was du hier änderst, wirkt sofort auf den ganzen Bestand. Von Hand gesetzte Zuordnungen bleiben davon unberührt.",
       nameHinzufuegen: "„{{name}}“ als Empfänger aufnehmen",
@@ -1986,6 +1984,14 @@ const de = {
       richtungWert: "{{charakter}} — Umbuchungen zwischen eigenen Konten bleiben draußen",
       laufend: "Läuft noch",
       laufendWert: "letzte Zahlung vor {{tage}} Tagen — ab {{grenze}} Tagen gilt der Vertrag als beendet",
+      zweck: "Verwendungszweck",
+      zweckWert: "alle Zahlungen beginnen mit „{{wert}}“ — als Pflichtmerkmal eingetragen trennt das zwei Verträge beim selben Empfänger",
+      zweckLeer: "nichts, womit alle Zahlungen beginnen — auf dieses Feld ist hier kein Verlass",
+      regel: "Wird daraus zur Regel",
+      regelSpanne: "Betrag {{von}} bis {{bis}}",
+      regelTage: "fällig am {{von}}.–{{bis}}. des Monats",
+      regelMonate: "fällig zwischen Monat {{von}} und {{bis}}",
+      regelHinweis: "nach dem Übernehmen im Vertragsdialog änderbar",
       schliessen: "Schließen",
     },
     rhythmus: {
@@ -3923,8 +3929,6 @@ const en: typeof de = {
       vorschlaegeZurueckgehalten:
         "{{n}} more not offered: they match a payment you explicitly linked to no contract.",
       musterPlatzhalter: "e.g. name*",
-      entstehtBeimSpeichern:
-        "Matching is created on save, from the provider name and the amount. After that it appears here and can be adjusted.",
       hinweis:
         "These rules decide which posted payments are linked to this contract — including future ones. Changes take effect immediately across the whole ledger. Links you set by hand are left alone.",
       nameHinzufuegen: "Add \"{{name}}\" as a payee",
@@ -3968,6 +3972,14 @@ const en: typeof de = {
       richtungWert: "{{charakter}} — transfers between your own accounts are excluded",
       laufend: "Still running",
       laufendWert: "last payment {{tage}} days ago — from {{grenze}} days on the contract counts as ended",
+      zweck: "Reference text",
+      zweckWert: "every payment starts with “{{wert}}” — entered as a required feature this separates two contracts with the same payee",
+      zweckLeer: "nothing all payments start with — this field cannot be relied on here",
+      regel: "Becomes this rule",
+      regelSpanne: "amount {{von}} to {{bis}}",
+      regelTage: "due on day {{von}}–{{bis}} of the month",
+      regelMonate: "due between month {{von}} and {{bis}}",
+      regelHinweis: "editable in the contract dialog after accepting",
       schliessen: "Close",
     },
     rhythmus: {

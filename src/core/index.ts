@@ -14,6 +14,7 @@ export * from "./vertraege/vertrag";
 export * from "./basis/muster";
 export * from "./basis/gegenpartei";
 export * from "./buchung/zahlungsspur";
+export * from "./vertraege/regelvorlage";
 export * from "./vertraege/vertragErkennung";
 export * from "./vertraege/vertragZuordnung";
 export * from "./vertraege/umbuchungErkennung";

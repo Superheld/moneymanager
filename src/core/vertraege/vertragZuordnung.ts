@@ -29,6 +29,7 @@ import { musterTrifft } from "../basis/muster";
 import type { Cent } from "../basis/geld";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
 import { umbuchungsregelFuer } from "./umbuchungErkennung";
+import { spanneWeiten, type Regelvorlage } from "./regelvorlage";
 
 /**
  * Woran EIN Merkmal ansetzt. Die Arten sind nicht austauschbar und sollen es auch nicht
@@ -164,6 +165,13 @@ export interface Vertragszuordnung {
 }
 
 /**
+ * Die abgeleitete Betragsspanne um den Vertragsbetrag: nach unten weniger Luft als nach
+ * oben, weil Preise steigen und selten fallen.
+ */
+export const SPANNE_UNTEN = 0.6;
+export const SPANNE_OBEN = 1.8;
+
+/**
  * Die Standardregel zu einem frisch erfassten Vertrag: Anbietername (normalisiert) und —
  * falls bekannt — die Gläubiger-ID als Schlüssel, dazu eine großzügige Betragsspanne um
  * den Vertragsbetrag.
@@ -191,6 +199,7 @@ export function standardErkennung(
   anbieter: string,
   betrag: Cent,
   glaeubigerId?: string,
+  vorlage?: Regelvorlage,
 ): Vertragserkennung {
   const merkmale: Erkennungsmerkmal[] = [];
   const name = anbieterSchluessel(anbieter.trim());
@@ -201,8 +210,20 @@ export function standardErkennung(
   return {
     vertragId,
     merkmale,
-    betragVon: hoehe > 0 ? Math.round(hoehe * 0.6) : undefined,
-    betragBis: hoehe > 0 ? Math.round(hoehe * 1.8) : undefined,
+    ...spanneWeiten(
+      {
+        von: hoehe > 0 ? Math.round(hoehe * SPANNE_UNTEN) : undefined,
+        bis: hoehe > 0 ? Math.round(hoehe * SPANNE_OBEN) : undefined,
+      },
+      vorlage && { von: vorlage.betragVon, bis: vorlage.betragBis },
+    ),
+    // Das Fälligkeitsfenster kommt ausschliesslich aus der Beobachtung — aus einem
+    // einzelnen Betrag lässt sich kein Termin ableiten, und ein geratenes Fenster wäre
+    // schlimmer als keins: es schnitte Zahlungen weg, ohne dass jemand es angegeben hat.
+    monatVon: vorlage?.monatVon,
+    monatBis: vorlage?.monatBis,
+    tagVon: vorlage?.tagVon,
+    tagBis: vorlage?.tagBis,
   };
 }
 

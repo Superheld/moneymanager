@@ -75,6 +75,33 @@ function ErkennungsDialog({ kandidat, onClose }: { kandidat: Vertragskandidat; o
   const { t } = useTranslation();
   const geld = useGeld();
   const b = kandidat.befund;
+  const v = kandidat.vorlage;
+
+  /**
+   * Was aus der Messung als REGEL entsteht — die Zeile, die den Dialog erst schliesst.
+   *
+   * Die Prüfungen darüber begründen den Vorschlag, und bis hierher hörte der Dialog damit
+   * auf: man las sieben gemessene Werte und erfuhr nichts darüber, was davon den Vertrag
+   * erreicht. Die Antwort war „das Wenigste", ohne dass es irgendwo stand. Jetzt steht es
+   * da, und zwar als das, was gleich passiert — nicht als weitere Messung.
+   */
+  const regelText = [
+    v.betragVon !== undefined && v.betragBis !== undefined
+      ? t("vertraege.erkennung.regelSpanne", {
+          von: `${geld.format(v.betragVon)} ${geld.symbol}`,
+          bis: `${geld.format(v.betragBis)} ${geld.symbol}`,
+        })
+      : null,
+    v.tagVon !== undefined && v.tagBis !== undefined
+      ? t("vertraege.erkennung.regelTage", { von: v.tagVon, bis: v.tagBis })
+      : null,
+    v.monatVon !== undefined && v.monatBis !== undefined
+      ? t("vertraege.erkennung.regelMonate", { von: v.monatVon, bis: v.monatBis })
+      : null,
+  ]
+    .filter(Boolean)
+    .concat(t("vertraege.erkennung.regelHinweis"))
+    .join(" · ");
 
   function Zeile({ label, wert }: { label: string; wert: string }) {
     return (
@@ -138,6 +165,15 @@ function ErkennungsDialog({ kandidat, onClose }: { kandidat: Vertragskandidat; o
         label={t("vertraege.erkennung.laufend")}
         wert={t("vertraege.erkennung.laufendWert", { tage: b.letzteVorTagen, grenze: b.beendetAbTagen })}
       />
+      <Zeile
+        label={t("vertraege.erkennung.zweck")}
+        wert={
+          b.zweckAnfang
+            ? t("vertraege.erkennung.zweckWert", { wert: b.zweckAnfang })
+            : t("vertraege.erkennung.zweckLeer")
+        }
+      />
+      <Zeile label={t("vertraege.erkennung.regel")} wert={regelText} />
     </Modal>
   );
 }

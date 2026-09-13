@@ -17,6 +17,7 @@ import {
   standardErkennung,
   zuordnungAbgleich,
   type Cent,
+  type Regelvorlage,
   type Vertragszuordnung,
 } from "../../core";
 import type {
@@ -213,10 +214,11 @@ export async function erkennungSicherstellen(
   anbieter: string,
   betrag: Cent,
   glaeubigerId?: string,
+  vorlage?: Regelvorlage,
 ): Promise<void> {
   const vorhanden = (await repo.alle()).some((e) => e.vertragId === vertragId);
   if (vorhanden) return;
-  await repo.speichern(standardErkennung(vertragId, anbieter, betrag, glaeubigerId));
+  await repo.speichern(standardErkennung(vertragId, anbieter, betrag, glaeubigerId, vorlage));
 }
 
 /**

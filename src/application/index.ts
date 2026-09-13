@@ -147,6 +147,8 @@ export {
   type Vertragskennzahlen,
   type VertragsichtDeps,
   erkennungProbieren,
+  erkennungsentwurf,
+  ENTWURF_VERTRAG_ID,
   type Erkennungsprobe,
   merkmaleVorschlagen,
   type Merkmalsvorschlag,
