@@ -10,14 +10,12 @@
 
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import type { TFunction } from "i18next";
 import {
   KONTOTYPEN,
   minorZuMajor,
   KONTOKLASSEN,
   klasseVorschlag,
   istAktiv,
-  istLoeschbar,
   type Kontoloeschung,
   type Kontoklasse,
   type Kontostand,
@@ -27,10 +25,8 @@ import {
 } from "../../../application";
 import {
   kontoAnlegen,
-  kontoLoeschen,
   kontoloeschung,
   kontoStilllegen,
-  kontoVollstaendigLoeschen,
   kontoWiederaufnehmen,
 } from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
@@ -39,43 +35,10 @@ import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { IconButton } from "../bausteine/IconButton";
 import { KontoAnlegenModal } from "./KontoAnlegenModal";
+import { KontoAufloesenModal } from "./KontoAufloesenModal";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
-import { useLoeschfrage } from "../bausteine/Loeschfrage";
-
-/**
- * Die Sperren als Aufzählung — „3 Buchungen, 214 importierte Zahlungen und eine
- * Bankverbindung".
- *
- * **Nur was zählt, kommt hinein.** Ein „0 Buchungen" in einer Begründung liest sich wie ein
- * Fehler im Programm, und es verlängert einen Satz, der ohnehin schon erklärt, was der
- * Nutzer nicht tun kann. Deshalb wird gefiltert und nicht formatiert.
- */
-function teileText(t: TFunction, teile: readonly (string | null)[]): string {
-  const da = teile.filter((x): x is string => x !== null);
-  if (da.length <= 1) return da[0] ?? "";
-  return `${da.slice(0, -1).join(", ")} ${t("konten.und")} ${da[da.length - 1]}`;
-}
-
-/** Was das Löschen SPERRT. */
-function sperrenText(t: TFunction, l: Kontoloeschung): string {
-  return teileText(t, [
-    l.buchungen > 0 ? t("konten.loeschsperreBuchungen", { count: l.buchungen }) : null,
-    l.belege > 0 ? t("konten.loeschsperreBelege", { count: l.belege }) : null,
-    l.bankverbindung ? t("konten.loeschsperreBankverbindung") : null,
-  ]);
-}
-
-/** Was seinen Bezug auf das Konto VERLIERT, ohne zu verschwinden. */
-function folgenText(t: TFunction, l: Kontoloeschung): string {
-  return teileText(t, [
-    l.budgets > 0 ? t("konten.folgenBudgets", { count: l.budgets }) : null,
-    l.ruecklagen > 0 ? t("konten.folgenRuecklagen", { count: l.ruecklagen }) : null,
-    l.regeln > 0 ? t("konten.folgenRegeln", { count: l.regeln }) : null,
-    l.erkennungsregeln > 0 ? t("konten.folgenErkennung", { count: l.erkennungsregeln }) : null,
-  ]);
-}
 
 /** Woran ein Konto hängt: welcher Zugang, welches Bankkonto, bis wann geholt. */
 export interface KontoVerbindung {
@@ -109,7 +72,6 @@ export function KontenVerwaltung({
   onChange: () => void;
 }) {
   const { t } = useTranslation();
-  const loeschfrage = useLoeschfrage();
   const geld = useGeld();
   const stand = new Map(kontostaende.map((k) => [k.konto.id, k]));
   const [offen, setOffen] = useState(false);
@@ -144,6 +106,8 @@ export function KontenVerwaltung({
    * danach dasteht — sonst zeigte der Dialog den alten Stand weiter, bis man ihn schliesst.
    */
   const [aktiv, setAktiv] = useState(true);
+  /** Welches Konto gerade im Aufloesen-Dialog steht, samt der Zaehlung dazu. */
+  const [aufloesen, setAufloesen] = useState<{ konto: Zahlungskonto; loeschung: Kontoloeschung } | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
   function toggleInhaber(id: string) {
@@ -246,86 +210,31 @@ export function KontenVerwaltung({
                 ]
               : []),
             { key: "_e", label: "", align: "right", render: (k) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} /> },
-            // Stilllegen steht VOR dem Muelleimer und ohne Rueckfrage: es ist der
-            // umkehrbare Weg, und eine Rueckfrage vor etwas, das ein Klick zurueckholt,
-            // erzieht nur dazu, Rueckfragen wegzuklicken. Der Muelleimer daneben behaelt
-            // seine — dort geht wirklich etwas weg.
-            {
-              key: "_s",
-              label: "",
-              align: "right",
-              render: (k: Zahlungskonto) =>
-                istAktiv(k) ? (
-                  <IconButton
-                    icon="stilllegen"
-                    label={t("konten.stilllegen")}
-                    hinweis={t("konten.stilllegenHinweis")}
-                    onClick={async () => { await kontoStilllegen(k.id); onChange(); }}
-                  />
-                ) : (
-                  <IconButton
-                    icon="wiederaufnehmen"
-                    label={t("konten.wiederaufnehmen")}
-                    hinweis={t("konten.wiederaufnehmenHinweis")}
-                    onClick={async () => { await kontoWiederaufnehmen(k.id); onChange(); }}
-                  />
-                ),
-            },
-            // Der Muelleimer raeumt ein LEERES Konto weg. Er zaehlt vorher, was daran
-            // haengt, und nennt es beim Namen — bis zum 13.09.2026 stand hier eine
-            // Vermutung („ein Konto mit Buchungen laesst sich nicht loeschen"), die in
-            // zwei Richtungen falsch war: gesperrt wird auch ohne eine einzige Buchung
-            // (eine Importzeile, eine Bankverbindung), und was ohne sie mitgeht, ist mehr
-            // als „nur das Konto selbst". Was ankam, war „FOREIGN KEY constraint failed".
+            // **EIN Symbol, immer dasselbe, immer da.** Vorher standen hier drei
+            // Aktionen (stilllegen, loeschen, und am stillgelegten Konto zusaetzlich
+            // endgueltig loeschen) — drei Dinge, die zusammengehoeren, nebeneinander, und
+            // nichts sagte wie. Der Muelleimer konnte fuer jedes Konto mit Geschichte nur
+            // ablehnen, und der Icon-Satz wechselte je Zustand.
             //
-            // Gezaehlt wird beim Oeffnen der Frage und nicht beim Laden der Liste: es sind
-            // acht Abfragen je Konto, und eine Liste mit zehn Konten fuehrte achtzig davon
-            // aus, um einen Satz zu zeigen, den fast niemand aufschlaegt.
-            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} hinweis={t("konten.loeschenHinweis")} onClick={async () => {
-              const l = await kontoloeschung(k.id);
-              loeschfrage.stellen({
-                name: k.bezeichnung,
-                folgen: istLoeschbar(l)
-                  ? t("konten.loeschbar")
-                  : t("konten.loeschsperre", { was: sperrenText(t, l) }),
-                ausfuehren: async () => { await kontoLoeschen(k.id); onChange(); },
-              });
-            }} /> },
-            // Der zweite Weg, und er steht NUR am stillgelegten Konto. Nicht aus
-            // Vorsicht: so ist Stilllegen die vorgegebene Antwort und das Zerstoerende
-            // eine zweite, eigene Handlung. Stuenden beide am selben Muelleimer, gewaenne
-            // der kuerzere Weg — auch dann, wenn der andere gemeint war.
+            // Was moeglich ist, entscheidet jetzt der Dialog. `ton` bleibt normal: dieser
+            // Knopf fragt nur — das Zerstoerende steht drinnen und traegt dort seine Farbe.
             {
-              key: "_xx",
+              key: "_a",
               label: "",
               align: "right",
-              render: (k: Zahlungskonto) =>
-                istAktiv(k) ? null : (
-                  <IconButton
-                    icon="verwerfen"
-                    ton="gefahr"
-                    label={t("konten.endgueltigLoeschen")}
-                    hinweis={t("konten.endgueltigHinweis")}
-                    onClick={async () => {
-                      const l = await kontoloeschung(k.id);
-                      const folgen = folgenText(t, l);
-                      loeschfrage.stellen({
-                        name: k.bezeichnung,
-                        folgen: [
-                          t("konten.endgueltigFolgen", { was: sperrenText(t, l) || t("konten.loeschbarKurz") }),
-                          l.umbuchungspaare > 0
-                            ? t("konten.endgueltigPaare", { count: l.umbuchungspaare })
-                            : null,
-                          folgen ? t("konten.endgueltigFolgenLos", { was: folgen }) : null,
-                          t("konten.endgueltigSicherung"),
-                        ]
-                          .filter(Boolean)
-                          .join(" "),
-                        ausfuehren: async () => { await kontoVollstaendigLoeschen(k.id); onChange(); },
-                      });
-                    }}
-                  />
-                ),
+              render: (k: Zahlungskonto) => (
+                <IconButton
+                  icon="aufloesen"
+                  label={t("konten.aufloesen.knopf")}
+                  hinweis={t("konten.aufloesen.knopfHinweis")}
+                  onClick={async () => {
+                    // Gezaehlt wird beim Oeffnen und nicht beim Laden der Liste: es sind
+                    // acht Abfragen je Konto, und zehn Konten fuehrten achtzig davon aus,
+                    // um einen Dialog zu fuellen, den fast niemand aufschlaegt.
+                    setAufloesen({ konto: k, loeschung: await kontoloeschung(k.id) });
+                  }}
+                />
+              ),
             },
           ]}
           rows={konten}
@@ -471,7 +380,14 @@ export function KontenVerwaltung({
         <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} />
       </div>
     )}
-    {loeschfrage.dialog}
+    {aufloesen && (
+      <KontoAufloesenModal
+        konto={aufloesen.konto}
+        loeschung={aufloesen.loeschung}
+        onClose={() => setAufloesen(null)}
+        onFertig={() => { setAufloesen(null); onChange(); }}
+      />
+    )}
 
     </>
   );
