@@ -1,7 +1,18 @@
 // Übersicht — was JETZT gilt, und sonst nichts.
 //
-// Zwei Blöcke: die drei Monatskarten (laufender Monat plus die beiden folgenden) und
-// darunter die Budgets dieses Monats. Alles, was einen ZEITRAUM auswertet — Verlauf,
+// Drei Blöcke, und die Reihenfolge ist die Reihenfolge der Fragen. Oben die drei
+// Monatskarten (laufender Monat plus die beiden folgenden) — „wie geht dieser Monat
+// aus". Darunter, nebeneinander, die beiden Seiten desselben Monats: was in ihm noch da
+// ist (Budgets) und was aus ihm noch abgeht (Vorschau). Ganz unten die Bestände, die von
+// keinem Monat abhängen: Depot und die Stände je Kontoklasse.
+//
+// **Die Vorschau stand bis 2026-09-13 zwischen Monatskarten und Budgets**, die Stände
+// darüber. Beide standen damit allein über die volle Breite, obwohl keine von beiden sie
+// braucht — und das Wichtigste, die Budgets, rutschte dadurch unter den Falz. Neben dem,
+// was es erklärt, steht jetzt jedes von beiden: die Vorschau nennt die Zahlungen, aus
+// denen der Budgetrest daneben schrumpft.
+//
+// Alles, was einen ZEITRAUM auswertet — Verlauf,
 // Kennzahlen, Aufschlüsselung nach Kategorien — ist 2026-08-19 in den Bereich „Analyse"
 // gezogen. Vorher hing das an einem Screen, den man erst nach unten scrollen musste,
 // bis die Kategorien kamen; und die Frage „wie stehe ich gerade da?" ging dabei unter.
@@ -152,19 +163,14 @@ export function UebersichtScreen() {
         />
       )}
 
-      {/* Was insgesamt da ist, aufgeteilt in die drei Klassen. Unter den Monatskarten,
-          weil die eine andere Frage beantworten: sie rechnen nur über die liquiden
-          Konten („wie geht dieser Monat aus"), diese Liste über alle („was ist da"). */}
-      {daten && <VermoegenKarte klassen={daten.klassen} />}
-
-      {/* Was noch kommt — zwischen den Monatskarten und den Budgets, weil es genau
-          dazwischen gehört: die Karten sagen, wie der Monat ausgeht, die Budgets, was in
-          ihm noch da ist, und diese Liste nennt die Zahlungen, aus denen beides folgt. */}
-      {daten && <VorschauKarte zeilen={daten.vorschau} kontoNamen={daten.kontoNamen} />}
-
-      {/* Budgets und Depots nebeneinander. Fehlt eines von beiden, nimmt das andere die
-          volle Breite — das erledigt `auto-fit` im Raster, ohne dass hier eine Bedingung
-          stünde, die man beim nächsten Element wieder anpassen müsste. */}
+      {/* Zwei Paare, und die Aufteilung folgt der Frage, nicht der Optik.
+          Oben, was den LAUFENDEN Monat betrifft: was in ihm noch da ist (Budgets) neben
+          dem, was aus ihm noch abgeht (Vorschau) — dieselbe Zeitspanne, von zwei Seiten.
+          Unten, was UNABHÄNGIG vom Monat gilt: der Depotstand neben den Ständen der
+          Kontoklassen. Beides sind Bestände, beides geht in keine Monatskarte ein.
+          Fehlt eine Karte, nimmt die andere die volle Breite — das erledigt `auto-fit`
+          im Raster, ohne dass hier eine Bedingung stünde, die man beim nächsten Element
+          wieder anpassen müsste. */}
       <div className="karten-paar">
       {daten && (
         <Card
@@ -278,7 +284,12 @@ export function UebersichtScreen() {
         </Card>
       )}
 
-      {depotdaten && <DepotKarte daten={depotdaten} />}
+      {daten && <VorschauKarte zeilen={daten.vorschau} kontoNamen={daten.kontoNamen} />}
+      </div>
+
+      <div className="karten-paar">
+        {depotdaten && <DepotKarte daten={depotdaten} />}
+        {daten && <VermoegenKarte klassen={daten.klassen} />}
       </div>
 
       {/* Nach einer Änderung wird die ganze Übersicht neu gerechnet, nicht nur die Zeile:
