@@ -133,10 +133,14 @@ describe("BudgetsScreen", () => {
     rendere(<BudgetsScreen />);
     await nutzer.click(await screen.findByRole("button", { name: /budget anlegen/i }));
 
-    // Das Startdatum gibt es nur beim Aufbauenden — beim Monatlichen wäre es ohne Wirkung.
+    // Beim Anlegen heisst das Feld „Gilt ab" und steht bei BEIDEN Arten: es sagt, ab
+    // welchem Monat der erste Betrag zaehlt. „Sammelt ab" ist der Anker und gehoert ins
+    // Bearbeiten — hier waeren es zwei Felder fuer denselben Zeitpunkt.
     expect(document.body.textContent).not.toMatch(/Sammelt ab/);
+    expect(screen.getByRole("textbox", { name: "Gilt ab" })).toBeTruthy();
     await auswahlWaehlen(nutzer, "Art", /aufbauend/);
-    await waitFor(() => expect(document.body.textContent).toMatch(/Sammelt ab/));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Gilt ab" })).toBeTruthy());
+    expect(document.body.textContent).not.toMatch(/Sammelt ab/);
 
     await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
     await nutzer.click(await screen.findByRole("button", { name: /Urlaub/ }));
@@ -154,6 +158,40 @@ describe("BudgetsScreen", () => {
       // (`heuteIso`), und ein hartkodierter Monat prueft ab dem naechsten Ersten etwas
       // anderes, als er soll — er wird rot, ohne dass sich etwas geaendert haette.
       expect(gespeichert[0].betraege).toEqual([{ abMonat: monatVersetzt(0), betrag: 10000 }]);
+    });
+  });
+
+  it("legt den ersten Betrag in den Monat aus dem Feld gilt-ab, nicht in den laufenden", async () => {
+    await stammdatenBasis();
+    await sqliteKategorieRepository.speichern({ id: "kat2", name: "Urlaub", defaultCharakter: "Aufwand" });
+
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+    await nutzer.click(await screen.findByRole("button", { name: /budget anlegen/i }));
+
+    await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
+    await nutzer.click(await screen.findByRole("button", { name: /Urlaub/ }));
+    const betrag = screen.getAllByRole("textbox").find((f) => f.getAttribute("inputmode") === "decimal");
+    await nutzer.type(betrag!, "100");
+
+    // Drei Monate zurueck — der Fall, um den es geht: ein Budget fuer etwas, das schon
+    // laeuft. Getippt wird ISO; das liest das Datumsfeld in jeder Sprache.
+    const frueher = monatVersetzt(-3);
+    const giltAb = screen.getByRole("textbox", { name: "Gilt ab" });
+    await nutzer.clear(giltAb);
+    await nutzer.type(giltAb, `${frueher}-01`);
+    await nutzer.tab();
+
+    const alle = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(alle[alle.length - 1]);
+
+    await waitFor(async () => {
+      const gespeichert = await sqliteBudgetRepository.alle();
+      expect(gespeichert).toHaveLength(1);
+      // Beides aus demselben Feld: die erste Betragsversion UND der Sammelanker. Zwei
+      // Felder fuer einen Zeitpunkt waeren zwei Wahrheiten.
+      expect(gespeichert[0].betraege).toEqual([{ abMonat: frueher, betrag: 10000 }]);
+      expect(gespeichert[0].start).toBe(`${frueher}-01`);
     });
   });
 

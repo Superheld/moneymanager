@@ -232,8 +232,9 @@ export function BudgetsScreen() {
     setFehler(null);
     try {
       await budgetSpeichern(
-        // `abMonat`: beim Anlegen der Startmonat, beim Bearbeiten der laufende. Ein
-        // geänderter Rahmen gilt ab jetzt — die Monate davor behalten ihre Planung.
+        // `abMonat`: beim Anlegen der Monat aus „gilt ab", beim Bearbeiten der
+        // laufende (bzw. die angetippte Version). Ein geänderter Rahmen gilt ab jetzt —
+        // die Monate davor behalten ihre Planung.
         {
           kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, art, start,
           abMonat: editId ? zielMonat : start.slice(0, 7),
@@ -643,11 +644,29 @@ export function BudgetsScreen() {
               </div>
             )}
 
-            {/* Nur beim Aufbauenden: ohne Anker weiss es nicht, wie viele Monate es
-                schon gesammelt hat. Beim Monatlichen wäre das Feld ohne Wirkung. */}
-            {art === "aufbauend" && (
-              <FormField label={t("budgets.feldStart")} hint={t("budgets.feldStartHinweis")}>
-                <Datumsfeld ariaLabel={t("budgets.feldStart")} wert={start} aufAenderung={setStart} />
+            {/* Beim ANLEGEN für beide Arten, und das ist der Punkt: das Feld sagt, ab
+                welchem Monat der erste Betrag gilt. Ohne es landete er zwangsläufig im
+                laufenden Monat, und wer ein Budget für etwas anlegt, das seit dem Frühjahr
+                läuft, sähe jeden Monat davor mit Rahmen 0 — die Auswertung zeigte dann
+                lauter Überziehungen, die nie welche waren. Rückwirkend ERFUNDEN wird
+                dabei nichts: der Monat ist eine Angabe und keine Annahme.
+
+                EIN Feld für beide Arten, nicht zwei: beim Aufbauenden setzt derselbe
+                Monat zugleich den Sammelanker. Zwei Felder für einen Zeitpunkt wären zwei
+                Wahrheiten, und die erste Abweichung fiele niemandem auf.
+
+                Beim BEARBEITEN bleibt es der Anker und damit nur beim Aufbauenden: ab
+                wann ein GEÄNDERTER Betrag gilt, sagt dort die Betragsreihe darüber. */}
+            {(!editId || art === "aufbauend") && (
+              <FormField
+                label={editId ? t("budgets.feldStart") : t("budgets.feldGiltAb")}
+                hint={editId ? t("budgets.feldStartHinweis") : t(`budgets.feldGiltAbHinweis.${art}`)}
+              >
+                <Datumsfeld
+                  ariaLabel={editId ? t("budgets.feldStart") : t("budgets.feldGiltAb")}
+                  wert={start}
+                  aufAenderung={setStart}
+                />
               </FormField>
             )}
           </div>
