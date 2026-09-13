@@ -141,8 +141,8 @@ ist sie:
 
 - **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `buchung_journal`
   (was mit einer Buchung geschah) · `umsatz_roh` +
-  `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ
-  UND Klasse, siehe unten) ·
+  `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ,
+  Klasse UND `aktiv`, siehe unten) ·
   `kontostand_anker` · `vormerkung` (was die Bank kennt und noch nicht gebucht hat,
   siehe unten) · `import_lauf` · `dubletten_freigabe` ·
   `kontogruppe` + `kontogruppe_konto` (frei benannte Gruppen, siehe unten)
@@ -405,6 +405,92 @@ Altbestand aus jedem Budget und die Rahmen sähen über Nacht grosszügig aus.
 Wer sie auswertet, muss sie an **beiden** Stellen auswerten: im Verbrauch
 (`budgetBuchungen`) und im Vorschlag (`budgetvorschlaege`). Nur im Verbrauch hiesse, einen
 Rahmen vorzuschlagen, gegen den die Buchung anschliessend nicht zählt.
+
+#### Ein Konto stilllegen — und der einzige Weg, einen Beleg loszuwerden
+
+Seit 2026-09-13 trägt `zahlungskonto` die Spalte `aktiv` (Vorgabe 1, im Typ optional mit
+„fehlend heisst JA" — dieselbe Form wie `budgetrelevant`, aus demselben Grund).
+
+Der Anlass war ein Fehler mit einer Meldung, die nichts sagte: **ein Konto, in das je
+importiert wurde, war über die Oberfläche nie wieder löschbar.** Drei Fremdschlüssel auf
+`zahlungskonto` stehen auf NO ACTION, und einer davon ist der, an den niemand denkt —
+`umsatz_verarbeitung.zahlungskonto_id` hängt an JEDER importierten Zahlung, auch an den
+verbuchten und den verworfenen. Die Buchungen zu löschen befreit das Konto nicht (der
+Verweis darauf steht auf SET NULL), und einen Weg, eine Importzeile zu löschen, gab es im
+ganzen Programm nicht. Was ankam, war „FOREIGN KEY constraint failed".
+
+**Die Spalte ist eine SICHT auf die Gegenwart und keine Rechenregel**, und daran hängt
+alles Weitere. Gefragt wird über `istAktiv`; was sie beantwortet, ist „kann man hier noch
+etwas tun" — nie „zählt es mit". Die Regel, nach der jede Aufrufstelle entscheidet, ist
+die Zeitrichtung:
+
+| | stillgelegtes Konto |
+|---|---|
+| **Rückblick** — Monatskarten, Budgetstände, Analyse, Kontoauszug, Abgleich | zählt und zeigt **unverändert** |
+| **Vorausschau** — Liquiditätsvorschau, „Da ist etwas zu tun" | **draußen**, und der Filter steht im KERN |
+| **Auswahl und Handlung** — Buchungsmaske, Umbuchungsziel, Bankabruf, Bankkonto verknüpfen | **draußen** |
+| „Was da ist" | zählt mit, unter seiner Klasse |
+| Kontenverwaltung | sichtbar, markiert, mit dem Weg zurück |
+
+Vier Dinge darin, die Entscheidungen sind und keine Rechenschritte:
+
+- **Die Monatskarten behalten sie.** Sie zeigen drei Monate, davon zwei vergangene. Wer nach
+  einem Bankwechsel sein altes Girokonto stilllegt, verlöre sonst rückwirkend den größten
+  Teil seines Ist der letzten Monate — Plan bliebe stehen, Ist fiele auf fast null. Dasselbe
+  gilt für `liquideMittelReal`, wo Saldo und Buchungen ohnehin mit derselben Liste filtern
+  müssen.
+- **`liquideMittel` filtert NICHT, `liquiditaetsvorschau` schon.** Der Unterschied ist wieder
+  die Zeitrichtung: ein Bestand lässt sich sinnvoll mit und ohne stillgelegte Konten bilden
+  („was ist da" gegen „was kann ich ausgeben"), eine Vorausschau nicht. Deshalb liegt der
+  Filter dort im Kern und hier nicht.
+- **„Was da ist" bleibt unberührt.** Eine eigene Zeile „stillgelegt" war geplant und ist
+  verworfen: die Karte fragt „was existiert", und Restgeld auf einer aufgegebenen Kasse
+  existiert. Es herauszurechnen liesse Vermögen verschwinden, ohne dass es irgendwo
+  auftauchte.
+- **`waehlbareKonten(konten, bereitsGewaehlt)` hat zwei Hälften**, und die zweite ist die
+  wichtige: das schon Gewählte bleibt in der Liste. Sonst fände eine Buchung, die auf einem
+  stillgelegten Konto liegt, ihr eigenes Konto in der Auswahl nicht mehr — das Feld stünde
+  leer oder zeigte ein anderes, und beim nächsten Speichern wäre die Buchung umgezogen.
+
+**Die Spalte hat einen EIGENEN Schreibweg** (`aktivSetzen`) und steht nicht in `speichern`.
+`kontoAnlegen` dient auch dem Bearbeiten (mit `id`, über das ON CONFLICT) und baut ein Konto
+ohne dieses Feld: mitgeschrieben holte jedes Umbenennen ein stillgelegtes Konto still zurück
+in die Gegenwart.
+
+##### Zwei Wege, ein Konto wegzubekommen
+
+| | was weggeht | wo |
+|---|---|---|
+| **löschen** | nur das Konto — der Fremdschlüssel lässt nichts anderes zu | an jedem Konto |
+| **endgültig löschen** | Buchungen, Belege, Bankverbindung, das Konto | **nur am stillgelegten** |
+
+Das „nur am stillgelegten" ist der Kern des Entwurfs und keine Vorsichtsmaßnahme: so ist
+Stilllegen die vorgegebene Antwort und das Zerstörende eine zweite, eigene Handlung.
+Stünden beide am selben Mülleimer, gewänne der kürzere Weg — auch dann, wenn der andere
+gemeint war. Durchgesetzt an der Anwendungsgrenze UND in der Oberfläche; ein Knopf, der
+beim Klick abweist, ist schlechter als keiner.
+
+`kontoloeschung` zählt dafür, was am Konto hängt, und trennt **Sperren** von **Folgen**: die
+drei oben verhindern das Löschen, ein Budget oder eine Rücklage verliert nur einen Verweis.
+Beides in einen Topf zu werfen liesse die Meldung behaupten, man müsse sie erst wegräumen —
+und wer das tut, hat umsonst gearbeitet.
+
+Vier Dinge am Löschweg selbst (`adapters/persistence/sqliteKontoentfernen.ts`):
+
+- **Erst lesen, dann schreiben.** `inTransaktion` nimmt eine fertige Liste; ein SELECT
+  dazwischen gibt es nicht. Das ist hier ohnehin die bessere Form — ein
+  `DELETE … WHERE id IN (SELECT … FROM umsatz_verarbeitung)` löscht per CASCADE aus genau der
+  Tabelle, aus der die Unterabfrage liest.
+- **Die Belege gehen über `COALESCE(zahlung_id, id)`**, damit ALLE Fassungen einer Zahlung
+  mitkommen und nicht nur die namengebende — eine Zahlung ohne ihren ersten Beleg wäre eine,
+  deren Herkunft niemand mehr feststellen kann.
+- **Jede gelöschte Buchung bekommt ihren Journaleintrag**, denselben Weg wie
+  `ledger.loeschen` (`standLesen` und `journalAnweisung` sind dafür exportiert statt
+  nachgebaut — das Journal hat einen Schreibweg, und eine zweite Fassung driftet).
+- **Das überlebende Gegenbein einer Umbuchung wird GELÖST, nicht mitgelöscht.** Es liegt auf
+  einem Konto, das jemand weiterführt. Mit Journaleintrag, denn eine Buchung, die still ihre
+  Paarung verliert, ist später nicht zu erklären; `transfer_id` trägt keinen Fremdschlüssel
+  und bliebe sonst als Verweis auf ein Paar stehen, das es nicht mehr gibt.
 
 #### Die Liquiditätsvorschau zieht ZWEI Linien
 
@@ -696,10 +782,18 @@ niemand später raten muss, was bewusst erfüllt ist und was bewusst nicht.
 
 ### Was die Unveränderbarkeit heute leistet
 
-**Der Beleg ist geschützt, und seit 2026-09-06 ohne Ausnahme.** `umsatz_roh` wird nach dem
-Anlegen nicht mehr beschrieben — die frühere Ausnahme `ergaenzen` ist ersatzlos weg, weil
+**Der Beleg wird nie GEÄNDERT, und seit 2026-09-06 ohne Ausnahme.** `umsatz_roh` wird nach
+dem Anlegen nicht mehr beschrieben — die frühere Ausnahme `ergaenzen` ist ersatzlos weg, weil
 eine zweite Fassung jetzt als eigener Beleg danebensteht statt in die vorhandene Zeile
 geschrieben zu werden. Was eine Quelle geliefert hat, steht unverändert da.
+
+**Seit 2026-09-13 lässt er sich aber LÖSCHEN**, an genau einer Stelle: beim endgültigen
+Löschen eines stillgelegten Kontos (siehe oben). Das ist kein Widerspruch zum Absatz darüber
+— unveränderlich heisst „nicht umgeschrieben", und eine gelöschte Zeile behauptet nichts
+Falsches. Es ist trotzdem die Grenze der Unveränderbarkeit, und sie gehört benannt statt
+beiläufig überschritten: der Inhalt der Buchungen bleibt im `buchung_journal`, der WORTLAUT
+der Bankzeile nicht. Die Rückfrage sagt es mit, weil ein Institut Umsätze nur begrenzt
+vorhält — nach der Frist ist diese Datei die einzige Stelle, an der sie standen.
 
 **Änderungen an Buchungen sind protokolliert.** Jedes Anlegen, Ändern und Löschen schreibt
 einen Eintrag ins `buchung_journal` — mit dem ganzen Zustand vorher und nachher, nicht mit
@@ -1791,6 +1885,11 @@ Vier Dinge gelten überall und stehen deshalb hier:
   Wer die Klassen erweitert (`KONTOKLASSEN` in `core/konten/konto.ts`), muss für jeden neuen
   Wert entscheiden, ob er verfügbar ist. Bislang trennt die Klasse **nur** das; was Rücklage
   und Vorsorge sonst unterscheiden soll, ist offen.
+
+  **`aktiv` ist die dritte Frage und wieder eine andere:** ob das Konto noch GEFÜHRT wird.
+  Typ und Klasse beschreiben, was es ist und wofür — `aktiv` nur, ob man damit noch etwas
+  tun kann. Es entscheidet deshalb keine einzige Summe über die Vergangenheit; siehe
+  „Ein Konto stilllegen" oben.
 
 - **Eine Kontogruppe ist eine SICHT, die Klasse eine RECHENREGEL.** Das ist der Unterschied,
   an dem sonst eine zweite Wahrheit entsteht. Die Klasse entscheidet mit — nur `liquide`

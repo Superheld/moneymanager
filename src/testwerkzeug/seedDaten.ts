@@ -181,11 +181,17 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     { id: "konto-bar", bezeichnung: "Haushaltskasse", typ: "Bargeld", klasse: "liquide", iban: null, stand: 13740 },
     { id: "konto-tagesgeld", bezeichnung: "Ruecklage", typ: "Tagesgeld", klasse: "ruecklage", iban: iban("99999902", 4005006), stand: 890000 },
     { id: "konto-kk", bezeichnung: "Kreditkarte", typ: "Kreditkarte", klasse: "liquide", iban: null, stand: -32000 },
+    // Ein STILLGELEGTES Konto — der Fall, den man sonst nur herstellt, indem man ihn
+    // herstellt. Es traegt Buchungen und einen Restbetrag, weil genau daran die beiden
+    // Haelften der Regel sichtbar werden: seine Buchungen zaehlen in der Analyse weiter
+    // mit und sein Geld steht in „Was da ist", aber in der Buchungsmaske ist es nicht
+    // waehlbar und in der Liquiditaetsvorschau kommt es nicht vor.
+    { id: "konto-alt", bezeichnung: "Altes Girokonto", typ: "Giro", klasse: "liquide", iban: iban("99999903", 7008009), stand: 4210, aktiv: false },
   ];
   for (const k of konten) {
     setzen(
-      "INSERT INTO zahlungskonto (id, bezeichnung, typ, iban, inhaber_ids, kontostand, klasse) VALUES (?, ?, ?, ?, ?, ?, ?)",
-      [k.id, k.bezeichnung, k.typ, k.iban, '["person-1"]', k.stand, k.klasse],
+      "INSERT INTO zahlungskonto (id, bezeichnung, typ, iban, inhaber_ids, kontostand, klasse, aktiv) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+      [k.id, k.bezeichnung, k.typ, k.iban, '["person-1"]', k.stand, k.klasse, "aktiv" in k && k.aktiv === false ? 0 : 1],
     );
     // Ein Anker je Konto: der Stand, gegen den der Verlauf rechnet.
     setzen(
@@ -529,6 +535,15 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       m % 2 === 0 ? "Mordhorst KD-4711" : "Mordhorst RE-8823",
       "Beitrag", "vertrag-versicherung", m % 3 === 0);
     fest(8, -zahlZwischen(6000, 11000), "konto-giro", "kat-energie", "Aufwand", "Wendlandt", "Abschlag");
+    // Das STILLGELEGTE Konto hat eine Vergangenheit und keine Zukunft — genau darum geht
+    // es. Es traegt Buchungen nur in der ersten Haelfte des Zeitraums; danach wurde es
+    // aufgegeben. Ohne diese Zeilen zeigte das Konto im Spielstand nichts, und die Aussage
+    // „seine Buchungen zaehlen weiter mit" waere an nichts zu pruefen.
+    if (m > MONATE / 2) {
+      buchung(tagIn(-m, 12), -zahlZwischen(1500, 4000), "konto-alt", "kat-lebensmittel", "Aufwand", {
+        notiz: "Einkauf",
+      });
+    }
     // Eine Umschichtung hat ZWEI Seiten — sonst zeigt der Verlauf einen Stand, den es nie gab.
     //
     // Beide Beine tragen `transfer_id` und `gegenkonto_id`. Ohne die sieht der

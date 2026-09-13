@@ -550,6 +550,30 @@ describe("Spielstand — Umbuchungsvertrag", () => {
     expect(Number(beine!.values[0][0])).toBeGreaterThan(0);
   });
 
+  /**
+   * Der Fall, den man sonst nur herstellt, indem man ihn herstellt — und an dem beide
+   * Haelften der Stilllegungs-Regel sichtbar werden.
+   */
+  it("enthaelt ein stillgelegtes Konto MIT Buchungen und Restbetrag", () => {
+    const db = mitSeed();
+    const [zeile] = db.exec(
+      "SELECT aktiv, kontostand FROM zahlungskonto WHERE id = 'konto-alt'",
+    );
+    expect(zeile!.values[0][0]).toBe(0);
+    // Restgeld: es steht in „Was da ist", obwohl das Konto nirgends mehr waehlbar ist.
+    expect(Number(zeile!.values[0][1])).toBeGreaterThan(0);
+    // Und eine Vergangenheit, die in der Analyse weiterzaehlt.
+    expect(zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE konto_id = 'konto-alt'")).toBeGreaterThan(0);
+  });
+
+  it("fuehrt alle anderen Konten als aktiv", () => {
+    // Die Gegenprobe zum Testfall darueber: genau EIN stillgelegtes Konto, nicht aus
+    // Versehen mehrere. Ein Spielstand, in dem die Haelfte der Konten still ist, zeigt die
+    // App in einem Zustand, den es so nicht gibt.
+    const db = mitSeed();
+    expect(zahl(db, "SELECT COUNT(*) FROM zahlungskonto WHERE aktiv = 0")).toBe(1);
+  });
+
   it("paart beide Beine jeder Umbuchung", () => {
     const db = mitSeed();
     // Eine transfer_id ohne Gegenstueck waere eine halbe Umbuchung — der Verlauf zeigte
