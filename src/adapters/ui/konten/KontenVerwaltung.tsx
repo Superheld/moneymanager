@@ -134,6 +134,16 @@ export function KontenVerwaltung({
   const [iban, setIban] = useState("");
   const [inhaberIds, setInhaberIds] = useState<string[]>([]);
   const [saldoText, setSaldoText] = useState("");
+  /**
+   * Der Zustand im Dialog — nur zur ANZEIGE, und er wird sofort geschrieben.
+   *
+   * Er läuft ausdrücklich NICHT über `speichern`: `kontoAnlegen` fasst `aktiv` nicht an
+   * (sonst holte jedes Umbenennen ein stillgelegtes Konto zurück in die Gegenwart), also
+   * hätte ein Feld, das erst beim Speichern wirkt, keinen Weg in den Bestand. Der Schalter
+   * hier ruft denselben Dienst wie der in der Liste, und dieser Zustand hält nur nach, was
+   * danach dasteht — sonst zeigte der Dialog den alten Stand weiter, bis man ihn schliesst.
+   */
+  const [aktiv, setAktiv] = useState(true);
   const [fehler, setFehler] = useState<string | null>(null);
 
   function toggleInhaber(id: string) {
@@ -155,6 +165,7 @@ export function KontenVerwaltung({
     setIban(k.iban ?? "");
     setInhaberIds([...k.inhaberIds]);
     setSaldoText(String(minorZuMajor(k.saldo, geld.waehrung)));
+    setAktiv(istAktiv(k));
     setFehler(null);
     setOffen(true);
   }
@@ -248,12 +259,14 @@ export function KontenVerwaltung({
                   <IconButton
                     icon="stilllegen"
                     label={t("konten.stilllegen")}
+                    hinweis={t("konten.stilllegenHinweis")}
                     onClick={async () => { await kontoStilllegen(k.id); onChange(); }}
                   />
                 ) : (
                   <IconButton
                     icon="wiederaufnehmen"
                     label={t("konten.wiederaufnehmen")}
+                    hinweis={t("konten.wiederaufnehmenHinweis")}
                     onClick={async () => { await kontoWiederaufnehmen(k.id); onChange(); }}
                   />
                 ),
@@ -268,7 +281,7 @@ export function KontenVerwaltung({
             // Gezaehlt wird beim Oeffnen der Frage und nicht beim Laden der Liste: es sind
             // acht Abfragen je Konto, und eine Liste mit zehn Konten fuehrte achtzig davon
             // aus, um einen Satz zu zeigen, den fast niemand aufschlaegt.
-            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={async () => {
+            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} hinweis={t("konten.loeschenHinweis")} onClick={async () => {
               const l = await kontoloeschung(k.id);
               loeschfrage.stellen({
                 name: k.bezeichnung,
@@ -292,6 +305,7 @@ export function KontenVerwaltung({
                     icon="verwerfen"
                     ton="gefahr"
                     label={t("konten.endgueltigLoeschen")}
+                    hinweis={t("konten.endgueltigHinweis")}
                     onClick={async () => {
                       const l = await kontoloeschung(k.id);
                       const folgen = folgenText(t, l);
@@ -351,6 +365,38 @@ export function KontenVerwaltung({
               </span>
             )}
           </FormField>
+
+          {/* Der Zustand steht NEBEN der Verbindung und nach demselben Muster: eine Pille,
+              die ihn nennt, ein Satz, der ihn erklärt, und der Weg, ihn zu ändern. Beides
+              sind Auskünfte über das Konto als Ganzes und keine Stammdatenfelder — deshalb
+              stehen sie über dem Gitter und nicht darin.
+
+              Nur beim BEARBEITEN: ein Konto, das gerade angelegt wird, ist geführt, und ein
+              Schalter dafür wäre eine Frage, die sich niemand stellt. */}
+          {editId && (
+            <FormField label={t("konten.zustandTitel")}>
+              <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+                <Pill variant={aktiv ? "ok" : "neutral"}>
+                  {aktiv ? t("konten.gefuehrt") : t("konten.stillgelegt")}
+                </Pill>
+                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {aktiv ? t("konten.zustandHinweisGefuehrt") : t("konten.zustandHinweisStill")}
+                </span>
+                <button
+                  className="linkbtn"
+                  title={aktiv ? t("konten.stilllegenHinweis") : t("konten.wiederaufnehmenHinweis")}
+                  onClick={async () => {
+                    if (aktiv) await kontoStilllegen(editId);
+                    else await kontoWiederaufnehmen(editId);
+                    setAktiv(!aktiv);
+                    onChange();
+                  }}
+                >
+                  {aktiv ? t("konten.stilllegen") : t("konten.wiederaufnehmen")}
+                </button>
+              </span>
+            </FormField>
+          )}
 
           <div className="form-grid">
             <FormField label={t("einstellungen.konto.feldBezeichnung")} required>

@@ -298,6 +298,23 @@ ganzen Teilbaum auf einmal, auch die Zellen, die ihre Farbe selbst setzen (Betr�
 `color` ginge das nicht, die Zellen überschreiben es. Benutzt wird es im Kontoauszug für
 Buchungen, deren Buchungstag noch vor uns liegt.
 
+**`IconButton` trennt NAME und ERKLÄRUNG.** `label` ist der Name (er wird `aria-label` und
+ist Pflicht), `hinweis` die Erklärung — sie erscheint beim Hovern statt des Namens. Ohne
+`hinweis` zeigt der Hover-Text weiter den Namen, so wie bisher.
+
+Wann welches: bei einem Stift genügt der Name, weil das Icon dasselbe sagt. Bei einer Aktion,
+deren FOLGEN man nicht ansieht, ist der Name keine Auskunft — „Stilllegen" über einem
+Kistensymbol beantwortet nicht, was mit den Buchungen passiert. Dort gehört ein Satz hin.
+
+Und der Name bleibt trotzdem `aria-label`: eine Vorlesehilfe liest in einer Zeile mehrere
+Aktionen hintereinander, dort ist kurz und gleichförmig richtig. ARIA gewinnt ohnehin gegen
+`title`, das Verhältnis ist also eindeutig und nicht zu verwechseln.
+
+**Einen Tooltip-Baustein gibt es nicht**, und das ist bislang Absicht: `title` kostet nichts
+und trägt so weit. Wer einen baut, nimmt Base UI `Tooltip` (Positionierung, Verzögerung,
+Berührung) — und muss dann für JEDEN `IconButton` der App entscheiden, was passiert, denn
+der Hover-Text ist heute überall der Name.
+
 **`Input` hat kein `onChange`** und ist für berechnete oder abgeleitete Felder gedacht.
 Editierbare Texteingaben bauen wir mit echten `<input>` im selben Token-Stil. Wer das
 übersieht, baut ein Feld, das sich nicht tippen lässt. Für eine AUSWAHL gilt das nicht mehr
