@@ -26,8 +26,44 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 ## Zahlen anzeigen
 
 **`useGeld()`** — nie eigenes `toFixed`, nie an der Locale-Schicht vorbei. Die Farbe kommt
-aus **`bausteine/geldFarbe.ts`**: Plus grün, Minus `--warn-deep`, Null neutral. Eine Farbregel
-für die ganze App, nicht eine je Screen.
+aus **`bausteine/geldFarbe.ts`**, und zwar jede: Plus grün, Minus `--warn-deep`, Null
+neutral. Eine Farbregel für die ganze App, nicht eine je Screen.
+
+**Seit 2026-09-13 deckt sie die ganze AUSWERTUNG ab, nicht nur Beträge.** Vorher liefen
+dort zwei Farbsprachen nebeneinander, die beide `--warn-deep` malten: `geldFarbe` meinte
+„Geld geht raus", der `tone` an `KPIStat` meinte „sieh hin". Weil sie gleich aussahen,
+konnte niemand die Frage beantworten, die eine rote Zahl stellt — und es schlich sich
+Unsinn ein, der keinem auffiel: Ausgaben mit `tone={summeAus < 0 ? "warn" : "default"}`
+(also immer warn), Einnahmen fest auf grün, und die positive Seite in derselben KPI-Reihe
+mal grün, mal neutral.
+
+Vier Fragen, vier Funktionen — die vollständige Begründung steht im Kopf der Datei:
+
+| | gerichtet (Vorzeichen = Richtung) | ungerichtet, an einer Schwelle |
+|---|---|---|
+| **Text** | `geldFarbe(betrag)` | `warnFarbe(bedingung)` |
+| **Fläche** (Balken, Linie) | `flussFarbe(betrag)` | `warnFlaeche(bedingung)` |
+| **`KPIStat`** | `tone={geldTon(betrag)}` | `tone={warnTon(bedingung)}` |
+
+Zwei Dinge daran sind Entscheidung und nicht Mechanik:
+
+- **Eine ungerichtete Grösse wird nie grün.** Prozent, Monate, Anzahl, blosse Höhe: amber
+  an der Schwelle, sonst neutral. Dieselbe Überlegung, aus der die Handlungsbedarf-Karte
+  verschwindet, statt „alles in Ordnung" zu schreiben — ein Dauergrün liest nach zwei
+  Wochen niemand mehr, und dann fällt das Rot daneben auch nicht mehr auf.
+- **Eine Fläche nimmt `--ok`/`--warn`, Text `--ok-deep`/`--warn-deep`.** Das ist keine
+  zweite Sprache, sondern das Tokenset: die `-deep`-Paare sind die Töne für Schrift auf
+  hellem Grund. Dieselbe Aussage, eine Stufe heller.
+
+**Bewertung gehört weiterhin in die Pille und in die Meta-Zeile.** Dort steht ein WORT,
+und ein Wort wird gelesen — eine grüne Pille „stabil" sagt etwas, eine grüne Zahl sagt nur
+„grün". `Pill variant="ok"` bleibt deshalb erlaubt.
+
+Durchgesetzt wird das von **`farbregel.test.ts`** über `analyse/`, `uebersicht/` und
+`budgets/`: dort darf kein `color:` und kein `fill=` eines der vier Tokens direkt tragen.
+Nur diese drei Bereiche, weil nur dort Zahlen nebeneinander stehen, über die eine Farbe
+etwas aussagt — ein Verwerfen-Knopf, der amber ist, sagt nichts über Geld. Kartenrahmen
+sind ausgenommen: die Karte *Da ist etwas zu tun* IST die Warnung, sie trägt keinen Betrag.
 
 **`useProzent()`** für Anteile (0…1) — dieselbe Regel, derselbe Ort. Sie stand hier lange
 nur für Geld, und direkt daneben formatierten die Depot-Anteile mit `toFixed`: im Deutschen
