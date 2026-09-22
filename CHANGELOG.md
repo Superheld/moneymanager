@@ -3,6 +3,25 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.29.1] — 2026-09-22
+
+Eine Sicherheitsaktualisierung, sonst nichts.
+
+### Behoben
+
+**`rustls` aus RUSTSEC-2026-0285 gehoben** (0.23.43 auf 0.23.45): TLS-1.3-Handshake-
+Nachrichten wurden ueber Verschluesselungsgrenzen hinweg akzeptiert. Die Kiste liegt nicht
+am Rand, sondern in beiden Wegen, die diese App nach draussen nimmt — unter dem Bankabruf
+und unter der Update-Pruefung. **Wer 0.29.0 geladen hat, sollte aktualisieren.**
+
+Gefunden hat es der woechentliche Lauf der Lieferketten-Pruefung, einen Tag bevor hier
+jemand etwas getippt hat. Genau dafuer gibt es ihn: beide Advisory-Datenbanken aendern
+sich ohne unser Zutun, und ein Lauf, der nur bei einem Push startet, findet so etwas erst
+beim naechsten Commit.
+
+Dazu `chacha20` von 0.10.1 auf 0.10.2 — weg von einer Fassung, die ihr Autor
+zurueckgezogen hat.
+
 ## [0.29.0] — 2026-09-22
 
 Die Gegenrichtung. Es gab zwei Exporte und keinen Weg zurueck — die schwierigere Haelfte
