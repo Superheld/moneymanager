@@ -181,6 +181,11 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     { id: "konto-bar", bezeichnung: "Haushaltskasse", typ: "Bargeld", klasse: "liquide", iban: null, stand: 13740 },
     { id: "konto-tagesgeld", bezeichnung: "Ruecklage", typ: "Tagesgeld", klasse: "ruecklage", iban: iban("99999902", 4005006), stand: 890000 },
     { id: "konto-kk", bezeichnung: "Kreditkarte", typ: "Kreditkarte", klasse: "liquide", iban: null, stand: -32000 },
+    // Je ein Konto der beiden Klassen, die 2026-09-22 dazugekommen sind — sonst zeigt die
+    // Karte „Was da ist" im Spielstand nur die Haelfte der Zeilen, die es geben kann.
+    { id: "konto-sparen", bezeichnung: "Sparkonto", typ: "Tagesgeld", klasse: "sparen", iban: iban("99999904", 1101202), stand: 456000 },
+    { id: "konto-vorsorge", bezeichnung: "Altersvorsorge", typ: "Tagesgeld", klasse: "vorsorge", iban: iban("99999905", 1301402), stand: 2310000 },
+    { id: "konto-depot", bezeichnung: "Wertpapierdepot", typ: "Depot", klasse: "investment", iban: null, stand: 1275000 },
     // Ein STILLGELEGTES Konto — der Fall, den man sonst nur herstellt, indem man ihn
     // herstellt. Es traegt Buchungen und einen Restbetrag, weil genau daran die beiden
     // Haelften der Regel sichtbar werden: seine Buchungen zaehlen in der Analyse weiter
@@ -198,19 +203,6 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
       "INSERT INTO kontostand_anker (konto_id, datum, herkunft, betrag, erfasst_am) VALUES (?, ?, ?, ?, ?)",
       [k.id, tagIn(-MONATE, 1), "hand", k.stand, JETZT],
     );
-  }
-
-  // Zwei Gruppen, und die zweite ist der Fall, den eine feste Klasse nicht abbilden
-  // kann: dasselbe Konto liegt in beiden. Genau dafuer gibt es Gruppen NEBEN der Klasse.
-  const gruppen = [
-    { id: "gruppe-alltag", bezeichnung: "Lebenshaltung", konten: ["konto-giro", "konto-bar"] },
-    { id: "gruppe-urlaub", bezeichnung: "Urlaubskasse", konten: ["konto-bar", "konto-tagesgeld"] },
-  ];
-  for (const g of gruppen) {
-    setzen("INSERT INTO kontogruppe (id, bezeichnung) VALUES (?, ?)", [g.id, g.bezeichnung]);
-    for (const kontoId of g.konten) {
-      setzen("INSERT INTO kontogruppe_konto (gruppe_id, konto_id) VALUES (?, ?)", [g.id, kontoId]);
-    }
   }
 
   // **Die Kategorien kommen aus der VORLAGE, nicht aus einer eigenen Liste.**

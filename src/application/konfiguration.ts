@@ -1,7 +1,7 @@
 // Konfiguration exportieren — heute die Kategorien, später mehr.
 //
 // **Was das ist und was es nicht ist.** Exportiert wird, wie der Haushalt ORDNET, nicht
-// was in ihm passiert ist: Kategorien, später Budgets, Verträge, Kontogruppen,
+// was in ihm passiert ist: Kategorien, später Budgets, Verträge,
 // Erkennungsregeln. Keine Buchungen, keine Salden, keine Kontonummern. Die Trennung ist
 // nicht Bequemlichkeit, sondern der Grund, warum es diese Datei überhaupt geben darf: eine
 // Ordnung lässt sich weitergeben, ein Kontoauszug nicht.

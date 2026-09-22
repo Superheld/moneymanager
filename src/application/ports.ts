@@ -12,7 +12,6 @@ import type {
   IstBuchung,
   Journaleintrag,
   Kategorie,
-  Kontogruppe,
   Merkmalsausschluss,
   Merkmalsherkunft,
   Modell,
@@ -53,13 +52,6 @@ export interface ZahlungskontoRepository {
   speichern(konto: Zahlungskonto): Promise<void>;
   /** Legt still (`false`) oder nimmt wieder auf (`true`). Ändert sonst nichts. */
   aktivSetzen(id: string, aktiv: boolean): Promise<void>;
-  loeschen(id: string): Promise<void>;
-}
-
-export interface KontogruppeRepository {
-  alle(): Promise<Kontogruppe[]>;
-  /** Legt an oder ersetzt — die Mitgliederliste der uebergebenen Gruppe ist der Stand. */
-  speichern(gruppe: Kontogruppe): Promise<void>;
   loeschen(id: string): Promise<void>;
 }
 

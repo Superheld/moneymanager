@@ -141,7 +141,7 @@ describe("Stammdaten-Repositories", () => {
       ["k8", "Altes Depot", "Depot"],
     );
     const k = (await zahlungskontoRepository.alle()).find((x) => x.id === "k8")!;
-    expect(k.klasse).toBe("vorsorge");
+    expect(k.klasse).toBe("investment");
   });
 
   it("führt ein neu gespeichertes Konto als aktiv", async () => {

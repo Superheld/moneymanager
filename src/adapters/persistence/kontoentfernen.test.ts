@@ -199,12 +199,10 @@ describe("vollstaendig", () => {
     expect(db.exec("SELECT id, konto_id FROM ruecklage")[0].values).toEqual([["r1", null]]);
   });
 
-  it("nimmt Anker, Gruppenmitgliedschaft und Vormerkungen per Kaskade mit", async () => {
+  it("nimmt Anker und Vormerkungen per Kaskade mit", async () => {
     bestand();
     db.run(`INSERT INTO kontostand_anker (konto_id, datum, herkunft, betrag, erfasst_am)
             VALUES ('alt','2026-05-01','manuell',0,'2026-05-01T00:00:00.000Z')`);
-    db.run(`INSERT INTO kontogruppe (id, bezeichnung) VALUES ('g1','Meine')`);
-    db.run(`INSERT INTO kontogruppe_konto (gruppe_id, konto_id) VALUES ('g1','alt')`);
     db.run(`INSERT INTO vormerkung (id, zahlungskonto_id, betrag, waehrung, gegenpartei,
               verwendungszweck, erfasst_am)
             VALUES ('v1','alt',-500,'EUR','Kesselmann','','2026-05-01T00:00:00.000Z')`);
@@ -212,10 +210,7 @@ describe("vollstaendig", () => {
     await sqliteKontoentfernen.vollstaendig("alt");
 
     expect(db.exec("SELECT konto_id FROM kontostand_anker")).toEqual([]);
-    expect(db.exec("SELECT konto_id FROM kontogruppe_konto")).toEqual([]);
     expect(db.exec("SELECT id FROM vormerkung")).toEqual([]);
-    // Die Gruppe selbst bleibt — sie ist eine Sicht und kann weitere Konten führen.
-    expect(db.exec("SELECT id FROM kontogruppe")[0].values).toEqual([["g1"]]);
   });
 
   it("lässt ein Konto ohne alles genauso gehen", async () => {

@@ -51,11 +51,10 @@ gegangen ist. Der Untertitel der Übersicht sagt es mit.
 
 Zwei Karten hängen daran und beantworten je eine eigene Frage:
 
-- **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE Konten. Nach Klasse und
-  nicht nach Gruppe: die Klasse ist die Rechenregel und jedes Konto hat genau eine, die
-  Summen addieren sich also zum Ganzen. Über Gruppen summiert ergäbe „das Vermögen" mehr,
-  als vorhanden ist (dasselbe Konto darf in mehreren liegen). Was man mit Gruppen ansehen
-  will, gehört in die Analyse.
+- **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE Konten. Die Klasse ist
+  die Rechenregel und jedes Konto hat genau eine, die Summen addieren sich also zum
+  Ganzen. Jede Bündelung, in der dasselbe Konto mehrfach vorkommen darf, ergäbe hier „das
+  Vermögen" grösser, als es ist — was man so ansehen will, gehört in die Analyse.
 - **„Da ist etwas zu tun"** — Konten, die im Vorschaufenster ins Minus laufen. Sie steht
   ganz oben und ist die einzige Karte, die VERSCHWINDET, wenn nichts anliegt: eine
   dauerhafte Zeile „alles in Ordnung" wäre nach zwei Wochen unsichtbar, und dann fiele
@@ -144,8 +143,7 @@ ist sie:
   `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ,
   Klasse UND `aktiv`, siehe unten) ·
   `kontostand_anker` · `vormerkung` (was die Bank kennt und noch nicht gebucht hat,
-  siehe unten) · `import_lauf` · `dubletten_freigabe` ·
-  `kontogruppe` + `kontogruppe_konto` (frei benannte Gruppen, siehe unten)
+  siehe unten) · `import_lauf` · `dubletten_freigabe`
 - **Ordnen:** `kategorie` · `budget` + `budget_betrag` (die
   Reihe seiner Beträge, siehe unten) · `vertrag` ·
   `vertrag_erkennung` · `zahlungsregel` · `ruecklage` + `ruecklage_ausbuchung` (siehe unten)
@@ -162,7 +160,8 @@ und `vertrag_zuordnung`, aufgegangen in zwei Spalten der Buchung (siehe unten). 
 Handkorrektur ist über `kategorie_herkunft` ohnehin sicher —, sondern eine
 VERALLGEMEINERUNG, und die soll das Modell leisten, über alle Merkmale statt über den
 Empfänger allein. Die Begründung samt dem, was beim Wiedereinbau zu bedenken wäre, steht
-im Kopf von `application/import/vorschlag.ts`.
+im Kopf von `application/import/vorschlag.ts`. Und seit Migration 74 `kontogruppe` +
+`kontogruppe_konto` — aufgegangen in der Kontoklasse (siehe unten).
 
 **Diese Liste stand bis zum 09.09.2026 selbst falsch da** — `kategorie_festlegung` war seit
 Migration 64 gedroppt und wurde hier weiter als lebend geführt. Das ist genau die
@@ -762,8 +761,9 @@ Bedarf über Plan heisst: du legst zu wenig zurück, die Deckung wird schlechter
 irgendwo etwas schiefgeht. Plan über Ist heisst: die Überweisung ist ausgefallen. Eine
 Zahl allein könnte keine dieser Aussagen treffen.
 
-**Wohin gerechnet wird, entscheidet die KONTOKLASSE**, nicht die Gruppe: ein Zufluss auf
-`ruecklage` oder `vorsorge` ist zurückgelegt, auf ein liquides nur umgeschichtet. Bedarf
+**Wohin gerechnet wird, entscheidet die KONTOKLASSE**, und zwar über genau eine Grenze:
+ein Zufluss auf ein NICHT liquides Konto ist zurückgelegt, auf ein liquides nur
+umgeschichtet. Bedarf
 und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
 Zeitraum. Wer sie über mehrere Monate vergleicht, muss die ersten beiden hochrechnen — das
 im Kern zu tun hiesse zu raten, wie viele Monate gemeint sind.
@@ -1050,7 +1050,7 @@ wiederfindet.
 
 Was NICHT drin ist, damit niemand danach sucht: unverbuchte Zeilen (Inbox, verworfen) —
 exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso Budgets,
-Rücklagen, Depots, Kontogruppen und das Journal: sie hängen nicht an einer Buchung.
+Rücklagen, Depots und das Journal: sie hängen nicht an einer Buchung.
 
 **Die Datei liegt im KLARTEXT, der Bestand daneben nicht.** Seit 2026-08-27 ist die
 Datenbank verschlüsselt und ihre Sicherungen sind es mit; ein Bestandsexport legt eine
@@ -1995,18 +1995,26 @@ Vier Dinge gelten überall und stehen deshalb hier:
   tun kann. Es entscheidet deshalb keine einzige Summe über die Vergangenheit; siehe
   „Ein Konto stilllegen" oben.
 
-- **Eine Kontogruppe ist eine SICHT, die Klasse eine RECHENREGEL.** Das ist der Unterschied,
-  an dem sonst eine zweite Wahrheit entsteht. Die Klasse entscheidet mit — nur `liquide`
-  zählt zu den liquiden Mitteln — und ein Konto hat genau eine. Eine Gruppe
-  (`core/konten/gruppe.ts`, Tabellen `kontogruppe` + `kontogruppe_konto`) heißt, wie der
-  Nutzer sie nennt, bündelt beliebig viele Konten und entscheidet **nichts**; dasselbe Konto
-  darf in mehreren liegen, und genau dafür gibt es sie neben der Klasse. Wer eine Gruppe je
-  eine Rechnung tragen lässt („Gruppe X zählt als liquide"), hat zwei Felder, die dasselbe
-  verschieden sagen — und der Widerspruch fällt erst auf, wenn eine Summe nicht mehr aufgeht.
+- **Die Klasse ist das EINE Feld für „wofür ist dieses Konto da".** Bis 2026-09-22 stand
+  daneben eine frei benannte `Kontogruppe` — eine Sicht, die nichts entschied, während die
+  Klasse über die liquiden Mittel entscheidet. Zwei Felder auf dieselbe Frage, und nur
+  eines galt: gepflegt wurden beide, und beim ersten Widerspruch hätte niemand sagen
+  können, welches gemeint war. Die Gruppen sind deshalb weg (Migration 74), die Klasse
+  trägt dafür fünf Werte statt drei — `liquide`, `ruecklage`, `vorsorge`, `sparen`,
+  `investment`, benannt in `i18n.ts` unter `einstellungen.konto.klasse`.
 
-  Was für eine Gruppe trotzdem gilt, weil es für jede Auswahl von Konten gilt: **Saldo und
-  Buchungen filtern mit derselben Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie
-  gab.
+  **Was dabei nicht mehr geht, gehört benannt:** ein Konto lag in beliebig vielen Gruppen
+  und liegt in genau einer Klasse. Ein Bargeldbestand, der zu „Lebenshaltung" UND zum
+  „Urlaubstopf" gehörte, ist so nicht mehr abzubilden. Wer Konten wieder frei bündeln
+  will, baut dafür etwas Neues — und es darf dann, wie die Gruppe, **nichts** entscheiden;
+  sonst stehen wieder zwei Felder da, die dasselbe verschieden sagen.
+
+  **Gerechnet wird weiterhin über genau eine Grenze:** `istLiquide` fragt `=== "liquide"`,
+  die vier übrigen Werte sind für jede Rechnung dasselbe. Wer das ändert, ändert nicht
+  eine Zahl, sondern die Bedeutung des Feldes.
+
+  Was für jede Auswahl von Konten gilt: **Saldo und Buchungen filtern mit derselben
+  Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie gab.
 
   **Saldo und Buchungen gehören dabei zusammen.** `istMonatsverlauf` bildet seinen Sockel aus
   `liquideMittel` und lässt Buchungen darüberlaufen. Nimmt man den Saldo eines Kontos heraus

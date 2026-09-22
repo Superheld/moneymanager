@@ -49,7 +49,7 @@ describe("Kontoklassen", () => {
   it("schlägt für ein Depot etwas anderes vor als für die übrigen Arten", () => {
     // Nur ein Vorschlag: ein Tagesgeldkonto ist mal Reserve, mal zweckgebundene Rücklage,
     // und das weiß nur der, dem es gehört.
-    expect(klasseVorschlag("Depot")).toBe("vorsorge");
+    expect(klasseVorschlag("Depot")).toBe("investment");
     expect(klasseVorschlag("Giro")).toBe("liquide");
     expect(klasseVorschlag("Tagesgeld")).toBe("liquide");
   });

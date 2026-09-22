@@ -2139,4 +2139,25 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE zahlungskonto ADD COLUMN aktiv INTEGER NOT NULL DEFAULT 1`,
     ],
   },
+  {
+    version: 74, // Die Kontogruppen gehen in der Kontoklasse auf
+    sql: [
+      // Zwei Felder beantworteten dieselbe Frage — „wofuer ist dieses Konto da" —, und
+      // nur eines davon galt: die Klasse entscheidet ueber die liquiden Mittel, die
+      // Gruppe entschied nichts. Ein Feld, das nichts entscheidet, aber so aussieht, als
+      // taete es das, ist die teurere Haelfte: es steht da, man pflegt es, und beim
+      // ersten Widerspruch zwischen beiden weiss niemand, welches gemeint war.
+      //
+      // Die Klasse traegt dafuer seit 2026-09-22 fuenf Werte statt drei (`sparen`,
+      // `investment` kommen dazu). Was dabei WEGFAELLT, gehoert benannt: ein Konto lag in
+      // beliebig vielen Gruppen und liegt in genau einer Klasse. Wer Konten frei buendeln
+      // will, braucht dafuer etwas Neues — und es darf dann wieder nichts entscheiden.
+      //
+      // Geloescht statt stehengelassen, weil das Alpha-Stadium es erlaubt (siehe
+      // CLAUDE.md): eine Tabelle, die kein Code mehr kennt, ist beim naechsten Hinsehen
+      // eine Frage, die niemand mehr beantworten kann.
+      `DROP TABLE IF EXISTS kontogruppe_konto`,
+      `DROP TABLE IF EXISTS kontogruppe`,
+    ],
+  },
 ];
