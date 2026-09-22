@@ -1513,8 +1513,8 @@ const de = {
           "Diese Datei ist dein Kontoauszug. Sie enthält IBANs, Kontostände, Empfänger " +
           "und jeden Verwendungszweck — gib sie nicht weiter und lade sie nirgends hoch.",
         vergaenglich:
-          "Sie liegt unverschlüsselt, während deine Datenbank verschlüsselt ist. " +
-          "Lösch sie, sobald du sie nicht mehr brauchst.",
+          "Sie liegt unverschlüsselt in deinem Download-Ordner, während deine Datenbank " +
+          "verschlüsselt ist. Lösch sie, sobald du sie nicht mehr brauchst.",
         knopf: "Bestand exportieren",
       },
     },
@@ -3496,8 +3496,8 @@ const en: typeof de = {
           "This file is your bank statement. It holds IBANs, balances, payees and every " +
           "reference line — do not share it and do not upload it anywhere.",
         vergaenglich:
-          "It sits unencrypted while your database is encrypted. Delete it as soon as " +
-          "you no longer need it.",
+          "It sits unencrypted in your downloads folder while your database is " +
+          "encrypted. Delete it as soon as you no longer need it.",
         knopf: "Export records",
       },
     },
