@@ -283,8 +283,8 @@ const de = {
     registerDatei: "Datei",
     registerInbox: "Inbox",
     dateiWaehlen: "Datei wählen",
-    hinweis: "Excel-Export aus Finanzguru (.xlsx). Die Datei wird lokal gelesen; nichts wird gespeichert oder verschickt.",
-    nichtErkannt: "Format nicht erkannt — derzeit wird nur der Finanzguru-Export als Excel-Datei (.xlsx) unterstützt.",
+    hinweis: "Excel-Export aus Finanzguru (.xlsx) oder ein Bestandsexport dieser App (.json). Die Datei wird lokal gelesen; nichts wird gespeichert oder verschickt.",
+    nichtErkannt: "Format nicht erkannt — gelesen werden der Finanzguru-Export als Excel-Datei (.xlsx) und der Bestandsexport dieser App (.json).",
     fremd: {
       titel: "Kategorien der Datei",
       untertitel:
@@ -2349,8 +2349,8 @@ const en: typeof de = {
     registerDatei: "File",
     registerInbox: "Inbox",
     dateiWaehlen: "Choose file",
-    hinweis: "Finanzguru Excel export (.xlsx). The file is read locally; nothing is saved or sent.",
-    nichtErkannt: "Format not recognised — currently only the Finanzguru Excel export (.xlsx) is supported.",
+    hinweis: "Finanzguru Excel export (.xlsx) or a records export from this app (.json). The file is read locally; nothing is saved or sent.",
+    nichtErkannt: "Format not recognised — this reads the Finanzguru Excel export (.xlsx) and this app's records export (.json).",
     fremd: {
       titel: "Categories in the file",
       untertitel:
