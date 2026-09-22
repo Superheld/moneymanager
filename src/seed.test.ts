@@ -20,7 +20,7 @@ import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { MIGRATIONS } from "./adapters/persistence/migrations";
 import { seedEinspielen } from "./testwerkzeug/seedDaten";
 import { standardkategorienFlach } from "./application/kategorien/standardkategorien";
-import { passtZu } from "./core";
+import { KONTOKLASSEN, passtZu } from "./core";
 import type { Zahlungsspur } from "./core";
 
 /**
@@ -119,8 +119,6 @@ describe("Spielstand", () => {
       ["umsatz_roh", 6],
       ["umsatz_verarbeitung", 6],
       ["kontostand_anker", 4],
-      ["kontogruppe", 2],
-      ["kontogruppe_konto", 4],
     ] as const) {
       expect(zahl(db, `SELECT COUNT(*) FROM ${tabelle}`), tabelle).toBeGreaterThanOrEqual(
         mindestens,
@@ -163,17 +161,21 @@ describe("Spielstand", () => {
     }
   });
 
-  // Der Fall, den eine feste Kontoklasse nicht abbilden kann und fuer den es Gruppen
-  // gibt: dasselbe Konto liegt in mehr als einer.
-  it("legt ein Konto in zwei Gruppen", () => {
+  /**
+   * Jede Kontoklasse kommt im Spielstand vor.
+   *
+   * Sonst faellt eine Klasse, die niemand benutzt, erst dann auf, wenn ein echter Bestand
+   * sie traegt — und die Karte „Was da ist" zeigt im Spielstand bis dahin eine Zeile
+   * weniger, als es geben kann.
+   */
+  it("belegt jede Kontoklasse mit mindestens einem Konto", () => {
     const db = mitSeed();
-    expect(
-      zahl(
-        db,
-        "SELECT COUNT(*) FROM (SELECT konto_id FROM kontogruppe_konto " +
-          "GROUP BY konto_id HAVING COUNT(*) > 1)",
-      ),
-    ).toBeGreaterThanOrEqual(1);
+    for (const klasse of KONTOKLASSEN) {
+      expect(
+        zahl(db, `SELECT COUNT(*) FROM zahlungskonto WHERE klasse = '${klasse}'`),
+        klasse,
+      ).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it("haelt die Invariante der Aufteilung: Summe der Teile = Betrag der Buchung", () => {

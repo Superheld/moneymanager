@@ -19,7 +19,6 @@ import {
 } from "../../dienste";
 import { Bereich } from "../bausteine/Bereich";
 import { AbgleichBereich } from "./AbgleichBereich";
-import { GruppenBereich } from "./GruppenBereich";
 import { BankzugaengeScreen } from "./BankzugaengeScreen";
 import { KontenVerwaltung, type KontoVerbindung } from "./KontenVerwaltung";
 
@@ -92,14 +91,6 @@ export function KontenVerwaltungScreen() {
               onChange={() => void laden()}
             />
           ),
-        },
-        {
-          // Die Gruppen stehen NEBEN den Konten und nicht in ihnen: eine Gruppe ist eine
-          // Aussage über mehrere Konten, und in der Kontenliste hätte sie keine Zeile.
-          id: "gruppen",
-          label: t("konten.registerGruppen"),
-          untertitel: t("konten.gruppen.untertitel"),
-          inhalt: () => <GruppenBereich />,
         },
         {
           id: "abgleich",

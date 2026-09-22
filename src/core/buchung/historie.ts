@@ -255,7 +255,7 @@ export function nachHauptgruppe(
  * wenn sie ein Gegenbein hat — sonst ist sie eine Zahlung wie jede andere.
  *
  * **Was das NICHT leistet, und das ist die offene Stelle:** ob eine Umbuchung intern ist,
- * hängt vom betrachteten Kontokreis ab. Innerhalb einer Kontogruppe kann dieselbe Zahlung
+ * hängt vom betrachteten Kontokreis ab. Innerhalb einer Auswahl von Konten kann dieselbe Zahlung
  * ein Transfer sein und aus Sicht der Gruppe ein Abfluss. Diese Funktion kennt den Kreis
  * nicht — sie beantwortet nur „ist es ein Transfer zwischen zwei erfassten Konten". Wer
  * gruppenweise auswertet, muss zusätzlich prüfen, ob BEIDE Beine im Kreis liegen.

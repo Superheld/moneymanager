@@ -182,14 +182,6 @@ import { sqliteZahlungsregelRepository } from "./persistence/sqliteZahlungsregel
 import { sqliteRuecklagenRepository } from "./persistence/sqliteRuecklagenRepository";
 import { sqliteUmsatzRepository } from "./persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository } from "./persistence/sqliteStammdatenRepositories";
-import { sqliteKontogruppeRepository } from "./persistence/sqliteKontogruppeRepository";
-import {
-  gruppensichten as gruppensichtenUseCase,
-  kontogruppeLoeschen as kontogruppeLoeschenUseCase,
-  kontogruppeSpeichern as kontogruppeSpeichernUseCase,
-  type Gruppensicht,
-  type KontogruppeEingabe,
-} from "../application/konten/gruppen";
 import { sqliteEinstellungenRepository } from "./persistence/sqliteEinstellungenRepository";
 
 const BUDGET_DEPS = {
@@ -440,24 +432,6 @@ export function kontoVollstaendigLoeschen(id: string): Promise<void> {
     { kontoRepo: sqliteZahlungskontoRepository, port: sqliteKontoentfernen },
     id,
   );
-}
-
-// --- Kontogruppen ----------------------------------------------------------
-
-/** Die Gruppen mit aufgelösten Mitgliedern — für die Verwaltung. */
-export function kontogruppen(): Promise<Gruppensicht[]> {
-  return gruppensichtenUseCase({
-    gruppeRepo: sqliteKontogruppeRepository,
-    kontoRepo: sqliteZahlungskontoRepository,
-  });
-}
-
-export function kontogruppeSpeichern(eingabe: KontogruppeEingabe, id?: string) {
-  return kontogruppeSpeichernUseCase(sqliteKontogruppeRepository, eingabe, id);
-}
-
-export function kontogruppeLoeschen(id: string): Promise<void> {
-  return kontogruppeLoeschenUseCase(sqliteKontogruppeRepository, id);
 }
 
 /** Alle bekannten Umsätze — für die Dublettenprüfung beim Anlegen einer Verbindung. */

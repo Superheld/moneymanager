@@ -27,18 +27,32 @@ export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld", "Kreditka
  * Tagesgeldkonto kann Alltagsreserve oder zweckgebundene Rücklage sein — der Typ ändert
  * sich dadurch nicht, die Antwort auf „wieviel habe ich" sehr wohl.
  *
- * Genau **eine** Wirkung hat die Klasse heute: `"liquide"` zählt zu den liquiden Mitteln,
- * alles andere nicht. Mehr soll sie vorerst auch nicht — die Unterscheidung zwischen
- * Rücklage und Vorsorge ist bislang eine Benennung, keine Regel. Was sie weiter trennen
- * soll, ist offen und wird sich zeigen.
+ * Genau **eine** Wirkung hat die Klasse: `"liquide"` zählt zu den liquiden Mitteln, alles
+ * andere nicht. Die vier übrigen Werte unterscheiden sich für die RECHNUNG also nicht —
+ * sie sind eine Benennung, und das ist Absicht. Was sie weiter trennen soll, ist offen.
+ *
+ * **Seit 2026-09-22 sind es fünf, und die zwei neuen haben die Kontogruppen ersetzt.**
+ * Bis dahin gab es daneben eine frei benannte `Kontogruppe` — eine Sicht, die nichts
+ * entschied. Zwei Felder, die beide „wofür ist dieses Konto da" beantworteten, und nur
+ * eines davon galt. Was dabei verloren geht, gehört benannt: **ein Konto liegt in genau
+ * einer Klasse.** Ein Bargeldbestand, der in „Lebenshaltung" UND „Urlaub" lag, lässt sich
+ * so nicht mehr abbilden — wer beliebige Bündel über Konten legen will, braucht dafür
+ * etwas Neues, und es darf dann wieder nichts entscheiden.
  *
  * **Erweitern:** einen Wert in `KONTOKLASSEN` ergänzen, in `i18n.ts` unter
- * `einstellungen.konto.klasse` benennen — und prüfen, ob er verfügbar ist oder nicht. Nur
- * `"liquide"` ist es.
+ * `einstellungen.konto.klasse` und `klasseHinweis` benennen — und entscheiden, ob er
+ * verfügbar ist. Nur `"liquide"` ist es. Die Reihenfolge in `KONTOKLASSEN` ist dabei die
+ * Reihenfolge in der Karte „Was da ist" und im Auswahlfeld: von verfügbar nach gebunden.
  */
-export type Kontoklasse = "liquide" | "ruecklage" | "vorsorge";
+export type Kontoklasse = "liquide" | "ruecklage" | "vorsorge" | "sparen" | "investment";
 
-export const KONTOKLASSEN: Kontoklasse[] = ["liquide", "ruecklage", "vorsorge"];
+export const KONTOKLASSEN: Kontoklasse[] = [
+  "liquide",
+  "ruecklage",
+  "vorsorge",
+  "sparen",
+  "investment",
+];
 
 /**
  * Vorschlag für ein Konto, das noch keine Klasse trägt.
@@ -48,7 +62,7 @@ export const KONTOKLASSEN: Kontoklasse[] = ["liquide", "ruecklage", "vorsorge"];
  * außer beim Depot, wo sie offensichtlich falsch wäre.
  */
 export function klasseVorschlag(typ: Kontotyp): Kontoklasse {
-  return typ === "Depot" ? "vorsorge" : "liquide";
+  return typ === "Depot" ? "investment" : "liquide";
 }
 
 /** Ist das Geld auf diesem Konto verfügbar? */
@@ -126,7 +140,7 @@ export interface Zahlungskonto {
  * Summe der VERFÜGBAREN Kontostände — die liquiden Mittel, Startpunkt der
  * Liquiditätsprojektion.
  *
- * Konten der Klasse `"ruecklage"` und `"vorsorge"` bleiben draußen. Bis 2026-08-21
+ * Konten jeder anderen Klasse bleiben draußen. Bis 2026-08-21
  * summierte diese Funktion alle Salden ohne Unterschied, und ein Depot zählte als
  * Bargeld.
  *

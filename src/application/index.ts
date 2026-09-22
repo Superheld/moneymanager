@@ -262,14 +262,6 @@ export {
   type RuecklagenEingabe,
 } from "./ruecklagen/ruecklagenPflege";
 export {
-  kontogruppeSpeichern,
-  kontogruppeLoeschen,
-  gruppensichten,
-  type KontogruppeEingabe,
-  type Gruppensicht,
-  type GruppenDeps,
-} from "./konten/gruppen";
-export {
   kontoloeschungPruefen,
   kontoVollstaendigLoeschen,
   istLoeschbar,

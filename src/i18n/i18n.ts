@@ -970,25 +970,7 @@ const de = {
       },
     },
     registerKonten: "Konten",
-    registerGruppen: "Gruppen",
     registerZugaenge: "Bankzugänge",
-    gruppen: {
-      untertitel:
-        "Konten bündeln, wie du sie ansiehst — Lebenshaltung, Rücklagen, was du brauchst. " +
-        "Eine Gruppe rechnet nichts um: was verfügbar ist, entscheidet weiterhin die Klasse " +
-        "des einzelnen Kontos. Ein Konto darf in mehreren Gruppen liegen.",
-      anlegen: "Gruppe",
-      keine: "Noch keine Gruppe angelegt.",
-      leer: "Noch kein Konto in dieser Gruppe.",
-      anfangsbestand: "Anfangsbestände zusammen {{betrag}}",
-      bearbeiten: "Bearbeiten",
-      loeschen: "Löschen",
-      loeschFolgen: "Die Konten selbst bleiben — nur die Gruppierung geht weg.",
-      titelNeu: "Neue Gruppe",
-      titelBearbeiten: "Gruppe bearbeiten",
-      feldBezeichnung: "Bezeichnung",
-      feldKonten: "Konten in dieser Gruppe",
-    },
     verbindung: {
       titel: "Bankverbindung",
       abgerufenBis: "abgerufen bis {{datum}}",
@@ -1582,11 +1564,19 @@ const de = {
       typ: { Giro: "Giro", Tagesgeld: "Tagesgeld", Bargeld: "Bargeld", Kreditkarte: "Kreditkarte", Depot: "Depot" },
       feldKlasse: "Wofür",
       spalteKlasse: "Wofür",
-      klasse: { liquide: "Verfügbar", ruecklage: "Rücklage", vorsorge: "Vorsorge" },
+      klasse: {
+        liquide: "Liquidität",
+        ruecklage: "Rücklagen",
+        vorsorge: "Vorsorge",
+        sparen: "Sparen",
+        investment: "Investment",
+      },
       klasseHinweis: {
         liquide: "Zählt zu den liquiden Mitteln — Geld, das für den Alltag da ist.",
         ruecklage: "Zurückgelegt für etwas Bestimmtes. Zählt nicht als verfügbar.",
-        vorsorge: "Langfristig gebunden. Zählt nicht als verfügbar.",
+        vorsorge: "Für später gebunden — Altersvorsorge und Ähnliches. Zählt nicht als verfügbar.",
+        sparen: "Angespart ohne festen Zweck. Zählt nicht als verfügbar.",
+        investment: "Angelegt, im Wert schwankend. Zählt nicht als verfügbar.",
       },
     },
     kategorie: {
@@ -2995,25 +2985,7 @@ const en: typeof de = {
       },
     },
     registerKonten: "Accounts",
-    registerGruppen: "Groups",
     registerZugaenge: "Bank access",
-    gruppen: {
-      untertitel:
-        "Bundle accounts the way you look at them — living costs, reserves, whatever you need. " +
-        "A group changes no calculation: what counts as available is still decided by each " +
-        "account's class. An account may belong to several groups.",
-      anlegen: "Group",
-      keine: "No group yet.",
-      leer: "No account in this group yet.",
-      anfangsbestand: "Opening balances together {{betrag}}",
-      bearbeiten: "Edit",
-      loeschen: "Delete",
-      loeschFolgen: "The accounts themselves stay — only the grouping goes.",
-      titelNeu: "New group",
-      titelBearbeiten: "Edit group",
-      feldBezeichnung: "Name",
-      feldKonten: "Accounts in this group",
-    },
     verbindung: {
       titel: "Bank connection",
       abgerufenBis: "retrieved through {{datum}}",
@@ -3575,11 +3547,19 @@ const en: typeof de = {
       typ: { Giro: "Checking", Tagesgeld: "Savings", Bargeld: "Cash", Kreditkarte: "Credit card", Depot: "Portfolio" },
       feldKlasse: "Purpose",
       spalteKlasse: "Purpose",
-      klasse: { liquide: "Available", ruecklage: "Reserve", vorsorge: "Long-term" },
+      klasse: {
+        liquide: "Liquidity",
+        ruecklage: "Reserves",
+        vorsorge: "Long-term",
+        sparen: "Savings",
+        investment: "Investment",
+      },
       klasseHinweis: {
         liquide: "Counts as liquid funds — money meant for everyday use.",
         ruecklage: "Set aside for something specific. Does not count as available.",
-        vorsorge: "Tied up long term. Does not count as available.",
+        vorsorge: "Tied up for later — retirement and the like. Does not count as available.",
+        sparen: "Saved up without a set purpose. Does not count as available.",
+        investment: "Invested, fluctuating in value. Does not count as available.",
       },
     },
     kategorie: {
