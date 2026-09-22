@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { IstBuchung, Person, Vertrag, Vertragszuordnung, Zahlungskonto } from "../core";
+import type { IstBuchung, Kategorie, Person, Vertrag, Vertragszuordnung, Zahlungskonto } from "../core";
 import type { Umsatz } from "./import/umsatz";
 import type {
+  KategorieRepository,
   LedgerPort,
   PersonRepository,
   UmsatzRepository,
@@ -74,6 +75,7 @@ function quellen(teil: {
   personen?: Person[];
   vertraege?: Vertrag[];
   zuordnungen?: Vertragszuordnung[];
+  kategorien?: Kategorie[];
 }): Bestandsquellen {
   const nichts = { speichern: async () => {}, loeschen: async () => {} };
   return {
@@ -86,6 +88,7 @@ function quellen(teil: {
       alle: async () => teil.zuordnungen ?? [],
       ...nichts,
     } as unknown as VertragszuordnungRepository,
+    kategorien: { alle: async () => teil.kategorien ?? [], ...nichts } as KategorieRepository,
   };
 }
 

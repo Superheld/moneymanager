@@ -36,11 +36,12 @@
 // Budgets, Rücklagen, Depots und das Journal: sie hängen nicht an einer
 // Buchung, und keiner der beiden Zwecke braucht sie heute.
 
-import type { Aufteilung, IstBuchung, Person, Vertrag, Zahlungskonto } from "../core";
+import type { Aufteilung, IstBuchung, Kategorie, Person, Vertrag, Zahlungskonto } from "../core";
 import { exportDateiname, type ExportZiel } from "./export";
 import { belegZuBuchung } from "./buchung/belegZuBuchung";
 import type { Umsatz } from "./import/umsatz";
 import type {
+  KategorieRepository,
   LedgerPort,
   PersonRepository,
   UmsatzRepository,
@@ -55,7 +56,7 @@ import type {
  * Zwei Dateien, die sich unabhängig entwickeln, teilen keine Versionsnummer: sonst steigt
  * die eine, weil sich an der anderen etwas geändert hat, und `fassung` sagt nichts mehr.
  */
-export const BESTANDSEXPORT_FASSUNG = 4;
+export const BESTANDSEXPORT_FASSUNG = 5;
 
 /** Ein Konto, wie es in der Datei steht. Mit IBAN und Saldo — daher die Warnung oben. */
 export interface ExportKonto {
@@ -171,6 +172,17 @@ export interface ExportBuchung {
   readonly betrag: number;
   readonly kontoId: string;
   readonly kategorieId: string | null;
+  /**
+   * Der NAME der Kategorie — seit Fassung 5, und er steht neben der Id, nicht statt ihrer.
+   *
+   * Die Id gilt nur in dem Bestand, aus dem die Datei stammt; wer sie woanders einliest,
+   * kann mit ihr nichts anfangen. Der Name ist die Angabe, über die diese App Kategorien
+   * ohnehin auflöst (`standardkategorienAnlegen`, der Kategorievorschlag des Imports) —
+   * und damit das Einzige, was eine Einsortierung über die Bestandsgrenze trägt. Ohne ihn
+   * kam jede Zeile beim Wiedereinlesen kategorielos an, obwohl die Einsortierung in der
+   * Datei stand.
+   */
+  readonly kategorie: string | null;
   /** Fehlend zählt als `automatisch` — hier ausgeschrieben, damit die Datei ohne Regelwissen lesbar ist. */
   readonly kategorieHerkunft: string;
   readonly charakter: string;
@@ -211,6 +223,8 @@ export interface Bestandsquellen {
   readonly personen: PersonRepository;
   readonly vertraege: VertragRepository;
   readonly vertragszuordnungen: VertragszuordnungRepository;
+  /** Nur für die NAMEN der Kategorien — die Datei trägt sie neben der Id, siehe `ExportBuchung`. */
+  readonly kategorien: KategorieRepository;
 }
 
 function leer(wert: string | undefined | null): string | null {
@@ -276,8 +290,10 @@ export function buchungenInExportform(
   buchungen: readonly IstBuchung[],
   umsaetze: readonly Umsatz[],
   zuordnungen: ReadonlyMap<string, { vertragId: string | null; herkunft: string }>,
+  kategorien: readonly Kategorie[] = [],
 ): ExportBuchung[] {
   const belege = belegZuBuchung(umsaetze);
+  const kategorieName = new Map(kategorien.map((k) => [k.id, k.name]));
 
   return [...buchungen]
     .sort((a, b) => (a.datum === b.datum ? a.id.localeCompare(b.id) : a.datum.localeCompare(b.datum)))
@@ -290,6 +306,7 @@ export function buchungenInExportform(
         betrag: b.betrag,
         kontoId: b.kontoId,
         kategorieId: leer(b.kategorieId),
+        kategorie: b.kategorieId ? kategorieName.get(b.kategorieId) ?? null : null,
         kategorieHerkunft: b.kategorieHerkunft ?? "automatisch",
         charakter: b.charakter,
         quelle: b.quelle,
@@ -351,13 +368,14 @@ export async function bestandExportieren(
   erzeugt: Date,
   bestand: string,
 ): Promise<string> {
-  const [buchungen, umsaetze, konten, personen, vertraege, zuordnungen] = await Promise.all([
+  const [buchungen, umsaetze, konten, personen, vertraege, zuordnungen, kategorien] = await Promise.all([
     quellen.ledger.alle(),
     quellen.umsaetze.alle(),
     quellen.konten.alle(),
     quellen.personen.alle(),
     quellen.vertraege.alle(),
     quellen.vertragszuordnungen.alle(),
+    quellen.kategorien.alle(),
   ]);
 
   const zuordnungsIndex = new Map(
@@ -370,7 +388,7 @@ export async function bestandExportieren(
     personen: personenInExportform(personen),
     konten: kontenInExportform(konten),
     vertraege: vertraegeInExportform(vertraege),
-    buchungen: buchungenInExportform(buchungen, umsaetze, zuordnungsIndex),
+    buchungen: buchungenInExportform(buchungen, umsaetze, zuordnungsIndex, kategorien),
   };
 
   return ziel.schreiben(

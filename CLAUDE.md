@@ -1071,6 +1071,30 @@ zu kurz: ein Konto zeigt über `inhaberIds` auf Personen, eine Buchung zusätzli
 `bestandsexport.test.ts` hält das fest, indem es jeden Verweis einer Buchung in der Datei
 wiederfindet.
 
+**Der Bestand kommt seit 2026-09-22 auch wieder HEREIN**, und zwar nicht über einen
+eigenen Weg, sondern als QUELLE des Imports (`adapters/import/bestandsAdapter.ts`). Das ist
+die ganze Entscheidung dahinter: der Import hat bereits alles, was ein Wiedereinlesen
+braucht — Kontozuordnung, Dublettenprüfung, Inbox, Verbuchen. Ein zweiter Weg daneben
+(„Bestand wiederherstellen") hätte jede dieser Fragen ein zweites Mal beantworten müssen,
+und zwei Antworten auf „steht das schon drin?" sind eine zu viel.
+
+Drei Dinge, die daraus folgen und die beim ersten Einlesen überraschen:
+
+- **Die Zeilen landen in der INBOX, nicht im Ledger.** Sie werden durchgesehen und verbucht
+  wie eine Bankdatei. Genau das ist die Zusicherung: nichts erscheint im Konto, ohne dass
+  jemand hingesehen hat.
+- **Die Aufteilung einer Buchung und die Paarung einer Umbuchung kommen NICHT mit.** Die
+  Inbox kennt eine Zahlung, nicht ihre Teile, und eine `transferId` entsteht beim Umbuchen.
+  Beides wird gezählt und als Warnung gemeldet — was verlorengeht, muss dastehen.
+- **Die Kategorie kommt als NAME herein** (`ExportBuchung.kategorie`, deshalb Fassung 5)
+  und geht als `kategorieVorschlag` weiter, denselben Weg wie Finanzgurus Vokabular. Die Id
+  daneben bleibt ungenutzt: sie gilt nur in dem Bestand, aus dem die Datei stammt. Ohne das
+  Feld kam jede Zeile kategorielos an, obwohl die Einsortierung in der Datei stand.
+
+`bestandsAdapter.test.ts` liest am Ende das, was `bestandExportieren` WIRKLICH schreibt —
+nicht ein ausgedachtes JSON. Wer den Export ändert, ohne den Adapter mitzuziehen, sieht es
+dort und nicht an dem Tag, an dem er die Datei braucht.
+
 Was NICHT drin ist, damit niemand danach sucht: unverbuchte Zeilen (Inbox, verworfen) —
 exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso Budgets,
 Rücklagen, Depots und das Journal: sie hängen nicht an einer Buchung.

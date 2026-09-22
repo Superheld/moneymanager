@@ -297,6 +297,7 @@ export function bestandExport(): Promise<string> {
       personen: sqlitePersonRepository,
       vertraege: sqliteVertragRepository,
       vertragszuordnungen: sqliteVertragszuordnungRepository,
+      kategorien: sqliteKategorieRepository,
     },
     tauriExportZiel,
     new Date(),
