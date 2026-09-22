@@ -77,6 +77,12 @@ import {
   type Experimente,
 } from "../application/experimente";
 import { konfigurationExportieren } from "../application/konfiguration";
+import {
+  importplan,
+  konfigurationLesen,
+  konfigurationUebernehmen,
+  type Importplan,
+} from "../application/konfigurationsimport";
 import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
@@ -296,6 +302,23 @@ export function bestandExport(): Promise<string> {
     new Date(),
     DATEINAME,
   );
+}
+
+/**
+ * Was eine Konfigurationsdatei mit dem Bestand machen WUERDE.
+ *
+ * Der Text kommt aus der Oberflaeche und nicht aus einem Kommando: eingelesen wird ueber
+ * die Dateiauswahl des Systems, dieselbe Naht wie beim Dateiimport. Der Webview bekommt
+ * damit keinen Lesezugriff aufs Dateisystem — er bekommt die eine Datei, die jemand
+ * ausgesucht hat.
+ */
+export async function konfigurationPlan(text: string): Promise<Importplan> {
+  return importplan(konfigurationLesen(text), await sqliteKategorieRepository.alle());
+}
+
+/** Legt an, was in der Datei steht und hier fehlt. Meldet, wie viele es waren. */
+export function konfigurationImport(text: string): Promise<number> {
+  return konfigurationUebernehmen(sqliteKategorieRepository, konfigurationLesen(text));
 }
 
 /**

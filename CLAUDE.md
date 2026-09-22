@@ -1027,11 +1027,29 @@ Vier Entscheidungen, die man kennen muss:
   jede Elternkategorie bereits angelegt vor. Nach Namen sortiert müsste ein Importeur
   zweimal laufen.
 
-**Einen Import gibt es nicht**, und das ist der Grund für den Experimente-Schalter: die
-schwierige Hälfte ist das Einlesen — eingelesene Kategorien treffen auf vorhandene, IDs
-kollidieren, Bäume müssen zusammengeführt werden. Bis das entschieden ist, sichert jede
-Datei nur ihre `fassung` zu. Die beiden Fassungsnummern sind dabei **getrennt**: sonst
-stiege die eine, weil sich an der anderen etwas geändert hat, und `fassung` sagte nichts mehr.
+**Den Import der ORDNUNG gibt es seit 2026-09-22** (`application/konfigurationsimport.ts`,
+Karte `ui/einstellungen/KonfigurationImportCard.tsx`). Er stand lange als die schwierigere
+Hälfte da — eingelesene Kategorien treffen auf vorhandene, IDs kollidieren, Bäume müssen
+zusammengeführt werden —, und die Antwort besteht aus drei Entscheidungen:
+
+- **Verglichen wird über den NAMEN**, nicht über die Id und nicht über den Pfad. Die Id
+  einer fremden Datei sagt über diesen Bestand nichts. Der Pfad wäre genauer und ist
+  trotzdem falsch: läge „Miete" hier unter „Fixkosten" und dort unter „Wohnen", entstünde
+  eine ZWEITE Kategorie desselben Namens — und der Name ist die Angabe, über die sonst
+  alles aufgelöst wird, von `standardkategorienAnlegen` bis zum Kategorievorschlag des
+  Imports. Zwei gleichnamige Kategorien sind kein doppelter Eintrag, sondern eine
+  mehrdeutige Auflösung.
+- **Es wird nur ANGELEGT, nie geändert.** Was es unter dem Namen schon gibt, bleibt wie es
+  ist — auch bei abweichendem Charakter. Eine Ordnung gehört dem, der sie eingerichtet
+  hat; ein Import, der sie stillschweigend umschreibt, nimmt sie ihm weg. Abweichungen
+  werden gezeigt.
+- **Der Plan steht vor der Tat.** Erst ansehen, was passieren würde, dann ein zweiter
+  Klick. Dieselbe Form wie beim Dateiimport — was eine fremde Datei mit dem Bestand macht,
+  soll man vorher wissen.
+
+Die Fassungen bleiben **getrennt**: sonst stiege die eine, weil sich an der anderen etwas
+geändert hat, und `fassung` sagte nichts mehr. Eine NEUERE Fassung weist der Import ab,
+statt sie zu raten — was ein Feld dort bedeutet, weiss diese App nicht.
 
 ### Was im Bestandsexport steht — und warum vollständig
 

@@ -331,6 +331,14 @@ export {
   type Konfigurationsexport,
 } from "./konfiguration";
 export {
+  konfigurationLesen,
+  importplan,
+  konfigurationUebernehmen,
+  type Befund,
+  type Kategoriebefund,
+  type Importplan,
+} from "./konfigurationsimport";
+export {
   bestandExportieren,
   BESTANDSEXPORT_FASSUNG,
   type Bestandsexport,
