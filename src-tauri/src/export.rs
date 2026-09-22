@@ -7,10 +7,22 @@
 // ist keiner. Dieselbe Ueberlegung wie beim Datenbankzugang, der aus demselben Grund ueber
 // eigene Kommandos laeuft statt ueber ein Plugin.
 //
-// **Wohin geschrieben wird, entscheidet NICHT der Aufrufer.** Ziel ist immer
-// `<App-Datenverzeichnis>/export/`, und der Name muss ein einfacher Dateiname sein. Ein
+// **Wohin geschrieben wird, entscheidet NICHT der Aufrufer.** Ziel ist der
+// DOWNLOAD-Ordner des Nutzers, und der Name muss ein einfacher Dateiname sein. Ein
 // Webview, der irgendwohin schreiben darf, ist ein Webview, der ueberall hinschreiben
-// kann — und was den Bestand liest, ist derselbe Prozess.
+// kann — und was den Bestand liest, ist derselbe Prozess. Die Abwehr bleibt damit
+// dieselbe; nur das Verzeichnis ist ein anderes.
+//
+// **Bis 2026-09-22 war es `<App-Datenverzeichnis>/export/`**, und das war die falsche
+// Haelfte der richtigen Ueberlegung. Der Ort war sicher und unauffindbar: eine Exportdatei
+// ist dazu da, WEITERGEGEBEN zu werden — an ein Tabellenprogramm, an den naechsten Rechner,
+// in den Anhang einer Mail —, und dafuer muss man sie greifen koennen. Wer sie im
+// App-Datenverzeichnis sucht, sucht in einem versteckten Pfad, dessen Namen nur die Karte
+// kennt. Der Download-Ordner ist der Ort, an dem jedes andere Programm seine Dateien
+// ablegt, und er gehoert dem Nutzer, nicht uns.
+//
+// Faellt er aus (kein Download-Ordner auffindbar), bleibt der alte Weg als Rueckfall — ein
+// Export, der stattfindet und an einem unbequemen Ort landet, ist besser als keiner.
 //
 // **Es ueberschreibt.** Ein zweiter Export desselben Tages ersetzt den ersten. Das ist bei
 // einer Momentaufnahme richtig: der neuere Stand ist der bessere, und eine Datei je Klick
@@ -22,7 +34,16 @@ use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
 /// Das Verzeichnis, in das exportiert wird — angelegt, falls es fehlt.
+///
+/// Der Download-Ordner ist der Ort, an dem der Nutzer eine Datei sucht; er existiert auf
+/// jedem System, das uns interessiert, und muss deshalb im Normalfall nicht angelegt
+/// werden. Der Rueckfall ins App-Datenverzeichnis ist fuer den Rest.
 fn exportverzeichnis(app: &AppHandle) -> Result<PathBuf, String> {
+    if let Ok(download) = app.path().download_dir() {
+        if std::fs::create_dir_all(&download).is_ok() {
+            return Ok(download);
+        }
+    }
     let basis = app
         .path()
         .app_data_dir()
@@ -49,11 +70,11 @@ fn geprueft(name: &str) -> Result<&str, String> {
     Ok(name)
 }
 
-/// Schreibt `inhalt` nach `<App-Datenverzeichnis>/export/<name>` und meldet den Pfad.
+/// Schreibt `inhalt` in den Download-Ordner und meldet den vollen Pfad.
 ///
-/// Der Pfad geht zurueck an die Oberflaeche, weil ein Export, dessen Ablageort man nicht
-/// erfaehrt, den Benutzer suchen laesst — im Datenverzeichnis einer Tauri-App findet ihn
-/// niemand von selbst.
+/// Der Pfad geht zurueck an die Oberflaeche, obwohl er jetzt an einem bekannten Ort liegt:
+/// „im Download-Ordner" ist eine Auskunft, der genaue Name ist die, mit der man die Datei
+/// auch findet, wenn dort dreihundert andere liegen.
 #[tauri::command]
 pub async fn export_schreiben(app: AppHandle, name: String, inhalt: String) -> Result<String, String> {
     let datei = exportverzeichnis(&app)?.join(geprueft(&name)?);

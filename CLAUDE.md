@@ -1009,11 +1009,16 @@ Vier Entscheidungen, die man kennen muss:
   nach Fassung nirgends oder wortlos im Papierkorb-Verzeichnis des Webviews. Ein Export,
   von dem man nicht weiss, wo er liegt, ist keiner. Dieselbe Überlegung wie beim
   Datenbankzugang.
-- **Das Ziel bestimmt NICHT der Aufrufer.** Immer `<App-Datenverzeichnis>/export/`, und der
-  Name muss ein einfacher Dateiname sein — derselbe Filter wie bei der Datenbankdatei. Ein
-  Webview, der irgendwohin schreiben darf, ist einer, der überall hinschreiben kann.
-- **Der Pfad wird angezeigt.** Ins App-Datenverzeichnis findet niemand von selbst; ein
-  „fertig" ohne Ort schickt den Nutzer suchen.
+- **Das Ziel bestimmt NICHT der Aufrufer.** Seit 2026-09-22 der DOWNLOAD-Ordner (vorher
+  `<App-Datenverzeichnis>/export/`), und der Name muss ein einfacher Dateiname sein —
+  derselbe Filter wie bei der Datenbankdatei. Ein Webview, der irgendwohin schreiben darf,
+  ist einer, der überall hinschreiben kann; das gilt unverändert, nur das Verzeichnis ist
+  ein anderes. Der Ort davor war sicher und unauffindbar, und damit an der Aufgabe vorbei:
+  eine Exportdatei ist dazu da, WEITERGEGEBEN zu werden — an ein Tabellenprogramm, an den
+  nächsten Rechner, in den Anhang einer Mail. Ist kein Download-Ordner zu finden, bleibt
+  der alte Pfad als Rückfall.
+- **Der Pfad wird trotzdem angezeigt.** „Im Download-Ordner" ist eine Auskunft; der volle
+  Name ist die, mit der man die Datei auch findet, wenn dort dreihundert andere liegen.
 - **Der Dateiname trägt den Bestand** (`konfiguration-moneymanager-dev-<tag>.json`). Echter
   Bestand und Spielstand liegen in zwei Dateien, aber im SELBEN Datenverzeichnis — der
   Identifier trennt sie nicht. Ohne die Kennung überschriebe ein Export aus der

@@ -1,10 +1,10 @@
 // Konfiguration exportieren — hinter dem Experimente-Schalter.
 //
-// **Der Pfad wird angezeigt, und das ist der halbe Zweck der Karte.** Eine Tauri-App legt
-// ihre Dateien im App-Datenverzeichnis ab, und dorthin findet niemand von selbst
-// (`~/Library/Application Support/…` auf macOS, versteckt auf jedem anderen System). Ein
-// Export, dessen Ablageort man nicht erfährt, ist so gut wie keiner — deshalb meldet das
-// Rust-Kommando den vollen Pfad zurück, statt nur „fertig" zu sagen.
+// **Der Pfad wird angezeigt, auch seit die Datei im Download-Ordner landet.** „Im
+// Download-Ordner" ist eine Auskunft; der volle Name ist die, mit der man sie auch dann
+// findet, wenn dort dreihundert andere liegen. Bis 2026-09-22 schrieb der Export ins
+// App-Datenverzeichnis — sicher und unauffindbar, und damit an der Aufgabe vorbei: eine
+// Exportdatei ist dazu da, weitergegeben zu werden.
 //
 // **Ein Fehlschlag wird gemeldet, anders als bei der Update-Prüfung.** Dort ist ein Fehler
 // stumm, weil niemand gefragt hat; hier hat jemand geklickt und wartet. Dieselbe Abwägung,
