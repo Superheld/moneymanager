@@ -1071,6 +1071,8 @@ import { tauriZugangPort } from "./persistence/zugang";
 import {
   zeitsperreLaden,
   zeitsperreSetzen as zeitsperreSetzenUseCase,
+  letztesKontoLaden as letztesKontoLadenUseCase,
+  letztesKontoMerken as letztesKontoMerkenUseCase,
 } from "../application/einstellungen";
 
 export function zugangsstand(): Promise<Zugangsstand> {
@@ -1099,6 +1101,18 @@ export function zugangCodeZeigen(passphrase: string): Promise<string | null> {
 
 export function zugangSperren(): Promise<void> {
   return tauriZugangPort.sperren();
+}
+
+/**
+ * Wo man im Bereich Konten zuletzt war — ein Vorschlag, den die Oberflaeche gegen die
+ * vorhandenen Konten prueft (siehe `letztesKontoLaden`).
+ */
+export function letztesKonto(): Promise<string> {
+  return letztesKontoLadenUseCase(sqliteEinstellungenRepository);
+}
+
+export function letztesKontoMerken(kontoId: string): Promise<void> {
+  return letztesKontoMerkenUseCase(sqliteEinstellungenRepository, kontoId);
 }
 
 export function zeitsperre(): Promise<number> {
