@@ -116,6 +116,11 @@ const de = {
         ohneUmsatz:
           "Zu dieser Buchung ist keine eingelesene Zeile gespeichert — sie lässt sich nur löschen, nicht verwerfen.",
       },
+      keinJson: "Diese Datei ist kein JSON.",
+      keineKonfiguration: "Das ist keine Konfigurationsdatei dieser App.",
+      fassungZuNeu:
+        "Diese Datei stammt aus einer neueren Fassung der App. Was darin steht, lässt " +
+        "sich hier nicht sicher deuten.",
     },
   },
   shell: {
@@ -1518,6 +1523,27 @@ const de = {
         knopf: "Bestand exportieren",
       },
     },
+    import: {
+      dateiWaehlen: "Datei wählen",
+      laeuft: "Wird übernommen …",
+      zaehlerNeu: "{{n}} neu",
+      zaehlerVorhanden: "{{n}} schon da",
+      zaehlerAbweichend: "{{n}} abweichend",
+      wirdAngelegt: "wird angelegt",
+      bleibtWieEsIst: "in der Datei {{datei}}, hier {{bestand}} — bleibt, wie es ist",
+      uebernehmen: "{{n}} Kategorien anlegen",
+      fertig: "{{n}} Kategorien angelegt.",
+      konfiguration: {
+        titel: "Ordnung einlesen",
+        text:
+          "Liest eine Datei konfiguration-….json und legt die Kategorien an, die es hier " +
+          "noch nicht gibt. Verglichen wird über den Namen.",
+        hinweis:
+          "Es wird nur angelegt, nie geändert: was es unter diesem Namen schon gibt, " +
+          "bleibt so, wie du es eingerichtet hast. Was die Datei anders sieht, siehst du " +
+          "vorher.",
+      },
+    },
     person: {
       titel: "Personen",
       untertitel: "Mitglieder des Haushalts — Dimension, kein eigener Mandant",
@@ -2156,6 +2182,11 @@ const en: typeof de = {
         ohneUmsatz:
           "No imported row is stored for this entry — it can only be deleted, not discarded.",
       },
+      keinJson: "This file is not JSON.",
+      keineKonfiguration: "This is not a configuration file from this app.",
+      fassungZuNeu:
+        "This file comes from a newer version of the app. What it says cannot be " +
+        "interpreted here with any certainty.",
     },
   },
   shell: {
@@ -3499,6 +3530,26 @@ const en: typeof de = {
           "It sits unencrypted in your downloads folder while your database is " +
           "encrypted. Delete it as soon as you no longer need it.",
         knopf: "Export records",
+      },
+    },
+    import: {
+      dateiWaehlen: "Choose file",
+      laeuft: "Importing …",
+      zaehlerNeu: "{{n}} new",
+      zaehlerVorhanden: "{{n}} already here",
+      zaehlerAbweichend: "{{n}} differing",
+      wirdAngelegt: "will be created",
+      bleibtWieEsIst: "{{datei}} in the file, {{bestand}} here — stays as it is",
+      uebernehmen: "Create {{n}} categories",
+      fertig: "{{n}} categories created.",
+      konfiguration: {
+        titel: "Import an order",
+        text:
+          "Reads a konfiguration-….json file and creates the categories that do not exist " +
+          "here yet. Matching is by name.",
+        hinweis:
+          "It only creates, never changes: whatever already exists under that name stays " +
+          "the way you set it up. What the file sees differently is shown beforehand.",
       },
     },
     person: {
