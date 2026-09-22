@@ -100,8 +100,11 @@ damit ein Thema an drei Stellen gleich heißt:
 core/         basis buchung konten budgets vertraege kategorien ruecklagen depot
               stammdaten klassifikator          + index, monatsausblick, auswertung
 application/  buchung konten budgets vertraege kategorien ruecklagen depot dubletten
-              stammdaten import fints           + index, ports, bootstrap,
-                                                  uebersicht, analysesichten, einstellungen
+              stammdaten import fints           + index, ports, bootstrap, einstellungen,
+                                                  uebersicht, analysesichten, experimente,
+                                                  zugang, sicherung, aktualisierung,
+                                                  export, konfiguration(simport),
+                                                  bestandsexport
 adapters/ui/  bausteine buchung konten budgets vertraege kategorien(training)
               ruecklagen analyse uebersicht import einstellungen
 ```
@@ -134,9 +137,10 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-30 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+27 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
-ist sie:
+ist sie. Die ausführbare Gegenprobe steht in `migrations.test.ts`: `ERWARTETE_TABELLEN`
+prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Test rot:
 
 - **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `buchung_journal`
   (was mit einer Buchung geschah) · `umsatz_roh` +
@@ -168,7 +172,9 @@ Migration 64 gedroppt und wurde hier weiter als lebend geführt. Das ist genau d
 Verwechslung, gegen die es die Liste gibt, und sie ist die teuerste Art, falsch zu sein:
 die Migrationskette ist append-only und deshalb keine Auskunft, also gibt es keine zweite
 Stelle, an der es auffiele. **Wer eine Tabelle droppt, streicht sie hier UND nennt sie
-unten.**
+unten — und zieht die Zahl in der Zeile darüber mit.** Die stand am 22.09.2026 um drei
+daneben: die Regel sprach bis dahin nur von den Namen, und eine falsche Zahl fällt
+niemandem auf, solange die Liste darunter stimmt.
 
 #### Der Beleg und was wir daraus gemacht haben
 
@@ -1296,6 +1302,10 @@ npm run typecheck
 npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
 npm run seed        # Spielstand für die Entwicklung neu schreiben (siehe unten)
 npm run installieren # macOS: bauen und nach /Applications installieren
+npm run test:watch  # Vitest im Wachmodus — derselbe Bestand, laeuft nur nicht einmal durch
+npm run bankenliste # die DK-Bankenliste neu erzeugen (Capabilities und Muster-Guard haengen dran)
+npm run preview     # NICHT `vorschau`: liefert den fertigen BUILD aus, ohne Attrappe und
+                    # ohne Spielstand. Wer die App ansehen will, nimmt `vorschau`.
 ```
 
 Zwei Dinge, die ein grüner Lauf verschweigt:
@@ -1503,18 +1513,19 @@ Mechanismus, Workflow und Releases stehen. Offen ist:
 - **Das Apple-Zertifikat** und die sechs Secrets dazu. Ohne sie wird unsigniert
   ausgeliefert, und das Release sagt es (siehe unten). Die drei anderen Secrets liegen:
   `TAURI_SIGNING_PRIVATE_KEY`, dessen Passwort und `FINTS_PRODUKT_ID`.
-- **Windows.** Linux baut — das AppImage hängt seit 0.24.0 an jedem Release. Windows nicht,
-  und der Stolperstein lag vor dem, den wir erwartet hatten: **der Job stirbt an den TESTS,
-  bevor überhaupt ein Compiler läuft.** Die vermutete Hürde (SQLCipher zieht OpenSSL mit,
-  dessen Bauweg dort Perl und NASM braucht) ist damit weiterhin ungeprüft — sie liegt hinter
-  einer Tür, die noch nie aufging.
+Alle drei Plattformen bauen. **Windows seit 0.29.0** — `x64-setup.exe` und seine Signatur
+hängen seither an jedem Release; Linux liefert sein AppImage seit 0.24.0.
 
-  Das ist der allgemeine Teil daran: **ein plattformübergreifender Testlauf prüft auch die
-  Tests auf Plattformunterschiede**, und die haben welche. Der erste Fund war ein URL-Pfad,
-  der als Dateipfad benutzt wurde (`new URL(…).pathname` — auf Windows steht der
-  Laufwerksbuchstabe hinter einem Schrägstrich); behoben, aber es ist unwahrscheinlich, dass
-  er der einzige war. Wer Windows zum Laufen bringen will, rechnet mit einer Kette solcher
-  Funde und nicht mit einem.
+Hier stand bis zum 22.09.2026, der Windows-Job sterbe an den TESTS, bevor überhaupt ein
+Compiler laufe, und die vermutete Hürde (SQLCipher zieht OpenSSL mit, dessen Bauweg dort
+Perl und NASM braucht) liege „hinter einer Tür, die noch nie aufging". Die Tür ist auf, und
+dahinter stand nichts: der Rust-Bauweg lief durch, sobald die Tests ihn liessen.
+
+**Der allgemeine Teil daran bleibt und hat sich bewährt: ein plattformübergreifender
+Testlauf prüft auch die TESTS auf Plattformunterschiede.** Der Fund, der die Tür geöffnet
+hat, war ein URL-Pfad, der als Dateipfad benutzt wurde (`new URL(…).pathname` — auf Windows
+steht der Laufwerksbuchstabe hinter einem Schrägstrich). Wer eine vierte Plattform
+dazunimmt, rechnet wieder mit einer Kette solcher Funde und nicht mit einem.
 
 **Was in einem veröffentlichten Archiv steckt** und was nicht, weil die Frage naheliegt:
 keine Zugangsdaten, keine Kontodaten, kein Datenbestand — die Datenbank liegt im
@@ -1699,11 +1710,23 @@ die Datenbank geöffnet und die Migrationen sind gelaufen. Dasselbe gilt für `p
 ein Prozess da ist, sagt über den Zustand dahinter nichts.
 
 **Der Punkt, an dem man sonst das Falsche tut:** Wer am **Schema** arbeitet, prüft nicht
-gegen den Spielstand, sondern gegen eine **Lesekopie des echten Bestands**
-(`scripts/migrationsprobe.mjs`, Rezept in `CLAUDE.local.md`). Der Spielstand ist
-widerspruchsfrei — er wurde gerade erst erzeugt. Der echte Bestand ist es nicht, und genau
-dort scheitern Migrationen. Ein grüner Testlauf gegen sql.js hat das schon einmal
+gegen den Spielstand, sondern gegen eine **Lesekopie des echten Bestands**. Der Spielstand
+ist widerspruchsfrei — er wurde gerade erst erzeugt. Der echte Bestand ist es nicht, und
+genau dort scheitern Migrationen. Ein grüner Testlauf gegen sql.js hat das schon einmal
 verschwiegen, weil dort die Fremdschlüssel aus sind.
+
+> **Und genau das geht seit dem 27.08.2026 nicht mehr.** Die Probe
+> (`scripts/migrationsprobe.mjs`) liest über sql.js, die Lesekopie zog man mit
+> `sqlite3 -readonly … .backup` — und beides scheitert an einer Datenbank, die seither mit
+> SQLCipher verschlüsselt ist. Es gibt keinen Ersatzweg; `bestandslesen` liest den Bestand,
+> aber fährt keine Migrationskette darüber.
+>
+> **Damit steht hier eine Pflicht ohne Weg, und das ist die ehrlichere Fassung als ein
+> Rezept, das ins Leere führt.** Was es praktisch heisst, gehört dazugesagt: Migration 74
+> ist in ein Release gegangen, ohne je gegen den echten Bestand gelaufen zu sein — der Fall,
+> vor dem dieser Absatz warnt, ist seitdem der Normalfall. Wer die Probe wiederherstellt,
+> braucht einen Leser, der den Schlüssel kennt (die Naht dafür steht in `src-tauri`, nicht
+> in Node), oder eine entschlüsselte Kopie, die nach Gebrauch wieder verschwindet.
 
 ### Eine Version ausliefern
 
