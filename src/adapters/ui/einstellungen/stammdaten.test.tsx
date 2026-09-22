@@ -14,6 +14,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
+import i18n from "../../../i18n/i18n";
 import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { KontenVerwaltungScreen } from "../konten/KontenVerwaltungScreen";
@@ -101,6 +102,176 @@ describe("EinstellungenScreen — Stammdaten", () => {
 
     rendere(<KontenVerwaltungScreen />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
+  });
+
+  /** Ein Konto mit Geschichte — die Vorlage fuer die Dialog-Tests darunter. */
+  async function mitGeschichte() {
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "b1", datum: "2026-05-04", betrag: -1200, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell",
+    });
+  }
+
+  it("zeigt im Auflösen-Dialog, was am Konto hängt — statt ein Löschen abzulehnen", async () => {
+    // **Der ursprüngliche Fehler, und die Umarbeitung danach.** Erst stand hier „error
+    // returned from database: (code: 787) FOREIGN KEY constraint failed". Dann eine ehrliche
+    // Absage — aber ein Knopf, dessen Normalfall eine Absage ist, gehört gar nicht in die
+    // Zeile. Jetzt nennt der Dialog die Zahlen und bietet an, was GEHT.
+    const nutzer = userEvent.setup();
+    await mitGeschichte();
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+    const knopf = await screen.findByLabelText(i18n.t("konten.aufloesen.knopf"));
+    // Der Hover-Text ERKLÄRT, der Name benennt — die Trennung ist der Sinn von `hinweis`,
+    // und sie hält nur, solange beide auseinanderliegen.
+    expect(knopf.getAttribute("title")).toBe(i18n.t("konten.aufloesen.knopfHinweis"));
+    expect(knopf.getAttribute("aria-label")).toBe(i18n.t("konten.aufloesen.knopf"));
+    await nutzer.click(knopf);
+
+    await waitFor(() =>
+      expect(document.body.textContent).toMatch(i18n.t("konten.loeschsperreBuchungen", { count: 1 })),
+    );
+    expect(document.body.textContent).not.toMatch(/FOREIGN KEY/);
+    // Und der Satz, um den es bei der ganzen Umarbeitung geht: was DANACH möglich ist.
+    expect(document.body.textContent).toMatch(i18n.t("konten.aufloesen.danach"));
+  });
+
+  it("legt aus dem Dialog still und nimmt von dort wieder auf — die Buchungen bleiben", async () => {
+    const nutzer = userEvent.setup();
+    await mitGeschichte();
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+
+    await nutzer.click(await screen.findByLabelText(i18n.t("konten.aufloesen.knopf")));
+    await nutzer.click(await screen.findByText(i18n.t("konten.stilllegen")));
+
+    await waitFor(async () =>
+      expect((await sqliteZahlungskontoRepository.alle())[0].aktiv).toBe(false),
+    );
+    // Die zweite Hälfte, und die wichtige: die Buchung ist unberührt, das Konto steht
+    // weiter in der Liste. Stilllegen ist eine Sicht auf die Gegenwart, kein Wegräumen.
+    expect(await sqliteLedgerRepository.alle()).toHaveLength(1);
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("konten.stillgelegt")));
+
+    // Derselbe Knopf öffnet jetzt den anderen Ausgang — das Symbol wechselt NICHT.
+    await nutzer.click(await screen.findByLabelText(i18n.t("konten.aufloesen.knopf")));
+    await nutzer.click(await screen.findByText(i18n.t("konten.wiederaufnehmen")));
+
+    await waitFor(async () =>
+      expect((await sqliteZahlungskontoRepository.alle())[0].aktiv).toBe(true),
+    );
+  });
+
+  it("löscht ein stillgelegtes Konto endgültig, samt Buchung — ohne zweite Rückfrage", async () => {
+    // Der Dialog IST die Rückfrage: er nennt jede Folge, bevor etwas passiert, und der
+    // Knopf trägt seinen Namen. Ein „Wirklich löschen?" dahinter wäre die Verzögerung ohne
+    // Information, vor der `Loeschfrage` im Kopf warnt — und es wäre genau der zweite
+    // Schritt, der die Abfolge unübersichtlich gemacht hat.
+    const nutzer = userEvent.setup();
+    await mitGeschichte();
+    await sqliteZahlungskontoRepository.aktivSetzen("k1", false);
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+
+    await nutzer.click(await screen.findByLabelText(i18n.t("konten.aufloesen.knopf")));
+    await nutzer.click(await screen.findByText(i18n.t("konten.endgueltigLoeschen")));
+
+    await waitFor(async () => expect(await sqliteZahlungskontoRepository.alle()).toEqual([]));
+    expect(await sqliteLedgerRepository.alle()).toEqual([]);
+  });
+
+  it("bietet bei einem LEEREN Konto das Löschen sofort an", async () => {
+    // Die Abfolge (erst stilllegen) ist dafür da, eine GESCHICHTE nicht versehentlich
+    // wegzuwerfen. Gibt es keine, schützt sie nichts und kostet nur einen Umweg — und das
+    // ist der häufigste Fall: ein Konto, das aus Versehen entstanden ist.
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Versehen", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Versehen/));
+    await nutzer.click(await screen.findByLabelText(i18n.t("konten.aufloesen.knopf")));
+
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("konten.aufloesen.haengtNichts")));
+    await nutzer.click(await screen.findByText(i18n.t("einstellungen.loeschen")));
+
+    await waitFor(async () => expect(await sqliteZahlungskontoRepository.alle()).toEqual([]));
+  });
+
+  it("zeigt den Zustand im Bearbeiten-Dialog und legt von dort still", async () => {
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+    await nutzer.click(await screen.findByLabelText(i18n.t("einstellungen.bearbeiten")));
+
+    // Der Zustand steht da, bevor man ihn ändert.
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("konten.gefuehrt")));
+    expect(document.body.textContent).toMatch(i18n.t("konten.zustandHinweisGefuehrt"));
+
+    await nutzer.click(await screen.findByText(i18n.t("konten.stilllegen")));
+
+    await waitFor(async () =>
+      expect((await sqliteZahlungskontoRepository.alle())[0].aktiv).toBe(false),
+    );
+    // Und der Dialog zeigt den neuen Zustand, statt auf den alten stehenzubleiben.
+    expect(document.body.textContent).toMatch(i18n.t("konten.zustandHinweisStill"));
+  });
+
+  it("macht das Speichern im Dialog ein stillgelegtes Konto NICHT wieder aktiv", async () => {
+    // **Die Falle, gegen die `aktiv` einen eigenen Schreibweg hat — jetzt über die
+    // Oberfläche.** Der Dialog trägt den Zustand nur zur Anzeige; `kontoAnlegen` fasst die
+    // Spalte nicht an. Wer das später zusammenlegt, macht diesen Test rot, und genau dafür
+    // steht er hier: im Repository-Test ist der Fall geprüft, aber der DIALOG ist die
+    // Stelle, an der jemand auf die Idee kommt.
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await sqliteZahlungskontoRepository.aktivSetzen("k1", false);
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+    await nutzer.click(await screen.findByLabelText(i18n.t("einstellungen.bearbeiten")));
+    await waitFor(() => expect(document.body.textContent).toMatch(i18n.t("konten.stillgelegt")));
+
+    // Etwas anderes ändern und speichern.
+    const feld = await screen.findByDisplayValue("Alte Kasse");
+    await nutzer.clear(feld);
+    await nutzer.type(feld, "Umbenannt");
+    await nutzer.click(await screen.findByText(i18n.t("einstellungen.speichern")));
+
+    await waitFor(async () =>
+      expect((await sqliteZahlungskontoRepository.alle())[0].bezeichnung).toBe("Umbenannt"),
+    );
+    expect((await sqliteZahlungskontoRepository.alle())[0].aktiv).toBe(false);
+  });
+
+  it("bietet an einem geführten Konto MIT Geschichte kein Löschen an", async () => {
+    // Die Abfolge, jetzt in der Oberfläche geprüft: solange das Konto geführt wird und
+    // etwas daran hängt, gibt es nur den umkehrbaren Weg. Der Dialog SAGT, dass das Löschen
+    // danach kommt — er bietet es nicht schon an. Ein Knopf, der beim Klick abweist, ist
+    // schlechter als keiner.
+    const nutzer = userEvent.setup();
+    await mitGeschichte();
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Alte Kasse/));
+    await nutzer.click(await screen.findByLabelText(i18n.t("konten.aufloesen.knopf")));
+
+    await waitFor(() => expect(screen.queryByText(i18n.t("konten.stilllegen"))).not.toBeNull());
+    expect(screen.queryByText(i18n.t("konten.endgueltigLoeschen"))).toBeNull();
+    expect(screen.queryByText(i18n.t("einstellungen.loeschen"))).toBeNull();
   });
 
   it("legt eine Person über das Formular an", async () => {

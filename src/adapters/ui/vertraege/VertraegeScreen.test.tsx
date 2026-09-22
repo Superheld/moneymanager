@@ -27,6 +27,7 @@ import {
 } from "../../persistence/sqliteVertragZuordnungRepositories";
 import { zuordnungenAbgleichen } from "../../../application/vertraege/vertragszuordnung";
 import { standardErkennung } from "../../../core";
+import i18n from "../../../i18n/i18n";
 import { sqliteZahlungsregelRepository } from "../../persistence/sqliteZahlungsregelRepository";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
 import { sqliteUmsatzRepository } from "../../persistence/sqliteImportRepositories";
@@ -751,6 +752,124 @@ describe("VertraegeScreen — Vorschläge", () => {
   });
 
   /**
+   * Zwei Policen bei DERSELBEN Versicherung: gleiche Glaeubiger-ID, gleicher Empfaenger.
+   * Unterschieden sind sie nur an der Versicherungsnummer im Verwendungszweck.
+   *
+   * Das ist der Fall, an dem die rein ODER-verknuepfte Merkmalsliste scheiterte: ein
+   * Zweckmuster daneben verengte die Regel nicht, es erweiterte sie — beide Vertraege
+   * trafen beide Zahlungen, und entschieden wurde alphabetisch nach Vertrags-Id.
+   */
+  async function zweiPolicenBeimSelbenEinzieher() {
+    await konto();
+    const gid = "DE99ZZZ00000000007";
+    for (const [nr, praefix] of [["KV-8842", "a"], ["KV-9107", "b"]] as const) {
+      for (let i = 0; i < 3; i++) {
+        const id = `${praefix}-${i}`;
+        const datum = tagVor(i * 30);
+        await sqliteLedgerRepository.speichern({
+          id, datum, betrag: -5500, kontoId: "k1", charakter: "Aufwand", quelle: "import",
+        });
+        await sqliteUmsatzRepository.anlegen({
+          id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
+          betrag: -5500, waehrung: "EUR", gegenpartei: "Ohlert Assekuranz",
+          glaeubigerId: gid, verwendungszweck: `Beitrag ${nr} Jahrespraemie`,
+          rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
+        });
+      }
+    }
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Ohlert Assekuranz", beginn: "2024-01-01",
+      verlaengerung: "automatisch", status: "aktiv",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-v1", bezeichnung: "Ohlert Assekuranz", betrag: -5500, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1", vertragId: "v1",
+    });
+    // Die Standardregel, wie sie beim Anlegen entsteht: Empfaenger und ID, beide offen.
+    await sqliteVertragserkennungRepository.speichern({
+      vertragId: "v1",
+      merkmale: [
+        { art: "empfaenger", muster: "ohlert*" },
+        { art: "glaeubigerId", muster: gid },
+      ],
+    });
+  }
+
+  it("zeigt den Verwendungszweck in der Vorschau", async () => {
+    // Ohne ihn baut man eine Regel auf ein Feld, das die Maske nirgends anzeigt — und
+    // die Versicherungsnummer, die die beiden Policen trennt, steht nur dort.
+    await zweiPolicenBeimSelbenEinzieher();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Ohlert Assekuranz");
+    await erkennungOeffnen(nutzer);
+
+    // Je drei Zahlungen pro Police — gesucht wird deshalb die Menge, nicht das Element.
+    expect(await screen.findAllByText(/Beitrag KV-8842 Jahrespraemie/)).toHaveLength(3);
+    expect(screen.getAllByText(/Beitrag KV-9107 Jahrespraemie/)).toHaveLength(3);
+  });
+
+  it("trennt zwei Policen beim selben Einzieher ueber ein Pflichtmerkmal", async () => {
+    await zweiPolicenBeimSelbenEinzieher();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Ohlert Assekuranz");
+    await erkennungOeffnen(nutzer);
+
+    // Ohne Zutun trifft die Standardregel BEIDE Policen — sechs Zahlungen.
+    await waitFor(() => expect(musterFelder()).toHaveLength(2));
+    expect(await screen.findByText("6 Zahlungen")).toBeInTheDocument();
+
+    // Eine Zeile fuer den Verwendungszweck anlegen und als Pflicht markieren.
+    await nutzer.click(screen.getByRole("button", { name: /merkmal hinzufügen/i }));
+    await waitFor(() => expect(musterFelder()).toHaveLength(3));
+    // `Auswahl` ist kein natives <select> (Base UI) — bedient wird sie mit zwei Klicks.
+    const arten = screen.getAllByRole("combobox", { name: /art des merkmals/i });
+    await nutzer.click(arten[arten.length - 1]);
+    await nutzer.click(await screen.findByRole("option", { name: /verwendungszweck/i }));
+    await nutzer.type(musterFelder()[2], "*KV-8842*");
+    const haken = screen.getAllByRole("checkbox", { name: /muss/i });
+    await nutzer.click(haken[haken.length - 1]);
+
+    // Jetzt muss der Zweck treffen UND einer der beiden offenen (Empfaenger/ID).
+    expect(await screen.findByText("3 Zahlungen")).toBeInTheDocument();
+
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const [regel] = await sqliteVertragserkennungRepository.alle();
+      expect(regel.merkmale).toContainEqual({
+        art: "verwendungszweck", muster: "*KV-8842*", pflicht: true,
+      });
+      // Die beiden offenen bleiben ohne Flag — sie fangen weiter die Schreibweisen ein.
+      expect(regel.merkmale.filter((m) => m.pflicht)).toHaveLength(1);
+    });
+  });
+
+  it("nimmt das Faelligkeitsfenster in die Regel auf", async () => {
+    await zweiPolicenBeimSelbenEinzieher();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Ohlert Assekuranz");
+    await erkennungOeffnen(nutzer);
+    await waitFor(() => expect(musterFelder()).toHaveLength(2));
+
+    await nutzer.type(screen.getByRole("textbox", { name: /^monat von$/i }), "11");
+    await nutzer.type(screen.getByRole("textbox", { name: /^monat bis$/i }), "2");
+
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const [regel] = await sqliteVertragserkennungRepository.alle();
+      // Ueber den Jahreswechsel: von groesser als bis ist gewollt und kein Vertipper.
+      expect(regel.monatVon).toBe(11);
+      expect(regel.monatBis).toBe(2);
+    });
+  });
+
+  /**
    * Einnahmen laufen durch dieselbe Naht wie Ausgaben, nur mit umgekehrtem Vorzeichen.
    * Der Test geht bis in die Regel, weil erst dort sichtbar wird, ob der Charakter das
    * Vorzeichen richtig dreht: ein Gehalt mit negativem Betrag verschöbe die gesamte
@@ -988,6 +1107,176 @@ describe("VertraegeScreen — Umbuchungsvertrag", () => {
     await waitFor(async () => {
       const zuordnungen = await sqliteVertragszuordnungRepository.alle();
       expect(zuordnungen.map((z) => z.istbuchungId)).toEqual(["ab"]);
+    });
+  });
+});
+
+/**
+ * Die Erkennung beim ANLEGEN — was der Vorschlag gemessen hat, muss die Regel erreichen.
+ *
+ * Beide Fälle hier waren bis 2026-09-13 offen und hingen zusammen: die Lupe am Vorschlag
+ * zeigte Termine und Betragsgrenzen, die Regel entstand daraus nicht, und der Abschnitt,
+ * in dem man das hätte sehen können, erschien erst beim Bearbeiten. Wer einen Vertrag von
+ * Hand erfasste, bekam eine Regel zugeschrieben, ohne sie je zu Gesicht zu bekommen.
+ */
+describe("VertraegeScreen — die Regel beim Anlegen", () => {
+  /**
+   * Eine Reihe mit FESTEM Tag im Monat. `monatsreihe` rechnet in 30-Tage-Schritten und
+   * wandert dadurch über den Monat — für ein Fälligkeitsfenster wäre das genau der Fall,
+   * in dem keines entsteht.
+   */
+  async function reiheAmErsten(praefix: string, gegenpartei: string, betrag: number, n = 6) {
+    for (let i = 0; i < n; i++) {
+      const id = `${praefix}-${i}`;
+      const monat = 8 - i;
+      const datum = `2026-${String(monat).padStart(2, "0")}-02`;
+      await sqliteLedgerRepository.speichern({
+        id, datum, betrag: -betrag, kontoId: "k1", charakter: "Aufwand", quelle: "import",
+      });
+      await sqliteUmsatzRepository.anlegen({
+        id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
+        betrag: -betrag, waehrung: "EUR", gegenpartei, verwendungszweck: "",
+        rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
+      });
+    }
+  }
+
+  it("zeigt den Erkennungsabschnitt schon beim Anlegen von Hand", async () => {
+    await konto();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+
+    await nutzer.click(await screen.findByRole("button", { name: /vertrag anlegen/i }));
+    // Ueber den i18n-SCHLUESSEL und nicht ueber den Wortlaut — sonst faellt der Test beim
+    // naechsten Wording-Durchgang um (siehe src/CLAUDE.md).
+    const anbieterfeld = await screen.findByPlaceholderText(
+      i18n.t("vertraege.feldAnbieterPlatzhalter"),
+    );
+    await nutzer.type(anbieterfeld, "Terhoven");
+    await nutzer.click(await screen.findByRole("button", { name: /^erkennung/i }));
+
+    // Das Merkmal wächst mit dem getippten Namen mit — ohne Speichern, ohne zweites
+    // Öffnen. Der normalisierte Name mit nachgestelltem Stern ist die Standardregel.
+    await waitFor(() =>
+      expect(screen.getAllByRole("textbox", { name: /^muster$/i })[0]).toHaveValue("terhoven*"),
+    );
+  });
+
+  it("übernimmt das gemessene Fälligkeitsfenster aus einem Vorschlag in die Regel", async () => {
+    await konto();
+    await reiheAmErsten("t", "Terhoven Media", 1200);
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Terhoven Media");
+
+    await nutzer.click(screen.getByRole("button", { name: /übernehmen/i }));
+    await waitFor(() => expect(screen.getByDisplayValue("Terhoven Media")).toBeInTheDocument());
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const [regel] = await sqliteVertragserkennungRepository.alle();
+      expect(regel).toBeDefined();
+      // Alle Zahlungen am 2. — das Fenster liegt gepuffert darum, und es liegt NICHT
+      // über dem halben Monat: was nichts einschränkt, entsteht gar nicht.
+      expect(regel.tagVon).toBeDefined();
+      expect(regel.tagBis).toBeDefined();
+      // Ein monatlicher Vertrag bekommt kein Monatsfenster: er ist in jedem Monat fällig.
+      expect(regel.monatVon).toBeUndefined();
+    });
+  });
+});
+
+/**
+ * Die Kategorie rückwirkend auf die zugeordneten Zahlungen — der Weg durch die Maske.
+ *
+ * Der Fall aus dem Bestand: die Erkennung ordnet einem frisch erfassten Vertrag seine
+ * Zahlungen von Jahren zurück zu, und die behalten die Kategorie, die sie damals
+ * bekamen. Die Zuordnung sagt „gehört zu diesem Vertrag", die Kategorie daneben
+ * widerspricht ihr.
+ *
+ * Geprüft wird am Ledger und nicht an der Anzeige: die Frage ist, ob geschrieben wurde.
+ */
+describe("VertraegeScreen — Kategorie auf die Zahlungen übertragen", () => {
+  async function vertragMitZahlungen() {
+    await konto();
+    await sqliteKategorieRepository.speichern({
+      id: "kat-alt", name: "Sonstiges", defaultCharakter: "Aufwand",
+    });
+    await sqliteKategorieRepository.speichern({
+      id: "kat-neu", name: "Laufende Kosten", defaultCharakter: "Aufwand",
+    });
+    for (let i = 0; i < 4; i++) {
+      const id = `z-${i}`;
+      const datum = tagVor(i * 30);
+      await sqliteLedgerRepository.speichern({
+        id, datum, betrag: -2900, kontoId: "k1", charakter: "Aufwand", quelle: "import",
+        kategorieId: "kat-alt", kategorieHerkunft: "automatisch",
+      });
+      await sqliteUmsatzRepository.anlegen({
+        id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
+        betrag: -2900, waehrung: "EUR", gegenpartei: "Terhoven Media", verwendungszweck: "",
+        rohHash: `h-${id}`, status: "verbucht", istbuchungId: id,
+      });
+    }
+    await sqliteVertragRepository.speichern({
+      id: "v-terhoven", anbieter: "Terhoven Media", beginn: "2025-01-01",
+      verlaengerung: "automatisch", status: "aktiv", kategorieId: "kat-neu",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-terhoven", bezeichnung: "Terhoven Media", betrag: -2900, rhythmus: "monatlich",
+      startdatum: "2025-01-01", charakter: "Aufwand", kontoId: "k1",
+      vertragId: "v-terhoven", kategorieId: "kat-neu",
+    });
+  }
+
+  it("schreibt die Vertragskategorie auf die Zahlungen, wenn der Haken steht", async () => {
+    await vertragMitZahlungen();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Terhoven Media");
+    // Erst wenn der Abgleich gelaufen ist, hängen die Zahlungen am Vertrag.
+    await waitFor(async () =>
+      expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(4),
+    );
+
+    await nutzer.click(await screen.findByRole("button", { name: /bearbeiten/i }));
+    // Die Zeile nennt die ZAHL der zugeordneten Zahlungen — deshalb der Schluessel mit
+    // `count` und nicht der ohne.
+    const haken = await screen.findByRole("checkbox", {
+      name: i18n.t("vertraege.kategorieUebertragenZahl", { count: 4 }),
+    });
+    await nutzer.click(haken);
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const buchungen = await sqliteLedgerRepository.alle();
+      expect(buchungen.every((b) => b.kategorieId === "kat-neu")).toBe(true);
+      // Ohne das holte die Kategorie-Automatik den alten Wert beim nächsten Import zurück.
+      expect(buchungen.every((b) => b.kategorieHerkunft === "manuell")).toBe(true);
+    });
+  });
+
+  it("lässt die Zahlungen OHNE Haken unberührt", async () => {
+    // Die Gegenprobe, und sie ist die wichtigere: der Abgleich läuft bei jedem Öffnen des
+    // Bereichs. Griffe er dabei in die Kategorien, wäre jede Handkorrektur beim nächsten
+    // Hinsehen weg.
+    await vertragMitZahlungen();
+    const nutzer = userEvent.setup();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Terhoven Media");
+    await waitFor(async () =>
+      expect(await sqliteVertragszuordnungRepository.alle()).toHaveLength(4),
+    );
+
+    await nutzer.click(await screen.findByRole("button", { name: /bearbeiten/i }));
+    const speichern = screen.getAllByRole("button", { name: /speichern/i });
+    await nutzer.click(speichern[speichern.length - 1]);
+
+    await waitFor(async () => {
+      const buchungen = await sqliteLedgerRepository.alle();
+      expect(buchungen.every((b) => b.kategorieId === "kat-alt")).toBe(true);
     });
   });
 });

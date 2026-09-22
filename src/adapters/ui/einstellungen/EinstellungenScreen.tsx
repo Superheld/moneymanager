@@ -33,6 +33,7 @@ import { Bereich } from "../bausteine/Bereich";
 import { VerschluesselungCard } from "../zugang/VerschluesselungCard";
 import { ExportCard } from "./ExportCard";
 import { BestandsexportCard } from "./BestandsexportCard";
+import { KonfigurationImportCard } from "./KonfigurationImportCard";
 import { Modal } from "../bausteine/Modal";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import {
@@ -115,6 +116,10 @@ export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
                   <>
                     <ExportCard />
                     <BestandsexportCard />
+                    {/* Der Import steht UNTER den Exporten und nicht in einem eigenen
+                        Register: es ist dieselbe Datei, einmal hinaus und einmal herein.
+                        Wer den Reiter „Export" offen hat, hat die Frage schon gestellt. */}
+                    <KonfigurationImportCard />
                   </>
                 ),
               },

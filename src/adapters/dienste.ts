@@ -77,6 +77,12 @@ import {
   type Experimente,
 } from "../application/experimente";
 import { konfigurationExportieren } from "../application/konfiguration";
+import {
+  importplan,
+  konfigurationLesen,
+  konfigurationUebernehmen,
+  type Importplan,
+} from "../application/konfigurationsimport";
 import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
@@ -135,6 +141,7 @@ import {
   vertragLoeschen as vertragLoeschenUseCase,
   type VertragEingabe,
 } from "../application/vertraege/vertragAnlegen";
+import { vertragskategorieUebertragen as vertragskategorieUebertragenUseCase } from "../application/vertraege/vertragskategorie";
 import { vorschlagIgnorieren as vertragsvorschlagIgnorierenUseCase } from "../application/vertraege/vertragsvorschlaege";
 import { sqliteVertragRepository } from "./persistence/sqliteVertragRepository";
 import {
@@ -157,6 +164,12 @@ import {
   type KontoEingabe,
   type PersonEingabe,
 } from "../application/stammdaten/stammdatenAnlegen";
+import {
+  kontoloeschungPruefen as kontoloeschungPruefenUseCase,
+  kontoVollstaendigLoeschen as kontoVollstaendigLoeschenUseCase,
+  type Kontoloeschung,
+} from "../application/konten/kontoentfernen";
+import { sqliteKontoentfernen } from "./persistence/sqliteKontoentfernen";
 import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/kategorien/standardkategorien";
 import type { Abrufadapter, Bankzugang, Zugangsart } from "../application/fints/abrufPort";
 import type { Kontozuordnung } from "../application/fints/bankzugangPort";
@@ -175,14 +188,6 @@ import { sqliteZahlungsregelRepository } from "./persistence/sqliteZahlungsregel
 import { sqliteRuecklagenRepository } from "./persistence/sqliteRuecklagenRepository";
 import { sqliteUmsatzRepository } from "./persistence/sqliteImportRepositories";
 import { sqliteZahlungskontoRepository } from "./persistence/sqliteStammdatenRepositories";
-import { sqliteKontogruppeRepository } from "./persistence/sqliteKontogruppeRepository";
-import {
-  gruppensichten as gruppensichtenUseCase,
-  kontogruppeLoeschen as kontogruppeLoeschenUseCase,
-  kontogruppeSpeichern as kontogruppeSpeichernUseCase,
-  type Gruppensicht,
-  type KontogruppeEingabe,
-} from "../application/konten/gruppen";
 import { sqliteEinstellungenRepository } from "./persistence/sqliteEinstellungenRepository";
 
 const BUDGET_DEPS = {
@@ -292,11 +297,29 @@ export function bestandExport(): Promise<string> {
       personen: sqlitePersonRepository,
       vertraege: sqliteVertragRepository,
       vertragszuordnungen: sqliteVertragszuordnungRepository,
+      kategorien: sqliteKategorieRepository,
     },
     tauriExportZiel,
     new Date(),
     DATEINAME,
   );
+}
+
+/**
+ * Was eine Konfigurationsdatei mit dem Bestand machen WUERDE.
+ *
+ * Der Text kommt aus der Oberflaeche und nicht aus einem Kommando: eingelesen wird ueber
+ * die Dateiauswahl des Systems, dieselbe Naht wie beim Dateiimport. Der Webview bekommt
+ * damit keinen Lesezugriff aufs Dateisystem — er bekommt die eine Datei, die jemand
+ * ausgesucht hat.
+ */
+export async function konfigurationPlan(text: string): Promise<Importplan> {
+  return importplan(konfigurationLesen(text), await sqliteKategorieRepository.alle());
+}
+
+/** Legt an, was in der Datei steht und hier fehlt. Meldet, wie viele es waren. */
+export function konfigurationImport(text: string): Promise<number> {
+  return konfigurationUebernehmen(sqliteKategorieRepository, konfigurationLesen(text));
 }
 
 /**
@@ -399,22 +422,40 @@ export function kontoLoeschen(id: string): Promise<void> {
   return sqliteZahlungskontoRepository.loeschen(id);
 }
 
-// --- Kontogruppen ----------------------------------------------------------
-
-/** Die Gruppen mit aufgelösten Mitgliedern — für die Verwaltung. */
-export function kontogruppen(): Promise<Gruppensicht[]> {
-  return gruppensichtenUseCase({
-    gruppeRepo: sqliteKontogruppeRepository,
-    kontoRepo: sqliteZahlungskontoRepository,
-  });
+/**
+ * Legt ein Konto still: es behält alle seine Buchungen und verschwindet nur aus der
+ * Gegenwart — aus der Buchungsmaske, dem Abruf, dem Abgleich und den liquiden Mitteln.
+ *
+ * Ohne Vorbedingung, ausdrücklich: mit Buchungen wie ohne, mit Restgeld wie ohne. Wer ein
+ * Konto nicht mehr führt, soll es wegräumen können, ohne vorher etwas aufräumen zu müssen
+ * — und was noch darauf liegt, bleibt in der Übersicht sichtbar, statt zu verschwinden.
+ */
+export function kontoStilllegen(id: string): Promise<void> {
+  return sqliteZahlungskontoRepository.aktivSetzen(id, false);
 }
 
-export function kontogruppeSpeichern(eingabe: KontogruppeEingabe, id?: string) {
-  return kontogruppeSpeichernUseCase(sqliteKontogruppeRepository, eingabe, id);
+/** Nimmt ein stillgelegtes Konto wieder auf. Der Weg zurück, und er kostet nichts. */
+export function kontoWiederaufnehmen(id: string): Promise<void> {
+  return sqliteZahlungskontoRepository.aktivSetzen(id, true);
 }
 
-export function kontogruppeLoeschen(id: string): Promise<void> {
-  return kontogruppeLoeschenUseCase(sqliteKontogruppeRepository, id);
+/** Was an dem Konto hängt — für die Rückfrage und für die Meldung, wenn es nicht geht. */
+export function kontoloeschung(id: string): Promise<Kontoloeschung> {
+  return kontoloeschungPruefenUseCase(sqliteKontoentfernen, id);
+}
+
+/**
+ * Löscht das Konto samt Buchungen, Belegen und Bankverbindung — nur ein stillgelegtes.
+ *
+ * Neben `kontoLoeschen`, nicht statt dessen: das eine räumt ein leeres Konto weg, das
+ * andere nimmt alles mit. Ein Knopf, der je nach Lage das eine oder das andere tut, wäre
+ * einer, dem man nicht ansieht, welches.
+ */
+export function kontoVollstaendigLoeschen(id: string): Promise<void> {
+  return kontoVollstaendigLoeschenUseCase(
+    { kontoRepo: sqliteZahlungskontoRepository, port: sqliteKontoentfernen },
+    id,
+  );
 }
 
 /** Alle bekannten Umsätze — für die Dublettenprüfung beim Anlegen einer Verbindung. */
@@ -526,6 +567,25 @@ export function vertragsvorschlagIgnorieren(schluessel: string) {
 /** Erkennungen und Zuordnungen neu rechnen — nach jeder Änderung an einem Vertrag. */
 export function vertragszuordnungenAbgleichen() {
   return zuordnungenAbgleichen(vertragsAbgleichDeps);
+}
+
+/**
+ * Die Kategorie des Vertrags auf seine zugeordneten Zahlungen schreiben — rückwirkend.
+ *
+ * Läuft NUR, wenn jemand den Haken in der Maske setzt; warum, steht im Kopf des
+ * Use-Cases. Gehört hinter den Abgleich: vorher gibt es die Zuordnungen nicht, die es
+ * auswertet.
+ */
+export function vertragskategorieUebertragen(vertragId: string) {
+  return vertragskategorieUebertragenUseCase(
+    {
+      ledger: sqliteLedgerRepository,
+      zuordnungRepo: sqliteVertragszuordnungRepository,
+      vertragRepo: sqliteVertragRepository,
+      kategorieRepo: sqliteKategorieRepository,
+    },
+    vertragId,
+  );
 }
 
 /**
@@ -1009,6 +1069,8 @@ import { tauriZugangPort } from "./persistence/zugang";
 import {
   zeitsperreLaden,
   zeitsperreSetzen as zeitsperreSetzenUseCase,
+  letztesKontoLaden as letztesKontoLadenUseCase,
+  letztesKontoMerken as letztesKontoMerkenUseCase,
 } from "../application/einstellungen";
 
 export function zugangsstand(): Promise<Zugangsstand> {
@@ -1037,6 +1099,18 @@ export function zugangCodeZeigen(passphrase: string): Promise<string | null> {
 
 export function zugangSperren(): Promise<void> {
   return tauriZugangPort.sperren();
+}
+
+/**
+ * Wo man im Bereich Konten zuletzt war — ein Vorschlag, den die Oberflaeche gegen die
+ * vorhandenen Konten prueft (siehe `letztesKontoLaden`).
+ */
+export function letztesKonto(): Promise<string> {
+  return letztesKontoLadenUseCase(sqliteEinstellungenRepository);
+}
+
+export function letztesKontoMerken(kontoId: string): Promise<void> {
+  return letztesKontoMerkenUseCase(sqliteEinstellungenRepository, kontoId);
 }
 
 export function zeitsperre(): Promise<number> {

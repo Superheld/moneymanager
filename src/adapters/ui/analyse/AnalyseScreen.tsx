@@ -35,7 +35,7 @@ import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { Auswahl } from "../bausteine/Auswahl";
 import { PageHead } from "../bausteine/PageHead";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { geldFarbe, geldTon } from "../bausteine/geldFarbe";
 
 import type { KategorieSumme } from "../../../application";
 
@@ -407,16 +407,21 @@ export function AnalyseScreen() {
         <Card>{t("historie.leer")}</Card>
       ) : (
         <>
+          {/* Alle fünf tragen GERICHTETES Geld, also kommt die Farbe aus dem
+              Vorzeichen und nirgendwo sonst (`bausteine/geldFarbe`). Vorher stand hier
+              fünfmal ein eigenes Ternär, und drei davon waren verschieden — Einnahmen
+              fest grün, Ausgaben „warn, wenn negativ" (also immer), und die positive
+              Seite bei Netto grün, beim Saldo neutral. Nebeneinander in einer Reihe. */}
           <div className="kpis">
             <KPIStat size="chip" label={monat ? t("historie.kpiEinnahmenMonat", { monat: monat.label }) : t("historie.kpiEinnahmen")}
-              value={geld.format(summeEin)} unit={geld.symbol} tone="ok" meta={vergleich(summeEin, oeEin)} />
+              value={geld.format(summeEin)} unit={geld.symbol} tone={geldTon(summeEin)} meta={vergleich(summeEin, oeEin)} />
             <KPIStat size="chip" label={monat ? t("historie.kpiAusgabenMonat", { monat: monat.label }) : t("historie.kpiAusgaben")}
-              value={geld.format(summeAus)} unit={geld.symbol} tone={summeAus < 0 ? "warn" : "default"} meta={vergleich(summeAus, oeAus)} />
-            <KPIStat size="chip" label={t("historie.kpiNetto")} value={geld.format(netto, { mitVorzeichen: true })} unit={geld.symbol} tone={netto < 0 ? "warn" : "ok"} />
+              value={geld.format(summeAus)} unit={geld.symbol} tone={geldTon(summeAus)} meta={vergleich(summeAus, oeAus)} />
+            <KPIStat size="chip" label={t("historie.kpiNetto")} value={geld.format(netto, { mitVorzeichen: true })} unit={geld.symbol} tone={geldTon(netto)} />
             {/* Der Maßstab: was ein Monat im Schnitt kostet. Bleibt beim Zeitraum-Ø,
                 auch wenn ein einzelner Monat gewählt ist — sonst gäbe es nichts zu vergleichen. */}
-            <KPIStat size="chip" label={t("historie.kpiOeAusgaben")} value={geld.format(oeAus)} unit={geld.symbol} tone={oeAus < 0 ? "warn" : "default"} />
-            <KPIStat size="chip" label={t("historie.kpiSaldo")} value={geld.format(saldoJetzt)} unit={geld.symbol} tone={saldoJetzt < 0 ? "warn" : "default"} />
+            <KPIStat size="chip" label={t("historie.kpiOeAusgaben")} value={geld.format(oeAus)} unit={geld.symbol} tone={geldTon(oeAus)} />
+            <KPIStat size="chip" label={t("historie.kpiSaldo")} value={geld.format(saldoJetzt)} unit={geld.symbol} tone={geldTon(saldoJetzt)} />
           </div>
 
           <Card

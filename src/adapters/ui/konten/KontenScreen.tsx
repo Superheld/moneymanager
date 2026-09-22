@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
+  waehlbareKonten,
   istGeteilt,
   registerSicht,
   type Dublettenverdacht,
@@ -21,6 +22,8 @@ import {
 import {
   buchungenSammelbearbeiten,
   konten as kontenLaden,
+  letztesKonto,
+  letztesKontoMerken,
   pruefmarkerSetzen,
   umbuchungErfassen,
   vertragsliste,
@@ -65,7 +68,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const datum = useDatum();
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Kontensicht | null>(null);
-  const [aktivId, setAktivId] = useState("");
+  const [aktivId, setAktivIdRoh] = useState("");
   const [katFilter, setKatFilter] = useState("alle");
   const [artFilter, setArtFilter] = useState<"alle" | "einnahmen" | "ausgaben" | "umbuchung">("alle");
   const [regSuche, setRegSuche] = useState("");
@@ -93,6 +96,18 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   /** Der Abgleich des Anfangsbestands — ein Eingriff, deshalb mit Vorschau. */
   const [fehler, setFehler] = useState<string | null>(null);
 
+  /**
+   * Setzt das aktive Konto und merkt es sich fuer den naechsten Besuch des Bereichs.
+   *
+   * Das Merken laeuft nebenher und ohne auf sein Ende zu warten: es entscheidet nichts,
+   * und ein Klick, der auf einen Schreibvorgang wartet, faende sich langsam an. Geht es
+   * schief, steht beim naechsten Mal das erste Konto da — dasselbe wie vorher.
+   */
+  function setAktivId(id: string) {
+    setAktivIdRoh(id);
+    if (id) void letztesKontoMerken(id).catch(() => {});
+  }
+
   // EIN Ladevorgang, EIN setState. Gestaffelte await/setState-Paare lassen abgeleitete
   // Werte kurz gegen leere Listen rechnen — der Empfänger einer importierten Buchung
   // käme aus einer noch leeren Umsatz-Liste und die Zeile zeigte für einen Render
@@ -100,10 +115,16 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   async function laden() {
     // Zusammen laden: die Vertragsliste steht in der Sammelbearbeitung neben den
     // Kategorien, und gestaffelt gesetzt waere ihr Auswahlfeld beim ersten Render leer.
-    const [s, v] = await Promise.all([kontenLaden(), vertragsliste()]);
+    const [s, v, gemerkt] = await Promise.all([kontenLaden(), vertragsliste(), letztesKonto()]);
     setSicht(s);
     setVertraege([...v]);
-    setAktivId((id) => id || s.zeilen[0]?.konto.id || "");
+    // Ein bereits gewaehltes Konto behaelt den Vorrang vor dem gemerkten: wer waehrend des
+    // Ladens schon geklickt hat, soll nicht zurueckgesetzt werden. Und beide gelten nur,
+    // solange es das Konto noch gibt — sonst das erste.
+    setAktivIdRoh((id) => {
+      const gibtEs = (x: string) => !!x && s.zeilen.some((z) => z.konto.id === x);
+      return gibtEs(id) ? id : gibtEs(gemerkt) ? gemerkt : s.zeilen[0]?.konto.id ?? "";
+    });
   }
   useEffect(() => {
     laden();
@@ -319,6 +340,10 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 // null, waehrend der Wert daneben in der Wertreihe steht. Gezeigt wird
                 // deshalb der zuletzt gemeldete Depotwert - mit dem Stichtag im Titel,
                 // damit er nicht wie ein gerechneter Saldo aussieht.
+                //
+                // Das Wort „Depot" stand bis 2026-09-22 hinter der Zahl und ist weg: die
+                // Typ-Spalte derselben Zeile sagt es bereits. Ein Etikett, das in einer
+                // Zeile zweimal steht, traegt beim zweiten Mal nichts mehr bei.
                 sortValue: (z) => z.depot?.aktuell?.gesamtwert ?? z.realerStand,
                 render: (z) =>
                   z.depot ? (
@@ -327,9 +352,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                       title={t("depot.standErklaerung", { datum: z.depot.aktuell ? datum.mitJahr(z.depot.aktuell.stichtag) : "—" })}
                     >
                       {z.depot.aktuell ? geld.format(z.depot.aktuell.gesamtwert) : "—"}
-                      <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-1)" }}>
-                        {t("depot.bezeichnung")}
-                      </span>
                     </span>
                   ) : (
                     <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(z.realerStand)}</span>
@@ -831,7 +853,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
             ariaLabel={t("konten.umbuchung.vonKonto")}
             wert={von}
             aufAenderung={setVon}
-            optionen={konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+            optionen={waehlbareKonten(konten).map((k) => ({ wert: k.id, text: k.bezeichnung }))}
           />
         </FormField>
         <FormField label={t("konten.umbuchung.nachKonto")} required>
@@ -839,7 +861,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
             ariaLabel={t("konten.umbuchung.nachKonto")}
             wert={nach}
             aufAenderung={setNach}
-            optionen={konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
+            optionen={waehlbareKonten(konten).map((k) => ({ wert: k.id, text: k.bezeichnung }))}
           />
         </FormField>
         <FormField label={t("konten.feldDatum")} required>

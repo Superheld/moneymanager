@@ -93,9 +93,7 @@ export function AusblickKarte({ punkte }: { punkte: readonly Verlaufspunkt[] }) 
               label: `${t("historie.spalteSaldo")} ${geld.symbol}`,
               align: "right",
               render: (r) => (
-                <span style={{ color: r.saldo < 0 ? "var(--warn-deep)" : undefined }}>
-                  {geld.format(r.saldo)}
-                </span>
+                <span style={{ color: geldFarbe(r.saldo) }}>{geld.format(r.saldo)}</span>
               ),
             },
           ]}

@@ -12,7 +12,6 @@ import type {
   IstBuchung,
   Journaleintrag,
   Kategorie,
-  Kontogruppe,
   Merkmalsausschluss,
   Merkmalsherkunft,
   Modell,
@@ -43,14 +42,16 @@ export interface PersonRepository {
 
 export interface ZahlungskontoRepository {
   alle(): Promise<Zahlungskonto[]>;
+  /**
+   * Legt an oder ersetzt die STAMMDATEN — `aktiv` fasst es nicht an.
+   *
+   * Getrennt von `aktivSetzen`, weil `kontoAnlegen` auch zum Bearbeiten dient und ein
+   * Konto ohne dieses Feld baut: mitgeschrieben machte jedes Speichern ein stillgelegtes
+   * Konto wieder aktiv.
+   */
   speichern(konto: Zahlungskonto): Promise<void>;
-  loeschen(id: string): Promise<void>;
-}
-
-export interface KontogruppeRepository {
-  alle(): Promise<Kontogruppe[]>;
-  /** Legt an oder ersetzt — die Mitgliederliste der uebergebenen Gruppe ist der Stand. */
-  speichern(gruppe: Kontogruppe): Promise<void>;
+  /** Legt still (`false`) oder nimmt wieder auf (`true`). Ändert sonst nichts. */
+  aktivSetzen(id: string, aktiv: boolean): Promise<void>;
   loeschen(id: string): Promise<void>;
 }
 

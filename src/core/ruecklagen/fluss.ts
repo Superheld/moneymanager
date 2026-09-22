@@ -15,10 +15,10 @@
 // machen. Deshalb rechnet diese Datei alle drei und lässt die Oberfläche entscheiden,
 // welche sie nebeneinander stellt.
 //
-// WOHIN gerechnet wird, entscheidet die KONTOKLASSE und nicht die Kontogruppe: die Klasse
-// trägt Rechenregeln, die Gruppe ist eine Sicht (siehe CLAUDE.md). Ein Zufluss auf ein
-// Konto der Klasse `ruecklage` oder `vorsorge` ist zurückgelegt; auf ein liquides ist er
-// nur umgeschichtet.
+// WOHIN gerechnet wird, entscheidet die KONTOKLASSE, und zwar über genau eine Grenze:
+// ein Zufluss auf ein NICHT liquides Konto ist zurückgelegt, auf ein liquides nur
+// umgeschichtet. Welche der vier gebundenen Klassen es ist, spielt hier keine Rolle —
+// die Klasse trägt genau eine Rechenregel, und das ist sie (siehe `core/konten/konto`).
 
 import type { IstBuchung } from "../buchung/istbuchung";
 import type { Cent } from "../basis/geld";

@@ -21,7 +21,7 @@ import { useTranslation } from "react-i18next";
 import type { Befunde, IstBuchung } from "../../../application";
 import { Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { useGeld } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { geldFarbe, warnFarbe, warnTon } from "../bausteine/geldFarbe";
 
 /**
  * Wie viele Zeilen eine Rangliste zeigt, bevor sie blättert.
@@ -87,7 +87,9 @@ export function BefundeBereich({
           size="chip"
           label={t("befunde.kpiSparquote")}
           value={quote(z.sparquote)}
-          tone={z.sparquote != null && z.sparquote < 0 ? "warn" : "ok"}
+          /* Eine Quote hat keine Richtung: warnend an der Schwelle, sonst neutral —
+             nie grün. Vorher war jede Sparquote über null grün, auch eine von 0,4 %. */
+          tone={warnTon(z.sparquote != null && z.sparquote < 0)}
           meta={t("befunde.kpiSparquoteMeta")}
         />
         <KPIStat
@@ -99,7 +101,7 @@ export function BefundeBereich({
               : z.reichweiteMonate.toLocaleString(geld.locale, { maximumFractionDigits: 1 })
           }
           unit={t("befunde.monate")}
-          tone={z.reichweiteMonate != null && z.reichweiteMonate < 3 ? "warn" : "default"}
+          tone={warnTon(z.reichweiteMonate != null && z.reichweiteMonate < 3)}
           meta={t("befunde.kpiReichweiteMeta")}
         />
       </div>
@@ -183,8 +185,10 @@ export function BefundeBereich({
                 label: `${t("befunde.spalteSchlimmste")} ${geld.symbol}`,
                 align: "right",
                 render: (r) =>
+                  // Die HÖHE einer Überziehung, kein gerichteter Betrag: die Farbe
+                  // kommt von der Schwelle, nicht vom Vorzeichen.
                   r.schlimmste > 0 ? (
-                    <span style={{ color: "var(--warn-deep)" }}>{geld.format(r.schlimmste)}</span>
+                    <span style={{ color: warnFarbe(true) }}>{geld.format(r.schlimmste)}</span>
                   ) : (
                     "—"
                   ),

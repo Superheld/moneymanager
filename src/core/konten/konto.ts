@@ -27,18 +27,32 @@ export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld", "Kreditka
  * Tagesgeldkonto kann Alltagsreserve oder zweckgebundene Rücklage sein — der Typ ändert
  * sich dadurch nicht, die Antwort auf „wieviel habe ich" sehr wohl.
  *
- * Genau **eine** Wirkung hat die Klasse heute: `"liquide"` zählt zu den liquiden Mitteln,
- * alles andere nicht. Mehr soll sie vorerst auch nicht — die Unterscheidung zwischen
- * Rücklage und Vorsorge ist bislang eine Benennung, keine Regel. Was sie weiter trennen
- * soll, ist offen und wird sich zeigen.
+ * Genau **eine** Wirkung hat die Klasse: `"liquide"` zählt zu den liquiden Mitteln, alles
+ * andere nicht. Die vier übrigen Werte unterscheiden sich für die RECHNUNG also nicht —
+ * sie sind eine Benennung, und das ist Absicht. Was sie weiter trennen soll, ist offen.
+ *
+ * **Seit 2026-09-22 sind es fünf, und die zwei neuen haben die Kontogruppen ersetzt.**
+ * Bis dahin gab es daneben eine frei benannte `Kontogruppe` — eine Sicht, die nichts
+ * entschied. Zwei Felder, die beide „wofür ist dieses Konto da" beantworteten, und nur
+ * eines davon galt. Was dabei verloren geht, gehört benannt: **ein Konto liegt in genau
+ * einer Klasse.** Ein Bargeldbestand, der in „Lebenshaltung" UND „Urlaub" lag, lässt sich
+ * so nicht mehr abbilden — wer beliebige Bündel über Konten legen will, braucht dafür
+ * etwas Neues, und es darf dann wieder nichts entscheiden.
  *
  * **Erweitern:** einen Wert in `KONTOKLASSEN` ergänzen, in `i18n.ts` unter
- * `einstellungen.konto.klasse` benennen — und prüfen, ob er verfügbar ist oder nicht. Nur
- * `"liquide"` ist es.
+ * `einstellungen.konto.klasse` und `klasseHinweis` benennen — und entscheiden, ob er
+ * verfügbar ist. Nur `"liquide"` ist es. Die Reihenfolge in `KONTOKLASSEN` ist dabei die
+ * Reihenfolge in der Karte „Was da ist" und im Auswahlfeld: von verfügbar nach gebunden.
  */
-export type Kontoklasse = "liquide" | "ruecklage" | "vorsorge";
+export type Kontoklasse = "liquide" | "ruecklage" | "vorsorge" | "sparen" | "investment";
 
-export const KONTOKLASSEN: Kontoklasse[] = ["liquide", "ruecklage", "vorsorge"];
+export const KONTOKLASSEN: Kontoklasse[] = [
+  "liquide",
+  "ruecklage",
+  "vorsorge",
+  "sparen",
+  "investment",
+];
 
 /**
  * Vorschlag für ein Konto, das noch keine Klasse trägt.
@@ -48,12 +62,56 @@ export const KONTOKLASSEN: Kontoklasse[] = ["liquide", "ruecklage", "vorsorge"];
  * außer beim Depot, wo sie offensichtlich falsch wäre.
  */
 export function klasseVorschlag(typ: Kontotyp): Kontoklasse {
-  return typ === "Depot" ? "vorsorge" : "liquide";
+  return typ === "Depot" ? "investment" : "liquide";
 }
 
 /** Ist das Geld auf diesem Konto verfügbar? */
 export function istLiquide(konto: Pick<Zahlungskonto, "klasse">): boolean {
   return konto.klasse === "liquide";
+}
+
+/**
+ * Wird dieses Konto noch geführt?
+ *
+ * Ein stillgelegtes Konto gibt es nicht mehr — aufgelöst bei der Bank, oder eine Kasse,
+ * die niemand mehr führt. Seine Buchungen BLEIBEN, und daran hängt der ganze Sinn: ein
+ * Konto loszuwerden, ohne seine Vergangenheit mitzunehmen.
+ *
+ * **Das hier ist eine Sicht auf die GEGENWART, keine Rechenregel.** Der Unterschied
+ * entscheidet, was diese Funktion beantworten darf und was nicht: Sie sagt, ob man auf das
+ * Konto noch etwas buchen, es noch abrufen, noch abgleichen, noch als Ziel wählen kann —
+ * und ob sein Geld für den nächsten Monat zur Verfügung steht. Sie sagt **nicht**, ob seine
+ * Buchungen in einer Auswertung mitzählen. Wer sie dort einsetzt, schreibt mit einem Klick
+ * in der Verwaltung rückwirkend jeden Monat um, und die Zahlen von letztem Jahr sind
+ * danach andere als vorher.
+ *
+ * Deshalb steht sie hier als FRAGE und nicht als Filter in `liquideMittel`: welche Summe
+ * ein stillgelegtes Konto mitnimmt, entscheidet die Aufrufstelle, weil die Aufrufstellen
+ * verschiedene Fragen stellen. Dieselbe Arbeitsteilung wie bei der Kontoklasse.
+ */
+export function istAktiv(konto: Pick<Zahlungskonto, "aktiv">): boolean {
+  return konto.aktiv !== false;
+}
+
+/**
+ * Die Konten, die eine Auswahl anbieten darf — plus das bereits Gewählte.
+ *
+ * Ein stillgelegtes Konto soll man nicht mehr WÄHLEN können; das ist der halbe Sinn der
+ * Stilllegung. Es einfach herauszufiltern ist aber der naheliegende und falsche Weg: eine
+ * Buchung, die auf einem stillgelegten Konto LIEGT, fände ihr eigenes Konto in der Liste
+ * nicht mehr — das Feld stünde leer oder zeigte stillschweigend ein anderes, und beim
+ * nächsten Speichern wäre die Buchung umgezogen. Auf einem Konto, das es nicht mehr gibt,
+ * kann man nichts Neues buchen; was dort schon liegt, muss man trotzdem ansehen und
+ * bearbeiten können.
+ *
+ * Deshalb nimmt diese Funktion beides: die geführten Konten, und dazu genau das eine, das
+ * ohnehin schon dransteht. Die Reihenfolge bleibt, wie sie hereinkam.
+ */
+export function waehlbareKonten(
+  konten: readonly Zahlungskonto[],
+  bereitsGewaehlt?: string,
+): Zahlungskonto[] {
+  return konten.filter((k) => istAktiv(k) || k.id === bereitsGewaehlt);
 }
 
 export interface Zahlungskonto {
@@ -69,13 +127,20 @@ export interface Zahlungskonto {
   readonly inhaberIds: string[];
   /** Aktueller Kontostand in Cent (manuell gepflegt; später aus Import). */
   readonly saldo: Cent;
+  /**
+   * Wird das Konto noch geführt? **Fehlend heißt JA** — dieselbe Form wie
+   * `Istbuchung.budgetrelevant`, und aus demselben Grund: ein fehlender Wert muss die
+   * harmlose Aussage sein, sonst fällt ein Konto aus einer Liste, weil jemand ein Feld
+   * nicht gesetzt hat. Gefragt wird deshalb über `istAktiv`, nie über `konto.aktiv` direkt.
+   */
+  readonly aktiv?: boolean;
 }
 
 /**
  * Summe der VERFÜGBAREN Kontostände — die liquiden Mittel, Startpunkt der
  * Liquiditätsprojektion.
  *
- * Konten der Klasse `"ruecklage"` und `"vorsorge"` bleiben draußen. Bis 2026-08-21
+ * Konten jeder anderen Klasse bleiben draußen. Bis 2026-08-21
  * summierte diese Funktion alle Salden ohne Unterschied, und ein Depot zählte als
  * Bargeld.
  *

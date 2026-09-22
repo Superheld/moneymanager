@@ -24,6 +24,7 @@ import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
+  waehlbareKonten,
   minorZuMajor,
   type Budgetart,
   type Budgetbereich,
@@ -48,7 +49,7 @@ import { PageHead } from "../bausteine/PageHead";
 import { Modal } from "../bausteine/Modal";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { geldFarbe, warnTon } from "../bausteine/geldFarbe";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
@@ -232,8 +233,9 @@ export function BudgetsScreen() {
     setFehler(null);
     try {
       await budgetSpeichern(
-        // `abMonat`: beim Anlegen der Startmonat, beim Bearbeiten der laufende. Ein
-        // geänderter Rahmen gilt ab jetzt — die Monate davor behalten ihre Planung.
+        // `abMonat`: beim Anlegen der Monat aus „gilt ab", beim Bearbeiten der
+        // laufende (bzw. die angetippte Version). Ein geänderter Rahmen gilt ab jetzt —
+        // die Monate davor behalten ihre Planung.
         {
           kategorieId, kontoId, betragProMonat: geld.parse(betragText) ?? 0, art, start,
           abMonat: editId ? zielMonat : start.slice(0, 7),
@@ -270,7 +272,7 @@ export function BudgetsScreen() {
           <KPIStat size="chip" label={t("budgets.kpiAnzahl")} value={String(zeilen.length)} />
           <KPIStat size="chip" label={t("budgets.kpiProMonat")} value={geld.format(summe.proMonat)} unit={geld.symbol} />
           <KPIStat size="chip" label={t("budgets.kpiVerbraucht")} value={geld.format(summe.verbraucht)} unit={geld.symbol} />
-          <KPIStat size="chip" label={t("budgets.kpiAuslastung")} value={String(summe.auslastung)} unit="%" tone={summe.auslastung > 100 ? "warn" : "default"} />
+          <KPIStat size="chip" label={t("budgets.kpiAuslastung")} value={String(summe.auslastung)} unit="%" tone={warnTon(summe.auslastung > 100)} />
           {summe.ueberzogen > 0 && (
             <KPIStat size="chip" label={t("budgets.kpiUeberzogen")} value={String(summe.ueberzogen)} tone="warn" />
           )}
@@ -584,7 +586,7 @@ export function BudgetsScreen() {
                 wert={kontoId}
                 aufAenderung={setKontoId}
                 platzhalter={t("budgets.kontoWaehlen")}
-                optionen={[{ wert: "", text: t("budgets.kontoWaehlen") }, ...konten.map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
+                optionen={[{ wert: "", text: t("budgets.kontoWaehlen") }, ...waehlbareKonten(konten, kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
               />
             </FormField>
 
@@ -643,11 +645,29 @@ export function BudgetsScreen() {
               </div>
             )}
 
-            {/* Nur beim Aufbauenden: ohne Anker weiss es nicht, wie viele Monate es
-                schon gesammelt hat. Beim Monatlichen wäre das Feld ohne Wirkung. */}
-            {art === "aufbauend" && (
-              <FormField label={t("budgets.feldStart")} hint={t("budgets.feldStartHinweis")}>
-                <Datumsfeld ariaLabel={t("budgets.feldStart")} wert={start} aufAenderung={setStart} />
+            {/* Beim ANLEGEN für beide Arten, und das ist der Punkt: das Feld sagt, ab
+                welchem Monat der erste Betrag gilt. Ohne es landete er zwangsläufig im
+                laufenden Monat, und wer ein Budget für etwas anlegt, das seit dem Frühjahr
+                läuft, sähe jeden Monat davor mit Rahmen 0 — die Auswertung zeigte dann
+                lauter Überziehungen, die nie welche waren. Rückwirkend ERFUNDEN wird
+                dabei nichts: der Monat ist eine Angabe und keine Annahme.
+
+                EIN Feld für beide Arten, nicht zwei: beim Aufbauenden setzt derselbe
+                Monat zugleich den Sammelanker. Zwei Felder für einen Zeitpunkt wären zwei
+                Wahrheiten, und die erste Abweichung fiele niemandem auf.
+
+                Beim BEARBEITEN bleibt es der Anker und damit nur beim Aufbauenden: ab
+                wann ein GEÄNDERTER Betrag gilt, sagt dort die Betragsreihe darüber. */}
+            {(!editId || art === "aufbauend") && (
+              <FormField
+                label={editId ? t("budgets.feldStart") : t("budgets.feldGiltAb")}
+                hint={editId ? t("budgets.feldStartHinweis") : t(`budgets.feldGiltAbHinweis.${art}`)}
+              >
+                <Datumsfeld
+                  ariaLabel={editId ? t("budgets.feldStart") : t("budgets.feldGiltAb")}
+                  wert={start}
+                  aufAenderung={setStart}
+                />
               </FormField>
             )}
           </div>

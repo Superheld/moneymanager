@@ -57,9 +57,11 @@ export const sqliteZahlungskontoRepository: ZahlungskontoRepository = {
         iban: string | null;
         inhaber_ids: string;
         kontostand: number;
+        aktiv: number;
       }[]
     >(
-      "SELECT id, bezeichnung, typ, klasse, iban, inhaber_ids, kontostand FROM zahlungskonto ORDER BY bezeichnung",
+      `SELECT id, bezeichnung, typ, klasse, iban, inhaber_ids, kontostand, aktiv
+         FROM zahlungskonto ORDER BY bezeichnung`,
     );
     return zeilen.map((z) => {
       const typ = z.typ as Kontotyp;
@@ -75,12 +77,23 @@ export const sqliteZahlungskontoRepository: ZahlungskontoRepository = {
         iban: z.iban ?? undefined,
         inhaberIds: parseIds(z.inhaber_ids),
         saldo: z.kontostand ?? 0,
+        // Ausdrücklich gesetzt und nicht bei `undefined` gelassen: nach oben soll niemand
+        // wissen müssen, dass ein fehlender Wert JA heisst. Die Kulanz im Typ ist für
+        // Aufrufer, die ein Konto BAUEN — nicht für den, der eines liest.
+        aktiv: z.aktiv !== 0,
       };
     });
   },
   async speichern(k: Zahlungskonto) {
     const db = await getDb();
     await db.execute(
+      // **`aktiv` steht bewusst NICHT in dieser Liste.** `kontoAnlegen` wird auch zum
+      // BEARBEITEN benutzt (mit `id`, über das ON CONFLICT), und es baut ein Konto ohne
+      // dieses Feld — jedes Speichern eines stillgelegten Kontos machte es damit
+      // stillschweigend wieder aktiv. Die Stilllegung hat ihren eigenen Schreibweg
+      // (`aktivSetzen`), und ein neues Konto bekommt die 1 aus der Spaltenvorgabe.
+      // Dieselbe Trennung wie bei Beleg und Verarbeitungsstand: was verschiedene
+      // Lebenszyklen hat, wird nicht von derselben Anweisung geschrieben.
       `INSERT INTO zahlungskonto (id, bezeichnung, typ, klasse, iban, inhaber_ids, kontostand)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT(id) DO UPDATE SET bezeichnung = excluded.bezeichnung, typ = excluded.typ,
@@ -96,6 +109,10 @@ export const sqliteZahlungskontoRepository: ZahlungskontoRepository = {
         k.saldo,
       ],
     );
+  },
+  async aktivSetzen(id, aktiv) {
+    const db = await getDb();
+    await db.execute("UPDATE zahlungskonto SET aktiv = $1 WHERE id = $2", [aktiv ? 1 : 0, id]);
   },
   async loeschen(id) {
     const db = await getDb();

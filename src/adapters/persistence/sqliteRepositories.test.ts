@@ -141,7 +141,49 @@ describe("Stammdaten-Repositories", () => {
       ["k8", "Altes Depot", "Depot"],
     );
     const k = (await zahlungskontoRepository.alle()).find((x) => x.id === "k8")!;
-    expect(k.klasse).toBe("vorsorge");
+    expect(k.klasse).toBe("investment");
+  });
+
+  it("führt ein neu gespeichertes Konto als aktiv", async () => {
+    // Die Spaltenvorgabe, von oben gelesen. `speichern` schickt das Feld gar nicht mit —
+    // ein neues Konto muss trotzdem geführt dastehen, sonst wäre jedes angelegte Konto
+    // sofort stillgelegt.
+    await zahlungskontoRepository.speichern({
+      id: "ka", bezeichnung: "Neu", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    const k = (await zahlungskontoRepository.alle()).find((x) => x.id === "ka")!;
+    expect(k.aktiv).toBe(true);
+  });
+
+  it("legt still und nimmt wieder auf", async () => {
+    await zahlungskontoRepository.speichern({
+      id: "kb", bezeichnung: "Alte Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await zahlungskontoRepository.aktivSetzen("kb", false);
+    const still = (await zahlungskontoRepository.alle()).find((x) => x.id === "kb")!;
+    expect(still.aktiv).toBe(false);
+
+    await zahlungskontoRepository.aktivSetzen("kb", true);
+    const wieder = (await zahlungskontoRepository.alle()).find((x) => x.id === "kb")!;
+    expect(wieder.aktiv).toBe(true);
+  });
+
+  it("macht ein stillgelegtes Konto durch Bearbeiten NICHT wieder aktiv", async () => {
+    // Der Fall, wegen dem `aktiv` einen eigenen Schreibweg hat. `kontoAnlegen` dient auch
+    // dem BEARBEITEN (mit `id`, über das ON CONFLICT) und baut ein Konto ohne dieses Feld;
+    // stünde `aktiv` in der UPDATE-Klausel, holte jedes Umbenennen das Konto still zurück
+    // in die Gegenwart — und niemand sähe der Aufrufstelle an, dass es passiert.
+    await zahlungskontoRepository.speichern({
+      id: "kc", bezeichnung: "Alt", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    await zahlungskontoRepository.aktivSetzen("kc", false);
+    await zahlungskontoRepository.speichern({
+      id: "kc", bezeichnung: "Umbenannt", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 500,
+    });
+    const k = (await zahlungskontoRepository.alle()).find((x) => x.id === "kc")!;
+    expect(k.bezeichnung).toBe("Umbenannt");
+    expect(k.saldo).toBe(500);
+    expect(k.aktiv).toBe(false);
   });
 
   it("speichert eine Kategorie mit Elternbezug", async () => {
@@ -719,6 +761,48 @@ describe("Vertragszuordnung — Persistenz", () => {
       { art: "glaeubigerId", muster: "DE98ZZZ09999999999" },
     ]);
     expect(e.betragVon).toBe(990);
+  });
+
+  it("hält Pflichtmerkmale und das Fälligkeitsfenster über die Rundreise", async () => {
+    // Beide Wege durch dieselbe Tabelle, aber auf verschiedenen Bahnen: das Pflichtflag
+    // steckt im JSON von `schluessel`, das Fenster in vier eigenen Spalten (Migration 72).
+    await erkennungRepository.speichern({
+      vertragId: "police",
+      merkmale: [
+        { art: "glaeubigerId", muster: "DE39ZZZ09999999123", pflicht: true },
+        { art: "verwendungszweck", muster: "*KV-8842*", pflicht: true },
+        { art: "empfaenger", muster: "ohlert*" },
+      ],
+      monatVon: 11,
+      monatBis: 2,
+      tagVon: 1,
+      tagBis: 5,
+    });
+    const [e] = await erkennungRepository.alle();
+    expect(e.merkmale).toEqual([
+      { art: "glaeubigerId", muster: "DE39ZZZ09999999123", pflicht: true },
+      { art: "verwendungszweck", muster: "*KV-8842*", pflicht: true },
+      // Das offene Merkmal kommt OHNE `pflicht: false` zurück — ein mitgeschlepptes
+      // falsches Flag liesse jede alte Regel beim Speichern um ein Feld wachsen, das
+      // nichts aussagt.
+      { art: "empfaenger", muster: "ohlert*" },
+    ]);
+    expect(e.monatVon).toBe(11);
+    expect(e.monatBis).toBe(2);
+    expect(e.tagVon).toBe(1);
+    expect(e.tagBis).toBe(5);
+  });
+
+  it("liest eine Regel ohne Fenster als kein-Fenster und nicht als Null", async () => {
+    // Der Unterschied entscheidet: `undefined` heisst „egal", eine 0 wäre ein Monat, den
+    // es nicht gibt, und `imFenster` liesse dann nichts mehr durch.
+    await erkennungRepository.speichern({
+      vertragId: "ohne-fenster",
+      merkmale: [{ art: "empfaenger", muster: "kesselmann*" }],
+    });
+    const [e] = await erkennungRepository.alle();
+    expect(e.monatVon).toBeUndefined();
+    expect(e.tagBis).toBeUndefined();
   });
 
   it("überlebt eine kaputte JSON-Spalte, ohne die Liste ausfallen zu lassen", async () => {

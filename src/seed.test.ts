@@ -20,7 +20,7 @@ import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { MIGRATIONS } from "./adapters/persistence/migrations";
 import { seedEinspielen } from "./testwerkzeug/seedDaten";
 import { standardkategorienFlach } from "./application/kategorien/standardkategorien";
-import { passtZu } from "./core";
+import { KONTOKLASSEN, passtZu } from "./core";
 import type { Zahlungsspur } from "./core";
 
 /**
@@ -119,8 +119,6 @@ describe("Spielstand", () => {
       ["umsatz_roh", 6],
       ["umsatz_verarbeitung", 6],
       ["kontostand_anker", 4],
-      ["kontogruppe", 2],
-      ["kontogruppe_konto", 4],
     ] as const) {
       expect(zahl(db, `SELECT COUNT(*) FROM ${tabelle}`), tabelle).toBeGreaterThanOrEqual(
         mindestens,
@@ -163,17 +161,21 @@ describe("Spielstand", () => {
     }
   });
 
-  // Der Fall, den eine feste Kontoklasse nicht abbilden kann und fuer den es Gruppen
-  // gibt: dasselbe Konto liegt in mehr als einer.
-  it("legt ein Konto in zwei Gruppen", () => {
+  /**
+   * Jede Kontoklasse kommt im Spielstand vor.
+   *
+   * Sonst faellt eine Klasse, die niemand benutzt, erst dann auf, wenn ein echter Bestand
+   * sie traegt — und die Karte „Was da ist" zeigt im Spielstand bis dahin eine Zeile
+   * weniger, als es geben kann.
+   */
+  it("belegt jede Kontoklasse mit mindestens einem Konto", () => {
     const db = mitSeed();
-    expect(
-      zahl(
-        db,
-        "SELECT COUNT(*) FROM (SELECT konto_id FROM kontogruppe_konto " +
-          "GROUP BY konto_id HAVING COUNT(*) > 1)",
-      ),
-    ).toBeGreaterThanOrEqual(1);
+    for (const klasse of KONTOKLASSEN) {
+      expect(
+        zahl(db, `SELECT COUNT(*) FROM zahlungskonto WHERE klasse = '${klasse}'`),
+        klasse,
+      ).toBeGreaterThanOrEqual(1);
+    }
   });
 
   it("haelt die Invariante der Aufteilung: Summe der Teile = Betrag der Buchung", () => {
@@ -548,6 +550,30 @@ describe("Spielstand — Umbuchungsvertrag", () => {
           AND konto_id = '${kontoId}' AND gegenkonto_id = '${gegenkontoId}'`,
     );
     expect(Number(beine!.values[0][0])).toBeGreaterThan(0);
+  });
+
+  /**
+   * Der Fall, den man sonst nur herstellt, indem man ihn herstellt — und an dem beide
+   * Haelften der Stilllegungs-Regel sichtbar werden.
+   */
+  it("enthaelt ein stillgelegtes Konto MIT Buchungen und Restbetrag", () => {
+    const db = mitSeed();
+    const [zeile] = db.exec(
+      "SELECT aktiv, kontostand FROM zahlungskonto WHERE id = 'konto-alt'",
+    );
+    expect(zeile!.values[0][0]).toBe(0);
+    // Restgeld: es steht in „Was da ist", obwohl das Konto nirgends mehr waehlbar ist.
+    expect(Number(zeile!.values[0][1])).toBeGreaterThan(0);
+    // Und eine Vergangenheit, die in der Analyse weiterzaehlt.
+    expect(zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE konto_id = 'konto-alt'")).toBeGreaterThan(0);
+  });
+
+  it("fuehrt alle anderen Konten als aktiv", () => {
+    // Die Gegenprobe zum Testfall darueber: genau EIN stillgelegtes Konto, nicht aus
+    // Versehen mehrere. Ein Spielstand, in dem die Haelfte der Konten still ist, zeigt die
+    // App in einem Zustand, den es so nicht gibt.
+    const db = mitSeed();
+    expect(zahl(db, "SELECT COUNT(*) FROM zahlungskonto WHERE aktiv = 0")).toBe(1);
   });
 
   it("paart beide Beine jeder Umbuchung", () => {

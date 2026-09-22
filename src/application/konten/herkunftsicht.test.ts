@@ -25,7 +25,7 @@ function umsatz(over: Partial<Umsatz> & { id: string }): Umsatz {
 
 function deps(umsaetze: Umsatz[], buchungen: IstBuchung[] = []): HerkunftDeps {
   return {
-    kontoRepo: { async alle() { return [GIRO, BAR]; }, async speichern() {}, async loeschen() {} },
+    kontoRepo: { async alle() { return [GIRO, BAR]; }, async speichern() {}, async aktivSetzen() {}, async loeschen() {} },
     umsatzRepo: { async alle() { return umsaetze; } } as unknown as HerkunftDeps["umsatzRepo"],
     laufRepo: { async alle() { return LAEUFE; }, async speichern() {}, async loeschen() {} },
     ledger: { async alle() { return buchungen; }, async speichern() {}, async loeschen() {} },

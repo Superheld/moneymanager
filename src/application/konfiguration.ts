@@ -1,17 +1,19 @@
 // Konfiguration exportieren — heute die Kategorien, später mehr.
 //
 // **Was das ist und was es nicht ist.** Exportiert wird, wie der Haushalt ORDNET, nicht
-// was in ihm passiert ist: Kategorien, später Budgets, Verträge, Kontogruppen,
+// was in ihm passiert ist: Kategorien, später Budgets, Verträge,
 // Erkennungsregeln. Keine Buchungen, keine Salden, keine Kontonummern. Die Trennung ist
 // nicht Bequemlichkeit, sondern der Grund, warum es diese Datei überhaupt geben darf: eine
 // Ordnung lässt sich weitergeben, ein Kontoauszug nicht.
 //
-// **Warum nur Kategorien, obwohl die Form auf mehr ausgelegt ist.** Ein Export ist erst
-// dann etwas wert, wenn es einen Import dazu gibt, und der ist die schwierigere Hälfte:
-// eingelesene Kategorien treffen auf vorhandene, IDs kollidieren, Bäume müssen
-// zusammengeführt werden. Diese Fragen sind offen. Was hier steht, ist der Teil, der ohne
-// sie schon nützt — und die Form (`fassung`, benannte Abschnitte) ist so gewählt, dass der
-// Rest daneben wachsen kann, ohne dass eine erste Datei ungültig wird.
+// **Warum nur Kategorien, obwohl die Form auf mehr ausgelegt ist.** Die Form (`fassung`,
+// benannte Abschnitte) ist so gewählt, dass der Rest daneben wachsen kann, ohne dass eine
+// erste Datei ungültig wird.
+//
+// **Die Gegenrichtung steht in `konfigurationsimport.ts`** — dort auch die drei
+// Entscheidungen, die das Einlesen überhaupt beantwortbar machen (Namensvergleich, nur
+// anlegen, Plan vor Tat). Was hier hinausgeschrieben wird, muss dort wieder hereinpassen;
+// `konfigurationsimport.test.ts` fasst genau diese Naht.
 //
 // **Es ist ein Experiment** (`experiment.export`), und die Schalterstellung sagt genau das:
 // die Form ist nicht zugesichert. Wer eine Datei von heute in einem halben Jahr einlesen

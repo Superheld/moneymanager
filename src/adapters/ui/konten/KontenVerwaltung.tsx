@@ -15,23 +15,30 @@ import {
   minorZuMajor,
   KONTOKLASSEN,
   klasseVorschlag,
+  istAktiv,
+  type Kontoloeschung,
   type Kontoklasse,
   type Kontostand,
   type Kontotyp,
   type Person,
   type Zahlungskonto,
 } from "../../../application";
-import { kontoAnlegen, kontoLoeschen } from "../../dienste";
+import {
+  kontoAnlegen,
+  kontoloeschung,
+  kontoStilllegen,
+  kontoWiederaufnehmen,
+} from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { IconButton } from "../bausteine/IconButton";
 import { KontoAnlegenModal } from "./KontoAnlegenModal";
+import { KontoAufloesenModal } from "./KontoAufloesenModal";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
-import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 /** Woran ein Konto hängt: welcher Zugang, welches Bankkonto, bis wann geholt. */
 export interface KontoVerbindung {
@@ -65,7 +72,6 @@ export function KontenVerwaltung({
   onChange: () => void;
 }) {
   const { t } = useTranslation();
-  const loeschfrage = useLoeschfrage();
   const geld = useGeld();
   const stand = new Map(kontostaende.map((k) => [k.konto.id, k]));
   const [offen, setOffen] = useState(false);
@@ -90,6 +96,18 @@ export function KontenVerwaltung({
   const [iban, setIban] = useState("");
   const [inhaberIds, setInhaberIds] = useState<string[]>([]);
   const [saldoText, setSaldoText] = useState("");
+  /**
+   * Der Zustand im Dialog — nur zur ANZEIGE, und er wird sofort geschrieben.
+   *
+   * Er läuft ausdrücklich NICHT über `speichern`: `kontoAnlegen` fasst `aktiv` nicht an
+   * (sonst holte jedes Umbenennen ein stillgelegtes Konto zurück in die Gegenwart), also
+   * hätte ein Feld, das erst beim Speichern wirkt, keinen Weg in den Bestand. Der Schalter
+   * hier ruft denselben Dienst wie der in der Liste, und dieser Zustand hält nur nach, was
+   * danach dasteht — sonst zeigte der Dialog den alten Stand weiter, bis man ihn schliesst.
+   */
+  const [aktiv, setAktiv] = useState(true);
+  /** Welches Konto gerade im Aufloesen-Dialog steht, samt der Zaehlung dazu. */
+  const [aufloesen, setAufloesen] = useState<{ konto: Zahlungskonto; loeschung: Kontoloeschung } | null>(null);
   const [fehler, setFehler] = useState<string | null>(null);
 
   function toggleInhaber(id: string) {
@@ -111,6 +129,7 @@ export function KontenVerwaltung({
     setIban(k.iban ?? "");
     setInhaberIds([...k.inhaberIds]);
     setSaldoText(String(minorZuMajor(k.saldo, geld.waehrung)));
+    setAktiv(istAktiv(k));
     setFehler(null);
     setOffen(true);
   }
@@ -148,12 +167,21 @@ export function KontenVerwaltung({
               // Die Zeile selbst bleibt stumm: eine unsichtbare Klickfläche findet
               // niemand, und wer sie zufällig trifft, hat sie nicht gemeint.
               render: (k: Zahlungskonto) => (
-                <Zeilenlink
-                  onKlick={() => setZeilenVon(zeilenVon === k.id ? null : k.id)}
-                  titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
-                >
-                  {k.bezeichnung}
-                </Zeilenlink>
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                  <Zeilenlink
+                    onKlick={() => setZeilenVon(zeilenVon === k.id ? null : k.id)}
+                    titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
+                  >
+                    {k.bezeichnung}
+                  </Zeilenlink>
+                  {/* Die Marke steht NEBEN dem Namen und nicht in einer eigenen Spalte:
+                      der Zustand ist selten, eine Spalte dafuer waere in jeder Zeile
+                      leer — und hier liest es sich als das, was es ist, ein Teil der
+                      Identitaet des Kontos. Die Zeile bleibt ansonsten normal lesbar:
+                      ein ausgegrautes Konto saehe nach „nicht benutzbar" aus, und
+                      benutzbar ist es sehr wohl, nur nicht fuer Neues. */}
+                  {!istAktiv(k) && <Pill variant="neutral">{t("konten.stillgelegt")}</Pill>}
+                </span>
               ),
             },
             { key: "typ", label: t("einstellungen.konto.spalteTyp"), render: (k) => t(`einstellungen.konto.typ.${k.typ}`) },
@@ -182,13 +210,32 @@ export function KontenVerwaltung({
                 ]
               : []),
             { key: "_e", label: "", align: "right", render: (k) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} /> },
-            { key: "_x", label: "", align: "right", render: (k) => <IconButton icon="loeschen" ton="gefahr" label={t("einstellungen.loeschen")} onClick={() => loeschfrage.stellen({
-              name: k.bezeichnung,
-              // Ein Konto mit Buchungen laesst der Fremdschluessel gar nicht erst
-              // loeschen — der Dialog bleibt dann stehen und zeigt, woran es lag.
-              folgen: t("konten.kontoLoeschenFolgen"),
-              ausfuehren: async () => { await kontoLoeschen(k.id); onChange(); },
-            })} /> },
+            // **EIN Symbol, immer dasselbe, immer da.** Vorher standen hier drei
+            // Aktionen (stilllegen, loeschen, und am stillgelegten Konto zusaetzlich
+            // endgueltig loeschen) — drei Dinge, die zusammengehoeren, nebeneinander, und
+            // nichts sagte wie. Der Muelleimer konnte fuer jedes Konto mit Geschichte nur
+            // ablehnen, und der Icon-Satz wechselte je Zustand.
+            //
+            // Was moeglich ist, entscheidet jetzt der Dialog. `ton` bleibt normal: dieser
+            // Knopf fragt nur — das Zerstoerende steht drinnen und traegt dort seine Farbe.
+            {
+              key: "_a",
+              label: "",
+              align: "right",
+              render: (k: Zahlungskonto) => (
+                <IconButton
+                  icon="aufloesen"
+                  label={t("konten.aufloesen.knopf")}
+                  hinweis={t("konten.aufloesen.knopfHinweis")}
+                  onClick={async () => {
+                    // Gezaehlt wird beim Oeffnen und nicht beim Laden der Liste: es sind
+                    // acht Abfragen je Konto, und zehn Konten fuehrten achtzig davon aus,
+                    // um einen Dialog zu fuellen, den fast niemand aufschlaegt.
+                    setAufloesen({ konto: k, loeschung: await kontoloeschung(k.id) });
+                  }}
+                />
+              ),
+            },
           ]}
           rows={konten}
         />
@@ -227,6 +274,38 @@ export function KontenVerwaltung({
               </span>
             )}
           </FormField>
+
+          {/* Der Zustand steht NEBEN der Verbindung und nach demselben Muster: eine Pille,
+              die ihn nennt, ein Satz, der ihn erklärt, und der Weg, ihn zu ändern. Beides
+              sind Auskünfte über das Konto als Ganzes und keine Stammdatenfelder — deshalb
+              stehen sie über dem Gitter und nicht darin.
+
+              Nur beim BEARBEITEN: ein Konto, das gerade angelegt wird, ist geführt, und ein
+              Schalter dafür wäre eine Frage, die sich niemand stellt. */}
+          {editId && (
+            <FormField label={t("konten.zustandTitel")}>
+              <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+                <Pill variant={aktiv ? "ok" : "neutral"}>
+                  {aktiv ? t("konten.gefuehrt") : t("konten.stillgelegt")}
+                </Pill>
+                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  {aktiv ? t("konten.zustandHinweisGefuehrt") : t("konten.zustandHinweisStill")}
+                </span>
+                <button
+                  className="linkbtn"
+                  title={aktiv ? t("konten.stilllegenHinweis") : t("konten.wiederaufnehmenHinweis")}
+                  onClick={async () => {
+                    if (aktiv) await kontoStilllegen(editId);
+                    else await kontoWiederaufnehmen(editId);
+                    setAktiv(!aktiv);
+                    onChange();
+                  }}
+                >
+                  {aktiv ? t("konten.stilllegen") : t("konten.wiederaufnehmen")}
+                </button>
+              </span>
+            </FormField>
+          )}
 
           <div className="form-grid">
             <FormField label={t("einstellungen.konto.feldBezeichnung")} required>
@@ -301,7 +380,14 @@ export function KontenVerwaltung({
         <HerkunftBereich key={zeilenVon} kontoId={zeilenVon} />
       </div>
     )}
-    {loeschfrage.dialog}
+    {aufloesen && (
+      <KontoAufloesenModal
+        konto={aufloesen.konto}
+        loeschung={aufloesen.loeschung}
+        onClose={() => setAufloesen(null)}
+        onFertig={() => { setAufloesen(null); onChange(); }}
+      />
+    )}
 
     </>
   );

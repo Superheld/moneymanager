@@ -220,7 +220,7 @@ export async function umsaetzeVerbuchen(
       // vergibt keine) — es bleibt offen und wartet in der Review-Inbox.
       kategorieId: u.vorschlag?.kategorieId,
       // Hat jemand in der Review-Inbox von Hand kategorisiert, ist das eine Entscheidung
-      // und überlebt jeden späteren automatischen Lauf. Alles andere (Festlegung, Vertrag,
+      // und überlebt jeden späteren automatischen Lauf. Alles andere (Vertrag, Umbuchung,
       // Modell) bleibt automatisch — und damit korrigierbar, ohne dass jemand die Zeile
       // zuerst freigeben muss.
       kategorieHerkunft: u.vorschlag?.quelle === "manuell" ? "manuell" : "automatisch",

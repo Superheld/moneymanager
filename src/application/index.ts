@@ -95,6 +95,21 @@ export {
   // Die Summe der Vormerkungen und ihre Zahl — die Anzeige braucht dieselbe Rechnung
   // wie die Vorschau, und zwei Additionen an zwei Orten laufen auseinander.
   vormerkungslast,
+  // Wird dieses Konto noch geführt? Eine Auskunft über EIN Konto, wie `hatZiel`.
+  istAktiv,
+  // **Die Ausnahme in dieser Liste, und sie steht hier mit Begründung.** `waehlbareKonten`
+  // geht über eine SAMMLUNG und wäre nach der Grenze oben eine Sicht. Sie greift nicht auf
+  // den Bestand zu: sie filtert die Liste, die der Screen ohnehin schon in der Hand hält,
+  // und beantwortet keine Frage über die Daten, sondern über ein ANGEBOT — welche Konten
+  // eine Auswahl anbieten darf.
+  //
+  // Hinter einen Use-Case gelegt bräuchte jeder Dialog einen zweiten Ladeaufruf für eine
+  // Liste, die er schon hat. Ausgelassen müsste jeder von neun Dialogen die Regel selbst
+  // hinschreiben — und ihre zweite Hälfte (`|| das schon Gewählte`) ist genau die, die
+  // einer vergisst, worauf eine alte Buchung stillschweigend ihr Konto wechselt. Das ist
+  // dieselbe Sorte Fehler, gegen die die Strenge dieser Datei überhaupt gebaut ist; hier
+  // zeigt sie in die andere Richtung.
+  waehlbareKonten,
 } from "../core";
 
 // ---------------------------------------------------------------------------
@@ -132,6 +147,8 @@ export {
   type Vertragskennzahlen,
   type VertragsichtDeps,
   erkennungProbieren,
+  erkennungsentwurf,
+  ENTWURF_VERTRAG_ID,
   type Erkennungsprobe,
   merkmaleVorschlagen,
   type Merkmalsvorschlag,
@@ -143,6 +160,11 @@ export {
   type VertragEingabe,
   type VertragErgebnis,
 } from "./vertraege/vertragAnlegen";
+export {
+  vertragskategorieUebertragen,
+  type UebertragungErgebnis,
+  type VertragskategorieDeps,
+} from "./vertraege/vertragskategorie";
 export { zahlungsspuren } from "./buchung/zahlungsspuren";
 export {
   historieLaden,
@@ -240,13 +262,13 @@ export {
   type RuecklagenEingabe,
 } from "./ruecklagen/ruecklagenPflege";
 export {
-  kontogruppeSpeichern,
-  kontogruppeLoeschen,
-  gruppensichten,
-  type KontogruppeEingabe,
-  type Gruppensicht,
-  type GruppenDeps,
-} from "./konten/gruppen";
+  kontoloeschungPruefen,
+  kontoVollstaendigLoeschen,
+  istLoeschbar,
+  type Kontoloeschung,
+  type KontoentfernenPort,
+  type KontoentfernenDeps,
+} from "./konten/kontoentfernen";
 export {
   stammdatenLaden,
   type Stammdaten,
@@ -308,6 +330,14 @@ export {
   type ExportKategorie,
   type Konfigurationsexport,
 } from "./konfiguration";
+export {
+  konfigurationLesen,
+  importplan,
+  konfigurationUebernehmen,
+  type Befund,
+  type Kategoriebefund,
+  type Importplan,
+} from "./konfigurationsimport";
 export {
   bestandExportieren,
   BESTANDSEXPORT_FASSUNG,

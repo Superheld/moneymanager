@@ -31,6 +31,7 @@ function fakes() {
   const kontoRepo: ZahlungskontoRepository = {
     alle: async () => konten,
     speichern: async (k) => { konten.push(k); },
+    aktivSetzen: async () => {},
     loeschen: async () => {},
   };
   const kategorieRepo: KategorieRepository = {

@@ -38,6 +38,8 @@ import {
   type Vertragszuordnung,
   type Zahlungsspur,
   type Zahlungsregel,
+  standardErkennung,
+  type Regelvorlage,
 } from "../../core";
 import { erkennungenNachziehen, zuordnungenAbgleichen, type AbgleichDeps } from "./vertragszuordnung";
 import { ignorierteSchluessel, vertragsvorschlaege } from "./vertragsvorschlaege";
@@ -230,6 +232,38 @@ export interface Erkennungsprobe {
    * `anfangsbestandVorschlag` im Kontoabgleich.
    */
   readonly spanne?: { von: Cent; bis: Cent };
+}
+
+/**
+ * Die Vertrags-Id einer Regel, die es noch nicht gibt.
+ *
+ * Eine Erkennung braucht sie als Feld, ein Entwurf hat aber noch keinen Vertrag. Zum
+ * Probieren spielt sie keine Rolle — `erkennungProbieren` fragt nur, welche Zahlungen die
+ * Merkmale treffen. Beim Speichern setzt der Aufrufer die echte ein; dieser Wert erreicht
+ * den Bestand nie.
+ */
+export const ENTWURF_VERTRAG_ID = "entwurf";
+
+/**
+ * Die Regel, die für einen noch nicht angelegten Vertrag ENTSTEHEN würde.
+ *
+ * Sie gibt es, damit die Maske beim Anlegen dasselbe zeigen kann, was `vertragAnlegen`
+ * sonst still im Hintergrund schreibt. Bis 2026-09-13 erschien der Erkennungsabschnitt
+ * erst beim Bearbeiten: wer einen Vertrag von Hand erfasste, bekam eine Regel
+ * zugeschrieben, ohne sie je zu sehen — und kam erst nach dem Speichern und erneuten
+ * Öffnen an sie heran.
+ *
+ * Dieselbe Funktion wie beim Speichern (`standardErkennung`), damit Vorschau und Ergebnis
+ * nicht auseinanderlaufen können. Zwei Fassungen davon wären zwei Regeln, die zufällig
+ * gleich aussehen, bis eine von beiden angefasst wird.
+ */
+export function erkennungsentwurf(
+  anbieter: string,
+  betrag: Cent,
+  glaeubigerId?: string,
+  vorlage?: Regelvorlage,
+): Vertragserkennung {
+  return standardErkennung(ENTWURF_VERTRAG_ID, anbieter, betrag, glaeubigerId, vorlage);
 }
 
 export function erkennungProbieren(

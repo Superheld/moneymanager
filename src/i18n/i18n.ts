@@ -70,7 +70,14 @@ const de = {
     },
     startdatum: { ungueltig: "Bitte ein gültiges Startdatum angeben." },
     name: { fehlt: "Bitte einen Namen angeben." },
-    konto: { waehlen: "Bitte ein Konto wählen." },
+    konto: {
+      waehlen: "Bitte ein Konto wählen.",
+      fehlt: "Dieses Konto gibt es nicht mehr.",
+      // Kein reiner Fehlertext, sondern der Hinweis auf den Weg: das endgültige Löschen
+      // steht nur an einem stillgelegten Konto, und wer hier landet, hat den ersten
+      // Schritt übersprungen.
+      nichtStillgelegt: "Das Konto wird noch geführt. Endgültig löschen lässt sich nur ein stillgelegtes — leg es erst still.",
+    },
     sammel: { nichtsGewaehlt: "Bitte wählen, was geändert werden soll." },
     datum: { ungueltig: "Bitte ein gültiges Datum angeben." },
     konten: {
@@ -109,6 +116,11 @@ const de = {
         ohneUmsatz:
           "Zu dieser Buchung ist keine eingelesene Zeile gespeichert — sie lässt sich nur löschen, nicht verwerfen.",
       },
+      keinJson: "Diese Datei ist kein JSON.",
+      keineKonfiguration: "Das ist keine Konfigurationsdatei dieser App.",
+      fassungZuNeu:
+        "Diese Datei stammt aus einer neueren Fassung der App. Was darin steht, lässt " +
+        "sich hier nicht sicher deuten.",
     },
   },
   shell: {
@@ -271,8 +283,8 @@ const de = {
     registerDatei: "Datei",
     registerInbox: "Inbox",
     dateiWaehlen: "Datei wählen",
-    hinweis: "Excel-Export aus Finanzguru (.xlsx). Die Datei wird lokal gelesen; nichts wird gespeichert oder verschickt.",
-    nichtErkannt: "Format nicht erkannt — derzeit wird nur der Finanzguru-Export als Excel-Datei (.xlsx) unterstützt.",
+    hinweis: "Excel-Export aus Finanzguru (.xlsx) oder ein Bestandsexport dieser App (.json). Die Datei wird lokal gelesen; nichts wird gespeichert oder verschickt.",
+    nichtErkannt: "Format nicht erkannt — gelesen werden der Finanzguru-Export als Excel-Datei (.xlsx) und der Bestandsexport dieser App (.json).",
     fremd: {
       titel: "Kategorien der Datei",
       untertitel:
@@ -749,6 +761,11 @@ const de = {
     feldBetragHinweis: "was jeden Monat hineingeht",
     feldStart: "Sammelt ab",
     feldStartHinweis: "gerechnet wird ab dem Monatsersten",
+    feldGiltAb: "Gilt ab",
+    feldGiltAbHinweis: {
+      monatlich: "ab diesem Monat zählt der Rahmen — der Tag spielt keine Rolle",
+      aufbauend: "ab diesem Monat zählt der Rahmen und wird gesammelt",
+    },
     modalBearbeiten: "Budget bearbeiten",
     modalUntertitel: "Ein Budget je Kategorie — für Feineres eine Unterkategorie nehmen",
   },
@@ -867,7 +884,59 @@ const de = {
     detailLoeschenFolgenPaar: "Beide Beine der Umbuchung verschwinden — die Gegenseite auf dem anderen Konto gehört dazu und bliebe sonst allein zurück.",
     detailVerwerfenFolgen: "Die Bankzeile wird verworfen. Der Beleg bleibt erhalten, und die Zeile lässt sich aus der Inbox erneut verbuchen — der Abruf holt sie nicht noch einmal.",
     zugangLoeschenFolgen: "Die abgerufenen Buchungen bleiben; sie stehen im Konto und hängen nicht am Zugang. Weg ist der Weg zur Bank — für weitere Abrufe muss der Zugang neu eingerichtet werden.",
-    kontoLoeschenFolgen: "Ein Konto mit Buchungen lässt sich nicht löschen — die Buchungen müssten zuerst weg. Ohne Buchungen verschwindet nur das Konto selbst.",
+    stillgelegt: "stillgelegt",
+    // Der Mülleimer: was sperrt, beim Namen genannt statt als SQLite-Code. Die Zahlen
+    // kommen aus `kontoloeschung`, und die Teile werden nur aufgenommen, wenn sie zählen —
+    // „0 Buchungen" in einer Begründung liest sich wie ein Fehler im Programm.
+    //
+    // **Die ersten Schlüssel im Bestand mit `_one`/`_other`.** Das ist i18next-Standard und
+    // keine Erfindung; gebraucht wird es hier, weil diese Teile in ganzen Sätzen stehen, in
+    // denen „1 Buchungen" sichtbar falsch ist — anders als bei einem knappen Etikett wie
+    // `vermoegenKonten`. Der i18n-Test vergleicht Blattpfade, beide Formen stehen in beiden
+    // Bundles, die Parität hält also von selbst.
+    loeschsperreBuchungen_one: "eine Buchung",
+    loeschsperreBuchungen_other: "{{count}} Buchungen",
+    loeschsperreBelege_one: "eine importierte Zahlung",
+    loeschsperreBelege_other: "{{count}} importierte Zahlungen",
+    loeschsperreBankverbindung: "eine Bankverbindung",
+    und: "und",
+    endgueltigLoeschen: "Endgültig löschen",
+    endgueltigFolgen: "Weg sind: {{was}}. Die Buchungen stehen danach in keiner Auswertung mehr; ihr Inhalt bleibt im Journal, die Belege der Bank nicht — sie sind die einzige Stelle, an der diese Zahlungen im Wortlaut der Quelle stehen.",
+    endgueltigFolgenLos: "Ausserdem verlieren ihren Bezug auf dieses Konto: {{was}}. Sie bleiben bestehen und gelten danach ohne Kontoeinschränkung.",
+    endgueltigPaare_one: "Eine Umbuchung auf einem anderen Konto verliert ihre Paarung — die Gegenbuchung selbst bleibt.",
+    endgueltigPaare_other: "{{count}} Umbuchungen auf anderen Konten verlieren ihre Paarung — die Gegenbuchungen selbst bleiben.",
+    endgueltigSicherung: "Die Tagessicherung von heute enthält das Konto noch.",
+    folgenBudgets_one: "ein Budget",
+    folgenBudgets_other: "{{count}} Budgets",
+    folgenRuecklagen_one: "eine Rücklage",
+    folgenRuecklagen_other: "{{count}} Rücklagen",
+    folgenRegeln_one: "eine Zahlungsregel",
+    folgenRegeln_other: "{{count}} Zahlungsregeln",
+    folgenErkennung_one: "eine Erkennungsregel",
+    folgenErkennung_other: "{{count}} Erkennungsregeln",
+    stilllegen: "Stilllegen",
+    wiederaufnehmen: "Wieder aufnehmen",
+    stilllegenHinweis: "Stilllegen: das Konto behält alle seine Buchungen und zählt in der Analyse weiter mit. Es verschwindet nur dort, wo es um das Kommende geht — aus der Auswahl beim Buchen, aus der Liquiditätsvorschau und aus dem Bankabruf. Jederzeit umkehrbar.",
+    wiederaufnehmenHinweis: "Wieder aufnehmen: das Konto kommt zurück in die Auswahl, in die Vorschau und in den Abruf.",
+    // Der EINE Weg, ein Konto loszuwerden. Vorher waren es drei Knöpfe in der Zeile, und
+    // welcher wann etwas tat, musste man ausprobieren.
+    aufloesen: {
+      knopf: "Auflösen",
+      knopfHinweis: "Auflösen: stilllegen oder löschen — der Dialog zeigt, was am Konto hängt, und sagt zu jedem Weg, was er bedeutet.",
+      titel: "{{konto}} auflösen",
+      haengtDran: "Daran hängen {{was}}.",
+      haengtNichts: "An diesem Konto hängt nichts — keine Buchung, keine importierte Zahlung, keine Bankverbindung.",
+      zeigenDrauf: "Ausserdem zeigen auf dieses Konto: {{was}}. Sie bleiben in jedem Fall bestehen.",
+      // Der Satz, um den es bei der ganzen Umarbeitung geht: er sagt, was DANACH möglich
+      // ist. Ohne ihn musste man die Abfolge durch Ausprobieren finden.
+      danach: "Ist es stillgelegt, steht hier auch „Endgültig löschen“ — dasselbe, nur ohne Rückweg.",
+      loeschenLeer: "Das Konto verschwindet, sonst ändert sich nichts. Weil nichts daran hängt, ist auch nichts zu bewahren.",
+    },
+    // Der Zustand im Bearbeiten-Dialog, nach dem Muster der Verbindungszeile darüber.
+    gefuehrt: "wird geführt",
+    zustandTitel: "Zustand",
+    zustandHinweisGefuehrt: "Auf dieses Konto wird gebucht, abgerufen und geplant.",
+    zustandHinweisStill: "Keine neuen Buchungen, kein Abruf, keine Vorschau — die vorhandenen Buchungen bleiben und zählen in der Analyse weiter mit.",
     merkmale: {
       titel: "Was die Erkennung hier sieht",
       laedt: "rechne …",
@@ -906,25 +975,7 @@ const de = {
       },
     },
     registerKonten: "Konten",
-    registerGruppen: "Gruppen",
     registerZugaenge: "Bankzugänge",
-    gruppen: {
-      untertitel:
-        "Konten bündeln, wie du sie ansiehst — Lebenshaltung, Rücklagen, was du brauchst. " +
-        "Eine Gruppe rechnet nichts um: was verfügbar ist, entscheidet weiterhin die Klasse " +
-        "des einzelnen Kontos. Ein Konto darf in mehreren Gruppen liegen.",
-      anlegen: "Gruppe",
-      keine: "Noch keine Gruppe angelegt.",
-      leer: "Noch kein Konto in dieser Gruppe.",
-      anfangsbestand: "Anfangsbestände zusammen {{betrag}}",
-      bearbeiten: "Bearbeiten",
-      loeschen: "Löschen",
-      loeschFolgen: "Die Konten selbst bleiben — nur die Gruppierung geht weg.",
-      titelNeu: "Neue Gruppe",
-      titelBearbeiten: "Gruppe bearbeiten",
-      feldBezeichnung: "Bezeichnung",
-      feldKonten: "Konten in dieser Gruppe",
-    },
     verbindung: {
       titel: "Bankverbindung",
       abgerufenBis: "abgerufen bis {{datum}}",
@@ -1467,9 +1518,30 @@ const de = {
           "Diese Datei ist dein Kontoauszug. Sie enthält IBANs, Kontostände, Empfänger " +
           "und jeden Verwendungszweck — gib sie nicht weiter und lade sie nirgends hoch.",
         vergaenglich:
-          "Sie liegt unverschlüsselt, während deine Datenbank verschlüsselt ist. " +
-          "Lösch sie, sobald du sie nicht mehr brauchst.",
+          "Sie liegt unverschlüsselt in deinem Download-Ordner, während deine Datenbank " +
+          "verschlüsselt ist. Lösch sie, sobald du sie nicht mehr brauchst.",
         knopf: "Bestand exportieren",
+      },
+    },
+    import: {
+      dateiWaehlen: "Datei wählen",
+      laeuft: "Wird übernommen …",
+      zaehlerNeu: "{{n}} neu",
+      zaehlerVorhanden: "{{n}} schon da",
+      zaehlerAbweichend: "{{n}} abweichend",
+      wirdAngelegt: "wird angelegt",
+      bleibtWieEsIst: "in der Datei {{datei}}, hier {{bestand}} — bleibt, wie es ist",
+      uebernehmen: "{{n}} Kategorien anlegen",
+      fertig: "{{n}} Kategorien angelegt.",
+      konfiguration: {
+        titel: "Ordnung einlesen",
+        text:
+          "Liest eine Datei konfiguration-….json und legt die Kategorien an, die es hier " +
+          "noch nicht gibt. Verglichen wird über den Namen.",
+        hinweis:
+          "Es wird nur angelegt, nie geändert: was es unter diesem Namen schon gibt, " +
+          "bleibt so, wie du es eingerichtet hast. Was die Datei anders sieht, siehst du " +
+          "vorher.",
       },
     },
     person: {
@@ -1518,11 +1590,19 @@ const de = {
       typ: { Giro: "Giro", Tagesgeld: "Tagesgeld", Bargeld: "Bargeld", Kreditkarte: "Kreditkarte", Depot: "Depot" },
       feldKlasse: "Wofür",
       spalteKlasse: "Wofür",
-      klasse: { liquide: "Verfügbar", ruecklage: "Rücklage", vorsorge: "Vorsorge" },
+      klasse: {
+        liquide: "Liquidität",
+        ruecklage: "Rücklagen",
+        vorsorge: "Vorsorge",
+        sparen: "Sparen",
+        investment: "Investment",
+      },
       klasseHinweis: {
         liquide: "Zählt zu den liquiden Mitteln — Geld, das für den Alltag da ist.",
         ruecklage: "Zurückgelegt für etwas Bestimmtes. Zählt nicht als verfügbar.",
-        vorsorge: "Langfristig gebunden. Zählt nicht als verfügbar.",
+        vorsorge: "Für später gebunden — Altersvorsorge und Ähnliches. Zählt nicht als verfügbar.",
+        sparen: "Angespart ohne festen Zweck. Zählt nicht als verfügbar.",
+        investment: "Angelegt, im Wert schwankend. Zählt nicht als verfügbar.",
       },
     },
     kategorie: {
@@ -1544,7 +1624,7 @@ const de = {
       titel: "4 · Bestand abgleichen",
       untertitel: "Vorhandene Buchungen mit dem aktuellen Stand der Erkennung durchrechnen",
       hinweis:
-        "Alles Bisherige wirkt nur nach vorn: ein frisch trainiertes Modell, eine neue Festlegung, eine Kategorie am Vertrag lassen die schon gebuchten Zahlungen unberührt. Der Abgleich rechnet sie neu — und zeigt zuerst, was er ändern würde. Geschrieben wird erst auf Bestätigung.",
+        "Alles Bisherige wirkt nur nach vorn: ein frisch trainiertes Modell, eine Kategorie am Vertrag, eine neue Erkennungsregel lassen die schon gebuchten Zahlungen unberührt. Der Abgleich rechnet sie neu — und zeigt zuerst, was er ändern würde. Geschrieben wird erst auf Bestätigung.",
       vorschau: "Vorschau rechnen",
       rechnet: "rechne …",
       nichtsZuTun: "Nichts zu ändern — bei {{unveraendert}} Buchungen liefert die Erkennung genau das, was schon dasteht.",
@@ -1824,6 +1904,10 @@ const de = {
     feldRhythmus: "Rhythmus",
     feldKategorie: "Kategorie",
     feldKategorieHinweis: "setzt den Charakter vor",
+    kategorieUebertragen: "Kategorie auf die zugeordneten Zahlungen übertragen",
+    kategorieUebertragenZahl: "Kategorie auf die {{count}} zugeordneten Zahlungen übertragen",
+    kategorieUebertragenHinweis:
+      "Rückwirkend, und es überschreibt auch von Hand gesetzte Kategorien. Geteilte Buchungen und Umbuchungs-Beine bleiben stehen. Ohne Haken bleiben die Zahlungen, wie sie sind.",
     feldCharakter: "Charakter",
     feldKonto: "Konto",
     verlaengerung: { automatisch: "automatisch", keine: "keine" },
@@ -1839,7 +1923,21 @@ const de = {
       zusammen: "Merkmale: {{merkmale}} · Treffer: {{count}}",
       merkmale: "Merkmale",
       merkmaleHinweis:
-        "Mindestens eines muss passen — sie sind ODER-verknüpft. Groß-/Kleinschreibung egal, * ist der Platzhalter. Ein Muster muss den GANZEN Wert abdecken: „*ard*“ trifft „Südwestrundfunk ARD ZDF“, „ard“ allein nur einen Empfänger, der genau so heißt. Die Zahl je Zeile sagt, wie viele Zahlungen dieses Muster für sich allein trifft.",
+        "Von den Merkmalen ohne Häkchen muss mindestens eines passen — sie sind ODER-verknüpft und fangen die Schreibweisen desselben Anbieters ein. Ein Merkmal mit Häkchen „muss“ dagegen MUSS passen: mehrere davon verengen die Regel Stück für Stück. Groß-/Kleinschreibung egal, * ist der Platzhalter. Ein Muster muss den GANZEN Wert abdecken: „*ard*“ trifft „Südwestrundfunk ARD ZDF“, „ard“ allein nur einen Empfänger, der genau so heißt. Die Zahl je Zeile sagt, wie viele Zahlungen dieses Muster für sich allein trifft — bei einem Pflichtmerkmal ist das die Obergrenze für die ganze Regel.",
+      pflicht: "muss",
+      pflichtHinweis:
+        "Dieses Merkmal muss passen, damit die Regel greift. So lassen sich zwei Verträge beim selben Einzieher trennen: Gläubiger-ID und Versicherungsnummer im Verwendungszweck beide als „muss“ — dann zählt nur, was beides erfüllt.",
+      pflichtTrifftNieHinweis:
+        "Dieses Muster hat in keiner Zahlung gepasst — und es ist ein Pflichtmerkmal. Damit trifft die ganze Regel nichts, egal was sonst noch dasteht.",
+      fenster: "Fälligkeitsfenster",
+      fensterHinweis:
+        "Wiederholt sich jedes Jahr bzw. jeden Monat — im Gegensatz zu „erst ab“/„nur bis“, die feste Stichtage sind. Monat 3–3 heißt: nur Buchungen im März, in jedem Jahr. Tag 1–5: nur Buchungen in den ersten fünf Tagen eines Monats. Beide Grenzen müssen dastehen, sonst gilt das Fenster nicht. Von größer als bis heißt über die Grenze hinweg (Monat 11–2 ist November bis Februar).",
+      fensterMonat: "Monat",
+      fensterMonatVon: "Monat von",
+      fensterMonatBis: "Monat bis",
+      fensterTag: "Tag",
+      fensterTagVon: "Tag von",
+      fensterTagBis: "Tag bis",
       merkmalArt: "Art des Merkmals",
       merkmalMuster: "Muster",
       art: {
@@ -1863,8 +1961,6 @@ const de = {
       vorschlaegeZurueckgehalten:
         "{{n}} weitere nicht angeboten: sie treffen eine Buchung, die du ausdrücklich keinem Vertrag zugeordnet hast.",
       musterPlatzhalter: "z. B. name*",
-      entstehtBeimSpeichern:
-        "Die Erkennung entsteht beim Speichern aus Anbieter und Betrag. Danach steht sie hier und lässt sich nachsteuern.",
       hinweis:
         "Nach diesen Regeln ordnet die App gebuchte Zahlungen diesem Vertrag zu — auch die, die erst noch kommen. Was du hier änderst, wirkt sofort auf den ganzen Bestand. Von Hand gesetzte Zuordnungen bleiben davon unberührt.",
       nameHinzufuegen: "„{{name}}“ als Empfänger aufnehmen",
@@ -1881,6 +1977,7 @@ const de = {
         merkmale: "{{weg}} Zahlungen passen zu keinem Muster.",
         betrag: "Die Betragsspanne nimmt {{weg}} Zahlungen weg, die die Muster treffen — {{uebrig}} bleiben. Spanne leeren oder weiten, wenn das nicht gewollt ist.",
         zeitraum: "Der Zeitraum nimmt {{weg}} Zahlungen weg — {{uebrig}} bleiben.",
+        fenster: "Das Fälligkeitsfenster nimmt {{weg}} Zahlungen weg — {{uebrig}} bleiben. Das ist gewollt, wenn zwei Verträge beim selben Anbieter zu verschiedenen Terminen fällig sind; sonst die Grenzen weiten.",
         konto: "Die Kontowahl nimmt {{weg}} Zahlungen weg — {{uebrig}} bleiben.",
       },
       weitere: "… und {{count}} weitere",
@@ -1907,6 +2004,14 @@ const de = {
       richtungWert: "{{charakter}} — Umbuchungen zwischen eigenen Konten bleiben draußen",
       laufend: "Läuft noch",
       laufendWert: "letzte Zahlung vor {{tage}} Tagen — ab {{grenze}} Tagen gilt der Vertrag als beendet",
+      zweck: "Verwendungszweck",
+      zweckWert: "alle Zahlungen beginnen mit „{{wert}}“ — als Pflichtmerkmal eingetragen trennt das zwei Verträge beim selben Empfänger",
+      zweckLeer: "nichts, womit alle Zahlungen beginnen — auf dieses Feld ist hier kein Verlass",
+      regel: "Wird daraus zur Regel",
+      regelSpanne: "Betrag {{von}} bis {{bis}}",
+      regelTage: "fällig am {{von}}.–{{bis}}. des Monats",
+      regelMonate: "fällig zwischen Monat {{von}} und {{bis}}",
+      regelHinweis: "nach dem Übernehmen im Vertragsdialog änderbar",
       schliessen: "Schließen",
     },
     rhythmus: {
@@ -2035,7 +2140,11 @@ const en: typeof de = {
     },
     startdatum: { ungueltig: "Please enter a valid start date." },
     name: { fehlt: "Please enter a name." },
-    konto: { waehlen: "Please select an account." },
+    konto: {
+      waehlen: "Please select an account.",
+      fehlt: "This account no longer exists.",
+      nichtStillgelegt: "This account is still kept. Only a retired account can be deleted permanently — retire it first.",
+    },
     sammel: { nichtsGewaehlt: "Please choose what should change." },
     datum: { ungueltig: "Please enter a valid date." },
     konten: {
@@ -2073,6 +2182,11 @@ const en: typeof de = {
         ohneUmsatz:
           "No imported row is stored for this entry — it can only be deleted, not discarded.",
       },
+      keinJson: "This file is not JSON.",
+      keineKonfiguration: "This is not a configuration file from this app.",
+      fassungZuNeu:
+        "This file comes from a newer version of the app. What it says cannot be " +
+        "interpreted here with any certainty.",
     },
   },
   shell: {
@@ -2235,8 +2349,8 @@ const en: typeof de = {
     registerDatei: "File",
     registerInbox: "Inbox",
     dateiWaehlen: "Choose file",
-    hinweis: "Finanzguru Excel export (.xlsx). The file is read locally; nothing is saved or sent.",
-    nichtErkannt: "Format not recognised — currently only the Finanzguru Excel export (.xlsx) is supported.",
+    hinweis: "Finanzguru Excel export (.xlsx) or a records export from this app (.json). The file is read locally; nothing is saved or sent.",
+    nichtErkannt: "Format not recognised — this reads the Finanzguru Excel export (.xlsx) and this app's records export (.json).",
     fremd: {
       titel: "Categories in the file",
       untertitel:
@@ -2702,6 +2816,11 @@ const en: typeof de = {
     feldBetragHinweis: "what goes in every month",
     feldStart: "Accumulates from",
     feldStartHinweis: "counted from the first of the month",
+    feldGiltAb: "Applies from",
+    feldGiltAbHinweis: {
+      monatlich: "the budget counts from this month on — the day is irrelevant",
+      aufbauend: "from this month on the budget counts and accumulates",
+    },
     modalBearbeiten: "Edit budget",
     modalUntertitel: "One budget per category — use a subcategory for anything finer",
   },
@@ -2820,7 +2939,45 @@ const en: typeof de = {
     detailLoeschenFolgenPaar: "Both legs of the transfer disappear — the counterpart on the other account belongs to it and would otherwise be left behind.",
     detailVerwerfenFolgen: "The bank line is discarded. The receipt is kept and the line can be posted again from the inbox — the retrieval will not fetch it a second time.",
     zugangLoeschenFolgen: "The retrieved entries stay; they live in the account and do not hang off the access. What goes is the route to the bank — further retrievals need it set up again.",
-    kontoLoeschenFolgen: "An account with entries cannot be deleted — the entries would have to go first. Without any, only the account itself disappears.",
+    stillgelegt: "retired",
+    loeschsperreBuchungen_one: "one entry",
+    loeschsperreBuchungen_other: "{{count}} entries",
+    loeschsperreBelege_one: "one imported payment",
+    loeschsperreBelege_other: "{{count}} imported payments",
+    loeschsperreBankverbindung: "a bank connection",
+    und: "and",
+    endgueltigLoeschen: "Delete permanently",
+    endgueltigFolgen: "Gone: {{was}}. The entries will no longer appear in any analysis; their content stays in the journal, the bank receipts do not — they are the only place where these payments exist in the words of their source.",
+    endgueltigFolgenLos: "These also lose their reference to this account: {{was}}. They remain and then apply without an account restriction.",
+    endgueltigPaare_one: "One transfer on another account loses its pairing — the counter entry itself stays.",
+    endgueltigPaare_other: "{{count}} transfers on other accounts lose their pairing — the counter entries themselves stay.",
+    endgueltigSicherung: "Today's daily backup still contains the account.",
+    folgenBudgets_one: "one budget",
+    folgenBudgets_other: "{{count}} budgets",
+    folgenRuecklagen_one: "one reserve",
+    folgenRuecklagen_other: "{{count}} reserves",
+    folgenRegeln_one: "one payment rule",
+    folgenRegeln_other: "{{count}} payment rules",
+    folgenErkennung_one: "one recognition rule",
+    folgenErkennung_other: "{{count}} recognition rules",
+    stilllegen: "Retire",
+    wiederaufnehmen: "Reinstate",
+    stilllegenHinweis: "Retire: the account keeps all its entries and still counts in the analysis. It only disappears where the future is concerned — from the account picker, from the liquidity forecast and from bank retrieval. Reversible at any time.",
+    wiederaufnehmenHinweis: "Reinstate: the account returns to the picker, the forecast and the retrieval.",
+    aufloesen: {
+      knopf: "Close out",
+      knopfHinweis: "Close out: retire or delete — the dialog shows what belongs to the account and says what each way means.",
+      titel: "Close out {{konto}}",
+      haengtDran: "It still holds {{was}}.",
+      haengtNichts: "Nothing belongs to this account — no entry, no imported payment, no bank connection.",
+      zeigenDrauf: "These also point at this account: {{was}}. They remain either way.",
+      danach: "Once it is retired, “Delete permanently” appears here too — the same thing, only without a way back.",
+      loeschenLeer: "The account disappears, nothing else changes. Since nothing belongs to it, there is nothing to preserve.",
+    },
+    gefuehrt: "kept",
+    zustandTitel: "State",
+    zustandHinweisGefuehrt: "This account is booked to, retrieved and planned with.",
+    zustandHinweisStill: "No new entries, no retrieval, no forecast — the existing entries stay and still count in the analysis.",
     merkmale: {
       titel: "What the recognition sees here",
       laedt: "computing …",
@@ -2859,25 +3016,7 @@ const en: typeof de = {
       },
     },
     registerKonten: "Accounts",
-    registerGruppen: "Groups",
     registerZugaenge: "Bank access",
-    gruppen: {
-      untertitel:
-        "Bundle accounts the way you look at them — living costs, reserves, whatever you need. " +
-        "A group changes no calculation: what counts as available is still decided by each " +
-        "account's class. An account may belong to several groups.",
-      anlegen: "Group",
-      keine: "No group yet.",
-      leer: "No account in this group yet.",
-      anfangsbestand: "Opening balances together {{betrag}}",
-      bearbeiten: "Edit",
-      loeschen: "Delete",
-      loeschFolgen: "The accounts themselves stay — only the grouping goes.",
-      titelNeu: "New group",
-      titelBearbeiten: "Edit group",
-      feldBezeichnung: "Name",
-      feldKonten: "Accounts in this group",
-    },
     verbindung: {
       titel: "Bank connection",
       abgerufenBis: "retrieved through {{datum}}",
@@ -3388,9 +3527,29 @@ const en: typeof de = {
           "This file is your bank statement. It holds IBANs, balances, payees and every " +
           "reference line — do not share it and do not upload it anywhere.",
         vergaenglich:
-          "It sits unencrypted while your database is encrypted. Delete it as soon as " +
-          "you no longer need it.",
+          "It sits unencrypted in your downloads folder while your database is " +
+          "encrypted. Delete it as soon as you no longer need it.",
         knopf: "Export records",
+      },
+    },
+    import: {
+      dateiWaehlen: "Choose file",
+      laeuft: "Importing …",
+      zaehlerNeu: "{{n}} new",
+      zaehlerVorhanden: "{{n}} already here",
+      zaehlerAbweichend: "{{n}} differing",
+      wirdAngelegt: "will be created",
+      bleibtWieEsIst: "{{datei}} in the file, {{bestand}} here — stays as it is",
+      uebernehmen: "Create {{n}} categories",
+      fertig: "{{n}} categories created.",
+      konfiguration: {
+        titel: "Import an order",
+        text:
+          "Reads a konfiguration-….json file and creates the categories that do not exist " +
+          "here yet. Matching is by name.",
+        hinweis:
+          "It only creates, never changes: whatever already exists under that name stays " +
+          "the way you set it up. What the file sees differently is shown beforehand.",
       },
     },
     person: {
@@ -3439,11 +3598,19 @@ const en: typeof de = {
       typ: { Giro: "Checking", Tagesgeld: "Savings", Bargeld: "Cash", Kreditkarte: "Credit card", Depot: "Portfolio" },
       feldKlasse: "Purpose",
       spalteKlasse: "Purpose",
-      klasse: { liquide: "Available", ruecklage: "Reserve", vorsorge: "Long-term" },
+      klasse: {
+        liquide: "Liquidity",
+        ruecklage: "Reserves",
+        vorsorge: "Long-term",
+        sparen: "Savings",
+        investment: "Investment",
+      },
       klasseHinweis: {
         liquide: "Counts as liquid funds — money meant for everyday use.",
         ruecklage: "Set aside for something specific. Does not count as available.",
-        vorsorge: "Tied up long term. Does not count as available.",
+        vorsorge: "Tied up for later — retirement and the like. Does not count as available.",
+        sparen: "Saved up without a set purpose. Does not count as available.",
+        investment: "Invested, fluctuating in value. Does not count as available.",
       },
     },
     kategorie: {
@@ -3465,7 +3632,7 @@ const en: typeof de = {
       titel: "4 · Reconcile existing bookings",
       untertitel: "Re-run existing bookings against the current state of the recognition",
       hinweis:
-        "Everything so far only works going forward: a freshly trained model, a new pin, a category on a contract leave already-booked payments untouched. The reconciliation recomputes them — and shows what it would change first. Nothing is written until you confirm.",
+        "Everything so far only works going forward: a freshly trained model, a category on a contract, a new recognition rule leave already-booked payments untouched. The reconciliation recomputes them — and shows what it would change first. Nothing is written until you confirm.",
       vorschau: "Compute preview",
       rechnet: "computing …",
       nichtsZuTun: "Nothing to change — for {{unveraendert}} bookings the recognition returns exactly what is already there.",
@@ -3744,6 +3911,10 @@ const en: typeof de = {
     feldRhythmus: "Frequency",
     feldKategorie: "Category",
     feldKategorieHinweis: "presets the character",
+    kategorieUebertragen: "Apply the category to the linked payments",
+    kategorieUebertragenZahl: "Apply the category to the {{count}} linked payments",
+    kategorieUebertragenHinweis:
+      "Retroactive, and it overwrites categories you set by hand too. Split bookings and transfer legs are left alone. Without the tick the payments stay as they are.",
     feldCharakter: "Character",
     feldKonto: "Account",
     verlaengerung: { automatisch: "automatic", keine: "none" },
@@ -3759,7 +3930,21 @@ const en: typeof de = {
       zusammen: "Features: {{merkmale}} · Matches: {{count}}",
       merkmale: "Features",
       merkmaleHinweis:
-        "At least one has to match — they are OR-linked. Case-insensitive, * is the wildcard. A pattern must cover the WHOLE value: \"*ard*\" matches \"Suedwestrundfunk ARD ZDF\", while \"ard\" alone only matches a payee called exactly that. The number on each row says how many payments that pattern matches on its own.",
+        "At least one of the unticked features has to match — those are OR-linked and catch the spellings of the same provider. A feature ticked \"required\" MUST match: several of them narrow the rule step by step. Case-insensitive, * is the wildcard. A pattern must cover the WHOLE value: \"*ard*\" matches \"Suedwestrundfunk ARD ZDF\", while \"ard\" alone only matches a payee called exactly that. The number on each row says how many payments that pattern matches on its own — for a required feature that is the ceiling for the whole rule.",
+      pflicht: "required",
+      pflichtHinweis:
+        "This feature must match for the rule to apply. That is how two contracts with the same creditor are told apart: tick both the creditor ID and the policy number in the payment reference — only what satisfies both counts.",
+      pflichtTrifftNieHinweis:
+        "This pattern matched no payment at all — and it is required. The whole rule therefore matches nothing, no matter what else is listed.",
+      fenster: "Due window",
+      fensterHinweis:
+        "Repeats every year or every month — unlike \"from\"/\"until\", which are fixed dates. Month 3–3 means: only transactions in March, in every year. Day 1–5: only transactions in the first five days of a month. Both bounds must be filled in, otherwise the window does not apply. From greater than to means across the boundary (month 11–2 is November through February).",
+      fensterMonat: "Month",
+      fensterMonatVon: "Month from",
+      fensterMonatBis: "Month to",
+      fensterTag: "Day",
+      fensterTagVon: "Day from",
+      fensterTagBis: "Day to",
       merkmalArt: "Feature type",
       merkmalMuster: "Pattern",
       art: {
@@ -3783,8 +3968,6 @@ const en: typeof de = {
       vorschlaegeZurueckgehalten:
         "{{n}} more not offered: they match a payment you explicitly linked to no contract.",
       musterPlatzhalter: "e.g. name*",
-      entstehtBeimSpeichern:
-        "Matching is created on save, from the provider name and the amount. After that it appears here and can be adjusted.",
       hinweis:
         "These rules decide which posted payments are linked to this contract — including future ones. Changes take effect immediately across the whole ledger. Links you set by hand are left alone.",
       nameHinzufuegen: "Add \"{{name}}\" as a payee",
@@ -3801,6 +3984,7 @@ const en: typeof de = {
         merkmale: "{{weg}} payments match none of the patterns.",
         betrag: "The amount range removes {{weg}} payments that do match the patterns — {{uebrig}} remain. Clear or widen it if that is not intended.",
         zeitraum: "The date range removes {{weg}} payments — {{uebrig}} remain.",
+        fenster: "The due window removes {{weg}} payments — {{uebrig}} remain. That is intended when two contracts with the same provider fall due at different times; otherwise widen the bounds.",
         konto: "The account choice removes {{weg}} payments — {{uebrig}} remain.",
       },
       weitere: "… and {{count}} more",
@@ -3827,6 +4011,14 @@ const en: typeof de = {
       richtungWert: "{{charakter}} — transfers between your own accounts are excluded",
       laufend: "Still running",
       laufendWert: "last payment {{tage}} days ago — from {{grenze}} days on the contract counts as ended",
+      zweck: "Reference text",
+      zweckWert: "every payment starts with “{{wert}}” — entered as a required feature this separates two contracts with the same payee",
+      zweckLeer: "nothing all payments start with — this field cannot be relied on here",
+      regel: "Becomes this rule",
+      regelSpanne: "amount {{von}} to {{bis}}",
+      regelTage: "due on day {{von}}–{{bis}} of the month",
+      regelMonate: "due between month {{von}} and {{bis}}",
+      regelHinweis: "editable in the contract dialog after accepting",
       schliessen: "Close",
     },
     rhythmus: {

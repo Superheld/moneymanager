@@ -1,8 +1,10 @@
 # `bausteine/` — was mehrere Bereiche benutzen
 
 Hier liegt, was nicht einem Bereich gehört: die Shell (`AppShell`, `Bereich`, `PageHead`),
-wiederkehrende Bedienteile (`Modal`, `IconButton`, `CategoryPicker`), die Farbregel für
-Beträge (`geldFarbe`) und der Einstellungs-Kontext (`EinstellungenProvider`,
+wiederkehrende Bedienteile (`Modal`, `IconButton`, `CategoryPicker`), die Farbregel der
+Auswertung (`geldFarbe` — sie deckt seit 2026-09-13 nicht mehr nur Beträge ab, sondern auch
+Kennzahlen und Flächen; Einzelheiten in `../CLAUDE.md` unter „Zahlen anzeigen") und der
+Einstellungs-Kontext (`EinstellungenProvider`,
 `einstellungenKontext`, Quelle von `useGeld`).
 
 **Die Regel dafür ist messbar, nicht Geschmack:** Was aus **zwei oder mehr** Bereichen
@@ -295,6 +297,32 @@ aus dem Design-System nicht überschreiben — dort ist weniger drin.
 ganzen Teilbaum auf einmal, auch die Zellen, die ihre Farbe selbst setzen (Beträge). Über
 `color` ginge das nicht, die Zellen überschreiben es. Benutzt wird es im Kontoauszug für
 Buchungen, deren Buchungstag noch vor uns liegt.
+
+**`IconButton` trennt NAME und ERKLÄRUNG.** `label` ist der Name (er wird `aria-label` und
+ist Pflicht), `hinweis` die Erklärung — sie erscheint beim Hovern statt des Namens. Ohne
+`hinweis` zeigt der Hover-Text weiter den Namen, so wie bisher.
+
+Wann welches: bei einem Stift genügt der Name, weil das Icon dasselbe sagt. Bei einer Aktion,
+deren FOLGEN man nicht ansieht, ist der Name keine Auskunft — „Stilllegen" über einem
+Kistensymbol beantwortet nicht, was mit den Buchungen passiert. Dort gehört ein Satz hin.
+
+Und der Name bleibt trotzdem `aria-label`: eine Vorlesehilfe liest in einer Zeile mehrere
+Aktionen hintereinander, dort ist kurz und gleichförmig richtig. ARIA gewinnt ohnehin gegen
+`title`, das Verhältnis ist also eindeutig und nicht zu verwechseln.
+
+**Ein Knopf, dessen Normalfall eine Absage ist, gehört nicht in eine Zeile.** Gemessen am
+Löschen eines Kontos: der Mülleimer konnte für jedes Konto mit Geschichte nur ablehnen, und
+eine ehrliche Absage ist immer noch eine Absage. Was möglich ist, entscheidet der Dialog,
+bevor jemand klickt — in der Zeile steht dann EIN Symbol, immer dasselbe.
+
+Daran hängt die zweite Hälfte derselben Regel: **ein wechselnder Icon-Satz ist keine
+Auskunft.** Verschiedene Zustände einer Zeile sollen nicht verschieden viele Symbole zeigen;
+was sich unterscheidet, gehört hinter das Symbol, nicht daneben.
+
+**Einen Tooltip-Baustein gibt es nicht**, und das ist bislang Absicht: `title` kostet nichts
+und trägt so weit. Wer einen baut, nimmt Base UI `Tooltip` (Positionierung, Verzögerung,
+Berührung) — und muss dann für JEDEN `IconButton` der App entscheiden, was passiert, denn
+der Hover-Text ist heute überall der Name.
 
 **`Input` hat kein `onChange`** und ist für berechnete oder abgeleitete Felder gedacht.
 Editierbare Texteingaben bauen wir mit echten `<input>` im selben Token-Stil. Wer das

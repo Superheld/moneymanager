@@ -3,6 +3,122 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.29.0] — 2026-09-22
+
+Die Gegenrichtung. Es gab zwei Exporte und keinen Weg zurueck — die schwierigere Haelfte
+stand seit Wochen als offene Frage da. Jetzt laesst sich beides wieder einlesen, und der
+Bestand nimmt dafuer keinen eigenen Weg, sondern denselben wie eine Bankdatei. Daneben:
+ein Konto laesst sich loswerden, ohne seine Vergangenheit mitzunehmen, und zwei Vertraege
+beim selben Einzieher sind endlich zu trennen.
+
+### Neu
+
+**Eine Ordnung einlesen.** Eine Datei `konfiguration-….json` — aus einem anderen Bestand,
+von einem anderen Rechner — legt die Kategorien an, die es hier noch nicht gibt. Erst
+siehst du, was passieren wuerde („neu", „schon da", „abweichend"), dann entscheidest du.
+Verglichen wird ueber den NAMEN, nicht ueber den Pfad: laege „Miete" hier unter
+„Fixkosten" und dort unter „Wohnen", entstuende sonst eine zweite Kategorie desselben
+Namens — und der Name ist die Angabe, ueber die diese App Kategorien ueberall aufloest.
+**Es wird nur angelegt, nie geaendert:** was es unter dem Namen schon gibt, bleibt so, wie
+du es eingerichtet hast. Abweichungen werden gezeigt statt ausgefuehrt.
+
+**Einen Bestand einlesen.** Eine Datei `bestand-….json` ist ab jetzt eine QUELLE im
+Import-Bereich, neben dem Finanzguru-Export. Damit laeuft sie durch dieselbe Strecke wie
+eine Bankdatei: Kontozuordnung, Dublettenpruefung, Inbox, verbuchen. Nichts erscheint im
+Konto, ohne dass jemand hingesehen hat. Zwei Dinge ueberleben den Weg durch die Inbox
+nicht, und der Import sagt es dazu: die Aufteilung einer Buchung (sie kommt mit ihrem
+Gesamtbetrag) und die Paarung einer Umbuchung (beide Beine kommen einzeln). Der Export
+traegt dafuer jetzt den NAMEN der Kategorie neben ihrer Id — ohne ihn kam jede Zeile
+kategorielos an, obwohl die Einsortierung in der Datei stand.
+
+**Ein Konto stilllegen, statt es loeschen zu muessen.** Ein Konto, in das je importiert
+wurde, war ueber die Oberflaeche nie wieder loeschbar; was ankam, war „FOREIGN KEY
+constraint failed". Meistens ist Loeschen aber gar nicht gemeint: ein Konto, das es nicht
+mehr gibt, soll seine Buchungen BEHALTEN und nur aufhoeren, ueberall mitzukommen. Genau
+das ist der neue Zustand. Ein stillgelegtes Konto zaehlt im Rueckblick unveraendert weiter
+— Monatskarten, Budgets, Analyse, Auszug —, faellt aber aus jeder Vorausschau und aus
+jeder Auswahl heraus.
+
+**Ein Symbol, ein Dialog.** „Aufloesen" steht in jeder Kontozeile und bietet an, was
+gerade moeglich ist: stilllegen, wieder aufnehmen, endgueltig loeschen. Was an dem Konto
+haengt und was dabei verlorengeht, steht davor da — der Dialog IST die Rueckfrage, eine
+zweite kommt nicht. Ein leeres Konto darf direkt gehen; die Abfolge schuetzt eine
+Geschichte, und wo keine ist, kostet sie nur einen Umweg.
+
+**Zwei Vertraege beim selben Einzieher auseinanderhalten.** Zwei Policen derselben
+Versicherung tragen dieselbe Glaeubiger-ID und denselben Namen; die Policennummer als
+weiteres Merkmal einzutragen half nicht — sie verengte die Regel nicht, sie erweiterte
+sie. Ein Merkmal kann jetzt **Pflicht** sein (alle Pflichtmerkmale muessen treffen, von
+den uebrigen genuegt eines), und dazu gibt es ein **Faelligkeitsfenster**: „im Maerz",
+„zwischen dem 1. und dem 5.". Beides wiederholt sich jedes Jahr bzw. jeden Monat und ist
+ausdruecklich etwas anderes als „gueltig ab/bis".
+
+**Was die Lupe misst, steht jetzt in der Regel.** Uebernimmst du einen Vorschlag, kommen
+Termin und Betragsspanne mit — vorher las man sieben gemessene Werte und bekam zwei davon.
+Der Erkennungsabschnitt steht ausserdem schon beim ANLEGEN da: wer einen Vertrag von Hand
+erfasste, bekam bis dahin eine Regel zugeschrieben, ohne sie je zu sehen.
+
+**Die Kategorie eines Vertrags rueckwirkend auf seine Zahlungen.** Ein frisch erfasster
+Vertrag bekommt seine Zahlungen von Jahren zurueck zugeordnet — und die behalten die
+Kategorie, die sie damals bekamen. Ein Haken im Dialog zieht sie nach. Er ist bei jedem
+Oeffnen wieder aus und passiert nie von selbst: eine Vertragszuordnung ist eine Aussage
+ueber die Zugehoerigkeit, keine Erlaubnis zur Massenaenderung an gebuchten Daten.
+
+**Der erste Budgetbetrag gilt ab dem Monat, den du angibst.** Das Feld „Gilt ab" steht
+jetzt bei beiden Budgetarten. Ein monatliches Budget begann vorher zwangslaeufig im
+laufenden Monat — wer eines fuer etwas anlegte, das schon laeuft, sah jeden Monat davor
+mit Rahmen 0 und lauter Ueberziehungen, die nie welche waren.
+
+**Das zuletzt gewaehlte Konto bleibt gewaehlt.** Der Bereich Konten ist der, in dem man
+sich aufhaelt: hinsehen, woanders nachschlagen, zurueckkommen. Danach stand wieder das
+erste Konto der Liste da.
+
+### Geaendert
+
+**Die Kontogruppen gehen in der Kontoklasse auf.** Zwei Felder beantworteten dieselbe
+Frage — wofuer ist dieses Konto da —, und nur eines davon galt: die Klasse entscheidet
+ueber die liquiden Mittel, die Gruppe entschied nichts. Die Klasse traegt dafuer fuenf
+Werte statt drei: **Liquiditaet, Ruecklagen, Vorsorge, Sparen, Investment**. Verfuegbar
+ist weiterhin genau eines davon, die vier anderen sind fuer jede Rechnung dasselbe.
+
+> **Was dabei wegfaellt:** ein Konto lag in beliebig vielen Gruppen und liegt in genau
+> einer Klasse. Angelegte Gruppen werden beim naechsten Start entfernt und sind nicht
+> wiederherzustellen. Die Konten selbst und alles, was an ihnen haengt, bleiben unberuehrt.
+
+**Der Export landet im Download-Ordner.** Vorher schrieb er ins App-Datenverzeichnis:
+sicher und unauffindbar, und damit an der Aufgabe vorbei — eine Exportdatei ist dazu da,
+weitergegeben zu werden. Das Ziel bestimmt weiterhin nicht der Webview; nur das
+Verzeichnis ist ein anderes. Der volle Pfad wird weiter angezeigt, denn „im
+Download-Ordner" hilft nicht, wenn dort dreihundert Dateien liegen.
+
+**Eine Farbregel fuer die ganze Auswertung.** Dort liefen zwei Farbsprachen nebeneinander,
+die beide dasselbe Rot malten: die eine meinte „Geld geht raus", die andere „sieh hin".
+Weil sie gleich aussahen, konnte niemand die Frage beantworten, die eine rote Zahl stellt.
+Jetzt entscheidet eine Stelle, und eine ungerichtete Groesse — Prozent, Monate, Anzahl —
+wird nie gruen: ein Dauergruen liest nach zwei Wochen niemand mehr, und dann faellt das
+Rot daneben auch nicht mehr auf.
+
+**Die Uebersicht liegt in zwei Kartenpaaren.** Oben, was den laufenden Monat betrifft
+(Budgets neben Vorschau), unten die Bestaende, die von keinem Monat abhaengen (Depot neben
+den Staenden je Kontoklasse). Die Budgets rutschten vorher unter den Falz.
+
+**Das Wort „Depot" hinter dem Depotwert ist weg.** Die Typ-Spalte derselben Zeile sagt es
+bereits.
+
+### Behoben
+
+**Ausgaben waren in der Auswertung immer rot**, Einnahmen immer gruen — unabhaengig davon,
+was in der Zeile stand. Ein Rest der zwei Farbsprachen; beides sagte damit nichts mehr aus.
+
+**Die Versionsnummer stand im Lockfile falsch.** `package-lock.json` traegt sie zweimal,
+und wer sie von Hand hebt, hebt sie dort nicht mit — `npm ci` prueft die Aufloesung der
+Abhaengigkeiten, nicht die eigene Nummer des Wurzelpakets. Das Release lief durch, und die
+Zahl stand falsch da.
+
+**Die Kategorie-Festlegung geisterte noch durch den Nutzertext.** Die Abgleich-Karte nannte
+„eine neue Festlegung" als eines der Dinge, die nur nach vorn wirken — wer das las, suchte
+eine Funktion, die es seit zwei Wochen nicht mehr gibt.
+
 ## [0.28.0] — 2026-09-09
 
 Die Runde am Beleg. Zwei stille Datenverluste im Import — einer, der die Bankfassung einer
@@ -1761,7 +1877,11 @@ Komfort für Listen & Tabellen.
 ### Geändert
 - Kategorie-Taxonomie (Standardkategorien) überarbeitet/erweitert.
 
-### Bekannt / offen
+### Bekannt / offen — Stand 0.10.0, inzwischen erledigt
+Der Abschnitt bleibt stehen, weil ein Changelog festhaelt, was damals galt. Er ist keine
+Liste offener Punkte mehr: Splits gibt es (`ist_buchung_aufteilung`), CAMT und FinTS
+laufen ueber den Bankabruf, und die Kategorie-Erkennung ist ein trainiertes Modell.
+
 - Split-Buchungen werden erkannt und gewarnt, aber noch nicht entzerrt (Doppelzählung vor
   produktivem Verbuchen prüfen).
 - Plan/Ist-Auto-Matching, weitere Importquellen (CAMT/FinTS) und KI-Vorschläge stehen aus.

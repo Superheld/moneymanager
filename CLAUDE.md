@@ -51,11 +51,10 @@ gegangen ist. Der Untertitel der Übersicht sagt es mit.
 
 Zwei Karten hängen daran und beantworten je eine eigene Frage:
 
-- **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE Konten. Nach Klasse und
-  nicht nach Gruppe: die Klasse ist die Rechenregel und jedes Konto hat genau eine, die
-  Summen addieren sich also zum Ganzen. Über Gruppen summiert ergäbe „das Vermögen" mehr,
-  als vorhanden ist (dasselbe Konto darf in mehreren liegen). Was man mit Gruppen ansehen
-  will, gehört in die Analyse.
+- **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE Konten. Die Klasse ist
+  die Rechenregel und jedes Konto hat genau eine, die Summen addieren sich also zum
+  Ganzen. Jede Bündelung, in der dasselbe Konto mehrfach vorkommen darf, ergäbe hier „das
+  Vermögen" grösser, als es ist — was man so ansehen will, gehört in die Analyse.
 - **„Da ist etwas zu tun"** — Konten, die im Vorschaufenster ins Minus laufen. Sie steht
   ganz oben und ist die einzige Karte, die VERSCHWINDET, wenn nichts anliegt: eine
   dauerhafte Zeile „alles in Ordnung" wäre nach zwei Wochen unsichtbar, und dann fiele
@@ -141,12 +140,11 @@ ist sie:
 
 - **Buchen:** `ist_buchung` · `ist_buchung_aufteilung` (Splits) · `buchung_journal`
   (was mit einer Buchung geschah) · `umsatz_roh` +
-  `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ
-  UND Klasse, siehe unten) ·
+  `umsatz_verarbeitung` (die Importzeile, siehe unten) · `zahlungskonto` (mit Typ,
+  Klasse UND `aktiv`, siehe unten) ·
   `kontostand_anker` · `vormerkung` (was die Bank kennt und noch nicht gebucht hat,
-  siehe unten) · `import_lauf` · `dubletten_freigabe` ·
-  `kontogruppe` + `kontogruppe_konto` (frei benannte Gruppen, siehe unten)
-- **Ordnen:** `kategorie` · `kategorie_festlegung` · `budget` + `budget_betrag` (die
+  siehe unten) · `import_lauf` · `dubletten_freigabe`
+- **Ordnen:** `kategorie` · `budget` + `budget_betrag` (die
   Reihe seiner Beträge, siehe unten) · `vertrag` ·
   `vertrag_erkennung` · `zahlungsregel` · `ruecklage` + `ruecklage_ausbuchung` (siehe unten)
 - **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
@@ -157,7 +155,20 @@ ist sie:
 
 Gedroppt und nicht wiederzubeleben: `topf`, `szenario`, `szenario_posten` — aufgegangen in
 den Budgets bzw. im Monatsausblick. Ebenso `umsatz`, aufgeteilt in die beiden folgenden,
-und `vertrag_zuordnung`, aufgegangen in zwei Spalten der Buchung (siehe unten).
+und `vertrag_zuordnung`, aufgegangen in zwei Spalten der Buchung (siehe unten). Dazu
+`kategorie_festlegung` (Migration 64): „immer bei diesem Empfänger" war kein Schutz — eine
+Handkorrektur ist über `kategorie_herkunft` ohnehin sicher —, sondern eine
+VERALLGEMEINERUNG, und die soll das Modell leisten, über alle Merkmale statt über den
+Empfänger allein. Die Begründung samt dem, was beim Wiedereinbau zu bedenken wäre, steht
+im Kopf von `application/import/vorschlag.ts`. Und seit Migration 74 `kontogruppe` +
+`kontogruppe_konto` — aufgegangen in der Kontoklasse (siehe unten).
+
+**Diese Liste stand bis zum 09.09.2026 selbst falsch da** — `kategorie_festlegung` war seit
+Migration 64 gedroppt und wurde hier weiter als lebend geführt. Das ist genau die
+Verwechslung, gegen die es die Liste gibt, und sie ist die teuerste Art, falsch zu sein:
+die Migrationskette ist append-only und deshalb keine Auskunft, also gibt es keine zweite
+Stelle, an der es auffiele. **Wer eine Tabelle droppt, streicht sie hier UND nennt sie
+unten.**
 
 #### Der Beleg und was wir daraus gemacht haben
 
@@ -394,6 +405,128 @@ Wer sie auswertet, muss sie an **beiden** Stellen auswerten: im Verbrauch
 (`budgetBuchungen`) und im Vorschlag (`budgetvorschlaege`). Nur im Verbrauch hiesse, einen
 Rahmen vorzuschlagen, gegen den die Buchung anschliessend nicht zählt.
 
+#### Ein Konto stilllegen — und der einzige Weg, einen Beleg loszuwerden
+
+Seit 2026-09-13 trägt `zahlungskonto` die Spalte `aktiv` (Vorgabe 1, im Typ optional mit
+„fehlend heisst JA" — dieselbe Form wie `budgetrelevant`, aus demselben Grund).
+
+Der Anlass war ein Fehler mit einer Meldung, die nichts sagte: **ein Konto, in das je
+importiert wurde, war über die Oberfläche nie wieder löschbar.** Drei Fremdschlüssel auf
+`zahlungskonto` stehen auf NO ACTION, und einer davon ist der, an den niemand denkt —
+`umsatz_verarbeitung.zahlungskonto_id` hängt an JEDER importierten Zahlung, auch an den
+verbuchten und den verworfenen. Die Buchungen zu löschen befreit das Konto nicht (der
+Verweis darauf steht auf SET NULL), und einen Weg, eine Importzeile zu löschen, gab es im
+ganzen Programm nicht. Was ankam, war „FOREIGN KEY constraint failed".
+
+**Die Spalte ist eine SICHT auf die Gegenwart und keine Rechenregel**, und daran hängt
+alles Weitere. Gefragt wird über `istAktiv`; was sie beantwortet, ist „kann man hier noch
+etwas tun" — nie „zählt es mit". Die Regel, nach der jede Aufrufstelle entscheidet, ist
+die Zeitrichtung:
+
+| | stillgelegtes Konto |
+|---|---|
+| **Rückblick** — Monatskarten, Budgetstände, Analyse, Kontoauszug, Abgleich | zählt und zeigt **unverändert** |
+| **Vorausschau** — Liquiditätsvorschau, „Da ist etwas zu tun" | **draußen**, und der Filter steht im KERN |
+| **Auswahl und Handlung** — Buchungsmaske, Umbuchungsziel, Bankabruf, Bankkonto verknüpfen | **draußen** |
+| „Was da ist" | zählt mit, unter seiner Klasse |
+| Kontenverwaltung | sichtbar, markiert, mit dem Weg zurück |
+
+Vier Dinge darin, die Entscheidungen sind und keine Rechenschritte:
+
+- **Die Monatskarten behalten sie.** Sie zeigen drei Monate, davon zwei vergangene. Wer nach
+  einem Bankwechsel sein altes Girokonto stilllegt, verlöre sonst rückwirkend den größten
+  Teil seines Ist der letzten Monate — Plan bliebe stehen, Ist fiele auf fast null. Dasselbe
+  gilt für `liquideMittelReal`, wo Saldo und Buchungen ohnehin mit derselben Liste filtern
+  müssen.
+- **`liquideMittel` filtert NICHT, `liquiditaetsvorschau` schon.** Der Unterschied ist wieder
+  die Zeitrichtung: ein Bestand lässt sich sinnvoll mit und ohne stillgelegte Konten bilden
+  („was ist da" gegen „was kann ich ausgeben"), eine Vorausschau nicht. Deshalb liegt der
+  Filter dort im Kern und hier nicht.
+- **„Was da ist" bleibt unberührt.** Eine eigene Zeile „stillgelegt" war geplant und ist
+  verworfen: die Karte fragt „was existiert", und Restgeld auf einer aufgegebenen Kasse
+  existiert. Es herauszurechnen liesse Vermögen verschwinden, ohne dass es irgendwo
+  auftauchte.
+- **`waehlbareKonten(konten, bereitsGewaehlt)` hat zwei Hälften**, und die zweite ist die
+  wichtige: das schon Gewählte bleibt in der Liste. Sonst fände eine Buchung, die auf einem
+  stillgelegten Konto liegt, ihr eigenes Konto in der Auswahl nicht mehr — das Feld stünde
+  leer oder zeigte ein anderes, und beim nächsten Speichern wäre die Buchung umgezogen.
+
+**Die Spalte hat einen EIGENEN Schreibweg** (`aktivSetzen`) und steht nicht in `speichern`.
+`kontoAnlegen` dient auch dem Bearbeiten (mit `id`, über das ON CONFLICT) und baut ein Konto
+ohne dieses Feld: mitgeschrieben holte jedes Umbenennen ein stillgelegtes Konto still zurück
+in die Gegenwart.
+
+##### Ein Konto loswerden — EIN Symbol, ein Dialog
+
+In der Zeile steht genau ein Symbol dafür („Auflösen"), und es steht dort in jedem Zustand.
+`ui/konten/KontoAufloesenModal.tsx` bietet an, was gerade möglich ist:
+
+| Zustand des Kontos | was der Dialog anbietet |
+|---|---|
+| geführt, etwas hängt dran | **Stilllegen** — und den Satz, dass danach auch „Endgültig löschen" hier steht |
+| geführt, nichts hängt dran | Stilllegen **und Löschen** |
+| stillgelegt | **Wieder aufnehmen** und **Endgültig löschen** |
+
+**Bis 2026-09-13 waren es drei Symbole in der Zeile**, und die erste Fassung des Löschens
+hatte drei Mängel, die erst beim Benutzen auffielen — sie stehen hier, weil jeder davon eine
+Regel hinterlässt:
+
+- **Der Mülleimer war ein Knopf, der fast immer Nein sagt.** Für jedes Konto mit Geschichte
+  konnte er nur ablehnen. Seine Meldung war ehrlich, und das genügt nicht: eine ehrliche
+  Absage ist immer noch eine Absage. **Ein Knopf, dessen Normalfall eine Absage ist, gehört
+  nicht in die Liste** — was möglich ist, entscheidet der Dialog, bevor jemand klickt.
+- **Der Icon-Satz wechselte** je Zustand, drei gegen vier Symbole, das vierte ein zweites
+  rotes neben dem ersten. Was erscheint und verschwindet, lernt niemand; deshalb ist es jetzt
+  dasselbe Symbol, und nur der Dialog dahinter ändert sich.
+- **Der Zusammenhang stand nirgends.** Dass Stilllegen die milde Fassung ist und das
+  endgültige Löschen erst danach auftaucht, musste man durch Ausprobieren finden. Genau das
+  sagt der Dialog jetzt aus — es ist der eigentliche Zugewinn der Umarbeitung.
+
+Die **Abfolge** bleibt und wird nur erklärt: das endgültige Löschen gibt es nur am
+stillgelegten Konto. So ist Stilllegen die vorgegebene Antwort und das Zerstörende eine
+zweite, eigene Handlung; stünden beide gleichberechtigt da, gewänne der kürzere Weg — auch
+dann, wenn der andere gemeint war. Durchgesetzt an der Anwendungsgrenze UND in der
+Oberfläche.
+
+**Ein LEERES Konto darf direkt gehen**, und das ist die eine Ausnahme von der Abfolge: sie
+ist dafür da, eine GESCHICHTE nicht versehentlich wegzuwerfen. Gibt es keine, schützt sie
+nichts und kostet nur einen Umweg — und das ist der häufigste Fall, ein Konto, das aus
+Versehen entstanden ist.
+
+**Der Dialog IST die Rückfrage, es kommt keine zweite.** Er nennt jede Folge, bevor etwas
+passiert, und die zerstörende Handlung trägt ihren Namen auf dem Knopf. Ein „Wirklich
+löschen?" dahinter wäre genau das, wovor `Loeschfrage` in ihrem Kopf warnt: eine Verzögerung
+ohne Information, die man nach dem zweiten Mal wegklickt — und es wäre der zweite Schritt,
+der die Abfolge unübersichtlich gemacht hat. `useLoeschfrage` ist deshalb aus der
+Kontenverwaltung verschwunden.
+
+`kontoloeschung` zählt, was am Konto hängt, und trennt **Sperren** von **Folgen**: die drei
+oben verhindern das Löschen, ein Budget oder eine Rücklage verliert nur einen Verweis. Beides
+in einen Topf zu werfen liesse den Dialog behaupten, man müsse sie erst wegräumen — und wer
+das tut, hat umsonst gearbeitet.
+
+**Stilllegen steht zusätzlich im Bearbeiten-Dialog**, als Zeile „Zustand" neben der
+Verbindung. Der Schalter dort schreibt SOFORT und nicht beim Speichern: `kontoAnlegen` fasst
+`aktiv` nicht an, ein Feld, das erst beim Speichern wirkt, hätte also keinen Weg in den
+Bestand.
+
+Vier Dinge am Löschweg selbst (`adapters/persistence/sqliteKontoentfernen.ts`):
+
+- **Erst lesen, dann schreiben.** `inTransaktion` nimmt eine fertige Liste; ein SELECT
+  dazwischen gibt es nicht. Das ist hier ohnehin die bessere Form — ein
+  `DELETE … WHERE id IN (SELECT … FROM umsatz_verarbeitung)` löscht per CASCADE aus genau der
+  Tabelle, aus der die Unterabfrage liest.
+- **Die Belege gehen über `COALESCE(zahlung_id, id)`**, damit ALLE Fassungen einer Zahlung
+  mitkommen und nicht nur die namengebende — eine Zahlung ohne ihren ersten Beleg wäre eine,
+  deren Herkunft niemand mehr feststellen kann.
+- **Jede gelöschte Buchung bekommt ihren Journaleintrag**, denselben Weg wie
+  `ledger.loeschen` (`standLesen` und `journalAnweisung` sind dafür exportiert statt
+  nachgebaut — das Journal hat einen Schreibweg, und eine zweite Fassung driftet).
+- **Das überlebende Gegenbein einer Umbuchung wird GELÖST, nicht mitgelöscht.** Es liegt auf
+  einem Konto, das jemand weiterführt. Mit Journaleintrag, denn eine Buchung, die still ihre
+  Paarung verliert, ist später nicht zu erklären; `transfer_id` trägt keinen Fremdschlüssel
+  und bliebe sonst als Verweis auf ein Paar stehen, das es nicht mehr gibt.
+
 #### Die Liquiditätsvorschau zieht ZWEI Linien
 
 `core/konten/liquiditaet.ts` rechnet je Konto den Stand über die nächsten Tage vor — und
@@ -427,6 +560,125 @@ Eine kleine Verlaufslinie stand hier vom 31.08. bis zum 01.09. daneben — sie i
 weg: über den Tiefstand und den Tag hinaus, die schon in der Zeile stehen, verriet sie
 nichts. Deshalb gibt `liquiditaetsvorschau` auch nur den BEFUND heraus und nicht den
 Tagesverlauf: was niemand anzeigt, muss auch niemand mitschleppen.
+
+#### Ein Merkmal kann MUSS sein, und die Regel hat ein Fälligkeitsfenster
+
+Die Merkmale einer `Vertragserkennung` waren bis 2026-09-13 ausnahmslos ODER-verknüpft:
+ein Treffer genügte. Das hat einen guten Grund — derselbe Anbieter steht mal als
+„Vibora GmbH", mal als „VIBORA KD" im Auszug, und beide Schreibweisen sollen greifen.
+
+**Zwei Verträge beim selben Einzieher waren damit nicht zu trennen.** Zwei Kfz-Policen
+derselben Versicherung tragen dieselbe Gläubiger-ID und denselben Namen; unterschieden
+sind sie nur an der Policennummer im Verwendungszweck. Die Merkmalsart dafür gibt es seit
+jeher — sie half trotzdem nicht: als weiteres ODER-Merkmal eingetragen verengte sie die
+Regel nicht, sie **erweiterte** sie. Beide Verträge trafen beide Zahlungen, und
+`besser` entschied das Gleichstandsduell alphabetisch nach Vertrags-Id. Deterministisch,
+und deterministisch falsch.
+
+Zwei Mittel stehen jetzt daneben, und sie beantworten verschiedene Fragen:
+
+- **`pflicht` am einzelnen Merkmal.** Alle Pflichtmerkmale müssen treffen, von den übrigen
+  genügt eines. Das UND sitzt damit am Merkmal und nicht an der Regel: ein globaler
+  Schalter „alles muss treffen" hätte die Schreibweisenliste erschlagen, für die es das
+  ODER überhaupt gibt. Ohne Flag verhält sich jede bestehende Regel unverändert — es steht
+  im JSON von `vertrag_erkennung.schluessel` und brauchte deshalb **keine Migration**.
+- **Das Fälligkeitsfenster** (`monat_von`/`monat_bis`, `tag_von`/`tag_bis`, Migration 72).
+  Es ist ausdrücklich etwas anderes als `gueltig_ab`/`gueltig_bis`: die beiden sind feste
+  Kalenderdaten und sagen, wie lange es den Vertrag GAB, das Fenster wiederholt sich jedes
+  Jahr bzw. jeden Monat. Es trennt dieselben zwei Policen über den Termin — nötig, weil
+  manche Institute im Verwendungszweck gar nichts Unterscheidendes liefern.
+
+Drei Dinge darin, die man kennen muss:
+
+- **Zwei Paare und nicht eines.** Eine Jahrespolice wird im Monat fällig, ein Abo am Tag im
+  Monat. Ein einziges Feld hätte die zweite Form nicht ausdrücken können, und ein Format,
+  das sich selbst auslegt („03-01" ist ein Datum, „01" ein Tag), wäre beim Lesen nicht mehr
+  zu entscheiden.
+- **Beide Paare wickeln um**, `von` größer als `bis` meint über die Grenze hinweg. Ohne das
+  wäre jeder Vertrag mit Fälligkeit um den Jahreswechsel nicht abbildbar.
+- **Ein halbes Fenster gilt nicht.** „ab März" ohne Ende ist bei einer Größe, die im Kreis
+  läuft, nicht zu deuten — es hiesse entweder „März bis Dezember" oder „März bis Februar",
+  und beides wäre eine Vermutung. Fehlt eine Grenze, greift das Fenster gar nicht.
+
+Die Vorrangregel in `besser` hat dafür eine neue erste Stufe bekommen: **mehr erfüllte
+Pflichtmerkmale gewinnt.** Beide Regeln passen an dieser Stelle ja bereits, ihre Pflichten
+sind also alle erfüllt — wer mehr davon gestellt hat, hat mehr verlangt und mehr bekommen.
+Eine alte, breite Regel verliert damit gegen eine neu verengte, ohne dass die Vertrags-Id
+mitredet.
+
+**Seit 2026-09-13 belegt ein übernommener Vorschlag das Fenster vor.** Die Lupe am
+Vorschlag misst Termine und Beträge und zeigte sie an; die Regel, die daraus entstand,
+kannte nur Name und Median-Betrag — man las sieben gemessene Werte und bekam zwei davon.
+Übersetzt wird in `core/vertraege/regelvorlage.ts`, und drei Entscheidungen darin sind
+keine Rechenschritte:
+
+- **Der Tag gilt für jeden Takt, der Monat nur für den JÄHRLICHEN.** Ein Fenster ist EIN
+  zusammenhängender Zeitraum; die vier Termine eines quartalsweisen Vertrags liegen über
+  das Jahr verstreut, und das engste Fenster, das sie alle fasst, umspannte zehn Monate.
+  Es stünde da und schränkte nichts ein.
+- **Gerechnet wird auf dem KREIS, nicht auf der Geraden.** Wer am Monatsletzten abbucht,
+  trägt Tage aus beiden Hälften; als Spanne von Kleinstem zu Größtem wäre das „1 bis 31".
+  Gefunden wird das Fenster über die größte Lücke. Was samt Puffer mehr als die Hälfte des
+  Kreises fasst, entsteht gar nicht erst.
+- **Die Betragsspanne wird GEWEITET, nie verengt.** Die abgeleitete Spanne (0,6× bis 1,8×)
+  hält fremde Zahlungen an denselben Empfänger draußen, und das bleibt ihre Aufgabe. Was
+  die Messung beiträgt, ist der umgekehrte Fall: die Nachzahlung, die über 1,8× lag und
+  bisher aus der eigenen Regel fiel. Eine zu enge Spanne ist der teurere der beiden
+  Fehler — was sie wegschneidet, fehlt still, während eine zu weite Spanne eine fremde
+  Zahlung in die Trefferliste des Dialogs holt, wo man sie sieht.
+
+**Der Erkennungsabschnitt steht seither auch beim ANLEGEN.** Vorher erschien er erst beim
+Bearbeiten, mit der Begründung, ein Vertrag ohne Id habe keinen Ort für eine Regel. Das
+stimmt fürs Speichern und nicht fürs Anzeigen — die Vorschau fragt nur, welche Zahlungen
+die Merkmale treffen. Wer einen Vertrag von Hand erfasste, bekam bis dahin eine Regel
+zugeschrieben, ohne sie je zu sehen, und kam erst nach Speichern und erneutem Öffnen an
+sie heran. Die Vorbelegung (`erkennungsentwurf`) folgt dabei den Stammdaten, **solange
+niemand den Abschnitt angefasst hat**: dasselbe Muster wie bei der Richtung im
+Buchungsdialog — die Ableitung gilt bis zur ersten eigenen Wahl, danach nie wieder.
+
+**Der gemeinsame Verwendungszweck steht in der Lupe, wird aber KEIN Merkmal.** Womit alle
+Zahlungen einer Gruppe beginnen, ist die Angabe, an der zwei Verträge beim selben
+Einzieher auseinandergehen — als automatisches Merkmal wäre es trotzdem falsch: ohne
+`pflicht` erweitert es die Regel (genau der Fehler, den das Flag behebt), mit `pflicht`
+bricht sie, sobald eine Quelle den Zweck einmal nicht liefert. Angezeigt wird er deshalb
+als Auskunft, eingetragen wird er von Hand. Dass eine Zahlung ohne Zweck die Auskunft
+ganz entfallen lässt, ist selbst die Aussage: auf dieses Feld ist bei diesem Vertrag kein
+Verlass.
+
+**Und die Vorschau zeigt seither den Verwendungszweck.** Sie tat es nicht, solange man
+Regeln nur auf Empfänger und Gläubiger-ID baute; seit man sie auf den Zweck baut, ist
+seine Abwesenheit der Fehler: man stellt eine Regel auf ein Feld, das die Maske, in der man
+das tut, nirgends anzeigt. Dieselbe Lücke steht noch im Kontoauszug — er **durchsucht** den
+Zweck (`KontenScreen`), zeigt ihn aber nicht.
+
+#### Die Kategorie des Vertrags rückwirkend auf seine Zahlungen
+
+Seit 2026-09-13 gibt es im Vertragsdialog einen Haken dafür
+(`application/vertraege/vertragskategorie.ts`). Der Anlass: die Erkennung ordnet einem
+frisch erfassten Vertrag seine Zahlungen von Jahren zurück zu, und die behalten die
+Kategorie, die sie damals bekamen — die Zuordnung sagt „gehört zu diesem Vertrag", die
+Kategorie daneben widerspricht ihr.
+
+**Es passiert nicht von selbst, und das ist die eigentliche Entscheidung.** Eine
+Vertragszuordnung ist eine Aussage über die ZUGEHÖRIGKEIT; daraus automatisch die Kategorie
+umzuschreiben machte aus `zuordnungenAbgleichen` — das bei jedem Öffnen des Bereichs läuft
+— eine Massenänderung an gebuchten Daten. Wer eine Zahlung bewusst anders einsortiert hat,
+verlöre das beim nächsten Hinsehen.
+
+Drei Dinge, die daran hängen:
+
+- **Mit Haken überschreibt es AUCH Handarbeit.** Das ist kein Versehen, sondern der Anlass:
+  „ich habe das damals falsch einsortiert, der Vertrag weiß es besser". Ein Schutz der
+  Handarbeit wäre hier ein Schutz gegen die Handlung, die gerade ausgelöst wurde. Der Haken
+  ist bei jedem Öffnen wieder aus.
+- **Eine GETEILTE Buchung bleibt stehen.** Bei einer Aufteilung stehen die Kategorien in
+  den Teilen; die Kopfkategorie umzuschreiben ließe die Teile stehen und erzeugte einen
+  Widerspruch, den die Budgetrechnung je nach Weg verschieden auflöst.
+- **Geschrieben wird über `buchungenSammelbearbeiten`**, nicht über eine eigene Schleife:
+  dort steht schon, was zu einer Kategorieänderung gehört — Herkunft auf `manuell` (sonst
+  holt die Kategorie-Automatik den alten Wert zurück), Charakter folgt der Kategorie,
+  Umbuchungs-Bein bleibt unberührt. Damit kommt auch der Journaleintrag mit, den
+  `ledger.speichern` schreibt.
 
 #### Ein Umbuchungsvertrag wird am WEG erkannt, nicht am Empfänger
 
@@ -509,8 +761,9 @@ Bedarf über Plan heisst: du legst zu wenig zurück, die Deckung wird schlechter
 irgendwo etwas schiefgeht. Plan über Ist heisst: die Überweisung ist ausgefallen. Eine
 Zahl allein könnte keine dieser Aussagen treffen.
 
-**Wohin gerechnet wird, entscheidet die KONTOKLASSE**, nicht die Gruppe: ein Zufluss auf
-`ruecklage` oder `vorsorge` ist zurückgelegt, auf ein liquides nur umgeschichtet. Bedarf
+**Wohin gerechnet wird, entscheidet die KONTOKLASSE**, und zwar über genau eine Grenze:
+ein Zufluss auf ein NICHT liquides Konto ist zurückgelegt, auf ein liquides nur
+umgeschichtet. Bedarf
 und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
 Zeitraum. Wer sie über mehrere Monate vergleicht, muss die ersten beiden hochrechnen — das
 im Kern zu tun hiesse zu raten, wie viele Monate gemeint sind.
@@ -536,6 +789,22 @@ letzten Eintrag.** Vor der ersten Version ist er 0, nicht der erste Betrag: da w
 geplant, und einen Rahmen rückwirkend anzunehmen hiesse, eine Planung zu erfinden, die es
 nie gab. Aus demselben Grund summiert `budgetRahmen` beim Aufbauenden über die Monate,
 statt zu multiplizieren.
+
+**Wann die erste Version anfängt, sagt beim Anlegen der Nutzer.** Der Dialog zeigt seit
+2026-09-13 für BEIDE Arten ein Feld „Gilt ab", vorbelegt mit dem laufenden Monat. Vorher
+stand es nur beim Aufbauenden (dort als Sammelanker `start`), und ein monatliches Budget
+begann zwangsläufig im laufenden Monat — wer eines für etwas anlegte, das seit dem Frühjahr
+läuft, sah jeden Monat davor mit Rahmen 0 und in der Auswertung lauter Überziehungen, die
+nie welche waren.
+
+Das widerspricht der 0 oben nicht, sondern schärft sie: **eine Angabe ist keine Annahme.**
+Rückwirkend von selbst zu füllen — etwa ab der ersten Buchung — bliebe verboten; der Monat
+kommt von jemandem, der ihn hinschreibt.
+
+**Ein Feld für beide Arten, nicht zwei.** Beim Aufbauenden setzt derselbe Monat zugleich
+`start`. Zwei Felder für einen Zeitpunkt wären zwei Wahrheiten, und ihre erste Abweichung
+fiele niemandem auf. Beim BEARBEITEN bleibt es der Anker und damit nur beim Aufbauenden
+sichtbar: ab wann ein GEÄNDERTER Betrag gilt, sagt dort die Betragsreihe darüber.
 
 #### Zuordnungen stehen an der Buchung
 
@@ -617,10 +886,18 @@ niemand später raten muss, was bewusst erfüllt ist und was bewusst nicht.
 
 ### Was die Unveränderbarkeit heute leistet
 
-**Der Beleg ist geschützt, und seit 2026-09-06 ohne Ausnahme.** `umsatz_roh` wird nach dem
-Anlegen nicht mehr beschrieben — die frühere Ausnahme `ergaenzen` ist ersatzlos weg, weil
+**Der Beleg wird nie GEÄNDERT, und seit 2026-09-06 ohne Ausnahme.** `umsatz_roh` wird nach
+dem Anlegen nicht mehr beschrieben — die frühere Ausnahme `ergaenzen` ist ersatzlos weg, weil
 eine zweite Fassung jetzt als eigener Beleg danebensteht statt in die vorhandene Zeile
 geschrieben zu werden. Was eine Quelle geliefert hat, steht unverändert da.
+
+**Seit 2026-09-13 lässt er sich aber LÖSCHEN**, an genau einer Stelle: beim endgültigen
+Löschen eines stillgelegten Kontos (siehe oben). Das ist kein Widerspruch zum Absatz darüber
+— unveränderlich heisst „nicht umgeschrieben", und eine gelöschte Zeile behauptet nichts
+Falsches. Es ist trotzdem die Grenze der Unveränderbarkeit, und sie gehört benannt statt
+beiläufig überschritten: der Inhalt der Buchungen bleibt im `buchung_journal`, der WORTLAUT
+der Bankzeile nicht. Die Rückfrage sagt es mit, weil ein Institut Umsätze nur begrenzt
+vorhält — nach der Frist ist diese Datei die einzige Stelle, an der sie standen.
 
 **Änderungen an Buchungen sind protokolliert.** Jedes Anlegen, Ändern und Löschen schreibt
 einen Eintrag ins `buchung_journal` — mit dem ganzen Zustand vorher und nachher, nicht mit
@@ -732,11 +1009,16 @@ Vier Entscheidungen, die man kennen muss:
   nach Fassung nirgends oder wortlos im Papierkorb-Verzeichnis des Webviews. Ein Export,
   von dem man nicht weiss, wo er liegt, ist keiner. Dieselbe Überlegung wie beim
   Datenbankzugang.
-- **Das Ziel bestimmt NICHT der Aufrufer.** Immer `<App-Datenverzeichnis>/export/`, und der
-  Name muss ein einfacher Dateiname sein — derselbe Filter wie bei der Datenbankdatei. Ein
-  Webview, der irgendwohin schreiben darf, ist einer, der überall hinschreiben kann.
-- **Der Pfad wird angezeigt.** Ins App-Datenverzeichnis findet niemand von selbst; ein
-  „fertig" ohne Ort schickt den Nutzer suchen.
+- **Das Ziel bestimmt NICHT der Aufrufer.** Seit 2026-09-22 der DOWNLOAD-Ordner (vorher
+  `<App-Datenverzeichnis>/export/`), und der Name muss ein einfacher Dateiname sein —
+  derselbe Filter wie bei der Datenbankdatei. Ein Webview, der irgendwohin schreiben darf,
+  ist einer, der überall hinschreiben kann; das gilt unverändert, nur das Verzeichnis ist
+  ein anderes. Der Ort davor war sicher und unauffindbar, und damit an der Aufgabe vorbei:
+  eine Exportdatei ist dazu da, WEITERGEGEBEN zu werden — an ein Tabellenprogramm, an den
+  nächsten Rechner, in den Anhang einer Mail. Ist kein Download-Ordner zu finden, bleibt
+  der alte Pfad als Rückfall.
+- **Der Pfad wird trotzdem angezeigt.** „Im Download-Ordner" ist eine Auskunft; der volle
+  Name ist die, mit der man die Datei auch findet, wenn dort dreihundert andere liegen.
 - **Der Dateiname trägt den Bestand** (`konfiguration-moneymanager-dev-<tag>.json`). Echter
   Bestand und Spielstand liegen in zwei Dateien, aber im SELBEN Datenverzeichnis — der
   Identifier trennt sie nicht. Ohne die Kennung überschriebe ein Export aus der
@@ -745,11 +1027,29 @@ Vier Entscheidungen, die man kennen muss:
   jede Elternkategorie bereits angelegt vor. Nach Namen sortiert müsste ein Importeur
   zweimal laufen.
 
-**Einen Import gibt es nicht**, und das ist der Grund für den Experimente-Schalter: die
-schwierige Hälfte ist das Einlesen — eingelesene Kategorien treffen auf vorhandene, IDs
-kollidieren, Bäume müssen zusammengeführt werden. Bis das entschieden ist, sichert jede
-Datei nur ihre `fassung` zu. Die beiden Fassungsnummern sind dabei **getrennt**: sonst
-stiege die eine, weil sich an der anderen etwas geändert hat, und `fassung` sagte nichts mehr.
+**Den Import der ORDNUNG gibt es seit 2026-09-22** (`application/konfigurationsimport.ts`,
+Karte `ui/einstellungen/KonfigurationImportCard.tsx`). Er stand lange als die schwierigere
+Hälfte da — eingelesene Kategorien treffen auf vorhandene, IDs kollidieren, Bäume müssen
+zusammengeführt werden —, und die Antwort besteht aus drei Entscheidungen:
+
+- **Verglichen wird über den NAMEN**, nicht über die Id und nicht über den Pfad. Die Id
+  einer fremden Datei sagt über diesen Bestand nichts. Der Pfad wäre genauer und ist
+  trotzdem falsch: läge „Miete" hier unter „Fixkosten" und dort unter „Wohnen", entstünde
+  eine ZWEITE Kategorie desselben Namens — und der Name ist die Angabe, über die sonst
+  alles aufgelöst wird, von `standardkategorienAnlegen` bis zum Kategorievorschlag des
+  Imports. Zwei gleichnamige Kategorien sind kein doppelter Eintrag, sondern eine
+  mehrdeutige Auflösung.
+- **Es wird nur ANGELEGT, nie geändert.** Was es unter dem Namen schon gibt, bleibt wie es
+  ist — auch bei abweichendem Charakter. Eine Ordnung gehört dem, der sie eingerichtet
+  hat; ein Import, der sie stillschweigend umschreibt, nimmt sie ihm weg. Abweichungen
+  werden gezeigt.
+- **Der Plan steht vor der Tat.** Erst ansehen, was passieren würde, dann ein zweiter
+  Klick. Dieselbe Form wie beim Dateiimport — was eine fremde Datei mit dem Bestand macht,
+  soll man vorher wissen.
+
+Die Fassungen bleiben **getrennt**: sonst stiege die eine, weil sich an der anderen etwas
+geändert hat, und `fassung` sagte nichts mehr. Eine NEUERE Fassung weist der Import ab,
+statt sie zu raten — was ein Feld dort bedeutet, weiss diese App nicht.
 
 ### Was im Bestandsexport steht — und warum vollständig
 
@@ -771,9 +1071,33 @@ zu kurz: ein Konto zeigt über `inhaberIds` auf Personen, eine Buchung zusätzli
 `bestandsexport.test.ts` hält das fest, indem es jeden Verweis einer Buchung in der Datei
 wiederfindet.
 
+**Der Bestand kommt seit 2026-09-22 auch wieder HEREIN**, und zwar nicht über einen
+eigenen Weg, sondern als QUELLE des Imports (`adapters/import/bestandsAdapter.ts`). Das ist
+die ganze Entscheidung dahinter: der Import hat bereits alles, was ein Wiedereinlesen
+braucht — Kontozuordnung, Dublettenprüfung, Inbox, Verbuchen. Ein zweiter Weg daneben
+(„Bestand wiederherstellen") hätte jede dieser Fragen ein zweites Mal beantworten müssen,
+und zwei Antworten auf „steht das schon drin?" sind eine zu viel.
+
+Drei Dinge, die daraus folgen und die beim ersten Einlesen überraschen:
+
+- **Die Zeilen landen in der INBOX, nicht im Ledger.** Sie werden durchgesehen und verbucht
+  wie eine Bankdatei. Genau das ist die Zusicherung: nichts erscheint im Konto, ohne dass
+  jemand hingesehen hat.
+- **Die Aufteilung einer Buchung und die Paarung einer Umbuchung kommen NICHT mit.** Die
+  Inbox kennt eine Zahlung, nicht ihre Teile, und eine `transferId` entsteht beim Umbuchen.
+  Beides wird gezählt und als Warnung gemeldet — was verlorengeht, muss dastehen.
+- **Die Kategorie kommt als NAME herein** (`ExportBuchung.kategorie`, deshalb Fassung 5)
+  und geht als `kategorieVorschlag` weiter, denselben Weg wie Finanzgurus Vokabular. Die Id
+  daneben bleibt ungenutzt: sie gilt nur in dem Bestand, aus dem die Datei stammt. Ohne das
+  Feld kam jede Zeile kategorielos an, obwohl die Einsortierung in der Datei stand.
+
+`bestandsAdapter.test.ts` liest am Ende das, was `bestandExportieren` WIRKLICH schreibt —
+nicht ein ausgedachtes JSON. Wer den Export ändert, ohne den Adapter mitzuziehen, sieht es
+dort und nicht an dem Tag, an dem er die Datei braucht.
+
 Was NICHT drin ist, damit niemand danach sucht: unverbuchte Zeilen (Inbox, verworfen) —
 exportiert werden Buchungen, und eine Inbox-Zeile ist noch keine. Ebenso Budgets,
-Rücklagen, Depots, Kontogruppen und das Journal: sie hängen nicht an einer Buchung.
+Rücklagen, Depots und das Journal: sie hängen nicht an einer Buchung.
 
 **Die Datei liegt im KLARTEXT, der Bestand daneben nicht.** Seit 2026-08-27 ist die
 Datenbank verschlüsselt und ihre Sicherungen sind es mit; ein Bestandsexport legt eine
@@ -1384,8 +1708,8 @@ verschwiegen, weil dort die Fremdschlüssel aus sind.
 ### Eine Version ausliefern
 
 1. `develop` ist grün und enthält alles, was mit soll.
-2. Version in `package.json` heben — **eine** Stelle, `tauri.conf.json` und `version.ts`
-   lesen von dort.
+2. Version in `package.json` heben — und **`package-lock.json` mit**. `tauri.conf.json`
+   und `version.ts` lesen wirklich von dort; der Lockfile nicht (siehe unten).
 3. `CHANGELOG.md` schreiben. Keine Zahl aus dem echten Bestand hinein.
 4. Nach `main` mergen (nur aus `develop`, der Hook lässt nichts anderes zu).
 5. Tag setzen und pushen — **das löst `.github/workflows/release.yml` aus**: bauen,
@@ -1397,6 +1721,25 @@ verschwiegen, weil dort die Fremdschlüssel aus sind.
 Für den eigenen Rechner geht es auch ohne Release: `npm run installieren` baut und
 installiert lokal. Beide Wege erzeugen dasselbe Bundle; der Unterschied ist nur, ob es
 jemand anders erreichen kann.
+
+#### Der Lockfile trägt die Version zweimal, und niemand schreibt sie fort
+
+Hier stand bis zum 09.09.2026 „**eine** Stelle", und das war zu kurz gefasst. `package.json`
+ist die Quelle für alles, was zur Bauzeit gelesen wird — aber **`package-lock.json` hält
+seine eigene Kopie**, zweimal: an der Wurzel und in `packages[""]`. Fortgeschrieben wird
+sie nur von `npm version` oder einem `npm install`; wer die Zahl von Hand hebt, hebt sie
+dort nicht mit.
+
+**Deshalb fällt es nicht auf:** `npm ci` prüft die Auflösung der Abhängigkeiten, nicht die
+eigene Versionsnummer des Wurzelpakets. Der Lockfile stand bei 0.27.0 auf 0.26.0, und das
+Release lief durch. Der Schaden ist kein Build, der bricht, sondern eine Zahl, die falsch
+dasteht — und je länger sie stehen bleibt, desto eher glaubt sie jemand, der von aussen
+draufsieht.
+
+**Von Hand heben, nicht mit `npm install --package-lock-only`.** Das rechnet nebenbei
+Auflösungen neu und zieht damit in einen Release-Commit Änderungen an Abhängigkeiten
+hinein, die niemand geprüft hat — genau das, wogegen der Pin und die Wächter der
+Lieferkette stehen. Zwei Zeilen ändern, danach `npm ci --dry-run`.
 
 **Zwei Schalter im Release-Workflow dürfen nicht auf „vorsichtig" stehen**, und beide sind
 verlockend:
@@ -1694,18 +2037,31 @@ Vier Dinge gelten überall und stehen deshalb hier:
   Wert entscheiden, ob er verfügbar ist. Bislang trennt die Klasse **nur** das; was Rücklage
   und Vorsorge sonst unterscheiden soll, ist offen.
 
-- **Eine Kontogruppe ist eine SICHT, die Klasse eine RECHENREGEL.** Das ist der Unterschied,
-  an dem sonst eine zweite Wahrheit entsteht. Die Klasse entscheidet mit — nur `liquide`
-  zählt zu den liquiden Mitteln — und ein Konto hat genau eine. Eine Gruppe
-  (`core/konten/gruppe.ts`, Tabellen `kontogruppe` + `kontogruppe_konto`) heißt, wie der
-  Nutzer sie nennt, bündelt beliebig viele Konten und entscheidet **nichts**; dasselbe Konto
-  darf in mehreren liegen, und genau dafür gibt es sie neben der Klasse. Wer eine Gruppe je
-  eine Rechnung tragen lässt („Gruppe X zählt als liquide"), hat zwei Felder, die dasselbe
-  verschieden sagen — und der Widerspruch fällt erst auf, wenn eine Summe nicht mehr aufgeht.
+  **`aktiv` ist die dritte Frage und wieder eine andere:** ob das Konto noch GEFÜHRT wird.
+  Typ und Klasse beschreiben, was es ist und wofür — `aktiv` nur, ob man damit noch etwas
+  tun kann. Es entscheidet deshalb keine einzige Summe über die Vergangenheit; siehe
+  „Ein Konto stilllegen" oben.
 
-  Was für eine Gruppe trotzdem gilt, weil es für jede Auswahl von Konten gilt: **Saldo und
-  Buchungen filtern mit derselben Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie
-  gab.
+- **Die Klasse ist das EINE Feld für „wofür ist dieses Konto da".** Bis 2026-09-22 stand
+  daneben eine frei benannte `Kontogruppe` — eine Sicht, die nichts entschied, während die
+  Klasse über die liquiden Mittel entscheidet. Zwei Felder auf dieselbe Frage, und nur
+  eines galt: gepflegt wurden beide, und beim ersten Widerspruch hätte niemand sagen
+  können, welches gemeint war. Die Gruppen sind deshalb weg (Migration 74), die Klasse
+  trägt dafür fünf Werte statt drei — `liquide`, `ruecklage`, `vorsorge`, `sparen`,
+  `investment`, benannt in `i18n.ts` unter `einstellungen.konto.klasse`.
+
+  **Was dabei nicht mehr geht, gehört benannt:** ein Konto lag in beliebig vielen Gruppen
+  und liegt in genau einer Klasse. Ein Bargeldbestand, der zu „Lebenshaltung" UND zum
+  „Urlaubstopf" gehörte, ist so nicht mehr abzubilden. Wer Konten wieder frei bündeln
+  will, baut dafür etwas Neues — und es darf dann, wie die Gruppe, **nichts** entscheiden;
+  sonst stehen wieder zwei Felder da, die dasselbe verschieden sagen.
+
+  **Gerechnet wird weiterhin über genau eine Grenze:** `istLiquide` fragt `=== "liquide"`,
+  die vier übrigen Werte sind für jede Rechnung dasselbe. Wer das ändert, ändert nicht
+  eine Zahl, sondern die Bedeutung des Feldes.
+
+  Was für jede Auswahl von Konten gilt: **Saldo und Buchungen filtern mit derselben
+  Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie gab.
 
   **Saldo und Buchungen gehören dabei zusammen.** `istMonatsverlauf` bildet seinen Sockel aus
   `liquideMittel` und lässt Buchungen darüberlaufen. Nimmt man den Saldo eines Kontos heraus

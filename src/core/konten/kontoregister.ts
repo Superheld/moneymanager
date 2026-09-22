@@ -6,7 +6,7 @@
 import type { Cent } from "../basis/geld";
 import { addTage, ord, parseIso, toIso } from "../basis/datum";
 import type { Charakter, Zahlungsregel } from "../basis/zahlungsregel";
-import type { Zahlungskonto } from "./konto";
+import { istAktiv, type Zahlungskonto } from "./konto";
 import { projiziereRegel } from "../buchung/projektion";
 import type { IstBuchung, PlanRef } from "../buchung/istbuchung";
 
@@ -155,7 +155,9 @@ export function vorschauAlleKonten(
   tage: number,
 ): Vorschauzeile[] {
   const zeilen: Vorschauzeile[] = [];
-  for (const konto of konten) {
+  // Stillgelegt heisst: keine kommenden Zahlungen mehr. Dieselbe Begründung wie in
+  // `liquiditaetsvorschau` — was vorausschaut, lässt sie aus; was zurückblickt, behält sie.
+  for (const konto of konten.filter(istAktiv)) {
     for (const z of kontoRegister(konto, ist, regeln, heute, tage).geplant) {
       // `geplant` trägt immer einen planRef — ohne ihn gäbe es die Zeile nicht.
       if (!z.planRef) continue;

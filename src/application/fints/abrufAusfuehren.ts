@@ -45,7 +45,7 @@ import type { Vorschlagskontext } from "../import/vorschlag";
 import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
 import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
-import { bankAnker } from "../../core";
+import { bankAnker, istAktiv } from "../../core";
 import type { Abrufadapter, Auszugsstand, Bankprofil, Bankzugang, TanFrager, Vormerkungszeile,
 } from "./abrufPort";
 import { abruffenster, erstabrufTage } from "./bankprofil";
@@ -292,6 +292,24 @@ export async function abrufAusfuehren(
         von,
         bis: deps.heute,
         fehler: "Das verknüpfte Konto der App gibt es nicht mehr.",
+      });
+      continue;
+    }
+    // **Stillgelegt heisst: hier kommt nichts mehr dazu.** Der dritte Fall neben „die Bank
+    // meldet es nicht mehr" und „unser Konto gibt es nicht mehr" — und er ist der einzige,
+    // den der Nutzer selbst herbeigeführt hat.
+    //
+    // Übersprungen wird MIT Befund und nicht still: die Zuordnung steht weiter in den
+    // Bankzugängen, und ein Abruf, der eines der aufgeführten Konten wortlos auslässt,
+    // sieht nach einem Fehler aus, den man an der falschen Stelle sucht. Wer das Konto
+    // wieder aufnimmt, ruft es ab wie vorher — die Verbindung bleibt unangetastet.
+    if (!istAktiv(zahlungskonto)) {
+      befunde.push({
+        zahlungskontoId: z.zahlungskontoId,
+        bezeichnung,
+        von,
+        bis: deps.heute,
+        fehler: "Das Konto ist stillgelegt — es wird nicht abgerufen.",
       });
       continue;
     }

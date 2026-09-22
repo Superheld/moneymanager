@@ -2,7 +2,7 @@
 // Erkennung durchrechnen.
 //
 // Der Grund, warum es das geben muss: alles, was hier gebaut wurde, wirkt sonst nur nach
-// vorn. Ein frisch trainiertes Modell, eine neue Festlegung, eine Kategorie am Vertrag —
+// vorn. Ein frisch trainiertes Modell, eine Kategorie am Vertrag, eine neue Erkennungsregel —
 // jede dieser Verbesserungen ließe die 5000 Zahlungen unberührt, die schon da sind. Ein
 // Haushaltsbuch, dessen Auswertungen von der Reihenfolge abhängen, in der man Dinge
 // gelernt hat, ist keins.

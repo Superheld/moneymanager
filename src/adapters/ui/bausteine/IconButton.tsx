@@ -24,6 +24,15 @@ export type IconName =
   | "uebernehmen"
   | "verwerfen"
   | "oeffnen"
+  // Ein Konto loswerden — Stilllegen wie Loeschen, beides hinter EINEM Symbol. Absichtlich
+  // keine zweite Muelleimer-Form: der Weg beginnt harmlos (die vorgegebene Antwort ist das
+  // umkehrbare Stilllegen), und was zerstoert, traegt seine Farbe erst im Dialog. Eine
+  // Kiste mit Deckel sagt genau das — weggelegt, nicht vernichtet.
+  //
+  // Es gab hier bis 2026-09-13 ein PAAR (`stilllegen` und ein Rundpfeil `wiederaufnehmen`),
+  // solange beide Handlungen in der Zeile standen. Mit dem Dialog braucht es sie nicht mehr:
+  // dort stehen Woerter, und ein Wort ist an dieser Stelle die bessere Auskunft.
+  | "aufloesen"
   // Der Griff zur Navigation — er steht in der Kopfleiste und nicht in der Liste, und
   // deshalb ist die Aehnlichkeit zu `einstellungen` (Schieberegler: dieselben drei
   // Striche, mit Griffen darauf) keine Verwechslungsgefahr: die beiden stehen nie
@@ -61,6 +70,8 @@ const PFADE: Record<IconName, ReactElement> = {
   verwerfen: <><path d="M6 6l12 12" /><path d="M18 6L6 18" /></>,
   // Pfeil nach rechts in ein Fenster
   oeffnen: <><path d="M14 4h6v6" /><path d="M20 4l-8 8" /><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></>,
+  // Kiste mit Deckel.
+  aufloesen: <><path d="M3 6h18v4H3z" /><path d="M5 10v9h14v-9" /><path d="M10 14h4" /></>,
   // Drei Striche.
   menue: <path d="M4 7h16M4 12h16M4 17h16" />,
 
@@ -116,10 +127,20 @@ export function Icon({ name, groesse = 16 }: { name: IconName; groesse?: number 
  *
  * `ton="gefahr"` färbt erst beim Hovern rot: eine Tabelle voller roter Papierkörbe liest
  * sich, als sei überall etwas kaputt.
+ *
+ * **`hinweis` trennt NAME und ERKLÄRUNG, und das war vorher zusammengelegt.** Der
+ * Hover-Text kam aus `label`, stand also mit einem Wort da, das dasselbe sagt wie das Icon
+ * — bei „Bearbeiten" (Stift) ist das genug, bei einer Aktion, deren Folgen man nicht ansieht,
+ * ist es keine Auskunft. Ohne `hinweis` bleibt alles wie vorher.
+ *
+ * Der NAME bleibt trotzdem `aria-label`: er ist das, was eine Vorlesehilfe in einer Liste von
+ * Aktionen braucht — kurz und gleichförmig. Ein ganzer Satz je Zeile wäre dort unbrauchbar,
+ * und ARIA gewinnt ohnehin gegen `title`, das Verhältnis ist also eindeutig.
  */
 export function IconButton({
   icon,
   label,
+  hinweis,
   onClick,
   ton = "normal",
   disabled,
@@ -127,6 +148,8 @@ export function IconButton({
 }: {
   icon: IconName;
   label: string;
+  /** Was die Aktion bewirkt — erscheint beim Hovern statt des Namens. */
+  hinweis?: string;
   onClick: () => void;
   ton?: "normal" | "gefahr";
   disabled?: boolean;
@@ -136,7 +159,7 @@ export function IconButton({
     <button
       type="button"
       className={ton === "gefahr" ? "iconbtn iconbtn-gefahr" : "iconbtn"}
-      title={label}
+      title={hinweis ?? label}
       aria-label={label}
       disabled={disabled}
       onClick={(e) => { e.stopPropagation(); onClick(); }}

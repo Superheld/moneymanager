@@ -20,6 +20,9 @@ import {
 } from "../../../application/import";
 // Selbst-Registrierung des Finanzguru-Adapters auslösen.
 import "../../import/finanzguruAdapter";
+// Der Bestandsexport dieser App ist eine QUELLE wie jede andere — deshalb steht er hier
+// neben Finanzguru und nicht als eigener Weg irgendwo sonst. Siehe `bestandsAdapter`.
+import "../../import/bestandsAdapter";
 import { Button, Card, DataTable } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { FremdkategorienKarte } from "./FremdkategorienKarte";
@@ -193,7 +196,7 @@ export function ImportScreen() {
 
       <Card>
         <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
-          <input ref={inputRef} type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" onChange={dateiGewaehlt} style={{ display: "none" }} />
+          <input ref={inputRef} type="file" accept=".xlsx,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json" onChange={dateiGewaehlt} style={{ display: "none" }} />
           <Button variant="primary" onClick={() => inputRef.current?.click()}>{t("import.dateiWaehlen")}</Button>
           {dateiname && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>{dateiname}</span>}
         </div>

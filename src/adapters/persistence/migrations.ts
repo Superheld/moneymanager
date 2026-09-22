@@ -2079,4 +2079,85 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS ix_umsatz_roh_zahlung ON umsatz_roh (zahlung_id)`,
     ],
   },
+  {
+    version: 72, // Das Faelligkeitsfenster einer Erkennungsregel
+    sql: [
+      // Vier Spalten fuer zwei Fenster, die sich WIEDERHOLEN — im Gegensatz zu
+      // `gueltig_ab`/`gueltig_bis` daneben, die feste Kalenderdaten sind und sagen, wie
+      // lange es den Vertrag gab.
+      //
+      // Der Fall, der sie erzwungen hat: zwei Kfz-Policen bei derselben Versicherung.
+      // Gleiche Glaeubiger-ID, gleicher Empfaengername — zu unterscheiden sind sie nur an
+      // der Versicherungsnummer im Verwendungszweck und am Faelligkeitstermin. Das erste
+      // leistet das Pflichtflag am Merkmal (es steht im JSON von `schluessel` und brauchte
+      // deshalb keine Spalte), das zweite diese hier.
+      //
+      // Zwei Paare und nicht eines: eine Jahrespolice wird im Monat faellig, ein Abo am
+      // Tag im Monat. Ein einziges Feld haette die zweite Form nicht ausdruecken koennen.
+      // Beide wickeln um (von > bis meint ueber die Grenze hinweg) — das ist Sache des
+      // Kerns, das Schema haelt nur die Zahlen.
+      //
+      // Nullable ohne Vorgabe, weil „nicht gesetzt" hier eine eigene Aussage ist: kein
+      // Fenster heisst „egal", und das ist etwas anderes als ein Fenster, das das ganze
+      // Jahr umfasst. Eine 1..12-Vorgabe haette den Unterschied eingeebnet.
+      `ALTER TABLE vertrag_erkennung ADD COLUMN monat_von INTEGER`,
+      `ALTER TABLE vertrag_erkennung ADD COLUMN monat_bis INTEGER`,
+      `ALTER TABLE vertrag_erkennung ADD COLUMN tag_von INTEGER`,
+      `ALTER TABLE vertrag_erkennung ADD COLUMN tag_bis INTEGER`,
+    ],
+  },
+  {
+    version: 73, // Ein Konto stilllegen, statt es loeschen zu muessen
+    sql: [
+      // Ein Konto, in das je importiert wurde, war ueber die Oberflaeche nie wieder
+      // loeschbar: `umsatz_verarbeitung.zahlungskonto_id` steht auf NO ACTION und haengt
+      // an JEDER importierten Zahlung — auch an den verbuchten und den verworfenen. Die
+      // Buchungen zu loeschen befreit es nicht (der Verweis darauf steht auf SET NULL),
+      // und einen Weg, eine Importzeile zu loeschen, gab es im ganzen Programm nicht.
+      //
+      // Der Ausweg ist in den meisten Faellen aber gar nicht das Loeschen: ein Konto, das
+      // es nicht mehr gibt, soll seine Buchungen BEHALTEN und nur aufhoeren, ueberall
+      // mitzukommen. Genau das ist diese Spalte.
+      //
+      // **Sie ist eine Sicht auf die GEGENWART und keine Rechenregel.** Sie entscheidet,
+      // was man noch tun kann und was die Gegenwart zeigt — nie eine Zahl ueber die
+      // Vergangenheit. Die Analyse zaehlt die Buchungen eines stillgelegten Kontos
+      // unveraendert weiter; sonst schriebe ein Klick in der Verwaltung rueckwirkend
+      // jeden Monat um. Welche Summe sie mitnimmt, entscheidet deshalb jede Aufrufstelle
+      // selbst, nicht diese Spalte — dieselbe Arbeitsteilung wie bei der Kontoklasse.
+      //
+      // **Positiv benannt und Vorgabe 1**, beides aus demselben Grund wie bei
+      // `budgetrelevant`: ein `stillgelegt` waere in einem WHERE eine doppelte Verneinung,
+      // und ein fehlender Wert muss JA heissen — sonst faellt mit der Einfuehrung der
+      // Spalte der ganze Altbestand aus jeder Liste und die App sieht leer aus.
+      //
+      // Ein DATUM waere die andere Form gewesen und ist verworfen: es sieht aus wie eine
+      // Rechengroesse („seit wann zaehlt es nicht mehr mit") und verlangte damit von jeder
+      // Auswertung eine Stichtagsentscheidung, die keine Auswertung hier braucht. Wer den
+      // Zeitpunkt wirklich einmal braucht, findet ihn ohnehin nicht hier, sondern an der
+      // letzten Buchung.
+      `ALTER TABLE zahlungskonto ADD COLUMN aktiv INTEGER NOT NULL DEFAULT 1`,
+    ],
+  },
+  {
+    version: 74, // Die Kontogruppen gehen in der Kontoklasse auf
+    sql: [
+      // Zwei Felder beantworteten dieselbe Frage — „wofuer ist dieses Konto da" —, und
+      // nur eines davon galt: die Klasse entscheidet ueber die liquiden Mittel, die
+      // Gruppe entschied nichts. Ein Feld, das nichts entscheidet, aber so aussieht, als
+      // taete es das, ist die teurere Haelfte: es steht da, man pflegt es, und beim
+      // ersten Widerspruch zwischen beiden weiss niemand, welches gemeint war.
+      //
+      // Die Klasse traegt dafuer seit 2026-09-22 fuenf Werte statt drei (`sparen`,
+      // `investment` kommen dazu). Was dabei WEGFAELLT, gehoert benannt: ein Konto lag in
+      // beliebig vielen Gruppen und liegt in genau einer Klasse. Wer Konten frei buendeln
+      // will, braucht dafuer etwas Neues — und es darf dann wieder nichts entscheiden.
+      //
+      // Geloescht statt stehengelassen, weil das Alpha-Stadium es erlaubt (siehe
+      // CLAUDE.md): eine Tabelle, die kein Code mehr kennt, ist beim naechsten Hinsehen
+      // eine Frage, die niemand mehr beantworten kann.
+      `DROP TABLE IF EXISTS kontogruppe_konto`,
+      `DROP TABLE IF EXISTS kontogruppe`,
+    ],
+  },
 ];

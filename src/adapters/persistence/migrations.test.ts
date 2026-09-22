@@ -87,8 +87,6 @@ const ERWARTETE_TABELLEN = [
   "dubletten_freigabe", // v34 — „kein Duplikat", von Hand festgehalten
   "einstellung", "import_lauf", "ist_buchung",
   "ist_buchung_aufteilung", "kategorie", "klassifikator_modell",
-  // v61 — frei benannte Gruppen von Konten; eine Sicht, keine Rechenregel
-  "kontogruppe", "kontogruppe_konto",
   "kontostand_anker", // v35 — was an einem Stichtag wirklich auf dem Konto lag
   "merkmal_ausschluss",
   "person",
@@ -1654,6 +1652,40 @@ describe("Migration 63 — halbe Umbuchungen bekommen ihre Richtung zurueck", ()
     const nachErstem = db.exec("SELECT charakter, betrag FROM ist_buchung")[0].values;
     apply(db, 62, 63);
     expect(db.exec("SELECT charakter, betrag FROM ist_buchung")[0].values).toEqual(nachErstem);
+    db.close();
+  });
+});
+
+describe("Migration 73 — ein Konto stilllegen", () => {
+  it("führt jedes vorhandene Konto weiter als aktiv", () => {
+    // Die wichtigste Zusicherung der Spalte: der Altbestand darf sie nicht spüren. Mit
+    // Vorgabe 0 wären nach dem ersten Start nach dem Update ALLE Konten stillgelegt — die
+    // Buchungsmaske hätte keine Auswahl mehr und die Übersicht sähe leer aus.
+    const db = new SQL.Database();
+    apply(db, 0, 72);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k1','Girokonto','Giro','[]')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k2','Bargeld','Bargeld','[]')");
+
+    apply(db, 72, 73);
+
+    expect(db.exec("SELECT id, aktiv FROM zahlungskonto ORDER BY id")[0].values).toEqual([
+      ["k1", 1],
+      ["k2", 1],
+    ]);
+    db.close();
+  });
+
+  it("läuft ein zweites Mal folgenlos durch", () => {
+    // `ALTER TABLE … ADD COLUMN` kennt kein `IF NOT EXISTS`; dass es trotzdem wiederholbar
+    // ist, leistet die Spaltenprüfung in `migrate()` — und `apply()` spiegelt sie.
+    const db = new SQL.Database();
+    apply(db, 0, 73);
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k1','Girokonto','Giro','[]')");
+    db.run("UPDATE zahlungskonto SET aktiv = 0 WHERE id = 'k1'");
+
+    apply(db, 72, 73);
+
+    expect(db.exec("SELECT aktiv FROM zahlungskonto")[0].values).toEqual([[0]]);
     db.close();
   });
 });

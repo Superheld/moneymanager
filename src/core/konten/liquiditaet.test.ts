@@ -220,3 +220,36 @@ describe("handlungsbedarf", () => {
     expect(handlungsbedarf([ok])).toEqual([]);
   });
 });
+
+describe("liquiditaetsvorschau — stillgelegte Konten", () => {
+  it("lässt ein stillgelegtes Konto aus", () => {
+    // Die Vorausschau-Hälfte der Regel. Ein Konto, das niemand mehr führt, hat keine
+    // nächsten 90 Tage; eine Warnung darüber wäre eine, an der man nichts tun kann — und
+    // die Handlungsbedarf-Karte ist die einzige, die VERSCHWINDET, wenn nichts anliegt.
+    // Eine Dauerzeile darin nähme ihr genau das, was sie wirksam macht.
+    const zeilen = liquiditaetsvorschau({
+      konten: [konto({ id: "giro" }), konto({ id: "alt", aktiv: false, saldo: -50000 })],
+      buchungen: [], regeln: [], heute: HEUTE, tage: 30,
+    });
+    expect(zeilen.map((z) => z.kontoId)).toEqual(["giro"]);
+  });
+
+  it("meldet für ein stillgelegtes Konto keinen Handlungsbedarf", () => {
+    const bedarf = handlungsbedarf(
+      liquiditaetsvorschau({
+        konten: [konto({ id: "alt", aktiv: false, saldo: -50000 })],
+        buchungen: [], regeln: [], heute: HEUTE, tage: 30,
+      }),
+    );
+    expect(bedarf).toEqual([]);
+  });
+
+  it("rechnet ein Konto OHNE Angabe weiter mit", () => {
+    // Fehlend heisst JA — sonst fiele mit der Einführung des Feldes jedes Konto aus der
+    // Vorschau, und die Karte wäre über Nacht stumm.
+    const zeilen = liquiditaetsvorschau({
+      konten: [konto()], buchungen: [], regeln: [], heute: HEUTE, tage: 30,
+    });
+    expect(zeilen).toHaveLength(1);
+  });
+});
