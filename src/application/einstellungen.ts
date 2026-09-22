@@ -125,3 +125,35 @@ export async function ignorierenVermerken(
   menge.add(wert);
   await repo.schreiben(schluessel, JSON.stringify([...menge]));
 }
+
+// ---------------------------------------------------------------------------------
+// Wo man zuletzt war
+// ---------------------------------------------------------------------------------
+
+const SCHLUESSEL_LETZTES_KONTO = "letztesKonto";
+
+/**
+ * Das Konto, dessen Auszug im Bereich Konten zuletzt offen war.
+ *
+ * **Ein Vorschlag, keine Zusicherung.** Was hier steht, kann es längst nicht mehr geben —
+ * gelöscht, während man woanders war. Die Aufrufstelle prüft deshalb gegen die Konten,
+ * die es wirklich gibt, und fällt sonst auf das erste zurück; ein leeres Register wäre
+ * die schlechtere Antwort auf eine Frage, die sich beantworten lässt.
+ *
+ * **Warum im Bestand und nicht im Modul.** Ein `let` neben der Komponente wäre billiger
+ * und täte dasselbe — bis zum Neustart. Es hat aber eine Eigenschaft, die erst beim
+ * zweiten Test auffällt: der Harness kann es nicht zurücksetzen. Jeder Test, der den
+ * Bereich zweimal aufbaut, erbt die Wahl des vorigen, und der Fehlschlag steht dann in
+ * einer Datei, die mit der Sache nichts zu tun hat. Eine Zeile in `einstellung` räumt
+ * `frischeDb()` mit weg.
+ */
+export async function letztesKontoLaden(repo: EinstellungenRepository): Promise<string> {
+  return (await repo.lesen())[SCHLUESSEL_LETZTES_KONTO] ?? "";
+}
+
+export function letztesKontoMerken(
+  repo: EinstellungenRepository,
+  kontoId: string,
+): Promise<void> {
+  return repo.schreiben(SCHLUESSEL_LETZTES_KONTO, kontoId);
+}
