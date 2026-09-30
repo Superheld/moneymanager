@@ -1709,24 +1709,21 @@ ist die Tagessicherung: die von heute löschen, App starten, und wenn sie neu en
 die Datenbank geöffnet und die Migrationen sind gelaufen. Dasselbe gilt für `pgrep` — dass
 ein Prozess da ist, sagt über den Zustand dahinter nichts.
 
-**Der Punkt, an dem man sonst das Falsche tut:** Wer am **Schema** arbeitet, prüft nicht
-gegen den Spielstand, sondern gegen eine **Lesekopie des echten Bestands**. Der Spielstand
-ist widerspruchsfrei — er wurde gerade erst erzeugt. Der echte Bestand ist es nicht, und
-genau dort scheitern Migrationen. Ein grüner Testlauf gegen sql.js hat das schon einmal
-verschwiegen, weil dort die Fremdschlüssel aus sind.
+**Echte Daten kommen in der Entwicklung nicht vor, auch nicht als Probe** (seit
+2026-09-30). Persönliche Daten sind schon einmal im öffentlichen Netz gelandet, und das zu
+verhindern ist aufwendig: jeder Ablauf, der den echten Bestand in die Entwicklung holt, ist
+ein weiterer Weg ins Repo. Eine einzelne Ausnahme (etwa `bestandslesen` für einen
+konkreten Datenbug) gibt es nur benannt und im Einzelfall, **nie als Regel oder Rezept**.
+Hier stand bis dahin das Gegenteil — wer am Schema arbeitet, prüfe gegen eine Lesekopie
+des echten Bestands —, und seit der Verschlüsselung war es ohnehin nicht mehr ausführbar.
 
-> **Und genau das geht seit dem 27.08.2026 nicht mehr.** Die Probe
-> (`scripts/migrationsprobe.mjs`) liest über sql.js, die Lesekopie zog man mit
-> `sqlite3 -readonly … .backup` — und beides scheitert an einer Datenbank, die seither mit
-> SQLCipher verschlüsselt ist. Es gibt keinen Ersatzweg; `bestandslesen` liest den Bestand,
-> aber fährt keine Migrationskette darüber.
->
-> **Damit steht hier eine Pflicht ohne Weg, und das ist die ehrlichere Fassung als ein
-> Rezept, das ins Leere führt.** Was es praktisch heisst, gehört dazugesagt: Migration 74
-> ist in ein Release gegangen, ohne je gegen den echten Bestand gelaufen zu sein — der Fall,
-> vor dem dieser Absatz warnt, ist seitdem der Normalfall. Wer die Probe wiederherstellt,
-> braucht einen Leser, der den Schlüssel kennt (die Naht dafür steht in `src-tauri`, nicht
-> in Node), oder eine entschlüsselte Kopie, die nach Gebrauch wieder verschwindet.
+**Was das kostet, gehört dazugesagt:** Eine Migration kann an einem Widerspruch scheitern,
+den nur der echte Bestand hat (verwaiste Verweise, über Monate angesammelt). Der
+Spielstand ist frisch erzeugt und widerspruchsfrei, und ein grüner Testlauf gegen sql.js
+hat so etwas schon einmal verschwiegen, weil dort die Fremdschlüssel aus sind. Vorbeugen
+geht damit nicht mehr, zurück schon: die **Tagessicherung vor den Migrationen** ist das
+Netz, `fremdschluesselPruefen` nach der Kette meldet den Widerspruch laut, und Migrationen
+werden so geschrieben, dass sie ihn selbst aufräumen.
 
 ### Eine Version ausliefern
 
