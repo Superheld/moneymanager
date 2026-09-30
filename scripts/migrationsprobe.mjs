@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// Faehrt die Migrationskette gegen eine KOPIE einer echten Datenbank.
+// Faehrt die Migrationskette gegen eine KOPIE eines Spielstands mit aelterem Schema.
+// Nicht gegen den echten Bestand — siehe CLAUDE.md, „Eine Aenderung machen".
 //
 // WOZU ES DAS GIBT. `npm test` prueft die Migrationen gegen sql.js — und sql.js hat
 // Fremdschluessel standardmaessig AUS, waehrend sqlx sie in der App auf jeder Verbindung
@@ -11,11 +12,7 @@
 //
 //   node scripts/migrationsprobe.mjs <kopie.db>
 //
-// Die Kopie wird mit `sqlite3 -readonly "$DB" ".backup '/pfad/kopie.db'"` gezogen — NICHT
-// mit `cp`: die Datenbank laeuft im WAL-Modus, und frische Schreibvorgaenge stehen in der
-// `-wal`-Datei. Ein `cp` liefert einen aelteren Stand, still und plausibel aussehend.
-//
-// Das Skript SCHREIBT nur in die Kopie und ruehrt die echte Datenbank nie an.
+// Das Skript SCHREIBT nur in die Kopie.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";

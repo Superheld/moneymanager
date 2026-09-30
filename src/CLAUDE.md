@@ -98,8 +98,8 @@ Sie liegen als `*.test.ts` **neben dem Code**, es gibt keinen Testordner —
 
 `tauri-driver` gibt es für Linux und Windows, **nicht für macOS** (WKWebView bietet keinen
 WebDriver). Es tragen drei Ersatzwege: die jsdom-Tests laufen von der Oberfläche bis ins
-Schema, App-Code-Pfade lassen sich headless gegen eine Lesekopie der echten Datenbank
-fahren (Rezept in `CLAUDE.local.md`), und die Oberfläche lässt sich in einem gewöhnlichen
+Schema, App-Code-Pfade lassen sich headless gegen den Spielstand
+fahren (`npx vite-node`), und die Oberfläche lässt sich in einem gewöhnlichen
 Browser ansehen.
 
 ### `npm run vorschau` — die App im Browser
