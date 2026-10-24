@@ -35,6 +35,12 @@
 // Rate dieses Monats, Verbrauch dieses Monats. Der grosse Betrag daneben bleibt derselbe;
 // die Fortschreibung ist die Zerlegung von `budgetStand`, keine zweite Rechnung
 // (Herleitung in `core/budgets/budgetverlauf`).
+//
+// **Der Abruf hat hier seit 2026-10-24 einen eigenen Knopf**, oben rechts im Kopf. Die
+// Übersicht ist der Bereich, in dem man landet, und das Erste, was man nach dem Öffnen
+// will, ist meist: holen, was seit dem letzten Mal passiert ist. Vorher lag der Knopf
+// einen Bereich weiter, im Kontoauszug. Der Dialog ist derselbe; nach dem Abruf wird
+// die ganze Übersicht neu gerechnet, weil jede Karte aus denselben Buchungen rechnet.
 
 import { Auswahl } from "../bausteine/Auswahl";
 import { useEffect, useMemo, useState } from "react";
@@ -45,12 +51,14 @@ import {
   fensterEnde,
   toIso,
   VORSCHAU_TAGE,
+  type Abrufstand,
   type Depotdaten,
   type IstBuchung,
   type Uebersichtsdaten,
 } from "../../../application";
-import { depots, uebersicht } from "../../dienste";
-import { Card, CoverageTrack, Pill } from "../bausteine";
+import { abrufstand, depots, uebersicht } from "../../dienste";
+import { Button, Card, CoverageTrack, Pill } from "../bausteine";
+import { AbrufDialog } from "../bausteine/AbrufDialog";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
@@ -98,6 +106,13 @@ export function UebersichtScreen() {
    * Kontoauszug wiederfinden.
    */
   const [detail, setDetail] = useState<IstBuchung | null>(null);
+  /**
+   * Wie frisch die Bankdaten sind. Getrennt von `daten` geladen, aus demselben Grund wie
+   * die Depots: ein Fehler hier nimmt der Übersicht nicht ihren Inhalt.
+   */
+  const [abruf, setAbruf] = useState<Abrufstand | null>(null);
+  /** Offener Abruf-Dialog: `null` zu, sonst der vorgewählte Zugang ("" = der erste). */
+  const [abrufOffen, setAbrufOffen] = useState<string | null>(null);
 
   async function laden() {
     try {
@@ -107,6 +122,9 @@ export function UebersichtScreen() {
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
     }
+    abrufstand(heute)
+      .then(setAbruf)
+      .catch(() => setAbruf(null));
   }
 
   useEffect(() => {
@@ -131,7 +149,17 @@ export function UebersichtScreen() {
 
   return (
     <div className="screen">
-      <PageHead title={t("uebersicht.titel")} subtitle={t("uebersicht.untertitel")} />
+      <PageHead
+        title={t("uebersicht.titel")}
+        subtitle={t("uebersicht.untertitel")}
+        // Nur, wenn es einen Zugang gibt — ein Knopf, der nichts tun kann, ist eine Frage
+        // an den Nutzer statt einer Antwort (dieselbe Regel wie im Kontoauszug).
+        action={
+          abruf?.hatZugang ? (
+            <Button variant="primary" onClick={() => setAbrufOffen("")}>{t("konten.abrufen")}</Button>
+          ) : undefined
+        }
+      />
 
       {fehler && <Card style={{ borderColor: "var(--warn)" }}>{t("uebersicht.fehlerDb")} ({fehler})</Card>}
 
@@ -143,6 +171,8 @@ export function UebersichtScreen() {
           bedarf={daten.bedarf}
           kontoNamen={daten.kontoNamen}
           bisTag={fensterEnde(heute, VORSCHAU_TAGE)}
+          veraltet={abruf?.zugaenge.filter((z) => z.veraltet) ?? []}
+          onAbrufen={setAbrufOffen}
         />
       )}
 
@@ -298,6 +328,14 @@ export function UebersichtScreen() {
           stehenzulassen zeigte zwei Wahrheiten nebeneinander. */}
       {detail && (
         <BuchungDetail buchung={detail} onClose={() => setDetail(null)} onGeaendert={laden} />
+      )}
+
+      {abrufOffen !== null && (
+        <AbrufDialog
+          zugangId={abrufOffen || undefined}
+          onClose={() => setAbrufOffen(null)}
+          onFertig={() => void laden()}
+        />
       )}
     </div>
   );

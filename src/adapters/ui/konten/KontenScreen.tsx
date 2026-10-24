@@ -34,7 +34,7 @@ import { VormerkungsBlock } from "./VormerkungsBlock";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVergleich";
 import { SammelDialog } from "../buchung/SammelDialog";
-import { AbrufDialog } from "./AbrufDialog";
+import { AbrufDialog } from "../bausteine/AbrufDialog";
 import { DepotAuszug } from "./DepotAuszug";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";

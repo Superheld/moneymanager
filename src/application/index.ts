@@ -296,6 +296,7 @@ export type {
 } from "./fints/abrufPort";
 export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
 export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
+export type { Abrufstand, Zugangsstand } from "./fints/abrufstand";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
 // Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen
 // Vorfall überhaupt darf, sind Entscheidungen mit genau einer richtigen Antwort.

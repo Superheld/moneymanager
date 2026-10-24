@@ -173,6 +173,7 @@ import { sqliteKontoentfernen } from "./persistence/sqliteKontoentfernen";
 import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/kategorien/standardkategorien";
 import type { Abrufadapter, Bankzugang, Zugangsart } from "../application/fints/abrufPort";
 import type { Kontozuordnung } from "../application/fints/bankzugangPort";
+import { abrufstandLaden, type Abrufstand } from "../application/fints/abrufstand";
 import {
   sqliteBankzugangRepository,
   sqliteKontozuordnungRepository,
@@ -392,6 +393,15 @@ export function bankzugangSpeichern(zugang: Bankzugang): Promise<void> {
 
 export function bankzugangLoeschen(id: string): Promise<void> {
   return sqliteBankzugangRepository.loeschen(id);
+}
+
+/** Wie frisch der letzte Abruf je Zugang ist — für den Hinweis in der Übersicht. */
+export function abrufstand(heute: string): Promise<Abrufstand> {
+  return abrufstandLaden(heute, {
+    zugangRepo: sqliteBankzugangRepository,
+    zuordnungRepo: sqliteKontozuordnungRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+  });
 }
 
 export function kontozuordnungen(): Promise<Kontozuordnung[]> {

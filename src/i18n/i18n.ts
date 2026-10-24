@@ -564,6 +564,10 @@ const de = {
       "„Sicher\" heißt: schon die festen Termine reichen dafür — daran ändert Sparsamkeit nichts. „Erwartet\" heißt: erst zusammen mit dem üblichen Verbrauch, gleichmäßig über die Tage verteilt.",
     bedarfHinweis:
       "Was hier NICHT steht, läuft im gerechneten Fenster nicht ins Minus — geprüft ist damit nicht mehr.",
+    abrufVeraltet: "zuletzt abgerufen bis {{datum}}",
+    abrufNie: "noch nie abgerufen",
+    abrufHinweis:
+      "Was seither auf diesen Konten passiert ist, kennt die Übersicht noch nicht — auch die Prüfung auf ein Minus nicht.",
     vermoegenTitel: "Was da ist",
     vermoegenUntertitel: "Alle Konten nach Klasse — die Karten oben rechnen nur über die verfügbaren",
     vermoegenKonten: "{{count}} Konten",
@@ -2623,6 +2627,10 @@ const en: typeof de = {
       "„Certain\" means the dated commitments alone are enough — spending less will not help. „Expected\" means only together with the usual spending, spread evenly across the days.",
     bedarfHinweis:
       "What is NOT listed here does not go negative within the window computed — that is all that has been checked.",
+    abrufVeraltet: "last retrieved up to {{datum}}",
+    abrufNie: "never retrieved",
+    abrufHinweis:
+      "Whatever has happened on these accounts since then is not yet known to the overview — nor to the check for going negative.",
     vermoegenTitel: "What you have",
     vermoegenUntertitel: "All accounts by class — the cards above cover only the available ones",
     vermoegenKonten: "{{count}} accounts",

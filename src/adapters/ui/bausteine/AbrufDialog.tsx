@@ -13,18 +13,30 @@ import { useTranslation } from "react-i18next";
 import { speicherzeitraumTage, type Abrufergebnis, type Bankprofil, type Bankzugang } from "../../../application";
 import { bankAbrufen, bankzugaenge } from "../../dienste";
 import { TanDialog, useTanFrage } from "./TanDialog";
-import { useGeld } from "../bausteine/einstellungenKontext";
-import { Button, FormField } from "../bausteine";
-import { Auswahl } from "../bausteine/Auswahl";
-import { beiEnter } from "../bausteine/beiEnter";
-import { Modal } from "../bausteine/Modal";
+import { useGeld } from "./einstellungenKontext";
+import { Button, FormField } from ".";
+import { Auswahl } from "./Auswahl";
+import { beiEnter } from "./beiEnter";
+import { Modal } from "./Modal";
 
 function heuteIso(): string {
   const n = new Date();
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 }
 
-export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFertig: () => void }) {
+export function AbrufDialog({
+  onClose,
+  onFertig,
+  zugangId: vorgewaehlt,
+}: {
+  onClose: () => void;
+  onFertig: () => void;
+  /**
+   * Welcher Zugang gewählt ist, wenn der Aufrufer es schon weiss — die Übersicht öffnet
+   * den Dialog aus der Zeile eines bestimmten Zugangs. Ohne die Angabe der erste.
+   */
+  zugangId?: string;
+}) {
   const { t } = useTranslation();
   const geld = useGeld();
   const [zugaenge, setZugaenge] = useState<Bankzugang[]>([]);
@@ -56,7 +68,7 @@ export function AbrufDialog({ onClose, onFertig }: { onClose: () => void; onFert
     bankzugaenge()
       .then((z) => {
         setZugaenge(z);
-        setZugangId(z[0]?.id ?? "");
+        setZugangId(z.find((x) => x.id === vorgewaehlt)?.id ?? z[0]?.id ?? "");
       })
       .catch(() => setZugaenge([]));
   }, []);

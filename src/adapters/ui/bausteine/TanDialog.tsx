@@ -15,9 +15,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { TanHerausforderung } from "../../../application/fints/abrufPort";
-import { Button, FormField } from "../bausteine";
-import { beiEnter } from "../bausteine/beiEnter";
-import { Modal } from "../bausteine/Modal";
+import { Button, FormField } from ".";
+import { beiEnter } from "./beiEnter";
+import { Modal } from "./Modal";
 
 /** Eine offene Rückfrage: was die Bank will, und der Weg, die Antwort zurückzugeben. */
 export interface TanFrage {
