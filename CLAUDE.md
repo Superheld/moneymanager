@@ -2298,6 +2298,15 @@ Lib-Branch mergen oder `npm ci`.
 
 ## Build-Stolpersteine
 
+- **Nach dem Verschieben des Repos baut `tauri dev` nicht mehr.** Die Build-Skripte von
+  Tauri und seinen Plugins schreiben ABSOLUTE Pfade in ihre Ausgabe unter
+  `src-tauri/target/debug/build/`, und Cargo führt sie nicht neu aus, nur weil das
+  Verzeichnis woanders liegt. Die Meldung zeigt auf den alten Ort und klingt nach einer
+  fehlenden Datei: „failed to read plugin permissions: failed to read file '…/app_hide.toml'".
+  Abhilfe: die betroffenen Kisten gezielt abräumen statt alles —
+  `grep -rl <alter-pfad> src-tauri/target/debug/build/*/output` nennt sie, dann je
+  `cargo clean -p <kiste>`. Auf macOS fällt ein Umzug, der nur die Gross-/Kleinschreibung
+  ändert, nicht auf; einer, der eine Ebene einzieht, schon.
 - **Ein Patch in `node_modules/<paket>/dist` erreicht die laufende App NICHT.** Vite
   serviert `node_modules/.vite/deps/<paket>.js` mit `immutable`-Caching und bündelt nur
   neu, wenn sich Lockfile oder Config ändern — nicht bei geändertem Paketinhalt. Wer eine
