@@ -117,6 +117,17 @@ const BETRAGS_TOLERANZ = 0.15;
 export interface MonatsAusblickEingabe {
   readonly regeln: readonly Zahlungsregel[];
   readonly budgets: readonly Budget[];
+  /**
+   * Budgets, die hier Ausgaben TRAGEN, aber nichts PLANEN.
+   *
+   * Der Fall ist ein Budget, dessen Geld auf einem Konto liegt, das diese Aufrechnung
+   * nicht rechnet — ein aufbauendes Budget auf dem Rücklagenkonto, gesehen von den
+   * liquiden Konten aus. Seine Rate fließt dort über eine Umbuchung hin, und die steht
+   * schon als Plan in „Sparen & Vorsorge"; sie hier noch einmal zu planen, zählte sie
+   * doppelt. Seine Ausgaben gehen trotzdem oft vom Girokonto ab, und die gehören in
+   * seine Zeile — ohne es zu führen, landeten sie unter „Sonstiges".
+   */
+  readonly budgetsOhnePlan?: ReadonlySet<string>;
   readonly ist: readonly IstBuchung[];
   readonly kategorien: readonly Kategorie[];
   /**
@@ -165,7 +176,7 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
     budgets: e.budgets,
     vertragsBuchungen: e.vertragsBuchungen,
   };
-  const { zeile: budgetZeile, getragen } = budgetsZeile(sicht, von, bis, zukunft);
+  const { zeile: budgetZeile, getragen } = budgetsZeile(sicht, von, bis, zukunft, e.budgetsOhnePlan);
 
   // Was gebucht, aber von keiner Plan-Zeile erfasst ist, kommt EINZELN dazu — je Buchung
   // ein Posten. Früher stand hier eine Summe pro Zeile („weitere Einnahmen: 342,10"),
@@ -309,6 +320,7 @@ function budgetsZeile(
   von: string,
   bis: string,
   zukunft: boolean,
+  ohnePlan: ReadonlySet<string> = new Set(),
 ): { zeile: AusblickZeile; getragen: Set<string> } {
   const { budgets, kategorien } = sicht;
   // Welche ANTEILE ein Budget trägt, wird hier festgehalten: „Sonstiges" nimmt genau den
@@ -330,7 +342,7 @@ function budgetsZeile(
         bezeichnung: b.kategorieId,
         // Der Monat der Zeile: seit der Betrag versioniert ist, plant ein Budget im
         // September womöglich mit einer anderen Rate als im Juli.
-        plan: geglaetteterMonatsabfluss(b, budgets, kategorien, von.slice(0, 7)),
+        plan: ohnePlan.has(b.id) ? 0 : geglaetteterMonatsabfluss(b, budgets, kategorien, von.slice(0, 7)),
         ist: verbrauch,
         status: verbrauch == null || verbrauch === 0 ? "offen" : "gebucht",
       };

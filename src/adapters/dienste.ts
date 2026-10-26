@@ -86,6 +86,7 @@ import {
 import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
+import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
@@ -486,6 +487,7 @@ export function depots(): Promise<Depotdaten> {
 // --- Rücklagen -------------------------------------------------------------
 
 const RUECKLAGEN_DEPS = {
+  ...BUDGET_DEPS,
   ruecklagenRepo: sqliteRuecklagenRepository,
   ledger: sqliteLedgerRepository,
   kontoRepo: sqliteZahlungskontoRepository,
@@ -496,6 +498,11 @@ const RUECKLAGEN_DEPS = {
 
 export function ruecklagen(heute: string): Promise<Ruecklagensicht> {
   return ruecklagenLaden(RUECKLAGEN_DEPS, heute);
+}
+
+/** Wem das Geld auf jedem Konto gehört — Rücklagen und aufbauende Budgets, anteilig gedeckt. */
+export function kontobelegung(heute: string): Promise<Belegungssicht> {
+  return kontobelegungLaden(RUECKLAGEN_DEPS, heute);
 }
 
 export function ruecklageAnlegen(eingabe: RuecklagenEingabe) {

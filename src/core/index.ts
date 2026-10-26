@@ -30,6 +30,7 @@ export * from "./konten/kontoregister";
 export * from "./konten/liquiditaet";
 export * from "./konten/vormerkung";
 export * from "./konten/kontostand";
+export * from "./konten/kontobelegung";
 export * from "./buchung/historie";
 export * from "./buchung/journal";
 export * from "./monatsausblick";

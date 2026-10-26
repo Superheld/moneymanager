@@ -41,13 +41,21 @@ Zuordnung zur Komponente in `App.tsx`:
 Depot ist das jüngste Beispiel: sein Stand steht in der Übersicht, sein Verlauf in der
 Analyse, aus derselben Wertreihe.
 
-**Die Übersicht rechnet seit 2026-08-31 über die LIQUIDEN Konten** — Monatskarten und
-Budgetliste aus derselben gefilterten Sicht. Was auf Rücklagen- und Vorsorgekonten
-passiert, ist zurückgelegt und steht für den Monat nicht zur Verfügung; es stand vorher
-mit in „so stehe ich gerade da". Der Preis ist eine Aussage, die man kennen muss:
-**dasselbe Budget kann in der Übersicht einen kleineren Verbrauch zeigen als im Bereich
-Budgets** — dort steht der ganze Rahmen, hier nur, was aus den verfügbaren Mitteln davon
-gegangen ist. Der Untertitel der Übersicht sagt es mit.
+**Die Übersicht rechnet über die LIQUIDEN Konten** — Monatskarten und Budgetliste aus
+derselben gefilterten Sicht. Gefiltert werden die BUCHUNGEN und Zahlungsregeln, nicht die
+Budgets: jedes Budget führt seine Zeile, auch wenn sein Geld auf einem Rücklagenkonto
+liegt, und trägt, was aus den liquiden Konten dafür abging. Seine Rate plant es dort
+nicht (`budgetsOhnePlan`) — sie kommt über eine Umbuchung an, und die steht schon in
+„Sparen & Vorsorge". Was auf Rücklagen- und Vorsorgekonten passiert, ist zurückgelegt
+und steht für den Monat nicht zur Verfügung. Der Preis ist eine Aussage, die man kennen
+muss: **dasselbe Budget kann in der Übersicht einen kleineren Verbrauch zeigen als im
+Bereich Budgets** — dort steht der ganze Rahmen, hier nur, was aus den verfügbaren
+Mitteln davon gegangen ist. Der Untertitel der Übersicht sagt es mit.
+
+**Budgets stehen getrennt nach Art** — monatlich (Rest verfällt) und aufbauend (Rest
+bleibt), in der Übersicht wie im Bereich Budgets. Getrennt wird nach dem DACH eines
+Budgetbaums, nicht je Zeile (`nachArtGetrennt`): ein aufbauendes Kind unter einem
+monatlichen Dach wird aus diesem herausgerechnet und bleibt deshalb dort, mit Pille.
 
 Zwei Karten hängen daran und beantworten je eine eigene Frage:
 
@@ -358,6 +366,28 @@ Rückfluss tragen KANN, macht das Wegwerfen des Vorzeichens aus „es kam Geld z
 „es wurde genau so viel ausgegeben". Der Unterschied zum Absatz davor: dort steht ein Wort
 daneben, das mitwandert; hier steht nur die Zahl. Ein Balken darf bei 0 anschlagen
 (`Math.max(0, …)`), die Zahl daneben behält ihr Vorzeichen.
+
+#### Die Kontobelegung — wem das Geld auf einem Konto gehört
+
+Die EINE Rechnung für „wie viel von diesem Stand ist für etwas bestimmt, und wie viel ist
+frei" (`core/konten/kontobelegung.ts`, geladen über `application/konten/kontobelegung.ts`).
+Jede Anzeige, die danach fragt, liest sie — die Rücklagen-Deckung, die Spalte „frei" und
+die Karte „Gebunden auf …" im Kontoauszug. Wer etwas Neues einführt, das Geld auf einem
+Konto beansprucht, liefert es dort als `Anspruch` an und rechnet nirgends selbst.
+
+Bis 2026-10-26 gab es das nicht, und das hatte eine konkrete Folge: die Rücklagen-Deckung
+verteilte den GANZEN Kontostand auf die Rücklagen, obwohl ein aufbauendes Budget auf
+demselben Konto denselben Euro beanspruchte. Die Deckung sah besser aus, als sie war.
+
+| Anspruch | in Höhe von | warum |
+|---|---|---|
+| Rücklage mit Konto | ihr Soll bis heute | das soll beisammen sein |
+| aufbauendes Budget | sein Rest, wenn positiv | er gehört weiter dem Budget |
+| monatliches Budget | **keiner** | sein Rest verfällt und bleibt einfach auf dem Konto, ohne Kommentar |
+
+Reicht der Stand nicht, wird **anteilig** verteilt, über alle Ansprüche gleich, ohne
+Reihenfolge. `budget.kontoId` heisst seither nur noch eines: hier liegt das Geld des
+Budgets, bis es ausgegeben ist.
 
 #### Eine Rücklage hat eine von zwei Formen — nie beide
 

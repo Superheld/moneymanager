@@ -29,8 +29,13 @@ import type {
   ZahlungsregelRepository,
 } from "../ports";
 import { spurenAus } from "../buchung/zahlungsspuren";
+import { budgetAnspruecheLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
 
-export interface RuecklagenDeps {
+/**
+ * Die Budget-Seite gehört dazu, weil ein aufbauendes Budget auf demselben Konto denselben
+ * Euro beanspruchen kann. Ohne sie verteilte die Deckung Geld, das schon dem Budget gehört.
+ */
+export interface RuecklagenDeps extends BudgetanspruchDeps {
   readonly ruecklagenRepo: RuecklagenRepository;
   readonly ledger: LedgerPort;
   readonly kontoRepo: ZahlungskontoRepository;
@@ -128,7 +133,7 @@ export async function ruecklagenLaden(
   deps: RuecklagenDeps,
   heute: string,
 ): Promise<Ruecklagensicht> {
-  const [ruecklagen, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze] =
+  const [ruecklagen, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget] =
     await Promise.all([
       deps.ruecklagenRepo.alle(),
       deps.ledger.alle(),
@@ -137,6 +142,7 @@ export async function ruecklagenLaden(
       deps.vertragRepo.alle(),
       deps.ruecklagenRepo.ausbuchungen(),
       deps.umsatzRepo.alle(),
+      budgetAnspruecheLaden(deps, heute),
     ]);
   const kontostaende = new Map(konten.map((k) => [k.id, realerKontostand(k, buchungen)]));
   // Nur laufende Verträge: ein gekündigter zahlt nicht mehr ein, und eine Mindestrücklage
@@ -150,7 +156,7 @@ export async function ruecklagenLaden(
     ruecklagen,
     konten,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
-    deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende),
+    deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.ansprueche),
     proMonat: monatsRuecklageGesamt(ruecklagen),
     zielwert: zielwertGesamt(ruecklagen),
     mindest: mindestRuecklage(einnahmen),

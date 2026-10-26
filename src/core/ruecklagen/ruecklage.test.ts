@@ -129,6 +129,17 @@ describe("ruecklagenDeckung", () => {
     expect(d.sollMitKonto).toBe(euroZuCent(720));
     expect(d.grad).toBe(100);
   });
+
+  // Der Fall, wegen dem es die Kontobelegung gibt: ein aufbauendes Budget auf DEMSELBEN
+  // Konto beansprucht denselben Euro. Ohne den zweiten Anspruch wäre die Rücklage hier voll
+  // gedeckt — obwohl die Hälfte des Geldes dem Budget gehört.
+  it("teilt das Konto mit fremden Ansprüchen, statt es der Rücklage allein zu geben", () => {
+    const items = [{ ...auto, kontoId: "k1" }];
+    const budget = { art: "budget" as const, id: "b1", kontoId: "k1", betrag: euroZuCent(720) };
+    const d = ruecklagenDeckung(items, "2026-07-01", stand({ k1: euroZuCent(720) }), [budget]);
+    expect(d.posten[0].tatsaechlich).toBe(euroZuCent(360));
+    expect(d.grad).toBe(50);
+  });
 });
 
 /**

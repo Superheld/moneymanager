@@ -117,6 +117,8 @@ export {
 // ---------------------------------------------------------------------------
 export {
   budgetuebersichtLaden,
+  nachArtGetrennt,
+  type Budgetgruppen,
   budgetstaende,
   budgetPostenZu,
   budgetPostenImMonat,
@@ -297,6 +299,8 @@ export type {
 export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
 export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
 export type { Abrufstand, Zugangsstand } from "./fints/abrufstand";
+export type { Belegungssicht } from "./konten/kontobelegung";
+export type { Anspruch, Anspruchsart, Belegungsposten, Kontobelegung } from "../core";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
 // Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen
 // Vorfall überhaupt darf, sind Entscheidungen mit genau einer richtigen Antwort.

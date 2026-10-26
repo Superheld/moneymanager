@@ -148,11 +148,16 @@ export async function uebersichtLaden(
    * Verkauf. Das ist eine andere Frage: was dort liegt, ist zurückgelegt und steht für
    * den Monat nicht zur Verfügung.
    *
-   * Gefiltert wird auf ALLEN Seiten mit derselben Liste: Buchungen, Zahlungsregeln,
-   * Budgets — und dieselbe gefilterte Sicht trägt auch die Budgetliste darunter. Nur
-   * eine Seite zu filtern war genau der Fehler, gegen den diese Datei überhaupt
-   * angelegt wurde (siehe Kopf): dasselbe Budget stand dann im selben Bild einmal ohne
-   * Verbrauch und einmal weit über seinem Rahmen.
+   * Gefiltert werden Buchungen und Zahlungsregeln — und dieselbe gefilterte Sicht trägt
+   * auch die Budgetliste darunter, damit Karten und Liste für dasselbe Budget denselben
+   * Verbrauch zeigen.
+   *
+   * **Budgets werden seit 2026-10-26 NICHT mehr nach ihrem Konto gefiltert.** Vorher
+   * verschwand ein aufbauendes Budget auf dem Rücklagenkonto ganz aus der Übersicht, und
+   * seine Ausgaben vom Girokonto standen als unerklärte Posten unter „Sonstiges". Jetzt
+   * führt es seine Zeile und trägt, was aus den liquiden Konten dafür abging. Seine RATE
+   * plant es hier aber nicht (`budgetsOhnePlan`): die fließt über eine Umbuchung, und die
+   * steht schon in „Sparen & Vorsorge".
    *
    * Der Preis ist eine Aussage, die man kennen muss: **dasselbe Budget kann hier einen
    * kleineren Verbrauch zeigen als im Bereich Budgets.** Dort steht der ganze Rahmen,
@@ -167,12 +172,12 @@ export async function uebersichtLaden(
   const liquideIds = new Set(konten.filter(istLiquide).map((k) => k.id));
   const nichtLiquide = new Set(konten.filter((k) => !istLiquide(k)).map((k) => k.id));
   const liquideBuchungen = buchungen.filter((b) => liquideIds.has(b.kontoId));
-  const liquideBudgets = budgets.filter((b) => liquideIds.has(b.kontoId));
+  const budgetsOhnePlan = new Set(budgets.filter((b) => !liquideIds.has(b.kontoId)).map((b) => b.id));
 
   const sicht: BudgetSicht = {
     buchungen: liquideBuchungen,
     kategorien,
-    budgets: liquideBudgets,
+    budgets,
     vertragsBuchungen,
   };
   const dieserMonat = heute.slice(0, 7);
@@ -180,7 +185,8 @@ export async function uebersichtLaden(
   return {
     ausblicke: monatsAusblicke({
       regeln: regeln.filter((r) => !r.kontoId || !nichtLiquide.has(r.kontoId)),
-      budgets: liquideBudgets,
+      budgets,
+      budgetsOhnePlan,
       ist: liquideBuchungen,
       kategorien,
       vertragsBuchungen,
