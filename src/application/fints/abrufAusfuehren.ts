@@ -455,7 +455,7 @@ export async function abrufAusfuehren(
         });
         // Ein Abruf gilt EINEM Konto: das Gegenbein einer Umbuchung liegt, wenn überhaupt,
         // schon gebucht auf dem anderen. Deshalb nach dem Verbuchen und über den Bestand.
-        await umbuchungenErkennen(frisch.map((u) => u.id), {
+        await umbuchungenErkennen({ umsatzIds: frisch.map((u) => u.id) }, {
           ledgerRepo: deps.ledgerRepo,
           umsatzRepo: deps.umsatzRepo,
           kontoRepo: deps.kontoRepo,

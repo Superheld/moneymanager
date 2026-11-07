@@ -46,7 +46,7 @@ describe("umbuchungenErkennen", () => {
       ],
     );
 
-    expect(await umbuchungenErkennen(["u-tg"], deps)).toBe(1);
+    expect(await umbuchungenErkennen({ umsatzIds: ["u-tg"] }, deps)).toBe(1);
 
     const [ab, zu] = ledger;
     expect(ab.transferId).toBeTruthy();
@@ -60,7 +60,7 @@ describe("umbuchungenErkennen", () => {
       [bein("b-giro", "giro", -20000, "2026-03-02"), bein("b-tg", "tagesgeld", 20000, "2026-03-04")],
       [{ id: "u-giro", istbuchungId: "b-giro", gegenparteiIban: IBAN_TAGESGELD }, { id: "u-tg", istbuchungId: "b-tg" }],
     );
-    await umbuchungenErkennen(["u-tg"], deps);
+    await umbuchungenErkennen({ umsatzIds: ["u-tg"] }, deps);
     expect(ledger.map((b) => b.zuPruefen)).toEqual([true, true]);
   });
 
@@ -69,14 +69,14 @@ describe("umbuchungenErkennen", () => {
       [bein("b-giro", "giro", -20000, "2026-03-02"), bein("b-tg", "tagesgeld", 20000, "2026-03-04")],
       [{ id: "u-giro", istbuchungId: "b-giro", gegenparteiIban: IBAN_TAGESGELD }, { id: "u-tg", istbuchungId: "b-tg" }],
     );
-    expect(await umbuchungenErkennen(["u-tg"], deps)).toBe(1);
+    expect(await umbuchungenErkennen({ umsatzIds: ["u-tg"] }, deps)).toBe(1);
     expect(ledger[0].transferId).toBeTruthy();
   });
 
   it("wartet, solange das zweite Bein fehlt: die Buchung bleibt, was sie ist", async () => {
     const einzeln = bein("b-giro", "giro", -20000, "2026-03-02");
     const { ledger, deps } = welt([einzeln], [{ id: "u-giro", istbuchungId: "b-giro", gegenparteiIban: IBAN_TAGESGELD }]);
-    expect(await umbuchungenErkennen(["u-giro"], deps)).toBe(0);
+    expect(await umbuchungenErkennen({ umsatzIds: ["u-giro"] }, deps)).toBe(0);
     expect(ledger).toEqual([einzeln]);
   });
 
@@ -88,17 +88,17 @@ describe("umbuchungenErkennen", () => {
         { id: "u-tg", istbuchungId: "b-tg", gegenparteiIban: IBAN_GIRO },
       ],
     );
-    await umbuchungenErkennen(["u-tg"], deps);
+    await umbuchungenErkennen({ umsatzIds: ["u-tg"] }, deps);
     await paarungLoesen(deps.ledgerRepo, ledger[0].transferId!);
 
     // Selbst wenn dieselben Zeilen noch einmal als „neu" hereinkämen.
-    expect(await umbuchungenErkennen(["u-giro", "u-tg"], deps)).toBe(0);
+    expect(await umbuchungenErkennen({ umsatzIds: ["u-giro", "u-tg"] }, deps)).toBe(0);
     expect(ledger.every((b) => b.transferId === undefined)).toBe(true);
   });
 
   it("tut ohne frische Umsätze nichts und fragt auch nichts ab", async () => {
     const { deps } = welt([], []);
     const nichtFragen = { ...deps, ledgerRepo: { ...deps.ledgerRepo, alle: async () => { throw new Error("gefragt"); } } };
-    expect(await umbuchungenErkennen([], nichtFragen)).toBe(0);
+    expect(await umbuchungenErkennen({}, nichtFragen)).toBe(0);
   });
 });

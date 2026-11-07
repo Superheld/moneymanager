@@ -9,7 +9,7 @@
 //
 // Es läuft bewusst nicht in `umsaetzeVerbuchen`: der Use-Case schreibt Fakten ins Ledger,
 // die Verbindung ist eine Interpretation darüber. Und nicht dort, wo jemand gerade eine
-// einzelne Zeile entscheidet (`BuchungDetail`): die Automatik käme ihm zuvor.
+// einzelne Bankzeile entscheidet (`BuchungDetail`): die Automatik käme ihm zuvor.
 
 import { exakteUmbuchungen, kontenNachIban } from "../../core";
 import type { LedgerPort, UmsatzRepository, ZahlungskontoRepository } from "../ports";
@@ -21,22 +21,29 @@ export interface UmbuchungenErkennenDeps {
   readonly kontoRepo: ZahlungskontoRepository;
 }
 
+/** Was gerade neu ist: Umsätze aus Import und Abruf, Buchungen von Hand. */
+export interface FrischeZeilen {
+  readonly umsatzIds?: readonly string[];
+  readonly buchungIds?: readonly string[];
+}
+
 /**
- * Sucht zu den frisch verbuchten Umsätzen ihre Gegenbeine und verbindet, was exakt passt.
- * Gibt die Zahl der entstandenen Umbuchungen zurück.
+ * Sucht zu frischen Zeilen ihre Gegenbeine und verbindet, was passt. Gibt die Zahl der
+ * entstandenen Umbuchungen zurück.
  *
- * Das Zeitfenster ist dasselbe wie bei den Vorschlägen im Dialog und nicht die drei Tage
- * der Stapelpaarung: dort entscheidet allein das Datum mit, hier stehen Absender und Ziel
- * fest, und eine Überweisung zwischen zwei Banken darf ihre Zeit brauchen.
+ * Das Zeitfenster ist dasselbe wie beim Paaren von Hand und nicht die drei Tage der
+ * Stapelpaarung: eine Überweisung zwischen zwei Banken darf ihre Zeit brauchen.
  *
  * Beide Beine werden als „noch anzusehen" markiert, auch das schon gesehene: an ihm hat
  * sich gerade etwas geändert, ohne dass jemand dabei war.
  */
 export async function umbuchungenErkennen(
-  umsatzIds: readonly string[],
+  zeilen: FrischeZeilen,
   deps: UmbuchungenErkennenDeps,
 ): Promise<number> {
-  if (umsatzIds.length === 0) return 0;
+  const umsatzIds = zeilen.umsatzIds ?? [];
+  const buchungIds = zeilen.buchungIds ?? [];
+  if (umsatzIds.length === 0 && buchungIds.length === 0) return 0;
 
   const [buchungen, umsaetze, konten] = await Promise.all([
     deps.ledgerRepo.alle(),
@@ -45,7 +52,7 @@ export async function umbuchungenErkennen(
   ]);
 
   const frisch = new Set(umsatzIds);
-  const neueIds = new Set<string>();
+  const neueIds = new Set<string>(buchungIds);
   const gegenIbanNachBuchung = new Map<string, string>();
   for (const u of umsaetze) {
     if (!u.istbuchungId) continue;

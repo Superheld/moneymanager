@@ -42,7 +42,7 @@ describe("exakteUmbuchungen", () => {
     expect(suche([ab, zu], { zu: IBAN_A })).toEqual([["ab", "zu"]]);
   });
 
-  it("gleicher Betrag allein reicht nie", () => {
+  it("bei zwei Bankzeilen reicht der gleiche Betrag nicht", () => {
     const ab = buchung("ab", "a", -5000, "2026-03-02");
     const zu = buchung("zu", "b", 5000, "2026-03-02");
     expect(suche([ab, zu], {})).toEqual([]);
@@ -116,6 +116,59 @@ describe("exakteUmbuchungen", () => {
     expect(suche([ab1, zu1, ab2, zu2], gegen).sort()).toEqual([["ab1", "zu1"], ["ab2", "zu2"]]);
   });
 
+  describe("Handbuchungen haben keinen Beleg", () => {
+    const hand = (id: string, kontoId: string, betrag: number, datum: string, over: Partial<IstBuchung> = {}) =>
+      buchung(id, kontoId, betrag, datum, { quelle: "manuell", ...over });
+
+    it("zwei Handbuchungen genügen Gegenbetrag, zwei Konten und Zeitfenster", () => {
+      const ab = hand("ab", "a", -5000, "2026-03-02");
+      const zu = hand("zu", "b", 5000, "2026-03-05");
+      expect(suche([ab, zu], {})).toEqual([["ab", "zu"]]);
+    });
+
+    it("auch ausserhalb der IBAN-Konten, etwa Bargeld", () => {
+      const ab = hand("ab", "bar", -5000, "2026-03-02");
+      const zu = hand("zu", "kasse", 5000, "2026-03-02");
+      expect(suche([ab, zu], {})).toEqual([["ab", "zu"]]);
+    });
+
+    it("eine Kategorie aus dem Erfassen steht nicht im Weg", () => {
+      const ab = hand("ab", "a", -5000, "2026-03-02", { kategorieId: "k", kategorieHerkunft: "manuell" });
+      const zu = hand("zu", "b", 5000, "2026-03-02", { kategorieId: "k", kategorieHerkunft: "manuell" });
+      expect(suche([ab, zu], {})).toEqual([["ab", "zu"]]);
+    });
+
+    it("eine Bankzeile mit fremder Gegenseite wird nicht zur Umbuchung", () => {
+      const bank = buchung("bank", "a", 5000, "2026-03-02");
+      const ab = hand("ab", "b", -5000, "2026-03-02");
+      expect(suche([bank, ab], { bank: IBAN_FREMD })).toEqual([]);
+    });
+
+    it("eine Bankzeile, die ein anderes eigenes Konto nennt, wird es auch nicht", () => {
+      const bank = buchung("bank", "a", -5000, "2026-03-02");
+      const zu = hand("zu", "c", 5000, "2026-03-02");
+      expect(suche([bank, zu], { bank: IBAN_B })).toEqual([]);
+    });
+
+    it("eine fremd wirkende IBAN widerspricht nicht, wenn das Konto selbst keine hinterlegt hat", () => {
+      const bank = buchung("bank", "a", -5000, "2026-03-02");
+      const zu = hand("zu", "c", 5000, "2026-03-02");
+      expect(suche([bank, zu], { bank: IBAN_FREMD })).toEqual([["bank", "zu"]]);
+    });
+
+    it("die Grenze des Zeitfensters gilt auch hier", () => {
+      const ab = hand("ab", "a", -5000, "2026-03-01");
+      const zu = hand("zu", "b", 5000, "2026-03-16");
+      expect(suche([ab, zu], {})).toEqual([]);
+    });
+
+    it("eine gelöste Paarung kommt auch unter Handbuchungen nicht zurück", () => {
+      const ab = hand("ab", "a", -5000, "2026-03-02", { charakter: "Umschichtung" });
+      const zu = hand("zu", "b", 5000, "2026-03-02", { charakter: "Umschichtung" });
+      expect(suche([ab, zu], {})).toEqual([]);
+    });
+  });
+
   describe("was jemand entschieden hat, bleibt", () => {
     const ab = buchung("ab", "a", -5000, "2026-03-02");
     const zu = (over: Partial<IstBuchung>) => buchung("zu", "b", 5000, "2026-03-02", over);
@@ -142,8 +195,9 @@ describe("exakteUmbuchungen", () => {
         .toEqual([]);
     });
 
-    it("eine von Hand erfasste Buchung bleibt draussen", () => {
-      expect(suche([ab, zu({ quelle: "manuell" })], { ab: IBAN_B })).toEqual([]);
+    it("eine von Hand erfasste Sparbuchung mit Kategorie wartet auf ihr Gegenstück", () => {
+      const sparen = zu({ quelle: "manuell", charakter: "Umschichtung", kategorieId: "k", kategorieHerkunft: "manuell" });
+      expect(suche([ab, sparen], {})).toEqual([["ab", "zu"]]);
     });
   });
 });

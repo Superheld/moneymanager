@@ -16,6 +16,7 @@ vi.mock("./db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, sqlLaden } from "../../testwerkzeug/harness";
 import { umbuchungenErkennen } from "../../application/buchung/umbuchungenErkennen";
+import { buchungErfassen } from "../dienste";
 import type { IstBuchung } from "../../core";
 import { sqliteImportLaufRepository as laufRepo, sqliteUmsatzRepository as umsatzRepo } from "./sqliteImportRepositories";
 import { sqliteLedgerRepository as ledgerRepo } from "./sqliteLedgerRepository";
@@ -60,7 +61,7 @@ describe("umbuchungenErkennen gegen echtes SQL", () => {
     await bein("ab", "k1", -7300, "2026-03-02", IBAN_ZWEITES);
     await bein("zu", "k2", 7300, "2026-03-04");
 
-    expect(await umbuchungenErkennen(["u-zu"], deps)).toBe(1);
+    expect(await umbuchungenErkennen({ umsatzIds: ["u-zu"] }, deps)).toBe(1);
 
     const [ab, zu] = (await ledgerRepo.alle()).sort((a, b) => a.betrag - b.betrag);
     expect(ab).toMatchObject({ charakter: "Umschichtung", gegenkontoId: "k2", zuPruefen: true });
@@ -69,12 +70,36 @@ describe("umbuchungenErkennen gegen echtes SQL", () => {
     expect((await journalRepo.zuBuchung("b-ab")).length).toBeGreaterThan(0);
   });
 
+  it("zwei Buchungen von Hand werden beim Anlegen der zweiten zur Umbuchung", async () => {
+    await buchungErfassen({ kontoId: "k1", datum: "2026-03-02", betrag: -7300, charakter: "Aufwand" });
+    await buchungErfassen({ kontoId: "k2", datum: "2026-03-03", betrag: 7300, charakter: "Ertrag" });
+
+    const [ab, zu] = (await ledgerRepo.alle()).sort((a, b) => a.betrag - b.betrag);
+    expect(ab).toMatchObject({ charakter: "Umschichtung", gegenkontoId: "k2", zuPruefen: true });
+    expect(zu).toMatchObject({ charakter: "Umschichtung", gegenkontoId: "k1", transferId: ab.transferId });
+    expect(ab.transferId).toBeTruthy();
+  });
+
+  it("zählt auch, wenn beim Erfassen eine Kategorie gewählt wurde", async () => {
+    await buchungErfassen({ kontoId: "k1", datum: "2026-03-02", betrag: -7300, charakter: "Aufwand", kategorieId: "kat-a" });
+    await buchungErfassen({ kontoId: "k2", datum: "2026-03-02", betrag: 7300, charakter: "Ertrag", kategorieId: "kat-b" });
+
+    const beine = await ledgerRepo.alle();
+    expect(beine.every((b) => b.transferId && b.charakter === "Umschichtung" && !b.kategorieId)).toBe(true);
+  });
+
+  it("eine einzelne Buchung von Hand bleibt, was sie ist", async () => {
+    await buchungErfassen({ kontoId: "k1", datum: "2026-03-02", betrag: -7300, charakter: "Aufwand" });
+    expect(await ledgerRepo.alle()).toMatchObject([{ charakter: "Aufwand" }]);
+    expect((await ledgerRepo.alle())[0].transferId).toBeUndefined();
+  });
+
   it("lässt die Beine stehen, wenn das Konto keine IBAN trägt", async () => {
     await kontoRepo.speichern({ id: "k3", bezeichnung: "Drittes", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 0 });
     await bein("ab", "k1", -7300, "2026-03-02", "DE04999999980000000003");
     await bein("zu", "k3", 7300, "2026-03-04");
 
-    expect(await umbuchungenErkennen(["u-zu"], deps)).toBe(0);
+    expect(await umbuchungenErkennen({ umsatzIds: ["u-zu"] }, deps)).toBe(0);
     expect((await ledgerRepo.alle()).every((b) => b.transferId === undefined)).toBe(true);
   });
 });

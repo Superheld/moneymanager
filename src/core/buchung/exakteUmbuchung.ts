@@ -1,22 +1,25 @@
-// Welche zwei Buchungen sind nachweislich dieselbe Umbuchung?
+// Welche zwei Buchungen sind dieselbe Umbuchung?
 //
-// Die Automatik macht dasselbe, was man von Hand mit „paaren" tut — und nur dann, wenn
-// nichts daran geraten ist. Ein gleicher Betrag genügt deshalb NIE: 50 raus auf dem einen
-// Konto und 50 rein auf dem anderen kann auch eine Ausgabe und eine fremde Erstattung
-// sein. Was ein Paar zum Paar macht, sind ABSENDER und ZIEL:
+// Die Automatik tut, was man von Hand mit „paaren" tut, und prüft dasselbe wie die Liste
+// dort (`paarungsKandidaten`): exakter Gegenbetrag, zwei verschiedene Konten, im
+// Zeitfenster, beide noch frei. Absender und Ziel sind damit die beiden eigenen Konten.
 //
-//   • Betrag exakt entgegengesetzt, zwei verschiedene Konten, im Zeitfenster.
-//   • Mindestens ein Bein NENNT das andere Konto (seine Gegen-IBAN gehört dorthin). Sein
-//     eigenes Konto ist der Absender bzw. das Ziel, die Gegen-IBAN die andere Seite — ein
-//     einziges Bein trägt also schon beide Enden.
-//   • Keines der beiden nennt ein ANDERES Konto. Fehlt die Angabe, widerspricht sie auch
-//     nicht: nicht jede Quelle liefert eine Gegen-IBAN.
+// Was sie zusätzlich verlangt, kommt aus den Belegen, denn anders als der Mensch vor der
+// Liste sieht sie nicht, worum es bei einer Zeile ging:
+//
+//   • **Nennt ein Beleg eine ANDERE Gegenseite, ist es kein Treffer.** Das ist der eine
+//     Satz, der die meisten Fehlgriffe ausschliesst: eine Erstattung vom Händler trägt
+//     dessen IBAN, nicht die des eigenen Kontos.
+//   • **Zwei Bankzeilen müssen sich ausweisen:** mindestens eine nennt per Gegen-IBAN das
+//     andere Konto. Sonst stünde eine Kartenzahlung ohne IBAN neben einer Gutschrift
+//     gleicher Höhe, und nichts außer dem Betrag spräche dafür.
+//   • **Eine Handbuchung kann das nicht** — sie hat keinen Beleg, und wer sie anlegt, hat
+//     nur Konto, Tag und Betrag angegeben. Ist eine dabei, genügt deshalb, was auch die
+//     Liste beim Paaren von Hand verlangt.
 //
 // Vorgemerkt wird nichts: **ein einzelnes Bein bleibt, was es ist**, bis das zweite da
-// ist. Ein Treffer braucht beide Seiten im Bestand.
-//
-// Ist die Wahl nicht eindeutig, passiert nichts. Eine fehlende Paarung lässt sich von Hand
-// nachholen und fällt in der Liste auf; eine falsche sieht richtig aus.
+// ist. Ist die Wahl nicht eindeutig, passiert nichts. Eine fehlende Paarung lässt sich von
+// Hand nachholen, eine falsche sieht richtig aus.
 
 import { tageBis } from "../basis/datum";
 import { normalisiereIban, type Zahlungskonto } from "../konten/konto";
@@ -25,23 +28,23 @@ import type { IstBuchung } from "./istbuchung";
 /**
  * Darf die Automatik diese Buchung überhaupt anfassen?
  *
- * Die Ausschlüsse sind alle dieselbe Regel: was jemand entschieden hat, bleibt.
+ * Alle Ausschlüsse sind dieselbe Regel: was jemand entschieden hat, bleibt.
  *
- *  • `quelle: "import"` — nur ein Bankbeleg sagt etwas über die Gegenseite.
  *  • Keine `transferId` — schon verbunden.
- *  • Nicht `Umschichtung` — ein Bein OHNE Partner mit diesem Charakter entsteht nur durch
- *    „Paarung lösen". Das ist ein Nein von Hand, und ohne diesen Ausschluss käme die
- *    gelöste Paarung beim nächsten Abruf zurück.
- *  • Keine Handkategorie — wer die Zeile selbst einsortiert hat, sah etwas anderes in ihr
- *    als eine Umbuchung. `alsBein` würde die Kategorie entfernen.
+ *  • Keine `Umschichtung` OHNE Kategorie — das entsteht nur durch „Paarung lösen"
+ *    (`alsBein` nimmt die Kategorie, `paarungLoesen` lässt den Charakter stehen). Es ist
+ *    ein Nein von Hand, und ohne diesen Ausschluss käme die gelöste Paarung zurück. MIT
+ *    Kategorie ist es dagegen eine eingetragene Sparbuchung, die auf ihr Gegenstück wartet.
+ *  • Keine Bankzeile, die jemand von Hand einsortiert hat — wer sie korrigiert, sah etwas
+ *    anderes in ihr als eine Umbuchung. Bei einer HANDBUCHUNG gilt das nicht: dort gehört
+ *    die Kategorie zum Erfassen und ist keine Antwort auf eine Frage.
  *  • Nicht aufgeteilt — die Teile tragen eigene Kategorien; eine Umschichtung hat keine.
  */
 function frei(b: IstBuchung): boolean {
   return (
-    b.quelle === "import" &&
     b.transferId == null &&
-    b.charakter !== "Umschichtung" &&
-    b.kategorieHerkunft !== "manuell" &&
+    !(b.charakter === "Umschichtung" && !b.kategorieId) &&
+    !(b.quelle === "import" && b.kategorieHerkunft === "manuell") &&
     !b.aufteilungen?.length
   );
 }
@@ -90,12 +93,20 @@ export interface Umbuchungssuche {
 export function exakteUmbuchungen(suche: Umbuchungssuche): [IstBuchung, IstBuchung][] {
   const { neueIds, buchungen, gegenIbanNachBuchung, kontoNachIban, maxTage } = suche;
   const kandidaten = buchungen.filter(frei);
+  const kontenMitIban = new Set(kontoNachIban.values());
 
-  /** Was sagt der Beleg von `von` über das Konto von `an`? */
+  /**
+   * Was sagt der Beleg von `von` über das Konto von `an`?
+   *
+   * Eine IBAN, die keines unserer Konten kennt, widerspricht nur, wenn `an` selbst eine
+   * trägt. Ohne hinterlegte IBAN lässt sich nicht sagen, dass sie nicht die seine ist.
+   */
   const aussage = (von: IstBuchung, an: IstBuchung): "keine" | "nennt" | "widerspricht" => {
     const iban = gegenIbanNachBuchung.get(von.id);
     if (!iban) return "keine";
-    return kontoNachIban.get(normalisiereIban(iban)) === an.kontoId ? "nennt" : "widerspricht";
+    const konto = kontoNachIban.get(normalisiereIban(iban));
+    if (konto) return konto === an.kontoId ? "nennt" : "widerspricht";
+    return kontenMitIban.has(an.kontoId) ? "widerspricht" : "keine";
   };
 
   const passt = (a: IstBuchung, b: IstBuchung): boolean => {
@@ -106,7 +117,7 @@ export function exakteUmbuchungen(suche: Umbuchungssuche): [IstBuchung, IstBuchu
     const hin = aussage(a, b);
     const zurueck = aussage(b, a);
     if (hin === "widerspricht" || zurueck === "widerspricht") return false;
-    return hin === "nennt" || zurueck === "nennt";
+    return hin === "nennt" || zurueck === "nennt" || a.quelle === "manuell" || b.quelle === "manuell";
   };
 
   /** Der eindeutig nächste Treffer; bei Gleichstand keiner. */

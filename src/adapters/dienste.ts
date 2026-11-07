@@ -703,7 +703,7 @@ export async function umsaetzeBuchen(
   // Ledger, die Zuordnung ist eine Interpretation darüber. Die Umbuchungen zuerst, damit
   // der Abgleich einen Umbuchungsvertrag an der fertigen Umschichtung erkennt.
   if (optionen.umbuchungenErkennen !== false) {
-    await umbuchungenErkennen(umsaetze.map((u) => u.id), {
+    await umbuchungenErkennen({ umsatzIds: umsaetze.map((u) => u.id) }, {
       ledgerRepo: sqliteLedgerRepository,
       umsatzRepo: sqliteUmsatzRepository,
       kontoRepo: sqliteZahlungskontoRepository,
@@ -985,8 +985,15 @@ export function buchungsdetail(): Promise<Buchungsdetaildaten> {
   });
 }
 
-export function buchungErfassen(eingabe: BuchungEingabe) {
-  return buchungErfassenUseCase(sqliteLedgerRepository, eingabe);
+/** Eine Buchung von Hand anlegen und nachsehen, ob sie das Gegenbein einer Umbuchung ist. */
+export async function buchungErfassen(eingabe: BuchungEingabe) {
+  const buchung = await buchungErfassenUseCase(sqliteLedgerRepository, eingabe);
+  await umbuchungenErkennen({ buchungIds: [buchung.id] }, {
+    ledgerRepo: sqliteLedgerRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+  });
+  return buchung;
 }
 
 export function buchungBearbeiten(buchung: IstBuchung, eingabe: Parameters<typeof buchungBearbeitenUseCase>[2]) {
