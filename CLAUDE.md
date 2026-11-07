@@ -746,6 +746,79 @@ Drei Entscheidungen darin, die man kennen muss:
 Die Vertragsart `umbuchung` hängt daran und trägt eine Folge: **keine
 Kündigungswarnung.** Eine Abmachung mit sich selbst kündigt man, indem man sie löscht.
 
+#### Was man von Hand paaren kann, erkennt die App selbst
+
+Seit 2026-11-07 verbindet die App zwei Buchungen von selbst zu einer Umbuchung — dasselbe
+wie „paaren" von Hand (`buchungenPaaren`). Die Regel steht in
+`core/buchung/exakteUmbuchung.ts`, der Ablauf in
+`application/buchung/umbuchungenErkennen.ts`.
+
+**Die Grundlage ist die Liste beim Paaren von Hand** (`paarungsKandidaten`): exakter
+Gegenbetrag, zwei verschiedene Konten, höchstens `MAX_VORSCHLAG_TAGE` auseinander, beide
+noch frei. Absender und Ziel sind die beiden eigenen Konten. Was die Automatik darüber
+hinaus prüft, ersetzt den Blick, den ein Mensch vor der Liste auf die Zeile wirft:
+
+| | genügt |
+|---|---|
+| **eine Handbuchung ist dabei** | die Grundlage — sie hat keinen Beleg, der mehr sagen könnte |
+| **zwei Bankzeilen** | die Grundlage UND mindestens eine nennt per Gegen-IBAN das andere Konto |
+| **ein Beleg nennt eine andere Gegenseite** | nie |
+
+Die letzte Zeile schliesst die meisten Fehlgriffe aus: eine Erstattung vom Händler trägt
+dessen IBAN. Die mittlere verhindert, dass eine Kartenzahlung ohne IBAN und eine Gutschrift
+gleicher Höhe nur am Betrag zusammenfinden. Eine fremd wirkende IBAN widerspricht einem
+Konto ohne hinterlegte IBAN nicht; ob sie seine ist, lässt sich dann nicht sagen.
+
+Fünf Entscheidungen darin:
+
+- **Ein Bein allein bleibt, was es ist.** Vorgemerkt wird nichts. Die erste Seite steht als
+  Ausgabe oder Einnahme im Bestand, bis die zweite da ist; das entspricht „eine Umbuchung
+  ohne Gegenbuchung gibt es nicht" (`umsatzVerbuchen`).
+- **Es läuft nach dem Verbuchen und über den Bestand**, nicht in `paareUmbuchungen`. Ein
+  Abruf gilt einem Konto, die Stapelpaarung sieht die beiden Beine also nie zusammen.
+  Dieselbe Prüfung läuft nach dem Erfassen von Hand (`dienste.buchungErfassen`).
+- **Das Zeitfenster ist weiter als die drei Tage der Stapelpaarung** und dasselbe wie beim
+  Paaren von Hand: eine Überweisung zwischen zwei Banken darf dauern.
+- **Die Suche geht nur von NEUEN Zeilen aus.** Der Bestand wird nicht bei jedem Abruf neu
+  aufgerollt. Das Nachholen für alte Zeilen wäre ein eigener Schritt mit Liste zum
+  Bestätigen; auch das Bearbeiten löst nichts aus.
+- **Unklar heisst: nichts tun.** Gepaart wird nur gegenseitig Nächstes; bei Gleichstand
+  bleibt die Buchung stehen. Eine fehlende Paarung lässt sich von Hand nachholen und fällt
+  auf, eine falsche sieht richtig aus.
+
+**Was jemand entschieden hat, bleibt** (`frei` in der Regel): keine von Hand einsortierte
+BANKZEILE, nichts Aufgeteiltes, und **keine Umschichtung ohne Kategorie**. So sieht ein
+Bein nach „Paarung lösen" aus, denn `alsBein` nimmt die Kategorie und `paarungLoesen` lässt
+den Charakter stehen. Das ist ein Nein von Hand; ohne den Ausschluss käme die gelöste
+Paarung zurück. Eine Handbuchung MIT Kategorie nimmt dagegen teil: die Kategorie gehört dort
+zum Erfassen und ist keine Antwort auf eine Frage. Sie geht beim Paaren weg wie von Hand
+auch und steht im Journal.
+
+**Die Gegen-IBAN hat bei jedem Protokoll dieselbe Form**, und dafür sorgt allein der
+FinTS-Adapter (`gegenparteiIbanAus` in `adapters/fints/uebersetzung.ts`). MT940 nennt die
+Gegenseite je nach Bank in `?38`, als IBAN in `?31` oder gar nicht als IBAN, sondern als
+Kontonummer in `?31` mit Bankleitzahl in `?30`; den letzten Fall rechnet der Adapter um
+(`deutscheIban`). Hinter ihm gibt es nur noch eine Form, und eine neue Spielart einer Bank
+bleibt in dieser Datei. Passt die Form nicht, etwa weil `?30` eine BIC trägt, bleibt das
+Feld leer: die Umbuchung wird dann nicht erkannt, und falsch verbunden wird nichts.
+
+Eine berechnete IBAN ist **keine Angabe der Bank**. Deshalb stehen `remoteBankId` und
+`remoteAccountNumber` dort im Original in `bankfelder` — aber NUR, wo die Bank keine IBAN
+genannt hat. Mitgeschrieben bei jeder Zeile bekäme über `traegtNeues` jede schon
+gespeicherte Zeile beim nächsten Abruf einen zweiten Beleg ohne neuen Inhalt. Bei Zeilen
+ohne IBAN ist genau das erwünscht: die Überlappung des Abrufs liefert die Angabe nach.
+Der `rohHash` hängt nicht daran, er nimmt die Gegen-IBAN nicht auf.
+
+**Beide Beine werden `zuPruefen` markiert**, auch das schon gesehene: an ihm hat sich
+etwas geändert, ohne dass jemand dabei war. „Paarung lösen" ist der Weg zurück.
+
+**Im Dialog einer einzelnen Bankzeile läuft sie nicht** (`BuchungDetail` →
+`umbuchungenErkennen: false`): dort wählt gerade jemand das Gegenbein, die Automatik käme
+ihm zuvor, und sein Paaren scheiterte an „schon gepaart".
+
+Noch nicht gebaut: eine Verwaltung der erkannten Automatismen, an der sich auch das
+Zeitfenster je Weg einstellen liesse, und das Nachholen im Altbestand.
+
 #### Eine Vormerkung ist eine Beobachtung, keine Buchung
 
 Seit 2026-09-05 liest der Abruf das ZWEITE Feld der Antwort mit: die Zahlungen, die die

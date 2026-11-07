@@ -466,7 +466,7 @@ function BuchungFormular({
         const auswahl = partnerEntwurf
           ? [entwurfMitEntscheidung(entwurf), { ...partnerEntwurf, vorschlag: { charakter: "Umschichtung" as const, quelle: "umbuchung" as const } }]
           : [entwurfMitEntscheidung(entwurf)];
-        await umsaetzeBuchen(auswahl);
+        await umsaetzeBuchen(auswahl, { umbuchungenErkennen: false });
 
         // Alles Weitere hängt an der Ist-Buchung, die es vorher nicht gab: Paarung mit
         // einer schon gebuchten Zeile, ein erzeugtes Gegenbein, die Vertragszuordnung.

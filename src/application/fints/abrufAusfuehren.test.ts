@@ -290,6 +290,26 @@ describe("abrufAusfuehren", () => {
     expect(f.umsaetze[0].istbuchungId).toBe(f.buchungen[0].id);
   });
 
+  it("verbindet die Zeile mit dem Gegenbein, das schon auf dem anderen Konto gebucht ist", async () => {
+    // Ein Abruf gilt einem Konto. Das andere Bein kam mit einem früheren Lauf herein, und
+    // nur sein Beleg nennt das Konto, das jetzt abgerufen wird.
+    const IBAN_K1 = "DE02999999010000001002";
+    const { adapter } = fakeAdapter({ konten: [bankkonto()] });
+    const f = fakes([zuordnung], { iban: IBAN_K1 });
+    const anderes = { ...konto, id: "k2", iban: "DE02999999120000000001" };
+    f.deps.kontoRepo.alle = async () => [{ ...konto, iban: IBAN_K1 }, anderes];
+    f.buchungen.push({ id: "b-alt", datum: "2026-08-15", betrag: 1234, kontoId: "k2", charakter: "Ertrag", quelle: "import" });
+    f.umsaetze.push({ id: "u-alt", status: "verbucht", istbuchungId: "b-alt", gegenparteiIban: IBAN_K1 });
+
+    await abrufAusfuehren(zugang, "1234", async () => undefined, { adapter, ...f.deps });
+
+    const neu = f.buchungen.find((b) => b.kontoId === "k1");
+    const alt = f.buchungen.find((b) => b.id === "b-alt");
+    expect(neu).toMatchObject({ charakter: "Umschichtung", gegenkontoId: "k2", zuPruefen: true });
+    expect(alt).toMatchObject({ charakter: "Umschichtung", gegenkontoId: "k1", transferId: neu.transferId });
+    expect(neu.transferId).toBeTruthy();
+  });
+
   it("legt dieselbe Zeile beim zweiten Abruf nicht noch einmal an", async () => {
     // Der Rückgriff (RUECKGRIFF_TAGE) holt jeden Abruf ein paar Tage doppelt. Der Finder
     // erkennt die Zeile als „identisch" und legt sie gar nicht erst an — das ist die

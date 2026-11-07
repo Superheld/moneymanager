@@ -166,12 +166,32 @@ export function ibanGueltig(iban: string): boolean {
   const s = normalisiereIban(iban);
   if (s.length < 15 || s.length > 34) return false;
   if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(s)) return false;
-  const umgestellt = s.slice(4) + s.slice(0, 4);
-  // Buchstaben → Zahlen (A=10 … Z=35), dann fortlaufend mod 97.
+  return rest97(s.slice(4) + s.slice(0, 4)) === 1;
+}
+
+/** Buchstaben → Zahlen (A=10 … Z=35), dann fortlaufend mod 97. */
+function rest97(umgestellt: string): number {
   let rest = 0;
   for (const ch of umgestellt) {
     const wert = ch >= "A" && ch <= "Z" ? ch.charCodeAt(0) - 55 : ch.charCodeAt(0) - 48;
     rest = wert > 9 ? (rest * 100 + wert) % 97 : (rest * 10 + wert) % 97;
   }
-  return rest === 1;
+  return rest;
+}
+
+/**
+ * Die deutsche IBAN zu Bankleitzahl und Kontonummer — oder `undefined`, wenn die Angaben
+ * nicht diese Form haben.
+ *
+ * Streng, und das ist Absicht: bleibt ein Wert hier hängen, fehlt eine Angabe; rutschte er
+ * durch, stünde eine erfundene IBAN im Bestand. Eine BIC an Stelle der Bankleitzahl ergibt
+ * deshalb nichts statt Unsinn.
+ */
+export function deutscheIban(bankleitzahl: string, kontonummer: string): string | undefined {
+  const blz = bankleitzahl.trim();
+  const konto = kontonummer.trim();
+  if (!/^\d{8}$/.test(blz) || !/^\d{1,10}$/.test(konto) || /^0+$/.test(konto)) return undefined;
+  const bban = blz + konto.padStart(10, "0");
+  const pruefziffer = String(98 - rest97(`${bban}DE00`)).padStart(2, "0");
+  return `DE${pruefziffer}${bban}`;
 }
