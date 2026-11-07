@@ -34,6 +34,23 @@ ignore = [
   # dann meldet cargo-deny die Freigabe als unnoetig, und sie kann hier raus.
   { id = "RUSTSEC-2026-0194", reason = "quick-xml via plist/Tauri; liest nur die eigene Info.plist" },
   { id = "RUSTSEC-2026-0195", reason = "quick-xml via plist/Tauri; liest nur die eigene Info.plist" },
+
+  # Alle vier betreffen `ZipArchive::extract` auf einem praeparierten Archiv (Symlinks,
+  # SUID-Bits, Rechte durch Symlinks hindurch). Bei uns kommt `zip` ueber
+  # `tauri-plugin-updater` und nur fuer Windows in den Baum. Der Pfad ist aus zwei
+  # Gruenden nicht erreichbar: `Update::download` prueft die minisign-Signatur, BEVOR
+  # `install` etwas auspackt — wer dort ein Archiv durchbekommt, hat unseren
+  # Signaturschluessel und braucht keine Zip-Luecke mehr. Und das Windows-Release liefert
+  # eine signierte `.exe`, kein Archiv; der Zip-Zweig laeuft also gar nicht erst.
+  #
+  # Die Behebung gibt es, aber sie ist kein Patch: erst `tauri-plugin-updater` 2.14.1
+  # bindet `zip` 9, und das zieht Tauri 2.12 samt `wry`, `tao` und `brotli` 9 mit und
+  # kostet den `alloc-stdlib`-Pin. Das gehoert in einen eigenen Branch. Danach meldet
+  # cargo-deny die Freigaben als unnoetig, und sie koennen hier raus.
+  { id = "RUSTSEC-2026-0367", reason = "zip via tauri-plugin-updater, nur Windows; entpackt wird erst nach der Signaturpruefung" },
+  { id = "RUSTSEC-2026-0368", reason = "zip via tauri-plugin-updater, nur Windows; entpackt wird erst nach der Signaturpruefung" },
+  { id = "RUSTSEC-2026-0369", reason = "zip via tauri-plugin-updater, nur Windows; entpackt wird erst nach der Signaturpruefung" },
+  { id = "RUSTSEC-2026-0429", reason = "zip via tauri-plugin-updater, nur Windows; entpackt wird erst nach der Signaturpruefung" },
 ]
 
 [bans]
