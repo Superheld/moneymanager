@@ -41,6 +41,7 @@ import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../applicati
 import type { Merkmalskonfiguration, Merkmalsherkunft } from "../core";
 import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnung";
 import { zahlungsspuren } from "../application/buchung/zahlungsspuren";
+import { umbuchungenErkennen } from "../application/buchung/umbuchungenErkennen";
 import { kategorisierungsquellen } from "../application/kategorien/kategorisierungsquellen";
 import { umsaetzeVerbuchen } from "../application/import";
 import type { Kategorie } from "../core";
@@ -681,15 +682,33 @@ export function importLaeufe() {
   return sqliteImportLaufRepository.alle();
 }
 
-/** Offene Umsätze ins Ledger buchen und die frischen Zahlungen ihren Verträgen zuordnen. */
-export async function umsaetzeBuchen(umsaetze: readonly Umsatz[]) {
+/**
+ * Offene Umsätze ins Ledger buchen, Umbuchungen verbinden und die frischen Zahlungen
+ * ihren Verträgen zuordnen.
+ *
+ * `umbuchungenErkennen: false` für den Dialog einer einzelnen Zeile: dort entscheidet
+ * gerade jemand selbst über das Gegenbein, und die Automatik käme ihm zuvor — sein
+ * Paaren scheiterte danach mit „schon gepaart".
+ */
+export async function umsaetzeBuchen(
+  umsaetze: readonly Umsatz[],
+  optionen: { readonly umbuchungenErkennen?: boolean } = {},
+) {
   const ergebnis = await umsaetzeVerbuchen(umsaetze, {
     ledgerRepo: sqliteLedgerRepository,
     umsatzRepo: sqliteUmsatzRepository,
     id: () => crypto.randomUUID(),
   });
   // Bewusst HIER und nicht in `umsaetzeVerbuchen`: der Use-Case schreibt Fakten ins
-  // Ledger, die Zuordnung ist eine Interpretation darüber.
+  // Ledger, die Zuordnung ist eine Interpretation darüber. Die Umbuchungen zuerst, damit
+  // der Abgleich einen Umbuchungsvertrag an der fertigen Umschichtung erkennt.
+  if (optionen.umbuchungenErkennen !== false) {
+    await umbuchungenErkennen(umsaetze.map((u) => u.id), {
+      ledgerRepo: sqliteLedgerRepository,
+      umsatzRepo: sqliteUmsatzRepository,
+      kontoRepo: sqliteZahlungskontoRepository,
+    });
+  }
   await zuordnungenAbgleichen(vertragsAbgleichDeps);
   return ergebnis;
 }

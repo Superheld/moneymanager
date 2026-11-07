@@ -716,6 +716,58 @@ Drei Entscheidungen darin, die man kennen muss:
 Die Vertragsart `umbuchung` hängt daran und trägt eine Folge: **keine
 Kündigungswarnung.** Eine Abmachung mit sich selbst kündigt man, indem man sie löscht.
 
+#### Eine Umbuchung wird nur erkannt, wenn sie nachweisbar ist
+
+Seit 2026-11-07 verbindet die App zwei Buchungen von selbst zu einer Umbuchung — dasselbe
+wie „paaren" von Hand (`buchungenPaaren`), aber nur, wenn nichts daran geraten ist. Die
+Regel steht in `core/buchung/exakteUmbuchung.ts`, der Ablauf in
+`application/buchung/umbuchungenErkennen.ts`.
+
+**Ein gleicher Betrag genügt nie.** Eine Ausgabe auf dem einen und eine fremde Erstattung
+auf dem anderen Konto sehen genauso aus. Gefordert ist exakter Gegenbetrag auf zwei
+Konten, im Fenster von `MAX_VORSCHLAG_TAGE`, und **mindestens ein Beleg muss das andere
+Konto nennen** (Gegen-IBAN gleich IBAN des Kontos). Ein Beleg trägt damit schon beide
+Enden: sein Konto ist die eine Seite, die Gegen-IBAN die andere. Nennt ein Beleg ein
+fremdes Konto, ist es kein Treffer. Fehlt die Angabe, widerspricht sie auch nicht, denn
+nicht jede Quelle liefert sie. Daraus folgt: **ein Konto ohne hinterlegte IBAN nimmt nicht
+teil.**
+
+Fünf Entscheidungen darin:
+
+- **Ein Bein allein bleibt, was es ist.** Vorgemerkt wird nichts. Die erste Seite steht als
+  Ausgabe oder Einnahme im Bestand, bis die zweite da ist; das entspricht „eine Umbuchung
+  ohne Gegenbuchung gibt es nicht" (`umsatzVerbuchen`).
+- **Es läuft nach dem Verbuchen und über den Bestand**, nicht in `paareUmbuchungen`. Ein
+  Abruf gilt einem Konto, die Stapelpaarung sieht die beiden Beine also nie zusammen. Dass
+  die Erkennung `paareUmbuchungen` nicht ersetzt, ist Absicht: dort entscheidet die
+  Markierung der Quelle, hier der Beleg.
+- **Das Zeitfenster ist weiter als die drei Tage der Stapelpaarung.** Dort ist das Datum
+  ein Teil des Beweises, hier stehen Absender und Ziel fest, und eine Überweisung zwischen
+  zwei Banken darf dauern.
+- **Die Suche geht nur von NEUEN Buchungen aus.** Damit wird der Bestand nicht bei jedem
+  Abruf neu aufgerollt. Das Nachholen für alte Zeilen wäre ein eigener Schritt mit Liste
+  zum Bestätigen.
+- **Unklar heisst: nichts tun.** Gepaart wird nur gegenseitig Nächstes; bei Gleichstand
+  bleibt die Buchung stehen. Eine fehlende Paarung lässt sich von Hand nachholen und fällt
+  auf, eine falsche sieht richtig aus.
+
+**Was jemand entschieden hat, bleibt** (`frei` in der Regel): keine von Hand erfasste,
+kategorisierte oder aufgeteilte Buchung, und **kein Bein mit Charakter `Umschichtung` ohne
+Partner**. Das entsteht nur durch „Paarung lösen" und ist ein Nein von Hand; ohne diesen
+Ausschluss käme die gelöste Paarung zurück. Die Herkunft der Kategorie reicht dafür nicht,
+denn `alsBein` nimmt sie beim Paaren weg.
+
+**Beide Beine werden `zuPruefen` markiert**, auch das schon gesehene: an ihm hat sich
+etwas geändert, ohne dass jemand dabei war.
+
+**Im Dialog einer einzelnen Zeile läuft sie nicht** (`BuchungDetail` →
+`umbuchungenErkennen: false`): dort wählt gerade jemand das Gegenbein, die Automatik käme
+ihm zuvor, und sein Paaren scheiterte an „schon gepaart".
+
+Noch nicht gebaut: eine Verwaltung der erkannten Automatismen, an der sich auch das
+Zeitfenster je Weg einstellen liesse, Regeln für Wege ohne IBAN (Kreditkartenabrechnung,
+Geldautomat) und der Altbestand.
+
 #### Eine Vormerkung ist eine Beobachtung, keine Buchung
 
 Seit 2026-09-05 liest der Abruf das ZWEITE Feld der Antwort mit: die Zahlungen, die die

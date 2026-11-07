@@ -44,6 +44,7 @@ import { zuordnungenAbgleichen } from "../vertraege/vertragszuordnung";
 import type { Vorschlagskontext } from "../import/vorschlag";
 import { quelleKeyFuer } from "../import/kontoMatch";
 import { umsaetzeUebernehmen, type UebernahmeErgebnis } from "../import/umsaetzeUebernehmen";
+import { umbuchungenErkennen } from "../buchung/umbuchungenErkennen";
 import { umsaetzeVerbuchen } from "../import/umsatzVerbuchen";
 import { bankAnker, istAktiv } from "../../core";
 import type { Abrufadapter, Auszugsstand, Bankprofil, Bankzugang, TanFrager, Vormerkungszeile,
@@ -451,6 +452,13 @@ export async function abrufAusfuehren(
           // Zeile zwischen Bank und Saldo in der Hand gehabt. Die Datei-Inbox setzt das
           // NICHT — dort übernimmt man jede Zeile einzeln und hat sie damit gesehen.
           zumPruefenVormerken: true,
+        });
+        // Ein Abruf gilt EINEM Konto: das Gegenbein einer Umbuchung liegt, wenn überhaupt,
+        // schon gebucht auf dem anderen. Deshalb nach dem Verbuchen und über den Bestand.
+        await umbuchungenErkennen(frisch.map((u) => u.id), {
+          ledgerRepo: deps.ledgerRepo,
+          umsatzRepo: deps.umsatzRepo,
+          kontoRepo: deps.kontoRepo,
         });
       }
 

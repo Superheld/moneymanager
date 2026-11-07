@@ -577,7 +577,8 @@ export interface KontoKontext {
  * nächsten Abruf eine andere Nummer. Die Dedup läuft damit allein über `rohHash`.
  *
  * `istUmbuchung` bleibt false: FinTS weiß nichts über die anderen Konten des Nutzers.
- * Die Umbuchungs-Paarung ist Sache der bestehenden Erkennung eine Schicht höher.
+ * Ob zwei Zeilen eine Umbuchung sind, entscheidet `application/buchung/umbuchungenErkennen`
+ * nach dem Verbuchen, anhand von `gegenparteiIban`.
  */
 /**
  * Eine gemeldete Vormerkung → die Form, in der die Anwendung sie annimmt.
