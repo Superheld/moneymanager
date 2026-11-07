@@ -336,3 +336,21 @@ describe("monatsAusblicke", () => {
     expect(drei.map((a) => a.label)).toEqual(["2026-01", "2026-02", "2026-03"]);
   });
 });
+
+/**
+ * Ein Budget, dessen Geld auf einem Konto liegt, das die Aufrechnung nicht rechnet — der
+ * Fall des aufbauenden Budgets auf dem Rücklagenkonto, von der Übersicht aus gesehen.
+ */
+describe("monatsAusblick — Budgets ohne Plan", () => {
+  it("trägt die Ausgabe, plant aber nichts — und nichts landet unter Sonstiges", () => {
+    const a = monatsAusblick({
+      ...basis,
+      budgets: [budget({ id: "werkstatt", kontoId: "ruecklagen", art: "aufbauend", betragProMonat: euroZuCent(50) })],
+      budgetsOhnePlan: new Set(["werkstatt"]),
+      ist: [ist({ id: "w", kategorieId: "lebenshaltung", betrag: euroZuCent(-80) })],
+      monatAb: "2026-08-01",
+    });
+    expect(zeile(a, "budgets")).toMatchObject({ plan: 0, ist: euroZuCent(-80) });
+    expect(zeile(a, "sonstiges")).toBeUndefined();
+  });
+});

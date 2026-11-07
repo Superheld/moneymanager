@@ -11,10 +11,17 @@
 //   SICHER    schon die datierten Verpflichtungen reissen das Konto ins Minus. Daran
 //             ändert Sparsamkeit nichts, hier hilft nur Geld.
 //   ERWARTET  erst mit dem üblichen Verbrauch. Wer weniger ausgibt, kommt hin.
+//
+// **Seit 2026-10-24 steht hier auch ein veralteter Abruf**, und zwar ÜBER den Konten im
+// Minus. Er ist kein dritter Schärfegrad, sondern stellt alles darunter unter Vorbehalt:
+// die Vorschau rechnet ab dem Kontostand, und der kennt die Zahlungen seit dem letzten
+// Abruf nicht. Ohne diese Zeile schwiege die Karte nach einer langen Pause genau dann,
+// wenn ihr Schweigen am wenigsten bedeutet. Und sie trägt den Knopf gleich mit — wer
+// liest, dass etwas zu tun ist, soll es an derselben Stelle tun können.
 
 import { useTranslation } from "react-i18next";
-import type { Kontovorschau } from "../../../application";
-import { Card, Pill } from "../bausteine";
+import type { Kontovorschau, Zugangsstand } from "../../../application";
+import { Button, Card, Pill } from "../bausteine";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { useSchmal } from "../bausteine/useSchmal";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -23,8 +30,14 @@ export function HandlungsbedarfKarte({
   bedarf,
   kontoNamen,
   bisTag,
+  veraltet = [],
+  onAbrufen,
 }: {
   bedarf: readonly Kontovorschau[];
+  /** Zugänge, deren letzter Abruf zu lange her ist — nur die veralteten. */
+  veraltet?: readonly Zugangsstand[];
+  /** Öffnet den Abruf für genau diesen Zugang. */
+  onAbrufen?: (zugangId: string) => void;
   kontoNamen: ReadonlyMap<string, string>;
   /** Ende des gerechneten Fensters — gehört in den Untertitel, sonst rät man daran. */
   bisTag: string;
@@ -36,14 +49,46 @@ export function HandlungsbedarfKarte({
   // Stand der Datenbank, nicht der einer Oberflaeche — und in einer englischen Fassung
   // haette auch eine deutsche Reihenfolge dort nichts zu suchen.
   const datum = useDatum();
-  if (bedarf.length === 0) return null;
+  if (bedarf.length === 0 && veraltet.length === 0) return null;
 
   return (
     <Card
       title={t("uebersicht.bedarfTitel")}
-      subtitle={t("uebersicht.bedarfUntertitel", { bis: datum.mitJahr(bisTag) })}
+      // Der Untertitel beschreibt das Fenster der Minus-Prüfung. Steht nur ein veralteter
+      // Abruf da, gibt es dieses Fenster in der Karte nicht — dann fehlt er lieber, als
+      // etwas anzukündigen, das nicht folgt.
+      subtitle={bedarf.length > 0 ? t("uebersicht.bedarfUntertitel", { bis: datum.mitJahr(bisTag) }) : undefined}
       style={{ borderColor: "var(--warn)" }}
     >
+      {veraltet.length > 0 && (
+        <div style={{ marginBottom: bedarf.length > 0 ? "var(--sp-4)" : 0 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+            {veraltet.map((z) => (
+              <div
+                key={z.zugangId}
+                style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}
+              >
+                <span>
+                  <b>{z.bezeichnung}</b>{" "}
+                  <span className="muted">
+                    {z.letzterAbrufBis
+                      ? t("uebersicht.abrufVeraltet", { datum: datum.mitJahr(z.letzterAbrufBis) })
+                      : t("uebersicht.abrufNie")}
+                  </span>
+                </span>
+                {onAbrufen && <Button onClick={() => onAbrufen(z.zugangId)}>{t("konten.abrufen")}</Button>}
+              </div>
+            ))}
+          </div>
+          {/* Eine EINSCHRÄNKUNG, kein Erklärtext: sie ändert, was alle Zahlen der
+              Übersicht bedeuten. Deshalb steht sie auf jeder Breite offen da. */}
+          <p className="muted" style={{ fontSize: "var(--fs-small)", marginBottom: 0 }}>
+            {t("uebersicht.abrufHinweis")}
+          </p>
+        </div>
+      )}
+      {bedarf.length > 0 && (
+      <>
       <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
         {bedarf.map((v) => {
           const sicher = v.fest.minusAb !== undefined;
@@ -97,6 +142,8 @@ export function HandlungsbedarfKarte({
       <p className="muted" style={{ fontSize: "var(--fs-small)", marginBottom: 0 }}>
         {t("uebersicht.bedarfHinweis")}
       </p>
+      </>
+      )}
     </Card>
   );
 }

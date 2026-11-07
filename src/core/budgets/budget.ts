@@ -40,6 +40,7 @@
 // automatisch und in BEIDE Richtungen (Betrag wie Verbrauch), damit die Zahlen zueinander
 // passen: `budgetKategorien` ist die eine Stelle, die entscheidet, was zu wem zählt.
 
+import type { Anspruch } from "../konten/kontobelegung";
 import type { Cent } from "../basis/geld";
 import { kategorieAnteile, type IstBuchung } from "../buchung/istbuchung";
 import { kategorieUnterbaum, type Kategorie } from "../kategorien/kategorie";
@@ -69,11 +70,17 @@ export interface Budget {
   readonly id: string;
   readonly kategorieId: string;
   /**
-   * Konto, auf dem das Geld dieses Budgets liegt und über das seine Buchungen laufen.
+   * Das Konto, auf dem das Geld dieses Budgets liegt, bis es ausgegeben ist — EINE
+   * Bedeutung, seit 2026-10-26 (vorher trug das Feld drei, und die versprochene vierte
+   * wurde nirgends gerechnet).
    *
-   * Pflicht: ein aufbauendes Budget ohne Konto ist eine Zahl ohne Deckung — man will
-   * sehen können, ob die 3.400 € „angespart" auch wirklich irgendwo liegen. Der
-   * VERBRAUCH wird bewusst NICHT auf dieses Konto eingeschränkt: dieselbe Kategorie
+   * Daraus folgt alles Weitere: beim aufbauenden Budget beansprucht sein Rest Geld auf
+   * diesem Konto (`aufbauendeAnsprueche` → `core/konten/kontobelegung`), die
+   * Liquiditätsvorschau lässt den Monatsrest eines monatlichen von hier abfliessen, und
+   * die Übersicht plant die Rate eines Budgets auf einem nicht liquiden Konto nicht —
+   * sie kommt dort über eine Umbuchung an.
+   *
+   * Der VERBRAUCH wird bewusst NICHT auf dieses Konto eingeschränkt: dieselbe Kategorie
    * wird auch mal bar oder über die Kreditkarte bezahlt, und ein Budget, das solche
    * Buchungen still übersieht, zeigt zu viel Rest an.
    */
@@ -399,4 +406,22 @@ export function budgetStand(
   const rahmen = budgetRahmen(budget, sicht.budgets, sicht.kategorien, am);
   const verbraucht = budgetVerbrauch(sicht, budget, von, bis);
   return { rahmen, verbraucht, rest: rahmen - verbraucht };
+}
+
+/**
+ * Was die AUFBAUENDEN Budgets auf ihren Konten beanspruchen: ihren Rest zum Monat von `am`.
+ *
+ * Nur die aufbauenden, und das ist die Entscheidung (siehe `core/konten/kontobelegung`):
+ * der Rest eines monatlichen Budgets verfällt zum Monatsende und bleibt einfach auf dem
+ * Konto, ein aufbauender gehört weiter dem Budget. Ein überzogenes Budget (Rest unter 0)
+ * beansprucht nichts — es hat mehr ausgegeben, als hineinging, und schuldet dem Konto
+ * nichts, was dort liegen müsste.
+ *
+ * Der Rest kommt aus der UNGEFILTERTEN Sicht: das Budget beansprucht, was ihm über alle
+ * Konten hinweg geblieben ist — derselbe Wert, den der Bereich Budgets zeigt.
+ */
+export function aufbauendeAnsprueche(sicht: BudgetSicht, am: string): Anspruch[] {
+  return sicht.budgets
+    .filter((b) => b.art === "aufbauend")
+    .map((b) => ({ art: "budget", id: b.id, kontoId: b.kontoId, betrag: budgetStand(sicht, b, am).rest }));
 }

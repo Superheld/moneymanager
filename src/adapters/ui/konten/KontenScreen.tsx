@@ -14,6 +14,7 @@ import {
   registerSicht,
   type Dublettenverdacht,
   type IstBuchung,
+  type Belegungssicht,
   type Kontensicht,
   type Registerzeile,
   type Vertrag,
@@ -21,6 +22,7 @@ import {
 } from "../../../application";
 import {
   buchungenSammelbearbeiten,
+  kontobelegung,
   konten as kontenLaden,
   letztesKonto,
   letztesKontoMerken,
@@ -34,8 +36,9 @@ import { VormerkungsBlock } from "./VormerkungsBlock";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVergleich";
 import { SammelDialog } from "../buchung/SammelDialog";
-import { AbrufDialog } from "./AbrufDialog";
+import { AbrufDialog } from "../bausteine/AbrufDialog";
 import { DepotAuszug } from "./DepotAuszug";
+import { BelegungKarte } from "./BelegungKarte";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
@@ -93,6 +96,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const [sammelOffen, setSammelOffen] = useState(false);
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [abruf, setAbruf] = useState(false);
+  /** Wem das Geld auf jedem Konto gehört — aus derselben Rechnung wie die Rücklagen-Deckung. */
+  const [belegung, setBelegung] = useState<Belegungssicht | null>(null);
   /** Der Abgleich des Anfangsbestands — ein Eingriff, deshalb mit Vorschau. */
   const [fehler, setFehler] = useState<string | null>(null);
 
@@ -115,8 +120,14 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   async function laden() {
     // Zusammen laden: die Vertragsliste steht in der Sammelbearbeitung neben den
     // Kategorien, und gestaffelt gesetzt waere ihr Auswahlfeld beim ersten Render leer.
-    const [s, v, gemerkt] = await Promise.all([kontenLaden(), vertragsliste(), letztesKonto()]);
+    const [s, v, gemerkt, bel] = await Promise.all([
+      kontenLaden(),
+      vertragsliste(),
+      letztesKonto(),
+      kontobelegung(heute).catch(() => null),
+    ]);
     setSicht(s);
+    setBelegung(bel);
     setVertraege([...v]);
     // Ein bereits gewaehltes Konto behaelt den Vorrang vor dem gemerkten: wer waehrend des
     // Ladens schon geklickt hat, soll nicht zurueckgesetzt werden. Und beide gelten nur,
@@ -142,6 +153,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   }, [aktivId]);
 
   const kontozeilen = sicht?.zeilen ?? [];
+  const hatBindung = [...(belegung?.jeKonto.values() ?? [])].some((b) => b.gebunden > 0);
   const kategorien = sicht?.kategorien ?? [];
   const ist = sicht?.buchungen ?? [];
   const kontoName = sicht?.kontoNamen ?? LEERE_NAMEN;
@@ -357,11 +369,40 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                     <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(z.realerStand)}</span>
                   ),
               },
+              // „frei" nur, wenn irgendein Konto überhaupt etwas gebunden hat — sonst stünde
+              // dieselbe Zahl zweimal nebeneinander.
+              ...(hatBindung
+                ? [
+                    {
+                      key: "frei",
+                      label: `${t("konten.spalteFrei")} ${geld.symbol}`,
+                      align: "right" as const,
+                      sortValue: (z: (typeof kontozeilen)[number]) => belegung?.jeKonto.get(z.konto.id)?.frei ?? z.realerStand,
+                      render: (z: (typeof kontozeilen)[number]) => {
+                        const b = belegung?.jeKonto.get(z.konto.id);
+                        if (!b || b.gebunden === 0) return <span className="muted">—</span>;
+                        return (
+                          <span style={{ color: geldFarbe(b.frei) }} title={t("konten.spalteFreiHinweis")}>
+                            {geld.format(b.frei)}
+                          </span>
+                        );
+                      },
+                    },
+                  ]
+                : []),
             ]}
             rows={[...kontozeilen]}
           />
         )}
       </Card>
+
+      {aktiv && belegung?.jeKonto.get(aktiv.id) && (
+        <BelegungKarte
+          belegung={belegung.jeKonto.get(aktiv.id)!}
+          namen={belegung.namen}
+          konto={aktiv.bezeichnung}
+        />
+      )}
 
 
       {abruf && (

@@ -88,6 +88,7 @@ import {
 import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
+import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
@@ -175,6 +176,7 @@ import { sqliteKontoentfernen } from "./persistence/sqliteKontoentfernen";
 import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/kategorien/standardkategorien";
 import type { Abrufadapter, Bankzugang, Zugangsart } from "../application/fints/abrufPort";
 import type { Kontozuordnung } from "../application/fints/bankzugangPort";
+import { abrufstandLaden, type Abrufstand } from "../application/fints/abrufstand";
 import {
   sqliteBankzugangRepository,
   sqliteKontozuordnungRepository,
@@ -405,6 +407,15 @@ export function bankzugangLoeschen(id: string): Promise<void> {
   return sqliteBankzugangRepository.loeschen(id);
 }
 
+/** Wie frisch der letzte Abruf je Zugang ist — für den Hinweis in der Übersicht. */
+export function abrufstand(heute: string): Promise<Abrufstand> {
+  return abrufstandLaden(heute, {
+    zugangRepo: sqliteBankzugangRepository,
+    zuordnungRepo: sqliteKontozuordnungRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+  });
+}
+
 export function kontozuordnungen(): Promise<Kontozuordnung[]> {
   return sqliteKontozuordnungRepository.alle();
 }
@@ -487,6 +498,7 @@ export function depots(): Promise<Depotdaten> {
 // --- Rücklagen -------------------------------------------------------------
 
 const RUECKLAGEN_DEPS = {
+  ...BUDGET_DEPS,
   ruecklagenRepo: sqliteRuecklagenRepository,
   ledger: sqliteLedgerRepository,
   kontoRepo: sqliteZahlungskontoRepository,
@@ -497,6 +509,11 @@ const RUECKLAGEN_DEPS = {
 
 export function ruecklagen(heute: string): Promise<Ruecklagensicht> {
   return ruecklagenLaden(RUECKLAGEN_DEPS, heute);
+}
+
+/** Wem das Geld auf jedem Konto gehört — Rücklagen und aufbauende Budgets, anteilig gedeckt. */
+export function kontobelegung(heute: string): Promise<Belegungssicht> {
+  return kontobelegungLaden(RUECKLAGEN_DEPS, heute);
 }
 
 export function ruecklageAnlegen(eingabe: RuecklagenEingabe) {
