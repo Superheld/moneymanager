@@ -97,3 +97,27 @@ describe("Schalter für die Aktualisierungsprüfung", () => {
     expect((await schalterHolen(nutzer)).checked).toBe(false);
   });
 });
+
+describe("der Schalter für Betaversionen", () => {
+  const betaName = () => i18n.t("einstellungen.aktualisierung.betaTitel");
+
+  async function betaHolen(nutzer: ReturnType<typeof userEvent.setup>) {
+    await registerWaehlen(nutzer, registerName());
+    return (await screen.findByLabelText(betaName())) as HTMLInputElement;
+  }
+
+  it("ist aus, solange niemand etwas entschieden hat", async () => {
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    expect((await betaHolen(nutzer)).checked).toBe(false);
+  });
+
+  it("schreibt beim Umlegen in die Einstellung", async () => {
+    const nutzer = userEvent.setup();
+    rendere(<EinstellungenScreen />);
+    await nutzer.click(await betaHolen(nutzer));
+    await waitFor(async () => {
+      expect((await sqliteEinstellungenRepository.lesen()).aktualisierungBeta).toBe("an");
+    });
+  });
+});

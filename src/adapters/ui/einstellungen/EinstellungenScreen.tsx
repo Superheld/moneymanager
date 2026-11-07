@@ -17,6 +17,8 @@ import {
   type Person,
 } from "../../../application";
 import {
+  aktualisierungBeta,
+  aktualisierungBetaSetzen,
   aktualisierungspruefung,
   aktualisierungspruefungSetzen,
   kategorieAnlegen,
@@ -251,9 +253,11 @@ function SchalterZeile({
 function AktualisierungCard() {
   const { t } = useTranslation();
   const [an, setAn] = useState<boolean | null>(null);
+  const [beta, setBeta] = useState<boolean | null>(null);
 
   useEffect(() => {
     void aktualisierungspruefung().then(setAn);
+    void aktualisierungBeta().then(setBeta);
   }, []);
 
   async function schalten(neu: boolean) {
@@ -261,6 +265,11 @@ function AktualisierungCard() {
     // stehen, zeigte es einen Zustand, den die Datenbank nicht hat.
     await aktualisierungspruefungSetzen(neu);
     setAn(neu);
+  }
+
+  async function betaWechseln(neu: boolean) {
+    await aktualisierungBetaSetzen(neu);
+    setBeta(neu);
   }
 
   return (
@@ -274,6 +283,14 @@ function AktualisierungCard() {
           text={t("einstellungen.aktualisierung.schalterText")}
           an={an}
           aufSchalten={(neu) => void schalten(neu)}
+        />
+      )}
+      {beta != null && (
+        <SchalterZeile
+          titel={t("einstellungen.aktualisierung.betaTitel")}
+          text={t("einstellungen.aktualisierung.betaText")}
+          an={beta}
+          aufSchalten={(neu) => void betaWechseln(neu)}
         />
       )}
     </Card>

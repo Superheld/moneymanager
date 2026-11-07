@@ -30,8 +30,11 @@ export interface Aktualisierung {
  * Tauri-Plugin nicht kennt — und damit sich der Ablauf ohne Shell prüfen lässt.
  */
 export interface AktualisierungPort {
-  /** `null`, wenn nichts bereitliegt. Wirft nur bei Programmierfehlern, nicht bei Netz. */
-  pruefen(): Promise<Aktualisierung | null>;
+  /**
+   * `null`, wenn nichts bereitliegt. Wirft nur bei Programmierfehlern, nicht bei Netz.
+   * Mit `beta` wird im Beta-Kanal nachgesehen statt am normalen Endpunkt.
+   */
+  pruefen(beta: boolean): Promise<Aktualisierung | null>;
   /** Lädt, installiert und startet neu. Kehrt im Erfolgsfall nicht zurück. */
   einspielen(): Promise<void>;
 }
@@ -48,6 +51,28 @@ export const SCHLUESSEL_AKTUALISIERUNG = "aktualisierungPruefen";
  */
 export function pruefungErlaubt(einstellungen: Record<string, string>): boolean {
   return einstellungen[SCHLUESSEL_AKTUALISIERUNG] !== "aus";
+}
+
+/** Einstellung: ob auch Betaversionen angeboten werden. */
+export const SCHLUESSEL_AKTUALISIERUNG_BETA = "aktualisierungBeta";
+
+/**
+ * Sollen Betaversionen angeboten werden?
+ *
+ * Standard ist NEIN, anders als bei der Prüfung selbst: eine Beta ist ungeprüft, und wer
+ * sie bekommt, hat das ausdrücklich gewollt. Ein fehlender Schlüssel heisst deshalb hier
+ * „aus", und nur `"an"` schaltet sie ein.
+ */
+export function betaErlaubt(einstellungen: Record<string, string>): boolean {
+  return einstellungen[SCHLUESSEL_AKTUALISIERUNG_BETA] === "an";
+}
+
+/** Schaltet die Betaversionen an oder aus. */
+export async function betaSchalten(
+  repo: EinstellungenRepository,
+  erlaubt: boolean,
+): Promise<void> {
+  await repo.schreiben(SCHLUESSEL_AKTUALISIERUNG_BETA, erlaubt ? "an" : "aus");
 }
 
 /** Schaltet die Prüfung beim Start an oder aus. */
@@ -71,8 +96,9 @@ export async function aktualisierungPruefen(
   repo: EinstellungenRepository,
 ): Promise<Aktualisierung | null> {
   try {
-    if (!pruefungErlaubt(await repo.lesen())) return null;
-    return await port.pruefen();
+    const einstellungen = await repo.lesen();
+    if (!pruefungErlaubt(einstellungen)) return null;
+    return await port.pruefen(betaErlaubt(einstellungen));
   } catch (fehler) {
     // Bewusst verschluckt — siehe Kopf. Sichtbar bleibt es trotzdem, sonst sucht man
     // später eine Prüfung, die nie stattgefunden hat.
