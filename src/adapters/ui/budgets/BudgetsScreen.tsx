@@ -24,6 +24,7 @@ import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
+  nachArtGetrennt,
   waehlbareKonten,
   minorZuMajor,
   type Budgetart,
@@ -137,6 +138,7 @@ export function BudgetsScreen() {
    * `budgetstaende` (Anwendungsschicht), nicht hier.
    */
   const zeilen: readonly Budgetstand[] = bereich?.staende ?? [];
+  const gruppen = useMemo(() => nachArtGetrennt(zeilen), [zeilen]);
   const kategorien = bereich?.kategorien ?? [];
   const konten = bereich?.konten ?? [];
   const vorschlaege = bereich?.vorschlaege ?? [];
@@ -279,156 +281,167 @@ export function BudgetsScreen() {
         </div>
       )}
 
-      <Card title={t("budgets.abschnittListe")} subtitle={t("budgets.abschnittListeHinweis")}>
-        {zeilen.length === 0 ? (
+      {/* Zwei Listen statt einer: monatlich und aufbauend beantworten verschiedene
+          Fragen, und in einer gemeinsamen Tabelle las man das eine mit dem Blick des
+          anderen. Getrennt nach dem DACH, nicht je Zeile (siehe `nachArtGetrennt`). */}
+      {zeilen.length === 0 ? (
+        <Card title={t("budgets.abschnittListe")}>
           <div className="muted">{t("budgets.leer")}</div>
-        ) : (
-          <>
-            <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
-              {t("budgets.verbrauchHinweis")}
-            </p>
-            <DataTable
-              pageSize={30}
-              columns={[
-                {
-                  key: "kategorie",
-                  label: t("budgets.spalteKategorie"),
-                  render: (z: Budgetstand) => (
-                    // Einrückung statt eigener Spalte: die Verschachtelung ist eine
-                    // Eigenschaft der Kategorie, keine zweite Information daneben.
-                    // Der Verlauf hängt am Bezeichner, nicht an der ganzen Zeile: eine
-                    // klickbare Zeile sieht man einer Tabelle nicht an (siehe
-                    // `bausteine/Zeilenlink`), und die Zeile trägt daneben schon zwei
-                    // Aktionen, die etwas anderes tun.
-                    // `stopPropagation` auf dem Block um den Link: sonst schaltet der
-                    // Klick zweimal um — einmal über den Link, einmal über die Zeile —
-                    // und das Aufklappen hebt sich selbst auf. Der Block ist so breit wie
-                    // sein Inhalt, der Rest der Zelle bleibt also Trefferfläche der Zeile.
-                    <span
-                      onClick={(e) => e.stopPropagation()}
-                      style={{ paddingLeft: z.tiefe * 18, display: "inline-flex", alignItems: "center", gap: 6 }}
-                    >
-                      {z.tiefe > 0 && <span style={{ color: "var(--ink-3)" }}>└</span>}
-                      <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)" }}>
-                        <Zeilenlink
-                          titel={t("budgets.verlaufOeffnen", { name: z.kategorieName })}
-                          onKlick={() => verlaufUmschalten(z.budget.id)}
+        </Card>
+      ) : (
+        ([["monatlich", gruppen.monatlich], ["aufbauend", gruppen.aufbauend]] as const)
+          .filter(([, rows]) => rows.length > 0)
+          .map(([art, rows], i) => (
+            <Card
+              key={art}
+              title={t(art === "monatlich" ? "budgets.abschnittMonatlich" : "budgets.abschnittAufbauend")}
+              subtitle={t(art === "monatlich" ? "budgets.abschnittMonatlichHinweis" : "budgets.abschnittAufbauendHinweis")}
+            >
+              {/* Die Erklärung der Zahlen gilt für beide Listen — einmal genügt. */}
+              {i === 0 && (
+                <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
+                  {t("budgets.verbrauchHinweis")}
+                </p>
+              )}
+                <DataTable
+                  pageSize={30}
+                  columns={[
+                    {
+                      key: "kategorie",
+                      label: t("budgets.spalteKategorie"),
+                      render: (z: Budgetstand) => (
+                        // Einrückung statt eigener Spalte: die Verschachtelung ist eine
+                        // Eigenschaft der Kategorie, keine zweite Information daneben.
+                        // Der Verlauf hängt am Bezeichner, nicht an der ganzen Zeile: eine
+                        // klickbare Zeile sieht man einer Tabelle nicht an (siehe
+                        // `bausteine/Zeilenlink`), und die Zeile trägt daneben schon zwei
+                        // Aktionen, die etwas anderes tun.
+                        // `stopPropagation` auf dem Block um den Link: sonst schaltet der
+                        // Klick zweimal um — einmal über den Link, einmal über die Zeile —
+                        // und das Aufklappen hebt sich selbst auf. Der Block ist so breit wie
+                        // sein Inhalt, der Rest der Zelle bleibt also Trefferfläche der Zeile.
+                        <span
+                          onClick={(e) => e.stopPropagation()}
+                          style={{ paddingLeft: z.tiefe * 18, display: "inline-flex", alignItems: "center", gap: 6 }}
                         >
-                          {z.kategorieName}
-                        </Zeilenlink>
-                      </span>
-                    </span>
-                  ),
-                },
-                {
-                  key: "art",
-                  label: t("budgets.spalteArt"),
-                  render: (z: Budgetstand) => (
-                    <Pill variant={z.budget.art === "aufbauend" ? "um" : "neutral"}>{t(`budgets.art.${z.budget.art}`)}</Pill>
-                  ),
-                },
-                {
-                  key: "konto",
-                  label: t("budgets.spalteKonto"),
-                  render: (z: Budgetstand) => kontoName.get(z.budget.kontoId) ?? <span className="muted">{t("budgets.kontoFehlt")}</span>,
-                },
-                {
-                  key: "proMonat",
-                  label: `${t("budgets.spalteProMonat")} ${geld.symbol}`,
-                  align: "right",
-                  render: (z: Budgetstand) => (
-                    <span title={z.proMonat !== z.vollerMonatsbetrag ? t("budgets.abzugHinweis", { voll: geld.format(z.vollerMonatsbetrag) }) : undefined}>
-                      {geld.format(z.proMonat)}
-                      {z.proMonat !== z.vollerMonatsbetrag && <span className="muted"> *</span>}
-                    </span>
-                  ),
-                },
-                {
-                  // Was in DIESEM Monat zur Verfügung steht: beim Monatlichen der
-                  // Monatsbetrag, beim Aufbauenden der Übertrag plus die Rate. Der Titel
-                  // legt die Aufrechnung offen, statt sie erraten zu lassen.
-                  key: "rahmen",
-                  label: `${t("budgets.spalteRahmen")} ${geld.symbol}`,
-                  align: "right",
-                  sortValue: (z: Budgetstand) => z.monat.verfuegbar,
-                  render: (z: Budgetstand) => (
-                    <span
-                      title={
-                        z.budget.art === "aufbauend"
-                          ? t("budgets.verfuegbarHinweis", {
-                              uebertrag: geld.formatMitSymbol(z.monat.uebertrag),
-                              zufuehrung: geld.formatMitSymbol(z.monat.zufuehrung),
-                              gesamt: geld.formatMitSymbol(z.rahmen),
-                            })
-                          : undefined
-                      }
-                    >
-                      {geld.format(z.monat.verfuegbar)}
-                    </span>
-                  ),
-                },
-                {
-                  key: "verbraucht",
-                  label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`,
-                  align: "right",
-                  sortValue: (z: Budgetstand) => z.monat.verbraucht,
-                  render: (z: Budgetstand) => geld.format(z.monat.verbraucht),
-                },
-                {
-                  key: "rest",
-                  label: `${t("budgets.spalteRest")} ${geld.symbol}`,
-                  align: "right",
-                  render: (z: Budgetstand) => (
-                    <span style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}>{geld.format(z.rest)}</span>
-                  ),
-                },
-                {
-                  key: "balken",
-                  label: "",
-                  sortable: false,
-                  render: (z: Budgetstand) => (
-                    <span style={{ display: "block", minWidth: 90 }}>
-                      <CoverageTrack value={Math.max(0, z.monat.verbraucht)} max={Math.max(1, z.monat.verfuegbar)} over={z.rest < 0} label="" right="" />
-                    </span>
-                  ),
-                },
-                {
-                  key: "_a",
-                  label: "",
-                  align: "right",
-                  sortable: false,
-                  render: (z: Budgetstand) => (
-                    // Der Klick auf ein Zeilen-Icon darf nicht zusätzlich den Verlauf
-                    // umschalten: er blubberte sonst zur Zeile hoch, und „löschen" öffnete
-                    // nebenbei ein Diagramm zu einem Budget, das es nicht mehr gibt.
-                    <span onClick={(e) => e.stopPropagation()}>
-                      <IconLeiste>
-                        <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z)} />
-                        <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => loeschfrage.stellen({
-                          name: z.kategorieName,
-                          folgen: t("budgets.loeschenFolgen"),
-                          ausfuehren: async () => { await budgetLoeschen(z.budget.id); await laden(); },
-                        })} />
-                      </IconLeiste>
-                    </span>
-                  ),
-                },
-              ]}
-              rows={[...zeilen]}
-              // Der Name TRÄGT die Möglichkeit sichtbar (siehe `bausteine/Zeilenlink`);
-              // die ganze Zeile als Ziel kommt dazu, weil man nach dem ersten Mal die
-              // Trefferfläche will und nicht die Zielübung.
-              onRowClick={(z: Budgetstand) => verlaufUmschalten(z.budget.id)}
-              istAktiv={(z: Budgetstand) => z.budget.id === offenesBudget}
-            />
-            {zeilen.some((z) => z.proMonat !== z.vollerMonatsbetrag) && (
-              <div className="muted" style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-2)" }}>
-                {t("budgets.abzugFussnote")}
-              </div>
-            )}
-          </>
-        )}
-      </Card>
+                          {z.tiefe > 0 && <span style={{ color: "var(--ink-3)" }}>└</span>}
+                          <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)" }}>
+                            <Zeilenlink
+                              titel={t("budgets.verlaufOeffnen", { name: z.kategorieName })}
+                              onKlick={() => verlaufUmschalten(z.budget.id)}
+                            >
+                              {z.kategorieName}
+                            </Zeilenlink>
+                          </span>
+                          {/* Ein Kind anderer Art steht unter seinem Dach, nicht in der
+                              anderen Liste — die Pille sagt, dass es trotzdem anders tickt. */}
+                          {z.budget.art !== art && <Pill variant={z.budget.art === "aufbauend" ? "um" : "neutral"}>{t(`budgets.art.${z.budget.art}`)}</Pill>}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "konto",
+                      label: t("budgets.spalteKonto"),
+                      render: (z: Budgetstand) => kontoName.get(z.budget.kontoId) ?? <span className="muted">{t("budgets.kontoFehlt")}</span>,
+                    },
+                    {
+                      key: "proMonat",
+                      label: `${t("budgets.spalteProMonat")} ${geld.symbol}`,
+                      align: "right",
+                      render: (z: Budgetstand) => (
+                        <span title={z.proMonat !== z.vollerMonatsbetrag ? t("budgets.abzugHinweis", { voll: geld.format(z.vollerMonatsbetrag) }) : undefined}>
+                          {geld.format(z.proMonat)}
+                          {z.proMonat !== z.vollerMonatsbetrag && <span className="muted"> *</span>}
+                        </span>
+                      ),
+                    },
+                    {
+                      // Was in DIESEM Monat zur Verfügung steht: beim Monatlichen der
+                      // Monatsbetrag, beim Aufbauenden der Übertrag plus die Rate. Der Titel
+                      // legt die Aufrechnung offen, statt sie erraten zu lassen.
+                      key: "rahmen",
+                      label: `${t("budgets.spalteRahmen")} ${geld.symbol}`,
+                      align: "right",
+                      sortValue: (z: Budgetstand) => z.monat.verfuegbar,
+                      render: (z: Budgetstand) => (
+                        <span
+                          title={
+                            z.budget.art === "aufbauend"
+                              ? t("budgets.verfuegbarHinweis", {
+                                  uebertrag: geld.formatMitSymbol(z.monat.uebertrag),
+                                  zufuehrung: geld.formatMitSymbol(z.monat.zufuehrung),
+                                  gesamt: geld.formatMitSymbol(z.rahmen),
+                                })
+                              : undefined
+                          }
+                        >
+                          {geld.format(z.monat.verfuegbar)}
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "verbraucht",
+                      label: `${t("budgets.spalteVerbraucht")} ${geld.symbol}`,
+                      align: "right",
+                      sortValue: (z: Budgetstand) => z.monat.verbraucht,
+                      render: (z: Budgetstand) => geld.format(z.monat.verbraucht),
+                    },
+                    {
+                      key: "rest",
+                      label: `${t("budgets.spalteRest")} ${geld.symbol}`,
+                      align: "right",
+                      render: (z: Budgetstand) => (
+                        <span style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}>{geld.format(z.rest)}</span>
+                      ),
+                    },
+                    {
+                      key: "balken",
+                      label: "",
+                      sortable: false,
+                      render: (z: Budgetstand) => (
+                        <span style={{ display: "block", minWidth: 90 }}>
+                          <CoverageTrack value={Math.max(0, z.monat.verbraucht)} max={Math.max(1, z.monat.verfuegbar)} over={z.rest < 0} label="" right="" />
+                        </span>
+                      ),
+                    },
+                    {
+                      key: "_a",
+                      label: "",
+                      align: "right",
+                      sortable: false,
+                      render: (z: Budgetstand) => (
+                        // Der Klick auf ein Zeilen-Icon darf nicht zusätzlich den Verlauf
+                        // umschalten: er blubberte sonst zur Zeile hoch, und „löschen" öffnete
+                        // nebenbei ein Diagramm zu einem Budget, das es nicht mehr gibt.
+                        <span onClick={(e) => e.stopPropagation()}>
+                          <IconLeiste>
+                            <IconButton icon="bearbeiten" label={t("budgets.bearbeiten")} onClick={() => bearbeiten(z)} />
+                            <IconButton icon="loeschen" ton="gefahr" label={t("budgets.loeschen")} onClick={() => loeschfrage.stellen({
+                              name: z.kategorieName,
+                              folgen: t("budgets.loeschenFolgen"),
+                              ausfuehren: async () => { await budgetLoeschen(z.budget.id); await laden(); },
+                            })} />
+                          </IconLeiste>
+                        </span>
+                      ),
+                    },
+                  ]}
+                  rows={[...rows]}
+                  // Der Name TRÄGT die Möglichkeit sichtbar (siehe `bausteine/Zeilenlink`);
+                  // die ganze Zeile als Ziel kommt dazu, weil man nach dem ersten Mal die
+                  // Trefferfläche will und nicht die Zielübung.
+                  onRowClick={(z: Budgetstand) => verlaufUmschalten(z.budget.id)}
+                  istAktiv={(z: Budgetstand) => z.budget.id === offenesBudget}
+                />
+              {(rows.some((z) => z.tiefe > 0) || rows.some((z) => z.proMonat !== z.vollerMonatsbetrag)) && (
+                <div className="muted" style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-2)" }}>
+                  {rows.some((z) => z.tiefe > 0) && <div>{t("budgets.abschnittListeHinweis")}</div>}
+                  {rows.some((z) => z.proMonat !== z.vollerMonatsbetrag) && <div>{t("budgets.abzugFussnote")}</div>}
+                </div>
+              )}
+            </Card>
+          ))
+      )}
 
       {/* Der Verlauf NEBEN der Liste, nicht darin: die Liste steckt schon in einer Karte,
           und eine zweite darin wären zwei Rahmen um dieselbe Sache. Der `key` sorgt dafür,

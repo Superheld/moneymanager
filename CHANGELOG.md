@@ -3,6 +3,41 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.30.0-beta.1] — 2026-11-07
+
+Die erste Vorabversion. Drei Dinge, die am echten Bestand noch nie gelaufen sind.
+
+### Neu
+
+**Umbuchungen werden erkannt.** Was man bisher von Hand paaren musste, verbindet die App
+selbst: zwei Buchungen mit exaktem Gegenbetrag auf zwei eigenen Konten, höchstens 14 Tage
+auseinander. Zwei Bankzeilen müssen sich dabei ausweisen, mindestens eine nennt per IBAN
+das andere Konto; bei einer Buchung von Hand gibt es diesen Beleg nicht, da genügt das
+Übrige. Nennt ein Beleg eine fremde Gegenseite, ist es nie eine Umbuchung. Beide Zeilen
+werden als noch anzusehen markiert, und „Paarung lösen" ist der Weg zurück: eine gelöste
+Paarung kommt nicht wieder. Gesucht wird nur von neuen Buchungen aus, der Altbestand
+bleibt, wie er ist.
+
+**Die Gegenseite hat bei jedem Abruf dieselbe Form.** Nennt die Bank keine IBAN, sondern
+Bankleitzahl und Kontonummer, rechnet die App sie um. Die Rohwerte bleiben am Beleg. Zeilen
+ohne IBAN bekommen dafür beim nächsten Abruf einmalig einen zweiten Beleg, soweit die
+Bank sie noch liefert.
+
+**Kontobelegung: wem das Geld auf einem Konto gehört.** Eine zentrale Rechnung verteilt den
+Kontostand auf Rücklagen und aufbauende Budgets, bei Unterdeckung anteilig. Im Kontoauszug
+steht das als Spalte „frei" und als Karte „Gebunden auf …". Die Rücklagen-Deckung rechnet
+damit nicht mehr denselben Euro doppelt.
+
+**Abrufen direkt aus der Übersicht.** Der Knopf steht im Kopf des Bereichs, sobald es einen
+Bankzugang gibt, und „Da ist etwas zu tun" meldet jeden Zugang, dessen letzter Abruf eine
+Woche oder länger her ist.
+
+### Geändert
+
+Budgets stehen in der Übersicht und im Bereich Budgets getrennt nach Art. Ein Budget auf dem
+Rücklagenkonto führt in der Übersicht seine Zeile und trägt seine Ausgaben, statt sie unter
+„Sonstiges" zu lassen.
+
 ## [0.29.3] — 2026-11-07
 
 Der Weg, eine neue Fassung am echten Bestand zu prüfen, bevor sie alle bekommen. Für alle,

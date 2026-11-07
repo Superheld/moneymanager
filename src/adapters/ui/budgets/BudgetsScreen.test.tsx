@@ -10,7 +10,7 @@
 // Budget, das in einem anderen liegt, wird aus dessen Betrag herausgerechnet.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -309,7 +309,8 @@ describe("BudgetsScreen — Vorschläge", () => {
     await screen.findByText("Lebenshaltung");
 
     const text = document.body.textContent ?? "";
-    const liste = text.indexOf("Deine Budgets");
+    // Die Liste heisst seit der Trennung nach Art nach ihrer Art — hier die monatliche.
+    const liste = text.indexOf("Monatlich");
     const vorschlaege = text.indexOf("Aus deinen Ausgaben abgeleitet");
     expect(liste, "Überschrift der Budgetliste steht im Text").toBeGreaterThanOrEqual(0);
     expect(vorschlaege, "Überschrift der Vorschläge steht im Text").toBeGreaterThanOrEqual(0);
@@ -505,8 +506,9 @@ describe("BudgetsScreen · Verlauf", () => {
     rendere(<BudgetsScreen />);
     await screen.findByText(/Urlaubskasse/);
 
-    // Irgendwo in der Zeile, aber nicht auf dem Namen: die Art-Pille.
-    await nutzer.click(screen.getByText("aufbauend"));
+    // Irgendwo in der Zeile, aber nicht auf dem Namen: die Konto-Zelle daneben.
+    const zeile = screen.getByRole("button", { name: /Urlaubskasse — Verlauf/ }).closest("tr") as HTMLElement;
+    await nutzer.click(within(zeile).getAllByRole("cell")[1]);
     await screen.findByText(/Verlauf · Urlaubskasse/);
 
     // Und der Name schaltet weiterhin genau einmal um — nicht hin und gleich zurück.

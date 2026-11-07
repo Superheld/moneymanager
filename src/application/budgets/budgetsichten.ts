@@ -11,11 +11,10 @@
 // hier an und bekommt sie fertig. Das ist der Grund, warum diese Datei existiert — nicht
 // Bequemlichkeit, sondern die Unmöglichkeit, die Regel zu umgehen.
 //
-// Welche Buchungen zu einem Vertrag gehören, sagt die Tabelle `vertrag_zuordnung`
-// (`VertragszuordnungRepository`) — eine erfasste Verknüpfung, keine Schätzung. Auf dem
-// echten Bestand liefert sie für den August exakt dieselben Zahlen wie die
-// Betragsheuristik des Monatsausblicks (0,00 / 131,00 / 45,87 / 289,51 / 26,50); wir
-// tauschen also kein Verhalten, sondern nur eine Vermutung gegen eine Tatsache.
+// Welche Buchungen zu einem Vertrag gehören, sagt die Spalte `vertrag_id` an der Buchung
+// (über `VertragszuordnungRepository`) — eine erfasste Verknüpfung, keine Schätzung. Sie
+// ersetzte eine Betragsheuristik, ohne deren Ergebnis zu ändern: getauscht wurde eine
+// Vermutung gegen eine Tatsache, nicht das Verhalten.
 
 import { empfaengerJeBuchung } from "../buchung/belegZuBuchung";
 import {
@@ -276,4 +275,34 @@ export async function budgetbereichLaden(
  */
 export async function budgetLoeschen(repo: BudgetRepository, id: string): Promise<void> {
   await repo.loeschen(id);
+}
+
+/** Die Budgetstände, getrennt danach, ob ihr Rest verfällt oder bleibt. */
+export interface Budgetgruppen {
+  readonly monatlich: readonly Budgetstand[];
+  readonly aufbauend: readonly Budgetstand[];
+}
+
+/**
+ * Trennt die Stände nach Art — und zwar nach der Art des OBERSTEN Budgets eines Baums.
+ *
+ * Monatlich und aufbauend beantworten verschiedene Fragen („was ist diesen Monat noch
+ * da" gegen „was hat sich angesammelt"), und in einer gemeinsamen Liste las man das eine
+ * mit dem Blick des anderen. Getrennt wird aber nach dem Dach und nicht je Zeile: ein
+ * aufbauendes „Urlaub" unter einem monatlichen „Freizeit" wird aus dem Dach
+ * herausgerechnet, und riss man es von dort weg, stünde der Abzug ohne seinen Grund da.
+ * Ein Kind anderer Art bleibt deshalb unter seinem Dach und trägt seine Art als Pille.
+ *
+ * Die Reihenfolge bleibt die des Baums: `budgetstaende` liefert ihn in Tiefensuche, ein
+ * Dach steht also immer vor seinen Kindern.
+ */
+export function nachArtGetrennt(staende: readonly Budgetstand[]): Budgetgruppen {
+  const monatlich: Budgetstand[] = [];
+  const aufbauend: Budgetstand[] = [];
+  let ziel = monatlich;
+  for (const z of staende) {
+    if (z.tiefe === 0) ziel = z.budget.art === "aufbauend" ? aufbauend : monatlich;
+    ziel.push(z);
+  }
+  return { monatlich, aufbauend };
 }

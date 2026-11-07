@@ -35,6 +35,12 @@
 // Rate dieses Monats, Verbrauch dieses Monats. Der grosse Betrag daneben bleibt derselbe;
 // die Fortschreibung ist die Zerlegung von `budgetStand`, keine zweite Rechnung
 // (Herleitung in `core/budgets/budgetverlauf`).
+//
+// **Der Abruf hat hier seit 2026-10-24 einen eigenen Knopf**, oben rechts im Kopf. Die
+// Übersicht ist der Bereich, in dem man landet, und das Erste, was man nach dem Öffnen
+// will, ist meist: holen, was seit dem letzten Mal passiert ist. Vorher lag der Knopf
+// einen Bereich weiter, im Kontoauszug. Der Dialog ist derselbe; nach dem Abruf wird
+// die ganze Übersicht neu gerechnet, weil jede Karte aus denselben Buchungen rechnet.
 
 import { Auswahl } from "../bausteine/Auswahl";
 import { useEffect, useMemo, useState } from "react";
@@ -43,14 +49,17 @@ import {
   budgetPostenZu,
   budgetstaende,
   fensterEnde,
+  nachArtGetrennt,
   toIso,
   VORSCHAU_TAGE,
+  type Abrufstand,
   type Depotdaten,
   type IstBuchung,
   type Uebersichtsdaten,
 } from "../../../application";
-import { depots, uebersicht } from "../../dienste";
-import { Card, CoverageTrack, Pill } from "../bausteine";
+import { abrufstand, depots, uebersicht } from "../../dienste";
+import { Button, Card, CoverageTrack, Pill } from "../bausteine";
+import { AbrufDialog } from "../bausteine/AbrufDialog";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
@@ -98,6 +107,13 @@ export function UebersichtScreen() {
    * Kontoauszug wiederfinden.
    */
   const [detail, setDetail] = useState<IstBuchung | null>(null);
+  /**
+   * Wie frisch die Bankdaten sind. Getrennt von `daten` geladen, aus demselben Grund wie
+   * die Depots: ein Fehler hier nimmt der Übersicht nicht ihren Inhalt.
+   */
+  const [abruf, setAbruf] = useState<Abrufstand | null>(null);
+  /** Offener Abruf-Dialog: `null` zu, sonst der vorgewählte Zugang ("" = der erste). */
+  const [abrufOffen, setAbrufOffen] = useState<string | null>(null);
 
   async function laden() {
     try {
@@ -107,6 +123,9 @@ export function UebersichtScreen() {
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
     }
+    abrufstand(heute)
+      .then(setAbruf)
+      .catch(() => setAbruf(null));
   }
 
   useEffect(() => {
@@ -129,9 +148,25 @@ export function UebersichtScreen() {
     return monat === dieserMonat ? daten.staende : budgetstaende(daten.sicht, `${monat}-28`);
   }, [daten, monat, dieserMonat]);
 
+  /** Die Stände nach Art getrennt, leere Gruppen weggelassen. */
+  const gruppen = useMemo(() => {
+    const g = nachArtGetrennt(staende);
+    return ([["monatlich", g.monatlich], ["aufbauend", g.aufbauend]] as const).filter(([, rows]) => rows.length > 0);
+  }, [staende]);
+
   return (
     <div className="screen">
-      <PageHead title={t("uebersicht.titel")} subtitle={t("uebersicht.untertitel")} />
+      <PageHead
+        title={t("uebersicht.titel")}
+        subtitle={t("uebersicht.untertitel")}
+        // Nur, wenn es einen Zugang gibt — ein Knopf, der nichts tun kann, ist eine Frage
+        // an den Nutzer statt einer Antwort (dieselbe Regel wie im Kontoauszug).
+        action={
+          abruf?.hatZugang ? (
+            <Button variant="primary" onClick={() => setAbrufOffen("")}>{t("konten.abrufen")}</Button>
+          ) : undefined
+        }
+      />
 
       {fehler && <Card style={{ borderColor: "var(--warn)" }}>{t("uebersicht.fehlerDb")} ({fehler})</Card>}
 
@@ -143,6 +178,8 @@ export function UebersichtScreen() {
           bedarf={daten.bedarf}
           kontoNamen={daten.kontoNamen}
           bisTag={fensterEnde(heute, VORSCHAU_TAGE)}
+          veraltet={abruf?.zugaenge.filter((z) => z.veraltet) ?? []}
+          onAbrufen={setAbrufOffen}
         />
       )}
 
@@ -197,88 +234,106 @@ export function UebersichtScreen() {
           {staende.length === 0 ? (
             <div className="muted">{t("uebersicht.budgetsLeer")}</div>
           ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
-              {staende.map((z) => {
-                const offen = offenesBudget === z.budget.id;
-                const name = z.kategorieName;
-                return (
-                  <div key={z.budget.id} style={{ paddingLeft: z.tiefe * 18 }}>
-                    {/* Die ganze Kopfzeile ist der Schalter: der Balken darunter gehört
-                        zur selben Aussage, und ein eigener Pfeil-Knopf daneben wäre ein
-                        zweites Ziel für dieselbe Geste. */}
-                    <div
-                      role="button"
-                      tabIndex={0}
-                      aria-expanded={offen}
-                      aria-label={t("uebersicht.budgetAufklappen", { name })}
-                      onClick={() => setOffenesBudget(offen ? null : z.budget.id)}
-                      onKeyDown={(e) =>
-                        (e.key === "Enter" || e.key === " ") &&
-                        (e.preventDefault(), setOffenesBudget(offen ? null : z.budget.id))
-                      }
-                      style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--sp-3)", marginBottom: 4, cursor: "pointer" }}
-                    >
-                      {/* Schmal wird es zuerst hier eng. Der NAME ist der einzige Teil, der
-                          zurückweicht — Pille und Zahlen tragen Information, die ein
-                          abgeschnittenes Wort nicht ersetzt. Ohne `minWidth: 0` schrumpft
-                          ein Flex-Kind nicht unter seinen Inhalt und schiebt stattdessen
-                          die rechte Spalte aus der Karte. */}
-                      <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, flex: "1 1 auto" }}>
-                        {z.tiefe > 0 && <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>└</span>}
-                        <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>{offen ? "▾" : "▸"}</span>
-                        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={name}>{name}</span>
-                        {/* Nur das Aufbauende bekommt eine Pille — es ist der Sonderfall.
-                            Zwei Pillen nebeneinander in jeder Zeile wären nur Rauschen. */}
-                        {z.budget.art === "aufbauend" && <span style={{ flex: "0 0 auto", display: "inline-flex" }}><Pill variant="um">{t("budgets.art.aufbauend")}</Pill></span>}
-                      </span>
-                      {/* Rechts der Rest, darunter die Herkunft. Beim Monatlichen genügt
-                          „von 200": der Rahmen IST der Monatsbetrag, es gibt nichts
-                          fortzuschreiben. Beim Aufbauenden steht dort die Aufrechnung —
-                          der kumulierte Rahmen hängt nur noch im Titel, weil „insgesamt
-                          eingezahlt" eine eigene, seltenere Frage ist. */}
-                      <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flex: "0 0 auto" }}>
-                        <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
-                          {z.monat.ohnePlan ? (
-                            // In diesem Monat gab es für die Kategorie noch keinen Rahmen.
-                            // Ein Rest von „−x von 0,00" läse sich als überzogen.
-                            <span className="muted">{t(z.monat.verbraucht < 0 ? "budgets.verlaufOhnePlanZurueck" : "budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(Math.abs(z.monat.verbraucht)) })}</span>
-                          ) : (
-                          <span
-                            style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}
-                            title={z.budget.art === "aufbauend" ? t("uebersicht.budgetGesamt", { rahmen: geld.formatMitSymbol(z.rahmen) }) : undefined}
-                          >
-                            {geld.format(z.rest)}
-                          </span>
-                          )}
-                          {z.budget.art === "monatlich" && !z.monat.ohnePlan && (
-                            <span className="muted"> {t("uebersicht.vonRahmen", { rahmen: geld.formatMitSymbol(z.monat.verfuegbar) })}</span>
-                          )}
-                        </span>
-                        {z.budget.art === "aufbauend" && !z.monat.ohnePlan && <BudgetFortschreibung monat={z.monat} />}
-                      </span>
+            // Monatlich und aufbauend getrennt — nach dem Dach eines Baums, nicht je
+            // Zeile (siehe `nachArtGetrennt`). Die Zwischenüberschrift steht nur, wenn es
+            // beide Arten gibt: über einer einzigen Liste sagte sie nichts.
+            <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
+              {gruppen.map(([art, rows]) => (
+                <div key={art}>
+                  {gruppen.length > 1 && (
+                    <div className="muted" style={{ fontSize: "var(--fs-small)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
+                      {t(art === "monatlich" ? "budgets.abschnittMonatlich" : "budgets.abschnittAufbauend")}
+                      {" · "}
+                      {t(art === "monatlich" ? "budgets.abschnittMonatlichHinweis" : "budgets.abschnittAufbauendHinweis")}
                     </div>
-                    <CoverageTrack
-                      value={Math.max(0, z.monat.verbraucht)}
-                      max={Math.max(1, z.monat.verfuegbar)}
-                      over={!z.monat.ohnePlan && z.rest < 0}
-                      label=""
-                      right=""
-                    />
-                    {offen && (
-                      <BudgetPostenliste
-                        // Schmale Karte: sie steht neben einer zweiten, die beim
-                        // Aufklappen mitwächst (siehe bausteine/aufklappen.ts).
-                        zeilen={AUFKLAPP_ZEILEN_SCHMAL}
-                        posten={budgetPostenZu(daten.sicht, z)}
-                        empfaenger={daten.empfaenger}
-                        kategorieNamen={daten.kategorieNamen}
-                        verbraucht={z.monat.verbraucht}
-                        onBuchung={setDetail}
-                      />
-                    )}
-                  </div>
-                );
+                  )}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
+              {rows.map((z) => {
+                    const offen = offenesBudget === z.budget.id;
+                    const name = z.kategorieName;
+                    return (
+                      <div key={z.budget.id} style={{ paddingLeft: z.tiefe * 18 }}>
+                        {/* Die ganze Kopfzeile ist der Schalter: der Balken darunter gehört
+                            zur selben Aussage, und ein eigener Pfeil-Knopf daneben wäre ein
+                            zweites Ziel für dieselbe Geste. */}
+                        <div
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={offen}
+                          aria-label={t("uebersicht.budgetAufklappen", { name })}
+                          onClick={() => setOffenesBudget(offen ? null : z.budget.id)}
+                          onKeyDown={(e) =>
+                            (e.key === "Enter" || e.key === " ") &&
+                            (e.preventDefault(), setOffenesBudget(offen ? null : z.budget.id))
+                          }
+                          style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--sp-3)", marginBottom: 4, cursor: "pointer" }}
+                        >
+                          {/* Schmal wird es zuerst hier eng. Der NAME ist der einzige Teil, der
+                              zurückweicht — Pille und Zahlen tragen Information, die ein
+                              abgeschnittenes Wort nicht ersetzt. Ohne `minWidth: 0` schrumpft
+                              ein Flex-Kind nicht unter seinen Inhalt und schiebt stattdessen
+                              die rechte Spalte aus der Karte. */}
+                          <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)", display: "inline-flex", alignItems: "center", gap: 6, minWidth: 0, flex: "1 1 auto" }}>
+                            {z.tiefe > 0 && <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>└</span>}
+                            <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>{offen ? "▾" : "▸"}</span>
+                            <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={name}>{name}</span>
+                            {/* Nur das Aufbauende bekommt eine Pille — es ist der Sonderfall.
+                                Zwei Pillen nebeneinander in jeder Zeile wären nur Rauschen. */}
+                            {/* Die Pille nur, wenn die Zeile anders tickt als ihre Gruppe —
+                            ein aufbauendes Kind unter einem monatlichen Dach. */}
+                        {z.budget.art !== art && <span style={{ flex: "0 0 auto", display: "inline-flex" }}><Pill variant={z.budget.art === "aufbauend" ? "um" : "neutral"}>{t(`budgets.art.${z.budget.art}`)}</Pill></span>}
+                          </span>
+                          {/* Rechts der Rest, darunter die Herkunft. Beim Monatlichen genügt
+                              „von 200": der Rahmen IST der Monatsbetrag, es gibt nichts
+                              fortzuschreiben. Beim Aufbauenden steht dort die Aufrechnung —
+                              der kumulierte Rahmen hängt nur noch im Titel, weil „insgesamt
+                              eingezahlt" eine eigene, seltenere Frage ist. */}
+                          <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flex: "0 0 auto" }}>
+                            <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
+                              {z.monat.ohnePlan ? (
+                                // In diesem Monat gab es für die Kategorie noch keinen Rahmen.
+                                // Ein Rest von „−x von 0,00" läse sich als überzogen.
+                                <span className="muted">{t(z.monat.verbraucht < 0 ? "budgets.verlaufOhnePlanZurueck" : "budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(Math.abs(z.monat.verbraucht)) })}</span>
+                              ) : (
+                              <span
+                                style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}
+                                title={z.budget.art === "aufbauend" ? t("uebersicht.budgetGesamt", { rahmen: geld.formatMitSymbol(z.rahmen) }) : undefined}
+                              >
+                                {geld.format(z.rest)}
+                              </span>
+                              )}
+                              {z.budget.art === "monatlich" && !z.monat.ohnePlan && (
+                                <span className="muted"> {t("uebersicht.vonRahmen", { rahmen: geld.formatMitSymbol(z.monat.verfuegbar) })}</span>
+                              )}
+                            </span>
+                            {z.budget.art === "aufbauend" && !z.monat.ohnePlan && <BudgetFortschreibung monat={z.monat} />}
+                          </span>
+                        </div>
+                        <CoverageTrack
+                          value={Math.max(0, z.monat.verbraucht)}
+                          max={Math.max(1, z.monat.verfuegbar)}
+                          over={!z.monat.ohnePlan && z.rest < 0}
+                          label=""
+                          right=""
+                        />
+                        {offen && (
+                          <BudgetPostenliste
+                            // Schmale Karte: sie steht neben einer zweiten, die beim
+                            // Aufklappen mitwächst (siehe bausteine/aufklappen.ts).
+                            zeilen={AUFKLAPP_ZEILEN_SCHMAL}
+                            posten={budgetPostenZu(daten.sicht, z)}
+                            empfaenger={daten.empfaenger}
+                            kategorieNamen={daten.kategorieNamen}
+                            verbraucht={z.monat.verbraucht}
+                            onBuchung={setDetail}
+                          />
+                        )}
+                      </div>
+                    );
               })}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </Card>
@@ -298,6 +353,14 @@ export function UebersichtScreen() {
           stehenzulassen zeigte zwei Wahrheiten nebeneinander. */}
       {detail && (
         <BuchungDetail buchung={detail} onClose={() => setDetail(null)} onGeaendert={laden} />
+      )}
+
+      {abrufOffen !== null && (
+        <AbrufDialog
+          zugangId={abrufOffen || undefined}
+          onClose={() => setAbrufOffen(null)}
+          onFertig={() => void laden()}
+        />
       )}
     </div>
   );

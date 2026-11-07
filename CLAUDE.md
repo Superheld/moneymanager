@@ -41,13 +41,21 @@ Zuordnung zur Komponente in `App.tsx`:
 Depot ist das jüngste Beispiel: sein Stand steht in der Übersicht, sein Verlauf in der
 Analyse, aus derselben Wertreihe.
 
-**Die Übersicht rechnet seit 2026-08-31 über die LIQUIDEN Konten** — Monatskarten und
-Budgetliste aus derselben gefilterten Sicht. Was auf Rücklagen- und Vorsorgekonten
-passiert, ist zurückgelegt und steht für den Monat nicht zur Verfügung; es stand vorher
-mit in „so stehe ich gerade da". Der Preis ist eine Aussage, die man kennen muss:
-**dasselbe Budget kann in der Übersicht einen kleineren Verbrauch zeigen als im Bereich
-Budgets** — dort steht der ganze Rahmen, hier nur, was aus den verfügbaren Mitteln davon
-gegangen ist. Der Untertitel der Übersicht sagt es mit.
+**Die Übersicht rechnet über die LIQUIDEN Konten** — Monatskarten und Budgetliste aus
+derselben gefilterten Sicht. Gefiltert werden die BUCHUNGEN und Zahlungsregeln, nicht die
+Budgets: jedes Budget führt seine Zeile, auch wenn sein Geld auf einem Rücklagenkonto
+liegt, und trägt, was aus den liquiden Konten dafür abging. Seine Rate plant es dort
+nicht (`budgetsOhnePlan`) — sie kommt über eine Umbuchung an, und die steht schon in
+„Sparen & Vorsorge". Was auf Rücklagen- und Vorsorgekonten passiert, ist zurückgelegt
+und steht für den Monat nicht zur Verfügung. Der Preis ist eine Aussage, die man kennen
+muss: **dasselbe Budget kann in der Übersicht einen kleineren Verbrauch zeigen als im
+Bereich Budgets** — dort steht der ganze Rahmen, hier nur, was aus den verfügbaren
+Mitteln davon gegangen ist. Der Untertitel der Übersicht sagt es mit.
+
+**Budgets stehen getrennt nach Art** — monatlich (Rest verfällt) und aufbauend (Rest
+bleibt), in der Übersicht wie im Bereich Budgets. Getrennt wird nach dem DACH eines
+Budgetbaums, nicht je Zeile (`nachArtGetrennt`): ein aufbauendes Kind unter einem
+monatlichen Dach wird aus diesem herausgerechnet und bleibt deshalb dort, mit Pille.
 
 Zwei Karten hängen daran und beantworten je eine eigene Frage:
 
@@ -358,6 +366,28 @@ Rückfluss tragen KANN, macht das Wegwerfen des Vorzeichens aus „es kam Geld z
 „es wurde genau so viel ausgegeben". Der Unterschied zum Absatz davor: dort steht ein Wort
 daneben, das mitwandert; hier steht nur die Zahl. Ein Balken darf bei 0 anschlagen
 (`Math.max(0, …)`), die Zahl daneben behält ihr Vorzeichen.
+
+#### Die Kontobelegung — wem das Geld auf einem Konto gehört
+
+Die EINE Rechnung für „wie viel von diesem Stand ist für etwas bestimmt, und wie viel ist
+frei" (`core/konten/kontobelegung.ts`, geladen über `application/konten/kontobelegung.ts`).
+Jede Anzeige, die danach fragt, liest sie — die Rücklagen-Deckung, die Spalte „frei" und
+die Karte „Gebunden auf …" im Kontoauszug. Wer etwas Neues einführt, das Geld auf einem
+Konto beansprucht, liefert es dort als `Anspruch` an und rechnet nirgends selbst.
+
+Bis 2026-10-26 gab es das nicht, und das hatte eine konkrete Folge: die Rücklagen-Deckung
+verteilte den GANZEN Kontostand auf die Rücklagen, obwohl ein aufbauendes Budget auf
+demselben Konto denselben Euro beanspruchte. Die Deckung sah besser aus, als sie war.
+
+| Anspruch | in Höhe von | warum |
+|---|---|---|
+| Rücklage mit Konto | ihr Soll bis heute | das soll beisammen sein |
+| aufbauendes Budget | sein Rest, wenn positiv | er gehört weiter dem Budget |
+| monatliches Budget | **keiner** | sein Rest verfällt und bleibt einfach auf dem Konto, ohne Kommentar |
+
+Reicht der Stand nicht, wird **anteilig** verteilt, über alle Ansprüche gleich, ohne
+Reihenfolge. `budget.kontoId` heisst seither nur noch eines: hier liegt das Geld des
+Budgets, bis es ausgegeben ist.
 
 #### Eine Rücklage hat eine von zwei Formen — nie beide
 
@@ -715,6 +745,79 @@ Drei Entscheidungen darin, die man kennen muss:
 
 Die Vertragsart `umbuchung` hängt daran und trägt eine Folge: **keine
 Kündigungswarnung.** Eine Abmachung mit sich selbst kündigt man, indem man sie löscht.
+
+#### Was man von Hand paaren kann, erkennt die App selbst
+
+Seit 2026-11-07 verbindet die App zwei Buchungen von selbst zu einer Umbuchung — dasselbe
+wie „paaren" von Hand (`buchungenPaaren`). Die Regel steht in
+`core/buchung/exakteUmbuchung.ts`, der Ablauf in
+`application/buchung/umbuchungenErkennen.ts`.
+
+**Die Grundlage ist die Liste beim Paaren von Hand** (`paarungsKandidaten`): exakter
+Gegenbetrag, zwei verschiedene Konten, höchstens `MAX_VORSCHLAG_TAGE` auseinander, beide
+noch frei. Absender und Ziel sind die beiden eigenen Konten. Was die Automatik darüber
+hinaus prüft, ersetzt den Blick, den ein Mensch vor der Liste auf die Zeile wirft:
+
+| | genügt |
+|---|---|
+| **eine Handbuchung ist dabei** | die Grundlage — sie hat keinen Beleg, der mehr sagen könnte |
+| **zwei Bankzeilen** | die Grundlage UND mindestens eine nennt per Gegen-IBAN das andere Konto |
+| **ein Beleg nennt eine andere Gegenseite** | nie |
+
+Die letzte Zeile schliesst die meisten Fehlgriffe aus: eine Erstattung vom Händler trägt
+dessen IBAN. Die mittlere verhindert, dass eine Kartenzahlung ohne IBAN und eine Gutschrift
+gleicher Höhe nur am Betrag zusammenfinden. Eine fremd wirkende IBAN widerspricht einem
+Konto ohne hinterlegte IBAN nicht; ob sie seine ist, lässt sich dann nicht sagen.
+
+Fünf Entscheidungen darin:
+
+- **Ein Bein allein bleibt, was es ist.** Vorgemerkt wird nichts. Die erste Seite steht als
+  Ausgabe oder Einnahme im Bestand, bis die zweite da ist; das entspricht „eine Umbuchung
+  ohne Gegenbuchung gibt es nicht" (`umsatzVerbuchen`).
+- **Es läuft nach dem Verbuchen und über den Bestand**, nicht in `paareUmbuchungen`. Ein
+  Abruf gilt einem Konto, die Stapelpaarung sieht die beiden Beine also nie zusammen.
+  Dieselbe Prüfung läuft nach dem Erfassen von Hand (`dienste.buchungErfassen`).
+- **Das Zeitfenster ist weiter als die drei Tage der Stapelpaarung** und dasselbe wie beim
+  Paaren von Hand: eine Überweisung zwischen zwei Banken darf dauern.
+- **Die Suche geht nur von NEUEN Zeilen aus.** Der Bestand wird nicht bei jedem Abruf neu
+  aufgerollt. Das Nachholen für alte Zeilen wäre ein eigener Schritt mit Liste zum
+  Bestätigen; auch das Bearbeiten löst nichts aus.
+- **Unklar heisst: nichts tun.** Gepaart wird nur gegenseitig Nächstes; bei Gleichstand
+  bleibt die Buchung stehen. Eine fehlende Paarung lässt sich von Hand nachholen und fällt
+  auf, eine falsche sieht richtig aus.
+
+**Was jemand entschieden hat, bleibt** (`frei` in der Regel): keine von Hand einsortierte
+BANKZEILE, nichts Aufgeteiltes, und **keine Umschichtung ohne Kategorie**. So sieht ein
+Bein nach „Paarung lösen" aus, denn `alsBein` nimmt die Kategorie und `paarungLoesen` lässt
+den Charakter stehen. Das ist ein Nein von Hand; ohne den Ausschluss käme die gelöste
+Paarung zurück. Eine Handbuchung MIT Kategorie nimmt dagegen teil: die Kategorie gehört dort
+zum Erfassen und ist keine Antwort auf eine Frage. Sie geht beim Paaren weg wie von Hand
+auch und steht im Journal.
+
+**Die Gegen-IBAN hat bei jedem Protokoll dieselbe Form**, und dafür sorgt allein der
+FinTS-Adapter (`gegenparteiIbanAus` in `adapters/fints/uebersetzung.ts`). MT940 nennt die
+Gegenseite je nach Bank in `?38`, als IBAN in `?31` oder gar nicht als IBAN, sondern als
+Kontonummer in `?31` mit Bankleitzahl in `?30`; den letzten Fall rechnet der Adapter um
+(`deutscheIban`). Hinter ihm gibt es nur noch eine Form, und eine neue Spielart einer Bank
+bleibt in dieser Datei. Passt die Form nicht, etwa weil `?30` eine BIC trägt, bleibt das
+Feld leer: die Umbuchung wird dann nicht erkannt, und falsch verbunden wird nichts.
+
+Eine berechnete IBAN ist **keine Angabe der Bank**. Deshalb stehen `remoteBankId` und
+`remoteAccountNumber` dort im Original in `bankfelder` — aber NUR, wo die Bank keine IBAN
+genannt hat. Mitgeschrieben bei jeder Zeile bekäme über `traegtNeues` jede schon
+gespeicherte Zeile beim nächsten Abruf einen zweiten Beleg ohne neuen Inhalt. Bei Zeilen
+ohne IBAN ist genau das erwünscht: die Überlappung des Abrufs liefert die Angabe nach.
+Der `rohHash` hängt nicht daran, er nimmt die Gegen-IBAN nicht auf.
+
+**Beide Beine werden `zuPruefen` markiert**, auch das schon gesehene: an ihm hat sich
+etwas geändert, ohne dass jemand dabei war. „Paarung lösen" ist der Weg zurück.
+
+**Im Dialog einer einzelnen Bankzeile läuft sie nicht** (`BuchungDetail` →
+`umbuchungenErkennen: false`): dort wählt gerade jemand das Gegenbein, die Automatik käme
+ihm zuvor, und sein Paaren scheiterte an „schon gepaart".
+
+Noch nicht gebaut: eine Verwaltung der erkannten Automatismen, an der sich auch das
+Zeitfenster je Weg einstellen liesse, und das Nachholen im Altbestand.
 
 #### Eine Vormerkung ist eine Beobachtung, keine Buchung
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { euroZuCent } from "../basis/geld";
 import {
+  aufbauendeAnsprueche,
   betragImMonat,
   budgetKategorien,
   budgetRahmen,
@@ -348,5 +349,28 @@ describe("Budget ohne Startdatum", () => {
     const stand = budgetStand(sicht([], [b]), b, "2026-03-15");
     expect(stand.rahmen).toBe(euroZuCent(400));
     expect(stand.rest).toBe(euroZuCent(400));
+  });
+});
+
+describe("aufbauendeAnsprueche", () => {
+  const sicht = (budgets: Budget[]): BudgetSicht => ({
+    buchungen: [],
+    kategorien: [{ id: "k", name: "Werkstatt", defaultCharakter: "Aufwand" }],
+    budgets,
+    vertragsBuchungen: new Set(),
+  });
+
+  it("beansprucht den Rest eines aufbauenden Budgets auf seinem Konto", () => {
+    const b = budget({ art: "aufbauend", kontoId: "ruecklagen", betragProMonat: euroZuCent(50) });
+    // Januar bis März: dreimal 50, nichts ausgegeben.
+    expect(aufbauendeAnsprueche(sicht([b]), "2026-03-15")).toEqual([
+      { art: "budget", id: "b", kontoId: "ruecklagen", betrag: euroZuCent(150) },
+    ]);
+  });
+
+  // Der Rest eines monatlichen Budgets verfällt zum Monatsende und bleibt einfach auf dem
+  // Konto — er gehört niemandem.
+  it("lässt monatliche Budgets aus", () => {
+    expect(aufbauendeAnsprueche(sicht([budget()]), "2026-03-15")).toEqual([]);
   });
 });

@@ -30,7 +30,7 @@ import {
   umsaetze,
 } from "../../dienste";
 import { BankSuche } from "./BankSuche";
-import { TanDialog, useTanFrage } from "./TanDialog";
+import { TanDialog, useTanFrage } from "../bausteine/TanDialog";
 import { Button, FormField, Pill } from "../bausteine";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Auswahl } from "../bausteine/Auswahl";

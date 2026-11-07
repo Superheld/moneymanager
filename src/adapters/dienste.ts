@@ -41,6 +41,7 @@ import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../applicati
 import type { Merkmalskonfiguration, Merkmalsherkunft } from "../core";
 import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnung";
 import { zahlungsspuren } from "../application/buchung/zahlungsspuren";
+import { umbuchungenErkennen } from "../application/buchung/umbuchungenErkennen";
 import { kategorisierungsquellen } from "../application/kategorien/kategorisierungsquellen";
 import { umsaetzeVerbuchen } from "../application/import";
 import type { Kategorie } from "../core";
@@ -88,6 +89,7 @@ import {
 import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
+import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
@@ -175,6 +177,7 @@ import { sqliteKontoentfernen } from "./persistence/sqliteKontoentfernen";
 import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/kategorien/standardkategorien";
 import type { Abrufadapter, Bankzugang, Zugangsart } from "../application/fints/abrufPort";
 import type { Kontozuordnung } from "../application/fints/bankzugangPort";
+import { abrufstandLaden, type Abrufstand } from "../application/fints/abrufstand";
 import {
   sqliteBankzugangRepository,
   sqliteKontozuordnungRepository,
@@ -405,6 +408,15 @@ export function bankzugangLoeschen(id: string): Promise<void> {
   return sqliteBankzugangRepository.loeschen(id);
 }
 
+/** Wie frisch der letzte Abruf je Zugang ist — für den Hinweis in der Übersicht. */
+export function abrufstand(heute: string): Promise<Abrufstand> {
+  return abrufstandLaden(heute, {
+    zugangRepo: sqliteBankzugangRepository,
+    zuordnungRepo: sqliteKontozuordnungRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+  });
+}
+
 export function kontozuordnungen(): Promise<Kontozuordnung[]> {
   return sqliteKontozuordnungRepository.alle();
 }
@@ -487,6 +499,7 @@ export function depots(): Promise<Depotdaten> {
 // --- Rücklagen -------------------------------------------------------------
 
 const RUECKLAGEN_DEPS = {
+  ...BUDGET_DEPS,
   ruecklagenRepo: sqliteRuecklagenRepository,
   ledger: sqliteLedgerRepository,
   kontoRepo: sqliteZahlungskontoRepository,
@@ -497,6 +510,11 @@ const RUECKLAGEN_DEPS = {
 
 export function ruecklagen(heute: string): Promise<Ruecklagensicht> {
   return ruecklagenLaden(RUECKLAGEN_DEPS, heute);
+}
+
+/** Wem das Geld auf jedem Konto gehört — Rücklagen und aufbauende Budgets, anteilig gedeckt. */
+export function kontobelegung(heute: string): Promise<Belegungssicht> {
+  return kontobelegungLaden(RUECKLAGEN_DEPS, heute);
 }
 
 export function ruecklageAnlegen(eingabe: RuecklagenEingabe) {
@@ -692,15 +710,33 @@ export function importLaeufe() {
   return sqliteImportLaufRepository.alle();
 }
 
-/** Offene Umsätze ins Ledger buchen und die frischen Zahlungen ihren Verträgen zuordnen. */
-export async function umsaetzeBuchen(umsaetze: readonly Umsatz[]) {
+/**
+ * Offene Umsätze ins Ledger buchen, Umbuchungen verbinden und die frischen Zahlungen
+ * ihren Verträgen zuordnen.
+ *
+ * `umbuchungenErkennen: false` für den Dialog einer einzelnen Zeile: dort entscheidet
+ * gerade jemand selbst über das Gegenbein, und die Automatik käme ihm zuvor — sein
+ * Paaren scheiterte danach mit „schon gepaart".
+ */
+export async function umsaetzeBuchen(
+  umsaetze: readonly Umsatz[],
+  optionen: { readonly umbuchungenErkennen?: boolean } = {},
+) {
   const ergebnis = await umsaetzeVerbuchen(umsaetze, {
     ledgerRepo: sqliteLedgerRepository,
     umsatzRepo: sqliteUmsatzRepository,
     id: () => crypto.randomUUID(),
   });
   // Bewusst HIER und nicht in `umsaetzeVerbuchen`: der Use-Case schreibt Fakten ins
-  // Ledger, die Zuordnung ist eine Interpretation darüber.
+  // Ledger, die Zuordnung ist eine Interpretation darüber. Die Umbuchungen zuerst, damit
+  // der Abgleich einen Umbuchungsvertrag an der fertigen Umschichtung erkennt.
+  if (optionen.umbuchungenErkennen !== false) {
+    await umbuchungenErkennen({ umsatzIds: umsaetze.map((u) => u.id) }, {
+      ledgerRepo: sqliteLedgerRepository,
+      umsatzRepo: sqliteUmsatzRepository,
+      kontoRepo: sqliteZahlungskontoRepository,
+    });
+  }
   await zuordnungenAbgleichen(vertragsAbgleichDeps);
   return ergebnis;
 }
@@ -977,8 +1013,15 @@ export function buchungsdetail(): Promise<Buchungsdetaildaten> {
   });
 }
 
-export function buchungErfassen(eingabe: BuchungEingabe) {
-  return buchungErfassenUseCase(sqliteLedgerRepository, eingabe);
+/** Eine Buchung von Hand anlegen und nachsehen, ob sie das Gegenbein einer Umbuchung ist. */
+export async function buchungErfassen(eingabe: BuchungEingabe) {
+  const buchung = await buchungErfassenUseCase(sqliteLedgerRepository, eingabe);
+  await umbuchungenErkennen({ buchungIds: [buchung.id] }, {
+    ledgerRepo: sqliteLedgerRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+  });
+  return buchung;
 }
 
 export function buchungBearbeiten(buchung: IstBuchung, eingabe: Parameters<typeof buchungBearbeitenUseCase>[2]) {

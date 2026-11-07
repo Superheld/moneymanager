@@ -87,3 +87,32 @@ describe("HandlungsbedarfKarte — die zwei Raenge", () => {
     expect(container.textContent).toBe("");
   });
 });
+
+describe("HandlungsbedarfKarte — ein veralteter Abruf", () => {
+  it("erscheint auch ohne Minus und öffnet den Abruf für genau diesen Zugang", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const geoeffnet: string[] = [];
+    render(
+      <HandlungsbedarfKarte
+        bedarf={[]}
+        kontoNamen={new Map()}
+        bisTag="2026-10-15"
+        veraltet={[{ zugangId: "z2", bezeichnung: "Ohlert Bank", letzterAbrufBis: "2026-09-30", veraltet: true }]}
+        onAbrufen={(id) => geoeffnet.push(id)}
+      />,
+    );
+    expect(screen.getByText(i18n.t("uebersicht.bedarfTitel"))).toBeInTheDocument();
+    // Die Einschränkung steht dabei, die Minus-Legende nicht — es gibt kein Minus.
+    expect(screen.getByText(i18n.t("uebersicht.abrufHinweis"))).toBeInTheDocument();
+    expect(screen.queryByText(i18n.t("uebersicht.bedarfHinweis"))).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: i18n.t("konten.abrufen") }));
+    expect(geoeffnet).toEqual(["z2"]);
+  });
+
+  it("verschwindet, wenn weder ein Minus noch ein veralteter Abruf anliegt", () => {
+    const { container } = render(
+      <HandlungsbedarfKarte bedarf={[]} kontoNamen={new Map()} bisTag="2026-10-15" veraltet={[]} />,
+    );
+    expect(container).toBeEmptyDOMElement();
+  });
+});

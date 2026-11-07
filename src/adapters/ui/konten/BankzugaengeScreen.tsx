@@ -36,7 +36,7 @@ import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { Bankprofilkarte } from "./Bankprofilkarte";
-import { TanDialog, useTanFrage } from "./TanDialog";
+import { TanDialog, useTanFrage } from "../bausteine/TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
 import { Modal } from "../bausteine/Modal";
