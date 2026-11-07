@@ -286,6 +286,57 @@ describe("zuRohUmsatz", () => {
     expect(mitKontonummer.gegenparteiIban).toBeUndefined();
   });
 
+  describe("die Gegenseite als IBAN, je nach Protokoll", () => {
+    const IBAN = "DE94999999010000001002";
+
+    it("eine ausdrücklich genannte IBAN gewinnt, und es entstehen keine Rohfelder", () => {
+      const u = zuRohUmsatz(buchung({ remoteIban: IBAN, remoteBankId: "99999912", remoteAccountNumber: "1" }), {});
+      expect(u.gegenparteiIban).toBe(IBAN);
+      expect(u.bankfelder).toBeUndefined();
+    });
+
+    it("eine IBAN in der Kontonummer wird übernommen, auch ohne Bankangabe", () => {
+      const u = zuRohUmsatz(buchung({ remoteAccountNumber: IBAN }), {});
+      expect(u.gegenparteiIban).toBe(IBAN);
+      expect(u.bankfelder).toBeUndefined();
+    });
+
+    it("setzt die IBAN aus Bankleitzahl und Kontonummer zusammen", () => {
+      const u = zuRohUmsatz(buchung({ remoteBankId: "99999901", remoteAccountNumber: "1002" }), {});
+      expect(u.gegenparteiIban).toBe(IBAN);
+    });
+
+    it("kommt mit führenden Nullen auf dieselbe IBAN", () => {
+      const u = zuRohUmsatz(buchung({ remoteBankId: "99999901", remoteAccountNumber: "0000001002" }), {});
+      expect(u.gegenparteiIban).toBe(IBAN);
+    });
+
+    it("hält die Rohwerte fest, wenn die IBAN berechnet ist", () => {
+      const u = zuRohUmsatz(buchung({ remoteBankId: "99999901", remoteAccountNumber: "1002" }), {});
+      expect(u.bankfelder).toMatchObject({ remoteBankId: "99999901", remoteAccountNumber: "1002" });
+    });
+
+    it("lässt das Feld leer, wenn statt der Bankleitzahl eine BIC kommt, und hebt die Rohwerte auf", () => {
+      const u = zuRohUmsatz(buchung({ remoteBankId: "XXXXDEXXXXX", remoteAccountNumber: "1002" }), {});
+      expect(u.gegenparteiIban).toBeUndefined();
+      expect(u.bankfelder).toMatchObject({ remoteBankId: "XXXXDEXXXXX", remoteAccountNumber: "1002" });
+    });
+
+    it("lässt das Feld leer, wenn die Kontonummer keine ist", () => {
+      expect(zuRohUmsatz(buchung({ remoteBankId: "99999901", remoteAccountNumber: "12A4" }), {}).gegenparteiIban).toBeUndefined();
+    });
+
+    it("lässt das Feld leer, wenn eine der beiden Angaben fehlt", () => {
+      expect(zuRohUmsatz(buchung({ remoteAccountNumber: "1002" }), {}).gegenparteiIban).toBeUndefined();
+      expect(zuRohUmsatz(buchung({ remoteBankId: "99999901" }), {}).gegenparteiIban).toBeUndefined();
+    });
+
+    it("eine ungültige IBAN als Angabe fällt auf Bankleitzahl und Kontonummer zurück", () => {
+      const u = zuRohUmsatz(buchung({ remoteIban: "DE00999999010000001002", remoteBankId: "99999901", remoteAccountNumber: "1002" }), {});
+      expect(u.gegenparteiIban).toBe(IBAN);
+    });
+  });
+
   it("nimmt ein befülltes remoteIdentifier vor dem geparsten Freitext", () => {
     // Heute füllt lib-fints das Feld nie. Täte es das eines Tages, ist die typisierte
     // Angabe die verlässlichere — der Parser ist nur der Ersatz dafür.

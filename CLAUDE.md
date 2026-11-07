@@ -764,6 +764,21 @@ Paarung zurück. Eine Handbuchung MIT Kategorie nimmt dagegen teil: die Kategori
 zum Erfassen und ist keine Antwort auf eine Frage. Sie geht beim Paaren weg wie von Hand
 auch und steht im Journal.
 
+**Die Gegen-IBAN hat bei jedem Protokoll dieselbe Form**, und dafür sorgt allein der
+FinTS-Adapter (`gegenparteiIbanAus` in `adapters/fints/uebersetzung.ts`). MT940 nennt die
+Gegenseite je nach Bank in `?38`, als IBAN in `?31` oder gar nicht als IBAN, sondern als
+Kontonummer in `?31` mit Bankleitzahl in `?30`; den letzten Fall rechnet der Adapter um
+(`deutscheIban`). Hinter ihm gibt es nur noch eine Form, und eine neue Spielart einer Bank
+bleibt in dieser Datei. Passt die Form nicht, etwa weil `?30` eine BIC trägt, bleibt das
+Feld leer: die Umbuchung wird dann nicht erkannt, und falsch verbunden wird nichts.
+
+Eine berechnete IBAN ist **keine Angabe der Bank**. Deshalb stehen `remoteBankId` und
+`remoteAccountNumber` dort im Original in `bankfelder` — aber NUR, wo die Bank keine IBAN
+genannt hat. Mitgeschrieben bei jeder Zeile bekäme über `traegtNeues` jede schon
+gespeicherte Zeile beim nächsten Abruf einen zweiten Beleg ohne neuen Inhalt. Bei Zeilen
+ohne IBAN ist genau das erwünscht: die Überlappung des Abrufs liefert die Angabe nach.
+Der `rohHash` hängt nicht daran, er nimmt die Gegen-IBAN nicht auf.
+
 **Beide Beine werden `zuPruefen` markiert**, auch das schon gesehene: an ihm hat sich
 etwas geändert, ohne dass jemand dabei war. „Paarung lösen" ist der Weg zurück.
 

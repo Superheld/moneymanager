@@ -21,7 +21,7 @@
 //     keine SEPA-Tags trägt. Die typisierten Felder haben Vorrang — die Angabe der
 //     Bibliothek ist die verlässlichere.
 
-import { ibanGueltig, istCent, majorZuMinor, waehrungNachCode, type Cent, type Waehrung } from "../../core";
+import { deutscheIban, ibanGueltig, istCent, majorZuMinor, waehrungNachCode, type Cent, type Waehrung } from "../../core";
 import type { RohSammelposten, RohUmsatz } from "../../application/import";
 import type { Vormerkungszeile } from "../../application/fints/abrufPort";
 
@@ -400,7 +400,7 @@ export interface FintsBuchung {
   readonly amount: number;
   readonly purpose?: string;
   readonly remoteName?: string;
-  /** Was das Format gerade hergibt: in CAMT die IBAN, in MT940 die Kontonummer aus `?31`. */
+  /** Was das Format gerade hergibt: in CAMT die IBAN, in MT940 `?31` — je nach Bank IBAN oder Kontonummer. */
   readonly remoteAccountNumber?: string;
   /**
    * Wo die Bank AUSDRÜCKLICH eine IBAN nennt — CAMT immer, MT940 im Unterfeld `?38`.
@@ -408,6 +408,7 @@ export interface FintsBuchung {
    * sagt, welches.
    */
   readonly remoteIban?: string;
+  /** Die Bank der Gegenseite: in MT940 `?30`, je nach Bank Bankleitzahl oder BIC. */
   readonly remoteBankId?: string;
   /** Geschäftsvorfallcode (MT940 `:61:`), z. B. 005, 700, 820. */
   readonly transactionCode?: string;
@@ -498,6 +499,12 @@ function nebenbetrag(geld: FintsGeld | undefined, konto: Waehrung): { betrag?: C
  */
 function bankfelderAus(b: FintsBuchung): Record<string, unknown> | undefined {
   const raus: Record<string, unknown> = {};
+  // Die Gegenseite im Original, und NUR, wo die Bank keine IBAN genannt hat. Dort ist
+  // `gegenparteiIban` berechnet oder leer, und die Rohwerte sind das Einzige, woran sich
+  // das nachprüfen oder später besser lösen lässt. Überall sonst stünden sie doppelt da —
+  // und `traegtNeues` vergleicht den Inhalt: jede schon gespeicherte Zeile bekäme beim
+  // nächsten Abruf einen zweiten Beleg, der nichts Neues sagt.
+  const ohneIban = !bankIban(b);
   const text = (wert: string | undefined) => wert?.trim() || undefined;
   const eintraege: [string, unknown][] = [
     ["transactionType", text(b.transactionType)],
@@ -506,6 +513,8 @@ function bankfelderAus(b: FintsBuchung): Record<string, unknown> | undefined {
     ["client", text(b.client)],
     ["textKeyExtension", text(b.textKeyExtension)],
     ["relatedReference", text(b.relatedReference)],
+    ["remoteBankId", ohneIban ? text(b.remoteBankId) : undefined],
+    ["remoteAccountNumber", ohneIban ? text(b.remoteAccountNumber) : undefined],
     ["batch", b.batch && Object.values(b.batch).some((v) => v !== undefined) ? b.batch : undefined],
   ];
   for (const [name, wert] of eintraege) if (wert !== undefined) raus[name] = wert;
@@ -609,26 +618,49 @@ export function zuVormerkung(b: FintsBuchung, kontoWaehrung?: string): Vormerkun
   };
 }
 
+/**
+ * Die IBAN der Gegenseite, soweit die Bank sie als solche nennt.
+ *
+ * ZWEI FELDER FÜR EINE FRAGE, und die Reihenfolge ist der Punkt. `remoteIban` steht da, wo
+ * die Bank ausdrücklich eine IBAN nennt — CAMT tut das immer, MT940 im Unterfeld `?38`. Es
+ * hat Vorrang, weil es eine Zusage ist und keine Deutung. `remoteAccountNumber` trägt, was
+ * das Format gerade hergibt: in CAMT die IBAN, in MT940 `?31`, und dort je nach Bank die
+ * IBAN oder die nationale Kontonummer. Keine Angabe sagt, welches von beiden; die Prüfziffer
+ * entscheidet.
+ */
+function bankIban(b: FintsBuchung): string | undefined {
+  if (b.remoteIban && ibanGueltig(b.remoteIban)) return b.remoteIban;
+  if (b.remoteAccountNumber && ibanGueltig(b.remoteAccountNumber)) return b.remoteAccountNumber;
+  return undefined;
+}
+
+/**
+ * Die Gegenseite als IBAN, gleich welches Protokoll sie wie geliefert hat.
+ *
+ * **Hier und nicht weiter hinten**, weil nur dieser Adapter die Formate kennt. Alles danach
+ * sieht eine einzige Form, und jede neue Spielart einer Bank bleibt in dieser Datei.
+ *
+ * Nennt die Bank keine IBAN, entsteht sie aus Bankleitzahl (`?30`) und Kontonummer (`?31`).
+ * Das ist eine Rechnung und keine Angabe der Bank, deshalb stehen die Rohwerte daneben in
+ * `bankfelder`. Passt die Form nicht, etwa weil in `?30` eine BIC steht, bleibt das Feld
+ * leer: „keine Aussage" ist die richtige Fehlerform, denn sie lässt schlimmstenfalls eine
+ * Umbuchung unerkannt und verbindet nichts Falsches.
+ */
+function gegenparteiIbanAus(b: FintsBuchung): string | undefined {
+  return (
+    bankIban(b) ??
+    (b.remoteBankId && b.remoteAccountNumber
+      ? deutscheIban(b.remoteBankId, b.remoteAccountNumber)
+      : undefined)
+  );
+}
+
 export function zuRohUmsatz(b: FintsBuchung, konto: KontoKontext): RohUmsatz {
   const a = klartextAnreicherung(b.purpose);
   const waehrung = waehrungNachCode(konto.waehrung ?? "EUR");
-  // ZWEI FELDER FÜR EINE FRAGE, und die Reihenfolge ist der Punkt.
-  //
-  // `remoteIban` steht da, wo die Bank ausdrücklich eine IBAN nennt — CAMT tut das immer,
-  // MT940 im Unterfeld `?38`. Es hat Vorrang, weil es eine Zusage ist und keine Deutung.
-  //
-  // `remoteAccountNumber` trägt dagegen, was das Format gerade hergibt: in CAMT die IBAN,
-  // in MT940 die nationale Kontonummer aus `?31`. Beides landet in derselben Eigenschaft,
-  // und keine Angabe sagt, welches von beiden. Deshalb die Prüfung — der Konto-Match und
-  // `rohHash` normalisieren IBANs, eine Kontonummer würde dort stillschweigend zu Müll.
   const original = nebenbetrag(b.originalAmount, waehrung);
   const gebuehr = nebenbetrag(b.charges, waehrung);
-  const gegenIban =
-    b.remoteIban && ibanGueltig(b.remoteIban)
-      ? b.remoteIban
-      : b.remoteAccountNumber && ibanGueltig(b.remoteAccountNumber)
-        ? b.remoteAccountNumber
-        : undefined;
+  const gegenIban = gegenparteiIbanAus(b);
   // Ein Buchungstag ist Pflicht, eine Valuta nicht — und das ist keine Bequemlichkeit,
   // sondern der Unterschied zwischen den beiden Feldern in `RohUmsatz`. Ohne Buchungstag
   // lässt sich die Zeile nicht bilden; der Wurf landet in der Schleife des Adapters und
