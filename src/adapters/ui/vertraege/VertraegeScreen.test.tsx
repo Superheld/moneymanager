@@ -1124,12 +1124,18 @@ describe("VertraegeScreen — die Regel beim Anlegen", () => {
    * Eine Reihe mit FESTEM Tag im Monat. `monatsreihe` rechnet in 30-Tage-Schritten und
    * wandert dadurch über den Monat — für ein Fälligkeitsfenster wäre das genau der Fall,
    * in dem keines entsteht.
+   *
+   * Die Monate zählen vom HEUTIGEN zurück und stehen nicht fest im Test: eine Reihe, deren
+   * letzte Zahlung zu lange her ist, gilt als beendet und wird nicht mehr vorgeschlagen.
+   * Mit festen Monaten wurde der Test darum eines Tages rot, ohne dass sich am Code
+   * etwas geändert hätte. Begonnen wird im Vormonat — der 2. des laufenden Monats kann
+   * noch vor uns liegen.
    */
   async function reiheAmErsten(praefix: string, gegenpartei: string, betrag: number, n = 6) {
     for (let i = 0; i < n; i++) {
       const id = `${praefix}-${i}`;
-      const monat = 8 - i;
-      const datum = `2026-${String(monat).padStart(2, "0")}-02`;
+      const tag = new Date(Date.UTC(heute.getUTCFullYear(), heute.getUTCMonth() - 1 - i, 2));
+      const datum = tag.toISOString().slice(0, 10);
       await sqliteLedgerRepository.speichern({
         id, datum, betrag: -betrag, kontoId: "k1", charakter: "Aufwand", quelle: "import",
       });

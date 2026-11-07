@@ -3,6 +3,32 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.29.2] — 2026-11-07
+
+Eine Sicherheitsaktualisierung, sonst nichts. **Wer 0.29.1 geladen hat, sollte
+aktualisieren.**
+
+### Behoben
+
+**`rustls` auf 0.23.46, `rustls-webpki` auf 0.103.16, die mitgelieferten
+Wurzelzertifikate auf 1.0.11.** Beide Wege, die diese App nach draussen nimmt — der
+Bankabruf und die Update-Pruefung —, laufen ueber diese Kisten. Behoben sind vier Meldungen
+zu `rustls` (RUSTSEC-2026-0346 bis -0349), darunter eine unauthentifizierte
+Server-Antwort, die spaetere Verbindungen auf klassischen Schluesselaustausch herabstufen
+konnte, sowie drei zur Zertifikatspruefung (RUSTSEC-2026-0381, -0382, -0383):
+Zwischenzertifikate, denen nicht mehr vertraut wird, konnten noch angenommen werden.
+
+Dazu `tokio` auf 1.54.1 (RUSTSEC-2026-0386) und `async-executor` auf 1.14.1 — weg von einer
+Fassung, die ihr Autor zurueckgezogen hat.
+
+### Bewusst nicht behoben
+
+Vier Meldungen zu `zip` 4.6.1 (RUSTSEC-2026-0367, -0368, -0369, -0429) stehen mit
+Begruendung in `deny.toml`. Die Kiste gibt es nur im Windows-Bau, unter dem Updater. Sie
+packt erst aus, nachdem die Signatur eines Updates geprueft ist, und das Windows-Release
+ist eine `.exe`, kein Archiv. Die Behebung haengt an einem groesseren Tauri-Update und kommt
+mit diesem.
+
 ## [0.29.1] — 2026-09-22
 
 Eine Sicherheitsaktualisierung, sonst nichts.

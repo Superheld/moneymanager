@@ -31,26 +31,24 @@ mehr hoch. SQLite prüft Spaltennamen beim Parsen — ein `WHERE … IS NULL` re
 
 **Während Schema-Arbeiten die App schließen.** Läuft `tauri dev`, kann die App die Version
 einer Migration verbuchen, bevor alle Statements drinstehen — der Rest läuft dann nie. Danach
-am echten Bestand nachsehen, ob sie gewirkt hat.
+am Spielstand nachsehen, ob sie gewirkt hat.
 
-**Neue Migrations-SQL vorher auf einer Kopie durchspielen** — dafür gibt es
-`scripts/migrationsprobe.mjs`:
+**Neue Migrations-SQL vorher auf einer Kopie des SPIELSTANDS durchspielen** — dafür gibt es
+`scripts/migrationsprobe.mjs`. Nicht auf dem echten Bestand: siehe `../../../CLAUDE.md`,
+„Eine Änderung machen".
 
 ```bash
-sqlite3 -readonly "$DB" ".backup '/tmp/kopie.db'"   # nicht `cp`, die DB läuft im WAL-Modus
-npx vite-node scripts/migrationsprobe.mjs -- /tmp/kopie.db
+npx vite-node scripts/migrationsprobe.mjs -- /pfad/kopie.db
 ```
 
-**Die Kopie danach vernichten.** `.backup` schreibt sie mit dem Schlüssel der offenen
-Verbindung — bei einem über `bestandslesen` entschlüsselten Bestand also im KLARTEXT. Eine
-liegengebliebene Probe ist ein vollständiger Bestand ohne jeden Schutz, und sie fällt
-niemandem mehr auf: die Verschlüsselung sagt nichts über ihre Kopien.
+Es fährt die Kette, meldet jede Tabelle, deren Zeilenzahl sich verändert hat, und prüft am
+Ende die Fremdschlüssel. **Das ist kein Ersatz für `npm test`, sondern die Prüfung, die
+`npm test` nicht leisten kann** — der Grund steht unten bei den Fremdschlüsseln.
 
-Es fährt die Kette gegen echte Daten, meldet jede Tabelle, deren Zeilenzahl sich verändert
-hat, und prüft am Ende die Fremdschlüssel. **Das ist kein Ersatz für `npm test`, sondern
-die Prüfung, die `npm test` nicht leisten kann** — der Grund steht unten bei den
-Fremdschlüsseln. Beim Umbau auf Fremdschlüssel war der Test grün, und die App wäre
-gescheitert; gefunden hat es dieses Skript.
+**Die Kopie muss ein ÄLTERES Schema tragen, sonst prüft sie nichts.** Ein frisch geseedeter
+Spielstand steht schon im Zielschema, und einen, den die App geöffnet hat, liest sql.js
+nicht mehr (er ist dann verschlüsselt). Der Weg ist ein Seed aus einem älteren Checkout
+(`git worktree` auf dem letzten Tag, dort `npm run seed` mit eigenem Zielpfad).
 
 Im Alpha-Stadium dürfen Migrationen auch **wegnehmen**; vor dem Abräumen prüfen, dass die
 Ziele leer sind.
@@ -77,8 +75,8 @@ Derselbe Gedanke wie bei den Spaltenprüfungen, eine Ebene höher. Beispiel: v44
 Startup-Pragma auf jeder Pool-Verbindung; sql.js und die `sqlite3`-CLI defaulten auf OFF.
 Eine Migration mit `REFERENCES` kann deshalb im Test grün sein und in der App an verwaisten
 Verweisen scheitern — an genau der Sorte Widerspruch, die sich über Monate ansammelt. Wer
-Constraints einführt, prüft vorher am echten Bestand, ob sie halten, und räumt den
-Widerspruch in derselben Migration auf. Ein Test dazu setzt `PRAGMA foreign_keys = ON`
+Constraints einführt, räumt mögliche Widersprüche in derselben Migration auf — ob welche
+da sind, lässt sich vorher nicht nachsehen (keine Echtdaten in der Entwicklung). Ein Test dazu setzt `PRAGMA foreign_keys = ON`
 selbst; sonst prüft er etwas anderes als die App tut.
 
 **SQLite kann Constraints nicht per `ALTER TABLE` nachrüsten.** Wer einen Fremdschlüssel an
@@ -95,7 +93,7 @@ Migrations-Statement läuft über `schemaStatement`, und nach der Kette holt
 
 Genau diese Asymmetrie ist der Grund, warum so etwas lange unentdeckt bleibt: sql.js hat
 Fremdschlüssel aus, der Test war grün, und die App wäre gescheitert. **Wer am Schema
-arbeitet, prüft gegen eine Lesekopie des echten Bestands** — Rezept in `CLAUDE.local.md`.
+arbeitet, setzt im Test `PRAGMA foreign_keys = ON`** — das ist die Prüfung, die bleibt.
 
 ## Was an der VERBINDUNG hängt, hängt nicht an der Datei
 
