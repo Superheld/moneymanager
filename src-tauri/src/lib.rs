@@ -2,6 +2,7 @@
 // Fenster + Plugins; die Fachlogik lebt im TS-Kern (src/core), Persistenz
 // läuft über tauri-plugin-sql (SQLite) und wird vom TS-Adapter angesprochen.
 
+mod aktualisierung;
 mod dateirechte;
 mod export;
 // Oeffentlich, weil das Werkzeug `bestandslesen` sie braucht (src/bin/).
@@ -59,7 +60,8 @@ pub fn run() {
             sicherung::sicherungen_auflisten,
             sicherung::sicherungen_entfernen,
             sicherung::sicherungsordner,
-            export::export_schreiben
+            export::export_schreiben,
+            aktualisierung::aktualisierung_beta
         ])
         // Was VOR dieser Aenderung entstanden ist, traegt noch die alten offenen Rechte —
         // die `umask` oben wirkt nur auf Neues. Ein Fehlschlag darf den Start nicht

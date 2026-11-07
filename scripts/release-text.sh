@@ -8,6 +8,11 @@
 #   PLATTFORMEN   Liste aus "macos", "linux", "windows", leer erlaubt
 #                 — welche Artefakte am Release WIRKLICH haengen
 #
+# Dazu VERSION, optional: sie holt den Abschnitt aus dem Changelog. Bis zur 0.29.2 stand
+# in jedem Release derselbe Text, und was sich geaendert hatte, stand nirgends dort, wo
+# man es beim Aktualisieren sucht. Fehlt der Abschnitt, entfaellt er einfach: ein Release
+# scheitert nicht an seinen Notizen.
+#
 # Warum das Skript ueberhaupt existiert: der Text stand bis zum 06.09.2026 inline im
 # Workflow und nannte alle drei Plattformen unbedingt. Der Windows-Job scheitert aber
 # seit mehreren Releases an den Tests, und das Release trug daraufhin einen Abschnitt
@@ -27,6 +32,32 @@ signiert="${SIGNIERT:-nein}"
 plattformen=" ${PLATTFORMEN:-} "
 
 hat() { [[ "$plattformen" == *" $1 "* ]]; }
+
+version="${VERSION:-}"
+changelog="$(dirname "$0")/../CHANGELOG.md"
+
+# Alles zwischen der Ueberschrift dieser Version und der naechsten.
+abschnitt=""
+if [ -n "$version" ] && [ -f "$changelog" ]; then
+  abschnitt=$(awk -v kopf="## [$version]" '
+    index($0, "## [") == 1 { if (drin) exit; drin = (index($0, kopf) == 1); next }
+    drin
+  ' "$changelog")
+fi
+
+# Ein Bindestrich in der Version ist dieselbe Grenze wie im Release-Workflow.
+if [[ "$version" == *-* ]]; then
+  echo "**Vorabversion.** Noch nicht fuer alle freigegeben, und sie erreicht nur, wer in"
+  echo "den Einstellungen Betaversionen eingeschaltet hat."
+  echo
+fi
+
+if [ -n "$abschnitt" ]; then
+  echo "$abschnitt" | sed '/./,$!d'
+  echo
+  echo "---"
+  echo
+fi
 
 echo "Lokale Haushalts-Finanz-App, Stadium **Alpha**."
 echo

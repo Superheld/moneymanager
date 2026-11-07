@@ -222,6 +222,35 @@ describe("Der Release-Workflow und die Apple-Signierung", () => {
  * Eingabe, und die lässt sich hier billig herstellen — das Skript ist reines bash ohne
  * Netz und ohne Zustand.
  */
+describe("Der Beta-Kanal", () => {
+  const WORKFLOW = readFileSync(join(import.meta.dirname, "..", ".github", "workflows", "release.yml"), "utf-8");
+  const RUST = readFileSync(join(import.meta.dirname, "..", "src-tauri", "src", "aktualisierung.rs"), "utf-8");
+
+  it("macht nur einen Tag mit Bindestrich zur Vorabversion", () => {
+    // Stünde hier ein festes `true`, fände der Updater keine einzige normale Fassung mehr.
+    expect(WORKFLOW).toContain("prerelease: ${{ contains(github.ref_name, '-') }}");
+    expect(WORKFLOW).not.toMatch(/^\s*prerelease: (true|false)\s*$/m);
+  });
+
+  it("schreibt das Manifest bei JEDEM Release fort, nicht nur bei einer Beta", () => {
+    // Sonst bliebe jeder Beta-Nutzer auf der letzten Beta sitzen. Der Schritt darf deshalb
+    // an keiner Bedingung hängen, die eine normale Fassung ausnimmt.
+    const schritt = WORKFLOW.slice(WORKFLOW.indexOf("Manifest des Beta-Kanals fortschreiben"));
+    expect(schritt).toContain("gh release upload beta-kanal latest.json --clobber");
+    expect(schritt).not.toMatch(/^\s*if: /m);
+  });
+
+  it("hält die Seite des Kanals aus releases/latest heraus", () => {
+    expect(WORKFLOW).toContain("gh release create beta-kanal --prerelease --latest=false");
+  });
+
+  it("fragt denselben Kanal, den der Workflow schreibt, und fällt auf den normalen Weg zurück", () => {
+    const conf = JSON.parse(readFileSync(join(import.meta.dirname, "..", "src-tauri", "tauri.conf.json"), "utf-8"));
+    expect(RUST).toContain("releases/download/beta-kanal/latest.json");
+    expect(RUST).toContain(conf.plugins.updater.endpoints[0]);
+  });
+});
+
 describe("Der Release-Text", () => {
   const SKRIPT = join(import.meta.dirname, "..", "scripts", "release-text.sh");
   const text = (signiert: string, plattformen: string) =>
@@ -229,6 +258,8 @@ describe("Der Release-Text", () => {
       encoding: "utf8",
       env: { ...process.env, SIGNIERT: signiert, PLATTFORMEN: plattformen },
     });
+  const lauf = (umgebung: Record<string, string>) =>
+    execFileSync("bash", [SKRIPT], { encoding: "utf8", env: { ...process.env, ...umgebung } });
 
   it("nennt genau die Plattformen, die man ihm gibt — und keine mehr", () => {
     // DER FALL AUS 0.27.0: macOS und Linux haben geliefert, Windows nicht.
@@ -238,6 +269,23 @@ describe("Der Release-Text", () => {
     expect(zwei, "Windows steht im Text, obwohl kein Windows-Artefakt vorliegt").not.toContain(
       "**Windows**",
     );
+  });
+
+  it("nimmt den Abschnitt seiner Version aus dem Changelog, und nur den", () => {
+    const text = lauf({ VERSION: "0.29.1", PLATTFORMEN: "macos" });
+    expect(text).toContain("RUSTSEC-2026-0285");
+    expect(text).not.toContain("## [");
+    expect(text).not.toContain("Die Gegenrichtung. Es gab zwei Exporte");
+  });
+
+  it("kommt ohne Abschnitt aus", () => {
+    expect(lauf({ VERSION: "99.0.0", PLATTFORMEN: "macos" })).toContain("Lokale Haushalts-Finanz-App");
+    expect(lauf({ PLATTFORMEN: "macos" })).toContain("Lokale Haushalts-Finanz-App");
+  });
+
+  it("kennzeichnet eine Beta, und nur eine Beta", () => {
+    expect(lauf({ VERSION: "99.0.0-beta.1" })).toContain("Vorabversion");
+    expect(lauf({ VERSION: "0.29.1" })).not.toContain("Vorabversion");
   });
 
   it("behauptet ohne Plattformliste gar keine Plattform", () => {

@@ -11,6 +11,8 @@ import {
   pruefungSchalten,
   SCHLUESSEL_AKTUALISIERUNG,
   type AktualisierungPort,
+  SCHLUESSEL_AKTUALISIERUNG_BETA,
+  betaSchalten,
 } from "./aktualisierung";
 import type { EinstellungenRepository } from "./ports";
 
@@ -120,5 +122,42 @@ describe("Aktualisierung einspielen", () => {
       },
     };
     await expect(aktualisierungEinspielen(port)).rejects.toThrow("Download abgebrochen");
+  });
+});
+
+describe("der Beta-Kanal", () => {
+  function welt(einstellungen: Record<string, string>) {
+    const pruefen = vi.fn(async () => null);
+    const repo = {
+      lesen: async () => einstellungen,
+      schreiben: vi.fn(async () => {}),
+    } as unknown as EinstellungenRepository;
+    return { port: { pruefen, einspielen: async () => {} }, repo, pruefen };
+  }
+
+  it("ist ohne Zutun aus: ein fehlender Schlüssel heisst nein", async () => {
+    const { port, repo, pruefen } = welt({});
+    await aktualisierungPruefen(port, repo);
+    expect(pruefen).toHaveBeenCalledWith(false);
+  });
+
+  it("fragt den Kanal, wenn jemand ihn eingeschaltet hat", async () => {
+    const { port, repo, pruefen } = welt({ [SCHLUESSEL_AKTUALISIERUNG_BETA]: "an" });
+    await aktualisierungPruefen(port, repo);
+    expect(pruefen).toHaveBeenCalledWith(true);
+  });
+
+  it("die abgeschaltete Prüfung gewinnt: dann wird gar nicht gefragt", async () => {
+    const { port, repo, pruefen } = welt({ [SCHLUESSEL_AKTUALISIERUNG]: "aus", [SCHLUESSEL_AKTUALISIERUNG_BETA]: "an" });
+    expect(await aktualisierungPruefen(port, repo)).toBeNull();
+    expect(pruefen).not.toHaveBeenCalled();
+  });
+
+  it("schreibt, was der Schalter sagt", async () => {
+    const { repo } = welt({});
+    await betaSchalten(repo, true);
+    expect(repo.schreiben).toHaveBeenCalledWith(SCHLUESSEL_AKTUALISIERUNG_BETA, "an");
+    await betaSchalten(repo, false);
+    expect(repo.schreiben).toHaveBeenCalledWith(SCHLUESSEL_AKTUALISIERUNG_BETA, "aus");
   });
 });

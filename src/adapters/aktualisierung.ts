@@ -8,7 +8,8 @@
 // Updater. Dann liegt eben nichts bereit; das ist die richtige Antwort und kein Sonderfall,
 // den jemand behandeln müsste.
 
-import { check } from "@tauri-apps/plugin-updater";
+import { invoke } from "@tauri-apps/api/core";
+import { check, Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import type { Aktualisierung, AktualisierungPort } from "../application/aktualisierung";
 
@@ -33,10 +34,22 @@ function inTauri(): boolean {
  */
 let bereit: Awaited<ReturnType<typeof check>> | null = null;
 
+/**
+ * Sieht im Beta-Kanal nach (`src-tauri/src/aktualisierung.rs`).
+ *
+ * Das Kommando liefert dieselbe Form wie das Plugin, also entsteht daraus ein gewöhnliches
+ * `Update`: Laden, Signaturprüfung und Einspielen laufen danach wie immer. `check()` nimmt
+ * keinen anderen Endpunkt an, sonst bräuchte es diesen Umweg nicht.
+ */
+async function betaPruefen(): Promise<Update | null> {
+  const stand = await invoke<ConstructorParameters<typeof Update>[0] | null>("aktualisierung_beta");
+  return stand ? new Update(stand) : null;
+}
+
 export const tauriAktualisierung: AktualisierungPort = {
-  async pruefen(): Promise<Aktualisierung | null> {
+  async pruefen(beta: boolean): Promise<Aktualisierung | null> {
     if (!inTauri()) return null;
-    bereit = await check();
+    bereit = beta ? await betaPruefen() : await check();
     if (!bereit) return null;
     return {
       version: bereit.version,

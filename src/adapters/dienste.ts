@@ -65,6 +65,8 @@ import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "
 import {
   aktualisierungEinspielen,
   aktualisierungPruefen,
+  betaErlaubt,
+  betaSchalten,
   pruefungErlaubt,
   pruefungSchalten,
   type Aktualisierung,
@@ -342,6 +344,15 @@ export async function aktualisierungspruefung(): Promise<boolean> {
 
 export function aktualisierungspruefungSetzen(erlaubt: boolean): Promise<void> {
   return pruefungSchalten(sqliteEinstellungenRepository, erlaubt);
+}
+
+/** Ob auch Betaversionen angeboten werden. Ohne Zutun: nein. */
+export async function aktualisierungBeta(): Promise<boolean> {
+  return betaErlaubt(await sqliteEinstellungenRepository.lesen());
+}
+
+export function aktualisierungBetaSetzen(erlaubt: boolean): Promise<void> {
+  return betaSchalten(sqliteEinstellungenRepository, erlaubt);
 }
 
 
