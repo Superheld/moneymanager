@@ -12,9 +12,10 @@ name: Release
 #
 #   • `releaseDraft: false` — Assets eines Entwurfs sind ohne Anmeldung nicht abrufbar.
 #     Ein Entwurf wäre bequem zum Nachsehen und macht den Updater blind.
-#   • `prerelease: false` — `releases/latest/` überspringt Vorabversionen. Bei einer App
-#     im Alpha-Stadium ist „prerelease" die naheliegende Wahl und liefert dann eine 404,
-#     die aussieht wie „kein Update da".
+#   • `prerelease` NUR bei einem Tag mit Bindestrich (`v0.30.0-beta.1`). `releases/latest/`
+#     überspringt Vorabversionen: bei einer normalen Fassung liefert das eine 404, die
+#     aussieht wie „kein Update da". Bei einer Beta ist es genau der Zweck, denn so
+#     erreicht sie niemanden, der den Schalter nicht umgelegt hat.
 #
 # Beides ist der Grund, warum hier nichts auf „vorsichtig" steht: der Endpunkt muss
 # erreichbar sein, sonst ist der ganze Weg tot.
@@ -248,9 +249,10 @@ jobs:
           # davon ab, ob wirklich signiert wurde. Ein fest eingetragener Satz wäre in
           # genau dem Fall falsch, in dem es darauf ankommt.
           releaseBody: ${{ steps.text.outputs.body }}
-          # Siehe Kopf: beides muss false bleiben, sonst findet der Updater nichts.
+          # Siehe Kopf: ein Entwurf macht den Updater blind, und `prerelease` darf nur eine
+          # Beta tragen. Der Bindestrich ist dieselbe Grenze, die auch SemVer zieht.
           releaseDraft: false
-          prerelease: false
+          prerelease: ${{ contains(github.ref_name, '-') }}
           # Erzeugt `latest.json` neben den Artefakten — genau die Datei, die
           # `plugins.updater.endpoints` in tauri.conf.json anfragt.
           #
@@ -313,6 +315,30 @@ jobs:
             exit 0
           fi
 
-          SIGNIERT="$signiert" PLATTFORMEN="$plattformen" bash scripts/release-text.sh > text.md
+          SIGNIERT="$signiert" PLATTFORMEN="$plattformen" VERSION="${TAG#v}" bash scripts/release-text.sh > text.md
           gh release edit "$TAG" --notes-file text.md
           echo "Text geschrieben."
+
+      # Das Manifest des Beta-Kanals, bei JEDEM Release und nicht nur bei einer Beta: der
+      # Updater nimmt die erste Antwort, die er bekommt. Stünde hier nur die letzte Beta,
+      # bliebe jeder auf ihr sitzen, sobald die fertige Fassung erschienen ist.
+      #
+      # Eine feste Release-Seite, weil GitHub keine Adresse für „neueste Vorabversion"
+      # kennt. Der Name beginnt nicht mit `v`, löst diesen Workflow also nicht aus, und
+      # `--prerelease` hält sie aus `releases/latest/` heraus.
+      - name: Manifest des Beta-Kanals fortschreiben
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if ! gh release download "$TAG" --pattern latest.json; then
+            echo "Kein Manifest am Release — der Kanal bleibt, wie er ist."
+            exit 0
+          fi
+          if ! gh release view beta-kanal > /dev/null 2>&1; then
+            gh release create beta-kanal --prerelease --latest=false --title "Beta-Kanal" \
+              --notes "Technische Seite: hier liegt das Update-Manifest für die Betaversionen."
+          fi
+          gh release upload beta-kanal latest.json --clobber
+          echo "Beta-Kanal zeigt jetzt auf $TAG."

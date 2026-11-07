@@ -1441,6 +1441,39 @@ Zwei Dinge, die man dabei auseinanderhalten muss:
   nicht selbst austauschen. Das entscheidet also das Bundle-Format mit, nicht erst die
   Verteilung.
 
+### Der Beta-Kanal
+
+Seit 0.29.3. Eine neue Fassung soll am echten Bestand laufen, bevor sie alle bekommen, und
+dafür gab es nur `npm run installieren`. Jetzt läuft eine Beta denselben Weg wie jede
+Fassung, und sie erreicht nur, wer **Einstellungen → Aktualisierung → Betaversionen
+erhalten** eingeschaltet hat. Ab Werk ist das aus.
+
+```
+v0.30.0-beta.1   ein Tag mit Bindestrich ist eine Vorabversion
+v0.30.0          die fertige Fassung, für alle
+```
+
+| | fragt | sieht |
+|---|---|---|
+| normal | latest.json unter releases/latest/download | nur reguläre Fassungen, GitHub überspringt Vorabversionen |
+| Schalter an | latest.json der Release-Seite `beta-kanal`, Rückfall wie normal | die jüngste Fassung, gleich welche |
+
+Vier Dinge, die man wissen muss:
+
+- **Die Seite `beta-kanal` wird bei JEDEM Release fortgeschrieben**, nicht nur bei einer
+  Beta. Der Updater fragt die Endpunkte der Reihe nach und nimmt die erste Antwort. Läge
+  dort nur die letzte Beta, bliebe jeder auf ihr sitzen, sobald die fertige Fassung
+  erschienen ist. Dass 0.30.0 nach 0.30.0-beta.1 kommt, regelt SemVer; es muss nur dastehen.
+- **Der normale Weg ist nicht angefasst.** `check()` aus dem Plugin nimmt keinen anderen
+  Endpunkt an, deshalb gibt es für den Kanal ein eigenes Kommando
+  (`src-tauri/src/aktualisierung.rs`), und nur er läuft darüber. Laden, Signaturprüfung und
+  Einspielen sind danach dasselbe `Update` wie sonst, gegen denselben Schlüssel.
+- **Es gibt keinen Weg zurück per Schalter.** Ausschalten nimmt eine Beta nicht zurück, ein
+  Downgrade gibt es nicht. Und eine Beta mit Migration baut den echten Bestand um; der
+  Rückweg ist dann die Tagessicherung vor den Migrationen.
+- **Der Tag einer Beta liegt auf `develop`**, nicht auf `main`: `main` bleibt der Stand, den
+  alle haben. Der Workflow fragt nicht nach dem Branch, nur nach dem Tag.
+
 ### Den Update-Weg durchspielen
 
 Halb prüfen geht nicht: entweder eine installierte App findet ein signiertes Paket, lädt
@@ -1766,9 +1799,10 @@ verlockend:
 
 - **`releaseDraft: false`** — die Assets eines Entwurfs sind ohne Anmeldung nicht
   abrufbar. Ein Entwurf wäre bequem zum Nachsehen und macht den Updater blind.
-- **`prerelease: false`** — `releases/latest/` **überspringt Vorabversionen**. Bei einer
-  App im Alpha-Stadium ist „prerelease" die naheliegende Wahl, und der Endpunkt liefert
-  dann eine 404, die für den Updater aussieht wie „kein Update da".
+- **`prerelease` nur bei einem Tag mit Bindestrich** — `releases/latest/` **überspringt
+  Vorabversionen**. Bei einer App im Alpha-Stadium ist „prerelease" die naheliegende Wahl,
+  und der Endpunkt liefert dann eine 404, die für den Updater aussieht wie „kein Update
+  da". Bei einer Beta ist genau das der Zweck (siehe „Der Beta-Kanal").
 
 **Der Punkt, an dem man sonst das Falsche tut:** vor dem Bauen prüfen, dass die `.env`
 steht. Sie ist gitignoriert, in einem frischen Klon oder Worktree also nicht da, und die

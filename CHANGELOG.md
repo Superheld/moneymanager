@@ -3,6 +3,22 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.29.3] — 2026-11-07
+
+Der Weg, eine neue Fassung am echten Bestand zu prüfen, bevor sie alle bekommen. Für alle,
+die den neuen Schalter nicht umlegen, ändert sich nichts.
+
+### Neu
+
+**Betaversionen erhalten** unter Einstellungen → Aktualisierung, ab Werk aus. Wer es
+einschaltet, bekommt ab dem nächsten Start auch Vorabversionen angeboten. Eine Beta läuft
+auf dem echten Bestand und kann Fehler enthalten. Ausschalten nimmt eine installierte Beta
+nicht zurück: sie bleibt, bis eine neuere reguläre Fassung erscheint, und die kommt dann
+von selbst.
+
+**Die Release-Notizen sagen jetzt, was sich geändert hat.** Bis hierher stand an jedem
+Release derselbe allgemeine Text; er zieht sich seinen Abschnitt jetzt aus dem Changelog.
+
 ## [0.29.2] — 2026-11-07
 
 Eine Sicherheitsaktualisierung, sonst nichts. **Wer 0.29.1 geladen hat, sollte
