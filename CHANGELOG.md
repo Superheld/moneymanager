@@ -3,6 +3,43 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.30.0-beta.2] — 2026-11-08
+
+Eine Runde Feinschliff nach dem ersten Blick auf die Beta. Keine Migration — der Bestand
+bleibt, wie er ist; manches wird anders gerechnet.
+
+### Geändert
+
+**Die Navigation ist nach Wichtigkeit sortiert.** Oben Übersicht, Budgets, Verträge,
+Rücklagen, Analyse. Der Kontoauszug heisst jetzt „Buchungen" und steht in der Verwaltung —
+vorher hiessen zwei Einträge „Konten".
+
+**Die Monatskarten der Übersicht rechnen Umbuchungen am Kreis der verfügbaren Konten.**
+Eine Umbuchung zwischen zwei verfügbaren Konten steht in keiner Zeile mehr. Eine aufs
+Rücklagenkonto steht in der neuen Zeile „Rücklagen", geplant und gebucht — vorher blieb
+dort das Gebuchte leer, obwohl das Geld geflossen war. Was auf Vorsorge-, Spar- oder
+Investmentkonten geht, bleibt unter „Sparen & Vorsorge". Budgets stehen in zwei Zeilen,
+monatlich und aufbauend.
+
+**Rücklagen: „eingegangen" statt „geflossen".** Gezählt wird jetzt jede Einzahlung auf ein
+Rücklagenkonto, Zinsen eingeschlossen, und die Buchungen stehen darunter. Eine Umbuchung
+auf ein Vorsorgekonto zählt nicht mehr als Rücklage. Die Faustformel zeigt als Tacho, wie
+weit der Stand der Rücklagenkonten an sie heranreicht.
+
+**Die Analyse steht in Reitern:** Verlauf, Kategorien, Ausblick, Befunde, Depot. Zeitraum
+und Monat sitzen im Kopf und gelten für alle.
+
+**Budget-Verlauf:** beim monatlichen Budget der Rahmen als Linie, beim aufbauenden der Stand
+als Verlauf — statt eines Schattenbalkens. Die Buchungen eines Monats haben einen Kopf und
+lassen sich zuklappen.
+
+**Verträge lassen sich nach Art filtern** (Abo, Dauervertrag, Umbuchung).
+
+### Entfernt
+
+Die Karte „Da ist etwas zu tun" oben in der Übersicht. Mit ihr geht auch der Hinweis auf
+einen lange zurückliegenden Abruf; der Knopf zum Abrufen bleibt im Kopf der Übersicht.
+
 ## [0.30.0-beta.1] — 2026-11-07
 
 Die erste Vorabversion. Drei Dinge, die am echten Bestand noch nie gelaufen sind.
