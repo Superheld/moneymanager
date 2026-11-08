@@ -57,16 +57,18 @@ bleibt), in der Übersicht wie im Bereich Budgets. Getrennt wird nach dem DACH e
 Budgetbaums, nicht je Zeile (`nachArtGetrennt`): ein aufbauendes Kind unter einem
 monatlichen Dach wird aus diesem herausgerechnet und bleibt deshalb dort, mit Pille.
 
-Zwei Karten hängen daran und beantworten je eine eigene Frage:
+Daran hängt die Karte **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE
+Konten. Die Klasse ist die Rechenregel und jedes Konto hat genau eine, die Summen addieren
+sich also zum Ganzen. Jede Bündelung, in der dasselbe Konto mehrfach vorkommen darf,
+ergäbe hier „das Vermögen" grösser, als es ist — was man so ansehen will, gehört in die
+Analyse.
 
-- **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE Konten. Die Klasse ist
-  die Rechenregel und jedes Konto hat genau eine, die Summen addieren sich also zum
-  Ganzen. Jede Bündelung, in der dasselbe Konto mehrfach vorkommen darf, ergäbe hier „das
-  Vermögen" grösser, als es ist — was man so ansehen will, gehört in die Analyse.
-- **„Da ist etwas zu tun"** — Konten, die im Vorschaufenster ins Minus laufen. Sie steht
-  ganz oben und ist die einzige Karte, die VERSCHWINDET, wenn nichts anliegt: eine
-  dauerhafte Zeile „alles in Ordnung" wäre nach zwei Wochen unsichtbar, und dann fiele
-  auch die Warnung nicht mehr auf.
+**Die Karte „Da ist etwas zu tun" ist seit 2026-11-08 weg.** Sie stand ganz oben, rot
+gerahmt, und meldete Konten, die im Vorschaufenster ins Minus laufen, dazu einen zu lange
+zurückliegenden Abruf. Im Gebrauch war das zu laut für eine Seite, die sagen soll, wie man
+dasteht. Die Rechnung dahinter (`liquiditaetsvorschau` in `core/konten/liquiditaet.ts`)
+ist geblieben und getestet, hat aber keine Oberfläche mehr; ebenso `veraltet` am
+Abrufstand. Wer sie wieder zeigt, sucht ihr einen leiseren Ort.
 
 **Die Rücklagen haben in den Monatskarten seit 2026-09-01 keine Zeile mehr.** Sie stand
 dort als kalkulatorische Monatsrate, in Plan und Ist mit demselben Betrag. Seit sich
@@ -462,7 +464,7 @@ die Zeitrichtung:
 | | stillgelegtes Konto |
 |---|---|
 | **Rückblick** — Monatskarten, Budgetstände, Analyse, Kontoauszug, Abgleich | zählt und zeigt **unverändert** |
-| **Vorausschau** — Liquiditätsvorschau, „Da ist etwas zu tun" | **draußen**, und der Filter steht im KERN |
+| **Vorausschau** — Liquiditätsvorschau | **draußen**, und der Filter steht im KERN |
 | **Auswahl und Handlung** — Buchungsmaske, Umbuchungsziel, Bankabruf, Bankkonto verknüpfen | **draußen** |
 | „Was da ist" | zählt mit, unter seiner Klasse |
 | Kontenverwaltung | sichtbar, markiert, mit dem Weg zurück |
