@@ -51,19 +51,28 @@ const GRUPPEN: NavGroup[] = [
       // war beides ein Screen, und die Kategorien standen ganz unten.
       // Der frühere Bereich „Planung" (Jahresprojektion, Szenarien) und „Deckung" sind
       // 2026-08-16 entfallen — sie kommen wieder, dann aber anders geschnitten.
+      //
+      // **Seit 2026-11-08 nach Wichtigkeit sortiert**, und der Kontoauszug steht nicht
+      // mehr hier. Wer sich informiert, will wissen, wie die Budgets stehen, seine
+      // Verträge verwalten, die Rücklagen sehen — und dann auswerten. In den Kontoauszug
+      // geht man, um zuzuordnen und abzuhaken: das ist Arbeit an den Daten, nicht
+      // Überblick, und gehört deshalb in die Verwaltung.
       { id: "uebersicht", labelKey: "shell.navUebersicht" },
-      { id: "konten", labelKey: "shell.navKonten" },
       { id: "budgets", labelKey: "shell.navBudgets" },
-      { id: "analyse", labelKey: "shell.navAnalyse" },
-      { id: "ruecklagen", labelKey: "shell.navRuecklagen" },
       { id: "vertraege", labelKey: "shell.navVertraege" },
+      { id: "ruecklagen", labelKey: "shell.navRuecklagen" },
+      { id: "analyse", labelKey: "shell.navAnalyse" },
     ],
   },
   {
     titelKey: "shell.gruppeVerwaltung",
     eintraege: [
-      { id: "kontenverwaltung", labelKey: "shell.navKontenVerwalten" },
+      // „Buchungen", nicht „Konten": zwei Einträge hiessen gleich, und der hier zeigt,
+      // was GEBUCHT ist. Die `ScreenId` bleibt `konten` — sie ist ein Schlüssel, kein
+      // Name, und hängt an Tests, Icon und Sprungzielen.
+      { id: "konten", labelKey: "shell.navBuchungen" },
       { id: "import", labelKey: "shell.navImport" },
+      { id: "kontenverwaltung", labelKey: "shell.navKontenVerwalten" },
       { id: "training", labelKey: "shell.navTraining" },
       { id: "einstellungen", labelKey: "shell.navEinstellungen" },
     ],

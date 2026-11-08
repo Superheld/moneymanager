@@ -128,7 +128,7 @@ const de = {
     gruppeVerwaltung: "Verwaltung",
     navUebersicht: "Übersicht",
     navAnalyse: "Analyse",
-    navKonten: "Konten",
+    navBuchungen: "Buchungen",
     navBudgets: "Budgets",
     navRuecklagen: "Rücklagen",
     navVertraege: "Verträge",
@@ -964,7 +964,7 @@ const de = {
       ausschliessen: "ausschließen",
       zulassen: "zulassen",
     },
-    titel: "Konten",
+    titel: "Buchungen",
     verwaltungTitel: "Konten verwalten",
     neue: {
       ohneGegenpartei: "ohne Empfänger",
@@ -1982,7 +1982,7 @@ const de = {
       ohneMerkmale: "Kein Merkmal — so ordnet die Regel nichts zu.",
       vorschlaege: "Aus {{n}} von Hand zugeordneten Buchungen abgeleitet",
       vorschlaegeOhneBelege:
-        "Noch keine Buchung von Hand diesem Vertrag zugeordnet. Sobald du im Kontoauszug welche zuordnest, entstehen hier Vorschläge.",
+        "Noch keine Buchung von Hand diesem Vertrag zugeordnet. Sobald du unter „Buchungen\" welche zuordnest, entstehen hier Vorschläge.",
       vorschlaegeAlleDrin: "Was sich ableiten lässt, steht schon in der Liste.",
       vorschlagZahlen: "deckt {{deckt}}/{{belege}} · sonst {{sonst}}",
       vorschlagUebernehmen: "übernehmen",
@@ -2222,7 +2222,7 @@ const en: typeof de = {
     gruppeVerwaltung: "Management",
     navUebersicht: "Overview",
     navAnalyse: "Analysis",
-    navKonten: "Accounts",
+    navBuchungen: "Entries",
     navBudgets: "Budgets",
     navRuecklagen: "Reserves",
     navVertraege: "Contracts",
@@ -3033,7 +3033,7 @@ const en: typeof de = {
       ausschliessen: "exclude",
       zulassen: "allow",
     },
-    titel: "Accounts",
+    titel: "Entries",
     verwaltungTitel: "Manage accounts",
     neue: {
       ohneGegenpartei: "no payee",
@@ -4015,7 +4015,7 @@ const en: typeof de = {
       ohneMerkmale: "No feature — the rule links nothing.",
       vorschlaege: "Derived from {{n}} payments linked by hand",
       vorschlaegeOhneBelege:
-        "No payment linked to this contract by hand yet. Link some in the account statement and suggestions will appear here.",
+        "No payment linked to this contract by hand yet. Link some under “Entries” and suggestions will appear here.",
       vorschlaegeAlleDrin: "Everything derivable is already in the list.",
       vorschlagZahlen: "covers {{deckt}}/{{belege}} · else {{sonst}}",
       vorschlagUebernehmen: "adopt",
