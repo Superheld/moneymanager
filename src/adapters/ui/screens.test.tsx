@@ -10,7 +10,7 @@
 // Wording- oder Design-Durchgang stehen, statt reihenweise rot zu werden.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -71,7 +71,16 @@ async function grunddaten() {
  * ganzen Screen trifft dann mehrere Elemente und bricht ab. Gesucht wird deshalb IN der
  * Karte, um die es geht; das bleibt auch dann richtig, wenn weitere Karten dazukommen.
  */
+/**
+ * Wählt in der Analyse das Register „Kategorien" — seit 2026-11-08 steht die
+ * Aufschlüsselung nicht mehr unter dem Verlauf, sondern in einem eigenen Reiter.
+ */
+async function zuKategorien() {
+  fireEvent.click(await screen.findByRole("tab", { name: "Kategorien" }));
+}
+
 async function inAufschluesselung() {
+  await zuKategorien();
   const titel = await screen.findByText("Nach Kategorien");
   // Titel → Titelspalte → Kopfzeile → Karte. `Card` baut den Kopf aus zwei geschachtelten
   // `div`s; ohne Klasse daran bleibt nur der Weg über die Ebenen.
@@ -406,6 +415,29 @@ describe("AnalyseScreen", () => {
   });
 
   /** Der Weg, der vorher nur über den Konto-Auszug ging: Kategorie → Buchung → Details. */
+  /**
+   * Die Abschnitte stehen in Registern, und nur die mit Inhalt bekommen einen Reiter:
+   * ohne abgerufenes Depot gibt es keinen Reiter „Depot". Zeitraum und Monat sitzen im
+   * Seitenkopf und bleiben beim Wechsel stehen — sie gelten für jedes Register.
+   */
+  it("zeigt die Abschnitte als Register und lässt den Zeitraum über allen stehen", async () => {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    rendere(<AnalyseScreen />);
+
+    await screen.findByRole("tab", { name: "Verlauf" });
+    expect(screen.getAllByRole("tab").map((r) => r.textContent)).toEqual(["Verlauf", "Kategorien", "Ausblick", "Befunde"]);
+    expect(screen.getByText("Monatsverlauf")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Befunde" }));
+    await waitFor(() => expect(screen.queryByText("Monatsverlauf")).toBeNull());
+    expect(screen.getByRole("tab", { name: "Befunde" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Zeitraum")).toBeInTheDocument();
+  });
+
   it("öffnet die Buchungsdetails aus einer aufgeklappten Kategorie", async () => {
     await grunddaten();
     await sqliteLedgerRepository.speichern({
@@ -441,6 +473,7 @@ describe("AnalyseScreen", () => {
     rendere(<AnalyseScreen />);
 
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
+    await zuKategorien();
     await auswahlWaehlen(nutzer, "Gliederung", "Hauptgruppen");
 
     // Jetzt steht die Hauptgruppe da; die Unterkategorie erst nach dem Aufklappen.

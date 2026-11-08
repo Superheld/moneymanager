@@ -499,11 +499,25 @@ gleichbehandelt, beantwortet eine davon falsch:
 
 Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweite.
 
-## Die Analyse steht in zwei Blöcken
+## Die Analyse steht in Registern
 
-Der obere beantwortet **„wie viel und wohin"** — Kennzahlen, Verlauf (Fluss · Saldo ·
+**Seit 2026-11-08** stehen die Abschnitte nicht mehr untereinander, sondern in Reitern
+(`bausteine/Registerleiste.tsx`): **Verlauf · Kategorien · Ausblick · Befunde · Depot**.
+Untereinander war die Seite so lang, dass man für die Befunde oder ein Depot an allem
+anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
+
+- **Zeitraum, Monat und Kennzahlen stehen ÜBER den Reitern**, Zeitraum und Monat im
+  Seitenkopf. Sie gelten für jedes Register; an der Verlaufskarte, wo sie vorher sassen,
+  wären sie beim Wechsel verschwunden.
+- **Nur Register mit Inhalt bekommen einen Reiter.** Ohne abgerufenes Depot gibt es
+  keinen Reiter „Depot" — ein Reiter ins Leere wäre schlechter als keiner.
+- **Die Befunde bleiben innerhalb ihres Registers Karten untereinander** (unten). Das ist
+  kein Widerspruch: ein Reiter „Befunde" sagt, was darunter liegt; sieben Reiter „Treue",
+  „Ohne Plan", „Ausreißer" sagten es nicht.
+
+Die Register davor beantworten **„wie viel und wohin"** — Verlauf (Fluss · Saldo ·
 Tabelle), der **Blick nach vorn** (`AusblickKarte.tsx`) und die Aufschlüsselung nach
-Kategorien. Der untere (`BefundeBereich.tsx`) beantwortet **„und wie tragfähig ist das"**:
+Kategorien. Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
 fest gegen frei, Budget-Treue, Ausgaben ohne Budget und ohne Vertrag, Verträge Soll gegen
 Ist, Empfänger, Nutzung der Kategorien, Ausreißer.
 

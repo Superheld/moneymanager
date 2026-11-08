@@ -1,6 +1,7 @@
 # `bausteine/` — was mehrere Bereiche benutzen
 
-Hier liegt, was nicht einem Bereich gehört: die Shell (`AppShell`, `Bereich`, `PageHead`),
+Hier liegt, was nicht einem Bereich gehört: die Shell (`AppShell`, `Bereich`, `PageHead`, `Registerleiste` — die Reiter, die
+`Bereich` und die Analyse teilen),
 wiederkehrende Bedienteile (`Modal`, `IconButton`, `CategoryPicker`), die Farbregel der
 Auswertung (`geldFarbe` — sie deckt seit 2026-09-13 nicht mehr nur Beträge ab, sondern auch
 Kennzahlen und Flächen; Einzelheiten in `../CLAUDE.md` unter „Zahlen anzeigen") und der
