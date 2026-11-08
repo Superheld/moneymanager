@@ -252,7 +252,7 @@ describe("buchungenInExportform", () => {
   });
 
   it("unterscheidet 'gehoert zu keinem Vertrag' von 'nie entschieden'", () => {
-    // Die mittlere Zeile der Tabelle in CLAUDE.md: eine leere vertragId MIT Herkunft ist
+    // Die mittlere Zeile der Tabelle in `src/core/vertraege/CLAUDE.md`: eine leere vertragId MIT Herkunft ist
     // eine Handentscheidung, die bleiben muss. Ohne die Herkunft im Export sähen die
     // beiden Fälle gleich aus, und der nächste Abgleich holte den korrigierten Fehlgriff
     // zurück.

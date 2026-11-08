@@ -112,7 +112,7 @@ export async function buchungBearbeiten(
   // die Eingabe das Vorzeichen selbst, und beide Fälle fallen zusammen: wer nichts an der
   // Richtung ändert, reicht das Vorzeichen des Belegs unverändert durch (die Maske füllt
   // das Feld vorzeichenbehaftet vor), und wer es ändert, meint genau das. Der Satz aus
-  // CLAUDE.md gilt unverändert und sogar strenger: eine EINORDNUNG dreht keine Tatsache
+  // `src/core/buchung/CLAUDE.md` gilt unverändert und sogar strenger: eine EINORDNUNG dreht keine Tatsache
   // um — nur ein Mensch tut das, ausdrücklich und sichtbar.
   //
   // Wo das Feld gar nicht angefasst werden DARF (Online-Konto, Umbuchungs-Bein), sperrt

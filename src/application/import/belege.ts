@@ -11,7 +11,7 @@
 // geliefert hat. Welcher Wert gilt, entscheidet sich hier — bei jedem Lesen neu, aus
 // Regeln, die man an einer Stelle aendern kann.
 //
-// Der Nebengewinn ist die Zusicherung aus dem GoBD-Abschnitt der CLAUDE.md: „`umsatz_roh`
+// Der Nebengewinn ist die Zusicherung aus dem GoBD-Abschnitt in `src/application/buchung/CLAUDE.md`: „`umsatz_roh`
 // wird nach dem Anlegen nicht mehr beschrieben." Sie wird damit STRENGER als vorher — die
 // Ausnahme `ergaenzen` faellt ersatzlos weg.
 //

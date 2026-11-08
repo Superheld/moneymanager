@@ -123,7 +123,7 @@ der Beleg und nach dem Anlegen unveränderlich, `umsatz_verarbeitung` der Stand.
 das nur an den Schreibwegen: `anlegen` schreibt beides (in einer Transaktion), `speichern`
 nur den Stand, `belegAnhaengen` einen weiteren Beleg — geändert wird ein Beleg nie.
 Wer eine neue Zeile mit `speichern` anlegt, bekommt einen Stand ohne Beleg und findet die
-Zeile nie wieder. Die Begründung der Trennung steht in der Wurzel-`CLAUDE.md`.
+Zeile nie wieder. Die Begründung der Trennung steht in `src/application/import/CLAUDE.md`.
 
 **Eine Zahlung kann MEHRERE Belege haben** (`umsatz_roh.zahlung_id`), und der Leseweg führt
 sie zusammen: der JOIN auf `umsatz_verarbeitung` hängt an `COALESCE(r.zahlung_id, r.id)`,

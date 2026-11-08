@@ -614,7 +614,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   }
 
   // Ein Rueckfluss — Aufwand mit POSITIVEM Betrag, in der Kategorie der Ausgabe. Der Fall
-  // steht ausdruecklich in der Wurzel-`CLAUDE.md`, und ohne ihn im Spielstand faellt eine
+  // steht ausdruecklich in `src/core/buchung/CLAUDE.md`, und ohne ihn im Spielstand faellt eine
   // Regression daran erst am echten Bestand auf.
   buchung(tagIn(-1, 20), 6400, "konto-giro", "kat-gesundheit", "Aufwand", {
     notiz: `${einesVon(GEGENPARTEIEN.gesundheit)} Erstattung`,
@@ -999,7 +999,7 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
 
   // Verworfen und als Dublette weggelegt — beide bleiben SICHTBAR. Der Import legt jede
   // Zeile an, auch die, die niemand haben wollte; das ist die Vollstaendigkeit, die die
-  // Wurzel-`CLAUDE.md` unter GoBD auffuehrt. Und beim Durchsehen zaehlt Weggelegtes mit:
+  // `src/application/buchung/CLAUDE.md` unter GoBD auffuehrt. Und beim Durchsehen zaehlt Weggelegtes mit:
   // „das habe ich schon einmal weggelegt" ist genau die Auskunft, die man dann braucht.
   umsatzAnlegen({
     laufId: LAUF_FG, kontoId: "konto-giro", datum: tagIn(-2, 11), betrag: -1290,
