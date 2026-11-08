@@ -17,6 +17,7 @@ import { empfaengerJeBuchung } from "./buchung/belegZuBuchung";
 import {
   fruehesterMonat,
   istLiquide,
+  istRuecklagenkonto,
   monatsAusblicke,
   staendeJeKlasse,
   vorschauAlleKonten,
@@ -67,9 +68,10 @@ export interface Uebersichtsdaten {
    * Gibt es überhaupt Plandaten (Verträge, Budgets)? Ohne sie zeigten die drei Karten
    * Nullen, und das liest sich wie ein Datenfehler statt wie ein leerer Plan.
    *
-   * Die Rücklagen zählen seit 2026-09-01 NICHT mehr mit: sie haben im Ausblick keine
-   * Zeile mehr (siehe `core/monatsausblick`), und was zu keiner Zeile führt, darf auch
-   * nicht darüber entscheiden, ob die Karten überhaupt erscheinen.
+   * Die Rücklagen zählen seit 2026-09-01 NICHT mit: ihr Bedarf führt zu keiner Zeile
+   * (die Zeile „Rücklagen" zeigt die Umbuchung, und die ist eine Zahlungsregel und zählt
+   * damit schon), und was zu keiner Zeile führt, darf auch nicht darüber entscheiden, ob
+   * die Karten überhaupt erscheinen.
    */
   readonly hatPlandaten: boolean;
   /**
@@ -138,7 +140,7 @@ export async function uebersichtLaden(
    * seine Ausgaben vom Girokonto standen als unerklärte Posten unter „Sonstiges". Jetzt
    * führt es seine Zeile und trägt, was aus den liquiden Konten dafür abging. Seine RATE
    * plant es hier aber nicht (`budgetsOhnePlan`): die fließt über eine Umbuchung, und die
-   * steht schon in „Sparen & Vorsorge".
+   * steht schon in „Rücklagen" bzw. „Sparen & Vorsorge".
    *
    * Der Preis ist eine Aussage, die man kennen muss: **dasselbe Budget kann hier einen
    * kleineren Verbrauch zeigen als im Bereich Budgets.** Dort steht der ganze Rahmen,
@@ -154,6 +156,10 @@ export async function uebersichtLaden(
   const nichtLiquide = new Set(konten.filter((k) => !istLiquide(k)).map((k) => k.id));
   const liquideBuchungen = buchungen.filter((b) => liquideIds.has(b.kontoId));
   const budgetsOhnePlan = new Set(budgets.filter((b) => !liquideIds.has(b.kontoId)).map((b) => b.id));
+  // Wohin eine Umbuchung aus dem Kreis führt, entscheidet ihre Zeile: auf ein Konto der
+  // Klasse Rücklage nach „Rücklagen", sonst nach „Sparen & Vorsorge". Dieselbe Grenze
+  // zieht der Rücklagenfluss im Bereich Rücklagen.
+  const ruecklagenKonten = new Set(konten.filter(istRuecklagenkonto).map((k) => k.id));
 
   const sicht: BudgetSicht = {
     buchungen: liquideBuchungen,
@@ -172,6 +178,8 @@ export async function uebersichtLaden(
       kategorien,
       vertragsBuchungen,
       heute,
+      kreis: liquideIds,
+      ruecklagenKonten,
     }),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,

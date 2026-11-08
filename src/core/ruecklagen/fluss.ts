@@ -15,15 +15,17 @@
 // machen. Deshalb rechnet diese Datei alle drei und lässt die Oberfläche entscheiden,
 // welche sie nebeneinander stellt.
 //
-// WOHIN gerechnet wird, entscheidet die KONTOKLASSE, und zwar über genau eine Grenze:
-// ein Zufluss auf ein NICHT liquides Konto ist zurückgelegt, auf ein liquides nur
-// umgeschichtet. Welche der vier gebundenen Klassen es ist, spielt hier keine Rolle —
-// die Klasse trägt genau eine Rechenregel, und das ist sie (siehe `core/konten/konto`).
+// WOHIN gerechnet wird, entscheidet die KONTOKLASSE: zurückgelegt ist, was von einem
+// liquiden Konto auf ein Konto der Klasse RÜCKLAGE geht. Bis 2026-11-08 zählte jedes
+// nicht liquide Ziel — auch Vorsorge, Sparen und Investment. Seit die Monatskarten der
+// Übersicht Rücklagen und „Sparen & Vorsorge" in zwei Zeilen trennen, zieht diese Datei
+// dieselbe Grenze (`istRuecklagenkonto`); sonst stünde dieselbe Überweisung hier als
+// Rücklage und dort als Sparen.
 
 import type { IstBuchung } from "../buchung/istbuchung";
 import type { Cent } from "../basis/geld";
 import type { Zahlungskonto } from "../konten/konto";
-import { istLiquide } from "../konten/konto";
+import { istLiquide, istRuecklagenkonto } from "../konten/konto";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
 import { RHYTHMUS_MONATE } from "../basis/zahlungsregel";
 import { istUmbuchungsregel } from "../vertraege/umbuchungErkennung";
@@ -79,7 +81,7 @@ export function ruecklagenfluss(
   const klasse = new Map(konten.map((k) => [k.id, k]));
   const istZiel = (id: string | undefined): boolean => {
     const k = id ? klasse.get(id) : undefined;
-    return !!k && !istLiquide(k);
+    return !!k && istRuecklagenkonto(k);
   };
   const istQuelle = (id: string | undefined): boolean => {
     const k = id ? klasse.get(id) : undefined;

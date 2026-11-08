@@ -158,7 +158,7 @@ describe("MonatsAusblick", () => {
     rendere(<MonatsAusblick {...props()} />);
     const august = await karte("August 2026");
 
-    await nutzer.click(within(august).getByText("Budgets"));
+    await nutzer.click(within(august).getByText("Budgets monatlich"));
     expect(within(august).getByText("Lebenshaltung")).toBeInTheDocument();
     expect(within(august).getByText("70,00 / 430,00 €")).toBeInTheDocument();
   });
@@ -180,7 +180,7 @@ describe("MonatsAusblick", () => {
     rendere(<MonatsAusblick {...props({ ist: zurueck })} />);
     const august = await karte("August 2026");
 
-    await nutzer.click(within(august).getByText("Budgets"));
+    await nutzer.click(within(august).getByText("Budgets monatlich"));
     expect(within(august).getByText("\u221290,00 / 430,00 €")).toBeInTheDocument();
   });
 

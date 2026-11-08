@@ -57,9 +57,12 @@ describe("ruecklagenfluss", () => {
     expect(f.posten).toHaveLength(1);
   });
 
-  it("zählt auch Vorsorgekonten — zurückgelegt ist zurückgelegt", () => {
+  // Bis 2026-11-08 zählte jedes nicht liquide Ziel als Rücklage. Seitdem trennen die
+  // Monatskarten Rücklagen von „Sparen & Vorsorge", und dieser Fluss zieht dieselbe
+  // Grenze — sonst stünde dieselbe Überweisung hier als Rücklage und dort als Sparen.
+  it("zählt ein Vorsorgekonto NICHT als Rücklage", () => {
     const f = ruecklagenfluss([buchung({ gegenkontoId: "depot" })], konten, [], [], VON, BIS);
-    expect(f.ist).toBe(20000);
+    expect(f.ist).toBe(0);
   });
 
   // Zwischen zwei liquiden Konten wurde nichts zurückgelegt, nur verschoben.

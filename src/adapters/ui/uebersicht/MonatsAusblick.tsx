@@ -250,7 +250,7 @@ function ZeileMitPosten({
             overflowY: "auto",
           }}
         >
-          {zeile.id === "budgets"
+          {zeile.id === "budgets" || zeile.id === "budgetsAufbauend"
             ? zeile.posten.map((p) => (
                 <BudgetPosten key={p.schluessel} posten={p} name={kategorieName.get(p.bezeichnung) ?? p.bezeichnung} zeigeIst={zweiSpalten} />
               ))

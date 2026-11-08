@@ -564,16 +564,19 @@ export function vertragstreue(
  * | `einnahmen` | ja | Geld kommt an |
  * | `vertraege` | ja | Geld geht weg |
  * | `budgets` | ja | Geld geht weg |
+ * | `budgetsAufbauend` | ja | wie `budgets` — geplant ist die Rate als Abfluss |
  * | `sonstiges` | ja | Geld geht weg |
+ * | `ruecklagen` | **nein** | wechselt das Konto, verlässt den Bestand nicht |
  * | `umschichtung` | **nein** | wechselt das Konto, verlässt den Bestand nicht |
  *
- * Die Umschichtung ist die einzige Ausnahme, seit die Rücklagenzeile weg ist (2026-09-01,
- * siehe `monatsausblick`). Sie wechselt das Konto und verlässt den Bestand nicht; sie in
+ * `budgetsAufbauend` ist seit 2026-11-08 eine eigene Zeile, vorher stand es in `budgets`
+ * mit; an der Wirkung ändert die Trennung nichts. `ruecklagen` ist seitdem ebenfalls neu
+ * und eine Umschichtung wie die Zeile darunter, nur auf ein Rücklagenkonto. Sie wechselt das Konto und verlässt den Bestand nicht; sie in
  * eine Saldo-Vorschau über ALLE Konten zu nehmen hiesse, jeden Monat eine Abbuchung zu
  * erfinden, die es so nicht gibt — der vorhergesagte Stand liefe immer weiter unter den
  * echten.
  */
-export const SALDOWIRKSAME_ZEILEN = ["einnahmen", "vertraege", "budgets", "sonstiges"] as const;
+export const SALDOWIRKSAME_ZEILEN = ["einnahmen", "vertraege", "budgets", "budgetsAufbauend", "sonstiges"] as const;
 
 export function planWirkung(zeilen: readonly { id: string; plan: Cent }[]): {
   einnahmen: Cent;
