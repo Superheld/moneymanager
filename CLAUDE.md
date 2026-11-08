@@ -16,23 +16,25 @@ Die Navigation steht in `adapters/ui/bausteine/AppShell.tsx` (Typ `ScreenId`, zw
 Gruppen), die
 Zuordnung zur Komponente in `App.tsx`:
 
-**Überblick** — was gilt und was war:
+**Überblick** — was gilt und was war, nach Wichtigkeit sortiert. Der Kontoauszug stand
+bis 2026-11-08 hier und heisst seitdem „Buchungen" in der Verwaltung: dorthin geht man,
+um zuzuordnen und abzuhaken, nicht um sich zu informieren.
 
 | Bereich | Komponente | worum es geht |
 |---|---|---|
 | Übersicht | `UebersichtScreen` | wie stehe ich gerade da — drei Monatskarten, Budgets des Monats |
-| Konten | `KontenScreen` | Auszug je Konto: suchen, filtern, bearbeiten, paaren |
 | Budgets | `BudgetsScreen` | monatlich (Rest verfällt) oder aufbauend (Rest bleibt), verschachtelbar |
-| Analyse | `AnalyseScreen` | alles, was einen ZEITRAUM auswertet |
-| Rücklagen | `RuecklagenScreen` | Ziel ÷ Frist = monatliche Rate, oder eine freie Rate |
 | Verträge | `VertraegeScreen` | Wiederkehrendes mit eigener Erkennungsregel |
+| Rücklagen | `RuecklagenScreen` | Ziel ÷ Frist = monatliche Rate, oder eine freie Rate |
+| Analyse | `AnalyseScreen` | alles, was einen ZEITRAUM auswertet |
 
 **Verwaltung** — woher die Daten kommen und wie sie sortiert werden:
 
 | Bereich | Komponente | worum es geht |
 |---|---|---|
-| Konten verwalten | `KontenVerwaltungScreen` | Konten anlegen, Abgleich, Bankzugänge (`BankzugaengeScreen`) |
+| Buchungen | `KontenScreen` | Auszug je Konto: suchen, filtern, bearbeiten, paaren — die `ScreenId` heisst weiter `konten` |
 | Import | `ImportScreen` | Dateiimport → Inbox (`ReviewScreen`) → verbuchen |
+| Konten verwalten | `KontenVerwaltungScreen` | Konten anlegen, Abgleich, Bankzugänge (`BankzugaengeScreen`) |
 | Training | `TrainingBereich` | die Karten der Kategorie-Erkennung (`KategorisierungCards`) — **Experiment**, siehe unten |
 | Einstellungen | `EinstellungenScreen` | Stammdaten und Voreinstellungen |
 
