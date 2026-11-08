@@ -98,6 +98,7 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
     >
       <BudgetVerlaufChart
         monate={monate}
+        art={stand.budget.art === "aufbauend" ? "aufbauend" : "monatlich"}
         aktivIndex={gewaehlt}
         onMonatClick={waehle}
       />
