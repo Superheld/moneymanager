@@ -149,7 +149,7 @@ export async function zuordnungVonHand(
 /**
  * Wohin eine Sammelzuordnung zeigt.
  *
- * Drei Werte und nicht zwei, weil es drei Zustände gibt (siehe CLAUDE.md, „Zuordnungen
+ * Drei Werte und nicht zwei, weil es drei Zustände gibt (siehe `src/core/vertraege/CLAUDE.md`, „Zuordnungen
  * stehen an der Buchung"): einem Vertrag zugeordnet, ausdrücklich KEINEM zugeordnet, und
  * noch nie entschieden. Der mittlere ist kein fehlender Wert — er ist die Aussage, ohne
  * die ein korrigierter Fehlgriff der Automatik beim nächsten Abgleich zurückkäme.

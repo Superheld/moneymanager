@@ -10,7 +10,7 @@
 //
 // Das Skript BAUT NICHT. Es nimmt, was im Bundle-Verzeichnis liegt, schreibt das Manifest
 // dazu und stellt beides bereit. Was vorher zu tun ist, sagt es, wenn etwas fehlt — und der
-// ganze Ablauf steht in CLAUDE.md unter „Den Update-Weg durchspielen".
+// ganze Ablauf steht im Skill `ausliefern` unter „Den Update-Weg durchspielen".
 
 import { createReadStream, existsSync, readFileSync, writeFileSync, statSync } from "node:fs";
 import { createServer } from "node:http";

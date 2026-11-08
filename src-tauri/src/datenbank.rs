@@ -297,7 +297,7 @@ fn nach_typ(zeile: &SqliteRow, i: usize, typ: &SqliteTypeInfo) -> JsonValue {
 /// Eingabe kommen nie im String an, sondern ausschliesslich ueber `werte` und `bind`** —
 /// dafuer gibt es `binden` gleich darunter.
 ///
-/// Was diese Naht NICHT leistet, steht schon in der CLAUDE.md unter „Was die CSP nicht
+/// Was diese Naht NICHT leistet, steht schon in `src-tauri/CLAUDE.md` unter „Was die CSP nicht
 /// leistet": fremder Code im Webview kann hier beliebiges SQL absetzen. Eine Pruefung an
 /// dieser Stelle wuerde daran nichts aendern — wer den Webview hat, hat den Bestand. Die
 /// Zusicherung ist deshalb ehrlich und nicht bequem.

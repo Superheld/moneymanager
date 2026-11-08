@@ -106,7 +106,7 @@ function vertragseinnahmenProMonat(
     if (!r.vertragId) continue;
     // Nur Erträge. Der Charakter entscheidet und nicht das Vorzeichen des Betrags: eine
     // Zahlungsregel ist eine PLANGRÖSSE, und dort trägt die Einordnung die Richtung
-    // (siehe „Für eine PLANGRÖSSE bleibt die Ableitung" in der CLAUDE.md).
+    // (siehe „Für eine PLANGRÖSSE bleibt die Ableitung" in `src/core/buchung/CLAUDE.md`).
     if (r.charakter !== "Ertrag") continue;
     const monate = RHYTHMUS_IN_MONATEN[r.rhythmus] ?? 1;
     summe += Math.abs(r.betrag) / monate;

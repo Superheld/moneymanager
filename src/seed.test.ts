@@ -195,7 +195,7 @@ describe("Spielstand", () => {
 
   it("enthaelt den Rueckfluss: Aufwand mit positivem Betrag", () => {
     const db = mitSeed();
-    // Steht ausdruecklich in der Wurzel-`CLAUDE.md` („Ein Rueckfluss gehoert IMMER in die
+    // Steht ausdruecklich in `src/core/buchung/CLAUDE.md` („Ein Rueckfluss gehoert IMMER in die
     // Kategorie der Ausgabe"). Faellt er aus dem Spielstand, faellt eine Regression daran
     // erst am echten Bestand auf.
     expect(
@@ -498,7 +498,7 @@ describe("Spielstand", () => {
 
   it("enthaelt die Zahlung, die AUSDRUECKLICH zu keinem Vertrag gehoert", () => {
     const db = mitSeed();
-    // Der Fall, fuer den `vertrag_herkunft` existiert (Wurzel-`CLAUDE.md`): ohne die
+    // Der Fall, fuer den `vertrag_herkunft` existiert (`src/core/vertraege/CLAUDE.md`): ohne die
     // Herkunft holte der naechste Abgleich die Buchung zurueck.
     expect(
       zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE vertrag_id IS NULL AND vertrag_herkunft IS NOT NULL"),

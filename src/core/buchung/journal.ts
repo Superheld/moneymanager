@@ -6,7 +6,7 @@
 // sich seitdem geaendert".
 //
 // **Das Journal ist eine Aufzeichnung, kein Speicher.** Es traegt bewusst keinen
-// Fremdschluessel auf `ist_buchung` (siehe CLAUDE.md) und darf deshalb auch nicht so
+// Fremdschluessel auf `ist_buchung` (siehe `src/application/buchung/CLAUDE.md`) und darf deshalb auch nicht so
 // benutzt werden, als muesste es vollstaendig sein: fehlt ein Eintrag, entfaellt das
 // ANGEBOT zurueckzusetzen — es geht nichts kaputt und nichts verloren, was nicht ohnehin
 // verloren waere. Ein Ablauf, der einen Eintrag VORAUSSETZT, gehoert nicht hierher.

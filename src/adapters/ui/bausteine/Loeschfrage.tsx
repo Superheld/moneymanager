@@ -9,7 +9,7 @@
 // **Warum eine Rückfrage und kein Rückgängig.** Ein „Rückgängig" wäre das bessere
 // Angebot, aber es müsste jeder Löschweg selbst können: die Kaskaden hängen dran (ein
 // Vertrag nimmt seine Zahlungsregel, seine Erkennungsregel und alle Zuordnungen mit) und
-// es gibt für Stammdaten bewusst kein Änderungsprotokoll (siehe CLAUDE.md). Eine
+// es gibt für Stammdaten bewusst kein Änderungsprotokoll (siehe `src/application/buchung/CLAUDE.md`). Eine
 // Rückfrage kostet einen Klick und deckt denselben Fall ab — den versehentlichen.
 //
 // **Was in der Frage steht, ist der eigentliche Punkt.** „Wirklich löschen?" ist eine

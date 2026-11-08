@@ -4,7 +4,7 @@
 // hier die Zerlegung eines vorzeichenbehafteten Betrags in seine zwei Hälften und das
 // Bedienteil, das die zweite zeigt — was zusammen gedacht werden muss, soll auch
 // zusammen liegen. Die Begründung, warum es überhaupt zwei Hälften sind, steht in der
-// Wurzel-`CLAUDE.md` unter „Das Vorzeichen ist die Richtung".
+// `src/core/buchung/CLAUDE.md` unter „Das Vorzeichen ist die Richtung".
 
 import { useTranslation } from "react-i18next";
 import type { Geld } from "../bausteine/einstellungenKontext";

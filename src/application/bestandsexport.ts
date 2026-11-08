@@ -102,7 +102,7 @@ export interface ExportBeleg {
   readonly endempfaenger: string | null;
   /** SEPA-Verwendungszweckcode (`SALA`, `RENT` …) — nur CAMT, sonst leer. */
   readonly zweckCode: string | null;
-  /** Etikett bzw. Freitext je nach Format — deutbar nur über `laufId`, siehe CLAUDE.md. */
+  /** Etikett bzw. Freitext je nach Format — deutbar nur über `laufId`, siehe `src/application/import/CLAUDE.md`. */
   readonly umsatzart: string | null;
   readonly buchungsschluessel: string | null;
   /**
@@ -194,7 +194,7 @@ export interface ExportBuchung {
   readonly vertragId: string | null;
   /**
    * Gesetzt bei leerem `vertragId` heisst „gehört AUSDRÜCKLICH zu keinem Vertrag" — eine
-   * Handentscheidung, nicht ein fehlender Wert. Siehe CLAUDE.md, „Zuordnungen stehen an
+   * Handentscheidung, nicht ein fehlender Wert. Siehe `src/core/vertraege/CLAUDE.md`, „Zuordnungen stehen an
    * der Buchung".
    */
   readonly vertragHerkunft: string | null;
