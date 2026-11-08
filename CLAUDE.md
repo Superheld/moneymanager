@@ -876,7 +876,7 @@ davon ersetzt einen anderen:
 |---|---|---|
 | **Bedarf** | Σ Monatsraten der Rücklagen | was die Rechnung verlangt |
 | **Plan** | Σ Umbuchungsregeln auf Rücklagenkonten | was du eingerichtet hast |
-| **Ist** | gebuchte Umschichtungen im Fenster | was tatsächlich geflossen ist |
+| **Eingegangen** (`ist`) | jede Einzahlung auf ein Rücklagenkonto im Fenster, Zinsen eingeschlossen; Umbuchungen nur, wenn sie nicht von einem anderen Rücklagenkonto kommen | was tatsächlich angekommen ist — bis 2026-11-08 „geflossen" und nur das abgehende Bein vom liquiden Konto |
 
 Bedarf über Plan heisst: du legst zu wenig zurück, die Deckung wird schlechter, ohne dass
 irgendwo etwas schiefgeht. Plan über Ist heisst: die Überweisung ist ausgefallen. Eine

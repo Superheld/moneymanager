@@ -34,11 +34,12 @@ import {
 import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
+import { FaustformelTacho } from "./FaustformelTacho";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { Modal } from "../bausteine/Modal";
-import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
@@ -59,6 +60,8 @@ export function RuecklagenScreen() {
   const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const geld = useGeld();
+  // Die Liste unter „Diesen Monat" geht über höchstens einen Monat — dort sagt das Jahr nichts.
+  const datum = useDatum();
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Ruecklagensicht | null>(null);
 
@@ -195,53 +198,85 @@ export function RuecklagenScreen() {
         </div>
       )}
 
-      {/* Drei Zahlen, nicht eine — und das ist der ganze Nutzen dieser Karte:
-          BEDARF verlangt die Rechnung, PLAN hast du eingerichtet, IST ist geflossen.
-          Bedarf über Plan heisst „du legst zu wenig zurück"; Plan über Ist heisst „die
-          Überweisung ist ausgefallen". Eine Zahl allein könnte keine der beiden Aussagen
-          treffen. */}
-      {(fluss.bedarf > 0 || fluss.plan > 0 || fluss.ist !== 0) && (
-        <Card title={t("ruecklagen.flussTitel")} subtitle={t("ruecklagen.flussUntertitel")}>
-          <div className="kpis">
-            <KPIStat size="chip" label={t("ruecklagen.flussBedarf")} value={geld.format(fluss.bedarf)} unit={geld.symbol} />
-            <KPIStat
-              size="chip"
-              label={t("ruecklagen.flussPlan")}
-              value={geld.format(fluss.plan)}
-              unit={geld.symbol}
-              tone={fluss.plan < fluss.bedarf ? "warn" : "default"}
-            />
-            <KPIStat
-              size="chip"
-              label={t("ruecklagen.flussIst")}
-              value={geld.format(fluss.ist)}
-              unit={geld.symbol}
-              tone={fluss.ist >= fluss.plan && fluss.plan > 0 ? "ok" : "default"}
-            />
-          </div>
-          {fluss.plan === 0 && fluss.bedarf > 0 && (
-            <div className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-2)" }}>
-              {t("ruecklagen.flussOhnePlan")}
-            </div>
+      {/* „Diesen Monat" und die Faustformel stehen als PAAR nebeneinander: beide sind
+          Massstäbe über den Rücklagen als Ganzes, die Liste darunter geht Rücklage für
+          Rücklage. Fehlt eine, nimmt die andere die volle Breite (`karten-paar`). */}
+      {(fluss.bedarf > 0 || fluss.plan > 0 || fluss.ist !== 0 || mindest > 0) && (
+        <div className="karten-paar" style={{ marginTop: 0, marginBottom: "var(--gap-card)" }}>
+          {/* Drei Zahlen, nicht eine — und das ist der ganze Nutzen dieser Karte:
+              BEDARF verlangt die Rechnung, PLAN hast du eingerichtet, EINGEGANGEN ist, was
+              auf den Rücklagenkonten angekommen ist. Bedarf über Plan heisst „du legst zu
+              wenig zurück"; Plan über Eingang heisst „die Überweisung ist ausgefallen".
+              Die Buchungen stehen darunter: bis 2026-11-08 hiess die dritte Zahl
+              „geflossen", und man musste raten, woraus sie bestand. */}
+          {(fluss.bedarf > 0 || fluss.plan > 0 || fluss.ist !== 0) && (
+            <Card title={t("ruecklagen.flussTitel")} subtitle={t("ruecklagen.flussUntertitel")}>
+              <div className="kpis">
+                <KPIStat size="chip" label={t("ruecklagen.flussBedarf")} value={geld.format(fluss.bedarf)} unit={geld.symbol} />
+                <KPIStat
+                  size="chip"
+                  label={t("ruecklagen.flussPlan")}
+                  value={geld.format(fluss.plan)}
+                  unit={geld.symbol}
+                  tone={fluss.plan < fluss.bedarf ? "warn" : "default"}
+                />
+                <KPIStat
+                  size="chip"
+                  label={t("ruecklagen.flussIst")}
+                  value={geld.format(fluss.ist)}
+                  unit={geld.symbol}
+                  tone={fluss.ist >= fluss.plan && fluss.plan > 0 ? "ok" : "default"}
+                />
+              </div>
+              {fluss.plan === 0 && fluss.bedarf > 0 && (
+                <div className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-2)" }}>
+                  {t("ruecklagen.flussOhnePlan")}
+                </div>
+              )}
+              {fluss.posten.length === 0 ? (
+                <div className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-3)" }}>
+                  {t("ruecklagen.flussKeineBuchung")}
+                </div>
+              ) : (
+                <div style={{ marginTop: "var(--sp-3)" }}>
+                  {fluss.posten.map((p, i) => (
+                    <div
+                      key={p.buchungId}
+                      style={{
+                        display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: "12.5px",
+                        borderTop: i === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
+                      }}
+                    >
+                      <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
+                        {datum.ohneJahr(p.datum)}
+                      </span>
+                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink-2)" }}>
+                        {kontoName.get(p.nachKontoId) ?? p.nachKontoId}
+                        <span className="muted">
+                          {" · "}
+                          {p.vonKontoId
+                            ? t("ruecklagen.flussVon", { konto: kontoName.get(p.vonKontoId) ?? p.vonKontoId })
+                            : t("ruecklagen.flussOhneKonto")}
+                        </span>
+                      </span>
+                      <span className="num" style={{ marginLeft: "auto", flex: "0 0 auto", fontWeight: "var(--fw-semi)" }}>
+                        {geld.format(p.betrag)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
           )}
-        </Card>
-      )}
 
-      {/* Die Faustformel steht für sich und nicht bei den Kennzahlen darüber: die messen
-          die Rücklagen, die es GIBT, sie nennt einen Betrag, den es geben sollte. In
-          einer Reihe mit den anderen sähe sie aus wie eine Vorgabe, an der etwas
-          gemessen wird — nichts im Programm misst daran. */}
-      {mindest > 0 && (
-        <Card title={t("ruecklagen.mindestTitel")}>
-          <div style={{ display: "flex", alignItems: "baseline", gap: "var(--sp-3)", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "var(--fs-h2)", fontWeight: "var(--fw-bold)" }}>
-              {geld.format(mindest)} {geld.symbol}
-            </span>
-            <span className="muted" style={{ fontSize: "var(--fs-small)" }}>
-              {t("ruecklagen.mindestHerleitung", { einnahmen: geld.format(sicht?.vertragseinnahmen ?? 0) })}
-            </span>
-          </div>
-        </Card>
+          {/* Die Faustformel misst seit 2026-11-08 etwas: den Stand der Rücklagenkonten.
+              Sie entscheidet trotzdem nichts — keine Warnung, keine Rechnung hängt an ihr. */}
+          {mindest > 0 && (
+            <Card title={t("ruecklagen.mindestTitel")} subtitle={t("ruecklagen.mindestHerleitung", { einnahmen: geld.formatMitSymbol(sicht?.vertragseinnahmen ?? 0) })}>
+              <FaustformelTacho stand={sicht?.ruecklagenStand ?? 0} mindest={mindest} />
+            </Card>
+          )}
+        </div>
       )}
 
       {items.length > 0 && deckung.sollMitKonto === 0 && (

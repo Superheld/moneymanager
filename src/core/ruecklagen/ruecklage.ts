@@ -186,7 +186,10 @@ export function ruecklagenDeckung(
 /**
  * Die Mindestrücklage nach der Faustformel: drei Monatseinnahmen.
  *
- * REINE INFORMATION und keine Regel — nichts im Programm misst etwas daran. Die Formel
+ * Keine Regel, aber seit 2026-11-08 ein MASSSTAB: der Bereich Rücklagen zeigt, wie weit
+ * der Stand der Rücklagenkonten an sie heranreicht. Bis dahin stand hier „nichts im
+ * Programm misst etwas daran". Sie entscheidet trotzdem nichts — keine Warnung, keine
+ * Rechnung hängt an ihr; der Tacho zeigt nur, wo man steht. Die Formel
  * ist eine verbreitete Faustregel für den Notgroschen, kein Rechenweg mit einer
  * Herleitung; deshalb steht der Faktor als Argument da und nicht als Konstante im Code.
  *

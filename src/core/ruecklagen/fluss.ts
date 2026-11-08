@@ -4,7 +4,15 @@
 //
 //   BEDARF  was die Rücklagen VERLANGEN — Σ ihrer Monatsraten. Eine Rechnung, kein Plan.
 //   PLAN    was du dafür EINGERICHTET hast — Σ der Umbuchungsverträge auf Rücklagenkonten.
-//   IST     was tatsächlich GEFLOSSEN ist — die gebuchten Umschichtungen im Zeitraum.
+//   IST     was tatsächlich EINGEGANGEN ist — jede Einzahlung auf ein Rücklagenkonto im
+//           Zeitraum, Zinsen eingeschlossen; eine Umbuchung nur, wenn sie nicht von einem
+//           anderen Rücklagenkonto kommt (das wäre ein Umräumen, kein Zugang).
+//
+// **Das Ist hiess bis 2026-11-08 „geflossen" und zählte nur das abgehende Bein einer
+// Umbuchung vom liquiden Konto.** Was sonst auf dem Rücklagenkonto ankam — Zinsen, eine
+// Überweisung vom Sparkonto, eine Gutschrift —, stand nirgends, und „geflossen" sagte
+// nicht, was gemeint war. Jetzt zählt die Empfängerseite, und die Oberfläche zeigt die
+// Buchungen dazu.
 //
 // Sie stimmen selten überein, und jede Abweichung sagt etwas anderes. Bedarf über Plan
 // heisst: du legst zu wenig zurück, die Deckung wird schlechter, ohne dass irgendwo etwas
@@ -34,9 +42,11 @@ import { monatsRuecklageGesamt, type Ruecklage } from "./ruecklage";
 export interface Flussposten {
   readonly buchungId: string;
   readonly datum: string;
-  /** POSITIV — was zurückgelegt wurde. */
+  /** POSITIV — was eingegangen ist. */
   readonly betrag: Cent;
-  readonly vonKontoId: string;
+  /** Woher, wenn es eine Umbuchung von einem eigenen Konto war; sonst leer (Zinsen, Gutschrift). */
+  readonly vonKontoId?: string;
+  /** Das Rücklagenkonto, auf dem es einging. */
   readonly nachKontoId: string;
 }
 
@@ -90,18 +100,20 @@ export function ruecklagenfluss(
 
   const posten: Flussposten[] = [];
   for (const b of buchungen) {
-    if (b.charakter !== "Umschichtung") continue;
-    // Nur das abgehende Bein — sonst zählte dieselbe Verschiebung zweimal, einmal
-    // negativ und einmal positiv, und die Summe wäre null.
-    if (b.betrag >= 0) continue;
+    // Die EMPFÄNGERSEITE: was auf einem Rücklagenkonto eingeht. Nur Zugänge — eine
+    // Umbuchung liegt als Paar vor, und nur ihr ankommendes Bein steht hier, die Summe
+    // zählt sie also einmal.
+    if (b.betrag <= 0) continue;
     if (b.datum < von || b.datum >= bis) continue;
-    if (!istQuelle(b.kontoId) || !istZiel(b.gegenkontoId)) continue;
+    if (!istZiel(b.kontoId)) continue;
+    // Von einem anderen Rücklagenkonto ist es Umräumen innerhalb der Rücklagen.
+    if (istZiel(b.gegenkontoId)) continue;
     posten.push({
       buchungId: b.id,
       datum: b.datum,
-      betrag: -b.betrag,
-      vonKontoId: b.kontoId,
-      nachKontoId: b.gegenkontoId as string,
+      betrag: b.betrag,
+      ...(b.gegenkontoId ? { vonKontoId: b.gegenkontoId } : {}),
+      nachKontoId: b.kontoId,
     });
   }
 
