@@ -114,15 +114,17 @@ describe("monatsAusblick — Plan-Spalte aus den Verträgen", () => {
     expect(zeile(a, "einnahmen")!.plan).toBe(0);
   });
 
-  it("rechnet ein aufbauendes Budget mit derselben Monatsrate ein wie ein monatliches", () => {
+  it("rechnet ein aufbauendes Budget mit derselben Monatsrate ein — in seiner eigenen Zeile", () => {
     // Auch was sich aufbaut, kostet jeden Monat seine Rate — es gibt sie nur am
-    // Monatsende nicht zurück. Für die Aufrechnung „was bleibt" ist das dasselbe.
+    // Monatsende nicht zurück. Für die Aufrechnung „was bleibt" ist das dasselbe; es
+    // steht seit 2026-11-08 nur in einer eigenen Zeile.
     const a = monatsAusblick({
       ...basis,
       budgets: [budget({ art: "aufbauend", betragProMonat: euroZuCent(400) })],
       monatAb: "2026-09-01",
     });
-    expect(zeile(a, "budgets")!.plan).toBe(euroZuCent(-400));
+    expect(zeile(a, "budgetsAufbauend")!.plan).toBe(euroZuCent(-400));
+    expect(zeile(a, "budgets")!.plan).toBe(0);
   });
 
   it("zieht ein eingebettetes Budget vom Dach ab, statt beide voll zu zählen", () => {
@@ -350,7 +352,72 @@ describe("monatsAusblick — Budgets ohne Plan", () => {
       ist: [ist({ id: "w", kategorieId: "lebenshaltung", betrag: euroZuCent(-80) })],
       monatAb: "2026-08-01",
     });
-    expect(zeile(a, "budgets")).toMatchObject({ plan: 0, ist: euroZuCent(-80) });
+    expect(zeile(a, "budgetsAufbauend")).toMatchObject({ plan: 0, ist: euroZuCent(-80) });
     expect(zeile(a, "sonstiges")).toBeUndefined();
+  });
+});
+
+/**
+ * Umbuchungen hängen am Kreis der Konten, über den gerechnet wird. Der Kreis hier: Giro
+ * und Tagesgeld (beide liquide). Draussen liegen ein Rücklagenkonto und ein Depotkonto.
+ */
+describe("monatsAusblick — Umbuchungen und der Kreis", () => {
+  const kreis = new Set(["giro", "tagesgeld"]);
+  const ruecklagenKonten = new Set(["ruecklage"]);
+  const mitKreis = { ...basis, kreis, ruecklagenKonten, monatAb: "2026-08-01" };
+  const umbuchung = (over: Partial<Zahlungsregel> = {}) =>
+    regel({
+      id: "r-um", bezeichnung: "Dauerauftrag", betrag: euroZuCent(-200), charakter: "Umschichtung",
+      kategorieId: undefined, kontoId: "giro", startdatum: "2026-01-03", ...over,
+    });
+  const bein = (over: Partial<IstBuchung> = {}) =>
+    ist({
+      id: "u1", datum: "2026-08-03", betrag: euroZuCent(-200), charakter: "Umschichtung",
+      kategorieId: undefined, kontoId: "giro", transferId: "t1", ...over,
+    });
+
+  it("lässt eine Umbuchung zwischen zwei Konten im Kreis aus Plan und Ist heraus", () => {
+    const a = monatsAusblick({
+      ...mitKreis,
+      regeln: [umbuchung({ gegenkontoId: "tagesgeld" })],
+      ist: [bein({ gegenkontoId: "tagesgeld" })],
+    });
+    expect(zeile(a, "umschichtung")).toBeUndefined();
+    expect(zeile(a, "ruecklagen")).toBeUndefined();
+  });
+
+  it("führt eine Umbuchung aufs Rücklagenkonto als Rücklage — geplant UND gebucht", () => {
+    // Vorher fiel das gebuchte Bein heraus, weil es ein Gegenbein hat: der Plan stand
+    // da, das Ist blieb leer, obwohl das Geld geflossen war.
+    const a = monatsAusblick({
+      ...mitKreis,
+      regeln: [umbuchung({ gegenkontoId: "ruecklage" })],
+      ist: [bein({ gegenkontoId: "ruecklage" })],
+    });
+    const r = zeile(a, "ruecklagen")!;
+    expect(r).toMatchObject({ plan: euroZuCent(-200), ist: euroZuCent(-200) });
+    // Gepaart über Quell- und Zielkonto, nicht als zweiter, ungeplanter Posten daneben.
+    expect(r.posten).toHaveLength(1);
+    expect(r.posten[0].status).toBe("gebucht");
+    expect(zeile(a, "umschichtung")).toBeUndefined();
+  });
+
+  it("führt eine Umbuchung aufs Depotkonto unter Sparen & Vorsorge, nicht als Rücklage", () => {
+    const a = monatsAusblick({ ...mitKreis, ist: [bein({ gegenkontoId: "depot" })] });
+    expect(zeile(a, "umschichtung")!.ist).toBe(euroZuCent(-200));
+    expect(zeile(a, "ruecklagen")).toBeUndefined();
+  });
+
+  it("lässt eine Umschichtung ohne Gegenkonto stehen — sie verlässt den Kreis", () => {
+    // Der Wertpapierkauf vom Girokonto: kein zweites Bein, kein Zielkonto.
+    const a = monatsAusblick({ ...mitKreis, ist: [bein({ transferId: undefined })] });
+    expect(zeile(a, "umschichtung")!.ist).toBe(euroZuCent(-200));
+  });
+
+  it("verhält sich ohne Kreis wie bisher: jedes gepaarte Bein ist intern", () => {
+    // Die Aufrechnung über ALLE Konten (Ausblick der Analyse) gibt keinen Kreis an.
+    const a = monatsAusblick({ ...basis, ist: [bein({ gegenkontoId: "ruecklage" })], monatAb: "2026-08-01" });
+    expect(zeile(a, "umschichtung")).toBeUndefined();
+    expect(zeile(a, "ruecklagen")).toBeUndefined();
   });
 });

@@ -46,14 +46,15 @@ derselben gefilterten Sicht. Gefiltert werden die BUCHUNGEN und Zahlungsregeln, 
 Budgets: jedes Budget führt seine Zeile, auch wenn sein Geld auf einem Rücklagenkonto
 liegt, und trägt, was aus den liquiden Konten dafür abging. Seine Rate plant es dort
 nicht (`budgetsOhnePlan`) — sie kommt über eine Umbuchung an, und die steht schon in
-„Sparen & Vorsorge". Was auf Rücklagen- und Vorsorgekonten passiert, ist zurückgelegt
+„Rücklagen" bzw. „Sparen & Vorsorge". Was auf Rücklagen- und Vorsorgekonten passiert, ist zurückgelegt
 und steht für den Monat nicht zur Verfügung. Der Preis ist eine Aussage, die man kennen
 muss: **dasselbe Budget kann in der Übersicht einen kleineren Verbrauch zeigen als im
 Bereich Budgets** — dort steht der ganze Rahmen, hier nur, was aus den verfügbaren
 Mitteln davon gegangen ist. Der Untertitel der Übersicht sagt es mit.
 
 **Budgets stehen getrennt nach Art** — monatlich (Rest verfällt) und aufbauend (Rest
-bleibt), in der Übersicht wie im Bereich Budgets. Getrennt wird nach dem DACH eines
+bleibt), in der Übersicht wie im Bereich Budgets — seit 2026-11-08 auch in den
+Monatskarten, als zwei Zeilen „Budgets monatlich" und „Budgets aufbauend". Getrennt wird nach dem DACH eines
 Budgetbaums, nicht je Zeile (`nachArtGetrennt`): ein aufbauendes Kind unter einem
 monatlichen Dach wird aus diesem herausgerechnet und bleibt deshalb dort, mit Pille.
 
@@ -70,13 +71,20 @@ dasteht. Die Rechnung dahinter (`liquiditaetsvorschau` in `core/konten/liquidita
 ist geblieben und getestet, hat aber keine Oberfläche mehr; ebenso `veraltet` am
 Abrufstand. Wer sie wieder zeigt, sucht ihr einen leiseren Ort.
 
-**Die Rücklagen haben in den Monatskarten seit 2026-09-01 keine Zeile mehr.** Sie stand
-dort als kalkulatorische Monatsrate, in Plan und Ist mit demselben Betrag. Seit sich
-Rücklagen über einen **Umbuchungsvertrag planen** lassen, steht dasselbe Zurücklegen schon
-als geplante Umschichtung in der Zeile „Sparen & Vorsorge" — beides nebeneinander zählte
-es zweimal. Die Rechnung selbst gibt es weiter, im Bereich Rücklagen als *Bedarf* neben
-Plan und Ist. Aus demselben Grund zählen Rücklagen nicht mehr zu `hatPlandaten`: was zu
-keiner Zeile führt, darf nicht darüber entscheiden, ob die Karten überhaupt erscheinen.
+**Umbuchungen hängen in den Monatskarten am Kreis der liquiden Konten** (seit 2026-11-08,
+`kreis` in `core/monatsausblick.ts`). Liegt das Zielkonto im Kreis, ist es eine interne
+Verschiebung und fällt aus Plan und Ist heraus. Verlässt sie ihn, ist sie ein Abfluss:
+auf ein Konto der Klasse Rücklage in der Zeile **„Rücklagen"**, sonst in **„Sparen &
+Vorsorge"** — dort stehen auch Umschichtungen ganz ohne Gegenkonto, etwa ein Wertpapierkauf.
+Gepaart werden Plan und Ist einer Umbuchung über Quell- und Zielkonto, nicht über die
+Kategorie, die sie meist nicht trägt. Vorher fiel JEDE gepaarte Umbuchung aus dem Ist,
+auch die aufs Rücklagenkonto: der Plan stand da, das Ist blieb leer.
+
+**Die Zeile „Rücklagen" ist nicht die von früher.** Bis 2026-09-01 stand dort die
+kalkulatorische Monatsrate aus dem Bedarf, in Plan und Ist mit demselben Betrag — neben
+dem Umbuchungsvertrag zählte das dasselbe Zurücklegen zweimal. Die heutige Zeile ist die
+Umbuchung selbst; den *Bedarf* gibt es weiter nur im Bereich Rücklagen. Deshalb zählen
+Rücklagen auch nicht zu `hatPlandaten`: der Bedarf führt zu keiner Zeile.
 
 ### Die Schichten
 
@@ -872,9 +880,11 @@ Bedarf über Plan heisst: du legst zu wenig zurück, die Deckung wird schlechter
 irgendwo etwas schiefgeht. Plan über Ist heisst: die Überweisung ist ausgefallen. Eine
 Zahl allein könnte keine dieser Aussagen treffen.
 
-**Wohin gerechnet wird, entscheidet die KONTOKLASSE**, und zwar über genau eine Grenze:
-ein Zufluss auf ein NICHT liquides Konto ist zurückgelegt, auf ein liquides nur
-umgeschichtet. Bedarf
+**Wohin gerechnet wird, entscheidet die KONTOKLASSE:** zurückgelegt ist, was von einem
+liquiden Konto auf ein Konto der Klasse **Rücklage** geht (`istRuecklagenkonto`). Bis
+2026-11-08 zählte jedes nicht liquide Ziel; seit die Monatskarten Rücklagen und „Sparen
+& Vorsorge" trennen, zieht der Fluss dieselbe Grenze — sonst stünde dieselbe Überweisung
+hier als Rücklage und dort als Sparen. Bedarf
 und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
 Zeitraum. Wer sie über mehrere Monate vergleicht, muss die ersten beiden hochrechnen — das
 im Kern zu tun hiesse zu raten, wie viele Monate gemeint sind.
@@ -2193,8 +2203,7 @@ Vier Dinge gelten überall und stehen deshalb hier:
   zweckgebundene Rücklage sein, ohne dass sich sein Typ ändert.
 
   Wer die Klassen erweitert (`KONTOKLASSEN` in `core/konten/konto.ts`), muss für jeden neuen
-  Wert entscheiden, ob er verfügbar ist. Bislang trennt die Klasse **nur** das; was Rücklage
-  und Vorsorge sonst unterscheiden soll, ist offen.
+  Wert entscheiden, ob er verfügbar ist — und ob er als Rücklage zählt (unten).
 
   **`aktiv` ist die dritte Frage und wieder eine andere:** ob das Konto noch GEFÜHRT wird.
   Typ und Klasse beschreiben, was es ist und wofür — `aktiv` nur, ob man damit noch etwas
@@ -2215,9 +2224,13 @@ Vier Dinge gelten überall und stehen deshalb hier:
   will, baut dafür etwas Neues — und es darf dann, wie die Gruppe, **nichts** entscheiden;
   sonst stehen wieder zwei Felder da, die dasselbe verschieden sagen.
 
-  **Gerechnet wird weiterhin über genau eine Grenze:** `istLiquide` fragt `=== "liquide"`,
-  die vier übrigen Werte sind für jede Rechnung dasselbe. Wer das ändert, ändert nicht
-  eine Zahl, sondern die Bedeutung des Feldes.
+  **Gerechnet wird über ZWEI Grenzen, seit 2026-11-08.** `istLiquide` fragt
+  `=== "liquide"` und entscheidet über die liquiden Mittel. `istRuecklagenkonto` fragt
+  `=== "ruecklage"` und entscheidet genau eines: ob eine Umbuchung dorthin als Rücklage
+  zählt (Monatskarten, Rücklagenfluss) oder als Sparen & Vorsorge. Vorsorge, Sparen und
+  Investment sind für jede Rechnung weiterhin dasselbe. Bis dahin stand hier „genau eine
+  Grenze"; die zweite kam, als die Monatskarten Rücklagen für sich zeigen sollten. Wer eine
+  dritte zieht, ändert wieder die Bedeutung des Feldes und schreibt es hierher.
 
   Was für jede Auswahl von Konten gilt: **Saldo und Buchungen filtern mit derselben
   Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie gab.
