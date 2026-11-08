@@ -446,6 +446,36 @@ describe("BudgetsScreen · Verlauf", () => {
   });
 
   /**
+   * Die Liste unter dem Monat hatte keinen Kopf: Datum, Name und Betrag standen da, ohne
+   * dass gesagt war, was welche Spalte ist. Und die Monatszeile darüber las sich wie
+   * loser Text, nicht wie der Kopf der Liste — jetzt ist sie eine aufgeklappte Zeile wie
+   * in den Monatskarten der Übersicht, mit derselben Bedienung.
+   */
+  it("gibt der Monatsliste Spaltenköpfe und lässt sie über die Monatszeile zuklappen", async () => {
+    await aufbauendMitHistorie();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+
+    await nutzer.click(await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ }));
+    await screen.findByText(/Verlauf · Urlaubskasse/);
+    await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
+    await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
+
+    const kopf = screen.getByText("Datum").parentElement!;
+    expect(kopf.textContent).toBe("DatumBuchungBetrag");
+
+    const zeile = screen.getByRole("button", { expanded: true, name: new RegExp(monatVersetzt(-1)) });
+    await nutzer.click(zeile);
+    expect(zeile).toHaveAttribute("aria-expanded", "false");
+    expect(document.body.textContent).not.toMatch(/Fährticket/);
+
+    // Ein anderer Monat aus dem Chart oder der Auswahl klappt wieder auf — wer ihn wählt,
+    // will sehen, was drin ist.
+    await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
+    await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
+  });
+
+  /**
    * Ein RUECKFLUSS — eine Erstattung, die in die Kategorie der Ausgabe gehoert und dort
    * das Budget entlastet. Er steht als Aufwand mit positivem Betrag in der Datenbank, und
    * der Verbrauch des Monats wird dadurch negativ.
