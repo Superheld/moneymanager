@@ -6,6 +6,17 @@
 // Monatskarten und die Budgets des laufenden Monats. Alles, was einen Zeitraum
 // auswertet, hat einen eigenen Bereich bekommen. Vorher war das ein Screen, den man
 // nach unten scrollen musste, bis die Kategorien kamen.
+//
+// **Seit 2026-11-08 in Registern.** Untereinander war die Seite so lang, dass man für
+// die Befunde oder ein Depot an allem anderen vorbeiscrollte; mit Reitern ist jeder
+// Abschnitt einen Klick entfernt, und die Leiste selbst zeigt, was es gibt. Zeitraum,
+// Monat und Kennzahlen stehen ÜBER den Reitern, weil sie für jedes Register gelten — wer
+// im Verlauf einen Monat wählt, sieht in den Kategorien denselben.
+//
+// Was hier NICHT umgekehrt wurde: die Befunde bleiben innerhalb ihres Registers sieben
+// Karten untereinander (siehe `BefundeBereich.tsx`). Dort galt und gilt, dass niemand
+// sucht, was hinter einem Reiter liegt; ein Reiter „Befunde" sagt aber, was darunter ist,
+// sieben Reiter „Treue", „Ohne Plan", „Ausreißer" sagten es nicht mehr.
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
@@ -34,12 +45,16 @@ import { DepotAnsicht } from "./DepotAnsicht";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 import { Auswahl } from "../bausteine/Auswahl";
 import { PageHead } from "../bausteine/PageHead";
+import { Registerleiste } from "../bausteine/Registerleiste";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe, geldTon } from "../bausteine/geldFarbe";
 
 import type { KategorieSumme } from "../../../application";
 
 type Zeitraum = "12" | "24" | "jahr" | "alles";
+
+/** Die Register in Anzeigereihenfolge — dieselbe, in der sie vorher untereinander standen. */
+type AnalyseRegister = "verlauf" | "kategorien" | "ausblick" | "befunde" | "depot";
 
 /**
  * Eine Sektion (Ausgaben/Einnahmen/Umschichtungen) mit ihren Zeilen.
@@ -211,6 +226,7 @@ export function AnalyseScreen() {
    * darunter aus dem Blick gerieten. Jetzt eine Fläche, umschaltbar.
    */
   const [ansicht, setAnsicht] = useState<"fluss" | "saldo" | "tabelle">("fluss");
+  const [register, setRegister] = useState<AnalyseRegister>("verlauf");
   /** Kategorien einzeln oder zu Hauptgruppen gebündelt. */
   const [ebene, setEbene] = useState<"kategorie" | "gruppe">("kategorie");
   const [offeneGruppe, setOffeneGruppe] = useState<string | null>(null);
@@ -397,9 +413,62 @@ export function AnalyseScreen() {
     );
   }
 
+  /**
+   * Nur Register mit Inhalt. Ein Reiter „Depot" ohne abgerufenes Depot wäre ein Weg ins
+   * Leere — als die Abschnitte untereinander standen, fehlte die Fläche dann einfach,
+   * und dasselbe gilt jetzt für ihren Reiter.
+   */
+  const registerListe = (
+    [
+      ["verlauf", true],
+      ["kategorien", !!aufschluesselung && kategorien.length > 0],
+      ["ausblick", true],
+      ["befunde", !!befunde && !!basis],
+      ["depot", !!depotdaten && depotdaten.depots.length > 0],
+    ] as const
+  )
+    .filter(([, da]) => da)
+    .map(([id]) => ({ id, label: t(`analyse.register.${id}`) }));
+  /** Verschwindet das gewählte Register (Depot entfernt), gilt wieder das erste. */
+  const wirksamesRegister: AnalyseRegister = registerListe.some((r) => r.id === register) ? register : "verlauf";
+
   return (
     <div className="screen">
-      <PageHead title={t("analyse.titel")} subtitle={t("analyse.untertitel")} />
+      {/* Zeitraum und Monat sitzen im Kopf, nicht mehr an der Verlaufskarte: sie gelten
+          für die Kennzahlen und JEDES Register, und an einer Karte in einem Register
+          wären sie verschwunden, sobald man ein anderes wählt. */}
+      <PageHead
+        title={t("analyse.titel")}
+        subtitle={t("analyse.untertitel")}
+        action={
+          geladen && ist.length > 0 ? (
+          <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
+            {/* Monat direkt wählbar — der Klick auf den Chart macht dasselbe, ist bei
+                vielen Monaten aber Zielübung. Beide schreiben denselben Zustand. */}
+            <Auswahl
+              ariaLabel={t("historie.monatWaehlen")}
+              wert={aktivMonat == null ? "" : String(aktivMonat)}
+              aufAenderung={(v) => { setAktivMonat(v === "" ? null : Number(v)); setOffeneKat(null); }}
+              optionen={[
+                { wert: "", text: t("historie.alleMonate") },
+                ...verlauf.map((m, i) => ({ wert: String(i), text: m.label })),
+              ]}
+            />
+            <Auswahl
+              ariaLabel={t("historie.zeitraumWaehlen")}
+              wert={zeitraum}
+              aufAenderung={(v) => { setZeitraum(v as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}
+              optionen={[
+                { wert: "12", text: t("historie.zr12") },
+                { wert: "24", text: t("historie.zr24") },
+                { wert: "jahr", text: t("historie.zrJahr") },
+                { wert: "alles", text: t("historie.zrAlles") },
+              ]}
+            />
+          </span>
+          ) : undefined
+        }
+      />
 
       {fehler && <Card style={{ borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
 
@@ -424,145 +493,126 @@ export function AnalyseScreen() {
             <KPIStat size="chip" label={t("historie.kpiSaldo")} value={geld.format(saldoJetzt)} unit={geld.symbol} tone={geldTon(saldoJetzt)} />
           </div>
 
-          <Card
-            title={t("historie.verlaufTitel")}
-            subtitle={t(`historie.verlauf.${ansicht}`)}
-            action={
-              <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
-                {/* Monat direkt wählbar — der Klick auf den Chart macht dasselbe, ist bei
-                    vielen Monaten aber Zielübung. Beide schreiben denselben Zustand. */}
-                <Auswahl
-                  ariaLabel={t("historie.monatWaehlen")}
-                  wert={aktivMonat == null ? "" : String(aktivMonat)}
-                  aufAenderung={(v) => { setAktivMonat(v === "" ? null : Number(v)); setOffeneKat(null); }}
-                  optionen={[
-                    { wert: "", text: t("historie.alleMonate") },
-                    ...verlauf.map((m, i) => ({ wert: String(i), text: m.label })),
-                  ]}
-                />
-                <Auswahl
-                  ariaLabel={t("historie.zeitraumWaehlen")}
-                  wert={zeitraum}
-                  aufAenderung={(v) => { setZeitraum(v as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}
-                  optionen={[
-                    { wert: "12", text: t("historie.zr12") },
-                    { wert: "24", text: t("historie.zr24") },
-                    { wert: "jahr", text: t("historie.zrJahr") },
-                    { wert: "alles", text: t("historie.zrAlles") },
-                  ]}
-                />
-              </span>
-            }
-          >
-            {/* Umschalter: eine Fläche, drei Blicke auf dieselben Monate. */}
-            <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)", marginBottom: "var(--sp-3)" }}>
-              {(["fluss", "saldo", "tabelle"] as const).map((a, i) => {
-                const an = ansicht === a;
-                return (
-                  <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
-                    style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                    {t(`historie.ansicht.${a}`)}
-                  </button>
-                );
-              })}
-            </div>
+          <Registerleiste
+            register={registerListe}
+            aktiv={wirksamesRegister}
+            onWahl={(id) => setRegister(id as AnalyseRegister)}
+          />
 
-            {verlauf.length > 0 && ansicht === "fluss" && (
-              <MonatsFlussChart
-                labels={verlauf.map((m) => m.label)}
-                einnahmen={verlauf.map((m) => m.einnahmen)}
-                ausgaben={verlauf.map((m) => -m.ausgaben)}
-                onMonatClick={(i) => setAktivMonat((cur) => (cur === i ? null : i))}
-                aktivIndex={aktivMonat}
-              />
-            )}
-
-            {verlauf.length > 0 && ansicht === "saldo" && (
-              <SaldoVerlaufChart labels={verlauf.map((m) => m.label)} werte={verlauf.map((m) => m.saldo)} legende={t("historie.saldoLegende")} />
-            )}
-
-            {verlauf.length > 0 && ansicht === "tabelle" && (
-              <DataTable
-                sortable
-                pageSize={24}
-                onRowClick={(m) => setAktivMonat((cur) => { const i = verlauf.findIndex((v) => v.label === m.label); return cur === i ? null : i; })}
-                istAktiv={(m) => aktivMonat != null && verlauf[aktivMonat]?.label === m.label}
-                columns={[
-                  { key: "label", label: t("historie.spalteMonat") },
-                  { key: "einnahmen", label: `${t("historie.spalteEinnahmen")} ${geld.symbol}`, align: "right", render: (m) => (m.einnahmen ? geld.format(m.einnahmen) : "—") },
-                  { key: "ausgaben", label: `${t("historie.spalteAusgaben")} ${geld.symbol}`, align: "right", render: (m) => (m.ausgaben ? geld.format(m.ausgaben) : "—") },
-                  { key: "netto", label: `${t("historie.spalteNetto")} ${geld.symbol}`, align: "right", render: (m) => <span style={{ color: geldFarbe(m.netto), fontWeight: "var(--fw-bold)" }}>{geld.format(m.netto, { mitVorzeichen: true })}</span> },
-                  { key: "umschichtung", label: `${t("historie.spalteUmschichtung")} ${geld.symbol}`, align: "right", render: (m) => (m.umschichtung ? geld.format(m.umschichtung, { mitVorzeichen: true }) : "—") },
-                  { key: "saldo", label: `${t("historie.spalteSaldo")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.saldo, { mitVorzeichen: true }) },
-                ]}
-                rows={[...verlauf].reverse()}
-              />
-            )}
-          </Card>
-
-          {aufschluesselung && kategorien.length > 0 && (
+          {wirksamesRegister === "verlauf" && (
             <Card
-              title={t("historie.katTitel")}
-              subtitle={aufschluesselung.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
-              action={
-                <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
-                  {aufschluesselung.label && <Button variant="ghost" onClick={() => setAktivMonat(null)}>{t("historie.alleMonate")}</Button>}
-                  <Auswahl
-                    ariaLabel={t("historie.ebeneWaehlen")}
-                    wert={ebene}
-                    aufAenderung={(v) => { setEbene(v as "kategorie" | "gruppe"); setOffeneKat(null); setOffeneGruppe(null); }}
-                    optionen={[
-                      { wert: "kategorie", text: t("historie.ebeneKategorie") },
-                      { wert: "gruppe", text: t("historie.ebeneGruppe") },
-                    ]}
-                  />
-                </span>
-              }
-                         >
-              {(["Aufwand", "Ertrag", "Umschichtung"] as const).map((ch) => {
-                const titel = ch === "Aufwand" ? t("historie.sektionAusgaben") : ch === "Ertrag" ? t("historie.sektionEinnahmen") : t("historie.sektionUmschichtung");
-                const ohneLabel = ch === "Umschichtung" ? t("historie.umbuchungen") : undefined;
-                const items = aufschluesselung.items.filter((i) => i.charakter === ch);
-                return ebene === "gruppe" ? (
-                  <GruppenSektion
-                    key={ch}
-                    titel={titel}
-                    gruppen={basis ? analyseGruppen(basis, items) : []}
-                    ohneLabel={ohneLabel}
-                    monate={monateImFenster}
-                    offeneGruppe={offeneGruppe ?? undefined}
-                    onGruppe={(id) => { setOffeneGruppe((cur) => (cur === id ? null : id)); setOffeneKat(null); }}
-                    offeneKat={offeneKat ?? undefined}
-                    onKat={(id) => setOffeneKat((cur) => (cur === id ? null : id))}
-                    renderDetail={detailTabelle}
-                  />
-                ) : (
-                  <KategorieSektion
-                    key={ch}
-                    titel={titel}
-                    items={items}
-                    ohneLabel={ohneLabel}
-                    monate={monateImFenster}
-                    onSelect={(id) => setOffeneKat((cur) => (cur === id ? null : id))}
-                    aktivId={offeneKat ?? undefined}
-                    renderDetail={detailTabelle}
-                  />
-                );
-              })}
-              {aufschluesselung.items.length === 0 && <div className="muted">{t("historie.katLeer")}</div>}
-              <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)", marginTop: "var(--sp-2)" }}>{t("historie.katKlickHinweis")}</div>
+              title={t("historie.verlaufTitel")}
+              subtitle={t(`historie.verlauf.${ansicht}`)}
+            >
+              {/* Umschalter: eine Fläche, drei Blicke auf dieselben Monate. */}
+              <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)", marginBottom: "var(--sp-3)" }}>
+                {(["fluss", "saldo", "tabelle"] as const).map((a, i) => {
+                  const an = ansicht === a;
+                  return (
+                    <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
+                      style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
+                      {t(`historie.ansicht.${a}`)}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {verlauf.length > 0 && ansicht === "fluss" && (
+                <MonatsFlussChart
+                  labels={verlauf.map((m) => m.label)}
+                  einnahmen={verlauf.map((m) => m.einnahmen)}
+                  ausgaben={verlauf.map((m) => -m.ausgaben)}
+                  onMonatClick={(i) => setAktivMonat((cur) => (cur === i ? null : i))}
+                  aktivIndex={aktivMonat}
+                />
+              )}
+
+              {verlauf.length > 0 && ansicht === "saldo" && (
+                <SaldoVerlaufChart labels={verlauf.map((m) => m.label)} werte={verlauf.map((m) => m.saldo)} legende={t("historie.saldoLegende")} />
+              )}
+
+              {verlauf.length > 0 && ansicht === "tabelle" && (
+                <DataTable
+                  sortable
+                  pageSize={24}
+                  onRowClick={(m) => setAktivMonat((cur) => { const i = verlauf.findIndex((v) => v.label === m.label); return cur === i ? null : i; })}
+                  istAktiv={(m) => aktivMonat != null && verlauf[aktivMonat]?.label === m.label}
+                  columns={[
+                    { key: "label", label: t("historie.spalteMonat") },
+                    { key: "einnahmen", label: `${t("historie.spalteEinnahmen")} ${geld.symbol}`, align: "right", render: (m) => (m.einnahmen ? geld.format(m.einnahmen) : "—") },
+                    { key: "ausgaben", label: `${t("historie.spalteAusgaben")} ${geld.symbol}`, align: "right", render: (m) => (m.ausgaben ? geld.format(m.ausgaben) : "—") },
+                    { key: "netto", label: `${t("historie.spalteNetto")} ${geld.symbol}`, align: "right", render: (m) => <span style={{ color: geldFarbe(m.netto), fontWeight: "var(--fw-bold)" }}>{geld.format(m.netto, { mitVorzeichen: true })}</span> },
+                    { key: "umschichtung", label: `${t("historie.spalteUmschichtung")} ${geld.symbol}`, align: "right", render: (m) => (m.umschichtung ? geld.format(m.umschichtung, { mitVorzeichen: true }) : "—") },
+                    { key: "saldo", label: `${t("historie.spalteSaldo")} ${geld.symbol}`, align: "right", render: (m) => geld.format(m.saldo, { mitVorzeichen: true }) },
+                  ]}
+                  rows={[...verlauf].reverse()}
+                />
+              )}
             </Card>
           )}
 
-          {/* Der Blick nach vorn steht direkt unter dem Verlauf: es ist derselbe Saldo,
-              nur weitergedacht. Zwischen beide etwas zu setzen hiesse, die Linie zu
-              zerreissen, die sie verbindet. */}
-          <AusblickKarte punkte={ausblick} />
+          {wirksamesRegister === "kategorien" && aufschluesselung && (
+              <Card
+                title={t("historie.katTitel")}
+                subtitle={aufschluesselung.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
+                action={
+                  <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+                    {aufschluesselung.label && <Button variant="ghost" onClick={() => setAktivMonat(null)}>{t("historie.alleMonate")}</Button>}
+                    <Auswahl
+                      ariaLabel={t("historie.ebeneWaehlen")}
+                      wert={ebene}
+                      aufAenderung={(v) => { setEbene(v as "kategorie" | "gruppe"); setOffeneKat(null); setOffeneGruppe(null); }}
+                      optionen={[
+                        { wert: "kategorie", text: t("historie.ebeneKategorie") },
+                        { wert: "gruppe", text: t("historie.ebeneGruppe") },
+                      ]}
+                    />
+                  </span>
+                }
+                           >
+                {(["Aufwand", "Ertrag", "Umschichtung"] as const).map((ch) => {
+                  const titel = ch === "Aufwand" ? t("historie.sektionAusgaben") : ch === "Ertrag" ? t("historie.sektionEinnahmen") : t("historie.sektionUmschichtung");
+                  const ohneLabel = ch === "Umschichtung" ? t("historie.umbuchungen") : undefined;
+                  const items = aufschluesselung.items.filter((i) => i.charakter === ch);
+                  return ebene === "gruppe" ? (
+                    <GruppenSektion
+                      key={ch}
+                      titel={titel}
+                      gruppen={basis ? analyseGruppen(basis, items) : []}
+                      ohneLabel={ohneLabel}
+                      monate={monateImFenster}
+                      offeneGruppe={offeneGruppe ?? undefined}
+                      onGruppe={(id) => { setOffeneGruppe((cur) => (cur === id ? null : id)); setOffeneKat(null); }}
+                      offeneKat={offeneKat ?? undefined}
+                      onKat={(id) => setOffeneKat((cur) => (cur === id ? null : id))}
+                      renderDetail={detailTabelle}
+                    />
+                  ) : (
+                    <KategorieSektion
+                      key={ch}
+                      titel={titel}
+                      items={items}
+                      ohneLabel={ohneLabel}
+                      monate={monateImFenster}
+                      onSelect={(id) => setOffeneKat((cur) => (cur === id ? null : id))}
+                      aktivId={offeneKat ?? undefined}
+                      renderDetail={detailTabelle}
+                    />
+                  );
+                })}
+                {aufschluesselung.items.length === 0 && <div className="muted">{t("historie.katLeer")}</div>}
+                <div style={{ fontSize: "var(--fs-2xs)", color: "var(--ink-3)", marginTop: "var(--sp-2)" }}>{t("historie.katKlickHinweis")}</div>
+              </Card>
+          )}
 
-          {/* Die Befunde stehen NACH den Kategorien und vor den Depots: sie setzen
-              voraus, dass man gesehen hat, wie viel wohin ging, und beantworten die
-              nächste Frage — ob das so tragfähig ist. */}
-          {befunde && basis && (
+          {/* Der Blick nach vorn ist derselbe Saldo wie im Verlauf, nur weitergedacht. Als
+              die Abschnitte untereinander standen, sass er deshalb direkt darunter; als
+              Register steht er gleich daneben. */}
+          {wirksamesRegister === "ausblick" && <AusblickKarte punkte={ausblick} />}
+
+          {/* Die Befunde setzen voraus, dass man gesehen hat, wie viel wohin ging, und
+              beantworten die nächste Frage — ob das so tragfähig ist. */}
+          {wirksamesRegister === "befunde" && befunde && basis && (
             <BefundeBereich
               befunde={befunde}
               kontoNamen={basis.kontoNamen}
@@ -573,7 +623,7 @@ export function AnalyseScreen() {
           {/* Depots zuletzt: sie beantworten eine eigene Frage und mischen sich in die
               Kategorien-Auswertung darüber nicht ein. Nebeneinander wie in der Übersicht —
               bei einem einzelnen Depot nimmt es die volle Breite. */}
-          {depotdaten && depotdaten.depots.length > 0 && (
+          {wirksamesRegister === "depot" && depotdaten && depotdaten.depots.length > 0 && (
             <div className="karten-paar">
               {depotdaten.depots.map((d) => (
                 <DepotAnsicht key={d.depot.id} sicht={d} von={von} bis={bisTag} />

@@ -592,6 +592,13 @@ const de = {
   analyse: {
     titel: "Analyse",
     untertitel: "Was tatsächlich geflossen ist — Monat für Monat",
+    register: {
+      verlauf: "Verlauf",
+      kategorien: "Kategorien",
+      ausblick: "Ausblick",
+      befunde: "Befunde",
+      depot: "Depot",
+    },
   },
   historie: {
     titel: "Übersicht",
@@ -2669,6 +2676,13 @@ const en: typeof de = {
   analyse: {
     titel: "Analysis",
     untertitel: "What actually happened — month by month",
+    register: {
+      verlauf: "History",
+      kategorien: "Categories",
+      ausblick: "Outlook",
+      befunde: "Findings",
+      depot: "Portfolio",
+    },
   },
   historie: {
     titel: "Overview",
