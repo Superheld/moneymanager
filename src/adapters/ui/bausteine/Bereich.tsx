@@ -15,6 +15,7 @@
 
 import { useState, type ReactNode } from "react";
 import { PageHead } from "./PageHead";
+import { Registerleiste } from "./Registerleiste";
 
 export interface RegisterDef {
   /** Stabiler technischer Schlüssel — nicht der Anzeigename. */
@@ -43,52 +44,7 @@ export function Bereich({
     <div className="screen">
       <PageHead title={titel} subtitle={offen?.untertitel} />
 
-      <div
-        role="tablist"
-        style={{
-          display: "flex",
-          gap: "var(--sp-4)",
-          borderBottom: "1px solid var(--line)",
-          marginBottom: "var(--sp-4)",
-          // Die Leiste darf waagerecht rollen, wenn viele Register nebeneinander stehen.
-          // `overflow-y` MUSS dabei ausdrücklich dastehen: sobald eine der beiden Achsen
-          // nicht mehr `visible` ist, rechnet der Browser die andere zu `auto` um — und
-          // die Reiter ragen mit ihrem `marginBottom: -1` genau einen Pixel über den
-          // Kasten hinaus. Das reicht für einen senkrechten Rollbalken an einer Leiste,
-          // die nur eine Zeile hoch ist.
-          overflowX: "auto",
-          overflowY: "hidden",
-        }}
-      >
-        {register.map((r) => {
-          const istAktiv = r.id === offen?.id;
-          return (
-            <button
-              key={r.id}
-              type="button"
-              role="tab"
-              aria-selected={istAktiv}
-              onClick={() => setAktiv(r.id)}
-              style={{
-                background: "none",
-                border: 0,
-                // Der aktive Reiter trägt die Akzentlinie; das Absetzen um einen Pixel
-                // legt sie über die Trennlinie der Leiste, statt daneben.
-                borderBottom: `2px solid ${istAktiv ? "var(--accent)" : "transparent"}`,
-                marginBottom: -1,
-                padding: "var(--sp-2) 0",
-                cursor: "pointer",
-                font: "inherit",
-                fontWeight: istAktiv ? "var(--fw-bold)" : "inherit",
-                color: istAktiv ? "var(--ink)" : "var(--ink-3)",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {r.label}
-            </button>
-          );
-        })}
-      </div>
+      <Registerleiste register={register} aktiv={offen?.id} onWahl={setAktiv} />
 
       <div role="tabpanel">{offen?.inhalt()}</div>
     </div>

@@ -16,20 +16,18 @@
 import { empfaengerJeBuchung } from "./buchung/belegZuBuchung";
 import {
   fruehesterMonat,
-  handlungsbedarf,
   istLiquide,
-  liquiditaetsvorschau,
+  istRuecklagenkonto,
   monatsAusblicke,
   staendeJeKlasse,
   vorschauAlleKonten,
   type Kategorie,
   type Klassenstand,
-  type Kontovorschau,
   type MonatsAusblick,
   type Vorschauzeile,
 } from "../core";
 import { budgetstaende, vertragsBuchungenLaden, type Budgetstand } from "./budgets/budgetsichten";
-import type { BudgetSicht, Vormerkung } from "../core";
+import type { BudgetSicht } from "../core";
 import type {
   BudgetRepository,
   KategorieRepository,
@@ -38,8 +36,6 @@ import type {
   VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
-
-  VormerkungRepository,
 } from "./ports";
 
 /** Wie viele Monate der Rückblick der Budgetliste höchstens anbietet. */
@@ -53,11 +49,6 @@ export interface UebersichtDeps {
   readonly umsatzRepo: UmsatzRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly kontoRepo: ZahlungskontoRepository;
-  /**
-   * Die Vormerkungen — optional, weil die Übersicht ohne sie vollständig bleibt: sie
-   * verschieben nur den Startpunkt der Vorschau um das, was schon feststeht.
-   */
-  readonly vormerkungRepo?: VormerkungRepository;
 }
 
 export interface Uebersichtsdaten {
@@ -77,9 +68,10 @@ export interface Uebersichtsdaten {
    * Gibt es überhaupt Plandaten (Verträge, Budgets)? Ohne sie zeigten die drei Karten
    * Nullen, und das liest sich wie ein Datenfehler statt wie ein leerer Plan.
    *
-   * Die Rücklagen zählen seit 2026-09-01 NICHT mehr mit: sie haben im Ausblick keine
-   * Zeile mehr (siehe `core/monatsausblick`), und was zu keiner Zeile führt, darf auch
-   * nicht darüber entscheiden, ob die Karten überhaupt erscheinen.
+   * Die Rücklagen zählen seit 2026-09-01 NICHT mit: ihr Bedarf führt zu keiner Zeile
+   * (die Zeile „Rücklagen" zeigt die Umbuchung, und die ist eine Zahlungsregel und zählt
+   * damit schon), und was zu keiner Zeile führt, darf auch nicht darüber entscheiden, ob
+   * die Karten überhaupt erscheinen.
    */
   readonly hatPlandaten: boolean;
   /**
@@ -105,14 +97,6 @@ export interface Uebersichtsdaten {
    * sagen, wie der laufende Monat aussieht, diese Liste sagt, was insgesamt da ist.
    */
   readonly klassen: readonly Klassenstand[];
-  /**
-   * Konten, die im Vorschaufenster ins Minus laufen — schärfster Fall zuerst.
-   *
-   * Leer heisst NICHT „alles geprüft und in Ordnung", sondern „läuft im gerechneten
-   * Fenster nicht ins Minus". Der Unterschied zählt, sobald jemand die Liste als
-   * Freigabe liest.
-   */
-  readonly bedarf: readonly Kontovorschau[];
 }
 
 /**
@@ -128,7 +112,7 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten, vormerkungen] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -137,7 +121,6 @@ export async function uebersichtLaden(
       deps.umsatzRepo.alle(),
       vertragsBuchungenLaden(deps.zuordnungRepo),
       deps.kontoRepo.alle(),
-      deps.vormerkungRepo?.alle() ?? Promise.resolve<Vormerkung[]>([]),
     ]);
 
   /**
@@ -157,7 +140,7 @@ export async function uebersichtLaden(
    * seine Ausgaben vom Girokonto standen als unerklärte Posten unter „Sonstiges". Jetzt
    * führt es seine Zeile und trägt, was aus den liquiden Konten dafür abging. Seine RATE
    * plant es hier aber nicht (`budgetsOhnePlan`): die fließt über eine Umbuchung, und die
-   * steht schon in „Sparen & Vorsorge".
+   * steht schon in „Rücklagen" bzw. „Sparen & Vorsorge".
    *
    * Der Preis ist eine Aussage, die man kennen muss: **dasselbe Budget kann hier einen
    * kleineren Verbrauch zeigen als im Bereich Budgets.** Dort steht der ganze Rahmen,
@@ -173,6 +156,10 @@ export async function uebersichtLaden(
   const nichtLiquide = new Set(konten.filter((k) => !istLiquide(k)).map((k) => k.id));
   const liquideBuchungen = buchungen.filter((b) => liquideIds.has(b.kontoId));
   const budgetsOhnePlan = new Set(budgets.filter((b) => !liquideIds.has(b.kontoId)).map((b) => b.id));
+  // Wohin eine Umbuchung aus dem Kreis führt, entscheidet ihre Zeile: auf ein Konto der
+  // Klasse Rücklage nach „Rücklagen", sonst nach „Sparen & Vorsorge". Dieselbe Grenze
+  // zieht der Rücklagenfluss im Bereich Rücklagen.
+  const ruecklagenKonten = new Set(konten.filter(istRuecklagenkonto).map((k) => k.id));
 
   const sicht: BudgetSicht = {
     buchungen: liquideBuchungen,
@@ -191,6 +178,8 @@ export async function uebersichtLaden(
       kategorien,
       vertragsBuchungen,
       heute,
+      kreis: liquideIds,
+      ruecklagenKonten,
     }),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,
@@ -201,23 +190,6 @@ export async function uebersichtLaden(
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     klassen: staendeJeKlasse(konten, buchungen),
-    // Die Vorschau rechnet über ALLE Konten, nicht nur die liquiden: gefragt ist, ob
-    // ein EINZELNES Konto ins Minus läuft, und das kann jedes. Sie bekommt deshalb auch
-    // die ungefilterten Buchungen und Budgets.
-    bedarf: handlungsbedarf(
-      liquiditaetsvorschau({
-        konten,
-        buchungen,
-        regeln,
-        budgetsicht: { buchungen, kategorien, budgets, vertragsBuchungen },
-        // Was die Bank schon kennt, ist vom Stand faktisch weg — auch wenn es noch in
-        // keinem Auszug steht. Ohne die Vormerkungen begänne die Vorschau mit Geld, über
-        // das niemand mehr verfügt.
-        vormerkungen,
-        heute,
-        tage: VORSCHAU_TAGE,
-      }),
-    ),
   };
 }
 

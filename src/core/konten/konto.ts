@@ -27,9 +27,11 @@ export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld", "Kreditka
  * Tagesgeldkonto kann Alltagsreserve oder zweckgebundene Rücklage sein — der Typ ändert
  * sich dadurch nicht, die Antwort auf „wieviel habe ich" sehr wohl.
  *
- * Genau **eine** Wirkung hat die Klasse: `"liquide"` zählt zu den liquiden Mitteln, alles
- * andere nicht. Die vier übrigen Werte unterscheiden sich für die RECHNUNG also nicht —
- * sie sind eine Benennung, und das ist Absicht. Was sie weiter trennen soll, ist offen.
+ * Zwei Wirkungen hat die Klasse: `"liquide"` zählt zu den liquiden Mitteln, alles andere
+ * nicht (`istLiquide`). Und seit 2026-11-08 zählt eine Umbuchung auf `"ruecklage"` als
+ * Rücklage, auf die drei übrigen als Sparen & Vorsorge (`istRuecklagenkonto`). Vorsorge,
+ * Sparen und Investment unterscheiden sich für die RECHNUNG nicht — sie sind eine
+ * Benennung, und das ist Absicht.
  *
  * **Seit 2026-09-22 sind es fünf, und die zwei neuen haben die Kontogruppen ersetzt.**
  * Bis dahin gab es daneben eine frei benannte `Kontogruppe` — eine Sicht, die nichts
@@ -68,6 +70,16 @@ export function klasseVorschlag(typ: Kontotyp): Kontoklasse {
 /** Ist das Geld auf diesem Konto verfügbar? */
 export function istLiquide(konto: Pick<Zahlungskonto, "klasse">): boolean {
   return konto.klasse === "liquide";
+}
+
+/**
+ * Ist das Konto ein Rücklagenkonto? Die ZWEITE Grenze zwischen den Klassen, seit
+ * 2026-11-08: Monatskarten und Rücklagenfluss trennen Umbuchungen auf ein Rücklagenkonto
+ * von denen auf Vorsorge-, Spar- und Investmentkonten. Für alles andere bleiben die
+ * vier nicht-liquiden Klassen dasselbe.
+ */
+export function istRuecklagenkonto(konto: Pick<Zahlungskonto, "klasse">): boolean {
+  return konto.klasse === "ruecklage";
 }
 
 /**

@@ -45,7 +45,7 @@ die Zeitrichtung:
 | | stillgelegtes Konto |
 |---|---|
 | **Rückblick** — Monatskarten, Budgetstände, Analyse, Kontoauszug, Abgleich | zählt und zeigt **unverändert** |
-| **Vorausschau** — Liquiditätsvorschau, „Da ist etwas zu tun" | **draußen**, und der Filter steht im KERN |
+| **Vorausschau** — Liquiditätsvorschau | **draußen**, und der Filter steht im KERN |
 | **Auswahl und Handlung** — Buchungsmaske, Umbuchungsziel, Bankabruf, Bankkonto verknüpfen | **draußen** |
 | „Was da ist" | zählt mit, unter seiner Klasse |
 | Kontenverwaltung | sichtbar, markiert, mit dem Weg zurück |

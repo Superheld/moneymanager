@@ -14,7 +14,10 @@ hierher, sondern in die Doku außerhalb des Repos. Maschinenspezifische Rezepte 
 
 Die Navigation steht in `adapters/ui/bausteine/AppShell.tsx` (Typ `ScreenId`, zwei
 Gruppen: **Überblick** — was gilt und was war; **Verwaltung** — woher die Daten kommen und
-wie sie sortiert werden), die Zuordnung zur Komponente in `App.tsx`.
+wie sie sortiert werden), die Zuordnung zur Komponente in `App.tsx`. Der Überblick ist
+nach Wichtigkeit sortiert (seit 2026-11-08); der Kontoauszug steht als **„Buchungen"** in
+der Verwaltung — dorthin geht man, um zuzuordnen und abzuhaken, nicht um sich zu
+informieren. Seine `ScreenId` heisst weiter `konten`: sie ist ein Schlüssel, kein Name.
 
 Übersicht beantwortet „wie stehe ich **gerade** da", Analyse „wie war es über einen
 **Zeitraum**" — diese Grenze ist beabsichtigt und entscheidet, wo Neues hingehört. Das
@@ -429,8 +432,7 @@ Vier Dinge gelten überall und stehen deshalb hier:
   zweckgebundene Rücklage sein, ohne dass sich sein Typ ändert.
 
   Wer die Klassen erweitert (`KONTOKLASSEN` in `core/konten/konto.ts`), muss für jeden neuen
-  Wert entscheiden, ob er verfügbar ist. Bislang trennt die Klasse **nur** das; was Rücklage
-  und Vorsorge sonst unterscheiden soll, ist offen.
+  Wert entscheiden, ob er verfügbar ist — und ob er als Rücklage zählt (unten).
 
   **`aktiv` ist die dritte Frage und wieder eine andere:** ob das Konto noch GEFÜHRT wird.
   Typ und Klasse beschreiben, was es ist und wofür — `aktiv` nur, ob man damit noch etwas
@@ -451,9 +453,13 @@ Vier Dinge gelten überall und stehen deshalb hier:
   will, baut dafür etwas Neues — und es darf dann, wie die Gruppe, **nichts** entscheiden;
   sonst stehen wieder zwei Felder da, die dasselbe verschieden sagen.
 
-  **Gerechnet wird weiterhin über genau eine Grenze:** `istLiquide` fragt `=== "liquide"`,
-  die vier übrigen Werte sind für jede Rechnung dasselbe. Wer das ändert, ändert nicht
-  eine Zahl, sondern die Bedeutung des Feldes.
+  **Gerechnet wird über ZWEI Grenzen, seit 2026-11-08.** `istLiquide` fragt
+  `=== "liquide"` und entscheidet über die liquiden Mittel. `istRuecklagenkonto` fragt
+  `=== "ruecklage"` und entscheidet genau eines: ob eine Umbuchung dorthin als Rücklage
+  zählt (Monatskarten, Rücklagenfluss) oder als Sparen & Vorsorge. Vorsorge, Sparen und
+  Investment sind für jede Rechnung weiterhin dasselbe. Bis dahin stand hier „genau eine
+  Grenze"; die zweite kam, als die Monatskarten Rücklagen für sich zeigen sollten. Wer eine
+  dritte zieht, ändert wieder die Bedeutung des Feldes und schreibt es hierher.
 
   Was für jede Auswahl von Konten gilt: **Saldo und Buchungen filtern mit derselben
   Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie gab.

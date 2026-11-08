@@ -55,6 +55,16 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
    * etwas zu sehen, das man schon gelesen hat.
    */
   const [gewaehlt, setGewaehlt] = useState(monate.length - 1);
+  /**
+   * Ob die Buchungen des Monats aufgeklappt sind. Vorbelegt OFFEN — wer einen Monat im
+   * Chart anklickt, will sehen, was drin ist; dieselbe Wahl klappt ihn deshalb auch
+   * wieder auf, falls er zu war.
+   */
+  const [offen, setOffen] = useState(true);
+  const waehle = (i: number) => {
+    setGewaehlt(i);
+    setOffen(true);
+  };
   const monat = monate[Math.min(gewaehlt, monate.length - 1)];
 
   const posten = useMemo(
@@ -79,7 +89,7 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
           <Auswahl
             ariaLabel={t("budgets.verlaufMonatWaehlen")}
             wert={String(gewaehlt)}
-            aufAenderung={(v) => setGewaehlt(Number(v))}
+            aufAenderung={(v) => waehle(Number(v))}
             optionen={monate.map((m, i) => ({ wert: String(i), text: m.monat }))}
           />
           <Button variant="ghost" onClick={onSchliessen}>{t("budgets.verlaufSchliessen")}</Button>
@@ -88,15 +98,40 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
     >
       <BudgetVerlaufChart
         monate={monate}
+        art={stand.budget.art === "aufbauend" ? "aufbauend" : "monatlich"}
         aktivIndex={gewaehlt}
-        onMonatClick={(i) => setGewaehlt(i)}
+        onMonatClick={waehle}
       />
 
+      {/* Die Monatszeile sieht aus wie eine aufgeklappte Zeile der Monatskarten in der
+          Übersicht (Pfeil, getönte Fläche, Liste direkt darunter) und verhält sich auch so:
+          ein Klick klappt die Buchungen zu. Vorher stand sie als lose Textzeile über der
+          Liste, und man sah nicht, dass beides zusammengehört. */}
       <div
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--sp-3)", flexWrap: "wrap", marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={offen}
+        onClick={() => setOffen((o) => !o)}
+        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setOffen((o) => !o))}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: "var(--sp-3)",
+          flexWrap: "wrap",
+          marginTop: "var(--sp-4)",
+          padding: "9px 10px",
+          borderTop: "1px solid var(--line)",
+          borderBottom: "1px solid var(--line-soft)",
+          cursor: "pointer",
+          background: offen ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent",
+        }}
       >
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: "var(--sp-2)", flexWrap: "wrap" }}>
-          <span style={{ fontWeight: "var(--fw-bold)" }}>{monat.monat}</span>
+          <span style={{ fontWeight: "var(--fw-bold)" }}>
+            <span style={{ color: "var(--ink-3)", marginRight: 6 }}>{offen ? "▾" : "▸"}</span>
+            {monat.monat}
+          </span>
           {/* Die Stufe im Chart braucht ihren Grund neben sich, sonst liest sie sich wie
               ein Rechenfehler. */}
           {monat.zufuehrungVorher != null && (
@@ -127,14 +162,17 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
         </span>
       </div>
 
-      <BudgetPostenliste
-        posten={posten}
-        empfaenger={empfaenger}
-        kategorieNamen={kategorieNamen}
-        verbraucht={monat.verbraucht}
-        leerText={t("budgets.verlaufMonatLeer", { monat: monat.monat })}
-        onBuchung={onBuchung}
-      />
+      {offen && (
+        <BudgetPostenliste
+          posten={posten}
+          empfaenger={empfaenger}
+          kategorieNamen={kategorieNamen}
+          verbraucht={monat.verbraucht}
+          leerText={t("budgets.verlaufMonatLeer", { monat: monat.monat })}
+          onBuchung={onBuchung}
+          kopf
+        />
+      )}
     </Card>
   );
 }

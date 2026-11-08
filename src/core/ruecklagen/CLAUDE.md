@@ -42,15 +42,17 @@ davon ersetzt einen anderen:
 |---|---|---|
 | **Bedarf** | Σ Monatsraten der Rücklagen | was die Rechnung verlangt |
 | **Plan** | Σ Umbuchungsregeln auf Rücklagenkonten | was du eingerichtet hast |
-| **Ist** | gebuchte Umschichtungen im Fenster | was tatsächlich geflossen ist |
+| **Eingegangen** (`ist`) | jede Einzahlung auf ein Rücklagenkonto im Fenster, Zinsen eingeschlossen; Umbuchungen nur, wenn sie nicht von einem anderen Rücklagenkonto kommen | was tatsächlich angekommen ist — bis 2026-11-08 „geflossen" und nur das abgehende Bein vom liquiden Konto |
 
 Bedarf über Plan heisst: du legst zu wenig zurück, die Deckung wird schlechter, ohne dass
 irgendwo etwas schiefgeht. Plan über Ist heisst: die Überweisung ist ausgefallen. Eine
 Zahl allein könnte keine dieser Aussagen treffen.
 
-**Wohin gerechnet wird, entscheidet die KONTOKLASSE**, und zwar über genau eine Grenze:
-ein Zufluss auf ein NICHT liquides Konto ist zurückgelegt, auf ein liquides nur
-umgeschichtet. Bedarf
+**Wohin gerechnet wird, entscheidet die KONTOKLASSE:** zurückgelegt ist, was von einem
+liquiden Konto auf ein Konto der Klasse **Rücklage** geht (`istRuecklagenkonto`). Bis
+2026-11-08 zählte jedes nicht liquide Ziel; seit die Monatskarten Rücklagen und „Sparen
+& Vorsorge" trennen, zieht der Fluss dieselbe Grenze — sonst stünde dieselbe Überweisung
+hier als Rücklage und dort als Sparen. Bedarf
 und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
 Zeitraum. Wer sie über mehrere Monate vergleicht, muss die ersten beiden hochrechnen — das
 im Kern zu tun hiesse zu raten, wie viele Monate gemeint sind.

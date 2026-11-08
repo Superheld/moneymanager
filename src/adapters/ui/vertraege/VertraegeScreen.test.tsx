@@ -7,7 +7,7 @@
 // lassen, sondern still nichts finden — deshalb geht dieser Test durch die echte DB.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -99,9 +99,9 @@ async function konto() {
  */
 describe("VertraegeScreen — Ansichten", () => {
   /** Ein Vertrag samt Regel; künftiger Start ⇒ die nächste Fälligkeit IST der Start. */
-  async function vertragMitRegel(id: string, anbieter: string, betrag: number, rhythmus: string, start: string) {
+  async function vertragMitRegel(id: string, anbieter: string, betrag: number, rhythmus: string, start: string, art?: "abo" | "dauervertrag") {
     await sqliteVertragRepository.speichern({
-      id, anbieter, beginn: start, verlaengerung: "keine", status: "aktiv",
+      id, anbieter, beginn: start, verlaengerung: "keine", status: "aktiv", ...(art ? { art } : {}),
     });
     await sqliteZahlungsregelRepository.speichern({
       id: `r-${id}`, bezeichnung: anbieter, betrag, rhythmus: rhythmus as "monatlich",
@@ -129,6 +129,47 @@ describe("VertraegeScreen — Ansichten", () => {
     rendere(<VertraegeScreen />);
     await screen.findByText("Alpha");
     await waitFor(() => expect(document.body.textContent).toMatch(/28,48/));
+  });
+
+  /**
+   * Der Filter nach Art blendet in der Liste aus, lässt die Kennzahlen darüber aber
+   * stehen: die gelten dem ganzen Bestand und kommen fertig aus der Anwendungsschicht.
+   * Und mit nur EINER Art im Bestand gibt es ihn gar nicht — zwischen „alle" und ihr
+   * gäbe es nichts zu wählen.
+   */
+  it("filtert die Liste nach Art und lässt die Kennzahlen beim ganzen Bestand", async () => {
+    await konto();
+    await vertragMitRegel("a", "Alpha", -12000, "jaehrlich", tagNach(40), "abo");
+    await vertragMitRegel("b", "Beta", -5544, "quartalsweise", tagNach(10), "dauervertrag");
+    // Gamma OHNE Art: das Feld ist optional und zählt dann als Abo.
+    await vertragMitRegel("c", "Gamma", -4700, "monatlich", tagNach(100));
+    const nutzer = userEvent.setup();
+    /** Der Anbieter steht mit seiner Art-Pille in derselben Zelle, daher der Anfang. */
+    const anbieter = () =>
+      [...document.querySelectorAll("tbody tr")].map((tr) => tr.querySelector("td")?.textContent?.trim() ?? "")
+        .map((x) => ["Alpha", "Beta", "Gamma"].find((n) => x.startsWith(n)))
+        .filter(Boolean);
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Alpha");
+
+    await auswahlWaehlen(nutzer, "Art", "Dauervertrag");
+    await waitFor(() => expect(anbieter()).toEqual(["Beta"]));
+    // Die Anzahl oben zählt weiter alle drei.
+    const kpis = document.querySelector(".kpis") as HTMLElement;
+    expect(within(kpis).getByText(i18n.t("vertraege.kpiAnzahl")).parentElement!.textContent).toMatch(/3/);
+
+    await auswahlWaehlen(nutzer, "Art", "Abo");
+    await waitFor(() => expect(anbieter()).toEqual(["Alpha", "Gamma"]));
+
+    await auswahlWaehlen(nutzer, "Art", "Alle Arten");
+    await waitFor(() => expect(anbieter()).toEqual(["Alpha", "Beta", "Gamma"]));
+  });
+
+  it("bietet den Filter nach Art nicht an, solange es nur eine Art gibt", async () => {
+    await bestand();
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Alpha");
+    expect(screen.queryByLabelText("Art")).toBeNull();
   });
 
   it("sortiert die Fälligkeits-Ansicht nach der nächsten Zahlung", async () => {

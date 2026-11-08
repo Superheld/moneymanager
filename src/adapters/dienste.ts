@@ -215,9 +215,6 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
       regelRepo: sqliteZahlungsregelRepository,
       umsatzRepo: sqliteUmsatzRepository,
       kontoRepo: sqliteZahlungskontoRepository,
-      // Was die Bank schon kennt, ist vom Stand faktisch weg — die Vorschau beginnt
-      // sonst mit Geld, über das niemand mehr verfügt.
-      vormerkungRepo: sqliteVormerkungRepository,
     },
     heute,
   );

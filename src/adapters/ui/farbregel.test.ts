@@ -12,8 +12,8 @@
 // eine Farbe eine Aussage über sie macht. Ein Wächter, der überall meldet, wird
 // abgeschaltet statt gelesen.
 //
-// **Und nur an ZAHLEN und FLÄCHEN**, also `color:` und `fill=`. Ein `borderColor` an der
-// Karte *Da ist etwas zu tun* ist kein Betrag — die Karte ist die Warnung.
+// **Und nur an ZAHLEN und FLÄCHEN**, also `color:` und `fill=`. Ein `borderColor` an einer
+// Karte ist kein Betrag — eine Karte, die so gerahmt ist, IST die Warnung.
 
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";

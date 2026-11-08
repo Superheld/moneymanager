@@ -7,7 +7,7 @@
 // Ausgabe senkt statt sie zu erhöhen.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import type { Database } from "sql.js";
 
 const halter = vi.hoisted(() => {
@@ -70,6 +70,8 @@ async function buchung(id: string, datum: string, betrag: number, extra: Record<
  * dass die Karte samt Tabelle da ist.
  */
 async function block(name: string) {
+  // Die Befunde stehen seit 2026-11-08 in einem eigenen Register der Analyse.
+  fireEvent.click(await screen.findByRole("tab", { name: text("analyse.register.befunde") }));
   await screen.findAllByText(text(`befunde.block.${name}.name`));
 }
 

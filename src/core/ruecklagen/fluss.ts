@@ -4,7 +4,15 @@
 //
 //   BEDARF  was die Rücklagen VERLANGEN — Σ ihrer Monatsraten. Eine Rechnung, kein Plan.
 //   PLAN    was du dafür EINGERICHTET hast — Σ der Umbuchungsverträge auf Rücklagenkonten.
-//   IST     was tatsächlich GEFLOSSEN ist — die gebuchten Umschichtungen im Zeitraum.
+//   IST     was tatsächlich EINGEGANGEN ist — jede Einzahlung auf ein Rücklagenkonto im
+//           Zeitraum, Zinsen eingeschlossen; eine Umbuchung nur, wenn sie nicht von einem
+//           anderen Rücklagenkonto kommt (das wäre ein Umräumen, kein Zugang).
+//
+// **Das Ist hiess bis 2026-11-08 „geflossen" und zählte nur das abgehende Bein einer
+// Umbuchung vom liquiden Konto.** Was sonst auf dem Rücklagenkonto ankam — Zinsen, eine
+// Überweisung vom Sparkonto, eine Gutschrift —, stand nirgends, und „geflossen" sagte
+// nicht, was gemeint war. Jetzt zählt die Empfängerseite, und die Oberfläche zeigt die
+// Buchungen dazu.
 //
 // Sie stimmen selten überein, und jede Abweichung sagt etwas anderes. Bedarf über Plan
 // heisst: du legst zu wenig zurück, die Deckung wird schlechter, ohne dass irgendwo etwas
@@ -15,15 +23,17 @@
 // machen. Deshalb rechnet diese Datei alle drei und lässt die Oberfläche entscheiden,
 // welche sie nebeneinander stellt.
 //
-// WOHIN gerechnet wird, entscheidet die KONTOKLASSE, und zwar über genau eine Grenze:
-// ein Zufluss auf ein NICHT liquides Konto ist zurückgelegt, auf ein liquides nur
-// umgeschichtet. Welche der vier gebundenen Klassen es ist, spielt hier keine Rolle —
-// die Klasse trägt genau eine Rechenregel, und das ist sie (siehe `core/konten/konto`).
+// WOHIN gerechnet wird, entscheidet die KONTOKLASSE: zurückgelegt ist, was von einem
+// liquiden Konto auf ein Konto der Klasse RÜCKLAGE geht. Bis 2026-11-08 zählte jedes
+// nicht liquide Ziel — auch Vorsorge, Sparen und Investment. Seit die Monatskarten der
+// Übersicht Rücklagen und „Sparen & Vorsorge" in zwei Zeilen trennen, zieht diese Datei
+// dieselbe Grenze (`istRuecklagenkonto`); sonst stünde dieselbe Überweisung hier als
+// Rücklage und dort als Sparen.
 
 import type { IstBuchung } from "../buchung/istbuchung";
 import type { Cent } from "../basis/geld";
 import type { Zahlungskonto } from "../konten/konto";
-import { istLiquide } from "../konten/konto";
+import { istLiquide, istRuecklagenkonto } from "../konten/konto";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
 import { RHYTHMUS_MONATE } from "../basis/zahlungsregel";
 import { istUmbuchungsregel } from "../vertraege/umbuchungErkennung";
@@ -32,9 +42,11 @@ import { monatsRuecklageGesamt, type Ruecklage } from "./ruecklage";
 export interface Flussposten {
   readonly buchungId: string;
   readonly datum: string;
-  /** POSITIV — was zurückgelegt wurde. */
+  /** POSITIV — was eingegangen ist. */
   readonly betrag: Cent;
-  readonly vonKontoId: string;
+  /** Woher, wenn es eine Umbuchung von einem eigenen Konto war; sonst leer (Zinsen, Gutschrift). */
+  readonly vonKontoId?: string;
+  /** Das Rücklagenkonto, auf dem es einging. */
   readonly nachKontoId: string;
 }
 
@@ -79,7 +91,7 @@ export function ruecklagenfluss(
   const klasse = new Map(konten.map((k) => [k.id, k]));
   const istZiel = (id: string | undefined): boolean => {
     const k = id ? klasse.get(id) : undefined;
-    return !!k && !istLiquide(k);
+    return !!k && istRuecklagenkonto(k);
   };
   const istQuelle = (id: string | undefined): boolean => {
     const k = id ? klasse.get(id) : undefined;
@@ -88,18 +100,20 @@ export function ruecklagenfluss(
 
   const posten: Flussposten[] = [];
   for (const b of buchungen) {
-    if (b.charakter !== "Umschichtung") continue;
-    // Nur das abgehende Bein — sonst zählte dieselbe Verschiebung zweimal, einmal
-    // negativ und einmal positiv, und die Summe wäre null.
-    if (b.betrag >= 0) continue;
+    // Die EMPFÄNGERSEITE: was auf einem Rücklagenkonto eingeht. Nur Zugänge — eine
+    // Umbuchung liegt als Paar vor, und nur ihr ankommendes Bein steht hier, die Summe
+    // zählt sie also einmal.
+    if (b.betrag <= 0) continue;
     if (b.datum < von || b.datum >= bis) continue;
-    if (!istQuelle(b.kontoId) || !istZiel(b.gegenkontoId)) continue;
+    if (!istZiel(b.kontoId)) continue;
+    // Von einem anderen Rücklagenkonto ist es Umräumen innerhalb der Rücklagen.
+    if (istZiel(b.gegenkontoId)) continue;
     posten.push({
       buchungId: b.id,
       datum: b.datum,
-      betrag: -b.betrag,
-      vonKontoId: b.kontoId,
-      nachKontoId: b.gegenkontoId as string,
+      betrag: b.betrag,
+      ...(b.gegenkontoId ? { vonKontoId: b.gegenkontoId } : {}),
+      nachKontoId: b.kontoId,
     });
   }
 

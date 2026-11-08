@@ -2,8 +2,8 @@
 //
 // Die Übersicht rechnet mit dem Kontostand, und der ist nur so aktuell wie der letzte
 // Abruf. Wer nach Wochen hereinkommt, sieht dort Zahlen, die plausibel aussehen und es
-// nicht sind: die Karte „Da ist etwas zu tun" meldet dann nichts, weil sie die Zahlungen
-// der letzten Wochen nicht kennt — und ihr Schweigen liest sich als Freigabe.
+// nicht sind. Bis 2026-11-08 meldete das die Karte „Da ist etwas zu tun" über `veraltet`;
+// die Karte ist entfallen, das Feld wird derzeit nirgends angezeigt.
 //
 // Zwei Entscheidungen, die man kennen muss:
 //
