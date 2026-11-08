@@ -41,9 +41,34 @@ export interface BudgetPostenlisteProps {
    * Text; ein Knopf, der nichts tut, wäre schlechter als keiner.
    */
   onBuchung?: (buchung: IstBuchung) => void;
+  /**
+   * Spaltenköpfe über den Buchungen (Datum · Buchung · Betrag).
+   *
+   * Optional, weil die Liste an zwei Stellen hängt, die verschieden viel Platz haben: im
+   * Verlauf steht sie über die volle Kartenbreite und ist dort die Hauptsache, in der
+   * Übersicht hängt sie in einer halben Karte unter einer Zeile, die schon sagt, was
+   * darunter kommt. Die Köpfe stehen beim Scrollen fest, sonst wären sie nach den
+   * ersten Zeilen weg.
+   */
+  kopf?: boolean;
 }
 
-export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbraucht, leerText, zeilen = AUFKLAPP_ZEILEN_BREIT, onBuchung }: BudgetPostenlisteProps) {
+/**
+ * Feste Breite der Datumsspalte — nur damit fluchten Kopf und Zeilen. `ch` misst die
+ * Ziffer, die Punkte sind schmaler; der Rest ist Luft und kein Fehler.
+ */
+const DATUM_BREITE = "8ch";
+
+/** Wie ein Tabellenkopf in `DataTable`, nur ohne Sortierung. */
+const KOPFSTIL = {
+  fontSize: "var(--fs-2xs)",
+  fontWeight: "var(--fw-bold)",
+  textTransform: "uppercase",
+  letterSpacing: ".04em",
+  color: "var(--ink-3)",
+} as const;
+
+export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbraucht, leerText, zeilen = AUFKLAPP_ZEILEN_BREIT, onBuchung, kopf = false }: BudgetPostenlisteProps) {
   const { t } = useTranslation();
   const geld = useGeld();
 
@@ -68,13 +93,34 @@ export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbrauc
         overflowY: "auto",
       }}
     >
+      {kopf && (
+        <div
+          style={{
+            ...KOPFSTIL,
+            display: "flex",
+            gap: 8,
+            padding: "6px 0 5px",
+            borderBottom: "1px solid var(--line)",
+            // Fest beim Scrollen. Der Hintergrund muss mit, sonst laufen die Zeilen sichtbar
+            // unter der Schrift durch. `-4` hebt das Innenpolster der Fläche auf: sonst
+            // bliebe darüber ein Streifen, in dem die Zeilen weiter sichtbar sind.
+            position: "sticky",
+            top: -4,
+            background: "var(--surface-2, rgba(0,0,0,.015))",
+          }}
+        >
+          <span style={{ width: DATUM_BREITE, flex: "0 0 auto" }}>{t("uebersicht.budgetKopfDatum")}</span>
+          <span>{t("uebersicht.budgetKopfBuchung")}</span>
+          <span style={{ marginLeft: "auto" }}>{t("uebersicht.budgetKopfBetrag")}</span>
+        </div>
+      )}
       {posten.map((p, i) => {
         const kategorie = p.kategorieId ? kategorieNamen.get(p.kategorieId) : undefined;
         const name =
           p.buchung.notiz || empfaenger.get(p.buchung.id) || kategorie || t("uebersicht.budgetBuchung");
         const inhalt = (
           <>
-            <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
+            <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto", width: kopf ? DATUM_BREITE : undefined }}>
               {p.buchung.datum.slice(8)}.{p.buchung.datum.slice(5, 7)}.{p.buchung.datum.slice(2, 4)}
             </span>
             <span title={name} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink-2)" }}>
