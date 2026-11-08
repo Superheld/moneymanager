@@ -14,12 +14,13 @@ const konten: Zahlungskonto[] = [
   { id: "zweit", bezeichnung: "Zweitkonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 },
 ];
 
+/** Das ANKOMMENDE Bein einer Umbuchung Giro → Tagesgeld (Rücklage) — was der Fluss zählt. */
 const buchung = (over: Partial<IstBuchung> = {}): IstBuchung => ({
   id: "b1",
   datum: "2026-06-05",
-  betrag: -20000,
-  kontoId: "giro",
-  gegenkontoId: "tagesgeld",
+  betrag: 20000,
+  kontoId: "tagesgeld",
+  gegenkontoId: "giro",
   charakter: "Umschichtung",
   quelle: "import",
   transferId: "t1",
@@ -51,32 +52,39 @@ const VON = "2026-06-01";
 const BIS = "2026-07-01";
 
 describe("ruecklagenfluss", () => {
-  it("zählt Umschichtungen von liquide nach Rücklage", () => {
+  it("zählt eine Umbuchung vom liquiden Konto aufs Rücklagenkonto", () => {
     const f = ruecklagenfluss([buchung()], konten, [], [], VON, BIS);
     expect(f.ist).toBe(20000);
-    expect(f.posten).toHaveLength(1);
+    expect(f.posten).toEqual([
+      { buchungId: "b1", datum: "2026-06-05", betrag: 20000, vonKontoId: "giro", nachKontoId: "tagesgeld" },
+    ]);
+  });
+
+  // Seit 2026-11-08 zählt die Empfängerseite: was auf dem Rücklagenkonto eingeht, egal
+  // ob es eine Umbuchung war. Zinsen sind ein Zugang wie jeder andere.
+  it("zählt auch Zinsen auf dem Rücklagenkonto — ohne Herkunftskonto", () => {
+    const zinsen = buchung({ id: "z", betrag: 312, charakter: "Ertrag", gegenkontoId: undefined, transferId: undefined });
+    const f = ruecklagenfluss([zinsen], konten, [], [], VON, BIS);
+    expect(f.ist).toBe(312);
+    expect(f.posten[0].vonKontoId).toBeUndefined();
   });
 
   // Bis 2026-11-08 zählte jedes nicht liquide Ziel als Rücklage. Seitdem trennen die
   // Monatskarten Rücklagen von „Sparen & Vorsorge", und dieser Fluss zieht dieselbe
   // Grenze — sonst stünde dieselbe Überweisung hier als Rücklage und dort als Sparen.
-  it("zählt ein Vorsorgekonto NICHT als Rücklage", () => {
-    const f = ruecklagenfluss([buchung({ gegenkontoId: "depot" })], konten, [], [], VON, BIS);
+  it("zählt einen Zugang auf einem Vorsorgekonto NICHT", () => {
+    const f = ruecklagenfluss([buchung({ kontoId: "depot" })], konten, [], [], VON, BIS);
     expect(f.ist).toBe(0);
   });
 
-  // Zwischen zwei liquiden Konten wurde nichts zurückgelegt, nur verschoben.
-  it("zählt eine Umbuchung zwischen zwei liquiden Konten nicht", () => {
-    const f = ruecklagenfluss([buchung({ gegenkontoId: "zweit" })], konten, [], [], VON, BIS);
+  it("zählt eine Umbuchung zwischen zwei Rücklagenkonten nicht — das ist Umräumen", () => {
+    const zwei = [...konten, { id: "tg2", bezeichnung: "Tagesgeld 2", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 0 } as Zahlungskonto];
+    const f = ruecklagenfluss([buchung({ gegenkontoId: "tg2" })], zwei, [], [], VON, BIS);
     expect(f.ist).toBe(0);
   });
 
-  it("zählt eine Rückholung aus der Rücklage nicht als Zufluss", () => {
-    // Das abgehende Bein liegt hier auf dem Tagesgeldkonto — die Quelle ist nicht liquide.
-    const f = ruecklagenfluss(
-      [buchung({ kontoId: "tagesgeld", gegenkontoId: "giro" })],
-      konten, [], [], VON, BIS,
-    );
+  it("zählt einen Abgang vom Rücklagenkonto nicht als Zugang", () => {
+    const f = ruecklagenfluss([buchung({ betrag: -20000 })], konten, [], [], VON, BIS);
     expect(f.ist).toBe(0);
   });
 
@@ -134,14 +142,14 @@ describe("ruecklagenfluss", () => {
   /** Der Fall, für den es die drei Zahlen gibt: sie sagen zusammen mehr als einzeln. */
   it("legt Bedarf, Plan und Ist nebeneinander offen", () => {
     const f = ruecklagenfluss(
-      [buchung({ betrag: -15000 })],
+      [buchung({ betrag: 15000 })],
       konten,
       [ruecklage],
       [regel()],
       VON,
       BIS,
     );
-    // Verlangt 50, eingerichtet 200, geflossen 150 — jede Zahl eine andere Aussage.
+    // Verlangt 50, eingerichtet 200, eingegangen 150 — jede Zahl eine andere Aussage.
     expect([f.bedarf, f.plan, f.ist]).toEqual([5000, 20000, 15000]);
   });
 });

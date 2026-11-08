@@ -160,3 +160,50 @@ describe("Rücklagen — löschen", () => {
     });
   });
 });
+
+/**
+ * „Diesen Monat" zählt, was auf den Rücklagenkonten EINGEHT, und zeigt die Buchungen
+ * dazu — bis 2026-11-08 stand dort „geflossen", und woraus die Zahl bestand, stand
+ * nirgends. Daneben misst der Tacho den Stand der Rücklagenkonten an der Faustformel.
+ */
+describe("Rücklagen — diesen Monat und die Faustformel", () => {
+  it("zählt Umbuchung und Zinsen als eingegangen und misst den Stand an der Faustformel", async () => {
+    const { sqliteZahlungskontoRepository } = await import("../../persistence/sqliteStammdatenRepositories");
+    const { sqliteLedgerRepository } = await import("../../persistence/sqliteLedgerRepository");
+    const { sqliteVertragRepository } = await import("../../persistence/sqliteVertragRepository");
+    const { sqliteZahlungsregelRepository } = await import("../../persistence/sqliteZahlungsregelRepository");
+    const n = new Date();
+    const tag = (d: number) => `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
+    await sqliteZahlungskontoRepository.speichern({ id: "tg", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 100000 });
+    // Die Faustformel braucht Vertragseinnahmen: 1.000,00 im Monat → 3.000,00.
+    await sqliteVertragRepository.speichern({ id: "v1", anbieter: "Arbeitgeber", beginn: "2024-01-01", verlaengerung: "keine", status: "aktiv" });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r1", bezeichnung: "Gehalt", betrag: 100000, rhythmus: "monatlich", startdatum: "2024-01-01",
+      charakter: "Ertrag", kontoId: "giro", vertragId: "v1",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "ab", datum: tag(1), betrag: -20000, kontoId: "giro", charakter: "Umschichtung", quelle: "manuell",
+      transferId: "t1", gegenkontoId: "tg",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "zu", datum: tag(1), betrag: 20000, kontoId: "tg", charakter: "Umschichtung", quelle: "manuell",
+      transferId: "t1", gegenkontoId: "giro",
+    });
+    await sqliteLedgerRepository.speichern({
+      id: "zins", datum: tag(1), betrag: 312, kontoId: "tg", charakter: "Ertrag", quelle: "manuell",
+    });
+
+    await mitRuecklage("Waschmaschine", 60000, 12);
+
+    // 200,00 Umbuchung + 3,12 Zinsen — das Paar zählt einmal, die Zinsen zählen mit.
+    await waitFor(() => expect(document.body.textContent).toMatch(/203,12/));
+    expect(document.body.textContent).toMatch(/eingegangen/);
+    expect(document.body.textContent).toMatch(/von Girokonto/);
+    expect(document.body.textContent).toMatch(/Zinsen oder Gutschrift/);
+    // Stand 1.000,00 + 203,12 = 1.203,12 gegen 3.000,00 → 40 %, es fehlen 1.796,88.
+    expect(document.body.textContent).toMatch(/40 %/);
+    expect(document.body.textContent).toMatch(/1\.796,88/);
+  });
+});
