@@ -71,7 +71,7 @@ Durchgesetzt wird das von **`farbregel.test.ts`** über `analyse/`, `uebersicht/
 `budgets/`: dort darf kein `color:` und kein `fill=` eines der vier Tokens direkt tragen.
 Nur diese drei Bereiche, weil nur dort Zahlen nebeneinander stehen, über die eine Farbe
 etwas aussagt — ein Verwerfen-Knopf, der amber ist, sagt nichts über Geld. Kartenrahmen
-sind ausgenommen: die Karte *Da ist etwas zu tun* IST die Warnung, sie trägt keinen Betrag.
+sind ausgenommen: eine Karte, die selbst die Warnung ist, trägt keinen Betrag.
 
 **`useProzent()`** für Anteile (0…1) — dieselbe Regel, derselbe Ort. Sie stand hier lange
 nur für Geld, und direkt daneben formatierten die Depot-Anteile mit `toFixed`: im Deutschen
@@ -430,12 +430,12 @@ Die Ränge sind an den drei Fällen gemessen, an denen sie zuerst angewendet wur
   wo sie hingehört — „Anfangsbestand + bestätigte Ist-Buchungen = realer Stand".
 
 **Der lehrreichste Fall war der dritte, und er ist der Grund für das Kriterium überhaupt:**
-unter der Karte *Da ist etwas zu tun* standen beide Ränge in EINEM Absatz — erst was
+unter der Karte *Da ist etwas zu tun* (bis 2026-11-08 in der Übersicht) standen beide Ränge in EINEM Absatz — erst was
 „sicher" und „erwartet" bedeuten (Erklärung), dann „was hier NICHT steht, läuft im
 gerechneten Fenster nicht ins Minus" (Einschränkung). Solange das ein Absatz ist, nimmt
 jedes Wegräumen der Erklärung die Einschränkung mit, **und die leere Karte liest sich
-danach als Freigabe**. Der Absatz ist deshalb geteilt, bevor überhaupt etwas eingeklappt
-wurde. Festgehalten in `uebersicht/handlungsbedarf.test.tsx`.
+danach als Freigabe**. Der Absatz wurde deshalb geteilt, bevor überhaupt etwas eingeklappt
+wurde. Der Test dazu ist mit der Karte gegangen; das Kriterium gilt weiter.
 
 **Warum Einklappen hier kein Rückfall in den Reiter-Fehler ist:** in der Analyse steht der
 Befund, dass niemand sucht, was hinter einem Reiter liegt — ein Reiter sagt nicht, was

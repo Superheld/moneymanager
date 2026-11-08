@@ -36,7 +36,6 @@ import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteDepotRepository } from "../persistence/sqliteDepotRepository";
 import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";
 import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
-import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import {
   sqliteKategorieRepository,
@@ -177,12 +176,6 @@ describe("RuecklagenScreen", () => {
 });
 
 describe("UebersichtScreen", () => {
-  /** Heute als ISO — die Screens lesen die Uhr selbst, ein festes Datum wäre morgen falsch. */
-  function heuteIso(): string {
-    const n = new Date();
-    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-  }
-
   /** Der Monatsschlüssel `zurueck` Monate vor heute. */
   function monat(zurueck: number): string {
     const n = new Date();
@@ -243,32 +236,6 @@ describe("UebersichtScreen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/1\.111,00/));
     // Und die Summe über beide Klassen.
     expect(document.body.textContent).toMatch(/3\.611,00/);
-  });
-
-  /**
-   * Die einzige Karte, die AUFFORDERT statt zu berichten — und die einzige, die
-   * verschwindet, wenn es nichts zu sagen gibt. Eine dauerhafte Zeile „alles in Ordnung"
-   * wäre nach zwei Wochen unsichtbar, und dann fiele auch die Warnung nicht mehr auf.
-   */
-  it("schweigt, solange kein Konto ins Minus läuft", async () => {
-    await grunddaten();
-    rendere(<UebersichtScreen />);
-    await waitFor(() => expect(document.body.textContent).toBeTruthy());
-    expect(document.body.textContent).not.toMatch(/Da ist etwas zu tun/);
-  });
-
-  it("meldet ein Konto, das an einem festen Termin ins Minus läuft", async () => {
-    await grunddaten(); // Girokonto mit 2.500,00
-    await sqliteZahlungsregelRepository.speichern({
-      id: "r1", bezeichnung: "Grosse Rate", betrag: -400000, rhythmus: "monatlich",
-      startdatum: heuteIso(), charakter: "Aufwand", kontoId: "k1",
-    });
-
-    rendere(<UebersichtScreen />);
-    await screen.findByText("Da ist etwas zu tun");
-    // „sicher": schon der Termin allein reicht — daran ändert Sparsamkeit nichts.
-    await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
-    expect(document.body.textContent).toMatch(/sicher/);
   });
 
   it("zeigt den Depotwert, nicht den Kontostand des Depot-Kontos", async () => {

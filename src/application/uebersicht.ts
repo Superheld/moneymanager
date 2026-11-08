@@ -16,20 +16,17 @@
 import { empfaengerJeBuchung } from "./buchung/belegZuBuchung";
 import {
   fruehesterMonat,
-  handlungsbedarf,
   istLiquide,
-  liquiditaetsvorschau,
   monatsAusblicke,
   staendeJeKlasse,
   vorschauAlleKonten,
   type Kategorie,
   type Klassenstand,
-  type Kontovorschau,
   type MonatsAusblick,
   type Vorschauzeile,
 } from "../core";
 import { budgetstaende, vertragsBuchungenLaden, type Budgetstand } from "./budgets/budgetsichten";
-import type { BudgetSicht, Vormerkung } from "../core";
+import type { BudgetSicht } from "../core";
 import type {
   BudgetRepository,
   KategorieRepository,
@@ -38,8 +35,6 @@ import type {
   VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
-
-  VormerkungRepository,
 } from "./ports";
 
 /** Wie viele Monate der Rückblick der Budgetliste höchstens anbietet. */
@@ -53,11 +48,6 @@ export interface UebersichtDeps {
   readonly umsatzRepo: UmsatzRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly kontoRepo: ZahlungskontoRepository;
-  /**
-   * Die Vormerkungen — optional, weil die Übersicht ohne sie vollständig bleibt: sie
-   * verschieben nur den Startpunkt der Vorschau um das, was schon feststeht.
-   */
-  readonly vormerkungRepo?: VormerkungRepository;
 }
 
 export interface Uebersichtsdaten {
@@ -105,14 +95,6 @@ export interface Uebersichtsdaten {
    * sagen, wie der laufende Monat aussieht, diese Liste sagt, was insgesamt da ist.
    */
   readonly klassen: readonly Klassenstand[];
-  /**
-   * Konten, die im Vorschaufenster ins Minus laufen — schärfster Fall zuerst.
-   *
-   * Leer heisst NICHT „alles geprüft und in Ordnung", sondern „läuft im gerechneten
-   * Fenster nicht ins Minus". Der Unterschied zählt, sobald jemand die Liste als
-   * Freigabe liest.
-   */
-  readonly bedarf: readonly Kontovorschau[];
 }
 
 /**
@@ -128,7 +110,7 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten, vormerkungen] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -137,7 +119,6 @@ export async function uebersichtLaden(
       deps.umsatzRepo.alle(),
       vertragsBuchungenLaden(deps.zuordnungRepo),
       deps.kontoRepo.alle(),
-      deps.vormerkungRepo?.alle() ?? Promise.resolve<Vormerkung[]>([]),
     ]);
 
   /**
@@ -201,23 +182,6 @@ export async function uebersichtLaden(
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     klassen: staendeJeKlasse(konten, buchungen),
-    // Die Vorschau rechnet über ALLE Konten, nicht nur die liquiden: gefragt ist, ob
-    // ein EINZELNES Konto ins Minus läuft, und das kann jedes. Sie bekommt deshalb auch
-    // die ungefilterten Buchungen und Budgets.
-    bedarf: handlungsbedarf(
-      liquiditaetsvorschau({
-        konten,
-        buchungen,
-        regeln,
-        budgetsicht: { buchungen, kategorien, budgets, vertragsBuchungen },
-        // Was die Bank schon kennt, ist vom Stand faktisch weg — auch wenn es noch in
-        // keinem Auszug steht. Ohne die Vormerkungen begänne die Vorschau mit Geld, über
-        // das niemand mehr verfügt.
-        vormerkungen,
-        heute,
-        tage: VORSCHAU_TAGE,
-      }),
-    ),
   };
 }
 

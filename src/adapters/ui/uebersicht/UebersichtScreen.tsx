@@ -48,10 +48,8 @@ import { useTranslation } from "react-i18next";
 import {
   budgetPostenZu,
   budgetstaende,
-  fensterEnde,
   nachArtGetrennt,
   toIso,
-  VORSCHAU_TAGE,
   type Abrufstand,
   type Depotdaten,
   type IstBuchung,
@@ -68,7 +66,6 @@ import { DepotKarte } from "./DepotKarte";
 import { MonatsAusblick } from "./MonatsAusblick";
 import { VorschauKarte } from "./VorschauKarte";
 import { PageHead } from "../bausteine/PageHead";
-import { HandlungsbedarfKarte } from "./HandlungsbedarfKarte";
 import { VermoegenKarte } from "./VermoegenKarte";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
@@ -169,19 +166,6 @@ export function UebersichtScreen() {
       />
 
       {fehler && <Card style={{ borderColor: "var(--warn)" }}>{t("uebersicht.fehlerDb")} ({fehler})</Card>}
-
-      {/* Ganz oben und nur, wenn es etwas zu sagen gibt: alles darunter berichtet, das
-          hier fordert auf. Eine dauerhafte Zeile „alles in Ordnung" wäre nach zwei
-          Wochen unsichtbar, und dann fiele auch die Warnung nicht mehr auf. */}
-      {daten && (
-        <HandlungsbedarfKarte
-          bedarf={daten.bedarf}
-          kontoNamen={daten.kontoNamen}
-          bisTag={fensterEnde(heute, VORSCHAU_TAGE)}
-          veraltet={abruf?.zugaenge.filter((z) => z.veraltet) ?? []}
-          onAbrufen={setAbrufOffen}
-        />
-      )}
 
       {daten && (
         <MonatsAusblick

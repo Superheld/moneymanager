@@ -554,20 +554,6 @@ const de = {
     titel: "Übersicht",
     untertitel: "Wie du gerade dastehst — dieser Monat und die beiden nächsten, über die verfügbaren Konten",
     fehlerDb: "Laden geht nur in der Desktop-App (tauri dev).",
-    bedarfTitel: "Da ist etwas zu tun",
-    bedarfUntertitel: "Konten, die bis zum {{bis}} ins Minus laufen",
-    bedarfSicher: "sicher",
-    bedarfErwartet: "erwartet",
-    bedarfAb: "ab {{datum}}",
-    bedarfLegendeFrage: "Was heißen „sicher\" und „erwartet\"?",
-    bedarfLegende:
-      "„Sicher\" heißt: schon die festen Termine reichen dafür — daran ändert Sparsamkeit nichts. „Erwartet\" heißt: erst zusammen mit dem üblichen Verbrauch, gleichmäßig über die Tage verteilt.",
-    bedarfHinweis:
-      "Was hier NICHT steht, läuft im gerechneten Fenster nicht ins Minus — geprüft ist damit nicht mehr.",
-    abrufVeraltet: "zuletzt abgerufen bis {{datum}}",
-    abrufNie: "noch nie abgerufen",
-    abrufHinweis:
-      "Was seither auf diesen Konten passiert ist, kennt die Übersicht noch nicht — auch die Prüfung auf ein Minus nicht.",
     vermoegenTitel: "Was da ist",
     vermoegenUntertitel: "Alle Konten nach Klasse — die Karten oben rechnen nur über die verfügbaren",
     vermoegenKonten: "{{count}} Konten",
@@ -2641,20 +2627,6 @@ const en: typeof de = {
     titel: "Overview",
     untertitel: "Where you stand right now — this month and the next two, across your available accounts",
     fehlerDb: "Loading only works in the desktop app (tauri dev).",
-    bedarfTitel: "Something needs doing",
-    bedarfUntertitel: "Accounts going negative before {{bis}}",
-    bedarfSicher: "certain",
-    bedarfErwartet: "expected",
-    bedarfAb: "from {{datum}}",
-    bedarfLegendeFrage: "What do „certain\" and „expected\" mean?",
-    bedarfLegende:
-      "„Certain\" means the dated commitments alone are enough — spending less will not help. „Expected\" means only together with the usual spending, spread evenly across the days.",
-    bedarfHinweis:
-      "What is NOT listed here does not go negative within the window computed — that is all that has been checked.",
-    abrufVeraltet: "last retrieved up to {{datum}}",
-    abrufNie: "never retrieved",
-    abrufHinweis:
-      "Whatever has happened on these accounts since then is not yet known to the overview — nor to the check for going negative.",
     vermoegenTitel: "What you have",
     vermoegenUntertitel: "All accounts by class — the cards above cover only the available ones",
     vermoegenKonten: "{{count}} accounts",
