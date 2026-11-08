@@ -21,6 +21,7 @@ import {
 } from "../../dienste";
 import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { Modal } from "../bausteine/Modal";
+import { Auswahl } from "../bausteine/Auswahl";
 import type { DataColumn } from "../bausteine/DataTable";
 import { PageHead } from "../bausteine/PageHead";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
@@ -56,6 +57,12 @@ const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "ja
  */
 type Ansicht = "liste" | "faelligkeit" | "turnus" | "kategorie";
 const ANSICHTEN: Ansicht[] = ["liste", "faelligkeit", "turnus", "kategorie"];
+
+/** Die Arten in Anzeigereihenfolge — dieselbe wie in der Anlege-Maske. */
+const ARTEN: readonly NonNullable<Vertrag["art"]>[] = ["abo", "dauervertrag", "umbuchung"];
+type ArtFilter = NonNullable<Vertrag["art"]> | "alle";
+/** Ein Vertrag ohne Art ist ein Abo — dieselbe Lesart wie in Maske und Persistenz. */
+const artVon = (v: Vertrag) => v.art ?? "abo";
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
   Aufwand: "aufwand",
   Ertrag: "ertrag",
@@ -214,7 +221,28 @@ export function VertraegeScreen() {
   }, []);
 
   const zeilen = sicht?.zeilen ?? [];
-  const vertraege = useMemo(() => zeilen.map((z) => z.vertrag), [zeilen]);
+  const alleVertraege = useMemo(() => zeilen.map((z) => z.vertrag), [zeilen]);
+  /**
+   * Der Filter nach Art wirkt NUR auf die Liste, nicht auf die Kennzahlen darüber. Die
+   * kommen fertig aus `vertraegeLaden` und gelten dem ganzen Bestand; sie hier für eine
+   * Teilmenge nachzurechnen hiesse, in der Oberfläche zu rechnen. Wer „was kosten mich
+   * meine Abos" wissen will, liest es am Kopf der Turnus- oder Kategoriegruppen, und die
+   * rechnen über das, was der Filter übrig lässt.
+   */
+  const [artFilter, setArtFilter] = useState<ArtFilter>("alle");
+  /** Nur die Arten, die im Bestand vorkommen — ein Filter auf Leeres ist eine Sackgasse. */
+  const vorhandeneArten = useMemo(() => ARTEN.filter((a) => alleVertraege.some((v) => artVon(v) === a)), [alleVertraege]);
+  /**
+   * Was tatsächlich gilt. Verschwindet die gewählte Art aus dem Bestand (der letzte
+   * Vertrag gelöscht oder umgestellt), fällt der Filter auf „alle" zurück — sonst stünde
+   * eine leere Liste da, und bliebe nur EINE Art übrig, wäre auch die Auswahl weg, über
+   * die man herauskäme.
+   */
+  const wirksamerFilter: ArtFilter = artFilter !== "alle" && vorhandeneArten.includes(artFilter) ? artFilter : "alle";
+  const vertraege = useMemo(
+    () => (wirksamerFilter === "alle" ? alleVertraege : alleVertraege.filter((v) => artVon(v) === wirksamerFilter)),
+    [alleVertraege, wirksamerFilter],
+  );
   const kategorien = sicht?.kategorien ?? [];
   const vorschlaege = sicht?.vorschlaege ?? [];
   const personName = sicht?.personNamen ?? LEERE_NAMEN;
@@ -523,9 +551,9 @@ export function VertraegeScreen() {
         }
       />
 
-      {vertraege.length > 0 && (
+      {alleVertraege.length > 0 && (
         <div className="kpis">
-          <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(vertraege.length)} />
+          <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(alleVertraege.length)} />
           <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proMonat < 0 ? "warn" : "ok"} />
           <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proJahr < 0 ? "warn" : "ok"} />
           {summe.ruecklage > 0 && (
@@ -616,7 +644,7 @@ export function VertraegeScreen() {
         </Card>
       )}
 
-      {vertraege.length === 0 ? (
+      {alleVertraege.length === 0 ? (
         <Card>
           <div className="muted">{t("vertraege.leer")}</div>
         </Card>
@@ -648,7 +676,24 @@ export function VertraegeScreen() {
               Spaltenköpfen und hält ihr Fehlen für einen Fehler.
             */}
             <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t(`vertraege.ordnung.${ansicht}`)}</span>
+            {/* Erst ab zwei Arten: mit nur einer gäbe es zwischen „alle" und ihr nichts zu
+                wählen. Rechts abgesetzt, weil er etwas anderes tut als der Umschalter
+                links — der ordnet, dieser blendet aus. */}
+            {vorhandeneArten.length > 1 && (
+              <span className="tabellenfilter" style={{ marginLeft: "auto" }}>
+                <Auswahl
+                  ariaLabel={t("vertraege.artFilter")}
+                  wert={wirksamerFilter}
+                  aufAenderung={(w) => setArtFilter(w as ArtFilter)}
+                  optionen={[
+                    { wert: "alle", text: t("vertraege.artFilterAlle") },
+                    ...vorhandeneArten.map((a) => ({ wert: a, text: t(`vertraege.artKurz.${a}`) })),
+                  ]}
+                />
+              </span>
+            )}
           </div>
+
 
           {ansicht === "turnus" || ansicht === "kategorie" ? (
             (ansicht === "turnus" ? turnusGruppen : kategorieGruppen).map((g, i) => (
@@ -667,7 +712,7 @@ export function VertraegeScreen() {
             <DataTable
               // Ohne key bliebe beim Ansichtswechsel die aufgeschlagene Seite stehen —
               // Seite 3 von „liste" ist in „faelligkeit" ein anderer Ausschnitt.
-              key={ansicht}
+              key={`${ansicht}·${wirksamerFilter}`}
               pageSize={25}
               columns={spalten(false)}
               rows={ansicht === "faelligkeit" ? nachFaelligkeit : nachBetrag}

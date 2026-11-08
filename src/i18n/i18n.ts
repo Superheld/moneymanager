@@ -1855,7 +1855,9 @@ const de = {
       dauervertrag: "Dauervertrag — Arbeit, Miete",
       umbuchung: "Umbuchung — von Konto zu Konto",
     },
-    artKurz: { dauervertrag: "Dauervertrag", umbuchung: "Umbuchung" },
+    artKurz: { abo: "Abo", dauervertrag: "Dauervertrag", umbuchung: "Umbuchung" },
+    artFilter: "Art",
+    artFilterAlle: "Alle Arten",
     artHinweis: {
       abo: "wird auf den nächsten Kündigungstermin hin überwacht",
       dauervertrag: "keine Kündigungswarnung — die Frist steht trotzdem in der Tabelle",
@@ -3877,7 +3879,9 @@ const en: typeof de = {
       dauervertrag: "Standing contract — work, rent",
       umbuchung: "Transfer — account to account",
     },
-    artKurz: { dauervertrag: "Standing", umbuchung: "Transfer" },
+    artKurz: { abo: "Subscription", dauervertrag: "Standing", umbuchung: "Transfer" },
+    artFilter: "Kind",
+    artFilterAlle: "All kinds",
     artHinweis: {
       abo: "watched for its next cancellation deadline",
       dauervertrag: "no cancellation warning — the notice period still shows in the table",
