@@ -3,6 +3,39 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.30.0-beta.3] — 2026-11-09
+
+Zweite Runde nach dem Live-Test. Keine Migration — der Bestand bleibt, wie er ist; manches
+wird anders gerechnet.
+
+### Geändert
+
+**Die Monatskarten lassen Umbuchungen zwischen deinen Konten ganz heraus.** Eine
+Überweisung aufs Tagesgeld-, Spar- oder Rücklagenkonto bewegt eigenes Geld und ist kein
+Abzug — gleich, wie das Zielkonto eingestuft ist. „Sparen & Vorsorge" heisst jetzt
+„Umbuchungen nach außen" und zeigt nur noch Geld, das auf ein Konto geht, das die App
+nicht kennt.
+
+**Die Rücklagen stehen als Raten in den Monatskarten.** Je Rücklage ihre Monatsrate, als
+Abzug — auch wenn noch nichts überwiesen wurde. Ist das Ziel erreicht, bindet sie nichts
+mehr. Aufbauende Budgets planen ihre Rate wieder selbst.
+
+**Budgets werden je Budget nach Art getrennt**, nicht mehr nach dem obersten Budget eines
+Baums — in den Monatskarten, in der Übersicht und im Bereich Budgets. Hängt ein Budget
+unter einem der anderen Art, steht dessen Name daneben. Im Bereich Budgets stehen beide
+Arten in einer Karte nebeneinander, mit schlankeren Zeilen, damit der Verlauf nach dem
+Klick gleich darunter beginnt.
+
+**Rücklagen: Tacho und Eingänge zählen auch Konten, denen eine Rücklage zugeordnet ist**,
+nicht nur solche der Klasse Rücklage. Vorher stand der Tacho auf null, wenn die Rücklagen
+auf einem anders eingestuften Konto lagen. Er misst den Kontostand, nicht die Deckung.
+
+**Analyse: Die Filter stehen am Reiter, den sie einstellen.** Verlauf und Kategorien
+haben Monat und Zeitraum an ihrer Karte, Befunde und Depot den Zeitraum, der Ausblick
+keinen. Die Kennzahlen stehen im Verlauf.
+
+**Neben der Version steht bei einer Beta „Beta"**, nicht mehr „Alpha".
+
 ## [0.30.0-beta.2] — 2026-11-08
 
 Eine Runde Feinschliff nach dem ersten Blick auf die Beta. Keine Migration — der Bestand
