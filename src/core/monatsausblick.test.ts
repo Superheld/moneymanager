@@ -127,7 +127,7 @@ describe("monatsAusblick — Plan-Spalte aus den Verträgen", () => {
     expect(zeile(a, "budgets")!.plan).toBe(0);
   });
 
-  it("zieht ein eingebettetes Budget vom Dach ab, statt beide voll zu zählen", () => {
+  it("plant Dach und eingebettetes Budget je mit ihrem eigenen Betrag", () => {
     const a = monatsAusblick({
       ...basis,
       budgets: [
@@ -136,9 +136,10 @@ describe("monatsAusblick — Plan-Spalte aus den Verträgen", () => {
       ],
       monatAb: "2026-09-01",
     });
-    // 200 insgesamt, nicht 280 — das Kind liegt IM Dach. Es steht seit 2026-11-09 nach
-    // SEINER Art in der aufbauenden Zeile, das Dach mit dem Rest in der monatlichen.
-    expect(zeile(a, "budgets")!.plan).toBe(euroZuCent(-120));
+    // 280 insgesamt: das Dach gilt für alles ausser dem Kind, zwei getrennte Töpfe
+    // (seit 2026-11-09; vorher zog das Kind seinen Betrag vom Dach ab). Jedes steht nach
+    // SEINER Art in seiner Zeile.
+    expect(zeile(a, "budgets")!.plan).toBe(euroZuCent(-200));
     expect(zeile(a, "budgetsAufbauend")!.plan).toBe(euroZuCent(-80));
   });
 

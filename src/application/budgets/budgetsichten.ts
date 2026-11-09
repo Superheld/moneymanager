@@ -23,7 +23,6 @@ import {
   budgetFortschreibung,
   budgetMonatsstand,
   budgetStand,
-  effektiverMonatsbetrag,
   elternBudget,
   verbrauchsFenster,
   verlaufsfenster,
@@ -61,20 +60,12 @@ export interface Budgetstand {
   /** Tiefe im Budgetbaum — 0 für freistehende, 1 für ein eingebettetes usw. */
   readonly tiefe: number;
   /**
-   * Was pro Monat auf dieses Budget entfällt, nachdem die eingebetteten ihren Teil
-   * bekommen haben. Kann negativ werden — dann fordern die Unterbudgets zusammen mehr,
-   * als das Dach hergibt. Bewusst nicht auf 0 geklemmt: das ist ein Widerspruch in der
-   * Planung, den man sehen soll.
+   * Was in diesem Monat in das Budget geht — sein eigener Betrag. Unterbudgets ziehen
+   * davon nichts ab (siehe `core/budgets/budget.ts`, Kopf). Hier und nicht in der
+   * Oberfläche, weil welcher Betrag in einem Monat gilt eine Entscheidung ist und hinter
+   * einen Use-Case gehört (`ui/CLAUDE.md`).
    */
   readonly proMonat: Cent;
-  /**
-   * Der eigene Betrag dieses Monats, VOR Abzug der eingebetteten Budgets.
-   *
-   * Steht hier, damit die Oberfläche „* gekürzt um die Budgets darin" zeigen kann, ohne
-   * die Betragsreihe selbst auszuwerten — welcher Betrag in einem Monat gilt, ist eine
-   * Entscheidung und gehört hinter einen Use-Case (`ui/CLAUDE.md`).
-   */
-  readonly vollerMonatsbetrag: Cent;
   /**
    * Rahmen und Verbrauch KUMULIERT — bei `aufbauend` also alles seit dem Start.
    *
@@ -161,8 +152,7 @@ export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
         budget: b,
         kategorieName: name.get(b.kategorieId) ?? "?",
         tiefe,
-        proMonat: effektiverMonatsbetrag(b, budgets, kategorien, am.slice(0, 7)),
-        vollerMonatsbetrag: betragImMonat(b, am.slice(0, 7)),
+        proMonat: betragImMonat(b, am.slice(0, 7)),
         ...budgetStand(sicht, b, am),
         ...verbrauchsFenster(b, am),
         monat: budgetMonatsstand(sicht, b, am),

@@ -404,7 +404,7 @@ function budgetsZeilen(
   bis: string,
   zukunft: boolean,
 ): { zeilen: { monatlich: AusblickZeile; aufbauend: AusblickZeile }; getragen: Set<string> } {
-  const { budgets, kategorien } = sicht;
+  const { budgets } = sicht;
   // Welche ANTEILE ein Budget trägt, wird hier festgehalten: „Sonstiges" nimmt genau den
   // Rest. Ohne diese Menge verschwände eine Vertragszahlung auf einer Budgetkategorie
   // aus beiden Zeilen — das Budget nimmt sie nicht (Vertrag), Sonstiges nimmt sie nicht
@@ -424,7 +424,7 @@ function budgetsZeilen(
         bezeichnung: b.kategorieId,
         // Der Monat der Zeile: seit der Betrag versioniert ist, plant ein Budget im
         // September womöglich mit einer anderen Rate als im Juli.
-        plan: geglaetteterMonatsabfluss(b, budgets, kategorien, von.slice(0, 7)),
+        plan: geglaetteterMonatsabfluss(b, von.slice(0, 7)),
         ist: verbrauch,
         status: verbrauch == null || verbrauch === 0 ? "offen" : "gebucht",
         art: b.art === "aufbauend" ? "aufbauend" : "monatlich",

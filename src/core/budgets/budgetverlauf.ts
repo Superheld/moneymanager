@@ -119,7 +119,7 @@ export function budgetFortschreibung(
   const untergrenze = fruehesterVerlaufsmonat(budget);
   const start = untergrenze && untergrenze > vonMonat ? untergrenze : vonMonat;
   const geplantAb = ersterBudgetmonat(budget);
-  const rate = (m: string) => zufuehrungIm(budget, sicht.budgets, sicht.kategorien, m);
+  const rate = (m: string) => zufuehrungIm(budget, m);
 
   let uebertrag = budget.art === "aufbauend" ? vorgeschichte(sicht, budget, start, rate) : 0;
 

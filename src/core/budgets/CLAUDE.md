@@ -60,3 +60,16 @@ kommt von jemandem, der ihn hinschreibt.
 `start`. Zwei Felder für einen Zeitpunkt wären zwei Wahrheiten, und ihre erste Abweichung
 fiele niemandem auf. Beim BEARBEITEN bleibt es der Anker und damit nur beim Aufbauenden
 sichtbar: ab wann ein GEÄNDERTER Betrag gilt, sagt dort die Betragsreihe darüber.
+
+## Ein Dach gilt für alles ausser seinen Unterbudgets
+
+Seit 2026-11-09, und das ist die Bedeutung, die gemeint war: „Mobilität" aufbauend mit
+50 €, darunter „Tanken" mit 100 € heisst 50 € für alles in Mobilität ausser Tanken, und
+100 € fürs Tanken. Zwei Töpfe, zusammen 150 € im Monat. Das Unterbudget nimmt dem Dach
+seine Kategorien weg (`budgetKategorien`, nur für den Verbrauch) und sonst nichts.
+
+Vorher zog es zusätzlich seinen BETRAG vom Dach ab (`effektiverMonatsbetrag`, gelöscht),
+als wäre das Dach ein Rahmen, der sich auf seine Teile verteilt. Bekam das Kind mehr als
+das Dach, lief dessen Rate ins Minus, und ein aufbauendes Dach sank Monat für Monat ohne
+eine einzige Ausgabe. Wer eine Aufteilung EINES Rahmens braucht, baut sie als eigene
+Funktion — nicht als stille Verrechnung in der Rate.

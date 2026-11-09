@@ -33,12 +33,18 @@
 // pflichtig, weil eine optionale Angabe genau an einer Aufrufstelle vergessen wird und
 // dort still eine falsche Zahl erzeugt. Genau so ist dieser Fehler entstanden.
 //
-// **Verschachtelung.** Budgets dürfen ineinander liegen: „Freizeit" monatlich, darin
-// „Urlaub" aufbauend. Dann gehört der Urlaub NICHT mehr zu Freizeit — weder sein Betrag
-// noch sein Verbrauch. Sonst zählte dieselbe Ausgabe zweimal, und der Monatsbetrag der
-// Hauptkategorie wäre die Summe aus sich selbst und seinen Teilen. Herausgerechnet wird
-// automatisch und in BEIDE Richtungen (Betrag wie Verbrauch), damit die Zahlen zueinander
-// passen: `budgetKategorien` ist die eine Stelle, die entscheidet, was zu wem zählt.
+// **Verschachtelung: das Dach gilt für alles AUSSER seinen Unterbudgets.** Budgets dürfen
+// ineinander liegen: „Mobilität" aufbauend mit 50 €, darunter „Tanken" mit 100 €. Dann
+// sind die 50 € für alles in Mobilität ausser Tanken da, und die 100 € fürs Tanken — zwei
+// getrennte Töpfe, zusammen 150 € im Monat. Das Unterbudget hat auf das Dach KEINEN
+// Einfluss: weder zählt sein Verbrauch gegen das Dach (`budgetKategorien` nimmt seinen
+// Unterbaum heraus), noch geht sein Betrag vom Dach ab.
+//
+// **Bis 2026-11-09 ging er ab.** Das Dach bekam „seinen Betrag minus die Beträge darin",
+// gedacht als Aufteilung EINES Rahmens auf seine Teile. So ist ein Budget aber nicht
+// gemeint, und es ergab Unsinn, sobald das Kind mehr bekam als das Dach: Mobilität bekam
+// jeden Monat −50 €, und ein aufbauendes Dach SANK Monat für Monat, ohne dass etwas
+// ausgegeben wurde. Wer den Abzug zurückbringt, bringt das mit.
 
 import type { Anspruch } from "../konten/kontobelegung";
 import type { Cent } from "../basis/geld";
@@ -150,21 +156,16 @@ export function ersterBudgetmonat(budget: Budget): string {
 }
 
 /**
- * Was in `monat` in dieses Budget hineingeht, nach Abzug der eingebetteten — 0, solange
- * der Monat vor seinem ersten liegt.
+ * Was in `monat` in dieses Budget hineingeht — 0, solange der Monat vor seinem ersten
+ * liegt. Unterbudgets ändern daran nichts (siehe Kopf).
  *
  * Die eine Stelle, die „wieviel bekommt dieses Budget in DIESEM Monat" beantwortet.
  * `budgetRahmen` und die Fortschreibung fragen beide hier, damit sie nicht auseinander
  * laufen können, wenn eine Version dazukommt.
  */
-export function zufuehrungIm(
-  budget: Budget,
-  alle: readonly Budget[],
-  kategorien: readonly Kategorie[],
-  monat: string,
-): Cent {
+export function zufuehrungIm(budget: Budget, monat: string): Cent {
   if (monat < ersterBudgetmonat(budget)) return 0;
-  return effektiverMonatsbetrag(budget, alle, kategorien, monat);
+  return betragImMonat(budget, monat);
 }
 
 /**
@@ -195,7 +196,7 @@ export function elternBudget(
   return undefined;
 }
 
-/** Die Budgets, die direkt in diesem hier liegen — ihre Beträge gehen von seinem ab. */
+/** Die Budgets, die direkt in diesem hier liegen — ihr Unterbaum zählt nicht aufs Dach. */
 export function kindBudgets(
   budget: Budget,
   alle: readonly Budget[],
@@ -208,8 +209,8 @@ export function kindBudgets(
  * Die Kategorien, die auf DIESES Budget zählen: sein Unterbaum, abzüglich der Unterbäume
  * der Budgets, die darin liegen.
  *
- * Die eine Stelle, an der „was gehört zu wem" entschieden wird — Betrag und Verbrauch
- * fragen beide hier, damit sie nicht auseinanderlaufen können.
+ * Die eine Stelle, an der „was gehört zu wem" entschieden wird. Seit 2026-11-09 nur noch
+ * für den Verbrauch — der Betrag eines Budgets ist sein eigener (siehe Kopf).
  */
 export function budgetKategorien(
   budget: Budget,
@@ -224,37 +225,12 @@ export function budgetKategorien(
 }
 
 /**
- * Was pro Monat auf dieses Budget entfällt, nachdem die eingebetteten Budgets ihren
- * Teil bekommen haben.
- *
- * Kann NEGATIV werden, wenn die Unterbudgets zusammen mehr fordern als das Dach hergibt.
- * Bewusst nicht auf 0 geklemmt: das ist ein Widerspruch in der Planung, den man sehen
- * soll, und eine stille 0 sähe aus wie ein leeres Budget.
- */
-export function effektiverMonatsbetrag(
-  budget: Budget,
-  alle: readonly Budget[],
-  kategorien: readonly Kategorie[],
-  monat: string,
-): Cent {
-  return kindBudgets(budget, alle, kategorien).reduce(
-    (s, k) => s - betragImMonat(k, monat),
-    betragImMonat(budget, monat),
-  );
-}
-
-/**
  * Geglätteter erwarteter Abfluss pro Monat (negativ) — was Planung und Monatsausblick
  * je Monat einrechnen. Für beide Arten derselbe Wert: auch ein aufbauendes Budget
  * kostet jeden Monat seine Rate, es gibt sie nur nicht am Monatsende zurück.
  */
-export function geglaetteterMonatsabfluss(
-  budget: Budget,
-  alle: readonly Budget[],
-  kategorien: readonly Kategorie[],
-  monat: string,
-): Cent {
-  return -effektiverMonatsbetrag(budget, alle, kategorien, monat);
+export function geglaetteterMonatsabfluss(budget: Budget, monat: string): Cent {
+  return -betragImMonat(budget, monat);
 }
 
 /**
@@ -288,20 +264,15 @@ export function verbrauchsFenster(budget: Budget, am: string): { von: string; bi
  *
  * Vor dem Start ist der Rahmen 0 — ein Budget rückwirkend zu füllen wäre erfunden.
  */
-export function budgetRahmen(
-  budget: Budget,
-  alle: readonly Budget[],
-  kategorien: readonly Kategorie[],
-  am: string,
-): Cent {
+export function budgetRahmen(budget: Budget, am: string): Cent {
   const monat = am.slice(0, 7);
-  if (budget.art === "monatlich") return zufuehrungIm(budget, alle, kategorien, monat);
+  if (budget.art === "monatlich") return zufuehrungIm(budget, monat);
   // Aufsummiert statt „Rate mal Monate": mit mehreren Betragsversionen ist die Rate nicht
   // mehr über die ganze Laufzeit dieselbe, und eine Multiplikation rechnete den heutigen
   // Betrag rückwirkend in jeden vergangenen Monat hinein.
   let summe = 0;
   for (let m = ersterBudgetmonat(budget); m <= monat; m = monatDanach(m)) {
-    summe += zufuehrungIm(budget, alle, kategorien, m);
+    summe += zufuehrungIm(budget, m);
   }
   return summe;
 }
@@ -403,7 +374,7 @@ export function budgetStand(
   am: string,
 ): { rahmen: Cent; verbraucht: Cent; rest: Cent } {
   const { von, bis } = verbrauchsFenster(budget, am);
-  const rahmen = budgetRahmen(budget, sicht.budgets, sicht.kategorien, am);
+  const rahmen = budgetRahmen(budget, am);
   const verbraucht = budgetVerbrauch(sicht, budget, von, bis);
   return { rahmen, verbraucht, rest: rahmen - verbraucht };
 }
