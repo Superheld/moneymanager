@@ -104,6 +104,8 @@ describe("BudgetsScreen", () => {
     // Das Dach zeigt 120,00 statt 200,00 — die 80,00 des Kindes sind abgezogen.
     await waitFor(() => expect(document.body.textContent).toMatch(/120,00/));
     expect(document.body.textContent).toMatch(/gekürzt um die Budgets/);
+    // Das aufbauende Kind steht bei den aufbauenden — und sagt, unter welchem Dach.
+    expect(screen.getByText(/unter Freizeit/)).toBeInTheDocument();
   });
 
   it("zählt gebuchte Ausgaben als Verbrauch gegen das Budget", async () => {

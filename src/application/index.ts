@@ -119,6 +119,7 @@ export {
   budgetuebersichtLaden,
   nachArtGetrennt,
   type Budgetgruppen,
+  type GruppierterStand,
   budgetstaende,
   budgetPostenZu,
   budgetPostenImMonat,

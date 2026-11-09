@@ -56,7 +56,7 @@ import {
   type Uebersichtsdaten,
 } from "../../../application";
 import { abrufstand, depots, uebersicht } from "../../dienste";
-import { Button, Card, CoverageTrack, Pill } from "../bausteine";
+import { Button, Card, CoverageTrack } from "../bausteine";
 import { AbrufDialog } from "../bausteine/AbrufDialog";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
 import { BuchungDetail } from "../buchung/BuchungDetail";
@@ -218,8 +218,8 @@ export function UebersichtScreen() {
           {staende.length === 0 ? (
             <div className="muted">{t("uebersicht.budgetsLeer")}</div>
           ) : (
-            // Monatlich und aufbauend getrennt — nach dem Dach eines Baums, nicht je
-            // Zeile (siehe `nachArtGetrennt`). Die Zwischenüberschrift steht nur, wenn es
+            // Monatlich und aufbauend getrennt — je Zeile nach der Art des Budgets
+            // (siehe `nachArtGetrennt`). Die Zwischenüberschrift steht nur, wenn es
             // beide Arten gibt: über einer einzigen Liste sagte sie nichts.
             <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
               {gruppen.map(([art, rows]) => (
@@ -261,11 +261,9 @@ export function UebersichtScreen() {
                             {z.tiefe > 0 && <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>└</span>}
                             <span style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>{offen ? "▾" : "▸"}</span>
                             <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={name}>{name}</span>
-                            {/* Nur das Aufbauende bekommt eine Pille — es ist der Sonderfall.
-                                Zwei Pillen nebeneinander in jeder Zeile wären nur Rauschen. */}
-                            {/* Die Pille nur, wenn die Zeile anders tickt als ihre Gruppe —
-                            ein aufbauendes Kind unter einem monatlichen Dach. */}
-                        {z.budget.art !== art && <span style={{ flex: "0 0 auto", display: "inline-flex" }}><Pill variant={z.budget.art === "aufbauend" ? "um" : "neutral"}>{t(`budgets.art.${z.budget.art}`)}</Pill></span>}
+                            {/* Hängt das Budget unter einem der anderen Art, steht dessen Name
+                                daneben — die Liste trennt je Zeile (`nachArtGetrennt`). */}
+                            {z.unter && <span className="muted" style={{ flex: "0 0 auto", fontWeight: "var(--fw-regular)", fontSize: "var(--fs-2xs)" }}>{t("budgets.unter", { name: z.unter })}</span>}
                           </span>
                           {/* Rechts der Rest, darunter die Herkunft. Beim Monatlichen genügt
                               „von 200": der Rahmen IST der Monatsbetrag, es gibt nichts

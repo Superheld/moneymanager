@@ -466,6 +466,16 @@ select.field {
 }
 
 /* Die Karten darin bringen ihren eigenen Abstand schon mit. */
+/* Zwei Listen nebeneinander IN einer Karte (Budgets: monatlich | aufbauend). Wie
+   `karten-paar`, nur ohne eigenen Rand oben — die Karte hat ihn schon. `min()` lässt
+   eine Spalte schmal die volle Breite nehmen, statt die Seite aufzuziehen. */
+.budget-spalten {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr));
+  gap: var(--sp-5);
+  align-items: start;
+}
+
 .karten-paar > * {
   margin-top: 0 !important;
 }

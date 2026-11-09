@@ -277,32 +277,57 @@ export async function budgetLoeschen(repo: BudgetRepository, id: string): Promis
   await repo.loeschen(id);
 }
 
+/** Ein Budgetstand in seiner Gruppe — Tiefe gezählt nur über Budgets derselben Art. */
+export interface GruppierterStand extends Budgetstand {
+  /**
+   * Der Name des Budgets, unter dem dieses im Baum hängt, wenn das in der ANDEREN Gruppe
+   * steht. Ohne den Hinweis stünde „Urlaub" bei den aufbauenden, und woraus es
+   * herausgerechnet ist, sagte nichts mehr.
+   */
+  readonly unter?: string;
+}
+
 /** Die Budgetstände, getrennt danach, ob ihr Rest verfällt oder bleibt. */
 export interface Budgetgruppen {
-  readonly monatlich: readonly Budgetstand[];
-  readonly aufbauend: readonly Budgetstand[];
+  readonly monatlich: readonly GruppierterStand[];
+  readonly aufbauend: readonly GruppierterStand[];
 }
 
 /**
- * Trennt die Stände nach Art — und zwar nach der Art des OBERSTEN Budgets eines Baums.
+ * Trennt die Stände nach der Art JEDES Budgets.
  *
  * Monatlich und aufbauend beantworten verschiedene Fragen („was ist diesen Monat noch
  * da" gegen „was hat sich angesammelt"), und in einer gemeinsamen Liste las man das eine
- * mit dem Blick des anderen. Getrennt wird aber nach dem Dach und nicht je Zeile: ein
- * aufbauendes „Urlaub" unter einem monatlichen „Freizeit" wird aus dem Dach
- * herausgerechnet, und riss man es von dort weg, stünde der Abzug ohne seinen Grund da.
- * Ein Kind anderer Art bleibt deshalb unter seinem Dach und trägt seine Art als Pille.
+ * mit dem Blick des anderen.
+ *
+ * **Bis 2026-11-09 wurde nach dem DACH getrennt**, nicht je Zeile: ein aufbauendes
+ * „Urlaub" unter einem monatlichen „Freizeit" blieb bei den monatlichen, mit Pille, weil
+ * es aus dem Dach herausgerechnet ist. Bei einem Baum, dessen Dächer alle monatlich
+ * sind, stand damit jedes Budget in einer Liste, und die Trennung war unsichtbar. Jetzt
+ * steht jedes bei seiner Art; den Zusammenhang hält `unter` fest, und die Tiefe zählt
+ * nur noch Vorfahren derselben Art — sonst stünde ein Kind eingerückt unter nichts.
  *
  * Die Reihenfolge bleibt die des Baums: `budgetstaende` liefert ihn in Tiefensuche, ein
  * Dach steht also immer vor seinen Kindern.
  */
 export function nachArtGetrennt(staende: readonly Budgetstand[]): Budgetgruppen {
-  const monatlich: Budgetstand[] = [];
-  const aufbauend: Budgetstand[] = [];
-  let ziel = monatlich;
+  const monatlich: GruppierterStand[] = [];
+  const aufbauend: GruppierterStand[] = [];
+  const artVon = (z: Budgetstand) => (z.budget.art === "aufbauend" ? "aufbauend" : "monatlich");
+  /** Die Vorfahren der aktuellen Zeile, Index = Tiefe. */
+  const pfad: Budgetstand[] = [];
   for (const z of staende) {
-    if (z.tiefe === 0) ziel = z.budget.art === "aufbauend" ? aufbauend : monatlich;
-    ziel.push(z);
+    pfad.length = z.tiefe;
+    const art = artVon(z);
+    const vorfahren = pfad.filter(Boolean);
+    const eltern = vorfahren[vorfahren.length - 1];
+    const eintrag: GruppierterStand = {
+      ...z,
+      tiefe: vorfahren.filter((v) => artVon(v) === art).length,
+      ...(eltern && artVon(eltern) !== art ? { unter: eltern.kategorieName } : {}),
+    };
+    (art === "aufbauend" ? aufbauend : monatlich).push(eintrag);
+    pfad[z.tiefe] = z;
   }
   return { monatlich, aufbauend };
 }
