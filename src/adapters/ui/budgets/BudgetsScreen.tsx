@@ -134,8 +134,8 @@ export function BudgetsScreen() {
 
   /**
    * Die Liste in Baumordnung: ein Budget steht unter dem, in dem es liegt. Nur so ist
-   * die Verrechnung ablesbar — sonst stünde beim Dach ein gekürzter Monatsbetrag und
-   * nirgends, wohin der Rest gegangen ist. Geordnet und gerechnet wird das in
+   * ablesbar, dass das Dach für alles AUSSER ihm gilt — sein Verbrauch zählt dort nicht.
+   * Geordnet und gerechnet wird das in
    * `budgetstaende` (Anwendungsschicht), nicht hier.
    */
   const zeilen: readonly Budgetstand[] = bereich?.staende ?? [];
@@ -150,8 +150,8 @@ export function BudgetsScreen() {
   const bearbeitetesBudget = zeilen.find((z) => z.budget.id === editId)?.budget;
 
   /**
-   * Die Kennzahlen zählen nur die EFFEKTIVEN Beträge — sonst stünde ein eingebettetes
-   * Budget zweimal in der Summe, einmal für sich und einmal im Dach.
+   * Die Kennzahlen summieren über alle Budgets. Doppelt zählt dabei nichts: ein Dach gilt
+   * für alles ausser seinen Unterbudgets, Betrag wie Verbrauch sind getrennte Töpfe.
    */
   const summe = useMemo(() => {
     let proMonat = 0, rahmen = 0, verbraucht = 0;
@@ -190,7 +190,7 @@ export function BudgetsScreen() {
     setKontoId(b.kontoId);
     // Der Betrag DIESES Monats, nicht „der Betrag" — es gibt eine Reihe davon, und was
     // im Feld steht, ist der Ausgangspunkt für die nächste Version.
-    setBetragText(String(minorZuMajor(z.vollerMonatsbetrag, geld.waehrung)));
+    setBetragText(String(minorZuMajor(z.proMonat, geld.waehrung)));
     setStart(b.start);
     setZielMonat(heute.slice(0, 7));
   }
@@ -340,7 +340,7 @@ export function BudgetsScreen() {
                       {
                         // Was in DIESEM Monat zur Verfügung steht: beim Monatlichen der
                         // Monatsbetrag, beim Aufbauenden Übertrag plus Rate. Der Titel legt
-                        // die Aufrechnung offen; ein Stern sagt, dass Kinder abgezogen sind.
+                        // die Aufrechnung offen.
                         key: "rahmen",
                         label: `${t("budgets.spalteRahmen")} ${geld.symbol}`,
                         align: "right",
@@ -354,13 +354,10 @@ export function BudgetsScreen() {
                                     zufuehrung: geld.formatMitSymbol(z.monat.zufuehrung),
                                     gesamt: geld.formatMitSymbol(z.rahmen),
                                   })
-                                : z.proMonat !== z.vollerMonatsbetrag
-                                  ? t("budgets.abzugHinweis", { voll: geld.format(z.vollerMonatsbetrag) })
-                                  : undefined
+                                : undefined
                             }
                           >
                             {geld.format(z.monat.verfuegbar)}
-                            {z.proMonat !== z.vollerMonatsbetrag && <span className="muted"> *</span>}
                           </span>
                         ),
                       },
@@ -417,10 +414,9 @@ export function BudgetsScreen() {
                 </section>
               ))}
           </div>
-          {(zeilen.some((z) => z.tiefe > 0) || zeilen.some((z) => z.proMonat !== z.vollerMonatsbetrag)) && (
+          {zeilen.some((z) => z.tiefe > 0) && (
             <div className="muted" style={{ fontSize: "var(--fs-2xs)", marginTop: "var(--sp-2)" }}>
-              {zeilen.some((z) => z.tiefe > 0) && <div>{t("budgets.abschnittListeHinweis")}</div>}
-              {zeilen.some((z) => z.proMonat !== z.vollerMonatsbetrag) && <div>{t("budgets.abzugFussnote")}</div>}
+              <div>{t("budgets.abschnittListeHinweis")}</div>
             </div>
           )}
         </Card>

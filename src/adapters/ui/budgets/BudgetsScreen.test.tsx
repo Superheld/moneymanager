@@ -88,7 +88,7 @@ describe("BudgetsScreen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/400,00/));
   });
 
-  it("rechnet ein eingebettetes Budget aus seinem Dach heraus", async () => {
+  it("zieht ein eingebettetes Budget NICHT vom Dach ab — das Dach gilt für alles andere", async () => {
     await stammdatenBasis();
     await sqliteKategorieRepository.speichern({ id: "frei", name: "Freizeit", defaultCharakter: "Aufwand" });
     await sqliteKategorieRepository.speichern({ id: "urlaub", name: "Urlaub", elternId: "frei", defaultCharakter: "Aufwand" });
@@ -101,9 +101,9 @@ describe("BudgetsScreen", () => {
 
     rendere(<BudgetsScreen />);
     await screen.findByText("Freizeit");
-    // Das Dach zeigt 120,00 statt 200,00 — die 80,00 des Kindes sind abgezogen.
-    await waitFor(() => expect(document.body.textContent).toMatch(/120,00/));
-    expect(document.body.textContent).toMatch(/gekürzt um die Budgets/);
+    // Das Dach behält seine 200,00 — die 80,00 des Kindes sind ein eigener Topf.
+    await waitFor(() => expect(document.body.textContent).toMatch(/200,00/));
+    expect(document.body.textContent).not.toMatch(/120,00/);
     // Das aufbauende Kind steht bei den aufbauenden — und sagt, unter welchem Dach.
     expect(screen.getByText(/unter Freizeit/)).toBeInTheDocument();
   });

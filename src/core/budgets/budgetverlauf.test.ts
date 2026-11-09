@@ -138,11 +138,11 @@ describe("budgetFortschreibung, aufbauend", () => {
     expect(reihe[0].verbraucht).toBe(euroZuCent(10));
   });
 
-  it("rechnet die Verschachtelung mit — das Kind nimmt dem Dach seine Rate weg", () => {
+  it("ein Kind nimmt dem Dach nichts von seiner Rate", () => {
     const dach = budget({ id: "dach", kategorieId: "freizeit", art: "aufbauend", betragProMonat: euroZuCent(200) });
     const kind = budget({ id: "kind", kategorieId: "urlaub", art: "aufbauend", betragProMonat: euroZuCent(80) });
     const reihe = budgetFortschreibung(sicht([], [dach, kind]), dach, "2026-01", "2026-02");
-    expect(reihe.map((m) => m.zufuehrung)).toEqual([euroZuCent(120), euroZuCent(120)]);
+    expect(reihe.map((m) => m.zufuehrung)).toEqual([euroZuCent(200), euroZuCent(200)]);
   });
 });
 

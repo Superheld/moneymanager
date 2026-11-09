@@ -17,8 +17,10 @@ Mitteln davon gegangen ist. Der Untertitel der Übersicht sagt es mit.
 bleibt), in der Übersicht wie im Bereich Budgets und in den Monatskarten als zwei Zeilen
 „Budgets monatlich" und „Budgets aufbauend". Seit 2026-11-09 nach der Art JEDES Budgets,
 nicht mehr nach dem Dach seines Baums: ein aufbauendes Kind unter einem monatlichen Dach
-steht bei den aufbauenden. Die Summe bleibt richtig, weil das Dach seinen Rahmen ohnehin
-ohne das Kind plant (`geglaetteterMonatsabfluss`).
+steht bei den aufbauenden. Doppelt zählt dabei nichts: ein Dach gilt für alles ausser
+seinen Unterbudgets, Betrag wie Verbrauch sind getrennte Töpfe (`core/budgets/budget.ts`,
+Kopf). Bis 2026-11-09 zog das Kind seinen Betrag vom Dach ab — ein aufbauendes Dach mit
+grösserem Kind sank dadurch jeden Monat, ohne dass etwas ausgegeben wurde.
 
 Daran hängt die Karte **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE
 Konten. Die Klasse ist die Rechenregel und jedes Konto hat genau eine, die Summen addieren
