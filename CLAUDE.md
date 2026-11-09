@@ -163,6 +163,8 @@ Netzzugriff, war damit falsch. Sie ist es erst, seit die Schrift im Bündel lieg
 Die App ist **nicht veröffentlicht**. Es gibt genau einen Datenbestand — den lokalen —, und
 der lässt sich per Import wiederherstellen. Sichtbar über `APP_STADIUM` in `src/version.ts`;
 im Versionsstring steht es bewusst nicht, weil der in die Tauri-Bundle-Metadaten durchschlägt.
+Läuft eine Beta, zeigt das Abzeichen den Kanal statt des Stadiums (`abzeichenFuer`) — das
+Stadium gilt dann trotzdem weiter.
 
 Daraus folgt genau eine Freiheit: **Migrationen dürfen auch wegnehmen.** Tabellen und
 Spalten, die kein Code mehr kennt, werden abgeräumt statt als Altlast mitgeschleppt. Vor dem
