@@ -16,7 +16,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { APP_STADIUM, APP_VERSION } from "../../../version";
+import { APP_ABZEICHEN, APP_VERSION } from "../../../version";
 import { AktualisierungKnopf } from "./AktualisierungKnopf";
 import { Icon } from "./IconButton";
 
@@ -212,10 +212,10 @@ export function AppShell({
         ))}
 
         <div className="foot">
-          {/* Das Stadium steht neben der Version, nicht darin: wer hier hinsieht, soll
-              wissen, dass Schema und Daten noch nicht festgeschrieben sind. */}
+          {/* Neben der Version steht das Stadium, bei einer Beta der Kanal — warum, steht
+              an `abzeichenFuer` in version.ts. */}
           <div>
-            Moneymanager {APP_VERSION} <span className="bdg">{APP_STADIUM}</span>
+            Moneymanager {APP_VERSION} <span className="bdg">{APP_ABZEICHEN}</span>
           </div>
           <div>{t("shell.footLokal")}</div>
           {/* Erscheint nur, wenn wirklich etwas bereitliegt — sonst rendert er nichts. */}

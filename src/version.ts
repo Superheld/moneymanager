@@ -18,3 +18,21 @@ export const APP_VERSION: string = pkg.version;
  * an der die Anzeige vom Konstanten-Wert abdriften kann.
  */
 export const APP_STADIUM = "Alpha";
+
+/**
+ * Was das Abzeichen neben der Version zeigt: bei einer Vorabversion den KANAL, sonst das
+ * Stadium. Seit es den Beta-Kanal gibt (0.29.3), trägt eine Beta ihr Suffix doch im
+ * Versionsstring (`0.30.0-beta.2`), und daneben „Alpha" las sich wie ein Widerspruch —
+ * zwei Reifegrade für dieselbe Fassung. Stimmen tun beide: das Stadium sagt, dass Schema
+ * und Daten noch nicht festgeschrieben sind, der Kanal, dass diese Fassung noch nicht für
+ * alle ist. Wer eine Beta laufen hat, für den ist das Zweite die dringendere Auskunft; das
+ * Erste gilt ohnehin, solange `APP_STADIUM` dasteht.
+ *
+ * Nur `beta` wird übersetzt, weil es nur diesen Kanal gibt. Ein anderes Suffix (`rc.1`)
+ * fällt aufs Stadium zurück, statt ein Abzeichen aus einem Wort zu raten.
+ */
+export function abzeichenFuer(version: string, stadium: string): string {
+  return /^\d+\.\d+\.\d+-beta(\.|$)/.test(version) ? "Beta" : stadium;
+}
+
+export const APP_ABZEICHEN = abzeichenFuer(APP_VERSION, APP_STADIUM);
