@@ -176,7 +176,7 @@ export interface Uebergang {
 }
 
 /**
- * Fasst den Plan zu Übergängen zusammen — „118 × Sonstiges → Drogerie".
+ * Fasst den Plan zu Übergängen zusammen — „12 × Sonstiges → Drogerie".
  *
  * Eine Liste aus tausend Zeilen ist keine Vorschau: niemand liest sie, und wer sie
  * bestätigt, hat nichts geprüft. Die Übergänge sind dagegen zählbar, und ein falscher

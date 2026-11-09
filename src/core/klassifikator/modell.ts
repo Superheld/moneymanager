@@ -3,7 +3,7 @@
 //
 // Warum ausgerechnet diese Modellklasse, und keine größere: Der Lern-Spike (2026-06) hat
 // linear, MLP und tief+breit auf denselben Daten verglichen — sie lagen gleichauf, der
-// Deckel bei ~85 % ist daten- und mehrdeutigkeitslimitiert. Ein Hidden Layer kostet also
+// Deckel ist daten- und mehrdeutigkeitslimitiert. Ein Hidden Layer kostet also
 // Rechenzeit und Erklärbarkeit, ohne etwas zu bringen.
 //
 // Und die Erklärbarkeit ist hier kein Beiwerk. Bei einem linearen Modell IST die
@@ -64,8 +64,9 @@ export interface TrainingsOptionen {
   readonly lernrate?: number;
   /**
    * L2-Regularisierung. Hält einzelne Gewichte klein und verhindert, dass ein Token, das
-   * genau einmal vorkommt, seine Kategorie im Alleingang entscheidet — bei ~2000
-   * Merkmalen auf ~3700 Beispielen ist das der wahrscheinlichste Fehlermodus.
+   * genau einmal vorkommt, seine Kategorie im Alleingang entscheidet — wenn das
+   * Vokabular in der Grössenordnung der Beispielzahl liegt, ist das der wahrscheinlichste
+   * Fehlermodus.
    */
   readonly l2?: number;
   /** Startwert des Mischens. Gleicher Wert ⇒ gleiches Modell. */
@@ -73,16 +74,18 @@ export interface TrainingsOptionen {
 }
 
 /**
- * Am echten Bestand kalibriert (2026-08-16, 3689 Beispiele über 47 Kategorien): Gitter
- * über Epochen × Lernrate × L2, gemessen über FÜNF verschiedene Trainings-/Prüf-Splits.
+ * Kalibriert (2026-08-16): Gitter über Epochen × Lernrate × L2, gemessen über mehrere
+ * verschiedene Trainings-/Prüf-Splits.
  *
- * Über mehrere Splits und nicht über einen: der beste Einzelsplit lieferte 90,5 %, das
- * Mittel derselben Einstellung 89,1 %. Wer den Höchstwert eines Splits festschreibt,
- * kalibriert auf dessen Zufall und trägt die Differenz später als Enttäuschung nach.
+ * Über mehrere Splits und nicht über einen: der beste Einzelsplit lag spürbar über dem
+ * Mittel derselben Einstellung. Wer den Höchstwert eines Splits festschreibt, kalibriert
+ * auf dessen Zufall und trägt die Differenz später als Enttäuschung nach.
  *
- * Gewählt: 89,1 % im Mittel (schlechtester Split 87,1 %), 137 ms über den ganzen Bestand.
- * 60 Epochen brachten nichts mehr, 20 lagen 0,3 Punkte darunter. L2 wirkt kaum — es
- * bleibt drin, weil es beim Wachsen des Vokabulars greift, nicht wegen der heutigen Zahl.
+ * Gewählt wurde das beste Mittel. Deutlich mehr Epochen brachten nichts mehr, die Hälfte
+ * lag knapp darunter. L2 wirkt kaum — es bleibt drin, weil es beim Wachsen des Vokabulars
+ * greift, nicht wegen eines heutigen Messwerts. Gemessen wurde damals mit zufälligen
+ * Splits; seit 2026-11-09 misst die App zeitlich (`messung.ts`), eine Neukalibrierung
+ * gegen dieses Protokoll steht aus.
  */
 export const STANDARD_TRAINING: Required<TrainingsOptionen> = {
   epochen: 40,

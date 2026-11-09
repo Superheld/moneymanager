@@ -1526,10 +1526,10 @@ function zustandsText(t: Hilfe["t"], zuwachs: number, zahl: (n: number) => strin
  *
  * Eine eigene Tabelle statt `DataTable`, weil hier die Spalten aus den Daten entstehen
  * und die Diagonale eine eigene Bedeutung hat. Sie scrollt in ihrem eigenen Kasten —
- * bei fünfundzwanzig beteiligten Kategorien ist sie breiter als jedes Fenster, und die
+ * bei ein paar Dutzend beteiligten Kategorien ist sie breiter als jedes Fenster, und die
  * Seite selbst darf davon nicht seitwärts wandern.
  *
- * Leere Zellen bleiben leer statt eine Null zu zeigen: bei rund neunzig Prozent Nullen
+ * Leere Zellen bleiben leer statt eine Null zu zeigen: bei einer Matrix fast nur aus Nullen
  * wäre das ein Feld aus Ziffern, in dem die wenigen echten Zahlen untergehen.
  */
 function Matrix({
