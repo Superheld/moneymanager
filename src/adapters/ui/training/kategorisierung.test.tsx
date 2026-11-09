@@ -459,8 +459,27 @@ describe("3 · Erkennungsmodell", () => {
 
     await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
 
-    await waitFor(() => expect(screen.getByText("100 %")).toBeTruthy());
+    // Die Kachel „Trefferquote" — „100 %" steht inzwischen mehrfach da (Nachschlagen,
+    // Macro-F1, je Kategorie), deshalb in ihrer Kachel gesucht.
+    const kachel = (await screen.findByText("Trefferquote")).parentElement!;
+    await waitFor(() => expect(within(kachel).getByText("100 %")).toBeTruthy());
     expect(screen.getByText(/Zuletzt trainiert am .*, aus 80 Beispielen/)).toBeTruthy();
+  });
+
+  it("sagt, woran gemessen wurde, und stellt Nachschlagen, Macro-F1 und Kalibrierung daneben", async () => {
+    material();
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.modell);
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+
+    // Keine handverlesenen Labels im Material → die Messung sagt, dass sie an allen prüft.
+    await waitFor(() => expect(screen.getByText(/Geprüft an den 16 jüngsten Buchungen/)).toBeTruthy());
+    expect(screen.getByText(/auch automatisch gesetzte Kategorien/)).toBeTruthy();
+    expect(screen.getByText("Nachschlagen")).toBeTruthy();
+    expect(screen.getByText("Macro-F1")).toBeTruthy();
+    expect(screen.getByText("Je Kategorie")).toBeTruthy();
+    expect(screen.getByText("Wie verlässlich ist die Sicherheit?")).toBeTruthy();
   });
 
   /**

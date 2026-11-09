@@ -1711,12 +1711,33 @@ const de = {
       grundlinie: "Blindes Raten",
       grundlinieMeta: "immer „{{kategorie}}\" — die häufigste Kategorie",
       vorsprung: "Vorsprung",
-      vorsprungMeta: "so viel besser als Raten. Darunter lernt das Modell nichts.",
+      vorsprungMeta: "so viel besser als die stärkere der beiden Linien. Darunter taugt das Modell nicht mehr als eine Nachschlagetabelle.",
+      empfaengerLinie: "Nachschlagen",
+      empfaengerLinieMeta: "dieselbe Kategorie wie beim Empfänger üblich, ganz ohne Modell — {{abdeckung}} der Empfänger waren bekannt",
+      macroF1: "Macro-F1",
+      macroF1Meta: "jede Kategorie zählt gleich, auch die seltenen",
+      protokollHandverlesen:
+        "Geprüft an den {{pruefung}} jüngsten Buchungen ab {{stichtag}} mit von Hand gesetzter Kategorie; trainiert auf den {{training}} davor.",
+      protokollAlle:
+        "Geprüft an den {{pruefung}} jüngsten Buchungen ab {{stichtag}}; trainiert auf den {{training}} davor. Darunter sind auch automatisch gesetzte Kategorien — für eine Prüfung nur an von Hand gesetzten gab es zu wenige, und eine automatische kann vom Modell selbst stammen.",
+      klassenTitel: "Je Kategorie",
+      klassenHinweis:
+        "Precision: von dem, was das Modell so nannte, war wie viel richtig. Recall: von dem, was wirklich diese Kategorie war, hat es wie viel erkannt. F1 fasst beides zusammen. Schwächste zuerst.",
+      spalteKategorie: "Kategorie",
+      spaltePrecision: "Precision",
+      spalteRecall: "Recall",
+      kalibrierungTitel: "Wie verlässlich ist die Sicherheit?",
+      kalibrierungHinweis:
+        "Wie viele Vorschläge ab einer Sicherheit kommen und wie oft sie dort stimmen. Im Mittel liegt die angegebene Sicherheit um {{ece}} neben der tatsächlichen Trefferquote.",
+      spalteSchwelle: "Sicherheit",
+      abSicherheit: "ab {{wert}}",
+      spalteAbdeckung: "Anteil der Vorschläge",
+      spalteTrefferDarin: "davon richtig",
       fehlgriffeHinweis:
         "Die einzelnen Zeilen dahinter, je mit der Rechnung, warum die falsche Kategorie gewann. „im Bestand“ sagt, wo ein Wort in deinen Buchungen steht — liegt es dort meist in der falschen Kategorie, sind die Labels uneins; steht nichts Unterscheidendes in der Zeile, fehlt ein Merkmal. Darunter der ganze Merkmalsvektor.",
       fehlgriffeLeer: "Zu diesem Paar liegen keine Einzelzeilen vor.",
       fehlgriffSicherheit: "Sicherheit {{wert}}",
-      genauigkeitMeta: "an {{gesamt}} zurückgehaltenen Zahlungen gemessen",
+      genauigkeitMeta: "an den {{gesamt}} jüngsten Zahlungen gemessen",
       genauigkeitUnbekannt: "nicht gemessen",
       genauigkeitUnbekanntMeta: "zu wenige Beispiele für eine belastbare Messung",
       trainiertAm: "Zuletzt trainiert am {{datum}}, aus {{beispiele}} Beispielen.",
@@ -1735,7 +1756,6 @@ const de = {
       paareTitel: "Häufigste Verwechslungen",
       paareHinweis:
         "Manche Kategorien sind aus dem Text schlicht nicht ableitbar — ob eine Zahlung zu einer Reise gehört, steht nicht im Verwendungszweck.",
-      spalteKategorie: "Kategorie",
       spalteTrefferquote: "Trefferquote",
       spaltePruefungen: "Geprüft",
       // --- Die Karten entlang des Trainingsablaufs ---
@@ -3772,12 +3792,33 @@ const en: typeof de = {
       grundlinie: "Blind guessing",
       grundlinieMeta: "always „{{kategorie}}\" — the most frequent category",
       vorsprung: "Lead",
-      vorsprungMeta: "this much better than guessing. Below it, the model learns nothing.",
+      vorsprungMeta: "this much better than the stronger of the two lines. Below it, the model is no better than a lookup table.",
+      empfaengerLinie: "Lookup",
+      empfaengerLinieMeta: "the payee's usual category, no model at all — {{abdeckung}} of payees were known",
+      macroF1: "Macro F1",
+      macroF1Meta: "every category counts the same, rare ones included",
+      protokollHandverlesen:
+        "Tested on the {{pruefung}} most recent bookings from {{stichtag}} with a hand-set category; trained on the {{training}} before.",
+      protokollAlle:
+        "Tested on the {{pruefung}} most recent bookings from {{stichtag}}; trained on the {{training}} before. This includes automatically set categories — there were too few hand-set ones to test on those alone, and an automatic one may come from the model itself.",
+      klassenTitel: "Per category",
+      klassenHinweis:
+        "Precision: of what the model called this, how much was right. Recall: of what really was this category, how much it found. F1 combines both. Weakest first.",
+      spalteKategorie: "Category",
+      spaltePrecision: "Precision",
+      spalteRecall: "Recall",
+      kalibrierungTitel: "How reliable is the confidence?",
+      kalibrierungHinweis:
+        "How many suggestions reach a given confidence and how often they are right there. On average, the stated confidence is {{ece}} off the actual hit rate.",
+      spalteSchwelle: "Confidence",
+      abSicherheit: "from {{wert}}",
+      spalteAbdeckung: "Share of suggestions",
+      spalteTrefferDarin: "of which right",
       fehlgriffeHinweis:
         "The individual rows behind it, each with the calculation of why the wrong category won. \"in your data\" shows where a word appears in your bookings — if it mostly sits in the wrong category, the labels disagree; if nothing in the row distinguishes, a feature is missing. Below, the full feature vector.",
       fehlgriffeLeer: "No individual rows available for this pair.",
       fehlgriffSicherheit: "confidence {{wert}}",
-      genauigkeitMeta: "measured on {{gesamt}} held-back payments",
+      genauigkeitMeta: "measured on the {{gesamt}} most recent payments",
       genauigkeitUnbekannt: "not measured",
       genauigkeitUnbekanntMeta: "too few examples for a meaningful measurement",
       trainiertAm: "Last trained on {{datum}}, from {{beispiele}} examples.",
@@ -3796,7 +3837,6 @@ const en: typeof de = {
       paareTitel: "Most frequent confusions",
       paareHinweis:
         "Some categories simply cannot be derived from the text — whether a payment belongs to a trip is not stated in the reference.",
-      spalteKategorie: "Category",
       spalteTrefferquote: "Hit rate",
       spaltePruefungen: "Evaluated",
       datenTitel: "1 · Training data",

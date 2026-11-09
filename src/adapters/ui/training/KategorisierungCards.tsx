@@ -54,6 +54,7 @@ import {
   type Abgleichsplan,
 } from "../../../application/kategorien/kategorieAbgleich";
 import type { Wirkung } from "../../../application/kategorien/merkmalskonfiguration";
+import type { Messprotokoll } from "../../../application/kategorien/klassifikatorTraining";
 import {
   herkunftUmschalten,
   kategorieAbgleichAnwenden,
@@ -96,6 +97,8 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
   const [bewertung, setBewertung] = useState<Bewertung | null>(null);
   /** Was blindes Raten träfe — ohne sie sagt die Genauigkeit daneben nichts. */
   const [grundlinie, setGrundlinie] = useState<Grundlinie | null>(null);
+  /** Wie gemessen wurde und was neben der Trefferquote steht. */
+  const [protokoll, setProtokoll] = useState<Messprotokoll | null>(null);
   const [wirkung, setWirkung] = useState<{ basis: number; wirkungen: Wirkung[] } | null>(null);
   const [listenGeaendert, setListenGeaendert] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -154,6 +157,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
       const r = await modellTrainieren({ herkuenfte: daten.herkuenfte, ausschluesse: daten.ausschluesse });
       setBewertung(r.bewertung ?? null);
       setGrundlinie(r.grundlinie ?? null);
+      setProtokoll(r.protokoll ?? null);
       setListenGeaendert(false);
       await laden();
     } catch (e) {
@@ -264,6 +268,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
                 {...hilfe}
                 bewertung={bewertung}
                 grundlinie={grundlinie}
+                protokoll={protokoll}
                 trainiert={laeuft === "training"}
                 listenGeaendert={listenGeaendert}
                 aufTraining={trainingStarten}
@@ -1037,10 +1042,11 @@ function Wortdetail({
 // -------------------------------------------------------------- 4 · Erkennungsmodell
 
 function ModellInhalt({
-  t, daten, kategorieName, zahl, prozent, bewertung, grundlinie, trainiert, listenGeaendert, aufTraining,
+  t, daten, kategorieName, zahl, prozent, bewertung, grundlinie, protokoll, trainiert, listenGeaendert, aufTraining,
 }: Hilfe & {
   bewertung: Bewertung | null;
   grundlinie: Grundlinie | null;
+  protokoll: Messprotokoll | null;
   trainiert: boolean;
   listenGeaendert: boolean;
   aufTraining: () => void;
@@ -1114,15 +1120,41 @@ function ModellInhalt({
                 })}
               />
             )}
-            {grundlinie && stand.genauigkeit !== undefined && (
+            {/* Die zweite Linie: was eine Nachschlagetabelle „Empfänger → übliche
+                Kategorie" träfe, ganz ohne Modell. Jedes Modell schlägt blindes Raten;
+                an dieser Linie muss es sich messen lassen. */}
+            {protokoll?.empfaenger && stand.genauigkeit !== undefined && (
               <KPIStat
                 size="tile"
-                label={t("einstellungen.lernmaterial.vorsprung")}
-                value={prozent(stand.genauigkeit - grundlinie.genauigkeit)}
-                meta={t("einstellungen.lernmaterial.vorsprungMeta")}
-                // Unter der Vergleichslinie ist das Modell schlechter als Raten. Das
-                // passiert und ist die wichtigste Meldung, die es geben kann.
-                tone={stand.genauigkeit <= grundlinie.genauigkeit ? "warn" : "ok"}
+                label={t("einstellungen.lernmaterial.empfaengerLinie")}
+                value={prozent(protokoll.empfaenger.genauigkeit)}
+                meta={t("einstellungen.lernmaterial.empfaengerLinieMeta", {
+                  abdeckung: prozent(protokoll.empfaenger.abdeckung),
+                })}
+              />
+            )}
+            {grundlinie && stand.genauigkeit !== undefined && (() => {
+              // Der Vorsprung zählt gegen die STÄRKERE der beiden Linien — gegen die
+              // schwächere gemessen, sähe jedes Modell gut aus.
+              const linie = Math.max(grundlinie.genauigkeit, protokoll?.empfaenger?.genauigkeit ?? 0);
+              return (
+                <KPIStat
+                  size="tile"
+                  label={t("einstellungen.lernmaterial.vorsprung")}
+                  value={prozent(stand.genauigkeit - linie)}
+                  meta={t("einstellungen.lernmaterial.vorsprungMeta")}
+                  // Unter der Linie ist das Modell schlechter als eine Nachschlagetabelle.
+                  // Das passiert und ist die wichtigste Meldung, die es geben kann.
+                  tone={stand.genauigkeit <= linie ? "warn" : "ok"}
+                />
+              );
+            })()}
+            {protokoll?.kennzahlen.macroF1 != null && (
+              <KPIStat
+                size="tile"
+                label={t("einstellungen.lernmaterial.macroF1")}
+                value={prozent(protokoll.kennzahlen.macroF1)}
+                meta={t("einstellungen.lernmaterial.macroF1Meta")}
               />
             )}
           </div>
@@ -1140,6 +1172,81 @@ function ModellInhalt({
             )}
           </div>
         </>
+      )}
+
+      {protokoll && (
+        <div className="muted" style={{ marginTop: "var(--sp-2)" }}>
+          {t(
+            protokoll.pruefmenge === "handverlesen"
+              ? "einstellungen.lernmaterial.protokollHandverlesen"
+              : "einstellungen.lernmaterial.protokollAlle",
+            {
+              pruefung: zahl(protokoll.pruefAnzahl),
+              training: zahl(protokoll.trainingAnzahl),
+              stichtag: protokoll.stichtag ? new Date(protokoll.stichtag).toLocaleDateString(locale) : "—",
+            },
+          )}
+        </div>
+      )}
+
+      {protokoll && (
+        <Abschnitt titel={t("einstellungen.lernmaterial.klassenTitel")}>
+          <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+            {t("einstellungen.lernmaterial.klassenHinweis")}
+          </div>
+          <DataTable
+            sortable
+            pageSize={15}
+            columns={[
+              {
+                key: "kategorieId",
+                label: t("einstellungen.lernmaterial.spalteKategorie"),
+                render: (r) => kategorieName.get(r.kategorieId) ?? r.kategorieId,
+              },
+              { key: "anzahl", label: t("einstellungen.lernmaterial.spalteAnzahl"), align: "right", render: (r) => zahl(r.anzahl) },
+              {
+                key: "precision", label: t("einstellungen.lernmaterial.spaltePrecision"), align: "right",
+                sortValue: (r) => r.precision ?? -1,
+                render: (r) => (r.precision === null ? "—" : prozent(r.precision)),
+              },
+              {
+                key: "recall", label: t("einstellungen.lernmaterial.spalteRecall"), align: "right",
+                sortValue: (r) => r.recall ?? -1,
+                render: (r) => (r.recall === null ? "—" : prozent(r.recall)),
+              },
+              {
+                key: "f1", label: "F1", align: "right",
+                sortValue: (r) => r.f1 ?? -1,
+                render: (r) => (r.f1 === null ? "—" : prozent(r.f1)),
+              },
+            ]}
+            rows={protokoll.kennzahlen.jeKategorie.map((k) => ({ ...k, id: k.kategorieId }))}
+          />
+        </Abschnitt>
+      )}
+
+      {protokoll?.kalibrierung && (
+        <Abschnitt titel={t("einstellungen.lernmaterial.kalibrierungTitel")}>
+          <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+            {t("einstellungen.lernmaterial.kalibrierungHinweis", {
+              ece: prozent(protokoll.kalibrierung.ece),
+            })}
+          </div>
+          <DataTable
+            columns={[
+              {
+                key: "schwelle", label: t("einstellungen.lernmaterial.spalteSchwelle"),
+                render: (r) => t("einstellungen.lernmaterial.abSicherheit", { wert: prozent(r.schwelle) }),
+              },
+              { key: "abdeckung", label: t("einstellungen.lernmaterial.spalteAbdeckung"), align: "right", render: (r) => prozent(r.abdeckung) },
+              {
+                key: "genauigkeit", label: t("einstellungen.lernmaterial.spalteTrefferDarin"), align: "right",
+                render: (r) => (r.genauigkeit === null ? "—" : prozent(r.genauigkeit)),
+              },
+            ]}
+            rows={protokoll.kalibrierung.schwellen.map((x) => ({ ...x, id: String(x.schwelle) }))}
+          />
+        </Abschnitt>
       )}
 
       {bewertung && (

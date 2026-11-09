@@ -29,6 +29,10 @@ export interface Lernbeispiel {
   readonly istbuchungId: string;
   readonly merkmale: readonly string[];
   readonly kategorieId: string;
+  /** Buchungsdatum — die Messung teilt danach in Vergangenheit und Zukunft. */
+  readonly datum: string;
+  /** Von Hand gesetzt? Nur daran wird geprüft, wenn es genug davon gibt. */
+  readonly handverlesen: boolean;
 }
 
 /** Warum eine Buchung nicht als Beispiel taugt. */
@@ -265,7 +269,13 @@ export function materialBefund(
       verteilung.set(s.kategorieId, (verteilung.get(s.kategorieId) ?? 0) + 1);
     }
 
-    beispiele.push({ istbuchungId: s.id, merkmale: befund.merkmale, kategorieId: s.kategorieId });
+    beispiele.push({
+      istbuchungId: s.id,
+      merkmale: befund.merkmale,
+      kategorieId: s.kategorieId,
+      datum: s.datum,
+      handverlesen: s.kategorieHerkunft === "manuell",
+    });
     jeKategorie.set(s.kategorieId, (jeKategorie.get(s.kategorieId) ?? 0) + 1);
     for (const m of befund.merkmale) {
       tokenZaehler.set(m, (tokenZaehler.get(m) ?? 0) + 1);

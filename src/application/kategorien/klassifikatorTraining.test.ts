@@ -79,6 +79,31 @@ describe("Training", () => {
     expect(r.stand.genauigkeit).toBe(r.bewertung!.genauigkeit);
   });
 
+  it("prüft an den jüngsten Buchungen — und an den handverlesenen, sobald es genug gibt", async () => {
+    // 80 Zahlungen über 80 Tage; die letzten 40 von Hand gesetzt. Geprüft wird das
+    // jüngste Fünftel (16 Zeilen), und weil davon zu wenige handverlesen wären, an allen.
+    const { buchungen, umsaetze } = genugMaterial();
+    const datiert = buchungen.map((b, i) => ({
+      ...b,
+      datum: `2026-${String(1 + Math.floor(i / 28)).padStart(2, "0")}-${String(1 + (i % 28)).padStart(2, "0")}`,
+      kategorieHerkunft: i >= 40 ? ("manuell" as const) : undefined,
+    }));
+    const { deps } = fakes(datiert, umsaetze);
+
+    const r = await klassifikatorTrainieren(deps);
+
+    const p = r.protokoll!;
+    expect(p.trainingAnzahl).toBe(64);
+    expect(p.pruefAnzahl).toBe(16);
+    expect(p.stichtag).toBe(datiert[64].datum);
+    expect(p.pruefmenge).toBe("alle");
+    // Beide Vergleichslinien und die Kennzahlen stehen daneben.
+    expect(r.grundlinie).toBeDefined();
+    expect(p.empfaenger).not.toBeNull();
+    expect(p.kennzahlen.macroF1).not.toBeNull();
+    expect(p.kalibrierung).not.toBeNull();
+  });
+
   it("das gespeicherte Modell nutzt ALLE Beispiele, auch die gemessenen", async () => {
     // Sonst würde ein Fünftel der Daten weggeworfen, nur um eine Zahl nennen zu können.
     const { buchungen, umsaetze } = genugMaterial();

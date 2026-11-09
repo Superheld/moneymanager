@@ -32,6 +32,16 @@ export interface Beispiel {
    * trennen sind. Optional, damit ein konstruiertes Beispiel im Test ohne sie auskommt.
    */
   readonly id?: string;
+  /**
+   * Buchungsdatum (ISO). Wie `id` für das Training bedeutungslos — die Messung teilt
+   * danach in Vergangenheit und Zukunft (`messung.ts`).
+   */
+  readonly datum?: string;
+  /**
+   * Hat ein Mensch die Kategorie gesetzt? Nur solche Labels sind eine Wahrheit, an der
+   * sich messen lässt; ein automatisches kann vom Modell selbst stammen.
+   */
+  readonly handverlesen?: boolean;
 }
 
 export interface Modell {
@@ -384,6 +394,11 @@ export interface Bewertung {
    * Form die Frage „wo ist es am schlimmsten" beantwortet und die andere „warum".
    */
   readonly fehltreffer: readonly Fehltreffer[];
+  /**
+   * Je Prüfbeispiel: wie sicher das Modell war und ob es traf. Grundlage der
+   * Kalibrierung (`messung.ts`) — die Frage, ob „90 % sicher" auch 90 % richtig heisst.
+   */
+  readonly vorhersagen: readonly { readonly sicherheit: number; readonly treffer: boolean }[];
 }
 
 /** Misst das Modell an Beispielen, die es nicht gesehen hat. */
@@ -391,12 +406,14 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
   const je = new Map<string, { richtig: number; gesamt: number }>();
   const paare = new Map<string, Verwechslung>();
   const fehltreffer: Fehltreffer[] = [];
+  const vorhersagen: { sicherheit: number; treffer: boolean }[] = [];
   let richtig = 0;
 
   for (const b of beispiele) {
     const k = klassifizieren(modell, b.merkmale);
     const treffer = k?.kategorieId === b.kategorieId;
     if (treffer) richtig++;
+    if (k) vorhersagen.push({ sicherheit: k.sicherheit, treffer });
     const e = je.get(b.kategorieId) ?? { richtig: 0, gesamt: 0 };
     e.gesamt++;
     if (treffer) e.richtig++;
@@ -438,6 +455,7 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
         a.vorhergesagt.localeCompare(b.vorhergesagt),
     ),
     fehltreffer,
+    vorhersagen,
   };
 }
 

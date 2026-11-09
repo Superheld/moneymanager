@@ -12,13 +12,20 @@
 // unbemerkt ändert, ist eines, dessen Verhalten sich niemand erklären kann.
 
 import {
-  aufteilen,
   bewerten,
+  empfaengerLinie,
   grundlinie,
+  kalibrierung,
+  klassenwerte,
+  pruefmengeWaehlen,
   trainieren,
+  zeitlichAufteilen,
   type Beispiel,
   type Bewertung,
+  type Kalibrierung,
+  type Klassenkennzahlen,
   type Merkmalskonfiguration,
+  type Pruefmenge,
 } from "../../core";
 import type { KlassifikatorRepository, LedgerPort, Modellstand, UmsatzRepository } from "../ports";
 import { trainingsmaterial, type Materialbefund } from "./trainingsmaterial";
@@ -48,6 +55,64 @@ export interface TrainingsErgebnis {
    * wie `bewertung` — ohne Prüfmenge gibt es nichts zu vergleichen.
    */
   readonly grundlinie?: { kategorieId: string; genauigkeit: number };
+  /** Wie gemessen wurde und was daneben steht — fehlt aus demselben Grund wie `bewertung`. */
+  readonly protokoll?: Messprotokoll;
+}
+
+/**
+ * Alles, was eine Messung ausser der Trefferquote braucht, um etwas zu bedeuten.
+ *
+ * Die Felder beantworten je eine Frage, die man an eine Zahl stellen muss, bevor man ihr
+ * glaubt: Woran wurde geprüft (Zeitraum, Labels)? Woran muss sie sich messen lassen
+ * (Empfängerlinie)? Trägt sie auch die seltenen Kategorien (Macro-F1)? Und taugt die
+ * Sicherheit daneben etwas (Kalibrierung)? Siehe `core/klassifikator/messung.ts`.
+ */
+export interface Messprotokoll {
+  /** Ab diesem Datum wurde geprüft; alles davor war Training. */
+  readonly stichtag?: string;
+  readonly trainingAnzahl: number;
+  readonly pruefAnzahl: number;
+  /** Nur handverlesene Labels — oder alle, weil es zu wenige gab. */
+  readonly pruefmenge: Pruefmenge;
+  /** „Dieselbe Kategorie wie bei diesem Empfänger üblich" — die Linie ohne Modell. */
+  readonly empfaenger: { genauigkeit: number; abdeckung: number } | null;
+  readonly kennzahlen: Klassenkennzahlen;
+  readonly kalibrierung: Kalibrierung | null;
+}
+
+/**
+ * Misst ein Modell nach dem Protokoll aus `messung.ts`: auf dem Älteren trainieren, an den
+ * jüngsten — wenn möglich handverlesenen — Buchungen prüfen, beide Vergleichslinien auf
+ * derselben Aufteilung.
+ *
+ * Exportiert, weil die Wirkungsmessung dasselbe Protokoll braucht: eine Wirkung, die
+ * anders gemessen wird als die Zahl daneben, vergleicht zwei verschiedene Dinge.
+ */
+export function messen(
+  beispiele: readonly Beispiel[],
+  pruefanteil = PRUEFANTEIL,
+  abschnittEnde = 0,
+): { bewertung: Bewertung; grundlinie?: { kategorieId: string; genauigkeit: number }; protokoll: Messprotokoll } | null {
+  const { training, pruefung, stichtag } = zeitlichAufteilen(beispiele, pruefanteil, abschnittEnde);
+  const gewaehlt = pruefmengeWaehlen(pruefung);
+  if (training.length === 0 || gewaehlt.beispiele.length === 0) return null;
+
+  const bewertung = bewerten(trainieren(training), gewaehlt.beispiele);
+  return {
+    bewertung,
+    // Auf DERSELBEN Aufteilung — eine Vergleichslinie, die an anderen Beispielen
+    // gemessen wird, vergleicht nichts.
+    grundlinie: grundlinie(training, gewaehlt.beispiele) ?? undefined,
+    protokoll: {
+      stichtag,
+      trainingAnzahl: training.length,
+      pruefAnzahl: gewaehlt.beispiele.length,
+      pruefmenge: gewaehlt.art,
+      empfaenger: empfaengerLinie(training, gewaehlt.beispiele),
+      kennzahlen: klassenwerte(bewertung),
+      kalibrierung: kalibrierung(bewertung),
+    },
+  };
 }
 
 export interface TrainingsDeps {
@@ -66,42 +131,51 @@ export interface TrainingsDeps {
 }
 
 /**
+ * Lernbeispiele in die Form des Kerns. Id, Datum und Herkunft des Labels wandern mit:
+ * fürs Training bedeutungslos, für die Messung der Unterschied zwischen „siebenmal
+ * verwechselt" und „diese sieben Zeilen", zwischen Vergangenheit und Zukunft und
+ * zwischen einem Label, das ein Mensch gesetzt hat, und einem, das das Modell riet.
+ */
+export function alsBeispiele(
+  material: readonly { merkmale: readonly string[]; kategorieId: string; istbuchungId: string; datum: string; handverlesen: boolean }[],
+): Beispiel[] {
+  return material.map((b) => ({
+    merkmale: b.merkmale,
+    kategorieId: b.kategorieId,
+    id: b.istbuchungId,
+    datum: b.datum,
+    handverlesen: b.handverlesen,
+  }));
+}
+
+/**
  * Trainiert neu und speichert das Ergebnis.
  *
- * Zwei Durchgänge, und das ist Absicht: einer auf der Trainingsmenge, um an den
- * zurückgehaltenen Beispielen zu MESSEN, und einer auf allem, um das Modell zu
- * BEKOMMEN. Nur den ersten zu behalten hieße, ein Fünftel der Daten wegzuwerfen; nur den
+ * Zwei Durchgänge, und das ist Absicht: einer auf dem Älteren, um an den jüngsten
+ * Buchungen zu MESSEN (`messen`), und einer auf allem, um das Modell zu BEKOMMEN. Nur den ersten zu behalten hieße, ein Fünftel der Daten wegzuwerfen; nur den
  * zweiten zu messen hieße, auf den eigenen Trainingsdaten zu prüfen — das ergibt keine
  * Genauigkeit, sondern eine Selbstbestätigung.
  */
 export async function klassifikatorTrainieren(deps: TrainingsDeps): Promise<TrainingsErgebnis> {
   const material = await trainingsmaterial(deps.ledger, deps.umsatzRepo, deps.konfiguration);
-  // Die Buchungs-ID wandert mit: fürs Training bedeutungslos, für die Bewertung der
-  // Unterschied zwischen „siebenmal verwechselt" und „diese sieben Zeilen".
-  const beispiele: Beispiel[] = material.beispiele.map((b) => ({
-    merkmale: b.merkmale,
-    kategorieId: b.kategorieId,
-    id: b.istbuchungId,
-  }));
+  const beispiele: Beispiel[] = alsBeispiele(material.beispiele);
 
-  let bewertung: Bewertung | undefined;
-  let linie: { kategorieId: string; genauigkeit: number } | undefined;
-  if (beispiele.length >= MESSBAR_AB) {
-    const { training, pruefung } = aufteilen(beispiele, PRUEFANTEIL);
-    bewertung = bewerten(trainieren(training), pruefung);
-    // Auf DERSELBEN Aufteilung — eine Vergleichslinie, die an anderen Beispielen
-    // gemessen wird, vergleicht nichts.
-    linie = grundlinie(training, pruefung) ?? undefined;
-  }
+  const messung = beispiele.length >= MESSBAR_AB ? messen(beispiele) : null;
 
   const stand: Modellstand = {
     modell: trainieren(beispiele),
     trainiertAm: deps.jetzt(),
-    genauigkeit: bewertung?.genauigkeit,
+    genauigkeit: messung?.bewertung.genauigkeit,
   };
   await deps.klassifikatorRepo.speichern(stand);
 
-  return { stand, material, bewertung, grundlinie: linie };
+  return {
+    stand,
+    material,
+    bewertung: messung?.bewertung,
+    grundlinie: messung?.grundlinie,
+    protokoll: messung?.protokoll,
+  };
 }
 
 export interface Modellzustand {
