@@ -15,6 +15,7 @@ import type {
   Merkmalsausschluss,
   Merkmalsherkunft,
   Modell,
+  Trainingslauf,
   Person,
   Vertrag,
   Vertragserkennung,
@@ -193,6 +194,20 @@ export interface KlassifikatorRepository {
   /** Der gespeicherte Stand, oder null, wenn noch nie trainiert wurde. */
   laden(): Promise<Modellstand | null>;
   speichern(stand: Modellstand): Promise<void>;
+}
+
+/**
+ * Die Trainingsläufe — jeder mit Konfiguration, Kennzahlen und den Vorhersagen an seiner
+ * Prüfmenge, damit sich zwei Läufe Zeile für Zeile vergleichen lassen (siehe
+ * `core/klassifikator/laeufe.ts`). Anders als das Modell, das es nur einmal gibt, ist das
+ * hier eine Geschichte: sie ist das Gedächtnis beim Ausprobieren von Varianten.
+ */
+export interface TrainingslaufRepository {
+  anlegen(lauf: Trainingslauf): Promise<void>;
+  /** Die jüngsten Läufe, neuester zuerst. */
+  juengste(anzahl: number): Promise<Trainingslauf[]>;
+  /** Löscht alles ausser den `behalten` jüngsten. */
+  ausduennen(behalten: number): Promise<void>;
 }
 
 /**

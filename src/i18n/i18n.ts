@@ -1720,6 +1720,26 @@ const de = {
         "Geprüft an den {{pruefung}} jüngsten Buchungen ab {{stichtag}} mit von Hand gesetzter Kategorie; trainiert auf den {{training}} davor.",
       protokollAlle:
         "Geprüft an den {{pruefung}} jüngsten Buchungen ab {{stichtag}}; trainiert auf den {{training}} davor. Darunter sind auch automatisch gesetzte Kategorien — für eine Prüfung nur an von Hand gesetzten gab es zu wenige, und eine automatische kann vom Modell selbst stammen.",
+      vergleichTitel: "Gegenüber dem letzten Lauf",
+      vergleichSumme:
+        "Gegenüber dem Lauf vom {{datum}}, an {{gemeinsam}} Prüfzeilen, die beide kannten: {{gewonnen}} gewonnen, {{verloren}} verloren.",
+      vergleichKonfigGleich: "An Quellen und Ausschlüssen hat sich nichts geändert.",
+      vergleichQuelleDazu: "Quelle dazu: {{quelle}}",
+      vergleichQuelleWeg: "Quelle weg: {{quelle}}",
+      vergleichAusgeschlossen: "neu ausgeschlossen: {{woerter}}",
+      vergleichZugelassen: "wieder zugelassen: {{woerter}}",
+      vergleichGewonnen: "jetzt richtig: {{richtig}} (vorher {{vorher}})",
+      vergleichVerloren: "jetzt falsch: {{nachher}} statt {{richtig}} (vorher richtig)",
+      laeufeTitel: "Läufe",
+      laeufeHinweis:
+        "Jedes Training mit seinen Zahlen, neuester zuerst. Liegt das Prüffenster nach einem Import woanders, sind zwei Zeilen nur ungefähr vergleichbar — der Vergleich darüber zählt deshalb nur Zeilen, die beide Läufe geprüft haben.",
+      spalteZeitpunkt: "Zeitpunkt",
+      spalteBeispiele: "Beispiele",
+      spaltePruefmenge: "geprüft an",
+      pruefmenge: {
+        handverlesen: "{{anzahl}} von Hand gesetzten",
+        alle: "{{anzahl}}, auch automatischen",
+      },
       klassenTitel: "Je Kategorie",
       klassenHinweis:
         "Precision: von dem, was das Modell so nannte, war wie viel richtig. Recall: von dem, was wirklich diese Kategorie war, hat es wie viel erkannt. F1 fasst beides zusammen. Schwächste zuerst.",
@@ -3801,6 +3821,26 @@ const en: typeof de = {
         "Tested on the {{pruefung}} most recent bookings from {{stichtag}} with a hand-set category; trained on the {{training}} before.",
       protokollAlle:
         "Tested on the {{pruefung}} most recent bookings from {{stichtag}}; trained on the {{training}} before. This includes automatically set categories — there were too few hand-set ones to test on those alone, and an automatic one may come from the model itself.",
+      vergleichTitel: "Compared with the last run",
+      vergleichSumme:
+        "Compared with the run of {{datum}}, on {{gemeinsam}} test rows both knew: {{gewonnen}} gained, {{verloren}} lost.",
+      vergleichKonfigGleich: "Sources and exclusions are unchanged.",
+      vergleichQuelleDazu: "source added: {{quelle}}",
+      vergleichQuelleWeg: "source removed: {{quelle}}",
+      vergleichAusgeschlossen: "newly excluded: {{woerter}}",
+      vergleichZugelassen: "allowed again: {{woerter}}",
+      vergleichGewonnen: "now right: {{richtig}} (was {{vorher}})",
+      vergleichVerloren: "now wrong: {{nachher}} instead of {{richtig}} (was right)",
+      laeufeTitel: "Runs",
+      laeufeHinweis:
+        "Every training with its numbers, newest first. If an import moved the test window, two rows are only roughly comparable — the comparison above therefore counts only rows both runs tested.",
+      spalteZeitpunkt: "Time",
+      spalteBeispiele: "Examples",
+      spaltePruefmenge: "tested on",
+      pruefmenge: {
+        handverlesen: "{{anzahl}} hand-set",
+        alle: "{{anzahl}}, incl. automatic",
+      },
       klassenTitel: "Per category",
       klassenHinweis:
         "Precision: of what the model called this, how much was right. Recall: of what really was this category, how much it found. F1 combines both. Weakest first.",

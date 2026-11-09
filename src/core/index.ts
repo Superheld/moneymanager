@@ -40,3 +40,4 @@ export * from "./klassifikator/merkmale";
 export * from "./klassifikator/modell";
 export * from "./klassifikator/erklaerung";
 export * from "./klassifikator/messung";
+export * from "./klassifikator/laeufe";
