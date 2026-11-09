@@ -27,6 +27,7 @@
 import { monateZwischen } from "../basis/datum";
 import type { Cent } from "../basis/geld";
 import { kontobelegung, type Anspruch } from "../konten/kontobelegung";
+import { istRuecklagenkonto, type Zahlungskonto } from "../konten/konto";
 
 export interface Ruecklage {
   readonly id: string;
@@ -87,6 +88,24 @@ export function sollRuecklage(r: Ruecklage, am: string): Cent {
     return Math.min(Math.round((ziel * monate) / (r.fristMonate as number)), ziel);
   }
   return (r.rate ?? 0) * monate;
+}
+
+/**
+ * Die Konten, auf denen zurückgelegt wird: jedes der Klasse Rücklage UND jedes, dem eine
+ * Rücklage zugeordnet ist — gleich welcher Klasse.
+ *
+ * Bis 2026-11-09 zählte allein die Klasse. Wer seine Rücklagen auf einem Tagesgeldkonto
+ * der Klasse „Sparen" führte, sah dann einen Tacho auf null und keinen einzigen
+ * Eingang, obwohl die Zuordnung an jeder Rücklage dastand. Die Zuordnung ist die
+ * genauere Aussage — sie ist je Rücklage getroffen, die Klasse nur einmal je Konto.
+ */
+export function ruecklagenKonten(
+  konten: readonly Zahlungskonto[],
+  items: readonly Pick<Ruecklage, "kontoId">[],
+): Set<string> {
+  const ids = new Set(konten.filter(istRuecklagenkonto).map((k) => k.id));
+  for (const r of items) if (r.kontoId) ids.add(r.kontoId);
+  return ids;
 }
 
 /** Summe der monatlichen Rücklagen — der Betrag, der jeden Monat gebunden ist. */

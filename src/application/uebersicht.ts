@@ -17,7 +17,6 @@ import { empfaengerJeBuchung } from "./buchung/belegZuBuchung";
 import {
   fruehesterMonat,
   istLiquide,
-  istRuecklagenkonto,
   monatsAusblicke,
   staendeJeKlasse,
   vorschauAlleKonten,
@@ -32,6 +31,7 @@ import type {
   BudgetRepository,
   KategorieRepository,
   LedgerPort,
+  RuecklagenRepository,
   UmsatzRepository,
   VertragszuordnungRepository,
   ZahlungskontoRepository,
@@ -49,6 +49,7 @@ export interface UebersichtDeps {
   readonly umsatzRepo: UmsatzRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly kontoRepo: ZahlungskontoRepository;
+  readonly ruecklagenRepo: RuecklagenRepository;
 }
 
 export interface Uebersichtsdaten {
@@ -68,10 +69,9 @@ export interface Uebersichtsdaten {
    * Gibt es überhaupt Plandaten (Verträge, Budgets)? Ohne sie zeigten die drei Karten
    * Nullen, und das liest sich wie ein Datenfehler statt wie ein leerer Plan.
    *
-   * Die Rücklagen zählen seit 2026-09-01 NICHT mit: ihr Bedarf führt zu keiner Zeile
-   * (die Zeile „Rücklagen" zeigt die Umbuchung, und die ist eine Zahlungsregel und zählt
-   * damit schon), und was zu keiner Zeile führt, darf auch nicht darüber entscheiden, ob
-   * die Karten überhaupt erscheinen.
+   * Die Rücklagen zählen seit 2026-11-09 wieder mit, weil ihre Raten wieder eine Zeile
+   * bilden. Die Regel dahinter bleibt: was zu keiner Zeile führt, darf nicht darüber
+   * entscheiden, ob die Karten überhaupt erscheinen.
    */
   readonly hatPlandaten: boolean;
   /**
@@ -112,7 +112,7 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten, ruecklagen] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -121,6 +121,7 @@ export async function uebersichtLaden(
       deps.umsatzRepo.alle(),
       vertragsBuchungenLaden(deps.zuordnungRepo),
       deps.kontoRepo.alle(),
+      deps.ruecklagenRepo.alle(),
     ]);
 
   /**
@@ -138,9 +139,10 @@ export async function uebersichtLaden(
    * **Budgets werden seit 2026-10-26 NICHT mehr nach ihrem Konto gefiltert.** Vorher
    * verschwand ein aufbauendes Budget auf dem Rücklagenkonto ganz aus der Übersicht, und
    * seine Ausgaben vom Girokonto standen als unerklärte Posten unter „Sonstiges". Jetzt
-   * führt es seine Zeile und trägt, was aus den liquiden Konten dafür abging. Seine RATE
-   * plant es hier aber nicht (`budgetsOhnePlan`): die fließt über eine Umbuchung, und die
-   * steht schon in „Rücklagen" bzw. „Sparen & Vorsorge".
+   * führt es seine Zeile und trägt, was aus den liquiden Konten dafür abging. Bis
+   * 2026-11-09 plante es hier seine RATE nicht, weil die als Umbuchung schon in einer
+   * eigenen Zeile stand; seit die Umbuchungen herausfallen (unten), plant es sie wieder
+   * selbst — sonst stünde sie nirgends.
    *
    * Der Preis ist eine Aussage, die man kennen muss: **dasselbe Budget kann hier einen
    * kleineren Verbrauch zeigen als im Bereich Budgets.** Dort steht der ganze Rahmen,
@@ -155,11 +157,16 @@ export async function uebersichtLaden(
   const liquideIds = new Set(konten.filter(istLiquide).map((k) => k.id));
   const nichtLiquide = new Set(konten.filter((k) => !istLiquide(k)).map((k) => k.id));
   const liquideBuchungen = buchungen.filter((b) => liquideIds.has(b.kontoId));
-  const budgetsOhnePlan = new Set(budgets.filter((b) => !liquideIds.has(b.kontoId)).map((b) => b.id));
-  // Wohin eine Umbuchung aus dem Kreis führt, entscheidet ihre Zeile: auf ein Konto der
-  // Klasse Rücklage nach „Rücklagen", sonst nach „Sparen & Vorsorge". Dieselbe Grenze
-  // zieht der Rücklagenfluss im Bereich Rücklagen.
-  const ruecklagenKonten = new Set(konten.filter(istRuecklagenkonto).map((k) => k.id));
+  /**
+   * DER KREIS DER MONATSKARTEN SIND ALLE KONTEN, nicht die liquiden (seit 2026-11-09).
+   * Eine Umbuchung vom Giro aufs Tagesgeld, Sparkonto oder Rücklagenkonto bewegt eigenes
+   * Geld und ist damit weder Ausgabe noch Abzug — sie fällt heraus. Was zurückgelegt
+   * wird, steht stattdessen als RECHNUNG in der Zeile „Rücklagen" (die Raten der
+   * Rücklagen) und in den Raten der aufbauenden Budgets. Bis dahin zählte eine Umbuchung,
+   * die die liquiden Konten verliess, als Abfluss — und ob sie als Rücklage oder als
+   * Sparen erschien, hing an der Klasse des Zielkontos.
+   */
+  const alleIds = new Set(konten.map((k) => k.id));
 
   const sicht: BudgetSicht = {
     buchungen: liquideBuchungen,
@@ -173,20 +180,19 @@ export async function uebersichtLaden(
     ausblicke: monatsAusblicke({
       regeln: regeln.filter((r) => !r.kontoId || !nichtLiquide.has(r.kontoId)),
       budgets,
-      budgetsOhnePlan,
       ist: liquideBuchungen,
       kategorien,
       vertragsBuchungen,
       heute,
-      kreis: liquideIds,
-      ruecklagenKonten,
+      kreis: alleIds,
+      ruecklagen,
     }),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,
     kategorieNamen: new Map(kategorien.map((k: Kategorie) => [k.id, k.name])),
     empfaenger: empfaengerJeBuchung(umsaetze),
     monate: waehlbareMonate(fruehesterMonat(liquideBuchungen) ?? heute, dieserMonat),
-    hatPlandaten: regeln.length > 0 || budgets.length > 0,
+    hatPlandaten: regeln.length > 0 || budgets.length > 0 || ruecklagen.length > 0,
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     klassen: staendeJeKlasse(konten, buchungen),

@@ -23,21 +23,20 @@
 // machen. Deshalb rechnet diese Datei alle drei und lässt die Oberfläche entscheiden,
 // welche sie nebeneinander stellt.
 //
-// WOHIN gerechnet wird, entscheidet die KONTOKLASSE: zurückgelegt ist, was von einem
-// liquiden Konto auf ein Konto der Klasse RÜCKLAGE geht. Bis 2026-11-08 zählte jedes
-// nicht liquide Ziel — auch Vorsorge, Sparen und Investment. Seit die Monatskarten der
-// Übersicht Rücklagen und „Sparen & Vorsorge" in zwei Zeilen trennen, zieht diese Datei
-// dieselbe Grenze (`istRuecklagenkonto`); sonst stünde dieselbe Überweisung hier als
-// Rücklage und dort als Sparen.
+// WOHIN gerechnet wird, entscheidet `ruecklagenKonten`: ein Konto der Klasse RÜCKLAGE
+// oder eines, dem eine Rücklage zugeordnet ist. Bis 2026-11-08 zählte jedes nicht
+// liquide Ziel, auch Vorsorge, Sparen und Investment; danach einen Tag lang allein die
+// Klasse Rücklage — und wer seine Rücklagen auf einem anders eingestuften Konto führte,
+// sah hier keinen einzigen Eingang.
 
 import type { IstBuchung } from "../buchung/istbuchung";
 import type { Cent } from "../basis/geld";
 import type { Zahlungskonto } from "../konten/konto";
-import { istLiquide, istRuecklagenkonto } from "../konten/konto";
+import { istLiquide } from "../konten/konto";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
 import { RHYTHMUS_MONATE } from "../basis/zahlungsregel";
 import { istUmbuchungsregel } from "../vertraege/umbuchungErkennung";
-import { monatsRuecklageGesamt, type Ruecklage } from "./ruecklage";
+import { monatsRuecklageGesamt, ruecklagenKonten, type Ruecklage } from "./ruecklage";
 
 export interface Flussposten {
   readonly buchungId: string;
@@ -89,10 +88,8 @@ export function ruecklagenfluss(
   bis: string,
 ): Ruecklagenfluss {
   const klasse = new Map(konten.map((k) => [k.id, k]));
-  const istZiel = (id: string | undefined): boolean => {
-    const k = id ? klasse.get(id) : undefined;
-    return !!k && istRuecklagenkonto(k);
-  };
+  const ziele = ruecklagenKonten(konten, ruecklagen);
+  const istZiel = (id: string | undefined): boolean => !!id && ziele.has(id);
   const istQuelle = (id: string | undefined): boolean => {
     const k = id ? klasse.get(id) : undefined;
     return !!k && istLiquide(k);

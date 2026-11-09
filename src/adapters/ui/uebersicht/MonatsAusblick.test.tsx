@@ -196,15 +196,16 @@ describe("MonatsAusblick", () => {
   });
 
   /**
-   * Die Rücklagen hatten bis 2026-09-01 eine eigene Zeile: die kalkulatorische Monatsrate,
-   * in Plan und Ist mit demselben Betrag. Sie ist weg, weil Rücklagen sich seit den
-   * Umbuchungsverträgen PLANEN lassen — die geplante Umbuchung steht in der Zeile
-   * „Sparen & Vorsorge", und beides nebeneinander zählte dasselbe Zurücklegen zweimal.
+   * Die Rücklagen stehen als Rechnung da: ihre Monatsrate, in Plan und Ist gleich. So war
+   * es bis 2026-09-01 schon einmal; dazwischen fehlte die Zeile, weil dasselbe
+   * Zurücklegen als geplante Umbuchung daneben stand. Seit 2026-11-09 fallen Umbuchungen
+   * zwischen erfassten Konten heraus, und die Rate ist wieder der einzige Ort dafür.
    */
-  it("zeigt keine Rücklagenzeile mehr", async () => {
-    rendere(<MonatsAusblick {...props()} />);
+  it("zeigt die Raten der Rücklagen als eigene Zeile", async () => {
+    rendere(<MonatsAusblick {...props({ ruecklagen: RUECKLAGEN })} />);
     await screen.findByText("August 2026");
-    expect(screen.queryByText("Rücklagen")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Rücklagen").length).toBeGreaterThan(0);
+    expect(document.body.textContent).toMatch(/120,00/);
   });
 
   it("schweigt über fehlende Einnahmen, sobald ein Ertrags-Vertrag existiert", async () => {
@@ -238,9 +239,8 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     const nutzer = userEvent.setup();
     await nutzer.click(screen.getAllByText("Verträge")[0]);
     expect(screen.getAllByText("Vermieter").length).toBeGreaterThan(0);
-    // Und keine Rücklagenzeile: die Rücklagen werden seit 2026-09-01 geplant statt
-    // gerechnet, und die geplante Umbuchung steht unter „Sparen & Vorsorge".
-    expect(screen.queryByText("Rücklagen")).not.toBeInTheDocument();
+    // Und die Rücklage aus der Datenbank steht mit ihrer Rate in jeder Karte.
+    expect(screen.getAllByText("Rücklagen")).toHaveLength(3);
   });
 
   it("klappt ein Budget der Liste auf und zeigt seine Buchungen", async () => {

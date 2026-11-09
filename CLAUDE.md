@@ -455,11 +455,13 @@ Vier Dinge gelten überall und stehen deshalb hier:
 
   **Gerechnet wird über ZWEI Grenzen, seit 2026-11-08.** `istLiquide` fragt
   `=== "liquide"` und entscheidet über die liquiden Mittel. `istRuecklagenkonto` fragt
-  `=== "ruecklage"` und entscheidet genau eines: ob eine Umbuchung dorthin als Rücklage
-  zählt (Monatskarten, Rücklagenfluss) oder als Sparen & Vorsorge. Vorsorge, Sparen und
-  Investment sind für jede Rechnung weiterhin dasselbe. Bis dahin stand hier „genau eine
-  Grenze"; die zweite kam, als die Monatskarten Rücklagen für sich zeigen sollten. Wer eine
-  dritte zieht, ändert wieder die Bedeutung des Feldes und schreibt es hierher.
+  `=== "ruecklage"` und entscheidet, welche Konten der Bereich Rücklagen als
+  Rücklagenkonten zählt (Eingänge, Tacho) — zusammen mit den Konten, denen eine Rücklage
+  zugeordnet ist (`ruecklagenKonten`), denn die Zuordnung ist die genauere Aussage.
+  Vorsorge, Sparen und Investment sind für jede Rechnung weiterhin dasselbe. Die
+  Monatskarten hingen einen Tag lang auch an dieser Grenze und tun es seit 2026-11-09
+  nicht mehr: dort fällt jede Umbuchung zwischen erfassten Konten heraus. Wer eine dritte
+  Grenze zieht, ändert wieder die Bedeutung des Feldes und schreibt es hierher.
 
   Was für jede Auswahl von Konten gilt: **Saldo und Buchungen filtern mit derselben
   Liste.** Sonst zeigt ein Verlauf einen Stand, den es nie gab.

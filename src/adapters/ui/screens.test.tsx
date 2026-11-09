@@ -235,37 +235,41 @@ describe("UebersichtScreen", () => {
   });
 
   /**
-   * Eine geplante Umbuchung zwischen zwei liquiden Konten verschiebt Geld innerhalb
-   * dessen, was die Karten rechnen — sie gehört in keine Zeile. Eine aufs Rücklagenkonto
-   * verlässt den Kreis und steht in „Rücklagen", nicht in „Sparen & Vorsorge".
+   * Eine Umbuchung zwischen erfassten Konten verschiebt eigenes Geld — sie gehört in
+   * keine Zeile, auch nicht, wenn sie die liquiden Konten verlässt. Was zurückgelegt
+   * wird, steht stattdessen als Rate in „Rücklagen".
    */
-  it("plant Umbuchungen nur, wenn sie die liquiden Konten verlassen", async () => {
+  it("lässt Umbuchungen auf erfasste Konten heraus und zieht die Rücklagen-Raten ab", async () => {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
       id: "k2", bezeichnung: "Zweitkonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
     });
+    // Ein Sparkonto — die Klasse ist absichtlich NICHT Rücklage: seit 2026-11-09 hängt an
+    // ihr nicht mehr, ob eine Umbuchung in der Karte steht.
     await sqliteZahlungskontoRepository.speichern({
-      id: "k-rueck", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "ruecklage",
+      id: "k-spar", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "sparen",
       inhaberIds: [], saldo: 0,
     });
-    for (const [id, ziel, betrag] of [["r-intern", "k2", -4321], ["r-rueck", "k-rueck", -20000]] as const) {
+    for (const [id, ziel, betrag] of [["r-intern", "k2", -4321], ["r-spar", "k-spar", -20000]] as const) {
       await sqliteZahlungsregelRepository.speichern({
         id, bezeichnung: id, betrag, rhythmus: "monatlich", startdatum: `${monat(1)}-03`,
         charakter: "Umschichtung", kontoId: "k1", gegenkontoId: ziel,
       });
     }
+    await sqliteRuecklagenRepository.speichern({
+      id: "rk", bezeichnung: "Puffer", rate: 15000, beginn: `${monat(0)}-01`, kontoId: "k-spar",
+    });
 
     rendere(<UebersichtScreen />);
     // Gesucht wird IN der Monatskarte: „Was noch kommt" führt jede Fälligkeit je Konto,
-    // auch die interne Umbuchung — dort gehört sie hin, sie bewegt ja ein Konto.
+    // auch die Umbuchung — dort gehört sie hin, sie bewegt ja ein Konto.
     const zeile = (await screen.findAllByText("Rücklagen"))[0];
     let karte: HTMLElement = zeile;
     while (!/bleibt/i.test(karte.textContent ?? "")) karte = karte.parentElement!;
-    expect(karte.textContent).toMatch(/200,00/);
-    // Die interne Verschiebung steht nicht in der Karte — und ohne sie gibt es auch keine
-    // Zeile „Sparen & Vorsorge".
+    expect(karte.textContent).toMatch(/150,00/);
     expect(karte.textContent).not.toMatch(/43,21/);
-    expect(karte.textContent).not.toMatch(/Sparen & Vorsorge/);
+    expect(karte.textContent).not.toMatch(/200,00/);
+    expect(karte.textContent).not.toMatch(/Umbuchungen nach außen/);
   });
 
   /** Was insgesamt da ist, steht daneben — nach Klasse, nicht nach Gruppe. */

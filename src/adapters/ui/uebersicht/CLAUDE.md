@@ -5,19 +5,20 @@ Gilt für die Übersicht. Die Grenze zur Analyse steht in der Wurzel-`CLAUDE.md`
 **Die Übersicht rechnet über die LIQUIDEN Konten** — Monatskarten und Budgetliste aus
 derselben gefilterten Sicht. Gefiltert werden die BUCHUNGEN und Zahlungsregeln, nicht die
 Budgets: jedes Budget führt seine Zeile, auch wenn sein Geld auf einem Rücklagenkonto
-liegt, und trägt, was aus den liquiden Konten dafür abging. Seine Rate plant es dort
-nicht (`budgetsOhnePlan`) — sie kommt über eine Umbuchung an, und die steht schon in
-„Rücklagen" bzw. „Sparen & Vorsorge". Was auf Rücklagen- und Vorsorgekonten passiert, ist zurückgelegt
-und steht für den Monat nicht zur Verfügung. Der Preis ist eine Aussage, die man kennen
+liegt, trägt, was aus den liquiden Konten dafür abging, und plant seine Rate. Bis
+2026-11-09 plante es sie dort nicht (`budgetsOhnePlan`), weil sie als Umbuchung schon in
+einer eigenen Zeile stand; seit die Umbuchungen herausfallen (unten), stünde sie sonst
+nirgends. Der Preis ist eine Aussage, die man kennen
 muss: **dasselbe Budget kann in der Übersicht einen kleineren Verbrauch zeigen als im
 Bereich Budgets** — dort steht der ganze Rahmen, hier nur, was aus den verfügbaren
 Mitteln davon gegangen ist. Der Untertitel der Übersicht sagt es mit.
 
 **Budgets stehen getrennt nach Art** — monatlich (Rest verfällt) und aufbauend (Rest
-bleibt), in der Übersicht wie im Bereich Budgets — seit 2026-11-08 auch in den
-Monatskarten, als zwei Zeilen „Budgets monatlich" und „Budgets aufbauend". Getrennt wird nach dem DACH eines
-Budgetbaums, nicht je Zeile (`nachArtGetrennt`): ein aufbauendes Kind unter einem
-monatlichen Dach wird aus diesem herausgerechnet und bleibt deshalb dort, mit Pille.
+bleibt), in der Übersicht wie im Bereich Budgets und in den Monatskarten als zwei Zeilen
+„Budgets monatlich" und „Budgets aufbauend". Seit 2026-11-09 nach der Art JEDES Budgets,
+nicht mehr nach dem Dach seines Baums: ein aufbauendes Kind unter einem monatlichen Dach
+steht bei den aufbauenden. Die Summe bleibt richtig, weil das Dach seinen Rahmen ohnehin
+ohne das Kind plant (`geglaetteterMonatsabfluss`).
 
 Daran hängt die Karte **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE
 Konten. Die Klasse ist die Rechenregel und jedes Konto hat genau eine, die Summen addieren
@@ -32,17 +33,19 @@ dasteht. Die Rechnung dahinter (`liquiditaetsvorschau` in `core/konten/liquidita
 ist geblieben und getestet, hat aber keine Oberfläche mehr; ebenso `veraltet` am
 Abrufstand. Wer sie wieder zeigt, sucht ihr einen leiseren Ort.
 
-**Umbuchungen hängen in den Monatskarten am Kreis der liquiden Konten** (seit 2026-11-08,
-`kreis` in `core/monatsausblick.ts`). Liegt das Zielkonto im Kreis, ist es eine interne
-Verschiebung und fällt aus Plan und Ist heraus. Verlässt sie ihn, ist sie ein Abfluss:
-auf ein Konto der Klasse Rücklage in der Zeile **„Rücklagen"**, sonst in **„Sparen &
-Vorsorge"** — dort stehen auch Umschichtungen ganz ohne Gegenkonto, etwa ein Wertpapierkauf.
-Gepaart werden Plan und Ist einer Umbuchung über Quell- und Zielkonto, nicht über die
-Kategorie, die sie meist nicht trägt. Vorher fiel JEDE gepaarte Umbuchung aus dem Ist,
-auch die aufs Rücklagenkonto: der Plan stand da, das Ist blieb leer.
+**Die Monatskarten rechnen Umbuchungen über ALLE erfassten Konten** (seit 2026-11-09,
+`kreis` in `core/monatsausblick.ts`). Eine Umbuchung vom Giro aufs Tagesgeld, Spar- oder
+Rücklagenkonto bewegt eigenes Geld — sie fällt aus Plan und Ist heraus, gleich welcher
+Klasse das Ziel ist. Stehen bleibt nur, was die erfassten Konten verlässt, in der Zeile
+**„Umbuchungen nach außen"**: eine Umschichtung ohne Gegenkonto, etwa ein Wertpapierkauf
+auf ein Depot, das die App nicht als Konto führt. Am 2026-11-08 war der Kreis einen Tag
+lang die liquiden Konten; dann stand die Überweisung aufs Sparkonto als „Sparen &
+Vorsorge" in der Karte, und ob sie als Rücklage erschien, hing an der Klasse des Ziels.
 
-**Die Zeile „Rücklagen" ist nicht die von früher.** Bis 2026-09-01 stand dort die
-kalkulatorische Monatsrate aus dem Bedarf, in Plan und Ist mit demselben Betrag — neben
-dem Umbuchungsvertrag zählte das dasselbe Zurücklegen zweimal. Die heutige Zeile ist die
-Umbuchung selbst; den *Bedarf* gibt es weiter nur im Bereich Rücklagen. Deshalb zählen
-Rücklagen auch nicht zu `hatPlandaten`: der Bedarf führt zu keiner Zeile.
+**Die Zeile „Rücklagen" ist eine Rechnung, keine Überweisung**: je Rücklage der Zuwachs
+ihres Solls im Monat, in Plan und Ist mit demselben Betrag. Gebunden ist die Rate, ob
+überwiesen wurde oder nicht; ist das Ziel erreicht, bindet sie nichts mehr. So stand die
+Zeile bis 2026-09-01 schon einmal da und flog heraus, weil dasselbe Zurücklegen daneben
+als geplante Umbuchung stand und doppelt zählte — **wer Umbuchungen wieder in die Karte
+holt, holt diese Doppelzählung mit.** Rücklagen zählen deshalb auch wieder zu
+`hatPlandaten`.

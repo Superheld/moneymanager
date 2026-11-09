@@ -206,4 +206,24 @@ describe("Rücklagen — diesen Monat und die Faustformel", () => {
     expect(document.body.textContent).toMatch(/40 %/);
     expect(document.body.textContent).toMatch(/1\.796,88/);
   });
+
+  it("misst den Stand eines Kontos, auf dem eine Rücklage liegt, auch wenn es nicht als Rücklage eingestuft ist", async () => {
+    // Der Tacho stand bis 2026-11-09 auf null, sobald die Rücklagen auf einem Konto der
+    // Klasse „Sparen" lagen — die Zuordnung an der Rücklage zählte nicht.
+    const { sqliteZahlungskontoRepository } = await import("../../persistence/sqliteStammdatenRepositories");
+    const { sqliteVertragRepository } = await import("../../persistence/sqliteVertragRepository");
+    const { sqliteZahlungsregelRepository } = await import("../../persistence/sqliteZahlungsregelRepository");
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
+    await sqliteZahlungskontoRepository.speichern({ id: "spar", bezeichnung: "Sparkonto", typ: "Tagesgeld", klasse: "sparen", inhaberIds: [], saldo: 150000 });
+    await sqliteVertragRepository.speichern({ id: "v1", anbieter: "Arbeitgeber", beginn: "2024-01-01", verlaengerung: "keine", status: "aktiv" });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r1", bezeichnung: "Gehalt", betrag: 100000, rhythmus: "monatlich", startdatum: "2024-01-01",
+      charakter: "Ertrag", kontoId: "giro", vertragId: "v1",
+    });
+    await sqliteRuecklagenRepository.speichern({ id: "rk", bezeichnung: "Puffer", rate: 5000, beginn: "2026-01-01", kontoId: "spar" });
+    rendere(<RuecklagenScreen />);
+    // 1.500,00 gegen 3.000,00 → 50 %.
+    await waitFor(() => expect(document.body.textContent).toMatch(/50 %/));
+    expect(document.body.textContent).toMatch(/1\.500,00/);
+  });
 });
