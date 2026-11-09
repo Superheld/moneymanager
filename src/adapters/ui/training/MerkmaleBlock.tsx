@@ -26,9 +26,19 @@ import type { Merkmalsansicht } from "../../../application/kategorien/merkmalsko
 import type { Umsatz } from "../../../application/import";
 import { merkmaleZuBuchung, wortFreigeben, wortSperren } from "../../dienste";
 import { Pill } from "../bausteine";
+import { ErklaerungsTafel } from "./ErklaerungsTafel";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 
-export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz?: Umsatz }) {
+export function MerkmaleBlock({
+  buchung,
+  umsatz,
+  kategorieName,
+}: {
+  buchung: IstBuchung;
+  umsatz?: Umsatz;
+  /** Für die Erklärung; ohne sie stehen dort Ids statt Namen. */
+  kategorieName?: ReadonlyMap<string, string>;
+}) {
   const { t } = useTranslation();
   const prozent = useProzent();
   const { locale } = useGeld();
@@ -43,6 +53,8 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
         await merkmaleZuBuchung({
           gegenpartei: umsatz?.gegenpartei ?? "",
           verwendungszweck: umsatz?.verwendungszweck ?? "",
+          betrag: buchung.betrag,
+          kategorieId: buchung.kategorieId,
         }),
       );
     } catch (e) {
@@ -93,16 +105,19 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
                       )}
                     </span>
                   </div>
-                  {/* Die Beitragszerlegung ist bei einem linearen Modell die Rechnung
-                      selbst, keine nachgebaute Erklärung. */}
-                  <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
-                    {stand.vorschlag.beitraege.map((b) => (
-                      <span key={b.merkmal} className="muted" style={{ fontVariantNumeric: "tabular-nums" }}>
-                        {b.gewicht >= 0 ? "+" : "−"}
-                        {Math.abs(b.gewicht).toFixed(2)} {b.merkmal}
-                      </span>
-                    ))}
-                  </div>
+                  {/* Warum diese Kategorie und nicht die gebuchte (oder, wenn
+                      beide gleich sind, nicht die Zweitbeste). Bis 2026-11-09 standen
+                      hier die rohen Gewichte der Gewinnerin — sie sagen nicht, was den
+                      Ausschlag gab. */}
+                  {stand.erklaerung && (
+                    <div style={{ marginTop: "var(--sp-2)" }}>
+                      <ErklaerungsTafel
+                        erklaerung={stand.erklaerung}
+                        kategorieName={(id) => kategorieName?.get(id) ?? id}
+                        verteilung={(m) => stand.verwendet.find((v) => v.merkmal === m)?.wert?.verteilung}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
               {!stand.hatModell && (

@@ -866,7 +866,7 @@ function BuchungFormular({
 
       {/* Was die automatische Erkennung aus dieser Buchung macht — und die Stelle, an
           der sich ihre Wortlisten am konkreten Fall pflegen lassen. */}
-      {buchung && <MerkmaleBlock buchung={buchung} umsatz={umsatz} />}
+      {buchung && <MerkmaleBlock buchung={buchung} umsatz={umsatz} kategorieName={kategorieName} />}
 
       {/* Umbuchungs-Abschnitt: Einstieg (S-1) bzw. Gegenbuchung und Paarung lösen. Beides
           braucht eine gespeicherte Buchung — gepaart wird im Ledger. */}

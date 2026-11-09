@@ -346,6 +346,7 @@ const de = {
       manuell: "Hier hat jemand von Hand entschieden.",
     },
     begruendungSicher: "{{wert}} sicher",
+    begruendungAusschlag: "entschieden durch {{merkmale}}",
     titel: "Import-Inbox",
     untertitel: "Importierte Buchungen prüfen, kategorisieren und verbuchen",
     leer: "Keine offenen importierten Buchungen. Erst etwas im Import übernehmen.",
@@ -1712,7 +1713,7 @@ const de = {
       vorsprung: "Vorsprung",
       vorsprungMeta: "so viel besser als Raten. Darunter lernt das Modell nichts.",
       fehlgriffeHinweis:
-        "Die einzelnen Zeilen dahinter. Die Pillen sind die Merkmale, die für die FALSCHE Kategorie sprachen; darunter steht der ganze Merkmalsvektor — manchmal ist die Antwort, dass darin nichts Unterscheidendes steht.",
+        "Die einzelnen Zeilen dahinter, je mit der Rechnung, warum die falsche Kategorie gewann. „im Bestand“ sagt, wo ein Wort in deinen Buchungen steht — liegt es dort meist in der falschen Kategorie, sind die Labels uneins; steht nichts Unterscheidendes in der Zeile, fehlt ein Merkmal. Darunter der ganze Merkmalsvektor.",
       fehlgriffeLeer: "Zu diesem Paar liegen keine Einzelzeilen vor.",
       fehlgriffSicherheit: "Sicherheit {{wert}}",
       genauigkeitMeta: "an {{gesamt}} zurückgehaltenen Zahlungen gemessen",
@@ -2127,6 +2128,22 @@ const de = {
     sperreMinuten: "{{minuten}} Minuten",
     jetztSperren: "Jetzt sperren",
   },
+  training: {
+    erklaerung: {
+      kandidaten: "Kandidaten:",
+      frage: "Warum {{a}} und nicht {{b}}? ({{b}} lag auf Platz {{rang}}, {{wahrscheinlichkeit}})",
+      spalteMerkmal: "Merkmal",
+      spalteAusschlag: "Ausschlag",
+      spalteBestand: "im Bestand",
+      grundneigung: "Grundneigung",
+      lesart:
+        "Ausschlag = Gewicht für {{a}} minus Gewicht für {{b}}. Positiv zog zu {{a}}, negativ zu {{b}}; die Summe aller Zeilen ist der Abstand ({{abstand}}). Ein Wort mit grossen Gewichten und kleinem Ausschlag spricht für beide und hat nichts entschieden.",
+      weitere: "{{anzahl}} weitere Merkmale mit kleinerem Ausschlag.",
+      vergleichUnbekannt:
+        "Die richtige Kategorie kam im Training nicht vor — das Modell konnte sie nicht wählen. Hier hilft kein Merkmal, nur Beispiele.",
+      unbekannt: "Dem Modell unbekannt, ohne Einfluss: {{woerter}}",
+    },
+  },
   charts: {
     einnahmen: "Einnahmen",
     ausgabenInklBudgets: "Ausgaben (inkl. Budgets)",
@@ -2447,6 +2464,7 @@ const en: typeof de = {
       manuell: "Someone decided this by hand.",
     },
     begruendungSicher: "{{wert}} confident",
+    begruendungAusschlag: "decided by {{merkmale}}",
     titel: "Import inbox",
     untertitel: "Review, categorise and post imported transactions",
     leer: "No open imported transactions. Import some first.",
@@ -3756,7 +3774,7 @@ const en: typeof de = {
       vorsprung: "Lead",
       vorsprungMeta: "this much better than guessing. Below it, the model learns nothing.",
       fehlgriffeHinweis:
-        "The individual rows behind it. The pills are the features that spoke for the WRONG category; below them the full feature vector — sometimes the answer is that it holds nothing distinguishing.",
+        "The individual rows behind it, each with the calculation of why the wrong category won. \"in your data\" shows where a word appears in your bookings — if it mostly sits in the wrong category, the labels disagree; if nothing in the row distinguishes, a feature is missing. Below, the full feature vector.",
       fehlgriffeLeer: "No individual rows available for this pair.",
       fehlgriffSicherheit: "confidence {{wert}}",
       genauigkeitMeta: "measured on {{gesamt}} held-back payments",
@@ -4166,6 +4184,22 @@ const en: typeof de = {
     sperreAus: "off",
     sperreMinuten: "{{minuten}} minutes",
     jetztSperren: "Lock now",
+  },
+  training: {
+    erklaerung: {
+      kandidaten: "Candidates:",
+      frage: "Why {{a}} and not {{b}}? ({{b}} ranked {{rang}}, {{wahrscheinlichkeit}})",
+      spalteMerkmal: "Feature",
+      spalteAusschlag: "Push",
+      spalteBestand: "in your data",
+      grundneigung: "Prior (bias)",
+      lesart:
+        "Push = weight for {{a}} minus weight for {{b}}. Positive pulled towards {{a}}, negative towards {{b}}; all rows add up to the margin ({{abstand}}). A word with large weights and a small push speaks for both and decided nothing.",
+      weitere: "{{anzahl}} more features with a smaller push.",
+      vergleichUnbekannt:
+        "The correct category never appeared in training — the model could not choose it. No feature helps here, only examples.",
+      unbekannt: "Unknown to the model, no influence: {{woerter}}",
+    },
   },
   charts: {
     einnahmen: "Income",

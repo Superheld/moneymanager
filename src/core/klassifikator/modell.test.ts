@@ -359,8 +359,12 @@ describe("bewerten — Fehltreffer", () => {
     expect(b.fehltreffer[0].tatsaechlich).toBe("freizeit");
     expect(b.fehltreffer[0].vorhergesagt).toBe("essen");
     expect(b.fehltreffer[0].merkmale).toEqual(["emp:kesselmann"]);
-    // Und WORAN es lag: das Merkmal, das für die falsche Kategorie sprach.
-    expect(b.fehltreffer[0].beitraege.map((x) => x.merkmal)).toContain("emp:kesselmann");
+    // Und WORAN es lag — gerechnet gegen die RICHTIGE Kategorie, nicht gegen die
+    // Zweitbeste: die Frage vor einem Fehlgriff ist „warum nicht freizeit".
+    const e = b.fehltreffer[0].erklaerung;
+    expect(e.gewaehlt.kategorieId).toBe("essen");
+    expect(e.vergleich?.kategorieId).toBe("freizeit");
+    expect(e.posten.map((x) => x.merkmal)).toEqual(["emp:kesselmann"]);
   });
 
   it("hält Treffer heraus", () => {

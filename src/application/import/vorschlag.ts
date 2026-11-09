@@ -45,10 +45,12 @@
 // `application/kategorisierungsquellen`.
 
 import {
+  erklaeren,
   klassifizieren,
   merkmalsbefund,
   vertragFuer,
   type Beitrag,
+  type Erklaerung,
   type Kategorie,
   type Merkmalskonfiguration,
   type Modell,
@@ -120,6 +122,11 @@ export interface Vorschlagsbefund {
   readonly vertragId?: string;
   /** Sicherheit des Modells (0…1), sofern es entschieden hat. */
   readonly sicherheit?: number;
+  /**
+   * Beim Modell: warum diese Kategorie und nicht die Zweitbeste. `beitraege` nennt nur,
+   * was für die Gewinnerin sprach; das hier, was den ABSTAND machte.
+   */
+  readonly erklaerung?: Erklaerung;
 }
 
 /**
@@ -218,7 +225,14 @@ export function vorschlagsbefundFuer(
       const k = klassifizieren(kontext.modell, befund.merkmale);
       if (k) {
         const vorschlag = auf(k.kategorieId, "ki", kontext);
-        if (vorschlag) return { vorschlag, beitraege: k.beitraege, sicherheit: k.sicherheit };
+        if (vorschlag) {
+          return {
+            vorschlag,
+            beitraege: k.beitraege,
+            sicherheit: k.sicherheit,
+            erklaerung: erklaeren(kontext.modell, befund.merkmale) ?? undefined,
+          };
+        }
       }
     }
   }

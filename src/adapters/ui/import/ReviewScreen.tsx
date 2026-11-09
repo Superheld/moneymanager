@@ -60,7 +60,15 @@ const SEITE_GROESSE = 100;
  * wie der gespeicherte Vorschlag, wird sie gezeigt — sonst erklärte sie etwas anderes,
  * als in der Zeile steht.
  */
-function Herkunft({ umsatz, kontext }: { umsatz: Umsatz; kontext: Vorschlagskontext | null }) {
+function Herkunft({
+  umsatz,
+  kontext,
+  katById,
+}: {
+  umsatz: Umsatz;
+  kontext: Vorschlagskontext | null;
+  katById: ReadonlyMap<string, Kategorie>;
+}) {
   const { t } = useTranslation();
   const quelle = umsatz.vorschlag?.quelle;
   if (!quelle) return null;
@@ -68,7 +76,12 @@ function Herkunft({ umsatz, kontext }: { umsatz: Umsatz; kontext: Vorschlagskont
   const befund =
     kontext && quelle === "ki" ? vorschlagsbefundFuer(umsatz, kontext, umsatz.zahlungskontoId) : null;
   const passt = befund?.vorschlag?.kategorieId === umsatz.vorschlag?.kategorieId;
-  const belege = passt ? befund?.beitraege ?? [] : [];
+  // Was den Abstand zur Zweitbesten machte — die Posten, die zur Gewinnerin zogen, und
+  // die Grundneigung, wenn sie mitentschied. Rohe Gewichte der Gewinnerin allein sagten
+  // nicht, was den Ausschlag gab (siehe `core/klassifikator/erklaerung.ts`).
+  const e = passt ? befund?.erklaerung : undefined;
+  const ausschlag = e ? e.posten.filter((p) => p.differenz > 0).slice(0, 3).map((p) => p.merkmal) : [];
+  if (e && e.grundneigung.differenz > 0 && ausschlag.length < 3) ausschlag.push(t("training.erklaerung.grundneigung"));
 
   return (
     <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
@@ -83,10 +96,10 @@ function Herkunft({ umsatz, kontext }: { umsatz: Umsatz; kontext: Vorschlagskont
         <span
           className="muted"
           style={{ fontSize: "var(--fs-2xs)" }}
-          title={belege.map((b) => `${b.gewicht >= 0 ? "+" : "−"}${Math.abs(b.gewicht).toFixed(2)} ${b.merkmal}`).join("  ")}
+          title={e?.kandidaten.map((k) => `${Math.round(k.wahrscheinlichkeit * 100)} % ${katById.get(k.kategorieId)?.name ?? k.kategorieId}`).join("  ")}
         >
           {t("review.begruendungSicher", { wert: `${Math.round(befund.sicherheit * 100)} %` })}
-          {belege.length > 0 && ` · ${belege.slice(0, 3).map((b) => b.merkmal).join(", ")}`}
+          {ausschlag.length > 0 && ` · ${t("review.begruendungAusschlag", { merkmale: ausschlag.join(", ") })}`}
         </span>
       )}
     </div>
@@ -570,7 +583,7 @@ export function ReviewScreen() {
                     ) : (
                       <CategoryPicker kategorien={kategorien} value={u.vorschlag?.kategorieId ?? ""} onChange={(id) => kategorieGesetzt(u, id)} />
                     )}
-                    {u.vorschlag && <Herkunft umsatz={u} kontext={kontext} />}
+                    {u.vorschlag && <Herkunft umsatz={u} kontext={kontext} katById={katById} />}
                   </td>
                   <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
                     <IconButton

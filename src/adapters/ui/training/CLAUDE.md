@@ -31,6 +31,21 @@ die Kategorien fachlich nicht zu trennen. Das sind zwei völlig verschiedene Ant
 und die Statistik gibt keine davon her. Dafür trägt `Beispiel` eine optionale `id`, die
 das Training nicht braucht und die Bewertung sehr wohl.
 
+**Erklärt wird KONTRASTIV, seit 2026-11-09** (`core/klassifikator/erklaerung.ts`,
+angezeigt über `ErklaerungsTafel`): nicht „was sprach für die Gewinnerin", sondern
+„warum sie und nicht jene". Bei einem linearen Modell zerlegt sich der Abstand zweier
+Kategorien exakt in einen Posten je Merkmal plus die Grundneigung (Bias) — keine
+Näherung, die Posten addieren sich ohne Rest zum Abstand, und ein Test hält das fest.
+Vorher standen die rohen Gewichte der Gewinnerin da; die sagen nicht, was den Ausschlag
+gab, denn ein Wort, das für beide Kategorien stark spricht, stand oben und hatte nichts
+entschieden. Und die Grundneigung kam gar nicht vor, obwohl sie bei ungleich grossen
+Kategorien oft mitentscheidet.
+
+Wogegen gerechnet wird, hängt am Ort: am **Fehlgriff** gegen die richtige Kategorie, an
+der **Buchung** gegen die gebuchte (oder die Zweitbeste, wenn beide übereinstimmen), in
+der **Review** gegen die Zweitbeste. Daneben steht, wo ein Wort im Bestand vorkommt —
+liegt es dort selbst in beiden Kategorien, sind die Labels uneins und kein Merkmal hilft.
+
 **Der BETRAG ist als Merkmal zuschaltbar** (`Merkmalsherkunft: "betrag"`), ab Werk aus.
 Er liefert Richtung und **Grössenordnung**, nicht den Wert: ein genauer Betrag wäre ein
 Token, das genau einmal vorkommt — das Modell lernt nichts daraus, und das Vokabular

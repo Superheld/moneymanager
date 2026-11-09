@@ -20,7 +20,9 @@ import {
   klassifizieren,
   merkmalsbefund,
   trainieren,
+  erklaeren,
   type Beispiel,
+  type Erklaerung,
   type Klassifikation,
   type Merkmalsherkunft,
   type Merkmalskonfiguration,
@@ -224,6 +226,12 @@ export interface Merkmalsansicht {
   /** Wörter, die auf der Ausschlussliste stehen — nur die lassen sich zurückholen. */
   readonly ausgeschlossen: ReadonlySet<string>;
   readonly vorschlag: Klassifikation | null;
+  /**
+   * Warum diese Kategorie und nicht die gebuchte — oder, wenn beide übereinstimmen, nicht
+   * die Zweitbeste. Das ist die Frage, mit der man eine falsch einsortierte Buchung
+   * öffnet (siehe `core/klassifikator/erklaerung.ts`).
+   */
+  readonly erklaerung: Erklaerung | null;
   readonly hatModell: boolean;
 }
 
@@ -234,10 +242,24 @@ export async function merkmalsansicht(
     readonly klassifikatorRepo: KlassifikatorRepository;
     readonly merkmalRepo: MerkmalskonfigurationRepository;
   },
-  quelle: { gegenpartei: string; verwendungszweck: string },
+  quelle: {
+    gegenpartei: string;
+    verwendungszweck: string;
+    /**
+     * Der Betrag muss mit, sonst sähe die Zahlung hier anders aus als beim Training und
+     * beim Import — bei zugeschaltetem Betragsmerkmal fehlte ihr genau ein Merkmal, und
+     * die Erklärung erklärte einen Vektor, den das Modell nie bekommt.
+     */
+    betrag?: number;
+    /** Die gebuchte Kategorie — wogegen die Erklärung rechnet. */
+    kategorieId?: string;
+  },
 ): Promise<Merkmalsansicht> {
   const konf = await konfigurationLaden(deps.merkmalRepo);
-  const befund = merkmalsbefund(quelle, konf.konfiguration);
+  const befund = merkmalsbefund(
+    { gegenpartei: quelle.gegenpartei, verwendungszweck: quelle.verwendungszweck, betrag: quelle.betrag },
+    konf.konfiguration,
+  );
 
   // Statistik und Modell parallel — beide lesen nur.
   const [material, modellstand] = await Promise.all([
@@ -256,6 +278,7 @@ export async function merkmalsansicht(
     verworfen: befund.verworfen,
     ausgeschlossen: new Set(konf.ausschluesse.map((a) => a.wort)),
     vorschlag: modellstand ? klassifizieren(modellstand.modell, befund.merkmale) : null,
+    erklaerung: modellstand ? erklaeren(modellstand.modell, befund.merkmale, quelle.kategorieId) : null,
     hatModell: !!modellstand,
   };
 }
