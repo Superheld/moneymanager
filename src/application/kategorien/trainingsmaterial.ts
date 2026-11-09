@@ -240,7 +240,7 @@ export function materialBefund(
     // Verwurf und Vokabular werden über DIESELBE Grundmenge gezählt: die Beispiele.
     // Verlockend wäre, den Verwurf über alle Zeilen laufen zu lassen — auch die noch
     // unkategorisierten, deren Text ja ebenfalls durch die Filter geht. Dann bezögen sich
-    // „5321 Tokens im Vokabular" und „1284 Wörter verworfen" aber auf verschiedene Mengen
+    // „so viele Tokens im Vokabular" und „so viele Wörter verworfen" aber auf verschiedene Mengen
     // und ließen sich nicht mehr gegeneinander lesen. Genau dafür stehen die Zahlen da.
     // Je Zeile EINMAL zählen, auch wenn dasselbe Wort mehrfach im Verwendungszweck
     // steht — sonst zählt eine Zeile als mehrere Belege, und die Deckung des Wortes
