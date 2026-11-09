@@ -461,7 +461,8 @@ describe("3 · Erkennungsmodell", () => {
 
     // Die Kachel „Trefferquote" — „100 %" steht inzwischen mehrfach da (Nachschlagen,
     // Macro-F1, je Kategorie), deshalb in ihrer Kachel gesucht.
-    const kachel = (await screen.findByText("Trefferquote")).parentElement!;
+    // Die erste Fundstelle ist die Kachel; der Name steht auch als Spaltenkopf der Läufe.
+    const kachel = (await screen.findAllByText("Trefferquote"))[0].parentElement!;
     await waitFor(() => expect(within(kachel).getByText("100 %")).toBeTruthy());
     expect(screen.getByText(/Zuletzt trainiert am .*, aus 80 Beispielen/)).toBeTruthy();
   });
@@ -476,8 +477,8 @@ describe("3 · Erkennungsmodell", () => {
     // Keine handverlesenen Labels im Material → die Messung sagt, dass sie an allen prüft.
     await waitFor(() => expect(screen.getByText(/Geprüft an den 16 jüngsten Buchungen/)).toBeTruthy());
     expect(screen.getByText(/auch automatisch gesetzte Kategorien/)).toBeTruthy();
-    expect(screen.getByText("Nachschlagen")).toBeTruthy();
-    expect(screen.getByText("Macro-F1")).toBeTruthy();
+    expect(screen.getAllByText("Nachschlagen").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Macro-F1").length).toBeGreaterThan(0);
     expect(screen.getByText("Je Kategorie")).toBeTruthy();
     expect(screen.getByText("Wie verlässlich ist die Sicherheit?")).toBeTruthy();
   });
@@ -510,6 +511,24 @@ describe("3 · Erkennungsmodell", () => {
    * vorkommt, fehlt ein Merkmal; steht dort nichts Unterscheidendes, sind die beiden
    * Kategorien fachlich nicht zu trennen.
    */
+  it("zeichnet jeden Lauf auf und vergleicht den nächsten mit ihm", async () => {
+    material();
+    const nutzer = userEvent.setup();
+    rendere(<TrainingBereich />);
+    await oeffne(nutzer, KARTEN.modell);
+
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+    await waitFor(() => expect(screen.getByText("Läufe")).toBeTruthy());
+    expect(screen.queryByText("Gegenüber dem letzten Lauf")).toBeNull();
+
+    await nutzer.click(screen.getByRole("button", { name: "Training starten" }));
+    await waitFor(() => expect(screen.getByText("Gegenüber dem letzten Lauf")).toBeTruthy());
+    expect(screen.getByText(/an 16 Prüfzeilen, die beide kannten: 0 gewonnen, 0 verloren/)).toBeTruthy();
+    expect(screen.getByText(/An Quellen und Ausschlüssen hat sich nichts geändert/)).toBeTruthy();
+    // Und beide stehen in der Datenbank.
+    expect(db.exec("SELECT COUNT(*) FROM trainingslauf")[0].values[0][0]).toBe(2);
+  });
+
   it("führt von einem Verwechslungspaar auf die betroffenen Zeilen", async () => {
     // Zwei Kategorien mit DEMSELBEN Empfänger — das muss danebengehen, und genau dieser
     // Fall ist der, den man sich ansehen will.

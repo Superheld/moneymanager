@@ -36,7 +36,8 @@ import { fintsAbruf } from "./fints";
 import { hanseaticAbruf } from "./hanseatic";
 import { konfigurationLaden, grundausstattungHerstellen, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
 import { trainingsmaterial, type Materialbefund } from "../application/kategorien/trainingsmaterial";
-import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
+import { klassifikatorTrainieren, modellzustand, trainingslaeufe, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
+import { sqliteTrainingslaufRepository } from "./persistence/sqliteTrainingslaufRepository";
 import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../application/kategorien/kategorieAbgleich";
 import type { Merkmalskonfiguration, Merkmalsherkunft } from "../core";
 import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnung";
@@ -839,9 +840,16 @@ export function modellStand(konfiguration: Merkmalskonfiguration): Promise<Model
 export function modellTrainieren(konfiguration: Merkmalskonfiguration) {
   return klassifikatorTrainieren({
     ...MODELL_DEPS,
+    laufRepo: sqliteTrainingslaufRepository,
+    neueId: () => crypto.randomUUID(),
     konfiguration,
     jetzt: () => new Date().toISOString(),
   });
+}
+
+/** Die aufgezeichneten Trainingsläufe, neuester zuerst. */
+export function laufhistorie() {
+  return trainingslaeufe({ laufRepo: sqliteTrainingslaufRepository });
 }
 
 export function merkmalswirkung(konfiguration: Merkmalskonfiguration) {

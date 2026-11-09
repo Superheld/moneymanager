@@ -42,6 +42,15 @@ drei Prüffenster zu je einem Zehntel, jedes trainiert auf allem davor („rolli
 Eine Wirkung, die anders gemessen wird als die Zahl daneben, vergliche zwei verschiedene
 Dinge.
 
+**Jeder Lauf wird aufgezeichnet** (`trainingslauf`, seit 2026-11-09; Vergleich in
+`core/klassifikator/laeufe.ts`): Konfiguration, Kennzahlen und die Vorhersage je
+Prüfzeile. Nach jedem Training steht da, was sich gegenüber dem vorigen geändert hat —
+an Quellen und Ausschlüssen, und welche Zeilen gewonnen oder verloren wurden. Eine
+Trefferquote, die gleich bleibt, kann zehn Zeilen gewonnen und zehn verloren haben; erst
+die Zeilen sagen, ob eine Änderung an den Wörtern das Richtige getroffen hat.
+Verglichen wird nur an Zeilen, die BEIDE Läufe geprüft haben: ein Import dazwischen
+schiebt das Prüffenster weiter. Aufgehoben werden die jüngsten `LAEUFE_BEHALTEN`.
+
 **Aus der Verwechslungsstatistik führt jetzt ein Weg in die einzelnen Zeilen.** Die Zahl
 sagt, WO es klemmt; erst die Zeilen sagen, WARUM — steht dort ein Empfänger, der für
 beide Kategorien vorkommt, fehlt ein Merkmal; steht dort nichts Unterscheidendes, sind

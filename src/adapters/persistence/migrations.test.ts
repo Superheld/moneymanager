@@ -92,6 +92,7 @@ const ERWARTETE_TABELLEN = [
   "person",
   // v65 — aus dem Inventar wurden Rücklagen: Ziel und Frist optional, freie Rate
   "ruecklage", "ruecklage_ausbuchung",
+  "trainingslauf", // v75 — jedes Training mit Konfiguration, Kennzahlen, Vorhersagen
   // v44 — der Beleg und was wir daraus gemacht haben, getrennt nach Lebenszyklus
   "umsatz_roh", "umsatz_verarbeitung",
   // v47 — die Zuordnung steht jetzt an der Buchung, `vertrag_zuordnung` ist weg

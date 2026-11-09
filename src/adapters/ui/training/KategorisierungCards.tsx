@@ -30,6 +30,7 @@ import {
   verwechslungsmatrix,
   wortVon,
   type Bewertung,
+  type Trainingslauf,
   type Fehltreffer,
   type Kategorie,
   type Matrixzeile,
@@ -54,13 +55,14 @@ import {
   type Abgleichsplan,
 } from "../../../application/kategorien/kategorieAbgleich";
 import type { Wirkung } from "../../../application/kategorien/merkmalskonfiguration";
-import type { Messprotokoll } from "../../../application/kategorien/klassifikatorTraining";
+import type { Laufvergleichsicht, Messprotokoll } from "../../../application/kategorien/klassifikatorTraining";
 import {
   herkunftUmschalten,
   kategorieAbgleichAnwenden,
   kategorieAbgleichVorschau,
   merkmalskonfiguration,
   merkmalswirkung,
+  laufhistorie,
   modellStand,
   modellTrainieren,
   trainingsdaten,
@@ -81,6 +83,8 @@ interface Daten {
   readonly zustand: Modellzustand;
   readonly herkuenfte: readonly Merkmalsherkunft[];
   readonly ausschluesse: readonly GespeicherterAusschluss[];
+  /** Die aufgezeichneten Trainingsläufe, neuester zuerst. */
+  readonly laeufe: readonly Trainingslauf[];
 }
 
 export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }) {
@@ -99,6 +103,8 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
   const [grundlinie, setGrundlinie] = useState<Grundlinie | null>(null);
   /** Wie gemessen wurde und was neben der Trefferquote steht. */
   const [protokoll, setProtokoll] = useState<Messprotokoll | null>(null);
+  /** Gegenüber dem vorigen Lauf — nur direkt nach einem Training. */
+  const [vergleich, setVergleich] = useState<Laufvergleichsicht | null>(null);
   const [wirkung, setWirkung] = useState<{ basis: number; wirkungen: Wirkung[] } | null>(null);
   const [listenGeaendert, setListenGeaendert] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
@@ -111,13 +117,15 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
    */
   async function laden() {
     const stand = await merkmalskonfiguration();
-    const [material, zustand] = await Promise.all([
+    const [material, zustand, laeufe] = await Promise.all([
       trainingsdaten(stand.konfiguration),
       modellStand(stand.konfiguration),
+      laufhistorie(),
     ]);
     setDaten({
       material,
       zustand,
+      laeufe,
       herkuenfte: stand.konfiguration.herkuenfte,
       ausschluesse: stand.ausschluesse,
     });
@@ -158,6 +166,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
       setBewertung(r.bewertung ?? null);
       setGrundlinie(r.grundlinie ?? null);
       setProtokoll(r.protokoll ?? null);
+      setVergleich(r.vergleich ?? null);
       setListenGeaendert(false);
       await laden();
     } catch (e) {
@@ -269,6 +278,7 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
                 bewertung={bewertung}
                 grundlinie={grundlinie}
                 protokoll={protokoll}
+                vergleich={vergleich}
                 trainiert={laeuft === "training"}
                 listenGeaendert={listenGeaendert}
                 aufTraining={trainingStarten}
@@ -1042,11 +1052,12 @@ function Wortdetail({
 // -------------------------------------------------------------- 4 · Erkennungsmodell
 
 function ModellInhalt({
-  t, daten, kategorieName, zahl, prozent, bewertung, grundlinie, protokoll, trainiert, listenGeaendert, aufTraining,
+  t, daten, kategorieName, zahl, prozent, bewertung, grundlinie, protokoll, vergleich, trainiert, listenGeaendert, aufTraining,
 }: Hilfe & {
   bewertung: Bewertung | null;
   grundlinie: Grundlinie | null;
   protokoll: Messprotokoll | null;
+  vergleich: Laufvergleichsicht | null;
   trainiert: boolean;
   listenGeaendert: boolean;
   aufTraining: () => void;
@@ -1189,6 +1200,12 @@ function ModellInhalt({
         </div>
       )}
 
+      {vergleich && (
+        <Abschnitt titel={t("einstellungen.lernmaterial.vergleichTitel")}>
+          <LaufvergleichAnsicht t={t} vergleich={vergleich} kategorieName={kategorieName} zahl={zahl} locale={locale} />
+        </Abschnitt>
+      )}
+
       {protokoll && (
         <Abschnitt titel={t("einstellungen.lernmaterial.klassenTitel")}>
           <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
@@ -1325,6 +1342,43 @@ function ModellInhalt({
           )}
         </Abschnitt>
       )}
+
+      {daten.laeufe.length > 0 && (
+        <Abschnitt titel={t("einstellungen.lernmaterial.laeufeTitel")}>
+          <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
+            {t("einstellungen.lernmaterial.laeufeHinweis")}
+          </div>
+          <DataTable
+            columns={[
+              {
+                key: "zeitpunkt", label: t("einstellungen.lernmaterial.spalteZeitpunkt"),
+                render: (r) => new Date(r.zeitpunkt).toLocaleString(locale),
+              },
+              { key: "beispiele", label: t("einstellungen.lernmaterial.spalteBeispiele"), align: "right", render: (r) => zahl(r.beispiele) },
+              {
+                key: "genauigkeit", label: t("einstellungen.lernmaterial.genauigkeit"), align: "right",
+                render: (r) => (r.kennzahlen ? prozent(r.kennzahlen.genauigkeit) : "—"),
+              },
+              {
+                key: "empfaenger", label: t("einstellungen.lernmaterial.empfaengerLinie"), align: "right",
+                render: (r) => (r.kennzahlen?.empfaenger !== undefined ? prozent(r.kennzahlen.empfaenger) : "—"),
+              },
+              {
+                key: "macroF1", label: t("einstellungen.lernmaterial.macroF1"), align: "right",
+                render: (r) => (r.kennzahlen?.macroF1 !== undefined ? prozent(r.kennzahlen.macroF1) : "—"),
+              },
+              {
+                key: "pruefmenge", label: t("einstellungen.lernmaterial.spaltePruefmenge"),
+                render: (r) =>
+                  r.kennzahlen
+                    ? t(`einstellungen.lernmaterial.pruefmenge.${r.kennzahlen.pruefmenge}`, { anzahl: zahl(r.kennzahlen.pruefAnzahl) })
+                    : "—",
+              },
+            ]}
+            rows={daten.laeufe.map((l) => ({ ...l }))}
+          />
+        </Abschnitt>
+      )}
     </>
   );
 }
@@ -1376,6 +1430,65 @@ function Fehlgriffe({
           <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
             {f.merkmale.map(wortVon).join(" · ")}
           </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * Was sich gegenüber dem vorigen Lauf geändert hat — an der Konfiguration und an den
+ * Zeilen. Eine Trefferquote, die gleich bleibt, kann zehn Zeilen gewonnen und zehn
+ * verloren haben; erst die Zeilen sagen, ob eine Änderung an den Wörtern das Richtige
+ * getroffen hat.
+ */
+function LaufvergleichAnsicht({
+  t,
+  vergleich,
+  kategorieName,
+  zahl,
+  locale,
+}: {
+  t: Hilfe["t"];
+  vergleich: Laufvergleichsicht;
+  kategorieName: ReadonlyMap<string, string>;
+  zahl: (n: number) => string;
+  locale: string;
+}) {
+  const name = (id: string) => kategorieName.get(id) ?? id;
+  const aenderungen = [
+    ...vergleich.herkuenfteDazu.map((h) => t("einstellungen.lernmaterial.vergleichQuelleDazu", { quelle: t(`einstellungen.lernmaterial.herkunft.${h}`) })),
+    ...vergleich.herkuenfteWeg.map((h) => t("einstellungen.lernmaterial.vergleichQuelleWeg", { quelle: t(`einstellungen.lernmaterial.herkunft.${h}`) })),
+    ...(vergleich.ausgeschlossenDazu.length
+      ? [t("einstellungen.lernmaterial.vergleichAusgeschlossen", { woerter: vergleich.ausgeschlossenDazu.join(", ") })]
+      : []),
+    ...(vergleich.ausgeschlossenWeg.length
+      ? [t("einstellungen.lernmaterial.vergleichZugelassen", { woerter: vergleich.ausgeschlossenWeg.join(", ") })]
+      : []),
+  ];
+  return (
+    <div style={{ display: "grid", gap: "var(--sp-2)" }}>
+      <div>
+        {t("einstellungen.lernmaterial.vergleichSumme", {
+          datum: new Date(vergleich.vorherAm).toLocaleString(locale),
+          gemeinsam: zahl(vergleich.gemeinsam),
+          gewonnen: zahl(vergleich.gewonnen),
+          verloren: zahl(vergleich.verloren),
+        })}
+      </div>
+      <div className="muted">
+        {aenderungen.length ? aenderungen.join(" · ") : t("einstellungen.lernmaterial.vergleichKonfigGleich")}
+      </div>
+      {vergleich.gekippt.slice(0, 25).map((g) => (
+        <div key={g.id} style={{ borderLeft: `2px solid ${g.gewonnen ? "var(--ok-deep)" : "var(--warn-deep)"}`, paddingLeft: "var(--sp-3)" }}>
+          <div>
+            {t(g.gewonnen ? "einstellungen.lernmaterial.vergleichGewonnen" : "einstellungen.lernmaterial.vergleichVerloren", {
+              richtig: name(g.tatsaechlich),
+              vorher: name(g.vorher),
+              nachher: name(g.nachher),
+            })}
+          </div>
+          <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{g.merkmale.map(wortVon).join(" · ")}</div>
         </div>
       ))}
     </div>

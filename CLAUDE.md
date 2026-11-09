@@ -81,7 +81,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-27 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+28 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie. Die ausführbare Gegenprobe steht in `migrations.test.ts`: `ERWARTETE_TABELLEN`
 prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Test rot:
@@ -95,7 +95,9 @@ prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Te
 - **Ordnen:** `kategorie` · `budget` + `budget_betrag` (die
   Reihe seiner Beträge, siehe `src/core/budgets/CLAUDE.md`) · `vertrag` ·
   `vertrag_erkennung` · `zahlungsregel` · `ruecklage` + `ruecklage_ausbuchung` (siehe `src/core/ruecklagen/CLAUDE.md`)
-- **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss`
+- **Erkennen:** `klassifikator_modell` · `merkmal_ausschluss` · `trainingslauf` (jedes
+  Training mit Konfiguration, Kennzahlen und Vorhersagen, siehe
+  `src/adapters/ui/training/CLAUDE.md`)
 - **Bank:** `bankzugang` (samt Bankfähigkeitsprofil) · `bankkonto_zuordnung`
 - **Besitzen:** `depot` · `depotwert` (Reihe der Stichtagswerte) · `depotposition` —
   Beobachtungen, keine Buchungen; siehe unten

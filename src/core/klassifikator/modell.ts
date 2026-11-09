@@ -398,7 +398,20 @@ export interface Bewertung {
    * Je Prüfbeispiel: wie sicher das Modell war und ob es traf. Grundlage der
    * Kalibrierung (`messung.ts`) — die Frage, ob „90 % sicher" auch 90 % richtig heisst.
    */
-  readonly vorhersagen: readonly { readonly sicherheit: number; readonly treffer: boolean }[];
+  readonly vorhersagen: readonly Vorhersage[];
+}
+
+/**
+ * Eine Vorhersage an einem Prüfbeispiel. Die Id und beide Kategorien stehen dabei, damit
+ * sich zwei Trainingsläufe Zeile für Zeile vergleichen lassen (`laeufe.ts`): eine
+ * Trefferquote, die gleich bleibt, kann zehn Zeilen gewonnen und zehn verloren haben.
+ */
+export interface Vorhersage {
+  readonly id?: string;
+  readonly tatsaechlich: string;
+  readonly vorhergesagt: string;
+  readonly sicherheit: number;
+  readonly treffer: boolean;
 }
 
 /** Misst das Modell an Beispielen, die es nicht gesehen hat. */
@@ -406,14 +419,22 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
   const je = new Map<string, { richtig: number; gesamt: number }>();
   const paare = new Map<string, Verwechslung>();
   const fehltreffer: Fehltreffer[] = [];
-  const vorhersagen: { sicherheit: number; treffer: boolean }[] = [];
+  const vorhersagen: Vorhersage[] = [];
   let richtig = 0;
 
   for (const b of beispiele) {
     const k = klassifizieren(modell, b.merkmale);
     const treffer = k?.kategorieId === b.kategorieId;
     if (treffer) richtig++;
-    if (k) vorhersagen.push({ sicherheit: k.sicherheit, treffer });
+    if (k) {
+      vorhersagen.push({
+        id: b.id,
+        tatsaechlich: b.kategorieId,
+        vorhergesagt: k.kategorieId,
+        sicherheit: k.sicherheit,
+        treffer,
+      });
+    }
     const e = je.get(b.kategorieId) ?? { richtig: 0, gesamt: 0 };
     e.gesamt++;
     if (treffer) e.richtig++;

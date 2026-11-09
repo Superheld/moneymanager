@@ -14,20 +14,31 @@
 import {
   bewerten,
   empfaengerLinie,
+  STANDARD_KONFIGURATION,
   grundlinie,
   kalibrierung,
   klassenwerte,
+  laeufeVergleichen,
   pruefmengeWaehlen,
   trainieren,
   zeitlichAufteilen,
   type Beispiel,
   type Bewertung,
+  type GekippteZeile,
   type Kalibrierung,
+  type Laufvergleich,
   type Klassenkennzahlen,
   type Merkmalskonfiguration,
   type Pruefmenge,
+  type Trainingslauf,
 } from "../../core";
-import type { KlassifikatorRepository, LedgerPort, Modellstand, UmsatzRepository } from "../ports";
+import type {
+  KlassifikatorRepository,
+  LedgerPort,
+  Modellstand,
+  TrainingslaufRepository,
+  UmsatzRepository,
+} from "../ports";
 import { trainingsmaterial, type Materialbefund } from "./trainingsmaterial";
 
 /**
@@ -57,7 +68,19 @@ export interface TrainingsErgebnis {
   readonly grundlinie?: { kategorieId: string; genauigkeit: number };
   /** Wie gemessen wurde und was daneben steht — fehlt aus demselben Grund wie `bewertung`. */
   readonly protokoll?: Messprotokoll;
+  /** Gegenüber dem vorigen Lauf — fehlt beim ersten. */
+  readonly vergleich?: Laufvergleichsicht;
 }
+
+/** Ein Laufvergleich, dessen gekippte Zeilen ihre Merkmale tragen — sonst wären es Ids. */
+export interface Laufvergleichsicht extends Omit<Laufvergleich, "gekippt"> {
+  readonly gekippt: readonly (GekippteZeile & { readonly merkmale: readonly string[] })[];
+  /** Wann der Lauf war, mit dem verglichen wird. */
+  readonly vorherAm: string;
+}
+
+/** Wie viele Läufe aufgehoben werden. Genug für eine Versuchsreihe, nicht für ein Archiv. */
+export const LAEUFE_BEHALTEN = 30;
 
 /**
  * Alles, was eine Messung ausser der Trefferquote braucht, um etwas zu bedeuten.
@@ -119,6 +142,9 @@ export interface TrainingsDeps {
   readonly ledger: LedgerPort;
   readonly umsatzRepo: UmsatzRepository;
   readonly klassifikatorRepo: KlassifikatorRepository;
+  readonly laufRepo: TrainingslaufRepository;
+  /** Erzeugt die Id eines Laufs — hereingereicht wie die Zeit, damit Tests sie festlegen. */
+  readonly neueId: () => string;
   /**
    * Was ins Training geht. Hereingereicht statt hier geladen: sonst hinge dieser
    * Use-Case an `merkmalskonfiguration`, das seinerseits die Messschwelle von hier
@@ -169,12 +195,54 @@ export async function klassifikatorTrainieren(deps: TrainingsDeps): Promise<Trai
   };
   await deps.klassifikatorRepo.speichern(stand);
 
+  // Der Lauf wird aufgezeichnet — samt Konfiguration und der Vorhersage je Prüfzeile,
+  // damit der nächste Lauf sagen kann, welche Zeilen er gewonnen und verloren hat.
+  const konfiguration = deps.konfiguration ?? STANDARD_KONFIGURATION;
+  const lauf: Trainingslauf = {
+    id: deps.neueId(),
+    zeitpunkt: stand.trainiertAm,
+    beispiele: beispiele.length,
+    konfiguration: { herkuenfte: konfiguration.herkuenfte, ausschluesse: konfiguration.ausschluesse },
+    kennzahlen: messung
+      ? {
+          genauigkeit: messung.bewertung.genauigkeit,
+          grundlinie: messung.grundlinie?.genauigkeit,
+          empfaenger: messung.protokoll.empfaenger?.genauigkeit,
+          macroF1: messung.protokoll.kennzahlen.macroF1 ?? undefined,
+          ece: messung.protokoll.kalibrierung?.ece,
+          pruefAnzahl: messung.protokoll.pruefAnzahl,
+          pruefmenge: messung.protokoll.pruefmenge,
+          stichtag: messung.protokoll.stichtag,
+        }
+      : undefined,
+    vorhersagen: (messung?.bewertung.vorhersagen ?? []).map((v) => ({
+      id: v.id,
+      tatsaechlich: v.tatsaechlich,
+      vorhergesagt: v.vorhergesagt,
+    })),
+  };
+  const [vorher] = await deps.laufRepo.juengste(1);
+  await deps.laufRepo.anlegen(lauf);
+  await deps.laufRepo.ausduennen(LAEUFE_BEHALTEN);
+
+  let vergleich: Laufvergleichsicht | undefined;
+  if (vorher) {
+    const v = laeufeVergleichen(vorher, lauf);
+    const merkmaleVon = new Map(material.beispiele.map((b) => [b.istbuchungId, b.merkmale]));
+    vergleich = {
+      ...v,
+      vorherAm: vorher.zeitpunkt,
+      gekippt: v.gekippt.map((g) => ({ ...g, merkmale: merkmaleVon.get(g.id) ?? [] })),
+    };
+  }
+
   return {
     stand,
     material,
     bewertung: messung?.bewertung,
     grundlinie: messung?.grundlinie,
     protokoll: messung?.protokoll,
+    vergleich,
   };
 }
 
@@ -221,4 +289,9 @@ export async function modellzustand(deps: {
     // Ohne Modell ist jedes Material Anlass genug; mit Modell erst ab der Schwelle.
     veraltet: stand ? Math.abs(zuwachs) >= ZUWACHS_SCHWELLE : beispieleJetzt > 0,
   };
+}
+
+/** Die aufgezeichneten Läufe, neuester zuerst — für die Tabelle im Training. */
+export function trainingslaeufe(deps: { laufRepo: TrainingslaufRepository }): Promise<Trainingslauf[]> {
+  return deps.laufRepo.juengste(LAEUFE_BEHALTEN);
 }

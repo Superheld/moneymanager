@@ -30,6 +30,7 @@ import { sqliteRuecklagenRepository as ruecklagenRepository } from "./sqliteRuec
 import { sqliteLedgerRepository as ledgerRepository } from "./sqliteLedgerRepository";
 import { sqliteKlassifikatorRepository as klassifikatorRepository } from "./sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository as merkmalRepository } from "./sqliteMerkmalskonfigurationRepository";
+import { sqliteTrainingslaufRepository as laufRepository } from "./sqliteTrainingslaufRepository";
 import { klassifizieren, trainieren } from "../../core";
 import { sqliteVertragRepository as vertragRepository } from "./sqliteVertragRepository";
 import {
@@ -910,6 +911,31 @@ describe("Klassifikator-Repository", () => {
     expect(zurueck!.modell.kategorien).toHaveLength(0);
     expect(zurueck!.modell.vokabular).toHaveLength(0);
     expect(zurueck!.genauigkeit).toBeUndefined();
+  });
+});
+
+describe("Trainingsläufe", () => {
+  const lauf = (id: string, zeitpunkt: string) => ({
+    id,
+    zeitpunkt,
+    beispiele: 80,
+    konfiguration: { herkuenfte: ["empGanz" as const], ausschluesse: [{ wort: "sepa" }] },
+    kennzahlen: { genauigkeit: 0.9, pruefAnzahl: 16, pruefmenge: "alle" as const, stichtag: "2026-03-01" },
+    vorhersagen: [{ id: "b1", tatsaechlich: "kat-a", vorhergesagt: "kat-b" }],
+  });
+
+  it("legt an und liest verlustfrei zurück, neuester zuerst", async () => {
+    await laufRepository.anlegen(lauf("l1", "2026-11-01T10:00:00.000Z"));
+    await laufRepository.anlegen(lauf("l2", "2026-11-02T10:00:00.000Z"));
+    const [neu, alt] = await laufRepository.juengste(10);
+    expect(neu.id).toBe("l2");
+    expect(alt).toEqual(lauf("l1", "2026-11-01T10:00:00.000Z"));
+  });
+
+  it("dünnt auf die jüngsten aus", async () => {
+    for (let i = 1; i <= 5; i++) await laufRepository.anlegen(lauf(`l${i}`, `2026-11-0${i}T10:00:00.000Z`));
+    await laufRepository.ausduennen(2);
+    expect((await laufRepository.juengste(10)).map((l) => l.id)).toEqual(["l5", "l4"]);
   });
 });
 
