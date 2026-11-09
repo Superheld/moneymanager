@@ -512,8 +512,12 @@ describe("3 · Erkennungsmodell", () => {
     // … dann die Zeilen dahinter.
     await nutzer.click(paar);
     await waitFor(() => expect(screen.getByText(/Die einzelnen Zeilen dahinter/)).toBeTruthy());
-    // Das Merkmal, das für die falsche Kategorie sprach, steht als Pille dabei.
-    expect(screen.getAllByText(/ohlert seewinkel/).length).toBeGreaterThan(0);
+    // Je Zeile die Rechnung GEGEN DIE RICHTIGE Kategorie, samt Grundneigung — und weil
+    // beide denselben Empfänger tragen, steht in der Spalte „im Bestand", dass das Wort
+    // in beiden Kategorien vorkommt: die Labels sind uneins, kein Merkmal fehlt.
+    expect(screen.getAllByText(/Warum (Alpha|Beta) und nicht (Alpha|Beta)\?/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Grundneigung").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Alpha 40 · Beta 40|Beta 40 · Alpha 40/).length).toBeGreaterThan(0);
   });
 
   it("misst nicht, wenn zu wenige Beispiele da sind", async () => {

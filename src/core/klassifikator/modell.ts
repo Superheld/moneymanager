@@ -17,6 +17,8 @@
 // Zufallsgenerator statt über `Math.random`. Sonst lieferte zweimal „Training starten"
 // zwei verschiedene Modelle, und keine Messung wäre wiederholbar.
 
+import { erklaeren, type Erklaerung } from "./erklaerung";
+
 /** Ein Trainingsbeispiel: Tokens plus die Kategorie, die herauskommen soll. */
 export interface Beispiel {
   readonly merkmale: readonly string[];
@@ -346,8 +348,13 @@ export interface Fehltreffer {
   readonly tatsaechlich: string;
   readonly vorhergesagt: string;
   readonly merkmale: readonly string[];
-  /** Was am stärksten für die FALSCHE Kategorie sprach. */
-  readonly beitraege: readonly Beitrag[];
+  /**
+   * Warum die falsche Kategorie und nicht die richtige — gegen die RICHTIGE gerechnet,
+   * nicht gegen die Zweitbeste. Bis 2026-11-09 standen hier die stärksten Gewichte der
+   * falschen Kategorie allein; die sagen nicht, was den Ausschlag gab (siehe
+   * `erklaerung.ts`).
+   */
+  readonly erklaerung: Erklaerung;
   readonly sicherheit: number;
 }
 
@@ -410,7 +417,8 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
         tatsaechlich: b.kategorieId,
         vorhergesagt: k.kategorieId,
         merkmale: b.merkmale,
-        beitraege: k.beitraege,
+        // Nicht null: dasselbe Modell hat eben eine Vorhersage geliefert.
+        erklaerung: erklaeren(modell, b.merkmale, b.kategorieId)!,
         sicherheit: k.sicherheit,
       });
     }

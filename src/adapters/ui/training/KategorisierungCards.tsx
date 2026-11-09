@@ -70,6 +70,7 @@ import {
 import type { GespeicherterAusschluss } from "../../../application/ports";
 import { Button, Card, DataTable, FormField, KPIStat, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
+import { ErklaerungsTafel } from "./ErklaerungsTafel";
 import { Bereich } from "../bausteine/Bereich";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 
@@ -1050,6 +1051,12 @@ function ModellInhalt({
     tatsaechlich: string;
     vorhergesagt: string;
   } | null>(null);
+  // Woher ein Merkmal sein Gewicht hat — einmal je Material als Karte, nicht je Zeile
+  // gesucht. Vor dem frühen Rücksprung, weil ein Hook nicht bedingt laufen darf.
+  const verteilungNachMerkmal = useMemo(
+    () => new Map((daten?.material.vokabular.merkmale ?? []).map((m) => [m.merkmal, m.verteilung])),
+    [daten],
+  );
   if (!daten) return <div className="muted">…</div>;
   const stand = daten.zustand.stand;
   const matrix = bewertung
@@ -1203,7 +1210,7 @@ function ModellInhalt({
                         f.vorhergesagt === offenesPaar.vorhergesagt,
                     )}
                     kategorieName={kategorieName}
-                    prozent={prozent}
+                    verteilung={(m) => verteilungNachMerkmal.get(m)}
                   />
                 )}
               </Abschnitt>
@@ -1218,14 +1225,17 @@ function ModellInhalt({
 // ------------------------------------------------------------------------ Bausteine
 
 /**
- * Die einzelnen Zeilen hinter einem Verwechslungspaar — mit ihren Merkmalen.
+ * Die einzelnen Zeilen hinter einem Verwechslungspaar — je Zeile die Erklärung, warum
+ * die falsche Kategorie gewann und nicht die richtige.
  *
  * NEBEN der Tabelle und nicht in einer eigenen Karte: es ist das Aufklappen einer Zeile,
  * kein zweiter Gegenstand (siehe `ui/CLAUDE.md`, „keine Karte IN einer Karte").
  *
- * Gezeigt werden die Merkmale, die für die FALSCHE Kategorie sprachen — nicht alle. Alle
- * zu zeigen hiesse, die interessanten drei zwischen dreissig zu verstecken; und die
- * Frage, mit der man hier hinsieht, ist „woran lag es", nicht „was stand alles drin".
+ * Bis 2026-11-09 standen hier als Pillen die Merkmale, die für die FALSCHE Kategorie
+ * sprachen. Das beantwortete die Frage nicht: ein Wort kann für die falsche stark sprechen
+ * und für die richtige noch stärker. Die Tafel rechnet deshalb gegen die richtige
+ * Kategorie (`erklaerung.ts`), und die Spalte „im Bestand" sagt, woher ein Wort sein
+ * Gewicht hat — dort sieht man, ob ein Merkmal fehlt oder die Labels selbst uneins sind.
  * Der ganze Vektor steht darunter in Grau, für den Fall, dass die Antwort das FEHLEN
  * eines Merkmals ist.
  */
@@ -1233,40 +1243,30 @@ function Fehlgriffe({
   t,
   treffer,
   kategorieName,
-  prozent,
+  verteilung,
 }: {
   t: Hilfe["t"];
   treffer: readonly Fehltreffer[];
   kategorieName: ReadonlyMap<string, string>;
-  prozent: (n: number) => string;
+  verteilung: (merkmal: string) => readonly { kategorieId: string; anzahl: number }[] | undefined;
 }) {
   if (treffer.length === 0) {
     return <div className="muted" style={{ marginTop: "var(--sp-3)" }}>{t("einstellungen.lernmaterial.fehlgriffeLeer")}</div>;
   }
   return (
-    <div style={{ marginTop: "var(--sp-3)", display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+    <div style={{ marginTop: "var(--sp-3)", display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
       <div className="muted">{t("einstellungen.lernmaterial.fehlgriffeHinweis")}</div>
       {treffer.map((f, i) => (
         <div
           key={f.id ?? i}
-          style={{ borderLeft: "2px solid var(--line)", paddingLeft: "var(--sp-3)" }}
+          style={{ borderLeft: "2px solid var(--line)", paddingLeft: "var(--sp-3)", display: "grid", gap: "var(--sp-2)" }}
         >
-          <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", alignItems: "baseline" }}>
-            <span style={{ fontWeight: "var(--fw-bold)" }}>
-              {kategorieName.get(f.vorhergesagt) ?? f.vorhergesagt}
-            </span>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
-              {t("einstellungen.lernmaterial.fehlgriffSicherheit", { wert: prozent(f.sicherheit) })}
-            </span>
-          </div>
-          <div style={{ display: "flex", gap: "var(--sp-2)", flexWrap: "wrap", marginTop: 4 }}>
-            {f.beitraege.map((b) => (
-              <Pill key={b.merkmal} variant={b.gewicht >= 0 ? "warn" : "neutral"}>
-                {wortVon(b.merkmal)}
-              </Pill>
-            ))}
-          </div>
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+          <ErklaerungsTafel
+            erklaerung={f.erklaerung}
+            kategorieName={(id) => kategorieName.get(id) ?? id}
+            verteilung={verteilung}
+          />
+          <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
             {f.merkmale.map(wortVon).join(" · ")}
           </div>
         </div>

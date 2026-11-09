@@ -182,7 +182,7 @@ describe("Was das Modell hier vorschlagen würde", () => {
     expect(screen.getByText(/Es ist noch kein Modell trainiert/)).toBeTruthy();
   });
 
-  it("zeigt Vorschlag, Sicherheit und die Belege dafür", async () => {
+  it("zeigt Vorschlag, Sicherheit und warum nicht die Zweitbeste", async () => {
     bestand();
     await klassifikatorRepo.speichern({
       modell: trainieren([
@@ -198,8 +198,12 @@ describe("Was das Modell hier vorschlagen würde", () => {
     expect(screen.getByText("Das Modell würde vorschlagen")).toBeTruthy();
     // Die gebuchte Kategorie ist kat-lm — das Modell muss sie treffen.
     expect(screen.getByText("trifft die gebuchte Kategorie")).toBeTruthy();
-    // Die Beitragszerlegung IST die Rechnung, keine nachgebaute Erklärung.
-    expect(screen.getByText(/[+−][\d.]+ emp=rewe markt/)).toBeTruthy();
+    // Gewählt und gebucht stimmen überein — also wird gegen die Zweitbeste erklärt,
+    // mit dem Empfänger als Zeile der Tafel und der Grundneigung als eigener Zeile.
+    expect(screen.getByText(/Warum kat-lm und nicht kat-sprit\?/)).toBeTruthy();
+    // Einmal in der Tafel, einmal in der Merkmalsliste darunter.
+    expect(screen.getAllByText("emp=rewe markt").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Grundneigung")).toBeTruthy();
   });
 
   it("meldet, wie viele Merkmale das Modell nicht kennt", async () => {

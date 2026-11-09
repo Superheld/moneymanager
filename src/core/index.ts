@@ -38,3 +38,4 @@ export * from "./monatsausblick";
 export * from "./auswertung";
 export * from "./klassifikator/merkmale";
 export * from "./klassifikator/modell";
+export * from "./klassifikator/erklaerung";
