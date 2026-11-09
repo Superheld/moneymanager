@@ -215,6 +215,7 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
       regelRepo: sqliteZahlungsregelRepository,
       umsatzRepo: sqliteUmsatzRepository,
       kontoRepo: sqliteZahlungskontoRepository,
+      ruecklagenRepo: sqliteRuecklagenRepository,
     },
     heute,
   );

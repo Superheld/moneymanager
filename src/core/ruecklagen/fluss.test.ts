@@ -69,9 +69,8 @@ describe("ruecklagenfluss", () => {
     expect(f.posten[0].vonKontoId).toBeUndefined();
   });
 
-  // Bis 2026-11-08 zählte jedes nicht liquide Ziel als Rücklage. Seitdem trennen die
-  // Monatskarten Rücklagen von „Sparen & Vorsorge", und dieser Fluss zieht dieselbe
-  // Grenze — sonst stünde dieselbe Überweisung hier als Rücklage und dort als Sparen.
+  // Bis 2026-11-08 zählte jedes nicht liquide Ziel als Rücklage. Seitdem zählt nur ein
+  // Rücklagenkonto: Klasse Rücklage oder eines, dem eine Rücklage zugeordnet ist.
   it("zählt einen Zugang auf einem Vorsorgekonto NICHT", () => {
     const f = ruecklagenfluss([buchung({ kontoId: "depot" })], konten, [], [], VON, BIS);
     expect(f.ist).toBe(0);
@@ -151,5 +150,15 @@ describe("ruecklagenfluss", () => {
     );
     // Verlangt 50, eingerichtet 200, eingegangen 150 — jede Zahl eine andere Aussage.
     expect([f.bedarf, f.plan, f.ist]).toEqual([5000, 20000, 15000]);
+  });
+
+  it("zählt auch ein Konto anderer Klasse, wenn eine Rücklage darauf liegt", () => {
+    // Das Depotkonto ist Vorsorge. Ohne Zuordnung zählt es nicht; liegt eine Rücklage
+    // darauf, ist es für diese Rechnung ein Rücklagenkonto — Eingang UND Plan.
+    const aufsDepot = buchung({ kontoId: "depot" });
+    const plan = regel({ gegenkontoId: "depot" });
+    expect(ruecklagenfluss([aufsDepot], konten, [ruecklage], [plan], VON, BIS)).toMatchObject({ ist: 0, plan: 0 });
+    const f = ruecklagenfluss([aufsDepot], konten, [{ ...ruecklage, kontoId: "depot" }], [plan], VON, BIS);
+    expect([f.plan, f.ist]).toEqual([20000, 20000]);
   });
 });

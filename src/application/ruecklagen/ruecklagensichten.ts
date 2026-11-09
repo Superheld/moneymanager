@@ -9,7 +9,7 @@
 import {
   mindestRuecklage,
   monatsRuecklageGesamt,
-  istRuecklagenkonto,
+  ruecklagenKonten,
   realerKontostand,
   ruecklagenDeckung,
   ruecklagenfluss,
@@ -76,9 +76,10 @@ export interface Ruecklagensicht {
   /** Faustformel: drei Monats-Vertragseinnahmen. Ein Massstab, keine Regel. */
   readonly mindest: Cent;
   /**
-   * Was auf den Rücklagenkonten (Klasse Rücklage) heute liegt — die Zahl, die der Tacho
-   * gegen `mindest` stellt. Über die KONTEN, nicht über die Rücklagen: die Faustformel
-   * fragt nach dem Notgroschen insgesamt, nicht danach, was einzelnen Zwecken zugeteilt ist.
+   * Was auf den Rücklagenkonten heute liegt (`ruecklagenKonten`: Klasse Rücklage oder
+   * einer Rücklage zugeordnet) — die Zahl, die der Tacho gegen `mindest` stellt. Der
+   * KONTOSTAND, nicht die Deckung: die Faustformel fragt nach dem Notgroschen insgesamt,
+   * nicht danach, was davon schon einzelnen Zwecken oder Budgets gehört.
    */
   readonly ruecklagenStand: Cent;
   /** Die monatlichen Vertragseinnahmen, aus denen `mindest` folgt. */
@@ -167,9 +168,7 @@ export async function ruecklagenLaden(
     proMonat: monatsRuecklageGesamt(ruecklagen),
     zielwert: zielwertGesamt(ruecklagen),
     mindest: mindestRuecklage(einnahmen),
-    ruecklagenStand: konten
-      .filter(istRuecklagenkonto)
-      .reduce((s, k) => s + (kontostaende.get(k.id) ?? 0), 0),
+    ruecklagenStand: [...ruecklagenKonten(konten, ruecklagen)].reduce((s, id) => s + (kontostaende.get(id) ?? 0), 0),
     vertragseinnahmen: einnahmen,
     ausbuchungen: [...ausbuchungen].sort((a, b) => b.datum.localeCompare(a.datum)),
     // Das Ist über den LAUFENDEN Monat, weil Bedarf und Plan Monatsgrössen sind. Ein

@@ -524,7 +524,7 @@ const de = {
       budgets: "Budgets monatlich",
       budgetsAufbauend: "Budgets aufbauend",
       ruecklagen: "Rücklagen",
-      umschichtung: "Sparen & Vorsorge",
+      umschichtung: "Umbuchungen nach außen",
       sonstiges: "Sonstiges",
     },
     // Sammelposten: gebucht, aber ohne geplanten Posten dahinter.
@@ -2621,7 +2621,7 @@ const en: typeof de = {
       budgets: "Budgets monthly",
       budgetsAufbauend: "Budgets building",
       ruecklagen: "Reserves",
-      umschichtung: "Saving & provisions",
+      umschichtung: "Transfers out",
       sonstiges: "Other",
     },
     sammel: {

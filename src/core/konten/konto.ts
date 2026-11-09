@@ -28,8 +28,8 @@ export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld", "Kreditka
  * sich dadurch nicht, die Antwort auf „wieviel habe ich" sehr wohl.
  *
  * Zwei Wirkungen hat die Klasse: `"liquide"` zählt zu den liquiden Mitteln, alles andere
- * nicht (`istLiquide`). Und seit 2026-11-08 zählt eine Umbuchung auf `"ruecklage"` als
- * Rücklage, auf die drei übrigen als Sparen & Vorsorge (`istRuecklagenkonto`). Vorsorge,
+ * nicht (`istLiquide`). Und seit 2026-11-08 zählt der Bereich Rücklagen ein Konto der
+ * Klasse `"ruecklage"` als Rücklagenkonto (`istRuecklagenkonto`). Vorsorge,
  * Sparen und Investment unterscheiden sich für die RECHNUNG nicht — sie sind eine
  * Benennung, und das ist Absicht.
  *
@@ -74,9 +74,9 @@ export function istLiquide(konto: Pick<Zahlungskonto, "klasse">): boolean {
 
 /**
  * Ist das Konto ein Rücklagenkonto? Die ZWEITE Grenze zwischen den Klassen, seit
- * 2026-11-08: Monatskarten und Rücklagenfluss trennen Umbuchungen auf ein Rücklagenkonto
- * von denen auf Vorsorge-, Spar- und Investmentkonten. Für alles andere bleiben die
- * vier nicht-liquiden Klassen dasselbe.
+ * 2026-11-08: Rücklagenfluss und Tacho zählen solche Konten — zusammen mit denen, auf
+ * denen eine Rücklage liegt (`ruecklagenKonten` in `ruecklagen/ruecklage.ts`). Für alles
+ * andere bleiben die vier nicht-liquiden Klassen dasselbe.
  */
 export function istRuecklagenkonto(konto: Pick<Zahlungskonto, "klasse">): boolean {
   return konto.klasse === "ruecklage";

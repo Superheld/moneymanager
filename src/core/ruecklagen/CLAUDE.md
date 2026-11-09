@@ -48,11 +48,14 @@ Bedarf über Plan heisst: du legst zu wenig zurück, die Deckung wird schlechter
 irgendwo etwas schiefgeht. Plan über Ist heisst: die Überweisung ist ausgefallen. Eine
 Zahl allein könnte keine dieser Aussagen treffen.
 
-**Wohin gerechnet wird, entscheidet die KONTOKLASSE:** zurückgelegt ist, was von einem
-liquiden Konto auf ein Konto der Klasse **Rücklage** geht (`istRuecklagenkonto`). Bis
-2026-11-08 zählte jedes nicht liquide Ziel; seit die Monatskarten Rücklagen und „Sparen
-& Vorsorge" trennen, zieht der Fluss dieselbe Grenze — sonst stünde dieselbe Überweisung
-hier als Rücklage und dort als Sparen. Bedarf
-und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
+**Wohin gerechnet wird, entscheidet `ruecklagenKonten`:** zurückgelegt ist, was von einem
+liquiden Konto auf ein Konto der Klasse **Rücklage** geht — oder auf eines, dem eine
+Rücklage zugeordnet ist, gleich welcher Klasse. Die Zuordnung kam am 2026-11-09 dazu:
+allein über die Klasse sah, wer seine Rücklagen auf einem Konto der Klasse „Sparen"
+führte, keinen Eingang und einen Tacho auf null, obwohl die Zuordnung an jeder Rücklage
+dastand. Dieselbe Menge misst der Tacho (`ruecklagenStand`): den Kontostand, nicht die
+Deckung — die Faustformel fragt nach dem Notgroschen, nicht danach, wem er schon gehört.
+
+Bedarf und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
 Zeitraum. Wer sie über mehrere Monate vergleicht, muss die ersten beiden hochrechnen — das
 im Kern zu tun hiesse zu raten, wie viele Monate gemeint sind.
