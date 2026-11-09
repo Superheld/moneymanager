@@ -4,22 +4,19 @@
 // Start angelegt und geändert. Dazu die Wirkungsmessung — der Grund, warum diese
 // Steuerung überhaupt verantwortbar ist.
 //
-// Am echten Bestand gemessen (2026-08-17): das Weglassen einzelner Herkünfte bewegt
-// zwischen ±0,00 (Vorzeichen, Gläubiger-ID) und −1,71 Punkten (Verwendungszweck), und
-// automatisches Aussortieren „sinnloser" Merkmale bringt +0,19 — also nichts. Ausschlüsse
-// verbessern die Genauigkeit nicht, sie machen das Modell LESBAR. Das ist ein legitimes
+// Gemessen (2026-08-17): das Weglassen einzelner Herkünfte bewegte die Genauigkeit
+// zwischen gar nicht (Vorzeichen, Gläubiger-ID) und spürbar (Verwendungszweck), und
+// automatisches Aussortieren „sinnloser" Merkmale brachte nichts Messbares. Ausschlüsse
+// verbessern die Genauigkeit nicht zwingend, sie machen das Modell LESBAR. Das ist ein legitimes
 // Ziel, aber nur mit sichtbarer Wirkung: `wirkungMessen` ist die Zusage, dass eine
 // Entscheidung hier eine gemessene bleibt und keine Geschmacksfrage wird.
 
 import {
-  aufteilen,
-  bewerten,
   herkunftVon,
   MERKMALSHERKUENFTE,
   STANDARD_KONFIGURATION,
   klassifizieren,
   merkmalsbefund,
-  trainieren,
   erklaeren,
   type Beispiel,
   type Erklaerung,
@@ -35,7 +32,7 @@ import type {
   MerkmalskonfigurationRepository,
   UmsatzRepository,
 } from "../ports";
-import { MESSBAR_AB } from "./klassifikatorTraining";
+import { alsBeispiele, MESSBAR_AB, messen } from "./klassifikatorTraining";
 import { materialBefund, trainingsmaterial, type Merkmalswert } from "./trainingsmaterial";
 import { zahlungsspuren } from "../buchung/zahlungsspuren";
 
@@ -156,23 +153,27 @@ export interface Wirkung {
 }
 
 /**
- * Wie viele Splits die Messung mittelt.
+ * Die Prüffenster der Wirkungsmessung, als Abstand vom Ende des Bestands.
  *
- * Fünf, weil ein einzelner Split um bis zu 1,5 Punkte danebenliegt — bei Abständen, die
- * oft unter einem Punkt liegen, wäre eine Einzelmessung reines Rauschen und würde zu
- * genau den Fehlentscheidungen führen, die sie verhindern soll.
+ * Bis 2026-11-09 mittelte die Messung über fünf ZUFÄLLIGE Aufteilungen. Seitdem misst sie
+ * nach demselben Protokoll wie das Training (`core/klassifikator/messung.ts`): auf dem
+ * Älteren trainieren, an Jüngerem prüfen. Weil eine einzelne zeitliche Aufteilung keinen
+ * Zufall hat, über den man mitteln könnte, rollt der Prüfzeitraum zurück — drei Fenster
+ * zu je einem Zehntel, das jüngste zuerst, und jedes wird mit allem trainiert, was davor
+ * liegt („rolling origin", die übliche Kreuzvalidierung für Daten mit Zeitachse).
+ *
+ * Gemittelt wird weiterhin, und aus demselben Grund wie früher: die Abstände zwischen
+ * Varianten liegen oft unter einem Punkt, und ein einzelnes Fenster schwankt mehr.
  */
-const SPLITS = [11, 222, 3333, 44444, 555555];
-
-const PRUEFANTEIL = 0.2;
+const FENSTER = [0, 0.1, 0.2];
+const FENSTERANTEIL = 0.1;
 
 /**
  * Misst, was jede Herkunft beiträgt: trainiert einmal mit allem und je einmal ohne eine
- * der Herkünfte, jeweils gemittelt über mehrere Splits.
+ * der Herkünfte, jeweils gemittelt über die Prüffenster.
  *
- * Das ist die teuerste Rechnung der App — sechs Varianten mal fünf Splits. Bei 137 ms je
- * Training sind das rund vier Sekunden; deshalb läuft sie auf Anforderung und nicht
- * nebenbei.
+ * Die teuerste Rechnung der App — Varianten mal Fenster, je ein Training. Deshalb läuft
+ * sie auf Anforderung und nicht nebenbei.
  */
 export async function wirkungMessen(deps: {
   ledger: LedgerPort;
@@ -180,21 +181,16 @@ export async function wirkungMessen(deps: {
   konfiguration: Merkmalskonfiguration;
 }): Promise<{ basis: number; wirkungen: Wirkung[] } | null> {
   const spuren = await zahlungsspuren(deps.ledger, deps.umsatzRepo);
-  const alle: Beispiel[] = materialBefund(spuren, deps.konfiguration).beispiele.map((b) => ({
-    merkmale: b.merkmale,
-    kategorieId: b.kategorieId,
-  }));
+  const alle: Beispiel[] = alsBeispiele(materialBefund(spuren, deps.konfiguration).beispiele);
   if (alle.length < MESSBAR_AB) return null;
 
   /** Mittlere Genauigkeit, wenn nur Merkmale gezählt werden, die `behalten` durchlässt. */
   const messe = (behalten: (merkmal: string) => boolean): number => {
-    let summe = 0;
-    for (const seed of SPLITS) {
-      const gefiltert = alle.map((b) => ({ ...b, merkmale: b.merkmale.filter(behalten) }));
-      const { training, pruefung } = aufteilen(gefiltert, PRUEFANTEIL, seed);
-      summe += bewerten(trainieren(training), pruefung).genauigkeit;
-    }
-    return summe / SPLITS.length;
+    const gefiltert = alle.map((b) => ({ ...b, merkmale: b.merkmale.filter(behalten) }));
+    const werte = FENSTER.map((ende) => messen(gefiltert, FENSTERANTEIL, ende)?.bewertung.genauigkeit).filter(
+      (g): g is number => g !== undefined,
+    );
+    return werte.length ? werte.reduce((a, b) => a + b, 0) / werte.length : 0;
   };
 
   const basis = messe(() => true);

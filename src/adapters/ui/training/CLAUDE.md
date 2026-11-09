@@ -9,20 +9,38 @@ Navigation**. Die Erkennung läuft trotzdem: ausgeliefert wird ein fertiges Mode
 wer nur seine Zahlungen kategorisiert haben will, hat mit dem Bereich nichts zu tun. Wer
 ihn einschaltet, greift in die Merkmale ein, trainiert neu und misst.
 
-**Und „messen" heisst seither drei Dinge**, nicht mehr nur eine Trefferquote:
+**Und „messen" heisst mehr als eine Trefferquote** — seit 2026-11-09 nach einem
+festen Protokoll (`core/klassifikator/messung.ts`, im Use-Case `messen`):
 
 | | sagt |
 |---|---|
-| Genauigkeit | wie oft das Modell richtig lag |
-| **Vergleichslinie** | wie oft blindes Raten richtig läge — immer die häufigste Kategorie |
-| **Vorsprung** | der Abstand, und damit das Einzige, woran sich eine Änderung messen lässt |
+| Genauigkeit | wie oft das Modell richtig lag — an den JÜNGSTEN Buchungen |
+| Blindes Raten | immer die häufigste Kategorie — die Untergrenze |
+| **Nachschlagen** | „dieselbe Kategorie wie beim Empfänger üblich", ganz ohne Modell |
+| **Vorsprung** | Abstand zur STÄRKEREN der beiden Linien |
+| **Macro-F1** | jede Kategorie zählt gleich — die seltenen werden sichtbar |
+| Je Kategorie | Precision, Recall, F1 |
+| Kalibrierung | ob „90 % sicher" auch 90 % richtig heisst, und wie viel ab welcher Sicherheit abgedeckt ist |
 
-Die Vergleichslinie ist der wichtigste Zusatz, und der Grund ist nicht Ordnungsliebe: eine
-Trefferquote sagt für sich genommen nichts. In einem Haushalt, in dem eine Kategorie ein
-Viertel aller Zahlungen ausmacht, trifft blindes Raten schon ein Viertel; bei
-gleichmässiger Verteilung fast nichts. Ohne den Abstand liesse sich nicht sagen, ob eine
-Variante besser ist als die davor — und genau daran hing, dass „verschiedene Varianten
-ausprobieren" bis dahin nicht weiterführte.
+Drei Entscheidungen darin, jede mit einem Grund, der sonst wieder verloren geht:
+
+- **Zeitlich geteilt, nicht zufällig.** Trainiert wird auf dem Älteren, geprüft an den
+  jüngsten Buchungen. Eine zufällige Aufteilung legt den März einer Monatszahlung ins
+  Training und den April in die Prüfung — das misst Auswendiglernen. Beim Import muss das
+  Modell die Zukunft einsortieren, also wird so gemessen. Die Zahl liegt dadurch
+  niedriger als vorher; sie ist nicht schlechter geworden, sie war vorher zu hoch.
+- **Geprüft an handverlesenen Labels**, sobald genug davon in der Prüfzeit liegen
+  (`HANDVERLESEN_AB`). Eine automatische Kategorie kann vom Modell selbst stammen; daran
+  zu messen hiesse, Übereinstimmung mit sich selbst zu messen. Reicht es nicht, wird an
+  allen geprüft, und die Oberfläche sagt das. Trainiert wird weiter auf allem.
+- **Die Nachschlagelinie neben dem blinden Raten.** Jedes Modell schlägt Raten. Ob es
+  mehr kann als eine Tabelle „Empfänger → Kategorie", ist die Frage, die es rechtfertigt
+  — deshalb zählt der Vorsprung gegen die stärkere Linie.
+
+**Die Wirkungsmessung der Merkmalsquellen misst nach demselben Protokoll**, nur rollend:
+drei Prüffenster zu je einem Zehntel, jedes trainiert auf allem davor („rolling origin").
+Eine Wirkung, die anders gemessen wird als die Zahl daneben, vergliche zwei verschiedene
+Dinge.
 
 **Aus der Verwechslungsstatistik führt jetzt ein Weg in die einzelnen Zeilen.** Die Zahl
 sagt, WO es klemmt; erst die Zeilen sagen, WARUM — steht dort ein Empfänger, der für
