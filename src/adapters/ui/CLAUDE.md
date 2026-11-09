@@ -506,9 +506,13 @@ Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweit
 Untereinander war die Seite so lang, dass man für die Befunde oder ein Depot an allem
 anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
 
-- **Zeitraum, Monat und Kennzahlen stehen ÜBER den Reitern**, Zeitraum und Monat im
-  Seitenkopf. Sie gelten für jedes Register; an der Verlaufskarte, wo sie vorher sassen,
-  wären sie beim Wechsel verschwunden.
+- **Jedes Register trägt die Filter, die es einstellt** (seit 2026-11-09) — Verlauf
+  und Kategorien Monat und Zeitraum an ihrer Karte, Befunde und Depot den Zeitraum
+  darüber, der Ausblick keinen. Die Kennzahlen stehen im Verlauf. Einen Tag lang sassen
+  Zeitraum, Monat und Kennzahlen über den Reitern: das las sich, als gälten sie überall,
+  und für den Ausblick galten sie nie. **Der Zustand bleibt gemeinsam** — wer im Verlauf
+  auf zwei Jahre stellt, findet die Kategorien auch über zwei Jahre, statt dort von vorn
+  anzufangen.
 - **Nur Register mit Inhalt bekommen einen Reiter.** Ohne abgerufenes Depot gibt es
   keinen Reiter „Depot" — ein Reiter ins Leere wäre schlechter als keiner.
 - **Die Befunde bleiben innerhalb ihres Registers Karten untereinander** (unten). Das ist
