@@ -456,10 +456,11 @@ describe("AnalyseScreen", () => {
   /** Der Weg, der vorher nur über den Konto-Auszug ging: Kategorie → Buchung → Details. */
   /**
    * Die Abschnitte stehen in Registern, und nur die mit Inhalt bekommen einen Reiter:
-   * ohne abgerufenes Depot gibt es keinen Reiter „Depot". Zeitraum und Monat sitzen im
-   * Seitenkopf und bleiben beim Wechsel stehen — sie gelten für jedes Register.
+   * ohne abgerufenes Depot gibt es keinen Reiter „Depot". Die Filter stehen seit
+   * 2026-11-09 am Register, das sie einstellen: Verlauf Monat und Zeitraum, Befunde nur
+   * den Zeitraum, der Ausblick keinen — er steht fest bei sechs Monaten.
    */
-  it("zeigt die Abschnitte als Register und lässt den Zeitraum über allen stehen", async () => {
+  it("zeigt die Abschnitte als Register, jedes mit den Filtern, die es einstellen", async () => {
     await grunddaten();
     await sqliteLedgerRepository.speichern({
       id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
@@ -475,6 +476,16 @@ describe("AnalyseScreen", () => {
     await waitFor(() => expect(screen.queryByText("Monatsverlauf")).toBeNull());
     expect(screen.getByRole("tab", { name: "Befunde" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByLabelText("Zeitraum")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Monat")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Ausblick" }));
+    await waitFor(() => expect(screen.queryByLabelText("Zeitraum")).toBeNull());
+    expect(screen.queryByLabelText("Monat")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Verlauf" }));
+    await screen.findByText("Monatsverlauf");
+    expect(screen.getByLabelText("Zeitraum")).toBeInTheDocument();
+    expect(screen.getByLabelText("Monat")).toBeInTheDocument();
   });
 
   it("öffnet die Buchungsdetails aus einer aufgeklappten Kategorie", async () => {

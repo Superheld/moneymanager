@@ -9,9 +9,10 @@
 //
 // **Seit 2026-11-08 in Registern.** Untereinander war die Seite so lang, dass man für
 // die Befunde oder ein Depot an allem anderen vorbeiscrollte; mit Reitern ist jeder
-// Abschnitt einen Klick entfernt, und die Leiste selbst zeigt, was es gibt. Zeitraum,
-// Monat und Kennzahlen stehen ÜBER den Reitern, weil sie für jedes Register gelten — wer
-// im Verlauf einen Monat wählt, sieht in den Kategorien denselben.
+// Abschnitt einen Klick entfernt, und die Leiste selbst zeigt, was es gibt. Die Filter
+// stehen seit 2026-11-09 am Register, das sie einstellen (siehe `zeitraumWahl`), ihr
+// Zustand bleibt gemeinsam — wer im Verlauf einen Monat wählt, sieht in den Kategorien
+// denselben.
 //
 // Was hier NICHT umgekehrt wurde: die Befunde bleiben innerhalb ihres Registers sieben
 // Karten untereinander (siehe `BefundeBereich.tsx`). Dort galt und gilt, dass niemand
@@ -35,7 +36,7 @@ import {
   type IstBuchung,
 } from "../../../application";
 import { analyse, depots } from "../../dienste";
-import { Button, Card, CoverageTrack, DataTable, KPIStat, Pill } from "../bausteine";
+import { Card, CoverageTrack, DataTable, KPIStat, Pill } from "../bausteine";
 import { AUFKLAPP_ZEILEN_BREIT, AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { AusblickKarte } from "./AusblickKarte";
@@ -432,43 +433,53 @@ export function AnalyseScreen() {
   /** Verschwindet das gewählte Register (Depot entfernt), gilt wieder das erste. */
   const wirksamesRegister: AnalyseRegister = registerListe.some((r) => r.id === register) ? register : "verlauf";
 
+  /*
+   * Die Filter stehen an dem Register, das sie einstellen (seit 2026-11-09), nicht mehr
+   * im Seitenkopf: dort sahen sie aus, als gälten sie für alles, und für den Ausblick
+   * galten sie nie. Jedes Register bekommt nur, was es wirklich verändert — Verlauf und
+   * Kategorien Zeitraum und Monat, Befunde und Depot den Zeitraum, der Ausblick nichts.
+   * Der ZUSTAND bleibt gemeinsam: wer im Verlauf auf zwei Jahre stellt und zu den
+   * Kategorien wechselt, will dort nicht wieder bei zwölf Monaten anfangen.
+   */
+  const zeitraumWahl = (
+    <Auswahl
+      ariaLabel={t("historie.zeitraumWaehlen")}
+      wert={zeitraum}
+      aufAenderung={(v) => { setZeitraum(v as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}
+      optionen={[
+        { wert: "12", text: t("historie.zr12") },
+        { wert: "24", text: t("historie.zr24") },
+        { wert: "jahr", text: t("historie.zrJahr") },
+        { wert: "alles", text: t("historie.zrAlles") },
+      ]}
+    />
+  );
+  // Monat direkt wählbar — der Klick auf den Chart macht dasselbe, ist bei vielen
+  // Monaten aber Zielübung. Beide schreiben denselben Zustand.
+  const monatWahl = (
+    <Auswahl
+      ariaLabel={t("historie.monatWaehlen")}
+      wert={aktivMonat == null ? "" : String(aktivMonat)}
+      aufAenderung={(v) => { setAktivMonat(v === "" ? null : Number(v)); setOffeneKat(null); }}
+      optionen={[
+        { wert: "", text: t("historie.alleMonate") },
+        ...verlauf.map((m, i) => ({ wert: String(i), text: m.label })),
+      ]}
+    />
+  );
+  const filterleiste = (...felder: ReactNode[]) => (
+    <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
+      {felder}
+    </span>
+  );
+  /** Für Register ohne eigene Karte (Befunde, Depot): die Leiste rechtsbündig darüber. */
+  const filterzeile = (...felder: ReactNode[]) => (
+    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "var(--sp-3)" }}>{filterleiste(...felder)}</div>
+  );
+
   return (
     <div className="screen">
-      {/* Zeitraum und Monat sitzen im Kopf, nicht mehr an der Verlaufskarte: sie gelten
-          für die Kennzahlen und JEDES Register, und an einer Karte in einem Register
-          wären sie verschwunden, sobald man ein anderes wählt. */}
-      <PageHead
-        title={t("analyse.titel")}
-        subtitle={t("analyse.untertitel")}
-        action={
-          geladen && ist.length > 0 ? (
-          <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
-            {/* Monat direkt wählbar — der Klick auf den Chart macht dasselbe, ist bei
-                vielen Monaten aber Zielübung. Beide schreiben denselben Zustand. */}
-            <Auswahl
-              ariaLabel={t("historie.monatWaehlen")}
-              wert={aktivMonat == null ? "" : String(aktivMonat)}
-              aufAenderung={(v) => { setAktivMonat(v === "" ? null : Number(v)); setOffeneKat(null); }}
-              optionen={[
-                { wert: "", text: t("historie.alleMonate") },
-                ...verlauf.map((m, i) => ({ wert: String(i), text: m.label })),
-              ]}
-            />
-            <Auswahl
-              ariaLabel={t("historie.zeitraumWaehlen")}
-              wert={zeitraum}
-              aufAenderung={(v) => { setZeitraum(v as Zeitraum); setAktivMonat(null); setOffeneKat(null); }}
-              optionen={[
-                { wert: "12", text: t("historie.zr12") },
-                { wert: "24", text: t("historie.zr24") },
-                { wert: "jahr", text: t("historie.zrJahr") },
-                { wert: "alles", text: t("historie.zrAlles") },
-              ]}
-            />
-          </span>
-          ) : undefined
-        }
-      />
+      <PageHead title={t("analyse.titel")} subtitle={t("analyse.untertitel")} />
 
       {fehler && <Card style={{ borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
 
@@ -476,12 +487,24 @@ export function AnalyseScreen() {
         <Card>{t("historie.leer")}</Card>
       ) : (
         <>
+          <Registerleiste
+            register={registerListe}
+            aktiv={wirksamesRegister}
+            onWahl={(id) => setRegister(id as AnalyseRegister)}
+          />
+
+          {wirksamesRegister === "verlauf" && (
+            <Card
+              title={t("historie.verlaufTitel")}
+              subtitle={t(`historie.verlauf.${ansicht}`)}
+              action={filterleiste(<span key="m">{monatWahl}</span>, <span key="z">{zeitraumWahl}</span>)}
+            >
           {/* Alle fünf tragen GERICHTETES Geld, also kommt die Farbe aus dem
               Vorzeichen und nirgendwo sonst (`bausteine/geldFarbe`). Vorher stand hier
               fünfmal ein eigenes Ternär, und drei davon waren verschieden — Einnahmen
               fest grün, Ausgaben „warn, wenn negativ" (also immer), und die positive
               Seite bei Netto grün, beim Saldo neutral. Nebeneinander in einer Reihe. */}
-          <div className="kpis">
+          <div className="kpis" style={{ marginTop: 0, marginBottom: "var(--sp-3)" }}>
             <KPIStat size="chip" label={monat ? t("historie.kpiEinnahmenMonat", { monat: monat.label }) : t("historie.kpiEinnahmen")}
               value={geld.format(summeEin)} unit={geld.symbol} tone={geldTon(summeEin)} meta={vergleich(summeEin, oeEin)} />
             <KPIStat size="chip" label={monat ? t("historie.kpiAusgabenMonat", { monat: monat.label }) : t("historie.kpiAusgaben")}
@@ -493,17 +516,7 @@ export function AnalyseScreen() {
             <KPIStat size="chip" label={t("historie.kpiSaldo")} value={geld.format(saldoJetzt)} unit={geld.symbol} tone={geldTon(saldoJetzt)} />
           </div>
 
-          <Registerleiste
-            register={registerListe}
-            aktiv={wirksamesRegister}
-            onWahl={(id) => setRegister(id as AnalyseRegister)}
-          />
 
-          {wirksamesRegister === "verlauf" && (
-            <Card
-              title={t("historie.verlaufTitel")}
-              subtitle={t(`historie.verlauf.${ansicht}`)}
-            >
               {/* Umschalter: eine Fläche, drei Blicke auf dieselben Monate. */}
               <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)", marginBottom: "var(--sp-3)" }}>
                 {(["fluss", "saldo", "tabelle"] as const).map((a, i) => {
@@ -557,7 +570,8 @@ export function AnalyseScreen() {
                 subtitle={aufschluesselung.label ? t("historie.katMonat", { monat: aufschluesselung.label }) : t("historie.katZeitraum")}
                 action={
                   <span className="tabellenfilter" style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
-                    {aufschluesselung.label && <Button variant="ghost" onClick={() => setAktivMonat(null)}>{t("historie.alleMonate")}</Button>}
+                    {monatWahl}
+                    {zeitraumWahl}
                     <Auswahl
                       ariaLabel={t("historie.ebeneWaehlen")}
                       wert={ebene}
@@ -612,6 +626,7 @@ export function AnalyseScreen() {
 
           {/* Die Befunde setzen voraus, dass man gesehen hat, wie viel wohin ging, und
               beantworten die nächste Frage — ob das so tragfähig ist. */}
+          {wirksamesRegister === "befunde" && befunde && basis && filterzeile(<span key="z">{zeitraumWahl}</span>)}
           {wirksamesRegister === "befunde" && befunde && basis && (
             <BefundeBereich
               befunde={befunde}
@@ -623,8 +638,9 @@ export function AnalyseScreen() {
           {/* Depots zuletzt: sie beantworten eine eigene Frage und mischen sich in die
               Kategorien-Auswertung darüber nicht ein. Nebeneinander wie in der Übersicht —
               bei einem einzelnen Depot nimmt es die volle Breite. */}
+          {wirksamesRegister === "depot" && depotdaten && depotdaten.depots.length > 0 && filterzeile(<span key="z">{zeitraumWahl}</span>)}
           {wirksamesRegister === "depot" && depotdaten && depotdaten.depots.length > 0 && (
-            <div className="karten-paar">
+            <div className="karten-paar" style={{ marginTop: 0 }}>
               {depotdaten.depots.map((d) => (
                 <DepotAnsicht key={d.depot.id} sicht={d} von={von} bis={bisTag} />
               ))}

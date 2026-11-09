@@ -131,7 +131,8 @@ describe("Befunde im Analyse-Bereich", () => {
     await buchung("retoure", tag(1), 5000, { kategorieId: "kat-freizeit", charakter: "Aufwand" });
 
     rendere(<AnalyseScreen />);
-    await block("kategorien");
+    // Die Ausgaben-Kennzahl steht seit 2026-11-09 im Register Verlauf, dem ersten.
+    await screen.findByRole("tab", { name: text("analyse.register.verlauf") });
 
     await waitFor(() => expect(document.body.textContent).toMatch(/150,00/));
     expect(document.body.textContent).not.toMatch(/250,00/);
