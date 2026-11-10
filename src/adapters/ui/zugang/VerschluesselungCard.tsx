@@ -1,5 +1,6 @@
 // Was man an der Verschlüsselung noch einstellen kann: Passphrase wechseln, den
-// Wiederherstellungscode noch einmal ansehen, die Zeitsperre stellen.
+// Wiederherstellungscode noch einmal ansehen, einen neuen Schlüssel erzeugen, die
+// Zeitsperre stellen.
 //
 // **Der Code hängt hier hinter der Passphrase**, obwohl die App gerade offen ist. Genau
 // das ist der Punkt: die Zeitsperre schützt gegen jemanden am entsperrten Rechner — läge
@@ -18,6 +19,7 @@ import {
   zeitsperreSetzen,
   zugangCodeZeigen,
   zugangPassphraseWechseln,
+  zugangSchluesselWechseln,
 } from "../../dienste";
 
 export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) {
@@ -31,6 +33,15 @@ export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) 
   const [codePassphrase, setCodePassphrase] = useState("");
   const [code, setCode] = useState<string | null>(null);
   const [codeMeldung, setCodeMeldung] = useState<string | null>(null);
+
+  const [schluesselPassphrase, setSchluesselPassphrase] = useState("");
+  const [schluesselLaeuft, setSchluesselLaeuft] = useState(false);
+  const [schluesselMeldung, setSchluesselMeldung] = useState<string | null>(null);
+  const [neuerSchluessel, setNeuerSchluessel] = useState<{
+    code: string;
+    umgestellt: number;
+    uebrig: number;
+  } | null>(null);
 
   const [minuten, setMinuten] = useState<number | null>(null);
 
@@ -77,6 +88,33 @@ export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) 
     else {
       setCode(ergebnis);
       setCodePassphrase("");
+    }
+  }
+
+  async function schluesselWechseln() {
+    if (schluesselLaeuft) return;
+    setSchluesselMeldung(null);
+    setSchluesselLaeuft(true);
+    try {
+      const ergebnis = await zugangSchluesselWechseln(schluesselPassphrase);
+      if (ergebnis === null) setSchluesselMeldung(t("zugang.passphraseFalsch"));
+      else {
+        setNeuerSchluessel({
+          code: ergebnis.wiederherstellungscode,
+          umgestellt: ergebnis.sicherungenUmgestellt,
+          uebrig: ergebnis.sicherungenUebrig,
+        });
+        setSchluesselPassphrase("");
+        // Ein vorher angezeigter Code ist ab jetzt der ALTE — er darf nicht neben dem
+        // neuen stehenbleiben und für den gültigen gehalten werden.
+        setCode(null);
+      }
+    } catch {
+      // Rust hat den Bestand dann mit dem bisherigen Schlüssel wieder geöffnet; der alte
+      // Code gilt weiter. Mehr als „hat nicht geklappt" weiss die Oberfläche nicht.
+      setSchluesselMeldung(t("zugang.fehlerAllgemein"));
+    } finally {
+      setSchluesselLaeuft(false);
     }
   }
 
@@ -149,6 +187,45 @@ export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) 
             />
             {codeMeldung && <p className="muted">{codeMeldung}</p>}
             <Button onClick={() => void zeigen()}>{t("zugang.codeAbrufenKnopf")}</Button>
+          </>
+        )}
+      </Card>
+
+      <Card title={t("zugang.schluesselTitel")}>
+        <p className="muted">{t("zugang.schluesselText")}</p>
+        {neuerSchluessel ? (
+          <>
+            <p>{t("zugang.schluesselFertig")}</p>
+            <pre className="zugang-code">{neuerSchluessel.code}</pre>
+            {neuerSchluessel.umgestellt > 0 && (
+              <p className="muted">
+                {t("zugang.schluesselSicherungen", { count: neuerSchluessel.umgestellt })}
+              </p>
+            )}
+            {neuerSchluessel.uebrig > 0 && (
+              <p className="muted">
+                {t("zugang.schluesselUebrig", { count: neuerSchluessel.uebrig })}
+              </p>
+            )}
+          </>
+        ) : (
+          <>
+            <Passwortfeld
+              label={t("zugang.feldPassphrase")}
+              wert={schluesselPassphrase}
+              setzen={setSchluesselPassphrase}
+            />
+            {schluesselMeldung && <p className="muted">{schluesselMeldung}</p>}
+            {/* Solange es läuft, steht hier der Hinweis STATT des Knopfs: ein zweiter
+                Klick träfe auf eine Datenbank, die Rust gerade geschlossen hat, und
+                meldete einen Fehler mitten in einen Wechsel hinein, der gelingt. */}
+            {schluesselLaeuft ? (
+              <p className="muted">{t("zugang.schluesselLaeuft")}</p>
+            ) : (
+              <Button onClick={() => void schluesselWechseln()}>
+                {t("zugang.schluesselKnopf")}
+              </Button>
+            )}
           </>
         )}
       </Card>

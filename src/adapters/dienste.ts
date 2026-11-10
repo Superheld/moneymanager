@@ -1123,6 +1123,7 @@ import {
   zugangEinrichten as zugangEinrichtenUseCase,
   type Einrichtung,
   type Rettung,
+  type Schluesselwechsel,
   type Wechsel,
   type Zugangsstand,
 } from "../application/zugang";
@@ -1167,6 +1168,11 @@ export function zugangPassphraseWechseln(alte: string, neue: string): Promise<We
 
 export function zugangCodeZeigen(passphrase: string): Promise<string | null> {
   return tauriZugangPort.codeZeigen(passphrase);
+}
+
+/** Neuer Datenschlüssel, neuer Code — nur gegen die Passphrase. `null`: sie war falsch. */
+export function zugangSchluesselWechseln(passphrase: string): Promise<Schluesselwechsel | null> {
+  return tauriZugangPort.schluesselWechseln(passphrase);
 }
 
 export function zugangSperren(): Promise<void> {

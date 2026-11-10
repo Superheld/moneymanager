@@ -117,10 +117,22 @@ steht still, während der Rechner schläft, und läuft danach mit dem Rest weite
 prüft deshalb bei jeder Rückkehr ins Fenster gegen die Uhr. Die Rückkehr selbst zählt
 nicht als Bedienung — sonst verlängerte das Aufklappen des Rechners die Frist.
 
-**Was der Verschlüsselung noch fehlt:** der Datenschlüssel lässt sich nicht wechseln. Wird
-der Wiederherstellungscode bekannt, hilft eine neue Passphrase nicht — der Code IST der
-Schlüssel. Dafür bräuchte es `PRAGMA rekey` samt neuer Hülle und neuem Code; bis dahin
-gilt für den Zettel dasselbe wie für einen Haustürschlüssel.
+**Der Datenschlüssel lässt sich wechseln** (Einstellungen → Verschlüsselung, „Neuen
+Schlüssel erzeugen"; `zugang_schluessel_wechseln`). Das ist der Weg für den Fall, dass der
+Wiederherstellungscode bekannt geworden sein könnte: eine neue Passphrase hilft dann
+nicht, der Code IST der Schlüssel. Drei Dinge daran:
+
+- **Nicht `PRAGMA rekey`, sondern derselbe Weg wie die Überführung:** daneben schreiben
+  (`sqlcipher_export`), prüfen, tauschen. Der alte Bestand bleibt unberührt, bis der neue
+  nachweislich heil ist; der Preis ist Platz für eine zweite Kopie.
+- **Die Hülle des neuen Schlüssels liegt auf der Platte, BEVOR umgeschrieben wird**
+  (`….schluessel.json.wechsel`). Bricht es danach ab, trägt die Datei den neuen Schlüssel
+  und die Hülle den alten — `zugang_entsperren` erkennt das („Passphrase stimmt, Datei
+  geht nicht auf") und setzt die vorläufige ein. Es gibt keinen Zeitpunkt, an dem der
+  Schlüssel der Datei in keiner Hülle steht.
+- **Die Sicherungen werden mit umgeschrieben.** Sonst öffnete der alte Code weiter jeden
+  früheren Stand. Was sich nicht umschreiben lässt, bleibt liegen und wird gezählt
+  zurückgemeldet — weggeworfen wird dabei nichts, die Jahresstufe ist das Archiv.
 
 ## Die App sichert sich selbst, gestaffelt
 
