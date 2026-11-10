@@ -17,7 +17,7 @@ import { useTranslation } from "react-i18next";
 import type { Kontoherkunft, Laufbefund } from "../../../application";
 import { zurueckholen, type Umsatz } from "../../../application/import";
 import { herkunft as herkunftLaden, umsatzSpeichern } from "../../dienste";
-import { Card, Pill } from "../bausteine";
+import { Card, Pill, Button } from "../bausteine";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
 import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { DataTable } from "../bausteine/DataTable";
@@ -197,10 +197,9 @@ export function HerkunftBereich({
           <Card>
             <div style={{ display: "flex", gap: "var(--sp-2)", marginBottom: "var(--sp-2)", flexWrap: "wrap" }}>
               {(["alle", "verbucht", "weggelegt", "offen"] as const).map((f) => (
-                <button
+                <Button variant="link"
                   key={f}
                   type="button"
-                  className="linkbtn"
                   aria-pressed={filter === f}
                   onClick={() => setFilter(f)}
                   style={{
@@ -213,7 +212,7 @@ export function HerkunftBereich({
                   }}
                 >
                   {t(`konten.herkunft.filter.${f}`)}
-                </button>
+                </Button>
               ))}
 
               {/* Nach Quelle eingrenzen — nur wo es überhaupt mehrere gibt. Ein Filter mit
@@ -272,9 +271,9 @@ export function HerkunftBereich({
                     key: "_a", label: "", align: "right", sortable: false,
                     render: (z) =>
                       z.umsatz.status === "verworfen" || z.umsatz.status === "duplikat" ? (
-                        <button className="linkbtn" style={{ padding: 0, fontSize: "var(--fs-xs)" }} onClick={() => void zurueck(z.umsatz)}>
+                        <Button variant="link" style={{ padding: 0, fontSize: "var(--fs-xs)" }} onClick={() => void zurueck(z.umsatz)}>
                           {t("konten.herkunft.zurueckholen")}
-                        </button>
+                        </Button>
                       ) : null,
                   },
                 ]}

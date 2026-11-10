@@ -75,7 +75,7 @@ export function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung:
       footer={
         <>
           <Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button>
-          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+          <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
           {fehler && <span className="err">{fehler}</span>}
         </>
       }
@@ -102,12 +102,12 @@ export function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung:
             aria-label={`${t("konten.split.spalteBetrag")} ${i + 1}`}
           />
           {rest !== 0 && (
-            <button className="linkbtn" title={t("konten.split.restVerteilen")} onClick={() => restEinsetzen(i)} style={{ padding: "6px 4px" }}>+</button>
+            <Button variant="link" title={t("konten.split.restVerteilen")} onClick={() => restEinsetzen(i)} style={{ padding: "6px 4px" }}>+</Button>
           )}
           {zeilen.length > 2 && (
-            <button className="linkbtn" onClick={() => setZeilen((zs) => zs.filter((_, j) => j !== i))}>
+            <Button variant="link" onClick={() => setZeilen((zs) => zs.filter((_, j) => j !== i))}>
               {t("konten.split.zeileEntfernen")}
-            </button>
+            </Button>
           )}
         </div>
       ))}

@@ -358,7 +358,7 @@ function PersonenCard({ personen, onChange }: { personen: Person[]; onChange: ()
         <Modal
           title={editId ? t("einstellungen.person.modalBearbeiten") : t("einstellungen.person.modalAnlegen")}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><Button variant="link" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</Button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <FormField label={t("einstellungen.person.feldName")} required>
             <input className="field" value={name} onChange={(e) => setName(e.target.value)} placeholder={t("einstellungen.person.feldNamePlaceholder")} />
@@ -485,7 +485,7 @@ function KategorienCard({ kategorien, onChange }: { kategorien: Kategorie[]; onC
         <Modal
           title={editId ? t("einstellungen.kategorie.modalBearbeiten") : t("einstellungen.kategorie.modalAnlegen")}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><Button variant="link" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</Button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <div className="form-grid">
             <FormField label={t("einstellungen.kategorie.feldName")} required>

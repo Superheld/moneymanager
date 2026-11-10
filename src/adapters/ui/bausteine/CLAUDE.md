@@ -16,10 +16,15 @@ Baustein, sondern ein Teil dieses Screens.
 ## Der Design-System-Teil
 
 Die `.jsx`/`.d.ts`-Dateien (`Card`, `KPIStat`, `Pill`, `CoverageTrack`, `DataTable`,
-`Button`, `FormField` mit `Input`, `Dialog`) stammen aus dem Design-System, das ausserhalb
+`FormField` mit `Input`, `Dialog`) stammen aus dem Design-System, das ausserhalb
 des Repos liegt. Es ist eine **Vorlage, keine Vorgabe**: was hier liegt, gehört der App und
 darf geändert werden. Wer aus dem Design-System nachzieht, holt sich einen Vorschlag, keine
 Wahrheit — und prüft, was hier inzwischen weiterentwickelt wurde.
+
+`Button` kam ebenfalls von dort und ist seit 2026-11-10 TypeScript auf Base UI `Button`
+(warum, steht im Kopf der Datei und in `../CLAUDE.md` unter „Bedienteile"). Die übrigen
+folgen demselben Weg: nach `.tsx`, die `.d.ts` fällt weg, und wo Base UI ein Gegenstück
+hat, steht es darunter.
 
 `index.ts` bündelt diesen Block, damit ein Screen `from "../bausteine"` schreiben kann. Die
 eigenen Bausteine daneben werden einzeln importiert.
@@ -220,8 +225,8 @@ schlechter: man verliert die Zeile aus den Augen, von der man ausgegangen ist, u
 zurück, um die nächste anzusehen. Der zweite Klick auf denselben Bezeichner klappt wieder
 zu.
 
-**Nicht verwechseln mit `.linkbtn`.** Die Klasse gibt es schon und sie ist für das
-Gegenteil da: eine gedämpfte NEBENAKTION in einer Zeile („Profil ansehen"), die sich
+**Nicht verwechseln mit `Button variant="link"`** (früher die Klasse `.linkbtn`). Der ist
+für das Gegenteil da: eine gedämpfte NEBENAKTION in einer Zeile („Profil ansehen"), die sich
 zurückhalten soll. `Zeilenlink` ist der Weg weiter und muss sich zeigen — Akzentfarbe,
 Unterstrich.
 

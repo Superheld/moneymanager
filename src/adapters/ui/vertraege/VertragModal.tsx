@@ -496,9 +496,9 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
           <Button variant="primary" onClick={speichern}>
             {t("vertraege.speichern")}
           </Button>
-          <button className="linkbtn" onClick={onClose}>
+          <Button variant="link" onClick={onClose}>
             {t("vertraege.abbrechen")}
-          </button>
+          </Button>
           {fehler && <span className="err">{fehler}</span>}
         </>
       }

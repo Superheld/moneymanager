@@ -70,7 +70,7 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
         {/* Gibt es weder eine Gegenbuchung noch ein Konto, auf dem erzeugt werden darf,
             hat der Knopf nichts zu bestätigen — dann führt nur der Weg zurück. */}
         {!nichtsZuTun && <Button variant="primary" onClick={speichern}>{t("konten.zurUmbuchung.bestaetigen")}</Button>}
-        <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+        <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
         {fehler && <span className="err">{fehler}</span>}
       </>}
     >

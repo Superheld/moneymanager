@@ -549,9 +549,9 @@ export function BudgetsScreen() {
               <Button variant="primary" onClick={speichern}>
                 {t("budgets.speichern")}
               </Button>
-              <button className="linkbtn" onClick={() => setOffen(false)}>
+              <Button variant="link" onClick={() => setOffen(false)}>
                 {t("budgets.abbrechen")}
-              </button>
+              </Button>
               {fehler && <span className="err">{fehler}</span>}
             </>
           }
@@ -630,9 +630,9 @@ export function BudgetsScreen() {
                 })}
                 {/* Zurück auf „ab jetzt", wenn gerade eine alte Version im Feld steht. */}
                 {!bearbeitetesBudget.betraege.some((v) => v.abMonat === zielMonat) ? null : zielMonat !== heute.slice(0, 7) && (
-                  <button className="linkbtn" type="button" onClick={() => setZielMonat(heute.slice(0, 7))}>
+                  <Button variant="link" type="button" onClick={() => setZielMonat(heute.slice(0, 7))}>
                     {t("budgets.wiederAbLaufend", { monat: heute.slice(0, 7) })}
-                  </button>
+                  </Button>
                 )}
               </div>
             )}

@@ -417,7 +417,7 @@ export function ReviewScreen() {
           action={
             <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center", flexWrap: "wrap" }}>
               {verb && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)" }}>{t("review.verbuchtErgebnis", { verbucht: verb.verbucht, umbuchungen: verb.umbuchungen, uebersprungen: verb.uebersprungen })}</span>}
-              <Button variant="primary" onClick={busy || fertig === 0 ? undefined : verbuchen} style={busy || fertig === 0 ? { opacity: 0.5, cursor: busy ? "wait" : "not-allowed" } : undefined}>
+              <Button variant="primary" onClick={verbuchen} laeuft={busy} disabled={fertig === 0}>
                 {busy ? t("review.verbuchenBusy") : t("review.verbuchen", { n: fertig })}
               </Button>
               {/* Der Gegenweg zum Verbuchen: was hier nie eine Kategorie bekommt, soll
@@ -427,13 +427,13 @@ export function ReviewScreen() {
                 verwerfenGefragt ? (
                   <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", fontSize: "var(--fs-xs)" }}>
                     <span className="muted">{t("review.verwerfenFrage", { n: gefiltert.filter((u) => !u.vorschlag).length })}</span>
-                    <button className="linkbtn" style={{ color: "var(--warn-deep)" }} onClick={() => void restVerwerfen()}>{t("review.verwerfenJa")}</button>
-                    <button className="linkbtn" onClick={() => setVerwerfenGefragt(false)}>{t("review.verwerfenNein")}</button>
+                    <Button variant="link" style={{ color: "var(--warn-deep)" }} onClick={() => void restVerwerfen()}>{t("review.verwerfenJa")}</Button>
+                    <Button variant="link" onClick={() => setVerwerfenGefragt(false)}>{t("review.verwerfenNein")}</Button>
                   </span>
                 ) : (
-                  <button className="linkbtn" onClick={() => setVerwerfenGefragt(true)}>
+                  <Button variant="link" onClick={() => setVerwerfenGefragt(true)}>
                     {t("review.restVerwerfen")}
-                  </button>
+                  </Button>
                 )
               )}
             </div>
@@ -496,10 +496,10 @@ export function ReviewScreen() {
                 placeholder={t("review.sammel.kategorieSetzen")}
                 ariaLabel={t("review.sammel.kategorieSetzen")}
               />
-              <button className="linkbtn" style={{ color: "var(--warn-deep)" }} onClick={busy ? undefined : () => void sammelVerwerfen()}>
+              <Button variant="link" style={{ color: "var(--warn-deep)" }} onClick={() => void sammelVerwerfen()} laeuft={busy}>
                 {t("review.sammel.weglegen", { n: auswahl.size })}
-              </button>
-              <button className="linkbtn" onClick={() => setAuswahl(new Set())}>{t("review.sammel.aufheben")}</button>
+              </Button>
+              <Button variant="link" onClick={() => setAuswahl(new Set())}>{t("review.sammel.aufheben")}</Button>
               {/* Was der Sammelweg auslässt, steht VOR der Aktion da — nicht als
                   Ergebnismeldung hinterher. */}
               {gewaehlteUmbuchungen > 0 && (
@@ -616,9 +616,9 @@ export function ReviewScreen() {
       {/* Der Rückweg — zugeklappt, aber mit Anzahl, damit man weiß, dass dort etwas liegt. */}
       {weggelegte.length > 0 && (
         <Card style={{ marginTop: "var(--gap-card)" }} pad>
-          <button className="linkbtn" onClick={() => setZeigeWeggelegt((x) => !x)}>
+          <Button variant="link" onClick={() => setZeigeWeggelegt((x) => !x)}>
             {t("review.weggelegt.titel", { n: weggelegte.length })}
-          </button>
+          </Button>
           {zeigeWeggelegt && (
             <>
               <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-2) 0" }}>
@@ -638,9 +638,9 @@ export function ReviewScreen() {
                         <Pill variant="neutral">{t(`review.weggelegt.status.${u.status}`)}</Pill>
                       </td>
                       <td style={{ ...td, textAlign: "right" }}>
-                        <button className="linkbtn" onClick={() => void zurueck(u)}>
+                        <Button variant="link" onClick={() => void zurueck(u)}>
                           {t("review.weggelegt.zurueckholen")}
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}

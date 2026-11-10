@@ -82,9 +82,9 @@ export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
           </Pill>
         )}
         {vonHand && (
-          <button className="linkbtn" onClick={() => bindung.zuruecksetzen()}>
+          <Button variant="link" onClick={() => bindung.zuruecksetzen()}>
             {t("konten.zuVertrag.zuruecksetzen")}
-          </button>
+          </Button>
         )}
         {/* „Vertrag daraus machen" gibt es nur, solange keiner zugeordnet ist — sonst
             wäre es ein Angebot, zwei Verträge für dieselbe Zahlung anzulegen. */}

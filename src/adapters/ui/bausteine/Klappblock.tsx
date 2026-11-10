@@ -13,6 +13,7 @@
 // eine Liste; das hier ist ein Abschnitt in einem Formular oder Dialog.
 
 import type { ReactNode } from "react";
+import { Button } from "./Button";
 
 export function Klappblock({
   titel,
@@ -30,10 +31,10 @@ export function Klappblock({
 }) {
   return (
     <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-      <button className="linkbtn" onClick={onUmschalten} aria-expanded={offen}>
+      <Button variant="link" onClick={onUmschalten} aria-expanded={offen}>
         {offen ? "▾" : "▸"} {titel}
         {zusatz != null && <> <span className="muted">{zusatz}</span></>}
-      </button>
+      </Button>
       {offen && <div style={{ marginTop: "var(--sp-2)" }}>{children}</div>}
     </div>
   );

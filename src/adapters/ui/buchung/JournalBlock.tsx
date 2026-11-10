@@ -165,9 +165,9 @@ export function JournalBlock({
 
           <div style={{ marginTop: "var(--sp-3)" }}>
             {rueckweg.moeglich && !fragt && (
-              <button className="linkbtn" onClick={() => { setFehler(null); setFragt(true); }}>
+              <Button variant="link" onClick={() => { setFehler(null); setFragt(true); }}>
                 {t("konten.journal.zuruecksetzen")}
-              </button>
+              </Button>
             )}
             {rueckweg.moeglich && fragt && (
               <div>
@@ -180,9 +180,9 @@ export function JournalBlock({
                   </Button>
                 )}
                 {laeuft && <span className="muted">{t("konten.journal.laeuft")}</span>}
-                <button className="linkbtn" style={{ marginLeft: "var(--sp-3)" }} onClick={() => setFragt(false)} disabled={laeuft}>
+                <Button variant="link" style={{ marginLeft: "var(--sp-3)" }} onClick={() => setFragt(false)} disabled={laeuft}>
                   {t("konten.journal.abbrechen")}
-                </button>
+                </Button>
               </div>
             )}
             {/* Warum nicht — statt eines fehlenden Knopfes ohne Erklärung. */}

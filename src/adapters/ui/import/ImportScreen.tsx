@@ -315,8 +315,9 @@ export function ImportScreen() {
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginTop: "var(--sp-4)", flexWrap: "wrap" }}>
             <Button
               variant="primary"
-              onClick={busy || uErgebnis || beruecksichtigt.length === 0 ? undefined : uebernehmen}
-              style={busy || uErgebnis || beruecksichtigt.length === 0 ? { opacity: 0.5, cursor: busy ? "wait" : "not-allowed" } : undefined}
+              onClick={uebernehmen}
+              laeuft={busy}
+              disabled={!!uErgebnis || beruecksichtigt.length === 0}
             >
               {busy ? t("import.uebernehmenBusy") : t("import.uebernehmen")}
             </Button>

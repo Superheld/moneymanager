@@ -14,7 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Abgleichzeile } from "../../../application";
 import { abgleich as abgleichLaden } from "../../dienste";
-import { Card, Pill } from "../bausteine";
+import { Card, Pill, Button } from "../bausteine";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { AbgleichModal, KassensturzModal } from "./KontostandModal";
@@ -161,14 +161,14 @@ export function AbgleichBereich() {
                       lässt — und sie schiebt die Differenz in die Vergangenheit. Richtig
                       nur, wenn sie von dort stammt, deshalb auf Zuruf statt automatisch. */}
                   {z.anfangsbestandVorschlag != null && (
-                    <button className="linkbtn" style={{ padding: 0 }} onClick={() => setAbgleichFuer(z)}>
+                    <Button variant="link" style={{ padding: 0 }} onClick={() => setAbgleichFuer(z)}>
                       {t("konten.anker.abgleichen")}
-                    </button>
+                    </Button>
                   )}
                   {!z.online && (
-                    <button className="linkbtn" style={{ padding: 0 }} onClick={() => setKassensturzFuer(z)}>
+                    <Button variant="link" style={{ padding: 0 }} onClick={() => setKassensturzFuer(z)}>
                       {t("konten.anker.festhalten")}
-                    </button>
+                    </Button>
                   )}
                 </div>
 

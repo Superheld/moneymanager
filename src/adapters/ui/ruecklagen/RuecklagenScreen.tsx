@@ -391,7 +391,7 @@ export function RuecklagenScreen() {
           title={editId ? t("ruecklagen.modalBearbeiten") : t("ruecklagen.modalAnlegen")}
           subtitle={t("ruecklagen.modalUntertitel")}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>{t("ruecklagen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("ruecklagen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>{t("ruecklagen.speichern")}</Button><Button variant="link" onClick={() => setOffen(false)}>{t("ruecklagen.abbrechen")}</Button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           <div className="form-grid">
             <FormField label={t("ruecklagen.feldBezeichnung")} required>
@@ -448,7 +448,7 @@ export function RuecklagenScreen() {
           title={t("ruecklagen.modalAusbuchen")}
           subtitle={`${ausItem.bezeichnung} · ${t(hatZiel(ausItem) ? "ruecklagen.ausbuchenNeustart" : "ruecklagen.ausbuchenEnde")}`}
           onClose={() => setAusItem(null)}
-          footer={<><Button variant="primary" onClick={ausbuchenSpeichern}>{t("ruecklagen.speichern")}</Button><button className="linkbtn" onClick={() => setAusItem(null)}>{t("ruecklagen.abbrechen")}</button>{ausFehler && <span className="err">{ausFehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={ausbuchenSpeichern}>{t("ruecklagen.speichern")}</Button><Button variant="link" onClick={() => setAusItem(null)}>{t("ruecklagen.abbrechen")}</Button>{ausFehler && <span className="err">{ausFehler}</span>}</>}
         >
           <div className="form-grid">
             <FormField label={t("ruecklagen.feldAusDatum")} required>

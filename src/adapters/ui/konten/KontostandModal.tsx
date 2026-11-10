@@ -68,7 +68,7 @@ export function KassensturzModal({
           <Button variant="primary" onClick={busy ? () => {} : () => void speichern()}>
             {t("konten.anker.festhalten")}
           </Button>
-          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+          <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
         </>
       }
     >
@@ -153,7 +153,7 @@ export function AbgleichModal({
           <Button variant="primary" onClick={busy ? () => {} : () => void anwenden()}>
             {t("konten.anker.abgleichBestaetigen")}
           </Button>
-          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+          <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
         </>
       }
     >

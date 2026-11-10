@@ -119,21 +119,20 @@ export function SammelDialog({
             <Button variant="primary" onClick={() => void loeschen()}>
               {t("konten.sammel.loeschenBestaetigen", { n: buchungen.length - gesperrt })}
             </Button>
-            <button className="linkbtn" onClick={() => setLoeschenGefragt(false)}>{t("konten.abbrechen")}</button>
+            <Button variant="link" onClick={() => setLoeschenGefragt(false)}>{t("konten.abbrechen")}</Button>
           </>
         ) : (
           <>
             <Button variant="primary" onClick={busy ? () => {} : () => void speichern()}>
               {t("konten.sammel.anwenden")}
             </Button>
-            <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
-            <button
-              className="linkbtn"
+            <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
+            <Button variant="link"
               style={{ marginLeft: "auto", color: "var(--warn-deep)" }}
               onClick={() => setLoeschenGefragt(true)}
             >
               {t("konten.loeschen")}
-            </button>
+            </Button>
           </>
         )
       }

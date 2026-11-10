@@ -141,9 +141,9 @@ export function DublettenVergleich({
         <>
           <Button variant="ghost" onClick={onClose}>{t("konten.abbrechen")}</Button>
           {beideMitUmsatz && (
-            <button className="linkbtn" disabled={busy} onClick={() => keinDuplikat()}>
+            <Button variant="link" disabled={busy} onClick={() => keinDuplikat()}>
               {t("konten.dublette.keinDuplikat")}
-            </button>
+            </Button>
           )}
           {fehler && <span className="err">{fehler}</span>}
         </>
@@ -193,15 +193,14 @@ export function DublettenVergleich({
       <div style={{ display: "grid", gridTemplateColumns: "minmax(9rem, 1fr) 1fr 1fr", gap: "var(--sp-3)", marginTop: "var(--sp-4)" }}>
         <span />
         {[links, rechts].map((s, i) => (
-          <button
+          <Button variant="link"
             key={i}
-            className="linkbtn"
             disabled={busy}
             style={{ color: "var(--warn-deep)", textAlign: "left" }}
             onClick={() => wegDamit(s)}
           >
             {t(istBankzeile(s) ? "konten.vergleich.dieseVerwerfen" : "konten.vergleich.dieseLoeschen")}
-          </button>
+          </Button>
         ))}
       </div>
 

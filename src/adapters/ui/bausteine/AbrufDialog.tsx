@@ -130,9 +130,9 @@ export function AbrufDialog({
               <Button variant="primary" onClick={() => void abrufen()}>
                 {busy ? t("konten.abruf.laeuft") : t("konten.abruf.starten")}
               </Button>
-              <button className="linkbtn" onClick={onClose}>
+              <Button variant="link" onClick={onClose}>
                 {t("einstellungen.abbrechen")}
-              </button>
+              </Button>
               {fehler && <span className="err">{fehler}</span>}
             </>
           )

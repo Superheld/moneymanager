@@ -357,19 +357,18 @@ export function WoerterInhalt({
                   sortable: false,
                   render: (r) =>
                     r.zustand === "gesperrt" ? (
-                      <button className="linkbtn" onClick={(e) => { e.stopPropagation(); aufZulassen(r.wort); }}>
+                      <Button variant="link" onClick={(e) => { e.stopPropagation(); aufZulassen(r.wort); }}>
                         {t("einstellungen.lernmaterial.zulassen")}
-                      </button>
+                      </Button>
                     ) : r.zustand === "genutzt" ? (
-                      <button
-                        className="linkbtn"
+                      <Button variant="link"
                         onClick={(e) => {
                           e.stopPropagation();
                           aufAusschliessen(r.wort, r.herkunft ? [r.herkunft] : undefined);
                         }}
                       >
                         {t("einstellungen.lernmaterial.ausschliessen")}
-                      </button>
+                      </Button>
                     ) : (
                       // Strukturell aussortiert — dafür gibt es keinen Listeneintrag,
                       // den man entfernen könnte.

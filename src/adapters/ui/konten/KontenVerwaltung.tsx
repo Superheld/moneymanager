@@ -245,7 +245,7 @@ export function KontenVerwaltung({
         <Modal
           title={editId ? t("einstellungen.konto.modalBearbeiten") : t("einstellungen.konto.modalAnlegen")}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><Button variant="link" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</Button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           {/* Die Verbindung gehört an den Anfang: sie entscheidet, wie viel an diesem
               Konto überhaupt von Hand gilt. IBAN und Bezeichnung kommen bei einem
@@ -261,9 +261,9 @@ export function KontenVerwaltung({
                     ? ` · ${t("konten.verbindung.abgerufenBis", { datum: verbindung.letzterAbrufBis })}`
                     : ` · ${t("konten.verbindung.nieAbgerufen")}`}
                 </span>
-                <button className="linkbtn" onClick={() => void trennen()}>
+                <Button variant="link" onClick={() => void trennen()}>
                   {t("konten.verbindung.trennen")}
-                </button>
+                </Button>
               </span>
             ) : (
               <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
@@ -291,8 +291,7 @@ export function KontenVerwaltung({
                 <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
                   {aktiv ? t("konten.zustandHinweisGefuehrt") : t("konten.zustandHinweisStill")}
                 </span>
-                <button
-                  className="linkbtn"
+                <Button variant="link"
                   title={aktiv ? t("konten.stilllegenHinweis") : t("konten.wiederaufnehmenHinweis")}
                   onClick={async () => {
                     if (aktiv) await kontoStilllegen(editId);
@@ -302,7 +301,7 @@ export function KontenVerwaltung({
                   }}
                 >
                   {aktiv ? t("konten.stilllegen") : t("konten.wiederaufnehmen")}
-                </button>
+                </Button>
               </span>
             </FormField>
           )}

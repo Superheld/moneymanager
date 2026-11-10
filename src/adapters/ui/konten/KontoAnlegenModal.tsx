@@ -239,9 +239,9 @@ export function KontoAnlegenModal({
       <Button variant="primary" onClick={() => void offlineSpeichern()}>
         {t("einstellungen.speichern")}
       </Button>
-      <button className="linkbtn" onClick={onClose}>
+      <Button variant="link" onClick={onClose}>
         {t("einstellungen.abbrechen")}
-      </button>
+      </Button>
       {fehler && <span className="err">{fehler}</span>}
     </>
   );
@@ -257,9 +257,9 @@ export function KontoAnlegenModal({
           {t("konten.anlegen.uebernehmen")}
         </Button>
       )}
-      <button className="linkbtn" onClick={onClose}>
+      <Button variant="link" onClick={onClose}>
         {t("einstellungen.abbrechen")}
-      </button>
+      </Button>
       {fehler && <span className="err">{fehler}</span>}
     </>
   );

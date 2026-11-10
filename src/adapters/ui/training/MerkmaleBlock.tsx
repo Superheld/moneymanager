@@ -25,7 +25,7 @@ import {
 import type { Merkmalsansicht } from "../../../application/kategorien/merkmalskonfiguration";
 import type { Umsatz } from "../../../application/import";
 import { merkmaleZuBuchung, wortFreigeben, wortSperren } from "../../dienste";
-import { Pill } from "../bausteine";
+import { Pill, Button } from "../bausteine";
 import { ErklaerungsTafel } from "./ErklaerungsTafel";
 import { Klappblock } from "../bausteine/Klappblock";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
@@ -142,8 +142,7 @@ export function MerkmaleBlock({
                               })
                             : t("konten.merkmale.nurEinmal")}
                         </span>
-                        <button
-                          className="linkbtn"
+                        <Button variant="link"
                           onClick={() =>
                             aendern(
                               wortSperren(
@@ -154,7 +153,7 @@ export function MerkmaleBlock({
                           }
                         >
                           {t("konten.merkmale.ausschliessen")}
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -184,9 +183,9 @@ export function MerkmaleBlock({
                             der Liste des Trainingsbereichs löschte derselbe Griff eine
                             Zeile, die es nicht gibt: ohne Fehler und ohne Wirkung. */}
                         {v.grund === "ausgeschlossen" && v.listenform && stand.ausgeschlossen.has(v.listenform) && (
-                          <button className="linkbtn" onClick={() => aendern(wortFreigeben(v.listenform!))}>
+                          <Button variant="link" onClick={() => aendern(wortFreigeben(v.listenform!))}>
                             {t("konten.merkmale.zulassen")}
-                          </button>
+                          </Button>
                         )}
                       </div>
                     ))}

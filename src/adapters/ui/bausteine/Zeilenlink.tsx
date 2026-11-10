@@ -9,7 +9,7 @@
 // Ein Link im Bezeichner zeigt sich dagegen selbst an. Er ist die kleinere Trefferfläche
 // und trotzdem der bessere Weg, weil man ihn überhaupt erst findet.
 //
-// **Nicht zu verwechseln mit `.linkbtn`.** Die Klasse gibt es schon, und sie ist für das
+// **Nicht zu verwechseln mit `Button variant="link"`** (früher `.linkbtn`). Der ist für das
 // Gegenteil gedacht: eine gedämpfte Nebenaktion in einer Zeile („Profil ansehen"), die
 // sich zurückhalten soll. Dies hier ist der Weg weiter und muss sich zeigen.
 //

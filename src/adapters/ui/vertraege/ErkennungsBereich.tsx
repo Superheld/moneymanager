@@ -47,7 +47,7 @@ import {
   type Waehrung,
   type Zahlungskonto,
 } from "../../../application";
-import { FormField, Pill } from "../bausteine";
+import { FormField, Pill, Button } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
@@ -339,21 +339,19 @@ export function ErkennungsBereich({
             );
           })}
           <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", marginTop: 2 }}>
-            <button
-              className="linkbtn"
+            <Button variant="link"
               style={{ padding: 0 }}
               onClick={() => setze("merkmale", [...f.merkmale, { art: "empfaenger", muster: "" }])}
             >
               {t("vertraege.regel.merkmalHinzufuegen")}
-            </button>
+            </Button>
             {nameFehlt && (
-              <button
-                className="linkbtn"
+              <Button variant="link"
                 style={{ padding: 0 }}
                 onClick={() => setze("merkmale", [...f.merkmale, { art: "empfaenger", muster: nameMuster }])}
               >
                 {t("vertraege.regel.nameHinzufuegen", { name: nameMuster })}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -395,13 +393,12 @@ export function ErkennungsBereich({
                         sonst: k.unbeschriftet,
                       })}
                     </Pill>
-                    <button
-                      className="linkbtn"
+                    <Button variant="link"
                       style={{ padding: 0, flex: "0 0 auto" }}
                       onClick={() => setze("merkmale", [...f.merkmale, { art: k.merkmal.art, muster: k.merkmal.muster }])}
                     >
                       {t("vertraege.regel.vorschlagUebernehmen")}
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -486,8 +483,7 @@ export function ErkennungsBereich({
           Schwankende nicht. Der Knopf erscheint nur, wenn die Stufe wirklich etwas
           wegnimmt. */}
       {probe.spanne && (
-        <button
-          className="linkbtn"
+        <Button variant="link"
           style={{ marginTop: "var(--sp-2)" }}
           onClick={() => {
             aufAenderung({
@@ -501,7 +497,7 @@ export function ErkennungsBereich({
             von: geld.formatMitSymbol(probe.spanne.von),
             bis: geld.formatMitSymbol(probe.spanne.bis),
           })}
-        </button>
+        </Button>
       )}
 
       {/* Vorschau — der Grund, warum diese Maske ueberhaupt bedienbar ist. */}

@@ -26,7 +26,7 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Fremdkategorienbefund } from "../../../application/import";
 import type { Kategorie } from "../../../application";
-import { Card } from "../bausteine";
+import { Card, Button } from "../bausteine";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 
 const KOPF = {
@@ -65,14 +65,13 @@ export function FremdkategorienKarte({
     <Card
       style={{ marginTop: "var(--sp-4)" }}
       title={
-        <button
-          className="linkbtn"
+        <Button variant="link"
           aria-expanded={offen}
           onClick={() => setOffen((x) => !x)}
           style={{ font: "inherit", color: "inherit" }}
         >
           {offen ? "▾" : "▸"} {t("import.fremd.titel")}
-        </button>
+        </Button>
       }
       subtitle={
         offen

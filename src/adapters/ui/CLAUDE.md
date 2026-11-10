@@ -77,7 +77,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Wahl im Formular | `Auswahl`; in einer Tabellenzeile: `Zeilenauswahl`; Kategorie: `CategoryPicker` |
 | Datum | `Datumsfeld`, angezeigt über `useDatum()` |
 | Feld plus Knopf nebeneinander | `Feldzeile`; Formularfeld: `FormField` |
-| Knopf | `Button`; Zeilenaktion als Icon: `IconButton` |
+| Knopf | `Button` — `primary` Hauptaktion, `link` gedämpfte Nebenaktion („Abbrechen"), `laeuft` sperrt während einer Handlung; Zeilenaktion als Icon: `IconButton` |
 | Dialog | `Modal` (über `Dialog`); vor dem Löschen: `Loeschfrage` |
 | Bankabruf, TAN | `AbrufDialog`, `TanDialog` |
 | Geld, Prozent, Farbe | `useGeld()`, `useProzent()`, `geldFarbe.ts` (unten) |
@@ -146,25 +146,52 @@ anderen umgangen. `stellen` ist die Obergrenze, eine glatte Zahl bleibt glatt.
 Zeilenaktionen sind Icons über `bausteine/IconButton.tsx` — ihr Text wandert in
 `title`/`aria-label`, statt zu verschwinden.
 
-## Bedienteile: fast alles von Hand, eine Ausnahme
+## Bedienteile: Base UI, wo immer es eines gibt
 
 **Base UI (`@base-ui/react`) ist die einzige UI-Bibliothek im Projekt**, und sie liefert
 ausschliesslich MECHANIK — kein Aussehen. Alles Sichtbare kommt weiterhin aus `app.css`
 und den Tokens.
 
-Sie steht heute unter genau zwei Bausteinen:
+**Die Regel (seit 2026-11-10): Hat Base UI ein Bedienteil für den Zweck, steht es unter
+unserem Baustein — auch dort, wo der Eigenbau heute funktioniert.** Vorher galt das
+Gegenteil („fast alles von Hand, Base UI als Ausnahme"), und der Preis zeigte sich an
+Stellen, die mit der Maus niemand bemerkt: der eigene `Button` liess sich nicht sperren,
+und als er es konnte, warf ein natives `disabled` den Fokus auf `<body>`. Base UI hatte
+die Antwort darauf (`focusableWhenDisabled`) im Paket liegen, das längst installiert war.
+Tastatur, ARIA, Fokus und Sperren sind genau die Hälfte eines Bedienteils, die man beim
+Eigenbau vergisst — und die Bibliothek ist dafür schon da.
+
+Drei Dinge, die dazugehören:
+
+- **Gekapselt, nie direkt.** Ein Screen importiert `Button`, nicht `@base-ui/react/button`.
+  Der Baustein trägt unsere Props (deutsch, wo sie Fachliches sagen: `laeuft`,
+  `gesperrt`), die Klassen und die Entscheidungen; wird die Bibliothek je getauscht, ist
+  es eine Datei je Bedienteil.
+- **Das Aussehen hängt an Base UIs Datenattributen**, nicht an Pseudoklassen, wo die beiden
+  auseinanderlaufen: gesperrt heisst `[data-disabled]`, weil Base UI über `aria-disabled`
+  sperrt und `:disabled` deshalb nie greift. Wer eine Regel schreibt, sieht im
+  `…DataAttributes.d.ts` des Teils nach, was gesetzt wird.
+- **Eigenbau bleibt, wo Base UI nichts hat** — und das gehört dann begründet: der Kalender
+  im `Datumsfeld` (es gibt keinen Datepicker), `DataTable` (keine Tabelle). Was Base UI
+  liefert, kommt trotzdem von dort: der Kalender sitzt in einem Base-UI-`Popover`.
+
+Wo es heute steht:
 
 | Baustein | statt | woher die Mechanik |
 |---|---|---|
 | `bausteine/Auswahl` | `<select className="field">` im Formular | Base UI `Select` |
 | `bausteine/Datumsfeld` | `<input type="date">` | Base UI `Popover`, Kalender von Hand |
+| `bausteine/Button` | eigener `<button>` mit Inline-Stil, roher `.linkbtn` | Base UI `Button` |
 
-**Die Grenze, an der die Entscheidung fiel:** ein Auswahlfeld braucht Combobox-Semantik
-(Knopf und Liste über ARIA verbunden, Tippsuche, Rollen) — das schreibt man nicht nebenbei
-richtig. Ein Kalender ist dagegen ein `role="grid"` mit einem Fokuspunkt, den die
-Pfeiltasten bewegen; das ist klein und klar, und Base UI hat ohnehin keinen Datepicker.
-Positionierung, Schliessen bei Klick daneben und Fokusrückgabe kommen trotzdem aus dem
-Popover statt aus Eigenbau.
+**Noch nicht umgestellt:** `Modal`/`Dialog` → `Dialog`, Kästchen und Optionsfelder → `Checkbox`/`Radio`,
+`Klappblock` → `Collapsible`, `Registerleiste` → `Tabs`, der Kategoriebaum im
+`CategoryPicker` → `Combobox` prüfen. Ein Tooltip-Baustein, wenn er kommt, kommt von dort
+(`Tooltip`). Wer einen davon anfasst, stellt ihn um, statt am Eigenbau weiterzubauen.
+
+**Die alte Grenze bleibt als Begründung für den Kalender gültig:** ein Auswahlfeld braucht
+Combobox-Semantik (Knopf und Liste über ARIA verbunden, Tippsuche, Rollen) — das schreibt
+man nicht nebenbei richtig. Ein Kalender ist dagegen ein `role="grid"` mit einem
+Fokuspunkt, den die Pfeiltasten bewegen; das ist klein und klar.
 
 Was das für neuen Code heisst: **im Formular `Auswahl` und `Datumsfeld` nehmen**, nicht die
 nativen Elemente. Seit 2026-08-25 ist der Bestand vollständig gewandert — in `ui/` steht

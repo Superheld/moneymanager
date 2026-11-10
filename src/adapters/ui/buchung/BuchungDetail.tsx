@@ -565,15 +565,14 @@ function BuchungFormular({
           <Button variant="primary" onClick={speichern}>
             {istEntwurf ? (busy ? t("konten.entwurf.laeuft") : t("konten.entwurf.uebernehmen")) : t("konten.speichern")}
           </Button>
-          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+          <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
           {istEntwurf && (
-            <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={() => verwerfenEntwurf()}>
+            <Button variant="link" style={{ marginLeft: "auto" }} onClick={() => verwerfenEntwurf()}>
               {t(dublette ? "konten.neue.schonGebucht" : "konten.entwurf.verwerfen")}
-            </button>
+            </Button>
           )}
           {buchung && (
-            <button
-              className="linkbtn"
+            <Button variant="link"
               style={{ marginLeft: "auto", color: "var(--warn-deep)" }}
               // Die Rückfrage sitzt HIER und nicht in `entfernen`: dort ist schon
               // entschieden. Was hier weggeht, ist eine Tatsache über Geld — der
@@ -600,7 +599,7 @@ function BuchungFormular({
               }
             >
               {t(ausBankabruf ? "konten.detail.verwerfenBankzeile" : "konten.loeschen")}
-            </button>
+            </Button>
           )}
           {fehler && <span className="err">{fehler}</span>}
         </>
@@ -754,9 +753,9 @@ function BuchungFormular({
                 <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>
                   {t("konten.zurUmbuchung.kandidatenTitel")}
                 </span>
-                <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={() => setCharakter("Aufwand")}>
+                <Button variant="link" style={{ marginLeft: "auto" }} onClick={() => setCharakter("Aufwand")}>
                   {t("konten.entwurf.dochKeineUmbuchung")}
-                </button>
+                </Button>
               </div>
 
               {entwurfKandidaten.map((k) => (
@@ -826,8 +825,8 @@ function BuchungFormular({
                 <span style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)" }}>
                   {t("konten.split.abschnitt")}
                 </span>
-                <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={onSplitten}>{t("konten.split.bearbeiten")}</button>
-                <button className="linkbtn" onClick={() => onSplitAufheben()}>{t("konten.split.aufheben")}</button>
+                <Button variant="link" style={{ marginLeft: "auto" }} onClick={onSplitten}>{t("konten.split.bearbeiten")}</Button>
+                <Button variant="link" onClick={() => onSplitAufheben()}>{t("konten.split.aufheben")}</Button>
               </div>
               {(buchung.aufteilungen ?? []).map((a, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", padding: "5px 0", borderBottom: "1px solid var(--line-soft)" }}>
@@ -854,7 +853,7 @@ function BuchungFormular({
                   Betrag, und der ist vorher noch nicht gebucht. */}
               {buchung && (
                 <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
-                  <button className="linkbtn" onClick={onSplitten}>{t("konten.split.aktion")}</button>
+                  <Button variant="link" onClick={onSplitten}>{t("konten.split.aktion")}</Button>
                   {" · "}
                   {t("konten.split.untertitel")}
                 </div>
@@ -879,13 +878,12 @@ function BuchungFormular({
                 <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
                   {t("konten.paarung.gegenkonto")}: {kontoName.get(buchung.gegenkontoId ?? "") ?? "?"}
                 </span>
-                <button className="linkbtn" style={{ marginLeft: "auto" }} onClick={() => onLoesen()}>{t("konten.paarung.loesen")}</button>
+                <Button variant="link" style={{ marginLeft: "auto" }} onClick={() => onLoesen()}>{t("konten.paarung.loesen")}</Button>
               </div>
 
               {/* Sprung ins andere Bein — derselbe Dialog, andere Buchung. */}
               {gegenbuchung && (
-                <button
-                  className="linkbtn"
+                <Button variant="link"
                   title={t("konten.paarung.gegenbuchungOeffnen")}
                   onClick={() => onGegenbuchung(gegenbuchung)}
                   style={{ display: "flex", width: "100%", alignItems: "center", gap: 10, marginTop: 8, padding: "8px 10px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", textAlign: "left" }}
@@ -898,7 +896,7 @@ function BuchungFormular({
                     {geld.formatMitSymbol(gegenbuchung.betrag, { mitVorzeichen: true })}
                   </span>
                   <span aria-hidden style={{ color: "var(--ink-3)" }}>›</span>
-                </button>
+                </Button>
               )}
 
               <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>

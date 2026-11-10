@@ -327,15 +327,14 @@ export function BankzugaengeScreen({
                 align: "right" as const,
                 render: (z: Bankzugang) =>
                   z.profil ? (
-                    <button
-                      className="linkbtn"
+                    <Button variant="link"
                       onClick={() => {
                         setAngesehen(angesehen === z.id ? null : z.id);
                         setTanGespeichert(false);
                       }}
                     >
                       {t("bankabruf.profilTitel")}
-                    </button>
+                    </Button>
                   ) : (
                     <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
                       {t("bankabruf.profilNochKeins")}
@@ -503,9 +502,9 @@ export function BankzugaengeScreen({
               <Button variant="primary" onClick={() => void pruefen(pin.zugang, pinText)}>
                 {busy ? t("konten.abruf.laeuft") : t("bankzugaenge.pruefen")}
               </Button>
-              <button className="linkbtn" onClick={() => setPin(null)}>
+              <Button variant="link" onClick={() => setPin(null)}>
                 {t("einstellungen.abbrechen")}
-              </button>
+              </Button>
               {fehler && <span className="err">{fehler}</span>}
             </>
           }

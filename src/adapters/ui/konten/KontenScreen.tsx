@@ -470,9 +470,9 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                       : t("konten.abgleich.differenz", { betrag: geld.formatMitSymbol(aktivZeile.abweichung ?? 0, { mitVorzeichen: true }) })}
                   </Pill>
                   {(aktivZeile.abweichung ?? 0) !== 0 && (
-                    <button className="linkbtn" style={{ padding: 0 }} onClick={() => onNavigate("kontenverwaltung")}>
+                    <Button variant="link" style={{ padding: 0 }} onClick={() => onNavigate("kontenverwaltung")}>
                       {t("konten.abgleichBereich.hinweg")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -598,7 +598,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 {t("konten.sammel.gewaehlt", { n: auswahl.size })}
               </span>
               <Button variant="primary" onClick={() => setSammelOffen(true)}>{t("konten.sammel.bearbeiten")}</Button>
-              <button className="linkbtn" onClick={() => setAuswahl(new Set())}>{t("konten.sammel.aufheben")}</button>
+              <Button variant="link" onClick={() => setAuswahl(new Set())}>{t("konten.sammel.aufheben")}</Button>
             </div>
           )}
 
@@ -886,7 +886,7 @@ function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Za
       title={t("konten.umbuchung.titel")}
       subtitle={t("konten.umbuchung.untertitel")}
       onClose={onClose}
-      footer={<><Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button><button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
+      footer={<><Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button><Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>{fehler && <span className="err">{fehler}</span>}</>}
     >
       <div className="form-grid">
         <FormField label={t("konten.umbuchung.vonKonto")} required>

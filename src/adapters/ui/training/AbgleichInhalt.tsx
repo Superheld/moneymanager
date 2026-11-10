@@ -37,7 +37,7 @@ export function AbgleichInhalt({
       </div>
 
       <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center", flexWrap: "wrap" }}>
-        <Button onClick={rechnet ? undefined : aufVorschau}>
+        <Button onClick={aufVorschau} laeuft={rechnet}>
           {rechnet ? t("einstellungen.abgleich.rechnet") : t("einstellungen.abgleich.vorschau")}
         </Button>
         {angewendet !== null && (
@@ -124,7 +124,7 @@ export function AbgleichInhalt({
           </Abschnitt>
 
           <div style={{ marginTop: "var(--sp-4)" }}>
-            <Button variant="primary" onClick={schreibt ? undefined : aufUebernehmen}>
+            <Button variant="primary" onClick={aufUebernehmen} laeuft={schreibt}>
               {schreibt
                 ? t("einstellungen.abgleich.schreibt")
                 : t("einstellungen.abgleich.uebernehmen", { anzahl: zahl(plan.setzen.length) })}

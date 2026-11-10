@@ -167,9 +167,9 @@ export function KontoAufloesenModal({
       onClose={laeuft ? () => {} : onClose}
       footer={
         <>
-          <button className="linkbtn" onClick={onClose} disabled={laeuft}>
+          <Button variant="link" onClick={onClose} disabled={laeuft}>
             {t("einstellungen.abbrechen")}
-          </button>
+          </Button>
           {laeuft && <span className="muted">{t("loeschen.laeuft")}</span>}
           {fehler && <span className="err">{fehler}</span>}
         </>

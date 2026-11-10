@@ -32,6 +32,7 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Popover } from "@base-ui/react/popover";
+import { Button } from "./Button";
 
 /** Wieviele Tage der Monat hat. Tag 0 des Folgemonats IST der letzte dieses Monats. */
 function tageImMonat(jahr: number, monat: number): number {
@@ -413,9 +414,8 @@ export function Datumsfeld({
             </div>
 
             <div className="datumsfeld-fuss">
-              <button
+              <Button variant="link"
                 type="button"
-                className="linkbtn"
                 onClick={() => {
                   if (!heuteWert) return;
                   aufAenderung(iso(heuteWert.jahr, heuteWert.monat, heuteWert.tag));
@@ -423,20 +423,19 @@ export function Datumsfeld({
                 }}
               >
                 {t("datum.heute")}
-              </button>
+              </Button>
               {/* Leeren geht nur, wenn etwas drinsteht — ein Knopf, der nichts tut, ist
                   eine Frage ohne Antwort. */}
               {wert ? (
-                <button
+                <Button variant="link"
                   type="button"
-                  className="linkbtn"
                   onClick={() => {
                     aufAenderung("");
                     setOffen(false);
                   }}
                 >
                   {t("datum.leeren")}
-                </button>
+                </Button>
               ) : null}
             </div>
           </Popover.Popup>
