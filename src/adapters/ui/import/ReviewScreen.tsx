@@ -49,6 +49,7 @@ import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 const SEITE_GROESSE = 100;
 
@@ -470,15 +471,13 @@ export function ReviewScreen() {
               style={{ ...select, flex: "1 1 200px", minWidth: 160 }}
             />
             <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-xs)", color: "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap", alignSelf: "center" }}>
-              <input
-                type="checkbox"
-                checked={auswahlModus}
-                onChange={(e) => { setAuswahlModus(e.target.checked); if (!e.target.checked) setAuswahl(new Set()); }}
-                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
-              />
+            <Kaestchen
+              an={auswahlModus}
+              aufAendern={(an) => { setAuswahlModus(an); if (!an) setAuswahl(new Set()); }}
+              style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)", whiteSpace: "nowrap", alignSelf: "center" }}
+            >
               {t("review.sammel.modus")}
-            </label>
+            </Kaestchen>
           </div>
 
           {/* Die Aktionsleiste erscheint erst, wenn etwas markiert ist. Vorher gäbe es
@@ -515,12 +514,10 @@ export function ReviewScreen() {
               <tr>
                 {auswahlModus && (
                   <th style={{ ...th, width: 32 }}>
-                    <input
-                      type="checkbox"
-                      checked={alleGewaehlt}
-                      aria-label={t("review.sammel.alleWaehlen")}
-                      onChange={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
-                      style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                    <Kaestchen
+                      an={alleGewaehlt}
+                      label={t("review.sammel.alleWaehlen")}
+                      aufAendern={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
                     />
                   </th>
                 )}
@@ -537,12 +534,10 @@ export function ReviewScreen() {
                 <tr key={u.id}>
                   {auswahlModus && (
                     <td style={td}>
-                      <input
-                        type="checkbox"
-                        checked={auswahl.has(u.id)}
-                        aria-label={t("review.sammel.zeileWaehlen")}
-                        onChange={() => auswahlUmschalten(u.id)}
-                        style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                      <Kaestchen
+                        an={auswahl.has(u.id)}
+                        label={t("review.sammel.zeileWaehlen")}
+                        aufAendern={() => auswahlUmschalten(u.id)}
                       />
                     </td>
                   )}

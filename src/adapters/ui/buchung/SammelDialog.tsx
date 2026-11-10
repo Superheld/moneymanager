@@ -14,6 +14,7 @@ import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 /** Die Auswahl der Maske → das Ziel des Use-Case. Zwei Sonderwerte, sonst eine Vertrags-Id. */
 function sammelziel(wahl: string): Sammelziel {
@@ -153,16 +154,9 @@ export function SammelDialog({
           <div className="form-grid">
             <FormField
               label={
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={kategorieAn}
-                    aria-label={t("konten.sammel.kategorieSetzen")}
-                    onChange={(e) => setKategorieAn(e.target.checked)}
-                    style={{ accentColor: "var(--accent-deep)" }}
-                  />
+                <Kaestchen an={kategorieAn} aufAendern={setKategorieAn}>
                   {t("konten.sammel.kategorieSetzen")}
-                </span>
+                </Kaestchen>
               }
               hint={kategorieAn && !kategorieId ? t("konten.sammel.kategorieLeeren") : undefined}
             >
@@ -173,16 +167,9 @@ export function SammelDialog({
 
             <FormField
               label={
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={notizAn}
-                    aria-label={t("konten.sammel.bezeichnungSetzen")}
-                    onChange={(e) => setNotizAn(e.target.checked)}
-                    style={{ accentColor: "var(--accent-deep)" }}
-                  />
+                <Kaestchen an={notizAn} aufAendern={setNotizAn}>
                   {t("konten.sammel.bezeichnungSetzen")}
-                </span>
+                </Kaestchen>
               }
               hint={t("konten.sammel.bezeichnungHinweis")}
             >
@@ -201,16 +188,9 @@ export function SammelDialog({
                 und trägt eine Herkunft, die der nächste Abgleich respektieren muss. */}
             <FormField
               label={
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={vertragAn}
-                    aria-label={t("konten.sammel.vertragSetzen")}
-                    onChange={(e) => setVertragAn(e.target.checked)}
-                    style={{ accentColor: "var(--accent-deep)" }}
-                  />
+                <Kaestchen an={vertragAn} aufAendern={setVertragAn}>
                   {t("konten.sammel.vertragSetzen")}
-                </span>
+                </Kaestchen>
               }
               hint={vertragAn ? t(`konten.sammel.vertragHinweis.${zielArt}`) : undefined}
             >

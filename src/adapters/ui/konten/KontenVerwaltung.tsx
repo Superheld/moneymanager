@@ -39,6 +39,7 @@ import { KontoAufloesenModal } from "./KontoAufloesenModal";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 /** Woran ein Konto hängt: welcher Zugang, welches Bankkonto, bis wann geholt. */
 export interface KontoVerbindung {
@@ -348,10 +349,9 @@ export function KontenVerwaltung({
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-3)", paddingTop: 4 }}>
                   {personen.map((p) => (
-                    <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--fs-sm)" }}>
-                      <input type="checkbox" checked={inhaberIds.includes(p.id)} onChange={() => toggleInhaber(p.id)} />
+                    <Kaestchen key={p.id} an={inhaberIds.includes(p.id)} aufAendern={() => toggleInhaber(p.id)} style={{ fontSize: "var(--fs-sm)" }}>
                       {p.name}
-                    </label>
+                    </Kaestchen>
                   ))}
                 </div>
               )}

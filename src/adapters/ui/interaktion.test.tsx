@@ -690,8 +690,8 @@ describe("Massenbearbeitung im Register", () => {
 
   /** Schaltet den Auswahlmodus ein und markiert alle gefilterten Zeilen. */
   async function alleMarkieren(nutzer: ReturnType<typeof userEvent.setup>) {
-    await nutzer.click(screen.getByLabelText(/mehrere bearbeiten/i));
-    await nutzer.click(await screen.findByLabelText(/alle gefilterten/i));
+    await nutzer.click(screen.getByRole("checkbox", { name: /mehrere bearbeiten/i }));
+    await nutzer.click(await screen.findByRole("checkbox", { name: /alle gefilterten/i }));
   }
 
   it("zeigt die Kästchen erst, wenn man den Modus einschaltet", async () => {
@@ -701,9 +701,9 @@ describe("Massenbearbeitung im Register", () => {
     await screen.findByText("Baecker");
 
     // Eine dauerhafte Kästchenspalte macht aus einer Leseansicht ein Formular.
-    expect(screen.queryByLabelText(/diese buchung wählen/i)).toBeNull();
-    await nutzer.click(screen.getByLabelText(/mehrere bearbeiten/i));
-    expect(screen.getAllByLabelText(/diese buchung wählen/i)).toHaveLength(2);
+    expect(screen.queryByRole("checkbox", { name: /diese buchung wählen/i })).toBeNull();
+    await nutzer.click(screen.getByRole("checkbox", { name: /mehrere bearbeiten/i }));
+    expect(screen.getAllByRole("checkbox", { name: /diese buchung wählen/i })).toHaveLength(2);
   });
 
   it("setzt die Kategorie auf allen markierten Buchungen", async () => {
@@ -716,7 +716,7 @@ describe("Massenbearbeitung im Register", () => {
     await nutzer.click(screen.getByRole("button", { name: /auswahl bearbeiten/i }));
     const dialog = within(await screen.findByRole("dialog"));
     // Ohne Haken passiert nichts — leer heisst hier „nicht anfassen".
-    await nutzer.click(dialog.getByLabelText(/kategorie setzen/i));
+    await nutzer.click(dialog.getByRole("checkbox", { name: /kategorie setzen/i }));
     await nutzer.click(dialog.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
     await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel/ }));
     await nutzer.click(dialog.getByRole("button", { name: /anwenden/i }));

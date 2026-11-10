@@ -766,6 +766,70 @@ select.field.tabellenfilter {
   border-color: transparent;
 }
 
+/* --- Kaestchen und Optionsfelder (bausteine/Kaestchen.tsx, buchung/Optionsgruppe.tsx) ---
+   Base UI rendert beide als `span` mit Rolle und haengt ein verstecktes `input` daneben;
+   das Aussehen haengt deshalb an den Datenattributen (`data-checked`, `data-disabled`),
+   nicht an `:checked`. Vorher das native Feld, eingefaerbt per `accentColor` — an manchen
+   Stellen, an anderen nicht, und damit in zwei Farben. */
+.kaestchen,
+.option {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+}
+.kaestchen--oben {
+  align-items: flex-start;
+}
+.kaestchen--oben .kaestchen-feld {
+  margin-top: 3px;
+}
+.kaestchen[data-disabled],
+.option[data-disabled] {
+  cursor: not-allowed;
+}
+.kaestchen-feld,
+.optionsfeld {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--ink-3);
+  background: var(--surface);
+  cursor: pointer;
+}
+.kaestchen-feld {
+  border-radius: 4px;
+  color: #fff;
+}
+.optionsfeld {
+  border-radius: 50%;
+}
+.kaestchen-feld[data-checked] {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+}
+.optionsfeld[data-checked] {
+  border-color: var(--accent-deep);
+}
+.optionsfeld-punkt {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-deep);
+}
+.kaestchen-feld:focus-visible,
+.optionsfeld:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.kaestchen-feld[data-disabled],
+.optionsfeld[data-disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 /* --- Der Bezeichner einer Zeile, der weiterfuehrt ---
    Nicht zu verwechseln mit `Button variant="link"`, und der Unterschied ist Absicht:
    der Link-Knopf ist eine gedaempfte NEBENAKTION in einer Zeile („Profil ansehen") und soll

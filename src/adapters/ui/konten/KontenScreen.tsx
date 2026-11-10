@@ -47,6 +47,7 @@ import { PageHead } from "../bausteine/PageHead";
 import { IconButton } from "../bausteine/IconButton";
 import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -579,15 +580,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 {t("konten.dubletten.filter", { n: dublettenAnzahl })}
               </button>
             )}
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-xs)", color: "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-              <input
-                type="checkbox"
-                checked={auswahlModus}
-                onChange={(e) => { setAuswahlModus(e.target.checked); if (!e.target.checked) setAuswahl(new Set()); }}
-                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
-              />
+            <Kaestchen
+              an={auswahlModus}
+              aufAendern={(an) => { setAuswahlModus(an); if (!an) setAuswahl(new Set()); }}
+              style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)", whiteSpace: "nowrap" }}
+            >
               {t("konten.sammel.modus")}
-            </label>
+            </Kaestchen>
           </div>
 
           {/* Die Aktionsleiste erscheint erst, wenn etwas markiert ist — vorher gäbe es
@@ -620,23 +619,19 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   ? [{
                       key: "_sel",
                       label: (
-                        <input
-                          type="checkbox"
-                          checked={alleGewaehlt}
-                          aria-label={t("konten.sammel.alleWaehlen")}
-                          onChange={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
-                          style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                        <Kaestchen
+                          an={alleGewaehlt}
+                          label={t("konten.sammel.alleWaehlen")}
+                          aufAendern={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
                         />
                       ),
                       sortable: false,
                       render: (r: Registerzeile) =>
                         r.zeile.istId ? (
-                          <input
-                            type="checkbox"
-                            checked={auswahl.has(r.zeile.istId)}
-                            aria-label={t("konten.sammel.zeileWaehlen")}
-                            onChange={() => auswahlUmschalten(r.zeile.istId!)}
-                            style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                          <Kaestchen
+                            an={auswahl.has(r.zeile.istId)}
+                            label={t("konten.sammel.zeileWaehlen")}
+                            aufAendern={() => auswahlUmschalten(r.zeile.istId!)}
                           />
                         ) : null,
                     }]

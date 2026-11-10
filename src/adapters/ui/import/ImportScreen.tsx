@@ -27,6 +27,7 @@ import { Button, Card, DataTable } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { FremdkategorienKarte } from "./FremdkategorienKarte";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 const VORSCHAU_MAX = 500;
 type RU = ImportErgebnis["umsaetze"][number];
@@ -223,16 +224,12 @@ export function ImportScreen() {
             <thead>
               <tr>
                 <th style={{ width: 32, padding: "8px 10px", borderBottom: "1px solid var(--line)" }}>
-                  <input
-                    type="checkbox"
-                    checked={matches.some((m) => !ausgeschlossen.has(m.quelleKey))}
-                    aria-label={t("import.alleKontenImportieren")}
-                    onChange={(e) =>
-                      setAusgeschlossen(
-                        e.target.checked ? new Set() : new Set(matches.map((m) => m.quelleKey)),
-                      )
+                  <Kaestchen
+                    an={matches.some((m) => !ausgeschlossen.has(m.quelleKey))}
+                    label={t("import.alleKontenImportieren")}
+                    aufAendern={(an) =>
+                      setAusgeschlossen(an ? new Set() : new Set(matches.map((m) => m.quelleKey)))
                     }
-                    style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
                   />
                 </th>
                 <th style={{ textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" }}>{t("import.spalteQuelle")}</th>
@@ -247,11 +244,10 @@ export function ImportScreen() {
                 return (
                   <tr key={m.quelleKey}>
                     <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", verticalAlign: "top" }}>
-                      <input
-                        type="checkbox"
-                        checked={dabei}
-                        aria-label={t("import.kontoImportieren", { name: m.quelleName ?? m.quelleKey })}
-                        onChange={() =>
+                      <Kaestchen
+                        an={dabei}
+                        label={t("import.kontoImportieren", { name: m.quelleName ?? m.quelleKey })}
+                        aufAendern={() =>
                           setAusgeschlossen((bisher) => {
                             const neu = new Set(bisher);
                             if (neu.has(m.quelleKey)) neu.delete(m.quelleKey);
@@ -259,7 +255,6 @@ export function ImportScreen() {
                             return neu;
                           })
                         }
-                        style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
                       />
                     </td>
                     {/* Die abgewählte Zeile bleibt STEHEN und wird nur blass. Sie zu

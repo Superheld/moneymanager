@@ -52,6 +52,7 @@ import { IconButton } from "../bausteine/IconButton";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useGeld } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 /** Wie viele Treffer die Vorschau einzeln auflistet — der Rest wird gezaehlt. */
 const VORSCHAU_ZEILEN = 8;
@@ -279,18 +280,14 @@ export function ErkennungsBereich({
                     ein Pflichtmerkmal verengt die Regel, ein offenes erweitert sie. Wer
                     die Liste ueberfliegt, soll das an der linken Kante sehen und nicht
                     erst am Ende der Zeile. */}
-                <label
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4, flex: "0 0 auto", fontSize: "var(--fs-xs)" }}
+                <Kaestchen
+                  an={!!m.pflicht}
+                  aufAendern={(an) => merkmalSetzen(i, { pflicht: an })}
                   title={t("vertraege.regel.pflichtHinweis")}
+                  style={{ gap: 4, flex: "0 0 auto", fontSize: "var(--fs-xs)" }}
                 >
-                  <input
-                    type="checkbox"
-                    aria-label={t("vertraege.regel.pflicht")}
-                    checked={!!m.pflicht}
-                    onChange={(e) => merkmalSetzen(i, { pflicht: e.target.checked })}
-                  />
                   <span className="muted">{t("vertraege.regel.pflicht")}</span>
-                </label>
+                </Kaestchen>
                 <Auswahl
                   ariaLabel={t("vertraege.regel.merkmalArt")}
                   wert={m.art}

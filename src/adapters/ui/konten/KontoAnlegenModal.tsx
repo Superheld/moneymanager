@@ -36,6 +36,7 @@ import { beiEnter } from "../bausteine/beiEnter";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useExperimente, useGeld } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 type Art = "offline" | "online";
 
@@ -313,10 +314,9 @@ export function KontoAnlegenModal({
               <FormField label={t("einstellungen.konto.feldInhaber")}>
                 <span style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap" }}>
                   {personen.map((p) => (
-                    <label key={p.id} style={{ display: "flex", gap: "var(--sp-1)", alignItems: "center" }}>
-                      <input type="checkbox" checked={inhaberIds.includes(p.id)} onChange={() => toggleInhaber(p.id)} />
+                    <Kaestchen key={p.id} an={inhaberIds.includes(p.id)} aufAendern={() => toggleInhaber(p.id)}>
                       {p.name}
-                    </label>
+                    </Kaestchen>
                   ))}
                 </span>
               </FormField>

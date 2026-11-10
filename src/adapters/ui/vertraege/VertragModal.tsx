@@ -54,6 +54,7 @@ import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useGeld, fehlerNachricht, type Geld } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 
@@ -582,18 +583,13 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
             anders einsortiert hat, verlöre das beim nächsten Hinsehen. */}
         {f.kategorieId && (
           <div>
-            <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={kategorieUebertragen}
-                onChange={(e) => setKategorieUebertragen(e.target.checked)}
-              />
+            <Kaestchen an={kategorieUebertragen} aufAendern={setKategorieUebertragen} style={{ display: "flex" }}>
               <span style={{ fontSize: "var(--fs-small)" }}>
                 {zugeordneteZahlungen > 0
                   ? t("vertraege.kategorieUebertragenZahl", { count: zugeordneteZahlungen })
                   : t("vertraege.kategorieUebertragen")}
               </span>
-            </label>
+            </Kaestchen>
             {kategorieUebertragen && (
               <p className="muted" style={{ fontSize: "var(--fs-xs)", margin: "6px 0 0 26px", maxWidth: 560 }}>
                 {t("vertraege.kategorieUebertragenHinweis")}

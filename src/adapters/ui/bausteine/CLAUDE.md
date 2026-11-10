@@ -30,6 +30,20 @@ hat, steht es darunter.
 `index.ts` bündelt diesen Block, damit ein Screen `from "../bausteine"` schreiben kann. Die
 eigenen Bausteine daneben werden einzeln importiert.
 
+## `Kaestchen` — ankreuzen, auf Base UI `Checkbox`
+
+Seit 2026-11-10 der Ersatz für `<input type="checkbox">`, das an rund zwanzig Stellen mit
+je eigener Hülle stand, mal mit `accentColor`, mal ohne — also in zwei Farben. Zwei Dinge,
+die man beim Benutzen wissen muss:
+
+- **Der Name.** Mit Text als `children` steht es in einem `<label>`, und der Text ist der
+  Name; ohne Text ist `label` Pflicht. Stehen beide da, gilt `label` — und dafür braucht
+  es einen Umweg: Base UI verweist per `aria-labelledby` auf das GANZE Label, und das
+  gewinnt gegen `aria-label`. Das Kästchen bekäme sonst den ganzen Absatz daneben als
+  Namen (so geschehen bei den Schaltern in den Einstellungen, bis der Umweg stand).
+- **`oben`** für Text über mehrere Zeilen: das Kästchen steht dann neben der ersten Zeile
+  und nicht neben der Mitte.
+
 ## `Zeilenauswahl` — eine Wahl in einer Tabellenzeile
 
 Ein Formularfeld ist für FORMULARE gebaut: volle Breite, grosse Innenabstände, eigene

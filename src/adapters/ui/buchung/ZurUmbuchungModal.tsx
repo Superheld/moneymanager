@@ -14,6 +14,7 @@ import { Button } from "../bausteine";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+import { Option, Optionsgruppe } from "./Optionsgruppe";
 
 /**
  * S-1 — macht aus einer bestehenden Buchung eine Umbuchung. EIN Dialog für beide Fälle:
@@ -87,19 +88,28 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
       <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
         {t("konten.zurUmbuchung.kandidatenTitel")}
       </div>
+      {/* Die Gruppe umschliesst Kandidaten UND den Ausweg: es ist eine Frage („welche
+          Gegenseite?"), und die Pfeiltasten laufen über alle Antworten. Die Spalte mit
+          Abstand nimmt die Abstände des Dialoginhalts mit, in dem die Zeilen vorher
+          unmittelbar standen. */}
+      <Optionsgruppe
+        wert={wahl}
+        aufAendern={setWahl}
+        label={t("konten.zurUmbuchung.kandidatenTitel")}
+        style={{ display: "flex", flexDirection: "column", gap: 15 }}
+      >
       {kandidaten.length === 0 ? (
         <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.zurUmbuchung.keineKandidaten", { tage: MAX_VORSCHLAG_TAGE })}</div>
       ) : (
         kandidaten.map((k) => (
-          <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
-            <input type="radio" name="gegenbein" value={k.id} checked={wahl === k.id} onChange={() => setWahl(k.id)} style={{ accentColor: "var(--accent-deep)" }} />
+          <Option key={k.id} wert={k.id} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datum.ohneJahr(k.datum)}</span>
             <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
               {kontoName.get(k.kontoId) ?? "?"}
               {kandidatLabel(k) && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{kandidatLabel(k)}</span>}
             </span>
             <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
-          </label>
+          </Option>
         ))
       )}
 
@@ -116,8 +126,7 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
             {t("konten.zurUmbuchung.oder")}
             <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
-          <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
-            <input type="radio" name="gegenbein" value="__neu" checked={wahl === "__neu"} onChange={() => setWahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
+          <Option wert="__neu" style={{ display: "flex", gap: 10 }}>
             <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
             <span style={{ minWidth: 180 }}>
               <Auswahl
@@ -127,7 +136,7 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
                 optionen={andereKonten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
               />
             </span>
-          </label>
+          </Option>
           <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
         </>
       ) : (
@@ -135,6 +144,7 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
           {t("konten.zurUmbuchung.nurVerbinden")}
         </div>
       )}
+      </Optionsgruppe>
 
       {buchung.kategorieId && (
         <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)" }}>

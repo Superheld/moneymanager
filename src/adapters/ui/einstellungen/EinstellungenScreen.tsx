@@ -43,6 +43,7 @@ import {
   useExperimentSchalter,
   useRegionUmschalter,
 } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };
@@ -214,17 +215,10 @@ function SchalterZeile({
 }) {
   const { t } = useTranslation();
   return (
-    <label style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-start", cursor: "pointer" }}>
-      <input
-        type="checkbox"
-        checked={an}
-        // Die Beschriftung steht daneben, nicht im Feld — ohne den Namen meldet eine
-        // Vorlesehilfe nur "Kontrollkaestchen", und mit dem zweiten Experiment waeren
-        // beide nicht mehr auseinanderzuhalten.
-        aria-label={titel}
-        onChange={(e) => aufSchalten(e.target.checked)}
-        style={{ marginTop: 3 }}
-      />
+    // `label`: der Text daneben traegt auch Zustand und Erklaerung — als Name waere das
+    // ein ganzer Absatz, und mit dem zweiten Experiment waeren beide nicht mehr
+    // auseinanderzuhalten.
+    <Kaestchen an={an} aufAendern={aufSchalten} label={titel} oben style={{ gap: "var(--sp-3)", display: "flex" }}>
       <span>
         <span style={{ fontWeight: "var(--fw-bold)" }}>{titel}</span>
         {" · "}
@@ -234,7 +228,7 @@ function SchalterZeile({
         <br />
         <span className="muted">{text}</span>
       </span>
-    </label>
+    </Kaestchen>
   );
 }
 

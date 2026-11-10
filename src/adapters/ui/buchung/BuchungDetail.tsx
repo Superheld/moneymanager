@@ -101,6 +101,8 @@ import {
 } from "./Richtungswahl";
 import { DublettenBlock, FreigabeHinweis, type Dublettenbefund } from "./DublettenBlock";
 import { VertragsBlock, type VertragsBindung } from "./VertragsBlock";
+import { Kaestchen } from "../bausteine/Kaestchen";
+import { Option, Optionsgruppe } from "./Optionsgruppe";
 
 /** Stabile Leerwerte — als Literal im useState-Aufruf wäre jeder Render ein neues Objekt. */
 const LEERE_KARTE: ReadonlyMap<string, Dublettenverdacht> = new Map();
@@ -706,18 +708,14 @@ function BuchungFormular({
             Deshalb steht er als Kästchen und nicht im Formularraster darüber. */}
         {!istEntwurf && buchung && (
           <FormField label={t("konten.pruefenFeld")} hint={t("konten.pruefenHinweis")}>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)", fontSize: "var(--fs-sm)", cursor: "pointer" }}>
-              <input
-                type="checkbox"
-                checked={!!aktuelle?.zuPruefen}
-                disabled={busy}
-                onChange={async (e) => {
-                  await onPruefmarker(e.target.checked);
-                }}
-                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
-              />
+            <Kaestchen
+              an={!!aktuelle?.zuPruefen}
+              disabled={busy}
+              aufAendern={(an) => void onPruefmarker(an)}
+              style={{ fontSize: "var(--fs-sm)" }}
+            >
               {t("konten.pillPruefen")}
-            </label>
+            </Kaestchen>
           </FormField>
         )}
         {!istEntwurf && (
@@ -758,34 +756,32 @@ function BuchungFormular({
                 </Button>
               </div>
 
+              <Optionsgruppe wert={gegenGewaehlt} aufAendern={setGegenwahl} label={t("konten.zurUmbuchung.kandidatenTitel")}>
               {entwurfKandidaten.map((k) => (
-                <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
-                  <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === `e:${k.id}`} onChange={() => setGegenwahl(`e:${k.id}`)} style={{ accentColor: "var(--accent-deep)" }} />
+                <Option key={k.id} wert={`e:${k.id}`} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.buchungstag)}</span>
                   <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
                     {kontoName.get(k.zahlungskontoId) ?? "?"}
                     <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.neu")}</span>
                   </span>
                   <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
-                </label>
+                </Option>
               ))}
 
               {buchungKandidaten.map((k) => (
-                <label key={k.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)", cursor: "pointer" }}>
-                  <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === `b:${k.id}`} onChange={() => setGegenwahl(`b:${k.id}`)} style={{ accentColor: "var(--accent-deep)" }} />
+                <Option key={k.id} wert={`b:${k.id}`} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
                   <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.datum)}</span>
                   <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
                     {kontoName.get(k.kontoId) ?? "?"}
                     <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.verbucht")}</span>
                   </span>
                   <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
-                </label>
+                </Option>
               ))}
 
               {/* Ausweg: kein Gegenbein vorhanden (S-1a) — typisch Bargeld. */}
               {andereKonten.length > 0 && (
-                <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer", flexWrap: "wrap" }}>
-                  <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === "__neu"} onChange={() => setGegenwahl("__neu")} style={{ accentColor: "var(--accent-deep)" }} />
+                <Option wert="__neu" style={{ display: "flex", gap: 10, padding: "8px 0", flexWrap: "wrap" }}>
                   <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
                   <span style={{ minWidth: 180 }}>
                     <Auswahl
@@ -795,13 +791,13 @@ function BuchungFormular({
                       optionen={andereKonten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
                     />
                   </span>
-                </label>
+                </Option>
               )}
 
-              <label style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0", cursor: "pointer" }}>
-                <input type="radio" name="entwurfGegenbein" checked={gegenGewaehlt === "__einseitig"} onChange={() => setGegenwahl("__einseitig")} style={{ accentColor: "var(--accent-deep)" }} />
+              <Option wert="__einseitig" style={{ display: "flex", gap: 10, padding: "8px 0" }}>
                 <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.entwurf.einseitig")}</span>
-              </label>
+              </Option>
+              </Optionsgruppe>
 
               <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
                 {gegenGewaehlt === "__einseitig" ? t("konten.neue.ohneGegenbein") : t("konten.zurUmbuchung.neuHinweis")}

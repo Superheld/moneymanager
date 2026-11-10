@@ -21,6 +21,7 @@ import {
 } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Abschnitt, type Hilfe } from "./kartenteile";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 /**
  * Der Wortbestand — eine Liste statt zweier Karten.
@@ -119,16 +120,13 @@ export function WoerterInhalt({
         {MERKMALSHERKUENFTE.map((h) => {
           const w = wirkungJe.get(h);
           return (
-            <label
+            <Kaestchen
               key={h}
-              style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-start", cursor: "pointer" }}
+              an={aktiv.has(h)}
+              aufAendern={(an) => aufSchalten(h, an)}
+              oben
+              style={{ display: "flex", gap: "var(--sp-3)" }}
             >
-              <input
-                type="checkbox"
-                checked={aktiv.has(h)}
-                onChange={(e) => aufSchalten(h, e.target.checked)}
-                style={{ marginTop: 3 }}
-              />
               <span>
                 <span style={{ fontWeight: "var(--fw-bold)" }}>{t(`einstellungen.lernmaterial.herkunft.${h}`)}</span>
                 {!aktiv.has(h) && <> · <span className="muted">{t("einstellungen.lernmaterial.herkunftAus")}</span></>}
@@ -149,7 +147,7 @@ export function WoerterInhalt({
                   {t(`einstellungen.lernmaterial.herkunftHinweis.${h}`)}
                 </div>
               </span>
-            </label>
+            </Kaestchen>
           );
         })}
       </div>
@@ -236,14 +234,9 @@ export function WoerterInhalt({
               ]}
             />
           </FormField>
-          <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", paddingBottom: "var(--sp-2)", cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={mitStandard}
-              onChange={(e) => setMitStandard(e.target.checked)}
-            />
+          <Kaestchen an={mitStandard} aufAendern={setMitStandard} style={{ paddingBottom: "var(--sp-2)" }}>
             <span>{t("einstellungen.lernmaterial.mitStandard")}</span>
-          </label>
+          </Kaestchen>
           <span className="muted" style={{ paddingBottom: "var(--sp-2)" }}>
             {t("einstellungen.lernmaterial.bestandZahl", {
               gezeigt: zahl(sichtbar.length),

@@ -38,14 +38,14 @@ const schalterName = () => i18n.t("einstellungen.experiment.hanseaticTitel");
 
 async function schalterHolen(nutzer: ReturnType<typeof userEvent.setup>) {
   await registerWaehlen(nutzer, registerName());
-  return (await screen.findByLabelText(schalterName())) as HTMLInputElement;
+  return await screen.findByRole("checkbox", { name: schalterName() });
 }
 
 describe("Experimente-Schalter", () => {
   it("ist aus, solange ihn niemand eingeschaltet hat", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    expect((await schalterHolen(nutzer)).checked).toBe(false);
+    expect((await schalterHolen(nutzer))).not.toBeChecked();
   });
 
   it("schaltet ein und schreibt es in die Datenbank", async () => {
@@ -59,7 +59,7 @@ describe("Experimente-Schalter", () => {
       const kv = await sqliteEinstellungenRepository.lesen();
       expect(kv["experiment.hanseatic"]).toBe("an");
     });
-    await waitFor(() => expect(schalter.checked).toBe(true));
+    await waitFor(() => expect(schalter).toBeChecked());
   });
 
   it("schaltet wieder aus", async () => {
@@ -68,14 +68,14 @@ describe("Experimente-Schalter", () => {
     const schalter = await schalterHolen(nutzer);
 
     await nutzer.click(schalter);
-    await waitFor(() => expect(schalter.checked).toBe(true));
+    await waitFor(() => expect(schalter).toBeChecked());
     await nutzer.click(schalter);
 
     await waitFor(async () => {
       const kv = await sqliteEinstellungenRepository.lesen();
       expect(kv["experiment.hanseatic"]).toBe("aus");
     });
-    await waitFor(() => expect(schalter.checked).toBe(false));
+    await waitFor(() => expect(schalter).not.toBeChecked());
   });
 
   // Der eigentliche Punkt eines Schalters: er überlebt den Neustart. Ohne das wäre er
@@ -85,6 +85,6 @@ describe("Experimente-Schalter", () => {
 
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    expect((await schalterHolen(nutzer)).checked).toBe(true);
+    expect((await schalterHolen(nutzer))).toBeChecked();
   });
 });

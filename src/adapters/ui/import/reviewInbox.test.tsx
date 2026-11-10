@@ -103,8 +103,8 @@ describe("Mehrere Zeilen auf einmal", () => {
 
   /** Schaltet den Sammelmodus ein und markiert alles, was gerade dasteht. */
   async function alleMarkieren(nutzer: ReturnType<typeof userEvent.setup>) {
-    await nutzer.click(await screen.findByLabelText(i18n.t("review.sammel.modus")));
-    await nutzer.click(await screen.findByLabelText(i18n.t("review.sammel.alleWaehlen")));
+    await nutzer.click(await screen.findByRole("checkbox", { name: i18n.t("review.sammel.modus") }));
+    await nutzer.click(await screen.findByRole("checkbox", { name: i18n.t("review.sammel.alleWaehlen") }));
   }
 
   it("zeigt die Kästchen erst, wenn man den Modus einschaltet", async () => {
@@ -115,10 +115,10 @@ describe("Mehrere Zeilen auf einmal", () => {
     rendere(<ReviewScreen />);
 
     await screen.findByText("Kesselmann");
-    expect(screen.queryByLabelText(i18n.t("review.sammel.zeileWaehlen"))).not.toBeInTheDocument();
+    expect(screen.queryByRole("checkbox", { name: i18n.t("review.sammel.zeileWaehlen") })).not.toBeInTheDocument();
 
-    await nutzer.click(await screen.findByLabelText(i18n.t("review.sammel.modus")));
-    expect(await screen.findAllByLabelText(i18n.t("review.sammel.zeileWaehlen"))).toHaveLength(2);
+    await nutzer.click(await screen.findByRole("checkbox", { name: i18n.t("review.sammel.modus") }));
+    expect(await screen.findAllByRole("checkbox", { name: i18n.t("review.sammel.zeileWaehlen") })).toHaveLength(2);
   });
 
   it("setzt die Kategorie an allen markierten Zeilen", async () => {

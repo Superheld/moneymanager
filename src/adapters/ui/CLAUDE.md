@@ -77,6 +77,8 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Wahl im Formular | `Auswahl`; in einer Tabellenzeile: `Zeilenauswahl`; Kategorie: `CategoryPicker` |
 | Datum | `Datumsfeld`, angezeigt über `useDatum()` |
 | Feld plus Knopf nebeneinander | `Feldzeile`; Formularfeld: `FormField` |
+| Ankreuzen | `Kaestchen` (Text als `children`, ohne Text `label`) |
+| Eine von mehreren Antworten | `buchung/Optionsgruppe` mit `Option` — bisher nur im Buchungsdialog |
 | Knopf | `Button` — `primary` Hauptaktion, `link` gedämpfte Nebenaktion („Abbrechen"), `laeuft` sperrt während einer Handlung; Zeilenaktion als Icon: `IconButton` |
 | Dialog | `Modal` (Base UI `Dialog`; `warnung` für Rückfragen); vor dem Löschen: `Loeschfrage` |
 | Bankabruf, TAN | `AbrufDialog`, `TanDialog` |
@@ -183,11 +185,21 @@ Wo es heute steht:
 | `bausteine/Datumsfeld` | `<input type="date">` | Base UI `Popover`, Kalender von Hand |
 | `bausteine/Button` | eigener `<button>` mit Inline-Stil, roher `.linkbtn` | Base UI `Button` |
 | `bausteine/Modal` | Eigenbau mit Nummernstapel plus `Dialog.jsx` | Base UI `Dialog`, mit `warnung` `AlertDialog` |
+| `bausteine/Kaestchen` | `<input type="checkbox">` mit `accentColor` | Base UI `Checkbox` |
+| `buchung/Optionsgruppe`, `buchung/Richtungswahl` | `<input type="radio">`, eigene `role="radiogroup"` | Base UI `RadioGroup`/`Radio` |
 
-**Noch nicht umgestellt:** Kästchen und Optionsfelder → `Checkbox`/`Radio`,
-`Klappblock` → `Collapsible`, `Registerleiste` → `Tabs`, der Kategoriebaum im
+**Noch nicht umgestellt:** `Klappblock` → `Collapsible`, `Registerleiste` → `Tabs`, der Kategoriebaum im
 `CategoryPicker` → `Combobox` prüfen. Ein Tooltip-Baustein, wenn er kommt, kommt von dort
-(`Tooltip`). Wer einen davon anfasst, stellt ihn um, statt am Eigenbau weiterzubauen.
+(`Tooltip`). Die Schalter in den Einstellungen (Experimente, Update-Prüfung) sind heute
+Kästchen und wären semantisch ein `Switch` — „an/aus" statt „angekreuzt". Wer einen davon
+anfasst, stellt ihn um, statt am Eigenbau weiterzubauen.
+
+**Kästchen und Optionsfelder sind in Tests keine `<input>` mehr.** Base UI rendert ein
+`span` mit Rolle und hängt ein verstecktes `input` daneben. Daraus folgt zweierlei:
+`.checked` gibt es am gefundenen Element nicht — `toBeChecked()` liest `aria-checked`
+und trägt in beiden Fällen —, und `getByLabelText` findet ZWEI Elemente, weil das
+versteckte Feld mit im `<label>` liegt. Gegriffen wird deshalb über
+`getByRole("checkbox" | "radio", { name })`.
 
 **Die alte Grenze bleibt als Begründung für den Kalender gültig:** ein Auswahlfeld braucht
 Combobox-Semantik (Knopf und Liste über ARIA verbunden, Tippsuche, Rollen) — das schreibt
