@@ -516,8 +516,9 @@ select.field {
   outline-offset: -2px;
 }
 
-/* Die Analyse-Zeile ist ein `tr` und kann kein Knopf sein — dort traegt die Zeile nur die
-   Flaeche. Die Tastaturfrage stellt sich dort schon laenger und haengt an `DataTable`. */
+/* In `Aufklapptabelle` ist die Zeile ein `tr` und kann kein Knopf sein — sie traegt
+   deshalb role="button", tabIndex und reagiert auf Enter/Leertaste. Die Klasse liefert
+   nur Flaeche und Fokusrahmen. */
 tr.buchungszeile {
   display: table-row;
   border-radius: 0;

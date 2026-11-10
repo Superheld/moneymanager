@@ -13,15 +13,80 @@ bekommt fertige Sichten, keine Rohteile. Eine Domänenregel, die die UI umgehen 
 sie irgendwann. Geprüft in `src/architektur.test.ts`, die Ausnahmeliste ist leer und bleibt
 es.
 
-## Gliederung
+## So wird hier gebaut
+
+Bevor eine neue Komponente entsteht, in dieser Reihenfolge:
+
+1. **Im Bausteinkatalog unten nachsehen.** Gibt es etwas für diesen Zweck, wird es benutzt —
+   auch wenn es nicht genau passt.
+2. **Passt es nicht ganz, wird der Baustein erweitert, nicht kopiert.** Eine zweite Fassung
+   „fast wie die andere" ist der Fehler, gegen den diese Regel steht: drei Aufklapptabellen
+   mit drei Polsterungen sahen an drei Stellen verschieden aus, und eine Verbesserung an
+   einer erreichte die anderen nie. Optionen am Baustein sind billiger als Doppelbauten.
+3. **Neu gebaut wird im Bereichsordner.** Braucht es ein zweiter Bereich, wandert es nach
+   `bausteine/` — gemessen, nicht geschätzt (siehe unten, „Gliederung").
+4. **Rechnen und Auswählen gehört nicht hierher** (oben): fehlt der Wert, fehlt ein Feld in
+   der Sicht des Use-Cases.
+5. **Texte in `src/i18n/i18n.ts`**, de und en zugleich; Platzhalter mit `{{doppelt}}`.
+6. **Schmal ansehen.** Unter 700 px fällt `DataTable` zusammen, unter 1100 px die
+   Seitenleiste; was dabei bricht, bricht beim Nutzer auf dem Telefon.
+7. **Test über die Oberfläche bis ins Schema** (unten, „Tests für Screens"), gesucht nach
+   Daten und i18n-Schlüsseln, nicht nach Wortlaut.
+
+## Gliederung — was wo liegt
 
 Ein Ordner je Navigationsbereich, dazu `bausteine/` für alles Geteilte (eigene Regeln dort
 in `bausteine/CLAUDE.md`). Die Einsortierregel: **was zwei oder mehr Bereiche benutzen, ist
 ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es allgemein aussieht.
 
+| Ordner | was |
+|---|---|
+| `uebersicht/` | „wie stehe ich gerade da": Monatskarten, Budgets, Was da ist, Depotstand (Regeln in `uebersicht/CLAUDE.md`) |
+| `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot |
+| `budgets/` | Budgetliste, Verlauf eines Budgets, Vorschläge |
+| `ruecklagen/` | Rücklagen, Fluss, Tacho |
+| `vertraege/` | Verträge und ihre Erkennung |
+| `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
+| `buchung/` | der Buchungsdialog in Teilen (unten) — er wird aus mehreren Bereichen geöffnet |
+| `import/` | Dateiimport und Review-Inbox |
+| `training/` | Werkbank der Kategorie-Erkennung (Regeln in `training/CLAUDE.md`) |
+| `einstellungen/` | Einstellungen, Exporte, Konfigurationsimport |
+| `zugang/` | Sperrbildschirm, Verschlüsselung |
+| `bausteine/` | alles, was zwei oder mehr Bereiche benutzen |
+
+Die Navigation steht in `bausteine/AppShell.tsx`, die Zuordnung zur Komponente in
+`App.tsx`, die gebundenen Aufrufe in `../dienste.ts`.
+
 Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlich ist es
 `kategorien/` wie in Kern und Anwendung. Die drei bereichsübergreifenden Tests (`screens`,
 `interaktion`, `formulare`) liegen in der Wurzel.
+
+## Bausteinkatalog — wofür es schon etwas gibt
+
+| Bedarf | Baustein |
+|---|---|
+| Fläche um einen Inhalt | `Card` (nie eine Karte IN einer Karte, unten) |
+| Seitenkopf mit Aktion | `PageHead`; Bereich mit Reitern: `Bereich`, die Reiter allein `Registerleiste` |
+| Tabelle | `DataTable` — Sortierung, Seiten, Zeilenklick, schmale Form |
+| Bezeichner in einer Zeile, der aufklappt | `Zeilenlink` |
+| Liste, die unter einer Zeile aufklappt | `Aufklapptabelle`; nur die Fläche: `Aufklappflaeche`; Höhe: `aufklappen.ts` |
+| Buchungen eines Budgets | `BudgetPostenliste` (auf `Aufklapptabelle`) |
+| Abschnitt im Dialog, auf- und zuklappbar | `Klappblock` |
+| Kennzahl | `KPIStat`; Balken mit Rahmen: `CoverageTrack` |
+| Etikett | `Pill` — sagt, was etwas IST |
+| Wahl im Formular | `Auswahl`; in einer Tabellenzeile: `Zeilenauswahl`; Kategorie: `CategoryPicker` |
+| Datum | `Datumsfeld`, angezeigt über `useDatum()` |
+| Feld plus Knopf nebeneinander | `Feldzeile`; Formularfeld: `FormField` |
+| Knopf | `Button`; Zeilenaktion als Icon: `IconButton` |
+| Dialog | `Modal` (über `Dialog`); vor dem Löschen: `Loeschfrage` |
+| Bankabruf, TAN | `AbrufDialog`, `TanDialog` |
+| Geld, Prozent, Farbe | `useGeld()`, `useProzent()`, `geldFarbe.ts` (unten) |
+| Enter bestätigt | `beiEnter` |
+| Schmales Fenster in JS | `useSchmal` — nur wenn sich das Markup ändert, sonst CSS |
+| Hervorhebung in Fliesstext | `betonung` mit `<Trans>` |
+
+Was nicht in der Tabelle steht und an zwei Stellen gebraucht wird, ist ein Kandidat für
+einen neuen Eintrag — und gehört dann auch hier hinein.
 
 ## Zahlen anzeigen
 

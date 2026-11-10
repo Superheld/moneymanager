@@ -108,6 +108,26 @@ also gegen jedes `z-index: auto`, egal wie weit hinten es im Dokument steht. Des
 `app.css` (Abschnitt „Schwebende Ebenen") einen Wert am **Positioner**; am Popup darin
 wirkte er nicht, weil nur ein positioniertes Element einen z-Index annimmt.
 
+## `Aufklapptabelle` und `Klappblock` — zwei Arten aufzuklappen
+
+**`Aufklapptabelle`** ist die Liste unter einer Tabellenzeile: getönte Fläche, Kopf, der
+beim Scrollen stehen bleibt, klickbare Zeilen, optionaler Fuss. Benutzt von der
+Budget-Postenliste (Budgets, Übersicht) und den Buchungen einer Kategorie (Analyse).
+`Aufklappflaeche` ist nur die Fläche — für Inhalt, der mit den Spalten der Zeile darüber
+fluchten muss und deshalb kein eigenes Raster haben darf (die Monatskarten).
+
+Bis 2026-11-09 gab es davon drei Fassungen mit drei Polsterungen, Zeilenhöhen und Köpfen.
+**Eine neue Stelle, die etwas unter einer Zeile aufklappt, nimmt eine der beiden** und
+erweitert sie bei Bedarf.
+
+Die Zeile ist ein `tr` und kann kein Knopf sein. Klickbar trägt sie deshalb
+`role="button"`, `tabIndex` und reagiert auf Enter und Leertaste — ohne das wäre sie für
+jeden, der nicht mit der Maus arbeitet, gar nicht da.
+
+**`Klappblock`** ist ein Abschnitt in einem Dialog: Trennlinie, Titel mit ▸/▾, Inhalt.
+Gesteuert von aussen (`offen`, `onUmschalten`), weil ein Block beim ersten Aufklappen
+nachladen können muss. Benutzt von Herkunft, Journal und Merkmalen im Buchungsdialog.
+
 ## Aufklappbereiche: zehn Zeilen breit, fünf Zeilen schmal
 
 `aufklappen.ts` hält die beiden Zahlen und sonst nichts. Sie stehen in ZEILEN und nicht in

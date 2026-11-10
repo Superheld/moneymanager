@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import type { Buchungshistorie, IstBuchung, Journaleintrag, Vergleichsfeld } from "../../../application";
 import { fehlerNachricht, useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { Button } from "../bausteine/Button";
+import { Klappblock } from "../bausteine/Klappblock";
 
 /** Womit sich ein Feldwert lesbar machen laesst — Namen und Geldformat kennt nur die UI. */
 interface Lesehilfe {
@@ -116,14 +117,12 @@ export function JournalBlock({
   const { eintraege, urzustand, abweichungen, rueckweg } = historie;
 
   return (
-    <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-      <button className="linkbtn" onClick={() => setOffen((x) => !x)} aria-expanded={offen}>
-        {offen ? "▾" : "▸"} {t("konten.journal.titel")}{" "}
-        {eintraege.length > 0 && <span className="muted">({eintraege.length})</span>}
-      </button>
-
-      {offen && (
-        <div style={{ marginTop: 8 }}>
+    <Klappblock
+      titel={t("konten.journal.titel")}
+      zusatz={eintraege.length > 0 ? `(${eintraege.length})` : undefined}
+      offen={offen}
+      onUmschalten={() => setOffen((x) => !x)}
+    >
           {eintraege.length === 0 ? (
             /* Der Bestand vor dem 23.08.2026. Kein Fehler, sondern eine Auskunft — und
                ohne sie stünde hier eine leere Fläche, die nach einem Fehler aussieht. */
@@ -194,8 +193,6 @@ export function JournalBlock({
             )}
             {fehler && <div className="err" style={{ marginTop: "var(--sp-2)", fontSize: 13 }}>{fehler}</div>}
           </div>
-        </div>
-      )}
-    </div>
+    </Klappblock>
   );
 }
