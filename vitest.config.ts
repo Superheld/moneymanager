@@ -23,7 +23,11 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       all: true,
-      include: ["src/**/*.{ts,tsx}"],
+      // AUCH `.js` und `.jsx`. Die Bausteine aus der Design-System-Vorlage liegen als
+      // `.jsx` da; bis 2026-11-10 nannte diese Zeile nur `.ts` und `.tsx`, und der
+      // meistbenutzte Code der Oberfläche fehlte in der Messung — ausgerechnet der, den
+      // auch der Compiler nicht prüft.
+      include: ["src/**/*.{ts,tsx,js,jsx}"],
       exclude: [
         "**/*.test.ts",
         "**/*.test.tsx",
