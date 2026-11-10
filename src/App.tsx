@@ -11,6 +11,7 @@ import { RuecklagenScreen } from "./adapters/ui/ruecklagen/RuecklagenScreen";
 import { ImportBereich } from "./adapters/ui/import/ImportBereich";
 import { TrainingBereich } from "./adapters/ui/training/TrainingBereich";
 import { EinstellungenProvider } from "./adapters/ui/bausteine/EinstellungenProvider";
+import { Fehlergrenze } from "./adapters/ui/bausteine/Fehlergrenze";
 import { Sperrbildschirm } from "./adapters/ui/zugang/Sperrbildschirm";
 import { useZeitsperre } from "./adapters/ui/zugang/useZeitsperre";
 import {
@@ -60,8 +61,16 @@ export default function App() {
     setStand({ art: "offen" });
   }, []);
 
+  /**
+   * Scheitert schon die erste Frage an Rust, gäbe es sonst gar nichts zu sehen: der
+   * Zustand bliebe „lädt", und „lädt" zeichnet `null`. Der Fehler wird deshalb gemerkt
+   * und beim Zeichnen geworfen — so landet er in der Fehlergrenze um die App und hat
+   * dieselbe Anzeige wie jeder andere.
+   */
+  const [startfehler, setStartfehler] = useState<Error | null>(null);
+
   useEffect(() => {
-    void standHolen();
+    standHolen().catch((e: unknown) => setStartfehler(e instanceof Error ? e : new Error(String(e))));
   }, [standHolen]);
 
   // Bootstrap und Zeitsperre-Einstellung erst NACH dem Entsperren — beide reden mit der
@@ -96,6 +105,7 @@ export default function App() {
 
   useZeitsperre(stand.art === "offen" ? minuten : 0, sperren);
 
+  if (startfehler) throw startfehler;
   if (stand.art === "laedt") return null;
 
   if (stand.art !== "offen") {
@@ -134,6 +144,9 @@ export default function App() {
         onNavigate={setScreen}
         versteckt={experimente.training ? [] : ["training"]}
       >
+        {/* Um den INHALT, nicht um den Rahmen: zeichnet ein Screen nicht, bleibt die
+            Navigation stehen, und ein Wechsel räumt die Meldung weg. */}
+        <Fehlergrenze ruecksetzenBei={screen}>
         {screen === "uebersicht" && <UebersichtScreen />}
         {screen === "analyse" && <AnalyseScreen />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
@@ -144,6 +157,7 @@ export default function App() {
         {screen === "import" && <ImportBereich />}
         {screen === "training" && <TrainingBereich />}
         {screen === "einstellungen" && <EinstellungenScreen onSperren={sperren} />}
+        </Fehlergrenze>
       </AppShell>
     </EinstellungenProvider>
   );

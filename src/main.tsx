@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import { Fehlergrenze } from "./adapters/ui/bausteine/Fehlergrenze";
 import App from "./App";
 import "./i18n/i18n"; // i18next initialisieren (Seiteneffekt), bevor Komponenten rendern
 import "./styles/tokens.css";
@@ -24,7 +25,11 @@ async function start(): Promise<void> {
 
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
-      <App />
+      {/* Die äussere Grenze: für alles, was VOR den Screens schiefgeht (Sperrbildschirm,
+          Rahmen, der erste Aufruf an Rust). Die innere steht in App.tsx um den Inhalt. */}
+      <Fehlergrenze>
+        <App />
+      </Fehlergrenze>
     </React.StrictMode>,
   );
 }

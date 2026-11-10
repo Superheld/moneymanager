@@ -2098,6 +2098,13 @@ const de = {
       jaehrlich: "jährlich",
     },
   },
+  fehlergrenze: {
+    titel: "Hier ist etwas schiefgegangen",
+    text: "Diese Ansicht konnte nicht angezeigt werden. Deine Daten sind davon nicht berührt.",
+    nochmal: "Noch einmal versuchen",
+    neuLaden: "App neu laden",
+    technisch: "Technische Meldung:",
+  },
   zugang: {
     einrichtenTitel: "Zugang einrichten",
     einrichtenNeu:
@@ -4208,6 +4215,13 @@ const en: typeof de = {
       halbjaehrlich: "semi-annually",
       jaehrlich: "yearly",
     },
+  },
+  fehlergrenze: {
+    titel: "Something went wrong here",
+    text: "This view could not be displayed. Your data is not affected.",
+    nochmal: "Try again",
+    neuLaden: "Reload app",
+    technisch: "Technical message:",
   },
   zugang: {
     einrichtenTitel: "Set up access",
