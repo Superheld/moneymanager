@@ -2153,6 +2153,19 @@ const de = {
     wechselnKnopf: "Ändern",
     wechselFertig: "Die Passphrase ist geändert.",
     alteFalsch: "Die bisherige Passphrase passt nicht.",
+    schluesselTitel: "Neuen Schlüssel erzeugen",
+    schluesselText:
+      "Wenn der Wiederherstellungscode in fremde Hände geraten sein könnte: Eine neue Passphrase hilft dann nicht, denn der Code öffnet den Bestand auch ohne sie. Hier bekommt der Bestand einen neuen Schlüssel und du einen neuen Code. Der alte Code öffnet danach nichts mehr, auch keine Sicherung. Das dauert einen Moment und braucht vorübergehend Platz für eine zweite Kopie.",
+    schluesselKnopf: "Neuen Schlüssel erzeugen",
+    schluesselLaeuft: "Der Bestand wird neu verschlüsselt …",
+    schluesselFertig:
+      "Fertig. Das ist dein neuer Wiederherstellungscode. Schreib ihn auf und wirf den alten weg.",
+    schluesselSicherungen_one: "{{count}} Sicherung wurde mit umgestellt.",
+    schluesselSicherungen_other: "{{count}} Sicherungen wurden mit umgestellt.",
+    schluesselUebrig_one:
+      "{{count}} Sicherung liess sich nicht umstellen. Sie lässt sich weiter nur mit dem alten Code öffnen.",
+    schluesselUebrig_other:
+      "{{count}} Sicherungen liessen sich nicht umstellen. Sie lassen sich weiter nur mit dem alten Code öffnen.",
     codeAbrufenTitel: "Wiederherstellungscode ansehen",
     codeAbrufenText:
       "Nur gegen die Passphrase — sonst läge er für jeden offen, der an einem " +
@@ -4248,6 +4261,19 @@ const en: typeof de = {
     wechselnKnopf: "Change",
     wechselFertig: "The passphrase has been changed.",
     alteFalsch: "The current passphrase does not match.",
+    schluesselTitel: "Generate a new key",
+    schluesselText:
+      "If your recovery code may have fallen into the wrong hands: a new passphrase does not help, because the code opens your data without it. This gives your data a new key and you a new code. The old code will no longer open anything, including backups. It takes a moment and temporarily needs space for a second copy.",
+    schluesselKnopf: "Generate new key",
+    schluesselLaeuft: "Re-encrypting your data …",
+    schluesselFertig:
+      "Done. This is your new recovery code. Write it down and discard the old one.",
+    schluesselSicherungen_one: "{{count}} backup was converted as well.",
+    schluesselSicherungen_other: "{{count}} backups were converted as well.",
+    schluesselUebrig_one:
+      "{{count}} backup could not be converted. It can still only be opened with the old code.",
+    schluesselUebrig_other:
+      "{{count}} backups could not be converted. They can still only be opened with the old code.",
     codeAbrufenTitel: "View recovery code",
     codeAbrufenText:
       "Only against the passphrase — otherwise it would lie open to anyone sitting at " +

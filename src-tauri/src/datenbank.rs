@@ -174,6 +174,17 @@ pub async fn pool_mit_schluessel(pfad: &Path, pragma: &str) -> Result<SqlitePool
     .await
 }
 
+/// Die Quelle fuer einen Schluesselwechsel: verschluesselt geoeffnet, aber MIT dem
+/// CREATE-Flag — aus demselben Grund wie bei `pool_klartext`: `ATTACH` erbt die
+/// Oeffnungsflags, und ohne das Flag kann es die Zieldatei nicht anlegen.
+pub async fn pool_exportquelle(pfad: &Path, pragma: &str) -> Result<SqlitePool, sqlx::Error> {
+    pool_von(
+        pfad,
+        &Oeffnung { datei: String::new(), pragma: Some(pragma.to_string()), anlegen: true },
+    )
+    .await
+}
+
 /// Ein NUR LESENDER Pool auf eine verschluesselte Datei — fuer das Werkzeug
 /// `bestandslesen`, mit dem sich der verschluesselte Bestand von der Kommandozeile lesen
 /// laesst (Rezept in CLAUDE.local.md).

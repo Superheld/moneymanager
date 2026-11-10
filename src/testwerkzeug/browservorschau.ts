@@ -112,6 +112,7 @@ function kommandos(db: Database) {
     zugang_stand: () => ({ eingerichtet: true, offen: true, altbestand: false }),
     zugang_entsperren: () => true,
     zugang_code_zeigen: () => null,
+    zugang_schluessel_wechseln: () => null,
 
     // --- Sicherung ---
     // `false` heisst „heute schon eine da" und ist damit der Wert, der nichts behauptet.

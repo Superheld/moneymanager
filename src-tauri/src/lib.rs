@@ -60,6 +60,7 @@ pub fn run() {
             zugang::zugang_mit_code,
             zugang::zugang_passphrase_wechseln,
             zugang::zugang_code_zeigen,
+            zugang::zugang_schluessel_wechseln,
             transaktion::transaktion,
             transaktion::schema_umbau,
             sicherung::sicherung_anlegen,

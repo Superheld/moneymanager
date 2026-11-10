@@ -1,7 +1,7 @@
 // Der Zugangs-Port auf die Tauri-Kommandos.
 
 import { invoke } from "@tauri-apps/api/core";
-import type { ZugangPort, Zugangsstand } from "../../application/zugang";
+import type { Schluesselwechsel, ZugangPort, Zugangsstand } from "../../application/zugang";
 import { DATEINAME } from "./datenbankdatei";
 import { datenbankSchliessen, zugangVergessen } from "./db";
 
@@ -30,6 +30,13 @@ export const tauriZugangPort: ZugangPort = {
   passphraseWechseln: (alte, neue) =>
     invoke<boolean>("zugang_passphrase_wechseln", { datei, alte, neue }),
   codeZeigen: (passphrase) => invoke<string | null>("zugang_code_zeigen", { datei, passphrase }),
+  // Rust schliesst dabei den Pool und öffnet ihn mit dem neuen Schlüssel wieder — für
+  // diese Seite ist das eine Öffnung wie jede andere.
+  schluesselWechseln: (passphrase) =>
+    geoeffnet(
+      invoke<Schluesselwechsel | null>("zugang_schluessel_wechseln", { datei, passphrase }),
+      (ergebnis) => ergebnis !== null,
+    ),
 
   // **Beides zusammen, nie einzeln.** Rust schliesst den Pool, und der gemerkte Zugang in
   // `db.ts` muss mit — sonst gäbe `getDb()` weiter die zwischengespeicherte Zusage
