@@ -78,7 +78,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Datum | `Datumsfeld`, angezeigt über `useDatum()` |
 | Feld plus Knopf nebeneinander | `Feldzeile`; Formularfeld: `FormField` |
 | Knopf | `Button` — `primary` Hauptaktion, `link` gedämpfte Nebenaktion („Abbrechen"), `laeuft` sperrt während einer Handlung; Zeilenaktion als Icon: `IconButton` |
-| Dialog | `Modal` (über `Dialog`); vor dem Löschen: `Loeschfrage` |
+| Dialog | `Modal` (Base UI `Dialog`; `warnung` für Rückfragen); vor dem Löschen: `Loeschfrage` |
 | Bankabruf, TAN | `AbrufDialog`, `TanDialog` |
 | Geld, Prozent, Farbe | `useGeld()`, `useProzent()`, `geldFarbe.ts` (unten) |
 | Enter bestätigt | `beiEnter` |
@@ -182,8 +182,9 @@ Wo es heute steht:
 | `bausteine/Auswahl` | `<select className="field">` im Formular | Base UI `Select` |
 | `bausteine/Datumsfeld` | `<input type="date">` | Base UI `Popover`, Kalender von Hand |
 | `bausteine/Button` | eigener `<button>` mit Inline-Stil, roher `.linkbtn` | Base UI `Button` |
+| `bausteine/Modal` | Eigenbau mit Nummernstapel plus `Dialog.jsx` | Base UI `Dialog`, mit `warnung` `AlertDialog` |
 
-**Noch nicht umgestellt:** `Modal`/`Dialog` → `Dialog`, Kästchen und Optionsfelder → `Checkbox`/`Radio`,
+**Noch nicht umgestellt:** Kästchen und Optionsfelder → `Checkbox`/`Radio`,
 `Klappblock` → `Collapsible`, `Registerleiste` → `Tabs`, der Kategoriebaum im
 `CategoryPicker` → `Combobox` prüfen. Ein Tooltip-Baustein, wenn er kommt, kommt von dort
 (`Tooltip`). Wer einen davon anfasst, stellt ihn um, statt am Eigenbau weiterzubauen.

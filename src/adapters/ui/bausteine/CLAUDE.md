@@ -16,13 +16,14 @@ Baustein, sondern ein Teil dieses Screens.
 ## Der Design-System-Teil
 
 Die `.jsx`/`.d.ts`-Dateien (`Card`, `KPIStat`, `Pill`, `CoverageTrack`, `DataTable`,
-`FormField` mit `Input`, `Dialog`) stammen aus dem Design-System, das ausserhalb
+`FormField` mit `Input`) stammen aus dem Design-System, das ausserhalb
 des Repos liegt. Es ist eine **Vorlage, keine Vorgabe**: was hier liegt, gehört der App und
 darf geändert werden. Wer aus dem Design-System nachzieht, holt sich einen Vorschlag, keine
 Wahrheit — und prüft, was hier inzwischen weiterentwickelt wurde.
 
 `Button` kam ebenfalls von dort und ist seit 2026-11-10 TypeScript auf Base UI `Button`
-(warum, steht im Kopf der Datei und in `../CLAUDE.md` unter „Bedienteile"). Die übrigen
+(warum, steht im Kopf der Datei und in `../CLAUDE.md` unter „Bedienteile"). `Dialog` ist
+am selben Tag in `Modal` aufgegangen, auf Base UI `Dialog` (unten). Die übrigen
 folgen demselben Weg: nach `.tsx`, die `.d.ts` fällt weg, und wo Base UI ein Gegenstück
 hat, steht es darunter.
 
@@ -88,24 +89,46 @@ mehr — ausser dem einen in `Zeilenauswahl`, und das ist eine Entscheidung: dor
 Feld so gross wie eine Pille daneben, und eine eigene Liste im Portal wäre für drei
 Einträge in einer Tabellenzeile Aufwand ohne Gegenwert.
 
-## `Modal` — der Dialog-Layer, und zwei Dinge, die nur verschachtelt auffallen
+## `Modal` — der Dialog, auf Base UI `Dialog`
+
+**Seit 2026-11-10 liegt Base UI darunter**, und `Dialog.jsx` aus der Vorlage ist darin
+aufgegangen (es hatte keinen anderen Nutzer). Der Eigenbau davor hatte Escape, Klick
+daneben und ein Portal — und sonst nichts, was einen Dialog mit der Tastatur benutzbar
+macht. Jetzt dazu: Fokus beim Öffnen IM Dialog, Tabulatortaste bleibt darin, Fokus beim
+Schliessen zurück an den Auslöser, Seite dahinter gesperrt, Name über den Titel, ein
+benannter Schliessknopf statt eines blossen „✕". Das „+" im Kopf ist weg — es stand auch
+beim Bearbeiten da.
 
 **Der Layer hängt per Portal am `document.body`.** Ein Modal wird dort gerendert, wo es
 aufgeht — seit die Kategorie in der Auszugszeile wählbar ist, also mitten in einer
 Tabellenzelle. Steht über ihm irgendwo eine `opacity` (der Auszug dämpft damit Zeilen,
 deren Buchungstag noch vor uns liegt), erbt ein `position: fixed`-Kind sie: der Dialog
 erscheint durchscheinend, liegt im Stapel der Zeile statt über der Seite, und der Scrim
-deckt nur die Tabelle ab. Das Portal nimmt ihn aus dem Baum, und alle drei Wirkungen sind
-weg. Wer den Layer je wieder inline rendert, holt sie zurück.
+deckt nur die Tabelle ab. Das Portal von Base UI nimmt ihn aus dem Baum, wie vorher das
+eigene.
 
-**Escape schliesst nur den OBERSTEN Dialog** — den auslösenden nie. Dafür führt `Modal.tsx`
-eine Menge offener Nummern, und die Nummer wird beim ersten **Render** vergeben, nicht im
-Effekt: React rendert von aussen nach innen und führt die Effekte von innen nach aussen
-aus. Ein Stapel, in den sich jeder Dialog im Effekt einträgt, steht deshalb auf dem Kopf,
-und der äussere schluckt die Taste, die dem inneren galt. Gemessen, nicht vermutet.
+**Escape schliesst nur den OBERSTEN Dialog** — den auslösenden nie. Der Eigenbau brauchte
+dafür einen Stapel offener Nummern (und scheiterte zuerst daran, dass React die Effekte
+von innen nach aussen ausführt). Base UI kennt verschachtelte Dialoge selbst — **unter
+einer Bedingung: der innere wird IM äusseren gerendert**, im React-Baum, nicht daneben.
+So entsteht die Verschachtelung in der App ohnehin (Buchungsdialog → Kategorie-Picker).
+Und Base UI **verbraucht** die Taste (`preventDefault`); erst damit stimmt, worauf die
+Schublade in `AppShell` sich verlässt — der Eigenbau las `defaultPrevented` nur und setzte
+es nie, eine Escape schloss Dialog und Schublade zugleich.
 
-Geprüft in `Modal.test.tsx` — beides an einem verschachtelten Aufbau, weil ein einzelner
-Dialog auf leerer Seite sich in beiden Fällen richtig verhält.
+**Wohin der Fokus beim Öffnen geht, entscheidet `Modal`, nicht Base UI.** Base UI nimmt
+das erste fokussierbare Element — bei uns der Schliessknopf im Kopf. Wer einen Dialog
+öffnet, um etwas einzutragen, landete auf „schliessen". `Modal` nimmt deshalb das Feld mit
+`autoFocus`, sonst das erste Ziel im INHALT, und erst wenn dort keins ist, den Standard.
+
+**`warnung` macht ihn zum `AlertDialog`** — für Rückfragen vor etwas, das nicht
+zurückgeht (`Loeschfrage`). Die Vorlesehilfe meldet eine Warnung, und ein Klick NEBEN
+den Kasten schliesst ihn nicht: ein Fehlklick soll die Frage nicht still verwerfen.
+
+Geprüft in `Modal.test.tsx` — die Verschachtelung an einem verschachtelten Aufbau, weil
+ein einzelner Dialog auf leerer Seite sich in jedem Fall richtig verhält, und der Fokus
+mit einer Pause nach jedem Tab: Base UI fängt ihn über Wächter am Rand ab und leitet ihn
+einen Tick später zurück.
 
 **Schwebende Ebenen ausserhalb des Modals** (Auswahlliste, Kalenderblatt) hängen ebenfalls
 am body, tragen aber von sich aus keinen z-Index — und ein Modal-Layer trägt 50, gewinnt
@@ -288,7 +311,7 @@ Eine Zahl steckt darin, die man kennen muss: schmal liegt **`table-layout: fixed
 die Wertspalte ist auf `12ch` festgelegt. Ohne beides zöge ein langer Name die Tabelle
 wieder aus dem Bild — genau das Übel, gegen das die schmale Form gebaut ist.
 
-## `Dialog` schmal: ueber die ganze Hoehe, Fusszeile bleibt stehen
+## `Modal` schmal: ueber die ganze Hoehe, Fusszeile bleibt stehen
 
 Breit ist er eine 680er Box mit 48 px Luft darueber. Auf einem Telefon hiess das:
 Formular ausfüllen, scrollen, „Speichern" suchen — und der Knopf lag unter dem Bildrand,
@@ -305,9 +328,15 @@ Zwei Dinge, die man beim Anfassen wissen muss:
   Die Box trägt `overflow: hidden` für ihre runden Ecken und ist damit selbst ein
   Scrollbereich, in dem nichts scrollt; das Sticky hätte keine Wirkung, und man sähe es ihm
   nicht an. Drei Teile mit einem scrollenden Mittelstück sagen, was gemeint ist.
-- **`minHeight: 0` am Inhalt ist Pflicht.** Ein Flex-Kind besteht sonst auf seiner
+- **`min-height: 0` am Inhalt ist Pflicht.** Ein Flex-Kind besteht sonst auf seiner
   Inhaltshöhe und schiebt die Fusszeile aus dem Bild — genau der Fehler, der behoben werden
   sollte, nur eine Ebene tiefer.
+
+**Es steht in CSS (`.dialog-*` in `app.css`), nicht mehr hinter `useSchmal`** — schmal ist
+die Grundform, breit kommt per `min-width: 700px` dazu. Am Markup ändert sich nichts, und
+dann ist es eine Frage für CSS (siehe `useSchmal` oben). Der Preis: jsdom wendet keine
+Medienabfragen an, `Modal.test.tsx` prüft deshalb nur noch die drei Teile, nicht ihre
+Masse.
 
 Die Ränder folgen `env(safe-area-inset-*)`: schmal liegt der Dialog unter der Kerbe und
 über der Wischleiste, und beide sind je nach Gerät verschieden hoch.

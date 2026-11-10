@@ -1,6 +1,7 @@
 /** @vitest-environment jsdom */
-// Die Bausteine aus der Design-System-Vorlage — `Button`, `Pill`, `KPIStat`, `Dialog`.
-// (`Button` ist seit 2026-11-10 TypeScript, die übrigen liegen noch als `.jsx` da.)
+// Die Bausteine aus der Design-System-Vorlage — `Button`, `Pill`, `KPIStat`.
+// (`Button` ist seit 2026-11-10 TypeScript, `Dialog` ist in `Modal` aufgegangen — siehe
+// `Modal.test.tsx`; die übrigen liegen noch als `.jsx` da.)
 //
 // **Warum sie einen eigenen Test brauchen.** Sie liegen als `.jsx` mit handgeschriebener
 // `.d.ts` daneben: der Compiler prüft ihr Inneres nicht, und bis 2026-11-10 zählte die
@@ -16,7 +17,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Button, Dialog, KPIStat, Pill } from "./index";
+import { Button, KPIStat, Pill } from "./index";
 
 describe("Button", () => {
   it("meldet den Klick", async () => {
@@ -193,49 +194,5 @@ describe("KPIStat", () => {
     expect(groesse("hero")).toBe("var(--fs-display)");
     expect(groesse("tile")).toBe("var(--fs-h1)");
     expect(groesse("chip")).toBe("var(--fs-h2)");
-  });
-});
-
-describe("Dialog", () => {
-  it("zeigt Titel, Untertitel, Inhalt und Fusszeile", () => {
-    render(
-      <Dialog title="Vertrag anlegen" subtitle="Schritt eins" footer={<button>Weiter</button>}>
-        <p>Der Inhalt</p>
-      </Dialog>,
-    );
-    expect(screen.getByRole("heading", { name: "Vertrag anlegen" })).toBeTruthy();
-    expect(screen.getByText("Schritt eins")).toBeTruthy();
-    expect(screen.getByText("Der Inhalt")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Weiter" })).toBeTruthy();
-  });
-
-  it("schliesst über den Knopf", async () => {
-    const zu = vi.fn();
-    render(<Dialog title="Titel" onClose={zu}>Inhalt</Dialog>);
-    await userEvent.click(screen.getByRole("button", { name: "✕" }));
-    expect(zu).toHaveBeenCalledTimes(1);
-  });
-
-  it("schliesst bei einem Klick auf den Hintergrund", async () => {
-    const zu = vi.fn();
-    const { container } = render(<Dialog title="Titel" onClose={zu}>Inhalt</Dialog>);
-    await userEvent.click(container.firstChild as HTMLElement);
-    expect(zu).toHaveBeenCalledTimes(1);
-  });
-
-  // Der Fall, der sonst Eingaben kostet: ein Klick IM Dialog steigt bis zum Hintergrund
-  // auf und darf ihn nicht schliessen.
-  it("schliesst NICHT bei einem Klick in den Inhalt", async () => {
-    const zu = vi.fn();
-    render(<Dialog title="Titel" onClose={zu}><p>Inhalt</p></Dialog>);
-    await userEvent.click(screen.getByText("Inhalt"));
-    await userEvent.click(screen.getByRole("heading", { name: "Titel" }));
-    expect(zu).not.toHaveBeenCalled();
-  });
-
-  it("verträgt einen Klick auf den Hintergrund ohne Schliess-Funktion", async () => {
-    const { container } = render(<Dialog title="Titel">Inhalt</Dialog>);
-    await userEvent.click(container.firstChild as HTMLElement);
-    expect(screen.getByText("Inhalt")).toBeTruthy();
   });
 });

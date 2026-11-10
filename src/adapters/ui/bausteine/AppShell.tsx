@@ -116,6 +116,8 @@ export function AppShell({
 
   // Escape schliesst die Schublade — aber nur sie: liegt ein Modal darüber, hat der
   // oberste Dialog die Taste schon verbraucht (siehe `Modal`, `defaultPrevented`).
+  // Das stimmt erst, seit Base UI darunter liegt (2026-11-10): der Eigenbau davor LAS
+  // `defaultPrevented`, setzte es aber selbst nie, und eine Escape schloss beide.
   useEffect(() => {
     if (!offen) return;
     const onKey = (e: KeyboardEvent) => {

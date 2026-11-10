@@ -946,6 +946,154 @@ select.field.tabellenfilter {
 }
 
 /* ============================================================
+   Dialog (siehe bausteine/Modal.tsx) — Mechanik von Base UI, Aussehen hier.
+
+   Schmal ist die GRUNDFORM: der Dialog fuellt den Bildschirm und besteht aus drei Teilen,
+   von denen nur der mittlere scrollt. Breit war er eine 680er Box mit 48 px Luft darueber,
+   und auf einem Telefon hiess das: Formular ausfuellen, scrollen, „Speichern" suchen —
+   der Knopf lag unter dem Bildrand, OHNE dass man das sieht: der Dialog ist ein eigener
+   Scrollbereich, der Rest der Seite steht still. So bleibt die Handlung immer sichtbar.
+   Dieselbe Regel wie beim Update-Knopf: Auskunft darf weichen, eine Handlung nicht.
+
+   Bis 2026-11-10 stand das als Inline-Stil hinter `useSchmal`. Es aendert sich aber nur
+   das Aussehen, nicht das Markup — und dafuer ist CSS da (siehe `useSchmal`).
+
+   `position: sticky` an der Fusszeile waere kuerzer und hier falsch: der Kasten traegt
+   `overflow: hidden` (fuer die runden Ecken) und ist damit selbst ein Scrollbereich, in
+   dem nichts scrollt — das Sticky haette keine Wirkung, und man saehe es ihm nicht an.
+
+   Die Raender folgen `env(safe-area-inset-*)`: schmal liegt der Dialog unter der Kerbe
+   und ueber der Wischleiste, und beide sind je nach Geraet verschieden hoch.
+   ============================================================ */
+.dialog-scrim {
+  position: fixed;
+  inset: 0;
+  background: oklch(0.3 0.02 60 / 0.34);
+}
+.dialog-viewport {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  padding: 0;
+  overflow: hidden;
+}
+.dialog-kasten {
+  width: 100%;
+  max-width: none;
+  background: var(--surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  outline: none;
+}
+.dialog-kopf {
+  display: flex;
+  align-items: flex-start;
+  gap: 13px;
+  padding: calc(18px + env(safe-area-inset-top)) 18px 18px;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.dialog-titelblock {
+  min-width: 0;
+}
+.dialog-titel {
+  margin: 0;
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-black);
+}
+.dialog-untertitel {
+  font-size: 12.5px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+/* 36 px schmal: eine Trefferflaeche fuer den Finger. */
+.dialog-schliessen {
+  margin-left: auto;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 15px;
+  flex: 0 0 auto;
+}
+.dialog-schliessen:hover {
+  color: var(--ink-2);
+  border-color: var(--ink-3);
+}
+.dialog-schliessen:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* Der einzige Teil, der schmal scrollt. `min-height: 0` ist Pflicht: ein Flex-Kind
+   besteht sonst auf seiner Inhaltshoehe und schiebt die Fusszeile aus dem Bild. */
+.dialog-inhalt {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+.dialog-fuss {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 15px 18px calc(15px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--cream);
+  flex: 0 0 auto;
+}
+@media (min-width: 700px) {
+  .dialog-viewport {
+    align-items: flex-start;
+    padding: 48px 20px;
+    overflow: auto;
+  }
+  .dialog-kasten {
+    max-width: 680px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-2xl);
+    box-shadow: var(--shadow-pop);
+  }
+  .dialog-kopf {
+    padding: 18px 22px;
+  }
+  .dialog-schliessen {
+    width: 30px;
+    height: 30px;
+  }
+  .dialog-inhalt {
+    padding: 20px 22px;
+    flex: 0 0 auto;
+    overflow-y: visible;
+  }
+  .dialog-fuss {
+    padding: 15px 22px;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .dialog-scrim,
+  .dialog-kasten {
+    transition: opacity 120ms ease;
+  }
+  .dialog-scrim[data-starting-style],
+  .dialog-scrim[data-ending-style],
+  .dialog-kasten[data-starting-style],
+  .dialog-kasten[data-ending-style] {
+    opacity: 0;
+  }
+}
+
+/* ============================================================
    Schwebende Ebenen — wer ueber wem liegt.
 
    Base UI haengt Auswahlliste und Kalender per Portal an `document.body`. Dort sind sie

@@ -81,6 +81,7 @@ export function useLoeschfrage(): Loeschfrage {
 
   const dialog = auftrag ? (
     <Modal
+      warnung
       title={t("loeschen.titel")}
       subtitle={t("loeschen.untertitel", { name: auftrag.name })}
       onClose={schliessen}
