@@ -559,6 +559,14 @@ und ist keine Quelle mehr. Was an seine Stelle tritt, ist offen.
 - **cargo-deny vor `cargo update`:** ein gezieltes `cargo update -p <kiste>` ist der Weg,
   eine Meldung zu beheben — blind über den ganzen Baum ist es der Weg, den brotli-Pin
   unten zu verlieren. Danach `npm run test:rust`.
+- **Eine Freigabe in `deny.toml` ist eine Wiedervorlage, kein Abschluss.** Es gibt zwei
+  Sorten, und nur eine meldet sich selbst: verschwindet die betroffene Kiste aus dem Baum,
+  nennt cargo-deny die Freigabe unnötig. Bleibt die Kiste und erscheint nur eine
+  gepatchte Fassung, **sagt niemand etwas** — die Freigabe trifft weiter zu, der Lauf
+  bleibt grün, und die Lücke bleibt mit ihm. Wer eine Rust-Abhängigkeit hebt, geht deshalb
+  die `ignore`-Liste durch und prüft jede Zeile, die mit `WIEDERVORLAGE` markiert ist,
+  gegen ihr Advisory. Wer eine solche Freigabe neu einträgt, schreibt die Bedingung
+  daneben, unter der sie fällt.
 - **brotli / rustc:** Tauri zieht `brotli 8.0.3`, das via `alloc-stdlib 0.2.3`
   `alloc-no-stdlib 3.0.0` einbindet, selbst aber `alloc-no-stdlib 2.0.4` nutzt →
   Trait-Konflikt (`StandardAlloc` implementiert `Allocator` nicht). In `Cargo.lock` gepinnt:
