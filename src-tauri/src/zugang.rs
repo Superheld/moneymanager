@@ -556,9 +556,7 @@ pub async fn zugang_schluessel_wechseln(
     let sicherungen = datenverzeichnis(&app)?.join("sicherungen");
     let stamm = datei.strip_suffix(".db").unwrap_or(&datei).to_string();
 
-    if let Some(pool) = db.0.write().await.take() {
-        pool.close().await;
-    }
+    db.schliessen().await;
 
     let ergebnis =
         schluessel_wechseln_in(&bestand, &huellendatei, &sicherungen, &stamm, &alt, &passphrase)

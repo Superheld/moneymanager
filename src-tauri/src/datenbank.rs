@@ -28,11 +28,30 @@ use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager, State};
 use tokio::sync::RwLock;
 
-/// Der Pool, solange die Datenbank offen ist. `None` heisst: gesperrt.
+/// Die EINE festgehaltene Verbindung, auf der eine Schemaaenderung laeuft — oder `None`.
+/// Was es damit auf sich hat, steht in `transaktion.rs` bei der Schemasitzung.
+pub type Schemasitzung =
+    Arc<tokio::sync::Mutex<Option<sqlx::pool::PoolConnection<sqlx::Sqlite>>>>;
+
+/// Der Pool, solange die Datenbank offen ist. `None` heisst: gesperrt. Daneben die
+/// Schemasitzung — sie haengt am Pool und muss vor ihm gehen.
 #[derive(Default)]
-pub struct Datenbank(pub Arc<RwLock<Option<SqlitePool>>>);
+pub struct Datenbank(pub Arc<RwLock<Option<SqlitePool>>>, pub Schemasitzung);
 
 impl Datenbank {
+    /// Schliesst die Datenbank — **die Schemasitzung zuerst.**
+    ///
+    /// `pool.close()` wartet, bis jede Verbindung zurueck ist. Eine Sitzung, die ihre
+    /// noch haelt (der Webview wurde mitten in einer Migration neu geladen), liesse das
+    /// Schliessen fuer immer warten — und mit ihm das Sperren. Jede Stelle, die den Pool
+    /// schliesst, geht deshalb hier durch.
+    pub async fn schliessen(&self) {
+        crate::transaktion::sitzung_raeumen(&self.1).await;
+        if let Some(pool) = self.0.write().await.take() {
+            pool.close().await;
+        }
+    }
+
     /// Der Pool — oder ein Fehler, wenn gesperrt.
     ///
     /// Jede Stelle, die an die Datenbank will, geht hier durch. Damit gibt es genau EINEN
@@ -220,11 +239,8 @@ pub async fn oeffnen_intern(
         return Ok(false);
     }
 
-    let mut halter = db.0.write().await;
-    if let Some(alt) = halter.take() {
-        alt.close().await;
-    }
-    *halter = Some(pool);
+    db.schliessen().await;
+    *db.0.write().await = Some(pool);
     Ok(true)
 }
 
@@ -235,9 +251,7 @@ pub async fn oeffnen_intern(
 /// die Anwendung, nicht diese Stelle.
 #[tauri::command]
 pub async fn datenbank_schliessen(db: State<'_, Datenbank>) -> Result<(), String> {
-    if let Some(pool) = db.0.write().await.take() {
-        pool.close().await;
-    }
+    db.schliessen().await;
     Ok(())
 }
 
@@ -276,7 +290,7 @@ pub(crate) fn binden<'q>(
 ///
 /// **Integer bleiben Integer.** In einer Finanz-App ist das keine Feinheit: Geld sind
 /// Cent, und ein Betrag, der als Fliesskomma durch die Naht geht, ist irgendwann 1234.99999.
-fn zeile_zu_json(zeile: &SqliteRow) -> JsonValue {
+pub(crate) fn zeile_zu_json(zeile: &SqliteRow) -> JsonValue {
     let mut obj = serde_json::Map::new();
     for (i, spalte) in zeile.columns().iter().enumerate() {
         let roh = zeile.try_get_raw(i).ok();

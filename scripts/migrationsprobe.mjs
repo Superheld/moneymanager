@@ -37,7 +37,7 @@ const { MIGRATIONS } = await import("../src/adapters/persistence/migrations.ts")
 const SQL = await initSqlJs({ locateFile: () => require.resolve("sql.js/dist/sql-wasm.wasm") });
 const db = new SQL.Database(readFileSync(pfad));
 
-// Waehrend des Umbaus AUS — wie `migrate()` es ueber den schema_umbau-Command tut.
+// Waehrend des Umbaus AUS — wie die Schemasitzung es in der App tut, bevor `migrate()` beginnt.
 db.run("PRAGMA foreign_keys = OFF");
 
 const zahl = (sql) => {

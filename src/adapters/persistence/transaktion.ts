@@ -45,8 +45,8 @@ function inTauri(): boolean {
   return typeof globalThis === "object" && "__TAURI_INTERNALS__" in globalThis;
 }
 
-// Die beiden `invoke`-Zweige darunter erreicht kein Test dieser Datei, und das lässt sich
-// nicht ändern: sie laufen nur in der Tauri-Shell. Ihre Gegenstücke — der Fallback-Weg und
+// Den `invoke`-Zweig darunter erreicht kein Test dieser Datei, und das lässt sich
+// nicht ändern: er läuft nur in der Tauri-Shell. Sein Gegenstück — der Fallback-Weg und
 // die Prüfung — sind geprüft, und was der Rust-Command leistet, steht in
 // `src-tauri/src/transaktion.rs`. Wer die Zweige „abdecken" will, indem er `invoke`
 // wegmockt, testet die Attrappe und nicht den Weg.
@@ -82,31 +82,6 @@ export async function inTransaktion(db: AusfuehrbareDb, anweisungen: readonly An
     }
     throw fehler;
   }
-}
-
-/**
- * Ein Schema-Statement — ohne Fremdschlüsselprüfung, aber auf einer Verbindung, die das
- * auch wirklich abschaltet.
- *
- * Gebraucht beim UMBAU einer Tabelle. SQLite kann Constraints nicht per `ALTER TABLE`
- * nachrüsten; eine Tabelle bekommt sie nur durch Neubau — anlegen, umkopieren, alte fallen
- * lassen, umbenennen. Mit eingeschalteten Schlüsseln geht dabei zweierlei schief, und
- * beides ist gemessen: `DROP TABLE` scheitert, wenn einer mit RESTRICT darauf zeigt, und
- * es löscht STILL, wo einer mit CASCADE darauf zeigt — SQLite behandelt den Drop wie das
- * Löschen aller Zeilen.
- *
- * Im Test (sql.js) sind Fremdschlüssel ohnehin aus; dort ist der direkte Weg derselbe.
- * Genau diese Asymmetrie ist der Grund, warum die Sache lange unentdeckt blieb: der Test
- * war grün, und die App wäre gescheitert.
- */
-export async function schemaStatement(db: AusfuehrbareDb, sql: string): Promise<void> {
-  if (inTauri()) {
-    await invoke("schema_umbau", {
-      anweisungen: [{ sql, werte: [] }],
-    });
-    return;
-  }
-  await db.execute(sql);
 }
 
 /** Das Minimum, um die Prüfung nachzuholen. */
