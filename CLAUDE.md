@@ -388,7 +388,7 @@ Sie stehen dort, wo man sie beim Schreiben liest — diese Datei zeigt nur, was 
 | `src/CLAUDE.md` | gilt für allen Code: deutsche Bezeichner, kein Linter, Testdaten |
 | `src/core/CLAUDE.md` | Geld als Integer Cent, Datum, Charakter, Kontostands-Anker |
 | `src/application/CLAUDE.md` | Use-Cases orchestrieren, `istCent()` an der Grenze, Ports |
-| `src/adapters/persistence/CLAUDE.md` | Migrationen (forward-only, ohne Transaktionen) |
+| `src/adapters/persistence/CLAUDE.md` | Migrationen (forward-only, je eine Transaktion) |
 | `src/adapters/ui/CLAUDE.md` | wie hier gebaut wird, was wo liegt, der Bausteinkatalog; `useGeld`, i18n, Screen-Tests, Base UI |
 | `src/adapters/ui/bausteine/CLAUDE.md` | was geteilt wird und was nicht |
 | `src/core/buchung/CLAUDE.md` | Vorzeichen und Charakter, Umbuchungen erkennen |
@@ -418,8 +418,8 @@ Vier Dinge gelten überall und stehen deshalb hier:
   Verbindungsoptionen, damit bekommt ihn jede Verbindung, die je entsteht. **Nach oben
   ist die Naht dieselbe geblieben** (`select`, `execute`); kein Repository musste dafür
   angefasst werden. Nebengewinn: `sql:allow-execute` ist aus den Capabilities gefallen.
-- **Migrationen sind forward-only und append-only** und klammern nichts in Transaktionen;
-  jedes Statement muss für sich wiederholbar sein.
+- **Migrationen sind forward-only und append-only.** Jede läuft in einer Transaktion
+  (`src/adapters/persistence/CLAUDE.md`); bricht sie ab, ist nichts von ihr geschehen.
 - **Kein Wert aus dem echten Bestand ins Repo** (unten ausführlich).
 - **Ein abgerufenes Depot ist kein Konto.** Ein `zahlungskonto` hat einen Anfangsbestand
   und Buchungen, aus denen sich sein Stand ergibt; ändert sich der Stand, ist etwas

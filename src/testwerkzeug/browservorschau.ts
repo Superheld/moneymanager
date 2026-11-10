@@ -101,10 +101,15 @@ function kommandos(db: Database) {
       }
       return undefined;
     },
-    schema_umbau: (a: { anweisungen: Anweisung[] }) => {
-      for (const x of a.anweisungen) ausfuehren(x.sql, x.werte);
-      return undefined;
+    // Die Schemasitzung: hier gibt es ohnehin nur EINE Verbindung, also ist sie einfach
+    // dieselbe Datenbank. `BEGIN`/`COMMIT` schickt `migrate()` selbst hindurch.
+    schemasitzung_beginnen: () => undefined,
+    schemasitzung_execute: (a: { sql: string; werte?: unknown[] }) => {
+      ausfuehren(a.sql, a.werte);
+      return 0;
     },
+    schemasitzung_select: (a: { sql: string; werte?: unknown[] }) => lesen(a.sql, a.werte),
+    schemasitzung_beenden: () => undefined,
 
     // --- Zugang ---
     // Eingerichtet UND offen: das Tor steht vor allem anderen, und eine Passphrase, die

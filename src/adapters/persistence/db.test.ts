@@ -12,7 +12,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: (...a: unknown[]) => invoke(...
 
 /** Eine Naht, die sich wie eine offene, fertig migrierte Datenbank verhält. */
 function offen(kommando: string, args?: { sql?: string }): unknown {
-  if (kommando === "db_select") {
+  if (kommando === "db_select" || kommando === "schemasitzung_select") {
     if (args?.sql?.includes("MAX(version)")) return [{ v: Number.MAX_SAFE_INTEGER }];
     return [];
   }
@@ -23,7 +23,7 @@ function offen(kommando: string, args?: { sql?: string }): unknown {
 
 const GESPERRT = "Die Datenbank ist gesperrt.";
 function gesperrt(kommando: string): unknown {
-  if (kommando.startsWith("db_")) throw new Error(GESPERRT);
+  if (kommando.startsWith("db_") || kommando.startsWith("schemasitzung_")) throw new Error(GESPERRT);
   return offen(kommando);
 }
 
@@ -65,5 +65,30 @@ describe("getDb", () => {
     invoke.mockImplementation(async (k: string, a?: { sql?: string }) => offen(k, a));
     const db = await getDb();
     await expect(db.select("SELECT 1")).resolves.toEqual([]);
+  });
+
+  // Die Migrationen laufen auf EINER festgehaltenen Verbindung. Bleibt die Sitzung nach
+  // einem Fehler offen, hält sie eine Schreibsperre — und daran wartet auch das Sperren.
+  it("beendet die Schemasitzung in jedem Fall, auch wenn die Migration scheitert", async () => {
+    const { getDb } = await import("./db");
+    invoke.mockImplementation(async (k: string, a?: { sql?: string }) => {
+      if (k === "schemasitzung_select") throw new Error("mittendrin kaputt");
+      return offen(k, a);
+    });
+
+    await expect(getDb()).rejects.toThrow("mittendrin kaputt");
+
+    const kommandos = invoke.mock.calls.map((c) => c[0] as string);
+    expect(kommandos.filter((k) => k === "schemasitzung_beginnen")).toHaveLength(1);
+    expect(kommandos[kommandos.length - 1]).toBe("schemasitzung_beenden");
+  });
+
+  it("schickt die Migrationen durch die Sitzung, nicht über den Pool", async () => {
+    invoke.mockImplementation(async (k: string, a?: { sql?: string }) => offen(k, a));
+    const { getDb } = await import("./db");
+    await getDb();
+    const mitVersion = invoke.mock.calls.filter((c) => String(c[1]?.sql).includes("_migration"));
+    expect(mitVersion.length).toBeGreaterThan(0);
+    for (const [kommando] of mitVersion) expect(kommando).toMatch(/^schemasitzung_/);
   });
 });
