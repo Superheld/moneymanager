@@ -3,6 +3,42 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.30.0-beta.4] — 2026-11-10
+
+Budgets rechnen verschachtelt richtig, die Kategorie-Erkennung misst ehrlich und erklärt
+sich, und was aufklappt, sieht überall gleich aus. **Eine Migration** (75): sie legt die
+Tabelle der Trainingsläufe an und ändert sonst nichts.
+
+### Behoben
+
+**Ein Budget in einem Budget nimmt dem äusseren nichts mehr weg.** Liegt „Tanken" (100 €)
+in „Mobilität" (50 €), gelten die 50 € für alles in Mobilität ausser Tanken und die 100 €
+fürs Tanken — zwei Töpfe. Vorher wurde der Betrag des inneren vom äusseren abgezogen; war
+er grösser, sank ein aufbauendes Budget jeden Monat, ohne dass etwas ausgegeben wurde.
+
+### Geändert
+
+**Die Trefferquote der Erkennung wird ehrlicher gemessen** und fällt dadurch niedriger aus:
+trainiert auf dem Älteren, geprüft an den jüngsten Buchungen — und an von Hand gesetzten
+Kategorien, sobald es genug davon gibt. Neben dem blinden Raten steht als zweite
+Vergleichslinie „dieselbe Kategorie wie beim Empfänger üblich"; dazu Precision, Recall und
+F1 je Kategorie, Macro-F1 und wie verlässlich die angegebene Sicherheit ist.
+
+**Was aufklappt, ist überall dieselbe Tabelle** — die Buchungen eines Budgets, einer
+Kategorie in der Analyse und die Posten der Monatskarten. Die Zeilen lassen sich auch mit
+der Tastatur öffnen.
+
+### Neu
+
+**Warum A und nicht B.** An jedem Fehlgriff im Training, an jeder Buchung und in der
+Review steht, welche Wörter den Ausschlag gaben — gerechnet gegen die richtige (oder
+zweitbeste) Kategorie, mit der Grundneigung als eigener Zeile und dem Hinweis, wo ein Wort
+in deinen Buchungen sonst vorkommt.
+
+**Trainingsläufe werden aufgezeichnet.** Nach jedem Training steht, was sich gegenüber dem
+vorigen geändert hat — an Quellen und ausgeschlossenen Wörtern, und welche Zeilen dadurch
+richtig oder falsch geworden sind. Dazu eine Tabelle der letzten Läufe.
+
 ## [0.30.0-beta.3] — 2026-11-09
 
 Zweite Runde nach dem Live-Test. Keine Migration — der Bestand bleibt, wie er ist; manches
