@@ -1,6 +1,12 @@
-// Tauri shell ("shell"-Schicht laut ARCHITEKTUR.md): bewusst dünn.
-// Fenster + Plugins; die Fachlogik lebt im TS-Kern (src/core), Persistenz
-// läuft über tauri-plugin-sql (SQLite) und wird vom TS-Adapter angesprochen.
+// Tauri shell ("shell"-Schicht): bewusst dünn.
+// Fenster + Plugins; die Fachlogik lebt im TS-Kern (src/core). Die Persistenz läuft über
+// EIGENE Kommandos (datenbank.rs, transaktion.rs) und wird vom TS-Adapter angesprochen.
+//
+// **Was hier NICHT registriert ist, ist Absicht.** Jedes Plugin ist eine Tür aus dem
+// Webview hinaus. `tauri-plugin-opener` stand bis 2026-11-10 hier, ohne dass es jemand
+// benutzte — und es öffnet beliebige http(s)-Adressen im Systembrowser, also einen Weg,
+// Daten in einer URL hinauszutragen, an der CSP vorbei. Welche Rechte der Webview
+// überhaupt haben darf, hält `src/absicherung.test.ts` fest.
 
 mod aktualisierung;
 mod dateirechte;
@@ -22,7 +28,6 @@ pub fn run() {
     dateirechte::standardrechte_einschraenken();
 
     tauri::Builder::default()
-        .plugin(tauri_plugin_opener::init())
         // Die Datenbank haengt nicht mehr am SQL-Plugin, sondern an einem eigenen Pool
         // (datenbank.rs). Der Grund ist `PRAGMA key`: es gilt pro Verbindung, und ueber
         // den Pool des Plugins erwischte es eine beliebige. Der Nebengewinn ist, dass
@@ -32,7 +37,7 @@ pub fn run() {
         // Reiner Transport für FinTS: der Bank-Endpunkt sendet kein
         // Access-Control-Allow-Origin, aus der Webview stirbt der POST an CORS.
         // Dieser fetch läuft durch Rust und kennt kein CORS. Keine Domänenlogik —
-        // welche URLs erlaubt sind, steht in capabilities/default.json.
+        // welche URLs erlaubt sind, steht in capabilities/fints-banken.json und hanseatic.json.
         .plugin(tauri_plugin_http::init())
         // Selbstaktualisierung. Der Updater prueft gegen einen Endpunkt aus
         // tauri.conf.json und laedt nur, was mit unserem Schluessel signiert ist
@@ -40,10 +45,11 @@ pub fn run() {
         // `process` kommt mit, weil nach dem Einspielen neu gestartet werden muss.
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
-        // Mehrere Statements atomar: was ueber tauri-plugin-sql nicht geht, weil dort jedes
-        // Statement eine andere Pool-Verbindung erwischt. Siehe transaktion.rs.
+        // `datenbank_oeffnen` fehlt hier mit Absicht (seit 2026-11-10): geoeffnet wird
+        // ausschliesslich ueber `zugang_*`, also mit einem Schluessel, den nur Rust kennt.
+        // Ein Kommando, das den Wert fuer `PRAGMA key` aus dem Webview annimmt, waere das
+        // Gegenteil der Zusage „die Anwendung kennt den Schluessel nie".
         .invoke_handler(tauri::generate_handler![
-            datenbank::datenbank_oeffnen,
             datenbank::datenbank_schliessen,
             datenbank::datenbank_ist_offen,
             datenbank::db_select,

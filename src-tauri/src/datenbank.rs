@@ -19,7 +19,7 @@
 
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use serde_json::Value as JsonValue;
 use sqlx::sqlite::{SqliteConnectOptions, SqlitePoolOptions, SqliteRow, SqliteTypeInfo};
 use sqlx::{AssertSqlSafe, Column, Row, SqlitePool, TypeInfo, ValueRef};
@@ -54,7 +54,8 @@ pub struct Wirkung {
     pub last_insert_id: i64,
 }
 
-#[derive(Deserialize)]
+/// Kommt NICHT aus dem Webview (kein `Deserialize`): gebaut wird sie in `zugang.rs`, mit
+/// einem Schluessel, den nur Rust kennt.
 pub struct Oeffnung {
     /// Der DATEINAME, nicht der Pfad — aufgeloest wird gegen das App-Datenverzeichnis.
     ///
@@ -69,20 +70,42 @@ pub struct Oeffnung {
     pub anlegen: bool,
 }
 
+/// Ein einfacher Dateiname — oder ein Fehler. **Die EINE Pruefung fuer jeden Namen, der
+/// aus dem Webview kommt.**
+///
+/// Bis 2026-11-10 stand sie zweimal da (hier und in `export.rs`) und fehlte an fuenf
+/// Stellen: `zugang_*` und `sicherung_anlegen` haengten den Namen ungeprueft an das
+/// Datenverzeichnis. `Path::join` ERSETZT bei einem absoluten Pfad die Basis — ein
+/// `zugang_einrichten` mit fremdem Pfad haette eine beliebige Klartext-SQLite des Nutzers
+/// mit einem gewuerfelten Schluessel verschluesselt und das Original geloescht. Eine
+/// Abwehr, die an jeder Stelle neu geschrieben wird, fehlt an der naechsten.
+///
+/// Abgewiesen statt zurechtgebogen: ein zurechtgebogener Pfad ist die Sorte Abwehr, die
+/// beim naechsten Sonderzeichen nicht mehr traegt. Der Doppelpunkt steht dabei fuer
+/// Windows (`C:datei`, Datenstroeme), das NUL-Zeichen fuer alles, was den Namen in C
+/// vorzeitig beendet.
+pub fn einfacher_dateiname(name: &str) -> Result<&str, String> {
+    if name.is_empty()
+        || name.len() > 128
+        || name.contains('/')
+        || name.contains('\\')
+        || name.contains(':')
+        || name.contains('\0')
+        || name.contains("..")
+        || name.starts_with('.')
+    {
+        return Err(format!("'{name}' ist kein einfacher Dateiname."));
+    }
+    Ok(name)
+}
+
 /// Der Dateiname unter dem App-Datenverzeichnis — und nichts anderes.
 ///
 /// Alles, was wie ein Pfad aussieht, wird abgewiesen statt zurechtgebogen: ein
 /// zurechtgebogener Pfad ist genau die Sorte Abwehr, die beim naechsten Sonderzeichen
 /// nicht mehr traegt.
-fn datei_im_datenverzeichnis(app: &AppHandle, datei: &str) -> Result<PathBuf, String> {
-    if datei.is_empty()
-        || datei.contains('/')
-        || datei.contains('\\')
-        || datei.contains("..")
-        || datei.starts_with('.')
-    {
-        return Err(format!("'{datei}' ist kein einfacher Dateiname."));
-    }
+pub fn datei_im_datenverzeichnis(app: &AppHandle, datei: &str) -> Result<PathBuf, String> {
+    let datei = einfacher_dateiname(datei)?;
     let basis = app
         .path()
         .app_data_dir()
@@ -166,7 +189,8 @@ pub async fn pool_lesend(pfad: &Path, pragma: &str) -> Result<SqlitePool, sqlx::
     SqlitePoolOptions::new().max_connections(1).connect_with(opts).await
 }
 
-/// Der Kern von `datenbank_oeffnen`, auch von innen aufrufbar.
+/// Oeffnet die Datenbank und haengt den Pool ein. Nur von innen aufrufbar (`zugang.rs`) —
+/// ein Kommando dazu gibt es nicht mehr, siehe `lib.rs`.
 pub async fn oeffnen_intern(
     app: &AppHandle,
     o: Oeffnung,
@@ -193,15 +217,6 @@ pub async fn oeffnen_intern(
     Ok(true)
 }
 
-#[tauri::command]
-pub async fn datenbank_oeffnen(
-    app: AppHandle,
-    o: Oeffnung,
-    db: State<'_, Datenbank>,
-) -> Result<bool, String> {
-    oeffnen_intern(&app, o, &db).await
-}
-
 /// Schliesst die Datenbank. Danach ist der Bestand wieder zu.
 ///
 /// Der Schluessel steckte in den Verbindungen; mit dem Pool geht er. Was die Zeitsperre
@@ -222,7 +237,9 @@ pub async fn datenbank_ist_offen(db: State<'_, Datenbank>) -> Result<bool, Strin
     Ok(db.0.read().await.is_some())
 }
 
-fn binden<'q>(
+/// Bindet JSON-Werte an eine Query. Die EINE Fassung — `transaktion.rs` benutzt dieselbe,
+/// damit „Ganzzahlen gehen als i64 hinein" nicht an zwei Stellen stimmen muss.
+pub(crate) fn binden<'q>(
     mut q: sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments>,
     werte: &'q [JsonValue],
 ) -> sqlx::query::Query<'q, sqlx::Sqlite, sqlx::sqlite::SqliteArguments> {
@@ -278,12 +295,17 @@ fn nach_typ(zeile: &SqliteRow, i: usize, typ: &SqliteTypeInfo) -> JsonValue {
             .unwrap_or(JsonValue::Null),
         // TEXT, NULL und alles ohne feste Angabe. SQLite ist dynamisch typisiert; was
         // hier ankommt, ist im Zweifel Text — und Text verliert nichts.
+        //
+        // **Drei Versuche, und der dritte fehlte bis 2026-11-10.** Ein berechneter
+        // Ausdruck (`COUNT(*)`, `AVG(x)`, `a / 2.0`) traegt KEINEN deklarierten Typ und
+        // landet hier. Ohne den Rueckfall auf f64 kam ein Fliesskomma-Ergebnis als NULL
+        // heraus — still, und NULL sieht in einer Auswertung aus wie „kein Wert".
         _ => zeile
             .try_get::<String, _>(i)
             .map(JsonValue::from)
-            .unwrap_or_else(|_| {
-                zeile.try_get::<i64, _>(i).map(JsonValue::from).unwrap_or(JsonValue::Null)
-            }),
+            .or_else(|_| zeile.try_get::<i64, _>(i).map(JsonValue::from))
+            .or_else(|_| zeile.try_get::<f64, _>(i).map(JsonValue::from))
+            .unwrap_or(JsonValue::Null),
     }
 }
 
@@ -349,25 +371,64 @@ mod tests {
             .expect("pool")
     }
 
+    /// Bis 2026-11-10 stand hier ein Test, der seine eigene Bedingung pruefte statt der
+    /// Funktion — er waere auch gruen geblieben, wenn die Abwehr ganz gefehlt haette.
     #[test]
     fn nur_einfache_dateinamen_kommen_durch() {
-        // Ohne AppHandle laesst sich die Funktion nicht ganz durchlaufen — geprueft wird
-        // deshalb genau der Teil, auf den es ankommt: die Form des Namens.
-        for boese in ["../andere.db", "/etc/passwd", "unter/pfad.db", ".versteckt", ""] {
+        for gut in ["moneymanager.db", "moneymanager-dev.db", "export-2026-08-30.json", "a"] {
+            assert!(einfacher_dateiname(gut).is_ok(), "'{gut}' sollte durchgehen.");
+        }
+        let zu_lang = "a".repeat(129);
+        for boese in [
+            "",
+            "../andere.db",
+            "/etc/passwd",
+            "unter/pfad.db",
+            "unter\\pfad.db",
+            ".versteckt",
+            "a..b",
+            "C:fremd.db",
+            "name\0.db",
+            zu_lang.as_str(),
+        ] {
             assert!(
-                boese.is_empty()
-                    || boese.contains('/')
-                    || boese.contains("..")
-                    || boese.starts_with('.'),
-                "Der Testfall '{boese}' prueft nichts."
+                einfacher_dateiname(boese).is_err(),
+                "'{boese}' haette abgewiesen werden muessen."
             );
         }
+    }
+
+    /// Ein berechneter Ausdruck hat keinen deklarierten Typ. Ganzzahl und Fliesskomma
+    /// muessen trotzdem als das ankommen, was sie sind — und nicht als NULL.
+    #[tokio::test]
+    async fn berechnete_spalten_kommen_mit_ihrem_wert_an() {
+        let datei = pfad("berechnet");
+        let pool = offen(&datei, None).await;
+        pool.execute("CREATE TABLE t (cent INTEGER)").await.expect("tabelle");
+        pool.execute("INSERT INTO t VALUES (100), (201)").await.expect("insert");
+
+        let zeilen = sqlx::query(
+            "SELECT COUNT(*) AS anzahl, SUM(cent) AS summe, AVG(cent) AS mittel, \
+             MAX(cent) / 2.0 AS halb, 'x' || 'y' AS wort FROM t",
+        )
+        .fetch_all(&pool)
+        .await
+        .expect("select");
+        let json = zeile_zu_json(&zeilen[0]);
+
+        assert_eq!(json["anzahl"], JsonValue::from(2i64));
+        assert_eq!(json["summe"], JsonValue::from(301i64));
+        assert!(json["summe"].is_i64(), "Eine Cent-Summe ist als Fliesskomma angekommen.");
+        assert_eq!(json["mittel"], JsonValue::from(150.5));
+        assert_eq!(json["halb"], JsonValue::from(100.5));
+        assert_eq!(json["wort"], JsonValue::from("xy"));
+        pool.close().await;
     }
 
     /// **Der Test, um dessentwillen dieses Modul existiert.**
     ///
     /// Ueber den Pool des Plugins bediente ein `PRAGMA key` nur eine Verbindung; hier
-    /// bekommt jede ihren, weil er im `after_connect`-Haken steht. Zwanzig Abfragen
+    /// bekommt jede ihren, weil er in den Verbindungsoptionen steht. Zwanzig Abfragen
     /// zwingen den Pool, mehrere zu oeffnen.
     #[tokio::test]
     async fn jede_verbindung_im_pool_bekommt_den_schluessel() {

@@ -53,22 +53,9 @@ fn exportverzeichnis(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(basis)
 }
 
-/// Prueft den Namen und weist alles ab, was wie ein Pfad aussieht.
-///
-/// Dieselbe Abwehr wie in `datenbank::datei_im_datenverzeichnis`, und aus demselben Grund
-/// wortgleich streng: ein zurechtgebogener Pfad ist die Sorte Abwehr, die beim naechsten
-/// Sonderzeichen nicht mehr traegt.
-fn geprueft(name: &str) -> Result<&str, String> {
-    if name.is_empty()
-        || name.contains('/')
-        || name.contains('\\')
-        || name.contains("..")
-        || name.starts_with('.')
-    {
-        return Err(format!("'{name}' ist kein einfacher Dateiname."));
-    }
-    Ok(name)
-}
+// Der Name wird mit `datenbank::einfacher_dateiname` geprueft — derselben Funktion wie
+// jeder andere Name aus dem Webview. Hier stand bis 2026-11-10 eine wortgleiche Kopie.
+use crate::datenbank::einfacher_dateiname as geprueft;
 
 /// Schreibt `inhalt` in den Download-Ordner und meldet den vollen Pfad.
 ///
@@ -85,6 +72,7 @@ pub async fn export_schreiben(app: AppHandle, name: String, inhalt: String) -> R
 #[cfg(test)]
 mod tests {
     use super::geprueft;
+    // (die ausfuehrliche Liste steht beim Original in datenbank.rs)
 
     #[test]
     fn nur_einfache_dateinamen_kommen_durch() {

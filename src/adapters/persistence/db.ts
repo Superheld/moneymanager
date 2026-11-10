@@ -10,9 +10,11 @@
 //
 // **Die Naht ist absichtlich schmal.** Nach oben sieht das aus wie vorher: `select` und
 // `execute`, dieselben Signaturen. Kein einziges Repository musste angefasst werden.
+//
+// Wo unten vom Plugin die Rede ist (bei `migrate`), ist das Geschichte und als solche
+// stehengelassen: sie erklärt, warum die Migrationen einzeln wiederholbar sind.
 
 import { invoke } from "@tauri-apps/api/core";
-import { DATEINAME } from "./datenbankdatei";
 import { MIGRATIONS } from "./migrations";
 import { schemaStatement, fremdschluesselPruefen } from "./transaktion";
 import { sicherungPflegen } from "../../application/sicherung";
@@ -171,21 +173,11 @@ const zugang: Datenbankzugang = {
     invoke<{ rowsAffected: number; lastInsertId: number }>("db_execute", { sql, werte }),
 };
 
-/**
- * Die Datenbank öffnen.
- *
- * `pragma` ist der fertige Wert für `PRAGMA key` — oder `null` für eine unverschlüsselte
- * Datenbank. Letzteres ist heute der Normalfall und wird es nicht bleiben.
- *
- * Gibt `false` zurück, wenn der Schlüssel nicht passt. Das ist kein Fehler, sondern eine
- * Antwort: eine falsch eingetippte Passphrase ist keine Ausnahme, sondern der häufigste
- * Fall beim Entsperren.
- */
-export async function datenbankOeffnen(pragma: string | null): Promise<boolean> {
-  return invoke<boolean>("datenbank_oeffnen", {
-    o: { datei: DATEINAME, pragma, anlegen: true },
-  });
-}
+// **Ein `datenbankOeffnen` gibt es hier nicht mehr (seit 2026-11-10).** Geöffnet wird
+// ausschliesslich über den Zugang (`zugang.ts` → `zugang_entsperren` und Verwandte), also
+// mit einem Schlüssel, den nur Rust kennt. Die Funktion stammte aus der Zeit vor der
+// Verschlüsselung und reichte den Wert für `PRAGMA key` durch den Webview — das Gegenteil
+// der Zusage in `application/zugang.ts`, dass die Anwendung den Schlüssel nie sieht.
 
 /** Die Datenbank schliessen — der Bestand ist danach wieder zu. */
 export function datenbankSchliessen(): Promise<void> {
@@ -223,23 +215,45 @@ async function sicherungVersuchen(): Promise<void> {
   }
 }
 
+/**
+ * Der Zugang zur Datenbank — samt Tagessicherung und Migrationen beim ersten Mal.
+ *
+ * **Geöffnet wird hier NICHT.** Das Tor in `App.tsx` rendert keinen Screen, bevor Rust
+ * „offen" meldet; wer hier ankommt, hat entsperrt. Bis 2026-11-10 stand an dieser Stelle
+ * trotzdem ein Öffnungsversuch OHNE Schlüssel, bei jedem Start. Er ging nur deshalb gut,
+ * weil die Prüfabfrage an der verschlüsselten Datei scheiterte und der vorhandene Pool
+ * stehen blieb — eine Zeile, die funktioniert, weil sie fehlschlägt.
+ *
+ * **Ein Fehlschlag wird nicht gemerkt.** Die Zusage wird zwischengespeichert, damit
+ * Sicherung und Migrationen genau einmal laufen. Scheitert sie aber — etwa weil ein noch
+ * laufender Ladevorgang nach dem Sperren hier ankommt und auf die geschlossene Datenbank
+ * trifft —, bliebe ohne das Zurücksetzen die ABGELEHNTE Zusage stehen, und nach dem
+ * Entsperren bekäme jeder Screen den alten Fehler, bis zum Neustart der App.
+ */
 export function getDb(): Promise<Datenbankzugang> {
   if (!dbPromise) {
-    dbPromise = (async () => {
-      await datenbankOeffnen(null);
+    const zusage = (async () => {
       await sicherungVersuchen();
       await migrate(zugang);
       return zugang;
     })();
+    dbPromise = zusage;
+    zusage.catch(() => {
+      // Nur die EIGENE Zusage räumen: inzwischen kann gesperrt, entsperrt und eine neue
+      // angelegt worden sein — die darf dieser späte Fehler nicht mitnehmen.
+      if (dbPromise === zusage) dbPromise = null;
+    });
   }
   return dbPromise;
 }
 
 /**
- * Den gemerkten Zugang vergessen — nach dem Sperren.
+ * Den gemerkten Zugang vergessen — nach dem Sperren UND nach dem Entsperren.
  *
- * Ohne das gäbe `getDb()` weiter die zwischengespeicherte Zusage zurück, und der nächste
- * Zugriff liefe gegen eine geschlossene Datenbank statt in den Entsperr-Bildschirm.
+ * Nach dem Sperren, weil `getDb()` sonst weiter die zwischengespeicherte Zusage
+ * zurückgäbe und der nächste Zugriff gegen eine geschlossene Datenbank liefe. Nach dem
+ * Entsperren, weil Sicherung und Migrationen zu jeder ÖFFNUNG gehören und nicht zum
+ * Prozess: wer über Nacht gesperrt hatte, bekommt am Morgen seine Tagessicherung.
  */
 export function zugangVergessen(): void {
   dbPromise = null;

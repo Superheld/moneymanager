@@ -19,42 +19,13 @@ use serde::Deserialize;
 use serde_json::Value as JsonValue;
 use sqlx::{AssertSqlSafe, Executor, Sqlite, Transaction};
 use tauri::State;
-use crate::datenbank::Datenbank;
+use crate::datenbank::{binden, Datenbank};
 
 #[derive(Deserialize)]
 pub struct Anweisung {
     pub sql: String,
     #[serde(default)]
     pub werte: Vec<JsonValue>,
-}
-
-/// Bindet einen JSON-Wert an eine Query.
-///
-/// Anders als das Plugin, das jede Zahl als `f64` bindet: Ganzzahlen gehen als `i64`
-/// hinein. In einer Anwendung, die Geld als Integer Cent führt, ist der Umweg über
-/// Fliesskomma unnötig — und er ist genau die Sorte Detail, die irgendwann einen Cent
-/// verschiebt, ohne dass jemand die Stelle wiederfindet.
-fn binden<'q>(
-    mut query: sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments>,
-    werte: &'q [JsonValue],
-) -> sqlx::query::Query<'q, Sqlite, sqlx::sqlite::SqliteArguments> {
-    for wert in werte {
-        query = match wert {
-            JsonValue::Null => query.bind(None::<String>),
-            JsonValue::Bool(b) => query.bind(*b),
-            JsonValue::String(s) => query.bind(s.as_str()),
-            JsonValue::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    query.bind(i)
-                } else {
-                    query.bind(n.as_f64().unwrap_or_default())
-                }
-            }
-            // Arrays und Objekte gehen als JSON-Text hinein — dieselbe Wahl wie im Plugin.
-            andere => query.bind(andere.to_string()),
-        };
-    }
-    query
 }
 
 async fn ausfuehren(

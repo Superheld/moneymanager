@@ -21,6 +21,7 @@ import {
   type Budgetuebersicht,
 } from "../application/budgets/budgetsichten";
 import { uebersichtLaden, type Uebersichtsdaten } from "../application/uebersicht";
+import { appBootstrap } from "../application/bootstrap";
 import {
   budgetAnlegen as budgetAnlegenUseCase,
   budgetBetragLoeschen as budgetBetragLoeschenUseCase,
@@ -1132,6 +1133,17 @@ import {
   letztesKontoLaden as letztesKontoLadenUseCase,
   letztesKontoMerken as letztesKontoMerkenUseCase,
 } from "../application/einstellungen";
+
+/**
+ * Was nach dem Entsperren einmal laufen muss, bevor ein Screen lädt.
+ *
+ * Steht hier, damit auch der Einstieg (`App.tsx`) kein Repository in die Hand nimmt —
+ * er liegt in der Wurzel von `src/` und damit ausserhalb jeder Schicht, und genau
+ * deshalb hatte ihn der Architekturtest bis 2026-11-10 nicht gesehen.
+ */
+export function appStarten(): Promise<void> {
+  return appBootstrap(sqliteKategorieRepository);
+}
 
 export function zugangsstand(): Promise<Zugangsstand> {
   return tauriZugangPort.stand();

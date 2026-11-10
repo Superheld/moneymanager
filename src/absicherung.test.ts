@@ -50,8 +50,8 @@ function stilvorlagen(verzeichnis: string): string[] {
 describe("Content Security Policy", () => {
   it("ist überhaupt gesetzt", () => {
     // `null` ist der Auslieferungszustand von Tauri und heisst: keine Einschränkung.
-    // Zusammen mit `sql:allow-execute` in den Capabilities hiesse das, dass jede Zeile
-    // fremden JavaScripts den ganzen Bestand lesen UND fortschaffen kann.
+    // Der Webview liest über `db_select` den ganzen Bestand — ohne CSP könnte jede Zeile
+    // fremden JavaScripts ihn lesen UND fortschaffen.
     expect(csp, "app.security.csp fehlt").toBeTruthy();
     expect(devCsp, "app.security.devCsp fehlt").toBeTruthy();
   });
@@ -123,5 +123,62 @@ describe("Stilvorlagen", () => {
       }
     }
     expect(treffer, treffer.join("\n")).toEqual([]);
+  });
+});
+
+describe("Capabilities", () => {
+  // Die CSP sperrt, was der WEBVIEW selbst ins Netz schickt. Ein Plugin läuft durch Rust
+  // und damit an ihr vorbei — jedes Recht in den Capabilities ist deshalb eine eigene Tür,
+  // und die CSP sieht keine davon. Bis 2026-11-10 stand `opener:default` hier, von
+  // niemandem benutzt: es öffnet beliebige http(s)-Adressen im Systembrowser, und eine
+  // Adresse trägt Daten. „Fortschaffen kann er nichts" stimmte so lange nicht.
+  //
+  // Deshalb eine GESCHLOSSENE Liste: ein neues Recht macht diesen Test rot, und wer es
+  // einträgt, hat die Frage „kommt darüber etwas hinaus?" vor sich statt hinter sich.
+  const ORDNER = join(WURZEL, "src-tauri", "capabilities");
+  const dateien = readdirSync(ORDNER).filter((d) => d.endsWith(".json"));
+  const rechte = dateien.flatMap((datei) => {
+    const inhalt = JSON.parse(readFileSync(join(ORDNER, datei), "utf8"));
+    return (inhalt.permissions as (string | { identifier: string; allow?: { url: string }[] })[]).map(
+      (p) => ({ datei, recht: typeof p === "string" ? p : p.identifier, allow: typeof p === "string" ? null : p.allow ?? [] }),
+    );
+  });
+
+  const ERLAUBT: Record<string, string> = {
+    "core:default": "Fenster, Ereignisse, IPC — ohne das startet nichts",
+    "updater:default": "prüft und lädt nur gegen die Endpunkte aus tauri.conf.json, signiert",
+    "process:allow-restart": "Neustart nach dem Einspielen eines Updates",
+    "http:default": "der Bankabruf — nur mit Hostliste, siehe unten",
+  };
+
+  it("sieht überhaupt etwas", () => {
+    expect(dateien).toContain("default.json");
+    expect(rechte.length).toBeGreaterThan(0);
+  });
+
+  it("enthalten nur Rechte, deren Weg nach draussen entschieden ist", () => {
+    const fremd = rechte.filter((r) => !(r.recht in ERLAUBT)).map((r) => `${r.datei}: ${r.recht}`);
+    expect(fremd, "neues Recht — kommt darüber etwas aus der App hinaus?").toEqual([]);
+  });
+
+  it("geben das Netz nur mit einer Hostliste frei, nie pauschal", () => {
+    for (const r of rechte.filter((x) => x.recht.startsWith("http:"))) {
+      expect(r.allow, `${r.datei}: http ohne Hostliste`).not.toBeNull();
+      expect(r.allow!.length, `${r.datei}: leere Hostliste`).toBeGreaterThan(0);
+      for (const { url } of r.allow!) {
+        // https, ein ausgeschriebener Host ohne Platzhalter, dann der Pfad. Ein `*` im
+        // Host wäre eine ganze Domänenfamilie, `http:` eine Leitung im Klartext.
+        expect(url, `${r.datei}: ${url}`).toMatch(/^https:\/\/[a-z0-9.-]+\/\*$/);
+      }
+    }
+  });
+
+  it("registrieren kein Plugin, dessen Recht hier nicht steht", () => {
+    // Die andere Hälfte: ein Plugin in `lib.rs` ohne Recht ist tot, eines mit Recht
+    // steht oben. Was hier auffallen soll, ist das WIEDEREINFÜHREN — das Paket kommt
+    // zurück, und das Recht folgt beim ersten „geht nicht".
+    const cargo = readFileSync(join(WURZEL, "src-tauri", "Cargo.toml"), "utf8");
+    const plugins = [...cargo.matchAll(/^tauri-plugin-([a-z-]+)\s*=/gm)].map((m) => m[1]).sort();
+    expect(plugins).toEqual(["http", "process", "updater"]);
   });
 });

@@ -84,7 +84,6 @@ function kommandos(db: Database) {
     // --- Datenbank ---
     db_select: (a: { sql: string; werte?: unknown[] }) => lesen(a.sql, a.werte),
     db_execute: (a: { sql: string; werte?: unknown[] }) => ausfuehren(a.sql, a.werte),
-    datenbank_oeffnen: () => true,
     datenbank_ist_offen: () => true,
     datenbank_schliessen: () => undefined,
     transaktion: (a: { anweisungen: Anweisung[] }) => {
