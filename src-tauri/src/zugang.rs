@@ -15,7 +15,7 @@ use serde::Serialize;
 use sqlx::{AssertSqlSafe, Executor, Row};
 use tauri::{AppHandle, Manager, State};
 
-use crate::datenbank::{Datenbank, Oeffnung};
+use crate::datenbank::{einfacher_dateiname, Datenbank, Oeffnung};
 use crate::schluessel::{auswickeln, einwickeln, Datenschluessel, Huelle, SchluesselFehler};
 
 /// Wie die Oberflaeche den Zustand sieht.
@@ -38,7 +38,15 @@ fn datenverzeichnis(app: &AppHandle) -> Result<PathBuf, String> {
     Ok(p)
 }
 
+/// Die Datenbankdatei im Datenverzeichnis. **Jeder Pfad in diesem Modul entsteht hier
+/// oder in `huellenpfad`** — beide pruefen den Namen, bevor sie ihn anhaengen. `datei`
+/// kommt aus dem Webview; siehe `datenbank::einfacher_dateiname`.
+fn bestandspfad(app: &AppHandle, datei: &str) -> Result<PathBuf, String> {
+    Ok(datenverzeichnis(app)?.join(einfacher_dateiname(datei)?))
+}
+
 fn huellenpfad(app: &AppHandle, datei: &str) -> Result<PathBuf, String> {
+    let datei = einfacher_dateiname(datei)?;
     Ok(datenverzeichnis(app)?.join(format!("{datei}.schluessel.json")))
 }
 
@@ -60,17 +68,39 @@ fn huelle_schreiben(app: &AppHandle, datei: &str, h: &Huelle) -> Result<(), Stri
     let ziel = huellenpfad(app, datei)?;
     let vorlaeufig = ziel.with_extension("json.neu");
     let text = serde_json::to_string_pretty(h).map_err(|e| e.to_string())?;
-    std::fs::write(&vorlaeufig, text).map_err(|e| format!("Huelle nicht schreibbar: {e}"))?;
-    std::fs::rename(&vorlaeufig, &ziel).map_err(|e| format!("Huelle nicht ersetzbar: {e}"))
+    huelle_ablegen(&vorlaeufig, &ziel, &text)
+}
+
+/// Schreiben, AUF DIE PLATTE ZWINGEN, dann umbenennen.
+///
+/// Ohne `sync_all` ist das Umbenennen nur halb atomar: der NAME wechselt sofort, der
+/// INHALT kann noch im Zwischenspeicher des Systems stehen. Faellt in diesem Fenster der
+/// Strom aus, heisst die Datei richtig und ist leer — und eine leere Huelle ist genau der
+/// verlorene Bestand, den der Umweg ueber die vorlaeufige Datei verhindern soll.
+fn huelle_ablegen(vorlaeufig: &Path, ziel: &Path, text: &str) -> Result<(), String> {
+    use std::io::Write;
+    let mut f = std::fs::File::create(vorlaeufig)
+        .map_err(|e| format!("Huelle nicht schreibbar: {e}"))?;
+    f.write_all(text.as_bytes()).map_err(|e| format!("Huelle nicht schreibbar: {e}"))?;
+    f.sync_all().map_err(|e| format!("Huelle nicht gesichert: {e}"))?;
+    drop(f);
+    std::fs::rename(vorlaeufig, ziel).map_err(|e| format!("Huelle nicht ersetzbar: {e}"))
 }
 
 /// Ob eine Datei eine UNVERSCHLUESSELTE SQLite-Datenbank ist.
 ///
 /// Am Dateikopf erkannt und nicht am Oeffnen: Oeffnen wuerde eine Datei anlegen, die es
 /// nicht gab, und aus der Frage eine Tatsache machen.
+///
+/// **Gelesen werden genau die 16 Byte des Kopfs.** Vorher las die Funktion die ganze
+/// Datei ein, um ihren Anfang zu vergleichen — bei jedem `zugang_stand`, also bei jedem
+/// Start und jedem Neuladen, den gesamten Bestand in den Speicher.
 fn ist_klartext(pfad: &Path) -> bool {
-    let Ok(inhalt) = std::fs::read(pfad) else { return false };
-    inhalt.starts_with(b"SQLite format 3\0")
+    use std::io::Read;
+    const KOPF: &[u8; 16] = b"SQLite format 3\0";
+    let Ok(mut f) = std::fs::File::open(pfad) else { return false };
+    let mut anfang = [0u8; 16];
+    f.read_exact(&mut anfang).is_ok() && &anfang == KOPF
 }
 
 #[tauri::command]
@@ -79,7 +109,7 @@ pub async fn zugang_stand(
     datei: String,
     db: State<'_, Datenbank>,
 ) -> Result<Stand, String> {
-    let pfad = datenverzeichnis(&app)?.join(&datei);
+    let pfad = bestandspfad(&app, &datei)?;
     Ok(Stand {
         eingerichtet: huelle_lesen(&app, &datei)?.is_some(),
         offen: db.0.read().await.is_some(),
@@ -118,7 +148,7 @@ pub async fn zugang_einrichten(
     }
 
     let dk = Datenschluessel::wuerfeln();
-    let pfad = datenverzeichnis(&app)?.join(&datei);
+    let pfad = bestandspfad(&app, &datei)?;
 
     if pfad.exists() && ist_klartext(&pfad) {
         ueberfuehren(&pfad, &dk).await?;
@@ -214,6 +244,7 @@ async fn pruefen(neu: &Path, dk: &Datenschluessel) -> Result<(), String> {
 /// lassen hiesse, den ganzen Aufwand durch die Hintertuer wieder aufzugeben. Entfernt
 /// wird ausschliesslich, was unverschluesselt IST: geprueft am Dateikopf, nicht am Namen.
 fn alte_sicherungen_wegwerfen(app: &AppHandle, datei: &str) -> Result<(), String> {
+    let datei = einfacher_dateiname(datei)?;
     let ordner = datenverzeichnis(app)?.join("sicherungen");
     let Ok(eintraege) = std::fs::read_dir(&ordner) else { return Ok(()) };
     let stamm = datei.strip_suffix(".db").unwrap_or(datei);
@@ -343,6 +374,30 @@ mod tests {
         assert!(ist_klartext(&p));
     }
 
+    #[test]
+    fn eine_zu_kurze_oder_fremde_datei_ist_kein_klartext_bestand() {
+        let kurz = pfad("kurz");
+        std::fs::write(&kurz, b"SQLite").unwrap();
+        assert!(!ist_klartext(&kurz), "Sechs Byte sind kein Dateikopf.");
+
+        let fremd = pfad("fremd");
+        std::fs::write(&fremd, b"Das ist ganz sicher keine Datenbank, nur Text.").unwrap();
+        assert!(!ist_klartext(&fremd));
+    }
+
+    #[test]
+    fn die_huelle_liegt_vollstaendig_da_und_die_vorlaeufige_ist_weg() {
+        let ziel = std::env::temp_dir().join("moneymanager-zugang-huelle.schluessel.json");
+        let vorlaeufig = ziel.with_extension("json.neu");
+        let _ = std::fs::remove_file(&ziel);
+
+        huelle_ablegen(&vorlaeufig, &ziel, "{\"erste\":1}").expect("erste");
+        huelle_ablegen(&vorlaeufig, &ziel, "{\"zweite\":2}").expect("zweite");
+
+        assert_eq!(std::fs::read_to_string(&ziel).unwrap(), "{\"zweite\":2}");
+        assert!(!vorlaeufig.exists(), "Die vorlaeufige Datei ist liegengeblieben.");
+    }
+
     #[tokio::test]
     async fn eine_fehlende_datei_ist_kein_klartext_bestand() {
         // Wichtig, weil daraus „muss ueberfuehrt werden" abgeleitet wird: eine Datei, die
@@ -406,27 +461,27 @@ mod tests {
         pool.close().await;
     }
 
-    /// **Die Ueberfuehrung an einer ECHTEN Datenbank pruefen.**
+    /// **Die Ueberfuehrung an einer GEWACHSENEN Datenbank pruefen.**
     ///
-    /// Die Tests darueber arbeiten mit einer Tabelle. Ein wirklicher Bestand hat
-    /// Dutzende, dazu Indizes, Fremdschluessel und Trigger — und genau dort faellt auf,
-    /// wenn `sqlcipher_export` etwas nicht mitnimmt. Ein Testbestand kann das nie
-    /// abdecken, weil er nie so alt und so gewachsen ist wie ein echter.
+    /// Die Tests darueber arbeiten mit einer Tabelle. Ein vollstaendiger Bestand hat
+    /// Dutzende, dazu Indizes und Fremdschluessel — und genau dort faellt auf, wenn
+    /// `sqlcipher_export` etwas nicht mitnimmt.
     ///
-    /// Deshalb `#[ignore]` und ein Pfad von aussen: der Bestand gehoert nicht ins Repo,
-    /// und der Lauf soll nicht bei jedem `cargo test` mitgehen. Das ist dieselbe Idee
-    /// wie `scripts/migrationsprobe.mjs` — gegen eine LESEKOPIE, niemals gegen das
-    /// Original:
+    /// Deshalb `#[ignore]` und ein Pfad von aussen. **Gemeint ist eine unverschluesselte
+    /// Kopie des SPIELSTANDS** (`npm run seed` schreibt ihn vollstaendig migriert), nicht
+    /// der echte Bestand: echte Daten kommen in der Entwicklung nicht vor, auch nicht als
+    /// Probe (Wurzel-`CLAUDE.md`, „Eine Aenderung machen"). Bis 2026-11-10 stand hier ein
+    /// Rezept mit einer Lesekopie des echten Bestands — aelter als die Regel und seit der
+    /// Verschluesselung ohnehin nicht mehr ausfuehrbar.
     ///
     /// ```sh
-    /// sqlite3 -readonly "<bestand>.db" ".backup '/tmp/probe.db'"
-    /// MONEYMANAGER_PROBE=/tmp/probe.db \
+    /// MONEYMANAGER_PROBE=<kopie-des-spielstands.db> \
     ///   cargo test --manifest-path src-tauri/Cargo.toml --lib \
-    ///   ueberfuehrung_an_einem_echten_bestand -- --ignored --nocapture
+    ///   ueberfuehrung_an_einem_gewachsenen_bestand -- --ignored --nocapture
     /// ```
     #[tokio::test]
-    #[ignore = "braucht MONEYMANAGER_PROBE mit dem Pfad einer Lesekopie"]
-    async fn ueberfuehrung_an_einem_echten_bestand() {
+    #[ignore = "braucht MONEYMANAGER_PROBE mit dem Pfad einer Klartext-Kopie des Spielstands"]
+    async fn ueberfuehrung_an_einem_gewachsenen_bestand() {
         let Ok(pfad) = std::env::var("MONEYMANAGER_PROBE") else {
             panic!("MONEYMANAGER_PROBE nicht gesetzt");
         };

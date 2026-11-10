@@ -1,8 +1,7 @@
 // Welche Datenbankdatei die App öffnet.
 //
-// Eine Konstante, weil der Name an drei Stellen gebraucht wird — `db.ts` zum Laden,
-// `transaktion.ts` zweimal für den Rust-Weg — und drei gleichlautende Zeichenketten
-// irgendwann auseinanderlaufen.
+// Eine Konstante, weil der Name an mehreren Stellen gebraucht wird — beim Zugang, bei den
+// Sicherungen, beim Export — und gleichlautende Zeichenketten irgendwann auseinanderlaufen.
 
 /**
  * Der echte Bestand und der Spielstand liegen in ZWEI Dateien.
@@ -27,10 +26,7 @@
  */
 export const DATEINAME = import.meta.env.VITE_DB_DATEI ?? (import.meta.env.DEV ? "moneymanager-dev.db" : "moneymanager.db");
 
-/**
- * Was `tauri-plugin-sql` als Verbindungszeichenkette erwartet. Der relative Pfad wird
- * gegen das App-Datenverzeichnis aufgelöst, das aus dem Bundle-Identifier stammt — beide
- * Dateien liegen deshalb nebeneinander, und der Rezeptweg aus `CLAUDE.local.md` findet
- * auch die Spielkopie.
- */
-export const DB_URL = `sqlite:${DATEINAME}`;
+// Aufgelöst wird der Name in Rust gegen das App-Datenverzeichnis, das aus dem
+// Bundle-Identifier stammt — beide Dateien liegen deshalb nebeneinander. Als Pfad nimmt
+// ihn dort niemand an: `datenbank::einfacher_dateiname` weist alles ab, was kein
+// schlichter Dateiname ist.

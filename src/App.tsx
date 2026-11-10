@@ -10,12 +10,11 @@ import { BudgetsScreen } from "./adapters/ui/budgets/BudgetsScreen";
 import { RuecklagenScreen } from "./adapters/ui/ruecklagen/RuecklagenScreen";
 import { ImportBereich } from "./adapters/ui/import/ImportBereich";
 import { TrainingBereich } from "./adapters/ui/training/TrainingBereich";
-import { appBootstrap } from "./application/bootstrap";
-import { sqliteKategorieRepository } from "./adapters/persistence/sqliteStammdatenRepositories";
 import { EinstellungenProvider } from "./adapters/ui/bausteine/EinstellungenProvider";
 import { Sperrbildschirm } from "./adapters/ui/zugang/Sperrbildschirm";
 import { useZeitsperre } from "./adapters/ui/zugang/useZeitsperre";
 import {
+  appStarten,
   experimente as experimenteStand,
   zeitsperre,
   zugangEinrichten,
@@ -71,7 +70,7 @@ export default function App() {
     if (stand.art !== "offen") return;
     let abgebrochen = false;
     void (async () => {
-      await appBootstrap(sqliteKategorieRepository).catch(() => {});
+      await appStarten().catch(() => {});
       const [m, e] = await Promise.all([
         zeitsperre().catch(() => 0),
         experimenteStand().catch(() => EXPERIMENTE_AUS),

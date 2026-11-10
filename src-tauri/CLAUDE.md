@@ -7,8 +7,9 @@ Gilt für die Rust-Shell und ihre Konfiguration. Was überall gilt, steht in der
 `app.security.csp` in `tauri.conf.json` erlaubt nur `'self'` und den Tauri-IPC. Das
 schützt nicht gegen einen Angreifer am Schreibtisch, sondern gegen den realistischen Fall:
 eine **Abhängigkeit**, die eines Tages etwas mitbringt, das niemand bestellt hat. Der
-Webview hat über `sql:allow-execute` Vollzugriff auf den Bestand — lesen kann fremder Code
-also alles. Was die CSP nimmt, ist der Rückweg: **fortschaffen kann er nichts.**
+Webview hat über `db_select` und `db_execute` Vollzugriff auf den Bestand — lesen kann
+fremder Code also alles. Was die CSP nimmt, ist der Rückweg: **fortschaffen kann er
+nichts** — solange auch die Capabilities keinen offen lassen (nächster Abschnitt).
 
 Drei Dinge, die man dabei wissen muss:
 
@@ -23,6 +24,28 @@ Drei Dinge, die man dabei wissen muss:
   Daten in einer URL hinaustragen lassen. Deshalb prüft der Wächter beides zusammen: die
   CSP und dass keine CSS-Datei etwas nachlädt. Eine CSP mit diesem Loch beruhigt, ohne zu
   wirken — und ein Wächter, der nichts sieht, ist schlimmer als keiner.
+
+## Die Capabilities sind die zweite Hälfte derselben Sperre
+
+Die CSP sieht nur, was der Webview SELBST ins Netz schickt. Ein Plugin läuft durch Rust
+und damit an ihr vorbei: jedes Recht in `capabilities/*.json` ist eine eigene Tür, und die
+CSP sieht keine davon. `src/absicherung.test.ts` hält deshalb eine **geschlossene Liste**
+der Rechte — ein neues macht den Test rot, und wer es einträgt, beantwortet dabei die
+Frage, ob darüber etwas hinauskommt.
+
+**Bis 2026-11-10 stimmte „fortschaffen kann er nichts" nicht.** `opener:default` stand in
+`default.json`, aus der Tauri-Vorlage übernommen und von niemandem benutzt. Es öffnet
+beliebige http(s)-Adressen im Systembrowser, und eine Adresse trägt Daten. Die CSP war
+dicht und der Wächter grün; die Tür stand daneben.
+
+Dieselbe Überlegung gilt für die eigenen Kommandos, und dort heisst sie: **kein Pfad aus
+dem Webview.** Jeder Name, den ein Kommando entgegennimmt, geht durch
+`datenbank::einfacher_dateiname`, und zwar durch diese eine Funktion — die Prüfung stand
+einmal zweifach da und fehlte an fünf Stellen (`zugang_*`, `sicherung_anlegen`). Was die
+Naht leistet, ist nicht „fremder Code kann nichts": er hat den Bestand. Sie begrenzt den
+Schaden AUF den Bestand, statt ihn auf alles auszudehnen, was der Nutzer erreicht. Aus
+demselben Grund gibt es kein Kommando mehr, das die Datenbank mit einem Schlüssel aus dem
+Webview öffnet — geöffnet wird nur über `zugang_*`.
 
 ## Was die CSP NICHT leistet
 
@@ -88,6 +111,16 @@ Die **Zeitsperre** (Einstellungen → Verschlüsselung, Vorgabe 15 Minuten, absc
 deckt den Fall ab, den weder Dateirechte noch Verschlüsselung erreichen: jemand setzt
 sich an den entsperrten Rechner. Aus demselben Grund ist der Wiederherstellungscode dort
 nur gegen die Passphrase einzusehen — läge er offen, wäre die Sperre umsonst.
+
+**Ihre Frist ist eine Uhrzeit, kein Countdown** (`useZeitsperre.ts`). Ein `setTimeout`
+steht still, während der Rechner schläft, und läuft danach mit dem Rest weiter; die Sperre
+prüft deshalb bei jeder Rückkehr ins Fenster gegen die Uhr. Die Rückkehr selbst zählt
+nicht als Bedienung — sonst verlängerte das Aufklappen des Rechners die Frist.
+
+**Was der Verschlüsselung noch fehlt:** der Datenschlüssel lässt sich nicht wechseln. Wird
+der Wiederherstellungscode bekannt, hilft eine neue Passphrase nicht — der Code IST der
+Schlüssel. Dafür bräuchte es `PRAGMA rekey` samt neuer Hülle und neuem Code; bis dahin
+gilt für den Zettel dasselbe wie für einen Haustürschlüssel.
 
 ## Die App sichert sich selbst, gestaffelt
 

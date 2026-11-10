@@ -18,11 +18,6 @@
 // RustCrypto-Projekt. Bei Krypto ist die eigene Konstruktion immer die schlechtere; was
 // hier steht, ist die Verdrahtung, nicht das Verfahren.
 
-// Noch nicht verdrahtet: die Oberflaeche zum Einrichten und Entsperren ist die naechste
-// Scheibe. Bis dahin sieht der Nicht-Test-Build hier lauter Ungenutztes — und eine
-// Warnung, die man wegzuschauen lernt, nimmt die naechste echte mit.
-#![allow(dead_code)]
-
 use argon2::{Algorithm, Argon2, Params, Version};
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{XChaCha20Poly1305, XNonce};
@@ -188,7 +183,27 @@ impl std::fmt::Display for SchluesselFehler {
 
 const FASSUNG: u32 = 1;
 
+/// **Obergrenzen fuer das, was eine Huelle verlangen darf.**
+///
+/// Die KDF-Angaben stehen in der Huelle, und die Huelle ist eine Datei, an der jemand
+/// drehen kann. Nach UNTEN ist das harmlos — wer die Parameter senkt, bekommt einen
+/// anderen Schluessel und damit nichts auf. Nach OBEN nicht: eine Huelle, die ein paar
+/// Terabyte Speicher verlangt, laesst die App beim Entsperren sterben, und zwar mit einer
+/// Meldung, die nach allem aussieht ausser nach einer veraenderten Datei. Die Grenzen
+/// liegen weit ueber allem, was diese App je selbst schreibt (64 MiB, 3, 4) — sie lassen
+/// Raum zum Heben und keinen zum Missbrauch.
+const M_KIB_HOECHSTENS: u32 = 1_048_576; // 1 GiB
+const T_HOECHSTENS: u32 = 16;
+const P_HOECHSTENS: u32 = 16;
+
 fn kek(passphrase: &str, salz: &[u8], p: &KdfAngaben) -> Result<[u8; 32], SchluesselFehler> {
+    if p.art != "argon2id"
+        || p.m_kib > M_KIB_HOECHSTENS
+        || p.t_durchgaenge > T_HOECHSTENS
+        || p.p_spuren > P_HOECHSTENS
+    {
+        return Err(SchluesselFehler::HuelleKaputt);
+    }
     let params = Params::new(p.m_kib, p.t_durchgaenge, p.p_spuren, Some(32))
         .map_err(|_| SchluesselFehler::HuelleKaputt)?;
     let argon = Argon2::new(Algorithm::Argon2id, Version::V0x13, params);
@@ -348,6 +363,26 @@ mod tests {
         assert_ne!(a.kdf.salz, b.kdf.salz);
         assert_ne!(a.nonce, b.nonce);
         assert_ne!(a.geheimtext, b.geheimtext);
+    }
+
+    #[test]
+    fn eine_huelle_mit_masslosen_parametern_wird_abgewiesen_statt_ausgefuehrt() {
+        let dk = Datenschluessel::wuerfeln();
+        let gut = schnelle_huelle(&dk, "kennwort");
+
+        let mut speicher = gut.clone();
+        speicher.kdf.m_kib = u32::MAX;
+        let mut durchgaenge = gut.clone();
+        durchgaenge.kdf.t_durchgaenge = 1_000_000;
+        let mut spuren = gut.clone();
+        spuren.kdf.p_spuren = 10_000;
+        let mut verfahren = gut.clone();
+        verfahren.kdf.art = "pbkdf2".into();
+
+        // Abgewiesen wird VOR der Ableitung — der Test liefe sonst gar nicht zu Ende.
+        for h in [speicher, durchgaenge, spuren, verfahren] {
+            assert_eq!(auswickeln(&h, "kennwort").unwrap_err(), SchluesselFehler::HuelleKaputt);
+        }
     }
 
     #[test]

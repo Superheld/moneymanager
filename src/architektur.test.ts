@@ -147,6 +147,20 @@ describe("Schichtgrenzen", () => {
     expect(verstoesse).toEqual([]);
   });
 
+  // Der Einstieg (`App.tsx`, `main.tsx`) liegt in der Wurzel und gehört damit zu keiner
+  // der Schichten oben — `schicht()` liefert für ihn seinen eigenen Dateinamen, und kein
+  // Filter trifft ihn. Bis 2026-11-10 holte sich `App.tsx` dort unbemerkt ein Repository.
+  // Für ihn gilt dieselbe Regel wie für die Oberfläche, deren Teil er ist.
+  it("der Einstieg in der Wurzel greift weder auf core noch auf die Persistenz durch", () => {
+    const verboten = new Set(["core", "adapters/persistence"]);
+    const wurzel = DATEIEN.filter((d) => dirname(d) === WURZEL);
+    expect(wurzel.map(kurz), "der Einstieg wurde nicht gefunden").toContain("App.tsx");
+    const verstoesse = wurzel
+      .map((d) => ({ datei: kurz(d), zieht: [...importierteSchichten(d)].filter((z) => verboten.has(z)) }))
+      .filter((v) => v.zieht.length > 0);
+    expect(verstoesse).toEqual([]);
+  });
+
   // Ohne diese Prüfung wäre die ALTLAST eine Liste, die niemand je wieder anfasst: ein
   // migrierter Screen bliebe darin stehen, und beim nächsten Direktzugriff fiele es
   // keinem auf. Sie muss mit jeder Migration kürzer werden.
