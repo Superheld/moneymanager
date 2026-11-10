@@ -288,9 +288,12 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     const nutzer = userEvent.setup();
     await nutzer.click(await screen.findByLabelText(/Lebenshaltung/));
 
-    // Die Zeile ist ein Knopf, kein Text — nur so ist sie auch mit der Tastatur erreichbar.
-    const zeile = (await screen.findByText("Wocheneinkauf")).closest("button");
+    // Die Zeile hat die Rolle eines Knopfs und steht in der Tab-Reihenfolge — nur so ist
+    // sie auch mit der Tastatur erreichbar (seit 2026-11-09 eine Tabellenzeile in
+    // `Aufklapptabelle`, vorher ein echtes <button>).
+    const zeile = (await screen.findByText("Wocheneinkauf")).closest('[role="button"]') as HTMLElement | null;
     expect(zeile).not.toBeNull();
+    expect(zeile!.tabIndex).toBe(0);
 
     await nutzer.click(zeile!);
     const dialog = await screen.findByRole("dialog");

@@ -7,12 +7,14 @@
 // auf, der Verlauf unter Budgets zeigt sie für den im Chart gewählten Monat. Sie lag vorher
 // in `UebersichtScreen.tsx` und wäre beim zweiten Aufrufer nachgebaut worden.
 //
-// Bewusst KEINE Karte: sie hängt unter einer Zeile, die schon in einer steckt (siehe
-// `ui/CLAUDE.md`). Eine getönte Fläche mit Radius reicht, um sie abzusetzen.
+// Gezeichnet wird sie seit 2026-11-09 mit `Aufklapptabelle` — derselben Fläche und Tabelle
+// wie die Buchungen einer Kategorie in der Analyse. Vorher baute sie ihre Zeilen selbst,
+// und dasselbe Aufklappen sah hier anders aus als dort.
 
 import { useTranslation } from "react-i18next";
 import type { IstBuchung, Verbrauchsposten } from "../../../application";
-import { AUFKLAPP_ZEILEN_BREIT, aufklappHoehe } from "./aufklappen";
+import { AUFKLAPP_ZEILEN_BREIT } from "./aufklappen";
+import { Aufklapptabelle } from "./Aufklapptabelle";
 import { useGeld } from "./einstellungenKontext";
 
 export interface BudgetPostenlisteProps {
@@ -53,115 +55,71 @@ export interface BudgetPostenlisteProps {
   kopf?: boolean;
 }
 
-/**
- * Feste Breite der Datumsspalte — nur damit fluchten Kopf und Zeilen. `ch` misst die
- * Ziffer, die Punkte sind schmaler; der Rest ist Luft und kein Fehler.
- */
+/** Feste Breite der Datumsspalte — damit fluchten Kopf und Zeilen. */
 const DATUM_BREITE = "8ch";
-
-/** Wie ein Tabellenkopf in `DataTable`, nur ohne Sortierung. */
-const KOPFSTIL = {
-  fontSize: "var(--fs-2xs)",
-  fontWeight: "var(--fw-bold)",
-  textTransform: "uppercase",
-  letterSpacing: ".04em",
-  color: "var(--ink-3)",
-} as const;
 
 export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbraucht, leerText, zeilen = AUFKLAPP_ZEILEN_BREIT, onBuchung, kopf = false }: BudgetPostenlisteProps) {
   const { t } = useTranslation();
   const geld = useGeld();
 
-  if (posten.length === 0) {
-    return (
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", padding: "8px 0 2px" }}>
-        {leerText ?? t("uebersicht.budgetOhneBuchungen")}
-      </div>
-    );
-  }
+  const nameVon = (p: Verbrauchsposten) =>
+    p.buchung.notiz ||
+    empfaenger.get(p.buchung.id) ||
+    (p.kategorieId ? kategorieNamen.get(p.kategorieId) : undefined) ||
+    t("uebersicht.budgetBuchung");
 
   return (
-    <div
-      style={{
-        background: "var(--surface-2, rgba(0,0,0,.015))",
-        borderRadius: "var(--r-md)",
-        padding: "4px 10px",
-        margin: "8px 0 2px",
-        // Die 30 px sind die gerechnete Zeilenhöhe unten: 5 px Polsterung oben und unten,
-        // eine Textzeile in 12,5 px und die Haarlinie darunter.
-        maxHeight: aufklappHoehe(zeilen, 30),
-        overflowY: "auto",
-      }}
-    >
-      {kopf && (
-        <div
-          style={{
-            ...KOPFSTIL,
-            display: "flex",
-            gap: 8,
-            padding: "6px 0 5px",
-            borderBottom: "1px solid var(--line)",
-            // Fest beim Scrollen. Der Hintergrund muss mit, sonst laufen die Zeilen sichtbar
-            // unter der Schrift durch. `-4` hebt das Innenpolster der Fläche auf: sonst
-            // bliebe darüber ein Streifen, in dem die Zeilen weiter sichtbar sind.
-            position: "sticky",
-            top: -4,
-            background: "var(--surface-2, rgba(0,0,0,.015))",
-          }}
-        >
-          <span style={{ width: DATUM_BREITE, flex: "0 0 auto" }}>{t("uebersicht.budgetKopfDatum")}</span>
-          <span>{t("uebersicht.budgetKopfBuchung")}</span>
-          <span style={{ marginLeft: "auto" }}>{t("uebersicht.budgetKopfBetrag")}</span>
+    <Aufklapptabelle
+      zeilen={posten}
+      schluessel={(p, i) => `${p.buchung.id}#${i}`}
+      sichtbar={zeilen}
+      kopf={kopf}
+      leer={leerText ?? t("uebersicht.budgetOhneBuchungen")}
+      onZeile={onBuchung ? (p) => onBuchung(p.buchung) : undefined}
+      zeilenTitel={t("uebersicht.buchungOeffnen")}
+      spalten={[
+        {
+          key: "datum",
+          label: t("uebersicht.budgetKopfDatum"),
+          breite: DATUM_BREITE,
+          gedimmt: true,
+          fett: true,
+          render: (p) => `${p.buchung.datum.slice(8)}.${p.buchung.datum.slice(5, 7)}.${p.buchung.datum.slice(2, 4)}`,
+        },
+        {
+          key: "buchung",
+          label: t("uebersicht.budgetKopfBuchung"),
+          kappen: true,
+          render: (p) => {
+            const name = nameVon(p);
+            const kategorie = p.kategorieId ? kategorieNamen.get(p.kategorieId) : undefined;
+            return (
+              <span title={name}>
+                <span style={{ color: "var(--ink-2)" }}>{name}</span>
+                {kategorie && kategorie !== name && (
+                  <span style={{ color: "var(--ink-3)", fontSize: "11.5px", marginLeft: 8 }}>{kategorie}</span>
+                )}
+              </span>
+            );
+          },
+        },
+        {
+          key: "betrag",
+          label: t("uebersicht.budgetKopfBetrag"),
+          align: "right",
+          render: (p) => <span style={{ fontWeight: "var(--fw-semi)" }}>{geld.format(p.betrag)}</span>,
+        },
+      ]}
+      fuss={
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 8px 5px", borderTop: "1px solid var(--line)", fontSize: "12.5px", fontWeight: "var(--fw-bold)" }}>
+          {/* Ist die Summe negativ, kam unterm Strich Geld ZURÜCK. Das Wort „Verbraucht"
+              über einem Minusbetrag behauptet das Gegenteil dessen, was daneben steht —
+              und ein Wort gewinnt gegen ein Vorzeichen. Die EINZELNEN Posten behalten ihres:
+              dort widerspricht ihm keins. */}
+          <span>{t(verbraucht < 0 ? "uebersicht.budgetSummeZurueck" : "uebersicht.budgetSumme")}</span>
+          <span className="num">{geld.formatMitSymbol(Math.abs(verbraucht))}</span>
         </div>
-      )}
-      {posten.map((p, i) => {
-        const kategorie = p.kategorieId ? kategorieNamen.get(p.kategorieId) : undefined;
-        const name =
-          p.buchung.notiz || empfaenger.get(p.buchung.id) || kategorie || t("uebersicht.budgetBuchung");
-        const inhalt = (
-          <>
-            <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto", width: kopf ? DATUM_BREITE : undefined }}>
-              {p.buchung.datum.slice(8)}.{p.buchung.datum.slice(5, 7)}.{p.buchung.datum.slice(2, 4)}
-            </span>
-            <span title={name} style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink-2)" }}>
-              {name}
-            </span>
-            {kategorie && kategorie !== name && (
-              <span style={{ color: "var(--ink-3)", fontSize: "11.5px", flex: "0 0 auto" }}>{kategorie}</span>
-            )}
-            <span className="num" style={{ marginLeft: "auto", flex: "0 0 auto", fontWeight: "var(--fw-semi)" }}>
-              {geld.format(p.betrag)}
-            </span>
-          </>
-        );
-        // Dieselbe Zeile, einmal als Text und einmal als Knopf. Das Aussehen darf sich
-        // dabei NICHT unterscheiden — der Unterschied ist der Weg, nicht die Zeile.
-        const zeilenstil = { display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: "12.5px", borderBottom: i < posten.length - 1 ? "1px solid var(--line-soft)" : "none" } as const;
-        return onBuchung ? (
-          <button
-            key={`${p.buchung.id}#${i}`}
-            type="button"
-            className="buchungszeile"
-            title={t("uebersicht.buchungOeffnen")}
-            style={zeilenstil}
-            onClick={() => onBuchung(p.buchung)}
-          >
-            {inhalt}
-          </button>
-        ) : (
-          <div key={`${p.buchung.id}#${i}`} style={zeilenstil}>
-            {inhalt}
-          </div>
-        );
-      })}
-      <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 0 5px", borderTop: "1px solid var(--line)", fontSize: "12.5px", fontWeight: "var(--fw-bold)" }}>
-        {/* Ist die Summe negativ, kam unterm Strich Geld ZURÜCK. Das Wort „Verbraucht"
-            über einem Minusbetrag behauptet das Gegenteil dessen, was daneben steht —
-            und ein Wort gewinnt gegen ein Vorzeichen. Die EINZELNEN Posten behalten ihres:
-            dort widerspricht ihm keins. */}
-        <span>{t(verbraucht < 0 ? "uebersicht.budgetSummeZurueck" : "uebersicht.budgetSumme")}</span>
-        <span className="num">{geld.formatMitSymbol(Math.abs(verbraucht))}</span>
-      </div>
-    </div>
+      }
+    />
   );
 }

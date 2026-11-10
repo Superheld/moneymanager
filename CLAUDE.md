@@ -389,7 +389,7 @@ Sie stehen dort, wo man sie beim Schreiben liest — diese Datei zeigt nur, was 
 | `src/core/CLAUDE.md` | Geld als Integer Cent, Datum, Charakter, Kontostands-Anker |
 | `src/application/CLAUDE.md` | Use-Cases orchestrieren, `istCent()` an der Grenze, Ports |
 | `src/adapters/persistence/CLAUDE.md` | Migrationen (forward-only, ohne Transaktionen) |
-| `src/adapters/ui/CLAUDE.md` | `useGeld`, `Promise.all`, i18n, Screen-Tests, Base UI, die einklappbare Seitenleiste |
+| `src/adapters/ui/CLAUDE.md` | wie hier gebaut wird, was wo liegt, der Bausteinkatalog; `useGeld`, i18n, Screen-Tests, Base UI |
 | `src/adapters/ui/bausteine/CLAUDE.md` | was geteilt wird und was nicht |
 | `src/core/buchung/CLAUDE.md` | Vorzeichen und Charakter, Umbuchungen erkennen |
 | `src/core/konten/CLAUDE.md` | Kontobelegung, Stilllegen und Löschen, Liquiditätsvorschau |

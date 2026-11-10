@@ -27,6 +27,7 @@ import type { Umsatz } from "../../../application/import";
 import { merkmaleZuBuchung, wortFreigeben, wortSperren } from "../../dienste";
 import { Pill } from "../bausteine";
 import { ErklaerungsTafel } from "./ErklaerungsTafel";
+import { Klappblock } from "../bausteine/Klappblock";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 
 export function MerkmaleBlock({
@@ -77,13 +78,7 @@ export function MerkmaleBlock({
   const zahl = (n: number) => n.toLocaleString(locale);
 
   return (
-    <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-      <button className="linkbtn" onClick={umschalten} aria-expanded={offen}>
-        {offen ? "▾" : "▸"} {t("konten.merkmale.titel")}
-      </button>
-
-      {offen && (
-        <div style={{ marginTop: "var(--sp-3)" }}>
+    <Klappblock titel={t("konten.merkmale.titel")} offen={offen} onUmschalten={umschalten}>
           {fehler && <div className="err">{fehler}</div>}
           {!stand ? (
             <div className="muted">{t("konten.merkmale.laedt")}</div>
@@ -200,8 +195,6 @@ export function MerkmaleBlock({
               )}
             </>
           )}
-        </div>
-      )}
-    </div>
+    </Klappblock>
   );
 }

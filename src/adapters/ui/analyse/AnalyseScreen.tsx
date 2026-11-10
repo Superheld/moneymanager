@@ -37,7 +37,8 @@ import {
 } from "../../../application";
 import { analyse, depots } from "../../dienste";
 import { Card, CoverageTrack, DataTable, KPIStat, Pill } from "../bausteine";
-import { AUFKLAPP_ZEILEN_BREIT, AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
+import { AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
+import { Aufklapptabelle } from "../bausteine/Aufklapptabelle";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { AusblickKarte } from "./AusblickKarte";
 import { BefundeBereich } from "./BefundeBereich";
@@ -340,77 +341,59 @@ export function AnalyseScreen() {
     return t("historie.vsDurchschnitt", { prozent: (a > 0 ? "+" : "\u2212") + Math.abs(a) });
   }
 
-  // `sticky`: die Kopfzeile bleibt beim Scrollen im aufgeklappten Bereich stehen. Ohne das
-  // scrollt sie nach oben weg, und ab der elften Zeile steht man vor fuenf namenlosen
-  // Spalten. Der Hintergrund ist Pflicht — ein durchsichtiger Kopf laesst die Zeilen
-  // durchscheinen, waehrend sie darunter durchlaufen.
-  const detailTh = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)", position: "sticky", top: 0, background: "var(--surface)", zIndex: 1 } as const;
-  const detailTd = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
-
+  /**
+   * Die Buchungen einer aufgeklappten Kategorie — mit `Aufklapptabelle`, derselben Fläche
+   * und Tabelle wie die Buchungen eines Budgets. Bis 2026-11-09 war das hier eine eigene
+   * `<table>` mit eigenem Kopf, und dasselbe Aufklappen sah an jeder Stelle anders aus.
+   *
+   * Anklickbar: beim Durchsehen einer Kategorie stößt man auf Buchungen, die eine
+   * Korrektur brauchen — der Umweg über den Kontoauszug entfällt.
+   */
   function detailTabelle(kategorieId: string) {
     const bs = basis ? analyseBuchungen(basis, kategorieId, detailFenster.bvon, detailFenster.bbis) : [];
-    if (bs.length === 0) return <div className="muted" style={{ padding: "8px" }}>{t("historie.detailLeer")}</div>;
     return (
-      <div style={{
-        background: "var(--surface-2, rgba(0,0,0,.015))", borderRadius: "var(--r-md)",
-        padding: "4px 8px", margin: "4px 0 10px",
-        // Zehn Zeilen, dann wird gescrollt (siehe bausteine/aufklappen.ts). Die Zahlen sind
-        // die gerechnete Zeilenhoehe dieser Tabelle: 8 px Polsterung oben und unten, eine
-        // Textzeile in 12,5 px und die Haarlinie darunter; die Kopfzeile faellt etwas
-        // niedriger aus, weil ihre Schrift kleiner ist.
-        maxHeight: aufklappHoehe(AUFKLAPP_ZEILEN_BREIT, 36, 34),
-        overflowY: "auto",
-      }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px" }}>
-          <thead>
-            <tr>
-              <th style={detailTh}>{t("historie.spalteDatum")}</th>
-              <th style={detailTh}>{t("historie.spalteEmpf")}</th>
-              <th style={detailTh}>{t("historie.spalteZweck")}</th>
-              <th style={detailTh}>{t("historie.spalteKonto")}</th>
-              <th style={{ ...detailTh, textAlign: "right" }}>{t("historie.spalteBetrag")} {geld.symbol}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {bs.slice(0, 50).map((z) => {
-              const zweck = z.verwendungszweck;
-              return (
-                // Anklickbar: beim Durchsehen einer Kategorie stößt man auf Buchungen,
-                // die eine Korrektur brauchen — der Umweg über den Konto-Auszug entfällt.
-                //
-                // `buchungszeile` faerbt die Zeile beim Ueberfahren ein. Der Zeiger allein
-                // war zu wenig: er zeigt sich erst, wenn man schon draufsteht, und in einer
-                // Liste probiert niemand jede Zeile durch. Dieselbe Klasse tragen die
-                // Buchungszeilen in der Uebersicht — was gleich funktioniert, sieht gleich aus.
-                <tr key={z.buchung.id} className="buchungszeile" onClick={() => setDetail(z.buchung)} title={t("historie.detailOeffnen")}>
-                  <td style={detailTd}>{datum.mitJahr(z.buchung.datum)}</td>
-                  <td style={{ ...detailTd, fontWeight: "var(--fw-bold)" }}>
-                    <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {z.empfaenger || "—"}
-                      </span>
-                      {/* Dieselbe Markierung wie im Kontoauszug. Sie zählt hier sogar
-                          mehr: die Analyse fragt „wofür ging das Geld", und dass ein
-                          Posten aus einem laufenden Vertrag stammt, ist die halbe
-                          Antwort — bei ihm ist die Frage nicht „war das nötig", sondern
-                          „läuft der noch". */}
-                      {z.vertragsname && (
-                        <span title={t("konten.pillVertrag", { anbieter: z.vertragsname })} style={{ flex: "0 0 auto" }}>
-                          <Pill variant="plan">{z.vertragsname}</Pill>
-                        </span>
-                      )}
-                    </span>
-                  </td>
-                  <td style={{ ...detailTd, color: "var(--ink-3)" }}>{zweck.length > 45 ? zweck.slice(0, 45) + "…" : zweck}</td>
-                  <td style={{ ...detailTd, color: "var(--ink-3)" }}>{z.kontoName || "—"}</td>
-                  <td style={{ ...detailTd, textAlign: "right", fontVariantNumeric: "tabular-nums", color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {bs.length > 50 && <div className="muted" style={{ padding: "6px 8px", fontSize: "var(--fs-2xs)" }}>{t("historie.detailMehr", { n: bs.length - 50 })}</div>}
-      </div>
+      <Aufklapptabelle
+        zeilen={bs.slice(0, 50)}
+        schluessel={(z) => z.buchung.id}
+        leer={t("historie.detailLeer")}
+        onZeile={(z) => setDetail(z.buchung)}
+        zeilenTitel={t("historie.detailOeffnen")}
+        mehr={bs.length > 50 ? t("historie.detailMehr", { n: bs.length - 50 }) : undefined}
+        spalten={[
+          { key: "datum", label: t("historie.spalteDatum"), breite: "10ch", render: (z) => datum.mitJahr(z.buchung.datum) },
+          {
+            key: "empf",
+            label: t("historie.spalteEmpf"),
+            fett: true,
+            render: (z) => (
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
+                <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{z.empfaenger || "—"}</span>
+                {/* Dieselbe Markierung wie im Kontoauszug. Sie zählt hier sogar mehr: die
+                    Analyse fragt „wofür ging das Geld", und dass ein Posten aus einem
+                    laufenden Vertrag stammt, ist die halbe Antwort. */}
+                {z.vertragsname && (
+                  <span title={t("konten.pillVertrag", { anbieter: z.vertragsname })} style={{ flex: "0 0 auto" }}>
+                    <Pill variant="plan">{z.vertragsname}</Pill>
+                  </span>
+                )}
+              </span>
+            ),
+          },
+          {
+            key: "zweck",
+            label: t("historie.spalteZweck"),
+            gedimmt: true,
+            render: (z) => (z.verwendungszweck.length > 45 ? z.verwendungszweck.slice(0, 45) + "…" : z.verwendungszweck),
+          },
+          { key: "konto", label: t("historie.spalteKonto"), gedimmt: true, render: (z) => z.kontoName || "—" },
+          {
+            key: "betrag",
+            label: `${t("historie.spalteBetrag")} ${geld.symbol}`,
+            align: "right",
+            render: (z) => <span style={{ color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span>,
+          },
+        ]}
+      />
     );
   }
 

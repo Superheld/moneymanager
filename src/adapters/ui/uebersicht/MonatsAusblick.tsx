@@ -21,6 +21,8 @@ import type {
 import { Card, CoverageTrack, Pill } from "../bausteine";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+import { Aufklappflaeche } from "../bausteine/Aufklapptabelle";
+import { AUFKLAPP_ZEILEN_BREIT } from "../bausteine/aufklappen";
 
 const MONATSNAMEN_KEY = "ausblick.monat";
 
@@ -235,21 +237,12 @@ function ZeileMitPosten({
       </div>
 
       {offen && (
-        // Dieselbe Fläche wie beim Aufklappen in der Historie. Der negative Rand hebt das
-        // Innenpolster wieder auf, damit die Beträge mit denen der Zeile darüber fluchten.
-        <div
-          style={{
-            background: "var(--surface-2, rgba(0,0,0,.015))",
-            borderRadius: "var(--r-md)",
-            padding: "4px 8px",
-            margin: "4px -8px 10px",
-            // „Sonstiges" ist im laufenden Monat die längste Liste — auf echten Daten
-            // dreissig bis vierzig Zeilen. Ohne Deckel schiebt eine aufgeklappte Zeile
-            // die beiden Nachbarkarten aus dem Bild.
-            maxHeight: 320,
-            overflowY: "auto",
-          }}
-        >
+        // Dieselbe Fläche wie überall, wo etwas aufklappt (`Aufklappflaeche`) — aber ohne
+        // eigenes Tabellenraster: die Posten fluchten mit den Spalten der Zeile darüber.
+        // Der negative Rand hebt dafür das Innenpolster auf. Der Deckel folgt der
+        // Zeilenregel der schmalen Karten; „Sonstiges" ist im laufenden Monat lang, und
+        // ohne ihn schöbe eine aufgeklappte Zeile die Nachbarkarten aus dem Bild.
+        <Aufklappflaeche zeilen={AUFKLAPP_ZEILEN_BREIT} rand="-8px">
           {zeile.id === "budgets" || zeile.id === "budgetsAufbauend"
             ? zeile.posten.map((p) => (
                 <BudgetPosten key={p.schluessel} posten={p} name={kategorieName.get(p.bezeichnung) ?? p.bezeichnung} zeigeIst={zweiSpalten} />
@@ -265,7 +258,7 @@ function ZeileMitPosten({
                   onBuchung={onBuchung}
                 />
               ))}
-        </div>
+        </Aufklappflaeche>
       )}
     </div>
   );

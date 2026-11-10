@@ -12,6 +12,7 @@ import { useState, type ReactNode } from "react";
 import type { IstBuchung } from "../../../application";
 import { nachRang, type ImportLauf, type Umsatz } from "../../../application/import";
 import { Pill } from "../bausteine";
+import { Klappblock } from "../bausteine/Klappblock";
 
 /** Ein Label/Wert-Paar im Herkunfts-Abschnitt. Lange Werte (Hash, Zweck) dürfen umbrechen. */
 function Infozeile({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
@@ -53,13 +54,7 @@ export function BuchungsHerkunft({
   if (!buchung && !entwurf) return null;
 
   return (
-    <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-      <button className="linkbtn" onClick={() => setOffen((x) => !x)} aria-expanded={offen}>
-        {offen ? "▾" : "▸"} {t("konten.detail.herkunft")}
-      </button>
-
-      {offen && (
-        <div style={{ marginTop: 8 }}>
+    <Klappblock titel={t("konten.detail.herkunft")} offen={offen} onUmschalten={() => setOffen((x) => !x)}>
           {buchung && <Infozeile label={t("konten.detail.erfasstUeber")}>{t(`konten.quelleName.${buchung.quelle}`)}</Infozeile>}
 
           {umsatz ? (
@@ -101,9 +96,6 @@ export function BuchungsHerkunft({
           ) : (
             <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.detail.ohneImport")}</div>
           )}
-
-        </div>
-      )}
-    </div>
+    </Klappblock>
   );
 }
