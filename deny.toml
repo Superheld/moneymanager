@@ -57,9 +57,11 @@ ignore = [
   # App oeffnet nur, was sie selbst im Datenverzeichnis angelegt hat. Wer dort eine Datei
   # ablegen kann, liest den Speicher des Prozesses auch ohne diese Luecke.
   #
-  # Nicht behebbar von hier: sqlx 0.9 haengt an libsqlite3-sys 0.30.x, und die
-  # SQLCipher-Variante der neueren Fassung (0.39.x) ist laut Advisory ebenfalls betroffen
-  # — ein Upgrade braechte also nichts ausser dem Umbau.
+  # Nicht behebbar von hier, aus zwei Gruenden. sqlx 0.9 laesst libsqlite3-sys nur
+  # unterhalb von 0.38 zu, und laut Advisory ist alles bis 0.38.2 betroffen — innerhalb
+  # dieses Fensters heben aendert an der Luecke nichts. Und die Fassung darueber (0.39.x)
+  # buendelt zwar ein gepatchtes SQLite, in der SQLCipher-Variante aber weiterhin ein
+  # betroffenes.
   #
   # WIEDERVORLAGE: anders als die Freigaben oben meldet sich diese NICHT von selbst als
   # unnoetig. Sie bleibt „zutreffend", solange die Kiste im Baum ist, auch wenn es laengst
