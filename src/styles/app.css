@@ -1112,3 +1112,28 @@ select.field.tabellenfilter {
   padding-top: 8px;
   border-top: 1px solid var(--line-soft);
 }
+
+/* Die Fehlergrenze: was statt eines Screens dasteht, wenn er nicht zeichnen konnte
+   (bausteine/Fehlergrenze.tsx). Bewusst ruhig — es ist eine Auskunft, kein Alarm. */
+.fehlergrenze {
+  max-width: 560px;
+  margin: var(--sp-6) auto;
+  padding: var(--sp-6);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+.fehlergrenze h2 {
+  margin: 0 0 var(--sp-3);
+}
+.fehlergrenze-knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  margin-top: var(--sp-5);
+}
+.fehlergrenze-technisch {
+  margin-top: var(--sp-5);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
