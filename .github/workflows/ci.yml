@@ -44,8 +44,11 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Tests
-        run: npm test
+      # MIT Coverage, weil dort die Schwellen sitzen (vitest.config.ts): der Lauf wird rot,
+      # wenn die Abdeckung unter den gemessenen Stand faellt. Dieselben Tests wie
+      # `npm test`, nur mit Messung — eine Schwelle, die nur lokal gilt, gilt nicht.
+      - name: Tests (mit Coverage-Schwelle)
+        run: npm run coverage
 
       - name: Build (Frontend)
         run: npx vite build

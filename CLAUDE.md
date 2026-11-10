@@ -235,7 +235,8 @@ npm run dev         # nur Frontend (ohne Tauri-Naht: weisse Seite, siehe `vorsch
 npm run vorschau    # dasselbe MIT Attrappe und Spielstand, im Netz — fuer den Blick aufs Handy
 npm test            # Vitest: Kern, Use-Cases, Repositories, UI, Schichtgrenzen
 npm run test:rust   # die wenigen Rust-Tests der Shell (Dateirechte) — laufen NICHT in `npm test`
-npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 %)
+npm run coverage    # dito + Coverage über das GESAMTE Projekt (Ziel: 90 %); wird ROT,
+                    # wenn sie unter die Schwelle in vitest.config.ts fällt — so läuft die CI
 npm run typecheck
 npm run build       # tsc + vite build; die CI prüft dasselbe in zwei Schritten
 npm run seed        # Spielstand neu schreiben (siehe src/testwerkzeug/CLAUDE.md)
