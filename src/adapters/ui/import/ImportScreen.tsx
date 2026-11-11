@@ -27,6 +27,8 @@ import { Button, Card, DataTable } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { FremdkategorienKarte } from "./FremdkategorienKarte";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
+import { Zeile } from "../bausteine/Anordnung";
 
 const VORSCHAU_MAX = 500;
 type RU = ImportErgebnis["umsaetze"][number];
@@ -189,22 +191,22 @@ export function ImportScreen() {
   const katName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   const konten = new Set(beruecksichtigt.map((u) => u.kontoIban)).size;
   const vorschau = beruecksichtigt.slice(0, VORSCHAU_MAX);
-  const eingabeStil = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "13px", fontFamily: "var(--font-ui)" } as const;
+  const eingabeStil = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "var(--fs-tabelle)", fontFamily: "var(--font-ui)" } as const;
 
   return (
     <>
 
       <Card>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+        <Zeile abstand={3}>
           <input ref={inputRef} type="file" accept=".xlsx,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json" onChange={dateiGewaehlt} style={{ display: "none" }} />
           <Button variant="primary" onClick={() => inputRef.current?.click()}>{t("import.dateiWaehlen")}</Button>
-          {dateiname && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>{dateiname}</span>}
-        </div>
-        <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: "var(--sp-3)" }}>{t("import.hinweis")}</div>
+          {dateiname && <span className="hinweis">{dateiname}</span>}
+        </Zeile>
+        <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>{t("import.hinweis")}</div>
       </Card>
 
       {nichtErkannt && (
-        <Card style={{ marginTop: "var(--sp-4)", borderColor: "var(--warn, #d9822b)" }}>{t("import.nichtErkannt")}</Card>
+        <Card style={{ marginTop: "var(--sp-4)", borderColor: "var(--warn)" }}>{t("import.nichtErkannt")}</Card>
       )}
 
       {ergebnis && (
@@ -219,20 +221,16 @@ export function ImportScreen() {
             </ul>
           )}
 
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
             <thead>
               <tr>
                 <th style={{ width: 32, padding: "8px 10px", borderBottom: "1px solid var(--line)" }}>
-                  <input
-                    type="checkbox"
-                    checked={matches.some((m) => !ausgeschlossen.has(m.quelleKey))}
-                    aria-label={t("import.alleKontenImportieren")}
-                    onChange={(e) =>
-                      setAusgeschlossen(
-                        e.target.checked ? new Set() : new Set(matches.map((m) => m.quelleKey)),
-                      )
+                  <Kaestchen
+                    an={matches.some((m) => !ausgeschlossen.has(m.quelleKey))}
+                    label={t("import.alleKontenImportieren")}
+                    aufAendern={(an) =>
+                      setAusgeschlossen(an ? new Set() : new Set(matches.map((m) => m.quelleKey)))
                     }
-                    style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
                   />
                 </th>
                 <th style={{ textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" }}>{t("import.spalteQuelle")}</th>
@@ -247,11 +245,10 @@ export function ImportScreen() {
                 return (
                   <tr key={m.quelleKey}>
                     <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", verticalAlign: "top" }}>
-                      <input
-                        type="checkbox"
-                        checked={dabei}
-                        aria-label={t("import.kontoImportieren", { name: m.quelleName ?? m.quelleKey })}
-                        onChange={() =>
+                      <Kaestchen
+                        an={dabei}
+                        label={t("import.kontoImportieren", { name: m.quelleName ?? m.quelleKey })}
+                        aufAendern={() =>
                           setAusgeschlossen((bisher) => {
                             const neu = new Set(bisher);
                             if (neu.has(m.quelleKey)) neu.delete(m.quelleKey);
@@ -259,7 +256,6 @@ export function ImportScreen() {
                             return neu;
                           })
                         }
-                        style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
                       />
                     </td>
                     {/* Die abgewählte Zeile bleibt STEHEN und wird nur blass. Sie zu
@@ -315,8 +311,9 @@ export function ImportScreen() {
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", marginTop: "var(--sp-4)", flexWrap: "wrap" }}>
             <Button
               variant="primary"
-              onClick={busy || uErgebnis || beruecksichtigt.length === 0 ? undefined : uebernehmen}
-              style={busy || uErgebnis || beruecksichtigt.length === 0 ? { opacity: 0.5, cursor: busy ? "wait" : "not-allowed" } : undefined}
+              onClick={uebernehmen}
+              laeuft={busy}
+              disabled={!!uErgebnis || beruecksichtigt.length === 0}
             >
               {busy ? t("import.uebernehmenBusy") : t("import.uebernehmen")}
             </Button>
@@ -331,8 +328,8 @@ export function ImportScreen() {
               </span>
             )}
           </div>
-          {uErgebnis && <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: "var(--sp-2)" }}>{t("import.uebernahmeHinweis")}</div>}
-          {fehler && <div style={{ fontSize: "var(--fs-xs)", color: "var(--danger, #c0392b)", marginTop: "var(--sp-2)" }}>{t("import.fehlerDb")} ({fehler})</div>}
+          {uErgebnis && <div className="hinweis" style={{ marginTop: "var(--sp-2)" }}>{t("import.uebernahmeHinweis")}</div>}
+          {fehler && <div style={{ fontSize: "var(--fs-xs)", color: "var(--danger)", marginTop: "var(--sp-2)" }}>{t("import.fehlerDb")} ({fehler})</div>}
         </Card>
       )}
 
@@ -387,7 +384,7 @@ export function ImportScreen() {
             rows={vorschau}
           />
           {beruecksichtigt.length > VORSCHAU_MAX && (
-            <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: "var(--sp-3)" }}>
+            <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
               {t("import.zeigeAuszug", { zeige: VORSCHAU_MAX, gesamt: beruecksichtigt.length })}
             </div>
           )}

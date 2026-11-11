@@ -52,6 +52,8 @@ import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe, geldTon } from "../bausteine/geldFarbe";
 
 import type { KategorieSumme } from "../../../application";
+import { Umschalter } from "../bausteine/Umschalter";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 type Zeitraum = "12" | "24" | "jahr" | "alles";
 
@@ -93,7 +95,7 @@ function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId, renderDe
           <div key={i.kategorieId ?? "__ohne"}>
             <div
               onClick={klickbar ? () => onSelect!(i.kategorieId!, i.name) : undefined}
-              style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: klickbar ? "pointer" : "default", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent" }}
+              style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: klickbar ? "pointer" : "default", background: aktiv ? "var(--accent-soft)" : "transparent" }}
             >
               <CoverageTrack
                 value={Math.abs(i.summe)}
@@ -152,7 +154,7 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
           <div key={schluessel}>
             <div
               onClick={() => onGruppe(schluessel)}
-              style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: "pointer", background: offen ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent" }}
+              style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: "pointer", background: offen ? "var(--accent-soft)" : "transparent" }}
             >
               <CoverageTrack
                 value={Math.abs(g.summe)}
@@ -184,7 +186,7 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
                     <div key={k.kategorieId ?? "__k-ohne"}>
                       <div
                         onClick={(e) => { e.stopPropagation(); if (k.kategorieId) onKat(k.kategorieId); }}
-                        style={{ padding: "5px 8px", borderRadius: "var(--r-md)", cursor: k.kategorieId ? "pointer" : "default", background: katOffen ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent" }}
+                        style={{ padding: "5px 8px", borderRadius: "var(--r-md)", cursor: k.kategorieId ? "pointer" : "default", background: katOffen ? "var(--accent-soft)" : "transparent" }}
                       >
                         <CoverageTrack
                           value={Math.abs(k.summe)}
@@ -257,7 +259,7 @@ export function AnalyseScreen() {
     laden();
     depots()
       .then(setDepotdaten)
-      .catch(() => setDepotdaten(null));
+      .catch((e) => { fehlerMelden(e); setDepotdaten(null); });
   }, []);
 
   const heute = useMemo(() => toIsoHeute(), []);
@@ -464,7 +466,7 @@ export function AnalyseScreen() {
     <div className="screen">
       <PageHead title={t("analyse.titel")} subtitle={t("analyse.untertitel")} />
 
-      {fehler && <Card style={{ borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
+      {fehler && <Card style={{ borderColor: "var(--danger)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
 
       {!geladen ? null : ist.length === 0 && !fehler ? (
         <Card>{t("historie.leer")}</Card>
@@ -474,7 +476,8 @@ export function AnalyseScreen() {
             register={registerListe}
             aktiv={wirksamesRegister}
             onWahl={(id) => setRegister(id as AnalyseRegister)}
-          />
+            stapeln
+          >
 
           {wirksamesRegister === "verlauf" && (
             <Card
@@ -501,17 +504,13 @@ export function AnalyseScreen() {
 
 
               {/* Umschalter: eine Fläche, drei Blicke auf dieselben Monate. */}
-              <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)", marginBottom: "var(--sp-3)" }}>
-                {(["fluss", "saldo", "tabelle"] as const).map((a, i) => {
-                  const an = ansicht === a;
-                  return (
-                    <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
-                      style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                      {t(`historie.ansicht.${a}`)}
-                    </button>
-                  );
-                })}
-              </div>
+              <Umschalter
+                label={t("historie.ansichtWahl")}
+                optionen={(["fluss", "saldo", "tabelle"] as const).map((a) => ({ wert: a, text: t(`historie.ansicht.${a}`) }))}
+                wert={ansicht}
+                aufAendern={setAnsicht}
+                style={{ marginBottom: "var(--sp-3)" }}
+              />
 
               {verlauf.length > 0 && ansicht === "fluss" && (
                 <MonatsFlussChart
@@ -630,6 +629,7 @@ export function AnalyseScreen() {
             </div>
           )}
 
+          </Registerleiste>
         </>
       )}
 

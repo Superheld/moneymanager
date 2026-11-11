@@ -21,6 +21,7 @@ import { Bereich } from "../bausteine/Bereich";
 import { AbgleichBereich } from "./AbgleichBereich";
 import { BankzugaengeScreen } from "./BankzugaengeScreen";
 import { KontenVerwaltung, type KontoVerbindung } from "./KontenVerwaltung";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 export function KontenVerwaltungScreen() {
   const { t } = useTranslation();
@@ -58,9 +59,9 @@ export function KontenVerwaltungScreen() {
   }
 
   useEffect(() => {
-    laden().catch(() => {
-      /* reiner Browser-Modus ohne SQLite */
-    });
+    // Schlägt das Laden fehl, bleibt die Liste leer — aber mit Meldung: eine stumme leere
+    // Liste sähe aus wie „du hast keine" (siehe `Meldungen`).
+    laden().catch(fehlerMelden);
   }, []);
 
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);

@@ -18,8 +18,8 @@ import { Klappblock } from "../bausteine/Klappblock";
 function Infozeile({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
   return (
     <div style={{ display: "flex", gap: "var(--sp-3)", padding: "5px 0", alignItems: "baseline" }}>
-      <span style={{ flex: "0 0 34%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>{label}</span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13, wordBreak: "break-word", fontFamily: mono ? "var(--font-mono, monospace)" : undefined, color: mono ? "var(--ink-2)" : "var(--ink)" }}>
+      <span className="hinweis" style={{ flex: "0 0 34%", fontWeight: "var(--fw-semi)" }}>{label}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-tabelle)", wordBreak: "break-word", fontFamily: mono ? "var(--font-mono)" : undefined, color: mono ? "var(--ink-2)" : "var(--ink)" }}>
         {children}
       </span>
     </div>
@@ -94,7 +94,7 @@ export function BuchungsHerkunft({
               )}
             </>
           ) : (
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.detail.ohneImport")}</div>
+            <div className="hinweis" style={{ marginTop: 6 }}>{t("konten.detail.ohneImport")}</div>
           )}
     </Klappblock>
   );

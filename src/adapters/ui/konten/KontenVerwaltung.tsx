@@ -39,6 +39,8 @@ import { KontoAufloesenModal } from "./KontoAufloesenModal";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+import { Kaestchen } from "../bausteine/Kaestchen";
+import { Zeile } from "../bausteine/Anordnung";
 
 /** Woran ein Konto hängt: welcher Zugang, welches Bankkonto, bis wann geholt. */
 export interface KontoVerbindung {
@@ -151,7 +153,7 @@ export function KontenVerwaltung({
     <>
     <Card action={<Button variant="primary" plus onClick={() => setAnlegen(true)}>{t("einstellungen.konto.anlegen")}</Button>}>
       {hatGebuchtes && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
+        <div className="hinweis" style={{ marginBottom: "var(--sp-3)" }}>
           {t("einstellungen.konto.untertitelIst")}
         </div>
       )}
@@ -167,7 +169,7 @@ export function KontenVerwaltung({
               // Die Zeile selbst bleibt stumm: eine unsichtbare Klickfläche findet
               // niemand, und wer sie zufällig trifft, hat sie nicht gemeint.
               render: (k: Zahlungskonto) => (
-                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--sp-2)" }}>
+                <Zeile inline umbruch={false}>
                   <Zeilenlink
                     onKlick={() => setZeilenVon(zeilenVon === k.id ? null : k.id)}
                     titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
@@ -181,7 +183,7 @@ export function KontenVerwaltung({
                       ein ausgegrautes Konto saehe nach „nicht benutzbar" aus, und
                       benutzbar ist es sehr wohl, nur nicht fuer Neues. */}
                   {!istAktiv(k) && <Pill variant="neutral">{t("konten.stillgelegt")}</Pill>}
-                </span>
+                </Zeile>
               ),
             },
             { key: "typ", label: t("einstellungen.konto.spalteTyp"), render: (k) => t(`einstellungen.konto.typ.${k.typ}`) },
@@ -245,7 +247,7 @@ export function KontenVerwaltung({
         <Modal
           title={editId ? t("einstellungen.konto.modalBearbeiten") : t("einstellungen.konto.modalAnlegen")}
           onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
+          footer={<><Button variant="primary" onClick={speichern}>{t("einstellungen.speichern")}</Button><Button variant="link" onClick={() => setOffen(false)}>{t("einstellungen.abbrechen")}</Button>{fehler && <span className="err">{fehler}</span>}</>}
         >
           {/* Die Verbindung gehört an den Anfang: sie entscheidet, wie viel an diesem
               Konto überhaupt von Hand gilt. IBAN und Bezeichnung kommen bei einem
@@ -255,20 +257,20 @@ export function KontenVerwaltung({
               <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
                 <Pill variant="ok">{t("konten.online")}</Pill>
                 <span>{verbindung.zugangName}</span>
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {verbindung.schluessel.replace("|", " · ")}
                   {verbindung.letzterAbrufBis
                     ? ` · ${t("konten.verbindung.abgerufenBis", { datum: verbindung.letzterAbrufBis })}`
                     : ` · ${t("konten.verbindung.nieAbgerufen")}`}
                 </span>
-                <button className="linkbtn" onClick={() => void trennen()}>
+                <Button variant="link" onClick={() => void trennen()}>
                   {t("konten.verbindung.trennen")}
-                </button>
+                </Button>
               </span>
             ) : (
               <span style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
                 <Pill variant="neutral">{t("konten.offline")}</Pill>
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {t("konten.verbindung.hinweisOffline")}
                 </span>
               </span>
@@ -288,11 +290,10 @@ export function KontenVerwaltung({
                 <Pill variant={aktiv ? "ok" : "neutral"}>
                   {aktiv ? t("konten.gefuehrt") : t("konten.stillgelegt")}
                 </Pill>
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {aktiv ? t("konten.zustandHinweisGefuehrt") : t("konten.zustandHinweisStill")}
                 </span>
-                <button
-                  className="linkbtn"
+                <Button variant="link"
                   title={aktiv ? t("konten.stilllegenHinweis") : t("konten.wiederaufnehmenHinweis")}
                   onClick={async () => {
                     if (aktiv) await kontoStilllegen(editId);
@@ -302,7 +303,7 @@ export function KontenVerwaltung({
                   }}
                 >
                   {aktiv ? t("konten.stilllegen") : t("konten.wiederaufnehmen")}
-                </button>
+                </Button>
               </span>
             </FormField>
           )}
@@ -349,10 +350,9 @@ export function KontenVerwaltung({
               ) : (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--sp-3)", paddingTop: 4 }}>
                   {personen.map((p) => (
-                    <label key={p.id} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: "var(--fs-sm)" }}>
-                      <input type="checkbox" checked={inhaberIds.includes(p.id)} onChange={() => toggleInhaber(p.id)} />
+                    <Kaestchen key={p.id} an={inhaberIds.includes(p.id)} aufAendern={() => toggleInhaber(p.id)} style={{ fontSize: "var(--fs-sm)" }}>
                       {p.name}
-                    </label>
+                    </Kaestchen>
                   ))}
                 </div>
               )}

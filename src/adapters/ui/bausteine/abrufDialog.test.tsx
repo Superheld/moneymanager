@@ -138,6 +138,23 @@ describe("Abruf-Dialog", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/mehr|weiter zurück|nur/i));
   });
 
+  it("kappt einen eigenen Zeitraum nicht still auf die Grenze, sondern sagt sie an", async () => {
+    // Das Feld hat bewusst kein `max`: gekappt, verschwände die Ansage, und wer 200 Tage
+    // eintippt, läse 90 und hielte sie für seine Eingabe.
+    await sqliteBankzugangRepository.speichern(zugang({ profil: JSON.stringify(PROFIL_90_TAGE) }));
+    const nutzer = userEvent.setup();
+    await oeffnen();
+    await screen.findByLabelText(/PIN/i);
+    await auswahlWaehlen(nutzer, "Zeitraum", /eigener Zeitraum/i);
+
+    const feld = (await screen.findByLabelText("Zeitraum in Tagen")) as HTMLInputElement;
+    await nutzer.type(feld, "200");
+    await nutzer.tab();
+
+    expect(feld.value).toBe("200");
+    await waitFor(() => expect(document.body.textContent).toMatch(/mehr|weiter zurück|nur/i));
+  });
+
   it("hält einen kaputten Profil-Eintrag aus, statt den Dialog zu zerlegen", async () => {
     // Das Profil ist serialisiertes JSON aus einer früheren Sitzung. Ist es beschädigt,
     // muss der Dialog trotzdem bedienbar bleiben — die Grenze ist dann eben unbekannt.

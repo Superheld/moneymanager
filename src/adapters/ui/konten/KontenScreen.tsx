@@ -9,7 +9,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  waehlbareKonten,
   istGeteilt,
   registerSicht,
   type Dublettenverdacht,
@@ -18,7 +17,6 @@ import {
   type Kontensicht,
   type Registerzeile,
   type Vertrag,
-  type Zahlungskonto,
 } from "../../../application";
 import {
   buchungenSammelbearbeiten,
@@ -27,12 +25,14 @@ import {
   letztesKonto,
   letztesKontoMerken,
   pruefmarkerSetzen,
-  umbuchungErfassen,
   vertragsliste,
 } from "../../dienste";
 import type { ScreenId } from "../bausteine/AppShell";
-import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
+import { Button, Card, DataTable, Pill } from "../bausteine";
 import { VormerkungsBlock } from "./VormerkungsBlock";
+import { UmbuchungModal } from "./UmbuchungModal";
+import { useRegisterfilter } from "./useRegisterfilter";
+import { useSammelauswahl } from "../bausteine/useSammelauswahl";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { DublettenVergleich, type Vergleichsseite } from "../buchung/DublettenVergleich";
 import { SammelDialog } from "../buchung/SammelDialog";
@@ -41,12 +41,15 @@ import { DepotAuszug } from "./DepotAuszug";
 import { BelegungKarte } from "./BelegungKarte";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
-import { Datumsfeld } from "../bausteine/Datumsfeld";
-import { Modal } from "../bausteine/Modal";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton } from "../bausteine/IconButton";
 import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+import { Kaestchen } from "../bausteine/Kaestchen";
+import { Umschalter } from "../bausteine/Umschalter";
+import { Toggle } from "@base-ui/react/toggle";
+import { Button as BaseButton } from "@base-ui/react/button";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -72,27 +75,12 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Kontensicht | null>(null);
   const [aktivId, setAktivIdRoh] = useState("");
-  const [katFilter, setKatFilter] = useState("alle");
-  const [artFilter, setArtFilter] = useState<"alle" | "einnahmen" | "ausgaben" | "umbuchung">("alle");
-  const [regSuche, setRegSuche] = useState("");
-  /**
-   * Nur die Zeilen zeigen, die womöglich doppelt im Konto stehen.
-   *
-   * Seit der Abruf direkt bucht, gibt es keine Vorstufe mehr, in der ein Zwilling
-   * auffiele — die Frage „steht das schon drin?" gehört deshalb an den Auszug selbst.
-   */
-  const [nurDubletten, setNurDubletten] = useState(false);
   /** Das Paar, das gerade nebeneinander liegt — beide Seiten und der Grund. */
   const [vergleich, setVergleich] = useState<{ links: Vergleichsseite; rechts: Vergleichsseite; verdacht: Dublettenverdacht } | null>(null);
   const [buchenOffen, setBuchenOffen] = useState(false);
   const [umbuchenOffen, setUmbuchenOffen] = useState(false);
   const [editBuchung, setEditBuchung] = useState<IstBuchung | null>(null);
-  /**
-   * Massenbearbeitung — auf Wunsch, nicht immer. Eine dauerhafte Kästchenspalte macht
-   * aus einer Leseansicht ein Formular; sie erscheint erst, wenn man sie einschaltet.
-   */
-  const [auswahlModus, setAuswahlModus] = useState(false);
-  const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
+  /** Die Sammelbearbeitung (Dialog) über die markierten Zeilen — siehe `useSammelauswahl`. */
   const [sammelOffen, setSammelOffen] = useState(false);
   const [vertraege, setVertraege] = useState<Vertrag[]>([]);
   const [abruf, setAbruf] = useState(false);
@@ -124,7 +112,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       kontenLaden(),
       vertragsliste(),
       letztesKonto(),
-      kontobelegung(heute).catch(() => null),
+      // Ohne Belegung steht der Auszug trotzdem da — gemeldet wird es aber.
+      kontobelegung(heute).catch((e) => { fehlerMelden(e); return null; }),
     ]);
     setSicht(s);
     setBelegung(bel);
@@ -141,16 +130,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     laden();
   }, []);
 
-  // Beim Kontowechsel die Filter zurücksetzen.
-  useEffect(() => {
-    setKatFilter("alle");
-    setArtFilter("alle");
-    setRegSuche("");
-    setNurDubletten(false);
-    // Die Auswahl gehört zum Register des Kontos — sie über einen Wechsel mitzunehmen
-    // hiesse, Buchungen zu ändern, die man nicht mehr vor sich hat.
-    setAuswahl(new Set());
-  }, [aktivId]);
 
   const kontozeilen = sicht?.zeilen ?? [];
   const hatBindung = [...(belegung?.jeKonto.values() ?? [])].some((b) => b.gebunden > 0);
@@ -178,35 +157,10 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
 
   const kategorieName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
 
-  // Kategorien, die im gebuchten Register wirklich vorkommen (für das Filter-Dropdown).
-  const kategorienImRegister = useMemo(() => {
-    const ids = new Set<string>();
-    for (const z of register?.gebucht ?? []) if (z.zeile.kategorieId) ids.add(z.zeile.kategorieId);
-    return [...ids].map((id) => ({ id, name: kategorieName.get(id) ?? "?" })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [register, kategorieName]);
-
-  const gebuchtGefiltert = useMemo(() => {
-    const q = regSuche.trim().toLowerCase();
-    // „12,50" soll die Zeile über 12,50 € finden, egal ob sie ein Zu- oder Abfluss ist.
-    // Zwei Wege nebeneinander, weil beide gebraucht werden: der geparste Betrag trifft
-    // exakt (auch „12" → 12,00), der formatierte Text erlaubt das Suchen nach Anfängen
-    // („1.2" findet 1.234,56). Nur der Text allein hätte „12" nie auf 12,00 gebracht.
-    const qBetrag = regSuche.trim() ? geld.parse(regSuche.trim()) : null;
-    return (register?.gebucht ?? []).filter((r) => {
-      const z = r.zeile;
-      if (nurDubletten && !r.dublette) return false;
-      if (katFilter === "__ohne" ? !!z.kategorieId : katFilter !== "alle" && z.kategorieId !== katFilter) return false;
-      if (artFilter === "umbuchung" && !z.gegenkontoId) return false;
-      if (artFilter === "einnahmen" && !(z.betrag > 0 && !z.gegenkontoId)) return false;
-      if (artFilter === "ausgaben" && !(z.betrag < 0 && !z.gegenkontoId)) return false;
-      if (q) {
-        const heu = `${r.bezeichnung} ${r.verwendungszweck} ${r.kategorieName} ${geld.format(Math.abs(z.betrag))}`.toLowerCase();
-        const trifftBetrag = qBetrag != null && Math.abs(z.betrag) === Math.abs(qBetrag);
-        if (!heu.includes(q) && !trifftBetrag) return false;
-      }
-      return true;
-    });
-  }, [register, katFilter, artFilter, regSuche, nurDubletten, geld]);
+  // Die Filter über das gebuchte Register: Suche, Art, Kategorie, nur Dubletten.
+  const filter = useRegisterfilter({ register, kategorieName, geld, kontoId: aktivId });
+  const { katFilter, setKatFilter, artFilter, setArtFilter, regSuche, setRegSuche, nurDubletten, setNurDubletten, kategorienImRegister, dublettenAnzahl } = filter;
+  const gebuchtGefiltert = filter.gefiltert;
 
   /**
    * Kategorie einer Zeile setzen oder leeren — direkt aus der Liste heraus.
@@ -254,47 +208,26 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
     setVergleich({ links: seite(links), rechts: seite(rechts), verdacht: d });
   }
 
-  /** Wie viele Zeilen des Registers überhaupt einen Verdacht tragen. */
-  const dublettenAnzahl = useMemo(
-    () => (register?.gebucht ?? []).filter((r) => r.dublette).length,
-    [register],
-  );
-
-  // Ist der letzte Verdacht erledigt, verschwindet der Filterknopf — der Filter selbst
-  // blieb bisher an und liess eine leere Tabelle zurück, ohne dass noch etwas dastand,
-  // womit man ihn wieder ausschaltet. Der Erfolg sah aus wie ein Datenverlust.
-  useEffect(() => {
-    if (dublettenAnzahl === 0) setNurDubletten(false);
-  }, [dublettenAnzahl]);
-
   // Standardansicht: neueste zuerst (Tabelle sortiert/paginiert intern weiter).
   const gebuchtFuerTabelle = useMemo(() => [...gebuchtGefiltert].reverse(), [gebuchtGefiltert]);
 
-  /** Die markierten Zeilen als echte Buchungen — nur die, die es noch gibt. */
-  const gewaehlteBuchungen = useMemo(
-    () => ist.filter((b) => auswahl.has(b.id)),
-    [ist, auswahl],
-  );
-
-  function auswahlUmschalten(id: string) {
-    setAuswahl((bisher) => {
-      const neu = new Set(bisher);
-      if (neu.has(id)) neu.delete(id);
-      else neu.add(id);
-      return neu;
-    });
-  }
-
-  /**
-   * Alles-Markieren bezieht sich auf das GEFILTERTE Register, nicht auf die sichtbare
-   * Seite. Wer nach „Nordhoff" filtert und alles markiert, meint alle Nordhoff-Zeilen — nicht
-   * die ersten fünfundzwanzig davon.
-   */
+  // Markieren für die Sammelbearbeitung — über das GEFILTERTE Register (siehe
+  // `useSammelauswahl`, auch zum Ausdünnen beim Filterwechsel).
   const alleIds = useMemo(
     () => gebuchtGefiltert.map((r) => r.zeile.istId).filter((x): x is string => !!x),
     [gebuchtGefiltert],
   );
-  const alleGewaehlt = alleIds.length > 0 && alleIds.every((id) => auswahl.has(id));
+  const sammel = useSammelauswahl(alleIds);
+
+  // Die Auswahl gehört zum Register des Kontos — sie über einen Wechsel mitzunehmen
+  // hiesse, Buchungen zu ändern, die man nicht mehr vor sich hat.
+  useEffect(() => {
+    sammel.leeren();
+    // `sammel` ist je Render neu; gemeint ist nur der Kontowechsel.
+  }, [aktivId]);
+
+  /** Die markierten Zeilen als echte Buchungen — nur die, die es noch gibt. */
+  const gewaehlteBuchungen = useMemo(() => ist.filter((b) => sammel.auswahl.has(b.id)), [ist, sammel.auswahl]);
 
 
 
@@ -417,10 +350,9 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {aktiv && aktivZeile?.depot && <DepotAuszug konto={aktiv} sicht={aktivZeile.depot} />}
 
       {aktiv && register && !aktivZeile?.depot && (
-        <Card
-          style={{ marginTop: "var(--gap-card)" }}
-          pad
-        >
+        // Kein eigener Rand oben: `.screen` setzt den Kartenabstand. Mit ihm standen über
+        // dieser Karte 32 px und darunter 16 — am Bildschirmvergleich gefunden.
+        <Card pad>
           {/* Statement-Masthead: wessen Auszug, welcher reale Stand */}
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--sp-4)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
             <div style={{ minWidth: 0 }}>
@@ -439,7 +371,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   zwei Zahlen und verschwieg, dass sie zusammen genau den Stand darüber
                   ergeben; „Σ Ist" hiess dabei nichts, was ausserhalb des Codes jemand
                   wissen konnte. */}
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+              <div className="hinweis" style={{ marginTop: 6 }}>
                 {t("konten.standHerkunft", {
                   anfang: geld.formatMitSymbol(aktiv.saldo),
                   bewegung: geld.formatMitSymbol(aktivZeile?.bewegungen ?? 0, { mitVorzeichen: true }),
@@ -470,9 +402,9 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                       : t("konten.abgleich.differenz", { betrag: geld.formatMitSymbol(aktivZeile.abweichung ?? 0, { mitVorzeichen: true }) })}
                   </Pill>
                   {(aktivZeile.abweichung ?? 0) !== 0 && (
-                    <button className="linkbtn" style={{ padding: 0 }} onClick={() => onNavigate("kontenverwaltung")}>
+                    <Button variant="link" style={{ padding: 0 }} onClick={() => onNavigate("kontenverwaltung")}>
                       {t("konten.abgleichBereich.hinweg")}
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
@@ -539,16 +471,12 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2.2" style={{ position: "absolute", left: 10, pointerEvents: "none" }}><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
               <input className="field" style={{ width: "100%", paddingLeft: 30 }} value={regSuche} onChange={(e) => setRegSuche(e.target.value)} placeholder={t("konten.suche")} />
             </span>
-            <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
-              {ART_OPTS.map((opt, i) => {
-                const an = artFilter === opt.v;
-                return (
-                  <button key={opt.v} type="button" aria-pressed={an} onClick={() => setArtFilter(opt.v)} style={{ padding: "6px 11px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                    {t(opt.k)}
-                  </button>
-                );
-              })}
-            </div>
+            <Umschalter
+              label={t("konten.artWahl")}
+              optionen={ART_OPTS.map((opt) => ({ wert: opt.v, text: t(opt.k) }))}
+              wert={artFilter}
+              aufAendern={setArtFilter}
+            />
             <Auswahl
               ariaLabel={t("konten.alleKategorien")}
               wert={katFilter}
@@ -559,46 +487,45 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 { wert: "__ohne", text: t("konten.ohneKategorie") },
               ]}
             />
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
+            <span className="hinweis">{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
             {/* Erscheint nur, wenn es etwas zu sehen gibt. Ein Schalter, der dauerhaft
                 „0 mögliche Dubletten" anbietet, ist eine Frage ohne Antwort. */}
             {dublettenAnzahl > 0 && (
-              <button
-                type="button"
-                aria-pressed={nurDubletten}
-                onClick={() => setNurDubletten((x) => !x)}
+              // Base UI `Toggle`: ein Schalter, der gedrückt bleibt — `aria-pressed` kommt von
+              // dort, wie vorher von Hand.
+              <Toggle
+                pressed={nurDubletten}
+                onPressedChange={setNurDubletten}
                 style={{
-                  padding: "5px 10px", fontSize: "12.5px", fontFamily: "var(--font-ui)",
+                  padding: "5px 10px", fontSize: "var(--fs-ui)", fontFamily: "var(--font-ui)",
                   fontWeight: "var(--fw-bold)", borderRadius: "var(--r-md)", cursor: "pointer",
                   border: "1px solid var(--warn, var(--line))",
-                  background: nurDubletten ? "var(--warn, #b8860b)" : "var(--warn-wash, transparent)",
-                  color: nurDubletten ? "var(--surface, #fff)" : "var(--warn-deep, var(--ink-2))",
+                  background: nurDubletten ? "var(--warn)" : "var(--warn-wash, transparent)",
+                  color: nurDubletten ? "var(--auf-akzent)" : "var(--warn-deep, var(--ink-2))",
                   whiteSpace: "nowrap",
                 }}
               >
                 {t("konten.dubletten.filter", { n: dublettenAnzahl })}
-              </button>
+              </Toggle>
             )}
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-xs)", color: "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-              <input
-                type="checkbox"
-                checked={auswahlModus}
-                onChange={(e) => { setAuswahlModus(e.target.checked); if (!e.target.checked) setAuswahl(new Set()); }}
-                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
-              />
+            <Kaestchen
+              an={sammel.modus}
+              aufAendern={sammel.modusSetzen}
+              style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)", whiteSpace: "nowrap" }}
+            >
               {t("konten.sammel.modus")}
-            </label>
+            </Kaestchen>
           </div>
 
           {/* Die Aktionsleiste erscheint erst, wenn etwas markiert ist — vorher gäbe es
               nichts zu tun, und ein grauer Knopf ist eine Frage ohne Antwort. */}
-          {auswahlModus && auswahl.size > 0 && (
+          {sammel.modus && sammel.auswahl.size > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)", padding: "8px 12px", borderRadius: "var(--r-md)", background: "var(--accent-wash)" }}>
               <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-bold)", color: "var(--accent-deep)" }}>
-                {t("konten.sammel.gewaehlt", { n: auswahl.size })}
+                {t("konten.sammel.gewaehlt", { n: sammel.auswahl.size })}
               </span>
               <Button variant="primary" onClick={() => setSammelOffen(true)}>{t("konten.sammel.bearbeiten")}</Button>
-              <button className="linkbtn" onClick={() => setAuswahl(new Set())}>{t("konten.sammel.aufheben")}</button>
+              <Button variant="link" onClick={sammel.leeren}>{t("konten.sammel.aufheben")}</Button>
             </div>
           )}
 
@@ -616,27 +543,23 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               columns={[
                 // Die Auswahlspalte gibt es nur im Auswahlmodus — sonst hätte jede Zeile
                 // dauerhaft ein Kästchen, das in neun von zehn Sitzungen niemand braucht.
-                ...(auswahlModus
+                ...(sammel.modus
                   ? [{
                       key: "_sel",
                       label: (
-                        <input
-                          type="checkbox"
-                          checked={alleGewaehlt}
-                          aria-label={t("konten.sammel.alleWaehlen")}
-                          onChange={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
-                          style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                        <Kaestchen
+                          an={sammel.alleGewaehlt}
+                          label={t("konten.sammel.alleWaehlen")}
+                          aufAendern={sammel.alleUmschalten}
                         />
                       ),
                       sortable: false,
                       render: (r: Registerzeile) =>
                         r.zeile.istId ? (
-                          <input
-                            type="checkbox"
-                            checked={auswahl.has(r.zeile.istId)}
-                            aria-label={t("konten.sammel.zeileWaehlen")}
-                            onChange={() => auswahlUmschalten(r.zeile.istId!)}
-                            style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                          <Kaestchen
+                            an={sammel.istGewaehlt(r.zeile.istId)}
+                            label={t("konten.sammel.zeileWaehlen")}
+                            aufAendern={() => sammel.umschalten(r.zeile.istId!)}
                           />
                         ) : null,
                     }]
@@ -651,14 +574,14 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   render: (r) => (
                     <span title={r.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
-                      {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
+                      {r.zeile.gegenkontoId && <span className="hinweis" style={{ whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
                       {/* Der Prüf-Marker steht VOR den anderen Pillen: die übrigen sagen,
                           was eine Zeile IST, dieser sagt, was noch zu tun ist. Klick nimmt
                           ihn weg — dafür ist er ein Knopf und kein Etikett.
                           Warnfarbe und Imperativ, weil er eine AUFFORDERUNG ist; grün und
                           „erledigt" lasen sich als Haken und damit als das Gegenteil. */}
                       {r.buchung?.zuPruefen && (
-                        <button
+                        <BaseButton
                           type="button"
                           aria-label={t("konten.pruefenWeg")}
                           title={t("konten.pruefenWeg")}
@@ -670,7 +593,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           }}
                         >
                           <Pill variant="warn">{t("konten.pillZuPruefen")}</Pill>
-                        </button>
+                        </BaseButton>
                       )}
                       {!r.zeile.gegenkontoId && r.zeile.quelle === "manuell" && <Pill variant="neutral">{t("konten.pillManuell")}</Pill>}
                       {/* Gehört die Zeile zu einem Vertrag, steht der Anbieter dran.
@@ -710,7 +633,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                         // Der title sitzt am Wrapper, nicht an der Pille: `bausteine/` ist teils aus
                         // dem Design-System kopiert und kennt die Eigenschaft nicht —
                         // dort wird nichts erfunden.
-                        <button
+                        <BaseButton
                           type="button"
                           aria-label={t("konten.vergleich.oeffnen")}
                           style={{ flex: "0 0 auto", display: "inline-flex", background: "none", border: 0, padding: 0, cursor: "pointer" }}
@@ -734,7 +657,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           <Pill variant="warn">
                             {t(r.dublette.urteil === "identisch" ? "konten.dubletten.sicher" : "konten.dubletten.verdacht")}
                           </Pill>
-                        </button>
+                        </BaseButton>
                       )}
                     </span>
                   ),
@@ -840,7 +763,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           vertraege={vertraege}
           gesperrteIds={ausBankabruf}
           onClose={() => setSammelOffen(false)}
-          onGeaendert={async () => { setAuswahl(new Set()); await laden(); }}
+          onGeaendert={async () => { sammel.leeren(); await laden(); }}
         />
       )}
 
@@ -854,67 +777,5 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
         />
       )}
     </div>
-  );
-}
-
-function UmbuchungModal({ konten, vonId, heute, onClose, onSaved }: { konten: Zahlungskonto[]; vonId: string; heute: string; onClose: () => void; onSaved: () => void }) {
-  const { t } = useTranslation();
-  const geld = useGeld();
-  // Vorbelegt wird das aktive Konto nur, wenn es überhaupt in der Liste steht: ist gerade
-  // ein Online-Konto gewählt, fehlt es hier, und ein `value`, das keine Option trifft,
-  // zeigt im Browser stumm die erste an — gespeichert würde dann ein anderes Konto als
-  // das angezeigte.
-  const [von, setVon] = useState(konten.some((k) => k.id === vonId) ? vonId : konten[0]?.id ?? "");
-  const [nach, setNach] = useState(konten.find((k) => k.id !== vonId)?.id ?? "");
-  const [datum, setDatum] = useState(heute);
-  const [betrag, setBetrag] = useState("");
-  const [notiz, setNotiz] = useState("");
-  const [fehler, setFehler] = useState<string | null>(null);
-
-  async function speichern() {
-    setFehler(null);
-    try {
-      await umbuchungErfassen({ vonKontoId: von, nachKontoId: nach, datum, betrag: geld.parse(betrag) ?? 0, notiz });
-      onSaved();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
-  }
-
-  return (
-    <Modal
-      title={t("konten.umbuchung.titel")}
-      subtitle={t("konten.umbuchung.untertitel")}
-      onClose={onClose}
-      footer={<><Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button><button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
-    >
-      <div className="form-grid">
-        <FormField label={t("konten.umbuchung.vonKonto")} required>
-          <Auswahl
-            ariaLabel={t("konten.umbuchung.vonKonto")}
-            wert={von}
-            aufAenderung={setVon}
-            optionen={waehlbareKonten(konten).map((k) => ({ wert: k.id, text: k.bezeichnung }))}
-          />
-        </FormField>
-        <FormField label={t("konten.umbuchung.nachKonto")} required>
-          <Auswahl
-            ariaLabel={t("konten.umbuchung.nachKonto")}
-            wert={nach}
-            aufAenderung={setNach}
-            optionen={waehlbareKonten(konten).map((k) => ({ wert: k.id, text: k.bezeichnung }))}
-          />
-        </FormField>
-        <FormField label={t("konten.feldDatum")} required>
-          <Datumsfeld ariaLabel={t("konten.feldDatum")} wert={datum} aufAenderung={setDatum} />
-        </FormField>
-        <FormField label={t("konten.feldBetrag")} required>
-          <input className="field" inputMode="decimal" value={betrag} onChange={(e) => setBetrag(e.target.value)} placeholder={geld.format(0)} />
-        </FormField>
-        <FormField label={t("konten.feldBezeichnung")} hint={t("konten.optional")}>
-          <input className="field" aria-label={t("konten.feldBezeichnung")} value={notiz} onChange={(e) => setNotiz(e.target.value)} placeholder={t("konten.umbuchung.notizPlatzhalter")} />
-        </FormField>
-      </div>
-    </Modal>
   );
 }

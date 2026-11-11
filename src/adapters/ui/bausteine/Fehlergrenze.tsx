@@ -8,8 +8,9 @@
 //
 // **Was sie fängt und was nicht.** Fehler beim RENDERN und in Lifecycle-Methoden der
 // Komponenten unter ihr. Nicht: Fehler in Ereignisbehandlern und in asynchronem Code —
-// ein abgelehntes `await` in einem Klick läuft an ihr vorbei. Dort bleibt es bei dem, was
-// der jeweilige Screen selbst meldet (`fehlerNachricht`).
+// ein abgelehntes `await` in einem Klick läuft an ihr vorbei. Dafür gibt es seit
+// 2026-11-10 `Meldungen` daneben: was ein Screen nicht selbst am Ort anzeigt
+// (`fehlerNachricht`), erscheint dort als Meldung.
 //
 // **Sie steht an zwei Stellen**, und der Unterschied ist die Reichweite: um den Inhalt
 // eines Screens (die Navigation bleibt stehen, man kommt woanders hin) und um die ganze

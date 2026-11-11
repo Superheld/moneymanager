@@ -8,6 +8,7 @@ import {
 } from "../../../application/kategorien/kategorieAbgleich";
 import { Button, KPIStat, Pill } from "../bausteine";
 import { Abschnitt, type Hilfe } from "./kartenteile";
+import { Zeile } from "../bausteine/Anordnung";
 
 /**
  * Der rückwirkende Abgleich: erst rechnen, zeigen, dann auf Bestätigung schreiben.
@@ -36,14 +37,14 @@ export function AbgleichInhalt({
         {t("einstellungen.abgleich.hinweis")}
       </div>
 
-      <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center", flexWrap: "wrap" }}>
-        <Button onClick={rechnet ? undefined : aufVorschau}>
+      <Zeile abstand={3}>
+        <Button onClick={aufVorschau} laeuft={rechnet}>
           {rechnet ? t("einstellungen.abgleich.rechnet") : t("einstellungen.abgleich.vorschau")}
         </Button>
         {angewendet !== null && (
           <span className="muted">{t("einstellungen.abgleich.fertig", { anzahl: zahl(angewendet) })}</span>
         )}
-      </div>
+      </Zeile>
 
       {plan && plan.setzen.length === 0 && (
         <div className="muted" style={{ marginTop: "var(--sp-4)" }}>
@@ -75,15 +76,15 @@ export function AbgleichInhalt({
             </div>
             {gruppen.map((g) => (
               <div key={`${g.vonKategorieId ?? ""}-${g.nachKategorieId}`} style={{ marginBottom: "var(--sp-3)" }}>
-                <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
+                <Zeile ausrichtung="baseline">
                   <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: "var(--fw-bold)", minWidth: "5ch", textAlign: "right" }}>
                     {zahl(g.anzahl)} ×
                   </span>
                   <span>{name(g.vonKategorieId)}</span>
                   <span className="muted">→</span>
                   <span style={{ fontWeight: "var(--fw-semi)" }}>{name(g.nachKategorieId)}</span>
-                </div>
-                <div className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "6ch" }}>
+                </Zeile>
+                <div className="hinweis" style={{ marginLeft: "6ch" }}>
                   {g.beispiele.map((b) => b.gegenpartei || t("einstellungen.abgleich.ohneEmpfaenger")).join(" · ")}
                   {g.anzahl > g.beispiele.length && " …"}
                 </div>
@@ -124,7 +125,7 @@ export function AbgleichInhalt({
           </Abschnitt>
 
           <div style={{ marginTop: "var(--sp-4)" }}>
-            <Button variant="primary" onClick={schreibt ? undefined : aufUebernehmen}>
+            <Button variant="primary" onClick={aufUebernehmen} laeuft={schreibt}>
               {schreibt
                 ? t("einstellungen.abgleich.schreibt")
                 : t("einstellungen.abgleich.uebernehmen", { anzahl: zahl(plan.setzen.length) })}

@@ -16,6 +16,7 @@ import type { Importplan } from "../../../application";
 import { Button, Card, Pill } from "../bausteine";
 import { konfigurationImport, konfigurationPlan } from "../../dienste";
 import { fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { Zeile } from "../bausteine/Anordnung";
 
 export function KonfigurationImportCard() {
   const { t } = useTranslation();
@@ -66,7 +67,7 @@ export function KonfigurationImportCard() {
       <p className="muted">{t("einstellungen.import.konfiguration.text")}</p>
       <p className="muted">{t("einstellungen.import.konfiguration.hinweis")}</p>
 
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap" }}>
+      <Zeile abstand={3}>
         <input
           ref={inputRef}
           type="file"
@@ -76,8 +77,8 @@ export function KonfigurationImportCard() {
           aria-label={t("einstellungen.import.dateiWaehlen")}
         />
         <Button onClick={() => inputRef.current?.click()}>{t("einstellungen.import.dateiWaehlen")}</Button>
-        {dateiname && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>{dateiname}</span>}
-      </div>
+        {dateiname && <span className="hinweis">{dateiname}</span>}
+      </Zeile>
 
       {plan && (
         <div style={{ marginTop: "var(--sp-4)" }}>

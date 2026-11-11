@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   padding: var(--sp-6, 1.5rem);
-  background: var(--bg, #fff);
+  background: var(--surface);
 }
 
 .zugang-inhalt {
@@ -22,7 +22,7 @@
 }
 
 .zugang-fehler {
-  color: var(--danger, #b3261e);
+  color: var(--danger);
   margin: 0;
 }
 
@@ -36,7 +36,7 @@
   white-space: pre-wrap;
   word-break: break-all;
   padding: var(--sp-4, 1rem);
-  border: 1px solid var(--line, #ddd);
+  border: 1px solid var(--line);
   border-radius: var(--r-md, 8px);
   margin: 0;
   user-select: all;

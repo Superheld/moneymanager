@@ -225,3 +225,55 @@ describe("DataTable — schmal", () => {
     expect(container.querySelectorAll("thead th")).toHaveLength(4);
   });
 });
+
+describe("DataTable — klickbare Zeilen mit der Tastatur", () => {
+  // Vorher hing der Klick an <tr onClick> ohne Fokus und ohne Tasten: ohne Maus kam man
+  // in keine Zeile hinein, in der kein Zeilenlink stand.
+  const drei = [{ name: "Alpha" }, { name: "Beta" }, { name: "Gamma" }];
+
+  it("erreicht eine Zeile per Tab und löst sie mit Enter und Leertaste aus", async () => {
+    const nutzer = userEvent.setup();
+    const geklickt: string[] = [];
+    render(<DataTable columns={spalten} rows={drei} onRowClick={(r) => geklickt.push(r.name)} />);
+
+    await nutzer.tab();
+    expect(document.activeElement?.textContent).toBe("Alpha");
+    await nutzer.keyboard("{Enter}");
+    await nutzer.tab();
+    await nutzer.keyboard(" ");
+    expect(geklickt).toEqual(["Alpha", "Beta"]);
+  });
+
+  it("bleibt eine Tabellenzeile und sagt, welche gerade offen ist", () => {
+    render(<DataTable columns={spalten} rows={drei} onRowClick={() => {}} istAktiv={(r) => r.name === "Beta"} />);
+    const zeilen = screen.getAllByRole("row").slice(1); // ohne Kopfzeile
+    expect(zeilen).toHaveLength(3);
+    expect(zeilen.map((z) => z.getAttribute("aria-current"))).toEqual([null, "true", null]);
+  });
+
+  it("lässt Zeilen ohne Klick aus der Tab-Reihenfolge", () => {
+    render(<DataTable columns={spalten} rows={drei} />);
+    for (const z of screen.getAllByRole("row")) expect(z.hasAttribute("tabindex")).toBe(false);
+  });
+
+  it("überlässt eine Taste in einem Knopf der Zeile dem Knopf", async () => {
+    const nutzer = userEvent.setup();
+    const geklickt: string[] = [];
+    const mitKnopf = [{ key: "name", label: "Name", render: (r: { name: string }) => <button onClick={(e) => { e.stopPropagation(); geklickt.push("knopf"); }}>{r.name}</button> }];
+    render(<DataTable columns={mitKnopf} rows={[{ name: "Alpha" }]} onRowClick={() => geklickt.push("zeile")} />);
+    screen.getByRole("button", { name: "Alpha" }).focus();
+    await nutzer.keyboard("{Enter}");
+    expect(geklickt).toEqual(["knopf"]);
+  });
+
+  it("meldet die Sortierung am Spaltenkopf", async () => {
+    const nutzer = userEvent.setup();
+    render(<DataTable sortable columns={spalten} rows={drei} />);
+    const kopf = screen.getByRole("columnheader", { name: /Name/ });
+    expect(kopf.hasAttribute("aria-sort")).toBe(false);
+    await nutzer.click(kopf);
+    expect(kopf.getAttribute("aria-sort")).toBe("ascending");
+    await nutzer.click(kopf);
+    expect(kopf.getAttribute("aria-sort")).toBe("descending");
+  });
+});

@@ -81,6 +81,7 @@ export function useLoeschfrage(): Loeschfrage {
 
   const dialog = auftrag ? (
     <Modal
+      warnung
       title={t("loeschen.titel")}
       subtitle={t("loeschen.untertitel", { name: auftrag.name })}
       onClose={schliessen}
@@ -98,9 +99,9 @@ export function useLoeschfrage(): Loeschfrage {
             </Button>
           )}
           {laeuft && <span className="muted">{t("loeschen.laeuft")}</span>}
-          <button className="linkbtn" onClick={schliessen} disabled={laeuft}>
+          <Button variant="link" onClick={schliessen} disabled={laeuft}>
             {t("loeschen.abbrechen")}
-          </button>
+          </Button>
           {fehler && <span className="err">{fehler}</span>}
         </>
       }

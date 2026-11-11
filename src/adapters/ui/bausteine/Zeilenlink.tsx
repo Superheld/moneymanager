@@ -9,7 +9,7 @@
 // Ein Link im Bezeichner zeigt sich dagegen selbst an. Er ist die kleinere Trefferfläche
 // und trotzdem der bessere Weg, weil man ihn überhaupt erst findet.
 //
-// **Nicht zu verwechseln mit `.linkbtn`.** Die Klasse gibt es schon, und sie ist für das
+// **Nicht zu verwechseln mit `Button variant="link"`** (früher `.linkbtn`). Der ist für das
 // Gegenteil gedacht: eine gedämpfte Nebenaktion in einer Zeile („Profil ansehen"), die
 // sich zurückhalten soll. Dies hier ist der Weg weiter und muss sich zeigen.
 //
@@ -19,6 +19,7 @@
 // gar nichts, eines mit `href="#"` ein Versprechen, das die App nicht hält.
 
 import type { ReactNode } from "react";
+import { Button as BaseButton } from "@base-ui/react/button";
 
 export interface ZeilenlinkProps {
   /** Was dasteht — meist der Bezeichner der Zeile. */
@@ -35,8 +36,8 @@ export interface ZeilenlinkProps {
 
 export function Zeilenlink({ children, onKlick, titel }: ZeilenlinkProps) {
   return (
-    <button type="button" className="zeilenlink" onClick={onKlick} title={titel} aria-label={titel}>
+    <BaseButton type="button" className="zeilenlink" onClick={onKlick} title={titel} aria-label={titel}>
       {children}
-    </button>
+    </BaseButton>
   );
 }

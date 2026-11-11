@@ -14,6 +14,7 @@ import { useTranslation } from "react-i18next";
 import { Button, Card, FormField } from "../bausteine";
 import { Passwortfeld } from "./Passwortfeld";
 import { MINDESTLAENGE, type Passphrasebefund } from "../../../application/zugang";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 export type Sperrgrund = "einrichten" | "entsperren";
 
@@ -115,15 +116,9 @@ export function Sperrbildschirm(p: SperrbildschirmProps) {
           {gezeigterCode}
         </pre>
         <p className="muted">{t("zugang.codeWarnung")}</p>
-        <label className="zugang-bestaetigung">
-          <input
-            type="checkbox"
-            aria-label={t("zugang.codeNotiert")}
-            checked={notiert}
-            onChange={(e) => setNotiert(e.target.checked)}
-          />
+        <Kaestchen an={notiert} aufAendern={setNotiert} className="zugang-bestaetigung">
           {t("zugang.codeNotiert")}
-        </label>
+        </Kaestchen>
         <Button variant="primary" onClick={() => notiert && p.onFertig()}>
           {t("zugang.weiter")}
         </Button>

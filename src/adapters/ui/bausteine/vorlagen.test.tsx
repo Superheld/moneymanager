@@ -1,5 +1,8 @@
 /** @vitest-environment jsdom */
-// Die Bausteine aus der Design-System-Vorlage — `Button`, `Pill`, `KPIStat`, `Dialog`.
+// Die Bausteine aus der Design-System-Vorlage — `Button`, `Pill`, `KPIStat`, `Card`,
+// `CoverageTrack`.
+// Seit 2026-11-10 sind alle TypeScript; `Dialog` ist in `Modal` aufgegangen (siehe
+// `Modal.test.tsx`), `DataTable` und `FormField` haben eigene Tests.
 //
 // **Warum sie einen eigenen Test brauchen.** Sie liegen als `.jsx` mit handgeschriebener
 // `.d.ts` daneben: der Compiler prüft ihr Inneres nicht, und bis 2026-11-10 zählte die
@@ -11,10 +14,11 @@
 // Geprüft wird VERHALTEN (was klickt, was erscheint, was die Vorlesehilfe findet) und
 // die eine Sorte Aussehen, die eine Aussage ist: welche Farbe eine Variante trägt.
 
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Button, Dialog, KPIStat, Pill } from "./index";
+import { Button, Card, CoverageTrack, KPIStat, Pill } from "./index";
 
 describe("Button", () => {
   it("meldet den Klick", async () => {
@@ -29,29 +33,92 @@ describe("Button", () => {
     expect(screen.getByRole("button").textContent).toBe("+Konto");
   });
 
-  it("unterscheidet die Varianten sichtbar", () => {
+  it("unterscheidet die Varianten über ihre Klasse", () => {
+    // Das Aussehen steht seit 2026-11-10 in app.css (`.btn`), nicht mehr inline — jsdom
+    // lädt das Stylesheet nicht, also wird die Klasse geprüft, die es auswählt.
     render(
       <>
         <Button>Normal</Button>
         <Button variant="primary">Haupt</Button>
         <Button variant="ghost">Still</Button>
+        <Button variant="link">Abbrechen</Button>
       </>,
     );
-    const farbe = (name: string) => screen.getByRole("button", { name }).style.background;
-    expect(farbe("Haupt")).toBe("var(--accent)");
-    expect(farbe("Still")).toBe("transparent");
-    expect(farbe("Normal")).toBe("var(--surface)");
+    const klasse = (name: string) => screen.getByRole("button", { name }).className;
+    expect(klasse("Normal")).toBe("btn");
+    expect(klasse("Haupt")).toBe("btn btn--primary");
+    expect(klasse("Still")).toBe("btn btn--ghost");
+    expect(klasse("Abbrechen")).toBe("btn btn--link");
   });
 
   it("fällt bei einer unbekannten Variante auf die normale zurück, statt zu werfen", () => {
-    // @ts-expect-error — genau der Fall, den die .d.ts verbietet und das JS trotzdem bekommt
+    // @ts-expect-error — genau der Fall, den der Typ verbietet und ein Aufruf trotzdem bringen kann
     render(<Button variant="gibtsnicht">Egal</Button>);
-    expect(screen.getByRole("button", { name: "Egal" }).style.background).toBe("var(--surface)");
+    expect(screen.getByRole("button", { name: "Egal" }).className).toBe("btn");
   });
 
   it("lässt den Aufrufer den Stil ergänzen", () => {
     render(<Button style={{ marginLeft: "auto" }}>Rechts</Button>);
     expect(screen.getByRole("button").style.marginLeft).toBe("auto");
+  });
+
+  it("schickt kein Formular ab, ausser es ist verlangt", async () => {
+    // Ohne `type` nimmt der Browser `submit` — ein „Abbrechen" in einem <form> schickte
+    // es dann ab.
+    const abschicken = vi.fn((e: Event) => e.preventDefault());
+    render(
+      <form onSubmit={(e) => abschicken(e.nativeEvent)}>
+        <Button>Abbrechen</Button>
+        <Button type="submit">Senden</Button>
+      </form>,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Abbrechen" }));
+    expect(abschicken).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Senden" }));
+    expect(abschicken).toHaveBeenCalledTimes(1);
+  });
+
+  it("nimmt gesperrt keinen Klick an", async () => {
+    const klick = vi.fn();
+    render(<Button disabled onClick={klick}>Speichern</Button>);
+    await userEvent.click(screen.getByRole("button", { name: "Speichern" }));
+    expect(klick).not.toHaveBeenCalled();
+  });
+
+  it("sperrt sich, solange er läuft, und meldet sich beschäftigt", async () => {
+    const klick = vi.fn();
+    render(<Button laeuft onClick={klick}>Wechseln</Button>);
+    const knopf = screen.getByRole("button", { name: "Wechseln" });
+    expect(knopf.getAttribute("aria-disabled")).toBe("true");
+    expect(knopf.getAttribute("aria-busy")).toBe("true");
+    await userEvent.click(knopf);
+    expect(klick).not.toHaveBeenCalled();
+  });
+
+  it("sperrt über aria-disabled, nicht über das Attribut — damit der Fokus stehen bleibt", async () => {
+    // Der Grund für Base UI darunter: ein natives `disabled` schiebt im Browser den Fokus
+    // auf <body>. jsdom tut das NICHT (nachgemessen: mit nativem `disabled` bliebe ein
+    // reiner Fokus-Test grün), also wird geprüft, was den Fokus im Browser hält — kein
+    // `disabled`-Attribut, und der Knopf bleibt in der Tab-Reihenfolge.
+    function Laeufer() {
+      const [laeuft, setLaeuft] = useState(false);
+      return <Button laeuft={laeuft} onClick={() => setLaeuft(true)}>Starten</Button>;
+    }
+    render(<Laeufer />);
+    const knopf = screen.getByRole("button", { name: "Starten" });
+    knopf.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(knopf.getAttribute("aria-busy")).toBe("true");
+    expect(knopf.hasAttribute("disabled")).toBe(false);
+    expect(knopf.tabIndex).toBe(0);
+  });
+
+  it("reicht Namen und Zustand an die Vorlesehilfe durch", () => {
+    render(<Button aria-label="Abschnitt öffnen" aria-expanded={false} title="Mehr zeigen">▸</Button>);
+    const knopf = screen.getByRole("button", { name: "Abschnitt öffnen" });
+    expect(knopf.getAttribute("aria-expanded")).toBe("false");
+    expect(knopf.getAttribute("title")).toBe("Mehr zeigen");
+    expect(knopf.hasAttribute("aria-busy")).toBe(false);
   });
 });
 
@@ -131,46 +198,49 @@ describe("KPIStat", () => {
   });
 });
 
-describe("Dialog", () => {
-  it("zeigt Titel, Untertitel, Inhalt und Fusszeile", () => {
-    render(
-      <Dialog title="Vertrag anlegen" subtitle="Schritt eins" footer={<button>Weiter</button>}>
-        <p>Der Inhalt</p>
-      </Dialog>,
-    );
-    expect(screen.getByRole("heading", { name: "Vertrag anlegen" })).toBeTruthy();
-    expect(screen.getByText("Schritt eins")).toBeTruthy();
-    expect(screen.getByText("Der Inhalt")).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Weiter" })).toBeTruthy();
+describe("Card", () => {
+  it("zeigt Kopf, Untertitel und Aktion nur, wenn es sie gibt", () => {
+    const { container, rerender } = render(<Card>nur Inhalt</Card>);
+    // Ohne Titel und Aktion kein Kopf: die Karte trägt nur ihren Text.
+    expect((container.firstChild as HTMLElement).children).toHaveLength(0);
+    rerender(<Card title="Konten" subtitle="alle" action={<button>Neu</button>}>Inhalt</Card>);
+    expect(screen.getByText("Konten")).toBeTruthy();
+    expect(screen.getByText("alle")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Neu" })).toBeTruthy();
   });
 
-  it("schliesst über den Knopf", async () => {
-    const zu = vi.fn();
-    render(<Dialog title="Titel" onClose={zu}>Inhalt</Dialog>);
-    await userEvent.click(screen.getByRole("button", { name: "✕" }));
-    expect(zu).toHaveBeenCalledTimes(1);
+  it("schwebt nur auf Wunsch und lässt sich ohne Polster stellen", () => {
+    const { container, rerender } = render(<Card>x</Card>);
+    const flaeche = () => container.firstChild as HTMLElement;
+    expect(flaeche().style.boxShadow).toBe("var(--shadow-none)");
+    expect(flaeche().style.padding).toBe("var(--pad-card)");
+    rerender(<Card floating pad={false}>x</Card>);
+    expect(flaeche().style.boxShadow).toBe("var(--shadow-card)");
+    expect(flaeche().style.padding).toBe("0px");
+  });
+});
+
+describe("CoverageTrack", () => {
+  // Vorher zwei div-Kästen: für eine Vorlesehilfe gab es den Balken nicht.
+  it("meldet sich als Messwert mit Grenzen", () => {
+    render(<CoverageTrack value={30} max={60} label="Lebensmittel" />);
+    const balken = screen.getByRole("meter", { name: "Lebensmittel" });
+    expect(balken.getAttribute("aria-valuenow")).toBe("30");
+    expect(balken.getAttribute("aria-valuemax")).toBe("60");
   });
 
-  it("schliesst bei einem Klick auf den Hintergrund", async () => {
-    const zu = vi.fn();
-    const { container } = render(<Dialog title="Titel" onClose={zu}>Inhalt</Dialog>);
-    await userEvent.click(container.firstChild as HTMLElement);
-    expect(zu).toHaveBeenCalledTimes(1);
+  it("sagt über dem Ziel, um wie viel — der Wert selbst ist gekappt", () => {
+    render(<CoverageTrack value={620} max={600} label="Budget" right="620 / 600" />);
+    const balken = screen.getByRole("meter", { name: "Budget" });
+    expect(balken.getAttribute("aria-valuenow")).toBe("600");
+    expect(balken.getAttribute("aria-valuetext")).toBe("620 / 600");
+    expect(screen.getByText("620 / 600").style.color).toBe("var(--warn-deep)");
   });
 
-  // Der Fall, der sonst Eingaben kostet: ein Klick IM Dialog steigt bis zum Hintergrund
-  // auf und darf ihn nicht schliessen.
-  it("schliesst NICHT bei einem Klick in den Inhalt", async () => {
-    const zu = vi.fn();
-    render(<Dialog title="Titel" onClose={zu}><p>Inhalt</p></Dialog>);
-    await userEvent.click(screen.getByText("Inhalt"));
-    await userEvent.click(screen.getByRole("heading", { name: "Titel" }));
-    expect(zu).not.toHaveBeenCalled();
-  });
-
-  it("verträgt einen Klick auf den Hintergrund ohne Schliess-Funktion", async () => {
-    const { container } = render(<Dialog title="Titel">Inhalt</Dialog>);
-    await userEvent.click(container.firstChild as HTMLElement);
-    expect(screen.getByText("Inhalt")).toBeTruthy();
+  it("nimmt eine erzwungene Überschreitung und ein Ziel von null hin", () => {
+    const { container } = render(<CoverageTrack value={5} max={0} over />);
+    const fuellung = container.querySelector("[data-ueber]") as HTMLElement;
+    expect(fuellung.style.background).toBe("var(--warn)");
+    expect(fuellung.style.width).toBe("100%");
   });
 });

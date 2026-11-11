@@ -21,6 +21,8 @@ import {
 } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Abschnitt, type Hilfe } from "./kartenteile";
+import { Kaestchen } from "../bausteine/Kaestchen";
+import { Zeile } from "../bausteine/Anordnung";
 
 /**
  * Der Wortbestand — eine Liste statt zweier Karten.
@@ -119,16 +121,13 @@ export function WoerterInhalt({
         {MERKMALSHERKUENFTE.map((h) => {
           const w = wirkungJe.get(h);
           return (
-            <label
+            <Kaestchen
               key={h}
-              style={{ display: "flex", gap: "var(--sp-3)", alignItems: "flex-start", cursor: "pointer" }}
+              an={aktiv.has(h)}
+              aufAendern={(an) => aufSchalten(h, an)}
+              oben
+              style={{ display: "flex", gap: "var(--sp-3)" }}
             >
-              <input
-                type="checkbox"
-                checked={aktiv.has(h)}
-                onChange={(e) => aufSchalten(h, e.target.checked)}
-                style={{ marginTop: 3 }}
-              />
               <span>
                 <span style={{ fontWeight: "var(--fw-bold)" }}>{t(`einstellungen.lernmaterial.herkunft.${h}`)}</span>
                 {!aktiv.has(h) && <> · <span className="muted">{t("einstellungen.lernmaterial.herkunftAus")}</span></>}
@@ -145,11 +144,11 @@ export function WoerterInhalt({
                     </span>
                   </>
                 )}
-                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <div className="hinweis">
                   {t(`einstellungen.lernmaterial.herkunftHinweis.${h}`)}
                 </div>
               </span>
-            </label>
+            </Kaestchen>
           );
         })}
       </div>
@@ -195,7 +194,7 @@ export function WoerterInhalt({
         <div className="muted" style={{ marginBottom: "var(--sp-2)" }}>
           {t("einstellungen.lernmaterial.bestandHinweis")}
         </div>
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
+        <div className="hinweis" style={{ marginBottom: "var(--sp-3)" }}>
           {t("einstellungen.lernmaterial.masseHinweis")}
         </div>
 
@@ -236,14 +235,9 @@ export function WoerterInhalt({
               ]}
             />
           </FormField>
-          <label style={{ display: "flex", gap: "var(--sp-2)", alignItems: "center", paddingBottom: "var(--sp-2)", cursor: "pointer" }}>
-            <input
-              type="checkbox"
-              checked={mitStandard}
-              onChange={(e) => setMitStandard(e.target.checked)}
-            />
+          <Kaestchen an={mitStandard} aufAendern={setMitStandard} style={{ paddingBottom: "var(--sp-2)" }}>
             <span>{t("einstellungen.lernmaterial.mitStandard")}</span>
-          </label>
+          </Kaestchen>
           <span className="muted" style={{ paddingBottom: "var(--sp-2)" }}>
             {t("einstellungen.lernmaterial.bestandZahl", {
               gezeigt: zahl(sichtbar.length),
@@ -278,7 +272,7 @@ export function WoerterInhalt({
                       {r.anzeige}
                       {r.wort !== r.anzeige && <span className="muted"> → {r.wort}</span>}
                       {r.herkunft && (
-                        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                        <span className="hinweis">
                           {" "}· {t(`einstellungen.lernmaterial.herkunft.${r.herkunft}`)}
                         </span>
                       )}
@@ -357,19 +351,18 @@ export function WoerterInhalt({
                   sortable: false,
                   render: (r) =>
                     r.zustand === "gesperrt" ? (
-                      <button className="linkbtn" onClick={(e) => { e.stopPropagation(); aufZulassen(r.wort); }}>
+                      <Button variant="link" onClick={(e) => { e.stopPropagation(); aufZulassen(r.wort); }}>
                         {t("einstellungen.lernmaterial.zulassen")}
-                      </button>
+                      </Button>
                     ) : r.zustand === "genutzt" ? (
-                      <button
-                        className="linkbtn"
+                      <Button variant="link"
                         onClick={(e) => {
                           e.stopPropagation();
                           aufAusschliessen(r.wort, r.herkunft ? [r.herkunft] : undefined);
                         }}
                       >
                         {t("einstellungen.lernmaterial.ausschliessen")}
-                      </button>
+                      </Button>
                     ) : (
                       // Strukturell aussortiert — dafür gibt es keinen Listeneintrag,
                       // den man entfernen könnte.
@@ -423,7 +416,7 @@ export function WoerterInhalt({
             {t("einstellungen.lernmaterial.grundausstattung")}
           </Button>
         </div>
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
+        <div className="hinweis" style={{ marginTop: "var(--sp-2)" }}>
           {t("einstellungen.lernmaterial.grundausstattungHinweis")}
         </div>
       </Abschnitt>
@@ -454,11 +447,11 @@ function Wortdetail({
         marginTop: "var(--sp-4)",
         padding: "var(--sp-3)",
         border: "1px solid var(--line)",
-        borderRadius: "var(--radius-2, 6px)",
+        borderRadius: "6px",
         background: "var(--surface-2)",
       }}
     >
-      <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
+      <Zeile ausrichtung="baseline">
         <span style={{ fontWeight: "var(--fw-bold)" }}>{zeile.anzeige}</span>
         {zeile.herkunft && (
           <span className="muted">{t(`einstellungen.lernmaterial.herkunft.${zeile.herkunft}`)}</span>
@@ -478,7 +471,7 @@ function Wortdetail({
               : t("einstellungen.lernmaterial.ueberall")}
           </span>
         )}
-      </div>
+      </Zeile>
 
       {zeile.grund && (
         <div className="muted" style={{ marginTop: "var(--sp-2)" }}>
@@ -492,13 +485,13 @@ function Wortdetail({
       {zeile.belege > 0 && zeile.kategorien > 0 && (
         <div style={{ display: "flex", gap: "var(--sp-5)", flexWrap: "wrap", marginTop: "var(--sp-3)" }}>
           <span>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <span className="hinweis">
               {t("einstellungen.lernmaterial.spalteDeckung")}
             </span>{" "}
             <span style={{ fontVariantNumeric: "tabular-nums" }}>{prozent(zeile.deckung)}</span>
           </span>
           <span>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <span className="hinweis">
               {t("einstellungen.lernmaterial.trennschaerfe")}
             </span>{" "}
             <span
@@ -539,7 +532,7 @@ function Wortdetail({
                   />
                 </span>
                 <span>{kategorieName.get(v.kategorieId) ?? v.kategorieId}</span>
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {prozent(v.anzahl / zeile.belege)}
                 </span>
               </div>

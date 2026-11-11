@@ -27,7 +27,7 @@ const ZEILENHOEHE = 32;
 const KOPFHOEHE = 28;
 
 const FLAECHE: CSSProperties = {
-  background: "var(--surface-2, rgba(0,0,0,.015))",
+  background: "var(--surface-2)",
   borderRadius: "var(--r-md)",
   padding: "2px 8px",
   margin: "6px 0 10px",
@@ -135,7 +135,7 @@ export function Aufklapptabelle<T>({
 }) {
   if (zeilen.length === 0) {
     return (
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", padding: "8px 0 2px" }}>
+      <div className="hinweis" style={{ padding: "8px 0 2px" }}>
         {leer}
       </div>
     );
@@ -150,7 +150,7 @@ export function Aufklapptabelle<T>({
 
   return (
     <Aufklappflaeche zeilen={sichtbar} kopfhoehe={kopf ? KOPFHOEHE : 0}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px", tableLayout: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-ui)", tableLayout: "auto" }}>
         {kopf && (
           <thead>
             <tr>

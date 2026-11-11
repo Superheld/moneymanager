@@ -39,7 +39,7 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
         <span>
           {p.name ?? p.kennung}
           {p.isin && (
-            <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-2)" }}>
+            <span className="hinweis" style={{ marginLeft: "var(--sp-2)" }}>
               {p.isin}
             </span>
           )}
@@ -80,7 +80,7 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
           <span className={e.veraenderung < 0 ? "err" : undefined}>
             {geld.formatMitSymbol(e.veraenderung)}
             {e.anteil != null && (
-              <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-2)" }}>
+              <span className="hinweis" style={{ marginLeft: "var(--sp-2)" }}>
                 {prozent(e.anteil, 1)}
               </span>
             )}
@@ -92,7 +92,6 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
 
   return (
     <Card
-      style={{ marginTop: "var(--gap-card)" }}
       title={sicht.depot.bezeichnung}
       subtitle={
         entwicklung.veraenderung != null
@@ -114,7 +113,7 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
         />
       )}
       {punkte.length <= 1 && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+        <div className="hinweis">
           {t("depot.zuWenigPunkte")}
         </div>
       )}

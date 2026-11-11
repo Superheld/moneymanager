@@ -36,6 +36,8 @@ import { beiEnter } from "../bausteine/beiEnter";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useExperimente, useGeld } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
+import { Zeile } from "../bausteine/Anordnung";
 
 type Art = "offline" | "online";
 
@@ -183,7 +185,10 @@ export function KontoAnlegenModal({
     setBusy(true);
     setFehler(null);
     try {
-      const bekannteBuchungen = await umsaetze().catch(() => []);
+      // KEIN Rückfall auf eine leere Liste: sie dient dazu, schon bekannte Buchungen zu
+      // erkennen. Still leer, gälte nichts als bekannt — und der Abruf legte Dubletten an.
+      // Der Fehler geht an den `catch` unten und steht im Dialog.
+      const bekannteBuchungen = await umsaetze();
       for (const k of bankkonten ?? []) {
         const wahl = wahlen[k.schluessel];
         if (!wahl || wahl.ziel === "ignorieren") continue;
@@ -239,9 +244,9 @@ export function KontoAnlegenModal({
       <Button variant="primary" onClick={() => void offlineSpeichern()}>
         {t("einstellungen.speichern")}
       </Button>
-      <button className="linkbtn" onClick={onClose}>
+      <Button variant="link" onClick={onClose}>
         {t("einstellungen.abbrechen")}
-      </button>
+      </Button>
       {fehler && <span className="err">{fehler}</span>}
     </>
   );
@@ -257,9 +262,9 @@ export function KontoAnlegenModal({
           {t("konten.anlegen.uebernehmen")}
         </Button>
       )}
-      <button className="linkbtn" onClick={onClose}>
+      <Button variant="link" onClick={onClose}>
         {t("einstellungen.abbrechen")}
-      </button>
+      </Button>
       {fehler && <span className="err">{fehler}</span>}
     </>
   );
@@ -313,10 +318,9 @@ export function KontoAnlegenModal({
               <FormField label={t("einstellungen.konto.feldInhaber")}>
                 <span style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap" }}>
                   {personen.map((p) => (
-                    <label key={p.id} style={{ display: "flex", gap: "var(--sp-1)", alignItems: "center" }}>
-                      <input type="checkbox" checked={inhaberIds.includes(p.id)} onChange={() => toggleInhaber(p.id)} />
+                    <Kaestchen key={p.id} an={inhaberIds.includes(p.id)} aufAendern={() => toggleInhaber(p.id)}>
                       {p.name}
-                    </label>
+                    </Kaestchen>
                   ))}
                 </span>
               </FormField>
@@ -428,16 +432,16 @@ export function KontoAnlegenModal({
 
         {art === "online" && bankkonten !== null && (
           <>
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
+            <div className="hinweis" style={{ marginBottom: "var(--sp-3)" }}>
               {t("konten.anlegen.zuordnenHinweis")}
             </div>
             {bankkonten.map((k) => {
               const wahl = wahlen[k.schluessel] ?? { ziel: "ignorieren" as const };
               return (
                 <div key={k.schluessel} style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-3) 0" }}>
-                  <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
+                  <Zeile ausrichtung="baseline">
                     <strong>{k.bezeichnung}</strong>
-                    <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                    <span className="hinweis">
                       {k.iban ?? k.nummer}
                     </span>
                     {salden[k.schluessel] !== undefined && (
@@ -446,9 +450,9 @@ export function KontoAnlegenModal({
                       </Pill>
                     )}
                     {!k.kannUmsaetze && <Pill variant="warn">{t("bankabruf.nichtAdressierbar")}</Pill>}
-                  </div>
+                  </Zeile>
                   {k.hinweis && (
-                    <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-1) 0" }}>
+                    <div className="hinweis" style={{ margin: "var(--sp-1) 0" }}>
                       {k.hinweis}
                     </div>
                   )}
@@ -481,7 +485,7 @@ export function KontoAnlegenModal({
                 </div>
               );
             })}
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+            <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
               {t("konten.anlegen.saldoHinweis")}
             </div>
           </>

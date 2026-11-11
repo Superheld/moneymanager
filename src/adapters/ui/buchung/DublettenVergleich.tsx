@@ -141,9 +141,9 @@ export function DublettenVergleich({
         <>
           <Button variant="ghost" onClick={onClose}>{t("konten.abbrechen")}</Button>
           {beideMitUmsatz && (
-            <button className="linkbtn" disabled={busy} onClick={() => keinDuplikat()}>
+            <Button variant="link" disabled={busy} onClick={() => keinDuplikat()}>
               {t("konten.dublette.keinDuplikat")}
-            </button>
+            </Button>
           )}
           {fehler && <span className="err">{fehler}</span>}
         </>
@@ -168,7 +168,7 @@ export function DublettenVergleich({
       <div style={{ display: "grid", gridTemplateColumns: "minmax(9rem, 1fr) 1fr 1fr", gap: "var(--sp-2) var(--sp-3)", alignItems: "baseline", marginBottom: "var(--sp-3)" }}>
         <span />
         {[links, rechts].map((s, i) => (
-          <span key={i} className="num" style={{ fontWeight: 700, fontSize: "var(--fs-lg)", color: geldFarbe(s.buchung.betrag) }}>
+          <span key={i} className="num" style={{ fontWeight: 700, fontSize: "var(--fs-h3)", color: geldFarbe(s.buchung.betrag) }}>
             {geld.formatMitSymbol(s.buchung.betrag, { mitVorzeichen: true })}
           </span>
         ))}
@@ -193,19 +193,18 @@ export function DublettenVergleich({
       <div style={{ display: "grid", gridTemplateColumns: "minmax(9rem, 1fr) 1fr 1fr", gap: "var(--sp-3)", marginTop: "var(--sp-4)" }}>
         <span />
         {[links, rechts].map((s, i) => (
-          <button
+          <Button variant="link"
             key={i}
-            className="linkbtn"
             disabled={busy}
             style={{ color: "var(--warn-deep)", textAlign: "left" }}
             onClick={() => wegDamit(s)}
           >
             {t(istBankzeile(s) ? "konten.vergleich.dieseVerwerfen" : "konten.vergleich.dieseLoeschen")}
-          </button>
+          </Button>
         ))}
       </div>
 
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+      <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
         {t("konten.vergleich.folge")}
       </div>
     </Modal>

@@ -15,9 +15,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Trans, useTranslation } from "react-i18next";
 import {
-  waehlbareKonten,
   hatZiel,
-  minorZuMajor,
   monatsRuecklage,
   type Ruecklage,
   type RuecklagenDeckung,
@@ -25,31 +23,25 @@ import {
   type Ruecklagensicht,
 } from "../../../application";
 import {
-  ruecklageAktualisieren,
-  ruecklageAnlegen,
-  ruecklageAusbuchen,
   ruecklageLoeschen,
   ruecklagen as ruecklagenLaden,
 } from "../../dienste";
-import { Button, Card, CoverageTrack, FormField, KPIStat, Pill } from "../bausteine";
-import { Auswahl } from "../bausteine/Auswahl";
-import { Datumsfeld } from "../bausteine/Datumsfeld";
+import { Button, Card, CoverageTrack, KPIStat, Pill } from "../bausteine";
 import { FaustformelTacho } from "./FaustformelTacho";
+import { RuecklageDialog } from "./RuecklageDialog";
+import { AusbuchungDialog } from "./AusbuchungDialog";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
-import { Modal } from "../bausteine/Modal";
-import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
+import { Stapel } from "../bausteine/Anordnung";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
 const LEERE_DECKUNG: RuecklagenDeckung = { posten: [], soll: 0, sollMitKonto: 0, tatsaechlich: 0, grad: 100 };
 const LEERE_LISTE: readonly never[] = [];
 const LEERER_FLUSS: Ruecklagenfluss = { bedarf: 0, plan: 0, ist: 0, posten: [] };
-
-/** Die beiden Formen einer Rücklage — die Wahl im Dialog, nicht im Datenmodell. */
-type Form = "ziel" | "rate";
 
 function heuteIso(): string {
   const n = new Date();
@@ -65,25 +57,10 @@ export function RuecklagenScreen() {
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Ruecklagensicht | null>(null);
 
-  // Anlegen/Bearbeiten
-  const [offen, setOffen] = useState(false);
-  const [editId, setEditId] = useState<string | null>(null);
-  const [form, setForm] = useState<Form>("ziel");
-  const [bezeichnung, setBezeichnung] = useState("");
-  const [ziel, setZiel] = useState("");
-  const [fristMonate, setFristMonate] = useState("");
-  const [rate, setRate] = useState("");
-  const [beginn, setBeginn] = useState(heute);
-  const [kontoId, setKontoId] = useState("");
-  const [fehler, setFehler] = useState<string | null>(null);
-
-  // Ausbuchen
-  const [ausItem, setAusItem] = useState<Ruecklage | null>(null);
-  const [ausDatum, setAusDatum] = useState(heute);
-  const [ausBetrag, setAusBetrag] = useState("");
-  const [ausBuchungId, setAusBuchungId] = useState("");
-  const [ausZiel, setAusZiel] = useState("");
-  const [ausFehler, setAusFehler] = useState<string | null>(null);
+  // Welcher Dialog offen ist — sein Zustand gehört ihm (`RuecklageDialog`,
+  // `AusbuchungDialog`), der Screen merkt sich nur, für welche Rücklage.
+  const [bearbeitet, setBearbeitet] = useState<Ruecklage | "neu" | null>(null);
+  const [ausbuchen, setAusbuchen] = useState<Ruecklage | null>(null);
 
   // Verwandte Repos in EINEM Zug laden und zusammen setzen: gestaffelte setState lassen
   // die Deckung kurz gegen eine leere Kontenliste rechnen (jeder Stand wäre dann 0).
@@ -104,76 +81,9 @@ export function RuecklagenScreen() {
   const buchungswahl = sicht?.buchungswahl ?? LEERE_LISTE;
   const fluss = sicht?.fluss ?? LEERER_FLUSS;
 
-  function neu() {
-    setEditId(null);
-    setForm("ziel");
-    setBezeichnung("");
-    setZiel("");
-    setFristMonate("");
-    setRate("");
-    setBeginn(heute);
-    setKontoId("");
-    setFehler(null);
-    setOffen(true);
-  }
-  function bearbeiten(r: Ruecklage) {
-    neu();
-    setEditId(r.id);
-    setForm(hatZiel(r) ? "ziel" : "rate");
-    setBezeichnung(r.bezeichnung);
-    setZiel(r.ziel == null ? "" : String(minorZuMajor(r.ziel, geld.waehrung)));
-    setFristMonate(r.fristMonate == null ? "" : String(r.fristMonate));
-    setRate(r.rate == null ? "" : String(minorZuMajor(r.rate, geld.waehrung)));
-    setBeginn(r.beginn);
-    setKontoId(r.kontoId ?? "");
-  }
-  async function speichern() {
-    setFehler(null);
-    // Nur die Felder DER GEWÄHLTEN FORM gehen mit. Sonst schickte ein Formularwechsel
-    // beides los, und der Use-Case wiese es als Widerspruch ab — mit einer Meldung über
-    // ein Feld, das gerade gar nicht zu sehen ist.
-    const eingabe = {
-      bezeichnung,
-      ziel: form === "ziel" ? (geld.parse(ziel) ?? 0) : undefined,
-      fristMonate: form === "ziel" ? Number(fristMonate) || 0 : undefined,
-      rate: form === "rate" ? (geld.parse(rate) ?? 0) : undefined,
-      beginn,
-      kontoId: kontoId || undefined,
-    };
-    try {
-      if (editId) await ruecklageAktualisieren(editId, eingabe);
-      else await ruecklageAnlegen(eingabe);
-      setOffen(false);
-      await laden();
-    } catch (e) {
-      setFehler(fehlerNachricht(t, e));
-    }
-  }
-
-  function ausbuchenOeffnen(r: Ruecklage) {
-    setAusItem(r);
-    setAusDatum(heute);
-    setAusBetrag("");
-    setAusBuchungId("");
-    setAusZiel(r.ziel == null ? "" : String(minorZuMajor(r.ziel, geld.waehrung)));
-    setAusFehler(null);
-  }
-  async function ausbuchenSpeichern() {
-    if (!ausItem) return;
-    setAusFehler(null);
-    try {
-      await ruecklageAusbuchen(ausItem, {
-        datum: ausDatum,
-        betrag: geld.parse(ausBetrag) ?? undefined,
-        istbuchungId: ausBuchungId || undefined,
-        ziel: hatZiel(ausItem) ? (geld.parse(ausZiel) ?? undefined) : undefined,
-      });
-      setAusItem(null);
-      await laden();
-    } catch (e) {
-      setAusFehler(fehlerNachricht(t, e));
-    }
-  }
+  const neu = () => setBearbeitet("neu");
+  const bearbeiten = (r: Ruecklage) => setBearbeitet(r);
+  const ausbuchenOeffnen = (r: Ruecklage) => setAusbuchen(r);
 
   return (
     <div className="screen">
@@ -229,12 +139,12 @@ export function RuecklagenScreen() {
                 />
               </div>
               {fluss.plan === 0 && fluss.bedarf > 0 && (
-                <div className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-2)" }}>
+                <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
                   {t("ruecklagen.flussOhnePlan")}
                 </div>
               )}
               {fluss.posten.length === 0 ? (
-                <div className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-3)" }}>
+                <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-3)" }}>
                   {t("ruecklagen.flussKeineBuchung")}
                 </div>
               ) : (
@@ -243,7 +153,7 @@ export function RuecklagenScreen() {
                     <div
                       key={p.buchungId}
                       style={{
-                        display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: "12.5px",
+                        display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: "var(--fs-ui)",
                         borderTop: i === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
                       }}
                     >
@@ -282,7 +192,7 @@ export function RuecklagenScreen() {
       {items.length > 0 && deckung.sollMitKonto === 0 && (
         // Ohne Kontozuordnung gibt es nur die Rechnung. Das einmal sagen, statt überall
         // ein „—" zu zeigen, hinter dem man einen Fehler vermutet.
-        <div className="muted" style={{ fontSize: "var(--fs-small)", margin: "0 0 var(--sp-3)" }}>
+        <div className="muted" style={{ fontSize: "var(--fs-sm)", margin: "0 0 var(--sp-3)" }}>
           {t("ruecklagen.hinweisOhneKonto")}
         </div>
       )}
@@ -291,7 +201,7 @@ export function RuecklagenScreen() {
         {items.length === 0 ? (
           <div className="muted">{t("ruecklagen.leer")}</div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
+          <Stapel abstand={5}>
             {deckung.posten.map((p, idx) => {
               const r = p.ruecklage;
               const mitZiel = hatZiel(r);
@@ -338,7 +248,7 @@ export function RuecklagenScreen() {
                       right={`${geld.format(p.soll)} / ${geld.format(r.ziel as number)} ${geld.symbol}`}
                     />
                   ) : (
-                    <div className="muted" style={{ fontSize: "var(--fs-small)" }}>
+                    <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>
                       {t("ruecklagen.freiAufgelaufen", { betrag: `${geld.format(p.soll)} ${geld.symbol}` })}
                     </div>
                   )}
@@ -361,7 +271,7 @@ export function RuecklagenScreen() {
                 </div>
               );
             })}
-          </div>
+          </Stapel>
         )}
       </Card>
 
@@ -370,7 +280,7 @@ export function RuecklagenScreen() {
           gerade dasteht. */}
       {(sicht?.ausbuchungen.length ?? 0) > 0 && (
         <Card title={t("ruecklagen.ausbuchungenTitel")} subtitle={t("ruecklagen.ausbuchungenUntertitel")}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+          <Stapel abstand={2}>
             {sicht?.ausbuchungen.map((a) => (
               <div key={a.id} style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap" }}>
                 <span>
@@ -382,105 +292,27 @@ export function RuecklagenScreen() {
                 </span>
               </div>
             ))}
-          </div>
+          </Stapel>
         </Card>
       )}
 
-      {offen && (
-        <Modal
-          title={editId ? t("ruecklagen.modalBearbeiten") : t("ruecklagen.modalAnlegen")}
-          subtitle={t("ruecklagen.modalUntertitel")}
-          onClose={() => setOffen(false)}
-          footer={<><Button variant="primary" onClick={speichern}>{t("ruecklagen.speichern")}</Button><button className="linkbtn" onClick={() => setOffen(false)}>{t("ruecklagen.abbrechen")}</button>{fehler && <span className="err">{fehler}</span>}</>}
-        >
-          <div className="form-grid">
-            <FormField label={t("ruecklagen.feldBezeichnung")} required>
-              <input className="field" value={bezeichnung} onChange={(e) => setBezeichnung(e.target.value)} placeholder={t("ruecklagen.feldBezeichnungPlatzhalter")} />
-            </FormField>
-
-            {/* Die Form ist eine Wahl mit zwei sichtbaren Möglichkeiten und kein
-                Kästchen: „hat ein Ziel" beantwortet die Frage nur in einer Richtung,
-                und die andere Form müsste man erraten. */}
-            <FormField label={t("ruecklagen.feldForm")} hint={t(`ruecklagen.formHinweis.${form}`)}>
-              <Auswahl
-                ariaLabel={t("ruecklagen.feldForm")}
-                wert={form}
-                aufAenderung={(v) => setForm(v as Form)}
-                optionen={[
-                  { wert: "ziel", text: t("ruecklagen.form.ziel") },
-                  { wert: "rate", text: t("ruecklagen.form.rate") },
-                ]}
-              />
-            </FormField>
-
-            {form === "ziel" ? (
-              <>
-                <FormField label={`${t("ruecklagen.feldZiel")} ${geld.symbol}`} required hint={t("ruecklagen.feldZielHinweis")}>
-                  <input className="field" inputMode="decimal" value={ziel} onChange={(e) => setZiel(e.target.value)} placeholder={geld.format(0)} />
-                </FormField>
-                <FormField label={t("ruecklagen.feldFrist")} required hint={t("ruecklagen.feldFristHinweis")}>
-                  <input className="field" inputMode="numeric" value={fristMonate} onChange={(e) => setFristMonate(e.target.value)} placeholder="96" />
-                </FormField>
-              </>
-            ) : (
-              <FormField label={`${t("ruecklagen.feldRate")} ${geld.symbol}`} required hint={t("ruecklagen.feldRateHinweis")}>
-                <input className="field" inputMode="decimal" value={rate} onChange={(e) => setRate(e.target.value)} placeholder={geld.format(0)} />
-              </FormField>
-            )}
-
-            <FormField label={t("ruecklagen.feldBeginn")}>
-              <Datumsfeld ariaLabel={t("ruecklagen.feldBeginn")} wert={beginn} aufAenderung={setBeginn} />
-            </FormField>
-            <FormField label={t("ruecklagen.feldKonto")} hint={t("ruecklagen.feldKontoHinweis")}>
-              <Auswahl
-                ariaLabel={t("ruecklagen.feldKonto")}
-                wert={kontoId}
-                aufAenderung={setKontoId}
-                optionen={[{ wert: "", text: t("ruecklagen.kontoKeins") }, ...waehlbareKonten(konten, kontoId).map((k) => ({ wert: k.id, text: k.bezeichnung }))]}
-              />
-            </FormField>
-          </div>
-        </Modal>
+      {bearbeitet && (
+        <RuecklageDialog
+          ruecklage={bearbeitet === "neu" ? null : bearbeitet}
+          heute={heute}
+          konten={konten}
+          onClose={() => setBearbeitet(null)}
+          onGespeichert={async () => { setBearbeitet(null); await laden(); }}
+        />
       )}
-
-      {ausItem && (
-        <Modal
-          title={t("ruecklagen.modalAusbuchen")}
-          subtitle={`${ausItem.bezeichnung} · ${t(hatZiel(ausItem) ? "ruecklagen.ausbuchenNeustart" : "ruecklagen.ausbuchenEnde")}`}
-          onClose={() => setAusItem(null)}
-          footer={<><Button variant="primary" onClick={ausbuchenSpeichern}>{t("ruecklagen.speichern")}</Button><button className="linkbtn" onClick={() => setAusItem(null)}>{t("ruecklagen.abbrechen")}</button>{ausFehler && <span className="err">{ausFehler}</span>}</>}
-        >
-          <div className="form-grid">
-            <FormField label={t("ruecklagen.feldAusDatum")} required>
-              <Datumsfeld ariaLabel={t("ruecklagen.feldAusDatum")} wert={ausDatum} aufAenderung={setAusDatum} />
-            </FormField>
-            <FormField label={`${t("ruecklagen.feldAusBetrag")} ${geld.symbol}`}>
-              <input className="field" inputMode="decimal" value={ausBetrag} onChange={(e) => setAusBetrag(e.target.value)} placeholder={geld.format(0)} />
-            </FormField>
-            {/* Die Verknüpfung leistet zweierlei: sie hält fest, wofür die Rücklage
-                draufging, UND sie nimmt die Ausgabe aus der Budgetbewertung. Deshalb
-                steht der zweite Teil im Hinweis — sonst überrascht er später. */}
-            <FormField label={t("ruecklagen.feldAusBuchung")} hint={t("ruecklagen.feldAusBuchungHinweis")}>
-              <Auswahl
-                ariaLabel={t("ruecklagen.feldAusBuchung")}
-                wert={ausBuchungId}
-                aufAenderung={setAusBuchungId}
-                optionen={[
-                  { wert: "", text: t("ruecklagen.buchungKeine") },
-                  ...buchungswahl.map((b) => ({
-                    wert: b.id,
-                    text: `${b.datum} · ${geld.format(b.betrag)} ${geld.symbol}${b.bezeichnung ? ` · ${b.bezeichnung}` : ""}`,
-                  })),
-                ]}
-              />
-            </FormField>
-            {hatZiel(ausItem) && (
-              <FormField label={`${t("ruecklagen.feldZiel")} ${geld.symbol}`} hint={t("ruecklagen.feldNeuesZielHinweis")}>
-                <input className="field" inputMode="decimal" value={ausZiel} onChange={(e) => setAusZiel(e.target.value)} placeholder={geld.format(0)} />
-              </FormField>
-            )}
-          </div>
-        </Modal>
+      {ausbuchen && (
+        <AusbuchungDialog
+          ruecklage={ausbuchen}
+          heute={heute}
+          buchungswahl={buchungswahl}
+          onClose={() => setAusbuchen(null)}
+          onGespeichert={async () => { setAusbuchen(null); await laden(); }}
+        />
       )}
       {loeschfrage.dialog}
 

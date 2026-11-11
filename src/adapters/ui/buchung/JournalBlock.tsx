@@ -126,11 +126,11 @@ export function JournalBlock({
           {eintraege.length === 0 ? (
             /* Der Bestand vor dem 23.08.2026. Kein Fehler, sondern eine Auskunft — und
                ohne sie stünde hier eine leere Fläche, die nach einem Fehler aussieht. */
-            <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.journal.leer")}</div>
+            <div className="hinweis">{t("konten.journal.leer")}</div>
           ) : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {eintraege.map((e: Journaleintrag) => (
-                <li key={e.id} style={{ display: "flex", gap: "var(--sp-3)", padding: "3px 0", fontSize: 13 }}>
+                <li key={e.id} style={{ display: "flex", gap: "var(--sp-3)", padding: "3px 0", fontSize: "var(--fs-tabelle)" }}>
                   <span className="muted" style={{ flex: "0 0 34%", fontSize: "var(--fs-xs)" }}>
                     {zeitpunkt(e.zeitpunkt, i18n.language)}
                   </span>
@@ -147,12 +147,12 @@ export function JournalBlock({
             // ohne Zusammenhang („Haushalt", „Werkzeug") und wiederholen sich anderswo im
             // Dialog. Ein Screenreader liest sie sonst als Fortsetzung des Formulars.
             <div role="group" aria-label={t("konten.journal.seitEntstehung")} style={{ marginTop: "var(--sp-3)" }}>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 4 }}>
+              <div className="hinweis" style={{ marginBottom: 4 }}>
                 {t("konten.journal.seitEntstehung")}
               </div>
               {abweichungen.map((feld) => (
-                <div key={feld} style={{ display: "flex", gap: "var(--sp-2)", padding: "3px 0", fontSize: 13, alignItems: "baseline" }}>
-                  <span style={{ flex: "0 0 34%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>
+                <div key={feld} style={{ display: "flex", gap: "var(--sp-2)", padding: "3px 0", fontSize: "var(--fs-tabelle)", alignItems: "baseline" }}>
+                  <span className="hinweis" style={{ flex: "0 0 34%", fontWeight: "var(--fw-semi)" }}>
                     {t(`konten.journal.feld.${feld}`)}
                   </span>
                   <span className="muted" style={{ textDecoration: "line-through" }}>{feldWert(urzustand, feld, hilfe)}</span>
@@ -165,13 +165,13 @@ export function JournalBlock({
 
           <div style={{ marginTop: "var(--sp-3)" }}>
             {rueckweg.moeglich && !fragt && (
-              <button className="linkbtn" onClick={() => { setFehler(null); setFragt(true); }}>
+              <Button variant="link" onClick={() => { setFehler(null); setFragt(true); }}>
                 {t("konten.journal.zuruecksetzen")}
-              </button>
+              </Button>
             )}
             {rueckweg.moeglich && fragt && (
               <div>
-                <p style={{ margin: "0 0 var(--sp-2)", fontSize: 13 }}>{t("konten.journal.frage")}</p>
+                <p style={{ margin: "0 0 var(--sp-2)", fontSize: "var(--fs-tabelle)" }}>{t("konten.journal.frage")}</p>
                 {/* `Button` kennt kein `disabled` (Design-System, dort wird nichts
                     erfunden) — während des Schreibens verschwindet er deshalb. */}
                 {!laeuft && (
@@ -180,18 +180,18 @@ export function JournalBlock({
                   </Button>
                 )}
                 {laeuft && <span className="muted">{t("konten.journal.laeuft")}</span>}
-                <button className="linkbtn" style={{ marginLeft: "var(--sp-3)" }} onClick={() => setFragt(false)} disabled={laeuft}>
+                <Button variant="link" style={{ marginLeft: "var(--sp-3)" }} onClick={() => setFragt(false)} disabled={laeuft}>
                   {t("konten.journal.abbrechen")}
-                </button>
+                </Button>
               </div>
             )}
             {/* Warum nicht — statt eines fehlenden Knopfes ohne Erklärung. */}
             {!rueckweg.moeglich && (
-              <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              <div className="hinweis">
                 {t(`konten.journal.zu.${rueckweg.grund}`)}
               </div>
             )}
-            {fehler && <div className="err" style={{ marginTop: "var(--sp-2)", fontSize: 13 }}>{fehler}</div>}
+            {fehler && <div className="err" style={{ marginTop: "var(--sp-2)", fontSize: "var(--fs-tabelle)" }}>{fehler}</div>}
           </div>
     </Klappblock>
   );

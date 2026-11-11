@@ -69,6 +69,9 @@ import { PageHead } from "../bausteine/PageHead";
 import { VermoegenKarte } from "./VermoegenKarte";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { fehlerMelden } from "../bausteine/Meldungen";
+import { Stapel } from "../bausteine/Anordnung";
 
 function heuteIso(): string {
   const n = new Date();
@@ -122,14 +125,14 @@ export function UebersichtScreen() {
     }
     abrufstand(heute)
       .then(setAbruf)
-      .catch(() => setAbruf(null));
+      .catch((e) => { fehlerMelden(e); setAbruf(null); });
   }
 
   useEffect(() => {
     laden();
     depots()
       .then(setDepotdaten)
-      .catch(() => setDepotdaten(null));
+      .catch((e) => { fehlerMelden(e); setDepotdaten(null); });
   }, [heute]);
 
   /**
@@ -221,35 +224,34 @@ export function UebersichtScreen() {
             // Monatlich und aufbauend getrennt — je Zeile nach der Art des Budgets
             // (siehe `nachArtGetrennt`). Die Zwischenüberschrift steht nur, wenn es
             // beide Arten gibt: über einer einzigen Liste sagte sie nichts.
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
+            <Stapel abstand={5}>
               {gruppen.map(([art, rows]) => (
                 <div key={art}>
                   {gruppen.length > 1 && (
-                    <div className="muted" style={{ fontSize: "var(--fs-small)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
+                    <div className="muted" style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
                       {t(art === "monatlich" ? "budgets.abschnittMonatlich" : "budgets.abschnittAufbauend")}
                       {" · "}
                       {t(art === "monatlich" ? "budgets.abschnittMonatlichHinweis" : "budgets.abschnittAufbauendHinweis")}
                     </div>
                   )}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
+                  <Stapel abstand={4}>
               {rows.map((z) => {
                     const offen = offenesBudget === z.budget.id;
                     const name = z.kategorieName;
                     return (
-                      <div key={z.budget.id} style={{ paddingLeft: z.tiefe * 18 }}>
+                      <Collapsible.Root
+                        key={z.budget.id}
+                        open={offen}
+                        onOpenChange={(auf) => setOffenesBudget(auf ? z.budget.id : null)}
+                        style={{ paddingLeft: z.tiefe * 18 }}
+                      >
                         {/* Die ganze Kopfzeile ist der Schalter: der Balken darunter gehört
                             zur selben Aussage, und ein eigener Pfeil-Knopf daneben wäre ein
                             zweites Ziel für dieselbe Geste. */}
-                        <div
-                          role="button"
-                          tabIndex={0}
-                          aria-expanded={offen}
+                        <Collapsible.Trigger
+                          nativeButton={false}
+                          render={<div />}
                           aria-label={t("uebersicht.budgetAufklappen", { name })}
-                          onClick={() => setOffenesBudget(offen ? null : z.budget.id)}
-                          onKeyDown={(e) =>
-                            (e.key === "Enter" || e.key === " ") &&
-                            (e.preventDefault(), setOffenesBudget(offen ? null : z.budget.id))
-                          }
                           style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--sp-3)", marginBottom: 4, cursor: "pointer" }}
                         >
                           {/* Schmal wird es zuerst hier eng. Der NAME ist der einzige Teil, der
@@ -290,15 +292,16 @@ export function UebersichtScreen() {
                             </span>
                             {z.budget.art === "aufbauend" && !z.monat.ohnePlan && <BudgetFortschreibung monat={z.monat} />}
                           </span>
-                        </div>
+                        </Collapsible.Trigger>
                         <CoverageTrack
+                          name={name}
                           value={Math.max(0, z.monat.verbraucht)}
                           max={Math.max(1, z.monat.verfuegbar)}
                           over={!z.monat.ohnePlan && z.rest < 0}
                           label=""
                           right=""
                         />
-                        {offen && (
+                        <Collapsible.Panel>
                           <BudgetPostenliste
                             // Schmale Karte: sie steht neben einer zweiten, die beim
                             // Aufklappen mitwächst (siehe bausteine/aufklappen.ts).
@@ -309,14 +312,14 @@ export function UebersichtScreen() {
                             verbraucht={z.monat.verbraucht}
                             onBuchung={setDetail}
                           />
-                        )}
-                      </div>
+                        </Collapsible.Panel>
+                      </Collapsible.Root>
                     );
               })}
-                  </div>
+                  </Stapel>
                 </div>
               ))}
-            </div>
+            </Stapel>
           )}
         </Card>
       )}

@@ -25,7 +25,7 @@ import {
 import type { Merkmalsansicht } from "../../../application/kategorien/merkmalskonfiguration";
 import type { Umsatz } from "../../../application/import";
 import { merkmaleZuBuchung, wortFreigeben, wortSperren } from "../../dienste";
-import { Pill } from "../bausteine";
+import { Pill, Button } from "../bausteine";
 import { ErklaerungsTafel } from "./ErklaerungsTafel";
 import { Klappblock } from "../bausteine/Klappblock";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
@@ -126,14 +126,14 @@ export function MerkmaleBlock({
               ) : (
                 <>
                   <div style={{ fontWeight: "var(--fw-bold)" }}>{t("konten.merkmale.verwendet")}</div>
-                  <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-2)" }}>
+                  <div className="hinweis" style={{ marginBottom: "var(--sp-2)" }}>
                     {t("konten.merkmale.verwendetHinweis")}
                   </div>
                   <div style={{ display: "grid", gap: 4 }}>
                     {stand.verwendet.map(({ merkmal, wert }) => (
                       <div key={merkmal} style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
                         <span style={{ fontWeight: "var(--fw-semi)", minWidth: "16ch" }}>{merkmal}</span>
-                        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                        <span className="hinweis">
                           {wert
                             ? t("konten.merkmale.belege", {
                                 belege: zahl(wert.belege),
@@ -142,8 +142,7 @@ export function MerkmaleBlock({
                               })
                             : t("konten.merkmale.nurEinmal")}
                         </span>
-                        <button
-                          className="linkbtn"
+                        <Button variant="link"
                           onClick={() =>
                             aendern(
                               wortSperren(
@@ -154,7 +153,7 @@ export function MerkmaleBlock({
                           }
                         >
                           {t("konten.merkmale.ausschliessen")}
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -164,7 +163,7 @@ export function MerkmaleBlock({
               {stand.verworfen.length > 0 && (
                 <div style={{ marginTop: "var(--sp-4)" }}>
                   <div style={{ fontWeight: "var(--fw-bold)" }}>{t("konten.merkmale.verworfen")}</div>
-                  <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-2)" }}>
+                  <div className="hinweis" style={{ marginBottom: "var(--sp-2)" }}>
                     {t("konten.merkmale.verworfenHinweis")}
                   </div>
                   <div style={{ display: "grid", gap: 4 }}>
@@ -172,7 +171,7 @@ export function MerkmaleBlock({
                       <div key={`${v.herkunft}-${v.wort}-${i}`} style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
                         <span style={{ minWidth: "16ch" }}>{v.wort}</span>
                         <Pill>{t(`einstellungen.lernmaterial.verwurf.${v.grund}`)}</Pill>
-                        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                        <span className="hinweis">
                           {t(`einstellungen.lernmaterial.herkunft.${v.herkunft}`)}
                         </span>
                         {/* Zurückholen geht nur bei Listeneinträgen — was der Code als
@@ -184,9 +183,9 @@ export function MerkmaleBlock({
                             der Liste des Trainingsbereichs löschte derselbe Griff eine
                             Zeile, die es nicht gibt: ohne Fehler und ohne Wirkung. */}
                         {v.grund === "ausgeschlossen" && v.listenform && stand.ausgeschlossen.has(v.listenform) && (
-                          <button className="linkbtn" onClick={() => aendern(wortFreigeben(v.listenform!))}>
+                          <Button variant="link" onClick={() => aendern(wortFreigeben(v.listenform!))}>
                             {t("konten.merkmale.zulassen")}
-                          </button>
+                          </Button>
                         )}
                       </div>
                     ))}

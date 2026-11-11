@@ -298,7 +298,7 @@ export function BudgetsScreen() {
               .filter(([, rows]) => rows.length > 0)
               .map(([art, rows]) => (
                 <section key={art} style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "var(--fs-small)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
+                  <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
                     {t(art === "monatlich" ? "budgets.abschnittMonatlich" : "budgets.abschnittAufbauend")}
                     <span className="muted" style={{ fontWeight: "var(--fw-regular)" }}>
                       {" · "}
@@ -371,7 +371,7 @@ export function BudgetsScreen() {
                         render: (z: GruppierterStand) => (
                           <span style={{ display: "block", minWidth: 80 }}>
                             <span className="num">{geld.format(z.monat.verbraucht)}</span>
-                            <CoverageTrack value={Math.max(0, z.monat.verbraucht)} max={Math.max(1, z.monat.verfuegbar)} over={z.rest < 0} label="" right="" style={{ marginTop: 4 }} />
+                            <CoverageTrack name={z.kategorieName} value={Math.max(0, z.monat.verbraucht)} max={Math.max(1, z.monat.verfuegbar)} over={z.rest < 0} label="" right="" style={{ marginTop: 4 }} />
                           </span>
                         ),
                       },
@@ -458,7 +458,7 @@ export function BudgetsScreen() {
           title={t("budgets.vorschlaegeTitel")}
           subtitle={t("budgets.vorschlaegeUntertitel", { count: vorschlaege.length })}
         >
-          <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
+          <p className="muted" style={{ fontSize: "var(--fs-sm)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
             {t("budgets.vorschlaegeHinweis")}
           </p>
           <DataTable
@@ -549,9 +549,9 @@ export function BudgetsScreen() {
               <Button variant="primary" onClick={speichern}>
                 {t("budgets.speichern")}
               </Button>
-              <button className="linkbtn" onClick={() => setOffen(false)}>
+              <Button variant="link" onClick={() => setOffen(false)}>
                 {t("budgets.abbrechen")}
-              </button>
+              </Button>
               {fehler && <span className="err">{fehler}</span>}
             </>
           }
@@ -604,7 +604,7 @@ export function BudgetsScreen() {
                   return (
                     <div
                       key={v.abMonat}
-                      style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent", fontSize: "12.5px" }}
+                      style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: aktiv ? "var(--accent-soft)" : "transparent", fontSize: "var(--fs-ui)" }}
                     >
                       <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
                         {t("budgets.versionAb", { monat: v.abMonat })}
@@ -630,9 +630,9 @@ export function BudgetsScreen() {
                 })}
                 {/* Zurück auf „ab jetzt", wenn gerade eine alte Version im Feld steht. */}
                 {!bearbeitetesBudget.betraege.some((v) => v.abMonat === zielMonat) ? null : zielMonat !== heute.slice(0, 7) && (
-                  <button className="linkbtn" type="button" onClick={() => setZielMonat(heute.slice(0, 7))}>
+                  <Button variant="link" type="button" onClick={() => setZielMonat(heute.slice(0, 7))}>
                     {t("budgets.wiederAbLaufend", { monat: heute.slice(0, 7) })}
-                  </button>
+                  </Button>
                 )}
               </div>
             )}

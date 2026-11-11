@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import type { Kategorie } from "../../../application";
 import { stammdaten } from "../../dienste";
 import { KategorisierungCards } from "./KategorisierungCards";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 export function TrainingBereich() {
   const [kategorien, setKategorien] = useState<Kategorie[]>([]);
@@ -16,7 +17,7 @@ export function TrainingBereich() {
   useEffect(() => {
     stammdaten()
       .then((d) => setKategorien([...d.kategorien]))
-      .catch(() => setKategorien([])); // reiner Browser-Modus ohne SQLite
+      .catch((e) => { fehlerMelden(e); setKategorien([]); });
   }, []);
 
   return <KategorisierungCards kategorien={kategorien} />;

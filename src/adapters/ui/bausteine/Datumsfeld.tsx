@@ -32,6 +32,8 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Popover } from "@base-ui/react/popover";
+import { Button } from "./Button";
+import { Button as BaseButton } from "@base-ui/react/button";
 
 /** Wieviele Tage der Monat hat. Tag 0 des Folgemonats IST der letzte dieses Monats. */
 function tageImMonat(jahr: number, monat: number): number {
@@ -351,25 +353,25 @@ export function Datumsfeld({
         <Popover.Positioner className="datumsfeld-positioner" sideOffset={4} align="start">
           <Popover.Popup className="datumsfeld-popup">
             <div className="datumsfeld-kopf">
-              <button
+              <BaseButton
                 type="button"
                 className="datumsfeld-pfeil"
                 aria-label={t("datum.vorherigerMonat")}
                 onClick={() => setBlatt(plusMonate(blatt.jahr, blatt.monat, 1, -1))}
               >
                 ‹
-              </button>
+              </BaseButton>
               {/* `aria-live`, damit das Blättern per Tastatur auch angesagt wird — sonst
                   wandert der Monat lautlos weiter. */}
               <span className="datumsfeld-monat" aria-live="polite">{monatsTitel}</span>
-              <button
+              <BaseButton
                 type="button"
                 className="datumsfeld-pfeil"
                 aria-label={t("datum.naechsterMonat")}
                 onClick={() => setBlatt(plusMonate(blatt.jahr, blatt.monat, 1, 1))}
               >
                 ›
-              </button>
+              </BaseButton>
             </div>
 
             <div
@@ -394,7 +396,7 @@ export function Datumsfeld({
                 const istHeute =
                   !!heuteWert && heuteWert.jahr === blatt.jahr && heuteWert.monat === blatt.monat && heuteWert.tag === tag;
                 return (
-                  <button
+                  <BaseButton
                     key={tag}
                     type="button"
                     role="gridcell"
@@ -407,15 +409,14 @@ export function Datumsfeld({
                     onClick={() => waehle(tag)}
                   >
                     {tag}
-                  </button>
+                  </BaseButton>
                 );
               })}
             </div>
 
             <div className="datumsfeld-fuss">
-              <button
+              <Button variant="link"
                 type="button"
-                className="linkbtn"
                 onClick={() => {
                   if (!heuteWert) return;
                   aufAenderung(iso(heuteWert.jahr, heuteWert.monat, heuteWert.tag));
@@ -423,20 +424,19 @@ export function Datumsfeld({
                 }}
               >
                 {t("datum.heute")}
-              </button>
+              </Button>
               {/* Leeren geht nur, wenn etwas drinsteht — ein Knopf, der nichts tut, ist
                   eine Frage ohne Antwort. */}
               {wert ? (
-                <button
+                <Button variant="link"
                   type="button"
-                  className="linkbtn"
                   onClick={() => {
                     aufAenderung("");
                     setOffen(false);
                   }}
                 >
                   {t("datum.leeren")}
-                </button>
+                </Button>
               ) : null}
             </div>
           </Popover.Popup>

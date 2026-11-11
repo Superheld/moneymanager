@@ -12,6 +12,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import i18n from "../../../i18n/i18n";
 import { AppShell } from "./AppShell";
+import { Modal } from "./Modal";
 
 function baue(onNavigate: (id: string) => void = () => {}) {
   return render(
@@ -61,6 +62,25 @@ describe("AppShell — die Schublade", () => {
     await nutzer.keyboard("{Escape}");
 
     expect(leiste().dataset.offen).toBe("false");
+  });
+
+  it("bleibt offen, wenn Escape einem Dialog darueber galt", async () => {
+    // Der Eigenbau des Modals las `defaultPrevented`, setzte es aber nie: eine Escape
+    // schloss Dialog UND Schublade. Base UI verbraucht die Taste.
+    const nutzer = userEvent.setup();
+    const zu: string[] = [];
+    const { rerender } = baue();
+    await nutzer.click(griff());
+    rerender(
+      <AppShell current="uebersicht" onNavigate={(() => {}) as never}>
+        <Modal title="Darueber" onClose={() => zu.push("dialog")}>Inhalt</Modal>
+      </AppShell>,
+    );
+
+    await nutzer.keyboard("{Escape}");
+
+    expect(zu).toEqual(["dialog"]);
+    expect(leiste().dataset.offen).toBe("true");
   });
 
   it("schliesst ueber den Knopf in der Schublade und gibt den Fokus zurueck", async () => {

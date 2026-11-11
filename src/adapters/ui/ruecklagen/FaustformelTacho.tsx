@@ -68,7 +68,7 @@ export function FaustformelTacho({ stand, mindest }: { stand: number; mindest: n
           {prozent} %
         </text>
       </svg>
-      <div style={{ fontSize: "var(--fs-small)", textAlign: "center" }}>
+      <div style={{ fontSize: "var(--fs-sm)", textAlign: "center" }}>
         <div>
           <span className="num" style={{ fontWeight: "var(--fw-bold)" }}>{geld.formatMitSymbol(stand)}</span>{" "}
           <span className="muted">{t("ruecklagen.tachoVon", { mindest: geld.formatMitSymbol(mindest) })}</span>

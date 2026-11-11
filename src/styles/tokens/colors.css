@@ -31,6 +31,19 @@
   --ok-deep:      oklch(0.46 0.09 167);
   --ok-wash:      oklch(0.95 0.03 165);
 
+  /* --- seit 2026-11-10 ---
+     Vier Stellen benutzten Tokens, die es nicht gab, und liefen deshalb immer auf ihren
+     festen Rückfallwert: `--accent-soft` (die Fläche einer offenen Zeile), `--danger`
+     (der Rand einer Fehlerkarte). Die Werte hier sind genau diese Rückfallwerte — es
+     ändert sich nichts am Bildschirm, nur gibt es sie jetzt an EINER Stelle, und das
+     dunkle Schema kann sie umstellen. `tokens.test.ts` hält fest, dass das nicht
+     wieder passiert. */
+  --accent-soft:  rgba(20, 160, 160, 0.10);   /* Fläche einer offenen/aktiven Zeile */
+  --danger:       #c0392b;                    /* ein Fehler, nicht ein Engpass */
+  /* Schrift und Zeichen AUF einer Akzentfläche (Hauptknopf, Haken, gewählter Tag). Im
+     Hellen weiss; im Dunklen wird der Akzent heller, und dann trägt Weiss darauf nicht. */
+  --auf-akzent:   #fff;
+
   /* --- semantic aliases (use these in product code) --- */
   --bg-app:       var(--cream);
   --bg-card:      var(--surface);
@@ -47,4 +60,53 @@
   --umschichtung: var(--accent-deep); /* Sparen/Anlegen, kein Verbrauch */
   --ertrag:       var(--ok);
   --aufwand:      var(--ink-3);
+}
+
+/* ============================================================
+   DUNKEL — seit 2026-11-10, dem System folgend, ohne eigenen Schalter.
+
+   Die App läuft in einer WebView; ist das System dunkel, stand sie bis dahin trotzdem
+   hell da — der einzige helle Kasten auf dem Bildschirm. Die Farben lagen vollständig in
+   Tokens, deshalb ist das hier ein zweiter Satz derselben Namen und nichts sonst.
+
+   Drei Dinge, die anders laufen als „alles umkehren":
+   - Die `-deep`-Töne sind die für SCHRIFT. Auf dunklem Grund heisst das HELLER, nicht
+     dunkler — der Name sagt „lesbar auf der Fläche", nicht „dunkler als der Grundton".
+   - Die `-wash`-Flächen werden dunkle, leicht getönte Flächen statt heller Pastelle.
+   - `--auf-akzent` wird dunkel: der Akzent ist hier hell genug, dass Weiss darauf nicht
+     mehr trägt.
+
+   Ein Schalter in den Einstellungen wäre der nächste Schritt; er bräuchte nur ein
+   Attribut am Wurzelelement statt der Medienabfrage.
+   ============================================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --cream:        oklch(0.205 0.008 70);
+    --surface:      oklch(0.245 0.009 70);
+    --surface-2:    oklch(0.285 0.010 70);
+
+    --ink:          oklch(0.93 0.010 80);
+    --ink-2:        oklch(0.80 0.012 75);
+    --ink-3:        oklch(0.66 0.012 72);
+
+    --line:         oklch(0.35 0.010 70);
+    --line-soft:    oklch(0.30 0.009 70);
+
+    --accent:       oklch(0.70 0.10 175);
+    --accent-deep:  oklch(0.80 0.09 175);
+    --accent-wash:  oklch(0.31 0.035 175);
+
+    --warn:         oklch(0.72 0.13 50);
+    --warn-deep:    oklch(0.80 0.11 55);
+    --warn-wash:    oklch(0.32 0.045 50);
+    --ok:           oklch(0.70 0.10 165);
+    --ok-deep:      oklch(0.80 0.09 165);
+    --ok-wash:      oklch(0.31 0.035 165);
+
+    --accent-soft:  oklch(0.70 0.10 175 / 0.14);
+    --danger:       oklch(0.70 0.15 28);
+    --auf-akzent:   oklch(0.20 0.02 175);
+  }
 }

@@ -18,6 +18,7 @@ const halter = vi.hoisted(() => {
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import i18n from "../../../i18n/i18n";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { KontenVerwaltung } from "./KontenVerwaltung";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../../persistence/sqliteStammdatenRepositories";
@@ -289,6 +290,21 @@ describe("Zwei Fragen, zwei Antworten — Konto gegen Zugang", () => {
       expect(text).toContain("Aus Datei Vibora");
       expect(text).toContain("Aus Abruf Eins");
       expect(text).toContain("Aus fremdem Zugang");
+    });
+  });
+
+  it("grenzt unter dem Konto nach Quelle ein, wenn es mehrere gibt", async () => {
+    // Die Quellenwahl steht neben dem Statusfilter. Beim Umbau auf `Umschalter` war sie
+    // einmal mit weggeschnitten, und kein Test bemerkte es — jetzt einer.
+    await ausZweiQuellen();
+    rendere(<HerkunftBereich kontoId="k1" />);
+    const wahl = await screen.findByLabelText(i18n.t("konten.detail.herkunft"));
+    await userEvent.selectOptions(wahl, "finanzguru");
+
+    await waitFor(() => {
+      const text = document.body.textContent ?? "";
+      expect(text).toContain("Aus Datei Vibora");
+      expect(text).not.toContain("Aus Abruf Eins");
     });
   });
 

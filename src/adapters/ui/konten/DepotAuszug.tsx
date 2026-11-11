@@ -29,7 +29,7 @@ export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Dep
         <span>
           {p.name ?? p.kennung}
           {p.isin && (
-            <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-2)" }}>
+            <span className="hinweis" style={{ marginLeft: "var(--sp-2)" }}>
               {p.isin}
             </span>
           )}
@@ -70,7 +70,7 @@ export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Dep
           <span className={e.veraenderung < 0 ? "err" : undefined}>
             {geld.formatMitSymbol(e.veraenderung)}
             {e.anteil != null && (
-              <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-2)" }}>
+              <span className="hinweis" style={{ marginLeft: "var(--sp-2)" }}>
                 {prozent(e.anteil, 1)}
               </span>
             )}
@@ -81,7 +81,7 @@ export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Dep
   ];
 
   return (
-    <Card style={{ marginTop: "var(--gap-card)" }} pad>
+    <Card pad>
       <div style={{ marginBottom: "var(--sp-4)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <span style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>
@@ -115,7 +115,7 @@ export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Dep
         </div>
         {/* Der Stichtag gehört an die Zahl, nicht in eine Fussnote: ein Depotwert ohne
             Datum ist eine Behauptung ohne Zeitbezug. */}
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+        <div className="hinweis" style={{ marginTop: 6 }}>
           {sicht.aktuell
             ? t("depot.standErklaerung", { datum: datum.mitJahr(sicht.aktuell.stichtag) })
             : t("depot.nieAbgerufen")}
@@ -128,7 +128,7 @@ export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Dep
         <div className="muted">{t("depot.keinePositionen")}</div>
       )}
 
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+      <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
         {t("depot.keineBewegungen")}
       </div>
     </Card>

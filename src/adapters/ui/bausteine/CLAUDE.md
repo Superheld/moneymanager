@@ -15,14 +15,36 @@ Baustein, sondern ein Teil dieses Screens.
 
 ## Der Design-System-Teil
 
-Die `.jsx`/`.d.ts`-Dateien (`Card`, `KPIStat`, `Pill`, `CoverageTrack`, `DataTable`,
-`Button`, `FormField` mit `Input`, `Dialog`) stammen aus dem Design-System, das ausserhalb
-des Repos liegt. Es ist eine **Vorlage, keine Vorgabe**: was hier liegt, gehört der App und
-darf geändert werden. Wer aus dem Design-System nachzieht, holt sich einen Vorschlag, keine
-Wahrheit — und prüft, was hier inzwischen weiterentwickelt wurde.
+`Card`, `KPIStat`, `Pill`, `CoverageTrack`, `DataTable`, `Button`, `FormField` und der in
+`Modal` aufgegangene `Dialog` stammen aus dem Design-System, das ausserhalb des Repos liegt.
+Es ist eine **Vorlage, keine Vorgabe**: was hier liegt, gehört der App und darf geändert
+werden. Wer aus dem Design-System nachzieht, holt sich einen Vorschlag, keine Wahrheit —
+und prüft, was hier inzwischen weiterentwickelt wurde.
+
+**Seit 2026-11-10 sind sie alle TypeScript** — vorher `.jsx` mit handgeschriebener
+`.d.ts`, deren Inneres der Compiler nicht prüfte und deren Typen vom Code weglaufen
+konnten, ohne dass etwas rot wurde. Wo Base UI ein Gegenstück hat, steht es darunter:
+`Button` (`Button`), `Modal` (`Dialog`), `FormField` (`Field`, nur um ein natives Feld —
+warum, steht im Kopf der Datei), `CoverageTrack` (`Meter`), die Seitensteuerung der
+`DataTable` (`NumberField`). `Card`, `KPIStat` und `Pill` sind reines Aussehen; dafür hat
+Base UI nichts.
 
 `index.ts` bündelt diesen Block, damit ein Screen `from "../bausteine"` schreiben kann. Die
 eigenen Bausteine daneben werden einzeln importiert.
+
+## `Kaestchen` — ankreuzen, auf Base UI `Checkbox`
+
+Seit 2026-11-10 der Ersatz für `<input type="checkbox">`, das an rund zwanzig Stellen mit
+je eigener Hülle stand, mal mit `accentColor`, mal ohne — also in zwei Farben. Zwei Dinge,
+die man beim Benutzen wissen muss:
+
+- **Der Name.** Mit Text als `children` steht es in einem `<label>`, und der Text ist der
+  Name; ohne Text ist `label` Pflicht. Stehen beide da, gilt `label` — und dafür braucht
+  es einen Umweg: Base UI verweist per `aria-labelledby` auf das GANZE Label, und das
+  gewinnt gegen `aria-label`. Das Kästchen bekäme sonst den ganzen Absatz daneben als
+  Namen (so geschehen bei den Schaltern in den Einstellungen, bis der Umweg stand).
+- **`oben`** für Text über mehrere Zeilen: das Kästchen steht dann neben der ersten Zeile
+  und nicht neben der Mitte.
 
 ## `Zeilenauswahl` — eine Wahl in einer Tabellenzeile
 
@@ -83,24 +105,46 @@ mehr — ausser dem einen in `Zeilenauswahl`, und das ist eine Entscheidung: dor
 Feld so gross wie eine Pille daneben, und eine eigene Liste im Portal wäre für drei
 Einträge in einer Tabellenzeile Aufwand ohne Gegenwert.
 
-## `Modal` — der Dialog-Layer, und zwei Dinge, die nur verschachtelt auffallen
+## `Modal` — der Dialog, auf Base UI `Dialog`
+
+**Seit 2026-11-10 liegt Base UI darunter**, und `Dialog.jsx` aus der Vorlage ist darin
+aufgegangen (es hatte keinen anderen Nutzer). Der Eigenbau davor hatte Escape, Klick
+daneben und ein Portal — und sonst nichts, was einen Dialog mit der Tastatur benutzbar
+macht. Jetzt dazu: Fokus beim Öffnen IM Dialog, Tabulatortaste bleibt darin, Fokus beim
+Schliessen zurück an den Auslöser, Seite dahinter gesperrt, Name über den Titel, ein
+benannter Schliessknopf statt eines blossen „✕". Das „+" im Kopf ist weg — es stand auch
+beim Bearbeiten da.
 
 **Der Layer hängt per Portal am `document.body`.** Ein Modal wird dort gerendert, wo es
 aufgeht — seit die Kategorie in der Auszugszeile wählbar ist, also mitten in einer
 Tabellenzelle. Steht über ihm irgendwo eine `opacity` (der Auszug dämpft damit Zeilen,
 deren Buchungstag noch vor uns liegt), erbt ein `position: fixed`-Kind sie: der Dialog
 erscheint durchscheinend, liegt im Stapel der Zeile statt über der Seite, und der Scrim
-deckt nur die Tabelle ab. Das Portal nimmt ihn aus dem Baum, und alle drei Wirkungen sind
-weg. Wer den Layer je wieder inline rendert, holt sie zurück.
+deckt nur die Tabelle ab. Das Portal von Base UI nimmt ihn aus dem Baum, wie vorher das
+eigene.
 
-**Escape schliesst nur den OBERSTEN Dialog** — den auslösenden nie. Dafür führt `Modal.tsx`
-eine Menge offener Nummern, und die Nummer wird beim ersten **Render** vergeben, nicht im
-Effekt: React rendert von aussen nach innen und führt die Effekte von innen nach aussen
-aus. Ein Stapel, in den sich jeder Dialog im Effekt einträgt, steht deshalb auf dem Kopf,
-und der äussere schluckt die Taste, die dem inneren galt. Gemessen, nicht vermutet.
+**Escape schliesst nur den OBERSTEN Dialog** — den auslösenden nie. Der Eigenbau brauchte
+dafür einen Stapel offener Nummern (und scheiterte zuerst daran, dass React die Effekte
+von innen nach aussen ausführt). Base UI kennt verschachtelte Dialoge selbst — **unter
+einer Bedingung: der innere wird IM äusseren gerendert**, im React-Baum, nicht daneben.
+So entsteht die Verschachtelung in der App ohnehin (Buchungsdialog → Kategorie-Picker).
+Und Base UI **verbraucht** die Taste (`preventDefault`); erst damit stimmt, worauf die
+Schublade in `AppShell` sich verlässt — der Eigenbau las `defaultPrevented` nur und setzte
+es nie, eine Escape schloss Dialog und Schublade zugleich.
 
-Geprüft in `Modal.test.tsx` — beides an einem verschachtelten Aufbau, weil ein einzelner
-Dialog auf leerer Seite sich in beiden Fällen richtig verhält.
+**Wohin der Fokus beim Öffnen geht, entscheidet `Modal`, nicht Base UI.** Base UI nimmt
+das erste fokussierbare Element — bei uns der Schliessknopf im Kopf. Wer einen Dialog
+öffnet, um etwas einzutragen, landete auf „schliessen". `Modal` nimmt deshalb das Feld mit
+`autoFocus`, sonst das erste Ziel im INHALT, und erst wenn dort keins ist, den Standard.
+
+**`warnung` macht ihn zum `AlertDialog`** — für Rückfragen vor etwas, das nicht
+zurückgeht (`Loeschfrage`). Die Vorlesehilfe meldet eine Warnung, und ein Klick NEBEN
+den Kasten schliesst ihn nicht: ein Fehlklick soll die Frage nicht still verwerfen.
+
+Geprüft in `Modal.test.tsx` — die Verschachtelung an einem verschachtelten Aufbau, weil
+ein einzelner Dialog auf leerer Seite sich in jedem Fall richtig verhält, und der Fokus
+mit einer Pause nach jedem Tab: Base UI fängt ihn über Wächter am Rand ab und leitet ihn
+einen Tick später zurück.
 
 **Schwebende Ebenen ausserhalb des Modals** (Auswahlliste, Kalenderblatt) hängen ebenfalls
 am body, tragen aber von sich aus keinen z-Index — und ein Modal-Layer trägt 50, gewinnt
@@ -123,6 +167,12 @@ erweitert sie bei Bedarf.
 Die Zeile ist ein `tr` und kann kein Knopf sein. Klickbar trägt sie deshalb
 `role="button"`, `tabIndex` und reagiert auf Enter und Leertaste — ohne das wäre sie für
 jeden, der nicht mit der Maus arbeitet, gar nicht da.
+
+**`Umschalter`** (Base UI `ToggleGroup`) ist die Leiste „Alle · Ausgaben · Einnahmen" oder
+„Fluss · Saldo · Tabelle": genau einer gedrückt, EIN Halt für die Tabulatortaste,
+Pfeiltasten dazwischen. Bis 2026-11-10 stand sie viermal von Hand da, in zwei Formen.
+Nicht verwechseln mit `Registerleiste`: die wechselt, WAS gezeigt wird; ein Umschalter
+zeigt dieselben Daten anders und steht in der Karte, die er einstellt.
 
 **`Klappblock`** ist ein Abschnitt in einem Dialog: Trennlinie, Titel mit ▸/▾, Inhalt.
 Gesteuert von aussen (`offen`, `onUmschalten`), weil ein Block beim ersten Aufklappen
@@ -220,8 +270,8 @@ schlechter: man verliert die Zeile aus den Augen, von der man ausgegangen ist, u
 zurück, um die nächste anzusehen. Der zweite Klick auf denselben Bezeichner klappt wieder
 zu.
 
-**Nicht verwechseln mit `.linkbtn`.** Die Klasse gibt es schon und sie ist für das
-Gegenteil da: eine gedämpfte NEBENAKTION in einer Zeile („Profil ansehen"), die sich
+**Nicht verwechseln mit `Button variant="link"`** (früher die Klasse `.linkbtn`). Der ist
+für das Gegenteil da: eine gedämpfte NEBENAKTION in einer Zeile („Profil ansehen"), die sich
 zurückhalten soll. `Zeilenlink` ist der Weg weiter und muss sich zeigen — Akzentfarbe,
 Unterstrich.
 
@@ -236,6 +286,12 @@ nicht, dass hier etwas passiert, und dem Sehenden nicht, was.
 
 Sonst gilt: die Fensterbreite ist eine Frage, die CSS selbst beantwortet, und in `app.css`
 steht die schmale Form ohne Abfrage da. Das reicht, solange sich nur das AUSSEHEN ändert.
+
+**Benutzt wird es seit 2026-11-10 genau einmal: von `DataTable`.** Der `Dialog` hing bis
+dahin auch daran und zeichnete seine schmale Form über Inline-Stile — obwohl sich dort nur
+das Aussehen ändert. Er steht jetzt in CSS. Dass kein Screen `useSchmal` benutzt, ist
+damit der gewollte Zustand und kein Versehen: ein Screen, der schmal anders aussehen will,
+tut das in `app.css`.
 
 Es reicht nicht, wo sich das **Markup** ändert. `DataTable` wird unter 700 px aus einer
 Tabelle mit sechs Spalten eine mit zwei, in der die übrigen Werte als zweite Zeile unter
@@ -283,7 +339,7 @@ Eine Zahl steckt darin, die man kennen muss: schmal liegt **`table-layout: fixed
 die Wertspalte ist auf `12ch` festgelegt. Ohne beides zöge ein langer Name die Tabelle
 wieder aus dem Bild — genau das Übel, gegen das die schmale Form gebaut ist.
 
-## `Dialog` schmal: ueber die ganze Hoehe, Fusszeile bleibt stehen
+## `Modal` schmal: ueber die ganze Hoehe, Fusszeile bleibt stehen
 
 Breit ist er eine 680er Box mit 48 px Luft darueber. Auf einem Telefon hiess das:
 Formular ausfüllen, scrollen, „Speichern" suchen — und der Knopf lag unter dem Bildrand,
@@ -300,14 +356,27 @@ Zwei Dinge, die man beim Anfassen wissen muss:
   Die Box trägt `overflow: hidden` für ihre runden Ecken und ist damit selbst ein
   Scrollbereich, in dem nichts scrollt; das Sticky hätte keine Wirkung, und man sähe es ihm
   nicht an. Drei Teile mit einem scrollenden Mittelstück sagen, was gemeint ist.
-- **`minHeight: 0` am Inhalt ist Pflicht.** Ein Flex-Kind besteht sonst auf seiner
+- **`min-height: 0` am Inhalt ist Pflicht.** Ein Flex-Kind besteht sonst auf seiner
   Inhaltshöhe und schiebt die Fusszeile aus dem Bild — genau der Fehler, der behoben werden
   sollte, nur eine Ebene tiefer.
+
+**Es steht in CSS (`.dialog-*` in `app.css`), nicht mehr hinter `useSchmal`** — schmal ist
+die Grundform, breit kommt per `min-width: 700px` dazu. Am Markup ändert sich nichts, und
+dann ist es eine Frage für CSS (siehe `useSchmal` oben). Der Preis: jsdom wendet keine
+Medienabfragen an, `Modal.test.tsx` prüft deshalb nur noch die drei Teile, nicht ihre
+Masse.
 
 Die Ränder folgen `env(safe-area-inset-*)`: schmal liegt der Dialog unter der Kerbe und
 über der Wischleiste, und beide sind je nach Gerät verschieden hoch.
 
 ## Zwei Fallen, die man kennen muss
+
+**Klickbare Zeilen der `DataTable` nehmen den Fokus selbst** (seit 2026-11-10): `tabIndex`,
+Enter und Leertaste, `aria-current` an der offenen Zeile. Sie bleiben dabei Tabellenzeilen
+und werden NICHT `role="button"` wie in `Aufklapptabelle` — dort ist eine Zeile eine
+einzelne Buchung, die als Ganzes gelesen wird; hier ist es eine Zeile einer Tabelle, die
+eine Vorlesehilfe weiter spaltenweise lesen können soll. Einen `Zeilenlink` braucht es für
+die Tastatur damit nicht mehr; für das SEHEN bleibt er der bessere Weg (unten).
 
 **`DataTable` ist die App-Fassung**, nicht die des Design-Systems: sie trägt Sortierung,
 Pagination, Zeilenklick, Spaltenbreiten, feste Zeilenhöhe, die Breitenkappung (innerer

@@ -216,16 +216,14 @@ export function VerschluesselungCard({ onSperren }: { onSperren?: () => void }) 
               setzen={setSchluesselPassphrase}
             />
             {schluesselMeldung && <p className="muted">{schluesselMeldung}</p>}
-            {/* Solange es läuft, steht hier der Hinweis STATT des Knopfs: ein zweiter
-                Klick träfe auf eine Datenbank, die Rust gerade geschlossen hat, und
-                meldete einen Fehler mitten in einen Wechsel hinein, der gelingt. */}
-            {schluesselLaeuft ? (
-              <p className="muted">{t("zugang.schluesselLaeuft")}</p>
-            ) : (
-              <Button onClick={() => void schluesselWechseln()}>
-                {t("zugang.schluesselKnopf")}
-              </Button>
-            )}
+            {/* Solange es läuft, ist der Knopf gesperrt: ein zweiter Klick träfe auf
+                eine Datenbank, die Rust gerade geschlossen hat, und meldete einen Fehler
+                mitten in einen Wechsel hinein, der gelingt. Der Hinweis daneben sagt,
+                warum nichts passiert. */}
+            <Button onClick={() => void schluesselWechseln()} laeuft={schluesselLaeuft}>
+              {t("zugang.schluesselKnopf")}
+            </Button>
+            {schluesselLaeuft && <p className="muted">{t("zugang.schluesselLaeuft")}</p>}
           </>
         )}
       </Card>

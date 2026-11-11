@@ -8,6 +8,8 @@
      und das Schriftbild wandert, ohne dass etwas kaputt aussieht. Die zweite
      Stelle bleibt fuer eine im System installierte Fassung. */
   --font-ui: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  /* Wie bisher über den nie definierten Rückfallwert: die Monospace-Schrift des Systems. */
+  --font-mono: monospace;
   --font-num: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, sans-serif; /* tnum via .num */
 
   /* type scale (px) */
@@ -18,6 +20,10 @@
   --fs-title:   14.5px; /* card titles */
   --fs-body:    15px;
   --fs-sm:      13.5px;
+  /* Die zwei Stufen, die bis 2026-11-10 fehlten — und deshalb als Pixelzahl an rund
+     dreissig Stellen standen, jede für sich. */
+  --fs-tabelle: 13px;   /* Tabellen- und Listentext */
+  --fs-ui:      12.5px; /* Bedienteile: Knöpfe, Umschalter, Untertitel */
   --fs-xs:      12px;
   --fs-2xs:     11px;
   --fs-eyebrow: 10.5px; /* uppercase labels */

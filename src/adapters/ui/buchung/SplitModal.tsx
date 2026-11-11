@@ -75,13 +75,13 @@ export function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung:
       footer={
         <>
           <Button variant="primary" onClick={speichern}>{t("konten.speichern")}</Button>
-          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+          <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
           {fehler && <span className="err">{fehler}</span>}
         </>
       }
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
-        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.split.gesamt")}</span>
+        <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>{t("konten.split.gesamt")}</span>
         <span className="num" style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-black)", color: geldFarbe(buchung.betrag) }}>
           {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
         </span>
@@ -102,12 +102,12 @@ export function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung:
             aria-label={`${t("konten.split.spalteBetrag")} ${i + 1}`}
           />
           {rest !== 0 && (
-            <button className="linkbtn" title={t("konten.split.restVerteilen")} onClick={() => restEinsetzen(i)} style={{ padding: "6px 4px" }}>+</button>
+            <Button variant="link" title={t("konten.split.restVerteilen")} onClick={() => restEinsetzen(i)} style={{ padding: "6px 4px" }}>+</Button>
           )}
           {zeilen.length > 2 && (
-            <button className="linkbtn" onClick={() => setZeilen((zs) => zs.filter((_, j) => j !== i))}>
+            <Button variant="link" onClick={() => setZeilen((zs) => zs.filter((_, j) => j !== i))}>
               {t("konten.split.zeileEntfernen")}
-            </button>
+            </Button>
           )}
         </div>
       ))}
@@ -116,7 +116,7 @@ export function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung:
         <Button plus onClick={() => setZeilen((zs) => [...zs, { kategorieId: "", betrag: "", notiz: "" }])}>
           {t("konten.split.zeileHinzufuegen")}
         </Button>
-        <span style={{ fontSize: 13, fontWeight: "var(--fw-bold)", color: rest === 0 ? "var(--ok-deep)" : "var(--warn-deep)" }}>
+        <span style={{ fontSize: "var(--fs-tabelle)", fontWeight: "var(--fw-bold)", color: rest === 0 ? "var(--ok-deep)" : "var(--warn-deep)" }}>
           {rest === 0
             ? t("konten.split.restPasst")
             : rest > 0
@@ -124,7 +124,7 @@ export function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung:
               : t("konten.split.restZuviel", { betrag: geld.formatMitSymbol(-rest) })}
         </span>
       </div>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+      <div className="hinweis" style={{ marginTop: 6 }}>
         {t("konten.split.hinweisPositiv")} · {t("konten.split.verteilt")}: {geld.formatMitSymbol(verteilt)}
       </div>
     </Modal>

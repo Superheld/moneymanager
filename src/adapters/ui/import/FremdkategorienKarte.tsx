@@ -28,6 +28,7 @@ import type { Fremdkategorienbefund } from "../../../application/import";
 import type { Kategorie } from "../../../application";
 import { Card } from "../bausteine";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Collapsible } from "@base-ui/react/collapsible";
 
 const KOPF = {
   textAlign: "left",
@@ -61,18 +62,15 @@ export function FremdkategorienKarte({
   const [offen, setOffen] = useState(offeneZiele > 0);
   if (befund.zeilen.length === 0) return null;
 
+  // Base UI `Collapsible`: der Titel ist der Auslöser, die Tabelle das Panel. Die Wurzel
+  // trägt den Abstand, den vorher die Karte trug.
   return (
+    <Collapsible.Root open={offen} onOpenChange={setOffen} style={{ marginTop: "var(--sp-4)" }}>
     <Card
-      style={{ marginTop: "var(--sp-4)" }}
       title={
-        <button
-          className="linkbtn"
-          aria-expanded={offen}
-          onClick={() => setOffen((x) => !x)}
-          style={{ font: "inherit", color: "inherit" }}
-        >
+        <Collapsible.Trigger className="btn btn--link" style={{ font: "inherit", color: "inherit" }}>
           {offen ? "▾" : "▸"} {t("import.fremd.titel")}
-        </button>
+        </Collapsible.Trigger>
       }
       subtitle={
         offen
@@ -82,9 +80,8 @@ export function FremdkategorienKarte({
             : t("import.fremd.kurz", { n: befund.zeilen.length })
       }
     >
-      {offen && (
-      <>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+      <Collapsible.Panel>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
         <thead>
           <tr>
             <th style={KOPF}>{t("import.fremd.spalteQuelle")}</th>
@@ -115,7 +112,7 @@ export function FremdkategorienKarte({
                     ariaLabel={t("import.fremd.zielFuer", { name: z.fremdName })}
                   />
                   {verwaist && (
-                    <div style={{ fontSize: "var(--fs-2xs)", color: "var(--warn, #d9822b)", marginTop: 4 }}>
+                    <div style={{ fontSize: "var(--fs-2xs)", color: "var(--warn)", marginTop: 4 }}>
                       {t("import.fremd.zielFehlt", { name: z.uebersetzung })}
                     </div>
                   )}
@@ -133,11 +130,11 @@ export function FremdkategorienKarte({
 
       {/* Was NICHT in der Tabelle steht, gehört trotzdem ins Bild: sonst sieht die
           Zuordnung nach „alle Zeilen der Datei" aus, und die Zahlen gehen nicht auf. */}
-      <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: "var(--sp-3)" }}>
+      <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
         {t("import.fremd.rest", { ohne: befund.ohneAngabe, um: befund.umbuchungen })}
       </div>
-      </>
-      )}
+      </Collapsible.Panel>
     </Card>
+    </Collapsible.Root>
   );
 }
