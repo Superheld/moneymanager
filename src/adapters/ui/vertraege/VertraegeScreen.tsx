@@ -36,6 +36,7 @@ import {
 } from "./VertragModal";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
+import { Umschalter } from "../bausteine/Umschalter";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -659,17 +660,12 @@ export function VertraegeScreen() {
          */
         <Card>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
-            <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
-              {ANSICHTEN.map((a, i) => {
-                const an = ansicht === a;
-                return (
-                  <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
-                    style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                    {t(`vertraege.ansicht.${a}`)}
-                  </button>
-                );
-              })}
-            </div>
+            <Umschalter
+              label={t("vertraege.ansichtWahl")}
+              optionen={ANSICHTEN.map((a) => ({ wert: a, text: t(`vertraege.ansicht.${a}`) }))}
+              wert={ansicht}
+              aufAendern={setAnsicht}
+            />
             {/*
               Die Ordnung steht fest und ist nicht klickbar (siehe Ansicht-Doku oben) —
               also gehört sie hingeschrieben. Sonst sucht man die Sortierpfeile in den

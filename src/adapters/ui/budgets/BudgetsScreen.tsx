@@ -371,7 +371,7 @@ export function BudgetsScreen() {
                         render: (z: GruppierterStand) => (
                           <span style={{ display: "block", minWidth: 80 }}>
                             <span className="num">{geld.format(z.monat.verbraucht)}</span>
-                            <CoverageTrack value={Math.max(0, z.monat.verbraucht)} max={Math.max(1, z.monat.verfuegbar)} over={z.rest < 0} label="" right="" style={{ marginTop: 4 }} />
+                            <CoverageTrack name={z.kategorieName} value={Math.max(0, z.monat.verbraucht)} max={Math.max(1, z.monat.verfuegbar)} over={z.rest < 0} label="" right="" style={{ marginTop: 4 }} />
                           </span>
                         ),
                       },

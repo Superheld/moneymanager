@@ -23,6 +23,7 @@ import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { DataTable } from "../bausteine/DataTable";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+import { Umschalter } from "../bausteine/Umschalter";
 
 type Statusfilter = "alle" | "verbucht" | "weggelegt" | "offen";
 
@@ -195,25 +196,13 @@ export function HerkunftBereich({
             </Card>
           ) : (
           <Card>
-            <div style={{ display: "flex", gap: "var(--sp-2)", marginBottom: "var(--sp-2)", flexWrap: "wrap" }}>
-              {(["alle", "verbucht", "weggelegt", "offen"] as const).map((f) => (
-                <Button variant="link"
-                  key={f}
-                  type="button"
-                  aria-pressed={filter === f}
-                  onClick={() => setFilter(f)}
-                  style={{
-                    padding: "3px 9px",
-                    borderRadius: "var(--r-sm)",
-                    border: "1px solid var(--line)",
-                    fontSize: "var(--fs-xs)",
-                    fontWeight: filter === f ? "var(--fw-bold)" : "normal",
-                    background: filter === f ? "var(--accent-wash)" : "transparent",
-                  }}
-                >
-                  {t(`konten.herkunft.filter.${f}`)}
-                </Button>
-              ))}
+            <div style={{ display: "flex", gap: "var(--sp-2)", marginBottom: "var(--sp-2)", flexWrap: "wrap", alignItems: "center" }}>
+              <Umschalter
+                label={t("konten.herkunft.filterWahl")}
+                optionen={(["alle", "verbucht", "weggelegt", "offen"] as const).map((f) => ({ wert: f, text: t(`konten.herkunft.filter.${f}`) }))}
+                wert={filter}
+                aufAendern={setFilter}
+              />
 
               {/* Nach Quelle eingrenzen — nur wo es überhaupt mehrere gibt. Ein Filter mit
                   einer einzigen Möglichkeit fragt nach etwas, das schon feststeht.

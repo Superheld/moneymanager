@@ -285,11 +285,11 @@ body {
   font-family: var(--font-ui);
   text-align: left;
 }
-.aktualisierungbtn:hover:not(:disabled) {
+.aktualisierungbtn:hover:not([data-disabled]) {
   background: var(--accent);
   color: var(--surface-1);
 }
-.aktualisierungbtn:disabled {
+.aktualisierungbtn[data-disabled] {
   cursor: default;
   opacity: 0.6;
 }
@@ -803,6 +803,127 @@ select.field.tabellenfilter {
   border-color: transparent;
 }
 
+/* --- Schalter in den Einstellungen (einstellungen/EinstellungenScreen.tsx) ---
+   Base UI `Switch`; an heisst `[data-checked]`. Groesse so, dass er neben einer
+   fetten Titelzeile steht, ohne sie zu ueberragen. */
+.schalterzeile {
+  display: flex;
+  gap: var(--sp-3);
+  align-items: flex-start;
+  cursor: pointer;
+}
+.schalter {
+  position: relative;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 18px;
+  margin-top: 2px;
+  padding: 0;
+  border: 1.5px solid var(--ink-3);
+  border-radius: var(--r-pill);
+  background: var(--surface);
+  cursor: pointer;
+}
+.schalter[data-checked] {
+  background: var(--accent-deep);
+  border-color: var(--accent-deep);
+}
+.schalter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.schalter-knopf {
+  position: absolute;
+  top: 1.5px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--ink-3);
+}
+.schalter-knopf[data-checked] {
+  left: 15px;
+  background: #fff;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .schalter-knopf {
+    transition: left 120ms ease;
+  }
+}
+
+/* --- Umschalter (bausteine/Umschalter.tsx) ---
+   Masse aus den drei Leisten, die vorher von Hand dastanden. Gedrueckt heisst bei Base UI
+   `[data-pressed]`. */
+.umschalter {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+.umschalter-knopf {
+  padding: 6px 12px;
+  font-size: 12.5px;
+  font-weight: var(--fw-semi);
+  font-family: var(--font-ui);
+  border: none;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.umschalter-knopf + .umschalter-knopf {
+  border-left: 1px solid var(--line-soft);
+}
+.umschalter-knopf[data-pressed] {
+  font-weight: var(--fw-bold);
+  background: var(--accent-wash);
+  color: var(--accent-deep);
+}
+.umschalter-knopf:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* --- Registerleiste (bausteine/Registerleiste.tsx) ---
+   Masse unveraendert aus dem frueheren Inline-Stil; der aktive Reiter heisst bei Base UI
+   `[data-active]`. */
+.registerleiste {
+  display: flex;
+  gap: var(--sp-4);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--sp-4);
+  /* Die Leiste darf waagerecht rollen, wenn viele Register nebeneinander stehen.
+     `overflow-y` MUSS dabei ausdruecklich dastehen: sobald eine der beiden Achsen nicht
+     mehr `visible` ist, rechnet der Browser die andere zu `auto` um — und die Reiter ragen
+     mit ihrem `margin-bottom: -1px` genau einen Pixel ueber den Kasten hinaus. Das reicht
+     fuer einen senkrechten Rollbalken an einer Leiste, die nur eine Zeile hoch ist. */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.registerleiste-reiter {
+  background: none;
+  border: 0;
+  /* Der aktive Reiter traegt die Akzentlinie; das Absetzen um einen Pixel legt sie ueber
+     die Trennlinie der Leiste, statt daneben. */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  padding: var(--sp-2) 0;
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.registerleiste-reiter[data-active] {
+  border-bottom-color: var(--accent);
+  font-weight: var(--fw-bold);
+  color: var(--ink);
+}
+.registerleiste-reiter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 /* --- Formularfeld (bausteine/FormField.tsx) ---
    Masse unveraendert aus dem frueheren Inline-Stil. */
 .formfeld {
@@ -952,7 +1073,7 @@ select.field.tabellenfilter {
   color: var(--ink-3);
   cursor: pointer;
 }
-.iconbtn:hover:not(:disabled) {
+.iconbtn:hover:not([data-disabled]) {
   background: var(--surface-2);
   color: var(--accent-deep);
 }
@@ -960,11 +1081,11 @@ select.field.tabellenfilter {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
 }
-.iconbtn:disabled {
+.iconbtn[data-disabled] {
   opacity: 0.35;
   cursor: not-allowed;
 }
-.iconbtn-gefahr:hover:not(:disabled) {
+.iconbtn-gefahr:hover:not([data-disabled]) {
   color: var(--warn-deep);
 }
 
@@ -1233,8 +1354,34 @@ select.field.tabellenfilter {
   --z-schwebend: 1000;
 }
 .auswahl-positioner,
-.datumsfeld-positioner {
+.datumsfeld-positioner,
+.vorschlag-positioner {
   z-index: var(--z-schwebend);
+}
+
+/* Vorschlagsliste unter einem Suchfeld (konten/BankSuche.tsx, Base UI `Combobox`).
+   So breit wie das Feld (`--anchor-width` setzt Base UI), markiert heisst
+   `[data-highlighted]` — Maus und Pfeiltasten setzen dieselbe Markierung. */
+.vorschlagsliste {
+  width: var(--anchor-width);
+  max-height: 260px;
+  overflow-y: auto;
+  padding: var(--sp-1) 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+}
+.vorschlagsliste:empty {
+  display: none;
+}
+.vorschlag {
+  padding: var(--sp-2) var(--sp-3);
+  color: var(--ink);
+  cursor: pointer;
+}
+.vorschlag[data-highlighted] {
+  background: var(--surface-2);
 }
 
 /* ============================================================

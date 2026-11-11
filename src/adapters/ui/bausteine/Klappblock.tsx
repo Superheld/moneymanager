@@ -12,9 +12,13 @@
 // Nicht verwechseln mit `Aufklappflaeche`: die hängt unter einer Tabellenzeile und zeigt
 // eine Liste; das hier ist ein Abschnitt in einem Formular oder Dialog.
 
+import { Collapsible } from "@base-ui/react/collapsible";
 import type { ReactNode } from "react";
-import { Button } from "./Button";
 
+// **Mechanik von Base UI `Collapsible`** (seit 2026-11-10): der Knopf trägt
+// `aria-expanded` UND `aria-controls`, verweist also auf den Abschnitt, den er öffnet —
+// der Eigenbau sagte nur, DASS etwas aufgeht, nicht was. Geschlossen ist der Inhalt nicht
+// im Baum, wie vorher: der Merkmalsblock lädt erst beim Öffnen.
 export function Klappblock({
   titel,
   zusatz,
@@ -30,12 +34,17 @@ export function Klappblock({
   children: ReactNode;
 }) {
   return (
-    <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-      <Button variant="link" onClick={onUmschalten} aria-expanded={offen}>
+    <Collapsible.Root
+      open={offen}
+      onOpenChange={onUmschalten}
+      style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}
+    >
+      {/* Aussehen des Link-Knopfs (`Button variant="link"`), Mechanik vom Collapsible. */}
+      <Collapsible.Trigger className="btn btn--link">
         {offen ? "▾" : "▸"} {titel}
         {zusatz != null && <> <span className="muted">{zusatz}</span></>}
-      </Button>
-      {offen && <div style={{ marginTop: "var(--sp-2)" }}>{children}</div>}
-    </div>
+      </Collapsible.Trigger>
+      <Collapsible.Panel style={{ marginTop: "var(--sp-2)" }}>{children}</Collapsible.Panel>
+    </Collapsible.Root>
   );
 }

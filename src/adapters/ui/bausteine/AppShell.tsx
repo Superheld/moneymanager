@@ -19,6 +19,7 @@ import { useTranslation } from "react-i18next";
 import { APP_ABZEICHEN, APP_VERSION } from "../../../version";
 import { AktualisierungKnopf } from "./AktualisierungKnopf";
 import { Icon } from "./IconButton";
+import { Button as BaseButton } from "@base-ui/react/button";
 
 export type ScreenId =
   | "uebersicht"
@@ -145,7 +146,7 @@ export function AppShell({
       {/* Nur schmal sichtbar. Sie trägt den Griff und den Namen des Bereichs — auf einem
           Handy ist die Marke nicht die Auskunft, die man beim Blick nach oben braucht. */}
       <header className="topbar">
-        <button
+        <BaseButton
           ref={griff}
           type="button"
           className="topbar-griff"
@@ -155,7 +156,7 @@ export function AppShell({
           onClick={() => setOffen(true)}
         >
           <Icon name="menue" groesse={20} />
-        </button>
+        </BaseButton>
         <span className="topbar-titel">{t(labelKeyVon(current))}</span>
       </header>
 
@@ -173,9 +174,9 @@ export function AppShell({
           {/* Ein sichtbarer Weg zurück. Der Scrim allein reicht auf einem Handy nicht:
               die Schublade nimmt fast die ganze Breite, und die Fläche daneben ist ein
               Streifen, den man nicht als Bedienteil liest. */}
-          <button type="button" className="side-zu" aria-label={t("shell.menueSchliessen")} onClick={schliessen}>
+          <BaseButton type="button" className="side-zu" aria-label={t("shell.menueSchliessen")} onClick={schliessen}>
             <Icon name="verwerfen" groesse={18} />
-          </button>
+          </BaseButton>
         </div>
 
         {GRUPPEN.map((g) => (

@@ -168,6 +168,12 @@ Die Zeile ist ein `tr` und kann kein Knopf sein. Klickbar trägt sie deshalb
 `role="button"`, `tabIndex` und reagiert auf Enter und Leertaste — ohne das wäre sie für
 jeden, der nicht mit der Maus arbeitet, gar nicht da.
 
+**`Umschalter`** (Base UI `ToggleGroup`) ist die Leiste „Alle · Ausgaben · Einnahmen" oder
+„Fluss · Saldo · Tabelle": genau einer gedrückt, EIN Halt für die Tabulatortaste,
+Pfeiltasten dazwischen. Bis 2026-11-10 stand sie viermal von Hand da, in zwei Formen.
+Nicht verwechseln mit `Registerleiste`: die wechselt, WAS gezeigt wird; ein Umschalter
+zeigt dieselben Daten anders und steht in der Karte, die er einstellt.
+
 **`Klappblock`** ist ein Abschnitt in einem Dialog: Trennlinie, Titel mit ▸/▾, Inhalt.
 Gesteuert von aussen (`offen`, `onUmschalten`), weil ein Block beim ersten Aufklappen
 nachladen können muss. Benutzt von Herkunft, Journal und Merkmalen im Buchungsdialog.

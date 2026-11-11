@@ -38,7 +38,7 @@ const schalterName = () => i18n.t("einstellungen.experiment.hanseaticTitel");
 
 async function schalterHolen(nutzer: ReturnType<typeof userEvent.setup>) {
   await registerWaehlen(nutzer, registerName());
-  return await screen.findByRole("checkbox", { name: schalterName() });
+  return await screen.findByRole("switch", { name: schalterName() });
 }
 
 describe("Experimente-Schalter", () => {
@@ -46,6 +46,15 @@ describe("Experimente-Schalter", () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
     expect((await schalterHolen(nutzer))).not.toBeChecked();
+  });
+
+  it("heisst wie sein Titel und trägt die Erklärung als Beschreibung", async () => {
+    // Base UI `Switch` in einem <label>: ohne eigenen Verweis hiesse er wie der ganze
+    // Absatz daneben, samt „aus" und Erklärtext.
+    rendere(<EinstellungenScreen />);
+    const schalter = await schalterHolen(userEvent.setup());
+    expect(schalter).toHaveAccessibleName(schalterName());
+    expect(schalter).toHaveAccessibleDescription(i18n.t("einstellungen.experiment.hanseaticText"));
   });
 
   it("schaltet ein und schreibt es in die Datenbank", async () => {

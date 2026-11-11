@@ -78,6 +78,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Datum | `Datumsfeld`, angezeigt über `useDatum()` |
 | Feld plus Knopf nebeneinander | `Feldzeile`; Formularfeld: `FormField` |
 | Ankreuzen | `Kaestchen` (Text als `children`, ohne Text `label`) |
+| Zwei bis vier Ansichten oder Filter, genau einer gilt | `Umschalter` |
 | Eine von mehreren Antworten | `buchung/Optionsgruppe` mit `Option` — bisher nur im Buchungsdialog |
 | Knopf | `Button` — `primary` Hauptaktion, `link` gedämpfte Nebenaktion („Abbrechen"), `laeuft` sperrt während einer Handlung; Zeilenaktion als Icon: `IconButton` |
 | Dialog | `Modal` (Base UI `Dialog`; `warnung` für Rückfragen); vor dem Löschen: `Loeschfrage` |
@@ -190,12 +191,32 @@ Wo es heute steht:
 | `bausteine/FormField` (um ein natives Feld) | `<label htmlFor>`, Hinweis unverbunden | Base UI `Field` |
 | `bausteine/CoverageTrack` | zwei `div` ohne Rolle | Base UI `Meter` |
 | Seitensteuerung der `DataTable` | `<input type="number">`, rohe Knöpfe | Base UI `NumberField`, `Button` |
+| `bausteine/Registerleiste` (samt Inhalt) | `role="tab"` von Hand, loses `tabpanel` | Base UI `Tabs` |
+| `bausteine/Klappblock` und jede Zeile, die aufklappt | `aria-expanded`/`role="button"` von Hand | Base UI `Collapsible` |
+| `bausteine/Umschalter` | drei Segmentleisten aus `aria-pressed`-Knöpfen | Base UI `ToggleGroup` |
+| „Nur Dubletten" im Kontoauszug | `aria-pressed` von Hand | Base UI `Toggle` |
+| Schalter in den Einstellungen | Kästchen | Base UI `Switch` |
+| `konten/BankSuche` | Vorschlagsliste ohne Rollen | Base UI `Combobox` |
+| Zahlenfeld im `AbrufDialog` | `<input type="number">` | Base UI `NumberField` |
+| `IconButton`, `Zeilenlink`, die Knöpfe in Shell, Kalender, Picker | roher `<button>` | Base UI `Button` |
 
-**Noch nicht umgestellt:** `Klappblock` → `Collapsible`, `Registerleiste` → `Tabs`, der Kategoriebaum im
-`CategoryPicker` → `Combobox` prüfen. Ein Tooltip-Baustein, wenn er kommt, kommt von dort
-(`Tooltip`). Die Schalter in den Einstellungen (Experimente, Update-Prüfung) sind heute
-Kästchen und wären semantisch ein `Switch` — „an/aus" statt „angekreuzt". Wer einen davon
-anfasst, stellt ihn um, statt am Eigenbau weiterzubauen.
+**Was bewusst Eigenbau bleibt** — jede Stelle mit Grund, und `bedienteile.test.ts` lässt
+nur genau diese durch:
+
+- **Die Schublade in `AppShell`.** Sie ist schmal eine Schublade und breit eine Spalte —
+  EIN Element in drei Formen, umgeschaltet per CSS. Base UI `Drawer` hiesse, die
+  Navigation je Breite in zwei Renderwege zu teilen; ihre drei Schliesswege sind getestet.
+- **`CategoryPicker`.** Geprüft gegen `Combobox` (inline im Modal) und verworfen: eine
+  Gruppe bleibt sichtbar, wenn nur ein Kind passt, markiert wird aber der erste TREFFER —
+  Base UI markiert bei eigenem Filter das erste Element, also die Gruppe. Und die Zeilen
+  sind Knöpfe in der Tab-Reihenfolge (Begründung im Kopf der Datei).
+- **`Zeilenauswahl`** (natives `<select>`), **der Kalender im `Datumsfeld`** (kein
+  Datepicker in Base UI) und **`DataTable`** (keine Tabelle).
+- **Die Zeile der `Aufklapptabelle`** ist ein `<tr>` mit `role="button"`: sie öffnet eine
+  Buchung, und ein Knopf kann keine Tabellenzeile sein.
+- **Kein Tooltip-Baustein** — `title` trägt so weit; wer einen baut, nimmt `Tooltip`.
+
+Wer eines davon anfasst und den Grund nicht mehr findet, stellt um, statt weiterzubauen.
 
 **Kästchen und Optionsfelder sind in Tests keine `<input>` mehr.** Base UI rendert ein
 `span` mit Rolle und hängt ein verstecktes `input` daneben. Daraus folgt zweierlei:

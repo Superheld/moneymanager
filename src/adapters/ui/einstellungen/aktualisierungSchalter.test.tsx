@@ -44,7 +44,7 @@ const schalterName = () => i18n.t("einstellungen.aktualisierung.schalterTitel");
 
 async function schalterHolen(nutzer: ReturnType<typeof userEvent.setup>) {
   await registerWaehlen(nutzer, registerName());
-  return await screen.findByRole("checkbox", { name: schalterName() });
+  return await screen.findByRole("switch", { name: schalterName() });
 }
 
 describe("Schalter für die Aktualisierungsprüfung", () => {
@@ -103,7 +103,7 @@ describe("der Schalter für Betaversionen", () => {
 
   async function betaHolen(nutzer: ReturnType<typeof userEvent.setup>) {
     await registerWaehlen(nutzer, registerName());
-    return await screen.findByRole("checkbox", { name: betaName() });
+    return await screen.findByRole("switch", { name: betaName() });
   }
 
   it("ist aus, solange niemand etwas entschieden hat", async () => {

@@ -18,6 +18,7 @@ import { Card, Pill, Button } from "../bausteine";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { AbgleichModal, KassensturzModal } from "./KontostandModal";
+import { Collapsible } from "@base-ui/react/collapsible";
 
 export function AbgleichBereich() {
   const { t } = useTranslation();
@@ -58,12 +59,14 @@ export function AbgleichBereich() {
           // Eine Karte je Konto — sie trägt die Fläche und den Rahmen. Selbst gezogene
           // Ränder sähen ähnlich aus, stünden aber auf dem nackten Seitenhintergrund und
           // liefen beim nächsten Token-Wechsel auseinander.
+          //
+          // Base UI `Collapsible`: die Kopfzeile sagte vorher nicht, DASS sie aufklappt
+          // (kein `aria-expanded`) — für eine Vorlesehilfe war sie ein Knopf ohne Folge.
           <Card key={z.konto.id}>
+            <Collapsible.Root open={aufgeklappt} onOpenChange={(auf) => setOffen(auf ? z.konto.id : null)}>
             {/* Die Kopfzeile beantwortet die Frage schon: stimmt es, und wenn nicht, um
                 wieviel. Alles Weitere ist die Begründung darunter. */}
-            <button
-              type="button"
-              onClick={() => setOffen(aufgeklappt ? null : z.konto.id)}
+            <Collapsible.Trigger
               style={{
                 width: "100%", background: "none", border: 0, padding: 0, cursor: "pointer",
                 display: "flex", alignItems: "baseline", justifyContent: "space-between",
@@ -88,7 +91,7 @@ export function AbgleichBereich() {
               <span className="num" style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.gerechnet) }}>
                 {geld.formatMitSymbol(z.gerechnet)}
               </span>
-            </button>
+            </Collapsible.Trigger>
 
             {z.juengster && (
               <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
@@ -99,7 +102,7 @@ export function AbgleichBereich() {
               </div>
             )}
 
-            {aufgeklappt && (
+            <Collapsible.Panel>
               <div style={{ marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)" }}>
                 {/* Die Reihe der Stichtage. Sie ist der eigentliche Inhalt: eine
                     Gesamtdifferenz sagt „irgendwo", die Reihe sagt „ab hier". */}
@@ -179,7 +182,8 @@ export function AbgleichBereich() {
                   })}
                 </div>
               </div>
-            )}
+            </Collapsible.Panel>
+            </Collapsible.Root>
           </Card>
         );
       })}

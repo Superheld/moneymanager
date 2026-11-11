@@ -26,6 +26,7 @@ import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { BudgetVerlaufChart } from "./BudgetVerlaufChart";
+import { Collapsible } from "@base-ui/react/collapsible";
 
 interface Props {
   sicht: BudgetSicht;
@@ -106,13 +107,13 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
       {/* Die Monatszeile sieht aus wie eine aufgeklappte Zeile der Monatskarten in der
           Übersicht (Pfeil, getönte Fläche, Liste direkt darunter) und verhält sich auch so:
           ein Klick klappt die Buchungen zu. Vorher stand sie als lose Textzeile über der
-          Liste, und man sah nicht, dass beides zusammengehört. */}
-      <div
-        role="button"
-        tabIndex={0}
-        aria-expanded={offen}
-        onClick={() => setOffen((o) => !o)}
-        onKeyDown={(e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), setOffen((o) => !o))}
+          Liste, und man sah nicht, dass beides zusammengehört.
+          Base UI `Collapsible`: Rolle, Tasten und `aria-controls` kommen von dort; die Zeile
+          bleibt ein `div`, damit ihr Flex-Layout unverändert bleibt. */}
+      <Collapsible.Root open={offen} onOpenChange={setOffen}>
+      <Collapsible.Trigger
+        nativeButton={false}
+        render={<div />}
         style={{
           display: "flex",
           justifyContent: "space-between",
@@ -160,9 +161,9 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
             </span>
           )}
         </span>
-      </div>
+      </Collapsible.Trigger>
 
-      {offen && (
+      <Collapsible.Panel>
         <BudgetPostenliste
           posten={posten}
           empfaenger={empfaenger}
@@ -172,7 +173,8 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
           onBuchung={onBuchung}
           kopf
         />
-      )}
+      </Collapsible.Panel>
+      </Collapsible.Root>
     </Card>
   );
 }

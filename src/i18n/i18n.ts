@@ -624,6 +624,7 @@ const de = {
     kpiSaldo: "Saldo heute",
     verlaufTitel: "Monatsverlauf",
     ansicht: { fluss: "Ein & Aus", saldo: "Saldo", tabelle: "Tabelle" },
+    ansichtWahl: "Ansicht",
     verlauf: {
       fluss: "Einnahmen und Ausgaben je Monat · Klick wählt einen Monat",
       saldo: "Realer Kontostand über die Zeit",
@@ -1017,6 +1018,7 @@ const de = {
       spalteStatus: "Was daraus wurde",
       buchungFehlt: "Buchung fehlt",
       zurueckholen: "zurückholen",
+      filterWahl: "Stand",
       filter: {
         alle: "alle",
         verbucht: "gebucht",
@@ -1209,6 +1211,7 @@ const de = {
     },
     suche: "Suche (Empfänger, Zweck, Betrag) …",
     artAlle: "Alle Arten",
+    artWahl: "Buchungsart",
     artEinnahmen: "Einnahmen",
     artAusgaben: "Ausgaben",
     artUmbuchung: "Umbuchungen",
@@ -1925,6 +1928,7 @@ const de = {
     feldZielkonto: "Zielkonto",
     feldZielkontoHinweis: "wohin umgebucht wird — daran wird die Zahlung wiedererkannt",
     ansicht: { liste: "Liste", faelligkeit: "Fälligkeit", turnus: "Turnus", kategorie: "Kategorie" },
+    ansichtWahl: "Ansicht",
     ordnung: {
       liste: "nach Betrag, groß nach klein",
       faelligkeit: "nach nächster Zahlung",
@@ -2793,6 +2797,7 @@ const en: typeof de = {
     kpiSaldo: "Balance today",
     verlaufTitel: "Monthly trend",
     ansicht: { fluss: "In & out", saldo: "Balance", tabelle: "Table" },
+    ansichtWahl: "View",
     verlauf: {
       fluss: "Income and expenses per month · click selects a month",
       saldo: "Real account balance over time",
@@ -3172,6 +3177,7 @@ const en: typeof de = {
       spalteStatus: "Outcome",
       buchungFehlt: "entry missing",
       zurueckholen: "restore",
+      filterWahl: "Status",
       filter: {
         alle: "all",
         verbucht: "booked",
@@ -3362,6 +3368,7 @@ const en: typeof de = {
     },
     suche: "Search (payee, reference, amount) …",
     artAlle: "All types",
+    artWahl: "Transaction type",
     artEinnahmen: "Income",
     artAusgaben: "Expenses",
     artUmbuchung: "Transfers",
@@ -4044,6 +4051,7 @@ const en: typeof de = {
     feldZielkonto: "Target account",
     feldZielkontoHinweis: "where the money goes — the payment is recognised by this route",
     ansicht: { liste: "List", faelligkeit: "Due date", turnus: "Frequency", kategorie: "Category" },
+    ansichtWahl: "View",
     ordnung: {
       liste: "by amount, largest first",
       faelligkeit: "by next payment",

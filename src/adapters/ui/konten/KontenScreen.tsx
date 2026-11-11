@@ -48,6 +48,9 @@ import { IconButton } from "../bausteine/IconButton";
 import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { Kaestchen } from "../bausteine/Kaestchen";
+import { Umschalter } from "../bausteine/Umschalter";
+import { Toggle } from "@base-ui/react/toggle";
+import { Button as BaseButton } from "@base-ui/react/button";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -540,16 +543,12 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--ink-3)" strokeWidth="2.2" style={{ position: "absolute", left: 10, pointerEvents: "none" }}><circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.5" y2="16.5" /></svg>
               <input className="field" style={{ width: "100%", paddingLeft: 30 }} value={regSuche} onChange={(e) => setRegSuche(e.target.value)} placeholder={t("konten.suche")} />
             </span>
-            <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
-              {ART_OPTS.map((opt, i) => {
-                const an = artFilter === opt.v;
-                return (
-                  <button key={opt.v} type="button" aria-pressed={an} onClick={() => setArtFilter(opt.v)} style={{ padding: "6px 11px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                    {t(opt.k)}
-                  </button>
-                );
-              })}
-            </div>
+            <Umschalter
+              label={t("konten.artWahl")}
+              optionen={ART_OPTS.map((opt) => ({ wert: opt.v, text: t(opt.k) }))}
+              wert={artFilter}
+              aufAendern={setArtFilter}
+            />
             <Auswahl
               ariaLabel={t("konten.alleKategorien")}
               wert={katFilter}
@@ -564,10 +563,11 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             {/* Erscheint nur, wenn es etwas zu sehen gibt. Ein Schalter, der dauerhaft
                 „0 mögliche Dubletten" anbietet, ist eine Frage ohne Antwort. */}
             {dublettenAnzahl > 0 && (
-              <button
-                type="button"
-                aria-pressed={nurDubletten}
-                onClick={() => setNurDubletten((x) => !x)}
+              // Base UI `Toggle`: ein Schalter, der gedrückt bleibt — `aria-pressed` kommt von
+              // dort, wie vorher von Hand.
+              <Toggle
+                pressed={nurDubletten}
+                onPressedChange={setNurDubletten}
                 style={{
                   padding: "5px 10px", fontSize: "12.5px", fontFamily: "var(--font-ui)",
                   fontWeight: "var(--fw-bold)", borderRadius: "var(--r-md)", cursor: "pointer",
@@ -578,7 +578,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 }}
               >
                 {t("konten.dubletten.filter", { n: dublettenAnzahl })}
-              </button>
+              </Toggle>
             )}
             <Kaestchen
               an={auswahlModus}
@@ -653,7 +653,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           Warnfarbe und Imperativ, weil er eine AUFFORDERUNG ist; grün und
                           „erledigt" lasen sich als Haken und damit als das Gegenteil. */}
                       {r.buchung?.zuPruefen && (
-                        <button
+                        <BaseButton
                           type="button"
                           aria-label={t("konten.pruefenWeg")}
                           title={t("konten.pruefenWeg")}
@@ -665,7 +665,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           }}
                         >
                           <Pill variant="warn">{t("konten.pillZuPruefen")}</Pill>
-                        </button>
+                        </BaseButton>
                       )}
                       {!r.zeile.gegenkontoId && r.zeile.quelle === "manuell" && <Pill variant="neutral">{t("konten.pillManuell")}</Pill>}
                       {/* Gehört die Zeile zu einem Vertrag, steht der Anbieter dran.
@@ -705,7 +705,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                         // Der title sitzt am Wrapper, nicht an der Pille: `bausteine/` ist teils aus
                         // dem Design-System kopiert und kennt die Eigenschaft nicht —
                         // dort wird nichts erfunden.
-                        <button
+                        <BaseButton
                           type="button"
                           aria-label={t("konten.vergleich.oeffnen")}
                           style={{ flex: "0 0 auto", display: "inline-flex", background: "none", border: 0, padding: 0, cursor: "pointer" }}
@@ -729,7 +729,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           <Pill variant="warn">
                             {t(r.dublette.urteil === "identisch" ? "konten.dubletten.sicher" : "konten.dubletten.verdacht")}
                           </Pill>
-                        </button>
+                        </BaseButton>
                       )}
                     </span>
                   ),

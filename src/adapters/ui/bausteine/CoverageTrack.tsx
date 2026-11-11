@@ -25,10 +25,15 @@ export interface CoverageTrackProps {
   right?: ReactNode;
   /** Überschreitung erzwingen; sonst gilt `value > max`. */
   over?: boolean;
+  /**
+   * Der Name des Balkens, wenn keine sichtbare Beschriftung dasteht (`label` leer) — in
+   * einer Liste, deren Zeile den Namen schon trägt. Ohne ihn hiesse der Balken nichts.
+   */
+  name?: string;
   style?: CSSProperties;
 }
 
-export function CoverageTrack({ value, max = 100, label, right, over, style }: CoverageTrackProps) {
+export function CoverageTrack({ value, max = 100, label, right, over, name, style }: CoverageTrackProps) {
   const sicheresMax = max > 0 ? max : 1;
   const pct = Math.max(0, Math.min(100, Math.round((value / sicheresMax) * 100)));
   const istUeber = over ?? value > max;
@@ -39,6 +44,7 @@ export function CoverageTrack({ value, max = 100, label, right, over, style }: C
       value={Math.max(0, Math.min(value, sicheresMax))}
       max={sicheresMax}
       getAriaValueText={rechtsText ? () => rechtsText : undefined}
+      aria-label={label ? undefined : name}
       style={style}
     >
       {(label || right) && (

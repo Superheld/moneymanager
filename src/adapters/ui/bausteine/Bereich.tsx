@@ -44,9 +44,9 @@ export function Bereich({
     <div className="screen">
       <PageHead title={titel} subtitle={offen?.untertitel} />
 
-      <Registerleiste register={register} aktiv={offen?.id} onWahl={setAktiv} />
-
-      <div role="tabpanel">{offen?.inhalt()}</div>
+      <Registerleiste register={register} aktiv={offen?.id} onWahl={setAktiv}>
+        {offen?.inhalt()}
+      </Registerleiste>
     </div>
   );
 }

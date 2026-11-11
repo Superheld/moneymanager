@@ -52,6 +52,7 @@ import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe, geldTon } from "../bausteine/geldFarbe";
 
 import type { KategorieSumme } from "../../../application";
+import { Umschalter } from "../bausteine/Umschalter";
 
 type Zeitraum = "12" | "24" | "jahr" | "alles";
 
@@ -474,7 +475,7 @@ export function AnalyseScreen() {
             register={registerListe}
             aktiv={wirksamesRegister}
             onWahl={(id) => setRegister(id as AnalyseRegister)}
-          />
+          >
 
           {wirksamesRegister === "verlauf" && (
             <Card
@@ -501,17 +502,13 @@ export function AnalyseScreen() {
 
 
               {/* Umschalter: eine Fläche, drei Blicke auf dieselben Monate. */}
-              <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)", marginBottom: "var(--sp-3)" }}>
-                {(["fluss", "saldo", "tabelle"] as const).map((a, i) => {
-                  const an = ansicht === a;
-                  return (
-                    <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
-                      style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                      {t(`historie.ansicht.${a}`)}
-                    </button>
-                  );
-                })}
-              </div>
+              <Umschalter
+                label={t("historie.ansichtWahl")}
+                optionen={(["fluss", "saldo", "tabelle"] as const).map((a) => ({ wert: a, text: t(`historie.ansicht.${a}`) }))}
+                wert={ansicht}
+                aufAendern={setAnsicht}
+                style={{ marginBottom: "var(--sp-3)" }}
+              />
 
               {verlauf.length > 0 && ansicht === "fluss" && (
                 <MonatsFlussChart
@@ -630,6 +627,7 @@ export function AnalyseScreen() {
             </div>
           )}
 
+          </Registerleiste>
         </>
       )}
 

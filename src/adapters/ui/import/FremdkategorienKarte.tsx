@@ -26,8 +26,9 @@ import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Fremdkategorienbefund } from "../../../application/import";
 import type { Kategorie } from "../../../application";
-import { Card, Button } from "../bausteine";
+import { Card } from "../bausteine";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
+import { Collapsible } from "@base-ui/react/collapsible";
 
 const KOPF = {
   textAlign: "left",
@@ -61,17 +62,15 @@ export function FremdkategorienKarte({
   const [offen, setOffen] = useState(offeneZiele > 0);
   if (befund.zeilen.length === 0) return null;
 
+  // Base UI `Collapsible`: der Titel ist der Auslöser, die Tabelle das Panel. Die Wurzel
+  // trägt den Abstand, den vorher die Karte trug.
   return (
+    <Collapsible.Root open={offen} onOpenChange={setOffen} style={{ marginTop: "var(--sp-4)" }}>
     <Card
-      style={{ marginTop: "var(--sp-4)" }}
       title={
-        <Button variant="link"
-          aria-expanded={offen}
-          onClick={() => setOffen((x) => !x)}
-          style={{ font: "inherit", color: "inherit" }}
-        >
+        <Collapsible.Trigger className="btn btn--link" style={{ font: "inherit", color: "inherit" }}>
           {offen ? "▾" : "▸"} {t("import.fremd.titel")}
-        </Button>
+        </Collapsible.Trigger>
       }
       subtitle={
         offen
@@ -81,8 +80,7 @@ export function FremdkategorienKarte({
             : t("import.fremd.kurz", { n: befund.zeilen.length })
       }
     >
-      {offen && (
-      <>
+      <Collapsible.Panel>
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
         <thead>
           <tr>
@@ -135,8 +133,8 @@ export function FremdkategorienKarte({
       <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: "var(--sp-3)" }}>
         {t("import.fremd.rest", { ohne: befund.ohneAngabe, um: befund.umbuchungen })}
       </div>
-      </>
-      )}
+      </Collapsible.Panel>
     </Card>
+    </Collapsible.Root>
   );
 }

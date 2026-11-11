@@ -14,6 +14,7 @@
 // Gezeichnet auf 24×24, `stroke="currentColor"` — die Farbe kommt vom Button.
 
 import type { CSSProperties, ReactElement, ReactNode } from "react";
+import { Button as BaseButton } from "@base-ui/react/button";
 
 export type IconName =
   | "bearbeiten"
@@ -156,17 +157,20 @@ export function IconButton({
   style?: CSSProperties;
 }) {
   return (
-    <button
+    <BaseButton
       type="button"
       className={ton === "gefahr" ? "iconbtn iconbtn-gefahr" : "iconbtn"}
       title={hinweis ?? label}
       aria-label={label}
       disabled={disabled}
+      // Gesperrt über `aria-disabled` statt das Attribut — derselbe Grund wie bei `Button`:
+      // ein natives `disabled` wirft den Fokus auf <body>.
+      focusableWhenDisabled
       onClick={(e) => { e.stopPropagation(); onClick(); }}
       style={style}
     >
       <Icon name={icon} />
-    </button>
+    </BaseButton>
   );
 }
 

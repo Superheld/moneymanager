@@ -23,6 +23,8 @@ import { useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { Aufklappflaeche } from "../bausteine/Aufklapptabelle";
 import { AUFKLAPP_ZEILEN_BREIT } from "../bausteine/aufklappen";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { Button as BaseButton } from "@base-ui/react/button";
 
 const MONATSNAMEN_KEY = "ausblick.monat";
 
@@ -205,14 +207,13 @@ function ZeileMitPosten({
   const geld = useGeld();
   const aufklappbar = zeile.posten.length > 0;
 
+  // Base UI `Collapsible`. Eine Zeile ohne Posten hat nichts aufzuklappen und ist kein
+  // Schalter — sie bekommt `disabled`, und damit weder Fokus noch Rolle als Knopf.
   return (
-    <div>
-      <div
-        role={aufklappbar ? "button" : undefined}
-        tabIndex={aufklappbar ? 0 : undefined}
-        aria-expanded={aufklappbar ? offen : undefined}
-        onClick={aufklappbar ? onToggle : undefined}
-        onKeyDown={aufklappbar ? (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onToggle()) : undefined}
+    <Collapsible.Root open={offen && aufklappbar} onOpenChange={onToggle} disabled={!aufklappbar}>
+      <Collapsible.Trigger
+        nativeButton={false}
+        render={<div />}
         style={{
           ...zeileGrid(zweiSpalten),
           padding: "9px 0",
@@ -234,9 +235,9 @@ function ZeileMitPosten({
         <span className="num" style={{ textAlign: "right", fontWeight: "var(--fw-bold)", color: geldFarbe(zeile.plan) }}>
           {geld.format(zeile.plan, { mitVorzeichen: true })}
         </span>
-      </div>
+      </Collapsible.Trigger>
 
-      {offen && (
+      <Collapsible.Panel>
         // Dieselbe Fläche wie überall, wo etwas aufklappt (`Aufklappflaeche`) — aber ohne
         // eigenes Tabellenraster: die Posten fluchten mit den Spalten der Zeile darüber.
         // Der negative Rand hebt dafür das Innenpolster auf. Der Deckel folgt der
@@ -259,8 +260,8 @@ function ZeileMitPosten({
                 />
               ))}
         </Aufklappflaeche>
-      )}
-    </div>
+      </Collapsible.Panel>
+    </Collapsible.Root>
   );
 }
 
@@ -334,9 +335,9 @@ function PlanPosten({
   // was hier klickbar ist, entscheidet der Inhalt der Zeile, nicht ihre Gestalt.
   const zeilenstil = { ...zeileGrid(zweiSpalten), padding: "5px 0", fontSize: "12.5px", alignItems: "baseline" } as const;
   return oeffnen ? (
-    <button type="button" className="buchungszeile" title={t("uebersicht.buchungOeffnen")} style={zeilenstil} onClick={oeffnen}>
+    <BaseButton type="button" className="buchungszeile" title={t("uebersicht.buchungOeffnen")} style={zeilenstil} onClick={oeffnen}>
       {inhalt}
-    </button>
+    </BaseButton>
   ) : (
     <div style={zeilenstil}>{inhalt}</div>
   );

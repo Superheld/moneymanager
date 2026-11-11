@@ -257,8 +257,9 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     rendere(<UebersichtScreen />);
     const nutzer = userEvent.setup();
     // Die Budget-Liste unten trägt denselben Kategorienamen wie die aufgeklappte
-    // Budgets-Zeile der Karte — deshalb über das aria-label der Kopfzeile greifen.
-    const kopf = await screen.findByLabelText(/Lebenshaltung/);
+    // Budgets-Zeile der Karte — deshalb über die aufklappende Kopfzeile greifen (seit der
+    // Balken darunter benannt ist, trägt auch er den Namen).
+    const kopf = await screen.findByRole("button", { name: /Lebenshaltung/ });
     expect(screen.queryByText("Wocheneinkauf")).not.toBeInTheDocument();
 
     await nutzer.click(kopf);
@@ -286,7 +287,7 @@ describe("Übersicht — Ausblick am echten Schema", () => {
 
     rendere(<UebersichtScreen />);
     const nutzer = userEvent.setup();
-    await nutzer.click(await screen.findByLabelText(/Lebenshaltung/));
+    await nutzer.click(await screen.findByRole("button", { name: /Lebenshaltung/ }));
 
     // Die Zeile hat die Rolle eines Knopfs und steht in der Tab-Reihenfolge — nur so ist
     // sie auch mit der Tastatur erreichbar (seit 2026-11-09 eine Tabellenzeile in

@@ -6,7 +6,8 @@
 // hat einen Stand, eine Bankverbindung und bald einen Abruf auf Knopfdruck.
 
 import { Datumsfeld } from "../bausteine/Datumsfeld";
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { Switch } from "@base-ui/react/switch";
+import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import {
   REGIONEN,
@@ -43,7 +44,6 @@ import {
   useExperimentSchalter,
   useRegionUmschalter,
 } from "../bausteine/einstellungenKontext";
-import { Kaestchen } from "../bausteine/Kaestchen";
 
 const CHARAKTERE: Charakter[] = ["Aufwand", "Ertrag", "Umschichtung"];
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };
@@ -194,13 +194,22 @@ function ExperimenteCard() {
 }
 
 /**
- * Eine Zeile mit einem Schalter: Kaestchen, fetter Titel, der aktuelle Stand und eine
+ * Eine Zeile mit einem Schalter: der Schalter, fetter Titel, der aktuelle Stand und eine
  * Erklaerung darunter.
  *
  * Hiess bis 2026-08-25 `ExperimentZeile` — nach ihrem ersten Anwendungsfall, nicht nach
  * dem, was sie ist. Beim zweiten (der Aktualisierungspruefung, die kein Experiment ist)
  * haette der Name gegen die Sache gestanden, und der naechste haette entweder einen
  * falschen Namen benutzt oder die Zeile ein zweites Mal gebaut.
+ *
+ * **Base UI `Switch`, kein Kaestchen** (seit 2026-11-10). Ein Kaestchen sagt „angekreuzt",
+ * ein Schalter „an/aus" — und die Zeile sagt selbst „an" und „aus". Eine Vorlesehilfe
+ * meldet jetzt „Schalter, ein" statt „Kontrollkaestchen, aktiviert".
+ *
+ * Name und Beschreibung sind getrennt verbunden: der NAME ist der Titel allein
+ * (`aria-labelledby` auf ein unsichtbares Element — das umschliessende `<label>` wuerde
+ * sonst den ganzen Absatz zum Namen machen, siehe `Kaestchen`), die Erklaerung ist die
+ * Beschreibung. Das `<label>` bleibt, damit ein Klick auf den Text schaltet.
  */
 function SchalterZeile({
   titel,
@@ -214,11 +223,22 @@ function SchalterZeile({
   aufSchalten: (an: boolean) => void;
 }) {
   const { t } = useTranslation();
+  const nameId = useId();
+  const textId = useId();
   return (
-    // `label`: der Text daneben traegt auch Zustand und Erklaerung — als Name waere das
-    // ein ganzer Absatz, und mit dem zweiten Experiment waeren beide nicht mehr
-    // auseinanderzuhalten.
-    <Kaestchen an={an} aufAendern={aufSchalten} label={titel} oben style={{ gap: "var(--sp-3)", display: "flex" }}>
+    <label className="schalterzeile">
+      <Switch.Root
+        className="schalter"
+        checked={an}
+        onCheckedChange={(neu) => aufSchalten(neu)}
+        aria-labelledby={nameId}
+        aria-describedby={textId}
+      >
+        <Switch.Thumb className="schalter-knopf" />
+      </Switch.Root>
+      <span id={nameId} hidden>
+        {titel}
+      </span>
       <span>
         <span style={{ fontWeight: "var(--fw-bold)" }}>{titel}</span>
         {" · "}
@@ -226,24 +246,14 @@ function SchalterZeile({
           {an ? t("einstellungen.experiment.an") : t("einstellungen.experiment.aus")}
         </span>
         <br />
-        <span className="muted">{text}</span>
+        <span className="muted" id={textId}>
+          {text}
+        </span>
       </span>
-    </Kaestchen>
+    </label>
   );
 }
 
-/**
- * Ob die App beim Start nach einer neueren Fassung sucht.
- *
- * Der Schalter war seit dem Update-Weg gebaut und geprueft (`pruefungSchalten`), hatte
- * aber keine Oberflaeche — abschalten ging nur ueber die Einstellungstabelle. Eine
- * Faehigkeit, die niemand erreicht, ist keine.
- *
- * Er steht in einem EIGENEN Register und nicht bei den Experimenten: die Pruefung ist
- * keins, sie ist an, und sie ist der einzige Netzzugriff, den die App von sich aus macht
- * (siehe `application/aktualisierung.ts`). Genau das ist der Grund, warum sie abschaltbar
- * sein muss — und der gehoert danebengeschrieben, nicht in eine Fussnote.
- */
 function AktualisierungCard() {
   const { t } = useTranslation();
   const [an, setAn] = useState<boolean | null>(null);
@@ -255,7 +265,7 @@ function AktualisierungCard() {
   }, []);
 
   async function schalten(neu: boolean) {
-    // Erst schreiben, dann anzeigen: bliebe das Kaestchen bei einem Fehler umgelegt
+    // Erst schreiben, dann anzeigen: bliebe der Schalter bei einem Fehler umgelegt
     // stehen, zeigte es einen Zustand, den die Datenbank nicht hat.
     await aktualisierungspruefungSetzen(neu);
     setAn(neu);

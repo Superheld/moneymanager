@@ -55,6 +55,7 @@ import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useGeld, fehlerNachricht, type Geld } from "../bausteine/einstellungenKontext";
 import { Kaestchen } from "../bausteine/Kaestchen";
+import { Collapsible } from "@base-ui/react/collapsible";
 
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
 
@@ -223,7 +224,9 @@ export function formularAusBuchung(
  * zugeklappten Zeile. Aufklappen muss nur, wer ÄNDERN will.
  *
  * Bewusst kein `<details>`: dessen Marker und Bündigkeit lassen sich über Browser
- * hinweg nicht verlässlich an die übrigen Abschnittsköpfe angleichen.
+ * hinweg nicht verlässlich an die übrigen Abschnittsköpfe angleichen. Base UI
+ * `Collapsible` (seit 2026-11-10) verbindet Kopf und Inhalt über `aria-controls`, ohne
+ * Vorgaben fürs Aussehen.
  */
 function Abschnitt({ titel, hinweis, einklappbar, children }: {
   titel: string;
@@ -246,22 +249,26 @@ function Abschnitt({ titel, hinweis, einklappbar, children }: {
 
   const kopfStil = { display: "flex", alignItems: "baseline", gap: 8, borderTop: "1px solid var(--line)", paddingTop: "var(--sp-3)" } as const;
 
-  return (
-    <section style={{ display: "flex", flexDirection: "column", gap: zugeklappt ? 0 : "var(--sp-3)" }}>
-      {einklappbar ? (
-        <button
-          type="button"
-          aria-expanded={offen}
-          onClick={() => setOffen((o) => !o)}
-          style={{ ...kopfStil, width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", textAlign: "left", cursor: "pointer", fontFamily: "var(--font-ui)", paddingLeft: 0, paddingRight: 0, paddingBottom: zugeklappt ? "var(--sp-3)" : 0 }}
-        >
-          {kopf}
-        </button>
-      ) : (
+  const spalte = { display: "flex", flexDirection: "column", gap: "var(--sp-3)" } as const;
+
+  if (!einklappbar) {
+    return (
+      <section style={spalte}>
         <div style={kopfStil}>{kopf}</div>
-      )}
-      {!zugeklappt && children}
-    </section>
+        {children}
+      </section>
+    );
+  }
+
+  return (
+    <Collapsible.Root open={offen} onOpenChange={setOffen} render={<section />} style={{ ...spalte, gap: zugeklappt ? 0 : "var(--sp-3)" }}>
+      <Collapsible.Trigger
+        style={{ ...kopfStil, width: "100%", background: "none", border: "none", borderTop: "1px solid var(--line)", textAlign: "left", cursor: "pointer", fontFamily: "var(--font-ui)", paddingLeft: 0, paddingRight: 0, paddingBottom: zugeklappt ? "var(--sp-3)" : 0 }}
+      >
+        {kopf}
+      </Collapsible.Trigger>
+      <Collapsible.Panel style={spalte}>{children}</Collapsible.Panel>
+    </Collapsible.Root>
   );
 }
 

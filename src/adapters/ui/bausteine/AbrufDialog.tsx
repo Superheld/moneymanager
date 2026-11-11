@@ -18,6 +18,7 @@ import { Button, FormField } from ".";
 import { Auswahl } from "./Auswahl";
 import { beiEnter } from "./beiEnter";
 import { Modal } from "./Modal";
+import { NumberField } from "@base-ui/react/number-field";
 
 function heuteIso(): string {
   const n = new Date();
@@ -190,18 +191,25 @@ export function AbrufDialog({
                 ]}
               />
               {eigenerZeitraum && (
-                <input
-                  className="field"
-                  type="number"
+                // Base UI `NumberField`: nimmt nur ganze Tage und lässt sich mit den
+                // Pfeiltasten stufen. KEIN `max` an der Bankgrenze, und das ist Absicht:
+                // ein Feld, das still auf die Grenze kappt, nähme die Ansage darunter weg
+                // („die Bank liefert nur so weit zurück") — wer mehr eintippt, soll lesen,
+                // warum er weniger bekommt.
+                <NumberField.Root
                   min={1}
-                  max={grenze ?? undefined}
+                  step={1}
+                  value={rueckgriff ? Number(rueckgriff) : null}
+                  onValueChange={(n) => setRueckgriff(n === null || Number.isNaN(n) ? "" : String(Math.round(n)))}
                   style={{ marginTop: "var(--sp-2)" }}
-                  aria-label={t("konten.abruf.zeitraumEigenFeld")}
-                  placeholder={t("konten.abruf.zeitraumEigenPlatzhalter")}
-                  value={rueckgriff}
-                  onChange={(e) => setRueckgriff(e.target.value)}
-                  autoFocus
-                />
+                >
+                  <NumberField.Input
+                    className="field"
+                    aria-label={t("konten.abruf.zeitraumEigenFeld")}
+                    placeholder={t("konten.abruf.zeitraumEigenPlatzhalter")}
+                    autoFocus
+                  />
+                </NumberField.Root>
               )}
               {/* Kein Fehler, sondern eine Ansage: die Bank liefert schlicht weniger, und
                   ohne diesen Satz liest sich das Ergebnis wie ein vollständiger Abruf. */}
