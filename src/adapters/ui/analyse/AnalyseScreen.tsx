@@ -53,6 +53,7 @@ import { geldFarbe, geldTon } from "../bausteine/geldFarbe";
 
 import type { KategorieSumme } from "../../../application";
 import { Umschalter } from "../bausteine/Umschalter";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 type Zeitraum = "12" | "24" | "jahr" | "alles";
 
@@ -258,7 +259,7 @@ export function AnalyseScreen() {
     laden();
     depots()
       .then(setDepotdaten)
-      .catch(() => setDepotdaten(null));
+      .catch((e) => { fehlerMelden(e); setDepotdaten(null); });
   }, []);
 
   const heute = useMemo(() => toIsoHeute(), []);

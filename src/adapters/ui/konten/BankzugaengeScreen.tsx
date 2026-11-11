@@ -42,6 +42,7 @@ import { IconButton } from "../bausteine/IconButton";
 import { Modal } from "../bausteine/Modal";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 interface KontoZeile extends Bankkonto {
   saldo?: number;
@@ -109,7 +110,7 @@ export function BankzugaengeScreen({
   }
 
   useEffect(() => {
-    laden().catch(() => setZugaenge([]));
+    laden().catch((e) => { fehlerMelden(e); setZugaenge([]); });
   }, []);
 
   async function pruefen(zugang: Bankzugang, geheim: string) {

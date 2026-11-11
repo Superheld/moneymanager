@@ -70,6 +70,7 @@ import { VermoegenKarte } from "./VermoegenKarte";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { Collapsible } from "@base-ui/react/collapsible";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 function heuteIso(): string {
   const n = new Date();
@@ -123,14 +124,14 @@ export function UebersichtScreen() {
     }
     abrufstand(heute)
       .then(setAbruf)
-      .catch(() => setAbruf(null));
+      .catch((e) => { fehlerMelden(e); setAbruf(null); });
   }
 
   useEffect(() => {
     laden();
     depots()
       .then(setDepotdaten)
-      .catch(() => setDepotdaten(null));
+      .catch((e) => { fehlerMelden(e); setDepotdaten(null); });
   }, [heute]);
 
   /**

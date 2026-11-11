@@ -19,6 +19,7 @@ import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { AbgleichModal, KassensturzModal } from "./KontostandModal";
 import { Collapsible } from "@base-ui/react/collapsible";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 export function AbgleichBereich() {
   const { t } = useTranslation();
@@ -35,9 +36,9 @@ export function AbgleichBereich() {
     setZeilen(await abgleichLaden());
   }
   useEffect(() => {
-    laden().catch(() => {
-      /* reiner Browser-Modus ohne SQLite */
-    });
+    // Schlägt das Laden fehl, bleibt die Liste leer — aber mit Meldung: eine stumme leere
+    // Liste sähe aus wie „du hast keine" (siehe `Meldungen`).
+    laden().catch(fehlerMelden);
   }, []);
 
   // Konten mit Abweichung zuerst: wer hier hereinschaut, sucht ein Problem, und die

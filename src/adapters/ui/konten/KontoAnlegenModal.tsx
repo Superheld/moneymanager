@@ -184,7 +184,10 @@ export function KontoAnlegenModal({
     setBusy(true);
     setFehler(null);
     try {
-      const bekannteBuchungen = await umsaetze().catch(() => []);
+      // KEIN Rückfall auf eine leere Liste: sie dient dazu, schon bekannte Buchungen zu
+      // erkennen. Still leer, gälte nichts als bekannt — und der Abruf legte Dubletten an.
+      // Der Fehler geht an den `catch` unten und steht im Dialog.
+      const bekannteBuchungen = await umsaetze();
       for (const k of bankkonten ?? []) {
         const wahl = wahlen[k.schluessel];
         if (!wahl || wahl.ziel === "ignorieren") continue;

@@ -51,6 +51,7 @@ import { Kaestchen } from "../bausteine/Kaestchen";
 import { Umschalter } from "../bausteine/Umschalter";
 import { Toggle } from "@base-ui/react/toggle";
 import { Button as BaseButton } from "@base-ui/react/button";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -128,7 +129,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       kontenLaden(),
       vertragsliste(),
       letztesKonto(),
-      kontobelegung(heute).catch(() => null),
+      // Ohne Belegung steht der Auszug trotzdem da — gemeldet wird es aber.
+      kontobelegung(heute).catch((e) => { fehlerMelden(e); return null; }),
     ]);
     setSicht(s);
     setBelegung(bel);

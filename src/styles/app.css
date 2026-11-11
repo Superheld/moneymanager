@@ -23,6 +23,33 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* --- Fokus: EINE Regel fuer alles, was man ansteuern kann ---
+   Bis 2026-11-10 hatte jedes Bedienteil seine eigene `:focus-visible`-Regel — oder
+   keine, und dann hing es am Browser-Standard, der in WebKit je nach Element fehlt.
+   `:where` haelt die Spezifitaet bei null: jede Regel eines Bausteins (Rahmen innen statt
+   aussen, andere Farbe) gewinnt weiterhin, und wo keiner etwas sagt, steht der Ring.
+   Felder (`.field`) zeigen den Fokus ueber ihren Rahmen und nehmen den Ring zurueck. */
+:where(button, a[href], input, select, textarea, summary, [tabindex]:not([tabindex="-1"]), [role="button"], [role="tab"], [role="checkbox"], [role="radio"], [role="switch"]):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* --- Bewegung: wer sie abgeschaltet hat, bekommt keine ---
+   Eine Regel fuer alles statt einer je Stelle: die Schublade hatte ihre eigene, Dialoge,
+   Aufklapper und Schalter keine. Uebergaenge laufen dann in einem Augenblick ab — nicht
+   `none`, weil Base UI beim Schliessen auf das Ende eines Uebergangs wartet und ein
+   fehlender nie endet. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 /* ============================================================
    Die Navigation in drei Stufen — mobile first.
 
@@ -143,12 +170,7 @@ body {
   transform: none;
   visibility: visible;
 }
-@media (prefers-reduced-motion: reduce) {
-  .side,
-  .side-scrim {
-    transition: none;
-  }
-}
+/* Reduzierte Bewegung: die Regel ganz oben gilt auch hier. */
 
 /* Der sichtbare Weg zurück. Der Scrim allein reicht nicht: die Schublade nimmt fast die
    ganze Breite, und der Streifen daneben liest sich nicht als Bedienteil. */
@@ -1335,6 +1357,70 @@ select.field.tabellenfilter {
   .dialog-kasten[data-ending-style] {
     opacity: 0;
   }
+}
+
+/* --- Meldungen (bausteine/Meldungen.tsx, Base UI `Toast`) ---
+   Unten rechts, ueber allem; schmal ueber die volle Breite. Ein Fehler traegt die
+   Warnfarbe als Rand, nicht als Flaeche — die Meldung soll gelesen werden, nicht
+   erschrecken. */
+.meldungen {
+  position: fixed;
+  z-index: calc(var(--z-schwebend) + 10);
+  right: max(16px, env(safe-area-inset-right));
+  bottom: max(16px, env(safe-area-inset-bottom));
+  left: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-2);
+  pointer-events: none;
+}
+@media (min-width: 700px) {
+  .meldungen {
+    left: auto;
+    width: 380px;
+  }
+}
+.meldung {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: var(--sp-3);
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-pop);
+}
+.meldung[data-art="fehler"] {
+  border-left: 3px solid var(--warn);
+}
+.meldung-inhalt {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.meldung-titel {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-bold);
+}
+.meldung-text {
+  margin: 2px 0 0;
+  font-size: var(--fs-xs);
+  color: var(--ink-2);
+  overflow-wrap: anywhere;
+}
+.meldung-zu {
+  flex: 0 0 auto;
+  border: 0;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 13px;
+}
+.meldung-zu:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ============================================================

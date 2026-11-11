@@ -19,6 +19,7 @@ import { Auswahl } from "./Auswahl";
 import { beiEnter } from "./beiEnter";
 import { Modal } from "./Modal";
 import { NumberField } from "@base-ui/react/number-field";
+import { fehlerMelden } from "./Meldungen";
 
 function heuteIso(): string {
   const n = new Date();
@@ -71,7 +72,7 @@ export function AbrufDialog({
         setZugaenge(z);
         setZugangId(z.find((x) => x.id === vorgewaehlt)?.id ?? z[0]?.id ?? "");
       })
-      .catch(() => setZugaenge([]));
+      .catch((e) => { fehlerMelden(e); setZugaenge([]); });
   }, []);
 
   /**

@@ -82,6 +82,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Eine von mehreren Antworten | `buchung/Optionsgruppe` mit `Option` — bisher nur im Buchungsdialog |
 | Knopf | `Button` — `primary` Hauptaktion, `link` gedämpfte Nebenaktion („Abbrechen"), `laeuft` sperrt während einer Handlung; Zeilenaktion als Icon: `IconButton` |
 | Dialog | `Modal` (Base UI `Dialog`; `warnung` für Rückfragen); vor dem Löschen: `Loeschfrage` |
+| Fehler, den kein Screen am Ort zeigen kann | `fehlerMelden` aus `Meldungen` (Base UI `Toast`) — nie still `.catch(() => [])` |
 | Bankabruf, TAN | `AbrufDialog`, `TanDialog` |
 | Geld, Prozent, Farbe | `useGeld()`, `useProzent()`, `geldFarbe.ts` (unten) |
 | Enter bestätigt | `beiEnter` |
@@ -198,6 +199,7 @@ Wo es heute steht:
 | Schalter in den Einstellungen | Kästchen | Base UI `Switch` |
 | `konten/BankSuche` | Vorschlagsliste ohne Rollen | Base UI `Combobox` |
 | Zahlenfeld im `AbrufDialog` | `<input type="number">` | Base UI `NumberField` |
+| `bausteine/Meldungen` | geschluckte Fehler, leere Listen | Base UI `Toast` |
 | `IconButton`, `Zeilenlink`, die Knöpfe in Shell, Kalender, Picker | roher `<button>` | Base UI `Button` |
 
 **Was bewusst Eigenbau bleibt** — jede Stelle mit Grund, und `bedienteile.test.ts` lässt

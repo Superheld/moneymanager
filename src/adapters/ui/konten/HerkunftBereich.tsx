@@ -24,6 +24,7 @@ import { DataTable } from "../bausteine/DataTable";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { Umschalter } from "../bausteine/Umschalter";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 type Statusfilter = "alle" | "verbucht" | "weggelegt" | "offen";
 
@@ -80,9 +81,9 @@ export function HerkunftBereich({
     setKonten(await herkunftLaden());
   }
   useEffect(() => {
-    laden().catch(() => {
-      /* reiner Browser-Modus ohne SQLite */
-    });
+    // Schlägt das Laden fehl, bleibt die Liste leer — aber mit Meldung: eine stumme leere
+    // Liste sähe aus wie „du hast keine" (siehe `Meldungen`).
+    laden().catch(fehlerMelden);
   }, []);
 
   const aktiv = konten.find((k) => k.konto.id === gewaehlt);

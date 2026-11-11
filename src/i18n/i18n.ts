@@ -2110,6 +2110,11 @@ const de = {
     neuLaden: "App neu laden",
     technisch: "Technische Meldung:",
   },
+  meldung: {
+    fehlerTitel: "Das hat nicht geklappt",
+    schliessen: "Meldung schließen",
+    bereich: "Meldungen",
+  },
   zugang: {
     einrichtenTitel: "Zugang einrichten",
     einrichtenNeu:
@@ -4232,6 +4237,11 @@ const en: typeof de = {
     nochmal: "Try again",
     neuLaden: "Reload app",
     technisch: "Technical message:",
+  },
+  meldung: {
+    fehlerTitel: "That did not work",
+    schliessen: "Close message",
+    bereich: "Notifications",
   },
   zugang: {
     einrichtenTitel: "Set up access",
