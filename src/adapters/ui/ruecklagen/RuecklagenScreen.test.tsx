@@ -226,4 +226,16 @@ describe("Rücklagen — diesen Monat und die Faustformel", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/50 %/));
     expect(document.body.textContent).toMatch(/1\.500,00/);
   });
+
+  it("steht auch ohne Vertragseinnahmen da und sagt, warum es keinen Zeiger hat", async () => {
+    // Bis 2026-11-11 fehlte die Karte dann ganz — und das sah aus wie ein Fehler.
+    const { default: i18n } = await import("../../../i18n/i18n");
+    const { sqliteZahlungskontoRepository } = await import("../../persistence/sqliteStammdatenRepositories");
+    await sqliteZahlungskontoRepository.speichern({ id: "tg", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 42000 });
+    rendere(<RuecklagenScreen />);
+    expect(await screen.findByRole("img", { name: i18n.t("ruecklagen.tachoOhneMassstabAria") })).toBeInTheDocument();
+    expect(document.body.textContent).toContain(i18n.t("ruecklagen.mindestTitel"));
+    // Der Stand der Rücklagenkonten steht im Hinweis.
+    expect(document.body.textContent).toMatch(/420,00/);
+  });
 });

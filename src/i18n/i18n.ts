@@ -783,9 +783,9 @@ const de = {
     titel: "Rücklagen",
     untertitel: "Was du zurücklegst für das, was noch kommt — und was es dich monatlich kostet",
     ruecklage: "Rücklage",
-    kpiAnzahl: "Rücklagen",
+    standTitel: "Wo die Rücklagen stehen",
+    standUntertitel: "Was die Rechnung verlangt und was auf den Konten liegt",
     kpiZielwert: "Ziele gesamt",
-    kpiProMonat: "Rate / Monat",
     kpiSoll: "Soll heute",
     kpiTatsaechlich: "Tatsächlich da",
     kpiDeckung: "Deckungsgrad",
@@ -817,6 +817,9 @@ const de = {
     tachoVon: "von {{mindest}}",
     tachoErreicht: "Die Faustformel ist erreicht.",
     tachoFehlt: "Bis zur Faustformel fehlen {{betrag}}.",
+    tachoOhneMassstabAria: "Faustformel ohne Massstab — es gibt keinen Vertrag mit Einnahmen",
+    tachoOhneMassstab:
+      "Kein Vertrag mit Einnahmen, also kein Massstab: die Faustformel rechnet mit drei Monaten deiner vertraglichen Einnahmen. Leg dein Gehalt als Vertrag an, dann steht hier der Zeiger. Auf den Rücklagenkonten liegen {{stand}}.",
     flussOhnePlan:
       "Es ist noch keine Umbuchung eingerichtet. Ein Vertrag der Art „Umbuchung\" bucht regelmäßig von einem liquiden Konto auf ein Rücklagenkonto — und wird dann auch als geflossen erkannt.",
     mindestTitel: "Mindestrücklage (Faustformel)",
@@ -2961,9 +2964,9 @@ const en: typeof de = {
     titel: "Reserves",
     untertitel: "What you set aside for what is still to come — and what it costs you per month",
     ruecklage: "Reserve",
-    kpiAnzahl: "Reserves",
+    standTitel: "Where the reserves stand",
+    standUntertitel: "What the calculation asks for and what is on the accounts",
     kpiZielwert: "Total targets",
-    kpiProMonat: "Rate / month",
     kpiSoll: "Target today",
     kpiTatsaechlich: "Actually there",
     kpiDeckung: "Coverage",
@@ -2995,6 +2998,9 @@ const en: typeof de = {
     tachoVon: "of {{mindest}}",
     tachoErreicht: "The rule of thumb is reached.",
     tachoFehlt: "{{betrag}} short of the rule of thumb.",
+    tachoOhneMassstabAria: "Rule of thumb without a measure — there is no contract with income",
+    tachoOhneMassstab:
+      "No contract with income, so no measure: the rule of thumb uses three months of your contractual income. Add your salary as a contract and the needle appears here. The reserve accounts hold {{stand}}.",
     flussOhnePlan:
       "No transfer is set up yet. A contract of the kind „transfer\" moves money regularly from a liquid account to a reserve account — and is then recognised as having flowed.",
     mindestTitel: "Minimum reserve (rule of thumb)",

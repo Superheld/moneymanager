@@ -24,8 +24,13 @@ export function FaustformelTacho({ stand, mindest }: { stand: number; mindest: n
   const cx = breite / 2;
   const cy = 120;
   const r = 96;
+  // Ohne Vertragseinnahmen gibt es keine Mindestrücklage und damit keinen Massstab. Das
+  // Tacho steht trotzdem da — leer, ohne Nadel und Marke — und sagt, was ihm fehlt. Bis
+  // 2026-11-11 verschwand die ganze Karte, und das sah aus wie ein Fehler, nicht wie
+  // eine Auskunft.
+  const ohneMassstab = mindest <= 0;
   const max = mindest * BOGEN_ENDE;
-  const anteil = Math.max(0, Math.min(1, stand / max));
+  const anteil = ohneMassstab ? 0 : Math.max(0, Math.min(1, stand / max));
   const erreicht = stand >= mindest;
   const prozent = Math.round((stand / mindest) * 100);
 
@@ -44,6 +49,22 @@ export function FaustformelTacho({ stand, mindest }: { stand: number; mindest: n
   const mAussen = punkt(marke, r + 14);
   const nadel = punkt(anteil, r - 26);
   const farbe = erreicht ? "var(--accent)" : "var(--warn)";
+
+  if (ohneMassstab) {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-2)" }}>
+        <svg viewBox={`0 0 ${breite} ${hoehe}`} width="100%" style={{ maxWidth: 280, display: "block" }} role="img" aria-label={t("ruecklagen.tachoOhneMassstabAria")}>
+          <path d={bogen(1)} fill="none" stroke="var(--line)" strokeWidth="14" strokeLinecap="round" />
+          <text x={cx} y={cy + 32} textAnchor="middle" fontSize="22" fontWeight="700" fill="var(--ink-3)" fontFamily="var(--font-ui)">
+            –
+          </text>
+        </svg>
+        <div className="hinweis" style={{ textAlign: "center", maxWidth: 320 }}>
+          {t("ruecklagen.tachoOhneMassstab", { stand: geld.formatMitSymbol(stand) })}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "var(--sp-2)" }}>
