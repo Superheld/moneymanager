@@ -516,6 +516,35 @@ select.field {
   outline-offset: -2px;
 }
 
+/* --- DataTable (bausteine/DataTable.tsx) ---
+   Eine klickbare Zeile traegt den Fokus selbst (Tab, Enter, Leertaste). Der Rahmen liegt
+   INNEN, weil `overflow` am Tabellenrahmen einen aeusseren abschneiden wuerde. */
+tr.datentabelle-zeile--klickbar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.datentabelle-seiten {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+  flex-wrap: wrap;
+}
+.datentabelle-seitenfeld {
+  width: 5.5ch;
+  padding: 2px 4px;
+  text-align: center;
+  font-size: var(--fs-xs);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm, 4px);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-family: inherit;
+}
+
 /* In `Aufklapptabelle` ist die Zeile ein `tr` und kann kein Knopf sein — sie traegt
    deshalb role="button", tabIndex und reagiert auf Enter/Leertaste. Die Klasse liefert
    nur Flaeche und Fokusrahmen. */
@@ -744,6 +773,14 @@ select.field.tabellenfilter {
 .btn--ghost:hover:not([data-disabled]) {
   background: var(--surface-2);
   border-color: transparent;
+}
+
+/* Fuer Bedienteile, die neben einer Tabelle stehen (Blaettern) — sie konkurrieren sonst
+   mit ihr um Aufmerksamkeit. Masse aus der frueheren Seitensteuerung der DataTable. */
+.btn--klein {
+  padding: 4px 10px;
+  font-size: 13px;
+  font-weight: var(--fw-regular);
 }
 
 /* Die gedaempfte NEBENAKTION („Abbrechen", „Auswahl aufheben") — frueher `.linkbtn`.

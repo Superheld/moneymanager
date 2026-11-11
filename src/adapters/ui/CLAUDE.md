@@ -67,7 +67,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 |---|---|
 | Fläche um einen Inhalt | `Card` (nie eine Karte IN einer Karte, unten) |
 | Seitenkopf mit Aktion | `PageHead`; Bereich mit Reitern: `Bereich`, die Reiter allein `Registerleiste` |
-| Tabelle | `DataTable` — Sortierung, Seiten, Zeilenklick, schmale Form |
+| Tabelle | `DataTable` — Sortierung, Seiten, Zeilenklick (auch per Tastatur), schmale Form |
 | Bezeichner in einer Zeile, der aufklappt | `Zeilenlink` |
 | Liste, die unter einer Zeile aufklappt | `Aufklapptabelle`; nur die Fläche: `Aufklappflaeche`; Höhe: `aufklappen.ts` |
 | Buchungen eines Budgets | `BudgetPostenliste` (auf `Aufklapptabelle`) |

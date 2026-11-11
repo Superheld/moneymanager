@@ -40,6 +40,8 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
    * „geht gerade nicht" gegen „geht nicht" — und der Zeiger das zeigen soll.
    */
   laeuft?: boolean;
+  /** `klein` für Bedienteile neben einer Tabelle (Blättern) — kleiner und nicht fett. */
+  groesse?: "normal" | "klein";
 }
 
 const KLASSE: Record<ButtonVariante, string> = {
@@ -53,6 +55,7 @@ export function Button({
   variant = "default",
   plus = false,
   laeuft = false,
+  groesse = "normal",
   disabled,
   type = "button",
   children,
@@ -63,7 +66,7 @@ export function Button({
       {...rest}
       // Eine unbekannte Variante (aus einem Aufruf, den der Typ nicht sieht) fällt auf den
       // normalen Knopf zurück, statt ohne Aussehen dazustehen.
-      className={KLASSE[variant] ?? KLASSE.default}
+      className={(KLASSE[variant] ?? KLASSE.default) + (groesse === "klein" ? " btn--klein" : "")}
       type={type}
       disabled={disabled || laeuft}
       focusableWhenDisabled

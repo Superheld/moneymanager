@@ -15,7 +15,7 @@ Baustein, sondern ein Teil dieses Screens.
 
 ## Der Design-System-Teil
 
-Die `.jsx`/`.d.ts`-Dateien (`Card`, `KPIStat`, `Pill`, `CoverageTrack`, `DataTable`,
+Die `.jsx`/`.d.ts`-Dateien (`Card`, `KPIStat`, `Pill`, `CoverageTrack`,
 `FormField` mit `Input`) stammen aus dem Design-System, das ausserhalb
 des Repos liegt. Es ist eine **Vorlage, keine Vorgabe**: was hier liegt, gehört der App und
 darf geändert werden. Wer aus dem Design-System nachzieht, holt sich einen Vorschlag, keine
@@ -23,7 +23,8 @@ Wahrheit — und prüft, was hier inzwischen weiterentwickelt wurde.
 
 `Button` kam ebenfalls von dort und ist seit 2026-11-10 TypeScript auf Base UI `Button`
 (warum, steht im Kopf der Datei und in `../CLAUDE.md` unter „Bedienteile"). `Dialog` ist
-am selben Tag in `Modal` aufgegangen, auf Base UI `Dialog` (unten). Die übrigen
+am selben Tag in `Modal` aufgegangen, auf Base UI `Dialog` (unten), und `DataTable` ist
+TypeScript (die Seitensteuerung auf `Button` und Base UI `NumberField`). Die übrigen
 folgen demselben Weg: nach `.tsx`, die `.d.ts` fällt weg, und wo Base UI ein Gegenstück
 hat, steht es darunter.
 
@@ -356,6 +357,13 @@ Die Ränder folgen `env(safe-area-inset-*)`: schmal liegt der Dialog unter der K
 über der Wischleiste, und beide sind je nach Gerät verschieden hoch.
 
 ## Zwei Fallen, die man kennen muss
+
+**Klickbare Zeilen der `DataTable` nehmen den Fokus selbst** (seit 2026-11-10): `tabIndex`,
+Enter und Leertaste, `aria-current` an der offenen Zeile. Sie bleiben dabei Tabellenzeilen
+und werden NICHT `role="button"` wie in `Aufklapptabelle` — dort ist eine Zeile eine
+einzelne Buchung, die als Ganzes gelesen wird; hier ist es eine Zeile einer Tabelle, die
+eine Vorlesehilfe weiter spaltenweise lesen können soll. Einen `Zeilenlink` braucht es für
+die Tastatur damit nicht mehr; für das SEHEN bleibt er der bessere Weg (unten).
 
 **`DataTable` ist die App-Fassung**, nicht die des Design-Systems: sie trägt Sortierung,
 Pagination, Zeilenklick, Spaltenbreiten, feste Zeilenhöhe, die Breitenkappung (innerer
