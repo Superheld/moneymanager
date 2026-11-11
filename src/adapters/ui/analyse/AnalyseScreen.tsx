@@ -476,6 +476,7 @@ export function AnalyseScreen() {
             register={registerListe}
             aktiv={wirksamesRegister}
             onWahl={(id) => setRegister(id as AnalyseRegister)}
+            stapeln
           >
 
           {wirksamesRegister === "verlauf" && (

@@ -31,15 +31,26 @@ export function Registerleiste({
   aktiv,
   onWahl,
   children,
+  stapeln = false,
 }: {
   register: readonly Register[];
   aktiv: string | undefined;
   onWahl: (id: string) => void;
   /** Der Inhalt des aktiven Registers. */
   children?: ReactNode;
+  /**
+   * Die Kinder des Registers stehen als Karten untereinander und bekommen den
+   * Kartenabstand von hier (die Analyse). Ohne die Angabe ordnet der Inhalt sich selbst
+   * (`Bereich`: jedes Register ist eine eigene Komponente mit eigenem Aufbau).
+   */
+  stapeln?: boolean;
 }) {
+  // Die Wurzel ist selbst ein Stapel mit Kartenabstand: vorher standen Leiste und Inhalt
+  // als zwei Kinder in `.screen`, und der Abstand dazwischen kam von dort. Seit beides in
+  // EINER Wurzel steht, muss sie ihn selbst tragen — sonst rückt der Inhalt um genau
+  // diesen Abstand an die Leiste heran (am Bildschirmvergleich gefunden).
   return (
-    <Tabs.Root value={aktiv ?? null} onValueChange={(id) => onWahl(String(id))}>
+    <Tabs.Root className="registerbereich" value={aktiv ?? null} onValueChange={(id) => onWahl(String(id))}>
       <Tabs.List className="registerleiste">
         {register.map((r) => (
           <Tabs.Tab key={r.id} value={r.id} className="registerleiste-reiter">
@@ -47,7 +58,11 @@ export function Registerleiste({
           </Tabs.Tab>
         ))}
       </Tabs.List>
-      {aktiv !== undefined && <Tabs.Panel value={aktiv}>{children}</Tabs.Panel>}
+      {aktiv !== undefined && (
+        <Tabs.Panel value={aktiv} className={stapeln ? "registerinhalt--stapel" : undefined}>
+          {children}
+        </Tabs.Panel>
+      )}
     </Tabs.Root>
   );
 }

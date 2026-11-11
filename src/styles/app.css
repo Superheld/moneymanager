@@ -445,6 +445,13 @@ body {
   outline: none;
   border-color: var(--accent);
 }
+/* Der Rahmen allein war der ganze Fokushinweis — ein Haarstrich, der die Farbe wechselt.
+   Am Bildschirm durchgemessen (2026-11-10): an jedem Feld und jeder Auswahl der App war
+   das die einzige Spur, wo die Tabulatortaste gerade steht. Der Ring legt sich aussen um
+   das Feld, ohne es zu verschieben. */
+.field:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 35%, transparent);
+}
 
 /* Selects an das Design angleichen: eigener Caret statt System-Pfeil */
 select.field {
@@ -945,6 +952,13 @@ select.field.tabellenfilter {
 /* --- Registerleiste (bausteine/Registerleiste.tsx) ---
    Masse unveraendert aus dem frueheren Inline-Stil; der aktive Reiter heisst bei Base UI
    `[data-active]`. */
+.registerbereich,
+.registerinhalt--stapel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-card);
+  min-width: 0;
+}
 .registerleiste {
   display: flex;
   gap: var(--sp-4);
