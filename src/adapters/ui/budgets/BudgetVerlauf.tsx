@@ -125,7 +125,7 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
           borderTop: "1px solid var(--line)",
           borderBottom: "1px solid var(--line-soft)",
           cursor: "pointer",
-          background: offen ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent",
+          background: offen ? "var(--accent-soft)" : "transparent",
         }}
       >
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: "var(--sp-2)", flexWrap: "wrap" }}>

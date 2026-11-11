@@ -139,12 +139,12 @@ export function RuecklagenScreen() {
                 />
               </div>
               {fluss.plan === 0 && fluss.bedarf > 0 && (
-                <div className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-2)" }}>
+                <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
                   {t("ruecklagen.flussOhnePlan")}
                 </div>
               )}
               {fluss.posten.length === 0 ? (
-                <div className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-3)" }}>
+                <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-3)" }}>
                   {t("ruecklagen.flussKeineBuchung")}
                 </div>
               ) : (
@@ -192,7 +192,7 @@ export function RuecklagenScreen() {
       {items.length > 0 && deckung.sollMitKonto === 0 && (
         // Ohne Kontozuordnung gibt es nur die Rechnung. Das einmal sagen, statt überall
         // ein „—" zu zeigen, hinter dem man einen Fehler vermutet.
-        <div className="muted" style={{ fontSize: "var(--fs-small)", margin: "0 0 var(--sp-3)" }}>
+        <div className="muted" style={{ fontSize: "var(--fs-sm)", margin: "0 0 var(--sp-3)" }}>
           {t("ruecklagen.hinweisOhneKonto")}
         </div>
       )}
@@ -248,7 +248,7 @@ export function RuecklagenScreen() {
                       right={`${geld.format(p.soll)} / ${geld.format(r.ziel as number)} ${geld.symbol}`}
                     />
                   ) : (
-                    <div className="muted" style={{ fontSize: "var(--fs-small)" }}>
+                    <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>
                       {t("ruecklagen.freiAufgelaufen", { betrag: `${geld.format(p.soll)} ${geld.symbol}` })}
                     </div>
                   )}

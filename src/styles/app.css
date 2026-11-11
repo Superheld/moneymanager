@@ -198,7 +198,7 @@ body {
   height: 36px;
   border-radius: var(--r-md);
   background: var(--accent);
-  color: #fff;
+  color: var(--auf-akzent);
   font-weight: var(--fw-black);
   display: grid;
   place-items: center;
@@ -309,7 +309,7 @@ body {
 }
 .aktualisierungbtn:hover:not([data-disabled]) {
   background: var(--accent);
-  color: var(--surface-1);
+  color: var(--auf-akzent);
 }
 .aktualisierungbtn[data-disabled] {
   cursor: default;
@@ -823,7 +823,7 @@ select.field.tabellenfilter {
 .btn--primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #fff;
+  color: var(--auf-akzent);
 }
 .btn--primary:hover:not([data-disabled]) {
   background: var(--accent-deep);
@@ -907,7 +907,7 @@ select.field.tabellenfilter {
 }
 .schalter-knopf[data-checked] {
   left: 15px;
-  background: #fff;
+  background: var(--auf-akzent);
 }
 @media (prefers-reduced-motion: no-preference) {
   .schalter-knopf {
@@ -1052,7 +1052,7 @@ select.field.tabellenfilter {
 }
 .kaestchen-feld {
   border-radius: 4px;
-  color: #fff;
+  color: var(--auf-akzent);
 }
 .optionsfeld {
   border-radius: 50%;
@@ -1559,7 +1559,7 @@ select.field.tabellenfilter {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  box-shadow: var(--sh-2, 0 8px 24px rgba(0, 0, 0, 0.10));
+  box-shadow: var(--shadow-schwebend);
   padding: 4px;
   /* Eine lange Liste (Kategorien, Vertraege) darf das Fenster nicht sprengen. */
   max-height: min(320px, var(--available-height, 320px));
@@ -1650,7 +1650,7 @@ select.field.tabellenfilter {
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--r-md);
-  box-shadow: var(--sh-2, 0 8px 24px rgba(0, 0, 0, 0.10));
+  box-shadow: var(--shadow-schwebend);
   padding: 10px;
   outline: none;
 }
@@ -1722,7 +1722,7 @@ select.field.tabellenfilter {
 }
 .datumsfeld-tag[data-gewaehlt] {
   background: var(--accent);
-  color: #fff;
+  color: var(--auf-akzent);
   font-weight: var(--fw-bold);
 }
 /* Der Tastatur-Punkt ist NICHT die Auswahl — er zeigt nur, wo man gerade steht. */

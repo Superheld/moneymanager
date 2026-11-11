@@ -228,7 +228,7 @@ export function UebersichtScreen() {
               {gruppen.map(([art, rows]) => (
                 <div key={art}>
                   {gruppen.length > 1 && (
-                    <div className="muted" style={{ fontSize: "var(--fs-small)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
+                    <div className="muted" style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
                       {t(art === "monatlich" ? "budgets.abschnittMonatlich" : "budgets.abschnittAufbauend")}
                       {" · "}
                       {t(art === "monatlich" ? "budgets.abschnittMonatlichHinweis" : "budgets.abschnittAufbauendHinweis")}

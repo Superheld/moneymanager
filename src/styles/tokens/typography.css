@@ -8,6 +8,8 @@
      und das Schriftbild wandert, ohne dass etwas kaputt aussieht. Die zweite
      Stelle bleibt fuer eine im System installierte Fassung. */
   --font-ui: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, -apple-system, sans-serif;
+  /* Wie bisher über den nie definierten Rückfallwert: die Monospace-Schrift des Systems. */
+  --font-mono: monospace;
   --font-num: 'Hanken Grotesk Variable', 'Hanken Grotesk', system-ui, sans-serif; /* tnum via .num */
 
   /* type scale (px) */

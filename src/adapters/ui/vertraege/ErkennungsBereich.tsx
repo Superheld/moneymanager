@@ -253,7 +253,7 @@ export function ErkennungsBereich({
 
   return (
     <>
-      <p className="muted" style={{ fontSize: "var(--fs-small)", margin: "0 0 var(--sp-3)", maxWidth: 640 }}>
+      <p className="muted" style={{ fontSize: "var(--fs-sm)", margin: "0 0 var(--sp-3)", maxWidth: 640 }}>
         {t("vertraege.regel.hinweis")}
       </p>
 
@@ -297,7 +297,7 @@ export function ErkennungsBereich({
                 <input
                   className="field"
                   aria-label={t("vertraege.regel.merkmalMuster")}
-                  style={{ flex: "1 1 180px", minWidth: 0, fontFamily: "var(--font-mono, monospace)", fontSize: "var(--fs-tabelle)" }}
+                  style={{ flex: "1 1 180px", minWidth: 0, fontFamily: "var(--font-mono)", fontSize: "var(--fs-tabelle)" }}
                   value={m.muster}
                   placeholder={t("vertraege.regel.musterPlatzhalter")}
                   onChange={(e) => merkmalSetzen(i, { muster: e.target.value })}

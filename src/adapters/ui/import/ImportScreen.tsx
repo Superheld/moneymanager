@@ -206,7 +206,7 @@ export function ImportScreen() {
       </Card>
 
       {nichtErkannt && (
-        <Card style={{ marginTop: "var(--sp-4)", borderColor: "var(--warn, #d9822b)" }}>{t("import.nichtErkannt")}</Card>
+        <Card style={{ marginTop: "var(--sp-4)", borderColor: "var(--warn)" }}>{t("import.nichtErkannt")}</Card>
       )}
 
       {ergebnis && (
@@ -329,7 +329,7 @@ export function ImportScreen() {
             )}
           </div>
           {uErgebnis && <div className="hinweis" style={{ marginTop: "var(--sp-2)" }}>{t("import.uebernahmeHinweis")}</div>}
-          {fehler && <div style={{ fontSize: "var(--fs-xs)", color: "var(--danger, #c0392b)", marginTop: "var(--sp-2)" }}>{t("import.fehlerDb")} ({fehler})</div>}
+          {fehler && <div style={{ fontSize: "var(--fs-xs)", color: "var(--danger)", marginTop: "var(--sp-2)" }}>{t("import.fehlerDb")} ({fehler})</div>}
         </Card>
       )}
 

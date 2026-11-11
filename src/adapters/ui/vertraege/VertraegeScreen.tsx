@@ -456,7 +456,7 @@ export function VertraegeScreen() {
           title={t("vertraege.vorschlaegeTitel")}
           subtitle={t("vertraege.vorschlaegeUntertitel", { count: vorschlaege.length })}
         >
-          <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
+          <p className="muted" style={{ fontSize: "var(--fs-sm)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
             {t("vertraege.vorschlaegeHinweis")}
           </p>
           <DataTable

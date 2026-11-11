@@ -19,7 +19,7 @@ function Infozeile({ label, children, mono }: { label: string; children: ReactNo
   return (
     <div style={{ display: "flex", gap: "var(--sp-3)", padding: "5px 0", alignItems: "baseline" }}>
       <span className="hinweis" style={{ flex: "0 0 34%", fontWeight: "var(--fw-semi)" }}>{label}</span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-tabelle)", wordBreak: "break-word", fontFamily: mono ? "var(--font-mono, monospace)" : undefined, color: mono ? "var(--ink-2)" : "var(--ink)" }}>
+      <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-tabelle)", wordBreak: "break-word", fontFamily: mono ? "var(--font-mono)" : undefined, color: mono ? "var(--ink-2)" : "var(--ink)" }}>
         {children}
       </span>
     </div>

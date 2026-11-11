@@ -331,6 +331,26 @@ westlich von Greenwich jeden Tag um einen zurück.
 Für Helfer ausserhalb einer Komponente gibt es den Typ `Datum`, genau wie `Geld` — der
 `JournalBlock` reicht ihn in seiner `Lesehilfe` durch.
 
+## Farben nur über Tokens — und das dunkle Schema
+
+**Seit 2026-11-10 folgt die App dem dunklen Schema des Systems** (`prefers-color-scheme`,
+kein eigener Schalter). Möglich war das, weil die Farben in Tokens liegen: der dunkle Satz
+steht in `styles/tokens/colors.css` und `shadow.css` unter derselben Medienabfrage und
+überschreibt dieselben Namen. Am Bildschirm gemessen: jeder Text in jedem Bereich erreicht
+dunkel den Kontrast von WCAG AA.
+
+Drei Regeln, die daraus folgen:
+
+- **Keine Farbe als Zahl** in `ui/` oder `app.css`. Was eine Zahl ist, bleibt im dunklen
+  Schema hell. Auch Rückfallwerte (`var(--x, #fff)`) zählen dazu — siehe nächster Punkt.
+- **Jedes `var(--…)` zeigt auf ein Token, das es gibt** (`styles/tokens.test.ts`). Bis
+  2026-11-10 taten das acht Namen nicht: `--accent-soft`, `--danger`, `--sh-2`, `--bg`,
+  `--font-mono`, `--radius-2` liefen still auf ihren Rückfallwert, `--fs-small` (elf
+  Dateien), `--fs-lg` und `--surface-1` hatten keinen — dort erbte das Element einfach,
+  und die kleinen Hinweistexte standen in der Grösse ihrer Umgebung.
+- **Schrift auf einer Akzentfläche ist `--auf-akzent`**, nicht `#fff`: im Dunklen wird der
+  Akzent hell, und Weiss darauf ist nicht mehr lesbar.
+
 ## Tabellenfilter sind kleiner als Formularfelder
 
 Ein `.field` ist auf ein Formular ausgelegt: volle Breite, grosse Innenabstände, eigene

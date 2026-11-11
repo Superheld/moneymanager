@@ -78,7 +78,7 @@ export function BelegungKarte({
       {/* Eine EINSCHRÄNKUNG: sie sagt, dass die Zahlen oben nicht vollständig gedeckt sind
           und wie verteilt wurde. Deshalb offen und nicht eingeklappt. */}
       {unterdeckt && (
-        <p className="muted" style={{ fontSize: "var(--fs-small)", marginBottom: 0 }}>
+        <p className="muted" style={{ fontSize: "var(--fs-sm)", marginBottom: 0 }}>
           {t("konten.belegung.unterdeckt", {
             betrag: geld.formatMitSymbol(-belegung.frei),
             prozent: Math.round(belegung.anteil * 100),

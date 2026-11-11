@@ -27,7 +27,7 @@ const ZEILENHOEHE = 32;
 const KOPFHOEHE = 28;
 
 const FLAECHE: CSSProperties = {
-  background: "var(--surface-2, rgba(0,0,0,.015))",
+  background: "var(--surface-2)",
   borderRadius: "var(--r-md)",
   padding: "2px 8px",
   margin: "6px 0 10px",

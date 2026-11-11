@@ -144,7 +144,7 @@ export function SammelDialog({
         <div>
           <p style={{ margin: 0 }}>{t("konten.sammel.loeschenFrage", { n: buchungen.length - gesperrt })}</p>
           {gesperrt > 0 && (
-            <p className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-3)" }}>
+            <p className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-3)" }}>
               {t("konten.sammel.loeschenGesperrt", { n: gesperrt })}
             </p>
           )}

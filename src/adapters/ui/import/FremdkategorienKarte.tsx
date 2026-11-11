@@ -112,7 +112,7 @@ export function FremdkategorienKarte({
                     ariaLabel={t("import.fremd.zielFuer", { name: z.fremdName })}
                   />
                   {verwaist && (
-                    <div style={{ fontSize: "var(--fs-2xs)", color: "var(--warn, #d9822b)", marginTop: 4 }}>
+                    <div style={{ fontSize: "var(--fs-2xs)", color: "var(--warn)", marginTop: 4 }}>
                       {t("import.fremd.zielFehlt", { name: z.uebersetzung })}
                     </div>
                   )}

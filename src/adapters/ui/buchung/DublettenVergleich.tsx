@@ -168,7 +168,7 @@ export function DublettenVergleich({
       <div style={{ display: "grid", gridTemplateColumns: "minmax(9rem, 1fr) 1fr 1fr", gap: "var(--sp-2) var(--sp-3)", alignItems: "baseline", marginBottom: "var(--sp-3)" }}>
         <span />
         {[links, rechts].map((s, i) => (
-          <span key={i} className="num" style={{ fontWeight: 700, fontSize: "var(--fs-lg)", color: geldFarbe(s.buchung.betrag) }}>
+          <span key={i} className="num" style={{ fontWeight: 700, fontSize: "var(--fs-h3)", color: geldFarbe(s.buchung.betrag) }}>
             {geld.formatMitSymbol(s.buchung.betrag, { mitVorzeichen: true })}
           </span>
         ))}

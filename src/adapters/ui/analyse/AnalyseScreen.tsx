@@ -95,7 +95,7 @@ function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId, renderDe
           <div key={i.kategorieId ?? "__ohne"}>
             <div
               onClick={klickbar ? () => onSelect!(i.kategorieId!, i.name) : undefined}
-              style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: klickbar ? "pointer" : "default", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent" }}
+              style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: klickbar ? "pointer" : "default", background: aktiv ? "var(--accent-soft)" : "transparent" }}
             >
               <CoverageTrack
                 value={Math.abs(i.summe)}
@@ -154,7 +154,7 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
           <div key={schluessel}>
             <div
               onClick={() => onGruppe(schluessel)}
-              style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: "pointer", background: offen ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent" }}
+              style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: "pointer", background: offen ? "var(--accent-soft)" : "transparent" }}
             >
               <CoverageTrack
                 value={Math.abs(g.summe)}
@@ -186,7 +186,7 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
                     <div key={k.kategorieId ?? "__k-ohne"}>
                       <div
                         onClick={(e) => { e.stopPropagation(); if (k.kategorieId) onKat(k.kategorieId); }}
-                        style={{ padding: "5px 8px", borderRadius: "var(--r-md)", cursor: k.kategorieId ? "pointer" : "default", background: katOffen ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent" }}
+                        style={{ padding: "5px 8px", borderRadius: "var(--r-md)", cursor: k.kategorieId ? "pointer" : "default", background: katOffen ? "var(--accent-soft)" : "transparent" }}
                       >
                         <CoverageTrack
                           value={Math.abs(k.summe)}
@@ -466,7 +466,7 @@ export function AnalyseScreen() {
     <div className="screen">
       <PageHead title={t("analyse.titel")} subtitle={t("analyse.untertitel")} />
 
-      {fehler && <Card style={{ borderColor: "var(--danger, #c0392b)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
+      {fehler && <Card style={{ borderColor: "var(--danger)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
 
       {!geladen ? null : ist.length === 0 && !fehler ? (
         <Card>{t("historie.leer")}</Card>

@@ -447,7 +447,7 @@ function Wortdetail({
         marginTop: "var(--sp-4)",
         padding: "var(--sp-3)",
         border: "1px solid var(--line)",
-        borderRadius: "var(--radius-2, 6px)",
+        borderRadius: "6px",
         background: "var(--surface-2)",
       }}
     >

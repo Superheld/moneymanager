@@ -501,8 +501,8 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   padding: "5px 10px", fontSize: "var(--fs-ui)", fontFamily: "var(--font-ui)",
                   fontWeight: "var(--fw-bold)", borderRadius: "var(--r-md)", cursor: "pointer",
                   border: "1px solid var(--warn, var(--line))",
-                  background: nurDubletten ? "var(--warn, #b8860b)" : "var(--warn-wash, transparent)",
-                  color: nurDubletten ? "var(--surface, #fff)" : "var(--warn-deep, var(--ink-2))",
+                  background: nurDubletten ? "var(--warn)" : "var(--warn-wash, transparent)",
+                  color: nurDubletten ? "var(--auf-akzent)" : "var(--warn-deep, var(--ink-2))",
                   whiteSpace: "nowrap",
                 }}
               >

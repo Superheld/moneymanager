@@ -220,7 +220,7 @@ function ZeileMitPosten({
           borderBottom: `1px solid ${letzte ? "var(--line)" : "var(--line-soft)"}`,
           cursor: aufklappbar ? "pointer" : "default",
           fontSize: "var(--fs-sm)",
-          background: offen ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent",
+          background: offen ? "var(--accent-soft)" : "transparent",
         }}
       >
         <span style={{ fontWeight: "var(--fw-semi)", color: "var(--ink-2)", ...gekappt }}>

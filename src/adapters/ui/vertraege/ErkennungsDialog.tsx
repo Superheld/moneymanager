@@ -67,7 +67,7 @@ export function ErkennungsDialog({ kandidat, onClose }: { kandidat: Vertragskand
       onClose={onClose}
       footer={<Button variant="primary" onClick={onClose}>{t("vertraege.erkennung.schliessen")}</Button>}
     >
-      <p className="muted" style={{ fontSize: "var(--fs-small)", margin: "0 0 var(--sp-3)", maxWidth: 620 }}>
+      <p className="muted" style={{ fontSize: "var(--fs-sm)", margin: "0 0 var(--sp-3)", maxWidth: 620 }}>
         {t("vertraege.erkennung.hinweis")}
       </p>
 

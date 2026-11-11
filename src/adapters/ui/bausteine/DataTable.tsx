@@ -307,7 +307,7 @@ export function DataTable<T>({
               // Vorgaben stellen kann (siehe Prop).
               const zeilenStil: CSSProperties = {
                 cursor: onRowClick ? "pointer" : "default",
-                background: zeileAktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent",
+                background: zeileAktiv ? "var(--accent-soft)" : "transparent",
                 ...(rowStyle ? rowStyle(row) : undefined),
               };
               const bedienung = zeilenBedienung(row);

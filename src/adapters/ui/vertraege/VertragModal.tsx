@@ -421,7 +421,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
         {f.kategorieId && (
           <div>
             <Kaestchen an={kategorieUebertragen} aufAendern={setKategorieUebertragen} style={{ display: "flex" }}>
-              <span style={{ fontSize: "var(--fs-small)" }}>
+              <span style={{ fontSize: "var(--fs-sm)" }}>
                 {zugeordneteZahlungen > 0
                   ? t("vertraege.kategorieUebertragenZahl", { count: zugeordneteZahlungen })
                   : t("vertraege.kategorieUebertragen")}

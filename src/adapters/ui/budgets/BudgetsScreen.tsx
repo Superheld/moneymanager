@@ -298,7 +298,7 @@ export function BudgetsScreen() {
               .filter(([, rows]) => rows.length > 0)
               .map(([art, rows]) => (
                 <section key={art} style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: "var(--fs-small)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
+                  <div style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
                     {t(art === "monatlich" ? "budgets.abschnittMonatlich" : "budgets.abschnittAufbauend")}
                     <span className="muted" style={{ fontWeight: "var(--fw-regular)" }}>
                       {" · "}
@@ -458,7 +458,7 @@ export function BudgetsScreen() {
           title={t("budgets.vorschlaegeTitel")}
           subtitle={t("budgets.vorschlaegeUntertitel", { count: vorschlaege.length })}
         >
-          <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
+          <p className="muted" style={{ fontSize: "var(--fs-sm)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
             {t("budgets.vorschlaegeHinweis")}
           </p>
           <DataTable
@@ -604,7 +604,7 @@ export function BudgetsScreen() {
                   return (
                     <div
                       key={v.abMonat}
-                      style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent", fontSize: "var(--fs-ui)" }}
+                      style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: aktiv ? "var(--accent-soft)" : "transparent", fontSize: "var(--fs-ui)" }}
                     >
                       <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
                         {t("budgets.versionAb", { monat: v.abMonat })}

@@ -332,7 +332,7 @@ export function ReviewScreen() {
   return (
     <>
 
-      {fehler && <Card style={{ marginBottom: "var(--sp-4)", borderColor: "var(--danger, #c0392b)" }}>{t("review.fehlerDb")} ({fehler})</Card>}
+      {fehler && <Card style={{ marginBottom: "var(--sp-4)", borderColor: "var(--danger)" }}>{t("review.fehlerDb")} ({fehler})</Card>}
 
       {umsaetze.length === 0 && !fehler ? (
         <Card>{t("review.leer")}</Card>
