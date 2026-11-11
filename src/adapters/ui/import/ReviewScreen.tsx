@@ -51,6 +51,7 @@ import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
 import { Kaestchen } from "../bausteine/Kaestchen";
 import { Zeile } from "../bausteine/Anordnung";
+import { useSammelauswahl } from "../bausteine/useSammelauswahl";
 
 const SEITE_GROESSE = 100;
 
@@ -151,8 +152,8 @@ export function ReviewScreen() {
    * die Ansicht, in der man ZEILENWEISE arbeitet — der Stapelweg steht daneben, nicht
    * davor.
    */
-  const [auswahlModus, setAuswahlModus] = useState(false);
-  const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
+  // Modus und Auswahl stehen weiter unten (`useSammelauswahl`): sie brauchen die
+  // gefilterte Liste, und die entsteht erst nach dem Laden.
   const [sammelKategorie, setSammelKategorie] = useState("");
 
   async function laden() {
@@ -244,23 +245,10 @@ export function ReviewScreen() {
    * die ersten hundert davon. Dieselbe Regel wie im Kontoauszug.
    */
   const alleIds = useMemo(() => gefiltert.map((u) => u.id), [gefiltert]);
-  const alleGewaehlt = alleIds.length > 0 && alleIds.every((id) => auswahl.has(id));
-
-  /**
-   * Was nicht mehr sichtbar ist, ist nicht mehr gewählt.
-   *
-   * Ohne das trüge man eine unsichtbare Auswahl durch Filterwechsel und Seiten mit sich
-   * herum — und ein Sammel-Weglegen träfe dann Zeilen, die niemand vor Augen hatte. Der
-   * Preis ist, dass ein Filterwechsel die Auswahl kostet; das ist der richtige Preis.
-   */
-  useEffect(() => {
-    setAuswahl((bisher) => {
-      if (bisher.size === 0) return bisher;
-      const sichtbar = new Set(alleIds);
-      const naechste = new Set([...bisher].filter((id) => sichtbar.has(id)));
-      return naechste.size === bisher.size ? bisher : naechste;
-    });
-  }, [alleIds]);
+  // Was nicht mehr sichtbar ist, ist nicht mehr gewählt — ohne das träfe ein
+  // Sammel-Weglegen Zeilen, die niemand vor Augen hatte (`useSammelauswahl`).
+  const sammel = useSammelauswahl(alleIds);
+  const auswahl = sammel.auswahl;
 
   const gewaehlteUmsaetze = useMemo(
     () => umsaetze.filter((u) => auswahl.has(u.id)),
@@ -271,14 +259,6 @@ export function ReviewScreen() {
     (u) => u.vorschlag?.quelle === "umbuchung",
   ).length;
 
-  function auswahlUmschalten(id: string) {
-    setAuswahl((bisher) => {
-      const neu = new Set(bisher);
-      if (neu.has(id)) neu.delete(id);
-      else neu.add(id);
-      return neu;
-    });
-  }
 
   /**
    * Die Kategorie für alle markierten Zeilen.
@@ -298,7 +278,7 @@ export function ReviewScreen() {
         kategorieId ? katById.get(kategorieId) : undefined,
       );
       await laden();
-      setAuswahl(new Set());
+      sammel.leeren();
       setSammelKategorie("");
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -314,7 +294,7 @@ export function ReviewScreen() {
     try {
       await umsaetzeSammelVerwerfen(gewaehlteUmsaetze);
       await laden();
-      setAuswahl(new Set());
+      sammel.leeren();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
     } finally {
@@ -473,8 +453,8 @@ export function ReviewScreen() {
             />
             <span className="hinweis" style={{ alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
             <Kaestchen
-              an={auswahlModus}
-              aufAendern={(an) => { setAuswahlModus(an); if (!an) setAuswahl(new Set()); }}
+              an={sammel.modus}
+              aufAendern={sammel.modusSetzen}
               style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)", whiteSpace: "nowrap", alignSelf: "center" }}
             >
               {t("review.sammel.modus")}
@@ -483,7 +463,7 @@ export function ReviewScreen() {
 
           {/* Die Aktionsleiste erscheint erst, wenn etwas markiert ist. Vorher gäbe es
               nichts zu tun, und ein grauer Knopf ist eine Frage ohne Antwort. */}
-          {auswahlModus && auswahl.size > 0 && (
+          {sammel.modus && auswahl.size > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)", padding: "8px 12px", borderRadius: "var(--r-md)", background: "var(--accent-wash)" }}>
               <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-bold)", color: "var(--accent-deep)" }}>
                 {t("review.sammel.gewaehlt", { n: auswahl.size })}
@@ -499,7 +479,7 @@ export function ReviewScreen() {
               <Button variant="link" style={{ color: "var(--warn-deep)" }} onClick={() => void sammelVerwerfen()} laeuft={busy}>
                 {t("review.sammel.weglegen", { n: auswahl.size })}
               </Button>
-              <Button variant="link" onClick={() => setAuswahl(new Set())}>{t("review.sammel.aufheben")}</Button>
+              <Button variant="link" onClick={sammel.leeren}>{t("review.sammel.aufheben")}</Button>
               {/* Was der Sammelweg auslässt, steht VOR der Aktion da — nicht als
                   Ergebnismeldung hinterher. */}
               {gewaehlteUmbuchungen > 0 && (
@@ -513,12 +493,12 @@ export function ReviewScreen() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
             <thead>
               <tr>
-                {auswahlModus && (
+                {sammel.modus && (
                   <th style={{ ...th, width: 32 }}>
                     <Kaestchen
-                      an={alleGewaehlt}
+                      an={sammel.alleGewaehlt}
                       label={t("review.sammel.alleWaehlen")}
-                      aufAendern={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
+                      aufAendern={sammel.alleUmschalten}
                     />
                   </th>
                 )}
@@ -533,12 +513,12 @@ export function ReviewScreen() {
             <tbody>
               {zeilen.map((u) => (
                 <tr key={u.id}>
-                  {auswahlModus && (
+                  {sammel.modus && (
                     <td style={td}>
                       <Kaestchen
-                        an={auswahl.has(u.id)}
+                        an={sammel.istGewaehlt(u.id)}
                         label={t("review.sammel.zeileWaehlen")}
-                        aufAendern={() => auswahlUmschalten(u.id)}
+                        aufAendern={() => sammel.umschalten(u.id)}
                       />
                     </td>
                   )}

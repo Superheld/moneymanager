@@ -47,6 +47,7 @@ import {
   sqliteKategorieRepository,
   sqliteZahlungskontoRepository,
 } from "../persistence/sqliteStammdatenRepositories";
+import i18n from "../../i18n/i18n";
 
 let db: Database;
 
@@ -704,6 +705,22 @@ describe("Massenbearbeitung im Register", () => {
     expect(screen.queryByRole("checkbox", { name: /diese buchung wählen/i })).toBeNull();
     await nutzer.click(screen.getByRole("checkbox", { name: /mehrere bearbeiten/i }));
     expect(screen.getAllByRole("checkbox", { name: /diese buchung wählen/i })).toHaveLength(2);
+  });
+
+  it("vergisst beim Filterwechsel, was nicht mehr zu sehen ist", async () => {
+    // Vorher blieb es markiert: wer nach einem Empfänger filterte, alles markierte, den
+    // Filter wechselte und dann bearbeitete, änderte Buchungen, die er nicht mehr sah.
+    // Die Review-Inbox tat es längst so — jetzt teilen beide `useSammelauswahl`.
+    await zweiOhneKategorie();
+    const nutzer = userEvent.setup();
+    rendere(<KontenScreen onNavigate={() => {}} />);
+    await screen.findByText("Baecker");
+    await alleMarkieren(nutzer);
+    expect(screen.getByText(i18n.t("konten.sammel.gewaehlt", { n: 2 }))).toBeInTheDocument();
+
+    await nutzer.type(screen.getByPlaceholderText(/suche/i), "Baecker");
+
+    expect(await screen.findByText(i18n.t("konten.sammel.gewaehlt", { n: 1 }))).toBeInTheDocument();
   });
 
   it("setzt die Kategorie auf allen markierten Buchungen", async () => {
