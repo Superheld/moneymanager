@@ -187,6 +187,9 @@ Wo es heute steht:
 | `bausteine/Modal` | Eigenbau mit Nummernstapel plus `Dialog.jsx` | Base UI `Dialog`, mit `warnung` `AlertDialog` |
 | `bausteine/Kaestchen` | `<input type="checkbox">` mit `accentColor` | Base UI `Checkbox` |
 | `buchung/Optionsgruppe`, `buchung/Richtungswahl` | `<input type="radio">`, eigene `role="radiogroup"` | Base UI `RadioGroup`/`Radio` |
+| `bausteine/FormField` (um ein natives Feld) | `<label htmlFor>`, Hinweis unverbunden | Base UI `Field` |
+| `bausteine/CoverageTrack` | zwei `div` ohne Rolle | Base UI `Meter` |
+| Seitensteuerung der `DataTable` | `<input type="number">`, rohe Knöpfe | Base UI `NumberField`, `Button` |
 
 **Noch nicht umgestellt:** `Klappblock` → `Collapsible`, `Registerleiste` → `Tabs`, der Kategoriebaum im
 `CategoryPicker` → `Combobox` prüfen. Ein Tooltip-Baustein, wenn er kommt, kommt von dort

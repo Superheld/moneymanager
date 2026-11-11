@@ -15,18 +15,19 @@ Baustein, sondern ein Teil dieses Screens.
 
 ## Der Design-System-Teil
 
-Die `.jsx`/`.d.ts`-Dateien (`Card`, `KPIStat`, `Pill`, `CoverageTrack`,
-`FormField` mit `Input`) stammen aus dem Design-System, das ausserhalb
-des Repos liegt. Es ist eine **Vorlage, keine Vorgabe**: was hier liegt, gehört der App und
-darf geändert werden. Wer aus dem Design-System nachzieht, holt sich einen Vorschlag, keine
-Wahrheit — und prüft, was hier inzwischen weiterentwickelt wurde.
+`Card`, `KPIStat`, `Pill`, `CoverageTrack`, `DataTable`, `Button`, `FormField` und der in
+`Modal` aufgegangene `Dialog` stammen aus dem Design-System, das ausserhalb des Repos liegt.
+Es ist eine **Vorlage, keine Vorgabe**: was hier liegt, gehört der App und darf geändert
+werden. Wer aus dem Design-System nachzieht, holt sich einen Vorschlag, keine Wahrheit —
+und prüft, was hier inzwischen weiterentwickelt wurde.
 
-`Button` kam ebenfalls von dort und ist seit 2026-11-10 TypeScript auf Base UI `Button`
-(warum, steht im Kopf der Datei und in `../CLAUDE.md` unter „Bedienteile"). `Dialog` ist
-am selben Tag in `Modal` aufgegangen, auf Base UI `Dialog` (unten), und `DataTable` ist
-TypeScript (die Seitensteuerung auf `Button` und Base UI `NumberField`). Die übrigen
-folgen demselben Weg: nach `.tsx`, die `.d.ts` fällt weg, und wo Base UI ein Gegenstück
-hat, steht es darunter.
+**Seit 2026-11-10 sind sie alle TypeScript** — vorher `.jsx` mit handgeschriebener
+`.d.ts`, deren Inneres der Compiler nicht prüfte und deren Typen vom Code weglaufen
+konnten, ohne dass etwas rot wurde. Wo Base UI ein Gegenstück hat, steht es darunter:
+`Button` (`Button`), `Modal` (`Dialog`), `FormField` (`Field`, nur um ein natives Feld —
+warum, steht im Kopf der Datei), `CoverageTrack` (`Meter`), die Seitensteuerung der
+`DataTable` (`NumberField`). `Card`, `KPIStat` und `Pill` sind reines Aussehen; dafür hat
+Base UI nichts.
 
 `index.ts` bündelt diesen Block, damit ein Screen `from "../bausteine"` schreiben kann. Die
 eigenen Bausteine daneben werden einzeln importiert.

@@ -1,7 +1,8 @@
 /** @vitest-environment jsdom */
-// Die Bausteine aus der Design-System-Vorlage — `Button`, `Pill`, `KPIStat`.
-// (`Button` ist seit 2026-11-10 TypeScript, `Dialog` ist in `Modal` aufgegangen — siehe
-// `Modal.test.tsx`; die übrigen liegen noch als `.jsx` da.)
+// Die Bausteine aus der Design-System-Vorlage — `Button`, `Pill`, `KPIStat`, `Card`,
+// `CoverageTrack`.
+// Seit 2026-11-10 sind alle TypeScript; `Dialog` ist in `Modal` aufgegangen (siehe
+// `Modal.test.tsx`), `DataTable` und `FormField` haben eigene Tests.
 //
 // **Warum sie einen eigenen Test brauchen.** Sie liegen als `.jsx` mit handgeschriebener
 // `.d.ts` daneben: der Compiler prüft ihr Inneres nicht, und bis 2026-11-10 zählte die
@@ -17,7 +18,7 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Button, KPIStat, Pill } from "./index";
+import { Button, Card, CoverageTrack, KPIStat, Pill } from "./index";
 
 describe("Button", () => {
   it("meldet den Klick", async () => {
@@ -194,5 +195,52 @@ describe("KPIStat", () => {
     expect(groesse("hero")).toBe("var(--fs-display)");
     expect(groesse("tile")).toBe("var(--fs-h1)");
     expect(groesse("chip")).toBe("var(--fs-h2)");
+  });
+});
+
+describe("Card", () => {
+  it("zeigt Kopf, Untertitel und Aktion nur, wenn es sie gibt", () => {
+    const { container, rerender } = render(<Card>nur Inhalt</Card>);
+    // Ohne Titel und Aktion kein Kopf: die Karte trägt nur ihren Text.
+    expect((container.firstChild as HTMLElement).children).toHaveLength(0);
+    rerender(<Card title="Konten" subtitle="alle" action={<button>Neu</button>}>Inhalt</Card>);
+    expect(screen.getByText("Konten")).toBeTruthy();
+    expect(screen.getByText("alle")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Neu" })).toBeTruthy();
+  });
+
+  it("schwebt nur auf Wunsch und lässt sich ohne Polster stellen", () => {
+    const { container, rerender } = render(<Card>x</Card>);
+    const flaeche = () => container.firstChild as HTMLElement;
+    expect(flaeche().style.boxShadow).toBe("var(--shadow-none)");
+    expect(flaeche().style.padding).toBe("var(--pad-card)");
+    rerender(<Card floating pad={false}>x</Card>);
+    expect(flaeche().style.boxShadow).toBe("var(--shadow-card)");
+    expect(flaeche().style.padding).toBe("0px");
+  });
+});
+
+describe("CoverageTrack", () => {
+  // Vorher zwei div-Kästen: für eine Vorlesehilfe gab es den Balken nicht.
+  it("meldet sich als Messwert mit Grenzen", () => {
+    render(<CoverageTrack value={30} max={60} label="Lebensmittel" />);
+    const balken = screen.getByRole("meter", { name: "Lebensmittel" });
+    expect(balken.getAttribute("aria-valuenow")).toBe("30");
+    expect(balken.getAttribute("aria-valuemax")).toBe("60");
+  });
+
+  it("sagt über dem Ziel, um wie viel — der Wert selbst ist gekappt", () => {
+    render(<CoverageTrack value={620} max={600} label="Budget" right="620 / 600" />);
+    const balken = screen.getByRole("meter", { name: "Budget" });
+    expect(balken.getAttribute("aria-valuenow")).toBe("600");
+    expect(balken.getAttribute("aria-valuetext")).toBe("620 / 600");
+    expect(screen.getByText("620 / 600").style.color).toBe("var(--warn-deep)");
+  });
+
+  it("nimmt eine erzwungene Überschreitung und ein Ziel von null hin", () => {
+    const { container } = render(<CoverageTrack value={5} max={0} over />);
+    const fuellung = container.querySelector("[data-ueber]") as HTMLElement;
+    expect(fuellung.style.background).toBe("var(--warn)");
+    expect(fuellung.style.width).toBe("100%");
   });
 });

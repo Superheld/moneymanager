@@ -803,6 +803,28 @@ select.field.tabellenfilter {
   border-color: transparent;
 }
 
+/* --- Formularfeld (bausteine/FormField.tsx) ---
+   Masse unveraendert aus dem frueheren Inline-Stil. */
+.formfeld {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.formfeld-label {
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+.formfeld-pflicht {
+  color: var(--accent-deep);
+}
+.formfeld-hinweis {
+  font-size: var(--fs-xs);
+  color: var(--ink-3);
+}
+
 /* --- Kaestchen und Optionsfelder (bausteine/Kaestchen.tsx, buchung/Optionsgruppe.tsx) ---
    Base UI rendert beide als `span` mit Rolle und haengt ein verstecktes `input` daneben;
    das Aussehen haengt deshalb an den Datenattributen (`data-checked`, `data-disabled`),
