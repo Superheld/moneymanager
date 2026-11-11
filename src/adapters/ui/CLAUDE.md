@@ -270,6 +270,18 @@ und wurde deshalb 2026-08-25 herausgezogen:
 | `JournalBlock` | was daran geändert wurde — und der Weg zurück |
 | `Richtungswahl` | Höhe und Richtung des Betrags, samt der Zerlegung dahinter |
 | `SplitModal` · `ZurUmbuchungModal` | die beiden Folge-Dialoge (S-7, S-1) |
+| `GegenbeinBlock` | wo die zweite Seite einer Umschichtung im Entwurf steckt |
+| `useBetragUndRichtung` · `useGegenbeinwahl` | der Zustand dazu, als Hooks (seit 2026-11-10) |
+
+**Seit 2026-11-10 liegt auch Zustand ausserhalb des Formulars**: Höhe und Richtung des
+Betrags und die Wahl der Gegenseite sind je ein Hook — drei bzw. fünf Zustände, die nur
+einander kennen. Ein `useReducer` über das ganze Formular ist geprüft und verworfen: die
+einzige Kopplung (Kategorie → Charakter → Richtung) läuft in genau einer Funktion
+(`kategorieSetzen`), und ein Reducer hätte nur sie umbenannt. Dasselbe Muster gilt für
+grosse Screens: ein Dialog bekommt seinen Zustand selbst (`RuecklageDialog`,
+`AusbuchungDialog`, `UmbuchungModal`), ein geschlossenes Thema wird ein Hook
+(`useRegisterfilter`, `useSammelauswahl`), mehrere Karten in einer Datei werden mehrere
+Dateien (`einstellungen/VerhaltenKarten`, `StammdatenKarten`).
 
 **Das Kriterium war nicht die Grösse, sondern die Abhängigkeit:** herausgezogen ist, was
 seine Daten hereinbekommt und Entscheidungen zurückmeldet. Der Rest gehört zum Formular

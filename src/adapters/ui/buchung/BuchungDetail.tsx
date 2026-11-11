@@ -29,7 +29,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  istAktiv,
   waehlbareKonten,
   istGeteilt,
   type Buchungshistorie,
@@ -42,7 +41,6 @@ import {
 } from "../../../application";
 import {
   alsDuplikat,
-  passtAlsGegenbein,
   verwerfen,
   zuruecksetzen,
   type ImportLauf,
@@ -54,9 +52,11 @@ import {
   type Dublettenverdacht,
 } from "../../../application";
 import { SplitModal } from "./SplitModal";
+import { useBetragUndRichtung } from "./useBetragUndRichtung";
+import { useGegenbeinwahl } from "./useGegenbeinwahl";
+import { GegenbeinBlock } from "./GegenbeinBlock";
 import { ZurUmbuchungModal } from "./ZurUmbuchungModal";
 import { vorzeichenbehaftet } from "../../../application/buchung/zahlungsregelAnlegen";
-import { paarungsKandidaten } from "../../../application/buchung/umbuchungAusBuchung";
 import {
   buchungBearbeiten,
   buchungErfassen,
@@ -81,7 +81,8 @@ import {
   vertragZuordnungZuruecksetzen,
 } from "../../dienste";
 import { Button, FormField, Pill } from "../bausteine";
-import { formularAusBuchung, VertragModal } from "../vertraege/VertragModal";
+import { VertragModal } from "../vertraege/VertragModal";
+import { formularAusBuchung } from "../vertraege/vertragFormular";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
@@ -92,17 +93,10 @@ import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKo
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { BuchungsHerkunft } from "./BuchungsHerkunft";
 import { JournalBlock } from "./JournalBlock";
-import {
-  betragsHoehe,
-  richtungVon,
-  Richtungswahl,
-  vorzeichenAbspalten,
-  type Richtung,
-} from "./Richtungswahl";
+import { Richtungswahl } from "./Richtungswahl";
 import { DublettenBlock, FreigabeHinweis, type Dublettenbefund } from "./DublettenBlock";
 import { VertragsBlock, type VertragsBindung } from "./VertragsBlock";
 import { Kaestchen } from "../bausteine/Kaestchen";
-import { Option, Optionsgruppe } from "./Optionsgruppe";
 
 /** Stabile Leerwerte — als Literal im useState-Aufruf wäre jeder Render ein neues Objekt. */
 const LEERE_KARTE: ReadonlyMap<string, Dublettenverdacht> = new Map();
@@ -264,49 +258,9 @@ function BuchungFormular({
   const istNeu = !buchung && !entwurf;
   const [kontoId, setKontoId] = useState(buchung?.kontoId ?? entwurf?.zahlungskontoId ?? vorgabe.kontoId);
   const [datum, setDatum] = useState(buchung?.datum ?? entwurf?.buchungstag ?? vorgabe.datum);
-  /**
-   * HÖHE und RICHTUNG stehen getrennt — zwei Felder, beide sichtbar.
-   *
-   * Der Betrag im Ledger ist vorzeichenbehaftet; die Maske zerlegt ihn beim Öffnen und
-   * setzt ihn beim Speichern wieder zusammen. Was dabei gewonnen ist: die Richtung ist
-   * nicht mehr etwas, das man dem Feld ansehen (oder erraten) muss, sondern eine Wahl
-   * mit zwei Möglichkeiten nebeneinander.
-   *
-   * `richtungVonHand` merkt sich, WER zuletzt gesprochen hat, und nur das. Solange
-   * niemand die Auswahl angefasst hat, folgt sie der Kategorie — Aufwand fliesst ab,
-   * Ertrag fliesst zu; sobald jemand sie anfasst, gilt seine Wahl und kein
-   * Kategoriewechsel nimmt sie ihm wieder weg. Eine bestehende Buchung zählt von Anfang
-   * an als von Hand gesetzt: ihre Richtung ist eine Tatsache (beim Import die der Bank),
-   * und ein Kategoriewechsel darf sie nicht umdrehen.
-   *
-   * Das ist NICHT die alte Ableitung mit anderem Namen. Die lief unsichtbar hinter dem
-   * Feld; diese hier bewegt einen Schalter, den man vor sich sieht, und man kann ihn
-   * jederzeit zurückstellen.
-   */
-  const startBetrag = buchung?.betrag ?? entwurf?.betrag;
-  const [betrag, setBetrag] = useState(startBetrag == null ? "" : betragsHoehe(startBetrag, geld));
-  const [richtung, setRichtung] = useState<Richtung>(startBetrag == null ? "ab" : richtungVon(startBetrag));
-  const [richtungVonHand, setRichtungVonHand] = useState(startBetrag != null);
-
-  /**
-   * Was ins Betragsfeld getippt wird, ist die Höhe. Bringt es ein Vorzeichen mit
-   * (getippt oder eingefügt), wandert das in die Richtungsauswahl, statt im Feld
-   * stehenzubleiben — dort hätte es keine Wirkung und sähe trotzdem aus, als hätte es
-   * eine.
-   */
-  function betragTippen(text: string) {
-    const { rest, richtung: gemeint } = vorzeichenAbspalten(text);
-    setBetrag(rest);
-    if (gemeint) {
-      setRichtung(gemeint);
-      setRichtungVonHand(true);
-    }
-  }
-
-  function richtungWaehlen(gewaehlt: Richtung) {
-    setRichtung(gewaehlt);
-    setRichtungVonHand(true);
-  }
+  // Höhe und Richtung — getrennt, und wer zuletzt gesprochen hat (`useBetragUndRichtung`).
+  const { betrag, richtung, betragTippen, richtungWaehlen, kategorieGewechselt, gebuchterBetrag } =
+    useBetragUndRichtung(buchung?.betrag ?? entwurf?.betrag, geld);
 
   const [charakter, setCharakter] = useState<Charakter>(buchung?.charakter ?? entwurf?.vorschlag?.charakter ?? "Aufwand");
   const [kategorieId, setKategorieId] = useState(buchung?.kategorieId ?? entwurf?.vorschlag?.kategorieId ?? "");
@@ -330,9 +284,7 @@ function BuchungFormular({
     const gewaehlt = kategorien.find((k) => k.id === id);
     if (!gewaehlt) return;
     setCharakter(gewaehlt.defaultCharakter);
-    // Die Richtung nur, solange sie niemand selbst gesetzt hat — siehe `richtungVonHand`.
-    // Der Normalfall bleibt damit ein Handgriff: Kategorie wählen, Höhe tippen, fertig.
-    if (!richtungVonHand) setRichtung(gewaehlt.defaultCharakter === "Ertrag" ? "zu" : "ab");
+    kategorieGewechselt(gewaehlt.defaultCharakter);
   }
   const [notiz, setNotiz] = useState(buchung?.notiz ?? "");
   const [fehler, setFehler] = useState<string | null>(null);
@@ -355,77 +307,21 @@ function BuchungFormular({
    */
   const kontoIstOnline = !istNeu && onlineKonten.has(kontoId);
   const istUmschichtung = charakter === "Umschichtung";
-  /**
-   * Was beim Speichern in den Ledger geht — Höhe mal Richtung, sonst nichts.
-   *
-   * Keine Ableitung mehr an dieser Stelle: was in der Auswahl steht, wird gebucht. Ein
-   * Zufluss auf einer Aufwandskategorie ist damit erlaubt und richtig — eine Erstattung
-   * oder Retoure gehört in die Kategorie der Ausgabe, dort entlastet sie deren Budget.
-   */
-  const gebuchterBetrag = (richtung === "ab" ? -1 : 1) * Math.abs(geld.parse(betrag) ?? 0);
   /** Floss das Geld entgegen dem, was die Einordnung erwarten lässt? (Erstattung, Storno) */
   const gegenDerEinordnung =
     gebuchterBetrag !== 0 && gebuchterBetrag !== vorzeichenbehaftet(gebuchterBetrag, charakter);
-  /**
-   * Konten, auf denen ein Gegenbein ERZEUGT werden darf.
-   *
-   * Nicht bloss „die anderen": auf einem abgerufenen Konto anzulegen hiesse, eine Buchung
-   * zu erfinden, die es bei der Bank nicht gibt. Zwei abgerufene Konten brauchen das auch
-   * gar nicht — beide Seiten meldet die Bank ohnehin, sie stehen als Gegenbuchung in der
-   * Liste darüber und werden VERBUNDEN statt erzeugt.
-   */
-  // Ein stillgelegtes Konto kommt nicht in Frage, und hier ohne Ausnahme: es wird ein
-  // NEUES Bein erzeugt, es steht also nichts schon dran, das man stehenlassen müsste.
-  const andereKonten = konten.filter(
-    (k) => k.id !== kontoId && !onlineKonten.has(k.id) && istAktiv(k),
-  );
-
-  // ── Gegenbein-Suche im Entwurf ──────────────────────────────────────────────────────
-  //
-  // Eine Umschichtung hat zwei Seiten, und die zweite liegt auf einem anderen Konto. Wo
-  // sie steckt, ist offen: sie kann als zweiter Entwurf danebenliegen, längst gebucht
-  // sein (das andere Bein kam mit einem früheren Abruf), gar nicht existieren (Bargeld
-  // wird nicht importiert) — oder es ist wirklich nur eine Seite.
-  //
-  // ZWEI Zeitfenster, und das ist kein Versehen: Entwürfe werden beim Übernehmen von
-  // `paareUmbuchungen` verknüpft, und die Regel dort erlaubt 3 Tage. Ein weiter entfernter
-  // Entwurf ließe sich hier auswählen, würde beim Verbuchen aber nicht gepaart — zwei
-  // halbe Umschichtungen. Bei gebuchten Zeilen paart `buchungenPaaren` auf Zuruf, ohne
-  // Fenster; da gilt das großzügigere Vorschlags-Fenster wie im Umbuchungs-Dialog.
-  const entwurfKandidaten = useMemo(
-    () =>
-      istEntwurf && istUmschichtung
-        ? andereEntwuerfe.filter((x) => passtAlsGegenbein({ ...entwurf!, zahlungskontoId: kontoId }, x))
-        : [],
-    [istEntwurf, istUmschichtung, andereEntwuerfe, entwurf, kontoId],
-  );
-  const buchungKandidaten = useMemo(
-    () =>
-      istEntwurf && istUmschichtung
-        ? paarungsKandidaten(alleBuchungen, {
-            id: "", datum: entwurf!.buchungstag, betrag: entwurf!.betrag,
-            kontoId, charakter: "Umschichtung", quelle: "import",
-          })
-        : [],
-    [istEntwurf, istUmschichtung, alleBuchungen, entwurf, kontoId],
-  );
-
-  /** Auswahlwerte: `e:<id>` Entwurf, `b:<id>` gebucht, `__neu` erzeugen, `__einseitig`. */
-  const gegenOptionen = [
-    ...entwurfKandidaten.map((x) => `e:${x.id}`),
-    ...buchungKandidaten.map((x) => `b:${x.id}`),
-    ...(andereKonten.length > 0 ? ["__neu"] : []),
-    "__einseitig",
-  ];
-  const [gegenwahl, setGegenwahl] = useState<string>("");
-  // Leer starten und beim Lesen auffüllen: die Kontenliste wird asynchron nachgeladen,
-  // ein useState-Initialwert liefe gegen die noch leere Liste und bliebe dann leer.
-  const [neuKontoId, setNeuKontoId] = useState("");
-  const neuKontoGewaehlt = andereKonten.some((k) => k.id === neuKontoId) ? neuKontoId : (andereKonten[0]?.id ?? "");
-  // Das Konto zu wechseln ändert die Kandidatenliste. Statt die Wahl per Effekt
-  // nachzuziehen (und dabei einen Render mit ungültigem Wert zu riskieren) wird sie beim
-  // Lesen geprüft: was nicht mehr angeboten wird, fällt auf die beste Vorgabe zurück.
-  const gegenGewaehlt = gegenOptionen.includes(gegenwahl) ? gegenwahl : (gegenOptionen[0] ?? "__einseitig");
+  // Wo die zweite Seite einer Umschichtung steckt (`useGegenbeinwahl`).
+  const gegenbein = useGegenbeinwahl({
+    aktiv: istEntwurf && istUmschichtung,
+    entwurf,
+    kontoId,
+    konten,
+    onlineKonten,
+    andereEntwuerfe,
+    alleBuchungen,
+  });
+  const { neuKontoGewaehlt } = gegenbein;
+  const gegenGewaehlt = gegenbein.gewaehlt;
 
   /** Vorgemerkte Vertragszuordnung — gesetzt wird sie erst nach dem Übernehmen. */
   const [vertragWahl, setVertragWahl] = useState<string>("");
@@ -756,52 +652,7 @@ function BuchungFormular({
                 </Button>
               </div>
 
-              <Optionsgruppe wert={gegenGewaehlt} aufAendern={setGegenwahl} label={t("konten.zurUmbuchung.kandidatenTitel")}>
-              {entwurfKandidaten.map((k) => (
-                <Option key={k.id} wert={`e:${k.id}`} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                  <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.buchungstag)}</span>
-                  <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
-                    {kontoName.get(k.zahlungskontoId) ?? "?"}
-                    <span className="muted" style={{ marginLeft: 8, fontSize: "var(--fs-xs)" }}>{t("konten.neue.status.neu")}</span>
-                  </span>
-                  <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
-                </Option>
-              ))}
-
-              {buchungKandidaten.map((k) => (
-                <Option key={k.id} wert={`b:${k.id}`} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                  <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.datum)}</span>
-                  <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
-                    {kontoName.get(k.kontoId) ?? "?"}
-                    <span className="muted" style={{ marginLeft: 8, fontSize: "var(--fs-xs)" }}>{t("konten.neue.status.verbucht")}</span>
-                  </span>
-                  <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
-                </Option>
-              ))}
-
-              {/* Ausweg: kein Gegenbein vorhanden (S-1a) — typisch Bargeld. */}
-              {andereKonten.length > 0 && (
-                <Option wert="__neu" style={{ display: "flex", gap: 10, padding: "8px 0", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
-                  <span style={{ minWidth: 180 }}>
-                    <Auswahl
-                      ariaLabel={t("konten.zurUmbuchung.neu")}
-                      wert={neuKontoGewaehlt}
-                      aufAenderung={(v) => { setNeuKontoId(v); setGegenwahl("__neu"); }}
-                      optionen={andereKonten.map((k) => ({ wert: k.id, text: k.bezeichnung }))}
-                    />
-                  </span>
-                </Option>
-              )}
-
-              <Option wert="__einseitig" style={{ display: "flex", gap: 10, padding: "8px 0" }}>
-                <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>{t("konten.entwurf.einseitig")}</span>
-              </Option>
-              </Optionsgruppe>
-
-              <div className="hinweis" style={{ marginTop: 6 }}>
-                {gegenGewaehlt === "__einseitig" ? t("konten.neue.ohneGegenbein") : t("konten.zurUmbuchung.neuHinweis")}
-              </div>
+              <GegenbeinBlock gegenbein={gegenbein} kontoName={kontoName} />
             </>
           )}
         </div>
