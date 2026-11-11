@@ -181,3 +181,47 @@ describe("Mehrere Zeilen auf einmal", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("Zeilen weglegen und eingrenzen", () => {
+  async function zwei() {
+    await grunddaten();
+    await umsatzRepo.anlegen({ ...GEMEINSAM, id: "u-a", laufId: "l-datei", rohHash: "h-a", status: "neu", gegenpartei: "Ohlert" });
+    await umsatzRepo.anlegen({ ...GEMEINSAM, id: "u-b", laufId: "l-datei", rohHash: "h-b", status: "neu", gegenpartei: "Halvern" });
+  }
+
+  it("legt eine einzelne Zeile weg — sie bleibt in der Datenbank, nur nicht im Stapel", async () => {
+    await zwei();
+    const nutzer = userEvent.setup();
+    rendere(<ReviewScreen />);
+    await screen.findByText("Ohlert");
+
+    await nutzer.click(screen.getAllByRole("button", { name: i18n.t("review.zeileVerwerfen") })[0]);
+
+    await waitFor(() => expect(screen.queryByText("Ohlert")).not.toBeInTheDocument());
+    const alle = await umsatzRepo.alle();
+    expect(alle.find((u) => u.id === "u-a")?.status).toBe("verworfen");
+  });
+
+  it("legt den Rest erst nach der Nachfrage weg", async () => {
+    await zwei();
+    const nutzer = userEvent.setup();
+    rendere(<ReviewScreen />);
+    await screen.findByText("Ohlert");
+
+    await nutzer.click(screen.getByRole("button", { name: new RegExp(i18n.t("review.restVerwerfen")) }));
+    expect((await umsatzRepo.alle()).every((u) => u.status !== "verworfen")).toBe(true);
+    await nutzer.click(await screen.findByRole("button", { name: i18n.t("review.verwerfenJa") }));
+
+    await waitFor(async () => expect((await umsatzRepo.alle()).every((u) => u.status === "verworfen")).toBe(true));
+  });
+
+  it("grenzt über die Suche ein", async () => {
+    await zwei();
+    const nutzer = userEvent.setup();
+    rendere(<ReviewScreen />);
+    await screen.findByText("Ohlert");
+    await nutzer.type(screen.getByPlaceholderText(i18n.t("review.suche")), "halv");
+    await waitFor(() => expect(screen.queryByText("Ohlert")).not.toBeInTheDocument());
+    expect(screen.getByText("Halvern")).toBeInTheDocument();
+  });
+});

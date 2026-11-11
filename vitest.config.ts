@@ -43,13 +43,15 @@ export default defineConfig({
       // Kommentar oben, und eine Zahl, die niemand prüft, sinkt. Die Werte hier sind der
       // gemessene Stand, abgerundet: der Lauf wird rot, wenn die Abdeckung FÄLLT. Wer sie
       // hebt, zieht die Schwelle nach; gesenkt wird sie nur mit einem Grund, der hier
-      // dabeisteht. Das grösste Loch ist `src/vendor/` (eingebetteter Fremdcode, dessen
-      // Netzwege kein Test fährt) — dort ist am meisten zu holen.
+      // dabeisteht. Seit 2026-11-10 erreichen die ZEILEN das Ziel; das grösste Loch ist
+      // inzwischen die Oberfläche selbst (Wege über den Bankabruf), danach `adapters/fints`
+      // und `src/vendor/` — beides Netzwege, die eine Attrappe des Abrufadapters braucht
+      // (Vorlage: `konten/bankzugangPruefen.test.tsx`).
       thresholds: {
-        statements: 87,
-        branches: 80,
-        functions: 83,
-        lines: 88,
+        statements: 88,
+        branches: 81,
+        functions: 85,
+        lines: 90,
       },
     },
   },
