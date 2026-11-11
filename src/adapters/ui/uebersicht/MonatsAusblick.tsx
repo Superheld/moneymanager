@@ -238,11 +238,14 @@ function ZeileMitPosten({
       </Collapsible.Trigger>
 
       <Collapsible.Panel>
-        // Dieselbe Fläche wie überall, wo etwas aufklappt (`Aufklappflaeche`) — aber ohne
-        // eigenes Tabellenraster: die Posten fluchten mit den Spalten der Zeile darüber.
-        // Der negative Rand hebt dafür das Innenpolster auf. Der Deckel folgt der
-        // Zeilenregel der schmalen Karten; „Sonstiges" ist im laufenden Monat lang, und
-        // ohne ihn schöbe eine aufgeklappte Zeile die Nachbarkarten aus dem Bild.
+        {/* Dieselbe Fläche wie überall, wo etwas aufklappt (`Aufklappflaeche`) — aber ohne
+            eigenes Tabellenraster: die Posten fluchten mit den Spalten der Zeile darüber.
+            Der negative Rand hebt dafür das Innenpolster auf. Der Deckel folgt der
+            Zeilenregel der schmalen Karten; „Sonstiges" ist im laufenden Monat lang, und
+            ohne ihn schöbe eine aufgeklappte Zeile die Nachbarkarten aus dem Bild.
+            Als JSX-Kommentar und nicht mit `//`: bis 2026-11-11 stand er so, und innerhalb
+            eines Elements ist `//` kein Kommentar, sondern TEXT — er stand in jeder
+            aufgeklappten Zeile da. Vor dem Umbau lag er in `{offen && (…)}`, also in JS. */}
         <Aufklappflaeche zeilen={AUFKLAPP_ZEILEN_BREIT} rand="-8px">
           {zeile.id === "budgets" || zeile.id === "budgetsAufbauend"
             ? zeile.posten.map((p) => (
