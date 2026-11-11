@@ -81,7 +81,7 @@ export function DepotAuszug({ konto, sicht }: { konto: Zahlungskonto; sicht: Dep
   ];
 
   return (
-    <Card style={{ marginTop: "var(--gap-card)" }} pad>
+    <Card pad>
       <div style={{ marginBottom: "var(--sp-4)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
           <span style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>

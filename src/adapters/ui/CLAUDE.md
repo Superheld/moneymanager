@@ -633,6 +633,27 @@ Was dabei mitwächst und darf: `karten-paar` und `ausblick-karten` sind `fr`-Ras
 KPI-Leiste bricht um, und die Charts skalieren über ihre `viewBox` — die laufen ohnehin
 zwischen halber und voller Kartenbreite.
 
+## Abstände: wer ihn setzt
+
+**Der Abstand ZWISCHEN Karten kommt vom Behälter, nie von der Karte.** `.screen` ist ein
+Stapel mit `gap-card`, der Inhalt eines Registers ebenso (`Registerleiste stapeln`), ein
+Kartenpaar setzt seinen `gap`. Eine Karte mit eigenem `marginTop: var(--gap-card)` direkt
+in einem solchen Behälter bekommt den Abstand doppelt — so stand es bis 2026-11-10 im
+Kontoauszug: 32 px über der Kontokarte, 16 darunter. Und wo der Behälter dafür eine
+`!important`-Regel brauchte, die die Ränder der Kinder wieder wegnimmt, war das der
+Hinweis, dass der Abstand am falschen Ort stand.
+
+**Innerhalb einer Karte** ordnen `Stapel` und `Zeile` (`bausteine/Anordnung`) mit Abständen
+aus der Token-Reihe. Drei Fälle bleiben bewusst am Element und sind kein Rückstand:
+
+- der Hinweis direkt unter seinem Feld (`marginTop: 6`) — der Abstand gehört zum Hinweis;
+- `margin: 0` gegen den Standardrand eines `<p>`;
+- ein einzelner Abstand, der eine Gruppe von der nächsten absetzt, wo es nur EINE solche
+  Stelle im Behälter gibt.
+
+Wer einen Behälter anfasst, in dem mehrere Kinder denselben `marginTop` tragen, macht ihn
+zum `Stapel`.
+
 ## Die Fläche kommt von `Card`
 
 **Inhalt steht in einer `Card`, nicht auf dem nackten Seitenhintergrund.** Sie trägt

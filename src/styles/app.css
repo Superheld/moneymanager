@@ -494,7 +494,6 @@ select.field {
   margin-top: var(--gap-card);
 }
 
-/* Die Karten darin bringen ihren eigenen Abstand schon mit. */
 /* Zwei Listen nebeneinander IN einer Karte (Budgets: monatlich | aufbauend). Wie
    `karten-paar`, nur ohne eigenen Rand oben — die Karte hat ihn schon. `min()` lässt
    eine Spalte schmal die volle Breite nehmen, statt die Seite aufzuziehen. */
@@ -505,9 +504,6 @@ select.field {
   align-items: start;
 }
 
-.karten-paar > * {
-  margin-top: 0 !important;
-}
 
 /* ============================================================
    Eine Buchungszeile in einer aufgeklappten Liste.

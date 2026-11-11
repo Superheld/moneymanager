@@ -92,7 +92,6 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
 
   return (
     <Card
-      style={{ marginTop: "var(--gap-card)" }}
       title={sicht.depot.bezeichnung}
       subtitle={
         entwicklung.veraenderung != null

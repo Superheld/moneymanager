@@ -350,10 +350,9 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
       {aktiv && aktivZeile?.depot && <DepotAuszug konto={aktiv} sicht={aktivZeile.depot} />}
 
       {aktiv && register && !aktivZeile?.depot && (
-        <Card
-          style={{ marginTop: "var(--gap-card)" }}
-          pad
-        >
+        // Kein eigener Rand oben: `.screen` setzt den Kartenabstand. Mit ihm standen über
+        // dieser Karte 32 px und darunter 16 — am Bildschirmvergleich gefunden.
+        <Card pad>
           {/* Statement-Masthead: wessen Auszug, welcher reale Stand */}
           <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "var(--sp-4)", flexWrap: "wrap", marginBottom: "var(--sp-4)" }}>
             <div style={{ minWidth: 0 }}>

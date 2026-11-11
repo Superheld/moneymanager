@@ -37,7 +37,6 @@ export function DepotKarte({ daten }: { daten: Depotdaten }) {
 
   return (
     <Card
-      style={{ marginTop: "var(--gap-card)" }}
       title={t("depot.uebersichtTitel")}
       subtitle={t("depot.uebersichtHinweis")}
       action={<strong>{geld.formatMitSymbol(daten.gesamtwert)}</strong>}
