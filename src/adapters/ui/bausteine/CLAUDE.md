@@ -287,6 +287,12 @@ nicht, dass hier etwas passiert, und dem Sehenden nicht, was.
 Sonst gilt: die Fensterbreite ist eine Frage, die CSS selbst beantwortet, und in `app.css`
 steht die schmale Form ohne Abfrage da. Das reicht, solange sich nur das AUSSEHEN ändert.
 
+**Benutzt wird es seit 2026-11-10 genau einmal: von `DataTable`.** Der `Dialog` hing bis
+dahin auch daran und zeichnete seine schmale Form über Inline-Stile — obwohl sich dort nur
+das Aussehen ändert. Er steht jetzt in CSS. Dass kein Screen `useSchmal` benutzt, ist
+damit der gewollte Zustand und kein Versehen: ein Screen, der schmal anders aussehen will,
+tut das in `app.css`.
+
 Es reicht nicht, wo sich das **Markup** ändert. `DataTable` wird unter 700 px aus einer
 Tabelle mit sechs Spalten eine mit zwei, in der die übrigen Werte als zweite Zeile unter
 dem Namen stehen. **Zellen zusammenzulegen kann CSS nicht** — es kann sie nur verstecken,

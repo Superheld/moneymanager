@@ -445,7 +445,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   zwei Zahlen und verschwieg, dass sie zusammen genau den Stand darüber
                   ergeben; „Σ Ist" hiess dabei nichts, was ausserhalb des Codes jemand
                   wissen konnte. */}
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+              <div className="hinweis" style={{ marginTop: 6 }}>
                 {t("konten.standHerkunft", {
                   anfang: geld.formatMitSymbol(aktiv.saldo),
                   bewegung: geld.formatMitSymbol(aktivZeile?.bewegungen ?? 0, { mitVorzeichen: true }),
@@ -561,7 +561,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 { wert: "__ohne", text: t("konten.ohneKategorie") },
               ]}
             />
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
+            <span className="hinweis">{t("konten.buchungenAnzahl", { n: gebuchtGefiltert.length })}</span>
             {/* Erscheint nur, wenn es etwas zu sehen gibt. Ein Schalter, der dauerhaft
                 „0 mögliche Dubletten" anbietet, ist eine Frage ohne Antwort. */}
             {dublettenAnzahl > 0 && (
@@ -648,7 +648,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   render: (r) => (
                     <span title={r.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
-                      {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: "var(--fs-xs)", whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
+                      {r.zeile.gegenkontoId && <span className="hinweis" style={{ whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
                       {/* Der Prüf-Marker steht VOR den anderen Pillen: die übrigen sagen,
                           was eine Zeile IST, dieser sagt, was noch zu tun ist. Klick nimmt
                           ihn weg — dafür ist er ein Knopf und kein Etikett.

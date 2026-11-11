@@ -72,7 +72,7 @@ export function BankSuche({ onWaehlen }: { onWaehlen: (b: Bankeintrag) => void }
               {(b: Bankeintrag) => (
                 <Combobox.Item key={b.blz} value={b} className="vorschlag">
                   <div>{b.name}</div>
-                  <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  <div className="hinweis">
                     {b.blz} · {b.ort} · {b.version}
                   </div>
                 </Combobox.Item>

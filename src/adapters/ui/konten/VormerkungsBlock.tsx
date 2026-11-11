@@ -57,7 +57,7 @@ export function VormerkungsBlock({ vormerkungen }: { vormerkungen: readonly Vorm
             {/* Ohne Datum ist die Vormerkung nicht kaputt, sondern ohne Termin — manche
                 Banken melden ihre so. Ein erfundenes Datum wäre schlechter als der
                 ehrliche Strich. */}
-            <span className="muted" style={{ fontSize: "var(--fs-xs)", minWidth: "5.5rem" }}>
+            <span className="hinweis" style={{ minWidth: "5.5rem" }}>
               {v.datum ?? t("konten.vormerkungen.ohneDatum")}
             </span>
             <span style={{ flex: 1, minWidth: 0 }}>
@@ -83,7 +83,7 @@ export function VormerkungsBlock({ vormerkungen }: { vormerkungen: readonly Vorm
           </li>
         ))}
       </ul>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+      <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
         {t("konten.vormerkungen.hinweis")}
       </div>
     </Card>

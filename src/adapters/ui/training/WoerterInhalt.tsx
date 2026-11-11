@@ -22,6 +22,7 @@ import {
 import { Auswahl } from "../bausteine/Auswahl";
 import { Abschnitt, type Hilfe } from "./kartenteile";
 import { Kaestchen } from "../bausteine/Kaestchen";
+import { Zeile } from "../bausteine/Anordnung";
 
 /**
  * Der Wortbestand — eine Liste statt zweier Karten.
@@ -143,7 +144,7 @@ export function WoerterInhalt({
                     </span>
                   </>
                 )}
-                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <div className="hinweis">
                   {t(`einstellungen.lernmaterial.herkunftHinweis.${h}`)}
                 </div>
               </span>
@@ -193,7 +194,7 @@ export function WoerterInhalt({
         <div className="muted" style={{ marginBottom: "var(--sp-2)" }}>
           {t("einstellungen.lernmaterial.bestandHinweis")}
         </div>
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
+        <div className="hinweis" style={{ marginBottom: "var(--sp-3)" }}>
           {t("einstellungen.lernmaterial.masseHinweis")}
         </div>
 
@@ -271,7 +272,7 @@ export function WoerterInhalt({
                       {r.anzeige}
                       {r.wort !== r.anzeige && <span className="muted"> → {r.wort}</span>}
                       {r.herkunft && (
-                        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                        <span className="hinweis">
                           {" "}· {t(`einstellungen.lernmaterial.herkunft.${r.herkunft}`)}
                         </span>
                       )}
@@ -415,7 +416,7 @@ export function WoerterInhalt({
             {t("einstellungen.lernmaterial.grundausstattung")}
           </Button>
         </div>
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
+        <div className="hinweis" style={{ marginTop: "var(--sp-2)" }}>
           {t("einstellungen.lernmaterial.grundausstattungHinweis")}
         </div>
       </Abschnitt>
@@ -450,7 +451,7 @@ function Wortdetail({
         background: "var(--surface-2)",
       }}
     >
-      <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
+      <Zeile ausrichtung="baseline">
         <span style={{ fontWeight: "var(--fw-bold)" }}>{zeile.anzeige}</span>
         {zeile.herkunft && (
           <span className="muted">{t(`einstellungen.lernmaterial.herkunft.${zeile.herkunft}`)}</span>
@@ -470,7 +471,7 @@ function Wortdetail({
               : t("einstellungen.lernmaterial.ueberall")}
           </span>
         )}
-      </div>
+      </Zeile>
 
       {zeile.grund && (
         <div className="muted" style={{ marginTop: "var(--sp-2)" }}>
@@ -484,13 +485,13 @@ function Wortdetail({
       {zeile.belege > 0 && zeile.kategorien > 0 && (
         <div style={{ display: "flex", gap: "var(--sp-5)", flexWrap: "wrap", marginTop: "var(--sp-3)" }}>
           <span>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <span className="hinweis">
               {t("einstellungen.lernmaterial.spalteDeckung")}
             </span>{" "}
             <span style={{ fontVariantNumeric: "tabular-nums" }}>{prozent(zeile.deckung)}</span>
           </span>
           <span>
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <span className="hinweis">
               {t("einstellungen.lernmaterial.trennschaerfe")}
             </span>{" "}
             <span
@@ -531,7 +532,7 @@ function Wortdetail({
                   />
                 </span>
                 <span>{kategorieName.get(v.kategorieId) ?? v.kategorieId}</span>
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {prozent(v.anzahl / zeile.belege)}
                 </span>
               </div>

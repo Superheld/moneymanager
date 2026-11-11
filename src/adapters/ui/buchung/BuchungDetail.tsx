@@ -690,7 +690,7 @@ function BuchungFormular({
             Aufwandskategorie erlaubt IST, sieht man dem Feld nicht an — dass er dort auch
             richtig liegt, erst recht nicht. */}
         {!istEntwurf && !gepaart && !kontoIstOnline && !istUmschichtung && gegenDerEinordnung && (
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "-4px 0 6px" }}>
+          <div className="hinweis" style={{ margin: "-4px 0 6px" }}>
             {t("konten.buchung.gegenrichtungHinweis")}
           </div>
         )}
@@ -736,11 +736,11 @@ function BuchungFormular({
           Fall vorliegt, statt sie vorher zu verlangen. Welche Seite gewählt ist, muss VOR
           dem Drücken dastehen — sonst entsteht lautlos eine einseitige Umschichtung. */}
       {istEntwurf && (
-        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+        <div className="abschnitt">
           {!istUmschichtung ? (
             <>
               <Button onClick={() => setCharakter("Umschichtung")}>{t("konten.zurUmbuchung.aktion")}</Button>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+              <div className="hinweis" style={{ marginTop: 6 }}>
                 {t("konten.zurUmbuchung.untertitel")}
               </div>
             </>
@@ -799,7 +799,7 @@ function BuchungFormular({
               </Option>
               </Optionsgruppe>
 
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+              <div className="hinweis" style={{ marginTop: 6 }}>
                 {gegenGewaehlt === "__einseitig" ? t("konten.neue.ohneGegenbein") : t("konten.zurUmbuchung.neuHinweis")}
               </div>
             </>
@@ -835,11 +835,11 @@ function BuchungFormular({
                   </span>
                 </div>
               ))}
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.split.stattKategorie")} {t("konten.split.aufhebenHinweis")}</div>
+              <div className="hinweis" style={{ marginTop: 6 }}>{t("konten.split.stattKategorie")} {t("konten.split.aufhebenHinweis")}</div>
             </>
           ) : charakter === "Umschichtung" && istEntwurf ? (
             // Verschobenes Geld zählt nicht ins Budget — eine Kategorie gäbe es nicht.
-            <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.zurUmbuchung.kategorieHinweis")}</div>
+            <div className="hinweis">{t("konten.zurUmbuchung.kategorieHinweis")}</div>
           ) : (
             <>
               <FormField label={t("konten.feldKategorie")} hint={t("konten.optional")}>
@@ -848,7 +848,7 @@ function BuchungFormular({
               {/* Aufteilen setzt eine gespeicherte Buchung voraus — es verteilt deren
                   Betrag, und der ist vorher noch nicht gebucht. */}
               {buchung && (
-                <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+                <div className="hinweis" style={{ marginTop: 6 }}>
                   <Button variant="link" onClick={onSplitten}>{t("konten.split.aktion")}</Button>
                   {" · "}
                   {t("konten.split.untertitel")}
@@ -866,7 +866,7 @@ function BuchungFormular({
       {/* Umbuchungs-Abschnitt: Einstieg (S-1) bzw. Gegenbuchung und Paarung lösen. Beides
           braucht eine gespeicherte Buchung — gepaart wird im Ledger. */}
       {buchung && (
-        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+        <div className="abschnitt">
           {gepaart ? (
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
@@ -895,14 +895,14 @@ function BuchungFormular({
                 </Button>
               )}
 
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+              <div className="hinweis" style={{ marginTop: 6 }}>
                 {t("konten.paarung.loesenHinweis")} {t("konten.paarung.loeschtBeide")}
               </div>
             </>
           ) : (
             <>
               <Button onClick={onZurUmbuchung}>{t("konten.zurUmbuchung.aktion")}</Button>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+              <div className="hinweis" style={{ marginTop: 6 }}>
                 {t("konten.zurUmbuchung.untertitel")}
               </div>
             </>
@@ -923,7 +923,7 @@ function BuchungFormular({
           verlöre dabei alles hier Eingestellte, weil noch nichts gespeichert ist. Aus
           einer übernommenen Buchung geht es weiterhin. */}
       {istEntwurf && !istUmschichtung && (
-        <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+        <div className="abschnitt">
           <div style={{ fontSize: "var(--fs-eyebrow)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)", color: "var(--ink-3)", marginBottom: 8 }}>
             {t("konten.zuVertrag.gehoertZu")}
           </div>
@@ -937,7 +937,7 @@ function BuchungFormular({
               ...vertraege.map((v) => ({ wert: v.id, text: v.anbieter })),
             ]}
           />
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+          <div className="hinweis" style={{ marginTop: 6 }}>
             {vertragWahl ? t("konten.entwurf.vertragVorgemerkt") : t("konten.entwurf.vertragOffen")}
           </div>
         </div>
@@ -966,7 +966,7 @@ function BuchungFormular({
 
       {/* Was hier NICHT geht und warum — statt Knöpfen, die ins Leere greifen. */}
       {istEntwurf && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+        <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
           {t("konten.entwurf.spaeterHinweis")}
         </div>
       )}
@@ -974,7 +974,7 @@ function BuchungFormular({
       {/* Die Folge des Verwerfens beziffert, nicht nur behauptet: ohne Gegenstück im
           Bestand fehlt danach genau dieser Betrag gegenüber dem, was die Bank sagt. */}
       {istEntwurf && !dublette && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
+        <div className="hinweis" style={{ marginTop: "var(--sp-2)" }}>
           {t("konten.entwurf.verwerfenFolge", { betrag: geld.formatMitSymbol(entwurf!.betrag, { mitVorzeichen: true }) })}
         </div>
       )}
@@ -983,7 +983,7 @@ function BuchungFormular({
           die ein Entwurf oben bekommt. Die Zeile verschwindet aus dem Saldo, die Bank
           kennt sie weiterhin, also weicht der Stand danach um genau diesen Betrag ab. */}
       {buchung && ausBankabruf && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+        <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
           {t("konten.detail.verwerfenFolge", { betrag: geld.formatMitSymbol(-buchung.betrag, { mitVorzeichen: true }) })}
         </div>
       )}
@@ -991,7 +991,7 @@ function BuchungFormular({
       {/* „Löschen" sagt nicht die ganze Wahrheit, wenn die Buchung aus einer DATEI kam:
           die eingelesene Zeile bleibt und steht danach wieder in der Import-Inbox. */}
       {buchung?.quelle === "import" && !ausBankabruf && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+        <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
           {t("konten.detail.loeschenHinweis")}
         </div>
       )}

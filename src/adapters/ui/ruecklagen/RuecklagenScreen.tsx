@@ -41,6 +41,7 @@ import { betont } from "../bausteine/betonung";
 import { Modal } from "../bausteine/Modal";
 import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
+import { Stapel } from "../bausteine/Anordnung";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -291,7 +292,7 @@ export function RuecklagenScreen() {
         {items.length === 0 ? (
           <div className="muted">{t("ruecklagen.leer")}</div>
         ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
+          <Stapel abstand={5}>
             {deckung.posten.map((p, idx) => {
               const r = p.ruecklage;
               const mitZiel = hatZiel(r);
@@ -361,7 +362,7 @@ export function RuecklagenScreen() {
                 </div>
               );
             })}
-          </div>
+          </Stapel>
         )}
       </Card>
 
@@ -370,7 +371,7 @@ export function RuecklagenScreen() {
           gerade dasteht. */}
       {(sicht?.ausbuchungen.length ?? 0) > 0 && (
         <Card title={t("ruecklagen.ausbuchungenTitel")} subtitle={t("ruecklagen.ausbuchungenUntertitel")}>
-          <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+          <Stapel abstand={2}>
             {sicht?.ausbuchungen.map((a) => (
               <div key={a.id} style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap" }}>
                 <span>
@@ -382,7 +383,7 @@ export function RuecklagenScreen() {
                 </span>
               </div>
             ))}
-          </div>
+          </Stapel>
         </Card>
       )}
 

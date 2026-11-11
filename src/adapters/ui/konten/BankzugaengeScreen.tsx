@@ -219,7 +219,7 @@ export function BankzugaengeScreen({
       render: (r: KontoZeile) => (
         <span>
           <div>{r.bezeichnung}</div>
-          <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{r.schluessel}</div>
+          <div className="hinweis">{r.schluessel}</div>
         </span>
       ),
     },
@@ -337,7 +337,7 @@ export function BankzugaengeScreen({
                       {t("bankabruf.profilTitel")}
                     </Button>
                   ) : (
-                    <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                    <span className="hinweis">
                       {t("bankabruf.profilNochKeins")}
                     </span>
                   ),
@@ -443,7 +443,7 @@ export function BankzugaengeScreen({
           <DataTable columns={kontenSpalten} rows={pruefung.konten} />
 
           {pruefung.konten.some((k) => k.hinweis) && (
-            <ul className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+            <ul className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
               {pruefung.konten.filter((k) => k.hinweis).map((k) => (
                 <li key={k.schluessel}>{k.hinweis}</li>
               ))}
@@ -453,7 +453,7 @@ export function BankzugaengeScreen({
           {pruefung.bankNachrichten.length > 0 && (
             <div style={{ marginTop: "var(--sp-3)" }}>
               <div className="nlbl">{t("bankabruf.bankNachrichten")}</div>
-              <ul className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              <ul className="hinweis">
                 {pruefung.bankNachrichten.map((n, i) => (
                   <li key={i}>{n}</li>
                 ))}
@@ -462,10 +462,10 @@ export function BankzugaengeScreen({
           )}
 
           <details style={{ marginTop: "var(--sp-3)" }}>
-            <summary className="muted" style={{ fontSize: "var(--fs-xs)", cursor: "pointer" }}>
+            <summary className="hinweis" style={{ cursor: "pointer" }}>
               {t("bankabruf.rueckmeldungen")}
             </summary>
-            <ul className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <ul className="hinweis">
               {pruefung.hinweise.map((h, i) => (
                 <li key={i}>{h}</li>
               ))}

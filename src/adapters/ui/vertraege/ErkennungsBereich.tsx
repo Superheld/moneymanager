@@ -263,7 +263,7 @@ export function ErkennungsBereich({
       <FormField label={t("vertraege.regel.merkmale")} hint={t("vertraege.regel.merkmaleHinweis")}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {f.merkmale.length === 0 && (
-            <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <div className="hinweis">
               {t("vertraege.regel.ohneMerkmale")}
             </div>
           )}
@@ -357,16 +357,16 @@ export function ErkennungsBereich({
               daneben, weil sie eine Zutat zu ihr ist und kein zweiter Weg. */}
           {vorschlag && (
             <div style={{ marginTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)", paddingTop: "var(--sp-2)" }}>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 6 }}>
+              <div className="hinweis" style={{ marginBottom: 6 }}>
                 {t("vertraege.regel.vorschlaege", { n: vorschlag.belege })}
               </div>
               {vorschlag.belege === 0 && (
-                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <div className="hinweis">
                   {t("vertraege.regel.vorschlaegeOhneBelege")}
                 </div>
               )}
               {vorschlag.belege > 0 && offeneVorschlaege.length === 0 && (
-                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <div className="hinweis">
                   {t("vertraege.regel.vorschlaegeAlleDrin")}
                 </div>
               )}
@@ -374,7 +374,7 @@ export function ErkennungsBereich({
                 {offeneVorschlaege.map((k) => (
                   <div key={`${k.merkmal.art} ${k.merkmal.muster}`}
                        style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                    <span className="muted" style={{ fontSize: "var(--fs-xs)", flex: "0 0 auto" }}>
+                    <span className="hinweis" style={{ flex: "0 0 auto" }}>
                       {t(`vertraege.regel.art.${k.merkmal.art}`)}
                     </span>
                     <code style={{ fontSize: "var(--fs-tabelle)", flex: "1 1 160px", minWidth: 0, overflowWrap: "anywhere" }}>
@@ -400,7 +400,7 @@ export function ErkennungsBereich({
                 ))}
               </div>
               {zurueckgehalten > 0 && (
-                <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+                <div className="hinweis" style={{ marginTop: 4 }}>
                   {t("vertraege.regel.vorschlaegeZurueckgehalten", { n: zurueckgehalten })}
                 </div>
               )}
@@ -451,7 +451,7 @@ export function ErkennungsBereich({
         <FormField label={t("vertraege.regel.fenster")} hint={t("vertraege.regel.fensterHinweis")}>
           <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("vertraege.regel.fensterMonat")}</span>
+              <span className="hinweis">{t("vertraege.regel.fensterMonat")}</span>
               <input className="field" inputMode="numeric" style={{ width: 64 }}
                 aria-label={t("vertraege.regel.fensterMonatVon")} placeholder="1"
                 value={f.monatVonText} onChange={(e) => setze("monatVonText", e.target.value)} />
@@ -461,7 +461,7 @@ export function ErkennungsBereich({
                 value={f.monatBisText} onChange={(e) => setze("monatBisText", e.target.value)} />
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("vertraege.regel.fensterTag")}</span>
+              <span className="hinweis">{t("vertraege.regel.fensterTag")}</span>
               <input className="field" inputMode="numeric" style={{ width: 64 }}
                 aria-label={t("vertraege.regel.fensterTagVon")} placeholder="1"
                 value={f.tagVonText} onChange={(e) => setze("tagVonText", e.target.value)} />
@@ -498,18 +498,18 @@ export function ErkennungsBereich({
       )}
 
       {/* Vorschau — der Grund, warum diese Maske ueberhaupt bedienbar ist. */}
-      <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+      <div className="abschnitt">
         <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
           <Pill variant={treffer.length > 0 ? "ok" : "warn"}>
             {t("vertraege.regel.treffer", { count: treffer.length })}
           </Pill>
-          <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+          <span className="hinweis">
             {t("vertraege.regel.trefferHinweis")}
           </span>
         </div>
 
         {engstelle && (
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 8 }}>
+          <div className="hinweis" style={{ marginBottom: 8 }}>
             {t(`vertraege.regel.engstelle.${engstelle.schluessel}`, {
               weg: engstelle.vorher - engstelle.nachher,
               uebrig: engstelle.nachher,
@@ -544,7 +544,7 @@ export function ErkennungsBereich({
           </div>
         ))}
         {treffer.length > VORSCHAU_ZEILEN && (
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+          <div className="hinweis" style={{ marginTop: 6 }}>
             {t("vertraege.regel.weitere", { count: treffer.length - VORSCHAU_ZEILEN })}
           </div>
         )}

@@ -37,6 +37,7 @@ import { Auswahl } from "../bausteine/Auswahl";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useExperimente, useGeld } from "../bausteine/einstellungenKontext";
 import { Kaestchen } from "../bausteine/Kaestchen";
+import { Zeile } from "../bausteine/Anordnung";
 
 type Art = "offline" | "online";
 
@@ -431,16 +432,16 @@ export function KontoAnlegenModal({
 
         {art === "online" && bankkonten !== null && (
           <>
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
+            <div className="hinweis" style={{ marginBottom: "var(--sp-3)" }}>
               {t("konten.anlegen.zuordnenHinweis")}
             </div>
             {bankkonten.map((k) => {
               const wahl = wahlen[k.schluessel] ?? { ziel: "ignorieren" as const };
               return (
                 <div key={k.schluessel} style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-3) 0" }}>
-                  <div style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
+                  <Zeile ausrichtung="baseline">
                     <strong>{k.bezeichnung}</strong>
-                    <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                    <span className="hinweis">
                       {k.iban ?? k.nummer}
                     </span>
                     {salden[k.schluessel] !== undefined && (
@@ -449,9 +450,9 @@ export function KontoAnlegenModal({
                       </Pill>
                     )}
                     {!k.kannUmsaetze && <Pill variant="warn">{t("bankabruf.nichtAdressierbar")}</Pill>}
-                  </div>
+                  </Zeile>
                   {k.hinweis && (
-                    <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-1) 0" }}>
+                    <div className="hinweis" style={{ margin: "var(--sp-1) 0" }}>
                       {k.hinweis}
                     </div>
                   )}
@@ -484,7 +485,7 @@ export function KontoAnlegenModal({
                 </div>
               );
             })}
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+            <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
               {t("konten.anlegen.saldoHinweis")}
             </div>
           </>

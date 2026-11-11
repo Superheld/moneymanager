@@ -135,7 +135,7 @@ export function Aufklapptabelle<T>({
 }) {
   if (zeilen.length === 0) {
     return (
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", padding: "8px 0 2px" }}>
+      <div className="hinweis" style={{ padding: "8px 0 2px" }}>
         {leer}
       </div>
     );

@@ -50,6 +50,7 @@ import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
 import { Kaestchen } from "../bausteine/Kaestchen";
+import { Zeile } from "../bausteine/Anordnung";
 
 const SEITE_GROESSE = 100;
 
@@ -416,7 +417,7 @@ export function ReviewScreen() {
         <Card
           title={t("review.offenInfo", { offen, fertig })}
           action={
-            <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center", flexWrap: "wrap" }}>
+            <Zeile abstand={3}>
               {verb && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)" }}>{t("review.verbuchtErgebnis", { verbucht: verb.verbucht, umbuchungen: verb.umbuchungen, uebersprungen: verb.uebersprungen })}</span>}
               <Button variant="primary" onClick={verbuchen} laeuft={busy} disabled={fertig === 0}>
                 {busy ? t("review.verbuchenBusy") : t("review.verbuchen", { n: fertig })}
@@ -437,7 +438,7 @@ export function ReviewScreen() {
                   </Button>
                 )
               )}
-            </div>
+            </Zeile>
           }
         >
           <div style={{ display: "flex", gap: "var(--sp-3)", marginBottom: "var(--sp-3)", flexWrap: "wrap" }}>
@@ -470,7 +471,7 @@ export function ReviewScreen() {
               placeholder={t("review.suche")}
               style={{ ...select, flex: "1 1 200px", minWidth: 160 }}
             />
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
+            <span className="hinweis" style={{ alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
             <Kaestchen
               an={auswahlModus}
               aufAendern={(an) => { setAuswahlModus(an); if (!an) setAuswahl(new Set()); }}
@@ -601,7 +602,7 @@ export function ReviewScreen() {
           {seitenAnzahl > 1 && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--sp-3)", marginTop: "var(--sp-3)" }}>
               <Button variant="ghost" onClick={() => setSeite((s) => Math.max(0, s - 1))}>‹</Button>
-              <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>{t("review.seite", { seite: aktuelleSeite + 1, gesamt: seitenAnzahl })}</span>
+              <span className="hinweis">{t("review.seite", { seite: aktuelleSeite + 1, gesamt: seitenAnzahl })}</span>
               <Button variant="ghost" onClick={() => setSeite((s) => Math.min(seitenAnzahl - 1, s + 1))}>›</Button>
             </div>
           )}
@@ -616,7 +617,7 @@ export function ReviewScreen() {
           </Button>
           {zeigeWeggelegt && (
             <>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-2) 0" }}>
+              <div className="hinweis" style={{ margin: "var(--sp-2) 0" }}>
                 {t("review.weggelegt.hinweis")}
               </div>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>

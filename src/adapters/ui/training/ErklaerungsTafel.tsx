@@ -54,7 +54,7 @@ export function ErklaerungsTafel({
 
   return (
     <div style={{ display: "grid", gap: "var(--sp-2)" }}>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+      <div className="hinweis">
         {t("training.erklaerung.kandidaten")}{" "}
         {e.kandidaten.map((k) => `${kategorieName(k.kategorieId)} ${prozent(k.wahrscheinlichkeit, 0)}`).join(" · ")}
       </div>
@@ -117,7 +117,7 @@ export function ErklaerungsTafel({
             ]}
             rows={zeilen}
           />
-          <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+          <div className="hinweis">
             {t("training.erklaerung.lesart", { a, b, abstand: gewicht(e.abstand, locale) })}
             {e.posten.length > ZEILEN && ` ${t("training.erklaerung.weitere", { anzahl: e.posten.length - ZEILEN })}`}
           </div>
@@ -125,7 +125,7 @@ export function ErklaerungsTafel({
       ) : null}
 
       {e.unbekannt.length > 0 && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+        <div className="hinweis">
           {t("training.erklaerung.unbekannt", { woerter: e.unbekannt.join(", ") })}
         </div>
       )}

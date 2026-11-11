@@ -214,18 +214,18 @@ export function SammelDialog({
           {(umbuchungen > 0 || gesperrt > 0 || (vertragAn && umschichtungen > 0)) && (
             <div style={{ marginTop: "var(--sp-4)", display: "flex", flexDirection: "column", gap: 6 }}>
               {umbuchungen > 0 && (
-                <span className="muted" style={{ fontSize: "var(--fs-xs)", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span className="hinweis" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                   <Pill variant="um">{t("konten.pillUmbuchung")}</Pill>
                   {t("konten.sammel.umbuchungHinweis", { n: umbuchungen })}
                 </span>
               )}
               {gesperrt > 0 && (
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {t("konten.sammel.onlineHinweis", { n: gesperrt })}
                 </span>
               )}
               {vertragAn && zielArt === "vertrag" && umschichtungen > 0 && (
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {t("konten.sammel.vertragUmschichtungHinweis", { n: umschichtungen })}
                 </span>
               )}

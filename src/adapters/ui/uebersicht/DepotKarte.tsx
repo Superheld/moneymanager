@@ -60,7 +60,7 @@ export function DepotKarte({ daten }: { daten: Depotdaten }) {
               <span>
                 {s.depot.bezeichnung}
                 {s.aktuell && (
-                  <span className="muted" style={{ fontSize: "var(--fs-xs)", marginLeft: "var(--sp-2)" }}>
+                  <span className="hinweis" style={{ marginLeft: "var(--sp-2)" }}>
                     {t("depot.stand", { datum: datum.mitJahr(s.aktuell.stichtag) })}
                   </span>
                 )}

@@ -114,7 +114,7 @@ function ErkennungsDialog({ kandidat, onClose }: { kandidat: Vertragskandidat; o
   function Zeile({ label, wert }: { label: string; wert: string }) {
     return (
       <div style={{ display: "flex", gap: "var(--sp-3)", padding: "7px 0", alignItems: "baseline", borderBottom: "1px solid var(--line-soft)" }}>
-        <span style={{ flex: "0 0 32%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>{label}</span>
+        <span className="hinweis" style={{ flex: "0 0 32%", fontWeight: "var(--fw-semi)" }}>{label}</span>
         <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-tabelle)", wordBreak: "break-word" }}>{wert}</span>
       </div>
     );
@@ -671,7 +671,7 @@ export function VertraegeScreen() {
               also gehört sie hingeschrieben. Sonst sucht man die Sortierpfeile in den
               Spaltenköpfen und hält ihr Fehlen für einen Fehler.
             */}
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t(`vertraege.ordnung.${ansicht}`)}</span>
+            <span className="hinweis">{t(`vertraege.ordnung.${ansicht}`)}</span>
             {/* Erst ab zwei Arten: mit nur einer gäbe es zwischen „alle" und ihr nichts zu
                 wählen. Rechts abgesetzt, weil er etwas anderes tut als der Umschalter
                 links — der ordnet, dieser blendet aus. */}
@@ -700,7 +700,7 @@ export function VertraegeScreen() {
                 style={i > 0 ? { borderTop: "1px solid var(--line)", marginTop: "var(--sp-5)", paddingTop: "var(--sp-5)" } : undefined}
               >
                 <div style={{ fontSize: "var(--fs-title)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{g.titel}</div>
-                <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", margin: "3px 0 var(--sp-3)" }}>{g.meta}</div>
+                <div className="hinweis" style={{ margin: "3px 0 var(--sp-3)" }}>{g.meta}</div>
                 <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
               </div>
             ))
@@ -726,7 +726,7 @@ export function VertraegeScreen() {
           title={t("vertraege.zahlungenTitel", { anbieter: zahlungsdetail.vertrag.anbieter })}
         >
           {zahlungsdetail.zahlungsliste.length === 0 ? (
-            <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <div className="hinweis">
               {t("vertraege.keineZahlungen")}
             </div>
           ) : (

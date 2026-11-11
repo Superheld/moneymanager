@@ -44,4 +44,20 @@ describe("Schriftgrössen", () => {
     expect(ZAHL.test('style={{ fontSize: "12.5px" }}')).toBe(true);
     expect(ZAHL.test('style={{ fontSize: "var(--fs-xs)" }}')).toBe(false);
   });
+
+  it("setzt den kleinen Erklärtext über `.hinweis`, nicht aus muted plus Grösse", () => {
+    // Er stand bis 2026-11-10 über hundertmal als `className="muted" style={{ fontSize:
+    // "var(--fs-xs)" … }}` da (B4). Die Klasse sagt, was es IST; das Zusammensetzen
+    // sagte nur, wie es aussieht.
+    const MUSTER = [/className="muted" style=\{\{ fontSize: "var\(--fs-xs\)"/, /fontSize: "var\(--fs-xs\)", color: "var\(--ink-3\)"/];
+    const funde: string[] = [];
+    for (const pfad of dateien(UI)) {
+      readFileSync(pfad, "utf8")
+        .split("\n")
+        .forEach((zeile, i) => {
+          if (MUSTER.some((m) => m.test(zeile))) funde.push(`${relative(UI, pfad)}:${i + 1}  ${zeile.trim()}`);
+        });
+    }
+    expect(funde).toEqual([]);
+  });
 });

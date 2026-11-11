@@ -37,7 +37,7 @@ export function Klappblock({
     <Collapsible.Root
       open={offen}
       onOpenChange={onUmschalten}
-      style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}
+      className="abschnitt"
     >
       {/* Aussehen des Link-Knopfs (`Button variant="link"`), Mechanik vom Collapsible. */}
       <Collapsible.Trigger className="btn btn--link">

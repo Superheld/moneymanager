@@ -178,7 +178,7 @@ export function AbgleichModal({
           </tr>
         </tbody>
       </table>
-      <p className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 0 }}>
+      <p className="hinweis" style={{ marginBottom: 0 }}>
         {t("konten.anker.abgleichHinweis")}
       </p>
       {offeneFenster > 0 && (

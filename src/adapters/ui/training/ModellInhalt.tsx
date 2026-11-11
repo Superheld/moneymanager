@@ -396,7 +396,7 @@ function Fehlgriffe({
             kategorieName={(id) => kategorieName.get(id) ?? id}
             verteilung={verteilung}
           />
-          <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+          <div className="hinweis">
             {f.merkmale.map(wortVon).join(" · ")}
           </div>
         </div>
@@ -457,7 +457,7 @@ function LaufvergleichAnsicht({
               nachher: name(g.nachher),
             })}
           </div>
-          <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{g.merkmale.map(wortVon).join(" · ")}</div>
+          <div className="hinweis">{g.merkmale.map(wortVon).join(" · ")}</div>
         </div>
       ))}
     </div>

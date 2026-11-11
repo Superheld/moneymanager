@@ -53,7 +53,7 @@ export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
   const ausgeschlossen = vonHand && zuordnung?.vertragId === null;
 
   return (
-    <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+    <div className="abschnitt">
       {/* Zuordnen von Hand — auch der Weg zurück: „kein Vertrag" ist eine gültige Wahl.
           Die Pille daneben sagt, WOHER die angezeigte Wahl kommt; sie erscheint nur,
           wenn es überhaupt eine gibt. Bei „noch offen" gäbe es keine Herkunft zu
@@ -95,7 +95,7 @@ export function VertragsBlock({ bindung }: { bindung: VertragsBindung }) {
         )}
       </div>
 
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+      <div className="hinweis" style={{ marginTop: 6 }}>
         {t(vonHand ? "konten.zuVertrag.vonHandHinweis" : vertrag ? "konten.zuVertrag.gehoertZuHinweis" : "konten.zuVertrag.untertitel")}
       </div>
     </div>

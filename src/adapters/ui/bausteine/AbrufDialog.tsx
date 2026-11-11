@@ -215,7 +215,7 @@ export function AbrufDialog({
               {/* Kein Fehler, sondern eine Ansage: die Bank liefert schlicht weniger, und
                   ohne diesen Satz liest sich das Ergebnis wie ein vollständiger Abruf. */}
               {ueberGrenze && (
-                <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-1)" }}>
+                <div className="hinweis" style={{ marginTop: "var(--sp-1)" }}>
                   {t("konten.abruf.zeitraumGedeckelt", { tage: grenze })}
                 </div>
               )}
@@ -228,7 +228,7 @@ export function AbrufDialog({
             {befunde.konten.map((b) => (
               <li key={b.zahlungskontoId + b.von} style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-2) 0" }}>
                 <strong>{b.bezeichnung}</strong>{" "}
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {b.von} – {b.bis}
                   {b.format ? ` · ${b.format}` : ""}
                 </span>
@@ -250,7 +250,7 @@ export function AbrufDialog({
                   )}
                 </div>
                 {b.bankSaldo != null && (
-                  <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  <div className="hinweis">
                     {t("konten.abgleich.gemeldet", { datum: b.bankSaldoDatum ?? b.bis })}
                   </div>
                 )}
@@ -269,7 +269,7 @@ export function AbrufDialog({
             {befunde.depots.map((d) => (
               <li key={d.schluessel} style={{ borderTop: "1px solid var(--line-soft)", padding: "var(--sp-2) 0" }}>
                 <strong>{d.bezeichnung}</strong>{" "}
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {t("depot.bezeichnung")}
                   {d.uebernahme ? ` · ${d.uebernahme.stichtag}` : ""}
                 </span>
@@ -295,7 +295,7 @@ export function AbrufDialog({
             {befunde.konten.length === 0 && befunde.depots.length === 0 && (
               <li className="muted">{t("konten.abruf.keineZuordnung")}</li>
             )}
-            <li className="muted" style={{ fontSize: "var(--fs-xs)", paddingTop: "var(--sp-3)" }}>
+            <li className="hinweis" style={{ paddingTop: "var(--sp-3)" }}>
               {t("konten.abruf.weiterInInbox")}
             </li>
           </ul>

@@ -20,6 +20,7 @@ import { useTranslation } from "react-i18next";
 import type { Klassenstand } from "../../../application";
 import { Card } from "../bausteine";
 import { useGeld } from "../bausteine/einstellungenKontext";
+import { Stapel } from "../bausteine/Anordnung";
 
 export function VermoegenKarte({ klassen }: { klassen: readonly Klassenstand[] }) {
   const { t } = useTranslation();
@@ -30,7 +31,7 @@ export function VermoegenKarte({ klassen }: { klassen: readonly Klassenstand[] }
 
   return (
     <Card title={t("uebersicht.vermoegenTitel")} subtitle={t("uebersicht.vermoegenUntertitel")}>
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+      <Stapel abstand={2}>
         {klassen.map((k) => (
           <div key={k.klasse} style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)" }}>
             <span>
@@ -61,7 +62,7 @@ export function VermoegenKarte({ klassen }: { klassen: readonly Klassenstand[] }
             </span>
           </div>
         )}
-      </div>
+      </Stapel>
     </Card>
   );
 }

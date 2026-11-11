@@ -204,7 +204,7 @@ export function DublettenVergleich({
         ))}
       </div>
 
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+      <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
         {t("konten.vergleich.folge")}
       </div>
     </Modal>

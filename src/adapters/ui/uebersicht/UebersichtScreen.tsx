@@ -71,6 +71,7 @@ import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { fehlerMelden } from "../bausteine/Meldungen";
+import { Stapel } from "../bausteine/Anordnung";
 
 function heuteIso(): string {
   const n = new Date();
@@ -223,7 +224,7 @@ export function UebersichtScreen() {
             // Monatlich und aufbauend getrennt — je Zeile nach der Art des Budgets
             // (siehe `nachArtGetrennt`). Die Zwischenüberschrift steht nur, wenn es
             // beide Arten gibt: über einer einzigen Liste sagte sie nichts.
-            <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
+            <Stapel abstand={5}>
               {gruppen.map(([art, rows]) => (
                 <div key={art}>
                   {gruppen.length > 1 && (
@@ -233,7 +234,7 @@ export function UebersichtScreen() {
                       {t(art === "monatlich" ? "budgets.abschnittMonatlichHinweis" : "budgets.abschnittAufbauendHinweis")}
                     </div>
                   )}
-                  <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
+                  <Stapel abstand={4}>
               {rows.map((z) => {
                     const offen = offenesBudget === z.budget.id;
                     const name = z.kategorieName;
@@ -315,10 +316,10 @@ export function UebersichtScreen() {
                       </Collapsible.Root>
                     );
               })}
-                  </div>
+                  </Stapel>
                 </div>
               ))}
-            </div>
+            </Stapel>
           )}
         </Card>
       )}

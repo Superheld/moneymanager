@@ -20,6 +20,7 @@ import { geldFarbe } from "../bausteine/geldFarbe";
 import { AbgleichModal, KassensturzModal } from "./KontostandModal";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { fehlerMelden } from "../bausteine/Meldungen";
+import { Stapel } from "../bausteine/Anordnung";
 
 export function AbgleichBereich() {
   const { t } = useTranslation();
@@ -53,7 +54,7 @@ export function AbgleichBereich() {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+    <Stapel>
       {sortiert.map((z) => {
         const aufgeklappt = offen === z.konto.id;
         return (
@@ -95,7 +96,7 @@ export function AbgleichBereich() {
             </Collapsible.Trigger>
 
             {z.juengster && (
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+              <div className="hinweis" style={{ marginTop: 4 }}>
                 {t(z.juengster.herkunft === "bank" ? "konten.abgleich.bankSagt" : "konten.anker.gezaehlt", {
                   betrag: geld.formatMitSymbol(z.juengster.betrag),
                   datum: datum.mitJahr(z.juengster.datum),
@@ -136,7 +137,7 @@ export function AbgleichBereich() {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  <div className="hinweis">
                     {t("konten.abgleichBereich.keineStichtage")}
                   </div>
                 )}
@@ -207,6 +208,6 @@ export function AbgleichBereich() {
           onGespeichert={async () => { setKassensturzFuer(null); await laden(); }}
         />
       )}
-    </div>
+    </Stapel>
   );
 }

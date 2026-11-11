@@ -666,6 +666,41 @@ select.field.tabellenfilter {
   color: var(--ink-3);
   font-size: var(--fs-sm);
 }
+
+/* --- Kleinbausteine (bausteine/Anordnung.tsx) ---
+   `.hinweis` ist der kleine graue Erklaertext. Er stand als
+   `className="muted" style={{ fontSize: "var(--fs-xs)" }}` ueber hundertmal da — dieselbe
+   Absicht, jedes Mal zusammengesetzt. Was eine Stelle an Abstand dazu braucht, bleibt dort.
+
+   `.abschnitt` ist ein Block mit Linie darueber, wie ihn Dialoge und Karten fuer einen
+   zweiten Teil setzen. */
+.hinweis {
+  color: var(--ink-3);
+  font-size: var(--fs-xs);
+}
+.abschnitt {
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-3);
+  border-top: 1px solid var(--line);
+}
+.trenner {
+  border: 0;
+  height: 1px;
+  background: var(--line);
+}
+.trenner-mit-text {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-3);
+  font-size: var(--fs-2xs);
+  font-weight: var(--fw-bold);
+  text-transform: uppercase;
+  letter-spacing: var(--ls-eyebrow);
+}
+.trenner-mit-text > .trenner {
+  flex: 1;
+}
 .row-actions {
   display: flex;
   justify-content: flex-end;

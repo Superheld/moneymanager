@@ -61,7 +61,7 @@ export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert, k
         const name = t(`bankabruf.vorfall.${v.segment}`, { defaultValue: v.segment });
         return (
           <span>
-            {name} <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{v.segment}</span>
+            {name} <span className="hinweis">{v.segment}</span>
           </span>
         );
       },
@@ -81,7 +81,7 @@ export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert, k
       render: (v: Vorfallprofil) => {
         const liste = merkmale(v, t);
         return liste.length > 0 ? (
-          <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{liste.join(" · ")}</span>
+          <span className="hinweis">{liste.join(" · ")}</span>
         ) : (
           "—"
         );
@@ -115,14 +115,14 @@ export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert, k
       {Object.keys(profil.kontoVorfaelle).length > 0 && (
         <div style={{ marginTop: "var(--sp-4)" }}>
           <div className="nlbl">{t("bankabruf.profilJeKonto")}</div>
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-2)" }}>
+          <div className="hinweis" style={{ marginBottom: "var(--sp-2)" }}>
             {t("bankabruf.profilJeKontoHinweis")}
           </div>
           <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
             {Object.entries(profil.kontoVorfaelle).map(([schluessel, segmente]) => (
               <li key={schluessel} style={{ padding: "var(--sp-1) 0" }}>
                 <div>{konten?.find((k) => k.schluessel === schluessel)?.bezeichnung ?? schluessel}</div>
-                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <div className="hinweis">
                   {segmente.length > 0
                     ? [...segmente].sort().join(" · ")
                     : t("bankabruf.profilKontoOhneVorfaelle")}
@@ -134,7 +134,7 @@ export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert, k
       )}
 
       {profil.nationaleFelderErlaubt === false && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+        <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
           {t("bankabruf.profilNationaleFelder")}
         </div>
       )}
@@ -161,7 +161,7 @@ export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert, k
                   {v.decoupled && <Pill>{t("bankabruf.profilTanDecoupled")}</Pill>}
                   {v.mediumPflicht && <Pill>{t("bankabruf.profilTanMedium")}</Pill>}
                   {v.medien.length > 0 && (
-                    <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{v.medien.join(", ")}</span>
+                    <span className="hinweis">{v.medien.join(", ")}</span>
                   )}
                   {!aktiv && onTanVerfahren && (
                     <Button onClick={() => onTanVerfahren(v.id)}>{t("bankabruf.profilTanWaehlen")}</Button>
@@ -171,7 +171,7 @@ export function Bankprofilkarte({ zugang, profil, onTanVerfahren, gespeichert, k
             })}
           </ul>
           {gespeichert && (
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)" }}>
+            <div className="hinweis" style={{ marginTop: "var(--sp-2)" }}>
               {t("bankabruf.profilTanGespeichert")}
             </div>
           )}

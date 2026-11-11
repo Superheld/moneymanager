@@ -38,7 +38,7 @@ export function Card({ title, subtitle, action, floating = false, pad = true, ch
         <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, marginBottom: "var(--sp-3)" }}>
           <div>
             {title && <div style={{ fontSize: "var(--fs-title)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{title}</div>}
-            {subtitle && <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: 3 }}>{subtitle}</div>}
+            {subtitle && <div className="hinweis" style={{ marginTop: 3 }}>{subtitle}</div>}
           </div>
           {action}
         </div>

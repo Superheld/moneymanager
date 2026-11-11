@@ -55,7 +55,7 @@ export function KPIStat({ label, value, unit, meta, tone = "default", size = "ch
         <span style={{ fontSize: wertGroesse, fontWeight: "var(--fw-black)", letterSpacing: "var(--ls-tight)", color: tonFarbe }}>{value}</span>
         {unit && <span style={{ fontSize: einheitGroesse, fontWeight: "var(--fw-bold)", color: tone === "default" ? "var(--ink-2)" : tonFarbe }}>{unit}</span>}
       </div>
-      {meta && <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: 7 }}>{meta}</div>}
+      {meta && <div className="hinweis" style={{ marginTop: 7 }}>{meta}</div>}
     </div>
   );
 }

@@ -35,6 +35,7 @@ import {
 import { Button, Pill } from "../bausteine";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht } from "../bausteine/einstellungenKontext";
+import { Stapel } from "../bausteine/Anordnung";
 
 /**
  * Eine Aufzählung — „37 Buchungen, 214 importierte Zahlungen und eine Bankverbindung".
@@ -89,7 +90,7 @@ function Wahl({
   onClick: () => void;
 }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-2)" }}>
+    <Stapel abstand={2}>
       {/* Der harmlose Weg ist `primary`, der zerstörende nicht — und das Design-System hat
           keinen Gefahren-Knopf, in dem hier nichts erfunden wird. Die Warnung trägt deshalb
           der Text darunter, in derselben Farbe wie jede andere Warnung der App. */}
@@ -106,7 +107,7 @@ function Wahl({
       >
         {erklaerung}
       </p>
-    </div>
+    </Stapel>
   );
 }
 
@@ -182,7 +183,7 @@ export function KontoAufloesenModal({
         </p>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-5)" }}>
+      <Stapel abstand={5}>
         {gefuehrt ? (
           <>
             <Wahl
@@ -240,7 +241,7 @@ export function KontoAufloesenModal({
             />
           </>
         )}
-      </div>
+      </Stapel>
     </Modal>
   );
 }

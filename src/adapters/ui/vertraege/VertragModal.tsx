@@ -243,7 +243,7 @@ function Abschnitt({ titel, hinweis, einklappbar, children }: {
         {einklappbar && <span aria-hidden style={{ marginRight: 6, color: "var(--ink-3)" }}>{offen ? "▾" : "▸"}</span>}
         {titel}
       </h4>
-      {hinweis && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>{hinweis}</span>}
+      {hinweis && <span className="hinweis">{hinweis}</span>}
     </>
   );
 
@@ -512,7 +512,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
       }
     >
       {hinweis && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-3)" }}>
+        <div className="hinweis" style={{ marginBottom: "var(--sp-3)" }}>
           {hinweis}
         </div>
       )}
@@ -598,7 +598,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
               </span>
             </Kaestchen>
             {kategorieUebertragen && (
-              <p className="muted" style={{ fontSize: "var(--fs-xs)", margin: "6px 0 0 26px", maxWidth: 560 }}>
+              <p className="hinweis" style={{ margin: "6px 0 0 26px", maxWidth: 560 }}>
                 {t("vertraege.kategorieUebertragenHinweis")}
               </p>
             )}
@@ -624,7 +624,7 @@ export function VertragModal({ editId, start, onClose, onSaved, hinweis }: {
           nie" an einer Einstellung, die voellig richtig ist. Wer das „behebt", tippt
           Muster ein, die nie greifen koennen. */}
       {f.art === "umbuchung" && (
-        <p className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-3) 0 0" }}>
+        <p className="hinweis" style={{ margin: "var(--sp-3) 0 0" }}>
           {t("vertraege.regel.umbuchungHinweis")}
         </p>
       )}

@@ -124,7 +124,7 @@ export function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung:
               : t("konten.split.restZuviel", { betrag: geld.formatMitSymbol(-rest) })}
         </span>
       </div>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+      <div className="hinweis" style={{ marginTop: 6 }}>
         {t("konten.split.hinweisPositiv")} · {t("konten.split.verteilt")}: {geld.formatMitSymbol(verteilt)}
       </div>
     </Modal>

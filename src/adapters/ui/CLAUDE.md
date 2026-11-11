@@ -79,6 +79,10 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Feld plus Knopf nebeneinander | `Feldzeile`; Formularfeld: `FormField` |
 | Ankreuzen | `Kaestchen` (Text als `children`, ohne Text `label`) |
 | Zwei bis vier Ansichten oder Filter, genau einer gilt | `Umschalter` |
+| Kleiner grauer Erklärtext | Klasse `.hinweis` — nicht `muted` plus `fontSize` |
+| Nebeneinander / untereinander mit Abstand | `Zeile` / `Stapel` (`bausteine/Anordnung`), Abstand aus `--sp-1`…`--sp-5` |
+| Trennlinie, auch mit „oder" | `Trenner` (Base UI `Separator`); Block mit Linie darüber: Klasse `.abschnitt` |
+| Schriftgrösse | nur Tokens (`--fs-*`, neu `--fs-tabelle`, `--fs-ui`) — `schriftgroessen.test.ts` |
 | Eine von mehreren Antworten | `buchung/Optionsgruppe` mit `Option` — bisher nur im Buchungsdialog |
 | Knopf | `Button` — `primary` Hauptaktion, `link` gedämpfte Nebenaktion („Abbrechen"), `laeuft` sperrt während einer Handlung; Zeilenaktion als Icon: `IconButton` |
 | Dialog | `Modal` (Base UI `Dialog`; `warnung` für Rückfragen); vor dem Löschen: `Loeschfrage` |

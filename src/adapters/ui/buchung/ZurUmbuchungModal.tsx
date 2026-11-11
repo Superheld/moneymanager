@@ -15,6 +15,7 @@ import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { Option, Optionsgruppe } from "./Optionsgruppe";
+import { Trenner } from "../bausteine/Anordnung";
 
 /**
  * S-1 — macht aus einer bestehenden Buchung eine Umbuchung. EIN Dialog für beide Fälle:
@@ -99,7 +100,7 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
         style={{ display: "flex", flexDirection: "column", gap: 15 }}
       >
       {kandidaten.length === 0 ? (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.zurUmbuchung.keineKandidaten", { tage: MAX_VORSCHLAG_TAGE })}</div>
+        <div className="hinweis">{t("konten.zurUmbuchung.keineKandidaten", { tage: MAX_VORSCHLAG_TAGE })}</div>
       ) : (
         kandidaten.map((k) => (
           <Option key={k.id} wert={k.id} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
@@ -121,11 +122,7 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
           die Bank ohnehin, sie muss nur verbunden werden. */}
       {andereKonten.length > 0 ? (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "var(--sp-4) 0 var(--sp-3)", color: "var(--ink-3)", fontSize: "var(--fs-2xs)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)" }}>
-            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-            {t("konten.zurUmbuchung.oder")}
-            <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
-          </div>
+          <Trenner text={t("konten.zurUmbuchung.oder")} style={{ margin: "var(--sp-4) 0 var(--sp-3)" }} />
           <Option wert="__neu" style={{ display: "flex", gap: 10 }}>
             <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
             <span style={{ minWidth: 180 }}>
@@ -137,17 +134,17 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
               />
             </span>
           </Option>
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
+          <div className="hinweis" style={{ marginTop: 6 }}>{t("konten.zurUmbuchung.neuHinweis")}</div>
         </>
       ) : (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-4)" }}>
+        <div className="hinweis" style={{ marginTop: "var(--sp-4)" }}>
           {t("konten.zurUmbuchung.nurVerbinden")}
         </div>
       )}
       </Optionsgruppe>
 
       {buchung.kategorieId && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)" }}>
+        <div className="hinweis" style={{ marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)" }}>
           {t("konten.zurUmbuchung.kategorieHinweis")}
         </div>
       )}

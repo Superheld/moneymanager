@@ -130,7 +130,7 @@ export function FremdkategorienKarte({
 
       {/* Was NICHT in der Tabelle steht, gehört trotzdem ins Bild: sonst sieht die
           Zuordnung nach „alle Zeilen der Datei" aus, und die Zahlen gehen nicht auf. */}
-      <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", marginTop: "var(--sp-3)" }}>
+      <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
         {t("import.fremd.rest", { ohne: befund.ohneAngabe, um: befund.umbuchungen })}
       </div>
       </Collapsible.Panel>

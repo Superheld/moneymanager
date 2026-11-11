@@ -126,7 +126,7 @@ export function JournalBlock({
           {eintraege.length === 0 ? (
             /* Der Bestand vor dem 23.08.2026. Kein Fehler, sondern eine Auskunft — und
                ohne sie stünde hier eine leere Fläche, die nach einem Fehler aussieht. */
-            <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.journal.leer")}</div>
+            <div className="hinweis">{t("konten.journal.leer")}</div>
           ) : (
             <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
               {eintraege.map((e: Journaleintrag) => (
@@ -147,12 +147,12 @@ export function JournalBlock({
             // ohne Zusammenhang („Haushalt", „Werkzeug") und wiederholen sich anderswo im
             // Dialog. Ein Screenreader liest sie sonst als Fortsetzung des Formulars.
             <div role="group" aria-label={t("konten.journal.seitEntstehung")} style={{ marginTop: "var(--sp-3)" }}>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 4 }}>
+              <div className="hinweis" style={{ marginBottom: 4 }}>
                 {t("konten.journal.seitEntstehung")}
               </div>
               {abweichungen.map((feld) => (
                 <div key={feld} style={{ display: "flex", gap: "var(--sp-2)", padding: "3px 0", fontSize: "var(--fs-tabelle)", alignItems: "baseline" }}>
-                  <span style={{ flex: "0 0 34%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>
+                  <span className="hinweis" style={{ flex: "0 0 34%", fontWeight: "var(--fw-semi)" }}>
                     {t(`konten.journal.feld.${feld}`)}
                   </span>
                   <span className="muted" style={{ textDecoration: "line-through" }}>{feldWert(urzustand, feld, hilfe)}</span>
@@ -187,7 +187,7 @@ export function JournalBlock({
             )}
             {/* Warum nicht — statt eines fehlenden Knopfes ohne Erklärung. */}
             {!rueckweg.moeglich && (
-              <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              <div className="hinweis">
                 {t(`konten.journal.zu.${rueckweg.grund}`)}
               </div>
             )}
