@@ -571,7 +571,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 pressed={nurDubletten}
                 onPressedChange={setNurDubletten}
                 style={{
-                  padding: "5px 10px", fontSize: "12.5px", fontFamily: "var(--font-ui)",
+                  padding: "5px 10px", fontSize: "var(--fs-ui)", fontFamily: "var(--font-ui)",
                   fontWeight: "var(--fw-bold)", borderRadius: "var(--r-md)", cursor: "pointer",
                   border: "1px solid var(--warn, var(--line))",
                   background: nurDubletten ? "var(--warn, #b8860b)" : "var(--warn-wash, transparent)",
@@ -648,7 +648,7 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   render: (r) => (
                     <span title={r.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
                       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
-                      {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: 12, whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
+                      {r.zeile.gegenkontoId && <span className="muted" style={{ fontSize: "var(--fs-xs)", whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
                       {/* Der Prüf-Marker steht VOR den anderen Pillen: die übrigen sagen,
                           was eine Zeile IST, dieser sagt, was noch zu tun ist. Klick nimmt
                           ihn weg — dafür ist er ein Knopf und kein Etikett.

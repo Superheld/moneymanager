@@ -160,7 +160,7 @@ export function AbgleichModal({
       {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
       {/* Erst die Zahlen, dann die Folge. Wer hier zustimmt, soll wissen, dass die
           Differenz nicht verschwindet, sondern umzieht. */}
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
         <tbody>
           <tr>
             <td style={{ padding: "4px 0", color: "var(--ink-3)" }}>{t("konten.anker.alt")}</td>

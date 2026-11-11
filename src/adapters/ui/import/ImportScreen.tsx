@@ -190,7 +190,7 @@ export function ImportScreen() {
   const katName = useMemo(() => new Map(kategorien.map((k) => [k.id, k.name])), [kategorien]);
   const konten = new Set(beruecksichtigt.map((u) => u.kontoIban)).size;
   const vorschau = beruecksichtigt.slice(0, VORSCHAU_MAX);
-  const eingabeStil = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "13px", fontFamily: "var(--font-ui)" } as const;
+  const eingabeStil = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "var(--fs-tabelle)", fontFamily: "var(--font-ui)" } as const;
 
   return (
     <>
@@ -220,7 +220,7 @@ export function ImportScreen() {
             </ul>
           )}
 
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
             <thead>
               <tr>
                 <th style={{ width: 32, padding: "8px 10px", borderBottom: "1px solid var(--line)" }}>

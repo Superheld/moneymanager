@@ -81,7 +81,7 @@ export function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung:
       }
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
-        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.split.gesamt")}</span>
+        <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>{t("konten.split.gesamt")}</span>
         <span className="num" style={{ fontSize: "var(--fs-h3)", fontWeight: "var(--fw-black)", color: geldFarbe(buchung.betrag) }}>
           {geld.formatMitSymbol(buchung.betrag, { mitVorzeichen: true })}
         </span>
@@ -116,7 +116,7 @@ export function SplitModal({ buchung, kategorien, onClose, onSaved }: { buchung:
         <Button plus onClick={() => setZeilen((zs) => [...zs, { kategorieId: "", betrag: "", notiz: "" }])}>
           {t("konten.split.zeileHinzufuegen")}
         </Button>
-        <span style={{ fontSize: 13, fontWeight: "var(--fw-bold)", color: rest === 0 ? "var(--ok-deep)" : "var(--warn-deep)" }}>
+        <span style={{ fontSize: "var(--fs-tabelle)", fontWeight: "var(--fw-bold)", color: rest === 0 ? "var(--ok-deep)" : "var(--warn-deep)" }}>
           {rest === 0
             ? t("konten.split.restPasst")
             : rest > 0

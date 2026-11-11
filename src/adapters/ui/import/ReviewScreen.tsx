@@ -403,7 +403,7 @@ export function ReviewScreen() {
 
   const th = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" } as const;
   const td = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
-  const select = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "13px", fontFamily: "var(--font-ui)" } as const;
+  const select = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "var(--fs-tabelle)", fontFamily: "var(--font-ui)" } as const;
 
   return (
     <>
@@ -509,7 +509,7 @@ export function ReviewScreen() {
             </div>
           )}
 
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
             <thead>
               <tr>
                 {auswahlModus && (
@@ -619,7 +619,7 @@ export function ReviewScreen() {
               <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-2) 0" }}>
                 {t("review.weggelegt.hinweis")}
               </div>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
                 <tbody>
                   {weggelegte.map((u) => (
                     <tr key={u.id}>

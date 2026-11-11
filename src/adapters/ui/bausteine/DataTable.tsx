@@ -272,7 +272,7 @@ export function DataTable<T>({
   return (
     <>
       <div style={{ overflowX: "auto", maxWidth: "100%" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px", tableLayout: schmal ? "fixed" : "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)", tableLayout: schmal ? "fixed" : "auto" }}>
           <thead>
             <tr>
               {kopf.map(({ c, i }) => {

@@ -243,7 +243,7 @@ export function RuecklagenScreen() {
                     <div
                       key={p.buchungId}
                       style={{
-                        display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: "12.5px",
+                        display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: "var(--fs-ui)",
                         borderTop: i === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
                       }}
                     >

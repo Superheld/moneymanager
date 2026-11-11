@@ -36,7 +36,9 @@ const TON: Record<NonNullable<KPIStatProps["tone"]>, string> = {
 export function KPIStat({ label, value, unit, meta, tone = "default", size = "chip", tag, style }: KPIStatProps) {
   const tonFarbe = TON[tone] ?? TON.default;
   const wertGroesse = size === "hero" ? "var(--fs-display)" : size === "tile" ? "var(--fs-h1)" : "var(--fs-h2)";
-  const einheitGroesse = size === "hero" ? 28 : 15;
+  // Die Einheit steht eine Stufe unter der Zahl. Bei der grossen Zahl liegt das zwischen
+  // zwei Textstufen (h1 30, h2 20) und ist deshalb eine eigene Zahl, keine Stufe.
+  const einheitGroesse = size === "hero" ? "28px" : "var(--fs-body)";
 
   const huelle: CSSProperties =
     size === "chip"

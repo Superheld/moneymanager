@@ -219,7 +219,7 @@ function ZeileMitPosten({
           padding: "9px 0",
           borderBottom: `1px solid ${letzte ? "var(--line)" : "var(--line-soft)"}`,
           cursor: aufklappbar ? "pointer" : "default",
-          fontSize: "13.5px",
+          fontSize: "var(--fs-sm)",
           background: offen ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent",
         }}
       >
@@ -317,7 +317,7 @@ function PlanPosten({
         {posten.datum && <span style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>{tagVon(posten.datum)}</span>}
         <span style={{ opacity: erledigt ? 0.72 : 1, ...gekappt }}>{name}</span>
         {kategorie && kategorie !== name && (
-          <span style={{ color: "var(--ink-3)", fontSize: "11.5px", flex: "0 0 auto" }}>{kategorie}</span>
+          <span style={{ color: "var(--ink-3)", fontSize: "var(--fs-2xs)", flex: "0 0 auto" }}>{kategorie}</span>
         )}
       </span>
       {zweiSpalten && (
@@ -333,7 +333,7 @@ function PlanPosten({
 
   // Dieselbe Zeile, einmal als Text und einmal als Knopf. Am Aussehen ändert sich nichts:
   // was hier klickbar ist, entscheidet der Inhalt der Zeile, nicht ihre Gestalt.
-  const zeilenstil = { ...zeileGrid(zweiSpalten), padding: "5px 0", fontSize: "12.5px", alignItems: "baseline" } as const;
+  const zeilenstil = { ...zeileGrid(zweiSpalten), padding: "5px 0", fontSize: "var(--fs-ui)", alignItems: "baseline" } as const;
   return oeffnen ? (
     <BaseButton type="button" className="buchungszeile" title={t("uebersicht.buchungOeffnen")} style={zeilenstil} onClick={oeffnen}>
       {inhalt}
@@ -362,9 +362,9 @@ function BudgetPosten({ posten, name, zeigeIst }: { posten: AusblickPosten; name
       <CoverageTrack
         value={zeigeIst ? Math.max(0, verbraucht) : 0}
         max={Math.max(1, rahmen)}
-        label={<span style={{ fontSize: "12.5px" }}>{name}</span>}
+        label={<span style={{ fontSize: "var(--fs-ui)" }}>{name}</span>}
         right={
-          <span className="num" style={{ fontSize: "12.5px" }}>
+          <span className="num" style={{ fontSize: "var(--fs-ui)" }}>
             {zeigeIst
               ? `${geld.format(verbraucht)} / ${geld.formatMitSymbol(rahmen)}`
               : geld.formatMitSymbol(rahmen)}

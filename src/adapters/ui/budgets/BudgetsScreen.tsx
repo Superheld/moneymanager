@@ -604,7 +604,7 @@ export function BudgetsScreen() {
                   return (
                     <div
                       key={v.abMonat}
-                      style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent", fontSize: "12.5px" }}
+                      style={{ display: "flex", alignItems: "center", gap: "var(--sp-2)", padding: "5px 8px", borderRadius: "var(--r-md)", background: aktiv ? "var(--accent-soft, rgba(20,160,160,.10))" : "transparent", fontSize: "var(--fs-ui)" }}
                     >
                       <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
                         {t("budgets.versionAb", { monat: v.abMonat })}

@@ -202,7 +202,7 @@ body {
   font-weight: var(--fw-black);
   display: grid;
   place-items: center;
-  font-size: 19px;
+  font-size: 19px; /* das Zeichen im Logo — Marke, keine Textstufe */
 }
 .brand .nm {
   font-weight: var(--fw-bold);
@@ -431,14 +431,14 @@ body {
      mit kleinerer Schrift den Fokus bekommt, und zoomt danach nicht von selbst zurueck.
      Aus einem angetippten Feld wird so ein verschobenes Bild. Ab 700 px gilt wieder
      der Formularschriftgrad des Designs. */
-  font-size: 16px;
+  font-size: 16px; /* NICHT als Token: unter 16 px zoomt iOS beim Fokus (ui/CLAUDE.md) */
   font-family: var(--font-ui);
   color: var(--ink);
   background: var(--surface);
 }
 @media (min-width: 700px) {
   .field {
-    font-size: 13.5px;
+    font-size: var(--fs-sm);
   }
 }
 .field:focus {
@@ -594,7 +594,7 @@ tr.buchungszeile {
    ============================================================ */
 .tabellenfilter .field,
 .field.tabellenfilter {
-  font-size: 13px;
+  font-size: var(--fs-tabelle);
   padding: 5px 9px;
   border-radius: var(--r-md);
 }
@@ -609,7 +609,7 @@ select.field.tabellenfilter {
 }
 .tabellenfilter .datumsfeld-eingabe {
   padding: 5px 0;
-  font-size: 13px;
+  font-size: var(--fs-tabelle);
 }
 .tabellenfilter .datumsfeld-knopf {
   width: 22px;
@@ -744,7 +744,7 @@ select.field.tabellenfilter {
   gap: 7px;
   border-radius: var(--r-md);
   padding: 8px 13px;
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
   font-weight: var(--fw-bold);
   font-family: var(--font-ui);
   white-space: nowrap;
@@ -774,7 +774,7 @@ select.field.tabellenfilter {
   cursor: progress;
 }
 .btn-plus {
-  font-size: 15px;
+  font-size: 15px; /* Glyphe (✕, +), keine Textstufe */
   line-height: 1;
 }
 
@@ -801,7 +801,7 @@ select.field.tabellenfilter {
    mit ihr um Aufmerksamkeit. Masse aus der frueheren Seitensteuerung der DataTable. */
 .btn--klein {
   padding: 4px 10px;
-  font-size: 13px;
+  font-size: var(--fs-tabelle);
   font-weight: var(--fw-regular);
 }
 
@@ -885,7 +885,7 @@ select.field.tabellenfilter {
 }
 .umschalter-knopf {
   padding: 6px 12px;
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
   font-weight: var(--fw-semi);
   font-family: var(--font-ui);
   border: none;
@@ -1272,7 +1272,7 @@ select.field.tabellenfilter {
   font-weight: var(--fw-black);
 }
 .dialog-untertitel {
-  font-size: 12.5px;
+  font-size: var(--fs-ui);
   color: var(--ink-3);
   margin-top: 2px;
 }
@@ -1286,7 +1286,7 @@ select.field.tabellenfilter {
   background: var(--surface);
   color: var(--ink-3);
   cursor: pointer;
-  font-size: 15px;
+  font-size: 15px; /* Glyphe (✕, +), keine Textstufe */
   flex: 0 0 auto;
 }
 .dialog-schliessen:hover {
@@ -1416,7 +1416,7 @@ select.field.tabellenfilter {
   background: none;
   color: var(--ink-3);
   cursor: pointer;
-  font-size: 13px;
+  font-size: var(--fs-tabelle);
 }
 .meldung-zu:focus-visible {
   outline: 2px solid var(--accent);
@@ -1525,7 +1525,7 @@ select.field.tabellenfilter {
   gap: var(--sp-3);
   padding: 7px 10px;
   border-radius: var(--r-sm);
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   color: var(--ink);
   cursor: pointer;
   user-select: none;
@@ -1576,7 +1576,7 @@ select.field.tabellenfilter {
   outline: none;
   background: none;
   padding: 10px 0;
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   font-family: var(--font-ui);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
@@ -1614,7 +1614,7 @@ select.field.tabellenfilter {
   margin-bottom: 8px;
 }
 .datumsfeld-monat {
-  font-size: 13.5px;
+  font-size: var(--fs-sm);
   font-weight: var(--fw-bold);
   color: var(--ink);
   text-transform: capitalize;
@@ -1626,7 +1626,7 @@ select.field.tabellenfilter {
   width: 26px;
   height: 26px;
   line-height: 1;
-  font-size: 15px;
+  font-size: 15px; /* Glyphe (‹ ›), keine Textstufe */
   color: var(--ink-2);
   cursor: pointer;
 }
@@ -1660,7 +1660,7 @@ select.field.tabellenfilter {
   border: 0;
   background: none;
   border-radius: var(--r-sm);
-  font-size: 13px;
+  font-size: var(--fs-tabelle);
   font-variant-numeric: tabular-nums;
   color: var(--ink);
   cursor: pointer;

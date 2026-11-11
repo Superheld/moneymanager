@@ -97,7 +97,7 @@ export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbrauc
               <span title={name}>
                 <span style={{ color: "var(--ink-2)" }}>{name}</span>
                 {kategorie && kategorie !== name && (
-                  <span style={{ color: "var(--ink-3)", fontSize: "11.5px", marginLeft: 8 }}>{kategorie}</span>
+                  <span style={{ color: "var(--ink-3)", fontSize: "var(--fs-2xs)", marginLeft: 8 }}>{kategorie}</span>
                 )}
               </span>
             );
@@ -111,7 +111,7 @@ export function BudgetPostenliste({ posten, empfaenger, kategorieNamen, verbrauc
         },
       ]}
       fuss={
-        <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 8px 5px", borderTop: "1px solid var(--line)", fontSize: "12.5px", fontWeight: "var(--fw-bold)" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", padding: "7px 8px 5px", borderTop: "1px solid var(--line)", fontSize: "var(--fs-ui)", fontWeight: "var(--fw-bold)" }}>
           {/* Ist die Summe negativ, kam unterm Strich Geld ZURÜCK. Das Wort „Verbraucht"
               über einem Minusbetrag behauptet das Gegenteil dessen, was daneben steht —
               und ein Wort gewinnt gegen ein Vorzeichen. Die EINZELNEN Posten behalten ihres:

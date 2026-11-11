@@ -77,7 +77,7 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
     >
       {/* Die Buchung, um die es geht */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", marginBottom: "var(--sp-4)" }}>
-        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
+        <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>
           {datum.ohneJahr(buchung.datum)} · {kandidatLabel(buchung) || kontoName.get(buchung.kontoId) || ""}
         </span>
         <span className="num" style={{ fontWeight: 700, color: geldFarbe(buchung.betrag) }}>
@@ -103,10 +103,10 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
       ) : (
         kandidaten.map((k) => (
           <Option key={k.id} wert={k.id} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
-            <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datum.ohneJahr(k.datum)}</span>
-            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
+            <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datum.ohneJahr(k.datum)}</span>
+            <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
               {kontoName.get(k.kontoId) ?? "?"}
-              {kandidatLabel(k) && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{kandidatLabel(k)}</span>}
+              {kandidatLabel(k) && <span className="muted" style={{ marginLeft: 8, fontSize: "var(--fs-xs)" }}>{kandidatLabel(k)}</span>}
             </span>
             <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
           </Option>
@@ -121,13 +121,13 @@ export function ZurUmbuchungModal({ buchung, konten, onlineKonten, alleBuchungen
           die Bank ohnehin, sie muss nur verbunden werden. */}
       {andereKonten.length > 0 ? (
         <>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "var(--sp-4) 0 var(--sp-3)", color: "var(--ink-3)", fontSize: 11.5, fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "var(--sp-4) 0 var(--sp-3)", color: "var(--ink-3)", fontSize: "var(--fs-2xs)", fontWeight: 700, textTransform: "uppercase", letterSpacing: "var(--ls-eyebrow)" }}>
             <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
             {t("konten.zurUmbuchung.oder")}
             <span style={{ flex: 1, height: 1, background: "var(--line)" }} />
           </div>
           <Option wert="__neu" style={{ display: "flex", gap: 10 }}>
-            <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
+            <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
             <span style={{ minWidth: 180 }}>
               <Auswahl
                 ariaLabel={t("konten.zurUmbuchung.neu")}

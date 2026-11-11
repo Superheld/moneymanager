@@ -759,10 +759,10 @@ function BuchungFormular({
               <Optionsgruppe wert={gegenGewaehlt} aufAendern={setGegenwahl} label={t("konten.zurUmbuchung.kandidatenTitel")}>
               {entwurfKandidaten.map((k) => (
                 <Option key={k.id} wert={`e:${k.id}`} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.buchungstag)}</span>
-                  <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.buchungstag)}</span>
+                  <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
                     {kontoName.get(k.zahlungskontoId) ?? "?"}
-                    <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.neu")}</span>
+                    <span className="muted" style={{ marginLeft: 8, fontSize: "var(--fs-xs)" }}>{t("konten.neue.status.neu")}</span>
                   </span>
                   <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
                 </Option>
@@ -770,10 +770,10 @@ function BuchungFormular({
 
               {buchungKandidaten.map((k) => (
                 <Option key={k.id} wert={`b:${k.id}`} style={{ display: "flex", gap: 10, padding: "8px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.datum)}</span>
-                  <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(k.datum)}</span>
+                  <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", flex: 1, minWidth: 0 }}>
                     {kontoName.get(k.kontoId) ?? "?"}
-                    <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{t("konten.neue.status.verbucht")}</span>
+                    <span className="muted" style={{ marginLeft: 8, fontSize: "var(--fs-xs)" }}>{t("konten.neue.status.verbucht")}</span>
                   </span>
                   <span className="num" style={{ fontWeight: 700, color: geldFarbe(k.betrag) }}>{geld.formatMitSymbol(k.betrag, { mitVorzeichen: true })}</span>
                 </Option>
@@ -782,7 +782,7 @@ function BuchungFormular({
               {/* Ausweg: kein Gegenbein vorhanden (S-1a) — typisch Bargeld. */}
               {andereKonten.length > 0 && (
                 <Option wert="__neu" style={{ display: "flex", gap: 10, padding: "8px 0", flexWrap: "wrap" }}>
-                  <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
+                  <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>{t("konten.zurUmbuchung.neu")}</span>
                   <span style={{ minWidth: 180 }}>
                     <Auswahl
                       ariaLabel={t("konten.zurUmbuchung.neu")}
@@ -795,7 +795,7 @@ function BuchungFormular({
               )}
 
               <Option wert="__einseitig" style={{ display: "flex", gap: 10, padding: "8px 0" }}>
-                <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>{t("konten.entwurf.einseitig")}</span>
+                <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>{t("konten.entwurf.einseitig")}</span>
               </Option>
               </Optionsgruppe>
 
@@ -826,11 +826,11 @@ function BuchungFormular({
               </div>
               {(buchung.aufteilungen ?? []).map((a, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", padding: "5px 0", borderBottom: "1px solid var(--line-soft)" }}>
-                  <span style={{ fontSize: 13, minWidth: 0 }}>
+                  <span style={{ fontSize: "var(--fs-tabelle)", minWidth: 0 }}>
                     {kategorieName.get(a.kategorieId) ?? "?"}
-                    {a.notiz && <span className="muted" style={{ marginLeft: 8, fontSize: 12 }}>{a.notiz}</span>}
+                    {a.notiz && <span className="muted" style={{ marginLeft: 8, fontSize: "var(--fs-xs)" }}>{a.notiz}</span>}
                   </span>
-                  <span className="num" style={{ fontSize: 13, fontWeight: 700, whiteSpace: "nowrap", color: geldFarbe(a.betrag) }}>
+                  <span className="num" style={{ fontSize: "var(--fs-tabelle)", fontWeight: 700, whiteSpace: "nowrap", color: geldFarbe(a.betrag) }}>
                     {geld.formatMitSymbol(a.betrag, { mitVorzeichen: true })}
                   </span>
                 </div>
@@ -871,7 +871,7 @@ function BuchungFormular({
             <>
               <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
                 <Pill variant="um">{t("konten.paarung.titel")}</Pill>
-                <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
+                <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>
                   {t("konten.paarung.gegenkonto")}: {kontoName.get(buchung.gegenkontoId ?? "") ?? "?"}
                 </span>
                 <Button variant="link" style={{ marginLeft: "auto" }} onClick={() => onLoesen()}>{t("konten.paarung.loesen")}</Button>
@@ -884,8 +884,8 @@ function BuchungFormular({
                   onClick={() => onGegenbuchung(gegenbuchung)}
                   style={{ display: "flex", width: "100%", alignItems: "center", gap: 10, marginTop: 8, padding: "8px 10px", borderRadius: "var(--r-md)", background: "var(--surface-2, var(--accent-wash))", textAlign: "left" }}
                 >
-                  <span style={{ fontSize: 11, fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(gegenbuchung.datum)}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
+                  <span style={{ fontSize: "var(--fs-2xs)", fontWeight: 700, color: "var(--ink-3)", minWidth: 42 }}>{datumAnzeige.ohneJahr(gegenbuchung.datum)}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>
                     {t("konten.paarung.gegenbuchung")} · {kontoName.get(gegenbuchung.kontoId) ?? "?"}
                   </span>
                   <span className="num" style={{ fontWeight: 700, color: geldFarbe(gegenbuchung.betrag) }}>

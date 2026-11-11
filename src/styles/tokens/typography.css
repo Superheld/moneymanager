@@ -18,6 +18,10 @@
   --fs-title:   14.5px; /* card titles */
   --fs-body:    15px;
   --fs-sm:      13.5px;
+  /* Die zwei Stufen, die bis 2026-11-10 fehlten — und deshalb als Pixelzahl an rund
+     dreissig Stellen standen, jede für sich. */
+  --fs-tabelle: 13px;   /* Tabellen- und Listentext */
+  --fs-ui:      12.5px; /* Bedienteile: Knöpfe, Umschalter, Untertitel */
   --fs-xs:      12px;
   --fs-2xs:     11px;
   --fs-eyebrow: 10.5px; /* uppercase labels */

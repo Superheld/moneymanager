@@ -115,7 +115,7 @@ function ErkennungsDialog({ kandidat, onClose }: { kandidat: Vertragskandidat; o
     return (
       <div style={{ display: "flex", gap: "var(--sp-3)", padding: "7px 0", alignItems: "baseline", borderBottom: "1px solid var(--line-soft)" }}>
         <span style={{ flex: "0 0 32%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>{label}</span>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 13, wordBreak: "break-word" }}>{wert}</span>
+        <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-tabelle)", wordBreak: "break-word" }}>{wert}</span>
       </div>
     );
   }

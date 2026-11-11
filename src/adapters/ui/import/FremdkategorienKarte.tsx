@@ -81,7 +81,7 @@ export function FremdkategorienKarte({
       }
     >
       <Collapsible.Panel>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
         <thead>
           <tr>
             <th style={KOPF}>{t("import.fremd.spalteQuelle")}</th>

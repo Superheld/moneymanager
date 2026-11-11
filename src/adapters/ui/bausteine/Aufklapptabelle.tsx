@@ -150,7 +150,7 @@ export function Aufklapptabelle<T>({
 
   return (
     <Aufklappflaeche zeilen={sichtbar} kopfhoehe={kopf ? KOPFHOEHE : 0}>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12.5px", tableLayout: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-ui)", tableLayout: "auto" }}>
         {kopf && (
           <thead>
             <tr>

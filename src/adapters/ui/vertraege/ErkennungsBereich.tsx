@@ -297,7 +297,7 @@ export function ErkennungsBereich({
                 <input
                   className="field"
                   aria-label={t("vertraege.regel.merkmalMuster")}
-                  style={{ flex: "1 1 180px", minWidth: 0, fontFamily: "var(--font-mono, monospace)", fontSize: 13 }}
+                  style={{ flex: "1 1 180px", minWidth: 0, fontFamily: "var(--font-mono, monospace)", fontSize: "var(--fs-tabelle)" }}
                   value={m.muster}
                   placeholder={t("vertraege.regel.musterPlatzhalter")}
                   onChange={(e) => merkmalSetzen(i, { muster: e.target.value })}
@@ -377,7 +377,7 @@ export function ErkennungsBereich({
                     <span className="muted" style={{ fontSize: "var(--fs-xs)", flex: "0 0 auto" }}>
                       {t(`vertraege.regel.art.${k.merkmal.art}`)}
                     </span>
-                    <code style={{ fontSize: 13, flex: "1 1 160px", minWidth: 0, overflowWrap: "anywhere" }}>
+                    <code style={{ fontSize: "var(--fs-tabelle)", flex: "1 1 160px", minWidth: 0, overflowWrap: "anywhere" }}>
                       {k.merkmal.muster}
                     </code>
                     {/* Drei Zahlen und keine Punktzahl: was sie gegeneinander wiegen,
@@ -524,7 +524,7 @@ export function ErkennungsBereich({
             steht klein unter dem Empfaenger statt in einer eigenen Spalte: er ist lang,
             und eine Spalte davon waere entweder abgeschnitten oder die ganze Zeile. */}
         {treffer.slice(0, VORSCHAU_ZEILEN).map((s) => (
-          <div key={s.id} style={{ display: "flex", gap: "var(--sp-3)", padding: "4px 0", alignItems: "baseline", fontSize: 13, borderBottom: "1px solid var(--line-soft)" }}>
+          <div key={s.id} style={{ display: "flex", gap: "var(--sp-3)", padding: "4px 0", alignItems: "baseline", fontSize: "var(--fs-tabelle)", borderBottom: "1px solid var(--line-soft)" }}>
             <span style={{ flex: "0 0 92px", color: "var(--ink-3)" }}>{s.datum}</span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>

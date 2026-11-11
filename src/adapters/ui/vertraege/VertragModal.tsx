@@ -243,7 +243,7 @@ function Abschnitt({ titel, hinweis, einklappbar, children }: {
         {einklappbar && <span aria-hidden style={{ marginRight: 6, color: "var(--ink-3)" }}>{offen ? "▾" : "▸"}</span>}
         {titel}
       </h4>
-      {hinweis && <span style={{ fontSize: "12px", color: "var(--ink-3)" }}>{hinweis}</span>}
+      {hinweis && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>{hinweis}</span>}
     </>
   );
 
