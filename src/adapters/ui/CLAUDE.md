@@ -654,6 +654,15 @@ aus der Token-Reihe. Drei Fälle bleiben bewusst am Element und sind kein Rücks
 Wer einen Behälter anfasst, in dem mehrere Kinder denselben `marginTop` tragen, macht ihn
 zum `Stapel`.
 
+**Am 2026-11-11 mit einem JSX-Parser über ganz `ui/` gemessen:** es gibt KEINEN solchen
+Behälter mehr. Jeder, in dem zwei oder mehr Kinder einen Rand tragen, hat einen
+ungleichmässigen Rhythmus — 16 px unter dem Titel, 12 zwischen Feldern, 6 für den Hinweis
+unter seinem Feld. Ein `Stapel` kennt genau EINEN Abstand; diese Ränder in Stapel zu
+überführen hiesse, das Aussehen zu ändern oder jedem Kind seinen Wert zurückzugeben — also
+dasselbe unter anderem Namen. Der einzige gleichmässige Fall (`Bankzugänge`, Prüfergebnis)
+ist es nur scheinbar: seine Kinder sind `<ul>`, deren Standardrand im Block-Fluss mit dem
+nächsten zusammenfällt und in einem Flex-Stapel nicht.
+
 ## Die Fläche kommt von `Card`
 
 **Inhalt steht in einer `Card`, nicht auf dem nackten Seitenhintergrund.** Sie trägt
