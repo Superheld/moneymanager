@@ -749,8 +749,9 @@ Drei Dinge, die beim Anbauen zählen:
   nicht besser, wenn man sie über zwei Jahre zieht; ihre späten Monate wären Behauptung
   statt Vorschau. Gezeichnet wird EINE Linie, deren geplanter Teil gestrichelt ist
   (`SaldoVerlaufChart`, `abIndex`): es ist derselbe Saldo, und zwei Linien behaupteten
-  zwei Grössen. **Der laufende Monat steht zweimal da** — als Stand von heute und als
-  geplanter Rest bis Monatsende (`analyseAusblick`, `restWirkung`).
+  zwei Grössen. **Der laufende Monat ist Plan, nicht Ist** (seit 2026-11-11): halb gebucht
+  knickte die Linie genau an der Naht ein. Das Ist endet mit dem Vormonat
+  (`analyseAusblick`).
 
 **Ein Screen-Test, der einen Kategorienamen sucht, muss ihn jetzt in seiner Karte
 suchen.** Derselbe Name steht in der Aufschlüsselung und in den Ranglisten darunter; eine

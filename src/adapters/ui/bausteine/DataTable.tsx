@@ -60,7 +60,7 @@
 // was ausdrücklich dasteht, und der Rest fällt weg.
 
 import { NumberField } from "@base-ui/react/number-field";
-import { Fragment, useState, type CSSProperties, type KeyboardEvent, type ReactNode } from "react";
+import { Fragment, useState, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from "react";
 import { Button } from "./Button";
 import { useSchmal } from "./useSchmal";
 
@@ -116,6 +116,9 @@ export interface DataTableProps<T> {
   labelZurueck?: string;
   labelVor?: string;
 }
+
+/** Was in einer klickbaren Zeile selbst bedient wird und deren Klick nicht auslöst. */
+const BEDIENTEIL = "button, a, input, select, textarea, label, [role=button], [role=checkbox], [role=combobox], [role=switch]";
 
 /** Kappungsbreite, wenn eine Spalte keine eigene angibt. Zahlen/Daten bleiben darunter. */
 const STANDARD_MAX = "32ch";
@@ -256,7 +259,14 @@ export function DataTable<T>({
     return {
       tabIndex: 0,
       className: "datentabelle-zeile--klickbar",
-      onClick: () => onRowClick(row),
+      onClick: (e: MouseEvent<HTMLTableRowElement>) => {
+        // Ein Klick auf ein Bedienteil IN der Zeile (Bearbeiten, Löschen, eine Auswahl)
+        // gehört diesem, nicht der Zeile — dieselbe Regel wie bei den Tasten unten. Ohne
+        // sie öffnete „Löschen" nebenbei auch, was die Zeile öffnet.
+        const ziel = (e.target as Element).closest(BEDIENTEIL);
+        if (ziel && ziel !== e.currentTarget && e.currentTarget.contains(ziel)) return;
+        onRowClick(row);
+      },
       onKeyDown: (e: KeyboardEvent<HTMLTableRowElement>) => {
         // Nur wenn die ZEILE den Fokus hat: eine Taste in einem Feld oder Knopf darin
         // gehört diesem, nicht der Zeile.

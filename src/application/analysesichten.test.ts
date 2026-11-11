@@ -135,13 +135,11 @@ describe("analyseAusblick", () => {
 
   it("liefert gewesene und geplante Monate in einer Reihe und markiert die Naht", () => {
     const punkte = analyseAusblick(basis(), "2026-08-15", 3, 3);
-    // Der laufende Monat steht zweimal da: als Stand von heute und als Rest bis Monatsende.
+    // Der laufende Monat ist Plan: halb gebucht knickte die Linie an der Naht ein.
     expect(punkte.map((p) => p.monat)).toEqual([
-      "2026-06", "2026-07", "2026-08", "2026-08", "2026-09", "2026-10", "2026-11",
+      "2026-05", "2026-06", "2026-07", "2026-08", "2026-09", "2026-10",
     ]);
-    expect(punkte.filter((p) => p.plan).map((p) => p.monat)).toEqual(["2026-08", "2026-09", "2026-10", "2026-11"]);
-    expect(punkte[2]).toMatchObject({ plan: false, stichtag: "2026-08-15" });
-    expect(punkte[3]).toMatchObject({ plan: true, rest: true });
+    expect(punkte.filter((p) => p.plan).map((p) => p.monat)).toEqual(["2026-08", "2026-09", "2026-10"]);
   });
 
   it("schreibt den Saldo an der Naht ohne Sprung fort", () => {
@@ -156,32 +154,28 @@ describe("analyseAusblick", () => {
     const letzterIst = gewesen[gewesen.length - 1];
     const ersterPlan = punkte.find((p) => p.plan)!;
     expect(ersterPlan.saldo).toBe(letzterIst.saldo + ersterPlan.netto);
-    // Der erste Planpunkt ist der Rest des laufenden Monats: die Miete für August ist
-    // noch nicht gebucht, also steht sie dort.
-    expect(ersterPlan).toMatchObject({ monat: "2026-08", rest: true, netto: -100000 });
+    // Der erste Planpunkt ist der laufende Monat — mit seinem ganzen Plan.
+    expect(ersterPlan).toMatchObject({ monat: "2026-08", netto: -100000 });
   });
 
-  // Der Fall von 2026-11-11: eine Buchung mit späterem Datum im laufenden Monat liess ihn
-  // aussehen wie fertig gebucht. Der Stand von heute kennt sie nicht; der Rest auch nicht,
-  // denn sie IST der Plan.
-  it("zählt Buchungen nach heute weder zum Stand noch doppelt in den Rest", () => {
+  // Der laufende Monat zählt als Plan, auch wenn schon etwas darin gebucht ist: sein
+  // Gebuchtes ist ein halber Monat und gehört nicht in die Linie.
+  it("rechnet den laufenden Monat ganz als Plan, auch mit Gebuchtem darin", () => {
     const regeln = [
       {
         id: "r1", bezeichnung: "Gehalt", betrag: 300000, rhythmus: "monatlich" as const,
         startdatum: "2026-01-28", charakter: "Ertrag" as const, kontoId: "k1",
       },
     ];
-    const spaeter = {
-      id: "g8", datum: "2026-08-28", betrag: 300000, kontoId: "k1",
-      charakter: "Ertrag" as const, quelle: "import" as const,
+    const frueh = {
+      id: "f8", datum: "2026-08-03", betrag: -5000, kontoId: "k1",
+      charakter: "Aufwand" as const, quelle: "import" as const, kategorieId: "kat1",
     };
     const b = basis({ regeln });
-    const punkte = analyseAusblick({ ...b, buchungen: [...b.buchungen, spaeter] }, "2026-08-15", 2, 1);
-    const heute = punkte.find((p) => p.stichtag)!;
-    const rest = punkte.find((p) => p.rest)!;
-    expect(heute.einnahmen).toBe(0);
-    expect(rest.einnahmen).toBe(300000);
-    expect(rest.saldo).toBe(heute.saldo + 300000);
+    const punkte = analyseAusblick({ ...b, buchungen: [...b.buchungen, frueh] }, "2026-08-15", 2, 1);
+    expect(punkte.map((p) => [p.monat, p.plan])).toEqual([["2026-06", false], ["2026-07", false], ["2026-08", true]]);
+    expect(punkte[2].einnahmen).toBe(300000);
+    expect(punkte[2].saldo).toBe(punkte[1].saldo + punkte[2].netto);
   });
 
   // Die Entscheidung, die `planWirkung` trägt, hier im Zusammenspiel: eine Umschichtung

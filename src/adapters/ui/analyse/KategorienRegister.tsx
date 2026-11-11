@@ -3,8 +3,9 @@
 // Vorher war es die Aufschlüsselung eines Fensters („wie viel ging wohin"), mit Monat und
 // Zeitraum aus dem Verlauf. Die steht jetzt im Verlauf unter dem gewählten Monat
 // (`Aufschluesselung`). Hier steht die Frage, die keine andere Stelle beantwortet: **wie
-// entwickelt sich jede Kategorie?** — je Zeile Summe, Schnitt, Anteil, die Monate als
-// kleine Balken und der Trend der letzten drei abgeschlossenen Monate.
+// entwickelt sich jede Kategorie?** — je Zeile Summe, Schnitt, Anteil und der
+// Trend der letzten drei abgeschlossenen Monate; darüber ein Balken, wie sich die Seite
+// auf ihre Kategorien verteilt.
 //
 // Ein Klick auf eine Zeile öffnet darunter die Kategorie im Einzelnen: Monat für Monat
 // gross, dazu ihre Buchungen. Neben der Karte, nicht darin.
@@ -25,7 +26,7 @@ import {
 } from "../../../application";
 import { Card, DataTable } from "../bausteine";
 import { useGeld, useProzent } from "../bausteine/einstellungenKontext";
-import { flussFarbe, geldFarbe, warnFarbe } from "../bausteine/geldFarbe";
+import { geldFarbe, warnFarbe } from "../bausteine/geldFarbe";
 import { Umschalter } from "../bausteine/Umschalter";
 import { KategorieBuchungen } from "./Aufschluesselung";
 import { MonatsFlussChart } from "./MonatsFlussChart";
@@ -45,22 +46,59 @@ export const KATEGORIEN_ANFANG: KategorienZustand = { zeitraum: "12", seite: "Au
 const schluessel = (z: KategorieReihe) => z.kategorieId ?? "__ohne";
 
 /**
- * Die Monate einer Zeile als kleine Balken — eine Form, keine Zahl. Gemessen am grössten
- * Monat DIESER Zeile: es geht um ihren eigenen Verlauf, nicht um den Vergleich mit der
- * Nachbarzeile (dafür stehen Summe und Anteil daneben).
+ * Die sechs grössten Teile tragen eine Farbe, der Rest steht grau als „Übrige".
+ *
+ * Mehr als sechs Farben unterscheidet niemand sicher, und eine siebte erzeugte wäre bei
+ * Farbfehlsichtigkeit von einer der sechs nicht zu trennen (`--serie-*` in den Tokens).
  */
-function Monatsbalken({ werte }: { werte: readonly number[] }) {
-  const breite = 5;
-  const luecke = 2;
-  const hoehe = 22;
-  const max = Math.max(1, ...werte.map((v) => Math.abs(v)));
+const SERIEN = 6;
+const serie = (rang: number) => (rang < SERIEN ? `var(--serie-${rang + 1})` : "var(--ink-3)");
+
+/**
+ * Wie sich die Seite auf ihre Kategorien verteilt — als ein schmaler Balken aus
+ * Segmenten über der Tabelle, ohne Zahlen darauf: die stehen in der Tabelle darunter,
+ * und dort trägt jede farbige Zeile ihr Farbfeld. Bewusst kein Kreis: Teile auf einer
+ * Linie vergleicht das Auge genauer als Winkel.
+ *
+ * Nur Teile, die in die Richtung der Seite gehen. Eine Kategorie, in der unterm Strich
+ * mehr zurückkam als hinausging (Steuern mit Erstattung), hat am Ausgegebenen keinen
+ * Anteil — sie stünde sonst als negatives Segment da, und das gibt es nicht.
+ */
+function Anteilsbalken({ teile, name }: { teile: readonly KategorieReihe[]; name: (z: KategorieReihe) => string }) {
+  const prozent = useProzent();
+  const { t } = useTranslation();
+  const mitAnteil = teile.filter((z) => z.anteil > 0);
+  const farbig = mitAnteil.slice(0, SERIEN);
+  const rest = mitAnteil.slice(SERIEN).reduce((s, z) => s + z.anteil, 0);
+  const segmente = [
+    ...farbig.map((z, i) => ({ key: schluessel(z), anteil: z.anteil, farbe: serie(i), titel: `${name(z)} · ${prozent(z.anteil, 1)}` })),
+    ...(rest > 0 ? [{ key: "__rest", anteil: rest, farbe: serie(SERIEN), titel: `${t("kategorienAuswertung.uebrige")} · ${prozent(rest, 1)}` }] : []),
+  ];
   return (
-    <svg width={werte.length * (breite + luecke)} height={hoehe} aria-hidden="true" style={{ display: "block" }}>
-      {werte.map((v, i) => {
-        const h = Math.max(v === 0 ? 0 : 1, Math.round((Math.abs(v) / max) * hoehe));
-        return <rect key={i} x={i * (breite + luecke)} y={hoehe - h} width={breite} height={h} rx={1} fill={flussFarbe(v)} />;
-      })}
-    </svg>
+    <div role="img" aria-label={segmente.map((g) => g.titel).join(", ")} style={{ display: "flex", gap: 2, height: 12, marginBottom: "var(--sp-3)" }}>
+      {segmente.map((g, i) => (
+        <span
+          key={g.key}
+          title={g.titel}
+          style={{
+            flex: `${g.anteil} 1 0`,
+            minWidth: 2,
+            background: g.farbe,
+            borderRadius: i === 0 ? "4px 0 0 4px" : i === segmente.length - 1 ? "0 4px 4px 0" : 0,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+/** Das Farbfeld einer Zeile — ihre Stelle im Anteilsbalken. */
+function Farbfeld({ farbe }: { farbe?: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      style={{ display: "inline-block", width: 10, height: 10, borderRadius: 2, background: farbe ?? "transparent", marginRight: 8, flex: "0 0 auto", verticalAlign: "baseline" }}
+    />
   );
 }
 
@@ -89,6 +127,9 @@ export function KategorienRegister({
   const seite: Seite = seiten.includes(zustand.seite as never) ? zustand.seite : (seiten[0] ?? "Aufwand");
   const zeilen = reihen.zeilen.filter((z) => z.charakter === seite);
   const offen = zeilen.find((z) => schluessel(z) === zustand.offen) ?? null;
+  // Die Farbe einer Zeile ist ihr Rang unter den Teilen mit Anteil — dieselbe Zählung
+  // wie im Anteilsbalken.
+  const farbe = new Map(zeilen.filter((z) => z.anteil > 0).map((z, i) => [schluessel(z), serie(i)] as const));
 
   const name = (z: KategorieReihe) => (z.kategorieId ? z.name : seite === "Umschichtung" ? t("historie.umbuchungen") : t("historie.ohneKategorie"));
 
@@ -130,6 +171,8 @@ export function KategorienRegister({
         {zeilen.length === 0 ? (
           <div className="muted">{t("historie.katLeer")}</div>
         ) : (
+          <>
+          <Anteilsbalken teile={zeilen} name={name} />
           <DataTable
             sortable
             pageSize={25}
@@ -144,16 +187,11 @@ export function KategorienRegister({
                 sortValue: (z) => name(z),
                 render: (z) => (
                   <span>
+                    <Farbfeld farbe={farbe.get(schluessel(z))} />
                     {name(z)}
                     {z.elternName && <span className="hinweis" style={{ marginLeft: "var(--sp-2)" }}>{z.elternName}</span>}
                   </span>
                 ),
-              },
-              {
-                key: "verlauf",
-                label: t("kategorienAuswertung.spalteVerlauf"),
-                sortable: false,
-                render: (z) => <Monatsbalken werte={z.monate} />,
               },
               {
                 key: "schnitt",
@@ -195,6 +233,7 @@ export function KategorienRegister({
               },
             ]}
           />
+          </>
         )}
         <div className="hinweis" style={{ marginTop: "var(--sp-3)" }}>{t("kategorienAuswertung.hinweis")}</div>
       </Card>

@@ -592,36 +592,3 @@ export function planWirkung(zeilen: readonly { id: string; plan: Cent }[]): {
   }
   return { einnahmen, ausgaben, netto: einnahmen + ausgaben };
 }
-
-/**
- * Was der LAUFENDE Monat bis zu seinem Ende noch bringt: je Zeile der Plan abzüglich dessen,
- * was schon gebucht ist — aber nur in die Richtung des Plans.
- *
- * Seit 2026-11-11 steht der laufende Monat im Blick nach vorn als Stand von HEUTE da, nicht
- * als ganzer Monat. Ohne diese Rechnung fiele dabei alles heraus, was in diesem Monat noch
- * kommt: das Gehalt am Monatsende wäre weder Ist (noch nicht gebucht) noch Plan (der beginnt
- * erst im Folgemonat), und jede spätere Zahl stünde um ein Monatsgehalt zu tief.
- *
- * **Nur in die Richtung des Plans**, und das ist die Entscheidung hier: ist schon mehr
- * ausgegeben als geplant („Sonstiges" hat gar keinen Plan), kommt deshalb nicht wieder Geld
- * herein — der Rest ist dann null, nicht positiv. Dasselbe umgekehrt bei den Einnahmen. Ein
- * Rückfluss im Ist (Erstattung) verkleinert das Gebuchte und vergrössert damit den Rest;
- * das ist richtig, denn der Plan gilt weiter für den Monat.
- *
- * Dieselbe Auswahl der Zeilen wie `planWirkung`.
- */
-export function restWirkung(zeilen: readonly { id: string; plan: Cent; ist: Cent | null }[]): {
-  einnahmen: Cent;
-  ausgaben: Cent;
-  netto: Cent;
-} {
-  let einnahmen = 0;
-  let ausgaben = 0;
-  for (const z of zeilen) {
-    if (!(SALDOWIRKSAME_ZEILEN as readonly string[]).includes(z.id)) continue;
-    const offen = z.plan - (z.ist ?? 0);
-    if (z.plan > 0 && offen > 0) einnahmen += offen;
-    else if (z.plan < 0 && offen < 0) ausgaben += offen;
-  }
-  return { einnahmen, ausgaben, netto: einnahmen + ausgaben };
-}

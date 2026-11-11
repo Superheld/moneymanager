@@ -1032,8 +1032,9 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
   });
 
   /**
-   * Eine Null in der Spalte heisst „die Regel findet nichts". Wer dem nachgeht, soll das
-   * auch aufgeklappt bestaetigt bekommen und nicht vor einer leeren Flaeche stehen.
+   * Eine Null in der Spalte heisst „die Regel findet nichts". Seit 2026-11-11 sagt das die
+   * Pille in der Zeile, und es gibt nichts aufzuklappen — eine Zeile, die nichts zeigen
+   * kann, bietet auch keinen Klick an.
    */
   it("sagt es, wenn die Regel auf nichts greift", async () => {
     await sqliteZahlungskontoRepository.speichern({
@@ -1045,8 +1046,10 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
     });
     rendere(<VertraegeScreen />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /Ohlert Seewinkel/ }));
-    await waitFor(() => expect(document.body.textContent ?? "").toMatch(/greift noch auf keine/i));
+    // Bei null gibt es nichts aufzuklappen: die Pille sagt es, ein Knopf fehlt.
+    const zeile = (await screen.findByText("Ohlert Seewinkel")).closest("tr") as HTMLElement;
+    expect(zeile.textContent).toMatch(new RegExp(i18n.t("vertraege.keineZuordnung")));
+    expect(within(zeile).queryByRole("button", { name: /Ohlert Seewinkel/ })).toBeNull();
   });
 });
 
@@ -1070,7 +1073,7 @@ describe("VertraegeScreen — Löschen", () => {
     });
 
     rendere(<VertraegeScreen />);
-    await screen.findByRole("button", { name: /Ohlert Seewinkel/ });
+    await screen.findByText("Ohlert Seewinkel");
 
     await userEvent.click(screen.getAllByRole("button", { name: /^löschen$/i })[0]);
 

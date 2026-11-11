@@ -1,7 +1,7 @@
 // Verträge (P2.1) — Übersicht mit Kündigungsterminen; Anlegen im Modal. Eine Maske
 // erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   hauptkategorie,
@@ -23,9 +23,9 @@ import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import type { DataColumn } from "../bausteine/DataTable";
 import { PageHead } from "../bausteine/PageHead";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
+import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { VertragModal } from "./VertragModal";
 import {
   formularAusKandidat,
@@ -84,6 +84,12 @@ export function VertraegeScreen() {
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
   /** Welcher Vertrag seine zugeordneten Zahlungen zeigt — aufgeklappt unter der Tabelle. */
   const [zahlungenVon, setZahlungenVon] = useState<string | null>(null);
+  // Die Zahlungen stehen UNTER der Tabelle — bei einer langen Liste ausserhalb des Bildes.
+  // Ohne das Scrollen sah der Klick aus, als täte er nichts.
+  const zahlungenRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (zahlungenVon) zahlungenRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [zahlungenVon]);
 
   /**
    * Die offene Maske: `start` ist ihr Anfangszustand, `editId` unterscheidet Ändern von
@@ -165,17 +171,10 @@ export function VertraegeScreen() {
         // jeder Zeile („Abo") sagte nichts und kostete eine Spaltenbreite.
         render: (v) => (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-            {/* Der Anbieter führt zu den Zahlungen, die der Abgleich diesem Vertrag
-                zugeordnet hat. Die Spalte daneben nennt nur ihre ANZAHL — die sagt „die
-                Regel greift", aber nicht WAS sie greift. Erst an der Liste sieht man den
-                Fehlgriff: eine fremde Zahlung an denselben Empfänger zählt genauso mit
-                und macht aus einer falschen Zuordnung eine gute Kennzahl. */}
-            <Zeilenlink
-              onKlick={() => setZahlungenVon(zahlungenVon === v.id ? null : v.id)}
-              titel={t("vertraege.zeigeZahlungen", { anbieter: v.anbieter })}
-            >
-              {v.anbieter}
-            </Zeilenlink>
+            {/* Klar als Text, seit 2026-11-11. Der Name war ein Link zu den Zahlungen
+                und sah damit aus wie der Weg „in" den Vertrag — den gibt es nicht, die
+                Zeile tut nichts. Der Weg zu den Zahlungen steht jetzt an ihrer Anzahl. */}
+            {v.anbieter}
             {v.art === "dauervertrag" && <Pill variant="neutral">{t("vertraege.artKurz.dauervertrag")}</Pill>}
             {v.art === "umbuchung" && <Pill variant="um">{t("vertraege.artKurz.umbuchung")}</Pill>}
           </span>
@@ -231,9 +230,23 @@ export function VertraegeScreen() {
         key: "zahlungen",
         label: t("vertraege.spalteZugeordnet"),
         align: "right",
+        // Die Anzahl führt zu den Zahlungen selbst. Sie sagt nur „die Regel greift",
+        // nicht WAS sie greift — erst an der Liste sieht man den Fehlgriff: eine fremde
+        // Zahlung an denselben Empfänger zählt genauso mit und macht aus einer falschen
+        // Zuordnung eine gute Kennzahl. Bei null gibt es nichts zu zeigen, also auch
+        // nichts zu klicken; die Pille sagt es schon.
         render: (v) => {
           const n = zeileZu.get(v.id)?.zahlungen ?? 0;
-          return n > 0 ? String(n) : <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>;
+          return n > 0 ? (
+            <Zeilenlink
+              onKlick={() => setZahlungenVon(zahlungenVon === v.id ? null : v.id)}
+              titel={t("vertraege.zeigeZahlungen", { anbieter: v.anbieter })}
+            >
+              {String(n)}
+            </Zeilenlink>
+          ) : (
+            <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>
+          );
         },
       },
     ];
@@ -605,6 +618,7 @@ export function VertraegeScreen() {
           Rhythmus, nächste Fälligkeit —, und ein Dialog verdeckte genau das. */}
       {zahlungsdetail && (
         <Card
+          ref={zahlungenRef}
           style={{ marginTop: "var(--gap-card)" }}
           title={t("vertraege.zahlungenTitel", { anbieter: zahlungsdetail.vertrag.anbieter })}
         >

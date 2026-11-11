@@ -25,7 +25,6 @@ import {
   kennzahlen,
   monatsAusblicke,
   planWirkung,
-  restWirkung,
   projiziereRegel,
   vertragstreue,
   betragInKategorie,
@@ -390,25 +389,17 @@ export interface Verlaufspunkt {
   readonly saldo: Cent;
   /** true = projiziert, nicht gebucht. */
   readonly plan: boolean;
-  /**
-   * Nur am laufenden Monat, und zwar an BEIDEN seiner Punkte: am gewesenen der Tag, bis
-   * zu dem gebucht ist (heute) — am geplanten `rest: true`, er trägt, was bis Monatsende
-   * noch kommt. Ein Monat, zwei Punkte, weil er zur Hälfte Tatsache und zur Hälfte Plan ist.
-   */
-  readonly stichtag?: string;
-  readonly rest?: boolean;
 }
 
 /**
- * Der Verlauf über die Gegenwart hinaus: `zurueck` gewesene Monate, `voraus` geplante.
+ * Der Verlauf über die Gegenwart hinaus: `zurueck` abgeschlossene Monate als Ist, ab dem
+ * laufenden Monat `voraus` Monate als Plan.
  *
- * **Der laufende Monat steht ZWEIMAL da** (seit 2026-11-11): als Stand von HEUTE — nur
- * Buchungen bis heute, auch wenn schon spätere im Bestand stehen — und als geplanter Rest
- * bis Monatsende (`restWirkung`). Bis dahin war er EIN Punkt aus allem, was im Monat
- * gebucht ist: standen dort schon Buchungen mit späterem Datum (das Gehalt am 28.), sah
- * der Monat aus wie fertig, und das war Planung, die als Stand auftrat. Fehlten sie, fiel
- * umgekehrt alles noch Kommende aus der Vorschau, weil die Projektion erst beim
- * Folgemonat ansetzt.
+ * **Die Naht liegt am Ende des VORMONATS** (seit 2026-11-11). Der laufende Monat ist
+ * halb gebucht; als Ist zeigte er einen halben Monat — die Ausgaben bis heute, das Gehalt
+ * vom Monatsende noch nicht —, und die Linie knickte genau dort ein, wo der Plan ansetzt.
+ * Bis dahin gehörte er zum Ist; ein Tag lang stand er doppelt da (Stand heute plus
+ * geplanter Rest), und auch das sprang. Ganz als Plan läuft die Linie durch.
  *
  * **Fortgeschrieben wird der Saldo der liquiden Konten**, weil der Ist-Verlauf genau den
  * liefert (`istMonatsverlauf` bildet seinen Sockel aus `liquideMittel`). Eine Vorschau,
@@ -426,12 +417,9 @@ export function analyseAusblick(
   voraus: number,
 ): Verlaufspunkt[] {
   const jetzt = { ...parseIso(heute), d: 1 };
-  const von = toIso(addMonate(jetzt, -Math.max(0, zurueck - 1)));
-  // Was nach heute datiert ist, ist noch nicht geschehen — weder im Stand noch in der
-  // Frage, was vom laufenden Monat noch offen ist.
-  const bisHeute = basis.buchungen.filter((b) => b.datum <= heute);
-  const ist = istMonatsverlauf(basis.konten, bisHeute, von, toIso(jetzt));
-  const laufenderMonat = toIso(jetzt).slice(0, 7);
+  const vormonat = addMonate(jetzt, -1);
+  const von = toIso(addMonate(jetzt, -Math.max(1, zurueck)));
+  const ist = zurueck > 0 ? istMonatsverlauf(basis.konten, basis.buchungen, von, toIso(vormonat)) : [];
 
   const punkte: Verlaufspunkt[] = ist.map((m) => ({
     monat: m.label,
@@ -440,30 +428,27 @@ export function analyseAusblick(
     netto: m.netto,
     saldo: m.saldo,
     plan: false,
-    ...(m.label === laufenderMonat ? { stichtag: heute } : {}),
   }));
 
   const vertragsBuchungen = new Set(basis.vertragsnamen.keys());
-  // `monatsAusblicke` beginnt beim laufenden Monat: der erste trägt den Rest, die übrigen
-  // sind ganze Planmonate.
-  const [laufend, ...ausblicke] = monatsAusblicke(
+  const ausblicke = monatsAusblicke(
     {
       regeln: basis.regeln,
       budgets: basis.budgets,
-      ist: bisHeute,
+      ist: basis.buchungen,
       kategorien: basis.kategorien,
       vertragsBuchungen,
       heute,
     },
-    Math.max(0, voraus) + 1,
+    Math.max(0, voraus),
   );
 
-  let saldo = punkte.length > 0 ? punkte[punkte.length - 1].saldo : 0;
-  if (laufend && punkte.some((p) => p.stichtag)) {
-    const r = restWirkung(laufend.zeilen);
-    saldo += r.netto;
-    punkte.push({ monat: laufend.label, einnahmen: r.einnahmen, ausgaben: r.ausgaben, netto: r.netto, saldo, plan: true, rest: true });
-  }
+  // Der Sockel ist der Stand am Ende des Vormonats — auch wenn kein gewesener Monat
+  // gezeigt wird; dann über ein Fenster genau dieses einen Monats.
+  let saldo =
+    punkte.length > 0
+      ? punkte[punkte.length - 1].saldo
+      : (istMonatsverlauf(basis.konten, basis.buchungen, toIso(vormonat), toIso(vormonat))[0]?.saldo ?? 0);
   for (const a of ausblicke) {
     const w = planWirkung(a.zeilen.map((z) => ({ id: z.id, plan: z.plan })));
     saldo += w.netto;

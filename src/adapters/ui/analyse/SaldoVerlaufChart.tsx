@@ -20,10 +20,10 @@ interface Props {
   /**
    * Die Achse ohne Null: von 10 % unter dem kleinsten bis 10 % über dem grössten Wert.
    *
-   * Für das Depot (seit 2026-11-11). Ein Saldo kann ins Minus laufen, und dann ist die
-   * Null die Linie, auf die es ankommt — beim Depotwert gibt es diese Linie nicht. Mit der
-   * Null im Bild lag seine Linie als fast gerader Strich oben am Rand, und die Schwankung,
-   * die man sehen will, war ein Pixel hoch.
+   * Für das Depot und den Blick nach vorn (seit 2026-11-11). Mit der Null im Bild lag die
+   * Linie als fast gerader Strich oben am Rand, und die Schwankung, die man sehen will,
+   * war ein Pixel hoch. Läuft ein Wert ins Minus, kommt die Null trotzdem ins Bild — die
+   * Nulllinie wird gezeichnet, sobald sie zwischen den Enden liegt.
    */
   ohneNull?: boolean;
   width?: number;

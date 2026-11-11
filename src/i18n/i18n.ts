@@ -502,10 +502,10 @@ const de = {
   // Der Verlauf über die Gegenwart hinaus — Analyse, eigene Karte.
   kategorienAuswertung: {
     titel: "Kategorien über die Zeit",
-    untertitel: "Jede Kategorie über {{monate}} Monate — wie viel, wie gleichmässig, wohin es geht",
+    untertitel: "Jede Kategorie über {{monate}} Monate — wie viel, welcher Anteil, wohin es geht",
     seiteWahl: "Seite",
     spalteKategorie: "Kategorie",
-    spalteVerlauf: "Monate",
+    uebrige: "Übrige",
     spalteSchnitt: "Ø Monat",
     spalteSumme: "Summe",
     spalteAnteil: "Anteil",
@@ -519,9 +519,8 @@ const de = {
     untertitel: "{{zurueck}} Monate gewesen, {{voraus}} geplant — derselbe Saldo, fortgeschrieben",
     legendeIst: "gebucht",
     legendePlan: "geplant",
+    legendeBalkenPlan: "blass: geplant",
     pillPlan: "Plan",
-    standAm: "Stand {{tag}}",
-    pillRest: "Rest des Monats",
     warnungMinus:
       "Im {{monat}} steht der vorhergesagte Stand bei {{betrag}}. Gerechnet ist monatsweise: " +
       "innerhalb eines Monats kann es früher eng werden, als hier zu sehen ist.",
@@ -1958,8 +1957,8 @@ const de = {
     spalteRuecklage: "zurücklegen/Mt",
     spalteZugeordnet: "Zahlungen",
     keineZuordnung: "keine erkannt",
-    zeigeZahlungen: "Zeigt die Zahlungen, die {{anbieter}} zugeordnet sind",
     zahlungenTitel: "Zahlungen von {{anbieter}}",
+    zeigeZahlungen: "Zeigt die Zahlungen, die {{anbieter}} zugeordnet sind",
     keineZahlungen: "Die Regel greift noch auf keine Buchung.",
     gruppeOhneRegel: "ohne hinterlegte Zahlung",
     gruppeMeta: "{{count}} Verträge · {{betrag}} pro Monat",
@@ -2704,10 +2703,10 @@ const en: typeof de = {
   },
   kategorienAuswertung: {
     titel: "Categories over time",
-    untertitel: "Each category over {{monate}} months — how much, how steady, where it is heading",
+    untertitel: "Each category over {{monate}} months — how much, what share, where it is heading",
     seiteWahl: "Side",
     spalteKategorie: "Category",
-    spalteVerlauf: "Months",
+    uebrige: "Others",
     spalteSchnitt: "Avg month",
     spalteSumme: "Total",
     spalteAnteil: "Share",
@@ -2721,9 +2720,8 @@ const en: typeof de = {
     untertitel: "{{zurueck}} months past, {{voraus}} planned — the same balance, carried forward",
     legendeIst: "booked",
     legendePlan: "planned",
+    legendeBalkenPlan: "faded: planned",
     pillPlan: "Plan",
-    standAm: "as of {{tag}}",
-    pillRest: "rest of month",
     warnungMinus:
       "In {{monat}} the projected balance is {{betrag}}. This is calculated by month: " +
       "within a month it can get tight earlier than shown here.",
@@ -4105,8 +4103,8 @@ const en: typeof de = {
     spalteRuecklage: "set aside/mo",
     spalteZugeordnet: "payments",
     keineZuordnung: "none matched",
-    zeigeZahlungen: "Shows the payments matched to {{anbieter}}",
     zahlungenTitel: "Payments matched to {{anbieter}}",
+    zeigeZahlungen: "Shows the payments matched to {{anbieter}}",
     keineZahlungen: "The rule does not match any booking yet.",
     gruppeOhneRegel: "no payment on file",
     gruppeMeta: "{{count}} contracts · {{betrag}} per month",

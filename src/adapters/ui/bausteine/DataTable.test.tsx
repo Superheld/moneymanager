@@ -266,6 +266,23 @@ describe("DataTable — klickbare Zeilen mit der Tastatur", () => {
     expect(geklickt).toEqual(["knopf"]);
   });
 
+  // Seit 2026-11-11: der Knopf muss das nicht mehr selbst verhindern (kein
+  // `stopPropagation`). Gefunden an den Verträgen — „Löschen" klappte nebenbei die
+  // Zahlungen der Zeile auf.
+  it("löst beim Klick auf einen Knopf in der Zeile den Zeilenklick nicht aus", async () => {
+    const nutzer = userEvent.setup();
+    const geklickt: string[] = [];
+    const mitKnopf = [
+      { key: "name", label: "Name" },
+      { key: "aktion", label: "", render: () => <button onClick={() => geklickt.push("knopf")}>Löschen</button> },
+    ];
+    render(<DataTable columns={mitKnopf} rows={[{ name: "Alpha" }]} onRowClick={() => geklickt.push("zeile")} />);
+    await nutzer.click(screen.getByRole("button", { name: "Löschen" }));
+    expect(geklickt).toEqual(["knopf"]);
+    await nutzer.click(screen.getByText("Alpha"));
+    expect(geklickt).toEqual(["knopf", "zeile"]);
+  });
+
   it("meldet die Sortierung am Spaltenkopf", async () => {
     const nutzer = userEvent.setup();
     render(<DataTable sortable columns={spalten} rows={drei} />);
