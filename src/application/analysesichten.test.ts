@@ -135,11 +135,13 @@ describe("analyseAusblick", () => {
 
   it("liefert gewesene und geplante Monate in einer Reihe und markiert die Naht", () => {
     const punkte = analyseAusblick(basis(), "2026-08-15", 3, 3);
+    // Der laufende Monat steht zweimal da: als Stand von heute und als Rest bis Monatsende.
     expect(punkte.map((p) => p.monat)).toEqual([
-      "2026-06", "2026-07", "2026-08", "2026-09", "2026-10", "2026-11",
+      "2026-06", "2026-07", "2026-08", "2026-08", "2026-09", "2026-10", "2026-11",
     ]);
-    // Der LAUFENDE Monat gehört zum Isten — er ist zur Hälfte gebucht.
-    expect(punkte.filter((p) => p.plan).map((p) => p.monat)).toEqual(["2026-09", "2026-10", "2026-11"]);
+    expect(punkte.filter((p) => p.plan).map((p) => p.monat)).toEqual(["2026-08", "2026-09", "2026-10", "2026-11"]);
+    expect(punkte[2]).toMatchObject({ plan: false, stichtag: "2026-08-15" });
+    expect(punkte[3]).toMatchObject({ plan: true, rest: true });
   });
 
   it("schreibt den Saldo an der Naht ohne Sprung fort", () => {
@@ -154,7 +156,32 @@ describe("analyseAusblick", () => {
     const letzterIst = gewesen[gewesen.length - 1];
     const ersterPlan = punkte.find((p) => p.plan)!;
     expect(ersterPlan.saldo).toBe(letzterIst.saldo + ersterPlan.netto);
-    expect(ersterPlan.netto).toBe(-100000);
+    // Der erste Planpunkt ist der Rest des laufenden Monats: die Miete für August ist
+    // noch nicht gebucht, also steht sie dort.
+    expect(ersterPlan).toMatchObject({ monat: "2026-08", rest: true, netto: -100000 });
+  });
+
+  // Der Fall von 2026-11-11: eine Buchung mit späterem Datum im laufenden Monat liess ihn
+  // aussehen wie fertig gebucht. Der Stand von heute kennt sie nicht; der Rest auch nicht,
+  // denn sie IST der Plan.
+  it("zählt Buchungen nach heute weder zum Stand noch doppelt in den Rest", () => {
+    const regeln = [
+      {
+        id: "r1", bezeichnung: "Gehalt", betrag: 300000, rhythmus: "monatlich" as const,
+        startdatum: "2026-01-28", charakter: "Ertrag" as const, kontoId: "k1",
+      },
+    ];
+    const spaeter = {
+      id: "g8", datum: "2026-08-28", betrag: 300000, kontoId: "k1",
+      charakter: "Ertrag" as const, quelle: "import" as const,
+    };
+    const b = basis({ regeln });
+    const punkte = analyseAusblick({ ...b, buchungen: [...b.buchungen, spaeter] }, "2026-08-15", 2, 1);
+    const heute = punkte.find((p) => p.stichtag)!;
+    const rest = punkte.find((p) => p.rest)!;
+    expect(heute.einnahmen).toBe(0);
+    expect(rest.einnahmen).toBe(300000);
+    expect(rest.saldo).toBe(heute.saldo + 300000);
   });
 
   // Die Entscheidung, die `planWirkung` trägt, hier im Zusammenspiel: eine Umschichtung

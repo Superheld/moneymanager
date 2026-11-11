@@ -12,18 +12,23 @@
 import { useTranslation } from "react-i18next";
 import type { Verlaufspunkt } from "../../../application";
 import { Card, DataTable, Pill } from "../bausteine";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 
 export function AusblickKarte({ punkte }: { punkte: readonly Verlaufspunkt[] }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
   if (punkte.length === 0) return null;
 
   const ersterPlan = punkte.findIndex((p) => p.plan);
+  // Der laufende Monat steht zweimal da (Stand heute, Rest bis Monatsende) und zählt
+  // trotzdem als EIN gewesener Monat — sonst stünde im Untertitel ein Monat zu viel.
   const gewesen = punkte.filter((p) => !p.plan).length;
-  const geplant = punkte.length - gewesen;
+  const geplant = punkte.filter((p) => p.plan && !p.rest).length;
+  /** Im Chart: der Stand von heute heisst nach seinem Tag, nicht nach seinem Monat. */
+  const beschriftung = (p: Verlaufspunkt) => (p.stichtag ? datum.ohneJahr(p.stichtag) : p.monat);
 
   // Der tiefste Punkt der Vorschau. Er ist die Aussage, auf die es ankommt: ein Monat, der
   // bei plus endet, kann zwischendurch unten gewesen sein — und der Endstand verschweigt
@@ -38,7 +43,7 @@ export function AusblickKarte({ punkte }: { punkte: readonly Verlaufspunkt[] }) 
       subtitle={t("blickNachVorn.untertitel", { zurueck: gewesen, voraus: geplant })}
     >
       <SaldoVerlaufChart
-        labels={punkte.map((p) => p.monat)}
+        labels={punkte.map(beschriftung)}
         werte={punkte.map((p) => p.saldo)}
         legende={t("blickNachVorn.legendeIst")}
         legendePlan={t("blickNachVorn.legendePlan")}
@@ -60,9 +65,10 @@ export function AusblickKarte({ punkte }: { punkte: readonly Verlaufspunkt[] }) 
               render: (r) => (
                 <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
                   {r.monat}
+                  {r.stichtag && <span className="muted">{t("blickNachVorn.standAm", { tag: datum.ohneJahr(r.stichtag) })}</span>}
                   {/* Nur die geplanten Zeilen tragen eine Pille: die gewesenen sind der
                       Normalfall, und ein Etikett an jeder Zeile beschriftet nichts mehr. */}
-                  {r.plan && <Pill variant="neutral">{t("blickNachVorn.pillPlan")}</Pill>}
+                  {r.plan && <Pill variant="neutral">{t(r.rest ? "blickNachVorn.pillRest" : "blickNachVorn.pillPlan")}</Pill>}
                 </span>
               ),
             },

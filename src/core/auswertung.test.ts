@@ -11,6 +11,7 @@ import {
   kennzahlen,
   monateImFenster,
   planWirkung,
+  restWirkung,
   vertragstreue,
 } from "./auswertung";
 import type { IstBuchung } from "./buchung/istbuchung";
@@ -320,5 +321,33 @@ describe("Plan-Wirkung auf den Saldo", () => {
 
   it("nimmt einen unbekannten Zeilentyp nicht stillschweigend mit", () => {
     expect(planWirkung([{ id: "irgendwas", plan: -99999 }]).netto).toBe(0);
+  });
+});
+
+describe("Rest des laufenden Monats", () => {
+  // Der Fall, für den es die Funktion gibt: das Gehalt kommt am Monatsende, heute ist es
+  // noch nicht gebucht. Es gehört in den Rest — sonst fehlt es der ganzen Vorschau.
+  it("nimmt den noch nicht gebuchten Plan als Rest", () => {
+    const r = restWirkung([
+      { id: "einnahmen", plan: 300000, ist: 0 },
+      { id: "vertraege", plan: -120000, ist: -120000 },
+      { id: "budgets", plan: -40000, ist: -25000 },
+    ]);
+    expect(r.einnahmen).toBe(300000);
+    expect(r.ausgaben).toBe(-15000);
+    expect(r.netto).toBe(285000);
+  });
+
+  it("macht aus mehr Ausgaben als geplant keinen Zufluss", () => {
+    const r = restWirkung([
+      { id: "budgets", plan: -40000, ist: -55000 },
+      { id: "sonstiges", plan: 0, ist: -12000 },
+      { id: "einnahmen", plan: 300000, ist: 310000 },
+    ]);
+    expect(r).toEqual({ einnahmen: 0, ausgaben: 0, netto: 0 });
+  });
+
+  it("lässt Rücklagen und Umschichtungen draussen, wie planWirkung", () => {
+    expect(restWirkung([{ id: "ruecklagen", plan: -25000, ist: 0 }, { id: "umschichtung", plan: -50000, ist: 0 }]).netto).toBe(0);
   });
 });

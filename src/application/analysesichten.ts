@@ -25,6 +25,7 @@ import {
   kennzahlen,
   monatsAusblicke,
   planWirkung,
+  restWirkung,
   projiziereRegel,
   vertragstreue,
   betragInKategorie,
@@ -33,6 +34,7 @@ import {
   istInterneUmbuchung,
   istMonatsverlauf,
   kategorieAggregat,
+  kategorieReihen,
   monateImFenster,
   nachHauptgruppe,
   parseIso,
@@ -55,6 +57,7 @@ import {
   type Zahlungsregel,
   type Kategorie,
   type KategorieSumme,
+  type KategorieReihe,
   type MonatsIst,
   type Zahlungskonto,
 } from "../core";
@@ -181,6 +184,37 @@ export function analyseAufschluesselung(
 ): KategorieSumme[] {
   const relevant = basis.buchungen.filter((b) => !istInterneUmbuchung(b));
   return kategorieAggregat(relevant, von, bis, basis.kategorien);
+}
+
+/** Die Kategorien eines Fensters Monat für Monat — das Register „Kategorien". */
+export interface Kategorienreihen {
+  /** „YYYY-MM", in der Reihenfolge der Spalten in `zeilen[].monate`. */
+  readonly monate: readonly string[];
+  readonly zeilen: readonly KategorieReihe[];
+}
+
+/**
+ * Wie `analyseAufschluesselung`, aber über die Zeit statt als eine Summe — und mit
+ * denselben Ausschlüssen: interne Umbuchungen bleiben draussen.
+ *
+ * Der Trend endet beim VORMONAT von heute: der laufende Monat ist halb gebucht und
+ * drückte jeden Vergleich nach unten (siehe `kategorieReihen`).
+ */
+export function analyseKategorienreihen(
+  basis: Analysebasis,
+  von: string,
+  bis: string,
+  heute: string,
+  nachGruppe = false,
+): Kategorienreihen {
+  const start = { ...parseIso(von), d: 1 };
+  const monate = Array.from({ length: monateImFenster(von, bis) }, (_, i) => toIso(addMonate(start, i)).slice(0, 7));
+  const vormonat = toIso(addMonate({ ...parseIso(heute), d: 1 }, -1)).slice(0, 7);
+  const relevant = basis.buchungen.filter((b) => !istInterneUmbuchung(b));
+  return {
+    monate,
+    zeilen: kategorieReihen(relevant, basis.kategorien, monate, { abgeschlossenBis: vormonat, nachGruppe }),
+  };
 }
 
 /** Dieselbe Aufschlüsselung, zu Hauptgruppen gebündelt. */
@@ -356,15 +390,25 @@ export interface Verlaufspunkt {
   readonly saldo: Cent;
   /** true = projiziert, nicht gebucht. */
   readonly plan: boolean;
+  /**
+   * Nur am laufenden Monat, und zwar an BEIDEN seiner Punkte: am gewesenen der Tag, bis
+   * zu dem gebucht ist (heute) — am geplanten `rest: true`, er trägt, was bis Monatsende
+   * noch kommt. Ein Monat, zwei Punkte, weil er zur Hälfte Tatsache und zur Hälfte Plan ist.
+   */
+  readonly stichtag?: string;
+  readonly rest?: boolean;
 }
 
 /**
  * Der Verlauf über die Gegenwart hinaus: `zurueck` gewesene Monate, `voraus` geplante.
  *
- * **Die Naht liegt am Monatsende und nicht bei „heute".** Der laufende Monat gehört zum
- * ISTEN — er ist zur Hälfte gebucht, und ihn als Plan zu zeigen hiesse, das Gebuchte
- * wegzuwerfen. Die Projektion setzt deshalb beim FOLGENDEN Monat an, auf dem Stand, den
- * der laufende bis heute erreicht hat.
+ * **Der laufende Monat steht ZWEIMAL da** (seit 2026-11-11): als Stand von HEUTE — nur
+ * Buchungen bis heute, auch wenn schon spätere im Bestand stehen — und als geplanter Rest
+ * bis Monatsende (`restWirkung`). Bis dahin war er EIN Punkt aus allem, was im Monat
+ * gebucht ist: standen dort schon Buchungen mit späterem Datum (das Gehalt am 28.), sah
+ * der Monat aus wie fertig, und das war Planung, die als Stand auftrat. Fehlten sie, fiel
+ * umgekehrt alles noch Kommende aus der Vorschau, weil die Projektion erst beim
+ * Folgemonat ansetzt.
  *
  * **Fortgeschrieben wird der Saldo der liquiden Konten**, weil der Ist-Verlauf genau den
  * liefert (`istMonatsverlauf` bildet seinen Sockel aus `liquideMittel`). Eine Vorschau,
@@ -383,7 +427,11 @@ export function analyseAusblick(
 ): Verlaufspunkt[] {
   const jetzt = { ...parseIso(heute), d: 1 };
   const von = toIso(addMonate(jetzt, -Math.max(0, zurueck - 1)));
-  const ist = istMonatsverlauf(basis.konten, basis.buchungen, von, toIso(jetzt));
+  // Was nach heute datiert ist, ist noch nicht geschehen — weder im Stand noch in der
+  // Frage, was vom laufenden Monat noch offen ist.
+  const bisHeute = basis.buchungen.filter((b) => b.datum <= heute);
+  const ist = istMonatsverlauf(basis.konten, bisHeute, von, toIso(jetzt));
+  const laufenderMonat = toIso(jetzt).slice(0, 7);
 
   const punkte: Verlaufspunkt[] = ist.map((m) => ({
     monat: m.label,
@@ -392,24 +440,30 @@ export function analyseAusblick(
     netto: m.netto,
     saldo: m.saldo,
     plan: false,
+    ...(m.label === laufenderMonat ? { stichtag: heute } : {}),
   }));
 
   const vertragsBuchungen = new Set(basis.vertragsnamen.keys());
-  // `monatsAusblicke` beginnt beim laufenden Monat — der steht als Ist schon da, also
-  // einen mehr holen und den ersten überspringen.
-  const ausblicke = monatsAusblicke(
+  // `monatsAusblicke` beginnt beim laufenden Monat: der erste trägt den Rest, die übrigen
+  // sind ganze Planmonate.
+  const [laufend, ...ausblicke] = monatsAusblicke(
     {
       regeln: basis.regeln,
       budgets: basis.budgets,
-      ist: basis.buchungen,
+      ist: bisHeute,
       kategorien: basis.kategorien,
       vertragsBuchungen,
       heute,
     },
     Math.max(0, voraus) + 1,
-  ).slice(1);
+  );
 
   let saldo = punkte.length > 0 ? punkte[punkte.length - 1].saldo : 0;
+  if (laufend && punkte.some((p) => p.stichtag)) {
+    const r = restWirkung(laufend.zeilen);
+    saldo += r.netto;
+    punkte.push({ monat: laufend.label, einnahmen: r.einnahmen, ausgaben: r.ausgaben, netto: r.netto, saldo, plan: true, rest: true });
+  }
   for (const a of ausblicke) {
     const w = planWirkung(a.zeilen.map((z) => ({ id: z.id, plan: z.plan })));
     saldo += w.netto;

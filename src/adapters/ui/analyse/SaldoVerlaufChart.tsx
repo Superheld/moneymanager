@@ -17,6 +17,15 @@ interface Props {
   abIndex?: number;
   /** Beschriftung des gestrichelten Teils. Fehlt sie, gibt es keinen. */
   legendePlan?: string;
+  /**
+   * Die Achse ohne Null: von 10 % unter dem kleinsten bis 10 % über dem grössten Wert.
+   *
+   * Für das Depot (seit 2026-11-11). Ein Saldo kann ins Minus laufen, und dann ist die
+   * Null die Linie, auf die es ankommt — beim Depotwert gibt es diese Linie nicht. Mit der
+   * Null im Bild lag seine Linie als fast gerader Strich oben am Rand, und die Schwankung,
+   * die man sehen will, war ein Pixel hoch.
+   */
+  ohneNull?: boolean;
   width?: number;
   height?: number;
 }
@@ -27,6 +36,7 @@ export function SaldoVerlaufChart({
   legende,
   abIndex,
   legendePlan,
+  ohneNull = false,
   width = 1000,
   height = 300,
 }: Props) {
@@ -37,9 +47,11 @@ export function SaldoVerlaufChart({
   const padB = 30;
   const n = labels.length;
 
-  const alle = [...werte, 0];
-  const max = Math.max(...alle);
-  const min = Math.min(...alle);
+  const alle = ohneNull ? werte : [...werte, 0];
+  // Über den Betrag gerechnet, damit „10 % darüber" auch bei einem negativen Wert nach
+  // oben zeigt.
+  const max = ohneNull ? Math.max(...alle) + Math.abs(Math.max(...alle)) * 0.1 : Math.max(...alle);
+  const min = ohneNull ? Math.min(...alle) - Math.abs(Math.min(...alle)) * 0.1 : Math.min(...alle);
   const spanne = max - min || 1;
 
   const x = (i: number) => padL + (n <= 1 ? 0 : (i * (width - padL - padR)) / (n - 1));
@@ -76,7 +88,9 @@ export function SaldoVerlaufChart({
         )}
         {labels.map((m, i) =>
           i % Math.ceil(n / 12) === 0 ? (
-            <text key={i} x={x(i)} y={height - 9} textAnchor="middle" fontSize="11" fill="var(--ink-3)" fontFamily="var(--font-ui)">
+            // Die letzte Beschriftung endet an ihrem Punkt statt mittig darüber: mittig
+            // ragte sie über den rechten Rand und wurde abgeschnitten.
+            <text key={i} x={x(i)} y={height - 9} textAnchor={i === n - 1 && n > 1 ? "end" : "middle"} fontSize="11" fill="var(--ink-3)" fontFamily="var(--font-ui)">
               {m}
             </text>
           ) : null,
