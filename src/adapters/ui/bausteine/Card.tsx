@@ -5,7 +5,7 @@
 // kein Gegenstück — eine Karte ist Aussehen, keine Mechanik. Warum Inhalt in einer Karte
 // steht und nie in einer Karte IN einer Karte, steht in `../CLAUDE.md`.
 
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode, Ref } from "react";
 
 export interface CardProps {
   /** Titel im Kopf, fett. */
@@ -20,11 +20,14 @@ export interface CardProps {
   pad?: boolean;
   children?: ReactNode;
   style?: CSSProperties;
+  /** Für den Aufrufer, der die Karte ins Bild holen will (React 19: `ref` ist eine Prop). */
+  ref?: Ref<HTMLDivElement>;
 }
 
-export function Card({ title, subtitle, action, floating = false, pad = true, children, style }: CardProps) {
+export function Card({ title, subtitle, action, floating = false, pad = true, children, style, ref }: CardProps) {
   return (
     <div
+      ref={ref}
       style={{
         background: "var(--surface)",
         border: "1px solid var(--line)",

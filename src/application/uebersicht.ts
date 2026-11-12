@@ -132,23 +132,22 @@ export async function uebersichtLaden(
    * Verkauf. Das ist eine andere Frage: was dort liegt, ist zurückgelegt und steht für
    * den Monat nicht zur Verfügung.
    *
-   * Gefiltert werden Buchungen und Zahlungsregeln — und dieselbe gefilterte Sicht trägt
-   * auch die Budgetliste darunter, damit Karten und Liste für dasselbe Budget denselben
-   * Verbrauch zeigen.
+   * Gefiltert werden Buchungen und Zahlungsregeln der MONATSKARTEN.
    *
-   * **Budgets werden seit 2026-10-26 NICHT mehr nach ihrem Konto gefiltert.** Vorher
-   * verschwand ein aufbauendes Budget auf dem Rücklagenkonto ganz aus der Übersicht, und
-   * seine Ausgaben vom Girokonto standen als unerklärte Posten unter „Sonstiges". Jetzt
-   * führt es seine Zeile und trägt, was aus den liquiden Konten dafür abging. Bis
-   * 2026-11-09 plante es hier seine RATE nicht, weil die als Umbuchung schon in einer
-   * eigenen Zeile stand; seit die Umbuchungen herausfallen (unten), plant es sie wieder
-   * selbst — sonst stünde sie nirgends.
+   * **Die Budgetliste rechnet seit 2026-11-11 über ALLE Konten**, mit denselben Zahlen wie
+   * der Bereich Budgets. Bis dahin trug auch sie die liquide Sicht, und ein aufbauendes
+   * Budget auf seinem Rücklagenkonto war darin blind für seine eigenen Ausgaben: die
+   * gingen vom Rücklagenkonto ab und zählten nicht — der Balken stand immer auf null, und
+   * der Stand wuchs Monat für Monat um die Rate, obwohl Geld ausgegeben war. Ein Budget
+   * ist ein Topf; was aus ihm ging, ging aus ihm, gleich von welchem Konto.
    *
-   * Der Preis ist eine Aussage, die man kennen muss: **dasselbe Budget kann hier einen
-   * kleineren Verbrauch zeigen als im Bereich Budgets.** Dort steht der ganze Rahmen,
-   * hier nur, was aus den verfügbaren Mitteln davon gegangen ist. Das ist gewollt — die
-   * beiden Bereiche beantworten verschiedene Fragen —, und deshalb sagt es der
-   * Untertitel der Übersicht mit.
+   * Der Preis: die Zeilen „Budgets monatlich/aufbauend" der Monatskarten rechnen weiter
+   * über die liquiden Konten und können für denselben Monat einen kleineren Verbrauch
+   * zeigen als die Liste darunter. Die Karte fragt „was geht aus dem Verfügbaren
+   * weg", die Liste „wie steht das Budget".
+   *
+   * Budgets werden NICHT nach ihrem Konto gefiltert (seit 2026-10-26): vorher verschwand
+   * ein aufbauendes Budget auf dem Rücklagenkonto ganz aus der Übersicht.
    *
    * Eine Zahlungsregel OHNE Konto bleibt drin: sie lässt sich keiner Klasse zuordnen,
    * und sie stillschweigend fallen zu lassen hiesse, einen Plan verschwinden zu lassen,
@@ -169,7 +168,7 @@ export async function uebersichtLaden(
   const alleIds = new Set(konten.map((k) => k.id));
 
   const sicht: BudgetSicht = {
-    buchungen: liquideBuchungen,
+    buchungen,
     kategorien,
     budgets,
     vertragsBuchungen,

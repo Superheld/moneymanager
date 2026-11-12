@@ -240,6 +240,8 @@ export {
   type Zeitraum,
   analyseBefunde,
   analyseAusblick,
+  analyseKategorienreihen,
+  type Kategorienreihen,
   type Befunde,
   type Verlaufspunkt,
 } from "./analysesichten";

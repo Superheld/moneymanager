@@ -67,12 +67,12 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 |---|---|
 | Fläche um einen Inhalt | `Card` (nie eine Karte IN einer Karte, unten) |
 | Seitenkopf mit Aktion | `PageHead`; Bereich mit Reitern: `Bereich`, die Reiter allein `Registerleiste` |
-| Tabelle | `DataTable` — Sortierung, Seiten, Zeilenklick (auch per Tastatur), schmale Form |
+| Tabelle | `DataTable` — Sortierung, Seiten, Zeilenklick (auch per Tastatur), schmale Form. Ist eine Zeile klickbar, dann die GANZE, und ihr Bezeichner steht als Link da — kein eigener Link in einer Spalte |
 | Bezeichner in einer Zeile, der aufklappt | `Zeilenlink` |
 | Liste, die unter einer Zeile aufklappt | `Aufklapptabelle`; nur die Fläche: `Aufklappflaeche`; Höhe: `aufklappen.ts` |
 | Buchungen eines Budgets | `BudgetPostenliste` (auf `Aufklapptabelle`) |
 | Abschnitt im Dialog, auf- und zuklappbar | `Klappblock` |
-| Kennzahl | `KPIStat`; Balken mit Rahmen: `CoverageTrack` |
+| Kennzahl | `KPIStat`; Balken mit Rahmen: `CoverageTrack` (mit `marke` für ein Soll — EIN Balken statt zwei) |
 | Etikett | `Pill` — sagt, was etwas IST |
 | Wahl im Formular | `Auswahl`; in einer Tabellenzeile: `Zeilenauswahl`; Kategorie: `CategoryPicker` |
 | Datum | `Datumsfeld`, angezeigt über `useDatum()` |
@@ -704,12 +704,17 @@ Untereinander war die Seite so lang, dass man für die Befunde oder ein Depot an
 anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
 
 - **Jedes Register trägt die Filter, die es einstellt** (seit 2026-11-09) — Verlauf
-  und Kategorien Monat und Zeitraum an ihrer Karte, Befunde und Depot den Zeitraum
-  darüber, der Ausblick keinen. Die Kennzahlen stehen im Verlauf. Einen Tag lang sassen
-  Zeitraum, Monat und Kennzahlen über den Reitern: das las sich, als gälten sie überall,
-  und für den Ausblick galten sie nie. **Der Zustand bleibt gemeinsam** — wer im Verlauf
-  auf zwei Jahre stellt, findet die Kategorien auch über zwei Jahre, statt dort von vorn
-  anzufangen.
+  Monat und Zeitraum an seiner Karte, Kategorien, Befunde und Depot den Zeitraum, der
+  Ausblick keinen. Die Kennzahlen stehen im Verlauf. Einen Tag lang sassen Zeitraum,
+  Monat und Kennzahlen über den Reitern: das las sich, als gälten sie überall, und für
+  den Ausblick galten sie nie.
+- **Und jedes Register hat seinen EIGENEN Zustand** (seit 2026-11-11). Bis dahin war er
+  gemeinsam — ein Zeitraum in den Befunden verschob den Verlauf, ein Monat im Verlauf die
+  Kategorien —, und das las sich als Verwechslung statt als Bequemlichkeit. Der Zustand
+  liegt trotzdem im Screen, nicht im Register: gerendert wird nur das aktive, und ein
+  Reiterwechsel soll nichts verwerfen. **Ein angeklickter Monat im Verlauf öffnet
+  darunter seine Aufschlüsselung** (`Aufschluesselung`); das Register „Kategorien" ist
+  eine eigene Auswertung über die Zeit (`KategorienRegister`, `kategorieReihen`).
 - **Nur Register mit Inhalt bekommen einen Reiter.** Ohne abgerufenes Depot gibt es
   keinen Reiter „Depot" — ein Reiter ins Leere wäre schlechter als keiner.
 - **Die Befunde bleiben innerhalb ihres Registers Karten untereinander** (unten). Das ist
@@ -717,8 +722,8 @@ anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
   „Ohne Plan", „Ausreißer" sagten es nicht.
 
 Die Register davor beantworten **„wie viel und wohin"** — Verlauf (Fluss · Saldo ·
-Tabelle), der **Blick nach vorn** (`AusblickKarte.tsx`) und die Aufschlüsselung nach
-Kategorien. Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
+Tabelle, darunter die Aufschlüsselung eines angeklickten Monats), die Kategorien über die
+Zeit und der **Blick nach vorn** (`AusblickKarte.tsx`). Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
 fest gegen frei, Budget-Treue, Ausgaben ohne Budget und ohne Vertrag, Verträge Soll gegen
 Ist, Empfänger, Nutzung der Kategorien, Ausreißer.
 
@@ -740,15 +745,18 @@ Drei Dinge, die beim Anbauen zählen:
   zurück" ein „es wurde noch mehr ausgegeben". Wer eine Spalte ergänzt, übernimmt die
   Regel mit.
 - **Der Blick nach vorn hängt NICHT am gewählten Zeitraum** — er steht fest bei sechs
-  Monaten zurück und sechs voraus. Eine Projektion wird nicht besser, wenn man sie über
-  zwei Jahre zieht; ihre späten Monate wären Behauptung statt Vorschau. Gezeichnet wird
-  EINE Linie, deren geplanter Teil gestrichelt ist (`SaldoVerlaufChart`, `abIndex`): es
-  ist derselbe Saldo, und zwei Linien behaupteten zwei Grössen.
+  Monaten zurück und zwölf voraus (seit 2026-11-11, vorher sechs). Eine Projektion wird
+  nicht besser, wenn man sie über zwei Jahre zieht; ihre späten Monate wären Behauptung
+  statt Vorschau. Gezeichnet wird EINE Linie, deren geplanter Teil gestrichelt ist
+  (`SaldoVerlaufChart`, `abIndex`): es ist derselbe Saldo, und zwei Linien behaupteten
+  zwei Grössen. **Der laufende Monat ist Plan, nicht Ist** (seit 2026-11-11): halb gebucht
+  knickte die Linie genau an der Naht ein. Das Ist endet mit dem Vormonat
+  (`analyseAusblick`).
 
 **Ein Screen-Test, der einen Kategorienamen sucht, muss ihn jetzt in seiner Karte
 suchen.** Derselbe Name steht in der Aufschlüsselung und in den Ranglisten darunter; eine
 Suche über das ganze Dokument findet mehrere Elemente und bricht ab. `screens.test.tsx`
-hat dafür `inAufschluesselung()`.
+hat dafür `inMonatsauswertung()`.
 
 ## Laden
 

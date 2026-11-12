@@ -73,16 +73,12 @@ async function grunddaten() {
  * Karte, um die es geht; das bleibt auch dann richtig, wenn weitere Karten dazukommen.
  */
 /**
- * Wählt in der Analyse das Register „Kategorien" — seit 2026-11-08 steht die
- * Aufschlüsselung nicht mehr unter dem Verlauf, sondern in einem eigenen Reiter.
+ * Wählt im Verlauf einen Monat und liefert die Karte darunter, die ihn aufschlüsselt —
+ * seit 2026-11-11 steht die Aufschlüsselung wieder im Verlauf, unter dem gewählten Monat.
  */
-async function zuKategorien() {
-  fireEvent.click(await screen.findByRole("tab", { name: "Kategorien" }));
-}
-
-async function inAufschluesselung() {
-  await zuKategorien();
-  const titel = await screen.findByText("Nach Kategorien");
+async function inMonatsauswertung(nutzer: ReturnType<typeof userEvent.setup>, monat: string) {
+  await auswahlWaehlen(nutzer, "Monat", monat);
+  const titel = await screen.findByText(`Wofür das Geld im ${monat} ging`);
   // Titel → Titelspalte → Kopfzeile → Karte. `Card` baut den Kopf aus zwei geschachtelten
   // `div`s; ohne Klasse daran bleibt nur der Weg über die Ebenen.
   const karte = titel.parentElement?.parentElement?.parentElement as HTMLElement;
@@ -203,7 +199,7 @@ describe("UebersichtScreen", () => {
    * gar keinem — was auf einem Rücklagenkonto passierte, stand mit in „so sieht der
    * Monat aus", obwohl es dort gerade nicht zur Verfügung steht.
    */
-  it("lässt Buchungen auf Rücklagenkonten aus den Monatskarten heraus", async () => {
+  it("lässt Buchungen auf Rücklagenkonten aus den Monatskarten heraus, nicht aus der Budgetliste", async () => {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
       id: "k-rueck", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "ruecklage",
@@ -229,9 +225,10 @@ describe("UebersichtScreen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
     // … und nicht die Summe beider Konten. Genau die stünde da ohne den Filter.
     expect(document.body.textContent).not.toMatch(/802,36/);
-    // Die Budgetliste rechnet aus DERSELBEN Sicht: 1.000,00 − 123,45 bleiben übrig.
-    // Ungefiltert stünden hier 197,64, und das Budget sähe fast erschöpft aus.
-    await waitFor(() => expect(document.body.textContent).toMatch(/876,55/));
+    // Die Budgetliste rechnet seit 2026-11-11 über ALLE Konten — ein Budget ist ein Topf,
+    // und was aus ihm ging, ging aus ihm: 1.000,00 − 123,45 − 678,91 = 197,64.
+    await waitFor(() => expect(document.body.textContent).toMatch(/197,64/));
+    expect(document.body.textContent).not.toMatch(/876,55/);
   });
 
   /**
@@ -458,7 +455,7 @@ describe("AnalyseScreen", () => {
    * Die Abschnitte stehen in Registern, und nur die mit Inhalt bekommen einen Reiter:
    * ohne abgerufenes Depot gibt es keinen Reiter „Depot". Die Filter stehen seit
    * 2026-11-09 am Register, das sie einstellen: Verlauf Monat und Zeitraum, Befunde nur
-   * den Zeitraum, der Ausblick keinen — er steht fest bei sechs Monaten.
+   * den Zeitraum, der Ausblick keinen — er steht fest.
    */
   it("zeigt die Abschnitte als Register, jedes mit den Filtern, die es einstellen", async () => {
     await grunddaten();
@@ -497,8 +494,8 @@ describe("AnalyseScreen", () => {
     const nutzer = userEvent.setup();
     rendere(<AnalyseScreen />);
 
-    // Kategorie aufklappen …
-    await nutzer.click((await inAufschluesselung()).getByText(/Lebensmittel/));
+    // Monat wählen, darunter die Kategorie aufklappen …
+    await nutzer.click((await inMonatsauswertung(nutzer, "2026-06")).getByText(/Lebensmittel/));
     // … dann die Buchung darin.
     await waitFor(() => expect(screen.getAllByTitle(/Buchungsdetails/).length).toBeGreaterThan(0));
     await nutzer.click(screen.getAllByTitle(/Buchungsdetails/)[0]);
@@ -523,17 +520,61 @@ describe("AnalyseScreen", () => {
     rendere(<AnalyseScreen />);
 
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
-    await zuKategorien();
-    await auswahlWaehlen(nutzer, "Gliederung", "Hauptgruppen");
+    const karte = await inMonatsauswertung(nutzer, "2026-06");
+    await nutzer.click(karte.getByRole("button", { name: "Hauptgruppen" }));
 
     // Jetzt steht die Hauptgruppe da; die Unterkategorie erst nach dem Aufklappen.
-    // Gesucht wird IN der Karte: die Ranglisten der Befunde führen dieselben Namen.
-    const karte = await inAufschluesselung();
     await waitFor(() => expect(karte.getByText(/Lebenshaltung/)).toBeInTheDocument());
     expect(karte.queryByText(/Lebensmittel/)).not.toBeInTheDocument();
 
     await nutzer.click(karte.getByText(/Lebenshaltung/));
     await waitFor(() => expect(karte.getByText(/Lebensmittel/)).toBeInTheDocument());
+  });
+
+  /**
+   * Seit 2026-11-11 hat jedes Register seinen eigenen Zeitraum. Vorher stellte der
+   * Zeitraum der Befunde auch den Verlauf um — und ein Monat im Verlauf die Kategorien.
+   */
+  it("hält den Zeitraum je Register getrennt", async () => {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<AnalyseScreen />);
+    await screen.findByText("Monatsverlauf");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Befunde" }));
+    await auswahlWaehlen(nutzer, "Zeitraum", "Letzte 24 Monate");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Verlauf" }));
+    await screen.findByText("Monatsverlauf");
+    expect(screen.getByLabelText("Zeitraum")).toHaveTextContent("Letzte 12 Monate");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Befunde" }));
+    await waitFor(() => expect(screen.getByLabelText("Zeitraum")).toHaveTextContent("Letzte 24 Monate"));
+  });
+
+  /** Das Register „Kategorien" ist seit 2026-11-11 eine Auswertung über die Zeit. */
+  it("zeigt im Register Kategorien jede Kategorie mit Summe und öffnet sie im Einzelnen", async () => {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Altpapier",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<AnalyseScreen />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Kategorien" }));
+
+    await screen.findByText("Kategorien über die Zeit");
+    const zeile = (await screen.findByText("Lebensmittel")).closest("tr") as HTMLElement;
+    expect(zeile.textContent).toMatch(/123,45/);
+    expect(zeile.textContent).toMatch(/100 %/);
+
+    await nutzer.click(zeile);
+    // Darunter die Kategorie im Einzelnen, mit ihren Buchungen.
+    await waitFor(() => expect(screen.getAllByTitle(/Buchungsdetails/).length).toBeGreaterThan(0));
   });
 });
 

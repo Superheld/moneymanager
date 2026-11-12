@@ -75,7 +75,6 @@ export function RuecklagenScreen() {
   const konten = sicht?.konten ?? LEERE_LISTE;
   const kontoName = sicht?.kontoNamen ?? LEERE_NAMEN;
   const deckung = sicht?.deckung ?? LEERE_DECKUNG;
-  const proMonat = sicht?.proMonat ?? 0;
   const zielwert = sicht?.zielwert ?? 0;
   const mindest = sicht?.mindest ?? 0;
   const buchungswahl = sicht?.buchungswahl ?? LEERE_LISTE;
@@ -97,96 +96,107 @@ export function RuecklagenScreen() {
         <Trans i18nKey="ruecklagen.erklaerung" components={betont} />
       </p>
 
-      {items.length > 0 && (
-        <div className="kpis">
-          <KPIStat size="chip" label={t("ruecklagen.kpiAnzahl")} value={String(items.length)} />
-          <KPIStat size="chip" label={t("ruecklagen.kpiZielwert")} value={geld.format(zielwert)} unit={geld.symbol} />
-          <KPIStat size="chip" label={t("ruecklagen.kpiProMonat")} value={geld.format(proMonat)} unit={geld.symbol} />
-          <KPIStat size="chip" label={t("ruecklagen.kpiSoll")} value={geld.format(deckung.soll)} unit={geld.symbol} />
-          <KPIStat size="chip" label={t("ruecklagen.kpiTatsaechlich")} value={geld.format(deckung.tatsaechlich)} unit={geld.symbol} tone="ok" />
-          <KPIStat size="chip" label={t("ruecklagen.kpiDeckung")} value={String(deckung.grad)} unit="%" tone={deckung.grad < 50 ? "warn" : "default"} />
-        </div>
-      )}
+      {/* Oben das PAAR: links, wie die Rücklagen dastehen — die Rechnung (Ziele, Soll)
+          gegen das, was auf den Konten liegt —, rechts der Massstab von aussen, die
+          Faustformel. Bis 2026-11-11 standen die Zahlen als sechs Kacheln über der Seite
+          und die Faustformel neben „Diesen Monat"; Anzahl und Rate je Monat sind dabei
+          weggefallen — die Anzahl zählt man in der Liste, die Rate steht als „Bedarf"
+          unter „Diesen Monat".
+          Das Tacho steht IMMER da, auch ohne Vertragseinnahmen: dann leer und mit dem
+          Grund. Vorher fehlte es in dem Fall einfach. */}
+      <div className="karten-paar" style={{ marginTop: 0 }}>
+        {items.length > 0 && (
+          <Card title={t("ruecklagen.standTitel")} subtitle={t("ruecklagen.standUntertitel")}>
+            {/* Zwei mal zwei statt `kpis`: vier Kacheln brechen dort drei zu eins um, und
+                die Paare gehören zusammen — Ziele und Soll ist die Rechnung, Stand und
+                Deckung die Wirklichkeit. */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "var(--gap-card)" }}>
+              <KPIStat size="chip" label={t("ruecklagen.kpiZielwert")} value={geld.format(zielwert)} unit={geld.symbol} />
+              <KPIStat size="chip" label={t("ruecklagen.kpiSoll")} value={geld.format(deckung.soll)} unit={geld.symbol} />
+              <KPIStat size="chip" label={t("ruecklagen.kpiTatsaechlich")} value={geld.format(deckung.tatsaechlich)} unit={geld.symbol} tone="ok" />
+              <KPIStat size="chip" label={t("ruecklagen.kpiDeckung")} value={String(deckung.grad)} unit="%" tone={deckung.grad < 50 ? "warn" : "default"} />
+            </div>
+          </Card>
+        )}
 
-      {/* „Diesen Monat" und die Faustformel stehen als PAAR nebeneinander: beide sind
-          Massstäbe über den Rücklagen als Ganzes, die Liste darunter geht Rücklage für
-          Rücklage. Fehlt eine, nimmt die andere die volle Breite (`karten-paar`). */}
-      {(fluss.bedarf > 0 || fluss.plan > 0 || fluss.ist !== 0 || mindest > 0) && (
-        <div className="karten-paar" style={{ marginTop: 0, marginBottom: "var(--gap-card)" }}>
-          {/* Drei Zahlen, nicht eine — und das ist der ganze Nutzen dieser Karte:
-              BEDARF verlangt die Rechnung, PLAN hast du eingerichtet, EINGEGANGEN ist, was
-              auf den Rücklagenkonten angekommen ist. Bedarf über Plan heisst „du legst zu
-              wenig zurück"; Plan über Eingang heisst „die Überweisung ist ausgefallen".
-              Die Buchungen stehen darunter: bis 2026-11-08 hiess die dritte Zahl
-              „geflossen", und man musste raten, woraus sie bestand. */}
-          {(fluss.bedarf > 0 || fluss.plan > 0 || fluss.ist !== 0) && (
-            <Card title={t("ruecklagen.flussTitel")} subtitle={t("ruecklagen.flussUntertitel")}>
-              <div className="kpis">
-                <KPIStat size="chip" label={t("ruecklagen.flussBedarf")} value={geld.format(fluss.bedarf)} unit={geld.symbol} />
-                <KPIStat
-                  size="chip"
-                  label={t("ruecklagen.flussPlan")}
-                  value={geld.format(fluss.plan)}
-                  unit={geld.symbol}
-                  tone={fluss.plan < fluss.bedarf ? "warn" : "default"}
-                />
-                <KPIStat
-                  size="chip"
-                  label={t("ruecklagen.flussIst")}
-                  value={geld.format(fluss.ist)}
-                  unit={geld.symbol}
-                  tone={fluss.ist >= fluss.plan && fluss.plan > 0 ? "ok" : "default"}
-                />
-              </div>
-              {fluss.plan === 0 && fluss.bedarf > 0 && (
-                <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
-                  {t("ruecklagen.flussOhnePlan")}
-                </div>
-              )}
-              {fluss.posten.length === 0 ? (
-                <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-3)" }}>
-                  {t("ruecklagen.flussKeineBuchung")}
-                </div>
-              ) : (
-                <div style={{ marginTop: "var(--sp-3)" }}>
-                  {fluss.posten.map((p, i) => (
-                    <div
-                      key={p.buchungId}
-                      style={{
-                        display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: "var(--fs-ui)",
-                        borderTop: i === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
-                      }}
-                    >
-                      <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
-                        {datum.ohneJahr(p.datum)}
-                      </span>
-                      <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink-2)" }}>
-                        {kontoName.get(p.nachKontoId) ?? p.nachKontoId}
-                        <span className="muted">
-                          {" · "}
-                          {p.vonKontoId
-                            ? t("ruecklagen.flussVon", { konto: kontoName.get(p.vonKontoId) ?? p.vonKontoId })
-                            : t("ruecklagen.flussOhneKonto")}
-                        </span>
-                      </span>
-                      <span className="num" style={{ marginLeft: "auto", flex: "0 0 auto", fontWeight: "var(--fw-semi)" }}>
-                        {geld.format(p.betrag)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Card>
-          )}
+        {/* Die Faustformel misst seit 2026-11-08 etwas: den Stand der Rücklagenkonten.
+            Sie entscheidet trotzdem nichts — keine Warnung, keine Rechnung hängt an ihr. */}
+        {/* Erst mit geladener Sicht: vorher ist `mindest` 0, und das Tacho meldete einen
+            Augenblick lang „kein Vertrag mit Einnahmen", der vielleicht da ist. */}
+        {sicht && (
+          <Card
+            title={t("ruecklagen.mindestTitel")}
+            subtitle={mindest > 0 ? t("ruecklagen.mindestHerleitung", { einnahmen: geld.formatMitSymbol(sicht.vertragseinnahmen) }) : undefined}
+          >
+            <FaustformelTacho stand={sicht.ruecklagenStand} mindest={mindest} />
+          </Card>
+        )}
+      </div>
 
-          {/* Die Faustformel misst seit 2026-11-08 etwas: den Stand der Rücklagenkonten.
-              Sie entscheidet trotzdem nichts — keine Warnung, keine Rechnung hängt an ihr. */}
-          {mindest > 0 && (
-            <Card title={t("ruecklagen.mindestTitel")} subtitle={t("ruecklagen.mindestHerleitung", { einnahmen: geld.formatMitSymbol(sicht?.vertragseinnahmen ?? 0) })}>
-              <FaustformelTacho stand={sicht?.ruecklagenStand ?? 0} mindest={mindest} />
-            </Card>
+      {/* Drei Zahlen, nicht eine — und das ist der ganze Nutzen dieser Karte:
+          BEDARF verlangt die Rechnung, PLAN hast du eingerichtet, EINGEGANGEN ist, was
+          auf den Rücklagenkonten angekommen ist. Bedarf über Plan heisst „du legst zu
+          wenig zurück"; Plan über Eingang heisst „die Überweisung ist ausgefallen".
+          Die Buchungen stehen darunter: bis 2026-11-08 hiess die dritte Zahl
+          „geflossen", und man musste raten, woraus sie bestand. */}
+      {(fluss.bedarf > 0 || fluss.plan > 0 || fluss.ist !== 0) && (
+        <Card title={t("ruecklagen.flussTitel")} subtitle={t("ruecklagen.flussUntertitel")}>
+          <div className="kpis">
+            <KPIStat size="chip" label={t("ruecklagen.flussBedarf")} value={geld.format(fluss.bedarf)} unit={geld.symbol} />
+            <KPIStat
+              size="chip"
+              label={t("ruecklagen.flussPlan")}
+              value={geld.format(fluss.plan)}
+              unit={geld.symbol}
+              tone={fluss.plan < fluss.bedarf ? "warn" : "default"}
+            />
+            <KPIStat
+              size="chip"
+              label={t("ruecklagen.flussIst")}
+              value={geld.format(fluss.ist)}
+              unit={geld.symbol}
+              tone={fluss.ist >= fluss.plan && fluss.plan > 0 ? "ok" : "default"}
+            />
+          </div>
+          {fluss.plan === 0 && fluss.bedarf > 0 && (
+            <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-2)" }}>
+              {t("ruecklagen.flussOhnePlan")}
+            </div>
           )}
-        </div>
+          {fluss.posten.length === 0 ? (
+            <div className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-3)" }}>
+              {t("ruecklagen.flussKeineBuchung")}
+            </div>
+          ) : (
+            <div style={{ marginTop: "var(--sp-3)" }}>
+              {fluss.posten.map((p, i) => (
+                <div
+                  key={p.buchungId}
+                  style={{
+                    display: "flex", alignItems: "baseline", gap: 8, padding: "5px 0", fontSize: "var(--fs-ui)",
+                    borderTop: i === 0 ? "1px solid var(--line)" : "1px solid var(--line-soft)",
+                  }}
+                >
+                  <span className="num" style={{ color: "var(--ink-3)", fontWeight: "var(--fw-bold)", flex: "0 0 auto" }}>
+                    {datum.ohneJahr(p.datum)}
+                  </span>
+                  <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "var(--ink-2)" }}>
+                    {kontoName.get(p.nachKontoId) ?? p.nachKontoId}
+                    <span className="muted">
+                      {" · "}
+                      {p.vonKontoId
+                        ? t("ruecklagen.flussVon", { konto: kontoName.get(p.vonKontoId) ?? p.vonKontoId })
+                        : t("ruecklagen.flussOhneKonto")}
+                    </span>
+                  </span>
+                  <span className="num" style={{ marginLeft: "auto", flex: "0 0 auto", fontWeight: "var(--fw-semi)" }}>
+                    {geld.format(p.betrag)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
       )}
 
       {items.length > 0 && deckung.sollMitKonto === 0 && (
@@ -232,15 +242,32 @@ export function RuecklagenScreen() {
                     </span>
                   </div>
 
-                  {/* Die Rechnung: wie weit die Ansparung fortgeschritten ist.
+                  {/* EIN Balken je Rücklage (seit 2026-11-11): was da ist, gegen das Ziel —
+                      und ein Strich beim Soll von heute. Vorher standen zwei Balken
+                      untereinander („Soll heute / Ziel" und „davon da"), und ob man im
+                      Rückstand ist, musste man aus zwei Längen im Kopf abgleichen. Liegt
+                      der Balken vor dem Strich, fehlt etwas; dann trägt er die Warnfarbe.
                       Der Balken bekommt die CENT-Werte direkt: er rechnet nur ein
-                      Verhältnis, und die Umrechnung in Euro kürzte sich darin ohnehin weg.
+                      Verhältnis.
 
-                      NUR MIT ZIEL. Eine freie Rücklage hat keinen Nenner — ein Balken
-                      bräuchte einen erfundenen, und jeder erfundene erzählte etwas
-                      Falsches: gegen ihr eigenes Soll gemessen stünde sie ewig bei
-                      100 %, gegen irgendetwas anderes bei einer Zahl ohne Bedeutung. */}
-                  {mitZiel ? (
+                      Ohne Konto gibt es nur die Rechnung — dann zeigt der Balken das Soll.
+                      Und eine FREIE Rücklage hat keinen Nenner: ein Balken bräuchte einen
+                      erfundenen. Dort steht, was aufgelaufen ist, und mit Konto der Stand
+                      gegen dieses Aufgelaufene. */}
+                  {mitZiel && p.tatsaechlich != null ? (
+                    <CoverageTrack
+                      value={p.tatsaechlich}
+                      max={r.ziel as number}
+                      marke={p.soll}
+                      over={p.tatsaechlich < p.soll}
+                      label={t("ruecklagen.stand", { konto: kontoName.get(r.kontoId!) ?? "?" })}
+                      right={t("ruecklagen.standRechts", {
+                        da: geld.format(p.tatsaechlich),
+                        ziel: geld.formatMitSymbol(r.ziel as number),
+                        soll: geld.format(p.soll),
+                      })}
+                    />
+                  ) : mitZiel ? (
                     <CoverageTrack
                       value={p.soll}
                       max={r.ziel as number}
@@ -248,25 +275,22 @@ export function RuecklagenScreen() {
                       right={`${geld.format(p.soll)} / ${geld.format(r.ziel as number)} ${geld.symbol}`}
                     />
                   ) : (
-                    <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>
-                      {t("ruecklagen.freiAufgelaufen", { betrag: `${geld.format(p.soll)} ${geld.symbol}` })}
-                    </div>
-                  )}
-
-                  {/* Die Wirklichkeit: nur, wenn ein Konto benannt ist.
-                      Bezugsgröße ist mit Ziel das ZIEL und ohne Ziel das aufgelaufene
-                      Soll — derselbe Maßstab wie beim Balken darüber. Die Warnfarbe
-                      bleibt am Soll: darunter liegt man zurück. */}
-                  {p.tatsaechlich != null && (
-                    <div style={{ marginTop: 6 }}>
-                      <CoverageTrack
-                        value={p.tatsaechlich}
-                        max={Math.max(1, mitZiel ? (r.ziel as number) : p.soll)}
-                        over={p.tatsaechlich < p.soll}
-                        label={t("ruecklagen.gedecktDurch", { konto: kontoName.get(r.kontoId!) ?? "?" })}
-                        right={`${geld.format(p.tatsaechlich)} / ${geld.format(mitZiel ? (r.ziel as number) : p.soll)} ${geld.symbol}`}
-                      />
-                    </div>
+                    <>
+                      <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>
+                        {t("ruecklagen.freiAufgelaufen", { betrag: `${geld.format(p.soll)} ${geld.symbol}` })}
+                      </div>
+                      {p.tatsaechlich != null && (
+                        <div style={{ marginTop: 6 }}>
+                          <CoverageTrack
+                            value={p.tatsaechlich}
+                            max={Math.max(1, p.soll)}
+                            over={p.tatsaechlich < p.soll}
+                            label={t("ruecklagen.gedecktDurch", { konto: kontoName.get(r.kontoId!) ?? "?" })}
+                            right={`${geld.format(p.tatsaechlich)} / ${geld.format(p.soll)} ${geld.symbol}`}
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               );

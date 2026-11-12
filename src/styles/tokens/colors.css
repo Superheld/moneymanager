@@ -44,6 +44,19 @@
      Hellen weiss; im Dunklen wird der Akzent heller, und dann trägt Weiss darauf nicht. */
   --auf-akzent:   #fff;
 
+  /* --- Reihen in Diagrammen, seit 2026-11-11 ---
+     Sechs Farben für Teile eines Ganzen (der Anteilsbalken der Kategorien). Feste
+     Reihenfolge, nie zyklisch: was über sechs hinausgeht, fällt in „Übrige" und steht
+     grau. Geprüft auf Unterscheidbarkeit bei Farbfehlsichtigkeit gegen die Kartenfläche
+     — hell und dunkel je ein eigener Satz, kein blosses Umkehren. Drei Töne liegen hell
+     unter 3:1 zur Fläche; das trägt, weil jeder Wert daneben als Text steht. */
+  --serie-1:      #2a78d6;
+  --serie-2:      #eb6834;
+  --serie-3:      #1baf7a;
+  --serie-4:      #eda100;
+  --serie-5:      #e87ba4;
+  --serie-6:      #008300;
+
   /* --- semantic aliases (use these in product code) --- */
   --bg-app:       var(--cream);
   --bg-card:      var(--surface);
@@ -108,5 +121,12 @@
     --accent-soft:  oklch(0.70 0.10 175 / 0.14);
     --danger:       oklch(0.70 0.15 28);
     --auf-akzent:   oklch(0.20 0.02 175);
+
+    --serie-1:      #3987e5;
+    --serie-2:      #d95926;
+    --serie-3:      #199e70;
+    --serie-4:      #c98500;
+    --serie-5:      #d55181;
+    --serie-6:      #008300;
   }
 }

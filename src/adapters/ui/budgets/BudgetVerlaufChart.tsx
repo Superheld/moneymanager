@@ -3,8 +3,10 @@
 //
 //   MONATLICH  eine waagerechte Grenze je Monat, als Stufe: der Rahmen ist eine Grenze,
 //              und ein Balken, der über sie ragt, ist überzogen.
-//   AUFBAUEND  eine Linie durch die Monate: was verfügbar ist, wächst mit jeder Rate und
-//              sinkt mit jeder Ausgabe — es ist ein STAND, und ein Stand ist ein Verlauf.
+//   AUFBAUEND  eine Linie durch die Monate: der Stand am MONATSENDE (`rest`) — er wächst
+//              mit jeder Rate und sinkt mit jeder Ausgabe; ein Stand ist ein Verlauf.
+//              Bis 2026-11-11 war es `verfuegbar` (Übertrag plus Rate), der Stand VOR den
+//              Ausgaben des Monats: was im November ausging, sank erst am Dezember-Punkt.
 //
 // **Bis 2026-11-08 stand dort ein heller Schattenbalken**, für beide Arten gleich. Er
 // sagte bei der aufbauenden nicht, dass sie sammelt (man musste die Höhen der Schatten
@@ -55,6 +57,8 @@ export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, on
   // Skala über beide Reihen. Ein überzogener Monat ragt über seinen hellen Balken hinaus —
   // das soll er, sonst sähe „Rahmen genau ausgeschöpft" aus wie „Rahmen gerissen".
   const oben = Math.max(1, ...monate.map((m) => Math.max(m.verfuegbar, m.verbraucht)));
+  /** Wo die Linie im Monat steht: beim Monatlichen die Grenze, beim Aufbauenden der Stand nach dem Monat. */
+  const linienwert = (m: Budgetmonat) => Math.max(0, art === "aufbauend" ? m.rest : m.verfuegbar);
   const unten = Math.min(0, ...monate.map((m) => m.verbraucht));
   const spanne = oben - unten;
   const y = (v: number) => padT + ((oben - v) / spanne) * innerH;
@@ -77,7 +81,7 @@ export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, on
         offen = false;
         return;
       }
-      const yv = y(Math.max(0, m.verfuegbar));
+      const yv = y(linienwert(m));
       if (art === "monatlich") {
         // Stufe: über die volle Breite des Monats, senkrecht verbunden zum nächsten.
         const x0 = padL + slot * i;
@@ -114,7 +118,7 @@ export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, on
         {art === "aufbauend" &&
           monate.map((m, i) =>
             m.ohnePlan ? null : (
-              <circle key={`p${m.monat}`} cx={mitte(i)} cy={y(Math.max(0, m.verfuegbar))} r="4"
+              <circle key={`p${m.monat}`} cx={mitte(i)} cy={y(linienwert(m))} r="4"
                 fill="var(--accent-deep)" stroke="var(--surface)" strokeWidth="2" />
             ),
           )}

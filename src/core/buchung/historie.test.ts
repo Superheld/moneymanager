@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, nachHauptgruppe, type KategorieSumme } from "./historie";
+import { buchungenDerKategorie, fruehesterMonat, istInterneUmbuchung, istMonatsverlauf, kategorieAggregat, kategorieReihen, nachHauptgruppe, type KategorieSumme } from "./historie";
 import type { IstBuchung } from "./istbuchung";
 import type { Kategorie } from "../kategorien/kategorie";
 import type { Zahlungskonto } from "../konten/konto";
@@ -255,5 +255,50 @@ describe("nachHauptgruppe", () => {
 
   it("kommt mit einer leeren Liste zurecht", () => {
     expect(nachHauptgruppe([], kategorien)).toEqual([]);
+  });
+});
+
+describe("kategorieReihen", () => {
+  const kats: Kategorie[] = [
+    { id: "g", name: "Haushalt", defaultCharakter: "Aufwand" },
+    { id: "a", name: "Ohlert", defaultCharakter: "Aufwand", elternId: "g" },
+    { id: "c", name: "Vibora", defaultCharakter: "Aufwand", elternId: "g" },
+    { id: "e", name: "Bezüge", defaultCharakter: "Ertrag" },
+  ];
+  const mit = (datum: string, betrag: number, kategorieId: string, charakter: IstBuchung["charakter"] = "Aufwand"): IstBuchung =>
+    ({ ...b(datum, betrag, charakter), id: `${datum}-${kategorieId}-${betrag}`, kategorieId });
+  const monate = ["2026-01", "2026-02", "2026-03"];
+
+  it("legt jeden Betrag in seinen Monat und rechnet Schnitt und Anteil je Seite", () => {
+    const r = kategorieReihen(
+      [mit("2026-01-05", -3000, "a"), mit("2026-03-09", -6000, "a"), mit("2026-02-01", -3000, "c"), mit("2026-02-28", 90000, "e", "Ertrag")],
+      kats,
+      monate,
+    );
+    const a = r.find((z) => z.kategorieId === "a")!;
+    expect(a.monate).toEqual([-3000, 0, -6000]);
+    expect(a.schnitt).toBe(-3000);
+    // 9.000 von 12.000 Ausgaben — die Einnahme zählt auf ihrer eigenen Seite.
+    expect(a.anteil).toBeCloseTo(0.75);
+    expect(r.find((z) => z.kategorieId === "e")!.anteil).toBe(1);
+  });
+
+  it("bündelt nachGruppe in die Hauptgruppe", () => {
+    const r = kategorieReihen([mit("2026-01-05", -3000, "a"), mit("2026-02-01", -2000, "c")], kats, monate, { nachGruppe: true });
+    expect(r).toHaveLength(1);
+    expect(r[0]).toMatchObject({ kategorieId: "g", name: "Haushalt", summe: -5000 });
+  });
+
+  it("rechnet den Trend nur über abgeschlossene Monate und erst ab sechs", () => {
+    const sechs = ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07"];
+    const buchungen = [
+      ...["01", "02", "03"].map((m) => mit(`2026-${m}-10`, -10000, "a")),
+      ...["04", "05", "06"].map((m) => mit(`2026-${m}-10`, -12000, "a")),
+      // Der laufende Monat ist erst angefangen — er darf den Trend nicht drücken.
+      mit("2026-07-02", -500, "a"),
+    ];
+    const r = kategorieReihen(buchungen, kats, sechs, { abgeschlossenBis: "2026-06" });
+    expect(r[0].trend).toBeCloseTo(0.2);
+    expect(kategorieReihen(buchungen, kats, monate).find((z) => z.kategorieId === "a")!.trend).toBeNull();
   });
 });

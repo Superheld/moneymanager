@@ -61,6 +61,25 @@ export function rendere(element: ReactElement): RenderResult {
 }
 
 /**
+ * Die klickbare Tabellenzeile zu einem Namen (seit 2026-11-11).
+ *
+ * Eine klickbare Zeile ist es als GANZE (`DataTable`, Bezeichner) — es gibt in ihr keinen
+ * eigenen Link-Knopf mehr, den ein Test über seine Rolle finden könnte. Gesucht wird der
+ * Text, und davon die nächste klickbare Zeile; steht derselbe Name auch anderswo (eine
+ * Überschrift, eine zweite Karte), zählt nur das Vorkommen in einer solchen Zeile.
+ */
+export async function klickbareZeile(name: RegExp | string): Promise<HTMLElement> {
+  return waitFor(() => {
+    const zeile = screen
+      .getAllByText(name)
+      .map((e) => e.closest("tr.datentabelle-zeile--klickbar"))
+      .find((z): z is HTMLTableRowElement => z != null);
+    if (!zeile) throw new Error(`keine klickbare Zeile mit ${String(name)}`);
+    return zeile;
+  });
+}
+
+/**
  * Wählt ein Register (Tab) im Bereichs-Kopf und wartet vorher darauf, dass überhaupt
  * gerendert ist. Löst `kartenAufklappen` ab: die Einstellungen sind keine Sammlung
  * aufklappbarer Karten mehr, sondern ein Bereich mit Registern — und weil immer genau

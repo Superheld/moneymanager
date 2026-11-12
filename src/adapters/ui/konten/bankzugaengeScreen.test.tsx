@@ -29,7 +29,7 @@ const halter = vi.hoisted(() => {
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import type { Bankprofil, Bankzugang } from "../../../application";
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { klickbareZeile, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { BankzugaengeScreen } from "./BankzugaengeScreen";
 import {
   sqliteBankzugangRepository,
@@ -131,7 +131,7 @@ describe("Bankzugänge", () => {
 
     // Vorher unsichtbar — die Zuordnung steht in keiner anderen Ansicht.
     expect(screen.queryByText("DE00999999010000000001")).toBeNull();
-    await nutzer.click(await screen.findByRole("button", { name: /Zeigt die Konten/ }));
+    await nutzer.click(await klickbareZeile("Kesselmann Bank"));
 
     expect(await screen.findByText("DE00999999010000000001")).toBeInTheDocument();
   });

@@ -44,7 +44,6 @@ import {
 import { Button, Card, CoverageTrack, DataTable, FormField, KPIStat, Pill } from "../bausteine";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { BudgetVerlauf } from "./BudgetVerlauf";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
 import { PageHead } from "../bausteine/PageHead";
@@ -313,19 +312,13 @@ export function BudgetsScreen() {
                         label: t("budgets.spalteKategorie"),
                         render: (z: GruppierterStand) => (
                           // Einrückung statt eigener Spalte: die Verschachtelung ist eine
-                          // Eigenschaft der Kategorie. Der Verlauf hängt am Bezeichner
-                          // (`bausteine/Zeilenlink`); `stopPropagation`, damit der Klick nicht
-                          // zusätzlich über die Zeile umschaltet und sich aufhebt.
-                          <span onClick={(e) => e.stopPropagation()} style={{ paddingLeft: z.tiefe * 14, display: "inline-block" }}>
+                          // Eigenschaft der Kategorie. Den Verlauf öffnet die Zeile; der
+                          // Name zeigt es an (`DataTable`, Bezeichner).
+                          <span style={{ paddingLeft: z.tiefe * 14, display: "inline-block" }}>
                             <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
                               {z.tiefe > 0 && <span style={{ color: "var(--ink-3)" }}>└</span>}
                               <span style={{ fontWeight: z.tiefe === 0 ? "var(--fw-bold)" : "var(--fw-semi)" }}>
-                                <Zeilenlink
-                                  titel={t("budgets.verlaufOeffnen", { name: z.kategorieName })}
-                                  onKlick={() => verlaufUmschalten(z.budget.id)}
-                                >
-                                  {z.kategorieName}
-                                </Zeilenlink>
+                                <span className="zeilenname">{z.kategorieName}</span>
                               </span>
                             </span>
                             {/* Zweite Zeile: worauf das Geld liegt und, wenn das Budget unter

@@ -1,7 +1,7 @@
 // Verträge (P2.1) — Übersicht mit Kündigungsterminen; Anlegen im Modal. Eine Maske
 // erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   hauptkategorie,
@@ -23,7 +23,6 @@ import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import type { DataColumn } from "../bausteine/DataTable";
 import { PageHead } from "../bausteine/PageHead";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
 import { VertragModal } from "./VertragModal";
@@ -84,6 +83,12 @@ export function VertraegeScreen() {
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
   /** Welcher Vertrag seine zugeordneten Zahlungen zeigt — aufgeklappt unter der Tabelle. */
   const [zahlungenVon, setZahlungenVon] = useState<string | null>(null);
+  // Die Zahlungen stehen UNTER der Tabelle — bei einer langen Liste ausserhalb des Bildes.
+  // Ohne das Scrollen sah der Klick aus, als täte er nichts.
+  const zahlungenRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (zahlungenVon) zahlungenRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [zahlungenVon]);
 
   /**
    * Die offene Maske: `start` ist ihr Anfangszustand, `editId` unterscheidet Ändern von
@@ -156,6 +161,18 @@ export function VertraegeScreen() {
    * eine eigene Tabelle zeigt und nur dort die Rücklagen-Spalte trägt — innerhalb einer
    * Gruppe steht der Rhythmus fest, also ist die Spalte dort auch vergleichbar.
    */
+  /**
+   * Ein Klick auf eine Zeile zeigt die Zahlungen, die der Abgleich diesem Vertrag
+   * zugeordnet hat. Die Spalte daneben nennt nur ihre ANZAHL — die sagt „die Regel greift",
+   * aber nicht WAS sie greift. Erst an der Liste sieht man den Fehlgriff: eine fremde
+   * Zahlung an denselben Empfänger zählt genauso mit und macht aus einer falschen
+   * Zuordnung eine gute Kennzahl. Der zweite Klick klappt wieder zu.
+   */
+  const zeileWaehlen = {
+    onRowClick: (v: Vertrag) => setZahlungenVon(zahlungenVon === v.id ? null : v.id),
+    istAktiv: (v: Vertrag) => v.id === zahlungenVon,
+  };
+
   function spalten(mitRuecklage: boolean): DataColumn<Vertrag>[] {
     const s: DataColumn<Vertrag>[] = [
       {
@@ -165,17 +182,9 @@ export function VertraegeScreen() {
         // jeder Zeile („Abo") sagte nichts und kostete eine Spaltenbreite.
         render: (v) => (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-            {/* Der Anbieter führt zu den Zahlungen, die der Abgleich diesem Vertrag
-                zugeordnet hat. Die Spalte daneben nennt nur ihre ANZAHL — die sagt „die
-                Regel greift", aber nicht WAS sie greift. Erst an der Liste sieht man den
-                Fehlgriff: eine fremde Zahlung an denselben Empfänger zählt genauso mit
-                und macht aus einer falschen Zuordnung eine gute Kennzahl. */}
-            <Zeilenlink
-              onKlick={() => setZahlungenVon(zahlungenVon === v.id ? null : v.id)}
-              titel={t("vertraege.zeigeZahlungen", { anbieter: v.anbieter })}
-            >
-              {v.anbieter}
-            </Zeilenlink>
+            {/* Die ganze Zeile öffnet die Zahlungen, der Name zeigt es an (`DataTable`,
+                Bezeichner) — dasselbe Muster wie in jeder Tabelle. */}
+            <span className="zeilenname">{v.anbieter}</span>
             {v.art === "dauervertrag" && <Pill variant="neutral">{t("vertraege.artKurz.dauervertrag")}</Pill>}
             {v.art === "umbuchung" && <Pill variant="um">{t("vertraege.artKurz.umbuchung")}</Pill>}
           </span>
@@ -584,7 +593,7 @@ export function VertraegeScreen() {
               >
                 <div style={{ fontSize: "var(--fs-title)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{g.titel}</div>
                 <div className="hinweis" style={{ margin: "3px 0 var(--sp-3)" }}>{g.meta}</div>
-                <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
+                <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} {...zeileWaehlen} />
               </div>
             ))
           ) : (
@@ -595,6 +604,7 @@ export function VertraegeScreen() {
               pageSize={25}
               columns={spalten(false)}
               rows={ansicht === "faelligkeit" ? nachFaelligkeit : nachBetrag}
+              {...zeileWaehlen}
             />
           )}
         </Card>
@@ -605,6 +615,7 @@ export function VertraegeScreen() {
           Rhythmus, nächste Fälligkeit —, und ein Dialog verdeckte genau das. */}
       {zahlungsdetail && (
         <Card
+          ref={zahlungenRef}
           style={{ marginTop: "var(--gap-card)" }}
           title={t("vertraege.zahlungenTitel", { anbieter: zahlungsdetail.vertrag.anbieter })}
         >

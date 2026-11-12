@@ -544,6 +544,35 @@ select.field {
 /* --- DataTable (bausteine/DataTable.tsx) ---
    Eine klickbare Zeile traegt den Fokus selbst (Tab, Enter, Leertaste). Der Rahmen liegt
    INNEN, weil `overflow` am Tabellenrahmen einen aeusseren abschneiden wuerde. */
+/* Der Bezeichner einer klickbaren Zeile sieht aus wie ein Link — siehe `BEZEICHNER` in
+   `DataTable.tsx`. Hinweise darin bleiben, was sie sind: als inline-block erben sie die
+   Unterstreichung nicht (CSS reicht sie nur an Inline-Kinder weiter); eine `Pill` ist
+   ohnehin inline-flex. */
+.datentabelle-bezeichner {
+  color: var(--accent-deep);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 1px;
+}
+/* Steht der Name in einer eigenen Hülle (Einrückung, Marke daneben), trägt `zeilenname`
+   die Unterstreichung selbst — über eine inline-block-Hülle kommt sie nicht hinweg. */
+.datentabelle-bezeichner .zeilenname {
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+  text-decoration-thickness: 1px;
+}
+.datentabelle-zeile--klickbar:hover .datentabelle-bezeichner {
+  color: var(--accent);
+}
+.datentabelle-bezeichner .hinweis,
+.datentabelle-bezeichner .muted {
+  display: inline-block;
+}
+.datentabelle-bezeichner .hinweis,
+.datentabelle-bezeichner .muted {
+  color: var(--ink-3);
+}
+
 tr.datentabelle-zeile--klickbar:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;

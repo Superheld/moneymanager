@@ -110,6 +110,7 @@ export function DepotAnsicht({ sicht, von, bis }: Props) {
           labels={punkte.map((w) => datum.kurz(w.stichtag))}
           werte={punkte.map((w) => w.gesamtwert)}
           legende={t("depot.verlaufLegende")}
+          ohneNull
         />
       )}
       {punkte.length <= 1 && (
