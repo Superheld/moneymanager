@@ -11,6 +11,7 @@
 // für immer im Saldo. Richtig ist die HERKUNFT, und die steht am Import-Lauf — also an
 // einer Stelle, die eine Tabellenspalte nicht kennen kann.
 
+import { buchungsname } from "../buchung/buchungszeile";
 import { belegZuBuchung } from "../buchung/belegZuBuchung";
 import {
   abweichungsfenster,
@@ -44,7 +45,6 @@ import type {
   DepotRepository,
   DublettenfreigabeRepository,
   ImportLaufRepository,
-  JournalRepository,
   KategorieRepository,
   KontostandsankerRepository,
   LedgerPort,
@@ -85,18 +85,8 @@ export interface KontenDeps {
    * alles andere läuft unverändert.
    */
   readonly depotRepo?: DepotRepository;
-  /**
-   * Das Buchungsjournal. Optional wie die Depots — ohne es fehlt im Auszug nur die
-   * Markierung, ob zu einer Zeile etwas protokolliert ist.
-   *
-   * **Vorläufig, zum Nachsehen.** Der Verlauf einer Buchung steht in ihrem Dialog; diese
-   * Markierung sagt von aussen, wo es überhaupt etwas zu sehen gibt. Das Journal ist
-   * jung (seit 2026-08-23), und ohne sie müsste man Zeilen aufmachen, um zu erfahren,
-   * dass nichts drinsteht.
-   */
   /** Optional — ohne ihn bleibt der Auszug vollständig, nur ohne den Block darüber. */
   readonly vormerkungRepo?: VormerkungRepository;
-  readonly journalRepo?: JournalRepository;
 }
 
 /** Ein Konto in der oberen Liste. */
@@ -195,13 +185,6 @@ export interface Kontensicht {
    */
   readonly vertragsnamen: ReadonlyMap<string, string>;
   /**
-   * Buchungs-ID → Zahl der Journaleinträge. Leer, wenn kein Journal-Port mitgegeben wurde.
-   *
-   * Die ZAHL und nicht bloss ein Ja/Nein, weil es dieselbe Abfrage kostet und „dreimal
-   * geändert" etwas anderes sagt als „einmal angelegt".
-   */
-  readonly journalAnzahl: ReadonlyMap<string, number>;
-  /**
    * Konto-ID → was die Bank kennt und noch nicht gebucht hat.
    *
    * Sie stehen ÜBER den Buchungen und nicht darin: eine Vormerkung ist keine Zahlung,
@@ -214,7 +197,7 @@ export interface Kontensicht {
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen, journalAnzahl, alleVormerkungen] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen, alleVormerkungen] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -227,7 +210,6 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.ankerRepo.alle(),
       deps.depotRepo ? depotsLaden({ depotRepo: deps.depotRepo }) : Promise.resolve(null),
       vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
-      deps.journalRepo?.anzahlen() ?? Promise.resolve(new Map<string, number>()),
       deps.vormerkungRepo?.alle() ?? Promise.resolve<Vormerkung[]>([]),
     ]);
 
@@ -285,7 +267,6 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     dublettenverdacht,
     freigegeben,
     vertragsnamen,
-    journalAnzahl,
     vormerkungen,
   };
 }
@@ -308,8 +289,6 @@ export interface Registerzeile {
   readonly dublette?: Dublettenverdacht;
   /** Der Vertrag, zu dem diese Zeile gehört — als Anbietername. Fehlt, wenn keiner. */
   readonly vertragsname?: string;
-  /** Wie viele Journaleinträge es zu dieser Buchung gibt. Fehlt, wenn keiner. */
-  readonly journaleintraege?: number;
 }
 
 export interface Registersicht {
@@ -345,28 +324,17 @@ export function registerSicht(
       return {
         zeile,
         buchung,
-        // Die Kette der Rückfallebenen, von der eigenen Angabe zur fremden:
-        //
-        //   eigene Bezeichnung → Empfänger aus dem Import → VERWENDUNGSZWECK → Füllwort
-        //
-        // Der Verwendungszweck steht in der Kette, weil ein Teil der Bankzeilen gar keinen
-        // Empfänger mitbringt: MT940 füllt das Feld je nach Institut und Geschäftsvorfall
-        // nicht, und der ganze Inhalt steckt dann im Zweck-Freitext. Ohne diese Stufe
-        // stünde die Zeile im Register ohne jede Beschriftung da — sichtbar leer, obwohl
-        // die Angabe vorhanden ist. Am echten Bestand betrifft das eine zweistellige Zahl
-        // von Zeilen, praktisch nur aus dem Abruf.
-        //
-        // „Buchung" ist Füllwort aus dem Register und zählt als leer.
+        // Dieselbe Namensregel wie in jeder Buchungsliste (`buchungsname`: Notiz →
+        // Empfänger → Verwendungszweck). Nur hier gibt es danach noch eine Stufe: eine
+        // projizierte Zeile ohne Buchung trägt den Namen ihrer Regel. „Buchung" ist
+        // Füllwort aus dem Register und zählt als leer.
         bezeichnung:
-          buchung?.notiz ||
-          umsatz?.gegenpartei ||
-          umsatz?.verwendungszweck ||
+          buchungsname(buchung?.notiz, umsatz) ||
           (zeile.bezeichnung && zeile.bezeichnung !== "Buchung" ? zeile.bezeichnung : ""),
         verwendungszweck: umsatz?.verwendungszweck ?? "",
         kategorieName: zeile.kategorieId ? kategorieNamen.get(zeile.kategorieId) ?? "" : "",
         dublette: zeile.istId ? sicht.dublettenverdacht.get(zeile.istId) : undefined,
         vertragsname: zeile.istId ? sicht.vertragsnamen.get(zeile.istId) : undefined,
-        journaleintraege: zeile.istId ? sicht.journalAnzahl.get(zeile.istId) : undefined,
       };
     }),
     standHeute: register.standHeute,

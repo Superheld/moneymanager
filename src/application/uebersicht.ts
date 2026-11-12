@@ -14,6 +14,8 @@
 // inzwischen veränderten Bestand rechnen, während die Karten oben den alten zeigen.
 
 import { empfaengerJeBuchung } from "./buchung/belegZuBuchung";
+import { zeilenkontext, type Zeilenkontext } from "./buchung/buchungszeile";
+import { vertragsnamenLaden } from "./vertraege/vertragszuordnung";
 import {
   fruehesterMonat,
   istLiquide,
@@ -33,6 +35,7 @@ import type {
   LedgerPort,
   RuecklagenRepository,
   UmsatzRepository,
+  VertragRepository,
   VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
@@ -50,6 +53,7 @@ export interface UebersichtDeps {
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly kontoRepo: ZahlungskontoRepository;
   readonly ruecklagenRepo: RuecklagenRepository;
+  readonly vertragRepo: VertragRepository;
 }
 
 export interface Uebersichtsdaten {
@@ -63,6 +67,8 @@ export interface Uebersichtsdaten {
   readonly kategorieNamen: ReadonlyMap<string, string>;
   /** Buchungs-ID → Empfänger aus dem Import. Steht am Umsatz, nicht an der Buchung. */
   readonly empfaenger: ReadonlyMap<string, string>;
+  /** Was die Buchungszeilen eines aufgeklappten Budgets brauchen (`budgetzeilenZu`). */
+  readonly zeilenkontext: Zeilenkontext;
   /** Wählbare Monate für die Budgetliste, neuester zuerst („YYYY-MM"). */
   readonly monate: readonly string[];
   /**
@@ -112,7 +118,7 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten, ruecklagen] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten, ruecklagen, vertragsnamen] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -122,6 +128,7 @@ export async function uebersichtLaden(
       vertragsBuchungenLaden(deps.zuordnungRepo),
       deps.kontoRepo.alle(),
       deps.ruecklagenRepo.alle(),
+      vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
     ]);
 
   /**
@@ -190,6 +197,7 @@ export async function uebersichtLaden(
     sicht,
     kategorieNamen: new Map(kategorien.map((k: Kategorie) => [k.id, k.name])),
     empfaenger: empfaengerJeBuchung(umsaetze),
+    zeilenkontext: zeilenkontext(umsaetze, konten, kategorien, vertragsnamen),
     monate: waehlbareMonate(fruehesterMonat(liquideBuchungen) ?? heute, dieserMonat),
     hatPlandaten: regeln.length > 0 || budgets.length > 0 || ruecklagen.length > 0,
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),

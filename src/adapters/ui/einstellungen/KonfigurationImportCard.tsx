@@ -16,7 +16,7 @@ import type { Importplan } from "../../../application";
 import { Button, Card, Pill } from "../bausteine";
 import { konfigurationImport, konfigurationPlan } from "../../dienste";
 import { fehlerNachricht } from "../bausteine/einstellungenKontext";
-import { Zeile } from "../bausteine/Anordnung";
+import { Stapel, Zeile } from "../bausteine/Anordnung";
 
 export function KonfigurationImportCard() {
   const { t } = useTranslation();
@@ -64,8 +64,9 @@ export function KonfigurationImportCard() {
 
   return (
     <Card title={t("einstellungen.import.konfiguration.titel")}>
-      <p className="muted">{t("einstellungen.import.konfiguration.text")}</p>
-      <p className="muted">{t("einstellungen.import.konfiguration.hinweis")}</p>
+      <Stapel>
+      <p className="muted" style={{ margin: 0 }}>{t("einstellungen.import.konfiguration.text")}</p>
+      <p className="muted" style={{ margin: 0 }}>{t("einstellungen.import.konfiguration.hinweis")}</p>
 
       <Zeile abstand={3}>
         <input
@@ -79,6 +80,7 @@ export function KonfigurationImportCard() {
         <Button onClick={() => inputRef.current?.click()}>{t("einstellungen.import.dateiWaehlen")}</Button>
         {dateiname && <span className="hinweis">{dateiname}</span>}
       </Zeile>
+      </Stapel>
 
       {plan && (
         <div style={{ marginTop: "var(--sp-4)" }}>
@@ -127,9 +129,9 @@ export function KonfigurationImportCard() {
       )}
 
       {angelegt !== null && (
-        <p style={{ marginBottom: 0 }}>{t("einstellungen.import.fertig", { n: angelegt })}</p>
+        <p style={{ marginBottom: 0, marginTop: "var(--sp-3)" }}>{t("einstellungen.import.fertig", { n: angelegt })}</p>
       )}
-      {fehler && <p className="zugang-fehler">{fehler}</p>}
+      {fehler && <p className="err" style={{ marginBottom: 0, marginTop: "var(--sp-3)" }}>{fehler}</p>}
     </Card>
   );
 }

@@ -37,7 +37,6 @@ import { KontoAnlegenModal } from "./KontoAnlegenModal";
 import { KontoAufloesenModal } from "./KontoAufloesenModal";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
 import { Kaestchen } from "../bausteine/Kaestchen";
 import { Zeile } from "../bausteine/Anordnung";
 
@@ -54,7 +53,6 @@ export function KontenVerwaltung({
   personen,
   personName,
   kontostaende,
-  hatGebuchtes,
   verbindungen,
   onTrennen,
   onChange,
@@ -64,8 +62,6 @@ export function KontenVerwaltung({
   personName: Map<string, string>;
   /** Die Zahlen je Konto, fertig gerechnet aus `stammdatenLaden`. */
   kontostaende: readonly Kontostand[];
-  /** Gibt es überhaupt gebuchte Bewegungen? Ohne sie IST der Anfangsbestand der Stand. */
-  hatGebuchtes: boolean;
   /** Bankverbindung je Zahlungskonto — fehlt sie, ist das Konto offline. */
   verbindungen: ReadonlyMap<string, KontoVerbindung>;
   /** Löst die Verbindung eines Kontos (der Zugang selbst bleibt bestehen). */
@@ -151,11 +147,6 @@ export function KontenVerwaltung({
   return (
     <>
     <Card action={<Button variant="primary" plus onClick={() => setAnlegen(true)}>{t("einstellungen.konto.anlegen")}</Button>}>
-      {hatGebuchtes && (
-        <div className="hinweis" style={{ marginBottom: "var(--sp-3)" }}>
-          {t("einstellungen.konto.untertitelIst")}
-        </div>
-      )}
       {konten.length === 0 ? (
         <div className="muted">{t("einstellungen.konto.leer")}</div>
       ) : (
@@ -200,13 +191,11 @@ export function KontenVerwaltung({
             },
             { key: "iban", label: t("einstellungen.konto.spalteIban"), render: (k) => k.iban ?? "—" },
             { key: "inhaber", label: t("einstellungen.konto.spalteInhaber"), render: (k) => (k.inhaberIds.length ? k.inhaberIds.map((id: string) => personName.get(id) ?? "?").join(", ") : "—") },
-            { key: "saldo", label: `${hatGebuchtes ? t("einstellungen.konto.spalteAnfangsbestand") : t("einstellungen.konto.spalteKontostand")} ${geld.symbol}`, align: "right", render: (k) => geld.format(k.saldo) },
-            ...(hatGebuchtes
-              ? [
-                  { key: "ist", label: `${t("einstellungen.konto.spalteIst")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => { const b = stand.get(k.id)?.bewegungen ?? 0; return b ? <span style={{ color: geldFarbe(b) }}>{geld.format(b, { mitVorzeichen: true })}</span> : "—"; } },
-                  { key: "real", label: `${t("einstellungen.konto.spalteRealerStand")} ${geld.symbol}`, align: "right" as const, render: (k: Zahlungskonto) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(stand.get(k.id)?.realerStand ?? k.saldo)}</span> },
-                ]
-              : []),
+            // EINE Zahl je Konto, der reale Stand. Anfangsbestand und Bewegungen standen bis
+            // 2026-11-12 als eigene Spalten daneben — die Rechnung dahinter, keine Auskunft
+            // über das Konto, und sie schoben die Spalte, um die es geht, aus dem Bild. Den
+            // Anfangsbestand pflegt der Bearbeiten-Dialog, die Bewegungen zeigt der Auszug.
+            { key: "real", label: `${t("einstellungen.konto.spalteKontostand")} ${geld.symbol}`, align: "right", render: (k: Zahlungskonto) => <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(stand.get(k.id)?.realerStand ?? k.saldo)}</span> },
             { key: "_e", label: "", align: "right", render: (k) => <IconButton icon="bearbeiten" label={t("einstellungen.bearbeiten")} onClick={() => bearbeiten(k)} /> },
             // **EIN Symbol, immer dasselbe, immer da.** Vorher standen hier drei
             // Aktionen (stilllegen, loeschen, und am stillgelegten Konto zusaetzlich

@@ -264,7 +264,8 @@ describe("Übersicht — Ausblick am echten Schema", () => {
 
     await nutzer.click(kopf);
     expect(await screen.findByText("Wocheneinkauf")).toBeInTheDocument();
-    expect(screen.getByText("Verbraucht")).toBeInTheDocument();
+    // Ohne Summenzeile: der Betrag steht schon in der Budgetzeile darüber.
+    expect(screen.queryByText("Verbraucht")).not.toBeInTheDocument();
   });
 
   /**

@@ -153,13 +153,6 @@ export interface LedgerPort {
 export interface JournalRepository {
   /** Alle Eintraege zu einer Buchung, aeltester zuerst. Leer heisst: nichts protokolliert. */
   zuBuchung(istbuchungId: string): Promise<Journaleintrag[]>;
-  /**
-   * Buchungs-Id -> Zahl der Eintraege, ueber den ganzen Bestand.
-   *
-   * Fuer Listen: dort will man je Zeile wissen, OB es etwas gibt, und eine Abfrage je
-   * Zeile waere ein N+1 ueber tausende Buchungen.
-   */
-  anzahlen(): Promise<ReadonlyMap<string, number>>;
 }
 
 /**

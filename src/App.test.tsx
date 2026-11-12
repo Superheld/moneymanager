@@ -86,3 +86,18 @@ describe("App", () => {
     expect(document.body.textContent).toMatch(/Moneymanager/);
   });
 });
+
+describe("App — Experimente", () => {
+  it("blendet das Training ein, sobald der Schalter umgelegt ist — ohne Neustart", async () => {
+    const nutzer = userEvent.setup();
+    render(<App />);
+    await nutzer.click((await screen.findAllByText(/^Einstellungen$/))[0]);
+    expect(screen.queryByText(/^Training$/)).toBeNull();
+
+    await nutzer.click(await screen.findByRole("tab", { name: "Über die App" }));
+    await nutzer.click(await screen.findByRole("switch", { name: /Training/ }));
+
+    // In der Seitenleiste, nicht nur im Schaltertext („Training des Erkennungsmodells").
+    expect(await screen.findByText(/^Training$/)).toBeInTheDocument();
+  });
+});

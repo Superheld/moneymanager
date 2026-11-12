@@ -649,6 +649,12 @@ select.field.tabellenfilter {
 }
 .tabellenfilter .auswahl-trigger {
   padding-right: 9px;
+  /* Ein `.field` nimmt die volle Breite — in einer Filterleiste heisst das: die Auswahl
+     bricht in eine eigene Zeile um und sieht aus wie ein Formularfeld unter der Leiste
+     statt wie ein Filter darin. So stand es im Kontoauszug beim Kategoriefilter. */
+  width: auto;
+  flex: 0 1 14rem;
+  min-width: 10rem;
 }
 
 /* ============================================================

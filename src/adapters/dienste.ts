@@ -67,12 +67,14 @@ import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkm
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
 import {
   aktualisierungEinspielen,
+  aktualisierungJetztPruefen,
   aktualisierungPruefen,
   betaErlaubt,
   betaSchalten,
   pruefungErlaubt,
   pruefungSchalten,
   type Aktualisierung,
+  type Pruefergebnis,
 } from "../application/aktualisierung";
 import { tauriAktualisierung } from "./aktualisierung";
 import {
@@ -218,6 +220,7 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
       umsatzRepo: sqliteUmsatzRepository,
       kontoRepo: sqliteZahlungskontoRepository,
       ruecklagenRepo: sqliteRuecklagenRepository,
+      vertragRepo: sqliteVertragRepository,
     },
     heute,
   );
@@ -231,6 +234,7 @@ export function budgetbereich(heute: string): Promise<Budgetbereich> {
       kontoRepo: sqliteZahlungskontoRepository,
       umsatzRepo: sqliteUmsatzRepository,
       einstellungenRepo: sqliteEinstellungenRepository,
+      vertragRepo: sqliteVertragRepository,
     },
     heute,
   );
@@ -333,6 +337,11 @@ export function konfigurationImport(text: string): Promise<number> {
  */
 export function aktualisierungSuchen(): Promise<Aktualisierung | null> {
   return aktualisierungPruefen(tauriAktualisierung, sqliteEinstellungenRepository);
+}
+
+/** Prüft auf Knopfdruck — auch wenn die Prüfung beim Start abgeschaltet ist. */
+export function aktualisierungJetztSuchen(): Promise<Pruefergebnis> {
+  return aktualisierungJetztPruefen(tauriAktualisierung, sqliteEinstellungenRepository);
 }
 
 /** Spielt die bereitliegende Fassung ein und startet neu. Kehrt im Erfolgsfall nie zurück. */
@@ -922,8 +931,6 @@ export function konten(): Promise<Kontensicht> {
     // Damit eine Vertragszahlung im Auszug als solche zu erkennen ist.
     zuordnungRepo: sqliteVertragszuordnungRepository,
     vertragRepo: sqliteVertragRepository,
-    // Vorläufig: die Markierung, zu welcher Zeile etwas protokolliert ist.
-    journalRepo: sqliteJournalRepository,
   });
 }
 

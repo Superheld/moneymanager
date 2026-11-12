@@ -39,7 +39,7 @@ beforeEach(() => {
 
 // Über die i18n-Schlüssel statt über Formulierungen — sonst wird die Suite beim nächsten
 // Wording-Durchgang rot (src/CLAUDE.md).
-const registerName = () => i18n.t("einstellungen.aktualisierung.titel");
+const registerName = () => i18n.t("einstellungen.app.titel");
 const schalterName = () => i18n.t("einstellungen.aktualisierung.schalterTitel");
 
 async function schalterHolen(nutzer: ReturnType<typeof userEvent.setup>) {

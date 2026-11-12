@@ -69,7 +69,10 @@ export function PersonenCard({ personen, onChange }: { personen: Person[]; onCha
   }
 
   return (
-    <Card action={<Button plus onClick={neu}>{t("einstellungen.person.anlegen")}</Button>}>
+    <Card
+      title={t("einstellungen.person.titel")}
+      action={<Button plus onClick={neu}>{t("einstellungen.person.anlegen")}</Button>}
+    >
       {personen.length === 0 ? (
         <div className="muted">{t("einstellungen.person.leer")}</div>
       ) : (

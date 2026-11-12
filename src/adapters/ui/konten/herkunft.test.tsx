@@ -170,7 +170,6 @@ describe("Der Weg dorthin — vom Konto zu dem, was hereinkam", () => {
         personen={[]}
         personName={new Map()}
         kontostaende={[]}
-        hatGebuchtes={false}
         verbindungen={new Map()}
         onTrennen={async () => {}}
         onChange={() => {}}

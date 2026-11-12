@@ -22,7 +22,6 @@ function buchung(felder: Partial<IstBuchung> = {}): IstBuchung {
 function journal(eintraege: Journaleintrag[]): JournalRepository {
   return {
     zuBuchung: async (id) => eintraege.filter((e) => e.istbuchungId === id),
-    anzahlen: async () => new Map(),
   };
 }
 

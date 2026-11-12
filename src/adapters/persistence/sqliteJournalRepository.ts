@@ -22,11 +22,6 @@ interface Zeile {
   nachher: string | null;
 }
 
-interface AnzahlZeile {
-  istbuchung_id: string;
-  anzahl: number;
-}
-
 /** Ein Wert aus dem JSON-Stand, falls er dort als nicht leerer Text steht. */
 function text(stand: Record<string, unknown>, feld: string): string | undefined {
   const wert = stand[feld];
@@ -119,13 +114,4 @@ export const sqliteJournalRepository: JournalRepository = {
     );
   },
 
-  async anzahlen() {
-    const db = await getDb();
-    // Gezaehlt in SQL und nicht in JS: die Alternative waere, saemtliche Staende als Text
-    // in den Speicher zu holen, um sie dann wegzuwerfen.
-    const zeilen = await db.select<AnzahlZeile[]>(
-      "SELECT istbuchung_id, COUNT(*) AS anzahl FROM buchung_journal GROUP BY istbuchung_id",
-    );
-    return new Map(zeilen.map((z) => [z.istbuchung_id, z.anzahl]));
-  },
 };

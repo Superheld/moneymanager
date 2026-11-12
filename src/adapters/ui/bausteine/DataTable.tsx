@@ -87,6 +87,12 @@ export interface DataColumn<T = unknown> {
    * wirft nichts weg.
    */
   schmal?: "titel" | "wert" | "zweitzeile";
+  /**
+   * Diese Spalte trägt den Bezeichner einer klickbaren Zeile (den Link-Stil) — statt der
+   * ersten. Für Tabellen, deren erste Spalte kein Name ist: im Kontoauszug steht vorn das
+   * Datum, und ein unterstrichenes Datum sagt nicht, WAS sich öffnet.
+   */
+  bezeichner?: boolean;
 }
 
 export interface DataTableProps<T> {
@@ -235,6 +241,8 @@ export function DataTable<T>({
   const sichtbareRows = pageSize ? sortedRows.slice(seite * pageSize, (seite + 1) * pageSize) : sortedRows;
 
   const rollen = schmal ? schmalRollen(columns) : null;
+  // Ohne Angabe ist es die erste Spalte — so stand es vorher fest im Code.
+  const bezeichnerSpalte = Math.max(0, columns.findIndex((c) => c.bezeichner));
   // Die Kopfzeile zeigt schmal genau die beiden Spalten, die es noch gibt — mit ihrem
   // ursprünglichen Index, damit ein Klick weiterhin nach derselben Spalte sortiert.
   const kopf: MitIndex<T>[] = rollen
@@ -356,6 +364,7 @@ export function DataTable<T>({
               return (
                 <tr key={ri} {...bedienung} aria-current={ausgewaehlt} style={zeilenStil}>
                   {columns.map((c, ci) => {
+                    const istBezeichner = onRowClick && ci === bezeichnerSpalte;
                     const v = zellwert(c, row);
                     const rechts = c.align === "right";
                     return (
@@ -367,7 +376,7 @@ export function DataTable<T>({
                             die Tabelle verteilt übrige Breite auf die Spalten, und ein
                             gekappter Block stünde sonst links davon — Zahl und Spaltenkopf
                             lägen nicht übereinander. */}
-                        <div title={alsText(v)} className={onRowClick && ci === 0 ? BEZEICHNER : undefined} style={{ maxWidth: c.maxWidth ?? STANDARD_MAX,
+                        <div title={alsText(v)} className={istBezeichner ? BEZEICHNER : undefined} style={{ maxWidth: c.maxWidth ?? STANDARD_MAX,
                           marginLeft: rechts ? "auto" : undefined,
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v}</div>
                       </td>

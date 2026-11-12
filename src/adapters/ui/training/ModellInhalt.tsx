@@ -10,7 +10,7 @@ import {
   type Matrixzeile,
 } from "../../../application";
 import type { Laufvergleichsicht, Messprotokoll } from "../../../application/kategorien/klassifikatorTraining";
-import { Button, DataTable, KPIStat } from "../bausteine";
+import { Button, Card, DataTable, KPIStat } from "../bausteine";
 import { ErklaerungsTafel } from "./ErklaerungsTafel";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import {
@@ -21,8 +21,10 @@ import {
 } from "./kartenteile";
 
 export function ModellInhalt({
-  t, daten, kategorieName, zahl, prozent, bewertung, grundlinie, protokoll, vergleich, trainiert, listenGeaendert, aufTraining,
+  t, daten, kategorieName, zahl, prozent, bewertung, grundlinie, protokoll, vergleich, trainiert, listenGeaendert, aufTraining, fehler,
 }: Hilfe & {
+  /** Was beim letzten Lauf schiefging — steht oben in der Stand-Karte. */
+  fehler?: string | null;
   bewertung: Bewertung | null;
   grundlinie: Grundlinie | null;
   protokoll: Messprotokoll | null;
@@ -49,134 +51,143 @@ export function ModellInhalt({
     ? verwechslungsmatrix(bewertung)
     : { kategorien: [] as string[], zeilen: [] as Matrixzeile[] };
 
+  // Jede Auswertung ist eine eigene Karte (seit 2026-11-12). Vorher standen Stand,
+  // Vergleich, Klassen, Kalibrierung, Matrix und Läufe als Abschnitte in EINER Karte —
+  // eine Fläche, die über mehrere Bildschirmhöhen lief und in der nichts sagte, wo eine
+  // Auswertung aufhört und die nächste anfängt. Den Kartenabstand setzt das Register
+  // (`stapeln`). Nur die Verwechslungspaare bleiben ein Abschnitt in der Matrix: sie sind
+  // deren Aufschlüsselung, kein eigener Gegenstand.
   return (
     <>
-      <div style={{ display: "flex", gap: "var(--sp-4)", alignItems: "center", flexWrap: "wrap" }}>
-        {daten.material.beispiele.length > 0 && (
-          <Button variant="primary" onClick={aufTraining}>
-            {trainiert ? t("einstellungen.lernmaterial.trainiertGerade") : t("einstellungen.lernmaterial.trainieren")}
-          </Button>
-        )}
-        {listenGeaendert && <span className="muted">{t("einstellungen.lernmaterial.modellVeraltet")}</span>}
-      </div>
-
-      {!stand ? (
-        <div className="muted" style={{ marginTop: "var(--sp-4)" }}>
-          {t("einstellungen.lernmaterial.nieTrainiert")}
+      <Card title={t("einstellungen.lernmaterial.standTitel")}>
+        {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
+        <div style={{ display: "flex", gap: "var(--sp-4)", alignItems: "center", flexWrap: "wrap" }}>
+          {daten.material.beispiele.length > 0 && (
+            <Button variant="primary" onClick={aufTraining}>
+              {trainiert ? t("einstellungen.lernmaterial.trainiertGerade") : t("einstellungen.lernmaterial.trainieren")}
+            </Button>
+          )}
+          {listenGeaendert && <span className="muted">{t("einstellungen.lernmaterial.modellVeraltet")}</span>}
         </div>
-      ) : (
-        <>
-          {/* Die Vergleichslinie steht NEBEN der Genauigkeit und nicht in einer
-              Fussnote: für sich genommen sagt eine Trefferquote nichts. In einem
-              Haushalt, in dem eine Kategorie ein Viertel aller Zahlungen ausmacht,
-              trifft blindes Raten schon ein Viertel. Erst der Abstand ist eine
-              Aussage — und erst mit ihm lässt sich sagen, ob eine Änderung etwas
-              gebracht hat. */}
-          <div className="kpis" style={{ marginTop: "var(--sp-4)" }}>
-            <KPIStat
-              size="tile"
-              label={t("einstellungen.lernmaterial.genauigkeit")}
-              value={
-                stand.genauigkeit === undefined
-                  ? t("einstellungen.lernmaterial.genauigkeitUnbekannt")
-                  : prozent(stand.genauigkeit)
-              }
-              meta={
-                stand.genauigkeit === undefined
-                  ? t("einstellungen.lernmaterial.genauigkeitUnbekanntMeta")
-                  : bewertung
-                    ? t("einstellungen.lernmaterial.genauigkeitMeta", { gesamt: zahl(bewertung.gesamt) })
-                    : undefined
-              }
-              tone={stand.genauigkeit !== undefined && stand.genauigkeit >= 0.85 ? "ok" : "default"}
-            />
-            {grundlinie && stand.genauigkeit !== undefined && (
+
+        {!stand ? (
+          <div className="muted" style={{ marginTop: "var(--sp-4)" }}>
+            {t("einstellungen.lernmaterial.nieTrainiert")}
+          </div>
+        ) : (
+          <>
+            {/* Die Vergleichslinie steht NEBEN der Genauigkeit und nicht in einer
+                Fussnote: für sich genommen sagt eine Trefferquote nichts. In einem
+                Haushalt, in dem eine Kategorie ein Viertel aller Zahlungen ausmacht,
+                trifft blindes Raten schon ein Viertel. Erst der Abstand ist eine
+                Aussage — und erst mit ihm lässt sich sagen, ob eine Änderung etwas
+                gebracht hat. */}
+            <div className="kpis" style={{ marginTop: "var(--sp-4)" }}>
               <KPIStat
                 size="tile"
-                label={t("einstellungen.lernmaterial.grundlinie")}
-                value={prozent(grundlinie.genauigkeit)}
-                meta={t("einstellungen.lernmaterial.grundlinieMeta", {
-                  kategorie: kategorieName.get(grundlinie.kategorieId) ?? grundlinie.kategorieId,
-                })}
+                label={t("einstellungen.lernmaterial.genauigkeit")}
+                value={
+                  stand.genauigkeit === undefined
+                    ? t("einstellungen.lernmaterial.genauigkeitUnbekannt")
+                    : prozent(stand.genauigkeit)
+                }
+                meta={
+                  stand.genauigkeit === undefined
+                    ? t("einstellungen.lernmaterial.genauigkeitUnbekanntMeta")
+                    : bewertung
+                      ? t("einstellungen.lernmaterial.genauigkeitMeta", { gesamt: zahl(bewertung.gesamt) })
+                      : undefined
+                }
+                tone={stand.genauigkeit !== undefined && stand.genauigkeit >= 0.85 ? "ok" : "default"}
               />
-            )}
-            {/* Die zweite Linie: was eine Nachschlagetabelle „Empfänger → übliche
-                Kategorie" träfe, ganz ohne Modell. Jedes Modell schlägt blindes Raten;
-                an dieser Linie muss es sich messen lassen. */}
-            {protokoll?.empfaenger && stand.genauigkeit !== undefined && (
-              <KPIStat
-                size="tile"
-                label={t("einstellungen.lernmaterial.empfaengerLinie")}
-                value={prozent(protokoll.empfaenger.genauigkeit)}
-                meta={t("einstellungen.lernmaterial.empfaengerLinieMeta", {
-                  abdeckung: prozent(protokoll.empfaenger.abdeckung),
-                })}
-              />
-            )}
-            {grundlinie && stand.genauigkeit !== undefined && (() => {
-              // Der Vorsprung zählt gegen die STÄRKERE der beiden Linien — gegen die
-              // schwächere gemessen, sähe jedes Modell gut aus.
-              const linie = Math.max(grundlinie.genauigkeit, protokoll?.empfaenger?.genauigkeit ?? 0);
-              return (
+              {grundlinie && stand.genauigkeit !== undefined && (
                 <KPIStat
                   size="tile"
-                  label={t("einstellungen.lernmaterial.vorsprung")}
-                  value={prozent(stand.genauigkeit - linie)}
-                  meta={t("einstellungen.lernmaterial.vorsprungMeta")}
-                  // Unter der Linie ist das Modell schlechter als eine Nachschlagetabelle.
-                  // Das passiert und ist die wichtigste Meldung, die es geben kann.
-                  tone={stand.genauigkeit <= linie ? "warn" : "ok"}
+                  label={t("einstellungen.lernmaterial.grundlinie")}
+                  value={prozent(grundlinie.genauigkeit)}
+                  meta={t("einstellungen.lernmaterial.grundlinieMeta", {
+                    kategorie: kategorieName.get(grundlinie.kategorieId) ?? grundlinie.kategorieId,
+                  })}
                 />
-              );
-            })()}
-            {protokoll?.kennzahlen.macroF1 != null && (
-              <KPIStat
-                size="tile"
-                label={t("einstellungen.lernmaterial.macroF1")}
-                value={prozent(protokoll.kennzahlen.macroF1)}
-                meta={t("einstellungen.lernmaterial.macroF1Meta")}
-              />
-            )}
-          </div>
-          <div className="muted" style={{ marginTop: "var(--sp-3)" }}>
-            {t("einstellungen.lernmaterial.trainiertAm", {
-              datum: new Date(stand.trainiertAm).toLocaleString(locale),
-              beispiele: zahl(stand.modell.beispiele),
-            })}
-            {daten.zustand.zuwachs !== 0 && (
-              <>
-                {" "}
-                {zustandsText(t, daten.zustand.zuwachs, zahl)}
-                {daten.zustand.veraltet && ` ${t("einstellungen.lernmaterial.veraltet")}`}
-              </>
-            )}
-          </div>
-        </>
-      )}
+              )}
+              {/* Die zweite Linie: was eine Nachschlagetabelle „Empfänger → übliche
+                  Kategorie" träfe, ganz ohne Modell. Jedes Modell schlägt blindes Raten;
+                  an dieser Linie muss es sich messen lassen. */}
+              {protokoll?.empfaenger && stand.genauigkeit !== undefined && (
+                <KPIStat
+                  size="tile"
+                  label={t("einstellungen.lernmaterial.empfaengerLinie")}
+                  value={prozent(protokoll.empfaenger.genauigkeit)}
+                  meta={t("einstellungen.lernmaterial.empfaengerLinieMeta", {
+                    abdeckung: prozent(protokoll.empfaenger.abdeckung),
+                  })}
+                />
+              )}
+              {grundlinie && stand.genauigkeit !== undefined && (() => {
+                // Der Vorsprung zählt gegen die STÄRKERE der beiden Linien — gegen die
+                // schwächere gemessen, sähe jedes Modell gut aus.
+                const linie = Math.max(grundlinie.genauigkeit, protokoll?.empfaenger?.genauigkeit ?? 0);
+                return (
+                  <KPIStat
+                    size="tile"
+                    label={t("einstellungen.lernmaterial.vorsprung")}
+                    value={prozent(stand.genauigkeit - linie)}
+                    meta={t("einstellungen.lernmaterial.vorsprungMeta")}
+                    // Unter der Linie ist das Modell schlechter als eine Nachschlagetabelle.
+                    // Das passiert und ist die wichtigste Meldung, die es geben kann.
+                    tone={stand.genauigkeit <= linie ? "warn" : "ok"}
+                  />
+                );
+              })()}
+              {protokoll?.kennzahlen.macroF1 != null && (
+                <KPIStat
+                  size="tile"
+                  label={t("einstellungen.lernmaterial.macroF1")}
+                  value={prozent(protokoll.kennzahlen.macroF1)}
+                  meta={t("einstellungen.lernmaterial.macroF1Meta")}
+                />
+              )}
+            </div>
+            <div className="muted" style={{ marginTop: "var(--sp-3)" }}>
+              {t("einstellungen.lernmaterial.trainiertAm", {
+                datum: new Date(stand.trainiertAm).toLocaleString(locale),
+                beispiele: zahl(stand.modell.beispiele),
+              })}
+              {daten.zustand.zuwachs !== 0 && (
+                <>
+                  {" "}
+                  {zustandsText(t, daten.zustand.zuwachs, zahl)}
+                  {daten.zustand.veraltet && ` ${t("einstellungen.lernmaterial.veraltet")}`}
+                </>
+              )}
+            </div>
+          </>
+        )}
 
-      {protokoll && (
-        <div className="muted" style={{ marginTop: "var(--sp-2)" }}>
-          {t(
-            protokoll.pruefmenge === "handverlesen"
-              ? "einstellungen.lernmaterial.protokollHandverlesen"
-              : "einstellungen.lernmaterial.protokollAlle",
-            {
-              pruefung: zahl(protokoll.pruefAnzahl),
-              training: zahl(protokoll.trainingAnzahl),
-              stichtag: protokoll.stichtag ? new Date(protokoll.stichtag).toLocaleDateString(locale) : "—",
-            },
-          )}
-        </div>
-      )}
+        {protokoll && (
+          <div className="muted" style={{ marginTop: "var(--sp-2)" }}>
+            {t(
+              protokoll.pruefmenge === "handverlesen"
+                ? "einstellungen.lernmaterial.protokollHandverlesen"
+                : "einstellungen.lernmaterial.protokollAlle",
+              {
+                pruefung: zahl(protokoll.pruefAnzahl),
+                training: zahl(protokoll.trainingAnzahl),
+                stichtag: protokoll.stichtag ? new Date(protokoll.stichtag).toLocaleDateString(locale) : "—",
+              },
+            )}
+          </div>
+        )}
+      </Card>
 
       {vergleich && (
-        <Abschnitt titel={t("einstellungen.lernmaterial.vergleichTitel")}>
+        <Card title={t("einstellungen.lernmaterial.vergleichTitel")}>
           <LaufvergleichAnsicht t={t} vergleich={vergleich} kategorieName={kategorieName} zahl={zahl} locale={locale} />
-        </Abschnitt>
+        </Card>
       )}
 
       {protokoll && (
-        <Abschnitt titel={t("einstellungen.lernmaterial.klassenTitel")}>
+        <Card title={t("einstellungen.lernmaterial.klassenTitel")}>
           <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
             {t("einstellungen.lernmaterial.klassenHinweis")}
           </div>
@@ -208,11 +219,11 @@ export function ModellInhalt({
             ]}
             rows={protokoll.kennzahlen.jeKategorie.map((k) => ({ ...k, id: k.kategorieId }))}
           />
-        </Abschnitt>
+        </Card>
       )}
 
       {protokoll?.kalibrierung && (
-        <Abschnitt titel={t("einstellungen.lernmaterial.kalibrierungTitel")}>
+        <Card title={t("einstellungen.lernmaterial.kalibrierungTitel")}>
           <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
             {t("einstellungen.lernmaterial.kalibrierungHinweis", {
               ece: prozent(protokoll.kalibrierung.ece),
@@ -232,11 +243,11 @@ export function ModellInhalt({
             ]}
             rows={protokoll.kalibrierung.schwellen.map((x) => ({ ...x, id: String(x.schwelle) }))}
           />
-        </Abschnitt>
+        </Card>
       )}
 
       {bewertung && (
-        <Abschnitt titel={t("einstellungen.lernmaterial.matrixTitel")}>
+        <Card title={t("einstellungen.lernmaterial.matrixTitel")}>
           <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
             {matrix.kategorien.length === 0
               ? t("einstellungen.lernmaterial.matrixFehlerfrei")
@@ -309,11 +320,11 @@ export function ModellInhalt({
               </Abschnitt>
             </>
           )}
-        </Abschnitt>
+        </Card>
       )}
 
       {daten.laeufe.length > 0 && (
-        <Abschnitt titel={t("einstellungen.lernmaterial.laeufeTitel")}>
+        <Card title={t("einstellungen.lernmaterial.laeufeTitel")}>
           <div className="muted" style={{ marginBottom: "var(--sp-3)" }}>
             {t("einstellungen.lernmaterial.laeufeHinweis")}
           </div>
@@ -346,7 +357,7 @@ export function ModellInhalt({
             ]}
             rows={daten.laeufe.map((l) => ({ ...l }))}
           />
-        </Abschnitt>
+        </Card>
       )}
     </>
   );

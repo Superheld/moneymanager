@@ -46,7 +46,7 @@ import { Auswahl } from "../bausteine/Auswahl";
 import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  budgetPostenZu,
+  budgetzeilenZu,
   budgetstaende,
   nachArtGetrennt,
   toIso,
@@ -60,7 +60,7 @@ import { Button, Card, CoverageTrack } from "../bausteine";
 import { AbrufDialog } from "../bausteine/AbrufDialog";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
 import { BuchungDetail } from "../buchung/BuchungDetail";
-import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
+import { Buchungsliste } from "../bausteine/Buchungsliste";
 import { AUFKLAPP_ZEILEN_SCHMAL } from "../bausteine/aufklappen";
 import { DepotKarte } from "./DepotKarte";
 import { MonatsAusblick } from "./MonatsAusblick";
@@ -302,14 +302,12 @@ export function UebersichtScreen() {
                           right=""
                         />
                         <Collapsible.Panel>
-                          <BudgetPostenliste
+                          <Buchungsliste
                             // Schmale Karte: sie steht neben einer zweiten, die beim
                             // Aufklappen mitwächst (siehe bausteine/aufklappen.ts).
-                            zeilen={AUFKLAPP_ZEILEN_SCHMAL}
-                            posten={budgetPostenZu(daten.sicht, z)}
-                            empfaenger={daten.empfaenger}
-                            kategorieNamen={daten.kategorieNamen}
-                            verbraucht={z.monat.verbraucht}
+                            sichtbar={AUFKLAPP_ZEILEN_SCHMAL}
+                            zeilen={budgetzeilenZu(daten.sicht, z, daten.zeilenkontext)}
+                            leer={t("uebersicht.budgetOhneBuchungen")}
                             onBuchung={setDetail}
                           />
                         </Collapsible.Panel>

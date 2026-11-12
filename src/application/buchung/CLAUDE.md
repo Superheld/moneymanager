@@ -44,9 +44,10 @@ gelöscht wurde. Deshalb trägt die Tabelle bewusst **keinen** Fremdschlüssel a
 
 Das Journal lief zwei Wochen mit, ohne dass es jemand zu sehen bekam. Es steht jetzt im
 Buchungsdialog unter **Verlauf** — die Einträge, der Unterschied zum Stand bei der
-Entstehung, und ein Weg zurück. Im Kontoauszug markiert eine Pille, zu welcher Zeile
-überhaupt etwas protokolliert ist; die ist ausdrücklich **vorläufig** und dient dem
-Nachsehen, solange das Journal jung ist.
+Entstehung, und ein Weg zurück. Im Kontoauszug stand bis 2026-11-12 an jeder Zeile mit
+Einträgen eine Pille „Verlauf n" — ausdrücklich **vorläufig**, solange das Journal jung
+war. Sie ist weg, samt der Zählung dahinter (`JournalRepository.anzahlen`): fast jede
+Zeile hat inzwischen Einträge, und eine Marke an fast jeder Zeile sagt nichts mehr.
 
 **Es gibt ZWEI Wege zurück, und sie bedeuten Verschiedenes.** Gebaut ist bislang der erste:
 

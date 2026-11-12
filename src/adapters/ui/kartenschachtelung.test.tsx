@@ -82,7 +82,6 @@ describe("Karten liegen nebeneinander, nicht ineinander", () => {
         personen={[]}
         personName={new Map()}
         kontostaende={[]}
-        hatGebuchtes={false}
         verbindungen={new Map()}
         onTrennen={async () => {}}
         onChange={() => {}}
