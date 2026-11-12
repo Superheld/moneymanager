@@ -3,6 +3,49 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.30.0-beta.6] — 2026-11-12
+
+Feinschliff aus dem Test von beta.4, und Buchungen sehen unter Budgets und in der Analyse
+jetzt gleich aus. **Keine Migration.**
+
+### Neu
+
+**Aktualisierung auf Knopfdruck.** Unter Einstellungen → Über die App steht die
+installierte Version und daneben „Jetzt prüfen" — vorher wurde nur beim Start geprüft.
+Das geht auch, wenn die Prüfung beim Start abgeschaltet ist. Liegt etwas bereit, lässt es
+sich dort gleich installieren; ging die Prüfung nicht, steht das da, statt „aktuell" zu
+behaupten.
+
+### Geändert
+
+**Einstellungen neu geordnet.** „Personalisierung" fasst Sprache & Währung und Personen
+zusammen, „Über die App" Aktualisierung und Experimente. Verschlüsselung und Export haben
+ordentliche Abstände zwischen und in ihren Karten.
+
+**Eine Liste für Buchungen.** Unter einem Budget (Übersicht, Budgets) und unter einer
+Kategorie (Analyse) stehen dieselben Spalten: Datum, Buchung mit Vertrag, Kategorie,
+Verwendungszweck, Konto, Betrag. Der Betrag trägt überall sein Vorzeichen, auch unter einem
+Budget. Kategorie und Konto fallen weg, wenn alle Zeilen dieselben tragen. Eine Buchung
+heisst überall gleich: eigene Notiz, sonst Empfänger, sonst Verwendungszweck.
+
+**Übersicht:** unter einem aufgeklappten Budget keine Summenzeile mehr — der Betrag steht
+schon in der Zeile darüber. Im Budget-Verlauf heisst sie jetzt „Summe" und trägt das
+Vorzeichen.
+
+**Buchungen:** die ganze Zeile öffnet die Buchung, und der Name ist als Link gesetzt. Der
+Kategoriefilter steht kompakt in der Filterleiste. Die Markierung „Verlauf" an den Zeilen
+ist weg; der Verlauf steht wie bisher im Dialog.
+
+**Konten verwalten:** je Konto nur noch der Kontostand. Anfangsbestand und Bewegungen
+pflegt der Bearbeiten-Dialog bzw. zeigt der Kontoauszug.
+
+**Training:** im Erkennungsmodell steht jede Auswertung in einer eigenen Karte.
+
+### Behoben
+
+**Ein eingeschaltetes Experiment** (etwa Training) erschien erst nach einem Neustart in der
+Navigation.
+
 ## [0.30.0-beta.5] — 2026-11-12
 
 Die Oberfläche ist neu gebaut, die Analyse neu geordnet, und der Datenschlüssel lässt sich
