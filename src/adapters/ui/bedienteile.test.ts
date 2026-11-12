@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from "vitest";
 import { readdirSync, readFileSync, statSync } from "node:fs";
-import { join, relative } from "node:path";
+import { join, relative, sep } from "node:path";
 
 const UI = join(__dirname);
 
@@ -79,7 +79,10 @@ describe("Bedienteile stehen auf Base UI", () => {
     it(`kein ${regel.name} ausserhalb der benannten Ausnahmen`, () => {
       const funde: string[] = [];
       for (const pfad of alle) {
-        const rel = relative(UI, pfad);
+        // Mit `/` wie in der Ausnahmeliste, auf jeder Plattform. Unter Windows liefert
+        // `relative` Backslashes, und keine Ausnahme griff — der Windows-Build von
+        // 0.30.0-beta.5 starb genau hier, an einer erlaubten Stelle.
+        const rel = relative(UI, pfad).split(sep).join("/");
         if (regel.erlaubt[rel]) continue;
         for (const { nr, text } of codezeilen(pfad)) {
           if (regel.muster.test(text)) funde.push(`${rel}:${nr}  ${text.trim()}`);
