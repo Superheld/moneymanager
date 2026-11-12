@@ -3,6 +3,66 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.30.0-beta.5] — 2026-11-12
+
+Die Oberfläche ist neu gebaut, die Analyse neu geordnet, und der Datenschlüssel lässt sich
+wechseln. **Keine Migration** — aber Migrationen laufen ab jetzt anders (siehe unten), und
+die Übersicht rechnet ihre Budgetliste anders.
+
+### Neu
+
+**Neuer Datenschlüssel.** Unter Einstellungen → Verschlüsselung lässt sich der Schlüssel
+selbst erneuern, nicht nur die Passphrase — für den Fall, dass der Wiederherstellungscode
+in fremde Hände geraten sein könnte. Die Datenbank und die Sicherungen werden dabei neu
+verschlüsselt; ein unterbrochener Wechsel wird beim nächsten Entsperren zu Ende geführt.
+
+**Dunkles Schema.** Die App folgt der Einstellung des Systems.
+
+**Analyse, neu geordnet.** Die Register sind unabhängig voneinander; ein Zeitraum, den du in einem wählst,
+gilt nur dort.
+- **Verlauf:** ein Klick auf einen Monat schlüsselt ihn darunter auf, nach Kategorien oder
+  Hauptgruppen, jede Zeile mit ihrem Anteil am Monat.
+- **Kategorien:** eine Auswertung über die Zeit — Ø je Monat, Summe, Anteil und Trend je
+  Kategorie, darüber die Aufteilung als Balken. Ein Klick zeigt den Verlauf der Kategorie
+  und ihre Buchungen.
+- **Blick nach vorn:** zwölf Monate. Der laufende Monat ist Plan, damit die Linie nicht
+  springt. Darunter Einnahmen und Ausgaben je Monat, und je Monat der **tiefste Stand
+  innerhalb des Monats** — wann wie viel liquide da sein muss.
+- Jeder Chart zeigt beim Überfahren seine Werte.
+
+**Rücklagen:** oben links der Stand (Ziele, Soll heute, tatsächlich da, Deckung), rechts die
+Faustformel. Je Rücklage ein Balken mit einem Strich beim Soll von heute.
+
+### Geändert
+
+**Eine Migration läuft jetzt ganz oder gar nicht.** Jede läuft in einer Transaktion;
+bricht sie ab, ist nichts von ihr geschehen.
+
+**Klickbare Tabellenzeilen sind überall gleich:** die ganze Zeile reagiert, der Name in
+der ersten Spalte sieht aus wie ein Link. Zeilen, bei denen ein Klick nichts tut, sehen
+auch nicht danach aus. Zeilen lassen sich mit der Tastatur öffnen.
+
+**Knöpfe, Dialoge, Reiter und Auswahlfelder** sind mit der Tastatur bedienbar: der Fokus
+bleibt im Dialog und kehrt danach zurück, Pfeiltasten wechseln die Reiter.
+
+**Die Budgetliste der Übersicht rechnet über alle Konten**, wie der Bereich Budgets. Die
+Zeilen „Budgets monatlich" und „Budgets aufbauend" der Monatskarten bleiben bei den
+liquiden Konten und können deshalb weniger zeigen als die Liste darunter.
+
+### Behoben
+
+**Aufbauende Budgets auf einem Rücklagenkonto** sahen in der Übersicht ihre eigenen
+Ausgaben nicht: der Balken stand auf null, der Stand wuchs nur. Im Budget-Verlauf zählen
+die Ausgaben eines Monats jetzt im selben Monat, nicht erst im nächsten.
+
+**In den aufgeklappten Monatskarten** stand ein Platzhaltertext statt der Tabelle.
+
+**Die Faustformel der Rücklagen** fehlte ganz, solange kein Vertrag mit Einnahmen da
+ist — jetzt steht der Bogen da und sagt, was fehlt.
+
+**Statt einer weissen Seite** erscheint bei einem Fehler eine Meldung; die Navigation
+bleibt stehen.
+
 ## [0.30.0-beta.4] — 2026-11-10
 
 Budgets rechnen verschachtelt richtig, die Kategorie-Erkennung misst ehrlich und erklärt
