@@ -1,9 +1,10 @@
 // Was unter einer Zeile aufklappt — EINE Fläche und EINE Tabelle für alle Stellen.
 //
-// Bis 2026-11-09 gab es davon drei Fassungen: die Buchungen eines Budgets
-// (`BudgetPostenliste`, als Flex-Zeilen), die Buchungen einer Kategorie in der Analyse
-// (als eigene `<table>`, mit weissem Kopf auf getönter Fläche) und die Posten der
-// Monatskarten (wieder Flex-Zeilen, mit festen 320 px statt der Zeilenregel). Drei
+// Bis 2026-11-09 gab es davon drei Fassungen: die Buchungen eines Budgets (die damalige
+// `BudgetPostenliste`, als Flex-Zeilen — heute `Buchungsliste`), die Buchungen einer
+// Kategorie in der Analyse (als eigene `<table>`, mit weissem Kopf auf getönter Fläche)
+// und die Posten der Monatskarten (wieder Flex-Zeilen, mit festen 320 px statt der
+// Zeilenregel). Drei
 // Polsterungen, drei Zeilenhöhen, drei Köpfe — dasselbe Ding sah an jeder Stelle anders
 // aus, und eine Verbesserung an einer Stelle erreichte die anderen nie.
 //
@@ -163,6 +164,9 @@ export function Aufklapptabelle<T>({
                     padding: "6px 8px 5px",
                     borderBottom: "1px solid var(--line)",
                     width: s.breite,
+                    // Ein Kopf bricht nie um — „Betrag €" in zwei Zeilen hob den ganzen
+                    // Kopf an und verschob den Deckel, der in Zeilen rechnet.
+                    whiteSpace: "nowrap",
                     // Fest beim Scrollen. Der Hintergrund muss mit — und zwar DERSELBE wie
                     // die Fläche, sonst steht ein weisser Balken auf getöntem Grund.
                     position: "sticky",

@@ -13,12 +13,19 @@ import {
   waehrungssymbol,
 } from "../../../application";
 import {
+  type Pruefergebnis,
+} from "../../../application";
+import {
   aktualisierungBeta,
   aktualisierungBetaSetzen,
+  aktualisierungInstallieren,
+  aktualisierungJetztSuchen,
   aktualisierungspruefung,
   aktualisierungspruefungSetzen,
 } from "../../dienste";
-import { Card, FormField } from "../bausteine";
+import { APP_ABZEICHEN, APP_VERSION } from "../../../version";
+import { Button, Card, FormField, Pill } from "../bausteine";
+import { Stapel, Zeile } from "../bausteine/Anordnung";
 import { Auswahl } from "../bausteine/Auswahl";
 import {
   useExperimentSchalter,
@@ -30,7 +37,7 @@ export function RegionCard() {
   const { t } = useTranslation();
   const { aktuelleLocale, regionSetzen } = useRegionUmschalter();
   return (
-    <Card>
+    <Card title={t("einstellungen.region.titel")}>
       <FormField label={t("einstellungen.region.feld")} hint={t("einstellungen.region.hinweis")}>
         <Auswahl
           ariaLabel={t("einstellungen.region.feld")}
@@ -58,7 +65,7 @@ export function ExperimenteCard() {
   const { t } = useTranslation();
   const { experimente, experimentSetzen } = useExperimentSchalter();
   return (
-    <Card>
+    <Card title={t("einstellungen.experiment.titel")}>
       <p className="muted" style={{ marginTop: 0 }}>
         {t("einstellungen.experiment.hinweis")}
       </p>
@@ -148,10 +155,24 @@ export function SchalterZeile({
   );
 }
 
+/**
+ * Welche Fassung läuft, und ob es eine neuere gibt — auf Knopfdruck.
+ *
+ * **Der Knopf, weil die Prüfung sonst nur beim Start läuft.** Wer wissen wollte, ob eine
+ * Fassung erschienen ist, musste die App neu starten. Geprüft wird hier auch bei
+ * abgeschalteter Startprüfung: der Schalter regelt, ob die App UNGEFRAGT nach draussen
+ * spricht, und ein Klick ist die Frage (`aktualisierungJetztPruefen`).
+ *
+ * Findet sie etwas, steht der Installieren-Knopf HIER und nicht nur in der Seitenleiste:
+ * die Antwort gehört an die Stelle, an der gefragt wurde.
+ */
 export function AktualisierungCard() {
   const { t } = useTranslation();
   const [an, setAn] = useState<boolean | null>(null);
   const [beta, setBeta] = useState<boolean | null>(null);
+  const [prueft, setPrueft] = useState(false);
+  const [ergebnis, setErgebnis] = useState<Pruefergebnis | null>(null);
+  const [installiert, setInstalliert] = useState<"laeuft" | "fehler" | null>(null);
 
   useEffect(() => {
     void aktualisierungspruefung().then(setAn);
@@ -168,29 +189,80 @@ export function AktualisierungCard() {
   async function betaWechseln(neu: boolean) {
     await aktualisierungBetaSetzen(neu);
     setBeta(neu);
+    // Ein Ergebnis von vorher galt für den anderen Kanal.
+    setErgebnis(null);
+  }
+
+  async function pruefen() {
+    setPrueft(true);
+    setErgebnis(null);
+    setInstalliert(null);
+    try {
+      setErgebnis(await aktualisierungJetztSuchen());
+    } finally {
+      setPrueft(false);
+    }
+  }
+
+  async function installieren() {
+    setInstalliert("laeuft");
+    try {
+      // Kehrt im Erfolgsfall nicht zurück — die App startet neu.
+      await aktualisierungInstallieren();
+    } catch {
+      setInstalliert("fehler");
+    }
   }
 
   return (
-    <Card>
-      <p className="muted" style={{ marginTop: 0 }}>
-        {t("einstellungen.aktualisierung.hinweis")}
-      </p>
-      {an != null && (
-        <SchalterZeile
-          titel={t("einstellungen.aktualisierung.schalterTitel")}
-          text={t("einstellungen.aktualisierung.schalterText")}
-          an={an}
-          aufSchalten={(neu) => void schalten(neu)}
-        />
-      )}
-      {beta != null && (
-        <SchalterZeile
-          titel={t("einstellungen.aktualisierung.betaTitel")}
-          text={t("einstellungen.aktualisierung.betaText")}
-          an={beta}
-          aufSchalten={(neu) => void betaWechseln(neu)}
-        />
-      )}
+    <Card title={t("einstellungen.aktualisierung.titel")}>
+      <Stapel>
+        <Zeile abstand={3}>
+          <span>
+            {t("einstellungen.aktualisierung.installiert")}{" "}
+            <span style={{ fontWeight: "var(--fw-bold)" }}>{APP_VERSION}</span>{" "}
+            <Pill variant="neutral">{APP_ABZEICHEN}</Pill>
+          </span>
+          <Button onClick={() => void pruefen()} laeuft={prueft}>
+            {prueft ? t("einstellungen.aktualisierung.prueft") : t("einstellungen.aktualisierung.jetztPruefen")}
+          </Button>
+          {ergebnis?.art === "aktuell" && (
+            <span className="hinweis">{t("einstellungen.aktualisierung.aktuell")}</span>
+          )}
+          {ergebnis?.art === "fehler" && (
+            <span className="hinweis">{t("einstellungen.aktualisierung.pruefungFehler")}</span>
+          )}
+          {ergebnis?.art === "neu" && (
+            <Button variant="primary" onClick={() => void installieren()} laeuft={installiert === "laeuft"}>
+              {installiert === "laeuft"
+                ? t("shell.aktualisierungLaeuft")
+                : t("shell.aktualisierungBereit", { version: ergebnis.aktualisierung.version })}
+            </Button>
+          )}
+          {installiert === "fehler" && (
+            <span className="hinweis">{t("shell.aktualisierungFehler")}</span>
+          )}
+        </Zeile>
+        <p className="muted" style={{ margin: 0 }}>
+          {t("einstellungen.aktualisierung.hinweis")}
+        </p>
+        {an != null && (
+          <SchalterZeile
+            titel={t("einstellungen.aktualisierung.schalterTitel")}
+            text={t("einstellungen.aktualisierung.schalterText")}
+            an={an}
+            aufSchalten={(neu) => void schalten(neu)}
+          />
+        )}
+        {beta != null && (
+          <SchalterZeile
+            titel={t("einstellungen.aktualisierung.betaTitel")}
+            text={t("einstellungen.aktualisierung.betaText")}
+            an={beta}
+            aufSchalten={(neu) => void betaWechseln(neu)}
+          />
+        )}
+      </Stapel>
     </Card>
   );
 }

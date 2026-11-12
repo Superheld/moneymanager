@@ -294,3 +294,28 @@ describe("DataTable — klickbare Zeilen mit der Tastatur", () => {
     expect(kopf.getAttribute("aria-sort")).toBe("descending");
   });
 });
+
+describe("DataTable — Bezeichner einer klickbaren Zeile", () => {
+  const zeilen = [{ id: "1", datum: "01.11.", name: "Ohlert" }];
+  const spalten = (mitAngabe: boolean) => [
+    { key: "datum", label: "Datum" },
+    { key: "name", label: "Name", bezeichner: mitAngabe },
+  ];
+
+  it("trägt den Link-Stil in der ersten Spalte, wenn keine Spalte ihn verlangt", () => {
+    render(<DataTable columns={spalten(false)} rows={zeilen} onRowClick={() => {}} />);
+    expect(screen.getByText("01.11.")).toHaveClass("datentabelle-bezeichner");
+    expect(screen.getByText("Ohlert")).not.toHaveClass("datentabelle-bezeichner");
+  });
+
+  it("trägt ihn in der Spalte, die ihn verlangt", () => {
+    render(<DataTable columns={spalten(true)} rows={zeilen} onRowClick={() => {}} />);
+    expect(screen.getByText("Ohlert")).toHaveClass("datentabelle-bezeichner");
+    expect(screen.getByText("01.11.")).not.toHaveClass("datentabelle-bezeichner");
+  });
+
+  it("trägt ihn nirgends, wenn die Zeile nicht klickbar ist", () => {
+    render(<DataTable columns={spalten(true)} rows={zeilen} />);
+    expect(screen.getByText("Ohlert")).not.toHaveClass("datentabelle-bezeichner");
+  });
+});

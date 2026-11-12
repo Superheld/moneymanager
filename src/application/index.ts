@@ -121,8 +121,8 @@ export {
   type Budgetgruppen,
   type GruppierterStand,
   budgetstaende,
-  budgetPostenZu,
-  budgetPostenImMonat,
+  budgetzeilenZu,
+  budgetzeilenImMonat,
   budgetVerlauf,
   vertragsBuchungenLaden,
   type Budgetstand,
@@ -235,7 +235,6 @@ export {
   analyseGruppen,
   analyseBuchungen,
   type Analysebasis,
-  type Analysezeile,
   type AnalyseDeps,
   type Zeitraum,
   analyseBefunde,
@@ -366,10 +365,17 @@ export {
 } from "./uebersicht";
 export {
   aktualisierungEinspielen,
+  aktualisierungJetztPruefen,
   aktualisierungPruefen,
   pruefungErlaubt,
   pruefungSchalten,
   SCHLUESSEL_AKTUALISIERUNG,
   type Aktualisierung,
   type AktualisierungPort,
+  type Pruefergebnis,
 } from "./aktualisierung";
+export {
+  buchungsname,
+  type Buchungszeile,
+  type Zeilenkontext,
+} from "./buchung/buchungszeile";

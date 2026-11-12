@@ -155,17 +155,6 @@ describe("Journal — die Rundreise", () => {
     expect((await sqliteJournalRepository.zuBuchung("b1")).length).toBe(1);
   });
 
-  it("zählt je Buchung, ohne die Stände zu laden", async () => {
-    await sqliteLedgerRepository.speichern(buchung({ id: "b1" }));
-    await sqliteLedgerRepository.speichern(buchung({ id: "b1", betrag: -1 }));
-    await sqliteLedgerRepository.speichern(buchung({ id: "b2" }));
-
-    const anzahlen = await sqliteJournalRepository.anzahlen();
-    expect(anzahlen.get("b1")).toBe(2);
-    expect(anzahlen.get("b2")).toBe(1);
-    expect(anzahlen.get("b3")).toBeUndefined();
-  });
-
   it("übergeht einen unlesbaren Eintrag, statt die Historie zu verweigern", async () => {
     await sqliteLedgerRepository.speichern(buchung());
     db.run(

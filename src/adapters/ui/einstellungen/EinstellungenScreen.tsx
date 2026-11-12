@@ -1,4 +1,5 @@
-// Einstellungen — Sprache & Währung, Personen, Kategorien. Anlegen UND
+// Einstellungen — Personalisierung (Sprache & Währung, Personen), Kategorien,
+// Verschlüsselung, Über die App (Version, Aktualisierung, Experimente), Export. Anlegen UND
 // Bearbeiten je im Modal (gleiche Maske, vorbefüllt). Reload-fest über die SQLite-Repos.
 //
 // Zwei Bereiche sind hier ausgezogen: die Kategorie-Erkennung nach „Training" und die
@@ -48,17 +49,20 @@ export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
     <Bereich
       titel={t("einstellungen.titel")}
       register={[
+        // Sprache, Währung und Personen sind Angaben ÜBER den Haushalt — wer er ist und
+        // wie er liest. Die Kategorien stehen daneben, weil sie etwas anderes sind: die
+        // Ordnung, nach der gebucht wird.
         {
-          id: "region",
-          label: t("einstellungen.region.titel"),
-          untertitel: t("einstellungen.region.untertitel"),
-          inhalt: () => <RegionCard />,
-        },
-        {
-          id: "personen",
-          label: t("einstellungen.person.titel"),
-          untertitel: t("einstellungen.person.untertitel"),
-          inhalt: () => <PersonenCard personen={personen} onChange={laden} />,
+          id: "personalisierung",
+          label: t("einstellungen.personalisierung.titel"),
+          untertitel: t("einstellungen.personalisierung.untertitel"),
+          stapeln: true,
+          inhalt: () => (
+            <>
+              <RegionCard />
+              <PersonenCard personen={personen} onChange={laden} />
+            </>
+          ),
         },
         {
           id: "kategorien",
@@ -67,32 +71,36 @@ export function EinstellungenScreen({ onSperren }: { onSperren?: () => void }) {
           inhalt: () => <KategorienCard kategorien={kategorien} onChange={laden} />,
         },
         {
-          id: "aktualisierung",
-          label: t("einstellungen.aktualisierung.titel"),
-          untertitel: t("einstellungen.aktualisierung.untertitel"),
-          inhalt: () => <AktualisierungCard />,
-        },
-        {
           id: "verschluesselung",
           label: t("zugang.kartenTitel"),
           untertitel: t("zugang.kartenText"),
+          stapeln: true,
           inhalt: () => <VerschluesselungCard onSperren={onSperren} />,
         },
+        // Version, Aktualisierung und Experimente beantworten dieselbe Frage: welche
+        // Fassung der App läuft hier, und was davon ist eingeschaltet.
         {
-          id: "experimente",
-          label: t("einstellungen.experiment.titel"),
-          untertitel: t("einstellungen.experiment.untertitel"),
-          inhalt: () => <ExperimenteCard />,
+          id: "app",
+          label: t("einstellungen.app.titel"),
+          untertitel: t("einstellungen.app.untertitel"),
+          stapeln: true,
+          inhalt: () => (
+            <>
+              <AktualisierungCard />
+              <ExperimenteCard />
+            </>
+          ),
         },
         // Das Register erscheint erst, wenn das Experiment an ist — ein Reiter, der
         // seinen Inhalt nur mit einem Hinweis „erst einschalten" fuellt, ist ein
-        // leeres Versprechen. Der Schalter darueber ist der Weg dorthin.
+        // leeres Versprechen. Der Schalter im Register „Über die App" ist der Weg dorthin.
         ...(experimente.export
           ? [
               {
                 id: "export",
                 label: t("einstellungen.export.titel"),
                 untertitel: t("einstellungen.export.untertitel"),
+                stapeln: true,
                 inhalt: () => (
                   <>
                     <ExportCard />

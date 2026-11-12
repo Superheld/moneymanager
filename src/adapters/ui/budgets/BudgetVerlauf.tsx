@@ -5,7 +5,7 @@
 // eine zweite darin wäre zwei Rahmen um dieselbe Sache (siehe `ui/CLAUDE.md`). Sie steht
 // unmittelbar darunter, damit die Zeile, von der man ausgegangen ist, im Blick bleibt.
 //
-// Gerechnet wird hier nichts: `budgetVerlauf` und `budgetPostenImMonat` kommen fertig aus
+// Gerechnet wird hier nichts: `budgetVerlauf` und `budgetzeilenImMonat` kommen fertig aus
 // der Anwendungsschicht und arbeiten auf DERSELBEN Sicht wie die Liste darüber. Ein
 // eigener Ladevorgang je aufgeklappter Zeile rechnete gegen einen womöglich anderen
 // Bestand als die Zeile selbst.
@@ -13,16 +13,17 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  budgetPostenImMonat,
+  budgetzeilenImMonat,
   budgetVerlauf,
   type BudgetSicht,
   type Budgetstand,
   type IstBuchung,
+  type Zeilenkontext,
 } from "../../../application";
 import { Button, Card } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
-import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
+import { Buchungsliste } from "../bausteine/Buchungsliste";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { BudgetVerlaufChart } from "./BudgetVerlaufChart";
@@ -33,8 +34,8 @@ interface Props {
   stand: Budgetstand;
   /** Heute als ISO — der Verlauf endet im Monat dieses Datums. */
   heute: string;
-  kategorieNamen: ReadonlyMap<string, string>;
-  empfaenger: ReadonlyMap<string, string>;
+  /** Was die Buchungszeilen des gewählten Monats brauchen. */
+  zeilenkontext: Zeilenkontext;
   onSchliessen: () => void;
   /**
    * Klick auf eine Buchung der Liste — der Bildschirm darüber öffnet sie.
@@ -45,7 +46,7 @@ interface Props {
   onBuchung?: (buchung: IstBuchung) => void;
 }
 
-export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger, onSchliessen, onBuchung }: Props) {
+export function BudgetVerlauf({ sicht, stand, heute, zeilenkontext, onSchliessen, onBuchung }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
 
@@ -68,9 +69,9 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
   };
   const monat = monate[Math.min(gewaehlt, monate.length - 1)];
 
-  const posten = useMemo(
-    () => (monat ? budgetPostenImMonat(sicht, stand.budget, monat) : []),
-    [sicht, stand.budget, monat],
+  const zeilen = useMemo(
+    () => (monat ? budgetzeilenImMonat(sicht, stand.budget, monat, zeilenkontext) : []),
+    [sicht, stand.budget, monat, zeilenkontext],
   );
 
   if (monate.length === 0) {
@@ -164,14 +165,11 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
       </Collapsible.Trigger>
 
       <Collapsible.Panel>
-        <BudgetPostenliste
-          posten={posten}
-          empfaenger={empfaenger}
-          kategorieNamen={kategorieNamen}
-          verbraucht={monat.verbraucht}
-          leerText={t("budgets.verlaufMonatLeer", { monat: monat.monat })}
+        <Buchungsliste
+          zeilen={zeilen}
+          leer={t("budgets.verlaufMonatLeer", { monat: monat.monat })}
           onBuchung={onBuchung}
-          kopf
+          summe
         />
       </Collapsible.Panel>
       </Collapsible.Root>

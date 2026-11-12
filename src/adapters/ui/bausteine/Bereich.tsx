@@ -25,6 +25,12 @@ export interface RegisterDef {
   readonly untertitel?: string;
   /** Erst beim Wechsel auf dieses Register aufgerufen. */
   readonly inhalt: () => ReactNode;
+  /**
+   * Der Inhalt sind mehrere Karten untereinander — der Kartenabstand kommt dann vom
+   * Register (`Registerleiste stapeln`), nicht von den Karten. Ohne die Angabe standen
+   * zwei Karten in einem Register Rand an Rand (Verschlüsselung, Export).
+   */
+  readonly stapeln?: boolean;
 }
 
 export function Bereich({
@@ -44,7 +50,7 @@ export function Bereich({
     <div className="screen">
       <PageHead title={titel} subtitle={offen?.untertitel} />
 
-      <Registerleiste register={register} aktiv={offen?.id} onWahl={setAktiv}>
+      <Registerleiste register={register} aktiv={offen?.id} onWahl={setAktiv} stapeln={offen?.stapeln}>
         {offen?.inhalt()}
       </Registerleiste>
     </div>

@@ -230,20 +230,19 @@ export function KategorisierungCards({ kategorien }: { kategorien: Kategorie[] }
           id: "modell",
           label: t("einstellungen.lernmaterial.modellKarteTitel"),
           untertitel: t("einstellungen.lernmaterial.modellKarteUntertitel"),
+          stapeln: true,
           inhalt: () => (
-            <Card>
-              {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
-              <ModellInhalt
-                {...hilfe}
-                bewertung={bewertung}
-                grundlinie={grundlinie}
-                protokoll={protokoll}
-                vergleich={vergleich}
-                trainiert={laeuft === "training"}
-                listenGeaendert={listenGeaendert}
-                aufTraining={trainingStarten}
-              />
-            </Card>
+            <ModellInhalt
+              {...hilfe}
+              fehler={fehler}
+              bewertung={bewertung}
+              grundlinie={grundlinie}
+              protokoll={protokoll}
+              vergleich={vergleich}
+              trainiert={laeuft === "training"}
+              listenGeaendert={listenGeaendert}
+              aufTraining={trainingStarten}
+            />
           ),
         },
         {

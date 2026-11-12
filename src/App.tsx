@@ -11,12 +11,12 @@ import { RuecklagenScreen } from "./adapters/ui/ruecklagen/RuecklagenScreen";
 import { ImportBereich } from "./adapters/ui/import/ImportBereich";
 import { TrainingBereich } from "./adapters/ui/training/TrainingBereich";
 import { EinstellungenProvider } from "./adapters/ui/bausteine/EinstellungenProvider";
+import { useExperimente } from "./adapters/ui/bausteine/einstellungenKontext";
 import { Fehlergrenze } from "./adapters/ui/bausteine/Fehlergrenze";
 import { Sperrbildschirm } from "./adapters/ui/zugang/Sperrbildschirm";
 import { useZeitsperre } from "./adapters/ui/zugang/useZeitsperre";
 import {
   appStarten,
-  experimente as experimenteStand,
   zeitsperre,
   zugangEinrichten,
   zugangEntsperren,
@@ -24,7 +24,6 @@ import {
   zugangsstand,
   zugangSperren,
 } from "./adapters/dienste";
-import { EXPERIMENTE_AUS, type Experimente } from "./application";
 import "./adapters/ui/zugang/zugang.css";
 
 /**
@@ -45,14 +44,6 @@ export default function App() {
   >({ art: "laedt" });
   const [bereit, setBereit] = useState(false);
   const [minuten, setMinuten] = useState(0);
-  /**
-   * Der Stand der Experimente. Er entscheidet, welche Bereiche in der Navigation stehen.
-   *
-   * Ausgangswert ist „alles aus" — dieselbe vorsichtige Voreinstellung wie im Kern. Ein
-   * Bereich, der beim Laden kurz auftaucht und dann verschwindet, sähe nach einem Fehler
-   * aus.
-   */
-  const [experimente, setExperimente] = useState<Experimente>(EXPERIMENTE_AUS);
 
   const standHolen = useCallback(async () => {
     const s = await zugangsstand();
@@ -80,13 +71,9 @@ export default function App() {
     let abgebrochen = false;
     void (async () => {
       await appStarten().catch(() => {});
-      const [m, e] = await Promise.all([
-        zeitsperre().catch(() => 0),
-        experimenteStand().catch(() => EXPERIMENTE_AUS),
-      ]);
+      const m = await zeitsperre().catch(() => 0);
       if (!abgebrochen) {
         setMinuten(m);
-        setExperimente(e);
         setBereit(true);
       }
     })();
@@ -135,6 +122,32 @@ export default function App() {
 
   return (
     <EinstellungenProvider>
+      <Arbeitsflaeche screen={screen} setScreen={setScreen} sperren={sperren} />
+    </EinstellungenProvider>
+  );
+}
+
+/**
+ * Navigation und Bereiche — INNERHALB des Einstellungs-Kontexts.
+ *
+ * Bis 2026-11-12 las `App` die Experimente einmal beim Start in einen eigenen Zustand,
+ * neben dem Kontext, den der Schalter in den Einstellungen ändert. Zwei Kopien desselben
+ * Stands: wer „Training" einschaltete, sah den Bereich erst nach einem Neustart. Jetzt
+ * liest die Navigation dieselbe Quelle wie der Schalter. Aufblitzen kann dabei nichts —
+ * der Provider zeichnet erst, wenn die Experimente geladen sind.
+ */
+function Arbeitsflaeche({
+  screen,
+  setScreen,
+  sperren,
+}: {
+  screen: ScreenId;
+  setScreen: (s: ScreenId) => void;
+  sperren: () => void;
+}) {
+  const experimente = useExperimente();
+  return (
+    <>
       {/* Das Training ist ein EXPERIMENT (Wunsch 2026-08-31): es ist eine Werkbank,
           kein fertiger Bereich — man greift dort in die Merkmale ein, misst Varianten
           und trainiert neu. Ausgeliefert wird ein fertiges Modell; wer es selbst
@@ -159,6 +172,6 @@ export default function App() {
         {screen === "einstellungen" && <EinstellungenScreen onSperren={sperren} />}
         </Fehlergrenze>
       </AppShell>
-    </EinstellungenProvider>
+    </>
   );
 }

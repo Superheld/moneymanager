@@ -12,6 +12,7 @@
 // die Nachbarzahl.
 
 import { belegZuBuchung } from "./buchung/belegZuBuchung";
+import { buchungszeile, type Buchungszeile, type Zeilenkontext } from "./buchung/buchungszeile";
 import {
   addMonate,
   blindeFlecken,
@@ -222,43 +223,28 @@ export function analyseGruppen(basis: Analysebasis, items: readonly KategorieSum
   return nachHauptgruppe(items, basis.kategorien);
 }
 
-/** Eine Zeile der aufgeklappten Kategorie — schon mit dem, was am Umsatz hängt. */
-export interface Analysezeile {
-  readonly buchung: IstBuchung;
-  /**
-   * Der Betrag, mit dem diese Buchung auf DIESE Kategorie wirkt.
-   *
-   * Bei einer geteilten Buchung ihr Teil, sonst der volle Betrag — und deshalb nicht
-   * dasselbe wie `buchung.betrag`. Die Liste steht unter einem Aggregat, das über
-   * `kategorieAnteile` rechnet; zeigte sie den Gesamtbetrag, summierten sich ihre Zeilen
-   * nicht auf die Zahl darüber, und der Wocheneinkauf stünde unter „Drogerie" mit dem
-   * Betrag, den er insgesamt gekostet hat.
-   */
-  readonly betrag: Cent;
-  readonly empfaenger: string;
-  readonly verwendungszweck: string;
-  readonly kontoName: string;
-  /** Der Vertrag, zu dem die Buchung gehört — als Anbietername. Fehlt, wenn keiner. */
-  readonly vertragsname?: string;
-}
-
+/**
+ * Die Buchungen einer aufgeklappten Kategorie — als `Buchungszeile`, dieselbe Form wie
+ * unter einem Budget. Der Betrag ist der, mit dem die Buchung auf DIESE Kategorie wirkt:
+ * bei einer geteilten Buchung ihr Teil, sonst der volle. Die Liste steht unter einem
+ * Aggregat, das über `kategorieAnteile` rechnet; zeigte sie den Gesamtbetrag, summierten
+ * sich ihre Zeilen nicht auf die Zahl darüber.
+ */
 export function analyseBuchungen(
   basis: Analysebasis,
   kategorieId: string,
   von: string,
   bis: string,
-): Analysezeile[] {
-  return buchungenDerKategorie(basis.buchungen, kategorieId, von, bis).map((buchung) => {
-    const u = basis.umsatzZuBuchung.get(buchung.id);
-    return {
-      buchung,
-      betrag: betragInKategorie(buchung, kategorieId),
-      empfaenger: u?.gegenpartei ?? buchung.notiz ?? "",
-      verwendungszweck: u?.verwendungszweck ?? "",
-      kontoName: basis.kontoNamen.get(buchung.kontoId) ?? "",
-      vertragsname: basis.vertragsnamen.get(buchung.id),
-    };
-  });
+): Buchungszeile[] {
+  const kontext: Zeilenkontext = {
+    umsatzZuBuchung: basis.umsatzZuBuchung,
+    kontoNamen: basis.kontoNamen,
+    kategorieNamen: new Map(basis.kategorien.map((k) => [k.id, k.name])),
+    vertragsnamen: basis.vertragsnamen,
+  };
+  return buchungenDerKategorie(basis.buchungen, kategorieId, von, bis).map((buchung) =>
+    buchungszeile(buchung, betragInKategorie(buchung, kategorieId), kategorieId, kontext),
+  );
 }
 
 /**

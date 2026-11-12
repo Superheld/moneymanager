@@ -18,12 +18,11 @@ import {
   type IstBuchung,
   type KategorieSumme,
 } from "../../../application";
-import { CoverageTrack, Pill } from "../bausteine";
+import { CoverageTrack } from "../bausteine";
 import { AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
-import { Aufklapptabelle } from "../bausteine/Aufklapptabelle";
+import { Buchungsliste } from "../bausteine/Buchungsliste";
 import { Umschalter } from "../bausteine/Umschalter";
-import { useDatum, useGeld, useProzent } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { useGeld, useProzent } from "../bausteine/einstellungenKontext";
 
 /**
  * Seit 2026-11-11 misst jeder Balken den ANTEIL an seiner Seite (alle Ausgaben, alle
@@ -270,9 +269,9 @@ export function Aufschluesselung({
 }
 
 /**
- * Die Buchungen einer Kategorie im Fenster — mit `Aufklapptabelle`, derselben Fläche
- * und Tabelle wie die Buchungen eines Budgets. Bis 2026-11-09 war das hier eine eigene
- * `<table>` mit eigenem Kopf, und dasselbe Aufklappen sah an jeder Stelle anders aus.
+ * Die Buchungen einer Kategorie im Fenster — mit `Buchungsliste`, derselben Liste wie
+ * unter einem Budget (seit 2026-11-12 auch mit denselben Spalten und derselben
+ * Namensregel; bis 2026-11-09 war das hier eine eigene `<table>`).
  *
  * Anklickbar: beim Durchsehen einer Kategorie stößt man auf Buchungen, die eine
  * Korrektur brauchen — der Umweg über den Kontoauszug entfällt.
@@ -290,52 +289,10 @@ export function KategorieBuchungen({
   bis: string;
   onBuchung: (b: IstBuchung) => void;
 }) {
-  const { t } = useTranslation();
-  const geld = useGeld();
-  const datum = useDatum();
-  const bs = analyseBuchungen(basis, kategorieId, von, bis);
   return (
-    <Aufklapptabelle
-      zeilen={bs.slice(0, 50)}
-      schluessel={(z) => z.buchung.id}
-      leer={t("historie.detailLeer")}
-      onZeile={(z) => onBuchung(z.buchung)}
-      zeilenTitel={t("historie.detailOeffnen")}
-      mehr={bs.length > 50 ? t("historie.detailMehr", { n: bs.length - 50 }) : undefined}
-      spalten={[
-        { key: "datum", label: t("historie.spalteDatum"), breite: "10ch", render: (z) => datum.mitJahr(z.buchung.datum) },
-        {
-          key: "empf",
-          label: t("historie.spalteEmpf"),
-          fett: true,
-          render: (z) => (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
-              <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{z.empfaenger || "—"}</span>
-              {/* Dieselbe Markierung wie im Kontoauszug. Sie zählt hier sogar mehr: die
-                  Analyse fragt „wofür ging das Geld", und dass ein Posten aus einem
-                  laufenden Vertrag stammt, ist die halbe Antwort. */}
-              {z.vertragsname && (
-                <span title={t("konten.pillVertrag", { anbieter: z.vertragsname })} style={{ flex: "0 0 auto" }}>
-                  <Pill variant="plan">{z.vertragsname}</Pill>
-                </span>
-              )}
-            </span>
-          ),
-        },
-        {
-          key: "zweck",
-          label: t("historie.spalteZweck"),
-          gedimmt: true,
-          render: (z) => (z.verwendungszweck.length > 45 ? z.verwendungszweck.slice(0, 45) + "…" : z.verwendungszweck),
-        },
-        { key: "konto", label: t("historie.spalteKonto"), gedimmt: true, render: (z) => z.kontoName || "—" },
-        {
-          key: "betrag",
-          label: `${t("historie.spalteBetrag")} ${geld.symbol}`,
-          align: "right",
-          render: (z) => <span style={{ color: geldFarbe(z.betrag) }}>{geld.format(z.betrag, { mitVorzeichen: true })}</span>,
-        },
-      ]}
+    <Buchungsliste
+      zeilen={analyseBuchungen(basis, kategorieId, von, bis)}
+      onBuchung={onBuchung}
     />
   );
 }

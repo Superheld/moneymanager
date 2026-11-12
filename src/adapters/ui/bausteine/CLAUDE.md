@@ -152,11 +152,34 @@ also gegen jedes `z-index: auto`, egal wie weit hinten es im Dokument steht. Des
 `app.css` (Abschnitt „Schwebende Ebenen") einen Wert am **Positioner**; am Popup darin
 wirkte er nicht, weil nur ein positioniertes Element einen z-Index annimmt.
 
+## `Buchungsliste` — dieselben Buchungen sehen überall gleich aus
+
+Bis 2026-11-12 zeigten Übersicht, Budget-Verlauf und Analyse dieselben Buchungen mit
+verschiedenen Spalten, Namen und Vorzeichen: zwei Komponenten, zwei Zeilentypen, zwei
+Namensregeln. Der Umbau vom 09.11. hatte nur die Fläche vereinheitlicht. Jetzt gibt es
+EINE Zeile (`Buchungszeile`, `application/buchung/buchungszeile.ts`) und EINE Liste
+darauf, mit festen Spalten: Datum · Buchung (mit Vertragspille) · Kategorie ·
+Verwendungszweck · Konto · Betrag mit Vorzeichen.
+
+Drei Dinge, die man wissen muss:
+
+- **Eine Spalte, die nichts unterscheidet, fällt weg** — die Kategorie unter einer
+  Kategorie, das Konto, wenn alle Zeilen vom selben kommen. Entschieden wird das am
+  INHALT, nicht per Schalter am Aufrufer; ein Schalter je Stelle wäre der Weg zurück zu
+  drei Fassungen.
+- **Der Betrag hat ein Vorzeichen, auch unter einem Budget.** Ein `Verbrauchsposten`
+  zählt „positiv heisst verbraucht"; die Liste dreht das um (`budgetzeilenImMonat`), damit
+  eine Ausgabe dort aussieht wie überall sonst.
+- **Monatskarten und Kontoauszug bleiben eigene Formen**: dort stehen auch geplante
+  Posten ohne Buchung, bzw. eine Arbeitsliste mit Saldo und Bearbeiten. Den NAMEN teilt
+  der Kontoauszug trotzdem (`buchungsname`).
+
 ## `Aufklapptabelle` und `Klappblock` — zwei Arten aufzuklappen
 
 **`Aufklapptabelle`** ist die Liste unter einer Tabellenzeile: getönte Fläche, Kopf, der
-beim Scrollen stehen bleibt, klickbare Zeilen, optionaler Fuss. Benutzt von der
-Budget-Postenliste (Budgets, Übersicht) und den Buchungen einer Kategorie (Analyse).
+beim Scrollen stehen bleibt, klickbare Zeilen, optionaler Fuss. Benutzt wird sie über
+**`Buchungsliste`** — unter einem Budget (Übersicht, Budgets) und unter einer Kategorie
+(Analyse).
 `Aufklappflaeche` ist nur die Fläche — für Inhalt, der mit den Spalten der Zeile darüber
 fluchten muss und deshalb kein eigenes Raster haben darf (die Monatskarten).
 

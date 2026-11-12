@@ -33,7 +33,7 @@ beforeEach(() => {
   halter.setzen(pluginApi(db));
 });
 
-const registerName = () => i18n.t("einstellungen.experiment.titel");
+const registerName = () => i18n.t("einstellungen.app.titel");
 const schalterName = () => i18n.t("einstellungen.experiment.hanseaticTitel");
 
 async function schalterHolen(nutzer: ReturnType<typeof userEvent.setup>) {

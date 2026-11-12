@@ -16,7 +16,8 @@
 // ersetzte eine Betragsheuristik, ohne deren Ergebnis zu ändern: getauscht wurde eine
 // Vermutung gegen eine Tatsache, nicht das Verhalten.
 
-import { empfaengerJeBuchung } from "../buchung/belegZuBuchung";
+import { buchungszeile, zeilenkontext, type Buchungszeile, type Zeilenkontext } from "../buchung/buchungszeile";
+import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
 import {
   betragImMonat,
   budgetBuchungen,
@@ -32,7 +33,6 @@ import {
   type Budgetvorschlag,
   type Cent,
   type Kategorie,
-  type Verbrauchsposten,
   type Zahlungskonto,
 } from "../../core";
 import { budgetvorschlaegeLaden, ignorierteBudgetvorschlaege } from "./budgetvorschlaege";
@@ -42,6 +42,7 @@ import type {
   KategorieRepository,
   LedgerPort,
   UmsatzRepository,
+  VertragRepository,
   VertragszuordnungRepository,
   ZahlungskontoRepository,
 } from "../ports";
@@ -165,28 +166,37 @@ export function budgetstaende(sicht: BudgetSicht, am: string): Budgetstand[] {
 }
 
 /**
- * Die Einzelposten hinter dem Verbrauch EINES Budgets im gezeigten Monat.
+ * Die Buchungen hinter dem Verbrauch EINES Budgets im gezeigten Monat — als
+ * `Buchungszeile`, dieselbe Form wie in der Analyse.
  *
  * Bewusst der MONAT und nicht das kumulierte Fenster: darüber steht die Aufrechnung
  * dieses Monats, und eine Liste, die bei einem aufbauenden Budget alles seit dem Start
  * zeigte, summierte sich auf eine andere Zahl als die Zeile darüber. Wer die früheren
  * Monate sehen will, wählt sie — in der Übersicht über den Monatsumschalter, unter
  * Budgets über den Verlauf.
+ *
+ * Der Betrag kommt MIT Vorzeichen heraus: ein Verbrauchsposten zählt „positiv heisst
+ * verbraucht", eine Buchungsliste zeigt die Richtung wie überall sonst. Die Ausgabe ist
+ * also negativ, die Erstattung positiv.
  */
-export function budgetPostenZu(
+export function budgetzeilenZu(
   sicht: BudgetSicht,
   stand: Budgetstand,
-): readonly Verbrauchsposten[] {
-  return budgetPostenImMonat(sicht, stand.budget, stand.monat);
+  kontext: Zeilenkontext,
+): readonly Buchungszeile[] {
+  return budgetzeilenImMonat(sicht, stand.budget, stand.monat, kontext);
 }
 
 /** Dieselbe Auswahl für einen beliebigen Monat des Verlaufs. */
-export function budgetPostenImMonat(
+export function budgetzeilenImMonat(
   sicht: BudgetSicht,
   budget: Budget,
   monat: Budgetmonat,
-): readonly Verbrauchsposten[] {
-  return budgetBuchungen(sicht, budget, monat.von, monat.bis);
+  kontext: Zeilenkontext,
+): readonly Buchungszeile[] {
+  return budgetBuchungen(sicht, budget, monat.von, monat.bis).map((p) =>
+    buchungszeile(p.buchung, -p.betrag, p.kategorieId, kontext),
+  );
 }
 
 /**
@@ -215,6 +225,7 @@ export function budgetVerlauf(
 
 export interface BudgetbereichDeps extends BudgetsichtDeps {
   readonly kontoRepo: ZahlungskontoRepository;
+  readonly vertragRepo: VertragRepository;
   readonly umsatzRepo: UmsatzRepository;
   readonly einstellungenRepo: EinstellungenRepository;
 }
@@ -225,10 +236,8 @@ export interface Budgetbereich extends Budgetuebersicht {
   /** Für die Konto-Spalte und die Kontoauswahl im Dialog. */
   readonly konten: readonly Zahlungskonto[];
   readonly kontoNamen: ReadonlyMap<string, string>;
-  /** Kategorie-ID → Name, für die Einzelposten eines aufgeklappten Monats. */
-  readonly kategorieNamen: ReadonlyMap<string, string>;
-  /** Buchungs-ID → Empfänger aus dem Import. Steht am Umsatz, nicht an der Buchung. */
-  readonly empfaenger: ReadonlyMap<string, string>;
+  /** Was die Buchungszeilen eines aufgeklappten Monats brauchen (`budgetzeilenImMonat`). */
+  readonly zeilenkontext: Zeilenkontext;
   /** Rahmenvorschläge für Hauptkategorien ohne Budget. */
   readonly vorschlaege: readonly Budgetvorschlag[];
 }
@@ -237,11 +246,12 @@ export async function budgetbereichLaden(
   deps: BudgetbereichDeps,
   heute: string,
 ): Promise<Budgetbereich> {
-  const [uebersicht, konten, ignoriert, umsaetze] = await Promise.all([
+  const [uebersicht, konten, ignoriert, umsaetze, vertragsnamen] = await Promise.all([
     budgetuebersichtLaden(deps, heute),
     deps.kontoRepo.alle(),
     ignorierteBudgetvorschlaege(deps.einstellungenRepo),
     deps.umsatzRepo.alle(),
+    vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
   ]);
   const vorschlaege = await budgetvorschlaegeLaden(
     deps.ledger, deps.umsatzRepo, deps.kategorieRepo, deps.budgetRepo,
@@ -252,8 +262,7 @@ export async function budgetbereichLaden(
     kategorien: uebersicht.sicht.kategorien,
     konten,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
-    kategorieNamen: new Map(uebersicht.sicht.kategorien.map((k: Kategorie) => [k.id, k.name])),
-    empfaenger: empfaengerJeBuchung(umsaetze),
+    zeilenkontext: zeilenkontext(umsaetze, konten, uebersicht.sicht.kategorien, vertragsnamen),
     vorschlaege,
   };
 }

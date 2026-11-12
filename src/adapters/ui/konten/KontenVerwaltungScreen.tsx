@@ -28,7 +28,6 @@ export function KontenVerwaltungScreen() {
   const [personen, setPersonen] = useState<Person[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kontostaende, setKontostaende] = useState<readonly Kontostand[]>([]);
-  const [hatGebuchtes, setHatGebuchtes] = useState(false);
   const [verbindungen, setVerbindungen] = useState<Map<string, KontoVerbindung>>(new Map());
 
   // Zusammen laden und zusammen setzen: gestaffelte setState lassen die abgeleiteten
@@ -42,7 +41,6 @@ export function KontenVerwaltungScreen() {
     setPersonen([...daten.personen]);
     setKonten([...daten.konten]);
     setKontostaende(daten.kontostaende);
-    setHatGebuchtes(daten.hatGebuchtes);
     setVerbindungen(
       new Map(
         zuordnungen.map((z) => [
@@ -81,7 +79,6 @@ export function KontenVerwaltungScreen() {
               personen={personen}
               personName={personName}
               kontostaende={kontostaende}
-              hatGebuchtes={hatGebuchtes}
               verbindungen={verbindungen}
               onTrennen={async (v) => {
                 // Nur die Zuordnung fällt weg — der Zugang bleibt, er kann weitere

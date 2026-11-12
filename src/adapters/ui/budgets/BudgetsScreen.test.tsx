@@ -464,7 +464,9 @@ describe("BudgetsScreen · Verlauf", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
 
     const kopf = screen.getByText("Datum").parentElement!;
-    expect(kopf.textContent).toBe("DatumBuchungBetrag");
+    // Die Spalten der gemeinsamen Buchungsliste. Kategorie und Konto fehlen, weil alle
+    // Zeilen hier dieselben tragen — eine Spalte, die nichts unterscheidet, fällt weg.
+    expect(kopf.textContent).toBe("DatumBuchungVerwendungszweckBetrag €");
 
     const zeile = screen.getByRole("button", { expanded: true, name: new RegExp(monatVersetzt(-1)) });
     await nutzer.click(zeile);
@@ -498,11 +500,12 @@ describe("BudgetsScreen · Verlauf", () => {
     await screen.findByText(/Verlauf · Urlaubskasse/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Ruecksendung/));
 
-    // Die Summe unter der Liste heisst anders und traegt den Betrag OHNE Minus: das
-    // Vorzeichen steckt schon im Wort, zweimal waere es eine doppelte Verneinung.
-    const fuss = (await screen.findByText("Zurückgeflossen")).parentElement!;
-    expect(fuss.textContent).toMatch(/34,90/);
-    expect(fuss.textContent).not.toMatch(/−/);
+    // Die Summe unter der Liste heisst neutral „Summe" und traegt das Vorzeichen wie jede
+    // Zeile darueber (seit 2026-11-12, gemeinsame Buchungsliste). Ein Wort, das „verbraucht"
+    // behauptet, steht dort nicht mehr — also kann es auch nicht gegen das Plus stehen.
+    const fuss = (await screen.findByText("Summe")).parentElement!;
+    expect(fuss.textContent).toMatch(/\+34,90/);
+    expect(fuss.textContent).not.toMatch(/[Vv]erbraucht/);
 
     // Und die Aufrechnung daneben sagt „zurückgeflossen" statt „verbraucht“.
     await waitFor(() =>

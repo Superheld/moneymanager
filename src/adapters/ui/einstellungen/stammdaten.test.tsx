@@ -65,7 +65,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
     // Ein Register nach dem anderen: es ist immer genau eines offen, und das ist der
     // Punkt der Umstellung — vorher standen alle Listen untereinander. Die Konten sind
     // seit 2026-08-18 gar nicht mehr hier, sondern haben einen eigenen Punkt.
-    await registerWaehlen(nutzer, /^Personen$/);
+    await registerWaehlen(nutzer, /^Personalisierung$/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Bruce/));
 
     await registerWaehlen(nutzer, /^Kategorien$/);
@@ -277,7 +277,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
   it("legt eine Person über das Formular an", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await registerWaehlen(nutzer, /^Personen$/);
+    await registerWaehlen(nutzer, /^Personalisierung$/);
 
     await klicke(nutzer, /person|hinzufügen|anlegen|neu/i);
     const felder = screen.queryAllByRole("textbox");
@@ -294,7 +294,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
   it("bietet die Sprach-/Regionsumschaltung an", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await registerWaehlen(nutzer, /Sprache & Währung/);
+    await registerWaehlen(nutzer, /^Personalisierung$/);
     // Die Region steuert Sprache UND Währung (ADR-0004) — die Auswahl muss existieren.
     const auswahl = screen.queryAllByRole("combobox");
     expect(auswahl.length).toBeGreaterThanOrEqual(0);

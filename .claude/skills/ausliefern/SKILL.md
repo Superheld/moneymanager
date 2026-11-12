@@ -73,8 +73,14 @@ sie nur nach draussen, wenn jemand einen Bankabruf auslöste. Deshalb ist sie ab
 (`aktualisierungPruefen` in `einstellung`); ohne Zutun ist sie an, denn ein Update, von
 dem niemand erfährt, ist keines.
 
-Der Schalter dafür steht seit 2026-08-25 unter **Einstellungen → Aktualisierung**, in
-einem eigenen Register und nicht bei den Experimenten: die Prüfung ist keins, sie ist an,
+**Daneben steht „Jetzt prüfen"** (seit 2026-11-12, `aktualisierungJetztPruefen`): sonst
+prüfte die App nur beim Start. Der Startschalter gilt dafür nicht — er regelt, ob die App
+UNGEFRAGT nach draussen spricht, und ein Klick ist die Frage. Anders als beim Start
+werden „nichts Neues" und „ging nicht" getrennt gemeldet: hier wartet jemand auf die
+Antwort.
+
+Der Schalter dafür steht unter **Einstellungen → Über die App**, in einer eigenen Karte
+„Aktualisierung" und nicht bei den Experimenten (die Karte darunter): die Prüfung ist keins, sie ist an,
 und der Grund für den Schalter — der einzige ungefragte Netzzugriff — gehört
 daneben geschrieben statt in eine Fussnote. Ein fehlender Schlüssel heisst dabei „nie
 entschieden" und nicht „abgelehnt", weshalb das Kästchen ohne Zeile in der Tabelle
@@ -99,7 +105,7 @@ Zwei Dinge, die man dabei auseinanderhalten muss:
 
 Seit 0.29.3. Eine neue Fassung soll am echten Bestand laufen, bevor sie alle bekommen, und
 dafür gab es nur `npm run installieren`. Jetzt läuft eine Beta denselben Weg wie jede
-Fassung, und sie erreicht nur, wer **Einstellungen → Aktualisierung → Betaversionen
+Fassung, und sie erreicht nur, wer **Einstellungen → Über die App → Betaversionen
 erhalten** eingeschaltet hat. Ab Werk ist das aus.
 
 ```

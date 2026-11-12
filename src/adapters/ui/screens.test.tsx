@@ -497,8 +497,8 @@ describe("AnalyseScreen", () => {
     // Monat wählen, darunter die Kategorie aufklappen …
     await nutzer.click((await inMonatsauswertung(nutzer, "2026-06")).getByText(/Lebensmittel/));
     // … dann die Buchung darin.
-    await waitFor(() => expect(screen.getAllByTitle(/Buchungsdetails/).length).toBeGreaterThan(0));
-    await nutzer.click(screen.getAllByTitle(/Buchungsdetails/)[0]);
+    await waitFor(() => expect(screen.getAllByTitle(/Buchung öffnen/).length).toBeGreaterThan(0));
+    await nutzer.click(screen.getAllByTitle(/Buchung öffnen/)[0]);
 
     // Der Detaildialog trägt die Notiz der Buchung.
     await waitFor(() => expect(document.body.textContent).toMatch(/Sondermüll/));
@@ -574,7 +574,7 @@ describe("AnalyseScreen", () => {
 
     await nutzer.click(zeile);
     // Darunter die Kategorie im Einzelnen, mit ihren Buchungen.
-    await waitFor(() => expect(screen.getAllByTitle(/Buchungsdetails/).length).toBeGreaterThan(0));
+    await waitFor(() => expect(screen.getAllByTitle(/Buchung öffnen/).length).toBeGreaterThan(0));
   });
 });
 
@@ -679,7 +679,7 @@ describe("EinstellungenScreen", () => {
     await sqlitePersonRepository.speichern({ id: "p1", name: "Bruce", rolle: "hauptperson" });
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await registerWaehlen(nutzer, /^Personen$/);
+    await registerWaehlen(nutzer, /^Personalisierung$/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Bruce|Girokonto|Lebensmittel/));
   });
 });

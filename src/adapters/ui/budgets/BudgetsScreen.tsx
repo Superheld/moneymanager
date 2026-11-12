@@ -426,8 +426,7 @@ export function BudgetsScreen() {
           sicht={bereich.sicht}
           stand={offenesZeile}
           heute={heute}
-          kategorieNamen={bereich.kategorieNamen}
-          empfaenger={bereich.empfaenger}
+          zeilenkontext={bereich.zeilenkontext}
           onSchliessen={() => setOffenesBudget(null)}
           onBuchung={setDetail}
         />

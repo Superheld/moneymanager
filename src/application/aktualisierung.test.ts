@@ -6,6 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   aktualisierungEinspielen,
+  aktualisierungJetztPruefen,
   aktualisierungPruefen,
   pruefungErlaubt,
   pruefungSchalten,
@@ -159,5 +160,38 @@ describe("der Beta-Kanal", () => {
     expect(repo.schreiben).toHaveBeenCalledWith(SCHLUESSEL_AKTUALISIERUNG_BETA, "an");
     await betaSchalten(repo, false);
     expect(repo.schreiben).toHaveBeenCalledWith(SCHLUESSEL_AKTUALISIERUNG_BETA, "aus");
+  });
+});
+
+describe("Aktualisierung auf Knopfdruck", () => {
+  it("prüft auch, wenn die Prüfung beim Start abgeschaltet ist", async () => {
+    const pruefen = vi.fn(async () => ({ version: "0.31.0" }));
+    const ergebnis = await aktualisierungJetztPruefen(
+      { pruefen, async einspielen() {} },
+      repoMit({ [SCHLUESSEL_AKTUALISIERUNG]: "aus" }),
+    );
+    expect(pruefen).toHaveBeenCalled();
+    expect(ergebnis).toEqual({ art: "neu", aktualisierung: { version: "0.31.0" } });
+  });
+
+  it("folgt dem Beta-Schalter", async () => {
+    const pruefen = vi.fn(async () => null);
+    await aktualisierungJetztPruefen(
+      { pruefen, async einspielen() {} },
+      repoMit({ [SCHLUESSEL_AKTUALISIERUNG_BETA]: "an" }),
+    );
+    expect(pruefen).toHaveBeenCalledWith(true);
+  });
+
+  it("trennt nichts Neues von einer Prüfung, die nicht ging", async () => {
+    expect(await aktualisierungJetztPruefen(NICHTS, repoMit())).toEqual({ art: "aktuell" });
+    const kaputt: AktualisierungPort = {
+      async pruefen() {
+        throw new Error("kein Netz");
+      },
+      async einspielen() {},
+    };
+    vi.spyOn(console, "warn").mockImplementation(() => {});
+    expect(await aktualisierungJetztPruefen(kaputt, repoMit())).toEqual({ art: "fehler" });
   });
 });

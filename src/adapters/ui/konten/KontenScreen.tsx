@@ -571,9 +571,12 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   // und beim Durchblättern klickt man daneben. Der volle Text steht im
                   // title, für die Fälle, in denen abgeschnitten wird.
                   key: "bez", label: t("konten.spalteBeschreibung"), maxWidth: 320,
+                  // Die Zeile öffnet die Buchung, und ihr Name zeigt das an — nicht das
+                  // Datum davor (`bezeichner`, siehe `DataTable`).
+                  bezeichner: true,
                   render: (r) => (
                     <span title={r.bezeichnung} style={{ display: "inline-flex", alignItems: "center", gap: 7, flexWrap: "nowrap", maxWidth: "100%" }}>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
+                      <span className="zeilenname" style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.bezeichnung}</span>
                       {r.zeile.gegenkontoId && <span className="hinweis" style={{ whiteSpace: "nowrap" }}>{r.zeile.betrag < 0 ? "→" : "←"} {kontoName.get(r.zeile.gegenkontoId) ?? "?"}</span>}
                       {/* Der Prüf-Marker steht VOR den anderen Pillen: die übrigen sagen,
                           was eine Zeile IST, dieser sagt, was noch zu tun ist. Klick nimmt
@@ -612,19 +615,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                           <Pill variant="plan" style={{ overflow: "hidden", textOverflow: "ellipsis" }}>
                             {r.vertragsname}
                           </Pill>
-                        </span>
-                      )}
-                      {/* VORLÄUFIG, zum Nachsehen: gibt es zu dieser Zeile einen
-                          Journaleintrag? Der Verlauf selbst steht im Dialog; hier steht
-                          nur, wo es überhaupt etwas zu sehen gibt. Das Journal ist jung
-                          (seit 2026-08-23), und ohne diese Markierung müsste man Zeilen
-                          aufmachen, um zu erfahren, dass nichts drinsteht. */}
-                      {!!r.journaleintraege && (
-                        <span
-                          title={t("konten.pillVerlauf", { anzahl: r.journaleintraege })}
-                          style={{ flex: "0 0 auto", display: "inline-flex" }}
-                        >
-                          <Pill variant="neutral">{t("konten.pillVerlaufKurz", { anzahl: r.journaleintraege })}</Pill>
                         </span>
                       )}
                       {/* Der Verdacht steht an BEIDEN Zeilen — es gibt kein Original.
@@ -714,6 +704,10 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                 },
               ]}
               rows={gebuchtFuerTabelle}
+              // Die ganze Zeile öffnet die Buchung, wie in jeder anderen Tabelle. Bis
+              // 2026-11-12 tat das nur der Stift am Ende — die Zeile sah klickbar aus und
+              // war es nicht. Eine Zeile ohne Buchung (Rest aus einem Abruf) bleibt Text.
+              onRowClick={(r) => r.buchung && setEditBuchung(r.buchung)}
               // Gebucht, aber der Buchungstag liegt noch vor uns: die Bank fuehrt die
               // Zeile bereits im Saldo, passiert ist sie noch nicht. Sie steht deshalb
               // hier oben und nicht unter „geplant" — gedaempft, damit man den
