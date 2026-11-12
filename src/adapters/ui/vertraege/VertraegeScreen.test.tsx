@@ -17,7 +17,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { klickbareZeile, auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { VertraegeScreen } from "./VertraegeScreen";
 import { sqliteVertragRepository } from "../../persistence/sqliteVertragRepository";
 import {
@@ -1010,7 +1010,7 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
     await vertragMitZahlung();
     rendere(<VertraegeScreen />);
 
-    const link = await screen.findByRole("button", { name: /Talmberg Energie/ });
+    const link = await klickbareZeile("Talmberg Energie");
     // Vorher steht der Betrag der Zahlung nirgends.
     expect(document.body.textContent ?? "").not.toMatch(/47,20/);
 
@@ -1023,7 +1023,7 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
     await vertragMitZahlung();
     rendere(<VertraegeScreen />);
 
-    const link = await screen.findByRole("button", { name: /Talmberg Energie/ });
+    const link = await klickbareZeile("Talmberg Energie");
     await userEvent.click(link);
     await waitFor(() => expect(document.body.textContent ?? "").toMatch(/47,20/));
 

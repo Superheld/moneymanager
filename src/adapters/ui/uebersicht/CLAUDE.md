@@ -2,16 +2,18 @@
 
 Gilt für die Übersicht. Die Grenze zur Analyse steht in der Wurzel-`CLAUDE.md` unter „Die App in zehn Bereichen“. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
 
-**Die Übersicht rechnet über die LIQUIDEN Konten** — Monatskarten und Budgetliste aus
-derselben gefilterten Sicht. Gefiltert werden die BUCHUNGEN und Zahlungsregeln, nicht die
-Budgets: jedes Budget führt seine Zeile, auch wenn sein Geld auf einem Rücklagenkonto
-liegt, trägt, was aus den liquiden Konten dafür abging, und plant seine Rate. Bis
-2026-11-09 plante es sie dort nicht (`budgetsOhnePlan`), weil sie als Umbuchung schon in
-einer eigenen Zeile stand; seit die Umbuchungen herausfallen (unten), stünde sie sonst
-nirgends. Der Preis ist eine Aussage, die man kennen
-muss: **dasselbe Budget kann in der Übersicht einen kleineren Verbrauch zeigen als im
-Bereich Budgets** — dort steht der ganze Rahmen, hier nur, was aus den verfügbaren
-Mitteln davon gegangen ist. Der Untertitel der Übersicht sagt es mit.
+**Die Monatskarten rechnen über die LIQUIDEN Konten, die Budgetliste über ALLE** (seit
+2026-11-11). Gefiltert werden für die Karten die BUCHUNGEN und Zahlungsregeln, nicht die
+Budgets: jedes Budget führt dort seine Zeile und plant seine Rate.
+
+Die Budgetliste trug bis 2026-11-11 dieselbe liquide Sicht, und das hatte eine Folge,
+die man ihr nicht ansah: ein aufbauendes Budget auf seinem Rücklagenkonto war blind für
+seine eigenen Ausgaben. Die gingen vom Rücklagenkonto ab und zählten nicht — der Balken
+stand immer auf null, der Stand wuchs Monat für Monat um die Rate. Jetzt zeigt die Liste
+dieselben Zahlen wie der Bereich Budgets. **Der Preis:** die Zeilen „Budgets monatlich"
+und „Budgets aufbauend" der Monatskarten können für denselben Monat einen kleineren
+Verbrauch zeigen als die Liste darunter — die Karte fragt, was aus dem Verfügbaren
+wegging, die Liste, wie das Budget steht.
 
 **Budgets stehen getrennt nach Art** — monatlich (Rest verfällt) und aufbauend (Rest
 bleibt), in der Übersicht wie im Bereich Budgets und in den Monatskarten als zwei Zeilen

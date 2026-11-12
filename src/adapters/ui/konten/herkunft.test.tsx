@@ -17,7 +17,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { klickbareZeile, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import i18n from "../../../i18n/i18n";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { KontenVerwaltung } from "./KontenVerwaltung";
@@ -195,7 +195,7 @@ describe("Der Weg dorthin — vom Konto zu dem, was hereinkam", () => {
     // Vorher steht dort nichts davon.
     expect(document.body.textContent ?? "").not.toContain("Kesselmann Anlagen");
 
-    await userEvent.click(await screen.findByRole("button", { name: /Tagesgeld/ }));
+    await userEvent.click(await klickbareZeile(/Tagesgeld/));
 
     await waitFor(() => {
       const text = document.body.textContent ?? "";
@@ -213,7 +213,7 @@ describe("Der Weg dorthin — vom Konto zu dem, was hereinkam", () => {
     await zweiKonten();
     verwaltung();
 
-    const link = await screen.findByRole("button", { name: /Tagesgeld/ });
+    const link = await klickbareZeile(/Tagesgeld/);
     await userEvent.click(link);
     await waitFor(() => expect(document.body.textContent ?? "").toContain("Kesselmann Anlagen"));
 
@@ -332,7 +332,7 @@ describe("Zwei Fragen, zwei Antworten — Konto gegen Zugang", () => {
     await ausZweiQuellen();
     rendere(<HerkunftBereich kontoId="k1" zugangId="z1" />);
 
-    await userEvent.click(await screen.findByRole("button", { name: /11\.08\.2026/ }));
+    await userEvent.click(await klickbareZeile(/11\.08\.2026/));
 
     await waitFor(() => {
       const text = document.body.textContent ?? "";
@@ -346,7 +346,7 @@ describe("Zwei Fragen, zwei Antworten — Konto gegen Zugang", () => {
     await ausZweiQuellen();
     rendere(<HerkunftBereich kontoId="k1" zugangId="z1" />);
 
-    const link = await screen.findByRole("button", { name: /11\.08\.2026/ });
+    const link = await klickbareZeile(/11\.08\.2026/);
     await userEvent.click(link);
     await waitFor(() => expect(document.body.textContent ?? "").toContain("Aus Abruf Eins"));
 

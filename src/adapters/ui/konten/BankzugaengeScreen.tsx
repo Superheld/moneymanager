@@ -33,7 +33,6 @@ import {
 import { kannVorfall } from "../../../application";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { Bankprofilkarte } from "./Bankprofilkarte";
 import { TanDialog, useTanFrage } from "../bausteine/TanDialog";
@@ -289,19 +288,10 @@ export function BankzugaengeScreen({
           <div className="muted">{t("bankzugaenge.leer")}</div>
         ) : (
           <DataTable
+            onRowClick={(z: Bankzugang) => setKontenOffen(kontenOffen === z.id ? null : z.id)}
+            istAktiv={(z: Bankzugang) => z.id === kontenOffen}
             columns={[
-              {
-                key: "bezeichnung",
-                label: t("bankzugaenge.spalteBank"),
-                render: (z: Bankzugang) => (
-                  <Zeilenlink
-                    onKlick={() => setKontenOffen(kontenOffen === z.id ? null : z.id)}
-                    titel={t("bankzugaenge.zeigeKonten", { bank: z.bezeichnung })}
-                  >
-                    {z.bezeichnung}
-                  </Zeilenlink>
-                ),
-              },
+              { key: "bezeichnung", label: t("bankzugaenge.spalteBank") },
               { key: "blz", label: t("bankabruf.feldBlz") },
               { key: "benutzer", label: t("bankabruf.feldBenutzer") },
               {
@@ -390,22 +380,14 @@ export function BankzugaengeScreen({
             <div className="muted">{t("bankzugaenge.keineKonten")}</div>
           ) : (
             <DataTable
+              onRowClick={(z: Kontozuordnung) => setZeilenVon(zeilenVon === z.zahlungskontoId ? null : z.zahlungskontoId)}
+              istAktiv={(z: Kontozuordnung) => z.zahlungskontoId === zeilenVon}
               columns={[
                 {
                   key: "konto",
                   label: t("bankzugaenge.spalteKonto"),
                   render: (z: Kontozuordnung) => {
-                    const name = kontoNamen?.get(z.zahlungskontoId) ?? z.zahlungskontoId;
-                    return (
-                      <Zeilenlink
-                        onKlick={() =>
-                          setZeilenVon(zeilenVon === z.zahlungskontoId ? null : z.zahlungskontoId)
-                        }
-                        titel={t("konten.herkunft.zeigeZeilen", { konto: name })}
-                      >
-                        {name}
-                      </Zeilenlink>
-                    );
+                    return kontoNamen?.get(z.zahlungskontoId) ?? z.zahlungskontoId;
                   },
                 },
                 { key: "schluessel", label: t("bankzugaenge.spalteSchluessel") },

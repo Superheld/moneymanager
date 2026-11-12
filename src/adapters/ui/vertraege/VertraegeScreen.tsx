@@ -25,7 +25,6 @@ import type { DataColumn } from "../bausteine/DataTable";
 import { PageHead } from "../bausteine/PageHead";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { VertragModal } from "./VertragModal";
 import {
   formularAusKandidat,
@@ -162,6 +161,18 @@ export function VertraegeScreen() {
    * eine eigene Tabelle zeigt und nur dort die Rücklagen-Spalte trägt — innerhalb einer
    * Gruppe steht der Rhythmus fest, also ist die Spalte dort auch vergleichbar.
    */
+  /**
+   * Ein Klick auf eine Zeile zeigt die Zahlungen, die der Abgleich diesem Vertrag
+   * zugeordnet hat. Die Spalte daneben nennt nur ihre ANZAHL — die sagt „die Regel greift",
+   * aber nicht WAS sie greift. Erst an der Liste sieht man den Fehlgriff: eine fremde
+   * Zahlung an denselben Empfänger zählt genauso mit und macht aus einer falschen
+   * Zuordnung eine gute Kennzahl. Der zweite Klick klappt wieder zu.
+   */
+  const zeileWaehlen = {
+    onRowClick: (v: Vertrag) => setZahlungenVon(zahlungenVon === v.id ? null : v.id),
+    istAktiv: (v: Vertrag) => v.id === zahlungenVon,
+  };
+
   function spalten(mitRuecklage: boolean): DataColumn<Vertrag>[] {
     const s: DataColumn<Vertrag>[] = [
       {
@@ -171,10 +182,9 @@ export function VertraegeScreen() {
         // jeder Zeile („Abo") sagte nichts und kostete eine Spaltenbreite.
         render: (v) => (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-            {/* Klar als Text, seit 2026-11-11. Der Name war ein Link zu den Zahlungen
-                und sah damit aus wie der Weg „in" den Vertrag — den gibt es nicht, die
-                Zeile tut nichts. Der Weg zu den Zahlungen steht jetzt an ihrer Anzahl. */}
-            {v.anbieter}
+            {/* Die ganze Zeile öffnet die Zahlungen, der Name zeigt es an (`DataTable`,
+                Bezeichner) — dasselbe Muster wie in jeder Tabelle. */}
+            <span className="zeilenname">{v.anbieter}</span>
             {v.art === "dauervertrag" && <Pill variant="neutral">{t("vertraege.artKurz.dauervertrag")}</Pill>}
             {v.art === "umbuchung" && <Pill variant="um">{t("vertraege.artKurz.umbuchung")}</Pill>}
           </span>
@@ -230,23 +240,9 @@ export function VertraegeScreen() {
         key: "zahlungen",
         label: t("vertraege.spalteZugeordnet"),
         align: "right",
-        // Die Anzahl führt zu den Zahlungen selbst. Sie sagt nur „die Regel greift",
-        // nicht WAS sie greift — erst an der Liste sieht man den Fehlgriff: eine fremde
-        // Zahlung an denselben Empfänger zählt genauso mit und macht aus einer falschen
-        // Zuordnung eine gute Kennzahl. Bei null gibt es nichts zu zeigen, also auch
-        // nichts zu klicken; die Pille sagt es schon.
         render: (v) => {
           const n = zeileZu.get(v.id)?.zahlungen ?? 0;
-          return n > 0 ? (
-            <Zeilenlink
-              onKlick={() => setZahlungenVon(zahlungenVon === v.id ? null : v.id)}
-              titel={t("vertraege.zeigeZahlungen", { anbieter: v.anbieter })}
-            >
-              {String(n)}
-            </Zeilenlink>
-          ) : (
-            <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>
-          );
+          return n > 0 ? String(n) : <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>;
         },
       },
     ];
@@ -597,7 +593,7 @@ export function VertraegeScreen() {
               >
                 <div style={{ fontSize: "var(--fs-title)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{g.titel}</div>
                 <div className="hinweis" style={{ margin: "3px 0 var(--sp-3)" }}>{g.meta}</div>
-                <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
+                <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} {...zeileWaehlen} />
               </div>
             ))
           ) : (
@@ -608,6 +604,7 @@ export function VertraegeScreen() {
               pageSize={25}
               columns={spalten(false)}
               rows={ansicht === "faelligkeit" ? nachFaelligkeit : nachBetrag}
+              {...zeileWaehlen}
             />
           )}
         </Card>

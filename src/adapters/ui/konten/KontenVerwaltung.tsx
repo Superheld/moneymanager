@@ -31,7 +31,6 @@ import {
 } from "../../dienste";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { IconButton } from "../bausteine/IconButton";
 import { KontoAnlegenModal } from "./KontoAnlegenModal";
@@ -161,21 +160,18 @@ export function KontenVerwaltung({
         <div className="muted">{t("einstellungen.konto.leer")}</div>
       ) : (
         <DataTable
+          onRowClick={(k: Zahlungskonto) => setZeilenVon(zeilenVon === k.id ? null : k.id)}
+          istAktiv={(k: Zahlungskonto) => k.id === zeilenVon}
           columns={[
             {
               key: "bezeichnung",
               label: t("einstellungen.konto.spalteBezeichnung"),
-              // Der Bezeichner führt weiter — sichtbar, weil er wie ein Link aussieht.
-              // Die Zeile selbst bleibt stumm: eine unsichtbare Klickfläche findet
-              // niemand, und wer sie zufällig trifft, hat sie nicht gemeint.
+              // Die ganze Zeile führt weiter, der Name zeigt es an (`DataTable`,
+              // Bezeichner). Bis 2026-11-11 war nur der Name ein Link und die Zeile
+              // daneben stumm — anders als in jeder anderen Tabelle.
               render: (k: Zahlungskonto) => (
                 <Zeile inline umbruch={false}>
-                  <Zeilenlink
-                    onKlick={() => setZeilenVon(zeilenVon === k.id ? null : k.id)}
-                    titel={t("konten.herkunft.zeigeZeilen", { konto: k.bezeichnung })}
-                  >
-                    {k.bezeichnung}
-                  </Zeilenlink>
+                  <span className="zeilenname">{k.bezeichnung}</span>
                   {/* Die Marke steht NEBEN dem Namen und nicht in einer eigenen Spalte:
                       der Zustand ist selten, eine Spalte dafuer waere in jeder Zeile
                       leer — und hier liest es sich als das, was es ist, ein Teil der

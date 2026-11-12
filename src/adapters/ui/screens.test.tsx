@@ -199,7 +199,7 @@ describe("UebersichtScreen", () => {
    * gar keinem — was auf einem Rücklagenkonto passierte, stand mit in „so sieht der
    * Monat aus", obwohl es dort gerade nicht zur Verfügung steht.
    */
-  it("lässt Buchungen auf Rücklagenkonten aus den Monatskarten heraus", async () => {
+  it("lässt Buchungen auf Rücklagenkonten aus den Monatskarten heraus, nicht aus der Budgetliste", async () => {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
       id: "k-rueck", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "ruecklage",
@@ -225,9 +225,10 @@ describe("UebersichtScreen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
     // … und nicht die Summe beider Konten. Genau die stünde da ohne den Filter.
     expect(document.body.textContent).not.toMatch(/802,36/);
-    // Die Budgetliste rechnet aus DERSELBEN Sicht: 1.000,00 − 123,45 bleiben übrig.
-    // Ungefiltert stünden hier 197,64, und das Budget sähe fast erschöpft aus.
-    await waitFor(() => expect(document.body.textContent).toMatch(/876,55/));
+    // Die Budgetliste rechnet seit 2026-11-11 über ALLE Konten — ein Budget ist ein Topf,
+    // und was aus ihm ging, ging aus ihm: 1.000,00 − 123,45 − 678,91 = 197,64.
+    await waitFor(() => expect(document.body.textContent).toMatch(/197,64/));
+    expect(document.body.textContent).not.toMatch(/876,55/);
   });
 
   /**

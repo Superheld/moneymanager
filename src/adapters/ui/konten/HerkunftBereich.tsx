@@ -19,7 +19,6 @@ import { zurueckholen, type Umsatz } from "../../../application/import";
 import { herkunft as herkunftLaden, umsatzSpeichern } from "../../dienste";
 import { Card, Pill, Button } from "../bausteine";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { DataTable } from "../bausteine/DataTable";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -139,18 +138,13 @@ export function HerkunftBereich({
               <DataTable
                 sortable
                 istAktiv={(l: Laufbefund) => l.lauf.id === laufId}
+                onRowClick={(l: Laufbefund) => setLaufId(laufId === l.lauf.id ? null : l.lauf.id)}
                 columns={[
                   {
                     key: "zeitpunkt",
                     label: t("konten.herkunft.spalteImport"),
-                    render: (l: Laufbefund) => (
-                      <Zeilenlink
-                        onKlick={() => setLaufId(laufId === l.lauf.id ? null : l.lauf.id)}
-                        titel={t("konten.herkunft.zeigeLauf", { datum: datum.mitJahr(l.lauf.zeitpunkt) })}
-                      >
-                        {datum.mitJahr(l.lauf.zeitpunkt)}
-                      </Zeilenlink>
-                    ),
+                    sortValue: (l: Laufbefund) => l.lauf.zeitpunkt,
+                    render: (l: Laufbefund) => datum.mitJahr(l.lauf.zeitpunkt),
                   },
                   {
                     key: "quelle",

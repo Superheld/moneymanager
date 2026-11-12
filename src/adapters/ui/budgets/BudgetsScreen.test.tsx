@@ -20,7 +20,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { klickbareZeile, auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { BudgetsScreen } from "./BudgetsScreen";
 import { sqliteBudgetRepository } from "../../persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
@@ -435,7 +435,7 @@ describe("BudgetsScreen · Verlauf", () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
 
-    const link = await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ });
+    const link = await klickbareZeile("Urlaubskasse");
     await nutzer.click(link);
 
     await screen.findByText(/Verlauf · Urlaubskasse/);
@@ -458,7 +458,7 @@ describe("BudgetsScreen · Verlauf", () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
 
-    await nutzer.click(await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Urlaubskasse"));
     await screen.findByText(/Verlauf · Urlaubskasse/);
     await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
     await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
@@ -494,7 +494,7 @@ describe("BudgetsScreen · Verlauf", () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
 
-    await nutzer.click(await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Urlaubskasse"));
     await screen.findByText(/Verlauf · Urlaubskasse/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Ruecksendung/));
 
@@ -515,7 +515,7 @@ describe("BudgetsScreen · Verlauf", () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
 
-    const link = await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ });
+    const link = await klickbareZeile("Urlaubskasse");
     await nutzer.click(link);
     await screen.findByText(/Verlauf · Urlaubskasse/);
 
@@ -539,12 +539,12 @@ describe("BudgetsScreen · Verlauf", () => {
     await screen.findByText(/Urlaubskasse/);
 
     // Irgendwo in der Zeile, aber nicht auf dem Namen: die Konto-Zelle daneben.
-    const zeile = screen.getByRole("button", { name: /Urlaubskasse — Verlauf/ }).closest("tr") as HTMLElement;
+    const zeile = await klickbareZeile("Urlaubskasse");
     await nutzer.click(within(zeile).getAllByRole("cell")[1]);
     await screen.findByText(/Verlauf · Urlaubskasse/);
 
     // Und der Name schaltet weiterhin genau einmal um — nicht hin und gleich zurück.
-    await nutzer.click(screen.getByRole("button", { name: /Urlaubskasse — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Urlaubskasse"));
     await waitFor(() => expect(screen.queryByText(/Verlauf · Urlaubskasse/)).toBeNull());
   });
 
@@ -570,7 +570,7 @@ describe("BudgetsScreen · Verlauf", () => {
 
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
-    await nutzer.click(await screen.findByRole("button", { name: /Rennrad — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Rennrad"));
 
     // Leere Balken für Monate vor dem Start zeigten Ausgaben, die das Budget nie
     // belastet haben — hier steht stattdessen, warum nichts da ist.
@@ -582,7 +582,7 @@ describe("BudgetsScreen · Verlauf", () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
 
-    const link = await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ });
+    const link = await klickbareZeile("Urlaubskasse");
     await nutzer.click(link);
     await screen.findByText(/Verlauf · Urlaubskasse/);
     await nutzer.click(link);
@@ -640,7 +640,7 @@ describe("BudgetsScreen · Betragsversionen", () => {
     await screen.findByText(/Lebensmittel/);
     await betragAendern(nutzer, "450");
 
-    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Lebensmittel"));
     await screen.findByText(/Verlauf · Lebensmittel/);
 
     // Laufender Monat: der neue Rahmen, plus der Hinweis auf den Wechsel.
@@ -700,7 +700,7 @@ describe("BudgetsScreen · Betragsversionen", () => {
 
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
-    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Lebensmittel"));
     await screen.findByText(/Verlauf · Lebensmittel/);
 
     await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-2));

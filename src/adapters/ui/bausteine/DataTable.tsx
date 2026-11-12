@@ -117,6 +117,18 @@ export interface DataTableProps<T> {
   labelVor?: string;
 }
 
+/**
+ * Der Bezeichner einer klickbaren Zeile — die erste Spalte, schmal die Titelzeile — steht
+ * als Link da (seit 2026-11-11, `.datentabelle-bezeichner` in `app.css`).
+ *
+ * Das EINE Muster für jede Tabelle: ist die Zeile klickbar, ist es die GANZE Zeile, und
+ * ihr Name zeigt es an. Ist sie es nicht, ist alles Text. Vorher stand das an drei Stellen
+ * dreimal anders da: Konten mit einem Link im Namen und einer toten Zeile daneben, der
+ * Kontoauszug mit einer klickbaren Zeile ohne jedes Zeichen dafür, die Verträge mit dem
+ * Weg in einer einzigen Spalte. Gesetzt wird es hier, damit es keine Tabelle vergisst.
+ */
+const BEZEICHNER = "datentabelle-bezeichner";
+
 /** Was in einer klickbaren Zeile selbst bedient wird und deren Klick nicht auslöst. */
 const BEDIENTEIL = "button, a, input, select, textarea, label, [role=button], [role=checkbox], [role=combobox], [role=switch]";
 
@@ -329,7 +341,7 @@ export function DataTable<T>({
                 return (
                   <tr key={ri} {...bedienung} aria-current={ausgewaehlt} style={zeilenStil}>
                     <td style={{ padding: "10px", borderBottom: "1px solid var(--line-soft)", textAlign: "left", color: "var(--ink)", overflow: "hidden" }}>
-                      <div title={alsText(tv)} style={{ fontWeight: "var(--fw-bold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tv}</div>
+                      <div title={alsText(tv)} className={onRowClick ? BEZEICHNER : undefined} style={{ fontWeight: "var(--fw-bold)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{tv}</div>
                       {zelleZweitzeile(row)}
                     </td>
                     {rollen.wert && (
@@ -355,7 +367,7 @@ export function DataTable<T>({
                             die Tabelle verteilt übrige Breite auf die Spalten, und ein
                             gekappter Block stünde sonst links davon — Zahl und Spaltenkopf
                             lägen nicht übereinander. */}
-                        <div title={alsText(v)} style={{ maxWidth: c.maxWidth ?? STANDARD_MAX,
+                        <div title={alsText(v)} className={onRowClick && ci === 0 ? BEZEICHNER : undefined} style={{ maxWidth: c.maxWidth ?? STANDARD_MAX,
                           marginLeft: rechts ? "auto" : undefined,
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{v}</div>
                       </td>
