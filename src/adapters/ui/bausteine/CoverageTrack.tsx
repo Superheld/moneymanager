@@ -30,10 +30,16 @@ export interface CoverageTrackProps {
    * einer Liste, deren Zeile den Namen schon trägt. Ohne ihn hiesse der Balken nichts.
    */
   name?: string;
+  /**
+   * Eine Marke auf derselben Skala wie `value` — ein senkrechter Strich über dem Balken
+   * (seit 2026-11-11, für das Soll einer Rücklage). Ein Balken plus Strich vergleicht Ist
+   * und Soll in EINER Zeile; zwei Balken untereinander liessen den Vergleich im Kopf.
+   */
+  marke?: number;
   style?: CSSProperties;
 }
 
-export function CoverageTrack({ value, max = 100, label, right, over, name, style }: CoverageTrackProps) {
+export function CoverageTrack({ value, max = 100, label, right, over, name, marke, style }: CoverageTrackProps) {
   const sicheresMax = max > 0 ? max : 1;
   const pct = Math.max(0, Math.min(100, Math.round((value / sicheresMax) * 100)));
   const istUeber = over ?? value > max;
@@ -53,6 +59,7 @@ export function CoverageTrack({ value, max = 100, label, right, over, name, styl
           <span className="num" style={{ color: istUeber ? "var(--warn-deep)" : "var(--ink-2)", whiteSpace: "nowrap" }}>{right}</span>
         </div>
       )}
+      <div style={{ position: "relative" }}>
       <Meter.Track style={{ height: 7, borderRadius: "var(--r-pill)", background: "var(--line)", overflow: "hidden" }}>
         {/* Die Breite setzen wir selbst: Base UI füllt nach dem gekappten Wert, wir nach
             dem gerundeten Anteil — und die Farbe hängt an der Überschreitung. */}
@@ -61,6 +68,23 @@ export function CoverageTrack({ value, max = 100, label, right, over, name, styl
           style={{ height: "100%", width: pct + "%", borderRadius: "var(--r-pill)", background: istUeber ? "var(--warn)" : "var(--accent)" }}
         />
       </Meter.Track>
+      {/* Ausserhalb der Spur, weil die ihre Füllung abschneidet (`overflow: hidden`);
+          der Strich ragt oben und unten etwas über. */}
+      {marke != null && (
+        <span
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            top: -3,
+            bottom: -3,
+            left: `calc(${Math.max(0, Math.min(100, (marke / sicheresMax) * 100))}% - 1px)`,
+            width: 2,
+            borderRadius: 1,
+            background: "var(--ink)",
+          }}
+        />
+      )}
+      </div>
     </Meter.Root>
   );
 }

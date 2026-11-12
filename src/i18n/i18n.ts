@@ -520,6 +520,9 @@ const de = {
     legendeIst: "gebucht",
     legendePlan: "geplant",
     legendeBalkenPlan: "blass: geplant",
+    legendeTief: "tiefster Stand im Monat",
+    tiefstandAm: "tiefster Stand {{betrag}} am {{tag}}",
+    spalteTiefstand: "Tiefster Stand",
     pillPlan: "Plan",
     warnungMinus:
       "Im {{monat}} steht der vorhergesagte Stand bei {{betrag}}. Gerechnet ist monatsweise: " +
@@ -818,6 +821,8 @@ const de = {
     fortschrittLabel: "Soll heute / Ziel",
     freiAufgelaufen: "aufgelaufen seit Beginn: {{betrag}}",
     gedecktDurch: "davon da auf {{konto}}",
+    stand: "da auf {{konto}} — der Strich ist das Soll von heute",
+    standRechts: "{{da}} / {{ziel}} · Soll {{soll}}",
     flussTitel: "Diesen Monat",
     flussUntertitel: "Was auf den Rücklagenkonten eingeht — und was dafür eingerichtet ist",
     flussBedarf: "Bedarf",
@@ -2228,6 +2233,7 @@ const de = {
   charts: {
     einnahmen: "Einnahmen",
     ausgabenInklBudgets: "Ausgaben (inkl. Budgets)",
+    tooltipFluss: "{{monat}}: Einnahmen {{ein}}, Ausgaben {{aus}}",
   },
 };
 
@@ -2716,6 +2722,9 @@ const en: typeof de = {
     legendeIst: "booked",
     legendePlan: "planned",
     legendeBalkenPlan: "faded: planned",
+    legendeTief: "lowest balance in the month",
+    tiefstandAm: "lowest {{betrag}} on {{tag}}",
+    spalteTiefstand: "Lowest balance",
     pillPlan: "Plan",
     warnungMinus:
       "In {{monat}} the projected balance is {{betrag}}. This is calculated by month: " +
@@ -3009,6 +3018,8 @@ const en: typeof de = {
     fortschrittLabel: "Target today / Goal",
     freiAufgelaufen: "accumulated since the start: {{betrag}}",
     gedecktDurch: "of that on {{konto}}",
+    stand: "on {{konto}} — the mark is today's target",
+    standRechts: "{{da}} / {{ziel}} · target {{soll}}",
     flussTitel: "This month",
     flussUntertitel: "What arrives on the reserve accounts — and what is set up for it",
     flussBedarf: "Needed",
@@ -4366,6 +4377,7 @@ const en: typeof de = {
   charts: {
     einnahmen: "Income",
     ausgabenInklBudgets: "Expenses (incl. budgets)",
+    tooltipFluss: "{{monat}}: income {{ein}}, expenses {{aus}}",
   },
 };
 

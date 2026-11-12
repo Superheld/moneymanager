@@ -33,7 +33,9 @@ interface Props {
 export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, height = 240, onMonatClick, aktivIndex, planAb, legendePlan }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
-  const padL = 52;
+  // Derselbe linke Rand wie `SaldoVerlaufChart`: stehen beide untereinander (Blick nach
+  // vorn), fluchten die Monate nur mit gleichem Rand.
+  const padL = 56;
   const padR = 16;
   const padT = 14;
   const padB = 26;
@@ -68,6 +70,7 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
           const klickbar = !!onMonatClick;
           return (
             <g key={i} onClick={klickbar ? () => onMonatClick!(i) : undefined} style={klickbar ? { cursor: "pointer" } : undefined}>
+              <title>{t("charts.tooltipFluss", { monat: m, ein: geld.formatMitSymbol(einnahmen[i] ?? 0), aus: geld.formatMitSymbol(ausgaben[i] ?? 0) })}</title>
               {aktivIndex === i && (
                 <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="var(--accent)" opacity="0.1" />
               )}
@@ -78,8 +81,9 @@ export function MonatsFlussChart({ labels, einnahmen, ausgaben, width = 1000, he
                   Euro in zwei Farben, je nachdem wo man hinsah. */}
               <rect x={cx - bw - 1} y={basis - ein} width={bw} height={ein} rx="2" fill={flussFarbe(1)} opacity={planAb != null && i >= planAb ? 0.45 : 1} />
               <rect x={cx + 1} y={basis - aus} width={bw} height={aus} rx="2" fill={flussFarbe(-1)} opacity={planAb != null && i >= planAb ? 0.45 : 1} />
-              {/* transparenter, voll-hoher Slot für leichtes Klicken */}
-              {klickbar && <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="transparent" />}
+              {/* transparenter, voll-hoher Slot — für leichtes Klicken und damit der Titel
+                  auch über der Lücke zwischen den Balken erscheint */}
+              <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="transparent" />
               {i % Math.ceil(n / 12) === 0 && (
                 <text x={cx} y={height - 8} textAnchor="middle" fontSize="10.5" fill="var(--ink-3)" fontFamily="var(--font-ui)">{m}</text>
               )}

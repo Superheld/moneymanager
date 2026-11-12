@@ -242,15 +242,32 @@ export function RuecklagenScreen() {
                     </span>
                   </div>
 
-                  {/* Die Rechnung: wie weit die Ansparung fortgeschritten ist.
+                  {/* EIN Balken je Rücklage (seit 2026-11-11): was da ist, gegen das Ziel —
+                      und ein Strich beim Soll von heute. Vorher standen zwei Balken
+                      untereinander („Soll heute / Ziel" und „davon da"), und ob man im
+                      Rückstand ist, musste man aus zwei Längen im Kopf abgleichen. Liegt
+                      der Balken vor dem Strich, fehlt etwas; dann trägt er die Warnfarbe.
                       Der Balken bekommt die CENT-Werte direkt: er rechnet nur ein
-                      Verhältnis, und die Umrechnung in Euro kürzte sich darin ohnehin weg.
+                      Verhältnis.
 
-                      NUR MIT ZIEL. Eine freie Rücklage hat keinen Nenner — ein Balken
-                      bräuchte einen erfundenen, und jeder erfundene erzählte etwas
-                      Falsches: gegen ihr eigenes Soll gemessen stünde sie ewig bei
-                      100 %, gegen irgendetwas anderes bei einer Zahl ohne Bedeutung. */}
-                  {mitZiel ? (
+                      Ohne Konto gibt es nur die Rechnung — dann zeigt der Balken das Soll.
+                      Und eine FREIE Rücklage hat keinen Nenner: ein Balken bräuchte einen
+                      erfundenen. Dort steht, was aufgelaufen ist, und mit Konto der Stand
+                      gegen dieses Aufgelaufene. */}
+                  {mitZiel && p.tatsaechlich != null ? (
+                    <CoverageTrack
+                      value={p.tatsaechlich}
+                      max={r.ziel as number}
+                      marke={p.soll}
+                      over={p.tatsaechlich < p.soll}
+                      label={t("ruecklagen.stand", { konto: kontoName.get(r.kontoId!) ?? "?" })}
+                      right={t("ruecklagen.standRechts", {
+                        da: geld.format(p.tatsaechlich),
+                        ziel: geld.formatMitSymbol(r.ziel as number),
+                        soll: geld.format(p.soll),
+                      })}
+                    />
+                  ) : mitZiel ? (
                     <CoverageTrack
                       value={p.soll}
                       max={r.ziel as number}
@@ -258,25 +275,22 @@ export function RuecklagenScreen() {
                       right={`${geld.format(p.soll)} / ${geld.format(r.ziel as number)} ${geld.symbol}`}
                     />
                   ) : (
-                    <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>
-                      {t("ruecklagen.freiAufgelaufen", { betrag: `${geld.format(p.soll)} ${geld.symbol}` })}
-                    </div>
-                  )}
-
-                  {/* Die Wirklichkeit: nur, wenn ein Konto benannt ist.
-                      Bezugsgröße ist mit Ziel das ZIEL und ohne Ziel das aufgelaufene
-                      Soll — derselbe Maßstab wie beim Balken darüber. Die Warnfarbe
-                      bleibt am Soll: darunter liegt man zurück. */}
-                  {p.tatsaechlich != null && (
-                    <div style={{ marginTop: 6 }}>
-                      <CoverageTrack
-                        value={p.tatsaechlich}
-                        max={Math.max(1, mitZiel ? (r.ziel as number) : p.soll)}
-                        over={p.tatsaechlich < p.soll}
-                        label={t("ruecklagen.gedecktDurch", { konto: kontoName.get(r.kontoId!) ?? "?" })}
-                        right={`${geld.format(p.tatsaechlich)} / ${geld.format(mitZiel ? (r.ziel as number) : p.soll)} ${geld.symbol}`}
-                      />
-                    </div>
+                    <>
+                      <div className="muted" style={{ fontSize: "var(--fs-sm)" }}>
+                        {t("ruecklagen.freiAufgelaufen", { betrag: `${geld.format(p.soll)} ${geld.symbol}` })}
+                      </div>
+                      {p.tatsaechlich != null && (
+                        <div style={{ marginTop: 6 }}>
+                          <CoverageTrack
+                            value={p.tatsaechlich}
+                            max={Math.max(1, p.soll)}
+                            over={p.tatsaechlich < p.soll}
+                            label={t("ruecklagen.gedecktDurch", { konto: kontoName.get(r.kontoId!) ?? "?" })}
+                            right={`${geld.format(p.tatsaechlich)} / ${geld.format(p.soll)} ${geld.symbol}`}
+                          />
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               );

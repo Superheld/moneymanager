@@ -2,6 +2,7 @@
 // Nulllinie betont, falls der Saldo ins Minus läuft.
 
 import { useGeld } from "../bausteine/einstellungenKontext";
+import { warnFlaeche } from "../bausteine/geldFarbe";
 
 interface Props {
   labels: string[];
@@ -28,6 +29,21 @@ interface Props {
   ohneNull?: boolean;
   width?: number;
   height?: number;
+  /**
+   * Punkte auf die MITTE je Monat statt auf die Ränder — dieselbe Lage wie die Balken
+   * eines `MonatsFlussChart` darunter (seit 2026-11-11, im Blick nach vorn). Sonst stand
+   * ein Monat oben an anderer Stelle als unten, und man las den falschen Balken ab.
+   */
+  mittig?: boolean;
+  /**
+   * Je Punkt optional der tiefste Stand INNERHALB des Monats. Gezeichnet als dünner
+   * Strich vom Monatsende hinunter bis zur Marke: die Linie sagt, wo der Monat endet, der
+   * Strich, wie tief es dazwischen geht.
+   */
+  tiefpunkte?: readonly (number | undefined)[];
+  /** Zusatz je Punkt für den Hover-Text (etwa der Tag des Tiefstands). */
+  zusatz?: readonly (string | undefined)[];
+  legendeTief?: string;
 }
 
 export function SaldoVerlaufChart({
@@ -39,6 +55,10 @@ export function SaldoVerlaufChart({
   ohneNull = false,
   width = 1000,
   height = 300,
+  mittig = false,
+  tiefpunkte,
+  zusatz,
+  legendeTief,
 }: Props) {
   const geld = useGeld();
   const padL = 56;
@@ -47,14 +67,17 @@ export function SaldoVerlaufChart({
   const padB = 30;
   const n = labels.length;
 
-  const alle = ohneNull ? werte : [...werte, 0];
+  const tiefe = (tiefpunkte ?? []).filter((v): v is number => v != null);
+  const alle = ohneNull ? [...werte, ...tiefe] : [...werte, ...tiefe, 0];
   // Über den Betrag gerechnet, damit „10 % darüber" auch bei einem negativen Wert nach
   // oben zeigt.
   const max = ohneNull ? Math.max(...alle) + Math.abs(Math.max(...alle)) * 0.1 : Math.max(...alle);
   const min = ohneNull ? Math.min(...alle) - Math.abs(Math.min(...alle)) * 0.1 : Math.min(...alle);
   const spanne = max - min || 1;
 
-  const x = (i: number) => padL + (n <= 1 ? 0 : (i * (width - padL - padR)) / (n - 1));
+  const slot = n > 0 ? (width - padL - padR) / n : width - padL - padR;
+  const x = (i: number) =>
+    mittig ? padL + slot * i + slot / 2 : padL + (n <= 1 ? 0 : (i * (width - padL - padR)) / (n - 1));
   const y = (v: number) => padT + ((max - v) * (height - padT - padB)) / spanne;
   const punkt = (v: number, i: number, erster: boolean) =>
     (erster ? "M" : "L") + x(i).toFixed(1) + " " + y(v).toFixed(1);
@@ -90,7 +113,7 @@ export function SaldoVerlaufChart({
           i % Math.ceil(n / 12) === 0 ? (
             // Die letzte Beschriftung endet an ihrem Punkt statt mittig darüber: mittig
             // ragte sie über den rechten Rand und wurde abgeschnitten.
-            <text key={i} x={x(i)} y={height - 9} textAnchor={i === n - 1 && n > 1 ? "end" : "middle"} fontSize="11" fill="var(--ink-3)" fontFamily="var(--font-ui)">
+            <text key={i} x={x(i)} y={height - 9} textAnchor={!mittig && i === n - 1 && n > 1 ? "end" : "middle"} fontSize="11" fill="var(--ink-3)" fontFamily="var(--font-ui)">
               {m}
             </text>
           ) : null,
@@ -117,6 +140,26 @@ export function SaldoVerlaufChart({
             strokeLinejoin="round"
           />
         )}
+        {/* Der Tiefstand im Monat: ein Strich vom Monatsende hinunter, unten eine Marke.
+            Amber nur, wo er unter null fällt — sonst ist er Auskunft, keine Warnung. */}
+        {tiefpunkte?.map((t, i) =>
+          t == null || t >= werte[i] ? null : (
+            <g key={`t${i}`}>
+              <line x1={x(i)} y1={y(werte[i])} x2={x(i)} y2={y(t)} stroke={warnFlaeche(t < 0) ?? "var(--ink-3)"} strokeWidth="1.4" />
+              <line x1={x(i) - 5} y1={y(t)} x2={x(i) + 5} y2={y(t)} stroke={warnFlaeche(t < 0) ?? "var(--ink-3)"} strokeWidth="2" strokeLinecap="round" />
+            </g>
+          ),
+        )}
+        {/* Hover: je Punkt eine unsichtbare Fläche über die ganze Höhe, mit dem Wert als
+            Titel. Ohne sie gab es in diesem Chart keinen einzigen Wert abzulesen. */}
+        {werte.map((v, i) => {
+          const breite = mittig ? slot : n <= 1 ? width - padL - padR : (width - padL - padR) / (n - 1);
+          return (
+            <rect key={`h${i}`} x={x(i) - breite / 2} y={padT} width={breite} height={height - padT - padB} fill="transparent">
+              <title>{`${labels[i]}: ${geld.formatMitSymbol(v)}${zusatz?.[i] ? ` · ${zusatz[i]}` : ""}`}</title>
+            </rect>
+          );
+        })}
       </svg>
       <div style={{ display: "flex", gap: "var(--sp-5)", marginTop: "var(--sp-2)", fontSize: "var(--fs-sm)", color: "var(--ink-2)" }}>
         <span>
@@ -136,6 +179,12 @@ export function SaldoVerlaufChart({
               }}
             />
             {legendePlan}
+          </span>
+        )}
+        {legendeTief && tiefe.length > 0 && (
+          <span>
+            <span style={{ display: "inline-block", width: 2, height: 12, background: "var(--ink-3)", verticalAlign: "middle", marginRight: 8, marginLeft: 4 }} />
+            {legendeTief}
           </span>
         )}
       </div>

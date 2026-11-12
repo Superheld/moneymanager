@@ -221,6 +221,18 @@ describe("Card", () => {
 });
 
 describe("CoverageTrack", () => {
+  // Seit 2026-11-11: ein Strich auf derselben Skala wie der Wert (das Soll einer Rücklage).
+  it("setzt die Marke an ihren Anteil am Maximum", () => {
+    const { container } = render(<CoverageTrack value={30} max={200} marke={50} name="Stand" />);
+    const strich = container.querySelector('[aria-hidden="true"]') as HTMLElement;
+    expect(strich.style.left).toBe("calc(25% - 1px)");
+  });
+
+  it("zeichnet ohne Marke keinen Strich", () => {
+    const { container } = render(<CoverageTrack value={30} max={200} name="Stand" />);
+    expect(container.querySelector('[aria-hidden="true"]')).toBeNull();
+  });
+
   // Vorher zwei div-Kästen: für eine Vorlesehilfe gab es den Balken nicht.
   it("meldet sich als Messwert mit Grenzen", () => {
     render(<CoverageTrack value={30} max={60} label="Lebensmittel" />);

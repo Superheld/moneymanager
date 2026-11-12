@@ -25,6 +25,7 @@ import {
   kennzahlen,
   monatsAusblicke,
   planWirkung,
+  tiefstandImMonat,
   projiziereRegel,
   vertragstreue,
   betragInKategorie,
@@ -389,6 +390,13 @@ export interface Verlaufspunkt {
   readonly saldo: Cent;
   /** true = projiziert, nicht gebucht. */
   readonly plan: boolean;
+  /**
+   * Nur an Planmonaten: der tiefste Stand INNERHALB des Monats und sein Tag
+   * (`tiefstandImMonat`). Die Linie zeigt das Monatsende; wann es dazwischen eng wird,
+   * steht hier.
+   */
+  readonly tiefstand?: Cent;
+  readonly tiefstandAm?: string;
 }
 
 /**
@@ -451,6 +459,7 @@ export function analyseAusblick(
       : (istMonatsverlauf(basis.konten, basis.buchungen, toIso(vormonat), toIso(vormonat))[0]?.saldo ?? 0);
   for (const a of ausblicke) {
     const w = planWirkung(a.zeilen.map((z) => ({ id: z.id, plan: z.plan })));
+    const tief = tiefstandImMonat(saldo, a.label, a.zeilen);
     saldo += w.netto;
     punkte.push({
       monat: a.label,
@@ -459,6 +468,8 @@ export function analyseAusblick(
       netto: w.netto,
       saldo,
       plan: true,
+      tiefstand: tief.tiefstand,
+      tiefstandAm: tief.am,
     });
   }
   return punkte;

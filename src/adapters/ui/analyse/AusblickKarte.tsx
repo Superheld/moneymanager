@@ -12,7 +12,7 @@
 import { useTranslation } from "react-i18next";
 import type { Verlaufspunkt } from "../../../application";
 import { Card, DataTable, Pill } from "../bausteine";
-import { useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { MonatsFlussChart } from "./MonatsFlussChart";
 import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
@@ -20,6 +20,7 @@ import { SaldoVerlaufChart } from "./SaldoVerlaufChart";
 export function AusblickKarte({ punkte }: { punkte: readonly Verlaufspunkt[] }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  const datum = useDatum();
   if (punkte.length === 0) return null;
 
   const ersterPlan = punkte.findIndex((p) => p.plan);
@@ -45,6 +46,10 @@ export function AusblickKarte({ punkte }: { punkte: readonly Verlaufspunkt[] }) 
         legendePlan={t("blickNachVorn.legendePlan")}
         abIndex={ersterPlan > 0 ? ersterPlan : undefined}
         ohneNull
+        mittig
+        tiefpunkte={punkte.map((p) => p.tiefstand)}
+        zusatz={punkte.map((p) => (p.tiefstand != null && p.tiefstandAm ? t("blickNachVorn.tiefstandAm", { betrag: geld.formatMitSymbol(p.tiefstand), tag: datum.ohneJahr(p.tiefstandAm) }) : undefined))}
+        legendeTief={t("blickNachVorn.legendeTief")}
       />
 
       {/* Darunter, was je Monat herein- und hinausgeht: die Linie sagt, wo der Stand
@@ -110,6 +115,22 @@ export function AusblickKarte({ punkte }: { punkte: readonly Verlaufspunkt[] }) 
               render: (r) => (
                 <span style={{ color: geldFarbe(r.saldo) }}>{geld.format(r.saldo)}</span>
               ),
+            },
+            {
+              // Wann es im Monat am engsten wird — die Antwort auf „wann brauche ich wie
+              // viel". Nur an Planmonaten; ein gewesener Monat hat seinen Tiefpunkt hinter sich.
+              key: "tiefstand",
+              label: `${t("blickNachVorn.spalteTiefstand")} ${geld.symbol}`,
+              align: "right",
+              render: (r) =>
+                r.tiefstand == null ? (
+                  <span className="muted">—</span>
+                ) : (
+                  <span style={{ color: geldFarbe(Math.min(0, r.tiefstand)) }}>
+                    {geld.format(r.tiefstand)}
+                    {r.tiefstandAm && <span className="hinweis" style={{ marginLeft: 6 }}>{datum.ohneJahr(r.tiefstandAm)}</span>}
+                  </span>
+                ),
             },
           ]}
           rows={[...punkte]}

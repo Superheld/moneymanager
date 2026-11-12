@@ -22,8 +22,25 @@ import { CoverageTrack, Pill } from "../bausteine";
 import { AUFKLAPP_ZEILEN_SCHMAL, aufklappHoehe } from "../bausteine/aufklappen";
 import { Aufklapptabelle } from "../bausteine/Aufklapptabelle";
 import { Umschalter } from "../bausteine/Umschalter";
-import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
+import { useDatum, useGeld, useProzent } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+
+/**
+ * Seit 2026-11-11 misst jeder Balken den ANTEIL an seiner Seite (alle Ausgaben, alle
+ * Einnahmen des Fensters) — nicht mehr den grössten Posten. Vorher war der grösste
+ * Balken immer voll, und eine Länge sagte nur „kleiner als die Miete". Jetzt ist ein
+ * Viertel der Ausgaben auch ein Viertel des Balkens, und die Prozentzahl steht daneben.
+ *
+ * Ein Rückfluss (unterm Strich mehr zurück als hinaus) hat an seiner Seite keinen
+ * Anteil: sein Balken bleibt leer, und statt eines negativen Prozentwerts steht nichts.
+ */
+function useAnteil(gesamt: number) {
+  const prozent = useProzent();
+  return (summe: number) => {
+    const anteil = gesamt === 0 ? 0 : summe / gesamt;
+    return { wert: Math.max(0, anteil), text: anteil > 0 ? prozent(anteil, 0) : "" };
+  };
+}
 
 /**
  * Eine Sektion (Ausgaben/Einnahmen/Umschichtungen) mit ihren Zeilen.
@@ -40,9 +57,9 @@ function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId, renderDe
       ? `${geld.formatMitSymbol(summe, { mitVorzeichen: true })} · Ø ${geld.format(Math.round(summe / monate))}`
       : geld.formatMitSymbol(summe, { mitVorzeichen: true });
 
-  if (items.length === 0) return null;
-  const maxAbs = Math.max(1, ...items.map((i) => Math.abs(i.summe)));
   const summe = items.reduce((s, i) => s + i.summe, 0);
+  const anteil = useAnteil(summe);
+  if (items.length === 0) return null;
   return (
     <div style={{ marginBottom: "var(--sp-4)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", marginBottom: "var(--sp-2)" }}>
@@ -63,11 +80,11 @@ function KategorieSektion({ titel, items, ohneLabel, onSelect, aktivId, renderDe
               style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: klickbar ? "pointer" : "default", background: aktiv ? "var(--accent-soft)" : "transparent" }}
             >
               <CoverageTrack
-                value={Math.abs(i.summe)}
-                max={maxAbs}
+                value={anteil(i.summe).wert}
+                max={1}
                 over={false}
                 label={`${aktiv ? "▾ " : "▸ "}${i.kategorieId ? i.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${i.anzahl}`}
-                right={mitSchnitt(i.summe)}
+                right={mitAnteil(mitSchnitt(i.summe), anteil(i.summe).text)}
               />
             </div>
             {aktiv && renderDetail && i.kategorieId && renderDetail(i.kategorieId)}
@@ -102,9 +119,9 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
       ? `${geld.formatMitSymbol(summe, { mitVorzeichen: true })} · Ø ${geld.format(Math.round(summe / monate))}`
       : geld.formatMitSymbol(summe, { mitVorzeichen: true });
 
-  if (gruppen.length === 0) return null;
-  const maxAbs = Math.max(1, ...gruppen.map((g) => Math.abs(g.summe)));
   const summe = gruppen.reduce((s, g) => s + g.summe, 0);
+  const anteil = useAnteil(summe);
+  if (gruppen.length === 0) return null;
 
   return (
     <div style={{ marginBottom: "var(--sp-4)" }}>
@@ -122,11 +139,11 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
               style={{ padding: "7px 8px", borderRadius: "var(--r-md)", cursor: "pointer", background: offen ? "var(--accent-soft)" : "transparent" }}
             >
               <CoverageTrack
-                value={Math.abs(g.summe)}
-                max={maxAbs}
+                value={anteil(g.summe).wert}
+                max={1}
                 over={false}
                 label={`${offen ? "▾ " : "▸ "}${g.kategorieId ? g.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${g.anzahl}`}
-                right={mitSchnitt(g.summe)}
+                right={mitAnteil(mitSchnitt(g.summe), anteil(g.summe).text)}
               />
             </div>
             {offen && (
@@ -154,11 +171,11 @@ function GruppenSektion({ titel, gruppen, ohneLabel, offeneGruppe, onGruppe, off
                         style={{ padding: "5px 8px", borderRadius: "var(--r-md)", cursor: k.kategorieId ? "pointer" : "default", background: katOffen ? "var(--accent-soft)" : "transparent" }}
                       >
                         <CoverageTrack
-                          value={Math.abs(k.summe)}
-                          max={Math.max(1, ...g.kinder.map((x) => Math.abs(x.summe)))}
+                          value={anteil(k.summe).wert}
+                          max={1}
                           over={false}
                           label={`${katOffen ? "▾ " : "▸ "}${k.kategorieId ? k.name : (ohneLabel ?? t("historie.ohneKategorie"))} · ${k.anzahl}`}
-                          right={mitSchnitt(k.summe)}
+                          right={mitAnteil(mitSchnitt(k.summe), anteil(k.summe).text)}
                         />
                       </div>
                       {katOffen && k.kategorieId && renderDetail(k.kategorieId)}
@@ -321,4 +338,9 @@ export function KategorieBuchungen({
       ]}
     />
   );
+}
+
+/** „450,00 € · 22 %" — der Anteil hinter dem Betrag, leer bleibt leer. */
+function mitAnteil(betrag: string, anteil: string): string {
+  return anteil ? `${betrag} · ${anteil}` : betrag;
 }
