@@ -1,7 +1,7 @@
 {
   "name": "moneymanager",
   "private": true,
-  "version": "0.29.3",
+  "version": "0.30.0",
   "type": "module",
   "engines": {
     "node": ">=22"
@@ -27,7 +27,6 @@
     "@fontsource-variable/hanken-grotesk": "^5.3.0",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-http": "^2.5.9",
-    "@tauri-apps/plugin-opener": "^2",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
     "buffer": "^6.0.3",
@@ -50,13 +49,13 @@
     "@types/react-dom": "^19.2.5",
     "@types/sql.js": "^1.4.11",
     "@vitejs/plugin-react": "^6.0.5",
-    "@vitest/coverage-v8": "^4.1.10",
+    "@vitest/coverage-v8": "^5.1.0",
     "jsdom": "^30.0.1",
     "sql.js": "^1.14.1",
     "typescript": "^7.0.2",
     "vite": "^8.2.2",
     "vite-node": "^6.0.0",
-    "vitest": "^4.1.11"
+    "vitest": "^5.1.0"
   },
   "allowScripts": {
     "fsevents@2.3.3": true

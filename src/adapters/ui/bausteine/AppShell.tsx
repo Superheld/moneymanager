@@ -16,9 +16,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { APP_STADIUM, APP_VERSION } from "../../../version";
+import { APP_ABZEICHEN, APP_VERSION } from "../../../version";
 import { AktualisierungKnopf } from "./AktualisierungKnopf";
 import { Icon } from "./IconButton";
+import { Button as BaseButton } from "@base-ui/react/button";
 
 export type ScreenId =
   | "uebersicht"
@@ -51,19 +52,28 @@ const GRUPPEN: NavGroup[] = [
       // war beides ein Screen, und die Kategorien standen ganz unten.
       // Der frühere Bereich „Planung" (Jahresprojektion, Szenarien) und „Deckung" sind
       // 2026-08-16 entfallen — sie kommen wieder, dann aber anders geschnitten.
+      //
+      // **Seit 2026-11-08 nach Wichtigkeit sortiert**, und der Kontoauszug steht nicht
+      // mehr hier. Wer sich informiert, will wissen, wie die Budgets stehen, seine
+      // Verträge verwalten, die Rücklagen sehen — und dann auswerten. In den Kontoauszug
+      // geht man, um zuzuordnen und abzuhaken: das ist Arbeit an den Daten, nicht
+      // Überblick, und gehört deshalb in die Verwaltung.
       { id: "uebersicht", labelKey: "shell.navUebersicht" },
-      { id: "konten", labelKey: "shell.navKonten" },
       { id: "budgets", labelKey: "shell.navBudgets" },
-      { id: "analyse", labelKey: "shell.navAnalyse" },
-      { id: "ruecklagen", labelKey: "shell.navRuecklagen" },
       { id: "vertraege", labelKey: "shell.navVertraege" },
+      { id: "ruecklagen", labelKey: "shell.navRuecklagen" },
+      { id: "analyse", labelKey: "shell.navAnalyse" },
     ],
   },
   {
     titelKey: "shell.gruppeVerwaltung",
     eintraege: [
-      { id: "kontenverwaltung", labelKey: "shell.navKontenVerwalten" },
+      // „Buchungen", nicht „Konten": zwei Einträge hiessen gleich, und der hier zeigt,
+      // was GEBUCHT ist. Die `ScreenId` bleibt `konten` — sie ist ein Schlüssel, kein
+      // Name, und hängt an Tests, Icon und Sprungzielen.
+      { id: "konten", labelKey: "shell.navBuchungen" },
       { id: "import", labelKey: "shell.navImport" },
+      { id: "kontenverwaltung", labelKey: "shell.navKontenVerwalten" },
       { id: "training", labelKey: "shell.navTraining" },
       { id: "einstellungen", labelKey: "shell.navEinstellungen" },
     ],
@@ -107,6 +117,8 @@ export function AppShell({
 
   // Escape schliesst die Schublade — aber nur sie: liegt ein Modal darüber, hat der
   // oberste Dialog die Taste schon verbraucht (siehe `Modal`, `defaultPrevented`).
+  // Das stimmt erst, seit Base UI darunter liegt (2026-11-10): der Eigenbau davor LAS
+  // `defaultPrevented`, setzte es aber selbst nie, und eine Escape schloss beide.
   useEffect(() => {
     if (!offen) return;
     const onKey = (e: KeyboardEvent) => {
@@ -134,7 +146,7 @@ export function AppShell({
       {/* Nur schmal sichtbar. Sie trägt den Griff und den Namen des Bereichs — auf einem
           Handy ist die Marke nicht die Auskunft, die man beim Blick nach oben braucht. */}
       <header className="topbar">
-        <button
+        <BaseButton
           ref={griff}
           type="button"
           className="topbar-griff"
@@ -144,7 +156,7 @@ export function AppShell({
           onClick={() => setOffen(true)}
         >
           <Icon name="menue" groesse={20} />
-        </button>
+        </BaseButton>
         <span className="topbar-titel">{t(labelKeyVon(current))}</span>
       </header>
 
@@ -162,9 +174,9 @@ export function AppShell({
           {/* Ein sichtbarer Weg zurück. Der Scrim allein reicht auf einem Handy nicht:
               die Schublade nimmt fast die ganze Breite, und die Fläche daneben ist ein
               Streifen, den man nicht als Bedienteil liest. */}
-          <button type="button" className="side-zu" aria-label={t("shell.menueSchliessen")} onClick={schliessen}>
+          <BaseButton type="button" className="side-zu" aria-label={t("shell.menueSchliessen")} onClick={schliessen}>
             <Icon name="verwerfen" groesse={18} />
-          </button>
+          </BaseButton>
         </div>
 
         {GRUPPEN.map((g) => (
@@ -203,10 +215,10 @@ export function AppShell({
         ))}
 
         <div className="foot">
-          {/* Das Stadium steht neben der Version, nicht darin: wer hier hinsieht, soll
-              wissen, dass Schema und Daten noch nicht festgeschrieben sind. */}
+          {/* Neben der Version steht das Stadium, bei einer Beta der Kanal — warum, steht
+              an `abzeichenFuer` in version.ts. */}
           <div>
-            Moneymanager {APP_VERSION} <span className="bdg">{APP_STADIUM}</span>
+            Moneymanager {APP_VERSION} <span className="bdg">{APP_ABZEICHEN}</span>
           </div>
           <div>{t("shell.footLokal")}</div>
           {/* Erscheint nur, wenn wirklich etwas bereitliegt — sonst rendert er nichts. */}

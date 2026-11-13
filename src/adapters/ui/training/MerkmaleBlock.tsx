@@ -25,10 +25,21 @@ import {
 import type { Merkmalsansicht } from "../../../application/kategorien/merkmalskonfiguration";
 import type { Umsatz } from "../../../application/import";
 import { merkmaleZuBuchung, wortFreigeben, wortSperren } from "../../dienste";
-import { Pill } from "../bausteine";
+import { Pill, Button } from "../bausteine";
+import { ErklaerungsTafel } from "./ErklaerungsTafel";
+import { Klappblock } from "../bausteine/Klappblock";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 
-export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz?: Umsatz }) {
+export function MerkmaleBlock({
+  buchung,
+  umsatz,
+  kategorieName,
+}: {
+  buchung: IstBuchung;
+  umsatz?: Umsatz;
+  /** Für die Erklärung; ohne sie stehen dort Ids statt Namen. */
+  kategorieName?: ReadonlyMap<string, string>;
+}) {
   const { t } = useTranslation();
   const prozent = useProzent();
   const { locale } = useGeld();
@@ -43,6 +54,8 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
         await merkmaleZuBuchung({
           gegenpartei: umsatz?.gegenpartei ?? "",
           verwendungszweck: umsatz?.verwendungszweck ?? "",
+          betrag: buchung.betrag,
+          kategorieId: buchung.kategorieId,
         }),
       );
     } catch (e) {
@@ -65,13 +78,7 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
   const zahl = (n: number) => n.toLocaleString(locale);
 
   return (
-    <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-      <button className="linkbtn" onClick={umschalten} aria-expanded={offen}>
-        {offen ? "▾" : "▸"} {t("konten.merkmale.titel")}
-      </button>
-
-      {offen && (
-        <div style={{ marginTop: "var(--sp-3)" }}>
+    <Klappblock titel={t("konten.merkmale.titel")} offen={offen} onUmschalten={umschalten}>
           {fehler && <div className="err">{fehler}</div>}
           {!stand ? (
             <div className="muted">{t("konten.merkmale.laedt")}</div>
@@ -93,16 +100,19 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
                       )}
                     </span>
                   </div>
-                  {/* Die Beitragszerlegung ist bei einem linearen Modell die Rechnung
-                      selbst, keine nachgebaute Erklärung. */}
-                  <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", flexWrap: "wrap" }}>
-                    {stand.vorschlag.beitraege.map((b) => (
-                      <span key={b.merkmal} className="muted" style={{ fontVariantNumeric: "tabular-nums" }}>
-                        {b.gewicht >= 0 ? "+" : "−"}
-                        {Math.abs(b.gewicht).toFixed(2)} {b.merkmal}
-                      </span>
-                    ))}
-                  </div>
+                  {/* Warum diese Kategorie und nicht die gebuchte (oder, wenn
+                      beide gleich sind, nicht die Zweitbeste). Bis 2026-11-09 standen
+                      hier die rohen Gewichte der Gewinnerin — sie sagen nicht, was den
+                      Ausschlag gab. */}
+                  {stand.erklaerung && (
+                    <div style={{ marginTop: "var(--sp-2)" }}>
+                      <ErklaerungsTafel
+                        erklaerung={stand.erklaerung}
+                        kategorieName={(id) => kategorieName?.get(id) ?? id}
+                        verteilung={(m) => stand.verwendet.find((v) => v.merkmal === m)?.wert?.verteilung}
+                      />
+                    </div>
+                  )}
                 </div>
               )}
               {!stand.hatModell && (
@@ -116,14 +126,14 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
               ) : (
                 <>
                   <div style={{ fontWeight: "var(--fw-bold)" }}>{t("konten.merkmale.verwendet")}</div>
-                  <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-2)" }}>
+                  <div className="hinweis" style={{ marginBottom: "var(--sp-2)" }}>
                     {t("konten.merkmale.verwendetHinweis")}
                   </div>
                   <div style={{ display: "grid", gap: 4 }}>
                     {stand.verwendet.map(({ merkmal, wert }) => (
                       <div key={merkmal} style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
                         <span style={{ fontWeight: "var(--fw-semi)", minWidth: "16ch" }}>{merkmal}</span>
-                        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                        <span className="hinweis">
                           {wert
                             ? t("konten.merkmale.belege", {
                                 belege: zahl(wert.belege),
@@ -132,8 +142,7 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
                               })
                             : t("konten.merkmale.nurEinmal")}
                         </span>
-                        <button
-                          className="linkbtn"
+                        <Button variant="link"
                           onClick={() =>
                             aendern(
                               wortSperren(
@@ -144,7 +153,7 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
                           }
                         >
                           {t("konten.merkmale.ausschliessen")}
-                        </button>
+                        </Button>
                       </div>
                     ))}
                   </div>
@@ -154,7 +163,7 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
               {stand.verworfen.length > 0 && (
                 <div style={{ marginTop: "var(--sp-4)" }}>
                   <div style={{ fontWeight: "var(--fw-bold)" }}>{t("konten.merkmale.verworfen")}</div>
-                  <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: "var(--sp-2)" }}>
+                  <div className="hinweis" style={{ marginBottom: "var(--sp-2)" }}>
                     {t("konten.merkmale.verworfenHinweis")}
                   </div>
                   <div style={{ display: "grid", gap: 4 }}>
@@ -162,7 +171,7 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
                       <div key={`${v.herkunft}-${v.wort}-${i}`} style={{ display: "flex", gap: "var(--sp-2)", alignItems: "baseline", flexWrap: "wrap" }}>
                         <span style={{ minWidth: "16ch" }}>{v.wort}</span>
                         <Pill>{t(`einstellungen.lernmaterial.verwurf.${v.grund}`)}</Pill>
-                        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                        <span className="hinweis">
                           {t(`einstellungen.lernmaterial.herkunft.${v.herkunft}`)}
                         </span>
                         {/* Zurückholen geht nur bei Listeneinträgen — was der Code als
@@ -174,9 +183,9 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
                             der Liste des Trainingsbereichs löschte derselbe Griff eine
                             Zeile, die es nicht gibt: ohne Fehler und ohne Wirkung. */}
                         {v.grund === "ausgeschlossen" && v.listenform && stand.ausgeschlossen.has(v.listenform) && (
-                          <button className="linkbtn" onClick={() => aendern(wortFreigeben(v.listenform!))}>
+                          <Button variant="link" onClick={() => aendern(wortFreigeben(v.listenform!))}>
                             {t("konten.merkmale.zulassen")}
-                          </button>
+                          </Button>
                         )}
                       </div>
                     ))}
@@ -185,8 +194,6 @@ export function MerkmaleBlock({ buchung, umsatz }: { buchung: IstBuchung; umsatz
               )}
             </>
           )}
-        </div>
-      )}
-    </div>
+    </Klappblock>
   );
 }

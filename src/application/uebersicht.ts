@@ -14,32 +14,31 @@
 // inzwischen veränderten Bestand rechnen, während die Karten oben den alten zeigen.
 
 import { empfaengerJeBuchung } from "./buchung/belegZuBuchung";
+import { zeilenkontext, type Zeilenkontext } from "./buchung/buchungszeile";
+import { vertragsnamenLaden } from "./vertraege/vertragszuordnung";
 import {
   fruehesterMonat,
-  handlungsbedarf,
   istLiquide,
-  liquiditaetsvorschau,
   monatsAusblicke,
   staendeJeKlasse,
   vorschauAlleKonten,
   type Kategorie,
   type Klassenstand,
-  type Kontovorschau,
   type MonatsAusblick,
   type Vorschauzeile,
 } from "../core";
 import { budgetstaende, vertragsBuchungenLaden, type Budgetstand } from "./budgets/budgetsichten";
-import type { BudgetSicht, Vormerkung } from "../core";
+import type { BudgetSicht } from "../core";
 import type {
   BudgetRepository,
   KategorieRepository,
   LedgerPort,
+  RuecklagenRepository,
   UmsatzRepository,
+  VertragRepository,
   VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
-
-  VormerkungRepository,
 } from "./ports";
 
 /** Wie viele Monate der Rückblick der Budgetliste höchstens anbietet. */
@@ -53,11 +52,8 @@ export interface UebersichtDeps {
   readonly umsatzRepo: UmsatzRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly kontoRepo: ZahlungskontoRepository;
-  /**
-   * Die Vormerkungen — optional, weil die Übersicht ohne sie vollständig bleibt: sie
-   * verschieben nur den Startpunkt der Vorschau um das, was schon feststeht.
-   */
-  readonly vormerkungRepo?: VormerkungRepository;
+  readonly ruecklagenRepo: RuecklagenRepository;
+  readonly vertragRepo: VertragRepository;
 }
 
 export interface Uebersichtsdaten {
@@ -71,15 +67,17 @@ export interface Uebersichtsdaten {
   readonly kategorieNamen: ReadonlyMap<string, string>;
   /** Buchungs-ID → Empfänger aus dem Import. Steht am Umsatz, nicht an der Buchung. */
   readonly empfaenger: ReadonlyMap<string, string>;
+  /** Was die Buchungszeilen eines aufgeklappten Budgets brauchen (`budgetzeilenZu`). */
+  readonly zeilenkontext: Zeilenkontext;
   /** Wählbare Monate für die Budgetliste, neuester zuerst („YYYY-MM"). */
   readonly monate: readonly string[];
   /**
    * Gibt es überhaupt Plandaten (Verträge, Budgets)? Ohne sie zeigten die drei Karten
    * Nullen, und das liest sich wie ein Datenfehler statt wie ein leerer Plan.
    *
-   * Die Rücklagen zählen seit 2026-09-01 NICHT mehr mit: sie haben im Ausblick keine
-   * Zeile mehr (siehe `core/monatsausblick`), und was zu keiner Zeile führt, darf auch
-   * nicht darüber entscheiden, ob die Karten überhaupt erscheinen.
+   * Die Rücklagen zählen seit 2026-11-09 wieder mit, weil ihre Raten wieder eine Zeile
+   * bilden. Die Regel dahinter bleibt: was zu keiner Zeile führt, darf nicht darüber
+   * entscheiden, ob die Karten überhaupt erscheinen.
    */
   readonly hatPlandaten: boolean;
   /**
@@ -105,14 +103,6 @@ export interface Uebersichtsdaten {
    * sagen, wie der laufende Monat aussieht, diese Liste sagt, was insgesamt da ist.
    */
   readonly klassen: readonly Klassenstand[];
-  /**
-   * Konten, die im Vorschaufenster ins Minus laufen — schärfster Fall zuerst.
-   *
-   * Leer heisst NICHT „alles geprüft und in Ordnung", sondern „läuft im gerechneten
-   * Fenster nicht ins Minus". Der Unterschied zählt, sobald jemand die Liste als
-   * Freigabe liest.
-   */
-  readonly bedarf: readonly Kontovorschau[];
 }
 
 /**
@@ -128,7 +118,7 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten, vormerkungen] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, vertragsBuchungen, konten, ruecklagen, vertragsnamen] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -137,7 +127,8 @@ export async function uebersichtLaden(
       deps.umsatzRepo.alle(),
       vertragsBuchungenLaden(deps.zuordnungRepo),
       deps.kontoRepo.alle(),
-      deps.vormerkungRepo?.alle() ?? Promise.resolve<Vormerkung[]>([]),
+      deps.ruecklagenRepo.alle(),
+      vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
     ]);
 
   /**
@@ -148,17 +139,22 @@ export async function uebersichtLaden(
    * Verkauf. Das ist eine andere Frage: was dort liegt, ist zurückgelegt und steht für
    * den Monat nicht zur Verfügung.
    *
-   * Gefiltert wird auf ALLEN Seiten mit derselben Liste: Buchungen, Zahlungsregeln,
-   * Budgets — und dieselbe gefilterte Sicht trägt auch die Budgetliste darunter. Nur
-   * eine Seite zu filtern war genau der Fehler, gegen den diese Datei überhaupt
-   * angelegt wurde (siehe Kopf): dasselbe Budget stand dann im selben Bild einmal ohne
-   * Verbrauch und einmal weit über seinem Rahmen.
+   * Gefiltert werden Buchungen und Zahlungsregeln der MONATSKARTEN.
    *
-   * Der Preis ist eine Aussage, die man kennen muss: **dasselbe Budget kann hier einen
-   * kleineren Verbrauch zeigen als im Bereich Budgets.** Dort steht der ganze Rahmen,
-   * hier nur, was aus den verfügbaren Mitteln davon gegangen ist. Das ist gewollt — die
-   * beiden Bereiche beantworten verschiedene Fragen —, und deshalb sagt es der
-   * Untertitel der Übersicht mit.
+   * **Die Budgetliste rechnet seit 2026-11-11 über ALLE Konten**, mit denselben Zahlen wie
+   * der Bereich Budgets. Bis dahin trug auch sie die liquide Sicht, und ein aufbauendes
+   * Budget auf seinem Rücklagenkonto war darin blind für seine eigenen Ausgaben: die
+   * gingen vom Rücklagenkonto ab und zählten nicht — der Balken stand immer auf null, und
+   * der Stand wuchs Monat für Monat um die Rate, obwohl Geld ausgegeben war. Ein Budget
+   * ist ein Topf; was aus ihm ging, ging aus ihm, gleich von welchem Konto.
+   *
+   * Der Preis: die Zeilen „Budgets monatlich/aufbauend" der Monatskarten rechnen weiter
+   * über die liquiden Konten und können für denselben Monat einen kleineren Verbrauch
+   * zeigen als die Liste darunter. Die Karte fragt „was geht aus dem Verfügbaren
+   * weg", die Liste „wie steht das Budget".
+   *
+   * Budgets werden NICHT nach ihrem Konto gefiltert (seit 2026-10-26): vorher verschwand
+   * ein aufbauendes Budget auf dem Rücklagenkonto ganz aus der Übersicht.
    *
    * Eine Zahlungsregel OHNE Konto bleibt drin: sie lässt sich keiner Klasse zuordnen,
    * und sie stillschweigend fallen zu lassen hiesse, einen Plan verschwinden zu lassen,
@@ -167,12 +163,21 @@ export async function uebersichtLaden(
   const liquideIds = new Set(konten.filter(istLiquide).map((k) => k.id));
   const nichtLiquide = new Set(konten.filter((k) => !istLiquide(k)).map((k) => k.id));
   const liquideBuchungen = buchungen.filter((b) => liquideIds.has(b.kontoId));
-  const liquideBudgets = budgets.filter((b) => liquideIds.has(b.kontoId));
+  /**
+   * DER KREIS DER MONATSKARTEN SIND ALLE KONTEN, nicht die liquiden (seit 2026-11-09).
+   * Eine Umbuchung vom Giro aufs Tagesgeld, Sparkonto oder Rücklagenkonto bewegt eigenes
+   * Geld und ist damit weder Ausgabe noch Abzug — sie fällt heraus. Was zurückgelegt
+   * wird, steht stattdessen als RECHNUNG in der Zeile „Rücklagen" (die Raten der
+   * Rücklagen) und in den Raten der aufbauenden Budgets. Bis dahin zählte eine Umbuchung,
+   * die die liquiden Konten verliess, als Abfluss — und ob sie als Rücklage oder als
+   * Sparen erschien, hing an der Klasse des Zielkontos.
+   */
+  const alleIds = new Set(konten.map((k) => k.id));
 
   const sicht: BudgetSicht = {
-    buchungen: liquideBuchungen,
+    buchungen,
     kategorien,
-    budgets: liquideBudgets,
+    budgets,
     vertragsBuchungen,
   };
   const dieserMonat = heute.slice(0, 7);
@@ -180,38 +185,24 @@ export async function uebersichtLaden(
   return {
     ausblicke: monatsAusblicke({
       regeln: regeln.filter((r) => !r.kontoId || !nichtLiquide.has(r.kontoId)),
-      budgets: liquideBudgets,
+      budgets,
       ist: liquideBuchungen,
       kategorien,
       vertragsBuchungen,
       heute,
+      kreis: alleIds,
+      ruecklagen,
     }),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,
     kategorieNamen: new Map(kategorien.map((k: Kategorie) => [k.id, k.name])),
     empfaenger: empfaengerJeBuchung(umsaetze),
+    zeilenkontext: zeilenkontext(umsaetze, konten, kategorien, vertragsnamen),
     monate: waehlbareMonate(fruehesterMonat(liquideBuchungen) ?? heute, dieserMonat),
-    hatPlandaten: regeln.length > 0 || budgets.length > 0,
+    hatPlandaten: regeln.length > 0 || budgets.length > 0 || ruecklagen.length > 0,
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     klassen: staendeJeKlasse(konten, buchungen),
-    // Die Vorschau rechnet über ALLE Konten, nicht nur die liquiden: gefragt ist, ob
-    // ein EINZELNES Konto ins Minus läuft, und das kann jedes. Sie bekommt deshalb auch
-    // die ungefilterten Buchungen und Budgets.
-    bedarf: handlungsbedarf(
-      liquiditaetsvorschau({
-        konten,
-        buchungen,
-        regeln,
-        budgetsicht: { buchungen, kategorien, budgets, vertragsBuchungen },
-        // Was die Bank schon kennt, ist vom Stand faktisch weg — auch wenn es noch in
-        // keinem Auszug steht. Ohne die Vormerkungen begänne die Vorschau mit Geld, über
-        // das niemand mehr verfügt.
-        vormerkungen,
-        heute,
-        tage: VORSCHAU_TAGE,
-      }),
-    ),
   };
 }
 

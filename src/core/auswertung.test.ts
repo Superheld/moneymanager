@@ -11,6 +11,7 @@ import {
   kennzahlen,
   monateImFenster,
   planWirkung,
+  tiefstandImMonat,
   vertragstreue,
 } from "./auswertung";
 import type { IstBuchung } from "./buchung/istbuchung";
@@ -320,5 +321,32 @@ describe("Plan-Wirkung auf den Saldo", () => {
 
   it("nimmt einen unbekannten Zeilentyp nicht stillschweigend mit", () => {
     expect(planWirkung([{ id: "irgendwas", plan: -99999 }]).netto).toBe(0);
+  });
+});
+
+describe("Tiefstand im Monat", () => {
+  // Der Fall, für den es die Funktion gibt: Miete am Ersten, Gehalt am 28. — dazwischen
+  // steht das Konto tiefer als an beiden Monatsenden.
+  it("findet den Tag vor dem Gehalt und endet genau auf der Planwirkung", () => {
+    const zeilen = [
+      { id: "einnahmen", plan: 300000, posten: [{ datum: "2026-12-28", plan: 300000 }] },
+      { id: "vertraege", plan: -100000, posten: [{ datum: "2026-12-01", plan: -100000 }] },
+      { id: "budgets", plan: -62000, posten: [{ plan: -62000 }] },
+    ];
+    const t = tiefstandImMonat(150000, "2026-12", zeilen);
+    // 1.500 − 1.000 − 28 Tage × 20,00 Budget = −60,00 am 28.: der Budgetanteil des Tages
+    // geht vor dem Gehalt ab (Abfluss vor Zufluss, siehe `tiefstandImMonat`).
+    expect(t).toEqual({ tiefstand: -6000, am: "2026-12-28" });
+    expect(150000 + planWirkung(zeilen).netto).toBe(288000);
+  });
+
+  it("nimmt den Anfang, wenn der Monat nur steigt", () => {
+    const t = tiefstandImMonat(50000, "2026-02", [{ id: "einnahmen", plan: 1000, posten: [{ datum: "2026-02-10", plan: 1000 }] }]);
+    expect(t).toEqual({ tiefstand: 50000, am: "2026-02-01" });
+  });
+
+  it("lässt Rücklagen und Umschichtungen draussen, wie planWirkung", () => {
+    const t = tiefstandImMonat(10000, "2026-03", [{ id: "ruecklagen", plan: -90000, posten: [{ plan: -90000 }] }]);
+    expect(t.tiefstand).toBe(10000);
   });
 });

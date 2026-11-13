@@ -427,7 +427,7 @@ export const sqliteUmsatzRepository: UmsatzRepository = {
    * (`application/import/belege.ts`).
    *
    * Damit ist der Beleg endlich ohne Ausnahme unveränderlich: die Zusicherung aus dem
-   * GoBD-Abschnitt der CLAUDE.md wird strenger, statt zu bröckeln.
+   * GoBD-Abschnitt in `src/application/buchung/CLAUDE.md` wird strenger, statt zu bröckeln.
    *
    * Der Verarbeitungsstand bleibt unberührt — er gehört der Zahlung, nicht dem Beleg.
    * Kategorie, Verbuchung und Aufteilungen hängen also weiter an dem, was sie kennen.

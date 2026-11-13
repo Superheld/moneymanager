@@ -68,7 +68,7 @@ export function KassensturzModal({
           <Button variant="primary" onClick={busy ? () => {} : () => void speichern()}>
             {t("konten.anker.festhalten")}
           </Button>
-          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+          <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
         </>
       }
     >
@@ -153,14 +153,14 @@ export function AbgleichModal({
           <Button variant="primary" onClick={busy ? () => {} : () => void anwenden()}>
             {t("konten.anker.abgleichBestaetigen")}
           </Button>
-          <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
+          <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
         </>
       }
     >
       {fehler && <div className="err" style={{ marginBottom: "var(--sp-3)" }}>{fehler}</div>}
       {/* Erst die Zahlen, dann die Folge. Wer hier zustimmt, soll wissen, dass die
           Differenz nicht verschwindet, sondern umzieht. */}
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
         <tbody>
           <tr>
             <td style={{ padding: "4px 0", color: "var(--ink-3)" }}>{t("konten.anker.alt")}</td>
@@ -178,7 +178,7 @@ export function AbgleichModal({
           </tr>
         </tbody>
       </table>
-      <p className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 0 }}>
+      <p className="hinweis" style={{ marginBottom: 0 }}>
         {t("konten.anker.abgleichHinweis")}
       </p>
       {offeneFenster > 0 && (

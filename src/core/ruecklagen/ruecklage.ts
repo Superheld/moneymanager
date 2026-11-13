@@ -20,11 +20,14 @@
 // REIN KALKULATORISCH (Entscheidung 2026-08-16, unverändert): Die Rücklage führt kein
 // eigenes Sparvehikel. Was tatsächlich zurückgelegt ist, wird nicht gebucht, sondern
 // ABGEGLICHEN: die Rücklage nennt das Konto, auf dem das Geld liegt, und der reale Stand
-// dieses Kontos wird anteilig auf die Rücklagen verteilt, die darauf zeigen. Deckung =
-// Wirklichkeit ÷ Rechnung, ohne Buchungslogik.
+// dieses Kontos wird anteilig auf ALLE verteilt, die darauf Anspruch haben — Rücklagen
+// wie aufbauende Budgets (`core/konten/kontobelegung`). Deckung = Wirklichkeit ÷
+// Rechnung, ohne Buchungslogik.
 
 import { monateZwischen } from "../basis/datum";
 import type { Cent } from "../basis/geld";
+import { kontobelegung, type Anspruch } from "../konten/kontobelegung";
+import { istRuecklagenkonto, type Zahlungskonto } from "../konten/konto";
 
 export interface Ruecklage {
   readonly id: string;
@@ -87,6 +90,24 @@ export function sollRuecklage(r: Ruecklage, am: string): Cent {
   return (r.rate ?? 0) * monate;
 }
 
+/**
+ * Die Konten, auf denen zurückgelegt wird: jedes der Klasse Rücklage UND jedes, dem eine
+ * Rücklage zugeordnet ist — gleich welcher Klasse.
+ *
+ * Bis 2026-11-09 zählte allein die Klasse. Wer seine Rücklagen auf einem Tagesgeldkonto
+ * der Klasse „Sparen" führte, sah dann einen Tacho auf null und keinen einzigen
+ * Eingang, obwohl die Zuordnung an jeder Rücklage dastand. Die Zuordnung ist die
+ * genauere Aussage — sie ist je Rücklage getroffen, die Klasse nur einmal je Konto.
+ */
+export function ruecklagenKonten(
+  konten: readonly Zahlungskonto[],
+  items: readonly Pick<Ruecklage, "kontoId">[],
+): Set<string> {
+  const ids = new Set(konten.filter(istRuecklagenkonto).map((k) => k.id));
+  for (const r of items) if (r.kontoId) ids.add(r.kontoId);
+  return ids;
+}
+
 /** Summe der monatlichen Rücklagen — der Betrag, der jeden Monat gebunden ist. */
 export function monatsRuecklageGesamt(items: readonly Ruecklage[]): Cent {
   return items.reduce((s, r) => s + monatsRuecklage(r), 0);
@@ -122,12 +143,28 @@ export interface RuecklagenDeckung {
 }
 
 /**
- * Gleicht die Rechnung gegen die Wirklichkeit ab: je Konto wird der reale Stand auf die
- * Rücklagen verteilt, die auf dieses Konto zeigen — anteilig an ihrem Soll.
+ * Die Ansprüche der Rücklagen auf ihre Konten — je Rücklage ihr Soll bis `am`.
  *
- * Bewusst KEINE Allokation nach Priorität und keine Warnung: liegen auf dem Rücklagenkonto
- * 60 % dessen, was rechnerisch beisammen sein müsste, dann ist jede Rücklage darauf zu
- * 60 % gedeckt. Alles andere würde eine Reihenfolge behaupten, die es nicht gibt.
+ * Eine Rücklage ohne Konto hat keinen: sie ist reine Rechnung, und es gibt keinen Stand,
+ * gegen den sie etwas beanspruchen könnte.
+ */
+export function ruecklagenAnsprueche(items: readonly Ruecklage[], am: string): Anspruch[] {
+  return items
+    .filter((r) => r.kontoId)
+    .map((r) => ({ art: "ruecklage", id: r.id, kontoId: r.kontoId as string, betrag: sollRuecklage(r, am) }));
+}
+
+/**
+ * Gleicht die Rechnung gegen die Wirklichkeit ab — über die Kontobelegung
+ * (`core/konten/kontobelegung`), nicht mit einer eigenen Verteilung.
+ *
+ * `weitere` sind die Ansprüche, die KEINE Rücklage sind und trotzdem auf denselben Konten
+ * liegen — heute die Reste aufbauender Budgets. Ohne sie verteilte die Deckung Geld, das
+ * schon jemand anderem gehört, und sähe besser aus, als sie ist.
+ *
+ * Bewusst KEINE Allokation nach Priorität: liegen auf dem Konto 60 % dessen, was alle
+ * Ansprüche zusammen verlangen, dann ist jede Rücklage darauf zu 60 % gedeckt. Alles
+ * andere würde eine Reihenfolge behaupten, die es nicht gibt.
  *
  * Überschuss wird gekappt (Grad ≤ 100 %): mehr als ihren Soll-Stand trägt eine Rücklage
  * nicht, auch wenn auf dem Konto mehr liegt.
@@ -136,29 +173,21 @@ export function ruecklagenDeckung(
   items: readonly Ruecklage[],
   am: string,
   kontostaende: ReadonlyMap<string, Cent>,
+  weitere: readonly Anspruch[] = [],
 ): RuecklagenDeckung {
-  const soll = new Map<string, Cent>();
-  for (const r of items) {
-    if (!r.kontoId) continue;
-    soll.set(r.kontoId, (soll.get(r.kontoId) ?? 0) + sollRuecklage(r, am));
+  const belegung = kontobelegung(kontostaende, [...ruecklagenAnsprueche(items, am), ...weitere]);
+  const gedeckt = new Map<string, Cent>();
+  for (const b of belegung.values()) {
+    for (const p of b.posten) if (p.art === "ruecklage") gedeckt.set(p.id, p.gedeckt);
   }
 
-  /** Deckungsanteil eines Kontos, 0–1. Ohne Soll ist nichts zu decken. */
-  const anteil = (kontoId: string): number => {
-    const s = soll.get(kontoId) ?? 0;
-    if (s <= 0) return 0;
-    const stand = kontostaende.get(kontoId) ?? 0;
-    return Math.max(0, Math.min(1, stand / s));
-  };
-
-  const posten = items.map((r): RuecklagenPosten => {
-    const s = sollRuecklage(r, am);
-    return {
-      ruecklage: r,
-      soll: s,
-      tatsaechlich: r.kontoId ? Math.round(s * anteil(r.kontoId)) : null,
-    };
-  });
+  const posten = items.map((r): RuecklagenPosten => ({
+    ruecklage: r,
+    soll: sollRuecklage(r, am),
+    // Ein Soll von 0 ist kein Anspruch und steht deshalb in keiner Belegung — gedeckt ist
+    // dann eben 0, nicht „unbekannt".
+    tatsaechlich: r.kontoId ? (gedeckt.get(r.id) ?? 0) : null,
+  }));
 
   const sollGesamt = posten.reduce((s, p) => s + p.soll, 0);
   const sollMitKonto = posten.reduce((s, p) => s + (p.tatsaechlich == null ? 0 : p.soll), 0);
@@ -176,7 +205,10 @@ export function ruecklagenDeckung(
 /**
  * Die Mindestrücklage nach der Faustformel: drei Monatseinnahmen.
  *
- * REINE INFORMATION und keine Regel — nichts im Programm misst etwas daran. Die Formel
+ * Keine Regel, aber seit 2026-11-08 ein MASSSTAB: der Bereich Rücklagen zeigt, wie weit
+ * der Stand der Rücklagenkonten an sie heranreicht. Bis dahin stand hier „nichts im
+ * Programm misst etwas daran". Sie entscheidet trotzdem nichts — keine Warnung, keine
+ * Rechnung hängt an ihr; der Tacho zeigt nur, wo man steht. Die Formel
  * ist eine verbreitete Faustregel für den Notgroschen, kein Rechenweg mit einer
  * Herleitung; deshalb steht der Faktor als Argument da und nicht als Konstante im Code.
  *

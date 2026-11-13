@@ -13,6 +13,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Card } from "../bausteine";
+import { Stapel } from "../bausteine/Anordnung";
 import { konfigurationExport } from "../../dienste";
 
 export function ExportCard() {
@@ -36,23 +37,33 @@ export function ExportCard() {
 
   return (
     <Card title={t("einstellungen.export.konfiguration.titel")}>
-      <p className="muted">{t("einstellungen.export.konfiguration.text")}</p>
-      <p className="muted">{t("einstellungen.export.konfiguration.hinweis")}</p>
-      {/* Kein `disabled` — der Baustein aus dem Design-System kennt es nicht, und ein
-          zweiter Klick waehrend des Schreibens ueberschreibt nur dieselbe Datei mit
-          demselben Inhalt. Der Text sagt trotzdem, dass gerade etwas laeuft. */}
-      <Button variant="primary" onClick={() => !laeuft && void exportieren()}>
-        {laeuft ? t("einstellungen.export.laeuft") : t("einstellungen.export.konfiguration.knopf")}
-      </Button>
-      {pfad && (
-        <p style={{ marginBottom: 0 }}>
-          {t("einstellungen.export.fertig")}{" "}
-          {/* `user-select: all` — ein Klick markiert den ganzen Pfad. Er ist lang und
-              enthält Leerzeichen; wer ihn von Hand markiert, erwischt die Hälfte. */}
-          <code style={{ userSelect: "all", wordBreak: "break-all" }}>{pfad}</code>
-        </p>
-      )}
-      {fehler && <p className="zugang-fehler">{fehler}</p>}
+      <Stapel>
+        <p className="muted" style={{ margin: 0 }}>{t("einstellungen.export.konfiguration.text")}</p>
+        <p className="muted" style={{ margin: 0 }}>{t("einstellungen.export.konfiguration.hinweis")}</p>
+        <div>
+          <Button variant="primary" onClick={() => void exportieren()} laeuft={laeuft}>
+            {laeuft ? t("einstellungen.export.laeuft") : t("einstellungen.export.konfiguration.knopf")}
+          </Button>
+        </div>
+        {pfad && <Exportpfad pfad={pfad} />}
+        {fehler && <p className="err" style={{ margin: 0 }}>{fehler}</p>}
+      </Stapel>
     </Card>
+  );
+}
+
+/**
+ * Wohin die Datei geschrieben wurde — für beide Exporte dieselbe Zeile.
+ *
+ * `user-select: all`: ein Klick markiert den ganzen Pfad. Er ist lang und enthält
+ * Leerzeichen; wer ihn von Hand markiert, erwischt die Hälfte.
+ */
+export function Exportpfad({ pfad }: { pfad: string }) {
+  const { t } = useTranslation();
+  return (
+    <p style={{ margin: 0 }}>
+      {t("einstellungen.export.fertig")}{" "}
+      <code style={{ userSelect: "all", wordBreak: "break-all" }}>{pfad}</code>
+    </p>
   );
 }

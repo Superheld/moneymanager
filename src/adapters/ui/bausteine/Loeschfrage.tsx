@@ -9,7 +9,7 @@
 // **Warum eine Rückfrage und kein Rückgängig.** Ein „Rückgängig" wäre das bessere
 // Angebot, aber es müsste jeder Löschweg selbst können: die Kaskaden hängen dran (ein
 // Vertrag nimmt seine Zahlungsregel, seine Erkennungsregel und alle Zuordnungen mit) und
-// es gibt für Stammdaten bewusst kein Änderungsprotokoll (siehe CLAUDE.md). Eine
+// es gibt für Stammdaten bewusst kein Änderungsprotokoll (siehe `src/application/buchung/CLAUDE.md`). Eine
 // Rückfrage kostet einen Klick und deckt denselben Fall ab — den versehentlichen.
 //
 // **Was in der Frage steht, ist der eigentliche Punkt.** „Wirklich löschen?" ist eine
@@ -81,6 +81,7 @@ export function useLoeschfrage(): Loeschfrage {
 
   const dialog = auftrag ? (
     <Modal
+      warnung
       title={t("loeschen.titel")}
       subtitle={t("loeschen.untertitel", { name: auftrag.name })}
       onClose={schliessen}
@@ -98,9 +99,9 @@ export function useLoeschfrage(): Loeschfrage {
             </Button>
           )}
           {laeuft && <span className="muted">{t("loeschen.laeuft")}</span>}
-          <button className="linkbtn" onClick={schliessen} disabled={laeuft}>
+          <Button variant="link" onClick={schliessen} disabled={laeuft}>
             {t("loeschen.abbrechen")}
-          </button>
+          </Button>
           {fehler && <span className="err">{fehler}</span>}
         </>
       }

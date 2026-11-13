@@ -17,12 +17,14 @@ import { useTranslation } from "react-i18next";
 import type { Kontoherkunft, Laufbefund } from "../../../application";
 import { zurueckholen, type Umsatz } from "../../../application/import";
 import { herkunft as herkunftLaden, umsatzSpeichern } from "../../dienste";
-import { Card, Pill } from "../bausteine";
+import { Card, Pill, Button } from "../bausteine";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { DataTable } from "../bausteine/DataTable";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
+import { Umschalter } from "../bausteine/Umschalter";
+import { fehlerMelden } from "../bausteine/Meldungen";
+import { Stapel } from "../bausteine/Anordnung";
 
 type Statusfilter = "alle" | "verbucht" | "weggelegt" | "offen";
 
@@ -79,9 +81,9 @@ export function HerkunftBereich({
     setKonten(await herkunftLaden());
   }
   useEffect(() => {
-    laden().catch(() => {
-      /* reiner Browser-Modus ohne SQLite */
-    });
+    // Schlägt das Laden fehl, bleibt die Liste leer — aber mit Meldung: eine stumme leere
+    // Liste sähe aus wie „du hast keine" (siehe `Meldungen`).
+    laden().catch(fehlerMelden);
   }, []);
 
   const aktiv = konten.find((k) => k.konto.id === gewaehlt);
@@ -121,7 +123,7 @@ export function HerkunftBereich({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-4)" }}>
+    <Stapel abstand={4}>
 
       {aktiv && (
         <>
@@ -131,23 +133,18 @@ export function HerkunftBereich({
           {zugangId && (
           <Card title={t("konten.herkunft.laeufeTitel")}>
             {alleLaeufe.length === 0 ? (
-              <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.herkunft.keineLaeufe")}</div>
+              <div className="hinweis">{t("konten.herkunft.keineLaeufe")}</div>
             ) : (
               <DataTable
                 sortable
                 istAktiv={(l: Laufbefund) => l.lauf.id === laufId}
+                onRowClick={(l: Laufbefund) => setLaufId(laufId === l.lauf.id ? null : l.lauf.id)}
                 columns={[
                   {
                     key: "zeitpunkt",
                     label: t("konten.herkunft.spalteImport"),
-                    render: (l: Laufbefund) => (
-                      <Zeilenlink
-                        onKlick={() => setLaufId(laufId === l.lauf.id ? null : l.lauf.id)}
-                        titel={t("konten.herkunft.zeigeLauf", { datum: datum.mitJahr(l.lauf.zeitpunkt) })}
-                      >
-                        {datum.mitJahr(l.lauf.zeitpunkt)}
-                      </Zeilenlink>
-                    ),
+                    sortValue: (l: Laufbefund) => l.lauf.zeitpunkt,
+                    render: (l: Laufbefund) => datum.mitJahr(l.lauf.zeitpunkt),
                   },
                   {
                     key: "quelle",
@@ -187,7 +184,7 @@ export function HerkunftBereich({
               verdeckt sie, statt sie zu beantworten. */}
           {zugangId && !laufId ? (
             <Card>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              <div className="hinweis">
                 {alleLaeufe.length === 0
                   ? t("konten.herkunft.keineLaeufeZugang")
                   : t("konten.herkunft.laufWaehlen")}
@@ -195,26 +192,13 @@ export function HerkunftBereich({
             </Card>
           ) : (
           <Card>
-            <div style={{ display: "flex", gap: "var(--sp-2)", marginBottom: "var(--sp-2)", flexWrap: "wrap" }}>
-              {(["alle", "verbucht", "weggelegt", "offen"] as const).map((f) => (
-                <button
-                  key={f}
-                  type="button"
-                  className="linkbtn"
-                  aria-pressed={filter === f}
-                  onClick={() => setFilter(f)}
-                  style={{
-                    padding: "3px 9px",
-                    borderRadius: "var(--r-sm)",
-                    border: "1px solid var(--line)",
-                    fontSize: "var(--fs-xs)",
-                    fontWeight: filter === f ? "var(--fw-bold)" : "normal",
-                    background: filter === f ? "var(--accent-wash)" : "transparent",
-                  }}
-                >
-                  {t(`konten.herkunft.filter.${f}`)}
-                </button>
-              ))}
+            <div style={{ display: "flex", gap: "var(--sp-2)", marginBottom: "var(--sp-2)", flexWrap: "wrap", alignItems: "center" }}>
+              <Umschalter
+                label={t("konten.herkunft.filterWahl")}
+                optionen={(["alle", "verbucht", "weggelegt", "offen"] as const).map((f) => ({ wert: f, text: t(`konten.herkunft.filter.${f}`) }))}
+                wert={filter}
+                aufAendern={setFilter}
+              />
 
               {/* Nach Quelle eingrenzen — nur wo es überhaupt mehrere gibt. Ein Filter mit
                   einer einzigen Möglichkeit fragt nach etwas, das schon feststeht.
@@ -234,7 +218,7 @@ export function HerkunftBereich({
             </div>
 
             {gefiltert.length === 0 ? (
-              <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("konten.herkunft.keineZeilen")}</div>
+              <div className="hinweis">{t("konten.herkunft.keineZeilen")}</div>
             ) : (
               <DataTable
                 columns={[
@@ -272,9 +256,9 @@ export function HerkunftBereich({
                     key: "_a", label: "", align: "right", sortable: false,
                     render: (z) =>
                       z.umsatz.status === "verworfen" || z.umsatz.status === "duplikat" ? (
-                        <button className="linkbtn" style={{ padding: 0, fontSize: "var(--fs-xs)" }} onClick={() => void zurueck(z.umsatz)}>
+                        <Button variant="link" style={{ padding: 0, fontSize: "var(--fs-xs)" }} onClick={() => void zurueck(z.umsatz)}>
                           {t("konten.herkunft.zurueckholen")}
-                        </button>
+                        </Button>
                       ) : null,
                   },
                 ]}
@@ -285,6 +269,6 @@ export function HerkunftBereich({
           )}
         </>
       )}
-    </div>
+    </Stapel>
   );
 }

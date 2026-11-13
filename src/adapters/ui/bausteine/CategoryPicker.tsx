@@ -29,6 +29,7 @@ import { useTranslation } from "react-i18next";
 import type { Charakter, Kategorie } from "../../../application";
 import { Pill } from "./Pill";
 import { Modal } from "./Modal";
+import { Button as BaseButton } from "@base-ui/react/button";
 
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = { Aufwand: "aufwand", Ertrag: "ertrag", Umschichtung: "um" };
 
@@ -161,7 +162,7 @@ export function CategoryPicker({
           Rahmen, Zeiger und den Auswahlpfeil: eine Zelle, die nur Text zeigt, sieht aus
           wie eine Anzeige, und niemand klickt darauf. Was gewählt WERDEN kann, muss man
           ihm ansehen — dieselbe Überlegung wie bei `Zeilenauswahl`, dieselbe Grösse. */}
-      <button
+      <BaseButton
         type="button"
         aria-label={ariaLabel}
         title={ariaLabel}
@@ -190,7 +191,7 @@ export function CategoryPicker({
           {gewaehlt ? gewaehlt.name : placeholder ?? t("kategoriePicker.leer")}
         </span>
         <span aria-hidden="true" style={{ color: "var(--ink-3)", flex: "0 0 auto" }}>▾</span>
-      </button>
+      </BaseButton>
 
       {offen && (
         <Modal title={t("kategoriePicker.titel")} onClose={() => setOffen(false)} z={60}>
@@ -262,7 +263,7 @@ function Pickzeile({ id, markiert, klasse, markiertRef, onWaehlen, onZeigen, chi
 }) {
   const istMarkiert = markiert === id;
   return (
-    <button
+    <BaseButton
       type="button"
       data-markiert={istMarkiert || undefined}
       ref={istMarkiert ? markiertRef : undefined}
@@ -276,6 +277,6 @@ function Pickzeile({ id, markiert, klasse, markiertRef, onWaehlen, onZeigen, chi
       onMouseMove={() => onZeigen(id)}
     >
       {children}
-    </button>
+    </BaseButton>
   );
 }

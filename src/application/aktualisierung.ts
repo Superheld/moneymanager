@@ -107,6 +107,40 @@ export async function aktualisierungPruefen(
   }
 }
 
+/** Was eine Prüfung auf Knopfdruck ergibt — anders als beim Start sind es DREI Fälle. */
+export type Pruefergebnis =
+  | { readonly art: "neu"; readonly aktualisierung: Aktualisierung }
+  | { readonly art: "aktuell" }
+  | { readonly art: "fehler" };
+
+/**
+ * Prüft auf Knopfdruck („Jetzt prüfen" in den Einstellungen).
+ *
+ * Zwei Unterschiede zur Prüfung beim Start, beide aus demselben Grund wie beim Einspielen:
+ * hier hat jemand geklickt und wartet.
+ *
+ * - **Der Startschalter gilt nicht.** Er sagt, ob die App UNGEFRAGT nach draussen spricht;
+ *   ein Klick ist die Frage. Wer die Prüfung beim Start abgeschaltet hat, soll trotzdem
+ *   nachsehen können, ohne sie dafür wieder einzuschalten. Der Beta-Schalter gilt dagegen
+ *   weiter: er sagt, WAS angeboten wird, nicht ob gefragt wird.
+ * - **„Aktuell" und „ging nicht" sind verschieden.** Beim Start fallen sie zusammen, weil
+ *   dort nichts angezeigt wird. Hier stünde sonst „du bist aktuell", obwohl niemand
+ *   gefragt werden konnte — eine Auskunft, die falsch ist, genau wenn man sie braucht.
+ */
+export async function aktualisierungJetztPruefen(
+  port: AktualisierungPort,
+  repo: EinstellungenRepository,
+): Promise<Pruefergebnis> {
+  try {
+    const einstellungen = await repo.lesen();
+    const gefunden = await port.pruefen(betaErlaubt(einstellungen));
+    return gefunden ? { art: "neu", aktualisierung: gefunden } : { art: "aktuell" };
+  } catch (fehler) {
+    console.warn("Aktualisierungsprüfung nicht möglich:", fehler);
+    return { art: "fehler" };
+  }
+}
+
 /**
  * Spielt die bereitliegende Fassung ein und startet neu.
  *

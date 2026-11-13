@@ -2,14 +2,14 @@
 // Klassifikator rechnet. Reine Funktionen, kein IO.
 //
 // Warum das eine eigene Datei mit eigenen Tests ist und nicht drei Zeilen im Modell:
-// Aus dem Lern-Spike (2026-06) steht fest, dass der Deckel bei ~85 % daten- und nicht
+// Aus dem Lern-Spike (2026-06) steht fest, dass der Deckel daten- und nicht
 // modelllimitiert ist — linear, MLP und tief+breit lagen gleichauf. Was dann noch etwas
 // bewegt, ist die Frage, WAS überhaupt in den Vektor kommt. Die Extraktion ist der Hebel,
 // das Modell dahinter ist Arithmetik.
 //
 // Vier Quellen, jede in einem eigenen Namensraum:
 //
-//   • `emp=…`  der ganze normalisierte Empfängername als EIN Token. Scharf: wer 68-mal
+//   • `emp=…`  der ganze normalisierte Empfängername als EIN Token. Scharf: wer dutzendfach
 //              an dieselbe Firma gezahlt hat, wird darüber praktisch sicher erkannt.
 //   • `emp:…`  seine Einzelwörter. Unscharf, aber sie GENERALISIEREN — „apotheke" zieht
 //              bei „Apotheke am Markt" und bei „Sonnen-Apotheke", auch wenn genau dieser
@@ -20,7 +20,7 @@
 //              schmutzigste Feld (siehe STRUKTURFILTER).
 //
 // **Zwei Quellen sind 2026-08-29 gefallen: das VORZEICHEN und die GLÄUBIGER-ID.** Beide
-// kosteten am echten Bestand 0,00 Punkte, und beide waren in einer Liste von WÖRTERN ein
+// kosteten beim Weglassen messbar nichts, und beide waren in einer Liste von WÖRTERN ein
 // Fremdkörper — ein `+` ist kein Wort, eine Gläubiger-ID ist ein Bezeichner. Sie standen
 // dort als Zeilen, die niemand beurteilen konnte.
 //
@@ -43,7 +43,7 @@
 // des Codes — aber nur, weil die Oberfläche die Wirkung jeder Änderung misst. Ohne diese
 // Messung wäre es eine Geschmacksfrage, und die schlechteste Antwort auf „welches Merkmal
 // taugt" ist ein Bauchgefühl: ein zusammengelaufener Schlüssel aus Händlername, Ort und
-// „karte" sieht nach Müll aus und trifft dreistellig oft zu 100 % dieselbe Kategorie,
+// „karte" sieht nach Müll aus und trifft oft und ausnahmslos dieselbe Kategorie,
 // während ein sauber lesbares Wort daneben über ein Dutzend Kategorien streut.
 
 import { anbieterSchluessel } from "../basis/gegenpartei";
@@ -205,9 +205,9 @@ const ZIFFERN_AB_LAENGE = 4;
  * Ab wie vielen Stellen eine Ziffernfolge am Wortrand als angeklebte Nummer gilt und
  * abgeschnitten wird.
  *
- * Gemessen am echten Bestand (2026-08-16): ohne diesen Schritt verwarf die Ziffernregel
+ * Gefunden 2026-08-16: ohne diesen Schritt verwarf die Ziffernregel
  * `debitkarte2025`, `debitkarte2024`, `debitkarte2026`, `3386musterbank` und
- * `3386kdn` (326×) KOMPLETT — mitsamt dem brauchbaren Wort darin. Banken setzen zwischen
+ * `3386kdn` KOMPLETT — mitsamt dem brauchbaren Wort darin. Banken setzen zwischen
  * Bezeichnung und Nummer kein Leerzeichen; wer das ganze Token wegwirft, wirft die
  * Bezeichnung mit weg.
  *

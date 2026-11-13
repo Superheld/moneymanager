@@ -14,6 +14,7 @@ import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 /** Die Auswahl der Maske → das Ziel des Use-Case. Zwei Sonderwerte, sonst eine Vertrags-Id. */
 function sammelziel(wahl: string): Sammelziel {
@@ -119,21 +120,20 @@ export function SammelDialog({
             <Button variant="primary" onClick={() => void loeschen()}>
               {t("konten.sammel.loeschenBestaetigen", { n: buchungen.length - gesperrt })}
             </Button>
-            <button className="linkbtn" onClick={() => setLoeschenGefragt(false)}>{t("konten.abbrechen")}</button>
+            <Button variant="link" onClick={() => setLoeschenGefragt(false)}>{t("konten.abbrechen")}</Button>
           </>
         ) : (
           <>
             <Button variant="primary" onClick={busy ? () => {} : () => void speichern()}>
               {t("konten.sammel.anwenden")}
             </Button>
-            <button className="linkbtn" onClick={onClose}>{t("konten.abbrechen")}</button>
-            <button
-              className="linkbtn"
+            <Button variant="link" onClick={onClose}>{t("konten.abbrechen")}</Button>
+            <Button variant="link"
               style={{ marginLeft: "auto", color: "var(--warn-deep)" }}
               onClick={() => setLoeschenGefragt(true)}
             >
               {t("konten.loeschen")}
-            </button>
+            </Button>
           </>
         )
       }
@@ -144,7 +144,7 @@ export function SammelDialog({
         <div>
           <p style={{ margin: 0 }}>{t("konten.sammel.loeschenFrage", { n: buchungen.length - gesperrt })}</p>
           {gesperrt > 0 && (
-            <p className="muted" style={{ fontSize: "var(--fs-small)", marginTop: "var(--sp-3)" }}>
+            <p className="muted" style={{ fontSize: "var(--fs-sm)", marginTop: "var(--sp-3)" }}>
               {t("konten.sammel.loeschenGesperrt", { n: gesperrt })}
             </p>
           )}
@@ -154,16 +154,9 @@ export function SammelDialog({
           <div className="form-grid">
             <FormField
               label={
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={kategorieAn}
-                    aria-label={t("konten.sammel.kategorieSetzen")}
-                    onChange={(e) => setKategorieAn(e.target.checked)}
-                    style={{ accentColor: "var(--accent-deep)" }}
-                  />
+                <Kaestchen an={kategorieAn} aufAendern={setKategorieAn}>
                   {t("konten.sammel.kategorieSetzen")}
-                </span>
+                </Kaestchen>
               }
               hint={kategorieAn && !kategorieId ? t("konten.sammel.kategorieLeeren") : undefined}
             >
@@ -174,16 +167,9 @@ export function SammelDialog({
 
             <FormField
               label={
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={notizAn}
-                    aria-label={t("konten.sammel.bezeichnungSetzen")}
-                    onChange={(e) => setNotizAn(e.target.checked)}
-                    style={{ accentColor: "var(--accent-deep)" }}
-                  />
+                <Kaestchen an={notizAn} aufAendern={setNotizAn}>
                   {t("konten.sammel.bezeichnungSetzen")}
-                </span>
+                </Kaestchen>
               }
               hint={t("konten.sammel.bezeichnungHinweis")}
             >
@@ -202,16 +188,9 @@ export function SammelDialog({
                 und trägt eine Herkunft, die der nächste Abgleich respektieren muss. */}
             <FormField
               label={
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
-                  <input
-                    type="checkbox"
-                    checked={vertragAn}
-                    aria-label={t("konten.sammel.vertragSetzen")}
-                    onChange={(e) => setVertragAn(e.target.checked)}
-                    style={{ accentColor: "var(--accent-deep)" }}
-                  />
+                <Kaestchen an={vertragAn} aufAendern={setVertragAn}>
                   {t("konten.sammel.vertragSetzen")}
-                </span>
+                </Kaestchen>
               }
               hint={vertragAn ? t(`konten.sammel.vertragHinweis.${zielArt}`) : undefined}
             >
@@ -235,18 +214,18 @@ export function SammelDialog({
           {(umbuchungen > 0 || gesperrt > 0 || (vertragAn && umschichtungen > 0)) && (
             <div style={{ marginTop: "var(--sp-4)", display: "flex", flexDirection: "column", gap: 6 }}>
               {umbuchungen > 0 && (
-                <span className="muted" style={{ fontSize: "var(--fs-xs)", display: "inline-flex", alignItems: "center", gap: 8 }}>
+                <span className="hinweis" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
                   <Pill variant="um">{t("konten.pillUmbuchung")}</Pill>
                   {t("konten.sammel.umbuchungHinweis", { n: umbuchungen })}
                 </span>
               )}
               {gesperrt > 0 && (
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {t("konten.sammel.onlineHinweis", { n: gesperrt })}
                 </span>
               )}
               {vertragAn && zielArt === "vertrag" && umschichtungen > 0 && (
-                <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <span className="hinweis">
                   {t("konten.sammel.vertragUmschichtungHinweis", { n: umschichtungen })}
                 </span>
               )}

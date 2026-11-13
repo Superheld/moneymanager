@@ -39,19 +39,19 @@ beforeEach(() => {
 
 // Über die i18n-Schlüssel statt über Formulierungen — sonst wird die Suite beim nächsten
 // Wording-Durchgang rot (src/CLAUDE.md).
-const registerName = () => i18n.t("einstellungen.aktualisierung.titel");
+const registerName = () => i18n.t("einstellungen.app.titel");
 const schalterName = () => i18n.t("einstellungen.aktualisierung.schalterTitel");
 
 async function schalterHolen(nutzer: ReturnType<typeof userEvent.setup>) {
   await registerWaehlen(nutzer, registerName());
-  return (await screen.findByLabelText(schalterName())) as HTMLInputElement;
+  return await screen.findByRole("switch", { name: schalterName() });
 }
 
 describe("Schalter für die Aktualisierungsprüfung", () => {
   it("ist AN, solange niemand etwas entschieden hat", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    expect((await schalterHolen(nutzer)).checked).toBe(true);
+    expect((await schalterHolen(nutzer))).toBeChecked();
     // Und zwar ohne Zeile in der Tabelle: „nie entschieden" ist nicht „abgelehnt".
     expect(await sqliteEinstellungenRepository.lesen()).not.toHaveProperty("aktualisierungPruefen");
   });
@@ -67,7 +67,7 @@ describe("Schalter für die Aktualisierungsprüfung", () => {
       const kv = await sqliteEinstellungenRepository.lesen();
       expect(kv["aktualisierungPruefen"]).toBe("aus");
     });
-    await waitFor(() => expect(schalter.checked).toBe(false));
+    await waitFor(() => expect(schalter).not.toBeChecked());
   });
 
   it("schaltet wieder an", async () => {
@@ -76,7 +76,7 @@ describe("Schalter für die Aktualisierungsprüfung", () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
     const schalter = await schalterHolen(nutzer);
-    expect(schalter.checked).toBe(false);
+    expect(schalter).not.toBeChecked();
 
     await nutzer.click(schalter);
 
@@ -84,7 +84,7 @@ describe("Schalter für die Aktualisierungsprüfung", () => {
       const kv = await sqliteEinstellungenRepository.lesen();
       expect(kv["aktualisierungPruefen"]).toBe("an");
     });
-    await waitFor(() => expect(schalter.checked).toBe(true));
+    await waitFor(() => expect(schalter).toBeChecked());
   });
 
   // Der eigentliche Punkt eines Schalters: er überlebt den Neustart. Ohne das wäre er
@@ -94,7 +94,7 @@ describe("Schalter für die Aktualisierungsprüfung", () => {
 
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    expect((await schalterHolen(nutzer)).checked).toBe(false);
+    expect((await schalterHolen(nutzer))).not.toBeChecked();
   });
 });
 
@@ -103,13 +103,13 @@ describe("der Schalter für Betaversionen", () => {
 
   async function betaHolen(nutzer: ReturnType<typeof userEvent.setup>) {
     await registerWaehlen(nutzer, registerName());
-    return (await screen.findByLabelText(betaName())) as HTMLInputElement;
+    return await screen.findByRole("switch", { name: betaName() });
   }
 
   it("ist aus, solange niemand etwas entschieden hat", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    expect((await betaHolen(nutzer)).checked).toBe(false);
+    expect((await betaHolen(nutzer))).not.toBeChecked();
   });
 
   it("schreibt beim Umlegen in die Einstellung", async () => {

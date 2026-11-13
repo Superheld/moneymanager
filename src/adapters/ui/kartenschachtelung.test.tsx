@@ -22,7 +22,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
+import { klickbareZeile, frischeDb, pluginApi, rendere, sqlLaden } from "../../testwerkzeug/harness";
 import { KontenVerwaltung } from "./konten/KontenVerwaltung";
 import { KontenScreen } from "./konten/KontenScreen";
 import { sqliteZahlungskontoRepository as kontoRepo } from "../persistence/sqliteStammdatenRepositories";
@@ -82,14 +82,13 @@ describe("Karten liegen nebeneinander, nicht ineinander", () => {
         personen={[]}
         personName={new Map()}
         kontostaende={[]}
-        hatGebuchtes={false}
         verbindungen={new Map()}
         onTrennen={async () => {}}
         onChange={() => {}}
       />,
     );
 
-    const link = await screen.findByRole("button", { name: /Girokonto/ });
+    const link = await klickbareZeile("Girokonto");
     expect(verschachtelteKarten()).toBe(0);
 
     await userEvent.click(link);

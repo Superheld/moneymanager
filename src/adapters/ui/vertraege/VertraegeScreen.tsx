@@ -1,7 +1,7 @@
 // Verträge (P2.1) — Übersicht mit Kündigungsterminen; Anlegen im Modal. Eine Maske
 // erzeugt Vertrag (Stammdaten) + abgeleitete Zahlungsregel (Planung).
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
   hauptkategorie,
@@ -20,21 +20,22 @@ import {
   vertragsvorschlagIgnorieren,
 } from "../../dienste";
 import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
-import { Modal } from "../bausteine/Modal";
+import { Auswahl } from "../bausteine/Auswahl";
 import type { DataColumn } from "../bausteine/DataTable";
 import { PageHead } from "../bausteine/PageHead";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
+import { VertragModal } from "./VertragModal";
 import {
   formularAusKandidat,
   formularAusVertrag,
   leeresFormular,
-  VertragModal,
   type VertragFormular,
-} from "./VertragModal";
+} from "./vertragFormular";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
+import { Umschalter } from "../bausteine/Umschalter";
+import { ErkennungsDialog } from "./ErkennungsDialog";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -56,127 +57,17 @@ const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "ja
  */
 type Ansicht = "liste" | "faelligkeit" | "turnus" | "kategorie";
 const ANSICHTEN: Ansicht[] = ["liste", "faelligkeit", "turnus", "kategorie"];
+
+/** Die Arten in Anzeigereihenfolge — dieselbe wie in der Anlege-Maske. */
+const ARTEN: readonly NonNullable<Vertrag["art"]>[] = ["abo", "dauervertrag", "umbuchung"];
+type ArtFilter = NonNullable<Vertrag["art"]> | "alle";
+/** Ein Vertrag ohne Art ist ein Abo — dieselbe Lesart wie in Maske und Persistenz. */
+const artVon = (v: Vertrag) => v.art ?? "abo";
 const CHARAKTER_PILL: Record<Charakter, "aufwand" | "ertrag" | "um"> = {
   Aufwand: "aufwand",
   Ertrag: "ertrag",
   Umschichtung: "um",
 };
-
-/**
- * „Woran erkannt?" — die Prüfungen, die bei diesem Kandidaten angeschlagen haben, je
- * mit dem gemessenen Wert UND der Schwelle.
- *
- * Warum das sichtbar gehört: ein Vorschlag ohne Begründung lässt nur zwei Reaktionen zu
- * — blind übernehmen oder blind wegklicken. Wer sieht, dass 68 Zahlungen im 30-Tage-Takt
- * an dieselbe Gläubiger-ID gingen, entscheidet anders als bei drei Zahlungen mit
- * schwankendem Abstand. Und wenn die Erkennung danebenliegt, ist hier zu sehen, warum.
- */
-function ErkennungsDialog({ kandidat, onClose }: { kandidat: Vertragskandidat; onClose: () => void }) {
-  const { t } = useTranslation();
-  const geld = useGeld();
-  const b = kandidat.befund;
-  const v = kandidat.vorlage;
-
-  /**
-   * Was aus der Messung als REGEL entsteht — die Zeile, die den Dialog erst schliesst.
-   *
-   * Die Prüfungen darüber begründen den Vorschlag, und bis hierher hörte der Dialog damit
-   * auf: man las sieben gemessene Werte und erfuhr nichts darüber, was davon den Vertrag
-   * erreicht. Die Antwort war „das Wenigste", ohne dass es irgendwo stand. Jetzt steht es
-   * da, und zwar als das, was gleich passiert — nicht als weitere Messung.
-   */
-  const regelText = [
-    v.betragVon !== undefined && v.betragBis !== undefined
-      ? t("vertraege.erkennung.regelSpanne", {
-          von: `${geld.format(v.betragVon)} ${geld.symbol}`,
-          bis: `${geld.format(v.betragBis)} ${geld.symbol}`,
-        })
-      : null,
-    v.tagVon !== undefined && v.tagBis !== undefined
-      ? t("vertraege.erkennung.regelTage", { von: v.tagVon, bis: v.tagBis })
-      : null,
-    v.monatVon !== undefined && v.monatBis !== undefined
-      ? t("vertraege.erkennung.regelMonate", { von: v.monatVon, bis: v.monatBis })
-      : null,
-  ]
-    .filter(Boolean)
-    .concat(t("vertraege.erkennung.regelHinweis"))
-    .join(" · ");
-
-  function Zeile({ label, wert }: { label: string; wert: string }) {
-    return (
-      <div style={{ display: "flex", gap: "var(--sp-3)", padding: "7px 0", alignItems: "baseline", borderBottom: "1px solid var(--line-soft)" }}>
-        <span style={{ flex: "0 0 32%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>{label}</span>
-        <span style={{ flex: 1, minWidth: 0, fontSize: 13, wordBreak: "break-word" }}>{wert}</span>
-      </div>
-    );
-  }
-
-  return (
-    <Modal
-      title={t("vertraege.erkennung.titel")}
-      subtitle={kandidat.anbieter}
-      onClose={onClose}
-      footer={<Button variant="primary" onClick={onClose}>{t("vertraege.erkennung.schliessen")}</Button>}
-    >
-      <p className="muted" style={{ fontSize: "var(--fs-small)", margin: "0 0 var(--sp-3)", maxWidth: 620 }}>
-        {t("vertraege.erkennung.hinweis")}
-      </p>
-
-      <Zeile
-        label={t("vertraege.erkennung.schluessel")}
-        wert={
-          b.schluesselArt === "glaeubigerId"
-            ? t("vertraege.erkennung.schluesselGlaeubiger", { wert: b.schluesselWert })
-            : t("vertraege.erkennung.schluesselName", { wert: b.schluesselWert })
-        }
-      />
-      <Zeile
-        label={t("vertraege.erkennung.termine")}
-        wert={t("vertraege.erkennung.termineWert", { termine: b.termine, min: b.minTermine, von: kandidat.ersteZahlung, bis: kandidat.letzteZahlung })}
-      />
-      <Zeile
-        label={t("vertraege.erkennung.takt")}
-        wert={t("vertraege.erkennung.taktWert", {
-          tage: b.medianAbstandTage,
-          rhythmus: t(`vertraege.rhythmus.${kandidat.rhythmus}`),
-          von: b.rhythmusFenster[0],
-          bis: b.rhythmusFenster[1],
-        })}
-      />
-      <Zeile
-        label={t("vertraege.erkennung.regelmaessig")}
-        wert={t("vertraege.erkennung.regelmaessigWert", { nah: b.abstaendeNah, gesamt: b.abstaendeGesamt, prozent: Math.round(b.minAnteilNah * 100) })}
-      />
-      <Zeile
-        label={t("vertraege.erkennung.betrag")}
-        wert={t("vertraege.erkennung.betragWert", {
-          median: `${geld.format(kandidat.betrag)} ${geld.symbol}`,
-          nah: b.betraegeNah,
-          gesamt: b.betraegeGesamt,
-          toleranz: `${geld.format(b.betragsToleranz)} ${geld.symbol}`,
-        })}
-      />
-      <Zeile
-        label={t("vertraege.erkennung.richtung")}
-        wert={t("vertraege.erkennung.richtungWert", { charakter: t(`charakter.${kandidat.charakter}`) })}
-      />
-      <Zeile
-        label={t("vertraege.erkennung.laufend")}
-        wert={t("vertraege.erkennung.laufendWert", { tage: b.letzteVorTagen, grenze: b.beendetAbTagen })}
-      />
-      <Zeile
-        label={t("vertraege.erkennung.zweck")}
-        wert={
-          b.zweckAnfang
-            ? t("vertraege.erkennung.zweckWert", { wert: b.zweckAnfang })
-            : t("vertraege.erkennung.zweckLeer")
-        }
-      />
-      <Zeile label={t("vertraege.erkennung.regel")} wert={regelText} />
-    </Modal>
-  );
-}
 
 function heuteIso(): string {
   const n = new Date();
@@ -192,6 +83,12 @@ export function VertraegeScreen() {
   const [ansicht, setAnsicht] = useState<Ansicht>("liste");
   /** Welcher Vertrag seine zugeordneten Zahlungen zeigt — aufgeklappt unter der Tabelle. */
   const [zahlungenVon, setZahlungenVon] = useState<string | null>(null);
+  // Die Zahlungen stehen UNTER der Tabelle — bei einer langen Liste ausserhalb des Bildes.
+  // Ohne das Scrollen sah der Klick aus, als täte er nichts.
+  const zahlungenRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (zahlungenVon) zahlungenRef.current?.scrollIntoView?.({ behavior: "smooth", block: "start" });
+  }, [zahlungenVon]);
 
   /**
    * Die offene Maske: `start` ist ihr Anfangszustand, `editId` unterscheidet Ändern von
@@ -214,7 +111,28 @@ export function VertraegeScreen() {
   }, []);
 
   const zeilen = sicht?.zeilen ?? [];
-  const vertraege = useMemo(() => zeilen.map((z) => z.vertrag), [zeilen]);
+  const alleVertraege = useMemo(() => zeilen.map((z) => z.vertrag), [zeilen]);
+  /**
+   * Der Filter nach Art wirkt NUR auf die Liste, nicht auf die Kennzahlen darüber. Die
+   * kommen fertig aus `vertraegeLaden` und gelten dem ganzen Bestand; sie hier für eine
+   * Teilmenge nachzurechnen hiesse, in der Oberfläche zu rechnen. Wer „was kosten mich
+   * meine Abos" wissen will, liest es am Kopf der Turnus- oder Kategoriegruppen, und die
+   * rechnen über das, was der Filter übrig lässt.
+   */
+  const [artFilter, setArtFilter] = useState<ArtFilter>("alle");
+  /** Nur die Arten, die im Bestand vorkommen — ein Filter auf Leeres ist eine Sackgasse. */
+  const vorhandeneArten = useMemo(() => ARTEN.filter((a) => alleVertraege.some((v) => artVon(v) === a)), [alleVertraege]);
+  /**
+   * Was tatsächlich gilt. Verschwindet die gewählte Art aus dem Bestand (der letzte
+   * Vertrag gelöscht oder umgestellt), fällt der Filter auf „alle" zurück — sonst stünde
+   * eine leere Liste da, und bliebe nur EINE Art übrig, wäre auch die Auswahl weg, über
+   * die man herauskäme.
+   */
+  const wirksamerFilter: ArtFilter = artFilter !== "alle" && vorhandeneArten.includes(artFilter) ? artFilter : "alle";
+  const vertraege = useMemo(
+    () => (wirksamerFilter === "alle" ? alleVertraege : alleVertraege.filter((v) => artVon(v) === wirksamerFilter)),
+    [alleVertraege, wirksamerFilter],
+  );
   const kategorien = sicht?.kategorien ?? [];
   const vorschlaege = sicht?.vorschlaege ?? [];
   const personName = sicht?.personNamen ?? LEERE_NAMEN;
@@ -243,6 +161,18 @@ export function VertraegeScreen() {
    * eine eigene Tabelle zeigt und nur dort die Rücklagen-Spalte trägt — innerhalb einer
    * Gruppe steht der Rhythmus fest, also ist die Spalte dort auch vergleichbar.
    */
+  /**
+   * Ein Klick auf eine Zeile zeigt die Zahlungen, die der Abgleich diesem Vertrag
+   * zugeordnet hat. Die Spalte daneben nennt nur ihre ANZAHL — die sagt „die Regel greift",
+   * aber nicht WAS sie greift. Erst an der Liste sieht man den Fehlgriff: eine fremde
+   * Zahlung an denselben Empfänger zählt genauso mit und macht aus einer falschen
+   * Zuordnung eine gute Kennzahl. Der zweite Klick klappt wieder zu.
+   */
+  const zeileWaehlen = {
+    onRowClick: (v: Vertrag) => setZahlungenVon(zahlungenVon === v.id ? null : v.id),
+    istAktiv: (v: Vertrag) => v.id === zahlungenVon,
+  };
+
   function spalten(mitRuecklage: boolean): DataColumn<Vertrag>[] {
     const s: DataColumn<Vertrag>[] = [
       {
@@ -252,17 +182,9 @@ export function VertraegeScreen() {
         // jeder Zeile („Abo") sagte nichts und kostete eine Spaltenbreite.
         render: (v) => (
           <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
-            {/* Der Anbieter führt zu den Zahlungen, die der Abgleich diesem Vertrag
-                zugeordnet hat. Die Spalte daneben nennt nur ihre ANZAHL — die sagt „die
-                Regel greift", aber nicht WAS sie greift. Erst an der Liste sieht man den
-                Fehlgriff: eine fremde Zahlung an denselben Empfänger zählt genauso mit
-                und macht aus einer falschen Zuordnung eine gute Kennzahl. */}
-            <Zeilenlink
-              onKlick={() => setZahlungenVon(zahlungenVon === v.id ? null : v.id)}
-              titel={t("vertraege.zeigeZahlungen", { anbieter: v.anbieter })}
-            >
-              {v.anbieter}
-            </Zeilenlink>
+            {/* Die ganze Zeile öffnet die Zahlungen, der Name zeigt es an (`DataTable`,
+                Bezeichner) — dasselbe Muster wie in jeder Tabelle. */}
+            <span className="zeilenname">{v.anbieter}</span>
             {v.art === "dauervertrag" && <Pill variant="neutral">{t("vertraege.artKurz.dauervertrag")}</Pill>}
             {v.art === "umbuchung" && <Pill variant="um">{t("vertraege.artKurz.umbuchung")}</Pill>}
           </span>
@@ -523,9 +445,9 @@ export function VertraegeScreen() {
         }
       />
 
-      {vertraege.length > 0 && (
+      {alleVertraege.length > 0 && (
         <div className="kpis">
-          <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(vertraege.length)} />
+          <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(alleVertraege.length)} />
           <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proMonat < 0 ? "warn" : "ok"} />
           <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proJahr < 0 ? "warn" : "ok"} />
           {summe.ruecklage > 0 && (
@@ -543,7 +465,7 @@ export function VertraegeScreen() {
           title={t("vertraege.vorschlaegeTitel")}
           subtitle={t("vertraege.vorschlaegeUntertitel", { count: vorschlaege.length })}
         >
-          <p className="muted" style={{ fontSize: "var(--fs-small)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
+          <p className="muted" style={{ fontSize: "var(--fs-sm)", maxWidth: 660, margin: "0 0 var(--sp-3)" }}>
             {t("vertraege.vorschlaegeHinweis")}
           </p>
           <DataTable
@@ -616,7 +538,7 @@ export function VertraegeScreen() {
         </Card>
       )}
 
-      {vertraege.length === 0 ? (
+      {alleVertraege.length === 0 ? (
         <Card>
           <div className="muted">{t("vertraege.leer")}</div>
         </Card>
@@ -631,23 +553,34 @@ export function VertraegeScreen() {
          */
         <Card>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)" }}>
-            <div style={{ display: "inline-flex", border: "1px solid var(--line)", borderRadius: "var(--r-md)", overflow: "hidden", background: "var(--surface)" }}>
-              {ANSICHTEN.map((a, i) => {
-                const an = ansicht === a;
-                return (
-                  <button key={a} type="button" aria-pressed={an} onClick={() => setAnsicht(a)}
-                    style={{ padding: "6px 12px", fontSize: "12.5px", fontWeight: an ? "var(--fw-bold)" : "var(--fw-semi)", fontFamily: "var(--font-ui)", border: "none", borderLeft: i ? "1px solid var(--line-soft)" : "none", background: an ? "var(--accent-wash)" : "transparent", color: an ? "var(--accent-deep)" : "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap" }}>
-                    {t(`vertraege.ansicht.${a}`)}
-                  </button>
-                );
-              })}
-            </div>
+            <Umschalter
+              label={t("vertraege.ansichtWahl")}
+              optionen={ANSICHTEN.map((a) => ({ wert: a, text: t(`vertraege.ansicht.${a}`) }))}
+              wert={ansicht}
+              aufAendern={setAnsicht}
+            />
             {/*
               Die Ordnung steht fest und ist nicht klickbar (siehe Ansicht-Doku oben) —
               also gehört sie hingeschrieben. Sonst sucht man die Sortierpfeile in den
               Spaltenköpfen und hält ihr Fehlen für einen Fehler.
             */}
-            <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t(`vertraege.ordnung.${ansicht}`)}</span>
+            <span className="hinweis">{t(`vertraege.ordnung.${ansicht}`)}</span>
+            {/* Erst ab zwei Arten: mit nur einer gäbe es zwischen „alle" und ihr nichts zu
+                wählen. Rechts abgesetzt, weil er etwas anderes tut als der Umschalter
+                links — der ordnet, dieser blendet aus. */}
+            {vorhandeneArten.length > 1 && (
+              <span className="tabellenfilter" style={{ marginLeft: "auto" }}>
+                <Auswahl
+                  ariaLabel={t("vertraege.artFilter")}
+                  wert={wirksamerFilter}
+                  aufAenderung={(w) => setArtFilter(w as ArtFilter)}
+                  optionen={[
+                    { wert: "alle", text: t("vertraege.artFilterAlle") },
+                    ...vorhandeneArten.map((a) => ({ wert: a, text: t(`vertraege.artKurz.${a}`) })),
+                  ]}
+                />
+              </span>
+            )}
           </div>
 
           {ansicht === "turnus" || ansicht === "kategorie" ? (
@@ -659,18 +592,19 @@ export function VertraegeScreen() {
                 style={i > 0 ? { borderTop: "1px solid var(--line)", marginTop: "var(--sp-5)", paddingTop: "var(--sp-5)" } : undefined}
               >
                 <div style={{ fontSize: "var(--fs-title)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>{g.titel}</div>
-                <div style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", margin: "3px 0 var(--sp-3)" }}>{g.meta}</div>
-                <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} />
+                <div className="hinweis" style={{ margin: "3px 0 var(--sp-3)" }}>{g.meta}</div>
+                <DataTable pageSize={25} columns={spalten(g.mitRuecklage)} rows={g.vertraege} {...zeileWaehlen} />
               </div>
             ))
           ) : (
             <DataTable
               // Ohne key bliebe beim Ansichtswechsel die aufgeschlagene Seite stehen —
               // Seite 3 von „liste" ist in „faelligkeit" ein anderer Ausschnitt.
-              key={ansicht}
+              key={`${ansicht}·${wirksamerFilter}`}
               pageSize={25}
               columns={spalten(false)}
               rows={ansicht === "faelligkeit" ? nachFaelligkeit : nachBetrag}
+              {...zeileWaehlen}
             />
           )}
         </Card>
@@ -681,11 +615,12 @@ export function VertraegeScreen() {
           Rhythmus, nächste Fälligkeit —, und ein Dialog verdeckte genau das. */}
       {zahlungsdetail && (
         <Card
+          ref={zahlungenRef}
           style={{ marginTop: "var(--gap-card)" }}
           title={t("vertraege.zahlungenTitel", { anbieter: zahlungsdetail.vertrag.anbieter })}
         >
           {zahlungsdetail.zahlungsliste.length === 0 ? (
-            <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <div className="hinweis">
               {t("vertraege.keineZahlungen")}
             </div>
           ) : (

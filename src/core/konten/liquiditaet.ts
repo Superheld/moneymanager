@@ -3,6 +3,10 @@
 // Das ist die eine Frage, aus der Handlungsbedarf entsteht. Alles andere in der Übersicht
 // sagt, wie es steht; hier steht, ob etwas zu tun ist.
 //
+// **Seit 2026-11-08 ohne Oberfläche.** Die Karte „Da ist etwas zu tun", die das hier
+// zeigte, war für die Übersicht zu laut und ist entfallen. Die Rechnung bleibt, bis sie
+// einen leiseren Ort bekommt.
+//
 // ZWEI LINIEN, und der Unterschied zwischen ihnen ist die eigentliche Auskunft:
 //
 //   FEST — nur datierte Verpflichtungen: Vertragsraten und geplante Umbuchungen. Wer hier

@@ -12,6 +12,7 @@
 // die Nachbarzahl.
 
 import { belegZuBuchung } from "./buchung/belegZuBuchung";
+import { buchungszeile, type Buchungszeile, type Zeilenkontext } from "./buchung/buchungszeile";
 import {
   addMonate,
   blindeFlecken,
@@ -25,6 +26,7 @@ import {
   kennzahlen,
   monatsAusblicke,
   planWirkung,
+  tiefstandImMonat,
   projiziereRegel,
   vertragstreue,
   betragInKategorie,
@@ -33,6 +35,7 @@ import {
   istInterneUmbuchung,
   istMonatsverlauf,
   kategorieAggregat,
+  kategorieReihen,
   monateImFenster,
   nachHauptgruppe,
   parseIso,
@@ -55,6 +58,7 @@ import {
   type Zahlungsregel,
   type Kategorie,
   type KategorieSumme,
+  type KategorieReihe,
   type MonatsIst,
   type Zahlungskonto,
 } from "../core";
@@ -183,48 +187,64 @@ export function analyseAufschluesselung(
   return kategorieAggregat(relevant, von, bis, basis.kategorien);
 }
 
+/** Die Kategorien eines Fensters Monat für Monat — das Register „Kategorien". */
+export interface Kategorienreihen {
+  /** „YYYY-MM", in der Reihenfolge der Spalten in `zeilen[].monate`. */
+  readonly monate: readonly string[];
+  readonly zeilen: readonly KategorieReihe[];
+}
+
+/**
+ * Wie `analyseAufschluesselung`, aber über die Zeit statt als eine Summe — und mit
+ * denselben Ausschlüssen: interne Umbuchungen bleiben draussen.
+ *
+ * Der Trend endet beim VORMONAT von heute: der laufende Monat ist halb gebucht und
+ * drückte jeden Vergleich nach unten (siehe `kategorieReihen`).
+ */
+export function analyseKategorienreihen(
+  basis: Analysebasis,
+  von: string,
+  bis: string,
+  heute: string,
+  nachGruppe = false,
+): Kategorienreihen {
+  const start = { ...parseIso(von), d: 1 };
+  const monate = Array.from({ length: monateImFenster(von, bis) }, (_, i) => toIso(addMonate(start, i)).slice(0, 7));
+  const vormonat = toIso(addMonate({ ...parseIso(heute), d: 1 }, -1)).slice(0, 7);
+  const relevant = basis.buchungen.filter((b) => !istInterneUmbuchung(b));
+  return {
+    monate,
+    zeilen: kategorieReihen(relevant, basis.kategorien, monate, { abgeschlossenBis: vormonat, nachGruppe }),
+  };
+}
+
 /** Dieselbe Aufschlüsselung, zu Hauptgruppen gebündelt. */
 export function analyseGruppen(basis: Analysebasis, items: readonly KategorieSumme[]): GruppenSumme[] {
   return nachHauptgruppe(items, basis.kategorien);
 }
 
-/** Eine Zeile der aufgeklappten Kategorie — schon mit dem, was am Umsatz hängt. */
-export interface Analysezeile {
-  readonly buchung: IstBuchung;
-  /**
-   * Der Betrag, mit dem diese Buchung auf DIESE Kategorie wirkt.
-   *
-   * Bei einer geteilten Buchung ihr Teil, sonst der volle Betrag — und deshalb nicht
-   * dasselbe wie `buchung.betrag`. Die Liste steht unter einem Aggregat, das über
-   * `kategorieAnteile` rechnet; zeigte sie den Gesamtbetrag, summierten sich ihre Zeilen
-   * nicht auf die Zahl darüber, und der Wocheneinkauf stünde unter „Drogerie" mit dem
-   * Betrag, den er insgesamt gekostet hat.
-   */
-  readonly betrag: Cent;
-  readonly empfaenger: string;
-  readonly verwendungszweck: string;
-  readonly kontoName: string;
-  /** Der Vertrag, zu dem die Buchung gehört — als Anbietername. Fehlt, wenn keiner. */
-  readonly vertragsname?: string;
-}
-
+/**
+ * Die Buchungen einer aufgeklappten Kategorie — als `Buchungszeile`, dieselbe Form wie
+ * unter einem Budget. Der Betrag ist der, mit dem die Buchung auf DIESE Kategorie wirkt:
+ * bei einer geteilten Buchung ihr Teil, sonst der volle. Die Liste steht unter einem
+ * Aggregat, das über `kategorieAnteile` rechnet; zeigte sie den Gesamtbetrag, summierten
+ * sich ihre Zeilen nicht auf die Zahl darüber.
+ */
 export function analyseBuchungen(
   basis: Analysebasis,
   kategorieId: string,
   von: string,
   bis: string,
-): Analysezeile[] {
-  return buchungenDerKategorie(basis.buchungen, kategorieId, von, bis).map((buchung) => {
-    const u = basis.umsatzZuBuchung.get(buchung.id);
-    return {
-      buchung,
-      betrag: betragInKategorie(buchung, kategorieId),
-      empfaenger: u?.gegenpartei ?? buchung.notiz ?? "",
-      verwendungszweck: u?.verwendungszweck ?? "",
-      kontoName: basis.kontoNamen.get(buchung.kontoId) ?? "",
-      vertragsname: basis.vertragsnamen.get(buchung.id),
-    };
-  });
+): Buchungszeile[] {
+  const kontext: Zeilenkontext = {
+    umsatzZuBuchung: basis.umsatzZuBuchung,
+    kontoNamen: basis.kontoNamen,
+    kategorieNamen: new Map(basis.kategorien.map((k) => [k.id, k.name])),
+    vertragsnamen: basis.vertragsnamen,
+  };
+  return buchungenDerKategorie(basis.buchungen, kategorieId, von, bis).map((buchung) =>
+    buchungszeile(buchung, betragInKategorie(buchung, kategorieId), kategorieId, kontext),
+  );
 }
 
 /**
@@ -356,15 +376,24 @@ export interface Verlaufspunkt {
   readonly saldo: Cent;
   /** true = projiziert, nicht gebucht. */
   readonly plan: boolean;
+  /**
+   * Nur an Planmonaten: der tiefste Stand INNERHALB des Monats und sein Tag
+   * (`tiefstandImMonat`). Die Linie zeigt das Monatsende; wann es dazwischen eng wird,
+   * steht hier.
+   */
+  readonly tiefstand?: Cent;
+  readonly tiefstandAm?: string;
 }
 
 /**
- * Der Verlauf über die Gegenwart hinaus: `zurueck` gewesene Monate, `voraus` geplante.
+ * Der Verlauf über die Gegenwart hinaus: `zurueck` abgeschlossene Monate als Ist, ab dem
+ * laufenden Monat `voraus` Monate als Plan.
  *
- * **Die Naht liegt am Monatsende und nicht bei „heute".** Der laufende Monat gehört zum
- * ISTEN — er ist zur Hälfte gebucht, und ihn als Plan zu zeigen hiesse, das Gebuchte
- * wegzuwerfen. Die Projektion setzt deshalb beim FOLGENDEN Monat an, auf dem Stand, den
- * der laufende bis heute erreicht hat.
+ * **Die Naht liegt am Ende des VORMONATS** (seit 2026-11-11). Der laufende Monat ist
+ * halb gebucht; als Ist zeigte er einen halben Monat — die Ausgaben bis heute, das Gehalt
+ * vom Monatsende noch nicht —, und die Linie knickte genau dort ein, wo der Plan ansetzt.
+ * Bis dahin gehörte er zum Ist; ein Tag lang stand er doppelt da (Stand heute plus
+ * geplanter Rest), und auch das sprang. Ganz als Plan läuft die Linie durch.
  *
  * **Fortgeschrieben wird der Saldo der liquiden Konten**, weil der Ist-Verlauf genau den
  * liefert (`istMonatsverlauf` bildet seinen Sockel aus `liquideMittel`). Eine Vorschau,
@@ -382,8 +411,9 @@ export function analyseAusblick(
   voraus: number,
 ): Verlaufspunkt[] {
   const jetzt = { ...parseIso(heute), d: 1 };
-  const von = toIso(addMonate(jetzt, -Math.max(0, zurueck - 1)));
-  const ist = istMonatsverlauf(basis.konten, basis.buchungen, von, toIso(jetzt));
+  const vormonat = addMonate(jetzt, -1);
+  const von = toIso(addMonate(jetzt, -Math.max(1, zurueck)));
+  const ist = zurueck > 0 ? istMonatsverlauf(basis.konten, basis.buchungen, von, toIso(vormonat)) : [];
 
   const punkte: Verlaufspunkt[] = ist.map((m) => ({
     monat: m.label,
@@ -395,8 +425,6 @@ export function analyseAusblick(
   }));
 
   const vertragsBuchungen = new Set(basis.vertragsnamen.keys());
-  // `monatsAusblicke` beginnt beim laufenden Monat — der steht als Ist schon da, also
-  // einen mehr holen und den ersten überspringen.
   const ausblicke = monatsAusblicke(
     {
       regeln: basis.regeln,
@@ -406,12 +434,18 @@ export function analyseAusblick(
       vertragsBuchungen,
       heute,
     },
-    Math.max(0, voraus) + 1,
-  ).slice(1);
+    Math.max(0, voraus),
+  );
 
-  let saldo = punkte.length > 0 ? punkte[punkte.length - 1].saldo : 0;
+  // Der Sockel ist der Stand am Ende des Vormonats — auch wenn kein gewesener Monat
+  // gezeigt wird; dann über ein Fenster genau dieses einen Monats.
+  let saldo =
+    punkte.length > 0
+      ? punkte[punkte.length - 1].saldo
+      : (istMonatsverlauf(basis.konten, basis.buchungen, toIso(vormonat), toIso(vormonat))[0]?.saldo ?? 0);
   for (const a of ausblicke) {
     const w = planWirkung(a.zeilen.map((z) => ({ id: z.id, plan: z.plan })));
+    const tief = tiefstandImMonat(saldo, a.label, a.zeilen);
     saldo += w.netto;
     punkte.push({
       monat: a.label,
@@ -420,6 +454,8 @@ export function analyseAusblick(
       netto: w.netto,
       saldo,
       plan: true,
+      tiefstand: tief.tiefstand,
+      tiefstandAm: tief.am,
     });
   }
   return punkte;

@@ -39,7 +39,7 @@ function originVon(url: string): string {
  * Gibt einen Bank-Endpunkt für den Tauri-Transport frei. Muss VOR dem ersten Dialog
  * aufgerufen werden — sonst läuft die Nachricht ins CORS.
  *
- * Zusätzlich muss die URL in `src-tauri/capabilities/default.json` stehen; die Freigabe
+ * Zusätzlich muss die URL in `src-tauri/capabilities/fints-banken.json` stehen; die Freigabe
  * hier ist nur die Seite in der Webview. Fehlt sie dort, antwortet der Plugin-Aufruf mit
  * einem Berechtigungsfehler statt mit der Bank.
  */

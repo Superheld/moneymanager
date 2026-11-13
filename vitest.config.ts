@@ -23,7 +23,12 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       all: true,
-      include: ["src/**/*.{ts,tsx}"],
+      // AUCH `.js` und `.jsx`. Bis 2026-11-10 lagen die Bausteine aus der
+      // Design-System-Vorlage als `.jsx` da, und diese Zeile nannte nur `.ts` und `.tsx`:
+      // der meistbenutzte Code der Oberfläche fehlte in der Messung. Heute ist dort alles
+      // TypeScript; die Zeile bleibt, damit ein neues `.js` nicht wieder unbemerkt
+      // herausfällt.
+      include: ["src/**/*.{ts,tsx,js,jsx}"],
       exclude: [
         "**/*.test.ts",
         "**/*.test.tsx",
@@ -34,6 +39,20 @@ export default defineConfig({
         "src/vite-env.d.ts",
       ],
       reporter: ["text", "html"],
+      // **Eine Sperrklinke, kein Ziel.** Das Ziel bleibt 90 % — es stand jahrelang nur im
+      // Kommentar oben, und eine Zahl, die niemand prüft, sinkt. Die Werte hier sind der
+      // gemessene Stand, abgerundet: der Lauf wird rot, wenn die Abdeckung FÄLLT. Wer sie
+      // hebt, zieht die Schwelle nach; gesenkt wird sie nur mit einem Grund, der hier
+      // dabeisteht. Seit 2026-11-10 erreichen die ZEILEN das Ziel; das grösste Loch ist
+      // inzwischen die Oberfläche selbst (Wege über den Bankabruf), danach `adapters/fints`
+      // und `src/vendor/` — beides Netzwege, die eine Attrappe des Abrufadapters braucht
+      // (Vorlage: `konten/bankzugangPruefen.test.tsx`).
+      thresholds: {
+        statements: 88,
+        branches: 81,
+        functions: 85,
+        lines: 90,
+      },
     },
   },
 });

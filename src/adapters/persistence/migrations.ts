@@ -2160,4 +2160,27 @@ export const MIGRATIONS: Migration[] = [
       `DROP TABLE IF EXISTS kontogruppe`,
     ],
   },
+  {
+    version: 75, // Trainingslaeufe: jedes Training mit Konfiguration, Kennzahlen und Vorhersagen
+    sql: [
+      // Bis hierher gab es genau ein Modell und genau eine Messung — die vom letzten
+      // Klick. Wer Varianten der Wortauswahl ausprobierte, musste sich die vorige Zahl
+      // merken, und selbst dann blieb verborgen, welche ZEILEN eine Aenderung gewonnen
+      // oder verloren hat. Je Lauf stehen deshalb Konfiguration, Kennzahlen und die
+      // Vorhersage je Pruefzeile da (JSON, gelesen wird immer ganz).
+      //
+      // Keine Fremdschluessel auf die Buchungen in `vorhersagen`: ein Lauf ist eine
+      // Aufzeichnung, und eine geloeschte Buchung soll ihn nicht veraendern. Der
+      // Vergleich zweier Laeufe nimmt ohnehin nur Zeilen, die beide kennen.
+      `CREATE TABLE IF NOT EXISTS trainingslauf (
+        id TEXT PRIMARY KEY,
+        zeitpunkt TEXT NOT NULL,
+        beispiele INTEGER NOT NULL,
+        konfiguration TEXT NOT NULL,
+        kennzahlen TEXT,
+        vorhersagen TEXT NOT NULL
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_trainingslauf_zeitpunkt ON trainingslauf (zeitpunkt)`,
+    ],
+  },
 ];

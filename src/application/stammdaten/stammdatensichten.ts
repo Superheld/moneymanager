@@ -47,14 +47,6 @@ export interface Stammdaten {
   readonly konten: readonly Zahlungskonto[];
   readonly kategorien: readonly Kategorie[];
   readonly kontostaende: readonly Kontostand[];
-  /**
-   * Gibt es überhaupt gebuchte Bewegungen (Import oder abgehakter Plan)?
-   *
-   * Daran hängt, ob die Kontenliste den Wert als „Anfangsbestand" oder schlicht als
-   * „Kontostand" beschriftet: ohne Bewegungen IST der Anfangsbestand der Kontostand,
-   * und zwei Zahlenspalten daneben wären leer.
-   */
-  readonly hatGebuchtes: boolean;
 }
 
 export async function stammdatenLaden(deps: StammdatenDeps): Promise<Stammdaten> {
@@ -68,7 +60,6 @@ export async function stammdatenLaden(deps: StammdatenDeps): Promise<Stammdaten>
     personen,
     konten,
     kategorien,
-    hatGebuchtes: buchungen.some((b) => b.quelle === "import"),
     kontostaende: konten.map((konto) => ({
       konto,
       bewegungen: istSummeKonto(buchungen, konto.id),

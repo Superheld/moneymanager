@@ -14,10 +14,13 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import type { Abgleichzeile } from "../../../application";
 import { abgleich as abgleichLaden } from "../../dienste";
-import { Card, Pill } from "../bausteine";
+import { Card, Pill, Button } from "../bausteine";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { AbgleichModal, KassensturzModal } from "./KontostandModal";
+import { Collapsible } from "@base-ui/react/collapsible";
+import { fehlerMelden } from "../bausteine/Meldungen";
+import { Stapel } from "../bausteine/Anordnung";
 
 export function AbgleichBereich() {
   const { t } = useTranslation();
@@ -34,9 +37,9 @@ export function AbgleichBereich() {
     setZeilen(await abgleichLaden());
   }
   useEffect(() => {
-    laden().catch(() => {
-      /* reiner Browser-Modus ohne SQLite */
-    });
+    // Schlägt das Laden fehl, bleibt die Liste leer — aber mit Meldung: eine stumme leere
+    // Liste sähe aus wie „du hast keine" (siehe `Meldungen`).
+    laden().catch(fehlerMelden);
   }, []);
 
   // Konten mit Abweichung zuerst: wer hier hereinschaut, sucht ein Problem, und die
@@ -51,19 +54,21 @@ export function AbgleichBereich() {
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "var(--sp-3)" }}>
+    <Stapel>
       {sortiert.map((z) => {
         const aufgeklappt = offen === z.konto.id;
         return (
           // Eine Karte je Konto — sie trägt die Fläche und den Rahmen. Selbst gezogene
           // Ränder sähen ähnlich aus, stünden aber auf dem nackten Seitenhintergrund und
           // liefen beim nächsten Token-Wechsel auseinander.
+          //
+          // Base UI `Collapsible`: die Kopfzeile sagte vorher nicht, DASS sie aufklappt
+          // (kein `aria-expanded`) — für eine Vorlesehilfe war sie ein Knopf ohne Folge.
           <Card key={z.konto.id}>
+            <Collapsible.Root open={aufgeklappt} onOpenChange={(auf) => setOffen(auf ? z.konto.id : null)}>
             {/* Die Kopfzeile beantwortet die Frage schon: stimmt es, und wenn nicht, um
                 wieviel. Alles Weitere ist die Begründung darunter. */}
-            <button
-              type="button"
-              onClick={() => setOffen(aufgeklappt ? null : z.konto.id)}
+            <Collapsible.Trigger
               style={{
                 width: "100%", background: "none", border: 0, padding: 0, cursor: "pointer",
                 display: "flex", alignItems: "baseline", justifyContent: "space-between",
@@ -88,10 +93,10 @@ export function AbgleichBereich() {
               <span className="num" style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.gerechnet) }}>
                 {geld.formatMitSymbol(z.gerechnet)}
               </span>
-            </button>
+            </Collapsible.Trigger>
 
             {z.juengster && (
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+              <div className="hinweis" style={{ marginTop: 4 }}>
                 {t(z.juengster.herkunft === "bank" ? "konten.abgleich.bankSagt" : "konten.anker.gezaehlt", {
                   betrag: geld.formatMitSymbol(z.juengster.betrag),
                   datum: datum.mitJahr(z.juengster.datum),
@@ -99,7 +104,7 @@ export function AbgleichBereich() {
               </div>
             )}
 
-            {aufgeklappt && (
+            <Collapsible.Panel>
               <div style={{ marginTop: "var(--sp-3)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)" }}>
                 {/* Die Reihe der Stichtage. Sie ist der eigentliche Inhalt: eine
                     Gesamtdifferenz sagt „irgendwo", die Reihe sagt „ab hier". */}
@@ -132,7 +137,7 @@ export function AbgleichBereich() {
                     </tbody>
                   </table>
                 ) : (
-                  <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                  <div className="hinweis">
                     {t("konten.abgleichBereich.keineStichtage")}
                   </div>
                 )}
@@ -161,14 +166,14 @@ export function AbgleichBereich() {
                       lässt — und sie schiebt die Differenz in die Vergangenheit. Richtig
                       nur, wenn sie von dort stammt, deshalb auf Zuruf statt automatisch. */}
                   {z.anfangsbestandVorschlag != null && (
-                    <button className="linkbtn" style={{ padding: 0 }} onClick={() => setAbgleichFuer(z)}>
+                    <Button variant="link" style={{ padding: 0 }} onClick={() => setAbgleichFuer(z)}>
                       {t("konten.anker.abgleichen")}
-                    </button>
+                    </Button>
                   )}
                   {!z.online && (
-                    <button className="linkbtn" style={{ padding: 0 }} onClick={() => setKassensturzFuer(z)}>
+                    <Button variant="link" style={{ padding: 0 }} onClick={() => setKassensturzFuer(z)}>
                       {t("konten.anker.festhalten")}
-                    </button>
+                    </Button>
                   )}
                 </div>
 
@@ -179,7 +184,8 @@ export function AbgleichBereich() {
                   })}
                 </div>
               </div>
-            )}
+            </Collapsible.Panel>
+            </Collapsible.Root>
           </Card>
         );
       })}
@@ -202,6 +208,6 @@ export function AbgleichBereich() {
           onGespeichert={async () => { setKassensturzFuer(null); await laden(); }}
         />
       )}
-    </div>
+    </Stapel>
   );
 }

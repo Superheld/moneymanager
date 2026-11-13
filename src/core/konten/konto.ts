@@ -27,9 +27,11 @@ export const KONTOTYPEN: Kontotyp[] = ["Giro", "Tagesgeld", "Bargeld", "Kreditka
  * Tagesgeldkonto kann Alltagsreserve oder zweckgebundene Rücklage sein — der Typ ändert
  * sich dadurch nicht, die Antwort auf „wieviel habe ich" sehr wohl.
  *
- * Genau **eine** Wirkung hat die Klasse: `"liquide"` zählt zu den liquiden Mitteln, alles
- * andere nicht. Die vier übrigen Werte unterscheiden sich für die RECHNUNG also nicht —
- * sie sind eine Benennung, und das ist Absicht. Was sie weiter trennen soll, ist offen.
+ * Zwei Wirkungen hat die Klasse: `"liquide"` zählt zu den liquiden Mitteln, alles andere
+ * nicht (`istLiquide`). Und seit 2026-11-08 zählt der Bereich Rücklagen ein Konto der
+ * Klasse `"ruecklage"` als Rücklagenkonto (`istRuecklagenkonto`). Vorsorge,
+ * Sparen und Investment unterscheiden sich für die RECHNUNG nicht — sie sind eine
+ * Benennung, und das ist Absicht.
  *
  * **Seit 2026-09-22 sind es fünf, und die zwei neuen haben die Kontogruppen ersetzt.**
  * Bis dahin gab es daneben eine frei benannte `Kontogruppe` — eine Sicht, die nichts
@@ -68,6 +70,16 @@ export function klasseVorschlag(typ: Kontotyp): Kontoklasse {
 /** Ist das Geld auf diesem Konto verfügbar? */
 export function istLiquide(konto: Pick<Zahlungskonto, "klasse">): boolean {
   return konto.klasse === "liquide";
+}
+
+/**
+ * Ist das Konto ein Rücklagenkonto? Die ZWEITE Grenze zwischen den Klassen, seit
+ * 2026-11-08: Rücklagenfluss und Tacho zählen solche Konten — zusammen mit denen, auf
+ * denen eine Rücklage liegt (`ruecklagenKonten` in `ruecklagen/ruecklage.ts`). Für alles
+ * andere bleiben die vier nicht-liquiden Klassen dasselbe.
+ */
+export function istRuecklagenkonto(konto: Pick<Zahlungskonto, "klasse">): boolean {
+  return konto.klasse === "ruecklage";
 }
 
 /**
@@ -166,12 +178,32 @@ export function ibanGueltig(iban: string): boolean {
   const s = normalisiereIban(iban);
   if (s.length < 15 || s.length > 34) return false;
   if (!/^[A-Z]{2}\d{2}[A-Z0-9]+$/.test(s)) return false;
-  const umgestellt = s.slice(4) + s.slice(0, 4);
-  // Buchstaben → Zahlen (A=10 … Z=35), dann fortlaufend mod 97.
+  return rest97(s.slice(4) + s.slice(0, 4)) === 1;
+}
+
+/** Buchstaben → Zahlen (A=10 … Z=35), dann fortlaufend mod 97. */
+function rest97(umgestellt: string): number {
   let rest = 0;
   for (const ch of umgestellt) {
     const wert = ch >= "A" && ch <= "Z" ? ch.charCodeAt(0) - 55 : ch.charCodeAt(0) - 48;
     rest = wert > 9 ? (rest * 100 + wert) % 97 : (rest * 10 + wert) % 97;
   }
-  return rest === 1;
+  return rest;
+}
+
+/**
+ * Die deutsche IBAN zu Bankleitzahl und Kontonummer — oder `undefined`, wenn die Angaben
+ * nicht diese Form haben.
+ *
+ * Streng, und das ist Absicht: bleibt ein Wert hier hängen, fehlt eine Angabe; rutschte er
+ * durch, stünde eine erfundene IBAN im Bestand. Eine BIC an Stelle der Bankleitzahl ergibt
+ * deshalb nichts statt Unsinn.
+ */
+export function deutscheIban(bankleitzahl: string, kontonummer: string): string | undefined {
+  const blz = bankleitzahl.trim();
+  const konto = kontonummer.trim();
+  if (!/^\d{8}$/.test(blz) || !/^\d{1,10}$/.test(konto) || /^0+$/.test(konto)) return undefined;
+  const bban = blz + konto.padStart(10, "0");
+  const pruefziffer = String(98 - rest97(`${bban}DE00`)).padStart(2, "0");
+  return `DE${pruefziffer}${bban}`;
 }

@@ -302,3 +302,111 @@ export function fruehesterMonat(buchungen: readonly IstBuchung[]): string | unde
   for (const b of buchungen) if (b.datum < min) min = b.datum;
   return monatVon(min) + "-01";
 }
+
+/** Eine Kategorie über die Monate eines Fensters — die Zeile der Kategorienauswertung. */
+export interface KategorieReihe {
+  /** undefined = unkategorisiert. */
+  readonly kategorieId?: string;
+  readonly name: string;
+  readonly elternName?: string;
+  readonly charakter: Charakter;
+  /** Je Monat des Fensters, in derselben Reihenfolge wie die übergebenen Monate. */
+  readonly monate: readonly Cent[];
+  readonly summe: Cent;
+  readonly anzahl: number;
+  /** Summe geteilt durch die Zahl der Monate im Fenster — auch der leeren. */
+  readonly schnitt: Cent;
+  /** Anteil an allen Zeilen desselben Charakters, 0…1. */
+  readonly anteil: number;
+  /**
+   * Die letzten drei abgeschlossenen Monate gegen die abgeschlossenen davor, als
+   * Veränderung (0,2 = um ein Fünftel mehr). `null`, wo das nichts aussagt: weniger als
+   * sechs abgeschlossene Monate, ein Schnitt davor von null, oder ein Richtungswechsel.
+   */
+  readonly trend: number | null;
+}
+
+/**
+ * Die Kategorien eines Fensters Monat für Monat — für die Kategorienauswertung der
+ * Analyse (seit 2026-11-11).
+ *
+ * `kategorieAggregat` beantwortet „wie viel ging wohin"; das hier „wie hat sich das
+ * entwickelt". Dieselben Regeln: geteilte Buchungen mit ihrem Teil, ohne Kategorie als
+ * eigene Zeile, sortiert nach Grösse.
+ *
+ * **Der Trend rechnet nur über ABGESCHLOSSENE Monate** (`abgeschlossenBis`). Der laufende
+ * Monat ist halb gebucht; nähme man ihn mit, sähe jede Kategorie am Monatsanfang aus, als
+ * ginge sie zurück. Und er braucht sechs davon: drei gegen weniger als drei verglichen ist
+ * ein Vergleich zweier Zufälle.
+ *
+ * `nachGruppe` bündelt jede Kategorie in ihre Hauptgruppe — dieselbe Ebene wie
+ * `nachHauptgruppe`, nur gleich beim Summieren.
+ */
+export function kategorieReihen(
+  buchungen: readonly IstBuchung[],
+  kategorien: readonly Kategorie[],
+  monate: readonly string[],
+  optionen: { abgeschlossenBis?: string; nachGruppe?: boolean } = {},
+): KategorieReihe[] {
+  const byId = new Map(kategorien.map((k) => [k.id, k]));
+  const index = new Map(monate.map((m, i) => [m, i]));
+  const map = new Map<string, { monate: Cent[]; anzahl: number; charakter: Charakter }>();
+
+  for (const b of buchungen) {
+    const i = index.get(monatVon(b.datum));
+    if (i == null) continue;
+    for (const a of kategorieAnteile(b)) {
+      const kat = a.kategorieId ? byId.get(a.kategorieId) : undefined;
+      const id = optionen.nachGruppe && kat?.elternId ? kat.elternId : (a.kategorieId ?? OHNE);
+      const e = map.get(id) ?? { monate: monate.map(() => 0), anzahl: 0, charakter: b.charakter };
+      e.monate[i] += a.betrag;
+      e.anzahl++;
+      map.set(id, e);
+    }
+  }
+
+  const abgeschlossen = monate
+    .map((m, i) => ({ m, i }))
+    .filter(({ m }) => optionen.abgeschlossenBis == null || m <= optionen.abgeschlossenBis)
+    .map(({ i }) => i);
+
+  const zeilen = [...map.entries()].map(([id, e]) => {
+    const kat = id === OHNE ? undefined : byId.get(id);
+    const eltern = kat?.elternId ? byId.get(kat.elternId) : undefined;
+    const summe = e.monate.reduce((s, v) => s + v, 0);
+    return {
+      kategorieId: kat?.id,
+      name: kat?.name ?? "—",
+      elternName: eltern?.name,
+      charakter: kat?.defaultCharakter ?? e.charakter,
+      monate: e.monate,
+      summe,
+      anzahl: e.anzahl,
+      schnitt: monate.length > 0 ? Math.round(summe / monate.length) : 0,
+      trend: trendAus(abgeschlossen.map((i) => e.monate[i])),
+    };
+  });
+
+  const jeCharakter = new Map<Charakter, Cent>();
+  for (const z of zeilen) jeCharakter.set(z.charakter, (jeCharakter.get(z.charakter) ?? 0) + z.summe);
+
+  return zeilen
+    .map((z): KategorieReihe => {
+      const gesamt = jeCharakter.get(z.charakter) ?? 0;
+      return { ...z, anteil: gesamt === 0 ? 0 : z.summe / gesamt };
+    })
+    .sort((a, b) => Math.abs(b.summe) - Math.abs(a.summe));
+}
+
+function trendAus(werte: readonly Cent[]): number | null {
+  if (werte.length < 6) return null;
+  const letzte = werte.slice(-3);
+  const davor = werte.slice(0, -3);
+  const oeLetzte = letzte.reduce((s, v) => s + v, 0) / letzte.length;
+  const oeDavor = davor.reduce((s, v) => s + v, 0) / davor.length;
+  if (oeDavor === 0) return null;
+  // Ein Richtungswechsel (aus Ausgaben werden Erstattungen) ist keine Veränderung um
+  // einen Prozentsatz, sondern eine andere Aussage.
+  if (oeLetzte !== 0 && Math.sign(oeLetzte) !== Math.sign(oeDavor)) return null;
+  return oeLetzte / oeDavor - 1;
+}

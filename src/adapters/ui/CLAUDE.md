@@ -13,15 +13,88 @@ bekommt fertige Sichten, keine Rohteile. Eine Domänenregel, die die UI umgehen 
 sie irgendwann. Geprüft in `src/architektur.test.ts`, die Ausnahmeliste ist leer und bleibt
 es.
 
-## Gliederung
+## So wird hier gebaut
+
+Bevor eine neue Komponente entsteht, in dieser Reihenfolge:
+
+1. **Im Bausteinkatalog unten nachsehen.** Gibt es etwas für diesen Zweck, wird es benutzt —
+   auch wenn es nicht genau passt.
+2. **Passt es nicht ganz, wird der Baustein erweitert, nicht kopiert.** Eine zweite Fassung
+   „fast wie die andere" ist der Fehler, gegen den diese Regel steht: drei Aufklapptabellen
+   mit drei Polsterungen sahen an drei Stellen verschieden aus, und eine Verbesserung an
+   einer erreichte die anderen nie. Optionen am Baustein sind billiger als Doppelbauten.
+3. **Neu gebaut wird im Bereichsordner.** Braucht es ein zweiter Bereich, wandert es nach
+   `bausteine/` — gemessen, nicht geschätzt (siehe unten, „Gliederung").
+4. **Rechnen und Auswählen gehört nicht hierher** (oben): fehlt der Wert, fehlt ein Feld in
+   der Sicht des Use-Cases.
+5. **Texte in `src/i18n/i18n.ts`**, de und en zugleich; Platzhalter mit `{{doppelt}}`.
+6. **Schmal ansehen.** Unter 700 px fällt `DataTable` zusammen, unter 1100 px die
+   Seitenleiste; was dabei bricht, bricht beim Nutzer auf dem Telefon.
+7. **Test über die Oberfläche bis ins Schema** (unten, „Tests für Screens"), gesucht nach
+   Daten und i18n-Schlüsseln, nicht nach Wortlaut.
+
+## Gliederung — was wo liegt
 
 Ein Ordner je Navigationsbereich, dazu `bausteine/` für alles Geteilte (eigene Regeln dort
 in `bausteine/CLAUDE.md`). Die Einsortierregel: **was zwei oder mehr Bereiche benutzen, ist
 ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es allgemein aussieht.
 
+| Ordner | was |
+|---|---|
+| `uebersicht/` | „wie stehe ich gerade da": Monatskarten, Budgets, Was da ist, Depotstand (Regeln in `uebersicht/CLAUDE.md`) |
+| `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot |
+| `budgets/` | Budgetliste, Verlauf eines Budgets, Vorschläge |
+| `ruecklagen/` | Rücklagen, Fluss, Tacho |
+| `vertraege/` | Verträge und ihre Erkennung |
+| `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
+| `buchung/` | der Buchungsdialog in Teilen (unten) — er wird aus mehreren Bereichen geöffnet |
+| `import/` | Dateiimport und Review-Inbox |
+| `training/` | Werkbank der Kategorie-Erkennung (Regeln in `training/CLAUDE.md`) |
+| `einstellungen/` | Einstellungen, Exporte, Konfigurationsimport |
+| `zugang/` | Sperrbildschirm, Verschlüsselung |
+| `bausteine/` | alles, was zwei oder mehr Bereiche benutzen |
+
+Die Navigation steht in `bausteine/AppShell.tsx`, die Zuordnung zur Komponente in
+`App.tsx`, die gebundenen Aufrufe in `../dienste.ts`.
+
 Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlich ist es
 `kategorien/` wie in Kern und Anwendung. Die drei bereichsübergreifenden Tests (`screens`,
 `interaktion`, `formulare`) liegen in der Wurzel.
+
+## Bausteinkatalog — wofür es schon etwas gibt
+
+| Bedarf | Baustein |
+|---|---|
+| Fläche um einen Inhalt | `Card` (nie eine Karte IN einer Karte, unten) |
+| Seitenkopf mit Aktion | `PageHead`; Bereich mit Reitern: `Bereich`, die Reiter allein `Registerleiste` |
+| Tabelle | `DataTable` — Sortierung, Seiten, Zeilenklick (auch per Tastatur), schmale Form. Ist eine Zeile klickbar, dann die GANZE, und ihr Bezeichner steht als Link da — kein eigener Link in einer Spalte |
+| Bezeichner in einer Zeile, der aufklappt | `Zeilenlink` |
+| Liste, die unter einer Zeile aufklappt | `Aufklapptabelle`; nur die Fläche: `Aufklappflaeche`; Höhe: `aufklappen.ts` |
+| Buchungen unter einer Auswertung (Budget, Kategorie) | `Buchungsliste` (auf `Aufklapptabelle`), Zeilen als `Buchungszeile` aus `application` |
+| Abschnitt im Dialog, auf- und zuklappbar | `Klappblock` |
+| Kennzahl | `KPIStat`; Balken mit Rahmen: `CoverageTrack` (mit `marke` für ein Soll — EIN Balken statt zwei) |
+| Etikett | `Pill` — sagt, was etwas IST |
+| Wahl im Formular | `Auswahl`; in einer Tabellenzeile: `Zeilenauswahl`; Kategorie: `CategoryPicker` |
+| Datum | `Datumsfeld`, angezeigt über `useDatum()` |
+| Feld plus Knopf nebeneinander | `Feldzeile`; Formularfeld: `FormField` |
+| Ankreuzen | `Kaestchen` (Text als `children`, ohne Text `label`) |
+| Zwei bis vier Ansichten oder Filter, genau einer gilt | `Umschalter` |
+| Kleiner grauer Erklärtext | Klasse `.hinweis` — nicht `muted` plus `fontSize` |
+| Nebeneinander / untereinander mit Abstand | `Zeile` / `Stapel` (`bausteine/Anordnung`), Abstand aus `--sp-1`…`--sp-5` |
+| Trennlinie, auch mit „oder" | `Trenner` (Base UI `Separator`); Block mit Linie darüber: Klasse `.abschnitt` |
+| Schriftgrösse | nur Tokens (`--fs-*`, neu `--fs-tabelle`, `--fs-ui`) — `schriftgroessen.test.ts` |
+| Eine von mehreren Antworten | `buchung/Optionsgruppe` mit `Option` — bisher nur im Buchungsdialog |
+| Knopf | `Button` — `primary` Hauptaktion, `link` gedämpfte Nebenaktion („Abbrechen"), `laeuft` sperrt während einer Handlung; Zeilenaktion als Icon: `IconButton` |
+| Dialog | `Modal` (Base UI `Dialog`; `warnung` für Rückfragen); vor dem Löschen: `Loeschfrage` |
+| Fehler, den kein Screen am Ort zeigen kann | `fehlerMelden` aus `Meldungen` (Base UI `Toast`) — nie still `.catch(() => [])` |
+| Bankabruf, TAN | `AbrufDialog`, `TanDialog` |
+| Geld, Prozent, Farbe | `useGeld()`, `useProzent()`, `geldFarbe.ts` (unten) |
+| Enter bestätigt | `beiEnter` |
+| Schmales Fenster in JS | `useSchmal` — nur wenn sich das Markup ändert, sonst CSS |
+| Hervorhebung in Fliesstext | `betonung` mit `<Trans>` |
+
+Was nicht in der Tabelle steht und an zwei Stellen gebraucht wird, ist ein Kandidat für
+einen neuen Eintrag — und gehört dann auch hier hinein.
 
 ## Zahlen anzeigen
 
@@ -71,7 +144,7 @@ Durchgesetzt wird das von **`farbregel.test.ts`** über `analyse/`, `uebersicht/
 `budgets/`: dort darf kein `color:` und kein `fill=` eines der vier Tokens direkt tragen.
 Nur diese drei Bereiche, weil nur dort Zahlen nebeneinander stehen, über die eine Farbe
 etwas aussagt — ein Verwerfen-Knopf, der amber ist, sagt nichts über Geld. Kartenrahmen
-sind ausgenommen: die Karte *Da ist etwas zu tun* IST die Warnung, sie trägt keinen Betrag.
+sind ausgenommen: eine Karte, die selbst die Warnung ist, trägt keinen Betrag.
 
 **`useProzent()`** für Anteile (0…1) — dieselbe Regel, derselbe Ort. Sie stand hier lange
 nur für Geld, und direkt daneben formatierten die Depot-Anteile mit `toFixed`: im Deutschen
@@ -81,25 +154,87 @@ anderen umgangen. `stellen` ist die Obergrenze, eine glatte Zahl bleibt glatt.
 Zeilenaktionen sind Icons über `bausteine/IconButton.tsx` — ihr Text wandert in
 `title`/`aria-label`, statt zu verschwinden.
 
-## Bedienteile: fast alles von Hand, eine Ausnahme
+## Bedienteile: Base UI, wo immer es eines gibt
 
 **Base UI (`@base-ui/react`) ist die einzige UI-Bibliothek im Projekt**, und sie liefert
 ausschliesslich MECHANIK — kein Aussehen. Alles Sichtbare kommt weiterhin aus `app.css`
 und den Tokens.
 
-Sie steht heute unter genau zwei Bausteinen:
+**Die Regel (seit 2026-11-10): Hat Base UI ein Bedienteil für den Zweck, steht es unter
+unserem Baustein — auch dort, wo der Eigenbau heute funktioniert.** Vorher galt das
+Gegenteil („fast alles von Hand, Base UI als Ausnahme"), und der Preis zeigte sich an
+Stellen, die mit der Maus niemand bemerkt: der eigene `Button` liess sich nicht sperren,
+und als er es konnte, warf ein natives `disabled` den Fokus auf `<body>`. Base UI hatte
+die Antwort darauf (`focusableWhenDisabled`) im Paket liegen, das längst installiert war.
+Tastatur, ARIA, Fokus und Sperren sind genau die Hälfte eines Bedienteils, die man beim
+Eigenbau vergisst — und die Bibliothek ist dafür schon da.
+
+Drei Dinge, die dazugehören:
+
+- **Gekapselt, nie direkt.** Ein Screen importiert `Button`, nicht `@base-ui/react/button`.
+  Der Baustein trägt unsere Props (deutsch, wo sie Fachliches sagen: `laeuft`,
+  `gesperrt`), die Klassen und die Entscheidungen; wird die Bibliothek je getauscht, ist
+  es eine Datei je Bedienteil.
+- **Das Aussehen hängt an Base UIs Datenattributen**, nicht an Pseudoklassen, wo die beiden
+  auseinanderlaufen: gesperrt heisst `[data-disabled]`, weil Base UI über `aria-disabled`
+  sperrt und `:disabled` deshalb nie greift. Wer eine Regel schreibt, sieht im
+  `…DataAttributes.d.ts` des Teils nach, was gesetzt wird.
+- **Eigenbau bleibt, wo Base UI nichts hat** — und das gehört dann begründet: der Kalender
+  im `Datumsfeld` (es gibt keinen Datepicker), `DataTable` (keine Tabelle). Was Base UI
+  liefert, kommt trotzdem von dort: der Kalender sitzt in einem Base-UI-`Popover`.
+
+Wo es heute steht:
 
 | Baustein | statt | woher die Mechanik |
 |---|---|---|
 | `bausteine/Auswahl` | `<select className="field">` im Formular | Base UI `Select` |
 | `bausteine/Datumsfeld` | `<input type="date">` | Base UI `Popover`, Kalender von Hand |
+| `bausteine/Button` | eigener `<button>` mit Inline-Stil, roher `.linkbtn` | Base UI `Button` |
+| `bausteine/Modal` | Eigenbau mit Nummernstapel plus `Dialog.jsx` | Base UI `Dialog`, mit `warnung` `AlertDialog` |
+| `bausteine/Kaestchen` | `<input type="checkbox">` mit `accentColor` | Base UI `Checkbox` |
+| `buchung/Optionsgruppe`, `buchung/Richtungswahl` | `<input type="radio">`, eigene `role="radiogroup"` | Base UI `RadioGroup`/`Radio` |
+| `bausteine/FormField` (um ein natives Feld) | `<label htmlFor>`, Hinweis unverbunden | Base UI `Field` |
+| `bausteine/CoverageTrack` | zwei `div` ohne Rolle | Base UI `Meter` |
+| Seitensteuerung der `DataTable` | `<input type="number">`, rohe Knöpfe | Base UI `NumberField`, `Button` |
+| `bausteine/Registerleiste` (samt Inhalt) | `role="tab"` von Hand, loses `tabpanel` | Base UI `Tabs` |
+| `bausteine/Klappblock` und jede Zeile, die aufklappt | `aria-expanded`/`role="button"` von Hand | Base UI `Collapsible` |
+| `bausteine/Umschalter` | drei Segmentleisten aus `aria-pressed`-Knöpfen | Base UI `ToggleGroup` |
+| „Nur Dubletten" im Kontoauszug | `aria-pressed` von Hand | Base UI `Toggle` |
+| Schalter in den Einstellungen | Kästchen | Base UI `Switch` |
+| `konten/BankSuche` | Vorschlagsliste ohne Rollen | Base UI `Combobox` |
+| Zahlenfeld im `AbrufDialog` | `<input type="number">` | Base UI `NumberField` |
+| `bausteine/Meldungen` | geschluckte Fehler, leere Listen | Base UI `Toast` |
+| `IconButton`, `Zeilenlink`, die Knöpfe in Shell, Kalender, Picker | roher `<button>` | Base UI `Button` |
 
-**Die Grenze, an der die Entscheidung fiel:** ein Auswahlfeld braucht Combobox-Semantik
-(Knopf und Liste über ARIA verbunden, Tippsuche, Rollen) — das schreibt man nicht nebenbei
-richtig. Ein Kalender ist dagegen ein `role="grid"` mit einem Fokuspunkt, den die
-Pfeiltasten bewegen; das ist klein und klar, und Base UI hat ohnehin keinen Datepicker.
-Positionierung, Schliessen bei Klick daneben und Fokusrückgabe kommen trotzdem aus dem
-Popover statt aus Eigenbau.
+**Was bewusst Eigenbau bleibt** — jede Stelle mit Grund, und `bedienteile.test.ts` lässt
+nur genau diese durch:
+
+- **Die Schublade in `AppShell`.** Sie ist schmal eine Schublade und breit eine Spalte —
+  EIN Element in drei Formen, umgeschaltet per CSS. Base UI `Drawer` hiesse, die
+  Navigation je Breite in zwei Renderwege zu teilen; ihre drei Schliesswege sind getestet.
+- **`CategoryPicker`.** Geprüft gegen `Combobox` (inline im Modal) und verworfen: eine
+  Gruppe bleibt sichtbar, wenn nur ein Kind passt, markiert wird aber der erste TREFFER —
+  Base UI markiert bei eigenem Filter das erste Element, also die Gruppe. Und die Zeilen
+  sind Knöpfe in der Tab-Reihenfolge (Begründung im Kopf der Datei).
+- **`Zeilenauswahl`** (natives `<select>`), **der Kalender im `Datumsfeld`** (kein
+  Datepicker in Base UI) und **`DataTable`** (keine Tabelle).
+- **Die Zeile der `Aufklapptabelle`** ist ein `<tr>` mit `role="button"`: sie öffnet eine
+  Buchung, und ein Knopf kann keine Tabellenzeile sein.
+- **Kein Tooltip-Baustein** — `title` trägt so weit; wer einen baut, nimmt `Tooltip`.
+
+Wer eines davon anfasst und den Grund nicht mehr findet, stellt um, statt weiterzubauen.
+
+**Kästchen und Optionsfelder sind in Tests keine `<input>` mehr.** Base UI rendert ein
+`span` mit Rolle und hängt ein verstecktes `input` daneben. Daraus folgt zweierlei:
+`.checked` gibt es am gefundenen Element nicht — `toBeChecked()` liest `aria-checked`
+und trägt in beiden Fällen —, und `getByLabelText` findet ZWEI Elemente, weil das
+versteckte Feld mit im `<label>` liegt. Gegriffen wird deshalb über
+`getByRole("checkbox" | "radio", { name })`.
+
+**Die alte Grenze bleibt als Begründung für den Kalender gültig:** ein Auswahlfeld braucht
+Combobox-Semantik (Knopf und Liste über ARIA verbunden, Tippsuche, Rollen) — das schreibt
+man nicht nebenbei richtig. Ein Kalender ist dagegen ein `role="grid"` mit einem
+Fokuspunkt, den die Pfeiltasten bewegen; das ist klein und klar.
 
 Was das für neuen Code heisst: **im Formular `Auswahl` und `Datumsfeld` nehmen**, nicht die
 nativen Elemente. Seit 2026-08-25 ist der Bestand vollständig gewandert — in `ui/` steht
@@ -135,6 +270,18 @@ und wurde deshalb 2026-08-25 herausgezogen:
 | `JournalBlock` | was daran geändert wurde — und der Weg zurück |
 | `Richtungswahl` | Höhe und Richtung des Betrags, samt der Zerlegung dahinter |
 | `SplitModal` · `ZurUmbuchungModal` | die beiden Folge-Dialoge (S-7, S-1) |
+| `GegenbeinBlock` | wo die zweite Seite einer Umschichtung im Entwurf steckt |
+| `useBetragUndRichtung` · `useGegenbeinwahl` | der Zustand dazu, als Hooks (seit 2026-11-10) |
+
+**Seit 2026-11-10 liegt auch Zustand ausserhalb des Formulars**: Höhe und Richtung des
+Betrags und die Wahl der Gegenseite sind je ein Hook — drei bzw. fünf Zustände, die nur
+einander kennen. Ein `useReducer` über das ganze Formular ist geprüft und verworfen: die
+einzige Kopplung (Kategorie → Charakter → Richtung) läuft in genau einer Funktion
+(`kategorieSetzen`), und ein Reducer hätte nur sie umbenannt. Dasselbe Muster gilt für
+grosse Screens: ein Dialog bekommt seinen Zustand selbst (`RuecklageDialog`,
+`AusbuchungDialog`, `UmbuchungModal`), ein geschlossenes Thema wird ein Hook
+(`useRegisterfilter`, `useSammelauswahl`), mehrere Karten in einer Datei werden mehrere
+Dateien (`einstellungen/VerhaltenKarten`, `StammdatenKarten`).
 
 **Das Kriterium war nicht die Grösse, sondern die Abhängigkeit:** herausgezogen ist, was
 seine Daten hereinbekommt und Entscheidungen zurückmeldet. Der Rest gehört zum Formular
@@ -183,6 +330,26 @@ westlich von Greenwich jeden Tag um einen zurück.
 
 Für Helfer ausserhalb einer Komponente gibt es den Typ `Datum`, genau wie `Geld` — der
 `JournalBlock` reicht ihn in seiner `Lesehilfe` durch.
+
+## Farben nur über Tokens — und das dunkle Schema
+
+**Seit 2026-11-10 folgt die App dem dunklen Schema des Systems** (`prefers-color-scheme`,
+kein eigener Schalter). Möglich war das, weil die Farben in Tokens liegen: der dunkle Satz
+steht in `styles/tokens/colors.css` und `shadow.css` unter derselben Medienabfrage und
+überschreibt dieselben Namen. Am Bildschirm gemessen: jeder Text in jedem Bereich erreicht
+dunkel den Kontrast von WCAG AA.
+
+Drei Regeln, die daraus folgen:
+
+- **Keine Farbe als Zahl** in `ui/` oder `app.css`. Was eine Zahl ist, bleibt im dunklen
+  Schema hell. Auch Rückfallwerte (`var(--x, #fff)`) zählen dazu — siehe nächster Punkt.
+- **Jedes `var(--…)` zeigt auf ein Token, das es gibt** (`styles/tokens.test.ts`). Bis
+  2026-11-10 taten das acht Namen nicht: `--accent-soft`, `--danger`, `--sh-2`, `--bg`,
+  `--font-mono`, `--radius-2` liefen still auf ihren Rückfallwert, `--fs-small` (elf
+  Dateien), `--fs-lg` und `--surface-1` hatten keinen — dort erbte das Element einfach,
+  und die kleinen Hinweistexte standen in der Grösse ihrer Umgebung.
+- **Schrift auf einer Akzentfläche ist `--auf-akzent`**, nicht `#fff`: im Dunklen wird der
+  Akzent hell, und Weiss darauf ist nicht mehr lesbar.
 
 ## Tabellenfilter sind kleiner als Formularfelder
 
@@ -430,12 +597,12 @@ Die Ränge sind an den drei Fällen gemessen, an denen sie zuerst angewendet wur
   wo sie hingehört — „Anfangsbestand + bestätigte Ist-Buchungen = realer Stand".
 
 **Der lehrreichste Fall war der dritte, und er ist der Grund für das Kriterium überhaupt:**
-unter der Karte *Da ist etwas zu tun* standen beide Ränge in EINEM Absatz — erst was
+unter der Karte *Da ist etwas zu tun* (bis 2026-11-08 in der Übersicht) standen beide Ränge in EINEM Absatz — erst was
 „sicher" und „erwartet" bedeuten (Erklärung), dann „was hier NICHT steht, läuft im
 gerechneten Fenster nicht ins Minus" (Einschränkung). Solange das ein Absatz ist, nimmt
 jedes Wegräumen der Erklärung die Einschränkung mit, **und die leere Karte liest sich
-danach als Freigabe**. Der Absatz ist deshalb geteilt, bevor überhaupt etwas eingeklappt
-wurde. Festgehalten in `uebersicht/handlungsbedarf.test.tsx`.
+danach als Freigabe**. Der Absatz wurde deshalb geteilt, bevor überhaupt etwas eingeklappt
+wurde. Der Test dazu ist mit der Karte gegangen; das Kriterium gilt weiter.
 
 **Warum Einklappen hier kein Rückfall in den Reiter-Fehler ist:** in der Analyse steht der
 Befund, dass niemand sucht, was hinter einem Reiter liegt — ein Reiter sagt nicht, was
@@ -465,6 +632,36 @@ hängen per Portal am `body`.
 Was dabei mitwächst und darf: `karten-paar` und `ausblick-karten` sind `fr`-Raster, die
 KPI-Leiste bricht um, und die Charts skalieren über ihre `viewBox` — die laufen ohnehin
 zwischen halber und voller Kartenbreite.
+
+## Abstände: wer ihn setzt
+
+**Der Abstand ZWISCHEN Karten kommt vom Behälter, nie von der Karte.** `.screen` ist ein
+Stapel mit `gap-card`, der Inhalt eines Registers ebenso (`Registerleiste stapeln`), ein
+Kartenpaar setzt seinen `gap`. Eine Karte mit eigenem `marginTop: var(--gap-card)` direkt
+in einem solchen Behälter bekommt den Abstand doppelt — so stand es bis 2026-11-10 im
+Kontoauszug: 32 px über der Kontokarte, 16 darunter. Und wo der Behälter dafür eine
+`!important`-Regel brauchte, die die Ränder der Kinder wieder wegnimmt, war das der
+Hinweis, dass der Abstand am falschen Ort stand.
+
+**Innerhalb einer Karte** ordnen `Stapel` und `Zeile` (`bausteine/Anordnung`) mit Abständen
+aus der Token-Reihe. Drei Fälle bleiben bewusst am Element und sind kein Rückstand:
+
+- der Hinweis direkt unter seinem Feld (`marginTop: 6`) — der Abstand gehört zum Hinweis;
+- `margin: 0` gegen den Standardrand eines `<p>`;
+- ein einzelner Abstand, der eine Gruppe von der nächsten absetzt, wo es nur EINE solche
+  Stelle im Behälter gibt.
+
+Wer einen Behälter anfasst, in dem mehrere Kinder denselben `marginTop` tragen, macht ihn
+zum `Stapel`.
+
+**Am 2026-11-11 mit einem JSX-Parser über ganz `ui/` gemessen:** es gibt KEINEN solchen
+Behälter mehr. Jeder, in dem zwei oder mehr Kinder einen Rand tragen, hat einen
+ungleichmässigen Rhythmus — 16 px unter dem Titel, 12 zwischen Feldern, 6 für den Hinweis
+unter seinem Feld. Ein `Stapel` kennt genau EINEN Abstand; diese Ränder in Stapel zu
+überführen hiesse, das Aussehen zu ändern oder jedem Kind seinen Wert zurückzugeben — also
+dasselbe unter anderem Namen. Der einzige gleichmässige Fall (`Bankzugänge`, Prüfergebnis)
+ist es nur scheinbar: seine Kinder sind `<ul>`, deren Standardrand im Block-Fluss mit dem
+nächsten zusammenfällt und in einem Flex-Stapel nicht.
 
 ## Die Fläche kommt von `Card`
 
@@ -499,11 +696,34 @@ gleichbehandelt, beantwortet eine davon falsch:
 
 Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweite.
 
-## Die Analyse steht in zwei Blöcken
+## Die Analyse steht in Registern
 
-Der obere beantwortet **„wie viel und wohin"** — Kennzahlen, Verlauf (Fluss · Saldo ·
-Tabelle), der **Blick nach vorn** (`AusblickKarte.tsx`) und die Aufschlüsselung nach
-Kategorien. Der untere (`BefundeBereich.tsx`) beantwortet **„und wie tragfähig ist das"**:
+**Seit 2026-11-08** stehen die Abschnitte nicht mehr untereinander, sondern in Reitern
+(`bausteine/Registerleiste.tsx`): **Verlauf · Kategorien · Ausblick · Befunde · Depot**.
+Untereinander war die Seite so lang, dass man für die Befunde oder ein Depot an allem
+anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
+
+- **Jedes Register trägt die Filter, die es einstellt** (seit 2026-11-09) — Verlauf
+  Monat und Zeitraum an seiner Karte, Kategorien, Befunde und Depot den Zeitraum, der
+  Ausblick keinen. Die Kennzahlen stehen im Verlauf. Einen Tag lang sassen Zeitraum,
+  Monat und Kennzahlen über den Reitern: das las sich, als gälten sie überall, und für
+  den Ausblick galten sie nie.
+- **Und jedes Register hat seinen EIGENEN Zustand** (seit 2026-11-11). Bis dahin war er
+  gemeinsam — ein Zeitraum in den Befunden verschob den Verlauf, ein Monat im Verlauf die
+  Kategorien —, und das las sich als Verwechslung statt als Bequemlichkeit. Der Zustand
+  liegt trotzdem im Screen, nicht im Register: gerendert wird nur das aktive, und ein
+  Reiterwechsel soll nichts verwerfen. **Ein angeklickter Monat im Verlauf öffnet
+  darunter seine Aufschlüsselung** (`Aufschluesselung`); das Register „Kategorien" ist
+  eine eigene Auswertung über die Zeit (`KategorienRegister`, `kategorieReihen`).
+- **Nur Register mit Inhalt bekommen einen Reiter.** Ohne abgerufenes Depot gibt es
+  keinen Reiter „Depot" — ein Reiter ins Leere wäre schlechter als keiner.
+- **Die Befunde bleiben innerhalb ihres Registers Karten untereinander** (unten). Das ist
+  kein Widerspruch: ein Reiter „Befunde" sagt, was darunter liegt; sieben Reiter „Treue",
+  „Ohne Plan", „Ausreißer" sagten es nicht.
+
+Die Register davor beantworten **„wie viel und wohin"** — Verlauf (Fluss · Saldo ·
+Tabelle, darunter die Aufschlüsselung eines angeklickten Monats), die Kategorien über die
+Zeit und der **Blick nach vorn** (`AusblickKarte.tsx`). Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
 fest gegen frei, Budget-Treue, Ausgaben ohne Budget und ohne Vertrag, Verträge Soll gegen
 Ist, Empfänger, Nutzung der Kategorien, Ausreißer.
 
@@ -525,15 +745,18 @@ Drei Dinge, die beim Anbauen zählen:
   zurück" ein „es wurde noch mehr ausgegeben". Wer eine Spalte ergänzt, übernimmt die
   Regel mit.
 - **Der Blick nach vorn hängt NICHT am gewählten Zeitraum** — er steht fest bei sechs
-  Monaten zurück und sechs voraus. Eine Projektion wird nicht besser, wenn man sie über
-  zwei Jahre zieht; ihre späten Monate wären Behauptung statt Vorschau. Gezeichnet wird
-  EINE Linie, deren geplanter Teil gestrichelt ist (`SaldoVerlaufChart`, `abIndex`): es
-  ist derselbe Saldo, und zwei Linien behaupteten zwei Grössen.
+  Monaten zurück und zwölf voraus (seit 2026-11-11, vorher sechs). Eine Projektion wird
+  nicht besser, wenn man sie über zwei Jahre zieht; ihre späten Monate wären Behauptung
+  statt Vorschau. Gezeichnet wird EINE Linie, deren geplanter Teil gestrichelt ist
+  (`SaldoVerlaufChart`, `abIndex`): es ist derselbe Saldo, und zwei Linien behaupteten
+  zwei Grössen. **Der laufende Monat ist Plan, nicht Ist** (seit 2026-11-11): halb gebucht
+  knickte die Linie genau an der Naht ein. Das Ist endet mit dem Vormonat
+  (`analyseAusblick`).
 
 **Ein Screen-Test, der einen Kategorienamen sucht, muss ihn jetzt in seiner Karte
 suchen.** Derselbe Name steht in der Aufschlüsselung und in den Ranglisten darunter; eine
 Suche über das ganze Dokument findet mehrere Elemente und bricht ab. `screens.test.tsx`
-hat dafür `inAufschluesselung()`.
+hat dafür `inMonatsauswertung()`.
 
 ## Laden
 

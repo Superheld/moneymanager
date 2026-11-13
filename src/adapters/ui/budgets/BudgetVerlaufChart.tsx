@@ -1,12 +1,19 @@
-// BudgetVerlaufChart — je Monat zwei ineinanderliegende Balken: hell, was in dem Monat
-// verfügbar war, davor massiv, was davon abgeflossen ist.
+// BudgetVerlaufChart — je Monat ein Balken für das, was abgeflossen ist, und dahinter
+// eine Linie für das, was verfügbar war. Die Linie hat je nach Art eine andere Form:
 //
-// Ineinander und nicht nebeneinander wie im MonatsFlussChart, weil die beiden Zahlen hier
-// nicht zwei Größen sind, sondern eine Größe und ihr Rahmen: man liest ab, wie voll der
-// Balken ist, nicht welcher der beiden höher steht. Bei einem aufbauenden Budget wächst
-// der helle Balken mit — genau daran sieht man, dass es sammelt.
+//   MONATLICH  eine waagerechte Grenze je Monat, als Stufe: der Rahmen ist eine Grenze,
+//              und ein Balken, der über sie ragt, ist überzogen.
+//   AUFBAUEND  eine Linie durch die Monate: der Stand am MONATSENDE (`rest`) — er wächst
+//              mit jeder Rate und sinkt mit jeder Ausgabe; ein Stand ist ein Verlauf.
+//              Bis 2026-11-11 war es `verfuegbar` (Übertrag plus Rate), der Stand VOR den
+//              Ausgaben des Monats: was im November ausging, sank erst am Dezember-Punkt.
 //
-// Ändert sich der Rahmen von einem Monat auf den nächsten, springt der helle Balken. Das
+// **Bis 2026-11-08 stand dort ein heller Schattenbalken**, für beide Arten gleich. Er
+// sagte bei der aufbauenden nicht, dass sie sammelt (man musste die Höhen der Schatten
+// im Kopf verbinden), und bei der monatlichen verdeckte er die Grenze, um die es geht,
+// unter einer Fläche.
+//
+// Ändert sich der Rahmen von einem Monat auf den nächsten, springt die Linie. Das
 // sieht ohne Erklärung aus wie ein Rechenfehler — deshalb steht am Wechselmonat eine Marke
 // auf der Grundlinie, und die Zeile unter dem Chart nennt den vorherigen Betrag.
 //
@@ -26,6 +33,8 @@ import { flussFarbe, warnFlaeche } from "../bausteine/geldFarbe";
 
 interface Props {
   monate: readonly Budgetmonat[];
+  /** Entscheidet die Form der Linie hinter den Balken — Grenze oder Stand. */
+  art: "monatlich" | "aufbauend";
   width?: number;
   height?: number;
   /** Klick auf einen Monat (Index) — die Balken und der ganze Slot sind das Ziel. */
@@ -33,7 +42,7 @@ interface Props {
   aktivIndex?: number | null;
 }
 
-export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonatClick, aktivIndex }: Props) {
+export function BudgetVerlaufChart({ monate, art, width = 1000, height = 220, onMonatClick, aktivIndex }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
   const padL = 60;
@@ -48,14 +57,42 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
   // Skala über beide Reihen. Ein überzogener Monat ragt über seinen hellen Balken hinaus —
   // das soll er, sonst sähe „Rahmen genau ausgeschöpft" aus wie „Rahmen gerissen".
   const oben = Math.max(1, ...monate.map((m) => Math.max(m.verfuegbar, m.verbraucht)));
+  /** Wo die Linie im Monat steht: beim Monatlichen die Grenze, beim Aufbauenden der Stand nach dem Monat. */
+  const linienwert = (m: Budgetmonat) => Math.max(0, art === "aufbauend" ? m.rest : m.verfuegbar);
   const unten = Math.min(0, ...monate.map((m) => m.verbraucht));
   const spanne = oben - unten;
   const y = (v: number) => padT + ((oben - v) / spanne) * innerH;
   const nulllinie = y(0);
 
   const slot = n > 0 ? innerW / n : innerW;
-  const rahmenBreite = Math.min(26, slot * 0.5);
-  const verbrauchBreite = rahmenBreite * 0.52;
+  const verbrauchBreite = Math.min(18, slot * 0.36);
+  const mitte = (i: number) => padL + slot * i + slot / 2;
+
+  /**
+   * Die Linie hinter den Balken. Monate ohne Rahmen (vor der ersten Betragsversion)
+   * unterbrechen sie: dort gab es nichts, und eine durchgezogene Linie behauptete eine
+   * Grenze oder einen Stand, den es nicht gab.
+   */
+  const linie = (() => {
+    let d = "";
+    let offen = false;
+    monate.forEach((m, i) => {
+      if (m.ohnePlan) {
+        offen = false;
+        return;
+      }
+      const yv = y(linienwert(m));
+      if (art === "monatlich") {
+        // Stufe: über die volle Breite des Monats, senkrecht verbunden zum nächsten.
+        const x0 = padL + slot * i;
+        d += offen ? ` L${x0},${yv} L${x0 + slot},${yv}` : ` M${x0},${yv} L${x0 + slot},${yv}`;
+      } else {
+        d += offen ? ` L${mitte(i)},${yv}` : ` M${mitte(i)},${yv}`;
+      }
+      offen = true;
+    });
+    return d.trim();
+  })();
 
   const gitter = [oben, oben / 2, 0, unten].filter((v, i, a) => a.indexOf(v) === i);
   const fmtAchse = (v: number) => geld.format(Math.round(v));
@@ -71,9 +108,22 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
             <text x={padL - 8} y={y(v) + 4} textAnchor="end" fontSize="10.5" fill="var(--ink-3)" fontFamily="var(--font-ui)">{fmtAchse(v)}</text>
           </g>
         ))}
+        {/* Die Linie liegt HINTER den Balken: sie ist der Massstab, die Balken die
+            Aussage. Die Farbe ist der Akzent, nicht die Tinte der Balken — sonst läse man
+            beide als eine Grösse. */}
+        {linie && (
+          <path d={linie} fill="none" stroke="var(--accent-deep)" strokeWidth="2"
+            strokeLinejoin="round" strokeLinecap="round" opacity={art === "monatlich" ? 0.7 : 0.9} />
+        )}
+        {art === "aufbauend" &&
+          monate.map((m, i) =>
+            m.ohnePlan ? null : (
+              <circle key={`p${m.monat}`} cx={mitte(i)} cy={y(linienwert(m))} r="4"
+                fill="var(--accent-deep)" stroke="var(--surface)" strokeWidth="2" />
+            ),
+          )}
         {monate.map((m, i) => {
-          const cx = padL + slot * i + slot / 2;
-          const rahmenH = Math.max(0, nulllinie - y(Math.max(0, m.verfuegbar)));
+          const cx = mitte(i);
           const ueberzogen = !m.ohnePlan && m.verbraucht > m.verfuegbar;
           const oberkante = y(Math.max(0, m.verbraucht));
           const verbrauchH = Math.abs(nulllinie - oberkante);
@@ -93,7 +143,6 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
               {aktivIndex === i && (
                 <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="var(--accent)" opacity="0.1" />
               )}
-              <rect x={cx - rahmenBreite / 2} y={nulllinie - rahmenH} width={rahmenBreite} height={rahmenH} rx="2" fill="var(--ink)" opacity="0.13" />
               <rect
                 x={cx - verbrauchBreite / 2}
                 y={m.verbraucht >= 0 ? oberkante : nulllinie}
@@ -125,7 +174,7 @@ export function BudgetVerlaufChart({ monate, width = 1000, height = 220, onMonat
         })}
       </svg>
       <div style={{ display: "flex", gap: "var(--sp-5)", marginTop: "var(--sp-2)", fontSize: "var(--fs-sm)", color: "var(--ink-2)", flexWrap: "wrap" }}>
-        <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.13, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeVerfuegbar")}</span>
+        <span><span style={{ display: "inline-block", width: 14, height: 2, borderRadius: 1, background: "var(--accent-deep)", verticalAlign: "middle", marginRight: 6 }} />{t(art === "monatlich" ? "budgets.legendeRahmen" : "budgets.legendeStand")}</span>
         <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: "var(--ink)", opacity: 0.78, verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeVerbraucht")}</span>
         <span><span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: warnFlaeche(true), verticalAlign: "middle", marginRight: 6 }} />{t("budgets.legendeUeberzogen")}</span>
         {monate.some((m) => m.ohnePlan) && (

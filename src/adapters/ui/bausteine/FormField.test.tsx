@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { FormField } from "./FormField";
 import { CategoryPicker } from "./CategoryPicker";
+import { Kaestchen } from "./Kaestchen";
 
 describe("FormField", () => {
   it("benennt ein natives Eingabefeld über sein Label", () => {
@@ -64,5 +65,31 @@ describe("FormField", () => {
   it("kommt ohne Label aus", () => {
     render(<FormField><input /></FormField>);
     expect(screen.getByRole("textbox")).toBeInTheDocument();
+  });
+
+  it("liest den Hinweis als Beschreibung des Feldes vor", () => {
+    // Vorher stand er nur darunter — eine Vorlesehilfe sagte ihn nie an.
+    render(<FormField label="Betrag" hint="ohne Vorzeichen"><input /></FormField>);
+    expect(screen.getByRole("textbox", { name: "Betrag" })).toHaveAccessibleDescription("ohne Vorzeichen");
+  });
+
+  it("lässt den Pflicht-Stern aus dem Namen", () => {
+    render(<FormField label="Konto" required><input /></FormField>);
+    expect(screen.getByRole("textbox", { name: "Konto" })).toBeInTheDocument();
+  });
+
+  it("benennt Teile in einer Liste nicht um", () => {
+    // Base UI `Field` ist für EIN Bedienteil; um eine Liste herum hiesse sonst jedes
+    // Kästchen wie das Feld statt wie die Person.
+    render(
+      <FormField label="Inhaber">
+        <span>
+          <Kaestchen an={false} aufAendern={() => {}}>Alma</Kaestchen>
+          <Kaestchen an={false} aufAendern={() => {}}>Bodo</Kaestchen>
+        </span>
+      </FormField>,
+    );
+    expect(screen.getByRole("checkbox", { name: "Alma" })).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Bodo" })).toBeInTheDocument();
   });
 });

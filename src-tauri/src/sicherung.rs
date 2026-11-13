@@ -16,7 +16,7 @@ use std::fs;
 use std::path::PathBuf;
 
 use tauri::{AppHandle, Manager, State};
-use crate::datenbank::Datenbank;
+use crate::datenbank::{einfacher_dateiname, Datenbank};
 
 /// Unterhalb des App-Datenverzeichnisses, damit die Sicherungen nicht zwischen den
 /// laufenden Datenbankdateien liegen — dort sind sie schon einmal übersehen worden.
@@ -48,11 +48,17 @@ fn stichtag_aus(name: &str, quelle: &str) -> Option<String> {
     let rest = name.strip_prefix(stamm)?.strip_prefix('-')?.strip_suffix(".db")?;
     // Genau `YYYY-MM-DD`. Alles andere ist eine fremde Datei, die uns nichts angeht —
     // und die wir vor allem nicht löschen dürfen.
-    let ziffern_und_striche = rest.len() == 10
-        && rest.chars().enumerate().all(|(i, c)| {
+    ist_stichtag(rest).then(|| rest.to_string())
+}
+
+/// Genau `YYYY-MM-DD` — die Form, nicht der Kalender. Ob es den Tag gibt, ist hier
+/// gleichgueltig; wichtig ist, dass nichts anderes als Ziffern und zwei Striche im
+/// Dateinamen landen kann.
+fn ist_stichtag(text: &str) -> bool {
+    text.len() == 10
+        && text.chars().enumerate().all(|(i, c)| {
             if i == 4 || i == 7 { c == '-' } else { c.is_ascii_digit() }
-        });
-    ziffern_und_striche.then(|| rest.to_string())
+        })
 }
 
 /// Legt die Sicherung des Tages an, falls es sie noch nicht gibt.
@@ -68,7 +74,16 @@ pub async fn sicherung_anlegen(
     stichtag: String,
     db: State<'_, Datenbank>,
 ) -> Result<bool, String> {
-    let ziel = verzeichnis(&app)?.join(dateiname(&quelle, &stichtag));
+    // **Beide Teile des Namens kommen aus dem Webview, und beide werden geprueft.** Bis
+    // 2026-11-10 ging der zusammengesetzte Name ungeprueft an `VACUUM INTO` — mit einem
+    // Pfad als `quelle` haette das eine Kopie des Bestands an einen beliebigen Ort
+    // geschrieben. `sicherungen_entfernen` darunter war von Anfang an streng; das
+    // Anlegen war es nicht, weil Schreiben harmloser aussieht als Loeschen.
+    let quelle = einfacher_dateiname(&quelle)?;
+    if !ist_stichtag(&stichtag) {
+        return Err(format!("'{stichtag}' ist kein Stichtag (JJJJ-MM-TT)."));
+    }
+    let ziel = verzeichnis(&app)?.join(dateiname(quelle, &stichtag));
     if ziel.exists() {
         return Ok(false);
     }
@@ -87,6 +102,7 @@ pub async fn sicherung_anlegen(
 /// Die Stichtage der vorhandenen Sicherungen, unsortiert.
 #[tauri::command]
 pub fn sicherungen_auflisten(app: AppHandle, quelle: String) -> Result<Vec<String>, String> {
+    let quelle = einfacher_dateiname(&quelle)?.to_string();
     let pfad = verzeichnis(&app)?;
     let Ok(eintraege) = fs::read_dir(&pfad) else {
         return Ok(vec![]);
@@ -109,6 +125,7 @@ pub fn sicherungen_entfernen(
     quelle: String,
     stichtage: Vec<String>,
 ) -> Result<usize, String> {
+    let quelle = einfacher_dateiname(&quelle)?.to_string();
     let pfad = verzeichnis(&app)?;
     let mut weg = 0;
     for stichtag in stichtage {
@@ -162,6 +179,14 @@ mod tests {
             stichtag_aus(&spielstand, "moneymanager-dev.db").as_deref(),
             Some("2026-08-26")
         );
+    }
+
+    #[test]
+    fn ein_stichtag_ist_nur_ziffern_und_zwei_striche() {
+        assert!(ist_stichtag("2026-08-26"));
+        for boese in ["", "2026-8-26", "2026-08-26x", "../../2026", "2026/08/26", "heute-noch"] {
+            assert!(!ist_stichtag(boese), "'{boese}' ging als Stichtag durch.");
+        }
     }
 
     #[test]

@@ -3,6 +3,300 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.30.0] — 2026-11-13
+
+Die fertige Fassung der sechs Betas. Wer eine davon hat, bekommt gegenüber beta.6 nichts
+Neues — nur Windows hat wieder ein Installationspaket, das bei beta.6 fehlte. Wer von
+0.29.x kommt, findet hier das Wichtigste; die Einzelheiten stehen in den Abschnitten der
+Betas darunter. **Eine Migration** (75): sie legt die Tabelle der Trainingsläufe an und
+ändert sonst nichts.
+
+### Neu
+
+**Umbuchungen werden erkannt.** Zwei Buchungen mit exaktem Gegenbetrag auf zwei eigenen
+Konten verbindet die App selbst; „Paarung lösen" ist der Weg zurück.
+
+**Kontobelegung.** Eine Rechnung verteilt jeden Kontostand auf Rücklagen und aufbauende
+Budgets. Im Kontoauszug steht dafür die Spalte „frei" und je Konto die Karte „Gebunden
+auf …".
+
+**Neuer Datenschlüssel** unter Einstellungen → Verschlüsselung, nicht nur eine neue
+Passphrase.
+
+**Dunkles Schema**, nach der Einstellung des Systems.
+
+**Aktualisierung auf Knopfdruck** unter Einstellungen → Über die App.
+
+**Erkennung, die sich erklärt:** an jeder Buchung steht, welche Wörter den Ausschlag
+gaben, und jedes Training wird aufgezeichnet.
+
+### Geändert
+
+**Die Navigation ist nach Wichtigkeit sortiert.** Der Kontoauszug heisst „Buchungen" und
+steht in der Verwaltung.
+
+**Die Monatskarten der Übersicht** lassen Umbuchungen zwischen eigenen Konten heraus,
+führen Rücklagen als Monatsrate und Budgets getrennt nach monatlich und aufbauend.
+
+**Die Analyse steht in Registern** — Verlauf, Kategorien, Ausblick, Befunde, Depot —, jedes
+mit eigenem Zeitraum.
+
+**Ein Budget in einem Budget** nimmt dem äusseren nichts mehr weg: zwei Töpfe, nicht einer.
+
+**Die Oberfläche ist neu gebaut**: klickbare Zeilen, Dialoge, Reiter und Aufklapptabellen
+sehen überall gleich aus und sind mit der Tastatur bedienbar. Buchungen stehen unter
+Budgets und Kategorien in derselben Liste.
+
+**Eine Migration läuft ganz oder gar nicht.**
+
+### Entfernt
+
+Die Karte „Da ist etwas zu tun" oben in der Übersicht.
+
+## [0.30.0-beta.6] — 2026-11-12
+
+Feinschliff aus dem Test von beta.4, und Buchungen sehen unter Budgets und in der Analyse
+jetzt gleich aus. **Keine Migration.**
+
+### Neu
+
+**Aktualisierung auf Knopfdruck.** Unter Einstellungen → Über die App steht die
+installierte Version und daneben „Jetzt prüfen" — vorher wurde nur beim Start geprüft.
+Das geht auch, wenn die Prüfung beim Start abgeschaltet ist. Liegt etwas bereit, lässt es
+sich dort gleich installieren; ging die Prüfung nicht, steht das da, statt „aktuell" zu
+behaupten.
+
+### Geändert
+
+**Einstellungen neu geordnet.** „Personalisierung" fasst Sprache & Währung und Personen
+zusammen, „Über die App" Aktualisierung und Experimente. Verschlüsselung und Export haben
+ordentliche Abstände zwischen und in ihren Karten.
+
+**Eine Liste für Buchungen.** Unter einem Budget (Übersicht, Budgets) und unter einer
+Kategorie (Analyse) stehen dieselben Spalten: Datum, Buchung mit Vertrag, Kategorie,
+Verwendungszweck, Konto, Betrag. Der Betrag trägt überall sein Vorzeichen, auch unter einem
+Budget. Kategorie und Konto fallen weg, wenn alle Zeilen dieselben tragen. Eine Buchung
+heisst überall gleich: eigene Notiz, sonst Empfänger, sonst Verwendungszweck.
+
+**Übersicht:** unter einem aufgeklappten Budget keine Summenzeile mehr — der Betrag steht
+schon in der Zeile darüber. Im Budget-Verlauf heisst sie jetzt „Summe" und trägt das
+Vorzeichen.
+
+**Buchungen:** die ganze Zeile öffnet die Buchung, und der Name ist als Link gesetzt. Der
+Kategoriefilter steht kompakt in der Filterleiste. Die Markierung „Verlauf" an den Zeilen
+ist weg; der Verlauf steht wie bisher im Dialog.
+
+**Konten verwalten:** je Konto nur noch der Kontostand. Anfangsbestand und Bewegungen
+pflegt der Bearbeiten-Dialog bzw. zeigt der Kontoauszug.
+
+**Training:** im Erkennungsmodell steht jede Auswertung in einer eigenen Karte.
+
+### Behoben
+
+**Ein eingeschaltetes Experiment** (etwa Training) erschien erst nach einem Neustart in der
+Navigation.
+
+## [0.30.0-beta.5] — 2026-11-12
+
+Die Oberfläche ist neu gebaut, die Analyse neu geordnet, und der Datenschlüssel lässt sich
+wechseln. **Keine Migration** — aber Migrationen laufen ab jetzt anders (siehe unten), und
+die Übersicht rechnet ihre Budgetliste anders.
+
+### Neu
+
+**Neuer Datenschlüssel.** Unter Einstellungen → Verschlüsselung lässt sich der Schlüssel
+selbst erneuern, nicht nur die Passphrase — für den Fall, dass der Wiederherstellungscode
+in fremde Hände geraten sein könnte. Die Datenbank und die Sicherungen werden dabei neu
+verschlüsselt; ein unterbrochener Wechsel wird beim nächsten Entsperren zu Ende geführt.
+
+**Dunkles Schema.** Die App folgt der Einstellung des Systems.
+
+**Analyse, neu geordnet.** Die Register sind unabhängig voneinander; ein Zeitraum, den du in einem wählst,
+gilt nur dort.
+- **Verlauf:** ein Klick auf einen Monat schlüsselt ihn darunter auf, nach Kategorien oder
+  Hauptgruppen, jede Zeile mit ihrem Anteil am Monat.
+- **Kategorien:** eine Auswertung über die Zeit — Ø je Monat, Summe, Anteil und Trend je
+  Kategorie, darüber die Aufteilung als Balken. Ein Klick zeigt den Verlauf der Kategorie
+  und ihre Buchungen.
+- **Blick nach vorn:** zwölf Monate. Der laufende Monat ist Plan, damit die Linie nicht
+  springt. Darunter Einnahmen und Ausgaben je Monat, und je Monat der **tiefste Stand
+  innerhalb des Monats** — wann wie viel liquide da sein muss.
+- Jeder Chart zeigt beim Überfahren seine Werte.
+
+**Rücklagen:** oben links der Stand (Ziele, Soll heute, tatsächlich da, Deckung), rechts die
+Faustformel. Je Rücklage ein Balken mit einem Strich beim Soll von heute.
+
+### Geändert
+
+**Eine Migration läuft jetzt ganz oder gar nicht.** Jede läuft in einer Transaktion;
+bricht sie ab, ist nichts von ihr geschehen.
+
+**Klickbare Tabellenzeilen sind überall gleich:** die ganze Zeile reagiert, der Name in
+der ersten Spalte sieht aus wie ein Link. Zeilen, bei denen ein Klick nichts tut, sehen
+auch nicht danach aus. Zeilen lassen sich mit der Tastatur öffnen.
+
+**Knöpfe, Dialoge, Reiter und Auswahlfelder** sind mit der Tastatur bedienbar: der Fokus
+bleibt im Dialog und kehrt danach zurück, Pfeiltasten wechseln die Reiter.
+
+**Die Budgetliste der Übersicht rechnet über alle Konten**, wie der Bereich Budgets. Die
+Zeilen „Budgets monatlich" und „Budgets aufbauend" der Monatskarten bleiben bei den
+liquiden Konten und können deshalb weniger zeigen als die Liste darunter.
+
+### Behoben
+
+**Aufbauende Budgets auf einem Rücklagenkonto** sahen in der Übersicht ihre eigenen
+Ausgaben nicht: der Balken stand auf null, der Stand wuchs nur. Im Budget-Verlauf zählen
+die Ausgaben eines Monats jetzt im selben Monat, nicht erst im nächsten.
+
+**In den aufgeklappten Monatskarten** stand ein Platzhaltertext statt der Tabelle.
+
+**Die Faustformel der Rücklagen** fehlte ganz, solange kein Vertrag mit Einnahmen da
+ist — jetzt steht der Bogen da und sagt, was fehlt.
+
+**Statt einer weissen Seite** erscheint bei einem Fehler eine Meldung; die Navigation
+bleibt stehen.
+
+## [0.30.0-beta.4] — 2026-11-10
+
+Budgets rechnen verschachtelt richtig, die Kategorie-Erkennung misst ehrlich und erklärt
+sich, und was aufklappt, sieht überall gleich aus. **Eine Migration** (75): sie legt die
+Tabelle der Trainingsläufe an und ändert sonst nichts.
+
+### Behoben
+
+**Ein Budget in einem Budget nimmt dem äusseren nichts mehr weg.** Liegt „Tanken" (100 €)
+in „Mobilität" (50 €), gelten die 50 € für alles in Mobilität ausser Tanken und die 100 €
+fürs Tanken — zwei Töpfe. Vorher wurde der Betrag des inneren vom äusseren abgezogen; war
+er grösser, sank ein aufbauendes Budget jeden Monat, ohne dass etwas ausgegeben wurde.
+
+### Geändert
+
+**Die Trefferquote der Erkennung wird ehrlicher gemessen** und fällt dadurch niedriger aus:
+trainiert auf dem Älteren, geprüft an den jüngsten Buchungen — und an von Hand gesetzten
+Kategorien, sobald es genug davon gibt. Neben dem blinden Raten steht als zweite
+Vergleichslinie „dieselbe Kategorie wie beim Empfänger üblich"; dazu Precision, Recall und
+F1 je Kategorie, Macro-F1 und wie verlässlich die angegebene Sicherheit ist.
+
+**Was aufklappt, ist überall dieselbe Tabelle** — die Buchungen eines Budgets, einer
+Kategorie in der Analyse und die Posten der Monatskarten. Die Zeilen lassen sich auch mit
+der Tastatur öffnen.
+
+### Neu
+
+**Warum A und nicht B.** An jedem Fehlgriff im Training, an jeder Buchung und in der
+Review steht, welche Wörter den Ausschlag gaben — gerechnet gegen die richtige (oder
+zweitbeste) Kategorie, mit der Grundneigung als eigener Zeile und dem Hinweis, wo ein Wort
+in deinen Buchungen sonst vorkommt.
+
+**Trainingsläufe werden aufgezeichnet.** Nach jedem Training steht, was sich gegenüber dem
+vorigen geändert hat — an Quellen und ausgeschlossenen Wörtern, und welche Zeilen dadurch
+richtig oder falsch geworden sind. Dazu eine Tabelle der letzten Läufe.
+
+## [0.30.0-beta.3] — 2026-11-09
+
+Zweite Runde nach dem Live-Test. Keine Migration — der Bestand bleibt, wie er ist; manches
+wird anders gerechnet.
+
+### Geändert
+
+**Die Monatskarten lassen Umbuchungen zwischen deinen Konten ganz heraus.** Eine
+Überweisung aufs Tagesgeld-, Spar- oder Rücklagenkonto bewegt eigenes Geld und ist kein
+Abzug — gleich, wie das Zielkonto eingestuft ist. „Sparen & Vorsorge" heisst jetzt
+„Umbuchungen nach außen" und zeigt nur noch Geld, das auf ein Konto geht, das die App
+nicht kennt.
+
+**Die Rücklagen stehen als Raten in den Monatskarten.** Je Rücklage ihre Monatsrate, als
+Abzug — auch wenn noch nichts überwiesen wurde. Ist das Ziel erreicht, bindet sie nichts
+mehr. Aufbauende Budgets planen ihre Rate wieder selbst.
+
+**Budgets werden je Budget nach Art getrennt**, nicht mehr nach dem obersten Budget eines
+Baums — in den Monatskarten, in der Übersicht und im Bereich Budgets. Hängt ein Budget
+unter einem der anderen Art, steht dessen Name daneben. Im Bereich Budgets stehen beide
+Arten in einer Karte nebeneinander, mit schlankeren Zeilen, damit der Verlauf nach dem
+Klick gleich darunter beginnt.
+
+**Rücklagen: Tacho und Eingänge zählen auch Konten, denen eine Rücklage zugeordnet ist**,
+nicht nur solche der Klasse Rücklage. Vorher stand der Tacho auf null, wenn die Rücklagen
+auf einem anders eingestuften Konto lagen. Er misst den Kontostand, nicht die Deckung.
+
+**Analyse: Die Filter stehen am Reiter, den sie einstellen.** Verlauf und Kategorien
+haben Monat und Zeitraum an ihrer Karte, Befunde und Depot den Zeitraum, der Ausblick
+keinen. Die Kennzahlen stehen im Verlauf.
+
+**Neben der Version steht bei einer Beta „Beta"**, nicht mehr „Alpha".
+
+## [0.30.0-beta.2] — 2026-11-08
+
+Eine Runde Feinschliff nach dem ersten Blick auf die Beta. Keine Migration — der Bestand
+bleibt, wie er ist; manches wird anders gerechnet.
+
+### Geändert
+
+**Die Navigation ist nach Wichtigkeit sortiert.** Oben Übersicht, Budgets, Verträge,
+Rücklagen, Analyse. Der Kontoauszug heisst jetzt „Buchungen" und steht in der Verwaltung —
+vorher hiessen zwei Einträge „Konten".
+
+**Die Monatskarten der Übersicht rechnen Umbuchungen am Kreis der verfügbaren Konten.**
+Eine Umbuchung zwischen zwei verfügbaren Konten steht in keiner Zeile mehr. Eine aufs
+Rücklagenkonto steht in der neuen Zeile „Rücklagen", geplant und gebucht — vorher blieb
+dort das Gebuchte leer, obwohl das Geld geflossen war. Was auf Vorsorge-, Spar- oder
+Investmentkonten geht, bleibt unter „Sparen & Vorsorge". Budgets stehen in zwei Zeilen,
+monatlich und aufbauend.
+
+**Rücklagen: „eingegangen" statt „geflossen".** Gezählt wird jetzt jede Einzahlung auf ein
+Rücklagenkonto, Zinsen eingeschlossen, und die Buchungen stehen darunter. Eine Umbuchung
+auf ein Vorsorgekonto zählt nicht mehr als Rücklage. Die Faustformel zeigt als Tacho, wie
+weit der Stand der Rücklagenkonten an sie heranreicht.
+
+**Die Analyse steht in Reitern:** Verlauf, Kategorien, Ausblick, Befunde, Depot. Zeitraum
+und Monat sitzen im Kopf und gelten für alle.
+
+**Budget-Verlauf:** beim monatlichen Budget der Rahmen als Linie, beim aufbauenden der Stand
+als Verlauf — statt eines Schattenbalkens. Die Buchungen eines Monats haben einen Kopf und
+lassen sich zuklappen.
+
+**Verträge lassen sich nach Art filtern** (Abo, Dauervertrag, Umbuchung).
+
+### Entfernt
+
+Die Karte „Da ist etwas zu tun" oben in der Übersicht. Mit ihr geht auch der Hinweis auf
+einen lange zurückliegenden Abruf; der Knopf zum Abrufen bleibt im Kopf der Übersicht.
+
+## [0.30.0-beta.1] — 2026-11-07
+
+Die erste Vorabversion. Drei Dinge, die am echten Bestand noch nie gelaufen sind.
+
+### Neu
+
+**Umbuchungen werden erkannt.** Was man bisher von Hand paaren musste, verbindet die App
+selbst: zwei Buchungen mit exaktem Gegenbetrag auf zwei eigenen Konten, höchstens 14 Tage
+auseinander. Zwei Bankzeilen müssen sich dabei ausweisen, mindestens eine nennt per IBAN
+das andere Konto; bei einer Buchung von Hand gibt es diesen Beleg nicht, da genügt das
+Übrige. Nennt ein Beleg eine fremde Gegenseite, ist es nie eine Umbuchung. Beide Zeilen
+werden als noch anzusehen markiert, und „Paarung lösen" ist der Weg zurück: eine gelöste
+Paarung kommt nicht wieder. Gesucht wird nur von neuen Buchungen aus, der Altbestand
+bleibt, wie er ist.
+
+**Die Gegenseite hat bei jedem Abruf dieselbe Form.** Nennt die Bank keine IBAN, sondern
+Bankleitzahl und Kontonummer, rechnet die App sie um. Die Rohwerte bleiben am Beleg. Zeilen
+ohne IBAN bekommen dafür beim nächsten Abruf einmalig einen zweiten Beleg, soweit die
+Bank sie noch liefert.
+
+**Kontobelegung: wem das Geld auf einem Konto gehört.** Eine zentrale Rechnung verteilt den
+Kontostand auf Rücklagen und aufbauende Budgets, bei Unterdeckung anteilig. Im Kontoauszug
+steht das als Spalte „frei" und als Karte „Gebunden auf …". Die Rücklagen-Deckung rechnet
+damit nicht mehr denselben Euro doppelt.
+
+**Abrufen direkt aus der Übersicht.** Der Knopf steht im Kopf des Bereichs, sobald es einen
+Bankzugang gibt, und „Da ist etwas zu tun" meldet jeden Zugang, dessen letzter Abruf eine
+Woche oder länger her ist.
+
+### Geändert
+
+Budgets stehen in der Übersicht und im Bereich Budgets getrennt nach Art. Ein Budget auf dem
+Rücklagenkonto führt in der Übersicht seine Zeile und trägt seine Ausgaben, statt sie unter
+„Sonstiges" zu lassen.
+
 ## [0.29.3] — 2026-11-07
 
 Der Weg, eine neue Fassung am echten Bestand zu prüfen, bevor sie alle bekommen. Für alle,

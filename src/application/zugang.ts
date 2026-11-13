@@ -20,6 +20,22 @@ export interface Zugangsstand {
   altbestand: boolean;
 }
 
+/**
+ * Was ein Wechsel des Datenschlüssels hinterlässt.
+ *
+ * **Wozu es ihn gibt:** eine neue Passphrase ändert nur die Hülle. Der
+ * Wiederherstellungscode IST der Datenschlüssel — wer fürchtet, dass der Zettel in fremde
+ * Hände geraten ist, braucht einen neuen Schlüssel, nicht eine neue Passphrase.
+ */
+export interface Schluesselwechsel {
+  /** Der NEUE Code. Der alte öffnet danach nichts mehr. */
+  wiederherstellungscode: string;
+  /** Sicherungen, die auf den neuen Schlüssel umgeschrieben wurden. */
+  sicherungenUmgestellt: number;
+  /** Sicherungen, die sich nicht umschreiben liessen — sie hängen weiter am alten Code. */
+  sicherungenUebrig: number;
+}
+
 export interface ZugangPort {
   stand(): Promise<Zugangsstand>;
   /** Richtet ein und gibt den Wiederherstellungscode zurück. */
@@ -32,6 +48,8 @@ export interface ZugangPort {
   passphraseWechseln(alte: string, neue: string): Promise<boolean>;
   /** `null` heisst: Passphrase falsch. */
   codeZeigen(passphrase: string): Promise<string | null>;
+  /** Neuer Datenschlüssel samt neuem Code. `null` heisst: Passphrase falsch. */
+  schluesselWechseln(passphrase: string): Promise<Schluesselwechsel | null>;
   sperren(): Promise<void>;
 }
 

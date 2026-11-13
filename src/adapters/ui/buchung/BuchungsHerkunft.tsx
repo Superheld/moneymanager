@@ -12,13 +12,14 @@ import { useState, type ReactNode } from "react";
 import type { IstBuchung } from "../../../application";
 import { nachRang, type ImportLauf, type Umsatz } from "../../../application/import";
 import { Pill } from "../bausteine";
+import { Klappblock } from "../bausteine/Klappblock";
 
 /** Ein Label/Wert-Paar im Herkunfts-Abschnitt. Lange Werte (Hash, Zweck) dürfen umbrechen. */
 function Infozeile({ label, children, mono }: { label: string; children: ReactNode; mono?: boolean }) {
   return (
     <div style={{ display: "flex", gap: "var(--sp-3)", padding: "5px 0", alignItems: "baseline" }}>
-      <span style={{ flex: "0 0 34%", fontSize: "var(--fs-xs)", color: "var(--ink-3)", fontWeight: "var(--fw-semi)" }}>{label}</span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13, wordBreak: "break-word", fontFamily: mono ? "var(--font-mono, monospace)" : undefined, color: mono ? "var(--ink-2)" : "var(--ink)" }}>
+      <span className="hinweis" style={{ flex: "0 0 34%", fontWeight: "var(--fw-semi)" }}>{label}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: "var(--fs-tabelle)", wordBreak: "break-word", fontFamily: mono ? "var(--font-mono)" : undefined, color: mono ? "var(--ink-2)" : "var(--ink)" }}>
         {children}
       </span>
     </div>
@@ -53,13 +54,7 @@ export function BuchungsHerkunft({
   if (!buchung && !entwurf) return null;
 
   return (
-    <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
-      <button className="linkbtn" onClick={() => setOffen((x) => !x)} aria-expanded={offen}>
-        {offen ? "▾" : "▸"} {t("konten.detail.herkunft")}
-      </button>
-
-      {offen && (
-        <div style={{ marginTop: 8 }}>
+    <Klappblock titel={t("konten.detail.herkunft")} offen={offen} onUmschalten={() => setOffen((x) => !x)}>
           {buchung && <Infozeile label={t("konten.detail.erfasstUeber")}>{t(`konten.quelleName.${buchung.quelle}`)}</Infozeile>}
 
           {umsatz ? (
@@ -99,11 +94,8 @@ export function BuchungsHerkunft({
               )}
             </>
           ) : (
-            <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>{t("konten.detail.ohneImport")}</div>
+            <div className="hinweis" style={{ marginTop: 6 }}>{t("konten.detail.ohneImport")}</div>
           )}
-
-        </div>
-      )}
-    </div>
+    </Klappblock>
   );
 }

@@ -160,7 +160,7 @@ einer echten Bank.
 **Bis zum 30.08.2026 stand hier mehr.** `src/privatsphaere.test.ts` las die Merkmale zur
 Laufzeit aus der echten Datenbank und prüfte den Arbeitsbaum dagegen, `.githooks/pre-push`
 zusätzlich die ausgehenden Commit-Texte. Dieser Wert-Abgleich ist ausgebaut — warum, steht
-in `../CLAUDE.md` unter „Der Wert-Abgleich ist weg, und was das kostet". Die Kurzfassung:
+in `../scripts/CLAUDE.md` unter „Der Wert-Abgleich ist weg, und was das kostet". Die Kurzfassung:
 er brauchte den Datenschlüssel im Klartext und sperrte ohne ihn jeden Push.
 
 Was bleibt, sind **Formen**:

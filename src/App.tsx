@@ -10,13 +10,13 @@ import { BudgetsScreen } from "./adapters/ui/budgets/BudgetsScreen";
 import { RuecklagenScreen } from "./adapters/ui/ruecklagen/RuecklagenScreen";
 import { ImportBereich } from "./adapters/ui/import/ImportBereich";
 import { TrainingBereich } from "./adapters/ui/training/TrainingBereich";
-import { appBootstrap } from "./application/bootstrap";
-import { sqliteKategorieRepository } from "./adapters/persistence/sqliteStammdatenRepositories";
 import { EinstellungenProvider } from "./adapters/ui/bausteine/EinstellungenProvider";
+import { useExperimente } from "./adapters/ui/bausteine/einstellungenKontext";
+import { Fehlergrenze } from "./adapters/ui/bausteine/Fehlergrenze";
 import { Sperrbildschirm } from "./adapters/ui/zugang/Sperrbildschirm";
 import { useZeitsperre } from "./adapters/ui/zugang/useZeitsperre";
 import {
-  experimente as experimenteStand,
+  appStarten,
   zeitsperre,
   zugangEinrichten,
   zugangEntsperren,
@@ -24,7 +24,6 @@ import {
   zugangsstand,
   zugangSperren,
 } from "./adapters/dienste";
-import { EXPERIMENTE_AUS, type Experimente } from "./application";
 import "./adapters/ui/zugang/zugang.css";
 
 /**
@@ -45,14 +44,6 @@ export default function App() {
   >({ art: "laedt" });
   const [bereit, setBereit] = useState(false);
   const [minuten, setMinuten] = useState(0);
-  /**
-   * Der Stand der Experimente. Er entscheidet, welche Bereiche in der Navigation stehen.
-   *
-   * Ausgangswert ist „alles aus" — dieselbe vorsichtige Voreinstellung wie im Kern. Ein
-   * Bereich, der beim Laden kurz auftaucht und dann verschwindet, sähe nach einem Fehler
-   * aus.
-   */
-  const [experimente, setExperimente] = useState<Experimente>(EXPERIMENTE_AUS);
 
   const standHolen = useCallback(async () => {
     const s = await zugangsstand();
@@ -61,8 +52,16 @@ export default function App() {
     setStand({ art: "offen" });
   }, []);
 
+  /**
+   * Scheitert schon die erste Frage an Rust, gäbe es sonst gar nichts zu sehen: der
+   * Zustand bliebe „lädt", und „lädt" zeichnet `null`. Der Fehler wird deshalb gemerkt
+   * und beim Zeichnen geworfen — so landet er in der Fehlergrenze um die App und hat
+   * dieselbe Anzeige wie jeder andere.
+   */
+  const [startfehler, setStartfehler] = useState<Error | null>(null);
+
   useEffect(() => {
-    void standHolen();
+    standHolen().catch((e: unknown) => setStartfehler(e instanceof Error ? e : new Error(String(e))));
   }, [standHolen]);
 
   // Bootstrap und Zeitsperre-Einstellung erst NACH dem Entsperren — beide reden mit der
@@ -71,14 +70,10 @@ export default function App() {
     if (stand.art !== "offen") return;
     let abgebrochen = false;
     void (async () => {
-      await appBootstrap(sqliteKategorieRepository).catch(() => {});
-      const [m, e] = await Promise.all([
-        zeitsperre().catch(() => 0),
-        experimenteStand().catch(() => EXPERIMENTE_AUS),
-      ]);
+      await appStarten().catch(() => {});
+      const m = await zeitsperre().catch(() => 0);
       if (!abgebrochen) {
         setMinuten(m);
-        setExperimente(e);
         setBereit(true);
       }
     })();
@@ -97,6 +92,7 @@ export default function App() {
 
   useZeitsperre(stand.art === "offen" ? minuten : 0, sperren);
 
+  if (startfehler) throw startfehler;
   if (stand.art === "laedt") return null;
 
   if (stand.art !== "offen") {
@@ -126,6 +122,32 @@ export default function App() {
 
   return (
     <EinstellungenProvider>
+      <Arbeitsflaeche screen={screen} setScreen={setScreen} sperren={sperren} />
+    </EinstellungenProvider>
+  );
+}
+
+/**
+ * Navigation und Bereiche — INNERHALB des Einstellungs-Kontexts.
+ *
+ * Bis 2026-11-12 las `App` die Experimente einmal beim Start in einen eigenen Zustand,
+ * neben dem Kontext, den der Schalter in den Einstellungen ändert. Zwei Kopien desselben
+ * Stands: wer „Training" einschaltete, sah den Bereich erst nach einem Neustart. Jetzt
+ * liest die Navigation dieselbe Quelle wie der Schalter. Aufblitzen kann dabei nichts —
+ * der Provider zeichnet erst, wenn die Experimente geladen sind.
+ */
+function Arbeitsflaeche({
+  screen,
+  setScreen,
+  sperren,
+}: {
+  screen: ScreenId;
+  setScreen: (s: ScreenId) => void;
+  sperren: () => void;
+}) {
+  const experimente = useExperimente();
+  return (
+    <>
       {/* Das Training ist ein EXPERIMENT (Wunsch 2026-08-31): es ist eine Werkbank,
           kein fertiger Bereich — man greift dort in die Merkmale ein, misst Varianten
           und trainiert neu. Ausgeliefert wird ein fertiges Modell; wer es selbst
@@ -135,6 +157,9 @@ export default function App() {
         onNavigate={setScreen}
         versteckt={experimente.training ? [] : ["training"]}
       >
+        {/* Um den INHALT, nicht um den Rahmen: zeichnet ein Screen nicht, bleibt die
+            Navigation stehen, und ein Wechsel räumt die Meldung weg. */}
+        <Fehlergrenze ruecksetzenBei={screen}>
         {screen === "uebersicht" && <UebersichtScreen />}
         {screen === "analyse" && <AnalyseScreen />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
@@ -145,7 +170,8 @@ export default function App() {
         {screen === "import" && <ImportBereich />}
         {screen === "training" && <TrainingBereich />}
         {screen === "einstellungen" && <EinstellungenScreen onSperren={sperren} />}
+        </Fehlergrenze>
       </AppShell>
-    </EinstellungenProvider>
+    </>
   );
 }

@@ -33,15 +33,15 @@ import {
 import { kannVorfall } from "../../../application";
 import { beiEnter } from "../bausteine/beiEnter";
 import { Zeilenauswahl } from "../bausteine/Zeilenauswahl";
-import { Zeilenlink } from "../bausteine/Zeilenlink";
 import { HerkunftBereich } from "./HerkunftBereich";
 import { Bankprofilkarte } from "./Bankprofilkarte";
-import { TanDialog, useTanFrage } from "./TanDialog";
+import { TanDialog, useTanFrage } from "../bausteine/TanDialog";
 import { Button, Card, DataTable, FormField, Pill } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
 import { Modal } from "../bausteine/Modal";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 interface KontoZeile extends Bankkonto {
   saldo?: number;
@@ -109,7 +109,7 @@ export function BankzugaengeScreen({
   }
 
   useEffect(() => {
-    laden().catch(() => setZugaenge([]));
+    laden().catch((e) => { fehlerMelden(e); setZugaenge([]); });
   }, []);
 
   async function pruefen(zugang: Bankzugang, geheim: string) {
@@ -218,7 +218,7 @@ export function BankzugaengeScreen({
       render: (r: KontoZeile) => (
         <span>
           <div>{r.bezeichnung}</div>
-          <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>{r.schluessel}</div>
+          <div className="hinweis">{r.schluessel}</div>
         </span>
       ),
     },
@@ -288,19 +288,10 @@ export function BankzugaengeScreen({
           <div className="muted">{t("bankzugaenge.leer")}</div>
         ) : (
           <DataTable
+            onRowClick={(z: Bankzugang) => setKontenOffen(kontenOffen === z.id ? null : z.id)}
+            istAktiv={(z: Bankzugang) => z.id === kontenOffen}
             columns={[
-              {
-                key: "bezeichnung",
-                label: t("bankzugaenge.spalteBank"),
-                render: (z: Bankzugang) => (
-                  <Zeilenlink
-                    onKlick={() => setKontenOffen(kontenOffen === z.id ? null : z.id)}
-                    titel={t("bankzugaenge.zeigeKonten", { bank: z.bezeichnung })}
-                  >
-                    {z.bezeichnung}
-                  </Zeilenlink>
-                ),
-              },
+              { key: "bezeichnung", label: t("bankzugaenge.spalteBank") },
               { key: "blz", label: t("bankabruf.feldBlz") },
               { key: "benutzer", label: t("bankabruf.feldBenutzer") },
               {
@@ -327,17 +318,16 @@ export function BankzugaengeScreen({
                 align: "right" as const,
                 render: (z: Bankzugang) =>
                   z.profil ? (
-                    <button
-                      className="linkbtn"
+                    <Button variant="link"
                       onClick={() => {
                         setAngesehen(angesehen === z.id ? null : z.id);
                         setTanGespeichert(false);
                       }}
                     >
                       {t("bankabruf.profilTitel")}
-                    </button>
+                    </Button>
                   ) : (
-                    <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                    <span className="hinweis">
                       {t("bankabruf.profilNochKeins")}
                     </span>
                   ),
@@ -390,22 +380,14 @@ export function BankzugaengeScreen({
             <div className="muted">{t("bankzugaenge.keineKonten")}</div>
           ) : (
             <DataTable
+              onRowClick={(z: Kontozuordnung) => setZeilenVon(zeilenVon === z.zahlungskontoId ? null : z.zahlungskontoId)}
+              istAktiv={(z: Kontozuordnung) => z.zahlungskontoId === zeilenVon}
               columns={[
                 {
                   key: "konto",
                   label: t("bankzugaenge.spalteKonto"),
                   render: (z: Kontozuordnung) => {
-                    const name = kontoNamen?.get(z.zahlungskontoId) ?? z.zahlungskontoId;
-                    return (
-                      <Zeilenlink
-                        onKlick={() =>
-                          setZeilenVon(zeilenVon === z.zahlungskontoId ? null : z.zahlungskontoId)
-                        }
-                        titel={t("konten.herkunft.zeigeZeilen", { konto: name })}
-                      >
-                        {name}
-                      </Zeilenlink>
-                    );
+                    return kontoNamen?.get(z.zahlungskontoId) ?? z.zahlungskontoId;
                   },
                 },
                 { key: "schluessel", label: t("bankzugaenge.spalteSchluessel") },
@@ -443,7 +425,7 @@ export function BankzugaengeScreen({
           <DataTable columns={kontenSpalten} rows={pruefung.konten} />
 
           {pruefung.konten.some((k) => k.hinweis) && (
-            <ul className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-3)" }}>
+            <ul className="hinweis" style={{ marginTop: "var(--sp-3)" }}>
               {pruefung.konten.filter((k) => k.hinweis).map((k) => (
                 <li key={k.schluessel}>{k.hinweis}</li>
               ))}
@@ -453,7 +435,7 @@ export function BankzugaengeScreen({
           {pruefung.bankNachrichten.length > 0 && (
             <div style={{ marginTop: "var(--sp-3)" }}>
               <div className="nlbl">{t("bankabruf.bankNachrichten")}</div>
-              <ul className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+              <ul className="hinweis">
                 {pruefung.bankNachrichten.map((n, i) => (
                   <li key={i}>{n}</li>
                 ))}
@@ -462,10 +444,10 @@ export function BankzugaengeScreen({
           )}
 
           <details style={{ marginTop: "var(--sp-3)" }}>
-            <summary className="muted" style={{ fontSize: "var(--fs-xs)", cursor: "pointer" }}>
+            <summary className="hinweis" style={{ cursor: "pointer" }}>
               {t("bankabruf.rueckmeldungen")}
             </summary>
-            <ul className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <ul className="hinweis">
               {pruefung.hinweise.map((h, i) => (
                 <li key={i}>{h}</li>
               ))}
@@ -503,9 +485,9 @@ export function BankzugaengeScreen({
               <Button variant="primary" onClick={() => void pruefen(pin.zugang, pinText)}>
                 {busy ? t("konten.abruf.laeuft") : t("bankzugaenge.pruefen")}
               </Button>
-              <button className="linkbtn" onClick={() => setPin(null)}>
+              <Button variant="link" onClick={() => setPin(null)}>
                 {t("einstellungen.abbrechen")}
-              </button>
+              </Button>
               {fehler && <span className="err">{fehler}</span>}
             </>
           }

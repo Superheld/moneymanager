@@ -82,4 +82,17 @@ describe("SaldoVerlauf", () => {
     const ys = [...d.matchAll(/[ML]\s*[\d.]+[ ,]([\d.]+)/g)].map((m) => Number(m[1]));
     expect(ys.every((y) => y >= 0 && y <= 300)).toBe(true);
   });
+
+  // Depot seit 2026-11-11: ohne die Null reicht die Achse von 10 % unter dem kleinsten bis
+  // 10 % über dem grössten Wert. Die Beschriftung zeigt dann genau diese beiden Enden.
+  it("lässt mit ohneNull die Null weg und rahmt die Werte mit zehn Prozent", async () => {
+    const { container } = rendere(
+      <SaldoVerlaufChart labels={["Jan", "Feb"]} werte={[100000, 200000]} legende="Verlauf" ohneNull />,
+    );
+    await pfad(container);
+    const achse = [...container.querySelectorAll("svg text")].map((t) => t.textContent ?? "");
+    expect(achse).toContain("900,00");
+    expect(achse).toContain("2.200,00");
+    expect(achse).not.toContain("0,00");
+  });
 });

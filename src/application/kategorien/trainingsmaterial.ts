@@ -29,6 +29,10 @@ export interface Lernbeispiel {
   readonly istbuchungId: string;
   readonly merkmale: readonly string[];
   readonly kategorieId: string;
+  /** Buchungsdatum — die Messung teilt danach in Vergangenheit und Zukunft. */
+  readonly datum: string;
+  /** Von Hand gesetzt? Nur daran wird geprüft, wenn es genug davon gibt. */
+  readonly handverlesen: boolean;
 }
 
 /** Warum eine Buchung nicht als Beispiel taugt. */
@@ -236,7 +240,7 @@ export function materialBefund(
     // Verwurf und Vokabular werden über DIESELBE Grundmenge gezählt: die Beispiele.
     // Verlockend wäre, den Verwurf über alle Zeilen laufen zu lassen — auch die noch
     // unkategorisierten, deren Text ja ebenfalls durch die Filter geht. Dann bezögen sich
-    // „5321 Tokens im Vokabular" und „1284 Wörter verworfen" aber auf verschiedene Mengen
+    // „so viele Tokens im Vokabular" und „so viele Wörter verworfen" aber auf verschiedene Mengen
     // und ließen sich nicht mehr gegeneinander lesen. Genau dafür stehen die Zahlen da.
     // Je Zeile EINMAL zählen, auch wenn dasselbe Wort mehrfach im Verwendungszweck
     // steht — sonst zählt eine Zeile als mehrere Belege, und die Deckung des Wortes
@@ -265,7 +269,13 @@ export function materialBefund(
       verteilung.set(s.kategorieId, (verteilung.get(s.kategorieId) ?? 0) + 1);
     }
 
-    beispiele.push({ istbuchungId: s.id, merkmale: befund.merkmale, kategorieId: s.kategorieId });
+    beispiele.push({
+      istbuchungId: s.id,
+      merkmale: befund.merkmale,
+      kategorieId: s.kategorieId,
+      datum: s.datum,
+      handverlesen: s.kategorieHerkunft === "manuell",
+    });
     jeKategorie.set(s.kategorieId, (jeKategorie.get(s.kategorieId) ?? 0) + 1);
     for (const m of befund.merkmale) {
       tokenZaehler.set(m, (tokenZaehler.get(m) ?? 0) + 1);

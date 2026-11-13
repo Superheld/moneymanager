@@ -21,13 +21,13 @@ import { Bereich } from "../bausteine/Bereich";
 import { AbgleichBereich } from "./AbgleichBereich";
 import { BankzugaengeScreen } from "./BankzugaengeScreen";
 import { KontenVerwaltung, type KontoVerbindung } from "./KontenVerwaltung";
+import { fehlerMelden } from "../bausteine/Meldungen";
 
 export function KontenVerwaltungScreen() {
   const { t } = useTranslation();
   const [personen, setPersonen] = useState<Person[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kontostaende, setKontostaende] = useState<readonly Kontostand[]>([]);
-  const [hatGebuchtes, setHatGebuchtes] = useState(false);
   const [verbindungen, setVerbindungen] = useState<Map<string, KontoVerbindung>>(new Map());
 
   // Zusammen laden und zusammen setzen: gestaffelte setState lassen die abgeleiteten
@@ -41,7 +41,6 @@ export function KontenVerwaltungScreen() {
     setPersonen([...daten.personen]);
     setKonten([...daten.konten]);
     setKontostaende(daten.kontostaende);
-    setHatGebuchtes(daten.hatGebuchtes);
     setVerbindungen(
       new Map(
         zuordnungen.map((z) => [
@@ -58,9 +57,9 @@ export function KontenVerwaltungScreen() {
   }
 
   useEffect(() => {
-    laden().catch(() => {
-      /* reiner Browser-Modus ohne SQLite */
-    });
+    // Schlägt das Laden fehl, bleibt die Liste leer — aber mit Meldung: eine stumme leere
+    // Liste sähe aus wie „du hast keine" (siehe `Meldungen`).
+    laden().catch(fehlerMelden);
   }, []);
 
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
@@ -80,7 +79,6 @@ export function KontenVerwaltungScreen() {
               personen={personen}
               personName={personName}
               kontostaende={kontostaende}
-              hatGebuchtes={hatGebuchtes}
               verbindungen={verbindungen}
               onTrennen={async (v) => {
                 // Nur die Zuordnung fällt weg — der Zugang bleibt, er kann weitere

@@ -92,6 +92,7 @@ const ERWARTETE_TABELLEN = [
   "person",
   // v65 — aus dem Inventar wurden Rücklagen: Ziel und Frist optional, freie Rate
   "ruecklage", "ruecklage_ausbuchung",
+  "trainingslauf", // v75 — jedes Training mit Konfiguration, Kennzahlen, Vorhersagen
   // v44 — der Beleg und was wir daraus gemacht haben, getrennt nach Lebenszyklus
   "umsatz_roh", "umsatz_verarbeitung",
   // v47 — die Zuordnung steht jetzt an der Buchung, `vertrag_zuordnung` ist weg
@@ -1314,6 +1315,98 @@ describe("migrate() gegen echtes SQLite", () => {
     db.close();
   });
 
+  /**
+   * **Jede Migration ist atomar — geprüft an JEDER einzelnen.**
+   *
+   * Der Fehler kommt an der spätesten Stelle, die es gibt: beim Versionseintrag, nachdem
+   * alle Statements der Migration gelaufen sind. Danach muss das Schema Zeichen für
+   * Zeichen so dastehen wie vorher. Das ist die Zusage, die vorher jede Migration von
+   * Hand halten musste (einzeln wiederholbar) und die jetzt die Transaktion hält.
+   *
+   * Je Version zwei Läufe: der erste scheitert AN ihr (nichts darf sich ändern), der
+   * zweite lässt sie durch und scheitert an der nächsten — so rückt der Stand genau
+   * eine Version vor, und der Vergleichsstand ist immer der unmittelbar davor.
+   */
+  it("nimmt eine gescheiterte Migration vollständig zurück — jede einzelne", async () => {
+    const db = new SQL.Database();
+    let scheitertBei = 0;
+    const basis = adapter(db);
+    const stoerend: MigrationsDb = {
+      ...basis,
+      async execute(sql: string, werte: unknown[] = []) {
+        if (sql.startsWith("INSERT INTO _migration") && werte[0] === scheitertBei) {
+          throw new Error("Strom weg");
+        }
+        return basis.execute(sql, werte);
+      },
+    };
+    const schema = () =>
+      JSON.stringify(db.exec("SELECT type, name, sql FROM sqlite_master ORDER BY type, name"));
+
+    db.run("CREATE TABLE IF NOT EXISTS _migration (version INTEGER PRIMARY KEY)");
+    let davor = 0;
+    for (const m of MIGRATIONS) {
+      // Zweiter Lauf der vorigen Runde: bis `davor` durch, an `m.version` gescheitert.
+      const vorher = schema();
+      scheitertBei = m.version;
+      await expect(migrate(stoerend), `v${m.version}`).rejects.toThrow("Strom weg");
+      expect(version(db), `Stand nach gescheiterter v${m.version}`).toBe(davor);
+      expect(schema(), `Schema nach gescheiterter v${m.version}`).toBe(vorher);
+
+      // Jetzt darf sie durch — und die Kette hält erst an der nächsten an.
+      const naechste = MIGRATIONS[MIGRATIONS.indexOf(m) + 1]?.version ?? -1;
+      scheitertBei = naechste;
+      if (naechste === -1) await migrate(stoerend);
+      else await expect(migrate(stoerend)).rejects.toThrow("Strom weg");
+      expect(version(db)).toBe(m.version);
+      davor = m.version;
+    }
+
+    expect(tabellen(db)).toEqual(["_migration", ...ERWARTETE_TABELLEN]);
+    db.close();
+  });
+
+  it("nimmt auch die DATEN einer gescheiterten Migration zurück", async () => {
+    const db = new SQL.Database();
+    const basis = adapter(db);
+    await migrate(basis);
+    const letzte = MIGRATIONS[MIGRATIONS.length - 1].version;
+    db.run("INSERT INTO person (id, name) VALUES ('p1', 'Vorher')");
+    // Die letzte Migration noch einmal ansetzen, mit einem Eingriff mittendrin.
+    db.run(`DELETE FROM _migration WHERE version = ${letzte}`);
+    let eingegriffen = false;
+    const stoerend: MigrationsDb = {
+      ...basis,
+      async execute(sql: string, werte: unknown[] = []) {
+        if (sql.startsWith("INSERT INTO _migration")) {
+          db.run("UPDATE person SET name = 'Halb' WHERE id = 'p1'");
+          eingegriffen = true;
+          throw new Error("Strom weg");
+        }
+        return basis.execute(sql, werte);
+      },
+    };
+
+    await expect(migrate(stoerend)).rejects.toThrow("zurückgenommen");
+
+    expect(eingegriffen).toBe(true);
+    expect(db.exec("SELECT name FROM person WHERE id = 'p1'")[0].values[0][0]).toBe("Vorher");
+    expect(version(db)).toBe(letzte - 1);
+    db.close();
+  });
+
+  // Beide wirken innerhalb einer Transaktion nicht: `VACUUM` scheitert, `PRAGMA
+  // foreign_keys` wird still übergangen — eine Migration, die sich darauf verlässt,
+  // täte etwas anderes, als dasteht.
+  it("enthält kein Statement, das in einer Transaktion nicht wirkt", () => {
+    const verboten = MIGRATIONS.flatMap((m) =>
+      m.sql
+        .filter((stmt) => /^\s*(--[^\n]*\n\s*)*(VACUUM|PRAGMA\s+foreign_keys|BEGIN|COMMIT|ROLLBACK)\b/i.test(stmt))
+        .map((stmt) => `v${m.version}: ${stmt.trim().slice(0, 60)}`),
+    );
+    expect(verboten).toEqual([]);
+  });
+
   it("läuft ein zweites Mal folgenlos durch", async () => {
     const db = new SQL.Database();
     await migrate(adapter(db));
@@ -1326,8 +1419,9 @@ describe("migrate() gegen echtes SQLite", () => {
    * Der Fall, für den früher eine Scheintransaktion hier stand: v11 fügt ZWEI Spalten
    * hinzu. Bricht es nach der ersten ab, steht die Version nicht — und der nächste Start
    * lief in „duplicate column name" und ließ die App dauerhaft nicht mehr hochkommen.
-   * Eine echte Transaktion ist über tauri-plugin-sql nicht zu haben (Pool, siehe db.ts),
-   * also muss das Wiederholen selbst folgenlos sein.
+   * Seit 2026-11-10 läuft jede Migration in einer echten Transaktion (siehe db.ts) und
+   * dieser Zustand entsteht nicht mehr neu; das Wiederholen bleibt trotzdem folgenlos,
+   * für Bestände, die unter dem alten Ablauf stehengeblieben sind.
    */
   /**
    * v18 nimmt weg statt hinzuzufügen — dieselbe Wiederholbarkeit muss auch dann halten.

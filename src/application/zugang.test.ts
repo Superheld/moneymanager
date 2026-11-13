@@ -22,6 +22,7 @@ function fakePort(überschreiben: Partial<ZugangPort> = {}) {
       return true;
     },
     codeZeigen: async () => "ABCD-EFGH",
+    schluesselWechseln: async () => null,
     sperren: async () => {},
     ...überschreiben,
   };

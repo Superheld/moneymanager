@@ -11,5 +11,4 @@ export { Pill } from "./Pill";
 export { CoverageTrack } from "./CoverageTrack";
 export { DataTable } from "./DataTable";
 export { Button } from "./Button";
-export { FormField, Input } from "./FormField";
-export { Dialog } from "./Dialog";
+export { FormField } from "./FormField";

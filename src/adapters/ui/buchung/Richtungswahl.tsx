@@ -4,8 +4,10 @@
 // hier die Zerlegung eines vorzeichenbehafteten Betrags in seine zwei Hälften und das
 // Bedienteil, das die zweite zeigt — was zusammen gedacht werden muss, soll auch
 // zusammen liegen. Die Begründung, warum es überhaupt zwei Hälften sind, steht in der
-// Wurzel-`CLAUDE.md` unter „Das Vorzeichen ist die Richtung".
+// `src/core/buchung/CLAUDE.md` unter „Das Vorzeichen ist die Richtung".
 
+import { Radio } from "@base-ui/react/radio";
+import { RadioGroup } from "@base-ui/react/radio-group";
 import { useTranslation } from "react-i18next";
 import type { Geld } from "../bausteine/einstellungenKontext";
 
@@ -90,18 +92,31 @@ export function Richtungswahl({
     { r: "zu", zeichen: "+", textKey: "konten.buchung.richtungZu", farbe: "var(--ok-deep)" },
   ];
   return (
-    <div role="radiogroup" aria-label={t("konten.buchung.richtung")} style={{ display: "flex", gap: 6 }}>
+    <RadioGroup
+      value={wert}
+      onValueChange={(v) => aufAenderung(v as Richtung)}
+      disabled={deaktiviert}
+      aria-label={t("konten.buchung.richtung")}
+      style={{ display: "flex", gap: 6 }}
+    >
       {moeglichkeiten.map((m) => {
         const aktiv = m.r === wert;
         return (
-          <button
+          // Base UI `Radio` statt eines Knopfs mit `role="radio"`: erst damit wechseln die
+          // Pfeiltasten die Richtung, wie es oben versprochen ist — der Eigenbau hatte nur
+          // die Rolle, nicht die Tasten. Kein `Option` aus `Optionsgruppe`: hier ist die
+          // ganze Fläche das Feld, ohne Punkt daneben.
+          <Radio.Root
             key={m.r}
-            type="button"
-            role="radio"
-            aria-checked={aktiv}
+            value={m.r}
             aria-label={t(m.textKey)}
-            disabled={deaktiviert}
-            onClick={() => aufAenderung(m.r)}
+            // Base UI meldet nur einen WECHSEL. Ein Klick auf die Richtung, die schon gilt,
+            // ist hier aber eine Aussage: „das habe ich so entschieden" — danach darf ein
+            // Kategoriewechsel sie nicht mehr umstellen (`buchungDialog.test.tsx`). Der
+            // Eigenbau meldete jeden Klick; dieser eine Fall wird deshalb selbst gemeldet.
+            onClick={() => {
+              if (aktiv && !deaktiviert) aufAenderung(m.r);
+            }}
             className="field"
             style={{
               flex: 1,
@@ -122,10 +137,10 @@ export function Richtungswahl({
           >
             <span aria-hidden="true" style={{ fontWeight: "var(--fw-black)" }}>{m.zeichen}</span>
             {t(m.textKey)}
-          </button>
+          </Radio.Root>
         );
       })}
-    </div>
+    </RadioGroup>
   );
 }
 

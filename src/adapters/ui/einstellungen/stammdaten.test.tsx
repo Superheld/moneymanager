@@ -15,7 +15,7 @@ const halter = vi.hoisted(() => {
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 import i18n from "../../../i18n/i18n";
-import { frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { auswahlWaehlen, frischeDb, pluginApi, registerWaehlen, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { EinstellungenScreen } from "./EinstellungenScreen";
 import { KontenVerwaltungScreen } from "../konten/KontenVerwaltungScreen";
 import { KontenScreen } from "../konten/KontenScreen";
@@ -65,7 +65,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
     // Ein Register nach dem anderen: es ist immer genau eines offen, und das ist der
     // Punkt der Umstellung — vorher standen alle Listen untereinander. Die Konten sind
     // seit 2026-08-18 gar nicht mehr hier, sondern haben einen eigenen Punkt.
-    await registerWaehlen(nutzer, /^Personen$/);
+    await registerWaehlen(nutzer, /^Personalisierung$/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Bruce/));
 
     await registerWaehlen(nutzer, /^Kategorien$/);
@@ -277,7 +277,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
   it("legt eine Person über das Formular an", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await registerWaehlen(nutzer, /^Personen$/);
+    await registerWaehlen(nutzer, /^Personalisierung$/);
 
     await klicke(nutzer, /person|hinzufügen|anlegen|neu/i);
     const felder = screen.queryAllByRole("textbox");
@@ -294,7 +294,7 @@ describe("EinstellungenScreen — Stammdaten", () => {
   it("bietet die Sprach-/Regionsumschaltung an", async () => {
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await registerWaehlen(nutzer, /Sprache & Währung/);
+    await registerWaehlen(nutzer, /^Personalisierung$/);
     // Die Region steuert Sprache UND Währung (ADR-0004) — die Auswahl muss existieren.
     const auswahl = screen.queryAllByRole("combobox");
     expect(auswahl.length).toBeGreaterThanOrEqual(0);
@@ -372,5 +372,44 @@ describe("KontenScreen — Auszug und Dialoge", () => {
     rendere(<KontenScreen onNavigate={() => {}} />);
     await waitFor(() => expect(document.body.textContent).toMatch(/Bargeld/));
     expect(document.body.textContent).toMatch(/50,00/);
+  });
+});
+
+describe("Konto bearbeiten — Felder bis in die Datenbank", () => {
+  it("übernimmt Klasse und Inhaber aus dem Dialog", async () => {
+    const nutzer = userEvent.setup();
+    await sqlitePersonRepository.speichern({ id: "p1", name: "Alma" });
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Kesselmann Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Kesselmann Giro/));
+    await nutzer.click(await screen.findByLabelText(i18n.t("einstellungen.bearbeiten")));
+
+    await auswahlWaehlen(nutzer, i18n.t("einstellungen.konto.feldKlasse"), i18n.t("einstellungen.konto.klasse.ruecklage"));
+    await nutzer.click(await screen.findByRole("checkbox", { name: "Alma" }));
+    await nutzer.click(screen.getByRole("button", { name: i18n.t("einstellungen.speichern") }));
+
+    await waitFor(async () => {
+      const [k] = await sqliteZahlungskontoRepository.alle();
+      expect(k.klasse).toBe("ruecklage");
+      expect(k.inhaberIds).toEqual(["p1"]);
+    });
+  });
+
+  it("zeigt die Ablehnung im Dialog, wenn der Name fehlt", async () => {
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k1", bezeichnung: "Vibora Kasse", typ: "Bargeld", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    rendere(<KontenVerwaltungScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch(/Vibora Kasse/));
+    await nutzer.click(await screen.findByLabelText(i18n.t("einstellungen.bearbeiten")));
+    const name = await screen.findByDisplayValue("Vibora Kasse");
+    await nutzer.clear(name);
+    await nutzer.click(screen.getByRole("button", { name: i18n.t("einstellungen.speichern") }));
+    await waitFor(() => expect(document.querySelector(".err")?.textContent).toBeTruthy());
+    expect((await sqliteZahlungskontoRepository.alle())[0].bezeichnung).toBe("Vibora Kasse");
   });
 });

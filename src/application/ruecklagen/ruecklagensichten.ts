@@ -9,6 +9,7 @@
 import {
   mindestRuecklage,
   monatsRuecklageGesamt,
+  ruecklagenKonten,
   realerKontostand,
   ruecklagenDeckung,
   ruecklagenfluss,
@@ -29,8 +30,13 @@ import type {
   ZahlungsregelRepository,
 } from "../ports";
 import { spurenAus } from "../buchung/zahlungsspuren";
+import { budgetAnspruecheLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
 
-export interface RuecklagenDeps {
+/**
+ * Die Budget-Seite gehört dazu, weil ein aufbauendes Budget auf demselben Konto denselben
+ * Euro beanspruchen kann. Ohne sie verteilte die Deckung Geld, das schon dem Budget gehört.
+ */
+export interface RuecklagenDeps extends BudgetanspruchDeps {
   readonly ruecklagenRepo: RuecklagenRepository;
   readonly ledger: LedgerPort;
   readonly kontoRepo: ZahlungskontoRepository;
@@ -67,8 +73,15 @@ export interface Ruecklagensicht {
   readonly proMonat: Cent;
   /** Summe der Ziele — freie Rücklagen zählen nicht mit, sie haben keins. */
   readonly zielwert: Cent;
-  /** Faustformel: drei Monats-Vertragseinnahmen. Reine Information. */
+  /** Faustformel: drei Monats-Vertragseinnahmen. Ein Massstab, keine Regel. */
   readonly mindest: Cent;
+  /**
+   * Was auf den Rücklagenkonten heute liegt (`ruecklagenKonten`: Klasse Rücklage oder
+   * einer Rücklage zugeordnet) — die Zahl, die der Tacho gegen `mindest` stellt. Der
+   * KONTOSTAND, nicht die Deckung: die Faustformel fragt nach dem Notgroschen insgesamt,
+   * nicht danach, was davon schon einzelnen Zwecken oder Budgets gehört.
+   */
+  readonly ruecklagenStand: Cent;
   /** Die monatlichen Vertragseinnahmen, aus denen `mindest` folgt. */
   readonly vertragseinnahmen: Cent;
   /** Was bisher ausgebucht wurde, jüngste zuerst. */
@@ -94,7 +107,7 @@ function vertragseinnahmenProMonat(
     if (!r.vertragId) continue;
     // Nur Erträge. Der Charakter entscheidet und nicht das Vorzeichen des Betrags: eine
     // Zahlungsregel ist eine PLANGRÖSSE, und dort trägt die Einordnung die Richtung
-    // (siehe „Für eine PLANGRÖSSE bleibt die Ableitung" in der CLAUDE.md).
+    // (siehe „Für eine PLANGRÖSSE bleibt die Ableitung" in `src/core/buchung/CLAUDE.md`).
     if (r.charakter !== "Ertrag") continue;
     const monate = RHYTHMUS_IN_MONATEN[r.rhythmus] ?? 1;
     summe += Math.abs(r.betrag) / monate;
@@ -128,7 +141,7 @@ export async function ruecklagenLaden(
   deps: RuecklagenDeps,
   heute: string,
 ): Promise<Ruecklagensicht> {
-  const [ruecklagen, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze] =
+  const [ruecklagen, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget] =
     await Promise.all([
       deps.ruecklagenRepo.alle(),
       deps.ledger.alle(),
@@ -137,6 +150,7 @@ export async function ruecklagenLaden(
       deps.vertragRepo.alle(),
       deps.ruecklagenRepo.ausbuchungen(),
       deps.umsatzRepo.alle(),
+      budgetAnspruecheLaden(deps, heute),
     ]);
   const kontostaende = new Map(konten.map((k) => [k.id, realerKontostand(k, buchungen)]));
   // Nur laufende Verträge: ein gekündigter zahlt nicht mehr ein, und eine Mindestrücklage
@@ -150,10 +164,11 @@ export async function ruecklagenLaden(
     ruecklagen,
     konten,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
-    deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende),
+    deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.ansprueche),
     proMonat: monatsRuecklageGesamt(ruecklagen),
     zielwert: zielwertGesamt(ruecklagen),
     mindest: mindestRuecklage(einnahmen),
+    ruecklagenStand: [...ruecklagenKonten(konten, ruecklagen)].reduce((s, id) => s + (kontostaende.get(id) ?? 0), 0),
     vertragseinnahmen: einnahmen,
     ausbuchungen: [...ausbuchungen].sort((a, b) => b.datum.localeCompare(a.datum)),
     // Das Ist über den LAUFENDEN Monat, weil Bedarf und Plan Monatsgrössen sind. Ein

@@ -47,11 +47,12 @@ import {
   type Waehrung,
   type Zahlungskonto,
 } from "../../../application";
-import { FormField, Pill } from "../bausteine";
+import { FormField, Pill, Button } from "../bausteine";
 import { IconButton } from "../bausteine/IconButton";
 import { Auswahl } from "../bausteine/Auswahl";
 import { Datumsfeld } from "../bausteine/Datumsfeld";
 import { useGeld } from "../bausteine/einstellungenKontext";
+import { Kaestchen } from "../bausteine/Kaestchen";
 
 /** Wie viele Treffer die Vorschau einzeln auflistet — der Rest wird gezaehlt. */
 const VORSCHAU_ZEILEN = 8;
@@ -252,7 +253,7 @@ export function ErkennungsBereich({
 
   return (
     <>
-      <p className="muted" style={{ fontSize: "var(--fs-small)", margin: "0 0 var(--sp-3)", maxWidth: 640 }}>
+      <p className="muted" style={{ fontSize: "var(--fs-sm)", margin: "0 0 var(--sp-3)", maxWidth: 640 }}>
         {t("vertraege.regel.hinweis")}
       </p>
 
@@ -262,7 +263,7 @@ export function ErkennungsBereich({
       <FormField label={t("vertraege.regel.merkmale")} hint={t("vertraege.regel.merkmaleHinweis")}>
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {f.merkmale.length === 0 && (
-            <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+            <div className="hinweis">
               {t("vertraege.regel.ohneMerkmale")}
             </div>
           )}
@@ -279,18 +280,14 @@ export function ErkennungsBereich({
                     ein Pflichtmerkmal verengt die Regel, ein offenes erweitert sie. Wer
                     die Liste ueberfliegt, soll das an der linken Kante sehen und nicht
                     erst am Ende der Zeile. */}
-                <label
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4, flex: "0 0 auto", fontSize: "var(--fs-xs)" }}
+                <Kaestchen
+                  an={!!m.pflicht}
+                  aufAendern={(an) => merkmalSetzen(i, { pflicht: an })}
                   title={t("vertraege.regel.pflichtHinweis")}
+                  style={{ gap: 4, flex: "0 0 auto", fontSize: "var(--fs-xs)" }}
                 >
-                  <input
-                    type="checkbox"
-                    aria-label={t("vertraege.regel.pflicht")}
-                    checked={!!m.pflicht}
-                    onChange={(e) => merkmalSetzen(i, { pflicht: e.target.checked })}
-                  />
                   <span className="muted">{t("vertraege.regel.pflicht")}</span>
-                </label>
+                </Kaestchen>
                 <Auswahl
                   ariaLabel={t("vertraege.regel.merkmalArt")}
                   wert={m.art}
@@ -300,7 +297,7 @@ export function ErkennungsBereich({
                 <input
                   className="field"
                   aria-label={t("vertraege.regel.merkmalMuster")}
-                  style={{ flex: "1 1 180px", minWidth: 0, fontFamily: "var(--font-mono, monospace)", fontSize: 13 }}
+                  style={{ flex: "1 1 180px", minWidth: 0, fontFamily: "var(--font-mono)", fontSize: "var(--fs-tabelle)" }}
                   value={m.muster}
                   placeholder={t("vertraege.regel.musterPlatzhalter")}
                   onChange={(e) => merkmalSetzen(i, { muster: e.target.value })}
@@ -339,21 +336,19 @@ export function ErkennungsBereich({
             );
           })}
           <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", marginTop: 2 }}>
-            <button
-              className="linkbtn"
+            <Button variant="link"
               style={{ padding: 0 }}
               onClick={() => setze("merkmale", [...f.merkmale, { art: "empfaenger", muster: "" }])}
             >
               {t("vertraege.regel.merkmalHinzufuegen")}
-            </button>
+            </Button>
             {nameFehlt && (
-              <button
-                className="linkbtn"
+              <Button variant="link"
                 style={{ padding: 0 }}
                 onClick={() => setze("merkmale", [...f.merkmale, { art: "empfaenger", muster: nameMuster }])}
               >
                 {t("vertraege.regel.nameHinzufuegen", { name: nameMuster })}
-              </button>
+              </Button>
             )}
           </div>
 
@@ -362,16 +357,16 @@ export function ErkennungsBereich({
               daneben, weil sie eine Zutat zu ihr ist und kein zweiter Weg. */}
           {vorschlag && (
             <div style={{ marginTop: "var(--sp-3)", borderTop: "1px solid var(--line-soft)", paddingTop: "var(--sp-2)" }}>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 6 }}>
+              <div className="hinweis" style={{ marginBottom: 6 }}>
                 {t("vertraege.regel.vorschlaege", { n: vorschlag.belege })}
               </div>
               {vorschlag.belege === 0 && (
-                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <div className="hinweis">
                   {t("vertraege.regel.vorschlaegeOhneBelege")}
                 </div>
               )}
               {vorschlag.belege > 0 && offeneVorschlaege.length === 0 && (
-                <div className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+                <div className="hinweis">
                   {t("vertraege.regel.vorschlaegeAlleDrin")}
                 </div>
               )}
@@ -379,10 +374,10 @@ export function ErkennungsBereich({
                 {offeneVorschlaege.map((k) => (
                   <div key={`${k.merkmal.art} ${k.merkmal.muster}`}
                        style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
-                    <span className="muted" style={{ fontSize: "var(--fs-xs)", flex: "0 0 auto" }}>
+                    <span className="hinweis" style={{ flex: "0 0 auto" }}>
                       {t(`vertraege.regel.art.${k.merkmal.art}`)}
                     </span>
-                    <code style={{ fontSize: 13, flex: "1 1 160px", minWidth: 0, overflowWrap: "anywhere" }}>
+                    <code style={{ fontSize: "var(--fs-tabelle)", flex: "1 1 160px", minWidth: 0, overflowWrap: "anywhere" }}>
                       {k.merkmal.muster}
                     </code>
                     {/* Drei Zahlen und keine Punktzahl: was sie gegeneinander wiegen,
@@ -395,18 +390,17 @@ export function ErkennungsBereich({
                         sonst: k.unbeschriftet,
                       })}
                     </Pill>
-                    <button
-                      className="linkbtn"
+                    <Button variant="link"
                       style={{ padding: 0, flex: "0 0 auto" }}
                       onClick={() => setze("merkmale", [...f.merkmale, { art: k.merkmal.art, muster: k.merkmal.muster }])}
                     >
                       {t("vertraege.regel.vorschlagUebernehmen")}
-                    </button>
+                    </Button>
                   </div>
                 ))}
               </div>
               {zurueckgehalten > 0 && (
-                <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+                <div className="hinweis" style={{ marginTop: 4 }}>
                   {t("vertraege.regel.vorschlaegeZurueckgehalten", { n: zurueckgehalten })}
                 </div>
               )}
@@ -457,7 +451,7 @@ export function ErkennungsBereich({
         <FormField label={t("vertraege.regel.fenster")} hint={t("vertraege.regel.fensterHinweis")}>
           <div style={{ display: "flex", gap: "var(--sp-3)", flexWrap: "wrap", alignItems: "flex-end" }}>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("vertraege.regel.fensterMonat")}</span>
+              <span className="hinweis">{t("vertraege.regel.fensterMonat")}</span>
               <input className="field" inputMode="numeric" style={{ width: 64 }}
                 aria-label={t("vertraege.regel.fensterMonatVon")} placeholder="1"
                 value={f.monatVonText} onChange={(e) => setze("monatVonText", e.target.value)} />
@@ -467,7 +461,7 @@ export function ErkennungsBereich({
                 value={f.monatBisText} onChange={(e) => setze("monatBisText", e.target.value)} />
             </div>
             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-              <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>{t("vertraege.regel.fensterTag")}</span>
+              <span className="hinweis">{t("vertraege.regel.fensterTag")}</span>
               <input className="field" inputMode="numeric" style={{ width: 64 }}
                 aria-label={t("vertraege.regel.fensterTagVon")} placeholder="1"
                 value={f.tagVonText} onChange={(e) => setze("tagVonText", e.target.value)} />
@@ -486,8 +480,7 @@ export function ErkennungsBereich({
           Schwankende nicht. Der Knopf erscheint nur, wenn die Stufe wirklich etwas
           wegnimmt. */}
       {probe.spanne && (
-        <button
-          className="linkbtn"
+        <Button variant="link"
           style={{ marginTop: "var(--sp-2)" }}
           onClick={() => {
             aufAenderung({
@@ -501,22 +494,22 @@ export function ErkennungsBereich({
             von: geld.formatMitSymbol(probe.spanne.von),
             bis: geld.formatMitSymbol(probe.spanne.bis),
           })}
-        </button>
+        </Button>
       )}
 
       {/* Vorschau — der Grund, warum diese Maske ueberhaupt bedienbar ist. */}
-      <div style={{ marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}>
+      <div className="abschnitt">
         <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap", marginBottom: 8 }}>
           <Pill variant={treffer.length > 0 ? "ok" : "warn"}>
             {t("vertraege.regel.treffer", { count: treffer.length })}
           </Pill>
-          <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+          <span className="hinweis">
             {t("vertraege.regel.trefferHinweis")}
           </span>
         </div>
 
         {engstelle && (
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginBottom: 8 }}>
+          <div className="hinweis" style={{ marginBottom: 8 }}>
             {t(`vertraege.regel.engstelle.${engstelle.schluessel}`, {
               weg: engstelle.vorher - engstelle.nachher,
               uebrig: engstelle.nachher,
@@ -531,7 +524,7 @@ export function ErkennungsBereich({
             steht klein unter dem Empfaenger statt in einer eigenen Spalte: er ist lang,
             und eine Spalte davon waere entweder abgeschnitten oder die ganze Zeile. */}
         {treffer.slice(0, VORSCHAU_ZEILEN).map((s) => (
-          <div key={s.id} style={{ display: "flex", gap: "var(--sp-3)", padding: "4px 0", alignItems: "baseline", fontSize: 13, borderBottom: "1px solid var(--line-soft)" }}>
+          <div key={s.id} style={{ display: "flex", gap: "var(--sp-3)", padding: "4px 0", alignItems: "baseline", fontSize: "var(--fs-tabelle)", borderBottom: "1px solid var(--line-soft)" }}>
             <span style={{ flex: "0 0 92px", color: "var(--ink-3)" }}>{s.datum}</span>
             <span style={{ flex: 1, minWidth: 0 }}>
               <span style={{ display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -551,7 +544,7 @@ export function ErkennungsBereich({
           </div>
         ))}
         {treffer.length > VORSCHAU_ZEILEN && (
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+          <div className="hinweis" style={{ marginTop: 6 }}>
             {t("vertraege.regel.weitere", { count: treffer.length - VORSCHAU_ZEILEN })}
           </div>
         )}

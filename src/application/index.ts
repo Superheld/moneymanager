@@ -117,9 +117,12 @@ export {
 // ---------------------------------------------------------------------------
 export {
   budgetuebersichtLaden,
+  nachArtGetrennt,
+  type Budgetgruppen,
+  type GruppierterStand,
   budgetstaende,
-  budgetPostenZu,
-  budgetPostenImMonat,
+  budgetzeilenZu,
+  budgetzeilenImMonat,
   budgetVerlauf,
   vertragsBuchungenLaden,
   type Budgetstand,
@@ -232,11 +235,12 @@ export {
   analyseGruppen,
   analyseBuchungen,
   type Analysebasis,
-  type Analysezeile,
   type AnalyseDeps,
   type Zeitraum,
   analyseBefunde,
   analyseAusblick,
+  analyseKategorienreihen,
+  type Kategorienreihen,
   type Befunde,
   type Verlaufspunkt,
 } from "./analysesichten";
@@ -296,6 +300,9 @@ export type {
 } from "./fints/abrufPort";
 export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
 export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
+export type { Abrufstand, Zugangsstand } from "./fints/abrufstand";
+export type { Belegungssicht } from "./konten/kontobelegung";
+export type { Anspruch, Anspruchsart, Belegungsposten, Kontobelegung } from "../core";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
 // Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen
 // Vorfall überhaupt darf, sind Entscheidungen mit genau einer richtigen Antwort.
@@ -358,10 +365,17 @@ export {
 } from "./uebersicht";
 export {
   aktualisierungEinspielen,
+  aktualisierungJetztPruefen,
   aktualisierungPruefen,
   pruefungErlaubt,
   pruefungSchalten,
   SCHLUESSEL_AKTUALISIERUNG,
   type Aktualisierung,
   type AktualisierungPort,
+  type Pruefergebnis,
 } from "./aktualisierung";
+export {
+  buchungsname,
+  type Buchungszeile,
+  type Zeilenkontext,
+} from "./buchung/buchungszeile";

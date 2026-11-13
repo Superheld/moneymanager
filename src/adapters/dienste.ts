@@ -21,6 +21,7 @@ import {
   type Budgetuebersicht,
 } from "../application/budgets/budgetsichten";
 import { uebersichtLaden, type Uebersichtsdaten } from "../application/uebersicht";
+import { appBootstrap } from "../application/bootstrap";
 import {
   budgetAnlegen as budgetAnlegenUseCase,
   budgetBetragLoeschen as budgetBetragLoeschenUseCase,
@@ -36,11 +37,13 @@ import { fintsAbruf } from "./fints";
 import { hanseaticAbruf } from "./hanseatic";
 import { konfigurationLaden, grundausstattungHerstellen, herkunftSchalten, merkmalsansicht, type Merkmalsansicht, wirkungMessen, wortAusschliessen, wortZulassen } from "../application/kategorien/merkmalskonfiguration";
 import { trainingsmaterial, type Materialbefund } from "../application/kategorien/trainingsmaterial";
-import { klassifikatorTrainieren, modellzustand, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
+import { klassifikatorTrainieren, modellzustand, trainingslaeufe, type Modellzustand } from "../application/kategorien/klassifikatorTraining";
+import { sqliteTrainingslaufRepository } from "./persistence/sqliteTrainingslaufRepository";
 import { abgleichVorschau, planAnwenden, type Abgleichsplan } from "../application/kategorien/kategorieAbgleich";
 import type { Merkmalskonfiguration, Merkmalsherkunft } from "../core";
 import { zuordnungenAbgleichen } from "../application/vertraege/vertragszuordnung";
 import { zahlungsspuren } from "../application/buchung/zahlungsspuren";
+import { umbuchungenErkennen } from "../application/buchung/umbuchungenErkennen";
 import { kategorisierungsquellen } from "../application/kategorien/kategorisierungsquellen";
 import { umsaetzeVerbuchen } from "../application/import";
 import type { Kategorie } from "../core";
@@ -64,12 +67,14 @@ import { sqliteMerkmalskonfigurationRepository } from "./persistence/sqliteMerkm
 import { einstellungenLaden, regionWaehlen, type Haushaltseinstellungen } from "../application/einstellungen";
 import {
   aktualisierungEinspielen,
+  aktualisierungJetztPruefen,
   aktualisierungPruefen,
   betaErlaubt,
   betaSchalten,
   pruefungErlaubt,
   pruefungSchalten,
   type Aktualisierung,
+  type Pruefergebnis,
 } from "../application/aktualisierung";
 import { tauriAktualisierung } from "./aktualisierung";
 import {
@@ -88,6 +93,7 @@ import {
 import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
+import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
@@ -175,6 +181,7 @@ import { sqliteKontoentfernen } from "./persistence/sqliteKontoentfernen";
 import { standardkategorienAnlegen as standardkategorienUseCase } from "../application/kategorien/standardkategorien";
 import type { Abrufadapter, Bankzugang, Zugangsart } from "../application/fints/abrufPort";
 import type { Kontozuordnung } from "../application/fints/bankzugangPort";
+import { abrufstandLaden, type Abrufstand } from "../application/fints/abrufstand";
 import {
   sqliteBankzugangRepository,
   sqliteKontozuordnungRepository,
@@ -212,9 +219,8 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
       regelRepo: sqliteZahlungsregelRepository,
       umsatzRepo: sqliteUmsatzRepository,
       kontoRepo: sqliteZahlungskontoRepository,
-      // Was die Bank schon kennt, ist vom Stand faktisch weg — die Vorschau beginnt
-      // sonst mit Geld, über das niemand mehr verfügt.
-      vormerkungRepo: sqliteVormerkungRepository,
+      ruecklagenRepo: sqliteRuecklagenRepository,
+      vertragRepo: sqliteVertragRepository,
     },
     heute,
   );
@@ -228,6 +234,7 @@ export function budgetbereich(heute: string): Promise<Budgetbereich> {
       kontoRepo: sqliteZahlungskontoRepository,
       umsatzRepo: sqliteUmsatzRepository,
       einstellungenRepo: sqliteEinstellungenRepository,
+      vertragRepo: sqliteVertragRepository,
     },
     heute,
   );
@@ -332,6 +339,11 @@ export function aktualisierungSuchen(): Promise<Aktualisierung | null> {
   return aktualisierungPruefen(tauriAktualisierung, sqliteEinstellungenRepository);
 }
 
+/** Prüft auf Knopfdruck — auch wenn die Prüfung beim Start abgeschaltet ist. */
+export function aktualisierungJetztSuchen(): Promise<Pruefergebnis> {
+  return aktualisierungJetztPruefen(tauriAktualisierung, sqliteEinstellungenRepository);
+}
+
 /** Spielt die bereitliegende Fassung ein und startet neu. Kehrt im Erfolgsfall nie zurück. */
 export function aktualisierungInstallieren(): Promise<void> {
   return aktualisierungEinspielen(tauriAktualisierung);
@@ -403,6 +415,15 @@ export function bankzugangSpeichern(zugang: Bankzugang): Promise<void> {
 
 export function bankzugangLoeschen(id: string): Promise<void> {
   return sqliteBankzugangRepository.loeschen(id);
+}
+
+/** Wie frisch der letzte Abruf je Zugang ist — für den Hinweis in der Übersicht. */
+export function abrufstand(heute: string): Promise<Abrufstand> {
+  return abrufstandLaden(heute, {
+    zugangRepo: sqliteBankzugangRepository,
+    zuordnungRepo: sqliteKontozuordnungRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+  });
 }
 
 export function kontozuordnungen(): Promise<Kontozuordnung[]> {
@@ -487,6 +508,7 @@ export function depots(): Promise<Depotdaten> {
 // --- Rücklagen -------------------------------------------------------------
 
 const RUECKLAGEN_DEPS = {
+  ...BUDGET_DEPS,
   ruecklagenRepo: sqliteRuecklagenRepository,
   ledger: sqliteLedgerRepository,
   kontoRepo: sqliteZahlungskontoRepository,
@@ -497,6 +519,11 @@ const RUECKLAGEN_DEPS = {
 
 export function ruecklagen(heute: string): Promise<Ruecklagensicht> {
   return ruecklagenLaden(RUECKLAGEN_DEPS, heute);
+}
+
+/** Wem das Geld auf jedem Konto gehört — Rücklagen und aufbauende Budgets, anteilig gedeckt. */
+export function kontobelegung(heute: string): Promise<Belegungssicht> {
+  return kontobelegungLaden(RUECKLAGEN_DEPS, heute);
 }
 
 export function ruecklageAnlegen(eingabe: RuecklagenEingabe) {
@@ -692,15 +719,33 @@ export function importLaeufe() {
   return sqliteImportLaufRepository.alle();
 }
 
-/** Offene Umsätze ins Ledger buchen und die frischen Zahlungen ihren Verträgen zuordnen. */
-export async function umsaetzeBuchen(umsaetze: readonly Umsatz[]) {
+/**
+ * Offene Umsätze ins Ledger buchen, Umbuchungen verbinden und die frischen Zahlungen
+ * ihren Verträgen zuordnen.
+ *
+ * `umbuchungenErkennen: false` für den Dialog einer einzelnen Zeile: dort entscheidet
+ * gerade jemand selbst über das Gegenbein, und die Automatik käme ihm zuvor — sein
+ * Paaren scheiterte danach mit „schon gepaart".
+ */
+export async function umsaetzeBuchen(
+  umsaetze: readonly Umsatz[],
+  optionen: { readonly umbuchungenErkennen?: boolean } = {},
+) {
   const ergebnis = await umsaetzeVerbuchen(umsaetze, {
     ledgerRepo: sqliteLedgerRepository,
     umsatzRepo: sqliteUmsatzRepository,
     id: () => crypto.randomUUID(),
   });
   // Bewusst HIER und nicht in `umsaetzeVerbuchen`: der Use-Case schreibt Fakten ins
-  // Ledger, die Zuordnung ist eine Interpretation darüber.
+  // Ledger, die Zuordnung ist eine Interpretation darüber. Die Umbuchungen zuerst, damit
+  // der Abgleich einen Umbuchungsvertrag an der fertigen Umschichtung erkennt.
+  if (optionen.umbuchungenErkennen !== false) {
+    await umbuchungenErkennen({ umsatzIds: umsaetze.map((u) => u.id) }, {
+      ledgerRepo: sqliteLedgerRepository,
+      umsatzRepo: sqliteUmsatzRepository,
+      kontoRepo: sqliteZahlungskontoRepository,
+    });
+  }
   await zuordnungenAbgleichen(vertragsAbgleichDeps);
   return ergebnis;
 }
@@ -805,9 +850,16 @@ export function modellStand(konfiguration: Merkmalskonfiguration): Promise<Model
 export function modellTrainieren(konfiguration: Merkmalskonfiguration) {
   return klassifikatorTrainieren({
     ...MODELL_DEPS,
+    laufRepo: sqliteTrainingslaufRepository,
+    neueId: () => crypto.randomUUID(),
     konfiguration,
     jetzt: () => new Date().toISOString(),
   });
+}
+
+/** Die aufgezeichneten Trainingsläufe, neuester zuerst. */
+export function laufhistorie() {
+  return trainingslaeufe({ laufRepo: sqliteTrainingslaufRepository });
 }
 
 export function merkmalswirkung(konfiguration: Merkmalskonfiguration) {
@@ -844,7 +896,7 @@ export function kategorieAbgleichAnwenden(plan: Abgleichsplan) {
 
 /** Was das Modell an EINER Buchung sieht — die Antwort auf „warum diese Kategorie?". */
 export function merkmaleZuBuchung(
-  quelle: { gegenpartei: string; verwendungszweck: string },
+  quelle: { gegenpartei: string; verwendungszweck: string; betrag?: number; kategorieId?: string },
 ): Promise<Merkmalsansicht> {
   return merkmalsansicht(
     {
@@ -879,8 +931,6 @@ export function konten(): Promise<Kontensicht> {
     // Damit eine Vertragszahlung im Auszug als solche zu erkennen ist.
     zuordnungRepo: sqliteVertragszuordnungRepository,
     vertragRepo: sqliteVertragRepository,
-    // Vorläufig: die Markierung, zu welcher Zeile etwas protokolliert ist.
-    journalRepo: sqliteJournalRepository,
   });
 }
 
@@ -977,8 +1027,15 @@ export function buchungsdetail(): Promise<Buchungsdetaildaten> {
   });
 }
 
-export function buchungErfassen(eingabe: BuchungEingabe) {
-  return buchungErfassenUseCase(sqliteLedgerRepository, eingabe);
+/** Eine Buchung von Hand anlegen und nachsehen, ob sie das Gegenbein einer Umbuchung ist. */
+export async function buchungErfassen(eingabe: BuchungEingabe) {
+  const buchung = await buchungErfassenUseCase(sqliteLedgerRepository, eingabe);
+  await umbuchungenErkennen({ buchungIds: [buchung.id] }, {
+    ledgerRepo: sqliteLedgerRepository,
+    umsatzRepo: sqliteUmsatzRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+  });
+  return buchung;
 }
 
 export function buchungBearbeiten(buchung: IstBuchung, eingabe: Parameters<typeof buchungBearbeitenUseCase>[2]) {
@@ -1073,6 +1130,7 @@ import {
   zugangEinrichten as zugangEinrichtenUseCase,
   type Einrichtung,
   type Rettung,
+  type Schluesselwechsel,
   type Wechsel,
   type Zugangsstand,
 } from "../application/zugang";
@@ -1083,6 +1141,17 @@ import {
   letztesKontoLaden as letztesKontoLadenUseCase,
   letztesKontoMerken as letztesKontoMerkenUseCase,
 } from "../application/einstellungen";
+
+/**
+ * Was nach dem Entsperren einmal laufen muss, bevor ein Screen lädt.
+ *
+ * Steht hier, damit auch der Einstieg (`App.tsx`) kein Repository in die Hand nimmt —
+ * er liegt in der Wurzel von `src/` und damit ausserhalb jeder Schicht, und genau
+ * deshalb hatte ihn der Architekturtest bis 2026-11-10 nicht gesehen.
+ */
+export function appStarten(): Promise<void> {
+  return appBootstrap(sqliteKategorieRepository);
+}
 
 export function zugangsstand(): Promise<Zugangsstand> {
   return tauriZugangPort.stand();
@@ -1106,6 +1175,11 @@ export function zugangPassphraseWechseln(alte: string, neue: string): Promise<We
 
 export function zugangCodeZeigen(passphrase: string): Promise<string | null> {
   return tauriZugangPort.codeZeigen(passphrase);
+}
+
+/** Neuer Datenschlüssel, neuer Code — nur gegen die Passphrase. `null`: sie war falsch. */
+export function zugangSchluesselWechseln(passphrase: string): Promise<Schluesselwechsel | null> {
+  return tauriZugangPort.schluesselWechseln(passphrase);
 }
 
 export function zugangSperren(): Promise<void> {

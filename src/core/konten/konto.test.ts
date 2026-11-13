@@ -6,6 +6,7 @@
 // oder zweckgebundene Rücklage sein, ohne dass sich sein Typ ändert.
 
 import { describe, expect, it } from "vitest";
+import { deutscheIban, ibanGueltig } from "./konto";
 import {
   KONTOKLASSEN,
   KONTOTYPEN,
@@ -136,5 +137,35 @@ describe("waehlbareKonten", () => {
   it("ohne Vorauswahl bleibt nur das Geführte", () => {
     const liste = waehlbareKonten([konto({ id: "a", aktiv: false })], undefined);
     expect(liste).toEqual([]);
+  });
+});
+
+describe("deutscheIban", () => {
+  it("rechnet die Prüfziffer und füllt die Kontonummer auf zehn Stellen", () => {
+    expect(deutscheIban("99999901", "1002")).toBe("DE94999999010000001002");
+  });
+
+  it("was herauskommt, ist eine gültige IBAN", () => {
+    for (const [blz, konto] of [["99999912", "1"], ["99999998", "3"], ["99999997", "1234567890"]]) {
+      expect(ibanGueltig(deutscheIban(blz, konto)!)).toBe(true);
+    }
+  });
+
+  it("hält eine einstellige Prüfziffer zweistellig", () => {
+    const treffer = Array.from({ length: 300 }, (_, i) => deutscheIban("99999901", String(i + 1))!);
+    expect(treffer.every((iban) => /^DE\d{2}\d{18}$/.test(iban) && ibanGueltig(iban))).toBe(true);
+  });
+
+  it("nimmt Leerzeichen am Rand hin", () => {
+    expect(deutscheIban(" 99999901", "1002 ")).toBe("DE94999999010000001002");
+  });
+
+  it("gibt nichts zurück, wenn die Form nicht stimmt", () => {
+    expect(deutscheIban("XXXXDEXXXXX", "1002")).toBeUndefined();
+    expect(deutscheIban("9999990", "1002")).toBeUndefined();
+    expect(deutscheIban("99999901", "12A4")).toBeUndefined();
+    expect(deutscheIban("99999901", "12345678901")).toBeUndefined();
+    expect(deutscheIban("99999901", "0000000000")).toBeUndefined();
+    expect(deutscheIban("99999901", "")).toBeUndefined();
   });
 });

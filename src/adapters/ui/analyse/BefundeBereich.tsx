@@ -1,7 +1,7 @@
 // Die Befunde: was die Zahlen über den Zeitraum sagen, wenn man sie fragt, wie es um die
 // Finanzen steht.
 //
-// Der Block darüber beantwortet „wie viel und wohin" — Verlauf und Kategorien. Das reicht,
+// Die Register davor beantworten „wie viel und wohin" — Verlauf und Kategorien. Das reicht,
 // solange man nachsieht; es reicht nicht, um zu beurteilen. Hier stehen deshalb die
 // Fragen, die eine ANTWORT haben statt einer Zahl: wie viel ist überhaupt frei, hält der
 // Plan, wo fliesst etwas, das in keiner Planung vorkommt.

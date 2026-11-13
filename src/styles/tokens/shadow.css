@@ -6,8 +6,22 @@
   --shadow-none: none;
   --shadow-sm:   0 1px 2px oklch(0.5 0.03 60 / .05);
   --shadow-card: 0 2px 6px oklch(0.5 0.03 60 / .06), 0 22px 46px -22px oklch(0.5 0.05 60 / .40);
+  /* Auswahlliste und Kalenderblatt — stand als Rückfallwert eines nie definierten
+     `--sh-2` da (siehe colors.css). */
+  --shadow-schwebend: 0 8px 24px rgba(0, 0, 0, 0.10);
   --shadow-pop:  0 8px 20px -6px oklch(0.45 0.04 60 / .22);
 
   /* most cards are flat with a hairline border, not a shadow */
   --elevation-flat: var(--shadow-none);
+}
+
+/* Dunkel: Schatten auf dunklem Grund brauchen mehr Deckung, sonst sieht man sie nicht —
+   die Karten setzen sich dort über ihre Fläche ab, der Schatten trägt nur die Schwebe. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow-sm:   0 1px 2px oklch(0 0 0 / .30);
+    --shadow-card: 0 2px 6px oklch(0 0 0 / .30), 0 22px 46px -22px oklch(0 0 0 / .60);
+    --shadow-pop:  0 8px 20px -6px oklch(0 0 0 / .55);
+    --shadow-schwebend: 0 8px 24px oklch(0 0 0 / .45);
+  }
 }

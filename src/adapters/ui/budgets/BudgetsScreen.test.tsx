@@ -10,7 +10,7 @@
 // Budget, das in einem anderen liegt, wird aus dessen Betrag herausgerechnet.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -20,7 +20,7 @@ const halter = vi.hoisted(() => {
 });
 vi.mock("../../persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
-import { auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
+import { klickbareZeile, auswahlWaehlen, frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/harness";
 import { BudgetsScreen } from "./BudgetsScreen";
 import { sqliteBudgetRepository } from "../../persistence/sqliteBudgetRepository";
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
@@ -88,7 +88,7 @@ describe("BudgetsScreen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/400,00/));
   });
 
-  it("rechnet ein eingebettetes Budget aus seinem Dach heraus", async () => {
+  it("zieht ein eingebettetes Budget NICHT vom Dach ab — das Dach gilt für alles andere", async () => {
     await stammdatenBasis();
     await sqliteKategorieRepository.speichern({ id: "frei", name: "Freizeit", defaultCharakter: "Aufwand" });
     await sqliteKategorieRepository.speichern({ id: "urlaub", name: "Urlaub", elternId: "frei", defaultCharakter: "Aufwand" });
@@ -101,9 +101,11 @@ describe("BudgetsScreen", () => {
 
     rendere(<BudgetsScreen />);
     await screen.findByText("Freizeit");
-    // Das Dach zeigt 120,00 statt 200,00 — die 80,00 des Kindes sind abgezogen.
-    await waitFor(() => expect(document.body.textContent).toMatch(/120,00/));
-    expect(document.body.textContent).toMatch(/gekürzt um die Budgets/);
+    // Das Dach behält seine 200,00 — die 80,00 des Kindes sind ein eigener Topf.
+    await waitFor(() => expect(document.body.textContent).toMatch(/200,00/));
+    expect(document.body.textContent).not.toMatch(/120,00/);
+    // Das aufbauende Kind steht bei den aufbauenden — und sagt, unter welchem Dach.
+    expect(screen.getByText(/unter Freizeit/)).toBeInTheDocument();
   });
 
   it("zählt gebuchte Ausgaben als Verbrauch gegen das Budget", async () => {
@@ -309,7 +311,8 @@ describe("BudgetsScreen — Vorschläge", () => {
     await screen.findByText("Lebenshaltung");
 
     const text = document.body.textContent ?? "";
-    const liste = text.indexOf("Deine Budgets");
+    // Die Liste heisst seit der Trennung nach Art nach ihrer Art — hier die monatliche.
+    const liste = text.indexOf("Monatlich");
     const vorschlaege = text.indexOf("Aus deinen Ausgaben abgeleitet");
     expect(liste, "Überschrift der Budgetliste steht im Text").toBeGreaterThanOrEqual(0);
     expect(vorschlaege, "Überschrift der Vorschläge steht im Text").toBeGreaterThanOrEqual(0);
@@ -432,7 +435,7 @@ describe("BudgetsScreen · Verlauf", () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
 
-    const link = await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ });
+    const link = await klickbareZeile("Urlaubskasse");
     await nutzer.click(link);
 
     await screen.findByText(/Verlauf · Urlaubskasse/);
@@ -440,6 +443,38 @@ describe("BudgetsScreen · Verlauf", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/nichts gebucht/));
 
     // Den Vormonat wählen: jetzt steht die Buchung da, die ihn belastet hat.
+    await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
+    await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
+  });
+
+  /**
+   * Die Liste unter dem Monat hatte keinen Kopf: Datum, Name und Betrag standen da, ohne
+   * dass gesagt war, was welche Spalte ist. Und die Monatszeile darüber las sich wie
+   * loser Text, nicht wie der Kopf der Liste — jetzt ist sie eine aufgeklappte Zeile wie
+   * in den Monatskarten der Übersicht, mit derselben Bedienung.
+   */
+  it("gibt der Monatsliste Spaltenköpfe und lässt sie über die Monatszeile zuklappen", async () => {
+    await aufbauendMitHistorie();
+    const nutzer = userEvent.setup();
+    rendere(<BudgetsScreen />);
+
+    await nutzer.click(await klickbareZeile("Urlaubskasse"));
+    await screen.findByText(/Verlauf · Urlaubskasse/);
+    await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
+    await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
+
+    const kopf = screen.getByText("Datum").parentElement!;
+    // Die Spalten der gemeinsamen Buchungsliste. Kategorie und Konto fehlen, weil alle
+    // Zeilen hier dieselben tragen — eine Spalte, die nichts unterscheidet, fällt weg.
+    expect(kopf.textContent).toBe("DatumBuchungVerwendungszweckBetrag €");
+
+    const zeile = screen.getByRole("button", { expanded: true, name: new RegExp(monatVersetzt(-1)) });
+    await nutzer.click(zeile);
+    expect(zeile).toHaveAttribute("aria-expanded", "false");
+    expect(document.body.textContent).not.toMatch(/Fährticket/);
+
+    // Ein anderer Monat aus dem Chart oder der Auswahl klappt wieder auf — wer ihn wählt,
+    // will sehen, was drin ist.
     await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-1));
     await waitFor(() => expect(document.body.textContent).toMatch(/Fährticket/));
   });
@@ -461,15 +496,16 @@ describe("BudgetsScreen · Verlauf", () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
 
-    await nutzer.click(await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Urlaubskasse"));
     await screen.findByText(/Verlauf · Urlaubskasse/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Ruecksendung/));
 
-    // Die Summe unter der Liste heisst anders und traegt den Betrag OHNE Minus: das
-    // Vorzeichen steckt schon im Wort, zweimal waere es eine doppelte Verneinung.
-    const fuss = (await screen.findByText("Zurückgeflossen")).parentElement!;
-    expect(fuss.textContent).toMatch(/34,90/);
-    expect(fuss.textContent).not.toMatch(/−/);
+    // Die Summe unter der Liste heisst neutral „Summe" und traegt das Vorzeichen wie jede
+    // Zeile darueber (seit 2026-11-12, gemeinsame Buchungsliste). Ein Wort, das „verbraucht"
+    // behauptet, steht dort nicht mehr — also kann es auch nicht gegen das Plus stehen.
+    const fuss = (await screen.findByText("Summe")).parentElement!;
+    expect(fuss.textContent).toMatch(/\+34,90/);
+    expect(fuss.textContent).not.toMatch(/[Vv]erbraucht/);
 
     // Und die Aufrechnung daneben sagt „zurückgeflossen" statt „verbraucht“.
     await waitFor(() =>
@@ -482,7 +518,7 @@ describe("BudgetsScreen · Verlauf", () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
 
-    const link = await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ });
+    const link = await klickbareZeile("Urlaubskasse");
     await nutzer.click(link);
     await screen.findByText(/Verlauf · Urlaubskasse/);
 
@@ -505,12 +541,13 @@ describe("BudgetsScreen · Verlauf", () => {
     rendere(<BudgetsScreen />);
     await screen.findByText(/Urlaubskasse/);
 
-    // Irgendwo in der Zeile, aber nicht auf dem Namen: die Art-Pille.
-    await nutzer.click(screen.getByText("aufbauend"));
+    // Irgendwo in der Zeile, aber nicht auf dem Namen: die Konto-Zelle daneben.
+    const zeile = await klickbareZeile("Urlaubskasse");
+    await nutzer.click(within(zeile).getAllByRole("cell")[1]);
     await screen.findByText(/Verlauf · Urlaubskasse/);
 
     // Und der Name schaltet weiterhin genau einmal um — nicht hin und gleich zurück.
-    await nutzer.click(screen.getByRole("button", { name: /Urlaubskasse — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Urlaubskasse"));
     await waitFor(() => expect(screen.queryByText(/Verlauf · Urlaubskasse/)).toBeNull());
   });
 
@@ -536,7 +573,7 @@ describe("BudgetsScreen · Verlauf", () => {
 
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
-    await nutzer.click(await screen.findByRole("button", { name: /Rennrad — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Rennrad"));
 
     // Leere Balken für Monate vor dem Start zeigten Ausgaben, die das Budget nie
     // belastet haben — hier steht stattdessen, warum nichts da ist.
@@ -548,7 +585,7 @@ describe("BudgetsScreen · Verlauf", () => {
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
 
-    const link = await screen.findByRole("button", { name: /Urlaubskasse — Verlauf/ });
+    const link = await klickbareZeile("Urlaubskasse");
     await nutzer.click(link);
     await screen.findByText(/Verlauf · Urlaubskasse/);
     await nutzer.click(link);
@@ -606,7 +643,7 @@ describe("BudgetsScreen · Betragsversionen", () => {
     await screen.findByText(/Lebensmittel/);
     await betragAendern(nutzer, "450");
 
-    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Lebensmittel"));
     await screen.findByText(/Verlauf · Lebensmittel/);
 
     // Laufender Monat: der neue Rahmen, plus der Hinweis auf den Wechsel.
@@ -666,7 +703,7 @@ describe("BudgetsScreen · Betragsversionen", () => {
 
     const nutzer = userEvent.setup();
     rendere(<BudgetsScreen />);
-    await nutzer.click(await screen.findByRole("button", { name: /Lebensmittel — Verlauf/ }));
+    await nutzer.click(await klickbareZeile("Lebensmittel"));
     await screen.findByText(/Verlauf · Lebensmittel/);
 
     await auswahlWaehlen(nutzer, "Monat", monatVersetzt(-2));

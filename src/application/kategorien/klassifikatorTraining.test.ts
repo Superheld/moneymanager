@@ -1,12 +1,20 @@
 import { describe, expect, it } from "vitest";
 import { klassifizieren, type IstBuchung } from "../../core";
-import type { KlassifikatorRepository, LedgerPort, Modellstand, UmsatzRepository } from "../ports";
+import type { KlassifikatorRepository, LedgerPort, Modellstand, TrainingslaufRepository, UmsatzRepository } from "../ports";
+import type { Trainingslauf } from "../../core";
 import type { Umsatz } from "../import";
 import { klassifikatorTrainieren, MESSBAR_AB, modellzustand, ZUWACHS_SCHWELLE } from "./klassifikatorTraining";
 
 /** Fakes für die Ports — der Kern rechnet, hier wird nur geladen und gespeichert. */
 function fakes(buchungen: IstBuchung[], umsaetze: Umsatz[]) {
   let gespeichert: Modellstand | null = null;
+  let laeufe: Trainingslauf[] = [];
+  let naechsteId = 0;
+  const laufRepo: TrainingslaufRepository = {
+    anlegen: async (l) => { laeufe = [l, ...laeufe]; },
+    juengste: async (n) => laeufe.slice(0, n),
+    ausduennen: async (n) => { laeufe = laeufe.slice(0, n); },
+  };
   const ledger: LedgerPort = {
     alle: async () => buchungen,
     speichern: async () => {},
@@ -22,7 +30,12 @@ function fakes(buchungen: IstBuchung[], umsaetze: Umsatz[]) {
     speichern: async (s) => { gespeichert = s; },
   };
   return {
-    deps: { ledger, umsatzRepo, klassifikatorRepo, jetzt: () => "2026-08-16T12:00:00.000Z" },
+    deps: {
+      ledger, umsatzRepo, klassifikatorRepo, laufRepo,
+      neueId: () => `lauf-${++naechsteId}`,
+      jetzt: () => "2026-08-16T12:00:00.000Z",
+    },
+    laeufe: () => laeufe,
     gelesen: () => gespeichert,
     setzen: (s: Modellstand | null) => { gespeichert = s; },
   };
@@ -77,6 +90,48 @@ describe("Training", () => {
     expect(r.bewertung).toBeDefined();
     expect(r.bewertung!.gesamt).toBe(16); // 20 % von 80 — die Prüfmenge, nicht alles
     expect(r.stand.genauigkeit).toBe(r.bewertung!.genauigkeit);
+  });
+
+  it("prüft an den jüngsten Buchungen — und an den handverlesenen, sobald es genug gibt", async () => {
+    // 80 Zahlungen über 80 Tage; die letzten 40 von Hand gesetzt. Geprüft wird das
+    // jüngste Fünftel (16 Zeilen), und weil davon zu wenige handverlesen wären, an allen.
+    const { buchungen, umsaetze } = genugMaterial();
+    const datiert = buchungen.map((b, i) => ({
+      ...b,
+      datum: `2026-${String(1 + Math.floor(i / 28)).padStart(2, "0")}-${String(1 + (i % 28)).padStart(2, "0")}`,
+      kategorieHerkunft: i >= 40 ? ("manuell" as const) : undefined,
+    }));
+    const { deps } = fakes(datiert, umsaetze);
+
+    const r = await klassifikatorTrainieren(deps);
+
+    const p = r.protokoll!;
+    expect(p.trainingAnzahl).toBe(64);
+    expect(p.pruefAnzahl).toBe(16);
+    expect(p.stichtag).toBe(datiert[64].datum);
+    expect(p.pruefmenge).toBe("alle");
+    // Beide Vergleichslinien und die Kennzahlen stehen daneben.
+    expect(r.grundlinie).toBeDefined();
+    expect(p.empfaenger).not.toBeNull();
+    expect(p.kennzahlen.macroF1).not.toBeNull();
+    expect(p.kalibrierung).not.toBeNull();
+  });
+
+  it("zeichnet jeden Lauf auf und vergleicht ihn mit dem vorigen", async () => {
+    const { buchungen, umsaetze } = genugMaterial();
+    const { deps, laeufe } = fakes(buchungen, umsaetze);
+
+    const erster = await klassifikatorTrainieren(deps);
+    expect(erster.vergleich).toBeUndefined();
+    expect(laeufe()).toHaveLength(1);
+    expect(laeufe()[0].kennzahlen?.pruefAnzahl).toBe(16);
+    expect(laeufe()[0].vorhersagen).toHaveLength(16);
+
+    const zweiter = await klassifikatorTrainieren(deps);
+    expect(laeufe()).toHaveLength(2);
+    // Dasselbe Material, dasselbe Modell: nichts gekippt, aber an allen 16 verglichen.
+    expect(zweiter.vergleich?.gemeinsam).toBe(16);
+    expect(zweiter.vergleich?.gekippt).toHaveLength(0);
   });
 
   it("das gespeicherte Modell nutzt ALLE Beispiele, auch die gemessenen", async () => {

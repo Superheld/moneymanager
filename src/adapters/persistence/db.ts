@@ -10,11 +10,13 @@
 //
 // **Die Naht ist absichtlich schmal.** Nach oben sieht das aus wie vorher: `select` und
 // `execute`, dieselben Signaturen. Kein einziges Repository musste angefasst werden.
+//
+// Wo unten vom Plugin die Rede ist (bei `migrate`), ist das Geschichte und als solche
+// stehengelassen: sie erklärt, warum die Migrationen zusätzlich einzeln wiederholbar sind.
 
 import { invoke } from "@tauri-apps/api/core";
-import { DATEINAME } from "./datenbankdatei";
 import { MIGRATIONS } from "./migrations";
-import { schemaStatement, fremdschluesselPruefen } from "./transaktion";
+import { fremdschluesselPruefen } from "./transaktion";
 import { sicherungPflegen } from "../../application/sicherung";
 import { heute, tauriSicherungPort } from "./sicherung";
 
@@ -82,33 +84,31 @@ async function spalteExistiert(db: MigrationsDb, tabelle: string, spalte: string
 /**
  * Zieht das Schema auf den aktuellen Stand.
  *
- * **Es gibt hier keine Transaktion — und es kann keine geben.** tauri-plugin-sql führt
- * jedes `execute` über `pool.execute()` aus (wrapper.rs), und `Executor for &Pool` holt
- * pro Aufruf eine Verbindung aus einem Pool mit sqlx-Standardgröße 10. Ein `BEGIN`
- * öffnete also eine Transaktion auf Verbindung A, die mit offener Transaktion in den Pool
- * zurückginge; die folgenden Statements liefen auf B, C, … und committeten einzeln; das
- * `COMMIT` träfe irgendeine. Früher stand hier so eine Klammer und sah aus wie Sicherheit.
- * Dass sie nie schadete, lag allein daran, dass der Aufrufcode sequentiell war und der
- * Pool deshalb faktisch nur eine Verbindung benutzte.
+ * **Jede Migration läuft in EINER Transaktion, samt ihrem Versionseintrag** (seit
+ * 2026-11-10). Bricht sie ab — ein Fehler im Statement, ein Absturz, ein Stromausfall —,
+ * steht die Datenbank da, wo sie vorher stand, und der nächste Start fährt die Migration
+ * von vorn. Den halben Zustand gibt es nicht mehr. SQLite kann das, weil dort auch
+ * `CREATE`, `ALTER` und `DROP` transaktional sind.
  *
- * Statt einer Scheintransaktion ist jedes Statement WIEDERHOLBAR. Das löst dasselbe
- * Problem, das die Klammer lösen sollte: bricht eine Mehr-Statement-Migration mittendrin
- * ab (v2, v3, v6, v9, v11, v14), steht die Version nicht, und der nächste Start wiederholt
- * die Migration folgenlos, statt an „duplicate column name" zu scheitern und die App
- * dauerhaft nicht mehr starten zu lassen.
+ * **Warum das lange nicht so war.** Über tauri-plugin-sql holte jedes `execute` eine
+ * beliebige Verbindung aus dem Pool: ein `BEGIN` landete auf der einen, die Statements
+ * auf anderen, das `COMMIT` irgendwo — eine Klammer, die aussah wie Sicherheit. Statt
+ * ihrer wurde jedes Statement WIEDERHOLBAR gemacht. Seit dem eigenen Pool gilt der Grund
+ * nicht mehr; `db` ist hier eine Sitzung auf EINER festgehaltenen Verbindung
+ * (`inSchemasitzung` unten, `src-tauri/src/transaktion.rs`).
  *
- *  • `CREATE TABLE/INDEX` tragen `IF NOT EXISTS` (alle Migrationen halten das ein).
- *  • `DROP TABLE/INDEX` tragen `IF EXISTS`.
- *  • `ALTER TABLE … ADD COLUMN` kennt kein `IF NOT EXISTS` in SQLite — deshalb wird die
- *    Spalte vorher per `PRAGMA table_info` geprüft und der Zugang übersprungen.
- *  • `ALTER TABLE … DROP COLUMN` genauso, nur andersherum: fehlt die Spalte schon, ist
- *    nichts zu tun. Ohne diese Prüfung scheiterte der zweite Lauf an „no such column"
- *    und die App käme nicht mehr hoch.
- *  • `-- @wennTabelle x` vor einem Statement überspringt es, wenn `x` fehlt. Für den
- *    UMBAU einer Tabelle: kopieren, dann die alte fallen lassen — beim zweiten Lauf ist
- *    die Quelle weg, und ein `INSERT … SELECT` daraus scheiterte.
- *  • `-- @wennSpalte x.y` dasselbe für eine Spalte. Für das ABLÖSEN einer Spalte: eine
- *    Version liest sie ein letztes Mal, die nächste lässt sie fallen.
+ * **Die Wiederholbarkeit bleibt trotzdem stehen**, als zweites Netz und weil die
+ * bestehenden Versionen darauf gebaut sind:
+ *
+ *  • `CREATE TABLE/INDEX` tragen `IF NOT EXISTS`, `DROP TABLE/INDEX` tragen `IF EXISTS`.
+ *  • `ALTER TABLE … ADD COLUMN` kennt kein `IF NOT EXISTS` in SQLite — die Spalte wird
+ *    vorher per `PRAGMA table_info` geprüft und der Zugang übersprungen.
+ *  • `ALTER TABLE … DROP COLUMN` genauso, nur andersherum.
+ *  • `-- @wennTabelle x` vor einem Statement überspringt es, wenn `x` fehlt.
+ *  • `-- @wennSpalte x.y` dasselbe für eine Spalte.
+ *
+ * Ein Bestand, der unter dem alten Ablauf mitten in einer Migration stehengeblieben ist,
+ * kommt so weiterhin hoch.
  *
  * **Die Statements laufen OHNE Fremdschlüsselprüfung, geprüft wird am Ende.** SQLite kann
  * Constraints nicht nachrüsten; eine Tabelle bekommt sie nur durch Neubau. Mit
@@ -116,11 +116,13 @@ async function spalteExistiert(db: MigrationsDb, tabelle: string, spalte: string
  * `DROP TABLE` scheitert, wenn ein Schlüssel mit RESTRICT darauf zeigt, und es LÖSCHT
  * STILL, wo einer mit CASCADE darauf zeigt — SQLite behandelt den Drop wie das Löschen
  * aller Zeilen. Die offizielle Umbau-Prozedur schaltet die Prüfung deshalb ab und holt
- * sie danach nach; genau das passiert hier. In der App braucht es dafür den Rust-Weg
- * (`PRAGMA foreign_keys` gilt pro Verbindung), im Test sind sie ohnehin aus.
+ * sie danach nach. In der App schaltet die Sitzung sie ab (das Pragma gilt pro
+ * Verbindung und wirkt nur AUSSERHALB einer Transaktion), im Test sind sie ohnehin aus.
  *
- * Der Versionseintrag kommt zuletzt: lieber eine Migration zweimal laufen lassen (sie ist
- * wiederholbar) als sie fälschlich für erledigt halten.
+ * **Die Prüfung steht bewusst NACH der Kette und ausserhalb der Transaktionen.** In die
+ * Klammer gezogen, würde ein Widerspruch, der schon VOR der Migration im Bestand lag,
+ * jede künftige Migration zurückrollen — für immer. So meldet sie ihn einmal laut, und
+ * der nächste Start kommt hoch.
  *
  * Die Migrationen selbst bleiben unverändert: append-only, bestehende Versionen werden nie
  * editiert (CLAUDE.md).
@@ -135,25 +137,66 @@ export async function migrate(db: MigrationsDb): Promise<void> {
 
   for (const m of MIGRATIONS) {
     if (m.version <= aktuell) continue;
-    for (const stmt of m.sql) {
-      const bedingung = tabellenBedingung(stmt);
-      if (bedingung && !(await tabelleExistiert(db, bedingung))) continue;
-      const spaltig = spaltenBedingung(stmt);
-      if (spaltig && !(await spalteExistiert(db, spaltig.tabelle, spaltig.spalte))) continue;
-      const zugang = spaltenZugang(stmt);
-      if (zugang && (await spalteExistiert(db, zugang.tabelle, zugang.spalte))) continue;
-      const abgang = spaltenAbgang(stmt);
-      if (abgang && !(await spalteExistiert(db, abgang.tabelle, abgang.spalte))) continue;
-      await schemaStatement(db, stmt);
-      gelaufen = true;
+    await db.execute("BEGIN");
+    try {
+      for (const stmt of m.sql) {
+        const bedingung = tabellenBedingung(stmt);
+        if (bedingung && !(await tabelleExistiert(db, bedingung))) continue;
+        const spaltig = spaltenBedingung(stmt);
+        if (spaltig && !(await spalteExistiert(db, spaltig.tabelle, spaltig.spalte))) continue;
+        const zugang = spaltenZugang(stmt);
+        if (zugang && (await spalteExistiert(db, zugang.tabelle, zugang.spalte))) continue;
+        const abgang = spaltenAbgang(stmt);
+        if (abgang && !(await spalteExistiert(db, abgang.tabelle, abgang.spalte))) continue;
+        await db.execute(stmt);
+      }
+      // Der Versionseintrag gehört IN die Klammer: Schema und Stand wechseln zusammen
+      // oder gar nicht.
+      await db.execute(`INSERT INTO _migration (version) VALUES ($1)`, [m.version]);
+      await db.execute("COMMIT");
+    } catch (fehler) {
+      // Der Rollback-Fehler darf den eigentlichen nicht verdecken.
+      try {
+        await db.execute("ROLLBACK");
+      } catch {
+        /* der ursprüngliche Fehler zählt */
+      }
+      throw new Error(
+        `Migration ${m.version} ist fehlgeschlagen und wurde zurückgenommen: ` +
+          (fehler instanceof Error ? fehler.message : String(fehler)),
+      );
     }
-    await db.execute(`INSERT INTO _migration (version) VALUES ($1)`, [m.version]);
+    gelaufen = true;
   }
 
   // Die Prüfung, die während des Umbaus ausgeschaltet war — nachgeholt, sobald das Schema
   // steht. Nur wenn überhaupt etwas lief: bei jedem App-Start die ganze Datenbank
   // durchzuprüfen, obwohl sich nichts geändert hat, wäre Aufwand ohne Anlass.
   if (gelaufen) await fremdschluesselPruefen(db);
+}
+
+/**
+ * Eine Sitzung auf EINER festgehaltenen Verbindung, mit abgeschalteten Fremdschlüsseln.
+ *
+ * Alles, was `arbeit` über das übergebene `db` schickt, läuft auf derselben Verbindung —
+ * das ist die Voraussetzung dafür, dass `BEGIN`, die Statements, die Blicke auf den
+ * Zwischenstand und `COMMIT` zusammengehören. Beendet wird in jedem Fall: eine Sitzung,
+ * die hängenbleibt, hält eine Schreibsperre, und an ihr wartet auch das Sperren der App.
+ *
+ * Die drei `invoke`-Zweige erreicht kein Test dieser Datei (sie laufen nur in der
+ * Tauri-Shell); was die Sitzung leistet, prüft `src-tauri/src/transaktion.rs`, und was
+ * `migrate` mit ihr anfängt, läuft im Test wortgleich über sql.js.
+ */
+async function inSchemasitzung<T>(arbeit: (db: MigrationsDb) => Promise<T>): Promise<T> {
+  await invoke("schemasitzung_beginnen");
+  try {
+    return await arbeit({
+      execute: (sql, werte = []) => invoke("schemasitzung_execute", { sql, werte }),
+      select: <T,>(sql: string) => invoke<T>("schemasitzung_select", { sql, werte: [] }),
+    });
+  } finally {
+    await invoke("schemasitzung_beenden");
+  }
 }
 
 /**
@@ -171,21 +214,11 @@ const zugang: Datenbankzugang = {
     invoke<{ rowsAffected: number; lastInsertId: number }>("db_execute", { sql, werte }),
 };
 
-/**
- * Die Datenbank öffnen.
- *
- * `pragma` ist der fertige Wert für `PRAGMA key` — oder `null` für eine unverschlüsselte
- * Datenbank. Letzteres ist heute der Normalfall und wird es nicht bleiben.
- *
- * Gibt `false` zurück, wenn der Schlüssel nicht passt. Das ist kein Fehler, sondern eine
- * Antwort: eine falsch eingetippte Passphrase ist keine Ausnahme, sondern der häufigste
- * Fall beim Entsperren.
- */
-export async function datenbankOeffnen(pragma: string | null): Promise<boolean> {
-  return invoke<boolean>("datenbank_oeffnen", {
-    o: { datei: DATEINAME, pragma, anlegen: true },
-  });
-}
+// **Ein `datenbankOeffnen` gibt es hier nicht mehr (seit 2026-11-10).** Geöffnet wird
+// ausschliesslich über den Zugang (`zugang.ts` → `zugang_entsperren` und Verwandte), also
+// mit einem Schlüssel, den nur Rust kennt. Die Funktion stammte aus der Zeit vor der
+// Verschlüsselung und reichte den Wert für `PRAGMA key` durch den Webview — das Gegenteil
+// der Zusage in `application/zugang.ts`, dass die Anwendung den Schlüssel nie sieht.
 
 /** Die Datenbank schliessen — der Bestand ist danach wieder zu. */
 export function datenbankSchliessen(): Promise<void> {
@@ -223,23 +256,45 @@ async function sicherungVersuchen(): Promise<void> {
   }
 }
 
+/**
+ * Der Zugang zur Datenbank — samt Tagessicherung und Migrationen beim ersten Mal.
+ *
+ * **Geöffnet wird hier NICHT.** Das Tor in `App.tsx` rendert keinen Screen, bevor Rust
+ * „offen" meldet; wer hier ankommt, hat entsperrt. Bis 2026-11-10 stand an dieser Stelle
+ * trotzdem ein Öffnungsversuch OHNE Schlüssel, bei jedem Start. Er ging nur deshalb gut,
+ * weil die Prüfabfrage an der verschlüsselten Datei scheiterte und der vorhandene Pool
+ * stehen blieb — eine Zeile, die funktioniert, weil sie fehlschlägt.
+ *
+ * **Ein Fehlschlag wird nicht gemerkt.** Die Zusage wird zwischengespeichert, damit
+ * Sicherung und Migrationen genau einmal laufen. Scheitert sie aber — etwa weil ein noch
+ * laufender Ladevorgang nach dem Sperren hier ankommt und auf die geschlossene Datenbank
+ * trifft —, bliebe ohne das Zurücksetzen die ABGELEHNTE Zusage stehen, und nach dem
+ * Entsperren bekäme jeder Screen den alten Fehler, bis zum Neustart der App.
+ */
 export function getDb(): Promise<Datenbankzugang> {
   if (!dbPromise) {
-    dbPromise = (async () => {
-      await datenbankOeffnen(null);
+    const zusage = (async () => {
       await sicherungVersuchen();
-      await migrate(zugang);
+      await inSchemasitzung(migrate);
       return zugang;
     })();
+    dbPromise = zusage;
+    zusage.catch(() => {
+      // Nur die EIGENE Zusage räumen: inzwischen kann gesperrt, entsperrt und eine neue
+      // angelegt worden sein — die darf dieser späte Fehler nicht mitnehmen.
+      if (dbPromise === zusage) dbPromise = null;
+    });
   }
   return dbPromise;
 }
 
 /**
- * Den gemerkten Zugang vergessen — nach dem Sperren.
+ * Den gemerkten Zugang vergessen — nach dem Sperren UND nach dem Entsperren.
  *
- * Ohne das gäbe `getDb()` weiter die zwischengespeicherte Zusage zurück, und der nächste
- * Zugriff liefe gegen eine geschlossene Datenbank statt in den Entsperr-Bildschirm.
+ * Nach dem Sperren, weil `getDb()` sonst weiter die zwischengespeicherte Zusage
+ * zurückgäbe und der nächste Zugriff gegen eine geschlossene Datenbank liefe. Nach dem
+ * Entsperren, weil Sicherung und Migrationen zu jeder ÖFFNUNG gehören und nicht zum
+ * Prozess: wer über Nacht gesperrt hatte, bekommt am Morgen seine Tagessicherung.
  */
 export function zugangVergessen(): void {
   dbPromise = null;

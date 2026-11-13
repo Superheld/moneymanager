@@ -5,7 +5,7 @@
 // eine zweite darin wäre zwei Rahmen um dieselbe Sache (siehe `ui/CLAUDE.md`). Sie steht
 // unmittelbar darunter, damit die Zeile, von der man ausgegangen ist, im Blick bleibt.
 //
-// Gerechnet wird hier nichts: `budgetVerlauf` und `budgetPostenImMonat` kommen fertig aus
+// Gerechnet wird hier nichts: `budgetVerlauf` und `budgetzeilenImMonat` kommen fertig aus
 // der Anwendungsschicht und arbeiten auf DERSELBEN Sicht wie die Liste darüber. Ein
 // eigener Ladevorgang je aufgeklappter Zeile rechnete gegen einen womöglich anderen
 // Bestand als die Zeile selbst.
@@ -13,27 +13,29 @@
 import { useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  budgetPostenImMonat,
+  budgetzeilenImMonat,
   budgetVerlauf,
   type BudgetSicht,
   type Budgetstand,
   type IstBuchung,
+  type Zeilenkontext,
 } from "../../../application";
 import { Button, Card } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
-import { BudgetPostenliste } from "../bausteine/BudgetPostenliste";
+import { Buchungsliste } from "../bausteine/Buchungsliste";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { useGeld } from "../bausteine/einstellungenKontext";
 import { BudgetVerlaufChart } from "./BudgetVerlaufChart";
+import { Collapsible } from "@base-ui/react/collapsible";
 
 interface Props {
   sicht: BudgetSicht;
   stand: Budgetstand;
   /** Heute als ISO — der Verlauf endet im Monat dieses Datums. */
   heute: string;
-  kategorieNamen: ReadonlyMap<string, string>;
-  empfaenger: ReadonlyMap<string, string>;
+  /** Was die Buchungszeilen des gewählten Monats brauchen. */
+  zeilenkontext: Zeilenkontext;
   onSchliessen: () => void;
   /**
    * Klick auf eine Buchung der Liste — der Bildschirm darüber öffnet sie.
@@ -44,7 +46,7 @@ interface Props {
   onBuchung?: (buchung: IstBuchung) => void;
 }
 
-export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger, onSchliessen, onBuchung }: Props) {
+export function BudgetVerlauf({ sicht, stand, heute, zeilenkontext, onSchliessen, onBuchung }: Props) {
   const { t } = useTranslation();
   const geld = useGeld();
 
@@ -55,11 +57,21 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
    * etwas zu sehen, das man schon gelesen hat.
    */
   const [gewaehlt, setGewaehlt] = useState(monate.length - 1);
+  /**
+   * Ob die Buchungen des Monats aufgeklappt sind. Vorbelegt OFFEN — wer einen Monat im
+   * Chart anklickt, will sehen, was drin ist; dieselbe Wahl klappt ihn deshalb auch
+   * wieder auf, falls er zu war.
+   */
+  const [offen, setOffen] = useState(true);
+  const waehle = (i: number) => {
+    setGewaehlt(i);
+    setOffen(true);
+  };
   const monat = monate[Math.min(gewaehlt, monate.length - 1)];
 
-  const posten = useMemo(
-    () => (monat ? budgetPostenImMonat(sicht, stand.budget, monat) : []),
-    [sicht, stand.budget, monat],
+  const zeilen = useMemo(
+    () => (monat ? budgetzeilenImMonat(sicht, stand.budget, monat, zeilenkontext) : []),
+    [sicht, stand.budget, monat, zeilenkontext],
   );
 
   if (monate.length === 0) {
@@ -79,7 +91,7 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
           <Auswahl
             ariaLabel={t("budgets.verlaufMonatWaehlen")}
             wert={String(gewaehlt)}
-            aufAenderung={(v) => setGewaehlt(Number(v))}
+            aufAenderung={(v) => waehle(Number(v))}
             optionen={monate.map((m, i) => ({ wert: String(i), text: m.monat }))}
           />
           <Button variant="ghost" onClick={onSchliessen}>{t("budgets.verlaufSchliessen")}</Button>
@@ -88,15 +100,40 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
     >
       <BudgetVerlaufChart
         monate={monate}
+        art={stand.budget.art === "aufbauend" ? "aufbauend" : "monatlich"}
         aktivIndex={gewaehlt}
-        onMonatClick={(i) => setGewaehlt(i)}
+        onMonatClick={waehle}
       />
 
-      <div
-        style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: "var(--sp-3)", flexWrap: "wrap", marginTop: "var(--sp-4)", paddingTop: "var(--sp-3)", borderTop: "1px solid var(--line)" }}
+      {/* Die Monatszeile sieht aus wie eine aufgeklappte Zeile der Monatskarten in der
+          Übersicht (Pfeil, getönte Fläche, Liste direkt darunter) und verhält sich auch so:
+          ein Klick klappt die Buchungen zu. Vorher stand sie als lose Textzeile über der
+          Liste, und man sah nicht, dass beides zusammengehört.
+          Base UI `Collapsible`: Rolle, Tasten und `aria-controls` kommen von dort; die Zeile
+          bleibt ein `div`, damit ihr Flex-Layout unverändert bleibt. */}
+      <Collapsible.Root open={offen} onOpenChange={setOffen}>
+      <Collapsible.Trigger
+        nativeButton={false}
+        render={<div />}
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "baseline",
+          gap: "var(--sp-3)",
+          flexWrap: "wrap",
+          marginTop: "var(--sp-4)",
+          padding: "9px 10px",
+          borderTop: "1px solid var(--line)",
+          borderBottom: "1px solid var(--line-soft)",
+          cursor: "pointer",
+          background: offen ? "var(--accent-soft)" : "transparent",
+        }}
       >
         <span style={{ display: "inline-flex", alignItems: "baseline", gap: "var(--sp-2)", flexWrap: "wrap" }}>
-          <span style={{ fontWeight: "var(--fw-bold)" }}>{monat.monat}</span>
+          <span style={{ fontWeight: "var(--fw-bold)" }}>
+            <span style={{ color: "var(--ink-3)", marginRight: 6 }}>{offen ? "▾" : "▸"}</span>
+            {monat.monat}
+          </span>
           {/* Die Stufe im Chart braucht ihren Grund neben sich, sonst liest sie sich wie
               ein Rechenfehler. */}
           {monat.zufuehrungVorher != null && (
@@ -125,16 +162,17 @@ export function BudgetVerlauf({ sicht, stand, heute, kategorieNamen, empfaenger,
             </span>
           )}
         </span>
-      </div>
+      </Collapsible.Trigger>
 
-      <BudgetPostenliste
-        posten={posten}
-        empfaenger={empfaenger}
-        kategorieNamen={kategorieNamen}
-        verbraucht={monat.verbraucht}
-        leerText={t("budgets.verlaufMonatLeer", { monat: monat.monat })}
-        onBuchung={onBuchung}
-      />
+      <Collapsible.Panel>
+        <Buchungsliste
+          zeilen={zeilen}
+          leer={t("budgets.verlaufMonatLeer", { monat: monat.monat })}
+          onBuchung={onBuchung}
+          summe
+        />
+      </Collapsible.Panel>
+      </Collapsible.Root>
     </Card>
   );
 }

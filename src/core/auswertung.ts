@@ -22,7 +22,7 @@
  */
 
 import type { Cent } from "./basis/geld";
-import { addMonate, parseIso, toIso } from "./basis/datum";
+import { addMonate, parseIso, tageImMonat, toIso } from "./basis/datum";
 import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
 import { istInterneUmbuchung } from "./buchung/historie";
 import { istLiquide, type Zahlungskonto } from "./konten/konto";
@@ -564,16 +564,19 @@ export function vertragstreue(
  * | `einnahmen` | ja | Geld kommt an |
  * | `vertraege` | ja | Geld geht weg |
  * | `budgets` | ja | Geld geht weg |
+ * | `budgetsAufbauend` | ja | wie `budgets` — geplant ist die Rate als Abfluss |
  * | `sonstiges` | ja | Geld geht weg |
+ * | `ruecklagen` | **nein** | wechselt das Konto, verlässt den Bestand nicht |
  * | `umschichtung` | **nein** | wechselt das Konto, verlässt den Bestand nicht |
  *
- * Die Umschichtung ist die einzige Ausnahme, seit die Rücklagenzeile weg ist (2026-09-01,
- * siehe `monatsausblick`). Sie wechselt das Konto und verlässt den Bestand nicht; sie in
+ * `budgetsAufbauend` ist seit 2026-11-08 eine eigene Zeile, vorher stand es in `budgets`
+ * mit; an der Wirkung ändert die Trennung nichts. `ruecklagen` ist seitdem ebenfalls neu
+ * und eine Umschichtung wie die Zeile darunter, nur auf ein Rücklagenkonto. Sie wechselt das Konto und verlässt den Bestand nicht; sie in
  * eine Saldo-Vorschau über ALLE Konten zu nehmen hiesse, jeden Monat eine Abbuchung zu
  * erfinden, die es so nicht gibt — der vorhergesagte Stand liefe immer weiter unter den
  * echten.
  */
-export const SALDOWIRKSAME_ZEILEN = ["einnahmen", "vertraege", "budgets", "sonstiges"] as const;
+export const SALDOWIRKSAME_ZEILEN = ["einnahmen", "vertraege", "budgets", "budgetsAufbauend", "sonstiges"] as const;
 
 export function planWirkung(zeilen: readonly { id: string; plan: Cent }[]): {
   einnahmen: Cent;
@@ -588,4 +591,61 @@ export function planWirkung(zeilen: readonly { id: string; plan: Cent }[]): {
     else ausgaben += z.plan;
   }
   return { einnahmen, ausgaben, netto: einnahmen + ausgaben };
+}
+
+/**
+ * Der tiefste Stand INNERHALB eines geplanten Monats — für die Frage „wann brauche ich wie
+ * viel", die eine Monatssumme nicht beantwortet: die Miete geht am Ersten, das Gehalt
+ * kommt am 28., und dazwischen steht das Konto tiefer als an beiden Monatsenden.
+ *
+ * **Aus demselben Plan wie `planWirkung`, nicht aus der Liquiditätsvorschau.** Die rechnet
+ * je Konto und mit eigenen Regeln (sie lässt etwa aufbauende Budgets weg); ihr Tiefstand
+ * passte nicht zur Linie, an der er steht, und könnte sogar über dem Monatsende liegen.
+ * Hier endet die Tagesreihe per Konstruktion genau auf `start + planWirkung().netto`.
+ *
+ * Wie verteilt wird, ist die Entscheidung: datierte Posten (Verträge, Einnahmen) an ihrem
+ * Tag, alles Undatierte (Budgets, Sonstiges) gleichmässig über die Tage — dieselbe neutrale
+ * Annahme wie in `liquiditaetsvorschau`, weder alles am Ersten noch alles am Letzten. Am
+ * selben Tag zählt der Abfluss vor dem Zufluss: ob die Miete morgens oder das Gehalt
+ * abends kommt, weiss niemand, und eine Vorschau, die eng werden kann, rechnet vorsichtig.
+ */
+export function tiefstandImMonat(
+  start: Cent,
+  monat: string,
+  zeilen: readonly { id: string; plan: Cent; posten: readonly { datum?: string; plan: Cent }[] }[],
+): { tiefstand: Cent; am: string } {
+  const { y, m } = parseIso(`${monat}-01`);
+  const tage = tageImMonat(y, m);
+  const zu = new Array<number>(tage + 1).fill(0);
+  const ab = new Array<number>(tage + 1).fill(0);
+  let verteilt = 0;
+  for (const z of zeilen) {
+    if (!(SALDOWIRKSAME_ZEILEN as readonly string[]).includes(z.id)) continue;
+    let datiert = 0;
+    for (const p of z.posten) {
+      if (!p.datum || p.datum.slice(0, 7) !== monat) continue;
+      const tag = Number(p.datum.slice(8, 10));
+      if (p.plan >= 0) zu[tag] += p.plan;
+      else ab[tag] += p.plan;
+      datiert += p.plan;
+    }
+    verteilt += z.plan - datiert;
+  }
+  let stand = start;
+  let tiefstand = start;
+  let am = `${monat}-01`;
+  for (let tag = 1; tag <= tage; tag++) {
+    const anteil = verteilt / tage;
+    const vorZufluss = stand + ab[tag] + Math.min(0, anteil);
+    if (vorZufluss < tiefstand) {
+      tiefstand = vorZufluss;
+      am = `${monat}-${String(tag).padStart(2, "0")}`;
+    }
+    stand = vorZufluss + zu[tag] + Math.max(0, anteil);
+    if (stand < tiefstand) {
+      tiefstand = stand;
+      am = `${monat}-${String(tag).padStart(2, "0")}`;
+    }
+  }
+  return { tiefstand: Math.round(tiefstand), am };
 }

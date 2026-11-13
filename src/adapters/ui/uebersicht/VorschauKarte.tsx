@@ -159,7 +159,7 @@ export function VorschauKarte({ zeilen, kontoNamen }: Props) {
           />
           {/* Die Summe ist der eigentliche Gewinn des kontoübergreifenden Blicks: sie war
               vorher gar nicht zu haben, weil jede Liste nur ihr eigenes Konto kannte. */}
-          <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: "var(--sp-2)", textAlign: "right" }}>
+          <div className="hinweis" style={{ marginTop: "var(--sp-2)", textAlign: "right" }}>
             {t("uebersicht.vorschauSumme", {
               betrag: geld.formatMitSymbol(summe, { mitVorzeichen: true }),
             })}

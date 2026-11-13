@@ -17,10 +17,24 @@ import userEvent from "@testing-library/user-event";
 
 const wechseln = vi.fn(async (_alte: string, _neue: string) => ({ art: "fertig" as const }));
 const codeZeigen = vi.fn(async (_passphrase: string) => "ABCD-EFGH-IJKL");
+const schluesselWechseln = vi.fn(
+  async (
+    _passphrase: string,
+  ): Promise<{
+    wiederherstellungscode: string;
+    sicherungenUmgestellt: number;
+    sicherungenUebrig: number;
+  } | null> => ({
+    wiederherstellungscode: "NEUE-RCOD-EHIE",
+    sicherungenUmgestellt: 3,
+    sicherungenUebrig: 0,
+  }),
+);
 
 vi.mock("../../dienste", () => ({
   zugangPassphraseWechseln: (alte: string, neue: string) => wechseln(alte, neue),
   zugangCodeZeigen: (p: string) => codeZeigen(p),
+  zugangSchluesselWechseln: (p: string) => schluesselWechseln(p),
   zeitsperre: async () => 15,
   zeitsperreSetzen: async () => {},
 }));
@@ -79,5 +93,75 @@ describe("Passphrase wechseln", () => {
     ]) {
       expect((screen.getByLabelText(feld) as HTMLInputElement).value).toBe("");
     }
+  });
+});
+
+describe("Neuen Schlüssel erzeugen", () => {
+  // Zwei Karten tragen ein Feld mit demselben Namen (Code ansehen, Schlüssel erzeugen) —
+  // gemeint ist das in der Karte, deren Knopf gedrückt wird.
+  async function passphraseEingeben(text: string) {
+    const felder = screen.getAllByLabelText("zugang.feldPassphrase");
+    await userEvent.type(felder[felder.length - 1], text);
+  }
+  const knopf = () => screen.getByRole("button", { name: "zugang.schluesselKnopf" });
+
+  beforeEach(() => schluesselWechseln.mockClear());
+
+  it("zeigt den neuen Code und nennt die umgestellten Sicherungen", async () => {
+    render(<VerschluesselungCard />);
+    await passphraseEingeben(ALT);
+    await userEvent.click(knopf());
+
+    expect(schluesselWechseln).toHaveBeenCalledWith(ALT);
+    expect(await screen.findByText("NEUE-RCOD-EHIE")).toBeTruthy();
+    expect(screen.getByText("zugang.schluesselFertig")).toBeTruthy();
+    expect(screen.getByText("zugang.schluesselSicherungen")).toBeTruthy();
+    expect(screen.queryByText("zugang.schluesselUebrig")).toBeNull();
+  });
+
+  it("sagt es, wenn Sicherungen am alten Code hängen bleiben", async () => {
+    schluesselWechseln.mockResolvedValueOnce({
+      wiederherstellungscode: "NEUE-RCOD-EHIE",
+      sicherungenUmgestellt: 0,
+      sicherungenUebrig: 2,
+    });
+    render(<VerschluesselungCard />);
+    await passphraseEingeben(ALT);
+    await userEvent.click(knopf());
+
+    expect(await screen.findByText("zugang.schluesselUebrig")).toBeTruthy();
+    expect(screen.queryByText("zugang.schluesselSicherungen")).toBeNull();
+  });
+
+  it("meldet eine falsche Passphrase und zeigt keinen Code", async () => {
+    schluesselWechseln.mockResolvedValueOnce(null);
+    render(<VerschluesselungCard />);
+    await passphraseEingeben("falsch geraten");
+    await userEvent.click(knopf());
+
+    expect(await screen.findByText("zugang.passphraseFalsch")).toBeTruthy();
+    expect(screen.queryByText("NEUE-RCOD-EHIE")).toBeNull();
+  });
+
+  it("räumt einen vorher angezeigten Code weg — er ist danach der alte", async () => {
+    render(<VerschluesselungCard />);
+    await userEvent.type(screen.getAllByLabelText("zugang.feldPassphrase")[0], ALT);
+    await userEvent.click(screen.getByRole("button", { name: "zugang.codeAbrufenKnopf" }));
+    expect(await screen.findByText("ABCD-EFGH-IJKL")).toBeTruthy();
+
+    await passphraseEingeben(ALT);
+    await userEvent.click(knopf());
+
+    expect(await screen.findByText("NEUE-RCOD-EHIE")).toBeTruthy();
+    expect(screen.queryByText("ABCD-EFGH-IJKL")).toBeNull();
+  });
+
+  it("meldet einen Fehlschlag, statt still zu bleiben", async () => {
+    schluesselWechseln.mockRejectedValueOnce(new Error("kein Platz"));
+    render(<VerschluesselungCard />);
+    await passphraseEingeben(ALT);
+    await userEvent.click(knopf());
+
+    expect(await screen.findByText("zugang.fehlerAllgemein")).toBeTruthy();
   });
 });

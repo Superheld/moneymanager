@@ -16,6 +16,8 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, Card } from "../bausteine";
+import { Stapel } from "../bausteine/Anordnung";
+import { Exportpfad } from "./ExportCard";
 import { bestandExport } from "../../dienste";
 
 export function BestandsexportCard() {
@@ -39,23 +41,22 @@ export function BestandsexportCard() {
 
   return (
     <Card title={t("einstellungen.export.bestand.titel")}>
-      <p className="muted">{t("einstellungen.export.bestand.text")}</p>
-      {/* Die Warnung steht VOR dem Knopf und nicht darunter: was sie sagt, entscheidet
-          darüber, ob man ihn drücken will. */}
-      <p className="zugang-fehler">{t("einstellungen.export.bestand.warnung")}</p>
-      <p className="muted">{t("einstellungen.export.bestand.vergaenglich")}</p>
-      <Button variant="primary" onClick={() => !laeuft && void exportieren()}>
-        {laeuft ? t("einstellungen.export.laeuft") : t("einstellungen.export.bestand.knopf")}
-      </Button>
-      {pfad && (
-        <p style={{ marginBottom: 0 }}>
-          {t("einstellungen.export.fertig")}{" "}
-          {/* `user-select: all` — ein Klick markiert den ganzen Pfad. Er ist lang und
-              enthält Leerzeichen; wer ihn von Hand markiert, erwischt die Hälfte. */}
-          <code style={{ userSelect: "all", wordBreak: "break-all" }}>{pfad}</code>
-        </p>
-      )}
-      {fehler && <p className="zugang-fehler">{fehler}</p>}
+      <Stapel>
+        <p className="muted" style={{ margin: 0 }}>{t("einstellungen.export.bestand.text")}</p>
+        {/* Die Warnung steht VOR dem Knopf und nicht darunter: was sie sagt, entscheidet
+            darüber, ob man ihn drücken will. `.err` und nicht die Fehlerklasse des
+            Sperrbildschirms (`zugang-fehler`) — die gehört dem Zugang und stand hier in
+            Fliesstextgrösse zwischen gedämpften Absätzen. */}
+        <p className="err" style={{ margin: 0 }}>{t("einstellungen.export.bestand.warnung")}</p>
+        <p className="muted" style={{ margin: 0 }}>{t("einstellungen.export.bestand.vergaenglich")}</p>
+        <div>
+          <Button variant="primary" onClick={() => void exportieren()} laeuft={laeuft}>
+            {laeuft ? t("einstellungen.export.laeuft") : t("einstellungen.export.bestand.knopf")}
+          </Button>
+        </div>
+        {pfad && <Exportpfad pfad={pfad} />}
+        {fehler && <p className="err" style={{ margin: 0 }}>{fehler}</p>}
+      </Stapel>
     </Card>
   );
 }

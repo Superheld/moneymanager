@@ -37,7 +37,6 @@ import {
   kategorisieren,
   verwerfen,
   zurueckholen,
-  vorschlagsbefundFuer,
   type Umsatz,
   type VerbuchenErgebnis,
   type Vorschlagskontext,
@@ -49,49 +48,12 @@ import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
+import { Kaestchen } from "../bausteine/Kaestchen";
+import { Zeile } from "../bausteine/Anordnung";
+import { useSammelauswahl } from "../bausteine/useSammelauswahl";
+import { Herkunft } from "./Herkunft";
 
 const SEITE_GROESSE = 100;
-
-/**
- * Woher der Vorschlag dieser Zeile kommt — und beim Modell, woran es lag.
- *
- * Die Belege werden hier neu gerechnet: sie hängen am aktuellen Modell und an der
- * aktuellen Merkmalskonfiguration. Nur wenn die Neurechnung dieselbe Kategorie liefert
- * wie der gespeicherte Vorschlag, wird sie gezeigt — sonst erklärte sie etwas anderes,
- * als in der Zeile steht.
- */
-function Herkunft({ umsatz, kontext }: { umsatz: Umsatz; kontext: Vorschlagskontext | null }) {
-  const { t } = useTranslation();
-  const quelle = umsatz.vorschlag?.quelle;
-  if (!quelle) return null;
-
-  const befund =
-    kontext && quelle === "ki" ? vorschlagsbefundFuer(umsatz, kontext, umsatz.zahlungskontoId) : null;
-  const passt = befund?.vorschlag?.kategorieId === umsatz.vorschlag?.kategorieId;
-  const belege = passt ? befund?.beitraege ?? [] : [];
-
-  return (
-    <div style={{ marginTop: 4, display: "flex", gap: "var(--sp-2)", alignItems: "center", flexWrap: "wrap" }}>
-      <span title={t(`review.herkunftTitel.${quelle}`)}>
-        {/* „ok" fuer alles, was auf einer ANGABE beruht (Umbuchung, Vertrag, Datei),
-            „neutral" fuer die Schaetzung des Modells, „plan" fuer die eigene Hand. */}
-        <Pill variant={quelle === "manuell" ? "plan" : quelle === "ki" ? "neutral" : "ok"}>
-          {t(`review.herkunft.${quelle}`)}
-        </Pill>
-      </span>
-      {passt && befund?.sicherheit !== undefined && (
-        <span
-          className="muted"
-          style={{ fontSize: "var(--fs-2xs)" }}
-          title={belege.map((b) => `${b.gewicht >= 0 ? "+" : "−"}${Math.abs(b.gewicht).toFixed(2)} ${b.merkmal}`).join("  ")}
-        >
-          {t("review.begruendungSicher", { wert: `${Math.round(befund.sicherheit * 100)} %` })}
-          {belege.length > 0 && ` · ${belege.slice(0, 3).map((b) => b.merkmal).join(", ")}`}
-        </span>
-      )}
-    </div>
-  );
-}
 
 export function ReviewScreen() {
   const { t } = useTranslation();
@@ -136,8 +98,8 @@ export function ReviewScreen() {
    * die Ansicht, in der man ZEILENWEISE arbeitet — der Stapelweg steht daneben, nicht
    * davor.
    */
-  const [auswahlModus, setAuswahlModus] = useState(false);
-  const [auswahl, setAuswahl] = useState<Set<string>>(new Set());
+  // Modus und Auswahl stehen weiter unten (`useSammelauswahl`): sie brauchen die
+  // gefilterte Liste, und die entsteht erst nach dem Laden.
   const [sammelKategorie, setSammelKategorie] = useState("");
 
   async function laden() {
@@ -229,23 +191,10 @@ export function ReviewScreen() {
    * die ersten hundert davon. Dieselbe Regel wie im Kontoauszug.
    */
   const alleIds = useMemo(() => gefiltert.map((u) => u.id), [gefiltert]);
-  const alleGewaehlt = alleIds.length > 0 && alleIds.every((id) => auswahl.has(id));
-
-  /**
-   * Was nicht mehr sichtbar ist, ist nicht mehr gewählt.
-   *
-   * Ohne das trüge man eine unsichtbare Auswahl durch Filterwechsel und Seiten mit sich
-   * herum — und ein Sammel-Weglegen träfe dann Zeilen, die niemand vor Augen hatte. Der
-   * Preis ist, dass ein Filterwechsel die Auswahl kostet; das ist der richtige Preis.
-   */
-  useEffect(() => {
-    setAuswahl((bisher) => {
-      if (bisher.size === 0) return bisher;
-      const sichtbar = new Set(alleIds);
-      const naechste = new Set([...bisher].filter((id) => sichtbar.has(id)));
-      return naechste.size === bisher.size ? bisher : naechste;
-    });
-  }, [alleIds]);
+  // Was nicht mehr sichtbar ist, ist nicht mehr gewählt — ohne das träfe ein
+  // Sammel-Weglegen Zeilen, die niemand vor Augen hatte (`useSammelauswahl`).
+  const sammel = useSammelauswahl(alleIds);
+  const auswahl = sammel.auswahl;
 
   const gewaehlteUmsaetze = useMemo(
     () => umsaetze.filter((u) => auswahl.has(u.id)),
@@ -255,15 +204,6 @@ export function ReviewScreen() {
   const gewaehlteUmbuchungen = gewaehlteUmsaetze.filter(
     (u) => u.vorschlag?.quelle === "umbuchung",
   ).length;
-
-  function auswahlUmschalten(id: string) {
-    setAuswahl((bisher) => {
-      const neu = new Set(bisher);
-      if (neu.has(id)) neu.delete(id);
-      else neu.add(id);
-      return neu;
-    });
-  }
 
   /**
    * Die Kategorie für alle markierten Zeilen.
@@ -283,7 +223,7 @@ export function ReviewScreen() {
         kategorieId ? katById.get(kategorieId) : undefined,
       );
       await laden();
-      setAuswahl(new Set());
+      sammel.leeren();
       setSammelKategorie("");
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
@@ -299,7 +239,7 @@ export function ReviewScreen() {
     try {
       await umsaetzeSammelVerwerfen(gewaehlteUmsaetze);
       await laden();
-      setAuswahl(new Set());
+      sammel.leeren();
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
     } finally {
@@ -329,8 +269,6 @@ export function ReviewScreen() {
       setFehler(e instanceof Error ? e.message : String(e));
     }
   }
-
-
 
   /**
    * Eine Zeile aus dem Stapel nehmen, ohne sie zu buchen.
@@ -389,12 +327,12 @@ export function ReviewScreen() {
 
   const th = { textAlign: "left", fontSize: "var(--fs-2xs)", fontWeight: "var(--fw-bold)", textTransform: "uppercase", letterSpacing: ".04em", color: "var(--ink-3)", padding: "8px 10px", borderBottom: "1px solid var(--line)" } as const;
   const td = { padding: "8px 10px", borderBottom: "1px solid var(--line-soft)", color: "var(--ink)" } as const;
-  const select = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "13px", fontFamily: "var(--font-ui)" } as const;
+  const select = { padding: "5px 8px", borderRadius: "var(--r-md)", border: "1px solid var(--line)", background: "var(--surface)", fontSize: "var(--fs-tabelle)", fontFamily: "var(--font-ui)" } as const;
 
   return (
     <>
 
-      {fehler && <Card style={{ marginBottom: "var(--sp-4)", borderColor: "var(--danger, #c0392b)" }}>{t("review.fehlerDb")} ({fehler})</Card>}
+      {fehler && <Card style={{ marginBottom: "var(--sp-4)", borderColor: "var(--danger)" }}>{t("review.fehlerDb")} ({fehler})</Card>}
 
       {umsaetze.length === 0 && !fehler ? (
         <Card>{t("review.leer")}</Card>
@@ -402,9 +340,9 @@ export function ReviewScreen() {
         <Card
           title={t("review.offenInfo", { offen, fertig })}
           action={
-            <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "center", flexWrap: "wrap" }}>
+            <Zeile abstand={3}>
               {verb && <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)" }}>{t("review.verbuchtErgebnis", { verbucht: verb.verbucht, umbuchungen: verb.umbuchungen, uebersprungen: verb.uebersprungen })}</span>}
-              <Button variant="primary" onClick={busy || fertig === 0 ? undefined : verbuchen} style={busy || fertig === 0 ? { opacity: 0.5, cursor: busy ? "wait" : "not-allowed" } : undefined}>
+              <Button variant="primary" onClick={verbuchen} laeuft={busy} disabled={fertig === 0}>
                 {busy ? t("review.verbuchenBusy") : t("review.verbuchen", { n: fertig })}
               </Button>
               {/* Der Gegenweg zum Verbuchen: was hier nie eine Kategorie bekommt, soll
@@ -414,16 +352,16 @@ export function ReviewScreen() {
                 verwerfenGefragt ? (
                   <span style={{ display: "inline-flex", gap: "var(--sp-2)", alignItems: "center", fontSize: "var(--fs-xs)" }}>
                     <span className="muted">{t("review.verwerfenFrage", { n: gefiltert.filter((u) => !u.vorschlag).length })}</span>
-                    <button className="linkbtn" style={{ color: "var(--warn-deep)" }} onClick={() => void restVerwerfen()}>{t("review.verwerfenJa")}</button>
-                    <button className="linkbtn" onClick={() => setVerwerfenGefragt(false)}>{t("review.verwerfenNein")}</button>
+                    <Button variant="link" style={{ color: "var(--warn-deep)" }} onClick={() => void restVerwerfen()}>{t("review.verwerfenJa")}</Button>
+                    <Button variant="link" onClick={() => setVerwerfenGefragt(false)}>{t("review.verwerfenNein")}</Button>
                   </span>
                 ) : (
-                  <button className="linkbtn" onClick={() => setVerwerfenGefragt(true)}>
+                  <Button variant="link" onClick={() => setVerwerfenGefragt(true)}>
                     {t("review.restVerwerfen")}
-                  </button>
+                  </Button>
                 )
               )}
-            </div>
+            </Zeile>
           }
         >
           <div style={{ display: "flex", gap: "var(--sp-3)", marginBottom: "var(--sp-3)", flexWrap: "wrap" }}>
@@ -456,21 +394,19 @@ export function ReviewScreen() {
               placeholder={t("review.suche")}
               style={{ ...select, flex: "1 1 200px", minWidth: 160 }}
             />
-            <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)", alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
-            <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: "var(--fs-xs)", color: "var(--ink-2)", cursor: "pointer", whiteSpace: "nowrap", alignSelf: "center" }}>
-              <input
-                type="checkbox"
-                checked={auswahlModus}
-                onChange={(e) => { setAuswahlModus(e.target.checked); if (!e.target.checked) setAuswahl(new Set()); }}
-                style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
-              />
+            <span className="hinweis" style={{ alignSelf: "center" }}>{t("review.treffer", { n: gefiltert.length })}</span>
+            <Kaestchen
+              an={sammel.modus}
+              aufAendern={sammel.modusSetzen}
+              style={{ fontSize: "var(--fs-xs)", color: "var(--ink-2)", whiteSpace: "nowrap", alignSelf: "center" }}
+            >
               {t("review.sammel.modus")}
-            </label>
+            </Kaestchen>
           </div>
 
           {/* Die Aktionsleiste erscheint erst, wenn etwas markiert ist. Vorher gäbe es
               nichts zu tun, und ein grauer Knopf ist eine Frage ohne Antwort. */}
-          {auswahlModus && auswahl.size > 0 && (
+          {sammel.modus && auswahl.size > 0 && (
             <div style={{ display: "flex", alignItems: "center", gap: "var(--sp-3)", flexWrap: "wrap", marginBottom: "var(--sp-3)", padding: "8px 12px", borderRadius: "var(--r-md)", background: "var(--accent-wash)" }}>
               <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-bold)", color: "var(--accent-deep)" }}>
                 {t("review.sammel.gewaehlt", { n: auswahl.size })}
@@ -483,10 +419,10 @@ export function ReviewScreen() {
                 placeholder={t("review.sammel.kategorieSetzen")}
                 ariaLabel={t("review.sammel.kategorieSetzen")}
               />
-              <button className="linkbtn" style={{ color: "var(--warn-deep)" }} onClick={busy ? undefined : () => void sammelVerwerfen()}>
+              <Button variant="link" style={{ color: "var(--warn-deep)" }} onClick={() => void sammelVerwerfen()} laeuft={busy}>
                 {t("review.sammel.weglegen", { n: auswahl.size })}
-              </button>
-              <button className="linkbtn" onClick={() => setAuswahl(new Set())}>{t("review.sammel.aufheben")}</button>
+              </Button>
+              <Button variant="link" onClick={sammel.leeren}>{t("review.sammel.aufheben")}</Button>
               {/* Was der Sammelweg auslässt, steht VOR der Aktion da — nicht als
                   Ergebnismeldung hinterher. */}
               {gewaehlteUmbuchungen > 0 && (
@@ -497,17 +433,15 @@ export function ReviewScreen() {
             </div>
           )}
 
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
             <thead>
               <tr>
-                {auswahlModus && (
+                {sammel.modus && (
                   <th style={{ ...th, width: 32 }}>
-                    <input
-                      type="checkbox"
-                      checked={alleGewaehlt}
-                      aria-label={t("review.sammel.alleWaehlen")}
-                      onChange={() => setAuswahl(alleGewaehlt ? new Set() : new Set(alleIds))}
-                      style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                    <Kaestchen
+                      an={sammel.alleGewaehlt}
+                      label={t("review.sammel.alleWaehlen")}
+                      aufAendern={sammel.alleUmschalten}
                     />
                   </th>
                 )}
@@ -522,14 +456,12 @@ export function ReviewScreen() {
             <tbody>
               {zeilen.map((u) => (
                 <tr key={u.id}>
-                  {auswahlModus && (
+                  {sammel.modus && (
                     <td style={td}>
-                      <input
-                        type="checkbox"
-                        checked={auswahl.has(u.id)}
-                        aria-label={t("review.sammel.zeileWaehlen")}
-                        onChange={() => auswahlUmschalten(u.id)}
-                        style={{ accentColor: "var(--accent-deep)", cursor: "pointer" }}
+                      <Kaestchen
+                        an={sammel.istGewaehlt(u.id)}
+                        label={t("review.sammel.zeileWaehlen")}
+                        aufAendern={() => sammel.umschalten(u.id)}
                       />
                     </td>
                   )}
@@ -570,7 +502,7 @@ export function ReviewScreen() {
                     ) : (
                       <CategoryPicker kategorien={kategorien} value={u.vorschlag?.kategorieId ?? ""} onChange={(id) => kategorieGesetzt(u, id)} />
                     )}
-                    {u.vorschlag && <Herkunft umsatz={u} kontext={kontext} />}
+                    {u.vorschlag && <Herkunft umsatz={u} kontext={kontext} katById={katById} />}
                   </td>
                   <td style={{ ...td, textAlign: "right", whiteSpace: "nowrap" }}>
                     <IconButton
@@ -593,7 +525,7 @@ export function ReviewScreen() {
           {seitenAnzahl > 1 && (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "var(--sp-3)", marginTop: "var(--sp-3)" }}>
               <Button variant="ghost" onClick={() => setSeite((s) => Math.max(0, s - 1))}>‹</Button>
-              <span style={{ fontSize: "var(--fs-xs)", color: "var(--ink-3)" }}>{t("review.seite", { seite: aktuelleSeite + 1, gesamt: seitenAnzahl })}</span>
+              <span className="hinweis">{t("review.seite", { seite: aktuelleSeite + 1, gesamt: seitenAnzahl })}</span>
               <Button variant="ghost" onClick={() => setSeite((s) => Math.min(seitenAnzahl - 1, s + 1))}>›</Button>
             </div>
           )}
@@ -603,15 +535,15 @@ export function ReviewScreen() {
       {/* Der Rückweg — zugeklappt, aber mit Anzahl, damit man weiß, dass dort etwas liegt. */}
       {weggelegte.length > 0 && (
         <Card style={{ marginTop: "var(--gap-card)" }} pad>
-          <button className="linkbtn" onClick={() => setZeigeWeggelegt((x) => !x)}>
+          <Button variant="link" onClick={() => setZeigeWeggelegt((x) => !x)}>
             {t("review.weggelegt.titel", { n: weggelegte.length })}
-          </button>
+          </Button>
           {zeigeWeggelegt && (
             <>
-              <div className="muted" style={{ fontSize: "var(--fs-xs)", margin: "var(--sp-2) 0" }}>
+              <div className="hinweis" style={{ margin: "var(--sp-2) 0" }}>
                 {t("review.weggelegt.hinweis")}
               </div>
-              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "var(--fs-tabelle)" }}>
                 <tbody>
                   {weggelegte.map((u) => (
                     <tr key={u.id}>
@@ -625,9 +557,9 @@ export function ReviewScreen() {
                         <Pill variant="neutral">{t(`review.weggelegt.status.${u.status}`)}</Pill>
                       </td>
                       <td style={{ ...td, textAlign: "right" }}>
-                        <button className="linkbtn" onClick={() => void zurueck(u)}>
+                        <Button variant="link" onClick={() => void zurueck(u)}>
                           {t("review.weggelegt.zurueckholen")}
-                        </button>
+                        </Button>
                       </td>
                     </tr>
                   ))}

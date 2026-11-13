@@ -10,7 +10,7 @@
 // Wording- oder Design-Durchgang stehen, statt reihenweise rot zu werden.
 
 import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
 
@@ -35,8 +35,8 @@ import { VertraegeScreen } from "./vertraege/VertraegeScreen";
 import { sqliteBudgetRepository } from "../persistence/sqliteBudgetRepository";
 import { sqliteDepotRepository } from "../persistence/sqliteDepotRepository";
 import { sqliteRuecklagenRepository } from "../persistence/sqliteRuecklagenRepository";
-import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteZahlungsregelRepository } from "../persistence/sqliteZahlungsregelRepository";
+import { sqliteLedgerRepository } from "../persistence/sqliteLedgerRepository";
 import { sqliteVertragRepository } from "../persistence/sqliteVertragRepository";
 import {
   sqliteKategorieRepository,
@@ -72,8 +72,13 @@ async function grunddaten() {
  * ganzen Screen trifft dann mehrere Elemente und bricht ab. Gesucht wird deshalb IN der
  * Karte, um die es geht; das bleibt auch dann richtig, wenn weitere Karten dazukommen.
  */
-async function inAufschluesselung() {
-  const titel = await screen.findByText("Nach Kategorien");
+/**
+ * Wählt im Verlauf einen Monat und liefert die Karte darunter, die ihn aufschlüsselt —
+ * seit 2026-11-11 steht die Aufschlüsselung wieder im Verlauf, unter dem gewählten Monat.
+ */
+async function inMonatsauswertung(nutzer: ReturnType<typeof userEvent.setup>, monat: string) {
+  await auswahlWaehlen(nutzer, "Monat", monat);
+  const titel = await screen.findByText(`Wofür das Geld im ${monat} ging`);
   // Titel → Titelspalte → Kopfzeile → Karte. `Card` baut den Kopf aus zwei geschachtelten
   // `div`s; ohne Klasse daran bleibt nur der Weg über die Ebenen.
   const karte = titel.parentElement?.parentElement?.parentElement as HTMLElement;
@@ -177,12 +182,6 @@ describe("RuecklagenScreen", () => {
 });
 
 describe("UebersichtScreen", () => {
-  /** Heute als ISO — die Screens lesen die Uhr selbst, ein festes Datum wäre morgen falsch. */
-  function heuteIso(): string {
-    const n = new Date();
-    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
-  }
-
   /** Der Monatsschlüssel `zurueck` Monate vor heute. */
   function monat(zurueck: number): string {
     const n = new Date();
@@ -200,7 +199,7 @@ describe("UebersichtScreen", () => {
    * gar keinem — was auf einem Rücklagenkonto passierte, stand mit in „so sieht der
    * Monat aus", obwohl es dort gerade nicht zur Verfügung steht.
    */
-  it("lässt Buchungen auf Rücklagenkonten aus den Monatskarten heraus", async () => {
+  it("lässt Buchungen auf Rücklagenkonten aus den Monatskarten heraus, nicht aus der Budgetliste", async () => {
     await grunddaten();
     await sqliteZahlungskontoRepository.speichern({
       id: "k-rueck", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "ruecklage",
@@ -226,9 +225,48 @@ describe("UebersichtScreen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
     // … und nicht die Summe beider Konten. Genau die stünde da ohne den Filter.
     expect(document.body.textContent).not.toMatch(/802,36/);
-    // Die Budgetliste rechnet aus DERSELBEN Sicht: 1.000,00 − 123,45 bleiben übrig.
-    // Ungefiltert stünden hier 197,64, und das Budget sähe fast erschöpft aus.
-    await waitFor(() => expect(document.body.textContent).toMatch(/876,55/));
+    // Die Budgetliste rechnet seit 2026-11-11 über ALLE Konten — ein Budget ist ein Topf,
+    // und was aus ihm ging, ging aus ihm: 1.000,00 − 123,45 − 678,91 = 197,64.
+    await waitFor(() => expect(document.body.textContent).toMatch(/197,64/));
+    expect(document.body.textContent).not.toMatch(/876,55/);
+  });
+
+  /**
+   * Eine Umbuchung zwischen erfassten Konten verschiebt eigenes Geld — sie gehört in
+   * keine Zeile, auch nicht, wenn sie die liquiden Konten verlässt. Was zurückgelegt
+   * wird, steht stattdessen als Rate in „Rücklagen".
+   */
+  it("lässt Umbuchungen auf erfasste Konten heraus und zieht die Rücklagen-Raten ab", async () => {
+    await grunddaten();
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Zweitkonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0,
+    });
+    // Ein Sparkonto — die Klasse ist absichtlich NICHT Rücklage: seit 2026-11-09 hängt an
+    // ihr nicht mehr, ob eine Umbuchung in der Karte steht.
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k-spar", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "sparen",
+      inhaberIds: [], saldo: 0,
+    });
+    for (const [id, ziel, betrag] of [["r-intern", "k2", -4321], ["r-spar", "k-spar", -20000]] as const) {
+      await sqliteZahlungsregelRepository.speichern({
+        id, bezeichnung: id, betrag, rhythmus: "monatlich", startdatum: `${monat(1)}-03`,
+        charakter: "Umschichtung", kontoId: "k1", gegenkontoId: ziel,
+      });
+    }
+    await sqliteRuecklagenRepository.speichern({
+      id: "rk", bezeichnung: "Puffer", rate: 15000, beginn: `${monat(0)}-01`, kontoId: "k-spar",
+    });
+
+    rendere(<UebersichtScreen />);
+    // Gesucht wird IN der Monatskarte: „Was noch kommt" führt jede Fälligkeit je Konto,
+    // auch die Umbuchung — dort gehört sie hin, sie bewegt ja ein Konto.
+    const zeile = (await screen.findAllByText("Rücklagen"))[0];
+    let karte: HTMLElement = zeile;
+    while (!/bleibt/i.test(karte.textContent ?? "")) karte = karte.parentElement!;
+    expect(karte.textContent).toMatch(/150,00/);
+    expect(karte.textContent).not.toMatch(/43,21/);
+    expect(karte.textContent).not.toMatch(/200,00/);
+    expect(karte.textContent).not.toMatch(/Umbuchungen nach außen/);
   });
 
   /** Was insgesamt da ist, steht daneben — nach Klasse, nicht nach Gruppe. */
@@ -243,32 +281,6 @@ describe("UebersichtScreen", () => {
     await waitFor(() => expect(document.body.textContent).toMatch(/1\.111,00/));
     // Und die Summe über beide Klassen.
     expect(document.body.textContent).toMatch(/3\.611,00/);
-  });
-
-  /**
-   * Die einzige Karte, die AUFFORDERT statt zu berichten — und die einzige, die
-   * verschwindet, wenn es nichts zu sagen gibt. Eine dauerhafte Zeile „alles in Ordnung"
-   * wäre nach zwei Wochen unsichtbar, und dann fiele auch die Warnung nicht mehr auf.
-   */
-  it("schweigt, solange kein Konto ins Minus läuft", async () => {
-    await grunddaten();
-    rendere(<UebersichtScreen />);
-    await waitFor(() => expect(document.body.textContent).toBeTruthy());
-    expect(document.body.textContent).not.toMatch(/Da ist etwas zu tun/);
-  });
-
-  it("meldet ein Konto, das an einem festen Termin ins Minus läuft", async () => {
-    await grunddaten(); // Girokonto mit 2.500,00
-    await sqliteZahlungsregelRepository.speichern({
-      id: "r1", bezeichnung: "Grosse Rate", betrag: -400000, rhythmus: "monatlich",
-      startdatum: heuteIso(), charakter: "Aufwand", kontoId: "k1",
-    });
-
-    rendere(<UebersichtScreen />);
-    await screen.findByText("Da ist etwas zu tun");
-    // „sicher": schon der Termin allein reicht — daran ändert Sparsamkeit nichts.
-    await waitFor(() => expect(document.body.textContent).toMatch(/Girokonto/));
-    expect(document.body.textContent).toMatch(/sicher/);
   });
 
   it("zeigt den Depotwert, nicht den Kontostand des Depot-Kontos", async () => {
@@ -439,6 +451,40 @@ describe("AnalyseScreen", () => {
   });
 
   /** Der Weg, der vorher nur über den Konto-Auszug ging: Kategorie → Buchung → Details. */
+  /**
+   * Die Abschnitte stehen in Registern, und nur die mit Inhalt bekommen einen Reiter:
+   * ohne abgerufenes Depot gibt es keinen Reiter „Depot". Die Filter stehen seit
+   * 2026-11-09 am Register, das sie einstellen: Verlauf Monat und Zeitraum, Befunde nur
+   * den Zeitraum, der Ausblick keinen — er steht fest.
+   */
+  it("zeigt die Abschnitte als Register, jedes mit den Filtern, die es einstellen", async () => {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    rendere(<AnalyseScreen />);
+
+    await screen.findByRole("tab", { name: "Verlauf" });
+    expect(screen.getAllByRole("tab").map((r) => r.textContent)).toEqual(["Verlauf", "Kategorien", "Ausblick", "Befunde"]);
+    expect(screen.getByText("Monatsverlauf")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Befunde" }));
+    await waitFor(() => expect(screen.queryByText("Monatsverlauf")).toBeNull());
+    expect(screen.getByRole("tab", { name: "Befunde" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("Zeitraum")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Monat")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Ausblick" }));
+    await waitFor(() => expect(screen.queryByLabelText("Zeitraum")).toBeNull());
+    expect(screen.queryByLabelText("Monat")).toBeNull();
+
+    fireEvent.click(screen.getByRole("tab", { name: "Verlauf" }));
+    await screen.findByText("Monatsverlauf");
+    expect(screen.getByLabelText("Zeitraum")).toBeInTheDocument();
+    expect(screen.getByLabelText("Monat")).toBeInTheDocument();
+  });
+
   it("öffnet die Buchungsdetails aus einer aufgeklappten Kategorie", async () => {
     await grunddaten();
     await sqliteLedgerRepository.speichern({
@@ -448,11 +494,11 @@ describe("AnalyseScreen", () => {
     const nutzer = userEvent.setup();
     rendere(<AnalyseScreen />);
 
-    // Kategorie aufklappen …
-    await nutzer.click((await inAufschluesselung()).getByText(/Lebensmittel/));
+    // Monat wählen, darunter die Kategorie aufklappen …
+    await nutzer.click((await inMonatsauswertung(nutzer, "2026-06")).getByText(/Lebensmittel/));
     // … dann die Buchung darin.
-    await waitFor(() => expect(screen.getAllByTitle(/Buchungsdetails/).length).toBeGreaterThan(0));
-    await nutzer.click(screen.getAllByTitle(/Buchungsdetails/)[0]);
+    await waitFor(() => expect(screen.getAllByTitle(/Buchung öffnen/).length).toBeGreaterThan(0));
+    await nutzer.click(screen.getAllByTitle(/Buchung öffnen/)[0]);
 
     // Der Detaildialog trägt die Notiz der Buchung.
     await waitFor(() => expect(document.body.textContent).toMatch(/Sondermüll/));
@@ -474,16 +520,61 @@ describe("AnalyseScreen", () => {
     rendere(<AnalyseScreen />);
 
     await waitFor(() => expect(document.body.textContent).toMatch(/123,45/));
-    await auswahlWaehlen(nutzer, "Gliederung", "Hauptgruppen");
+    const karte = await inMonatsauswertung(nutzer, "2026-06");
+    await nutzer.click(karte.getByRole("button", { name: "Hauptgruppen" }));
 
     // Jetzt steht die Hauptgruppe da; die Unterkategorie erst nach dem Aufklappen.
-    // Gesucht wird IN der Karte: die Ranglisten der Befunde führen dieselben Namen.
-    const karte = await inAufschluesselung();
     await waitFor(() => expect(karte.getByText(/Lebenshaltung/)).toBeInTheDocument());
     expect(karte.queryByText(/Lebensmittel/)).not.toBeInTheDocument();
 
     await nutzer.click(karte.getByText(/Lebenshaltung/));
     await waitFor(() => expect(karte.getByText(/Lebensmittel/)).toBeInTheDocument());
+  });
+
+  /**
+   * Seit 2026-11-11 hat jedes Register seinen eigenen Zeitraum. Vorher stellte der
+   * Zeitraum der Befunde auch den Verlauf um — und ein Monat im Verlauf die Kategorien.
+   */
+  it("hält den Zeitraum je Register getrennt", async () => {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<AnalyseScreen />);
+    await screen.findByText("Monatsverlauf");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Befunde" }));
+    await auswahlWaehlen(nutzer, "Zeitraum", "Letzte 24 Monate");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Verlauf" }));
+    await screen.findByText("Monatsverlauf");
+    expect(screen.getByLabelText("Zeitraum")).toHaveTextContent("Letzte 12 Monate");
+
+    fireEvent.click(screen.getByRole("tab", { name: "Befunde" }));
+    await waitFor(() => expect(screen.getByLabelText("Zeitraum")).toHaveTextContent("Letzte 24 Monate"));
+  });
+
+  /** Das Register „Kategorien" ist seit 2026-11-11 eine Auswertung über die Zeit. */
+  it("zeigt im Register Kategorien jede Kategorie mit Summe und öffnet sie im Einzelnen", async () => {
+    await grunddaten();
+    await sqliteLedgerRepository.speichern({
+      id: "i1", datum: "2026-06-01", betrag: -12345, kontoId: "k1",
+      charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1", notiz: "Altpapier",
+    });
+    const nutzer = userEvent.setup();
+    rendere(<AnalyseScreen />);
+    fireEvent.click(await screen.findByRole("tab", { name: "Kategorien" }));
+
+    await screen.findByText("Kategorien über die Zeit");
+    const zeile = (await screen.findByText("Lebensmittel")).closest("tr") as HTMLElement;
+    expect(zeile.textContent).toMatch(/123,45/);
+    expect(zeile.textContent).toMatch(/100 %/);
+
+    await nutzer.click(zeile);
+    // Darunter die Kategorie im Einzelnen, mit ihren Buchungen.
+    await waitFor(() => expect(screen.getAllByTitle(/Buchung öffnen/).length).toBeGreaterThan(0));
   });
 });
 
@@ -588,7 +679,7 @@ describe("EinstellungenScreen", () => {
     await sqlitePersonRepository.speichern({ id: "p1", name: "Bruce", rolle: "hauptperson" });
     const nutzer = userEvent.setup();
     rendere(<EinstellungenScreen />);
-    await registerWaehlen(nutzer, /^Personen$/);
+    await registerWaehlen(nutzer, /^Personalisierung$/);
     await waitFor(() => expect(document.body.textContent).toMatch(/Bruce|Girokonto|Lebensmittel/));
   });
 });

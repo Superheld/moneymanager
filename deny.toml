@@ -51,6 +51,24 @@ ignore = [
   { id = "RUSTSEC-2026-0368", reason = "zip via tauri-plugin-updater, nur Windows; entpackt wird erst nach der Signaturpruefung" },
   { id = "RUSTSEC-2026-0369", reason = "zip via tauri-plugin-updater, nur Windows; entpackt wird erst nach der Signaturpruefung" },
   { id = "RUSTSEC-2026-0429", reason = "zip via tauri-plugin-updater, nur Windows; entpackt wird erst nach der Signaturpruefung" },
+
+  # SQLite liest fremden Speicher, wenn neben der Datenbank ein praepariertes `-wal` mit
+  # anderer Seitengroesse liegt. Der Angriff braucht eine UNTERGESCHOBENE Datei, und die
+  # App oeffnet nur, was sie selbst im Datenverzeichnis angelegt hat. Wer dort eine Datei
+  # ablegen kann, liest den Speicher des Prozesses auch ohne diese Luecke.
+  #
+  # Nicht behebbar von hier, aus zwei Gruenden. sqlx 0.9 laesst libsqlite3-sys nur
+  # unterhalb von 0.38 zu, und laut Advisory ist alles bis 0.38.2 betroffen — innerhalb
+  # dieses Fensters heben aendert an der Luecke nichts. Und die Fassung darueber (0.39.x)
+  # buendelt zwar ein gepatchtes SQLite, in der SQLCipher-Variante aber weiterhin ein
+  # betroffenes.
+  #
+  # WIEDERVORLAGE: anders als die Freigaben oben meldet sich diese NICHT von selbst als
+  # unnoetig. Sie bleibt „zutreffend", solange die Kiste im Baum ist, auch wenn es laengst
+  # eine gepatchte Fassung gibt. Zu pruefen bei jedem Heben von sqlx oder libsqlite3-sys:
+  # buendelt `bundled-sqlcipher` inzwischen ein SQLite ab 3.54.0? Dann heben und die
+  # Zeile streichen. Siehe CLAUDE.md, „Build-Stolpersteine".
+  { id = "RUSTSEC-2026-0459", reason = "SQLite/WAL, braucht eine untergeschobene Datei im Datenverzeichnis; kein gepatchtes SQLCipher ueber sqlx 0.9 erreichbar" },
 ]
 
 [bans]

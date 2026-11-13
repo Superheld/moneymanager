@@ -9,7 +9,7 @@
 // und derselbe Vorgang stünde je nach Einsortierung für zwei völlig verschiedene
 // Aussagen. Es braucht dafür auch nichts: der Charakter sagt WOFÜR das Geld war, das
 // Vorzeichen sagt, wohin es floss, und eine Erstattung ist damit ein Aufwand mit
-// positivem Betrag (CLAUDE.md → „Die Richtung kommt vom Beleg").
+// positivem Betrag (`src/core/buchung/CLAUDE.md` → „Das Vorzeichen ist die Richtung").
 //
 // Das gilt auch, wenn die ursprüngliche Ausgabe gar nicht im Bestand steht: eine
 // Steuerrückerstattung gehört zu „Steuern", eine Kautionsrückzahlung zu „Wohnen".

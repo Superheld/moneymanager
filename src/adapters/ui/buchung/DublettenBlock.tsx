@@ -10,7 +10,7 @@
 import { useTranslation } from "react-i18next";
 import type { Dublettenverdacht } from "../../../application";
 import type { Umsatz } from "../../../application/import";
-import { Pill } from "../bausteine";
+import { Pill, Button } from "../bausteine";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
@@ -66,18 +66,18 @@ export function DublettenBlock({
     <div style={{ marginBottom: "var(--sp-4)", padding: "10px 12px", borderRadius: "var(--r-md)", background: "var(--warn-wash, var(--surface-2))", border: "1px solid var(--warn, var(--line))" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 9, flexWrap: "wrap" }}>
         <Pill variant="warn">{t(sicher ? "konten.neue.dubletteSicher" : "konten.neue.dublette")}</Pill>
-        <span style={{ fontSize: 13.5, fontWeight: "var(--fw-semi)" }}>
+        <span style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)" }}>
           {datum.ohneJahr(zwilling.buchungstag)} · {zwilling.gegenpartei || t("konten.neue.ohneGegenpartei")}
         </span>
         <span className="num" style={{ fontWeight: 700, color: geldFarbe(zwilling.betrag) }}>{geld.formatMitSymbol(zwilling.betrag, { mitVorzeichen: true })}</span>
-        <span className="muted" style={{ fontSize: "var(--fs-xs)" }}>
+        <span className="hinweis">
           {t(`konten.neue.status.${zwilling.status}`)}
         </span>
         {onZwillingOeffnen && (
           <IconButton icon="oeffnen" label={t("konten.dublette.oeffnen")} onClick={onZwillingOeffnen} style={{ marginLeft: "auto" }} />
         )}
       </div>
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 6 }}>
+      <div className="hinweis" style={{ marginTop: 6 }}>
         {t("konten.neue.dubletteHinweis", { gruende: verdacht.gruende.join(", ") })}
       </div>
       {/* Der Fall, in dem die Zeile NICHT ueberfluessig ist: sie ist schon einmal einem
@@ -85,21 +85,20 @@ export function DublettenBlock({
           Auskunft aendert — „beide bleiben stehen, bis du eine loeschst" ist hier die
           falsche Handlungsempfehlung. */}
       {fremdkonto && (
-        <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+        <div className="hinweis" style={{ marginTop: 4 }}>
           {t("konten.dublette.anderesKonto", { konto: fremdkonto })}
         </div>
       )}
-      <div className="muted" style={{ fontSize: "var(--fs-xs)", marginTop: 4 }}>
+      <div className="hinweis" style={{ marginTop: 4 }}>
         {t(imLedger ? "konten.dublette.hinweisLedger" : "konten.dublette.hinweis")}
       </div>
       {onKeinDuplikat && (
-        <button
-          className="linkbtn"
+        <Button variant="link"
           style={{ marginTop: 6, padding: 0 }}
           onClick={() => void onKeinDuplikat()}
         >
           {t("konten.dublette.keinDuplikat")}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -117,9 +116,9 @@ export function FreigabeHinweis({ onAufheben }: { onAufheben: () => void | Promi
   return (
     <div className="muted" style={{ marginBottom: "var(--sp-4)", fontSize: "var(--fs-xs)", display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
       <span>{t("konten.dublette.freigegeben")}</span>
-      <button className="linkbtn" style={{ padding: 0 }} onClick={() => void onAufheben()}>
+      <Button variant="link" style={{ padding: 0 }} onClick={() => void onAufheben()}>
         {t("konten.dublette.freigabeAufheben")}
-      </button>
+      </Button>
     </div>
   );
 }

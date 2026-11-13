@@ -1,19 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { euroZuCent } from "../basis/geld";
 import {
-  betragImMonat,
+  aufbauendeAnsprueche,
   budgetKategorien,
   budgetRahmen,
   budgetStand,
   budgetBuchungen,
   budgetVerbrauch,
-  effektiverMonatsbetrag,
   elternBudget,
   ersterBudgetmonat,
   geglaetteterMonatsabfluss,
   kindBudgets,
   monatsFenster,
   verbrauchsFenster,
+  zufuehrungIm,
   type Budget,
   type BudgetSicht,
 } from "./budget";
@@ -74,23 +74,23 @@ describe("verbrauchsFenster", () => {
 describe("budgetRahmen", () => {
   it("monatlich: jeden Monat derselbe Betrag", () => {
     const b = budget();
-    expect(budgetRahmen(b, [b], BAUM, "2026-06-14")).toBe(euroZuCent(400));
+    expect(budgetRahmen(b, "2026-06-14")).toBe(euroZuCent(400));
   });
 
   it("aufbauend: Monatsbetrag mal verstrichene Monate, der laufende zählt mit", () => {
     // Start Januar, Blick im März → Januar, Februar, März = 3 Monate.
     const b = budget({ art: "aufbauend", betragProMonat: euroZuCent(50), start: "2026-01-01" });
-    expect(budgetRahmen(b, [b], BAUM, "2026-03-20")).toBe(euroZuCent(150));
+    expect(budgetRahmen(b, "2026-03-20")).toBe(euroZuCent(150));
   });
 
   it("aufbauend: im Startmonat genau eine Rate — nicht null", () => {
     const b = budget({ art: "aufbauend", betragProMonat: euroZuCent(50), start: "2026-01-01" });
-    expect(budgetRahmen(b, [b], BAUM, "2026-01-31")).toBe(euroZuCent(50));
+    expect(budgetRahmen(b, "2026-01-31")).toBe(euroZuCent(50));
   });
 
   it("aufbauend: vor dem Start ist nichts da — rückwirkend füllen wäre erfunden", () => {
     const b = budget({ art: "aufbauend", betragProMonat: euroZuCent(50), start: "2026-06-01" });
-    expect(budgetRahmen(b, [b], BAUM, "2026-04-10")).toBe(0);
+    expect(budgetRahmen(b, "2026-04-10")).toBe(0);
   });
 });
 
@@ -119,24 +119,27 @@ describe("Verschachtelung", () => {
     expect([...budgetKategorien(kind, alle, BAUM)].sort()).toEqual(["fernreise", "urlaub"]);
   });
 
-  it("rechnet den Betrag des Kindes aus dem Dach heraus", () => {
-    expect(effektiverMonatsbetrag(dach, alle, BAUM, "2026-06")).toBe(euroZuCent(120));
-    expect(effektiverMonatsbetrag(kind, alle, BAUM, "2026-06")).toBe(euroZuCent(80));
-    // Zusammen bleibt es bei dem, was das Dach ansagt — nichts entsteht, nichts fällt weg.
-    expect(
-      effektiverMonatsbetrag(dach, alle, BAUM, "2026-06") +
-        effektiverMonatsbetrag(kind, alle, BAUM, "2026-06"),
-    ).toBe(betragImMonat(dach, "2026-06"));
+  it("zieht den Betrag des Kindes NICHT vom Dach ab — das Dach gilt für alles ausser ihm", () => {
+    // Mobilität aufbauend 50 €, darunter Tanken 100 €: zwei getrennte Töpfe, zusammen
+    // 150 €. Bis 2026-11-09 bekam das Dach 50 − 100 = −50 € je Monat und sank, ohne dass
+    // etwas ausgegeben wurde.
+    const mobil = budget({ id: "mobil", kategorieId: "freizeit", art: "aufbauend", betragProMonat: euroZuCent(50), start: "2026-01-01" });
+    const tanken = budget({ id: "tanken", kategorieId: "urlaub", betragProMonat: euroZuCent(100) });
+    expect(zufuehrungIm(mobil, "2026-06")).toBe(euroZuCent(50));
+    expect(budgetRahmen(mobil, "2026-03-15")).toBe(euroZuCent(150));
+    expect(geglaetteterMonatsabfluss(mobil, "2026-06") + geglaetteterMonatsabfluss(tanken, "2026-06")).toBe(euroZuCent(-150));
   });
 
-  it("lässt einen negativen Rest stehen, statt ihn auf null zu klemmen", () => {
-    // Das Kind fordert mehr, als das Dach hergibt — ein Widerspruch, den man sehen soll.
-    const gierig = { ...kind, betraege: [{ abMonat: "2026-01", betrag: euroZuCent(500) }] };
-    expect(effektiverMonatsbetrag(dach, [dach, gierig], BAUM, "2026-06")).toBe(euroZuCent(-300));
-  });
-
-  it("glättet den Monatsabfluss für die Planung auf den effektiven Betrag", () => {
-    expect(geglaetteterMonatsabfluss(dach, alle, BAUM, "2026-06")).toBe(euroZuCent(-120));
+  it("ein aufbauendes Dach sinkt ohne Ausgaben nie, wie gross die Kinder auch sind", () => {
+    const mobil = budget({ id: "mobil", kategorieId: "freizeit", art: "aufbauend", betragProMonat: euroZuCent(50), start: "2026-01-01" });
+    const tanken = budget({ id: "tanken", kategorieId: "urlaub", betragProMonat: euroZuCent(500) });
+    const s0 = sicht([], [mobil, tanken]);
+    let vorher = 0;
+    for (const am of ["2026-01-15", "2026-02-15", "2026-03-15", "2026-04-15"]) {
+      const rest = budgetStand(s0, mobil, am).rest;
+      expect(rest).toBeGreaterThan(vorher);
+      vorher = rest;
+    }
   });
 });
 
@@ -348,5 +351,28 @@ describe("Budget ohne Startdatum", () => {
     const stand = budgetStand(sicht([], [b]), b, "2026-03-15");
     expect(stand.rahmen).toBe(euroZuCent(400));
     expect(stand.rest).toBe(euroZuCent(400));
+  });
+});
+
+describe("aufbauendeAnsprueche", () => {
+  const sicht = (budgets: Budget[]): BudgetSicht => ({
+    buchungen: [],
+    kategorien: [{ id: "k", name: "Werkstatt", defaultCharakter: "Aufwand" }],
+    budgets,
+    vertragsBuchungen: new Set(),
+  });
+
+  it("beansprucht den Rest eines aufbauenden Budgets auf seinem Konto", () => {
+    const b = budget({ art: "aufbauend", kontoId: "ruecklagen", betragProMonat: euroZuCent(50) });
+    // Januar bis März: dreimal 50, nichts ausgegeben.
+    expect(aufbauendeAnsprueche(sicht([b]), "2026-03-15")).toEqual([
+      { art: "budget", id: "b", kontoId: "ruecklagen", betrag: euroZuCent(150) },
+    ]);
+  });
+
+  // Der Rest eines monatlichen Budgets verfällt zum Monatsende und bleibt einfach auf dem
+  // Konto — er gehört niemandem.
+  it("lässt monatliche Budgets aus", () => {
+    expect(aufbauendeAnsprueche(sicht([budget()]), "2026-03-15")).toEqual([]);
   });
 });

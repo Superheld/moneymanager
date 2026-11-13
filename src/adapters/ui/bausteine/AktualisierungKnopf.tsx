@@ -22,6 +22,7 @@ import { useTranslation } from "react-i18next";
 import type { Aktualisierung } from "../../../application";
 import { Icon } from "./IconButton";
 import { aktualisierungInstallieren, aktualisierungSuchen } from "../../dienste";
+import { Button as BaseButton } from "@base-ui/react/button";
 
 export function AktualisierungKnopf() {
   const { t } = useTranslation();
@@ -63,10 +64,13 @@ export function AktualisierungKnopf() {
       {/* Das Icon steht VOR dem Text und bleibt, wenn die Seitenleiste einklappt — dort
           faellt jede Beschriftung weg (`.lbl`), und ohne Icon bliebe ein leerer Knopf.
           Der `title` traegt den Satz dann allein. */}
-      <button
+      <BaseButton
         className="aktualisierungbtn"
         onClick={installieren}
         disabled={laeuft}
+        // Er sperrt sich selbst, sobald er gedrückt ist — der Fokus soll dabei stehen bleiben.
+        focusableWhenDisabled
+        aria-busy={laeuft || undefined}
         title={
           laeuft
             ? t("shell.aktualisierungLaeuft")
@@ -79,7 +83,7 @@ export function AktualisierungKnopf() {
             ? t("shell.aktualisierungLaeuft")
             : t("shell.aktualisierungBereit", { version: bereit.version })}
         </span>
-      </button>
+      </BaseButton>
       {fehler && <div className="aktualisierungfehler">{t("shell.aktualisierungFehler")}</div>}
     </div>
   );

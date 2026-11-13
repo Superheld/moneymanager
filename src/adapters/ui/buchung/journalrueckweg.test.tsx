@@ -69,27 +69,25 @@ async function verlaufOeffnen(nutzer: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("Verlauf im Auszug", () => {
-  it("markiert die Zeile mit der Zahl der Einträge", async () => {
+  it("markiert die Zeile nicht mehr — der Verlauf steht im Dialog", async () => {
+    // Bis 2026-11-12 trug eine Zeile mit Journaleinträgen eine Pille „Verlauf n". Sie war
+    // als vorläufig gebaut, solange das Journal jung war; der Verlauf steht im Dialog.
     await verstellteBuchung();
     rendere(<KontenScreen onNavigate={() => {}} />);
 
     const zeile = (await screen.findByText("Vertippt")).closest("tr")!;
-    // Angelegt und einmal geändert — zwei Einträge.
-    expect(within(zeile).getByText(/Verlauf 2/)).toBeInTheDocument();
+    expect(within(zeile).queryByText(/Verlauf/)).toBeNull();
   });
 
-  it("markiert nichts, wo nichts protokolliert ist", async () => {
-    // Der Bestand vor Einführung des Journals: eine Buchung, die an der Schicht vorbei
-    // in die Tabelle kam, hat keinen Eintrag — und darf auch keine Markierung tragen.
-    await grunddaten();
-    db.run(
-      `INSERT INTO ist_buchung (id, datum, betrag, konto_id, kategorie_id, charakter, quelle, notiz)
-       VALUES ('b-alt','2026-08-10',-2929,'kt','kat-a','Aufwand','manuell','Altbestand')`,
-    );
+  it("öffnet die Buchung mit einem Klick irgendwo in der Zeile", async () => {
+    // Nicht über den Stift: die ganze Zeile führt in den Dialog, wie in jeder Tabelle.
+    const nutzer = userEvent.setup();
+    await verstellteBuchung();
     rendere(<KontenScreen onNavigate={() => {}} />);
 
-    const zeile = (await screen.findByText("Altbestand")).closest("tr")!;
-    expect(within(zeile).queryByText(/Verlauf/)).toBeNull();
+    const zeile = (await screen.findByText("Vertippt")).closest("tr")!;
+    await nutzer.click(zeile.cells[zeile.cells.length - 2]);
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 });
 

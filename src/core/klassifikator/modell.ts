@@ -3,7 +3,7 @@
 //
 // Warum ausgerechnet diese Modellklasse, und keine größere: Der Lern-Spike (2026-06) hat
 // linear, MLP und tief+breit auf denselben Daten verglichen — sie lagen gleichauf, der
-// Deckel bei ~85 % ist daten- und mehrdeutigkeitslimitiert. Ein Hidden Layer kostet also
+// Deckel ist daten- und mehrdeutigkeitslimitiert. Ein Hidden Layer kostet also
 // Rechenzeit und Erklärbarkeit, ohne etwas zu bringen.
 //
 // Und die Erklärbarkeit ist hier kein Beiwerk. Bei einem linearen Modell IST die
@@ -16,6 +16,8 @@
 // für Bit. Das Mischen der Trainingsreihenfolge läuft über einen eigenen, gesetzten
 // Zufallsgenerator statt über `Math.random`. Sonst lieferte zweimal „Training starten"
 // zwei verschiedene Modelle, und keine Messung wäre wiederholbar.
+
+import { erklaeren, type Erklaerung } from "./erklaerung";
 
 /** Ein Trainingsbeispiel: Tokens plus die Kategorie, die herauskommen soll. */
 export interface Beispiel {
@@ -30,6 +32,16 @@ export interface Beispiel {
    * trennen sind. Optional, damit ein konstruiertes Beispiel im Test ohne sie auskommt.
    */
   readonly id?: string;
+  /**
+   * Buchungsdatum (ISO). Wie `id` für das Training bedeutungslos — die Messung teilt
+   * danach in Vergangenheit und Zukunft (`messung.ts`).
+   */
+  readonly datum?: string;
+  /**
+   * Hat ein Mensch die Kategorie gesetzt? Nur solche Labels sind eine Wahrheit, an der
+   * sich messen lässt; ein automatisches kann vom Modell selbst stammen.
+   */
+  readonly handverlesen?: boolean;
 }
 
 export interface Modell {
@@ -52,8 +64,9 @@ export interface TrainingsOptionen {
   readonly lernrate?: number;
   /**
    * L2-Regularisierung. Hält einzelne Gewichte klein und verhindert, dass ein Token, das
-   * genau einmal vorkommt, seine Kategorie im Alleingang entscheidet — bei ~2000
-   * Merkmalen auf ~3700 Beispielen ist das der wahrscheinlichste Fehlermodus.
+   * genau einmal vorkommt, seine Kategorie im Alleingang entscheidet — wenn das
+   * Vokabular in der Grössenordnung der Beispielzahl liegt, ist das der wahrscheinlichste
+   * Fehlermodus.
    */
   readonly l2?: number;
   /** Startwert des Mischens. Gleicher Wert ⇒ gleiches Modell. */
@@ -61,16 +74,18 @@ export interface TrainingsOptionen {
 }
 
 /**
- * Am echten Bestand kalibriert (2026-08-16, 3689 Beispiele über 47 Kategorien): Gitter
- * über Epochen × Lernrate × L2, gemessen über FÜNF verschiedene Trainings-/Prüf-Splits.
+ * Kalibriert (2026-08-16): Gitter über Epochen × Lernrate × L2, gemessen über mehrere
+ * verschiedene Trainings-/Prüf-Splits.
  *
- * Über mehrere Splits und nicht über einen: der beste Einzelsplit lieferte 90,5 %, das
- * Mittel derselben Einstellung 89,1 %. Wer den Höchstwert eines Splits festschreibt,
- * kalibriert auf dessen Zufall und trägt die Differenz später als Enttäuschung nach.
+ * Über mehrere Splits und nicht über einen: der beste Einzelsplit lag spürbar über dem
+ * Mittel derselben Einstellung. Wer den Höchstwert eines Splits festschreibt, kalibriert
+ * auf dessen Zufall und trägt die Differenz später als Enttäuschung nach.
  *
- * Gewählt: 89,1 % im Mittel (schlechtester Split 87,1 %), 137 ms über den ganzen Bestand.
- * 60 Epochen brachten nichts mehr, 20 lagen 0,3 Punkte darunter. L2 wirkt kaum — es
- * bleibt drin, weil es beim Wachsen des Vokabulars greift, nicht wegen der heutigen Zahl.
+ * Gewählt wurde das beste Mittel. Deutlich mehr Epochen brachten nichts mehr, die Hälfte
+ * lag knapp darunter. L2 wirkt kaum — es bleibt drin, weil es beim Wachsen des Vokabulars
+ * greift, nicht wegen eines heutigen Messwerts. Gemessen wurde damals mit zufälligen
+ * Splits; seit 2026-11-09 misst die App zeitlich (`messung.ts`), eine Neukalibrierung
+ * gegen dieses Protokoll steht aus.
  */
 export const STANDARD_TRAINING: Required<TrainingsOptionen> = {
   epochen: 40,
@@ -346,8 +361,13 @@ export interface Fehltreffer {
   readonly tatsaechlich: string;
   readonly vorhergesagt: string;
   readonly merkmale: readonly string[];
-  /** Was am stärksten für die FALSCHE Kategorie sprach. */
-  readonly beitraege: readonly Beitrag[];
+  /**
+   * Warum die falsche Kategorie und nicht die richtige — gegen die RICHTIGE gerechnet,
+   * nicht gegen die Zweitbeste. Bis 2026-11-09 standen hier die stärksten Gewichte der
+   * falschen Kategorie allein; die sagen nicht, was den Ausschlag gab (siehe
+   * `erklaerung.ts`).
+   */
+  readonly erklaerung: Erklaerung;
   readonly sicherheit: number;
 }
 
@@ -377,6 +397,24 @@ export interface Bewertung {
    * Form die Frage „wo ist es am schlimmsten" beantwortet und die andere „warum".
    */
   readonly fehltreffer: readonly Fehltreffer[];
+  /**
+   * Je Prüfbeispiel: wie sicher das Modell war und ob es traf. Grundlage der
+   * Kalibrierung (`messung.ts`) — die Frage, ob „90 % sicher" auch 90 % richtig heisst.
+   */
+  readonly vorhersagen: readonly Vorhersage[];
+}
+
+/**
+ * Eine Vorhersage an einem Prüfbeispiel. Die Id und beide Kategorien stehen dabei, damit
+ * sich zwei Trainingsläufe Zeile für Zeile vergleichen lassen (`laeufe.ts`): eine
+ * Trefferquote, die gleich bleibt, kann zehn Zeilen gewonnen und zehn verloren haben.
+ */
+export interface Vorhersage {
+  readonly id?: string;
+  readonly tatsaechlich: string;
+  readonly vorhergesagt: string;
+  readonly sicherheit: number;
+  readonly treffer: boolean;
 }
 
 /** Misst das Modell an Beispielen, die es nicht gesehen hat. */
@@ -384,12 +422,22 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
   const je = new Map<string, { richtig: number; gesamt: number }>();
   const paare = new Map<string, Verwechslung>();
   const fehltreffer: Fehltreffer[] = [];
+  const vorhersagen: Vorhersage[] = [];
   let richtig = 0;
 
   for (const b of beispiele) {
     const k = klassifizieren(modell, b.merkmale);
     const treffer = k?.kategorieId === b.kategorieId;
     if (treffer) richtig++;
+    if (k) {
+      vorhersagen.push({
+        id: b.id,
+        tatsaechlich: b.kategorieId,
+        vorhergesagt: k.kategorieId,
+        sicherheit: k.sicherheit,
+        treffer,
+      });
+    }
     const e = je.get(b.kategorieId) ?? { richtig: 0, gesamt: 0 };
     e.gesamt++;
     if (treffer) e.richtig++;
@@ -410,7 +458,8 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
         tatsaechlich: b.kategorieId,
         vorhergesagt: k.kategorieId,
         merkmale: b.merkmale,
-        beitraege: k.beitraege,
+        // Nicht null: dasselbe Modell hat eben eine Vorhersage geliefert.
+        erklaerung: erklaeren(modell, b.merkmale, b.kategorieId)!,
         sicherheit: k.sicherheit,
       });
     }
@@ -430,6 +479,7 @@ export function bewerten(modell: Modell, beispiele: readonly Beispiel[]): Bewert
         a.vorhergesagt.localeCompare(b.vorhergesagt),
     ),
     fehltreffer,
+    vorhersagen,
   };
 }
 

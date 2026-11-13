@@ -158,7 +158,7 @@ describe("MonatsAusblick", () => {
     rendere(<MonatsAusblick {...props()} />);
     const august = await karte("August 2026");
 
-    await nutzer.click(within(august).getByText("Budgets"));
+    await nutzer.click(within(august).getByText("Budgets monatlich"));
     expect(within(august).getByText("Lebenshaltung")).toBeInTheDocument();
     expect(within(august).getByText("70,00 / 430,00 €")).toBeInTheDocument();
   });
@@ -180,7 +180,7 @@ describe("MonatsAusblick", () => {
     rendere(<MonatsAusblick {...props({ ist: zurueck })} />);
     const august = await karte("August 2026");
 
-    await nutzer.click(within(august).getByText("Budgets"));
+    await nutzer.click(within(august).getByText("Budgets monatlich"));
     expect(within(august).getByText("\u221290,00 / 430,00 €")).toBeInTheDocument();
   });
 
@@ -196,15 +196,16 @@ describe("MonatsAusblick", () => {
   });
 
   /**
-   * Die Rücklagen hatten bis 2026-09-01 eine eigene Zeile: die kalkulatorische Monatsrate,
-   * in Plan und Ist mit demselben Betrag. Sie ist weg, weil Rücklagen sich seit den
-   * Umbuchungsverträgen PLANEN lassen — die geplante Umbuchung steht in der Zeile
-   * „Sparen & Vorsorge", und beides nebeneinander zählte dasselbe Zurücklegen zweimal.
+   * Die Rücklagen stehen als Rechnung da: ihre Monatsrate, in Plan und Ist gleich. So war
+   * es bis 2026-09-01 schon einmal; dazwischen fehlte die Zeile, weil dasselbe
+   * Zurücklegen als geplante Umbuchung daneben stand. Seit 2026-11-09 fallen Umbuchungen
+   * zwischen erfassten Konten heraus, und die Rate ist wieder der einzige Ort dafür.
    */
-  it("zeigt keine Rücklagenzeile mehr", async () => {
-    rendere(<MonatsAusblick {...props()} />);
+  it("zeigt die Raten der Rücklagen als eigene Zeile", async () => {
+    rendere(<MonatsAusblick {...props({ ruecklagen: RUECKLAGEN })} />);
     await screen.findByText("August 2026");
-    expect(screen.queryByText("Rücklagen")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Rücklagen").length).toBeGreaterThan(0);
+    expect(document.body.textContent).toMatch(/120,00/);
   });
 
   it("schweigt über fehlende Einnahmen, sobald ein Ertrags-Vertrag existiert", async () => {
@@ -238,9 +239,8 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     const nutzer = userEvent.setup();
     await nutzer.click(screen.getAllByText("Verträge")[0]);
     expect(screen.getAllByText("Vermieter").length).toBeGreaterThan(0);
-    // Und keine Rücklagenzeile: die Rücklagen werden seit 2026-09-01 geplant statt
-    // gerechnet, und die geplante Umbuchung steht unter „Sparen & Vorsorge".
-    expect(screen.queryByText("Rücklagen")).not.toBeInTheDocument();
+    // Und die Rücklage aus der Datenbank steht mit ihrer Rate in jeder Karte.
+    expect(screen.getAllByText("Rücklagen")).toHaveLength(3);
   });
 
   it("klappt ein Budget der Liste auf und zeigt seine Buchungen", async () => {
@@ -257,13 +257,15 @@ describe("Übersicht — Ausblick am echten Schema", () => {
     rendere(<UebersichtScreen />);
     const nutzer = userEvent.setup();
     // Die Budget-Liste unten trägt denselben Kategorienamen wie die aufgeklappte
-    // Budgets-Zeile der Karte — deshalb über das aria-label der Kopfzeile greifen.
-    const kopf = await screen.findByLabelText(/Lebenshaltung/);
+    // Budgets-Zeile der Karte — deshalb über die aufklappende Kopfzeile greifen (seit der
+    // Balken darunter benannt ist, trägt auch er den Namen).
+    const kopf = await screen.findByRole("button", { name: /Lebenshaltung/ });
     expect(screen.queryByText("Wocheneinkauf")).not.toBeInTheDocument();
 
     await nutzer.click(kopf);
     expect(await screen.findByText("Wocheneinkauf")).toBeInTheDocument();
-    expect(screen.getByText("Verbraucht")).toBeInTheDocument();
+    // Ohne Summenzeile: der Betrag steht schon in der Budgetzeile darüber.
+    expect(screen.queryByText("Verbraucht")).not.toBeInTheDocument();
   });
 
   /**
@@ -286,11 +288,14 @@ describe("Übersicht — Ausblick am echten Schema", () => {
 
     rendere(<UebersichtScreen />);
     const nutzer = userEvent.setup();
-    await nutzer.click(await screen.findByLabelText(/Lebenshaltung/));
+    await nutzer.click(await screen.findByRole("button", { name: /Lebenshaltung/ }));
 
-    // Die Zeile ist ein Knopf, kein Text — nur so ist sie auch mit der Tastatur erreichbar.
-    const zeile = (await screen.findByText("Wocheneinkauf")).closest("button");
+    // Die Zeile hat die Rolle eines Knopfs und steht in der Tab-Reihenfolge — nur so ist
+    // sie auch mit der Tastatur erreichbar (seit 2026-11-09 eine Tabellenzeile in
+    // `Aufklapptabelle`, vorher ein echtes <button>).
+    const zeile = (await screen.findByText("Wocheneinkauf")).closest('[role="button"]') as HTMLElement | null;
     expect(zeile).not.toBeNull();
+    expect(zeile!.tabIndex).toBe(0);
 
     await nutzer.click(zeile!);
     const dialog = await screen.findByRole("dialog");

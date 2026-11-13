@@ -19,12 +19,25 @@
 // Budget-Kategorie hängt (auf echten Daten: Sport → Freizeit & Kultur), doppelt — und
 // die Aufrechnung ginge nicht mehr gegen den Kontostand auf.
 //
-// DIE RÜCKLAGEN-ZEILE IST DIE EINE AUSNAHME von „Ist = was tatsächlich floss": die
-// monatliche Rate der Rücklagen wird nirgends gebucht, sie ist reine Rechnung.
-// Sie steht deshalb in BEIDEN Spalten mit demselben Betrag. Das ist Absicht — die Frage
-// unter dem Strich lautet „was kann ich noch ausgeben?", und eine Rücklage kann man
-// nicht ausgeben, ob sie nun geflossen ist oder nicht. Wer die Ist-Spalte gegen den
-// Kontoauszug prüft, muss diese Zeile herausrechnen.
+// UMBUCHUNGEN HÄNGEN AM KREIS. Die Aufrechnung rechnet über eine Auswahl von Konten
+// (`kreis`, in der Übersicht seit 2026-11-09 ALLE erfassten). Eine Umbuchung, deren
+// Zielkonto im Kreis liegt, verschiebt eigenes Geld — sie fällt aus Plan UND Ist heraus.
+// Was bleibt, verlässt den Kreis: in der Zeile „Umbuchungen nach außen" steht nur noch
+// Geld, das auf ein Konto geht, das die App nicht kennt (der Wertpapierkauf ohne
+// erfasstes Depotkonto).
+//
+// DIE RÜCKLAGEN SIND EINE RECHNUNG, KEINE ÜBERWEISUNG (wieder seit 2026-11-09): je
+// Rücklage ihre Monatsrate, in Plan und Ist mit demselben Betrag — gebunden ist sie, ob
+// überwiesen wurde oder nicht. Genau so stand die Zeile schon bis 2026-09-01 da und flog
+// damals heraus, weil dasselbe Zurücklegen daneben als geplante Umbuchung stand und
+// doppelt zählte. Der Grund ist weg, seit die Umbuchungen den Kreis nicht mehr verlassen.
+// Dazwischen (2026-11-08) zeigte die Zeile die echte Überweisung aufs Rücklagenkonto;
+// das hing an der Kontoklasse und blieb leer, wo die Rücklagen auf einem anders
+// eingestuften Konto lagen.
+//
+// BUDGETS STEHEN IN ZWEI ZEILEN, monatlich und aufbauend — nach der Art JEDES Budgets,
+// wie in der Budgetliste (`nachArtGetrennt`), damit dasselbe Budget in Karte und Liste
+// in derselben Gruppe steht.
 
 import { addMonate, parseIso, toIso } from "./basis/datum";
 import type { Cent } from "./basis/geld";
@@ -33,6 +46,8 @@ import { istInterneUmbuchung } from "./buchung/historie";
 import type { Kategorie } from "./kategorien/kategorie";
 import { kategorieAnteile, type IstBuchung } from "./buchung/istbuchung";
 import { projiziereRegel, type Planbuchung } from "./buchung/projektion";
+import { istUmbuchungsregel } from "./vertraege/umbuchungErkennung";
+import { sollRuecklage, type Ruecklage } from "./ruecklagen/ruecklage";
 import type { Zahlungsregel } from "./basis/zahlungsregel";
 
 /** Die Zeilen der Aufrechnung, in Anzeigereihenfolge. */
@@ -40,6 +55,8 @@ export type AusblickZeileId =
   | "einnahmen"
   | "vertraege"
   | "budgets"
+  | "budgetsAufbauend"
+  | "ruecklagen"
   | "umschichtung"
   | "sonstiges";
 
@@ -130,6 +147,40 @@ export interface MonatsAusblickEingabe {
   readonly monatAb: string;
   /** Heutiges Datum (ISO) — trennt Plan-only von Plan+Ist. */
   readonly heute: string;
+  /**
+   * Die Konten, über die gerechnet wird. Eine Umbuchung, deren Zielkonto hier liegt, ist
+   * aus Sicht der Aufrechnung intern und fällt heraus; eine, die hinausführt, ist ein
+   * Abfluss und bleibt.
+   *
+   * Optional, weil es auch eine Aufrechnung über ALLE Konten gibt (der Ausblick der
+   * Analyse). Ohne Angabe gilt jede gepaarte Umbuchung als intern — das ist dort richtig,
+   * denn jedes erfasste Konto liegt im Kreis.
+   */
+  readonly kreis?: ReadonlySet<string>;
+  /**
+   * Die Rücklagen, deren Monatsrate als Abzug in der Zeile „Rücklagen" steht. Optional:
+   * die Aufrechnung der Analyse fragt nach dem Saldo, und eine Rate ist keine Bewegung.
+   */
+  readonly ruecklagen?: readonly Ruecklage[];
+}
+
+/**
+ * Ist diese Buchung aus Sicht des Kreises eine interne Verschiebung?
+ *
+ * Mit Kreis entscheidet das Zielkonto. Ohne Gegenkonto bleibt nur der Verweis auf ein
+ * zweites Bein — dann ist es eine Umbuchung zwischen erfassten Konten, deren Ziel
+ * niemand kennt, und sie gilt wie bisher als intern. Eine Umschichtung OHNE beides (der
+ * Wertpapierkauf vom Girokonto) verlässt den Kreis und bleibt.
+ */
+function istIntern(b: IstBuchung, kreis: ReadonlySet<string> | undefined): boolean {
+  if (!kreis) return istInterneUmbuchung(b);
+  if (b.gegenkontoId) return kreis.has(b.gegenkontoId);
+  return istInterneUmbuchung(b);
+}
+
+/** Eine geplante Umbuchung, deren Ziel im Kreis liegt — sie verschiebt nur. */
+function istInterneRegel(r: Zahlungsregel, kreis: ReadonlySet<string> | undefined): boolean {
+  return !!kreis && r.charakter === "Umschichtung" && !!r.gegenkontoId && kreis.has(r.gegenkontoId);
 }
 
 /** Aufrechnung eines Monats. Reine Funktion über bereits geladene Daten. */
@@ -140,14 +191,15 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
   const zukunft = von > e.heute;
   const laufend = !zukunft && e.heute < bis;
 
-  const planPosten = e.regeln.flatMap((r) => projiziereRegel(r, von, 1).map((p) => ({ p, regel: r })));
-  const regelById = new Map(e.regeln.map((r) => [r.id, r]));
+  const regeln = e.regeln.filter((r) => !istInterneRegel(r, e.kreis));
+  const planPosten = regeln.flatMap((r) => projiziereRegel(r, von, 1).map((p) => ({ p, regel: r })));
+  const regelById = new Map(regeln.map((r) => [r.id, r]));
 
-  // Ist des Monats. Interne Umbuchungen raus — sie schieben eigenes Geld zwischen
-  // eigenen Konten und gehören in keine Zeile dieser Aufrechnung.
+  // Ist des Monats. Interne Umbuchungen raus — sie schieben eigenes Geld innerhalb des
+  // Kreises und gehören in keine Zeile dieser Aufrechnung.
   const istImMonat = zukunft
     ? []
-    : e.ist.filter((b) => b.datum >= von && b.datum < bis && !istInterneUmbuchung(b));
+    : e.ist.filter((b) => b.datum >= von && b.datum < bis && !istIntern(b, e.kreis));
 
   const zugeordnet = ordneZu(planPosten, istImMonat, regelById);
   const verbraucht = new Set([...zugeordnet.values()].map((b) => b.id));
@@ -155,6 +207,7 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
   const einnahmen = zeileAusRegeln("einnahmen", planPosten, zugeordnet, "Ertrag");
   const vertraege = zeileAusRegeln("vertraege", planPosten, zugeordnet, "Aufwand");
   const umschichtung = zeileAusRegeln("umschichtung", planPosten, zugeordnet, "Umschichtung");
+  const ruecklagen = ruecklagenZeile(e.ruecklagen ?? [], von, bis, zukunft);
 
   // Was noch keiner Zeile gehört — die Basis für Budgets und Sonstiges.
   const offenesIst = istImMonat.filter((b) => !verbraucht.has(b.id));
@@ -165,16 +218,14 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
     budgets: e.budgets,
     vertragsBuchungen: e.vertragsBuchungen,
   };
-  const { zeile: budgetZeile, getragen } = budgetsZeile(sicht, von, bis, zukunft);
+  const { zeilen: budgetZeilen, getragen } = budgetsZeilen(sicht, von, bis, zukunft);
 
   // Was gebucht, aber von keiner Plan-Zeile erfasst ist, kommt EINZELN dazu — je Buchung
   // ein Posten. Früher stand hier eine Summe pro Zeile („weitere Einnahmen: 342,10"),
   // und damit war die Zeile zwar richtig, aber unbeantwortbar: welche Buchungen das
   // waren, stand nirgends, und genau danach fragt man beim Aufklappen.
   const weitereEinnahmen = offenesIst.filter((b) => b.charakter === "Ertrag").map(buchungsPosten);
-  const weitereUmschichtung = offenesIst
-    .filter((b) => b.charakter === "Umschichtung")
-    .map(buchungsPosten);
+  const weitereUmschichtung = offenesIst.filter((b) => b.charakter === "Umschichtung").map(buchungsPosten);
   // Bei den Ausgaben zählt der ANTEIL, nicht die Buchung: eine geteilte Buchung kann
   // zur Hälfte auf ein Budget laufen und zur anderen hier landen. Gefragt wird, was die
   // Budgets TATSÄCHLICH getragen haben — nicht, ob die Kategorie unter einem Budget
@@ -192,8 +243,12 @@ export function monatsAusblick(e: MonatsAusblickEingabe): MonatsAusblick {
   const zeilen: AusblickZeile[] = [
     mitEinzelposten(einnahmen, weitereEinnahmen),
     vertraege,
-    budgetZeile,
+    budgetZeilen.monatlich,
   ];
+  // Aufbauende Budgets, Rücklagen und Umschichtung nur, wenn es sie gibt: drei Zeilen
+  // voller Nullen wären bei einem Haushalt ohne sie Lärm.
+  if (budgetZeilen.aufbauend.posten.length > 0) zeilen.push(budgetZeilen.aufbauend);
+  if (ruecklagen.posten.length > 0) zeilen.push(ruecklagen);
   if (umschichtung.plan !== 0 || weitereUmschichtung.length > 0) {
     zeilen.push(mitEinzelposten(umschichtung, weitereUmschichtung));
   }
@@ -249,11 +304,17 @@ function ordneZu(
     const s = schluesselVon(p);
     if (treffer.has(s)) continue;
     const regel = regelById.get(p.regelId);
-    if (!regel?.kategorieId || p.betrag === 0) continue;
+    if (!regel || p.betrag === 0) continue;
+    // Eine Umbuchung trägt meist keine Kategorie, aber Quell- und Zielkonto — daran wird
+    // sie wiedererkannt, wie in der Vertragszuordnung (`umbuchungErkennung`).
+    const umbuchung = istUmbuchungsregel(regel);
+    if (!umbuchung && !regel.kategorieId) continue;
     for (const b of istImMonat) {
       if (b.charakter !== p.charakter) continue;
       if (Math.sign(b.betrag) !== Math.sign(p.betrag)) continue;
-      if (!kategorieAnteile(b).some((a) => a.kategorieId === regel.kategorieId)) continue;
+      if (umbuchung) {
+        if (b.kontoId !== regel.kontoId || b.gegenkontoId !== regel.gegenkontoId) continue;
+      } else if (!kategorieAnteile(b).some((a) => a.kategorieId === regel.kategorieId)) continue;
       const abstand = Math.abs(b.betrag - p.betrag) / Math.abs(p.betrag);
       if (abstand > BETRAGS_TOLERANZ) continue;
       paare.push({ schluessel: s, buchung: b, abstand });
@@ -301,23 +362,56 @@ function zeileAusRegeln(
 }
 
 /**
+ * Die Rücklagen des Monats: je Rücklage, was ihr Soll in diesem Monat wächst.
+ *
+ * Über den Zuwachs des Solls und nicht über die blosse Rate, damit die Zeile dieselbe
+ * Rechnung trägt wie der Bereich Rücklagen: vor dem Beginn steht nichts, und eine
+ * Rücklage, deren Ziel erreicht ist, bindet nichts mehr — bis sie ausgebucht wird und
+ * von vorn anfängt.
+ *
+ * Plan und Ist sind derselbe Betrag: gebunden ist die Rate, sobald der Monat läuft, ob
+ * das Geld schon umgebucht wurde oder nicht. Nur ein künftiger Monat hat kein Ist.
+ */
+function ruecklagenZeile(items: readonly Ruecklage[], von: string, bis: string, zukunft: boolean): AusblickZeile {
+  const posten = items
+    .map((r): AusblickPosten => {
+      const plan = -(sollRuecklage(r, bis) - sollRuecklage(r, von)) || 0;
+      return {
+        schluessel: `ruecklage:${r.id}`,
+        bezeichnung: r.bezeichnung,
+        plan,
+        ist: zukunft ? null : plan,
+        status: zukunft ? "offen" : "gebucht",
+      };
+    })
+    .filter((p) => p.plan !== 0)
+    .sort((a, b) => a.plan - b.plan);
+  return {
+    id: "ruecklagen",
+    plan: summe(posten.map((p) => p.plan)),
+    ist: zukunft ? null : summe(posten.map((p) => p.ist ?? 0)),
+    posten,
+  };
+}
+
+/**
  * Budgets: geplant der geglättete Monatsanteil, gebucht der Verbrauch DES MONATS —
  * auch bei jährlicher Periode. Sonst stünde ein Zwölftel Plan gegen einen Jahresverbrauch.
  */
-function budgetsZeile(
+function budgetsZeilen(
   sicht: BudgetSicht,
   von: string,
   bis: string,
   zukunft: boolean,
-): { zeile: AusblickZeile; getragen: Set<string> } {
-  const { budgets, kategorien } = sicht;
+): { zeilen: { monatlich: AusblickZeile; aufbauend: AusblickZeile }; getragen: Set<string> } {
+  const { budgets } = sicht;
   // Welche ANTEILE ein Budget trägt, wird hier festgehalten: „Sonstiges" nimmt genau den
   // Rest. Ohne diese Menge verschwände eine Vertragszahlung auf einer Budgetkategorie
   // aus beiden Zeilen — das Budget nimmt sie nicht (Vertrag), Sonstiges nimmt sie nicht
   // (Budgetkategorie) —, und die Ist-Spalte summierte nicht mehr auf das Gebuchte.
   const getragen = new Set<string>();
   const posten = budgets
-    .map((b): AusblickPosten => {
+    .map((b): AusblickPosten & { art: Budget["art"] } => {
       const beitraege = budgetBuchungen(sicht, b, von, bis);
       for (const p of beitraege) getragen.add(`${p.buchung.id}#${p.anteil}`);
       // `|| 0` fängt die negative Null: `-0` formatiert sich als „−0,00" und liest sich
@@ -330,23 +424,29 @@ function budgetsZeile(
         bezeichnung: b.kategorieId,
         // Der Monat der Zeile: seit der Betrag versioniert ist, plant ein Budget im
         // September womöglich mit einer anderen Rate als im Juli.
-        plan: geglaetteterMonatsabfluss(b, budgets, kategorien, von.slice(0, 7)),
+        plan: geglaetteterMonatsabfluss(b, von.slice(0, 7)),
         ist: verbrauch,
         status: verbrauch == null || verbrauch === 0 ? "offen" : "gebucht",
+        art: b.art === "aufbauend" ? "aufbauend" : "monatlich",
       };
     })
     .sort((a, b) => a.plan - b.plan);
 
+  const zeile = (id: AusblickZeileId, art: Budget["art"]): AusblickZeile => {
+    const drin = posten.filter((p) => p.art === art).map(({ art: _art, ...p }) => p);
+    return {
+      id,
+      plan: summe(drin.map((p) => p.plan)),
+      ist: zukunft ? null : summe(drin.map((p) => p.ist ?? 0)),
+      posten: drin,
+    };
+  };
   return {
-    zeile: {
-      id: "budgets",
-      plan: summe(posten.map((p) => p.plan)),
-      ist: zukunft ? null : summe(posten.map((p) => p.ist ?? 0)),
-      posten,
-    },
+    zeilen: { monatlich: zeile("budgets", "monatlich"), aufbauend: zeile("budgetsAufbauend", "aufbauend") },
     getragen,
   };
 }
+
 
 /** Hängt die ungeplanten Buchungen einer Zeile als eigene Posten an. */
 function mitEinzelposten(zeile: AusblickZeile, weitere: readonly AusblickPosten[]): AusblickZeile {
