@@ -3,6 +3,56 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [0.30.0] — 2026-11-13
+
+Die fertige Fassung der sechs Betas. Wer eine davon hat, bekommt gegenüber beta.6 nichts
+Neues — nur Windows hat wieder ein Installationspaket, das bei beta.6 fehlte. Wer von
+0.29.x kommt, findet hier das Wichtigste; die Einzelheiten stehen in den Abschnitten der
+Betas darunter. **Eine Migration** (75): sie legt die Tabelle der Trainingsläufe an und
+ändert sonst nichts.
+
+### Neu
+
+**Umbuchungen werden erkannt.** Zwei Buchungen mit exaktem Gegenbetrag auf zwei eigenen
+Konten verbindet die App selbst; „Paarung lösen" ist der Weg zurück.
+
+**Kontobelegung.** Eine Rechnung verteilt jeden Kontostand auf Rücklagen und aufbauende
+Budgets. Im Kontoauszug steht dafür die Spalte „frei" und je Konto die Karte „Gebunden
+auf …".
+
+**Neuer Datenschlüssel** unter Einstellungen → Verschlüsselung, nicht nur eine neue
+Passphrase.
+
+**Dunkles Schema**, nach der Einstellung des Systems.
+
+**Aktualisierung auf Knopfdruck** unter Einstellungen → Über die App.
+
+**Erkennung, die sich erklärt:** an jeder Buchung steht, welche Wörter den Ausschlag
+gaben, und jedes Training wird aufgezeichnet.
+
+### Geändert
+
+**Die Navigation ist nach Wichtigkeit sortiert.** Der Kontoauszug heisst „Buchungen" und
+steht in der Verwaltung.
+
+**Die Monatskarten der Übersicht** lassen Umbuchungen zwischen eigenen Konten heraus,
+führen Rücklagen als Monatsrate und Budgets getrennt nach monatlich und aufbauend.
+
+**Die Analyse steht in Registern** — Verlauf, Kategorien, Ausblick, Befunde, Depot —, jedes
+mit eigenem Zeitraum.
+
+**Ein Budget in einem Budget** nimmt dem äusseren nichts mehr weg: zwei Töpfe, nicht einer.
+
+**Die Oberfläche ist neu gebaut**: klickbare Zeilen, Dialoge, Reiter und Aufklapptabellen
+sehen überall gleich aus und sind mit der Tastatur bedienbar. Buchungen stehen unter
+Budgets und Kategorien in derselben Liste.
+
+**Eine Migration läuft ganz oder gar nicht.**
+
+### Entfernt
+
+Die Karte „Da ist etwas zu tun" oben in der Übersicht.
+
 ## [0.30.0-beta.6] — 2026-11-12
 
 Feinschliff aus dem Test von beta.4, und Buchungen sehen unter Budgets und in der Analyse
