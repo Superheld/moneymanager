@@ -5,34 +5,20 @@ import pkg from "../package.json";
 export const APP_VERSION: string = pkg.version;
 
 /**
- * Entwicklungsstadium. Steht sichtbar in der Seitenleiste, damit beim Draufschauen klar
- * ist, woran man ist: die App ist NICHT veröffentlicht, und das Datenschema darf sich
- * noch ohne Rücksicht ändern (siehe CLAUDE.md → „Stadium").
+ * Ob eine Version eine Vorabversion ist: Suffix `-pre`, mit oder ohne Nummer
+ * (`0.31.0-pre.1`). Dann steht neben der Version das Abzeichen „Vorab" — sonst nichts.
  *
- * Bewusst NICHT im Versionsstring (`0.11.0-alpha`): tauri.conf.json liest die Version von
- * hier weiter an die Bundle-Metadaten, und ein Suffix dort ist eine eigene Entscheidung
- * mit Folgen für Signierung und Updater. Das Stadium ist eine Anzeige, keine Versionsangabe.
+ * **Ein Stadium gibt es nicht mehr** (bis 0.30.0 „Alpha", als `APP_STADIUM`). Dass die
+ * App noch nicht stabil ist, sagt die 0 vorne in der Version, nach SemVer genau dafür da;
+ * ein Wort daneben wiederholte das nur — und warb, sobald es „Beta" hiess, mit demselben
+ * Wort wie die Vorabversionen, die bis dahin `-beta.N` hiessen. Was am Stadium wirklich
+ * hing, die Regel für Migrationen, steht in der Wurzel-`CLAUDE.md` unter „Stadium".
  *
- * Und bewusst NICHT über t(): „Alpha" ist in beiden Sprachen dasselbe Wort und gehört zur
- * Versionsangabe, nicht zur Prosa — ein Übersetzungsschlüssel dafür wäre eine Stelle mehr,
- * an der die Anzeige vom Konstanten-Wert abdriften kann.
+ * Ein anderes Suffix (`rc.1`, ein altes `beta.2`) ist keine Vorabversion im Sinne des
+ * Kanals: es bekommt kein Abzeichen, statt eines aus einem Wort zu raten.
  */
-export const APP_STADIUM = "Alpha";
-
-/**
- * Was das Abzeichen neben der Version zeigt: bei einer Vorabversion den KANAL, sonst das
- * Stadium. Seit es den Beta-Kanal gibt (0.29.3), trägt eine Beta ihr Suffix doch im
- * Versionsstring (`0.30.0-beta.2`), und daneben „Alpha" las sich wie ein Widerspruch —
- * zwei Reifegrade für dieselbe Fassung. Stimmen tun beide: das Stadium sagt, dass Schema
- * und Daten noch nicht festgeschrieben sind, der Kanal, dass diese Fassung noch nicht für
- * alle ist. Wer eine Beta laufen hat, für den ist das Zweite die dringendere Auskunft; das
- * Erste gilt ohnehin, solange `APP_STADIUM` dasteht.
- *
- * Nur `beta` wird übersetzt, weil es nur diesen Kanal gibt. Ein anderes Suffix (`rc.1`)
- * fällt aufs Stadium zurück, statt ein Abzeichen aus einem Wort zu raten.
- */
-export function abzeichenFuer(version: string, stadium: string): string {
-  return /^\d+\.\d+\.\d+-beta(\.|$)/.test(version) ? "Beta" : stadium;
+export function istVorabversion(version: string): boolean {
+  return /^\d+\.\d+\.\d+-pre(\.|$)/.test(version);
 }
 
-export const APP_ABZEICHEN = abzeichenFuer(APP_VERSION, APP_STADIUM);
+export const APP_IST_VORAB = istVorabversion(APP_VERSION);

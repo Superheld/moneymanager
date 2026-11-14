@@ -12,9 +12,9 @@ name: Release
 #
 #   • `releaseDraft: false` — Assets eines Entwurfs sind ohne Anmeldung nicht abrufbar.
 #     Ein Entwurf wäre bequem zum Nachsehen und macht den Updater blind.
-#   • `prerelease` NUR bei einem Tag mit Bindestrich (`v0.30.0-beta.1`). `releases/latest/`
+#   • `prerelease` NUR bei einem Tag mit Bindestrich (`v0.31.0-pre.1`). `releases/latest/`
 #     überspringt Vorabversionen: bei einer normalen Fassung liefert das eine 404, die
-#     aussieht wie „kein Update da". Bei einer Beta ist es genau der Zweck, denn so
+#     aussieht wie „kein Update da". Bei einer Vorabversion ist es genau der Zweck, denn so
 #     erreicht sie niemanden, der den Schalter nicht umgelegt hat.
 #
 # Beides ist der Grund, warum hier nichts auf „vorsichtig" steht: der Endpunkt muss
@@ -250,7 +250,7 @@ jobs:
           # genau dem Fall falsch, in dem es darauf ankommt.
           releaseBody: ${{ steps.text.outputs.body }}
           # Siehe Kopf: ein Entwurf macht den Updater blind, und `prerelease` darf nur eine
-          # Beta tragen. Der Bindestrich ist dieselbe Grenze, die auch SemVer zieht.
+          # Vorabversion tragen. Der Bindestrich ist dieselbe Grenze, die auch SemVer zieht.
           releaseDraft: false
           prerelease: ${{ contains(github.ref_name, '-') }}
           # Erzeugt `latest.json` neben den Artefakten — genau die Datei, die

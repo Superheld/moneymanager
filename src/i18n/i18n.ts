@@ -138,6 +138,7 @@ const de = {
     navEinstellungen: "Einstellungen",
     brandSub: "deine private Bilanz",
     footLokal: "Lokal · keine Cloud",
+    abzeichenVorab: "Vorab",
     menueOeffnen: "Navigation öffnen",
     menueSchliessen: "Navigation schliessen",
     dialogSchliessen: "Dialog schließen",
@@ -1527,11 +1528,11 @@ const de = {
       // Stelle, an der die App ungefragt nach draußen spricht.
       hinweis:
         "Das ist der einzige Netzzugriff, den die App von sich aus macht — sonst spricht sie nur nach draußen, wenn du einen Bankabruf auslöst. Abgerufen wird ausschließlich, ob es eine neuere Fassung gibt; es werden keine Daten von dir übertragen.",
-      betaTitel: "Betaversionen erhalten",
+      betaTitel: "Vorabversionen erhalten",
       // Die drei Sätze sagen, was man sich damit einhandelt: ungeprüfter Stand am echten
       // Bestand, Wirkung erst beim Start, und dass Ausschalten nichts zurückdreht.
       betaText:
-        "Bietet auch Vorabversionen an, die noch nicht für alle freigegeben sind. Sie laufen auf deinem echten Bestand und können Fehler enthalten. Gilt ab dem nächsten Start. Ausschalten nimmt eine installierte Beta nicht zurück: sie bleibt, bis eine neuere reguläre Fassung erscheint.",
+        "Bietet auch Vorabversionen an, die noch nicht für alle freigegeben sind. Sie laufen auf deinem echten Bestand und können Fehler enthalten. Gilt ab dem nächsten Start. Ausschalten nimmt eine installierte Vorabversion nicht zurück: sie bleibt, bis eine neuere reguläre Fassung erscheint.",
       schalterTitel: "Beim Start nach Aktualisierungen suchen",
       schalterText:
         "Liegt eine neuere Fassung bereit, erscheint unten links in der Seitenleiste ein Knopf. Findet die Prüfung nichts oder scheitert sie, passiert nichts — es gibt dann keine Meldung.",
@@ -2353,6 +2354,7 @@ const en: typeof de = {
     navEinstellungen: "Settings",
     brandSub: "your private balance sheet",
     footLokal: "Local · no cloud",
+    abzeichenVorab: "Pre-release",
     menueOeffnen: "Open navigation",
     menueSchliessen: "Close navigation",
     dialogSchliessen: "Close dialog",
@@ -3688,9 +3690,9 @@ const en: typeof de = {
       untertitel: "Whether the app looks for a newer version at startup",
       hinweis:
         "This is the only network request the app makes on its own — otherwise it only talks to the outside when you start a bank retrieval. All it asks is whether a newer version exists; none of your data is sent.",
-      betaTitel: "Receive beta versions",
+      betaTitel: "Receive pre-release versions",
       betaText:
-        "Also offers pre-release versions that are not yet released to everyone. They run on your real data and may contain bugs. Takes effect at the next start. Switching this off does not remove an installed beta: it stays until a newer regular version appears.",
+        "Also offers pre-release versions that are not yet released to everyone. They run on your real data and may contain bugs. Takes effect at the next start. Switching this off does not remove an installed pre-release: it stays until a newer regular version appears.",
       schalterTitel: "Look for updates at startup",
       schalterText:
         "If a newer version is ready, a button appears at the bottom left of the sidebar. If the check finds nothing or fails, nothing happens — there is no message.",

@@ -6,9 +6,9 @@
 //   npx vite-node scripts/seed-anlegen.mjs -- /pfad/x.db   # woanders hin
 //
 // WOZU ES DAS GIBT. Die installierte App verwaltet echtes Geld, die Entwicklung soll frei
-// rumprobieren koennen. Beides auf derselben Datei geht nicht gut aus: im Alpha-Stadium
-// duerfen Migrationen ausdruecklich WEGNEHMEN, und ein Versuch, der schiefgeht, traefe
-// sonst den einzigen Bestand, den es gibt.
+// rumprobieren koennen. Beides auf derselben Datei geht nicht gut aus: eine Migration ist
+// in der Entwicklung erst ein Entwurf, der mehrmals laeuft, bevor er stimmt, und ein
+// Versuch, der schiefgeht, traefe sonst den einzigen Bestand, den es gibt.
 //
 // Welche Datei die App oeffnet, entscheidet `src/adapters/persistence/datenbankdatei.ts`.
 // Dieses Skript fuellt die andere. Die Daten selbst stehen in

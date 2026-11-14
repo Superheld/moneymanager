@@ -73,8 +73,11 @@ Spielstand steht schon im Zielschema, und einen, den die App geöffnet hat, lies
 nicht mehr (er ist dann verschlüsselt). Der Weg ist ein Seed aus einem älteren Checkout
 (`git worktree` auf dem letzten Tag, dort `npm run seed` mit eigenem Zielpfad).
 
-Im Alpha-Stadium dürfen Migrationen auch **wegnehmen**; vor dem Abräumen prüfen, dass die
-Ziele leer sind.
+**Seit 0.30.0 überführt eine Migration, statt wegzunehmen** (Wurzel-`CLAUDE.md`
+→ „Stadium"): wer eine Tabelle oder Spalte ablöst, trägt ihren Inhalt vorher in die neue
+Struktur. Abgeräumt wird danach nur, was nachweislich leer ist, und das prüft die Migration
+selbst. Die älteren Migrationen, die mit „ALPHA" begründet wegnehmen, bleiben, wie sie sind
+— die Kette ist append-only.
 
 **Eine Spalte ABLÖSEN: `-- @wennSpalte x.y` vor das Statement, das sie ein letztes Mal
 liest.** Eine Version liest die Spalte (etwa in eine neue Tabelle), die nächste lässt sie

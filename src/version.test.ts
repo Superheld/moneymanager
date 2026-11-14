@@ -1,18 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { abzeichenFuer } from "./version";
+import { istVorabversion } from "./version";
 
-describe("abzeichenFuer", () => {
-  it("zeigt bei einer Beta den Kanal statt des Stadiums", () => {
-    expect(abzeichenFuer("0.30.0-beta.2", "Alpha")).toBe("Beta");
-    expect(abzeichenFuer("1.0.0-beta", "Alpha")).toBe("Beta");
+describe("istVorabversion", () => {
+  it("erkennt eine Vorabversion, mit und ohne Nummer", () => {
+    expect(istVorabversion("0.31.0-pre.2")).toBe(true);
+    expect(istVorabversion("1.0.0-pre")).toBe(true);
   });
 
-  it("zeigt bei einer fertigen Fassung das Stadium", () => {
-    expect(abzeichenFuer("0.30.0", "Alpha")).toBe("Alpha");
+  it("nimmt eine fertige Fassung nicht dafuer", () => {
+    expect(istVorabversion("0.31.0")).toBe(false);
   });
 
-  it("raet kein Abzeichen aus einem fremden Suffix", () => {
-    expect(abzeichenFuer("0.30.0-rc.1", "Alpha")).toBe("Alpha");
-    expect(abzeichenFuer("0.30.0-betamax", "Alpha")).toBe("Alpha");
+  it("raet nicht aus einem fremden Suffix", () => {
+    expect(istVorabversion("0.31.0-rc.1")).toBe(false);
+    expect(istVorabversion("0.31.0-preview")).toBe(false);
+    // Die alten Vorabversionen hiessen so; als Kanal gelten sie nicht mehr.
+    expect(istVorabversion("0.30.0-beta.6")).toBe(false);
   });
 });

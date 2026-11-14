@@ -48,7 +48,7 @@ fi
 # Ein Bindestrich in der Version ist dieselbe Grenze wie im Release-Workflow.
 if [[ "$version" == *-* ]]; then
   echo "**Vorabversion.** Noch nicht fuer alle freigegeben, und sie erreicht nur, wer in"
-  echo "den Einstellungen Betaversionen eingeschaltet hat."
+  echo "den Einstellungen Vorabversionen eingeschaltet hat."
   echo
 fi
 
@@ -59,7 +59,7 @@ if [ -n "$abschnitt" ]; then
   echo
 fi
 
-echo "Lokale Haushalts-Finanz-App, Stadium **Alpha**."
+echo "Lokale Haushalts-Finanz-App."
 echo
 echo "Der Bestand wird beim ersten Start verschluesselt — die Passphrase wird dabei"
 echo "gesetzt, und der Wiederherstellungscode gehoert aufgeschrieben."

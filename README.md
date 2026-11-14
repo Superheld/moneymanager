@@ -21,10 +21,9 @@ Alle Daten bleiben auf dem Gerät: keine Cloud, kein Benutzerkonto, keine Regist
 sie funktioniert ohne KI — der rechnende Kern ist Arithmetik, die automatische
 Kategorisierung ist Komfort obendrauf.
 
-> **Alpha.** Es gibt genau einen Datenbestand, an dem entwickelt wird. Das Schema darf sich
-> noch ohne Rücksicht ändern, Migrationen dürfen auch wegnehmen. Dieses Repo ist offen, weil
-> der Weg dorthin interessanter ist als das Ziel — es ist keine Empfehlung, deine Finanzen
-> darin zu führen.
+> **In Entwicklung (0.x).** Das Schema ändert sich noch, aber eine Migration überführt den
+> Bestand, statt etwas wegzunehmen. Dieses Repo ist offen, weil der Weg dorthin interessanter ist als das
+> Ziel — es ist keine Empfehlung, deine Finanzen darin zu führen.
 
 ## Nichts davon ist verifiziert
 

@@ -160,19 +160,28 @@ sieht. Die Behauptung im Skill `ausliefern`, die Update-Prüfung sei der erste u
 Netzzugriff, war damit falsch. Sie ist es erst, seit die Schrift im Bündel liegt
 (`@fontsource-variable/hanken-grotesk`).
 
-## Stadium: Alpha
+## Stadium: 0.x, ohne eigenes Wort
 
-Die App ist **nicht veröffentlicht**. Es gibt genau einen Datenbestand — den lokalen —, und
-der lässt sich per Import wiederherstellen. Sichtbar über `APP_STADIUM` in `src/version.ts`;
-im Versionsstring steht es bewusst nicht, weil der in die Tauri-Bundle-Metadaten durchschlägt.
-Läuft eine Beta, zeigt das Abzeichen den Kanal statt des Stadiums (`abzeichenFuer`) — das
-Stadium gilt dann trotzdem weiter.
+Bis 0.30.0 hiess das Stadium **Alpha** und stand als Abzeichen neben der Version. Seit
+0.30.0 (2026-11-13) steht dort nichts mehr: dass die App noch nicht stabil ist, sagt die 0
+vorne in der Version, nach SemVer genau dafür da. Ein Wort daneben wiederholte das nur, und
+„Beta" hätte mit den Vorabversionen um dasselbe Wort konkurriert. Ein Abzeichen trägt nur
+noch eine Vorabversion („Vorab", `istVorabversion` in `src/version.ts`).
 
-Daraus folgt genau eine Freiheit: **Migrationen dürfen auch wegnehmen.** Tabellen und
-Spalten, die kein Code mehr kennt, werden abgeräumt statt als Altlast mitgeschleppt. Vor dem
-Abräumen wird geprüft, dass die Ziele leer sind; ist Inhalt drin, gehört er benannt und
-gesichert, nicht stillschweigend gelöscht. Alle übrigen Migrationsregeln gelten unverändert.
-Mit dem ersten veröffentlichten Stand endet die Freiheit.
+**Was am Stadium hing, war genau eine Regel, und die hat sich geändert: Migrationen
+ÜBERFÜHREN, sie nehmen nicht mehr weg.** In der Alpha durften Tabellen und Spalten, die kein Code mehr
+kennt, abgeräumt werden, und der Bestand galt als per Import wiederherstellbar. Beides gilt
+nicht mehr: der Bestand ist schützenswert, und eine Migration, die eine Struktur ablöst,
+trägt ihren Inhalt vorher in die neue. Abgeräumt wird danach nur, was nachweislich leer ist
+— leer, weil überführt, oder leer, weil nie benutzt; geprüft in der Migration selbst, nicht
+angenommen. Alle übrigen Migrationsregeln gelten unverändert.
+
+**Vorabversionen heissen seit 0.30.0 `-pre.N`** (`v0.31.0-pre.1`), in der Oberfläche
+„Vorab". Bis dahin hiessen sie `-beta.N`, und „Beta" klingt nach einem Reifegrad der
+ganzen App, nicht nach „diese Fassung ist noch nicht für alle". Die
+interne Release-Seite `beta-kanal` und der Einstellungsschlüssel `aktualisierungBeta`
+behalten ihren Namen: die Adresse steckt fest in jeder installierten App, der Schlüssel
+steht im Bestand. Einzelheiten im Skill `ausliefern`.
 
 ## Wo die Wahrheit liegt
 
@@ -293,15 +302,15 @@ Skill `ausliefern` (`.claude/skills/ausliefern/SKILL.md`). Drei Dinge gelten auc
 - **Der private Signaturschlüssel liegt ausserhalb des Repos** (`~/.moneymanager-schluessel/`)
   und ist **unersetzlich**: geht er verloren, kann keine installierte App je wieder ein
   Update annehmen — sie prüft gegen den öffentlichen Schlüssel, der in ihrem Bundle steckt.
-- **Der Tag einer Beta liegt auf `develop`**, der einer fertigen Fassung auf `main`: `main`
-  bleibt der Stand, den alle haben.
+- **Der Tag einer Vorabversion liegt auf `develop`**, der einer fertigen Fassung auf `main`:
+  `main` bleibt der Stand, den alle haben.
 - **Verschlüsselung und Sicherungen des Bestands** stehen in `src-tauri/CLAUDE.md`.
 
 ### Zwei Datenbestände, eine Zeile Unterschied
 
 Die installierte App verwaltet echtes Geld; die Entwicklung soll frei rumprobieren können.
-Beides auf derselben Datei geht nicht gut aus — im Alpha-Stadium dürfen Migrationen
-ausdrücklich **wegnehmen**, und ein Versuch, der schiefgeht, träfe dann den einzigen
+Beides auf derselben Datei geht nicht gut aus — eine Migration ist in der Entwicklung erst
+ein Entwurf, der mehrmals läuft, bevor er stimmt, und ein Versuch, der schiefgeht, träfe dann den einzigen
 Bestand, den es gibt. Die Trennung ist deshalb keine Bequemlichkeit, sondern die Grenze
 zwischen „kaputt" und „weg".
 

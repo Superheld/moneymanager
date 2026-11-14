@@ -109,9 +109,22 @@ Fassung, und sie erreicht nur, wer **Einstellungen → Über die App → Betaver
 erhalten** eingeschaltet hat. Ab Werk ist das aus.
 
 ```
-v0.30.0-beta.1   ein Tag mit Bindestrich ist eine Vorabversion
-v0.30.0          die fertige Fassung, für alle
+v0.31.0-pre.1    ein Tag mit Bindestrich ist eine Vorabversion
+v0.31.0          die fertige Fassung, für alle
 ```
+
+**Seit 0.30.0 heissen Vorabversionen `-pre.N`**, in der Oberfläche „Vorab" und
+„Vorabversionen erhalten". Bis dahin `-beta.N` — „Beta" klingt nach einem Reifegrad der
+ganzen App, nicht nach „noch nicht für alle". Ein Stadium-Wort gibt es seitdem ohnehin
+nicht mehr (Wurzel-`CLAUDE.md` → „Stadium"). Das Abzeichen erkennt nur `-pre`
+(`istVorabversion` in `src/version.ts`); ein anderes Suffix bekommt keins.
+
+**Drei Namen bleiben `beta`, und das ist Absicht:** die Release-Seite `beta-kanal` (ihre
+Adresse steckt fest in jeder installierten App — umbenannt, wäre jeder vom Kanal
+abgeschnitten, der ihn eingeschaltet hat), der Einstellungsschlüssel `aktualisierungBeta`
+(er steht im Bestand) und das Kommando `aktualisierung_beta` (eine Naht, die niemand
+sieht). Wer sie doch umbenennt, braucht für die ersten beiden einen Übergang, keine
+Suchen-und-Ersetzen-Runde.
 
 | | fragt | sieht |
 |---|---|---|
@@ -131,8 +144,8 @@ Vier Dinge, die man wissen muss:
 - **Es gibt keinen Weg zurück per Schalter.** Ausschalten nimmt eine Beta nicht zurück, ein
   Downgrade gibt es nicht. Und eine Beta mit Migration baut den echten Bestand um; der
   Rückweg ist dann die Tagessicherung vor den Migrationen.
-- **Der Tag einer Beta liegt auf `develop`**, nicht auf `main`: `main` bleibt der Stand, den
-  alle haben. Der Workflow fragt nicht nach dem Branch, nur nach dem Tag.
+- **Der Tag einer Vorabversion liegt auf `develop`**, nicht auf `main`: `main` bleibt der
+  Stand, den alle haben. Der Workflow fragt nicht nach dem Branch, nur nach dem Tag.
 
 ## Den Update-Weg durchspielen
 
@@ -271,9 +284,10 @@ verlockend:
 - **`releaseDraft: false`** — die Assets eines Entwurfs sind ohne Anmeldung nicht
   abrufbar. Ein Entwurf wäre bequem zum Nachsehen und macht den Updater blind.
 - **`prerelease` nur bei einem Tag mit Bindestrich** — `releases/latest/` **überspringt
-  Vorabversionen**. Bei einer App im Alpha-Stadium ist „prerelease" die naheliegende Wahl,
-  und der Endpunkt liefert dann eine 404, die für den Updater aussieht wie „kein Update
-  da". Bei einer Beta ist genau das der Zweck (siehe „Der Beta-Kanal").
+  Vorabversionen**. Bei einer App, die noch nicht 1.0 ist, ist „prerelease" die
+  naheliegende Wahl, und der Endpunkt liefert dann eine 404, die für den Updater aussieht
+  wie „kein Update da". Bei einer Vorabversion ist genau das der Zweck (siehe „Der
+  Beta-Kanal").
 
 **Der Punkt, an dem man sonst das Falsche tut:** vor dem Bauen prüfen, dass die `.env`
 steht. Sie ist gitignoriert, in einem frischen Klon oder Worktree also nicht da, und die

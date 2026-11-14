@@ -170,7 +170,7 @@ Vier Dinge, die man wissen muss:
 **Die Jahresstufe läuft nie aus, und das ist der wichtigste Teil.** Eine Sicherung enthält
 immer den GANZEN Bestand — alte Stände tragen also keine Buchung, die der neueste nicht
 auch hätte. Was sie tragen, ist der Stand, BEVOR etwas verschwand: eine versehentliche
-Löschung, eine Migration, die wegnimmt (im Alpha-Stadium ausdrücklich erlaubt), ein Fehler,
+Löschung, eine Migration, die wegnahm (im Alpha-Stadium bis 0.30.0 erlaubt) oder falsch überführt, ein Fehler,
 den niemand bemerkt hat.
 
 Solange die Bank die Umsätze noch führt, ist so etwas ärgerlich und behebbar — man ruft sie
