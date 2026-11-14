@@ -73,7 +73,7 @@ Spielstand steht schon im Zielschema, und einen, den die App geöffnet hat, lies
 nicht mehr (er ist dann verschlüsselt). Der Weg ist ein Seed aus einem älteren Checkout
 (`git worktree` auf dem letzten Tag, dort `npm run seed` mit eigenem Zielpfad).
 
-**Seit der Beta (0.30.0) überführt eine Migration, statt wegzunehmen** (Wurzel-`CLAUDE.md`
+**Seit 0.30.0 überführt eine Migration, statt wegzunehmen** (Wurzel-`CLAUDE.md`
 → „Stadium"): wer eine Tabelle oder Spalte ablöst, trägt ihren Inhalt vorher in die neue
 Struktur. Abgeräumt wird danach nur, was nachweislich leer ist, und das prüft die Migration
 selbst. Die älteren Migrationen, die mit „ALPHA" begründet wegnehmen, bleiben, wie sie sind

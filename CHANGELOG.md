@@ -7,8 +7,9 @@ Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 
 ### Geändert
 
-**Die App ist jetzt Beta, nicht mehr Alpha.** Das Datenschema ändert sich weiter, aber eine
-Migration überführt den Bestand, statt etwas wegzunehmen.
+**Kein „Alpha" mehr neben der Version.** Dass die App noch nicht stabil ist, sagt die 0
+vorne. Das Datenschema ändert sich weiter, aber eine Migration überführt den Bestand,
+statt etwas wegzunehmen.
 
 **Vorabversionen heissen „Vorab"** statt „Beta" — im Abzeichen neben der Version und am
 Schalter „Vorabversionen erhalten". Wer den Schalter eingeschaltet hat, behält ihn.

@@ -114,9 +114,10 @@ v0.31.0          die fertige Fassung, für alle
 ```
 
 **Seit 0.30.0 heissen Vorabversionen `-pre.N`**, in der Oberfläche „Vorab" und
-„Vorabversionen erhalten". Bis dahin `-beta.N` — seit das STADIUM Beta heisst (Wurzel-
-`CLAUDE.md`), hätte dasselbe Wort zwei Aussagen getragen. Das Abzeichen erkennt nur noch
-`-pre` (`istVorabversion` in `src/version.ts`); ein anderes Suffix zeigt das Stadium.
+„Vorabversionen erhalten". Bis dahin `-beta.N` — „Beta" klingt nach einem Reifegrad der
+ganzen App, nicht nach „noch nicht für alle". Ein Stadium-Wort gibt es seitdem ohnehin
+nicht mehr (Wurzel-`CLAUDE.md` → „Stadium"). Das Abzeichen erkennt nur `-pre`
+(`istVorabversion` in `src/version.ts`); ein anderes Suffix bekommt keins.
 
 **Drei Namen bleiben `beta`, und das ist Absicht:** die Release-Seite `beta-kanal` (ihre
 Adresse steckt fest in jeder installierten App — umbenannt, wäre jeder vom Kanal

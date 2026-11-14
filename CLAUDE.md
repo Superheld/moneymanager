@@ -160,24 +160,25 @@ sieht. Die Behauptung im Skill `ausliefern`, die Update-Prüfung sei der erste u
 Netzzugriff, war damit falsch. Sie ist es erst, seit die Schrift im Bündel liegt
 (`@fontsource-variable/hanken-grotesk`).
 
-## Stadium: Beta
+## Stadium: 0.x, ohne eigenes Wort
 
-Seit **0.30.0** (2026-11-13), davor Alpha. Sichtbar über `APP_STADIUM` in `src/version.ts`;
-im Versionsstring steht es bewusst nicht, weil der in die Tauri-Bundle-Metadaten
-durchschlägt. Läuft eine Vorabversion, zeigt das Abzeichen den Kanal statt des Stadiums
-(`abzeichenFuer`) — das Stadium gilt dann trotzdem weiter.
+Bis 0.30.0 hiess das Stadium **Alpha** und stand als Abzeichen neben der Version. Seit
+0.30.0 (2026-11-13) steht dort nichts mehr: dass die App noch nicht stabil ist, sagt die 0
+vorne in der Version, nach SemVer genau dafür da. Ein Wort daneben wiederholte das nur, und
+„Beta" hätte mit den Vorabversionen um dasselbe Wort konkurriert. Ein Abzeichen trägt nur
+noch eine Vorabversion („Vorab", `istVorabversion` in `src/version.ts`).
 
-**Was sich mit der Beta geändert hat, ist genau eine Regel: Migrationen ÜBERFÜHREN, sie
-nehmen nicht mehr weg.** In der Alpha durften Tabellen und Spalten, die kein Code mehr
+**Was am Stadium hing, war genau eine Regel, und die hat sich geändert: Migrationen
+ÜBERFÜHREN, sie nehmen nicht mehr weg.** In der Alpha durften Tabellen und Spalten, die kein Code mehr
 kennt, abgeräumt werden, und der Bestand galt als per Import wiederherstellbar. Beides gilt
 nicht mehr: der Bestand ist schützenswert, und eine Migration, die eine Struktur ablöst,
 trägt ihren Inhalt vorher in die neue. Abgeräumt wird danach nur, was nachweislich leer ist
 — leer, weil überführt, oder leer, weil nie benutzt; geprüft in der Migration selbst, nicht
 angenommen. Alle übrigen Migrationsregeln gelten unverändert.
 
-**Vorabversionen heissen seit der Beta `-pre.N`** (`v0.31.0-pre.1`), in der Oberfläche
-„Vorab". Bis 0.30.0 hiessen sie `-beta.N`; mit dem Stadium Beta hätte dasselbe Wort zwei
-Dinge gesagt — wie weit die App ist und dass eine Fassung noch nicht für alle ist. Die
+**Vorabversionen heissen seit 0.30.0 `-pre.N`** (`v0.31.0-pre.1`), in der Oberfläche
+„Vorab". Bis dahin hiessen sie `-beta.N`, und „Beta" klingt nach einem Reifegrad der
+ganzen App, nicht nach „diese Fassung ist noch nicht für alle". Die
 interne Release-Seite `beta-kanal` und der Einstellungsschlüssel `aktualisierungBeta`
 behalten ihren Namen: die Adresse steckt fest in jeder installierten App, der Schlüssel
 steht im Bestand. Einzelheiten im Skill `ausliefern`.

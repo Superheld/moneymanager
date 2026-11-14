@@ -59,7 +59,7 @@ if [ -n "$abschnitt" ]; then
   echo
 fi
 
-echo "Lokale Haushalts-Finanz-App, Stadium **Beta**."
+echo "Lokale Haushalts-Finanz-App."
 echo
 echo "Der Bestand wird beim ersten Start verschluesselt — die Passphrase wird dabei"
 echo "gesetzt, und der Wiederherstellungscode gehoert aufgeschrieben."

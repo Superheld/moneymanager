@@ -297,7 +297,7 @@ describe("Der Release-Text", () => {
       expect(ohne, `${p} steht da, obwohl noch nichts gebaut wurde`).not.toContain(p);
     }
     expect(ohne, "Auch der allgemeine Teil fehlt — dann sagt der Text gar nichts").toContain(
-      "Stadium **Beta**",
+      "Lokale Haushalts-Finanz-App.",
     );
   });
 
