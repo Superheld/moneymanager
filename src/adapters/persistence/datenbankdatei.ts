@@ -7,8 +7,8 @@
  * Der echte Bestand und der Spielstand liegen in ZWEI Dateien.
  *
  * Die installierte App verwaltet echtes Geld; die Entwicklung soll frei rumprobieren
- * können. Beides auf derselben Datei geht nicht gut aus: im Alpha-Stadium dürfen
- * Migrationen ausdrücklich WEGNEHMEN (siehe Wurzel-`CLAUDE.md`), und ein Versuch, der
+ * können. Beides auf derselben Datei geht nicht gut aus: eine Migration ist in der
+ * Entwicklung erst ein Entwurf, der mehrmals läuft, bevor er stimmt, und ein Versuch, der
  * schiefgeht, träfe dann den einzigen Bestand, den es gibt. Die Trennung ist deshalb
  * keine Bequemlichkeit, sondern die Grenze zwischen „kaputt" und „weg".
  *

@@ -16,7 +16,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { APP_ABZEICHEN, APP_VERSION } from "../../../version";
+import { abzeichenFuer, APP_STADIUM, APP_VERSION } from "../../../version";
 import { AktualisierungKnopf } from "./AktualisierungKnopf";
 import { Icon } from "./IconButton";
 import { Button as BaseButton } from "@base-ui/react/button";
@@ -215,10 +215,10 @@ export function AppShell({
         ))}
 
         <div className="foot">
-          {/* Neben der Version steht das Stadium, bei einer Beta der Kanal — warum, steht
-              an `abzeichenFuer` in version.ts. */}
+          {/* Neben der Version steht das Stadium, bei einer Vorabversion der Kanal — warum,
+              steht an `abzeichenFuer` in version.ts. */}
           <div>
-            Moneymanager {APP_VERSION} <span className="bdg">{APP_ABZEICHEN}</span>
+            Moneymanager {APP_VERSION} <span className="bdg">{abzeichenFuer(APP_VERSION, APP_STADIUM, t("shell.abzeichenVorab"))}</span>
           </div>
           <div>{t("shell.footLokal")}</div>
           {/* Erscheint nur, wenn wirklich etwas bereitliegt — sonst rendert er nichts. */}

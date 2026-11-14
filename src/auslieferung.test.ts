@@ -283,8 +283,8 @@ describe("Der Release-Text", () => {
     expect(lauf({ PLATTFORMEN: "macos" })).toContain("Lokale Haushalts-Finanz-App");
   });
 
-  it("kennzeichnet eine Beta, und nur eine Beta", () => {
-    expect(lauf({ VERSION: "99.0.0-beta.1" })).toContain("Vorabversion");
+  it("kennzeichnet eine Vorabversion, und nur eine Vorabversion", () => {
+    expect(lauf({ VERSION: "99.0.0-pre.1" })).toContain("Vorabversion");
     expect(lauf({ VERSION: "0.29.1" })).not.toContain("Vorabversion");
   });
 
@@ -297,7 +297,7 @@ describe("Der Release-Text", () => {
       expect(ohne, `${p} steht da, obwohl noch nichts gebaut wurde`).not.toContain(p);
     }
     expect(ohne, "Auch der allgemeine Teil fehlt — dann sagt der Text gar nichts").toContain(
-      "Stadium **Alpha**",
+      "Stadium **Beta**",
     );
   });
 

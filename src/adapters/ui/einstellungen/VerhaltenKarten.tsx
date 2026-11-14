@@ -23,7 +23,7 @@ import {
   aktualisierungspruefung,
   aktualisierungspruefungSetzen,
 } from "../../dienste";
-import { APP_ABZEICHEN, APP_VERSION } from "../../../version";
+import { abzeichenFuer, APP_STADIUM, APP_VERSION } from "../../../version";
 import { Button, Card, FormField, Pill } from "../bausteine";
 import { Stapel, Zeile } from "../bausteine/Anordnung";
 import { Auswahl } from "../bausteine/Auswahl";
@@ -221,7 +221,7 @@ export function AktualisierungCard() {
           <span>
             {t("einstellungen.aktualisierung.installiert")}{" "}
             <span style={{ fontWeight: "var(--fw-bold)" }}>{APP_VERSION}</span>{" "}
-            <Pill variant="neutral">{APP_ABZEICHEN}</Pill>
+            <Pill variant="neutral">{abzeichenFuer(APP_VERSION, APP_STADIUM, t("shell.abzeichenVorab"))}</Pill>
           </span>
           <Button onClick={() => void pruefen()} laeuft={prueft}>
             {prueft ? t("einstellungen.aktualisierung.prueft") : t("einstellungen.aktualisierung.jetztPruefen")}

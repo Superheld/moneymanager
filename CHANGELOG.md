@@ -3,6 +3,16 @@
 Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 [Keep a Changelog](https://keepachangelog.com/de/1.0.0/); Versionierung [SemVer](https://semver.org/lang/de/).
 
+## [Unveröffentlicht]
+
+### Geändert
+
+**Die App ist jetzt Beta, nicht mehr Alpha.** Das Datenschema ändert sich weiter, aber eine
+Migration überführt den Bestand, statt etwas wegzunehmen.
+
+**Vorabversionen heissen „Vorab"** statt „Beta" — im Abzeichen neben der Version und am
+Schalter „Vorabversionen erhalten". Wer den Schalter eingeschaltet hat, behält ihn.
+
 ## [0.30.0] — 2026-11-13
 
 Die fertige Fassung der sechs Betas. Wer eine davon hat, bekommt gegenüber beta.6 nichts
