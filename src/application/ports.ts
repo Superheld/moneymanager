@@ -10,6 +10,7 @@ import type {
   Depotwert,
   Ruecklage,
   Ruecklagenrate,
+  Ruecklagenzuordnung,
   Ruecklagenzyklus,
   IstBuchung,
   Journaleintrag,
@@ -153,24 +154,9 @@ export interface RuecklagenRepository {
 }
 
 /**
- * Eine ausdrückliche Zuordnung: welche Rücklage einen Anteil einer Buchung trägt (seit
- * Migration 79, ADR-0006).
+ * Die ausdrücklichen Zuordnungen (`Ruecklagenzuordnung`, im Kern bei `zustaendigkeit`,
+ * weil sie dort gelesen werden).
  *
- * Gebraucht wird sie nur, wo die Kategorie allein nicht entscheidet — wenn mehrere
- * Rücklagen an ihr hängen. Der Anteil wird über seine KATEGORIE benannt und nicht über
- * seinen Index: die Aufteilungen bekommen bei jedem Speichern neue IDs, die Kategorie
- * bleibt. Ändert jemand sie, passt die Zuordnung zu keinem Anteil mehr, und die Buchung
- * wird neu eingeordnet — eine neue Kategorie ist eine neue Frage.
- */
-export interface Ruecklagenzuordnung {
-  readonly istbuchungId: string;
-  /** Der Anteil mit dieser Kategorie; fehlt sie, gilt die Zuordnung der ganzen Buchung. */
-  readonly kategorieId?: string;
-  /** Fehlt sie, heisst das „ausdrücklich keine Rücklage" — nicht „noch offen". */
-  readonly ruecklageId?: string;
-}
-
-/**
  * **Im Umbau:** angelegt mit Migration 79 und von keinem Use-Case benutzt. Die Einordnung
  * fragt erst danach, wenn die Rechnung umgestellt ist.
  */

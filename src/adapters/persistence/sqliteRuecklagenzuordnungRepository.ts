@@ -3,7 +3,8 @@
 // Im Umbau: noch von keinem Use-Case benutzt und deshalb in `dienste.ts` nicht verdrahtet.
 // Was die Tabelle trägt und warum sie eine eigene ist, steht an der Migration.
 
-import type { Ruecklagenzuordnung, RuecklagenzuordnungRepository } from "../../application/ports";
+import type { Ruecklagenzuordnung } from "../../core";
+import type { RuecklagenzuordnungRepository } from "../../application/ports";
 import { getDb } from "./db";
 
 interface Zeile {

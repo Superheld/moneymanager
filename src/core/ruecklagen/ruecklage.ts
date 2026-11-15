@@ -40,8 +40,8 @@ import { zufuehrungIm, type Budget } from "../budgets/budget";
  * trennt genau diese beiden Fragen. Was nach dem Abschliessen folgt (neu beginnen oder
  * beenden), wählt der Nutzer beim Abschliessen — das ist eine dritte Frage.
  *
- * **Im Umbau:** gelesen wird das Feld bisher nur von den Bausteinen in `topf.ts`, die
- * noch niemand aufruft. Die laufende Rechnung behandelt jede Rücklage wie bisher.
+ * **Im Umbau:** gelesen wird das Feld bisher nur von den Bausteinen in `topf.ts` und
+ * `zustaendigkeit.ts`, die noch niemand aufruft. Die laufende Rechnung behandelt jede Rücklage wie bisher.
  */
 export type Ruecklagenart = "fortlaufend" | "abschliessend";
 
@@ -87,7 +87,7 @@ export interface Ruecklage {
   /**
    * Ab welchem Tag (ISO) die Kategorie Ausgaben von selbst findet. Fehlt es, findet eine
    * `abschliessend`e Rücklage nichts über die Kategorie; eine `fortlaufend`e gilt dann
-   * „ohne Anfang", wie heute ein aufbauendes Budget (`zustaendigkeit` in `topf.ts`).
+   * „ohne Anfang", wie heute ein aufbauendes Budget (`zustaendigkeit.ts`).
    */
   readonly findetAb?: string;
   /**
