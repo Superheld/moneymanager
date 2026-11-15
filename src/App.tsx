@@ -162,14 +162,14 @@ function Arbeitsflaeche({
             Navigation stehen, und ein Wechsel räumt die Meldung weg. */}
         <Fehlergrenze ruecksetzenBei={screen}>
         {screen === "uebersicht" && <UebersichtScreen onNavigate={setScreen} />}
-        {screen === "analyse" && <AnalyseScreen />}
+        {screen === "analyse" && <AnalyseScreen onNavigate={setScreen} />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
         {screen === "ruecklagen" && <RuecklagenScreen />}
         {screen === "vermoegen" && <VermoegenScreen />}
-        {screen === "budgets" && <BudgetsScreen />}
-        {screen === "vertraege" && <VertraegeScreen />}
-        {screen === "kontenverwaltung" && <KontenVerwaltungScreen />}
-        {screen === "import" && <ImportBereich />}
+        {screen === "budgets" && <BudgetsScreen onNavigate={setScreen} />}
+        {screen === "vertraege" && <VertraegeScreen onNavigate={setScreen} />}
+        {screen === "kontenverwaltung" && <KontenVerwaltungScreen onNavigate={setScreen} />}
+        {screen === "import" && <ImportBereich onNavigate={setScreen} />}
         {screen === "training" && <TrainingBereich />}
         {screen === "einstellungen" && <EinstellungenScreen onSperren={sperren} />}
         </Fehlergrenze>

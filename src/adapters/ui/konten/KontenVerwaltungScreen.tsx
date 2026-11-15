@@ -22,9 +22,15 @@ import { AbgleichBereich } from "./AbgleichBereich";
 import { BankzugaengeScreen } from "./BankzugaengeScreen";
 import { KontenVerwaltung, type KontoVerbindung } from "./KontenVerwaltung";
 import { fehlerMelden } from "../bausteine/Meldungen";
+import type { ScreenId } from "../bausteine/AppShell";
 
-export function KontenVerwaltungScreen() {
+/**
+ * `onNavigate` ist freiwillig: ohne Konto führt der leere Bereich damit in den Import.
+ * Ohne Shell (Tests) steht dort nur der Knopf zum Anlegen.
+ */
+export function KontenVerwaltungScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => void } = {}) {
   const { t } = useTranslation();
+  const [geladen, setGeladen] = useState(false);
   const [personen, setPersonen] = useState<Person[]>([]);
   const [konten, setKonten] = useState<Zahlungskonto[]>([]);
   const [kontostaende, setKontostaende] = useState<readonly Kontostand[]>([]);
@@ -59,7 +65,7 @@ export function KontenVerwaltungScreen() {
   useEffect(() => {
     // Schlägt das Laden fehl, bleibt die Liste leer — aber mit Meldung: eine stumme leere
     // Liste sähe aus wie „du hast keine" (siehe `Meldungen`).
-    laden().catch(fehlerMelden);
+    laden().then(() => setGeladen(true)).catch(fehlerMelden);
   }, []);
 
   const personName = useMemo(() => new Map(personen.map((p) => [p.id, p.name])), [personen]);
@@ -87,6 +93,8 @@ export function KontenVerwaltungScreen() {
                 await laden();
               }}
               onChange={() => void laden()}
+              geladen={geladen}
+              onNavigate={onNavigate}
             />
           ),
         },

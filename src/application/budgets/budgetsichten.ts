@@ -253,6 +253,11 @@ export interface Budgetbereich extends Budgetuebersicht {
   /** Rahmenvorschläge für Hauptkategorien ohne Budget. */
   readonly vorschlaege: readonly Budgetvorschlag[];
   /**
+   * Gibt es überhaupt Buchungen? Ohne sie gibt es nichts, woraus sich ein Budget
+   * vorschlagen liesse — der leere Bereich führt dann zuerst in den Import.
+   */
+  readonly hatBuchungen: boolean;
+  /**
    * Budget-ID → Deckung, nur für aufbauende Budgets mit einem Rest über null.
    *
    * Aus der Kontobelegung gelesen und nicht hier gerechnet: dieselbe Zahl steht in der
@@ -294,6 +299,7 @@ export async function budgetbereichLaden(
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     zeilenkontext: zeilenkontext(umsaetze, konten, uebersicht.sicht.kategorien, vertragsnamen),
     vorschlaege,
+    hatBuchungen: uebersicht.sicht.buchungen.length > 0,
   };
 }
 

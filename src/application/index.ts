@@ -411,9 +411,11 @@ export {
   type ExportVertrag,
 } from "./bestandsexport";
 export {
+  einrichtungLaden,
   uebersichtLaden,
   waehlbareMonate,
   VORSCHAU_TAGE,
+  type EinrichtungDeps,
   type Uebersichtsdaten,
   type UebersichtDeps,
 } from "./uebersicht";

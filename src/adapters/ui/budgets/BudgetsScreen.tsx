@@ -53,6 +53,8 @@ import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { geldFarbe, warnFarbe, warnTon } from "../bausteine/geldFarbe";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
+import { LeererZustand } from "../bausteine/LeererZustand";
+import type { ScreenId } from "../bausteine/AppShell";
 
 const ARTEN: Budgetart[] = ["monatlich", "aufbauend"];
 
@@ -64,7 +66,11 @@ function heuteIso(): string {
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 }
 
-export function BudgetsScreen() {
+/**
+ * `onNavigate` ist freiwillig: der leere Bereich führt damit in den Import. Ohne Shell
+ * (Tests) steht dort nur der Knopf zum Anlegen.
+ */
+export function BudgetsScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => void } = {}) {
   const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const geld = useGeld();
@@ -293,7 +299,35 @@ export function BudgetsScreen() {
           sagt `unter`. Gibt es nur eine Art, nimmt sie die volle Breite — `auto-fit`. */}
       {zeilen.length === 0 ? (
         <Card title={t("budgets.abschnittListe")}>
-          <div className="muted">{t("budgets.leer")}</div>
+          {/* Vor dem Laden nur der alte Satz: ob es Buchungen gibt, weiss erst die Sicht,
+              und daran hängt der nächste Schritt — ohne Buchungen gibt es nichts, woraus
+              sich ein Budget vorschlagen liesse, also zuerst der Import. */}
+          {!bereich ? (
+            <div className="muted">{t("budgets.leer")}</div>
+          ) : (
+            <LeererZustand
+              kopf={t("budgets.leer")}
+              aktionen={
+                <>
+                  {!bereich.hatBuchungen && onNavigate && (
+                    <Button variant="primary" onClick={() => onNavigate("import")}>
+                      {t("einrichtung.zuBereich", { bereich: t("shell.navImport") })}
+                    </Button>
+                  )}
+                  <Button variant={bereich.hatBuchungen ? "primary" : undefined} plus onClick={neu}>
+                    {t("budgets.anlegen")}
+                  </Button>
+                </>
+              }
+            >
+              {t("budgets.leerErklaerung")}
+              {!bereich.hatBuchungen
+                ? ` ${t("budgets.leerOhneBuchungen")}`
+                : vorschlaege.length > 0
+                  ? ` ${t("budgets.leerMitVorschlaegen")}`
+                  : ""}
+            </LeererZustand>
+          )}
         </Card>
       ) : (
         <Card title={t("budgets.abschnittListe")} subtitle={t("budgets.verbrauchHinweis")}>

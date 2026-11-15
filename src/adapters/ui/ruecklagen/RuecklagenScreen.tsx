@@ -38,6 +38,7 @@ import { betont } from "../bausteine/betonung";
 import { useDatum, useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import { Stapel } from "../bausteine/Anordnung";
+import { LeererZustand } from "../bausteine/LeererZustand";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -209,8 +210,19 @@ export function RuecklagenScreen() {
       )}
 
       <Card>
-        {items.length === 0 ? (
+        {items.length === 0 && !sicht ? (
+          // Vor dem Laden nur der alte Satz — sonst stünde die Erklärung kurz auch bei
+          // dem da, der längst Rücklagen führt.
           <div className="muted">{t("ruecklagen.leer")}</div>
+        ) : items.length === 0 ? (
+          // Rücklagen brauchen keine Buchungen — wer eine anlegen will, kann es sofort.
+          // Deshalb nur der eine Knopf, und kein Weg in den Import.
+          <LeererZustand
+            kopf={t("ruecklagen.leer")}
+            aktionen={<Button variant="primary" plus onClick={neu}>{t("ruecklagen.ruecklage")}</Button>}
+          >
+            {t("ruecklagen.leerErklaerung")}
+          </LeererZustand>
         ) : (
           <Stapel abstand={5}>
             {deckung.posten.map((p, idx) => {

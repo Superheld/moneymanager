@@ -8,8 +8,10 @@ import { useTranslation } from "react-i18next";
 import { Bereich } from "../bausteine/Bereich";
 import { ImportScreen } from "./ImportScreen";
 import { ReviewScreen } from "./ReviewScreen";
+import type { ScreenId } from "../bausteine/AppShell";
 
-export function ImportBereich() {
+/** `onNavigate` reicht die Inbox weiter: nach dem Verbuchen führt sie zum nächsten Schritt. */
+export function ImportBereich({ onNavigate }: { onNavigate?: (id: ScreenId) => void } = {}) {
   const { t } = useTranslation();
   return (
     <Bereich
@@ -25,7 +27,7 @@ export function ImportBereich() {
           id: "inbox",
           label: t("import.registerInbox"),
           untertitel: t("review.untertitel"),
-          inhalt: () => <ReviewScreen />,
+          inhalt: () => <ReviewScreen onNavigate={onNavigate} />,
         },
       ]}
     />

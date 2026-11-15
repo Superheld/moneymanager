@@ -43,6 +43,7 @@ import { BelegungKarte } from "./BelegungKarte";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
 import { PageHead } from "../bausteine/PageHead";
+import { LeererZustand } from "../bausteine/LeererZustand";
 import { IconButton } from "../bausteine/IconButton";
 import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
@@ -256,8 +257,21 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
           </span>
         }
       >
-        {kontozeilen.length === 0 ? (
+        {kontozeilen.length === 0 && !sicht ? (
           <div className="muted">{t("konten.keineKonten")}</div>
+        ) : kontozeilen.length === 0 ? (
+          // „Konto anlegen" steht schon im Kopf dieser Karte. Der Knopf hier zeigt den
+          // zweiten Weg: eine eingelesene Datei bringt ihre Konten selbst mit.
+          <LeererZustand
+            kopf={t("konten.keineKonten")}
+            aktionen={
+              <Button onClick={() => onNavigate("import")}>
+                {t("einrichtung.zuBereich", { bereich: t("shell.navImport") })}
+              </Button>
+            }
+          >
+            {t("konten.leerOhneKonto")}
+          </LeererZustand>
         ) : (
           <DataTable
             sortable
@@ -530,7 +544,26 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
             </div>
           )}
 
-          {gebuchtGefiltert.length === 0 ? (
+          {register.gebucht.length === 0 ? (
+            // Das Konto hat GAR keine Buchung — nicht nur keine, die zum Filter passt.
+            // Wie sie hereinkommen, hängt am Konto: ein verbundenes holt sie bei der Bank,
+            // auf einem anderen kommen sie aus einer Datei oder von Hand (der Knopf
+            // „Buchung" steht im Kopf darüber).
+            <LeererZustand
+              kopf={t("konten.keineGebucht")}
+              aktionen={
+                aktivZeile?.online ? (
+                  <Button variant="primary" onClick={() => setAbruf(true)}>{t("konten.abrufen")}</Button>
+                ) : (
+                  <Button onClick={() => onNavigate("import")}>
+                    {t("einrichtung.zuBereich", { bereich: t("shell.navImport") })}
+                  </Button>
+                )
+              }
+            >
+              {t(aktivZeile?.online ? "konten.leerOhneBuchungenOnline" : "konten.leerOhneBuchungen")}
+            </LeererZustand>
+          ) : gebuchtGefiltert.length === 0 ? (
             <div className="muted">{t("konten.keineGebucht")}</div>
           ) : (
             <DataTable

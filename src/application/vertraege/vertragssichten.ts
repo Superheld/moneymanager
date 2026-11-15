@@ -167,6 +167,12 @@ export interface Vertragssicht {
   readonly kategorien: readonly Kategorie[];
   readonly regeln: readonly Zahlungsregel[];
   readonly vorschlaege: readonly Vertragskandidat[];
+  /**
+   * Gibt es überhaupt Buchungen? Der leere Bereich braucht die Antwort: ohne Buchungen
+   * kann die Erkennung nichts vorschlagen, und der nächste Schritt ist der Import statt
+   * des Anlegens von Hand.
+   */
+  readonly hatBuchungen: boolean;
 }
 
 export async function vertraegeLaden(
@@ -243,6 +249,7 @@ export async function vertraegeLaden(
     personNamen: new Map(personen.map((p) => [p.id, p.name])),
     kategorien,
     regeln,
+    hatBuchungen: buchungen.length > 0,
     // Die Vorschläge lesen den gesamten Buchungsbestand — deshalb zuletzt.
     vorschlaege: await vertragsvorschlaege(
       deps.ledger, deps.umsatzRepo, deps.vertragRepo, heute, { ignoriert },

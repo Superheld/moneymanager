@@ -20,7 +20,8 @@ import {
   type Budgetbereich,
   type Budgetuebersicht,
 } from "../application/budgets/budgetsichten";
-import { uebersichtLaden, type Uebersichtsdaten } from "../application/uebersicht";
+import { einrichtungLaden, uebersichtLaden, type Uebersichtsdaten } from "../application/uebersicht";
+import type { Einrichtungsstand } from "../application";
 import { appBootstrap } from "../application/bootstrap";
 import {
   budgetAnlegen as budgetAnlegenUseCase,
@@ -249,6 +250,20 @@ export function uebersicht(heute: string): Promise<Uebersichtsdaten> {
       ruecklagenRepo: sqliteRuecklagenRepository,
       vertragRepo: sqliteVertragRepository,
       vorsorge: VORSORGE_DEPS,
+    },
+    heute,
+  );
+}
+
+/** Was dem Haushalt noch fehlt — derselbe Stand wie in der Karte der Übersicht. */
+export function einrichtung(heute: string): Promise<Einrichtungsstand> {
+  return einrichtungLaden(
+    {
+      ledger: sqliteLedgerRepository,
+      kontoRepo: sqliteZahlungskontoRepository,
+      regelRepo: sqliteZahlungsregelRepository,
+      budgetRepo: sqliteBudgetRepository,
+      ruecklagenRepo: sqliteRuecklagenRepository,
     },
     heute,
   );
