@@ -26,11 +26,12 @@ am aufbauenden Budget („auf dem Konto fehlen …", nur wenn etwas fehlt) und i
 Rücklagen-Deckung.
 
 Seit 2026-11-15 liest sie eine vierte: die Reichweite im Ausblick der Analyse
-(`core/reichweite.ts`, „Wie lange reicht es ohne Einnahmen?"). Ihr Zähler ist das Freie
-der Klasse `liquide` aus `bilanzJeKlasse` — dieselbe Zahl wie unter „Was da ist", nicht
-nachgerechnet. Daraus folgt auch ihre Grenze: ein Konto im Minus zählt dort mit 0 und
-nicht mit seinem Minus (was fehlt, steht in `fehlt`, nicht in `frei`), ein überzogenes
-Girokonto mindert die Reichweite also nicht.
+(`core/reichweite.ts`, „Wie lange reicht es ohne Einnahmen?"). Ihr Zähler ist Stand
+minus Gebundenes der Klasse `liquide` aus `bilanzJeKlasse`. Ohne ein Konto im Minus ist
+das dieselbe Zahl wie `frei` unter „Was da ist". **Mit einem überzogenen Konto ist sie
+kleiner, und das ist Absicht:** `frei` ist je Konto bei null gedeckelt (was fehlt, steht
+dort in Worten), die Reichweite rechnet das Minus mit — ein Dispo, der sie nicht kürzt,
+verschwiege genau das, wonach die Karte fragt.
 
 Reicht der Stand nicht, wird **anteilig** verteilt, über alle Ansprüche gleich, ohne
 Reihenfolge. `budget.kontoId` heisst seither nur noch eines: hier liegt das Geld des

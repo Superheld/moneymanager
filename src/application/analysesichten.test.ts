@@ -421,6 +421,20 @@ describe("analyseReichweite", () => {
     ...extra,
   });
 
+  it("zieht ein überzogenes Konto mit seinem Minus ab", () => {
+    const ohne = analyseReichweite(basis(), heute)!.reichweite!;
+    const b = basis();
+    const mit = analyseReichweite(
+      {
+        ...b,
+        konten: [...b.konten, { id: "dispo", bezeichnung: "Zweitkonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: -70000 }],
+      },
+      heute,
+    )!.reichweite!;
+    expect(mit.frei).toBe(ohne.frei - 70000);
+    expect(mit.ohneZuruecklegen!).toBeLessThan(ohne.ohneZuruecklegen!);
+  });
+
   it("mittelt über die abgeschlossenen, voll erfassten Monate", () => {
     const r = analyseReichweite(basis(), heute)!.reichweite!;
     // Mai, Juni, Juli — nicht der halbe April, nicht der laufende August.
