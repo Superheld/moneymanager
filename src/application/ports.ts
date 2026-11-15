@@ -26,6 +26,10 @@ import type {
   Ankerherkunft,
   Kontostandsanker,
   Vormerkung,
+  Verbindlichkeit,
+  Verbindlichkeitsstand,
+  Vermoegensgegenstand,
+  Vermoegenswert,
 } from "../core";
 import type { ImportLauf, Umsatz } from "./import";
 import type { Dublettenfreigabe } from "./dubletten/dublettensicht";
@@ -290,6 +294,36 @@ export interface DepotRepository {
     stichtag: string,
     positionen: readonly Depotposition[],
   ): Promise<void>;
+}
+
+/**
+ * Vermögenswerte und Schulden samt ihren Beobachtungen.
+ *
+ * Ein Port für vier Tabellen, aus demselben Grund wie beim Depot: das Nettovermögen
+ * braucht immer alle vier, und eine Reihe ohne ihren Stammsatz ist nichts.
+ *
+ * `…Eintragen` heisst so, weil es NICHT überschreibt — anders als `wertSpeichern` am
+ * Depot. Dort ist die spätere Meldung der Bank die genauere; hier trägt ein Mensch einen
+ * Betrag aus einem Schreiben ab, und ein zweiter Betrag zum selben Stichtag ist ein
+ * Widerspruch, den er sehen soll. Der Schlüssel aus Stammsatz und Stichtag weist ihn ab;
+ * die freundliche Meldung dazu baut der Use-Case, bevor es so weit kommt.
+ */
+export interface VermoegenRepository {
+  gegenstaende(): Promise<Vermoegensgegenstand[]>;
+  gegenstandSpeichern(gegenstand: Vermoegensgegenstand): Promise<void>;
+  /** Nimmt die Wertreihe mit und löst den Verweis der Schulden, die darauf zeigen. */
+  gegenstandLoeschen(id: string): Promise<void>;
+  werte(): Promise<Vermoegenswert[]>;
+  wertEintragen(wert: Vermoegenswert, erfasstAm: string): Promise<void>;
+  wertEntfernen(gegenstandId: string, stichtag: string): Promise<void>;
+
+  verbindlichkeiten(): Promise<Verbindlichkeit[]>;
+  verbindlichkeitSpeichern(verbindlichkeit: Verbindlichkeit): Promise<void>;
+  /** Nimmt die Reihe der Restschulden mit. */
+  verbindlichkeitLoeschen(id: string): Promise<void>;
+  staende(): Promise<Verbindlichkeitsstand[]>;
+  standEintragen(stand: Verbindlichkeitsstand, erfasstAm: string): Promise<void>;
+  standEntfernen(verbindlichkeitId: string, stichtag: string): Promise<void>;
 }
 
 /**

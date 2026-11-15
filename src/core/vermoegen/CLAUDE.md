@@ -1,0 +1,91 @@
+# `vermoegen/` — Bestände zum Stichtag
+
+Was ein Haushalt besitzt und schuldet, auch dort, wo kein Konto es zeigt: eine Immobilie,
+ein Fahrzeug, eine Versicherung mit Rückkaufswert, eine Beteiligung — und Kredite. Daraus
+und aus Konten und Depots rechnet `vermoegen.ts` das **Nettovermögen** und seinen Verlauf.
+
+## Beobachtung statt Buchung
+
+Ein Vermögenswert hat keinen Saldo und keine Buchungen. Er hat einen Wert, den jemand ab
+und zu nachsieht, und genau das wird gespeichert: an DIESEM Stichtag stand DIESER Betrag
+da. Dasselbe Muster wie beim Depot (`../depot/depot.ts`) und beim Kontostands-Anker —
+Stammsatz plus Reihe.
+
+Drei Dinge folgen daraus:
+
+- **Eine Beobachtung wird nie überschrieben.** Der Schlüssel ist Stammsatz plus Stichtag;
+  ein zweiter Betrag zum selben Tag wird abgewiesen, nicht übernommen. Wer sich vertippt
+  hat, entfernt den Eintrag und trägt neu ein. Das Depot überschreibt an derselben Stelle
+  — dort meldet die Bank, und ihre spätere Meldung ist die genauere. Hier tippt ein
+  Mensch ab, und eine Zahl, die sich still ändert, hätte niemand so gemeint.
+- **Zwischen zwei Beobachtungen wird nicht interpoliert.** Es gilt die jüngste bis zum
+  Stichtag (`beobachtungAm`). Eine Gerade zwischen zwei Jahresauszügen wäre eine Aussage
+  über elf Monate, zu denen niemand etwas gesagt hat.
+- **Vor der ersten Beobachtung gibt es keinen Wert** — auch keinen von null.
+  `beobachtungAm` liefert `undefined`; erst die Summe macht daraus „trägt nichts bei".
+
+## Warum kein Tilgungsplan
+
+Eine Schuld ist ebenfalls eine Reihe von Beobachtungen: die Restschuld aus dem
+Jahreskontoauszug. Ein Plan (Zinssatz, Rate, Laufzeit) wäre eine RECHNUNG, und sie stimmt
+nach der ersten Sondertilgung, Zinsanpassung oder ausgesetzten Rate nicht mehr — dann
+stünde eine gerechnete Zahl gegen die der Bank, und die App hätte unrecht.
+
+`vertragId` und `gegenstandId` an der Verbindlichkeit sind deshalb **Verweise ohne
+Rechnung**: der Vertrag, über den die Rate läuft, und der Vermögenswert, den die Schuld
+finanziert. Gespeichert und in der Maske wählbar, aber nichts liest sie. Die Aufteilung
+einer Rate in Zins und Tilgung ist ein eigener Schritt; wer ihn baut, entscheidet dort,
+ob die Tilgung aus der Reihe der Restschulden folgt oder eingegeben wird.
+
+**Die Restschuld ist positiv gespeichert.** Das Vorzeichen setzt `nettovermoegen`, an
+genau einer Stelle. Eine Schuld, die mal positiv und mal negativ dasteht, wird irgendwo
+einmal zu oft gedreht.
+
+## Was das Nettovermögen zählt
+
+```
+Nettovermögen = Konten + Depots + Vermögenswerte − Schulden      (alles zum Stichtag)
+```
+
+| Teil | woher | Regel |
+|---|---|---|
+| Konten | Anfangsbestand plus Buchungen bis zum Stichtag (`istSummeBis`) | **alle** Kontoklassen — die Klasse sagt, wofür Geld da ist, hier zählt nur, dass es da ist |
+| Depots | `depotwert` | je Depot der jüngste Wert bis zum Stichtag |
+| Vermögenswerte | `vermoegenswert` | je Eintrag die jüngste Beobachtung |
+| Schulden | `verbindlichkeit_stand` | je Eintrag die jüngste Restschuld, abgezogen |
+
+Die Kontensumme ist KEINE zweite Saldenrechnung: sie ist `konto.saldo + istSummeBis`,
+dieselbe Summe, die der Abgleich gegen den Kontostands-Anker benutzt.
+
+`nettovermoegenVerlauf` ruft für jedes Monatsende `nettovermoegen` auf — der Verlauf kann
+von der Zahl darüber nicht weglaufen. Sein letzter Punkt liegt auf dem Bis-Tag selbst,
+wenn der Monat dort noch nicht zu Ende ist.
+
+**Welche Konten hereinkommen, entscheidet der Aufrufer.** Die Sicht
+(`application/vermoegen/vermoegensichten.ts`) lässt ein Konto weg, an dem ein abgerufenes
+Depot hängt: es zeigt im Kontenbereich den Depotwert statt seines Stands und stünde sonst
+zweimal in der Summe.
+
+## Was `aktiv` hier heisst
+
+Wie am Konto: **wird noch geführt** — nicht „zählt". Ein verkauftes Fahrzeug, ein
+abgezahlter Kredit. Gefragt wird über `wirdGefuehrt`, fehlend heisst ja.
+
+Anders als am Konto entscheidet es hier eine Summe, und die Grenze ist genau gezogen: ein
+stillgelegter Eintrag zählt **nach seiner letzten Beobachtung** nicht mehr, bis
+einschliesslich ihres Stichtags aber schon. Er fällt damit aus dem heutigen Nettovermögen
+und bleibt im Verlauf stehen, wo er war. Eine zweite Angabe („stillgelegt am") braucht es
+dafür nicht — die letzte Beobachtung IST das Ende der Geschichte. Wer genau sein will,
+trägt am Tag des Verkaufs noch einen Wert ein und legt dann still.
+
+Löschen nimmt die Reihe mit und schreibt damit den Verlauf rückwirkend um. Dafür ist es
+da — für den Eintrag, den es nie hätte geben sollen —, und deshalb sagt die Rückfrage in
+der Oberfläche, dass Stilllegen der Weg für „verkauft" ist.
+
+## Die Wörter
+
+Im Code heisst es wie im Schema: `Vermoegensgegenstand`, `Verbindlichkeit`,
+`Verbindlichkeitsstand`. In der Oberfläche heisst es **Vermögenswert**, **Schuld**,
+**Wert** bzw. **Restschuld** mit **Stichtag**, die Summe **Nettovermögen**, der Bereich
+**Vermögen** — und nichts davon hat ein Synonym. Verbindlich ist `src/i18n/i18n.ts`,
+Namensraum `vermoegen`.

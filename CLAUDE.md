@@ -10,7 +10,7 @@ hierher, sondern in die Doku außerhalb des Repos. Maschinenspezifische Rezepte 
 
 ## Orientierung
 
-### Die App in zehn Bereichen
+### Die App in elf Bereichen
 
 Die Navigation steht in `adapters/ui/bausteine/AppShell.tsx` (Typ `ScreenId`, zwei
 Gruppen: **Überblick** — was gilt und was war; **Verwaltung** — woher die Daten kommen und
@@ -24,6 +24,13 @@ informieren. Seine `ScreenId` heisst weiter `konten`: sie ist ein Schlüssel, ke
 Depot ist das jüngste Beispiel: sein Stand steht in der Übersicht, sein Verlauf in der
 Analyse, aus derselben Wertreihe. Was die Übersicht rechnet und zeigt, steht in
 `src/adapters/ui/uebersicht/CLAUDE.md`.
+
+**Vermögen** ist der elfte Bereich und zieht eine zweite Grenze: die Karte „Was da ist"
+der Übersicht zeigt die KONTEN je Klasse und wem ihr Geld gehört; Vermögen zeigt alles,
+was jemand besitzt und schuldet — auch was auf keinem Konto liegt —, und daraus das
+Nettovermögen. Sein Verlauf steht im Bereich selbst und nicht in der Analyse: er ist die
+Geschichte einer einzigen Zahl, und die Einträge, aus denen er entsteht, pflegt man
+daneben. Regeln in `src/core/vermoegen/CLAUDE.md`.
 
 ### Die Schichten
 
@@ -82,7 +89,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-28 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+32 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie. Die ausführbare Gegenprobe steht in `migrations.test.ts`: `ERWARTETE_TABELLEN`
 prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Test rot:
@@ -101,7 +108,10 @@ prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Te
   `src/adapters/ui/training/CLAUDE.md`)
 - **Bank:** `bankzugang` (samt Bankfähigkeitsprofil) · `bankkonto_zuordnung`
 - **Besitzen:** `depot` · `depotwert` (Reihe der Stichtagswerte) · `depotposition` —
-  Beobachtungen, keine Buchungen; siehe unten
+  Beobachtungen, keine Buchungen; siehe unten · `vermoegensgegenstand` +
+  `vermoegenswert` (was auf keinem Konto liegt, als Reihe von Werten) · `verbindlichkeit`
+  + `verbindlichkeit_stand` (Schulden, als Reihe von Restschulden) — dasselbe Muster,
+  siehe `src/core/vermoegen/CLAUDE.md`
 - **Sonstiges:** `person` · `einstellung`
 
 Gedroppt und nicht wiederzubeleben: `topf`, `szenario`, `szenario_posten` — aufgegangen in
@@ -406,6 +416,7 @@ Sie stehen dort, wo man sie beim Schreiben liest — diese Datei zeigt nur, was 
 | `src/core/konten/CLAUDE.md` | Kontobelegung, Stilllegen und Löschen, Liquiditätsvorschau |
 | `src/core/budgets/CLAUDE.md` | `budgetrelevant`, die Reihe der Budgetbeträge |
 | `src/core/ruecklagen/CLAUDE.md` | die zwei Formen einer Rücklage, der Rücklagenfluss |
+| `src/core/vermoegen/CLAUDE.md` | Beobachtung statt Buchung, was das Nettovermögen zählt, was `aktiv` dort heisst |
 | `src/core/vertraege/CLAUDE.md` | Zuordnung und Herkunft, Merkmale und Fälligkeitsfenster, Umbuchungsverträge |
 | `src/application/import/CLAUDE.md` | Beleg und Verarbeitung, mehrere Belege je Zahlung |
 | `src/application/fints/CLAUDE.md` | Vormerkungen |

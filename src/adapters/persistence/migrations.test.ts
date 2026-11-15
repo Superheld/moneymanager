@@ -96,6 +96,10 @@ const ERWARTETE_TABELLEN = [
   // v44 — der Beleg und was wir daraus gemacht haben, getrennt nach Lebenszyklus
   "umsatz_roh", "umsatz_verarbeitung",
   // v47 — die Zuordnung steht jetzt an der Buchung, `vertrag_zuordnung` ist weg
+  // v77 — Schulden als Beobachtungen: Stammsatz und die Reihe der Restschulden
+  "verbindlichkeit", "verbindlichkeit_stand",
+  // v77 — Vermögenswerte, nach demselben Muster wie das Depot
+  "vermoegensgegenstand", "vermoegenswert",
   "vertrag", "vertrag_erkennung",
   // v70 — was die Bank kennt und noch nicht gebucht hat: eine Beobachtung mit
   // Verfallsdatum, deshalb neben `kontostand_anker` und nicht in `umsatz_roh`

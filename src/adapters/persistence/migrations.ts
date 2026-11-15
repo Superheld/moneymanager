@@ -2206,4 +2206,59 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE ruecklage ADD COLUMN beendet_am TEXT`,
     ],
   },
+  {
+    version: 77, // Vermoegen: Vermoegenswerte und Schulden als Beobachtungen zu Stichtagen
+    sql: [
+      // Was ein Haushalt besitzt und schuldet, steht nur zum Teil auf Konten. Ein Haus,
+      // ein Fahrzeug, der Rueckkaufswert einer Versicherung, ein Kredit: nichts davon
+      // hat Buchungen, aus denen sich ein Stand ergaebe. Es hat einen Wert, den jemand
+      // ab und zu nachsieht — in der Standmitteilung, im Jahreskontoauszug.
+      //
+      // Deshalb dasselbe Muster wie beim Depot (v38): ein Stammsatz und daneben die
+      // Reihe der Beobachtungen. Eine Beobachtung wird eingetragen und nie
+      // ueberschrieben; der Primaerschluessel aus Stammsatz und Stichtag haelt das fest.
+      // Kein Saldo, keine Buchung, kein Tilgungsplan — ein Plan waere eine Rechnung,
+      // und die stimmt nach der ersten Sondertilgung nicht mehr.
+      //
+      // `aktiv` heisst wie am Konto „wird noch gefuehrt": ein verkauftes Fahrzeug, ein
+      // abgezahlter Kredit. Geloescht wird dafuer nicht — die Reihe ist die einzige
+      // Geschichte, die es gibt.
+      //
+      // Nichts wird abgeloest und nichts ueberfuehrt: die vier Tabellen sind neu.
+      `CREATE TABLE IF NOT EXISTS vermoegensgegenstand (
+        id TEXT PRIMARY KEY,
+        bezeichnung TEXT NOT NULL,
+        art TEXT NOT NULL,
+        aktiv INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE TABLE IF NOT EXISTS vermoegenswert (
+        gegenstand_id TEXT NOT NULL REFERENCES vermoegensgegenstand(id) ON DELETE CASCADE,
+        stichtag TEXT NOT NULL,
+        wert INTEGER NOT NULL,
+        erfasst_am TEXT NOT NULL,
+        PRIMARY KEY (gegenstand_id, stichtag)
+      )`,
+      // `vertrag_id` und `gegenstand_id` sind Verweise ohne Rechnung: der Vertrag, ueber
+      // den die Rate laeuft, und der Vermoegenswert, den der Kredit finanziert. SET NULL
+      // statt CASCADE, weil die Schuld bleibt, wenn der Vertrag oder das Haus aus der
+      // App verschwindet.
+      `CREATE TABLE IF NOT EXISTS verbindlichkeit (
+        id TEXT PRIMARY KEY,
+        bezeichnung TEXT NOT NULL,
+        art TEXT NOT NULL,
+        vertrag_id TEXT REFERENCES vertrag(id) ON DELETE SET NULL,
+        gegenstand_id TEXT REFERENCES vermoegensgegenstand(id) ON DELETE SET NULL,
+        aktiv INTEGER NOT NULL DEFAULT 1
+      )`,
+      // `restschuld` ist POSITIV: sie sagt, wie viel noch offen ist. Das Vorzeichen
+      // setzt erst die Rechnung des Nettovermoegens, an genau einer Stelle.
+      `CREATE TABLE IF NOT EXISTS verbindlichkeit_stand (
+        verbindlichkeit_id TEXT NOT NULL REFERENCES verbindlichkeit(id) ON DELETE CASCADE,
+        stichtag TEXT NOT NULL,
+        restschuld INTEGER NOT NULL,
+        erfasst_am TEXT NOT NULL,
+        PRIMARY KEY (verbindlichkeit_id, stichtag)
+      )`,
+    ],
+  },
 ];

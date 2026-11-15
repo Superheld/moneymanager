@@ -95,6 +95,25 @@ import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stam
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
 import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
+import { vermoegenLaden, type Vermoegenssicht } from "../application/vermoegen/vermoegensichten";
+import {
+  restschuldEintragen as restschuldEintragenUseCase,
+  restschuldEntfernen as restschuldEntfernenUseCase,
+  schuldAendern as schuldAendernUseCase,
+  schuldAnlegen as schuldAnlegenUseCase,
+  schuldFuehren as schuldFuehrenUseCase,
+  schuldLoeschen as schuldLoeschenUseCase,
+  vermoegenswertAendern as vermoegenswertAendernUseCase,
+  vermoegenswertAnlegen as vermoegenswertAnlegenUseCase,
+  vermoegenswertFuehren as vermoegenswertFuehrenUseCase,
+  vermoegenswertLoeschen as vermoegenswertLoeschenUseCase,
+  wertEintragen as wertEintragenUseCase,
+  wertEntfernen as wertEntfernenUseCase,
+  type BeobachtungEingabe,
+  type SchuldEingabe,
+  type VermoegenswertEingabe,
+} from "../application/vermoegen/vermoegenPflege";
+import { sqliteVermoegenRepository } from "./persistence/sqliteVermoegenRepository";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
 import { kontenLaden, type Kontensicht } from "../application/konten/kontensichten";
@@ -504,6 +523,79 @@ export function umsaetze() {
 
 export function depots(): Promise<Depotdaten> {
   return depotsLaden({ depotRepo: sqliteDepotRepository });
+}
+
+// --- Vermögen --------------------------------------------------------------
+//
+// Der Bereich liest quer — Konten, Buchungen, Depots — und schreibt nur in seine eigenen
+// vier Tabellen. Kein Schreibweg hier fasst ein Konto oder eine Buchung an.
+
+const VERMOEGEN_PFLEGE = {
+  vermoegenRepo: sqliteVermoegenRepository,
+  vertragRepo: sqliteVertragRepository,
+};
+
+export function vermoegen(heute: string): Promise<Vermoegenssicht> {
+  return vermoegenLaden(
+    {
+      ...VERMOEGEN_PFLEGE,
+      kontoRepo: sqliteZahlungskontoRepository,
+      ledger: sqliteLedgerRepository,
+      depotRepo: sqliteDepotRepository,
+      kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
+    },
+    heute,
+  );
+}
+
+export function vermoegenswertAnlegen(eingabe: VermoegenswertEingabe) {
+  return vermoegenswertAnlegenUseCase(VERMOEGEN_PFLEGE, eingabe);
+}
+
+export function vermoegenswertAendern(id: string, eingabe: VermoegenswertEingabe) {
+  return vermoegenswertAendernUseCase(VERMOEGEN_PFLEGE, id, eingabe);
+}
+
+export function vermoegenswertFuehren(id: string, aktiv: boolean) {
+  return vermoegenswertFuehrenUseCase(VERMOEGEN_PFLEGE, id, aktiv);
+}
+
+export function vermoegenswertLoeschen(id: string) {
+  return vermoegenswertLoeschenUseCase(VERMOEGEN_PFLEGE, id);
+}
+
+// `erfasstAm` entsteht HIER und nicht im Use-Case: die Uhr ist ein Adapter. Der Stichtag
+// sagt, für wann die Beobachtung gilt; dieser Zeitpunkt nur, wann sie eingetippt wurde.
+export function wertEintragen(gegenstandId: string, eingabe: BeobachtungEingabe, heute: string) {
+  return wertEintragenUseCase(VERMOEGEN_PFLEGE, gegenstandId, eingabe, heute, new Date().toISOString());
+}
+
+export function wertEntfernen(gegenstandId: string, stichtag: string) {
+  return wertEntfernenUseCase(VERMOEGEN_PFLEGE, gegenstandId, stichtag);
+}
+
+export function schuldAnlegen(eingabe: SchuldEingabe) {
+  return schuldAnlegenUseCase(VERMOEGEN_PFLEGE, eingabe);
+}
+
+export function schuldAendern(id: string, eingabe: SchuldEingabe) {
+  return schuldAendernUseCase(VERMOEGEN_PFLEGE, id, eingabe);
+}
+
+export function schuldFuehren(id: string, aktiv: boolean) {
+  return schuldFuehrenUseCase(VERMOEGEN_PFLEGE, id, aktiv);
+}
+
+export function schuldLoeschen(id: string) {
+  return schuldLoeschenUseCase(VERMOEGEN_PFLEGE, id);
+}
+
+export function restschuldEintragen(verbindlichkeitId: string, eingabe: BeobachtungEingabe, heute: string) {
+  return restschuldEintragenUseCase(VERMOEGEN_PFLEGE, verbindlichkeitId, eingabe, heute, new Date().toISOString());
+}
+
+export function restschuldEntfernen(verbindlichkeitId: string, stichtag: string) {
+  return restschuldEntfernenUseCase(VERMOEGEN_PFLEGE, verbindlichkeitId, stichtag);
 }
 
 // --- Rücklagen -------------------------------------------------------------

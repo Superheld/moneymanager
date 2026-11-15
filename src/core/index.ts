@@ -26,6 +26,7 @@ export * from "./budgets/budgetVorschlag";
 export * from "./ruecklagen/ruecklage";
 export * from "./ruecklagen/fluss";
 export * from "./depot/depot";
+export * from "./vermoegen/vermoegen";
 export * from "./buchung/istbuchung";
 export * from "./buchung/exakteUmbuchung";
 export * from "./konten/kontoregister";

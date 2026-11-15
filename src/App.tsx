@@ -8,6 +8,7 @@ import { EinstellungenScreen } from "./adapters/ui/einstellungen/EinstellungenSc
 import { VertraegeScreen } from "./adapters/ui/vertraege/VertraegeScreen";
 import { BudgetsScreen } from "./adapters/ui/budgets/BudgetsScreen";
 import { RuecklagenScreen } from "./adapters/ui/ruecklagen/RuecklagenScreen";
+import { VermoegenScreen } from "./adapters/ui/vermoegen/VermoegenScreen";
 import { ImportBereich } from "./adapters/ui/import/ImportBereich";
 import { TrainingBereich } from "./adapters/ui/training/TrainingBereich";
 import { EinstellungenProvider } from "./adapters/ui/bausteine/EinstellungenProvider";
@@ -164,6 +165,7 @@ function Arbeitsflaeche({
         {screen === "analyse" && <AnalyseScreen />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
         {screen === "ruecklagen" && <RuecklagenScreen />}
+        {screen === "vermoegen" && <VermoegenScreen />}
         {screen === "budgets" && <BudgetsScreen />}
         {screen === "vertraege" && <VertraegeScreen />}
         {screen === "kontenverwaltung" && <KontenVerwaltungScreen />}
