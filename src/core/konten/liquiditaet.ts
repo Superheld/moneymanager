@@ -32,7 +32,7 @@
 // liegen — sie mitzurechnen hiesse, Geld abfliessen zu lassen, das auf dem Konto bleibt.
 // Was daraus einmal gekauft wird, ist unvorhersagbar und gehört in keine Vorschau.
 
-import { addTage, ord, parseIso, tageImMonat, toIso } from "../basis/datum";
+import { addTage, parseIso, tageImMonat, toIso } from "../basis/datum";
 import type { Cent } from "../basis/geld";
 import { vormerkungslast, type Vormerkung } from "./vormerkung";
 import { realerKontostand, type IstBuchung } from "../buchung/istbuchung";
@@ -218,7 +218,6 @@ export function liquiditaetsvorschau(e: LiquiditaetsEingabe): Kontovorschau[] {
     const erwarteteReihe: Ereignis[] = [];
     let standFest = start;
     let standErwartet = start;
-    const startOrd = ord(parseIso(e.heute));
     for (let i = 0; i <= e.tage; i++) {
       const datum = toIso(addTage(parseIso(e.heute), i));
       const termin = jeTag.get(datum) ?? 0;
@@ -226,9 +225,11 @@ export function liquiditaetsvorschau(e: LiquiditaetsEingabe): Kontovorschau[] {
       standErwartet += termin - proTag(datum);
       festeReihe.push({ datum, betrag: standFest });
       erwarteteReihe.push({ datum, betrag: standErwartet });
-      // Sicherheitsnetz gegen eine falsch gerechnete Datumsreihe: ohne ihn liefe die
-      // Schleife bei einem Fehler in `addTage` still ins Leere statt aufzufallen.
-      if (ord(parseIso(datum)) !== startOrd + i) break;
+      // Hier stand bis 2026-11-16 ein „Sicherheitsnetz", das die Schleife abbrach, sobald
+      // `ord(datum)` nicht mehr `ord(heute) + i` war. `ord` ist aber ein Sortierschlüssel
+      // (YYYYMMDD) und kein Tageszähler: am ersten Monatswechsel sprang er, und die
+      // Vorschau endete dort still — sie rechnete bis zum Monatsende statt über das
+      // ganze Fenster. `addTage` rechnet echte Kalendertage und braucht kein Netz.
     }
 
     return {
