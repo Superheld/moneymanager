@@ -39,6 +39,7 @@ export * from "./monatsausblick";
 export * from "./einordnung";
 export * from "./ergebnis";
 export * from "./einrichtung";
+export * from "./vorsorge/vorsorge";
 export * from "./auswertung";
 export * from "./klassifikator/merkmale";
 export * from "./klassifikator/modell";
