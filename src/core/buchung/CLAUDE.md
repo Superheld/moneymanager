@@ -2,6 +2,18 @@
 
 Gilt für alles, was an einer Ist-Buchung Richtung, Charakter oder Paarung berührt — auch in der Maske. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
 
+## Was eine Buchung kaufmännisch ist, steht nicht hier
+
+**Was eine Buchung kaufmännisch IST** (Einnahme, Fixkosten, laufende Kosten, Entnahme aus
+Topf oder Rücklage, Vorsorge, Umbuchung, ungeplant), steht nicht hier, sondern in
+`../einordnung.ts` — an EINER Stelle für die ganze App. Die Ergebnisrechnung der Übersicht
+liest sie von dort, und seit 2026-11-15 auch der Kontoauszug (Spalte „Einordnung") und der
+Buchungsdialog (der Satz mit dem Warum), beide über
+`application/buchung/einordnungssicht.ts`. Der Grund für die eine Stelle: vorher
+beantwortete jede Sicht die Frage selbst, und dieselbe Buchung zählte an drei Stellen als
+drei verschiedene Dinge. Vorzeichen und Charakter unten sind die EINGABEN dieser
+Einordnung, nicht eine zweite Fassung davon.
+
 ## Das Vorzeichen ist die Richtung, der Charakter ordnet ein
 
 **Der Betrag einer Ist-Buchung trägt sein Vorzeichen selbst, überall.** Er kommt

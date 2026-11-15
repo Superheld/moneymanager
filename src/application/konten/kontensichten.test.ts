@@ -68,6 +68,7 @@ function deps(
       async alle() { return vertraege.vertraege ?? []; },
       async speichern() {}, async loeschen() {},
     } as unknown as KontenDeps["vertragRepo"],
+    budgetRepo: { async alle() { return []; } } as unknown as KontenDeps["budgetRepo"],
   };
 }
 

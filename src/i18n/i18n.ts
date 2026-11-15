@@ -1496,6 +1496,37 @@ const de = {
       notizPlatzhalter: "z. B. Bäcker, Tankstelle",
     },
   },
+  // Was eine Buchung kaufmännisch IST — an der Zeile im Kontoauszug als Pille, im
+  // Buchungsdialog als Satz mit dem Warum. Die Art selbst kommt aus `core/einordnung.ts`;
+  // hier stehen nur die Wörter dafür. Alltagssprache: wer die Zeile liest, soll ohne
+  // Rechnungswesen verstehen, warum eine Ausgabe den Monat (nicht) belastet.
+  einordnung: {
+    titel: "Einordnung",
+    spalte: "Einordnung",
+    geteilt: "Diese Buchung ist aufgeteilt, und ihre Teile zählen verschieden:",
+    pille: {
+      einnahme: "Einnahme",
+      fixkosten: "Fixkosten",
+      laufend: "Laufende Kosten",
+      topf: "aus Budget {{budget}}",
+      ruecklage: "aus Rücklage",
+      vorsorge: "Vorsorge",
+      umbuchung: "Umbuchung",
+      ungeplant: "Ungeplant",
+    },
+    grund: {
+      einnahme: "Zählt als Einnahme: Geld, das neu hereinkommt und nicht von einem deiner eigenen Konten stammt.",
+      fixkosten: "Zählt als Fixkosten, weil sie dem Vertrag {{vertrag}} zugeordnet ist.",
+      fixkostenOhneName: "Zählt als Fixkosten, weil sie einem Vertrag zugeordnet ist.",
+      laufend: "Zählt als laufende Kosten: ihre Kategorie gehört zum monatlichen Budget {{budget}}.",
+      topf: "Kommt aus dem aufbauenden Budget {{budget}}: kostet den Monat nicht noch einmal. Gekostet haben schon die Monatsbeträge, mit denen das Budget angespart wurde — nur was darüber hinausgeht, zählt zusätzlich.",
+      ruecklage: "Aus einer Rücklage bezahlt: kostet den Monat nicht noch einmal. Gekostet haben schon die Raten, mit denen die Rücklage gebildet wurde.",
+      vorsorgeKonto: "Zählt als Vorsorge: das Geld geht auf ein Vorsorgekonto. Es bleibt dein Vermögen, ist aber für später bestimmt.",
+      vorsorgeUmschichtung: "Zählt als Vorsorge: eine Umschichtung ohne Gegenkonto in der App. Das Geld verlässt die erfassten Konten, bleibt aber dein Vermögen — etwa ein Wertpapierkauf oder eine Tilgung.",
+      umbuchung: "Umbuchung zwischen eigenen Konten: weder Einnahme noch Kosten. Das Geld liegt danach nur woanders.",
+      ungeplant: "Ungeplant: weder einem Vertrag zugeordnet noch von einem Budget gedeckt. Zählt voll als Kosten des Monats.",
+    },
+  },
   buchungsliste: {
     datum: "Datum",
     buchung: "Buchung",
@@ -3676,6 +3707,33 @@ const en: typeof de = {
       richtungZu: "Money in",
       gegenrichtungHinweis: "Runs against the category — so it is a refund (reimbursement, return, reversal). The category stays the one of the expense: that is where it relieves the budget.",
       notizPlatzhalter: "e.g. bakery, gas station",
+    },
+  },
+  einordnung: {
+    titel: "Classification",
+    spalte: "Classification",
+    geteilt: "This transaction is split, and its parts count differently:",
+    pille: {
+      einnahme: "Income",
+      fixkosten: "Fixed costs",
+      laufend: "Running costs",
+      topf: "from budget {{budget}}",
+      ruecklage: "from reserve",
+      vorsorge: "Provision",
+      umbuchung: "Transfer",
+      ungeplant: "Unplanned",
+    },
+    grund: {
+      einnahme: "Counts as income: money that comes in new and not from one of your own accounts.",
+      fixkosten: "Counts as fixed costs because it is assigned to the contract {{vertrag}}.",
+      fixkostenOhneName: "Counts as fixed costs because it is assigned to a contract.",
+      laufend: "Counts as running costs: its category belongs to the monthly budget {{budget}}.",
+      topf: "Comes from the building budget {{budget}}: it does not cost the month a second time. The monthly amounts that built up the budget were the cost already — only what goes beyond them counts on top.",
+      ruecklage: "Paid from a reserve: it does not cost the month a second time. The instalments that built up the reserve were the cost already.",
+      vorsorgeKonto: "Counts as provision: the money goes to a provision account. It remains your wealth but is meant for later.",
+      vorsorgeUmschichtung: "Counts as provision: a reallocation without a counter account in the app. The money leaves the tracked accounts but remains your wealth — a securities purchase or a loan repayment, for example.",
+      umbuchung: "Transfer between your own accounts: neither income nor cost. The money just sits somewhere else afterwards.",
+      ungeplant: "Unplanned: neither assigned to a contract nor covered by a budget. Counts in full as a cost of the month.",
     },
   },
   buchungsliste: {

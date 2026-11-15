@@ -29,6 +29,7 @@ import {
 } from "../../dienste";
 import type { ScreenId } from "../bausteine/AppShell";
 import { Button, Card, DataTable, Pill } from "../bausteine";
+import { EinordnungsPillen, einordnungsText } from "./EinordnungsPillen";
 import { VormerkungsBlock } from "./VormerkungsBlock";
 import { UmbuchungModal } from "./UmbuchungModal";
 import { useRegisterfilter } from "./useRegisterfilter";
@@ -653,11 +654,6 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   ),
                 },
                 {
-                  // Die Umbuchungs-Pille steht HIER, nicht bei der Beschreibung: eine
-                  // Umbuchung trägt keine Kategorie (sie verschiebt nur eigenes Geld),
-                  // die Pille sagt also genau das, was in dieser Spalte fehlt. Vorher
-                  // stand sie rechts neben dem Empfänger und die Kategorie-Spalte zeigte
-                  // daneben einen Strich — zwei Zeichen für dieselbe Aussage.
                   key: "kat", label: t("konten.spalteKategorie"), maxWidth: 180,
                   sortValue: (r) => (r.zeile.gegenkontoId ? "" : r.kategorieName),
                   // Die Kategorie ist hier ÄNDERBAR, nicht nur abzulesen.
@@ -680,8 +676,13 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                   // einzusortieren" und schickte auf die Suche nach einer Lücke, die
                   // keine ist.
                   render: (r) =>
+                    // Das Umbuchungs-Bein bleibt hier LEER. Bis 2026-11-15 stand an dieser
+                    // Stelle eine Pille „Umbuchung"; die steht jetzt eine Spalte weiter
+                    // unter „Einordnung", zusammen mit jeder anderen Art. Beide zu zeigen
+                    // hiesse, dasselbe Wort zweimal nebeneinander zu schreiben — und kein
+                    // Strich, weil der „noch einzusortieren" sagte, wo nichts fehlt.
                     r.zeile.gegenkontoId
-                      ? <Pill variant="um">{t("konten.pillUmbuchung")}</Pill>
+                      ? null
                       : r.buchung && istGeteilt(r.buchung)
                         ? <Pill variant="neutral">{t("konten.split.pille")}</Pill>
                         : r.buchung
@@ -695,6 +696,23 @@ export function KontenScreen({ onNavigate }: { onNavigate: (id: ScreenId) => voi
                               />
                             )
                           : r.kategorieName || "—",
+                },
+                {
+                  // Was die Zeile kaufmännisch IST — eine eigene Spalte neben der Kategorie
+                  // und nicht eine weitere Pille am Namen: dort stehen schon bis zu vier
+                  // (prüfen, manuell, Vertrag, Dublette), und die sagen etwas über
+                  // einzelne Zeilen. Die Einordnung hat JEDE Zeile; als Spalte liest man
+                  // sie hinunter und kann nach ihr sortieren („zeig mir alles Ungeplante").
+                  //
+                  // Neben der Kategorie, weil sie deren Folge ist: die Kategorie sagt,
+                  // WOFÜR, die Einordnung, wie es deshalb ZÄHLT. Die Art kommt fertig aus
+                  // der Sicht (`core/einordnung.ts`), hier wird nichts entschieden.
+                  //
+                  // Schmal braucht sie keine Angabe: keine Spalte dieser Tabelle setzt
+                  // `schmal`, also wandert sie mit Datum und Kategorie in die zweite Zeile.
+                  key: "einordnung", label: t("einordnung.spalte"), maxWidth: 220,
+                  sortValue: (r) => r.einordnung.map((e) => einordnungsText(t, e)).join(" "),
+                  render: (r) => <EinordnungsPillen einordnung={r.einordnung} />,
                 },
                 { key: "betrag", label: `${t("konten.spalteBetrag")} ${geld.symbol}`, align: "right", sortValue: (r) => r.zeile.betrag, render: (r) => <span className="num" style={{ fontWeight: 700, color: geldFarbe(r.zeile.betrag) }}>{geld.format(r.zeile.betrag, { mitVorzeichen: true })}</span> },
                 { key: "saldo", label: `${t("konten.spalteSaldo")} ${geld.symbol}`, align: "right", sortValue: (r) => r.zeile.saldo, render: (r) => geld.format(r.zeile.saldo) },
