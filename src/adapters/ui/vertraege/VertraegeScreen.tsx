@@ -38,6 +38,8 @@ import { useGeld } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 import { Umschalter } from "../bausteine/Umschalter";
 import { ErkennungsDialog } from "./ErkennungsDialog";
+import { LeererZustand } from "../bausteine/LeererZustand";
+import type { ScreenId } from "../bausteine/AppShell";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
@@ -76,7 +78,11 @@ function heuteIso(): string {
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 }
 
-export function VertraegeScreen() {
+/**
+ * `onNavigate` ist freiwillig: der leere Bereich führt damit in den Import. Ohne Shell
+ * (Tests) steht dort nur der Knopf zum Anlegen.
+ */
+export function VertraegeScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => void } = {}) {
   const loeschfrage = useLoeschfrage();
   const { t } = useTranslation();
   const geld = useGeld();
@@ -580,9 +586,41 @@ export function VertraegeScreen() {
       )}
 
       {alleVertraege.length === 0 ? (
+        // Vor dem Laden nur der alte Satz: ob es Buchungen gibt, weiss erst die Sicht, und
+        // sonst stünde einen Augenblick lang der falsche nächste Schritt da.
+        !sicht ? (
+          <Card>
+            <div className="muted">{t("vertraege.leer")}</div>
+          </Card>
+        ) : (
         <Card>
-          <div className="muted">{t("vertraege.leer")}</div>
+          {/* Der nächste Schritt hängt daran, was es schon gibt: ohne Buchungen kann die
+              Erkennung nichts finden, also erst der Import; mit Vorschlägen stehen die
+              darüber, und der Satz zeigt dorthin, statt nur „anlegen" zu sagen. */}
+          <LeererZustand
+            kopf={t("vertraege.leer")}
+            aktionen={
+              <>
+                {!sicht.hatBuchungen && onNavigate && (
+                  <Button variant="primary" onClick={() => onNavigate("import")}>
+                    {t("einrichtung.zuBereich", { bereich: t("shell.navImport") })}
+                  </Button>
+                )}
+                <Button variant={sicht.hatBuchungen ? "primary" : undefined} plus onClick={neu}>
+                  {t("vertraege.anlegen")}
+                </Button>
+              </>
+            }
+          >
+            {t("vertraege.leerErklaerung")}{" "}
+            {!sicht.hatBuchungen
+              ? t("vertraege.leerOhneBuchungen")
+              : vorschlaege.length > 0
+                ? t("vertraege.leerMitVorschlaegen")
+                : t("vertraege.leerOhneVorschlaege")}
+          </LeererZustand>
         </Card>
+        )
       ) : (
         /*
          * EINE Card für alle vier Ansichten. Der Umschalter sitzt darin wie eine

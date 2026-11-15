@@ -15,34 +15,15 @@
 // abgehakter Schritt, der in einer Einstellung stünde, bliebe abgehakt, wenn jemand das
 // einzige Budget wieder löscht.
 //
-// Die Karte RECHNET NICHTS und entscheidet nur, wohin ein Schritt führt — das ist
-// Navigation und gehört in die Oberfläche.
+// Die Zeile je Schritt samt ihrem Ziel steht in `bausteine/Einrichtungsschritt.tsx` —
+// das Ende des Imports zeigt den nächsten Schritt mit derselben Zeile.
 
 import { useTranslation } from "react-i18next";
-import type { Einrichtungsschritt, EinrichtungsschrittId, Einrichtungsstand } from "../../../application";
-import { Button, Card, Pill } from "../bausteine";
+import type { Einrichtungsstand } from "../../../application";
+import { Card } from "../bausteine";
 import type { ScreenId } from "../bausteine/AppShell";
 import { Stapel } from "../bausteine/Anordnung";
-
-/** In welchem Bereich man den Schritt erledigt. */
-const ZIEL: Record<EinrichtungsschrittId, ScreenId> = {
-  konto: "kontenverwaltung",
-  buchungen: "import",
-  kategorien: "konten",
-  vertraege: "vertraege",
-  budgets: "budgets",
-  ruecklagen: "ruecklagen",
-};
-
-/** Der Name des Zielbereichs, wie er in der Navigation steht. */
-const ZIEL_NAME: Record<EinrichtungsschrittId, string> = {
-  konto: "shell.navKontenVerwalten",
-  buchungen: "shell.navImport",
-  kategorien: "shell.navBuchungen",
-  vertraege: "shell.navVertraege",
-  budgets: "shell.navBudgets",
-  ruecklagen: "shell.navRuecklagen",
-};
+import { EinrichtungsschrittZeile } from "../bausteine/Einrichtungsschritt";
 
 export interface EinrichtungKarteProps {
   readonly stand: Einrichtungsstand;
@@ -63,45 +44,9 @@ export function EinrichtungKarte({ stand, onNavigate }: EinrichtungKarteProps) {
     >
       <Stapel abstand={4}>
         {stand.schritte.map((s) => (
-          <Schritt key={s.id} schritt={s} onNavigate={onNavigate} />
+          <EinrichtungsschrittZeile key={s.id} schritt={s} onNavigate={onNavigate} />
         ))}
       </Stapel>
     </Card>
-  );
-}
-
-function Schritt({ schritt, onNavigate }: { schritt: Einrichtungsschritt; onNavigate?: (id: ScreenId) => void }) {
-  const { t } = useTranslation();
-  const { id, status } = schritt;
-  const offen = status === "offen";
-
-  return (
-    <div style={{ display: "flex", gap: "var(--sp-3)", alignItems: "baseline", justifyContent: "space-between", flexWrap: "wrap" }}>
-      <div style={{ minWidth: 0, flex: "1 1 18rem" }}>
-        {/* Nur der offene Schritt trägt Gewicht: er ist das, was als Nächstes zu tun ist.
-            Erledigtes und Wartendes tritt zurück, bleibt aber stehen — die Liste zeigt
-            den ganzen Weg, nicht nur den Rest. */}
-        <div className={offen ? undefined : "muted"} style={{ fontWeight: offen ? "var(--fw-semi)" : undefined }}>
-          {t(`einrichtung.schritt.${id}.frage`)}
-          {schritt.freiwillig && status !== "erledigt" && (
-            <span className="muted" style={{ fontWeight: "normal" }}> · {t("einrichtung.freiwillig")}</span>
-          )}
-        </div>
-        {offen && (
-          <div className="hinweis" style={{ marginTop: 2 }}>
-            {schritt.anzahl !== undefined
-              ? t(`einrichtung.schritt.${id}.warumAnzahl`, { count: schritt.anzahl })
-              : t(`einrichtung.schritt.${id}.warum`)}
-          </div>
-        )}
-      </div>
-      {status === "erledigt" && <Pill variant="ok">{t("einrichtung.erledigt")}</Pill>}
-      {status === "wartet" && <Pill variant="neutral">{t("einrichtung.wartet")}</Pill>}
-      {offen && onNavigate && (
-        <Button groesse="klein" onClick={() => onNavigate(ZIEL[id])}>
-          {t("einrichtung.zuBereich", { bereich: t(ZIEL_NAME[id]) })}
-        </Button>
-      )}
-    </div>
   );
 }

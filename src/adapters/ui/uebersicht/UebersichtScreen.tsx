@@ -74,6 +74,7 @@ import { useGeld } from "../bausteine/einstellungenKontext";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { fehlerMelden } from "../bausteine/Meldungen";
 import { Stapel } from "../bausteine/Anordnung";
+import { LeererZustand } from "../bausteine/LeererZustand";
 
 function heuteIso(): string {
   const n = new Date();
@@ -178,7 +179,19 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
 
       {daten && <EinrichtungKarte stand={daten.einrichtung} onNavigate={onNavigate} />}
 
-      {daten && (
+      {/* Ganz am Anfang — keine Buchung und kein Plan — stand hier der Hinweis auf die
+          fehlenden Plan-Daten. Der ist dann der zweite Schritt vor dem ersten: woraus die
+          Karten überhaupt rechnen, sind die Buchungen. Mit Plan bleiben die Karten stehen,
+          auch ohne Buchung — ihre Spalte „geplant" sagt dann schon etwas.
+          Ohne eigenen Knopf: in diesem Zustand steht „Damit die Zahlen stimmen" immer
+          direkt darüber (ohne Buchungen ist die Einrichtung nie fertig) und trägt ihn. */}
+      {daten && !daten.hatBuchungen && !daten.hatPlandaten && (
+        <Card subtitle={t("ergebnis.leerUntertitel")}>
+          <LeererZustand>{t("uebersicht.leerOhneBuchungen")}</LeererZustand>
+        </Card>
+      )}
+
+      {daten && (daten.hatBuchungen || daten.hatPlandaten) && (
         <ErgebnisKarten
           ergebnisse={daten.ergebnisse}
           hatPlandaten={daten.hatPlandaten}

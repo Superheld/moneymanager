@@ -54,6 +54,17 @@ export interface Einrichtungsstand {
   readonly schritte: readonly Einrichtungsschritt[];
   /** Sind alle Schritte erledigt, die nicht freiwillig sind? */
   readonly fertig: boolean;
+  /**
+   * Was als Nächstes dran ist: der erste offene Schritt — und nichts, wenn die
+   * Einrichtung fertig ist.
+   *
+   * Hier und nicht in der Oberfläche, weil zwei Stellen dieselbe Antwort geben müssen:
+   * die Karte in der Übersicht und das Ende des Imports. Wählte jede selbst, zeigte die
+   * eine früher oder später auf einen anderen Schritt als die andere. Ein freiwilliger
+   * Schritt ist nie der nächste einer fertigen Einrichtung — sonst erinnerte das Ende
+   * jedes Imports an Rücklagen, die nicht jeder führt.
+   */
+  readonly naechster?: Einrichtungsschritt;
 }
 
 export interface EinrichtungEingabe {
@@ -110,8 +121,7 @@ export function einrichtungsstand(e: EinrichtungEingabe): Einrichtungsstand {
     freiwillig: id === "ruecklagen",
     ...(id === "kategorien" && unsortiert > 0 ? { anzahl: unsortiert } : {}),
   }));
-  return {
-    schritte,
-    fertig: schritte.every((s) => s.freiwillig || s.status === "erledigt"),
-  };
+  const fertig = schritte.every((s) => s.freiwillig || s.status === "erledigt");
+  const naechster = fertig ? undefined : schritte.find((s) => s.status === "offen");
+  return { schritte, fertig, ...(naechster ? { naechster } : {}) };
 }

@@ -39,6 +39,8 @@ import { Modal } from "../bausteine/Modal";
 import { fehlerNachricht, useGeld } from "../bausteine/einstellungenKontext";
 import { Kaestchen } from "../bausteine/Kaestchen";
 import { Zeile } from "../bausteine/Anordnung";
+import { LeererZustand } from "../bausteine/LeererZustand";
+import type { ScreenId } from "../bausteine/AppShell";
 
 /** Woran ein Konto hängt: welcher Zugang, welches Bankkonto, bis wann geholt. */
 export interface KontoVerbindung {
@@ -56,6 +58,8 @@ export function KontenVerwaltung({
   verbindungen,
   onTrennen,
   onChange,
+  geladen = true,
+  onNavigate,
 }: {
   konten: Zahlungskonto[];
   personen: Person[];
@@ -67,6 +71,10 @@ export function KontenVerwaltung({
   /** Löst die Verbindung eines Kontos (der Zugang selbst bleibt bestehen). */
   onTrennen: (v: KontoVerbindung) => Promise<void>;
   onChange: () => void;
+  /** Erst geladen steht die Erklärung da — vorher sähe auch ein voller Bestand leer aus. */
+  geladen?: boolean;
+  /** Führt aus dem leeren Bereich in den Import. Ohne ihn (Tests) nur der Knopf zum Anlegen. */
+  onNavigate?: (id: ScreenId) => void;
 }) {
   const { t } = useTranslation();
   const geld = useGeld();
@@ -147,8 +155,27 @@ export function KontenVerwaltung({
   return (
     <>
     <Card action={<Button variant="primary" plus onClick={() => setAnlegen(true)}>{t("einstellungen.konto.anlegen")}</Button>}>
-      {konten.length === 0 ? (
+      {konten.length === 0 && !geladen ? (
         <div className="muted">{t("einstellungen.konto.leer")}</div>
+      ) : konten.length === 0 ? (
+        // Das ist der erste Schritt der Einrichtung — wer hier landet, fängt gerade an.
+        // Zwei Wege, und beide gehören genannt: von Hand anlegen, oder eine Datei
+        // einlesen, die ihre Konten selbst mitbringt.
+        <LeererZustand
+          kopf={t("einstellungen.konto.leer")}
+          aktionen={
+            <>
+              <Button variant="primary" plus onClick={() => setAnlegen(true)}>{t("einstellungen.konto.anlegen")}</Button>
+              {onNavigate && (
+                <Button onClick={() => onNavigate("import")}>
+                  {t("einrichtung.zuBereich", { bereich: t("shell.navImport") })}
+                </Button>
+              )}
+            </>
+          }
+        >
+          {t("einstellungen.konto.leerErklaerung")}
+        </LeererZustand>
       ) : (
         <DataTable
           onRowClick={(k: Zahlungskonto) => setZeilenVon(zeilenVon === k.id ? null : k.id)}

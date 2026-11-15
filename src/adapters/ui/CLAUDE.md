@@ -59,8 +59,8 @@ Die Navigation steht in `bausteine/AppShell.tsx`, die Zuordnung zur Komponente i
 `App.tsx`, die gebundenen Aufrufe in `../dienste.ts`.
 
 Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlich ist es
-`kategorien/` wie in Kern und Anwendung. Die drei bereichsübergreifenden Tests (`screens`,
-`interaktion`, `formulare`) liegen in der Wurzel.
+`kategorien/` wie in Kern und Anwendung. Die bereichsübergreifenden Tests (`screens`,
+`interaktion`, `formulare`, `leereZustaende`) liegen in der Wurzel.
 
 ## Bausteinkatalog — wofür es schon etwas gibt
 
@@ -93,9 +93,45 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Enter bestätigt | `beiEnter` |
 | Schmales Fenster in JS | `useSchmal` — nur wenn sich das Markup ändert, sonst CSS |
 | Hervorhebung in Fliesstext | `betonung` mit `<Trans>` |
+| Ein Bereich, in dem noch nichts steht | `LeererZustand` — Satz, Erklärung, Knöpfe; keine Karte (unten, „Leere Zustände") |
+| Ein Schritt der Einrichtung samt Knopf in seinen Bereich | `Einrichtungsschritt` (`EinrichtungsschrittZeile`, `EINRICHTUNG_ZIEL`) |
 
 Was nicht in der Tabelle steht und an zwei Stellen gebraucht wird, ist ein Kandidat für
 einen neuen Eintrag — und gehört dann auch hier hinein.
+
+## Leere Zustände
+
+**Ist in einem Bereich nichts da, sagt er in zwei, drei Sätzen, was hierher gehört, wozu
+es gut ist und was als Nächstes dran ist — mit dem Knopf, der es tut oder dorthin führt.**
+Seit 2026-11-15, über `bausteine/LeererZustand.tsx`. Der Anlass: die Karte „Damit die
+Zahlen stimmen" führt in die Bereiche, und dort stand für einen neuen Nutzer oft nur eine
+leere Tabelle oder „Noch keine Verträge." Vermögen hatte als einziger Bereich einen
+Absatz mit Knöpfen (`vermoegen.leer`) und ist das Vorbild; es nutzt den Baustein (noch)
+nicht.
+
+Vier Regeln dazu:
+
+- **Der vorhandene Satz bleibt im Wortlaut stehen** (`kopf`), ergänzt wird darunter.
+  Vorhandene Texte werden nicht ungefragt umformuliert.
+- **Der nächste Schritt folgt aus dem Bestand, nicht aus einem gemerkten Zustand.**
+  Ohne Buchungen führt ein Bereich, der aus ihnen vorschlägt (Verträge, Budgets), zuerst
+  in den Import; gibt es Vorschläge, zeigt der Satz auf sie statt nur „anlegen" zu sagen.
+  Die Antwort kommt aus der Sicht des Use-Cases (`hatBuchungen`), nicht aus einer Zählung
+  im Screen.
+- **Erst nach dem Laden.** Vorher steht nur der alte Satz da; sonst zeigte ein voller
+  Bestand einen Augenblick lang die Erklärung oder einen falschen nächsten Schritt.
+- **Navigiert wird über ein freiwilliges `onNavigate`**, wie bei Übersicht und
+  Kontoauszug: ohne Shell (Tests) steht kein Knopf da, der nichts tun kann.
+
+**Am Ende des Imports steht der nächste offene Schritt der Einrichtung**
+(`import/NaechsterSchritt.tsx`), nach dem Verbuchen in der Inbox. Er kommt aus derselben
+Kernfunktion wie die Karte der Übersicht (`einrichtungsstand`, Feld `naechster`, geholt
+über `einrichtungLaden`), und dieselbe Zeile zeichnet ihn (`bausteine/Einrichtungsschritt`).
+Ist die Einrichtung fertig, steht dort nichts — auch kein „alles erledigt".
+
+Die Übersicht trägt ihren leeren Zustand nur ganz am Anfang (keine Buchung, kein Plan)
+und ohne Knopf: dann steht „Damit die Zahlen stimmen" immer direkt darüber und trägt ihn.
+Geprüft in `leereZustaende.test.tsx`, je Bereich leer und gefüllt.
 
 ## Zahlen anzeigen
 

@@ -39,7 +39,9 @@ import {
   type Zeitraum,
 } from "../../../application";
 import { analyse, depots } from "../../dienste";
-import { Card } from "../bausteine";
+import { Button, Card } from "../bausteine";
+import type { ScreenId } from "../bausteine/AppShell";
+import { LeererZustand } from "../bausteine/LeererZustand";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { AusblickKarte } from "./AusblickKarte";
 import { BefundeBereich } from "./BefundeBereich";
@@ -63,7 +65,8 @@ function toIsoHeute(): string {
   return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 }
 
-export function AnalyseScreen() {
+/** `onNavigate` führt aus der leeren Analyse in den Import; ohne Shell (Tests) kein Knopf. */
+export function AnalyseScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => void } = {}) {
   const { t } = useTranslation();
   const [basis, setBasis] = useState<Analysebasis | null>(null);
   const [detail, setDetail] = useState<IstBuchung | null>(null);
@@ -173,7 +176,18 @@ export function AnalyseScreen() {
       {fehler && <Card style={{ borderColor: "var(--danger)" }}>{t("historie.fehlerDb")} ({fehler})</Card>}
 
       {!geladen ? null : ist.length === 0 && !fehler ? (
-        <Card>{t("historie.leer")}</Card>
+        <Card>
+          <LeererZustand
+            kopf={t("historie.leer")}
+            aktionen={onNavigate && (
+              <Button variant="primary" onClick={() => onNavigate("import")}>
+                {t("einrichtung.zuBereich", { bereich: t("shell.navImport") })}
+              </Button>
+            )}
+          >
+            {t("analyse.leerErklaerung")}
+          </LeererZustand>
+        </Card>
       ) : (
         basis && (
           <Registerleiste

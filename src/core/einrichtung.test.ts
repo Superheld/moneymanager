@@ -86,4 +86,19 @@ describe("einrichtungsstand", () => {
     expect(status(eingabe({ budgets: [budget("aufbauend")] }), "ruecklagen").status).toBe("erledigt");
     expect(status(eingabe({ ruecklagenAnzahl: 1 }), "ruecklagen").status).toBe("erledigt");
   });
+
+  it("nennt den ersten offenen Schritt als nächsten, solange die Einrichtung nicht fertig ist", () => {
+    expect(einrichtungsstand(eingabe({ kontenAnzahl: 0 })).naechster?.id).toBe("konto");
+    expect(einrichtungsstand(eingabe()).naechster?.id).toBe("buchungen");
+    // Ohne Kategorie ist der nächste Schritt das Sortieren, nicht der Vertrag danach.
+    expect(einrichtungsstand(eingabe({ buchungen: [ist("2025-06-01", -1000)] })).naechster?.id).toBe("kategorien");
+  });
+
+  it("nennt keinen nächsten Schritt, wenn nur noch Freiwilliges fehlt", () => {
+    const stand = einrichtungsstand(
+      eingabe({ buchungen: [ist("2025-06-01", -1000, { kategorieId: "k" })], regeln: [REGEL], budgets: [budget("monatlich")] }),
+    );
+    expect(stand.fertig).toBe(true);
+    expect(stand.naechster).toBeUndefined();
+  });
 });

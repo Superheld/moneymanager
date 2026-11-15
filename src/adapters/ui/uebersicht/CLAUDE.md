@@ -19,6 +19,10 @@ und beim ersten Öffnen nicht zu deuten. Drei Dinge daran:
 Sie kommt deshalb wieder, wenn nach einem Import Zahlungen ohne Kategorie dastehen. Das
 ist gewollt: genau diese Zahlungen machen die Karten darunter ungenau.
 
+**Ihr nächster offener Schritt steht auch am Ende des Imports** (seit 2026-11-15): der
+Kern nennt ihn (`naechster` am Einrichtungsstand), die Zeile je Schritt liegt deshalb in
+`bausteine/Einrichtungsschritt.tsx`. Einzelheiten in `../CLAUDE.md` unter „Leere Zustände".
+
 **Die Monatskarten sind eine Ergebnisrechnung** (seit 2026-11-15, `ErgebnisKarten.tsx`
 auf `core/ergebnis.ts`): sie zeigen, was der Monat KOSTET, nicht was in ihm vom Konto
 ging. Die Begriffe dazu stehen in `src/core/CLAUDE.md` unter „Auszahlung und Kosten".

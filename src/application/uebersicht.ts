@@ -97,6 +97,11 @@ export interface Uebersichtsdaten {
    */
   readonly hatPlandaten: boolean;
   /**
+   * Gibt es überhaupt eine Buchung? Ganz ohne Buchung und ohne Plan sagt der Screen
+   * statt des Hinweises auf die Plan-Daten zuerst, woraus die Karten rechnen.
+   */
+  readonly hatBuchungen: boolean;
+  /**
    * Was in den nächsten Tagen fällig wird, über alle Konten — und die Namen dazu.
    *
    * Sie stand bis hierher im Kontoauszug, je Konto eine eigene Liste. Dort beantwortete
@@ -203,6 +208,7 @@ export async function uebersichtLaden(
     zeilenkontext: zeilenkontext(umsaetze, konten, kategorien, vertragsnamen),
     monate: waehlbareMonate(fruehesterMonat(liquideBuchungen) ?? heute, dieserMonat),
     hatPlandaten: regeln.length > 0 || budgets.length > 0 || ruecklagen.length > 0,
+    hatBuchungen: buchungen.length > 0,
     vorschau: vorschauAlleKonten(konten, buchungen, regeln, heute, VORSCHAU_TAGE),
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     vermoegen: bilanzJeKlasse(staendeJeKlasse(konten, buchungen), belegung.jeKonto),
@@ -216,6 +222,36 @@ export async function uebersichtLaden(
       heute,
     }),
   };
+}
+
+/** Was `einrichtungLaden` braucht — dieselben Repositories wie die Übersicht, nur weniger. */
+export type EinrichtungDeps = Pick<UebersichtDeps, "ledger" | "kontoRepo" | "regelRepo" | "budgetRepo" | "ruecklagenRepo">;
+
+/**
+ * Der Einrichtungsstand allein — für die Stellen AUSSERHALB der Übersicht, die wissen
+ * müssen, was als Nächstes dran ist (das Ende des Imports).
+ *
+ * Dieselbe Kernfunktion mit denselben Eingaben wie in `uebersichtLaden`, nur ohne den
+ * Rest der Übersicht. Ein eigener Ladeweg ist hier richtig, weil daneben keine Liste
+ * steht, die aus anderen Daten etwas anderes sagen könnte; in der Übersicht selbst
+ * bleibt der Stand Teil ihrer Sicht.
+ */
+export async function einrichtungLaden(deps: EinrichtungDeps, heute: string): Promise<Einrichtungsstand> {
+  const [buchungen, konten, regeln, budgets, ruecklagen] = await Promise.all([
+    deps.ledger.alle(),
+    deps.kontoRepo.alle(),
+    deps.regelRepo.alle(),
+    deps.budgetRepo.alle(),
+    deps.ruecklagenRepo.alle(),
+  ]);
+  return einrichtungsstand({
+    kontenAnzahl: konten.length,
+    buchungen,
+    regeln,
+    budgets,
+    ruecklagenAnzahl: ruecklagen.length,
+    heute,
+  });
 }
 
 /**

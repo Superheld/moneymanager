@@ -18,11 +18,14 @@ import { useTranslation } from "react-i18next";
 import {
   ABRUF_QUELLEN,
   stapelVerdacht,
+  toIso,
   type Dublettenverdacht,
+  type Einrichtungsstand,
   type Kategorie,
   type Zahlungskonto,
 } from "../../../application";
 import {
+  einrichtung,
   importLaeufe,
   kategorisierung,
   offeneUmsaetze,
@@ -52,10 +55,22 @@ import { Kaestchen } from "../bausteine/Kaestchen";
 import { Zeile } from "../bausteine/Anordnung";
 import { useSammelauswahl } from "../bausteine/useSammelauswahl";
 import { Herkunft } from "./Herkunft";
+import { NaechsterSchritt } from "./NaechsterSchritt";
+import type { ScreenId } from "../bausteine/AppShell";
 
 const SEITE_GROESSE = 100;
 
-export function ReviewScreen() {
+/** Heute als ISO — die Uhr wird hier gelesen, gerechnet wird in der Anwendungsschicht. */
+function heuteIso(): string {
+  const n = new Date();
+  return toIso({ y: n.getFullYear(), m: n.getMonth() + 1, d: n.getDate() });
+}
+
+/**
+ * `onNavigate` ist freiwillig: der nächste Schritt nach dem Verbuchen führt damit in
+ * seinen Bereich. Ohne Shell (Tests) steht er ohne Knopf da.
+ */
+export function ReviewScreen({ onNavigate }: { onNavigate?: (id: ScreenId) => void } = {}) {
   const { t } = useTranslation();
   const geld = useGeld();
   const datum = useDatum();
@@ -70,6 +85,12 @@ export function ReviewScreen() {
   const [busy, setBusy] = useState(false);
   const [fehler, setFehler] = useState<string | null>(null);
   const [verb, setVerb] = useState<VerbuchenErgebnis | null>(null);
+  /**
+   * Was nach dem Verbuchen als Nächstes dran ist — erst NACH einem Verbuchen geholt.
+   * Vorher ist der Import nicht zu Ende, und der nächste Schritt wäre „Buchungen
+   * hereinholen", also dieser Bereich selbst.
+   */
+  const [einrichtungsstand, setEinrichtungsstand] = useState<Einrichtungsstand | null>(null);
   // Für die Frage „warum diese Kategorie?": dieselben Quellen, aus denen der Vorschlag
   // beim Import entstand. Die Begründung wird beim Anzeigen neu gerechnet statt beim
   // Import gespeichert — sie hängt am aktuellen Modell, und ein gespeicherter Satz von
@@ -318,6 +339,8 @@ export function ReviewScreen() {
       // über den neue Buchungen ihre Kennzeichnung bekommen, ohne dass jemand klickt.
       setVerb(await umsaetzeBuchen(umsaetze));
       await laden(); // verbuchte fallen aus „offene" raus
+      // Leise: geht das schief, fehlt nur der Hinweis — der Import ist trotzdem durch.
+      setEinrichtungsstand(await einrichtung(heuteIso()).catch(() => null));
     } catch (e) {
       setFehler(e instanceof Error ? e.message : String(e));
     } finally {
@@ -333,6 +356,10 @@ export function ReviewScreen() {
     <>
 
       {fehler && <Card style={{ marginBottom: "var(--sp-4)", borderColor: "var(--danger)" }}>{t("review.fehlerDb")} ({fehler})</Card>}
+
+      {/* Über der Liste: ist alles verbucht, steht darunter nur noch die leere Inbox, und
+          genau dann ist das die Frage — wohin jetzt? */}
+      <NaechsterSchritt stand={einrichtungsstand} onNavigate={onNavigate} />
 
       {umsaetze.length === 0 && !fehler ? (
         <Card>{t("review.leer")}</Card>
