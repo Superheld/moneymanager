@@ -91,6 +91,7 @@ describe("analyseBuchungen — der Betrag der Zeile", () => {
     regeln: [],
     ruecklagen: [],
     ausbuchungsdaten: [],
+    ausbuchungen: [],
     vertragJeBuchung: new Map(),
     vormerkungen: [],
   };
@@ -137,6 +138,7 @@ describe("analyseAusblick", () => {
     regeln: [],
     ruecklagen: [],
     ausbuchungsdaten: [],
+    ausbuchungen: [],
     vertragJeBuchung: new Map(),
     vormerkungen: [],
     ...extra,
@@ -237,6 +239,7 @@ describe("analyseKostenverlauf", () => {
     ],
     ruecklagen: [{ id: "rl", bezeichnung: "Vibora", rate: 10000, beginn: "2026-01-01" }],
     ausbuchungsdaten: [],
+    ausbuchungen: [],
     vertragJeBuchung: new Map([["m6", "v1"], ["m7", "v1"], ["m8", "v1"]]),
     vormerkungen: [],
     ...extra,
@@ -269,7 +272,7 @@ describe("analyseKostenverlauf", () => {
   it("trägt für den laufenden Monat dieselbe Zahl wie die Übersicht", () => {
     const b = basis();
     const uebersicht = monatsErgebnis(
-      ergebnisbasis({ regeln: b.regeln, budgets: b.budgets, ruecklagen: b.ruecklagen, ist: b.buchungen, kategorien: b.kategorien, konten: b.konten, vertragJeBuchung: b.vertragJeBuchung, heute }),
+      ergebnisbasis({ regeln: b.regeln, budgets: b.budgets, ruecklagen: b.ruecklagen, ausbuchungen: b.ausbuchungen, ist: b.buchungen, kategorien: b.kategorien, konten: b.konten, vertragJeBuchung: b.vertragJeBuchung, heute }),
       "2026-08-01",
     );
     const { monate } = analyseKostenverlauf(b, "2026-06-01", "2026-08-01", heute);
@@ -287,6 +290,7 @@ describe("analyseKostenverlauf", () => {
     const ausgebucht = basis({
       ruecklagen: [{ id: "rl", bezeichnung: "Vibora", ziel: 120000, fristMonate: 12, beginn: "2026-07-20" }],
       ausbuchungsdaten: ["2026-07-20"],
+      ausbuchungen: [],
     });
     const v = analyseKostenverlauf(ausgebucht, "2026-06-01", "2026-08-01", heute);
     expect(v.monate.map((m) => [m.monat, m.kosten.abschreibungen, m.ruecklagenUnvollstaendig])).toEqual([
@@ -324,6 +328,7 @@ describe("analyseLiquiditaet", () => {
     regeln: [],
     ruecklagen: [],
     ausbuchungsdaten: [],
+    ausbuchungen: [],
     vertragJeBuchung: new Map(),
     vormerkungen: [],
     ...extra,

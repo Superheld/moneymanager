@@ -60,6 +60,7 @@ import type {
   ZahlungskontoRepository,
   ZahlungsregelRepository,
   VormerkungRepository,
+  RuecklagenRepository,
 } from "../ports";
 
 // Der Verdacht selbst steht in `dublettensicht` — die Regel gilt für alle Anzeigen
@@ -93,6 +94,8 @@ export interface KontenDeps {
    * sondern eine falsche.
    */
   readonly budgetRepo: BudgetRepository;
+  /** Für die Einordnung: nur ein Kauf, den eine Rücklage trug, gilt als Entnahme. */
+  readonly ruecklagenRepo: RuecklagenRepository;
   /**
    * Die Depots. Optional — ohne sie fehlt an einem Depot-Konto nur die Bestandsansicht,
    * alles andere läuft unverändert.
@@ -294,6 +297,7 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     vertragsnamen,
     einordnungen: einordnungJeBuchung({
       buchungen, kategorien, budgets, konten, zuordnungen: vertragszuordnungen, vertraege,
+      ausbuchungen: await deps.ruecklagenRepo.ausbuchungen(),
     }),
     vormerkungen,
   };

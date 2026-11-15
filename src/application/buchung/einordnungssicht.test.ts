@@ -53,7 +53,7 @@ function buchung(over: Partial<IstBuchung> = {}): IstBuchung {
 
 function sicht(buchungen: IstBuchung[], over: Partial<EinordnungssichtEingabe> = {}) {
   return einordnungJeBuchung({
-    buchungen, kategorien: KATEGORIEN, budgets: BUDGETS, konten: KONTEN,
+    buchungen, kategorien: KATEGORIEN, budgets: BUDGETS, konten: KONTEN, ausbuchungen: [],
     zuordnungen: [], vertraege: [VERTRAG], ...over,
   });
 }
@@ -130,9 +130,16 @@ describe("einordnungJeBuchung", () => {
     expect(e.get("b1")!.map((x) => x.budgetName)).toEqual(["Vorhaben Nordseite", "Vorhaben Südseite"]);
   });
 
-  it("nennt die Ausgabe ohne Budgetwirkung eine Entnahme aus der Rücklage", () => {
-    const e = sicht([buchung({ kategorieId: "kat-m", budgetrelevant: false })]);
+  it("nennt den Kauf, für den eine Rücklage ausgebucht wurde, eine Entnahme", () => {
+    const e = sicht([buchung({ kategorieId: "kat-m", budgetrelevant: false })], {
+      ausbuchungen: [{ id: "a1", ruecklageId: "r1", datum: "2026-10-05", istbuchungId: "b1" }],
+    });
     expect(e.get("b1")).toMatchObject([{ art: "ruecklage" }]);
+  });
+
+  it("nennt eine Ausgabe ungeplant, die nur von Hand aus den Budgets genommen wurde", () => {
+    const e = sicht([buchung({ kategorieId: "kat-m", budgetrelevant: false })]);
+    expect(e.get("b1")).toMatchObject([{ art: "ungeplant" }]);
   });
 
   it("trennt Umbuchung und Vorsorge am Zielkonto und merkt, ob es ein Gegenbein gibt", () => {

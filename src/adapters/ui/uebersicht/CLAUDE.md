@@ -105,6 +105,6 @@ ein Wertpapierkauf auf ein Depot, das die App nicht als Konto führt. Eine Umbuc
 Sparkonto zählt nicht: Geld ohne Zweck beiseitezulegen ist Überschuss.
 
 **Was die Karten noch nicht können**, steht im Kopf von `core/ergebnis.ts`: Einnahmen
-werden nicht periodisiert, die Vorsorge zählt mit der tatsächlichen Umbuchung statt mit
-der Rate eines Ziels, und der Kauf aus einer Rücklage wird nicht gegen ihren Stand
-geprüft.
+werden nicht periodisiert, und die Vorsorge zählt mit der tatsächlichen Umbuchung statt
+mit der Rate eines Ziels. Der Kauf aus einer Rücklage wird seit Migration 76 gegen das
+Angesparte geprüft; was darüber hinausgeht, steht als Kosten in der Zeile der Rücklagen.

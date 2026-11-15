@@ -21,15 +21,18 @@
 //      bleibt aber Vermögen (der Wertpapierkauf, die Tilgung).
 //   3. Ertrag                      → Einnahme.
 //   4. Aufwand mit Vertrag         → Fixkosten.
-//   5. Aufwand, nicht budgetrelevant → Entnahme aus einer Rücklage.
+//   5. Aufwand, nicht budgetrelevant → Entnahme aus einer Rücklage, WENN für die
+//      Buchung eine ausgebucht wurde; sonst ungeplant (ausserhalb der Budgets).
 //   6. Kategorie unter einem Budget → laufende Kosten (monatlich) oder Entnahme aus
 //      dem Topf (aufbauend).
 //   7. sonst                       → ungeplant.
 //
-// **Schritt 5 liest `budgetrelevant` als „aus Erspartem bezahlt".** Das Feld sagt das
-// seit jeher (siehe `core/budgets/CLAUDE.md`), nur hat es bisher allein die Budgets
-// entlastet. Die Buchung landete danach unter „Sonstiges" und zählte ein zweites Mal —
-// die Raten der Rücklage davor waren schon Kosten.
+// **Schritt 5 fragt nach der AUSBUCHUNG, nicht nach `budgetrelevant` allein.** Das Feld
+// sagt „zählt in kein Budget" und wird beim Ausbuchen gesetzt — aber auch von Hand.
+// Zunächst galt es allein als „aus Erspartem bezahlt"; damit kostete eine von Hand
+// markierte Ausgabe nie etwas, obwohl niemand dafür zurückgelegt hatte. Entnahme ist
+// deshalb nur, wofür eine Rücklage ausgebucht wurde (`ruecklagenKaeufe`); deren Raten
+// waren die Kosten davor.
 //
 // Keine Migration, kein neues Feld: die Einordnung ist ABGELEITET. Ein gespeicherter Wert
 // könnte der Kategorie, dem Vertrag oder dem Budget widersprechen, aus denen er folgt.
@@ -81,6 +84,15 @@ export interface Einordnungskontext {
   readonly vertragJeBuchung: ReadonlyMap<string, string>;
   /** Die Konten, die der Vorsorge dienen (`istVorsorgekonto`). */
   readonly vorsorgeKonten: ReadonlySet<string>;
+  /**
+   * Die Buchungen, mit denen eine Rücklage ausgebucht wurde.
+   *
+   * Nur sie gelten als Entnahme. `budgetrelevant === false` allein genügt seit
+   * 2026-11-15 nicht mehr: das Feld sagt „zählt in kein Budget", und wer es von Hand
+   * setzt, ohne dass eine Rücklage dahintersteht, hat damit nichts angespart. Eine
+   * solche Ausgabe kostet ihren Monat (ungeplant) — sonst hätte sie nie etwas gekostet.
+   */
+  readonly ruecklagenKaeufe: ReadonlySet<string>;
 }
 
 /**
@@ -121,7 +133,9 @@ export function einordner(kontext: Einordnungskontext): (b: IstBuchung) => Einor
     if (b.charakter === "Umschichtung") return alsGanzes("vorsorge");
     if (b.charakter === "Ertrag") return alsGanzes("einnahme");
     if (vertragId) return alsGanzes("fixkosten");
-    if (b.budgetrelevant === false) return alsGanzes("ruecklage");
+    if (b.budgetrelevant === false) {
+      return alsGanzes(kontext.ruecklagenKaeufe.has(b.id) ? "ruecklage" : "ungeplant");
+    }
 
     return kategorieAnteile(b).map((a, anteil): Einordnung => {
       const budget = a.kategorieId ? budgetJeKategorie.get(a.kategorieId) : undefined;

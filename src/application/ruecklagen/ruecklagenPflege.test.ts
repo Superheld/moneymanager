@@ -180,7 +180,20 @@ describe("ruecklageAusbuchen", () => {
     const nachher = await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04" });
 
     expect(nachher).toBeNull();
-    expect(daten).toHaveLength(0);
+    // Beendet, nicht gelöscht: mit der Zeile ginge ihre Ausbuchung per CASCADE mit.
+    expect(daten).toHaveLength(1);
+    expect(daten[0].beendetAm).toBe("2026-05-04");
+  });
+
+  it("hält an der Ausbuchung fest, wie der beendete Zyklus aussah", async () => {
+    const { repo, ausgebucht } = memRuecklagen();
+    const { ledger } = memLedger();
+    const r = await ruecklageAnlegen(repo, mitZiel);
+
+    await ruecklageAusbuchen(repo, ledger, r, { datum: "2026-05-04", ziel: 72000 });
+
+    // Der ALTE Zyklus, nicht der neue: Beginn und Ziel von vor dem Ausbuchen.
+    expect(ausgebucht[0]).toMatchObject({ zyklusBeginn: r.beginn, zyklusZiel: r.ziel, zyklusFrist: r.fristMonate });
   });
 
   it("hält die Ausbuchung fest, auch wenn die Rücklage danach weg ist", async () => {

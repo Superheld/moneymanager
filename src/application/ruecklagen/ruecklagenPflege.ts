@@ -122,6 +122,13 @@ export async function ruecklageAusbuchen(
     betrag: e.betrag ?? 0,
     istbuchungId: e.istbuchungId,
     notiz: e.notiz,
+    // Der Zyklus, der hier endet — festgehalten, bevor `beginn` unten überschrieben
+    // wird. Ohne das wäre nach dem Ausbuchen weder die Rate der Monate davor noch der
+    // Stand am Tag des Kaufs zu rechnen.
+    zyklusBeginn: ruecklage.beginn,
+    zyklusZiel: ruecklage.ziel,
+    zyklusFrist: ruecklage.fristMonate,
+    zyklusRate: ruecklage.rate,
   };
   // Zuerst die Aufzeichnung, dann der Zustandswechsel: bricht es dazwischen ab, steht
   // eine Ausbuchung ohne Folgen da. Andersherum wäre der Zyklus neu gestartet und
@@ -142,7 +149,9 @@ export async function ruecklageAusbuchen(
   }
 
   if (!hatZiel(ruecklage)) {
-    await repo.loeschen(ruecklage.id);
+    // Beenden statt löschen: mit der Rücklage ginge ihre Ausbuchung per CASCADE mit,
+    // und die ist die einzige Aufzeichnung, wofür sie draufging.
+    await repo.speichern({ ...ruecklage, beendetAm: e.datum });
     return null;
   }
 

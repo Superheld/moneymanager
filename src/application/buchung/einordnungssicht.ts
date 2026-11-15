@@ -18,6 +18,7 @@
 import {
   einordner,
   einordnungskontext,
+  type Ruecklagenzyklus,
   type Budget,
   type Einordnungsart,
   type IstBuchung,
@@ -56,6 +57,8 @@ export interface EinordnungssichtEingabe {
   /** Roh aus `VertragszuordnungRepository.alle()`; gezählt werden nur die mit `vertragId`. */
   readonly zuordnungen: readonly Vertragszuordnung[];
   readonly vertraege: readonly Vertrag[];
+  /** Roh aus `RuecklagenRepository.ausbuchungen()` — welche Käufe eine Rücklage trug. */
+  readonly ausbuchungen: readonly Ruecklagenzyklus[];
 }
 
 const LEER: readonly Buchungseinordnung[] = [];
@@ -80,6 +83,7 @@ export function einordnungJeBuchung(
       budgets: e.budgets,
       konten: e.konten,
       vertragJeBuchung,
+      ausbuchungen: e.ausbuchungen,
     }),
   );
 

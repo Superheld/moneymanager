@@ -148,13 +148,21 @@ jedem davon widersprechen.
 
 **Was die Ergebnisrechnung noch nicht kann**, steht in ihrem Kopf und hier, damit niemand
 es für fertig hält: Einnahmen werden nicht periodisiert, die Vorsorge zählt mit der
-tatsächlichen Umbuchung statt mit der Rate eines Ziels, und eine Entnahme aus einer
-RÜCKLAGE wird nicht gegen ihren Stand geprüft (beim aufbauenden Budget schon).
+tatsächlichen Umbuchung statt mit der Rate eines Ziels.
 
-**Und sie ist nach HINTEN nicht vollständig.** Eine Rücklage kennt nur ihren laufenden
-Zyklus (`sollRuecklage` ab `beginn`); das Ausbuchen setzt ihn zurück oder löscht sie. Für
-Monate vor einer Ausbuchung liefert `monatsErgebnis` deshalb keine Rate mehr, obwohl
-damals zurückgelegt wurde — ihre Kosten stehen zu niedrig da. Die Übersicht merkt davon
+**Der Kauf aus einer Rücklage wird gegen ihren Stand geprüft** (seit Migration 76,
+dieselbe Regel wie `topfKosten`): die Ausbuchung hält den beendeten Zyklus fest, und was
+der Kauf über das Angesparte hinaus kostet, zählt im Kaufmonat. **Entnahme ist dabei nur,
+wofür eine Rücklage ausgebucht wurde.** `budgetrelevant === false` allein genügt nicht
+mehr: eine Ausgabe, die jemand nur von Hand aus den Budgets nimmt, kostet ihren Monat
+(ungeplant) — sonst hätte sie nie etwas gekostet.
+
+**Und sie ist nach HINTEN nur für Ausbuchungen ab Migration 76 vollständig.** Eine
+Rücklage kennt nur ihren laufenden Zyklus (`sollRuecklage` ab `beginn`); das Ausbuchen
+setzt ihn zurück oder beendet sie. Die Rate der Monate davor kommt aus dem Zyklus, den
+die Ausbuchung festhält. Ältere Ausbuchungen haben keinen: für die Monate vor ihnen
+liefert `monatsErgebnis` keine Rate, obwohl damals zurückgelegt wurde — ihre Kosten
+stehen zu niedrig da. Die Übersicht merkt davon
 nichts, weil sie nur nach vorn rechnet; die Kostensicht der Analyse rechnet zurück und
 fragt deshalb `ruecklagenrateFehlt`, um die betroffenen Monate zu benennen. Wer über
 vergangene Monate auswertet (`ergebnisKennzahlen`), reicht die Grenze mit durch.
