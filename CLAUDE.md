@@ -563,7 +563,9 @@ Kommentare und diese Doku benutzen das Fachwort, die Oberfläche das rechte:
 wird, heisst überall so wie der Bereich: ein Budget ist ein Budget (nicht „Rahmen",
 „Topf" oder „Alltag"), sein Geld je Monat der „Betrag"; eine Rücklage hat eine „Rate";
 eine Bewegung zwischen eigenen Konten ist eine „Umbuchung" (nie „Umschichtung" — das ist
-der Charakter im Code); der Charakter selbst heisst aussen „Ausgabe" und „Einnahme".
+der Charakter im Code). **Der Charakter selbst behält aussen „Aufwand" und „Ertrag"**:
+er sagt, WOFÜR das Geld war, nicht wohin es floss, und eine Erstattung ist Aufwand mit
+positivem Betrag. Als „Ausgabe" neben einem Plus-Betrag läse sie sich wie ein Fehler.
 Drei Wörter sind dagegen mit Absicht verschieden, weil sie Verschiedenes meinen:
 **Umsatz** ist die Zeile der Bank, **Buchung** dieselbe in der App, **Zahlung** die
 Buchung eines Vertrags. Ebenso **Anbieter** (am Vertrag) und **Empfänger / Sender** (an

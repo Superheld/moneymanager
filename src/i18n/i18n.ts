@@ -22,8 +22,8 @@ export const SPRACHEN = [
 const de = {
   // Enum-Label-Schicht: stored value → freundliches Label.
   charakter: {
-    Aufwand: "Ausgabe",
-    Ertrag: "Einnahme",
+    Aufwand: "Aufwand",
+    Ertrag: "Ertrag",
     Umschichtung: "Sparen & Vorsorge",
   },
   // Bedienung des Kalenders. Die Monats- und Wochentagsnamen stehen bewusst NICHT hier:
@@ -591,7 +591,7 @@ const de = {
       7: "Juli", 8: "August", 9: "September", 10: "Oktober", 11: "November", 12: "Dezember",
     },
     hinweisKeineEinnahmen:
-      "Für keinen der drei Monate sind Einnahmen geplant. Einnahmen kommen aus Verträgen — leg unter Verträge einen mit Charakter „Einnahme“ an, dann rechnen die Karten sie mit.",
+      "Für keinen der drei Monate sind Einnahmen geplant. Einnahmen kommen aus Verträgen — leg unter Verträge einen mit Charakter „Ertrag“ an, dann rechnen die Karten sie mit.",
     leer: "Für die Monatskarten fehlen die Plan-Daten: sie rechnen Einnahmen und feste Ausgaben (beides aus Verträgen) gegen Budgets und Rücklagen auf. Gepflegt wird das unter Verträge, Budgets und Rücklagen — aus den Buchungen allein wird hier nichts geschätzt.",
     leerUntertitel: "Die nächsten drei Monate",
   },
