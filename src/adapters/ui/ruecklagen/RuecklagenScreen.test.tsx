@@ -239,3 +239,72 @@ describe("Rücklagen — diesen Monat und die Faustformel", () => {
     expect(document.body.textContent).toMatch(/420,00/);
   });
 });
+
+/**
+ * Seit Migration 76 bleibt eine freie Rücklage nach dem Ausbuchen stehen — zu sehen war
+ * sie danach nirgends. Die Geschichte unter der Liste zeigt sie, mit der Ausbuchung, die
+ * sie beendet hat, und führt in die Buchung, wenn eine dranhängt.
+ */
+describe("Rücklagen — die Geschichte", () => {
+  it("zeigt eine eben beendete Rücklage als beendet, ohne Weg in eine Buchung", async () => {
+    const { default: i18n } = await import("../../../i18n/i18n");
+    const nutzer = userEvent.setup();
+    await sqliteRuecklagenRepository.speichern({
+      id: "rue-wendler", bezeichnung: "Wendlinger", beginn: "2024-03-01", rate: 3000,
+    });
+    rendere(<RuecklagenScreen />);
+    await waitFor(() => expect(document.body.textContent).toMatch("Wendlinger"));
+
+    await nutzer.click(screen.getByRole("button", { name: "ausgebucht" }));
+    await nutzer.click(screen.getByRole("button", { name: /^speichern$/i }));
+
+    // Bis ins Schema: beendet, nicht gelöscht, und über den eigenen Leseweg zu finden.
+    await waitFor(async () => {
+      const [r] = await sqliteRuecklagenRepository.beendete();
+      expect(r?.id).toBe("rue-wendler");
+    });
+    expect(await sqliteRuecklagenRepository.alle()).toHaveLength(0);
+
+    expect(await screen.findByText(i18n.t("ruecklagen.ausbuchungenTitel"))).toBeInTheDocument();
+    const pille = await screen.findByText(i18n.t("ruecklagen.pillBeendet"));
+    const zeile = pille.closest("tr") as HTMLElement;
+    expect(zeile.textContent).toContain("Wendlinger");
+    // Keine Buchung dran: die Zeile ist Text, nicht anklickbar und nicht im Tab-Fluss.
+    expect(zeile.getAttribute("tabindex")).toBeNull();
+  });
+
+  it("öffnet aus der Zeile die verknüpfte Buchung und nennt, was ungedeckt war", async () => {
+    const { default: i18n } = await import("../../../i18n/i18n");
+    const { sqliteLedgerRepository } = await import("../../persistence/sqliteLedgerRepository");
+    const { sqliteZahlungskontoRepository } = await import("../../persistence/sqliteStammdatenRepositories");
+    const nutzer = userEvent.setup();
+    await sqliteZahlungskontoRepository.speichern({ id: "giro", bezeichnung: "Girokonto", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 });
+    await sqliteLedgerRepository.speichern({
+      id: "b-ortlieb", datum: "2025-04-02", betrag: -21000, kontoId: "giro", charakter: "Aufwand",
+      quelle: "manuell", notiz: "Ortlieb", budgetrelevant: false,
+    });
+    // Frei, 40,00 im Monat seit Januar, ausgebucht Anfang April: 120,00 angespart,
+    // die Buchung über 210,00 lässt 90,00 ungedeckt.
+    await sqliteRuecklagenRepository.speichern({
+      id: "rue-ortlieb", bezeichnung: "Gessnitz", beginn: "2025-01-01", rate: 4000, beendetAm: "2025-04-01",
+    });
+    await sqliteRuecklagenRepository.ausbuchungSpeichern({
+      id: "a-ortlieb", ruecklageId: "rue-ortlieb", datum: "2025-04-01", betrag: 0, istbuchungId: "b-ortlieb",
+      zyklusBeginn: "2025-01-01", zyklusRate: 4000,
+    });
+    rendere(<RuecklagenScreen />);
+
+    const pille = await screen.findByText(i18n.t("ruecklagen.pillBeendet"));
+    const zeile = pille.closest("tr") as HTMLElement;
+    expect(zeile.textContent).toContain("Gessnitz");
+    expect(zeile.textContent).toContain("Ortlieb");
+    expect(zeile.textContent).toMatch(/120,00/);
+    expect(zeile.textContent).toMatch(/90,00/);
+    expect(zeile.textContent).toMatch(/210,00/);
+    expect(zeile.getAttribute("tabindex")).toBe("0");
+
+    await nutzer.click(zeile);
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog.textContent).toContain("Ortlieb");
+  });
+});

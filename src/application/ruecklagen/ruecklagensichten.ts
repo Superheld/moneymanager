@@ -15,7 +15,11 @@ import {
   ruecklagenDeckung,
   ruecklagenfluss,
   zielwertGesamt,
+  zyklusSoll,
+  zyklusUngedeckt,
+  hatGeschichte,
   type Cent,
+  type IstBuchung,
   type Kategorie,
   type Ruecklage,
   type RuecklagenDeckung,
@@ -32,6 +36,9 @@ import type {
   ZahlungsregelRepository,
 } from "../ports";
 import { spurenAus } from "../buchung/zahlungsspuren";
+import { belegZuBuchung } from "../buchung/belegZuBuchung";
+import { buchungsname } from "../buchung/buchungszeile";
+import type { Umsatz } from "../import/umsatz";
 import { budgetAnspruecheLaden, type BudgetanspruchDeps } from "../konten/kontobelegung";
 
 /**
@@ -95,6 +102,102 @@ export function buchungswahlFuer(
  */
 const WAHL_ANZAHL = 50;
 
+/**
+ * Eine Ausbuchung, wie die Geschichte sie zeigt.
+ *
+ * EINE Liste für beide Formen, und das ist die Entscheidung: eine Ausbuchung ist dasselbe
+ * Ereignis, ob die Rücklage danach von vorn anfängt (mit Ziel) oder beendet ist (frei).
+ * Die Fragen an sie sind dieselben — wann, wofür, wie viel war angespart, was war
+ * ungedeckt —, und zwei Listen mit denselben Spalten trennten, was zusammengehört. Die
+ * beendete Rücklage ist darin der Sonderfall: ihre letzte Ausbuchung trägt `beendet`.
+ */
+export interface Ausbuchungszeile {
+  /** Die ID der Ausbuchung — bei einer beendeten Rücklage ohne Ausbuchung `beendet:<id>`. */
+  readonly id: string;
+  readonly ruecklageId: string;
+  /** Leer nur, wenn die Rücklage fehlt; dann wählt die Oberfläche ein Wort. */
+  readonly bezeichnung: string;
+  /** Der Tag des Ausbuchens; bei einer beendeten Rücklage ist es der Tag des Endes. */
+  readonly datum: string;
+  /**
+   * Was ausgegeben wurde, positiv. Mit verknüpfter Buchung ihr Betrag, sonst der
+   * eingetragene — dieselbe Wahl wie in der Ergebnisrechnung, die das Ungedeckte gegen
+   * die Buchung prüft. Zwei Beträge für denselben Kauf liefen sonst auseinander.
+   */
+  readonly ausgabe: Cent;
+  /** Die verknüpfte Buchung, falls es sie noch gibt — der Weg in den Buchungsdialog. */
+  readonly buchung?: IstBuchung;
+  /** Empfänger, sonst Notiz oder Verwendungszweck der Buchung; leer ohne Buchung. */
+  readonly buchungsname: string;
+  /** Was im beendeten Zyklus angespart sein sollte; `null`, wenn er nicht festgehalten ist. */
+  readonly angespart: Cent | null;
+  /** Der Teil der Ausgabe über dem Angesparten; `null` wie oben — dann gilt sie als gedeckt. */
+  readonly ungedeckt: Cent | null;
+  /** Hat diese Ausbuchung die Rücklage beendet? */
+  readonly beendet: boolean;
+}
+
+/**
+ * Die Geschichte der Rücklagen: jede Ausbuchung, jüngste zuerst.
+ *
+ * `beendete` kommt aus einem eigenen Leseweg (`RuecklagenRepository.beendete`), weil
+ * `alle()` beendete Rücklagen nicht ausliefert. Gebraucht wird er für zweierlei: um die
+ * Ausbuchung zu kennzeichnen, mit der eine Rücklage endete — und damit eine beendete
+ * Rücklage, zu der es keine Ausbuchung gibt, nicht unsichtbar bleibt. Über die App
+ * entsteht das nicht (beendet wird nur durch Ausbuchen), aber `beendet_am` ist eine
+ * Spalte, und was in ihr steht, soll auch irgendwo zu sehen sein.
+ */
+export function ruecklagenGeschichte(
+  ausbuchungen: readonly RuecklagenAusbuchung[],
+  beendete: readonly Ruecklage[],
+  buchungen: readonly IstBuchung[],
+  umsaetze: readonly Umsatz[],
+): Ausbuchungszeile[] {
+  const beendetIds = new Set(beendete.map((r) => r.id));
+  const buchungJeId = new Map(buchungen.map((b) => [b.id, b]));
+  const umsatzJeBuchung = belegZuBuchung(umsaetze);
+  const sortiert = [...ausbuchungen].sort((a, b) => b.datum.localeCompare(a.datum) || b.id.localeCompare(a.id));
+
+  // Die JÜNGSTE Ausbuchung einer beendeten Rücklage ist die, mit der sie endete. Eine
+  // Rücklage mit Ziel, die später auf eine freie Rate umgestellt und dann ausgebucht
+  // wurde, hat davor weitere — die haben sie nur neu beginnen lassen.
+  const gesehen = new Set<string>();
+  const zeilen = sortiert.map((a): Ausbuchungszeile => {
+    const buchung = a.istbuchungId ? buchungJeId.get(a.istbuchungId) : undefined;
+    const ausgabe = buchung ? Math.max(0, -buchung.betrag) : a.betrag;
+    const beendet = beendetIds.has(a.ruecklageId) && !gesehen.has(a.ruecklageId);
+    gesehen.add(a.ruecklageId);
+    return {
+      id: a.id,
+      ruecklageId: a.ruecklageId,
+      bezeichnung: a.bezeichnung ?? "",
+      datum: a.datum,
+      ausgabe,
+      buchung,
+      buchungsname: buchung ? buchungsname(buchung.notiz, umsatzJeBuchung.get(buchung.id)) : "",
+      angespart: hatGeschichte(a) ? zyklusSoll(a, a.datum) : null,
+      ungedeckt: zyklusUngedeckt(a, ausgabe),
+      beendet,
+    };
+  });
+
+  const ohneAusbuchung = beendete
+    .filter((r) => !gesehen.has(r.id))
+    .map((r): Ausbuchungszeile => ({
+      id: `beendet:${r.id}`,
+      ruecklageId: r.id,
+      bezeichnung: r.bezeichnung,
+      datum: r.beendetAm as string,
+      ausgabe: 0,
+      buchungsname: "",
+      angespart: null,
+      ungedeckt: null,
+      beendet: true,
+    }));
+
+  return [...zeilen, ...ohneAusbuchung].sort((a, b) => b.datum.localeCompare(a.datum));
+}
+
 export interface Ruecklagensicht {
   readonly ruecklagen: readonly Ruecklage[];
   readonly konten: readonly Zahlungskonto[];
@@ -118,8 +221,11 @@ export interface Ruecklagensicht {
   readonly ruecklagenStand: Cent;
   /** Die monatlichen Vertragseinnahmen, aus denen `mindest` folgt. */
   readonly vertragseinnahmen: Cent;
-  /** Was bisher ausgebucht wurde, jüngste zuerst. */
-  readonly ausbuchungen: readonly RuecklagenAusbuchung[];
+  /**
+   * Was bisher ausgebucht wurde, jüngste zuerst — laufende wie beendete Rücklagen
+   * (`ruecklagenGeschichte`).
+   */
+  readonly geschichte: readonly Ausbuchungszeile[];
   /** Abflüsse, die sich beim Ausbuchen verknüpfen lassen — jüngste zuerst. */
   readonly buchungswahl: readonly Buchungswahl[];
   /** Was von den liquiden Mitteln in die Rücklagen wandert — Bedarf, Plan und Ist. */
@@ -175,9 +281,10 @@ export async function ruecklagenLaden(
   deps: RuecklagenDeps,
   heute: string,
 ): Promise<Ruecklagensicht> {
-  const [ruecklagen, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget, kategorien] =
+  const [ruecklagen, beendete, buchungen, konten, regeln, vertraege, ausbuchungen, umsaetze, budget, kategorien] =
     await Promise.all([
       deps.ruecklagenRepo.alle(),
+      deps.ruecklagenRepo.beendete(),
       deps.ledger.alle(),
       deps.kontoRepo.alle(),
       deps.regelRepo.alle(),
@@ -206,7 +313,7 @@ export async function ruecklagenLaden(
     mindest: mindestRuecklage(einnahmen),
     ruecklagenStand: [...ruecklagenKonten(konten, ruecklagen)].reduce((s, id) => s + (kontostaende.get(id) ?? 0), 0),
     vertragseinnahmen: einnahmen,
-    ausbuchungen: [...ausbuchungen].sort((a, b) => b.datum.localeCompare(a.datum)),
+    geschichte: ruecklagenGeschichte(ausbuchungen, beendete, buchungen, umsaetze),
     // Das Ist über den LAUFENDEN Monat, weil Bedarf und Plan Monatsgrössen sind. Ein
     // Fenster über den ganzen Bestand daneben verglichen Jahre mit einem Monat.
     fluss: ruecklagenfluss(

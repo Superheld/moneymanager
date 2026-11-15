@@ -458,6 +458,19 @@ describe("Rücklagen-Repository", () => {
     expect(a.zyklusZiel).toBeUndefined();
   });
 
+  // Der Leseweg für die Geschichte: nur die beendeten, mit dem Tag ihres Endes, jüngste
+  // zuerst — und `alle()` bleibt dabei unberührt.
+  it("liefert über beendete() genau die beendeten Rücklagen, jüngste zuerst", async () => {
+    await ruecklagenRepository.speichern({ id: "h1", bezeichnung: "Lindtner", beginn: "2023-01-01", rate: 4000, beendetAm: "2023-09-02" });
+    await ruecklagenRepository.speichern({ id: "h2", bezeichnung: "Moravek", beginn: "2024-01-01", rate: 2500, beendetAm: "2025-02-11" });
+    await ruecklagenRepository.speichern({ id: "h3", bezeichnung: "Quandel", beginn: "2024-01-01", ziel: 90000, fristMonate: 36 });
+
+    const beendet = await ruecklagenRepository.beendete();
+    expect(beendet.map((r) => [r.id, r.beendetAm])).toEqual([["h2", "2025-02-11"], ["h1", "2023-09-02"]]);
+    expect(beendet[0]).toMatchObject({ bezeichnung: "Moravek", rate: 2500, beginn: "2024-01-01" });
+    expect((await ruecklagenRepository.alle()).map((r) => r.id)).toEqual(["h3"]);
+  });
+
   // Die freie Form. Ihre drei Spalten stehen auf NULL, und das muss durch das Mapping
   // hindurch als `undefined` ankommen — nicht als 0, sonst hätte sie ein Ziel von 0 und
   // `hatZiel` fiele auf die falsche Seite.

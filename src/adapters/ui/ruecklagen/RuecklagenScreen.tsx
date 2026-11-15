@@ -31,6 +31,7 @@ import { Button, Card, CoverageTrack, KPIStat, Pill } from "../bausteine";
 import { FaustformelTacho } from "./FaustformelTacho";
 import { RuecklageDialog } from "./RuecklageDialog";
 import { AusbuchungDialog } from "./AusbuchungDialog";
+import { AusbuchungenKarte } from "./AusbuchungenKarte";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
@@ -299,26 +300,8 @@ export function RuecklagenScreen() {
         )}
       </Card>
 
-      {/* Was schon gebraucht wurde. Steht unter der Liste und nicht daneben: es ist ein
-          Nachschlagen und kein Überblick — wer den Bereich öffnet, will wissen, wie er
-          gerade dasteht. */}
-      {(sicht?.ausbuchungen.length ?? 0) > 0 && (
-        <Card title={t("ruecklagen.ausbuchungenTitel")} subtitle={t("ruecklagen.ausbuchungenUntertitel")}>
-          <Stapel abstand={2}>
-            {sicht?.ausbuchungen.map((a) => (
-              <div key={a.id} style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", flexWrap: "wrap" }}>
-                <span>
-                  {a.datum} · {items.find((r) => r.id === a.ruecklageId)?.bezeichnung ?? t("ruecklagen.ausgebuchtWeg")}
-                </span>
-                <span className="muted">
-                  {geld.format(a.betrag)} {geld.symbol}
-                  {a.istbuchungId && <> · {t("ruecklagen.mitBuchung")}</>}
-                </span>
-              </div>
-            ))}
-          </Stapel>
-        </Card>
-      )}
+      {/* Was schon gebraucht wurde — samt der beendeten Rücklagen (`AusbuchungenKarte`). */}
+      <AusbuchungenKarte zeilen={sicht?.geschichte ?? LEERE_LISTE} onGeaendert={laden} />
 
       {bearbeitet && (
         <RuecklageDialog

@@ -31,6 +31,24 @@ interface AusbuchungsZeile {
   kategorie_id: string | null;
 }
 
+/**
+ * Eine Zeile als Rücklage. `beendetAm` kommt mit; bei `alle()` ist es durch den Filter
+ * ohnehin leer.
+ */
+function ausZeile(z: Zeile): Ruecklage {
+  return {
+    id: z.id,
+    bezeichnung: z.bezeichnung,
+    ziel: z.ziel ?? undefined,
+    fristMonate: z.frist_monate ?? undefined,
+    rate: z.rate ?? undefined,
+    beginn: z.beginn,
+    kategorieId: z.kategorie_id ?? undefined,
+    kontoId: z.konto_id ?? undefined,
+    beendetAm: z.beendet_am ?? undefined,
+  };
+}
+
 export const sqliteRuecklagenRepository: RuecklagenRepository = {
   async alle() {
     const db = await getDb();
@@ -41,16 +59,14 @@ export const sqliteRuecklagenRepository: RuecklagenRepository = {
       // kann; ihre Geschichte kommt über `ausbuchungen()`.
       "SELECT id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am FROM ruecklage WHERE beendet_am IS NULL ORDER BY bezeichnung",
     );
-    return zeilen.map((z) => ({
-      id: z.id,
-      bezeichnung: z.bezeichnung,
-      ziel: z.ziel ?? undefined,
-      fristMonate: z.frist_monate ?? undefined,
-      rate: z.rate ?? undefined,
-      beginn: z.beginn,
-      kategorieId: z.kategorie_id ?? undefined,
-      kontoId: z.konto_id ?? undefined,
-    }));
+    return zeilen.map(ausZeile);
+  },
+  async beendete() {
+    const db = await getDb();
+    const zeilen = await db.select<Zeile[]>(
+      "SELECT id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am FROM ruecklage WHERE beendet_am IS NOT NULL ORDER BY beendet_am DESC, bezeichnung",
+    );
+    return zeilen.map(ausZeile);
   },
   async speichern(r: Ruecklage) {
     const db = await getDb();
@@ -87,7 +103,7 @@ export const sqliteRuecklagenRepository: RuecklagenRepository = {
   async ausbuchungen() {
     const db = await getDb();
     const zeilen = await db.select<AusbuchungsZeile[]>(
-// Bezeichnung und Kategorie kommen aus der Rücklage mit: die Ausbuchung ist die
+      // Bezeichnung und Kategorie kommen aus der Rücklage mit: die Ausbuchung ist die
       // einzige Spur einer beendeten Rücklage, und ohne Namen wäre ihr Posten in der
       // Ergebnisrechnung eine Zahl ohne Zeile.
       `SELECT a.id, a.ruecklage_id, a.datum, a.betrag, a.istbuchung_id, a.notiz,

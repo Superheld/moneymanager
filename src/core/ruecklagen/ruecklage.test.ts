@@ -11,7 +11,9 @@ import {
   hatZiel,
   mindestRuecklage,
   zielwertGesamt,
+  zyklusUngedeckt,
   type Ruecklage,
+  type Ruecklagenzyklus,
 } from "./ruecklage";
 
 const auto: Ruecklage = {
@@ -196,5 +198,29 @@ describe("mindestRuecklage", () => {
 
   it("wird bei Einnahmen von 0 nicht negativ", () => {
     expect(mindestRuecklage(-5000)).toBe(0);
+  });
+});
+
+describe("zyklusUngedeckt", () => {
+  // 1200 in 12 Monaten ab Januar, ausgebucht Anfang Juli: sechs Monate, also 600 angespart.
+  const zyklus: Ruecklagenzyklus = {
+    id: "a1", ruecklageId: "r1", datum: "2026-07-01",
+    zyklusBeginn: "2026-01-01", zyklusZiel: 120000, zyklusFrist: 12,
+  };
+
+  it("nennt, was die Ausgabe über das Angesparte hinaus kostete", () => {
+    expect(zyklusUngedeckt(zyklus, 80000)).toBe(20000);
+  });
+
+  it("ist null Cent, wenn das Angesparte reicht", () => {
+    expect(zyklusUngedeckt(zyklus, 50000)).toBe(0);
+  });
+
+  it("weiss nichts, wenn die Ausbuchung keinen Zyklus festhielt", () => {
+    expect(zyklusUngedeckt({ id: "a2", ruecklageId: "r1", datum: "2026-07-01" }, 80000)).toBeNull();
+  });
+
+  it("liest eine Rückbuchung nicht als Ausgabe", () => {
+    expect(zyklusUngedeckt(zyklus, -5000)).toBe(0);
   });
 });

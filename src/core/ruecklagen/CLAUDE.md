@@ -42,6 +42,33 @@ kann. Wer von Hand LÖSCHT, nimmt die Geschichte weiterhin mit; das ist dann gew
 steht deshalb auf `SET NULL` und nicht auf `CASCADE` — dieselbe Überlegung wie beim
 `buchung_journal`, nur eine Nummer kleiner.
 
+**Beendete Rücklagen stehen in der Geschichte, nirgends sonst** (seit 2026-11-15). Bis
+dahin waren sie nach dem Ausbuchen in der Oberfläche unsichtbar, obwohl sie in der
+Tabelle standen. Gelesen werden sie über einen EIGENEN Weg,
+`RuecklagenRepository.beendete()`, und nicht über einen Schalter an `alle()`: jede
+laufende Rechnung (Deckung, Rate, Fluss, Ergebnis) soll sie nicht sehen können, ohne es
+ausdrücklich zu wollen.
+
+Die Geschichte (`ruecklagenGeschichte` in `application/ruecklagen/ruecklagensichten.ts`,
+in der Oberfläche `AusbuchungenKarte`) ist EINE Liste von Ausbuchungen — laufende und
+beendete Rücklagen zusammen. Eine Ausbuchung ist dasselbe Ereignis, ob die Rücklage danach
+neu beginnt oder endet, und die Fragen an sie sind dieselben: wann, wofür, wie viel war
+angespart, was war ungedeckt. Die beendete Rücklage ist darin der Sonderfall: ihre
+JÜNGSTE Ausbuchung trägt die Pille „beendet". Eine beendete Rücklage ohne Ausbuchung
+(über die App nicht herzustellen) erscheint trotzdem, mit dem Tag aus `beendet_am`.
+
+Drei Dinge daran sind Entscheidung:
+
+- **Die Ausgabe ist die verknüpfte Buchung, wenn es sie gibt**, sonst der eingetragene
+  Betrag. Dieselbe Wahl trifft die Ergebnisrechnung, wenn sie das Ungedeckte prüft; zwei
+  Beträge für denselben Kauf liefen sonst auseinander.
+- **Ungedeckt** ist die Ausgabe über dem Zyklus-Soll am Tag des Ausbuchens
+  (`zyklusUngedeckt`). Ohne festgehaltenen Zyklus steht „unbekannt" da, nicht 0 — und der
+  Kauf gilt, wie in der Ergebnisrechnung, als gedeckt. In `ergebnis.ts` steht dieselbe
+  Regel noch inline; wer eine ändert, ändert beide.
+- **Die Zeile öffnet die Buchung nur, wenn eine dranhängt** (`DataTable` mit
+  `istKlickbar`). Wiederaufnehmen oder Löschen einer beendeten Rücklage gibt es dort nicht.
+
 **Gebucht wird beim Ausbuchen nichts.** Der Kauf ist eine ganz normale Ausgabe vom Konto,
 und weil die Deckung gegen den REALEN Kontostand rechnet, fällt sie durch die Abbuchung von
 selbst. Eine zweite, kalkulatorische Buchung zeigte dieselbe Bewegung doppelt.
