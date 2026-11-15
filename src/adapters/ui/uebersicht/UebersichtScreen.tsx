@@ -63,7 +63,7 @@ import { BuchungDetail } from "../buchung/BuchungDetail";
 import { Buchungsliste } from "../bausteine/Buchungsliste";
 import { AUFKLAPP_ZEILEN_SCHMAL } from "../bausteine/aufklappen";
 import { DepotKarte } from "./DepotKarte";
-import { MonatsAusblick } from "./MonatsAusblick";
+import { ErgebnisKarten } from "./ErgebnisKarten";
 import { VorschauKarte } from "./VorschauKarte";
 import { PageHead } from "../bausteine/PageHead";
 import { VermoegenKarte } from "./VermoegenKarte";
@@ -171,12 +171,12 @@ export function UebersichtScreen() {
       {fehler && <Card style={{ borderColor: "var(--warn)" }}>{t("uebersicht.fehlerDb")} ({fehler})</Card>}
 
       {daten && (
-        <MonatsAusblick
-          ausblicke={daten.ausblicke}
+        <ErgebnisKarten
+          ergebnisse={daten.ergebnisse}
           hatPlandaten={daten.hatPlandaten}
           kategorieNamen={daten.kategorieNamen}
           empfaenger={daten.empfaenger}
-          // Der Ausblick reicht nur die ID heraus; die Buchung selbst steht in der Sicht,
+          // Die Karte reicht nur die ID heraus; die Buchung selbst steht in der Sicht,
           // die dieser Bildschirm ohnehin schon geladen hat. Findet sich nichts, passiert
           // nichts — eine Zeile, deren Buchung inzwischen gelöscht ist, soll keinen leeren
           // Dialog öffnen.

@@ -1,7 +1,7 @@
 // Die eine Regel, welche Farbe eine Zahl in der Auswertung trägt.
 //
 // Vorher stand sie viermal im Baum, jedes Mal etwas anders: KontenScreen färbte
-// Zuflüsse grün und Abflüsse schwarz (Umschichtungen teal), MonatsAusblick färbte nur
+// Zuflüsse grün und Abflüsse schwarz (Umschichtungen teal), die Monatskarte färbte nur
 // das Minus, die Historie nur die Netto-Spalte, und die meisten Tabellen färbten gar
 // nicht. Derselbe Betrag sah je nach Screen anders aus — und „schwarz" hiess mal
 // „Ausgabe", mal „unauffällig".

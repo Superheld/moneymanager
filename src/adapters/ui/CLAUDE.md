@@ -565,8 +565,8 @@ Zwei Dinge, die daran hängen:
 - **Sie verschwindet nur für Augen**, nicht aus dem Dokument. Eine Seite ohne `h1` hätte
   keine Gliederung mehr, und die Kopfleiste trägt einen `span`, keine Überschrift.
 - **Der Untertitel bleibt sichtbar.** Er trägt an mehreren Stellen die Einschränkung, die
-  die Zahlen darunter ehrlich hält — „über die verfügbaren Konten" ist der Grund, warum
-  dasselbe Budget hier weniger Verbrauch zeigt als im Bereich Budgets.
+  die Zahlen darunter ehrlich hält — in der Übersicht etwa, dass die Karten zeigen, was
+  der Monat KOSTET, und nicht, was vom Konto ging.
 
 Die Regel steht ausnahmsweise als `max-width` und nicht als Grundform: die sichtbare `h1`
 aus der versteckten zurückzuholen kostet sieben Rücknahmen, und genau davor warnt die Regel
@@ -585,11 +585,12 @@ der Text TUT:
 
 Die Ränge sind an den drei Fällen gemessen, an denen sie zuerst angewendet wurden:
 
-- **Einschränkung:** der Untertitel der Übersicht endet auf „über die verfügbaren Konten",
-  und das ist der Grund, warum dasselbe Budget hier weniger Verbrauch zeigt als im Bereich
-  Budgets. Ebenso „die Karten oben rechnen nur über die verfügbaren" an der Karte
-  *Was da ist*. Fällt so ein Satz weg, lügt die Zahl daneben — und zwar dort, wo man am
-  flüchtigsten hinsieht.
+- **Einschränkung:** der Untertitel der Übersicht endete bis 2026-11-15 auf „über die
+  verfügbaren Konten", und das war der Grund, warum dasselbe Budget dort weniger Verbrauch
+  zeigte als im Bereich Budgets. Fällt so ein Satz weg, lügt die Zahl daneben — und zwar
+  dort, wo man am flüchtigsten hinsieht. (Der Satz ist inzwischen weg, weil der
+  Unterschied weg ist: die Übersicht rechnet über alle Konten. Das ist der bessere Weg,
+  eine Einschränkung loszuwerden.)
 - **Nacherzählung:** der Untertitel des Kontenbereichs lautete „Kontostände, gebuchte und
   voraussichtliche Buchungen je Konto" und beschrieb genau das, was auf dem Bildschirm
   steht. Er ist **ganz** weg, nicht nur schmal: was breit nichts trug, trägt schmal

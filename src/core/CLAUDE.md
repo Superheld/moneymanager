@@ -137,7 +137,7 @@ auf" ausführbar macht.
 |---|---|
 | `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus Topf oder Rücklage, Vorsorge, Umbuchung, ungeplant? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. |
 | `ergebnis.ts` | Was kostet der Monat? Baut auf der Einordnung und fügt die Zeit hinzu (Periodisierung, Topfkosten), dazu die Überleitung. |
-| `monatsausblick.ts` | Die ältere Aufrechnung nach Auszahlung. Sie rechnet noch gemischt (Rücklagen mit der Rate) und ordnet über Betragsnähe zu; sie bleibt, bis jede Sicht umgestellt ist. |
+| `monatsausblick.ts` | Die Aufrechnung nach AUSZAHLUNG: was gebucht ist und was fällig wird. Sie trägt den Saldo-Ausblick der Analyse und ordnet noch über Betragsnähe zu. |
 
 Beide neuen Dateien liegen in der Wurzel, aus demselben Grund wie `monatsausblick.ts`: sie
 rechnen über alle Bereiche.
