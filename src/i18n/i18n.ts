@@ -568,6 +568,8 @@ const de = {
       ergebnis: "Bleibt wirklich frei",
     },
     ergebnisErklaerung: "Nach allen Kosten des Monats — auch denen, die noch nicht vom Konto gegangen sind",
+    erwartet: "Voraussichtlich am Monatsende",
+    erwartetHinweis: "Offene Verträge mit ihrem Betrag, monatliche Budgets als ausgegeben gerechnet. Ungeplantes ist nicht dazugeschätzt.",
     // Posten ohne Plan dahinter: gebucht, aber keiner Regel und keinem Budget zugeordnet.
     sammel: {
       einnahmen: "weitere Einnahme",
@@ -2917,6 +2919,8 @@ const en: typeof de = {
       ergebnis: "Truly free",
     },
     ergebnisErklaerung: "After all costs of the month — including those that have not left the account yet",
+    erwartet: "Expected at month end",
+    erwartetHinweis: "Open contracts with their amount, monthly budgets counted as spent. Nothing unplanned is estimated on top.",
     sammel: {
       einnahmen: "other income",
       fixkosten: "contract payment without a rule",

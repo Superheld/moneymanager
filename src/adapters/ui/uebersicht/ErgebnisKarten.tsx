@@ -95,6 +95,7 @@ function ErgebnisKarte({
   onBuchung?: (istId: string) => void;
 }) {
   const { t } = useTranslation();
+  const geld = useGeld();
   const [offen, setOffen] = useState<string | null>(null);
   const [wegOffen, setWegOffen] = useState(false);
   const zweiSpalten = !ergebnis.zukunft;
@@ -148,6 +149,21 @@ function ErgebnisKarte({
           </div>
         );
       })}
+
+      {/* Die Hochrechnung steht als EINE Zeile unter dem Ergebnis und nicht als dritte
+          Spalte: „bisher" und „geplant" sind je Zeile verschieden, die Erwartung ist je
+          Zeile fast immer eine der beiden. Neu ist nur die Summe. */}
+      {ergebnis.erwartet !== undefined && (
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--sp-3)", alignItems: "start", marginTop: "var(--sp-3)", fontSize: "var(--fs-sm)" }}>
+          <span>
+            {t("ergebnis.erwartet")}
+            <span className="hinweis" style={{ display: "block", marginTop: 2 }}>{t("ergebnis.erwartetHinweis")}</span>
+          </span>
+          <span className="num" style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(ergebnis.erwartet), whiteSpace: "nowrap" }}>
+            {geld.formatMitSymbol(ergebnis.erwartet, { mitVorzeichen: true })}
+          </span>
+        </div>
+      )}
 
       {ergebnis.ueberleitung && ergebnis.ueberleitung.posten.length > 0 && (
         <Klappblock titel={t("ergebnis.ueberleitung.titel")} offen={wegOffen} onUmschalten={() => setWegOffen((o) => !o)}>

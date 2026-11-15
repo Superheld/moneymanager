@@ -126,6 +126,12 @@ export interface MonatsErgebnis {
   readonly ergebnis: Stufe;
   /** Fehlt in einem künftigen Monat: wo nichts gebucht ist, gibt es nichts überzuleiten. */
   readonly ueberleitung?: Ueberleitung;
+  /**
+   * Womit der LAUFENDE Monat voraussichtlich endet (`hochrechnung`). Nur dort gesetzt:
+   * ein vergangener Monat ist sein Ist, ein künftiger sein Plan — eine dritte Zahl
+   * daneben sagte in beiden Fällen nichts Neues.
+   */
+  readonly erwartet?: Cent;
 }
 
 export interface ErgebnisEingabe {
@@ -370,6 +376,7 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
     nachPflichten,
     nachAlltag,
     ergebnis,
+    erwartet: laufend ? hochrechnung(zeilen) : undefined,
     ueberleitung: zukunft
       ? undefined
       : ueberleitung(ergebnis.ist ?? 0, {
@@ -500,6 +507,46 @@ function regelZeile(
   posten.sort((a, b) => (a.datum ?? "").localeCompare(b.datum ?? "") || a.plan - b.plan);
   return zeile(id, posten, o.zukunft);
 }
+
+/**
+ * Womit ein angefangener Monat voraussichtlich endet: das Gebuchte, ergänzt um das, was
+ * der Plan noch erwarten lässt.
+ *
+ * „Bisher" allein ist zur Monatsmitte zu gut (die Miete fehlt noch) oder zu schlecht
+ * (das Gehalt fehlt noch), „geplant" allein übersieht, was schon anders gelaufen ist.
+ * Die Hochrechnung nimmt je Posten die Zahl, die man heute für die wahrscheinlichere
+ * halten muss:
+ *
+ *   • **Vertrag, noch offen** — der Plan. Die Zahlung kommt noch.
+ *   • **Vertrag, gebucht** — das Ist. Was abgebucht wurde, gilt, auch wenn es vom Plan
+ *     abweicht.
+ *   • **Monatliches Budget** — das GRÖSSERE von Betrag und Verbrauch. Ein Budget gilt
+ *     als ausgegeben, bis der Monat das Gegenteil zeigt; ist es schon überzogen, zählt
+ *     die Überziehung. Wer den Rest als gespart rechnet, gibt ihn in Gedanken zweimal
+ *     aus.
+ *   • **Alles andere** (Rücklagen, aufbauende Budgets, Ungeplantes) — das Ist. Die
+ *     Raten stehen schon mit dem ganzen Monat da, und Ungeplantes lässt sich nicht
+ *     vorhersagen: geschätzt wird hier nichts.
+ *
+ * Der letzte Punkt ist die Grenze der Rechnung: sie kennt keine Ausgabe, die noch
+ * niemand geplant hat. Die Zahl ist deshalb eine Obergrenze für einen Monat, in dem
+ * nichts Ungeplantes mehr passiert.
+ */
+export function hochrechnung(zeilen: readonly ErgebnisZeile[]): Cent {
+  let erwartet = 0;
+  for (const z of zeilen) {
+    for (const p of z.posten) {
+      if (p.ist == null) erwartet += p.plan;
+      else if (z.id === "laufend") erwartet += Math.min(p.plan, p.ist);
+      else if (p.status === "offen" && VERTRAGSZEILEN.has(z.id)) erwartet += p.plan;
+      else erwartet += p.ist;
+    }
+  }
+  return erwartet || 0;
+}
+
+/** Die Zeilen, deren Posten aus Zahlungsregeln kommen: dort heisst „offen", es kommt noch. */
+const VERTRAGSZEILEN: ReadonlySet<ErgebnisZeileId> = new Set(["einnahmen", "fixkosten", "vorsorge"]);
 
 /** Die Ergebnisrechnungen ab dem Monat von `heute` — der laufende und die folgenden. */
 export function monatsErgebnisse(basis: Ergebnisbasis, anzahl = 3): MonatsErgebnis[] {

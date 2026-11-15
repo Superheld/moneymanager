@@ -406,3 +406,38 @@ describe("Die Grenze nach hinten: ausgebuchte Rücklagen", () => {
     expect(ruecklagenrateFehlt("2025-05", [])).toBe(false);
   });
 });
+
+describe("Hochrechnung — womit der laufende Monat endet", () => {
+  const miete = regel({ id: "rm", vertragId: "vm", bezeichnung: "Ohlert", betrag: -80000, rhythmus: "monatlich", startdatum: "2025-01-28", kategorieId: "absicherung" });
+  const gehalt = regel({ id: "rg", vertragId: "vg", bezeichnung: "Varnhorn", betrag: 250000, rhythmus: "monatlich", startdatum: "2025-01-30", charakter: "Ertrag", kategorieId: "gehalt" });
+  const alltag = budget({ rate: 40000 });
+  const mitte = (over: Partial<ErgebnisEingabe>) => eingabe({ regeln: [miete, gehalt], budgets: [alltag], heute: "2025-06-15", ...over });
+
+  it("rechnet offene Verträge mit ihrem Plan und das Budget als ausgegeben", () => {
+    const r = rechne(mitte({ ist: [ist("2025-06-05", -10000, { kategorieId: "alltag" })] }), "2025-06");
+    // Bisher: nur 100 Ausgabe. Erwartet: 2.500 Gehalt − 800 Miete − 400 Budget.
+    expect(r.ergebnis.ist).toBe(-10000);
+    expect(r.erwartet).toBe(250000 - 80000 - 40000);
+  });
+
+  it("nimmt das Gebuchte, wo es vom Plan abweicht", () => {
+    const zahlung = ist("2025-06-02", -85000, { kategorieId: "absicherung" });
+    const r = rechne(mitte({ ist: [zahlung], vertragJeBuchung: new Map([[zahlung.id, "vm"]]) }), "2025-06");
+    expect(r.erwartet).toBe(250000 - 85000 - 40000);
+  });
+
+  it("zählt ein überzogenes Budget mit dem, was ausgegeben wurde", () => {
+    const r = rechne(mitte({ ist: [ist("2025-06-05", -55000, { kategorieId: "alltag" })] }), "2025-06");
+    expect(r.erwartet).toBe(250000 - 80000 - 55000);
+  });
+
+  it("schätzt nichts Ungeplantes dazu, zählt das Gebuchte aber mit", () => {
+    const r = rechne(mitte({ ist: [ist("2025-06-05", -7000, { kategorieId: "sonstiges" })] }), "2025-06");
+    expect(r.erwartet).toBe(250000 - 80000 - 40000 - 7000);
+  });
+
+  it("steht nur am laufenden Monat", () => {
+    expect(rechne(mitte({}), "2025-05").erwartet).toBeUndefined();
+    expect(rechne(mitte({}), "2025-07").erwartet).toBeUndefined();
+  });
+});

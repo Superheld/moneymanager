@@ -45,6 +45,12 @@ dieselbe, nach der die Budgetliste rechnet. Eine Vertragszahlung ohne Zuordnung 
 unter „Ungeplant" (oder in ihrem Budget), und der Vertrag daneben als „offen" — das ist
 kein Fehler der Karte, sondern der Hinweis, dass die Zuordnung fehlt.
 
+**Der laufende Monat nennt, womit er voraussichtlich endet** (`hochrechnung` im Kern):
+offene Verträge mit ihrem Plan, gebuchte mit ihrem Ist, monatliche Budgets als
+ausgegeben. Eine Zeile unter dem Ergebnis, keine dritte Spalte — je Zeile wäre die
+Erwartung fast immer eine der beiden Zahlen, die schon dastehen. Ungeplantes wird nicht
+dazugeschätzt; das steht im Satz darunter, weil die Zahl sonst wie eine Vorhersage läse.
+
 **Unter der Karte steht der Weg zum Konto** („Und auf dem Konto?", die Überleitung). Er
 ist aufklappbar und erscheint nur, wenn Ergebnis und Kontostandsänderung sich
 unterscheiden. Er ist der Beleg, dass die Rechnung darüber gegen die Bank aufgeht, und
