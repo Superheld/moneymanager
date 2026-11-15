@@ -15,12 +15,14 @@ import {
   monatsanteil,
   monatsErgebnis,
   type ErgebnisEingabe,
+  type ErgebnisVorsorge,
   type ErgebnisZeileId,
   type MonatsErgebnis,
 } from "./ergebnis";
 import type { Kategorie } from "./kategorien/kategorie";
 import type { Zahlungskonto } from "./konten/konto";
 import type { Ruecklage } from "./ruecklagen/ruecklage";
+import type { Vorsorgezielannahme } from "./vorsorge/vorsorge";
 
 const KATEGORIEN: Kategorie[] = [
   { id: "gehalt", name: "Gehalt", defaultCharakter: "Ertrag" },
@@ -320,6 +322,131 @@ describe("Vorsorge", () => {
     const r = erwarteAufgang(eingabe({ ist: [kauf] }), "2025-02");
     expect(zeile(r, "vorsorge")?.ist).toBe(-25000);
     expect(posten(r, "vorsorgeEigen")).toBe(0);
+  });
+});
+
+describe("Vorsorge mit Ziel — die Rate statt der Überweisung", () => {
+  // Rendite null, damit die Raten von Hand nachzurechnen sind: Lücke 1.000 je Monat über
+  // elf Monate Entnahme ergibt einen Bedarf von 11.000; ab Februar bleiben elf Monate bis
+  // zum Zielmonat, die Rate ist also (11.000 − Vermögen) ÷ verbleibende Monate.
+  const annahme = (over: Partial<Vorsorgezielannahme> = {}): Vorsorgezielannahme => ({
+    zielId: "z1",
+    abMonat: "2025-02",
+    zielMonat: "2026-01",
+    wunschMonatlich: 250000,
+    renteMonatlich: 150000,
+    entnahmeMonate: 11,
+    renditeBp: 0,
+    ...over,
+  });
+  const mitZiel = (ist: IstBuchung[], annahmen = [annahme()], over: Partial<ErgebnisEingabe> = {}) => {
+    const vorsorge: ErgebnisVorsorge = {
+      zielId: "z1",
+      bezeichnung: "Lindqvist",
+      annahmen,
+      bestand: { konten: KONTEN, buchungen: ist, depotwerte: [], gegenstaende: [], werte: [] },
+    };
+    return eingabe({ ist, vorsorge, ...over });
+  };
+  const umbuchung = (datum: string, betrag: number, t: string) => [
+    ist(datum, -betrag, { charakter: "Umschichtung", transferId: t, gegenkontoId: "depotkonto" }),
+    ist(datum, betrag, { charakter: "Umschichtung", transferId: t, kontoId: "depotkonto", gegenkontoId: "giro" }),
+  ];
+  const vorsorgeposten = (r: MonatsErgebnis) => zeile(r, "vorsorge")?.posten[0];
+
+  it("kostet die Rate, und die Umbuchung steht als Zuführung in der Überleitung", () => {
+    const r = erwarteAufgang(mitZiel(umbuchung("2025-02-10", 30000, "t1")), "2025-02");
+    expect(zeile(r, "vorsorge")?.plan).toBe(-100000);
+    expect(zeile(r, "vorsorge")?.ist).toBe(-100000);
+    expect(vorsorgeposten(r)?.zufuehrung).toBe(-30000);
+    expect(vorsorgeposten(r)?.bezeichnung).toBe("Lindqvist");
+    expect(posten(r, "raten")).toBe(100000);
+    expect(posten(r, "zufuehrung")).toBe(-30000);
+    expect(posten(r, "vorsorgeEigen")).toBe(30000);
+    expect(r.ueberleitung?.kontoaenderung).toBe(0);
+  });
+
+  it("kostet die Rate auch, wenn nichts überwiesen wurde", () => {
+    const r = erwarteAufgang(mitZiel([ist("2025-02-05", -4000, { kategorieId: "haushalt" })]), "2025-02");
+    expect(zeile(r, "vorsorge")?.ist).toBe(-100000);
+    expect(vorsorgeposten(r)?.zufuehrung).toBe(0);
+    expect(posten(r, "raten")).toBe(100000);
+    expect(posten(r, "zufuehrung")).toBe(0);
+  });
+
+  it("kostet nicht mehr als die Rate, wenn mehr überwiesen wurde", () => {
+    const kauf = ist("2025-02-03", -250000, { charakter: "Umschichtung" });
+    const r = erwarteAufgang(mitZiel([kauf]), "2025-02");
+    expect(zeile(r, "vorsorge")?.ist).toBe(-100000);
+    expect(vorsorgeposten(r)?.zufuehrung).toBe(-250000);
+    expect(posten(r, "zufuehrung")).toBe(-250000);
+    expect(posten(r, "vorsorgeEigen")).toBe(0);
+    expect(r.ueberleitung?.kontoaenderung).toBe(-250000);
+  });
+
+  it("rechnet zum Monatsanfang: was danach eingeht, ändert die Rate dieses Monats nicht", () => {
+    // Eine Überweisung am Ersten zählt erst ab dem Folgemonat, eine spätere erst recht.
+    const ist = [...umbuchung("2025-02-01", 30000, "t1"), ...umbuchung("2025-04-15", 50000, "t2")];
+    expect(rechne(mitZiel(ist), "2025-02").ergebnis.ist).toBe(-100000);
+    // März: (11.000 − 300) ÷ 10 verbleibende Monate.
+    expect(zeile(rechne(mitZiel(ist), "2025-03"), "vorsorge")?.ist).toBe(-107000);
+    erwarteAufgang(mitZiel(ist), "2025-03");
+  });
+
+  it("rechnet vor der ersten Annahme genau wie ohne Ziel", () => {
+    const ist = umbuchung("2025-01-10", 30000, "t1");
+    const ohne = rechne(eingabe({ ist }), "2025-01");
+    const mit = erwarteAufgang(mitZiel(ist), "2025-01");
+    expect(mit).toEqual(ohne);
+    expect(zeile(mit, "vorsorge")?.ist).toBe(-30000);
+  });
+
+  it("nimmt je Monat die Annahme, die damals galt", () => {
+    const annahmen = [annahme(), annahme({ abMonat: "2025-03", wunschMonatlich: 200000 })];
+    const e = mitZiel([], annahmen);
+    expect(zeile(rechne(e, "2025-02"), "vorsorge")?.ist).toBe(-100000);
+    // Ab März: Lücke 500 × 11 = 5.500 über zehn Monate.
+    expect(zeile(rechne(e, "2025-03"), "vorsorge")?.ist).toBe(-55000);
+    erwarteAufgang(e, "2025-03");
+  });
+
+  it("verlangt ab dem Zielmonat keine Rate mehr und zählt wieder die Überweisung", () => {
+    // Am Zielmonat ist das Ziel nicht mehr erreichbar (`sparrate === null`).
+    const ist = umbuchung("2026-01-10", 30000, "t1");
+    const ohne = rechne(eingabe({ ist, heute: "2026-02-15" }), "2026-01");
+    const mit = erwarteAufgang(mitZiel(ist, [annahme()], { heute: "2026-02-15" }), "2026-01");
+    expect(mit).toEqual(ohne);
+    expect(zeile(mit, "vorsorge")?.ist).toBe(-30000);
+  });
+
+  it("kostet nichts, wenn das Ziel gedeckt ist — die Überweisung bleibt sichtbar", () => {
+    const konten = KONTEN.map((k) => (k.id === "depotkonto" ? { ...k, saldo: 2000000 } : k));
+    const ist = umbuchung("2025-02-10", 30000, "t1");
+    // Nur der Bestand des Ziels kennt den Anfangsbestand; die Ergebnisrechnung braucht ihn nicht.
+    const e = mitZiel(ist);
+    const r = erwarteAufgang({ ...e, vorsorge: { ...e.vorsorge!, bestand: { ...e.vorsorge!.bestand, konten } } }, "2025-02");
+    expect(zeile(r, "vorsorge")?.ist).toBe(0);
+    expect(vorsorgeposten(r)?.zufuehrung).toBe(-30000);
+    expect(posten(r, "raten")).toBe(0);
+    expect(r.ergebnis.ist).toBe(0);
+  });
+
+  it("plant die Rate in künftigen Monaten und rechnet sie im laufenden ganz", () => {
+    const e = mitZiel([], [annahme()], { heute: "2025-02-15" });
+    const laufend = rechne(e, "2025-02");
+    expect(laufend.erwartet).toBe(-100000);
+    const kuenftig = rechne(e, "2025-03");
+    expect(zeile(kuenftig, "vorsorge")?.plan).toBe(-110000);
+    expect(zeile(kuenftig, "vorsorge")?.ist).toBeNull();
+    expect(vorsorgeposten(kuenftig)?.zufuehrung).toBeUndefined();
+  });
+
+  it("ersetzt einen Dauerauftrag auf das Vorsorgekonto, statt ihn neben die Rate zu stellen", () => {
+    const dauerauftrag = regel({ id: "rv", vertragId: undefined, bezeichnung: "Brandauer", betrag: -30000, rhythmus: "monatlich", startdatum: "2025-01-10", charakter: "Umschichtung", kategorieId: undefined, kontoId: "giro", gegenkontoId: "depotkonto" });
+    const e = mitZiel(umbuchung("2025-02-10", 30000, "t1"), [annahme()], { regeln: [dauerauftrag] });
+    const r = erwarteAufgang(e, "2025-02");
+    expect(zeile(r, "vorsorge")?.posten).toHaveLength(1);
+    expect(zeile(r, "vorsorge")?.plan).toBe(-100000);
   });
 });
 

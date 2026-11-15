@@ -34,6 +34,7 @@ import {
 import { budgetstaende, type Budgetstand } from "./budgets/budgetsichten";
 import type { BudgetSicht } from "../core";
 import { belegungssicht } from "./konten/kontobelegung";
+import { ergebnisvorsorgeLaden, type VorsorgeDeps } from "./vorsorge/vorsorge";
 import type {
   BudgetRepository,
   KategorieRepository,
@@ -59,6 +60,12 @@ export interface UebersichtDeps {
   readonly kontoRepo: ZahlungskontoRepository;
   readonly ruecklagenRepo: RuecklagenRepository;
   readonly vertragRepo: VertragRepository;
+  /**
+   * Für die Zeile Vorsorge: hat der Haushalt ein Ziel, kostet der Monat dessen Rate.
+   * Pflicht, nicht optional — fehlte es still, rechneten die Karten wieder mit der
+   * Überweisung, und niemand sähe den Unterschied.
+   */
+  readonly vorsorge: VorsorgeDeps;
 }
 
 export interface Uebersichtsdaten {
@@ -137,7 +144,7 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, umsaetze, zuordnungen, konten, ruecklagen, vertragsnamen, ausbuchungen] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, zuordnungen, konten, ruecklagen, vertragsnamen, ausbuchungen, vorsorge] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -149,6 +156,7 @@ export async function uebersichtLaden(
       deps.ruecklagenRepo.alle(),
       vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
       deps.ruecklagenRepo.ausbuchungen(),
+      ergebnisvorsorgeLaden(deps.vorsorge),
     ]);
 
   /**
@@ -180,7 +188,7 @@ export async function uebersichtLaden(
 
   return {
     ergebnisse: monatsErgebnisse(
-      ergebnisbasis({ regeln, budgets, ruecklagen, ausbuchungen, ist: buchungen, kategorien, konten, vertragJeBuchung, heute }),
+      ergebnisbasis({ regeln, budgets, ruecklagen, ausbuchungen, ist: buchungen, kategorien, konten, vertragJeBuchung, heute, vorsorge }),
     ),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,

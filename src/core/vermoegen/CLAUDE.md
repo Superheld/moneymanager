@@ -101,9 +101,13 @@ gegen eine engere Auswahl desselben Bestands:
 - **Keine Vorgabe für die Rendite**, auch nicht im Dialog. Sie ist die Annahme des
   Nutzers und steht im Untertitel der Karte neben jedem Ergebnis.
 
-Die Zeile „Vorsorge und Anlage" der Ergebnisrechnung zählt weiterhin die tatsächliche
-Umbuchung, nicht die Sparrate des Ziels. Das ist der nächste Schritt und steht im Kopf
-von `../ergebnis.ts`.
+**Die Zeile „Vorsorge und Anlage" der Ergebnisrechnung kostet die Sparrate des Ziels**
+(seit 2026-11-15, `vorsorgerateIm` in `../ergebnis.ts`) — über dieselbe Kette und
+denselben Bestand wie die Karte hier, aber zum Anfang JEDES Monats gerechnet statt zu
+heute. Die Karte und die Übersicht zeigen deshalb im laufenden Monat nicht zwingend
+dieselbe Rate: die Karte rechnet mit dem, was heute da ist, die Übersicht mit dem, was
+am Monatsanfang da war, damit sich die Kosten eines Monats nicht im Lauf des Monats
+verschieben. Was tatsächlich überwiesen wurde, steht in der Überleitung.
 
 ## Die Wörter
 

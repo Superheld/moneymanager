@@ -30,8 +30,9 @@ import {
   sqliteZahlungskontoRepository,
 } from "../../persistence/sqliteStammdatenRepositories";
 import { sqliteRuecklagenRepository } from "../../persistence/sqliteRuecklagenRepository";
+import { sqliteVorsorgeRepository } from "../../persistence/sqliteVorsorgeRepository";
 import { ergebnisbasis, monatsErgebnisse } from "../../../core";
-import type { Budget, Ruecklage, IstBuchung, Kategorie, Zahlungskonto, Zahlungsregel } from "../../../core";
+import type { Budget, ErgebnisVorsorge, Ruecklage, IstBuchung, Kategorie, Zahlungskonto, Zahlungsregel } from "../../../core";
 
 let db: Database;
 beforeAll(sqlLaden);
@@ -237,6 +238,37 @@ describe("ErgebnisKarten", () => {
     expect(within(august).getByText(new RegExp("600,00"))).toBeInTheDocument();
   });
 
+  it("zeigt am Vorsorgeziel die Rate als Kosten und daneben, was überwiesen wurde", async () => {
+    const nutzer = userEvent.setup();
+    const konten: Zahlungskonto[] = [...KONTEN, { id: "anlage", bezeichnung: "Anlage", typ: "Depot", klasse: "investment", inhaberIds: [], saldo: 0 }];
+    const ist: IstBuchung[] = [
+      ...IST,
+      { id: "u1", datum: "2026-08-10", betrag: -30000, kontoId: "giro", gegenkontoId: "anlage", transferId: "t1", charakter: "Umschichtung", quelle: "manuell" },
+      { id: "u2", datum: "2026-08-10", betrag: 30000, kontoId: "anlage", gegenkontoId: "giro", transferId: "t1", charakter: "Umschichtung", quelle: "manuell" },
+    ];
+    // Lücke 1.000 über zwölf Monate Entnahme, ohne Rendite und ohne Vermögen, zwölf
+    // Monate bis zum Ziel: die Rate ist 1.000 im Monat.
+    const vorsorge: ErgebnisVorsorge = {
+      zielId: "z1",
+      bezeichnung: "Hasselbrink",
+      annahmen: [{ zielId: "z1", abMonat: "2026-08", zielMonat: "2027-08", wunschMonatlich: 250000, renteMonatlich: 150000, entnahmeMonate: 12, renditeBp: 0 }],
+      bestand: { konten, buchungen: ist, depotwerte: [], gegenstaende: [], werte: [] },
+    };
+    rendere(<ErgebnisKarten {...props()} ergebnisse={monatsErgebnisse(ergebnisbasis({ ...ROH, konten, ist, vorsorge }))} />);
+    const august = await karte("August 2026");
+
+    await nutzer.click(within(august).getByText(text("ergebnis.zeile.vorsorge")));
+    expect(within(august).getByTitle("Hasselbrink")).toBeInTheDocument();
+    expect(within(august).getAllByText("−1.000,00").length).toBeGreaterThan(0);
+    const ueberwiesen = i18n.t("ergebnis.ueberwiesen", { betrag: "" }).trim();
+    expect(within(august).getByText((inhalt) => inhalt.includes(ueberwiesen) && inhalt.includes("300,00"))).toBeInTheDocument();
+
+    // Und im Weg zum Konto: die Rate blieb, die Überweisung ging, und sie liegt auf einem eigenen Konto.
+    await nutzer.click(within(august).getByRole("button", { name: new RegExp(text("ergebnis.ueberleitung.titel").replace("?", "\\?")) }));
+    expect(within(august).getByText(text("ergebnis.ueberleitung.zufuehrung"))).toBeInTheDocument();
+    expect(within(august).getByText(text("ergebnis.ueberleitung.vorsorgeEigen"))).toBeInTheDocument();
+  });
+
   it("weist darauf hin, wenn gar keine Einnahmen geplant sind", async () => {
     rendere(<ErgebnisKarten {...props({ regeln: [REGELN[0]] })} />);
     expect(await screen.findByText(text("ergebnis.hinweisKeineEinnahmen"))).toBeInTheDocument();
@@ -280,6 +312,31 @@ describe("Übersicht — Monatskarten am echten Schema", () => {
     // Und die Rücklage aus der Datenbank steht mit ihrer Rate in jeder Karte.
     expect(screen.getAllByText(text("ergebnis.zeile.abschreibungen"))).toHaveLength(3);
   });
+  it("liest das Vorsorgeziel aus der Datenbank und rechnet seine Rate in jede Karte", async () => {
+    for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
+    for (const r of REGELN) await sqliteZahlungsregelRepository.speichern({ ...r, vertragId: undefined });
+    await sqliteZahlungskontoRepository.speichern({ ...KONTEN[0], saldo: 100000 });
+    const jetzt = new Date();
+    const monat = `${jetzt.getFullYear()}-${String(jetzt.getMonth() + 1).padStart(2, "0")}`;
+    await sqliteVorsorgeRepository.zielSpeichern({ id: "z1", bezeichnung: "Hasselbrink" }, `${monat}-01T00:00:00Z`);
+    // Ein Ziel weit genug in der Zukunft, dass es in allen drei Karten eine Rate verlangt.
+    await sqliteVorsorgeRepository.annahmeSpeichern({
+      zielId: "z1", abMonat: monat, zielMonat: `${jetzt.getFullYear() + 10}-01`,
+      wunschMonatlich: 250000, renteMonatlich: 150000, entnahmeMonate: 120, renditeBp: 0,
+    });
+
+    rendere(<UebersichtScreen />);
+
+    // Ohne Ziel und ohne Umbuchung gäbe es die Zeile gar nicht: sie steht nur da, weil die
+    // Rate aus der Datenbank kam.
+    await waitFor(() => expect(screen.getAllByText(text("ergebnis.zeile.vorsorge"))).toHaveLength(3));
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getAllByText(text("ergebnis.zeile.vorsorge"))[0]);
+    expect(screen.getAllByTitle("Hasselbrink").length).toBeGreaterThan(0);
+    const ueberwiesen = i18n.t("ergebnis.ueberwiesen", { betrag: "" }).trim();
+    expect(screen.getByText((inhalt) => inhalt.includes(ueberwiesen))).toBeInTheDocument();
+  });
+
   it("klappt ein Budget der Liste auf und zeigt seine Buchungen", async () => {
     for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
     for (const b of BUDGETS) await sqliteBudgetRepository.speichern(b);

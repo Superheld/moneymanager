@@ -147,8 +147,22 @@ Budget, `budgetrelevant` und der Klasse des Gegenkontos. Ein gespeicherter Wert 
 jedem davon widersprechen.
 
 **Was die Ergebnisrechnung noch nicht kann**, steht in ihrem Kopf und hier, damit niemand
-es für fertig hält: Einnahmen werden nicht periodisiert, die Vorsorge zählt mit der
-tatsächlichen Umbuchung statt mit der Rate eines Ziels.
+es für fertig hält: Einnahmen werden nicht periodisiert.
+
+**Die Vorsorge kostet die Rate des Ziels** (seit 2026-11-15, `vorsorgerateIm`), sobald
+eines angelegt ist. Die tatsächliche Überweisung ist dann die Zuführung: sie steht am
+Posten und in der Überleitung (`zufuehrung`), nicht in den Kosten. Drei Dinge daran:
+
+- **Gerechnet zum Monatsanfang** — mit der Annahme, die in dem Monat galt, und dem
+  Vorsorgevermögen am Vortag. Die Rate eines vergangenen Monats ändert sich nicht, weil
+  heute mehr da ist, und eine Überweisung am Ersten senkt nicht die Rate desselben Monats.
+- **Ohne Rate zählt wieder die Überweisung**: vor der ersten Annahme, ab dem Zielmonat und
+  wenn das Ziel nicht mehr erreichbar ist (`sparrate === null`, das fällt mit dem
+  Zielmonat zusammen). Null als Rate machte dort jede Überweisung kostenlos. Eine Rate
+  von null dagegen ist eine Aussage — das Ziel ist gedeckt —, und dann kostet die
+  Vorsorge nichts.
+- **Die Rate ersetzt die ganze Zeile**, auch einen Dauerauftrag auf ein Vorsorgekonto.
+  Beide nebeneinander stünden zweimal für dasselbe Geld da.
 
 **Der Kauf aus einer Rücklage wird gegen ihren Stand geprüft** (seit Migration 76,
 dieselbe Regel wie `topfKosten`): die Ausbuchung hält den beendeten Zyklus fest, und was
