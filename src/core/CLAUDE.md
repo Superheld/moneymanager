@@ -164,6 +164,27 @@ Posten und in der Überleitung (`zufuehrung`), nicht in den Kosten. Drei Dinge d
 - **Die Rate ersetzt die ganze Zeile**, auch einen Dauerauftrag auf ein Vorsorgekonto.
   Beide nebeneinander stünden zweimal für dasselbe Geld da.
 
+**Eine Kreditrate wird in Zinsen und Tilgung geteilt** (seit 2026-11-15,
+`tilgungAbspalten`), sobald eine Schuld auf ihren Vertrag verweist und mindestens zwei
+Restschulden hat. Kaufmännisch sind nur die Zinsen Kosten; die Tilgung baut Vermögen auf,
+weil die Schuld sinkt. Vier Dinge daran:
+
+- **Die Tilgung kommt aus der Reihe der Restschulden**, nicht aus einem Plan
+  (`vermoegen/tilgung.ts`, die Fälle in `vermoegen/CLAUDE.md`).
+- **Sie steht in der dritten Stufe**, als eigene Zeile „Tilgung" neben Rücklagen und
+  Vorsorge, und unter „Verträge" bleiben die Zinsen. Dieselbe Überlegung wie bei der
+  Vorsorge: als blosse Verwendung des Überschusses sähe ein Monat, in dem nichts getilgt
+  wurde, besser aus. „Bleibt wirklich frei" ändert sich dadurch NICHT; ehrlicher werden
+  die beiden Zwischensummen davor.
+- **Nie mehr als der Vertrag im Monat kostet** — der Plan gegen den Plan, das Ist gegen
+  das Ist, bei einem Jahreszahler gegen das Zwölftel. Eine Sondertilgung senkt die
+  Restschuld, läuft aber nicht über die Rate. Die Überleitung bleibt unberührt: die
+  Tilgung ging mit der Rate vom Konto.
+- **Die Einordnung der Buchung ändert sich nicht.** Die Zahlung bleibt eine
+  Vertragszahlung, auch in der Pille im Kontoauszug (`einordnung.ts`): die Teilung ist eine Rechnung über den
+  Monat, keine Eigenschaft der einzelnen Abbuchung — sie trägt nicht in sich, welcher
+  Teil Zins war.
+
 **Der Kauf aus einer Rücklage wird gegen ihren Stand geprüft** (seit Migration 76,
 dieselbe Regel wie `topfKosten`): die Ausbuchung hält den beendeten Zyklus fest, und was
 der Kauf über das Angesparte hinaus kostet, zählt im Kaufmonat. **Entnahme ist dabei nur,

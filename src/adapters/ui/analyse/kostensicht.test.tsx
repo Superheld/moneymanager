@@ -22,6 +22,9 @@ import { frischeDb, pluginApi, rendere, sqlLaden } from "../../../testwerkzeug/h
 import { sqliteLedgerRepository } from "../../persistence/sqliteLedgerRepository";
 import { sqliteRuecklagenRepository } from "../../persistence/sqliteRuecklagenRepository";
 import { sqliteKategorieRepository, sqliteZahlungskontoRepository } from "../../persistence/sqliteStammdatenRepositories";
+import { sqliteVermoegenRepository } from "../../persistence/sqliteVermoegenRepository";
+import { sqliteVertragszuordnungRepository } from "../../persistence/sqliteVertragZuordnungRepositories";
+import { sqliteZahlungsregelRepository } from "../../persistence/sqliteZahlungsregelRepository";
 import { AnalyseScreen } from "./AnalyseScreen";
 
 let db: Database;
@@ -122,6 +125,47 @@ describe("Verlauf — die Frage nach den Kosten", () => {
     // Der laufende Monat steht da und ist als solcher markiert.
     const laufend = screen.getByText(tag(0).slice(0, 7)).closest("tr") as HTMLElement;
     expect(within(laufend).getByText(t("ergebnis.pillLaufend"))).toBeInTheDocument();
+  });
+
+  it("zeigt die Tilgung nur, wenn eine Schuld sie trägt — dann schraffiert und als eigene Spalte", async () => {
+    await haushalt();
+    const nutzer = userEvent.setup();
+    await zurKostenfrage(nutzer);
+    const chart = screen.getByRole("img", { name: t("historie.kosten.diagrammName") });
+    expect(chart.querySelector('rect[data-art="tilgung"]')).toBeNull();
+    await nutzer.click(screen.getByRole("button", { name: t("historie.kosten.ansicht.tabelle") }));
+    expect(screen.queryByRole("columnheader", { name: new RegExp(t("ergebnis.zeile.tilgung")) })).toBeNull();
+  });
+
+  it("teilt eine gebuchte Kreditrate in Zinsen und eine schraffierte Tilgung", async () => {
+    await haushalt();
+    const jahr = new Date().getFullYear();
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-kredit", bezeichnung: "Tornquist", betrag: -80000, rhythmus: "monatlich", startdatum: `${jahr - 3}-01-15`,
+      charakter: "Aufwand", kategorieId: "kat1", vertragId: "v-kredit",
+    });
+    await sqliteLedgerRepository.speichern({ id: "rate", datum: tag(1), betrag: -80000, kontoId: "k1", charakter: "Aufwand", quelle: "manuell", kategorieId: "kat1" });
+    await sqliteVertragszuordnungRepository.speichern({ istbuchungId: "rate", vertragId: "v-kredit", herkunft: "manuell" });
+    await sqliteVermoegenRepository.verbindlichkeitSpeichern({ id: "s1", bezeichnung: "Darlehen Morsbach", art: "ratenkredit", vertragId: "v-kredit" });
+    // 1.200,00 weniger im Jahr vor dem Vorjahr: 100,00 im Monat, fortgeschrieben.
+    await sqliteVermoegenRepository.standEintragen({ verbindlichkeitId: "s1", stichtag: `${jahr - 3}-12-31`, restschuld: 3_000_000 }, `${jahr}-01-02T00:00:00Z`);
+    await sqliteVermoegenRepository.standEintragen({ verbindlichkeitId: "s1", stichtag: `${jahr - 2}-12-31`, restschuld: 2_880_000 }, `${jahr}-01-02T00:00:00Z`);
+    const nutzer = userEvent.setup();
+    await zurKostenfrage(nutzer);
+
+    const chart = screen.getByRole("img", { name: t("historie.kosten.diagrammName") });
+    const vormonat = chart.querySelector(`g[data-monat="${tag(1).slice(0, 7)}"]`) as SVGGElement;
+    const tilgung = vormonat.querySelector('rect[data-art="tilgung"]');
+    // Keine siebte Farbe: ein Muster im Ton der Vorsorge.
+    expect(tilgung?.getAttribute("fill")).toMatch(/^url\(#/);
+    expect(within(chart.parentElement as HTMLElement).getByText(t("ergebnis.zeile.tilgung"))).toBeInTheDocument();
+
+    await nutzer.click(screen.getByRole("button", { name: t("historie.kosten.ansicht.tabelle") }));
+    expect(screen.getByRole("columnheader", { name: new RegExp(t("ergebnis.zeile.tilgung")) })).toBeInTheDocument();
+    const zeile = (await screen.findByText(tag(1).slice(0, 7))).closest("tr") as HTMLElement;
+    // Verträge 700,00 Zinsen, Tilgung 100,00 — zusammen die Rate.
+    expect(zeile.textContent).toMatch(/700,00/);
+    expect(zeile.textContent).toMatch(/100,00/);
   });
 
   it("rechnet die Quoten über die abgeschlossenen Monate und färbt sie nie grün", async () => {

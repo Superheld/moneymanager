@@ -237,3 +237,33 @@ describe("Vermögen — stilllegen und löschen", () => {
     });
   });
 });
+
+describe("Vermögen — die Tilgung an der Schuld", () => {
+  // Zwei Jahresauszüge in der Vergangenheit der echten Uhr: der laufende Monat liegt
+  // danach und bekommt die fortgeschriebene Monatstilgung.
+  const jahr = new Date().getFullYear();
+  const reihe = async () => {
+    await repo.standEintragen({ verbindlichkeitId: "v1", stichtag: `${jahr - 2}-12-31`, restschuld: 60_000_00 }, JETZT);
+    await repo.standEintragen({ verbindlichkeitId: "v1", stichtag: `${jahr - 1}-12-31`, restschuld: 58_200_00 }, JETZT);
+  };
+  const tilgungstext = () => t("vermoegen.tilgungImMonat", { betrag: "" }).trim();
+
+  it("zeigt an einer Schuld mit Vertrag die abgeleitete Tilgung im Monat", async () => {
+    await repo.verbindlichkeitSpeichern({ id: "v1", bezeichnung: "Darlehen Quellenhof", art: "ratenkredit", vertragId: "vt-1" });
+    await reihe();
+    rendere(<VermoegenScreen />);
+
+    // 1.800,00 weniger über zwölf Monate: 150,00 im Monat.
+    const angabe = await screen.findByText((inhalt) => inhalt.startsWith(tilgungstext()));
+    expect(angabe.textContent).toMatch(/150,00/);
+  });
+
+  it("zeigt sie nicht, solange die Schuld auf keinen Vertrag verweist", async () => {
+    await repo.verbindlichkeitSpeichern({ id: "v1", bezeichnung: "Darlehen Quellenhof", art: "ratenkredit" });
+    await reihe();
+    rendere(<VermoegenScreen />);
+
+    expect(await screen.findByText("Darlehen Quellenhof")).toBeTruthy();
+    expect(screen.queryByText((inhalt) => inhalt.startsWith(tilgungstext()))).toBeNull();
+  });
+});

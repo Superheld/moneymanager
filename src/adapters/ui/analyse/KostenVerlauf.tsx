@@ -43,6 +43,10 @@ export function KostenVerlauf({
   const prozent = useProzent();
   const k = verlauf.kennzahlen;
   const hatLaufenden = verlauf.monate.some((m) => m.laufend);
+  // Die Tilgung steht nur als Spalte da, wenn eine Schuld sie trägt: ohne verknüpfte
+  // Schuld wäre es eine Spalte voller Striche für etwas, das es im Haushalt nicht gibt.
+  // Die übrigen sechs stehen immer — ein Monat ohne Rücklage ist eine Aussage.
+  const arten = KOSTENZEILEN.filter((art) => art !== "tilgung" || verlauf.monate.some((m) => m.kosten.tilgung !== 0));
 
   const betrag = (wert: number) => (wert ? geld.format(wert) : "—");
   const quote = (wert: number | null) => (wert == null ? "—" : prozent(wert));
@@ -94,10 +98,10 @@ export function KostenVerlauf({
               ),
             },
             { key: "einnahmen", label: `${t("ergebnis.zeile.einnahmen")} ${geld.symbol}`, align: "right", sortValue: (m) => m.einnahmen, render: (m) => betrag(m.einnahmen) },
-            // Die sechs Kostenarten, positiv wie im Diagramm. Schmal fallen sie weg: neun
+            // Die Kostenarten, positiv wie im Diagramm. Schmal fallen sie weg: neun
             // Zahlen in einer zweiten Zeile ohne Beschriftung wären keine Auskunft, und
             // die Zerlegung steht im Diagramm.
-            ...KOSTENZEILEN.map((art) => ({
+            ...arten.map((art) => ({
               key: art,
               label: `${t(`ergebnis.zeile.${art}`)} ${geld.symbol}`,
               align: "right" as const,

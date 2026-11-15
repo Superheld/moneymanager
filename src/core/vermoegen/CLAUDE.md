@@ -31,11 +31,40 @@ Jahreskontoauszug. Ein Plan (Zinssatz, Rate, Laufzeit) wäre eine RECHNUNG, und 
 nach der ersten Sondertilgung, Zinsanpassung oder ausgesetzten Rate nicht mehr — dann
 stünde eine gerechnete Zahl gegen die der Bank, und die App hätte unrecht.
 
-`vertragId` und `gegenstandId` an der Verbindlichkeit sind deshalb **Verweise ohne
-Rechnung**: der Vertrag, über den die Rate läuft, und der Vermögenswert, den die Schuld
-finanziert. Gespeichert und in der Maske wählbar, aber nichts liest sie. Die Aufteilung
-einer Rate in Zins und Tilgung ist ein eigener Schritt; wer ihn baut, entscheidet dort,
-ob die Tilgung aus der Reihe der Restschulden folgt oder eingegeben wird.
+`vertragId` und `gegenstandId` an der Verbindlichkeit sind **Verweise**: der Vertrag, über
+den die Rate läuft, und der Vermögenswert, den die Schuld finanziert. `gegenstandId` liest
+weiterhin nichts.
+
+**`vertragId` wird seit 2026-11-15 gelesen** — von der Ergebnisrechnung, die die Rate
+dieses Vertrags in Zinsen und Tilgung teilt (`../ergebnis.ts`, `tilgungAbspalten`). Die
+Tilgung wird dafür nicht eingegeben und nicht geplant, sondern aus der Reihe der
+Restschulden ABGELEITET (`tilgung.ts`, `tilgungIm`): der Rückgang zwischen zwei
+Stichtagen, gleichmässig auf die Monate dazwischen. Damit bleibt alles oben richtig — es
+gibt keine Zahl, die gegen die der Bank stehen könnte, nur eine Verteilung dessen, was die
+Bank gemeldet hat. Und es ist keine Interpolation der Restschuld (oben, „Beobachtung statt
+Buchung"): das Nettovermögen bleibt zwischen zwei Stichtagen bei der jüngsten
+Beobachtung; verteilt wird nur, welcher Teil der Rate eines Monats Vermögen aufgebaut
+hat. Die Fälle:
+
+| Lage | Tilgung im Monat |
+|---|---|
+| weniger als zwei Restschulden, oder bis zum Monat der ersten | keine — die Rate bleibt ganz Kosten |
+| zwischen zwei Restschulden | der Rückgang ÷ Monate dazwischen, der Rest der Teilung im ersten |
+| die Restschuld stieg (Aufstockung, ausgesetzte Rate) | 0 für den Zeitraum |
+| nach der jüngsten Restschuld | die zuletzt bekannte Monatstilgung, bis die Restschuld aufgebraucht wäre |
+| nach der jüngsten Restschuld, Schuld stillgelegt | 0 |
+
+**Die Fortschreibung nach der jüngsten Restschuld ist kein Plan.** Sie sagt nur „es geht
+so weiter wie zuletzt gesehen" und wird durch die nächste Beobachtung ersetzt. Ohne sie
+fiele jeder Monat seit dem letzten Jahresauszug — also gerade der laufende — auf „die
+ganze Rate ist Kosten" zurück, jedes Jahr elf Monate lang. Bei einer Annuität liegt sie
+leicht zu niedrig, weil der Tilgungsanteil von Monat zu Monat wächst; dazugeschätzt wird
+das nicht.
+
+**Begrenzt wird erst in der Ergebnisrechnung**, gegen das, was der Vertrag im Monat
+kostet: eine Sondertilgung senkt die Restschuld, läuft aber nicht über die Rate. Die
+leise Angabe an der Schuld im Bereich Vermögen („Tilgung im Monat") ist deshalb die
+abgeleitete Zahl vor dieser Grenze — und steht nur an einer Schuld mit Vertrag.
 
 **Die Restschuld ist positiv gespeichert.** Das Vorzeichen setzt `nettovermoegen`, an
 genau einer Stelle. Eine Schuld, die mal positiv und mal negativ dasteht, wird irgendwo

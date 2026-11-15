@@ -34,6 +34,7 @@ import {
 import { budgetstaende, type Budgetstand } from "./budgets/budgetsichten";
 import type { BudgetSicht } from "../core";
 import { belegungssicht } from "./konten/kontobelegung";
+import { vermoegensbestandLaden } from "./vermoegen/vermoegensichten";
 import { ergebnisvorsorgeLaden, type VorsorgeDeps } from "./vorsorge/vorsorge";
 import type {
   BudgetRepository,
@@ -144,6 +145,7 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
+  const bestand = vermoegensbestandLaden(deps.vorsorge);
   const [buchungen, kategorien, regeln, budgets, umsaetze, zuordnungen, konten, ruecklagen, vertragsnamen, ausbuchungen, vorsorge] =
     await Promise.all([
       deps.ledger.alle(),
@@ -156,8 +158,12 @@ export async function uebersichtLaden(
       deps.ruecklagenRepo.alle(),
       vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
       deps.ruecklagenRepo.ausbuchungen(),
-      ergebnisvorsorgeLaden(deps.vorsorge),
+      ergebnisvorsorgeLaden(deps.vorsorge, bestand),
     ]);
+  // Die Schulden für die Teilung der Kreditraten: derselbe Bestand wie im Bereich
+  // Vermögen und in der Vorsorge, EINMAL geholt.
+  const { verbindlichkeiten, staende } = await bestand;
+  const schulden = { verbindlichkeiten, staende };
 
   /**
    * DIE GANZE ÜBERSICHT RECHNET ÜBER ALLE KONTEN (seit 2026-11-15).
@@ -188,7 +194,7 @@ export async function uebersichtLaden(
 
   return {
     ergebnisse: monatsErgebnisse(
-      ergebnisbasis({ regeln, budgets, ruecklagen, ausbuchungen, ist: buchungen, kategorien, konten, vertragJeBuchung, heute, vorsorge }),
+      ergebnisbasis({ regeln, budgets, ruecklagen, ausbuchungen, ist: buchungen, kategorien, konten, vertragJeBuchung, heute, vorsorge, schulden }),
     ),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,

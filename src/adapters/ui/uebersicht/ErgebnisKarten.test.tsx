@@ -31,6 +31,7 @@ import {
 } from "../../persistence/sqliteStammdatenRepositories";
 import { sqliteRuecklagenRepository } from "../../persistence/sqliteRuecklagenRepository";
 import { sqliteVorsorgeRepository } from "../../persistence/sqliteVorsorgeRepository";
+import { sqliteVermoegenRepository } from "../../persistence/sqliteVermoegenRepository";
 import { ergebnisbasis, monatsErgebnisse } from "../../../core";
 import type { Budget, ErgebnisVorsorge, Ruecklage, IstBuchung, Kategorie, Zahlungskonto, Zahlungsregel } from "../../../core";
 
@@ -335,6 +336,35 @@ describe("Übersicht — Monatskarten am echten Schema", () => {
     expect(screen.getAllByTitle("Hasselbrink").length).toBeGreaterThan(0);
     const ueberwiesen = i18n.t("ergebnis.ueberwiesen", { betrag: "" }).trim();
     expect(screen.getByText((inhalt) => inhalt.includes(ueberwiesen))).toBeInTheDocument();
+  });
+
+  it("liest die Schuld zum Kreditvertrag aus der Datenbank und teilt seine Rate in jeder Karte", async () => {
+    for (const k of KATEGORIEN) await sqliteKategorieRepository.speichern(k);
+    await sqliteZahlungskontoRepository.speichern({ ...KONTEN[0], saldo: 100000 });
+    const jahr = new Date().getFullYear();
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-kredit", bezeichnung: "Tornquist", betrag: -90000, rhythmus: "monatlich", startdatum: `${jahr - 3}-01-20`,
+      charakter: "Aufwand", kategorieId: "wohnen", vertragId: "v-kredit",
+    });
+    // Zwei Jahresauszüge vor dem laufenden Jahr: 150,00 Tilgung im Monat, fortgeschrieben.
+    await sqliteVermoegenRepository.verbindlichkeitSpeichern({ id: "s1", bezeichnung: "Darlehen Felsach", art: "immobilienkredit", vertragId: "v-kredit" });
+    await sqliteVermoegenRepository.standEintragen({ verbindlichkeitId: "s1", stichtag: `${jahr - 2}-12-31`, restschuld: 6_000_000 }, `${jahr}-01-02T00:00:00Z`);
+    await sqliteVermoegenRepository.standEintragen({ verbindlichkeitId: "s1", stichtag: `${jahr - 1}-12-31`, restschuld: 5_820_000 }, `${jahr}-01-02T00:00:00Z`);
+
+    rendere(<UebersichtScreen />);
+
+    // Ohne die Schuld gäbe es die Zeile nicht: sie steht nur da, weil Reihe und Verweis
+    // aus der Datenbank kamen.
+    await waitFor(() => expect(screen.getAllByText(text("ergebnis.zeile.tilgung"))).toHaveLength(3));
+    const nutzer = userEvent.setup();
+    await nutzer.click(screen.getAllByText(text("ergebnis.zeile.tilgung"))[0]);
+    expect(screen.getAllByTitle("Darlehen Felsach").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("−150,00").length).toBeGreaterThan(0);
+    // Der Vertrag darüber zeigt nur noch die Zinsen.
+    await nutzer.click(screen.getAllByText(text("ergebnis.zeile.fixkosten"))[0]);
+    expect(screen.getAllByText("−750,00").length).toBeGreaterThan(0);
+    // Das Wort steht im Zusatz neben dem Namen, zusammen mit der Kategorie.
+    expect(screen.getAllByText((inhalt) => inhalt.split(" · ").includes(text("ergebnis.nurZinsen"))).length).toBeGreaterThan(0);
   });
 
   it("klappt ein Budget der Liste auf und zeigt seine Buchungen", async () => {

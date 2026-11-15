@@ -416,9 +416,11 @@ const de = {
     feldBezeichnung: "Bezeichnung",
     feldArt: "Art",
     feldVertrag: "Vertrag",
-    feldVertragHinweis: "Der Vertrag, über den die Rate läuft. Er wird gemerkt, aber noch nicht verrechnet.",
+    feldVertragHinweis:
+      "Der Vertrag, über den die Rate läuft. Sinkt die Restschuld zwischen zwei Stichtagen, zählt der Rückgang als Tilgung, der Rest der Rate als Zinsen.",
     vertragKeiner: "kein Vertrag",
     feldVermoegenswert: "Vermögenswert",
+    tilgungImMonat: "Tilgung im Monat: {{betrag}}",
     feldVermoegenswertHinweis: "Was mit dieser Schuld bezahlt wurde. Er wird gemerkt, aber noch nicht verrechnet.",
     vermoegenswertKeiner: "keiner",
     gefuehrt: "wird noch geführt",
@@ -715,6 +717,7 @@ const de = {
       abschreibungen: "Rücklagen",
       wagnisse: "Aufbauende Budgets",
       vorsorge: "Vorsorge und Anlage",
+      tilgung: "Tilgung",
     },
     stufe: {
       nachPflichten: "Nach den Verträgen",
@@ -734,6 +737,8 @@ const de = {
     anteil: "1/{{teile}} der Zahlung",
     entnommen: "daraus bezahlt: {{betrag}}",
     ueberwiesen: "überwiesen: {{betrag}}",
+    // An einem Vertragsposten, von dessen Rate die Tilgung abgespalten ist.
+    nurZinsen: "Zinsen",
     ueberleitung: {
       titel: "Und auf dem Konto?",
       ergebnis: "Bleibt wirklich frei",
@@ -2918,9 +2923,11 @@ const en: typeof de = {
     feldBezeichnung: "Name",
     feldArt: "Type",
     feldVertrag: "Contract",
-    feldVertragHinweis: "The contract the instalment runs through. It is remembered but not yet used in any calculation.",
+    feldVertragHinweis:
+      "The contract the instalment runs through. When the outstanding balance falls between two as-of dates, the decrease counts as repayment and the rest of the instalment as interest.",
     vertragKeiner: "no contract",
     feldVermoegenswert: "Asset",
+    tilgungImMonat: "Repayment per month: {{betrag}}",
     feldVermoegenswertHinweis: "What this debt paid for. It is remembered but not yet used in any calculation.",
     vermoegenswertKeiner: "none",
     gefuehrt: "still kept",
@@ -3211,6 +3218,7 @@ const en: typeof de = {
       abschreibungen: "Reserves",
       wagnisse: "Building budgets",
       vorsorge: "Provision and investment",
+      tilgung: "Repayment",
     },
     stufe: {
       nachPflichten: "After contracts",
@@ -3229,6 +3237,7 @@ const en: typeof de = {
     anteil: "1/{{teile}} of the payment",
     entnommen: "paid from it: {{betrag}}",
     ueberwiesen: "transferred: {{betrag}}",
+    nurZinsen: "interest",
     ueberleitung: {
       titel: "And on the account?",
       ergebnis: "Truly free",

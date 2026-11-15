@@ -23,6 +23,7 @@ import {
   type Cent,
   type ErgebnisVorsorge,
   type Nettovermoegen,
+  type VermoegensEingabe,
   type Vorsorgestand,
   type Vorsorgeziel,
   type Vorsorgezielannahme,
@@ -87,11 +88,18 @@ export async function vorsorgeLaden(deps: VorsorgeDeps, heute: string): Promise<
  * Rate, die damals galt. Und derselbe Bestand wie in `vorsorgeLaden`, damit die Rate in
  * der Übersicht dieselbe ist wie die auf der Karte im Bereich Vermögen.
  */
-export async function ergebnisvorsorgeLaden(deps: VorsorgeDeps): Promise<ErgebnisVorsorge | undefined> {
+export async function ergebnisvorsorgeLaden(
+  deps: VorsorgeDeps,
+  /**
+   * Der Bestand, wenn der Aufrufer ihn schon geladen hat — die Übersicht braucht ihn
+   * auch für die Schulden und holt ihn deshalb nur einmal.
+   */
+  geladen?: Promise<VermoegensEingabe>,
+): Promise<ErgebnisVorsorge | undefined> {
   const [ziele, annahmen, bestand] = await Promise.all([
     deps.vorsorgeRepo.ziele(),
     deps.vorsorgeRepo.annahmen(),
-    vermoegensbestandLaden(deps),
+    geladen ?? vermoegensbestandLaden(deps),
   ]);
   const ziel = ziele[0];
   if (!ziel) return undefined;

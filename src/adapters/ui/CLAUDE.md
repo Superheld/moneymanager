@@ -807,9 +807,14 @@ Geprüft in `analyse/kostensicht.test.tsx`.
 **Die Stapel des Kostendiagramms tragen die Reihenfarben** (`--serie-1`…`-6`,
 `KostenStapelChart.tsx`), in fester Zuordnung zur Kostenart und nie nach Rang. Die vier
 Geld-Tokens stehen dort nicht: ein amberfarbener Stapel hiesse „sieh hin", und dass ein
-Monat etwas kostet, ist kein Befund. Sechs Kostenarten, sechs Reihenfarben — wer eine
-siebte Zeile in die Ergebnisrechnung bringt, braucht dafür eine Entscheidung und keinen
-zyklischen Index.
+Monat etwas kostet, ist kein Befund. Sechs Reihenfarben, und seit 2026-11-15 sieben
+Kostenarten: **die Tilgung trägt den Ton der Vorsorge (`--serie-6`) schraffiert**, im
+Diagramm wie in der Legende. Eine siebte Farbe wäre ungeprüft auf Farbfehlsichtigkeit, ein
+zyklischer Index gäbe ihr die der Fixkosten. Tilgung und Vorsorge bauen beide Vermögen auf
+und stehen in derselben Stufe; der Ton sagt „dieselbe Familie", die Schraffur „eine andere
+Art" — und eine Form trägt auch dort, wo Töne fürs Auge zusammenfallen. Wer eine achte
+Zeile bringt, braucht wieder eine Entscheidung. Die Spalte „Tilgung" der Tabelle steht
+nur da, wenn eine Schuld sie trägt.
 
 **Jeder Befund ist eine eigene Karte, kein Register.** Der erste Versuch legte sie als
 umschaltbare Lupen auf eine Fläche — kürzer, und genau deshalb falsch: was hinter einem

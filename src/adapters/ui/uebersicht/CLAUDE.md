@@ -29,7 +29,7 @@ Drei Stufen, jede mit ihrer Zwischensumme, weil jede eine eigene Frage beantwort
 |---|---|---|
 | nach den Pflichten | Einnahmen − Fixkosten | was bleibt, bevor ich etwas entscheide |
 | was der Alltag übrig lässt | − laufende Kosten − Ungeplantes | wie ich diesen Monat gewirtschaftet habe |
-| bleibt wirklich frei | − Rücklagen − aufbauende Budgets − Vorsorge | was ich ausgeben kann, ohne mir etwas vorzumachen |
+| bleibt wirklich frei | − Rücklagen − aufbauende Budgets − Vorsorge − Tilgung | was ich ausgeben kann, ohne mir etwas vorzumachen |
 
 **Eine Zwischensumme steht nur da, wenn danach noch etwas abgeht.** Ohne Rücklagen und
 Vorsorge wäre die zweite dieselbe Zahl wie das Ergebnis darunter.
@@ -110,6 +110,13 @@ Rücklage: in „bisher" wie in „geplant", ob überwiesen wurde oder nicht. Wa
 genau das will man an dieser Zeile sehen) und im Weg zum Konto als „In die Vorsorge
 überwiesen". Ohne Ziel, vor seiner ersten Annahme und ab dem Zielmonat zählt die
 Überweisung selbst, wie bisher. Die Regeln stehen in `src/core/CLAUDE.md`.
+
+**Eine Kreditrate steht geteilt da** (seit 2026-11-15), sobald eine Schuld im Bereich
+Vermögen auf ihren Vertrag verweist und zwei Restschulden hat: unter „Verträge" die
+Zinsen, der Posten trägt dafür das Wort „Zinsen" neben dem Namen; in der dritten Stufe
+die Zeile „Tilgung" mit der Schuld als Posten. Der Status folgt dem Vertrag — ist die
+Rate noch offen, ist es auch die Tilgung. Ohne eine solche Schuld gibt es die Zeile
+nicht. Gerechnet wird im Kern (`tilgungAbspalten`, Regeln in `src/core/CLAUDE.md`).
 
 **Was die Karten noch nicht können**, steht im Kopf von `core/ergebnis.ts`: Einnahmen
 werden nicht periodisiert. Der Kauf aus einer Rücklage wird seit Migration 76 gegen das
