@@ -124,6 +124,24 @@ describe("Sicherungs-Rotation", () => {
     expect(zuBehalten(reihe).length).toBeLessThanOrEqual(endlich + jahre);
   });
 
+  // Bis 2026-11-16 bildete ein Sortierschlüssel (YYYYMMDD) die Blöcke; am Monatswechsel
+  // sprang er, und zwei benachbarte Tage wie der 30.11. und der 01.12. lagen in
+  // verschiedenen Blöcken, obwohl kein voller Block davor zu Ende war.
+  it("bildet Wochenblöcke aus echten Tagen, auch über den Monatswechsel", () => {
+    const nurWochen = { taeglich: 0, woechentlich: 99, monatlich: 0, quartalsweise: 0, halbjaehrlich: 0, jaehrlich: 0 };
+    // 28 aufeinanderfolgende Tage über den Wechsel November/Dezember: genau vier oder
+    // (wenn der erste Tag mitten in einem Block liegt) fünf Blöcke — nie mehr.
+    const tage = Array.from({ length: 28 }, (_, i) => {
+      const d = new Date(Date.UTC(2026, 10, 17 + i));
+      return d.toISOString().slice(0, 10);
+    });
+    const behalten = zuBehalten(tage, nurWochen);
+    expect(behalten.length).toBeLessThanOrEqual(5);
+    // Und die behaltenen Stände liegen je sieben Tage auseinander, sobald ein Block voll ist.
+    const abstaende = behalten.slice(0, -1).map((iso, i) => (Date.parse(iso) - Date.parse(behalten[i + 1])) / 86_400_000);
+    expect(abstaende.slice(1, -1).every((a) => a === 7)).toBe(true);
+  });
+
   it("hält je Quartal einen Stand", () => {
     const reihe = ["2026-08-15", "2026-07-02", "2026-05-20", "2026-02-10"];
     const nurQuartale = { ...NICHTS, quartalsweise: 3 };
