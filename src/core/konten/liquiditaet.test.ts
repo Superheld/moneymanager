@@ -103,6 +103,23 @@ describe("liquiditaetsvorschau — die feste Linie", () => {
   });
 
   /**
+   * Das Fenster reicht über den Monatswechsel. Bis 2026-11-16 endete die Rechnung am
+   * ersten Monatsende: ein Abbruch in der Schleife verglich einen Sortierschlüssel
+   * (YYYYMMDD) wie einen Tageszähler. Kein Test fiel auf, weil alle am Monatsersten
+   * begannen und der Termin im selben Monat lag.
+   */
+  it("rechnet über den Monatswechsel hinaus", () => {
+    const [v] = liquiditaetsvorschau({
+      konten: [konto({ saldo: 50000 })], buchungen: [], regeln: [regel()], heute: "2026-06-06", tage: 90,
+    });
+    // Die Rate vom 05.06. ist vorbei; die nächste am 05.07. liegt im Folgemonat.
+    expect(v.fest.minusAb).toBe("2026-07-05");
+    // Das Fenster endet am 04.09.: darin liegen die Raten vom 05.07. und 05.08.
+    expect(v.fest.tiefstand).toBe(50000 - 2 * 80000);
+    expect(v.fest.tiefstandAm).toBe("2026-08-05");
+  });
+
+  /**
    * Nur die Abflussseite einer geplanten Umbuchung zu rechnen hiesse, das Zielkonto
    * ärmer zu zeigen, als es sein wird — und genau das Rücklagenkonto sähe nach
    * Handlungsbedarf aus, auf das gerade eingezahlt wird.
