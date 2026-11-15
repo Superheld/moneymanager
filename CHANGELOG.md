@@ -31,7 +31,22 @@ Kontostände; und das Nettovermögen am Anfang und am Ende mit seinen vier Teile
 wird dasselbe wie in den Monatskarten und der Kostensicht — ein Jahr ist die Summe seiner
 zwölf Monate. Wählbar ist nur, was ganz erfasst ist.
 
+**Wo das Geld liegt**, als neue Karte im Bereich Rücklagen. Für jedes Konto, auf dem
+Rücklagen ihr Geld haben, steht auf einem Blatt: welche Rücklagen das sind (beide
+Formen), was sie beanspruchen, was davon gedeckt ist und was auf dem Konto frei bleibt —
+und wenn der Stand nicht reicht, wie viel fehlt. Am Ende stehen die Rücklagen ohne Konto;
+ein Klick öffnet sie, damit man das Konto eintragen kann. Bisher gab es das nur je Konto
+im Kontoauszug.
+
 ### Geändert
+
+**Die Kennzahlen im Bereich Rücklagen zählen beide Formen.** „Soll heute", „Tatsächlich
+da" und der Deckungsgrad rechnen die Rücklagen über die Kategorie mit — ihr Soll ist, was
+von ihnen übrig ist —, der Bedarf unter „Diesen Monat" ihre Monatsrate. „Ziele gesamt"
+bleibt bei den Rücklagen mit Ziel; die über die Kategorie haben keins. Liegt eine
+Rücklage über die Kategorie auf einem Konto, das nicht liquide ist, zählt es zu den
+Rücklagenkonten: was dort eingeht, steht unter „eingegangen", und die Faustformel misst
+es mit. Die Monatskarten und die Kostensicht ändern sich dadurch nicht.
 
 **Aufbauende Budgets heissen jetzt Rücklagen** und stehen im Bereich Rücklagen, als
 „Rücklage über die Kategorie": was in ihrer Kategorie ausgegeben wird, zählt von selbst

@@ -6,6 +6,7 @@ import type { Ruecklage } from "./ruecklage";
 import type { IstBuchung } from "../buchung/istbuchung";
 import type { Zahlungskonto } from "../konten/konto";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
+import type { Budget } from "../budgets/budget";
 
 const konten: Zahlungskonto[] = [
   { id: "giro", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 0 },
@@ -160,5 +161,22 @@ describe("ruecklagenfluss", () => {
     expect(ruecklagenfluss([aufsDepot], konten, [ruecklage], [plan], VON, BIS)).toMatchObject({ ist: 0, plan: 0 });
     const f = ruecklagenfluss([aufsDepot], konten, [{ ...ruecklage, kontoId: "depot" }], [plan], VON, BIS);
     expect([f.plan, f.ist]).toEqual([20000, 20000]);
+  });
+});
+
+describe("ruecklagenfluss mit Rücklagen über die Kategorie", () => {
+  const spar: Zahlungskonto = { id: "spar", bezeichnung: "Spar", typ: "Tagesgeld", klasse: "sparen", inhaberIds: [], saldo: 0 };
+  const budget: Budget = {
+    id: "b", kategorieId: "kat", kontoId: "spar", art: "aufbauend", start: "2026-01-01",
+    betraege: [{ abMonat: "2026-01", betrag: 3000 }],
+  };
+
+  it("zählt ihre Zuführung zum Bedarf und ihr Konto zu den Rücklagenkonten", () => {
+    const ein = buchung({ kontoId: "spar" });
+    const plan = regel({ gegenkontoId: "spar" });
+    // Ohne sie: kein Eingang, kein Plan, Bedarf nur die Waschmaschine.
+    expect(ruecklagenfluss([ein], [...konten, spar], [ruecklage], [plan], VON, BIS)).toMatchObject({ bedarf: 5000, ist: 0, plan: 0 });
+    const f = ruecklagenfluss([ein], [...konten, spar], [ruecklage], [plan], VON, BIS, [budget]);
+    expect(f).toMatchObject({ bedarf: 8000, ist: 20000, plan: 20000 });
   });
 });

@@ -359,6 +359,7 @@ export type { Formatwahl, Kontozuordnung } from "./fints/bankzugangPort";
 export type { AbrufBefund, Abrufergebnis, DepotBefund } from "./fints/abrufAusfuehren";
 export type { Abrufstand, Zugangsstand } from "./fints/abrufstand";
 export type { Belegungssicht } from "./konten/kontobelegung";
+export type { GeldAufKonto, GeldJeKonto, RuecklageOhneKonto } from "./ruecklagen/geldJeKonto";
 export type { Anspruch, Anspruchsart, Belegungsposten, Kontobelegung } from "../core";
 // Was das Bankprofil hergibt, wird GERECHNET — also nicht in der Oberfläche: welcher
 // Speicherzeitraum gilt, wenn zwei Formate verschiedene nennen, und ob ein Konto einen

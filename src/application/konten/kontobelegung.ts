@@ -4,7 +4,9 @@
 // WER Ansprüche hat. Das sind heute zwei: Rücklagen (ihr Soll) und aufbauende Budgets
 // (ihr Rest). Wer einen dritten einführt, trägt ihn HIER ein — und nur hier: die
 // Rücklagen-Deckung holt ihre fremden Ansprüche über `budgetAnspruecheLaden` von derselben
-// Stelle, damit sie nicht an einem Konto anders rechnet als die Kontenansicht.
+// Stelle, damit sie nicht an einem Konto anders rechnet als die Kontenansicht, und die
+// Karte „Wo das Geld liegt" im Bereich Rücklagen liest `belegungssicht` selbst
+// (`application/ruecklagen/geldJeKonto.ts`).
 
 import {
   aufbauendeAnsprueche,
@@ -12,6 +14,7 @@ import {
   realerKontostand,
   ruecklagenAnsprueche,
   type Anspruch,
+  type Budget,
   type BudgetSicht,
   type IstBuchung,
   type Kontobelegung,
@@ -56,7 +59,7 @@ export interface Belegungssicht {
 export async function budgetAnspruecheLaden(
   deps: BudgetanspruchDeps,
   heute: string,
-): Promise<{ ansprueche: Anspruch[]; namen: Map<string, string> }> {
+): Promise<{ ansprueche: Anspruch[]; namen: Map<string, string>; budgets: readonly Budget[] }> {
   const [buchungen, kategorien, budgets, vertragsBuchungen] = await Promise.all([
     deps.ledger.alle(),
     deps.kategorieRepo.alle(),
@@ -67,6 +70,9 @@ export async function budgetAnspruecheLaden(
   return {
     ansprueche: aufbauendeAnsprueche({ buchungen, kategorien, budgets, vertragsBuchungen }, heute),
     namen: new Map(budgets.map((b) => [b.id, kategorie.get(b.kategorieId) ?? "?"])),
+    // Mitgegeben, weil der Bereich Rücklagen die aufbauenden auch für Bedarf und
+    // Rücklagenkonten braucht — und sie sonst ein zweites Mal läse.
+    budgets,
   };
 }
 

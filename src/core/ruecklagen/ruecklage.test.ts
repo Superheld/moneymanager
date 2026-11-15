@@ -6,7 +6,9 @@ import { euroZuCent } from "../basis/geld";
 import {
   monatsRuecklage,
   monatsRuecklageGesamt,
+  ruecklagenBedarf,
   ruecklagenDeckung,
+  ruecklagenKonten,
   sollRuecklage,
   hatZiel,
   mindestRuecklage,
@@ -15,6 +17,7 @@ import {
   type Ruecklage,
   type Ruecklagenzyklus,
 } from "./ruecklage";
+import type { Budget } from "../budgets/budget";
 
 const auto: Ruecklage = {
   id: "auto",
@@ -222,5 +225,73 @@ describe("zyklusUngedeckt", () => {
 
   it("liest eine Rückbuchung nicht als Ausgabe", () => {
     expect(zyklusUngedeckt(zyklus, -5000)).toBe(0);
+  });
+});
+
+/**
+ * Seit 2026-11-16 zählen die Kennzahlen des Bereichs beide Formen. Eine Rücklage über die
+ * Kategorie (im Modell ein aufbauendes Budget) liefert ihren Rest als Anspruch der Art
+ * `budget` an — ihr Soll ist dieser Rest, gedeckt ist, was die Belegung ihr zuteilt.
+ */
+describe("ruecklagenDeckung über beide Formen", () => {
+  const stand = (eintraege: Record<string, number>) => new Map(Object.entries(eintraege));
+  const ueberKategorie = { art: "budget" as const, id: "b-kat", kontoId: "k2", betrag: euroZuCent(400) };
+
+  it("zählt den Rest einer Rücklage über die Kategorie in Soll, Gedecktes und Grad", () => {
+    // Von Hand: 720,00 Soll auf k1, voll da. Über die Kategorie: 400,00 Rest auf k2, 100,00 da.
+    const d = ruecklagenDeckung(
+      [{ ...auto, kontoId: "k1" }],
+      "2026-07-01",
+      stand({ k1: euroZuCent(720), k2: euroZuCent(100) }),
+      [ueberKategorie],
+    );
+    expect(d.soll).toBe(euroZuCent(1120));
+    expect(d.sollMitKonto).toBe(euroZuCent(1120));
+    expect(d.tatsaechlich).toBe(euroZuCent(820));
+    expect(d.grad).toBe(73);
+    expect(d.ueberKategorie).toEqual([{ ...ueberKategorie, gedeckt: euroZuCent(100) }]);
+    // Die Posten bleiben die Rücklagen von Hand — die Liste darunter zeigt nur sie.
+    expect(d.posten.map((p) => p.ruecklage.id)).toEqual(["auto"]);
+  });
+
+  it("lässt einen Rest von null oder darunter aus — er beansprucht nichts", () => {
+    const d = ruecklagenDeckung([], "2026-07-01", stand({ k2: euroZuCent(100) }), [{ ...ueberKategorie, betrag: -500 }]);
+    expect(d).toMatchObject({ soll: 0, tatsaechlich: 0, grad: 100, ueberKategorie: [] });
+  });
+
+  it("nennt die Lage nur Rechnung, wenn keine Rücklage ein Konto hat und es keine über die Kategorie gibt", () => {
+    expect(ruecklagenDeckung([auto], "2026-07-01", stand({})).nurRechnung).toBe(true);
+    // Eine über die Kategorie hat immer ein Konto, auch mit Rest 0.
+    expect(ruecklagenDeckung([auto], "2026-07-01", stand({}), [{ ...ueberKategorie, betrag: 0 }]).nurRechnung).toBe(false);
+    expect(ruecklagenDeckung([{ ...auto, kontoId: "k1" }], "2026-07-01", stand({})).nurRechnung).toBe(false);
+    expect(ruecklagenDeckung([], "2026-07-01", stand({})).nurRechnung).toBe(false);
+  });
+});
+
+describe("ruecklagenKonten und ruecklagenBedarf mit Rücklagen über die Kategorie", () => {
+  const konten = [
+    { id: "giro", bezeichnung: "Giro", typ: "Giro" as const, klasse: "liquide" as const, inhaberIds: [], saldo: 0 },
+    { id: "spar", bezeichnung: "Spar", typ: "Tagesgeld" as const, klasse: "sparen" as const, inhaberIds: [], saldo: 0 },
+  ];
+  const budget = (over: Partial<Budget> = {}): Budget => ({
+    id: "b", kategorieId: "kat", kontoId: "spar", art: "aufbauend", start: "2026-01-01",
+    betraege: [{ abMonat: "2026-01", betrag: euroZuCent(30) }, { abMonat: "2026-06", betrag: euroZuCent(40) }],
+    ...over,
+  });
+
+  it("nimmt das nicht liquide Konto einer Rücklage über die Kategorie dazu, das liquide nicht", () => {
+    expect([...ruecklagenKonten(konten, [], [budget()])]).toEqual(["spar"]);
+    // Auf dem Girokonto zählte sonst jedes Gehalt als Eingang in die Rücklagen.
+    expect([...ruecklagenKonten(konten, [], [budget({ kontoId: "giro" })])]).toEqual([]);
+    // Ein monatliches Budget ist keine Rücklage.
+    expect([...ruecklagenKonten(konten, [], [budget({ art: "monatlich" })])]).toEqual([]);
+  });
+
+  it("zählt im Bedarf die Zuführung des Monats beider Formen", () => {
+    // 120,00 im Monat von Hand (Auto) + 40,00 ab Juni über die Kategorie; ein monatliches zählt nicht.
+    expect(ruecklagenBedarf([auto], [budget(), budget({ id: "m", art: "monatlich" })], "2026-06")).toBe(euroZuCent(160));
+    expect(ruecklagenBedarf([auto], [budget()], "2026-05")).toBe(euroZuCent(150));
+    // Vor dem Start legt sie noch nichts zurück.
+    expect(ruecklagenBedarf([], [budget({ start: "2026-08-01" })], "2026-07")).toBe(0);
   });
 });

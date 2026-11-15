@@ -44,7 +44,7 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | `uebersicht/` | „wie stehe ich gerade da": Monatskarten, Budgets, Was da ist, Depotstand (Regeln in `uebersicht/CLAUDE.md`) |
 | `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot, Bericht |
 | `budgets/` | die monatlichen Budgets, Vorschläge (Tabelle, Dialog und Verlauf liegen in `bausteine/`) |
-| `ruecklagen/` | Rücklagen — von Hand ausgebucht und über die Kategorie (die aufbauenden Budgets) —, Fluss, Tacho |
+| `ruecklagen/` | Rücklagen — von Hand ausgebucht und über die Kategorie (die aufbauenden Budgets) —, Fluss, Tacho, „Wo das Geld liegt" (je Konto, `GeldJeKontoKarte`) |
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
 | `vertraege/` | Verträge und ihre Erkennung |
 | `konten/` | der Kontoauszug („Buchungen", `ScreenId` `konten`), Kontenverwaltung, Bankzugänge, Abgleich, Depotauszug |
@@ -95,6 +95,7 @@ Der Ordner heißt `training/`, weil die Navigation den Bereich so nennt; fachlic
 | Hervorhebung in Fliesstext | `betonung` mit `<Trans>` |
 | Ein Bereich, in dem noch nichts steht | `LeererZustand` — Satz, Erklärung, Knöpfe; keine Karte (unten, „Leere Zustände") |
 | Ein Schritt der Einrichtung samt Knopf in seinen Bereich | `Einrichtungsschritt` (`EinrichtungsschrittZeile`, `EINRICHTUNG_ZIEL`) |
+| Was auf einem Konto gebunden ist: Ansprüche, gedeckt, Stand, gebunden, frei | `BelegungTabelle` (ohne Karte; im Kontoauszug und in „Wo das Geld liegt") |
 | Budgets einer Art: Liste, Anlegen/Bearbeiten, Verlauf | `BudgetTabelle`, `BudgetDialog`, `BudgetVerlauf` — die Wörter je Art aus `budgetTexte` (unten, „Rücklagen und Budgets") |
 
 Was nicht in der Tabelle steht und an zwei Stellen gebraucht wird, ist ein Kandidat für

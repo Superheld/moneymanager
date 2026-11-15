@@ -26,8 +26,9 @@
 
 import { monateZwischen } from "../basis/datum";
 import type { Cent } from "../basis/geld";
-import { kontobelegung, type Anspruch } from "../konten/kontobelegung";
-import { istRuecklagenkonto, type Zahlungskonto } from "../konten/konto";
+import { kontobelegung, type Anspruch, type Belegungsposten } from "../konten/kontobelegung";
+import { istLiquide, istRuecklagenkonto, type Zahlungskonto } from "../konten/konto";
+import { zufuehrungIm, type Budget } from "../budgets/budget";
 
 export interface Ruecklage {
   readonly id: string;
@@ -98,21 +99,51 @@ export function sollRuecklage(r: Ruecklage, am: string): Cent {
 }
 
 /**
- * Die Konten, auf denen zurückgelegt wird: jedes der Klasse Rücklage UND jedes, dem eine
- * Rücklage zugeordnet ist — gleich welcher Klasse.
+ * Die Konten, auf denen zurückgelegt wird: jedes der Klasse Rücklage, jedes, dem eine
+ * Rücklage zugeordnet ist — gleich welcher Klasse —, und jedes NICHT liquide Konto, auf
+ * dem eine Rücklage über die Kategorie (ein aufbauendes Budget) ihr Geld hat.
  *
  * Bis 2026-11-09 zählte allein die Klasse. Wer seine Rücklagen auf einem Tagesgeldkonto
  * der Klasse „Sparen" führte, sah dann einen Tacho auf null und keinen einzigen
  * Eingang, obwohl die Zuordnung an jeder Rücklage dastand. Die Zuordnung ist die
  * genauere Aussage — sie ist je Rücklage getroffen, die Klasse nur einmal je Konto.
+ *
+ * **Warum beim Budget nur die nicht liquiden** (seit 2026-11-16): ein Budget MUSS ein
+ * Konto nennen, und meist ist es das Girokonto, von dem auch bezahlt wird. Zählte das
+ * mit, wäre jedes Gehalt dort ein „Eingang" in die Rücklagen und der Tacho mässe das
+ * Girokonto. Eine Rücklage von Hand nennt ihr Konto dagegen freiwillig und eigens dafür.
  */
 export function ruecklagenKonten(
   konten: readonly Zahlungskonto[],
   items: readonly Pick<Ruecklage, "kontoId">[],
+  budgets: readonly Pick<Budget, "art" | "kontoId">[] = [],
 ): Set<string> {
   const ids = new Set(konten.filter(istRuecklagenkonto).map((k) => k.id));
   for (const r of items) if (r.kontoId) ids.add(r.kontoId);
+  const jeId = new Map(konten.map((k) => [k.id, k]));
+  for (const b of budgets) {
+    const k = jeId.get(b.kontoId);
+    if (b.art === "aufbauend" && k && !istLiquide(k)) ids.add(k.id);
+  }
   return ids;
+}
+
+/**
+ * Was beide Formen zusammen in `monat` (`YYYY-MM`) verlangen: die Raten der Rücklagen
+ * von Hand und die Zuführung jeder Rücklage über die Kategorie (`zufuehrungIm`).
+ *
+ * Eine Rücklage über die Kategorie ist im Modell ein aufbauendes Budget; ein monatliches
+ * zählt nicht, sein Rest verfällt und wird nicht zurückgelegt.
+ */
+export function ruecklagenBedarf(
+  items: readonly Ruecklage[],
+  budgets: readonly Budget[],
+  monat: string,
+): Cent {
+  const kategorie = budgets
+    .filter((b) => b.art === "aufbauend")
+    .reduce((s, b) => s + zufuehrungIm(b, monat), 0);
+  return monatsRuecklageGesamt(items) + kategorie;
 }
 
 /** Summe der monatlichen Rücklagen — der Betrag, der jeden Monat gebunden ist. */
@@ -139,14 +170,35 @@ export interface RuecklagenPosten {
   readonly tatsaechlich: Cent | null;
 }
 
+/**
+ * Die Deckung über BEIDE Formen (seit 2026-11-16): die Rücklagen von Hand als `posten`,
+ * die über die Kategorie (aufbauende Budgets) als `ueberKategorie`, und die Summen über
+ * beide. Vorher zählten die Summen nur die Rücklagen von Hand, obwohl die Überschrift
+ * im Bereich beide meinte.
+ */
 export interface RuecklagenDeckung {
+  /** Die Rücklagen von Hand, je eine. */
   readonly posten: readonly RuecklagenPosten[];
+  /**
+   * Die Rücklagen über die Kategorie mit einem Rest über null, so wie die Kontobelegung
+   * sie führt: Anspruch = Rest, `gedeckt` = was davon auf dem Konto liegt.
+   */
+  readonly ueberKategorie: readonly Belegungsposten[];
+  /** Σ Soll der Rücklagen von Hand + Σ Rest der Rücklagen über die Kategorie. */
   readonly soll: Cent;
-  /** Nur die Rücklagen MIT Konto — sonst stünde ein Soll ohne Gegenstück im Nenner. */
+  /**
+   * Nur, was einem Konto gegenübersteht — sonst stünde ein Soll ohne Gegenstück im
+   * Nenner. Eine Rücklage über die Kategorie hat immer ein Konto.
+   */
   readonly sollMitKonto: Cent;
   readonly tatsaechlich: Cent;
   /** 0–100, gedeckelt. 100, wenn nichts zu decken ist. */
   readonly grad: number;
+  /**
+   * Gibt es nur Rücklagen von Hand, und nennt keine ein Konto? Dann ist alles reine
+   * Rechnung, und das sagt der Bereich einmal statt an jeder Zahl.
+   */
+  readonly nurRechnung: boolean;
 }
 
 /**
@@ -175,6 +227,13 @@ export function ruecklagenAnsprueche(items: readonly Ruecklage[], am: string): A
  *
  * Überschuss wird gekappt (Grad ≤ 100 %): mehr als ihren Soll-Stand trägt eine Rücklage
  * nicht, auch wenn auf dem Konto mehr liegt.
+ *
+ * **Die Summen zählen die Ansprüche der Art `budget` mit** (seit 2026-11-16). Sie kommen
+ * nur von aufbauenden Budgets (`aufbauendeAnsprueche`), und die heissen in der
+ * Oberfläche Rücklage über die Kategorie. Ihr Soll ist ihr Rest — das, was heute auf
+ * dem Konto liegen sollte; ein Ziel haben sie nicht, deshalb bleibt `zielwertGesamt`
+ * bei den Rücklagen von Hand. Wer einen Anspruch einer dritten Art einführt, entscheidet
+ * hier, ob er mitzählt.
  */
 export function ruecklagenDeckung(
   items: readonly Ruecklage[],
@@ -184,8 +243,12 @@ export function ruecklagenDeckung(
 ): RuecklagenDeckung {
   const belegung = kontobelegung(kontostaende, [...ruecklagenAnsprueche(items, am), ...weitere]);
   const gedeckt = new Map<string, Cent>();
+  const ueberKategorie: Belegungsposten[] = [];
   for (const b of belegung.values()) {
-    for (const p of b.posten) if (p.art === "ruecklage") gedeckt.set(p.id, p.gedeckt);
+    for (const p of b.posten) {
+      if (p.art === "ruecklage") gedeckt.set(p.id, p.gedeckt);
+      else if (p.art === "budget") ueberKategorie.push(p);
+    }
   }
 
   const posten = items.map((r): RuecklagenPosten => ({
@@ -196,16 +259,20 @@ export function ruecklagenDeckung(
     tatsaechlich: r.kontoId ? (gedeckt.get(r.id) ?? 0) : null,
   }));
 
-  const sollGesamt = posten.reduce((s, p) => s + p.soll, 0);
-  const sollMitKonto = posten.reduce((s, p) => s + (p.tatsaechlich == null ? 0 : p.soll), 0);
-  const tatsaechlich = posten.reduce((s, p) => s + (p.tatsaechlich ?? 0), 0);
+  const kategorieSoll = ueberKategorie.reduce((s, p) => s + p.betrag, 0);
+  const kategorieGedeckt = ueberKategorie.reduce((s, p) => s + p.gedeckt, 0);
+  const sollGesamt = posten.reduce((s, p) => s + p.soll, 0) + kategorieSoll;
+  const sollMitKonto = posten.reduce((s, p) => s + (p.tatsaechlich == null ? 0 : p.soll), 0) + kategorieSoll;
+  const tatsaechlich = posten.reduce((s, p) => s + (p.tatsaechlich ?? 0), 0) + kategorieGedeckt;
 
   return {
     posten,
+    ueberKategorie,
     soll: sollGesamt,
     sollMitKonto,
     tatsaechlich,
     grad: sollMitKonto > 0 ? Math.round((tatsaechlich / sollMitKonto) * 100) : 100,
+    nurRechnung: items.length > 0 && items.every((r) => !r.kontoId) && !weitere.some((a) => a.art === "budget"),
   };
 }
 

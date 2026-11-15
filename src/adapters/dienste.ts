@@ -95,6 +95,7 @@ import { bestandExportieren } from "../application/bestandsexport";
 import { stammdatenLaden, type Stammdaten } from "../application/stammdaten/stammdatensichten";
 import { ruecklagenLaden, type Ruecklagensicht } from "../application/ruecklagen/ruecklagensichten";
 import { kontobelegungLaden, type Belegungssicht } from "../application/konten/kontobelegung";
+import { geldJeKontoLaden, type GeldJeKonto } from "../application/ruecklagen/geldJeKonto";
 import { depotsLaden, type Depotdaten } from "../application/depot/depotsichten";
 import { vermoegenLaden, type Vermoegenssicht } from "../application/vermoegen/vermoegensichten";
 import {
@@ -665,6 +666,11 @@ export function ruecklagen(heute: string): Promise<Ruecklagensicht> {
 /** Wem das Geld auf jedem Konto gehört — Rücklagen und aufbauende Budgets, anteilig gedeckt. */
 export function kontobelegung(heute: string): Promise<Belegungssicht> {
   return kontobelegungLaden(RUECKLAGEN_DEPS, heute);
+}
+
+/** Wo das Geld der Rücklagen liegt — je Konto, dieselbe Belegung wie oben; dazu, was auf keinem liegt. */
+export function geldJeKonto(heute: string): Promise<GeldJeKonto> {
+  return geldJeKontoLaden(RUECKLAGEN_DEPS, heute);
 }
 
 export function ruecklageAnlegen(eingabe: RuecklagenEingabe) {
