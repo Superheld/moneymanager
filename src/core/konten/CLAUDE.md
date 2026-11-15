@@ -20,6 +20,11 @@ demselben Konto denselben Euro beanspruchte. Die Deckung sah besser aus, als sie
 | aufbauendes Budget | sein Rest, wenn positiv | er gehört weiter dem Budget |
 | monatliches Budget | **keiner** | sein Rest verfällt und bleibt einfach auf dem Konto, ohne Kommentar |
 
+Dieselbe Belegung steht an drei weiteren Stellen, jede liest sie und rechnet nicht selbst:
+in der Übersicht unter „Was da ist" je Kontoklasse (`bilanzJeKlasse`), im Bereich Budgets
+am aufbauenden Budget („auf dem Konto fehlen …", nur wenn etwas fehlt) und in der
+Rücklagen-Deckung.
+
 Reicht der Stand nicht, wird **anteilig** verteilt, über alle Ansprüche gleich, ohne
 Reihenfolge. `budget.kontoId` heisst seither nur noch eines: hier liegt das Geld des
 Budgets, bis es ausgegeben ist.

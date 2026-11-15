@@ -50,7 +50,7 @@ import { PageHead } from "../bausteine/PageHead";
 import { Modal } from "../bausteine/Modal";
 import { Auswahl } from "../bausteine/Auswahl";
 import { CategoryPicker } from "../bausteine/CategoryPicker";
-import { geldFarbe, warnTon } from "../bausteine/geldFarbe";
+import { geldFarbe, warnFarbe, warnTon } from "../bausteine/geldFarbe";
 import { useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { useLoeschfrage } from "../bausteine/Loeschfrage";
 
@@ -143,6 +143,11 @@ export function BudgetsScreen() {
   const konten = bereich?.konten ?? [];
   const vorschlaege = bereich?.vorschlaege ?? [];
   const kontoName = bereich?.kontoNamen ?? LEERE_NAMEN;
+  /** Was vom Rest eines aufbauenden Budgets auf seinem Konto NICHT liegt — 0, wenn alles da ist. */
+  const fehlt = (budgetId: string) => {
+    const d = bereich?.deckung.get(budgetId);
+    return d ? d.anspruch - d.gedeckt : 0;
+  };
   /** Die Zeile, deren Verlauf offen ist — sie kann nach einem Löschen weg sein. */
   const offenesZeile = zeilen.find((z) => z.budget.id === offenesBudget);
   /** Das Budget, das der Dialog gerade bearbeitet — für die Liste seiner Beträge. */
@@ -326,6 +331,15 @@ export function BudgetsScreen() {
                             <span className="muted" style={{ display: "block", fontSize: "var(--fs-2xs)" }}>
                               {kontoName.get(z.budget.kontoId) ?? t("budgets.kontoFehlt")}
                               {z.unter && ` · ${t("budgets.unter", { name: z.unter })}`}
+                              {/* Nur, wenn etwas fehlt: der Rest steht rechts als verfügbar da,
+                                  und das stimmt nur, wenn er auf dem Konto auch liegt. Eine
+                                  Einschränkung, deshalb offen in der Zeile und in Worten. */}
+                              {fehlt(z.budget.id) > 0 && (
+                                <span style={{ color: warnFarbe(true) }}>
+                                  {" · "}
+                                  {t("budgets.deckungFehlt", { betrag: geld.formatMitSymbol(fehlt(z.budget.id)) })}
+                                </span>
+                              )}
                             </span>
                           </span>
                         ),

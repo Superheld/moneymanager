@@ -748,6 +748,7 @@ const de = {
     spalteVerbraucht: "verbraucht",
     spalteRest: "Rest",
     kontoFehlt: "kein Konto",
+    deckungFehlt: "auf dem Konto fehlen {{betrag}}",
     verbrauchHinweis:
       "Alle Zahlen gelten für den laufenden Monat. Verbraucht = bestätigte Ausgaben dieser Kategorie und ihrer Unterkategorien. Verfügbar ist beim monatlichen Budget der Monatsbetrag, beim aufbauenden der Übertrag aus dem Vormonat plus die Rate. Ein Klick auf eine Zeile zeigt den Verlauf.",
     verfuegbarHinweis: "Übertrag {{uebertrag}} + Rate {{zufuehrung}} · insgesamt eingezahlt {{gesamt}}",
@@ -2975,6 +2976,7 @@ const en: typeof de = {
     spalteVerbraucht: "spent",
     spalteRest: "Left",
     kontoFehlt: "no account",
+    deckungFehlt: "{{betrag}} missing on the account",
     verbrauchHinweis:
       "All figures are for the current month. Spent = confirmed expenses on this category and its subcategories. Available is the monthly amount for a monthly budget, and last month's carry-over plus this month's rate for a building one. Click a row to see the history.",
     verfuegbarHinweis: "Carry-over {{uebertrag}} + rate {{zufuehrung}} · paid in altogether {{gesamt}}",

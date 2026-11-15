@@ -13,6 +13,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Database } from "sql.js";
+import i18n from "../../../i18n/i18n";
 
 const halter = vi.hoisted(() => {
   let aktuell: unknown = null;
@@ -86,6 +87,39 @@ describe("BudgetsScreen", () => {
     // Das Konto steht in der Zeile — es ist die Deckung hinter der Zahl.
     expect(screen.getAllByText("Tagesgeldkonto").length).toBeGreaterThan(0);
     await waitFor(() => expect(document.body.textContent).toMatch(/400,00/));
+  });
+
+  /**
+   * Der Rest eines aufbauenden Budgets steht als verfügbar da. Das stimmt nur, wenn er
+   * auf seinem Konto auch liegt — sonst ist die Zahl eine Rechnung ohne Geld dahinter.
+   */
+  it("sagt am aufbauenden Budget, wenn sein Geld auf dem Konto fehlt", async () => {
+    await sqliteZahlungskontoRepository.speichern({
+      id: "leer", bezeichnung: "Sparbuch", typ: "Tagesgeld", klasse: "ruecklage", inhaberIds: [], saldo: 5000,
+    });
+    await sqliteKategorieRepository.speichern({ id: "kat2", name: "Urlaubskasse", defaultCharakter: "Aufwand" });
+    // Zwei Monate zu 100,00 gesammelt, auf dem Konto liegen 50,00: es fehlen 150,00.
+    await sqliteBudgetRepository.speichern({
+      id: "b2", kategorieId: "kat2", kontoId: "leer", betraege: [{ abMonat: monatVersetzt(-1), betrag: 10000 }],
+      art: "aufbauend", start: `${monatVersetzt(-1)}-01`,
+    });
+
+    rendere(<BudgetsScreen />);
+    await screen.findByText("Urlaubskasse");
+    expect(await screen.findByText(new RegExp(i18n.t("budgets.deckungFehlt", { betrag: "150,00 €" })))).toBeInTheDocument();
+  });
+
+  it("schweigt über die Deckung, wenn das Geld da ist", async () => {
+    await stammdatenBasis();
+    await sqliteKategorieRepository.speichern({ id: "kat2", name: "Urlaubskasse", defaultCharakter: "Aufwand" });
+    await sqliteBudgetRepository.speichern({
+      id: "b2", kategorieId: "kat2", kontoId: "k2", betraege: [{ abMonat: monatVersetzt(-1), betrag: 10000 }],
+      art: "aufbauend", start: `${monatVersetzt(-1)}-01`,
+    });
+
+    rendere(<BudgetsScreen />);
+    await screen.findByText("Urlaubskasse");
+    expect(document.body.textContent).not.toMatch(/fehlen/);
   });
 
   it("zieht ein eingebettetes Budget NICHT vom Dach ab — das Dach gilt für alles andere", async () => {
