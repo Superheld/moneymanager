@@ -573,6 +573,16 @@ select.field {
   color: var(--ink-3);
 }
 
+/* Die Beschriftung eines Werts, der schmal in die zweite Zeile wandert (`schmal:
+   "zweitzeile"` an der Spalte): breit sagt der Spaltenkopf, was die Zahl ist; schmal steht
+   dieser Kopf nicht mehr da, und eine Zahl ohne Namen ist keine Auskunft. Eine Frage des
+   Aussehens, nicht des Markups — deshalb CSS und nicht `useSchmal`. */
+@media (min-width: 700px) {
+  .zweitzeile-beschriftung {
+    display: none;
+  }
+}
+
 tr.datentabelle-zeile--klickbar:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;

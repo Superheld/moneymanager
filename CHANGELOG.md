@@ -24,6 +24,13 @@ Vermögen auf. Sie wird nicht eingegeben, sondern aus den eingetragenen Restschu
 abgeleitet: was die Schuld zwischen zwei Stichtagen gesunken ist, verteilt auf die Monate
 dazwischen. Was am Ende frei bleibt, ändert sich dadurch nicht.
 
+**Der Bericht**, als neues Register in der Analyse. Für einen abgeschlossenen Monat oder
+ein Kalenderjahr steht auf einem Blatt untereinander: was der Zeitraum gekostet hat und
+was bleibt, neben dem Vormonat bzw. Vorjahr; der Weg vom Ergebnis zur Änderung der
+Kontostände; und das Nettovermögen am Anfang und am Ende mit seinen vier Teilen. Gerechnet
+wird dasselbe wie in den Monatskarten und der Kostensicht — ein Jahr ist die Summe seiner
+zwölf Monate. Wählbar ist nur, was ganz erfasst ist.
+
 ### Geändert
 
 **Kein „Alpha" mehr neben der Version.** Dass die App noch nicht stabil ist, sagt die 0

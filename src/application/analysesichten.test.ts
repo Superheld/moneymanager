@@ -9,7 +9,7 @@ import type { Depotwert } from "../core";
 import { depotEntwicklung, type Depotsicht } from "./depot/depotsichten";
 import { bilanzJeKlasse, ergebnisbasis, monatsErgebnis, staendeJeKlasse } from "../core";
 import { belegungssicht } from "./konten/kontobelegung";
-import { analyseAusblick, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, analyseLiquiditaet, analyseReichweite, type Analysebasis } from "./analysesichten";
+import { analyseAusblick, analyseBericht, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, analyseLiquiditaet, analyseReichweite, type Analysebasis } from "./analysesichten";
 
 describe("analyseFensterTaggenau", () => {
   it("schiebt die Monatsmarke auf den letzten Tag desselben Monats", () => {
@@ -473,5 +473,115 @@ describe("analyseReichweite", () => {
   it("nennt die Grenze bei ausgebuchten Rücklagen, wenn sie einen gemittelten Monat trifft", () => {
     expect(analyseReichweite(basis(), heute)!.ruecklagenUnvollstaendig).toBe(false);
     expect(analyseReichweite(basis({ ausbuchungsdaten: ["2026-06-20"] }), heute)!.ruecklagenUnvollstaendig).toBe(true);
+  });
+});
+
+/**
+ * Der Bericht. Alle Werte erfunden; festgehalten wird, dass er nichts eigenes rechnet —
+ * derselbe Monat trägt hier dieselben Kosten wie in der Kostensicht —, welcher Zeitraum
+ * vorgegeben ist und wann der Vergleich fehlt.
+ */
+describe("analyseBericht", () => {
+  const heute = "2026-08-15";
+  const ist = (id: string, datum: string, betrag: number, kategorieId: string) =>
+    ({ id, datum, betrag, kontoId: "giro", charakter: betrag > 0 ? "Ertrag" : "Aufwand", quelle: "import", kategorieId }) as const;
+  const basis = (extra: Partial<Analysebasis> = {}): Analysebasis => ({
+    buchungen: [
+      // Die erste Buchung mitten im Mai: der Mai ist nur zum Teil erfasst.
+      ist("a5", "2026-05-20", -12000, "alltag"),
+      ist("g6", "2026-06-28", 210000, "lohn"), ist("a6", "2026-06-12", -45000, "alltag"),
+      ist("g7", "2026-07-28", 210000, "lohn"), ist("a7", "2026-07-12", -38000, "alltag"),
+      ist("a8", "2026-08-02", -9000, "alltag"),
+    ],
+    konten: [{ id: "giro", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 50000 }],
+    kategorien: [
+      { id: "lohn", name: "Lohn", defaultCharakter: "Ertrag" },
+      { id: "alltag", name: "Alltag", defaultCharakter: "Aufwand" },
+    ],
+    kontoNamen: new Map(),
+    umsatzZuBuchung: new Map(),
+    vertragsnamen: new Map(),
+    vertragZuBuchung: new Map(),
+    budgets: [],
+    vertraege: [],
+    regeln: [],
+    ruecklagen: [{ id: "rl", bezeichnung: "Kesselmann", rate: 6000, beginn: "2026-01-01" }],
+    ausbuchungsdaten: [],
+    ausbuchungen: [],
+    vertragJeBuchung: new Map(),
+    vormerkungen: [],
+    ...extra,
+  });
+
+  it("nimmt ohne Wahl den letzten abgeschlossenen Monat und bietet nur voll erfasste an", () => {
+    const s = analyseBericht(basis(), "monat", null, heute);
+    expect(s.wahl).toEqual(["2026-07", "2026-06"]);
+    expect(s.bericht!.schluessel).toBe("2026-07");
+    expect(s.bericht!.vorher).toBe("2026-06");
+  });
+
+  it("trägt dieselben Zahlen wie die Kostensicht für denselben Monat", () => {
+    const b = basis();
+    const bericht = analyseBericht(b, "monat", "2026-07", heute).bericht!;
+    const kosten = analyseKostenverlauf(b, "2026-06-01", "2026-07-01", heute);
+    const juli = kosten.monate.find((m) => m.monat === "2026-07")!;
+    const juni = kosten.monate.find((m) => m.monat === "2026-06")!;
+    expect(bericht.ergebnis.ergebnis).toEqual({ jetzt: juli.ergebnis, vorher: juni.ergebnis, veraenderung: juli.ergebnis - juni.ergebnis });
+    expect(bericht.kennzahlen.kostenJeMonat).toBe(juli.kostenGesamt);
+  });
+
+  it("vergleicht nicht mit einem Monat, der nicht ganz erfasst ist", () => {
+    const s = analyseBericht(basis(), "monat", "2026-06", heute);
+    expect(s.bericht!.vorher).toBeNull();
+    expect(s.bericht!.ergebnis.ergebnis.vorher).toBeNull();
+  });
+
+  it("fällt auf den jüngsten Zeitraum zurück, wenn die Wahl nicht wählbar ist", () => {
+    expect(analyseBericht(basis(), "monat", "2026-08", heute).bericht!.schluessel).toBe("2026-07");
+  });
+
+  it("hat ohne ganz erfasstes Jahr keinen Bericht über ein Jahr", () => {
+    const s = analyseBericht(basis(), "jahr", null, heute);
+    expect(s.wahl).toEqual([]);
+    expect(s.bericht).toBeNull();
+  });
+
+  it("rechnet das Vermögen über die Konten, wenn kein Bestand geladen ist, und geht gegen die Überleitung auf", () => {
+    const bericht = analyseBericht(basis(), "monat", "2026-07", heute).bericht!;
+    const konten = bericht.vermoegen.zeilen.find((z) => z.teil === "konten")!;
+    expect(bericht.vermoegen.anfang).toBe("2026-06-30");
+    expect(bericht.vermoegen.ende).toBe("2026-07-31");
+    // Ohne Umbuchungen und ohne Depot: die Konten ändern sich um genau das, was die
+    // Überleitung als Änderung aller Kontostände nennt.
+    expect(konten.veraenderung).toBe(bericht.ueberleitung.kontoaenderung);
+    expect(bericht.ueberleitung.kontoaenderung).toBe(210000 - 38000);
+    expect(bericht.mitBeobachtungen).toBe(false);
+  });
+
+  it("zählt Vermögenswerte und Schulden aus dem Bestand und sagt, dass sie Beobachtungen sind", () => {
+    const b = basis();
+    const bericht = analyseBericht(
+      {
+        ...b,
+        vermoegen: {
+          konten: b.konten, buchungen: b.buchungen, depotwerte: [],
+          gegenstaende: [{ id: "g", bezeichnung: "Vibora", art: "sonstiges" }],
+          werte: [{ gegenstandId: "g", stichtag: "2026-07-10", wert: 400000 }],
+          verbindlichkeiten: [], staende: [],
+        },
+      },
+      "monat",
+      "2026-07",
+      heute,
+    ).bericht!;
+    expect(bericht.vermoegen.zeilen.find((z) => z.teil === "vermoegenswerte")).toMatchObject({ anfang: 0, ende: 400000, veraenderung: 400000 });
+    expect(bericht.mitBeobachtungen).toBe(true);
+  });
+
+  it("meldet fehlende Rücklagenraten auch, wenn sie nur den Vergleich treffen", () => {
+    const s = analyseBericht(basis({ ausbuchungsdaten: ["2026-07-05"] }), "monat", "2026-07", heute);
+    // Der Juli selbst ist der Monat der Ausbuchung und nicht betroffen, der Juni schon.
+    expect(s.bericht!.ruecklagenUnvollstaendig).toBe(true);
+    expect(analyseBericht(basis(), "monat", "2026-07", heute).bericht!.ruecklagenUnvollstaendig).toBe(false);
   });
 });

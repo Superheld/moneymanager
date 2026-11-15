@@ -259,6 +259,9 @@ export {
   type Liquiditaetszeile,
   analyseReichweite,
   type Reichweitensicht,
+  analyseBericht,
+  type Bericht,
+  type Berichtssicht,
 } from "./analysesichten";
 export {
   depotsLaden,

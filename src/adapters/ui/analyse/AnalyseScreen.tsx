@@ -49,12 +49,13 @@ import { ReichweiteKarte } from "./ReichweiteKarte";
 import { KATEGORIEN_ANFANG, KategorienRegister, type KategorienZustand } from "./KategorienRegister";
 import { VERLAUF_ANFANG, VerlaufRegister, type VerlaufZustand } from "./VerlaufRegister";
 import { Filterzeile, ZeitraumWahl } from "./ZeitraumWahl";
+import { BERICHT_ANFANG, BerichtRegister, type BerichtZustand } from "./BerichtRegister";
 import { PageHead } from "../bausteine/PageHead";
 import { Registerleiste } from "../bausteine/Registerleiste";
 import { fehlerMelden } from "../bausteine/Meldungen";
 
 /** Die Register in Anzeigereihenfolge — dieselbe, in der sie vorher untereinander standen. */
-type AnalyseRegister = "verlauf" | "kategorien" | "ausblick" | "befunde" | "depot";
+type AnalyseRegister = "verlauf" | "kategorien" | "ausblick" | "befunde" | "depot" | "bericht";
 
 /** Heute als ISO — die Uhr wird hier gelesen, gerechnet wird in der Anwendungsschicht. */
 function toIsoHeute(): string {
@@ -80,6 +81,7 @@ export function AnalyseScreen() {
   const [kategorien, setKategorien] = useState<KategorienZustand>(KATEGORIEN_ANFANG);
   const [befundeZeitraum, setBefundeZeitraum] = useState<Zeitraum>("12");
   const [depotZeitraum, setDepotZeitraum] = useState<Zeitraum>("12");
+  const [bericht, setBericht] = useState<BerichtZustand>(BERICHT_ANFANG);
 
   // Gemeinsam laden und in EINEM Schritt setzen — kein Render-Fenster, in dem die
   // Aufschlüsselung gegen eine noch leere Kategorie-Liste rechnet (sonst „ohne Kategorie").
@@ -154,6 +156,9 @@ export function AnalyseScreen() {
       ["ausblick", true],
       ["befunde", !!befunde],
       ["depot", !!depotdaten && depotdaten.depots.length > 0],
+      // Zuletzt: der Bericht fasst zusammen, was die Register davor einzeln zeigen. Er
+      // steht auch ohne abgeschlossenen Monat da und sagt dann, ab wann es ihn gibt.
+      ["bericht", true],
     ] as const
   )
     .filter(([, da]) => da)
@@ -215,6 +220,11 @@ export function AnalyseScreen() {
                   ))}
                 </div>
               </>
+            )}
+
+            {/* Ein Zeitraum auf einem Blatt: Ergebnis, Weg zum Konto, Vermögen. */}
+            {wirksamesRegister === "bericht" && (
+              <BerichtRegister basis={basis} heute={heute} zustand={bericht} setZustand={setBericht} />
             )}
           </Registerleiste>
         )
