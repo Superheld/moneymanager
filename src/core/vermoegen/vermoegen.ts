@@ -49,6 +49,11 @@ export interface Vermoegensgegenstand {
    * `wirdGefuehrt`, nie über das Feld direkt.
    */
   readonly aktiv?: boolean;
+  /**
+   * Das Vorsorgeziel, zu dem er zählt (`../vorsorge/vorsorge.ts`). Fehlt es, zählt er nur
+   * zum Nettovermögen: ein Fahrzeug ist Vermögen, aber niemand lebt im Ruhestand davon.
+   */
+  readonly vorsorgezielId?: string;
 }
 
 /** Der Wert eines Gegenstands zu einem Stichtag — eine Beobachtung. */

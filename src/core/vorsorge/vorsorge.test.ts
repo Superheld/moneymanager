@@ -1,7 +1,9 @@
 // Die Vorsorgerechnung — jedes Glied der Kette für sich, dann die ganze Kette.
 
 import { describe, expect, it } from "vitest";
+import type { Zahlungskonto } from "../konten/konto";
 import {
+  annahmeIm,
   hochgerechnet,
   kapitalbedarf,
   moeglicheEntnahme,
@@ -10,6 +12,7 @@ import {
   reichweiteMonate,
   versorgungsluecke,
   vorsorgestand,
+  vorsorgevermoegen,
   type Vorsorgeannahmen,
 } from "./vorsorge";
 
@@ -132,5 +135,56 @@ describe("Entnahme", () => {
 
   it("reicht unbegrenzt, wenn die Entnahme den Zins nicht übersteigt", () => {
     expect(reichweiteMonate(100000000, 100000, 300)).toBeNull();
+  });
+});
+
+describe("annahmeIm", () => {
+  const reihe = [{ abMonat: "2025-03" }, { abMonat: "2025-09" }];
+
+  it("nimmt die jüngste Zeile, die nicht nach dem Monat beginnt", () => {
+    expect(annahmeIm(reihe, "2025-03")?.abMonat).toBe("2025-03");
+    expect(annahmeIm(reihe, "2025-08")?.abMonat).toBe("2025-03");
+    expect(annahmeIm(reihe, "2026-01")?.abMonat).toBe("2025-09");
+  });
+
+  it("kennt vor der ersten Zeile keine — auch nicht die erste rückwirkend", () => {
+    expect(annahmeIm(reihe, "2025-02")).toBeUndefined();
+  });
+});
+
+describe("vorsorgevermoegen", () => {
+  const konto = (id: string, klasse: Zahlungskonto["klasse"], saldo: number): Zahlungskonto =>
+    ({ id, bezeichnung: id, typ: "Giro", klasse, inhaberIds: [], saldo }) as Zahlungskonto;
+
+  const bestand = {
+    konten: [
+      konto("giro", "liquide", 500_00),
+      konto("spar", "sparen", 700_00),
+      konto("vors", "vorsorge", 1_000_00),
+      konto("inv", "investment", 2_000_00),
+    ],
+    buchungen: [],
+    depotwerte: [{ depotId: "d1", stichtag: "2025-05-31", gesamtwert: 4_000_00, waehrung: "EUR" }],
+    gegenstaende: [
+      { id: "police", bezeichnung: "Police", art: "versicherung" as const, vorsorgezielId: "z1" },
+      { id: "wagen", bezeichnung: "Wagen", art: "fahrzeug" as const },
+    ],
+    werte: [
+      { gegenstandId: "police", stichtag: "2025-01-31", wert: 8_000_00 },
+      { gegenstandId: "wagen", stichtag: "2025-01-31", wert: 16_000_00 },
+    ],
+  };
+
+  it("zählt Vorsorge- und Investmentkonten, alle Depots und die zugeordneten Vermögenswerte", () => {
+    const v = vorsorgevermoegen(bestand as never, "z1", "2025-06-15");
+    expect(v.konten).toBe(3_000_00);
+    expect(v.depots).toBe(4_000_00);
+    expect(v.vermoegenswerte).toBe(8_000_00);
+    expect(v.schulden).toBe(0);
+    expect(v.netto).toBe(15_000_00);
+  });
+
+  it("lässt einen Vermögenswert weg, der einem anderen oder keinem Ziel gehört", () => {
+    expect(vorsorgevermoegen(bestand as never, "anderes", "2025-06-15").vermoegenswerte).toBe(0);
   });
 });

@@ -16,12 +16,15 @@ import type {
   Schuldzeile,
   Vermoegenssicht,
   Vermoegenswertzeile,
+  Vorsorgesicht,
 } from "../../../application";
 import {
   restschuldEntfernen,
   schuldLoeschen,
   vermoegen as vermoegenLaden,
   vermoegenswertLoeschen,
+  vorsorge as vorsorgeLaden,
+  vorsorgezielLoeschen,
   wertEntfernen,
 } from "../../dienste";
 import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
@@ -36,6 +39,8 @@ import { warnTon } from "../bausteine/geldFarbe";
 import { BeobachtungDialog } from "./BeobachtungDialog";
 import { NettoVerlaufChart } from "./NettoVerlaufChart";
 import { SchuldDialog, VermoegenswertDialog } from "./StammDialoge";
+import { VorsorgeDialog } from "./VorsorgeDialog";
+import { VorsorgeKarte } from "./VorsorgeKarte";
 
 function heuteIso(): string {
   const n = new Date();
@@ -64,6 +69,8 @@ export function VermoegenScreen() {
   const loeschfrage = useLoeschfrage();
   const heute = useMemo(heuteIso, []);
   const [sicht, setSicht] = useState<Vermoegenssicht | null>(null);
+  const [vorsorge, setVorsorge] = useState<Vorsorgesicht | null>(null);
+  const [vorsorgeDialog, setVorsorgeDialog] = useState(false);
 
   // Welcher Dialog offen ist. Ihr Zustand gehört den Dialogen; der Screen merkt sich nur,
   // für welchen Eintrag.
@@ -76,7 +83,11 @@ export function VermoegenScreen() {
   const [offeneSchuld, setOffeneSchuld] = useState<string | null>(null);
 
   async function laden() {
-    setSicht(await vermoegenLaden(heute));
+    // Zusammen geholt und zusammen gesetzt: die Vorsorge rechnet über denselben Bestand,
+    // und ein Wert, der oben schon zählt und unten noch nicht, sähe wie ein Fehler aus.
+    const [v, vs] = await Promise.all([vermoegenLaden(heute), vorsorgeLaden(heute)]);
+    setSicht(v);
+    setVorsorge(vs);
   }
   useEffect(() => {
     laden().catch(fehlerMelden);
@@ -333,12 +344,29 @@ export function VermoegenScreen() {
         </Card>
       )}
 
+      {/* Auch im leeren Zustand: ein Vorsorgeziel rechnet schon über Konten und Depots. */}
+      <VorsorgeKarte
+        sicht={vorsorge}
+        onBearbeiten={() => setVorsorgeDialog(true)}
+        onLoeschen={() =>
+          loeschfrage.stellen({
+            name: vorsorge?.ziel.bezeichnung ?? "",
+            folgen: t("vermoegen.vorsorge.loeschenFolgen"),
+            ausfuehren: async () => {
+              await vorsorgezielLoeschen();
+              await laden();
+            },
+          })
+        }
+      />
+
       {!leer && liste("wert", wertzeilen, offenerWert, setOffenerWert)}
       {!leer && liste("restschuld", schuldzeilen, offeneSchuld, setOffeneSchuld)}
 
       {wertDialog && (
         <VermoegenswertDialog
           zeile={wertDialog === "neu" ? null : wertDialog}
+          vorsorgeziel={vorsorge?.ziel}
           onClose={() => setWertDialog(null)}
           onGespeichert={async () => { setWertDialog(null); await laden(); }}
         />
@@ -360,6 +388,14 @@ export function VermoegenScreen() {
           heute={heute}
           onClose={() => setEintragen(null)}
           onGespeichert={async () => { setEintragen(null); await laden(); }}
+        />
+      )}
+      {vorsorgeDialog && (
+        <VorsorgeDialog
+          sicht={vorsorge}
+          heute={heute}
+          onClose={() => setVorsorgeDialog(false)}
+          onGespeichert={async () => { setVorsorgeDialog(false); await laden(); }}
         />
       )}
       {loeschfrage.dialog}

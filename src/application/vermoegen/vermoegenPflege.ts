@@ -36,6 +36,11 @@ export interface VermoegenPflegeDeps {
 export interface VermoegenswertEingabe {
   bezeichnung: string;
   art: Vermoegensart;
+  /**
+   * Das Vorsorgeziel, zu dem er zählt. Fehlt die Angabe, zählt er zu keinem — auch beim
+   * Ändern: die Maske schickt immer den ganzen Stand.
+   */
+  vorsorgezielId?: string;
 }
 
 export interface SchuldEingabe {
@@ -71,7 +76,7 @@ function pruefeStichtag(stichtag: string, heute: string): void {
 function baueGegenstand(e: VermoegenswertEingabe, id: string, aktiv: boolean): Vermoegensgegenstand {
   const bezeichnung = bezeichnungVon(e.bezeichnung);
   if (!VERMOEGENSARTEN.includes(e.art)) throw new FachlicherFehler("vermoegen.artUnbekannt");
-  return { id, bezeichnung, art: e.art, aktiv };
+  return { id, bezeichnung, art: e.art, aktiv, ...(e.vorsorgezielId ? { vorsorgezielId: e.vorsorgezielId } : {}) };
 }
 
 async function gegenstandHolen(repo: VermoegenRepository, id: string): Promise<Vermoegensgegenstand> {

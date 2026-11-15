@@ -25,6 +25,8 @@
 
 import { monateZwischen } from "../basis/datum";
 import type { Cent } from "../basis/geld";
+import { istVorsorgekonto } from "../konten/konto";
+import { nettovermoegen, type Nettovermoegen, type VermoegensEingabe } from "../vermoegen/vermoegen";
 
 /** Die Annahmen eines Ziels — was der Nutzer einträgt. */
 export interface Vorsorgeannahmen {
@@ -154,4 +156,84 @@ export function reichweiteMonate(kapital: Cent, monatlich: Cent, renditeBp: numb
   if (i === 0) return Math.floor(kapital / monatlich);
   if (monatlich <= kapital * i) return null;
   return Math.floor(-Math.log(1 - (kapital * i) / monatlich) / Math.log(1 + i));
+}
+
+// ---------------------------------------------------------------- Das Ziel
+//
+// Bis hierher war alles Rechnung über Zahlen, die jemand hereinreicht. Ab hier steht,
+// was davon GESPEICHERT wird und woher das Vermögen kommt, gegen das gerechnet wird.
+
+/**
+ * Ein Vorsorgeziel — der Stammsatz. Die Zahlen stehen nicht an ihm, sondern in der Reihe
+ * seiner Annahmen (`Vorsorgezielannahme`).
+ */
+export interface Vorsorgeziel {
+  readonly id: string;
+  readonly bezeichnung: string;
+}
+
+/**
+ * Die Annahmen eines Ziels, gültig AB einem Monat.
+ *
+ * Eine Reihe und kein Satz Spalten am Ziel, aus demselben Grund wie beim Budgetbetrag:
+ * wer heute die Rendite senkt, hat damit nichts über das letzte Jahr gesagt. Stünden die
+ * Annahmen am Ziel, wäre der Bedarf jedes vergangenen Monats rückwirkend ein anderer.
+ */
+export interface Vorsorgezielannahme extends Vorsorgeannahmen {
+  readonly zielId: string;
+  /** „YYYY-MM" — ab diesem Monat gelten sie, bis die nächste Zeile beginnt. */
+  readonly abMonat: string;
+}
+
+/**
+ * Die Annahmen, die in `monat` gelten: die jüngste Zeile, die nicht nach ihm beginnt.
+ *
+ * Vor der ersten Zeile gilt KEINE — auch nicht die erste rückwirkend. Ein Ziel, das im
+ * März angelegt wurde, hat im Januar nichts verlangt.
+ */
+export function annahmeIm<T extends { readonly abMonat: string }>(
+  reihe: readonly T[],
+  monat: string,
+): T | undefined {
+  let treffer: T | undefined;
+  for (const a of reihe) {
+    if (a.abMonat > monat) continue;
+    if (treffer === undefined || a.abMonat > treffer.abMonat) treffer = a;
+  }
+  return treffer;
+}
+
+/**
+ * Was zum Stichtag für das Ziel da ist.
+ *
+ * Drei Quellen, und keine davon wird hier neu gerechnet — es ist `nettovermoegen` über
+ * eine engere Auswahl, damit die Zahl nie von der im Bereich Vermögen weglaufen kann:
+ *
+ *   • KONTEN der Klassen Vorsorge und Investment (`istVorsorgekonto`, dieselbe Grenze,
+ *     nach der die Ergebnisrechnung eine Umbuchung als Vorsorge zählt),
+ *   • alle DEPOTS,
+ *   • die VERMÖGENSWERTE, die jemand dem Ziel zugeordnet hat — die Versicherung mit
+ *     Rückkaufswert ja, das Auto nein. Das kann nur der Nutzer wissen.
+ *
+ * Schulden werden NICHT abgezogen. Ein Kredit mindert das Nettovermögen, aber nicht das,
+ * was im Ruhestand entnommen werden kann — es sei denn, er läuft dann noch, und das
+ * gehört in den Wunschbetrag.
+ */
+export function vorsorgevermoegen(
+  e: Pick<VermoegensEingabe, "konten" | "buchungen" | "depotwerte" | "gegenstaende" | "werte">,
+  zielId: string,
+  stichtag: string,
+): Nettovermoegen {
+  return nettovermoegen(
+    {
+      konten: e.konten.filter(istVorsorgekonto),
+      buchungen: e.buchungen,
+      depotwerte: e.depotwerte,
+      gegenstaende: e.gegenstaende.filter((g) => g.vorsorgezielId === zielId),
+      werte: e.werte,
+      verbindlichkeiten: [],
+      staende: [],
+    },
+    stichtag,
+  );
 }
