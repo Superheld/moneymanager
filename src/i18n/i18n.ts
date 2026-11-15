@@ -695,6 +695,26 @@ const de = {
       hinweis:
         "Was hier nicht im Minus steht, läuft bis zum {{bis}} nicht ins Minus — geprüft ist damit nicht mehr. Gerechnet wird ab dem Kontostand, den die App kennt: was seit dem letzten Abruf passiert ist, fehlt.",
     },
+    // „Wie lange reicht es ohne Einnahmen?" — das freie Geld gegen die Kosten eines Monats.
+    // Die Zeilennamen folgen der Ergebnisrechnung (`ergebnis.zeile`) und `metaSparquote`.
+    reichweite: {
+      titel: "Wie lange reicht es ohne Einnahmen?",
+      untertitel: "Das freie Geld der liquiden Konten gegen das, was ein Monat kostet",
+      ohneZuruecklegen: "Verträge, monatliche Budgets, Ungeplantes",
+      mitZuruecklegen: "Dazu Rücklagen, aufbauende Budgets und Vorsorge",
+      einheit_one: "Monat",
+      einheit_other: "Monate",
+      jeMonat: "{{betrag}} im Monat",
+      ohneKosten: "In diesen Monaten hat nichts gekostet — ohne Kosten keine Reichweite.",
+      hinweis_one:
+        "Gerechnet mit {{frei}}, die auf den liquiden Konten frei sind — was Rücklagen und aufbauenden Budgets gehört, zählt nicht. Die Kosten sind der Durchschnitt des letzten abgeschlossenen Monats; der laufende zählt nicht, Einnahmen zählen gar nicht.",
+      hinweis_other:
+        "Gerechnet mit {{frei}}, die auf den liquiden Konten frei sind — was Rücklagen und aufbauenden Budgets gehört, zählt nicht. Die Kosten sind der Durchschnitt der letzten {{count}} abgeschlossenen Monate; der laufende zählt nicht, Einnahmen zählen gar nicht.",
+      ruecklagen:
+        "Einem dieser Monate fehlt die Rate einer später ausgebuchten Rücklage. Die zweite Zahl steht deshalb zu hoch da.",
+      zuWenig_one: "Für eine Aussage braucht es die Kosten von mindestens einem abgeschlossenen Monat mit Buchungen.",
+      zuWenig_other: "Für eine Aussage braucht es die Kosten von mindestens {{count}} abgeschlossenen Monaten mit Buchungen.",
+    },
     warnungMinus:
       "Im {{monat}} steht der vorhergesagte Stand bei {{betrag}}. Gerechnet ist monatsweise: " +
       "innerhalb eines Monats kann es früher eng werden, als hier zu sehen ist.",
@@ -3195,6 +3215,24 @@ const en: typeof de = {
         "“Fixed” only counts what has a date: contract payments and planned transfers. Going negative there is certain — spending less will not help. “Expected” additionally deducts what is still open in the monthly budgets, spread evenly across the days. Going negative only there still leaves you a choice.",
       hinweis:
         "What is not shown as negative here does not go negative before {{bis}} — that is all that has been checked. The computation starts from the balance the app knows: whatever has happened since the last retrieval is missing.",
+    },
+    reichweite: {
+      titel: "How long would it last without income?",
+      untertitel: "The free money on the liquid accounts against what a month costs",
+      ohneZuruecklegen: "Contracts, monthly budgets, unplanned",
+      mitZuruecklegen: "Plus reserves, building budgets and provision",
+      einheit_one: "month",
+      einheit_other: "months",
+      jeMonat: "{{betrag}} a month",
+      ohneKosten: "Nothing cost anything in these months — no costs, no range.",
+      hinweis_one:
+        "Computed with {{frei}} that is free on the liquid accounts — what belongs to reserves and building budgets does not count. The costs are the average of the last completed month; the current month does not count, income does not count at all.",
+      hinweis_other:
+        "Computed with {{frei}} that is free on the liquid accounts — what belongs to reserves and building budgets does not count. The costs are the average of the last {{count}} completed months; the current month does not count, income does not count at all.",
+      ruecklagen:
+        "One of these months lacks the rate of a reserve that was paid out later. The second figure is therefore too high.",
+      zuWenig_one: "A statement needs the costs of at least one completed month with transactions.",
+      zuWenig_other: "A statement needs the costs of at least {{count}} completed months with transactions.",
     },
     warnungMinus:
       "In {{monat}} the projected balance is {{betrag}}. This is calculated by month: " +

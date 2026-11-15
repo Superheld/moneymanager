@@ -12,7 +12,7 @@ macht jeden Test von der Laufzeit abhängig. Zeitpunkte kommen als Parameter her
 `zahlungsregel`, `muster`, `fehler`, `region`. Alles Fachliche liegt in seinem Bereich
 (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`, `ruecklagen/`,
 `vermoegen/`, `vorsorge/`, `stammdaten/`). In der Wurzel bleibt nur, was über Bereiche hinweg rechnet
-(`monatsausblick.ts`, `einordnung.ts`, `ergebnis.ts`, `einrichtung.ts`) und die Fassade `index.ts`.
+(`monatsausblick.ts`, `einordnung.ts`, `ergebnis.ts`, `reichweite.ts`, `einrichtung.ts`) und die Fassade `index.ts`.
 
 ## Geld
 
@@ -137,6 +137,7 @@ auf" ausführbar macht.
 |---|---|
 | `einordnung.ts` | Was IST diese Buchung — Einnahme, Fixkosten, laufende Kosten, Entnahme aus Topf oder Rücklage, Vorsorge, Umbuchung, ungeplant? Die eine Stelle dafür; wer auswertet, fragt hier und sortiert nicht selbst. |
 | `ergebnis.ts` | Was kostet der Monat? Baut auf der Einordnung und fügt die Zeit hinzu (Periodisierung, Topfkosten), dazu die Überleitung. |
+| `reichweite.ts` | Wie viele Monate das freie Geld die Kosten trägt. Liest die Zeilen von `ergebnis.ts` nur und steht deshalb daneben, nicht darin. |
 | `monatsausblick.ts` | Die Aufrechnung nach AUSZAHLUNG: was gebucht ist und was fällig wird. Sie trägt den Saldo-Ausblick der Analyse und ordnet noch über Betragsnähe zu. |
 
 Beide neuen Dateien liegen in der Wurzel, aus demselben Grund wie `monatsausblick.ts`: sie

@@ -32,6 +32,7 @@ import {
   analyseFenster,
   analyseFensterTaggenau,
   analyseLiquiditaet,
+  analyseReichweite,
   type Analysebasis,
   type Depotdaten,
   type IstBuchung,
@@ -44,6 +45,7 @@ import { AusblickKarte } from "./AusblickKarte";
 import { BefundeBereich } from "./BefundeBereich";
 import { DepotAnsicht } from "./DepotAnsicht";
 import { LiquiditaetKarte } from "./LiquiditaetKarte";
+import { ReichweiteKarte } from "./ReichweiteKarte";
 import { KATEGORIEN_ANFANG, KategorienRegister, type KategorienZustand } from "./KategorienRegister";
 import { VERLAUF_ANFANG, VerlaufRegister, type VerlaufZustand } from "./VerlaufRegister";
 import { Filterzeile, ZeitraumWahl } from "./ZeitraumWahl";
@@ -132,6 +134,13 @@ export function AnalyseScreen() {
    */
   const liquiditaet = useMemo(() => (basis ? analyseLiquiditaet(basis, heute) : null), [basis, heute]);
 
+  /**
+   * „Wie lange reicht es ohne Einnahmen?" steht darunter und hängt ebenfalls an keinem
+   * Zeitraum: gemittelt wird fest über die letzten abgeschlossenen Monate
+   * (`REICHWEITE_MONATE` im Kern). Dieselbe Basis wie die Karten darüber.
+   */
+  const reichweite = useMemo(() => (basis ? analyseReichweite(basis, heute) : null), [basis, heute]);
+
   const ist = basis?.buchungen ?? [];
 
   /**
@@ -182,6 +191,9 @@ export function AnalyseScreen() {
                 rechnet monatsweise über alle liquiden Konten zusammen; das hier sagt je
                 Konto und taggenau, ob es reicht. */}
             {wirksamesRegister === "ausblick" && liquiditaet && <LiquiditaetKarte sicht={liquiditaet} />}
+            {/* Dieselbe Frage ohne die Einnahmen und über das Fenster hinaus: wie lange das
+                freie Geld die Kosten eines Monats trägt. */}
+            {wirksamesRegister === "ausblick" && reichweite && <ReichweiteKarte sicht={reichweite} />}
 
             {/* Die Befunde beantworten die Frage nach „wie viel wohin" — ob das so
                 tragfähig ist. */}

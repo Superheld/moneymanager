@@ -257,6 +257,8 @@ export {
   LIQUIDITAET_TAGE,
   type Liquiditaetssicht,
   type Liquiditaetszeile,
+  analyseReichweite,
+  type Reichweitensicht,
 } from "./analysesichten";
 export {
   depotsLaden,
