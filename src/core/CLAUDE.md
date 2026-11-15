@@ -70,6 +70,72 @@ Zwei Dinge, an denen man ihn erkennt und die deshalb festgehalten sind:
 Rechenwege, die auf den Charakter verzweigen, gegen denselben Fall — ein Ort statt verstreuter
 Einzelfälle, damit die nächste betroffene Stelle auffällt.
 
+## Auszahlung und Kosten — zwei Sichten auf dieselbe Buchung
+
+Der Charakter oben sagt, OB eine Zahlung das Ergebnis berührt. Diese Unterscheidung sagt,
+WANN. Sie ist die Grundlage der kaufmännischen Rechnung, auf die der Kern umgebaut wird
+(beschlossen 2026-11-15), und sie steht hier, bevor der erste Code dazu entsteht, damit
+jedes Paket dieselben Wörter benutzt.
+
+| | Frage | Jahresbeitrag 600 € im Januar | Gerät für 960 €, alle 8 Jahre |
+|---|---|---|---|
+| **Auszahlung** | Wann geht Geld vom Konto? | Januar 600, sonst 0 | im Kaufmonat 960 |
+| **Kosten** | Was kostet der Monat? | 50 je Monat | 10 je Monat |
+
+**Jede Zahl gehört in genau eine der beiden Sichten.** Eine Summe, die Auszahlungen und
+Kosten mischt, beantwortet keine Frage: sie geht weder gegen die Bank auf, noch sagt sie,
+was das Leben kostet.
+
+Daraus werden drei Rechnungen, und jede hat ihren Ort:
+
+| Rechnung | rechnet | beantwortet |
+|---|---|---|
+| **Ergebnis** | Kosten je Monat | Was kostet mein Leben, was bleibt? |
+| **Liquidität** | Auszahlungen an ihrem Tag | Reicht das Geld am Tag X? |
+| **Vermögen** | Bestände zum Stichtag | Was ist da, und wem gehört es schon? |
+
+Zwischen Ergebnis und Liquidität steht die **Überleitung**: sie erklärt Zeile für Zeile,
+warum das Ergebnis eines Monats nicht die Änderung des Kontostands ist. Sie muss exakt
+auf die Summe der Ist-Buchungen aufgehen — das ist die Probe, die „geht gegen die Bank
+auf" ausführbar macht.
+
+### Die Wörter
+
+| Wort | meint | nicht verwechseln mit |
+|---|---|---|
+| **Topf** | Geld, das für etwas bestimmt ist: eine Rücklage, ein aufbauendes Budget, ein Vorsorgeziel | dem Konto — das sagt, WO Geld liegt, der Topf, WEM es gehört |
+| **Rate** | was ein Topf den Monat kostet, ob überwiesen wurde oder nicht | der Überweisung auf das Konto des Topfs |
+| **Zuführung** | die Rate, von der Geldseite gesehen: was in den Topf hineingeht | — |
+| **Entnahme** | eine Ausgabe, die ein Topf trägt | Kosten — die waren die Raten davor |
+| **ungedeckt** | der Teil einer Entnahme über dem Stand des Topfs | — |
+| **periodisiert** | eine Zahlung, auf die Monate verteilt, für die sie gilt | geglättet — ein Budget hat keine Fälligkeit, die man verteilen könnte |
+
+### Die Regeln
+
+- **Ein Topf kostet seine Rate, nicht seine Auszahlung.** Für Rücklage, aufbauendes
+  Budget und Vorsorge gleich. Sonst sieht der Monat der grossen Ausgabe schlecht aus und
+  jeder davor zu gut.
+- **Eine Entnahme ist kein zweites Mal Kosten — bis zur Höhe des Topfstands.** Was
+  darüber hinausgeht, ist ungedeckt und zählt als Kosten des Monats. Ohne die Grenze
+  machte ein leerer Topf jede Ausgabe folgenlos.
+- **Verträge werden vorschüssig periodisiert:** die Zahlung gilt für die Monate AB ihrer
+  Fälligkeit, verteilt nach dem Rhythmus der Zahlungsregel. Vorschüssig, weil es der
+  Normalfall ist (Versicherung, Jahresabo) und der Kern die Abweichung davon nicht kennt.
+- **Der Topf hängt an der KATEGORIE, nicht an der Buchung.** Ein zweites Feld an der
+  Buchung („woraus bezahlt") ist geprüft und verworfen: wer es genauer will, legt
+  Unterkategorien an. Es bleibt bei einem Kategoriebaum.
+- **Vorsorge ist Kosten, keine Verwendung des Überschusses.** Als Verwendung sähe ein
+  Monat, in dem nichts zurückgelegt wurde, BESSER aus. Gerechnet wird die Rate, die das
+  Ziel verlangt; ob sie überwiesen wurde, zeigt die Überleitung.
+- **Annahmen sind Eingaben.** Rendite und Inflation einer Vorsorgerechnung trägt der
+  Nutzer ein, und sie stehen neben jedem Ergebnis, das von ihnen abhängt — nie als
+  Konstante im Kern.
+
+**Was davon heute schon gilt, und was nicht:** die Aufrechnung in `monatsausblick.ts`
+rechnet noch gemischt — Rücklagen mit der Rate, aufbauende Budgets mit der Auszahlung,
+Verträge zur Fälligkeit. Dieser Abschnitt beschreibt, wohin gebaut wird. Wer dort etwas
+ändert, ändert es in diese Richtung und nicht in die andere.
+
 ## Kontostands-Anker
 
 Ein Anker (`konten/kontostand.ts`) ist eine **Beobachtung, kein Rechenergebnis**: an DIESEM
