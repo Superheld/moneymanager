@@ -9,7 +9,6 @@
 import {
   kategorieUnterbaum,
   mindestRuecklage,
-  monatsRuecklageGesamt,
   ruecklagenKonten,
   realerKontostand,
   ruecklagenDeckung,
@@ -204,11 +203,14 @@ export interface Ruecklagensicht {
   /** Für die Kategoriewahl im Dialog und für `buchungswahlFuer`. */
   readonly kategorien: readonly Kategorie[];
   readonly kontoNamen: ReadonlyMap<string, string>;
-  /** Reicht das Ersparte für den bis heute aufgelaufenen Bedarf? */
+  /**
+   * Reicht das Ersparte für den bis heute aufgelaufenen Bedarf? Über beide Formen:
+   * `posten` sind die Rücklagen von Hand, `ueberKategorie` die über die Kategorie.
+   */
   readonly deckung: RuecklagenDeckung;
-  /** Summe der monatlichen Raten aller Rücklagen. */
+  /** Summe der monatlichen Raten beider Formen — derselbe Wert wie `fluss.bedarf`. */
   readonly proMonat: Cent;
-  /** Summe der Ziele — freie Rücklagen zählen nicht mit, sie haben keins. */
+  /** Summe der Ziele — freie Rücklagen und die über die Kategorie zählen nicht mit, sie haben keins. */
   readonly zielwert: Cent;
   /** Faustformel: drei Monats-Vertragseinnahmen. Ein Massstab, keine Regel. */
   readonly mindest: Cent;
@@ -302,28 +304,34 @@ export async function ruecklagenLaden(
     regeln.filter((r) => r.vertragId && laufend.has(r.vertragId)),
   );
 
+  // Das Ist über den LAUFENDEN Monat, weil Bedarf und Plan Monatsgrössen sind. Ein
+  // Fenster über den ganzen Bestand daneben verglichen Jahre mit einem Monat.
+  const fluss = ruecklagenfluss(
+    buchungen,
+    konten,
+    ruecklagen,
+    regeln,
+    `${heute.slice(0, 7)}-01`,
+    monatDanach(heute),
+    budget.budgets,
+  );
+
   return {
     ruecklagen,
     konten,
     kategorien,
     kontoNamen: new Map(konten.map((k) => [k.id, k.bezeichnung])),
     deckung: ruecklagenDeckung(ruecklagen, heute, kontostaende, budget.ansprueche),
-    proMonat: monatsRuecklageGesamt(ruecklagen),
+    proMonat: fluss.bedarf,
     zielwert: zielwertGesamt(ruecklagen),
     mindest: mindestRuecklage(einnahmen),
-    ruecklagenStand: [...ruecklagenKonten(konten, ruecklagen)].reduce((s, id) => s + (kontostaende.get(id) ?? 0), 0),
+    ruecklagenStand: [...ruecklagenKonten(konten, ruecklagen, budget.budgets)].reduce(
+      (s, id) => s + (kontostaende.get(id) ?? 0),
+      0,
+    ),
     vertragseinnahmen: einnahmen,
     geschichte: ruecklagenGeschichte(ausbuchungen, beendete, buchungen, umsaetze),
-    // Das Ist über den LAUFENDEN Monat, weil Bedarf und Plan Monatsgrössen sind. Ein
-    // Fenster über den ganzen Bestand daneben verglichen Jahre mit einem Monat.
-    fluss: ruecklagenfluss(
-      buchungen,
-      konten,
-      ruecklagen,
-      regeln,
-      `${heute.slice(0, 7)}-01`,
-      monatDanach(heute),
-    ),
+    fluss,
     buchungswahl: spurenAus(buchungen, umsaetze)
       // Nur Abflüsse: eine Rücklage wird ausgegeben, nicht eingenommen.
       .filter((sp) => sp.betrag < 0)

@@ -1099,6 +1099,13 @@ const de = {
     abschnittHandHinweis: "Die Ausgabe wählst du beim Ausbuchen",
     abschnittKategorie: "Über die Kategorie",
     abschnittKategorieHinweis: "Ausgaben in der Kategorie zählen von selbst, der Rest bleibt stehen. Die Zahlen gelten für den laufenden Monat; ein Klick auf eine Zeile zeigt den Verlauf.",
+    geldJeKonto: {
+      titel: "Wo das Geld liegt",
+      untertitel: "Je Konto: welche Rücklagen dort ihr Geld haben, was davon gedeckt ist und was frei bleibt",
+      ohneKontoTitel: "Ohne Konto",
+      ohneKontoHinweis: "Diese Rücklagen liegen auf keinem Konto, es gibt für sie nur die Rechnung. Ein Klick öffnet sie — trag dort das Konto ein, auf dem das Geld liegt.",
+      spalteForm: "Form",
+    },
     // Eine Rücklage über die Kategorie ist im Datenmodell ein aufbauendes Budget. Dialog,
     // Tabelle und Verlauf sind die der Budgets; hier stehen die Sätze, in denen sonst
     // „Budget" stünde (`bausteine/budgetTexte.ts`).
@@ -3667,6 +3674,13 @@ const en: typeof de = {
     abschnittHandHinweis: "You pick the expense when booking it out",
     abschnittKategorie: "By category",
     abschnittKategorieHinweis: "Expenses in the category count by themselves, the rest stays. Figures are for the current month; click a row to see the history.",
+    geldJeKonto: {
+      titel: "Where the money is",
+      untertitel: "Per account: which reserves keep their money there, how much of it is covered and what stays free",
+      ohneKontoTitel: "No account",
+      ohneKontoHinweis: "These reserves are on no account, so there is only the calculation. Click one to open it — enter the account the money is on.",
+      spalteForm: "Type",
+    },
     kategorie: {
       knopf: "Reserve by category",
       anlegen: "Add reserve by category",

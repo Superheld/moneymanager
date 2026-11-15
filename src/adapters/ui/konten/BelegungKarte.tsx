@@ -3,13 +3,13 @@
 // Die Karte zeigt die Kontobelegung (`core/konten/kontobelegung`) und rechnet nichts
 // selbst. Sie steht NEBEN der Kontenliste und nicht darin, und sie fehlt, wenn auf dem
 // Konto niemand etwas beansprucht: eine Aufstellung „gebunden: 0" sagte nur, was die
-// Spalte darüber schon sagt.
+// Spalte darüber schon sagt. Die Tabelle darin teilt sie mit der Karte „Wo das Geld
+// liegt" im Bereich Rücklagen (`bausteine/BelegungTabelle`).
 
 import { useTranslation } from "react-i18next";
 import type { Kontobelegung } from "../../../application";
-import { Card, DataTable } from "../bausteine";
-import { useGeld } from "../bausteine/einstellungenKontext";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { Card } from "../bausteine";
+import { BelegungTabelle } from "../bausteine/BelegungTabelle";
 
 export function BelegungKarte({
   belegung,
@@ -21,9 +21,7 @@ export function BelegungKarte({
   konto: string;
 }) {
   const { t } = useTranslation();
-  const geld = useGeld();
   if (belegung.posten.length === 0) return null;
-  const unterdeckt = belegung.anteil < 1;
 
   return (
     <Card
@@ -31,57 +29,7 @@ export function BelegungKarte({
       title={t("konten.belegung.titel", { konto })}
       subtitle={t("konten.belegung.untertitel")}
     >
-      <DataTable
-        columns={[
-          {
-            key: "name",
-            label: t("konten.belegung.spalteWofuer"),
-            // Ohne Pille für die Art: Rücklage und aufbauendes Budget heissen seit
-            // 2026-11-15 beide „Rücklage", die Pille sagte an jeder Zeile dasselbe.
-            render: (p) => namen.get(p.id) ?? p.id,
-          },
-          {
-            key: "betrag",
-            label: `${t("konten.belegung.spalteAnspruch")} ${geld.symbol}`,
-            align: "right",
-            render: (p) => geld.format(p.betrag),
-          },
-          // Die Spalte „gedeckt" nur, wenn sie etwas anderes sagt als die davor.
-          ...(unterdeckt
-            ? [
-                {
-                  key: "gedeckt",
-                  label: `${t("konten.belegung.spalteGedeckt")} ${geld.symbol}`,
-                  align: "right" as const,
-                  render: (p: (typeof belegung.posten)[number]) => geld.format(p.gedeckt),
-                },
-              ]
-            : []),
-        ]}
-        rows={[...belegung.posten]}
-      />
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--sp-5)", marginTop: "var(--sp-3)", flexWrap: "wrap" }}>
-        <span className="muted">
-          {t("konten.belegung.stand")} <b className="num">{geld.formatMitSymbol(belegung.stand)}</b>
-        </span>
-        <span className="muted">
-          {t("konten.belegung.gebunden")} <b className="num">{geld.formatMitSymbol(belegung.gebunden)}</b>
-        </span>
-        <span className="muted">
-          {t("konten.belegung.frei")}{" "}
-          <b className="num" style={{ color: geldFarbe(belegung.frei) }}>{geld.formatMitSymbol(belegung.frei)}</b>
-        </span>
-      </div>
-      {/* Eine EINSCHRÄNKUNG: sie sagt, dass die Zahlen oben nicht vollständig gedeckt sind
-          und wie verteilt wurde. Deshalb offen und nicht eingeklappt. */}
-      {unterdeckt && (
-        <p className="muted" style={{ fontSize: "var(--fs-sm)", marginBottom: 0 }}>
-          {t("konten.belegung.unterdeckt", {
-            betrag: geld.formatMitSymbol(-belegung.frei),
-            prozent: Math.round(belegung.anteil * 100),
-          })}
-        </p>
-      )}
+      <BelegungTabelle belegung={belegung} namen={namen} />
     </Card>
   );
 }

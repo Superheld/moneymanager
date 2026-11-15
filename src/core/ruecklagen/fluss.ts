@@ -36,7 +36,8 @@ import { istLiquide } from "../konten/konto";
 import type { Zahlungsregel } from "../basis/zahlungsregel";
 import { RHYTHMUS_MONATE } from "../basis/zahlungsregel";
 import { istUmbuchungsregel } from "../vertraege/umbuchungErkennung";
-import { monatsRuecklageGesamt, ruecklagenKonten, type Ruecklage } from "./ruecklage";
+import type { Budget } from "../budgets/budget";
+import { ruecklagenBedarf, ruecklagenKonten, type Ruecklage } from "./ruecklage";
 
 export interface Flussposten {
   readonly buchungId: string;
@@ -50,7 +51,10 @@ export interface Flussposten {
 }
 
 export interface Ruecklagenfluss {
-  /** Σ der Monatsraten aller Rücklagen — was die Rechnung verlangt. */
+  /**
+   * Σ der Monatsraten beider Formen — Rücklagen von Hand und über die Kategorie
+   * (`ruecklagenBedarf`) —, was die Rechnung verlangt.
+   */
   readonly bedarf: Cent;
   /** Σ der eingerichteten Umbuchungen auf Rücklagenkonten, auf den Monat normalisiert. */
   readonly plan: Cent;
@@ -77,7 +81,13 @@ function monatsanteil(r: Zahlungsregel): Cent {
  * `bedarf` und `plan` sind MONATSGRÖSSEN und hängen nicht am Fenster — sie beschreiben
  * einen Zustand, keinen Zeitraum. `ist` ist die Summe über das Fenster. Wer die drei
  * über mehrere Monate vergleicht, muss die ersten beiden entsprechend hochrechnen; das
- * hier zu tun hiesse zu raten, wie viele Monate gemeint sind.
+ * hier zu tun hiesse zu raten, wie viele Monate gemeint sind. Weil die Zuführung einer
+ * Rücklage über die Kategorie je Monat verschieden sein kann (Betragsreihe), gilt für
+ * `bedarf` der Monat, in dem das Fenster BEGINNT.
+ *
+ * `budgets` sind seit 2026-11-16 dabei: die aufbauenden zählen zum Bedarf, und ihre nicht
+ * liquiden Konten zu den Rücklagenkonten (`ruecklagenKonten`). Ohne sie stand der Bedarf
+ * nur für die Rücklagen von Hand da.
  */
 export function ruecklagenfluss(
   buchungen: readonly IstBuchung[],
@@ -86,9 +96,10 @@ export function ruecklagenfluss(
   regeln: readonly Zahlungsregel[],
   von: string,
   bis: string,
+  budgets: readonly Budget[] = [],
 ): Ruecklagenfluss {
   const klasse = new Map(konten.map((k) => [k.id, k]));
-  const ziele = ruecklagenKonten(konten, ruecklagen);
+  const ziele = ruecklagenKonten(konten, ruecklagen, budgets);
   const istZiel = (id: string | undefined): boolean => !!id && ziele.has(id);
   const istQuelle = (id: string | undefined): boolean => {
     const k = id ? klasse.get(id) : undefined;
@@ -119,7 +130,7 @@ export function ruecklagenfluss(
     .reduce((s, r) => s + monatsanteil(r), 0);
 
   return {
-    bedarf: monatsRuecklageGesamt(ruecklagen),
+    bedarf: ruecklagenBedarf(ruecklagen, budgets, von.slice(0, 7)),
     plan,
     ist: posten.reduce((s, p) => s + p.betrag, 0),
     posten: posten.sort((a, b) => a.datum.localeCompare(b.datum)),

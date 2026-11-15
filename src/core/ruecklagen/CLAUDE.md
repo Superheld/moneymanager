@@ -109,8 +109,27 @@ und Texten:
 `budget` mit `art = aufbauend`), zwei Use-Case-Wege, zwei Rechenregeln. Sie
 zusammenzulegen hiesse, die Ausbuchung mit dem Zyklus und die Betragsreihe mit dem
 Übertrag in eine Form zu bringen — das ist eine eigene Entscheidung und kein Umbenennen.
-Was dabei offen ist: die Kennzahlen oben im Bereich („Wo die Rücklagen stehen") und der
-Bedarf unter „Diesen Monat" rechnen weiter nur über die Rücklagen von Hand.
+
+### Die Kennzahlen des Bereichs zählen beide Formen (seit 2026-11-16)
+
+Bis dahin rechneten „Wo die Rücklagen stehen" und der Bedarf unter „Diesen Monat" nur
+über die Rücklagen von Hand, obwohl die Überschrift beide meinte. Jetzt gilt je Kennzahl:
+
+| Kennzahl | zählt | warum so |
+|---|---|---|
+| Ziele gesamt | nur Rücklagen von Hand MIT Ziel | die anderen haben keins; ein Rest ist kein Ziel |
+| Soll heute | Soll von Hand + Rest über die Kategorie (über null) | der Rest ist, was heute dasein sollte — dieselbe Frage |
+| Tatsächlich da | was die Kontobelegung beiden zuteilt | EINE Rechnung für gedeckt, `ruecklagenDeckung` liest sie |
+| Deckungsgrad | Tatsächlich da ÷ Soll mit Konto | eine über die Kategorie hat immer ein Konto |
+| Bedarf | Rate von Hand + `zufuehrungIm` des Monats über die Kategorie | `ruecklagenBedarf` |
+
+Was das im Code heisst: `ruecklagenDeckung` zählt die Ansprüche der Art `budget` in ihre
+Summen und gibt sie als `ueberKategorie` heraus; `posten` bleiben die Rücklagen von Hand,
+weil nur sie die Liste mit Balken zeigt. Der Satz „nur Rechnung" hängt an `nurRechnung`
+(alle von Hand ohne Konto UND keine über die Kategorie) und nicht mehr an
+`sollMitKonto === 0` — ein Rest von null hätte ihn sonst neben einer Rücklage mit Konto
+stehen lassen. **Die Ergebnisrechnung ist davon unberührt**: sie liest keine dieser
+Funktionen.
 
 Die Spalte `kategorie_id` der Rücklage war bis 2026-11-15 gespeichert und nirgends
 benutzt; ein Feld dafür gab es in keiner Maske. Seitdem trägt der Dialog sie, und sie
@@ -127,7 +146,7 @@ davon ersetzt einen anderen:
 
 | | woher | sagt |
 |---|---|---|
-| **Bedarf** | Σ Monatsraten der Rücklagen | was die Rechnung verlangt |
+| **Bedarf** | Σ Monatsraten beider Formen (`ruecklagenBedarf`; über die Kategorie die Zuführung des Monats, in dem das Fenster beginnt) | was die Rechnung verlangt |
 | **Plan** | Σ Umbuchungsregeln auf Rücklagenkonten | was du eingerichtet hast |
 | **Eingegangen** (`ist`) | jede Einzahlung auf ein Rücklagenkonto im Fenster, Zinsen eingeschlossen; Umbuchungen nur, wenn sie nicht von einem anderen Rücklagenkonto kommen | was tatsächlich angekommen ist — bis 2026-11-08 „geflossen" und nur das abgehende Bein vom liquiden Konto |
 
@@ -142,6 +161,31 @@ allein über die Klasse sah, wer seine Rücklagen auf einem Konto der Klasse „
 führte, keinen Eingang und einen Tacho auf null, obwohl die Zuordnung an jeder Rücklage
 dastand. Dieselbe Menge misst der Tacho (`ruecklagenStand`): den Kontostand, nicht die
 Deckung — die Faustformel fragt nach dem Notgroschen, nicht danach, wem er schon gehört.
+
+**Seit 2026-11-16 gehört auch das Konto einer Rücklage über die Kategorie dazu — aber nur,
+wenn es NICHT liquide ist.** Ein Budget muss ein Konto nennen, und meist ist es das
+Girokonto, von dem bezahlt wird; zählte es mit, wäre jedes Gehalt ein Eingang in die
+Rücklagen und der Tacho mässe das Girokonto. Eine Rücklage von Hand nennt ihr Konto
+dagegen freiwillig und eigens dafür, sie bleibt bei „gleich welcher Klasse".
+
+## Wo das Geld liegt — alle Konten auf einem Blatt
+
+Die Karte im Bereich (seit 2026-11-16, `ui/ruecklagen/GeldJeKontoKarte`) zeigt je Konto,
+das einen Anspruch trägt, dieselbe Belegung wie die Karte „Gebunden auf …" im
+Kontoauszug — beide über `ui/bausteine/BelegungTabelle`. Die Sicht kommt aus
+`application/ruecklagen/geldJeKonto.ts`, die Zahlen aus der Kontobelegung; ausgewählt wird
+dort nur, welche Konten etwas tragen und welche Rücklage auf keinem liegt.
+
+Drei Entscheidungen:
+
+- **Sie steht nach den beiden Listen**, vor der Geschichte. In den Listen wird gearbeitet
+  (anlegen, ausbuchen); hier wird nachgesehen. Davor schöbe ein Abschnitt je Konto die
+  Handlungen aus dem ersten Blick.
+- **„Ohne Konto" ist ein eigener Abschnitt am Ende**, beide Formen: von Hand ohne oder mit
+  einem gelöschten Konto, über die Kategorie mit einem gelöschten Konto. Die Zeile öffnet
+  den Dialog, in dem man das Konto einträgt.
+- **Ein stillgelegtes Konto steht da, solange etwas darauf beansprucht wird** — das Geld
+  liegt dort, ob das Konto noch geführt wird oder nicht.
 
 Bedarf und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
 Zeitraum. Wer sie über mehrere Monate vergleicht, muss die ersten beiden hochrechnen — das

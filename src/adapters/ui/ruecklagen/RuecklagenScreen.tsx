@@ -31,6 +31,7 @@ import {
   monatsRuecklage,
   nachArtGetrennt,
   type Budgetbereich,
+  type GeldJeKonto,
   type GruppierterStand,
   type IstBuchung,
   type Ruecklage,
@@ -42,6 +43,7 @@ import {
 import {
   budgetbereich,
   budgetLoeschen,
+  geldJeKonto,
   ruecklageLoeschen,
   ruecklagen as ruecklagenLaden,
 } from "../../dienste";
@@ -54,6 +56,7 @@ import { FaustformelTacho } from "./FaustformelTacho";
 import { RuecklageDialog } from "./RuecklageDialog";
 import { AusbuchungDialog } from "./AusbuchungDialog";
 import { AusbuchungenKarte } from "./AusbuchungenKarte";
+import { GeldJeKontoKarte } from "./GeldJeKontoKarte";
 import { PageHead } from "../bausteine/PageHead";
 import { IconButton, IconLeiste } from "../bausteine/IconButton";
 import { betont } from "../bausteine/betonung";
@@ -64,7 +67,9 @@ import { LeererZustand } from "../bausteine/LeererZustand";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
-const LEERE_DECKUNG: RuecklagenDeckung = { posten: [], soll: 0, sollMitKonto: 0, tatsaechlich: 0, grad: 100 };
+const LEERE_DECKUNG: RuecklagenDeckung = {
+  posten: [], ueberKategorie: [], soll: 0, sollMitKonto: 0, tatsaechlich: 0, grad: 100, nurRechnung: false,
+};
 const LEERE_LISTE: readonly never[] = [];
 const LEERER_FLUSS: Ruecklagenfluss = { bedarf: 0, plan: 0, ist: 0, posten: [] };
 
@@ -83,6 +88,8 @@ export function RuecklagenScreen() {
   const [sicht, setSicht] = useState<Ruecklagensicht | null>(null);
   /** Die Budgets — gebraucht werden hier nur die aufbauenden („über die Kategorie"). */
   const [budgets, setBudgets] = useState<Budgetbereich | null>(null);
+  /** Je Konto, welche Rücklagen dort Geld haben — für die Karte „Wo das Geld liegt". */
+  const [jeKonto, setJeKonto] = useState<GeldJeKonto | null>(null);
 
   // Welcher Dialog offen ist — sein Zustand gehört ihm (`RuecklageDialog`,
   // `AusbuchungDialog`), der Screen merkt sich nur, für welche Rücklage.
@@ -98,9 +105,10 @@ export function RuecklagenScreen() {
   // Verwandte Repos in EINEM Zug laden und zusammen setzen: gestaffelte setState lassen
   // die Deckung kurz gegen eine leere Kontenliste rechnen (jeder Stand wäre dann 0).
   async function laden() {
-    const [r, b] = await Promise.all([ruecklagenLaden(heute), budgetbereich(heute)]);
+    const [r, b, k] = await Promise.all([ruecklagenLaden(heute), budgetbereich(heute), geldJeKonto(heute)]);
     setSicht(r);
     setBudgets(b);
+    setJeKonto(k);
   }
   useEffect(() => {
     laden();
@@ -166,7 +174,10 @@ export function RuecklagenScreen() {
           Das Tacho steht IMMER da, auch ohne Vertragseinnahmen: dann leer und mit dem
           Grund. Vorher fehlte es in dem Fall einfach. */}
       <div className="karten-paar" style={{ marginTop: 0 }}>
-        {items.length > 0 && (
+        {/* Seit 2026-11-16 über BEIDE Formen (`ruecklagenDeckung`): Soll, „tatsächlich da"
+            und Deckung zählen die Rücklagen über die Kategorie mit (ihr Rest ist ihr Soll).
+            „Ziele gesamt" bleibt bei denen von Hand mit Ziel — die anderen haben keins. */}
+        {(items.length > 0 || ueberKategorie.length > 0) && (
           <Card title={t("ruecklagen.standTitel")} subtitle={t("ruecklagen.standUntertitel")}>
             {/* Zwei mal zwei statt `kpis`: vier Kacheln brechen dort drei zu eins um, und
                 die Paare gehören zusammen — Ziele und Soll ist die Rechnung, Stand und
@@ -260,7 +271,7 @@ export function RuecklagenScreen() {
         </Card>
       )}
 
-      {items.length > 0 && deckung.sollMitKonto === 0 && (
+      {deckung.nurRechnung && (
         // Ohne Kontozuordnung gibt es nur die Rechnung. Das einmal sagen, statt überall
         // ein „—" zu zeigen, hinter dem man einen Fehler vermutet.
         <div className="muted" style={{ fontSize: "var(--fs-sm)", margin: "0 0 var(--sp-3)" }}>
@@ -404,6 +415,22 @@ export function RuecklagenScreen() {
           zeilenkontext={budgets.zeilenkontext}
           onSchliessen={() => setOffenesBudget(null)}
           onBuchung={setDetail}
+        />
+      )}
+
+      {/* Nach den beiden Listen und nicht davor: dort wird gearbeitet (anlegen, ausbuchen),
+          hier wird nachgesehen, auf welchem Konto das alles liegt. Vor den Listen schöbe
+          eine Karte mit einem Abschnitt je Konto die Handlungen aus dem ersten Blick. */}
+      {jeKonto && (
+        <GeldJeKontoKarte
+          sicht={jeKonto}
+          onBearbeiten={(r) => {
+            if (r.form === "kategorie") setBudgetDialog(r.id);
+            else {
+              const ruecklage = items.find((x) => x.id === r.id);
+              if (ruecklage) setBearbeitet(ruecklage);
+            }
+          }}
         />
       )}
 

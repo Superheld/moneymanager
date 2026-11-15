@@ -33,6 +33,13 @@ kleiner, und das ist Absicht:** `frei` ist je Konto bei null gedeckelt (was fehl
 dort in Worten), die Reichweite rechnet das Minus mit — ein Dispo, der sie nicht kürzt,
 verschwiege genau das, wonach die Karte fragt.
 
+Seit 2026-11-16 liest sie eine fünfte: die Karte „Wo das Geld liegt" im Bereich Rücklagen
+(`application/ruecklagen/geldJeKonto.ts`) — jedes Konto mit einem Anspruch auf einem
+Blatt, mit derselben Tabelle wie „Gebunden auf …" (`ui/bausteine/BelegungTabelle`). Und
+die Kennzahlen des Bereichs (Soll, Tatsächlich da, Deckung) zählen über
+`ruecklagenDeckung` jetzt auch die Ansprüche der aufbauenden Budgets in ihre Summen, nicht
+nur in die Verteilung.
+
 Reicht der Stand nicht, wird **anteilig** verteilt, über alle Ansprüche gleich, ohne
 Reihenfolge. `budget.kontoId` heisst seither nur noch eines: hier liegt das Geld des
 Budgets, bis es ausgegeben ist.

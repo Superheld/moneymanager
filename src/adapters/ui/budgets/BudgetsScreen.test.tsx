@@ -92,7 +92,8 @@ describe("BudgetsScreen", () => {
     budgets.unmount();
 
     rendere(<RuecklagenScreen />);
-    expect(await screen.findByText("Urlaubskasse")).toBeInTheDocument();
+    // Der Name steht auch in „Wo das Geld liegt" — gemeint ist die Zeile der Liste.
+    expect(await klickbareZeile("Urlaubskasse")).toBeInTheDocument();
     expect(screen.getByText(i18n.t("ruecklagen.abschnittKategorie"))).toBeInTheDocument();
     // Das Konto steht in der Zeile — es ist die Deckung hinter der Zahl.
     expect(screen.getAllByText("Tagesgeldkonto").length).toBeGreaterThan(0);
@@ -115,7 +116,7 @@ describe("BudgetsScreen", () => {
     });
 
     rendere(<RuecklagenScreen />);
-    await screen.findByText("Urlaubskasse");
+    await klickbareZeile("Urlaubskasse");
     expect(await screen.findByText(new RegExp(i18n.t("budgets.deckungFehlt", { betrag: "150,00 €" })))).toBeInTheDocument();
   });
 
@@ -128,7 +129,7 @@ describe("BudgetsScreen", () => {
     });
 
     rendere(<RuecklagenScreen />);
-    await screen.findByText("Urlaubskasse");
+    await klickbareZeile("Urlaubskasse");
     expect(document.body.textContent).not.toMatch(/fehlen/);
   });
 
@@ -156,7 +157,7 @@ describe("BudgetsScreen", () => {
 
     // Unter Rücklagen steht es — und sagt, unter welchem Budget es liegt.
     rendere(<RuecklagenScreen />);
-    await screen.findByText("Urlaub");
+    await klickbareZeile("Urlaub");
     expect(screen.getByText(/unter Freizeit/)).toBeInTheDocument();
   });
 
@@ -500,7 +501,7 @@ describe("Rücklage über die Kategorie · Verlauf", () => {
   it("zeigt beim aufbauenden Budget die Zahlen DIESES Monats, nicht die Summe seit Start", async () => {
     await aufbauendMitHistorie();
     rendere(<RuecklagenScreen />);
-    await screen.findByText(/Urlaubskasse/);
+    await klickbareZeile("Urlaubskasse");
 
     // 170,00 Übertrag + 100,00 Rate = 270,00 verfügbar, davon in diesem Monat nichts weg.
     await waitFor(() => expect(document.body.textContent).toMatch(/270,00/));
@@ -600,11 +601,13 @@ describe("Rücklage über die Kategorie · Verlauf", () => {
     await nutzer.click(link);
     await screen.findByText(/Verlauf · Urlaubskasse/);
 
-    // Karten erkennt man an ihrer Fläche, nicht an einer Klasse — wie in
-    // `kartenschachtelung.test.tsx`.
-    const karten = [...document.querySelectorAll<HTMLElement>("div")].filter((d) =>
-      d.getAttribute("style")?.includes("var(--surface)"),
-    );
+    // Karten erkennt man an ihrer Fläche UND ihrem Radius, nicht an einer Klasse — wie in
+    // `kartenschachtelung.test.tsx`. Die Fläche allein trägt auch eine Kennzahl-Kachel,
+    // und die stehen, seit die Kennzahlen beide Formen zählen, hier mit da.
+    const karten = [...document.querySelectorAll<HTMLElement>("div")].filter((d) => {
+      const stil = d.getAttribute("style") ?? "";
+      return stil.includes("var(--surface)") && stil.includes("var(--r-xl)");
+    });
     expect(karten.filter((k) => karten.some((a) => a !== k && a.contains(k)))).toHaveLength(0);
   });
 
@@ -617,7 +620,7 @@ describe("Rücklage über die Kategorie · Verlauf", () => {
     await aufbauendMitHistorie();
     const nutzer = userEvent.setup();
     rendere(<RuecklagenScreen />);
-    await screen.findByText(/Urlaubskasse/);
+    await klickbareZeile("Urlaubskasse");
 
     // Irgendwo in der Zeile, aber nicht auf dem Namen: die Konto-Zelle daneben.
     const zeile = await klickbareZeile("Urlaubskasse");
@@ -633,7 +636,7 @@ describe("Rücklage über die Kategorie · Verlauf", () => {
     await aufbauendMitHistorie();
     const nutzer = userEvent.setup();
     rendere(<RuecklagenScreen />);
-    await screen.findByText(/Urlaubskasse/);
+    await klickbareZeile("Urlaubskasse");
 
     // „bearbeiten" öffnet den Dialog — und nicht nebenbei ein Diagramm.
     await nutzer.click(screen.getByRole("button", { name: "bearbeiten" }));
