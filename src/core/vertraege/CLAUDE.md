@@ -79,6 +79,42 @@ je nach Bank die eigene IBAN, den eigenen Namen oder nichts. Zuordnen darf man s
 Umbuchungsvertrag ist genau das), als Beleg wäre sie ein Nenner, den kein Kandidat je
 erreicht. Durchgesetzt an einer Stelle: `belegspuren`.
 
+## Was die Regel nicht greift, wird VORGESCHLAGEN — nie zugeordnet
+
+Die Erkennung hängt am Empfänger. Greift sie nicht — der Name im Auszug weicht ab, die
+Spanne ist zu eng, die Buchung wurde von Hand erfasst und hat keinen Beleg —, bleibt die
+Zahlung ohne Vertrag. Das hat eine sichtbare Folge, seit die Ergebnisrechnung Fixkosten
+über die Zuordnung findet: der Vertrag steht in der Übersicht als „offen", seine Zahlung
+unter „Ungeplant".
+
+`core/vertraege/zuordnungsvorschlag.ts` sucht deshalb von der anderen Seite: nicht nach
+dem Namen, sondern nach dem, was die Zahlungsregel über die Zahlung weiss — Kategorie
+(über `kategorieAnteile`), Richtung, Höhe, Termin. Sichtbar am einzelnen Vertrag unter
+seinen Zahlungen („Könnte dazugehören"), herausgegeben über `Vertragszeile.kandidaten`.
+
+- **Es ist ein Vorschlag, und das ist die Entscheidung.** Dieselbe Messung hat in der
+  früheren Monatskarte selbsttätig gepaart; dort ist sie abgelöst worden, weil ein Betrag,
+  der zufällig passt, keine Aussage ist. Zur Aussage wird er erst durch die Bestätigung —
+  geschrieben wird also nur auf einen Klick, mit Herkunft `manuell`. Wer hieraus eine
+  Automatik macht, baut die Betragsnähe wieder ein, nur an anderer Stelle.
+- **Die Bestätigung ist zugleich ein Beleg.** Eine Handzuordnung ist genau das, woraus
+  die Merkmalsableitung (unten) die Regel verbessert. Der Vorschlag repariert damit nicht
+  nur die eine Zahlung, sondern führt dahin, dass die nächste von selbst erkannt wird.
+- **Über eine entschiedene Buchung wird nicht noch einmal gefragt.** Kandidat ist nur die
+  erste Zeile der Tabelle unten. Vor allem das Nein von Hand (zweite Zeile) bleibt
+  draussen: sonst stünde dieselbe Frage bei jedem Öffnen wieder da.
+- **„Gehört nicht dazu" heisst hier „gehört zu KEINEM Vertrag".** Das Schema kennt kein
+  Nein zu einem einzelnen Vertrag, nur das zu allen. Der Knopf sagt deshalb, was er
+  schreibt. Für eine Zahlung, die zu einem ANDEREN Vertrag gehört, ist er der falsche —
+  die ordnet man dort zu.
+- **Die Toleranzen sind auf „lieber zu viel" gestellt.** Was zu viel vorgeschlagen wird,
+  sieht man und klickt es weg; was fehlt, sieht niemand. Beim Termin heisst das: bei
+  monatlichem Takt schränkt er praktisch nichts ein (die erste Fälligkeit einer Regel ist
+  oft geschätzt), erst bei längerem Takt trennt er.
+- **Für einen Umbuchungsvertrag gibt es keine Vorschläge.** Er wird am Weg erkannt
+  (unten), und das ist eine harte Übereinstimmung; eine weiche daneben wären zwei
+  Antworten auf dieselbe Frage.
+
 ## Ein Merkmal kann MUSS sein, und die Regel hat ein Fälligkeitsfenster
 
 Die Merkmale einer `Vertragserkennung` waren bis 2026-09-13 ausnahmslos ODER-verknüpft:

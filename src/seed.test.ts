@@ -507,6 +507,30 @@ describe("Spielstand", () => {
     expect(zahl(db, "SELECT COUNT(*) FROM ist_buchung WHERE vertrag_id IS NOT NULL")).toBeGreaterThan(0);
   });
 
+  it("ordnet Miete und Gehalt ihrem Vertrag zu", () => {
+    // Die Ergebnisrechnung findet Fixkosten und Einnahmen ueber die Vertragszuordnung der
+    // Buchung. Ohne sie stuende der groesste Posten des Spielstands unter „Ungeplant" und
+    // sein Vertrag dauerhaft als „offen" — die Uebersicht zeigte dann genau den Fall, den
+    // sie als Hinweis auf eine fehlende Zuordnung meint, als Normalzustand.
+    const db = mitSeed();
+    for (const [regelId, kategorieId] of [
+      ["regel-miete", "kat-miete-nebenkosten"],
+      ["regel-gehalt", "kat-gehalt"],
+    ]) {
+      const [regel] = db.exec("SELECT vertrag_id FROM zahlungsregel WHERE id = ?", [regelId]);
+      const vertragId = regel?.values[0]?.[0];
+      expect(vertragId, `${regelId} haengt an keinem Vertrag`).toBeTruthy();
+      expect(
+        zahl(db, `SELECT COUNT(*) FROM ist_buchung WHERE kategorie_id = '${kategorieId}' AND vertrag_id = '${vertragId}'`),
+        `${regelId}: keine Zahlung ist dem Vertrag zugeordnet`,
+      ).toBeGreaterThan(0);
+      expect(
+        zahl(db, `SELECT COUNT(*) FROM ist_buchung WHERE kategorie_id = '${kategorieId}' AND vertrag_id IS NULL`),
+        `${regelId}: eine Zahlung steht ohne Vertrag da`,
+      ).toBe(0);
+    }
+  });
+
   it("traegt Plangroessen, damit der Monatsausblick etwas zu rechnen hat", () => {
     const db = mitSeed();
     expect(zahl(db, "SELECT COUNT(*) FROM zahlungsregel")).toBeGreaterThanOrEqual(4);

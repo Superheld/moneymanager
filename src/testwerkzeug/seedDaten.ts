@@ -290,15 +290,24 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
 
   // ---------------------------------------------------------- Vertraege und Ruecklagen
 
+  // Miete und Gehalt sind VERTRAEGE und nicht bloss Zahlungsregeln. Sie standen lange als
+  // Regeln ohne Vertrag da — ein Zustand, den die App gar nicht erzeugen kann (eine Regel
+  // entsteht nur zusammen mit ihrem Vertrag). Solange die Monatskarte Plan und Ist ueber
+  // Betragsnaehe paarte, fiel das nicht auf. Seit die Ergebnisrechnung ueber die
+  // Vertragszuordnung der Buchung geht, stand die Miete des Spielstands dauerhaft als
+  // „offen" da und ihre Zahlung unter „Ungeplant" — der groesste Posten des Haushalts in
+  // der falschen Zeile.
   const vertraege = [
-    { id: "vertrag-internet", anbieter: "Halvern", kategorie: "kat-internet-telefon", betrag: -4500 },
-    { id: "vertrag-versicherung", anbieter: "Mordhorst", kategorie: "kat-versicherungen", betrag: -8900 },
+    { id: "vertrag-miete", anbieter: "Steenbeck", kategorie: "kat-miete-nebenkosten", betrag: -98000, art: "dauervertrag" },
+    { id: "vertrag-gehalt", anbieter: "Varnhorn", kategorie: "kat-gehalt", betrag: 315000, art: "dauervertrag" },
+    { id: "vertrag-internet", anbieter: "Halvern", kategorie: "kat-internet-telefon", betrag: -4500, art: "abo" },
+    { id: "vertrag-versicherung", anbieter: "Mordhorst", kategorie: "kat-versicherungen", betrag: -8900, art: "abo" },
   ];
   for (const v of vertraege) {
     setzen(
       "INSERT INTO vertrag (id, anbieter, vertragsnummer, inhaber_id, beginn, verlaengerung, verlaengerung_monate, kuendigungsfrist_monate, status, kategorie_id, art) " +
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [v.id, v.anbieter, null, "person-1", tagIn(-MONATE, 1), "automatisch", 12, 3, "aktiv", v.kategorie, "abo"],
+      [v.id, v.anbieter, null, "person-1", tagIn(-MONATE, 1), "automatisch", 12, 3, "aktiv", v.kategorie, v.art],
     );
     // Zwei Dinge daran waren falsch, und beide sind still gescheitert — die Regeln des
     // Spielstands haben nie eine einzige Zahlung getroffen:
@@ -511,8 +520,8 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     };
 
     // Wiederkehrendes — das Geruest, an dem der Monatsverlauf haengt
-    fest(28, 315000, "konto-giro", "kat-gehalt", "Ertrag", "Auszahlung", "Bezuege");
-    fest(1, -98000, "konto-giro", "kat-miete-nebenkosten", "Aufwand", "Steenbeck", "Monatsmiete");
+    fest(28, 315000, "konto-giro", "kat-gehalt", "Ertrag", "Varnhorn", "Bezuege", "vertrag-gehalt");
+    fest(1, -98000, "konto-giro", "kat-miete-nebenkosten", "Aufwand", "Steenbeck", "Monatsmiete", "vertrag-miete");
     fest(5, -4500, "konto-giro", "kat-internet-telefon", "Aufwand", "Halvern", "Grundgebuehr", "vertrag-internet");
     // Der Vertrag, an dem die MERKMALSABLEITUNG etwas zu tun bekommt. Zwei Dinge daran
     // sind Absicht und beide fehlten dem Spielstand bisher:
@@ -669,8 +678,8 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
   // Zahlungsregeln tragen den Monatsausblick. Ohne sie zeigt die Uebersicht zwar Ist-Zahlen,
   // aber keine Vorschau — und der halbe Zweck des Bereichs bliebe unsichtbar.
   for (const r of [
-    { id: "regel-miete", bez: "Miete", betrag: -98000, rhythmus: "monatlich", tag: 1, kat: "kat-miete-nebenkosten", charakter: "Aufwand", vertrag: null },
-    { id: "regel-gehalt", bez: "Bezuege", betrag: 315000, rhythmus: "monatlich", tag: 28, kat: "kat-gehalt", charakter: "Ertrag", vertrag: null },
+    { id: "regel-miete", bez: "Miete", betrag: -98000, rhythmus: "monatlich", tag: 1, kat: "kat-miete-nebenkosten", charakter: "Aufwand", vertrag: "vertrag-miete" },
+    { id: "regel-gehalt", bez: "Bezuege", betrag: 315000, rhythmus: "monatlich", tag: 28, kat: "kat-gehalt", charakter: "Ertrag", vertrag: "vertrag-gehalt" },
     { id: "regel-internet", bez: "Internet", betrag: -4500, rhythmus: "monatlich", tag: 5, kat: "kat-internet-telefon", charakter: "Aufwand", vertrag: "vertrag-internet" },
     { id: "regel-versicherung", bez: "Versicherung", betrag: -8900, rhythmus: "monatlich", tag: 15, kat: "kat-versicherungen", charakter: "Aufwand", vertrag: "vertrag-versicherung" },
     // Eine nicht-monatliche, damit die Projektionsarithmetik im Spielstand vorkommt.

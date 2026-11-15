@@ -1099,6 +1099,100 @@ describe("VertraegeScreen — die Zahlungen hinter einem Vertrag", () => {
 });
 
 /**
+ * Die App FRAGT, statt anzunehmen: eine Zahlung, die die Erkennungsregel nicht greift,
+ * aber nach Kategorie, Betrag und Termin passt, steht als Vorschlag am Vertrag. Ohne
+ * Zuordnung stünde sie in der Übersicht unter „Ungeplant" und der Vertrag als „offen" —
+ * die Ergebnisrechnung findet Fixkosten über die Zuordnung, nicht über Betragsnähe.
+ */
+describe("VertraegeScreen — Könnte dazugehören", () => {
+  /**
+   * Ein Vertrag, dessen Regel am Namen scheitert: der Beleg trägt einen anderen
+   * Empfänger als der Vertrag. Daneben eine Zahlung, die nur in der Kategorie passt.
+   */
+  async function vertragMitUnerkannterZahlung() {
+    await konto();
+    await sqliteKategorieRepository.speichern({ id: "kat-x", name: "Kategorie X", defaultCharakter: "Aufwand" });
+    await sqliteVertragRepository.speichern({
+      id: "v1", anbieter: "Brakelmann", beginn: "2026-01-01", verlaengerung: "keine", status: "aktiv", kategorieId: "kat-x",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-v1", bezeichnung: "Brakelmann", betrag: -61300, rhythmus: "monatlich",
+      startdatum: "2026-01-03", charakter: "Aufwand", kontoId: "k1", kategorieId: "kat-x", vertragId: "v1",
+    });
+    const zahlung = async (id: string, datum: string, betrag: number, gegenpartei: string) => {
+      await sqliteLedgerRepository.speichern({
+        id, datum, betrag, kontoId: "k1", charakter: "Aufwand", quelle: "import", kategorieId: "kat-x",
+      });
+      await sqliteUmsatzRepository.anlegen({
+        id: `u-${id}`, laufId: "l1", zahlungskontoId: "k1", buchungstag: datum,
+        betrag, waehrung: "EUR", gegenpartei, verwendungszweck: "", rohHash: `h-${id}`,
+        status: "verbucht", istbuchungId: id,
+      });
+    };
+    // Passt in allem ausser dem Namen — der Kandidat.
+    await zahlung("passt", "2026-08-04", -61300, "Tjarksen KD");
+    // Dieselbe Kategorie, aber ein ganz anderer Betrag — kein Kandidat.
+    await zahlung("fremd", "2026-08-05", -1990, "Tjarksen KD");
+  }
+
+  const kandidaten = () => screen.queryByTestId("zuordnungskandidaten");
+
+  it("zeigt die passende Zahlung als Vorschlag und ordnet sie nicht selbst zu", async () => {
+    await vertragMitUnerkannterZahlung();
+    rendere(<VertraegeScreen />);
+
+    const zeile = await klickbareZeile("Brakelmann");
+    // In der Zeile steht, dass etwas wartet — und dass nichts zugeordnet ist.
+    await waitFor(() => expect(zeile.textContent).toMatch(i18n.t("vertraege.kandidaten.pille", { count: 1 })));
+    expect(zeile.textContent).toMatch(i18n.t("vertraege.keineZuordnung"));
+
+    await userEvent.click(zeile);
+    const liste = await screen.findByTestId("zuordnungskandidaten");
+    expect(liste.textContent).toMatch(/613,00/);
+    expect(liste.textContent).toMatch(/Tjarksen KD/);
+    expect(liste.textContent).not.toMatch(/19,90/);
+    // Geschrieben ist nichts: der Vorschlag allein ist keine Zuordnung.
+    expect(await sqliteVertragszuordnungRepository.alle()).toEqual([]);
+  });
+
+  it("ordnet auf einen Klick von Hand zu und nimmt die Zeile aus den Vorschlägen", async () => {
+    await vertragMitUnerkannterZahlung();
+    rendere(<VertraegeScreen />);
+    await userEvent.click(await klickbareZeile("Brakelmann"));
+    const liste = await screen.findByTestId("zuordnungskandidaten");
+
+    await userEvent.click(within(liste).getByRole("button", { name: i18n.t("vertraege.kandidaten.zuordnen") }));
+
+    await waitFor(async () =>
+      expect(await sqliteVertragszuordnungRepository.alle()).toEqual([
+        { istbuchungId: "passt", vertragId: "v1", herkunft: "manuell" },
+      ]),
+    );
+    // Nach dem Neuladen: kein Vorschlag mehr, dafür eine zugeordnete Zahlung.
+    await waitFor(() => expect(kandidaten()).toBeNull());
+    const zeile = await klickbareZeile("Brakelmann");
+    expect(zeile.textContent).not.toMatch(i18n.t("vertraege.keineZuordnung"));
+  });
+
+  it("merkt sich ein Nein als Handentscheidung und fragt nicht wieder", async () => {
+    await vertragMitUnerkannterZahlung();
+    rendere(<VertraegeScreen />);
+    await userEvent.click(await klickbareZeile("Brakelmann"));
+    const liste = await screen.findByTestId("zuordnungskandidaten");
+
+    await userEvent.click(within(liste).getByRole("button", { name: i18n.t("vertraege.kandidaten.keinVertrag") }));
+
+    // `vertragId` leer bei gesetzter Herkunft: „gehört ausdrücklich zu keinem Vertrag".
+    await waitFor(async () =>
+      expect(await sqliteVertragszuordnungRepository.alle()).toEqual([
+        { istbuchungId: "passt", vertragId: null, herkunft: "manuell" },
+      ]),
+    );
+    await waitFor(() => expect(kandidaten()).toBeNull());
+  });
+});
+
+/**
  * Löschen — der Weg vom Knopf bis in die Tabelle.
  *
  * Er stand einmal still: die Spalte griff auf `v.vertrag.anbieter` zu, obwohl die

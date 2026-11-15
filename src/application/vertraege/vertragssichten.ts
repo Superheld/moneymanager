@@ -26,6 +26,8 @@ import {
   pflichtenJeMonat,
   ruecklagenbedarf,
   vertragLaeuft,
+  zuordnungskandidaten,
+  type Zuordnungskandidat,
   type Cent,
   type IstBuchung,
   type Kategorie,
@@ -45,6 +47,7 @@ import {
 } from "../../core";
 import { erkennungenNachziehen, zuordnungenAbgleichen, type AbgleichDeps } from "./vertragszuordnung";
 import { ignorierteSchluessel, vertragsvorschlaege } from "./vertragsvorschlaege";
+import { spurenAus } from "../buchung/zahlungsspuren";
 import type {
   EinstellungenRepository,
   KategorieRepository,
@@ -69,6 +72,21 @@ export interface VertragsichtDeps {
   readonly einstellungenRepo: EinstellungenRepository;
   /** Für den Abgleich, der vor dem Anzeigen läuft. */
   readonly abgleich: AbgleichDeps;
+}
+
+/**
+ * Eine Buchung, die zu einem Vertrag gehören könnte — der Kandidat aus dem Kern, ergänzt
+ * um das, woran ein Mensch ihn wiedererkennt.
+ *
+ * Empfänger und Verwendungszweck stehen am Beleg und nicht an der Buchung, der Kern
+ * rechnet ohne sie (er sucht ja gerade NICHT nach dem Namen). Wer die Zeile bestätigen
+ * soll, braucht sie trotzdem: Datum und Betrag allein sagen bei zwei gleich hohen
+ * Zahlungen im selben Monat nicht, welche gemeint ist.
+ */
+export interface Zuordnungsvorschlag extends Zuordnungskandidat {
+  /** Leer bei einer von Hand erfassten Buchung — sie hat keinen Beleg. */
+  readonly gegenpartei: string;
+  readonly verwendungszweck: string;
 }
 
 /** Ein Vertrag mit allem, was die Liste über ihn zeigt. */
@@ -110,6 +128,15 @@ export interface Vertragszeile {
    * Regel gibt oder der Vertrag beendet ist — er kostet dann nichts mehr.
    */
   readonly jeMonat: Cent;
+  /**
+   * Noch unentschiedene Buchungen, die nach Kategorie, Richtung, Höhe und Termin zu
+   * diesem Vertrag gehören könnten (`zuordnungskandidaten`) — jüngste zuerst.
+   *
+   * Ein VORSCHLAG und keine Zuordnung: die Sicht schreibt davon nichts. Zugeordnet wird
+   * erst auf einen Klick, von Hand. Der Abgleich ist an dieser Stelle schon gelaufen —
+   * was hier steht, hat die Erkennungsregel also nicht gegriffen.
+   */
+  readonly kandidaten: readonly Zuordnungsvorschlag[];
 }
 
 /**
@@ -149,7 +176,7 @@ export async function vertraegeLaden(
   await erkennungenNachziehen(deps.vertragRepo, deps.regelRepo, deps.erkennungRepo, deps.abgleich);
   await zuordnungenAbgleichen(deps.abgleich);
 
-  const [vertraege, regeln, personen, kategorien, zuordnungen, buchungen, ignoriert] =
+  const [vertraege, regeln, personen, kategorien, zuordnungen, buchungen, ignoriert, umsaetze] =
     await Promise.all([
       deps.vertragRepo.alle(),
       deps.regelRepo.alle(),
@@ -158,6 +185,7 @@ export async function vertraegeLaden(
       deps.zuordnungRepo.alle(),
       deps.ledger.alle(),
       ignorierteSchluessel(deps.einstellungenRepo),
+      deps.umsatzRepo.alle(),
     ]);
 
   const regelZuVertrag = new Map<string, Zahlungsregel>();
@@ -177,8 +205,19 @@ export async function vertraegeLaden(
   }
   for (const liste of zahlungenJeVertrag.values()) liste.sort((a, b) => b.datum.localeCompare(a.datum));
 
+  // Über `spurenAus` und nicht über einen eigenen Join: dort steht, welcher Beleg für eine
+  // Buchung spricht, wenn sie mehrere hat. Eine zweite Auswahl hier zeigte am Kandidaten
+  // einen anderen Empfänger als die Erkennungsvorschau desselben Vertrags.
+  const spurJeBuchung = new Map(spurenAus(buchungen, umsaetze).map((s) => [s.id, s]));
+
   const zeilen = vertraege.map((vertrag): Vertragszeile => {
     const regel = regelZuVertrag.get(vertrag.id);
+    // Die Kategorie der Regel, ersatzweise die des Vertrags: sie steht an beiden, und bei
+    // älteren Verträgen nur an einem. Auch ein beendeter Vertrag bekommt Vorschläge: seine
+    // Zahlungen aus der Zeit, in der er lief, können genauso unzugeordnet sein.
+    const kandidaten = regel
+      ? zuordnungskandidaten(regel, buchungen, zuordnungen, regel.kategorieId ?? vertrag.kategorieId)
+      : [];
     return {
       vertrag,
       regel,
@@ -189,6 +228,11 @@ export async function vertraegeLaden(
       zahlungsliste: zahlungenJeVertrag.get(vertrag.id) ?? [],
       ruecklage: regel ? ruecklageProMonat(regel) : 0,
       jeMonat: regel && vertragLaeuft(vertrag) ? kostenJeMonat(regel) : 0,
+      kandidaten: kandidaten.map((k) => ({
+        ...k,
+        gegenpartei: spurJeBuchung.get(k.buchung.id)?.gegenpartei ?? "",
+        verwendungszweck: spurJeBuchung.get(k.buchung.id)?.verwendungszweck ?? "",
+      })),
     };
   });
 

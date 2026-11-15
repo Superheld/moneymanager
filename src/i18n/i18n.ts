@@ -1986,6 +1986,15 @@ const de = {
     keineZuordnung: "keine erkannt",
     zahlungenTitel: "Zahlungen von {{anbieter}}",
     keineZahlungen: "Die Regel greift noch auf keine Buchung.",
+    kandidaten: {
+      titel: "Könnte dazugehören",
+      hinweis:
+        "Buchungen ohne Vertrag, die nach Kategorie, Betrag und Termin zu diesem passen — die Erkennungsregel hat sie nicht gegriffen. Zugeordnet wird nichts von selbst: du bestätigst jede Zeile einzeln. Eine bestätigte Zahlung zählt in der Übersicht zu den Fixkosten statt zu „Ungeplant“ und dient als Beleg, aus dem sich die Regel verbessern lässt.",
+      spalteGegenpartei: "Empfänger / Sender",
+      zuordnen: "zuordnen",
+      keinVertrag: "gehört zu keinem Vertrag",
+      pille: "{{count}} möglich",
+    },
     gruppeOhneRegel: "ohne hinterlegte Zahlung",
     gruppeMeta: "{{count}} Verträge · {{betrag}} pro Monat",
     gruppeMetaTurnus: "{{count}} Verträge · {{summe}} je Fälligkeit · {{proMonat}} pro Monat",
@@ -4159,6 +4168,15 @@ const en: typeof de = {
     keineZuordnung: "none matched",
     zahlungenTitel: "Payments matched to {{anbieter}}",
     keineZahlungen: "The rule does not match any booking yet.",
+    kandidaten: {
+      titel: "Might belong here",
+      hinweis:
+        "Bookings without a contract that fit this one by category, amount and date — the matching rule did not pick them up. Nothing is assigned automatically: you confirm each row yourself. A confirmed payment counts as a fixed cost in the overview instead of “Unplanned”, and serves as evidence for improving the rule.",
+      spalteGegenpartei: "Payee / Payer",
+      zuordnen: "assign",
+      keinVertrag: "belongs to no contract",
+      pille: "{{count}} possible",
+    },
     gruppeOhneRegel: "no payment on file",
     gruppeMeta: "{{count}} contracts · {{betrag}} per month",
     gruppeMetaTurnus: "{{count}} contracts · {{summe}} per due date · {{proMonat}} per month",

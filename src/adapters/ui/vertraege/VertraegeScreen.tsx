@@ -13,10 +13,12 @@ import {
   type Vertragskandidat,
   type Vertragssicht,
   type Zahlungsregel,
+  type Zuordnungsvorschlag,
 } from "../../../application";
 import {
   vertraege as vertraegeLaden,
   vertragLoeschen,
+  vertragZuordnenVonHand,
   vertragsvorschlagIgnorieren,
 } from "../../dienste";
 import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
@@ -145,6 +147,18 @@ export function VertraegeScreen() {
     setMaske({ editId: null, start: formularAusKandidat(k, heute, geld) });
   }
 
+  /**
+   * Einen Kandidaten entscheiden: `vertragId` ordnet zu, `null` sagt „gehört zu keinem
+   * Vertrag". Beides ist eine Handentscheidung (Herkunft `manuell`) und überlebt jeden
+   * Abgleich — und beides nimmt die Zeile aus der Liste, weil über sie entschieden ist.
+   * Danach neu laden: die Zahl in der Tabelle, die Zahlungsliste und die Kandidaten der
+   * ANDEREN Verträge hängen alle an derselben Buchung.
+   */
+  async function kandidatEntscheiden(k: Zuordnungsvorschlag, vertragId: string | null) {
+    await vertragZuordnenVonHand(k.buchung.id, vertragId);
+    await laden();
+  }
+
   async function vorschlagVerwerfen(k: Vertragskandidat) {
     await vertragsvorschlagIgnorieren(k.schluessel);
     await laden();
@@ -254,7 +268,16 @@ export function VertraegeScreen() {
         align: "right",
         render: (v) => {
           const n = zeileZu.get(v.id)?.zahlungen ?? 0;
-          return n > 0 ? String(n) : <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>;
+          const moeglich = zeileZu.get(v.id)?.kandidaten.length ?? 0;
+          return (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+              {/* Dass es etwas zu bestätigen gibt, muss in der ZEILE stehen: die Liste
+                  dazu liegt aufgeklappt unter der Tabelle, und wer nicht weiss, dass
+                  dort etwas wartet, klappt nicht auf. */}
+              {moeglich > 0 && <Pill variant="neutral">{t("vertraege.kandidaten.pille", { count: moeglich })}</Pill>}
+              {n > 0 ? String(n) : <Pill variant="warn">{t("vertraege.keineZuordnung")}</Pill>}
+            </span>
+          );
         },
       },
     ];
@@ -663,6 +686,73 @@ export function VertraegeScreen() {
               ]}
               rows={[...zahlungsdetail.zahlungsliste]}
             />
+          )}
+
+          {/* Was die Erkennungsregel NICHT gegriffen hat und trotzdem passen könnte. Es
+              steht hier, direkt unter den zugeordneten Zahlungen, weil es dieselbe Frage
+              von der anderen Seite ist: oben „was gehört dazu", hier „was fehlt noch".
+              Die App fragt und ordnet nichts selbst zu — ein passender Betrag ist keine
+              Aussage, bis jemand ihn bestätigt. */}
+          {zahlungsdetail.kandidaten.length > 0 && (
+            <div data-testid="zuordnungskandidaten" style={{ borderTop: "1px solid var(--line)", marginTop: "var(--sp-5)", paddingTop: "var(--sp-5)" }}>
+              <div style={{ fontSize: "var(--fs-title)", fontWeight: "var(--fw-bold)", letterSpacing: "var(--ls-h)" }}>
+                {t("vertraege.kandidaten.titel")}
+              </div>
+              <p className="hinweis" style={{ maxWidth: 660, margin: "3px 0 var(--sp-3)" }}>
+                {t("vertraege.kandidaten.hinweis")}
+              </p>
+              <DataTable
+                pageSize={10}
+                columns={[
+                  { key: "datum", label: t("konten.spalteDatum"), render: (k: Zuordnungsvorschlag) => k.buchung.datum },
+                  {
+                    key: "gegenpartei",
+                    label: t("vertraege.kandidaten.spalteGegenpartei"),
+                    // Eine von Hand erfasste Buchung hat keinen Beleg; dann trägt die Notiz
+                    // den Namen, unter dem man sie kennt.
+                    render: (k: Zuordnungsvorschlag) => (
+                      <span>
+                        {k.gegenpartei || k.buchung.notiz || <span className="muted">—</span>}
+                        {k.verwendungszweck && <span className="muted"> · {k.verwendungszweck}</span>}
+                      </span>
+                    ),
+                  },
+                  {
+                    key: "betrag",
+                    label: `${t("konten.spalteBetrag")} ${geld.symbol}`,
+                    align: "right" as const,
+                    render: (k: Zuordnungsvorschlag) => (
+                      <span style={{ color: geldFarbe(k.buchung.betrag) }}>{geld.format(k.buchung.betrag)}</span>
+                    ),
+                  },
+                  {
+                    key: "_z",
+                    label: "",
+                    align: "right" as const,
+                    render: (k: Zuordnungsvorschlag) => (
+                      <IconButton
+                        icon="uebernehmen"
+                        label={t("vertraege.kandidaten.zuordnen")}
+                        onClick={() => kandidatEntscheiden(k, zahlungsdetail.vertrag.id)}
+                      />
+                    ),
+                  },
+                  {
+                    key: "_n",
+                    label: "",
+                    align: "right" as const,
+                    render: (k: Zuordnungsvorschlag) => (
+                      <IconButton
+                        icon="verwerfen"
+                        label={t("vertraege.kandidaten.keinVertrag")}
+                        onClick={() => kandidatEntscheiden(k, null)}
+                      />
+                    ),
+                  },
+                ]}
+                rows={[...zahlungsdetail.kandidaten]}
+              />
+            </div>
           )}
         </Card>
       )}
