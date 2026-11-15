@@ -22,6 +22,7 @@ interface GegenstandZeile {
   bezeichnung: string;
   art: string;
   aktiv: number;
+  vorsorgeziel_id: string | null;
 }
 
 interface WertZeile {
@@ -52,25 +53,27 @@ export const sqliteVermoegenRepository: VermoegenRepository = {
       // Stillgelegte kommen MIT: ihre Reihe gehört in den Verlauf, und die Liste zeigt
       // sie gedämpft. Wer sie nicht zählen will, fragt `wirdGefuehrt` — die Regel dazu
       // steht im Kern und nicht in einem Filter, den ein zweiter Leseweg vergässe.
-      "SELECT id, bezeichnung, art, aktiv FROM vermoegensgegenstand ORDER BY bezeichnung",
+      "SELECT id, bezeichnung, art, aktiv, vorsorgeziel_id FROM vermoegensgegenstand ORDER BY bezeichnung",
     );
     return zeilen.map((z) => ({
       id: z.id,
       bezeichnung: z.bezeichnung,
       art: z.art as Vermoegensart,
       aktiv: z.aktiv !== 0,
+      ...(z.vorsorgeziel_id ? { vorsorgezielId: z.vorsorgeziel_id } : {}),
     }));
   },
 
   async gegenstandSpeichern(g: Vermoegensgegenstand) {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO vermoegensgegenstand (id, bezeichnung, art, aktiv)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT(id) DO UPDATE SET bezeichnung = excluded.bezeichnung,
-                                     art         = excluded.art,
-                                     aktiv       = excluded.aktiv`,
-      [g.id, g.bezeichnung, g.art, g.aktiv === false ? 0 : 1],
+      `INSERT INTO vermoegensgegenstand (id, bezeichnung, art, aktiv, vorsorgeziel_id)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT(id) DO UPDATE SET bezeichnung     = excluded.bezeichnung,
+                                     art             = excluded.art,
+                                     aktiv           = excluded.aktiv,
+                                     vorsorgeziel_id = excluded.vorsorgeziel_id`,
+      [g.id, g.bezeichnung, g.art, g.aktiv === false ? 0 : 1, g.vorsorgezielId ?? null],
     );
   },
 

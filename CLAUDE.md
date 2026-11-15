@@ -89,7 +89,7 @@ Fachgliederung:
 
 ### Das Datenmodell
 
-32 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
+34 Tabellen, angelegt über `adapters/persistence/migrations.ts`. Welche heute leben, sagt
 weder die Migrationskette (append-only, enthält auch Gedroppte) noch eine Übersicht — hier
 ist sie. Die ausführbare Gegenprobe steht in `migrations.test.ts`: `ERWARTETE_TABELLEN`
 prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Test rot:
@@ -112,6 +112,8 @@ prüft die Menge auf GLEICHHEIT, eine Tabelle zu viel oder zu wenig macht den Te
   `vermoegenswert` (was auf keinem Konto liegt, als Reihe von Werten) · `verbindlichkeit`
   + `verbindlichkeit_stand` (Schulden, als Reihe von Restschulden) — dasselbe Muster,
   siehe `src/core/vermoegen/CLAUDE.md`
+- **Vorsorgen:** `vorsorgeziel` + `vorsorgeziel_annahme` (die Reihe seiner Annahmen,
+  gültig ab einem Monat — wie `budget_betrag`), siehe `src/core/vermoegen/CLAUDE.md`
 - **Sonstiges:** `person` · `einstellung`
 
 Gedroppt und nicht wiederzubeleben: `topf`, `szenario`, `szenario_posten` — aufgegangen in

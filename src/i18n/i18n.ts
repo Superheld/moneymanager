@@ -135,6 +135,13 @@ const de = {
       wertUngueltig: "Bitte einen Wert angeben — 0 oder mehr.",
       restschuldUngueltig: "Bitte die Restschuld angeben — 0 oder mehr, ohne Minus.",
     },
+    vorsorge: {
+      zielMonatUngueltig: "Bitte angeben, ab wann du das Geld brauchst.",
+      wunschUngueltig: "Bitte angeben, was du im Monat brauchst — mehr als 0.",
+      renteUngueltig: "Bitte die erwartete Rente angeben — 0 oder mehr.",
+      entnahmeUngueltig: "Bitte angeben, wie viele Jahre es reichen soll — zwischen 1 und 60.",
+      renditeUngueltig: "Bitte die Rendite in Prozent angeben — zwischen 0 und 15.",
+    },
   },
   shell: {
     gruppeUeberblick: "Überblick",
@@ -298,6 +305,49 @@ const de = {
   // „Wert" bzw. „Restschuld" mit „Stichtag". Keine Synonyme — auch nicht „Verbindlichkeit"
   // (so heisst es nur im Code) und nicht „Kredit" als Oberbegriff.
   vermoegen: {
+    // Das Vorsorgeziel wohnt im Bereich Vermögen. Die Sache heisst überall „Vorsorgeziel",
+    // die Karte „Vorsorge" — dasselbe Wort wie die Kontoklasse und die Zeile der
+    // Monatskarte, weil es dieselbe Sache ist.
+    vorsorge: {
+      titel: "Vorsorge",
+      leer:
+        "Mit einem Vorsorgeziel rechnet die App aus, wie viel am ersten Tag des Ruhestands da sein muss und was du dafür jeden Monat zurücklegen müsstest. Du gibst an, was du im Monat brauchst, welche Rente du erwartest und mit welcher Rendite du rechnest.",
+      neu: "Vorsorgeziel",
+      annahmen:
+        "Ab {{ab}} · {{wunsch}} im Monat, davon {{rente}} Rente · für {{jahre}} Jahre · Rendite über Inflation {{rendite}}",
+      sparrate: "Nötige Sparrate im Monat",
+      gedeckt: "Was da ist, reicht für das Ziel.",
+      unerreichbar:
+        "Der Zeitpunkt ist erreicht, und es fehlt noch etwas. Eine Sparrate, die das aufholt, gibt es nicht mehr.",
+      deckung: "Gedeckt",
+      kpiDa: "Heute dafür da",
+      kpiHochgerechnet: "Wird daraus bis {{ab}}",
+      kpiBedarf: "Muss dann da sein",
+      kpiFehlt: "Fehlt",
+      ohneSparen: "Ohne weiteres Sparen hättest du im Ruhestand {{betrag}} im Monat statt {{wunsch}}.",
+      hinweis:
+        "Alle Beträge in heutiger Kaufkraft. Dafür da ist, was auf Konten der Klassen {{vorsorge}} und {{investment}} liegt, dazu alle Depots und die Vermögenswerte, bei denen „zählt zum Vorsorgeziel“ angehakt ist. Schulden sind nicht abgezogen.",
+      bearbeiten: "Vorsorgeziel bearbeiten",
+      loeschen: "Vorsorgeziel löschen",
+      loeschenFolgen:
+        "Die Annahmen gehen mit. Konten, Depots und Vermögenswerte bleiben, wie sie sind.",
+      modalNeu: "Vorsorgeziel anlegen",
+      modalBearbeiten: "Vorsorgeziel bearbeiten",
+      modalHinweis: "Alle Beträge in heutiger Kaufkraft — also so, als wäre der Ruhestand heute.",
+      modalAendernHinweis: "Änderungen gelten ab diesem Monat. Was vorher galt, bleibt für die Monate davor stehen.",
+      vorgabeBezeichnung: "Ruhestand",
+      feldAb: "Ruhestand ab",
+      feldAbHinweis: "Es zählt der Monat.",
+      feldWunsch: "Was du im Monat brauchst",
+      feldRente: "Erwartete Rente im Monat",
+      feldRenteHinweis: "Gesetzliche Rente, Betriebsrente und was sonst sicher kommt. Im Zweifel 0.",
+      feldJahre: "Wie viele Jahre es reichen soll",
+      feldRendite: "Rendite über Inflation, % im Jahr",
+      feldRenditeHinweis:
+        "Was du im Jahr an Ertrag erwartest, abzüglich der Inflation. Je niedriger du sie ansetzt, desto vorsichtiger die Rechnung.",
+      zaehlt: "zählt zum Vorsorgeziel",
+      zaehltHinweis: "Mit Haken zählt sein Wert zu dem, was für {{name}} da ist — etwa eine Versicherung mit Rückkaufswert.",
+    },
     titel: "Vermögen",
     untertitel: "Was du besitzt und was du schuldest — auch das, was auf keinem Konto liegt",
     neuVermoegenswert: "Vermögenswert",
@@ -2593,6 +2643,13 @@ const en: typeof de = {
       wertUngueltig: "Please enter a value — 0 or more.",
       restschuldUngueltig: "Please enter the outstanding balance — 0 or more, without a minus.",
     },
+    vorsorge: {
+      zielMonatUngueltig: "Please enter when you will need the money.",
+      wunschUngueltig: "Please enter what you need per month — more than 0.",
+      renteUngueltig: "Please enter the expected pension — 0 or more.",
+      entnahmeUngueltig: "Please enter how many years it should last — between 1 and 60.",
+      renditeUngueltig: "Please enter the return in percent — between 0 and 15.",
+    },
   },
   shell: {
     gruppeUeberblick: "Overview",
@@ -2752,6 +2809,45 @@ const en: typeof de = {
       "A portfolio has no bookings — buying and selling runs through the settlement account. How its value developed is in Analysis.",
   },
   vermoegen: {
+    vorsorge: {
+      titel: "Retirement",
+      leer:
+        "With a retirement goal the app works out how much must be there on the first day of retirement and what you would have to set aside each month. You enter what you need per month, the pension you expect and the return you assume.",
+      neu: "Retirement goal",
+      annahmen:
+        "From {{ab}} · {{wunsch}} per month, of which {{rente}} pension · for {{jahre}} years · return above inflation {{rendite}}",
+      sparrate: "Required monthly savings",
+      gedeckt: "What is there covers the goal.",
+      unerreichbar:
+        "The date has been reached and something is still missing. No savings rate can make up for that any more.",
+      deckung: "Covered",
+      kpiDa: "Available for it today",
+      kpiHochgerechnet: "Grows to this by {{ab}}",
+      kpiBedarf: "Must be there by then",
+      kpiFehlt: "Missing",
+      ohneSparen: "Without further saving you would have {{betrag}} per month in retirement instead of {{wunsch}}.",
+      hinweis:
+        "All amounts in today's purchasing power. Counted are accounts of the classes {{vorsorge}} and {{investment}}, all securities accounts and the assets marked “counts towards the retirement goal”. Debts are not deducted.",
+      bearbeiten: "Edit retirement goal",
+      loeschen: "Delete retirement goal",
+      loeschenFolgen: "The assumptions go with it. Accounts, securities accounts and assets stay as they are.",
+      modalNeu: "Create retirement goal",
+      modalBearbeiten: "Edit retirement goal",
+      modalHinweis: "All amounts in today's purchasing power — as if retirement were today.",
+      modalAendernHinweis: "Changes apply from this month. What applied before stays in place for earlier months.",
+      vorgabeBezeichnung: "Retirement",
+      feldAb: "Retirement from",
+      feldAbHinweis: "Only the month counts.",
+      feldWunsch: "What you need per month",
+      feldRente: "Expected pension per month",
+      feldRenteHinweis: "State pension, company pension and whatever else is certain. If in doubt, 0.",
+      feldJahre: "How many years it should last",
+      feldRendite: "Return above inflation, % per year",
+      feldRenditeHinweis:
+        "The yearly return you expect, minus inflation. The lower you set it, the more cautious the calculation.",
+      zaehlt: "counts towards the retirement goal",
+      zaehltHinweis: "When ticked, its value counts towards what is there for {{name}} — a policy with a surrender value, for example.",
+    },
     titel: "Wealth",
     untertitel: "What you own and what you owe — including what is not in any account",
     neuVermoegenswert: "Asset",

@@ -82,6 +82,29 @@ Löschen nimmt die Reihe mit und schreibt damit den Verlauf rückwirkend um. Daf
 da — für den Eintrag, den es nie hätte geben sollen —, und deshalb sagt die Rückfrage in
 der Oberfläche, dass Stilllegen der Weg für „verkauft" ist.
 
+## Das Vorsorgeziel rechnet über denselben Bestand
+
+`../vorsorge/vorsorge.ts` beantwortet „wie viel muss am Tag X da sein, und was muss ich
+dafür jeden Monat zurücklegen". Es wohnt in der Oberfläche in diesem Bereich und rechnet
+gegen eine engere Auswahl desselben Bestands:
+
+- **`vorsorgevermoegen` IST `nettovermoegen`**, über Konten der Klassen Vorsorge und
+  Investment (`istVorsorgekonto`), alle Depots und die Vermögenswerte, die dem Ziel
+  zugeordnet sind (`vorsorgezielId`). Keine zweite Summe, die von der ersten weglaufen
+  könnte. Schulden werden nicht abgezogen.
+- **Die Annahmen sind eine Reihe mit „gilt ab"** (`vorsorgeziel_annahme`, `annahmeIm`).
+  Wer heute die Rendite senkt, hat nichts über das letzte Jahr gesagt. Im selben Monat
+  wird überschrieben — eine Annahme ist ein Vorsatz, keine Messung.
+- **Für den Anfang gibt es EIN Ziel je Haushalt.** Das Schema trägt mehrere; mit mehreren
+  bräuchte jedes Konto und jedes Depot eine Zuordnung. Die Use-Cases
+  (`application/vorsorge/vorsorge.ts`) nehmen deshalb keine Id.
+- **Keine Vorgabe für die Rendite**, auch nicht im Dialog. Sie ist die Annahme des
+  Nutzers und steht im Untertitel der Karte neben jedem Ergebnis.
+
+Die Zeile „Vorsorge und Anlage" der Ergebnisrechnung zählt weiterhin die tatsächliche
+Umbuchung, nicht die Sparrate des Ziels. Das ist der nächste Schritt und steht im Kopf
+von `../ergebnis.ts`.
+
 ## Die Wörter
 
 Im Code heisst es wie im Schema: `Vermoegensgegenstand`, `Verbindlichkeit`,

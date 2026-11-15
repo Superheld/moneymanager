@@ -35,16 +35,20 @@ import { fehlerNachricht } from "../bausteine/einstellungenKontext";
 
 export function VermoegenswertDialog({
   zeile,
+  vorsorgeziel,
   onClose,
   onGespeichert,
 }: {
   /** `null` legt einen neuen an. */
   zeile: Vermoegenswertzeile | null;
+  /** Das Vorsorgeziel, wenn es eines gibt — nur dann steht die Zuordnung zur Wahl. */
+  vorsorgeziel?: { readonly id: string; readonly bezeichnung: string };
   onClose: () => void;
   onGespeichert: () => void | Promise<void>;
 }) {
   const { t } = useTranslation();
   const g = zeile?.gegenstand;
+  const [zurVorsorge, setZurVorsorge] = useState(Boolean(g?.vorsorgezielId));
   const [bezeichnung, setBezeichnung] = useState(g?.bezeichnung ?? "");
   const [art, setArt] = useState<Vermoegensart>(g?.art ?? "immobilie");
   const [gefuehrt, setGefuehrt] = useState(zeile?.gefuehrt ?? true);
@@ -52,14 +56,17 @@ export function VermoegenswertDialog({
 
   async function speichern() {
     setFehler(null);
+    // Ohne Ziel bleibt stehen, was gespeichert ist: die Maske zeigt das Kästchen dann
+    // nicht, und ein unsichtbares Feld darf nichts ändern.
+    const vorsorgezielId = vorsorgeziel ? (zurVorsorge ? vorsorgeziel.id : undefined) : g?.vorsorgezielId;
     try {
       if (g) {
-        await vermoegenswertAendern(g.id, { bezeichnung, art });
+        await vermoegenswertAendern(g.id, { bezeichnung, art, vorsorgezielId });
         // Nur wenn sich die Angabe geändert hat: sonst schriebe jedes Bearbeiten ein
         // zweites Mal, ohne dass jemand etwas dazu gesagt hätte.
         if (gefuehrt !== zeile.gefuehrt) await vermoegenswertFuehren(g.id, gefuehrt);
       } else {
-        await vermoegenswertAnlegen({ bezeichnung, art });
+        await vermoegenswertAnlegen({ bezeichnung, art, vorsorgezielId });
       }
       await onGespeichert();
     } catch (e) {
@@ -92,6 +99,11 @@ export function VermoegenswertDialog({
             optionen={VERMOEGENSARTEN.map((a) => ({ wert: a, text: t(`vermoegen.art.${a}`) }))}
           />
         </FormField>
+        {vorsorgeziel && (
+          <FormField hint={t("vermoegen.vorsorge.zaehltHinweis", { name: vorsorgeziel.bezeichnung })}>
+            <Kaestchen an={zurVorsorge} aufAendern={setZurVorsorge}>{t("vermoegen.vorsorge.zaehlt")}</Kaestchen>
+          </FormField>
+        )}
         {/* Erst beim Bearbeiten: was gerade angelegt wird, wird auch geführt. */}
         {g && (
           <FormField hint={t("vermoegen.gefuehrtHinweisVermoegenswert")}>

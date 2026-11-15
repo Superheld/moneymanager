@@ -275,6 +275,14 @@ export {
   type Vermoegenswertzeile,
 } from "./vermoegen/vermoegensichten";
 export {
+  vorsorgeLaden,
+  vorsorgezielFestlegen,
+  vorsorgezielLoeschen,
+  type VorsorgeDeps,
+  type Vorsorgesicht,
+  type VorsorgezielEingabe,
+} from "./vorsorge/vorsorge";
+export {
   vermoegenswertAnlegen,
   vermoegenswertAendern,
   vermoegenswertFuehren,

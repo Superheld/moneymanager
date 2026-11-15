@@ -114,6 +114,14 @@ import {
   type VermoegenswertEingabe,
 } from "../application/vermoegen/vermoegenPflege";
 import { sqliteVermoegenRepository } from "./persistence/sqliteVermoegenRepository";
+import { sqliteVorsorgeRepository } from "./persistence/sqliteVorsorgeRepository";
+import {
+  vorsorgeLaden,
+  vorsorgezielFestlegen as vorsorgezielFestlegenUseCase,
+  vorsorgezielLoeschen as vorsorgezielLoeschenUseCase,
+  type Vorsorgesicht,
+  type VorsorgezielEingabe,
+} from "../application/vorsorge/vorsorge";
 import { analyseLaden, type Analysebasis } from "../application/analysesichten";
 import { vertraegeLaden, type Vertragssicht } from "../application/vertraege/vertragssichten";
 import { kontenLaden, type Kontensicht } from "../application/konten/kontensichten";
@@ -535,17 +543,34 @@ const VERMOEGEN_PFLEGE = {
   vertragRepo: sqliteVertragRepository,
 };
 
+/** Der Bestand, über den Vermögen UND Vorsorge rechnen — dieselben Quellen für beide. */
+const VERMOEGEN_BESTAND = {
+  ...VERMOEGEN_PFLEGE,
+  kontoRepo: sqliteZahlungskontoRepository,
+  ledger: sqliteLedgerRepository,
+  depotRepo: sqliteDepotRepository,
+  kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
+};
+
 export function vermoegen(heute: string): Promise<Vermoegenssicht> {
-  return vermoegenLaden(
-    {
-      ...VERMOEGEN_PFLEGE,
-      kontoRepo: sqliteZahlungskontoRepository,
-      ledger: sqliteLedgerRepository,
-      depotRepo: sqliteDepotRepository,
-      kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
-    },
+  return vermoegenLaden(VERMOEGEN_BESTAND, heute);
+}
+
+export function vorsorge(heute: string): Promise<Vorsorgesicht | null> {
+  return vorsorgeLaden({ ...VERMOEGEN_BESTAND, vorsorgeRepo: sqliteVorsorgeRepository }, heute);
+}
+
+export function vorsorgezielFestlegen(eingabe: VorsorgezielEingabe, heute: string) {
+  return vorsorgezielFestlegenUseCase(
+    { vorsorgeRepo: sqliteVorsorgeRepository },
+    eingabe,
     heute,
+    new Date().toISOString(),
   );
+}
+
+export function vorsorgezielLoeschen() {
+  return vorsorgezielLoeschenUseCase({ vorsorgeRepo: sqliteVorsorgeRepository });
 }
 
 export function vermoegenswertAnlegen(eingabe: VermoegenswertEingabe) {

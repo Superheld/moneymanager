@@ -30,6 +30,8 @@ import type {
   Verbindlichkeitsstand,
   Vermoegensgegenstand,
   Vermoegenswert,
+  Vorsorgeziel,
+  Vorsorgezielannahme,
 } from "../core";
 import type { ImportLauf, Umsatz } from "./import";
 import type { Dublettenfreigabe } from "./dubletten/dublettensicht";
@@ -324,6 +326,23 @@ export interface VermoegenRepository {
   staende(): Promise<Verbindlichkeitsstand[]>;
   standEintragen(stand: Verbindlichkeitsstand, erfasstAm: string): Promise<void>;
   standEntfernen(verbindlichkeitId: string, stichtag: string): Promise<void>;
+}
+
+/**
+ * Das Vorsorgeziel und die Reihe seiner Annahmen.
+ *
+ * `annahmeSpeichern` ÜBERSCHREIBT die Zeile desselben Monats — anders als eine
+ * Beobachtung im Vermögen. Eine Annahme ist keine Messung, sondern ein Vorsatz: wer sie
+ * im selben Monat zweimal ändert, hat sich korrigiert, und die erste Fassung hat nie
+ * einen ganzen Monat gegolten. Über Monatsgrenzen hinweg bleibt jede Zeile stehen.
+ */
+export interface VorsorgeRepository {
+  ziele(): Promise<Vorsorgeziel[]>;
+  zielSpeichern(ziel: Vorsorgeziel, erfasstAm: string): Promise<void>;
+  /** Nimmt die Annahmen mit und löst die Zuordnung der Vermögenswerte. */
+  zielLoeschen(id: string): Promise<void>;
+  annahmen(): Promise<Vorsorgezielannahme[]>;
+  annahmeSpeichern(annahme: Vorsorgezielannahme): Promise<void>;
 }
 
 /**

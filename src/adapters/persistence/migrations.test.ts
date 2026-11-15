@@ -104,6 +104,8 @@ const ERWARTETE_TABELLEN = [
   // v70 — was die Bank kennt und noch nicht gebucht hat: eine Beobachtung mit
   // Verfallsdatum, deshalb neben `kontostand_anker` und nicht in `umsatz_roh`
   "vormerkung",
+  // v78 — das Vorsorgeziel und die Reihe seiner Annahmen (gültig ab einem Monat)
+  "vorsorgeziel", "vorsorgeziel_annahme",
   "zahlungskonto", "zahlungsregel",
 ];
 

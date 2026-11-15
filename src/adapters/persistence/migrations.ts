@@ -2261,4 +2261,43 @@ export const MIGRATIONS: Migration[] = [
       )`,
     ],
   },
+  {
+    version: 78, // Vorsorgeziel: Stammsatz, Annahmen als Reihe, Zuordnung der Vermoegenswerte
+    sql: [
+      // Ein Vorsorgeziel beantwortet „wie viel muss am Tag X da sein, und was muss ich
+      // dafuer jeden Monat zuruecklegen". Die Rechnung steht im Kern
+      // (`core/vorsorge/vorsorge.ts`); gespeichert werden nur ihre Eingaben.
+      //
+      // Der Stammsatz traegt nur den Namen. Die Zahlen stehen in der Reihe daneben,
+      // gueltig AB einem Monat — dasselbe Muster wie `budget_betrag` (v60) und aus
+      // demselben Grund: wer heute die Rendite senkt, hat damit nichts ueber das letzte
+      // Jahr gesagt. Am Stammsatz gespeichert, waere der Bedarf jedes vergangenen Monats
+      // rueckwirkend ein anderer.
+      //
+      // Alles in heutiger Kaufkraft: eine Inflationsspalte gibt es nicht, die Rendite ist
+      // die UEBER der Inflation. In Basispunkten, aus demselben Grund wie Geld in Cent.
+      `CREATE TABLE IF NOT EXISTS vorsorgeziel (
+        id TEXT PRIMARY KEY,
+        bezeichnung TEXT NOT NULL,
+        erfasst_am TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS vorsorgeziel_annahme (
+        ziel_id TEXT NOT NULL REFERENCES vorsorgeziel(id) ON DELETE CASCADE,
+        ab_monat TEXT NOT NULL,
+        ziel_monat TEXT NOT NULL,
+        wunsch_monatlich INTEGER NOT NULL,
+        rente_monatlich INTEGER NOT NULL DEFAULT 0,
+        entnahme_monate INTEGER NOT NULL,
+        rendite_bp INTEGER NOT NULL,
+        PRIMARY KEY (ziel_id, ab_monat)
+      )`,
+      // Welcher Vermoegenswert zum Ziel zaehlt, kann nur der Nutzer wissen: die
+      // Versicherung mit Rueckkaufswert ja, das Fahrzeug nein. SET NULL, weil der
+      // Vermoegenswert bleibt, wenn das Ziel geloescht wird.
+      //
+      // Nichts wird abgeloest und nichts ueberfuehrt: zwei neue Tabellen, eine neue
+      // Spalte ohne Vorgabe.
+      `ALTER TABLE vermoegensgegenstand ADD COLUMN vorsorgeziel_id TEXT REFERENCES vorsorgeziel(id) ON DELETE SET NULL`,
+    ],
+  },
 ];

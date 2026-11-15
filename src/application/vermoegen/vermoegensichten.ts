@@ -92,8 +92,16 @@ const VERLAUF_MONATE_HOECHSTENS = 120;
 const absteigend = (a: Beobachtungszeile, b: Beobachtungszeile) =>
   b.stichtag.localeCompare(a.stichtag);
 
-export async function vermoegenLaden(deps: VermoegenDeps, heute: string): Promise<Vermoegenssicht> {
-  const [gegenstaende, werte, verbindlichkeiten, staende, alleKonten, buchungen, depots, depotwerte, vertraege, zuordnungen] =
+/** Was die Rechnung braucht und nicht der Bereich Vermögen allein. */
+export type VermoegensbestandDeps = Omit<VermoegenDeps, "vertragRepo">;
+
+/**
+ * Der Bestand, über den `nettovermoegen` rechnet — an EINER Stelle geholt, weil die
+ * Vorsorge (`../vorsorge/vorsorge.ts`) gegen dieselbe Auswahl rechnen muss. Holte sie
+ * sich Konten und Depots selbst, zählte früher oder später eines davon dort anders.
+ */
+export async function vermoegensbestandLaden(deps: VermoegensbestandDeps): Promise<VermoegensEingabe> {
+  const [gegenstaende, werte, verbindlichkeiten, staende, alleKonten, buchungen, depots, depotwerte, zuordnungen] =
     await Promise.all([
       deps.vermoegenRepo.gegenstaende(),
       deps.vermoegenRepo.werte(),
@@ -103,7 +111,6 @@ export async function vermoegenLaden(deps: VermoegenDeps, heute: string): Promis
       deps.ledger.alle(),
       deps.depotRepo.alle(),
       deps.depotRepo.werte(),
-      deps.vertragRepo.alle(),
       deps.kontozuordnungen?.() ?? Promise.resolve([]),
     ]);
 
@@ -118,15 +125,12 @@ export async function vermoegenLaden(deps: VermoegenDeps, heute: string): Promis
   );
   const konten = alleKonten.filter((k) => !mitDepot.has(k.id));
 
-  const eingabe: VermoegensEingabe = {
-    konten,
-    buchungen,
-    depotwerte,
-    gegenstaende,
-    werte,
-    verbindlichkeiten,
-    staende,
-  };
+  return { konten, buchungen, depotwerte, gegenstaende, werte, verbindlichkeiten, staende };
+}
+
+export async function vermoegenLaden(deps: VermoegenDeps, heute: string): Promise<Vermoegenssicht> {
+  const [eingabe, vertraege] = await Promise.all([vermoegensbestandLaden(deps), deps.vertragRepo.alle()]);
+  const { gegenstaende, werte, verbindlichkeiten, staende } = eingabe;
 
   const erste = ersteBeobachtung(werte, staende);
   let verlauf: Nettovermoegen[] = [];
