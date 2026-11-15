@@ -16,14 +16,16 @@ import {
   erkennungsDiagnose,
   merkmaleAbleiten,
   merkmalsTreffer,
+  kostenJeMonat,
   kuendigungsterminNaht,
   naechsteFaelligkeit,
   naechsterKuendigungstermin,
   ruecklageProMonat,
   passtZu,
   spannenVorschlag,
+  pflichtenJeMonat,
   ruecklagenbedarf,
-  RHYTHMUS_MONATE,
+  vertragLaeuft,
   type Cent,
   type IstBuchung,
   type Kategorie,
@@ -99,11 +101,33 @@ export interface Vertragszeile {
   readonly zahlungsliste: readonly IstBuchung[];
   /** Was ein nicht-monatlicher Abfluss im Monat kostet, obwohl er nicht abgeht. */
   readonly ruecklage: Cent;
+  /**
+   * Was der Vertrag den Monat kostet oder einbringt, vorzeichenbehaftet — der Betrag der
+   * Regel auf die Monate ihres Rhythmus verteilt (`kostenJeMonat`).
+   *
+   * Steht NEBEN dem Betrag je Fälligkeit und ersetzt ihn nicht: der eine sagt, was am
+   * Stichtag vom Konto geht, der andere, was der Vertrag kostet. Null, wenn es keine
+   * Regel gibt oder der Vertrag beendet ist — er kostet dann nichts mehr.
+   */
+  readonly jeMonat: Cent;
 }
 
+/**
+ * Die Kennzahlen über der Liste — dieselbe erste Stufe wie in der Übersicht.
+ *
+ * Bis 2026-11-15 stand hier EINE Summe „pro Monat" über alle Regeln: Einnahmen,
+ * Ausgaben und Umbuchungen in einer Zahl. Sie beantwortete keine Frage — ein Gehalt
+ * machte sie positiv, eine Sparrate drückte sie, und was die Verträge KOSTEN, stand
+ * nirgends. Jetzt sind es die drei Zahlen, aus denen die Übersicht „nach den Pflichten"
+ * bildet, über die Verträge als Plan gerechnet.
+ */
 export interface Vertragskennzahlen {
-  readonly proMonat: Cent;
-  readonly proJahr: Cent;
+  /** Σ Kosten je Monat der laufenden Aufwands-Verträge, negativ. */
+  readonly fixkostenJeMonat: Cent;
+  /** Σ je Monat der laufenden Ertrags-Verträge. */
+  readonly einnahmenJeMonat: Cent;
+  /** Einnahmen minus Fixkosten. Umbuchungsverträge zählen in keines von beiden. */
+  readonly nachPflichten: Cent;
   readonly baldKuendbar: number;
   readonly ruecklage: Cent;
 }
@@ -164,6 +188,7 @@ export async function vertraegeLaden(
       zahlungen: zahlungenJeVertrag.get(vertrag.id)?.length ?? 0,
       zahlungsliste: zahlungenJeVertrag.get(vertrag.id) ?? [],
       ruecklage: regel ? ruecklageProMonat(regel) : 0,
+      jeMonat: regel && vertragLaeuft(vertrag) ? kostenJeMonat(regel) : 0,
     };
   });
 
@@ -182,19 +207,17 @@ export async function vertraegeLaden(
 }
 
 function kennzahlenAus(zeilen: readonly Vertragszeile[]): Vertragskennzahlen {
-  let proMonat = 0;
   let baldKuendbar = 0;
   const eigeneRegeln: Zahlungsregel[] = [];
   for (const z of zeilen) {
-    if (z.regel) {
-      proMonat += z.regel.betrag / RHYTHMUS_MONATE[z.regel.rhythmus];
-      eigeneRegeln.push(z.regel);
-    }
+    if (z.regel) eigeneRegeln.push(z.regel);
     if (z.kuendigungNaht) baldKuendbar++;
   }
+  const pflichten = pflichtenJeMonat(zeilen);
   return {
-    proMonat: Math.round(proMonat),
-    proJahr: Math.round(proMonat * 12),
+    fixkostenJeMonat: pflichten.fixkosten,
+    einnahmenJeMonat: pflichten.einnahmen,
+    nachPflichten: pflichten.nachPflichten,
     baldKuendbar,
     ruecklage: ruecklagenbedarf(eigeneRegeln),
   };

@@ -23,7 +23,7 @@ import { Button, Card, DataTable, KPIStat, Pill } from "../bausteine";
 import { Auswahl } from "../bausteine/Auswahl";
 import type { DataColumn } from "../bausteine/DataTable";
 import { PageHead } from "../bausteine/PageHead";
-import { geldFarbe } from "../bausteine/geldFarbe";
+import { geldFarbe, geldTon, warnTon } from "../bausteine/geldFarbe";
 import { IconButton } from "../bausteine/IconButton";
 import { VertragModal } from "./VertragModal";
 import {
@@ -39,7 +39,7 @@ import { ErkennungsDialog } from "./ErkennungsDialog";
 
 /** Stabil leer, damit die abgeleiteten Werte nicht bei jedem Render neu entstehen. */
 const LEERE_NAMEN: ReadonlyMap<string, string> = new Map();
-const LEERE_KENNZAHLEN = { proMonat: 0, proJahr: 0, baldKuendbar: 0, ruecklage: 0 } as const;
+const LEERE_KENNZAHLEN = { fixkostenJeMonat: 0, einnahmenJeMonat: 0, nachPflichten: 0, baldKuendbar: 0, ruecklage: 0 } as const;
 
 /** Die Turnus-Ansicht zeigt je Rhythmus eine Gruppe — in dieser Reihenfolge. */
 const RHYTHMEN: Rhythmus[] = ["monatlich", "quartalsweise", "halbjaehrlich", "jaehrlich"];
@@ -233,6 +233,18 @@ export function VertraegeScreen() {
         render: (v) => {
           const r = regelZuVertrag.get(v.id);
           return r ? geld.format(r.betrag) : "—";
+        },
+      },
+      {
+        // Was der Vertrag den Monat KOSTET, neben dem, was bei Fälligkeit abgeht. Bei
+        // monatlichem Takt dieselbe Zahl — sie steht trotzdem da, weil die Spalte sonst
+        // Lücken hätte und sich nicht mehr von oben nach unten lesen liesse.
+        key: "jeMonat",
+        label: `${t("vertraege.spalteJeMonat")} ${geld.symbol}`,
+        align: "right",
+        render: (v) => {
+          const wert = zeileZu.get(v.id)?.jeMonat ?? 0;
+          return wert !== 0 ? geld.format(wert) : <span className="muted">—</span>;
         },
       },
       {
@@ -448,15 +460,21 @@ export function VertraegeScreen() {
       {alleVertraege.length > 0 && (
         <div className="kpis">
           <KPIStat size="chip" label={t("vertraege.kpiAnzahl")} value={String(alleVertraege.length)} />
-          <KPIStat size="chip" label={t("vertraege.kpiProMonat")} value={geld.format(summe.proMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proMonat < 0 ? "warn" : "ok"} />
-          <KPIStat size="chip" label={t("vertraege.kpiProJahr")} value={geld.format(summe.proJahr, { mitVorzeichen: true })} unit={geld.symbol} tone={summe.proJahr < 0 ? "warn" : "ok"} />
+          {/* Die erste Stufe der Ergebnisrechnung, über die Verträge als Plan: was sie
+              kosten, was sie einbringen, was danach bleibt. Alle drei sind gerichtetes
+              Geld, die Farbe kommt deshalb aus dem Vorzeichen (`geldTon`) — und das Wort
+              für die dritte ist dasselbe wie in der Übersicht, weil es dieselbe Zahl
+              meint. */}
+          <KPIStat size="chip" label={t("vertraege.kpiFixkosten")} value={geld.format(summe.fixkostenJeMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={geldTon(summe.fixkostenJeMonat)} />
+          <KPIStat size="chip" label={t("vertraege.kpiEinnahmen")} value={geld.format(summe.einnahmenJeMonat, { mitVorzeichen: true })} unit={geld.symbol} tone={geldTon(summe.einnahmenJeMonat)} />
+          <KPIStat size="chip" label={t("ergebnis.stufe.nachPflichten")} value={geld.format(summe.nachPflichten, { mitVorzeichen: true })} unit={geld.symbol} tone={geldTon(summe.nachPflichten)} />
           {summe.ruecklage > 0 && (
             // Ohne meta-Zeile: sie machte genau diese Karte eine Zeile höher als ihre
             // Nachbarn, und die Reihe stand sichtbar schief. Was sie erklärte, steht
             // jetzt im Label.
             <KPIStat size="chip" label={t("vertraege.kpiRuecklage")} value={geld.format(summe.ruecklage)} unit={geld.symbol} />
           )}
-          {summe.baldKuendbar > 0 && <KPIStat size="chip" label={t("vertraege.kpiBald")} value={String(summe.baldKuendbar)} tone="warn" />}
+          {summe.baldKuendbar > 0 && <KPIStat size="chip" label={t("vertraege.kpiBald")} value={String(summe.baldKuendbar)} tone={warnTon(true)} />}
         </div>
       )}
 

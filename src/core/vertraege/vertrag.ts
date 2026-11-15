@@ -143,6 +143,79 @@ export function ruecklagenbedarf(regeln: readonly Zahlungsregel[]): number {
   return regeln.reduce((s, r) => s + ruecklageProMonat(r), 0);
 }
 
+/**
+ * Was eine Zahlungsregel den Monat KOSTET (bzw. einbringt), vorzeichenbehaftet wie ihr
+ * Betrag: der Betrag je Fälligkeit, verteilt auf die Monate ihres Rhythmus.
+ *
+ * Das ist die Sicht „Kosten" aus `core/CLAUDE.md` („Auszahlung und Kosten") für den
+ * Bereich Verträge: der Betrag in der Liste sagt, was bei Fälligkeit vom Konto geht,
+ * diese Zahl, was der Vertrag das Leben kostet. Erst sie macht einen Jahresbeitrag mit
+ * einem Monatsabo vergleichbar.
+ *
+ * GERUNDET und nicht wie `monatsanteil` mit dem Rest im ersten Monat: dort wird eine
+ * einzelne Zahlung auf ihre Monate verteilt und muss exakt aufgehen, weil die
+ * Überleitung sonst nicht gegen die Bank stimmt. Hier ist die Dauerrate gefragt — eine
+ * Zahl, die für jeden Monat gilt und sich mit keinem Kontoauszug messen muss.
+ *
+ * Anders als `ruecklageProMonat` darunter gilt sie für JEDE Regel: auch für die
+ * monatliche und für die Einnahme. Die beiden beantworten verschiedene Fragen („was
+ * kostet es" gegen „was muss ich beiseitelegen") und stimmen nur beim nicht-monatlichen
+ * Abfluss überein.
+ */
+export function kostenJeMonat(regel: Zahlungsregel): number {
+  const monate = RHYTHMUS_MONATE[regel.rhythmus];
+  // Über den Betrag ohne Vorzeichen runden: `Math.round` rundet die Hälfte nach OBEN,
+  // ein halber Cent fiele bei einem Abfluss also anders als bei einer Einnahme.
+  return Math.sign(regel.betrag) * Math.round(Math.abs(regel.betrag) / monate) || 0;
+}
+
+/**
+ * Läuft der Vertrag noch — kostet er also weiter?
+ *
+ * Nur `beendet` nimmt ihn heraus. Ein GEKÜNDIGTER Vertrag läuft bis zu seinem Ende
+ * weiter und kostet bis dahin; ihn schon mit der Kündigung aus den Fixkosten zu nehmen,
+ * zeigte Geld als frei, das noch monatelang abgeht.
+ */
+export function vertragLaeuft(v: Vertrag): boolean {
+  return v.status !== "beendet";
+}
+
+/** Was die Verträge zusammen den Monat bedeuten — die erste Stufe der Ergebnisrechnung. */
+export interface Pflichten {
+  /** Σ Kosten je Monat aller laufenden Aufwands-Verträge, negativ. */
+  readonly fixkosten: number;
+  /** Σ je Monat aller laufenden Ertrags-Verträge, positiv. */
+  readonly einnahmen: number;
+  /** `einnahmen + fixkosten` — was bleibt, bevor man etwas entscheidet. */
+  readonly nachPflichten: number;
+}
+
+/**
+ * Fixkosten, geplante Einnahmen und was danach bleibt, je Monat.
+ *
+ * Sortiert wird nach dem CHARAKTER der Regel, wie in `monatsErgebnis`: Aufwand sind
+ * Fixkosten, Ertrag Einnahmen. Eine **Umschichtung zählt in keine der beiden** — ein
+ * Umbuchungsvertrag bewegt eigenes Geld, er kostet nichts. In der Übersicht steht er
+ * deshalb in keiner Zeile der ersten Stufe (als Vorsorge allenfalls weiter unten), und
+ * hier muss dieselbe Zahl herauskommen, sonst zeigen zwei Bereiche unter demselben Wort
+ * („nach den Pflichten") Verschiedenes.
+ *
+ * Summiert werden die GERUNDETEN Werte je Vertrag: die Kennzahl ist damit die Summe der
+ * Spalte, die darunter steht, auf den Cent.
+ */
+export function pflichtenJeMonat(
+  posten: readonly { readonly vertrag: Vertrag; readonly regel?: Zahlungsregel }[],
+): Pflichten {
+  let fixkosten = 0;
+  let einnahmen = 0;
+  for (const { vertrag, regel } of posten) {
+    if (!regel || !vertragLaeuft(vertrag)) continue;
+    if (regel.charakter === "Aufwand") fixkosten += kostenJeMonat(regel);
+    else if (regel.charakter === "Ertrag") einnahmen += kostenJeMonat(regel);
+  }
+  return { fixkosten, einnahmen, nachPflichten: einnahmen + fixkosten };
+}
+
 /** Naht der nächste Kündigungstermin (kuendigenBis innerhalb `warnTage` ab heute)? */
 export function kuendigungsterminNaht(v: Vertrag, heute: string, warnTage = 45): boolean {
   // Ein Dauervertrag wird nicht „bald kündbar" — die Warnung gehört den Abos. Der Termin

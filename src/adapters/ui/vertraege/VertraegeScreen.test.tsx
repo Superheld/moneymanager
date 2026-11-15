@@ -132,6 +132,51 @@ describe("VertraegeScreen — Ansichten", () => {
   });
 
   /**
+   * Die Kennzahlen sind die erste Stufe der Ergebnisrechnung, über die Verträge als Plan:
+   * Kosten je Monat statt Betrag je Fälligkeit. 120/Jahr → 10,00, 55,44/Quartal → 18,48,
+   * dazu 47,00 monatlich: 75,48 Fixkosten. Die Sparrate ist eine Umbuchung und zählt in
+   * keine der beiden Summen — sonst stünde hier eine andere Zahl als in der Übersicht.
+   */
+  it("nennt Fixkosten, Einnahmen und was nach den Pflichten bleibt — je Monat", async () => {
+    await bestand();
+    await sqliteVertragRepository.speichern({
+      id: "e", anbieter: "Epsilon", beginn: tagNach(5), verlaengerung: "keine", status: "aktiv", art: "dauervertrag",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-e", bezeichnung: "Epsilon", betrag: 200000, rhythmus: "monatlich",
+      startdatum: tagNach(5), charakter: "Ertrag", kontoId: "k1", vertragId: "e",
+    });
+    await sqliteZahlungskontoRepository.speichern({
+      id: "k2", bezeichnung: "Tagesgeld", typ: "Tagesgeld", klasse: "sparen", inhaberIds: [], saldo: 0,
+    });
+    await sqliteVertragRepository.speichern({
+      id: "u", anbieter: "Zeta", beginn: tagNach(5), verlaengerung: "keine", status: "aktiv", art: "umbuchung",
+    });
+    await sqliteZahlungsregelRepository.speichern({
+      id: "r-u", bezeichnung: "Zeta", betrag: -30000, rhythmus: "monatlich",
+      startdatum: tagNach(5), charakter: "Umschichtung", kontoId: "k1", gegenkontoId: "k2", vertragId: "u",
+    });
+    rendere(<VertraegeScreen />);
+    await screen.findByText("Alpha");
+
+    const kpis = document.querySelector(".kpis") as HTMLElement;
+    const kachel = (schluessel: string) => within(kpis).getByText(i18n.t(schluessel)).parentElement!.textContent ?? "";
+    await waitFor(() => expect(kachel("vertraege.kpiFixkosten")).toMatch(/75,48/));
+    expect(kachel("vertraege.kpiEinnahmen")).toMatch(/2\.000,00/);
+    // 2.000,00 − 75,48 — ohne die 300,00 der Umbuchung.
+    expect(kachel("ergebnis.stufe.nachPflichten")).toMatch(/1\.924,52/);
+  });
+
+  it("zeigt je Vertrag die Kosten je Monat neben dem Betrag je Fälligkeit", async () => {
+    await bestand();
+    rendere(<VertraegeScreen />);
+    const zeile = (await screen.findByText("Alpha")).closest("tr") as HTMLElement;
+    // Der Jahresbeitrag steht mit beidem da: was abgeht und was er kostet.
+    expect(zeile.textContent).toMatch(/120,00/);
+    expect(zeile.textContent).toMatch(/10,00/);
+  });
+
+  /**
    * Der Filter nach Art blendet in der Liste aus, lässt die Kennzahlen darüber aber
    * stehen: die gelten dem ganzen Bestand und kommen fertig aus der Anwendungsschicht.
    * Und mit nur EINER Art im Bestand gibt es ihn gar nicht — zwischen „alle" und ihr

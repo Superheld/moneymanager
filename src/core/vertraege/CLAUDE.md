@@ -2,6 +2,33 @@
 
 Gilt für die Zuordnung von Buchungen zu Verträgen und für die Erkennungsregeln. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
 
+## Ein Vertrag hat zwei Beträge: was abgeht und was er kostet
+
+Die Zahlungsregel trägt den Betrag **je Fälligkeit** — die Auszahlung. Daneben steht, was
+der Vertrag **den Monat kostet**: derselbe Betrag auf die Monate des Rhythmus verteilt
+(`kostenJeMonat` in `vertrag.ts`). Das sind die beiden Sichten aus `src/core/CLAUDE.md`
+(„Auszahlung und Kosten"), und der Bereich zeigt beide, weil erst die zweite einen
+Jahresbeitrag mit einem Monatsabo vergleichbar macht.
+
+Die Kennzahlen über der Liste (`pflichtenJeMonat`) sind die erste Stufe der
+Ergebnisrechnung, über die Verträge als Plan: Fixkosten, geplante Einnahmen, und was
+**nach den Pflichten** bleibt. Drei Dinge daran:
+
+- **Sortiert wird nach dem Charakter der Regel**, wie in `core/ergebnis.ts`: Aufwand sind
+  Fixkosten, Ertrag Einnahmen. Das Wort „nach den Pflichten" steht auch in der Übersicht,
+  und zwei Bereiche, die darunter Verschiedenes rechnen, wären zwei Wahrheiten.
+- **Ein Umbuchungsvertrag zählt in keine der beiden Summen.** Er bewegt eigenes Geld und
+  kostet nichts. Eine Summe „pro Monat" über alle Regeln — die hier lange stand — mischte
+  Einnahmen, Ausgaben und Sparraten und beantwortete keine Frage.
+- **Nur `beendet` nimmt einen Vertrag heraus** (`vertragLaeuft`). Ein gekündigter läuft
+  bis zu seinem Ende und kostet bis dahin; ihn mit der Kündigung herauszunehmen zeigte
+  Geld als frei, das noch abgeht.
+
+`kostenJeMonat` RUNDET, `monatsanteil` in `core/ergebnis.ts` nicht — und beides ist
+richtig. Dort wird eine einzelne Zahlung auf ihre Monate verteilt und muss auf den Cent
+aufgehen (der Rest fällt in den ersten Monat), weil die Überleitung sonst nicht gegen die
+Bank stimmt. Hier ist die Dauerrate gefragt, die für jeden Monat gilt.
+
 ## Zuordnungen stehen an der Buchung
 
 `kategorie_id` und `vertrag_id` sind **Spalten von `ist_buchung`**, nicht eigene Tabellen.

@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
+  kostenJeMonat,
+  pflichtenJeMonat,
+  vertragLaeuft,
   kuendigungsterminNaht,
   naechsterKuendigungstermin,
   ruecklagenbedarf,
@@ -118,5 +121,85 @@ describe("Vertragsart", () => {
   it("behandelt einen Vertrag ohne Art wie ein Abo", () => {
     // Bestandsdaten tragen das Feld nicht — sie sollen sich verhalten wie bisher.
     expect(kuendigungsterminNaht(basis, "2026-08-19")).toBe(true);
+  });
+});
+
+describe("kostenJeMonat", () => {
+  const regel = (over: Partial<Zahlungsregel>): Zahlungsregel => ({
+    id: "r",
+    bezeichnung: "Regel",
+    betrag: -60000,
+    rhythmus: "jaehrlich",
+    startdatum: "2026-01-15",
+    charakter: "Aufwand",
+    ...over,
+  });
+
+  it("verteilt den Betrag auf die Monate des Rhythmus", () => {
+    expect(kostenJeMonat(regel({ betrag: -60000, rhythmus: "jaehrlich" }))).toBe(-5000);
+    expect(kostenJeMonat(regel({ betrag: -5544, rhythmus: "quartalsweise" }))).toBe(-1848);
+    expect(kostenJeMonat(regel({ betrag: -9000, rhythmus: "halbjaehrlich" }))).toBe(-1500);
+  });
+
+  it("lässt eine monatliche Zahlung, wie sie ist", () => {
+    expect(kostenJeMonat(regel({ betrag: -4700, rhythmus: "monatlich" }))).toBe(-4700);
+  });
+
+  it("behält das Vorzeichen — eine Einnahme bleibt eine Einnahme", () => {
+    expect(kostenJeMonat(regel({ betrag: 120000, rhythmus: "jaehrlich", charakter: "Ertrag" }))).toBe(10000);
+  });
+
+  it("rundet Abfluss und Zufluss gleich", () => {
+    // 10,01 im Quartal sind 3,3366… — und 10,05 im Halbjahr genau 1,675: die Hälfte.
+    expect(kostenJeMonat(regel({ betrag: -1005, rhythmus: "halbjaehrlich" }))).toBe(-168);
+    expect(kostenJeMonat(regel({ betrag: 1005, rhythmus: "halbjaehrlich", charakter: "Ertrag" }))).toBe(168);
+  });
+
+  it("liefert bei Betrag null eine saubere Null", () => {
+    expect(Object.is(kostenJeMonat(regel({ betrag: 0 })), 0)).toBe(true);
+  });
+});
+
+describe("pflichtenJeMonat", () => {
+  const posten = (
+    id: string,
+    betrag: number,
+    rhythmus: Zahlungsregel["rhythmus"],
+    charakter: Zahlungsregel["charakter"],
+    over: Partial<Vertrag> = {},
+  ) => ({
+    vertrag: vertrag({ id, ...over }),
+    regel: { id: `r-${id}`, bezeichnung: id, betrag, rhythmus, startdatum: "2026-01-01", charakter, vertragId: id },
+  });
+
+  it("trennt Fixkosten von Einnahmen und nennt, was bleibt", () => {
+    const p = pflichtenJeMonat([
+      posten("a", -60000, "jaehrlich", "Aufwand"),
+      posten("b", -4700, "monatlich", "Aufwand"),
+      posten("c", 250000, "monatlich", "Ertrag"),
+    ]);
+    expect(p).toEqual({ fixkosten: -9700, einnahmen: 250000, nachPflichten: 240300 });
+  });
+
+  it("zählt einen Umbuchungsvertrag nicht mit — er bewegt eigenes Geld", () => {
+    const p = pflichtenJeMonat([
+      posten("a", -4700, "monatlich", "Aufwand"),
+      posten("u", -30000, "monatlich", "Umschichtung", { art: "umbuchung" }),
+    ]);
+    expect(p).toEqual({ fixkosten: -4700, einnahmen: 0, nachPflichten: -4700 });
+  });
+
+  it("lässt einen beendeten Vertrag aus, einen gekündigten nicht", () => {
+    const p = pflichtenJeMonat([
+      posten("a", -1000, "monatlich", "Aufwand", { status: "beendet" }),
+      posten("b", -2000, "monatlich", "Aufwand", { status: "gekuendigt" }),
+    ]);
+    expect(p.fixkosten).toBe(-2000);
+    expect(vertragLaeuft(vertrag({ status: "gekuendigt" }))).toBe(true);
+    expect(vertragLaeuft(vertrag({ status: "beendet" }))).toBe(false);
+  });
+
+  it("übergeht einen Vertrag ohne Zahlungsregel", () => {
+    expect(pflichtenJeMonat([{ vertrag: vertrag() }])).toEqual({ fixkosten: 0, einnahmen: 0, nachPflichten: 0 });
   });
 });
