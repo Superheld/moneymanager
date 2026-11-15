@@ -139,6 +139,14 @@ describe("ErgebnisKarten", () => {
     expect(ist.compareDocumentPosition(plan) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
+  it("nennt nur am laufenden Monat, womit er voraussichtlich endet", async () => {
+    rendere(<ErgebnisKarten {...props()} />);
+    const august = await karte("August 2026");
+    expect(within(august).getByText(text("ergebnis.erwartet"))).toBeInTheDocument();
+    const september = await karte("September 2026");
+    expect(within(september).queryByText(text("ergebnis.erwartet"))).not.toBeInTheDocument();
+  });
+
   it("zeigt für kommende Monate nur die Plan-Spalte und keinen Weg zum Konto", async () => {
     rendere(<ErgebnisKarten {...props()} />);
     const september = await karte("September 2026");
