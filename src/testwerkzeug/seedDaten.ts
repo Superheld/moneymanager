@@ -396,6 +396,103 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     );
   }
 
+  // ------------------------------------------------------------ Vermoegen und Vorsorge
+
+  // Bis zum Bereich Vermoegen (Migrationen 77 und 78) legte der Spielstand davon nichts
+  // an — der Bereich startete in der Entwicklung leer, und niemand konnte ihn ansehen.
+  //
+  // Die Reihen reichen bewusst WEITER zurueck als die Buchungen (`MONATE`): der Verlauf
+  // des Nettovermoegens beginnt bei der ersten eigenen Beobachtung, und ein Verlauf, der
+  // nur so weit reicht wie der Kontoverlauf der Analyse, zeigte nichts Eigenes. Die
+  // Abstaende sind die, in denen jemand nachsieht — Jahres- und Halbjahresauszuege —,
+  // und der juengste Stichtag liegt nie nach `stichtag`: eine Beobachtung aus der Zukunft
+  // gibt es nicht.
+  //
+  // Kein Wuerfel in diesem Abschnitt: er zoege Zahlen aus derselben Folge wie die
+  // Buchungen darunter und verschoebe damit den ganzen Alltag des Spielstands.
+
+  // Das Ziel zuerst — der Vermoegenswert unten verweist darauf.
+  setzen("INSERT INTO vorsorgeziel (id, bezeichnung, erfasst_am) VALUES (?, ?, ?)", [
+    "vorsorge-1",
+    "Ruhestand",
+    JETZT,
+  ]);
+  // ZWEI Zeilen, weil die Reihe mit „gilt ab" der Grund ist, warum es die Tabelle gibt:
+  // die aeltere rechnete mit hoeherer Rendite, die juengere senkt sie und hebt den
+  // Wunsch. Die Zahlen sind so gewaehlt, dass die Karte eine Sparrate zeigt — weder
+  // „gedeckt" (dann waere die Kette nicht zu sehen) noch „unerreichbar" (dann fehlte die
+  // Rate). Der Zielmonat liegt relativ zum Stichtag, damit das auch in Jahren noch gilt.
+  for (const a of [
+    { ab: monat(-MONATE), wunsch: 220000, rente: 150000, renditeBp: 350 },
+    { ab: monat(-3), wunsch: 240000, rente: 150000, renditeBp: 250 },
+  ]) {
+    setzen(
+      "INSERT INTO vorsorgeziel_annahme (ziel_id, ab_monat, ziel_monat, wunsch_monatlich, rente_monatlich, entnahme_monate, rendite_bp) " +
+        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ["vorsorge-1", a.ab, monat(22 * 12), a.wunsch, a.rente, 25 * 12, a.renditeBp],
+    );
+  }
+
+  // Drei Vermoegenswerte, und nur EINER zaehlt zum Ziel: die Versicherung mit
+  // Rueckkaufswert. Das Fahrzeug verliert an Wert, die Beteiligung wird selten
+  // nachgesehen — beides Faelle, an denen „es gilt die juengste Beobachtung, nichts wird
+  // interpoliert" sichtbar wird.
+  const gegenstaende = [
+    {
+      id: "gegenstand-versicherung", bezeichnung: "Kapitalversicherung", art: "versicherung", ziel: "vorsorge-1",
+      reihe: [[48, 1240000], [36, 1395000], [24, 1560000], [12, 1730000], [0, 1905000]],
+    },
+    {
+      id: "gegenstand-fahrzeug", bezeichnung: "Fahrzeug", art: "fahrzeug", ziel: null,
+      reihe: [[42, 2450000], [30, 2080000], [18, 1790000], [6, 1560000]],
+    },
+    {
+      id: "gegenstand-beteiligung", bezeichnung: "Beteiligung Oelkers", art: "beteiligung", ziel: null,
+      reihe: [[30, 500000], [6, 540000]],
+    },
+  ] as const;
+  for (const g of gegenstaende) {
+    setzen(
+      "INSERT INTO vermoegensgegenstand (id, bezeichnung, art, aktiv, vorsorgeziel_id) VALUES (?, ?, ?, ?, ?)",
+      [g.id, g.bezeichnung, g.art, 1, g.ziel],
+    );
+    for (const [vorMonaten, wert] of g.reihe) {
+      setzen("INSERT INTO vermoegenswert (gegenstand_id, stichtag, wert, erfasst_am) VALUES (?, ?, ?, ?)", [
+        g.id,
+        tagIn(-vorMonaten, 1),
+        wert,
+        JETZT,
+      ]);
+    }
+  }
+
+  // Zwei Schulden mit sinkender Restschuld. Der Ratenkredit finanziert das Fahrzeug und
+  // zeigt damit den Verweis auf den Vermoegenswert. Einen Vertrag bekommt er NICHT: der
+  // Spielstand hat keinen, ueber den eine Kreditrate liefe, und einen dafuer anzulegen
+  // haette Buchungen, Plan und Ergebnis aller anderen Bereiche mitverschoben.
+  const schulden = [
+    {
+      id: "schuld-ratenkredit", bezeichnung: "Ratenkredit", art: "ratenkredit", gegenstand: "gegenstand-fahrzeug",
+      reihe: [[42, 2000000], [30, 1560000], [18, 1110000], [6, 650000]],
+    },
+    {
+      id: "schuld-privat", bezeichnung: "Privatdarlehen", art: "privat", gegenstand: null,
+      reihe: [[24, 600000], [12, 400000], [0, 200000]],
+    },
+  ] as const;
+  for (const s of schulden) {
+    setzen(
+      "INSERT INTO verbindlichkeit (id, bezeichnung, art, vertrag_id, gegenstand_id, aktiv) VALUES (?, ?, ?, ?, ?, ?)",
+      [s.id, s.bezeichnung, s.art, null, s.gegenstand, 1],
+    );
+    for (const [vorMonaten, restschuld] of s.reihe) {
+      setzen(
+        "INSERT INTO verbindlichkeit_stand (verbindlichkeit_id, stichtag, restschuld, erfasst_am) VALUES (?, ?, ?, ?)",
+        [s.id, tagIn(-vorMonaten, 1), restschuld, JETZT],
+      );
+    }
+  }
+
   // ------------------------------------------------------------ Buchungen
 
   let lfd = 0;

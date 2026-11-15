@@ -5,6 +5,18 @@ Alle nennenswerten Änderungen an Moneymanager. Format angelehnt an
 
 ## [Unveröffentlicht]
 
+### Neu
+
+**Der Bereich Vermögen.** Vermögenswerte (etwa ein Fahrzeug oder eine Versicherung mit
+Rückkaufswert) und Schulden stehen als Wert bzw. Restschuld zum Stichtag da, wie man sie
+aus dem Auszug abliest. Daraus und aus Konten und Depots rechnet die App das
+Nettovermögen, mit seinem Verlauf über die Monatsenden.
+
+**Das Vorsorgeziel**, im Bereich Vermögen. Aus Wunschbetrag, erwarteter Rente,
+Entnahmezeit und Rendite rechnet es, was am Zieltag da sein muss und welche Sparrate das
+im Monat verlangt. Die Annahmen gelten ab dem Monat, in dem sie eingetragen wurden — was
+vorher galt, bleibt für die Monate davor stehen.
+
 ### Geändert
 
 **Kein „Alpha" mehr neben der Version.** Dass die App noch nicht stabil ist, sagt die 0
