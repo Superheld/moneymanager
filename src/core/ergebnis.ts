@@ -15,6 +15,10 @@
 //   • Ein VORSORGEZIEL kostet die Sparrate, die es verlangt (`vorsorgerateIm`). Was
 //     tatsächlich in die Vorsorge überwiesen wurde, ist die Zuführung und steht in der
 //     Überleitung, nicht in den Kosten. Ohne Ziel zählt die Überweisung selbst.
+//   • Eine KREDITRATE wird geteilt, wenn eine Schuld auf ihren Vertrag verweist: die
+//     Zinsen bleiben unter den Verträgen, die TILGUNG steht in der dritten Stufe
+//     (`tilgungAbspalten`). Die Tilgung kommt aus der Reihe der Restschulden
+//     (`vermoegen/tilgung.ts`), nicht aus einem Plan.
 //
 // Darunter steht die ÜBERLEITUNG: sie führt vom Ergebnis zur Änderung der Kontostände
 // und muss exakt auf die Summe der Buchungen ohne Gegenbein aufgehen. Das ist keine
@@ -25,7 +29,14 @@
 //
 //     Einnahmen − Fixkosten                       = nach den Pflichten
 //     − laufende Kosten − Ungeplantes             = was der Alltag übrig lässt
-//     − Abschreibungen − Wagnisse − Vorsorge      = Ergebnis
+//     − Abschreibungen − Wagnisse − Vorsorge
+//     − Tilgung                                   = Ergebnis
+//
+// Die Tilgung steht unten und nicht als blosse Verwendung des Überschusses — aus
+// demselben Grund wie die Vorsorge (`core/CLAUDE.md`): sonst sähe ein Monat, in dem
+// nichts getilgt wurde, besser aus. „Bleibt wirklich frei" ändert sich durch die Teilung
+// nicht; ehrlicher werden die beiden Zwischensummen davor, die eine Kreditrate bis dahin
+// ganz als Pflicht führten, obwohl ein Teil davon Vermögen aufbaut.
 //
 // WAS HIER NOCH NICHT GILT, und wer es ändert, ändert es hier:
 //
@@ -48,7 +59,8 @@ import { einordnen, type Einordnung, type Einordnungskontext } from "./einordnun
 import type { Kategorie } from "./kategorien/kategorie";
 import { istVorsorgekonto, type Zahlungskonto } from "./konten/konto";
 import { hatGeschichte, sollRuecklage, zyklusSoll, type Ruecklage, type Ruecklagenzyklus } from "./ruecklagen/ruecklage";
-import type { VermoegensEingabe } from "./vermoegen/vermoegen";
+import { tilgungIm } from "./vermoegen/tilgung";
+import { wirdGefuehrt, type VermoegensEingabe } from "./vermoegen/vermoegen";
 import { annahmeIm, vorsorgestand, vorsorgevermoegen, type Vorsorgezielannahme } from "./vorsorge/vorsorge";
 
 export type ErgebnisZeileId =
@@ -58,7 +70,8 @@ export type ErgebnisZeileId =
   | "ungeplant"
   | "abschreibungen"
   | "wagnisse"
-  | "vorsorge";
+  | "vorsorge"
+  | "tilgung";
 
 export type PostenStand = "gebucht" | "offen" | "ohnePlan";
 
@@ -79,6 +92,13 @@ export interface ErgebnisPosten {
   readonly vertragId?: string;
   readonly budgetId?: string;
   readonly ruecklageId?: string;
+  /** Bei der Tilgung: die Schuld, deren Restschuld sinkt. */
+  readonly verbindlichkeitId?: string;
+  /**
+   * Bei einem Vertrag, über den eine Schuld läuft: der Posten zeigt nur noch die ZINSEN,
+   * weil die Tilgung abgespalten wurde und in ihrer eigenen Zeile steht.
+   */
+  readonly nurZinsen?: true;
   /** Über wie viele Monate die Zahlung verteilt ist — nur gesetzt, wenn mehr als einer. */
   readonly teile?: number;
   /**
@@ -172,7 +192,15 @@ export interface ErgebnisEingabe {
   readonly heute: string;
   /** Das Vorsorgeziel, falls eines angelegt ist. Fehlt es, zählt die tatsächliche Umbuchung. */
   readonly vorsorge?: ErgebnisVorsorge;
+  /**
+   * Die Schulden mit ihren Restschulden — gebraucht wird nur, was auf einen Vertrag
+   * verweist. Fehlt die Angabe, rechnet jede Kreditrate ganz als Kosten des Vertrags.
+   */
+  readonly schulden?: ErgebnisSchulden;
 }
+
+/** Was die Ergebnisrechnung von den Schulden braucht — derselbe Bestand wie im Bereich Vermögen. */
+export type ErgebnisSchulden = Pick<VermoegensEingabe, "verbindlichkeiten" | "staende">;
 
 /**
  * Was die Ergebnisrechnung über das Vorsorgeziel wissen muss, um seine Rate für JEDEN
@@ -351,12 +379,13 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
     basis.einordnungen.filter((x) => x.art === "einnahme"),
     { von, zukunft, periodisiert: false },
   );
-  const fixkosten = regelZeile(
+  const fixkostenGesamt = regelZeile(
     "fixkosten",
     e.regeln.filter((r) => r.charakter === "Aufwand"),
     basis.einordnungen.filter((x) => x.art === "fixkosten"),
     { von, zukunft, periodisiert: true },
   );
+  const { fixkosten, tilgung } = tilgungAbspalten(fixkostenGesamt, e.schulden, { monat, von, zukunft });
   // Mit Ziel ersetzt seine Rate die Zeile ganz, auch die Daueraufträge darin: deren
   // Plan neben der Rate stünde zweimal für dasselbe Geld da. Die Überweisungen selbst
   // stehen am Posten (`zufuehrung`) und in der Überleitung.
@@ -502,7 +531,7 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
   // Die drei ersten Zeilen stehen immer da: ein Monat ohne Einnahmen, Fixkosten oder
   // Alltag ist eine Aussage. Die übrigen nur, wenn es sie gibt — Zeilen voller Nullen
   // wären bei einem Haushalt ohne Töpfe Lärm.
-  const zeilen = [einnahmen, fixkosten, laufendeKosten, ungeplant, abschreibungen, wagnisse, vorsorge].filter(
+  const zeilen = [einnahmen, fixkosten, laufendeKosten, ungeplant, abschreibungen, wagnisse, vorsorge, tilgung].filter(
     (z, i) => i < 3 || z.posten.length > 0,
   );
 
@@ -512,7 +541,7 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
   });
   const nachPflichten = stufe(einnahmen, fixkosten);
   const nachAlltag = stufe(einnahmen, fixkosten, laufendeKosten, ungeplant);
-  const ergebnis = stufe(einnahmen, fixkosten, laufendeKosten, ungeplant, abschreibungen, wagnisse, vorsorge);
+  const ergebnis = stufe(einnahmen, fixkosten, laufendeKosten, ungeplant, abschreibungen, wagnisse, vorsorge, tilgung);
 
   return {
     jahr: start.y,
@@ -532,7 +561,9 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
       : ueberleitung(ergebnis.ist ?? 0, {
           raten: -((abschreibungen.ist ?? 0) + (wagnisse.ist ?? 0) + (mitZiel ? vorsorge.ist ?? 0 : 0)) || 0,
           entnahmen: summe([...derArt("topf"), ...derArt("ruecklage")].map((x) => x.betrag)),
-          periodisierung: summe(derArt("fixkosten").map((x) => x.betrag)) - (fixkosten.ist ?? 0) || 0,
+          // Gegen die Verträge VOR der Teilung: die Tilgung ist mit der Rate vom Konto
+          // gegangen, sie ist kein Unterschied zwischen Kosten und Auszahlung.
+          periodisierung: summe(derArt("fixkosten").map((x) => x.betrag)) - (fixkostenGesamt.ist ?? 0) || 0,
           // Mit Ziel ist die Überweisung nicht die Kosten, sondern ihre Gegenseite: sie
           // geht vom Konto, steht aber nicht im Ergebnis. Ohne Ziel steht sie schon oben.
           zufuehrung: mitZiel ? zugefuehrt : 0,
@@ -544,6 +575,81 @@ export function monatsErgebnis(basis: Ergebnisbasis, monatAb: string): MonatsErg
             ) || 0,
         }),
   };
+}
+
+/**
+ * Teilt die Rate eines Vertrags, über den eine Schuld läuft, in Zinsen und Tilgung.
+ *
+ * Die Tilgung des Monats kommt aus der Reihe der Restschulden (`tilgungIm`) und wird hier
+ * nur noch begrenzt: **nie mehr, als der Vertrag in dem Monat kostet** — für den Plan
+ * gegen seinen Plan, für das Ist gegen sein Ist. Eine Sondertilgung senkt die Restschuld,
+ * läuft aber nicht über die Rate; ohne die Grenze stünde sie als Tilgung eines Monats da,
+ * dessen Zinsen dann negativ wären. Und ein Monat, in dem die Rate (noch) nicht abgebucht
+ * ist, hat im Ist nichts zu teilen.
+ *
+ * Gegen die KOSTEN des Vertrags und nicht gegen seine Zahlung: bei einem periodisierten
+ * Vertrag (ein Jahreszahler) kostet jeder Monat ein Zwölftel, und gegen dieses Zwölftel
+ * wird die Monatstilgung gestellt. Beides ist gleichmässig über die Monate verteilt, also
+ * passt es zusammen.
+ *
+ * Was abgespalten wird, verschwindet aus den Vertragsposten und steht als eigener Posten
+ * in der Zeile „tilgung". Beide Zeilen zusammen sind in Plan und Ist genau, was der
+ * Vertrag vorher allein war — das Ergebnis ändert sich nicht, nur seine Stufen. Der
+ * Status folgt dem Vertrag: ist seine Rate noch offen, ist es auch die Tilgung, und die
+ * Hochrechnung nimmt für beide den Plan.
+ *
+ * Die Einordnung der einzelnen Buchung (`einordnung.ts`) bleibt davon unberührt: die
+ * Zahlung IST eine Vertragszahlung. Die Teilung ist eine Rechnung über den Monat, keine
+ * Eigenschaft der Buchung — eine Abbuchung trägt nicht in sich, welcher Teil Zins war.
+ */
+function tilgungAbspalten(
+  vertraege: ErgebnisZeile,
+  schulden: ErgebnisSchulden | undefined,
+  o: { monat: string; von: string; zukunft: boolean },
+): { fixkosten: ErgebnisZeile; tilgung: ErgebnisZeile } {
+  let posten = vertraege.posten;
+  const tilgungsposten: ErgebnisPosten[] = [];
+  for (const v of schulden?.verbindlichkeiten ?? []) {
+    const vertragId = v.vertragId;
+    if (!vertragId) continue;
+    const monatlich = tilgungIm(
+      schulden!.staende.filter((s) => s.verbindlichkeitId === v.id),
+      wirdGefuehrt(v),
+      o.monat,
+    );
+    if (!monatlich) continue;
+    const eigene = posten.filter((p) => p.vertragId === vertragId);
+    if (eigene.length === 0) continue;
+
+    const plan = Math.min(monatlich, Math.max(0, -summe(eigene.map((p) => p.plan))));
+    const ist = o.zukunft ? null : Math.min(monatlich, Math.max(0, -summe(eigene.map((p) => p.ist ?? 0))));
+    if (plan === 0 && (ist ?? 0) === 0) continue;
+
+    // Abgezogen wird Posten für Posten, bis die Tilgung verteilt ist — der Normalfall ist
+    // EIN Posten je Vertrag und Monat.
+    let restPlan = plan;
+    let restIst = ist ?? 0;
+    posten = posten.map((p): ErgebnisPosten => {
+      if (p.vertragId !== vertragId) return p;
+      const abPlan = Math.min(restPlan, Math.max(0, -p.plan));
+      const abIst = p.ist == null ? 0 : Math.min(restIst, Math.max(0, -p.ist));
+      restPlan -= abPlan;
+      restIst -= abIst;
+      if (abPlan === 0 && abIst === 0) return p;
+      return { ...p, plan: p.plan + abPlan || 0, ist: p.ist == null ? null : p.ist + abIst || 0, nurZinsen: true };
+    });
+    tilgungsposten.push({
+      schluessel: `tilgung:${v.id}@${o.von}`,
+      bezeichnung: v.bezeichnung,
+      plan: -plan || 0,
+      ist: ist == null ? null : -ist || 0,
+      status: o.zukunft || eigene.every((p) => p.status === "offen") ? "offen" : "gebucht",
+      vertragId,
+      verbindlichkeitId: v.id,
+    });
+  }
+  if (tilgungsposten.length === 0) return { fixkosten: vertraege, tilgung: zeile("tilgung", [], o.zukunft) };
+  return { fixkosten: zeile("fixkosten", posten, o.zukunft), tilgung: zeile("tilgung", tilgungsposten, o.zukunft) };
 }
 
 function ueberleitung(ergebnis: Cent, teile: Record<UeberleitungId, Cent>): Ueberleitung {
@@ -700,7 +806,9 @@ export function hochrechnung(zeilen: readonly ErgebnisZeile[]): Cent {
 }
 
 /** Die Zeilen, deren Posten aus Zahlungsregeln kommen: dort heisst „offen", es kommt noch. */
-const VERTRAGSZEILEN: ReadonlySet<ErgebnisZeileId> = new Set(["einnahmen", "fixkosten", "vorsorge"]);
+// Die Tilgung gehört dazu: sie ist der Teil einer Vertragsrate, und ist die Rate noch
+// offen, kommt auch die Tilgung noch.
+const VERTRAGSZEILEN: ReadonlySet<ErgebnisZeileId> = new Set(["einnahmen", "fixkosten", "vorsorge", "tilgung"]);
 
 /** Die Ergebnisrechnungen ab dem Monat von `heute` — der laufende und die folgenden. */
 export function monatsErgebnisse(basis: Ergebnisbasis, anzahl = 3): MonatsErgebnis[] {
@@ -718,7 +826,7 @@ export function monatsErgebnisse(basis: Ergebnisbasis, anzahl = 3): MonatsErgebn
 // in die Kennzahlen eingehen muss.
 
 /** Die Zeilen, die KOSTEN sind — alle ausser den Einnahmen, in der Reihenfolge der Stufen. */
-export const KOSTENZEILEN = ["fixkosten", "laufend", "ungeplant", "abschreibungen", "wagnisse", "vorsorge"] as const;
+export const KOSTENZEILEN = ["fixkosten", "laufend", "ungeplant", "abschreibungen", "wagnisse", "vorsorge", "tilgung"] as const;
 export type KostenZeileId = (typeof KOSTENZEILEN)[number];
 
 /**
@@ -741,9 +849,12 @@ export interface ErgebnisKennzahlen {
   readonly kostenJeMonat: Cent;
   /** Durchschnitt je Monat, vorzeichenbehaftet — „bleibt wirklich frei". */
   readonly ergebnisJeMonat: Cent;
-  /** Fixkosten ÷ Einnahmen (0…1, bei Überdeckung darüber). `null` ohne Einnahmen. */
+  /**
+   * Fixkosten ÷ Einnahmen (0…1, bei Überdeckung darüber). `null` ohne Einnahmen. Bei
+   * einem Kredit zählen nur seine Zinsen — die Tilgung baut Vermögen auf.
+   */
   readonly fixkostenquote: number | null;
-  /** (Rücklagen + aufbauende Budgets + Vorsorge) ÷ Einnahmen. `null` ohne Einnahmen. */
+  /** (Rücklagen + aufbauende Budgets + Vorsorge + Tilgung) ÷ Einnahmen. `null` ohne Einnahmen. */
   readonly sparquote: number | null;
 }
 
@@ -775,7 +886,9 @@ export function ergebnisKennzahlen(monate: readonly MonatsErgebnis[]): ErgebnisK
   const kosten = summe(gewesen.map(monatsKosten));
   const ergebnis = summe(gewesen.map((m) => m.ergebnis.ist ?? 0));
   const fix = -ueberAlle("fixkosten");
-  const gespart = -(ueberAlle("abschreibungen") + ueberAlle("wagnisse") + ueberAlle("vorsorge"));
+  // Die Tilgung zählt mit: sie baut Vermögen auf wie eine Rücklagenrate, nur auf der
+  // anderen Seite der Bilanz — die Schuld sinkt, statt dass ein Topf wächst.
+  const gespart = -(ueberAlle("abschreibungen") + ueberAlle("wagnisse") + ueberAlle("vorsorge") + ueberAlle("tilgung"));
 
   return {
     monate: n,

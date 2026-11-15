@@ -17,7 +17,16 @@
 // amberfarbener Stapel hiesse „sieh hin", und Kosten zu haben ist kein Befund. Die
 // Einnahmen sind eine Linie in `--ink` und nicht grün wie im Flussdiagramm — sie läuft
 // über sechs farbige Flächen, und zwei davon sind selbst Grüntöne.
+//
+// DIE SIEBTE ART, die Tilgung (seit 2026-11-15), bekommt KEINE siebte Farbe. Die Reihe hat
+// sechs Töne, die bei Farbfehlsichtigkeit unterscheidbar geprüft sind; ein siebter wäre
+// ungeprüft, und ein zyklischer Index gäbe ihr die Farbe der Fixkosten. Sie trägt den Ton
+// der Vorsorge (`--serie-6`) SCHRAFFIERT: beides baut Vermögen auf und steht in derselben
+// Stufe — der Ton sagt „dieselbe Familie", die Schraffur „eine andere Art". Eine Schraffur
+// ist eine Form und keine Farbe, sie trägt auch dort, wo zwei Töne für das Auge
+// zusammenfallen. Die Legende zeigt dasselbe Muster.
 
+import { useId } from "react";
 import { useTranslation } from "react-i18next";
 import { KOSTENZEILEN, type KostenMonat, type KostenZeileId } from "../../../application";
 import { useGeld } from "../bausteine/einstellungenKontext";
@@ -35,7 +44,12 @@ const FARBE: Record<KostenZeileId, string> = {
   abschreibungen: "var(--serie-4)",
   wagnisse: "var(--serie-5)",
   vorsorge: "var(--serie-6)",
+  // Derselbe Ton wie die Vorsorge — die Fläche schraffiert ihn (`SCHRAFFIERT`, oben im Kopf).
+  tilgung: "var(--serie-6)",
 };
+
+/** Die Arten, deren Fläche schraffiert statt voll gezeichnet wird. */
+const SCHRAFFIERT: ReadonlySet<KostenZeileId> = new Set(["tilgung"]);
 
 /** Blass steht, was noch läuft — dieselbe Zurücknahme wie beim Plan im Flussdiagramm. */
 const BLASS = 0.45;
@@ -43,6 +57,11 @@ const BLASS = 0.45;
 export function KostenStapelChart({ monate, width = 1000, height = 260 }: { monate: readonly KostenMonat[]; width?: number; height?: number }) {
   const { t } = useTranslation();
   const geld = useGeld();
+  // Eine Kennung je Diagramm: zwei Diagramme auf derselben Seite dürfen sich ihr Muster
+  // nicht gegenseitig überschreiben. `useId` liefert Doppelpunkte, die in `url(#…)` nicht
+  // zuverlässig tragen.
+  const musterId = `schraffur-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const flaeche = (art: KostenZeileId) => (SCHRAFFIERT.has(art) ? `url(#${musterId})` : FARBE[art]);
   // Derselbe linke Rand wie die beiden anderen Charts des Verlaufs: beim Umschalten
   // bleiben die Monate an ihrem Platz.
   const padL = 56;
@@ -78,6 +97,12 @@ export function KostenStapelChart({ monate, width = 1000, height = 260 }: { mona
   return (
     <div>
       <svg viewBox={`0 0 ${width} ${height}`} width="100%" style={{ display: "block", height: "auto" }} role="img" aria-label={t("historie.kosten.diagrammName")}>
+        <defs>
+          <pattern id={musterId} width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <rect width="6" height="6" fill="var(--surface)" />
+            <rect width="3" height="6" fill={FARBE.tilgung} />
+          </pattern>
+        </defs>
         {gitter.map((g, i) => (
           <g key={i}>
             <line x1={padL} y1={g.y} x2={width - padR} y2={g.y} stroke={g.v === 0 ? "var(--ink-3)" : "var(--line)"} strokeWidth={g.v === 0 ? 1.2 : 1} />
@@ -95,7 +120,7 @@ export function KostenStapelChart({ monate, width = 1000, height = 260 }: { mona
                 unten -= hh;
                 // Ein Pixel Fläche zwischen den Teilen: ohne die Fuge verschmelzen zwei
                 // benachbarte Töne, und der Stapel liest sich als ein Block.
-                return <rect key={art} data-art={art} x={mitte(i) - bw / 2} y={unten} width={bw} height={Math.max(0, hh - 1)} fill={FARBE[art]} />;
+                return <rect key={art} data-art={art} x={mitte(i) - bw / 2} y={unten} width={bw} height={Math.max(0, hh - 1)} fill={flaeche(art)} />;
               })}
               {/* Der Slot in voller Höhe, damit der Titel auch über der Lücke erscheint. */}
               <rect x={padL + slot * i} y={padT} width={slot} height={innerH} fill="transparent" />
@@ -119,7 +144,22 @@ export function KostenStapelChart({ monate, width = 1000, height = 260 }: { mona
         </span>
         {vorhanden.map((art) => (
           <span key={art}>
-            <span style={{ display: "inline-block", width: 11, height: 11, borderRadius: 3, background: FARBE[art], verticalAlign: "middle", marginRight: 6 }} />
+            <span
+              style={{
+                display: "inline-block",
+                width: 11,
+                height: 11,
+                borderRadius: 3,
+                // Dieselbe Schraffur wie im Bild, sonst stünde in der Legende eine Fläche,
+                // die man im Diagramm nicht wiederfindet.
+                background: SCHRAFFIERT.has(art)
+                  ? `repeating-linear-gradient(45deg, ${FARBE[art]} 0 2px, var(--surface) 2px 4px)`
+                  : FARBE[art],
+                boxShadow: SCHRAFFIERT.has(art) ? `inset 0 0 0 1px ${FARBE[art]}` : undefined,
+                verticalAlign: "middle",
+                marginRight: 6,
+              }}
+            />
             {t(`ergebnis.zeile.${art}`)}
           </span>
         ))}

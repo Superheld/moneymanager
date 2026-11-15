@@ -6,7 +6,7 @@
 
 import { describe, expect, it } from "vitest";
 import type { ErgebnisZeileId, MonatsErgebnis } from "./ergebnis";
-import { REICHWEITE_MINDESTENS, reichweite, reichweiteInMonaten, reichweitenMonate } from "./reichweite";
+import { GRUNDKOSTEN, REICHWEITE_MINDESTENS, reichweite, reichweiteInMonaten, reichweitenMonate } from "./reichweite";
 
 /** Ein vergangener Monat mit den gegebenen Zeilen (Kosten negativ, wie in der Rechnung). */
 function monat(label: string, zeilen: Partial<Record<ErgebnisZeileId, number>>, o: { laufend?: boolean; zukunft?: boolean } = {}): MonatsErgebnis {
@@ -125,5 +125,11 @@ describe("reichweite", () => {
     expect(r.monate).toBe(3);
     expect(r.ohneZuruecklegen).toBeNull();
     expect(r.mitZuruecklegen).toBeNull();
+  });
+});
+
+describe("GRUNDKOSTEN", () => {
+  it("zählt die Tilgung mit — eine Kreditrate lässt sich nicht aussetzen", () => {
+    expect(GRUNDKOSTEN).toContain("tilgung");
   });
 });

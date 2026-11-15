@@ -60,6 +60,8 @@ interface Listenzeile {
   readonly reihe: readonly Beobachtungszeile[];
   /** Nur bei Schulden: wozu sie gehört (Vertrag, Vermögenswert). */
   readonly verknuepft?: string;
+  /** Nur bei Schulden mit Vertrag: die abgeleitete Tilgung im laufenden Monat. */
+  readonly tilgungImMonat?: number;
 }
 
 export function VermoegenScreen() {
@@ -114,6 +116,7 @@ export function VermoegenScreen() {
     aktuell: z.aktuell,
     reihe: z.reihe,
     verknuepft: [z.gegenstandName, z.vertragName].filter(Boolean).join(" · ") || undefined,
+    tilgungImMonat: z.tilgungImMonat,
   }));
 
   /** Eine der beiden Listen samt der aufgeklappten Reihe darunter. */
@@ -192,7 +195,16 @@ export function VermoegenScreen() {
         sortValue: (z: Listenzeile) => z.aktuell?.betrag ?? -1,
         render: (z: Listenzeile) =>
           z.aktuell ? (
-            <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(z.aktuell.betrag)}</span>
+            <>
+              <span style={{ fontWeight: "var(--fw-bold)" }}>{geld.format(z.aktuell.betrag)}</span>
+              {/* Leise unter der Restschuld: eine abgeleitete Zahl, keine Beobachtung. Sie
+                  sagt, warum die Rate des Vertrags in der Übersicht geteilt dasteht. */}
+              {z.tilgungImMonat !== undefined && (
+                <span className="hinweis" style={{ display: "block" }}>
+                  {t("vermoegen.tilgungImMonat", { betrag: geld.formatMitSymbol(z.tilgungImMonat) })}
+                </span>
+              )}
+            </>
           ) : (
             <span className="muted">{istWert ? t("vermoegen.keinWert") : t("vermoegen.keineRestschuld")}</span>
           ),

@@ -14,6 +14,7 @@ import {
   nettovermoegen,
   nettovermoegenVerlauf,
   parseIso,
+  tilgungIm,
   toIso,
   wirdGefuehrt,
   type Cent,
@@ -69,6 +70,14 @@ export interface Schuldzeile {
   readonly vertragName?: string;
   /** Die Bezeichnung des verknüpften Vermögenswerts, wenn es ihn noch gibt. */
   readonly gegenstandName?: string;
+  /**
+   * Die Tilgung im laufenden Monat, aus der Reihe der Restschulden abgeleitet
+   * (`tilgungIm`) — die Zahl, die die Ergebnisrechnung von der Rate des Vertrags
+   * abspaltet, bevor sie sie dort gegen die Rate begrenzt. Nur gesetzt, wenn die Schuld
+   * auf einen Vertrag verweist und die Zahl über null liegt: ohne Vertrag wird nichts
+   * geteilt, und „Tilgung 0" sagte nur, dass sich nichts ableiten liess.
+   */
+  readonly tilgungImMonat?: Cent;
 }
 
 export interface Vermoegenssicht {
@@ -157,9 +166,17 @@ export async function vermoegenLaden(deps: VermoegenDeps, heute: string): Promis
         .filter((s) => s.verbindlichkeitId === verbindlichkeit.id)
         .map((s) => ({ stichtag: s.stichtag, betrag: s.restschuld }))
         .sort(absteigend);
+      const tilgung = verbindlichkeit.vertragId
+        ? tilgungIm(
+            staende.filter((s) => s.verbindlichkeitId === verbindlichkeit.id),
+            wirdGefuehrt(verbindlichkeit),
+            heute.slice(0, 7),
+          )
+        : undefined;
       return {
         verbindlichkeit,
         gefuehrt: wirdGefuehrt(verbindlichkeit),
+        tilgungImMonat: tilgung ? tilgung : undefined,
         aktuell: reihe[0],
         reihe,
         vertragName: verbindlichkeit.vertragId ? vertragName.get(verbindlichkeit.vertragId) : undefined,

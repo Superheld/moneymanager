@@ -32,6 +32,7 @@ import {
   type ErgebnisKennzahlen,
   type ErgebnisVorsorge,
   type KostenZeileId,
+  type ErgebnisSchulden,
   type Ruecklage,
   blindeFlecken,
   budgetKategorien,
@@ -89,6 +90,7 @@ import {
 import { belegungssicht } from "./konten/kontobelegung";
 import type { Umsatz } from "./import";
 import { vertragsbindungLaden } from "./vertraege/vertragszuordnung";
+import { vermoegensbestandLaden } from "./vermoegen/vermoegensichten";
 import { ergebnisvorsorgeLaden, type VorsorgeDeps } from "./vorsorge/vorsorge";
 import type {
   BudgetRepository,
@@ -167,9 +169,12 @@ export interface Analysebasis {
    * dieselbe Zahl trägt.
    */
   readonly vorsorge?: ErgebnisVorsorge;
+  /** Die Schulden für die Teilung der Kreditraten — dieselbe Angabe wie in der Übersicht. */
+  readonly schulden?: ErgebnisSchulden;
 }
 
 export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
+  const bestand = vermoegensbestandLaden(deps.vorsorge);
   const [buchungen, konten, kategorien, umsaetze, bindung, budgets, vertraege, regeln, ruecklagen, ausbuchungen, zuordnungen, vormerkungen, vorsorge] =
     await Promise.all([
       deps.ledger.alle(),
@@ -184,8 +189,9 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
       deps.ruecklagenRepo.ausbuchungen(),
       deps.zuordnungRepo.alle(),
       deps.vormerkungRepo.alle(),
-      ergebnisvorsorgeLaden(deps.vorsorge),
+      ergebnisvorsorgeLaden(deps.vorsorge, bestand),
     ]);
+  const { verbindlichkeiten, staende } = await bestand;
   const umsatzZuBuchung = belegZuBuchung(umsaetze);
   const vertragJeBuchung = new Map<string, string>();
   for (const z of zuordnungen) if (z.vertragId) vertragJeBuchung.set(z.istbuchungId, z.vertragId);
@@ -208,6 +214,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
     vertragJeBuchung,
     vormerkungen,
     vorsorge,
+    schulden: { verbindlichkeiten, staende },
   };
 }
 
@@ -558,6 +565,8 @@ function kostenbasis(basis: Analysebasis, heute: string) {
     heute,
     // Mit Vorsorgeziel kostet der Monat dessen Sparrate — in Kostensicht UND Reichweite.
     vorsorge: basis.vorsorge,
+    // Und mit einer Schuld am Vertrag ist nur der Zins Kosten unter „Verträge".
+    schulden: basis.schulden,
   });
 }
 //

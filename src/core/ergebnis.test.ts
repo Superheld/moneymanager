@@ -15,6 +15,7 @@ import {
   monatsanteil,
   monatsErgebnis,
   type ErgebnisEingabe,
+  type ErgebnisSchulden,
   type ErgebnisVorsorge,
   type ErgebnisZeileId,
   type MonatsErgebnis,
@@ -447,6 +448,118 @@ describe("Vorsorge mit Ziel — die Rate statt der Überweisung", () => {
     const r = erwarteAufgang(e, "2025-02");
     expect(zeile(r, "vorsorge")?.posten).toHaveLength(1);
     expect(zeile(r, "vorsorge")?.plan).toBe(-100000);
+  });
+});
+
+describe("Tilgung — die Kreditrate in Zinsen und Tilgung geteilt", () => {
+  // Rate 1.000 im Monat; die Restschuld sinkt über 2025 um 1.200, also 100 Tilgung je
+  // Monat und 900 Zinsen.
+  const rate = regel({ id: "rk", vertragId: "vk", bezeichnung: "Brenneke", betrag: -100000, rhythmus: "monatlich", startdatum: "2025-01-15" });
+  const schulden = (over: Partial<ErgebnisSchulden["verbindlichkeiten"][number]> = {}, staende = [
+    { verbindlichkeitId: "s1", stichtag: "2024-12-31", restschuld: 5_000_000 },
+    { verbindlichkeitId: "s1", stichtag: "2025-12-31", restschuld: 4_880_000 },
+  ]): ErgebnisSchulden => ({
+    verbindlichkeiten: [{ id: "s1", bezeichnung: "Halvorsen", art: "ratenkredit", vertragId: "vk", ...over }],
+    staende,
+  });
+  const gezahlt = (datum: string, betrag = -100000) => ist(datum, betrag, { kategorieId: "absicherung" });
+  const mitRate = (buchungen: IstBuchung[], over: Partial<ErgebnisEingabe> = {}) =>
+    eingabe({ regeln: [rate], ist: buchungen, vertragJeBuchung: new Map(buchungen.map((b) => [b.id, "vk"])), ...over });
+  const tilgungsposten = (r: MonatsErgebnis) => zeile(r, "tilgung")?.posten[0];
+
+  it("zeigt unter den Verträgen die Zinsen und die Tilgung in der dritten Stufe", () => {
+    const e = mitRate([gezahlt("2025-06-15")]);
+    const ohne = rechne(e, "2025-06");
+    const r = erwarteAufgang({ ...e, schulden: schulden() }, "2025-06");
+    expect(zeile(r, "fixkosten")).toMatchObject({ plan: -90000, ist: -90000 });
+    expect(zeile(r, "fixkosten")?.posten[0].nurZinsen).toBe(true);
+    expect(zeile(r, "tilgung")).toMatchObject({ plan: -10000, ist: -10000 });
+    expect(tilgungsposten(r)).toMatchObject({ bezeichnung: "Halvorsen", verbindlichkeitId: "s1", vertragId: "vk", status: "gebucht" });
+    // Bleibt wirklich frei ändert sich nicht, die Zwischensummen davor schon.
+    expect(r.ergebnis).toEqual(ohne.ergebnis);
+    expect(r.nachPflichten.ist).toBe((ohne.nachPflichten.ist ?? 0) + 10000);
+    expect(r.ueberleitung).toEqual(ohne.ueberleitung);
+  });
+
+  it("rechnet ohne verknüpfte Schuld genau wie vorher", () => {
+    const e = mitRate([gezahlt("2025-06-15")]);
+    const ohne = rechne(e, "2025-06");
+    expect(rechne({ ...e, schulden: { verbindlichkeiten: [], staende: [] } }, "2025-06")).toEqual(ohne);
+    expect(rechne({ ...e, schulden: schulden({ vertragId: undefined }) }, "2025-06")).toEqual(ohne);
+    // Eine einzige Restschuld sagt nichts über die Tilgung.
+    const eine = schulden({}, [{ verbindlichkeitId: "s1", stichtag: "2024-12-31", restschuld: 5_000_000 }]);
+    expect(rechne({ ...e, schulden: eine }, "2025-06")).toEqual(ohne);
+    // Vor der ersten Beobachtung ebenso.
+    const frueh = mitRate([gezahlt("2024-12-15")]);
+    expect(rechne({ ...frueh, schulden: schulden() }, "2024-12")).toEqual(rechne(frueh, "2024-12"));
+    expect(zeile(rechne(e, "2025-06"), "tilgung")).toBeUndefined();
+  });
+
+  it("schreibt nach der jüngsten Restschuld die letzte Monatstilgung fort", () => {
+    const e = mitRate([gezahlt("2026-03-15")], { heute: "2026-03-31", schulden: schulden() });
+    const r = erwarteAufgang(e, "2026-03");
+    expect(zeile(r, "tilgung")?.ist).toBe(-10000);
+  });
+
+  it("tilgt nie mehr, als der Vertrag im Monat kostet", () => {
+    // Die Restschuld sinkt um 2.400 im Jahr, die Rate ist 1.000: der Rest war Sondertilgung.
+    const viel = schulden({}, [
+      { verbindlichkeitId: "s1", stichtag: "2024-12-31", restschuld: 5_000_000 },
+      { verbindlichkeitId: "s1", stichtag: "2025-12-31", restschuld: 2_600_000 },
+    ]);
+    const r = erwarteAufgang(mitRate([gezahlt("2025-06-15")], { schulden: viel }), "2025-06");
+    expect(zeile(r, "tilgung")?.ist).toBe(-100000);
+    expect(zeile(r, "fixkosten")?.ist).toBe(0);
+  });
+
+  it("teilt im Ist nichts, solange die Rate nicht abgebucht ist", () => {
+    const r = erwarteAufgang(mitRate([], { schulden: schulden() }), "2025-06");
+    expect(zeile(r, "tilgung")).toMatchObject({ plan: -10000, ist: 0 });
+    expect(tilgungsposten(r)?.status).toBe("offen");
+    expect(zeile(r, "fixkosten")).toMatchObject({ plan: -90000, ist: 0 });
+  });
+
+  it("rechnet den laufenden Monat mit offener Rate genauso hoch wie ohne Teilung", () => {
+    const e = mitRate([], { heute: "2025-06-10" });
+    const r = rechne({ ...e, schulden: schulden() }, "2025-06");
+    expect(r.erwartet).toBe(rechne(e, "2025-06").erwartet);
+    expect(r.erwartet).toBe(-100000);
+  });
+
+  it("plant die Teilung in künftigen Monaten", () => {
+    const r = rechne(mitRate([], { heute: "2025-03-10", schulden: schulden() }), "2025-05");
+    expect(zeile(r, "tilgung")).toMatchObject({ plan: -10000, ist: null });
+    expect(zeile(r, "fixkosten")?.plan).toBe(-90000);
+    expect(r.ueberleitung).toBeUndefined();
+  });
+
+  it("stellt bei einem Jahreszahler die Monatstilgung gegen das Zwölftel", () => {
+    const jaehrlich = regel({ id: "rj", vertragId: "vk", bezeichnung: "Brenneke", betrag: -1200000, rhythmus: "jaehrlich", startdatum: "2025-01-15" });
+    const zahlung = gezahlt("2025-01-15", -1200000);
+    const e = eingabe({ regeln: [jaehrlich], ist: [zahlung], vertragJeBuchung: new Map([[zahlung.id, "vk"]]), schulden: schulden() });
+    const januar = erwarteAufgang(e, "2025-01");
+    expect(zeile(januar, "fixkosten")?.ist).toBe(-90000);
+    expect(zeile(januar, "tilgung")?.ist).toBe(-10000);
+    // Bezahlt 12.000, davon gehören 11.000 späteren Monaten.
+    expect(posten(januar, "periodisierung")).toBe(-1100000);
+    const juli = erwarteAufgang(e, "2025-07");
+    expect(zeile(juli, "fixkosten")?.ist).toBe(-90000);
+    expect(zeile(juli, "tilgung")?.ist).toBe(-10000);
+  });
+
+  it("lässt eine stillgelegte Schuld nach ihrer letzten Restschuld nicht mehr tilgen", () => {
+    const e = mitRate([gezahlt("2026-02-15")], { heute: "2026-02-28", schulden: schulden({ aktiv: false }) });
+    expect(zeile(rechne(e, "2026-02"), "tilgung")).toBeUndefined();
+  });
+
+  it("zählt die Tilgung zur Sparquote und die Zinsen zur Fixkostenquote", () => {
+    const gehalt = ist("2025-06-01", 400000, { kategorieId: "gehalt" });
+    const zahlung = gezahlt("2025-06-15");
+    const e = mitRate([zahlung, gehalt], { schulden: schulden(), vertragJeBuchung: new Map([[zahlung.id, "vk"]]) });
+    const k = ergebnisKennzahlen([rechne(e, "2025-06")]);
+    expect(k.fixkostenquote).toBeCloseTo(90000 / 400000, 10);
+    expect(k.sparquote).toBeCloseTo(10000 / 400000, 10);
+    expect(monatsKosten(rechne(e, "2025-06"))).toBe(100000);
   });
 });
 

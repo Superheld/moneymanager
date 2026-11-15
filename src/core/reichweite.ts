@@ -47,7 +47,10 @@ export const REICHWEITE_MINDESTENS = 3;
  * Die Kostenzeilen, die auch im Notfall weiterlaufen. Alles andere in `KOSTENZEILEN` ist
  * Zurücklegen (Rücklagen, aufbauende Budgets, Vorsorge) und lässt sich aussetzen.
  */
-export const GRUNDKOSTEN = ["fixkosten", "laufend", "ungeplant"] as const satisfies readonly KostenZeileId[];
+// `tilgung` gehört dazu, obwohl sie in der Ergebnisrechnung bei Rücklagen und Vorsorge
+// steht: sie ist Teil einer Vertragsrate, und eine Kreditrate lässt sich nicht aussetzen
+// wie das Zurücklegen. Ohne sie reichte das Geld hier länger, als es reicht.
+export const GRUNDKOSTEN = ["fixkosten", "tilgung", "laufend", "ungeplant"] as const satisfies readonly KostenZeileId[];
 
 /**
  * Die Monate, über die gemittelt wird — ihre Ersten, älteste zuerst.

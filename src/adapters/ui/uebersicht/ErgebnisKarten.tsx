@@ -32,7 +32,10 @@ import { Button as BaseButton } from "@base-ui/react/button";
 const STUFEN: readonly { id: "nachPflichten" | "nachAlltag" | "ergebnis"; zeilen: readonly ErgebnisZeileId[] }[] = [
   { id: "nachPflichten", zeilen: ["einnahmen", "fixkosten"] },
   { id: "nachAlltag", zeilen: ["laufend", "ungeplant"] },
-  { id: "ergebnis", zeilen: ["abschreibungen", "wagnisse", "vorsorge"] },
+  // Die Tilgung steht hier und nicht bei den Verträgen: sie ist der Teil der Kreditrate,
+  // der Vermögen aufbaut (die Schuld sinkt), wie eine Rücklagenrate. Der Kern spaltet sie
+  // ab; hier steht nur, in welche Stufe sie gehört.
+  { id: "ergebnis", zeilen: ["abschreibungen", "wagnisse", "vorsorge", "tilgung"] },
 ];
 
 interface Namen {
@@ -351,6 +354,9 @@ function PlanPosten({
   // steht als Kosten da, ob gespart wurde oder nicht, und genau das will man hier sehen.
   const zusatz = [
     posten.teile ? t("ergebnis.anteil", { teile: posten.teile }) : undefined,
+    // Ohne das Wort läse sich der Vertrag kleiner, als er abgebucht wird — die Tilgung
+    // steht weiter unten in ihrer eigenen Zeile.
+    posten.nurZinsen ? t("ergebnis.nurZinsen") : undefined,
     posten.entnahme ? t("ergebnis.entnommen", { betrag: geld.formatMitSymbol(-posten.entnahme) }) : undefined,
     posten.zufuehrung !== undefined
       ? t("ergebnis.ueberwiesen", { betrag: geld.formatMitSymbol(-posten.zufuehrung || 0) })

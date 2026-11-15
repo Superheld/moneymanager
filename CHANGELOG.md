@@ -17,6 +17,13 @@ Entnahmezeit und Rendite rechnet es, was am Zieltag da sein muss und welche Spar
 im Monat verlangt. Die Annahmen gelten ab dem Monat, in dem sie eingetragen wurden — was
 vorher galt, bleibt für die Monate davor stehen.
 
+**Eine Kreditrate steht als Zinsen und Tilgung da.** Verweist eine Schuld auf den Vertrag,
+über den ihre Rate läuft, zeigen die Monatskarten unter „Verträge" nur noch die Zinsen;
+die Tilgung steht in einer eigenen Zeile bei Rücklagen und Vorsorge, denn sie baut
+Vermögen auf. Sie wird nicht eingegeben, sondern aus den eingetragenen Restschulden
+abgeleitet: was die Schuld zwischen zwei Stichtagen gesunken ist, verteilt auf die Monate
+dazwischen. Was am Ende frei bleibt, ändert sich dadurch nicht.
+
 ### Geändert
 
 **Kein „Alpha" mehr neben der Version.** Dass die App noch nicht stabil ist, sagt die 0

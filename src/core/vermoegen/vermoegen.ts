@@ -69,8 +69,9 @@ export interface Verbindlichkeit {
   readonly bezeichnung: string;
   readonly art: Verbindlichkeitsart;
   /**
-   * Der Vertrag, über den die Rate läuft. Gespeichert, aber NICHT verrechnet: die
-   * Aufteilung einer Rate in Zins und Tilgung ist ein eigener Schritt.
+   * Der Vertrag, über den die Rate läuft. Die Ergebnisrechnung teilt seine Rate in Zinsen
+   * und Tilgung (`../ergebnis.ts`, `tilgungAbspalten`); die Tilgung kommt aus der Reihe
+   * der Restschulden (`./tilgung.ts`), nicht aus einem Plan.
    */
   readonly vertragId?: string;
   /** Der Vermögenswert, den die Schuld finanziert. Ebenfalls nur ein Verweis. */
