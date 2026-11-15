@@ -52,7 +52,7 @@ describe("BudgetVerlaufChart — die Linie hinter den Balken", () => {
     expect(d.match(/M/g)).toHaveLength(1);
     expect(d.match(/L/g)).toHaveLength(5);
     expect(container.querySelectorAll("svg circle")).toHaveLength(0);
-    expect(container.textContent).toMatch(/Budget/);
+    expect(container.textContent).toMatch(/Rahmen/);
   });
 
   it("zeichnet beim aufbauenden Budget den Stand als Linie mit Punkten", async () => {
