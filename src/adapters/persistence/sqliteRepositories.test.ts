@@ -441,6 +441,23 @@ describe("Rücklagen-Repository", () => {
     expect(await ruecklagenRepository.alle()).toHaveLength(0);
   });
 
+  // Migration 76: eine beendete Rücklage bleibt in der Tabelle und ist trotzdem für
+  // jede laufende Rechnung weg. Ihre Spur ist die Ausbuchung, samt dem Zyklus davor.
+  it("liefert eine beendete Rücklage nicht mehr aus, ihre Ausbuchung mit Zyklus und Namen schon", async () => {
+    await ruecklagenRepository.speichern({ id: "g3", bezeichnung: "Reisekasse", beginn: "2024-01-01", rate: 5000 });
+    await ruecklagenRepository.ausbuchungSpeichern({
+      id: "a1", ruecklageId: "g3", datum: "2024-07-10", betrag: 28000,
+      zyklusBeginn: "2024-01-01", zyklusRate: 5000,
+    });
+    await ruecklagenRepository.speichern({ id: "g3", bezeichnung: "Reisekasse", beginn: "2024-01-01", rate: 5000, beendetAm: "2024-07-10" });
+
+    expect(await ruecklagenRepository.alle()).toHaveLength(0);
+    const [a] = await ruecklagenRepository.ausbuchungen();
+    expect(a).toMatchObject({ zyklusBeginn: "2024-01-01", zyklusRate: 5000, bezeichnung: "Reisekasse" });
+    // Die Form „mit Ziel" war es nicht: ihre Spalten kommen als undefined, nicht als 0.
+    expect(a.zyklusZiel).toBeUndefined();
+  });
+
   // Die freie Form. Ihre drei Spalten stehen auf NULL, und das muss durch das Mapping
   // hindurch als `undefined` ankommen — nicht als 0, sonst hätte sie ein Ziel von 0 und
   // `hatZiel` fiele auf die falsche Seite.

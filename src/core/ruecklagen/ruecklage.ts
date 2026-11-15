@@ -43,6 +43,13 @@ export interface Ruecklage {
   readonly kategorieId?: string;
   /** Zahlungskonto, auf dem die Rücklage tatsächlich liegt. Ohne Zuordnung nur Soll. */
   readonly kontoId?: string;
+  /**
+   * Der Tag, an dem eine FREIE Rücklage ausgebucht wurde. Eine beendete Rücklage wird
+   * nicht mehr gelöscht (bis Migration 76 war es so, und ihre Ausbuchung ging per
+   * CASCADE mit): sie bleibt stehen, damit dasteht, wofür sie draufging. Das Repository
+   * liefert sie in `alle()` nicht mehr aus — für jede laufende Rechnung gibt es sie nicht.
+   */
+  readonly beendetAm?: string;
 }
 
 /**
@@ -218,4 +225,55 @@ export function ruecklagenDeckung(
  */
 export function mindestRuecklage(monatsEinnahmen: Cent, monate = 3): Cent {
   return Math.max(0, Math.round(monatsEinnahmen * monate));
+}
+
+// ---------------------------------------------------------------- vergangene Zyklen
+//
+// Eine Rücklage kennt nur ihren laufenden Zyklus: das Ausbuchen setzt `beginn` neu (mit
+// Ziel) oder beendet sie (frei). Was davor galt, wäre damit verloren — und mit ihm die
+// Antwort auf zwei Fragen: was hat die Rücklage in einem vergangenen Monat gekostet, und
+// war der Kauf vom Angesparten gedeckt? Seit Migration 76 hält die Ausbuchung deshalb
+// fest, wie der Zyklus aussah, den sie beendet hat.
+
+/**
+ * Ein beendeter Zyklus, so wie die Ausbuchung ihn festgehalten hat.
+ *
+ * Die `zyklus*`-Felder fehlen bei Ausbuchungen von vor Migration 76. Das heisst
+ * „Geschichte unbekannt" und nicht „nichts angespart": gerechnet wird dann wie zuvor —
+ * keine Rate für die Monate davor, und der Kauf gilt als gedeckt. Erfunden wird nichts.
+ */
+export interface Ruecklagenzyklus {
+  /** Die ID der Ausbuchung. */
+  readonly id: string;
+  readonly ruecklageId: string;
+  /** Aus der Rücklage mitgelesen; fehlt nur, wenn sie inzwischen gelöscht wäre. */
+  readonly bezeichnung?: string;
+  readonly kategorieId?: string;
+  /** Der Tag des Ausbuchens — das Ende des Zyklus. */
+  readonly datum: string;
+  /** Die Buchung, mit der gekauft wurde. */
+  readonly istbuchungId?: string;
+  readonly zyklusBeginn?: string;
+  readonly zyklusZiel?: Cent;
+  readonly zyklusFrist?: number;
+  readonly zyklusRate?: Cent;
+}
+
+/** Kennt die Ausbuchung den Zyklus, den sie beendet hat? */
+export function hatGeschichte(z: Ruecklagenzyklus): boolean {
+  return !!z.zyklusBeginn;
+}
+
+/**
+ * Was im Zyklus bis `am` angespart sein sollte — nach dem Ausbuchen wächst es nicht mehr.
+ *
+ * Dieselbe Rechnung wie `sollRuecklage`, auf den festgehaltenen Werten: zwei Formeln für
+ * denselben Stand liefen bei der ersten Änderung auseinander.
+ */
+export function zyklusSoll(z: Ruecklagenzyklus, am: string): Cent {
+  if (!z.zyklusBeginn) return 0;
+  return sollRuecklage(
+    { id: z.ruecklageId, bezeichnung: "", beginn: z.zyklusBeginn, ziel: z.zyklusZiel, fristMonate: z.zyklusFrist, rate: z.zyklusRate },
+    am < z.datum ? am : z.datum,
+  );
 }

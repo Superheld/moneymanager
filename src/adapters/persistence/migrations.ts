@@ -2183,4 +2183,27 @@ export const MIGRATIONS: Migration[] = [
       `CREATE INDEX IF NOT EXISTS idx_trainingslauf_zeitpunkt ON trainingslauf (zeitpunkt)`,
     ],
   },
+  {
+    version: 76, // Der Ruecklagenstand bekommt eine Geschichte
+    sql: [
+      // Eine Ruecklage kennt nur ihren laufenden Zyklus: das Ausbuchen setzt `beginn`
+      // neu, und was davor galt, ist danach nicht mehr zu rechnen. Zwei Dinge fehlten
+      // deshalb: die Rate vergangener Monate (die Kostensicht der Analyse zeigte sie
+      // zu niedrig) und die Pruefung, ob ein Kauf vom Angesparten gedeckt war.
+      //
+      // Die Ausbuchung haelt ab hier fest, wie der Zyklus aussah, den sie beendet hat.
+      // Bestehende Zeilen behalten NULL — das heisst „Geschichte unbekannt" und rechnet
+      // wie bisher. Rueckwirkend erfunden wird nichts: der fruehere `beginn` ist an
+      // der Ruecklage ueberschrieben und aus nichts mehr abzuleiten.
+      `ALTER TABLE ruecklage_ausbuchung ADD COLUMN zyklus_beginn TEXT`,
+      `ALTER TABLE ruecklage_ausbuchung ADD COLUMN zyklus_ziel INTEGER`,
+      `ALTER TABLE ruecklage_ausbuchung ADD COLUMN zyklus_frist INTEGER`,
+      `ALTER TABLE ruecklage_ausbuchung ADD COLUMN zyklus_rate INTEGER`,
+      // Eine FREIE Ruecklage wurde beim Ausbuchen geloescht — und weil
+      // `ruecklage_ausbuchung.ruecklage_id` auf CASCADE steht, ging ihre Ausbuchung im
+      // selben Moment mit. Wofuer sie draufging, stand danach nirgends. Sie wird ab
+      // hier beendet statt geloescht; das Repository liefert sie nicht mehr aus.
+      `ALTER TABLE ruecklage ADD COLUMN beendet_am TEXT`,
+    ],
+  },
 ];

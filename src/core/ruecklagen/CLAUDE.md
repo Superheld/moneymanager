@@ -24,8 +24,21 @@ drei Spalten sind nullable, weil SQLite ein „genau eines von beiden" nicht aus
 ohne dass die Migration zur Fingerübung wird.
 
 **Das Ausbuchen ist eine AUFZEICHNUNG und kein Zustand.** Der Zustand steht an der Rücklage
-selbst (`beginn`) beziehungsweise darin, dass es sie nicht mehr gibt;
-`ruecklage_ausbuchung` hält fest, WOFÜR sie draufging. Der Fremdschlüssel auf `ist_buchung`
+selbst (`beginn`, bei der freien Form `beendet_am`);
+`ruecklage_ausbuchung` hält fest, WOFÜR sie draufging — und seit Migration 76, wie der
+Zyklus aussah, den sie beendet hat (`zyklus_beginn`, `zyklus_ziel`, `zyklus_frist`,
+`zyklus_rate`; im Kern `Ruecklagenzyklus`). Daraus rechnet die Ergebnisrechnung zwei
+Dinge, die vorher verloren waren: die Rate der Monate VOR dem Ausbuchen und ob der Kauf
+vom Angesparten gedeckt war (`zyklusSoll`). Eine Ausbuchung von davor trägt NULL in den
+vier Spalten; das heisst „Geschichte unbekannt" und rechnet wie früher — keine Rate
+davor, der Kauf gilt als gedeckt.
+
+**Eine freie Rücklage wird beendet, nicht gelöscht.** Bis Migration 76 verschwand sie
+beim Ausbuchen, und weil `ruecklage_ausbuchung.ruecklage_id` auf `CASCADE` steht, ging
+ihre Ausbuchung im selben Moment mit — die Aufzeichnung, um die es dem Absatz darüber
+geht, gab es für die freie Form also gar nicht. `RuecklagenRepository.alle()` liefert
+Beendete nicht aus: der Filter steht im Repository, damit kein Aufrufer ihn vergessen
+kann. Wer von Hand LÖSCHT, nimmt die Geschichte weiterhin mit; das ist dann gewollt. Der Fremdschlüssel auf `ist_buchung`
 steht deshalb auf `SET NULL` und nicht auf `CASCADE` — dieselbe Überlegung wie beim
 `buchung_journal`, nur eine Nummer kleiner.
 

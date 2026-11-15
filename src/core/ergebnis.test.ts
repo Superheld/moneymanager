@@ -88,6 +88,7 @@ function eingabe(over: Partial<ErgebnisEingabe>): ErgebnisEingabe {
     regeln: [],
     budgets: [],
     ruecklagen: [],
+    ausbuchungen: [],
     ist: [],
     kategorien: KATEGORIEN,
     konten: KONTEN,
@@ -206,12 +207,67 @@ describe("Abschreibungen — die Rücklage", () => {
     expect(posten(r, "raten")).toBe(1000);
   });
 
+  // Eine Ausbuchung von vor Migration 76: sie kennt die Buchung, aber nicht den Zyklus.
+  const ohneGeschichte = (kaufId: string) => [{ id: "a0", ruecklageId: "g", datum: "2025-04-12", istbuchungId: kaufId }];
+
   it("zählt den Kauf als Entnahme und nicht ein zweites Mal als Kosten", () => {
     const kauf = ist("2025-04-12", -96000, { kategorieId: "haushalt", budgetrelevant: false });
-    const r = erwarteAufgang(eingabe({ ruecklagen: [geraet], ist: [kauf] }), "2025-04");
+    const r = erwarteAufgang(eingabe({ ruecklagen: [geraet], ist: [kauf], ausbuchungen: ohneGeschichte(kauf.id) }), "2025-04");
     expect(zeile(r, "ungeplant")).toBeUndefined();
     expect(posten(r, "entnahmen")).toBe(-96000);
     expect(r.ergebnis.ist).toBe(-1000);
+  });
+
+  it("zählt eine Ausgabe als Kosten, die nur von Hand aus den Budgets genommen wurde", () => {
+    // Keine Rücklage wurde dafür ausgebucht: angespart war nichts, also kostet sie
+    // ihren Monat. Sonst hätte sie nie etwas gekostet.
+    const kauf = ist("2025-04-12", -80000, { kategorieId: "haushalt", budgetrelevant: false });
+    const r = erwarteAufgang(eingabe({ ist: [kauf] }), "2025-04");
+    expect(zeile(r, "ungeplant")?.ist).toBe(-80000);
+    expect(posten(r, "entnahmen")).toBe(0);
+  });
+});
+
+describe("Abschreibungen — der beendete Zyklus", () => {
+  // Eine freie Rücklage: 50 je Monat seit Januar, im Juli ausgebucht. Angespart: 300.
+  const zyklus = (kaufId?: string) => ({
+    id: "a1", ruecklageId: "u", bezeichnung: "Reise", datum: "2025-07-10",
+    istbuchungId: kaufId, zyklusBeginn: "2025-01-01", zyklusRate: 5000,
+  });
+
+  it("kostet in den Monaten vor dem Ausbuchen weiter seine Rate", () => {
+    const r = erwarteAufgang(eingabe({ ausbuchungen: [zyklus()] }), "2025-03");
+    expect(zeile(r, "abschreibungen")?.ist).toBe(-5000);
+  });
+
+  it("kostet nach dem Ausbuchen nichts mehr", () => {
+    const r = erwarteAufgang(eingabe({ ausbuchungen: [zyklus()] }), "2025-09");
+    expect(zeile(r, "abschreibungen")).toBeUndefined();
+  });
+
+  it("lässt einen Kauf bis zur Höhe des Angesparten nichts kosten", () => {
+    const kauf = ist("2025-07-10", -28000, { kategorieId: "reise", budgetrelevant: false });
+    const r = erwarteAufgang(eingabe({ ist: [kauf], ausbuchungen: [zyklus(kauf.id)] }), "2025-07");
+    // Angespart sind sechs volle Monate zu 50 = 300; der angefangene Juli zählt nicht
+    // mehr. Der Kauf liegt darunter und kostet nichts.
+    expect(zeile(r, "abschreibungen")?.ist).toBe(0);
+    expect(posten(r, "entnahmen")).toBe(-28000);
+  });
+
+  it("zählt, was über das Angesparte hinausgeht, als Kosten des Kaufmonats", () => {
+    const kauf = ist("2025-07-10", -45000, { kategorieId: "reise", budgetrelevant: false });
+    const r = erwarteAufgang(eingabe({ ist: [kauf], ausbuchungen: [zyklus(kauf.id)] }), "2025-07");
+    // Angespart 300, gekauft für 450: 150 sind ungedeckt.
+    expect(zeile(r, "abschreibungen")?.ist).toBe(-15000);
+    expect(zeile(r, "ungeplant")).toBeUndefined();
+  });
+
+  it("zählt das Ungedeckte nicht doppelt, wenn die Buchung inzwischen an einem Vertrag hängt", () => {
+    const kauf = ist("2025-07-10", -45000, { kategorieId: "reise", budgetrelevant: false });
+    const e = eingabe({ ist: [kauf], ausbuchungen: [zyklus(kauf.id)], vertragJeBuchung: new Map([[kauf.id, "v9"]]) });
+    const r = erwarteAufgang(e, "2025-07");
+    // Sie zählt dort als Vertragszahlung; die Rücklagenzeile bleibt leer.
+    expect(zeile(r, "abschreibungen")).toBeUndefined();
   });
 });
 

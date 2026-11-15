@@ -9,6 +9,7 @@ import type {
   Depotposition,
   Depotwert,
   Ruecklage,
+  Ruecklagenzyklus,
   IstBuchung,
   Journaleintrag,
   Kategorie,
@@ -104,18 +105,14 @@ export interface BudgetRepository {
  * Eine Ausbuchung: die Rücklage ist gebraucht worden.
  *
  * Sie ist eine AUFZEICHNUNG und kein Zustand — der Zustand steht an der Rücklage selbst
- * (`beginn`) beziehungsweise darin, dass es sie nicht mehr gibt. Deshalb trägt sie
+ * (`beginn` bzw. `beendetAm`). Seit Migration 76 hält sie zusätzlich fest, wie der Zyklus
+ * aussah, den sie beendet hat (`Ruecklagenzyklus` im Kern). Deshalb trägt sie
  * bewusst keinen Fremdschlüssel auf `ist_buchung`, der sie mitrisse: welche Buchung es
  * war, soll auch dann noch dastehen, wenn die Buchung längst gelöscht ist.
  */
-export interface RuecklagenAusbuchung {
-  readonly id: string;
-  readonly ruecklageId: string;
-  readonly datum: string;
+export interface RuecklagenAusbuchung extends Ruecklagenzyklus {
   /** Was tatsächlich ausgegeben wurde. */
   readonly betrag: Cent;
-  /** Die Buchung, mit der ausgegeben wurde — sie zählt danach in kein Budget. */
-  readonly istbuchungId?: string;
   readonly notiz?: string;
 }
 

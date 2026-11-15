@@ -70,7 +70,7 @@ const RUECKLAGEN: Ruecklage[] = [
 ];
 
 const ROH = {
-  regeln: REGELN, budgets: BUDGETS, ruecklagen: [] as Ruecklage[], ist: IST, kategorien: KATEGORIEN,
+  regeln: REGELN, budgets: BUDGETS, ruecklagen: [] as Ruecklage[], ausbuchungen: [], ist: IST, kategorien: KATEGORIEN,
   konten: KONTEN, vertragJeBuchung: new Map([["i1", "v-miete"]]), heute: "2026-08-16",
 };
 

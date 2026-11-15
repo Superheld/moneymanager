@@ -137,7 +137,7 @@ export async function uebersichtLaden(
   deps: UebersichtDeps,
   heute: string,
 ): Promise<Uebersichtsdaten> {
-  const [buchungen, kategorien, regeln, budgets, umsaetze, zuordnungen, konten, ruecklagen, vertragsnamen] =
+  const [buchungen, kategorien, regeln, budgets, umsaetze, zuordnungen, konten, ruecklagen, vertragsnamen, ausbuchungen] =
     await Promise.all([
       deps.ledger.alle(),
       deps.kategorieRepo.alle(),
@@ -148,6 +148,7 @@ export async function uebersichtLaden(
       deps.kontoRepo.alle(),
       deps.ruecklagenRepo.alle(),
       vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
+      deps.ruecklagenRepo.ausbuchungen(),
     ]);
 
   /**
@@ -179,7 +180,7 @@ export async function uebersichtLaden(
 
   return {
     ergebnisse: monatsErgebnisse(
-      ergebnisbasis({ regeln, budgets, ruecklagen, ist: buchungen, kategorien, konten, vertragJeBuchung, heute }),
+      ergebnisbasis({ regeln, budgets, ruecklagen, ausbuchungen, ist: buchungen, kategorien, konten, vertragJeBuchung, heute }),
     ),
     staende: budgetstaende(sicht, `${dieserMonat}-28`),
     sicht,

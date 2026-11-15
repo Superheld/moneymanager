@@ -21,6 +21,8 @@ import {
   type Verlaufsbefund,
   type Vormerkung,
   ergebnisbasis,
+  hatGeschichte,
+  type Ruecklagenzyklus,
   ergebnisKennzahlen,
   KOSTENZEILEN,
   monatsErgebnis,
@@ -133,6 +135,8 @@ export interface Analysebasis {
    * fehlt (`ruecklagenrateFehlt`).
    */
   readonly ausbuchungsdaten: readonly string[];
+  /** Die Ausbuchungen selbst — aus ihnen kommen die Raten vergangener Zyklen. */
+  readonly ausbuchungen: readonly Ruecklagenzyklus[];
   /**
    * Buchungs-ID → Vertrags-ID, so wie die ERGEBNISRECHNUNG sie liest: jede Zuordnung mit
    * Vertrag, auch wenn der Vertrag dahinter fehlt.
@@ -179,7 +183,10 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
     vertraege,
     regeln,
     ruecklagen,
-    ausbuchungsdaten: ausbuchungen.map((a) => a.datum),
+    // Nur Ausbuchungen OHNE festgehaltenen Zyklus lassen Monate unvollständig: seit
+    // Migration 76 kennt jede neue ihre Geschichte, und die Rate davor wird gerechnet.
+    ausbuchungsdaten: ausbuchungen.filter((a) => !hatGeschichte(a)).map((a) => a.datum),
+    ausbuchungen,
     vertragJeBuchung,
     vormerkungen,
   };
@@ -586,6 +593,7 @@ export function analyseKostenverlauf(basis: Analysebasis, von: string, bis: stri
     regeln: basis.regeln,
     budgets: basis.budgets,
     ruecklagen: basis.ruecklagen,
+    ausbuchungen: basis.ausbuchungen,
     ist: basis.buchungen,
     kategorien: basis.kategorien,
     konten: basis.konten,

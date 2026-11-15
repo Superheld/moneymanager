@@ -37,6 +37,7 @@ import type {
   VertragszuordnungRepository,
   ZahlungskontoRepository,
   ZahlungsregelRepository,
+  RuecklagenRepository,
 } from "../ports";
 
 export interface BuchungsdetailDeps {
@@ -51,6 +52,8 @@ export interface BuchungsdetailDeps {
   readonly freigabeRepo: DublettenfreigabeRepository;
   /** Für die Einordnung — dieselbe Begründung wie in `KontenDeps`. */
   readonly budgetRepo: BudgetRepository;
+  /** Für die Einordnung: nur ein Kauf, den eine Rücklage trug, gilt als Entnahme. */
+  readonly ruecklagenRepo: RuecklagenRepository;
   /**
    * Die Konto-Zuordnungen der Bankzugänge — daran hängt, welches Konto ONLINE geführt
    * wird. Optional, damit ein Aufrufer ohne Bankanbindung (Tests, Analyse) den Dialog
@@ -134,7 +137,10 @@ export async function buchungsdetailLaden(
     dublettenverdacht: ledgerVerdacht(umsaetze, new Set(buchungen.map((b) => b.id)), freigegeben),
     freigegeben,
     freigaben,
-    einordnungen: einordnungJeBuchung({ buchungen, kategorien, budgets, konten, zuordnungen, vertraege }),
+    einordnungen: einordnungJeBuchung({
+      buchungen, kategorien, budgets, konten, zuordnungen, vertraege,
+      ausbuchungen: await deps.ruecklagenRepo.ausbuchungen(),
+    }),
     onlineKonten: new Set(zuordnungen_online.map((z) => z.zahlungskontoId)),
   };
 }

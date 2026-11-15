@@ -936,6 +936,7 @@ export function konten(): Promise<Kontensicht> {
     vertragRepo: sqliteVertragRepository,
     // Damit jede Zeile sagt, was sie kaufmännisch ist — ohne Budgets hiesse alles „ungeplant".
     budgetRepo: sqliteBudgetRepository,
+    ruecklagenRepo: sqliteRuecklagenRepository,
   });
 }
 
@@ -1029,6 +1030,7 @@ export function buchungsdetail(): Promise<Buchungsdetaildaten> {
     zuordnungRepo: sqliteVertragszuordnungRepository,
     freigabeRepo: sqliteDublettenfreigabeRepository,
     budgetRepo: sqliteBudgetRepository,
+    ruecklagenRepo: sqliteRuecklagenRepository,
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
   });
 }
