@@ -867,7 +867,32 @@ const de = {
       ausblick: "Ausblick",
       befunde: "Befunde",
       depot: "Depot",
+      bericht: "Bericht",
     },
+  },
+  // Das Register „Bericht": ein abgeschlossener Monat oder ein Jahr auf einem Blatt. Die
+  // Zeilen, Stufen, die Überleitung und die Teile des Vermögens heissen wie dort, wo sie
+  // herkommen (`ergebnis.*`, `vermoegen.kpi*`) — hier stehen nur die Wörter, die der
+  // Bericht selbst braucht.
+  bericht: {
+    art: { monat: "Monat", jahr: "Jahr" },
+    untertitel: {
+      monat: "Was der Monat gekostet hat und was bleibt — neben dem Vormonat",
+      jahr: "Was das Jahr gekostet hat und was bleibt, als Summe seiner zwölf Monate — neben dem Vorjahr",
+    },
+    spalteVeraenderung: "Veränderung",
+    ohneVergleich: {
+      monat: "Der Vormonat ist nicht ganz erfasst. Ohne ihn gibt es keinen Vergleich.",
+      jahr: "Das Vorjahr ist nicht ganz erfasst. Ohne es gibt es keinen Vergleich.",
+    },
+    leer: {
+      monat: "Ein Bericht entsteht, sobald ein Monat abgeschlossen und ganz erfasst ist.",
+      jahr: "Ein Bericht über ein Jahr entsteht, sobald ein Kalenderjahr abgeschlossen ist und alle zwölf Monate erfasst sind.",
+    },
+    ueberleitungUntertitel: "Vom Ergebnis zur Änderung aller Kontostände im selben Zeitraum",
+    vermoegenUntertitel: "Am {{anfang}} und am {{ende}}",
+    vermoegenHinweis:
+      "Vermögenswerte und Schulden zählen an jedem der beiden Tage mit dem zuletzt eingetragenen Wert. Was sich seitdem geändert hat, ohne eingetragen zu sein, fehlt.",
   },
   historie: {
     titel: "Übersicht",
@@ -3388,7 +3413,28 @@ const en: typeof de = {
       ausblick: "Outlook",
       befunde: "Findings",
       depot: "Portfolio",
+      bericht: "Report",
     },
+  },
+  bericht: {
+    art: { monat: "Month", jahr: "Year" },
+    untertitel: {
+      monat: "What the month cost and what is left — next to the month before",
+      jahr: "What the year cost and what is left, as the sum of its twelve months — next to the year before",
+    },
+    spalteVeraenderung: "Change",
+    ohneVergleich: {
+      monat: "The month before is not fully recorded. Without it there is no comparison.",
+      jahr: "The year before is not fully recorded. Without it there is no comparison.",
+    },
+    leer: {
+      monat: "A report appears once a month is over and fully recorded.",
+      jahr: "A report for a year appears once a calendar year is over and all twelve months are recorded.",
+    },
+    ueberleitungUntertitel: "From the result to the change of all account balances in the same period",
+    vermoegenUntertitel: "On {{anfang}} and on {{ende}}",
+    vermoegenHinweis:
+      "Assets and debts count on each of the two days with the value entered last. Whatever changed since without being entered is missing.",
   },
   historie: {
     titel: "Overview",

@@ -42,7 +42,7 @@ ein Baustein; was einer benutzt, gehört in dessen Ordner** — auch wenn es all
 | Ordner | was |
 |---|---|
 | `uebersicht/` | „wie stehe ich gerade da": Monatskarten, Budgets, Was da ist, Depotstand (Regeln in `uebersicht/CLAUDE.md`) |
-| `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot |
+| `analyse/` | „wie war es über einen Zeitraum": Register Verlauf, Kategorien, Ausblick, Befunde, Depot, Bericht |
 | `budgets/` | Budgetliste, Verlauf eines Budgets, Vorschläge |
 | `ruecklagen/` | Rücklagen, Fluss, Tacho |
 | `vermoegen/` | Nettovermögen mit Verlauf, Vermögenswerte und Schulden als Werte zum Stichtag |
@@ -738,7 +738,8 @@ Gesteuert über `zugangId`. Ohne den Parameter gilt das erste, mit ihm das zweit
 ## Die Analyse steht in Registern
 
 **Seit 2026-11-08** stehen die Abschnitte nicht mehr untereinander, sondern in Reitern
-(`bausteine/Registerleiste.tsx`): **Verlauf · Kategorien · Ausblick · Befunde · Depot**.
+(`bausteine/Registerleiste.tsx`): **Verlauf · Kategorien · Ausblick · Befunde · Depot ·
+Bericht**.
 Untereinander war die Seite so lang, dass man für die Befunde oder ein Depot an allem
 anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
 
@@ -894,6 +895,37 @@ FREIE Geld der liquiden Konten die Kosten eines Monats trägt. Was daran Entsche
 
 Geprüft in `analyse/reichweite.test.tsx`, `application/analysesichten.test.ts` und
 `core/reichweite.test.ts`.
+
+### Der Bericht — ein Zeitraum auf einem Blatt
+
+Seit 2026-11-15 steht als letztes Register der **Bericht** (`BerichtRegister.tsx`,
+gerechnet von `analyseBericht` über `core/bericht.ts`): für EINEN abgeschlossenen Monat
+oder EIN Kalenderjahr drei Karten untereinander — das Ergebnis mit seinen Stufen neben dem
+Zeitraum davor, der Weg zum Konto (die Überleitung) und das Nettovermögen am Tag vor dem
+Zeitraum und an seinem letzten Tag. Was daran Entscheidung ist:
+
+- **Er rechnet nichts Eigenes.** Dieselbe Eingabe wie Kostensicht und Reichweite
+  (`kostenbasis`), ein Jahr ist die Summe seiner zwölf Monate — auch in der Überleitung,
+  die deshalb wie im Monat exakt aufgeht (`core/bericht.test.ts`). Die Kennzahlen sind die
+  der Kostensicht für diesen Zeitraum, mit ihren Wörtern.
+- **Wählbar ist nur Abgeschlossenes und ganz Erfasstes**, ab dem ersten voll erfassten
+  Monat (`reichweitenMonate`), ein Jahr nur mit allen zwölf. Vorgabe ist der jüngste.
+  Ein angefangenes Jahr neben einem vollen wäre kein Vergleich.
+- **Der Vergleich fehlt, statt zu lügen.** Ist der Zeitraum davor nicht ganz erfasst,
+  gibt es keine zweite Spalte, und das steht als Satz darunter.
+- **Ein Blatt, nichts eingeklappt.** Die Überleitung, in der Übersicht ein Beleg hinter
+  einem Deckel, ist hier einer der drei Teile und hat eine eigene Karte. Die
+  Einschränkungen (fehlender Vergleich, fehlende Rücklagenraten, Vermögenswerte und
+  Schulden mit dem zuletzt eingetragenen Wert) stehen offen da, wenn sie treffen.
+- **Die Schulden stehen im Vermögensteil als Abzug** (negativ), damit sich die Spalte zum
+  Nettovermögen addiert und eine sinkende Schuld als Zuwachs dasteht. Gedreht wird das an
+  einer Stelle, in `vermoegensvergleich`; gespeichert bleibt die Restschuld positiv.
+- **Schmal** bleiben Name und Betrag des Zeitraums; die Veränderung wandert in die zweite
+  Zeile und trägt dort ihren Namen (`.zweitzeile-beschriftung` in `app.css`, breit
+  ausgeblendet, weil dort der Spaltenkopf ihn trägt).
+
+Kein Export und kein Druck — das Blatt ist so gebaut, dass es sich wie eines lesen lässt.
+Geprüft in `analyse/bericht.test.tsx`.
 
 **Ein Screen-Test, der einen Kategorienamen sucht, muss ihn jetzt in seiner Karte
 suchen.** Derselbe Name steht in der Aufschlüsselung und in den Ranglisten darunter; eine

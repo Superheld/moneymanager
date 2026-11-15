@@ -86,6 +86,18 @@ import {
   reichweitenMonate,
   REICHWEITE_MINDESTENS,
   type Reichweite,
+  berichtsstichtage,
+  berichtszeitraeume,
+  berichtszeitraum,
+  ergebnisVergleich,
+  ueberleitungSumme,
+  vermoegensvergleich,
+  vorherigerSchluessel,
+  type Berichtsart,
+  type Berichtsergebnis,
+  type Ueberleitung,
+  type VermoegensEingabe,
+  type Vermoegensvergleich,
 } from "../core";
 import { belegungssicht } from "./konten/kontobelegung";
 import type { Umsatz } from "./import";
@@ -171,6 +183,12 @@ export interface Analysebasis {
   readonly vorsorge?: ErgebnisVorsorge;
   /** Die Schulden für die Teilung der Kreditraten — dieselbe Angabe wie in der Übersicht. */
   readonly schulden?: ErgebnisSchulden;
+  /**
+   * Der Bestand des Nettovermögens (`vermoegensbestandLaden`) — derselbe, aus dem der
+   * Bereich Vermögen rechnet, für den Vermögensteil des Berichts. Fehlt er (in Tests, die
+   * eine Basis von Hand bauen), zählen nur die Konten.
+   */
+  readonly vermoegen?: VermoegensEingabe;
 }
 
 export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
@@ -191,7 +209,8 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
       deps.vormerkungRepo.alle(),
       ergebnisvorsorgeLaden(deps.vorsorge, bestand),
     ]);
-  const { verbindlichkeiten, staende } = await bestand;
+  const vermoegen = await bestand;
+  const { verbindlichkeiten, staende } = vermoegen;
   const umsatzZuBuchung = belegZuBuchung(umsaetze);
   const vertragJeBuchung = new Map<string, string>();
   for (const z of zuordnungen) if (z.vertragId) vertragJeBuchung.set(z.istbuchungId, z.vertragId);
@@ -215,6 +234,7 @@ export async function analyseLaden(deps: AnalyseDeps): Promise<Analysebasis> {
     vormerkungen,
     vorsorge,
     schulden: { verbindlichkeiten, staende },
+    vermoegen,
   };
 }
 
@@ -807,3 +827,87 @@ export function analyseReichweite(basis: Analysebasis, heute: string): Reichweit
   };
 }
 
+
+// ---------------------------------------------------------------- Bericht
+
+/** Ein abgeschlossener Monat oder ein Kalenderjahr auf einem Blatt (`core/bericht.ts`). */
+export interface Bericht {
+  /** „YYYY-MM" bzw. „YYYY". */
+  readonly schluessel: string;
+  /** Der Zeitraum davor, wenn er voll erfasst ist — sonst `null`, und es gibt keinen Vergleich. */
+  readonly vorher: string | null;
+  readonly ergebnis: Berichtsergebnis;
+  /** Vom Ergebnis zur Änderung der Kontostände, über den ganzen Zeitraum. */
+  readonly ueberleitung: Ueberleitung;
+  readonly kennzahlen: ErgebnisKennzahlen;
+  /** Am letzten Tag vor dem Zeitraum und an seinem letzten Tag. */
+  readonly vermoegen: Vermoegensvergleich;
+  /** Fehlt einem Monat dieses Zeitraums oder des Vergleichs die Rate einer ausgebuchten Rücklage? */
+  readonly ruecklagenUnvollstaendig: boolean;
+  /**
+   * Gibt es Vermögenswerte oder Schulden? Nur dann gilt die Einschränkung, dass sie mit
+   * ihrem zuletzt eingetragenen Wert zählen.
+   */
+  readonly mitBeobachtungen: boolean;
+}
+
+export interface Berichtssicht {
+  readonly art: Berichtsart;
+  /** Was gewählt werden kann, jüngster Zeitraum zuerst. Leer: es gibt noch keinen. */
+  readonly wahl: readonly string[];
+  /** `null`, wenn es nichts zu wählen gibt. */
+  readonly bericht: Bericht | null;
+}
+
+/**
+ * Der Bericht über einen abgeschlossenen Zeitraum — Ergebnis, Weg zum Konto, Vermögen.
+ *
+ * **Dieselbe Eingabe wie Kostensicht und Reichweite** (`kostenbasis`): derselbe Monat
+ * trägt im Bericht dieselben Kosten wie in der Analyse und in den Monatskarten der
+ * Übersicht. Das Jahr ist die Summe seiner Monate, nicht eine eigene Rechnung.
+ *
+ * **Wählbar ist nur Abgeschlossenes und voll Erfasstes** (`berichtszeitraeume`). Ohne
+ * Wahl — oder mit einer, die nicht (mehr) wählbar ist — gilt der jüngste Zeitraum: der
+ * letzte abgeschlossene Monat bzw. das letzte abgeschlossene Jahr.
+ *
+ * Der Vermögensteil rechnet über den Bestand des Bereichs Vermögen; fehlt er, über die
+ * Konten der Basis allein.
+ */
+export function analyseBericht(
+  basis: Analysebasis,
+  art: Berichtsart,
+  schluessel: string | null,
+  heute: string,
+): Berichtssicht {
+  const zeitraeume = berichtszeitraeume(heute, basis.buchungen);
+  const wahl = art === "jahr" ? zeitraeume.jahre : zeitraeume.monate;
+  if (wahl.length === 0) return { art, wahl, bericht: null };
+  const gewaehlt = schluessel && wahl.includes(schluessel) ? schluessel : wahl[0];
+  const vorherSchluessel = vorherigerSchluessel(art, gewaehlt);
+  const vorher = wahl.includes(vorherSchluessel) ? vorherSchluessel : null;
+
+  const rechenbasis = kostenbasis(basis, heute);
+  const zeitraum = berichtszeitraum(art, gewaehlt);
+  const jetzt = zeitraum.monate.map((m) => monatsErgebnis(rechenbasis, m));
+  const davor = vorher ? berichtszeitraum(art, vorher).monate.map((m) => monatsErgebnis(rechenbasis, m)) : null;
+
+  const bestand: VermoegensEingabe = basis.vermoegen ?? {
+    konten: basis.konten, buchungen: basis.buchungen, depotwerte: [], gegenstaende: [], werte: [], verbindlichkeiten: [], staende: [],
+  };
+  const { anfang, ende } = berichtsstichtage(zeitraum);
+
+  return {
+    art,
+    wahl,
+    bericht: {
+      schluessel: gewaehlt,
+      vorher,
+      ergebnis: ergebnisVergleich(jetzt, davor),
+      ueberleitung: ueberleitungSumme(jetzt),
+      kennzahlen: ergebnisKennzahlen(jetzt),
+      vermoegen: vermoegensvergleich(bestand, anfang, ende),
+      ruecklagenUnvollstaendig: [...jetzt, ...(davor ?? [])].some((m) => ruecklagenrateFehlt(m.label, basis.ausbuchungsdaten)),
+      mitBeobachtungen: bestand.gegenstaende.length > 0 || bestand.verbindlichkeiten.length > 0,
+    },
+  };
+}

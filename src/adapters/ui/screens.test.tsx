@@ -453,7 +453,8 @@ describe("AnalyseScreen", () => {
   /** Der Weg, der vorher nur über den Konto-Auszug ging: Kategorie → Buchung → Details. */
   /**
    * Die Abschnitte stehen in Registern, und nur die mit Inhalt bekommen einen Reiter:
-   * ohne abgerufenes Depot gibt es keinen Reiter „Depot". Die Filter stehen seit
+   * ohne abgerufenes Depot gibt es keinen Reiter „Depot" (der Bericht steht immer da und
+   * sagt ohne abgeschlossenen Monat, ab wann es ihn gibt). Die Filter stehen seit
    * 2026-11-09 am Register, das sie einstellen: Verlauf Monat und Zeitraum, Befunde nur
    * den Zeitraum, der Ausblick keinen — er steht fest.
    */
@@ -466,7 +467,7 @@ describe("AnalyseScreen", () => {
     rendere(<AnalyseScreen />);
 
     await screen.findByRole("tab", { name: "Verlauf" });
-    expect(screen.getAllByRole("tab").map((r) => r.textContent)).toEqual(["Verlauf", "Kategorien", "Ausblick", "Befunde"]);
+    expect(screen.getAllByRole("tab").map((r) => r.textContent)).toEqual(["Verlauf", "Kategorien", "Ausblick", "Befunde", "Bericht"]);
     expect(screen.getByText("Monatsverlauf")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("tab", { name: "Befunde" }));
