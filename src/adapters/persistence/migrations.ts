@@ -2300,4 +2300,67 @@ export const MIGRATIONS: Migration[] = [
       `ALTER TABLE vermoegensgegenstand ADD COLUMN vorsorgeziel_id TEXT REFERENCES vorsorgeziel(id) ON DELETE SET NULL`,
     ],
   },
+  {
+    version: 79, // Eine Ruecklage: Sorte, Fundfenster, Ratenreihe, Zuordnung — nur das Schema
+    sql: [
+      // Erste von drei Stufen, in denen Ruecklage und aufbauendes Budget eine Sache werden
+      // (ADR-0006). Diese hier legt NUR das Schema an und fuellt nichts: der Code, der die
+      // neuen Spalten liest, rechnet noch nicht danach. Ueberfuehrt wird erst, wenn er es
+      // tut — sonst schriebe der alte Code eine Aenderung in die alte Spalte, waehrend die
+      // neue schon gefuellt daneben steht, und beide liefen auseinander.
+      //
+      // `art` sagt, wann die Ruecklage wieder bei null beginnt: `fortlaufend` nie,
+      // `abschliessend` wenn der Nutzer sie abschliesst. Ein eigenes Feld und keine Folge
+      // der Form (Ziel oder Rate), weil ADR-0006 genau diese beiden Fragen trennt. Die
+      // Vorgabe `abschliessend` trifft jede bestehende Zeile richtig: bisher gab es nur
+      // Ruecklagen von Hand, und die werden alle ausgebucht.
+      `ALTER TABLE ruecklage ADD COLUMN art TEXT NOT NULL DEFAULT 'abschliessend'`,
+      // Ab welchem Tag die Kategorie Ausgaben von selbst findet. Ohne dieses Feld kostete
+      // nach der Umstellung jeder vergangene Monat anders, weil die Kategorie dann
+      // rueckwirkend fuende. NULL heisst bei `abschliessend` „findet nichts ueber die
+      // Kategorie", bei `fortlaufend` „ohne Anfang" (wie heute ein aufbauendes Budget).
+      // Hier ohne Vorgabe: eine erfundene Grenze waere eine Aussage ueber die
+      // Vergangenheit, die niemand getroffen hat.
+      `ALTER TABLE ruecklage ADD COLUMN findet_ab TEXT`,
+      // Die Reihe der freien Raten, gueltig AB einem Monat — dasselbe Muster wie
+      // `budget_betrag` (v58) und aus demselben Grund: eine Aenderung darf die
+      // Vergangenheit nicht umschreiben. Mit Ziel bleibt es bei Ziel ÷ Frist.
+      `CREATE TABLE IF NOT EXISTS ruecklage_rate (
+         ruecklage_id TEXT    NOT NULL REFERENCES ruecklage(id) ON DELETE CASCADE,
+         ab_monat     TEXT    NOT NULL,
+         betrag       INTEGER NOT NULL,
+         PRIMARY KEY (ruecklage_id, ab_monat)
+       )`,
+      // Welche Ruecklage einen Anteil einer Buchung traegt — nur gebraucht, wo mehrere an
+      // derselben Kategorie haengen. Eine eigene Tabelle statt einer Spalte an der
+      // Buchung (wie beim Vertrag, v47): bei einer geteilten Buchung gilt sie je Anteil,
+      // und die Aufteilungen bekommen bei jedem Speichern neue IDs. Ueber (Buchung,
+      // Kategorie) uebersteht sie das Neuschreiben durch das Ledger, ohne dass das Ledger
+      // davon weiss. `kategorie_id` NULL heisst die ganze Buchung, `ruecklage_id` NULL
+      // „ausdruecklich keine".
+      //
+      // CASCADE auf allen drei Verweisen: eine Zuordnung ohne ihre Buchung, ihre Kategorie
+      // oder ihre Ruecklage beantwortet keine Frage mehr — die Buchung wird dann neu
+      // eingeordnet, und das ist richtig. Eine geaenderte Kategorie ist eine neue Frage.
+      //
+      // Keine Spalte `herkunft`. Der erste Entwurf sah `hand | ausbuchung` vor; die alten
+      // Verknuepfungen bleiben aber in `ruecklage_ausbuchung`, und damit gaebe es nur einen
+      // Wert. Eine Spalte mit einem einzigen Wert verspricht eine Unterscheidung, die
+      // niemand trifft. Kommt eine zweite Herkunft, ist sie verlustfrei nachzuruesten:
+      // `ADD COLUMN herkunft TEXT NOT NULL DEFAULT 'hand'` sagt ueber jede bis dahin
+      // geschriebene Zeile das Richtige.
+      `CREATE TABLE IF NOT EXISTS ruecklage_zuordnung (
+         istbuchung_id TEXT NOT NULL REFERENCES ist_buchung(id) ON DELETE CASCADE,
+         kategorie_id  TEXT REFERENCES kategorie(id) ON DELETE CASCADE,
+         ruecklage_id  TEXT REFERENCES ruecklage(id) ON DELETE CASCADE
+       )`,
+      // EINE Entscheidung je (Buchung, Kategorie oder ganze Buchung). Ueber einen
+      // Ausdruck, weil SQLite NULL in einem UNIQUE als verschieden zaehlt: zwei Zeilen
+      // „ganze Buchung" fuer dieselbe Buchung kaemen sonst beide durch.
+      `CREATE UNIQUE INDEX IF NOT EXISTS ux_ruecklage_zuordnung
+         ON ruecklage_zuordnung (istbuchung_id, IFNULL(kategorie_id, ''))`,
+      `CREATE INDEX IF NOT EXISTS ix_ruecklage_zuordnung_ruecklage
+         ON ruecklage_zuordnung (ruecklage_id) WHERE ruecklage_id IS NOT NULL`,
+    ],
+  },
 ];

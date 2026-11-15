@@ -1,6 +1,10 @@
 // SQLite-Implementierung des RuecklagenRepository-Ports.
+//
+// Zwei Tabellen, EIN Aggregat — wie beim Budget: `ruecklage` trägt, was sich nicht datiert
+// ändert, `ruecklage_rate` die Reihe der freien Raten (seit Migration 79). Anders als beim
+// Budget schreibt `speichern` die Reihe NICHT mit; warum, steht am Port.
 
-import type { Ruecklage } from "../../core";
+import type { Cent, Ruecklage, Ruecklagenart, Ruecklagenrate } from "../../core";
 import type { RuecklagenAusbuchung, RuecklagenRepository } from "../../application/ports";
 import { getDb } from "./db";
 
@@ -14,6 +18,14 @@ interface Zeile {
   kategorie_id: string | null;
   konto_id: string | null;
   beendet_am: string | null;
+  art: string;
+  findet_ab: string | null;
+}
+
+interface Ratenzeile {
+  ruecklage_id: string;
+  ab_monat: string;
+  betrag: number;
 }
 
 interface AusbuchungsZeile {
@@ -31,11 +43,14 @@ interface AusbuchungsZeile {
   kategorie_id: string | null;
 }
 
+const SPALTEN = "id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am, art, findet_ab";
+
 /**
  * Eine Zeile als Rücklage. `beendetAm` kommt mit; bei `alle()` ist es durch den Filter
- * ohnehin leer.
+ * ohnehin leer. `raten` ist immer eine Liste, auch eine leere: das Repository weiss, dass
+ * es keine gibt, und sagt es — `undefined` hiesse „nicht gelesen".
  */
-function ausZeile(z: Zeile): Ruecklage {
+function ausZeile(z: Zeile, raten: readonly Ruecklagenrate[]): Ruecklage {
   return {
     id: z.id,
     bezeichnung: z.bezeichnung,
@@ -46,42 +61,87 @@ function ausZeile(z: Zeile): Ruecklage {
     kategorieId: z.kategorie_id ?? undefined,
     kontoId: z.konto_id ?? undefined,
     beendetAm: z.beendet_am ?? undefined,
+    art: z.art as Ruecklagenart,
+    findetAb: z.findet_ab ?? undefined,
+    raten,
   };
+}
+
+/**
+ * Liest die Rücklagen der Auswahl samt ihrer Reihe. Beide Tabellen in einem Rutsch und
+ * dann zusammengesetzt, wie beim Budget: eine Abfrage je Rücklage wäre N+1.
+ */
+async function lesen(bedingung: string, ordnung: string): Promise<Ruecklage[]> {
+  const db = await getDb();
+  const [zeilen, raten] = await Promise.all([
+    db.select<Zeile[]>(`SELECT ${SPALTEN} FROM ruecklage WHERE ${bedingung} ORDER BY ${ordnung}`),
+    db.select<Ratenzeile[]>("SELECT ruecklage_id, ab_monat, betrag FROM ruecklage_rate ORDER BY ruecklage_id, ab_monat"),
+  ]);
+  const jeRuecklage = new Map<string, Ruecklagenrate[]>();
+  for (const r of raten) {
+    const eintrag: Ruecklagenrate = { abMonat: r.ab_monat, betrag: r.betrag as Cent };
+    const liste = jeRuecklage.get(r.ruecklage_id);
+    if (liste) liste.push(eintrag);
+    else jeRuecklage.set(r.ruecklage_id, [eintrag]);
+  }
+  return zeilen.map((z) => ausZeile(z, jeRuecklage.get(z.id) ?? []));
 }
 
 export const sqliteRuecklagenRepository: RuecklagenRepository = {
   async alle() {
-    const db = await getDb();
-    const zeilen = await db.select<Zeile[]>(
-      // Beendete (freie, ausgebuchte) Rücklagen bleiben in der Tabelle, sind aber für jede
-      // laufende Rechnung nicht mehr da: keine Rate, kein Anspruch auf ein Konto, kein
-      // Eintrag in der Liste. Der Filter steht HIER, damit kein Aufrufer ihn vergessen
-      // kann; ihre Geschichte kommt über `ausbuchungen()`.
-      "SELECT id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am FROM ruecklage WHERE beendet_am IS NULL ORDER BY bezeichnung",
-    );
-    return zeilen.map(ausZeile);
+    // Beendete (freie, ausgebuchte) Rücklagen bleiben in der Tabelle, sind aber für jede
+    // laufende Rechnung nicht mehr da: keine Rate, kein Anspruch auf ein Konto, kein
+    // Eintrag in der Liste. Der Filter steht HIER, damit kein Aufrufer ihn vergessen
+    // kann; ihre Geschichte kommt über `ausbuchungen()`.
+    return lesen("beendet_am IS NULL", "bezeichnung");
   },
   async beendete() {
-    const db = await getDb();
-    const zeilen = await db.select<Zeile[]>(
-      "SELECT id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am FROM ruecklage WHERE beendet_am IS NOT NULL ORDER BY beendet_am DESC, bezeichnung",
-    );
-    return zeilen.map(ausZeile);
+    return lesen("beendet_am IS NOT NULL", "beendet_am DESC, bezeichnung");
   },
   async speichern(r: Ruecklage) {
     const db = await getDb();
+    // `art` über COALESCE: fehlt sie, gilt bei einer neuen Zeile die Vorgabe der Spalte
+    // und bei einer bestehenden die gespeicherte (Begründung am Port). Die Reihe bleibt
+    // unberührt.
+    //
+    // Der Wert steht zweimal in der Liste ($10 und $12) statt einmal zweimal benutzt: die
+    // Naht zur Shell bindet der Reihe nach (`src-tauri/src/datenbank.rs`), und ob ein
+    // wiederholter Platzhalter dort denselben Wert bekommt, prüft kein Test hier.
     await db.execute(
-      `INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+      `INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am, art, findet_ab)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE($10,'abschliessend'),$11)
        ON CONFLICT(id) DO UPDATE SET bezeichnung = excluded.bezeichnung,
          ziel = excluded.ziel, frist_monate = excluded.frist_monate, rate = excluded.rate,
          beginn = excluded.beginn, kategorie_id = excluded.kategorie_id,
-         konto_id = excluded.konto_id, beendet_am = excluded.beendet_am`,
-      [r.id, r.bezeichnung, r.ziel ?? null, r.fristMonate ?? null, r.rate ?? null, r.beginn, r.kategorieId ?? null, r.kontoId ?? null, r.beendetAm ?? null],
+         konto_id = excluded.konto_id, beendet_am = excluded.beendet_am,
+         art = COALESCE($12, ruecklage.art), findet_ab = excluded.findet_ab`,
+      [
+        r.id, r.bezeichnung, r.ziel ?? null, r.fristMonate ?? null, r.rate ?? null, r.beginn,
+        r.kategorieId ?? null, r.kontoId ?? null, r.beendetAm ?? null, r.art ?? null, r.findetAb ?? null,
+        r.art ?? null,
+      ],
     );
+  },
+  async rateSpeichern(ruecklageId: string, rate: Ruecklagenrate) {
+    const db = await getDb();
+    await db.execute(
+      `INSERT INTO ruecklage_rate (ruecklage_id, ab_monat, betrag) VALUES ($1,$2,$3)
+       ON CONFLICT(ruecklage_id, ab_monat) DO UPDATE SET betrag = excluded.betrag`,
+      [ruecklageId, rate.abMonat, rate.betrag],
+    );
+  },
+  async rateLoeschen(ruecklageId: string, abMonat: string) {
+    const db = await getDb();
+    await db.execute("DELETE FROM ruecklage_rate WHERE ruecklage_id = $1 AND ab_monat = $2", [ruecklageId, abMonat]);
   },
   async loeschen(id: string) {
     const db = await getDb();
+    // Reihe und Zuordnungen hängen per CASCADE daran. Im Test sind Fremdschlüssel aber AUS
+    // (`persistence/CLAUDE.md`), und eine verwaiste Zeile wäre dort unsichtbar — deshalb
+    // ausdrücklich zuerst, wie beim Budget. Die Ausbuchungen bleiben dem CASCADE
+    // überlassen, so wie bisher.
+    await db.execute("DELETE FROM ruecklage_rate WHERE ruecklage_id = $1", [id]);
+    await db.execute("DELETE FROM ruecklage_zuordnung WHERE ruecklage_id = $1", [id]);
     await db.execute("DELETE FROM ruecklage WHERE id = $1", [id]);
   },
   async ausbuchungSpeichern(a: RuecklagenAusbuchung) {

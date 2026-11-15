@@ -9,6 +9,7 @@ import type {
   Depotposition,
   Depotwert,
   Ruecklage,
+  Ruecklagenrate,
   Ruecklagenzyklus,
   IstBuchung,
   Journaleintrag,
@@ -131,10 +132,57 @@ export interface RuecklagenRepository {
    * es zu wollen — gebraucht werden sie nur für die Geschichte.
    */
   beendete(): Promise<Ruecklage[]>;
+  /**
+   * Schreibt die Rücklage samt `art` und `findetAb` — die Reihe der Raten NICHT, die hat
+   * ihren eigenen Weg (`rateSpeichern`, `rateLoeschen`). Wer eine Rücklage aus einer
+   * Eingabe neu baut (`ruecklageAktualisieren`), kennt ihre Reihe nicht; schriebe
+   * `speichern` sie mit, wäre sie nach dem ersten Bearbeiten weg.
+   *
+   * Fehlt `art`, bleibt die gespeicherte stehen (bei einer neuen gilt die Vorgabe
+   * `abschliessend`): eine Rücklage ohne Sorte gibt es nicht, und ein Aufrufer, der das
+   * Feld nicht kennt, soll sie nicht umstellen. `findetAb` wird geschrieben, wie es
+   * kommt — dort heisst „fehlt" etwas (siehe `Ruecklage.findetAb`).
+   */
   speichern(ruecklage: Ruecklage): Promise<void>;
+  /** Legt eine Rate der Reihe an oder überschreibt die eines Monats. */
+  rateSpeichern(ruecklageId: string, rate: Ruecklagenrate): Promise<void>;
+  rateLoeschen(ruecklageId: string, abMonat: string): Promise<void>;
   loeschen(id: string): Promise<void>;
   ausbuchungSpeichern(a: RuecklagenAusbuchung): Promise<void>;
   ausbuchungen(): Promise<RuecklagenAusbuchung[]>;
+}
+
+/**
+ * Eine ausdrückliche Zuordnung: welche Rücklage einen Anteil einer Buchung trägt (seit
+ * Migration 79, ADR-0006).
+ *
+ * Gebraucht wird sie nur, wo die Kategorie allein nicht entscheidet — wenn mehrere
+ * Rücklagen an ihr hängen. Der Anteil wird über seine KATEGORIE benannt und nicht über
+ * seinen Index: die Aufteilungen bekommen bei jedem Speichern neue IDs, die Kategorie
+ * bleibt. Ändert jemand sie, passt die Zuordnung zu keinem Anteil mehr, und die Buchung
+ * wird neu eingeordnet — eine neue Kategorie ist eine neue Frage.
+ */
+export interface Ruecklagenzuordnung {
+  readonly istbuchungId: string;
+  /** Der Anteil mit dieser Kategorie; fehlt sie, gilt die Zuordnung der ganzen Buchung. */
+  readonly kategorieId?: string;
+  /** Fehlt sie, heisst das „ausdrücklich keine Rücklage" — nicht „noch offen". */
+  readonly ruecklageId?: string;
+}
+
+/**
+ * **Im Umbau:** angelegt mit Migration 79 und von keinem Use-Case benutzt. Die Einordnung
+ * fragt erst danach, wenn die Rechnung umgestellt ist.
+ */
+export interface RuecklagenzuordnungRepository {
+  alle(): Promise<Ruecklagenzuordnung[]>;
+  /**
+   * Setzt die EINE Zuordnung für (Buchung, Kategorie oder ganze Buchung) — eine
+   * bestehende für denselben Anteil wird ersetzt, nicht ergänzt.
+   */
+  setzen(z: Ruecklagenzuordnung): Promise<void>;
+  /** Nimmt die Zuordnung des Anteils weg; danach gilt wieder, was die Kategorie sagt. */
+  entfernen(istbuchungId: string, kategorieId?: string): Promise<void>;
 }
 
 /**

@@ -150,6 +150,17 @@ describe("Spielstand", () => {
     }
   });
 
+  it("traegt die Ruecklagen so, wie Migration 79 einen Bestand hinterlaesst", () => {
+    // Bis die Rechnung umgestellt ist, soll der Spielstand aussehen wie ein migrierter
+    // Bestand: jede Ruecklage von Hand abschliessend, ohne Fundfenster, die Reihe leer.
+    // Stuende hier schon eine Reihe oder eine Zuordnung, saehe man in der App etwas, das
+    // kein echter Bestand hat.
+    const db = mitSeed();
+    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage WHERE art <> 'abschliessend' OR findet_ab IS NOT NULL")).toBe(0);
+    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_rate")).toBe(0);
+    expect(zahl(db, "SELECT COUNT(*) FROM ruecklage_zuordnung")).toBe(0);
+  });
+
   /**
    * Der Spielstand muss die Maske ueberstehen, nicht nur das Schema.
    *

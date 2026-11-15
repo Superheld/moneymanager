@@ -92,6 +92,8 @@ const ERWARTETE_TABELLEN = [
   "person",
   // v65 — aus dem Inventar wurden Rücklagen: Ziel und Frist optional, freie Rate
   "ruecklage", "ruecklage_ausbuchung",
+  // v79 — eine Rücklage: die Reihe der freien Raten und die ausdrückliche Zuordnung
+  "ruecklage_rate", "ruecklage_zuordnung",
   "trainingslauf", // v75 — jedes Training mit Konfiguration, Kennzahlen, Vorhersagen
   // v44 — der Beleg und was wir daraus gemacht haben, getrennt nach Lebenszyklus
   "umsatz_roh", "umsatz_verarbeitung",
@@ -1786,6 +1788,117 @@ describe("Migration 73 — ein Konto stilllegen", () => {
     apply(db, 72, 73);
 
     expect(db.exec("SELECT aktiv FROM zahlungskonto")[0].values).toEqual([[0]]);
+    db.close();
+  });
+});
+
+describe("Migration 79 — eine Rücklage: nur das Schema", () => {
+  /** Ein Bestand vor v79 mit einer Rücklage jeder Form, ohne Fremdschlüssel-Widerspruch. */
+  function vor79(): Database {
+    const db = new SQL.Database();
+    apply(db, 0, 78);
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat-a','Haushalt','Aufwand'), ('kat-b','Freizeit','Aufwand')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k1','Girokonto','Giro','[]')");
+    db.run(
+      `INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, beendet_am) VALUES
+         ('r-ziel','Brammert',120000,24,NULL,'2025-03-01','kat-a','k1',NULL),
+         ('r-frei','Ossenkamp',NULL,NULL,5000,'2025-06-01',NULL,NULL,NULL),
+         ('r-ende','Tiedjen',NULL,NULL,2000,'2024-01-01',NULL,NULL,'2025-02-10')`,
+    );
+    return db;
+  }
+
+  it("legt die beiden Tabellen und die beiden Spalten an", () => {
+    const db = vor79();
+    apply(db, 78, 79);
+    expect(spalten(db, "ruecklage")).toEqual(expect.arrayContaining(["art", "findet_ab"]));
+    expect(spalten(db, "ruecklage_rate")).toEqual(["ruecklage_id", "ab_monat", "betrag"]);
+    // Ohne `herkunft`: es gäbe nur einen Wert (Begründung an der Migration).
+    expect(spalten(db, "ruecklage_zuordnung")).toEqual(["istbuchung_id", "kategorie_id", "ruecklage_id"]);
+    expect(indexExistiert(db, "ux_ruecklage_zuordnung")).toBe(true);
+    expect(indexExistiert(db, "ix_ruecklage_zuordnung_ruecklage")).toBe(true);
+    db.close();
+  });
+
+  it("macht jede bestehende Rücklage abschliessend, ohne Fundfenster, und füllt nichts", () => {
+    // Die Zusicherung, auf der das ganze Paket steht: nach v79 rechnet der Bestand wie
+    // davor. Kein `findet_ab` heisst, keine Kategorie findet etwas von selbst; keine Rate
+    // in der Reihe heisst, `rate` bleibt die einzige Quelle.
+    const db = vor79();
+    apply(db, 78, 79);
+    expect(db.exec("SELECT id, art, findet_ab, rate FROM ruecklage ORDER BY id")[0].values).toEqual([
+      ["r-ende", "abschliessend", null, 2000],
+      ["r-frei", "abschliessend", null, 5000],
+      ["r-ziel", "abschliessend", null, null],
+    ]);
+    expect(db.exec("SELECT COUNT(*) FROM ruecklage_rate")[0].values[0][0]).toBe(0);
+    expect(db.exec("SELECT COUNT(*) FROM ruecklage_zuordnung")[0].values[0][0]).toBe(0);
+    db.close();
+  });
+
+  it("läuft ein zweites Mal folgenlos durch", () => {
+    const db = vor79();
+    apply(db, 78, 79);
+    db.run("UPDATE ruecklage SET art = 'fortlaufend', findet_ab = '2025-07-01' WHERE id = 'r-frei'");
+    db.run("INSERT INTO ruecklage_rate (ruecklage_id, ab_monat, betrag) VALUES ('r-frei','2025-06',5000)");
+    apply(db, 78, 79);
+    expect(db.exec("SELECT art, findet_ab FROM ruecklage WHERE id = 'r-frei'")[0].values).toEqual([["fortlaufend", "2025-07-01"]]);
+    expect(db.exec("SELECT COUNT(*) FROM ruecklage_rate")[0].values[0][0]).toBe(1);
+    db.close();
+  });
+
+  it("lässt je Buchung und Kategorie genau eine Zuordnung zu, auch für die ganze Buchung", () => {
+    const db = vor79();
+    apply(db, 78, 79);
+    db.run("INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle) VALUES ('b1','2025-08-04',-12000,'k1','Aufwand','manuell')");
+    db.run("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES ('b1','kat-a','r-ziel')");
+    // Ein anderer Anteil derselben Buchung ist eine eigene Frage.
+    db.run("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES ('b1','kat-b','r-frei')");
+    db.run("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES ('b1',NULL,NULL)");
+    expect(() =>
+      db.run("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES ('b1','kat-a','r-frei')"),
+    ).toThrow(/UNIQUE/);
+    // Der Fall, für den der Index ein Ausdruck ist: zweimal NULL wäre in einem gewöhnlichen
+    // UNIQUE erlaubt, weil SQLite NULL als verschieden zählt.
+    expect(() =>
+      db.run("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES ('b1',NULL,'r-ziel')"),
+    ).toThrow(/UNIQUE/);
+    db.close();
+  });
+
+  it("räumt Reihe und Zuordnung per CASCADE mit ab, wenn die Fremdschlüssel an sind wie in der App", () => {
+    // sql.js hat sie von Haus aus AUS (`persistence/CLAUDE.md`); ohne diese Zeile prüfte
+    // der Test etwas anderes, als die App tut.
+    const db = vor79();
+    apply(db, 78, 79);
+    db.run("PRAGMA foreign_keys = ON");
+    db.run(
+      "INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle) VALUES ('b1','2025-08-04',-12000,'k1','Aufwand','manuell'), ('b2','2025-08-05',-3000,'k1','Aufwand','manuell')",
+    );
+    db.run("INSERT INTO ruecklage_rate (ruecklage_id, ab_monat, betrag) VALUES ('r-frei','2025-06',5000), ('r-ziel','2025-03',5000)");
+    db.run(
+      `INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES
+         ('b1',NULL,'r-frei'), ('b2','kat-a','r-ziel'), ('b2','kat-b','r-ziel')`,
+    );
+    const zuordnungen = () =>
+      db.exec("SELECT istbuchung_id, kategorie_id, ruecklage_id FROM ruecklage_zuordnung ORDER BY istbuchung_id, kategorie_id")[0]
+        ?.values ?? [];
+
+    db.run("DELETE FROM ruecklage WHERE id = 'r-frei'");
+    expect(db.exec("SELECT ruecklage_id FROM ruecklage_rate")[0].values).toEqual([["r-ziel"]]);
+    expect(zuordnungen()).toEqual([["b2", "kat-a", "r-ziel"], ["b2", "kat-b", "r-ziel"]]);
+
+    db.run("DELETE FROM kategorie WHERE id = 'kat-b'");
+    expect(zuordnungen()).toEqual([["b2", "kat-a", "r-ziel"]]);
+
+    db.run("DELETE FROM ist_buchung WHERE id = 'b2'");
+    expect(zuordnungen()).toEqual([]);
+
+    // Eine Zuordnung auf eine Rücklage, die es nicht gibt, kommt gar nicht erst hinein.
+    expect(() =>
+      db.run("INSERT INTO ruecklage_zuordnung (istbuchung_id, kategorie_id, ruecklage_id) VALUES ('b1',NULL,'gibt-es-nicht')"),
+    ).toThrow(/FOREIGN KEY/);
+    expect(db.exec("PRAGMA foreign_key_check")).toEqual([]);
     db.close();
   });
 });
