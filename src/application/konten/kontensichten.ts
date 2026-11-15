@@ -14,6 +14,11 @@
 import { buchungsname } from "../buchung/buchungszeile";
 import { belegZuBuchung } from "../buchung/belegZuBuchung";
 import {
+  einordnungJeBuchung,
+  einordnungVon,
+  type Buchungseinordnung,
+} from "../buchung/einordnungssicht";
+import {
   abweichungsfenster,
   anfangsbestandAusAnker,
   ankerAbweichung,
@@ -42,6 +47,7 @@ import type { Kontozuordnung } from "../fints/bankzugangPort";
 import { depotJeKonto, depotsLaden, type Depotsicht } from "../depot/depotsichten";
 import { vertragsnamenLaden } from "../vertraege/vertragszuordnung";
 import type {
+  BudgetRepository,
   DepotRepository,
   DublettenfreigabeRepository,
   ImportLaufRepository,
@@ -80,6 +86,13 @@ export interface KontenDeps {
   /** Für die Vertragsmarkierung im Auszug — beide zusammen ergeben den Anbieternamen. */
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly vertragRepo: VertragRepository;
+  /**
+   * Für die Einordnung jeder Zeile: ob eine Kategorie unter einem Budget liegt, entscheidet
+   * zwischen „laufend", „aus dem Topf" und „ungeplant". Pflicht und nicht optional — ohne
+   * die Budgets hiesse jede Ausgabe „ungeplant", und das wäre keine fehlende Auskunft,
+   * sondern eine falsche.
+   */
+  readonly budgetRepo: BudgetRepository;
   /**
    * Die Depots. Optional — ohne sie fehlt an einem Depot-Konto nur die Bestandsansicht,
    * alles andere läuft unverändert.
@@ -185,6 +198,15 @@ export interface Kontensicht {
    */
   readonly vertragsnamen: ReadonlyMap<string, string>;
   /**
+   * Buchungs-ID → was die Buchung kaufmännisch IST (Einnahme, Fixkosten, aus einem
+   * Budget …), bei einer geteilten Buchung mehrere.
+   *
+   * Dieselbe Einordnung, aus der die Ergebnisrechnung der Übersicht rechnet
+   * (`core/einordnung.ts`) — der Auszug ist die Stelle, an der man nachsieht, warum eine
+   * Zahl dort so aussieht, und er darf darauf keine eigene Antwort haben.
+   */
+  readonly einordnungen: ReadonlyMap<string, readonly Buchungseinordnung[]>;
+  /**
    * Konto-ID → was die Bank kennt und noch nicht gebucht hat.
    *
    * Sie stehen ÜBER den Buchungen und nicht darin: eine Vormerkung ist keine Zahlung,
@@ -197,7 +219,7 @@ export interface Kontensicht {
 }
 
 export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
-  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen, alleVormerkungen] =
+  const [konten, buchungen, regeln, kategorien, umsaetze, zuordnungen, laeufe, freigaben, anker, depotdaten, vertragsnamen, alleVormerkungen, budgets, vertragszuordnungen, vertraege] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.ledger.alle(),
@@ -211,6 +233,9 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
       deps.depotRepo ? depotsLaden({ depotRepo: deps.depotRepo }) : Promise.resolve(null),
       vertragsnamenLaden(deps.zuordnungRepo, deps.vertragRepo),
       deps.vormerkungRepo?.alle() ?? Promise.resolve<Vormerkung[]>([]),
+      deps.budgetRepo.alle(),
+      deps.zuordnungRepo.alle(),
+      deps.vertragRepo.alle(),
     ]);
 
   // Je Konto gebündelt — die Liste kommt flach aus der Datenbank, gelesen wird sie je
@@ -267,6 +292,9 @@ export async function kontenLaden(deps: KontenDeps): Promise<Kontensicht> {
     dublettenverdacht,
     freigegeben,
     vertragsnamen,
+    einordnungen: einordnungJeBuchung({
+      buchungen, kategorien, budgets, konten, zuordnungen: vertragszuordnungen, vertraege,
+    }),
     vormerkungen,
   };
 }
@@ -289,6 +317,11 @@ export interface Registerzeile {
   readonly dublette?: Dublettenverdacht;
   /** Der Vertrag, zu dem diese Zeile gehört — als Anbietername. Fehlt, wenn keiner. */
   readonly vertragsname?: string;
+  /**
+   * Was die Zeile kaufmännisch ist — eine Einordnung, bei geteilten Buchungen die
+   * verschiedenen ihrer Anteile. Leer bei einer Zeile ohne Buchung.
+   */
+  readonly einordnung: readonly Buchungseinordnung[];
 }
 
 export interface Registersicht {
@@ -335,6 +368,7 @@ export function registerSicht(
         kategorieName: zeile.kategorieId ? kategorieNamen.get(zeile.kategorieId) ?? "" : "",
         dublette: zeile.istId ? sicht.dublettenverdacht.get(zeile.istId) : undefined,
         vertragsname: zeile.istId ? sicht.vertragsnamen.get(zeile.istId) : undefined,
+        einordnung: einordnungVon(sicht.einordnungen, zeile.istId),
       };
     }),
     standHeute: register.standHeute,

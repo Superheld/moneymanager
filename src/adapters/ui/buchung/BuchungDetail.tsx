@@ -31,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import {
   waehlbareKonten,
   istGeteilt,
+  type Buchungseinordnung,
   type Buchungshistorie,
   type Charakter,
   type IstBuchung,
@@ -92,6 +93,7 @@ import { Modal } from "../bausteine/Modal";
 import { useDatum, useGeld, fehlerNachricht } from "../bausteine/einstellungenKontext";
 import { geldFarbe } from "../bausteine/geldFarbe";
 import { BuchungsHerkunft } from "./BuchungsHerkunft";
+import { EinordnungsBlock } from "./EinordnungsBlock";
 import { JournalBlock } from "./JournalBlock";
 import { Richtungswahl } from "./Richtungswahl";
 import { DublettenBlock, FreigabeHinweis, type Dublettenbefund } from "./DublettenBlock";
@@ -101,6 +103,10 @@ import { Kaestchen } from "../bausteine/Kaestchen";
 /** Stabile Leerwerte — als Literal im useState-Aufruf wäre jeder Render ein neues Objekt. */
 const LEERE_KARTE: ReadonlyMap<string, Dublettenverdacht> = new Map();
 const LEERE_MENGE: ReadonlySet<string> = new Set();
+// Feste Leerwerte statt `new Map()`/`[]` im Aufruf: sonst bekäme das Formular bei jedem
+// Render eine neue Referenz, obwohl sich nichts geändert hat.
+const KEINE_EINORDNUNGEN: ReadonlyMap<string, readonly Buchungseinordnung[]> = new Map();
+const KEINE_EINORDNUNG: readonly Buchungseinordnung[] = [];
 
 /**
  * Die Maske selbst — alle drei Rollen in EINEM Formular.
@@ -113,6 +119,7 @@ const LEERE_MENGE: ReadonlySet<string> = new Set();
  *   `VertragsBlock`      gehört diese Zahlung zu einem Vertrag?
  *   `DublettenBlock`     steht sie womöglich schon ein zweites Mal da?
  *   `BuchungsHerkunft`   woher sie kommt — reine Anzeige
+ *   `EinordnungsBlock`   was sie kaufmännisch ist, und warum — reine Anzeige
  *   `Richtungswahl`      Höhe und Richtung des Betrags, samt der Zerlegung dahinter
  *   `SplitModal`         aufteilen (S-7)
  *   `ZurUmbuchungModal`  zur Umbuchung machen (S-1)
@@ -189,6 +196,8 @@ interface FormularProps {
   aktuelle?: IstBuchung;
   /** Was mit dieser Zeile geschah — fehlt, solange sie noch nicht gespeichert ist. */
   historie?: Buchungshistorie;
+  /** Was die GESPEICHERTE Buchung kaufmännisch ist — leer beim Anlegen und im Entwurf. */
+  einordnung: readonly Buchungseinordnung[];
   ausBankabruf?: boolean;
 
   // ── Dublettenverdacht ───────────────────────────────────────────────────────────────
@@ -248,6 +257,7 @@ function BuchungFormular({
   onSplitten,
   onSplitAufheben,
   historie,
+  einordnung,
   onZuruecksetzen,
 }: FormularProps) {
   const { t } = useTranslation();
@@ -794,6 +804,11 @@ function BuchungFormular({
         </div>
       )}
 
+      {/* Einordnung — unter dem Vertrag, weil der die häufigste Begründung ist: wer
+          oben einen Vertrag wählt, liest hier gleich danach, was das bewirkt hat.
+          Auch am Umbuchungs-Bein: gerade dort fragt man, warum es nirgends mitzählt. */}
+      {buchung && <EinordnungsBlock einordnung={einordnung} />}
+
       {/* Verlauf — was an dieser Zeile geändert wurde, und der Weg zurück. Über der
           Herkunft, weil er die eigene Arbeit betrifft: „was habe ich hier verstellt"
           fragt man eher als „woher kam die Zeile". */}
@@ -920,6 +935,7 @@ export function BuchungDetail(props: {
   const [freigaben, setFreigaben] = useState<readonly Dublettenfreigabe[]>([]);
   const [onlineKonten, setOnlineKonten] = useState<ReadonlySet<string>>(LEERE_MENGE);
   const [historie, setHistorie] = useState<Buchungshistorie | undefined>(undefined);
+  const [einordnungen, setEinordnungen] = useState<ReadonlyMap<string, readonly Buchungseinordnung[]>>(KEINE_EINORDNUNGEN);
 
   async function laden() {
     const d = await buchungsdetail();
@@ -928,6 +944,7 @@ export function BuchungDetail(props: {
     setVertraege([...d.vertraege]); setZuordnungen([...d.zuordnungen]);
     setDublettenverdacht(d.dublettenverdacht); setFreigegeben(d.freigegeben); setFreigaben(d.freigaben);
     setOnlineKonten(d.onlineKonten);
+    setEinordnungen(d.einordnungen);
     // Die gezeigte Buchung aus dem frischen Stand nachziehen (nach dem Speichern).
     setAktuelle((b) => (b ? d.buchungen.find((x) => x.id === b.id) ?? b : undefined));
   }
@@ -1189,6 +1206,7 @@ export function BuchungDetail(props: {
       // von der Teileliste auf das Kategoriefeld.
       onSplitAufheben={async () => { if (!aktuelle) return; await splitAufheben(aktuelle); await nachAenderung(); }}
       historie={historie}
+      einordnung={(aktuelle && einordnungen.get(aktuelle.id)) || KEINE_EINORDNUNG}
       // Kein `onClose()`: das Zurücknehmen ist ein Schritt IM Dialog. Man will danach
       // sehen, was jetzt dasteht — dieselbe Überlegung wie beim Aufheben der Aufteilung.
       onZuruecksetzen={async () => { if (!aktuelle) return; await buchungZuruecksetzen(aktuelle); await nachAenderung(); }}

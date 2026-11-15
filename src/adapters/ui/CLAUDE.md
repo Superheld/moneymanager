@@ -267,6 +267,7 @@ und wurde deshalb 2026-08-25 herausgezogen:
 | `VertragsBlock` | gehört diese Zahlung zu einem Vertrag? |
 | `DublettenBlock` | steht sie womöglich schon ein zweites Mal da? |
 | `BuchungsHerkunft` | woher sie kommt — reine Anzeige |
+| `EinordnungsBlock` | was sie kaufmännisch ist, und WARUM — reine Anzeige (unten, „Die Einordnung an der Zeile") |
 | `JournalBlock` | was daran geändert wurde — und der Weg zurück |
 | `Richtungswahl` | Höhe und Richtung des Betrags, samt der Zerlegung dahinter |
 | `SplitModal` · `ZurUmbuchungModal` | die beiden Folge-Dialoge (S-7, S-1) |
@@ -435,6 +436,40 @@ es begründet hat**, und ein einspaltiges Grid sieht im Code aus wie Absicht.
 Ein eigener Deckel für diesen einen Bereich war der erste Versuch und fiel sofort auf: eine
 Seite, die breiter aufzieht als alle Nachbarn, sieht nach einem Fehler aus und nicht nach
 einer Entscheidung.
+
+## Die Einordnung an der Zeile
+
+Seit 2026-11-15 trägt jede Zeile des Kontoauszugs eine Spalte **Einordnung**
+(`konten/EinordnungsPillen.tsx`): Einnahme, Fixkosten, laufende Kosten, „aus Budget …",
+aus Rücklage, Vorsorge, Umbuchung, ungeplant. Der Buchungsdialog sagt dasselbe als Satz
+mit der Begründung (`buchung/EinordnungsBlock.tsx`) — „zählt als Fixkosten, weil sie dem
+Vertrag … zugeordnet ist". Der Satz ist die eigentliche Hilfe: das Wort allein erklärt
+niemandem ohne Rechnungswesen, warum eine grosse Ausgabe den Monat nicht belastet.
+
+**Die Art kommt aus `core/einordnung.ts` und aus nichts sonst.** Der Weg dorthin ist
+`application/buchung/einordnungssicht.ts`: es ruft `einordner` mit `einordnungskontext`
+— derselbe Kontext, aus dem die Ergebnisrechnung der Übersicht rechnet — und hängt nur
+die NAMEN von Budget und Vertrag an. Beide Oberflächen wählen danach Wort und Farbe, mehr
+nicht. Der Grund für die eine Stelle: der Auszug ist der Ort, an dem man nachsieht, warum
+eine Zahl in der Übersicht so aussieht. Sortierte er selbst, erklärte er früher oder später
+eine Rechnung, die es nicht gibt. **Wer in einer der beiden Dateien eine Bedingung auf
+Charakter, Kategorie oder Vertrag schreibt, baut die zweite Sortierlogik.**
+
+Drei Entscheidungen daran:
+
+- **Eine eigene Spalte, keine weitere Pille am Namen.** Am Namen stehen schon bis zu vier
+  Pillen, und die sagen etwas über EINZELNE Zeilen. Die Einordnung hat jede; als Spalte
+  liest man sie hinunter und sortiert nach ihr. Schmal wandert sie ohne Zutun in die
+  zweite Zeile — die Tabelle setzt an keiner Spalte `schmal`.
+- **Die Pille „Umbuchung" steht nur noch dort.** Bis dahin stand sie in der
+  Kategorie-Spalte; beide zu zeigen wäre dasselbe Wort zweimal nebeneinander. Die
+  Kategorie-Zelle eines Umbuchungs-Beins bleibt leer — kein Strich, der „noch
+  einzusortieren" sagte.
+- **Der Dialog zeigt den GESPEICHERTEN Stand.** Eine Vorschau auf das, was im Formular
+  gerade eingestellt ist, müsste die Regel aus dem Kern in der Oberfläche nachbauen.
+
+Eine aufgeteilte Buchung kann mehrere Einordnungen tragen (eingeordnet wird der Anteil);
+gezeigt werden die verschiedenen, jede einmal.
 
 ## Was im Konto steht, hat jemand belegt
 

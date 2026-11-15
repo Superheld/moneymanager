@@ -645,21 +645,29 @@ describe("Konto-Register — Suche und Spalten", () => {
     expect(screen.getByText("Tankstelle")).toBeInTheDocument();
   });
 
-  it("zeigt die Umbuchungs-Pille in der Kategorie-Spalte", async () => {
+  it("zeigt die Umbuchungs-Pille in der Einordnungs-Spalte und lässt die Kategorie leer", async () => {
     await dreiBuchungen();
     rendere(<KontenScreen onNavigate={() => {}} />);
     await screen.findAllByText("Girokonto");
     await screen.findByText("Uebertrag");
 
-    // Die Pille ersetzt die Kategorie: sie steht in derselben Zelle, in der bei den
-    // anderen Zeilen „Lebensmittel" steht.
+    // Bis 2026-11-15 stand die Pille IN der Kategorie-Spalte. Seit jede Zeile ihre
+    // Einordnung in einer eigenen Spalte trägt, steht sie dort — und zwar nur dort:
+    // dieselbe Aussage zweimal nebeneinander wäre eine zu viel.
     const zeile = screen.getByText("Uebertrag").closest("tr")!;
     const zellen = [...zeile.querySelectorAll("td")].map((z) => z.textContent ?? "");
-    const katSpalte = zellen.findIndex((z) => z.includes("Umbuchung"));
-    expect(katSpalte).toBeGreaterThan(0);
-    // Und bei einer normalen Zeile steht an derselben Stelle die Kategorie.
-    const andere = screen.getByText("Baecker").closest("tr")!;
-    expect([...andere.querySelectorAll("td")][katSpalte].textContent).toContain("Lebensmittel");
+    const treffer = zellen.flatMap((z, i) => (z.includes("Umbuchung") ? [i] : []));
+    expect(treffer).toHaveLength(1);
+    const einordnungSpalte = treffer[0];
+    // Die Kategorie steht direkt davor. Am Umbuchungs-Bein bleibt sie leer — kein Strich,
+    // der „noch einzusortieren" sagte: eine Umbuchung trägt keine Kategorie.
+    const katSpalte = einordnungSpalte - 1;
+    expect(zellen[katSpalte]).toBe("");
+    // Bei einer normalen Zeile steht an derselben Stelle die Kategorie, und daneben
+    // ihre eigene Einordnung.
+    const andere = [...screen.getByText("Baecker").closest("tr")!.querySelectorAll("td")];
+    expect(andere[katSpalte].textContent).toContain("Lebensmittel");
+    expect(andere[einordnungSpalte].textContent).not.toBe("");
   });
 
   it("zeigt in der Kontenliste weder Anfangsbestand noch Abgleich", async () => {

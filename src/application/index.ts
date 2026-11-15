@@ -382,3 +382,5 @@ export {
   type Buchungszeile,
   type Zeilenkontext,
 } from "./buchung/buchungszeile";
+// Die Einordnung einer Buchung, anzeigefertig — die Art kommt aus `core/einordnung.ts`.
+export type { Buchungseinordnung } from "./buchung/einordnungssicht";

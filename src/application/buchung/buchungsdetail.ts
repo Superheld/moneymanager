@@ -10,6 +10,7 @@
 // buchungSplitten, zuordnungVonHand …) — sie sind schon jeweils an ihrem Ort.
 
 import { belegZuBuchung } from "./belegZuBuchung";
+import { einordnungJeBuchung, type Buchungseinordnung } from "./einordnungssicht";
 import type {
   IstBuchung,
   Kategorie,
@@ -26,6 +27,7 @@ import {
   type Dublettenverdacht,
 } from "../dubletten/dublettensicht";
 import type {
+  BudgetRepository,
   DublettenfreigabeRepository,
   ImportLaufRepository,
   KategorieRepository,
@@ -47,6 +49,8 @@ export interface BuchungsdetailDeps {
   readonly vertragRepo: VertragRepository;
   readonly zuordnungRepo: VertragszuordnungRepository;
   readonly freigabeRepo: DublettenfreigabeRepository;
+  /** Für die Einordnung — dieselbe Begründung wie in `KontenDeps`. */
+  readonly budgetRepo: BudgetRepository;
   /**
    * Die Konto-Zuordnungen der Bankzugänge — daran hängt, welches Konto ONLINE geführt
    * wird. Optional, damit ein Aufrufer ohne Bankanbindung (Tests, Analyse) den Dialog
@@ -83,6 +87,12 @@ export interface Buchungsdetaildaten {
   readonly freigegeben: ReadonlySet<string>;
   readonly freigaben: readonly Dublettenfreigabe[];
   /**
+   * Buchungs-ID → Einordnung — DIESELBE Abbildung wie im Kontoauszug, aus derselben
+   * Funktion. Der Dialog sagt dazu den Satz mit dem Warum; stünde dort eine andere Art
+   * als an der Zeile, aus der er geöffnet wurde, wäre der Satz die Erklärung von nichts.
+   */
+  readonly einordnungen: ReadonlyMap<string, readonly Buchungseinordnung[]>;
+  /**
    * Konten, die an einer Bankverbindung hängen.
    *
    * Auf ihnen bestimmt die BANK, was steht: Datum und Betrag sind dort Tatsachen, keine
@@ -97,7 +107,7 @@ export interface Buchungsdetaildaten {
 export async function buchungsdetailLaden(
   deps: BuchungsdetailDeps,
 ): Promise<Buchungsdetaildaten> {
-  const [konten, kategorien, regeln, umsaetze, laeufe, buchungen, vertraege, zuordnungen, freigaben] =
+  const [konten, kategorien, regeln, umsaetze, laeufe, buchungen, vertraege, zuordnungen, freigaben, budgets] =
     await Promise.all([
       deps.kontoRepo.alle(),
       deps.kategorieRepo.alle(),
@@ -108,6 +118,7 @@ export async function buchungsdetailLaden(
       deps.vertragRepo.alle(),
       deps.zuordnungRepo.alle(),
       deps.freigabeRepo.alle(),
+      deps.budgetRepo.alle(),
     ]);
   const zuordnungen_online = deps.kontozuordnungen ? await deps.kontozuordnungen() : [];
 
@@ -123,6 +134,7 @@ export async function buchungsdetailLaden(
     dublettenverdacht: ledgerVerdacht(umsaetze, new Set(buchungen.map((b) => b.id)), freigegeben),
     freigegeben,
     freigaben,
+    einordnungen: einordnungJeBuchung({ buchungen, kategorien, budgets, konten, zuordnungen, vertraege }),
     onlineKonten: new Set(zuordnungen_online.map((z) => z.zahlungskontoId)),
   };
 }

@@ -932,6 +932,8 @@ export function konten(): Promise<Kontensicht> {
     // Damit eine Vertragszahlung im Auszug als solche zu erkennen ist.
     zuordnungRepo: sqliteVertragszuordnungRepository,
     vertragRepo: sqliteVertragRepository,
+    // Damit jede Zeile sagt, was sie kaufmännisch ist — ohne Budgets hiesse alles „ungeplant".
+    budgetRepo: sqliteBudgetRepository,
   });
 }
 
@@ -1024,6 +1026,7 @@ export function buchungsdetail(): Promise<Buchungsdetaildaten> {
     vertragRepo: sqliteVertragRepository,
     zuordnungRepo: sqliteVertragszuordnungRepository,
     freigabeRepo: sqliteDublettenfreigabeRepository,
+    budgetRepo: sqliteBudgetRepository,
     kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
   });
 }
