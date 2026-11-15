@@ -160,7 +160,7 @@ function Arbeitsflaeche({
         {/* Um den INHALT, nicht um den Rahmen: zeichnet ein Screen nicht, bleibt die
             Navigation stehen, und ein Wechsel räumt die Meldung weg. */}
         <Fehlergrenze ruecksetzenBei={screen}>
-        {screen === "uebersicht" && <UebersichtScreen />}
+        {screen === "uebersicht" && <UebersichtScreen onNavigate={setScreen} />}
         {screen === "analyse" && <AnalyseScreen />}
         {screen === "konten" && <KontenScreen onNavigate={setScreen} />}
         {screen === "ruecklagen" && <RuecklagenScreen />}

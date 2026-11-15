@@ -12,7 +12,7 @@ macht jeden Test von der Laufzeit abhängig. Zeitpunkte kommen als Parameter her
 `zahlungsregel`, `muster`, `fehler`, `region`. Alles Fachliche liegt in seinem Bereich
 (`buchung/`, `konten/`, `budgets/`, `vertraege/`, `kategorien/`, `ruecklagen/`,
 `stammdaten/`). In der Wurzel bleibt nur, was über Bereiche hinweg rechnet
-(`monatsausblick.ts`, `einordnung.ts`, `ergebnis.ts`) und die Fassade `index.ts`.
+(`monatsausblick.ts`, `einordnung.ts`, `ergebnis.ts`, `einrichtung.ts`) und die Fassade `index.ts`.
 
 ## Geld
 

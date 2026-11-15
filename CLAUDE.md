@@ -66,7 +66,7 @@ Drei Regeln, wohin eine neue Datei gehört:
 Was **keinem** Bereich gehört, bleibt in der Wurzel der Schicht: die Fassaden (`index.ts`,
 `ports.ts`), der Start (`bootstrap.ts`) und die bewusst querliegenden Sichten
 (`uebersicht.ts`, `analysesichten.ts`, `core/monatsausblick.ts`, `core/auswertung.ts`,
-`core/einordnung.ts`, `core/ergebnis.ts`) —
+`core/einordnung.ts`, `core/ergebnis.ts`, `core/einrichtung.ts`) —
 sie rechnen über mehrere Bereiche hinweg, und das ist ihre Aufgabe, kein Fehler. In `ui/` liegen aus demselben Grund
 die bereichsübergreifenden Tests oben (`screens`, `interaktion`, `formulare`).
 

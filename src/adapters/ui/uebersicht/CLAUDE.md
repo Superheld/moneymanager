@@ -2,6 +2,23 @@
 
 Gilt für die Übersicht. Die Grenze zur Analyse steht in der Wurzel-`CLAUDE.md` unter „Die App in zehn Bereichen“. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
 
+**Ganz oben steht „Damit die Zahlen stimmen"** (`EinrichtungKarte.tsx` auf
+`core/einrichtung.ts`), und nur, solange etwas fehlt. Die Karten darunter rechnen auch
+ohne Verträge und Budgets, zeigen dann aber alles unter „Ungeplant" — richtig gerechnet
+und beim ersten Öffnen nicht zu deuten. Drei Dinge daran:
+
+- **Fragen statt Fachwörter.** Der Schritt heisst „Was kommt und geht jeden Monat
+  fest?", das Fachwort steht erst im Knopf, der in den Bereich führt.
+- **Sie merkt sich nichts.** Erledigt ist, was im Bestand da ist. Ein gespeicherter
+  Haken bliebe stehen, wenn jemand das einzige Budget wieder löscht.
+- **Rücklagen sind freiwillig** und halten die Karte nicht offen; ohne ein Feld zum
+  Wegklicken stünde sie sonst für jeden da, der keine führt. Die fehlenden Kategorien
+  zählen nur über die letzten Monate, damit ein importierter Altbestand niemanden
+  zwingt, ihn ganz durchzusortieren.
+
+Sie kommt deshalb wieder, wenn nach einem Import Zahlungen ohne Kategorie dastehen. Das
+ist gewollt: genau diese Zahlungen machen die Karten darunter ungenau.
+
 **Die Monatskarten sind eine Ergebnisrechnung** (seit 2026-11-15, `ErgebnisKarten.tsx`
 auf `core/ergebnis.ts`): sie zeigen, was der Monat KOSTET, nicht was in ihm vom Konto
 ging. Die Begriffe dazu stehen in `src/core/CLAUDE.md` unter „Auszahlung und Kosten".
