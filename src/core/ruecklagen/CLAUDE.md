@@ -84,6 +84,34 @@ eine Ausgabe zu ihnen findet:
 | **aufbauendes Budget** | von selbst, über die Kategorie samt Unterkategorien | viele Ausgaben über die Zeit: Urlaub, Reparaturen |
 | **Rücklage** | von Hand, eine Buchung je Ausbuchen | ein Gegenstand, ein Kauf: das Gerät, das Auto |
 
+### In der Oberfläche ist beides eine Rücklage (seit 2026-11-15)
+
+Für den Nutzer sind beide dasselbe — Geld, das Monat für Monat für etwas Späteres
+zurückgelegt wird —, und zwei Namen dafür in zwei Bereichen liessen ihn bei jeder neuen
+Sache raten, wohin sie gehört. Deshalb, als erste Stufe und NUR in Oberfläche, Sichten
+und Texten:
+
+- **Der Bereich Rücklagen zeigt beide**, in zwei Karten: „Von Hand ausgebucht" (die
+  Rücklage) und „Über die Kategorie" (das aufbauende Budget). Zwei Karten und nicht eine
+  Liste, weil genau dieser Unterschied beim Benutzen zählt — wie die Ausgabe zu ihr
+  findet. Die zweite Karte benutzt Tabelle, Dialog und Verlauf der Budgets
+  (`ui/bausteine/BudgetTabelle`, `BudgetDialog`, `BudgetVerlauf`); nur die Sätze mit dem
+  Wort „Budget" kommen aus `ruecklagen.kategorie.*` (`ui/bausteine/budgetTexte.ts`).
+- **Die Ergebnisrechnung führt beide in EINER Zeile** (`abschreibungen`, angezeigt als
+  „Rücklagen"). Zusammengelegt wird in `core/ergebnis.ts`, nicht in einer Sicht:
+  Monatskarten, Kostensicht, Bericht, Reichweite und Kennzahlen lesen dieselbe Zeile.
+  Jeder Posten rechnet weiter nach seiner Regel — die Rücklage den Zuwachs ihres Solls,
+  das Budget `topfKosten` —, und jeder trägt weiter, woher er kommt (`ruecklageId` bzw.
+  `budgetId`). Die Zeile `wagnisse` gibt es nicht mehr.
+- **Das Wort „aufbauendes Budget" steht nirgends mehr in der Oberfläche.**
+
+**Im Datenmodell bleibt die Trennung bewusst stehen**: zwei Tabellen (`ruecklage`,
+`budget` mit `art = aufbauend`), zwei Use-Case-Wege, zwei Rechenregeln. Sie
+zusammenzulegen hiesse, die Ausbuchung mit dem Zyklus und die Betragsreihe mit dem
+Übertrag in eine Form zu bringen — das ist eine eigene Entscheidung und kein Umbenennen.
+Was dabei offen ist: die Kennzahlen oben im Bereich („Wo die Rücklagen stehen") und der
+Bedarf unter „Diesen Monat" rechnen weiter nur über die Rücklagen von Hand.
+
 Die Spalte `kategorie_id` der Rücklage war bis 2026-11-15 gespeichert und nirgends
 benutzt; ein Feld dafür gab es in keiner Maske. Seitdem trägt der Dialog sie, und sie
 tut genau eines: **beim Ausbuchen stehen die Buchungen dieser Kategorie zuerst**

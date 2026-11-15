@@ -28,13 +28,10 @@
 // darüber. Er lädt auch nicht neu, sondern rechnet über `budgetstaende` einen anderen
 // Monat aus denselben Daten.
 //
-// **Ein aufbauendes Budget zeigt hier seinen MONAT, nicht seine Summe seit Start.** Dort
-// stand vorher „140 von 200", und die 200 waren der Betrag, der hineingegangen wäre, hätte
-// man nie etwas ausgegeben — eine Zahl, die jeden Monat weiterwächst und über den
-// laufenden nichts sagt. An ihre Stelle tritt die Aufrechnung: Übertrag aus dem Vormonat,
-// Rate dieses Monats, Verbrauch dieses Monats. Der grosse Betrag daneben bleibt derselbe;
-// die Fortschreibung ist die Zerlegung von `budgetStand`, keine zweite Rechnung
-// (Herleitung in `core/budgets/budgetverlauf`).
+// **Die Karte „Budgets" zeigt seit 2026-11-15 nur die monatlichen.** Die aufbauenden
+// heissen in der Oberfläche Rücklagen und stehen in deren Bereich; in den Monatskarten
+// zählen sie in der Zeile „Rücklagen", unter „Was da ist" als gebunden. Bis dahin standen
+// sie hier als zweite Gruppe mit ihrer Fortschreibung (Übertrag, Rate, Verbrauch).
 //
 // **Der Abruf hat hier seit 2026-10-24 einen eigenen Knopf**, oben rechts im Kopf. Die
 // Übersicht ist der Bereich, in dem man landet, und das Erste, was man nach dem Öffnen
@@ -58,7 +55,6 @@ import {
 import { abrufstand, depots, uebersicht } from "../../dienste";
 import { Button, Card, CoverageTrack } from "../bausteine";
 import { AbrufDialog } from "../bausteine/AbrufDialog";
-import { BudgetFortschreibung } from "../bausteine/BudgetFortschreibung";
 import { BuchungDetail } from "../buchung/BuchungDetail";
 import { Buchungsliste } from "../bausteine/Buchungsliste";
 import { AUFKLAPP_ZEILEN_SCHMAL } from "../bausteine/aufklappen";
@@ -155,11 +151,8 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
     return monat === dieserMonat ? daten.staende : budgetstaende(daten.sicht, `${monat}-28`);
   }, [daten, monat, dieserMonat]);
 
-  /** Die Stände nach Art getrennt, leere Gruppen weggelassen. */
-  const gruppen = useMemo(() => {
-    const g = nachArtGetrennt(staende);
-    return ([["monatlich", g.monatlich], ["aufbauend", g.aufbauend]] as const).filter(([, rows]) => rows.length > 0);
-  }, [staende]);
+  /** Nur die monatlichen — die aufbauenden sind Rücklagen (Kopf der Datei). */
+  const monatliche = useMemo(() => nachArtGetrennt(staende).monatlich, [staende]);
 
   return (
     <div className="screen">
@@ -222,7 +215,7 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
           title={t("uebersicht.budgetsTitel")}
           subtitle={monat === dieserMonat ? t("uebersicht.budgetsLaufend") : t("uebersicht.budgetsVergangen")}
           action={
-            staende.length > 0 ? (
+            monatliche.length > 0 ? (
               // `tabellenfilter`: der Wähler stellt ein, was die Karte darunter zeigt —
               // er ist ihr Filter und nicht ihr Inhalt (siehe app.css).
               <span className="tabellenfilter">
@@ -239,24 +232,11 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
             ) : undefined
           }
         >
-          {staende.length === 0 ? (
+          {monatliche.length === 0 ? (
             <div className="muted">{t("uebersicht.budgetsLeer")}</div>
           ) : (
-            // Monatlich und aufbauend getrennt — je Zeile nach der Art des Budgets
-            // (siehe `nachArtGetrennt`). Die Zwischenüberschrift steht nur, wenn es
-            // beide Arten gibt: über einer einzigen Liste sagte sie nichts.
-            <Stapel abstand={5}>
-              {gruppen.map(([art, rows]) => (
-                <div key={art}>
-                  {gruppen.length > 1 && (
-                    <div className="muted" style={{ fontSize: "var(--fs-sm)", fontWeight: "var(--fw-semi)", marginBottom: "var(--sp-2)" }}>
-                      {t(art === "monatlich" ? "budgets.abschnittMonatlich" : "budgets.abschnittAufbauend")}
-                      {" · "}
-                      {t(art === "monatlich" ? "budgets.abschnittMonatlichHinweis" : "budgets.abschnittAufbauendHinweis")}
-                    </div>
-                  )}
                   <Stapel abstand={4}>
-              {rows.map((z) => {
+              {monatliche.map((z) => {
                     const offen = offenesBudget === z.budget.id;
                     const name = z.kategorieName;
                     return (
@@ -287,12 +267,12 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
                             {/* Hängt das Budget unter einem der anderen Art, steht dessen Name
                                 daneben — die Liste trennt je Zeile (`nachArtGetrennt`). */}
                             {z.unter && <span className="muted" style={{ flex: "0 0 auto", fontWeight: "var(--fw-regular)", fontSize: "var(--fs-2xs)" }}>{t("budgets.unter", { name: z.unter })}</span>}
+                            {/* Liegt eine Rücklage auf einer Unterkategorie, zählt ihr
+                                Verbrauch hier nicht — und sie steht nicht in dieser Karte. */}
+                            {z.abgezogen && <span className="muted" style={{ flex: "0 0 auto", fontWeight: "var(--fw-regular)", fontSize: "var(--fs-2xs)" }}>{t("budgets.ruecklageAbgezogen", { count: z.abgezogen.length, namen: z.abgezogen.join(", ") })}</span>}
                           </span>
-                          {/* Rechts der Rest, darunter die Herkunft. Beim Monatlichen genügt
-                              „von 200": der Rahmen IST der Monatsbetrag, es gibt nichts
-                              fortzuschreiben. Beim Aufbauenden steht dort die Aufrechnung —
-                              der kumulierte Rahmen hängt nur noch im Titel, weil „insgesamt
-                              eingezahlt" eine eigene, seltenere Frage ist. */}
+                          {/* Rechts der Rest, daneben der Rahmen: „von 200" genügt, der
+                              Rahmen IST der Monatsbetrag, es gibt nichts fortzuschreiben. */}
                           <span style={{ display: "inline-flex", flexDirection: "column", alignItems: "flex-end", gap: 1, flex: "0 0 auto" }}>
                             <span className="num" style={{ fontSize: "var(--fs-sm)", whiteSpace: "nowrap" }}>
                               {z.monat.ohnePlan ? (
@@ -300,18 +280,14 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
                                 // Ein Rest von „−x von 0,00" läse sich als überzogen.
                                 <span className="muted">{t(z.monat.verbraucht < 0 ? "budgets.verlaufOhnePlanZurueck" : "budgets.verlaufOhnePlan", { verbraucht: geld.formatMitSymbol(Math.abs(z.monat.verbraucht)) })}</span>
                               ) : (
-                              <span
-                                style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}
-                                title={z.budget.art === "aufbauend" ? t("uebersicht.budgetGesamt", { rahmen: geld.formatMitSymbol(z.rahmen) }) : undefined}
-                              >
+                              <span style={{ fontWeight: "var(--fw-bold)", color: geldFarbe(z.rest) }}>
                                 {geld.format(z.rest)}
                               </span>
                               )}
-                              {z.budget.art === "monatlich" && !z.monat.ohnePlan && (
+                              {!z.monat.ohnePlan && (
                                 <span className="muted"> {t("uebersicht.vonRahmen", { rahmen: geld.formatMitSymbol(z.monat.verfuegbar) })}</span>
                               )}
                             </span>
-                            {z.budget.art === "aufbauend" && !z.monat.ohnePlan && <BudgetFortschreibung monat={z.monat} />}
                           </span>
                         </Collapsible.Trigger>
                         <CoverageTrack
@@ -336,9 +312,6 @@ export function UebersichtScreen({ onNavigate }: { onNavigate?: (id: ScreenId) =
                     );
               })}
                   </Stapel>
-                </div>
-              ))}
-            </Stapel>
           )}
         </Card>
       )}

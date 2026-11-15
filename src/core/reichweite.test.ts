@@ -80,7 +80,7 @@ describe("reichweitenMonate", () => {
 describe("reichweite", () => {
   const drei = [
     monat("2026-01", { einnahmen: 400000, fixkosten: -100000, laufend: -50000, ungeplant: -30000, abschreibungen: -20000 }),
-    monat("2026-02", { einnahmen: 400000, fixkosten: -100000, laufend: -40000, ungeplant: -10000, wagnisse: -20000, vorsorge: -20000 }),
+    monat("2026-02", { einnahmen: 400000, fixkosten: -100000, laufend: -40000, ungeplant: -10000, abschreibungen: -20000, vorsorge: -20000 }),
     monat("2026-03", { einnahmen: 400000, fixkosten: -100000, laufend: -60000, ungeplant: -20000, abschreibungen: -20000 }),
   ];
 

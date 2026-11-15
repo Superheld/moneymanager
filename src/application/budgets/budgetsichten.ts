@@ -320,6 +320,14 @@ export interface GruppierterStand extends Budgetstand {
    * herausgerechnet ist, sagte nichts mehr.
    */
   readonly unter?: string;
+  /**
+   * Die Gegenrichtung zu `unter`: die Namen der Budgets der ANDEREN Art, die direkt in
+   * diesem liegen. Ihr Verbrauch zählt hier nicht (`budgetKategorien`), und seit die
+   * aufbauenden im Bereich Rücklagen stehen, sieht man sie in der Liste daneben nicht
+   * mehr — ohne den Hinweis wäre der Verbrauch dieser Zeile kleiner als die Ausgaben ihrer
+   * Kategorie, und nichts sagte warum. Fehlt, wenn nichts herausgerechnet ist.
+   */
+  readonly abgezogen?: readonly string[];
 }
 
 /** Die Budgetstände, getrennt danach, ob ihr Rest verfällt oder bleibt. */
@@ -348,6 +356,8 @@ export interface Budgetgruppen {
 export function nachArtGetrennt(staende: readonly Budgetstand[]): Budgetgruppen {
   const monatlich: GruppierterStand[] = [];
   const aufbauend: GruppierterStand[] = [];
+  /** Budget-ID → Namen der Kinder der anderen Art; nachgetragen, wenn das Kind kommt. */
+  const abgezogen = new Map<string, string[]>();
   const artVon = (z: Budgetstand) => (z.budget.art === "aufbauend" ? "aufbauend" : "monatlich");
   /** Die Vorfahren der aktuellen Zeile, Index = Tiefe. */
   const pfad: Budgetstand[] = [];
@@ -362,7 +372,18 @@ export function nachArtGetrennt(staende: readonly Budgetstand[]): Budgetgruppen 
       ...(eltern && artVon(eltern) !== art ? { unter: eltern.kategorieName } : {}),
     };
     (art === "aufbauend" ? aufbauend : monatlich).push(eintrag);
+    if (eltern && artVon(eltern) !== art) {
+      const liste = abgezogen.get(eltern.budget.id);
+      if (liste) liste.push(z.kategorieName);
+      else abgezogen.set(eltern.budget.id, [z.kategorieName]);
+    }
     pfad[z.tiefe] = z;
   }
-  return { monatlich, aufbauend };
+  // Nachgetragen statt beim Dach gesetzt: in Tiefensuche steht das Dach VOR seinen
+  // Kindern, wenn es in die Liste kommt, kennt es sie also noch nicht.
+  const mitAbzug = (g: GruppierterStand): GruppierterStand => {
+    const namen = abgezogen.get(g.budget.id);
+    return namen ? { ...g, abgezogen: namen } : g;
+  };
+  return { monatlich: monatlich.map(mitAbzug), aufbauend: aufbauend.map(mitAbzug) };
 }

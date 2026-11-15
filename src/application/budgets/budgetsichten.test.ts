@@ -31,6 +31,18 @@ describe("nachArtGetrennt", () => {
     expect(unter(g.monatlich, "kino")).toBeUndefined();
   });
 
+  it("nennt am Dach, was aus ihm herausgerechnet ist und in der anderen Liste steht", () => {
+    // Der Bereich Budgets zeigt nur die monatlichen: dass „urlaub" aus „freizeit"
+    // herausgerechnet ist, muss deshalb an „freizeit" selbst stehen.
+    const abgezogen = (l: typeof g.monatlich, id: string) => l.find((z) => z.budget.id === id)!.abgezogen;
+    expect(abgezogen(g.monatlich, "freizeit")).toEqual(["urlaub"]);
+    expect(abgezogen(g.monatlich, "reifen")).toEqual(["winter"]);
+    expect(abgezogen(g.aufbauend, "werkstatt")).toEqual(["reifen"]);
+    // Ein Kind derselben Art steht eingerückt darunter und braucht keinen Hinweis.
+    expect(abgezogen(g.monatlich, "essen")).toBeUndefined();
+    expect(abgezogen(g.monatlich, "kino")).toBeUndefined();
+  });
+
   it("zählt die Tiefe nur über Vorfahren derselben Art", () => {
     const tiefe = (l: typeof g.monatlich) => l.map((z) => z.tiefe);
     expect(tiefe(g.monatlich)).toEqual([0, 1, 0, 0]);

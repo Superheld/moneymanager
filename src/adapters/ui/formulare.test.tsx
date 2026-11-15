@@ -83,6 +83,8 @@ describe("Budgets — Formularpfade", () => {
     await waitFor(() => expect(screen.queryByText("Verworfen")).not.toBeInTheDocument());
   });
 
+  // Seit 2026-11-15 legt man ein aufbauendes Budget im Bereich Rücklagen an, als
+  // „Rücklage über die Kategorie" — eine Wahl der Art gibt es im Dialog nicht mehr.
   it("legt ein aufbauendes Budget über die Maske an", async () => {
     await sqliteZahlungskontoRepository.speichern({
       id: "k1", bezeichnung: "Tagesgeldkonto", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 100000,
@@ -90,11 +92,8 @@ describe("Budgets — Formularpfade", () => {
     await sqliteKategorieRepository.speichern({ id: "kat1", name: "Urlaub", defaultCharakter: "Aufwand" });
 
     const nutzer = userEvent.setup();
-    rendere(<BudgetsScreen />);
-    await nutzer.click(await screen.findByRole("button", { name: /anlegen/i }));
-
-    // Art umstellen — seit der Zusammenlegung ist das nur noch ein Auswahlfeld.
-    await auswahlWaehlen(nutzer, "Art", /aufbauend/);
+    rendere(<RuecklagenScreen />);
+    await nutzer.click((await screen.findAllByRole("button", { name: /über kategorie/i }))[0]);
 
     // Der Kategorie-Picker ist ein Knopf, der einen eigenen Dialog öffnet.
     await nutzer.click(screen.getByRole("button", { name: /Kategorie wählen|—|▾/ }));
@@ -122,9 +121,11 @@ describe("Rücklagen — Formularpfade", () => {
   it("legt eine Rücklage mit vollständigem Formular an", async () => {
     const nutzer = userEvent.setup();
     rendere(<RuecklagenScreen />);
-    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben).
-    await screen.findByRole("button", { name: /rücklage/i });
-    await klicke(nutzer, /anlegen|neu|rücklage|erfassen/i);
+    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben). Seit
+    // 2026-11-15 gibt es zwei Knöpfe zum Anlegen; gemeint ist die Rücklage von Hand,
+    // nicht die über die Kategorie.
+    await screen.findAllByRole("button", { name: /^\+?Rücklage$/i });
+    await klicke(nutzer, /^\+?Rücklage$/i);
 
     await nutzer.type(await screen.findByLabelText(/^Wofür/), "Geschirrspüler");
     await nutzer.type(await screen.findByLabelText(/^Ziel/), "600");
@@ -147,9 +148,11 @@ describe("Rücklagen — Formularpfade", () => {
   it("legt eine Rücklage ohne Ziel an, nur mit Rate", async () => {
     const nutzer = userEvent.setup();
     rendere(<RuecklagenScreen />);
-    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben).
-    await screen.findByRole("button", { name: /rücklage/i });
-    await klicke(nutzer, /anlegen|neu|rücklage|erfassen/i);
+    // Erst warten, bis der Screen steht: `klicke` sucht synchron (siehe oben). Seit
+    // 2026-11-15 gibt es zwei Knöpfe zum Anlegen; gemeint ist die Rücklage von Hand,
+    // nicht die über die Kategorie.
+    await screen.findAllByRole("button", { name: /^\+?Rücklage$/i });
+    await klicke(nutzer, /^\+?Rücklage$/i);
 
     await nutzer.type(await screen.findByLabelText(/^Wofür/), "Urlaubskasse");
     await auswahlWaehlen(nutzer, /^Form/, /freie Rate/);

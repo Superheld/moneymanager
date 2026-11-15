@@ -2,6 +2,30 @@
 
 Gilt für Budgets in Kern, Anwendung und Oberfläche. Was überall gilt, steht in der Wurzel-`CLAUDE.md`.
 
+## In der Oberfläche ist ein Budget monatlich
+
+Seit 2026-11-15 zeigt der Bereich Budgets nur die monatlichen. Ein aufbauendes Budget
+heisst in der Oberfläche **Rücklage** („über die Kategorie") und steht im Bereich
+Rücklagen; für den Nutzer ist es dieselbe Sache wie eine Rücklage. Im Modell bleibt es ein
+Budget mit `art = aufbauend`, mit Betragsreihe, Übertrag und `topfKosten` — warum die
+Trennung im Datenmodell stehen bleibt, steht in `../ruecklagen/CLAUDE.md`.
+
+Drei Folgen, die man kennen muss:
+
+- **Der Dialog hat kein Feld „Art" mehr.** Die Art entscheidet der Bereich, aus dem man
+  anlegt (`ui/bausteine/BudgetDialog`); beim Bearbeiten bleibt die des Budgets. Ein Feld,
+  das ein Budget in den anderen Bereich schöbe, wäre ein Weg, es aus den Augen zu
+  verlieren. Ein Vorschlag der Art aufbauend legt deshalb unter Budgets eine Rücklage über
+  die Kategorie an; die Pille sagt „Rücklage", der Dialog sagt es im Titel.
+- **Die Verschachtelung gilt weiter** (unten, „Ein Dach gilt für alles ausser seinen
+  Unterbudgets") — auch über die Bereichsgrenze. Das Kind steht dann nicht in derselben
+  Liste wie das Dach, und der Verbrauch des Dachs wäre kleiner als die Ausgaben seiner
+  Kategorie, ohne dass man sähe warum. Das Dach nennt deshalb, was aus ihm herausgerechnet
+  ist (`abgezogen` an `GruppierterStand`, gesetzt in `nachArtGetrennt`): „ohne Rücklage
+  Urlaub" unter Budgets, „ohne Budget Tanken" unter Rücklagen.
+- **Der Einrichtungsschritt „Budgets" zählt nur die monatlichen** (`core/einrichtung.ts`);
+  ein aufbauendes erledigt den Schritt „Rücklagen".
+
 ## `budgetrelevant` — die eine Ausgabe, die kein Budget messen soll
 
 Eine Spalte an `ist_buchung`, Vorgabe 1. Sie beschreibt — wie `zu_pruefen` — keine Tatsache

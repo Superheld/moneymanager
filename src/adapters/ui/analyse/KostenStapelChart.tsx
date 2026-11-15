@@ -42,7 +42,6 @@ const FARBE: Record<KostenZeileId, string> = {
   laufend: "var(--serie-2)",
   ungeplant: "var(--serie-3)",
   abschreibungen: "var(--serie-4)",
-  wagnisse: "var(--serie-5)",
   vorsorge: "var(--serie-6)",
   // Derselbe Ton wie die Vorsorge — die Fläche schraffiert ihn (`SCHRAFFIERT`, oben im Kopf).
   tilgung: "var(--serie-6)",

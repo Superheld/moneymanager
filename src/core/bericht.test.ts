@@ -145,7 +145,8 @@ describe("Ein Jahr — die Summe seiner Monate", () => {
     expect(v.zeilen.find((z) => z.id === "einnahmen")!.wert.jetzt).toBe(12 * 250000);
     // Sechs Zwölftel des Beitrags fallen in dieses Jahr.
     expect(v.zeilen.find((z) => z.id === "fixkosten")!.wert.jetzt).toBe(-36000);
-    expect(v.zeilen.find((z) => z.id === "abschreibungen")!.wert.jetzt).toBe(-12 * 8000);
+    // Rücklagen samt aufbauendem Budget, in einer Zeile: 80 + 50 je Monat.
+    expect(v.zeilen.find((z) => z.id === "abschreibungen")!.wert.jetzt).toBe(-12 * (8000 + 5000));
     // Ohne Vergleich gibt es keine zweite Zahl — und keine Null an ihrer Stelle.
     expect(v.ergebnis.vorher).toBeNull();
     expect(v.ergebnis.veraenderung).toBeNull();
@@ -161,9 +162,9 @@ describe("Ein Jahr — die Summe seiner Monate", () => {
   });
 
   it("zeigt eine Zeile, die es nur im Zeitraum davor gab", () => {
-    const ohneRuecklage = monatsErgebnis(ergebnisbasis({ ...e, ruecklagen: [] }), "2025-07-01");
+    const ohneRuecklage = monatsErgebnis(ergebnisbasis({ ...e, ruecklagen: [], budgets: [] }), "2025-07-01");
     const v = ergebnisVergleich([ohneRuecklage], [monate[5]]);
-    expect(v.zeilen.find((z) => z.id === "abschreibungen")!.wert).toEqual({ jetzt: 0, vorher: -8000, veraenderung: 8000 });
+    expect(v.zeilen.find((z) => z.id === "abschreibungen")!.wert).toEqual({ jetzt: 0, vorher: -13000, veraenderung: 13000 });
   });
 
   it("rechnet die Kennzahlen des Jahres über dieselben Monate", () => {

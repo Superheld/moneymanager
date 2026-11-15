@@ -33,15 +33,18 @@ Drei Stufen, jede mit ihrer Zwischensumme, weil jede eine eigene Frage beantwort
 |---|---|---|
 | nach den Pflichten | Einnahmen − Fixkosten | was bleibt, bevor ich etwas entscheide |
 | was der Alltag übrig lässt | − laufende Kosten − Ungeplantes | wie ich diesen Monat gewirtschaftet habe |
-| bleibt wirklich frei | − Rücklagen − aufbauende Budgets − Vorsorge − Tilgung | was ich ausgeben kann, ohne mir etwas vorzumachen |
+| bleibt wirklich frei | − Rücklagen − Vorsorge − Tilgung | was ich ausgeben kann, ohne mir etwas vorzumachen |
 
 **Eine Zwischensumme steht nur da, wenn danach noch etwas abgeht.** Ohne Rücklagen und
 Vorsorge wäre die zweite dieselbe Zahl wie das Ergebnis darunter.
 
-**Rücklagen und aufbauende Budgets stehen mit ihrer RATE da**, in „bisher" wie in
-„geplant". Was aus ihnen bezahlt wurde, ist eine Entnahme: sie steht am Posten daneben
-und in der Überleitung, nicht in den Kosten. Reicht ein aufbauendes Budget nicht, zählt
-das Ungedeckte als Kosten des Monats (`topfKosten`).
+**Rücklagen stehen mit ihrer RATE da**, in „bisher" wie in „geplant" — die Rücklagen
+von Hand und die über die Kategorie (im Modell aufbauende Budgets) in EINER Zeile, seit
+2026-11-15. Zusammengelegt wird im Kern (`core/ergebnis.ts`), nicht hier; bis dahin
+standen zwei Zeilen untereinander, „Rücklagen" und „Aufbauende Budgets", für etwas, das
+für den Nutzer dasselbe ist. Was aus ihnen bezahlt wurde, ist eine Entnahme: sie steht
+am Posten daneben und in der Überleitung, nicht in den Kosten. Reicht eine Rücklage über
+die Kategorie nicht, zählt das Ungedeckte als Kosten des Monats (`topfKosten`).
 
 **Fixkosten sind, was einem Vertrag ZUGEORDNET ist.** Die alte Karte fand die Zahlung zu
 einem Plan-Posten über Betragsnähe; jetzt entscheidet die Vertragszuordnung der Buchung,
@@ -66,10 +69,11 @@ Budgetliste über alle; dasselbe Budget zeigte in Karte und Liste verschiedene Z
 der Untertitel der Seite musste es erklären. Der Satz ist weg, weil der Unterschied weg
 ist.
 
-**Budgets stehen in der Liste getrennt nach Art** — monatlich (Rest verfällt) und
-aufbauend (Rest bleibt), nach der Art JEDES Budgets, nicht nach dem Dach seines Baums.
-In den Karten sind es zwei Zeilen in zwei Stufen: die monatlichen sind laufende Kosten,
-die aufbauenden stehen bei den Rücklagen.
+**Die Karte „Budgets" zeigt nur die monatlichen** (seit 2026-11-15). Bis dahin standen
+dort beide Arten in zwei Gruppen; die aufbauenden heissen jetzt Rücklagen, stehen in deren
+Bereich und in den Karten oben in der Zeile „Rücklagen". Liegt eine auf einer
+Unterkategorie eines monatlichen Budgets, nennt dessen Zeile sie („ohne Rücklage …") —
+ihr Verbrauch zählt dort nicht, und sie steht nicht in derselben Karte.
 
 Darunter steht die Karte **„Was da ist"** — die realen Stände je Kontoklasse, über ALLE
 Konten. Die Klasse ist die Rechenregel und jedes Konto hat genau eine, die Summen addieren
@@ -78,8 +82,8 @@ ergäbe hier „das Vermögen" grösser, als es ist — was man so ansehen will,
 Analyse.
 
 **Sie zeigt seit 2026-11-15 auch, was GEBUNDEN ist**: unter jeder Klasse die Rücklagen
-und aufbauenden Budgets, die ihr Geld dort haben, und was frei bleibt (`bilanzJeKlasse`
-auf der Kontobelegung). Ein Stand ohne diese Aufteilung liest sich als verfügbar, auch
+(beide Formen, ohne Pille für die Art — beide heissen gleich), die ihr Geld dort haben,
+und was frei bleibt (`bilanzJeKlasse` auf der Kontobelegung). Ein Stand ohne diese Aufteilung liest sich als verfügbar, auch
 wenn er zur Hälfte einer Rücklage gehört. Die Rechnung gab es schon; zu sehen war sie
 nur im Kontoauszug, je Konto. Drei Dinge daran:
 

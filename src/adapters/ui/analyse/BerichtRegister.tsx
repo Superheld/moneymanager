@@ -51,7 +51,7 @@ export const BERICHT_ANFANG: BerichtZustand = { art: "monat", monat: null, jahr:
 const STUFEN: readonly { id: "nachPflichten" | "nachAlltag" | "ergebnis"; zeilen: readonly ErgebnisZeileId[] }[] = [
   { id: "nachPflichten", zeilen: ["einnahmen", "fixkosten"] },
   { id: "nachAlltag", zeilen: ["laufend", "ungeplant"] },
-  { id: "ergebnis", zeilen: ["abschreibungen", "wagnisse", "vorsorge", "tilgung"] },
+  { id: "ergebnis", zeilen: ["abschreibungen", "vorsorge", "tilgung"] },
 ];
 
 /** Eine Zeile der Ergebnistabelle: eine Zeile der Rechnung oder eine Stufe darunter. */

@@ -118,10 +118,12 @@ describe("Verlauf — die Frage nach den Kosten", () => {
     expect(text).toMatch(/100,00/); // Rücklage: die Rate, obwohl nichts geflossen ist
     expect(text).toMatch(/\+1\.400,00/); // bleibt wirklich frei
 
-    // Die Spalten heissen wie die Zeilen der Monatskarten — ein Wort je Sache.
-    for (const id of ["fixkosten", "laufend", "ungeplant", "abschreibungen", "wagnisse", "vorsorge"]) {
+    // Die Spalten heissen wie die Zeilen der Monatskarten — ein Wort je Sache. Rücklagen
+    // und aufbauende Budgets sind seit 2026-11-15 EINE Spalte.
+    for (const id of ["fixkosten", "laufend", "ungeplant", "abschreibungen", "vorsorge"]) {
       expect(screen.getByRole("columnheader", { name: new RegExp(t(`ergebnis.zeile.${id}`)) })).toBeInTheDocument();
     }
+    expect(screen.getAllByRole("columnheader", { name: new RegExp(t("ergebnis.zeile.abschreibungen")) })).toHaveLength(1);
     // Der laufende Monat steht da und ist als solcher markiert.
     const laufend = screen.getByText(tag(0).slice(0, 7)).closest("tr") as HTMLElement;
     expect(within(laufend).getByText(t("ergebnis.pillLaufend"))).toBeInTheDocument();

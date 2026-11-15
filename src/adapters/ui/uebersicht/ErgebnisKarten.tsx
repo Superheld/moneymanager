@@ -35,7 +35,7 @@ const STUFEN: readonly { id: "nachPflichten" | "nachAlltag" | "ergebnis"; zeilen
   // Die Tilgung steht hier und nicht bei den Verträgen: sie ist der Teil der Kreditrate,
   // der Vermögen aufbaut (die Schuld sinkt), wie eine Rücklagenrate. Der Kern spaltet sie
   // ab; hier steht nur, in welche Stufe sie gehört.
-  { id: "ergebnis", zeilen: ["abschreibungen", "wagnisse", "vorsorge", "tilgung"] },
+  { id: "ergebnis", zeilen: ["abschreibungen", "vorsorge", "tilgung"] },
 ];
 
 interface Namen {
