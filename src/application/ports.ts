@@ -9,6 +9,8 @@ import type {
   Depotposition,
   Depotwert,
   Ruecklage,
+  Ruecklagenrate,
+  Ruecklagenzuordnung,
   Ruecklagenzyklus,
   IstBuchung,
   Journaleintrag,
@@ -131,10 +133,42 @@ export interface RuecklagenRepository {
    * es zu wollen — gebraucht werden sie nur für die Geschichte.
    */
   beendete(): Promise<Ruecklage[]>;
+  /**
+   * Schreibt die Rücklage samt `art` und `findetAb` — die Reihe der Raten NICHT, die hat
+   * ihren eigenen Weg (`rateSpeichern`, `rateLoeschen`). Wer eine Rücklage aus einer
+   * Eingabe neu baut (`ruecklageAktualisieren`), kennt ihre Reihe nicht; schriebe
+   * `speichern` sie mit, wäre sie nach dem ersten Bearbeiten weg.
+   *
+   * Fehlt `art`, bleibt die gespeicherte stehen (bei einer neuen gilt die Vorgabe
+   * `abschliessend`): eine Rücklage ohne Sorte gibt es nicht, und ein Aufrufer, der das
+   * Feld nicht kennt, soll sie nicht umstellen. `findetAb` wird geschrieben, wie es
+   * kommt — dort heisst „fehlt" etwas (siehe `Ruecklage.findetAb`).
+   */
   speichern(ruecklage: Ruecklage): Promise<void>;
+  /** Legt eine Rate der Reihe an oder überschreibt die eines Monats. */
+  rateSpeichern(ruecklageId: string, rate: Ruecklagenrate): Promise<void>;
+  rateLoeschen(ruecklageId: string, abMonat: string): Promise<void>;
   loeschen(id: string): Promise<void>;
   ausbuchungSpeichern(a: RuecklagenAusbuchung): Promise<void>;
   ausbuchungen(): Promise<RuecklagenAusbuchung[]>;
+}
+
+/**
+ * Die ausdrücklichen Zuordnungen (`Ruecklagenzuordnung`, im Kern bei `zustaendigkeit`,
+ * weil sie dort gelesen werden).
+ *
+ * **Im Umbau:** angelegt mit Migration 79 und von keinem Use-Case benutzt. Die Einordnung
+ * fragt erst danach, wenn die Rechnung umgestellt ist.
+ */
+export interface RuecklagenzuordnungRepository {
+  alle(): Promise<Ruecklagenzuordnung[]>;
+  /**
+   * Setzt die EINE Zuordnung für (Buchung, Kategorie oder ganze Buchung) — eine
+   * bestehende für denselben Anteil wird ersetzt, nicht ergänzt.
+   */
+  setzen(z: Ruecklagenzuordnung): Promise<void>;
+  /** Nimmt die Zuordnung des Anteils weg; danach gilt wieder, was die Kategorie sagt. */
+  entfernen(istbuchungId: string, kategorieId?: string): Promise<void>;
 }
 
 /**

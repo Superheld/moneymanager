@@ -353,10 +353,14 @@ export function seedEinspielen(db: SeedDb, stichtag: Date = new Date()): void {
     { id: "rue-3", bezeichnung: "Fahrrad", ziel: 92000, frist: 96, rate: null },
     { id: "rue-4", bezeichnung: "Urlaubskasse", ziel: null, frist: null, rate: 15000 },
   ];
+  // `art` und `findet_ab` (Migration 79) stehen ausdruecklich da, mit genau den Werten,
+  // die eine bestehende Ruecklage nach der Migration traegt: so sieht der Spielstand aus
+  // wie ein migrierter Bestand und nicht wie einer, der schon nach der neuen Regel rechnet.
+  // Die Reihe `ruecklage_rate` bleibt leer — die freie Rate steht noch in `rate`.
   for (const r of ruecklagen) {
     setzen(
-      "INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-      [r.id, r.bezeichnung, r.ziel, r.frist, r.rate, tagIn(-MONATE - 12, 10), "kat-anschaffungen", "konto-tagesgeld"],
+      "INSERT INTO ruecklage (id, bezeichnung, ziel, frist_monate, rate, beginn, kategorie_id, konto_id, art, findet_ab) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [r.id, r.bezeichnung, r.ziel, r.frist, r.rate, tagIn(-MONATE - 12, 10), "kat-anschaffungen", "konto-tagesgeld", "abschliessend", null],
     );
   }
 

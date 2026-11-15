@@ -27,6 +27,9 @@ function memRuecklagen() {
       if (i >= 0) daten[i] = r;
       else daten.push(r);
     },
+    // Die Reihe der Raten benutzt kein Use-Case dieser Datei (Migration 79, im Umbau).
+    rateSpeichern: async () => {},
+    rateLoeschen: async () => {},
     loeschen: async (id) => {
       const i = daten.findIndex((x) => x.id === id);
       if (i >= 0) daten.splice(i, 1);

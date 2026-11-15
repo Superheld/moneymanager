@@ -27,6 +27,7 @@ vi.mock("./db", () => ({
 import { sqliteBudgetRepository as budgetRepository } from "./sqliteBudgetRepository";
 import { sqliteEinstellungenRepository as einstellungenRepository } from "./sqliteEinstellungenRepository";
 import { sqliteRuecklagenRepository as ruecklagenRepository } from "./sqliteRuecklagenRepository";
+import { sqliteRuecklagenzuordnungRepository as zuordnungRuecklageRepository } from "./sqliteRuecklagenzuordnungRepository";
 import { sqliteLedgerRepository as ledgerRepository } from "./sqliteLedgerRepository";
 import { sqliteKlassifikatorRepository as klassifikatorRepository } from "./sqliteKlassifikatorRepository";
 import { sqliteMerkmalskonfigurationRepository as merkmalRepository } from "./sqliteMerkmalskonfigurationRepository";
@@ -494,6 +495,144 @@ describe("Rücklagen-Repository", () => {
     const [a] = await ruecklagenRepository.ausbuchungen();
     expect(a.betrag).toBe(62000);
     expect(a.istbuchungId).toBe("b1");
+  });
+
+  // Migration 79: Sorte, Fundfenster und Reihe kommen mit, und eine Rücklage, die sie
+  // nicht nennt, liest sich wie jede bisherige.
+  it("liefert ohne Angabe die Sorte abschliessend, kein Fundfenster und eine leere Reihe", async () => {
+    await ruecklagenRepository.speichern({ id: "s1", bezeichnung: "Halvorsen", beginn: "2025-01-01", rate: 3000 });
+    const [r] = await ruecklagenRepository.alle();
+    expect(r.art).toBe("abschliessend");
+    expect(r.findetAb).toBeUndefined();
+    expect(r.raten).toEqual([]);
+  });
+
+  it("schreibt Sorte und Fundfenster und liest sie zurück", async () => {
+    await ruecklagenRepository.speichern({
+      id: "s2", bezeichnung: "Wennemann", beginn: "2025-01-01", rate: 3000, art: "fortlaufend", findetAb: "2025-04-01",
+    });
+    const [r] = await ruecklagenRepository.alle();
+    expect(r).toMatchObject({ art: "fortlaufend", findetAb: "2025-04-01" });
+  });
+
+  // Der Fall, für den `art` über COALESCE geschrieben wird: `ruecklageAktualisieren` baut
+  // die Rücklage aus der Eingabe neu und kennt die Sorte nicht. Sie darf dabei nicht still
+  // auf die Vorgabe zurückfallen.
+  it("behält die Sorte, wenn ein Aufrufer sie nicht nennt", async () => {
+    await ruecklagenRepository.speichern({ id: "s3", bezeichnung: "Krusenbaum", beginn: "2025-01-01", rate: 3000, art: "fortlaufend" });
+    await ruecklagenRepository.speichern({ id: "s3", bezeichnung: "Krusenbaum neu", beginn: "2025-01-01", rate: 3500 });
+    const [r] = await ruecklagenRepository.alle();
+    expect(r).toMatchObject({ bezeichnung: "Krusenbaum neu", art: "fortlaufend" });
+  });
+
+  it("führt die Reihe der Raten über ihren eigenen Weg, aufsteigend nach Monat", async () => {
+    await ruecklagenRepository.speichern({ id: "s4", bezeichnung: "Pfannkuch", beginn: "2025-01-01", rate: 3000 });
+    await ruecklagenRepository.speichern({ id: "s5", bezeichnung: "Querfurt", beginn: "2025-01-01", rate: 1000 });
+    await ruecklagenRepository.rateSpeichern("s4", { abMonat: "2025-06", betrag: 4000 });
+    await ruecklagenRepository.rateSpeichern("s4", { abMonat: "2025-01", betrag: 3000 });
+    await ruecklagenRepository.rateSpeichern("s5", { abMonat: "2025-01", betrag: 1000 });
+    // Derselbe Monat ein zweites Mal überschreibt, statt eine zweite Zeile anzulegen.
+    await ruecklagenRepository.rateSpeichern("s4", { abMonat: "2025-06", betrag: 4500 });
+
+    const jeId = new Map((await ruecklagenRepository.alle()).map((r) => [r.id, r.raten]));
+    expect(jeId.get("s4")).toEqual([{ abMonat: "2025-01", betrag: 3000 }, { abMonat: "2025-06", betrag: 4500 }]);
+    expect(jeId.get("s5")).toEqual([{ abMonat: "2025-01", betrag: 1000 }]);
+
+    await ruecklagenRepository.rateLoeschen("s4", "2025-06");
+    const [nachher] = (await ruecklagenRepository.alle()).filter((r) => r.id === "s4");
+    expect(nachher.raten).toEqual([{ abMonat: "2025-01", betrag: 3000 }]);
+  });
+
+  // Warum `speichern` die Reihe nicht anfasst: wer die Rücklage aus einer Eingabe neu
+  // baut, bringt keine Reihe mit — und hätte sie sonst mit dem ersten Bearbeiten gelöscht.
+  it("lässt die Reihe stehen, wenn die Rücklage ohne sie gespeichert wird", async () => {
+    await ruecklagenRepository.speichern({ id: "s6", bezeichnung: "Ellerbrock", beginn: "2025-01-01", rate: 2000 });
+    await ruecklagenRepository.rateSpeichern("s6", { abMonat: "2025-01", betrag: 2000 });
+    await ruecklagenRepository.speichern({ id: "s6", bezeichnung: "Ellerbrock", beginn: "2025-01-01", rate: 2500, raten: [] });
+    const [r] = await ruecklagenRepository.alle();
+    expect(r.raten).toEqual([{ abMonat: "2025-01", betrag: 2000 }]);
+  });
+
+  it("nimmt Reihe und Zuordnungen beim Löschen mit, auch ohne Fremdschlüssel", async () => {
+    await ruecklagenRepository.speichern({ id: "s7", bezeichnung: "Gerdesmeyer", beginn: "2025-01-01", rate: 2000 });
+    await ruecklagenRepository.rateSpeichern("s7", { abMonat: "2025-01", betrag: 2000 });
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b-gerdesmeyer", ruecklageId: "s7" });
+    await ruecklagenRepository.loeschen("s7");
+    expect(db.exec("SELECT COUNT(*) FROM ruecklage_rate")[0].values[0][0]).toBe(0);
+    expect(await zuordnungRuecklageRepository.alle()).toEqual([]);
+  });
+});
+
+describe("Rücklagenzuordnung-Repository", () => {
+  // Mit eingeschalteten Fremdschlüsseln wie in der App: sql.js hat sie AUS, und die
+  // CASCADE-Regeln der Tabelle sind ein Teil dessen, was hier geprüft wird.
+  async function mitBestand() {
+    db.run("PRAGMA foreign_keys = ON");
+    db.run("INSERT INTO kategorie (id, name, default_charakter) VALUES ('kat-x','Haushalt','Aufwand'), ('kat-y','Freizeit','Aufwand')");
+    db.run("INSERT INTO zahlungskonto (id, bezeichnung, typ, inhaber_ids) VALUES ('k1','Girokonto','Giro','[]')");
+    db.run(
+      "INSERT INTO ist_buchung (id, datum, betrag, konto_id, charakter, quelle) VALUES ('b1','2025-08-04',-12000,'k1','Aufwand','manuell'), ('b2','2025-08-05',-3000,'k1','Aufwand','manuell')",
+    );
+    await ruecklagenRepository.speichern({ id: "rz-a", bezeichnung: "Achterberg", beginn: "2025-01-01", rate: 2000 });
+    await ruecklagenRepository.speichern({ id: "rz-b", bezeichnung: "Bolwerk", beginn: "2025-01-01", rate: 3000 });
+  }
+
+  it("setzt je Anteil eine Zuordnung und liest sie ohne leere Strings zurück", async () => {
+    await mitBestand();
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b1", kategorieId: "kat-x", ruecklageId: "rz-a" });
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b1", kategorieId: "kat-y", ruecklageId: "rz-b" });
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b2" });
+    expect(await zuordnungRuecklageRepository.alle()).toEqual([
+      { istbuchungId: "b1", kategorieId: "kat-x", ruecklageId: "rz-a" },
+      { istbuchungId: "b1", kategorieId: "kat-y", ruecklageId: "rz-b" },
+      // Ganze Buchung, ausdrücklich keine Rücklage — beides als `undefined`, nicht als "".
+      { istbuchungId: "b2", kategorieId: undefined, ruecklageId: undefined },
+    ]);
+  });
+
+  it("ersetzt die Zuordnung desselben Anteils, statt eine zweite anzulegen", async () => {
+    await mitBestand();
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b1", kategorieId: "kat-x", ruecklageId: "rz-a" });
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b1", kategorieId: "kat-x", ruecklageId: "rz-b" });
+    // Auch für die ganze Buchung, wo `kategorie_id` NULL ist — der Fall, den ein
+    // gewöhnlicher UNIQUE-Index durchliesse.
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b2", ruecklageId: "rz-a" });
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b2", ruecklageId: "rz-b" });
+    expect(await zuordnungRuecklageRepository.alle()).toEqual([
+      { istbuchungId: "b1", kategorieId: "kat-x", ruecklageId: "rz-b" },
+      { istbuchungId: "b2", kategorieId: undefined, ruecklageId: "rz-b" },
+    ]);
+  });
+
+  it("entfernt genau den einen Anteil", async () => {
+    await mitBestand();
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b1", kategorieId: "kat-x", ruecklageId: "rz-a" });
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b1", ruecklageId: "rz-b" });
+    await zuordnungRuecklageRepository.entfernen("b1");
+    expect(await zuordnungRuecklageRepository.alle()).toEqual([{ istbuchungId: "b1", kategorieId: "kat-x", ruecklageId: "rz-a" }]);
+    await zuordnungRuecklageRepository.entfernen("b1", "kat-x");
+    expect(await zuordnungRuecklageRepository.alle()).toEqual([]);
+  });
+
+  it("verliert die Zuordnung mit ihrer Buchung, ihrer Kategorie oder ihrer Rücklage", async () => {
+    await mitBestand();
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b1", kategorieId: "kat-x", ruecklageId: "rz-a" });
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b1", kategorieId: "kat-y", ruecklageId: "rz-b" });
+    await zuordnungRuecklageRepository.setzen({ istbuchungId: "b2", ruecklageId: "rz-b" });
+
+    db.run("DELETE FROM kategorie WHERE id = 'kat-x'");
+    expect((await zuordnungRuecklageRepository.alle()).map((z) => z.kategorieId ?? "-")).toEqual(["kat-y", "-"]);
+    db.run("DELETE FROM ist_buchung WHERE id = 'b2'");
+    expect((await zuordnungRuecklageRepository.alle()).map((z) => z.istbuchungId)).toEqual(["b1"]);
+    db.run("DELETE FROM ruecklage WHERE id = 'rz-b'");
+    expect(await zuordnungRuecklageRepository.alle()).toEqual([]);
+  });
+
+  it("weist eine Zuordnung auf eine Buchung ab, die es nicht gibt", async () => {
+    await mitBestand();
+    await expect(zuordnungRuecklageRepository.setzen({ istbuchungId: "gibt-es-nicht", ruecklageId: "rz-a" })).rejects.toThrow(
+      /FOREIGN KEY/,
+    );
   });
 });
 

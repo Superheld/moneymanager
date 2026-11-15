@@ -190,3 +190,41 @@ Drei Entscheidungen:
 Bedarf und Plan sind **Monatsgrössen** und hängen nicht am Fenster; nur `ist` summiert über den
 Zeitraum. Wer sie über mehrere Monate vergleicht, muss die ersten beiden hochrechnen — das
 im Kern zu tun hiesse zu raten, wie viele Monate gemeint sind.
+
+## Im Umbau: eine Rücklage (seit 2026-11-16)
+
+Rücklage und aufbauendes Budget werden eine Sache: jede Rücklage hängt an einer
+Kategorie, läuft wie ein Budget (auch ins Minus) und ist entweder `fortlaufend` oder
+`abschliessend`. **Alles, was oben steht, gilt bis zur Umstellung weiter** — was hier
+steht, ist angelegt und wird noch von nichts benutzt, das rechnet.
+
+Was schon steht:
+
+- **Das Schema (Migration 79):** `ruecklage.art` (Vorgabe `abschliessend`, so ist jede
+  bisherige gemeint), `ruecklage.findet_ab` (ohne Vorgabe), die Reihe `ruecklage_rate`
+  und die Zuordnung `ruecklage_zuordnung`. Gefüllt wird davon nichts; die freie Rate steht
+  weiter in `rate`. `RuecklagenRepository` liest und schreibt die Felder, die Reihe über
+  eigene Wege (`rateSpeichern`), damit `ruecklageAktualisieren` sie nicht löscht.
+  `RuecklagenzuordnungRepository` gibt es als Port und in SQLite, verdrahtet ist es nicht.
+- **Die Rechenbausteine** in `topf.ts` und `zustaendigkeit.ts`: Zyklen, Raten, Stand je
+  Sorte, die max-Regel je Zyklus (`zyklusKosten`), die alte Regel für Zyklen, die vor der
+  Umstellung mit einer Buchung ausgebucht wurden (`altabschlussKosten`), Abschliessen und
+  wer einen Anteil trägt. **Aufgerufen werden sie nur von ihren Tests**, und die prüfen
+  vor allem eines: auf heutigen Daten ergeben sie Monat für Monat dasselbe wie
+  `topfKosten`, der Rücklagenposten und `zyklusPosten` in `ergebnis.ts` und die
+  Einordnung.
+
+Zwei Kostenregeln, und wo jede gelten wird: die **max-Regel** für jeden Zyklus ausser
+einem, den eine Ausbuchung mit verknüpfter Buchung vor der Umstellung abgeschlossen hat
+— dort die **alte Regel** (Ungedecktes im Kaufmonat, gemessen am Abschlusstag), damit
+kein vergangener Monat anders kostet. Beides trifft nie im selben Zyklus zusammen.
+
+**`findet_ab` leer heisst je Sorte etwas anderes:** bei `abschliessend` findet die
+Kategorie nichts von selbst, bei `fortlaufend` gilt sie ohne Anfang — wie heute ein
+aufbauendes Budget, dessen Kategoriebuchungen VOR dem Start Entnahmen sind und nichts
+kosten. Das ist ein bekannter Befund und wird nachgebildet, nicht behoben.
+
+Wenn die Rechnung umgestellt ist, gehört dieser Abschnitt in die Abschnitte oben, und
+die Sätze dort, die die Trennung beschreiben, fallen weg — ebenso in `../CLAUDE.md` die
+Regel „Der Topf hängt an der KATEGORIE, nicht an der Buchung": die Zuordnung gibt es,
+wo die Kategorie mehrdeutig ist.

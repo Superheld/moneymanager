@@ -30,6 +30,32 @@ import { kontobelegung, type Anspruch, type Belegungsposten } from "../konten/ko
 import { istLiquide, istRuecklagenkonto, type Zahlungskonto } from "../konten/konto";
 import { zufuehrungIm, type Budget } from "../budgets/budget";
 
+/**
+ * Wann eine Rücklage wieder bei null beginnt (ADR-0006, seit Migration 79):
+ *
+ *   • `fortlaufend` — nie. Reparaturen, der Fall des bisherigen aufbauenden Budgets.
+ *   • `abschliessend` — wenn der Nutzer sie abschliesst. Urlaub, ein Gerät.
+ *
+ * Ein eigenes Feld und nicht aus der Form (Ziel oder Rate) abgeleitet: die Entscheidung
+ * trennt genau diese beiden Fragen. Was nach dem Abschliessen folgt (neu beginnen oder
+ * beenden), wählt der Nutzer beim Abschliessen — das ist eine dritte Frage.
+ *
+ * **Im Umbau:** gelesen wird das Feld bisher nur von den Bausteinen in `topf.ts` und
+ * `zustaendigkeit.ts`, die noch niemand aufruft. Die laufende Rechnung behandelt jede Rücklage wie bisher.
+ */
+export type Ruecklagenart = "fortlaufend" | "abschliessend";
+
+/**
+ * Eine freie Rate und der Monat (`YYYY-MM`), ab dem sie gilt — dasselbe Muster wie
+ * `Budgetbetrag` und aus demselben Grund: eine Änderung darf die Vergangenheit nicht
+ * umschreiben. Mit Ziel gibt es keine Reihe, die Rate folgt aus Ziel ÷ Frist.
+ */
+export interface Ruecklagenrate {
+  readonly abMonat: string;
+  /** Positiv, in Cent. */
+  readonly betrag: Cent;
+}
+
 export interface Ruecklage {
   readonly id: string;
   readonly bezeichnung: string;
@@ -51,6 +77,24 @@ export interface Ruecklage {
    * liefert sie in `alle()` nicht mehr aus — für jede laufende Rechnung gibt es sie nicht.
    */
   readonly beendetAm?: string;
+  /**
+   * Die Sorte (siehe `Ruecklagenart`). Fehlt sie, ist es `abschliessend` — so steht es
+   * in jeder Zeile vor Migration 79, und so ist jede bisherige Rücklage gemeint: sie
+   * wird ausgebucht. Optional, damit jeder Aufrufer, der eine Rücklage baut, ohne das
+   * Feld dasselbe meint wie vorher; das Repository liefert es immer.
+   */
+  readonly art?: Ruecklagenart;
+  /**
+   * Ab welchem Tag (ISO) die Kategorie Ausgaben von selbst findet. Fehlt es, findet eine
+   * `abschliessend`e Rücklage nichts über die Kategorie; eine `fortlaufend`e gilt dann
+   * „ohne Anfang", wie heute ein aufbauendes Budget (`zustaendigkeit.ts`).
+   */
+  readonly findetAb?: string;
+  /**
+   * Die Reihe der freien Raten, aufsteigend nach `abMonat`. Bis Migration 80 leer: die
+   * freie Rate steht noch in `rate`, und die laufende Rechnung liest nur dort.
+   */
+  readonly raten?: readonly Ruecklagenrate[];
 }
 
 /**
