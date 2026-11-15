@@ -7,8 +7,9 @@
 import { describe, expect, it } from "vitest";
 import type { Depotwert } from "../core";
 import { depotEntwicklung, type Depotsicht } from "./depot/depotsichten";
-import { ergebnisbasis, monatsErgebnis } from "../core";
-import { analyseAusblick, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, analyseLiquiditaet, type Analysebasis } from "./analysesichten";
+import { bilanzJeKlasse, ergebnisbasis, monatsErgebnis, staendeJeKlasse } from "../core";
+import { belegungssicht } from "./konten/kontobelegung";
+import { analyseAusblick, analyseBuchungen, analyseFensterTaggenau, analyseKostenverlauf, analyseLiquiditaet, analyseReichweite, type Analysebasis } from "./analysesichten";
 
 describe("analyseFensterTaggenau", () => {
   it("schiebt die Monatsmarke auf den letzten Tag desselben Monats", () => {
@@ -368,5 +369,95 @@ describe("analyseLiquiditaet", () => {
       heute,
     );
     expect(sicht.zeilen[0].start).toBe(75000);
+  });
+});
+
+/**
+ * „Wie lange reicht es ohne Einnahmen?" — was der Use-Case AUSWÄHLT: welche Monate
+ * gemittelt werden, welches Geld als frei gilt. Die Rechnung selbst ist im Kern geprüft
+ * (`core/reichweite.test.ts`). Alle Werte erfunden.
+ */
+describe("analyseReichweite", () => {
+  const heute = "2026-08-15";
+  const ist = (id: string, datum: string, betrag: number, kategorieId: string) =>
+    ({ id, datum, betrag, kontoId: "giro", charakter: betrag > 0 ? "Ertrag" : "Aufwand", quelle: "import", kategorieId }) as const;
+  const basis = (extra: Partial<Analysebasis> = {}): Analysebasis => ({
+    buchungen: [
+      // Die erste Buchung liegt mitten im April: der April ist nur zum Teil erfasst.
+      ist("a4", "2026-04-20", -10000, "alltag"),
+      ist("g5", "2026-05-28", 300000, "lohn"), ist("m5", "2026-05-03", -90000, "fix"), ist("a5", "2026-05-12", -30000, "alltag"),
+      ist("g6", "2026-06-28", 300000, "lohn"), ist("m6", "2026-06-03", -90000, "fix"), ist("a6", "2026-06-12", -50000, "alltag"),
+      ist("g7", "2026-07-28", 300000, "lohn"), ist("m7", "2026-07-03", -90000, "fix"), ist("a7", "2026-07-12", -40000, "alltag"),
+      // Der laufende Monat: die Rate ist bezahlt, sonst nichts.
+      ist("m8", "2026-08-03", -90000, "fix"),
+    ],
+    konten: [
+      { id: "giro", bezeichnung: "Giro", typ: "Giro", klasse: "liquide", inhaberIds: [], saldo: 200000 },
+      { id: "kasse", bezeichnung: "Kasse", typ: "Tagesgeld", klasse: "liquide", inhaberIds: [], saldo: 300000 },
+      { id: "spar", bezeichnung: "Sparbuch", typ: "Tagesgeld", klasse: "sparen", inhaberIds: [], saldo: 900000 },
+    ],
+    kategorien: [
+      { id: "lohn", name: "Lohn", defaultCharakter: "Ertrag" },
+      { id: "fix", name: "Festes", defaultCharakter: "Aufwand" },
+      { id: "alltag", name: "Alltag", defaultCharakter: "Aufwand" },
+    ],
+    kontoNamen: new Map(),
+    umsatzZuBuchung: new Map(),
+    vertragsnamen: new Map(),
+    vertragZuBuchung: new Map(),
+    budgets: [
+      { id: "b1", kategorieId: "alltag", kontoId: "giro", art: "monatlich", start: "2026-01-01", betraege: [{ abMonat: "2026-01", betrag: 40000 }] },
+    ],
+    vertraege: [],
+    regeln: [
+      { id: "r1", bezeichnung: "Ohlert", betrag: -90000, rhythmus: "monatlich", startdatum: "2026-01-03", charakter: "Aufwand", kontoId: "giro", kategorieId: "fix", vertragId: "v1" },
+    ],
+    // Eine Rücklage, deren Geld auf der Kasse liegt: sie kostet ihre Rate UND bindet Geld.
+    ruecklagen: [{ id: "rl", bezeichnung: "Vibora", rate: 10000, beginn: "2026-01-01", kontoId: "kasse" }],
+    ausbuchungsdaten: [],
+    ausbuchungen: [],
+    vertragJeBuchung: new Map([["m5", "v1"], ["m6", "v1"], ["m7", "v1"], ["m8", "v1"]]),
+    vormerkungen: [],
+    ...extra,
+  });
+
+  it("mittelt über die abgeschlossenen, voll erfassten Monate", () => {
+    const r = analyseReichweite(basis(), heute)!.reichweite!;
+    // Mai, Juni, Juli — nicht der halbe April, nicht der laufende August.
+    expect(r.monate).toBe(3);
+    // Grund: Vertrag 900 plus Alltag 300 / 500 / 400 → im Mittel 1300.
+    expect(r.grundkosten).toBe(130000);
+    // Dazu die Rate der Rücklage.
+    expect(r.alleKosten).toBe(140000);
+  });
+
+  it("nimmt als Zähler das Freie der liquiden Konten — dieselbe Zahl wie unter Was da ist", () => {
+    const b = basis();
+    const r = analyseReichweite(b, heute)!.reichweite!;
+    const belegung = belegungssicht(
+      { konten: b.konten, buchungen: [...b.buchungen], ruecklagen: b.ruecklagen, sicht: { buchungen: [...b.buchungen], kategorien: b.kategorien, budgets: b.budgets, vertragsBuchungen: new Set(b.vertragJeBuchung.keys()) } },
+      heute,
+    );
+    const liquide = bilanzJeKlasse(staendeJeKlasse(b.konten, b.buchungen), belegung.jeKonto).find((k) => k.klasse === "liquide")!;
+    expect(r.frei).toBe(liquide.frei);
+    // Die Rücklage bindet einen Teil, das Sparbuch zählt gar nicht.
+    expect(liquide.gebunden).toBeGreaterThan(0);
+    expect(r.frei).toBe(liquide.stand - liquide.gebunden);
+    expect(r.ohneZuruecklegen).toBe(Math.floor((r.frei * 10) / 130000) / 10);
+  });
+
+  it("macht mit zu wenigen abgeschlossenen Monaten keine Aussage, sagt aber ab wann", () => {
+    const sicht = analyseReichweite(basis(), "2026-07-15")!;
+    expect(sicht.reichweite).toBeNull();
+    expect(sicht.mindestens).toBe(3);
+  });
+
+  it("entfällt ohne liquides Konto", () => {
+    expect(analyseReichweite(basis({ konten: [{ id: "spar", bezeichnung: "Sparbuch", typ: "Tagesgeld", klasse: "sparen", inhaberIds: [], saldo: 1 }] }), heute)).toBeNull();
+  });
+
+  it("nennt die Grenze bei ausgebuchten Rücklagen, wenn sie einen gemittelten Monat trifft", () => {
+    expect(analyseReichweite(basis(), heute)!.ruecklagenUnvollstaendig).toBe(false);
+    expect(analyseReichweite(basis({ ausbuchungsdaten: ["2026-06-20"] }), heute)!.ruecklagenUnvollstaendig).toBe(true);
   });
 });

@@ -78,7 +78,14 @@ import {
   type KategorieReihe,
   type MonatsIst,
   type Zahlungskonto,
+  bilanzJeKlasse,
+  staendeJeKlasse,
+  reichweite,
+  reichweitenMonate,
+  REICHWEITE_MINDESTENS,
+  type Reichweite,
 } from "../core";
+import { belegungssicht } from "./konten/kontobelegung";
 import type { Umsatz } from "./import";
 import { vertragsbindungLaden } from "./vertraege/vertragszuordnung";
 import type {
@@ -520,6 +527,25 @@ export function analyseAusblick(
 }
 
 // ---------------------------------------------------------------- Kostensicht
+
+/**
+ * Die Eingabe der Ergebnisrechnung aus der Analysebasis — EINE Stelle für Kostensicht und
+ * Reichweite. Dieselbe Eingabe wie die Monatskarten der Übersicht (`uebersichtLaden`):
+ * derselbe Monat muss überall dieselben Kosten tragen.
+ */
+function kostenbasis(basis: Analysebasis, heute: string) {
+  return ergebnisbasis({
+    regeln: basis.regeln,
+    budgets: basis.budgets,
+    ruecklagen: basis.ruecklagen,
+    ausbuchungen: basis.ausbuchungen,
+    ist: basis.buchungen,
+    kategorien: basis.kategorien,
+    konten: basis.konten,
+    vertragJeBuchung: basis.vertragJeBuchung,
+    heute,
+  });
+}
 //
 // Die zweite FRAGE des Verlaufs. `analyseVerlauf` oben sagt, wofür Geld vom Konto ging
 // (Auszahlung); das hier sagt, was der Monat gekostet hat (Kosten). Die Begriffe stehen
@@ -589,17 +615,7 @@ export interface Kostenverlauf {
  * Künftige Monate kommen nicht vor: das Fenster endet beim laufenden Monat.
  */
 export function analyseKostenverlauf(basis: Analysebasis, von: string, bis: string, heute: string): Kostenverlauf {
-  const rechenbasis = ergebnisbasis({
-    regeln: basis.regeln,
-    budgets: basis.budgets,
-    ruecklagen: basis.ruecklagen,
-    ausbuchungen: basis.ausbuchungen,
-    ist: basis.buchungen,
-    kategorien: basis.kategorien,
-    konten: basis.konten,
-    vertragJeBuchung: basis.vertragJeBuchung,
-    heute,
-  });
+  const rechenbasis = kostenbasis(basis, heute);
   const start = { ...parseIso(von), d: 1 };
   const ergebnisse = Array.from({ length: monateImFenster(von, bis) }, (_, i) =>
     monatsErgebnis(rechenbasis, toIso(addMonate(start, i))),
@@ -699,3 +715,66 @@ export function analyseLiquiditaet(basis: Analysebasis, heute: string, tage = LI
     })),
   };
 }
+
+// ---------------------------------------------------------------- Wie lange reicht es?
+
+export interface Reichweitensicht {
+  /** `null`: zu wenige abgeschlossene Monate für eine Aussage (`REICHWEITE_MINDESTENS`). */
+  readonly reichweite: Reichweite | null;
+  /** Ab wie vielen abgeschlossenen Monaten es eine Aussage gibt — für den Satz, wenn nicht. */
+  readonly mindestens: number;
+  /**
+   * Fehlt einem der gemittelten Monate die Rate einer später ausgebuchten Rücklage
+   * (`ruecklagenrateFehlt`)? Dann stehen ALLE Kosten zu niedrig da und die zweite Zahl zu
+   * hoch — dieselbe Grenze wie in der Kostensicht.
+   */
+  readonly ruecklagenUnvollstaendig: boolean;
+}
+
+/**
+ * „Wie lange reicht es ohne Einnahmen?" — das freie Geld der liquiden Konten gegen die
+ * durchschnittlichen Kosten eines Monats (`core/reichweite.ts`).
+ *
+ * **Der Zähler ist die Zahl aus „Was da ist"**, nicht eine eigene: dieselbe Belegung
+ * (`belegungssicht`), dieselbe Summe je Klasse (`bilanzJeKlasse`), die Klasse `liquide`.
+ * Stillgelegte Konten zählen deshalb mit wie dort — Restgeld auf einer aufgegebenen Kasse
+ * ist da. Und wie dort zählt ein Konto im Minus mit 0, nicht mit seinem Minus: die
+ * Belegung rechnet je Konto, und was fehlt, steht in `fehlt`, nicht in `frei`.
+ *
+ * **Der Nenner hängt an keinem Zeitraum des Screens**, wie alles im Ausblick: gemittelt
+ * wird über die letzten abgeschlossenen Monate (`reichweitenMonate`), höchstens
+ * `REICHWEITE_MONATE`. Ein Jahr, weil Ungeplantes jahreszeitlich schwankt und ein Jahr
+ * jede Jahreszeit einmal enthält; Verträge sind ohnehin periodisiert.
+ *
+ * Ohne liquides Konto gibt es nichts, womit man auskäme: `null`, und die Karte entfällt.
+ */
+export function analyseReichweite(basis: Analysebasis, heute: string): Reichweitensicht | null {
+  if (!basis.konten.some(istLiquide)) return null;
+
+  const belegung = belegungssicht(
+    {
+      konten: basis.konten,
+      buchungen: [...basis.buchungen],
+      ruecklagen: basis.ruecklagen,
+      sicht: {
+        buchungen: [...basis.buchungen],
+        kategorien: basis.kategorien,
+        budgets: basis.budgets,
+        vertragsBuchungen: new Set(basis.vertragJeBuchung.keys()),
+      },
+    },
+    heute,
+  );
+  const frei = bilanzJeKlasse(staendeJeKlasse(basis.konten, basis.buchungen), belegung.jeKonto).find((k) => k.klasse === "liquide")?.frei ?? 0;
+
+  const rechenbasis = kostenbasis(basis, heute);
+  const monate = reichweitenMonate(heute, basis.buchungen);
+  const r = reichweite(frei, monate.map((m) => monatsErgebnis(rechenbasis, m)));
+
+  return {
+    reichweite: r,
+    mindestens: REICHWEITE_MINDESTENS,
+    ruecklagenUnvollstaendig: !!r && monate.some((m) => ruecklagenrateFehlt(m.slice(0, 7), basis.ausbuchungsdaten)),
+  };
+}
+

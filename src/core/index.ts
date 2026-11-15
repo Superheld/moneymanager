@@ -39,6 +39,7 @@ export * from "./buchung/journal";
 export * from "./monatsausblick";
 export * from "./einordnung";
 export * from "./ergebnis";
+export * from "./reichweite";
 export * from "./einrichtung";
 export * from "./vorsorge/vorsorge";
 export * from "./auswertung";

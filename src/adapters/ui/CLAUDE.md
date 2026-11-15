@@ -762,7 +762,7 @@ anderen vorbeiscrollte. Drei Dinge daran sind Entscheidungen:
 
 Die Register davor beantworten **„wie viel und wohin"** — Verlauf (in zwei Fragen, unten;
 zur Ausgabenfrage darunter die Aufschlüsselung eines angeklickten Monats), die Kategorien über die
-Zeit und der **Blick nach vorn** (`AusblickKarte.tsx`, darunter „Reicht das Geld?"). Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
+Zeit und der **Blick nach vorn** (`AusblickKarte.tsx`, darunter „Reicht das Geld?" und „Wie lange reicht es ohne Einnahmen?"). Die Befunde (`BefundeBereich.tsx`) beantworten **„und wie tragfähig ist das"**:
 fest gegen frei, Budget-Treue, Ausgaben ohne Budget und ohne Vertrag, Verträge Soll gegen
 Ist, Empfänger, Nutzung der Kategorien, Ausreißer.
 
@@ -857,6 +857,38 @@ taggenau, wie tief es geht und wann. Was daran Entscheidung ist:
   dem gerechnet wurde.
 - **Schmal bleiben Konto, der erwartete Tiefstand und „im Minus ab".** Die erwartete
   Linie ist die tiefere; an ihr sieht man zuerst, ob es eng wird.
+
+### Darunter: „Wie lange reicht es ohne Einnahmen?"
+
+Seit 2026-11-15 steht unter „Reicht das Geld?" eine dritte Karte (`ReichweiteKarte.tsx`,
+gerechnet in `core/reichweite.ts`, geholt von `analyseReichweite`): wie viele Monate das
+FREIE Geld der liquiden Konten die Kosten eines Monats trägt. Was daran Entscheidung ist:
+
+- **Sie steht im Ausblick, nicht in der Übersicht.** Der Zähler ist ein Stand von heute,
+  aber der Nenner ist ein Durchschnitt über ein Jahr, und die Aussage zeigt nach vorn.
+  Eine Zahl, die erst mit Zeitraum und Annahme etwas bedeutet, ist keine Antwort auf
+  „wie stehe ich gerade da" — sie ist dieselbe Frage wie „Reicht das Geld?", nur ohne
+  die Einnahmen und über das Fenster der Tabelle hinaus.
+- **Der Zähler ist die Zahl aus „Was da ist"** (`bilanzJeKlasse`, Klasse `liquide`,
+  Spalte frei) und keine eigene. Wer sie in der Übersicht sucht, findet sie dort.
+- **Der Nenner sind KOSTEN, nicht Auszahlungen** — aus der Ergebnisrechnung, gemittelt
+  über die letzten zwölf abgeschlossenen Monate, frühestens ab dem ersten voll erfassten
+  (`reichweitenMonate`). Der laufende zählt nicht, dieselbe Regel wie in der Kostensicht.
+  Ein Jahr, weil Ungeplantes jahreszeitlich schwankt; Verträge sind ohnehin periodisiert.
+  Unter drei Monaten gibt es keine Zahl, sondern den Satz, ab wann es eine gibt.
+- **Zwei Zahlen, höchstens.** Ohne das Zurücklegen (Verträge, monatliche Budgets,
+  Ungeplantes) und mit ihm (dazu Rücklagen, aufbauende Budgets und Vorsorge). Wer im
+  Notfall das Zurücklegen aussetzt, kommt länger aus; welche Annahme gilt, entscheidet,
+  wer liest.
+- **Keine Farbe.** Monate sind ungerichtet, und eine Schwelle „zu wenig" gibt es im
+  Bestand nicht. Die Faustformel der Rücklagen (drei Monatseinnahmen auf den
+  Rücklagenkonten) misst etwas anderes und ist bewusst NICHT umgedeutet worden.
+- **Die Annahme ist eine Einschränkung** und steht offen unter den Zahlen: worüber
+  gemittelt wurde und was als frei gilt. Die Grenze bei ausgebuchten Rücklagen
+  (`ruecklagenrateFehlt`) steht nur dabei, wenn sie einen gemittelten Monat trifft.
+
+Geprüft in `analyse/reichweite.test.tsx`, `application/analysesichten.test.ts` und
+`core/reichweite.test.ts`.
 
 **Ein Screen-Test, der einen Kategorienamen sucht, muss ihn jetzt in seiner Karte
 suchen.** Derselbe Name steht in der Aufschlüsselung und in den Ranglisten darunter; eine
