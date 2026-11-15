@@ -779,7 +779,13 @@ export function analyseReichweite(basis: Analysebasis, heute: string): Reichweit
     },
     heute,
   );
-  const frei = bilanzJeKlasse(staendeJeKlasse(basis.konten, basis.buchungen), belegung.jeKonto).find((k) => k.klasse === "liquide")?.frei ?? 0;
+  // Stand minus Gebundenes, NICHT das Feld `frei`: das ist je Konto bei null gedeckelt,
+  // damit die Karte „Was da ist" eine Unterdeckung in Worten zeigen kann. Hier hiesse der
+  // Deckel, dass ein überzogenes Girokonto die Reichweite nicht kürzt — und dann sähe man
+  // gerade nicht, was los ist. Der Stand der Klasse trägt das Minus, `gebunden` ist
+  // höchstens, was da ist; ohne ein Konto im Minus ist die Differenz dieselbe Zahl wie `frei`.
+  const liquide = bilanzJeKlasse(staendeJeKlasse(basis.konten, basis.buchungen), belegung.jeKonto).find((k) => k.klasse === "liquide");
+  const frei = liquide ? liquide.stand - liquide.gebunden : 0;
 
   const rechenbasis = kostenbasis(basis, heute);
   const monate = reichweitenMonate(heute, basis.buchungen);
