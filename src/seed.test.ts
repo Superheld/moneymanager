@@ -14,7 +14,7 @@
 // ueberschritten wird oder ein Verlauf plausibel aussieht, sieht nur ein Mensch — dafuer
 // ist der Spielstand da, nicht dieser Test.
 
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { createRequire } from "node:module";
 import initSqlJs, { type Database, type SqlJsStatic } from "sql.js";
 import { MIGRATIONS } from "./adapters/persistence/migrations";
@@ -22,6 +22,24 @@ import { seedEinspielen } from "./testwerkzeug/seedDaten";
 import { standardkategorienFlach } from "./application/kategorien/standardkategorien";
 import { KONTOKLASSEN, passtZu } from "./core";
 import type { Zahlungsspur } from "./core";
+import { pluginApi } from "./testwerkzeug/harness";
+import { sqliteVermoegenRepository } from "./adapters/persistence/sqliteVermoegenRepository";
+import { sqliteVorsorgeRepository } from "./adapters/persistence/sqliteVorsorgeRepository";
+import { sqliteZahlungskontoRepository } from "./adapters/persistence/sqliteStammdatenRepositories";
+import { sqliteLedgerRepository } from "./adapters/persistence/sqliteLedgerRepository";
+import { sqliteDepotRepository } from "./adapters/persistence/sqliteDepotRepository";
+import { sqliteVertragRepository } from "./adapters/persistence/sqliteVertragRepository";
+import { sqliteKontozuordnungRepository } from "./adapters/persistence/sqliteBankzugangRepositories";
+import { vermoegenLaden } from "./application/vermoegen/vermoegensichten";
+import { vorsorgeLaden } from "./application/vorsorge/vorsorge";
+
+// Fuer die Faelle, die den Spielstand durch die USE-CASES lesen statt per SQL: `getDb`
+// zeigt dann auf dieselbe sql.js-Datenbank, in die der Seed geschrieben hat.
+const halter = vi.hoisted(() => {
+  let aktuell: unknown = null;
+  return { setzen: (d: unknown) => (aktuell = d), lesen: () => aktuell };
+});
+vi.mock("./adapters/persistence/db", () => ({ getDb: async () => halter.lesen() }));
 
 /**
  * Ein FESTER Stichtag. Mit `new Date()` pruefte der Test am Monatsersten etwas anderes
@@ -119,6 +137,12 @@ describe("Spielstand", () => {
       ["umsatz_roh", 6],
       ["umsatz_verarbeitung", 6],
       ["kontostand_anker", 4],
+      ["vermoegensgegenstand", 2],
+      ["vermoegenswert", 4],
+      ["verbindlichkeit", 1],
+      ["verbindlichkeit_stand", 2],
+      ["vorsorgeziel", 1],
+      ["vorsorgeziel_annahme", 2],
     ] as const) {
       expect(zahl(db, `SELECT COUNT(*) FROM ${tabelle}`), tabelle).toBeGreaterThanOrEqual(
         mindestens,
@@ -611,5 +635,75 @@ describe("Spielstand — Umbuchungsvertrag", () => {
        )`,
     );
     expect(Number(ungepaart!.values[0][0])).toBe(0);
+  });
+});
+
+/**
+ * Der Bereich Vermoegen, gelesen wie die Oberflaeche ihn liest — ueber die Use-Cases.
+ *
+ * Per SQL liesse sich nur zaehlen, ob Zeilen da sind. Ob die Karte etwas ZEIGT, haengt an
+ * der Rechnung: ein Verlauf mit einem einzigen Punkt, ein Ziel, das schon gedeckt oder
+ * nicht mehr erreichbar ist, saehe in der Tabelle genauso gefuellt aus.
+ */
+describe("Spielstand — Vermoegen und Vorsorge", () => {
+  const HEUTE = "2026-06-15"; // derselbe Tag wie STICHTAG
+  const bestand = {
+    vermoegenRepo: sqliteVermoegenRepository,
+    kontoRepo: sqliteZahlungskontoRepository,
+    ledger: sqliteLedgerRepository,
+    depotRepo: sqliteDepotRepository,
+    vertragRepo: sqliteVertragRepository,
+    kontozuordnungen: () => sqliteKontozuordnungRepository.alle(),
+  };
+  const mitSeedAngebunden = () => halter.setzen(pluginApi(mitSeed()));
+
+  it("legt keine Beobachtung in die Zukunft", () => {
+    const db = mitSeed();
+    for (const tabelle of ["vermoegenswert", "verbindlichkeit_stand"]) {
+      expect(zahl(db, `SELECT COUNT(*) FROM ${tabelle} WHERE stichtag > '${HEUTE}'`), tabelle).toBe(0);
+    }
+  });
+
+  it("zeigt ein Nettovermoegen mit Verlauf ueber mehrere Jahre", async () => {
+    mitSeedAngebunden();
+    const sicht = await vermoegenLaden(bestand, HEUTE);
+    // Mehr Punkte als der Kontoverlauf hat: die Reihen reichen weiter zurueck als die
+    // Buchungen, und genau das soll der Verlauf zeigen.
+    expect(sicht.verlauf.length).toBeGreaterThan(24);
+    expect(sicht.verlauf[sicht.verlauf.length - 1]).toEqual(sicht.netto);
+    // Und er bewegt sich — ein Verlauf, der ueber Jahre auf einem Wert steht, sieht nach
+    // fehlenden Daten aus.
+    expect(new Set(sicht.verlauf.map((p) => p.netto)).size).toBeGreaterThan(3);
+    expect(sicht.netto.schulden).toBeGreaterThan(0);
+  });
+
+  it("verknuepft eine Schuld mit einem Vermoegenswert, und die Restschuld sinkt", async () => {
+    mitSeedAngebunden();
+    const sicht = await vermoegenLaden(bestand, HEUTE);
+    const verknuepft = sicht.schulden.filter((s) => s.gegenstandName);
+    expect(verknuepft.length).toBeGreaterThan(0);
+    for (const s of sicht.schulden) {
+      // `reihe` ist juengste zuerst: jede aeltere Restschuld ist hoeher.
+      const betraege = s.reihe.map((r) => r.betrag);
+      expect(betraege.length, s.verbindlichkeit.id).toBeGreaterThan(1);
+      expect([...betraege].sort((a, b) => a - b), s.verbindlichkeit.id).toEqual(betraege);
+    }
+  });
+
+  it("rechnet fuer das Vorsorgeziel eine Sparrate — weder gedeckt noch unerreichbar", async () => {
+    mitSeedAngebunden();
+    const sicht = await vorsorgeLaden({ ...bestand, vorsorgeRepo: sqliteVorsorgeRepository }, HEUTE);
+    expect(sicht).not.toBeNull();
+    // Es gilt die JUENGERE der beiden Annahmen, nicht die erste.
+    const annahmen = await sqliteVorsorgeRepository.annahmen();
+    expect(annahmen.length).toBe(2);
+    const juengste = [...annahmen].sort((a, b) => b.abMonat.localeCompare(a.abMonat))[0];
+    expect(sicht!.annahme.abMonat).toBe(juengste.abMonat);
+
+    expect(sicht!.stand.sparrate).not.toBeNull();
+    expect(sicht!.stand.sparrate!).toBeGreaterThan(0);
+    expect(sicht!.stand.deckung).toBeLessThan(1);
+    // Und der Vermoegenswert, der dem Ziel zugeordnet ist, zaehlt mit.
+    expect(sicht!.vermoegen.vermoegenswerte).toBeGreaterThan(0);
   });
 });
